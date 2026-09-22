@@ -174,15 +174,16 @@ const catenaLookup = creaConto(HOUR);
 // rinuncia e basta) o 'raffica' (in questo momento se ne stanno facendo
 // troppe in tutto: si riprova fra poco, perché la rinuncia non è colpa di
 // questo sito). Niente si ricorda in nessuno dei due casi.
-// `catena` è il conto di chi consuma: si guarda PRIMA degli altri due e la sua
-// rinuncia è definitiva ('suo'), perché riprovare fra qualche secondo sarebbe
-// proprio la raffica che questo conto deve fermare.
 // `catena` è il conto di chi consuma: si GUARDA per primo e si CONSUMA per
 // ultimo, come gli altri due, perché una verifica rimandata dal conto comune
 // verrà richiesta di nuovo e non deve pagare due volte.
+// #591, ottavo giro — la catena esaurita RIMANDA, non rinuncia: a svuotarla è
+// chi naviga, e chi naviga può essere la pagina ostile che subito dopo ti porta
+// sulla truffa. Chi riprova è la scheda, e solo finché è rimasta su quella
+// pagina: le pagine di una raffica le ha già lasciate.
 function prendiGettone(conto, raffica, chi, max = DEEP_MAX_PER_OWNER, maxRaffica = DEEP_MAX_RAFFICA, catena = null) {
   const vivo = catena && catena.chiave;
-  if (vivo && catena.conto.valore(catena.chiave) >= catena.max) return 'suo';
+  if (vivo && catena.conto.valore(catena.chiave) >= catena.max) return 'raffica';
   if (raffica.valore(CHIAVE_TUTTI) >= maxRaffica) return 'raffica';
   if (!conto.prendi(chi, max)) return 'suo';
   raffica.prendi(CHIAVE_TUTTI, maxRaffica);
