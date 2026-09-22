@@ -435,17 +435,12 @@ let congedoUscitaFatto = false;
 app.on('before-quit', (e) => {
   if (congedoUscitaFatto) return;
   congedoUscitaFatto = true;
-  let interne = [];
-  try {
-    const tm = mainWindow?._filoTabs;
-    interne = (tm?.tabs || []).filter((t) => t && t.isInternal && t.view);
-  } catch (_) { return; }
-  if (!interne.length) return;
+  const { congedaSchedeInterne } = require('./congedo');
+  const attesa = congedaSchedeInterne(mainWindow?._filoTabs);
+  if (!attesa) return;
   e.preventDefault();
-  const { congedaPagina } = require('./congedo');
-  const attese = interne.map((t) => congedaPagina(t.view.webContents).catch(() => {}));
   const esci = () => { try { app.quit(); } catch (_) {} };
-  Promise.all(attese).then(esci, esci);
+  attesa.then(esci, esci);
 });
 
 // Wipe dei cookie-tracker all'uscita (modalità 'default'): i cookie funzionali e
