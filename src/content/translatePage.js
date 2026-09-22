@@ -589,6 +589,21 @@
       contentObserver.observe(document.documentElement || document, { childList: true, subtree: true });
       addWatchRoots(extraRoots);
     } catch (_) { contentObserver = null; }
+    startWatchingReveal();
+  }
+
+  // Le fisarmoniche fatte di solo CSS (la casella nascosta, il bersaglio nell'indirizzo) si aprono senza toccare
+  // il documento: la sentinella lì non vede niente, ma un dito l'utente ce l'ha messo.
+  function startWatchingReveal() {
+    if (revealWatchOn) return;
+    revealWatchOn = true;
+    const tocco = () => { revealedDirty = true; };
+    try {
+      // Il tasto destro non entra: è lui ad aprire il menu, e segnarlo sporco a ogni apertura annullerebbe il
+      // risparmio proprio dove serve.
+      document.addEventListener('click', tocco, true);
+      document.addEventListener('keyup', tocco, true);
+    } catch (_) {}
   }
 
   // I componenti aperti del sito sono alberi a parte: vanno sorvegliati uno per
