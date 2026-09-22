@@ -572,10 +572,21 @@
     applyConfig(res.config || {});
   }
 
+  // La conferma parla dell'ULTIMO salvataggio: appena qualcosa sullo schermo non
+  // è più ciò che è partito agli utenti, lo dice invece di lasciar credere di sì.
+  function segnalaModifica() {
+    if (save._inCorso) return;
+    const status = $('saveStatus');
+    clearTimeout(save._t);
+    status.classList.remove('sn-error');
+    status.textContent = I18n.t('admin_defaults_unsaved');
+  }
+
   async function save() {
     const status = $('saveStatus');
     const btn = $('saveBtn');
     btn.disabled = true;
+    save._inCorso = true;
     status.classList.remove('sn-error');
     status.textContent = I18n.t('admin_defaults_saving');
 
