@@ -108,6 +108,7 @@ test('con la propria chiave la chat deve continuare a rispondere', async () => {
     });
     testo = r.text;
   } catch (e) { errore = e; }
+  delete require_.cache[require_.resolve(join(REPO, ROUTER))];
 
   expect(
     testo,
