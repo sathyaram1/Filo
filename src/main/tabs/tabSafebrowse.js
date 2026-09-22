@@ -70,7 +70,10 @@ const safebrowseMethods = {
     const SB = globalThis.SN_SAFEBROWSE;
     if (!SB) return;
     let v = null;
-    try { v = SB.checkSync(url, this._sbCtx({}, tab, url)); } catch (_) { return; }
+    // Niente catena: qui non parte nessun controllo, si rilegge solo quello che
+    // si sa già, e toccarla ne terrebbe viva una che deve scadere.
+    const ctx = { ...this._sbSegnali(tab, url, null), incognito: !!this.incognito };
+    try { v = SB.checkSync(url, ctx); } catch (_) { return; }
     this._sbBroadcast(tab, url, this._sbApplyState(tab, v));
   },
 
