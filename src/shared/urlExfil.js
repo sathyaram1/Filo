@@ -115,8 +115,14 @@
     return tok.length >= STRONG_TOKEN && !STOPWORDS.has(tok);
   }
 
-  // Taint-match: l'URL contiene dati del corpus sensibile?
-  function taint(url, corpus) {
+  /**
+   * Taint-match: l'URL contiene dati del corpus sensibile?
+   * `soloForte` tiene solo il token lungo o con cifre e lascia perdere la
+   * regola dei due token: in un indirizzo due parole tue sono già strane, in
+   * una domanda di ricerca sono normali (chi ha appena letto un estratto conto
+   * cerca «come si legge un estratto conto»). #533, ottavo giro di verifica.
+   */
+  function taint(url, corpus, { soloForte = false } = {}) {
     const exposed = exposedAlnum(url);
     if (!exposed) return null;
     const toks = corpusTokens(corpus);

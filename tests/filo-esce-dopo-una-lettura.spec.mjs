@@ -13,6 +13,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
+import { CONFIRM_HOST } from './helpers/confirm.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const NEWTAB = 'filo://newtab/';
@@ -171,6 +172,5 @@ test('dentro una pagina web il clic su un collegamento di Filo chiede prima di a
 
   // Quello che l'utente vede al suo posto: il riquadro di conferma di Filo,
   // con l'indirizzo intero.
-  const riquadro = page.locator('sn-confirm-host, .sn-confirm, [data-filo-confirm]').first();
-  await expect(riquadro).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8_000 });
 });
