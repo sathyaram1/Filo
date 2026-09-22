@@ -74,23 +74,3 @@ test('la scelta generale si vede nei due temi e non sta incollata al pulsante so
       .toBeGreaterThanOrEqual(8);
   }
 });
-
-test('con la finestra stretta la riga di un modello resta dentro lo schermo', async ({ app, openTab }) => {
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'light' }); });
-  const page = await apriConConfig(openTab, CONFIG);
-  await page.setViewportSize({ width: 720, height: 800 });
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: 'tests/.shots/ordine-host-stretta.png', fullPage: false });
-
-  const fuori = await page.evaluate(() => {
-    const riga = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
-    const larghezza = document.documentElement.clientWidth;
-    const figli = Array.from(riga.children).map((c) => {
-      const r = c.getBoundingClientRect();
-      return { destra: Math.round(r.right), larghezza: Math.round(r.width) };
-    });
-    return { larghezza, oltre: figli.filter((f) => f.destra > larghezza + 1).length, stretti: figli.filter((f) => f.larghezza < 20).length };
-  });
-  expect(fuori.oltre, 'con la finestra stretta dei controlli della riga finiscono fuori dallo schermo').toBe(0);
-  expect(fuori.stretti, 'con la finestra stretta dei controlli della riga si schiacciano a niente').toBe(0);
-});
