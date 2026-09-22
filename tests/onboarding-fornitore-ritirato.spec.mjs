@@ -403,3 +403,158 @@ test('chiesto qualcosa con «solo modelli a pesi aperti» che esclude tutto: la 
   await expect(bolla).not.toContainText(/qualcosa è andato storto/i);
   await expect(bolla.locator('.dash-action-btn', { hasText: 'Apri Opzioni' })).toHaveCount(1);
 });
+
+// ── Il motivo che cambia senza che cambi la risposta ────────────────────────
+//
+// La home già aperta si accorgeva solo del passaggio «non posso» ↔ «posso».
+// Ma i messaggi sono tre e mandano in tre posti diversi: restare «non posso»
+// per un motivo NUOVO è già uno stato nuovo da mostrare. Senza il fix questi
+// due test sono rossi (la home resta parola per parola quella di prima, e
+// arriva a chiedere all'utente una cosa che ha appena fatto).
+
+async function scriviOpzioni(page, settings) {
+  await page.evaluate(async (s) => {
+    await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: s });
+  }, settings);
+}
+
+// Chi tiene il conto di «Filo può rispondere» nasce senza una risposta, e il
+// primo salvataggio della sessione avvisa comunque le home. Un salvataggio che
+// non tocca la prontezza porta il conto al punto in cui si trova ogni sessione
+// che ha già vissuto: da lì in poi si misura quello che conta.
+async function contoGiaAvviato(page) {
+  await scriviOpzioni(page, { theme: 'system' });
+}
+
+async function modelliVuoti(page) {
+  return page.evaluate(() => {
+    const vuoti = {};
+    for (const a of Object.values(window.SN_CONST.ACTIONS)) vuoti[a] = '';
+    return vuoti;
+  });
+}
+
+test('spenti i modelli predefiniti, la home smette di incolpare «solo modelli a pesi aperti»', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await accoglienzaGiaFatta(app);
+  const A0 = await page.evaluate(() => window.SN_CONST.ACTIONS);
+  await app.evaluate(async (_e, a) => {
+    const Defaults = globalThis.__filoDefaults;
+    const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+    globalThis.__filoDefaultsGet = origGet;
+    Defaults.get = () => ({
+      ...origGet(),
+      provider: 'openrouter',
+      models: { [a.FILO_CHAT]: 'chiuso', [a.FILO_DASHBOARD]: 'chiuso' },
+      modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+    });
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' }, openWeightsOnly: true });
+  }, A0);
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#homeMessage')).toContainText(/pesi aperti/i, { timeout: 30_000 });
+  await contoGiaAvviato(page);
+
+  // In Opzioni l'utente non tocca l'interruttore: spegne «usa i modelli
+  // predefiniti» e non ne ha di suoi. L'interruttore non decide più niente.
+  await scriviOpzioni(page, { useDefaultModels: false, models: await modelliVuoti(page) });
+
+  await expect(page.locator('#homeMessage')).not.toContainText(/pesi aperti/i, { timeout: 30_000 });
+  await expect(page.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 30_000 });
+});
+
+test('scelto il modello che la home chiedeva, la home smette di chiederlo', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await accoglienzaGiaFatta(app);
+  await configCondivisa(app, { provider: 'openrouter', models: {} });
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ openWeightsOnly: true }); });
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 30_000 });
+  await contoGiaAvviato(page);
+
+  // L'utente fa quello che la home gli dice. Il modello è proprietario e
+  // l'interruttore lo esclude: Filo resta muto, ma per un motivo nuovo.
+  const A = await page.evaluate(() => window.SN_CONST.ACTIONS);
+  await scriviOpzioni(page, {
+    useDefaultModels: false,
+    modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+    models: { ...(await modelliVuoti(page)), [A.FILO_CHAT]: 'chiuso', [A.FILO_DASHBOARD]: 'chiuso' },
+  });
+
+  await expect(page.locator('#homeMessage')).toContainText(/pesi aperti/i, { timeout: 30_000 });
+});
+
+// ── La stessa domanda fatta da una pagina web ───────────────────────────────
+//
+// Sulla home chi non legge il messaggio e scrive nella barra riceve la
+// spiegazione. Il riquadro dell'Aiuto su una pagina web è lo stesso gesto in un
+// posto dove sopra non c'è niente da leggere, e lì la frase già scritta si
+// perdeva: la risposta del main arriva come oggetto piatto e chi la
+// ricomponeva a mano buttava via il codice. Senza il fix questi due test sono
+// rossi («Qualcosa è andato storto. Riprova.»).
+
+const PAGINA_QUALUNQUE = '<!doctype html><meta charset="utf-8"><title>Una pagina</title><p>Contenuto.</p>';
+
+// L'Aiuto si apre col comando di pagina, lo stesso che gli mandano il menu del
+// tasto destro e la scorciatoia: su una pagina esterna i moduli di Filo vivono
+// nel mondo isolato del preload e da fuori non si chiamano.
+async function apriAiuto(app, page) {
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w._filoTabs) continue;
+      for (const t of w._filoTabs.tabs) {
+        const wc = t.view.webContents;
+        if (!wc.getURL().startsWith('http')) continue;
+        wc.mainFrame.send('filo:broadcast', { type: 'top_frame_command', surface: 'help' });
+      }
+    }
+  });
+  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 20_000 });
+  await page.fill('.sn-sidebar-input textarea', 'cosa posso fare qui?');
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+}
+
+test('senza crediti, l’Aiuto su una pagina web dice che serve un invito', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: '' }, openWeightsOnly: false });
+  });
+  const page = await testServer.openReady(openTab, PAGINA_QUALUNQUE);
+  await apriAiuto(app, page);
+
+  const bolla = page.locator('.sn-sidebar-msg-error').last();
+  await expect(bolla).toBeVisible({ timeout: 30_000 });
+  await expect(bolla).toContainText(/invito|crediti/i, { timeout: 15_000 });
+  await expect(bolla).not.toContainText(/qualcosa è andato storto/i);
+});
+
+test('con «solo modelli a pesi aperti» che esclude tutto, l’Aiuto su una pagina web nomina l’interruttore', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await app.evaluate(async () => {
+    const A = globalThis.SN_CONST.ACTIONS;
+    const Defaults = globalThis.__filoDefaults;
+    const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+    globalThis.__filoDefaultsGet = origGet;
+    Defaults.get = () => ({
+      ...origGet(),
+      provider: 'openrouter',
+      models: { ...origGet().models, [A.HELP]: 'chiuso' },
+      modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+    });
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' }, openWeightsOnly: true });
+  });
+  const page = await testServer.openReady(openTab, PAGINA_QUALUNQUE);
+  await apriAiuto(app, page);
+
+  const bolla = page.locator('.sn-sidebar-msg-error').last();
+  await expect(bolla).toBeVisible({ timeout: 30_000 });
+  await expect(bolla).toContainText(/pesi aperti/i, { timeout: 15_000 });
+  await expect(bolla).not.toContainText(/qualcosa è andato storto/i);
+});

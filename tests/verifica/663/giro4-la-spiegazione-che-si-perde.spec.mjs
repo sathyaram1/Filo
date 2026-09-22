@@ -174,7 +174,7 @@ test('cambia solo il motivo passando dalle Opzioni: la home aperta smette di inc
   await expect(page.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 30_000 });
 });
 
-test('scelto il modello che la home chiedeva, la home continua a chiederlo', async ({ app, shell }) => {
+test('scelto il modello che la home chiedeva, la home smette di chiederlo', async ({ app, shell }) => {
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtab(app);

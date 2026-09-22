@@ -940,7 +940,13 @@
         action: ACTIONS.HELP,
         payload,
       });
-      if (!res?.ok) throw new Error(res?.error || I18n.t('err_provider_failed'));
+      // Col suo codice: senza, la frase già scritta per l'utente («serve un
+      // invito») diventava «qualcosa è andato storto» (#663).
+      if (!res?.ok) {
+        const CE = globalThis.SN_CHAT_ERRORS;
+        throw CE ? CE.fromResponse(res, I18n.t('err_provider_failed'))
+          : new Error(res?.error || I18n.t('err_provider_failed'));
+      }
       const parsed = parseAssistantOutput(res.text);
 
       // Caso speciale: l'AI ha chiesto una ricerca web. Esegui la ricerca,

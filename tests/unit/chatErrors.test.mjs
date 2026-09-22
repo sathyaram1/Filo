@@ -197,3 +197,36 @@ test('chi non porta da nessuna parte col solo «Riprova» dice dove si rimedia',
   assert.equal(CE.rimedio(''), '');
   assert.equal(CE.rimedio(undefined), '');
 });
+
+// ── La risposta dell'IPC ricomposta (#663) ────────────────────────────────────
+// Chi mostra un errore venuto dal main riceve un oggetto piatto, non un Error.
+// Ricomporlo con `new Error(res.error)` perdeva il codice, e la frase già
+// scritta per l'utente tornava «qualcosa è andato storto» — sulla home no, nel
+// riquadro dell'Aiuto su una pagina web sì.
+
+test('fromResponse tiene il codice, e la frase già scritta arriva intera', () => {
+  const invito = 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti.';
+  const e = CE.fromResponse({ ok: false, error: invito, code: 'NO_API_KEY' });
+  assert.equal(e.code, 'NO_API_KEY');
+  assert.equal(CE.sentence(e), invito);
+  assert.equal(CE.rimedio(e.code), 'crediti');
+});
+
+test('fromResponse: ogni codice già scritto sopravvive al viaggio dall\'IPC', () => {
+  for (const code of CE.CODICI_GIA_SCRITTI) {
+    const testo = `Spiegazione per l'utente di ${code}.`;
+    assert.equal(CE.sentence(CE.fromResponse({ error: testo, code })), testo);
+  }
+});
+
+test('fromResponse: senza codice utile resta lo status, e «UNKNOWN» non diventa un codice', () => {
+  const e = CE.fromResponse({ error: 'OpenRouter 503: upstream', code: 'UNKNOWN', status: 503 });
+  assert.equal(e.code, undefined);
+  assert.equal(e.status, 503);
+  assert.match(CE.sentence(e), /sovraccarico|non disponibile/i);
+});
+
+test('fromResponse: risposta vuota o assente → il ripiego di chi chiama', () => {
+  assert.equal(CE.fromResponse(null, 'Il provider AI ha fallito.').message, 'Il provider AI ha fallito.');
+  assert.equal(CE.fromResponse({ ok: false }, 'ripiego').message, 'ripiego');
+});

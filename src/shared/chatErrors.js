@@ -23,6 +23,10 @@
 //   (senza marcatore di provider AI). Se la chat non interroga nient'altro,
 //   ometti l'opzione: l'errore diventa una frase generica.
 //
+//   SN_CHAT_ERRORS.fromResponse(res, fallback)
+//     → la risposta d'errore dell'IPC ({ error, code, status }) ricomposta in un
+//       Error che le due funzioni qui sopra sanno leggere.
+//
 //   SN_CHAT_ERRORS.isTransientNetwork(err) → bool
 //     Vero per i guasti di rete PASSEGGERI (connessione caduta, DNS, timeout,
 //     socket chiusa): quelli per cui vale la pena riprovare da soli.
@@ -89,10 +93,8 @@
   };
   function rimedio(code) { return RIMEDIO[String(code || '')] || ''; }
 
-  // La risposta d'errore che arriva dal main è un oggetto piatto
-  // ({ error, code, status }). Ricomporla con `new Error(res.error)` perde il
-  // codice, e la frase già scritta per l'utente tornava «qualcosa è andato
-  // storto» (#663): chi mostra un errore venuto dall'IPC passa da qui.
+  // Chi mostra un errore venuto dall'IPC lo ricompone da qui: un `new Error`
+  // a mano perde il codice, e la frase già scritta torna generica (#663).
   function fromResponse(res, fallbackMessage) {
     const e = new Error(String((res && res.error) || fallbackMessage || ''));
     if (res && res.code && res.code !== 'UNKNOWN') e.code = res.code;
@@ -198,6 +200,6 @@
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
   }
 
-  global.SN_CHAT_ERRORS = { friendly, sentence, isTransientNetwork, rimedio, CODICI_GIA_SCRITTI };
+  global.SN_CHAT_ERRORS = { friendly, sentence, fromResponse, isTransientNetwork, rimedio, CODICI_GIA_SCRITTI };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

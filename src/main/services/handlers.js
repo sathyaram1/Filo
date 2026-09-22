@@ -959,10 +959,8 @@ async function maybeRunCompactor() {
 // condivisa (dalla rete, dopo l'avvio), le impostazioni (chiave, modelli,
 // interruttore dei pesi aperti) e il portafoglio, dove vive la chiave di chi
 // entra con un invito. Un solo avviso per tutte e tre (#663).
-// Si confronta anche il MOTIVO, non solo il sì/no: la home scrive tre messaggi
-// diversi e manda in tre posti diversi, quindi «non posso» per un motivo nuovo
-// è già uno stato nuovo da mostrare. Guardando il solo sì/no restava a chiedere
-// una cosa che l'utente aveva appena fatto (#663).
+// Si confronta anche il MOTIVO, non solo il sì/no: la home scrive un messaggio
+// diverso per ognuno, e col solo sì/no restava a chiedere una cosa già fatta.
 let _statoProntezza = null;
 async function avvisaSeLaProntezzaCambia() {
   let ora = false;

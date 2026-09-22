@@ -740,15 +740,12 @@
     return { ok: false, error: errFrom(null) };
   }
 
-  // La risposta d'errore che arriva dal main è un oggetto piatto
-  // ({ error, code }): lo ricompone nella forma che SN_CHAT_ERRORS sa leggere
-  // (message/code/status), così "chiave rifiutata", "servizio sovraccarico" e
-  // "rete caduta" diventano frasi diverse invece di un unico messaggio generico.
+  // La regola sta in SN_CHAT_ERRORS, una volta sola: ricomporre a mano la
+  // risposta d'errore dell'IPC faceva perdere il codice a chi se lo scordava.
   function errFrom(res) {
-    const e = new Error(String((res && res.error) || 'translate_failed'));
-    if (res && res.code && res.code !== 'UNKNOWN') e.code = res.code;
-    if (res && Number(res.status) > 0) e.status = Number(res.status);
-    return e;
+    const CE = global.SN_CHAT_ERRORS;
+    return CE ? CE.fromResponse(res, 'translate_failed')
+      : new Error(String((res && res.error) || 'translate_failed'));
   }
 
   // Sostituisce il contenuto dell'unità con la traduzione, rimettendo i figli
