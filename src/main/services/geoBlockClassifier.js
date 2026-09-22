@@ -330,7 +330,10 @@ function createFreno({
       const nSuo = vivo(suo, ora) ? suo.n : 0;
       const nTutti = vivo(tutti, ora) ? tutti.n : 0;
       const nCatena = vivo(sua, ora) ? sua.n : 0;
-      if (kCatena && nCatena >= maxPerCatena) return 'suo';
+      // #591, ottavo giro — la catena esaurita RIMANDA: a svuotarla è chi
+      // naviga, e chi naviga può essere la pagina ostile che ti porta subito
+      // dopo sul sito che il controllo doveva guardare.
+      if (kCatena && nCatena >= maxPerCatena) return 'raffica';
       if (nTutti >= maxTotale) return 'raffica';
       if (nSuo >= maxPerSito) return 'suo';
       if (vivo(suo, ora)) suo.n = nSuo + 1; else m.set(chiave, { n: 1, fino: ora + finestraMs });
