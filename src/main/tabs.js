@@ -853,7 +853,7 @@ class TabManager {
     this._archiveClosedTab(tab);
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
-    try { tab.view.webContents.close(); } catch (_) {}
+    this._chiudiView(tab);
     this.tabs.splice(idx, 1);
     if (this.activeId === id) {
       // Chiudendo la tab attiva, torna alla PENULTIMA tab che l'utente stava
@@ -963,7 +963,7 @@ class TabManager {
       this._archiveClosedTab(tab); // §3.1 — anche "chiudi tutto" archivia
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
-      try { tab.view.webContents.close(); } catch (_) {}
+      this._chiudiView(tab);
     }
     this.tabs = [];
     this.activeId = null;
@@ -1310,7 +1310,7 @@ class TabManager {
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
       if (idx >= 0) {
         try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
-        try { tab.view.webContents.close(); } catch (_) {}
+        this._chiudiView(tab);
         this.tabs.splice(idx, 1);
       }
     }
@@ -1560,6 +1560,8 @@ class TabManager {
     const wasActive = tab.id === this.activeId;
     const partition = this._partitionForTab(tab, url);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
+    // Qui la scheda resta e naviga: il `pagehide` vero arriva da solo, e
+    // l'avviso di _chiudiView ne farebbe un secondo.
     try { tab.view.webContents.close(); } catch (_) {}
     const view = this._makeView(url, partition, { suppressAutoplay: tab.suppressAutoplay });
     tab.view = view;
@@ -2345,7 +2347,7 @@ class TabManager {
       ? { title: tab.title, url: tab.url }
       : null;
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
-    try { tab.view.webContents.close(); } catch (_) {}
+    this._chiudiView(tab);
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
     this.tabs.splice(idx, 1);
     if (this.activeId === tab.id) {
