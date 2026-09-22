@@ -11,6 +11,33 @@
   // Stack di popup aperti. L'ultimo è il topmost.
   const popups = [];
 
+  // Un errore dell'AI, detto all'utente. La regola sta in SN_CHAT_ERRORS, una
+  // volta sola: ricomporre a mano la risposta del main faceva arrivare qui la
+  // riga grezza del servizio, parentesi graffe comprese (#663).
+  function frasePerLUtente(res) {
+    const CE = global.SN_CHAT_ERRORS;
+    if (!CE) return (res && res.message) || I18n.t('err_provider_failed');
+    return CE.sentence(CE.fromResponse({ ...res, error: res && res.message }, I18n.t('err_provider_failed')));
+  }
+
+  // Il tasto che toglie l'ostacolo, sotto la frase che lo nomina. Su una pagina
+  // web «riscattalo nella pagina Crediti» è un'indicazione senza strada: da lì
+  // l'utente a quella pagina non sa arrivare (#663).
+  function mostraRimedio(host, code) {
+    const CE = global.SN_CHAT_ERRORS;
+    const pagina = CE && CE.rimedioPagina ? CE.rimedioPagina(code) : null;
+    if (!host || !pagina) return null;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-msg-rimedio';
+    btn.textContent = pagina.label;
+    btn.addEventListener('click', () => {
+      try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
+    });
+    host.appendChild(btn);
+    return btn;
+  }
+
   // z-index iniziale e step per stacking deterministico
   const Z_BASE = 2147483600;
   const Z_STEP = 1;
