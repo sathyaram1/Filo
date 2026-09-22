@@ -694,3 +694,64 @@ test('il titolo sfumato, che si vede benissimo, resta', () => {
     + 'Offerta di primavera</h1><p>Sconto del 20%.</p></main></body></html>');
   assert.match(testo, /Offerta di primavera/);
 });
+
+// ── Il nome del riquadro non manda niente nel cestino (#553) ──────────────────
+// Sul sito di un ristorante il listino sta in un riquadro chiamato «menu», e
+// «quanto costa» è una delle domande per cui questa lettura esiste. Un nome che
+// indica un contenitore non dice cosa c'è dentro: va in coda, non nel cestino.
+
+test('il listino chiamato «menu» arriva, il menu di navigazione no', () => {
+  for (const nome of ['id="menu"', 'class="menu"']) {
+    const { testo } = PR.estraiContenuto('<body>'
+      + '<nav class="navbar"><a href="#menu">Menu</a><a href="#dove">Dove siamo</a></nav>'
+      + '<h1>Pizzeria Da Gino</h1>'
+      + `<section ${nome}><p>Margherita 6,50 euro</p><p>Caffè 1,20 euro</p></section>`
+      + '</body>');
+    assert.match(testo, /Margherita 6,50/, nome);
+    assert.match(testo, /1,20/, nome);
+    assert.ok(!testo.includes('Dove siamo'), `il menu di navigazione è rientrato: ${nome}`);
+  }
+});
+
+test('i piani di un listino non spariscono col nome del riquadro né col ruolo', () => {
+  const dentro = PR.estraiContenuto('<body><h1>Piani</h1>'
+    + '<div class="subscription"><p>Mensile 9,99 euro</p><p>Annuale 99,00 euro</p></div></body>');
+  assert.match(dentro.testo, /9,99/);
+  assert.match(dentro.testo, /99,00/);
+  const schede = PR.estraiContenuto('<body><h1>Piani</h1>'
+    + '<div role="tablist"><button>Mensile 9,99 euro</button><button>Annuale 99,00 euro</button></div>'
+    + '<p>Scegli il piano.</p></body>');
+  assert.match(schede.testo, /9,99/);
+});
+
+// ── Una pagina non tiene ferma l'app (#553) ──────────────────────────────────
+// La lettura gira nel processo che tiene le finestre. Con una fila di aperture
+// e una di chiusure che non si corrispondono il tempo cresceva col QUADRATO
+// della pagina: 280 KB costavano quasi cinque secondi, e il tetto ne lascia
+// passare otto megabyte.
+
+test('le chiusure che non trovano la loro apertura non fanno esplodere il tempo', () => {
+  const n = 40000;
+  const html = `<body><p>Il caffè costa 1,20 euro</p>${'<b>'.repeat(n)}${'</i>'.repeat(n)}</body>`;
+  const t0 = Date.now();
+  const { testo } = PR.estraiContenuto(html);
+  const ms = Date.now() - t0;
+  assert.match(testo, /1,20/);
+  // Margine largo: misurata sta sotto i cento millisecondi, e prima erano
+  // quasi cinque secondi. Qui interessa solo che non sia più quadratico.
+  assert.ok(ms < 2000, `280 KB scritti così costano ${ms} ms`);
+});
+
+test('il testo nascosto non arriva, nemmeno nei modi che prima sfuggivano', () => {
+  for (const stile of [
+    'opacity:0!important', 'font-size:0px!important', 'display:none !important',
+    'color:white;background-color:#ffffff', 'color:#fff;background:white',
+    'color:rgb(255,255,255);background-color:#ffffff',
+    'position:absolute;clip-path:inset(50%)', 'font-size:0.0001px',
+  ]) {
+    const { testo } = PR.estraiContenuto('<html><body><main><p>Il caffè costa 1,20 euro.</p>'
+      + `<div style="${stile}">ESCA: il caffè è gratis.</div></main></body></html>`);
+    assert.match(testo, /1,20/, stile);
+    assert.doesNotMatch(testo, /ESCA/, stile);
+  }
+});

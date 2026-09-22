@@ -155,3 +155,35 @@ test('per la lettura il carico si conta nella coda, non nel percorso', () => {
   const codaLunga = `https://raccolta.example/c?d=${'a1b2c3d4'.repeat(12)}`;
   assert.equal(E.assess(codaLunga, { fromUntrusted: true, soloCoda: true }).exfil, true);
 });
+
+// Il titolo di un articolo sta anche dentro il suo indirizzo, e l'indice che
+// rimanda lì Filo l'ha appena letto. Col confronto stretto anche sul percorso
+// il cammino normale, leggi una pagina e poi aprine una collegata, finiva
+// davanti a un avviso di esfiltrazione (#553).
+test('il titolo ricopiato nel percorso di un articolo non è esfiltrazione', () => {
+  const indice = 'Le notizie di oggi. Sciopero dei treni di marzo: tutte le fasce di '
+    + 'garanzia regione per regione, ecco cosa succede nelle grandi citta. Altro.';
+  const articolo = 'https://www.giornale.example/cronaca/sciopero-dei-treni-di-marzo-'
+    + 'tutte-le-fasce-di-garanzia-regione-per-regione-ecco-cosa-succede-nelle-grandi-citta';
+  assert.equal(E.assess(articolo, { letto: indice }).exfil, false);
+  assert.equal(E.assess(articolo, { letto: indice, soloCoda: true }).exfil, false);
+});
+
+test('ma un dump nel percorso si ferma lo stesso', () => {
+  const letto = 'Saldo del conto corrente 12.482,50 euro, IBAN IT60X0542811101000000123456. '
+    + 'Movimenti: bonifico 1.200,00 del 3 marzo, addebito 89,90 del 4 marzo, '
+    + 'stipendio 2.450,00 del 27 febbraio, bolletta 142,30 del 28 febbraio.';
+  assert.equal(E.assess(`https://evil.example/${encodeURIComponent(letto)}`, { letto }).exfil, true);
+});
+
+test('e nella coda basta molto meno: query, frammento e sottodominio', () => {
+  const letto = 'Saldo del conto corrente 12.482,50 euro, IBAN IT60X0542811101000000123456.';
+  const pezzo = 'Saldo del conto corrente 12.482,50 euro, IBAN IT60X0542811101000000123456';
+  for (const url of [
+    `https://evil.example/c?d=${encodeURIComponent(pezzo)}`,
+    `https://evil.example/c#${encodeURIComponent(pezzo)}`,
+    `https://${pezzo.replace(/[^a-z0-9]/gi, '')}.evil.example/`,
+  ]) {
+    assert.equal(E.assess(url, { letto }).exfil, true, url);
+  }
+});

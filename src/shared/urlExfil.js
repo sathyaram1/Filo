@@ -32,8 +32,10 @@
   // Ricopiatura da ciò che Filo ha letto, nella CODA dell'indirizzo (query,
   // frammento, sottodominio): è lì che i dati si portano fuori, e una
   // sessantina di caratteri ricopiati non è una coincidenza.
+  // Si guarda ogni posizione, non una ogni otto: a salti la ricopiatura si
+  // riconosceva o no secondo dove cadeva l'allineamento, e sullo stesso sito un
+  // pezzo passava e quello dopo no (#553). Un indirizzo è corto, costa poco.
   const READ_RUN = 56;
-  const READ_STEP = 8;
   // Nel PERCORSO serve molto di più: il percorso di una pagina È il suo titolo,
   // su ogni sito di notizie, e il titolo Filo l'ha appena letto nell'indice che
   // rimandava lì. Confrontarlo con la stessa finestra faceva comparire l'avviso
