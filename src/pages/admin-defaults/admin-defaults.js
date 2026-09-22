@@ -479,6 +479,7 @@
     try {
       const settings = await Storage.getSettings();
       window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
+      misureProva = settings.defaultModelTests || {};
     } catch (_) {}
 
     let res;
