@@ -754,7 +754,7 @@
 
     const term = settings.terminal || {};
     set('terminalEnabled', (el) => { el.checked = term.enabled === true; });
-    if (term.shell) opzione('terminalShell', term.shell, term.shell);
+    if (term.shell) opzione('terminalShell', term.shell);
 
     const notif = settings.notifications || {};
     set('notifDuration', (el) => { el.value = String(clampNotifDurationSec(Number(notif.durationSec))); });
