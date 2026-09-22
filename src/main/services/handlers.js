@@ -3320,19 +3320,15 @@ async function wireSafebrowse(settingsArg) {
   // toccano nessuna chiave dell'owner e non costano niente, quindi legarle al
   // tetto di spesa spegnerebbe un segnale senza risparmiare un centesimo. Il
   // loro abuso lo ferma il freno, insieme a quello del primo stadio.
+  // #591, settimo giro — lo stesso ragionamento vale per la ricerca
+  // nell'elenco: passa dal cancello per il conto e per il controllo
+  // automatico, ma il tetto mensile non la ferma, perché non costa.
   const chiaveGsb = sb.safeBrowsingKey || '';
   const runGsb = !chiaveGsb ? null : async (rawUrl) => {
     const s = await getEffectiveSettings();
-    return await Gate.service({
-      settings: s,
-      action: SN_CONST.SERVIZI.SAFE_BROWSING,
-      provider: 'google_safe_browsing',
-      run: () => SB.net.safeBrowsingLookup(rawUrl, chiaveGsb),
-      costoUsd: 0,
-    });
+    return await Gate.blacklistLookup({ settings: s, url: rawUrl, apiKey: chiaveGsb });
   };
   SB.configure({
-    gsbKey: chiaveGsb,
     runGsb,
     runLlm,
     enableSandbox: sb.sandbox !== false,
