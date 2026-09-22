@@ -539,7 +539,7 @@
   function renderModelsGrid(models) {
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: models || {},
-      getRegistry: () => collectModelRegistry(),
+      getRegistry: () => collectModelRegistry().registry,
     });
   }
 
