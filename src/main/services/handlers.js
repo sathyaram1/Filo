@@ -1412,9 +1412,17 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
   // L'azione viaggia col verdetto: per IMPOSTA_PREFERENZA la famiglia dipende
   // da QUALE preferenza sta per scrivere (#533, quinto giro di verifica).
   const verdettoPerimetro = (Compiti && task) ? Compiti.consentito(task, type, action) : { ok: true };
+  // Un'azione che parte da un CLIC dell'utente su qualcosa che Filo ha scritto:
+  // non si rifiuta in silenzio (l'utente l'ha appena premuta) e non si esegue
+  // in silenzio (a scegliere la destinazione è stato il modello). Si chiede,
+  // mostrando dove si va a finire (#533, settimo giro di verifica). Il segno
+  // vale solo dai mittenti fidati: da una pagina web è un modo di saltare il
+  // rifiuto.
+  const daClic = !!(action && action._daClic) && mittenteFidato(sender);
   // `secco` è il rifiuto che non conosce permessi: vale anche dove a chiedere
   // per conto del modello sarebbe il motore (#533, quarto giro di verifica).
-  if (!verdettoPerimetro.ok && (verdettoPerimetro.secco || verdettoPerimetro.puoChiedere)) {
+  if (!verdettoPerimetro.ok && !(daClic && !verdettoPerimetro.secco)
+      && (verdettoPerimetro.secco || verdettoPerimetro.puoChiedere)) {
     Compiti.registraAzione(task, {
       type,
       azione: action,
