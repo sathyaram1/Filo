@@ -332,5 +332,5 @@
     }
   }
 
-  window.SN_PAGE_BOOTSTRAP = { applyTheme, applyTextScale, applyThemeTokens, enhanceSelect, enhanceSelects };
+  window.SN_PAGE_BOOTSTRAP = { applyTheme, applyTextScale, applyThemeTokens, enhanceSelect, enhanceSelects, staUsandoAdesso };
 })();
