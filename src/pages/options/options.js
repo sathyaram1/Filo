@@ -870,19 +870,33 @@
     saveTimer = setTimeout(save, 400);
   }
 
-  // La chiave OpenRouter si mette e si toglie anche dalla pagina Crediti
-  // (#629), e questa pagina risalva TUTTO il modulo a ogni modifica: con la
-  // fotografia di quando è stata aperta, un cambio qualunque qui riportava la
-  // chiave a com'era prima (o la cancellava, se all'apertura non c'era). Al
-  // cambio arrivato da fuori il campo si riallinea, a meno che l'utente ci
-  // stia scrivendo dentro proprio adesso.
+  // Questa pagina risalva TUTTO il modulo a ogni modifica, e le stesse cose si
+  // cambiano anche altrove (la chiave dalla pagina Crediti, il resto chiedendo
+  // a Filo): senza riallineamento un cambio qualunque qui le riportava com'erano
+  // all'apertura. Il campo in uso adesso non si tocca. Vedi
+  // patterns/una-pagina-di-impostazioni-aperta-non-e-una-fotografia.md
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings || !msg.settings.apiKeys) return;
-      const field = $('apiKey');
-      if (!field || document.activeElement === field) return;
-      const now = String(msg.settings.apiKeys.openrouter || '');
-      if (field.value !== now) field.value = now;
+      if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings) return;
+      const s = msg.settings;
+      const testo = (id, valore) => {
+        const el = $(id);
+        if (!el || document.activeElement === el) return;
+        const now = String(valore ?? '');
+        if (el.value !== now) el.value = now;
+      };
+      const interruttore = (id, acceso) => {
+        const el = $(id);
+        if (!el || document.activeElement === el) return;
+        el.checked = acceso;
+      };
+      if (s.apiKeys) {
+        testo('apiKey', s.apiKeys.openrouter);
+        testo('apiKeyTavily', s.apiKeys.tavily);
+      }
+      interruttore('useDefaultModels', s.useDefaultModels !== false);
+      interruttore('openWeightsOnly', s.openWeightsOnly === true);
+      testo('monthlyLimit', s.monthlyLimitEur ?? 5);
     });
   }
 
