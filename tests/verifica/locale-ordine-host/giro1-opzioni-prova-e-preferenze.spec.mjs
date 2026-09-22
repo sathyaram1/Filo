@@ -33,6 +33,22 @@ async function intercetta(app) {
   });
 }
 
+// La riga del registry personale con quel nickname: il valore dei campi non sta
+// nell'attributo HTML, quindi l'indice si cerca leggendo le caselle.
+async function rigaDelNickname(page, nick) {
+  const selettore = '#modelRegistryList .sn-model-row:not(.sn-model-row-head)';
+  await page.waitForSelector(selettore, { timeout: 15_000 });
+  const indice = await page.evaluate(([sel, n]) => {
+    const righe = Array.from(document.querySelectorAll(sel));
+    return righe.findIndex((r) => {
+      const el = r.querySelector('.sn-model-nick');
+      return el && el.value === n;
+    });
+  }, [selettore, nick]);
+  if (indice < 0) throw new Error(`riga "${nick}" non trovata nel registry personale`);
+  return page.locator(selettore).nth(indice);
+}
+
 test('Opzioni, con i modelli predefiniti accesi: l\'esito della prova resta dopo il ricaricamento', async ({ app, openTab }) => {
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({
@@ -67,17 +83,13 @@ test('Opzioni, con i modelli propri: l\'esito della prova resta dopo il ricarica
   await intercetta(app);
 
   const page = await openTab(OPZIONI);
-  const riga = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)')
-    .filter({ has: page.locator('.sn-model-nick[value="mio"]') });
-  await riga.first().waitFor({ timeout: 15_000 });
-  await riga.first().locator('.sn-model-test').click();
-  await expect(riga.first().locator('.sn-model-row-status')).toHaveText(ESITO, { timeout: 20_000 });
+  let riga = await rigaDelNickname(page, 'mio');
+  await riga.locator('.sn-model-test').click();
+  await expect(riga.locator('.sn-model-row-status')).toHaveText(ESITO, { timeout: 20_000 });
 
   await page.reload();
-  const dopo = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)')
-    .filter({ has: page.locator('.sn-model-nick[value="mio"]') });
-  await dopo.first().waitFor({ timeout: 15_000 });
-  await expect(dopo.first().locator('.sn-model-row-status'), 'la misura della prova è sparita col ricaricamento').toHaveText(ESITO, { timeout: 10_000 });
+  riga = await rigaDelNickname(page, 'mio');
+  await expect(riga.locator('.sn-model-row-status'), 'la misura della prova è sparita col ricaricamento').toHaveText(ESITO, { timeout: 10_000 });
 });
 
 test('Opzioni: la prova di una riga parte con l\'ordinamento scelto per quel modello', async ({ app, openTab }) => {
@@ -92,11 +104,9 @@ test('Opzioni: la prova di una riga parte con l\'ordinamento scelto per quel mod
   await intercetta(app);
 
   const page = await openTab(OPZIONI);
-  const riga = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)')
-    .filter({ has: page.locator('.sn-model-nick[value="mio"]') });
-  await riga.first().waitFor({ timeout: 15_000 });
-  await riga.first().locator('.sn-model-test').click();
-  await expect(riga.first().locator('.sn-model-row-status')).toHaveText(ESITO, { timeout: 20_000 });
+  const riga = await rigaDelNickname(page, 'mio');
+  await riga.locator('.sn-model-test').click();
+  await expect(riga.locator('.sn-model-row-status')).toHaveText(ESITO, { timeout: 20_000 });
 
   const partita = await app.evaluate(async () =>
     globalThis.__richieste.filter((r) => r.url.includes('/chat/completions')).pop());
