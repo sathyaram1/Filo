@@ -1402,7 +1402,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
       if (Exfil && query) {
         const privato = (Compiti && task) ? Compiti.materialePrivato(task) : '';
         const corpus = [await navExfilCorpus(), privato].filter(Boolean).join('\n');
-        const v = corpus ? Exfil.taint(`https://ricerca.invalid/?q=${encodeURIComponent(query)}`, corpus) : null;
+        const v = corpus
+          ? Exfil.taint(`https://ricerca.invalid/?q=${encodeURIComponent(query)}`, corpus, { soloForte: true })
+          : null;
         if (v) { action._exfil = true; action._exfilReason = v.reason; }
       }
     } catch (_) {}
