@@ -274,12 +274,26 @@
       if (r && r.ok && r.modelRegistry) {
         registry = r.modelRegistry;
         defaultModelsPublic = { models: r.models || {}, modelRegistry: registry };
+        sceltaGeneraleHost = r.providerSort || '';
       }
     } catch (_) {}
     renderDefaultModels(registry);
     // L'effetto dell'interruttore si calcola sulla config VERA: ora che è
     // arrivata, ricalcolalo.
     renderOpenWeightsImpact();
+    // La scelta generale è arrivata adesso: le righe disegnate prima hanno
+    // giudicato la loro misura senza sapere a cosa rimandava «Automatico».
+    rinfrescaMisure();
+  }
+
+  // Una riga chiama con l'ordinamento suo, o con quello generale se resta su
+  // «Automatico»: è quello a cui una misura deve corrispondere per valere.
+  let sceltaGeneraleHost = '';
+
+  function rinfrescaMisure() {
+    for (const row of document.querySelectorAll('.sn-model-row')) {
+      if (row.querySelector('.sn-model-row-status')) renderRowTest(row);
+    }
   }
 
   function renderDefaultModels(registry) {
