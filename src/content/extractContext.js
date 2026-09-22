@@ -390,14 +390,18 @@
     return !!(el.tagName === 'DETAILS' && !el.open);
   }
 
-  // Schiacciato da una trasformazione a fattore zero: il riquadro e tutto quello
-  // che contiene non arrivano sullo schermo, qualunque sia l'overflow.
+  // Schiacciato da una trasformazione fino a non avere più area: il riquadro e quello che contiene non arrivano
+  // sullo schermo, qualunque sia l'overflow. Conta l'AREA che resta (il determinante), non un fattore preso da
+  // solo: una rotazione di novanta gradi ne azzera due su quattro e lascia il testo leggibile, girato (#505).
   function isScaledToNothing(cs) {
     const t = cs.transform;
     if (!t || t === 'none') return false;
     const nums = t.slice(t.indexOf('(') + 1, -1).split(',').map((n) => parseFloat(n));
-    if (nums.length === 6) return nums[0] === 0 || nums[3] === 0;
-    if (nums.length === 16) return nums[0] === 0 || nums[5] === 0;
+    if (nums.some((n) => !Number.isFinite(n))) return false;
+    if (nums.length === 6) return Math.abs(nums[0] * nums[3] - nums[1] * nums[2]) < 1e-6;
+    // matrix3d: l'area che resta sul piano dello schermo è il determinante del blocco in alto a sinistra. Così
+    // rotateX/rotateY di novanta gradi (di taglio, invisibili) restano nascosti e rotateZ no.
+    if (nums.length === 16) return Math.abs(nums[0] * nums[5] - nums[1] * nums[4]) < 1e-6;
     return false;
   }
 
