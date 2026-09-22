@@ -76,7 +76,7 @@ function schedeAperte(app) {
 // Il giro completo: l'utente chiede una cosa che comporta davvero l'apertura di
 // una pagina (quindi «schede» è dentro il perimetro dichiarato), poi Filo legge,
 // poi compone l'indirizzo mettendoci dentro il dato.
-async function apriDopoAverLetto(app, page, { segreto, testServer }) {
+async function apriDopoAverLetto(app, page, { segreto, testServer, storico = [] }) {
   const destinazione = `${testServer.html('<p>presa</p>')}?d=${encodeURIComponent(segreto)}`;
   await copione(app, {
     giri: [
