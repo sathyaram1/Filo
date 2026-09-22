@@ -5,34 +5,24 @@ const parola = (k) => `ZQ${k}TOKEN`;
 const frase = (k, d) => `Section ${parola(k)} hidden text about ${d} which nobody has opened yet.`;
 
 const FORME = [
-  ['A', 'contenitore visibility:hidden con figlio visibility:visible (SI VEDE)'],
-  ['B', 'cassetto in flusso traslato fuori da un contenitore che ritaglia'],
-  ['C', 'clip rect legacy su posizionato assoluto'],
-  ['D', 'filter opacity(0)'],
-  ['E', 'dialog chiuso'],
-  ['F', 'popover non aperto'],
-  ['G', 'aria-expanded=false sul pannello'],
-  ['H', 'contenitore overflow hidden h=0 statico con figlio assoluto (SI VEDE)'],
-  ['I', 'scheda in secondo piano con height 0 e overflow auto'],
-  ['J', 'pannello con transform scale(0.0000001)'],
-  ['K', 'testo dentro un contenitore con content-visibility hidden'],
+  ['A', 'pannello chiuso con la proprieta scale: 0'],
+  ['B', 'pannello chiuso con la proprieta scale: 1 0'],
+  ['C', 'cassetto in flusso chiuso con la proprieta translate: -200% 0'],
+  ['D', 'etichetta girata con la proprieta rotate: 90deg (SI VEDE)'],
+  ['E', 'pannello chiuso con transform: scale(1, 0) (gia coperto)'],
+  ['F', 'testo normale di controllo'],
 ];
 
 const PAGINA = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
   <h1 id="titolo">Visible heading of the page</h1>
   <p id="intro">A visible paragraph that every reader sees without clicking anything at all.</p>
-
-  <div style="visibility:hidden"><div id="pA" style="visibility:visible">${frase('A', 'a')}</div></div>
-  <div style="overflow:hidden;width:300px;height:60px"><div id="pB" style="transform:translateX(-400px)">${frase('B', 'b')}</div></div>
-  <div id="pC" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">${frase('C', 'c')}</div>
-  <div id="pD" style="filter:opacity(0)">${frase('D', 'd')}</div>
-  <dialog id="pE">${frase('E', 'e')}</dialog>
-  <div id="pF" popover>${frase('F', 'f')}</div>
-  <div id="pG" aria-expanded="false">${frase('G', 'g')}</div>
-  <div style="overflow:hidden;height:0"><div id="pH" style="position:absolute;top:400px;left:20px">${frase('H', 'h')}</div></div>
-  <div id="pI" style="height:0;overflow:auto">${frase('I', 'i')}</div>
-  <div id="pJ" style="transform:scale(0.0000001)">${frase('J', 'j')}</div>
-  <div style="content-visibility:hidden"><div id="pK">${frase('K', 'k')}</div></div>
+  <div id="tanti"></div>
+  <script>
+    const c = document.getElementById('tanti');
+    let h = '';
+    for (let i = 0; i < 5; i++) h += '<div style="max-height:0;overflow:hidden"><p>Collapsed section number ' + i + ' with a sentence of English prose inside it that nobody opened.</p></div>';
+    c.innerHTML = h;
+  <\/script>
 </body></html>`;
 
 async function stubTranslationProvider(app) {
@@ -91,17 +81,26 @@ async function apriMenu(page, anchor) {
   return btn;
 }
 
-test('sonda: quali forme si pagano', async ({ app, openTab, testServer }) => {
+test('sonda: quanto costa aprire il menu con tante sezioni ripiegate', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app);
   const page = await testServer.openReady(openTab, PAGINA);
   await watchToasts(page);
   const btn = await apriMenu(page, '#intro');
   await btn.click();
-  await expect(page.locator('#intro')).toHaveText(/^IT /, { timeout: 30000 });
-  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  await expect(page.locator('#intro')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect.poll(async () => (await toasts(page)).some((t) => /tradotta/.test(t)), { timeout: 60000 }).toBe(true);
+  await page.keyboard.press('Escape');
 
-  const inviato = await spedito(app);
-  const righe = FORME.map(([k, d]) => `${k} ${inviato.includes(parola(k)) ? 'PAGATA ' : 'rimandata'} — ${d}`);
-  console.log('\n===SONDA===\n' + righe.join('\n') + '\n===FINE===\n');
+  const tempi = [];
+  for (let i = 0; i < 3; i++) {
+    const t0 = Date.now();
+    const b = await apriMenu(page, '#intro');
+    tempi.push(Date.now() - t0);
+    await b.getAttribute('aria-label');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+  }
+  const avvisi = await toasts(page);
+  console.log(['', '===SONDA===', 'avvisi: ' + JSON.stringify(avvisi), 'tempi apertura menu (ms): ' + tempi.join(', '), '===FINE===', ''].join('\n'));
   expect(true).toBe(true);
 });
