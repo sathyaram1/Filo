@@ -730,6 +730,7 @@
   // rimanderebbe indietro tutte le altre. Il campo in uso adesso non si tocca.
   function riallineaDaFuori(settings) {
     if (!settings || typeof settings !== 'object') return;
+    if (!$('theme')) return;
     const attivo = document.activeElement;
     const set = (id, fn) => {
       const el = $(id);
