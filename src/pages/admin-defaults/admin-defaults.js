@@ -134,6 +134,59 @@
   const PROVIDER_SORTS = (window.SN_CONST && window.SN_CONST.PROVIDER_SORTS)
     || ['auto', 'throughput', 'latency', 'price'];
 
+  // Le misure del «Prova» stanno con chi le ha prese (la config condivisa è di
+  // tutti), per nickname, nello stesso posto delle Opzioni: sono la stessa cosa.
+  let misureProva = {};
+
+  async function ricordaMisura(nickname, esito) {
+    if (!nickname) return;
+    misureProva = { ...misureProva, [nickname]: esito };
+    try {
+      await chrome.runtime.sendMessage({
+        type: MSG.UPDATE_SETTINGS,
+        settings: { defaultModelTests: misureProva },
+      });
+    } catch (_) {}
+  }
+
+  // Con che modello, ragionamento e ordinamento la riga chiamerebbe adesso:
+  // «Automatico» rimanda alla scelta generale, che sta su questa stessa pagina.
+  function configurazioneRiga(row) {
+    const val = (sel) => { const el = row.querySelector(sel); return el ? el.value : ''; };
+    return {
+      model: val('.sn-model-id').trim(),
+      reasoning: normReasoning(val('.sn-model-reason')),
+      sort: window.SN_CONST.ordinamentoEffettivo(val('.sn-model-sort'), $('providerSort').value),
+    };
+  }
+
+  function mostraMisura(row) {
+    const statusEl = row.querySelector('.sn-model-row-status');
+    if (!statusEl) return;
+    const misura = row._misura;
+    if (!window.SN_CONST.misuraValePer(misura, configurazioneRiga(row))) {
+      statusEl.textContent = I18n.t('options_model_untested');
+      return;
+    }
+    const giorno = giornoMisura(misura.at);
+    statusEl.textContent = I18n.t('options_test_result', misura.ttftMs ?? '—', misura.tokensPerSec ?? '—') + giorno;
+  }
+
+  // Il giorno solo se non è oggi: numeri di settimane fa messi accanto a quelli
+  // appena presi si leggerebbero allo stesso modo.
+  function giornoMisura(at) {
+    const d = at ? new Date(at) : null;
+    if (!d || Number.isNaN(d.getTime())) return '';
+    if (d.toDateString() === new Date().toDateString()) return '';
+    return ` · ${d.toLocaleDateString()}`;
+  }
+
+  function rinfrescaMisure() {
+    for (const row of $('modelRegistryList').querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
+      mostraMisura(row);
+    }
+  }
+
   function normSort(v) {
     if (window.SN_CONST && window.SN_CONST.normalizeProviderSort) {
       return window.SN_CONST.normalizeProviderSort(v);
