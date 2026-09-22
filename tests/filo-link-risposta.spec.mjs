@@ -61,7 +61,8 @@ async function ripristina(app) {
 }
 
 // Manda il messaggio e mette la risposta in una bolla vera, con il nome della
-// richiesta attaccato: è così che la chat la disegna.
+// richiesta attaccato: è così che la chat la disegna. La bolla si marca, così
+// il clic dopo prende il collegamento di QUESTA risposta.
 async function rispostaInBolla(page, userMessage) {
   return page.evaluate(async (msg) => {
     const r = await chrome.runtime.sendMessage({
@@ -69,11 +70,12 @@ async function rispostaInBolla(page, userMessage) {
     });
     const bolla = document.createElement('div');
     bolla.className = 'dash-bubble dash-bubble-filo';
+    bolla.id = 'bolla-di-prova';
     if (r && r.compito) bolla.dataset.compito = r.compito;
     bolla.innerHTML = self.SN_MARKDOWN.render((r && r.text) || '');
     document.getElementById('bubbles').appendChild(bolla);
     const a = bolla.querySelector('a.filo-md-link');
-    return { href: a ? a.getAttribute('href') : '', titolo: a ? a.getAttribute('title') : '' };
+    return { href: a ? a.getAttribute('href') : '', titolo: a ? a.getAttribute('title') : '', compito: (r && r.compito) || '' };
   }, userMessage);
 }
 
@@ -106,8 +108,9 @@ test('dopo una lettura, un collegamento verso un indirizzo mai visto chiede prim
     giri: [[{ name: 'LEGGI_DOCUMENTO', args: { percorso: '/tmp/non-ce.pdf' } }], []],
     risposta: `Ecco. [Apri la bolletta di marzo](${dove})`,
   });
-  await rispostaInBolla(page, 'Leggimi la bolletta che mi hanno mandato.');
+  const bolla = await rispostaInBolla(page, 'Leggimi la bolletta che mi hanno mandato.');
   await ripristina(app);
+  expect(bolla.compito, 'la risposta non porta il nome della richiesta che l\'ha scritta').toBeTruthy();
 
   // L'utente preme, e non risponde alla domanda: la scheda non si apre.
   const domanda = await page.evaluate(async () => {
@@ -115,7 +118,7 @@ test('dopo una lettura, un collegamento verso un indirizzo mai visto chiede prim
     const Ui = window.SN_CONFIRM_UI;
     const orig = Ui.confirm;
     Ui.confirm = async (o) => { testo = String((o && o.text) || ''); return false; };
-    document.querySelector('#bubbles a.filo-md-link').click();
+    document.querySelector('#bolla-di-prova a.filo-md-link').click();
     await new Promise((r) => setTimeout(r, 1500));
     Ui.confirm = orig;
     return testo;
@@ -138,15 +141,16 @@ test('dopo una ricerca, il collegamento a un risultato si apre senza chiedere', 
     risposta: `Ecco la notizia. [La notizia](${dove})`,
     risultati: [{ title: 'La notizia', url: dove, content: 'testo' }],
   });
-  await rispostaInBolla(page, 'Cerca le notizie di oggi.');
+  const bolla = await rispostaInBolla(page, 'Cerca le notizie di oggi.');
   await ripristina(app);
+  expect(bolla.compito, 'la risposta non porta il nome della richiesta che l\'ha scritta').toBeTruthy();
 
   const chiesto = await page.evaluate(async () => {
     let visto = false;
     const Ui = window.SN_CONFIRM_UI;
     const orig = Ui.confirm;
     Ui.confirm = async () => { visto = true; return false; };
-    document.querySelector('#bubbles a.filo-md-link').click();
+    document.querySelector('#bolla-di-prova a.filo-md-link').click();
     await new Promise((r) => setTimeout(r, 2000));
     Ui.confirm = orig;
     return visto;
