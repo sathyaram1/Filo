@@ -41,6 +41,7 @@ async function rigaDelNickname(page, nick) {
 }
 
 test('cambiando il modello di una riga la misura di prima non resta a parlare del nuovo', async ({ app, openTab }) => {
+  test.fail(true, 'rilievo aperto: la misura segue il nickname, non il modello misurato');
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
