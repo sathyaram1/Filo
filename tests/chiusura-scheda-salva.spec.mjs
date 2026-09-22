@@ -3,7 +3,14 @@
 // scheda distrutta non riceve `pagehide`, quindi il salvataggio non partiva mai.
 // La cura sta in src/main/congedo.js; qui si guarda l'esito dal lato utente.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { _electron as electron } from '@playwright/test';
+import { readFileSync, rmSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
+
+const RADICE = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 async function schede(shell) {
   return shell.evaluate(async () => {
