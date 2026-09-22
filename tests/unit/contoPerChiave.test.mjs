@@ -38,7 +38,7 @@ async function spendi(keySource, quante = 10) {
   for (let i = 0; i < quante; i++) {
     await Costs.record({
       action: 'filo_chat', provider: 'openrouter', model: 'deepseek/deepseek-v4-flash',
-      usage: { promptTokens: 4000, completionTokens: 800, costUsd: 0.5, keySource },
+      usage: { promptTokens: 4000, completionTokens: 800, costUsd: 0.6, keySource },
       pricing: null, usdToEur: 0.92,
     });
   }
