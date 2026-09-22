@@ -65,11 +65,14 @@
 
 .sn-nav-item.is-soon:hover { opacity: 0.75; }
 
+/* Il titolo può arrivare dall'indirizzo: una parola senza spazi lunga quanto
+ * vuole non deve allargare la pagina. */
 .sn-doc h1 {
   font-size: 1.9rem;
   line-height: 1.2;
   margin: 0 0 0.5rem;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .sn-doc-sub {
