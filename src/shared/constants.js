@@ -992,6 +992,19 @@
     return PROVIDER_SORTS.includes(s) ? s : null;
   }
 
+  // Una misura del pulsante «Prova» (latenza, token al secondo) vale per la
+  // configurazione con cui è stata presa: cambiato il modello, il livello di
+  // ragionamento o l'ordinamento degli host, quei numeri parlano di altro. PURA.
+  function misuraValePer(misura, voce) {
+    if (!misura || typeof misura !== 'object') return false;
+    if (misura.ttftMs == null && misura.tokensPerSec == null) return false;
+    const v = voce || {};
+    const uguale = (a, b) => String(a == null ? '' : a) === String(b == null ? '' : b);
+    return uguale(misura.model, v.model)
+      && uguale(normalizeReasoning(misura.reasoning), normalizeReasoning(v.reasoning))
+      && uguale(normalizeProviderSort(misura.sort), normalizeProviderSort(v.sort));
+  }
+
   // Istruzioni di routing per una chiamata al router. L'ordinamento della voce
   // vince su quello globale; `ignore` non dipende mai dall'ordinamento. PURA.
   function providerRoutingFor(settings, entrySort) {
