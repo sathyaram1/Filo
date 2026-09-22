@@ -56,12 +56,14 @@
   border-bottom-color: var(--sn-accent, #c45a3b);
 }
 
-/* Le sezioni non ancora scritte restano visibili ma spente: dire "in arrivo" è
- * più onesto che far sparire la voce. */
+/* Le sezioni non ancora scritte restano visibili e più tenui: dire "in arrivo" è
+ * più onesto che far sparire la voce. Si cliccano comunque, e la pagina che si
+ * apre spiega che non sono scritte. */
 .sn-nav-item.is-soon {
-  opacity: 0.4;
-  cursor: default;
+  opacity: 0.45;
 }
+
+.sn-nav-item.is-soon:hover { opacity: 0.75; }
 
 .sn-doc h1 {
   font-size: 1.9rem;
