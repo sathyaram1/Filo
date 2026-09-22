@@ -168,7 +168,7 @@
 
   function persistTokensDebounced() {
     clearTimeout(tokensSaveTimer);
-    tokensSaveTimer = setTimeout(persistTokens, 400);
+    tokensSaveTimer = setTimeout(() => { tokensSaveTimer = null; persistTokens(); }, 400);
   }
 
   // Ridisegna tutte le righe TRANNE quella in `exceptName` (che l'utente sta
@@ -452,7 +452,7 @@
 
   function persistTabColorDebounced() {
     clearTimeout(tabColorSaveTimer);
-    tabColorSaveTimer = setTimeout(persistTabColor, 400);
+    tabColorSaveTimer = setTimeout(() => { tabColorSaveTimer = null; persistTabColor(); }, 400);
   }
 
   // Restituisce lo stile testuale corrente dal textarea.
@@ -718,7 +718,12 @@
     if (!settings || typeof settings !== 'object') return;
     if (!$('theme')) return;
     const attivo = document.activeElement;
+    // Un salvataggio già in coda su questo blocco sta per scrivere gli stessi
+    // campi: riallinearli adesso da un messaggio più vecchio glieli farebbe
+    // rimandare indietro com'erano, che è proprio il danno da evitare.
+    const inCoda = !!saveTimer;
     const set = (id, fn) => {
+      if (inCoda) return;
       const el = $(id);
       if (!el || el === attivo) return;
       fn(el);
@@ -774,17 +779,21 @@
   // dalla copia letta all'apertura: senza riallineare anche quella, il primo
   // ritocco rimanda indietro ciò che Filo ha appena cambiato a parole.
   function riallineaBlocchiAvanzati(settings, idAttivo) {
-    const tokenAttivo = idAttivo.startsWith('tok-') ? idAttivo.slice(4) : '';
-    currentOverrides = fondiTenendoIlCampoInUso(settings.themeTokens || {}, currentOverrides, tokenAttivo);
-    if (Tokens && $('tok-accent')) {
-      for (const name of Tokens.names()) if (name !== tokenAttivo) renderTokenRow(name);
+    if (!tokensSaveTimer) {
+      const tokenAttivo = idAttivo.startsWith('tok-') ? idAttivo.slice(4) : '';
+      currentOverrides = fondiTenendoIlCampoInUso(settings.themeTokens || {}, currentOverrides, tokenAttivo);
+      if (Tokens && $('tok-accent')) {
+        for (const name of Tokens.names()) if (name !== tokenAttivo) renderTokenRow(name);
+      }
     }
 
-    const paramAttivo = idAttivo.startsWith('tabcol-') ? idAttivo.slice(7) : '';
-    const arrivati = TabColor ? TabColor.clampParams(settings.tabColor || {}) : { ...(settings.tabColor || {}) };
-    currentTabColor = fondiTenendoIlCampoInUso(arrivati, currentTabColor, paramAttivo);
-    if (TabColor && Array.isArray(TabColor.IDENTITY_PARAM_META)) {
-      for (const m of TabColor.IDENTITY_PARAM_META) if (m.key !== paramAttivo) renderTabColorRow(m.key);
+    if (!tabColorSaveTimer) {
+      const paramAttivo = idAttivo.startsWith('tabcol-') ? idAttivo.slice(7) : '';
+      const arrivati = TabColor ? TabColor.clampParams(settings.tabColor || {}) : { ...(settings.tabColor || {}) };
+      currentTabColor = fondiTenendoIlCampoInUso(arrivati, currentTabColor, paramAttivo);
+      if (TabColor && Array.isArray(TabColor.IDENTITY_PARAM_META)) {
+        for (const m of TabColor.IDENTITY_PARAM_META) if (m.key !== paramAttivo) renderTabColorRow(m.key);
+      }
     }
   }
 
@@ -844,7 +853,7 @@
 
   function persistDebounced() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(persist, 400);
+    saveTimer = setTimeout(() => { saveTimer = null; persist(); }, 400);
   }
 
   function buildPresetOptions() {

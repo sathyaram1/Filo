@@ -867,7 +867,7 @@
   let saveTimer = null;
   function saveDebounced() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(save, 400);
+    saveTimer = setTimeout(() => { saveTimer = null; save(); }, 400);
   }
 
   // Questa pagina risalva TUTTO il modulo a ogni modifica, e le stesse cose si
@@ -877,6 +877,10 @@
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings) return;
       if (!$('useDefaultModels')) return;
+      // Un salvataggio già in coda sta per scrivere gli stessi campi:
+      // riallinearli adesso da un messaggio più vecchio glieli farebbe
+      // rimandare indietro com'erano.
+      if (saveTimer) return;
       const s = msg.settings;
       const testo = (id, valore) => {
         const el = $(id);
