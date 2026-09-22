@@ -106,6 +106,24 @@ era la cifra in fondo. La regola generale: un riempimento proporzionale vuole
 (`getBoundingClientRect().width`), non l'attributo di stile che le è stato
 scritto sopra.
 
+## Quando l'elenco si chiude, il fuoco torna dove eri
+
+Chi apre l'elenco dalla tastiera lo chiude con Esc o con «chiudi», e da lì deve
+ripartire dal numero da cui era partito. Finché la chiusura si limitava a
+nascondere il riquadro, il fuoco cadeva sul corpo della pagina e il Tab
+successivo ricominciava dal primo elemento: una scheda costruita apposta per
+essere usata senza mouse la rendeva peggiore proprio a chi il mouse non lo usa.
+Le vie di chiusura passano quindi da una sola funzione, che si ricorda la riga
+di partenza e ce la rimette: due porte separate divergono, prima o poi.
+
+## Un conto si scrive allo stesso modo ovunque compaia
+
+Anche nei riquadri che si vedono solo col mouse sopra. La legenda accanto alla
+torta scriveva «1.200» e il suggerimento della fetta, a un centimetro, «1200»:
+le due etichette se lo formattavano per conto proprio. Un'etichetta che porta
+un numero si compone in un punto solo, così una superficie nuova nasce già
+scritta come le altre.
+
 ## Come si prova
 
 In `tests/manage-statistiche-feedback.spec.mjs`: una riga della ripartizione,
