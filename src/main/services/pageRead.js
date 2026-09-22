@@ -57,19 +57,23 @@ const TAG_CORNICE = new Set(['header', 'footer', 'aside']);
 
 // Classi e id del rumore, confrontati come TOKEN INTERI: per sottostringa
 // `class="header-price"` contiene «header», e il prezzo sparirebbe in silenzio.
-// I blocchi di commenti NON stanno qui: su una discussione o su una domanda con
-// le risposte sotto, il dato che l'utente cerca esiste solo lì (#553).
-const TOKEN_RUMORE = /^(nav|navbar|navigation|menu|menubar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|social|social-?share|share|sharing|newsletter|subscribe|subscription|paywall|related|related-?posts|recommended|skip-?link|screen-?reader-?text|sr-only|visually-hidden|modal|popup|overlay|toolbar|search-?form)$/i;
+// Nel cestino solo i nomi che indicano una FUNZIONE del sito: navigare,
+// acconsentire, condividere, pubblicizzare, impaginare, rimandare ad altre
+// pagine. Un nome che indica un CONTENITORE il sito lo riempie di quello che
+// vuole, quindi non decide niente e va in coda (#553).
+const TOKEN_RUMORE = /^(nav|navbar|navigation|menubar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|social|social-?share|share|sharing|newsletter|subscribe|related|related-?posts|recommended|skip-?link|screen-?reader-?text|sr-only|visually-hidden|toolbar|search-?form)$/i;
 
 // Contorno che può contenere il dato chiesto, quindi va in coda e non nel
 // cestino: l'orario sta nel piè di pagina, il prezzo scontato nel «promo», il
-// titolo col suo giorno nel «banner». Qui stanno anche i nomi che i programmi
-// per fare siti scrivono da soli, che sono quelli dei siti veri (#553).
-const TOKEN_CORNICE = /^(banner|promo|promotion|widget|sidebar|side-?bar|hero|header|site-?header|page-?header|masthead|footer|site-?footer|page-?footer|colophon|topbar|top-?bar|bottom-?bar)$/i;
+// listino di una trattoria nel riquadro chiamato «menu». Qui stanno anche i
+// nomi che i programmi per fare siti scrivono da soli (#553).
+const TOKEN_CORNICE = /^(banner|promo|promotion|widget|sidebar|side-?bar|hero|header|site-?header|page-?header|masthead|footer|site-?footer|page-?footer|colophon|topbar|top-?bar|bottom-?bar|menu|modal|popup|overlay|subscription|paywall)$/i;
 
-const ROLE_RUMORE = /^(navigation|search|dialog|alertdialog|menu|menubar|toolbar|tablist)$/i;
+const ROLE_RUMORE = /^(navigation|search|dialog|alertdialog|menu|menubar|toolbar)$/i;
 
-const ROLE_CORNICE = /^(banner|contentinfo|complementary)$/i;
+// `tablist` porta le etichette delle schede, e su un listino quelle etichette
+// sono i prezzi: «Mensile 9,99», «Annuale 99,00».
+const ROLE_CORNICE = /^(banner|contentinfo|complementary|tablist)$/i;
 
 const TAG_TABELLA = new Set(['table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot', 'caption', 'colgroup', 'col']);
 
