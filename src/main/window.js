@@ -36,10 +36,8 @@ function revealWindow(win) {
 const osservatoriFinestraNormale = [];
 function onFinestraNormale(cb) { if (typeof cb === 'function') osservatoriFinestraNormale.push(cb); }
 
-// Una scadenza si fa sentire solo da una finestra che la vede: suono e pulsante
-// che ferma vivono lì, e una finestra incognito le scadenze normali non le vede.
-// Senza questa garanzia, su Mac (dove chiudere la finestra non spegne Filo) o
-// con la sola incognito aperta il timer resterebbe vivo e muto.
+// Suono e pulsante che ferma vivono in una finestra che la scadenza la vede, e
+// non è detto che ce ne sia una: senza garanzia il timer resta vivo e muto.
 function assicuraFinestraNormale() {
   const esistente = BrowserWindow.getAllWindows().find((w) => {
     try { return !w.isDestroyed() && !!w._filoTabs && !w._filoIncognito; } catch (_) { return false; }

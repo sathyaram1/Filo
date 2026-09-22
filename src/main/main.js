@@ -229,8 +229,7 @@ app.whenReady().then(async () => {
   try { require('./services/downloads').init().catch(() => {}); } catch (_) {}
 
   // Una finestra normale può nascere anche senza di noi (la scadenza che deve
-  // farsi sentire ne apre una): il riferimento qui va aggiornato, o punta a una
-  // finestra chiusa.
+  // farsi sentire ne apre una): senza aggiornarlo, questo punta a una chiusa.
   onFinestraNormale((w) => { mainWindow = w; });
   mainWindow = createMainWindow();
   registerShortcuts(mainWindow);

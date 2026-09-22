@@ -49,9 +49,8 @@ async function passata(incognito) {
   // schermo che arriva DOPO ricoprirebbe il pulsante e rimetterebbe il rumore
   // senza interruttore.
   if (ringingNow.size) {
-    // Suono e pulsante vivono in una finestra che la scadenza la vede: senza
-    // garantirne una, con la sola incognito aperta o su Mac a finestra chiusa
-    // (dove Filo resta in funzione) la scadenza resta viva e muta.
+    // Con la sola incognito aperta, o su Mac a finestra chiusa (dove Filo resta
+    // in funzione), non c'è nessuna finestra che la senta: gliene serve una.
     if (!incognito) { try { require('../window').assicuraFinestraNormale(); } catch (_) {} }
     rientraDaTuttoSchermo(incognito);
   }
@@ -93,9 +92,8 @@ function rientraDaTuttoSchermo(incognito) {
   }
 }
 
-// Il click sulla notifica deve portare dove si ferma la suoneria, cioè in una
-// finestra NORMALE: una incognito quella scadenza non la vede, e senza nessuna
-// finestra aperta la notifica non porterebbe da nessuna parte.
+// Il click sulla notifica deve portare dove la suoneria si ferma, cioè in una
+// finestra NORMALE: altrimenti l'unica cosa che l'utente vede non porta da nessuna parte.
 function mostraFinestra() {
   const { assicuraFinestraNormale, revealWindow } = require('../window');
   const win = assicuraFinestraNormale();

@@ -24,9 +24,8 @@
     chime: 'Carillon',
   };
 
-  // Volume come percentuale 0-100 (100 = il livello di sempre). L'utente lo
-  // cambia in Preferenze: una sveglia al mattino e un timer in cucina non
-  // vogliono la stessa voce, e a 0 la suoneria resta muta di proposito.
+  // Volume come percentuale 0-100 (100 = il livello di sempre), scelto
+  // dall'utente in Preferenze. A 0 la suoneria resta muta di proposito.
   const GUADAGNO_PIENO = 0.35;
   const VOLUME_PIENO = 100;
   function guadagno(volume) {
