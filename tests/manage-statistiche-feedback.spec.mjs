@@ -296,7 +296,7 @@ test('#496 — la torta dice quante critiche è costato ogni lavoro, e i fermati
 
   // La media sta nel buco della ciambella e NON conta il fermato:
   // (0 + 2) / 2 = 1.0.
-  await expect(page.locator('#mgFsPieMid b')).toHaveText('1.0');
+  await expect(page.locator('#mgFsPieMid b')).toHaveText('1,0');
 
   // E i due esiti che il grafico non racconta da solo.
   await expect(page.locator('[data-fs-esito="fermati"] b')).toHaveText('1');
@@ -764,10 +764,10 @@ test('#496 anche i numeri della fila in fondo portano alle segnalazioni che hann
   });
   await page.locator('[data-fs-range="7g"]').click();
 
-  // Nel riquadro delle esplorazioni a contare segnalazioni è la riga piccola,
-  // non il numero grande (quello conta partenze, che segnalazioni non sono):
-  // quindi è lei ad aprirsi.
-  for (const id of ['proberTrovate', 'attesa', 'durata', 'arenati']) {
+  // Nelle esplorazioni e negli arenamenti a contare segnalazioni è la riga
+  // piccola, non il numero grande (che conta partenze e arenamenti, e una
+  // segnalazione arenata due volte ne vale due): quindi è lei ad aprirsi.
+  for (const id of ['proberTrovate', 'attesa', 'durata', 'arenatiFeedback']) {
     await page.locator(`[data-fs-id="${id}"]`).click();
     await expect(page.locator('#mgFsDrill'), `il riquadro «${id}» non apre niente`).toBeVisible();
     await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
@@ -1345,4 +1345,100 @@ test('#496 Esc chiude l\'elenco aperto sotto un numero', async ({ openTab }) => 
   await expect(page.locator('#mgFsDrill')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('#mgFsDrill')).toBeHidden();
+});
+
+// ══ Un numero e l'elenco che apre dicono la stessa cifra ═══════════════════
+//
+// Il registro delle esecuzioni cita anche numeri che la lista delle
+// segnalazioni non ha (le sue sono più vecchie, o sono state archiviate). Quei
+// lavori si contano lo stesso — sono successi — e l'elenco che il numero apre
+// li NOMINA, invece di lasciarli fuori in silenzio: prima un riquadro che
+// diceva 3 apriva un elenco di 2 e il menu del tasto destro lo dichiarava da sé.
+
+test('#496 un numero che conta anche lavori fuori dalla lista apre un elenco che li nomina', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const noto = fb({ seq: 11, status: 'done', createdAt: g(3), reviewedAt: g(2), name: 'in lista' });
+  await apri(page, {
+    feedbacks: [noto],
+    workerLog: [
+      { role: 'fixer', startedAt: g(3), num: '11' },
+      { role: 'verifier', startedAt: g(2), num: '11' },
+      // 999: il registro lo cita, la lista non ce l'ha. Due istanti diversi,
+      // quindi entra anche nella mediana della durata.
+      { role: 'fixer', startedAt: g(4), num: '999' },
+      { role: 'verifier', startedAt: g(3), num: '999' },
+    ],
+  });
+  await page.locator('[data-fs-range="tutto"]').click();
+
+  for (const [id, quanti] of [['lavorati', 2], ['durata', 2]]) {
+    await page.locator(`[data-fs-id="${id}"]`).click({ button: 'right' });
+    await expect(page.locator('.mg-ctxmenu')).toContainText(`le ${quanti} segnalazioni contate`);
+    await page.locator('.mg-ctxmenu .sn-select-option').first().click();
+    await expect(page.locator('#mgFsDrillTitle')).toContainText(`${quanti} segnalazioni`);
+    await expect(page.locator('#mgFsDrillList li')).toHaveCount(quanti);
+    // Il lavoro che la lista non ha resta visibile col suo numero.
+    await expect(page.locator('#mgFsDrillList')).toContainText('#999');
+    await page.locator('#mgFsDrillClose').click();
+  }
+});
+
+test('#496 «Controlli di sicurezza passati» si apre sulle segnalazioni che ha contato', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const passato = fb({ seq: 21, status: 'done', createdAt: g(3), name: 'controllato', livelli: { l4: { esito: 'pass' } } });
+  await apri(page, {
+    feedbacks: [passato],
+    workerLog: [{ role: 'fixer', startedAt: g(3), num: '21' }, { role: 'verifier', startedAt: g(3), num: '21' }],
+  });
+  await page.locator('[data-fs-range="tutto"]').click();
+
+  await page.locator('[data-fs-id="audit"]').click({ button: 'right' });
+  await expect(page.locator('.mg-ctxmenu')).toContainText('Mostra la segnalazione contata');
+  await page.locator('.mg-ctxmenu .sn-select-option').first().click();
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
+});
+
+test('#496 i lavori che la torta lascia fuori si possono guardare', async ({ openTab }) => {
+  const page = await openTab(URL);
+  // Passato, ma nel registro non c'è nessuna sua verifica: la torta lo lascia
+  // fuori e lo dichiara in una frase. Quella frase è un conto come gli altri.
+  const vecchio = fb({ seq: 31, status: 'done', createdAt: g(4), name: 'vecchio' });
+  await apri(page, {
+    feedbacks: [vecchio],
+    workerLog: [{ role: 'fixer', startedAt: g(4), num: '31' }],
+  });
+  await page.locator('[data-fs-range="tutto"]').click();
+
+  await expect(page.locator('#mgFsPieHint')).toContainText('più vecchie del registro');
+  // Il numero dentro la frase si apre da solo…
+  await page.locator('#mgFsPieHint [data-fs-esito="senzaGiri"]').click();
+  await expect(page.locator('#mgFsDrillTitle')).toContainText('più vecchie del registro');
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
+  await page.locator('#mgFsDrillClose').click();
+  // …e il tasto destro sulla frase intera offre i conti che ci stanno dentro.
+  await page.locator('#mgFsPieHint').click({ button: 'right' });
+  await expect(page.locator('.mg-ctxmenu')).toContainText('Mostra');
+});
+
+// ══ I numeri si scrivono all'italiana ══════════════════════════════════════
+
+test('#496 i numeri della scheda hanno la virgola sui decimali e il punto sulle migliaia', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const feedbacks = [];
+  for (let i = 0; i < 1200; i++) feedbacks.push(fb({ _id: 'it' + i, seq: 100 + i, createdAt: g(2), name: 't' + i }));
+  // Due lavori passati, uno senza critiche e uno con una: media 0,5.
+  const workerLog = [
+    { role: 'fixer', startedAt: g(2), num: '100' },
+    { role: 'verifier', startedAt: g(2), num: '100' },
+    { role: 'fixer', startedAt: g(2), num: '101' },
+    { role: 'verifier', startedAt: g(2), num: '101' },
+    { role: 'verifier', startedAt: g(2), num: '101' },
+  ];
+  feedbacks[0].status = 'done';
+  feedbacks[1].status = 'done';
+  await apri(page, { feedbacks, workerLog });
+  await page.locator('[data-fs-range="tutto"]').click();
+
+  await expect(page.locator('[data-fs-id="ricevuti"] .mg-tile-n')).toHaveText('1.200');
+  await expect(page.locator('#mgFsPieMid b')).toHaveText('0,5');
 });

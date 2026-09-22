@@ -4633,7 +4633,7 @@
       const n = gr.kinds.reduce((s, k) => s + (conti[k] || 0), 0);
       return `<button type="button" class="mg-chip${on ? ' mg-chip--on' : ''}" data-fs-creator="${esc(gr.key)}"`
         + ` aria-pressed="${on}" title="${esc(`${gr.label}: ${gr.kinds.map((k) => fsEtichettaCreatore(k)).join(', ')}`)}">`
-        + `${esc(gr.label)}<span class="mg-chip-n">${n}</span></button>`;
+        + `${esc(gr.label)}<span class="mg-chip-n">${esc(fsNum(n))}</span></button>`;
     }).join('');
     const voci = gruppi + FS.CREATORI.map((kind) => {
       const meta = AUTHOR_META[kind] || AUTHOR_META.user;
@@ -4641,7 +4641,7 @@
       const n = conti[kind] || 0;
       return `<button type="button" class="mg-chip${on ? ' mg-chip--on' : ''}" data-fs-creator="${esc(kind)}"`
         + ` aria-pressed="${on}" title="${esc(meta.label)}">${meta.icon} ${esc(meta.label)}`
-        + `<span class="mg-chip-n">${n}</span></button>`;
+        + `<span class="mg-chip-n">${esc(fsNum(n))}</span></button>`;
     }).join('');
     // Anche «Tutti» porta il suo numero, come ogni altra pasticca della barra:
     // era l'unica senza, e senza numero non aveva nemmeno niente da offrire col
@@ -4651,7 +4651,7 @@
     mgFsCreators.innerHTML = '<span class="mg-fs-bar-label">Creatore</span>'
       + `<button type="button" class="mg-chip${tuttiOn ? ' mg-chip--on' : ''}" data-fs-creator="__tutti"`
       + ` aria-pressed="${tuttiOn}" title="Tutti i mittenti, senza filtro">Tutti`
-      + `<span class="mg-chip-n">${tuttiN}</span></button>` + voci;
+      + `<span class="mg-chip-n">${esc(fsNum(tuttiN))}</span></button>` + voci;
   }
 
   // ── Da dove partono davvero i numeri ─────────────────────────────────────
@@ -4739,7 +4739,20 @@
   // Un numero che non si conosce si scrive col trattino, mai con uno zero: uno
   // zero grande si legge «non è successo niente», che è il contrario di «non lo
   // so». I conti tornano `null` quando la sorgente non ha risposto.
-  function fsNum(v) { return v == null ? '—' : String(v); }
+  // I numeri si scrivono all'italiana, come ovunque in Filo: il punto separa
+  // le migliaia e la virgola i decimali (Intl.NumberFormat('it-IT')).
+  const FS_FMT = (() => {
+    try { return new Intl.NumberFormat('it-IT'); } catch (_) { return null; }
+  })();
+  function fsCifra(v, decimali) {
+    if (typeof v !== 'number' || !Number.isFinite(v)) return String(v);
+    try {
+      return decimali
+        ? v.toLocaleString('it-IT', { minimumFractionDigits: decimali, maximumFractionDigits: decimali })
+        : (FS_FMT ? FS_FMT.format(v) : String(v));
+    } catch (_) { return decimali ? v.toFixed(decimali) : String(v); }
+  }
+  function fsNum(v) { return v == null ? '—' : fsCifra(v); }
 
   /**
    * `sottoId`: il sottotitolo conta delle segnalazioni SUE, diverse da quelle
@@ -4765,8 +4778,11 @@
     // diventano un clic da soli.
     const tag = (dettaglio || apribile) ? 'button' : 'div';
     const cls = 'mg-tile' + (dettaglio || apribile ? ' mg-tile--click' : '') + (aperto ? ' mg-tile--open' : '');
+    // Se è un numero lo si decide sul valore crudo: dopo la formattazione
+    // all'italiana «1.200» sarebbe ancora un numero per `Number()`, ma «12 ore»
+    // no, ed è quello il caso che questa classe distingue.
+    const testo = typeof n !== 'number' && !Number.isFinite(Number(n));
     n = fsNum(n);
-    const testo = !Number.isFinite(Number(n));
     const spiega = FS_SPIEGA[id] ? ` title="${esc(FS_SPIEGA[id])}"` : '';
     // `data-fs-id` sta su TUTTI i riquadri (è il nome della cosa contata);
     // `data-fs-tile` solo su quelli che si aprono, perché è quello che
@@ -4779,7 +4795,7 @@
       + (sotto
         ? (sottoId
           ? `<button type="button" class="mg-tile-sub mg-tile-sub--click" data-fs-id="${esc(sottoId)}"`
-            + ` title="Mostra le segnalazioni che l'esplorazione ha trovato">${esc(sotto)}</button>`
+            + ` title="Mostra le segnalazioni contate">${esc(sotto)}</button>`
           : `<span class="mg-tile-sub">${esc(sotto)}</span>`)
         : '')
       + (dettaglio ? `<span class="mg-tile-more"><span class="mg-tile-caret">›</span>${aperto ? 'chiudi' : 'vedi il dettaglio'}</span>` : '')
@@ -4794,7 +4810,7 @@
     if (!voci.length) return '<p class="mg-fs-empty">Niente in questa finestra.</p>';
     const max = Math.max.apply(null, voci.map((v) => v.n)) || 1;
     return '<ul class="mg-bars">' + voci.map((v) => {
-      const apribile = !!(v.ids && v.ids.length);
+      const apribile = !!((v.ids && v.ids.length) || (v.mancanti && v.mancanti.length));
       const tag = apribile ? 'button' : 'div';
       return `<li><${tag} class="mg-bar-row${apribile ? ' mg-bar-row--click' : ''}"`
         + ` data-fs-bar="${esc(v.key)}"${gruppo ? ` data-fs-bargroup="${esc(gruppo)}"` : ''}`
@@ -4802,7 +4818,7 @@
         + '>'
         + `<span class="mg-bar-label" title="${esc(v.label)}">${esc(v.label)}</span>`
         + `<span class="mg-bar-track"><span class="mg-bar-fill" style="width:${Math.round((v.n / max) * 100)}%"></span></span>`
-        + `<span class="mg-bar-n">${v.n}</span></${tag}></li>`;
+        + `<span class="mg-bar-n">${esc(fsNum(v.n))}</span></${tag}></li>`;
     }).join('') + '</ul>';
   }
 
@@ -4859,7 +4875,7 @@
       // sopra, «2 critiche» sotto, stesso lavoro).
       fsTile('lavorati', stat.lavorati.totale, 'Feedback lavorati',
         ko ? noto : (stat.lavorati.verifiche
-          ? `${stat.lavorati.verifiche} ${stat.lavorati.verifiche === 1 ? 'verifica partita' : 'verifiche partite'} in questa finestra`
+          ? `${fsNum(stat.lavorati.verifiche)} ${stat.lavorati.verifiche === 1 ? 'verifica partita' : 'verifiche partite'} in questa finestra`
           : ''), ko ? false : 'espandi'),
       // Il numero grande conta PARTENZE dell'esplorazione: non sono
       // segnalazioni e non si aprono su niente, quindi il riquadro non promette
@@ -4870,7 +4886,7 @@
         (ko ? noto + ' · ' : '')
           + (fbKo
             ? 'segnalazioni dell\'esploratore non lette'
-            : `${stat.prober.ritrovamenti} ${stat.prober.ritrovamenti === 1 ? 'segnalazione' : 'segnalazioni'} dall'esploratore`),
+            : `${fsNum(stat.prober.ritrovamenti)} ${stat.prober.ritrovamenti === 1 ? 'segnalazione' : 'segnalazioni'} dall'esploratore`),
         false,
         stat.prober.ritrovamentiIds.length ? 'proberTrovate' : ''),
       fsTile('lanci', stat.lanci.totale, 'Lanci delle routine', ko ? noto : '', ko ? false : 'espandi'),
@@ -4898,19 +4914,25 @@
     const ignoti = stat.giri.ignoti;
     const senzaGiri = stat.giri.senzaGiri;
     const statoIgnoto = stat.giri.statoIgnoto || 0;
+    // Ogni numero di questa frase è un conto come gli altri e si apre su ciò
+    // che ha contato: erano gli ultimi rimasti muti, e il caso più comune —
+    // il registro conserva solo le ultime esecuzioni — finisce proprio qui.
     const coda = [];
-    if (aperti) coda.push(`${aperti} ${aperti === 1 ? 'lavoro è ancora in mezzo al giro e non entra' : 'lavori sono ancora in mezzo al giro e non entrano'} nel conto.`);
+    const numeroApribile = (chiave, n) =>
+      `<button type="button" class="mg-fs-quanti" data-fs-esito="${esc(chiave)}"`
+      + ` title="${esc(`Mostra ${n === 1 ? 'la segnalazione contata' : 'le segnalazioni contate'}`)}">${esc(fsNum(n))}</button>`;
+    if (aperti) coda.push(`${numeroApribile('aperti', aperti)} ${aperti === 1 ? 'lavoro è ancora in mezzo al giro e non entra' : 'lavori sono ancora in mezzo al giro e non entrano'} nel conto.`);
     // Senza la chiave dell'owner lo stato non si legge, e dove sia arrivato
     // quel lavoro è proprio la domanda a cui la torta risponde: si dichiara,
     // invece di darlo per ancora aperto (che su un lavoro già chiuso è il
     // contrario del vero).
     if (statoIgnoto) {
-      coda.push(statoIgnoto === 1
-        ? '1 lavoro ha lo stato cifrato e non leggibile con questa chiave: dov\'è arrivato non si sa, quindi resta fuori dal conto.'
-        : `${statoIgnoto} lavori hanno lo stato cifrato e non leggibile con questa chiave: dove sono arrivati non si sa, quindi restano fuori dal conto.`);
+      coda.push(`${numeroApribile('statoIgnoto', statoIgnoto)} ${statoIgnoto === 1
+        ? 'lavoro ha lo stato cifrato e non leggibile con questa chiave: dov\'è arrivato non si sa, quindi resta fuori dal conto.'
+        : 'lavori hanno lo stato cifrato e non leggibile con questa chiave: dove sono arrivati non si sa, quindi restano fuori dal conto.'}`);
     }
-    if (senzaGiri) coda.push(`${senzaGiri} ${senzaGiri === 1 ? 'lavoro ha avuto il via libera ma le sue verifiche sono più vecchie del registro' : 'lavori hanno avuto il via libera ma le loro verifiche sono più vecchie del registro'}: quanto ${senzaGiri === 1 ? 'è costato' : 'sono costati'} non si sa.`);
-    if (ignoti) coda.push(`${ignoti} ${ignoti === 1 ? 'lavoro non è' : 'lavori non sono'} fra le segnalazioni caricate, quindi non se ne conosce l'esito.`);
+    if (senzaGiri) coda.push(`${numeroApribile('senzaGiri', senzaGiri)} ${senzaGiri === 1 ? 'lavoro ha avuto il via libera ma le sue verifiche sono più vecchie del registro' : 'lavori hanno avuto il via libera ma le loro verifiche sono più vecchie del registro'}: quanto ${senzaGiri === 1 ? 'è costato' : 'sono costati'} non si sa.`);
+    if (ignoti) coda.push(`${numeroApribile('ignoti', ignoti)} ${ignoti === 1 ? 'lavoro non è' : 'lavori non sono'} fra le segnalazioni caricate, quindi non se ne conosce l'esito.`);
     // La frase diceva «su tutta la storia del lavoro», e la riga in cima alla
     // scheda diceva il contrario: il registro tiene le ultime esecuzioni, e i
     // giri più vecchi di così non si contano. Due frasi opposte sulla stessa
@@ -4928,10 +4950,10 @@
     const soloRegistro = stat.copertura.logCorto
       ? `Si contano i giri che il registro conserva, che parte dal ${FS.dataBreve(stat.copertura.logDa)}: un lavoro cominciato prima può risultare più economico di quanto è stato. `
       : 'Le critiche si contano su tutta la storia del lavoro che il registro conserva, anche i giri successi fuori dalla finestra. ';
-    mgFsPieHint.textContent = 'Un lavoro esce dal giro automatico quando la verifica non ha più niente da ridire. '
+    mgFsPieHint.innerHTML = esc('Un lavoro esce dal giro automatico quando la verifica non ha più niente da ridire. '
       + 'Ogni verifica in più è una critica che l\'ha rimandato indietro. '
       + soloRegistro
-      + 'Quelli fermati aspettano una tua decisione e non entrano nella media. '
+      + 'Quelli fermati aspettano una tua decisione e non entrano nella media. ')
       + coda.join(' ');
 
     if (!totale) {
@@ -4979,13 +5001,13 @@
     const media = stat.giri.media;
     mgFsPieMid.innerHTML = media == null
       ? '<span>Nessun via libera in questa finestra</span>'
-      : `<b>${esc(media.toFixed(1))}</b><span>critiche in media prima del via libera</span>`;
+      : `<b>${esc(fsCifra(media, 1))}</b><span>critiche in media prima del via libera</span>`;
 
     mgFsLegend.innerHTML = fette.map((f) => `<li data-group="${esc(f.key)}" tabindex="0" role="button"`
       + ` title="${esc(`Mostra ${f.n === 1 ? 'la segnalazione contata' : 'le segnalazioni contate'}`)}">`
       + `<span class="mg-fs-sw" style="background:${FS_COLORI[f.key] || FS_COLORI.g0}"></span>`
       + `<span>${esc(f.label)}</span>`
-      + `<span class="mg-fs-legend-n">${f.n}</span></li>`).join('');
+      + `<span class="mg-fs-legend-n">${esc(fsNum(f.n))}</span></li>`).join('');
   }
 
   // Lo stato vuoto della sezione: la ciambella si TOGLIE invece di lasciare un
@@ -5092,7 +5114,7 @@
     // sembra un errore di conto, non una scala.
     const ultimo = punti[punti.length - 1];
     mgFsTrendAxis.innerHTML = `<span>${esc(punti[0].label)}</span>`
-      + `<span>punta: ${max}</span>`
+      + `<span>punta: ${esc(fsNum(max))}</span>`
       + (ultimo.chiave === punti[0].chiave ? '<span></span>' : `<span>${esc(ultimo.label)}</span>`);
   }
 
@@ -5109,21 +5131,25 @@
       fsTile('attesa', FS.durata(t.presaInCarico.mediana), 'Attesa prima che tu lo prendessi in mano',
         stat.copertura.feedbackLetti === false
           ? 'segnalazioni non lette'
-          : (t.presaInCarico.n ? `mediana su ${t.presaInCarico.n}` : 'nessuno preso in mano qui'),
+          : (t.presaInCarico.n ? `mediana su ${fsNum(t.presaInCarico.n)}` : 'nessuno preso in mano qui'),
         t.presaInCarico.ids.length ? 'apri' : false),
       fsTile('durata', FS.durata(t.lavorazione.mediana), 'Durata di una lavorazione',
-        ko ? noto : (t.lavorazione.n ? `mediana su ${t.lavorazione.n}` : 'nessuna lavorazione chiusa qui'),
+        ko ? noto : (t.lavorazione.n ? `mediana su ${fsNum(t.lavorazione.n)}` : 'nessuna lavorazione chiusa qui'),
         t.lavorazione.ids.length ? 'apri' : false),
       // Il controllo di sicurezza e gli arenamenti si leggono sulle lavorazioni
       // della finestra, e quali siano lo dice il registro: senza, non sono zero.
       fsTile('audit', stat.audit.pass, 'Controlli di sicurezza passati',
-        ko ? noto : `${stat.audit.fail} bocciati · ${stat.audit.saltato} saltati da te`,
+        ko ? noto : `${fsNum(stat.audit.fail)} bocciati · ${fsNum(stat.audit.saltato)} saltati da te`,
         auditN ? 'espandi' : false),
+      // Il numero grande conta ARENAMENTI: una segnalazione arenata due volte
+      // ne vale due, quindi non è un conto di segnalazioni e non si apre.
+      // Ad aprirle è la riga piccola, come nel riquadro delle esplorazioni.
       fsTile('arenati', stat.arenati.lavorazioni, 'Lavorazioni arenate e rimesse in coda',
         ko ? noto : (stat.arenati.feedback
-          ? `su ${stat.arenati.feedback} ${stat.arenati.feedback === 1 ? 'segnalazione' : 'segnalazioni'}`
+          ? `su ${fsNum(stat.arenati.feedback)} ${stat.arenati.feedback === 1 ? 'segnalazione' : 'segnalazioni'}`
           : 'nessuna'),
-        stat.arenati.ids.length ? 'apri' : false),
+        false,
+        stat.arenati.ids.length ? 'arenatiFeedback' : ''),
     ].join('') + (det
       ? `<div class="mg-fs-detail"><h4>${esc(det.titolo)}</h4>${det.html}</div>`
       : '');
@@ -5178,9 +5204,12 @@
         const nomi = { pass: 'Controllo di sicurezza passato', fail: 'Controllo di sicurezza bocciato', saltato: 'Controllo di sicurezza saltato da te' };
         v = ids.length ? { label: nomi[chiave] || chiave, ids } : null;
       }
-      if (!v || !v.ids || !v.ids.length) return null;
+      if (!v) return null;
+      const idsBar = v.ids || [];
+      const manBar = v.mancanti || [];
+      if (!idsBar.length && !manBar.length) return null;
       const nome = v.label || fsEtichettaCreatore(chiave) || chiave;
-      return { ...desc, titolo: nome, ids: v.ids };
+      return { ...desc, titolo: nome, ids: idsBar, mancanti: manBar };
     }
 
     if (desc.tipo === 'fetta') {
@@ -5196,31 +5225,46 @@
     }
 
     if (desc.tipo === 'esito') {
+      // Anche i tre numeri scritti nella frase sotto il titolo: sono conti come
+      // gli altri, e prima erano gli unici a non portare da nessuna parte.
       const mappa = {
-        fermati:   { titolo: 'Fermati: aspettano una tua decisione', ids: fsStat.giri.fermatiIds },
-        rimandati: { titolo: 'Passati lasciando indietro dei rilievi', ids: fsStat.giri.rimandatiIds },
-        aperti:    { titolo: 'Ancora in mezzo al giro', ids: fsStat.giri.apertiIds },
+        fermati:     { titolo: 'Fermati: aspettano una tua decisione', ids: fsStat.giri.fermatiIds },
+        rimandati:   { titolo: 'Passati lasciando indietro dei rilievi', ids: fsStat.giri.rimandatiIds },
+        aperti:      { titolo: 'Ancora in mezzo al giro', ids: fsStat.giri.apertiIds },
+        statoIgnoto: { titolo: 'Stato cifrato: non leggibile con questa chiave', ids: fsStat.giri.statoIgnotoIds },
+        senzaGiri:   { titolo: 'Passati, ma le loro verifiche sono più vecchie del registro', ids: fsStat.giri.senzaGiriIds },
+        ignoti:      { titolo: 'Lavorati, ma non fra le segnalazioni caricate', ids: [], mancanti: fsStat.giri.ignotiNumeri },
       };
       const v = mappa[chiave];
-      if (!v || !v.ids || !v.ids.length) return null;
-      return { ...desc, titolo: v.titolo, ids: v.ids };
+      if (!v) return null;
+      const man = v.mancanti || [];
+      if (!v.ids.length && !man.length) return null;
+      return { ...desc, titolo: v.titolo, ids: v.ids, mancanti: man };
     }
 
     if (desc.tipo === 'tile') {
       // Ogni riquadro che ha contato delle segnalazioni, compresi i quattro
       // della fila in fondo: un numero si apre su cosa ha contato, e i loro
       // sottotitoli contano segnalazioni esattamente come gli altri.
+      // Il terzo posto sono i NUMERI che il conto ha contato senza una
+      // segnalazione dietro: l'elenco li nomina, così numero ed elenco dicono
+      // la stessa cifra invece di divergere in silenzio.
       const dietro = {
         ricevuti: ['Feedback ricevuti in questa finestra', fsStat.ricevuti.ids],
-        lavorati: ['Feedback lavorati in questa finestra', fsStat.lavorati.ids],
-        // `prober` (il numero grande) conta partenze, non segnalazioni: non sta
-        // qui apposta. A contare segnalazioni è la riga piccola sotto.
+        lavorati: ['Feedback lavorati in questa finestra', fsStat.lavorati.ids, fsStat.lavorati.mancanti],
+        // `prober` e `arenati` (i numeri grandi) contano partenze e
+        // arenamenti, non segnalazioni: non stanno qui apposta. A contare
+        // segnalazioni è la riga piccola sotto.
         proberTrovate: ['Segnalazioni trovate dall\'esploratore', fsStat.prober.ritrovamentiIds],
         attesa:   ['Segnalazioni che hai preso in mano', fsStat.tempi.presaInCarico.ids],
-        durata:   ['Lavorazioni misurate in questa finestra', fsStat.tempi.lavorazione.ids],
-        arenati:  ['Segnalazioni la cui lavorazione si è arenata', fsStat.arenati.ids],
+        durata:   ['Lavorazioni misurate in questa finestra', fsStat.tempi.lavorazione.ids, fsStat.tempi.lavorazione.mancanti],
+        audit:    ['Controllo di sicurezza passato', (fsStat.auditIds || {}).pass],
+        arenatiFeedback: ['Segnalazioni la cui lavorazione si è arenata', fsStat.arenati.ids],
       }[chiave];
-      if (dietro && dietro[1] && dietro[1].length) return { ...desc, titolo: dietro[0], ids: dietro[1] };
+      if (!dietro) return null;
+      const ids = dietro[1] || [];
+      const man = dietro[2] || [];
+      if (ids.length || man.length) return { ...desc, titolo: dietro[0], ids, mancanti: man };
     }
     return null;
   }
@@ -5241,9 +5285,16 @@
     const src = fsRisolvi(fsDrill);
     if (!src) { mgFsDrill.hidden = true; mgFsDrillList.innerHTML = ''; return; }
     mgFsDrill.hidden = false;
-    const n = src.ids.length;
-    mgFsDrillTitle.textContent = `${src.titolo} · ${n} ${n === 1 ? 'segnalazione' : 'segnalazioni'}`;
+    const mancanti = src.mancanti || [];
+    const n = src.ids.length + mancanti.length;
+    mgFsDrillTitle.textContent = `${src.titolo} · ${fsNum(n)} ${n === 1 ? 'segnalazione' : 'segnalazioni'}`;
     const perId = new Map((fsFeedbacks || []).map((f) => [f._id, f]));
+    // Prima quelle che si possono guardare, poi i numeri che il registro cita
+    // e la lista non ha: restano contati e nominati, invece di sparire.
+    const righeMancanti = mancanti.map((num) => '<li><button type="button" class="mg-fs-drill-row" disabled'
+      + ' title="Il registro delle esecuzioni la cita, ma non è fra le segnalazioni caricate">'
+      + `<span class="mg-fs-drill-num">#${esc(String(num))}</span>`
+      + '<span class="mg-fs-drill-t">Lavorata, ma non è fra le segnalazioni caricate.</span></button></li>').join('');
     mgFsDrillList.innerHTML = src.ids.map((id) => {
       const fb = perId.get(id);
       if (!fb) {
@@ -5265,7 +5316,7 @@
         + `<span class="mg-fs-drill-num">${num ? '#' + esc(num) : '—'}</span>`
         + `<span class="mg-fs-drill-t">${esc(titolo)}</span>`
         + `<span class="mg-fs-drill-cat">${esc(cat.label)}</span></button></li>`;
-    }).join('');
+    }).join('') + righeMancanti;
   }
 
   // Il menu del tasto destro della scheda: le stesse azioni del clic, più la
@@ -5379,11 +5430,22 @@
     }
     const src = fsSorgente(el);
     if (src) {
-      const n = src.ids.length;
+      const n = src.ids.length + ((src.mancanti || []).length);
       voci.push({
         label: `Mostra ${n === 1 ? 'la segnalazione contata' : `le ${n} segnalazioni contate`}`,
         run: () => fsApriDrill(src),
       });
+    } else if (el && el.querySelectorAll) {
+      // Una FRASE che contiene dei numeri (quella sotto il titolo della torta):
+      // il tasto destro sulla frase offre i conti che ci stanno dentro, uno per
+      // voce, invece del menu generale della pagina. Sul numero da solo resta
+      // il suo menu, più corto.
+      for (const b of el.querySelectorAll('[data-fs-esito]')) {
+        const s2 = fsSorgente(b);
+        if (!s2) continue;
+        const n2 = s2.ids.length + ((s2.mancanti || []).length);
+        voci.push({ label: `Mostra ${s2.titolo.toLowerCase()} (${fsNum(n2)})`, run: () => fsApriDrill(s2) });
+      }
     }
     // Nome e numero della cosa sotto il dito, pronti da incollare altrove.
     const testo = fsTestoRiga(el, src);
@@ -5418,8 +5480,13 @@
     const esito = el.closest('[data-fs-esito]');
     if (esito) {
       const b = esito.querySelector('b');
-      const resto = esito.textContent.slice((b ? b.textContent : '').length).trim();
-      return `${resto}: ${b ? b.textContent.trim() : ''}`;
+      // Senza il numero in grassetto è uno dei conti scritti dentro una frase:
+      // lì il nome della cosa contata lo sa solo il conto, non il DOM attorno.
+      if (b) {
+        const resto = esito.textContent.slice(b.textContent.length).trim();
+        return `${resto}: ${b.textContent.trim()}`;
+      }
+      if (src) return `${src.titolo}: ${fsNum(src.ids.length + ((src.mancanti || []).length))}`;
     }
     const punto = el.closest('[data-fs-punto]');
     if (punto) return punto.getAttribute('title') || '';
@@ -5429,7 +5496,7 @@
       const t = tile.querySelector('.mg-tile-t');
       if (n && t) return `${t.textContent.trim()}: ${n.textContent.trim()}`;
     }
-    if (src) return `${src.titolo}: ${src.ids.length}`;
+    if (src) return `${src.titolo}: ${fsNum(src.ids.length + ((src.mancanti || []).length))}`;
     return '';
   }
 

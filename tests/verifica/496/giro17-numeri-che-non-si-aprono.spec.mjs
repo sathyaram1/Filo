@@ -59,7 +59,10 @@ test('#496 giro17 — i numeri sotto i riquadri non si aprono su cosa hanno cont
     // La riga piccola del riquadro delle esplorazioni: è lei a contare
     // segnalazioni, mentre il numero grande conta partenze (giro 21).
     ['[data-fs-id="proberTrovate"]',  'le 2 segnalazioni trovate dall\'esploratore'],
-    ['[data-fs-id="arenati"]', 'la segnalazione arenata'],
+    // Come sopra: il numero grande degli arenamenti conta ARENAMENTI (una
+    // segnalazione arenata due volte ne vale due), e a contare segnalazioni è
+    // la riga piccola «su N segnalazioni» (giro 23).
+    ['[data-fs-id="arenatiFeedback"]', 'la segnalazione arenata'],
     ['[data-fs-id="attesa"]',  'la segnalazione presa in mano'],
     ['[data-fs-id="durata"]',  'la lavorazione misurata'],
   ];

@@ -845,12 +845,13 @@
         ignoti: ignotiN,
         senzaGiri: senzaGiriN,
         senzaGiriIds: idsSenzaGiri,
+        ignotiNumeri: ignotiNumeri,
       },
       tempi: {
         // L'attesa prima della presa in carico si misura sulle SEGNALAZIONI: la
         // si sa anche col registro giù. La durata di una lavorazione no.
         presaInCarico: { mediana: seNotoFb(mediana(attesePresa)), n: seNotoFb(attesePresa.length), ids: attesePresaIds },
-        lavorazione: { mediana: seNoto(mediana(durateLavoro)), n: seNoto(durateLavoro.length), ids: durateIds },
+        lavorazione: { mediana: seNoto(mediana(durateLavoro)), n: seNoto(durateLavoro.length), ids: durateIds, mancanti: durateMancanti },
       },
       audit: { pass: seNoto(audit.pass), fail: seNoto(audit.fail), saltato: seNoto(audit.saltato) },
       auditIds: auditIds,
