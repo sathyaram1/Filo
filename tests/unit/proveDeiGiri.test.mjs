@@ -139,10 +139,17 @@ test('un controllo dentro un commento o una stringa non conta come controllo', (
   assert.equal(asserisceQualcosa("assert.deepEqual(a, b);"), true);
 });
 
-test('la dichiarazione di passaggio si legge solo nell\'intestazione', () => {
+test('la dichiarazione di passaggio si legge solo dove un file dice cos\'è', () => {
   assert.equal(siDichiaraTemporanea('// AUDIT (routine, throwaway): esercita la pagina.\nimport x from "y";'), true);
   assert.equal(siDichiaraTemporanea('// TEMP audit spec. Delete after.\n'), true);
-  assert.equal(siDichiaraTemporanea('// Prova vera della funzione.\nconst nota = "questa riga è temporanea";'), false);
+  assert.equal(siDichiaraTemporanea('// Prova vera.\nconst nota = "questa riga è temporanea";'), false);
+  // Una prova vera che racconta un «cancella» dell'app non si sta descrivendo:
+  // accusarla per quello fa cancellare copertura buona.
+  assert.equal(siDichiaraTemporanea([
+    '// Disegna su tutta la finestra di Filo.',
+    '// Il bottone compare perché ora c\'è qualcosa da cancellare, e un solo',
+    '// clic deve bastare a togliere il disegno temporaneo dalla barra.',
+  ].join('\n')), false);
 });
 
 test('lo scorrimento non perde né inventa pezzi di codice', () => {
