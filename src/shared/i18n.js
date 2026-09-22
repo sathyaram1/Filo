@@ -398,7 +398,11 @@
     reasoning_high: 'Alto',
     admin_defaults_sort: 'host',
     admin_defaults_sort_desc:
-      'Come OpenRouter sceglie l\'host di questo modello. «Automatico» segue la scelta generale, che di serie è il prezzo. I fornitori esclusi restano esclusi.',
+      'Come OpenRouter sceglie l\'host di questo modello. «Automatico» segue la scelta generale qui sotto. I fornitori esclusi restano esclusi.',
+    admin_defaults_sort_general: 'Scelta generale degli host',
+    admin_defaults_sort_general_desc:
+      'Vale per i modelli lasciati su «Automatico». Di serie Filo non chiede nessun ordine e l\'host lo sceglie OpenRouter.',
+    provider_sort_general_auto: 'Lo sceglie OpenRouter',
     provider_sort_auto: 'Automatico',
     provider_sort_throughput: 'Più veloce',
     provider_sort_latency: 'Risposta più pronta',

@@ -96,6 +96,9 @@
     $('h-models').textContent = I18n.t('options_models');
     $('models-desc').textContent = I18n.t('options_models_desc');
     $('addModelRow').textContent = I18n.t('options_model_add');
+    $('providerSortLabel').textContent = I18n.t('admin_defaults_sort_general');
+    $('providerSortDesc').textContent = I18n.t('admin_defaults_sort_general_desc');
+    riempiSceltaGenerale();
     $('h-excluded').textContent = I18n.t('admin_defaults_excluded');
     $('excluded-desc').textContent = I18n.t('admin_defaults_excluded_desc');
     $('addExcludedRow').textContent = I18n.t('admin_defaults_excluded_add');
@@ -439,6 +442,21 @@
   }
 
   // ── Load / Save ─────────────────────────────────────────────────────────────
+  // Le voci della scelta generale sono le stesse delle righe, meno «Automatico»:
+  // a livello generale «automatico» vuol dire lasciar scegliere il router.
+  function riempiSceltaGenerale() {
+    const sel = $('providerSort');
+    sel.innerHTML = '';
+    for (const val of PROVIDER_SORTS) {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = val === 'auto'
+        ? I18n.t('provider_sort_general_auto')
+        : I18n.t('provider_sort_' + val);
+      sel.appendChild(opt);
+    }
+  }
+
   function applyConfig(cfg) {
     const present = cfg.apiKeysPresent || {};
     $('apiKey-state').textContent = `(${keyStateText(present.openrouter)})`;
@@ -449,6 +467,7 @@
     // Lista EFFETTIVA (codice ⊕ override remoto): è quella che l'app applica, ed
     // è quella che il salvataggio riscrive per intero.
     renderExcluded(cfg.excludedProviders || []);
+    $('providerSort').value = normSort(cfg.providerSort) || 'auto';
     // Combobox modelli: semina con gli id già nel registry (compaiono subito),
     // poi carica i cataloghi completi in background (non blocca il render).
     seedDatalistsFromRegistry(cfg.modelRegistry || {});
@@ -495,6 +514,7 @@
     const config = {
       modelRegistry: collectModelRegistry(),
       models: collectModels(),
+      providerSort: normSort($('providerSort').value) || '',
     };
     // Fornitori esclusi: si invia la lista SOLO se l'owner l'ha toccata (anche
     // per svuotarla: [] è un valore, e viaggia). Salvarla a ogni salvataggio
