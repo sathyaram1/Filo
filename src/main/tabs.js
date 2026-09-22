@@ -974,13 +974,14 @@ class TabManager {
       const url = tab.url || '';
       if (!url || tab.isInternal || url.startsWith('filo://')) return;
       if (!/^https?:\/\//i.test(url)) return;
-      // #591, giro 9 — l'archiviazione non si ferma qui: manda titolo e testo
-      // della pagina al modello per il riassunto e l'indice di ricerca. Dalla
-      // rete di casa (router, NAS, stampante, applicazione in prova) sta alla
-      // larga, come il riordino automatico e come gli stadi di rete del
-      // rilevamento siti pericolosi. La domanda è quella, non una copia.
+      // #591, giro 9 — l'archivio resta locale e prende tutto; quello che ESCE
+      // di casa è l'arricchimento (riassunto e indice di ricerca li fa il
+      // modello). Dalla rete di casa — router, NAS, stampante, applicazione in
+      // prova — non deve uscire niente, come per il riordino automatico e per
+      // gli stadi di rete del rilevamento siti pericolosi. La domanda è quella,
+      // non una copia.
       const T = globalThis.SN_TAB_TRIAGE;
-      if (!T || typeof T.isTriageableUrl !== 'function' || !T.isTriageableUrl(url)) return;
+      const fuoriCasa = !!(T && typeof T.isTriageableUrl === 'function' && T.isTriageableUrl(url));
       const coOpenUrls = this.tabs
         .filter((t) => t.id !== tab.id && t.url && /^https?:\/\//i.test(t.url))
         .map((t) => t.url);
