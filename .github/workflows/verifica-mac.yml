@@ -32,6 +32,9 @@ on:
     paths:
       - '.github/workflows/verifica-mac.yml'
       - 'scripts/after-pack-mac.js'
+      # Lo smistatore comune decide se la firma locale per Mac viene messa: se
+      # cambia lui, cambia il pacchetto anche senza toccare la firma.
+      - 'scripts/after-pack.js'
       - 'assets/icons/icon-1024.png'
       # Il primo passo di questo lavoro E' la sentinella: se cambia lei, cambia
       # cosa questo lavoro controlla, e va rifatto girare.
