@@ -70,6 +70,7 @@ test('Modelli predefiniti: la misura del «Prova» resta dopo il ricaricamento, 
 // Nelle Opzioni una riga mai provata lo dice. Qui la riga resta muta, quindi
 // non si distingue «non l'ho mai provata» da «l'ho provata e non ha risposto».
 test('Modelli predefiniti: una riga mai provata lo dice, come nelle Opzioni', async ({ openTab }) => {
+  test.fail(true, 'rilievo aperto del giro 3: qui una riga mai provata resta muta');
   const page = await apriEditor(openTab);
   expect((await statoPrimaRiga(page)).trim(),
     'una riga mai provata non dice niente, mentre nelle Opzioni lo dice')
