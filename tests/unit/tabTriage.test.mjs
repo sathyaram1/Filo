@@ -11,6 +11,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+// «È un indirizzo della rete di casa?» è una domanda sola, e vive col
+// rilevamento siti pericolosi: il riordino la legge da lì (#591, ottavo giro).
+import '../../src/main/services/safebrowse/index.js';
 import '../../src/shared/tabTriage.js';
 
 const T = globalThis.SN_TAB_TRIAGE;
@@ -80,4 +83,21 @@ test('un duplicato con form non inviato non viene collassato', () => {
   // Quello con form sporco (indice 1) è saltato; l'altro è unico → nessun dup.
   assert.equal(dup.has(1), false);
   assert.equal(dup.size, 0);
+});
+
+// #591, ottavo giro — il riordino parte da solo ed è acceso di serie, e di ogni
+// scheda che prende manda al modello indirizzo, titolo ed estratto del testo.
+// Le pagine della rete di casa (router, NAS, stampante, applicazione in prova)
+// non devono uscire di casa: è la porta che il quinto giro ha chiuso sul
+// riconoscimento del blocco geografico, che manda le stesse cose.
+test('le pagine della rete di casa non sono candidabili al riordino', () => {
+  for (const url of [
+    'http://192.168.1.1/admin',
+    'http://10.0.0.5/setup',
+    'http://172.16.4.2/status',
+    'http://127.0.0.1:3000/',
+    'http://localhost:8080/',
+    'http://mio-nas.local/files',
+    'http://stampante.lan/',
+  ]) assert.equal(T.isTriageableUrl(url), false, url);
 });

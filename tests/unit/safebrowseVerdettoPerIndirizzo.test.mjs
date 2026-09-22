@@ -266,3 +266,59 @@ test('la pagina che l\'utente ha lasciato non fa tornare in fila la sua verifica
   assert.deepEqual(profonde.filter((p) => p.includes('esempio-591-lasciata')), [],
     'una pagina che la scheda ha lasciato non deve rubare il posto a quella dove l\'utente è');
 });
+
+// #591, ottavo giro — la domanda all'elenco dei siti di truffa è su UN
+// indirizzo, quindi la risposta non può valere per tutto il sito: sui servizi
+// dove i file sono di persone diverse faceva due danni opposti.
+test('la risposta dell\'elenco dei siti di truffa è dell\'indirizzo, non di tutto il sito', async () => {
+  const PULITO = 'https://drive.condiviso.com/file/relazione';
+  const ELENCATO = 'https://drive.condiviso.com/file/accesso-paypal-verifica';
+  const gsb = async (u) => (u === ELENCATO
+    ? { listed: true, category: 'phishing', threatType: 'SOCIAL_ENGINEERING' }
+    : { listed: false });
+
+  pulisci();
+  const chieste = [];
+  SB.setProviders({ gsb: async (u) => { chieste.push(u); return gsb(u); }, rdap: null, ct: null, llm: null, sandbox: null });
+  SB.analyze(PULITO, {}, () => {});
+  await attendi(20);
+  SB.analyze(ELENCATO, {}, () => {});
+  await attendi(20);
+  assert.equal(chieste.includes(ELENCATO), true, 'il file di truffa va chiesto: la risposta di un altro file non è la sua');
+  assert.equal(SB.checkSync(ELENCATO, {}).level, 'pericoloso');
+
+  pulisci();
+  SB.setProviders({ gsb, rdap: null, ct: null, llm: null, sandbox: null });
+  SB.analyze(ELENCATO, {}, () => {});
+  await attendi(20);
+  SB.analyze(PULITO, {}, () => {});
+  await attendi(20);
+  assert.notEqual(SB.checkSync(PULITO, {}).level, 'pericoloso',
+    'il file di un\'altra persona, sullo stesso sito, non si prende la pagina rossa dell\'altro');
+});
+
+// #591, ottavo giro — la scheda rimasta sulla pagina la riottiene: il conto
+// della catena lo può aver svuotato la pagina ostile che ti ha portato qui.
+test('la scheda rimasta sulla truffa ottiene il controllo anche a catena svuotata', async () => {
+  pulisci();
+  const profonde = [];
+  SB.setProviders({
+    gsb: null, rdap: null, ct: null,
+    llm: async (meta) => { profonde.push(meta.host); return { suspicious: false }; },
+    sandbox: null,
+  });
+  const truffa = 'http://paypa1-verifica.esempio-591-catena.tk/login';
+  const tm = schedaSu(truffa);
+  // La pagina ostile si porta da sola su indirizzi suoi, dentro questa scheda.
+  for (let i = 0; i < SB.DEEP_MAX_PER_CATENA + 1; i++) {
+    tm.safebrowseGet(1, `http://paypa1-esca-${i}.pages.dev/login`, { hasPassword: true });
+    await attendi(5);
+  }
+  profonde.length = 0;
+  tm.safebrowseGet(1, truffa, { hasPassword: true });
+  await attendi(30);
+  assert.deepEqual(profonde, [], 'a catena vuota la verifica non parte subito');
+  await attendi(6200);
+  assert.notDeepEqual(profonde, [],
+    'la scheda è rimasta qui: il controllo della truffa non si perde per una raffica altrui');
+});
