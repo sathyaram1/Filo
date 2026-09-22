@@ -390,17 +390,16 @@
     return !!(el.tagName === 'DETAILS' && !el.open);
   }
 
-  // Schiacciato da una trasformazione fino a non avere più area: il riquadro e quello che contiene non arrivano
-  // sullo schermo, qualunque sia l'overflow. Conta l'AREA che resta (il determinante), non un fattore preso da
-  // solo: una rotazione di novanta gradi ne azzera due su quattro e lascia il testo leggibile, girato (#505).
+  // Schiacciato da una trasformazione fino a non avere più area. Conta l'area che resta (il determinante), non un
+  // fattore da solo: una rotazione di novanta gradi ne azzera due su quattro e il testo resta leggibile, girato (#505).
   function isScaledToNothing(cs) {
     const t = cs.transform;
     if (!t || t === 'none') return false;
     const nums = t.slice(t.indexOf('(') + 1, -1).split(',').map((n) => parseFloat(n));
     if (nums.some((n) => !Number.isFinite(n))) return false;
     if (nums.length === 6) return Math.abs(nums[0] * nums[3] - nums[1] * nums[2]) < 1e-6;
-    // matrix3d: l'area che resta sul piano dello schermo è il determinante del blocco in alto a sinistra. Così
-    // rotateX/rotateY di novanta gradi (di taglio, invisibili) restano nascosti e rotateZ no.
+    // Nello spazio conta lo stesso determinante sul piano dello schermo: una rotazione di taglio non lascia area,
+    // una rotazione nel piano sì.
     if (nums.length === 16) return Math.abs(nums[0] * nums[5] - nums[1] * nums[4]) < 1e-6;
     return false;
   }
@@ -415,11 +414,10 @@
     return r.top < (vx.innerHeight || 0) && r.bottom > 0 && r.left < (vx.innerWidth || 0) && r.right > 0;
   }
 
-  // Sfilato dove non si arriva scorrendo (`left:-9999px`, un cassetto traslato via). Chi è ancorato alla finestra
-  // è irraggiungibile da OGNI lato, perché lo scorrimento non lo muove; chi è appoggiato al documento solo sopra e
-  // a sinistra dell'origine, perché a destra e sotto allunga lui stesso l'area su cui si scorre (#505). Solo fuori
-  // flusso, o ci finirebbero le diapositive già passate di una giostra, a cui si torna con una strisciata.
+  // Sfilato dove non si arriva scorrendo. Ancorato alla finestra è fuori portata da OGNI lato, perché scorrere non lo
+  // muove; appoggiato al documento solo sopra e a sinistra, perché sotto e a destra è lui ad allungare l'area (#505).
   function isPushedOutOfPage(el, cs) {
+    // Solo fuori flusso: in flusso ci finirebbero le diapositive passate di una giostra, a cui si torna strisciando.
     const ancorato = cs.position === 'fixed';
     if (!ancorato && cs.position !== 'absolute') return false;
     let r;
@@ -434,9 +432,8 @@
     return (w > 0 && r.left >= w) || (h > 0 && r.top >= h);
   }
 
-  // Ritagliato via del tutto da una maschera (`clip-path: inset(100%)`, il modo in cui certi siti chiudono un
-  // pannello). Sotto i quattro pixel non si guarda: lì lo stesso ritaglio è la ricetta del testo per i lettori di
-  // schermo, che nessuno apre mai e che quindi va tradotto col resto invece di restare inglese per sempre.
+  // Ritagliato via del tutto da una maschera: è il modo in cui certi siti chiudono un pannello. Sotto i quattro
+  // pixel no: lì è la ricetta del testo per i lettori di schermo, che nessuno apre e che va tradotto col resto.
   function isClippedAwayByPath(el, cs) {
     const cp = cs.clipPath;
     if (!cp || cp.indexOf('inset(') !== 0) return false;

@@ -1490,9 +1490,12 @@ const RIPIEGATE = `<!doctype html><html lang="en"><body style="font:16px sans-se
   <div id="pScale" style="transform:scaleY(0)">ZZSCALE answer in a panel squashed by a transform.</div>
   <div id="pOff" style="position:absolute;left:-9999px;top:0">ZZOFF answer in a panel parked off the page.</div>
   <div id="pFade" style="opacity:0">ZZFADE answer in a panel left fully transparent.</div>
+  <div id="pRight" style="position:fixed;top:0;right:-9999px;width:300px">ZZRIGHT answer in a drawer parked past the right edge.</div>
+  <div id="pSlide" style="position:fixed;top:0;right:0;width:300px;transform:translateX(100%)">ZZSLIDE answer in a drawer slid out to the right.</div>
+  <div id="pClip" style="clip-path:inset(100%)">ZZCLIP answer in a panel masked away completely.</div>
 </body></html>`;
 
-const TOKEN = ['ZZWRAP', 'ZZBARE', 'ZZMAX', 'ZZNONE', 'ZZSCALE', 'ZZOFF', 'ZZFADE'];
+const TOKEN = ['ZZWRAP', 'ZZBARE', 'ZZMAX', 'ZZNONE', 'ZZSCALE', 'ZZOFF', 'ZZFADE', 'ZZRIGHT', 'ZZSLIDE', 'ZZCLIP'];
 
 test('le sezioni ripiegate non si pagano in anticipo, comunque il sito le abbia chiuse', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app);
@@ -1543,6 +1546,9 @@ test('aperta una sezione ripiegata, il tasto destro offre di tradurre il testo s
     ['pannello trasformato', () => { document.getElementById('pScale').style.transform = 'none'; }, () => { document.getElementById('pScale').style.transform = 'scaleY(0)'; }],
     ['pannello fuori pagina', () => { document.getElementById('pOff').style.left = '0'; }, () => { document.getElementById('pOff').style.left = '-9999px'; }],
     ['pannello trasparente', () => { document.getElementById('pFade').style.opacity = '1'; }, () => { document.getElementById('pFade').style.opacity = '0'; }],
+    ['cassetto oltre il bordo destro', () => { document.getElementById('pRight').style.right = '0'; }, () => { document.getElementById('pRight').style.right = '-9999px'; }],
+    ['cassetto traslato a destra', () => { document.getElementById('pSlide').style.transform = 'none'; }, () => { document.getElementById('pSlide').style.transform = 'translateX(100%)'; }],
+    ['pannello mascherato via', () => { document.getElementById('pClip').style.clipPath = 'none'; }, () => { document.getElementById('pClip').style.clipPath = 'inset(100%)'; }],
   ];
   const muti = [];
   for (const [nome, apri, chiudi] of casi) {
@@ -1584,11 +1590,16 @@ test('quel che si vede continua a tradursi: scorrimento, pannelli aperti, testo 
     <div style="max-height:500px;overflow:hidden"><p id="inOpen">Text inside an accordion panel that is currently open.</p></div>
     <div style="width:80px;overflow-x:hidden;white-space:nowrap"><span id="inWide">A long single line of text that overflows sideways.</span></div>
     <div style="position:absolute;left:20px;top:2000px"><p id="inLow">Text parked far below the fold but still inside the page.</p></div>
+    <div style="transform:rotate(90deg);transform-origin:left top;margin:60px 0 0 60px"><p id="inTurned">A vertical side label that readers see turned ninety degrees.</p></div>
+    <div style="transform:rotate(-90deg);margin:90px 0 0 0"><p id="inTurnedBack">Another vertical label turned the other way round.</p></div>
+    <div style="clip-path:inset(50%);width:1px;height:1px;overflow:hidden;position:absolute"><span id="inScreenReader">Label meant for screen readers only.</span></div>
   </body></html>`);
   await watchToasts(page);
   await clickTranslateIcon(page, '#vis');
 
-  for (const id of ['#vis', '#inScroll', '#inOpen', '#inWide', '#inLow']) {
+  // Girato non vuol dire schiacciato: un'etichetta verticale si legge, e restare in inglese sotto un "Pagina
+  // tradotta" era il difetto (#505). Il testo per i lettori di schermo non si apre con un clic: si traduce ora.
+  for (const id of ['#vis', '#inScroll', '#inOpen', '#inWide', '#inLow', '#inTurned', '#inTurnedBack', '#inScreenReader']) {
     await expect(page.locator(id)).toHaveText(/^IT /, { timeout: 30000 });
   }
 });
