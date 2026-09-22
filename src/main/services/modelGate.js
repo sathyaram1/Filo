@@ -107,7 +107,8 @@
         try {
           await C.record({
             action, provider: f.provider, model: f.model,
-            usage: { costUsd: r.costUsd }, pricing: null, usdToEur: settings && settings.usdToEur,
+            usage: { costUsd: r.costUsd, keySource: f.keySource || '' },
+            pricing: null, usdToEur: settings && settings.usdToEur,
           });
         } catch (_) {}
       };
