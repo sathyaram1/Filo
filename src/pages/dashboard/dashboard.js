@@ -931,17 +931,19 @@
       // Dove si rimedia lo dice chi conosce i codici, non un elenco di casi
       // scritto qui: un ostacolo nuovo restava col solo «Riprova», che finché
       // l'ostacolo c'è rimanda sempre la stessa risposta (#663).
-      const dove = keyRefused ? 'crediti' : (window.SN_CHAT_ERRORS?.rimedio(r?.code) || '');
-      if (dove) {
+      const CE = window.SN_CHAT_ERRORS;
+      const pagina = keyRefused
+        ? { dove: 'crediti', url: 'filo://credits/credits.html', label: 'Apri Crediti' }
+        : (CE?.rimedioPagina ? CE.rimedioPagina(r?.code) : null);
+      if (pagina) {
         const via = document.createElement('button');
         via.type = 'button';
         via.className = 'dash-action-btn';
-        via.textContent = dove === 'crediti' ? 'Apri Crediti' : 'Apri Opzioni';
-        via.title = dove === 'opzioni'
+        via.textContent = pagina.label;
+        via.title = pagina.dove === 'opzioni'
           ? 'Scegli il modello per questa funzione'
           : (r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter');
-        const url = dove === 'crediti' ? 'filo://credits/credits.html' : 'filo://options/options.html';
-        via.addEventListener('click', () => chrome.tabs.create({ url }));
+        via.addEventListener('click', () => chrome.tabs.create({ url: pagina.url }));
         row.appendChild(via);
       }
       // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
