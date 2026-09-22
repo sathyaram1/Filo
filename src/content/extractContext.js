@@ -373,6 +373,7 @@
     if (isScaledToNothing(cs)) return true;
     if (isTransparentOnScreen(el, cs)) return true;
     if (isPushedOutOfPage(el, cs)) return true;
+    if (isClippedAwayByPath(el, cs)) return true;
     return isClippedToNothing(el, cs);
   }
 
