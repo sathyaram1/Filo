@@ -83,6 +83,10 @@ test('il tetto esaurito non ferma nulla in incognito', async ({ app }) => {
     out.incognito.fermato,
     'col mese esaurito il cancello deve fermare la chiamata anche in una finestra in incognito',
   ).toBe(true);
+  expect(
+    out.incognito.chiamataPartita,
+    'col mese esaurito la chiamata al fornitore non deve partire nemmeno in incognito',
+  ).toBe(false);
 });
 
 test('quello che si spende in incognito sparisce dal conto del mese', async ({ app }) => {
