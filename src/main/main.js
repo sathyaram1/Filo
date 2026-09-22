@@ -228,6 +228,10 @@ app.whenReady().then(async () => {
   // aggancia will-download così la barra in alto ne mostra l'avanzamento.
   try { require('./services/downloads').init().catch(() => {}); } catch (_) {}
 
+  // Una finestra normale può nascere anche senza di noi (la scadenza che deve
+  // farsi sentire ne apre una): il riferimento qui va aggiornato, o punta a una
+  // finestra chiusa.
+  onFinestraNormale((w) => { mainWindow = w; });
   mainWindow = createMainWindow();
   registerShortcuts(mainWindow);
 
