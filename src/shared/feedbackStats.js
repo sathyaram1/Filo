@@ -824,6 +824,7 @@
         durataMediana: seNoto(mediana(durateLavoro)),
         stati: ordinaPerN(statiLavorati),
         ids: idsRicevuti(statiLavorati),
+        mancanti: ignotiNumeri,
       },
       lanci: { totale: seNoto(lanciTot), perRuolo: ordinaRuoli(perRuolo) },
       // `ritrovamenti` viene dalle SEGNALAZIONI, non dal registro: quello si sa
