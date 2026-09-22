@@ -271,6 +271,27 @@
     return msg;
   }
 
+  // Il tasto che porta dove si toglie l'ostacolo, sotto il messaggio d'errore.
+  // Dove si rimedia lo dice SN_CHAT_ERRORS, non un elenco di casi scritto qui.
+  function mostraRimedio(afterEl, code) {
+    const CE = globalThis.SN_CHAT_ERRORS;
+    const pagina = CE && CE.rimedioPagina ? CE.rimedioPagina(code) : null;
+    if (!afterEl || !pagina) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-choices';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-sidebar-choice';
+    btn.textContent = pagina.label;
+    btn.addEventListener('click', () => {
+      try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
+    });
+    wrap.appendChild(btn);
+    afterEl.insertAdjacentElement('afterend', wrap);
+    const conv = convEl();
+    if (conv) conv.scrollTop = conv.scrollHeight;
+  }
+
   // Render dei bottoni "choices" sotto un messaggio dell'assistente.
   // Click → invia il prompt come messaggio utente e disattiva tutti i bottoni
   // (un solo percorso per turno).
