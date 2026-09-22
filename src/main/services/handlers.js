@@ -1389,6 +1389,25 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
     } catch (_) {}
   }
 
+  // CERCA_WEB: cercare è un ingresso e resta libero, ma prima di riportare
+  // indietro qualcosa SPEDISCE FUORI una frase scelta dal modello. Dopo aver
+  // letto un documento dell'utente quella frase può portarsi via il documento,
+  // senza un clic e senza una conferma (#533, ottavo giro di verifica). Stessa
+  // misura di NAVIGA: non si blocca, si alza a livello 2 e l'utente legge la
+  // domanda intera prima che parta. Il flag lo mette il main, mai l'LLM.
+  if (type === 'CERCA_WEB') {
+    try {
+      const Exfil = globalThis.SN_URL_EXFIL;
+      const query = String(action.query ?? action.q ?? action.testo ?? action.text ?? '').trim();
+      if (Exfil && query) {
+        const privato = (Compiti && task) ? Compiti.materialePrivato(task) : '';
+        const corpus = [await navExfilCorpus(), privato].filter(Boolean).join('\n');
+        const v = corpus ? Exfil.taint(`https://ricerca.invalid/?q=${encodeURIComponent(query)}`, corpus) : null;
+        if (v) { action._exfil = true; action._exfilReason = v.reason; }
+      }
+    } catch (_) {}
+  }
+
   // CANCELLA_SVEGLIA / MODIFICA_SVEGLIA: il livello dipende da QUANTE sveglie o
   // timer il riferimento dell'utente prende davvero — cosa che solo il main sa,
   // avendo la lista. Risolviamo il riferimento PRIMA del gate e iniettiamo
