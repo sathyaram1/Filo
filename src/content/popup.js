@@ -1219,9 +1219,12 @@
         popup.activePort = null;
       } else if (m.type === 'error') {
         // L'errore va LETTO: è l'unica cosa rimasta da leggere, la vista ci va.
+        // E va letto in italiano: la riga grezza del servizio («OpenRouter 402:
+        // {…}») non dice niente a chi ha finito i crediti (#663).
         scrollaConservando(popup, () => {
-          bubble.text.textContent = m.message || I18n.t('err_provider_failed');
+          bubble.text.textContent = frasePerLUtente(m);
           bubble.wrap.classList.add('sn-msg-error');
+          aggiungiRimedio(bubble.text, m.code);
         }, true);
         popup.activePort = null;
       }
