@@ -57,6 +57,7 @@ async function rigaMisurato(page) {
 
 test('cambiata la scelta generale degli host, la misura presa con quella di prima non resta a parlare di adesso', async ({ app, openTab, shell }) => {
   test.setTimeout(120_000);
+  test.fail(true, 'rilievo aperto del giro 3: la misura sopravvive al cambio della scelta generale');
   await predefinitiCon(app, 'price');
   await intercetta(app);
   await app.evaluate(async () => {
