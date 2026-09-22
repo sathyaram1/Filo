@@ -53,10 +53,12 @@ async function preparaModello(app) {
 }
 
 async function chiediSpiegazione(app, page) {
-  await page.evaluate(async () => {
-    const M = window.SN_MESSAGES || (window.SN_CONST && window.SN_CONST.MSG);
-    await chrome.runtime.sendMessage({ type: M.AI_EXPLAIN, text: 'una parola', context: '' });
-  });
+  const esito = await page.evaluate(async () => window.filo.message({
+    type: 'ai_request',
+    action: 'explain',
+    payload: { messages: [{ role: 'user', content: 'scelta generale ' + Date.now() }] },
+  }));
+  expect(esito && esito.ok, `chiamata fallita: ${JSON.stringify(esito)}`).toBeTruthy();
   return app.evaluate(async () =>
     globalThis.__richieste.filter((r) => r.url.includes('/chat/completions')).pop());
 }
