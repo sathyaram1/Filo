@@ -102,7 +102,11 @@ test('una riga con un soprannome già usato non viene salvata, e la pagina dice 
 });
 
 // Il metro: nelle Opzioni, sui modelli propri, la stessa riga viene segnalata.
-test('nelle Opzioni la stessa riga senza soprannome viene segnalata', async ({ openTab }) => {
+test('nelle Opzioni la stessa riga senza soprannome viene segnalata', async ({ app, openTab }) => {
+  // I modelli propri si vedono solo con l'interruttore dei predefiniti spento.
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ useDefaultModels: false });
+  });
   const page = await openTab('filo://options/options.html');
   await page.waitForSelector('#addModelRow', { timeout: 15_000 });
   await page.click('#addModelRow');
