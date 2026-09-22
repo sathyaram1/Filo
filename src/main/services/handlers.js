@@ -1137,6 +1137,11 @@ async function ricercaPortaFuori(query, task) {
     const Exfil = globalThis.SN_URL_EXFIL;
     const q = String(query || '').trim();
     if (!Exfil || !q) return null;
+    // Solo da una richiesta che ha letto roba scritta da altri: se nessuno le
+    // ha ancora parlato, la domanda è quella dell'utente e chiedergli conferma
+    // dei suoi stessi dati è solo un fastidio. Di un compito che non si
+    // conosce si pensa il peggio, come per le conversazioni riprese.
+    if (task && !task.contaminato) return null;
     const Compiti = globalThis.SN_COMPITI;
     const privato = (Compiti && task) ? Compiti.materialePrivato(task) : '';
     const corpus = [await navExfilCorpus(), privato].filter(Boolean).join('\n');
