@@ -201,6 +201,10 @@
 
   const HAS_LETTER = /\p{L}/u;
 
+  // Valori di overflow che TAGLIANO quel che esce dal riquadro: con uno di
+  // questi, misura zero vuol dire che dentro non si vede niente.
+  const CLIPPING_OVERFLOW = new Set(['hidden', 'clip', 'scroll', 'auto']);
+
   // ---------------------------------------------------------------------------
   // Testo che si legge sullo schermo ma non sta nella pagina: sta negli
   // ATTRIBUTI (#407). Il grigio dentro un campo di ricerca (`placeholder`), il
@@ -333,7 +337,7 @@
     // anche se un domani comparisse un tag radice non previsto nella lista sopra.
     if (el.namespaceURI && el.namespaceURI !== HTML_NS) return 'tag';
     const hard = hardSkipForTranslation(el);
-    if (hard === 'hidden') return 'hidden';
+    if (hard === 'hidden' || hard === 'visibility') return hard;
     return hard ? 'hard' : false;
   }
 
@@ -342,7 +346,8 @@
     if (el.getAttribute && el.getAttribute('translate') === 'no') return true;
     if (el.classList && el.classList.contains('notranslate')) return true;
     if (isFiloOwnUi(el)) return true;
-    return isVisibilityHidden(el) ? 'hidden' : false;
+    const nascosto = isVisibilityHidden(el);
+    return nascosto ? (nascosto === 'visibility' ? 'visibility' : 'hidden') : false;
   }
 
   // Nascosto in questo momento: una fisarmonica chiusa, la scheda che non è in
@@ -351,15 +356,119 @@
   // del testo che il sito AGGIUNGE dopo, e va trattato uguale (#407): non si
   // traduce adesso, ma appena si vede il menu deve offrire di tradurlo, invece
   // di lasciare come unica strada tornare all'originale e ripagare la pagina.
+  // Il sito sceglie COME ripiegare una sezione, e da quella scelta non possono
+  // dipendere né il comportamento né il conto dell'utente (#505).
   function isVisibilityHidden(el) {
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
     if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true;
+    // Prima dello stile: su una pagina di domande frequenti la risposta è quasi sempre questa, e chiedere lo stile
+    // di migliaia di elementi per scoprirlo si sente all'apertura del menu.
+    if (isInsideClosedDisclosure(el)) return true;
     // La finestra dell'elemento, non la nostra: da quando la traduzione entra
     // nei riquadri senza indirizzo (#407) qui arrivano elementi di un ALTRO
     // documento, e chiederne lo stile alla finestra sbagliata non risponde di
     // loro.
     const cs = viewOf(el).getComputedStyle(el);
-    return cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse';
+    if (cs.display === 'none' || cs.contentVisibility === 'hidden') return true;
+    // La visibilità è l'unica ripiegatura che un figlio può disfare da solo (`visibility: visible`): chi chiama
+    // deve saperlo per scendere lo stesso, invece di lasciare in inglese del testo che si vede (#505).
+    if (cs.visibility === 'hidden' || cs.visibility === 'collapse') return 'visibility';
+    if (isFlattened(el)) return true;
+    if (isTransparentOnScreen(el, cs)) return true;
+    if (isPushedOutOfPage(el, cs)) return true;
+    if (isClippedAwayByPath(el, cs)) return true;
+    return isClippedToNothing(el, cs);
+  }
+
+  // La fisarmonica che fa il browser da sé: un <details> chiuso non tocca lo stile di quel che contiene (display resta
+  // block, e la misura pure), quindi la chiusura si legge solo dal <details>. Fuori la scritta, che si vede sempre.
+  function isInsideClosedDisclosure(el) {
+    const p = el.parentElement;
+    return !!(p && p.tagName === 'DETAILS' && !p.open && el.tagName !== 'SUMMARY');
+  }
+
+  // Un <details> chiuso nasconde anche il testo scritto senza un riquadro attorno, che non è figlio di niente da
+  // saltare: senza questa domanda la fisarmonica nella sua forma base si pagava da chiusa, con un riquadro no (#505).
+  function isOwnTextHidden(el) {
+    return !!(el.tagName === 'DETAILS' && !el.open);
+  }
+
+  // Schiacciato fino a non lasciare area sullo schermo. Si confronta la misura dell'elemento col rettangolo
+  // DIPINTO: risponde a ogni scrittura della trasformazione, anche a quelle che il CSS aggiungerà (#505).
+  function isFlattened(el) {
+    // Senza misura non c'è niente da schiacciare, e il testo può debordare: lì decide il ritaglio, più sotto.
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    if (!(w > 0 && h > 0)) return false;
+    let r;
+    try { r = el.getBoundingClientRect(); } catch (_) { return false; }
+    return r.width <= 0.5 || r.height <= 0.5;
+  }
+
+  // Trasparente MENTRE è sullo schermo: il menu a tendina chiuso, il suggerimento non ancora aperto. Fuori no: lì
+  // è quasi sempre una comparsa in dissolvenza allo scorrimento, e rimandarla lascerebbe mezzo articolo in inglese.
+  function isTransparentOnScreen(el, cs) {
+    if (!isFullyTransparent(cs)) return false;
+    let r;
+    try { r = el.getBoundingClientRect(); } catch (_) { return false; }
+    const vx = viewOf(el);
+    return r.top < (vx.innerHeight || 0) && r.bottom > 0 && r.left < (vx.innerWidth || 0) && r.right > 0;
+  }
+
+  // Niente di lui arriva all'occhio. L'opacità ha due scritture — la proprietà e il filtro — e sullo schermo
+  // danno lo stesso identico risultato: da quale delle due il sito ha scelto non può dipendere il conto (#505).
+  function isFullyTransparent(cs) {
+    if (parseFloat(cs.opacity) === 0) return true;
+    const f = cs.filter;
+    return !!(f && f !== 'none' && /(?:^|\s)opacity\(\s*0(?:\.0+)?%?\s*\)/.test(f));
+  }
+
+  // Sfilato dove non si arriva scorrendo. Ancorato alla finestra è fuori portata da OGNI lato, perché scorrere non lo
+  // muove; appoggiato al documento solo sopra e a sinistra, perché sotto e a destra è lui ad allungare l'area (#505).
+  function isPushedOutOfPage(el, cs) {
+    // Solo fuori flusso: in flusso ci finirebbero le diapositive passate di una giostra, a cui si torna strisciando.
+    const ancorato = cs.position === 'fixed';
+    if (!ancorato && cs.position !== 'absolute') return false;
+    let r;
+    try { r = el.getBoundingClientRect(); } catch (_) { return false; }
+    if (r.width <= 0 && r.height <= 0) return false;
+    const vx = viewOf(el);
+    if (!ancorato) return (r.right + (vx.scrollX || 0)) <= 0 || (r.bottom + (vx.scrollY || 0)) <= 0;
+    if (r.right <= 0 || r.bottom <= 0) return true;
+    // Una misura della finestra a zero vuol dire che non si sa: meglio tradurre che saltare tutta la pagina.
+    const w = vx.innerWidth || 0;
+    const h = vx.innerHeight || 0;
+    return (w > 0 && r.left >= w) || (h > 0 && r.top >= h);
+  }
+
+  // Ritagliato via del tutto da una maschera: è il modo in cui certi siti chiudono un pannello. Sotto i quattro
+  // pixel no: lì è la ricetta del testo per i lettori di schermo, che nessuno apre e che va tradotto col resto.
+  function isClippedAwayByPath(el, cs) {
+    const cp = cs.clipPath;
+    if (!cp || cp.indexOf('inset(') !== 0) return false;
+    let r;
+    try { r = el.getBoundingClientRect(); } catch (_) { return false; }
+    if (r.width < 4 || r.height < 4) return false;
+    const parti = cp.slice(6, cp.indexOf(')')).trim().split(/\s+/);
+    if (!parti.length || parti.length > 4) return false;
+    const [alto, destra = alto, basso = alto, sinistra = destra] = parti;
+    const misura = (v, base) => (v.endsWith('%') ? (parseFloat(v) / 100) * base : parseFloat(v));
+    const y = misura(alto, r.height) + misura(basso, r.height);
+    const x = misura(sinistra, r.width) + misura(destra, r.width);
+    if (!Number.isFinite(y) || !Number.isFinite(x)) return false;
+    return y >= r.height - 0.5 || x >= r.width - 0.5;
+  }
+
+  // Schiacciato a zero e ritagliato (`max-height:0` più `overflow:hidden`). Il RITAGLIO è la condizione che conta:
+  // a misura zero senza ritaglio il testo deborda e si legge; e a contenuto vuoto non c'è niente da rimandare.
+  function isClippedToNothing(el, cs) {
+    const clipsY = CLIPPING_OVERFLOW.has(cs.overflowY);
+    const clipsX = CLIPPING_OVERFLOW.has(cs.overflowX);
+    if (!clipsY && !clipsX) return false;
+    let r;
+    try { r = el.getBoundingClientRect(); } catch (_) { return false; }
+    if (clipsY && r.height <= 0.5 && el.scrollHeight > 0) return true;
+    return !!(clipsX && r.width <= 0.5 && el.scrollWidth > 0);
   }
 
   function viewOf(el) {
@@ -395,13 +504,17 @@
   // quindi deve costare poco: la lista è corta per costruzione (MAX_HIDDEN) e
   // la maggior parte degli elementi esce alla prima riga.
   function hasRevealedText(list) {
-    for (const el of (list || [])) {
+    for (const voce of (list || [])) {
       try {
+        // Due forme nella stessa lista: un sottoalbero rimandato, oppure il solo testo proprio di un elemento che
+        // si vede (la fisarmonica chiusa senza riquadro attorno alla risposta).
+        const own = !!(voce && voce.own);
+        const el = own ? voce.el : voce;
         if (!el || !el.isConnected) continue;
-        if (isVisibilityHidden(el)) continue;
-        const txt = (el.textContent || '');
-        if (!HAS_LETTER.test(txt)) continue;
         if (el.dataset && el.dataset.snTranslated) continue;
+        if (own ? isOwnTextHidden(el) : isVisibilityHidden(el)) continue;
+        const txt = own ? ownTextOf(el) : (el.textContent || '');
+        if (!HAS_LETTER.test(txt)) continue;
         return true;
       } catch (_) {}
     }
@@ -550,10 +663,21 @@
   // l'avviso finale: senza, una pagina enorme veniva dichiarata "tradotta" con
   // la coda ancora in lingua originale (la bugia di #407, altra causa). Contare
   // costa una camminata nel DOM, niente richieste al modello.
-  // Quanti sottoalberi nascosti tenere d'occhio: la lista serve al menu del
-  // tasto destro, che deve aprirsi subito. Una pagina con centinaia di sezioni
-  // ripiegate ne segna le prime: basta una per offrire "traduci quello nuovo".
-  const MAX_HIDDEN = 200;
+  // Guardia contro la pagina patologica, non una misura: a 200 una pagina di domande frequenti un po' lunga lo
+  // superava, e la sezione aperta oltre il tetto non faceva più offrire niente se non ripagare tutto (#505).
+  const MAX_HIDDEN = 5000;
+
+  // Figli della pagina e, se il componente è aperto, quelli del suo albero a parte: in ordine di lettura.
+  function pushKids(el, stack, shadowRoots) {
+    const kids = [];
+    const shadow = el.shadowRoot;
+    if (shadow) {
+      if (shadowRoots.length < 500) shadowRoots.push(shadow);
+      for (const c of shadow.children) kids.push(c);
+    }
+    for (const c of el.children) kids.push(c);
+    for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+  }
 
   function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
     const root = document.body || document.documentElement;
@@ -576,6 +700,9 @@
     // Sottoalberi nascosti ADESSO (#407): non entrano nel lavoro, ma se
     // l'utente li scopre il menu deve offrire di tradurli.
     const hidden = [];
+    // Le radici dei sottoalberi resi invisibili: dentro ci si scende, ma la sezione da riproporre al menu è una
+    // sola — la cima — non un elemento per ogni riga che contiene.
+    const sottoInvisibile = new WeakSet();
     let unreachable = 0;
     let truncated = 0;
     const room = () => out.length + attrs.length < maxBlocks;
@@ -607,6 +734,16 @@
       // partenza spegnerebbe la traduzione dell'intera pagina, che prima invece
       // partiva. Il filtro vale — come prima — da lì in giù.
       const skip = el !== root && skipSubtreeForTranslation(el);
+      // Invisibile per `visibility`, che un figlio può riprendersi: si segna come ogni altra ripiegatura, ma la
+      // camminata continua là sotto, se no il testo che si vede resta in inglese e il menu non lo offre (#505).
+      if (skip === 'visibility') {
+        const p = el.parentElement;
+        if (!(p && sottoInvisibile.has(p)) && hidden.length < MAX_HIDDEN
+            && HAS_LETTER.test(el.textContent || '')) hidden.push(el);
+        sottoInvisibile.add(el);
+        pushKids(el, stack, shadowRoots);
+        continue;
+      }
       if (skip) {
         // Sottoalbero senza prosa: il contenuto resta intoccato, ma le sue
         // etichette (placeholder di un campo, suggerimento di un bottone,
@@ -644,20 +781,16 @@
         // Serve almeno una lettera: numeri, bullet e simboli non si traducono.
         const txt = ownTextOf(el);
         if (txt.length >= 2 && HAS_LETTER.test(txt)) {
-          if (room()) out.push({ el, text: txt });
+          // L'elemento si vede, il suo testo no: la fisarmonica chiusa con la risposta scritta senza riquadro
+          // attorno. Si rimanda come ogni altra sezione ripiegata, segnandola perché il menu se ne accorga (#505).
+          if (isOwnTextHidden(el)) {
+            if (hidden.length < MAX_HIDDEN) hidden.push({ el, own: true });
+          } else if (room()) out.push({ el, text: txt });
           else truncated++;
         }
       }
-      const kids = [];
-      const shadow = el.shadowRoot;
-      if (shadow) {
-        if (shadowRoots.length < 500) shadowRoots.push(shadow);
-        for (const c of shadow.children) kids.push(c);
-      } else if (isClosedComponent(el)) {
-        unreachable++;
-      }
-      for (const c of el.children) kids.push(c);
-      for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+      if (isClosedComponent(el) && !el.shadowRoot) unreachable++;
+      pushKids(el, stack, shadowRoots);
     }
     return Object.assign(out, { unreachable, truncated, attrs, mirrors, shadowRoots, frameDocs, hidden });
   }

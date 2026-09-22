@@ -875,6 +875,80 @@ test('la sezione ripiegata che si apre DOPO si traduce dal menu, senza rifare il
   expect(doubled).toBe(0);
 });
 
+// #505 — il sito sceglie COME ripiegare una sezione, e quella scelta non deve
+// cambiare né il comportamento né il conto: far sparire il riquadro, lasciarlo
+// al browser (<details>) o schiacciarlo a zero e ritagliarlo sono la stessa
+// cosa per chi guarda lo schermo. Prima l'ultimo caso veniva tradotto subito e
+// pagato anche da chi non l'avrebbe mai aperto.
+const FOLDS = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">One gesture, three ways of folding a section away</h1>
+  <p id="visible">The paragraph anyone can read without opening anything at all.</p>
+
+  <button id="t1" onclick="document.getElementById('gone').style.display='block'">Open the first one</button>
+  <div id="gone" style="display:none">
+    <p id="gbody">The body of the section the site makes disappear entirely.</p>
+  </div>
+
+  <button id="t2" onclick="document.getElementById('squashed').style.maxHeight='500px'">Open the second one</button>
+  <div id="squashed" style="max-height:0;overflow:hidden">
+    <p id="sbody">The body of the section the site squashes down to nothing.</p>
+  </div>
+
+  <details id="det">
+    <summary id="dsum">Open the third one</summary>
+    <p id="detbody">The body of the section the browser folds away by itself.</p>
+  </details>
+</body></html>`;
+
+const foldedTexts = (page) => page.evaluate(() => ({
+  gone: document.getElementById('gbody').textContent || '',
+  squashed: document.getElementById('sbody').textContent || '',
+  details: document.getElementById('detbody').textContent || '',
+}));
+
+async function translateNewFromMenu(page) {
+  await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
+  const icon = page.locator('[data-sn-icon-id="translate"]');
+  await expect(icon).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
+  await icon.click();
+}
+
+test('ripiegata, schiacciata a zero o lasciata al browser: una sezione chiusa vale come le altre', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180000);
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, FOLDS);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#visible');
+
+  await expect(page.locator('#visible')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(page.locator('#dsum')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+
+  // Nessuna delle tre sezioni chiuse è stata pagata: quello che l'utente non
+  // vede non si traduce, comunque il sito abbia scelto di chiuderlo.
+  const before = await foldedTexts(page);
+  expect(before.gone).not.toMatch(/^IT /);
+  expect(before.squashed).not.toMatch(/^IT /);
+  expect(before.details).not.toMatch(/^IT /);
+
+  // …e aprendole si traducono, allo stesso prezzo: un blocco per sezione.
+  let paid = await blocksSent(app);
+  for (const [open, body] of [['#t1', '#gbody'], ['#t2', '#sbody'], ['#dsum', '#detbody']]) {
+    await page.locator(open).click();
+    await translateNewFromMenu(page);
+    await expect(page.locator(body)).toHaveText(/^IT /, { timeout: 60000 });
+    const now = await blocksSent(app);
+    expect(now - paid).toBe(1);
+    paid = now;
+  }
+
+  // Niente pagato due volte lungo la strada.
+  const doubled = await page.evaluate(() => Array.from(document.querySelectorAll('[data-sn-translated="1"]'))
+    .filter((el) => /^IT\s+IT\s/.test(el.textContent || '')).length);
+  expect(doubled).toBe(0);
+  await page.screenshot({ path: 'tests/.shots/translate-page-folds.png' }).catch(() => {});
+});
+
 // Le scritte sui bottoni dei moduli: su <input> la scritta è `value`. La riga
 // di confine passa in mezzo agli input — si traduce ciò che si legge, mai ciò
 // che il modulo rimanda indietro (e il valore di un bottone parte solo se il
@@ -1394,4 +1468,145 @@ test('"Mostra originale" rimette a posto anche le etichette copiate dal testo', 
   expect(back.btnLabel).toBe('Subscribe to the newsletter');
   expect(back.wrappedTitle).toBe('Open the gallery');
   expect(back.differentTitle).toBe('Opens in a new window');
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// #505 — come il sito RIPIEGA una sezione non può decidere né cosa vede
+// l'utente né quanto paga. Qui la stessa sezione è ripiegata in sette modi
+// diversi: nessuno dei sette deve partire verso il modello prima che l'utente
+// apra, e ognuno dei sette, una volta aperto, deve far offrire la traduzione.
+// ───────────────────────────────────────────────────────────────────────────
+
+const RIPIEGATE = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <p id="vis">A visible paragraph that every reader sees without clicking anything at all.</p>
+  <details id="dWrap"><summary id="sWrap">Question with a wrapper</summary>
+    <div id="pWrap">ZZWRAP answer kept inside a block element of its own.</div>
+  </details>
+  <details id="dBare"><summary id="sBare">Question without a wrapper</summary>
+    ZZBARE answer written straight under the question, with no block around it.
+  </details>
+  <div id="pMax" style="max-height:0;overflow:hidden">ZZMAX answer in a panel squashed to zero height.</div>
+  <div id="pNone" style="display:none">ZZNONE answer in a panel switched off entirely.</div>
+  <div id="pScale" style="transform:scaleY(0)">ZZSCALE answer in a panel squashed by a transform.</div>
+  <div id="pOff" style="position:absolute;left:-9999px;top:0">ZZOFF answer in a panel parked off the page.</div>
+  <div id="pFade" style="opacity:0">ZZFADE answer in a panel left fully transparent.</div>
+  <div id="pRight" style="position:fixed;top:0;right:-9999px;width:300px">ZZRIGHT answer in a drawer parked past the right edge.</div>
+  <div id="pSlide" style="position:fixed;top:0;right:0;width:300px;transform:translateX(100%)">ZZSLIDE answer in a drawer slid out to the right.</div>
+  <div id="pClip" style="clip-path:inset(100%)">ZZCLIP answer in a panel masked away completely.</div>
+  <div id="pProp" style="scale:1 0">ZZPROP answer in a panel squashed with the short spelling of the transform.</div>
+  <div id="pFilt" style="filter:opacity(0)">ZZFILT answer in a panel left fully transparent by a filter.</div>
+</body></html>`;
+
+const TOKEN = ['ZZWRAP', 'ZZBARE', 'ZZMAX', 'ZZNONE', 'ZZSCALE', 'ZZOFF', 'ZZFADE', 'ZZRIGHT', 'ZZSLIDE', 'ZZCLIP',
+  'ZZPROP', 'ZZFILT'];
+
+test('le sezioni ripiegate non si pagano in anticipo, comunque il sito le abbia chiuse', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, RIPIEGATE);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#vis');
+
+  await expect(page.locator('#vis')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(page.locator('#sBare')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+
+  const sent = await app.evaluate(() => (globalThis.__filoTranslatePrompts || []).join('\n'));
+  const pagate = TOKEN.filter((t) => sent.includes(t));
+  expect(pagate, `ripiegature spedite al modello: ${pagate.join(', ')}`).toEqual([]);
+});
+
+test('aperta una sezione ripiegata, il tasto destro offre di tradurre il testo scoperto', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, RIPIEGATE);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#vis');
+  await expect(page.locator('#vis')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+
+  const label = async (apri, chiudi) => {
+    await page.evaluate(apri);
+    await page.waitForTimeout(120);
+    await page.locator('#vis').click({ button: 'right', position: { x: 5, y: 5 } });
+    const btn = page.locator('[data-sn-icon-id="translate"]');
+    await expect(btn).toBeVisible();
+    const l = await btn.getAttribute('aria-label');
+    await page.keyboard.press('Escape');
+    await page.evaluate(chiudi);
+    await page.waitForTimeout(120);
+    return l;
+  };
+
+  // Prima di toccare niente l'icona torna all'originale: è il metro degli altri.
+  await page.locator('#vis').click({ button: 'right', position: { x: 5, y: 5 } });
+  await expect(page.locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Mostra originale');
+  await page.keyboard.press('Escape');
+
+  const casi = [
+    ['fisarmonica con riquadro', () => { document.getElementById('dWrap').open = true; }, () => { document.getElementById('dWrap').open = false; }],
+    ['fisarmonica senza riquadro', () => { document.getElementById('dBare').open = true; }, () => { document.getElementById('dBare').open = false; }],
+    ['pannello schiacciato', () => { document.getElementById('pMax').style.maxHeight = 'none'; }, () => { document.getElementById('pMax').style.maxHeight = '0'; }],
+    ['pannello spento', () => { document.getElementById('pNone').style.display = 'block'; }, () => { document.getElementById('pNone').style.display = 'none'; }],
+    ['pannello trasformato', () => { document.getElementById('pScale').style.transform = 'none'; }, () => { document.getElementById('pScale').style.transform = 'scaleY(0)'; }],
+    ['pannello fuori pagina', () => { document.getElementById('pOff').style.left = '0'; }, () => { document.getElementById('pOff').style.left = '-9999px'; }],
+    ['pannello trasparente', () => { document.getElementById('pFade').style.opacity = '1'; }, () => { document.getElementById('pFade').style.opacity = '0'; }],
+    ['cassetto oltre il bordo destro', () => { document.getElementById('pRight').style.right = '0'; }, () => { document.getElementById('pRight').style.right = '-9999px'; }],
+    ['cassetto traslato a destra', () => { document.getElementById('pSlide').style.transform = 'none'; }, () => { document.getElementById('pSlide').style.transform = 'translateX(100%)'; }],
+    ['pannello mascherato via', () => { document.getElementById('pClip').style.clipPath = 'none'; }, () => { document.getElementById('pClip').style.clipPath = 'inset(100%)'; }],
+    ['pannello schiacciato dalla scrittura breve', () => { document.getElementById('pProp').style.scale = 'none'; }, () => { document.getElementById('pProp').style.scale = '1 0'; }],
+    ['pannello trasparente per un filtro', () => { document.getElementById('pFilt').style.filter = 'none'; }, () => { document.getElementById('pFilt').style.filter = 'opacity(0)'; }],
+  ];
+  const muti = [];
+  for (const [nome, apri, chiudi] of casi) {
+    if (await label(apri, chiudi) !== 'Traduci il testo nuovo') muti.push(nome);
+  }
+  expect(muti, `ripiegature che, aperte, non fanno offrire niente: ${muti.join(', ')}`).toEqual([]);
+});
+
+test('il testo scoperto si traduce senza rispedire al modello la pagina già tradotta', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, RIPIEGATE);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#vis');
+  await expect(page.locator('#vis')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  const primo = await app.evaluate(() => (globalThis.__filoTranslatePrompts || []).join('\n'));
+
+  await page.evaluate(() => { document.getElementById('dBare').open = true; });
+  await page.waitForTimeout(150);
+  await clickTranslateIcon(page, '#vis');
+
+  // SUCCESSO: la risposta appena scoperta è passata dal traduttore. Si guarda il
+  // solo testo PROPRIO della sezione: quello della domanda era già tradotto dal
+  // primo giro, e sommarli confonderebbe i due.
+  const rispostaPropria = () => page.evaluate(() => Array.from(document.getElementById('dBare').childNodes)
+    .filter((n) => n.nodeType === 3).map((n) => n.nodeValue).join('').trim());
+  await expect.poll(rispostaPropria, { timeout: 30000 }).toMatch(/^IT /);
+  const dopo = (await app.evaluate(() => (globalThis.__filoTranslatePrompts || []).join('\n'))).slice(primo.length);
+  expect(dopo).toContain('ZZBARE');
+  // …e il resto della pagina non è tornato al modello una seconda volta.
+  expect(dopo).not.toContain('visible paragraph');
+});
+
+test('quel che si vede continua a tradursi: scorrimento, pannelli aperti, testo che sborda', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+    <p id="vis">A visible paragraph that every reader sees without clicking anything at all.</p>
+    <div style="max-height:40px;overflow:auto"><p id="inScroll">Text inside a scrollable box, clipped but readable by scrolling.</p></div>
+    <div style="max-height:500px;overflow:hidden"><p id="inOpen">Text inside an accordion panel that is currently open.</p></div>
+    <div style="width:80px;overflow-x:hidden;white-space:nowrap"><span id="inWide">A long single line of text that overflows sideways.</span></div>
+    <div style="position:absolute;left:20px;top:2000px"><p id="inLow">Text parked far below the fold but still inside the page.</p></div>
+    <div style="transform:rotate(90deg);transform-origin:left top;margin:60px 0 0 60px"><p id="inTurned">A vertical side label that readers see turned ninety degrees.</p></div>
+    <div style="transform:rotate(-90deg);margin:90px 0 0 0"><p id="inTurnedBack">Another vertical label turned the other way round.</p></div>
+    <div style="clip-path:inset(50%);width:1px;height:1px;overflow:hidden;position:absolute"><span id="inScreenReader">Label meant for screen readers only.</span></div>
+    <div style="visibility:hidden"><p id="inShown" style="visibility:visible">Text a child takes back into view inside an invisible container.</p></div>
+  </body></html>`);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#vis');
+
+  // Girato non vuol dire schiacciato: un'etichetta verticale si legge, e restare in inglese sotto un "Pagina
+  // tradotta" era il difetto (#505). Il testo per i lettori di schermo non si apre con un clic: si traduce ora.
+  for (const id of ['#vis', '#inScroll', '#inOpen', '#inWide', '#inLow', '#inTurned', '#inTurnedBack', '#inScreenReader',
+    '#inShown']) {
+    await expect(page.locator(id)).toHaveText(/^IT /, { timeout: 30000 });
+  }
 });

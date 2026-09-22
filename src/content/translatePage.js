@@ -94,6 +94,11 @@
   // tradurli: scoprire del testo e riceverlo dal sito, per chi guarda lo
   // schermo, sono la stessa cosa (#407).
   let hiddenSkipped = [];
+  // Una sezione si apre o si chiude solo se la pagina cambia o se l'utente la tocca: finché nessuna delle due
+  // cose succede, la risposta di prima vale ancora.
+  let revealedDirty = true;
+  let revealedAnswer = false;
+  let revealWatchOn = false;
   // Numero d'ordine del lavoro in corso. Chi chiede l'originale lo fa avanzare:
   // le richieste rimaste in volo si accorgono di non essere più quelle buone e
   // si buttano via, invece di scaricarsi addosso a una pagina che l'utente ha
@@ -216,6 +221,8 @@
           stopWatchingNewContent();
           newContentSeen = false;
           hiddenSkipped = [];
+          revealedDirty = true;
+          revealedAnswer = false;
         }
       }
     }
@@ -232,6 +239,7 @@
     // Anche i riquadri riempiti dalla pagina stessa sono alberi a parte (#407).
     addWatchRoots(blocks.frameDocs);
     hiddenSkipped = blocks.hidden || [];
+    revealedDirty = true;
     // Pezzi di pagina che nessuno script può leggere (#439): non entrano nel
     // lavoro, ma cambiano l'avviso finale — "Pagina tradotta" sarebbe falso.
     const unreachable = Number(blocks.unreachable || 0);
@@ -573,6 +581,7 @@
     if (typeof MutationObserver !== 'function') return;
     try {
       contentObserver = new MutationObserver((muts) => {
+        revealedDirty = true;
         if (newContentSeen) return;
         for (const m of muts) {
           for (const n of m.addedNodes) {
@@ -583,6 +592,23 @@
       contentObserver.observe(document.documentElement || document, { childList: true, subtree: true });
       addWatchRoots(extraRoots);
     } catch (_) { contentObserver = null; }
+    startWatchingReveal();
+  }
+
+  // Le fisarmoniche fatte di solo CSS (la casella nascosta, il bersaglio nell'indirizzo) si aprono senza toccare
+  // il documento: la sentinella lì non vede niente, ma un dito l'utente ce l'ha messo.
+  function startWatchingReveal() {
+    if (revealWatchOn) return;
+    revealWatchOn = true;
+    // Il tasto di fuga chiude, non apre: è quello con cui si esce dal menu, e sporcare lì la risposta vorrebbe
+    // dire rifare la camminata a ogni apertura, cioè proprio dove il risparmio serve.
+    const tocco = (e) => { if (!e || e.type !== 'keyup' || (e.key !== 'Escape' && e.key !== 'Esc')) revealedDirty = true; };
+    try {
+      // Il tasto destro non entra: è lui ad aprire il menu, e segnarlo sporco a ogni apertura annullerebbe il
+      // risparmio proprio dove serve.
+      document.addEventListener('click', tocco, true);
+      document.addEventListener('keyup', tocco, true);
+    } catch (_) {}
   }
 
   // I componenti aperti del sito sono alberi a parte: vanno sorvegliati uno per
@@ -889,6 +915,8 @@
     stopWatchingNewContent();
     newContentSeen = false;
     hiddenSkipped = [];
+    revealedDirty = true;
+    revealedAnswer = false;
     // Il lavoro ancora in volo smette di essere quello buono: quando le
     // risposte arriveranno si butteranno via da sole, invece di ritradurre a
     // metà una pagina che l'utente ha appena riportato indietro.
@@ -972,8 +1000,13 @@
   function hasNewContent() {
     if (!pageHasTranslation || !pageComplete) return false;
     if (newContentSeen) return true;
-    return !!(Extract && typeof Extract.hasRevealedText === 'function'
+    // La risposta costa una camminata su TUTTE le sezioni rimandate, e il tasto destro è la cosa che in Filo si
+    // apre più spesso: si rifà solo se da allora la pagina è cambiata o l'utente l'ha toccata (#505).
+    if (!revealedDirty) return revealedAnswer;
+    revealedDirty = false;
+    revealedAnswer = !!(Extract && typeof Extract.hasRevealedText === 'function'
       && Extract.hasRevealedText(hiddenSkipped));
+    return revealedAnswer;
   }
   // C'è dell'altro da tradurre, per un motivo o per l'altro: nei due casi
   // l'icona del menu serve a CONTINUARE, non a tornare all'originale.
