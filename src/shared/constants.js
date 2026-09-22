@@ -2445,6 +2445,7 @@
     normalizeProviderSort,
     misuraValePer,
     providerRoutingFor,
+    ordinamentoEffettivo,
     DEFAULT_EXCLUDED_PROVIDERS,
     normalizeProviderName,
     isProviderExcluded,
