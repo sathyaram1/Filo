@@ -96,6 +96,24 @@ function normalizePath(input) {
 }
 
 /**
+ * Un percorso di RETE (\\server\condivisione, o //server/condivisione). Su
+ * Windows aprirlo fa partire una connessione verso quel nome e manda le
+ * credenziali dell'utente all'altro capo, e il nome lo sceglie il modello: è la
+ * via d'uscita di una richiesta che ha letto, senza che nessuno clicchi niente
+ * (#533, settimo giro di verifica). Regola unica per tutto ciò che apre un file
+ * dell'utente. Vale su ogni sistema: un percorso vero non comincia mai con due
+ * barre, quindi rifiutarle non toglie casi legittimi. PURA.
+ */
+function percorsoDiRete(raw) {
+  const s = String(raw == null ? '' : raw)
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .trim();
+  return /^[\\/]{2}[^\\/]/.test(s);
+}
+
+/**
  * Che tipo di file è, dalla sola estensione. PURA.
  * → 'pdf' | 'text' | { binary: 'spiegazione' } | 'unknown'
  */
