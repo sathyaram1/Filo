@@ -308,7 +308,13 @@
       },
       describe: (a) => {
         const built = prefBuilt(a);
-        if (!built) return 'Modificare una preferenza';
+        // Valore che nessun setter sa costruire: il popup lo dice PRIMA dell'OK,
+        // altrimenti l'utente conferma e non succede niente senza sapere perché.
+        if (!built) {
+          return 'Filo vuole cambiare un’impostazione, ma il valore che ha scelto non è '
+            + 'fra quelli che conosce: confermando non cambierà nulla. Dille com’è fatta '
+            + 'l’impostazione che vuoi (per esempio «modalità terminale attiva»).';
+        }
         // Il popup di conferma spiega COSA Filo sta per fare e, per le
         // impostazioni sensibili (livello 2), anche i RISCHI (#183). Il `risk`
         // arriva dal setter in preferences.js: è obbligatorio per il livello 2.
