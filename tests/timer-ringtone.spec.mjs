@@ -348,3 +348,23 @@ test('senza una finestra che la vede, la scadenza se ne fa aprire una', async ({
   await suonante.locator('#ring-indicator').click();
   await expect(suonante.locator('#ring-indicator')).toBeHidden({ timeout: 6_000 });
 });
+
+// Garantire una finestra mentre qualcosa suona non deve impedire di uscire: chi
+// chiede di chiudere Filo con un timer che squilla se lo vedrebbe riaprire da
+// solo, e l'uscita non finirebbe mai.
+test('con la suoneria in corso, Filo si chiude lo stesso', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+
+  const tipo = await shell.evaluate(() => window.SN_MSG.MSG.FILO_ADD_TIMER);
+  await shell.evaluate((t) => window.filoShell.message({ type: t, label: 'Pasta', seconds: 2 }), tipo);
+  await expect(shell.locator('#ring-indicator')).toBeVisible({ timeout: 15_000 });
+  expect(await shell.evaluate(() => window.SN_SOUNDS.isRinging())).toBe(true);
+
+  // Nessuna scorciatoia: se l'uscita non arriva, questa attesa scade.
+  const uscito = await Promise.race([
+    app.close().then(() => true),
+    new Promise((r) => setTimeout(() => r(false), 20_000)),
+  ]);
+  expect(uscito, 'la chiusura non deve restare appesa a una finestra riaperta').toBe(true);
+});
