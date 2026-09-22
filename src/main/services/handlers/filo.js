@@ -122,8 +122,8 @@ module.exports = function register(on, ctx) {
           if (st.mtimeMs < limite) await fs.promises.unlink(vecchio);
         } catch (_) {}
       }
-      file = path.join(dir, `${Date.now().toString(36)}-${C.fileName(ev)}`);
-      await fs.promises.writeFile(file, C.buildIcs(ev), 'utf8');
+      file = path.join(dir, C.fileName(ev));
+      await fs.promises.writeFile(file, C.buildIcs(ev, { uid: `${C.uidPer(ev)}@filo` }), 'utf8');
     } catch (e) {
       return { ok: false, error: e?.message || 'file non scritto' };
     }
