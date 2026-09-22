@@ -563,11 +563,15 @@
     }
   }
 
-  function applyConfig(cfg) {
+  function applyStatoChiavi(cfg) {
     const present = cfg.apiKeysPresent || {};
     $('apiKey-state').textContent = `(${keyStateText(present.openrouter)})`;
     $('apiKeyTavily-state').textContent = `(${keyStateText(present.tavily)})`;
     $('apiKeySafebrowse-state').textContent = `(${keyStateText(cfg.safeBrowsingKeyPresent)})`;
+  }
+
+  function applyConfig(cfg) {
+    applyStatoChiavi(cfg);
     renderModelRegistry(cfg.modelRegistry || {});
     renderModelsGrid(cfg.models || {});
     // Lista EFFETTIVA (codice ⊕ override remoto): è quella che l'app applica, ed
