@@ -95,50 +95,77 @@ const BLOCCHI = new Set([
 
 const LETTERA = /[a-zA-Z]/;
 
-// I modi di nascondere un blocco scritti attaccati all'elemento. Quello che
-// l'utente non vede non è contenuto della pagina: su una pagina scritta per chi
-// legge con un agente è l'esca, e al modello arrivava come testo del sito
-// (#553). Quelli che stanno nel foglio di stile da qui non si vedono.
-const NASCOSTO = new RegExp([
-  'display\\s*:\\s*none',
-  'visibility\\s*:\\s*hidden',
-  'opacity\\s*:\\s*0(\\.0+)?\\s*(;|$)',
-  'font-size\\s*:\\s*0(\\.0+)?[a-z%]*\\s*(;|$)',
-  '(left|right|top|bottom|text-indent)\\s*:\\s*-\\s*\\d{3,}',
-  'clip-path\\s*:\\s*inset\\(\\s*100',
-  'clip\\s*:\\s*rect\\(\\s*0',
-].map((r) => `(?:^|;)\\s*(?:${r})`).join('|'), 'i');
+// I nomi dei colori che servono a far sparire del testo. Gli altri non
+// servono: l'esca è bianco su bianco, o nero su nero.
+const NOMI_COLORE = { white: '#ffffff', black: '#000000', '#fff': '#ffffff', '#000': '#000000' };
 
-// Riquadro schiacciato a zero che taglia quello che contiene, e riquadro
-// rimpicciolito a zero: il testo resta nella pagina ma fuori dagli occhi.
-const SCHIACCIATO = /(?:^|;)\s*(?:width|height)\s*:\s*[01](?:\.\d+)?\s*(?:px)?\s*(?:;|$)/i;
-const RIMPICCIOLITO = /transform\s*:[^;]*\b(?:scale(?:3d|x|y)?|matrix)\s*\(\s*0(?:\.0+)?\s*[,)]/i;
-const INVISIBILE = /(?:^|;)\s*color\s*:\s*(?:transparent|rgba\s*\([^)]*,\s*0(?:\.0+)?\s*\))/i;
+/**
+ * Lo stile scritto addosso all'elemento, letto come DICHIARAZIONI. PURA.
+ *
+ * A confrontare il testo grezzo, «opacity:0!important» non somigliava a
+ * «opacity:0» e l'esca passava: la parola che serve a far vincere la regola la
+ * scrive proprio chi vuole che vinca (#553).
+ */
+function dichiarazioni(style) {
+  const out = new Map();
+  for (const pezzo of String(style || '').split(';')) {
+    const i = pezzo.indexOf(':');
+    if (i < 0) continue;
+    const nome = pezzo.slice(0, i).trim().toLowerCase();
+    if (nome) out.set(nome, pezzo.slice(i + 1).replace(/!\s*important\s*$/i, '').trim().toLowerCase());
+  }
+  return out;
+}
 
 /** Un colore CSS in una forma confrontabile. PURA. */
 function coloreNormale(v) {
   const s = String(v || '').trim().toLowerCase().replace(/\s+/g, '');
   const m = /^#([0-9a-f]{3,4})$/.exec(s);
-  return m ? `#${m[1].split('').map((c) => c + c).join('')}` : s;
+  const hex = m ? `#${m[1].split('').map((c) => c + c).join('')}` : s;
+  const rgb = /^rgba?\((\d+),(\d+),(\d+)/.exec(hex);
+  if (rgb) return `#${rgb.slice(1, 4).map((n) => Number(n).toString(16).padStart(2, '0')).join('')}`;
+  return NOMI_COLORE[hex] || hex;
+}
+
+/** Il numero di una misura CSS, o NaN. PURA. */
+function misura(v) {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : NaN;
 }
 
 /**
  * Questo elemento è nascosto da quello che ha scritto addosso? PURA.
  *
- * Il testo del colore dello sfondo l'utente non lo vede, e su una pagina
+ * Quello che l'utente non vede non è contenuto della pagina: su una pagina
  * scritta per chi legge con un agente è l'esca (#553). Il testo dipinto col
- * proprio sfondo resta: è il titolo sfumato, e si vede benissimo.
+ * proprio sfondo resta: è il titolo sfumato, e si vede benissimo. Quello che
+ * sta nel foglio di stile da qui non si vede: lo prende la lettura dalla
+ * scheda aperta, che guarda la pagina resa.
  */
 function nascostoInline(style) {
-  const s = String(style || '');
-  if (!s) return false;
-  if (NASCOSTO.test(s) || RIMPICCIOLITO.test(s)) return true;
-  if (SCHIACCIATO.test(s) && /overflow\s*:\s*hidden/i.test(s)) return true;
-  if (/background-clip\s*:\s*text/i.test(s)) return false;
-  if (INVISIBILE.test(s)) return true;
-  const testo = /(?:^|;)\s*color\s*:\s*([^;]+)/i.exec(s);
-  const sfondo = /(?:^|;)\s*background(?:-color)?\s*:\s*([^;]+)/i.exec(s);
-  return !!(testo && sfondo && coloreNormale(testo[1]) === coloreNormale(sfondo[1]));
+  const d = dichiarazioni(style);
+  if (!d.size) return false;
+  if (d.get('display') === 'none' || d.get('visibility') === 'hidden') return true;
+  if (misura(d.get('opacity')) === 0) return true;
+  const corpo = d.get('font-size');
+  if (corpo !== undefined && (misura(corpo) === 0 || (misura(corpo) < 1 && /px|pt|%/.test(corpo)))) return true;
+  for (const lato of ['left', 'right', 'top', 'bottom', 'text-indent']) {
+    if (misura(d.get(lato)) <= -100) return true;
+  }
+  // Il ritaglio con cui le librerie di stili tolgono dagli occhi il testo
+  // riservato ai lettori di schermo: metà o più del riquadro tagliata via.
+  const ritaglio = /inset\(\s*(\d+(?:\.\d+)?)%/.exec(d.get('clip-path') || '');
+  if (ritaglio && Number(ritaglio[1]) >= 50) return true;
+  if (/rect\(\s*0/.test(d.get('clip') || '')) return true;
+  if (/\b(?:scale(?:3d|x|y)?|matrix3?d?)\s*\(\s*0(?:\.0+)?\s*[,)]/.test(d.get('transform') || '')) return true;
+  const stretto = ['width', 'height'].some((k) => d.has(k) && misura(d.get(k)) <= 1);
+  const taglia = /hidden|clip/.test(`${d.get('overflow') || ''} ${d.get('overflow-x') || ''} ${d.get('overflow-y') || ''}`);
+  if (stretto && taglia) return true;
+  if (/text/.test(d.get('background-clip') || d.get('-webkit-background-clip') || '')) return false;
+  const testo = d.get('color');
+  if (testo === 'transparent' || /rgba\s*\([^)]*,\s*0(\.0+)?\s*\)/.test(testo || '')) return true;
+  const sfondo = d.get('background-color') ?? d.get('background');
+  return !!(testo && sfondo && coloreNormale(testo) === coloreNormale(sfondo));
 }
 
 /**
