@@ -23,6 +23,8 @@ test('l\'evento aggiunto dall\'utente resta «proposto» nella conversazione ria
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  // L'intervista di benvenuto aperta si prende ogni chat: qui servono le chat normali.
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
 
   await fakeProvider(app, [
     { toolCalls: [{ id: 'g4a', name: 'EVENTO_CALENDARIO', arguments: JSON.stringify({ titolo: 'Cena con Anna', data: '2026-10-02', ora: '20:30' }) }] },
@@ -53,6 +55,7 @@ test('l\'evento aggiunto dall\'utente resta «proposto» nella conversazione ria
   const note = (await riaperta.locator('.dash-bubble-note[data-replay="1"]').allTextContents()).join(' | ');
   await riaperta.screenshot({ path: 'tests/.shots/567-giro4-chat-riaperta-evento.png' });
 
+  expect(note, 'la chat riaperta non racconta niente di quel turno').not.toBe('');
   expect(note, `la chat riaperta racconta: ${JSON.stringify(note)}`).not.toContain('proposto un evento');
 
   await restore(app, '__v567g4a');
@@ -64,6 +67,8 @@ test('una conferma mai data torna nella conversazione riaperta come cosa fatta',
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  // L'intervista di benvenuto aperta si prende ogni chat: qui servono le chat normali.
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
 
   await fakeProvider(app, [
     { toolCalls: [{ id: 'g4b', name: 'CANCELLA_MEMORIA', arguments: '{}' }] },
@@ -90,7 +95,8 @@ test('una conferma mai data torna nella conversazione riaperta come cosa fatta',
   const note = (await riaperta.locator('.dash-bubble-note[data-replay="1"]').allTextContents()).join(' | ');
   await riaperta.screenshot({ path: 'tests/.shots/567-giro4-chat-riaperta-memoria.png' });
 
-  expect(note, `la chat riaperta racconta: ${JSON.stringify(note)}`).not.toContain('cancellato la memoria');
+  expect(note, 'la chat riaperta non racconta niente di quel turno').not.toBe('');
+  expect(note, `la memoria non è stata cancellata, ma la chat riaperta racconta: ${JSON.stringify(note)}`).not.toContain('cancellato la memoria');
 
   await restore(app, '__v567g4b');
 });
@@ -112,6 +118,8 @@ test('il riordino che non è potuto partire non deve leggersi come riuscito', as
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  // L'intervista di benvenuto aperta si prende ogni chat: qui servono le chat normali.
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
 
   await fakeProvider(app, [
     { toolCalls: [{ id: 'g4c', name: 'PULISCI_TAB', arguments: '{}' }] },
