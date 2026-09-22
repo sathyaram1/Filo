@@ -896,6 +896,21 @@
       interruttore('useDefaultModels', s.useDefaultModels !== false);
       interruttore('openWeightsOnly', s.openWeightsOnly === true);
       testo('monthlyLimit', s.monthlyLimitEur ?? 5);
+      // Il modello di un'azione si sceglie anche dal tasto destro di una pagina
+      // (la dettatura): senza ridisegnare la griglia, il salvataggio dopo la
+      // rimanderebbe indietro. Si ridisegna solo se è davvero cambiata e se
+      // nessuno ci sta scrivendo dentro, o si perderebbe quello che sta
+      // digitando (patterns/una-pagina-di-impostazioni-aperta-non-e-una-fotografia.md).
+      const griglia = $('modelsGrid');
+      const ciScrive = griglia && griglia.contains(document.activeElement);
+      if (s.models && griglia && !ciScrive
+        && JSON.stringify(ModelChain.collect(modelChains || {})) !== JSON.stringify(s.models)) {
+        modelChains = ModelChain.renderGrid(griglia, {
+          models: s.models,
+          onChange: saveDebounced,
+          getRegistry: () => collectModelRegistry().registry,
+        });
+      }
       // I due interruttori governano cosa si vede e cosa si può premere:
       // spostarli senza ridisegnare lascerebbe la pagina che si contraddice.
       applyDefaultModelsVisibility();
