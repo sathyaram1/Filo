@@ -897,6 +897,10 @@
       interruttore('useDefaultModels', s.useDefaultModels !== false);
       interruttore('openWeightsOnly', s.openWeightsOnly === true);
       testo('monthlyLimit', s.monthlyLimitEur ?? 5);
+      // I due interruttori governano cosa si vede e cosa si può premere:
+      // spostarli senza ridisegnare lascerebbe la pagina che si contraddice.
+      applyDefaultModelsVisibility();
+      applyOpenWeightsTestGates();
     });
   }
 
