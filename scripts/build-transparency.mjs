@@ -321,14 +321,27 @@ function buildDocs() {
   return { docs, glossary };
 }
 
-// Le quattro voci della navigazione. Quelle senza documento compaiono comunque,
-// spente: dire "in arrivo" è più onesto che far finta che la sezione non esista.
-const NAV = [
-  { id: 'models', label: 'Modelli' },
-  { id: 'privacy', label: 'Privacy' },
-  { id: 'security', label: 'Sicurezza' },
-  { id: 'business', label: 'Come si sostiene' },
+// Le aree ANNUNCIATE: compaiono nella barra anche senza documento, perché dire
+// "in arrivo" è più onesto che far finta che la sezione non esista.
+const AREE_ANNUNCIATE = [
+  { id: 'models', label: 'Modelli', order: 1 },
+  { id: 'privacy', label: 'Privacy', order: 2 },
+  { id: 'security', label: 'Sicurezza', order: 3 },
+  { id: 'business', label: 'Come si sostiene', order: 4 },
 ];
+
+// La barra non è un elenco a mano: le aree annunciate più OGNI documento
+// scritto. Un elenco fisso avrebbe nascosto un documento su un tema non
+// previsto — esiste, la chat lo offre, ma sfogliando non lo trova nessuno
+// (#515). L'etichetta corta la dà il front matter `nav`, altrimenti il titolo.
+function buildNav(docs) {
+  const voci = AREE_ANNUNCIATE.map((a) => ({ ...a }));
+  for (const d of docs) {
+    if (voci.some((v) => v.id === d.id)) continue;
+    voci.push({ id: d.id, label: d.nav || d.title, order: Number.isFinite(d.order) ? d.order : 99 });
+  }
+  return voci.sort((a, b) => a.order - b.order).map(({ id, label }) => ({ id, label }));
+}
 
 function emitModule({ docs, glossary }) {
   const payload = docs.map((d) => ({
