@@ -39,7 +39,9 @@ const safebrowseMethods = {
       ...(ctx || {}),
       ...this._sbSegnali(tab, url, ctx),
       incognito: !!this.incognito,
-      catena: catenaDi(tab),
+      // Un rinvio non è una navigazione: non deve tenere viva la catena della
+      // pagina ostile, o chi ha fatto una pausa non ne aprirebbe mai una nuova.
+      catena: insistito ? ((ctx && ctx.catena) || '') : catenaDi(tab),
       insistito: !!insistito,
     };
   },
