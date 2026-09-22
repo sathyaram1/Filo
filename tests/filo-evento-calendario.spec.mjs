@@ -28,8 +28,7 @@ test('un evento diventa un file vero, e il bottone in chat lo apre col calendari
 
   // Chi ha aperto per davvero: lo stub dei test annota shell.openPath invece di
   // chiamare il sistema.
-  await app.evaluate(() => {
-    const { shell } = require('electron');
+  await app.evaluate(({ shell }) => {
     globalThis.__aperti = [];
     globalThis.__origOpenPath = shell.openPath;
     shell.openPath = async (p) => { globalThis.__aperti.push(p); return ''; };
@@ -48,8 +47,7 @@ test('un evento diventa un file vero, e il bottone in chat lo apre col calendari
     return { bottone: true, prima, dopo: b.textContent };
   }, { type: 'EVENTO_CALENDARIO', titolo: 'Dentista', data: '2026-10-02', ora: '15:00', _output: r.output });
 
-  const aperti = await app.evaluate(() => {
-    const { shell } = require('electron');
+  const aperti = await app.evaluate(({ shell }) => {
     if (globalThis.__origOpenPath) shell.openPath = globalThis.__origOpenPath;
     return globalThis.__aperti || [];
   });

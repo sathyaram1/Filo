@@ -502,7 +502,10 @@
   // dove l'appunto è finito, e il controllo per scegliere la tinta esatta.
   // Aggiungerne una qui è obbligatorio quando le si dà una riga: senza, la riga
   // si mangia il bottone e la funzione sparisce dalla chat.
-  const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA'];
+  // L'evento del calendario sta qui perché la riga («Evento pronto») racconta,
+  // e il bottone è come lo si consegna davvero al calendario: senza, l'utente
+  // legge che c'è e non ha niente da premere (#533, ottavo giro di verifica).
+  const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA', 'EVENTO_CALENDARIO'];
 
   // `shown`: gli id delle chiamate già raccontate in diretta nel blocco di
   // attività (evento 'done'): a fine turno non si ripetono.

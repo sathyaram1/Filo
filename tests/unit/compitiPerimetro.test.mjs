@@ -111,7 +111,10 @@ test('chi legge senza aver dichiarato resta con «solo chat»: risponde e propon
   assert.deepEqual(c.perimetro, []);
   const ammessi = C.strumentiPermessi(c, Tools.NAMES);
   assert.ok(!ammessi.includes('NAVIGA'), 'un\'uscita non dichiarata non deve esistere per questo compito');
-  assert.ok(ammessi.includes('EVENTO_CALENDARIO'), 'proporre costa zero: resta sempre');
+  // Un evento non è più una proposta a costo zero: prepara un file e un
+  // bottone che lo consegna a un programma fuori da Filo, quindi si dichiara
+  // come le altre uscite (#533, ottavo giro di verifica).
+  assert.ok(!ammessi.includes('EVENTO_CALENDARIO'), 'un evento che nessuno ha chiesto non si prepara');
   assert.ok(ammessi.includes('CERCA_WEB'), 'leggere resta sempre libero');
   // Dichiarare dopo aver letto non vale: l'elenco potrebbe venire dalla pagina.
   assert.equal(C.dichiara(c, ['memoria']).ok, false);
