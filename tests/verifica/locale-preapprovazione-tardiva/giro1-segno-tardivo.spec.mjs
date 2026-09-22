@@ -250,3 +250,24 @@ test('fusione non riuscita: togliere e rimettere il segno la ritenta', async ({ 
   await expect.poll(() => approvazioni(page).then((a) => a.length), { timeout: 8000 }).toBe(2);
   await expect(page.locator('#mgManageMsg')).toContainText('su main');
 });
+
+// ── 7. L'esito di una fusione partita da sola ──────────────────────────────
+
+test('fusione partita da sola e non riuscita: l’owner la legge senza aprire la pratica', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ mergePreapproved: { by: 'owner@esempio', at: '2026-09-20T09:00:00.000Z' } });
+  const req = richiesta();
+  await apri(page, {
+    fbs: [fb], pending: [],
+    approveReplies: [{ ok: false, error: 'github_502 unreachable' }],
+  });
+  // Nessuna pratica aperta: l'owner sta guardando la lista.
+  await page.evaluate((r) => { window.__cfg.pending = [r]; }, req);
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await expect.poll(() => approvazioni(page).then((a) => a.length)).toBe(1);
+
+  // La fusione non è avvenuta: deve arrivare sotto gli occhi, non in un
+  // pannello che si apre solo cliccando la scheda.
+  await expect(page.locator('#mgManageMsg')).toBeVisible();
+  await expect(page.locator('#mgManageMsg')).toContainText('riprova');
+});
