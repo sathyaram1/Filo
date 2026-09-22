@@ -64,6 +64,10 @@ function corpo(sorgente, nome) {
   return sorgente.slice(inizio, fine);
 }
 
+// Elementi che un salvataggio tocca senza salvarli: la scritta «Salvato», gli
+// avvisi. Non sono impostazioni, quindi non c'è niente da riallineare.
+const SOLO_AVVISI = new Set(['savedHint', 'tokenSavedHint', 'tabColorSavedHint', 'modelsStatus']);
+
 function campiLetti(testo, aiutanti) {
   const ids = new Set();
   for (const m of testo.matchAll(/\$\('([A-Za-z0-9_-]+)'\)/g)) ids.add(m[1]);
@@ -71,6 +75,7 @@ function campiLetti(testo, aiutanti) {
   for (const [aiutante, id] of Object.entries(aiutanti)) {
     if (id && new RegExp(`\\b${aiutante}\\(`).test(testo)) ids.add(id);
   }
+  for (const id of SOLO_AVVISI) ids.delete(id);
   return ids;
 }
 
@@ -94,7 +99,7 @@ for (const p of PAGINE) {
 
   test(`${p.nome}: un aiutante nuovo del salvataggio non passa inosservato`, () => {
     const note = new Set([
-      ...Object.keys(p.aiutanti), ...Object.keys(p.eccezioni),
+      ...Object.keys(p.aiutanti), ...Object.keys(p.eccezioni), ...p.salvataggi,
       'parseFloat', 'parseInt', 'Number', 'String', 'Boolean', 'Math', 'sendMessage', 'trim',
       'clampIdleHours', 'clampNotifDurationSec', 'clampParams', 'collect', 'join', 'slice',
       'persist', 'save', 'setTimeout', 'clearTimeout', 'applyTheme', 'applyTextScale',

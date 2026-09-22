@@ -64,3 +64,43 @@ test('il campo in uso non viene riscritto sotto le dita', async ({ shell, openTa
 
   await expect(prefs.locator('#agentStyleText')).toHaveValue('sto scrivendo');
 });
+
+// Le impostazioni avanzate salvano in due blocchi loro, che ripartono da una
+// copia letta all'apertura: senza riallinearla, un colore chiesto a Filo
+// («rendi i bottoni verdi») spariva al primo altro numero ritoccato.
+const estetica = (shell, token, valore) => shell.evaluate(
+  ({ t, v }) => window.filoShell.message({
+    type: window.SN_MSG.MSG.FILO_RUN_ACTION,
+    action: { type: 'IMPOSTA_ESTETICA', token: t, valore: v },
+  }),
+  { t: token, v: valore },
+);
+
+test('un colore chiesto a Filo resta anche dopo aver ritoccato un altro token', async ({ shell, openTab }) => {
+  const prefs = await openTab('filo://preferences/preferences.html');
+  await prefs.waitForSelector('#tok-accent');
+
+  await estetica(shell, 'accent', '#ff0000');
+  await expect(prefs.locator('#tok-accent')).toHaveValue('#ff0000', { timeout: 8_000 });
+
+  await prefs.fill('#tok-radius', '10px');
+  await prefs.locator('#tok-radius').blur();
+  await expect.poll(async () => (await salvate(prefs)).themeTokens?.radius, { timeout: 8_000 }).toBe('10px');
+  expect((await salvate(prefs)).themeTokens.accent, 'il colore chiesto a Filo resta').toBe('#ff0000');
+});
+
+test('il colore delle schede chiesto a Filo resta anche dopo aver ritoccato un numero', async ({ shell, openTab }) => {
+  await daFuori(shell, 'colore_tab', 'niente colore');
+
+  const prefs = await openTab('filo://preferences/preferences.html');
+  await prefs.waitForSelector('#tabcol-opacita_tab');
+  await expect(prefs.locator('#tabcol-opacita_tab')).toHaveValue('0');
+
+  await daFuori(shell, 'colore_tab', 'più vivaci');
+  await expect(prefs.locator('#tabcol-opacita_tab')).toHaveValue('0.9', { timeout: 8_000 });
+
+  await prefs.fill('#tabcol-peso_centralita', '6');
+  await prefs.locator('#tabcol-peso_centralita').blur();
+  await expect.poll(async () => (await salvate(prefs)).tabColor?.peso_centralita, { timeout: 8_000 }).toBe(6);
+  expect((await salvate(prefs)).tabColor.opacita_tab, 'i colori chiesti a Filo restano').toBeCloseTo(0.9, 5);
+});
