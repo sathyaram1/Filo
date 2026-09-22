@@ -294,7 +294,10 @@ function cacheKey(host, url) {
 // niente.
 const FRENO_PER_SITO = 8;
 const FRENO_RAFFICA = 8;
-const FRENO_PER_CATENA = 8;
+// Sta SOTTO il conto comune di proposito: cosi una catena che si esaurisce
+// lascia sempre qualche gettone a chi naviga dopo, invece di rimandarne il
+// riconoscimento al giro d'orologio successivo.
+const FRENO_PER_CATENA = 6;
 const FRENO_FINESTRA_MS = 60 * 60 * 1000;
 const FRENO_RAFFICA_MS = 5 * 1000;
 const CHIAVE_TUTTI = '\u0000tutti';

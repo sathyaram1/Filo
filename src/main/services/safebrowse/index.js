@@ -161,7 +161,9 @@ const sandboxRaffica = creaConto(RAFFICA_MS);
 // il controllo a chi salta in fretta fra le pagine senza togliere niente a chi
 // attacca.
 // I due stadi profondi spendono dallo stesso conto: sono la stessa risorsa
-// vista da due lati, e chi attacca li fa partire sempre insieme.
+// vista da due lati, e chi attacca li fa partire sempre insieme. I due numeri
+// stanno SOTTO i conti comuni qui sopra di proposito: cosi una catena che si
+// esaurisce lascia sempre qualche gettone a chi naviga dopo.
 const DEEP_MAX_PER_CATENA = 6;
 const LOOKUP_MAX_PER_CATENA = 24;
 const catenaSpesa = creaConto(HOUR);
