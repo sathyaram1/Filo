@@ -599,6 +599,13 @@
     // main, che ricontrolla il percorso per conto suo.
     // { percorso }  Risposta: { ok } | { ok: false, error }
     FILO_OPEN_FILE: 'filo_open_file',
+    // #533 (settimo giro di verifica) — apre un collegamento che Filo ha
+    // scritto nella sua risposta. Non è un link qualunque: la scritta e
+    // l'indirizzo li sceglie il modello, che può aver letto la pagina di
+    // qualcun altro. Passa dal motore come «apri una pagina», col compito di
+    // quella risposta: se porta dove Filo non è stato, chiede prima.
+    // { url, compito?, conferma? }  Risposta: { ok, chiede?, testo? }
+    FILO_OPEN_LINK: 'filo_open_link',
     // Genera dashboard (messaggio centro + suggerimenti). Usa cache con cooldown.
     // { force?: boolean }
     // Risposta: { ok, message, suggestions, cached, ts }
