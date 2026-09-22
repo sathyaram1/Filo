@@ -547,15 +547,14 @@
   // è quella che cambia mentre si parla).
   const DICTATE_LIVE_CHARS = 140;
 
-  // Perché la dettatura non è partita, detto all'utente. Un errore di
-  // CONFIGURAZIONE dei modelli (nessun modello per questa funzione, o «solo
-  // pesi aperti» senza un modello che ascolti) arriva già spiegato e va
-  // mostrato com'è: dice cosa fare per rimetterla in piedi.
+  // Perché la dettatura non è partita, detto all'utente. Quali errori arrivano
+  // già scritti lo sa SN_CHAT_ERRORS: l'elenco tenuto qui ne conosceva due su
+  // quattro, e a chi non ha ancora riscattato l'invito rispondeva di
+  // controllare una chiave che non ha mai avuto (#663).
   function explainDictationFailure(res) {
-    const spiegato = (res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_OPEN_WEIGHTS_MODEL')
-      && res.error;
-    if (spiegato) Popup.showToast(res.error, { duration: 9000 });
-    else Popup.showToast(I18n.t('err_provider_failed'));
+    const CE = global.SN_CHAT_ERRORS;
+    if (!CE) { Popup.showToast(I18n.t('err_provider_failed')); return; }
+    Popup.showToast(CE.sentence(CE.fromResponse(res, I18n.t('err_provider_failed'))), { duration: 9000 });
   }
 
   async function startDictation() {
