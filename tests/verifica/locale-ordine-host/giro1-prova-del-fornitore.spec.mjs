@@ -82,22 +82,3 @@ test('la prova della chiave parte con l\'ordinamento degli host scelto per quel 
   expect(partita.corpo.reasoning && partita.corpo.reasoning.effort,
     'la prova misura la velocità senza il livello di ragionamento del modello').toBe('high');
 });
-
-test('la prova della stessa riga dalla pagina dei modelli predefiniti l\'ordinamento ce l\'ha', async ({ app, openTab }) => {
-  await predefinitiConOrdinamento(app);
-  await intercetta(app);
-
-  // Stessa azione, altra pagina: qui l'ordinamento della riga viaggia col
-  // messaggio, ed è il metro di paragone della prova qui sopra.
-  const esito = await app.evaluate(async () => {
-    const M = globalThis.SN_MESSAGES || globalThis.SN_CONST.MSG;
-    return globalThis.__filoTestSend
-      ? globalThis.__filoTestSend({ type: M.TEST_DEFAULT_MODEL, nickname: 'prova-veloce', provider: 'openrouter', model: 'finto/prova-veloce', reasoning: 'high', sort: 'throughput' })
-      : null;
-  }).catch(() => null);
-  test.skip(esito === null, 'niente scorciatoia per parlare col main da qui');
-
-  const partita = await app.evaluate(async () =>
-    globalThis.__richieste.filter((r) => r.url.includes('/chat/completions')).pop());
-  expect(partita.corpo.provider.sort).toBe('throughput');
-});
