@@ -250,6 +250,10 @@
 
   function scrivi(c, riga) {
     if (!c) return;
+    // Un compito ricostruito dal registro su disco non ha le liste: le porta
+    // solo quello vivo in memoria, e qui ci arriva anche l'altro.
+    if (!Array.isArray(c.registro)) c.registro = [];
+    if (typeof c.omesse !== 'number') c.omesse = 0;
     if (c.registro.length >= MAX_RIGHE) { c.omesse += 1; return; }
     c.registro.push({ ts: Date.now(), ...riga });
   }
