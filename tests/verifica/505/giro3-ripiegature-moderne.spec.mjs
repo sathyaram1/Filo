@@ -3,9 +3,8 @@
 //
 // Stessa domanda dei giri 1 e 2: il sito sceglie COME ripiega una sezione, e da
 // quella scelta non possono dipendere né cosa vede l'utente né quanto paga.
-// Qui il pannello è chiuso con `scale` (la proprietà, non `transform`), con un
-// filtro, o marcato come non espanso: tre modi che lasciano lo schermo identico
-// a quelli già coperti.
+// Qui il pannello è chiuso con `scale` (la proprietà, non `transform`) o con un
+// filtro: modi che lasciano lo schermo identico a quelli già coperti.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -16,7 +15,6 @@ const FORME = [
   ['A', 'pannello chiuso con la proprietà scale: 0'],
   ['B', 'pannello schiacciato in verticale con la proprietà scale: 1 0'],
   ['C', 'pannello reso invisibile da un filtro (filter: opacity(0))'],
-  ['D', 'pannello marcato come non espanso (aria-expanded="false")'],
 ];
 
 const PAGINA = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
@@ -26,7 +24,6 @@ const PAGINA = `<!doctype html><html lang="en"><body style="font:16px sans-serif
   <div id="pA" style="scale:0">${frase('A', FORME[0][1])}</div>
   <div id="pB" style="scale:1 0">${frase('B', FORME[1][1])}</div>
   <div id="pC" style="filter:opacity(0)">${frase('C', FORME[2][1])}</div>
-  <div id="pD" aria-expanded="false">${frase('D', FORME[3][1])}</div>
   <div id="pRif" style="transform:scale(1,0)">Reference panel folded the old way, already deferred.</div>
 </body></html>`;
 
@@ -109,9 +106,7 @@ test('nessuna di queste sezioni chiuse si paga prima che l’utente la apra', as
 });
 
 // La seconda metà della stessa regola: rimandare senza accorgersi dell'apertura
-// lascerebbe l'inglese sullo schermo. Oggi è rossa di riflesso — quelle sezioni
-// vengono tradotte e pagate subito, quindi aprirle non scopre niente di nuovo —
-// e diventa verde insieme alla prova qui sopra.
+// lascerebbe l'inglese sullo schermo.
 test('aperte, quelle sezioni fanno offrire la traduzione del testo nuovo', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app);
   const page = await testServer.openReady(openTab, PAGINA);
@@ -127,7 +122,6 @@ test('aperte, quelle sezioni fanno offrire la traduzione del testo nuovo', async
       const el = document.getElementById('p' + key);
       if (!el) return;
       el.setAttribute('style', '');
-      el.removeAttribute('aria-expanded');
     }, k);
     await page.waitForTimeout(150);
     const btn = await apriMenu(page, '#intro');
@@ -141,4 +135,19 @@ test('aperte, quelle sezioni fanno offrire la traduzione del testo nuovo', async
     await page.waitForTimeout(150);
   }
   expect(mancate, `sezioni che, una volta aperte, non fanno offrire la traduzione: ${mancate.join(' | ')}`).toEqual([]);
+});
+
+// Un pannello marcato come non espanso viene tradotto e pagato anche da chiuso.
+// Resta così di proposito: quella marcatura sta sul BOTTONE che apre la
+// sezione, non sulla sezione, e prenderla per "nascosto" lascerebbe in lingua
+// originale il titolo di ogni fisarmonica del web — la domanda di una pagina di
+// domande frequenti. Vale solo se un giorno si saprà distinguere il bottone
+// dal pannello che comanda.
+test.fixme('un pannello marcato come non espanso non si paga da chiuso', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const chiuso = '<div id="pZ" aria-expanded="false">Section ZQZTOKEN closed panel marked as not expanded.</div></body>';
+  const page = await testServer.openReady(openTab, PAGINA.replace('</body>', chiuso));
+  await watchToasts(page);
+  await traduciTutto(page);
+  expect(await spedito(app)).not.toContain('ZQZTOKEN');
 });
