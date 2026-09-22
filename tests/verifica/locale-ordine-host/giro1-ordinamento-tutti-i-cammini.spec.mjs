@@ -69,13 +69,11 @@ async function preparaModelli(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
     const A = C.ACTIONS;
-    const s = await globalThis.SN_STORAGE.getSettings();
-    await globalThis.SN_STORAGE.setSettings({
+    await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       openWeightsOnly: false,
       apiKeys: { openrouter: 'sk-or-finta-ordine-host' },
       modelRegistry: {
-        ...(s.modelRegistry || {}),
         'prova-chat': { provider: 'openrouter', model: 'finto/chat', sort: 'throughput' },
         'prova-voce': { provider: 'openrouter', model: 'finto/voce', sort: 'latency' },
         'prova-detta': { provider: 'openrouter', model: 'finto/detta', sort: 'price' },
