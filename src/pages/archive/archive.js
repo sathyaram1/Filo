@@ -591,6 +591,7 @@
     const ripristina = () => {
       if (chiuso) return;
       chiuso = true;
+      campoAlVolo.confermato();
       input.replaceWith(titleEl);
     };
     const salva = async () => {
