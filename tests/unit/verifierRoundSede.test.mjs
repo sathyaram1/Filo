@@ -157,6 +157,6 @@ test('roundNote dice quanti esterni escono, e che il lavoro si ferma solo per un
   const fermo = decide([f(2, 'i', 'qui', true), f(2, 'e', 'altrove')]);
   const nota = R.roundNote({ summary: 's', findings: [f(2, 'i', 'qui', true), f(2, 'e', 'altrove')], decision: fermo });
   assert.match(nota, /Un rilievo è esterno/);
-  assert.match(nota, /rilievo interno di livello 2 o 3/);
+  assert.match(nota, /rilievo interno di livello 3 o 2 che chiede una tua decisione/);
   assert.match(nota, /- \[2i\?\] qui\n- \[2e\] altrove/);
 });
