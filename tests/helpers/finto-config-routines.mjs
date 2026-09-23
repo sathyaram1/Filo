@@ -1,19 +1,20 @@
 // Un server finto che risponde come Firestore REST per il documento
 // `config/routines`: serve ai test di scripts/verify-local.mjs, che dal
-// 2026-09-16 legge i tre bilanci del giro dal server e senza si ferma.
+// 2026-09-16 legge i bilanci del giro dal server e senza si ferma.
 //
 // Gira in un PROCESSO SUO perché i test del CLI lanciano lo script in modo
 // sincrono (execFileSync): un server nello stesso processo non risponderebbe
 // mai. Uso:
 //   node tests/helpers/finto-config-routines.mjs
 // stampa `PORT=<n>` su stdout e resta in ascolto finché non viene ucciso.
-// I campi li decide l'ambiente: FINTO_CAPS (JSON, es. {"cap2":10,"cap1":1,"cap0":0});
-// FINTO_STATUS (HTTP di risposta, default 200); FINTO_RICHIEDI_BEARER=1 fa
-// rispondere 401 senza l'intestazione Authorization.
+// I campi li decide l'ambiente: FINTO_CAPS (JSON, es.
+// {"cap3":5,"cap2":10,"cap1":1,"cap0":0}); FINTO_STATUS (HTTP di risposta,
+// default 200); FINTO_RICHIEDI_BEARER=1 fa rispondere 401 senza l'intestazione
+// Authorization.
 
 import { createServer } from 'node:http';
 
-const caps = JSON.parse(process.env.FINTO_CAPS || '{"cap2":10,"cap1":1,"cap0":0}');
+const caps = JSON.parse(process.env.FINTO_CAPS || '{"cap3":5,"cap2":10,"cap1":1,"cap0":0}');
 const status = Number(process.env.FINTO_STATUS || 200);
 const richiediBearer = process.env.FINTO_RICHIEDI_BEARER === '1';
 
