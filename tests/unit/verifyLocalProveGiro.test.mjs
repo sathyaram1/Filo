@@ -36,13 +36,13 @@ test('la coda stampata dopo la critica dice di rilanciare le prove del giro, e c
   assert.match(t, /npx playwright test tests\/verifica\/locale-giri-corti/);
   assert.match(t, /regressione della correzione/);
   // Quello che c'era prima resta: i rilievi e come si consegna.
-  assert.match(t, /\[2\] rotto/);
+  assert.match(t, /\[2i\] rotto/);
   assert.match(t, /verify-local\.mjs corretto/);
 });
 
 test('consegnare una correzione con file non salvati: il rifiuto elenca i file e spiega il salvataggio automatico', () => {
   const dopoCritica = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', {
-    critique: 'provato tutto.\n[2] rotto', sha: SHA,
+    critique: 'provato tutto.\n[2i] rotto', sha: SHA,
     // I bilanci li passa chi chiama: nel codice non c'è un default (2026-09-16).
     caps: { cap2: 5, cap1: 2, cap0: 0 },
   });

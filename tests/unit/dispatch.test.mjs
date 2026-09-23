@@ -77,21 +77,21 @@ test('applyVerifierVerdict pass: imposta pass e svuota la critica', () => {
 });
 
 test('applyVerifierVerdict fix: lo specchio locale registra la critica coi livelli e il seguito del giro', () => {
-  const s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2] rotto qui');
+  const s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2i] rotto qui');
   assert.equal(s.verifierVerdict, 'fix-pending');
-  assert.equal(s.verifierCritique, '[2] rotto qui');
-  assert.equal(applyVerifierVerdict(s, 'stop', '[2] ancora').verifierVerdict, 'stop');
+  assert.equal(s.verifierCritique, '[2i] rotto qui');
+  assert.equal(applyVerifierVerdict(s, 'stop', '[2i] ancora').verifierVerdict, 'stop');
 });
 
 test('applyFixed: ri-mette in coda verifier e azzera la critica (i bilanci li tiene il server)', () => {
-  const fixed = applyFixed(applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2] x'));
+  const fixed = applyFixed(applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2i] x'));
   assert.equal(fixed.verifierVerdict, null);
   assert.equal(fixed.verifierCritique, '');
 });
 
 test('VERIFIER_ROUND: il parser della critica coi livelli arriva dagli strumenti (fonte unica)', async () => {
   const { VERIFIER_ROUND, VERIFIER_OUTCOMES } = await import('../../scripts/dispatch.mjs');
-  const p = VERIFIER_ROUND.parseFindings('funziona\n[2] rotto\n[1?] gusto');
+  const p = VERIFIER_ROUND.parseFindings('funziona\n[2i] rotto\n[1i?] gusto');
   assert.deepEqual(p.findings.map((f) => [f.level, f.decision]), [[2, false], [1, true]]);
   assert.deepEqual(VERIFIER_OUTCOMES, ['pass', 'fix', 'stop']);
 });
@@ -103,15 +103,15 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
     phase2: { findings: [{ level: 2, text: 'rotto' }], derived: [{ level: 0, text: 'raro' }], budgets: { cap2: { cap: 5, used: 1, left: 4 } }, instructions: 'FASE 2 — correggi' },
   });
   assert.match(fix, /c'è da correggere/);
-  assert.match(fix, /\[2\] rotto/);
-  assert.match(fix, /\[0\] raro/);
+  assert.match(fix, /\[2i\] rotto/);
+  assert.match(fix, /\[0i\] raro/);
   assert.match(fix, /cap2: 4 giri residui su 5/);
   assert.match(fix, /FASE 2 — correggi/);
   // Il testo della fase 2 è dell'owner e può tacerla: la regola che ferma la stampa lo strumento.
   assert.match(fix, /--record-fixed <id> "<report>" --segnala <file\.md>/);
   assert.ok(fix.indexOf('FERMA il lavoro') > fix.indexOf('FASE 2 — correggi'), 'dopo le istruzioni, non al loro posto');
   assert.match(verifierReplyText({ outcome: 'pass', derived: { num: '#42.1' } }), /#42\.1/);
-  assert.match(verifierReplyText({ outcome: 'stop', blocking: [{ level: 3, text: 'grave' }] }), /si ferma[\s\S]*\[3\] grave/);
+  assert.match(verifierReplyText({ outcome: 'stop', blocking: [{ level: 3, text: 'grave' }] }), /si ferma[\s\S]*\[3i\] grave/);
   // Un «ok» senza esito non è un pass: dirlo superato mandava a rilasciare il
   // biglietto anche con un rilievo di livello 2 nella critica (verifica del
   // giro 3 sul lavoro di lancio delle routine).
@@ -207,11 +207,11 @@ test('serialAwarenessNote: scatta dalla SECONDA bocciatura, per chi corregge e c
 // ─── Stato su disco ───────────────────────────────────────────────────────────
 
 test('writeState/readState/clearState: round-trip su STATE_DIR temporanea', () => {
-  const s = applyVerifierVerdict(defaultState('DISK1', 'worker/DISK1'), 'fix', '[2] boom');
+  const s = applyVerifierVerdict(defaultState('DISK1', 'worker/DISK1'), 'fix', '[2i] boom');
   writeState(s);
   const back = readState('DISK1');
   assert.equal(back.verifierVerdict, 'fix-pending');
-  assert.equal(back.verifierCritique, '[2] boom');
+  assert.equal(back.verifierCritique, '[2i] boom');
   clearState('DISK1');
   assert.equal(readState('DISK1'), null);
 });
@@ -505,8 +505,8 @@ test('verifierScope: un valore sconosciuto vale pieno, e lo dice', () => {
 
 test('perimetroNote: il perimetro si legge come testo, non come JSON', () => {
   const c = perimetroNote('chiusura', { rilievi: [{ level: 2, text: 'Salva non salva' }, { level: 1, text: 'bordo freddo', decision: true }], shaPrima: 'abc1234' });
-  assert.match(c, /\[2\] Salva non salva/);
-  assert.match(c, /\[1\?\] bordo freddo/);
+  assert.match(c, /\[2i\] Salva non salva/);
+  assert.match(c, /\[1i\?\] bordo freddo/);
   assert.match(c, /git diff abc1234\.\.HEAD/);
   assert.ok(!c.includes('{'), 'niente JSON grezzo nel compito');
   const r = perimetroNote('riallineamento', { reportRebase: 'conflitto nelle schede\nsolo meccanico', shaVerificato: 'def5678' });
@@ -544,7 +544,7 @@ test('emit: il valore di scope sceglie il testo del ruolo e accoda il perimetro'
 
   const chiusura = consegna({ feedback: { text: 't' }, history: storia, scope: 'chiusura', perimetro: { rilievi: [{ level: 2, text: 'Salva non salva' }], shaPrima: 'abc1234' } });
   assert.match(chiusura.instructions, /# verifica di chiusura/);
-  assert.match(chiusura.instructions, /Perimetro di questo giro[\s\S]*\[2\] Salva non salva/);
+  assert.match(chiusura.instructions, /Perimetro di questo giro[\s\S]*\[2i\] Salva non salva/);
   assert.ok(!/Avvertenza di serie/.test(chiusura.instructions), 'il giro stretto non invita alla ricerca larga');
   assert.equal(chiusura.payload.scope, 'chiusura');
 

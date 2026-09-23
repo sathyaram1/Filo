@@ -39,7 +39,7 @@ const ASPETTANO = [
   // la scelta si scrive qui, ed è quello che chi riprende riceve.
   ['fermo su una scelta',            { status: 'design', statusReason: 'decisione', notes: 'Report.\n\nSegnalazione per l\'owner (chi risolve):\nA o B?',
                                        livelli: { l3: { esito: 'segnalato', ruolo: 'resolver', testo: 'A o B?' } } }],
-  ['fermo su un rilievo col «?»',    { status: 'design', statusReason: 'decisione', notes: '[2?] Il bordo: caldo o freddo?' }],
+  ['fermo su un rilievo col «?»',    { status: 'design', statusReason: 'decisione', notes: '[2i?] Il bordo: caldo o freddo?' }],
 ];
 
 const NON_ASPETTANO = [

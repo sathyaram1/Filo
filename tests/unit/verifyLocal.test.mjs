@@ -116,7 +116,7 @@ test('critica senza rilievi: verifica superata sul contenuto', () => {
 
 test('critica con un 2: finché il giro non è chiuso non si pubblica, e dopo serve un\'altra verifica', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
-  const r = withCritique(s, 'r', { critique: 'funziona Y\n[2] il pulsante non salva\n[0] caso raro', sha: SHA });
+  const r = withCritique(s, 'r', { critique: 'funziona Y\n[2i] il pulsante non salva\n[0i] caso raro', sha: SHA });
   assert.equal(r.outcome, 'fix');
   assert.deepEqual(r.decision.fix.map((f) => f.level), [2, 0], 'gli 0 si correggono insieme ad altro');
   assert.equal(r.state.r.verdict, 'fix-pending');
@@ -126,7 +126,7 @@ test('critica con un 2: finché il giro non è chiuso non si pubblica, e dopo se
   assert.match(bloccato.reason, /giro di correzione aperto/);
   // La fase 2 si vede solo adesso, e dice cosa correggere e come consegnare.
   const testo = codaText({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch: 'r' });
-  assert.match(testo, /\[2\] il pulsante non salva/);
+  assert.match(testo, /\[2i\] il pulsante non salva/);
   assert.match(testo, /verify-local\.mjs corretto/);
   // Consegna: chiude la fase 2, ma NON approva: serve un'altra verifica.
   const c = withFixed(r.state, 'r', { report: 'corretto', sha: ALTRO_SHA });
@@ -149,16 +149,16 @@ test('withFixed senza un giro aperto: rifiutata', () => {
 test('un 2 a bilancio esaurito, o col segno ?: esito stop', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   s.r.counts = { count2: 5 };
-  const r = withCritique(s, 'r', { critique: '[2] ancora rotto', sha: SHA });
+  const r = withCritique(s, 'r', { critique: '[2i] ancora rotto', sha: SHA });
   assert.equal(r.outcome, 'stop');
   assert.equal(r.state.r.verdict, 'fail');
   assert.match(checkVerdict(r.state.r, SHA).reason, /bocciato/);
-  const d = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2?] quale strada?', sha: SHA });
+  const d = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2i?] quale strada?', sha: SHA });
   assert.equal(d.outcome, 'stop');
 });
 
 test('i rilievi fuori dal giro restano in `derived` per il report', () => {
-  const r = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[0] caso raro', sha: SHA });
+  const r = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[0i] caso raro', sha: SHA });
   assert.equal(r.outcome, 'pass');
   assert.equal(r.state.r.derived.length, 1);
   assert.equal(checkVerdict(r.state.r, SHA).ok, true, 'uno 0 da solo non ferma la pubblicazione');
@@ -396,8 +396,8 @@ test('#561 verifica: una critica vuota non è un pass', () => {
 
 test('#561 verifica: una seconda critica sullo stesso giro è rifiutata e non paga un altro giro', () => {
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
-  const uno = withCritique(s, 'r', { critique: '[2] rotto', sha: SHA });
-  const due = withCritique(uno.state, 'r', { critique: '[2] rotto ancora', sha: SHA });
+  const uno = withCritique(s, 'r', { critique: '[2i] rotto', sha: SHA });
+  const due = withCritique(uno.state, 'r', { critique: '[2i] rotto ancora', sha: SHA });
   assert.equal(due.ok, false);
   assert.equal(due.state.r.counts.count2, 1, 'un giro solo');
   assert.equal(due.state.r.verdict, 'fix-pending');
@@ -406,7 +406,7 @@ test('#561 verifica: una seconda critica sullo stesso giro è rifiutata e non pa
 
 test('#561 verifica: il giro dopo vede il TESTO della critica precedente, mai il report di chi ha lavorato', () => {
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
-  const r = withCritique(s, 'r', { critique: 'ok\n[2] il pulsante non salva col titolo vuoto', sha: SHA });
+  const r = withCritique(s, 'r', { critique: 'ok\n[2i] il pulsante non salva col titolo vuoto', sha: SHA });
   const c = withFixed(r.state, 'r', { report: 'REPORT SEGRETO del correttore', sha: ALTRO_SHA });
   assert.equal(c.outcome, 'fixed');
   const h = historyFromRounds(c.state.r.rounds);
@@ -420,7 +420,7 @@ test('#561 verifica: il giro dopo vede il TESTO della critica precedente, mai il
 
 test('#561 verifica: «corretto» senza un commit nuovo non chiede un\'altra verifica', () => {
   // Con solo un 1 in sospeso: il lavoro passa e il rilievo va nel report.
-  const uno = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[1] bordo grigio', sha: SHA });
+  const uno = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[1i] bordo grigio', sha: SHA });
   const c1 = withFixed(uno.state, 'r', { report: 'non ci sono riuscito', sha: SHA });
   assert.equal(c1.ok, true);
   assert.equal(c1.outcome, 'pass');
@@ -428,7 +428,7 @@ test('#561 verifica: «corretto» senza un commit nuovo non chiede un\'altra ver
   assert.equal(c1.state.r.derived.length, 1);
   assert.equal(c1.state.r.rounds.at(-1).outcome, 'non corretto');
   // Con un 2 in sospeso: non correggibile, il lavoro si ferma.
-  const due = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2] rotto', sha: SHA });
+  const due = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2i] rotto', sha: SHA });
   const c2 = withFixed(due.state, 'r', { report: 'non ci sono riuscito', sha: SHA });
   assert.equal(c2.outcome, 'stop');
   assert.equal(c2.state.r.verdict, 'fail');
@@ -442,7 +442,7 @@ test('#561 verifica: «corretto» senza un commit nuovo non chiede un\'altra ver
 
 test('#561 giro 2: chiuso un giro, la critica non si registra di nuovo: serve un nuovo start', () => {
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
-  const r = withCritique(s, 'r', { critique: 'ok\n[1] bordo', sha: SHA });
+  const r = withCritique(s, 'r', { critique: 'ok\n[1i] bordo', sha: SHA });
   const c = withFixed(r.state, 'r', { report: 'corretto', sha: ALTRO_SHA });
   assert.equal(c.outcome, 'fixed');
   const auto = withCritique(c.state, 'r', { critique: 'Provato tutto: regge.', sha: ALTRO_SHA });
@@ -461,7 +461,7 @@ test('#561 giro 2: un livello scritto fuori posto non è un pass silenzioso; l\'
   assert.equal(inline.ok, false);
   assert.match(inline.reason, /Rilievo \[2\]/);
   assert.equal(checkVerdict(inline.state.r, SHA).ok, false);
-  const numerato = withCritique(s, 'r', { critique: 'Provato.\n1. [2] il pulsante non salva\n2. [1] bordo', sha: SHA });
+  const numerato = withCritique(s, 'r', { critique: 'Provato.\n1. [2i] il pulsante non salva\n2. [1i] bordo', sha: SHA });
   assert.equal(numerato.ok, true);
   assert.equal(numerato.outcome, 'fix');
   assert.deepEqual(numerato.decision.fix.map((f) => f.level), [2, 1]);
@@ -473,16 +473,16 @@ test('#561 giro 3: dopo un pass (o uno stop) una seconda critica senza un nuovo 
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   const ok = withCritique(s, 'r', { critique: 'Regge tutto.', sha: SHA });
   assert.equal(ok.outcome, 'pass');
-  const ripensa = withCritique(ok.state, 'r', { critique: 'Ripensandoci.\n[2] ora lo vedo', sha: SHA });
+  const ripensa = withCritique(ok.state, 'r', { critique: 'Ripensandoci.\n[2i] ora lo vedo', sha: SHA });
   assert.equal(ripensa.ok, false);
   assert.match(ripensa.reason, /start/);
   assert.equal(ripensa.state.r.verdict, 'pass', 'il pass registrato resta quello');
   assert.equal(ripensa.state.r.counts.count2 || 0, 0, 'nessun giro pagato');
-  const fermo = withCritique(s, 'r', { critique: 'P.\n[2?] scelta', sha: SHA });
+  const fermo = withCritique(s, 'r', { critique: 'P.\n[2i?] scelta', sha: SHA });
   assert.equal(fermo.outcome, 'stop');
   assert.equal(withCritique(fermo.state, 'r', { critique: 'Regge.', sha: SHA }).ok, false);
   // Dopo start la critica di un'altra istanza passa.
-  const dopo = withCritique(withRequest(ok.state, 'r', { request: 'fai X', sha: ALTRO_SHA }), 'r', { critique: 'P.\n[2] ora lo vedo', sha: ALTRO_SHA });
+  const dopo = withCritique(withRequest(ok.state, 'r', { request: 'fai X', sha: ALTRO_SHA }), 'r', { critique: 'P.\n[2i] ora lo vedo', sha: ALTRO_SHA });
   assert.equal(dopo.ok, true);
   assert.equal(dopo.outcome, 'fix');
 });
@@ -490,16 +490,16 @@ test('#561 giro 3: dopo un pass (o uno stop) una seconda critica senza un nuovo 
 test('#561 giro 3: quando il lavoro si ferma i bilanci si azzerano (come sul server), la storia resta', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   for (let i = 0; i < 5; i++) {
-    const r = withCritique(s, 'r', { critique: `P.\n[2] rotto ${i}`, sha: SHA });
+    const r = withCritique(s, 'r', { critique: `P.\n[2i] rotto ${i}`, sha: SHA });
     assert.equal(r.outcome, 'fix', `giro ${i}`);
     s = withRequest(withFixed(r.state, 'r', { report: 'ok', sha: ALTRO_SHA }).state, 'r', { request: 'fai X', sha: ALTRO_SHA });
   }
-  const sesto = withCritique(s, 'r', { critique: 'P.\n[2] rotto 6', sha: ALTRO_SHA });
+  const sesto = withCritique(s, 'r', { critique: 'P.\n[2i] rotto 6', sha: ALTRO_SHA });
   assert.equal(sesto.outcome, 'stop');
   assert.deepEqual(sesto.state.r.counts, {});
   assert.equal(sesto.state.r.rounds.length, 6, 'la storia dei giri resta');
-  // L'owner decide, il lavoro si rifà: il primo [2] si corregge, non ferma.
-  const rifatto = withCritique(withRequest(sesto.state, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: 'P.\n[2] rotto 7', sha: SHA });
+  // L'owner decide, il lavoro si rifà: il primo [2i] si corregge, non ferma.
+  const rifatto = withCritique(withRequest(sesto.state, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: 'P.\n[2i] rotto 7', sha: SHA });
   assert.equal(rifatto.outcome, 'fix');
   assert.equal(historyFromRounds(rifatto.state.r.rounds).length, 7);
   // Anche lo stop da «corretto» senza commit nuovo azzera.
@@ -523,7 +523,7 @@ test('#561 giro 4: «[2]» senza testo è respinto, non un pass; il riassunto pu
   assert.match(vuoto.reason, /rilievo senza testo/);
   // Dal 2026-09-07 (#565, decisione dell'owner) le quadre col livello dentro
   // sono sempre un rilievo: nel riassunto il livello si cita a parole.
-  const conQuadre = withCritique(s, 'r', { critique: 'Provato il caso [2?] del giro prima: chiuso.', sha: SHA });
+  const conQuadre = withCritique(s, 'r', { critique: 'Provato il caso [2i?] del giro prima: chiuso.', sha: SHA });
   assert.equal(conQuadre.ok, false);
   const aParole = withCritique(s, 'r', { critique: 'Provato il caso di livello 2 del giro prima: chiuso, e testi lunghi.', sha: SHA });
   assert.equal(aParole.ok, true);
@@ -552,7 +552,7 @@ function depositoUsaEGetta() {
 }
 // Una motivazione vera: sotto gli 80 caratteri il CLI la respinge, e con
 // ragione (una verifica di due parole non è una verifica).
-const LUNGA_FIX = 'Provato inserimento, tasto destro, tema scuro e finestra stretta: il resto regge bene.\n[2] rotto';
+const LUNGA_FIX = 'Provato inserimento, tasto destro, tema scuro e finestra stretta: il resto regge bene.\n[2i] rotto';
 function vl(casa, ...args) {
   try {
     return { code: 0, out: _exec(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env: { ...process.env, FILO_REPO_ROOT: casa }, stdio: ['ignore', 'pipe', 'pipe'] }) };
@@ -590,7 +590,7 @@ test('CLI: una motivazione di due parole è respinta, sia per promuovere sia per
   assert.equal(corta.code, 1, corta.out);
   assert.match(corta.out, /troppo corta \(2 caratteri/, 'il rifiuto dice il numero');
   assert.match(vl(casa, 'status').out, /senza esito/, 'niente scritto');
-  const cortaBoccia = vl(casa, 'critica', '[2] rotto');
+  const cortaBoccia = vl(casa, 'critica', '[2i] rotto');
   assert.equal(cortaBoccia.code, 1, cortaBoccia.out);
   assert.match(vl(casa, 'status').out, /senza esito/);
   // Con la motivazione vera passa, e l'esito è quello del testo.
@@ -608,10 +608,10 @@ test('una critica lunga entra INTERA nella storia; oltre il tetto è respinta co
   const { MAX_CRITIQUE_CHARS, leggiCoda } = await import('../../scripts/verify-local.mjs');
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   const riassunto = 'provato '.repeat(700); // ~5600 caratteri: sopra il vecchio taglio a 4000
-  const lunga = withCritique(s, 'r', { critique: `${riassunto}\n[2] LA PORTA ROSSA: il salvataggio non salva col titolo vuoto`, sha: SHA });
+  const lunga = withCritique(s, 'r', { critique: `${riassunto}\n[2i] LA PORTA ROSSA: il salvataggio non salva col titolo vuoto`, sha: SHA });
   assert.equal(lunga.outcome, 'fix');
   assert.match(lunga.state.r.critique, /LA PORTA ROSSA/, 'il rilievo in coda sopravvive: non si taglia');
-  const troppa = withCritique(s, 'r', { critique: `${'x'.repeat(MAX_CRITIQUE_CHARS + 1)}\n[2] rotto`, sha: SHA });
+  const troppa = withCritique(s, 'r', { critique: `${'x'.repeat(MAX_CRITIQUE_CHARS + 1)}\n[2i] rotto`, sha: SHA });
   assert.equal(troppa.ok, false);
   assert.match(troppa.reason, /troppo lunga/);
   assert.match(troppa.reason, new RegExp(String(MAX_CRITIQUE_CHARS)), 'il rifiuto dice il tetto');
@@ -634,7 +634,7 @@ test('#256 locale: con file non registrati la critica è respinta con l\'elenco,
   assert.equal(r.state.r.verdict, undefined, 'niente pass registrato');
   assert.equal(checkVerdict(r.state.r, SHA).ok, false);
   // Vale anche per una bocciatura: il commit della pulizia passerebbe poi per una correzione.
-  const boccia = withCritique(s, 'r', { critique: '[2] rotto', sha: SHA, dirtyFiles: ['tests/x.spec.mjs'] });
+  const boccia = withCritique(s, 'r', { critique: '[2i] rotto', sha: SHA, dirtyFiles: ['tests/x.spec.mjs'] });
   assert.equal(boccia.ok, false);
   assert.equal(boccia.state.r.verdict, undefined);
   // Con la directory pulita la stessa critica passa.
@@ -685,7 +685,7 @@ test('quando il testo in coda manca, il messaggio non tace', () => {
   const base = { findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'r' };
   const conFile = codaText({ ...base, instructions: 'ISTRUZIONI SEGRETE DELL\'OWNER' });
   assert.match(conFile, /ISTRUZIONI SEGRETE DELL'OWNER/);
-  assert.match(conFile, /\[2\] rotto/);
+  assert.match(conFile, /\[2i\] rotto/);
   const senza = codaText(base);
   assert.match(senza, /CODA-GIRO-LOCALE\.md/, 'dice dove doveva essere il file');
   assert.match(senza, /verify-local\.mjs corretto/, 'e come si consegna comunque');
@@ -696,7 +696,7 @@ test('quando il testo in coda manca, il messaggio non tace', () => {
 
 test('#561 giro 10: la STESSA critica rimandata a correzione in sospeso ridà la stessa risposta senza scrivere né ripagare; un\'altra è respinta', () => {
   let s = withRequest({}, 'b', { request: 'X', sha: SHA });
-  const testo = 'Provato.\n[2] rotto\n[0] raro';
+  const testo = 'Provato.\n[2i] rotto\n[0i] raro';
   const prima = withCritique(s, 'b', { critique: testo, sha: SHA });
   assert.equal(prima.outcome, 'fix');
   s = prima.state;
@@ -709,9 +709,9 @@ test('#561 giro 10: la STESSA critica rimandata a correzione in sospeso ridà la
   assert.equal(ridata.decision.budgets.cap2.left, 4, 'i bilanci della fase 2 sono quelli del giro');
   assert.equal(JSON.stringify(ridata.state), snap, 'niente scritto');
   // La barra-n letterale è la stessa critica.
-  assert.equal(withCritique(s, 'b', { critique: 'Provato.\n[2] rotto\n[0] raro', sha: SHA }).replayed, true);
+  assert.equal(withCritique(s, 'b', { critique: 'Provato.\n[2i] rotto\n[0i] raro', sha: SHA }).replayed, true);
   // Un testo diverso, o un altro commit, non è un replay.
-  assert.equal(withCritique(s, 'b', { critique: 'Provato.\n[2] rotto in un altro modo', sha: SHA }).ok, false);
+  assert.equal(withCritique(s, 'b', { critique: 'Provato.\n[2i] rotto in un altro modo', sha: SHA }).ok, false);
   assert.equal(withCritique(s, 'b', { critique: testo, sha: ALTRO_SHA }).ok, false);
   // Consegnata la correzione, la stessa critica non si ridà più.
   const dopo = withFixed(s, 'b', { report: 'ok', sha: ALTRO_SHA }).state;
@@ -730,11 +730,11 @@ test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un p
   assert.match(vl(casa, 'critica', testo).out, /c'è da correggere/);
   const st = vl(casa, 'status');
   assert.match(st.out, /giro di correzione aperto/);
-  assert.match(st.out, /\[2\] rotto/, 'status elenca i rilievi in sospeso');
+  assert.match(st.out, /\[2i\] rotto/, 'status elenca i rilievi in sospeso');
   const ridata = vl(casa, 'critica', testo);
   assert.equal(ridata.code, 0, ridata.out);
   assert.match(ridata.out, /ristampo la fase 2/);
-  assert.match(ridata.out, /Rilievi da correggere in questo giro[\s\S]*\[2\] rotto/);
+  assert.match(ridata.out, /Rilievi da correggere in questo giro[\s\S]*\[2i\] rotto/);
   assert.match(ridata.out, /cap2: 4 giri residui su 5/, 'il giro non si ripaga');
   const altra = vl(casa, 'critica', LUNGA_FIX.replace('rotto', 'rotto diversamente'));
   assert.equal(altra.code, 1);
@@ -873,7 +873,7 @@ test('giro stretto: l\'interruttore si legge coi bilanci, e solo un true esplici
 });
 
 test('giro stretto: il perimetro nasce dalla correzione consegnata e vale solo per la verifica subito dopo', () => {
-  const giro = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: 'Provato.\n[2] Salva non salva col titolo vuoto\n[1?] bordo caldo o freddo', sha: SHA });
+  const giro = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: 'Provato.\n[2i] Salva non salva col titolo vuoto\n[1i?] bordo caldo o freddo', sha: SHA });
   const corretto = withFixed(giro.state, 'r', { report: 'corretto il salvataggio', sha: ALTRO_SHA });
   assert.equal(corretto.outcome, 'fixed');
   const dopo = withRequest(corretto.state, 'r', { request: 'fai X', sha: ALTRO_SHA });
@@ -897,7 +897,7 @@ test('giro stretto: il compito consegna il testo di chiusura col perimetro leggi
     perimetro: { rilievi: [{ level: 2, text: 'Salva non salva col titolo vuoto' }], shaPrima: 'abc1234' },
   });
   assert.match(chiusura, /controllo di chiusura/);
-  assert.match(chiusura, /Perimetro di questo giro[\s\S]*\[2\] Salva non salva col titolo vuoto/);
+  assert.match(chiusura, /Perimetro di questo giro[\s\S]*\[2i\] Salva non salva col titolo vuoto/);
   assert.match(chiusura, /git diff abc1234\.\.HEAD/);
   assert.match(chiusura, /seconda eccezione/, 'il divieto del diff dichiara la sua eccezione');
   assert.doesNotMatch(chiusura, /cap[012]|Bilanci/);
@@ -925,7 +925,7 @@ test('CLI giro stretto: dopo «corretto», start consegna la chiusura solo con l
     assert.equal(consegna.status, 0, consegna.stderr);
     const secondo = lancia('start');
     assert.equal(secondo.status, 0, secondo.stderr);
-    assert.match(secondo.stdout, /Perimetro di questo giro[\s\S]*\[2\] rotto/);
+    assert.match(secondo.stdout, /Perimetro di questo giro[\s\S]*\[2i\] rotto/);
     assert.match(secondo.stderr, /Ambito della verifica: chiusura/);
     // Stesso stato, interruttore spento (il server di tutto il file): pieno.
     const spento = vl(casa, 'start');
