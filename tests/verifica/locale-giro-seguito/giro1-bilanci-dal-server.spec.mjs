@@ -55,8 +55,10 @@ async function serverFinto() {
   return { stato, url, chiudi: () => new Promise((ok) => srv.close(ok)) };
 }
 
-const doc = (cap2, cap1, cap0) => ({
+// Il bilancio dei 3 (dal 2026-09-23) c'è sempre, salvo chiederne l'assenza.
+const doc = (cap2, cap1, cap0, cap3 = { integerValue: '5' }) => ({
   fields: {
+    ...(cap3 !== undefined ? { cap3 } : {}),
     ...(cap2 !== undefined ? { cap2 } : {}),
     ...(cap1 !== undefined ? { cap1 } : {}),
     ...(cap0 !== undefined ? { cap0 } : {}),
