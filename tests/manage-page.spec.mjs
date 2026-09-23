@@ -441,8 +441,8 @@ test('l\'interruttore master spegne le routine e rende inerti le impostazioni ch
   // 2. Le impostazioni che senza routine non decidono niente diventano
   //    inerti — e si vede, invece di restare lì a promettere un effetto.
   await expect(page.locator('#mgProberIdle')).toBeDisabled();
-  for (const id of ['#mgCap2', '#mgCap1', '#mgCap0', '#mgFixInstructions']) await expect(page.locator(id)).toBeDisabled();
-  for (const id of ['#mgProberIdleBlock', '#mgCap2Block', '#mgCap1Block', '#mgCap0Block', '#mgFixInstructionsBlock']) {
+  for (const id of ['#mgCap3', '#mgCap2', '#mgCap1', '#mgCap0', '#mgFixInstructions']) await expect(page.locator(id)).toBeDisabled();
+  for (const id of ['#mgProberIdleBlock', '#mgCap3Block', '#mgCap2Block', '#mgCap1Block', '#mgCap0Block', '#mgFixInstructionsBlock']) {
     await expect(page.locator(id)).toHaveClass(/mg-auto-block--off/);
   }
   // Il timeout dei giudici NON dipende dalle routine: resta usabile.
