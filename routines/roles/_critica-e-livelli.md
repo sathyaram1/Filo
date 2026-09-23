@@ -34,6 +34,9 @@ l'attaccante raggiunge solo con una condizione rara è un 2, non un 3. Un
 rilievo di livello basso non si perde: alzargli il livello per salvarlo non
 serve, e costa.
 
+Accertati che ogni rilievo sia reale: se hai un dubbio, verificalo prima di
+scriverlo. Se sei in dubbio sul livello, scegli il più basso.
+
 ### La sede: interno o esterno
 
 **Interno** (`i`) se una delle due:
