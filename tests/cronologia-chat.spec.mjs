@@ -1090,10 +1090,16 @@ test('l’esito di un comando lento resta nella chat in cui il comando è stato 
   await expect.poll(async () => dash.evaluate(() => document.body.dataset.state), { timeout: 10_000 })
     .toBe('home');
 
+  // L'esito, non la riga del comando: quella la si riconosce perché contiene
+  // il comando stesso.
   await expect.poll(async () => {
     const c = (await leggiArchivio(app))[0];
-    return c ? c.messages.map((m) => m.text).join('\n') : '';
-  }, { timeout: 40_000 }).toContain('ESITO-TARDIVO');
+    if (!c) return false;
+    return c.messages.some((m) => {
+      const t = String((m && m.text) || '');
+      return t.includes('ESITO-TARDIVO') && !t.includes('sleep');
+    });
+  }, { timeout: 40_000 }).toBe(true);
 
   const chats = await leggiArchivio(app);
   // Una conversazione sola: l'esito è tornato dove il comando era stato dato.
