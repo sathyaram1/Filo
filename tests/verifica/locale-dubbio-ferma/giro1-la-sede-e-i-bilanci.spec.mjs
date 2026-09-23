@@ -73,15 +73,16 @@ test('un 1 o uno 0 interno oltre il bilancio non si perde: diventa un feedback s
 });
 
 test('allo stop gli altri rilievi interni della stessa critica non si perdono: o restano davanti a chi riprende, o diventano feedback loro', () => {
+  // «Davanti a chi riprende» = nel segnalibro: quello che ha fermato più i sospesi.
+  const tenutiDa = (d) => d.blocking.concat(d.sospesi || [], d.derived).map((f) => f.text);
   const d = decide('[2i?] a\n[1i] b\n[0i] c');
   expect(d.stop).toBe(true);
-  const tenuti = d.blocking.concat(d.derived).map((f) => f.text);
-  expect(tenuti).toContain('b');
-  expect(tenuti).toContain('c');
+  expect(tenutiDa(d)).toContain('b');
+  expect(tenutiDa(d)).toContain('c');
   // Lo stesso quando a fermare è il bilancio del 2 esaurito.
   const d2 = decide('[2i] a\n[1i] b', { count2: 10 });
   expect(d2.stop).toBe(true);
-  expect(d2.blocking.concat(d2.derived).map((f) => f.text)).toContain('b');
+  expect(tenutiDa(d2)).toContain('b');
 });
 
 test('il compito stampato in locale insegna il formato che il lettore accetta: i suoi esempi passano la registrazione', () => {
