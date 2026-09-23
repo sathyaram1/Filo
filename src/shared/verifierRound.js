@@ -561,7 +561,7 @@
       budgets[consume].used += 1;
       budgets[consume].left = Math.max(0, budgets[consume].left - 1);
     }
-    return { stop: false, blocking: [], fix, derived: rest, external, consume, counts, budgets };
+    return { stop: false, blocking: [], sospesi: [], fix, derived: rest, external, consume, counts, budgets };
   }
 
   // ── Testi ─────────────────────────────────────────────────────────────────
