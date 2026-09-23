@@ -1303,7 +1303,7 @@ if (isMain) {
         console.log(`Rilievi non corretti, da riportare nel report per l'owner (ciascuno diventa un feedback suo, con quella priorità):\n${derivatiText(e.derived)}`);
         const due = dueDaParteText(r.decision.derived);
         if (due) console.log(due);
-        console.log(testoRossiAttesi(branch));
+        console.log(testoProveDaCancellare(branch, e.derived));
       }
       console.log(`Bilanci: ${bilanciResiduiText(r.decision.budgets)}`);
       // «Si può pubblicare» solo se è vero adesso: il pass vale per l'ultimo
