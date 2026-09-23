@@ -1011,7 +1011,8 @@ export const FERMA_NOTE = [
 export function derivatiAperti(derived) {
   const list = Array.isArray(derived) ? derived : (derived && derived.num ? [derived] : []);
   return list.filter((f) => f && typeof f === 'object').map((f) => ({
-    num: String(f.num || '?'),
+    rilievo: f,
+    num: String(f.num || '').trim(),
     priority: Number.isFinite(Number(f.priority)) ? Number(f.priority) : (Number.isFinite(Number(f.level)) ? Number(f.level) : null),
     esterno: f.sede === 'e',
     frase: VERIFIER_ROUND.primaFrase ? VERIFIER_ROUND.primaFrase(f.text) : String(f.text || '').split('\n')[0],
@@ -1020,7 +1021,10 @@ export function derivatiAperti(derived) {
 
 function derivatiRighe(list) {
   if (!list.length) return '  (nessuno)';
-  return list.map((d) => `- ${d.num}${d.priority != null ? ` (priorità ${d.priority}, ${d.esterno ? 'esterno' : 'interno messo da parte'})` : ''}${d.frase ? `: ${d.frase}` : ''}`).join('\n');
+  return list.map((d) => {
+    const dove = `feedback ${d.num || '(numero non comunicato)'}${d.priority != null ? `, priorità ${d.priority}, ${d.esterno ? 'esterno' : 'interno messo da parte'}` : ''}`;
+    return d.rilievo.text ? `${VERIFIER_ROUND.formatFinding(d.rilievo)}\n  → ${dove}` : `- ${dove}`;
+  }).join('\n');
 }
 
 export function verifierReplyText(reply) {
