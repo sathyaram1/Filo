@@ -192,7 +192,7 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
         const testo = readFileSync(p, 'utf8');
         for (const [i, riga] of testo.split(/\r?\n/).entries()) {
           if (/^\s*(\/\/|#|\*)/.test(riga)) continue; // i commenti raccontano la storia (5/2/0), non sono un default
-          if (/\bcap[210]\s*[:=]\s*\d/.test(riga) || /\bDEFAULT_CAPS\b/.test(riga)) trovati.push(`${p}:${i + 1}: ${riga.trim()}`);
+          if (/\bcap[3210]\s*[:=]\s*\d/.test(riga) || /\bDEFAULT_CAPS\b/.test(riga)) trovati.push(`${p}:${i + 1}: ${riga.trim()}`);
         }
       }
     };
