@@ -128,9 +128,13 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
       expect(r.status).toBe(1);
       expect(r.stderr).toMatch(/non ha cap3/);
       // I quattro numeri ci sono, lo 0 compreso e uno scritto come stringa numerica: si va avanti.
+      // I numeri però non si stampano davanti a chi verifica (saperli orienta il livello):
+      // `status` dice solo che li ha letti.
       s.stato.risposta = { status: 200, body: doc(int(10), { stringValue: '1' }, { doubleValue: 0 }) };
       r = await lancia(repo, s.url, 'status');
-      expect(r.stdout).toMatch(/Bilanci del giro \(dal server, config\/routines\): cap3 5 · cap2 10 · cap1 1 · cap0 0/);
+      expect(r.status).toBe(0);
+      expect(r.stdout).toMatch(/Server raggiunto/);
+      expect(r.stdout).not.toMatch(/cap3 5|cap2 10|Bilanci del giro/);
       // Il token dell'owner è arrivato al server, non un altro.
       expect(s.stato.richieste.every((q) => q.auth === 'Bearer token-finto-di-prova')).toBe(true);
     } finally {
