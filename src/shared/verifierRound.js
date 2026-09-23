@@ -6,7 +6,8 @@
 //   quali si correggono subito (e da quale bilancio si paga il giro), quali
 //   finiscono nel feedback derivato, e quando il lavoro si ferma e passa
 //   all'owner. Più il formato con cui il verificatore scrive la critica
-//   (`[livello] testo`, una riga per rilievo) e il suo parser.
+//   (`[livello+sede] testo`: `[2i]`, `[1e?]`, una riga per rilievo) e il suo
+//   parser. Contano solo i rilievi interni; gli esterni escono a parte.
 //
 // PERCHÉ È CONDIVISO
 //   Le stesse regole girano in TRE posti: sul server (filo-security, che le
