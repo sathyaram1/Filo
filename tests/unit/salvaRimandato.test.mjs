@@ -93,9 +93,55 @@ test('le pagine che salvano da sole usano la regola condivisa', () => {
     ['src', 'pages', 'options', 'options.js'],
     ['src', 'pages', 'options', 'altro.js'],
     ['src', 'pages', 'preferences', 'preferences.js'],
+    ['src', 'pages', 'security', 'security.js'],
   ]) {
     const testo = readFileSync(join(RADICE, ...rel), 'utf8');
     assert.match(testo, /SN_SALVA\.crea\(/, `${rel.join('/')} non usa SN_SALVA`);
     assert.doesNotMatch(testo, /addEventListener\('pagehide'/, `${rel.join('/')} si riscrive l'uscita in casa`);
   }
+});
+
+// L'altra metà della stessa regola: un campo che si conferma quando il cursore
+// ne esce (una rinomina, la riga di un elenco) si conferma anche se la pagina
+// sparisce prima. Chi ha campi così li registra in SN_SALVA.
+test('i campi che si confermano al blur passano dalla regola condivisa', () => {
+  for (const rel of [
+    ['src', 'pages', 'editor', 'editor.js'],
+    ['src', 'pages', 'spellcheck', 'spellcheck.js'],
+    ['src', 'pages', 'archive', 'archive.js'],
+  ]) {
+    const testo = readFileSync(join(RADICE, ...rel), 'utf8');
+    assert.match(testo, /SN_SALVA\.campoAlVolo\(\)/, `${rel.join('/')} non registra il campo sotto il cursore`);
+    assert.match(testo, /campoAlVolo\.scrivendo\(/, `${rel.join('/')} non dice cosa confermare`);
+  }
+});
+
+// Una pagina che usa la regola deve anche caricarla, o la chiamata esplode al
+// primo campo scritto e la pagina resta senza salvataggio.
+test('ogni pagina che usa la regola carica il modulo', () => {
+  for (const [cartella, file] of [
+    ['options', 'options.html'],
+    ['options', 'altro.html'],
+    ['preferences', 'preferences.html'],
+    ['security', 'security.html'],
+    ['editor', 'editor.html'],
+    ['spellcheck', 'spellcheck.html'],
+    ['archive', 'archive.html'],
+  ]) {
+    const html = readFileSync(join(RADICE, 'src', 'pages', cartella, file), 'utf8');
+    assert.match(html, /shared\/salvaRimandato\.js/, `${cartella}/${file} non carica salvaRimandato`);
+  }
+});
+
+test('un campo al volo si conferma da solo quando la pagina sparisce', () => {
+  const fatti = [];
+  const campo = Salva.campoAlVolo();
+  campo.scrivendo(() => fatti.push('confermato'));
+  Salva.salvaTuttoSubito();
+  assert.deepEqual(fatti, ['confermato']);
+  // Confermato a mano (Invio, o il cursore che esce), l'uscita non lo rifà.
+  campo.scrivendo(() => fatti.push('secondo'));
+  campo.confermato();
+  Salva.salvaTuttoSubito();
+  assert.deepEqual(fatti, ['confermato']);
 });
