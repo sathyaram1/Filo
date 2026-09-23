@@ -225,11 +225,13 @@ test('#561 giro 3: un livello fuori scala o a intervallo a inizio riga non è un
 test('#561 giro 4: un livello senza testo non sparisce; nel riassunto le parentesi in mezzo alla frase sono testo; oltre il tetto si dice', () => {
   // «[2]» da solo (riga vuota o fine critica dopo): prima il lettore lo
   // scartava in silenzio e un 2 diventava un pass.
-  assert.deepEqual(R.unparsedLevelLines('Provato: regge quasi tutto.\n[2]'), ['[2] (rilievo senza testo)']);
-  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2]\n\n[1i] bordo grigio'), ['[2] (rilievo senza testo)']);
+  assert.deepEqual(R.unparsedLevelLines('Provato: regge quasi tutto.\n[2i]'), ['[2i] (rilievo senza testo)']);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2i]\n\n[1i] bordo grigio'), ['[2i] (rilievo senza testo)']);
   // Col testo sulla riga dopo è un rilievo intero.
-  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2]\nil pulsante non salva'), []);
-  assert.equal(R.parseFindings('Provato.\n[2]\nil pulsante non salva').findings[0].text, 'il pulsante non salva');
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2i]\nil pulsante non salva'), []);
+  assert.equal(R.parseFindings('Provato.\n[2i]\nil pulsante non salva').findings[0].text, 'il pulsante non salva');
+  // Senza la sede, prima ancora del testo che manca, si dice cosa manca.
+  assert.match(R.unparsedLevelLines('Provato.\n[2]')[0], /^\[2\] \(manca la sede/);
   // DAL 2026-09-07 (decisione dell'owner su #565) le quadre con dentro un
   // livello sono SEMPRE un rilievo, anche in mezzo a una frase del riassunto:
   // la tolleranza di prima lasciava passare un rilievo scritto dopo
