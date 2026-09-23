@@ -47,9 +47,11 @@ codice e `npm run test:unit` e dichiaralo nella critica: non è un rilievo.
 ## Una famiglia di difetti si scrive insieme
 
 Tutte le porte che trovi per la stessa causa (criterio 9) vanno nella **stessa
-critica**, ciascuna coi suoi passi, e sopra di loro **una riga con la causa
-comune**, in parole da utente: chi corregge deve poter curare il meccanismo,
-non l'ultima porta. Una porta per giro costa un giro per porta.
+critica** e nello **stesso rilievo**: la causa comune, in parole da utente,
+nella riga col livello e la sede; ogni porta coi suoi passi nelle righe sotto.
+Chi corregge deve poter curare il meccanismo, non l'ultima porta. Una porta
+per giro costa un giro per porta; una porta per rilievo, se la famiglia è
+esterna, costa un feedback per porta.
 
 Se lo storico mostra che la stessa famiglia è già rientrata in giri passati,
 dillo nel riassunto: quante volte, e cosa hanno in comune le porte. Una strada
