@@ -1057,7 +1057,7 @@ export function verifierReplyText(reply) {
       fmt(r.phase2.findings),
       'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu):',
       derivatiRighe(derivati),
-      derivati.length ? 'Prove del giro da TOGLIERE dal ramo, nello stesso commit della correzione:' : null,
+      derivati.length ? 'Prove del giro da TOGLIERE dal ramo, nello stesso commit della correzione (quelle dei rilievi esterni le ha già tolte chi ha verificato: se non ci sono più, vai avanti):' : null,
       derivati.length ? daTogliere : null,
       dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
