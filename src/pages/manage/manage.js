@@ -1137,6 +1137,9 @@
   // Una richiesta si manda a fondere per il segno UNA volta per pagina: un
   // rifiuto o un conflitto non si ritentano da soli a ogni rilettura.
   const fusioniTentate = new Set();
+  // L'esito di quel tentativo, per richiesta: il riquadro in basso e la riga
+  // del dettaglio sono un posto solo, e chi arriva dopo cancella chi c'era.
+  const esitiTentati = new Map();
 
   // Dal numero della segnalazione (l'etichetta "automazione · feedback #N"
   // sulla scheda) al feedback vero: la scheda sta già dentro la dashboard dei
