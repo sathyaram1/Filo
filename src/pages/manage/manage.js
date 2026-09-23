@@ -43,9 +43,12 @@
   const mgProberIdle      = document.getElementById('mgProberIdle');
   const mgProberIdleMsg   = document.getElementById('mgProberIdleMsg');
   const mgProberIdleBlock = document.getElementById('mgProberIdleBlock');
-  // I tre bilanci dei giri di correzione (feedback #561): cap2 = giri
-  // per i rilievi di livello 3/2, cap1 = per gli 1, cap0 = per i soli 0; più il
-  // testo in coda alla risposta (fixInstructions).
+  // I bilanci dei giri di correzione, uno per livello (feedback #561): cap3 =
+  // giri per i rilievi di livello 3, cap2 = per i 2, cap1 = per gli 1, cap0 =
+  // per i soli 0; più il testo in coda alla risposta (fixInstructions).
+  const mgCap3     = document.getElementById('mgCap3');
+  const mgCap3Save = document.getElementById('mgCap3Save');
+  const mgCap3Msg  = document.getElementById('mgCap3Msg');
   const mgCap2     = document.getElementById('mgCap2');
   const mgCap2Save = document.getElementById('mgCap2Save');
   const mgCap2Msg  = document.getElementById('mgCap2Msg');
