@@ -135,7 +135,7 @@ test('un 1 entra nel giro di un 2, anche a cap1 finito (decisione owner 2026-09-
   assert.equal(d.consume, 'cap2', 'il giro lo paga il livello più alto');
   assert.equal(d.counts.count1, 2, 'cap1 non si tocca');
   // Con cap1 a zero dall'owner vale lo stesso.
-  const zero = decide([f(1, 'bordo'), f(2, 'rotto')], {}, { cap2: 10, cap1: 0, cap0: 0 });
+  const zero = decide([f(1, 'bordo'), f(2, 'rotto')], {}, { cap3: 10, cap2: 10, cap1: 0, cap0: 0 });
   assert.deepEqual(zero.fix.map((x) => x.level), [1, 2], 'ordine della critica conservato');
   assert.equal(zero.consume, 'cap2');
 });
