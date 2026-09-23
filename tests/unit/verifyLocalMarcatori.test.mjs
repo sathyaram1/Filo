@@ -103,41 +103,87 @@ test('dentroProveGiro: solo la cartella delle prove dei giri', () => {
 
 // ─── il controllo del diff, i tre casi del feedback ─────────────────────────
 
-test('soloMarcatori: un file fuori dalla cartella fa decadere il verdetto', () => {
-  const r = soloMarcatori([
-    { path: 'tests/verifica/locale-x/giro4.spec.mjs', prima: PROVA, dopo: PROVA_SEGNATA },
-    { path: 'src/main/menu.js', prima: 'a', dopo: 'a' },
+test('la tolleranza: un file fuori dalla cartella fa decadere il verdetto', () => {
+  const r = soloMarcatoriOCancellazioni([
+    { path: 'tests/verifica/locale-x/giro4.spec.mjs', stato: 'M', prima: PROVA, dopo: PROVA_SEGNATA },
+    { path: 'src/main/menu.js', stato: 'M', prima: 'a', dopo: 'a' },
   ]);
   assert.equal(r.ok, false);
   assert.match(r.motivo, /fuori dalle prove del giro/);
   assert.match(r.motivo, /src\/main\/menu\.js/, 'il file si dice per nome: senza, non si sa cosa togliere');
 });
 
-test('soloMarcatori: solo marcatori nelle prove del giro → il verdetto vale', () => {
-  const r = soloMarcatori([
-    { path: 'tests/verifica/locale-x/giro4.spec.mjs', prima: PROVA, dopo: PROVA_SEGNATA },
-    { path: 'tests/verifica/locale-x/giro3.spec.mjs', prima: PROVA, dopo: PROVA_SEGNATA },
+test('la tolleranza: solo marcatori nelle prove del giro → il verdetto vale', () => {
+  const r = soloMarcatoriOCancellazioni([
+    { path: 'tests/verifica/locale-x/giro4.spec.mjs', stato: 'M', prima: PROVA, dopo: PROVA_SEGNATA },
+    { path: 'tests/verifica/locale-x/giro3.spec.mjs', stato: 'M', prima: PROVA, dopo: PROVA_SEGNATA },
   ]);
   assert.equal(r.ok, true, 'è il caso che senza il fix costava un giro intero');
   assert.deepEqual(r.files, ['tests/verifica/locale-x/giro4.spec.mjs', 'tests/verifica/locale-x/giro3.spec.mjs']);
 });
 
-test('soloMarcatori: una riga di codice in una prova del giro fa decadere il verdetto', () => {
+// La regola del 23/09/2026: la prova di un rilievo diventato un feedback suo si
+// TOGLIE, e toglierla è la strada normale, non un'eccezione da spiegare.
+test('la tolleranza: una prova tolta non fa decadere il verdetto', () => {
+  const r = soloMarcatoriOCancellazioni([
+    { path: 'tests/verifica/locale-x/giro4.spec.mjs', stato: 'D', prima: PROVA, dopo: '' },
+    { path: 'tests/verifica/locale-x/giro3.spec.mjs', stato: 'D', prima: PROVA_SEGNATA, dopo: '' },
+  ]);
+  assert.equal(r.ok, true, 'togliere la prova di un rilievo uscito in un feedback suo è la strada normale');
+  assert.equal(r.files.length, 2, 'chi pubblica deve vedere cosa gli è stato lasciato passare');
+  // Tolta una e segnata un'altra, nello stesso commit: due mosse della stessa
+  // regola, non due regole.
+  assert.equal(soloMarcatoriOCancellazioni([
+    { path: 'tests/verifica/locale-x/giro4.spec.mjs', stato: 'D', prima: PROVA, dopo: '' },
+    { path: 'tests/verifica/locale-x/giro3.spec.mjs', stato: 'M', prima: PROVA, dopo: PROVA_SEGNATA },
+  ]).ok, true);
+});
+
+test('la tolleranza: una prova AGGIUNTA fa decadere il verdetto', () => {
+  const r = soloMarcatoriOCancellazioni([{ path: 'tests/verifica/locale-x/giro5.spec.mjs', stato: 'A', prima: '', dopo: PROVA }]);
+  assert.equal(r.ok, false, 'una prova nuova è roba da girare che nessuno ha provato');
+  assert.match(r.motivo, /giro5\.spec\.mjs/);
+  // Uno spostamento è una prova tolta più una aggiunta: la seconda chiude.
+  assert.equal(soloMarcatoriOCancellazioni([
+    { path: 'tests/verifica/locale-x/giro1.spec.mjs', stato: 'D', prima: PROVA, dopo: '' },
+    { path: 'tests/verifica/locale-x/giro9.spec.mjs', stato: 'A', prima: '', dopo: PROVA },
+  ]).ok, false);
+});
+
+test('la tolleranza: una riga di codice in una prova del giro fa decadere il verdetto', () => {
   const alterata = PROVA_SEGNATA.replace("toContain('crediti di Filo')", "toContain('')");
-  const r = soloMarcatori([{ path: 'tests/verifica/locale-x/giro4.spec.mjs', prima: PROVA, dopo: alterata }]);
+  const r = soloMarcatoriOCancellazioni([{ path: 'tests/verifica/locale-x/giro4.spec.mjs', stato: 'M', prima: PROVA, dopo: alterata }]);
   assert.equal(r.ok, false);
-  assert.match(r.motivo, /non sono cambiati solo i marcatori/);
+  assert.match(r.motivo, /oltre alle prove tolte e ai marcatori/);
 });
 
-test('soloMarcatori: aggiungere o togliere una prova non è un marcatore', () => {
-  assert.equal(soloMarcatori([{ path: 'tests/verifica/locale-x/giro5.spec.mjs', prima: '', dopo: PROVA }]).ok, false);
-  assert.equal(soloMarcatori([{ path: 'tests/verifica/locale-x/giro1.spec.mjs', prima: PROVA, dopo: '' }]).ok, false);
+// Lo stato di git vale più del contenuto: `git show` muto su un file che esiste
+// darebbe un file «vuoto», identico a uno cancellato, e si tollererebbe una
+// modifica vera.
+test('la tolleranza: un contenuto illeggibile non passa per una cancellazione', () => {
+  const r = soloMarcatoriOCancellazioni([{ path: 'tests/verifica/locale-x/giro4.spec.mjs', stato: 'M', prima: PROVA, dopo: '' }]);
+  assert.equal(r.ok, false, 'lo stato dice M: non è un file tolto');
 });
 
-test('soloMarcatori: senza il diff non si tollera niente', () => {
-  assert.equal(soloMarcatori(null).ok, false, 'git muto non è un via libera');
-  assert.match(soloMarcatori(null).motivo, /non sono riuscito a leggere/);
-  assert.equal(soloMarcatori('tutto a posto').ok, false);
+test('la tolleranza: senza il diff non si tollera niente', () => {
+  assert.equal(soloMarcatoriOCancellazioni(null).ok, false, 'git muto non è un via libera');
+  assert.match(soloMarcatoriOCancellazioni(null).motivo, /non sono riuscito a leggere/);
+  assert.equal(soloMarcatoriOCancellazioni('tutto a posto').ok, false);
+});
+
+test('vociNameStatus: lo stato e il nome, anche con uno spazio dentro', () => {
+  assert.deepEqual(vociNameStatus('M\0tests/verifica/1/a.spec.mjs\0D\0tests/verifica/1/b c.spec.mjs\0'), [
+    { stato: 'M', path: 'tests/verifica/1/a.spec.mjs' },
+    { stato: 'D', path: 'tests/verifica/1/b c.spec.mjs' },
+  ]);
+  // Uno spostamento porta due nomi e diventa due voci: il vecchio tolto, il
+  // nuovo aggiunto.
+  assert.deepEqual(vociNameStatus('R100\0tests/verifica/1/a.spec.mjs\0tests/verifica/1/z.spec.mjs\0'), [
+    { stato: 'D', path: 'tests/verifica/1/a.spec.mjs' },
+    { stato: 'A', path: 'tests/verifica/1/z.spec.mjs' },
+  ]);
+  assert.deepEqual(vociNameStatus(''), []);
+  assert.deepEqual(vociNameStatus(undefined), []);
 });
 
 // ─── il cancello ────────────────────────────────────────────────────────────
