@@ -541,13 +541,13 @@
     for (const k of CAP_KEYS) budgets[k] = { cap: caps[k], used: counts[k.replace('cap', 'count')], left: Math.max(0, left(k)) };
 
     if (blocking.length) {
-      return { stop: true, blocking, fix: [], derived: [], consume: null, counts: Object.assign({}, counts), budgets };
+      return { stop: true, blocking, fix: [], derived: [], external, consume: null, counts: Object.assign({}, counts), budgets };
     }
 
     // Ordine stabile: come nella critica. Il bilancio si paga dal livello più
     // alto corretto.
     const fix = findings.filter((f) => fixable.includes(f));
-    const rest = findings.filter((f) => derived.includes(f));
+    const rest = findings.filter((f) => derived.includes(f)).map(conPriorita);
     let consume = null;
     if (fix.length) {
       consume = capKeyOf(maxLevel(fix));
@@ -555,7 +555,7 @@
       budgets[consume].used += 1;
       budgets[consume].left = Math.max(0, budgets[consume].left - 1);
     }
-    return { stop: false, blocking: [], fix, derived: rest, consume, counts, budgets };
+    return { stop: false, blocking: [], fix, derived: rest, external, consume, counts, budgets };
   }
 
   // ── Testi ─────────────────────────────────────────────────────────────────
