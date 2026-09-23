@@ -49,11 +49,10 @@
 //   Il verdetto vale per il commit su cui è stato dato. Se dopo il PASS si
 //   tocca ancora il codice, il verdetto decade e va rifatto: altrimenti
 //   basterebbe farsi approvare una versione e pubblicarne un'altra.
-//   UNICA eccezione (#661): quello che chi verifica fa alle PROVE DEL GIRO dopo
-//   il verdetto — cancellare quelle dei rilievi diventati un feedback loro, o
-//   segnarle rosse attese. Lì quello che gira non cresce, e il verdetto regge
-//   sul commit che lo fa — a patto che in quel commit non cambi altro, e niente
-//   fuori da `tests/verifica/`.
+//   UNICA eccezione (#661): dopo il verdetto dalle PROVE DEL GIRO si può solo
+//   TOGLIERE — una prova intera o un suo caso, quelli dei rilievi diventati un
+//   feedback loro. Il verdetto regge sul commit che lo fa, se lì non si
+//   aggiunge né si cambia una riga e niente sta fuori da `tests/verifica/`.
 //
 // DOVE VIVE
 //   `.claude/verify-local.json`, effimero e gitignorato come gli altri
