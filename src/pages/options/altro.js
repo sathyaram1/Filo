@@ -128,9 +128,13 @@
   async function save() {
     const blocklist = $('blocklist').value.split('\n').map((s) => s.trim()).filter(Boolean);
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { blocklist } });
+    // Arrivata un'altra modifica mentre questo salvataggio viaggiava, la
+    // conferma parlerebbe di uno stato superato: la scrive chi chiude la fila.
+    if (rimandato.inAttesa()) return;
     const hint = $('savedHint');
     hint.classList.add('sn-show');
-    setTimeout(() => hint.classList.remove('sn-show'), 1500);
+    clearTimeout(save._t);
+    save._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
   // Stessa regola della pagina sorella: la conferma non sopravvive a una
