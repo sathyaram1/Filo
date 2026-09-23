@@ -51,6 +51,18 @@
     return api;
   }
 
+  // Un campo che si conferma quando il cursore ne esce (una rinomina, la riga di
+  // un elenco) va confermato anche se la pagina sparisce prima: chi scrive
+  // registra qui la conferma, e le uscite la fanno partire come un salvataggio.
+  function campoAlVolo() {
+    let conferma = null;
+    const r = crea({ salva: () => { const f = conferma; conferma = null; if (f) f(); } });
+    return {
+      scrivendo(fn) { conferma = fn; r.modificato(); },
+      confermato() { conferma = null; r.subito(); },
+    };
+  }
+
   function salvaTuttoSubito() {
     let salvati = 0;
     for (const r of inAscolto.slice()) {
