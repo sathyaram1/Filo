@@ -603,7 +603,8 @@ export function testoProveDaCancellare(branch, derived) {
     'si TOGLIE e non si aggiunge niente. Una riga cambiata, una prova aggiunta o un file fuori da quella',
     'cartella lo fanno decadere, e serve un altro giro.',
     'Se una prova copre ANCHE un caso che resta aperto qui, non cancellarla: toglile il caso che se ne va',
-    'e lascia il resto. Una prova rossa che nessuno ha toccato ferma la chiusura.',
+    'e lascia il resto. La chiusura le prove del giro non le corre: una lasciata rossa non ferma niente,',
+    'confonde solo il giro dopo.',
   ].join('\n');
 }
 
