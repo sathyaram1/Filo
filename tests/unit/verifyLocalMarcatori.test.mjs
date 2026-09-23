@@ -314,7 +314,9 @@ test('su un deposito vero: una prova del giro tolta dopo il verdetto non ferma l
   assert.equal(letto[0].stato, 'D');
 
   // Una prova AGGIUNTA nella stessa cartella richiude il cancello: quello che
-  // gira è cresciuto, e nessuno l'ha provato.
+  // gira è cresciuto, e nessuno l'ha provato. (Tolta l'unica prova, git si
+  // porta via anche la cartella: va rifatta.)
+  mkdirSync(resolve(casa, 'tests', 'verifica', 'locale-x'), { recursive: true });
   writeFileSync(resolve(casa, 'tests', 'verifica', 'locale-x', 'giro5.spec.mjs'), PROVA, 'utf8');
   git('add', '-A');
   git('commit', '-qm', 'prova nuova');
