@@ -900,7 +900,7 @@
 
     // Se nel frattempo è arrivata un'altra modifica, la conferma parlerebbe di
     // uno stato già superato: la scrive il salvataggio che chiude la fila.
-    if (saveTimer != null) return;
+    if (rimandato.inAttesa()) return;
 
     const hasDiscarded = (missingNickRows && missingNickRows.length) || (dupRows && dupRows.length);
     const hint = $('savedHint');
