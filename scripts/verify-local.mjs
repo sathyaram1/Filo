@@ -748,6 +748,8 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
     'Rilievi esterni (non toccano a questo lavoro: ciascuno diventa un feedback suo, lo apre chi guida dal report):',
     derivatiText(external),
   ];
+  const due = dueDaParteText(derived);
+  if (due) righe.push(due);
   if (b) righe.push(`Bilanci: ${b}`);
   righe.push(
     '',
