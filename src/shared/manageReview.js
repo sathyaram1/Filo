@@ -1094,11 +1094,11 @@
 
   const L3_ATTESA = 'Claude aspetta una tua risposta: le domande sono nella conversazione.';
 
-  // I motivi di `design` dopo i quali la risposta dell'owner fa RIPARTIRE il
-  // lavoro da dov'era: le domande di chi risolve, una segnalazione o un rilievo
-  // che chiedono una sua scelta, un bilancio esaurito. La risposta va nella
-  // conversazione ed è quello che chi riprende riceve.
-  const MOTIVI_RISPOSTA = ['clarify', 'decisione', 'loop'];
+  // I motivi di `design` che aspettano una RISPOSTA scritta dell'owner: le
+  // domande di chi risolve, e una segnalazione o un rilievo che chiedono una
+  // sua scelta. La risposta va nella conversazione ed è quello che chi riprende
+  // il lavoro riceve. Un bilancio esaurito (`loop`) si rimette in coda e basta.
+  const MOTIVI_RISPOSTA = ['clarify', 'decisione'];
 
   /**
    * Questa pratica aspetta una risposta dell'owner? PURA.
