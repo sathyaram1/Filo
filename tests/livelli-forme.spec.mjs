@@ -304,6 +304,31 @@ test('domande nelle sole note: rombo verde, e dentro ci sono le domande', async 
   await expect(page.locator('#mgSideBody')).toContainText('decisi voce per voce');
 });
 
+test('fermo su una scelta dell’owner: sta fra i Ricevuti con la casella di risposta, e il rombo apre la segnalazione', async ({ openTab }) => {
+  // Una consegna con segnalazione ferma il lavoro (design/decisione): l'owner
+  // deve trovarlo dove guarda i feedback nuovi, con la scelta da fare e il
+  // posto dove scriverla.
+  const fb = {
+    _id: 'fb-livelli-fermo', text: 'Il tasto salva anche col titolo vuoto.', name: 'Salva senza titolo',
+    seq: 702, subSeq: 0, status: 'design', statusReason: 'decisione', branch: 'worker/fb-livelli-fermo',
+    clientId: 'user:abc', createdAt: '2026-09-22T10:00:00Z', images: [],
+    notes: 'Corretto per la strada A.\n\nSegnalazione per l\'owner (chi verifica):\n## Problema\nDue strade con costi diversi.\n## Scelte\n- A: rifiutare\n- B: titolo automatico',
+    livelli: { l3: { esito: 'segnalato', ruolo: 'verifier', at: '2026-09-22T10:05:00Z', testo: '## Problema\nDue strade con costi diversi.\n## Scelte\n- A: rifiutare\n- B: titolo automatico' } },
+  };
+  const page = await openTab(MANAGE);
+  await apri(page, [fb]);
+  // È fra i Ricevuti, la scheda che si apre per prima.
+  await expect(page.locator(`[data-id="${fb._id}"]`).first()).toBeVisible();
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  await expect(page.locator('#mgClarify')).toBeVisible();
+  await expect(page.locator('#mgDetail')).toContainText(/fermo su una scelta/i);
+  const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
+  await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
+  await rombo.click();
+  await expect(page.locator('#mgSideBody')).toContainText('Due strade con costi diversi');
+});
+
 test('il pentagono verde dice cosa ha controllato l’audit, e non offre di saltarlo', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [FB_COMPLETO]);
