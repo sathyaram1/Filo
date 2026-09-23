@@ -234,7 +234,7 @@
     // server in UN feedback derivato per lavoro, figlio #N.k: categoria
     // propria, così leggendo la coda si vede che nasce da una verifica, non da
     // un'esplorazione.
-    residuo:  { icon: '🧹', label: 'Claude (rilievi residui)' },
+    residuo:  { icon: '🧹', label: 'Claude (rilievi derivati da una verifica)' },
     // Sessione locale: Claude in chat con l'owner, sulla sua macchina. Icona
     // "computer" perché è l'unica delle istanze che lavora DAVANTI a lui: le
     // altre girano da sole, questa nasce da una conversazione.
