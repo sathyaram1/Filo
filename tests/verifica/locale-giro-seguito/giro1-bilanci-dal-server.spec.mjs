@@ -121,10 +121,15 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
       r = await lancia(repo, s.url, 'status');
       expect(r.status).toBe(1);
       expect(r.stderr).toMatch(/HTTP 403/);
-      // I tre numeri ci sono, lo 0 compreso e uno scritto come stringa numerica: si va avanti.
+      // Manca il bilancio dei 3 (un documento di prima della separazione): si ferma e lo dice.
+      s.stato.risposta = { status: 200, body: doc(int(10), int(1), int(0), undefined) };
+      r = await lancia(repo, s.url, 'status');
+      expect(r.status).toBe(1);
+      expect(r.stderr).toMatch(/non ha cap3/);
+      // I quattro numeri ci sono, lo 0 compreso e uno scritto come stringa numerica: si va avanti.
       s.stato.risposta = { status: 200, body: doc(int(10), { stringValue: '1' }, { doubleValue: 0 }) };
       r = await lancia(repo, s.url, 'status');
-      expect(r.stdout).toMatch(/Bilanci del giro \(dal server, config\/routines\): cap2 10 · cap1 1 · cap0 0/);
+      expect(r.stdout).toMatch(/Bilanci del giro \(dal server, config\/routines\): cap3 5 · cap2 10 · cap1 1 · cap0 0/);
       // Il token dell'owner è arrivato al server, non un altro.
       expect(s.stato.richieste.every((q) => q.auth === 'Bearer token-finto-di-prova')).toBe(true);
     } finally {
