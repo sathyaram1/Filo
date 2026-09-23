@@ -147,9 +147,9 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
     const statoFile = join(repo, '.claude', 'verify-local.json');
     writeFileSync(statoFile, JSON.stringify({ 'claude/prova': { request: 'la richiesta', requestedSha: sha, requestedAt: '2026-09-17T00:00:00.000Z', counts: {}, derived: [], rounds: [] } }, null, 2));
     const prima = readFileSync(statoFile, 'utf8');
-    const critica = 'Provato: il comando con e senza server, i tre numeri, lo zero. Funziona tutto quello che ho toccato.\n'
-      + '[2] il pulsante Salva non salva col titolo vuoto: passi, apri, lascia vuoto, premi.\n'
-      + '[1] il bordo del riquadro è grigio freddo dove il resto di Filo è caldo.';
+    const critica = 'Provato: il comando con e senza server, i quattro numeri, lo zero. Funziona tutto quello che ho toccato.\n'
+      + '[2i] il pulsante Salva non salva col titolo vuoto: passi, apri, lascia vuoto, premi.\n'
+      + '[1i] il bordo del riquadro è grigio freddo dove il resto di Filo è caldo.';
     const s = await serverFinto();
     try {
       s.stato.risposta = { status: 200, body: doc(undefined, int(0), int(0)) };
