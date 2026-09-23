@@ -545,7 +545,6 @@ async function main() {
   //    ha fatto il lavoro, quindi hanno i suoi stessi punti ciechi. In cloud
   //    questo passaggio c'è da sempre; qui mancava, e si pubblicava senza.
   {
-    const v = verdictForCurrentBranch(ROOT);
     const esito = esitoVerificaPerCheck({ checkOnly, ok: v.ok, reason: v.reason });
     if (esito.nota) console.log(`\n${esito.nota}`);
     if (esito.ferma) {
