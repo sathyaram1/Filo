@@ -814,8 +814,8 @@ test('leggiBilanciDalServer: senza token, senza documento o senza uno dei quattr
 
 test('withCritique senza i bilanci lancia: non c\'è un default con cui rimpiazzarli', () => {
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
-  assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA }), /senza i bilanci cap2, cap1, cap0/);
-  assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA, caps: { cap2: 5, cap1: 2 } }), /senza i bilanci cap0/);
+  assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA }), /senza i bilanci cap3, cap2, cap1, cap0/);
+  assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA, caps: { cap3: 5, cap2: 5, cap1: 2 } }), /senza i bilanci cap0/);
 });
 
 test('CLI: né status né start mettono i bilanci davanti a chi verifica; con un server irraggiungibile o un documento incompleto si fermano con l\'errore', async () => {
