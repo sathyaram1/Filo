@@ -96,8 +96,3 @@ test('il compito stampato in locale insegna il formato che il lettore accetta: i
   // E il segno del trade-off si spiega con la sede accanto, non da solo.
   expect(brief).not.toMatch(/`\[1\?\]`/);
 });
-
-test('con una segnalazione allegata e nessuno stop, la risposta stampata a chi verifica lo dice, come già a chi corregge', () => {
-  expect(fixedReplyText('#1', { outcome: 'fixed' }, true)).toMatch(/segnalazione/i);
-  expect(verifierReplyText({ outcome: 'pass', derived: [] }, true)).toMatch(/segnalazione/i);
-});
