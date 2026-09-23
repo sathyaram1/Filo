@@ -79,9 +79,20 @@ riaperto la stessa famiglia da sei porte diverse.
   perdeva l'ultima frase a ogni chiusura di scheda.
 - **La regola sta in un posto solo.** `src/shared/salvaRimandato.js`
   (`SN_SALVA`): attesa, spegnimento della conferma, salvataggio da qualunque
-  uscita. Le Preferenze, le Opzioni e «Altro» la chiedono lì invece di
-  riscriversela, e una sentinella diventa rossa se una delle tre torna a
-  riscriversi l'uscita in casa.
+  uscita. Le Preferenze, le Opzioni, «Altro» e Sicurezza la chiedono lì invece
+  di riscriversela, e una sentinella diventa rossa se una torna a riscriversi
+  l'uscita in casa.
+- **L'avviso arriva a tutti, ma serve solo a chi ha qualcosa in sospeso.** Il
+  settimo giro ha trovato le porte rimaste: una pagina che l'avviso non lo
+  ascoltava affatto (Sicurezza) e i campi che si confermano al blur — la
+  rinomina di un documento, la riga di un elenco — che in sospeso non mettono
+  niente. `SN_SALVA.campoAlVolo()` è quella metà: chi scrive registra la
+  conferma del campo, l'uscita la fa partire, e chi conferma a mano la toglie.
+- **Prima di sparire c'è tempo per UN messaggio.** Il congedo aspetta la
+  risposta della pagina, quindi il salvataggio d'uscita deve spedire subito,
+  non dopo una rilettura: il Correttore rileggeva l'elenco prima di riscriverlo
+  e quel giro in più arrivava dopo la fine della scheda.
 - **Dove:** `src/shared/salvaRimandato.js`, il congedo in
   `src/preload/internal-preload.js`. Test:
-  `tests/unit/salvaRimandato.test.mjs` e `tests/uscite-che-salvano.spec.mjs`.
+  `tests/unit/salvaRimandato.test.mjs` e `tests/uscite-che-salvano.spec.mjs`
+  (la rinomina di una chat sta in `tests/cronologia-chat.spec.mjs`).
