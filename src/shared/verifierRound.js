@@ -544,7 +544,10 @@
     for (const k of CAP_KEYS) budgets[k] = { cap: caps[k], used: counts[k.replace('cap', 'count')], left: Math.max(0, left(k)) };
 
     if (blocking.length) {
-      return { stop: true, blocking, fix: [], derived: [], external, consume: null, counts: Object.assign({}, counts), budgets };
+      // Gli altri interni non si perdono con lo stop: chi riprende li trova nel
+      // segnalibro, insieme a quello che ha fermato, e il giro dopo non li riscopre.
+      const sospesi = findings.filter((f) => !blocking.includes(f));
+      return { stop: true, blocking, sospesi, fix: [], derived: [], external, consume: null, counts: Object.assign({}, counts), budgets };
     }
 
     // Ordine stabile: come nella critica. Il bilancio si paga dal livello più
