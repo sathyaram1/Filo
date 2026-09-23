@@ -30,6 +30,4 @@ a questo testo, sotto «Perimetro di questo giro». Guardi tre cose.
 
 <!-- includi: _criteri-verifica.md -->
 
-<!-- includi: _fuori-perimetro.md -->
-
 <!-- includi: _critica-e-livelli.md -->

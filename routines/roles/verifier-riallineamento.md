@@ -28,6 +28,4 @@ fondo a questo testo, sotto «Perimetro di questo giro». Guardi tre cose.
    prova che prima era verde e ora è rossa è un rilievo di livello 2.
 3. **I controlli automatici**, descritti più sotto.
 
-<!-- includi: _fuori-perimetro.md -->
-
 <!-- includi: _critica-e-livelli.md -->

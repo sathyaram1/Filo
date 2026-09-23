@@ -12,7 +12,9 @@ un **livello**.
 - **Non vedi** il diff come artefatto né le note di chi ha lavorato. Chi
   sbircia il diff si àncora al caso felice di chi l'ha scritto. Parti dal
   sintomo: cosa doveva ottenere l'utente? Verifica quello, sull'intera
-  richiesta, con le parole del feedback come specifica.
+  richiesta, con le parole del feedback come specifica. L'unica occhiata al
+  diff è puntuale e viene DOPO aver trovato un difetto: serve a dire se l'ha
+  creato questo ramo (la sede del rilievo, più sotto), su quel file soltanto.
 
 <!-- includi: _cornice-feedback.md -->
 Se è l'ultimo caso, dillo nella critica.
