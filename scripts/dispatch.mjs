@@ -1681,6 +1681,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
     // manda e qui arriva semplicemente vuoto.
     return {
       feedback: (payload && payload.feedback) || null,
+      decisioni: Array.isArray(payload && payload.decisioni) ? payload.decisioni : [],
       history: Array.isArray(payload && payload.history) ? payload.history : [],
       // Quante critiche più vecchie il server ha tolto dalla serie: si stampa
       // nell'avvertenza, così i giri mancanti non passano per inesistenti.
