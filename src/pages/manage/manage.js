@@ -1219,23 +1219,29 @@
   async function fondiPreapprovateInAttesa() {
     if (fusioniInCorso || !isAdmin || !dataLoaded) return;
     fusioniInCorso = true;
+    const righe = [];
     try {
       for (const fb of allFeedbacks.slice()) {
         if (!preapprovedOf(fb) || !isOpenPublic(fb)) continue;
         for (const { req, msg } of await fondiCoperte(fb)) {
           const num = window.SN_MERGE_APPROVALS.feedbackNum(req);
           const dove = num ? ` su #${num}` : '';
-          const testo = `Fusione ferma${dove}, pratica segnata «fondi senza chiedermelo»: ${msg.text}`;
-          setManageMsg(testo, msg.kind === 'ok' ? 'ok' : 'err');
-          // Questa parte da sola, di solito senza nessuna pratica aperta: la riga
-          // del dettaglio lì non è sullo schermo, e un ramo fermo resterebbe fermo
-          // senza che nessuno sappia perché.
-          toast(testo, msg.kind === 'ok' ? 'ok' : 'err');
+          righe.push({ testo: `Fusione ferma${dove}, pratica segnata «fondi senza chiedermelo»: ${msg.text}`, kind: msg.kind });
         }
       }
     } finally {
       fusioniInCorso = false;
     }
+    if (!righe.length) return;
+    // Gli esiti del giro si dicono TUTTI INSIEME: il riquadro è uno solo, e uno
+    // alla volta il secondo cancella il primo prima che si possa leggere.
+    // Questa parte da sola, di solito senza nessuna pratica aperta: la riga del
+    // dettaglio lì non è sullo schermo, e un ramo fermo resterebbe fermo senza
+    // che nessuno sappia perché.
+    const testo = righe.map((r) => r.testo).join('\n');
+    const kind = righe.every((r) => r.kind === 'ok') ? 'ok' : 'err';
+    setManageMsg(testo, kind);
+    toast(testo, kind, 4500 + (righe.length - 1) * 2500);
   }
 
   // Le richieste ferme che NON hanno una scheda in questa lista. Finché i
