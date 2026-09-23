@@ -92,7 +92,17 @@
   // underscore: guardando solo gli asterischi, «__tre] …» passava muta e la
   // bocciatura finiva nel riassunto (feedback #565).
   const GRASSETTO = '(?:\\*{1,3}|_{1,3})?';
-  const FINDING_LINE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(\\?)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
+  // Il segno «?» si accetta anche PRIMA della lettera («[1?i]»): il significato
+  // è lo stesso e respingerlo costerebbe un giro per un ordine di due caratteri.
+  const FINDING_LINE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(?:(\\?)\\s*)?([ieIE])\\s*(\\?)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
+  // La forma VECCHIA, col solo livello: si riconosce per respingerla con la
+  // spiegazione giusta, non per leggerla.
+  const FINDING_LINE_SENZA_SEDE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(\\?)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
+
+  /** I gruppi di FINDING_LINE come rilievo: livello, sede minuscola, segno «?», testo. PURA. */
+  function rilievoDa(m) {
+    return { level: Number(m[1]), sede: String(m[3]).toLowerCase(), text: m[5].trim(), decision: m[2] === '?' || m[4] === '?' };
+  }
   // Qualunque cosa fra parentesi quadre che sembri un livello — anche fuori
   // scala («[4]») o scritto come intervallo («[2-3]», «[2/3]»). Una riga che
   // COMINCIA così, o che lo porta dopo una breve etichetta e prima di un
