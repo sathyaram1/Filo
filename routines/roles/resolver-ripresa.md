@@ -19,6 +19,9 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
 
 `payload.feedback` è la richiesta originale; `payload.history` le critiche dei
 giri passati, dalla più vecchia: le porte già trovate si tengono chiuse.
+`payload.decisioni` tiene TUTTE le risposte dell'owner su questo feedback, in
+ordine e con la loro domanda, anche quelle di fermate precedenti: `ripresa`
+porta solo l'ultima.
 
 1. Applica la scelta dell'owner al codice del ramo, e chiudi i rilievi rimasti.
    Se il lavoro era appena cominciato (una domanda fatta prima di scrivere
