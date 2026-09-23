@@ -1003,6 +1003,26 @@ export const FERMA_NOTE = [
   'risposto. Senza segnalazione torna in coda per un\'altra verifica. Un difetto non è una segnalazione.',
 ].join('\n');
 
+/**
+ * I feedback derivati aperti dal server per questo giro, come li stampa la
+ * risposta: numero, priorità, sede, prima frase. Accetta anche la forma di un
+ * server vecchio (un oggetto solo, col numero). PURA.
+ */
+export function derivatiAperti(derived) {
+  const list = Array.isArray(derived) ? derived : (derived && derived.num ? [derived] : []);
+  return list.filter((f) => f && typeof f === 'object').map((f) => ({
+    num: String(f.num || '?'),
+    priority: Number.isFinite(Number(f.priority)) ? Number(f.priority) : (Number.isFinite(Number(f.level)) ? Number(f.level) : null),
+    esterno: f.sede === 'e',
+    frase: VERIFIER_ROUND.primaFrase ? VERIFIER_ROUND.primaFrase(f.text) : String(f.text || '').split('\n')[0],
+  }));
+}
+
+function derivatiRighe(list) {
+  if (!list.length) return '  (nessuno)';
+  return list.map((d) => `- ${d.num}${d.priority != null ? ` (priorità ${d.priority}, ${d.esterno ? 'esterno' : 'interno messo da parte'})` : ''}${d.frase ? `: ${d.frase}` : ''}`).join('\n');
+}
+
 export function verifierReplyText(reply) {
   const r = reply && typeof reply === 'object' ? reply : {};
   const fmt = (list) => (Array.isArray(list) && list.length ? VERIFIER_ROUND.formatFindings(list) : '  (nessuno)');
@@ -1010,34 +1030,42 @@ export function verifierReplyText(reply) {
   const budgets = b && typeof b === 'object'
     ? ['cap2', 'cap1', 'cap0'].map((k) => (b[k] ? `${k}: ${b[k].left} giri residui su ${b[k].cap}` : null)).filter(Boolean).join(' · ')
     : '';
+  const derivati = derivatiAperti(r.phase2 ? r.phase2.derived : r.derived);
+  // Le prove del giro dei rilievi interni messi da parte le marca chi
+  // corregge, col numero del loro feedback, nello stesso commit: la riga è
+  // pronta da copiare. Quelle degli esterni le ha già marcate il verificatore.
+  const daMarcare = derivati.filter((d) => !d.esterno);
   if (r.outcome === 'fix' && r.phase2) {
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
-      'Rilievi da correggere in questo giro:',
+      'Rilievi interni da correggere in questo giro (con la loro famiglia: le altre porte della stessa causa):',
       fmt(r.phase2.findings),
-      'Rilievi messi da parte (fuori da questo giro: li apre il server come feedback derivato):',
-      fmt(r.phase2.derived),
-      budgets ? `Bilanci: ${budgets}` : '',
+      'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu):',
+      derivatiRighe(derivati),
+      daMarcare.length ? 'Prove del giro da marcare attese rosse nello stesso commit della correzione, in testa al corpo della prova:' : null,
+      daMarcare.length ? daMarcare.map((d) => `  test.fail(true, '${d.num}: ${d.frase.replace(/'/g, '’')}');`).join('\n') : null,
+      budgets ? `Bilanci: ${budgets}` : null,
       '',
       String(r.phase2.instructions || ''),
       '',
       FERMA_NOTE,
       '',
       'A giro chiuso, rilascia il biglietto.',
-    ].filter((l, i) => l !== '' || i === 6 || i === 8 || i === 10).join('\n');
+    ].filter((l) => l !== null).join('\n');
   }
   if (r.outcome === 'stop') {
     return [
       '══ RISPOSTA DEL SERVER: il lavoro si ferma ══',
-      'Rilievi di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l\'owner.',
+      'Rilievi interni di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l\'owner.',
       fmt(r.blocking),
+      derivati.length ? `Feedback derivati aperti dal server (esterni: escono comunque):\n${derivatiRighe(derivati)}` : null,
       'Non c\'è niente da correggere: rilascia il biglietto.',
-    ].join('\n');
+    ].filter((l) => l !== null).join('\n');
   }
   if (r.outcome === 'pass') {
     return [
       '══ RISPOSTA DEL SERVER: verifica superata ══',
-      r.derived && r.derived.num ? `I rilievi non corretti sono diventati il feedback ${r.derived.num}.` : 'Nessun rilievo da mettere da parte.',
+      derivati.length ? `Rilievi non corretti, diventati feedback loro (priorità uguale al livello):\n${derivatiRighe(derivati)}` : 'Nessun rilievo da mettere da parte.',
       'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',
     ].join('\n');
   }
