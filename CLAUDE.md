@@ -378,8 +378,8 @@ modifica:
   ramo, senza pubblicare. Una regressione è rara: non vale un'ora d'attesa a
   ogni consegna;
 - **al suo posto**, nelle routine come in locale, chi verifica lancia
-  `npm run finish:check` (unit test più gli spec delle aree toccate dal ramo:
-  è lo stesso controllo del cancello di `npm run finish`) e le prove del giro,
+  `npm run finish:check` (unit test più gli spec delle aree toccate dal ramo) e
+  le prove del giro,
   `npx playwright test tests/verifica/<numero>` — quel percorso scritto
   relativo alla radice del repo e con le barre normali (vedi più sotto). Un
   rosso fuori dai rossi noti torna a chi risolve con l'elenco degli spec
