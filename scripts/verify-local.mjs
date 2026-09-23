@@ -726,10 +726,13 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
   const righe = [
     '══ ESITO: c\'è da correggere ══',
     `Ramo: ${branch}.`,
-    'Rilievi da correggere in questo giro:',
+    'Rilievi da correggere in questo giro (con la loro famiglia: le altre porte della stessa causa):',
     fmt(findings),
-    'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner):',
-    fmt(derived),
+    'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner, e le loro prove del giro',
+    'si marcano attese rosse nello stesso commit della correzione, `test.fail(true, \'messo da parte: <prima frase>\')`):',
+    derivatiText(derived),
+    'Rilievi esterni (non toccano a questo lavoro: ciascuno diventa un feedback suo, lo apre chi guida dal report):',
+    derivatiText(external),
   ];
   if (b) righe.push(`Bilanci: ${b}`);
   righe.push(
