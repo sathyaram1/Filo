@@ -58,12 +58,13 @@ test('riallineamento: dopo un conflitto di fusione la routine può riportare il 
     'il rientro è un passo dell\'iter: appartiene alle routine, non alla dashboard');
 });
 
-test('i tre bilanci dei giri di correzione (feedback #561, §4): qui solo i NOMI, mai un numero', () => {
+test('i bilanci dei giri di correzione, uno per livello (feedback #561, §4): qui solo i NOMI, mai un numero', () => {
   // I numeri li scrive l'owner dalla dashboard (config/routines) e basta:
   // dal 2026-09-16 nel codice non c'è un default (la verifica locale
   // ragionava con 5/2/0 mentre la dashboard diceva 10/1/0). I vecchi
-  // failCap/improvableCap e il verdetto a tre valori sono aboliti.
-  assert.deepEqual(DATA.VERIFIER_CAP_KEYS, ['cap2', 'cap1', 'cap0']);
+  // failCap/improvableCap e il verdetto a tre valori sono aboliti. Dal
+  // 2026-09-23 il 3 ha un bilancio suo, separato da quello del 2.
+  assert.deepEqual(DATA.VERIFIER_CAP_KEYS, ['cap3', 'cap2', 'cap1', 'cap0']);
   assert.equal(DATA.VERIFIER_CAPS, undefined, 'un default numerico nel codice è un numero che nessuno applica');
 });
 
