@@ -1019,6 +1019,33 @@ test('rinominare con un campo vuoto non lascia una riga senza niente da leggere'
   await expect(page.locator('.arc-chat-title').first()).toHaveText(primaTitolo, { timeout: 10_000 });
 });
 
+// Il titolo si conferma quando il cursore lascia il campo: chiudendo la scheda
+// prima, il cursore non esce e quel nome non lo salverebbe nessuno.
+test('il titolo appena scritto non si perde chiudendo la scheda', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  await preparaDueChat(app);
+  await expect.poll(async () => (await leggiArchivio(app)).filter((c) => c.title).length, { timeout: 30_000 }).toBe(2);
+
+  const page = await openTab(ARCHIVE);
+  const riga = page.locator('.arc-chat').first();
+  await expect(riga).toBeVisible({ timeout: 20_000 });
+  await riga.click({ button: 'right' });
+  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Rinomina' }).click();
+  const campo = page.locator('.arc-chat-rename');
+  await expect(campo).toBeVisible({ timeout: 10_000 });
+  await campo.fill('titolo scritto e chiuso subito');
+
+  const id = await shell.evaluate(async () => {
+    const snap = await window.filoShell.tabs.snapshot();
+    const t = (snap.tabs || snap).find((x) => String(x.url || '').includes('archive'));
+    return t && t.id;
+  });
+  await shell.evaluate((tabId) => window.filoShell.tabs.close(tabId), id);
+
+  await expect.poll(async () => (await leggiArchivio(app)).map((c) => c.title || ''), { timeout: 15_000 })
+    .toContain('titolo scritto e chiuso subito');
+});
+
 test('cercare una frase intera trova la chat, e la pagina dice con quali parole', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   await preparaDueChat(app);
