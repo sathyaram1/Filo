@@ -139,7 +139,9 @@ export const VERIFIER_ROUND = (() => {
       }
       return { summary: '', findings, rifiutati: [] };
     },
-    formatFindings(list) { return (list || []).map((f) => `- [${f.level}${f.sede === 'e' ? 'e' : 'i'}${f.decision ? '?' : ''}] ${f.text}`).join('\n'); },
+    formatFinding(f) { return `- [${f.level}${f.sede === 'e' ? 'e' : 'i'}${f.decision ? '?' : ''}] ${f.text}`; },
+    formatFindings(list) { return (list || []).map((f) => this.formatFinding(f)).join('\n'); },
+    primaFrase(text) { return String(text || '').split('\n')[0].trim().slice(0, 120); },
   };
 })();
 
