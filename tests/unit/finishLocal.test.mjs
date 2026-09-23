@@ -452,6 +452,29 @@ test('senza --check la verifica mancante ferma la chiusura, come sempre', () => 
   assert.deepEqual(esitoVerificaPerCheck({ checkOnly: true, ok: true }), { ferma: false, nota: '' });
 });
 
+// Gli spec delle aree toccate sono la parte lunga della chiusura, e chi
+// verifica li lancia in partenza per obbligo del suo ruolo: rifarli qui, sullo
+// stesso commit, è la stessa ora pagata due volte (regola del 23/09/2026). Si
+// salta solo con un verdetto valido in mano; senza, non cambia niente.
+test('con la verifica superata gli spec delle aree non si rifanno, e si dice perché', () => {
+  const r = specDaRilanciare({ checkOnly: false, ok: true, sha: 'a'.repeat(40) });
+  assert.equal(r.rilancia, false);
+  assert.match(r.nota, /aaaaaaaa/, 'si dice su quale contenuto li ha corsi');
+  assert.match(r.nota, /logica pura/, 'e che gli unit test girano comunque');
+  // Il verdetto che regge su un commit successivo (prove del giro tolte) dice
+  // anche questo: un cancello che si apre in silenzio non si distingue da uno
+  // che non c'è.
+  assert.match(specDaRilanciare({ checkOnly: false, ok: true, sha: 'b'.repeat(40), tollerato: true }).nota, /prove del giro/);
+});
+
+test('senza verifica superata, o con --check, gli spec si rifanno come sempre', () => {
+  assert.deepEqual(specDaRilanciare({ checkOnly: false, ok: false, sha: 'a'.repeat(40) }), { rilancia: true, nota: '' });
+  // `--check` è il comando che lancia chi verifica: per lui la verifica è la
+  // sua, ancora senza esito, e deve fare i controlli davvero.
+  assert.deepEqual(specDaRilanciare({ checkOnly: true, ok: true, sha: 'a'.repeat(40) }), { rilancia: true, nota: '' });
+  assert.deepEqual(specDaRilanciare({ checkOnly: true, ok: false }), { rilancia: true, nota: '' });
+});
+
 test('splitKnownRed: i rossi noti escono dal gruppo bloccante, gli altri restano', () => {
   const r = splitKnownRed(['tests/a', 'tests/decks-chat-stress', 'tests/b'], ['tests/decks-chat-stress', 'tests/altro.spec.mjs']);
   assert.deepEqual(r.blocking, ['tests/a', 'tests/b']);
