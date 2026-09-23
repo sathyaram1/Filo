@@ -88,10 +88,14 @@ il rombo e il pentagono della fila delle forme).
   (`revision_capability → revision_capability`), poi un altro verificatore riprova
   (feedback #561, dal 2026-09-05); —rilievo di livello 3/2 non correggibile (bilancio
   esaurito)→ `design` (`statusReason: loop`); —rilievo di livello 3/2 che chiede una
-  decisione→ `design` (`statusReason: decisione`); —consegna (di chi risolve o di chi
-  corregge) con una segnalazione per l'owner (`--segnala`)→ `design`
-  (`statusReason: decisione`), dal 2026-09-23 senza bisogno di `--ferma`: un feedback
-  che aspetta una scelta dell'owner non gira altri giri.
+  decisione→ `design` (`statusReason: decisione`); —QUALUNQUE consegna con una
+  segnalazione per l'owner (`--segnala`: di chi risolve, di chi corregge, e la critica
+  di chi verifica in ogni esito)→ `design` (`statusReason: decisione`), senza bisogno
+  di `--ferma`: un feedback che aspetta una scelta dell'owner non gira altri giri. Le
+  consegne che non possono fermare (nota, controllo di sicurezza, apertura di un
+  feedback) la RESPINGONO, mai ignorata in silenzio. Il segnalibro di ripresa porta,
+  con quello che ha fermato, anche gli altri rilievi interni della stessa critica
+  (`sospesi`): chi riprende li chiude, il giro dopo non li riscopre.
 - `revision_security` —routine PASS secaudit+merge→ `done`; —FAIL fixer-loop→ `design`
   (`statusReason: loop`); —conflitto di fusione→ `revision_capability`
   (riallineamento: main è avanzato e il merge non passa più da solo — non è una
