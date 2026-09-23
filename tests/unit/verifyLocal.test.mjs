@@ -21,7 +21,7 @@ const {
 
 // I bilanci di QUESTI test. Dal 2026-09-16 nel codice non c'è un default: lo
 // script li legge dal server, e withCritique li pretende da chi chiama.
-const CAPS_TEST = { cap2: 5, cap1: 2, cap0: 0 };
+const CAPS_TEST = { cap3: 5, cap2: 5, cap1: 2, cap0: 0 };
 const withCritique = (s, b, o) => withCritiqueRaw(s, b, { caps: CAPS_TEST, ...o });
 
 // Il server finto che serve config/routines ai comandi del CLI (processo
