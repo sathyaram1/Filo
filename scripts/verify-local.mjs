@@ -696,8 +696,17 @@ export function codaDalServer(testoServer) {
   ].join('\n');
 }
 
+/**
+ * I rilievi che questo ramo non corregge, uno per riga con la priorità che
+ * avrà il suo feedback (uguale al livello). PURA.
+ */
+export function derivatiText(list) {
+  if (!Array.isArray(list) || !list.length) return '  (nessuno)';
+  return list.map((f) => `${ROUND.formatFinding(f)}\n  → feedback a parte, priorità ${Number.isFinite(Number(f.priority)) ? Number(f.priority) : Number(f.level) || 0}${f.sede === 'e' ? ' (esterno: non tocca a questo lavoro)' : ' (interno, messo da parte)'}`).join('\n');
+}
+
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
-export function codaText({ findings, derived, budgets, branch, instructions }) {
+export function codaText({ findings, derived, external, budgets, branch, instructions }) {
   const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
   const b = budgets && typeof budgets === 'object'
     ? ['cap2', 'cap1', 'cap0'].map((k) => (budgets[k] ? `${k}: ${budgets[k].left} giri residui su ${budgets[k].cap}` : null)).filter(Boolean).join(' · ')
