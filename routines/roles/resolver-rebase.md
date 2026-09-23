@@ -6,9 +6,7 @@ correzione del comportamento.
 
 Sei già sul ramo: non cambiarlo, e non fondere su `main`.
 
-`payload.decisioni`, se c'è, sono le risposte dell'owner alle domande fatte su
-questo feedback, ognuna con la sua domanda: fanno parte dell'intenzione del
-lavoro, e nel riallineamento non si perdono.
+<!-- includi: _decisioni-owner.md -->
 
 1. `git fetch origin main && git rebase origin/main`. In ogni conflitto tieni
    **tutte e due le intenzioni**: quella del lavoro e quella arrivata su
