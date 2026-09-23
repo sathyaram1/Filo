@@ -771,10 +771,17 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
   if (b) righe.push(`Bilanci: ${b}`);
   righe.push(
     '',
-    `Prima di consegnare rilancia le prove del giro (le tue e quelle dei giri prima): npx playwright test ${cartella}`,
-    'Una che diventa rossa è una regressione della correzione. Se quella cartella non c\'è, non c\'era niente da rilanciare:',
-    'guardala però, non fidarti del messaggio — «No tests found» arriva anche a cartella piena se il percorso è scritto in',
-    'un\'altra forma (solo quello relativo alla radice del repo, con le barre normali, viene riconosciuto).',
+    `Le prove del giro stanno in ${cartella}. Lancia SOLO quelle dei rilievi che stai correggendo, prima e dopo`,
+    '(`npx playwright test <percorso della singola prova>`): la cartella intera la rilancia chi verifica, all\'inizio del',
+    'giro. Il percorso va scritto relativo alla radice del repo e con le barre normali: in ogni altra forma la risposta è',
+    '«No tests found» anche a file esistente.',
+    'Nello stesso commit della correzione TOGLI da quella cartella:',
+    '  · le prove dei rilievi messi da parte e degli esterni elencati qui sopra — ognuno è un feedback suo adesso, e il',
+    '    testo del rilievo viaggia lì: la cartella del giro non deve crescere;',
+    '  · le prove dei rilievi che hai corretto, quando scrivi la prova durevole che li tiene chiusi. Se non ne scrivi una,',
+    '    la prova del giro resta.',
+    'Restano le prove dei rilievi che fermano il lavoro: le tratta chi riprende. Una prova che copre anche un caso ancora',
+    'aperto non si cancella: toglile il caso che se ne va, o segnale il rosso atteso in testa al corpo.',
     '',
     testo,
   );
