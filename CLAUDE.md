@@ -472,8 +472,8 @@ la scrittura chiara.
   unit test confronta le voci verificabili (scorciatoie, pagine interne) col
   codice reale e diventa rossa se derivano.
 - **`src/shared/feedbackTransitions.js`** — le TABELLE della macchina a stati
-  (stati, transizioni, statusPublic, imbottitura, i NOMI dei tre bilanci del
-  verificatore — i numeri NON stanno nel codice: li scrive l'owner in
+  (stati, transizioni, statusPublic, imbottitura, i NOMI dei bilanci del
+  verificatore, uno per livello — i numeri NON stanno nel codice: li scrive l'owner in
   Gestione → Automazioni, e chi ne ha bisogno li legge dal server o si ferma)
   come DATI. La dashboard le legge da qui; il server di
   filo-security le INCORPORA al deploy (predeploy `bake-shared`), insieme a
