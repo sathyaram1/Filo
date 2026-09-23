@@ -53,7 +53,9 @@ async function stubMain(page, { pending = [], approveReply = null, updateReply =
         return msg.mergePreapproved ? { ok: true, by: 'owner@esempio' } : { ok: true };
       }
       if (t === 'merge_approvals_get') {
-        const usate = new Set(window.__approvals.map((a) => a.id));
+        // Una fusione che NON è avvenuta lascia la richiesta dov'era: è il caso
+        // del server irraggiungibile, non quello della fusione riuscita.
+        const usate = cfg.tieniInAttesa ? new Set() : new Set(window.__approvals.map((a) => a.id));
         return { ok: true, pending: cfg.pending.filter((r) => !usate.has(r.id)), failed: [], recent: [], preapproved: [], ttlMs: cfg.ttl };
       }
       if (t === 'merge_approval_approve') {
