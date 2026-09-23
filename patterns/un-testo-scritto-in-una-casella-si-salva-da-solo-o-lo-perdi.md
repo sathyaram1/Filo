@@ -73,6 +73,11 @@ riaperto la stessa famiglia da sei porte diverse.
   nessun `change`: senza contarlo, nessuna uscita lo salva, per quanto si
   aspetti. Le pagine ascoltano anche `input`, e quel tocco basta a far partire
   il salvataggio d'uscita e a spegnere la conferma di prima.
+- **E si ascolta sulla PAGINA, non campo per campo.** L'ottavo giro ha trovato
+  due campi numerici delle Preferenze rimasti fuori da quell'elenco scritto a
+  mano: il numero digitato non partiva da nessuna uscita e la conferma di prima
+  restava accesa. Ogni pagina che salva da sé iscrive `input` su `#page`, così
+  un campo aggiunto domani è coperto senza che nessuno se ne ricordi.
 - **L'avviso di fine pagina parte in tutte e due le forme.** Il main avvisa una
   scheda che sta per sparire (`src/main/congedo.js`), e il preload lo consegna
   come `beforeunload` E come `pagehide`: l'Editor ascoltava solo il primo e
