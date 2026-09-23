@@ -36,7 +36,7 @@ const MISURE_VECCHIE = /~100 spec|~25 min|~465 volte|~11 min/;
 test('nessun documento del repo cita più le misure vecchie della suite', () => {
   for (const f of DOCUMENTI) {
     const m = leggi(f).match(MISURE_VECCHIE);
-    assert.equal(m, null, `${f} cita ancora «${m && m[0]}»: la suite è ~390 spec, ~1.600 casi, quasi sette ore in locale`);
+    assert.equal(m, null, `${f} cita ancora «${m && m[0]}»: la suite è ~350 spec, ~1.450 casi, quasi sette ore in locale`);
   }
 });
 

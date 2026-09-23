@@ -29,7 +29,7 @@ test('safeName: nessun nome può uscire dalla cartella Download', () => {
 
 // Il traversal arriva anche in MEZZO al nome: Chromium ha già cambiato le barre
 // in `_`, e `../../pwned` si presenta come `_.._.._pwned`. Togliere i punti
-// solo in testa lo lasciava passare (tests/verifier-stress-410, «nome file
+// solo in testa lo lasciava passare (tests/verifica/410/verifier-stress-410, «nome file
 // ostile», rosso per questo).
 test('safeName: un ".." in mezzo al nome non sopravvive, i punti normali sì', () => {
   for (const evil of ['_.._.._pwned.txt', 'a..b', 'pwned...txt', 'x.._y..']) {

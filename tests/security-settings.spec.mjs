@@ -121,6 +121,16 @@ test('siti fidati: un dominio non valido mostra un avviso e NON sparisce in sile
   await expect(page.locator('#cookie-wl-list li span')).toHaveText(['example.com']);
   await expect(page.locator('#cookie-wl-error')).toBeHidden();
   await expect(page.locator('#cookie-wl-input')).toHaveValue('');
+
+  // Lo stesso dominio una seconda volta: lo dice, e la lista resta di uno.
+  await page.locator('#cookie-wl-input').fill('Example.com');
+  await page.locator('#cookie-wl-add-btn').click();
+  await expect(page.locator('#cookie-wl-error')).toBeVisible();
+  await expect(page.locator('#cookie-wl-list li span')).toHaveText(['example.com']);
+
+  // Quello che si aggiunge si toglie: senza questo il sito fidato resta per sempre.
+  await page.locator('#cookie-wl-list li button').first().click();
+  await expect(page.locator('#cookie-wl-list li span')).toHaveCount(0);
 });
 
 test('blacklist siti: una voce senza estensione avvisa e NON viene salvata (#225)', async ({ openTab }) => {

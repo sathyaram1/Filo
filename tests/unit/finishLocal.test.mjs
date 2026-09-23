@@ -36,6 +36,11 @@ describe('quali spec lanciare', () => {
     assert.deepEqual(specsForChangedFiles(['tests/editor-chat.spec.mjs']), ['tests/editor-chat']);
   });
 
+  test('una prova di un giro toccata NON entra nei controlli: si lancia per numero', () => {
+    assert.deepEqual(specsForChangedFiles(['tests/verifica/514/verify-514-g6.spec.mjs']), [],
+      'un ramo che ne sposta o ne ritocca qualcuna trascinerebbe centinaia di casi di giri passati');
+  });
+
   test('niente duplicati quando più file portano allo stesso spec', () => {
     const out = specsForChangedFiles(['src/pages/manage/manage.js', 'src/pages/manage/manage.html']);
     assert.deepEqual(out, ['tests/manage']);

@@ -80,4 +80,4 @@ all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
 - **Dove:** `src/content/translatePage.js` (stato + ripresa),
   `src/content/extractContext.js` (`extractTranslatableBlocks`),
   `src/content/menuIcons.js` + `src/content/content.js` (menu). Test:
-  `tests/translate-page.spec.mjs`, `tests/verify-407-stress.spec.mjs`.
+  `tests/translate-page.spec.mjs`, `tests/verifica/407/verify-407-stress.spec.mjs`.

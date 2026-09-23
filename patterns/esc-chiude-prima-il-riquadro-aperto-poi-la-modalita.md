@@ -119,7 +119,7 @@ da zero solo su cose che la pagina non può fabbricare: l'input vero
 (`input-event` della WebContents, tutto tranne l'Esc stesso) e il cambio di
 modalità. **Regola generale: un limite contro l'abuso di una pagina non può
 essere contato dentro quella pagina**, per isolato che sia il mondo in cui
-gira. La prova sta in `tests/verify-514-g6.spec.mjs` («sito ladro»), con la
+gira. La prova sta in `tests/verifica/514/verify-514-g6.spec.mjs` («sito ladro»), con la
 controprova della stessa pagina senza gli eventi finti.
 
 **Al tetto si esce, ma il tasto non si ruba.** Arrivato al tetto il main faceva
@@ -155,8 +155,8 @@ Rifiutare **lì** e non a cose fatte è l'unico posto che funziona: quando arriv
 della finestra arriva prima) e la modalità è già stata adottata. Lo stato
 «l'ultimo tasto era l'Esc» si scrive in `before-input-event`, che arriva prima che
 il documento veda il tasto, e si cancella al primo input che Esc non è — un
-clic, un'altra lettera. La prova sta in `tests/verify-514-g7.spec.mjs` e
-`tests/verify-514-g7b.spec.mjs`, con la controprova della stessa pagina senza
+clic, un'altra lettera. La prova sta in `tests/verifica/514/verify-514-g7.spec.mjs` e
+`tests/verifica/514/verify-514-g7b.spec.mjs`, con la controprova della stessa pagina senza
 quella riga.
 
 **«Sparito» vuol dire anche dentro una nostra radice, non solo la radice.** Il
@@ -173,7 +173,7 @@ lo stesso perché quel sottoalbero l'abbiamo disegnato noi. Il prezzo è un fals
 positivo possibile: un pezzo dentro una nostra radice che sparisce da solo nel
 millisecondo dell'Esc (un avviso che scade nel contenitore degli avvisi) fa
 credere che il tasto fosse suo. Costa un Esc in più, ed è la direzione giusta
-dell'errore. La prova sta in `tests/verify-514-g8.spec.mjs`, con la controprova
+dell'errore. La prova sta in `tests/verifica/514/verify-514-g8.spec.mjs`, con la controprova
 dello stesso box sulla home di Filo.
 
 **Chi apre un riquadro nuovo non deve fare niente.** Un riquadro disegnato sopra
@@ -182,7 +182,7 @@ traduce la pagina; uno disegnato da una pagina di Filo non deve nemmeno quello,
 gli basta chiudersi. Un riquadro aperto dentro un altro riquadro nostro non
 deve marcarsi: basta che sparisca. Le prove stanno in
 `tests/esc-riquadri-schermo-intero.spec.mjs` (cinque famiglie di riquadri sopra
-i siti) e in `tests/verify-514-g5.spec.mjs` (quattro riquadri delle pagine di
+i siti) e in `tests/verifica/514/verify-514-g5.spec.mjs` (quattro riquadri delle pagine di
 Filo, più il sito che si traveste da riquadro nostro).
 
 **Chi disegna la UI di Filo sono TUTTI i frame, quindi l'annuncio va a tutti.**
@@ -199,7 +199,7 @@ quel frame credeva di non essere a schermo intero e non rivendicava niente. Ora
 **uno stato che ogni frame usa per decidere va annunciato a ogni frame**; il
 frame nato dopo se lo chiede da solo (`MSG.FULLSCREEN_STATE`), ma quello nato
 prima può saperlo solo se glielo si dice. La prova sta in
-`tests/verify-514-g9.spec.mjs`, con la controprova del riquadro incorporato nato
+`tests/verifica/514/verify-514-g9.spec.mjs`, con la controprova del riquadro incorporato nato
 mentre la modalità era già accesa.
 
 **Un tasto che il browser si prende va CHIESTO, non aspettato.** Il giro 10 ha
@@ -226,7 +226,7 @@ c'è ordine di intercettazione che tenga, si chiede.
 La stessa famiglia porta con sé il nome della voce: quello guarda anche lo
 schermo pieno della PAGINA, quindi si ridisegna anche sul `fullscreenchange`
 del documento e non solo sull'annuncio del main, che arriva mentre il documento
-sta ancora uscendo. Le prove stanno in `tests/verify-514-g10.spec.mjs`, con le
+sta ancora uscendo. Le prove stanno in `tests/verifica/514/verify-514-g10.spec.mjs`, con le
 controprove della stessa pagina senza niente aperto sopra e della modalità di
 Filo.
 
