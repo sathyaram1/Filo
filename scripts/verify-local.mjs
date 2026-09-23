@@ -377,25 +377,31 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
       consumed: decision.consume, outcome, critique: testo,
     }]),
   };
+  // La coda locale dei derivati: quello che questo ramo non corregge, con la
+  // priorità uguale al livello. Gli esterni ci entrano in ogni esito (sono di
+  // un altro lavoro); in cloud il server li apre come feedback, qui li apre
+  // chi guida, dal report.
+  const coda = (Array.isArray(prev.derived) ? prev.derived : []).concat(decision.external);
   if (outcome === 'stop') {
     entry.verdict = 'fail';
     entry.critique = ROUND.formatFindings(decision.blocking);
     entry.pending = null;
+    entry.derived = coda;
     // Il lavoro si ferma e decide l'owner: i bilanci si azzerano, come sul
-    // server. Lasciarli consumati faceva fermare di nuovo, al primo [2], il
+    // server. Lasciarli consumati faceva fermare di nuovo, al primo [2i], il
     // lavoro rifatto dopo la decisione, senza nessun giro di correzione
     // possibile (verifica del giro 3 su #561). La storia dei giri resta.
     entry.counts = {};
   } else if (outcome === 'fix') {
     entry.verdict = 'fix-pending';
-    // Anche i rilievi messi da parte e i bilanci del giro: servono a
-    // ristampare la risposta tale e quale se si è persa.
-    entry.pending = { findings: decision.fix, sha: sha || '', at: when, derived: decision.derived, budgets: decision.budgets };
-    entry.derived = (Array.isArray(prev.derived) ? prev.derived : []).concat(decision.derived);
+    // Anche i rilievi messi da parte, gli esterni e i bilanci del giro:
+    // servono a ristampare la risposta tale e quale se si è persa.
+    entry.pending = { findings: decision.fix, sha: sha || '', at: when, derived: decision.derived, external: decision.external, budgets: decision.budgets };
+    entry.derived = coda.concat(decision.derived);
   } else {
     entry.verdict = 'pass';
     entry.pending = null;
-    entry.derived = (Array.isArray(prev.derived) ? prev.derived : []).concat(decision.derived);
+    entry.derived = coda.concat(decision.derived);
   }
   s[branch] = entry;
   return { ok: true, state: s, decision, outcome };
