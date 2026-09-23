@@ -169,8 +169,10 @@
         wIn.dataset.original = newKey;
       }
     };
-    wIn.addEventListener('change', commit);
-    cIn.addEventListener('change', commit);
+    for (const el of [wIn, cIn]) {
+      el.addEventListener('input', () => campoAlVolo.scrivendo(commit));
+      el.addEventListener('change', () => { campoAlVolo.confermato(); commit(); });
+    }
 
     return row;
   }
