@@ -687,7 +687,7 @@ test('le scelte sulle sessioni restano manovrabili anche a routine spente', asyn
 // config/routines senza rete/main. Cattura ogni `set` per provare che il valore
 // LASCIA il client (è la config che il server dei verdetti legge → "il
 // cambiamento ha effetto").
-async function stubCaps(page, initial = { cap2: 5, cap1: 2, cap0: 0, fixInstructions: '' }) {
+async function stubCaps(page, initial = { cap3: 5, cap2: 5, cap1: 2, cap0: 0, fixInstructions: '' }) {
   await page.evaluate((init) => {
     window.__capsValue = { ...init };
     window.__capsSets = [];
