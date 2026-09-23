@@ -504,27 +504,29 @@ export function cartellaProveGiro(branch) {
   return `${PROVE_GIRO}locale-${slug}`;
 }
 
-// ─── Il verdetto non decade per i soli marcatori di rosso atteso (#661) ─────
+// ─── Il verdetto non decade per quello che il giro fa alle sue prove (#661) ──
 //
-// Quando il giro mette da parte un rilievo (bilancio esaurito) e dice «si può
-// pubblicare», le prove del giro che riproducono quel rilievo restano rosse:
-// la chiusura le rilancia e si ferma lì. Chi verifica le segna come rosso
-// atteso (`test.fail`) e le committa — e quel commit sposta la punta del ramo
-// DOPO il verdetto, che vale per il commit di prima. La chiusura respingeva
-// («il codice è cambiato dopo la verifica») e serviva un giro intero in più,
-// di un'altra istanza, per riverificare un ramo in cui era cambiata una riga
-// di test. È successo due volte: il 10/09 sul ramo della suite locale e il
-// 18/09 su quello del ripiego crediti (#629), dove il quarto giro è servito
-// solo a questo.
+// Quando il giro mette da parte un rilievo e dice «si può pubblicare», la prova
+// del giro che lo riproduce resta rossa. Dal 23/09/2026 quella prova si
+// CANCELLA: il rilievo vive nel feedback che è appena nato, e la cartella si
+// svuota invece di crescere. Cancellare vuol dire un commit, e quel commit
+// sposta la punta del ramo DOPO il verdetto, che vale per il commit di prima.
+// La chiusura respingeva («il codice è cambiato dopo la verifica») e serviva un
+// giro intero in più, di un'altra istanza, per un ramo in cui non era cambiata
+// una riga di prodotto. È successo due volte col vecchio marcatore di rosso
+// atteso: il 10/09 sul ramo della suite locale e il 18/09 su quello del ripiego
+// crediti (#629), dove il quarto giro è servito solo a questo.
 //
-// LA REGOLA: il verdetto regge su un commit successivo se quello che è
-// cambiato non cambia niente di quello che GIRA, e sta tutto nelle prove del
-// giro. Non si leggono le righe del diff una per una: si riducono i due
-// contenuti a ciò che fa girare — via commenti, righe vuote e marcatori — e si
-// confrontano. Così un marcatore aggiunto, tolto o riscritto passa, e una riga
-// di codice cambiata dentro una prova del giro no. Il resto del cancello non
-// si muove: una prova del giro rossa SENZA marcatore ferma la chiusura come
-// prima, perché la chiusura quelle prove le lancia davvero.
+// LA REGOLA: il verdetto regge su un commit successivo se quello che GIRA non
+// cresce e non cambia, e se quello che è cambiato sta tutto nelle prove del
+// giro. Quindi si tollerano due mosse sole, e solo lì dentro: togliere un file
+// intero, e i marcatori di rosso atteso (il ripiego, per una prova che non si
+// può cancellare senza perdere un caso ancora aperto). Non si leggono le righe
+// del diff una per una: si riducono i due contenuti a ciò che fa girare — via
+// commenti, righe vuote e marcatori — e si confrontano. Una prova AGGIUNTA no:
+// lì qualcosa da girare c'è, e nessuno l'ha vista. Il resto del cancello non si
+// muove: una prova del giro rossa, né cancellata né segnata, ferma la chiusura
+// come prima.
 
 /** Dove vivono le prove dei giri di verifica: l'unica cartella tollerata. */
 export const PROVE_GIRO = 'tests/verifica/';
