@@ -101,6 +101,24 @@ test('le pagine che salvano da sole usano la regola condivisa', () => {
   }
 });
 
+// «Sto scrivendo» si ascolta sulla pagina intera, non campo per campo: otto
+// giri di verifica hanno trovato campi rimasti fuori da quell'elenco a mano.
+test('quello che si scrive conta su ogni campo della pagina', () => {
+  for (const rel of [
+    ['src', 'pages', 'options', 'options.js'],
+    ['src', 'pages', 'options', 'altro.js'],
+    ['src', 'pages', 'preferences', 'preferences.js'],
+    ['src', 'pages', 'security', 'security.js'],
+  ]) {
+    const testo = readFileSync(join(RADICE, ...rel), 'utf8');
+    assert.match(
+      testo,
+      /\$\('page'\)\.addEventListener\('input'/,
+      `${rel.join('/')} non ascolta la scrittura sull'intera pagina: un campo nuovo resterebbe fuori`,
+    );
+  }
+});
+
 // L'altra metà della stessa regola: un campo che si conferma quando il cursore
 // ne esce (una rinomina, la riga di un elenco) si conferma anche se la pagina
 // sparisce prima. Chi ha campi così li registra in SN_SALVA.
