@@ -224,13 +224,11 @@ export function checkVerdict(entry, headSha, dirty = false, leggiDiff = null) {
     return { ok: false, reason: `la verifica ha bocciato il lavoro: ${entry.critique || '(nessuna critica registrata)'}` };
   }
   if (!headSha || entry.sha !== headSha) {
-    // Unica eccezione (#661): dopo la verifica nelle prove del giro sono state
-    // tolte prove, o segnati rossi attesi. Quello che gira non cresce, e il
-    // verdetto riguarda quello. `leggiDiff` legge i due contenuti da git: chi
-    // non lo passa (i controlli sulla sola logica) ha il cancello stretto di
-    // sempre.
+    // Unica eccezione (#661): dopo la verifica dalle prove del giro si è solo
+    // tolto. `leggiDiff` legge i due contenuti da git: chi non lo passa (i
+    // controlli sulla sola logica) ha il cancello stretto di sempre.
     const tol = (typeof leggiDiff === 'function' && entry.sha && headSha)
-      ? soloMarcatoriOCancellazioni(leggiDiff(entry.sha, headSha))
+      ? soloProveTolte(leggiDiff(entry.sha, headSha))
       : null;
     if (!tol || !tol.ok) {
       const perche = tol && tol.motivo ? ` (${tol.motivo})` : '';
