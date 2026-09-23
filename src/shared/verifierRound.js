@@ -369,13 +369,16 @@
     return {
       summary: summary.join('\n').trim(),
       findings: normalizeFindings(findings),
+      rifiutati,
     };
   }
 
   /**
    * Un elenco di rilievi arrivato da fuori (dal client, da un file) portato
    * alla forma canonica. Scarta quello che non è un rilievo: livello fuori
-   * scala, testo vuoto. PURA.
+   * scala, testo vuoto. Un rilievo STRUTTURATO senza sede vale interno: è
+   * la forma dei client non aggiornati e dello stato già scritto, dove la
+   * sede non esisteva; l'obbligo vale sul testo della critica. PURA.
    */
   function normalizeFindings(list) {
     if (!Array.isArray(list)) return [];
@@ -386,10 +389,19 @@
       if (!LEVELS.includes(level)) continue;
       const text = String(f.text == null ? '' : f.text).trim().slice(0, MAX_FINDING_TEXT);
       if (!text) continue;
-      out.push({ level, text, decision: f.decision === true });
+      const sede = String(f.sede == null ? '' : f.sede).trim().toLowerCase() === 'e' ? 'e' : 'i';
+      out.push({ level, sede, text, decision: f.decision === true });
       if (out.length >= MAX_FINDINGS) break;
     }
     return out;
+  }
+
+  /** La prima frase di un rilievo, per un titolo (al più `max` caratteri). PURA. */
+  function primaFrase(text, max = 120) {
+    const prima = String(text == null ? '' : text).split('\n')[0].trim();
+    const m = /^(.*?[.!?])(?:\s|$)/.exec(prima);
+    const frase = (m ? m[1] : prima).trim();
+    return frase.length > max ? `${frase.slice(0, max - 1).trimEnd()}…` : frase;
   }
 
   /** Il livello più alto fra i rilievi (null se non ce ne sono). PURA. */
