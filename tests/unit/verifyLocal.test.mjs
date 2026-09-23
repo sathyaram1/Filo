@@ -518,9 +518,13 @@ test('#561 giro 3: «[4] gravissimo» a inizio riga non è un pass silenzioso', 
 
 test('#561 giro 4: «[2]» senza testo è respinto, non un pass; il riassunto può citare un livello in mezzo alla frase', () => {
   const s = withRequest({}, 'r', { request: 'x', sha: SHA });
-  const vuoto = withCritique(s, 'r', { critique: 'Provato: regge quasi tutto.\n[2]', sha: SHA });
+  const vuoto = withCritique(s, 'r', { critique: 'Provato: regge quasi tutto.\n[2i]', sha: SHA });
   assert.equal(vuoto.ok, false);
   assert.match(vuoto.reason, /rilievo senza testo/);
+  // E senza la sede si dice cosa manca: un «[2]» non vale interno in silenzio.
+  const senzaSede = withCritique(s, 'r', { critique: 'Provato: regge quasi tutto.\n[2] il pulsante non salva', sha: SHA });
+  assert.equal(senzaSede.ok, false);
+  assert.match(senzaSede.reason, /manca la sede/);
   // Dal 2026-09-07 (#565, decisione dell'owner) le quadre col livello dentro
   // sono sempre un rilievo: nel riassunto il livello si cita a parole.
   const conQuadre = withCritique(s, 'r', { critique: 'Provato il caso [2i?] del giro prima: chiuso.', sha: SHA });
