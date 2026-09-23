@@ -60,3 +60,28 @@ eppure il testo era perso lo stesso.
 - **Dove:** `bozzeRiapertura`, `renderReopen`, `renderList` e `loadData` in
   `src/pages/board/board.js`. Test: i due casi sul ridisegno in
   `tests/board-reopen.spec.mjs`.
+
+## Anche la pagina che sparisce, e anche col cursore ancora dentro
+
+Le pagine che salvano da sé, senza pulsante, avevano tre buchi tutti figli
+della stessa causa. Il salvataggio aspetta qualche centesimo prima di partire;
+per non perdere l'ultima modifica si appoggia a un avviso d'uscita; e conta una
+modifica solo quando il cursore lascia il campo. Sei giri di verifica hanno
+riaperto la stessa famiglia da sei porte diverse.
+
+- **Toccare È modificare.** Un campo ancora sotto il cursore non ha mandato
+  nessun `change`: senza contarlo, nessuna uscita lo salva, per quanto si
+  aspetti. Le pagine ascoltano anche `input`, e quel tocco basta a far partire
+  il salvataggio d'uscita e a spegnere la conferma di prima.
+- **L'avviso di fine pagina parte in tutte e due le forme.** Il main avvisa una
+  scheda che sta per sparire (`src/main/congedo.js`), e il preload lo consegna
+  come `beforeunload` E come `pagehide`: l'Editor ascoltava solo il primo e
+  perdeva l'ultima frase a ogni chiusura di scheda.
+- **La regola sta in un posto solo.** `src/shared/salvaRimandato.js`
+  (`SN_SALVA`): attesa, spegnimento della conferma, salvataggio da qualunque
+  uscita. Le Preferenze, le Opzioni e «Altro» la chiedono lì invece di
+  riscriversela, e una sentinella diventa rossa se una delle tre torna a
+  riscriversi l'uscita in casa.
+- **Dove:** `src/shared/salvaRimandato.js`, il congedo in
+  `src/preload/internal-preload.js`. Test:
+  `tests/unit/salvaRimandato.test.mjs` e `tests/uscite-che-salvano.spec.mjs`.
