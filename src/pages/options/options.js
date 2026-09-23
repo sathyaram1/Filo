@@ -936,27 +936,13 @@
     }
   }
 
-  let saveTimer = null;
-  function saveDebounced() {
-    clearTimeout(saveTimer);
-    // Un «Salvato» ancora sullo schermo parla del salvataggio di PRIMA: con una
-    // modifica in attesa mentirebbe, e chi chiude la pagina la perde credendola al sicuro.
-    $('savedHint').classList.remove('sn-show');
-    saveTimer = setTimeout(() => { saveTimer = null; save(); }, 400);
-  }
-
-  // Chiudere la pagina (o cambiare scheda) dentro i 400 ms dell'attesa buttava
-  // via l'ultima modifica senza dirlo: prima di sparire si salva subito.
-  function flushSave() {
-    if (saveTimer == null) return;
-    clearTimeout(saveTimer);
-    saveTimer = null;
-    save();
-  }
-  window.addEventListener('pagehide', flushSave);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flushSave();
+  // Attesa, spegnimento della conferma e salvataggio prima di sparire: la
+  // regola è una sola e sta in SN_SALVA, per tutte le pagine che salvano da sé.
+  const rimandato = window.SN_SALVA.crea({
+    salva: save,
+    spegniConferma: () => $('savedHint').classList.remove('sn-show'),
   });
+  const saveDebounced = () => rimandato.programma();
 
   // La chiave OpenRouter si mette e si toglie anche dalla pagina Crediti
   // (#629), e questa pagina risalva TUTTO il modulo a ogni modifica: con la
