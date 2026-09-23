@@ -175,11 +175,12 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
   });
 
   test('il calcolo dell\'esito senza uno dei bilanci lancia, non inventa', () => {
-    expect(() => withCritique({}, 'b', { critique: 'x'.repeat(100), sha: 'abc', caps: { cap2: 10, cap1: 1 } })).toThrow(/cap0/);
-    expect(() => withCritique({}, 'b', { critique: 'x'.repeat(100), sha: 'abc', caps: null })).toThrow(/cap2, cap1, cap0/);
+    expect(() => withCritique({}, 'b', { critique: 'x'.repeat(100), sha: 'abc', caps: { cap3: 5, cap2: 10, cap1: 1 } })).toThrow(/cap0/);
+    expect(() => withCritique({}, 'b', { critique: 'x'.repeat(100), sha: 'abc', caps: { cap2: 10, cap1: 1, cap0: 0 } })).toThrow(/cap3/);
+    expect(() => withCritique({}, 'b', { critique: 'x'.repeat(100), sha: 'abc', caps: null })).toThrow(/cap3, cap2, cap1, cap0/);
   });
 
-  test('nel codice pubblico non resta un numero di ripiego per cap2/cap1/cap0', () => {
+  test('nel codice pubblico non resta un numero di ripiego per cap3/cap2/cap1/cap0', () => {
     const cartelle = ['scripts', 'src/shared', 'src/main', 'routines', '.claude/hooks', '.claude/skills'];
     const trovati = [];
     const cammina = (dir) => {
