@@ -134,12 +134,12 @@ export const VERIFIER_ROUND = (() => {
     parseFindings(text) {
       const findings = [];
       for (const line of String(text || '').split('\n')) {
-        const m = /^\s*\[\s*([0-3])\s*(\?)?\s*\]\s*(.+)$/.exec(line);
-        if (m) findings.push({ level: Number(m[1]), text: m[3].trim(), decision: m[2] === '?' });
+        const m = /^\s*\[\s*([0-3])\s*([ieIE])\s*(\?)?\s*\]\s*(.+)$/.exec(line);
+        if (m) findings.push({ level: Number(m[1]), sede: m[2].toLowerCase(), text: m[4].trim(), decision: m[3] === '?' });
       }
-      return { summary: '', findings };
+      return { summary: '', findings, rifiutati: [] };
     },
-    formatFindings(list) { return (list || []).map((f) => `- [${f.level}${f.decision ? '?' : ''}] ${f.text}`).join('\n'); },
+    formatFindings(list) { return (list || []).map((f) => `- [${f.level}${f.sede === 'e' ? 'e' : 'i'}${f.decision ? '?' : ''}] ${f.text}`).join('\n'); },
   };
 })();
 
