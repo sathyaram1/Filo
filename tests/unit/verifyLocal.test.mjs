@@ -759,18 +759,18 @@ test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un p
 
 // ─── I bilanci si leggono dal server (decisione dell'owner, 2026-09-16) ──────
 
-test('leggiBilanciDalServer: i tre numeri dal documento Firestore, col token dell\'owner; fixInstructions se c\'è', async () => {
+test('leggiBilanciDalServer: i quattro numeri dal documento Firestore, col token dell\'owner; fixInstructions se c\'è', async () => {
   const chiamate = [];
   const fetchImpl = async (url, opts) => {
     chiamate.push({ url, auth: opts.headers.Authorization });
-    return { ok: true, status: 200, json: async () => ({ fields: { cap2: { integerValue: '10' }, cap1: { integerValue: '1' }, cap0: { integerValue: '0' }, fixInstructions: { stringValue: 'TESTO' } } }) };
+    return { ok: true, status: 200, json: async () => ({ fields: { cap3: { integerValue: '5' }, cap2: { integerValue: '10' }, cap1: { integerValue: '1' }, cap0: { integerValue: '0' }, fixInstructions: { stringValue: 'TESTO' } } }) };
   };
   const caps = await leggiBilanciDalServer({ fetchImpl, env: { FILO_ADMIN_ID_TOKEN: 'tok' } });
-  assert.deepEqual(caps, { cap2: 10, cap1: 1, cap0: 0, fixInstructions: 'TESTO', giroStretto: false });
+  assert.deepEqual(caps, { cap3: 5, cap2: 10, cap1: 1, cap0: 0, fixInstructions: 'TESTO', giroStretto: false });
   assert.equal(chiamate.length, 1);
   assert.match(chiamate[0].url, /config\/routines/);
   assert.equal(chiamate[0].auth, 'Bearer tok');
-  assert.equal(bilanciText(caps), 'Bilanci del giro (dal server, config/routines): cap2 10 · cap1 1 · cap0 0');
+  assert.equal(bilanciText(caps), 'Bilanci del giro (dal server, config/routines): cap3 5 · cap2 10 · cap1 1 · cap0 0');
   // Anche un doubleValue o una stringa numerica valgono; vuoto e parole no.
   assert.equal(numeroFirestore({ doubleValue: 3 }), 3);
   assert.equal(numeroFirestore({ stringValue: '4' }), 4);
