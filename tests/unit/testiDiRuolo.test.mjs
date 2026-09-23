@@ -53,7 +53,10 @@ test('i tre ambiti della verifica condividono livelli, critica e registrazione',
     assert.notEqual(t, pieno, `l'ambito ${scope} riceve il testo del giro pieno`);
     assert.equal(coda(t), coda(pieno), `l'ambito ${scope} ha un metro suo`);
     assert.match(t, /Perimetro di questo giro/, 'il testo dice dove trovare il perimetro');
-    assert.match(t, /massimo livello 1/, 'fuori perimetro: al massimo livello 1');
+    // La sede non abbassa il livello: un rilievo fuori dal perimetro è
+    // esterno, col livello che ha (decisione dell'owner del 2026-09-22).
+    assert.doesNotMatch(t, /massimo livello 1/, 'fuori perimetro non vale più «al massimo 1»');
+    assert.match(t, /\[2e\]/, 'il testo spiega la sede esterna');
   }
   assert.equal(readRoleInstructions('verifier', { scope: 'inventato' }), pieno, 'un ambito sconosciuto vale pieno');
 });
