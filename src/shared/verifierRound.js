@@ -560,11 +560,12 @@
 
   // ── Testi ─────────────────────────────────────────────────────────────────
 
-  /** Un rilievo come riga di elenco: «- [2] testo (chiede una decisione)». PURA. */
+  /** Un rilievo come riga di elenco: «- [2i] testo», «- [1e?] testo». PURA. */
   function formatFinding(f) {
     const mark = f && f.decision ? '?' : '';
+    const sede = f && String(f.sede || '').toLowerCase() === 'e' ? 'e' : 'i';
     const text = String((f && f.text) || '').replace(/\n/g, '\n  ');
-    return `- [${Number(f && f.level) || 0}${mark}] ${text}`;
+    return `- [${Number(f && f.level) || 0}${sede}${mark}] ${text}`;
   }
 
   /** L'elenco puntato dei rilievi, col livello davanti. PURA. */
