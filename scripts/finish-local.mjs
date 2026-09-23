@@ -355,6 +355,30 @@ export function esitoVerificaPerCheck({ checkOnly, ok, reason }) {
 }
 
 /**
+ * Gli spec delle aree toccate si rilanciano, o li ha già corsi chi ha
+ * verificato sullo stesso contenuto? PURA.
+ *
+ * Sono la parte lunga della chiusura (da quindici a quarantacinque minuti), e
+ * chi verifica li lancia in partenza per obbligo del suo ruolo: rifarli qui,
+ * sullo stesso commit, è la stessa ora pagata due volte. Si saltano solo con un
+ * verdetto valido in mano, che è già legato a quel contenuto — senza verifica
+ * superata non cambia niente. `--check` non salta mai: promette «i controlli e
+ * basta», e chi lo lancia è spesso proprio chi sta verificando.
+ *
+ * La logica pura NON si salta: le prove del giro che chi verifica committa
+ * dopo aver lanciato i controlli passano solo di qui (le sentinelle su quella
+ * cartella stanno negli unit test), e costa millisecondi.
+ */
+export function specDaRilanciare({ checkOnly, ok, sha, tollerato }) {
+  if (checkOnly || !ok) return { rilancia: true, nota: '' };
+  const dove = String(sha || '').slice(0, 8) || '—';
+  return {
+    rilancia: false,
+    nota: `▸ Spec delle aree toccate: li ha già corsi la verifica indipendente su ${dove}${tollerato ? ' (da lì il ramo si è mosso solo dentro le prove del giro)' : ''}, non li rifaccio.\n  La logica pura gira lo stesso: le prove del giro committate dopo quel controllo passano solo di qui.`,
+  };
+}
+
+/**
  * Spezza l'elenco degli spec in lotti che stanno in UNA riga di comando. PURA.
  * Su Windows la riga ha un tetto di ~8.000 caratteri: con tutto `src` toccato
  * gli spec mirati sono stati 245 e il lancio moriva con «riga troppo lunga»
