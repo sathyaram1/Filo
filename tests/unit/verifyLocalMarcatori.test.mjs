@@ -247,6 +247,8 @@ test('chi verifica sa quali prove togliere, e cosa fa decadere il verdetto', () 
   // una riga, e il cancello del server non lo tollera. Proporlo qui sarebbe una
   // trappola su una delle due strade.
   assert.doesNotMatch(t, /test\.fail\(/);
+  // La chiusura le prove dei giri non le corre più: dire che una rossa la ferma è falso.
+  assert.doesNotMatch(t, /ferma la chiusura/);
   // Senza rilievi in mano il testo rimanda all'elenco, non stampa una riga vuota.
   assert.match(testoProveDaCancellare('claude/x', []), /elencati qui sopra/);
 });
