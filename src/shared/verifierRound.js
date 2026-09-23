@@ -289,14 +289,21 @@
         // primo, e un difetto di sicurezza spariva in coda a uno cosmetico.
         // Basta un a capo dimenticato, che è lo stesso errore della virgoletta
         // che manca (feedback #565).
-        if (quadraColLivello(m[3])) {
+        if (quadraColLivello(m[5])) {
           flush();
           out.push(raw.trim());
           continue;
         }
         flush();
         count += 1;
-        current = { line: raw.trim(), text: m[3].trim() };
+        current = { line: raw.trim(), text: m[5].trim() };
+        continue;
+      }
+      // Il livello c'è ma la sede no: è la forma vecchia, e si spiega cosa
+      // manca invece di lasciarla fra le righe «scritte male» senza motivo.
+      if (FINDING_LINE_SENZA_SEDE.test(raw)) {
+        flush();
+        out.push(`${raw.trim()} (${SPIEGAZIONE_SEDE})`);
         continue;
       }
       // La regola, senza finestre e senza eccezioni (decisione dell'owner del
