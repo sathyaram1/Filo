@@ -123,7 +123,7 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
       expect(r.status).toBe(1);
       expect(r.stderr).toMatch(/HTTP 403/);
       // Manca il bilancio dei 3 (un documento di prima della separazione): si ferma e lo dice.
-      s.stato.risposta = { status: 200, body: doc(int(10), int(1), int(0), undefined) };
+      s.stato.risposta = { status: 200, body: doc(int(10), int(1), int(0), null) };
       r = await lancia(repo, s.url, 'status');
       expect(r.status).toBe(1);
       expect(r.stderr).toMatch(/non ha cap3/);
