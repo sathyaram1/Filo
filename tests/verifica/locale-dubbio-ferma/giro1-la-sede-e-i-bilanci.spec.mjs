@@ -79,10 +79,13 @@ test('allo stop gli altri rilievi interni della stessa critica non si perdono: o
   expect(d.stop).toBe(true);
   expect(tenutiDa(d)).toContain('b');
   expect(tenutiDa(d)).toContain('c');
-  // Lo stesso quando a fermare è il bilancio del 2 esaurito.
-  const d2 = decide('[2i] a\n[1i] b', { count2: 10 });
+  // Lo stesso quando a fermare è il bilancio del 3 esaurito (dal 2026-09-23 il 2 a bilancio finito non ferma: esce a parte).
+  const d2 = decide('[3i] a\n[1i] b', { count3: 10 });
   expect(d2.stop).toBe(true);
   expect(tenutiDa(d2)).toContain('b');
+  const d3 = decide('[2i] a\n[1i] b', { count2: 10 });
+  expect(d3.stop).toBe(false);
+  expect(d3.derived.map((f) => [f.text, f.priority])).toEqual([['a', 2]]);
 });
 
 test('il compito stampato in locale insegna il formato che il lettore accetta: i suoi esempi passano la registrazione', () => {
