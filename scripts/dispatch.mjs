@@ -380,7 +380,7 @@ export function fixedPayload({ report, frase, branch, segnalazione, ferma } = {}
 export function fermaSenzaSegnalazione(ferma, segnalazione) {
   if (!ferma || String(segnalazione || '').trim()) return '';
   return [
-    '--ferma da solo non ferma niente: è --segnala <file.md> che ferma il lavoro. Non ho consegnato niente.',
+    '--ferma da solo non ferma niente: è --segnala <file.md> che ferma il lavoro, e non ho consegnato niente.',
     'Fermarsi chiama l\'owner, e senza la segnalazione non saprebbe cosa decidere: scrivi nel file il problema, le scelte e cosa hai fatto nel frattempo, poi rilancia con --segnala (--ferma puoi toglierlo).',
   ].join('\n');
 }
