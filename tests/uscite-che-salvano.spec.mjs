@@ -51,6 +51,39 @@ test('Preferenze: lo stile digitato si salva anche chiudendo la scheda', async (
     .toBe('scritto e chiuso subito');
 });
 
+// Un campo per campo dimentica un campo: qui si guardano i due numerici, che
+// erano rimasti fuori dall'elenco a mano mentre il testo accanto partiva.
+test('Preferenze: anche i campi numerici si salvano chiudendo la scheda col cursore dentro', async ({ app, shell, openTab }) => {
+  const page = await openTab(PREFERENZE);
+  await page.waitForSelector('#autoArchiveIdleHours', { timeout: 15_000 });
+  await page.click('#autoArchiveIdleHours');
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('23');
+
+  await chiudiScheda(shell, 'preferences');
+
+  await expect
+    .poll(() => impostazioni(app).then((s) => (s.autoArchive || {}).idleHours), { timeout: 8000 })
+    .toBe(23);
+});
+
+test('Preferenze: la conferma si spegne anche digitando in un campo numerico', async ({ shell, openTab }) => {
+  const page = await openTab(PREFERENZE);
+  await page.waitForSelector('#showHomeMessage', { timeout: 15_000 });
+  const acceso = () => page.evaluate(() => document.getElementById('savedHint').classList.contains('sn-show'));
+
+  await page.click('#showHomeMessage');
+  await expect.poll(acceso, { timeout: 6000 }).toBe(true);
+
+  await page.click('#notifDuration');
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('42');
+  await page.waitForTimeout(100);
+  expect(await acceso(), 'la conferma resta accesa mentre il numero digitato non è ancora salvato').toBe(false);
+
+  await chiudiScheda(shell, 'preferences');
+});
+
 test('Altro: i domini esclusi digitati si salvano anche chiudendo la scheda col cursore nella casella', async ({ app, shell, openTab }) => {
   const page = await openTab(ALTRO);
   await page.waitForSelector('#blocklist', { timeout: 15_000 });
