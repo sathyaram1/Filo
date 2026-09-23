@@ -148,15 +148,17 @@ export function exitCodeForError(err) {
 
 /**
  * Priorità richiesta dalla riga di comando. PURA.
- * Ammessi 1, 2, 3 (0 = nessuna, come nel resto del sistema). Qualunque altra
- * cosa è un errore d'uso: meglio fermarsi che scrivere una priorità inventata.
+ * La scala è 3/2/1/0 (lo 0 è un gradino della scala, non «nessuna»: assente
+ * = non impostata). Qualunque altra cosa è un errore d'uso: meglio fermarsi
+ * che scrivere una priorità inventata.
  * @returns {{ ok: true, valore: number|null } | { ok: false, motivo: string }}
  */
+export const PRIORITA_AMMESSE = Object.freeze([0, 1, 2, 3]);
 export function parsePriorita(raw) {
   if (raw === undefined || raw === null || raw === '') return { ok: true, valore: null };
   const n = Number(raw);
-  if (!Number.isInteger(n) || n < 1 || n > 3) {
-    return { ok: false, motivo: `priorità "${raw}" non valida: ammessi 1, 2, 3` };
+  if (!Number.isInteger(n) || !PRIORITA_AMMESSE.includes(n)) {
+    return { ok: false, motivo: `priorità "${raw}" non valida: ammessi ${PRIORITA_AMMESSE.join(', ')}` };
   }
   return { ok: true, valore: n };
 }
