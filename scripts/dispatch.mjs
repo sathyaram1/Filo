@@ -1059,6 +1059,7 @@ export function verifierReplyText(reply) {
       derivatiRighe(derivati),
       daMarcare.length ? 'Prove del giro da marcare attese rosse nello stesso commit della correzione, in testa al corpo della prova:' : null,
       daMarcare.length ? daMarcare.map((d) => `  test.fail(true, '${d.num}: ${d.frase.replace(/'/g, '’')}');`).join('\n') : null,
+      dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
       '',
       String(r.phase2.instructions || ''),
