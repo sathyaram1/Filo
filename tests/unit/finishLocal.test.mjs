@@ -432,7 +432,7 @@ describe('quale ramo NON si spedisce mai', () => {
 // Un rosso d'ambiente (rosso anche su main su questa macchina) spacciato per
 // regressione blocca la pubblicazione di un lavoro sano: l'elenco tracciato
 // dice quali sono, e il cancello li separa da quelli che devono essere verdi.
-import { splitKnownRed, esitoVerificaPerCheck } from '../../scripts/finish-local.mjs';
+import { splitKnownRed, esitoVerificaPerCheck, specDaRilanciare } from '../../scripts/finish-local.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 // `--check` promette solo i controlli: chi verifica lo lancia al posto della
