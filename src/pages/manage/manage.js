@@ -1166,6 +1166,7 @@
     const UI = window.SN_MERGE_APPROVALS;
     return Object.assign({
       onDone: () => { setTimeout(loadMergeApprovals, 1200); },
+      esitoIniziale: (req) => esitiTentati.get(req.id) || null,
       onApprove: (req) => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }),
       onDiscard: (req) => sendToMain({ type: MERGE_APPROVAL_DISCARD, id: req.id }),
       onFeedback: (req) => openFeedbackByNum(UI ? UI.feedbackNum(req) : ''),
