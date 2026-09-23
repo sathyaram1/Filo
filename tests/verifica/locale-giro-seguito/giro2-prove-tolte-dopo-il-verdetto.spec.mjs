@@ -124,8 +124,7 @@ test.describe('prove del giro tolte dopo il verdetto — il pass regge, la chius
     try {
       const repo = await conPass(s);
       const p = join(repo, CARTELLA, 'giro1-a.spec.mjs');
-      writeFileSync(p, readFileSync(p, 'utf8').replace('expect(1 + 1).toBe(2);', 'expect(1 + 1).toBe(2);
-  expect(3).toBe(3);'));
+      writeFileSync(p, readFileSync(p, 'utf8').replace('expect(1 + 1).toBe(2);', 'expect(1 + 1).toBe(2);\n  expect(3).toBe(3);'));
       commit(repo, 'aggiunta una riga');
       const r = await lancia(repo, s.url, 'status');
       expect(r.status).toBe(1);
