@@ -1095,10 +1095,11 @@ export function verifierReplyText(reply) {
       derivati.length ? 'Prove del giro da TOGLIERE adesso, prima di rilasciare il biglietto:' : null,
       derivati.length ? daTogliere : null,
       // Toglierle è un commit, e un commit dopo il verdetto lo farebbe decadere:
-      // qui è tollerato, e dirlo serve a non lasciarle rosse per paura.
-      derivati.length ? '  Poi `git add -A && git commit`, e spingi: quel commit non fa decadere il verdetto, finché lì si tolgono' : null,
-      derivati.length ? '  prove e nient\'altro. Una prova che copre anche un caso ancora aperto non si cancella: toglile il caso che' : null,
-      derivati.length ? '  se ne va, oppure segnale il rosso atteso in testa al corpo.' : null,
+      // qui è tollerato, e dirlo serve a non lasciarle rosse per paura. Solo
+      // TOGLIERE però: una riga aggiunta dopo il verdetto lo fa decadere.
+      derivati.length ? '  Poi `git add -A && git commit`, e spingi: quel commit non fa decadere il verdetto, finché lì si TOGLIE' : null,
+      derivati.length ? '  e non si aggiunge niente. Una prova che copre anche un caso ancora aperto non si cancella: toglile il caso' : null,
+      derivati.length ? '  che se ne va, e lascia il resto.' : null,
       'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',
     ].filter((l) => l !== null).join('\n');
   }
