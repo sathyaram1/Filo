@@ -1191,7 +1191,9 @@
       let reply;
       try { reply = await sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }); }
       catch (e) { reply = { ok: false, error: e?.message || String(e) }; }
-      esiti.push({ req, msg: UI.outcomeMessage(reply, req) });
+      const msg = UI.outcomeMessage(reply, req);
+      esitiTentati.set(req.id, msg);
+      esiti.push({ req, msg });
     }
     if (esiti.length) setTimeout(loadMergeApprovals, 1200);
     return esiti;
