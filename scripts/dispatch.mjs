@@ -1060,12 +1060,19 @@ export function verifierReplyText(reply) {
     ].filter((l) => l !== null).join('\n');
   }
   if (r.outcome === 'stop') {
+    // Fermo per la segnalazione allegata, o per un rilievo che decide l'owner:
+    // in tutti e due i casi i rilievi non bloccanti restano davanti a chi riprende.
+    const perSegnalazione = r.motivo === 'segnalazione';
+    const sospesi = Array.isArray(r.sospesi) ? r.sospesi : [];
     return [
       '══ RISPOSTA DEL SERVER: il lavoro si ferma ══',
-      'Rilievi interni di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l\'owner.',
-      fmt(r.blocking),
+      perSegnalazione
+        ? 'La segnalazione è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
+        : 'Rilievi interni di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l\'owner.',
+      perSegnalazione ? null : fmt(r.blocking),
+      sospesi.length ? `Rilievi interni che restano davanti a chi riprende dopo la risposta:\n${fmt(sospesi)}` : null,
       derivati.length ? `Feedback derivati aperti dal server (esterni: escono comunque):\n${derivatiRighe(derivati)}` : null,
-      'Non c\'è niente da correggere: rilascia il biglietto.',
+      'Non c\'è niente da correggere adesso: rilascia il biglietto.',
     ].filter((l) => l !== null).join('\n');
   }
   if (r.outcome === 'pass') {
