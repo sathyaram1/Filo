@@ -44,7 +44,7 @@ test('consegnare una correzione con file non salvati: il rifiuto elenca i file e
   const dopoCritica = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', {
     critique: 'provato tutto.\n[2i] rotto', sha: SHA,
     // I bilanci li passa chi chiama: nel codice non c'è un default (2026-09-16).
-    caps: { cap2: 5, cap1: 2, cap0: 0 },
+    caps: { cap3: 5, cap2: 5, cap1: 2, cap0: 0 },
   });
   const rifiuto = withFixed(dopoCritica.state, 'r', {
     report: 'corretto', sha: ALTRO, dirtyFiles: ['tests/verifica/locale-r/giro1-prova.spec.mjs', 'avanzo.txt'],
