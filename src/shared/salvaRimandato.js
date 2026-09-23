@@ -81,5 +81,5 @@
     });
   }
 
-  global.SN_SALVA = { crea, salvaTuttoSubito, ATTESA_MS };
+  global.SN_SALVA = { crea, campoAlVolo, salvaTuttoSubito, ATTESA_MS };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
