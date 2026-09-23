@@ -693,11 +693,10 @@ export function testoProveDaCancellare(branch, derived) {
     'che ne nasce, e la cartella del giro non deve crescere di giro in giro. Una per rilievo:',
     ...(elenco.length ? elenco.map((f) => `  · ${ROUND.primaFrase ? ROUND.primaFrase(f.text) : String(f.text).split('\n')[0]}`) : ['  (quelli elencati qui sopra)']),
     'Poi `git add -A && git commit`: il commit che le toglie NON fa decadere questo verdetto, finché lì',
-    'si tolgono prove e nient\'altro. Una riga cambiata, una prova aggiunta o un file fuori da quella',
+    'si TOGLIE e non si aggiunge niente. Una riga cambiata, una prova aggiunta o un file fuori da quella',
     'cartella lo fanno decadere, e serve un altro giro.',
-    'Se una prova copre ANCHE un caso che resta aperto qui, non cancellarla: toglile il caso che se ne va,',
-    'oppure segnala il rosso atteso — `test.fail(true, \'<prima frase del rilievo>\');` in testa al corpo —',
-    'che il commit tollera allo stesso modo. Una prova rossa né tolta né segnata ferma la chiusura.',
+    'Se una prova copre ANCHE un caso che resta aperto qui, non cancellarla: toglile il caso che se ne va',
+    'e lascia il resto. Una prova rossa che nessuno ha toccato ferma la chiusura.',
   ].join('\n');
 }
 
