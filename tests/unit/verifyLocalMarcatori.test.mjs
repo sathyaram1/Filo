@@ -1,17 +1,20 @@
-// Il verdetto non decade per i soli marcatori di rosso atteso (#661).
+// Il verdetto non decade per quello che il giro fa alle sue prove (#661).
 //
 // PERCHÉ CONTA
 //   Il cancello di `npm run finish` lega il verdetto a un commit: se la punta
 //   si muove, il verdetto decade. Giusto — tranne per l'unico commit che chi
-//   verifica DEVE fare dopo il verdetto: quello che segna come rossi attesi le
-//   prove del giro dei rilievi messi da parte. Due volte (10/09 e 18/09, #629)
-//   quel commit è costato un giro intero, mezz'ora e un'istanza, per un ramo
-//   in cui era cambiata una riga di test.
+//   verifica DEVE fare dopo il verdetto: quello che TOGLIE dalle prove del giro
+//   i rilievi diventati un feedback loro (o, come ripiego, li segna rossi
+//   attesi). Due volte (10/09 e 18/09, #629) quel commit è costato un giro
+//   intero, mezz'ora e un'istanza, per un ramo in cui non era cambiata una riga
+//   di prodotto.
 //
 //   Qui si inchioda il confine, e il pericolo è tutto da una parte: se questa
 //   logica sbaglia in senso permissivo, una riga di codice vera entra nel ramo
 //   dopo che l'ha vista l'ultima persona che doveva vederla. Quindi la prova
-//   che conta di più è quella dei casi che devono FAR DECADERE il verdetto.
+//   che conta di più è quella dei casi che devono FAR DECADERE il verdetto — e
+//   una prova AGGIUNTA è uno di quelli: lì c'è roba da girare che nessuno ha
+//   ancora provato.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,8 +24,9 @@ import { resolve } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const {
-  checkVerdict, corpoSenzaMarcatori, soloMarcatori, dentroProveGiro,
-  diffDopoLaVerifica, verdictForCurrentBranch, writeState, testoRossiAttesi,
+  checkVerdict, corpoSenzaMarcatori, soloMarcatoriOCancellazioni, dentroProveGiro,
+  diffDopoLaVerifica, verdictForCurrentBranch, writeState, testoProveDaCancellare,
+  vociNameStatus,
 } = await import('../../scripts/verify-local.mjs');
 
 const SHA = 'a'.repeat(40);
