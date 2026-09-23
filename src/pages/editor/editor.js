@@ -1458,6 +1458,7 @@
       if (save) renameFileAction(doc.id, val, { manual: true });
       else renderDocSwitcher();
     };
+    input.addEventListener('input', () => campoAlVolo.scrivendo(() => finish(true)));
     input.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter') { e.preventDefault(); finish(true); }
