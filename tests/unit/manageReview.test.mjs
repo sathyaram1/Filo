@@ -1326,3 +1326,26 @@ test('livelli L1: il pannello del triangolo porta anche la decisione già presa'
   assert.match(sec, /bloccato dalla sicurezza/);
   assert.match(sec, /decidi tu/);
 });
+
+// ── Un lavoro fermo su una scelta dell'owner aspetta la sua risposta ─────────
+
+test('aspettaRisposta: la casella di risposta si apre su domande e su una scelta da fare, non sugli altri motivi', () => {
+  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'clarify' }), true);
+  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'decisione' }), true, 'una segnalazione ferma il lavoro: l\'owner risponde qui');
+  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'loop' }), false, 'un bilancio esaurito si rimette in coda e basta');
+  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'secaudit' }), false);
+  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'l5' }), false);
+  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'branch' }), false);
+  assert.equal(MR.aspettaRisposta({ status: 'design' }), false, 'il verdetto dei giudici non è una domanda');
+  assert.equal(MR.aspettaRisposta({ status: 'todo', statusReason: 'decisione' }), false);
+});
+
+test('judgesNote e reasonText: design/decisione dice che il lavoro è fermo su una scelta dell\'owner', () => {
+  const n = MR.judgesNote({ status: 'design', statusReason: 'decisione' });
+  assert.match(n.text, /fermo/i);
+  assert.match(n.text, /scelta/i);
+  assert.match(n.text, /rispondi/i);
+  assert.equal(n.color, '#2e9e5b');
+  assert.match(MR.reasonText('decisione'), /scelta/);
+  assert.equal(MR.manageTabFor({ status: 'design', statusReason: 'decisione' }), 'inbox', 'sta fra i Ricevuti, dove l\'owner guarda');
+});

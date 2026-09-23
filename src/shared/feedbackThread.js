@@ -155,12 +155,12 @@
   //                                      saprebbe più da dove viene un
   //                                      ritrovamento — ed è l'unica cosa che il
   //                                      mittente serve a dire
-  //   routine:residuo       → 'residuo'  i rilievi RESIDUI di una verifica: quelli
-  //                                      quelli rimasti fuori dal giro di
-  //                                      correzione (feedback #561: livello 0,
-  //                                      bilancio esaurito, o da decidere), raccolti
-  //                                      dal SERVER in un feedback derivato figlio
-  //                                      del lavoro (#N.k). Categoria propria, NON
+  //   routine:residuo       → 'residuo'  i rilievi DERIVATI da una verifica: quelli
+  //                                      che quel lavoro non corregge (esterni, o
+  //                                      interni messi da parte dal bilancio),
+  //                                      aperti dal SERVER uno per rilievo come
+  //                                      feedback figli del lavoro (#N.k), con la
+  //                                      priorità del livello. Categoria propria, NON
   //                                      prober e NON verifier: spacciarlo per uno
   //                                      dei due falserebbe la lettura di dove
   //                                      nascono i ritrovamenti

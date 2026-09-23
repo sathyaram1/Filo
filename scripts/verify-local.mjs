@@ -29,7 +29,7 @@
 //     si rilancia senza argomenti: riusa la richiesta registrata.
 //
 //   node scripts/verify-local.mjs critica "<una riga per rilievo, col livello davanti>"
-//     Lo lancia l'istanza che ha verificato. Formato: `[2] testo`, `[1?]` =
+//     Lo lancia l'istanza che ha verificato. Formato: `[2i] testo`, `[2e]` = esterno, `[1i?]` =
 //     chiede una decisione dell'owner; le righe prima del primo rilievo sono
 //     il riassunto. Nessun rilievo = verifica superata. Stampa l'esito.
 //     Le quadre col livello dentro sono SEMPRE un rilievo, dovunque stiano
@@ -326,7 +326,7 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
       const p = prev.pending;
       return {
         ok: true, state: s, replayed: true, outcome: 'fix',
-        decision: { fix: p.findings || [], derived: Array.isArray(p.derived) ? p.derived : [], budgets: p.budgets || null, blocking: [] },
+        decision: { fix: p.findings || [], derived: Array.isArray(p.derived) ? p.derived : [], external: Array.isArray(p.external) ? p.external : [], budgets: p.budgets || null, blocking: [] },
       };
     }
     return { ok: false, state: s, reason: 'critica già registrata su questo giro: non si modifica più, e un giro non si paga due volte. Prima chi corregge consegna (verify-local.mjs corretto "<report>"), poi si riparte con start. (Se ti serve rileggere la risposta, rimanda la stessa identica critica: viene ristampata senza pagare.)' };
@@ -347,7 +347,7 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
   // farlo finire nel riassunto trasformava un [2] in un pass silenzioso.
   const brutte = ROUND.unparsedLevelLines(critique);
   if (brutte.length) {
-    return { ok: false, state: s, reason: `rilievi non riconosciuti. Le parentesi quadre con dentro un livello sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto e nei passi un livello si cita a parole («il livello 2»), mai «[2]». Il livello, fra 0 e 3, va a inizio riga col testo del rilievo dopo, una riga per rilievo («[2] testo», anche «- [2]», «1. [2]», «### [2]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
+    return { ok: false, state: s, reason: `rilievi non riconosciuti. Le parentesi quadre con dentro un livello sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto e nei passi un livello si cita a parole («il livello 2»), mai «[2i]». Il livello, fra 0 e 3, va a inizio riga seguito dalla sede — «i» se tocca a questo lavoro, «e» se è un altro — e dal testo del rilievo, una riga per rilievo («[2i] testo», «[1e?] testo», anche «- [2i]», «1. [2i]», «### [2i]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
   }
   // Il testo si conserva con gli a capo veri (una barra-n scritta come a capo
   // vale come a capo): è quello che il verificatore dopo rilegge nel brief.
@@ -377,25 +377,33 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
       consumed: decision.consume, outcome, critique: testo,
     }]),
   };
+  // La coda locale dei derivati: quello che questo ramo non corregge, con la
+  // priorità uguale al livello. Gli esterni ci entrano in ogni esito (sono di
+  // un altro lavoro); in cloud il server li apre come feedback, qui li apre
+  // chi guida, dal report.
+  const coda = (Array.isArray(prev.derived) ? prev.derived : []).concat(decision.external);
   if (outcome === 'stop') {
     entry.verdict = 'fail';
-    entry.critique = ROUND.formatFindings(decision.blocking);
+    // Con quello che ha fermato restano anche gli altri interni della critica:
+    // chi riprende dopo la risposta dell'owner li chiude, il giro dopo non li riscopre.
+    entry.critique = ROUND.formatFindings(decision.blocking.concat(decision.sospesi || []));
     entry.pending = null;
+    entry.derived = coda;
     // Il lavoro si ferma e decide l'owner: i bilanci si azzerano, come sul
-    // server. Lasciarli consumati faceva fermare di nuovo, al primo [2], il
+    // server. Lasciarli consumati faceva fermare di nuovo, al primo [2i], il
     // lavoro rifatto dopo la decisione, senza nessun giro di correzione
     // possibile (verifica del giro 3 su #561). La storia dei giri resta.
     entry.counts = {};
   } else if (outcome === 'fix') {
     entry.verdict = 'fix-pending';
-    // Anche i rilievi messi da parte e i bilanci del giro: servono a
-    // ristampare la risposta tale e quale se si è persa.
-    entry.pending = { findings: decision.fix, sha: sha || '', at: when, derived: decision.derived, budgets: decision.budgets };
-    entry.derived = (Array.isArray(prev.derived) ? prev.derived : []).concat(decision.derived);
+    // Anche i rilievi messi da parte, gli esterni e i bilanci del giro:
+    // servono a ristampare la risposta tale e quale se si è persa.
+    entry.pending = { findings: decision.fix, sha: sha || '', at: when, derived: decision.derived, external: decision.external, budgets: decision.budgets };
+    entry.derived = coda.concat(decision.derived);
   } else {
     entry.verdict = 'pass';
     entry.pending = null;
-    entry.derived = (Array.isArray(prev.derived) ? prev.derived : []).concat(decision.derived);
+    entry.derived = coda.concat(decision.derived);
   }
   s[branch] = entry;
   return { ok: true, state: s, decision, outcome };
@@ -665,7 +673,8 @@ export function testoRossiAttesi(branch) {
   return [
     'Le prove del giro che riproducono questi rilievi restano rosse, e la chiusura le rilancia.',
     `Segnale come rosso atteso in ${cartella}, una riga per rilievo.`,
-    "  test.fail(true, '<il rilievo, in breve>');   (in testa al corpo della prova)",
+    "  test.fail(true, 'esterno: <prima frase del rilievo>');          (in testa al corpo della prova)",
+    "  test.fail(true, 'messo da parte: <prima frase del rilievo>');   (per un rilievo interno non corretto)",
     'Il commit che aggiunge i marcatori NON fa decadere questo verdetto, finché lì cambiano solo',
     'quelli. Qualunque altra riga, o un file fuori da quella cartella, lo fa decadere e serve un',
     'altro giro. Una prova rossa senza marcatore ferma la chiusura come prima.',
@@ -682,17 +691,25 @@ export function codaDalServer(testoServer) {
     '',
     'IN LOCALE, quattro differenze da quanto scritto qui sopra:',
     '- le prove del giro stanno nella cartella indicata più su, non in `tests/verifica/<numero>`;',
-    '- non c\'è `--segnala`: un trade-off vero si scrive nel report, con le strade e i loro costi, e lo porta',
-    '  all\'owner chi guida il giro;',
-    '- non c\'è nemmeno `--ferma`: un rilievo che chiede una decisione dell\'owner non si corregge a metà. Consegna',
-    '  il resto e scrivilo per primo nel report: il lavoro lo ferma chi guida il giro;',
+    '- non c\'è `--segnala`, quindi qui una segnalazione non ferma niente da sola: un trade-off vero si scrive',
+    '  PER PRIMO nel report, con le strade e i loro costi, e lo porta all\'owner chi guida il giro, che è lui a',
+    '  fermare il lavoro. Un rilievo che chiede una sua decisione non si corregge a metà: consegna il resto;',
     '- la consegna è `node scripts/verify-local.mjs corretto "<report della correzione>"`, e non c\'è un biglietto',
     '  da rilasciare. Dopo serve un\'altra verifica, di un\'altra istanza: la lancia chi guida.',
   ].join('\n');
 }
 
+/**
+ * I rilievi che questo ramo non corregge, uno per riga con la priorità che
+ * avrà il suo feedback (uguale al livello). PURA.
+ */
+export function derivatiText(list) {
+  if (!Array.isArray(list) || !list.length) return '  (nessuno)';
+  return list.map((f) => `${ROUND.formatFinding(f)}\n  → feedback a parte, priorità ${Number.isFinite(Number(f.priority)) ? Number(f.priority) : Number(f.level) || 0}${f.sede === 'e' ? ' (esterno: non tocca a questo lavoro)' : ' (interno, messo da parte)'}`).join('\n');
+}
+
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
-export function codaText({ findings, derived, budgets, branch, instructions }) {
+export function codaText({ findings, derived, external, budgets, branch, instructions }) {
   const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
   const b = budgets && typeof budgets === 'object'
     ? ['cap2', 'cap1', 'cap0'].map((k) => (budgets[k] ? `${k}: ${budgets[k].left} giri residui su ${budgets[k].cap}` : null)).filter(Boolean).join(' · ')
@@ -712,10 +729,13 @@ export function codaText({ findings, derived, budgets, branch, instructions }) {
   const righe = [
     '══ ESITO: c\'è da correggere ══',
     `Ramo: ${branch}.`,
-    'Rilievi da correggere in questo giro:',
+    'Rilievi da correggere in questo giro (con la loro famiglia: le altre porte della stessa causa):',
     fmt(findings),
-    'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner):',
-    fmt(derived),
+    'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner, e le loro prove del giro',
+    'si marcano attese rosse nello stesso commit della correzione, `test.fail(true, \'messo da parte: <prima frase>\')`):',
+    derivatiText(derived),
+    'Rilievi esterni (non toccano a questo lavoro: ciascuno diventa un feedback suo, lo apre chi guida dal report):',
+    derivatiText(external),
   ];
   if (b) righe.push(`Bilanci: ${b}`);
   righe.push(
@@ -984,17 +1004,18 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     'cartella piena se il percorso è scritto in un\'altra forma (solo quello relativo alla',
     'radice del repo, con le barre normali, viene riconosciuto).',
     '',
-    'QUANDO HAI FINITO registra la critica: una riga per rilievo, col livello davanti',
-    '(3 sicurezza/dati/Filo inutilizzabile · 2 la cosa chiesta non si ottiene o cammino',
-    'principale · 1 cosmetica/attrito fuori cammino · 0 situazione rara; `[1?]` = chiede una',
-    'decisione dell’owner). Le righe prima del primo rilievo sono il riassunto di cosa',
-    'funziona. Nessun rilievo = verifica superata.',
+    'QUANDO HAI FINITO registra la critica: una riga per rilievo, con livello E sede davanti',
+    'fra quadre, prima la cifra e poi la lettera (3 sicurezza/dati/Filo inutilizzabile · 2 la',
+    'cosa chiesta non si ottiene o cammino principale · 1 cosmetica/attrito fuori cammino ·',
+    '0 situazione rara; `i` tocca a questo lavoro, `e` è un altro lavoro; `[1i?]` = chiede una',
+    'decisione dell’owner). Una riga col solo livello viene respinta. Le righe prima del',
+    'primo rilievo sono il riassunto di cosa funziona. Nessun rilievo = verifica superata.',
     'LE QUADRE COL LIVELLO DENTRO SONO SEMPRE UN RILIEVO, dovunque stiano nella riga:',
     'nel riassunto E NEI PASSI un livello si cita a parole («il livello 2»), mai',
-    '«[2]», o la riga viene respinta. Il testo va in UN pezzo solo, fra virgolette.',
+    '«[2i]», o la riga viene respinta. Il testo va in UN pezzo solo, fra virgolette.',
     '  node scripts/verify-local.mjs critica "funziona X e Y.',
-    '  [2] il pulsante non salva se il titolo è vuoto: passi …',
-    '  [0] con la finestra sotto i 300 pixel il menu esce dallo schermo"',
+    '  [2i] il pulsante non salva se il titolo è vuoto: passi …',
+    '  [0e] con la finestra sotto i 300 pixel il menu esce dallo schermo: c’era già su main"',
     'Poi SEGUI la risposta stampata dal comando: dice cosa succede adesso.',
     'Boccia per ciò che non si ottiene, non per differenze di gusto: un trade-off vero',
     'si segna con `?` e lo decide l’owner.',
@@ -1159,7 +1180,7 @@ if (isMain) {
     console.error('Si registra sempre una critica, e il motivo si scrive in tutti e due i casi:');
     console.error('  node scripts/verify-local.mjs critica "<cosa hai provato e cosa funziona>"');
     console.error('Nessun rilievo = verifica superata. Per bocciare, una riga col livello davanti:');
-    console.error('  «[2] il pulsante Salva non salva col titolo vuoto» (e i passi per rifarlo).');
+    console.error('  «[2i] il pulsante Salva non salva col titolo vuoto» (e i passi per rifarlo).');
     process.exit(1);
   }
 
@@ -1193,13 +1214,19 @@ if (isMain) {
     const e = r.state[branch];
     if (r.outcome === 'fix') {
       if (r.replayed) console.log('(critica già registrata su questo giro: ristampo la fase 2, il giro non si ripaga)');
-      console.log(codaText({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch, instructions: codaDalServer(caps.fixInstructions) || leggiCoda() }));
+      console.log(codaText({ findings: r.decision.fix, derived: r.decision.derived, external: r.decision.external, budgets: r.decision.budgets, branch, instructions: codaDalServer(caps.fixInstructions) || leggiCoda() }));
     } else if (r.outcome === 'stop') {
-      console.log(`══ ESITO: il lavoro si ferma ══\nRilievi di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}`);
+      const sospesi = Array.isArray(r.decision.sospesi) && r.decision.sospesi.length
+        ? `\nAltri rilievi interni della stessa critica, che restano davanti a chi riprende dopo la risposta dell'owner:\n${ROUND.formatFindings(r.decision.sospesi)}`
+        : '';
+      console.log(`══ ESITO: il lavoro si ferma ══\nRilievi interni di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}${sospesi}`);
+      if (r.decision.external && r.decision.external.length) {
+        console.log(`Rilievi esterni (non toccano a questo lavoro): ciascuno diventa un feedback suo, lo apre chi guida dal report.\n${derivatiText(r.decision.external)}`);
+      }
     } else {
       console.log(`══ ESITO: verifica superata per '${branch}' su ${sha.slice(0, 8)} ══`);
       if (e.derived && e.derived.length) {
-        console.log(`Rilievi non corretti, da riportare nel report per l'owner:\n${ROUND.formatFindings(e.derived)}`);
+        console.log(`Rilievi non corretti, da riportare nel report per l'owner (ciascuno diventa un feedback suo, con quella priorità):\n${derivatiText(e.derived)}`);
         console.log(testoRossiAttesi(branch));
       }
       // «Si può pubblicare» solo se è vero adesso: il pass vale per l'ultimo
@@ -1237,7 +1264,7 @@ if (isMain) {
     }
     if (r.outcome === 'pass') {
       console.log(`Nessun commit nuovo dopo la critica: niente da riverificare. Verifica superata per '${branch}' su ${sha.slice(0, 8)}.`);
-      console.log(`Rilievi non corretti, da riportare nel report per l'owner:\n${ROUND.formatFindings(r.derived)}`);
+      console.log(`Rilievi non corretti, da riportare nel report per l'owner (ciascuno diventa un feedback suo, con quella priorità):\n${derivatiText(r.derived)}`);
       // Stessa uscita, stesso consiglio: di qui esce un pass con rilievi
       // aperti esattamente come da «critica», e le prove del giro sono rosse
       // nello stesso modo.

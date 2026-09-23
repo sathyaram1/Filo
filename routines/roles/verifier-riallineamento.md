@@ -25,9 +25,8 @@ fondo a questo testo, sotto «Perimetro di questo giro». Guardi tre cose.
 2. **Le prove dei giri**, se la cartella c'è:
    `npx playwright test tests/verifica/<numero>` (numero del feedback senza
    cancelletto, percorso relativo alla radice del repo, barre normali). Una
-   prova che prima era verde e ora è rossa è un rilievo di livello 2.
+   prova che prima era verde e ora è rossa è un rilievo di livello 2,
+   interno.
 3. **I controlli automatici**, descritti più sotto.
-
-<!-- includi: _fuori-perimetro.md -->
 
 <!-- includi: _critica-e-livelli.md -->

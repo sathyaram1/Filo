@@ -106,7 +106,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
   try {
     const r = await esegui([
       '--record-verifier', 'fid-901',
-      'Provato: incolla, trascina. Funziona.\n[2] il pulsante non salva\n    Passi: titolo vuoto, Salva.\n[0] caso raro',
+      'Provato: incolla, trascina. Funziona.\n[2i] il pulsante non salva\n    Passi: titolo vuoto, Salva.\n[0i] caso raro',
     ], ENV(casa, port));
     assert.equal(r.code, 0, `la critica doveva essere accettata (stderr: ${r.se})`);
 
@@ -117,15 +117,15 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
     assert.deepEqual(d.findings.map((f) => [f.level, f.decision]), [[2, false], [0, false]], 'i rilievi arrivano STRUTTURATI, coi livelli');
     assert.match(d.findings[0].text, /Passi: titolo vuoto/, 'la continuazione resta attaccata al suo rilievo');
     assert.match(String(d.summary), /Provato: incolla/, 'il riassunto viaggia a parte');
-    assert.match(String(d.critique), /\[2\] il pulsante non salva/, 'la critica intera, com\'è stata scritta');
+    assert.match(String(d.critique), /\[2i\] il pulsante non salva/, 'la critica intera, com\'è stata scritta');
     assert.equal(d.sha, sha, 'il commit provato: il pass vale per quello');
     assert.equal(d.verdict, undefined, 'nessun verdetto a tre valori: l\'esito lo decide il server');
 
     // La fase 2 arriva a schermo intera: è l'unico posto in cui esiste.
     assert.match(r.so, /esito=fix/);
     assert.match(r.so, /SEGRETO DEL SERVER/, 'le istruzioni della fase 2 vengono stampate come arrivano');
-    assert.match(r.so, /\[2\] il pulsante non salva/);
-    assert.match(r.so, /\[0\] caso raro/);
+    assert.match(r.so, /\[2i\] il pulsante non salva/);
+    assert.match(r.so, /\[0i\] caso raro/);
     assert.match(r.so, /cap2: 4 giri residui su 5/);
 
     // Lo specchio locale dice che c'e' una correzione in sospeso.
@@ -211,10 +211,10 @@ test('#561 giro 6: una critica lunga parte INTERA, coi rilievi in coda oltre i 4
   const { srv, ricevuti, port } = await fintoServer(() => ({ reply: { outcome: 'pass', derived: null } }));
   try {
     const riassunto = `Provato ${'x'.repeat(4500)}.`;
-    const r = await esegui(['--record-verifier', 'fid-901', `${riassunto}\n[2] in fondo\n[0] raro`], ENV(casa, port));
+    const r = await esegui(['--record-verifier', 'fid-901', `${riassunto}\n[2i] in fondo\n[0i] raro`], ENV(casa, port));
     assert.equal(r.code, 0, r.se);
     const inviato = ricevuti.find((x) => x.url.includes('routineDeliver')).body.data;
-    assert.ok(inviato.critique.endsWith('[2] in fondo\n[0] raro'), 'il testo arriva intero');
+    assert.ok(inviato.critique.endsWith('[2i] in fondo\n[0i] raro'), 'il testo arriva intero');
     assert.deepEqual(inviato.findings.map((f) => f.level), [2, 0]);
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 });

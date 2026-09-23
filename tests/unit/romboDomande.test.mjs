@@ -35,6 +35,11 @@ const ASPETTANO = [
   ['conversazione cifrata',          { status: 'design', statusReason: 'clarify', notes: 'FENC:xxxx' }],
   ['con anche una segnalazione',     { status: 'design', statusReason: 'clarify', notes: domande,
                                        livelli: { l3: { esito: 'segnalato', testo: 'Due strade possibili.' } } }],
+  // Una segnalazione alla consegna ferma il lavoro finché l'owner non sceglie:
+  // la scelta si scrive qui, ed è quello che chi riprende riceve.
+  ['fermo su una scelta',            { status: 'design', statusReason: 'decisione', notes: 'Report.\n\nSegnalazione per l\'owner (chi risolve):\nA o B?',
+                                       livelli: { l3: { esito: 'segnalato', ruolo: 'resolver', testo: 'A o B?' } } }],
+  ['fermo su un rilievo col «?»',    { status: 'design', statusReason: 'decisione', notes: '[2i?] Il bordo: caldo o freddo?' }],
 ];
 
 const NON_ASPETTANO = [

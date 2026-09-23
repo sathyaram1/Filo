@@ -45,6 +45,7 @@ const {
   fixedPayload,
   fermaSenzaSegnalazione,
   fixedReplyText,
+  FERMA_NOTE,
   verifierScope,
   perimetroNote,
   serverCtx,
@@ -76,21 +77,21 @@ test('applyVerifierVerdict pass: imposta pass e svuota la critica', () => {
 });
 
 test('applyVerifierVerdict fix: lo specchio locale registra la critica coi livelli e il seguito del giro', () => {
-  const s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2] rotto qui');
+  const s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2i] rotto qui');
   assert.equal(s.verifierVerdict, 'fix-pending');
-  assert.equal(s.verifierCritique, '[2] rotto qui');
-  assert.equal(applyVerifierVerdict(s, 'stop', '[2] ancora').verifierVerdict, 'stop');
+  assert.equal(s.verifierCritique, '[2i] rotto qui');
+  assert.equal(applyVerifierVerdict(s, 'stop', '[2i] ancora').verifierVerdict, 'stop');
 });
 
 test('applyFixed: ri-mette in coda verifier e azzera la critica (i bilanci li tiene il server)', () => {
-  const fixed = applyFixed(applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2] x'));
+  const fixed = applyFixed(applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2i] x'));
   assert.equal(fixed.verifierVerdict, null);
   assert.equal(fixed.verifierCritique, '');
 });
 
 test('VERIFIER_ROUND: il parser della critica coi livelli arriva dagli strumenti (fonte unica)', async () => {
   const { VERIFIER_ROUND, VERIFIER_OUTCOMES } = await import('../../scripts/dispatch.mjs');
-  const p = VERIFIER_ROUND.parseFindings('funziona\n[2] rotto\n[1?] gusto');
+  const p = VERIFIER_ROUND.parseFindings('funziona\n[2i] rotto\n[1i?] gusto');
   assert.deepEqual(p.findings.map((f) => [f.level, f.decision]), [[2, false], [1, true]]);
   assert.deepEqual(VERIFIER_OUTCOMES, ['pass', 'fix', 'stop']);
 });
@@ -102,15 +103,15 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
     phase2: { findings: [{ level: 2, text: 'rotto' }], derived: [{ level: 0, text: 'raro' }], budgets: { cap2: { cap: 5, used: 1, left: 4 } }, instructions: 'FASE 2 — correggi' },
   });
   assert.match(fix, /c'è da correggere/);
-  assert.match(fix, /\[2\] rotto/);
-  assert.match(fix, /\[0\] raro/);
+  assert.match(fix, /\[2i\] rotto/);
+  assert.match(fix, /\[0i\] raro/);
   assert.match(fix, /cap2: 4 giri residui su 5/);
   assert.match(fix, /FASE 2 — correggi/);
-  // Il testo della fase 2 è dell'owner e può tacerla: la porta per fermarsi la stampa lo strumento.
-  assert.match(fix, /--record-fixed <id> "<report>" --segnala <file\.md> --ferma/);
-  assert.ok(fix.indexOf('--ferma') > fix.indexOf('FASE 2 — correggi'), 'dopo le istruzioni, non al loro posto');
+  // Il testo della fase 2 è dell'owner e può tacerla: la regola che ferma la stampa lo strumento.
+  assert.match(fix, /--record-fixed <id> "<report>" --segnala <file\.md>/);
+  assert.ok(fix.indexOf('FERMA il lavoro') > fix.indexOf('FASE 2 — correggi'), 'dopo le istruzioni, non al loro posto');
   assert.match(verifierReplyText({ outcome: 'pass', derived: { num: '#42.1' } }), /#42\.1/);
-  assert.match(verifierReplyText({ outcome: 'stop', blocking: [{ level: 3, text: 'grave' }] }), /si ferma[\s\S]*\[3\] grave/);
+  assert.match(verifierReplyText({ outcome: 'stop', blocking: [{ level: 3, text: 'grave' }] }), /si ferma[\s\S]*\[3i\] grave/);
   // Un «ok» senza esito non è un pass: dirlo superato mandava a rilasciare il
   // biglietto anche con un rilievo di livello 2 nella critica (verifica del
   // giro 3 sul lavoro di lancio delle routine).
@@ -206,11 +207,11 @@ test('serialAwarenessNote: scatta dalla SECONDA bocciatura, per chi corregge e c
 // ─── Stato su disco ───────────────────────────────────────────────────────────
 
 test('writeState/readState/clearState: round-trip su STATE_DIR temporanea', () => {
-  const s = applyVerifierVerdict(defaultState('DISK1', 'worker/DISK1'), 'fix', '[2] boom');
+  const s = applyVerifierVerdict(defaultState('DISK1', 'worker/DISK1'), 'fix', '[2i] boom');
   writeState(s);
   const back = readState('DISK1');
   assert.equal(back.verifierVerdict, 'fix-pending');
-  assert.equal(back.verifierCritique, '[2] boom');
+  assert.equal(back.verifierCritique, '[2i] boom');
   clearState('DISK1');
   assert.equal(readState('DISK1'), null);
 });
@@ -406,20 +407,28 @@ test('fixedPayload: stop viaggia solo se chiesto, e mai come valore falso', () =
   assert.ok(!('stop' in fixedPayload({ report: 'r', ferma: 'sì' })), 'solo il true vero ferma un lavoro');
 });
 
-test('--ferma senza segnalazione non parte: chi decide non saprebbe cosa decidere', () => {
-  assert.match(fermaSenzaSegnalazione(true, ''), /--segnala/);
+test('--ferma senza segnalazione non parte: è la segnalazione che ferma, e senza chi decide non saprebbe cosa decidere', () => {
+  assert.match(fermaSenzaSegnalazione(true, ''), /--segnala <file\.md> che ferma il lavoro/);
   assert.match(fermaSenzaSegnalazione(true, '   '), /non ho consegnato niente/);
   assert.equal(fermaSenzaSegnalazione(true, 'file.md'), '');
   assert.equal(fermaSenzaSegnalazione(false, ''), '');
 });
 
-test('fixedReplyText: un fermo non confermato dal server si dice, non si dà per fatto', () => {
+test('fixedReplyText: il fermo lo conferma il server; una segnalazione non fermata si dice, non si dà per fatta', () => {
   assert.match(fixedReplyText('A', { outcome: 'stop' }, true), /FERMATO/);
+  assert.match(fixedReplyText('A', { outcome: 'stop' }, false), /FERMATO/, 'il server ha fermato: si dice anche se qui non lo si aspettava');
   assert.match(fixedReplyText('A', {}, true), /ATTENZIONE/);
+  assert.match(fixedReplyText('A', {}, true), /segnalazione/);
   assert.match(fixedReplyText('A', {}, false), /torna in coda/);
 });
 
-test('CLI: --record-fixed --ferma senza --segnala si ferma prima del server', () => {
+test('la nota che lo strumento stampa dopo la critica dice che la segnalazione ferma, senza --ferma', () => {
+  assert.match(FERMA_NOTE, /--segnala <file\.md>/);
+  assert.match(FERMA_NOTE, /FERMA il lavoro/);
+  assert.doesNotMatch(FERMA_NOTE, /--ferma/);
+});
+
+test('CLI: --record-fixed --ferma senza --segnala si ferma prima del server, e dice che a fermare è --segnala', () => {
   const script = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
   const report = 'Non si può correggere senza una decisione: le due strade hanno costi diversi e le spiego nel file.';
   let uscita = 0;
@@ -428,7 +437,59 @@ test('CLI: --record-fixed --ferma senza --segnala si ferma prima del server', ()
     execFileSync(process.execPath, [script, '--record-fixed', 'fid-x', report, '--ferma'], { encoding: 'utf8', stdio: 'pipe', env: { ...process.env, FILO_ROUTINE_TICKET: '' } });
   } catch (e) { uscita = e.status; testo = `${e.stdout || ''}${e.stderr || ''}`; }
   assert.equal(uscita, 1);
-  assert.match(testo, /--ferma vuole anche --segnala/);
+  assert.match(testo, /--segnala <file\.md> che ferma il lavoro/);
+});
+
+// ─── La ripresa dopo la risposta dell'owner ──────────────────────────────────
+
+const RIPRESA = { motivo: 'decisione', ruolo: 'verifier', domanda: 'A o B?', risposta: 'B.', rilievi: [{ level: 2, text: 'non salva', decision: false }], at: '2026-09-23T08:00:00.000Z' };
+
+test('buildPayload: il correttore che riprende riceve domanda, risposta, rilievi e la serie; il riallineamento resta com\'era', () => {
+  const history = [{ verdict: 'critica', findings: [{ level: 2, text: 'non salva' }] }];
+  const rip = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A' }, { feedback: { text: 's' }, history, ripresa: RIPRESA });
+  assert.equal(rip.case, 'ripresa');
+  assert.equal(rip.ripresa.risposta, 'B.');
+  assert.deepEqual(rip.history, history, 'chi riprende a metà di un giro deve vedere le porte già trovate');
+  const rb = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A' }, { feedback: { text: 's' }, history, ripresa: null });
+  assert.equal(rb.case, 'riallineamento');
+  assert.ok(!('ripresa' in rb));
+  assert.ok(!('history' in rb));
+});
+
+test('buildPayload: chi risolve riceve la ripresa solo quando c\'è', () => {
+  const con = buildPayload({ role: 'new-work', id: 'a', num: '7' }, { feedback: { text: 't' }, ripresa: RIPRESA });
+  assert.equal(con.case, 'primo-passaggio');
+  assert.equal(con.ripresa.domanda, 'A o B?');
+  const senza = buildPayload({ role: 'new-work', id: 'a', num: '7' }, { feedback: { text: 't' } });
+  assert.ok(!('ripresa' in senza));
+});
+
+test('serverCtx: la ripresa passa dalla busta del server a chi riprende, e un valore storto non passa', () => {
+  const ok = serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' }, ripresa: RIPRESA } });
+  assert.deepEqual(ok.ripresa, RIPRESA);
+  assert.equal(serverCtx({ role: 'new-work' }, { payload: { feedback: { text: 't' }, ripresa: 'sì' } }).ripresa, null);
+  assert.equal(serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' } } }).ripresa, null);
+});
+
+test('readRoleInstructions: il caso del correttore sceglie il testo (ripresa ≠ rebase), e un caso ignoto vale il rebase', () => {
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(resolve(dir, 'resolver-rebase.md'), '# stai facendo un rebase\n');
+  writeFileSync(resolve(dir, 'resolver-ripresa.md'), '# stai riprendendo un lavoro fermo\n');
+  assert.match(readRoleInstructions('fixer', { caso: 'ripresa' }), /riprendendo un lavoro fermo/);
+  assert.match(readRoleInstructions('fixer', { caso: 'riallineamento' }), /stai facendo un rebase/);
+  assert.match(readRoleInstructions('fixer', {}), /stai facendo un rebase/);
+  assert.match(readRoleInstructions('fixer', { caso: 'constructor' }), /stai facendo un rebase/);
+});
+
+test('il testo di ruolo della ripresa esiste nel repo e dice da dove si riparte', () => {
+  const testo = readFileSync(fileURLToPath(new URL('../../routines/roles/resolver-ripresa.md', import.meta.url)), 'utf8');
+  assert.match(testo, /payload\.ripresa/);
+  assert.match(testo, /risposta/);
+  assert.match(testo, /--record-fixed/);
+  assert.match(testo, /includi: _segnala\.md/);
+  const segnala = readFileSync(fileURLToPath(new URL('../../routines/roles/_segnala.md', import.meta.url)), 'utf8');
+  assert.match(segnala, /FERMA il lavoro/);
 });
 
 // ─── L'ambito della verifica (pieno / riallineamento / chiusura) ─────────────
@@ -444,8 +505,8 @@ test('verifierScope: un valore sconosciuto vale pieno, e lo dice', () => {
 
 test('perimetroNote: il perimetro si legge come testo, non come JSON', () => {
   const c = perimetroNote('chiusura', { rilievi: [{ level: 2, text: 'Salva non salva' }, { level: 1, text: 'bordo freddo', decision: true }], shaPrima: 'abc1234' });
-  assert.match(c, /\[2\] Salva non salva/);
-  assert.match(c, /\[1\?\] bordo freddo/);
+  assert.match(c, /\[2i\] Salva non salva/);
+  assert.match(c, /\[1i\?\] bordo freddo/);
   assert.match(c, /git diff abc1234\.\.HEAD/);
   assert.ok(!c.includes('{'), 'niente JSON grezzo nel compito');
   const r = perimetroNote('riallineamento', { reportRebase: 'conflitto nelle schede\nsolo meccanico', shaVerificato: 'def5678' });
@@ -483,7 +544,7 @@ test('emit: il valore di scope sceglie il testo del ruolo e accoda il perimetro'
 
   const chiusura = consegna({ feedback: { text: 't' }, history: storia, scope: 'chiusura', perimetro: { rilievi: [{ level: 2, text: 'Salva non salva' }], shaPrima: 'abc1234' } });
   assert.match(chiusura.instructions, /# verifica di chiusura/);
-  assert.match(chiusura.instructions, /Perimetro di questo giro[\s\S]*\[2\] Salva non salva/);
+  assert.match(chiusura.instructions, /Perimetro di questo giro[\s\S]*\[2i\] Salva non salva/);
   assert.ok(!/Avvertenza di serie/.test(chiusura.instructions), 'il giro stretto non invita alla ricerca larga');
   assert.equal(chiusura.payload.scope, 'chiusura');
 

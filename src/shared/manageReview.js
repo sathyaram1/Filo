@@ -457,7 +457,7 @@
         return { text: 'La verifica ha trovato un difetto che non si può più correggere da soli: decidi tu.', color: S.design.color };
       }
       if (statusReason === 'decisione') {
-        return { text: 'La verifica ha trovato un difetto che chiede una tua decisione.', color: S.design.color };
+        return { text: 'Il lavoro è fermo su una scelta che spetta a te: leggila nel rombo e rispondi qui sotto.', color: S.design.color };
       }
       if (statusReason === 'arenato') {
         return { text: 'La lavorazione si è arenata troppe volte: decidi tu.', color: S.design.color };
@@ -498,7 +498,7 @@
     l5: 'fermo al cancello di fusione',
     clarify: 'domande per te',
     loop: 'difetto non più correggibile da soli',
-    decisione: 'la verifica chiede una tua decisione',
+    decisione: 'fermo: aspetta una tua scelta',
     arenato: 'lavorazione arenata',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
@@ -1094,6 +1094,12 @@
 
   const L3_ATTESA = 'Claude aspetta una tua risposta: le domande sono nella conversazione.';
 
+  // I motivi di `design` che aspettano una RISPOSTA scritta dell'owner: le
+  // domande di chi risolve, e una segnalazione o un rilievo che chiedono una
+  // sua scelta. La risposta va nella conversazione ed è quello che chi riprende
+  // il lavoro riceve. Un bilancio esaurito (`loop`) si rimette in coda e basta.
+  const MOTIVI_RISPOSTA = ['clarify', 'decisione'];
+
   /**
    * Questa pratica aspetta una risposta dell'owner? PURA.
    *
@@ -1105,7 +1111,7 @@
     if (!fb || statusUnreadable(fb)) return false;
     const norm = normalizeStatus(fb);
     if (norm.status !== 'design') return false;
-    return norm.statusReason === 'clarify' || String(fb.status || '') === 'clarify';
+    return MOTIVI_RISPOSTA.includes(String(norm.statusReason || '')) || String(fb.status || '') === 'clarify';
   }
 
   /** L'ultimo turno di Filo nella conversazione, o null. PURA. */
@@ -1147,13 +1153,17 @@
     if (l.at) righe.push(riga('Quando', String(l.at)));
     const testo = String(l.testo || '').trim() || 'La segnalazione è arrivata senza testo.';
     // Segnalazione registrata E domande in attesa: chi clicca il verde cerca
-    // la cosa a cui rispondere adesso, quindi va per prima.
+    // la cosa a cui rispondere adesso, quindi va per prima. Fermo per una
+    // scelta, la segnalazione È la domanda (il server la appende anche alla
+    // conversazione): si legge una volta sola, non come domanda e poi di nuovo.
     if (attesa) {
-      const corpo = (domanda && domanda.body) || L3_ATTESA;
+      const corpo = (domanda && domanda.body) || '';
+      const motivo = String(normalizeStatus(fb).statusReason || '');
+      const soloSegnalazione = !valueUnreadable(l.testo) && (motivo === 'decisione' || !corpo || corpo.includes(testo));
       return forma('l3', 'rombo', titolo, 'design', 'domande', {
         titolo,
         righe,
-        testo: `## Domande in attesa di risposta\n${corpo}\n\n## Segnalazione\n${testo}`,
+        testo: soloSegnalazione ? testo : `## Domande in attesa di risposta\n${corpo || L3_ATTESA}\n\n## Segnalazione\n${testo}`,
         illeggibile: valueUnreadable(l.testo) && valueUnreadable(fb && fb.notes),
         azioni: [],
       });

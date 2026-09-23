@@ -815,12 +815,13 @@ if (isMain) {
   }
   delete data.segnala;
 
-  // `--stop` ferma il lavoro e chiama l'owner: senza segnalazione non saprebbe
-  // cosa decidere. Stessa regola di dispatch --record-fixed --ferma.
+  // `--stop` resta accettato per chi lo scrive ancora, ma non serve: è la
+  // segnalazione che ferma il lavoro, e senza l'owner non saprebbe cosa
+  // decidere. Stessa regola di dispatch --record-fixed --ferma.
   if (data.stop !== undefined) {
     const suFixed = cmd === 'deliver' && [args[0], args[1]].includes('fixed');
     if (data.stop !== true || !suFixed || !data.segnalazione) {
-      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md>: non ho consegnato niente.');
+      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md> (che da sola ferma già il lavoro): non ho consegnato niente.');
       process.exit(1);
     }
   }
@@ -1105,7 +1106,16 @@ if (isMain) {
         sealCurrentWork(ROOT, { by: `deliver:${intento}` });
       } catch (_) { /* best-effort: la consegna è già registrata */ }
     }
-    if (r.outcome === 'ok') { console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.'); process.exit(0); }
+    if (r.outcome === 'ok') {
+      // Una consegna con segnalazione ferma il lavoro: chi consegna deve saperlo
+      // adesso, o crede di averlo mandato in verifica.
+      const fermo = r.reply && r.reply.outcome === 'stop';
+      const conSegnalazione = typeof data.segnalazione === 'string' && data.segnalazione.trim();
+      if (fermo) console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: il lavoro è FERMO e aspetta l'owner (la segnalazione è consegnata). Rilascia il biglietto.`);
+      else if (conSegnalazione) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. ATTENZIONE: la consegna portava una segnalazione ma il server non ha fermato il lavoro (server vecchio?).`);
+      else console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.');
+      process.exit(0);
+    }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'compare') {

@@ -17,7 +17,7 @@ a questo testo, sotto «Perimetro di questo giro». Guardi tre cose.
 
 1. **Ogni rilievo dell'elenco è chiuso.** Rifai i suoi passi usando Filo:
    leggere il codice non basta. Un rilievo rimasto aperto lo riscrivi, col
-   livello che aveva.
+   livello e la sede che aveva.
 2. **Le prove sono verdi.** Le prove dei giri,
    `npx playwright test tests/verifica/<numero>` (numero del feedback senza
    cancelletto, percorso relativo alla radice del repo, barre normali), e i
@@ -29,7 +29,5 @@ a questo testo, sotto «Perimetro di questo giro». Guardi tre cose.
    zone che i rilievi nominano.
 
 <!-- includi: _criteri-verifica.md -->
-
-<!-- includi: _fuori-perimetro.md -->
 
 <!-- includi: _critica-e-livelli.md -->

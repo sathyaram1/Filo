@@ -22,7 +22,9 @@ export const unaRiga = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
 // Lo sha finisce dentro un comando da copiare: solo esadecimale, o niente.
 const soloSha = (v) => (/^[0-9a-f]{7,40}$/i.test(unaRiga(v)) ? unaRiga(v) : '');
 
-const formatoMinimo = (list) => list.map((f) => `- [${f.level}${f.decision ? '?' : ''}] ${unaRiga(f.text)}`).join('\n');
+// Livello E sede, come il lettore della critica li pretende: un perimetro
+// scritto senza sede insegnerebbe a chi verifica una forma che poi viene respinta.
+const formatoMinimo = (list) => list.map((f) => `- [${f.level}${String(f.sede || '').toLowerCase() === 'e' ? 'e' : 'i'}${f.decision ? '?' : ''}] ${unaRiga(f.text)}`).join('\n');
 
 /**
  * Il perimetro di un giro stretto, scritto come testo in coda al compito: un
