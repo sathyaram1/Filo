@@ -350,10 +350,13 @@ if (IS_FILO_ORIGIN) {
   }
 }
 
-// L'avviso di src/main/congedo.js arriva come `pagehide`, che una scheda
-// distrutta non riceve: così ogni pagina che già lo ascolta è coperta.
+// L'avviso di src/main/congedo.js arriva nelle DUE forme con cui una pagina
+// può aspettare la propria fine: chi ne ascolta una qualsiasi è coperto.
 if (IS_FILO_ORIGIN) {
   ipcRenderer.on('filo:pagina-sparisce', () => {
+    try {
+      window.dispatchEvent(new Event('beforeunload', { cancelable: true }));
+    } catch (_) {}
     try {
       let evento;
       try { evento = new PageTransitionEvent('pagehide', { persisted: false }); }
