@@ -336,7 +336,8 @@ export async function main(argvIn) {
     console.error(`ALLEGATO NON CARICATO: ${f.name} (${f.reason}). Il feedback esiste ma senza questo documento.`);
   }
 
-  if (p.valore) {
+  // `!= null`, non un controllo di verità: lo 0 è una priorità da scrivere.
+  if (p.valore != null) {
     const pr = await applicaPriorita(r.id, p.valore);
     if (pr.ok) console.log(`Priorità ${p.valore} impostata.`);
     else console.log(`Priorità NON impostata (${pr.motivo}): mettila dalla dashboard.`);
