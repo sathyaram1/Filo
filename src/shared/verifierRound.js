@@ -492,11 +492,11 @@
    * non ferma niente: la domanda viaggia nel suo feedback. Anche i rilievi
    * interni messi da parte (`derived`) portano `priority` = livello.
    *
-   * @param {object} p { findings, caps:{cap2,cap1,cap0}, counts:{count2,count1,count0} }
+   * @param {object} p { findings, caps:{cap3,cap2,cap1,cap0}, counts:{count3,count2,count1,count0} }
    * @returns {{
    *   stop: boolean, blocking: object[], sospesi: object[], fix: object[], derived: object[], external: object[],
-   *   consume: 'cap2'|'cap1'|'cap0'|null, counts: object,
-   *   budgets: { cap2:{cap,used,left}, cap1:…, cap0:… }
+   *   consume: 'cap3'|'cap2'|'cap1'|'cap0'|null, counts: object,
+   *   budgets: { cap3:{cap,used,left}, cap2:…, cap1:…, cap0:… }
    * }}
    *   `sospesi` (solo allo stop): gli altri interni della stessa critica, che
    *   restano davanti a chi riprende dopo la risposta dell'owner.
