@@ -457,7 +457,7 @@
         return { text: 'La verifica ha trovato un difetto che non si può più correggere da soli: decidi tu.', color: S.design.color };
       }
       if (statusReason === 'decisione') {
-        return { text: 'La verifica ha trovato un difetto che chiede una tua decisione.', color: S.design.color };
+        return { text: 'Il lavoro è fermo su una scelta che spetta a te: leggila nel rombo e rispondi qui sotto.', color: S.design.color };
       }
       if (statusReason === 'arenato') {
         return { text: 'La lavorazione si è arenata troppe volte: decidi tu.', color: S.design.color };
