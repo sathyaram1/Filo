@@ -107,9 +107,9 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
   assert.match(fix, /\[0\] raro/);
   assert.match(fix, /cap2: 4 giri residui su 5/);
   assert.match(fix, /FASE 2 — correggi/);
-  // Il testo della fase 2 è dell'owner e può tacerla: la porta per fermarsi la stampa lo strumento.
-  assert.match(fix, /--record-fixed <id> "<report>" --segnala <file\.md> --ferma/);
-  assert.ok(fix.indexOf('--ferma') > fix.indexOf('FASE 2 — correggi'), 'dopo le istruzioni, non al loro posto');
+  // Il testo della fase 2 è dell'owner e può tacerla: la regola che ferma la stampa lo strumento.
+  assert.match(fix, /--record-fixed <id> "<report>" --segnala <file\.md>/);
+  assert.ok(fix.indexOf('FERMA il lavoro') > fix.indexOf('FASE 2 — correggi'), 'dopo le istruzioni, non al loro posto');
   assert.match(verifierReplyText({ outcome: 'pass', derived: { num: '#42.1' } }), /#42\.1/);
   assert.match(verifierReplyText({ outcome: 'stop', blocking: [{ level: 3, text: 'grave' }] }), /si ferma[\s\S]*\[3\] grave/);
   // Un «ok» senza esito non è un pass: dirlo superato mandava a rilasciare il
