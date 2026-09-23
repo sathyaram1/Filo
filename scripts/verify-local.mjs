@@ -711,6 +711,8 @@ export function codaDalServer(testoServer) {
     '',
     'IN LOCALE, quattro differenze da quanto scritto qui sopra:',
     '- le prove del giro stanno nella cartella indicata più su, non in `tests/verifica/<numero>`;',
+    '- qui i rilievi lasciati fuori non prendono un numero di feedback, quindi le prove da togliere sono quelle',
+    '  dei rilievi elencati più su, riconosciute dal loro testo;',
     '- non c\'è `--segnala`, quindi qui una segnalazione non ferma niente da sola: un trade-off vero si scrive',
     '  PER PRIMO nel report, con le strade e i loro costi, e lo porta all\'owner chi guida il giro, che è lui a',
     '  fermare il lavoro. Un rilievo che chiede una sua decisione non si corregge a metà: consegna il resto;',
