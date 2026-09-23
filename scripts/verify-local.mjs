@@ -384,7 +384,9 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
   const coda = (Array.isArray(prev.derived) ? prev.derived : []).concat(decision.external);
   if (outcome === 'stop') {
     entry.verdict = 'fail';
-    entry.critique = ROUND.formatFindings(decision.blocking);
+    // Con quello che ha fermato restano anche gli altri interni della critica:
+    // chi riprende dopo la risposta dell'owner li chiude, il giro dopo non li riscopre.
+    entry.critique = ROUND.formatFindings(decision.blocking.concat(decision.sospesi || []));
     entry.pending = null;
     entry.derived = coda;
     // Il lavoro si ferma e decide l'owner: i bilanci si azzerano, come sul
