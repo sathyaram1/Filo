@@ -1257,7 +1257,7 @@ if (isMain) {
     }
     if (r.outcome === 'pass') {
       console.log(`Nessun commit nuovo dopo la critica: niente da riverificare. Verifica superata per '${branch}' su ${sha.slice(0, 8)}.`);
-      console.log(`Rilievi non corretti, da riportare nel report per l'owner:\n${ROUND.formatFindings(r.derived)}`);
+      console.log(`Rilievi non corretti, da riportare nel report per l'owner (ciascuno diventa un feedback suo, con quella priorità):\n${derivatiText(r.derived)}`);
       // Stessa uscita, stesso consiglio: di qui esce un pass con rilievi
       // aperti esattamente come da «critica», e le prove del giro sono rosse
       // nello stesso modo.
