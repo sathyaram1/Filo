@@ -406,6 +406,10 @@
       console.error('[Filo editor] save', e);
     }
   }
+  // Il nome del documento si conferma quando il cursore lascia il campo:
+  // registrato qui, si conferma anche se la scheda si chiude prima.
+  const campoAlVolo = window.SN_SALVA.campoAlVolo();
+
   function markDirty() {
     dirty = true;
     saveStateEl.textContent = 'Non salvato';
