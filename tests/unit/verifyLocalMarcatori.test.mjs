@@ -233,12 +233,20 @@ test('checkVerdict: la tolleranza non riapre le altre porte', () => {
   assert.equal(checkVerdict({ verdict: 'pass', sha: SHA }, '', false, soloMarc).ok, false);
 });
 
-test('chi verifica sa come si segna un rosso atteso, e cosa fa decadere il verdetto', () => {
-  const t = testoRossiAttesi('claude/ripiego-crediti');
+test('chi verifica sa quali prove togliere, e cosa fa decadere il verdetto', () => {
+  const t = testoProveDaCancellare('claude/ripiego-crediti', [
+    { level: 1, sede: 'e', text: 'il riquadro non dice da dove arrivano i crediti. Passi: apri il riquadro.' },
+  ]);
   assert.match(t, /tests\/verifica\/locale-ripiego-crediti/);
-  assert.match(t, /test\.fail\(/);
+  // I rilievi si riconoscono dal loro testo: qui un numero di feedback non c'è.
+  assert.match(t, /il riquadro non dice da dove arrivano i crediti/);
   assert.match(t, /NON fa decadere questo verdetto/);
-  assert.match(t, /senza marcatore/, 'un rosso non segnato deve continuare a fermare la chiusura');
+  assert.match(t, /git commit/, 'un rm non lo salva nessun hook: il commit va chiesto');
+  assert.match(t, /aggiunta/, 'una prova nuova deve continuare a far decadere il verdetto');
+  // Il ripiego resta scritto, per una prova che copre anche un caso aperto.
+  assert.match(t, /test\.fail\(/);
+  // Senza rilievi in mano il testo rimanda all'elenco, non stampa una riga vuota.
+  assert.match(testoProveDaCancellare('claude/x', []), /elencati qui sopra/);
 });
 
 // ─── su un deposito git vero ────────────────────────────────────────────────
