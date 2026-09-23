@@ -90,7 +90,7 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
       .rejects.toThrow(/FILO_ADMIN_REFRESH_TOKEN/);
   });
 
-  test('`status`: documento assente, numero mancante, numero non numerico, server che rifiuta, rete giù → esce con errore e lo dice; con i tre numeri (anche 0) li stampa', async () => {
+  test('`status`: documento assente, numero mancante, numero non numerico, server che rifiuta, rete giù → esce con errore e lo dice; con i quattro numeri (anche 0) va avanti senza stamparli', async () => {
     const repo = repoTemporaneo();
     const s = await serverFinto();
     try {
@@ -132,7 +132,8 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
       // `status` dice solo che li ha letti.
       s.stato.risposta = { status: 200, body: doc(int(10), { stringValue: '1' }, { doubleValue: 0 }) };
       r = await lancia(repo, s.url, 'status');
-      expect(r.status).toBe(0);
+      // Senza una verifica avviata `status` esce 1 per conto suo: qui conta che i bilanci siano stati letti.
+      expect(r.stderr).not.toMatch(/BILANCI DEL GIRO NON LETTI/);
       expect(r.stdout).toMatch(/Server raggiunto/);
       expect(r.stdout).not.toMatch(/cap3 5|cap2 10|Bilanci del giro/);
       // Il token dell'owner è arrivato al server, non un altro.
