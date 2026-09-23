@@ -437,29 +437,47 @@
       },
     };
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+    mostraConferma();
+  }
+
+  // La conferma parla dell'ULTIMA modifica: se ne è arrivata un'altra mentre il
+  // salvataggio viaggiava, la scrive chi chiude la fila.
+  function mostraConferma() {
+    if (rimandato.inAttesa()) return;
     const hint = $('savedHint');
     hint.classList.add('sn-show');
-    clearTimeout(save._t);
-    save._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
+    clearTimeout(mostraConferma._t);
+    mostraConferma._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
+
+  // Stessa regola delle pagine sorelle: la conferma non sopravvive a una
+  // modifica nuova, e quello che c'è nelle caselle parte prima di sparire.
+  const rimandato = window.SN_SALVA.crea({
+    salva: save,
+    spegniConferma: () => $('savedHint').classList.remove('sn-show'),
+  });
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
     // Niente pulsante "Salva": ogni toggle viene applicato e persistito subito.
-    $('sec-protect-ip').addEventListener('change', save);
-    $('sec-block-popups').addEventListener('change', save);
-    $('sec-adblock').addEventListener('change', save);
-    $('sec-siteblock').addEventListener('change', () => { syncSiteBlockEnabled(); save(); });
-    $('sec-siteblock-lists').addEventListener('change', save);
-    $('sec-siteblock-blacklist').addEventListener('change', save);
-    // Mentre l'utente corregge le righe, togli l'avviso precedente (rivalutato
-    // al prossimo salvataggio su blur).
-    $('sec-siteblock-blacklist').addEventListener('input', () => setBlacklistError([]));
-    $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
-    $('sec-safebrowse-network').addEventListener('change', save);
-    $('sec-safebrowse-llm').addEventListener('change', save);
-    $('sec-safebrowse-sandbox').addEventListener('change', save);
-    $('sec-auto-feedback').addEventListener('change', save);
+    const subito = () => rimandato.adesso();
+    $('sec-protect-ip').addEventListener('change', subito);
+    $('sec-block-popups').addEventListener('change', subito);
+    $('sec-adblock').addEventListener('change', subito);
+    $('sec-siteblock').addEventListener('change', () => { syncSiteBlockEnabled(); rimandato.adesso(); });
+    $('sec-siteblock-lists').addEventListener('change', subito);
+    $('sec-siteblock-blacklist').addEventListener('change', () => rimandato.programma());
+    // Quello che si sta ancora scrivendo è già una modifica: senza, chi chiude
+    // la scheda col cursore nel campo perde l'ultima riga scritta.
+    $('sec-siteblock-blacklist').addEventListener('input', () => {
+      setBlacklistError([]);
+      rimandato.modificato();
+    });
+    $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); rimandato.adesso(); });
+    $('sec-safebrowse-network').addEventListener('change', subito);
+    $('sec-safebrowse-llm').addEventListener('change', subito);
+    $('sec-safebrowse-sandbox').addEventListener('change', subito);
+    $('sec-auto-feedback').addEventListener('change', subito);
     for (const r of document.querySelectorAll('input[name="cookie-mode"]')) {
       r.addEventListener('change', () => { syncCookieMode(); saveCookies(); });
     }
