@@ -45,7 +45,7 @@ test('ogni ruolo riceve un testo intero, senza richiami rimasti dentro', () => {
 // giro pieno, parola per parola, o tre verificatori danno tre livelli diversi.
 test('i tre ambiti della verifica condividono livelli, critica e registrazione', () => {
   const pieno = readRoleInstructions('verifier');
-  const coda = (t) => t.slice(t.indexOf('## Il livello di ogni rilievo'));
+  const coda = (t) => t.slice(t.indexOf('## Il livello e la sede di ogni rilievo'));
   assert.ok(coda(pieno).includes('--record-verifier') && coda(pieno).includes('## Dopo la registrazione'));
   for (const scope of ['chiusura', 'riallineamento']) {
     const t = readRoleInstructions('verifier', { scope });
