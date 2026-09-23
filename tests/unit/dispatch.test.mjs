@@ -407,20 +407,28 @@ test('fixedPayload: stop viaggia solo se chiesto, e mai come valore falso', () =
   assert.ok(!('stop' in fixedPayload({ report: 'r', ferma: 'sì' })), 'solo il true vero ferma un lavoro');
 });
 
-test('--ferma senza segnalazione non parte: chi decide non saprebbe cosa decidere', () => {
-  assert.match(fermaSenzaSegnalazione(true, ''), /--segnala/);
+test('--ferma senza segnalazione non parte: è la segnalazione che ferma, e senza chi decide non saprebbe cosa decidere', () => {
+  assert.match(fermaSenzaSegnalazione(true, ''), /--segnala <file\.md> che ferma il lavoro/);
   assert.match(fermaSenzaSegnalazione(true, '   '), /non ho consegnato niente/);
   assert.equal(fermaSenzaSegnalazione(true, 'file.md'), '');
   assert.equal(fermaSenzaSegnalazione(false, ''), '');
 });
 
-test('fixedReplyText: un fermo non confermato dal server si dice, non si dà per fatto', () => {
+test('fixedReplyText: il fermo lo conferma il server; una segnalazione non fermata si dice, non si dà per fatta', () => {
   assert.match(fixedReplyText('A', { outcome: 'stop' }, true), /FERMATO/);
+  assert.match(fixedReplyText('A', { outcome: 'stop' }, false), /FERMATO/, 'il server ha fermato: si dice anche se qui non lo si aspettava');
   assert.match(fixedReplyText('A', {}, true), /ATTENZIONE/);
+  assert.match(fixedReplyText('A', {}, true), /segnalazione/);
   assert.match(fixedReplyText('A', {}, false), /torna in coda/);
 });
 
-test('CLI: --record-fixed --ferma senza --segnala si ferma prima del server', () => {
+test('la nota dopo la fase 2 dice che la segnalazione ferma, senza --ferma', () => {
+  assert.match(FERMA_NOTE, /--segnala <file\.md>/);
+  assert.match(FERMA_NOTE, /FERMA il lavoro/);
+  assert.doesNotMatch(FERMA_NOTE, /--ferma/);
+});
+
+test('CLI: --record-fixed --ferma senza --segnala si ferma prima del server, e dice che a fermare è --segnala', () => {
   const script = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
   const report = 'Non si può correggere senza una decisione: le due strade hanno costi diversi e le spiego nel file.';
   let uscita = 0;
@@ -429,7 +437,59 @@ test('CLI: --record-fixed --ferma senza --segnala si ferma prima del server', ()
     execFileSync(process.execPath, [script, '--record-fixed', 'fid-x', report, '--ferma'], { encoding: 'utf8', stdio: 'pipe', env: { ...process.env, FILO_ROUTINE_TICKET: '' } });
   } catch (e) { uscita = e.status; testo = `${e.stdout || ''}${e.stderr || ''}`; }
   assert.equal(uscita, 1);
-  assert.match(testo, /--ferma vuole anche --segnala/);
+  assert.match(testo, /--segnala <file\.md> che ferma il lavoro/);
+});
+
+// ─── La ripresa dopo la risposta dell'owner ──────────────────────────────────
+
+const RIPRESA = { motivo: 'decisione', ruolo: 'verifier', domanda: 'A o B?', risposta: 'B.', rilievi: [{ level: 2, text: 'non salva', decision: false }], at: '2026-09-23T08:00:00.000Z' };
+
+test('buildPayload: il correttore che riprende riceve domanda, risposta, rilievi e la serie; il riallineamento resta com\'era', () => {
+  const history = [{ verdict: 'critica', findings: [{ level: 2, text: 'non salva' }] }];
+  const rip = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A' }, { feedback: { text: 's' }, history, ripresa: RIPRESA });
+  assert.equal(rip.case, 'ripresa');
+  assert.equal(rip.ripresa.risposta, 'B.');
+  assert.deepEqual(rip.history, history, 'chi riprende a metà di un giro deve vedere le porte già trovate');
+  const rb = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A' }, { feedback: { text: 's' }, history, ripresa: null });
+  assert.equal(rb.case, 'riallineamento');
+  assert.ok(!('ripresa' in rb));
+  assert.ok(!('history' in rb));
+});
+
+test('buildPayload: chi risolve riceve la ripresa solo quando c\'è', () => {
+  const con = buildPayload({ role: 'new-work', id: 'a', num: '7' }, { feedback: { text: 't' }, ripresa: RIPRESA });
+  assert.equal(con.case, 'primo-passaggio');
+  assert.equal(con.ripresa.domanda, 'A o B?');
+  const senza = buildPayload({ role: 'new-work', id: 'a', num: '7' }, { feedback: { text: 't' } });
+  assert.ok(!('ripresa' in senza));
+});
+
+test('serverCtx: la ripresa passa dalla busta del server a chi riprende, e un valore storto non passa', () => {
+  const ok = serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' }, ripresa: RIPRESA } });
+  assert.deepEqual(ok.ripresa, RIPRESA);
+  assert.equal(serverCtx({ role: 'new-work' }, { payload: { feedback: { text: 't' }, ripresa: 'sì' } }).ripresa, null);
+  assert.equal(serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' } } }).ripresa, null);
+});
+
+test('readRoleInstructions: il caso del correttore sceglie il testo (ripresa ≠ rebase), e un caso ignoto vale il rebase', () => {
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(resolve(dir, 'resolver-rebase.md'), '# stai facendo un rebase\n');
+  writeFileSync(resolve(dir, 'resolver-ripresa.md'), '# stai riprendendo un lavoro fermo\n');
+  assert.match(readRoleInstructions('fixer', { caso: 'ripresa' }), /riprendendo un lavoro fermo/);
+  assert.match(readRoleInstructions('fixer', { caso: 'riallineamento' }), /stai facendo un rebase/);
+  assert.match(readRoleInstructions('fixer', {}), /stai facendo un rebase/);
+  assert.match(readRoleInstructions('fixer', { caso: 'constructor' }), /stai facendo un rebase/);
+});
+
+test('il testo di ruolo della ripresa esiste nel repo e dice da dove si riparte', () => {
+  const testo = readFileSync(fileURLToPath(new URL('../../routines/roles/resolver-ripresa.md', import.meta.url)), 'utf8');
+  assert.match(testo, /payload\.ripresa/);
+  assert.match(testo, /risposta/);
+  assert.match(testo, /--record-fixed/);
+  assert.match(testo, /includi: _segnala\.md/);
+  const segnala = readFileSync(fileURLToPath(new URL('../../routines/roles/_segnala.md', import.meta.url)), 'utf8');
+  assert.match(segnala, /FERMA il lavoro/);
 });
 
 // ─── L'ambito della verifica (pieno / riallineamento / chiusura) ─────────────
