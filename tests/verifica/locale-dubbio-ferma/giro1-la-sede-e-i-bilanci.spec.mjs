@@ -69,7 +69,7 @@ test('un 1 o uno 0 interno oltre il bilancio non si perde: diventa un feedback s
   const d = decide('[2i] a\n[1i] b\n[0i] c', { count1: 1 });
   expect(d.fix.map(sigla)).toEqual(['2i', '1i', '0i']);
   expect(d.consume).toBe('cap2');
-  expect(d.counts).toEqual({ count2: 1, count1: 1, count0: 0 });
+  expect(d.counts).toEqual({ count3: 0, count2: 1, count1: 1, count0: 0 });
 });
 
 test('allo stop gli altri rilievi interni della stessa critica non si perdono: o restano davanti a chi riprende, o diventano feedback loro', () => {
