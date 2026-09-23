@@ -557,7 +557,7 @@
     // Le due impostazioni che valgono solo per le routine: senza routine non
     // decidono niente, quindi non si toccano (come i mittenti con l'automatica
     // spenta). Restano visibili: sono una scelta dell'owner, non un segreto.
-    for (const el of [mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save, mgFixInstructions, mgFixInstructionsSave]) {
+    for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save, mgFixInstructions, mgFixInstructionsSave]) {
       if (el) el.disabled = !isAdmin || !routinesOn;
     }
     if (mgProberIdle)  mgProberIdle.disabled = !isAdmin || !routinesOn;
