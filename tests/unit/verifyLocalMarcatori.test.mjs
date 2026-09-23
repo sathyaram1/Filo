@@ -243,8 +243,10 @@ test('chi verifica sa quali prove togliere, e cosa fa decadere il verdetto', () 
   assert.match(t, /NON fa decadere questo verdetto/);
   assert.match(t, /git commit/, 'un rm non lo salva nessun hook: il commit va chiesto');
   assert.match(t, /aggiunta/, 'una prova nuova deve continuare a far decadere il verdetto');
-  // Il ripiego resta scritto, per una prova che copre anche un caso aperto.
-  assert.match(t, /test\.fail\(/);
+  // Dopo un verdetto si può solo TOGLIERE: il marcatore di rosso atteso aggiunge
+  // una riga, e il cancello del server non lo tollera. Proporlo qui sarebbe una
+  // trappola su una delle due strade.
+  assert.doesNotMatch(t, /test\.fail\(/);
   // Senza rilievi in mano il testo rimanda all'elenco, non stampa una riga vuota.
   assert.match(testoProveDaCancellare('claude/x', []), /elencati qui sopra/);
 });
