@@ -1153,13 +1153,17 @@
     if (l.at) righe.push(riga('Quando', String(l.at)));
     const testo = String(l.testo || '').trim() || 'La segnalazione è arrivata senza testo.';
     // Segnalazione registrata E domande in attesa: chi clicca il verde cerca
-    // la cosa a cui rispondere adesso, quindi va per prima.
+    // la cosa a cui rispondere adesso, quindi va per prima. Fermo per una
+    // scelta, la segnalazione È la domanda (il server la appende anche alla
+    // conversazione): si legge una volta sola, non come domanda e poi di nuovo.
     if (attesa) {
-      const corpo = (domanda && domanda.body) || L3_ATTESA;
+      const corpo = (domanda && domanda.body) || '';
+      const motivo = String(normalizeStatus(fb).statusReason || '');
+      const soloSegnalazione = !valueUnreadable(l.testo) && (motivo === 'decisione' || !corpo || corpo.includes(testo));
       return forma('l3', 'rombo', titolo, 'design', 'domande', {
         titolo,
         righe,
-        testo: `## Domande in attesa di risposta\n${corpo}\n\n## Segnalazione\n${testo}`,
+        testo: soloSegnalazione ? testo : `## Domande in attesa di risposta\n${corpo || L3_ATTESA}\n\n## Segnalazione\n${testo}`,
         illeggibile: valueUnreadable(l.testo) && valueUnreadable(fb && fb.notes),
         azioni: [],
       });
