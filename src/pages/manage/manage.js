@@ -3587,8 +3587,9 @@
     void el.offsetWidth;
     el.classList.add('show');
     clearTimeout(mgToastTimer);
-    // Le frasi degli esiti sono lunghe: quattro secondi e mezzo per leggerle.
-    mgToastTimer = setTimeout(() => el.classList.remove('show'), 4500);
+    // Le frasi degli esiti sono lunghe: quattro secondi e mezzo per leggerle,
+    // di più quando chi chiama ne mette insieme più d'una.
+    mgToastTimer = setTimeout(() => el.classList.remove('show'), Math.max(4500, Number(ms) || 0));
   }
 
   // ── Il pannello di un livello ─────────────────────────────────────────────
