@@ -966,6 +966,10 @@
     // subito. I controlli testuali salvano allo `change` (cioè al blur), gli
     // altri (select/checkbox) immediatamente.
     $('page').addEventListener('change', () => saveDebounced());
+    // Quello che si sta ancora scrivendo è già una modifica: senza questo, chi
+    // chiude la scheda col cursore nel campo perdeva tutto quello che c'era
+    // dentro, e la conferma di prima restava accesa mentre digitava.
+    $('page').addEventListener('input', () => rimandato.modificato());
     // Qualunque cosa cambi (interruttore, modelli per azione, registry) può
     // cambiare l'effetto di "solo pesi aperti": lo ricalcoliamo sempre.
     $('page').addEventListener('change', renderOpenWeightsImpact);
