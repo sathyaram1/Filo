@@ -112,13 +112,14 @@ test('gli esterni tornano a parte, ciascuno con la priorità uguale al livello, 
 });
 
 test('pass con soli esterni: nessun interno da correggere, il lavoro passa', () => {
-  const r = decide([f(3, 'e', 'a'), f(2, 'e', 'b'), f(1, 'e', 'c', true)]);
+  const list = [f(3, 'e', 'a'), f(2, 'e', 'b'), f(1, 'e', 'c', true)];
+  const r = decide(list);
   assert.equal(r.stop, false);
   assert.deepEqual(r.fix, []);
   assert.deepEqual(r.derived, []);
   assert.equal(r.external.length, 3);
   assert.equal(r.consume, null);
-  assert.match(R.roundNote({ summary: 'ok', findings: [f(2, 'e', 'b')], decision: r }), /esterno[\s\S]*Nessun rilievo interno: il lavoro prosegue/);
+  assert.match(R.roundNote({ summary: 'ok', findings: list, decision: r }), /3 rilievi sono esterni[\s\S]*Nessun rilievo interno: il lavoro prosegue/);
 });
 
 test('un esterno col ? non ferma: diventa un derivato con la domanda dentro; un interno col ? di livello 2 ferma', () => {
