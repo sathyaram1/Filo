@@ -682,10 +682,9 @@ export function codaDalServer(testoServer) {
     '',
     'IN LOCALE, quattro differenze da quanto scritto qui sopra:',
     '- le prove del giro stanno nella cartella indicata più su, non in `tests/verifica/<numero>`;',
-    '- non c\'è `--segnala`: un trade-off vero si scrive nel report, con le strade e i loro costi, e lo porta',
-    '  all\'owner chi guida il giro;',
-    '- non c\'è nemmeno `--ferma`: un rilievo che chiede una decisione dell\'owner non si corregge a metà. Consegna',
-    '  il resto e scrivilo per primo nel report: il lavoro lo ferma chi guida il giro;',
+    '- non c\'è `--segnala`, quindi qui una segnalazione non ferma niente da sola: un trade-off vero si scrive',
+    '  PER PRIMO nel report, con le strade e i loro costi, e lo porta all\'owner chi guida il giro, che è lui a',
+    '  fermare il lavoro. Un rilievo che chiede una sua decisione non si corregge a metà: consegna il resto;',
     '- la consegna è `node scripts/verify-local.mjs corretto "<report della correzione>"`, e non c\'è un biglietto',
     '  da rilasciare. Dopo serve un\'altra verifica, di un\'altra istanza: la lancia chi guida.',
   ].join('\n');
