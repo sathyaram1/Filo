@@ -786,12 +786,17 @@ test('leggiBilanciDalServer: senza token, senza documento o senza uno dei quattr
   );
   const conCampi = (fields) => async () => ({ ok: true, status: 200, json: async () => ({ fields }) });
   await assert.rejects(
-    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap2: { integerValue: '10' }, cap0: { integerValue: '0' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap3: { integerValue: '5' }, cap2: { integerValue: '10' }, cap0: { integerValue: '0' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
     /non ha cap1: l'owner li imposta in Gestione → Automazioni/,
   );
   await assert.rejects(
-    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap2: { stringValue: '' }, cap1: { integerValue: '1' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap3: { integerValue: '5' }, cap2: { stringValue: '' }, cap1: { integerValue: '1' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
     /non ha cap2, cap0/,
+  );
+  await assert.rejects(
+    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap2: { integerValue: '10' }, cap1: { integerValue: '1' }, cap0: { integerValue: '0' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    /non ha cap3/,
+    'un documento di prima della separazione dei bilanci: manca il bilancio dei 3, e lo dice',
   );
   await assert.rejects(
     () => leggiBilanciDalServer({ fetchImpl: async () => ({ ok: false, status: 404, text: async () => '' }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
