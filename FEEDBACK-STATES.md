@@ -206,8 +206,8 @@ sdoppiare l'interruttore riaprirebbe da solo cinque porte che l'owner aveva chiu
 Un solo stato `design`, più origini, distinte da `statusReason`: (1) verdetto
 giudici (nessun reason o `judges`); (2) domande della routine (appende le domande
 alla chat + `statusReason: clarify`); (3) la verifica ha trovato un difetto di livello
-3/2 che non si può più correggere da soli — bilancio delle correzioni esaurito
-(`statusReason: loop`, con la critica coi livelli in chat) — oppure che chiede una
+3 che non si può più correggere da soli — bilancio delle correzioni dei 3 esaurito
+(`statusReason: loop`, con la critica coi livelli in chat) — oppure un 3/2 che chiede una
 decisione dell'owner (`statusReason: decisione`), oppure chi risolve o chi corregge ha
 consegnato con una segnalazione per l'owner (stesso `statusReason: decisione`); in
 tutti questi casi bilanci e verdetti del giro si azzerano — la storia delle critiche
