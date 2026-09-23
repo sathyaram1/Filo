@@ -1046,10 +1046,10 @@ export function verifierReplyText(reply) {
   const dueRiga = dueDaParte
     ? `Bilancio delle correzioni di livello 2 finito: ${dueDaParte === 1 ? 'il rilievo interno di livello 2 rimasto è uscito come feedback a parte' : `i ${dueDaParte} rilievi interni di livello 2 rimasti sono usciti come feedback a parte`}, a priorità 2 (elencati sopra). Il lavoro non si ferma.`
     : null;
-  // Le prove del giro dei rilievi interni messi da parte le marca chi
-  // corregge, col numero del loro feedback, nello stesso commit: la riga è
-  // pronta da copiare. Quelle degli esterni le ha già marcate il verificatore.
-  const daMarcare = derivati.filter((d) => !d.esterno);
+  // Un rilievo diventato un feedback suo non lascia una prova rossa nel ramo:
+  // il testo vive nel feedback, e la cartella del giro si svuota invece di
+  // crescere. Le righe sono pronte da spuntare, col numero di ciascuno.
+  const daTogliere = derivati.map((d) => `  · la prova che riproduce ${d.num || '(numero non comunicato)'}: ${d.frase}`).join('\n');
   if (r.outcome === 'fix' && r.phase2) {
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
@@ -1057,8 +1057,8 @@ export function verifierReplyText(reply) {
       fmt(r.phase2.findings),
       'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu):',
       derivatiRighe(derivati),
-      daMarcare.length ? 'Prove del giro da marcare attese rosse nello stesso commit della correzione, in testa al corpo della prova:' : null,
-      daMarcare.length ? daMarcare.map((d) => `  test.fail(true, '${d.num}: ${d.frase.replace(/'/g, '’')}');`).join('\n') : null,
+      derivati.length ? 'Prove del giro da TOGLIERE dal ramo, nello stesso commit della correzione:' : null,
+      derivati.length ? daTogliere : null,
       dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
       '',
