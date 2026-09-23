@@ -852,6 +852,10 @@
   document.addEventListener('DOMContentLoaded', () => {
     load();
 
+    // Quello che si sta ancora scrivendo è già una modifica, e vale per OGNI
+    // campo della pagina: iscritto campo per campo, prima o poi ne resta fuori uno.
+    $('page').addEventListener('input', () => persistDebounced.modificato());
+
     // Tema e dimensione testo: anteprima immediata + salvataggio.
     $('theme').addEventListener('change', () => {
       Bootstrap.applyTheme($('theme').value);
