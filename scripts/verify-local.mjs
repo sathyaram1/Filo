@@ -518,7 +518,7 @@ export const PROVE_GIRO = 'tests/verifica/';
 
 /** Il percorso sta fra le prove dei giri? PURA. */
 export function dentroProveGiro(percorso) {
-  const p = String(percorso ?? '').replace(/\/g, '/').replace(/^\.\//, '');
+  const p = String(percorso ?? '').replace(/\\/g, '/').replace(/^\.\//, '');
   return p.startsWith(PROVE_GIRO) && !p.split('/').includes('..');
 }
 
