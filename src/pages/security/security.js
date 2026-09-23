@@ -243,10 +243,7 @@
   async function saveFingerprint() {
     const partial = { security: { fingerprint: { mode: currentFpMode() } } };
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
-    const hint = $('savedHint');
-    hint.classList.add('sn-show');
-    clearTimeout(saveFingerprint._t);
-    saveFingerprint._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
+    mostraConferma();
   }
 
   // ─── gestione cookie ──────────────────────────────────────────────────────
