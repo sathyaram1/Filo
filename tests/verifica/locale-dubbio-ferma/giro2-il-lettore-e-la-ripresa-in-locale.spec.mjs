@@ -46,8 +46,10 @@ test('allo stop restano davanti a chi riprende anche i 2 correggibili; un estern
   expect(d.consume).toBeNull();
 });
 
-test('i confini dei bilanci: il 3 paga col 2, due 1 pagano un giro solo, il decimo 2 passa e l’undicesimo ferma', () => {
-  expect(decide('[3i] a', { count2: 10 }).stop).toBe(true);
+test('i confini dei bilanci: il 3 paga dal suo bilancio, due 1 pagano un giro solo, il decimo 2 passa e l’undicesimo esce a parte (un 3 in più ferma)', () => {
+  // Dal 2026-09-23 il 3 ha un bilancio suo: il bilancio dei 2 finito non lo tocca, il suo sì.
+  expect(decide('[3i] a', { count2: 10 }).stop).toBe(false);
+  expect(decide('[3i] a', { count3: 10 }).stop).toBe(true);
   const due = decide('[1i] a\n[1i] b');
   expect(due.fix.map((f) => f.text)).toEqual(['a', 'b']);
   expect(due.consume).toBe('cap1');
@@ -55,7 +57,9 @@ test('i confini dei bilanci: il 3 paga col 2, due 1 pagano un giro solo, il deci
   const nono = decide('[2i] a', { count2: 9 });
   expect(nono.stop).toBe(false);
   expect(nono.counts.count2).toBe(10);
-  expect(decide('[2i] b', nono.counts).stop).toBe(true);
+  const undicesimo = decide('[2i] b', nono.counts);
+  expect(undicesimo.stop).toBe(false);
+  expect(undicesimo.derived.map((f) => [sigla(f), f.priority])).toEqual([['2i', 2]]);
   // Un esterno col segno non ferma, nemmeno a bilanci esauriti.
   const est = decide('[2e?] a', { count2: 10 });
   expect(est.stop).toBe(false);
