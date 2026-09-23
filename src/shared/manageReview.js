@@ -1094,6 +1094,12 @@
 
   const L3_ATTESA = 'Claude aspetta una tua risposta: le domande sono nella conversazione.';
 
+  // I motivi di `design` dopo i quali la risposta dell'owner fa RIPARTIRE il
+  // lavoro da dov'era: le domande di chi risolve, una segnalazione o un rilievo
+  // che chiedono una sua scelta, un bilancio esaurito. La risposta va nella
+  // conversazione ed è quello che chi riprende riceve.
+  const MOTIVI_RISPOSTA = ['clarify', 'decisione', 'loop'];
+
   /**
    * Questa pratica aspetta una risposta dell'owner? PURA.
    *
@@ -1105,7 +1111,7 @@
     if (!fb || statusUnreadable(fb)) return false;
     const norm = normalizeStatus(fb);
     if (norm.status !== 'design') return false;
-    return norm.statusReason === 'clarify' || String(fb.status || '') === 'clarify';
+    return MOTIVI_RISPOSTA.includes(String(norm.statusReason || '')) || String(fb.status || '') === 'clarify';
   }
 
   /** L'ultimo turno di Filo nella conversazione, o null. PURA. */
