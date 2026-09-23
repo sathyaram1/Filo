@@ -1452,6 +1452,7 @@
     const finish = (save) => {
       if (done) return;
       done = true;
+      campoAlVolo.confermato();
       const val = input.value;
       if (docSwitchBtn) docSwitchBtn.style.display = '';
       input.remove();
