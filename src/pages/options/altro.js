@@ -133,15 +133,17 @@
     setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
-  let saveTimer = null;
-  function saveDebounced() {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(save, 400);
-  }
+  // Stessa regola della pagina sorella: la conferma non sopravvive a una
+  // modifica nuova, e quello che c'è nella casella parte prima di sparire.
+  const rimandato = window.SN_SALVA.crea({
+    salva: save,
+    spegniConferma: () => $('savedHint').classList.remove('sn-show'),
+  });
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
-    $('blocklist').addEventListener('change', saveDebounced);
+    $('blocklist').addEventListener('change', () => rimandato.programma());
+    $('blocklist').addEventListener('input', () => rimandato.modificato());
     // #252 — indirizzo canonico filo://<page>/<file> (non la forma legacy
     // filo://src/pages/…): un solo URL per pagina, e la scheda già aperta viene
     // riportata a fuoco invece di duplicarla.
