@@ -166,17 +166,18 @@ test('fusione partita da sola e ancora in corso: la richiesta ferma non si rilan
 
   const approva = page.locator('#mgSideBody .sn-mac-btn-go');
   await expect(approva).toBeVisible();
+  await page.screenshot({ path: 'tests/.shots/preapprovazione-tardiva-giro3-in-corso.png' });
+
+  // Mentre ci prova lo deve dire: una richiesta ferma che non racconta niente
+  // è una richiesta su cui l'owner rifà il lavoro che il server sta già facendo.
+  await expect.soft(page.locator('#mgSideBody .sn-mac-status')).toBeVisible();
+
   if (await approva.isEnabled()) {
     await approva.click();
     await approva.click();
   }
   await page.waitForTimeout(1200);
-  await page.screenshot({ path: 'tests/.shots/preapprovazione-tardiva-giro3-in-corso.png' });
   expect(await approvazioni(page)).toEqual([req.id]);
-
-  // E mentre ci prova lo deve dire: una richiesta ferma che non racconta
-  // niente è una richiesta su cui l'owner rifà il lavoro del server.
-  await expect(page.locator('#mgSideBody .sn-mac-status')).toBeVisible();
 });
 
 
