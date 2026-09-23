@@ -46,14 +46,14 @@
   const MAX_FINDING_TEXT = 12000;
 
   /**
-   * A quale bilancio appartiene un livello. I livelli 3 e 2 condividono lo
-   * stesso bilancio (x): entrambi sono "la cosa chiesta non si ottiene", e la
-   * differenza fra loro conta per la priorità, non per quante correzioni si
-   * pagano. PURA.
+   * A quale bilancio appartiene un livello: uno per livello. Fino al
+   * 2026-09-23 il 3 pagava dal bilancio del 2; separarli è ciò che permette
+   * al 2 di non fermare il lavoro a bilancio finito (decideRound). PURA.
    */
   function capKeyOf(level) {
     const n = Number(level);
-    if (n >= 2) return 'cap2';
+    if (n >= 3) return 'cap3';
+    if (n === 2) return 'cap2';
     if (n === 1) return 'cap1';
     return 'cap0';
   }
