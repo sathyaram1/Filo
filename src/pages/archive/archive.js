@@ -613,6 +613,7 @@
       if (e.key === 'Enter') { e.preventDefault(); salva(); }
       else if (e.key === 'Escape') { e.preventDefault(); ripristina(); }
     });
+    input.addEventListener('input', () => campoAlVolo.scrivendo(salva));
     input.addEventListener('blur', () => salva());
     // Un clic dentro il campo non deve riaprire la chat.
     input.addEventListener('click', (e) => e.stopPropagation());
