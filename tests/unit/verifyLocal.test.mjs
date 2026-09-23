@@ -956,6 +956,7 @@ test('giro stretto dopo un riallineamento a main: il diff della chiusura resta l
 test('la coda locale dice che fermare il lavoro da lì non si può, e cosa fare al suo posto', async () => {
   const { codaDalServer } = await import('../../scripts/verify-local.mjs');
   const t = codaDalServer('FASE 2 — adesso correggi tu.');
-  assert.match(t, /non c'è nemmeno `--ferma`/);
-  assert.match(t, /per primo nel report/);
+  assert.match(t, /non c'è `--segnala`, quindi qui una segnalazione non ferma niente da sola/);
+  assert.match(t, /PER PRIMO nel report/);
+  assert.match(t, /fermare il lavoro/);
 });
