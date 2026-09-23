@@ -1134,6 +1134,12 @@
   // avviso e l'altro — una scheda aperta deve poter ridisegnare il suo quadrato
   // senza rileggere niente.
   let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
+  // Una richiesta si manda a fondere per il segno UNA volta per pagina: un
+  // rifiuto o un conflitto non si ritentano da soli a ogni rilettura.
+  const fusioniTentate = new Set();
+  // L'esito di quel tentativo, per richiesta: il riquadro in basso e la riga
+  // del dettaglio sono un posto solo, e chi arriva dopo cancella chi c'era.
+  const esitiTentati = new Map();
 
   // Dal numero della segnalazione (l'etichetta "automazione · feedback #N"
   // sulla scheda) al feedback vero: la scheda sta già dentro la dashboard dei
@@ -1160,10 +1166,82 @@
     const UI = window.SN_MERGE_APPROVALS;
     return Object.assign({
       onDone: () => { setTimeout(loadMergeApprovals, 1200); },
+      esitoIniziale: (req) => esitiTentati.get(req.id) || null,
       onApprove: (req) => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }),
       onDiscard: (req) => sendToMain({ type: MERGE_APPROVAL_DISCARD, id: req.id }),
       onFeedback: (req) => openFeedbackByNum(UI ? UI.feedbackNum(req) : ''),
     }, extra || {});
+  }
+
+  // Il segno «fondi senza chiedermelo» messo DOPO il blocco: il server la
+  // richiesta l'ha già aperta e non la riguarda, quindi la fonde questa pagina,
+  // con lo stesso gesto e lo stesso esito del tasto «Approva e fondi».
+  async function fondiCoperte(fb, opts) {
+    const UI = window.SN_MERGE_APPROVALS;
+    if (!UI || !fb || !isAdmin) return [];
+    const daFondere = UI.richiesteCoperte(fusioni.pending, {
+      feedbackId: fb._id,
+      numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
+      ancheNuovi: !!(opts && opts.ancheNuovi),
+    }).filter((req) => !fusioniTentate.has(req.id));
+    if (daFondere.length && opts && typeof opts.avvia === 'function') opts.avvia(daFondere.length);
+    const esiti = [];
+    for (const req of daFondere) {
+      fusioniTentate.add(req.id);
+      let reply;
+      try { reply = await sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }); }
+      catch (e) { reply = { ok: false, error: e?.message || String(e) }; }
+      const msg = UI.outcomeMessage(reply, req);
+      esitiTentati.set(req.id, msg);
+      esiti.push({ req, msg });
+    }
+    if (esiti.length) setTimeout(loadMergeApprovals, 1200);
+    return esiti;
+  }
+
+  // Il segno rimesso a mano è una decisione nuova, non una rilettura: quello che
+  // non era riuscito si ritenta. Senza, dopo un server irraggiungibile il ramo
+  // restava fermo e la pagina rispondeva lo stesso «da ora si fonde senza chiedere».
+  function dimenticaTentativi(fb) {
+    const UI = window.SN_MERGE_APPROVALS;
+    if (!UI || !fb) return;
+    for (const req of UI.richiesteCoperte(fusioni.pending, {
+      feedbackId: fb._id,
+      numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
+      ancheNuovi: true,
+    })) { fusioniTentate.delete(req.id); esitiTentati.delete(req.id); }
+  }
+
+  // Le richieste ferme sulle pratiche già segnate si fondono appena la pagina
+  // vede le due cose insieme: segno e richiesta arrivano da due letture
+  // diverse, in un ordine qualunque.
+  let fusioniInCorso = false;
+  async function fondiPreapprovateInAttesa() {
+    if (fusioniInCorso || !isAdmin || !dataLoaded) return;
+    fusioniInCorso = true;
+    const righe = [];
+    try {
+      for (const fb of allFeedbacks.slice()) {
+        if (!preapprovedOf(fb) || !isOpenPublic(fb)) continue;
+        for (const { req, msg } of await fondiCoperte(fb)) {
+          const num = window.SN_MERGE_APPROVALS.feedbackNum(req);
+          const dove = num ? ` su #${num}` : '';
+          righe.push({ testo: `Fusione ferma${dove}, pratica segnata «fondi senza chiedermelo»: ${msg.text}`, kind: msg.kind });
+        }
+      }
+    } finally {
+      fusioniInCorso = false;
+    }
+    if (!righe.length) return;
+    // Gli esiti del giro si dicono TUTTI INSIEME: il riquadro è uno solo, e uno
+    // alla volta il secondo cancella il primo prima che si possa leggere.
+    // Questa parte da sola, di solito senza nessuna pratica aperta: la riga del
+    // dettaglio lì non è sullo schermo, e un ramo fermo resterebbe fermo senza
+    // che nessuno sappia perché.
+    const testo = righe.map((r) => r.testo).join('\n');
+    const kind = righe.every((r) => r.kind === 'ok') ? 'ok' : 'err';
+    setManageMsg(testo, kind);
+    toast(testo, kind, 4500 + (righe.length - 1) * 2500);
   }
 
   // Le richieste ferme che NON hanno una scheda in questa lista. Finché i
@@ -1222,10 +1300,14 @@
       // resta finché non si rilegge.
       preapproved: Array.isArray(r.preapproved) ? r.preapproved : (fusioni.preapproved || []),
     };
+    // Una richiesta che non c'è più non ha un esito da raccontare.
+    const vive = new Set(fusioni.pending.concat(fusioni.failed).map((req) => req.id));
+    for (const id of Array.from(esitiTentati.keys())) if (!vive.has(id)) esitiTentati.delete(id);
     const n = renderFusioniOrfane();
     // Il quadrato della scheda aperta e il bordo delle card in lista vengono da
     // questi elenchi: una richiesta nuova deve vedersi subito, senza riaprire.
     riflettiFusioni();
+    fondiPreapprovateInAttesa();
     UI.renderRecent(mgMergeApprovalsRecent, { recent: r.recent || [] });
     // Le fuse senza chiedere: il controllo a posteriori del segno messo sulla
     // pratica. Quando il main avvisa di un cambiamento manda solo l'elenco in
@@ -2567,10 +2649,26 @@
       if (selectedId !== id) { renderList(); return; }
       reflectPreapproved(fb);
       renderList();
-      setManageMsg(next ? 'Da ora si fonde senza chiedere.' : 'Da ora ti chiede prima di fondere.', 'ok');
-    } catch (e) {
+      let testo = next ? 'Da ora si fonde senza chiedere.' : 'Da ora ti chiede prima di fondere.';
+      let kind = 'ok';
+      if (next) {
+        // Il segno messo con una richiesta già ferma davanti: si fonde adesso,
+        // anche quella aperta per i soli blocchi nuovi, che l'owner ha sotto gli occhi.
+        const avvia = () => setManageMsg(testo + ' Chiedo al server di fondere la richiesta ferma…', '');
+        dimenticaTentativi(fb);
+        for (const { msg } of await fondiCoperte(fb, { ancheNuovi: true, avvia })) {
+          testo += ` Fusione ferma su questa pratica: ${msg.text}`;
+          if (msg.kind !== 'ok') kind = 'err';
+        }
+      }
       if (selectedId !== id) return;
-      setManageMsg(e.message || 'Errore', 'err');
+      setManageMsg(testo, kind);
+    } catch (e) {
+      // Un rifiuto va detto anche se intanto hai aperto un'altra pratica: il
+      // segno che credevi messo non c'è, e senza questa riga nessuno lo sa.
+      const altrove = selectedId !== id && FB && typeof FB.formatNum === 'function';
+      const dove = altrove ? ` (#${FB.formatNum(fb.seq, fb.subSeq)})` : '';
+      setManageMsg(`Segno non messo${dove}: ${e.message || 'Errore'}`, 'err');
     } finally {
       mgPreapproveBtn.disabled = false;
     }
@@ -3478,7 +3576,7 @@
   // Toast discreto in basso a destra: l'esito di un'azione deve arrivare anche
   // se nel frattempo l'owner ha chiuso il pannello o cambiato scheda.
   let mgToastTimer = null;
-  function toast(text, kind) {
+  function toast(text, kind, ms) {
     let el = document.getElementById('mgToast');
     if (!el) {
       el = document.createElement('div');
@@ -3492,8 +3590,9 @@
     void el.offsetWidth;
     el.classList.add('show');
     clearTimeout(mgToastTimer);
-    // Le frasi degli esiti sono lunghe: quattro secondi e mezzo per leggerle.
-    mgToastTimer = setTimeout(() => el.classList.remove('show'), 4500);
+    // Le frasi degli esiti sono lunghe: quattro secondi e mezzo per leggerle,
+    // di più quando chi chiama ne mette insieme più d'una.
+    mgToastTimer = setTimeout(() => el.classList.remove('show'), Math.max(4500, Number(ms) || 0));
   }
 
   // ── Il pannello di un livello ─────────────────────────────────────────────
@@ -3830,6 +3929,7 @@
       allFeedbacks = fresh;
       dataLoaded = true;
       loadFailed = false;
+      fondiPreapprovateInAttesa();
     } catch (err) {
       if (testDataInjected) return;
       // Il guasto va RICORDATO, non solo scritto una volta: il primo click su
@@ -3982,6 +4082,11 @@
       }
       allFeedbacks = LIVE.applyChanges(allFeedbacks, { fresh, removed });
       reindexByClient();
+      // Il segno «fondi senza chiedermelo» può arrivare da fuori — dallo script
+      // dell'owner o da un'altra finestra — e allora la richiesta ferma è la
+      // stessa di prima: nessuno avvisa, e senza questo giro il ramo resta fermo
+      // finché la pagina non viene riaperta.
+      fondiPreapprovateInAttesa();
       rerenderAfterLive(new Set(ids));
       return { changed: ids.length + removed.length };
     })().finally(() => { liveTick = null; liveLastAt = Date.now(); });

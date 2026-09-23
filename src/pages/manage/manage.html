@@ -350,7 +350,7 @@
     }
 
     .mg-list { display: flex; flex-direction: column; gap: 4px; }
-    /* Una riga sola: #N · titolo con ellissi. Il motivo resta implicito nel colore del border-left. */
+    /* #N · titolo con ellissi. Il motivo resta implicito nel colore del border-left. */
     .mg-item {
       display: flex; flex-direction: row; align-items: baseline; gap: 6px;
       padding: 8px 10px; border-radius: 6px; cursor: pointer;
@@ -359,6 +359,9 @@
       background: transparent;
       transition: background 0.1s;
     }
+    /* Le etichette vanno a capo invece di uscire dalla scheda: «fusione ferma» e «senza chiedere»
+       insieme non ci stanno, e tagliate a metà parola non dicono più niente. */
+    .mg-item:not(.mg-item--staged) { flex-wrap: wrap; }
     .mg-item:hover { background: var(--sn-hover); }
     .mg-item--selected { background: var(--sn-hover); }
     /* "Non filtrato": il colore del bordo è bianco. Per renderlo leggibile su
@@ -401,9 +404,10 @@
     /* Icona d'autore (chi ha scritto il feedback): owner/utente/Claude/Filo. */
     .mg-item-author { flex: 0 0 auto; font-size: 13px; line-height: 1; align-self: center; }
     .mg-item-num { font-size: 11px; color: var(--sn-muted); font-weight: 600; flex: 0 0 auto; }
+    /* Base zero: col titolo che non chiede spazio suo, a mandare a capo sono le etichette, non lui. */
     .mg-item-title {
       font-size: 13px; line-height: 1.4;
-      flex: 1 1 auto; min-width: 0;
+      flex: 1 1 0; min-width: 0;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     /* Aperta/Chiusa è l'unica cosa che si sa di una segnalazione il cui stato fine è cifrato: stesse parole e
@@ -435,8 +439,8 @@
        (implementazione, controllo funzionalità, controllo sicurezza, più l'istanza attiva o in attesa). */
     .mg-item--staged { flex-direction: column; align-items: stretch; gap: 4px; }
     .mg-item--staged .mg-item-row {
-      display: flex; flex-direction: row; align-items: baseline; gap: 6px;
-      min-width: 0;
+      display: flex; flex-direction: row; align-items: baseline; gap: 6px 6px;
+      min-width: 0; flex-wrap: wrap; width: 100%;
     }
     .mg-item--active-work { border-left-color: var(--sn-accent) !important; }
     .mg-item-state {
@@ -702,6 +706,8 @@
       border-left: 3px solid var(--sn-accent); border-radius: 10px;
       box-shadow: var(--sn-shadow); padding: 12px 14px; font-size: 13px;
       line-height: 1.45; color: var(--sn-fg); opacity: 0; transform: translateY(8px);
+      /* Più esiti in un avviso solo: ognuno sulla sua riga. */
+      white-space: pre-line;
       transition: opacity 0.18s ease, transform 0.18s ease;
       pointer-events: none; z-index: 2147483001;
     }
@@ -721,7 +727,7 @@
       color: var(--sn-fg);
     }
     .mg-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .mg-action-msg { font-size: 12px; color: var(--sn-muted); }
+    .mg-action-msg { font-size: 12px; color: var(--sn-muted); white-space: pre-line; }
 
     /* Un contenitore solo per i tre gruppi di tasti, che però restano DIVISI: ognuno compare e sparisce per conto
        suo (le azioni di stato spariscono su una segnalazione illeggibile, il preferito no). */
