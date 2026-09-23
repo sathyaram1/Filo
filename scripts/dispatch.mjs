@@ -887,7 +887,7 @@ function sealTransition(state, by) {
 /**
  * La critica del verificatore, registrata sul server (feedback #561).
  *
- * Il testo si legge col formato dei livelli (`[2] …`, una riga per rilievo,
+ * Il testo si legge col formato dei livelli (`[2i] …`, una riga per rilievo,
  * `[1?]` = chiede una decisione dell'owner; le righe prima del primo rilievo
  * sono il riassunto). Al server arrivano i rilievi STRUTTURATI, il riassunto,
  * la critica intera e il commit su cui è stata fatta la prova: il pass vale
@@ -1383,7 +1383,7 @@ export function usageText() {
     '  (nessun argomento)     giro locale, senza server (sceglie il bucket qui)',
     '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
     '  --record-verifier <id> "<critica>" [--segnala <file.md>] [--ticket <b>]   una riga per rilievo,',
-    '                         col livello davanti ([2] …; [1?] = chiede una decisione);',
+    '                         con livello e sede davanti ([2i] …, [2e] …; [1i?] = chiede una decisione);',
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
@@ -1821,7 +1821,7 @@ if (isMainModule) {
       const seg = stripFileArg(conBiglietto(argv), 'segnala');
       if (seg.error) { console.error(seg.error); process.exit(1); }
       const [, id, ...rest] = seg.args;
-      if (!id) { console.error('Uso: --record-verifier <id> "<critica: una riga per rilievo, col livello davanti: [2] …>"'); process.exit(1); }
+      if (!id) { console.error('Uso: --record-verifier <id> "<critica: una riga per rilievo, con livello e sede davanti: [2i] …>"'); process.exit(1); }
       // La parola del vecchio verdetto (pass|migliorabile|fail) NON si tollera
       // più: veniva buttata via in silenzio, e senza rilievi la verifica
       // risulta superata — chi scriveva `fail` per bocciare registrava una
@@ -1831,7 +1831,7 @@ if (isMainModule) {
       if (rest.length && LEGACY_VERDICT_WORDS.includes(rest[0])) {
         console.error(`«${rest[0]}» non è più un verdetto: non ho registrato niente.`);
         console.error('L\'esito non lo scegli tu, lo calcolano i livelli dei rilievi: senza rilievi la verifica risulta SUPERATA, quindi questa riga registrerebbe una promozione.');
-        console.error('Togli quella parola e scrivi i rilievi, uno per riga, col livello davanti: «[2] il pulsante Salva non salva col titolo vuoto», coi passi per rifarlo.');
+        console.error('Togli quella parola e scrivi i rilievi, uno per riga, con livello e sede davanti: «[2i] il pulsante Salva non salva col titolo vuoto», coi passi per rifarlo.');
         process.exit(1);
       }
       // Qui la critica è UN testo, e non ci sono opzioni: una parola con due

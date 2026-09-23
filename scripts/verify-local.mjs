@@ -29,7 +29,7 @@
 //     si rilancia senza argomenti: riusa la richiesta registrata.
 //
 //   node scripts/verify-local.mjs critica "<una riga per rilievo, col livello davanti>"
-//     Lo lancia l'istanza che ha verificato. Formato: `[2] testo`, `[1?]` =
+//     Lo lancia l'istanza che ha verificato. Formato: `[2i] testo`, `[2e]` = esterno, `[1i?]` =
 //     chiede una decisione dell'owner; le righe prima del primo rilievo sono
 //     il riassunto. Nessun rilievo = verifica superata. Stampa l'esito.
 //     Le quadre col livello dentro sono SEMPRE un rilievo, dovunque stiano
@@ -1009,7 +1009,7 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     'funziona. Nessun rilievo = verifica superata.',
     'LE QUADRE COL LIVELLO DENTRO SONO SEMPRE UN RILIEVO, dovunque stiano nella riga:',
     'nel riassunto E NEI PASSI un livello si cita a parole («il livello 2»), mai',
-    '«[2]», o la riga viene respinta. Il testo va in UN pezzo solo, fra virgolette.',
+    '«[2i]», o la riga viene respinta. Il testo va in UN pezzo solo, fra virgolette.',
     '  node scripts/verify-local.mjs critica "funziona X e Y.',
     '  [2] il pulsante non salva se il titolo è vuoto: passi …',
     '  [0] con la finestra sotto i 300 pixel il menu esce dallo schermo"',
@@ -1177,7 +1177,7 @@ if (isMain) {
     console.error('Si registra sempre una critica, e il motivo si scrive in tutti e due i casi:');
     console.error('  node scripts/verify-local.mjs critica "<cosa hai provato e cosa funziona>"');
     console.error('Nessun rilievo = verifica superata. Per bocciare, una riga col livello davanti:');
-    console.error('  «[2] il pulsante Salva non salva col titolo vuoto» (e i passi per rifarlo).');
+    console.error('  «[2i] il pulsante Salva non salva col titolo vuoto» (e i passi per rifarlo).');
     process.exit(1);
   }
 
