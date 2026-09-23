@@ -11,7 +11,7 @@ require('../../../src/shared/feedbackTransitions.js');
 require('../../../src/shared/verifierRound.js');
 const V = globalThis.SN_VERIFIER_ROUND;
 
-const CAPS = { cap2: 10, cap1: 1, cap0: 0 };
+const CAPS = { cap3: 10, cap2: 10, cap1: 1, cap0: 0 };
 const F = (s) => V.parseFindings(s).findings;
 const decide = (s, counts = {}) => V.decideRound({ findings: F(s), caps: CAPS, counts });
 const sigla = (f) => `${f.level}${f.sede}${f.decision ? '?' : ''}`;
