@@ -34,10 +34,13 @@ Se è l'ultimo caso, dillo nella critica.
    cancelletto). Il percorso va scritto relativo alla radice del repo e con le
    barre normali: in ogni altra forma la risposta è «No tests found» anche a
    cartella piena. Al primo giro la cartella non c'è: controlla con
-   `ls tests/verifica`, non dal messaggio. Una porta di un giro passato che si
-   riapre è un rilievo di livello 2, interno; le porte già chiuse si
-   ri-provano, non si riscoprono come nuove. Una prova marcata come rosso
-   atteso di un rilievo esterno resta rossa: non è un rilievo.
+   `ls tests/verifica`, non dal messaggio. **È l'unica corsa di quella cartella
+   in tutto il giro, e tocca a te**: dopo di te chi corregge lancia solo le
+   prove dei rilievi che sta correggendo, e la chiusura non la rilancia. Quindi
+   qui, adesso, in partenza. Una porta di un giro passato che si riapre è un
+   rilievo di livello 2, interno; le porte già chiuse si ri-provano, non si
+   riscoprono come nuove. Una prova già segnata come rosso atteso resta rossa:
+   non è un rilievo.
 4. **Applica i criteri qui sotto**, uno per uno. Ciò che non li regge è un
    rilievo. Un miglioramento con trade-off si scrive col segno `?` dopo la
    sede (`[1i?] …`). Non apri feedback: i rilievi che restano aperti li
