@@ -79,48 +79,60 @@ function commit(repo, msg) {
   git(repo, 'commit', '-q', '-m', msg);
 }
 
+/** Repo con le prove, verifica superata sul commit delle prove. */
+async function conPass(s) {
+  const repo = repoConProve();
+  const r = await lancia(repo, s.url, 'critica', 'Provato il lavoro dal lato di chi lo usa, con dati vuoti e lunghissimi: funziona, nessun rilievo.');
+  expect(r.status, r.stderr).toBe(0);
+  expect(r.stdout).toMatch(/verifica superata/);
+  return repo;
+}
+
 test.describe('prove del giro tolte dopo il verdetto — il pass regge, la chiusura non rifà gli spec', () => {
   test.setTimeout(120_000);
 
-  test('file tolto, poi caso tolto: il pass regge e la chiusura salta gli spec; una riga aggiunta lo fa decadere', async () => {
-    const repo = repoConProve();
+  test('un file intero tolto: il pass regge, e la chiusura salta gli spec delle aree (--check no)', async () => {
     const s = await serverFinto();
     try {
-      let r = await lancia(repo, s.url, 'critica', 'Provato il lavoro dal lato di chi lo usa, con dati vuoti e lunghissimi: funziona, nessun rilievo.');
-      expect(r.status, r.stderr).toBe(0);
-      expect(r.stdout).toMatch(/verifica superata/);
-
-      // Il file intero di un rilievo diventato feedback suo.
-      git(repo, 'rm', '-q', join(CARTELLA, 'giro1-b.spec.mjs').replace(/\\/g, '/'));
+      const repo = await conPass(s);
+      git(repo, 'rm', '-q', `${CARTELLA}/giro1-b.spec.mjs`);
       commit(repo, 'tolta la prova del rilievo esterno');
-      r = await lancia(repo, s.url, 'status');
+      const r = await lancia(repo, s.url, 'status');
       expect(r.status, r.stdout + r.stderr).toBe(0);
-      let v = verdictForCurrentBranch(repo);
+      const v = verdictForCurrentBranch(repo);
       expect(v.ok).toBe(true);
-      let spec = specDaRilanciare({ checkOnly: false, ok: v.ok, sha: v.entry && v.entry.sha, tollerato: v.tollerato });
-      expect(spec.rilancia).toBe(false);
-      // `--check` rifà sempre tutto.
+      expect(specDaRilanciare({ checkOnly: false, ok: v.ok, sha: v.entry && v.entry.sha, tollerato: v.tollerato }).rilancia).toBe(false);
       expect(specDaRilanciare({ checkOnly: true, ok: v.ok, sha: v.entry && v.entry.sha, tollerato: v.tollerato }).rilancia).toBe(true);
+    } finally { await s.chiudi(); }
+  });
 
-      // Un caso tolto da una prova che copre anche altro.
+  test('un caso tolto da una prova che ne ha altri: il pass regge (come nel cancello di fusione del server)', async () => {
+    const s = await serverFinto();
+    try {
+      const repo = await conPass(s);
       const p = join(repo, CARTELLA, 'giro1-a.spec.mjs');
       writeFileSync(p, readFileSync(p, 'utf8').split("test('il secondo caso")[0]);
       commit(repo, 'tolto il caso messo da parte');
-      r = await lancia(repo, s.url, 'status');
+      const r = await lancia(repo, s.url, 'status');
       expect(r.status, r.stdout + r.stderr).toBe(0);
-      v = verdictForCurrentBranch(repo);
-      expect(v.ok).toBe(true);
+      expect(verdictForCurrentBranch(repo).ok).toBe(true);
+    } finally { await s.chiudi(); }
+  });
 
-      // Una riga aggiunta nella stessa cartella: qualcosa da far girare che nessuno ha visto.
-      writeFileSync(p, readFileSync(p, 'utf8').replace('expect(1 + 1).toBe(2);', 'expect(1 + 1).toBe(2);\n  expect(3).toBe(3);'));
+  test('una riga aggiunta nella cartella delle prove fa decadere il pass, e la chiusura rifà gli spec', async () => {
+    const s = await serverFinto();
+    try {
+      const repo = await conPass(s);
+      const p = join(repo, CARTELLA, 'giro1-a.spec.mjs');
+      writeFileSync(p, readFileSync(p, 'utf8').replace('expect(1 + 1).toBe(2);', 'expect(1 + 1).toBe(2);
+  expect(3).toBe(3);'));
       commit(repo, 'aggiunta una riga');
-      r = await lancia(repo, s.url, 'status');
+      const r = await lancia(repo, s.url, 'status');
       expect(r.status).toBe(1);
       expect(r.stdout + r.stderr).toMatch(/cambiato dopo la verifica/);
-      v = verdictForCurrentBranch(repo);
+      const v = verdictForCurrentBranch(repo);
       expect(v.ok).toBe(false);
-      spec = specDaRilanciare({ checkOnly: false, ok: v.ok, sha: v.entry && v.entry.sha, tollerato: v.tollerato });
-      expect(spec.rilancia).toBe(true);
+      expect(specDaRilanciare({ checkOnly: false, ok: v.ok, sha: v.entry && v.entry.sha, tollerato: v.tollerato }).rilancia).toBe(true);
     } finally { await s.chiudi(); }
   });
 });
