@@ -38,7 +38,7 @@ function richiesta(over = {}) {
 }
 
 /** Il canale verso il main: proprietario; scritture e approvazioni registrate. */
-async function stubMain(page, { pending = [], approveReply = null, updateReply = null } = {}) {
+async function stubMain(page, { pending = [], approveReply = null, updateReply = null, tieniInAttesa = false } = {}) {
   await page.evaluate((cfg) => {
     window.__updates = [];
     window.__approvals = [];
