@@ -145,14 +145,16 @@ test('sentinella: i nomi dei bilanci sono gli stessi nella regola, nelle tabelle
   assert.ok(blocco, 'CAP_FIELDS in manage.js');
   const chiavi = [...blocco[1].matchAll(/^\s*(cap\d):/gm)].map((m) => m[1]);
   assert.deepEqual(chiavi, R.CAP_KEYS, 'i campi guidati da CAP_FIELDS, nello stesso ordine');
-  // Il blocco da non-owner (e a routine spente) è l'unica lista scritta a mano
-  // fuori da CAP_FIELDS: un campo nuovo che ci manca resta scrivibile a chiunque.
+  // Due liste scritte a mano fuori da CAP_FIELDS: il blocco da non-owner (un
+  // campo che ci manca resta scrivibile a chiunque) e la spenta a routine
+  // spente (un blocco che ci manca resta acceso mentre gli altri si spengono).
   const gate = /function applyAutoModeGate\(\) \{([\s\S]*?)\n  \}/.exec(js);
   assert.ok(gate, 'applyAutoModeGate in manage.js');
   for (const k of R.CAP_KEYS) {
     const K = k.replace('cap', 'Cap');
     assert.match(gate[1], new RegExp(`\\bmg${K}\\b`), `mg${K} manca dal blocco da non-owner`);
     assert.match(gate[1], new RegExp(`\\bmg${K}Save\\b`), `mg${K}Save manca dal blocco da non-owner`);
+    assert.match(js, new RegExp(`'mg${K}Block'`), `mg${K}Block manca dalla lista dei blocchi spenti a routine spente`);
   }
 });
 
