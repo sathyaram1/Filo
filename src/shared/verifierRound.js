@@ -489,10 +489,12 @@
    *
    * @param {object} p { findings, caps:{cap2,cap1,cap0}, counts:{count2,count1,count0} }
    * @returns {{
-   *   stop: boolean, blocking: object[], fix: object[], derived: object[], external: object[],
+   *   stop: boolean, blocking: object[], sospesi: object[], fix: object[], derived: object[], external: object[],
    *   consume: 'cap2'|'cap1'|'cap0'|null, counts: object,
    *   budgets: { cap2:{cap,used,left}, cap1:…, cap0:… }
    * }}
+   *   `sospesi` (solo allo stop): gli altri interni della stessa critica, che
+   *   restano davanti a chi riprende dopo la risposta dell'owner.
    */
   function decideRound(p) {
     const tutti = normalizeFindings(p && p.findings);
