@@ -26,6 +26,7 @@
       ],
       fixes: [
         'Nelle Opzioni, se scegli un modello dalla tendina la velocità misurata prima non resta più attaccata al modello nuovo: la riga torna a dire che non è ancora stata provata.',
+        'Quello che scrivi non si perde più se chiudi la scheda o spegni Filo subito dopo, nemmeno col cursore ancora dentro la casella: vale per le Preferenze, le Opzioni con la sua pagina «Altro» e per il testo dell\'Editor. E dove compare «Salvato», la scritta si spegne appena scrivi qualcos\'altro, così non dice di aver messo al sicuro una cosa che sta ancora aspettando.',
         'Tradurre una pagina non paga più le sezioni chiuse. Filo traduce quello che vedi, e quando apri un pannello o un «leggi tutto» il tasto destro ti offre di tradurre anche quello. Prima dipendeva da come il sito aveva chiuso la sezione, e su certi siti pagavi la traduzione di roba che non avresti mai aperto.',
         'A schermo intero ogni riquadro aperto sopra la pagina costa il suo Esc, anche quando ne hai quattro o più uno sull\'altro, e lo schermo intero resta finché non li hai chiusi tutti. Prima dal quarto in poi il tasto ti buttava fuori e lasciava aperto quello in cima.',
         'Su Mac e su Linux la modalità terminale usa davvero la shell scelta nelle Preferenze. Prima chi sceglieva Bash otteneva comunque la shell di sistema.',
