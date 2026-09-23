@@ -423,9 +423,13 @@ CANCELLA: il testo del rilievo viaggia nel feedback, e una prova rossa lasciata
 indietro è un rosso da rispiegare a ogni giro. Si cancella anche quella di un
 rilievo corretto, nello stesso commit in cui si scrive la prova durevole che lo
 tiene chiuso (se prova durevole non ce n'è, la prova del giro resta). Restano le
-prove dei rilievi che hanno fermato il lavoro: le tratta chi riprende. Per una
-prova che copre anche un caso ancora aperto c'è il ripiego del rosso atteso
-(`test.fail(true, '<motivo>')` in testa al corpo), non la strada normale. La
+prove dei rilievi che hanno fermato il lavoro: le tratta chi riprende. Una prova
+che copre anche un caso ancora aperto non si cancella: le si toglie il caso che
+se ne va. Nel commit di una correzione c'è anche il ripiego del rosso atteso
+(`test.fail(true, '<motivo>')` in testa al corpo); **dopo un verdetto invece si
+può solo TOGLIERE** — una riga aggiunta lì fa decadere il verdetto e costa un
+giro intero, e i due cancelli (la chiusura in locale, il cancello di fusione del
+server) lo controllano. La
 suite completa non le raccoglie (quelle di un solo feedback costano otto
 minuti e mezzo); `FILO_TEST_VERIFICA=1` le include tutte. In quella cartella ci
 vanno **davvero**, e in una che porta il numero: una prova di giro lasciata
