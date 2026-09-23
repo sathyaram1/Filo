@@ -45,6 +45,7 @@ const {
   fixedPayload,
   fermaSenzaSegnalazione,
   fixedReplyText,
+  FERMA_NOTE,
   verifierScope,
   perimetroNote,
   serverCtx,
