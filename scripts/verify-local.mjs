@@ -708,12 +708,23 @@ export function derivatiText(list) {
   return list.map((f) => `${ROUND.formatFinding(f)}\n  → feedback a parte, priorità ${Number.isFinite(Number(f.priority)) ? Number(f.priority) : Number(f.level) || 0}${f.sede === 'e' ? ' (esterno: non tocca a questo lavoro)' : ' (interno, messo da parte)'}`).join('\n');
 }
 
+/** I bilanci residui in una riga («cap3: 4 giri residui su 5 · …»), vuota senza bilanci. PURA. */
+export function bilanciResiduiText(budgets) {
+  if (!budgets || typeof budgets !== 'object') return '';
+  return CAP_KEYS.map((k) => (budgets[k] ? `${k}: ${budgets[k].left} giri residui su ${budgets[k].cap}` : null)).filter(Boolean).join(' · ');
+}
+
+/** La riga che dice dei 2 interni messi da parte (bilancio dei 2 finito), o vuota. PURA. */
+export function dueDaParteText(list) {
+  const n = (Array.isArray(list) ? list : []).filter((f) => f && Number(f.level) === 2 && f.sede !== 'e').length;
+  if (!n) return '';
+  return `Bilancio delle correzioni di livello 2 finito: ${n === 1 ? 'il rilievo interno di livello 2 rimasto esce come feedback a parte' : `i ${n} rilievi interni di livello 2 rimasti escono come feedback a parte`}, a priorità 2. Il lavoro non si ferma.`;
+}
+
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
 export function codaText({ findings, derived, external, budgets, branch, instructions }) {
   const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
-  const b = budgets && typeof budgets === 'object'
-    ? ['cap2', 'cap1', 'cap0'].map((k) => (budgets[k] ? `${k}: ${budgets[k].left} giri residui su ${budgets[k].cap}` : null)).filter(Boolean).join(' · ')
-    : '';
+  const b = bilanciResiduiText(budgets);
   // La coda non sta qui: arriva da quel file. Se manca, si dice dove doveva
   // essere e come si consegna, e basta.
   const testo = String(instructions || '').trim() || [
