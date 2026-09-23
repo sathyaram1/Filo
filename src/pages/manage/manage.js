@@ -3169,6 +3169,11 @@
   if (mgUserNoteText) {
     mgUserNoteText.addEventListener('input', () => { userNoteToccata = true; programmaSalvataggioFrase(); });
     mgUserNoteText.addEventListener('blur', () => { salvaFraseAutomatico(); });
+    // Chiudere la scheda o spegnere Filo non passa dal blur: senza queste due,
+    // la pausa di scrittura in corso butta via la frase appena scritta.
+    for (const uscita of ['pagehide', 'beforeunload']) {
+      window.addEventListener(uscita, () => { salvaFraseAutomatico(); });
+    }
     mgUserNoteText.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); salvaFraseAMano(); }
     });
