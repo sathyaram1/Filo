@@ -1080,8 +1080,9 @@ test('l’esito di un comando lento resta nella chat in cui il comando è stato 
   await dash.locator('#input').press('Enter');
   await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 30_000 });
 
-  // Un comando che ci mette qualche secondo, e l'utente se ne va prima.
-  await dash.locator('#input').fill('/sleep 4; echo "ESIT""O-TARDIVO"');
+  // Un comando che ci mette qualche secondo, e l'utente se ne va prima. Il
+  // marcatore non porta virgolette: PowerShell e sh le raddoppiano diversamente.
+  await dash.locator('#input').fill('/sleep 4; echo ESITO-TARDIVO');
   await dash.locator('#input').press('Enter');
   await dash.waitForTimeout(700);
   await dash.locator('#input').fill('/home');
