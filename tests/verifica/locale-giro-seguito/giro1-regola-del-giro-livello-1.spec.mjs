@@ -71,20 +71,21 @@ function provaRegola(nome, ROUND) {
     });
 
     test('lo stesso a cap1 già consumato (cap1 = 1, un giro già speso)', () => {
-      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[2] non salva\n[1] bordo freddo'), caps: { cap2: 10, cap1: 1, cap0: 0 }, counts: { count1: 1 } });
+      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[2i] non salva\n[1i] bordo freddo'), caps: CAPS(10, 1, 0), counts: { count1: 1 } });
       expect(d.fix.map((f) => f.level)).toEqual([2, 1]);
       expect(d.consume).toBe('cap2');
       expect(d.counts.count1).toBe(1);
     });
 
-    test('un 3 con un 1: entrano tutti e due, e il conto va al bilancio del 3 (che è cap2)', () => {
-      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[3] si scrive nelle chiavi SSH\n[1] bordo freddo'), caps: { cap2: 10, cap1: 0, cap0: 0 }, counts: {} });
+    test('un 3 con un 1: entrano tutti e due, e il conto va al bilancio del 3 (cap3, non più quello del 2)', () => {
+      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[3i] si scrive nelle chiavi SSH\n[1i] bordo freddo'), caps: CAPS(10, 0, 0), counts: {} });
       expect(d.fix.map((f) => f.level)).toEqual([3, 1]);
-      expect(d.consume).toBe('cap2');
+      expect(d.consume).toBe('cap3');
+      expect(d.counts.count2).toBe(0);
     });
 
     test('un 1 da solo a cap1 = 0 va nel derivato e non paga niente', () => {
-      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[1] bordo freddo'), caps: { cap2: 10, cap1: 0, cap0: 0 }, counts: {} });
+      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[1i] bordo freddo'), caps: CAPS(10, 0, 0), counts: {} });
       expect(d.stop).toBe(false);
       expect(d.fix).toEqual([]);
       expect(d.derived.map((f) => f.level)).toEqual([1]);
@@ -92,7 +93,7 @@ function provaRegola(nome, ROUND) {
     });
 
     test('un 1 da solo a cap1 = 1 entra nel giro e il conto va a cap1, come prima', () => {
-      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[1] bordo freddo'), caps: { cap2: 10, cap1: 1, cap0: 0 }, counts: {} });
+      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[1i] bordo freddo'), caps: CAPS(10, 1, 0), counts: {} });
       expect(d.fix.map((f) => f.level)).toEqual([1]);
       expect(d.consume).toBe('cap1');
       expect(d.counts.count1).toBe(1);
@@ -100,46 +101,53 @@ function provaRegola(nome, ROUND) {
     });
 
     test('un 1 con la domanda resta derivato anche accanto a un 2 che entra nel giro', () => {
-      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[2] non salva\n[1?] bordo freddo: caldo come il resto?'), caps: { cap2: 10, cap1: 5, cap0: 0 }, counts: {} });
+      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[2i] non salva\n[1i?] bordo freddo: caldo come il resto?'), caps: CAPS(10, 5, 0), counts: {} });
       expect(d.stop).toBe(false);
       expect(d.fix.map((f) => f.level)).toEqual([2]);
       expect(d.derived.map((f) => f.level)).toEqual([1]);
       expect(d.derived[0].decision).toBeTruthy();
     });
 
-    test('a cap2 finito il 2 ferma il lavoro e l\'1 non entra da solo per la strada del 2', () => {
-      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[2] non salva\n[1] bordo freddo'), caps: { cap2: 1, cap1: 0, cap0: 0 }, counts: { count2: 1 } });
-      expect(d.stop).toBe(true);
-      expect(d.blocking.map((f) => f.level)).toEqual([2]);
+    test('a cap2 finito il 2 esce a parte a priorità 2 senza fermare, e l\'1 non entra per la strada del 2; a cap3 finito il 3 ferma', () => {
+      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[2i] non salva\n[1i] bordo freddo'), caps: CAPS(1, 0, 0), counts: { count2: 1 } });
+      expect(d.stop).toBe(false);
+      expect(d.blocking).toEqual([]);
       expect(d.fix).toEqual([]);
+      expect(d.derived.map((f) => [f.level, f.priority])).toEqual([[2, 2], [1, 1]]);
       expect(d.consume).toBe(null);
+      const tre = ROUND.decideRound({ findings: rilievi(ROUND, '[3i] perde i dati\n[1i] bordo freddo'), caps: CAPS(10, 0, 0, 1), counts: { count3: 1 } });
+      expect(tre.stop).toBe(true);
+      expect(tre.blocking.map((f) => f.level)).toEqual([3]);
+      expect(tre.fix).toEqual([]);
+      expect(tre.consume).toBe(null);
     });
 
     test('un 2 con la domanda ferma il lavoro: nemmeno l\'1 entra nel giro', () => {
-      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[2?] scelta di prodotto\n[1] bordo freddo'), caps: { cap2: 10, cap1: 5, cap0: 0 }, counts: {} });
+      const d = ROUND.decideRound({ findings: rilievi(ROUND, '[2i?] scelta di prodotto\n[1i] bordo freddo'), caps: CAPS(10, 5, 0), counts: {} });
       expect(d.stop).toBe(true);
       expect(d.fix).toEqual([]);
     });
 
     test('con un 2 si correggono anche 1 e 0, sempre da cap2; un 0 da solo resta derivato', () => {
-      let d = ROUND.decideRound({ findings: rilievi(ROUND, '[2] non salva\n[1] bordo\n[0] finestra sotto i 300 px'), caps: { cap2: 10, cap1: 0, cap0: 0 }, counts: {} });
+      let d = ROUND.decideRound({ findings: rilievi(ROUND, '[2i] non salva\n[1i] bordo\n[0i] finestra sotto i 300 px'), caps: CAPS(10, 0, 0), counts: {} });
       expect(d.fix.map((f) => f.level)).toEqual([2, 1, 0]);
       expect(d.consume).toBe('cap2');
-      d = ROUND.decideRound({ findings: rilievi(ROUND, '[0] finestra sotto i 300 px'), caps: { cap2: 10, cap1: 1, cap0: 0 }, counts: {} });
+      d = ROUND.decideRound({ findings: rilievi(ROUND, '[0i] finestra sotto i 300 px'), caps: CAPS(10, 1, 0), counts: {} });
       expect(d.fix).toEqual([]);
       expect(d.derived.map((f) => f.level)).toEqual([0]);
     });
 
-    test('senza uno dei tre bilanci lancia, non inventa un numero', () => {
-      expect(() => ROUND.decideRound({ findings: rilievi(ROUND, '[1] bordo'), caps: { cap2: 10, cap0: 0 }, counts: {} })).toThrow(/mancanti: cap1/);
-      expect(() => ROUND.decideRound({ findings: [], caps: {}, counts: {} })).toThrow(/cap2, cap1, cap0/);
-      expect(ROUND.missingCaps({ cap2: 0, cap1: 0, cap0: 0 })).toEqual([]);
-      expect(ROUND.missingCaps({ cap2: true, cap1: '', cap0: 'x' })).toEqual(['cap2', 'cap1', 'cap0']);
+    test('senza uno dei quattro bilanci lancia, non inventa un numero', () => {
+      expect(() => ROUND.decideRound({ findings: rilievi(ROUND, '[1i] bordo'), caps: { cap3: 10, cap2: 10, cap0: 0 }, counts: {} })).toThrow(/mancanti: cap1/);
+      expect(() => ROUND.decideRound({ findings: rilievi(ROUND, '[1i] bordo'), caps: { cap2: 10, cap1: 0, cap0: 0 }, counts: {} })).toThrow(/mancanti: cap3/);
+      expect(() => ROUND.decideRound({ findings: [], caps: {}, counts: {} })).toThrow(/cap3, cap2, cap1, cap0/);
+      expect(ROUND.missingCaps({ cap3: 0, cap2: 0, cap1: 0, cap0: 0 })).toEqual([]);
+      expect(ROUND.missingCaps({ cap3: null, cap2: true, cap1: '', cap0: 'x' })).toEqual(['cap3', 'cap2', 'cap1', 'cap0']);
     });
   });
 }
 
-provaRegola('regola del giro — copia pubblica', caricaPubblico());
+provaRegola('regola del giro — copia pubblica', PUBBLICO);
 
 if (COPIA_SERVER) {
   provaRegola('regola del giro — copia incorporata nel server (stessa risposta)', require(COPIA_SERVER));
