@@ -77,9 +77,13 @@ il rombo e il pentagono della fila delle forme).
 - `working` —routine→ `revision_capability`; —arenato (ramo fermo da un'ora)→ `todo`;
   —arenato per la 3ª volta consecutiva→ `design` (`statusReason: arenato`, nota
   in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
-- `revision_capability` —routine, critica del verificatore senza rilievi da correggere→
-  `revision_security` (i rilievi rimasti, se ci sono, diventano UN feedback derivato
-  figlio `#N.k`, aperto dal server); —critica con rilievi da correggere→ resta
+- `revision_capability` —routine, critica del verificatore senza rilievi INTERNI da
+  correggere→ `revision_security` (dal 2026-09-23 ogni rilievo porta livello e sede,
+  `[2i]`/`[2e]`: contano solo gli interni; ogni rilievo che il lavoro non corregge —
+  esterno, o interno messo da parte dal bilancio — diventa SUBITO un feedback derivato
+  suo, figlio `#N.k`, con priorità uguale al livello e `priorityManual` perché il
+  giudice non la riabbassi, aperto dal server in ogni esito); —critica con rilievi
+  interni da correggere→ resta
   `revision_capability`: chi corregge consegna `fixed`
   (`revision_capability → revision_capability`), poi un altro verificatore riprova
   (feedback #561, dal 2026-09-05); —rilievo di livello 3/2 non correggibile (bilancio
