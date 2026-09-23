@@ -8,9 +8,7 @@ prima: non rifarla.
 Sei già sul ramo del lavoro: non cambiarlo. Una critica emessa da un'altra
 versione del codice viene rifiutata.
 
-`payload.decisioni`, se c'è, sono le risposte dell'owner alle domande fatte su
-questo feedback, ognuna con la sua domanda: valgono come specifica insieme alla
-segnalazione. Una scelta che ha già fatto lui non è un rilievo.
+<!-- includi: _decisioni-owner.md -->
 
 <!-- includi: _cornice-feedback.md -->
 
