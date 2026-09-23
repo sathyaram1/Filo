@@ -42,7 +42,11 @@
       return true;
     }
 
-    const api = { modificato, programma, subito, inAttesa: () => timer != null || sporco };
+    // Un controllo che non si scrive (interruttore, menu) salva senza pausa, ma
+    // passa di qui perché conferma e uscite restino una regola sola.
+    function adesso() { modificato(); return subito(); }
+
+    const api = { modificato, programma, subito, adesso, inAttesa: () => timer != null || sporco };
     inAscolto.push(api);
     return api;
   }
