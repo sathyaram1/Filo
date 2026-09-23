@@ -195,10 +195,19 @@ giudici (nessun reason o `judges`); (2) domande della routine (appende le domand
 alla chat + `statusReason: clarify`); (3) la verifica ha trovato un difetto di livello
 3/2 che non si può più correggere da soli — bilancio delle correzioni esaurito
 (`statusReason: loop`, con la critica coi livelli in chat) — oppure che chiede una
-decisione dell'owner (`statusReason: decisione`); in entrambi i casi bilanci e
-verdetti del giro si azzerano — la storia delle critiche resta, per il
-verificatore del lavoro rifatto — così dopo la decisione dell'owner il lavoro
-rifatto riparte da un verificatore invece di rimbalzare a `design`; (4) fix bocciato
+decisione dell'owner (`statusReason: decisione`), oppure chi risolve o chi corregge ha
+consegnato con una segnalazione per l'owner (stesso `statusReason: decisione`); in
+tutti questi casi bilanci e verdetti del giro si azzerano — la storia delle critiche
+resta — e il server lascia un **segnalibro di ripresa** nello stato del giro (chi si
+è fermato, perché, i rilievi rimasti aperti). Nei casi `clarify`, `decisione` e
+`loop` la dashboard offre la casella di risposta: la risposta dell'owner va nella
+conversazione, il feedback torna `todo`, e la coda — vedendo ramo e segnalibro — manda
+un **correttore sul ramo** (ruolo `fixer`, testo `resolver-ripresa.md`) con domanda,
+risposta e rilievi fermi nel payload (`ripresa`), non un risolutore da capo; dopo la
+sua consegna riprova un verificatore. Se la domanda era arrivata prima di avere un
+ramo, riprende un risolutore con la stessa `ripresa` nel payload. Un `→ In coda`
+senza testo vale «va bene quello che è stato fatto nel frattempo»; un commento
+scritto approvando conta come risposta solo se è arrivato dopo lo stop; (4) fix bocciato
 dal **controllo di sicurezza** (`statusReason: secaudit`, con `livelli.l4.esito:
 fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
 server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
