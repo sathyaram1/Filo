@@ -589,12 +589,18 @@
     const d = decision || {};
     const parts = [`Verifica: ${list.length} ${list.length === 1 ? 'rilievo' : 'rilievi'}.`];
     if (s) parts.push(s);
+    const esterni = Array.isArray(d.external) ? d.external.length : 0;
+    if (esterni) {
+      parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non tocca a questo lavoro): diventa' : `${esterni} rilievi sono esterni (non toccano a questo lavoro): diventano`} feedback a parte, con priorità uguale al livello.`);
+    }
     if (d.stop) {
-      parts.push('Il lavoro si ferma: c\'è un rilievo di livello 2 o 3 che non si può correggere da soli (bilancio esaurito, o chiede una tua decisione).');
+      parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 2 o 3 che non si può correggere da soli (bilancio esaurito, o chiede una tua decisione).');
     } else if (Array.isArray(d.fix) && d.fix.length) {
       parts.push(`La correzione riguarda ${d.fix.length === list.length ? 'tutti i rilievi' : `${d.fix.length} su ${list.length}`}; poi un'altra verifica ricontrolla.`);
     } else {
-      parts.push('Nessun rilievo da correggere adesso: il lavoro prosegue e i rilievi vanno in un feedback derivato.');
+      parts.push(esterni === list.length
+        ? 'Nessun rilievo interno: il lavoro prosegue.'
+        : 'Nessun rilievo interno da correggere adesso: il lavoro prosegue e i rilievi messi da parte vanno in feedback derivati.');
     }
     parts.push(formatFindings(list));
     return parts.join('\n');
