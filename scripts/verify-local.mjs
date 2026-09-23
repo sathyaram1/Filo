@@ -752,18 +752,16 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
     'chiedila a chi guida. In ogni caso si correggono SOLO i rilievi dell\'elenco qui sopra, e si consegna con',
     '  node scripts/verify-local.mjs corretto "<report della correzione>"',
   ].join('\n');
-  // Le prove del giro le rilancia CHI CORREGGE, prima di consegnare: è la metà
-  // che rende utile tenerle nel ramo. In cloud sta nelle istruzioni del ruolo;
-  // qui la coda arriva da un file fuori dal repo, che non le nomina — quindi la
-  // riga la mette lo strumento, che è la parte che vive nel repo.
+  // Quali prove del giro si lanciano, e quali si tolgono, lo dice lo strumento:
+  // in cloud sta nelle istruzioni del ruolo, ma qui la coda arriva da un file
+  // fuori dal repo, che non le nomina — e la parte che vive nel repo è questa.
   const cartella = cartellaProveGiro(branch);
   const righe = [
     '══ ESITO: c\'è da correggere ══',
     `Ramo: ${branch}.`,
     'Rilievi da correggere in questo giro (con la loro famiglia: le altre porte della stessa causa):',
     fmt(findings),
-    'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner, e le loro prove del giro',
-    'si marcano attese rosse nello stesso commit della correzione, `test.fail(true, \'messo da parte: <prima frase>\')`):',
+    'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner):',
     derivatiText(derived),
     'Rilievi esterni (non toccano a questo lavoro: ciascuno diventa un feedback suo, lo apre chi guida dal report):',
     derivatiText(external),
