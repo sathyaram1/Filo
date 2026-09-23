@@ -5,7 +5,6 @@
 import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
 import { buildVerifierBrief } from '../../../scripts/verify-local.mjs';
-import { verifierReplyText, fixedReplyText } from '../../../scripts/dispatch.mjs';
 
 const require = createRequire(import.meta.url);
 require('../../../src/shared/feedbackTransitions.js');
