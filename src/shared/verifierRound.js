@@ -479,15 +479,22 @@
    *     mancanti: …`): un numero inventato al posto di quello dell'owner è
    *     peggio di un errore (decisione del 2026-09-16).
    *
+   * Contano SOLO i rilievi interni (sede `i`). Gli esterni non entrano in
+   * nessuna delle regole sopra: tornano a parte in `external`, ciascuno con
+   * `priority` uguale al livello, in ogni esito (anche a lavoro fermo: sono
+   * di un altro lavoro, ed escono in un feedback loro). Un esterno col `?`
+   * non ferma niente: la domanda viaggia nel suo feedback. Anche i rilievi
+   * interni messi da parte (`derived`) portano `priority` = livello.
+   *
    * @param {object} p { findings, caps:{cap2,cap1,cap0}, counts:{count2,count1,count0} }
    * @returns {{
-   *   stop: boolean, blocking: object[], fix: object[], derived: object[],
+   *   stop: boolean, blocking: object[], fix: object[], derived: object[], external: object[],
    *   consume: 'cap2'|'cap1'|'cap0'|null, counts: object,
    *   budgets: { cap2:{cap,used,left}, cap1:…, cap0:… }
    * }}
    */
   function decideRound(p) {
-    const findings = normalizeFindings(p && p.findings);
+    const tutti = normalizeFindings(p && p.findings);
     const mancanti = missingCaps(p && p.caps, p && p.defaults);
     if (mancanti.length) {
       throw new Error(`bilanci del verificatore mancanti: ${mancanti.join(', ')} — li imposta l'owner in Gestione → Automazioni (config/routines); nel codice non c'è un default`);
@@ -495,7 +502,10 @@
     const caps = normalizeCaps(p && p.caps, p && p.defaults);
     const counts = normalizeCounts(p && p.counts);
     const left = (k) => caps[k] - counts[k.replace('cap', 'count')];
+    const conPriorita = (f) => Object.assign({}, f, { priority: f.level });
 
+    const findings = tutti.filter((f) => f.sede !== 'e');
+    const external = tutti.filter((f) => f.sede === 'e').map(conPriorita);
     const blocking = [];
     const fixable = [];
     const derived = [];
