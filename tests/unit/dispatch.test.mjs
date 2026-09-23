@@ -112,6 +112,22 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
   assert.ok(fix.indexOf('FERMA il lavoro') > fix.indexOf('FASE 2 — correggi'), 'dopo le istruzioni, non al loro posto');
   assert.match(verifierReplyText({ outcome: 'pass', derived: { num: '#42.1' } }), /#42\.1/);
   assert.match(verifierReplyText({ outcome: 'stop', blocking: [{ level: 3, text: 'grave' }] }), /si ferma[\s\S]*\[3i\] grave/);
+
+  // Un rilievo diventato un feedback suo non lascia una prova rossa nel ramo: la
+  // prova si TOGLIE, e la risposta dice quali per numero (regola del
+  // 23/09/2026). Chi le toglie cambia con l'esito: chi corregge se c'è una fase
+  // 2, chi ha verificato se il lavoro passa.
+  assert.match(fix, /Prove del giro da TOGLIERE dal ramo, nello stesso commit della correzione/);
+  assert.doesNotMatch(fix, /test\.fail\(true/, 'il marcatore non è più la strada principale');
+  const passConFigli = verifierReplyText({
+    outcome: 'pass',
+    derived: [{ level: 2, sede: 'e', text: 'la pagina non si apre. Passi: aprila.', priority: 2, num: '#42.3' }],
+  });
+  assert.match(passConFigli, /Prove del giro da TOGLIERE adesso/);
+  assert.match(passConFigli, /#42\.3/);
+  assert.match(passConFigli, /non fa decadere il verdetto/, 'o restano rosse per paura di perdere il pass');
+  // Senza figli non si stampa un elenco vuoto.
+  assert.doesNotMatch(verifierReplyText({ outcome: 'pass', derived: [] }), /TOGLIERE/);
   // Un «ok» senza esito non è un pass: dirlo superato mandava a rilasciare il
   // biglietto anche con un rilievo di livello 2 nella critica (verifica del
   // giro 3 sul lavoro di lancio delle routine).
