@@ -661,7 +661,7 @@
   async function saveCap(field) {
     const f = CAP_FIELDS[field];
     if (!f.input) return;
-    // Un campo vuoto non è uno zero (per i difetti gravi lo 0 ferma il lavoro
+    // Un campo vuoto non è uno zero (per il livello 3 lo 0 ferma il lavoro
     // al primo rilievo) e non è nemmeno «torno al default»: un default non
     // c'è più (2026-09-16). Vuoto = non si salva, e la scritta lo dice.
     const val = clampCap(f.input.value, f.min);
