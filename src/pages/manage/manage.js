@@ -1209,7 +1209,7 @@
       feedbackId: fb._id,
       numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
       ancheNuovi: true,
-    })) fusioniTentate.delete(req.id);
+    })) { fusioniTentate.delete(req.id); esitiTentati.delete(req.id); }
   }
 
   // Le richieste ferme sulle pratiche già segnate si fondono appena la pagina
