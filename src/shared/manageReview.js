@@ -498,7 +498,7 @@
     l5: 'fermo al cancello di fusione',
     clarify: 'domande per te',
     loop: 'difetto non più correggibile da soli',
-    decisione: 'la verifica chiede una tua decisione',
+    decisione: 'fermo: aspetta una tua scelta',
     arenato: 'lavorazione arenata',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
