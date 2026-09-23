@@ -227,3 +227,43 @@ test('una fusione partita da sola che non riesce si legge anche senza pratica ap
   await expect(toast).toBeVisible();
   await expect(toast).toContainText('riprova');
 });
+
+test('due fusioni partite da sole nello stesso giro: si leggono tutte e due', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const segno = { by: 'owner@esempio', at: '2026-09-20T09:00:00.000Z' };
+  const uno = pratica({ mergePreapproved: segno });
+  const due = pratica({ _id: 'fb-tardiva-2', seq: 582, name: 'Il terminale non ricorda la cartella', mergePreapproved: segno });
+  const reqDue = richiesta({ id: 'bb22cc33dd44bb22cc33dd44', num: '#582', feedbackId: 'fb-tardiva-2', branch: 'worker/fb-tardiva-2' });
+  await apri(page, [uno, due], {
+    pending: [richiesta(), reqDue],
+    approveReply: { ok: false, error: 'github_502 unreachable' },
+    tieniInAttesa: true,
+  });
+  await expect.poll(() => approvazioni(page).then((a) => a.length), { timeout: 8000 }).toBe(2);
+
+  // Il riquadro è uno solo: se gli esiti arrivano uno alla volta, il secondo
+  // cancella il primo e quel ramo resta fermo senza che nessuno sappia perché.
+  const toast = page.locator('#mgToast');
+  await expect(toast).toBeVisible();
+  await expect(toast).toContainText('Fusione ferma su #581');
+  await expect(toast).toContainText('Fusione ferma su #582');
+});
+
+test('un tentativo non riuscito resta scritto sulla fusione ferma, dopo che l’avviso è passato', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ mergePreapproved: { by: 'owner@esempio', at: '2026-09-20T09:00:00.000Z' } });
+  await apri(page, [fb], {
+    pending: [richiesta()],
+    approveReply: { ok: false, error: 'github_502 unreachable' },
+    tieniInAttesa: true,
+  });
+  await expect.poll(() => approvazioni(page).then((a) => a.length), { timeout: 8000 }).toBe(1);
+
+  // L'owner arriva sulla pratica dopo: il perché dev'essere ancora lì, perché
+  // quel ramo non riparte da solo.
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+  await page.evaluate((doc) => window.__mgTest.openSidebarLivello(doc, 'l5'), fb);
+  const stato = page.locator('.sn-mac-card .sn-mac-status').first();
+  await expect(stato).toBeVisible();
+  await expect(stato).toContainText('riprova');
+});
