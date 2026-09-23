@@ -616,8 +616,11 @@
     if (esterni) {
       parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non tocca a questo lavoro): diventa' : `${esterni} rilievi sono esterni (non toccano a questo lavoro): diventano`} feedback a parte, con priorità uguale al livello.`);
     }
+    // I 2 interni messi da parte: il bilancio dei 2 è finito, e a differenza
+    // dei 3 non fermano il lavoro; escono come feedback a priorità 2.
+    const dueDaParte = Array.isArray(d.derived) ? d.derived.filter((f) => f && Number(f.level) === 2 && f.sede !== 'e').length : 0;
     if (d.stop) {
-      parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 2 o 3 che non si può correggere da soli (bilancio esaurito, o chiede una tua decisione).');
+      parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 3 che non si può correggere da soli (bilancio esaurito), o un rilievo interno di livello 3 o 2 che chiede una tua decisione.');
       const sospesi = Array.isArray(d.sospesi) ? d.sospesi.length : 0;
       if (sospesi) parts.push(`${sospesi === 1 ? 'Un altro rilievo interno resta' : `Altri ${sospesi} rilievi interni restano`} davanti a chi riprende dopo la tua risposta.`);
     } else if (Array.isArray(d.fix) && d.fix.length) {
@@ -626,6 +629,9 @@
       parts.push(esterni === list.length
         ? 'Nessun rilievo interno: il lavoro prosegue.'
         : 'Nessun rilievo interno da correggere adesso: il lavoro prosegue e i rilievi messi da parte vanno in feedback derivati.');
+    }
+    if (dueDaParte) {
+      parts.push(`Il bilancio delle correzioni di livello 2 è finito: ${dueDaParte === 1 ? 'il rilievo interno di livello 2 rimasto esce come feedback a parte' : `i ${dueDaParte} rilievi interni di livello 2 rimasti escono come feedback a parte`}, a priorità 2.`);
     }
     parts.push(formatFindings(list));
     return parts.join('\n');
