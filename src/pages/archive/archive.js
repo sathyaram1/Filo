@@ -601,6 +601,7 @@
       // niente da leggere. Vale come rinuncia.
       if (!nuovo || nuovo === (c.title || '')) { ripristina(); return; }
       chiuso = true;
+      campoAlVolo.confermato();
       try { await chrome.runtime.sendMessage({ type: MSG.FILO_CHAT_UPDATE, id: c.id, title: nuovo }); } catch (_) {}
       c.title = nuovo;
       titleEl.textContent = nuovo;
