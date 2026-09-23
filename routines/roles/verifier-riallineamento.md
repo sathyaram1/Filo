@@ -9,6 +9,10 @@ verificato: non rifarlo.
 Sei già sul ramo del lavoro: non cambiarlo. Una critica emessa da un'altra
 versione del codice viene rifiutata.
 
+`payload.decisioni`, se c'è, sono le risposte dell'owner alle domande fatte su
+questo feedback, ognuna con la sua domanda: fanno parte dell'intenzione del
+lavoro, e una scelta che ha già fatto lui non è un rilievo.
+
 <!-- includi: _cornice-feedback.md -->
 
 ## Il perimetro
