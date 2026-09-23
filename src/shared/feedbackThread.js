@@ -433,8 +433,21 @@
   //     duplicati;
   //   - altrimenti → APPENDI il report come nuovo turno dell'agente, conservando
   //     report precedente + annotazione di riapertura dell'utente.
+  // Un report di un agente non può aprire un turno: una riga che imita un
+  // confine («--- La tua risposta del … ---») diventerebbe una decisione
+  // dell'owner. Resta leggibile, citata con «> » davanti (come fa il server).
+  const CONFINE_GENERICO_RE = /^---\s.*\sdel\s.*---\s*$/;
+  const CONFINE_PROPRIETARIO_RE = /^---\s*(?:Risposta|Aggiornamento) (?:dell'utente|dell’utente|del proprietario) del .*---\s*$/;
+  function neutralizzaConfini(report) {
+    return String(report || '').split('\n').map((l) => {
+      const t = l.replace(/\r$/, '');
+      const confine = USER_TURN_RE.test(t) || MODEL_TURN_RE.test(t) || CONFINE_GENERICO_RE.test(t) || CONFINE_PROPRIETARIO_RE.test(t);
+      return confine ? `> ${l}` : l;
+    }).join('\n');
+  }
+
   function mergeModelReport(existingNotes, incomingReport, opts) {
-    const incoming = String(incomingReport || '').trim();
+    const incoming = neutralizzaConfini(String(incomingReport || '').trim());
     const existing = String(existingNotes || '');
     if (!incoming) return existing;
     if (!existing.trim()) return incoming;
