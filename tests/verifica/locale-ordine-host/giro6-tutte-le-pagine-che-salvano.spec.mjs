@@ -92,10 +92,14 @@ async function scriviBlocklist(page, testo) {
   }, testo);
 }
 
+// Scritto col cursore ancora dentro la casella: è il gesto vero, e non dipende
+// da quanto ci mette la scheda a sparire.
 test('Altro: i domini esclusi appena scritti non si perdono chiudendo la scheda', async ({ app, shell, openTab }) => {
-  test.fail(true, 'rilievo aperto del sesto giro: questa pagina non salva prima di sparire');
+  test.fail(true, 'rilievo aperto del sesto giro: questa pagina salva solo quando il cursore lascia la casella');
   const page = await openTab(ALTRO);
-  await scriviBlocklist(page, 'esempio-escluso.test');
+  await page.waitForSelector('#blocklist', { timeout: 15_000 });
+  await page.click('#blocklist');
+  await page.keyboard.type('esempio-escluso.test');
 
   await chiudiScheda(shell, 'options/altro.html');
 
