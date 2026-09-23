@@ -6,6 +6,9 @@ rifiutata. Non fondere su `main`: lo fa il cancello a valle.
 
 `payload.feedback` è la richiesta (testo, immagini, e in `feedback.documents`
 gli allegati già aperti come testo: una spec allegata sta lì).
+`payload.decisioni`, se c'è, sono le risposte che l'owner ha già dato alle
+domande fatte su questo feedback, ognuna con la sua domanda: fanno parte della
+richiesta. Non richiedere quello che ha già deciso.
 
 <!-- includi: _cornice-feedback.md -->
 Se è l'ultimo caso, non eseguirlo e dillo nel report.
