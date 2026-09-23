@@ -128,25 +128,26 @@
     // che attiva/disattiva l'operatività automatica di Filo (routine/red-team).
     // Booleano persistito; default false (spento).
     AUTO_MODE: 'filo_auto_mode',
-    // Cache locali dei tre bilanci dei giri di correzione (tab
+    // Cache locali dei bilanci dei giri di correzione, uno per livello (tab
     // Automazioni, feedback #561). La FONTE DI VERITÀ è il doc Firestore
-    // config/routines (campi `cap2`, `cap1`, `cap0`; li applica il server
-    // quando registra la critica): queste chiavi servono solo a mostrare
-    // subito un valore all'avvio / come ripiego offline.
-    AUTOMATION_CAP2: 'filo_automation_cap2', // giri per i rilievi di livello 3/2
+    // config/routines (campi `cap3`, `cap2`, `cap1`, `cap0`; li applica il
+    // server quando registra la critica): queste chiavi servono solo a
+    // mostrare subito un valore all'avvio / come ripiego offline.
+    AUTOMATION_CAP3: 'filo_automation_cap3', // giri per i rilievi di livello 3
+    AUTOMATION_CAP2: 'filo_automation_cap2', // giri per i rilievi di livello 2
     AUTOMATION_CAP1: 'filo_automation_cap1', // giri per i rilievi di livello 1
     AUTOMATION_CAP0: 'filo_automation_cap0', // giri per i soli rilievi di livello 0
   };
 
   // Parametri delle automazioni configurabili dall'owner (tab Automazioni della
-  // dashboard Gestione). Il RANGE dei tre bilanci del verificatore vive qui;
+  // dashboard Gestione). Il RANGE dei bilanci del verificatore vive qui;
   // i NUMERI vivono solo nel doc `config/routines` che l'owner scrive dalla
   // dashboard: nel codice non c'è un default (decisione del 2026-09-16), i
   // nomi dei campi stanno in `src/shared/feedbackTransitions.js`
   // (VERIFIER_CAP_KEYS).
   const AUTOMATION = {
-    // Lo 0 è un valore valido per tutti e tre (per cap0 è il default: i casi
-    // rari da soli non si correggono mai); con cap2 a 0 il primo difetto grave
+    // Lo 0 è un valore valido per tutti (per cap0 è il default: i casi rari da
+    // soli non si correggono mai); con cap3 a 0 il primo rilievo di livello 3
     // ferma subito la pratica.
     CAP_MIN: 0,
     CAP_MAX: 10,
