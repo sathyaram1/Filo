@@ -519,14 +519,16 @@ export function cartellaProveGiro(branch) {
 //
 // LA REGOLA: il verdetto regge su un commit successivo se quello che GIRA non
 // cresce e non cambia, e se quello che è cambiato sta tutto nelle prove del
-// giro. Quindi si tollerano due mosse sole, e solo lì dentro: togliere un file
-// intero, e i marcatori di rosso atteso (il ripiego, per una prova che non si
-// può cancellare senza perdere un caso ancora aperto). Non si leggono le righe
-// del diff una per una: si riducono i due contenuti a ciò che fa girare — via
-// commenti, righe vuote e marcatori — e si confrontano. Una prova AGGIUNTA no:
-// lì qualcosa da girare c'è, e nessuno l'ha vista. Il resto del cancello non si
-// muove: una prova del giro rossa, né cancellata né segnata, ferma la chiusura
-// come prima.
+// giro. Quello che i testi mandano a fare dopo un verdetto è una mossa sola —
+// TOGLIERE, un file intero o un caso da un file — perché è la sola che regge
+// anche sul cancello di fusione del server. I marcatori di rosso atteso restano
+// tollerati da quando la regola era quella: qui non si stringe per non far
+// decadere un verdetto su un ramo scritto ieri. Non si leggono le righe del diff
+// una per una: si riducono i due contenuti a ciò che fa girare — via commenti,
+// righe vuote e marcatori — e si confrontano. Una prova AGGIUNTA no: lì
+// qualcosa da girare c'è, e nessuno l'ha vista. Il resto del cancello non si
+// muove: una prova del giro rossa che nessuno ha toccato ferma la chiusura come
+// prima.
 
 /** Dove vivono le prove dei giri di verifica: l'unica cartella tollerata. */
 export const PROVE_GIRO = 'tests/verifica/';
