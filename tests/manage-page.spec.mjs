@@ -703,7 +703,7 @@ async function stubCaps(page, initial = { cap3: 5, cap2: 5, cap1: 2, cap0: 0, fi
           window.__capsSets.push({ giroStretto: msg.giroStretto });
         }
         const clamp =(n) => Math.min(10, Math.max(0, Math.round(Number(n))));
-        for (const field of ['cap2', 'cap1', 'cap0']) {
+        for (const field of ['cap3', 'cap2', 'cap1', 'cap0']) {
           if (msg[field] != null) {
             window.__capsValue[field] = clamp(msg[field]);
             window.__capsSets.push({ [field]: window.__capsValue[field] });
