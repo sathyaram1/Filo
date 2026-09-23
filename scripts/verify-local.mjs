@@ -1343,9 +1343,9 @@ if (isMain) {
       console.log(`Nessun commit nuovo dopo la critica: niente da riverificare. Verifica superata per '${branch}' su ${sha.slice(0, 8)}.`);
       console.log(`Rilievi non corretti, da riportare nel report per l'owner (ciascuno diventa un feedback suo, con quella priorità):\n${derivatiText(r.derived)}`);
       // Stessa uscita, stesso consiglio: di qui esce un pass con rilievi
-      // aperti esattamente come da «critica», e le prove del giro sono rosse
-      // nello stesso modo.
-      console.log(testoRossiAttesi(branch));
+      // aperti esattamente come da «critica», e le loro prove del giro vanno
+      // tolte nello stesso modo.
+      console.log(testoProveDaCancellare(branch, r.derived));
       process.exit(0);
     }
     console.log(`Correzione consegnata su '${branch}' (${sha.slice(0, 8)}). Serve un'altra verifica, di un'altra istanza:`);
