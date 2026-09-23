@@ -422,7 +422,7 @@ test('fixedReplyText: il fermo lo conferma il server; una segnalazione non ferma
   assert.match(fixedReplyText('A', {}, false), /torna in coda/);
 });
 
-test('la nota dopo la fase 2 dice che la segnalazione ferma, senza --ferma', () => {
+test('la nota che lo strumento stampa dopo la critica dice che la segnalazione ferma, senza --ferma', () => {
   assert.match(FERMA_NOTE, /--segnala <file\.md>/);
   assert.match(FERMA_NOTE, /FERMA il lavoro/);
   assert.doesNotMatch(FERMA_NOTE, /--ferma/);
