@@ -1413,6 +1413,7 @@
         patch(id, { notes: v }, { notes: v }, { silenzioso: true });
       };
       ta.addEventListener('blur', flush);
+      ta._salvaInSospeso = flush;
       ta.addEventListener('input', () => {
         clearTimeout(timer);
         timer = setTimeout(flush, 1500);
@@ -1434,11 +1435,23 @@
         patch(id, { userNote: v }, { userNote: v }, { silenzioso: true });
       };
       input.addEventListener('blur', flush);
+      input._salvaInSospeso = flush;
       input.addEventListener('input', () => {
         clearTimeout(timer);
         timer = setTimeout(flush, 1500);
       });
     });
+  }
+
+  // Chiudere la scheda o spegnere Filo non passa dal blur: quello che aspetta
+  // la pausa di scrittura non partirebbe mai piu.
+  function salvaTestiInSospeso() {
+    for (const el of document.querySelectorAll('.fb-notes, .fb-usernote')) {
+      try { el._salvaInSospeso && el._salvaInSospeso(); } catch (_) {}
+    }
+  }
+  for (const uscita of ['pagehide', 'beforeunload']) {
+    window.addEventListener(uscita, salvaTestiInSospeso);
   }
 
   // Rimette i pulsanti originali di una scheda AL SUO POSTO, senza toccare il
