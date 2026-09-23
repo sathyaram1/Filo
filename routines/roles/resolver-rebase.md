@@ -12,11 +12,12 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
    punto, non indovinarla.
 2. Non migliorare, non ritoccare, non aggiungere: ogni riga cambiata oltre il
    conflitto è codice che nessuno ha verificato.
-3. Rilancia le prove dei giri, `npx playwright test tests/verifica/<numero>`
-   (percorso relativo alla radice del repo, con le barre normali: in ogni altra
-   forma risponde «No tests found» anche a cartella piena; se la cartella non
-   c'è, guardala con `ls tests/verifica`), poi `npm run test:unit` e gli spec
-   delle aree in conflitto. Una prova rossa è una regressione del tuo rebase.
+3. Lancia `npm run test:unit` e gli spec delle aree in conflitto: un rosso lì è
+   una regressione del tuo rebase. La cartella delle prove dei giri non la
+   rilanciare per intero — la corre chi verifica, subito dopo di te, ed è
+   l'unica corsa del giro; lancia la singola prova che copre il punto in
+   conflitto, col percorso relativo alla radice del repo e le barre normali (in
+   ogni altra forma risponde «No tests found» anche a file esistente).
 4. Nel report scrivi **dove c'erano i conflitti** e se per risolverli hai
    dovuto toccare la logica del lavoro, o se è stato solo meccanico.
 
