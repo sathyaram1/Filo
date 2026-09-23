@@ -193,6 +193,25 @@ test('buildPayload prober: payload vuoto', () => {
   assert.deepEqual(buildPayload({ role: 'prober' }), {});
 });
 
+// ─── Le decisioni dell'owner: dalla busta del server al compito del lavoratore ─
+
+test('le decisioni dell\'owner arrivano a chi verifica, risolve, riprende e riallinea; non al controllo di sicurezza', () => {
+  const decisioni = [{ domanda: 'A destra o a sinistra?', risposta: 'A destra.' }, { domanda: '', risposta: 'Tieni la scorciatoia.' }];
+  const busta = (extra = {}) => ({ payload: { feedback: { text: 's', num: '#7' }, history: [], decisioni, ...extra } });
+  const compito = (role, extra) => {
+    const b = { role, id: 'A', num: '#7', branch: 'worker/A' };
+    return buildPayload(b, serverCtx(b, busta(extra), role === 'secaudit' ? 'DIFF' : ''));
+  };
+  assert.deepEqual(compito('verifier').decisioni, decisioni);
+  assert.deepEqual(compito('new-work').decisioni, decisioni);
+  assert.deepEqual(compito('fixer', { ripresa: { domanda: 'q', risposta: 'r', rilievi: [] } }).decisioni, decisioni);
+  assert.deepEqual(compito('fixer').decisioni, decisioni, 'anche chi riallinea deve tenere le scelte dell\'owner');
+  assert.equal(compito('secaudit').decisioni, undefined);
+  // Un server che non le manda: nessun campo, non un elenco inventato.
+  const b = { role: 'verifier', id: 'A', num: '#7', branch: 'worker/A' };
+  assert.equal(buildPayload(b, serverCtx(b, { payload: { feedback: { text: 's' } } })).decisioni, undefined);
+});
+
 // ─── Lo storico delle critiche (caso #502: sei giri per un difetto da due) ────
 
 test('buildPayload: lo storico delle critiche arriva a chi verifica, e a nessun altro', () => {
