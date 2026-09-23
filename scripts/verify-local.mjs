@@ -960,18 +960,46 @@ export function verdictForCurrentBranch(root = ROOT) {
  */
 export function diffDopoLaVerifica(base, head, root = ROOT) {
   if (!base || !head || base === head) return null;
-  const elenco = tryGit(['diff', '--name-only', '-z', `${base}`, `${head}`], root);
+  const elenco = tryGit(['diff', '--name-status', '-z', `${base}`, `${head}`], root);
   // Git muto non è git contento: senza il diff non si tollera niente.
   if (!elenco.ok) return null;
-  const paths = elenco.out.split('\0').map((p) => p.trim()).filter(Boolean);
-  if (!paths.length || paths.some((p) => !dentroProveGiro(p))) {
-    return paths.map((path) => ({ path, prima: '', dopo: '' }));
+  const voci = vociNameStatus(elenco.out);
+  if (!voci.length || voci.some((v) => !dentroProveGiro(v.path))) {
+    return voci.map((v) => ({ path: v.path, stato: v.stato, prima: '', dopo: '' }));
   }
-  return paths.map((path) => ({
-    path,
-    prima: contenutoAl(base, path, root),
-    dopo: contenutoAl(head, path, root),
+  return voci.map((v) => ({
+    path: v.path,
+    stato: v.stato,
+    prima: contenutoAl(base, v.path, root),
+    dopo: contenutoAl(head, v.path, root),
   }));
+}
+
+/**
+ * L'uscita di `git diff --name-status -z` in `[{ stato, path }]`. PURA.
+ *
+ * Con `-z` i campi sono separati da NUL e i nomi arrivano crudi, senza
+ * virgolette: è l'unica forma in cui un percorso con uno spazio (la macchina di
+ * chi sviluppa ne ha) si legge per intero. Uno spostamento (`R`) porta DUE
+ * nomi e qui diventa due voci, il vecchio tolto e il nuovo aggiunto: un file
+ * che ricompare altrove è roba da girare che nessuno ha ancora provato.
+ */
+export function vociNameStatus(out) {
+  const campi = String(out ?? '').split('\0');
+  const voci = [];
+  for (let i = 0; i < campi.length; i += 1) {
+    const stato = campi[i].trim();
+    if (!stato) continue;
+    const doppio = /^[RC]/i.test(stato);
+    const primo = (campi[i + 1] || '').trim();
+    const secondo = doppio ? (campi[i + 2] || '').trim() : '';
+    i += doppio ? 2 : 1;
+    if (doppio) {
+      if (primo) voci.push({ stato: 'D', path: primo });
+      if (secondo) voci.push({ stato: 'A', path: secondo });
+    } else if (primo) voci.push({ stato: stato[0].toUpperCase(), path: primo });
+  }
+  return voci;
 }
 
 /** Il contenuto di un file a un commit, stringa vuota se lì non c'era. */
