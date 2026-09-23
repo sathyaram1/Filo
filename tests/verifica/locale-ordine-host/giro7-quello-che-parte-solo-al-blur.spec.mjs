@@ -67,10 +67,7 @@ test('Editor: confermando il nome con Invio, il nome c\'è', async ({ shell, ope
 
 // ─── Correttore: una regola già scritta, corretta al volo ───────────────────
 
-const regole = (app) => app.evaluate(async () => {
-  const raw = await globalThis.SN_STORAGE.getRaw();
-  return (raw && raw.sn_autocorrect) || {};
-});
+const regole = (app) => app.evaluate(async () => globalThis.SN_STORAGE.getRaw('sn_autocorrect', {}));
 
 async function aggiungiRegola(page, parola, correzione) {
   await page.waitForSelector('#newWord', { timeout: 20_000 });
