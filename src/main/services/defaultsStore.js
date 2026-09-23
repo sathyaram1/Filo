@@ -483,8 +483,8 @@ async function setAutomationProberIdle(on, idToken) {
   return Boolean(on);
 }
 
-// I tre bilanci dei giri di correzione (config/routines, campi `cap2`,
-// `cap1`, `cap0` — feedback #561) e il testo della fase 2 (`fixInstructions`).
+// I bilanci dei giri di correzione, uno per livello (config/routines, campi in
+// VERIFIER_CAP_KEYS — feedback #561) e il testo della fase 2 (`fixInstructions`).
 // Li applica il SERVER quando registra la critica; qui la dashboard li legge e
 // li scrive. Non c'è un default: i numeri stanno SOLO nel documento (decisione
 // dell'owner del 2026-09-16 — un default nel codice faceva ragionare la
