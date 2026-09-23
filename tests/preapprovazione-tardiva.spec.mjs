@@ -64,7 +64,7 @@ async function stubMain(page, { pending = [], approveReply = null, updateReply =
       }
       return orig(msg);
     };
-  }, { pending, approveReply, updateReply, sha: SHA, ttl: 7 * GIORNO });
+  }, { pending, approveReply, updateReply, tieniInAttesa, sha: SHA, ttl: 7 * GIORNO });
 }
 
 async function apri(page, fbs, opts) {
