@@ -14,7 +14,7 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
   coda senza scrivere: vale la strada presa nel frattempo (l'ultima parte
   della domanda);
 - `rilievi`: i rilievi che erano rimasti aperti quando il lavoro si è fermato,
-  col loro livello. Vanno chiusi adesso, alla luce della risposta;
+  col loro livello e la sede. Vanno chiusi adesso, alla luce della risposta;
 - `ruolo`: chi si è fermato (chi risolveva, o chi verificava e correggeva).
 
 `payload.feedback` è la richiesta originale; `payload.history` le critiche dei
