@@ -1300,6 +1300,9 @@
       // resta finché non si rilegge.
       preapproved: Array.isArray(r.preapproved) ? r.preapproved : (fusioni.preapproved || []),
     };
+    // Una richiesta che non c'è più non ha un esito da raccontare.
+    const vive = new Set(fusioni.pending.concat(fusioni.failed).map((req) => req.id));
+    for (const id of Array.from(esitiTentati.keys())) if (!vive.has(id)) esitiTentati.delete(id);
     const n = renderFusioniOrfane();
     // Il quadrato della scheda aperta e il bordo delle card in lista vengono da
     // questi elenchi: una richiesta nuova deve vedersi subito, senza riaprire.
