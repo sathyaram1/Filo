@@ -33,9 +33,9 @@ test('allo stop gli altri interni della critica sono «sospesi»: restano con qu
   assert.deepEqual(d.sospesi.map((f) => f.text), ['b', 'c']);
   assert.deepEqual(d.external.map((f) => f.text), ['d']);
   assert.equal(d.consume, null);
-  assert.deepEqual(d.counts, { count2: 0, count1: 0, count0: 0 });
-  // A bilancio del 2 esaurito, uguale.
-  const d2 = decide('[2i] a\n[1i] b', { count2: 10 });
+  assert.deepEqual(d.counts, { count3: 0, count2: 0, count1: 0, count0: 0 });
+  // A bilancio del 3 esaurito, uguale (il 2 a bilancio finito non ferma: esce a parte).
+  const d2 = decide('[3i] a\n[1i] b', { count3: 10 });
   assert.deepEqual(d2.sospesi.map((f) => f.text), ['b']);
   // Fuori dallo stop non c'è niente di sospeso.
   assert.deepEqual(decide('[2i] a\n[1i] b').sospesi, []);
