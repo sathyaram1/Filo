@@ -175,23 +175,31 @@ test('il segno ? → stop ai livelli 3/2, derivato ai livelli 1 e 0', () => {
 });
 
 test('i bilanci si normalizzano: fuori scala si stringe, assenti → i default ESPLICITI del chiamante, contatori negativi → 0', () => {
-  assert.deepEqual(R.normalizeCaps({ cap2: 99, cap1: -3 }, CAPS), { cap2: 10, cap1: 0, cap0: 0 });
+  assert.deepEqual(R.normalizeCaps({ cap2: 99, cap1: -3 }, CAPS), { cap3: 5, cap2: 10, cap1: 0, cap0: 0 });
   assert.deepEqual(R.normalizeCaps(null, CAPS), CAPS);
-  assert.deepEqual(R.normalizeCounts({ count2: -1, count1: '2' }), { count2: 0, count1: 2, count0: 0 });
+  assert.deepEqual(R.normalizeCounts({ count2: -1, count1: '2' }), { count3: 0, count2: 0, count1: 2, count0: 0 });
 });
 
-test('cap2 a zero: il primo 2 → stop subito (scelta possibile dell\'owner)', () => {
-  assert.equal(decide([f(2, 'rotto')], {}, { cap2: 0, cap1: 2, cap0: 0 }).stop, true);
+test('cap3 a zero: il primo 3 → stop subito (scelta possibile dell\'owner); cap2 a zero: il primo 2 va da parte, non ferma', () => {
+  assert.equal(decide([f(3, 'rotto')], {}, { cap3: 0, cap2: 5, cap1: 2, cap0: 0 }).stop, true);
+  const due = decide([f(2, 'rotto')], {}, { cap3: 5, cap2: 0, cap1: 2, cap0: 0 });
+  assert.equal(due.stop, false);
+  assert.equal(due.derived.length, 1);
 });
 
-test('la sequenza intera: cinque giri di livello 2, il sesto → stop', () => {
-  let counts = {};
-  for (let i = 0; i < 5; i++) {
-    const d = decide([f(2, `giro ${i}`)], counts);
-    assert.equal(d.stop, false, `giro ${i} si corregge`);
-    counts = d.counts;
+test('la sequenza intera: cinque giri di livello 3, il sesto → stop; cinque di livello 2, il sesto passa e mette da parte', () => {
+  for (const [level, ferma] of [[3, true], [2, false]]) {
+    let counts = {};
+    for (let i = 0; i < 5; i++) {
+      const d = decide([f(level, `giro ${i}`)], counts);
+      assert.equal(d.stop, false, `giro ${i} si corregge`);
+      assert.equal(d.fix.length, 1);
+      counts = d.counts;
+    }
+    const sesto = decide([f(level, 'ancora')], counts);
+    assert.equal(sesto.stop, ferma, `livello ${level} al sesto giro`);
+    assert.deepEqual(sesto.fix, []);
   }
-  assert.equal(decide([f(2, 'ancora')], counts).stop, true);
 });
 
 // ── Testi ────────────────────────────────────────────────────────────────────
