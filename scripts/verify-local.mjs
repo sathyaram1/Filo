@@ -1210,13 +1210,16 @@ if (isMain) {
     const e = r.state[branch];
     if (r.outcome === 'fix') {
       if (r.replayed) console.log('(critica già registrata su questo giro: ristampo la fase 2, il giro non si ripaga)');
-      console.log(codaText({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch, instructions: codaDalServer(caps.fixInstructions) || leggiCoda() }));
+      console.log(codaText({ findings: r.decision.fix, derived: r.decision.derived, external: r.decision.external, budgets: r.decision.budgets, branch, instructions: codaDalServer(caps.fixInstructions) || leggiCoda() }));
     } else if (r.outcome === 'stop') {
-      console.log(`══ ESITO: il lavoro si ferma ══\nRilievi di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}`);
+      console.log(`══ ESITO: il lavoro si ferma ══\nRilievi interni di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}`);
+      if (r.decision.external && r.decision.external.length) {
+        console.log(`Rilievi esterni (non toccano a questo lavoro): ciascuno diventa un feedback suo, lo apre chi guida dal report.\n${derivatiText(r.decision.external)}`);
+      }
     } else {
       console.log(`══ ESITO: verifica superata per '${branch}' su ${sha.slice(0, 8)} ══`);
       if (e.derived && e.derived.length) {
-        console.log(`Rilievi non corretti, da riportare nel report per l'owner:\n${ROUND.formatFindings(e.derived)}`);
+        console.log(`Rilievi non corretti, da riportare nel report per l'owner (ciascuno diventa un feedback suo, con quella priorità):\n${derivatiText(e.derived)}`);
         console.log(testoRossiAttesi(branch));
       }
       // «Si può pubblicare» solo se è vero adesso: il pass vale per l'ultimo
