@@ -379,7 +379,7 @@
     if (mgRoutinesToggle) mgRoutinesToggle.checked = routinesOn;
     if (mgRoutinesState)  mgRoutinesState.textContent = routinesOn ? 'On' : 'Off';
     if (mgProberIdleBlock) mgProberIdleBlock.classList.toggle('mg-auto-block--off', !routinesOn);
-    for (const id of ['mgCap2Block', 'mgCap1Block', 'mgCap0Block', 'mgFixInstructionsBlock']) {
+    for (const id of ['mgCap3Block', 'mgCap2Block', 'mgCap1Block', 'mgCap0Block', 'mgFixInstructionsBlock']) {
       const el = document.getElementById(id);
       if (el) el.classList.toggle('mg-auto-block--off', !routinesOn);
     }
