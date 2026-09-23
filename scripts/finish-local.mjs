@@ -496,6 +496,12 @@ async function main() {
     if (nota) console.log(`\n${nota}`);
   }
 
+  // L'esito della verifica si legge PRIMA dei controlli: è lui a dire se gli
+  // spec delle aree sono già stati corsi su questo contenuto (il cancello vero
+  // resta più sotto, dopo i controlli, dov'è sempre stato).
+  const v = verdictForCurrentBranch(ROOT);
+  const spec = specDaRilanciare({ checkOnly, ok: v.ok, sha: v.entry && v.entry.sha, tollerato: v.tollerato });
+
   {
     // 1. Logica pura — veloce, nessuna finestra che si apre.
     if (!run('npm', ['run', 'test:unit'], 'Controlli di logica')) {
@@ -506,7 +512,8 @@ async function main() {
     //    Actions, nel lavoro di release, ogni sei ore prima di pubblicare
     //    (dal 2026-09-15: nessun ruolo e nessuna sessione la lancia): qui
     //    serve il segnale rapido.
-    const changed = git(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean);
+    if (!spec.rilancia) console.log(`\n${spec.nota}`);
+    const changed = spec.rilancia ? git(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean) : [];
     // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
     // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
     // l'elenco degli spec tracciati e filtriamo in memoria.
