@@ -22,11 +22,18 @@
 (function (global) {
   'use strict';
 
-  // I livelli della scala delle priorità di Filo (routines/roles/verifier.md
-  // § Che esito dare): 3 sicurezza/dati/Filo inutilizzabile, 2 la cosa chiesta
-  // non si ottiene o cammino principale, 1 cosmetica/attrito fuori cammino,
-  // 0 situazione rara.
+  // I livelli della scala delle priorità di Filo (routines/roles/
+  // _critica-e-livelli.md): il metro è la frequenza, 3 sicurezza/soldi/Filo
+  // inutilizzabile sul cammino normale, 2 funzione rotta nel caso normale,
+  // 1 di rado, 0 cosmetico raro.
   const LEVELS = [0, 1, 2, 3];
+  // La SEDE di un rilievo, indipendente dal livello (decisione dell'owner del
+  // 2026-09-22): `i` interno (tocca a questo lavoro: lo scenario della
+  // segnalazione, o l'ha creato il ramo), `e` esterno (un altro lavoro). Il
+  // giro conta solo gli interni; ogni esterno esce subito in un feedback suo
+  // con priorità uguale al livello.
+  const SEDI = ['i', 'e'];
+  const SPIEGAZIONE_SEDE = 'manca la sede dopo il livello: «i» se tocca a questo lavoro, «e» se è un altro lavoro (per esempio [2i], [1e?])';
 
   // Tetto ai rilievi di una critica: oltre non è una critica, è un elenco
   // generato. E tetto al testo di ciascuno: finiscono nel feedback derivato.
