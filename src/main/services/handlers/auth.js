@@ -608,9 +608,9 @@ module.exports = function register(on, ctx) {
     try {
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      return capsReply(await Defaults.setRoutineCaps({
-        cap2: msg.cap2, cap1: msg.cap1, cap0: msg.cap0, fixInstructions: msg.fixInstructions, giroStretto: msg.giroStretto,
-      }, idToken));
+      const patch = { fixInstructions: msg.fixInstructions, giroStretto: msg.giroStretto };
+      for (const k of CAP_KEYS) patch[k] = msg[k];
+      return capsReply(await Defaults.setRoutineCaps(patch, idToken));
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
