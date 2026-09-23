@@ -701,10 +701,11 @@ export function buildPayload(bucket, ctx = {}) {
         id: bucket.id,
         num: bucket.num,
         feedback: ctx.feedback || null,
+        ...conDecisioni(ctx),
       };
     }
     case 'new-work': {
-      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
+      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null, ...conDecisioni(ctx) };
       // Chi lo ha preceduto aveva chiesto prima di avere un ramo, e l'owner ha
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
