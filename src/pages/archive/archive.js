@@ -572,6 +572,10 @@
     ]);
   }
 
+  // Il titolo si conferma quando il cursore lascia il campo: registrato qui, si
+  // conferma anche se la scheda si chiude prima.
+  const campoAlVolo = window.SN_SALVA.campoAlVolo();
+
   // Rinomina sul posto: il titolo diventa un campo, Invio salva, Esc lascia
   // com'era. Niente finestra di sistema — è la stessa regola per cui i menu di
   // Filo non sono quelli del browser.
