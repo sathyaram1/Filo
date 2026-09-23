@@ -81,7 +81,15 @@
   // ----------------------------------------------------------------------
   // Autocorrect
   // ----------------------------------------------------------------------
+  // Le correzioni che la pagina sta mostrando, cioè quelle su cui si scrive.
+  let mappaMostrata = {};
+
+  // Un campo si conferma quando il cursore ne esce: registrato qui, si conferma
+  // anche se la scheda si chiude prima.
+  const campoAlVolo = window.SN_SALVA.campoAlVolo();
+
   function renderAutocorrect(map) {
+    mappaMostrata = { ...(map || {}) };
     const list = $('autocorrectList');
     list.innerHTML = '';
     const keys = Object.keys(map || {}).sort((a, b) => a.localeCompare(b));
