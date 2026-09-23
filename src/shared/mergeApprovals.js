@@ -518,6 +518,10 @@
     actions.appendChild(approveBtn);
     card.appendChild(status);
     card.appendChild(actions);
+    // Un tentativo già fatto — e non riuscito — resta scritto sulla card: un
+    // avviso che passa lo legge solo chi è davanti allo schermo in quel momento.
+    var prima = o.esitoIniziale ? o.esitoIniziale(req) : null;
+    if (prima) say(prima);
     return card;
   }
 
