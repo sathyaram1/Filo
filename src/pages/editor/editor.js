@@ -1580,9 +1580,11 @@
     const commit = (save) => {
       if (done) return;
       done = true;
+      campoAlVolo.confermato();
       if (save) renameFileAction(f.id, input.value);
       else renderDocSwitcher();
     };
+    input.addEventListener('input', () => campoAlVolo.scrivendo(() => commit(true)));
     input.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter') { e.preventDefault(); commit(true); }
