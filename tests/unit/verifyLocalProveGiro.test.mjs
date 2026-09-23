@@ -28,16 +28,49 @@ test('cartellaProveGiro: la cartella viene dal ramo, ed è la stessa a ogni giro
 test('il compito consegnato a chi verifica in locale dice DOVE lasciare le prove', () => {
   const brief = buildVerifierBrief({ request: 'fai X', branch: 'claude/giri-corti', recipe: 'RECIPE' });
   assert.match(brief, /tests\/verifica\/locale-giri-corti/, 'la cartella per esteso, non «<numero>»');
-  assert.match(brief, /non si\s*\n?cancellano|non si cancellano/, 'e che non si cancellano');
+  // Dal 23/09/2026 quella cartella si corre una volta per giro, e la corsa è la
+  // sua: se il compito non gliela mette in mano adesso, nessuno la lancia più.
+  assert.match(brief, /unico a rilanciare|l'unica corsa/, 'e che la corsa di quella cartella è sua');
+  assert.match(brief, /partenza/, 'e che il momento è adesso');
 });
 
-test('la coda stampata dopo la critica dice di rilanciare le prove del giro, e con quale comando', () => {
-  const t = codaText({ findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'claude/giri-corti' });
-  assert.match(t, /npx playwright test tests\/verifica\/locale-giri-corti/);
-  assert.match(t, /regressione della correzione/);
+test('la coda stampata dopo la critica manda a correre le singole prove, non la cartella', () => {
+  const t = codaText({
+    findings: [{ level: 2, text: 'rotto' }],
+    derived: [{ level: 1, sede: 'i', text: 'il bordo è freddo', priority: 1 }],
+    external: [], budgets: {}, branch: 'claude/giri-corti',
+  });
+  assert.match(t, /tests\/verifica\/locale-giri-corti/, 'la cartella si nomina: le prove stanno lì');
+  // La cartella intera NON si rilancia da qui: è la corsa in più che il giro
+  // pagava tre o quattro volte.
+  assert.doesNotMatch(t, /playwright test tests\/verifica\/locale-giri-corti/);
+  assert.match(t, /SOLO quelle dei rilievi che stai correggendo/);
+  // E le prove dei rilievi che escono in un feedback loro si TOLGONO.
+  assert.match(t, /TOGLI/);
+  assert.match(t, /prova durevole/, 'anche quelle dei rilievi corretti, insieme alla prova che resta');
   // Quello che c'era prima resta: i rilievi e come si consegna.
   assert.match(t, /\[2i\] rotto/);
   assert.match(t, /verify-local\.mjs corretto/);
+});
+
+// La regola del 23/09/2026: la cartella delle prove dei giri si corre UNA volta
+// per giro, e la corre chi verifica. Un testo che manda anche chi corregge a
+// rilanciarla la fa correre tre o quattro volte, e al decimo giro sono cinque o
+// dieci minuti per corsa — con la cache del contesto che scade in mezzo.
+test('nessun testo manda chi corregge a rilanciare la cartella intera', () => {
+  const ROOT = new URL('../../', import.meta.url);
+  const leggi = (p) => readFileSync(new URL(p, ROOT), 'utf8');
+  const superfici = [
+    ['routines/roles/resolver.md', leggi('routines/roles/resolver.md')],
+    ['routines/roles/resolver-ripresa.md', leggi('routines/roles/resolver-ripresa.md')],
+    ['routines/roles/resolver-rebase.md', leggi('routines/roles/resolver-rebase.md')],
+    ['la coda della fase di correzione',
+      codaText({ findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'claude/giri-corti' })],
+  ];
+  for (const [nome, testo] of superfici) {
+    assert.doesNotMatch(testo, /playwright\s+test\s+tests\/verifica/,
+      `${nome} manda a rilanciare la cartella intera: quella corsa è di chi verifica, in partenza, e una sola per giro`);
+  }
 });
 
 test('consegnare una correzione con file non salvati: il rifiuto elenca i file e spiega il salvataggio automatico', () => {
