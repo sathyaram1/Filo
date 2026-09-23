@@ -230,8 +230,8 @@
     worker:   { icon: '🔧', label: 'Claude (sviluppo)' },
     verifier: { icon: '🧪', label: 'Claude (verifica)' },
     // I rilievi rimasti fuori dal giro di correzione (feedback #561:
-    // livello 0, bilancio esaurito, o che chiedono una decisione), raccolti dal
-    // server in UN feedback derivato per lavoro, figlio #N.k: categoria
+    // esterni al lavoro, o interni messi da parte dal bilancio), aperti dal
+    // server uno per rilievo, figli #N.k, priorità = livello: categoria
     // propria, così leggendo la coda si vede che nasce da una verifica, non da
     // un'esplorazione.
     residuo:  { icon: '🧹', label: 'Claude (rilievi derivati da una verifica)' },
