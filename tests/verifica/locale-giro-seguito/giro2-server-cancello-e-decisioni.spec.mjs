@@ -1,7 +1,7 @@
 // Prove del giro 2 (verifica locale) sul lavoro «seguito del giro», lato
 // server (punti 3 e 4), sul codice del repo del server se sta accanto (la
 // cartella di lavoro `filo-security*` di questa generazione); altrimenti si
-// saltano. Più lo scrittore locale delle note, che sta in questo repo.
+// saltano.
 
 import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
