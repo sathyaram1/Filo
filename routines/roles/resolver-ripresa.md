@@ -27,11 +27,12 @@ porta solo l'ultima.
    Se il lavoro era appena cominciato (una domanda fatta prima di scrivere
    codice), è un lavoro intero: vale il ruolo di chi risolve, criteri
    compresi.
-2. Prima di consegnare rilancia le prove dei giri con
-   `npx playwright test tests/verifica/<numero>`, scritto relativo alla radice
-   del repo e con le barre normali (in ogni altra forma dice «No tests found»
-   anche a cartella piena; `ls tests/verifica` dice se la cartella c'è), e
-   `npm run finish:check`, in sottofondo mentre lavori.
+2. Prima di consegnare lancia `npm run finish:check`, in sottofondo mentre
+   lavori. La cartella delle prove dei giri non la rilanciare: la corre per
+   intero chi verifica, subito dopo di te, ed è l'unica corsa del giro. Lancia
+   la singola prova del rilievo che stai chiudendo, prima e dopo, col percorso
+   relativo alla radice del repo e le barre normali (in ogni altra forma dice
+   «No tests found» anche a file esistente).
 3. Nel report scrivi cosa hai applicato della risposta e cosa hai lasciato
    com'era. Frase e riga di changelog restano valide: cambiale solo se è
    cambiato qualcosa di visibile.
