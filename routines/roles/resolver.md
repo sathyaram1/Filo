@@ -58,9 +58,9 @@ un rosso lì ti tornerebbe indietro come rilievo grave.
 `tests/<feature>.spec.mjs`, o `tests/unit/` per la logica pura. Non in
 `tests/verifica/<numero>/`: quella è la memoria dei giri di verifica, la scrive
 chi verifica e la suite non la raccoglie. Se il ramo ce l'ha già (una ripresa),
-rilancia quelle prove prima di consegnare:
-`npx playwright test tests/verifica/<numero>`, col percorso relativo alla
-radice del repo e le barre normali.
+non rilanciarla tutta: quella cartella la corre chi verifica, in partenza, ed è
+l'unica corsa del giro. Lancia la singola prova solo se stai chiudendo proprio
+il rilievo che riproduce.
 
 <!-- includi: _segnala.md -->
 
