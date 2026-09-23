@@ -40,6 +40,7 @@ require(path.join(SHARED, 'modelUsage.js'));
 // solo dentro le funzioni di rendering, mai al caricamento.
 require(path.join(SHARED, 'modelChainEditor.js'));
 require(path.join(SHARED, 'storage.js'));
+require(path.join(SHARED, 'salvaRimandato.js'));
 require(path.join(SHARED, 'themeTokens.js'));
 require(path.join(SHARED, 'tabColor.js'));
 require(path.join(SHARED, 'tabTriage.js')); // §2.1 — candidati/dedup riordino schede (logica pura)
