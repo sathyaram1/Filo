@@ -140,13 +140,17 @@ test('un 1 entra nel giro di un 2, anche a cap1 finito (decisione owner 2026-09-
   assert.equal(zero.consume, 'cap2');
 });
 
-test('un 1 col segno ? resta derivato anche accanto a un 2 da correggere; se il 2 ferma il lavoro, si ferma tutto', () => {
+test('un 1 col segno ? resta derivato anche accanto a un 2 da correggere; se un 3 ferma il lavoro, si ferma tutto', () => {
   const d = decide([f(2, 'rotto'), f(1, 'gusto?', true)], { count1: 2 });
   assert.deepEqual(d.fix.map((x) => x.level), [2]);
   assert.equal(d.derived.length, 1, 'la domanda non si corregge da soli');
-  const stop = decide([f(2, 'rotto'), f(1, 'bordo')], { count2: 5, count1: 2 });
+  const stop = decide([f(3, 'rotto'), f(1, 'bordo')], { count3: 5, count1: 2 });
   assert.equal(stop.stop, true);
   assert.deepEqual(stop.fix, [], 'fermandosi non si corregge nemmeno l\'1');
+  // Un 2 a bilancio finito invece non ferma: va da parte, e l'1 segue il suo bilancio.
+  const daParte = decide([f(2, 'rotto'), f(1, 'bordo')], { count2: 5, count1: 2 });
+  assert.equal(daParte.stop, false);
+  assert.deepEqual(daParte.derived.map((x) => x.level), [2, 1]);
 });
 
 test('livello 3 con cap3 esaurito → stop, decide l\'owner; un 2 a cap2 esaurito non ferma', () => {
