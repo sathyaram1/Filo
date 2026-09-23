@@ -55,10 +55,11 @@ async function serverFinto() {
   return { stato, url, chiudi: () => new Promise((ok) => srv.close(ok)) };
 }
 
-// Il bilancio dei 3 (dal 2026-09-23) c'è sempre, salvo chiederne l'assenza.
+// Il bilancio dei 3 (dal 2026-09-23) c'è sempre, salvo chiederne l'assenza con `null`
+// (un `undefined` esplicito prenderebbe il valore di serie).
 const doc = (cap2, cap1, cap0, cap3 = { integerValue: '5' }) => ({
   fields: {
-    ...(cap3 !== undefined ? { cap3 } : {}),
+    ...(cap3 !== undefined && cap3 !== null ? { cap3 } : {}),
     ...(cap2 !== undefined ? { cap2 } : {}),
     ...(cap1 !== undefined ? { cap1 } : {}),
     ...(cap0 !== undefined ? { cap0 } : {}),
