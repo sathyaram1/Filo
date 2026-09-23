@@ -186,8 +186,7 @@
 
   async function removeAutocorrect(word) {
     const key = String(word || '').toLowerCase();
-    const data = await chrome.storage.local.get(STORAGE_KEYS.AUTOCORRECT);
-    const map = { ...(data[STORAGE_KEYS.AUTOCORRECT] || {}) };
+    const map = { ...mappaMostrata };
     delete map[key];
     await chrome.storage.local.set({ [STORAGE_KEYS.AUTOCORRECT]: map });
     renderAutocorrect(map);
