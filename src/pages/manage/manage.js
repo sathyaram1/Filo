@@ -3573,7 +3573,7 @@
   // Toast discreto in basso a destra: l'esito di un'azione deve arrivare anche
   // se nel frattempo l'owner ha chiuso il pannello o cambiato scheda.
   let mgToastTimer = null;
-  function toast(text, kind) {
+  function toast(text, kind, ms) {
     let el = document.getElementById('mgToast');
     if (!el) {
       el = document.createElement('div');
