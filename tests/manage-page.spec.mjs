@@ -849,8 +849,8 @@ test('i quattro bilanci dei giri di correzione e le loro istruzioni sono editabi
   // critica legge): è qui che "hanno effetto", non solo in una cache locale.
   // Ogni salvataggio tocca SOLO il suo campo.
   await expect.poll(() => page.evaluate(() => window.__capsSets))
-    .toEqual([{ cap2: 5 }, { cap1: 3 }, { cap0: 1 }, { fixInstructions: '' }]);
-  expect(await page.evaluate(() => window.__capsValue)).toEqual({ cap2: 5, cap1: 3, cap0: 1, fixInstructions: '' });
+    .toEqual([{ cap3: 4 }, { cap2: 5 }, { cap1: 3 }, { cap0: 1 }, { fixInstructions: '' }]);
+  expect(await page.evaluate(() => window.__capsValue)).toEqual({ cap3: 4, cap2: 5, cap1: 3, cap0: 1, fixInstructions: '' });
 
   // Sono anche specchiati nella cache locale (display istantaneo all'avvio).
   const cached = await page.evaluate(async () => {
