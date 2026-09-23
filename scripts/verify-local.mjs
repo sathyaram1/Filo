@@ -15,8 +15,8 @@
 //
 // IL GIRO (feedback #561)
 //   Stessa struttura del giro in cloud. Chi verifica registra la CRITICA coi
-//   livelli; questo strumento calcola l'esito dai livelli e dai tre bilanci
-//   (le stesse regole del server, src/shared/verifierRound.js) e lo stampa.
+//   livelli; questo strumento calcola l'esito dai livelli e dai bilanci, uno
+//   per livello (le stesse regole del server, src/shared/verifierRound.js).
 //   Chiuso il giro serve un'altra verifica, fatta da un'altra istanza.
 //
 // COME SI USA
