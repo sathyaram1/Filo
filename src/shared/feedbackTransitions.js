@@ -155,30 +155,29 @@
   // e spazio per stati futuri. Cambiarla NON rompe i documenti già scritti.
   const CIPHER_PAD = 32;
 
-  // ── I tre bilanci dei giri di correzione (feedback #561, §4) ────────
+  // ── I quattro bilanci dei giri di correzione (feedback #561, §4) ────────
   // I NUMERI non stanno qui. Li detta l'owner dalla dashboard (doc Firestore
-  // `config/routines`, campi `cap2`, `cap1`, `cap0`, Gestione → Automazioni)
-  // e li applica il SERVER quando registra la critica — mai il prompt, mai un
-  // conteggio dichiarato dal client. Fino al 2026-09-16 qui c'era un default
-  // (5/2/0) e la verifica locale ragionava con quello mentre la dashboard
-  // diceva 10/1/0: decisione dell'owner, nessun default nel codice — chi ha
-  // bisogno dei bilanci li legge dal server, e se non ci sono si ferma con un
-  // errore che dice cosa manca. Qui restano solo i NOMI dei tre campi. Le
-  // regole che li consumano stanno in `verifierRound.js` (decideRound),
-  // incorporato anch'esso dal server al deploy.
-  //   cap2 (x): giri di correzione per i rilievi di livello 3 e 2 (la cosa
-  //             chiesta non si ottiene, cammino principale). A bilancio finito
-  //             un 3/2 ferma la pratica e chiama l'owner (statusReason `loop`).
-  //   cap1 (y): giri di correzione per i rilievi di livello 1 (cosmetica,
-  //             attrito fuori cammino). A bilancio finito un 1 va nel feedback
-  //             derivato invece di essere corretto.
-  //   cap0 (z): giri per i soli rilievi di livello 0 (casi rari). Con z = 0 gli
-  //             0 da soli non si correggono mai: si correggono solo insieme ad
-  //             altro (un altro verificatore arriva comunque).
+  // `config/routines`, campi `cap3`, `cap2`, `cap1`, `cap0`, Gestione →
+  // Automazioni) e li applica il SERVER quando registra la critica — mai il
+  // prompt, mai un conteggio dichiarato dal client. Dal 2026-09-16 nel codice
+  // non c'è un default: chi ha bisogno dei bilanci li legge dal server, e se
+  // non ci sono si ferma con un errore che dice cosa manca. Qui restano solo i
+  // NOMI dei campi, uno per livello. Le regole che li consumano stanno in
+  // `verifierRound.js` (decideRound), incorporato anch'esso dal server al
+  // deploy; una sentinella tiene questa lista uguale alla sua e ai campi della
+  // dashboard.
+  //   cap3: giri di correzione per i rilievi di livello 3 (sicurezza, soldi,
+  //         Filo inutilizzabile). A bilancio finito un 3 ferma la pratica e
+  //         chiama l'owner (statusReason `loop`): è l'unico che ferma.
+  //   cap2: giri per i rilievi di livello 2 (la cosa chiesta non si ottiene nel
+  //         caso normale). A bilancio finito un 2 NON ferma: diventa un
+  //         feedback a parte a priorità 2, e il lavoro passa (2026-09-23).
+  //   cap1: giri per i rilievi di livello 1 (di rado, cosmetica evidente). A
+  //         bilancio finito un 1 va nel feedback derivato.
+  //   cap0: giri per i soli rilievi di livello 0 (casi rari). Con 0 gli 0 da
+  //         soli non si correggono mai: solo insieme ad altro.
   // Ogni giro consuma UN giro dal bilancio del livello più alto corretto.
-  // I vecchi nomi (`failCap`/`improvableCap`, i tre esiti pass/migliorabile/
-  // fail) sono aboliti: l'esito lo calcola il server dai livelli e dai bilanci.
-  const VERIFIER_CAP_KEYS = ['cap2', 'cap1', 'cap0'];
+  const VERIFIER_CAP_KEYS = ['cap3', 'cap2', 'cap1', 'cap0'];
 
   global.SN_FB_TRANSITIONS = {
     STATUSES, ACTORS, TRANSITIONS, PUBLIC_MAP, CIPHER_PAD, VERIFIER_CAP_KEYS,
