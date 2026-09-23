@@ -635,15 +635,28 @@ export function corpoSenzaMarcatori(testo) {
 }
 
 /**
- * Le differenze fra il commit verificato e quello di adesso sono SOLO
- * marcatori di rosso atteso nelle prove del giro? PURA.
+ * Una voce del diff è un file TOLTO dalle prove del giro? PURA.
  *
- * `files`: `[{ path, prima, dopo }]` — il contenuto ai due commit, stringa
- * vuota dove il file non c'era (aggiunto o cancellato); `null` quando non si è
- * riuscito a leggere il diff, che NON è un via libera. Ritorna
+ * `stato` è la lettera di `git diff --name-status` e vale più del contenuto:
+ * senza di lei un file illeggibile (git muto su `show`) somiglierebbe a un file
+ * cancellato, e si tollererebbe una modifica vera. Dove la lettera non c'è —
+ * una voce costruita a mano — resta il ripiego sul contenuto.
+ */
+function cancellata(f) {
+  if (f.stato) return String(f.stato).toUpperCase().startsWith('D');
+  return String(f.prima ?? '') !== '' && String(f.dopo ?? '') === '';
+}
+
+/**
+ * Le differenze fra il commit verificato e quello di adesso stanno tutte nelle
+ * prove del giro, e sono solo prove tolte o marcatori di rosso atteso? PURA.
+ *
+ * `files`: `[{ path, prima, dopo, stato }]` — il contenuto ai due commit,
+ * stringa vuota dove il file non c'era, e la lettera di stato di git; `null`
+ * quando non si è riuscito a leggere il diff, che NON è un via libera. Ritorna
  * `{ ok, motivo, files }`: `motivo` è già la frase da mostrare a chi pubblica.
  */
-export function soloMarcatori(files) {
+export function soloMarcatoriOCancellazioni(files) {
   if (!Array.isArray(files)) return { ok: false, motivo: 'non sono riuscito a leggere cosa è cambiato dopo la verifica', files: [] };
   const elenco = files.filter((f) => f && f.path);
   const fuori = elenco.filter((f) => !dentroProveGiro(f.path)).map((f) => f.path);
@@ -651,35 +664,40 @@ export function soloMarcatori(files) {
     const primi = fuori.slice(0, 5).join(', ');
     return { ok: false, files: [], motivo: `fuori dalle prove del giro: ${primi}${fuori.length > 5 ? ` e altri ${fuori.length - 5}` : ''}` };
   }
-  const veri = elenco.filter((f) => corpoSenzaMarcatori(f.prima) !== corpoSenzaMarcatori(f.dopo)).map((f) => f.path);
+  const veri = elenco
+    .filter((f) => !cancellata(f) && corpoSenzaMarcatori(f.prima) !== corpoSenzaMarcatori(f.dopo))
+    .map((f) => f.path);
   if (veri.length) {
     const primi = veri.slice(0, 5).join(', ');
-    return { ok: false, files: [], motivo: `nelle prove del giro non sono cambiati solo i marcatori di rosso atteso: ${primi}${veri.length > 5 ? ` e altri ${veri.length - 5}` : ''}` };
+    return { ok: false, files: [], motivo: `nelle prove del giro c'è dell'altro, oltre alle prove tolte e ai marcatori di rosso atteso: ${primi}${veri.length > 5 ? ` e altri ${veri.length - 5}` : ''}` };
   }
   return { ok: true, motivo: '', files: elenco.map((f) => f.path) };
 }
 
 /**
- * Cosa fare delle prove del giro che restano rosse quando un rilievo è messo
- * da parte. PURA. Si stampa col pass, che è l'unico momento in cui chi
- * verifica ha in mano insieme i rilievi non corretti e un ramo da chiudere.
+ * Cosa fare delle prove del giro che riproducono i rilievi non corretti. PURA.
+ * Si stampa col pass, che è l'unico momento in cui chi verifica ha in mano
+ * insieme i rilievi diventati un feedback loro e un ramo da chiudere.
  *
  * Senza queste righe la strada la si trova da soli, e le due volte che è
- * successo (10/09 e 18/09, #629) è costata un giro intero: si segnavano i
- * rossi attesi DOPO il verdetto, il commit spostava la punta e la chiusura
- * respingeva. Adesso il verdetto regge su quel commit — ma solo se lì cambiano
- * i marcatori e nient'altro, e questo va detto a chi li scrive.
+ * successo (10/09 e 18/09, #629) è costata un giro intero: si toccavano le
+ * prove DOPO il verdetto, il commit spostava la punta e la chiusura respingeva.
+ * Adesso il verdetto regge su quel commit — ma solo se lì si tolgono prove e
+ * nient'altro, e questo va detto a chi le toglie.
  */
-export function testoRossiAttesi(branch) {
+export function testoProveDaCancellare(branch, derived) {
   const cartella = cartellaProveGiro(branch);
+  const elenco = (Array.isArray(derived) ? derived : []).filter((f) => f && f.text);
   return [
-    'Le prove del giro che riproducono questi rilievi restano rosse, e la chiusura le rilancia.',
-    `Segnale come rosso atteso in ${cartella}, una riga per rilievo.`,
-    "  test.fail(true, 'esterno: <prima frase del rilievo>');          (in testa al corpo della prova)",
-    "  test.fail(true, 'messo da parte: <prima frase del rilievo>');   (per un rilievo interno non corretto)",
-    'Il commit che aggiunge i marcatori NON fa decadere questo verdetto, finché lì cambiano solo',
-    'quelli. Qualunque altra riga, o un file fuori da quella cartella, lo fa decadere e serve un',
-    'altro giro. Una prova rossa senza marcatore ferma la chiusura come prima.',
+    `Adesso togli da ${cartella} le prove che riproducono questi rilievi: il rilievo vive nel feedback`,
+    'che ne nasce, e la cartella del giro non deve crescere di giro in giro. Una per rilievo:',
+    ...(elenco.length ? elenco.map((f) => `  · ${ROUND.primaFrase ? ROUND.primaFrase(f.text) : String(f.text).split('\n')[0]}`) : ['  (quelli elencati qui sopra)']),
+    'Poi `git add -A && git commit`: il commit che le toglie NON fa decadere questo verdetto, finché lì',
+    'si tolgono prove e nient\'altro. Una riga cambiata, una prova aggiunta o un file fuori da quella',
+    'cartella lo fanno decadere, e serve un altro giro.',
+    'Se una prova copre ANCHE un caso che resta aperto qui, non cancellarla: toglile il caso che se ne va,',
+    'oppure segnala il rosso atteso — `test.fail(true, \'<prima frase del rilievo>\');` in testa al corpo —',
+    'che il commit tollera allo stesso modo. Una prova rossa né tolta né segnata ferma la chiusura.',
   ].join('\n');
 }
 
