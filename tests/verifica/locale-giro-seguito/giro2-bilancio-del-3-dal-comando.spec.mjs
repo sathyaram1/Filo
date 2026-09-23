@@ -110,7 +110,7 @@ test.describe('bilancio dei 3 separato dal 2 — dal comando della verifica loca
     } finally { await s.chiudi(); }
   });
 
-  test('un 2 da solo con giri dei 2 ancora da spendere si corregge e paga il bilancio dei 2, non quello dei 3', async () => {
+  test('un 2 da solo con giri dei 2 ancora da spendere entra nel giro e consuma il bilancio dei 2, non quello dei 3', async () => {
     const repo = repoConVerificaAvviata({ count2: 3 });
     const s = await serverFinto(CAPS);
     try {
