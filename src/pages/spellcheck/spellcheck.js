@@ -167,9 +167,10 @@
     return row;
   }
 
+  // Si parte da quello che la pagina ha in mano, non da una rilettura: chiudendo
+  // la scheda c'è tempo per UN messaggio solo, e un giro in più lo mangia.
   async function updateAutocorrect(oldKey, newKey, newVal, opts = {}) {
-    const data = await chrome.storage.local.get(STORAGE_KEYS.AUTOCORRECT);
-    const map = { ...(data[STORAGE_KEYS.AUTOCORRECT] || {}) };
+    const map = { ...mappaMostrata };
     // Controllo conflitto: se stiamo rinominando (oldKey diverso da newKey) e
     // newKey esiste già in un'altra riga, blocca la modifica e avvisa l'utente.
     if (newKey && oldKey !== newKey && Object.prototype.hasOwnProperty.call(map, newKey)) {
