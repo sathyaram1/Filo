@@ -300,10 +300,23 @@ test('su un deposito vero: il commit dei marcatori non fa decadere il verdetto',
   assert.match(terzo.reason, /src\/menu\.js/);
 });
 
-test('su un deposito vero: una prova del giro cancellata dopo il verdetto ferma la chiusura', () => {
-  const { casa, git } = depositoConProva('filo-marcatori-tolta-');
+test('su un deposito vero: una prova del giro tolta dopo il verdetto non ferma la chiusura', () => {
+  const { casa, git, verificato } = depositoConProva('filo-marcatori-tolta-');
   git('rm', '-q', 'tests/verifica/locale-x/giro4.spec.mjs');
-  git('commit', '-qm', 'via la prova');
+  git('commit', '-qm', 'via la prova del rilievo uscito in un feedback suo');
   const r = verdictForCurrentBranch(casa);
-  assert.equal(r.ok, false, 'togliere la prova che riproduce il rilievo non è segnarla');
+  assert.equal(r.ok, true, 'è la strada normale dal 23/09/2026: senza questo, svuotare la cartella costa un giro');
+  assert.equal(r.tollerato, true);
+  assert.deepEqual(r.files, ['tests/verifica/locale-x/giro4.spec.mjs']);
+  // Lo stato arriva da git, non dedotto dal contenuto.
+  const letto = diffDopoLaVerifica(verificato, git('rev-parse', 'HEAD').trim(), casa);
+  assert.equal(letto.length, 1);
+  assert.equal(letto[0].stato, 'D');
+
+  // Una prova AGGIUNTA nella stessa cartella richiude il cancello: quello che
+  // gira è cresciuto, e nessuno l'ha provato.
+  writeFileSync(resolve(casa, 'tests', 'verifica', 'locale-x', 'giro5.spec.mjs'), PROVA, 'utf8');
+  git('add', '-A');
+  git('commit', '-qm', 'prova nuova');
+  assert.equal(verdictForCurrentBranch(casa).ok, false);
 });
