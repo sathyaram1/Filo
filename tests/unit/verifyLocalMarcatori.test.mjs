@@ -199,7 +199,7 @@ test('checkVerdict: il pass regge sul commit dei soli marcatori', () => {
   ]));
   assert.equal(r.ok, true);
   assert.equal(r.tollerato, true);
-  assert.match(r.reason, /marcatori di rosso atteso/);
+  assert.match(r.reason, /tolte prove o segnati rossi attesi/);
   assert.match(r.reason, /giro4\.spec\.mjs/, 'chi pubblica deve vedere cosa gli è stato lasciato passare');
 });
 
