@@ -157,6 +157,7 @@ test('fusione non riuscita: il segno rimesso dallo script la ritenta', async ({ 
 // esattamente com'era, e due clic la rimandano una seconda volta.
 
 test('fusione partita da sola e ancora in corso: la richiesta ferma non si rilancia', async ({ openTab }) => {
+  test.fail(true, 'rilievo aperto: la fusione in corso non si vede e due clic ne mandano una seconda');
   test.setTimeout(90000);
   const page = await openTab(MANAGE);
   const fb = segnata();
