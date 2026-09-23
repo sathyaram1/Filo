@@ -654,6 +654,12 @@ export function readRoleInstructions(role, { scope, caso } = {}) {
  * @param {object} bucket  bucket costruito dalla busta del server
  * @param {object} ctx     { diff?, feedback? } dati già raccolti dal chiamante
  */
+// Le decisioni dell'owner fanno parte della richiesta per chi verifica, risolve
+// e corregge: il server le mette nel payload, e qui non si perdono per strada.
+function conDecisioni(ctx) {
+  return Array.isArray(ctx && ctx.decisioni) && ctx.decisioni.length ? { decisioni: ctx.decisioni } : {};
+}
+
 export function buildPayload(bucket, ctx = {}) {
   switch (bucket.role) {
     case 'secaudit':
