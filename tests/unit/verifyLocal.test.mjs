@@ -845,7 +845,7 @@ test('CLI: né status né start mettono i bilanci davanti a chi verifica; con un
   assert.match(giu.stderr, /rete/);
 
   // Documento senza cap1: si ferma e dice quale manca, anche su critica.
-  const parziale = await fintoConfigRoutines({ FINTO_CAPS: JSON.stringify({ cap2: 5, cap0: 0 }) });
+  const parziale = await fintoConfigRoutines({ FINTO_CAPS: JSON.stringify({ cap3: 5, cap2: 5, cap0: 0 }) });
   try {
     const env = { ...process.env, FILO_ROUTINE_CONFIG_URL: parziale.url, FILO_REPO_ROOT: casa };
     const r = spawnSync(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), 'critica', LUNGA_FIX], { cwd: casa, encoding: 'utf8', env });
