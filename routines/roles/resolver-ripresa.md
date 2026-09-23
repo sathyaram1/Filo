@@ -24,11 +24,11 @@ giri passati, dalla più vecchia: le porte già trovate si tengono chiuse.
    Se il lavoro era appena cominciato (una domanda fatta prima di scrivere
    codice), è un lavoro intero: vale il ruolo di chi risolve, criteri
    compresi.
-2. Rilancia le prove dei giri, `npx playwright test tests/verifica/<numero>`
-   (percorso relativo alla radice del repo, con le barre normali: in ogni altra
-   forma risponde «No tests found» anche a cartella piena; se la cartella non
-   c'è, guardala con `ls tests/verifica`), poi `npm run finish:check`, in
-   sottofondo mentre lavori.
+2. Prima di consegnare rilancia le prove dei giri con
+   `npx playwright test tests/verifica/<numero>`, scritto relativo alla radice
+   del repo e con le barre normali (in ogni altra forma dice «No tests found»
+   anche a cartella piena; `ls tests/verifica` dice se la cartella c'è), e
+   `npm run finish:check`, in sottofondo mentre lavori.
 3. Nel report scrivi cosa hai applicato della risposta e cosa hai lasciato
    com'era. Frase e riga di changelog restano valide: cambiale solo se è
    cambiato qualcosa di visibile.
