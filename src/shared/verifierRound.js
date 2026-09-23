@@ -63,18 +63,20 @@
 
   // ── Il formato della critica ───────────────────────────────────────────────
   //
-  // Una riga per rilievo, che comincia col livello fra parentesi quadre:
+  // Una riga per rilievo, che comincia col livello E la sede fra quadre:
   //
-  //   [2] Il pulsante «Salva» non salva se il titolo è vuoto: passi …
-  //   [1?] Il colore del bordo non segue il tema scuro (chiede una decisione)
-  //   [0] Con la finestra sotto i 300 pixel il menu esce dallo schermo
+  //   [2i] Il pulsante «Salva» non salva se il titolo è vuoto: passi …
+  //   [1i?] Il colore del bordo non segue il tema scuro (chiede una decisione)
+  //   [2e] Preferenze aperta in due schede cancella le modifiche (c'era già su main)
   //
-  // Il `?` dopo il livello segna «chiede una decisione dell'owner» (un
-  // trade-off vero, una scelta di prodotto). Le righe che seguono un rilievo
-  // senza un livello davanti sono la sua continuazione (i passi per
-  // riprodurlo); le righe PRIMA del primo rilievo sono il riassunto («cosa
-  // funziona»). Una critica senza nessuna riga con livello ha zero rilievi:
-  // è il pass.
+  // Il `?` dopo la sede segna «chiede una decisione dell'owner» (un
+  // trade-off vero, una scelta di prodotto). La sede è OBBLIGATORIA: un
+  // «[2]» senza lettera non prende un default in silenzio, viene respinto con
+  // la spiegazione (unparsedLevelLines, e `rifiutati` di parseFindings). Le
+  // righe che seguono un rilievo senza un livello davanti sono la sua
+  // continuazione (i passi per riprodurlo); le righe PRIMA del primo rilievo
+  // sono il riassunto («cosa funziona»). Una critica senza nessuna riga con
+  // livello ha zero rilievi: è il pass.
   // Il livello può stare dopo un punto elenco («- [2]») o un numero («1. [2]»):
   // un elenco numerato è il modo più naturale di scrivere tre rilievi.
   // Davanti al livello valgono anche un titolo Markdown («### [2]»), una
