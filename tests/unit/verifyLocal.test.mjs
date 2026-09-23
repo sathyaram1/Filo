@@ -779,7 +779,7 @@ test('leggiBilanciDalServer: i quattro numeri dal documento Firestore, col token
   assert.ok(Number.isNaN(numeroFirestore(undefined)));
 });
 
-test('leggiBilanciDalServer: senza token, senza documento o senza uno dei tre numeri si FERMA e dice cosa manca — mai un default', async () => {
+test('leggiBilanciDalServer: senza token, senza documento o senza uno dei quattro numeri si FERMA e dice cosa manca — mai un default', async () => {
   await assert.rejects(
     () => leggiBilanciDalServer({ fetchImpl: async () => { throw new Error('non deve chiamare'); }, env: {}, trovaRefresh: () => null }),
     (e) => e.message === SENZA_TOKEN_MSG && /FILO_ADMIN_REFRESH_TOKEN/.test(e.message) && /tests\/agent\/\.env/.test(e.message) && /admin-login/.test(e.message),
