@@ -467,12 +467,10 @@
     $('sec-siteblock').addEventListener('change', () => { syncSiteBlockEnabled(); rimandato.adesso(); });
     $('sec-siteblock-lists').addEventListener('change', subito);
     $('sec-siteblock-blacklist').addEventListener('change', () => rimandato.programma());
-    // Quello che si sta ancora scrivendo è già una modifica: senza, chi chiude
-    // la scheda col cursore nel campo perde l'ultima riga scritta.
-    $('sec-siteblock-blacklist').addEventListener('input', () => {
-      setBlacklistError([]);
-      rimandato.modificato();
-    });
+    // Quello che si sta ancora scrivendo è già una modifica, e vale per OGNI
+    // campo della pagina: iscritto campo per campo, prima o poi ne resta fuori uno.
+    $('page').addEventListener('input', () => rimandato.modificato());
+    $('sec-siteblock-blacklist').addEventListener('input', () => setBlacklistError([]));
     $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); rimandato.adesso(); });
     $('sec-safebrowse-network').addEventListener('change', subito);
     $('sec-safebrowse-llm').addEventListener('change', subito);
