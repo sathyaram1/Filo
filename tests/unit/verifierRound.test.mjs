@@ -113,10 +113,10 @@ test('cap0 a zero: soli 0 → derivato; in elenco con livelli più alti rientran
 });
 
 test('cap0 alzato dall\'owner: soli 0 → fix, il giro si conta su cap0', () => {
-  const d = decide([f(0, 'raro')], {}, { cap2: 5, cap1: 2, cap0: 1 });
+  const d = decide([f(0, 'raro')], {}, { cap3: 5, cap2: 5, cap1: 2, cap0: 1 });
   assert.equal(d.fix.length, 1);
   assert.equal(d.consume, 'cap0');
-  const dopo = decide([f(0, 'raro')], d.counts, { cap2: 5, cap1: 2, cap0: 1 });
+  const dopo = decide([f(0, 'raro')], d.counts, { cap3: 5, cap2: 5, cap1: 2, cap0: 1 });
   assert.deepEqual(dopo.fix, [], 'al secondo giro il bilancio è finito');
 });
 
