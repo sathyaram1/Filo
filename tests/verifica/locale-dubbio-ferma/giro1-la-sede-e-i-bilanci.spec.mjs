@@ -35,7 +35,7 @@ test('un livello fra quadre nel riassunto o nei passi, o due sulla stessa riga, 
   expect(V.unparsedLevelLines('funziona X [2i] Y\n[1i] vero')).toHaveLength(1);
   expect(V.unparsedLevelLines('[2i] rilievo\n  Passi: apri e vedi [3i] boom')).toHaveLength(1);
   expect(V.unparsedLevelLines('[2i] primo [1e] secondo')).toHaveLength(1);
-  expect(V.unparsedLevelLines('[2i]\nfine')).toEqual(['[2i] (rilievo senza testo)']);
+  expect(V.unparsedLevelLines('[2i]\n[1e] x')).toEqual(['[2i] (rilievo senza testo)']);
 });
 
 test('gli esterni non contano per il giro: il lavoro passa e ognuno diventa un feedback con priorità uguale al livello', () => {
