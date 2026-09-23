@@ -1078,10 +1078,11 @@ export function verifierReplyText(reply) {
       '══ RISPOSTA DEL SERVER: il lavoro si ferma ══',
       perSegnalazione
         ? 'La segnalazione è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
-        : 'Rilievi interni di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l\'owner.',
+        : 'Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o un 3/2 che chiede una decisione): decide l\'owner.',
       perSegnalazione ? null : fmt(r.blocking),
       sospesi.length ? `Rilievi interni che restano davanti a chi riprende dopo la risposta:\n${fmt(sospesi)}` : null,
       derivati.length ? `Feedback derivati aperti dal server (esterni: escono comunque):\n${derivatiRighe(derivati)}` : null,
+      budgets ? `Bilanci: ${budgets}` : null,
       'Non c\'è niente da correggere adesso: rilascia il biglietto.',
     ].filter((l) => l !== null).join('\n');
   }
@@ -1089,8 +1090,10 @@ export function verifierReplyText(reply) {
     return [
       '══ RISPOSTA DEL SERVER: verifica superata ══',
       derivati.length ? `Rilievi non corretti, diventati feedback loro (priorità uguale al livello):\n${derivatiRighe(derivati)}` : 'Nessun rilievo da mettere da parte.',
+      dueRiga,
+      budgets ? `Bilanci: ${budgets}` : null,
       'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',
-    ].join('\n');
+    ].filter((l) => l !== null).join('\n');
   }
   // Il server ha accettato la critica ma non ha detto l'esito: non è un pass,
   // e non lo si inventa qui.
