@@ -491,8 +491,14 @@ async function setAutomationProberIdle(on, idToken) {
 // verifica locale con 5/2/0 mentre la dashboard diceva 10/1/0). Un campo che
 // nel documento non c'è torna `null`, e la dashboard lo mostra vuoto. Il range
 // da SN_CONST.AUTOMATION; clamp prudente sia in lettura sia in scrittura. Lo 0
-// è un valore valido per tutti e tre.
-const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap2', 'cap1', 'cap0'];
+// è un valore valido per tutti.
+const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
+/** La forma di risposta coi bilanci tutti a `null`: un campo che nel documento non c'è resta vuoto. */
+function capsVuoti() {
+  const out = { fixInstructions: '', giroStretto: false };
+  for (const k of CAP_KEYS) out[k] = null;
+  return out;
+}
 const FIX_INSTRUCTIONS_MAX = Number(globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION && globalThis.SN_CONST.AUTOMATION.FIX_INSTRUCTIONS_MAX) || 8000;
 
 function automationRange() {
