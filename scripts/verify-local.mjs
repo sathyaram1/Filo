@@ -111,9 +111,9 @@ export function numeroFirestore(campo) {
 }
 
 /**
- * I tre bilanci come stanno nel documento del server. Lancia con un messaggio
- * che dice cosa manca; mai un numero al posto di quello dell'owner.
- * @returns {Promise<{cap2:number, cap1:number, cap0:number, fixInstructions:string, giroStretto:boolean}>}
+ * I bilanci come stanno nel documento del server, uno per livello. Lancia con
+ * un messaggio che dice cosa manca; mai un numero al posto di quello dell'owner.
+ * @returns {Promise<{cap3:number, cap2:number, cap1:number, cap0:number, fixInstructions:string, giroStretto:boolean}>}
  */
 export async function leggiBilanciDalServer({ fetchImpl = fetch, env = process.env, trovaRefresh = null } = {}) {
   const fa = await import('./lib/firestore-auth.mjs');
