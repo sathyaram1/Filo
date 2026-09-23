@@ -355,10 +355,7 @@
       },
     };
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
-    const hint = $('savedHint');
-    hint.classList.add('sn-show');
-    clearTimeout(saveCookies._t);
-    saveCookies._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
+    mostraConferma();
   }
 
   // I sotto-controlli del rilevamento siti pericolosi sono attivi solo quando il
