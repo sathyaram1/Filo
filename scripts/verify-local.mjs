@@ -1216,7 +1216,10 @@ if (isMain) {
       if (r.replayed) console.log('(critica già registrata su questo giro: ristampo la fase 2, il giro non si ripaga)');
       console.log(codaText({ findings: r.decision.fix, derived: r.decision.derived, external: r.decision.external, budgets: r.decision.budgets, branch, instructions: codaDalServer(caps.fixInstructions) || leggiCoda() }));
     } else if (r.outcome === 'stop') {
-      console.log(`══ ESITO: il lavoro si ferma ══\nRilievi interni di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}`);
+      const sospesi = Array.isArray(r.decision.sospesi) && r.decision.sospesi.length
+        ? `\nAltri rilievi interni della stessa critica, che restano davanti a chi riprende dopo la risposta dell'owner:\n${ROUND.formatFindings(r.decision.sospesi)}`
+        : '';
+      console.log(`══ ESITO: il lavoro si ferma ══\nRilievi interni di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}${sospesi}`);
       if (r.decision.external && r.decision.external.length) {
         console.log(`Rilievi esterni (non toccano a questo lavoro): ciascuno diventa un feedback suo, lo apre chi guida dal report.\n${derivatiText(r.decision.external)}`);
       }
