@@ -73,30 +73,30 @@ const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : 
 
 // Le regole del giro: le stesse del server e degli strumenti delle routine
 // (fonte unica). Lette dal progetto, accanto a questo file: in locale non c'è
-// una copia fissata degli strumenti. I BILANCI (cap2/cap1/cap0) invece non
-// stanno in nessun file: si leggono dal server (leggiBilanciDalServer).
+// una copia fissata degli strumenti. I BILANCI (uno per livello, cap3…cap0)
+// invece non stanno in nessun file: si leggono dal server (leggiBilanciDalServer).
 const require = createRequire(import.meta.url);
 require(resolve(__dirname, '..', 'src', 'shared', 'feedbackTransitions.js'));
 require(resolve(__dirname, '..', 'src', 'shared', 'verifierRound.js'));
 const ROUND = globalThis.SN_VERIFIER_ROUND;
-const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap2', 'cap1', 'cap0'];
+const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
 
 // ─── I bilanci del giro si leggono dal server ────────────────────────────────
 //
 // Fino al 2026-09-16 questo script ragionava con un default scritto nel
-// codice (5/2/0) mentre l'owner in dashboard aveva 10/1/0: i giri locali
-// facevano i conti coi numeri sbagliati. Decisione dell'owner: i tre bilanci
-// si leggono dal documento che la dashboard scrive (`config/routines`, campi
-// cap2/cap1/cap0, Gestione → Automazioni), con l'identità dell'owner — lo
-// stesso token admin degli altri script locali (FILO_ADMIN_REFRESH_TOKEN, in
+// codice mentre l'owner in dashboard aveva altri numeri: i giri locali
+// facevano i conti coi numeri sbagliati. Decisione dell'owner: i bilanci si
+// leggono dal documento che la dashboard scrive (`config/routines`, i campi di
+// CAP_KEYS, Gestione → Automazioni), con l'identità dell'owner — lo stesso
+// token admin degli altri script locali (FILO_ADMIN_REFRESH_TOKEN, in
 // tests/agent/.env del checkout principale) — e NON c'è un ripiego: se il
-// token manca, se la lettura fallisce o se il documento non ha i tre numeri,
+// token manca, se la lettura fallisce o se al documento manca un numero,
 // ci si ferma con un errore che dice cosa manca e dove si mette.
 //
 // `FILO_ROUTINE_CONFIG_URL` e `FILO_ADMIN_ID_TOKEN` esistono per i controlli
 // (un server finto in ascolto in locale, un token già coniato): non sono un
 // ripiego, in produzione non sono impostate e la lettura resta quella vera.
-export const SENZA_TOKEN_MSG = 'Manca FILO_ADMIN_REFRESH_TOKEN: i bilanci del giro (cap2/cap1/cap0) si leggono dal server con l\'identità dell\'owner. '
+export const SENZA_TOKEN_MSG = `Manca FILO_ADMIN_REFRESH_TOKEN: i bilanci del giro (${CAP_KEYS.join('/')}) si leggono dal server con l'identità dell'owner. `
   + 'Mettilo in tests/agent/.env del checkout principale (riga FILO_ADMIN_REFRESH_TOKEN=…, lo genera `node scripts/admin-login.mjs`) '
   + 'oppure esportalo nell\'ambiente. Senza, la verifica non parte: non c\'è un default.';
 
