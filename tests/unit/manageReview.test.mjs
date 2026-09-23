@@ -1329,10 +1329,10 @@ test('livelli L1: il pannello del triangolo porta anche la decisione già presa'
 
 // ── Un lavoro fermo su una scelta dell'owner aspetta la sua risposta ─────────
 
-test('aspettaRisposta: la casella di risposta si apre su domande, scelta e bilancio esaurito, non sugli altri motivi', () => {
+test('aspettaRisposta: la casella di risposta si apre su domande e su una scelta da fare, non sugli altri motivi', () => {
   assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'clarify' }), true);
   assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'decisione' }), true, 'una segnalazione ferma il lavoro: l\'owner risponde qui');
-  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'loop' }), true);
+  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'loop' }), false, 'un bilancio esaurito si rimette in coda e basta');
   assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'secaudit' }), false);
   assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'l5' }), false);
   assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'branch' }), false);
