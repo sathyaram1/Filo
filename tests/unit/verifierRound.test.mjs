@@ -205,7 +205,7 @@ test('formatFindings e roundNote: livelli davanti, il segno ? conservato, esito 
   assert.match(fix, /\[2i\] rotto/);
   assert.match(R.roundNote({ findings: [] }), /^Verifica superata\.$/);
   assert.match(R.roundNote({ findings: [f(2, 'x')], decision: { stop: true } }), /Il lavoro si ferma/);
-  assert.match(R.roundNote({ findings: [f(0, 'x')], decision: { fix: [] } }), /feedback derivato/);
+  assert.match(R.roundNote({ findings: [f(0, 'x')], decision: { fix: [] } }), /feedback derivati/);
 });
 
 test('#561 giro 2: unparsedLevelLines segnala i livelli fuori posto; «1. [2]» e «- [2]» sono rilievi', () => {
