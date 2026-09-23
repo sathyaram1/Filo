@@ -38,6 +38,16 @@ trovi.
 
 <!-- includi: _criteri-verifica.md -->
 
+A ogni difetto il verificatore dà un livello, col metro della frequenza
+(quanti utenti lo incontrano), e una sede: **interno** se sta nello scenario
+della segnalazione — i suoi esempi, i suoi passi, i casi ovvi della cosa
+chiesta — o se l'ha creato il tuo ramo; **esterno** se tocca a un altro
+lavoro. Usa lo stesso metro: chiudi lo scenario e le porte della stessa causa,
+col 20% dello sforzo che dà l'80% del risultato. **Niente oltre al chiesto**:
+un difetto fuori dallo scenario, o una funzione che nessuno ha chiesto, non si
+fa — lo scrivi nel report e diventerà un feedback suo. È ciò che una
+correzione aggiunge a generare i rilievi del giro dopo.
+
 Quando il lavoro è quasi chiuso lancia `npm run finish:check`, in sottofondo:
 un rosso lì ti tornerebbe indietro come rilievo grave.
 
