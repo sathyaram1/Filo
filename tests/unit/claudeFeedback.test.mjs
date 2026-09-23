@@ -116,12 +116,31 @@ test('il guasto del server è "riprova", il rifiuto no', () => {
   assert.equal(SCRIPT.exitCodeForError(cifratura), SCRIPT.EXIT.RIFIUTATO);
 });
 
-test('priorità: si accettano 1-3, il resto è un errore d’uso', () => {
+test('priorità: la scala è 3/2/1/0, si accettano tutti e quattro i gradini, il resto è un errore d’uso', () => {
+  assert.deepEqual(SCRIPT.PRIORITA_AMMESSE, [0, 1, 2, 3]);
   assert.deepEqual(SCRIPT.parsePriorita(undefined), { ok: true, valore: null });
   assert.deepEqual(SCRIPT.parsePriorita('2'), { ok: true, valore: 2 });
-  assert.equal(SCRIPT.parsePriorita('0').ok, false);
+  // Lo 0 è un gradino della scala (un caso raro), non «nessuna priorità»:
+  // rifiutarlo lasciava un feedback senza modo di dire «vale zero».
+  assert.deepEqual(SCRIPT.parsePriorita('0'), { ok: true, valore: 0 });
   assert.equal(SCRIPT.parsePriorita('4').ok, false);
+  assert.match(SCRIPT.parsePriorita('4').motivo, /ammessi 0, 1, 2, 3/);
+  assert.equal(SCRIPT.parsePriorita('-1').ok, false);
   assert.equal(SCRIPT.parsePriorita('alta').ok, false);
+});
+
+test('priorità 0 dalla riga di comando: si accetta e si dichiara (prova a vuoto), senza depositare', async () => {
+  await conSubmit(async () => { throw new Error('submit non doveva essere chiamata'); }, async (visti) => {
+    const righe = [];
+    const orig = console.log;
+    console.log = (...a) => righe.push(a.join(' '));
+    let code;
+    try { code = await SCRIPT.main(['T', 'X', '--priorita', '0', '--dry-run']); } finally { console.log = orig; }
+    assert.equal(code, SCRIPT.EXIT.FATTO);
+    assert.equal(visti.length, 0);
+    // Uno 0 letto come «falso» spariva dalla riga: il numero va stampato.
+    assert.match(righe.join('\n'), /priorità 0/);
+  });
 });
 
 test('priorità fuori scala: si ferma PRIMA di depositare', async () => {
