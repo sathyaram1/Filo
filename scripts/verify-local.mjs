@@ -243,7 +243,7 @@ export function checkVerdict(entry, headSha, dirty = false, leggiDiff = null) {
         tollerato: true,
         files: tol.files,
         reason: tol.files.length
-          ? `verifica superata su ${String(entry.sha).slice(0, 8)}: dopo di lei nelle prove del giro sono state tolte prove o segnati rossi attesi (${tol.files.join(', ')}), e quello che gira non è cresciuto`
+          ? `verifica superata su ${String(entry.sha).slice(0, 8)}: dopo di lei dalle prove del giro sono state solo tolte prove o casi (${tol.files.join(', ')}), e quello che gira non è cresciuto`
           : `verifica superata su ${String(entry.sha).slice(0, 8)}: dopo di lei il contenuto non è cambiato`,
       };
     }
