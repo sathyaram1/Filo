@@ -334,18 +334,29 @@
 
   /**
    * Legge la critica scritta dal verificatore. PURA.
-   * @returns {{ summary: string, findings: Array<{level:number, text:string, decision:boolean}> }}
+   *
+   * `rifiutati` sono le righe con un livello ma SENZA la sede («[2] …»), con
+   * la spiegazione: non diventano rilievi né riassunto, e chi registra deve
+   * respingere la critica finché ce ne sono (le altre forme storte le elenca
+   * unparsedLevelLines).
+   * @returns {{ summary: string, findings: Array<{level:number, sede:'i'|'e', text:string, decision:boolean}>, rifiutati: string[] }}
    */
   function parseFindings(text) {
     const lines = normalizeCritique(text).split('\n');
     const summary = [];
     const findings = [];
+    const rifiutati = [];
     let current = null;
     for (const raw of lines) {
       const m = FINDING_LINE.exec(raw);
       if (m) {
-        current = { level: Number(m[1]), text: m[3].trim(), decision: m[2] === '?' };
+        current = rilievoDa(m);
         findings.push(current);
+        continue;
+      }
+      if (FINDING_LINE_SENZA_SEDE.test(raw)) {
+        rifiutati.push(`${raw.trim()} (${SPIEGAZIONE_SEDE})`);
+        current = null;
         continue;
       }
       if (current) {
