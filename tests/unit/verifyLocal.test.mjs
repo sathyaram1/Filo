@@ -873,7 +873,7 @@ test('la coda locale è il testo del server più le sole differenze locali', asy
 // ─── Giro stretto: dopo una correzione, la verifica controlla la chiusura ────
 
 test('giro stretto: l\'interruttore si legge coi bilanci, e solo un true esplicito lo accende', async () => {
-  const conCampi = (extra) => async () => ({ ok: true, status: 200, json: async () => ({ fields: { cap2: { integerValue: '5' }, cap1: { integerValue: '2' }, cap0: { integerValue: '0' }, ...extra } }) });
+  const conCampi = (extra) => async () => ({ ok: true, status: 200, json: async () => ({ fields: { cap3: { integerValue: '5' }, cap2: { integerValue: '5' }, cap1: { integerValue: '2' }, cap0: { integerValue: '0' }, ...extra } }) });
   const leggi = (extra) => leggiBilanciDalServer({ fetchImpl: conCampi(extra), env: { FILO_ADMIN_ID_TOKEN: 't' } });
   assert.equal((await leggi({})).giroStretto, false, 'campo assente = spento');
   assert.equal((await leggi({ giroStretto: { booleanValue: false } })).giroStretto, false);
