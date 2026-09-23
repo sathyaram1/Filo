@@ -268,7 +268,7 @@ test('una barra-n letterale davanti a un rilievo vale come a capo: il [2i] non s
 
 test('con la barra-n anche un livello scritto male viene respinto, non ignorato', () => {
   assert.deepEqual(R.unparsedLevelLines(`Provato.${BSN}[4] gravissimo`), ['[4] gravissimo']);
-  assert.deepEqual(R.unparsedLevelLines(`Provato.${BSN}[2]`), ['[2] (rilievo senza testo)']);
+  assert.deepEqual(R.unparsedLevelLines(`Provato.${BSN}[2i]`), ['[2i] (rilievo senza testo)']);
 });
 
 test('una barra-n in mezzo a una frase, senza una parentesi dopo, resta testo', () => {
