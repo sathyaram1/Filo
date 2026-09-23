@@ -562,7 +562,7 @@ async function setRoutineCaps(patch, idToken) {
   } catch (e) {
     // Scritto ma non riletto: un salvataggio riuscito non deve sembrare fallito. Tornano i soli campi scritti.
     if (!mask.length) throw e;
-    const scritto = { cap2: null, cap1: null, cap0: null, fixInstructions: '', giroStretto: false };
+    const scritto = capsVuoti();
     for (const k of mask) scritto[k] = k === 'fixInstructions' ? p[k].slice(0, FIX_INSTRUCTIONS_MAX) : (k === 'giroStretto' ? p[k] : clampCap(p[k]));
     return scritto;
   }
