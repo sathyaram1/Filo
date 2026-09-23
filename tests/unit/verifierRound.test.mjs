@@ -15,7 +15,7 @@ require(resolve(ROOT, 'src', 'shared', 'verifierRound.js'));
 const R = globalThis.SN_VERIFIER_ROUND;
 // I bilanci di QUESTI test: nel codice non esiste un default (2026-09-16), i
 // numeri veri li scrive l'owner in config/routines.
-const CAPS = { cap2: 5, cap1: 2, cap0: 0 };
+const CAPS = { cap3: 5, cap2: 5, cap1: 2, cap0: 0 };
 
 const f = (level, text, decision = false) => ({ level, text, decision });
 const decide = (findings, counts = {}, caps = CAPS) => R.decideRound({ findings, caps, counts });
