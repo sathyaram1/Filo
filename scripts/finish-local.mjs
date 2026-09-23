@@ -560,12 +560,12 @@ async function main() {
     }
     if (v.ok) {
       console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
-      // Il verdetto vale per un commit. Se la punta si è mossa solo per prove
-      // del giro tolte (o segnate rosse attese), regge lo stesso (#661):
-      // quando succede si DICE quali file sono passati, perché un cancello che
-      // si apre in silenzio è indistinguibile da uno che non c'è.
+      // Il verdetto vale per un commit. Se dopo di lui dalle prove del giro si
+      // è solo tolto, regge lo stesso (#661): quando succede si DICE quali file
+      // sono passati, perché un cancello che si apre in silenzio è
+      // indistinguibile da uno che non c'è.
       if (v.tollerato) {
-        console.log(`  Il ramo si è mosso dopo la verifica, ma solo dentro le prove del giro: ${(v.files || []).join(', ')}`);
+        console.log(`  Il ramo si è mosso dopo la verifica, ma solo togliendo prove o casi dalle prove del giro: ${(v.files || []).join(', ')}`);
         console.log('  Quello che gira non è cresciuto rispetto al contenuto verificato, quindi il verdetto regge.');
       }
     }
