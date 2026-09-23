@@ -23,7 +23,12 @@ node scripts/routine-channel.mjs deliver status --status design --reason clarify
 ```
 
 Poi rilascia il biglietto come qui sotto: il lavoro riparte quando l'owner ha
-risposto.
+risposto, e chi riprende riceve le domande e la risposta.
+
+Se `payload.ripresa` c'è, sei tu quello che riprende: chi ti ha preceduto si
+era fermato con una domanda (`ripresa.domanda`) e l'owner ha risposto
+(`ripresa.risposta`; vuota vuol dire che ha rimesso in coda senza scrivere:
+vale quello che era stato proposto). Parti da lì, non richiederla.
 
 ## Prima di consegnare, fai tu quello che farà la verifica
 
