@@ -343,8 +343,9 @@ resto.
   col livello davanti (3/2/1/0; `?` = chiede una decisione dell'owner). Il
   metro dei livelli sta nel testo del ruolo
   (`routines/roles/_critica-e-livelli.md`), uno per tutti gli ambiti.
-- **L'esito lo calcola il server** dai livelli e da tre bilanci per lavoro
-  (`cap2` per i livelli 3/2, `cap1`, `cap0`): `pass`, `fix` o `stop`. Le regole
+- **L'esito lo calcola il server** dai livelli e da un bilancio per livello
+  (`cap3`, `cap2`, `cap1`, `cap0`; dal 2026-09-23 solo il 3 ferma a bilancio
+  finito, il 2 esce come feedback a priorità 2): `pass`, `fix` o `stop`. Le regole
   stanno in `src/shared/verifierRound.js`, che il server incorpora al deploy; i
   numeri li scrive l'owner in Gestione → Automazioni e non hanno un default nel
   codice. Un'istanza catturata non può promuoversi da sola: i conti non li fa
