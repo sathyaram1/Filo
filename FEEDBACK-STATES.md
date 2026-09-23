@@ -202,9 +202,10 @@ decisione dell'owner (`statusReason: decisione`), oppure chi risolve o chi corre
 consegnato con una segnalazione per l'owner (stesso `statusReason: decisione`); in
 tutti questi casi bilanci e verdetti del giro si azzerano — la storia delle critiche
 resta — e il server lascia un **segnalibro di ripresa** nello stato del giro (chi si
-è fermato, perché, i rilievi rimasti aperti). Nei casi `clarify`, `decisione` e
-`loop` la dashboard offre la casella di risposta: la risposta dell'owner va nella
-conversazione, il feedback torna `todo`, e la coda — vedendo ramo e segnalibro — manda
+è fermato, perché, i rilievi rimasti aperti). Nei casi `clarify` e `decisione` la
+dashboard offre la casella di risposta (su `loop` si rimette in coda e basta): la
+risposta dell'owner va nella conversazione, il feedback torna `todo`, e la coda —
+vedendo ramo e segnalibro — manda
 un **correttore sul ramo** (ruolo `fixer`, testo `resolver-ripresa.md`) con domanda,
 risposta e rilievi fermi nel payload (`ripresa`), non un risolutore da capo; dopo la
 sua consegna riprova un verificatore. Se la domanda era arrivata prima di avere un
