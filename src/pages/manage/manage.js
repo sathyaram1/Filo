@@ -574,10 +574,12 @@
     applyAutoApproveGate();
   }
 
-  // ── I tre bilanci dei giri di correzione (tab Automazioni) ────────
-  // Quattro campi sul doc Firestore config/routines (feedback #561, §4):
-  //   cap2  giri di correzione per i rilievi di livello 3 e 2 (a bilancio
-  //         finito un 3/2 ferma la pratica e chiama l'owner);
+  // ── I bilanci dei giri di correzione, uno per livello (tab Automazioni) ──
+  // Cinque campi sul doc Firestore config/routines (feedback #561, §4):
+  //   cap3  giri di correzione per i rilievi di livello 3 (a bilancio finito
+  //         un 3 ferma la pratica e chiama l'owner);
+  //   cap2  giri per i rilievi di livello 2 (a bilancio finito escono come
+  //         feedback a priorità 2, il lavoro non si ferma);
   //   cap1  giri per i rilievi di livello 1 (a bilancio finito vanno nel
   //         feedback derivato);
   //   cap0  giri per i soli rilievi di livello 0 (0 = mai da soli);
