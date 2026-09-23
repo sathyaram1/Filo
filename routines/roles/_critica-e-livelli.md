@@ -112,7 +112,10 @@ node scripts/dispatch.mjs --record-verifier <id> "Provato: …
 
 Qui il file accompagna un rilievo col `?`: la riga nella critica resta una
 riga, le scelte e i loro costi stanno nel file. Un difetto non va lì: è un
-rilievo col suo livello.
+rilievo col suo livello. Sulla critica a fermare il lavoro è il livello del
+rilievo col `?`: un 2 o un 3 lo fermano, un 1 va avanti in un feedback
+derivato che l'owner decide a parte. Se poi il server ti manda a correggere,
+una segnalazione a QUELLA consegna ferma il lavoro come per chi risolve.
 
 La critica registrata non si modifica più.
 
