@@ -326,7 +326,7 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
       const p = prev.pending;
       return {
         ok: true, state: s, replayed: true, outcome: 'fix',
-        decision: { fix: p.findings || [], derived: Array.isArray(p.derived) ? p.derived : [], budgets: p.budgets || null, blocking: [] },
+        decision: { fix: p.findings || [], derived: Array.isArray(p.derived) ? p.derived : [], external: Array.isArray(p.external) ? p.external : [], budgets: p.budgets || null, blocking: [] },
       };
     }
     return { ok: false, state: s, reason: 'critica già registrata su questo giro: non si modifica più, e un giro non si paga due volte. Prima chi corregge consegna (verify-local.mjs corretto "<report>"), poi si riparte con start. (Se ti serve rileggere la risposta, rimanda la stessa identica critica: viene ristampata senza pagare.)' };
