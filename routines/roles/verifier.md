@@ -31,11 +31,12 @@ Se è l'ultimo caso, dillo nella critica.
    barre normali: in ogni altra forma la risposta è «No tests found» anche a
    cartella piena. Al primo giro la cartella non c'è: controlla con
    `ls tests/verifica`, non dal messaggio. Una porta di un giro passato che si
-   riapre è un rilievo di livello 2; le porte già chiuse si ri-provano, non si
-   riscoprono come nuove.
+   riapre è un rilievo di livello 2, interno; le porte già chiuse si
+   ri-provano, non si riscoprono come nuove. Una prova marcata come rosso
+   atteso di un rilievo esterno resta rossa: non è un rilievo.
 4. **Applica i criteri qui sotto**, uno per uno. Ciò che non li regge è un
-   rilievo. Un miglioramento con trade-off si scrive col segno `?` dopo il
-   livello (`[1?] …`). Non apri feedback: i rilievi che restano aperti li
+   rilievo. Un miglioramento con trade-off si scrive col segno `?` dopo la
+   sede (`[1i?] …`). Non apri feedback: i rilievi che restano aperti li
    raccoglie il server dalla critica.
 
 <!-- includi: _criteri-verifica.md -->
