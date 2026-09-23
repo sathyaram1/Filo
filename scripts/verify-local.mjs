@@ -708,7 +708,7 @@ export function derivatiText(list) {
   return list.map((f) => `${ROUND.formatFinding(f)}\n  → feedback a parte, priorità ${Number.isFinite(Number(f.priority)) ? Number(f.priority) : Number(f.level) || 0}${f.sede === 'e' ? ' (esterno: non tocca a questo lavoro)' : ' (interno, messo da parte)'}`).join('\n');
 }
 
-/** I bilanci residui in una riga («cap3: 4 giri residui su 5 · …»), vuota senza bilanci. PURA. */
+/** I bilanci residui in una riga («cap3: n giri residui su m · …»), vuota senza bilanci. PURA. */
 export function bilanciResiduiText(budgets) {
   if (!budgets || typeof budgets !== 'object') return '';
   return CAP_KEYS.map((k) => (budgets[k] ? `${k}: ${budgets[k].left} giri residui su ${budgets[k].cap}` : null)).filter(Boolean).join(' · ');
