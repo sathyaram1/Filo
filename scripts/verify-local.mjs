@@ -501,136 +501,25 @@ export function cartellaProveGiro(branch) {
   return `${PROVE_GIRO}locale-${slug}`;
 }
 
-// ─── Il verdetto non decade per quello che il giro fa alle sue prove (#661) ──
+// ─── Il verdetto non decade per le prove del giro TOLTE (#661) ──────────────
 //
 // Quando il giro mette da parte un rilievo e dice «si può pubblicare», la prova
-// del giro che lo riproduce resta rossa. Dal 23/09/2026 quella prova si
-// CANCELLA: il rilievo vive nel feedback che è appena nato, e la cartella si
-// svuota invece di crescere. Cancellare vuol dire un commit, e quel commit
-// sposta la punta del ramo DOPO il verdetto, che vale per il commit di prima.
-// La chiusura respingeva («il codice è cambiato dopo la verifica») e serviva un
-// giro intero in più, di un'altra istanza, per un ramo in cui non era cambiata
-// una riga di prodotto. È successo due volte col vecchio marcatore di rosso
-// atteso: il 10/09 sul ramo della suite locale e il 18/09 su quello del ripiego
-// crediti (#629), dove il quarto giro è servito solo a questo.
+// del giro che lo riproduce si CANCELLA: il rilievo vive nel feedback appena
+// nato. Quel commit sposta la punta DOPO il verdetto, e senza questa eccezione
+// costava un giro intero di un'altra istanza (10/09 e 18/09, #629).
 //
-// LA REGOLA: il verdetto regge su un commit successivo se quello che GIRA non
-// cresce e non cambia, e se quello che è cambiato sta tutto nelle prove del
-// giro. Quello che i testi mandano a fare dopo un verdetto è una mossa sola —
-// TOGLIERE, un file intero o un caso da un file — perché è la sola che regge
-// anche sul cancello di fusione del server. I marcatori di rosso atteso restano
-// tollerati da quando la regola era quella: qui non si stringe per non far
-// decadere un verdetto su un ramo scritto ieri. Non si leggono le righe del diff
-// una per una: si riducono i due contenuti a ciò che fa girare — via commenti,
-// righe vuote e marcatori — e si confrontano. Una prova AGGIUNTA no: lì
-// qualcosa da girare c'è, e nessuno l'ha vista. Il resto del cancello non si
-// muove: una prova del giro rossa che nessuno ha toccato ferma la chiusura come
-// prima.
+// LA REGOLA è la stessa del cancello di fusione del server: dopo il verdetto,
+// dentro `tests/verifica/`, si può solo TOGLIERE — un file intero o delle righe
+// (un caso) da un file. Nessuna riga aggiunta o cambiata, nemmeno un marcatore
+// di rosso atteso o un commento: quello va nel commit di una correzione.
 
 /** Dove vivono le prove dei giri di verifica: l'unica cartella tollerata. */
 export const PROVE_GIRO = 'tests/verifica/';
 
 /** Il percorso sta fra le prove dei giri? PURA. */
 export function dentroProveGiro(percorso) {
-  const p = String(percorso ?? '').replace(/\\/g, '/').replace(/^\.\//, '');
+  const p = String(percorso ?? '').replace(/\/g, '/').replace(/^\.\//, '');
   return p.startsWith(PROVE_GIRO) && !p.split('/').includes('..');
-}
-
-// Un marcatore di rosso atteso, nelle due forme che Playwright accetta:
-//   · modificatore dentro il corpo — `test.fail(true, 'motivo');`
-//   · dichiarazione — `test.fail('titolo', async () => { … });`
-// Il primo argomento distingue: una stringa è il TITOLO di una prova, quindi
-// è la dichiarazione; tutto il resto (niente, una condizione, una funzione) è
-// il modificatore. `test.skip` non è qui di proposito: non dice «questo è
-// rosso e lo so», toglie la prova dal giro.
-const MARCATORE = /^(?:await\s+)?test\s*\.\s*(?:fail|fixme)\s*\(/;
-const MARCATORE_DICHIARAZIONE = /^test\s*\.\s*(?:fail|fixme)\s*\(\s*['"`]/;
-const APRE_MARCATORE = /test\s*\.\s*(?:fail|fixme)\s*\(/;
-// Quante righe al massimo può occupare un marcatore: un motivo lungo va a capo
-// una volta o due, non otto.
-const MAX_RIGHE_MARCATORE = 8;
-
-/** Saldo delle tonde di una riga. */
-function saldoTonde(riga) {
-  let s = 0;
-  for (const c of String(riga)) {
-    if (c === '(') s += 1;
-    else if (c === ')') s -= 1;
-  }
-  return s;
-}
-
-/**
- * L'ultima riga del marcatore che comincia a `i`, o -1 se quella riga non è un
- * marcatore intero. In quel caso vale come una riga qualunque e si confronta
- * com'è: meglio un verdetto che decade di uno che tollera una riga di codice
- * inghiottita da un marcatore scritto male.
- *
- * Una virgoletta dimenticata (`test.fail(true, 'motivo;`) lascia le tonde
- * aperte, e chiudono solo sul `});` che chiude la prova: senza i due paletti
- * qui sotto il marcatore si sarebbe mangiato il CORPO della prova, e due corpi
- * diversi sarebbero risultati uguali. Quindi una riga di continuazione è il
- * resto di un argomento e nient'altro: niente graffe, niente frecce, e niente
- * punto e virgola prima che le tonde si chiudano.
- */
-function fineIstruzione(righe, i) {
-  let saldo = 0;
-  for (let j = i; j < righe.length && j - i < MAX_RIGHE_MARCATORE; j += 1) {
-    const r = righe[j];
-    if (j > i && (/[{}]/.test(r) || r.includes('=>'))) return -1;
-    saldo += saldoTonde(r);
-    if (saldo <= 0) return j;
-    if (j > i && r.trim().endsWith(';')) return -1;
-  }
-  return -1;
-}
-
-/**
- * Riduce una prova del giro a ciò che FA GIRARE: via le righe vuote, via i
- * commenti, via i marcatori di rosso atteso. PURA.
- *
- * Righe vuote e commenti non cambiano cosa fa una prova, e chi segna un rosso
- * atteso quasi sempre scrive accanto anche il perché: se contassero, il giro
- * in più tornerebbe per una riga di commento. Una riga che diventa un commento
- * (`// expect(…)`) invece si vede eccome: quello che c'era prima sparisce dal
- * confronto e il verdetto decade, com'è giusto.
- */
-export function corpoSenzaMarcatori(testo) {
-  const righe = String(testo ?? '').replace(/\r\n?/g, '\n').split('\n');
-  const out = [];
-  let blocco = false;
-  for (let i = 0; i < righe.length; i += 1) {
-    const riga = righe[i];
-    const t = riga.trim();
-    if (blocco) {
-      const k = riga.indexOf('*/');
-      if (k < 0) continue;
-      blocco = false;
-      // Codice dopo la chiusura del commento: la riga conta, e conta com'è.
-      if (riga.slice(k + 2).trim()) out.push(riga);
-      continue;
-    }
-    if (!t) continue;
-    if (t.startsWith('//')) continue;
-    if (t.startsWith('/*')) {
-      const k = riga.indexOf('*/');
-      if (k < 0) { blocco = true; continue; }
-      if (riga.slice(k + 2).trim()) out.push(riga);
-      continue;
-    }
-    if (MARCATORE_DICHIARAZIONE.test(t)) {
-      // `test.fail('titolo', …)` e `test('titolo', …)` sono la stessa prova
-      // con e senza marcatore: si confrontano nella forma senza.
-      out.push(riga.replace(APRE_MARCATORE, 'test('));
-      continue;
-    }
-    if (MARCATORE.test(t)) {
-      const fine = fineIstruzione(righe, i);
-      if (fine >= 0) { i = fine; continue; }
-    }
-    out.push(riga);
-  }
-  return out.join('\n');
 }
 
 /**
@@ -647,15 +536,34 @@ function cancellata(f) {
 }
 
 /**
- * Le differenze fra il commit verificato e quello di adesso stanno tutte nelle
- * prove del giro, e sono solo prove tolte o marcatori di rosso atteso? PURA.
+ * `dopo` si ottiene da `prima` solo togliendo righe? PURA. Vuoto da una parte o
+ * dall'altra è un no: un file svuotato si cancella, uno illeggibile non passa.
+ */
+export function soloRigheTolte(prima, dopo) {
+  const a = String(prima ?? '');
+  const b = String(dopo ?? '');
+  if (!a || !b) return false;
+  const righeA = a.replace(/\r\n?/g, '\n').split('\n');
+  const righeB = b.replace(/\r\n?/g, '\n').split('\n');
+  let i = 0;
+  for (const riga of righeB) {
+    while (i < righeA.length && righeA[i] !== riga) i += 1;
+    if (i >= righeA.length) return false;
+    i += 1;
+  }
+  return true;
+}
+
+/**
+ * Fra il commit verificato e quello di adesso dalle prove del giro si è solo
+ * tolto (file interi o righe)? PURA.
  *
  * `files`: `[{ path, prima, dopo, stato }]` — il contenuto ai due commit,
  * stringa vuota dove il file non c'era, e la lettera di stato di git; `null`
  * quando non si è riuscito a leggere il diff, che NON è un via libera. Ritorna
  * `{ ok, motivo, files }`: `motivo` è già la frase da mostrare a chi pubblica.
  */
-export function soloMarcatoriOCancellazioni(files) {
+export function soloProveTolte(files) {
   if (!Array.isArray(files)) return { ok: false, motivo: 'non sono riuscito a leggere cosa è cambiato dopo la verifica', files: [] };
   const elenco = files.filter((f) => f && f.path);
   const fuori = elenco.filter((f) => !dentroProveGiro(f.path)).map((f) => f.path);
@@ -664,11 +572,11 @@ export function soloMarcatoriOCancellazioni(files) {
     return { ok: false, files: [], motivo: `fuori dalle prove del giro: ${primi}${fuori.length > 5 ? ` e altri ${fuori.length - 5}` : ''}` };
   }
   const veri = elenco
-    .filter((f) => !cancellata(f) && corpoSenzaMarcatori(f.prima) !== corpoSenzaMarcatori(f.dopo))
+    .filter((f) => !cancellata(f) && (String(f.stato || '').toUpperCase().startsWith('A') || !soloRigheTolte(f.prima, f.dopo)))
     .map((f) => f.path);
   if (veri.length) {
     const primi = veri.slice(0, 5).join(', ');
-    return { ok: false, files: [], motivo: `nelle prove del giro c'è dell'altro, oltre alle prove tolte e ai marcatori di rosso atteso: ${primi}${veri.length > 5 ? ` e altri ${veri.length - 5}` : ''}` };
+    return { ok: false, files: [], motivo: `nelle prove del giro c'è dell'altro, oltre a prove e casi tolti (righe aggiunte o cambiate, file nuovi): ${primi}${veri.length > 5 ? ` e altri ${veri.length - 5}` : ''}` };
   }
   return { ok: true, motivo: '', files: elenco.map((f) => f.path) };
 }
