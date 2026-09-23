@@ -671,7 +671,8 @@ export function testoRossiAttesi(branch) {
   return [
     'Le prove del giro che riproducono questi rilievi restano rosse, e la chiusura le rilancia.',
     `Segnale come rosso atteso in ${cartella}, una riga per rilievo.`,
-    "  test.fail(true, '<il rilievo, in breve>');   (in testa al corpo della prova)",
+    "  test.fail(true, 'esterno: <prima frase del rilievo>');          (in testa al corpo della prova)",
+    "  test.fail(true, 'messo da parte: <prima frase del rilievo>');   (per un rilievo interno non corretto)",
     'Il commit che aggiunge i marcatori NON fa decadere questo verdetto, finché lì cambiano solo',
     'quelli. Qualunque altra riga, o un file fuori da quella cartella, lo fa decadere e serve un',
     'altro giro. Una prova rossa senza marcatore ferma la chiusura come prima.',
