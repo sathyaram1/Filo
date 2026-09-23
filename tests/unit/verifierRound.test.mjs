@@ -598,7 +598,7 @@ test('grassetto con gli underscore e parentesi di apertura dimenticata: niente p
     }
   }
   // Le forme buone restano rilievi, grassetto con gli underscore compreso.
-  for (const riga of ['[2i] non salva', '**[2]** non salva', '__[2]__ non salva', '- [1i?] bordo freddo']) {
+  for (const riga of ['[2i] non salva', '**[2i]** non salva', '__[2i]__ non salva', '- [1i?] bordo freddo']) {
     assert.equal(R.parseFindings(`Provato tutto.${NL}${riga}`).findings.length, 1, `non letta: ${riga}`);
     assert.equal(R.unparsedLevelLines(`Provato tutto.${NL}${riga}`).length, 0, `respinta a torto: ${riga}`);
   }
