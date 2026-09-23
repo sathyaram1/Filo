@@ -131,7 +131,7 @@ export async function leggiBilanciDalServer({ fetchImpl = fetch, env = process.e
     throw new Error(`config/routines non letto dal server (rete): ${String((e && e.message) || e)}. Senza i bilanci la verifica non parte.`);
   }
   if (res.status === 404) {
-    throw new Error('config/routines non esiste sul server: l\'owner deve salvare i tre bilanci in Gestione → Automazioni. Non c\'è un default.');
+    throw new Error('config/routines non esiste sul server: l\'owner deve salvare i bilanci in Gestione → Automazioni. Non c\'è un default.');
   }
   if (!res.ok) {
     const testo = await res.text().catch(() => '');
