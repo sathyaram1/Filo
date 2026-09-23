@@ -126,6 +126,10 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
   assert.match(passConFigli, /Prove del giro da TOGLIERE adesso/);
   assert.match(passConFigli, /#42\.3/);
   assert.match(passConFigli, /non fa decadere il verdetto/, 'o restano rosse per paura di perdere il pass');
+  // Dopo un verdetto si può solo TOGLIERE: un marcatore aggiunge una riga, e il
+  // cancello di fusione del server non lo tollera. Proporlo qui sarebbe una
+  // trappola: il commit costerebbe il giro che questa finestra serve a salvare.
+  assert.doesNotMatch(passConFigli, /test\.fail/);
   // Senza figli non si stampa un elenco vuoto.
   assert.doesNotMatch(verifierReplyText({ outcome: 'pass', derived: [] }), /TOGLIERE/);
   // Un «ok» senza esito non è un pass: dirlo superato mandava a rilasciare il
