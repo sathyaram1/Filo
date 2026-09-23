@@ -404,15 +404,28 @@ Quale prova scrivere lo dicono i minimi qui sopra: se non c'è niente da aprire
 
 Quello che trovi lo correggi adesso, non lo lasci a chi verifica.
 
-Le prove di un **giro di verifica** non si cancellano: restano nel ramo, in
+Le prove di un **giro di verifica** restano nel ramo, in
 `tests/verifica/<numero>/` (in locale, dove un numero non c'è, la cartella la
-dice il compito che riceve chi verifica). Chi corregge le rilancia prima di
-consegnare, per numero: `npx playwright test tests/verifica/<numero>`. Quel
+dice il compito che riceve chi verifica), e **si corrono una volta per giro**:
+le rilancia chi verifica, in partenza, ed è il controllo delle porte riaperte.
+Chi corregge lancia solo le prove dei rilievi che sta correggendo, e la chiusura
+non le rilancia affatto. Il comando è
+`npx playwright test tests/verifica/<numero>`. Quel
 percorso va scritto **relativo alla radice del repo e con le barre normali**:
 con le barre di Windows (la forma che il completamento del terminale produce da
 solo) o per intero dalla radice del disco, la risposta è «No tests found» anche
 a cartella piena — la stessa che dà una cartella che non c'è. Prima di
-concludere che non c'era niente da rilanciare, guarda la cartella. La
+concludere che non c'era niente da rilanciare, guarda la cartella.
+
+**La cartella si svuota invece di crescere.** La prova di un rilievo che esce di
+lì in un feedback suo — esterno, o interno lasciato fuori dal giro — si
+CANCELLA: il testo del rilievo viaggia nel feedback, e una prova rossa lasciata
+indietro è un rosso da rispiegare a ogni giro. Si cancella anche quella di un
+rilievo corretto, nello stesso commit in cui si scrive la prova durevole che lo
+tiene chiuso (se prova durevole non ce n'è, la prova del giro resta). Restano le
+prove dei rilievi che hanno fermato il lavoro: le tratta chi riprende. Per una
+prova che copre anche un caso ancora aperto c'è il ripiego del rosso atteso
+(`test.fail(true, '<motivo>')` in testa al corpo), non la strada normale. La
 suite completa non le raccoglie (quelle di un solo feedback costano otto
 minuti e mezzo); `FILO_TEST_VERIFICA=1` le include tutte. In quella cartella ci
 vanno **davvero**, e in una che porta il numero: una prova di giro lasciata
