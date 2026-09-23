@@ -147,7 +147,9 @@
   document.addEventListener('DOMContentLoaded', () => {
     load();
     $('blocklist').addEventListener('change', () => rimandato.programma());
-    $('blocklist').addEventListener('input', () => rimandato.modificato());
+    // Quello che si sta ancora scrivendo è già una modifica, e vale per OGNI
+    // campo della pagina: iscritto campo per campo, prima o poi ne resta fuori uno.
+    $('page').addEventListener('input', () => rimandato.modificato());
     // #252 — indirizzo canonico filo://<page>/<file> (non la forma legacy
     // filo://src/pages/…): un solo URL per pagina, e la scheda già aperta viene
     // riportata a fuoco invece di duplicarla.
