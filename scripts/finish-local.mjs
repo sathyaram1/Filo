@@ -534,7 +534,7 @@ async function main() {
         ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
         : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');
     }
-    if (!specs.length) {
+    if (spec.rilancia && !specs.length) {
       console.log('\n(nessuno spec mirato per le aree toccate: il lavoro verrà comunque ricontrollato prima della pubblicazione agli utenti)');
     }
   }
