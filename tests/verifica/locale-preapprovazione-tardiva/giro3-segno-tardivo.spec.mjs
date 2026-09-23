@@ -156,10 +156,11 @@ test('fusione non riuscita: il segno rimesso dallo script la ritenta', async ({ 
 // esattamente com'era, e due clic la rimandano una seconda volta.
 
 test('fusione partita da sola e ancora in corso: la richiesta ferma non si rilancia', async ({ openTab }) => {
+  test.setTimeout(90000);
   const page = await openTab(MANAGE);
   const fb = segnata();
   const req = richiesta();
-  await apri(page, { fbs: [fb], pending: [req], approveDelayMs: 4000 });
+  await apri(page, { fbs: [fb], pending: [req], approveDelayMs: 20000 });
 
   await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([req.id]);
   await apriQuadrato(page, fb._id);
@@ -170,7 +171,7 @@ test('fusione partita da sola e ancora in corso: la richiesta ferma non si rilan
 
   // Mentre ci prova lo deve dire: una richiesta ferma che non racconta niente
   // è una richiesta su cui l'owner rifà il lavoro che il server sta già facendo.
-  await expect.soft(page.locator('#mgSideBody .sn-mac-status')).toBeVisible();
+  await expect.soft(page.locator('#mgSideBody .sn-mac-status')).toBeVisible({ timeout: 1500 });
 
   if (await approva.isEnabled()) {
     await approva.click();
