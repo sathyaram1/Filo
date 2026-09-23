@@ -102,20 +102,19 @@ test('consegnare una correzione con file non salvati: il rifiuto elenca i file e
 // ferme le prove del giro, e il giro dopo ritrova la porta aperta — cioè
 // esattamente il ripasso che tenerle nel ramo esiste per togliere.
 // Quindi: ovunque quel comando sia scritto per esteso, accanto ci dev'essere
-// come va scritto il percorso. Sono cinque posti, e ne è già mancato uno
-// (le regole generali del repo, verifica del giro 7).
+// come va scritto il percorso. I posti che DEVONO parlarne sono quelli di chi
+// verifica, che è l'unico a correre la cartella; ne è già mancato uno (le
+// regole generali del repo, verifica del giro 7).
 test('ovunque si dica di rilanciare le prove del giro, si dice anche come va scritto il percorso', () => {
   const ROOT = new URL('../../', import.meta.url);
   const leggi = (p) => readFileSync(new URL(p, ROOT), 'utf8');
   const superfici = [
     ['CLAUDE.md', leggi('CLAUDE.md')],
     ['routines/roles/verifier.md', leggi('routines/roles/verifier.md')],
-    ['routines/roles/resolver.md', leggi('routines/roles/resolver.md')],
-    ['routines/roles/resolver-rebase.md', leggi('routines/roles/resolver-rebase.md')],
+    ['routines/roles/verifier-chiusura.md', leggi('routines/roles/verifier-chiusura.md')],
+    ['routines/roles/verifier-riallineamento.md', leggi('routines/roles/verifier-riallineamento.md')],
     ['il compito consegnato a chi verifica in locale',
       buildVerifierBrief({ request: 'fai X', branch: 'claude/giri-corti', recipe: 'RECIPE' })],
-    ['la coda della fase di correzione',
-      codaText({ findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'claude/giri-corti' })],
   ];
   for (const [nome, testo] of superfici) {
     // L'ancora sono i due punti in cui si può sbagliare: il comando scritto per
