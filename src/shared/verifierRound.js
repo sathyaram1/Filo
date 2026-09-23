@@ -517,17 +517,29 @@
     const blocking = [];
     const fixable = [];
     const derived = [];
+    const twos = [];
     const ones = [];
     const zeros = [];
     for (const f of findings) {
-      if (f.level >= 2) {
-        if (f.decision || left('cap2') <= 0) blocking.push(f);
+      if (f.level >= 3) {
+        if (f.decision || left('cap3') <= 0) blocking.push(f);
         else fixable.push(f);
+      } else if (f.level === 2) {
+        if (f.decision) blocking.push(f);
+        else twos.push(f);
       } else if (f.level === 1) {
         ones.push(f);
       } else {
         zeros.push(f);
       }
+    }
+    // I 2: con un 3 da correggere nello stesso giro si correggono pure loro
+    // (il giro lo paga il 3); da soli seguono il loro bilancio, e a bilancio
+    // finito non fermano: vanno da parte, ciascuno un feedback a priorità 2.
+    const withThree = fixable.length > 0;
+    for (const f of twos) {
+      if (withThree || left('cap2') > 0) fixable.push(f);
+      else derived.push(f);
     }
     // Gli 1: con un 3/2 da correggere nello stesso giro si correggono pure
     // loro (il giro lo paga il 3/2); da soli seguono il loro bilancio.
