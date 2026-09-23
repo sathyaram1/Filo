@@ -1,8 +1,8 @@
 // Prove del giro 1 (verifica locale) sul lavoro «seguito del giro»,
-// punto A: i bilanci del giro di verifica locale (cap2/cap1/cap0) si leggono
-// dal server, con l'identità dell'owner, e nel codice pubblico non c'è più un
-// numero di ripiego. Senza token, senza documento, senza uno dei tre numeri:
-// errore evidente e stop, niente toccato.
+// punto A: i bilanci del giro di verifica locale (uno per livello, cap3…cap0)
+// si leggono dal server, con l'identità dell'owner, e nel codice pubblico non
+// c'è più un numero di ripiego. Senza token, senza documento, senza uno dei
+// numeri: errore evidente e stop, niente toccato.
 //
 // Lo strumento si prova COME LO USA L'OWNER: il comando vero (`status`,
 // `critica`) lanciato in un sotto-processo, con un server finto in ascolto in
