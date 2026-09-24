@@ -197,14 +197,22 @@
       if (ids.length === 0) return [];
       const vers = await versionsOf(ids);
       const mossi = [];
+      const primaVolta = [];
       for (const v of Array.isArray(vers) ? vers : []) {
         if (!v || !v._id) continue;
         const id = String(v._id);
         const mio = versioniSeguite.get(id);
-        if (mio !== undefined && mio !== (v._updateTime || null)) mossi.push(id);
-        versioniSeguite.set(id, v._updateTime || null);
+        if (mio === undefined) primaVolta.push([id, v._updateTime || null]);
+        else if (mio !== (v._updateTime || null)) mossi.push([id, v._updateTime || null]);
       }
-      return mossi.length ? await readRows(mossi) : [];
+      // Il primo avvistamento non è un cambiamento: si prende nota e basta.
+      for (const [id, t] of primaVolta) versioniSeguite.set(id, t);
+      if (mossi.length === 0) return [];
+      const rows = await readRows(mossi.map(([id]) => id));
+      // L'ora nuova si segna DOPO la rilettura: se quella fallisce, il giro
+      // dopo deve riprovare, non credere di averlo già portato alle pagine.
+      for (const [id, t] of mossi) versioniSeguite.set(id, t);
+      return rows;
     }
 
     async function incremental() {
