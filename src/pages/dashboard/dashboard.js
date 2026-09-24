@@ -358,16 +358,16 @@
           : `${quante} immagini, non conservate`;
         bubblesEl.appendChild(nota);
       }
-      if (!isUser && types.length) {
+      if (!isUser && voci.length) {
         const note = document.createElement('div');
         note.className = 'dash-bubble-note';
         note.dataset.replay = '1';
-        note.textContent = Att.summarizeActivity(types, false);
+        note.textContent = Att.summarizeActivity(voci, false);
         bubblesEl.appendChild(note);
       }
       threadHistory.push(isUser
         ? { role: 'user', text }
-        : { role: 'filo', text, actions: types.map((t) => ({ type: t })) });
+        : { role: 'filo', text, actions: voci.map((v) => ({ type: v.type })) });
     }
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     inputEl.focus();
