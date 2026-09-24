@@ -152,6 +152,7 @@ function ricercheFragili(riga) {
     const opzioni = letterale.slice(fine + 1);
     for (let i = 0; i < corpo.length - 1; i += 1) {
       if (corpo[i] !== '\\' || corpo[i + 1] !== 'n' || sfuggito(corpo, i)) continue;
+      if (dentroClasse(corpo, i)) continue;
       if (TESTO_PRIMA.test(corpo.slice(0, i))) motivi.add('una regex con un «a capo» in mezzo (usa `\\s+`, o `\\r?\\n`)');
     }
     if (!opzioni.includes('m')) continue;
