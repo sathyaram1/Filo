@@ -1496,9 +1496,11 @@
   const DETTAGLI_PER_VOLTA = 200;
 
   async function completaDettagli(ids) {
-    const chiesti = new Set(ids);
     for (let i = 0; i < ids.length; i += DETTAGLI_PER_VOLTA) {
       const pezzo = ids.slice(i, i + DETTAGLI_PER_VOLTA);
+      // Il gruppo di QUESTO blocco, non tutti: togliere il marchio a chi non è
+      // ancora stato chiesto lo lascerebbe per sempre senza conversazione.
+      const chiesti = new Set(pezzo);
       // eslint-disable-next-line no-await-in-loop
       let rows = await SN_FEEDBACK.getMany(pezzo, { timeoutMs: 20000 });
       if (isAdmin && rows.length > 0) {
