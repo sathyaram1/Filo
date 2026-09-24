@@ -1120,8 +1120,8 @@
   // `createdAt` e non `__name__`: costa le stesse letture (Firestore le conta
   // per documento, non per campo) e dice dov'è il bordo della finestra, cioè
   // quali feedback la pagina mostra e quali no.
-  async function listVersions({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0 } = {}) {
-    const rows = await list({ pageSize, timeoutMs, fields: ['createdAt'] });
+  async function listVersions({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '' } = {}) {
+    const rows = await list({ pageSize, timeoutMs, fields: ['createdAt'], idToken });
     return rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime, createdAt: r.createdAt || null }));
   }
 
