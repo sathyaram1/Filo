@@ -1006,14 +1006,19 @@ module.exports = function register(on, ctx) {
       } catch (e) { console.warn('[feedback] chiusi di recente non letti:', e?.message || e); }
     }
 
-    const tutteLeMancanti = (Array.isArray(schede) ? schede : [])
+    // Le schede fuori pagina si chiedono TUTTE, a blocchi: fermarsi al tetto
+    // lasciava indietro proprio le schede più vecchie, che sono quelle che
+    // nessun'altra strada guarda.
+    const mancanti = (Array.isArray(schede) ? schede : [])
       .map((c) => String((c && c._id) || ''))
       .filter((id) => id && !visti.has(id));
-    const mancanti = tutteLeMancanti.slice(0, FB.LIST_PAGE_SIZE);
-    let schedeCoperte = mancanti.length === tutteLeMancanti.length;
-    if (mancanti.length) {
-      try { aggiungi(await FB.getMany(mancanti, { idToken, timeoutMs: 30000, fields: Array.isArray(FB.CAMPI_LISTA) ? FB.CAMPI_LISTA : null })); }
-      catch (e) {
+    let schedeCoperte = true;
+    for (let i = 0; i < mancanti.length; i += SCHEDE_PER_VOLTA) {
+      const pezzo = mancanti.slice(i, i + SCHEDE_PER_VOLTA);
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        aggiungi(await FB.getMany(pezzo, { idToken, timeoutMs: 30000, fields: Array.isArray(FB.CAMPI_LISTA) ? FB.CAMPI_LISTA : null }));
+      } catch (e) {
         schedeCoperte = false;
         console.warn('[feedback] feedback delle schede fuori pagina non letti:', e?.message || e);
       }
