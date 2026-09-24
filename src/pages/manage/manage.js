@@ -3985,10 +3985,15 @@
   }
 
   // ── Aggiornamento continuo ────────────────────────────────────────────────
-  // La dashboard resta al passo da sola: a ogni giro chiede a Firestore le sole
-  // versioni dei feedback (id + ultima scrittura, pochi byte), riscarica i soli
-  // documenti cambiati o nuovi, li decifra e li fonde nella lista. Niente
-  // ricaricamento della pagina, niente riscaricamento dei 5 MB della lista.
+  // La dashboard resta al passo da sola, ma non è lei a chiedere: il giro vive
+  // nel main, uno solo per tutte le schede aperte (#676), e qui arrivano gli
+  // avvisi. Due forme:
+  //   · `changed`   — le righe scritte dall'ultimo giro, già lette dal main:
+  //                   si decifrano e si fondono;
+  //   · `reconcile` — le versioni di tutta la pagina, ogni mezz'ora: è l'unica
+  //                   domanda che vede una CANCELLAZIONE, e qui si rifà il
+  //                   confronto di sempre (versioni → differenze → rilettura).
+  // Niente ricaricamento della pagina, niente riscaricamento dei 5 MB.
   // Il confronto e la fusione sono logica pura in SN_FEEDBACK_LIVE.
   const LIVE = window.SN_FEEDBACK_LIVE;
   // Sorgenti sostituibili dagli spec (che non hanno Firestore).
