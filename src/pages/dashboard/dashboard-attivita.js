@@ -593,6 +593,16 @@
   // eseguita dal main. Ritorna true se l'azione è stata raccontata così (e
   // quindi non è un bottone). Serve sia in diretta (evento 'done' mentre il
   // turno lavora) sia a fine turno per le azioni arrivate senza evento.
+  // La targa di un'azione dentro un lavoro. Due azioni dello stesso tipo nella
+  // stessa risposta (due appuntamenti chiesti insieme) devono restare due.
+  let contaChiavi = 0;
+  function chiaveRiga(a) {
+    if (!a) return '';
+    if (a._callId) return `c:${a._callId}`;
+    if (!a._rigaKey) { contaChiavi += 1; a._rigaKey = `k:${contaChiavi}`; }
+    return a._rigaKey;
+  }
+
   function tellActionInActivity(activity, a) {
     if (!activity || !a) return false;
     // Comando già eseguito (livello 1): il suo esito è un passo del lavoro e
