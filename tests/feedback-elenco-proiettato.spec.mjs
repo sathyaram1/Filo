@@ -471,6 +471,8 @@ test('il commento della revisione scritto durante l_attesa arriva al server', as
   const page = await gestionePronta(openTab, DA_DECIDERE);
   await expect(page.locator('#mgAcceptComment')).toBeVisible({ timeout: 10_000 });
   await page.locator('#mgAcceptComment').fill('Sbloccata: è una richiesta legittima.');
+  // Il ridisegno arriva PRIMA del clic: è lui che svuotava la casella.
+  await page.waitForTimeout(LENTO_MS + 800);
   await page.locator('#mgActions button').first().click();
 
   await expect.poll(
