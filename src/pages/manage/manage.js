@@ -2951,6 +2951,10 @@
   }
 
   async function confermaRiapertura() {
+    // Quello che l'owner ha scritto si legge PRIMA di ogni attesa, come nella
+    // gemella che risponde a un chiarimento: durante l'attesa la casella può
+    // svuotarsi, e allora si riaprirebbe la segnalazione senza il motivo.
+    const reason = mgReopenText ? (mgReopenText.value || '').trim() : '';
     // La conversazione su cui si appende va letta PRIMA: dall'elenco arriva
     // senza note, e appenderci sopra il motivo le cancellerebbe.
     const fb = await feedbackCompleto(selectedId);
