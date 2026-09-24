@@ -30,7 +30,7 @@ const fs = require('node:fs');
 // su Linux e Mac la voce "Bash" delle Preferenze non faceva niente.
 // I preludi che mettono la shell di Windows in UTF-8 (#551) stanno in un posto
 // solo, accanto ai comandi one-shot dell'assistente: due copie divergono.
-const { resolveShell, PRELUDI_CODIFICA, ESITO_POWERSHELL } = require('./terminal');
+const { resolveShell, PRELUDI_CODIFICA, ESITO_POWERSHELL, ERRORE_DI_PRIMA_POWERSHELL } = require('./terminal');
 
 function defaultCwd() {
   return os.homedir();
