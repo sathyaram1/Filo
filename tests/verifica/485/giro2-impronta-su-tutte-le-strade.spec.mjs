@@ -268,11 +268,12 @@ test('la fusione fermata perché il ramo si è mosso dice quale passo registrare
     const gate = await lancia(GATE, ['worker/485'], env, dir);
     const detto = `${gate.stdout}\n${gate.stderr}`;
     expect(gate.status).not.toBe(0);
-    // Fermarsi e basta lascia la notizia su questa macchina: sul canale i due
-    // via libera continuano a risultare buoni per questo ramo.
-    expect(detto, 'il rifiuto non dice quale passo registra la decadenza').toContain('revision_capability');
+    // Il passo dettato dev'essere uno che il server concede a chi chiede la
+    // fusione: rileggere il pezzo nuovo e registrare di nuovo il verdetto.
+    expect(detto, 'il rifiuto non dice cosa rileggere').toContain('git diff ');
+    expect(detto, 'il rifiuto non dice come registrare di nuovo il verdetto').toContain('--record-secaudit ID485');
     expect(detto, 'il comando deve nominare il ramo, per copiarlo invece di ricostruirlo').toContain('worker/485');
-    expect(detto).toContain('--guasto');
+    expect(detto, 'il rientro in verifica il server lo nega al controllo di sicurezza').not.toContain('revision_capability');
     expect(detto, 'nominare una persona che non c\'è non è un passo da registrare')
       .not.toContain('chi ha cambiato il ramo lo rimette in verifica');
     expect(punta()).toBeTruthy();
