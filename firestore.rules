@@ -322,6 +322,12 @@ service cloud.firestore {
                     // 'userNote' la frase in chiaro per chi ha mandato il feedback.
                     'userNote',
                     'archiveOverride', 'reopenRequests',
+                    // #676: l'ora dell'ultima scrittura, firmata da chi scrive.
+                    // È il campo su cui la dashboard chiede «cosa è cambiato
+                    // da allora?» invece di rileggere la collezione a ogni
+                    // giro: chi scrive un feedback senza rimetterlo rende quel
+                    // cambiamento invisibile fino alla riconciliazione.
+                    'updatedAt',
                     // I livelli L3/L4 (vincolo di forma: livelliValidi, in cima).
                     'livelli',
                     // La pre-approvazione della fusione, per singola pratica:
