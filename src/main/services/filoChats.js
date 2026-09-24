@@ -204,6 +204,26 @@
   // rimette dove va chi l'ha fatta. Quello che sceglie l'utente vince e non
   // viene più riscritto: senza il marchio, la prima riclassificazione (una chat
   // riaperta e continuata) rimetterebbe il titolo del modello al suo posto.
+  // L'esito di un'azione che l'utente ha finito col bottone, arrivato quando il
+  // turno era già scritto. Si cerca dall'ultimo: la stessa targa può tornare in
+  // turni diversi, e quella buona è la più recente.
+  async function setActionEsito(id, azione, esito) {
+    if (!id || !azione) return false;
+    const items = await list();
+    const chat = items.find((c) => c && c.id === id);
+    const msgs = (chat && Array.isArray(chat.messages)) ? chat.messages : [];
+    for (let i = msgs.length - 1; i >= 0; i -= 1) {
+      const atti = Array.isArray(msgs[i] && msgs[i].actions) ? msgs[i].actions : [];
+      const a = atti.find((x) => x && typeof x === 'object' && x.id === azione);
+      if (!a) continue;
+      if (a.esito === esito) return true;
+      a.esito = esito;
+      await save(items);
+      return true;
+    }
+    return false;
+  }
+
   async function setUserTriage(id, { title, kind } = {}) {
     if (!id) return null;
     const items = await list();
