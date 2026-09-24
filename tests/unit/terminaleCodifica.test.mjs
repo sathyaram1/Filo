@@ -76,15 +76,24 @@ test('bash e sh non hanno preludio: lo stdout è già UTF-8', () => {
 });
 
 test('il preludio precede il comando dell\'utente, non lo segue', () => {
-  // Su Linux `resolveShell` risolve tutto in sh, quindi il preludio di Windows
-  // da qui non si vede mai girare: l'ORDINE si controlla sul codice. Se il
-  // preludio finisse dopo il comando, la console avrebbe già scritto l'output
-  // con la codifica sbagliata e il nome sarebbe perso.
+  // L'ORDINE si controlla sul codice, uguale su ogni sistema. Se il preludio
+  // finisse dopo il comando, la console avrebbe già scritto l'output con la
+  // codifica sbagliata e il nome sarebbe perso.
   const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'terminal.js'), 'utf8');
   assert.match(src, /const toRun = encodingPrelude\(usedShell\) \+ \(/);
-  // Fuori da Windows non si tocca niente.
-  assert.equal(T.encodingPrelude('sh'), '');
-  assert.equal(T.encodingPrelude('bash'), '');
+});
+
+test('il preludio è quello della shell che gira, non di quella chiesta', () => {
+  // Su Windows «sh» gira come PowerShell, fuori da Windows «powershell» gira
+  // come sh: il preludio sbagliato arriva a una shell che non lo capisce (#714).
+  for (const chiesta of ['sh', 'bash', 'powershell', 'cmd', 'zsh', '', undefined]) {
+    const vera = T.resolveShell(chiesta);
+    assert.equal(typeof T.PRELUDI_CODIFICA[vera], 'string', `nessun preludio per la shell ${vera}`);
+    assert.equal(
+      T.encodingPrelude(chiesta), T.PRELUDI_CODIFICA[vera],
+      `chiesta «${chiesta}», gira «${vera}»: il preludio non è il suo`,
+    );
+  }
 });
 
 // ───────────── la shell persistente della dashboard usa lo stesso ────────────
