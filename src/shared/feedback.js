@@ -1134,19 +1134,12 @@
   }
 
   // ── Il giro al minuto: solo quello che è cambiato ────────────────────────
-  //
-  // Chiedere i nomi di tutta la collezione a ogni giro costa una lettura per
-  // feedback anche quando non è cambiato niente: con la dashboard aperta erano
-  // 500 letture al minuto a database fermo. Qui la domanda è «chi è stato
-  // scritto dopo questo istante?», e un giro a vuoto costa una lettura sola.
-  //
-  // L'ordinamento è (updatedAt, nome): il nome fa da spareggio fra due
-  // scritture nello stesso istante, e Firestore lo mette in coda a ogni indice
-  // a campo singolo — nessun indice composto da dichiarare.
-  //
-  // Un feedback SENZA `updatedAt` non compare in questa domanda: è il prezzo
-  // del campo, e per questo la riconciliazione completa resta (vedi
-  // SN_FEEDBACK_LIVE.RECONCILE_MS).
+  // Un giro a vuoto costa una lettura, non una per feedback. L'ordinamento è
+  // (updatedAt, nome) perché due scritture nello stesso istante non si
+  // saltino quando si pagina; il nome Firestore lo mette in coda a ogni indice
+  // a campo singolo, quindi non serve un indice composto. Chi non ha
+  // `updatedAt` qui non compare: vedi
+  // patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md.
   async function listChangedDirect({ since, after = null, pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '' } = {}) {
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const structuredQuery = {
