@@ -191,7 +191,7 @@
       tick,
       /** Il prossimo giro è un riallineamento completo (apertura di una pagina). */
       forceReconcile() { lastReconcileAt = 0; },
-      _state() { return { size: versions.size, floor, lastTickAt, lastReconcileAt }; },
+      _state() { return { floor, lastTickAt, lastReconcileAt }; },
     };
   }
 
