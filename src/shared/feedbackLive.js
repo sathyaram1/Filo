@@ -125,15 +125,18 @@
   // deps:
   //   listChangedSince({ since }) → { rows, complete }   i cambiati dopo `since`
   //   listVersions()              → [{ _id, _updateTime, createdAt }]
-  //   getMany(ids)                → righe intere
   //   broadcast(msg)              avvisa le pagine
   //   now()                       l'orologio (i test lo fissano)
+  //
+  // Il riallineamento manda le VERSIONI, non i documenti: chi ha in mano la
+  // lista è la pagina, quindi è lei a sapere quali le mancano e a chiederli.
+  // Il giro al minuto invece manda le righe già lette, una volta per tutte le
+  // pagine — è il caso frequente, ed è lì che si paga.
   function makeWatcher({
-    listChangedSince, listVersions, getMany, broadcast,
+    listChangedSince, listVersions, broadcast,
     now = () => Date.now(), pollMs = POLL_MS, reconcileMs = RECONCILE_MS,
     overlapMs = OVERLAP_MS, pageSize = 500, onWarn = null,
   } = {}) {
-    let versions = new Map();   // id → _updateTime dell'ultimo riallineamento
     let floor = null;           // bordo della finestra (data d'invio)
     let lastTickAt = 0;         // inizio dell'ultimo giro riuscito
     let lastReconcileAt = 0;
@@ -148,21 +151,11 @@
       const startedAt = now();
       const remote = await listVersions();
       if (!Array.isArray(remote)) throw new Error('versioni non lette');
-      const locali = Array.from(versions.entries(), ([_id, _updateTime]) => ({ _id, _updateTime }));
-      const { changed, added, removed } = diffVersions(locali, remote);
-      const ids = changed.concat(added);
-      const rows = ids.length ? await getMany(ids) : [];
-      versions = new Map(remote.map((v) => [String(v._id), v._updateTime || null]));
       floor = windowFloor(remote, pageSize);
       lastReconcileAt = startedAt;
       lastTickAt = startedAt;
-      broadcast({
-        kind: 'reconcile',
-        rows,
-        ids: remote.map((v) => String(v._id)),
-        removed,
-      });
-      return { kind: 'reconcile', changed: ids.length, removed: removed.length };
+      broadcast({ kind: 'reconcile', versions: remote });
+      return { kind: 'reconcile', versions: remote.length };
     }
 
     async function incremental() {
@@ -177,9 +170,8 @@
       }
       const rows = tutte.filter((r) => inWindow(r, floor));
       lastTickAt = startedAt;
-      for (const r of rows) if (r && r._id) versions.set(String(r._id), r._updateTime || null);
       if (rows.length) broadcast({ kind: 'changed', rows });
-      return { kind: 'changed', changed: rows.length, removed: 0 };
+      return { kind: 'changed', changed: rows.length };
     }
 
     async function run(force) {
