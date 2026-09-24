@@ -328,6 +328,7 @@
     close: (...a) => inCoda(() => close(...a)),
     setTriage: (...a) => inCoda(() => setTriage(...a)),
     setUserTriage: (...a) => inCoda(() => setUserTriage(...a)),
+    setActionEsito: (...a) => inCoda(() => setActionEsito(...a)),
     remove: (...a) => inCoda(() => remove(...a)),
     clear: (...a) => inCoda(() => clear(...a)),
   };
