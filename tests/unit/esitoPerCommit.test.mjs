@@ -212,8 +212,12 @@ test('esitiDecaduti: un via libera dato su un altro commit non vale per questo c
   const A = 'a'.repeat(40);
   const B = 'b'.repeat(40);
   assert.deepEqual(esitiDecaduti({ verifierSha: A, secauditSha: A }, A), [], 'ramo fermo: niente decade');
-  assert.equal(esitiDecaduti({ verifierSha: A, secauditSha: A }, B).length, 2, 'ramo mosso: decadono tutti e due');
-  assert.equal(esitiDecaduti({ verifierSha: '', secauditSha: A }, B).length, 1,
+  assert.deepEqual(esitiDecaduti({ verifierSha: A, secauditSha: A }, B).map((d) => d.quale), ['il controllo di sicurezza'],
+    'ramo mosso: qui decade il controllo di sicurezza; la verifica la giudica il server, che tollera le prove del giro tolte');
+  assert.deepEqual(esitiDecaduti({ verifierSha: A, secauditSha: B }, B), [],
+    'verifica su un commit più vecchio: non si ferma qui (#676, #667, #569: fermi con due via libera)');
+  assert.equal(esitiDecaduti({ verifierSha: '', secauditSha: A }, B).length, 1);
+  assert.deepEqual(esitiDecaduti({ verifierSha: A, secauditSha: '' }, B), [],
     'un esito senza commit scritto accanto non decade: viene da uno strumento vecchio, e a giudicarlo resta il server');
   assert.deepEqual(esitiDecaduti(null, B), [], 'nessuno stato locale: non si inventa un decadimento');
   assert.deepEqual(esitiDecaduti({ secauditSha: A }, ''), [], 'punta sconosciuta: il confronto non si fa qui');
