@@ -271,6 +271,15 @@
       }
       inviiVisti = invii;
 
+      // Un worker delle routine è partito: sta lavorando una segnalazione che
+      // la dashboard non ha modo di indovinare (l'ordine con cui il server
+      // sceglie non è quello della coda in pagina) e che il server riscrive
+      // senza firmare l'ora. Ci si riallinea al giro dopo, una volta per
+      // avvio, invece di seguire a vuoto le prime della coda.
+      const avvio = await ultimoAvvio(avvioVisto);
+      if (avvio && avvioVisto && avvio !== avvioVisto) lastReconcileAt = 0;
+      avvioVisto = avvio;
+
       const perId = new Map();
       for (const r of tutte) if (r && r._id) perId.set(String(r._id), r);
       for (const r of await daiSeguiti()) if (r && r._id) perId.set(String(r._id), r);
