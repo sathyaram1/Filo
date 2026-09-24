@@ -432,14 +432,16 @@ test('la fusione fermata dal decadimento dice quale passo registrare, col ramo d
   const A = 'a'.repeat(40);
   const B = 'b'.repeat(40);
   const decaduti = esitiDecaduti({ verifierSha: A, secauditSha: A }, B);
-  const testo = testoEsitiDecaduti(decaduti, B, 'worker/485-xyz');
+  const testo = testoEsitiDecaduti(decaduti, B, 'worker/485-xyz', 'ID42');
 
-  assert.match(testo, /la verifica ha dato l'ok su a{12}/);
   assert.match(testo, /il controllo di sicurezza ha dato l'ok su a{12}/);
   assert.match(testo, /la directory adesso è su b{12}/);
-  assert.match(testo, /revision_capability/, 'il passo che registra la decadenza, per nome');
-  assert.ok(testo.includes('worker/485-xyz'), 'col ramo dentro: il comando si copia, non si ricostruisce');
-  assert.match(testo, /--guasto/, 'e la via d\'uscita se il server rifiuta quel passaggio');
+  assert.match(testo, /git diff a{12} b{12}/, 'cosa rileggere, già pronto');
+  assert.match(testo, /--record-secaudit ID42 <pass\|fail>/, 'il passo che registra il verdetto sul contenuto nuovo');
+  // Il ritorno in verifica al controllo di sicurezza il server lo nega: proporlo
+  // lasciava il lavoro fermo con due via libera (24/09/2026).
+  assert.doesNotMatch(testo, /revision_capability/);
+  assert.ok(testo.includes('worker/485-xyz'), 'col ramo dentro: chi legge sa di quale lavoro si parla');
   assert.ok(!/chi ha cambiato il ramo lo rimette in verifica/.test(testo),
     'non si nomina una persona che non esiste al posto di un passo da registrare');
 });
