@@ -985,13 +985,11 @@
     return marcaProiezione(await listDirect(COLLECTION, { pageSize, timeoutMs, fields, idToken }), fields);
   }
 
-  // Una proiezione che LASCIA FUORI campi di dettaglio va marcata: chi mostra
-  // il dettaglio deve poter distinguere «questo feedback non ha note» da «le
-  // note non sono state chieste». Il giro leggero del battito (solo
-  // `__name__`) non produce righe da mostrare e non ha bisogno del marchio.
+  // Una riga arrivata da una proiezione va marcata: chi mostra il dettaglio
+  // deve poter distinguere «questo feedback non ha note» da «le note non sono
+  // state chieste», o mostrerebbe una conversazione vuota credendola vuota.
   function marcaProiezione(rows, fields) {
     if (!Array.isArray(fields) || fields.length === 0) return rows;
-    if (!CAMPI_DETTAGLIO.some((f) => !fields.includes(f))) return rows;
     for (const r of Array.isArray(rows) ? rows : []) {
       if (r && typeof r === 'object') r._proiezione = true;
     }
