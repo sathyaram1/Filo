@@ -59,7 +59,7 @@ async function fingiFirestore(app, docs) {
     FB.getManyPublic = async (ids) => { globalThis.__conta.schede += ids.length; return []; };
     // Il ritmo del giro lo legge chi accende il timer: accorciarlo qui basta.
     globalThis.SN_FEEDBACK_LIVE.POLL_MS = ritmo;
-  }, { docs, ritmo });
+  }, { docs, ritmo: RITMO });
 }
 
 const conta = (app) => app.evaluate(() => globalThis.__conta);
