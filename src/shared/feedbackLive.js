@@ -259,7 +259,7 @@
   }
 
   global.SN_FEEDBACK_LIVE = {
-    POLL_MS, RECONCILE_MS, OVERLAP_MS,
+    POLL_MS, RECONCILE_MS, OVERLAP_MS, SEGUITI_MAX,
     diffVersions, applyChanges, windowFloor, inWindow, makeWatcher,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
