@@ -384,18 +384,18 @@ async function main() {
   // contenuto? Il muro vero resta il server, che risolve la punta da GitHub;
   // questo è il controllo che si può fare qui, e che sul cammino locale
   // (`npm run finish`) c'è da sempre.
-  const statoRamo = (() => {
-    const id = findStateIdByBranch(ROOT, source);
-    return id ? readBranchState(ROOT, id) : null;
-  })();
+  const idStato = findStateIdByBranch(ROOT, source);
+  const statoRamo = idStato ? readBranchState(ROOT, idStato) : null;
   const decaduti = esitiDecaduti(statoRamo, punta);
   if (decaduti.length) {
     // I comandi del rimedio con gli attrezzi del GIRO, non con quelli che il
     // ramo si porta dietro: `scripts/…` qui dentro è la copia del ramo, che può
     // essere vecchia di giorni e non fare quello che chi legge crede.
-    console.error(absolutizeRecipe(testoEsitiDecaduti(decaduti, punta, source), TOOLS_ROOT, ROOT));
+    console.error(absolutizeRecipe(testoEsitiDecaduti(decaduti, punta, source, idStato || ''), TOOLS_ROOT, ROOT));
     process.exit(1);
   }
+  const notaVerifica = notaVerificaSuAltroCommit(statoRamo, punta);
+  if (notaVerifica) console.error(notaVerifica);
   // Astenersi si dice, e si dice PER CIASCUNO dei due: se di uno non risulta il
   // commit, quel via libera non l'ho controllato, e chi legge il registro non
   // deve credere il contrario perché l'altro tornava.
