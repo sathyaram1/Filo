@@ -974,7 +974,7 @@ module.exports = function register(on, ctx) {
     const mancanti = tutteLeMancanti.slice(0, FB.LIST_PAGE_SIZE);
     let schedeCoperte = mancanti.length === tutteLeMancanti.length;
     if (mancanti.length) {
-      try { aggiungi(await FB.getMany(mancanti, { idToken, timeoutMs: 30000 })); }
+      try { aggiungi(await FB.getMany(mancanti, { idToken, timeoutMs: 30000, fields: Array.isArray(FB.CAMPI_LISTA) ? FB.CAMPI_LISTA : null })); }
       catch (e) {
         schedeCoperte = false;
         console.warn('[feedback] feedback delle schede fuori pagina non letti:', e?.message || e);
