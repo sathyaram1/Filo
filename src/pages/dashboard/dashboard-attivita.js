@@ -1176,6 +1176,17 @@
         btn.textContent = '🧹 Riordino in corso…';
         const r = await send({ type: MSG.RUN_TAB_TRIAGE });
         const n = (r && r.archived) || 0;
+        // Senza il giudizio sulle schede non è stato valutato niente: dirlo
+        // «nessuna scheda da archiviare» è la stessa frase di un riordino
+        // riuscito, e l'utente non ha modo di distinguere i due casi.
+        const motivo = motivoRiordinoMancato(r, n);
+        if (motivo) {
+          btn.disabled = false;
+          btn.textContent = '🧹 Riordino non riuscito';
+          btn.title = `${motivo} Puoi riprovare.`;
+          segnaFallita(a, activity, motivo);
+          return;
+        }
         const esito = n > 0
           ? `Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}`
           : 'Nessuna scheda da archiviare';
