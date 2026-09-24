@@ -4123,20 +4123,27 @@
   }
 
   // L'avviso del giro del main. Una pagina che non ha ancora la lista non ha
-  // niente in cui fondere: prima si carica.
+  // niente in cui fondere: prima si carica. Gli avvisi si mettono in fila
+  // dietro il giro in corso, o due fusioni si pesterebbero sulla stessa lista.
   function onLiveMessage(m) {
-    if (!liveEnabled || liveBlocked || !m) return Promise.resolve(null);
+    if (!m) return Promise.resolve(null);
     if (!dataLoaded) { loadData().catch(() => {}); return Promise.resolve(null); }
-    const prima = liveTick || Promise.resolve();
-    liveTick = prima.then(() => (
-      m.kind === 'reconcile'
-        ? reconcileFrom(m.versions)
-        : mergeLive(m.rows)
+    const mio = (liveTick || Promise.resolve()).then(() => (
+      m.kind === 'reconcile' ? reconcileFrom(m.versions) : mergeLive(m.rows)
     )).catch((e) => {
       console.warn('[manage] aggiornamento:', e?.message || e);
       return null;
-    }).finally(() => { liveLastAt = Date.now(); });
-    return liveTick;
+    }).finally(() => {
+      liveLastAt = Date.now();
+      if (liveTick === mio) liveTick = null;
+    });
+    liveTick = mio;
+    return mio;
+  }
+
+  function onLiveBroadcast(m) {
+    if (!liveEnabled || liveBlocked) return;
+    onLiveMessage(m);
   }
 
   function liveTickIfDue(force) {
