@@ -179,6 +179,10 @@ function nuovoMarcatore() {
     + Date.now().toString(36).slice(-5);
 }
 
+// L'esito di un comando PowerShell, con $__filo_ok = il $? preso subito dopo. $LASTEXITCODE lo scrivono solo
+// i programmi esterni: un cmdlet fallito lo lascia a 0, e a dirlo resta $? (#714). Vale anche per shell.js.
+const ESITO_POWERSHELL = 'if ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEXITCODE } else { 1 }';
+
 // Appende al comando una "sonda" che stampa <marcatore>:<exitcode>:<cwd>. La
 // sonda gira SEMPRE (anche se il comando fallisce) e cattura l'exit code reale
 // del comando, non quello della sonda. Specifica per shell.
@@ -189,9 +193,10 @@ function withCwdProbe(shell, command, mark = nuovoMarcatore()) {
     return `${command}\r\necho ${mark}:%errorlevel%:%cd%`;
   }
   if (sh === 'powershell') {
-    // try/finally: il marcatore esce anche su errore terminante. Azzeriamo
-    // $LASTEXITCODE prima così i cmdlet (che non lo toccano) riportano 0.
-    return `$global:LASTEXITCODE=0\ntry { ${command} } finally { Write-Output "${mark}:$($LASTEXITCODE):$((Get-Location).Path)" }`;
+    // Il comando su righe sue: un commento in coda si mangiava la chiusura del try. Se non arriva in fondo
+    // (exit, errore che ferma tutto) l'esito resta vuoto e lo dà il codice del processo, l'unico che lo sa.
+    return `$global:LASTEXITCODE=0\n$__filo_c=''\ntry {\n${command}\n$__filo_ok=$?\n$__filo_c=${ESITO_POWERSHELL}\n}`
+      + ` finally { Write-Output "${mark}:$($__filo_c):$((Get-Location).Path)" }`;
   }
   // bash / sh (incluse le routine cloud Linux): cattura $? subito dopo il
   // comando, poi stampa il marcatore (sempre eseguito, su riga propria).
