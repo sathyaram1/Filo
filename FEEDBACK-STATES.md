@@ -321,13 +321,17 @@ dashboard scriveva "in attesa di ripresa". Adesso:
    non più necessario). Dal 2026-09-24 la dashboard non rilegge più la collezione a
    ogni giro: chiede «chi è stato scritto dopo questo istante?» filtrando su
    `updatedAt`. L'app e gli script lo scrivono, il server no. Perché la dashboard
-   veda lo stesso quello che scrive lui (stato, claim, battiti) il giro controlla, per
-   i soli feedback in mano alle routine, l'ora d'ultima scrittura che tiene Firestore:
-   costa una lettura per feedback seguito, non per feedback esistente. Se il server
-   firmasse l'ora, quel controllo diventerebbe superfluo e il giro tornerebbe a una
-   lettura sola. Le regole ammettono il campo in tutti e tre i rami (create, update
-   admin, update routine) e pretendono che sia una DATA: scritto come testo il
-   confronto per data non lo riconosce.
+   veda lo stesso quello che scrive lui (stato, claim, battiti) il giro guarda altri
+   tre segni, che nessun orologio tocca: l'ora d'ultima scrittura che tiene Firestore,
+   per i feedback in mano alle routine (una lettura ciascuno, e sono pochi, quanti il
+   server ne lavora insieme); il contatore degli invii, CONFRONTATO col numero di
+   segnalazioni che la domanda per data ha portato; e il registro dei worker, perché
+   quale feedback il server prenda in carico non si deduce dall'ordine della coda in
+   dashboard — un avvio nuovo fa riallineare il giro dopo. Se il server firmasse
+   l'ora, tutti e tre diventerebbero superflui e il giro tornerebbe a una lettura
+   sola. Le regole ammettono il campo in tutti e tre i rami (create, update admin,
+   update routine) e pretendono che sia una DATA: scritto come testo il confronto per
+   data non lo riconosce.
 3. Gate deterministico file sospetti (vive QUI, decisione owner): gira PRIMA dei giudici
    su ogni feedback con allegati; flag → `suspicious_file` e NON va al panel finché
    l'owner non decide. Contesto noto: il widget accetta via drag&drop tipi non ammessi
