@@ -66,6 +66,7 @@
     send,
     faviconUrl: (url) => faviconUrl(url),
     applyCommandCwd: (actions) => Term.applyCommandCwd(actions),
+    chatId: () => chatId,
   });
   // #525 — una riga scritta in chat senza passare dal modello (la risposta a un
   // comando con lo slash, il comando di terminale e il suo esito) entra
