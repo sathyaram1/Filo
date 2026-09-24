@@ -104,7 +104,12 @@ ogni volta era già stato chiuso di sotto:
 6. e il controllo appena nato chiedeva se l'esaminato fosse ARRIVATO là, non
    se fosse QUELLO che chi fonde trova: un ramo più avanti su origin passava
    in silenzio, e ad atterrare era il commit in cima (2026-09-20, stesso
-   feedback, quarta verifica).
+   feedback, quarta verifica);
+7. e il rifiuto dettava un rientro in verifica che il server nega al
+   controllo di sicurezza, cioè a chi chiede la fusione: dopo il pass il
+   verificatore toglie le prove del giro, la fusione si fermava qui, e cinque
+   lavori approvati sono rimasti fermi senza nessuno che li portasse avanti
+   (2026-09-24).
 
 Dove vive: `ROUTINE-AUTH-SPEC.md` §11 («Un esito vale per la versione
 esaminata»), `scripts/dispatch.mjs`, `scripts/routine-channel.mjs`,
