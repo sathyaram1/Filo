@@ -1254,13 +1254,18 @@ class TabManager {
       }
 
       // 2) LLM per il resto (giudizio). No-op sui duplicati (già decisi sopra).
+      // Il giudizio può non arrivare (crediti finiti, chiave sbagliata, rete
+      // giù): chi ha chiesto il riordino deve saperlo, o legge lo stesso esito
+      // di un riordino riuscito in cui non c'era niente da chiudere.
       const decide = globalThis.SN_TAB_TRIAGE_DECIDE;
       let decisions = [];
+      let giudizioMancato = true;
       if (typeof decide === 'function') {
         try {
           const input = await this._gatherTriageInput(cands);
           const r = await decide({ tabs: input, trigger });
           decisions = Array.isArray(r && r.decisions) ? r.decisions : [];
+          giudizioMancato = false;
         } catch (_) { decisions = []; }
       }
 
