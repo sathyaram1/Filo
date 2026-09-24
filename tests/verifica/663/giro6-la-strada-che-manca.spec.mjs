@@ -1,18 +1,12 @@
-// Verifica #663, giro 6 — stessa famiglia dei giri 3, 4 e 5: la frase già
-// scritta per l'utente arriva, ma la STRADA per togliere l'ostacolo la mette
-// solo qualche superficie. Il giro 5 l'ha chiesta per l'Aiuto su una pagina
-// web e c'è; il diario delle versioni la promette anche per la riscrittura di
-// un testo, per la dettatura e per la trascrizione di una regione.
-//
-// Qui si prova: che le strade già messe portino davvero alla pagina Crediti
-// (essercì non basta: deve aprirsi), e che il riquadro «Modifica testo» non
-// resti l'unico posto dove la frase nomina una pagina irraggiungibile.
+// Verifica #663, giro 6 — la frase già scritta per l'utente arriva, e da dove
+// la strada per togliere l'ostacolo è stata messa (l'Aiuto su una pagina web,
+// il riquadro della spiegazione) deve APRIRSI davvero la pagina Crediti:
+// esserci non basta. Le superfici rimaste senza strada viaggiano nel #663.2.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const PAGINA = '<!doctype html><meta charset="utf-8"><title>Pagina</title>'
-  + '<p id="p">Una frase con dentro la parola sonda.</p>'
-  + '<textarea id="t" style="width:300px;height:80px">Questo testo va riscritto meglio.</textarea>';
+  + '<p id="p">Una frase con dentro la parola sonda.</p>';
 
 async function configModelli(app, { chiave }) {
   await app.evaluate(async (_e, cfg) => {
