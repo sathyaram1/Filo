@@ -27,12 +27,19 @@ La forma giusta, ogni volta che un esito attraversa il tempo:
 - **Chi legge l'esito lo confronta col contenuto vero**, risolto da lui una
   volta sola. Se non combaciano l'esito è decaduto, e il controllo va rifatto
   invece che dato per buono.
-- **Il decadimento si REGISTRA, non si stampa e basta.** Accorgersene su una
-  macchina e fermarsi lì lascia l'esito «buono» dove lo leggono gli altri: è
-  lo stesso difetto spostato di un passo. Il rifiuto nomina il passo che
-  rimette il lavoro in verifica, col comando pronto, invece di nominare
-  qualcuno che dovrebbe farlo (per esempio «chi ha cambiato il ramo»: quasi
-  sempre una sessione ormai chiusa).
+- **Il decadimento si REGISTRA, non si stampa e basta, e lo registra chi ha
+  il permesso di farlo.** Accorgersene su una macchina e fermarsi lì lascia
+  l'esito «buono» dove lo leggono gli altri: è lo stesso difetto spostato di un
+  passo. Ma il passo che un rifiuto detta dev'essere uno che il server
+  concede a CHI legge il rifiuto: un comando che il suo ruolo non può eseguire
+  lascia il lavoro con due via libera e nessuno che lo porti avanti. Quindi
+  l'esito di un ALTRO lo giudica chi fonde, dallo stato vero (il server
+  confronta la punta col commit verificato, tollera le sole prove del giro
+  tolte, e altrimenti azzera la verifica e la rimette in giro da sé); il
+  rifiuto locale resta sull'esito di chi lo legge, col rimedio che lui può
+  fare: rileggere il pezzo nuovo e registrare di nuovo il proprio verdetto.
+  Mai nominare qualcuno che dovrebbe farlo (per esempio «chi ha cambiato il
+  ramo»: quasi sempre una sessione ormai chiusa).
 - **Ogni passo a valle parla dell'impronta, fino all'ultimo.** Timbrarla sugli
   esiti non chiude niente se poi l'azione finale si chiede per etichetta: il
   giro intero va letto, non il pezzo appena toccato.
