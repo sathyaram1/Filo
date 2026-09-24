@@ -115,7 +115,9 @@ test('riaprire un fix uscito non cancella il report della lavorazione', async ({
       },
     });
     window.__mgTest.setAdmin(true);
+    window.__mgTest.setReleasedVersion('9.9.9');
     window.__mgTest.setData([JSON.parse(JSON.stringify(riga))]);
+    window.__mgTest.setTab('resolved');
   }, { riga: USCITO, report: REPORT });
 
   await page.locator('.mg-item[data-id="fb677r"]').click();
