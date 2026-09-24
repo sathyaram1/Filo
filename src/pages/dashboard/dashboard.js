@@ -337,7 +337,9 @@
     for (const m of chat.messages) {
       const isUser = m.role === 'user';
       const text = String(m.text || '');
-      const types = Array.isArray(m.actions) ? m.actions : [];
+      // Le azioni archiviate col loro esito: senza, il racconto di una chat
+      // riaperta dava per riuscito tutto quello che Filo aveva solo nominato.
+      const voci = self.SN_ESITO.voci(m.actions);
       if (text.trim()) {
         bubblesEl.appendChild(makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser }));
       }
