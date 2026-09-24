@@ -179,8 +179,8 @@ function shellConfig(shell, sid, startCwd) {
     options: { cwd: startCwd || undefined, windowsHide: true },
     ready: `${PRELUDI_CODIFICA.powershell}"FILO_RDY_${sid}"\n`,
     wrap: (command) =>
-      `$global:LASTEXITCODE=0\n${comandoPerPowerShell(command)}\n` +
-      `"FILO_META_${sid}:$($LASTEXITCODE):$((Get-Location).Path)"\n`,
+      `$global:LASTEXITCODE=0\n$__filo_ok=$false\n${comandoPerPowerShell(`${command}\n$__filo_ok=$?`)}\n` +
+      `"FILO_META_${sid}:$(${ESITO_POWERSHELL}):$((Get-Location).Path)"\n`,
   };
 }
 
