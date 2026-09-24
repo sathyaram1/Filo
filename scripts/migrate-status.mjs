@@ -126,6 +126,10 @@ async function main() {
     const fields = { status: toFsValue(fine), statusPublic: toFsValue(publicStatus) };
     const mask = ['status', 'statusPublic'];
     if (statusReason) { fields.statusReason = toFsValue(statusReason); mask.push('statusReason'); }
+    // #676: ogni scrittura firma l'ora, o la dashboard non vede il cambiamento
+    // fino al riallineamento (che è raro per scelta).
+    fields.updatedAt = { timestampValue: new Date().toISOString() };
+    mask.push('updatedAt');
     const qs = mask.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
     const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(fb._id)}?${qs}`, {
       method: 'PATCH',

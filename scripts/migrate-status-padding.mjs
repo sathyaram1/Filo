@@ -120,6 +120,9 @@ async function main() {
         campi[k] = { stringValue: await C.encryptForOwner(doc.fields[k].stringValue) };
         mask.push(k);
       }
+      // #676: ogni scrittura firma l'ora (vedi src/shared/feedback.js).
+      campi.updatedAt = { timestampValue: new Date().toISOString() };
+      mask.push('updatedAt');
       const qs = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
       const res = await fetch(`${FIRESTORE_BASE}/feedback/${doc.id}?${qs}`, {
         method: 'PATCH',
@@ -170,6 +173,9 @@ async function main() {
     // regole la riservano al backend, e giustamente. A smontare la vetrina di un
     // feedback che smette di essere "chiuso" ci pensa il backend di sicurezza,
     // che se ne accorge da questa stessa scrittura.
+    // #676: ogni scrittura firma l'ora (vedi src/shared/feedback.js).
+    campi.updatedAt = { timestampValue: new Date().toISOString() };
+    mask.push('updatedAt');
     const qs = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
     const res = await fetch(`${FIRESTORE_BASE}/feedback/${doc.id}?${qs}`, {
       method: 'PATCH',
