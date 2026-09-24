@@ -2543,6 +2543,15 @@
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb) return;
 
+    // Aperto da un elenco proiettato: il resto arriva adesso e il pannello si
+    // ridisegna da sé. Nel frattempo quello che c'è si vede già, e la parte
+    // che manca lo dice invece di sembrare vuota.
+    if (FB.soloLista(fb)) {
+      completaDettaglio(id).then((pieno) => {
+        if (pieno && selectedId === id) openDetail(id, { ridisegno: true });
+      }).catch((e) => console.warn('[manage] dettaglio non completato:', e?.message || e));
+    }
+
     mgDetailEmpty.hidden = true;
     mgDetail.hidden = false;
 
