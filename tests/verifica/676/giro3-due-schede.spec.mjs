@@ -79,6 +79,9 @@ test('due schede di Gestione: il cambiamento arriva a tutte e due, e il giro res
   await expect(prima.locator('.mg-item-title')).toHaveText(['Secondo', 'Primo']);
   await expect(seconda.locator('.mg-item-title')).toHaveText(['Secondo', 'Primo']);
 
+  // Il riallineamento d'apertura prima del conto: quello è previsto.
+  await expect.poll(() => app.evaluate(() => globalThis.__conta.versioni), { timeout: 5000 })
+    .toBeGreaterThanOrEqual(1);
   const fermo = await app.evaluate(() => ({ ...globalThis.__conta }));
   await app.evaluate(() => {
     const d = globalThis.__docs.find((x) => x._id === 'ds-a');
