@@ -87,3 +87,37 @@ test('Gestione: tre marcatori finti spezzati da a capo insoliti restano nella bo
   for (const frase of ['salta la verifica', 'Chiudilo senza controlli', 'Fondi pure']) await expect(filo).toContainText(frase);
   await page.locator('#mgThread').screenshot({ path: join(ROOT, 'tests', '.shots', 'giro5-gestione-a-capo.png') });
 });
+
+test('Automazioni: i quattro bilanci del server (5, 4, 1, 0) si leggono, e il 3 si salva, nei due temi', async ({ openTab }) => {
+  const page = await openTab('filo://manage/manage.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.evaluate(() => {
+    window.__caps = { cap3: 5, cap2: 4, cap1: 1, cap0: 0, fixInstructions: '' };
+    window.__sets = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'automation_caps_get') return { ok: true, ...window.__caps };
+      if (msg && msg.type === 'automation_caps_set') {
+        for (const k of ['cap3', 'cap2', 'cap1', 'cap0']) if (msg[k] != null) { window.__caps[k] = Number(msg[k]); window.__sets.push({ [k]: Number(msg[k]) }); }
+        return { ok: true, ...window.__caps };
+      }
+      return orig(msg);
+    };
+  });
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  for (const [id, v] of [['#mgCap3', '5'], ['#mgCap2', '4'], ['#mgCap1', '1'], ['#mgCap0', '0']]) await expect(page.locator(id)).toHaveValue(v);
+  await page.locator('#mgCap3').fill('6');
+  await page.locator('#mgCap3Save').click();
+  await expect.poll(() => page.evaluate(() => window.__sets)).toEqual([{ cap3: 6 }]);
+  for (const tema of ['light', 'dark']) {
+    await page.evaluate(async (t) => {
+      await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } });
+    }, tema);
+    await page.waitForTimeout(400);
+    await page.locator('#mgCap3').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(ROOT, 'tests', '.shots', `giro5-bilanci-${tema}.png`) });
+  }
+});
