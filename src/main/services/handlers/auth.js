@@ -937,13 +937,15 @@ module.exports = function register(on, ctx) {
    *
    * Best-effort: se una delle due domande non riesce, il giro prosegue con
    * quello che ha invece di fermarsi. Torna anche gli id aggiunti, perché su
-   * quelli chi pubblica è più prudente (vedi `statusLeggibile`).
+   * quelli chi pubblica è più prudente (vedi `statusLeggibile`), e
+   * `schedeCoperte`: se ogni scheda in bacheca ha il suo feedback sotto gli
+   * occhi, una scheda rimasta sola è un orfano vero e si può togliere.
    */
-  async function conLeSegnalazioniFuoriPagina(base, idToken, schede) {
+  async function conLeSegnalazioniFuoriPagina(base, idToken, schede, sinceIso) {
     const FB = FEEDBACK();
     const rows = Array.isArray(base) ? base.slice() : [];
     const aggiunti = new Set();
-    if (!FB || !idToken) return { rows, aggiunti };
+    if (!FB || !idToken) return { rows, aggiunti, schedeCoperte: false };
     const visti = new Set(rows.map((r) => String((r && r._id) || '')).filter(Boolean));
     const aggiungi = (arr) => {
       for (const r of Array.isArray(arr) ? arr : []) {
@@ -956,19 +958,28 @@ module.exports = function register(on, ctx) {
     };
 
     if (typeof FB.listResolved === 'function') {
-      try { aggiungi(await FB.listResolved({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken })); }
+      // Solo le chiusure arrivate DOPO l'ultimo giro riuscito: quelle di prima
+      // hanno già la loro scheda, e rileggerle ogni minuto era il grosso del
+      // conto. Alla prima sincronizzazione dopo l'avvio la data non c'è e si
+      // riparte dalla finestra intera, una volta.
+      const campi = Array.isArray(FB.CAMPI_LISTA) ? FB.CAMPI_LISTA : null;
+      try { aggiungi(await FB.listResolved({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken, sinceIso, fields: campi })); }
       catch (e) { console.warn('[feedback] chiusi di recente non letti:', e?.message || e); }
     }
 
-    const mancanti = (Array.isArray(schede) ? schede : [])
+    const tutteLeMancanti = (Array.isArray(schede) ? schede : [])
       .map((c) => String((c && c._id) || ''))
-      .filter((id) => id && !visti.has(id))
-      .slice(0, FB.LIST_PAGE_SIZE);
+      .filter((id) => id && !visti.has(id));
+    const mancanti = tutteLeMancanti.slice(0, FB.LIST_PAGE_SIZE);
+    let schedeCoperte = mancanti.length === tutteLeMancanti.length;
     if (mancanti.length) {
       try { aggiungi(await FB.getMany(mancanti, { idToken, timeoutMs: 30000 })); }
-      catch (e) { console.warn('[feedback] feedback delle schede fuori pagina non letti:', e?.message || e); }
+      catch (e) {
+        schedeCoperte = false;
+        console.warn('[feedback] feedback delle schede fuori pagina non letti:', e?.message || e);
+      }
     }
-    return { rows, aggiunti };
+    return { rows, aggiunti, schedeCoperte };
   }
 
   /**
