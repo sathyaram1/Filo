@@ -849,7 +849,7 @@ module.exports = function register(on, ctx) {
     if (op === 'getMany') {
       const ids = Array.isArray(msg.ids) ? msg.ids : [];
       const rows = await FB.getMany(ids, { timeoutMs, idToken });
-      return { ok: true, rows: await mergeCardFields(rows) };
+      return { ok: true, rows: await mergeCardFields(rows, { ids }) };
     }
     if (op !== 'list') return { ok: false, error: `lettura non prevista: ${op}` };
 
