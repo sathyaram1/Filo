@@ -2502,7 +2502,7 @@
     if (!key) return Promise.resolve(null);
     if (dettagliInCorso.has(key)) return dettagliInCorso.get(key);
     const p = (async () => {
-      let rows = await FB.getMany([key]);
+      let rows = await liveSources.getDettagli([key]);
       if (isAdmin && rows.length > 0) {
         try {
           const r = await sendToMain({ type: 'feedback_decrypt_fields', list: rows });
@@ -4070,7 +4070,10 @@
   // Sorgenti sostituibili dagli spec (che non hanno Firestore).
   const liveSources = {
     listVersions: (o) => FB.listVersions(o),
+    // Il giro dal vivo rilegge le RIGHE: stessa proiezione del caricamento.
     getMany: (ids) => FB.getMany(ids, { fields: FB.CAMPI_LISTA }),
+    // Il documento intero, per il feedback che l'owner ha aperto.
+    getDettagli: (ids) => FB.getMany(ids),
   };
   let liveEnabled = false;
   let liveBlocked = false;  // dati finti iniettati: il giro non parte più, nemmeno se l'avvio finisce dopo

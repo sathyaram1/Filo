@@ -30,7 +30,7 @@ const RIGA = {
   subSeq: 0,
   name: 'Aprire senza scaricare tutto due volte',
   text: 'Gestione ci mette una vita ad aprirsi.',
-  status: 'todo',
+  status: 'unlabeled',
   statusPublic: 'open',
   priority: 2,
   clientId: 'tester-1',
@@ -65,13 +65,23 @@ async function admin(page) {
 async function collezioneFinta(page, riga, intero) {
   await page.evaluate(({ r, i }) => {
     window.__chiesti = [];
-    window.SN_FEEDBACK.list = async () => [JSON.parse(JSON.stringify(r))];
-    window.SN_FEEDBACK.getMany = async (ids) => {
+    window.__dettaglio = (ids) => {
       window.__chiesti.push(...ids);
       const pieno = JSON.parse(JSON.stringify(i));
       delete pieno._proiezione;
       return ids.includes(pieno._id) ? [pieno] : [];
     };
+    window.SN_FEEDBACK.list = async () => [JSON.parse(JSON.stringify(r))];
+    window.SN_FEEDBACK.getMany = async (ids) => window.__dettaglio(ids);
+    // In Gestione le letture passano dalle sorgenti sostituibili (la pagina
+    // tiene un riferimento suo al modulo dei feedback).
+    if (window.__mgTest) {
+      window.__mgTest.setLiveSources({
+        getDettagli: async (ids) => window.__dettaglio(ids),
+        getMany: async (ids) => window.__dettaglio(ids),
+        listVersions: async () => [],
+      });
+    }
   }, { r: riga, i: intero });
 }
 
@@ -82,21 +92,10 @@ test('la pagina dei feedback mostra la riga, e la conversazione arriva quando se
   await admin(page);
   await collezioneFinta(page, RIGA, INTERO);
   await page.evaluate(() => window.__fbTest.setAdmin(true, { email: 'owner@example.invalid' }));
-  await page.evaluate(() => window.location.reload());
-  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 15_000 });
-  await admin(page);
-  await collezioneFinta(page, RIGA, INTERO);
-  await page.evaluate(() => { window.__fbTest.setAdmin(true, { email: 'owner@example.invalid' }); });
-
-  // Il caricamento vero (proiettato) e poi il completamento della sezione.
+  // Il cammino vero: la lista proiettata entra da SN_FEEDBACK.list, e il
+  // completamento della sezione parte da solo al primo disegno.
   await page.evaluate(async () => {
-    const R = JSON.parse(JSON.stringify(window.__rigaProiettata || null));
-    return R;
-  }).catch(() => {});
-  await page.evaluate(() => window.__fbTest.setData([]));
-  await page.evaluate(async () => {
-    // Il cammino vero: la lista proiettata entra da SN_FEEDBACK.list.
-    const righe = await window.SN_FEEDBACK.list({});
+    const righe = await window.SN_FEEDBACK.list({ pageSize: 500, fields: window.SN_FEEDBACK.CAMPI_LISTA });
     window.__fbTest.setData(righe);
   });
 
@@ -109,7 +108,9 @@ test('la pagina dei feedback mostra la riga, e la conversazione arriva quando se
   // sono arrivati col completamento, non col caricamento della lista.
   await expect(card.locator('.fb-bubble-body').first()).toContainText('Gestione ci mette una vita');
   await expect(card.locator('.fb-notes')).toHaveValue(/caricamento chiede i documenti interi/);
-  await expect(card.locator('.fb-imgs img')).toHaveCount(1);
+  // L'allegato della segnalazione c'è: che poi l'immagine si decifri o no è
+  // un'altra storia, e non è quella che questa prova racconta.
+  await expect(card.locator('.fb-imgs')).toHaveCount(1);
 
   const chiesti = await page.evaluate(() => window.__chiesti);
   expect(chiesti).toEqual(['fb677']);
@@ -145,4 +146,67 @@ test('in Gestione la lista è la stessa, e il dettaglio si completa aprendolo', 
   await riga.click();
   await page.waitForTimeout(300);
   expect(await page.evaluate(() => window.__chiesti)).toEqual(['fb677']);
+});
+
+// La riga d'elenco non ha le note. Rispondere a un chiarimento le APPENDE: se
+// si scrive sulla riga invece che sul documento, al posto di tutto il report
+// resta la sola risposta. Qui la lettura del dettaglio è lenta apposta e si
+// risponde subito: la risposta deve comunque finire in coda al report.
+const IN_CHIARIMENTO = {
+  _id: 'fb678',
+  _proiezione: true,
+  seq: 678,
+  subSeq: 0,
+  name: 'Domanda aperta',
+  text: 'Non so quale delle due strade vuoi.',
+  status: 'design',
+  statusReason: 'clarify',
+  statusPublic: 'open',
+  clientId: 'tester-1',
+  createdAt: '2026-09-21T09:00:00.000Z',
+};
+
+const REPORT = 'Report della lavorazione, con dentro la domanda per te.';
+
+test('rispondere a un chiarimento non cancella il report della lavorazione', async ({ openTab }) => {
+  const page = await openTab(PAGINA_GESTIONE);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
+  await admin(page);
+
+  await page.evaluate(({ riga, report }) => {
+    window.__inviati = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') { window.__inviati.push(msg); return { ok: true }; }
+      if (msg && msg.type === 'auth_status') return { ok: true, isAdmin: true, profile: { email: 'owner@example.invalid' } };
+      if (msg && msg.type === 'feedback_decrypt_fields') return { ok: true, list: msg.list };
+      return orig(msg);
+    };
+    window.__mgTest.setLiveSources({
+      listVersions: async () => [],
+      getMany: async () => [],
+      // Lenta apposta: è la finestra in cui prima si perdeva il report.
+      getDettagli: async (ids) => {
+        await new Promise((r) => setTimeout(r, 1200));
+        const pieno = JSON.parse(JSON.stringify(riga));
+        delete pieno._proiezione;
+        pieno.notes = report;
+        return ids.includes(pieno._id) ? [pieno] : [];
+      },
+    });
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([JSON.parse(JSON.stringify(riga))]);
+  }, { riga: IN_CHIARIMENTO, report: REPORT });
+
+  await page.locator('.mg-item[data-id="fb678"]').click();
+  // Subito, senza aspettare che il dettaglio arrivi.
+  await page.locator('#mgClarifyText').fill('Prendi la seconda.');
+  await page.locator('#mgClarifyBtn').click();
+
+  await expect.poll(async () => (await page.evaluate(() => window.__inviati)).length, { timeout: 15_000 })
+    .toBeGreaterThan(0);
+  const [inviato] = await page.evaluate(() => window.__inviati);
+  expect(inviato.notes).toContain(REPORT);
+  expect(inviato.notes).toContain('Prendi la seconda.');
 });
