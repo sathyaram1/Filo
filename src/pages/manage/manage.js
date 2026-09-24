@@ -2871,7 +2871,6 @@
     if (selectedId !== id) { setActionsBusy(false); return; }
     const payload = { type: 'feedback_update', id, status: action.to };
     const locale = { status: action.to };
-    const comment = (mgAcceptComment && !mgAcceptComment.hidden) ? (mgAcceptComment.value || '').trim() : '';
     if (action.kind === 'accept' || action.kind === 'reject') {
       const decision = action.kind === 'accept' ? 'accepted' : 'rejected';
       payload.reviewDecision = decision;
