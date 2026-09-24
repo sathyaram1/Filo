@@ -96,16 +96,27 @@ test('all\'assistente un comando fallito arriva fallito, e uno riuscito col comm
   }
 });
 
-test('all\'assistente il codice d\'uscita di un programma esterno vale anche con le redirezioni e dentro uno script', async ({ openTab }) => {
+test('all\'assistente un programma esterno riuscito resta riuscito anche con le redirezioni di stderr', async ({ openTab }) => {
   const base = preparaCartella();
   try {
     const page = await assistenteIn(openTab, base);
+    // Riuscito, ma scrive su stderr: 2>&1 è la forma che un modello scrive spesso, git la usa per i messaggi.
+    for (const redir of ['2>&1', '2>$null']) {
+      if (!WIN && redir === '2>$null') continue;
+      const avviso = await eseguiComando(page, `node -e "console.error('avviso-7731')" ${redir}`);
+      expect(avviso.output.code, `con ${redir} un programma riuscito risulta fallito: ${JSON.stringify(avviso.output).slice(0, 300)}`)
+        .toBe(0);
+      expect(avviso.executed).toBe(true);
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
 
-    // Riuscito, ma scrive su stderr: con 2>&1 (la forma che un modello scrive spesso) resta riuscito.
-    const avviso = await eseguiComando(page, 'node -e "console.error(\'avviso-7731\')" 2>&1');
-    expect(avviso.output.code, `un programma riuscito risulta fallito: ${JSON.stringify(avviso.output).slice(0, 300)}`).toBe(0);
-    expect(avviso.executed).toBe(true);
-
+test('all\'assistente uno script che finisce con un programma esterno fallito risulta fallito', async ({ openTab }) => {
+  const base = preparaCartella();
+  try {
+    const page = await assistenteIn(openTab, base);
     // Lo script finisce con un programma esterno uscito con 3: l'esito è 3, non riuscito.
     const script = await eseguiComando(page, WIN ? '.\\costruisci.ps1' : 'sh ./costruisci.sh');
     expect(String(script.output.stdout)).toContain('costruisco');
