@@ -74,9 +74,11 @@ async function fingiFirestore(app, docs) {
       globalThis.__conta.documenti += trovati.length;
       return trovati;
     };
+    // Una lettura per giro, contata a parte: è un documento solo e non è un
+    // feedback, e i conti sotto parlano di feedback.
     FB.submissionCount = async () => {
       globalThis.__conta.richieste += 1;
-      globalThis.__conta.documenti += 1;
+      globalThis.__conta.contatori += 1;
       return globalThis.__invii;
     };
     // Il ritmo del giro lo legge chi accende il timer: accorciarlo qui basta.
