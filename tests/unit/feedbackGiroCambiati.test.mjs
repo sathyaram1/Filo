@@ -109,7 +109,7 @@ test('listChangedSince: il freno sulle pagine lo DICE, non taglia in silenzio', 
 
 test('updateStatus firma sempre l\'ora: senza, il cambiamento sparisce dal giro', async () => {
   await conFetch(() => ({}), async (chiamate) => {
-    await FB.updateStatus('doc-1', { status: 'working' }, { idToken: 'x' });
+    await FB.updateStatus('doc-1', { starred: true }, { idToken: 'x' });
     const mask = new URLSearchParams(chiamate[0].url.split('?')[1] || '').getAll('updateMask.fieldPaths');
     assert.ok(mask.includes('updatedAt'), 'updatedAt deve stare nella maschera');
     const v = chiamate[0].body.fields.updatedAt.timestampValue;
