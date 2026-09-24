@@ -128,7 +128,8 @@ test('due segnalazioni nello stesso giro: quella con l\'ora indietro non entra i
 
   const page = await openTab(URL_MANAGE);
   await apriGestione(page, [B, A], 'inbox');
-  await expect(page.locator('.mg-item-title')).toHaveText(['Seconda', 'Prima']);
+  await expect.poll(() => page.locator('.mg-item-title').allTextContents(), { timeout: 5000 })
+    .toEqual(['Seconda', 'Prima']);
   await riaccendiGiro(page);
   // Un paio di giri a vuoto: il contatore degli invii è ormai in pari.
   await new Promise((r) => setTimeout(r, RITMO * 4));
@@ -154,7 +155,9 @@ test('due segnalazioni nello stesso giro: quella con l\'ora indietro non entra i
   });
 
   // La terza arriva: è la prova che il giro sta girando davvero.
-  await expect(page.locator('.mg-item-title')).toContainText(['Terza'], { timeout: 5000 });
+  await expect.poll(() => page.locator('.mg-item-title').allTextContents(), { timeout: 5000 })
+    .toContain('Terza');
   // La quarta è quella che conta: una segnalazione mandata non deve sparire.
-  await expect(page.locator('.mg-item-title')).toContainText(['Quarta'], { timeout: 5000 });
+  await expect.poll(() => page.locator('.mg-item-title').allTextContents(), { timeout: 5000 })
+    .toContain('Quarta');
 });
