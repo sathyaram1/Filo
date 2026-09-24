@@ -434,6 +434,11 @@ service cloud.firestore {
         // archiviare nonostante il punteggio. '' = nessun override (substrato
         // SN_BOARD_ARCHIVE.hasOwnerOverride).
         && request.resource.data.get('archiveOverride', '') in ['', 'archived', 'keep_open']
+        // #676: un timestamp, o la stringa ISO che scrivono gli script.
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt is timestamp
+            || (request.resource.data.updatedAt is string
+                && request.resource.data.updatedAt.size() <= 40))
         // `reopenRequests` (DC4): l'admin può azzerarlo (es. {}) quando un fix
         // riaperto viene risistemato e rispedito, sbloccando una futura
         // riapertura sullo stesso doc. Nessun vincolo di forma extra qui: il
