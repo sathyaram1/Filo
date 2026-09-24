@@ -76,8 +76,10 @@ servita a niente, una volta.
 
 - `src/shared/feedbackLive.js` — la decisione del giro, pura (`makeWatcher`).
 - `src/shared/feedback.js` — `listChangedSince`, `touchUpdatedAt`,
-  `getManyPublic`.
+  `getManyPublic`, `versionsOf`, `submissionCount`.
 - `src/main/services/handlers/auth.js` — il giro unico e le iscrizioni.
 - `tests/unit/feedbackGiroCambiati.test.mjs`,
+  `tests/unit/feedbackGiroSenzaOrologio.test.mjs`,
   `tests/manage-giro-cambiati.spec.mjs` — le sentinelle: contano richieste e
-  documenti, e asseriscono che il cambiamento si VEDE entro il giro.
+  documenti, e asseriscono che il cambiamento si VEDE entro il giro, anche
+  quando chi scrive non ha firmato l'ora.
