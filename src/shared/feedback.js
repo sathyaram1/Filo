@@ -1259,19 +1259,23 @@
 
   // Legge i documenti indicati (interi) in UNA richiesta (batchGet). Ritorna
   // solo quelli trovati: un id cancellato nel frattempo non compare. Vuoto → [].
-  async function getMany(ids, { timeoutMs = 0, idToken = '' } = {}) {
+  async function getMany(ids, { timeoutMs = 0, idToken = '', fields = null } = {}) {
     const wanted = (Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean);
     if (wanted.length === 0) return [];
     const bridge = pageBridge();
-    if (bridge) return readViaMain(bridge, { op: 'getMany', ids: wanted, timeoutMs });
+    if (bridge) return marcaProiezione(await readViaMain(bridge, { op: 'getMany', ids: wanted, timeoutMs, fields }), fields);
     const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
     const prefix = `${FIRESTORE_BASE}/${COLLECTION}/`;
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    const corpo = { documents: wanted.map((id) => prefix + id) };
+    // Stessa proiezione delle liste: chi rilegge una riga d'elenco non deve
+    // riscaricare note e allegati per riscrivere un titolo.
+    if (Array.isArray(fields) && fields.length > 0) corpo.mask = { fieldPaths: fields.map((f) => String(f)) };
     const opts = {
       method: 'POST',
       headers,
-      body: JSON.stringify({ documents: wanted.map((id) => prefix + id) }),
+      body: JSON.stringify(corpo),
     };
     let timer = null;
     let timedOut = false;
