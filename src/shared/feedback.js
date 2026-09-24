@@ -1358,7 +1358,7 @@
       // vera sotto una pagina che crede finta.
       const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.listPublic) || listPublic;
       // eslint-disable-next-line no-await-in-loop
-      const batch = await porta({ pageSize: limit, timeoutMs, afterName: cursor });
+      const batch = await porta({ pageSize: limit, timeoutMs, afterName: cursor, fields });
       const arr = Array.isArray(batch) ? batch : [];
       let nuove = 0;
       for (const r of arr) {
