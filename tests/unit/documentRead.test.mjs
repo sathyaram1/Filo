@@ -357,16 +357,39 @@ test('anche la CARTELLA può avere il nome storpiato', async () => {
 });
 
 test('quando il nome quasi giusto è giusto per DUE file, non si indovina', async () => {
+  // I due nomi differiscono per l'accento e non per le maiuscole: su Windows e
+  // sul Mac due nomi che differiscono solo per le maiuscole sono lo stesso file.
   const dir = join(TMP, 'ambigui');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'Relazione — città.txt'), 'primo', 'utf8');
-  writeFileSync(join(dir, 'RELAZIONE - CITTA.txt'), 'secondo', 'utf8');
+  writeFileSync(join(dir, 'Relazione — cittá.txt'), 'secondo', 'utf8');
   const r = await DR.readDocument(join(dir, 'Relazione - citta.txt'));
   assert.equal(r.ok, false);
   assert.equal(r.error, 'not_found');
   // Dirlo è la parte utile: il modello può chiedere all'utente quale intende.
   assert.match(r.detail, /quasi uguale/);
   assert.match(r.detail, /Relazione — città\.txt/);
+  assert.match(r.detail, /Relazione — cittá\.txt/);
+});
+
+test('un nome giusto a meno delle maiuscole apre il file, su ogni disco', async () => {
+  // Dove il disco non distingue le maiuscole il file lo apre il sistema e non
+  // c'è niente da dichiarare; dove le distingue lo ritrova la ricerca tollerante e lo dice.
+  const dir = join(TMP, 'maiuscole');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'RELAZIONE - CITTA.txt'), 'il solo file', 'utf8');
+  writeFileSync(join(dir, 'SONDA.tmp'), '', 'utf8');
+  const distingue = !existsSync(join(dir, 'sonda.tmp'));
+
+  const r = await DR.readDocument(join(dir, 'Relazione - citta.txt'));
+  assert.equal(r.ok, true, `doveva aprirlo: ${r.detail}`);
+  assert.equal(r.text, 'il solo file');
+  if (distingue) {
+    assert.equal(r.name, 'RELAZIONE - CITTA.txt');
+    assert.ok(r.requested.endsWith('Relazione - citta.txt'), 'la sostituzione va dichiarata');
+  } else {
+    assert.equal(r.requested, '', 'il sistema ha aperto il file chiesto: nessuna sostituzione da dichiarare');
+  }
 });
 
 test('un file che esiste davvero non passa mai dalla ricerca tollerante', async () => {
