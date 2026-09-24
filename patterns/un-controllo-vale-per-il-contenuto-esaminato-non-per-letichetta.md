@@ -66,7 +66,8 @@ La forma giusta, ogni volta che un esito attraversa il tempo:
   prende, e allora ad arrivare è il resto, che nessuno ha guardato. Le due
   direzioni vogliono rimedi opposti e vanno distinte: se là manca si spedisce,
   se là c'è di più non si spedisce niente (sovrascrivere butterebbe via lavoro
-  che qui non c'è) e il giro si rifà su quel contenuto. È il gemello del
+  che qui non c'è): ci si porta su quel contenuto e si rilegge il pezzo in
+  più, con la regola del punto sopra su chi registra cosa. È il gemello del
   rifiuto per i file fuori dai commit — lì la punta si sposta in avanti dopo
   l'ok, qui non si è mai mossa dove conta. La punta vera si chiede a chi la
   tiene, non al ricordo locale di dov'era; il controllo che parla con la rete
