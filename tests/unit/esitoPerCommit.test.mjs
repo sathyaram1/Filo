@@ -616,7 +616,7 @@ test('i comandi del rifiuto puntano agli attrezzi del giro, non a quelli del ram
   const A = 'a'.repeat(40);
   const B = 'b'.repeat(40);
   const crudo = testoEsitiDecaduti(esitiDecaduti({ secauditSha: A }, B), B, 'worker/485');
-  assert.match(crudo, /node scripts\/routine-channel\.mjs/, 'la ricetta si scrive come si legge');
+  assert.match(crudo, /node scripts\/dispatch\.mjs/, 'la ricetta si scrive come si legge');
 
   // In un giro vero gli attrezzi stanno fuori dal deposito: `scripts/…` qui
   // dentro riporterebbe alla copia che il ramo si porta dietro, vecchia di
