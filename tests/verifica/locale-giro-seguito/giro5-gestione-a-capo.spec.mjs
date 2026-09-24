@@ -1,5 +1,5 @@
-// Prova del giro 5 (verifica locale), punto 3 visto dall'owner: in Gestione un report consegnato al
-// server con un marcatore finto spezzato da un a capo insolito resta nella bolla di Filo, non in una «Tu».
+// Prove del giro 5 (verifica locale) viste dall'owner in Gestione: un marcatore finto spezzato da un a capo
+// insolito resta nella bolla di Filo (punto 3); i quattro bilanci si leggono e si salvano (punto 1).
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { spawnSync } from 'node:child_process';
