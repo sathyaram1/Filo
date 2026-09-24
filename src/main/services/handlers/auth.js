@@ -868,6 +868,111 @@ module.exports = function register(on, ctx) {
     return { ok: true, rows: await mergeCardFields(rows) };
   }));
 
+  // ── #676: il giro della dashboard, uno solo, qui nel main ────────────────
+  //
+  // Prima ogni pagina di Gestione aperta chiedeva a Firestore i nomi di TUTTA
+  // la collezione ogni sessanta secondi: 500 letture al minuto a database
+  // fermo, moltiplicate per le schede aperte. Adesso il giro è uno, vive qui,
+  // e le pagine ascoltano. Due forme, e il perché sta in feedbackLive.js:
+  // al minuto i soli feedback scritti da poco (un giro a vuoto = una lettura),
+  // ogni mezz'ora le versioni di tutta la pagina — l'unica domanda che vede
+  // una CANCELLAZIONE, che per data non comparirebbe mai.
+  //
+  // Nessun iscritto, nessun giro: con Gestione chiusa non si paga niente.
+  const liveSubs = new Set();
+  let liveWatcher = null;
+  let liveTimer = null;
+
+  function liveBroadcast(payload) {
+    const msg = { type: MSG.FEEDBACK_LIVE_CHANGED, ...payload };
+    for (const wc of Array.from(liveSubs)) {
+      try {
+        if (!wc || (wc.isDestroyed && wc.isDestroyed())) { liveSubs.delete(wc); continue; }
+        wc.send('filo:broadcast', msg);
+      } catch (_) { liveSubs.delete(wc); }
+    }
+    if (liveSubs.size === 0) liveStop();
+  }
+
+  function liveBuild() {
+    const LIVE = globalThis.SN_FEEDBACK_LIVE;
+    const FB = FEEDBACK();
+    if (!LIVE || !LIVE.makeWatcher || !FB) return null;
+    const token = async () => {
+      const t = await auth.getIdToken();
+      if (!t) throw new Error('sessione scaduta');
+      return t;
+    };
+    return LIVE.makeWatcher({
+      pageSize: FB.LIST_PAGE_SIZE,
+      broadcast: liveBroadcast,
+      onWarn: (m) => console.warn('[feedback] giro:', m),
+      listVersions: async () => FB.listVersions({
+        pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000, idToken: await token(),
+      }),
+      listChangedSince: async ({ since }) => {
+        const out = await FB.listChangedSince({
+          since, pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000, idToken: await token(),
+        });
+        const rows = await mergeCardFields(out.rows, { ids: out.rows.map((r) => r._id) });
+        return { rows, complete: out.complete };
+      },
+    });
+  }
+
+  function liveTick(opts) {
+    if (!auth.isAdmin() || liveSubs.size === 0) return Promise.resolve(null);
+    if (!liveWatcher) liveWatcher = liveBuild();
+    if (!liveWatcher) return Promise.resolve(null);
+    return liveWatcher.tick(opts).catch((e) => {
+      console.warn('[feedback] giro non riuscito:', e?.message || e);
+      return null;
+    });
+  }
+
+  function liveStart() {
+    if (liveTimer) return;
+    const LIVE = globalThis.SN_FEEDBACK_LIVE;
+    liveTimer = setInterval(() => liveTick({ force: true }), (LIVE && LIVE.POLL_MS) || 60000);
+    if (typeof liveTimer.unref === 'function') liveTimer.unref();
+  }
+
+  function liveStop() {
+    if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+    liveWatcher = null;
+  }
+
+  on(MSG.FEEDBACK_LIVE_SUBSCRIBE, ownerOnly(async (msg, sender) => {
+    const LIVE = globalThis.SN_FEEDBACK_LIVE;
+    const wc = sender && sender.wc;
+    if (!wc) return { ok: false, error: 'mittente sconosciuto' };
+    if (msg && msg.off === true) {
+      liveSubs.delete(wc);
+      if (liveSubs.size === 0) liveStop();
+      return { ok: true, subscribed: false };
+    }
+    if (!liveSubs.has(wc)) {
+      liveSubs.add(wc);
+      // Una scheda chiusa non deve lasciare il giro acceso per sempre.
+      try { wc.once('destroyed', () => { liveSubs.delete(wc); if (liveSubs.size === 0) liveStop(); }); } catch (_) {}
+    }
+    liveStart();
+    return {
+      ok: true,
+      subscribed: true,
+      pollMs: (LIVE && LIVE.POLL_MS) || 60000,
+      reconcileMs: (LIVE && LIVE.RECONCILE_MS) || 0,
+    };
+  }));
+
+  // Gli spec non hanno né Firestore né una sessione admin: qui si sostituiscono
+  // le due letture del giro e lo si fa battere a comando.
+  ctx.__feedbackLiveTest = {
+    tick: (opts) => liveTick(opts),
+    setWatcher: (w) => { liveWatcher = w; },
+    subs: liveSubs,
+  };
+
   // ── Chi pubblica la vista, e quando ──────────────────────────────────────
   //
   // La scheda pubblica di un feedback la può scrivere solo chi ha due cose che
