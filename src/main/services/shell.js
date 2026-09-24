@@ -166,9 +166,9 @@ function shellConfig(shell, sid, startCwd) {
     };
   }
   // PowerShell (default). `-Command -` legge ed esegue da stdin in modo
-  // incrementale, senza prompt. Azzeriamo $LASTEXITCODE prima di ogni comando
-  // così i cmdlet (che non lo toccano) riportano 0 invece dell'ultimo codice
-  // nativo rimasto appeso.
+  // incrementale, senza prompt. $LASTEXITCODE si azzera prima di ogni comando
+  // perché non resti appeso quello nativo di prima; l'esito dei cmdlet lo dà $?.
+  // $? va preso DENTRO il testo codificato: dopo Invoke-Expression vale il suo, non quello del comando.
   // La prima cosa che scriviamo è il preludio UTF-8 (#551): la console di
   // Windows scrive di suo nella tabella OEM, dove il trattino lungo diventa
   // «-» e la «à» un byte che qui arriva come «<27>». Gemello del preludio in
