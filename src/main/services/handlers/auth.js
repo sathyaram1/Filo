@@ -832,16 +832,18 @@ module.exports = function register(on, ctx) {
       const { rows, complete } = await FB.listAllPaged({ timeoutMs, idToken });
       return { ok: true, rows, complete };
     }
-    if (op !== 'list') return { ok: false, error: `lettura non prevista: ${op}` };
+    if (op !== 'list' && op !== 'versions') return { ok: false, error: `lettura non prevista: ${op}` };
 
     const fields = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
     const pageSize = Math.max(1, Math.min(FB.LIST_PAGE_SIZE, Number(msg.pageSize) || FB.LIST_PAGE_SIZE));
     const rows = await FB.list({ pageSize, timeoutMs, fields, idToken });
-    // Una PROIEZIONE (il giro leggero che chiede solo "cosa è cambiato") non
-    // porta campi da riunire, e non deve pagare la lettura delle schede a ogni
-    // battito. La lista intera invece sì — ed è anche il momento buono per
-    // rimettere in pari la vista pubblica.
-    if (fields) return { ok: true, rows };
+    // Il giro leggero del battito ("cosa è cambiato?") non porta campi da
+    // riunire e non deve pagare la lettura delle schede a ogni minuto. Una
+    // lista vera invece sì, anche quando è una proiezione — ed è anche il
+    // momento buono per rimettere in pari la vista pubblica. La differenza la
+    // dichiara chi chiede (`op`): dedurla dai campi era indovinare, e da
+    // quando anche le liste sono proiezioni sbagliava sempre.
+    if (op === 'versions') return { ok: true, rows };
     // Le righe appena lette sono le stesse che servirebbero alla
     // sincronizzazione: gliele passiamo invece di far rileggere mezzo database
     // un attimo dopo.
