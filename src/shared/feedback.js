@@ -1345,7 +1345,7 @@
   // essere tutto. Chi vuole solo le righe usa `listAllPublic`.
   const ALL_PAGES_MAX = 40;
 
-  async function listAllPublicPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, maxPages = ALL_PAGES_MAX } = {}) {
+  async function listAllPublicPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, maxPages = ALL_PAGES_MAX, fields = null } = {}) {
     const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
     const rows = [];
     const visti = new Set();
