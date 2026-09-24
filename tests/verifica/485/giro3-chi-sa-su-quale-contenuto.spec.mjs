@@ -213,6 +213,8 @@ test('il contenuto esaminato non è mai arrivato su origin: la fusione non parte
   }
 });
 
+// Dal 24/09/2026 la verifica mossa dopo il verdetto la giudica il server: qui si guarda che la strada del
+// canale lasci la stessa memoria, perché la nota la nomini invece di astenersi.
 test('la strada del canale non è meno severa nemmeno sulla verifica funzionale', async () => {
   const { srv, ricevuti, port } = await fintoServer();
   const { dir, g, punta } = deposito('filo-485-g3-canale-verifica-');
