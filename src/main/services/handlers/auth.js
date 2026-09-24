@@ -1048,13 +1048,14 @@ module.exports = function register(on, ctx) {
         (f) => !aggiunti.has(String((f && f._id) || '')) || statusLeggibile(f),
       );
 
-      // `complete`: il caricamento PER DATA D'INVIO non ha toccato il tetto,
-      // quindi questi sono TUTTI i feedback che esistono, e solo allora una
-      // scheda senza feedback è un orfano (feedback cancellato) da togliere.
-      // Si guarda la pagina di partenza, non il totale: le segnalazioni pescate
-      // per data di chiusura sono un'aggiunta, e contarle direbbe «pagina
-      // piena» anche quando non lo era.
-      const complete = base.length < FB.LIST_PAGE_SIZE;
+      // `complete` decide una cosa sola: se una scheda rimasta senza feedback
+      // è un orfano da togliere. Guardava se la pagina per data d'invio aveva
+      // toccato il tetto — e passati i cinquecento feedback la risposta è
+      // sempre «sì», cioè da allora nessuna scheda orfana è più uscita dalla
+      // bacheca, in silenzio. La domanda giusta è un'altra e non costa niente
+      // in più: il feedback di OGNI scheda in bacheca l'abbiamo appena
+      // chiesto (`schedeCoperte`), quindi quello che non è tornato non esiste.
+      const complete = schedeCoperte || base.length < FB.LIST_PAGE_SIZE;
       const plan = V.planSync(published, feedbacks, { complete });
       for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
       for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
