@@ -28,7 +28,10 @@ function feedbackChiuso(i) {
     status: 'done',
     statusPublic: 'closed',
     resolvedInVersion: '0.2.70',
-    createdAt: `2026-0${1 + (i % 8)}-01T10:00:00Z`,
+    // Data d'invio che scende con i: così «i più recenti» è esattamente
+    // `feedbacks.slice(0, tetto)` e la prova non dipende da un ordinamento
+    // ambiguo.
+    createdAt: new Date(Date.UTC(2026, 8, 20) - i * 3600_000).toISOString(),
     resolvedAt: '2026-09-10T10:00:00Z',
   };
 }
@@ -117,9 +120,11 @@ test('a parità di dati le scritture sono le stesse di una lettura intera', asyn
   const conto = collezioneFinta({ feedbacks, schede: [] });
   const r = await publishPublicView();
   assert.equal(r.tuttiLetti, true);
-  assert.deepEqual(conto.scritte.map((s) => s.id), feedbacks.map((f) => f._id).sort(
-    (a, b) => feedbacks.findIndex((f) => f._id === a) - feedbacks.findIndex((f) => f._id === b),
-  ));
+  assert.deepEqual(
+    conto.scritte.map((s) => s.id).sort(),
+    feedbacks.map((f) => f._id).sort(),
+    'ogni feedback chiuso ha la sua scheda, come con la lettura intera',
+  );
   for (const s of conto.scritte) {
     assert.equal(typeof s.card.name, 'string');
     assert.equal(s.card.statusPublic, 'closed');
