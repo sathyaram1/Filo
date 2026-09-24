@@ -228,10 +228,14 @@
       // Un invio in più che la domanda per data non ha portato: l'ha mandato
       // una macchina con l'ora indietro. Si riallinea al giro dopo, che è
       // l'unica domanda che vede ciò che nessuna data racconta.
+      //
+      // Si CONTANO, non si guarda se ne è arrivata almeno una: due invii nello
+      // stesso giro, uno con l'ora giusta e uno con l'ora indietro, e il primo
+      // coprirebbe il secondo per sempre.
       const invii = await contaInvii(inviiVisti);
-      if (Number.isInteger(invii) && Number.isInteger(inviiVisti) && invii > inviiVisti
-          && !tutte.some((r) => Number(r && r.seq) > inviiVisti)) {
-        lastReconcileAt = 0;
+      if (Number.isInteger(invii) && Number.isInteger(inviiVisti) && invii > inviiVisti) {
+        const arrivate = tutte.filter((r) => Number(r && r.seq) > inviiVisti).length;
+        if (arrivate < invii - inviiVisti) lastReconcileAt = 0;
       }
       inviiVisti = invii;
 
