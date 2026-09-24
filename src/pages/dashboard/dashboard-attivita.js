@@ -214,11 +214,9 @@
           return;
         }
         this.addRow(t, rowIcon, text, esito === self.SN_ESITO.FALLITO, chiave);
-        if (esito === self.SN_ESITO.COMPIUTO) {
-          const v = voci[voci.length - 1];
-          if (v) v.esito = esito;
-          if (phase === 'done') renderSummary();
-        }
+        const nuova = voci[voci.length - 1];
+        if (nuova) nuova.esito = esito;
+        if (phase === 'done') renderSummary();
       },
       // Esito di un comando eseguito subito (livello 1): riga di comando e
       // output, nella cronologia — non nella bolla della risposta.
