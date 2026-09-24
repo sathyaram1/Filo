@@ -345,10 +345,18 @@
     const role = turn.role === 'user' ? 'user' : 'filo';
     const text = String(turn.text == null ? '' : turn.text);
     const out = { role, text, ts: turn.ts || new Date().toISOString() };
+    // Di un'azione si tiene anche COM'È ANDATA, o la conversazione riaperta
+    // racconta come riuscito tutto quello che Filo ha soltanto nominato.
+    // `id` è la targa con cui il click che arriva dopo ritrova la sua azione.
     if (Array.isArray(turn.actions) && turn.actions.length) {
+      const E = (typeof globalThis !== 'undefined' && globalThis.SN_ESITO) || null;
       out.actions = turn.actions
-        .map((a) => (a && a.type ? String(a.type) : ''))
-        .filter(Boolean);
+        .filter((a) => a && a.type)
+        .map((a) => {
+          const v = { type: String(a.type), esito: E ? E.esitoAzione(a) : 'fatto' };
+          if (a._callId) v.id = String(a._callId);
+          return v;
+        });
     }
     if (turn.images) out.images = Number(turn.images) || 0;
     return out;
