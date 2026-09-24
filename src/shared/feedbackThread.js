@@ -448,10 +448,9 @@
   const CONFINE_PROPRIETARIO_RE = /^---\s*(?:Risposta|Aggiornamento) (?:dell'utente|dell’utente|del proprietario) del .*---\s*$/;
   const DOMANDA_SERVER_RE = /^(?:Segnalazione|Domande) per l'owner \(chi [^)\n]+\):/;
   function neutralizzaConfini(report) {
-    return String(report || '').split('\n').map((l) => {
-      const t = l.replace(/\r$/, '');
-      const confine = USER_TURN_RE.test(t) || MODEL_TURN_RE.test(t) || CONFINE_GENERICO_RE.test(t)
-        || CONFINE_PROPRIETARIO_RE.test(t) || DOMANDA_SERVER_RE.test(t.trim());
+    return righe(report || '').map((l) => {
+      const confine = USER_TURN_RE.test(l) || MODEL_TURN_RE.test(l) || CONFINE_GENERICO_RE.test(l)
+        || CONFINE_PROPRIETARIO_RE.test(l) || DOMANDA_SERVER_RE.test(l.trim());
       return confine ? `> ${l}` : l;
     }).join('\n');
   }
