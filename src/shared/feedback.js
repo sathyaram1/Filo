@@ -1897,7 +1897,13 @@
     listAll,
     listAllPaged,
     listVersions,
+    // Il giro al minuto della dashboard: i soli feedback scritti dopo un
+    // istante. Un giro a vuoto costa una lettura, non una per feedback.
+    listChangedSince,
+    listChangedDirect,
     getMany,
+    // Le sole schede pubbliche che servono, per id.
+    getManyPublic,
     // #583 — la vista pubblica: l'unica lettura dei feedback che non chiede
     // credenziali. Ci sono dentro i soli campi pubblici dei feedback chiusi.
     listPublic,
