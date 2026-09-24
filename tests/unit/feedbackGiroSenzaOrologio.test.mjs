@@ -44,6 +44,7 @@ function giro(mondo) {
     },
     readRows: async (ids) => {
       log.letti.push(ids.slice());
+      if (mondo.letturaRotta) throw new Error('rilettura non riuscita');
       return ids.map((id) => ({ _id: id, _updateTime: mondo.ore[id], createdAt: '2026-09-01T00:00:00Z' }));
     },
     submissionCount: async () => {
@@ -149,6 +150,25 @@ test('un contatore non letto non vale «niente di nuovo»', async () => {
   avanza(LIVE.POLL_MS);
   await w.tick({ force: true });
   assert.equal(log.versioni, 2, 'l\'invio arrivato durante il guasto non si perde');
+});
+
+test('una rilettura fallita non si dà per fatta: il giro dopo riprova', async () => {
+  const mondo = { ore: { a: 't1' }, seguiti: ['a'], invii: 10, letturaRotta: true };
+  const { w, log, avanza } = giro(mondo);
+  await w.tick({ force: true });
+
+  mondo.ore.a = 't2';
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true }).catch(() => {});
+  assert.deepEqual(log.letti, [['a']], 'ci ha provato');
+  assert.equal(log.avvisi.length, 1, 'ma alle pagine non è arrivato niente');
+
+  mondo.letturaRotta = false;
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  const ultimo = log.avvisi[log.avvisi.length - 1];
+  assert.equal(ultimo.kind, 'changed');
+  assert.deepEqual(ultimo.rows.map((r) => r._id), ['a']);
 });
 
 // ── le due domande, come arrivano a Firestore ───────────────────────────────
