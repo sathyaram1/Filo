@@ -967,8 +967,11 @@ module.exports = function register(on, ctx) {
     // Tetto sulla lista che arriva dalla pagina: è un elenco di id, non un
     // posto dove far crescere il lavoro del giro senza che nessuno se ne accorga.
     if (Array.isArray(msg && msg.watch)) {
-      const max = (LIVE && LIVE.SEGUITI_MAX) || 40;
-      liveSubs.set(wc, new Set(msg.watch.map((s) => String(s || '')).filter(Boolean).slice(0, max)));
+      const max = (LIVE && LIVE.SEGUITI_MAX) || 12;
+      // Solo nomi di documento: un id con una barra dentro comporrebbe un
+      // indirizzo che esce dalla collezione dei feedback.
+      const puliti = msg.watch.map((s) => String(s || '')).filter((s) => /^[A-Za-z0-9_-]{1,120}$/.test(s));
+      liveSubs.set(wc, new Set(puliti.slice(0, max)));
     } else if (!liveSubs.has(wc)) {
       liveSubs.set(wc, new Set());
     }
