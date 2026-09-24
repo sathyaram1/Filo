@@ -100,10 +100,18 @@ test.describe('le decisioni dell\'owner arrivano nel compito stampato, e solo lo
   });
 
   test('a chi riallinea il ramo e ai controlli di chiusura e dopo un riallineamento', () => {
-    asserisciDecisioni(compitoStampato({ role: 'fixer', branch: 'worker/x', feedbackId: 'fid' }));
-    for (const giroStretto of [true]) {
-      const out = compitoStampato({ role: 'verifier', branch: 'worker/x', feedbackId: 'fid' }, { lastFix: { sha: 'a'.repeat(40), findings: [] }, giroStretto });
+    const rialline = compitoStampato({ role: 'fixer', branch: 'worker/x', feedbackId: 'fid' });
+    expect(rialline.payload.case).toBe('riallineamento');
+    asserisciDecisioni(rialline);
+    const casi = [
+      [{ kind: 'correzione', rilievi: [{ level: 2, text: 'il pulsante non salva' }], shaPrima: 'a'.repeat(40) }, 'chiusura'],
+      [{ kind: 'riallineamento', shaVerificato: 'a'.repeat(40), report: 'riallineato' }, 'riallineamento'],
+    ];
+    for (const [lastFix, scope] of casi) {
+      const out = compitoStampato({ role: 'verifier', branch: 'worker/x', feedbackId: 'fid' }, { lastFix, giroStretto: true });
+      expect(out.payload.scope).toBe(scope);
       asserisciDecisioni(out);
+      expect(out.instructions).toMatch(/valgono come specifica/);
     }
   });
 });
