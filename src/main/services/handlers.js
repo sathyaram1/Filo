@@ -1048,16 +1048,42 @@ function refreshProxyRulesAllWindows() {
 // STESSA mostrata nella barra della home → percorso mostrato e cartella reale
 // coincidono. La shell PERSISTENTE della modalità terminale (src/main/services/
 // shell.js) resta separata e off-limits all'LLM: qui non la tocchiamo.
+// ⚠️ La cartella NON si appunta sul "mittente" del messaggio: quello è un
+// oggetto costruito da capo a ogni messaggio che arriva da una pagina (vedi
+// senderInfo in ipc.js). Appuntarcela sopra vuol dire dimenticarla appena
+// l'utente scrive di nuovo — e, peggio, appena CONFERMA: la conferma di un
+// comando è per forza un messaggio nuovo, quindi il comando che l'utente ha
+// approvato leggendo «scriverò in questa cartella» girava nella sua cartella
+// personale (#551, terzo giro di verifica). Quello che dura è la SCHEDA, cioè
+// i suoi webContents: la teniamo lì, con una mappa debole, così l'appunto muore
+// con la scheda come prima.
+const _assistantCwdByTab = new WeakMap();
 let _assistantCwdFallback = '';
+// La scheda dietro a un mittente, se c'è. `wc` è il webContents grezzo che
+// senderInfo porta con sé; un mittente costruito a mano dai test o dalle
+// chiamate interne non ce l'ha, e allora si ripiega sul deposito condiviso.
+function assistantCwdTab(sender) {
+  const wc = sender && sender.wc;
+  return wc && typeof wc === 'object' ? wc : null;
+}
 function getAssistantCwd(sender) {
   const { defaultCwd } = require('./shell');
-  if (sender) return sender._filoAssistantCwd || defaultCwd();
+  const tab = assistantCwdTab(sender);
+  if (tab) return _assistantCwdByTab.get(tab) || defaultCwd();
   return _assistantCwdFallback || defaultCwd();
 }
 function setAssistantCwd(sender, cwd) {
   if (!cwd) return;
-  if (sender) { try { sender._filoAssistantCwd = cwd; } catch (_) {} }
-  else _assistantCwdFallback = cwd;
+  const tab = assistantCwdTab(sender);
+  if (tab) { try { _assistantCwdByTab.set(tab, cwd); return; } catch (_) {} }
+  _assistantCwdFallback = cwd;
+}
+
+// La cartella in cui un comando girerà davvero: quella appuntata se c'è ancora,
+// la home se è sparita (#551, quarto giro). La risposta la dà shell.js, perché
+// sia la stessa che si dà il comando quando parte.
+function cartellaDelComando(cwd) {
+  try { return require('./shell').cartellaPerComando(cwd).cwd || cwd; } catch (_) { return cwd; }
 }
 
 // Cartella di lavoro come va MOSTRATA nel popup di conferma: la home abbreviata
@@ -1251,7 +1277,11 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     // dall'LLM, e mai usata per decidere il livello. Il prefisso `_` la tiene
     // fuori dalla firma dell'azione (actionSignature), così RUN e CONFIRM
     // continuano a combaciare.
-    action._cwd = displayCwd(getAssistantCwd(sender));
+    // Se quella cartella nel frattempo è sparita, il comando girerà nella home:
+    // il popup deve dire QUELLA, altrimenti promette una cartella e ne usa
+    // un'altra (#551, quarto giro). Stessa domanda che si fa il comando quando
+    // parte, fatta nello stesso posto.
+    action._cwd = displayCwd(cartellaDelComando(getAssistantCwd(sender)));
   }
 
   // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
@@ -1656,7 +1686,14 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         let r = null;
         try {
           const DR = require('./documentRead');
-          r = await DR.readDocument(percorso);
+          // La cartella in cui Filo sta guardando col terminale. Un elenco
+          // stampa i NOMI, non i percorsi: se quel nome arrivasse qui senza
+          // cartella verrebbe cercato dove sta il programma Filo, che con la
+          // domanda dell'utente non c'entra niente (#551, terzo giro).
+          // Se quella cartella è sparita, un nome senza percorso si cerca da
+          // dove il terminale riparte — la home — non in un posto che non
+          // esiste (#551, quarto giro).
+          r = await DR.readDocument(percorso, { cwd: cartellaDelComando(getAssistantCwd(sender)) });
         } catch (e) {
           console.warn('[Filo] lettura documento fallita', e?.message || e);
         }
@@ -1673,11 +1710,20 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           output: {
             documentRead: String(percorso == null ? '' : percorso),
             ok: !!r.ok,
+            // Il percorso chiesto, quando NON è quello aperto davvero: il nome
+            // era quasi giusto (accenti, trattino lungo) e il file è stato
+            // ritrovato lo stesso. Va detto, non taciuto (#551).
+            requested: r.requested || '',
             name: r.name || '',
             kind: r.kind || '',
             pages: r.pages || 0,
             empty: !!r.empty,
             truncated: !!r.truncated,
+            // Con quale tabella il testo è stato letto e quanti byte il file
+            // aveva rotti: un documento bucato non deve arrivare al modello
+            // come se fosse intero (#551, sesto giro).
+            codifica: r.codifica || '',
+            bytesPersi: r.bytesPersi || 0,
             text: r.text || '',
             error: r.error || null,
             detail: r.detail || '',
@@ -1935,6 +1981,14 @@ function commandOutputsForPrompt(actions) {
     const meta = [];
     if (typeof out.code === 'number') meta.push(`uscita ${out.code}`);
     if (out.cwd) meta.push(`cartella ${out.cwd}`);
+    // La cartella dove stavi guardando non c'è più (rinominata, cancellata,
+    // chiavetta staccata): il comando è girato nella home. Va detto, o il
+    // modello continua a ragionare su una cartella che non esiste e all'utente
+    // racconta un guasto che non c'è (#551, quarto giro).
+    if (out.cwdPersa) {
+      meta.push('la cartella di prima non esiste più (rinominata, spostata o cancellata): '
+        + 'il comando è girato nella cartella personale, dillo all\'utente');
+    }
     if (out.timedOut) meta.push('interrotto per timeout');
     // #593 (terzo giro di verifica) — IL COMANDO È DI FILO, QUELLO CHE STAMPA
     // NO. Un `curl`, un `cat` di un file appena scaricato, la risposta di un
@@ -2017,6 +2071,21 @@ function webSearchResultsForPrompt(actions) {
 // dall'owner invece di ricostruirlo a memoria — che su queste cose è il modo
 // tipico di attribuire a Filo posizioni che non ha. Sono DATI di sistema
 // affidabili, non istruzioni dell'utente.
+// Taglia un testo al tetto senza spezzare un carattere. Un'emoji occupa DUE
+// unità di testo: tagliando per numero di unità si resta con la prima metà, che
+// da sola non è nessun carattere e arriva al modello come un rombo. Le stesse
+// due righe stanno dove il terminale tiene l'uscita di un comando, dove il
+// lettore tiene il testo di un documento e nella busta con cui entra ogni
+// contenuto esterno; qui coprono gli ultimi due tagli rimasti a fette secche
+// (#551, sesto giro di verifica).
+function tagliaInteri(s, max) {
+  if (s.length <= max) return s;
+  let n = max;
+  const ultimo = s.charCodeAt(n - 1);
+  if (ultimo >= 0xD800 && ultimo <= 0xDBFF) n -= 1;
+  return s.slice(0, n);
+}
+
 function transparencyDocsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   const blocks = [];
@@ -2025,7 +2094,7 @@ function transparencyDocsForPrompt(actions) {
     const out = a._output;
     if (!out || !out.text) continue;
     let body = String(out.text);
-    if (body.length > 16000) body = body.slice(0, 16000) + '\n…(documento troncato)';
+    if (body.length > 16000) body = `${tagliaInteri(body, 16000)}\n…(documento troncato)`;
     blocks.push(`[Documento di trasparenza di Filo${out.doc ? ` "${out.doc}"` : ''}]\n${body}`);
   }
   return blocks.join('\n\n').trim();
@@ -2140,7 +2209,7 @@ function fileReadsForPrompt(actions) {
       continue;
     }
     let body = String(out.text || '');
-    if (body.length > 8000) body = body.slice(0, 8000) + '\n…(contenuto troncato)';
+    if (body.length > 8000) body = `${tagliaInteri(body, 8000)}\n…(contenuto troncato)`;
     blocks.push(`[Contenuto completo del file "${out.title || out.fileRead}"]\n${body || '(vuoto)'}`);
   }
   return blocks.join('\n\n').trim();
@@ -2172,6 +2241,18 @@ function documentReadsForPrompt(actions) {
     // dal corpo della risposta di un servizio (#593, terzo giro di verifica).
     const E = globalThis.SN_ESTERNO;
     const etichetta = E.perCanaleSistema(out.name || out.documentRead || 'documento');
+    // #551 — il percorso chiesto non esisteva, ma nella cartella c'era un solo
+    // file col nome uguale a meno di accenti e trattini: è stato aperto quello.
+    // Il modello deve sapere QUALE file ha in mano — e dirlo — invece di
+    // continuare a usare il nome storpiato che non porta da nessuna parte.
+    if (out.ok && out.requested) {
+      blocks.push(
+        `[Al percorso "${E.perCanaleSistema(out.requested)}" non c'era nessun file. Nella stessa `
+        + `cartella ce n'era uno solo col nome uguale a meno di accenti, maiuscole e tipo di `
+        + `trattino, ed è quello che hai letto: il nome VERO è "${etichetta}". Usa questo d'ora `
+        + `in poi e dillo all'utente in una riga.]`,
+      );
+    }
     if (!out.ok) {
       const why = E.perCanaleSistema(out.detail || out.error || 'non è stato possibile leggerlo');
       blocks.push(
@@ -2190,6 +2271,15 @@ function documentReadsForPrompt(actions) {
     }
     const meta = [];
     if (out.kind === 'pdf' && out.pages) meta.push(`${out.pages} ${out.pages === 1 ? 'pagina' : 'pagine'}`);
+    // #551, sesto giro. Il file aveva dei byte rotti: al loro posto nel testo
+    // c'è un rombo. Il modello deve sapere che quel rombo è un buco del file e
+    // non una lettera, così non lo ricopia in un nome o in un comando e può
+    // dirlo all'utente invece di rispondere su un testo bucato senza saperlo.
+    if (out.bytesPersi > 0) {
+      meta.push(`${out.bytesPersi} ${out.bytesPersi === 1 ? 'carattere' : 'caratteri'} del file `
+        + 'sono scritti male e nel testo qui sotto compaiono come «�»: '
+        + 'non ricopiarli e, se cadono dove serve leggere, dillo all\'utente');
+    }
     // #593 (terzo giro di verifica) — LA CORNICE LA SCRIVEVA IL DOCUMENTO.
     // Che il testo venga da fuori era già scritto, ma lo era in una riga fra
     // parentesi quadre come tutte le altre: un PDF che contiene quella stessa
