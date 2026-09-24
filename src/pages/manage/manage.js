@@ -4177,12 +4177,45 @@
     sendToMain({ type: LIVE_SUBSCRIBE, now: true }).catch(() => {});
   }
 
+  // I feedback che il giro deve seguire con l'ora vera di Firestore invece che
+  // con quella firmata da chi scrive: quelli in mano alle routine, che scrivono
+  // senza firmarla, e la testa della coda, da cui esce la prossima presa in
+  // carico. Più in fondo nessuno si muove senza prima arrivare in testa.
+  const STATI_IN_MANO = ['working', 'revision_capability', 'revision_security'];
+  function idsDaSeguire() {
+    const inMano = [];
+    const coda = [];
+    for (const fb of MR.listForManageTab(allFeedbacks, 'queue', { releasedVersion })) {
+      (STATI_IN_MANO.includes(String(fb && fb.status || '')) ? inMano : coda).push(fb);
+    }
+    return inMano.concat(coda)
+      .map((fb) => fb && fb._id)
+      .filter(Boolean)
+      .slice(0, LIVE.SEGUITI_MAX);
+  }
+
+  let seguitiInviati = '';
+  function inviaSeguiti(extra = {}) {
+    const watch = idsDaSeguire();
+    seguitiInviati = watch.join(',');
+    return sendToMain({ type: LIVE_SUBSCRIBE, watch, ...extra }).catch(() => {});
+  }
+
+  // La lista è cambiata: se è cambiato anche CHI va seguito da vicino, il main
+  // deve saperlo subito. Una presa in carico che nessuno segue si vedrebbe solo
+  // al riallineamento, cioè mezz'ora dopo.
+  function aggiornaSeguiti() {
+    if (!liveEnabled || liveBlocked) return;
+    if (idsDaSeguire().join(',') === seguitiInviati) return;
+    inviaSeguiti();
+  }
+
   function startLive() {
     if (!LIVE || liveEnabled || liveBlocked) return;
     liveEnabled = true;
     // Il giro lo tiene il main: qui ci si iscrive e basta, e ci si toglie
     // quando la pagina se ne va (senza iscritti il main non paga niente).
-    sendToMain({ type: LIVE_SUBSCRIBE }).catch(() => {});
+    inviaSeguiti();
     window.addEventListener('pagehide', () => {
       sendToMain({ type: LIVE_SUBSCRIBE, off: true }).catch(() => {});
     });
