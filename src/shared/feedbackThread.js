@@ -436,12 +436,15 @@
   // Un report di un agente non può aprire un turno: una riga che imita un
   // confine («--- La tua risposta del … ---») diventerebbe una decisione
   // dell'owner. Resta leggibile, citata con «> » davanti (come fa il server).
+  // Lo stesso per l'intestazione di un blocco di domande: le scrive solo il server.
   const CONFINE_GENERICO_RE = /^---\s.*\sdel\s.*---\s*$/;
   const CONFINE_PROPRIETARIO_RE = /^---\s*(?:Risposta|Aggiornamento) (?:dell'utente|dell’utente|del proprietario) del .*---\s*$/;
+  const DOMANDA_SERVER_RE = /^(?:Segnalazione|Domande) per l'owner \(chi [^)\n]+\):/;
   function neutralizzaConfini(report) {
     return String(report || '').split('\n').map((l) => {
       const t = l.replace(/\r$/, '');
-      const confine = USER_TURN_RE.test(t) || MODEL_TURN_RE.test(t) || CONFINE_GENERICO_RE.test(t) || CONFINE_PROPRIETARIO_RE.test(t);
+      const confine = USER_TURN_RE.test(t) || MODEL_TURN_RE.test(t) || CONFINE_GENERICO_RE.test(t)
+        || CONFINE_PROPRIETARIO_RE.test(t) || DOMANDA_SERVER_RE.test(t.trim());
       return confine ? `> ${l}` : l;
     }).join('\n');
   }
