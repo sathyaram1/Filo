@@ -100,8 +100,7 @@ test('Gestione passata in secondo piano smette di chiedere', async ({ app, openT
 
   // L'owner passa a un'altra scheda: Gestione va in secondo piano e Chromium
   // la dichiara nascosta (le schede non attive ricevono setVisible(false)).
-  const altra = await testServer.serve('<html><body><h1>Altrove</h1></body></html>');
-  await openTab(altra);
+  await openTab(testServer.html('<html><body><h1>Altrove</h1></body></html>'));
   await expect.poll(() => page.evaluate(() => document.hidden), { timeout: 5000 }).toBe(true);
 
   // Da qui in poi nessuno guarda: il conto non deve muoversi.
