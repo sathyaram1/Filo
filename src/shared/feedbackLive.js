@@ -151,7 +151,7 @@
     listChangedSince, listVersions, broadcast,
     seguiti = null, versionsOf = null, readRows = null, submissionCount = null,
     now = () => Date.now(), pollMs = POLL_MS, reconcileMs = RECONCILE_MS,
-    overlapMs = OVERLAP_MS, pageSize = 500, onWarn = null, seguitiMax = SEGUITI_MAX,
+    overlapMs = OVERLAP_MS, pageSize = 500, onWarn = null, seguitiMax = SEGUITI_TETTO,
   } = {}) {
     let floor = null;           // bordo della finestra (data d'invio)
     let lastTickAt = 0;         // inizio dell'ultimo giro riuscito
