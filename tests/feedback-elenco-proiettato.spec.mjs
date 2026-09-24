@@ -337,6 +337,16 @@ test('cambiare sezione mentre arriva non ricompra la sezione di prima', async ({
   expect(doppi, `documenti chiesti più di una volta: ${JSON.stringify(conteggi)}`).toEqual([]);
 });
 
+test('premere «Solo automatici» mentre la sezione arriva non la ricompra', async ({ openTab }) => {
+  const page = await pronta(openTab);
+  await page.locator('#agentOnly').click();
+  await page.locator('#agentOnly').click();
+  await expect(page.locator('.fb-card').first()).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(1500);
+  const { conteggi, ripetuti: doppi } = await ripetuti(page);
+  expect(doppi, `documenti chiesti più di una volta: ${JSON.stringify(conteggi)}`).toEqual([]);
+});
+
 // ── Un ridisegno non porta via quello che l'owner sta scrivendo ─────────────
 //
 // Il pannello si ridisegna da solo quando il resto del documento arriva, e
