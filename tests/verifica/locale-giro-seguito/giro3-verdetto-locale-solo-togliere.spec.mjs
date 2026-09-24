@@ -41,7 +41,7 @@ function ramoVerificato() {
   git(repo, 'commit', '-q', '-m', 'lavoro verificato');
   const sha = git(repo, 'rev-parse', 'HEAD');
   mkdirSync(join(repo, '.claude'), { recursive: true });
-  writeState(repo, { 'claude/prova': { request: 'r', requestedSha: sha, verdict: 'pass', sha, critique: 'ok', rounds: [], derived: [] } });
+  writeState({ 'claude/prova': { request: 'r', requestedSha: sha, verdict: 'pass', sha, critique: 'ok', rounds: [], derived: [] } }, repo);
   return repo;
 }
 
@@ -59,7 +59,9 @@ test.describe('verdetto locale: dopo il pass dalle prove del giro si può solo t
     commit(repo);
     const r = verdictForCurrentBranch(repo);
     expect(r.ok, r.reason).toBe(true);
-    expect(specDaRilanciare({ checkOnly: false, ok: r.ok, sha: r.entry.sha, tollerato: r.tollerato }).rilancia ?? specDaRilanciare({ checkOnly: false, ok: r.ok, sha: r.entry.sha, tollerato: r.tollerato })).toBeFalsy();
+    expect(r.tollerato).toBe(true);
+    expect(specDaRilanciare({ checkOnly: false, ok: r.ok, sha: r.entry.sha, tollerato: r.tollerato }).rilancia).toBe(false);
+    expect(specDaRilanciare({ checkOnly: true, ok: r.ok, sha: r.entry.sha, tollerato: r.tollerato }).rilancia).toBe(true);
   });
 
   test('una prova tolta per intero: il verdetto regge', () => {
