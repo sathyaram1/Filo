@@ -4108,6 +4108,7 @@
     // finché la pagina non viene riaperta.
     fondiPreapprovateInAttesa();
     rerenderAfterLive(new Set(righe.map((f) => f && f._id).filter(Boolean)));
+    aggiornaSeguiti();
     return { changed: righe.length + Math.max(0, prima - allFeedbacks.length) };
   }
 
