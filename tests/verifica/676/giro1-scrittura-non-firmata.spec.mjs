@@ -122,3 +122,71 @@ test('un feedback riscritto senza firmare l’ora non arriva col giro al minuto'
   expect(esito.dopoRiallineamento.kind).toBe('reconcile');
   expect(esito.dopoRiallineamento.ids).toContain('fb-2');
 });
+
+test('una segnalazione nuova da una macchina con l’orologio indietro non arriva col giro', async ({ app }) => {
+  const esito = await app.evaluate(async () => {
+    const FB = globalThis.SN_FEEDBACK;
+    const LIVE = globalThis.SN_FEEDBACK_LIVE;
+    const PREFIX = 'projects/filo-8b9cb/databases/(default)/documents';
+    const docs = new Map();
+    const vecchio = new Date(Date.parse('2026-09-01T00:00:00Z')).toISOString();
+    docs.set('fb-0', { id: 'fb-0', createdAt: vecchio, updatedAt: vecchio, updateTime: vecchio, name: 'Vecchio' });
+
+    const toFs = (d, soloCreated) => ({
+      name: `${PREFIX}/feedback/${d.id}`,
+      createTime: d.createdAt,
+      updateTime: d.updateTime,
+      fields: soloCreated ? { createdAt: { timestampValue: d.createdAt } } : {
+        createdAt: { timestampValue: d.createdAt },
+        updatedAt: { timestampValue: d.updatedAt },
+        name: { stringValue: d.name },
+      },
+    });
+    const veroFetch = globalThis.fetch;
+    globalThis.fetch = async (url, opts) => {
+      const u = String(url);
+      const body = opts && opts.body ? JSON.parse(opts.body) : {};
+      let out = [];
+      if (u.includes(':runQuery')) {
+        const q = body.structuredQuery || {};
+        if (((q.from || [])[0] || {}).collectionId !== 'feedback') out = [{}];
+        else if (q.where) {
+          const since = q.where.fieldFilter.value.timestampValue;
+          out = Array.from(docs.values()).filter((d) => d.updatedAt > since).map((d) => ({ document: toFs(d) }));
+        } else {
+          const p = ((q.select && q.select.fields) || []).map((f) => f.fieldPath);
+          out = Array.from(docs.values()).map((d) => ({ document: toFs(d, p.length === 1 && p[0] === 'createdAt') }));
+        }
+      } else if (u.includes(':batchGet')) out = [];
+      else return veroFetch(url, opts);
+      return { ok: true, status: 200, json: async () => out, text: async () => '' };
+    };
+
+    const annunci = [];
+    let orologio = Date.parse('2026-09-24T12:00:00Z');
+    const watcher = LIVE.makeWatcher({
+      pageSize: FB.LIST_PAGE_SIZE,
+      now: () => orologio,
+      broadcast: (m) => annunci.push(m),
+      listVersions: async () => FB.listVersions({ pageSize: FB.LIST_PAGE_SIZE }),
+      listChangedSince: async ({ since }) => {
+        const out = await FB.listChangedSince({ since, pageSize: FB.LIST_PAGE_SIZE });
+        return { rows: out.rows, complete: out.complete };
+      },
+    });
+    await watcher.tick({ force: true });
+
+    // La segnalazione arriva ADESSO, ma la firma l'orologio del mittente, che è
+    // indietro di dieci minuti: la finestra del giro è di due.
+    orologio += 60_000;
+    const iso = new Date(orologio - 10 * 60_000).toISOString();
+    docs.set('nuovo', { id: 'nuovo', createdAt: iso, updatedAt: iso, updateTime: new Date(orologio).toISOString(), name: 'Appena arrivato' });
+    await watcher.tick({ force: true });
+    const dopo = annunci[annunci.length - 1];
+
+    globalThis.fetch = veroFetch;
+    return { kind: dopo.kind, ids: (dopo.rows || dopo.versions || []).map((r) => r._id) };
+  });
+
+  expect(esito.ids, 'la segnalazione nuova non arriva col giro al minuto').not.toContain('nuovo');
+});
