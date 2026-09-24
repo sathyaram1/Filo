@@ -45,6 +45,9 @@ require(resolve(ROOT, 'src', 'shared', 'feedbackPublicView.js'));
 const FB = globalThis.SN_FEEDBACK;
 const PV = globalThis.SN_FEEDBACK_PUBLIC_VIEW;
 
+// Quante schede fuori pagina si chiedono per richiesta (batchGet).
+const SCHEDE_PER_VOLTA = 200;
+
 // Le segnalazioni che la pagina PER DATA D'INVIO non vede, e che qui servono
 // lo stesso. È la stessa domanda che l'app dell'owner fa dentro Filo
 // (`conLeSegnalazioniFuoriPagina` in src/main/services/handlers/auth.js), e va
@@ -79,17 +82,25 @@ async function conLeSegnalazioniFuoriPagina(base, bearer, schede) {
     catch (e) { console.warn(`AVVISO: chiusi di recente non letti (${e?.message || e})`); }
   }
 
-  const tutteLeMancanti = (Array.isArray(schede) ? schede : [])
+  // TUTTE le schede fuori pagina, a blocchi: fermarsi al tetto lasciava
+  // indietro proprio le più vecchie, che nessun'altra strada guarda.
+  const mancanti = (Array.isArray(schede) ? schede : [])
     .map((c) => String((c && c._id) || ''))
     .filter((id) => id && !visti.has(id));
-  const mancanti = tutteLeMancanti.slice(0, FB.LIST_PAGE_SIZE);
-  let schedeCoperte = mancanti.length === tutteLeMancanti.length;
-  if (mancanti.length && typeof FB.getMany === 'function') {
-    try { aggiungi(await FB.getMany(mancanti, { idToken: bearer, fields: FB.CAMPI_LISTA })); }
-    catch (e) {
-      schedeCoperte = false;
-      console.warn(`AVVISO: feedback delle schede fuori pagina non letti (${e?.message || e})`);
+  let schedeCoperte = true;
+  if (typeof FB.getMany === 'function') {
+    for (let i = 0; i < mancanti.length; i += SCHEDE_PER_VOLTA) {
+      const pezzo = mancanti.slice(i, i + SCHEDE_PER_VOLTA);
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        aggiungi(await FB.getMany(pezzo, { idToken: bearer, fields: FB.CAMPI_LISTA }));
+      } catch (e) {
+        schedeCoperte = false;
+        console.warn(`AVVISO: feedback delle schede fuori pagina non letti (${e?.message || e})`);
+      }
     }
+  } else if (mancanti.length) {
+    schedeCoperte = false;
   }
   return { rows, schedeCoperte };
 }
