@@ -288,7 +288,7 @@ export async function scrivi(id, to, nota, opts = {}) {
 
   // #676: ogni scrittura firma l'ora, o la dashboard non vede il cambiamento
   // fino al riallineamento (che è raro per scelta).
-  set('updatedAt', undefined);
+  mask.push('updatedAt');
   fields.updatedAt = { timestampValue: new Date().toISOString() };
 
   if (opts.dryRun) return { ok: true, from, to, dryRun: true, campi: mask };
