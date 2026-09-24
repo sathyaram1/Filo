@@ -34,12 +34,10 @@ function fakeFb(id, name, extra = {}) {
 
 // Firestore finto NEL MAIN: conta le richieste e i documenti che tornano.
 async function fingiFirestore(app, docs) {
-  await app.evaluate(async ({ app: electronApp }, { docs, ritmo }) => {
-    // Dentro `evaluate` il `require` del modulo non c'è: si passa da quello
-    // del modulo d'ingresso, che è la stessa cache di moduli del main.
-    const req = process.mainModule.require.bind(process.mainModule);
-    const nodePath = req('node:path');
-    const auth = req(nodePath.join(electronApp.getAppPath(), 'src', 'main', 'auth', 'google-auth.js'));
+  await app.evaluate(async (_electron, { docs, ritmo }) => {
+    // Dentro `evaluate` il `require` del modulo non c'è: il main espone i suoi
+    // moduli su globalThis quando gira sotto test (src/main/main.js).
+    const auth = globalThis.__filoAuth;
     auth.isAdmin = () => true;
     auth.getIdToken = async () => 'token-finto';
 
