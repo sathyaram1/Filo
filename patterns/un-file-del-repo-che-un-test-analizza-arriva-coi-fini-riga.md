@@ -98,11 +98,36 @@ veri, dove i fini riga non cambiano niente — la riga porta il marcatore
 `fini riga: non analizzato`. Un'esenzione scritta si vede in revisione; una
 cartella esclusa in silenzio no.
 
+## Il tentativo sbagliato: riconoscere i modi di scrivere
+
+Per quattro giri di verifica la difesa è stata una coppia di reti che leggevano
+il sorgente dei test e riconoscevano la lettura grezza e la ricerca fragile. A
+ogni giro entrava una forma nuova, e ogni giro la aggiungeva all'elenco: la
+lettura asincrona, il percorso spostato in una variabile, la lettura affidata a
+una funzione di una riga o rinominata all'import, l'espressione regolare
+costruita al volo, la stringa scritta su due righe invece che con un `\n`, il
+percorso tenuto in un altro modulo (che faceva sparire il file anche dalla
+seconda rete, perché non lo riconosceva più come uno di quelli da guardare), il
+file di prova con l'altra estensione. Elencare le grafie non converge: la
+grafia successiva è sempre più semplice di quella appena chiusa.
+
+La cura è spostare la garanzia dove le grafie non contano: la normalizzazione
+avviene alla LETTURA, dentro il processo degli unit test, e il test non ha più
+niente da ricordarsi. Le due reti restano come avviso in anticipo — e per gli
+spec Playwright, dove il lanciatore non passa — ma non sono più quello su cui si
+regge la promessa; quella la misura una prova che rifà lo stesso difetto in
+quattro grafie diverse e pretende che nessuna sia rossa.
+
 ## Dove vive
 
 - `.gitattributes` — la regola per tutti i checkout.
+- `tests/helpers/finiRigaDelRepo.cjs` — la normalizzazione alla lettura, caricata
+  da `scripts/run-unit-tests.mjs` prima di ogni unit test.
+- `tests/unit/finiRigaLetturaNormalizzata.test.mjs` — la prova che misura il
+  fatto: quattro grafie della stessa ricerca su una copia col CRLF sul disco,
+  verdi col lanciatore e rosse senza.
 - `tests/helpers/testo.mjs` — `leggiTestoRepo()` e `normalizzaFiniRiga()`.
-- `tests/unit/finiDiRiga.test.mjs` — la sentinella: pretende la riga in
+- `tests/unit/finiDiRiga.test.mjs` — l'avviso in anticipo: pretende la riga in
   `.gitattributes`, prova che il lettore normalizzi davvero, e diventa rossa se
   un test torna a leggere per conto suo un file che analizza — in qualunque
   forma, sincrona o asincrona — o se ci cerca dentro una stringa o una regex con
