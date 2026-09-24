@@ -252,14 +252,30 @@ test('le immagini incollate NON entrano nell’archivio, il loro numero sì', ()
   assert.equal(JSON.stringify(m).length < 200, true);
 });
 
-test('di un’azione resta il tipo: serve a raccontare cosa Filo aveva fatto', () => {
+test('di un’azione restano il tipo e com’è andata, non il suo contenuto', () => {
   const m = CA.toStoredMessage({
     role: 'filo',
     text: 'Fatto.',
-    actions: [{ type: 'SVEGLIA', ora: '07:00', _output: { enorme: 'x'.repeat(5000) } }],
+    actions: [{ type: 'SVEGLIA', ora: '07:00', _callId: 'c1', _output: { enorme: 'x'.repeat(5000) } }],
   });
-  assert.deepEqual(m.actions, ['SVEGLIA']);
-  assert.ok(!JSON.stringify(m).includes('xxxxx'), 'l’esito di un’azione non va in archivio');
+  assert.deepEqual(m.actions, [{ type: 'SVEGLIA', esito: 'fatto', id: 'c1' }]);
+  assert.ok(!JSON.stringify(m).includes('xxxxx'), 'il contenuto di un’azione non va in archivio');
+});
+
+// Senza l'esito la conversazione riaperta racconta come riuscito tutto quello
+// che Filo ha soltanto nominato: la conferma mai data, il comando mai partito.
+test('l’azione in attesa di conferma e quella fallita si archiviano per quel che sono', () => {
+  const m = CA.toStoredMessage({
+    role: 'filo',
+    text: '',
+    actions: [
+      { type: 'CANCELLA_MEMORIA', _confirm: { level: 3, text: 'Cancellare tutto' } },
+      { type: 'ESEGUI_COMANDO', _executed: false, _output: { blocked: 'disabled' } },
+      { type: 'EVENTO_CALENDARIO', _output: { proposta: true } },
+      { type: 'COMANDO_FINESTRA', _executed: true, _output: { already: true } },
+    ],
+  });
+  assert.deepEqual(m.actions.map((a) => a.esito), ['chiesto', 'fallito', 'proposto', 'fallito']);
 });
 
 test('un turno senza azioni non porta un campo azioni vuoto', () => {
