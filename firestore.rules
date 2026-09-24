@@ -245,9 +245,7 @@ service cloud.firestore {
           ]
         )
         && (!('updatedAt' in request.resource.data)
-            || request.resource.data.updatedAt is timestamp
-            || (request.resource.data.updatedAt is string
-                && request.resource.data.updatedAt.size() <= 40))
+            || request.resource.data.updatedAt is timestamp)
         // #652: se c'è, è uno pseudonimo di portafoglio (16 hex). Facoltativo:
         // chi non ha un portafoglio manda il feedback e basta.
         && request.resource.data.get('walletPseudonym', '') is string
@@ -434,11 +432,10 @@ service cloud.firestore {
         // archiviare nonostante il punteggio. '' = nessun override (substrato
         // SN_BOARD_ARCHIVE.hasOwnerOverride).
         && request.resource.data.get('archiveOverride', '') in ['', 'archived', 'keep_open']
-        // #676: un timestamp, o la stringa ISO che scrivono gli script.
+        // #676: una DATA, mai testo. Scritta come testo il confronto per data
+        // non la riconosce, e quel feedback resta fuori dal giro per sempre.
         && (!('updatedAt' in request.resource.data)
-            || request.resource.data.updatedAt is timestamp
-            || (request.resource.data.updatedAt is string
-                && request.resource.data.updatedAt.size() <= 40))
+            || request.resource.data.updatedAt is timestamp)
         // `reopenRequests` (DC4): l'admin può azzerarlo (es. {}) quando un fix
         // riaperto viene risistemato e rispedito, sbloccando una futura
         // riapertura sullo stesso doc. Nessun vincolo di forma extra qui: il
@@ -540,9 +537,7 @@ service cloud.firestore {
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 60000
         && (!('updatedAt' in request.resource.data)
-            || request.resource.data.updatedAt is timestamp
-            || (request.resource.data.updatedAt is string
-                && request.resource.data.updatedAt.size() <= 40))
+            || request.resource.data.updatedAt is timestamp)
         && livelliValidi(request.resource.data);
 
       // Cancellazione: solo admin.
