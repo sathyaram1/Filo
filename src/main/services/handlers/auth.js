@@ -1123,6 +1123,10 @@ module.exports = function register(on, ctx) {
       }
 
       lastSyncAt = Date.now();
+      // La data si sposta solo a giro riuscito, e solo se abbiamo visto tutte
+      // le schede: un giro parziale che spostasse la data lascerebbe indietro
+      // per sempre le chiusure che non ha guardato.
+      if (schedeCoperte) await segnaSincroRiuscita();
       if (plan.upsert.length || plan.remove.length) {
         cardsCache = { at: 0, rows: [] }; // la prossima lettura rilegge davvero
         // E anche la memoria breve della lettura completa: le schede sono
