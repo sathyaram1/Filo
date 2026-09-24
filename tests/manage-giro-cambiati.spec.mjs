@@ -128,6 +128,11 @@ test('il giro al minuto chiede solo i cambiati, e il cambiato compare in lista',
   expect(fermo.versioni).toBe(1);
   expect(fermo.documenti).toBe(dopoApertura.documenti);
   expect(fermo.schede).toBe(0);
+  // Il contatore degli invii: una lettura per giro, e niente di più. È quello
+  // che fa vedere una segnalazione mandata da una macchina con l'ora indietro,
+  // che la domanda per data non troverebbe.
+  expect(fermo.contatori).toBeGreaterThanOrEqual(3);
+  expect(fermo.contatori).toBeLessThanOrEqual(fermo.richieste - 3);
 
   // UN GIRO CON UN FEEDBACK CAMBIATO.
   await app.evaluate(() => {
