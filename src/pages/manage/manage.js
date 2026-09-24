@@ -4155,7 +4155,7 @@
     // Il primo caricamento è fallito? Il giro lo ritenta da solo, invece di
     // lasciare "Errore nel caricamento" finché l'owner non ricarica a mano.
     if (!dataLoaded) { loadData().catch(() => {}); return; }
-    refreshFromRemote().catch((e) => console.warn('[manage] aggiornamento:', e?.message || e));
+    sendToMain({ type: LIVE_SUBSCRIBE, now: true }).catch(() => {});
   }
 
   function startLive() {
