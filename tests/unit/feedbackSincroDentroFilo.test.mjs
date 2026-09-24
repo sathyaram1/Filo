@@ -33,8 +33,8 @@ for (const m of ['constants', 'feedback', 'feedbackCrypto', 'feedbackThread', 'f
   require(resolve(ROOT, 'src', 'shared', `${m}.js`));
 }
 const FB = globalThis.SN_FEEDBACK;
-const MSG = require(resolve(ROOT, 'src', 'shared', 'messages.js')).MSG
-  || globalThis.SN_MESSAGES || require(resolve(ROOT, 'src', 'shared', 'messages.js'));
+require(resolve(ROOT, 'src', 'shared', 'messages.js'));
+const { MSG } = globalThis.SN_MSG;
 
 // La memoria locale del main: qui basta una mappa.
 const memoria = new Map();
