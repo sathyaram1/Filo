@@ -60,11 +60,11 @@ test('aggiunto il primo di due eventi, il diario non deve perdere il secondo né
   const titolo = await titoloDiario(page);
   await page.screenshot({ path: 'tests/.shots/567-giro5-due-eventi.png' });
 
-  expect(
+  expect.soft(
     righe.join(' | '),
     `il pranzo con Bruno è sparito dal diario: ${JSON.stringify(righe)}`,
   ).toContain('Bruno');
-  expect(
+  expect.soft(
     righe.filter((t) => /aggiunt/i.test(t)).length,
     `l'utente ha aggiunto un evento solo, e il diario dice: ${JSON.stringify(righe)}`,
   ).toBe(1);
