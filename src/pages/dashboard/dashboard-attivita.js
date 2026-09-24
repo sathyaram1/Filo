@@ -852,14 +852,17 @@
   // adesso; nell'archivio, che è dove lo rilegge fra un mese; e sull'azione,
   // che è quello che il modello si ritrova nel contesto al turno dopo.
   function scriviEsito(a, activity) {
-    const E = self.SN_ESITO;
-    const esito = E.esitoAzione(a);
     const row = activityRowFor(a);
-    if (activity && row) activity.esitoDelClick(chiaveRiga(a), a.type, row.icon, row.text, esito);
-    const id = chatIdCorrente();
-    if (id && a._callId) {
-      try { send({ type: MSG.FILO_CHAT_AZIONE, id, azione: String(a._callId), esito }); } catch (_) {}
+    if (activity && row) {
+      activity.esitoDelClick(chiaveRiga(a), a.type, row.icon, row.text, self.SN_ESITO.esitoAzione(a));
     }
+    segnalaArchivio(a);
+  }
+  function segnalaArchivio(a) {
+    const id = chatIdCorrente();
+    if (!id || !a || !a._callId) return;
+    const esito = self.SN_ESITO.esitoAzione(a);
+    try { send({ type: MSG.FILO_CHAT_AZIONE, id, azione: String(a._callId), esito }); } catch (_) {}
   }
 
   function renderActionButton(a, { onAck, activity = null } = {}) {
