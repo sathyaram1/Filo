@@ -161,6 +161,7 @@
     let inFlight = null;
     let versioniSeguite = new Map();  // id → ora d'ultima scrittura secondo Firestore
     let inviiVisti = null;            // valore del contatore all'ultimo giro
+    let avvioVisto = null;            // ultimo worker delle routine partito, all'ultimo giro
 
     function since() {
       const base = lastTickAt || (now() - overlapMs);
