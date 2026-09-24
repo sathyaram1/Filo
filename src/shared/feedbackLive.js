@@ -16,6 +16,13 @@
   // rete di sicurezza, non il giro.
   const RECONCILE_MS = 30 * 60 * 1000;
 
+  // Quanti feedback per volta si controllano con l'ora vera di Firestore. Le
+  // routine lavorano una pratica alla volta, quindi in genere ne bastano zero o
+  // una: il tetto è largo perché una coda insolita non lasci fuori proprio
+  // quella che si sta muovendo, e costa una lettura per feedback SEGUITO, non
+  // per feedback esistente.
+  const SEGUITI_MAX = 40;
+
   // Quanto si torna indietro rispetto all'inizio del giro precedente. `updatedAt`
   // lo scrive chi scrive, con il SUO orologio: due minuti di margine assorbono
   // lo scarto fra le macchine senza far ripagare niente quando non cambia
