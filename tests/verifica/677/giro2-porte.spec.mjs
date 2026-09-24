@@ -140,6 +140,65 @@ test('riaprire un fix uscito non cancella il report della lavorazione', async ({
   expect(riapertura.notes).toContain('Manca il caso con lo schermo piccolo.');
 });
 
+// ── 2b. Le altre due caselle dello stesso pannello ──────────────────────────
+// Stessa causa: quando il documento intero arriva, il pannello si ridisegna
+// senza chiedersi se l'owner sta scrivendo. Il giro dal vivo quella domanda la
+// fa (detailBeingEdited) e infatti non butta via niente.
+const IN_CHIARIMENTO = {
+  _id: 'fb677c',
+  _proiezione: true,
+  seq: 6773,
+  subSeq: 0,
+  name: 'Domanda aperta',
+  text: 'Quale delle due strade?',
+  status: 'design',
+  statusReason: 'clarify',
+  statusPublic: 'open',
+  clientId: 'tester-1',
+  createdAt: '2026-09-23T09:00:00.000Z',
+};
+
+async function gestioneLenta(openTab, riga) {
+  const page = await openTab(PAGINA_GESTIONE);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
+  await admin(page);
+  await page.evaluate((r) => {
+    window.__mgTest.setLiveSources({
+      listVersions: async () => [],
+      getMany: async () => [],
+      getDettagli: async (ids) => {
+        await new Promise((x) => setTimeout(x, 1500));
+        const pieno = JSON.parse(JSON.stringify(r));
+        delete pieno._proiezione;
+        pieno.notes = 'Report.';
+        return ids.includes(pieno._id) ? [pieno] : [];
+      },
+    });
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([JSON.parse(JSON.stringify(r))]);
+  }, riga);
+  return page;
+}
+
+test('la risposta scritta mentre il dettaglio arriva non sparisce', async ({ openTab }) => {
+  const page = await gestioneLenta(openTab, IN_CHIARIMENTO);
+  await page.locator('.mg-item[data-id="fb677c"]').click();
+  await page.locator('#mgClarifyText').fill('Prendi la seconda strada.');
+  // Il documento intero arriva adesso.
+  await page.waitForTimeout(2500);
+  await expect(page.locator('#mgClarifyText')).toHaveValue('Prendi la seconda strada.');
+});
+
+test('la frase per chi ha segnalato scritta mentre il dettaglio arriva non sparisce', async ({ openTab }) => {
+  const page = await gestioneLenta(openTab, IN_CHIARIMENTO);
+  await page.locator('.mg-item[data-id="fb677c"]').click();
+  await page.locator('#mgUserNoteToggle').click();
+  await page.locator('#mgUserNoteText').fill('Adesso funziona, riprova.');
+  await page.waitForTimeout(2500);
+  await expect(page.locator('#mgUserNoteText')).toHaveValue('Adesso funziona, riprova.');
+});
+
 // ── 3. Un allegato NON immagine nel dettaglio di Gestione ───────────────────
 // «aprendo un dettaglio testo e allegati ci sono»: gli allegati sono due
 // campi, `images` e `files`, e solo il primo ha una prova.
