@@ -4168,6 +4168,10 @@
     // Il primo caricamento è fallito? Il giro lo ritenta da solo, invece di
     // lasciare "Errore nel caricamento" finché l'owner non ricarica a mano.
     if (!dataLoaded) { loadData().catch(() => {}); return; }
+    // Una scheda sparita in un giro precedente, tenuta aperta da una bozza,
+    // può chiudersi ora che la bozza non c'è più: il giro del main non manda
+    // niente quando non è cambiato niente, quindi questo tocca a noi.
+    closeDetailIfGone();
     sendToMain({ type: LIVE_SUBSCRIBE, now: true }).catch(() => {});
   }
 
