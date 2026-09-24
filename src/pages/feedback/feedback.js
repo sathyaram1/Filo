@@ -1679,7 +1679,12 @@
     try {
       // timeoutMs: offline la fetch resta muta ~13 s prima che il sistema la
       // lasci cadere. Ci arrendiamo prima e mostriamo l'errore (con Riprova).
-      let list = await SN_FEEDBACK.list({ pageSize: SN_FEEDBACK.LIST_PAGE_SIZE, timeoutMs: 8000 });
+      // La PROIEZIONE della lista: titoli, stati, numeri e tutto ciò su cui
+      // le sezioni contano e la ricerca filtra. Conversazione e allegati — la
+      // parte che pesa — arrivano per la sezione che si guarda davvero.
+      let list = await SN_FEEDBACK.list({
+        pageSize: SN_FEEDBACK.LIST_PAGE_SIZE, timeoutMs: 8000, fields: SN_FEEDBACK.CAMPI_LISTA,
+      });
       // S1.3: decifratura batch dei campi FENC1: — una sola IPC per tutta la lista.
       // Graceful fallback: se l'utente non è admin o l'IPC fallisce, i valori
       // restano invariati (la dashboard non si rompe, mostra il ciphertext).
