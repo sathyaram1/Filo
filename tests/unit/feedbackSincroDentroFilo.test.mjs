@@ -183,3 +183,26 @@ test('chi non arriva da una superficie di Filo non legge i feedback', async () =
   assert.equal(r.ok, false);
   assert.equal(r.code, 'forbidden');
 });
+
+test('una segnalazione fuori pagina con lo stato illeggibile non perde la scheda', async () => {
+  // Il feedback della scheda c'è, ma il suo stato non si è potuto leggere: per
+  // chi fa il piano è indistinguibile da uno cancellato. Toglierle la scheda
+  // vorrebbe dire far sparire un fix buono dalla bacheca.
+  const inPagina = Array.from({ length: 3 }, (_, i) => feedbackChiuso(i + 1));
+  const illeggibile = {
+    ...feedbackChiuso(900),
+    _id: 'fb-cifrato',
+    status: 'FENC1:blob-che-questa-macchina-non-apre',
+    createdAt: '2020-01-01T00:00:00.000Z', // vecchio: fuori dalla pagina
+  };
+  const schede = [{
+    _id: 'fb-cifrato', seq: 900, subSeq: 0, name: 'Un fix già in bacheca',
+    status: 'done', statusPublic: 'closed', resolvedInVersion: '0.2.70',
+  }];
+  const { conto, porta } = apparecchia([...inPagina, illeggibile], schede);
+  // La pagina per data d'invio si ferma ai tre recenti: il cifrato entra solo
+  // come «scheda fuori pagina».
+  await porta({ ...CARICA, pageSize: 3 }, null, DA_GESTIONE);
+  assert.equal(await aspettaIlGiro(conto), true);
+  assert.deepEqual(conto.tolte, [], 'la scheda di un fix illeggibile non si toglie');
+});
