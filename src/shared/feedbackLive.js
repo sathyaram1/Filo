@@ -183,6 +183,23 @@
       return { kind: 'reconcile', versions: remote.length };
     }
 
+    // Quando le routine prendono in mano un lavoro, il server segna che un
+    // worker è partito. È UNA lettura, e dice quel che nessuna lista sa
+    // indovinare: quale segnalazione stiano toccando adesso. Se si provasse a
+    // indovinarla dalla coda si sbaglierebbe ogni volta che l'ordine del
+    // server non è quello che la dashboard mostra.
+    async function ultimoAvvio(precedente) {
+      if (typeof ultimoAvvioRoutine !== 'function') return precedente;
+      try {
+        const t = await ultimoAvvioRoutine();
+        return t == null ? precedente : String(t);
+      } catch (e) {
+        // Non letto non è «non è partito niente»: si tiene il valore di prima.
+        if (onWarn) onWarn(`avvio worker non letto: ${e && e.message ? e.message : e}`);
+        return precedente;
+      }
+    }
+
     async function contaInvii(precedente) {
       if (typeof submissionCount !== 'function') return precedente;
       try {
