@@ -292,7 +292,7 @@
   // { role: 'model'|'user', ts: string|null, body: string } senza i segmenti
   // vuoti (es. note che iniziano direttamente con un marcatore di riapertura).
   function splitNotes(notes) {
-    const lines = String(notes || '').split('\n');
+    const lines = righe(notes || '');
     const segments = [];
     // Il testo prima di qualsiasi marcatore è il turno di Filo (il report/le
     // domande scritte dalla routine).
