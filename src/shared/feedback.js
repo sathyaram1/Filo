@@ -1005,8 +1005,51 @@
   // chiaro sul documento, quindi si può ordinare; i feedback che non sono mai
   // stati chiusi non ce l'hanno e Firestore li lascia fuori da sé.
   // Serve il token dell'owner: la collezione non si legge senza.
-  async function listResolved({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '' } = {}) {
-    return listDirect(COLLECTION, { pageSize, timeoutMs, idToken, orderField: 'resolvedAt' });
+  //
+  // `sinceIso`: la data dell'ultima sincronizzazione riuscita. Chiedere ogni
+  // volta gli ultimi cinquecento chiusi vuol dire rileggere cinquecento
+  // documenti per trovarne, quasi sempre, zero o uno: quelli chiusi PRIMA
+  // dell'ultimo giro hanno già la loro scheda. Con la data il conto scende a
+  // quello che è davvero cambiato, e il tetto diventa una rete di sicurezza
+  // invece del solito prezzo. Senza data (primo giro dopo l'avvio, o memoria
+  // persa) si torna alla finestra di prima: meglio pagare una volta che
+  // saltare una chiusura.
+  //
+  // `fields`: chi vuole solo decidere la scheda non ha bisogno del documento
+  // intero (vedi CAMPI_LISTA).
+  async function listResolved({
+    pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', sinceIso = '',
+    fields = null, maxPages = ALL_PAGES_MAX,
+  } = {}) {
+    const since = String(sinceIso || '').trim();
+    const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
+    const comune = { timeoutMs, idToken, fields, orderField: 'resolvedAt' };
+    if (!since) return listDirect(COLLECTION, { ...comune, pageSize: limit });
+    // Con il filtro la risposta è di solito cortissima, ma non si può contare
+    // su questo: se l'app è rimasta chiusa un mese le chiusure arretrate sono
+    // tante, e una finestra sola le taglierebbe di nuovo in silenzio.
+    const rows = [];
+    const visti = new Set();
+    let cursore = null;
+    for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const batch = await listDirect(COLLECTION, {
+        ...comune, pageSize: limit, where: { field: 'resolvedAt', op: 'GREATER_THAN', timestamp: since }, startAfter: cursore,
+      });
+      let nuove = 0;
+      for (const r of batch) {
+        const id = String((r && r._id) || '');
+        if (id && visti.has(id)) continue;
+        if (id) visti.add(id);
+        rows.push(r);
+        nuove += 1;
+      }
+      const ultimo = batch[batch.length - 1];
+      const coda = ultimo && ultimo.resolvedAt ? String(ultimo.resolvedAt) : '';
+      if (batch.length < limit || nuove === 0 || !coda) break;
+      cursore = { timestamp: coda, name: nomeDocumento(COLLECTION, ultimo) };
+    }
+    return rows;
   }
 
   // ── TUTTE le segnalazioni, non una pagina ────────────────────────────────
