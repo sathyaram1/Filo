@@ -4162,9 +4162,11 @@
     onLiveMessage(m);
   }
 
-  function liveTickIfDue(force) {
+  // Rientro in vista: non si aspetta il prossimo giro, si chiede subito — ma
+  // non più spesso di mezzo giro, o un alt-tab ripetuto sarebbe una raffica.
+  function liveTickIfDue() {
     if (!liveEnabled || document.hidden) return;
-    if (!force && Date.now() - liveLastAt < LIVE.POLL_MS / 2) return;
+    if (Date.now() - liveLastAt < LIVE.POLL_MS / 2) return;
     // Il primo caricamento è fallito? Il giro lo ritenta da solo, invece di
     // lasciare "Errore nel caricamento" finché l'owner non ricarica a mano.
     if (!dataLoaded) { loadData().catch(() => {}); return; }
