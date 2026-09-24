@@ -1201,6 +1201,17 @@
     return null;
   }
 
+  // Perché il riordino non è potuto partire, o '' se è andato. Un riordino che
+  // ha comunque archiviato qualcosa è riuscito, anche se il giudizio è mancato:
+  // i doppioni li decide Filo da sé.
+  function motivoRiordinoMancato(r, archiviate) {
+    if (!r || r.ok === false) return 'Filo non è riuscito a valutare le schede.';
+    if (archiviate > 0) return '';
+    if (r.giaInCorso) return 'Un riordino è già in corso.';
+    if (r.giudizioMancato) return 'Filo non è riuscito a valutare le schede.';
+    return '';
+  }
+
   // §5 — pannello di cancellazione retroattiva: cerca le schede pertinenti nella
   // cronologia e le elimina DEFINITIVAMENTE dopo conferma esplicita.
   function renderDeleteArchivePanel(query, onFatto = null) {
