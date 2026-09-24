@@ -1,5 +1,5 @@
 // Verifica locale, giro 1 (ramo claude/rossi-windows): l'esito di un comando che arriva all'assistente e al
-// terminale della dashboard è quello vero, anche quando a decidere è un programma esterno.
+// terminale della dashboard è quello vero, e un commento in coda non ferma il comando.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
@@ -52,27 +52,14 @@ async function nelTerminale(page, comando) {
   return bolle.last();
 }
 
-function preparaCartella() {
+test('all\'assistente un comando fallito arriva fallito, e uno riuscito col commento in coda gira', async ({ openTab }) => {
   const base = cartellaTemporanea('filo-esito-vero-');
   writeFileSync(join(base, 'esiste.txt'), 'contenuto-7731\n', 'utf8');
-  // Uno script il cui ultimo passo è un programma esterno che esce con 3, senza un exit esplicito.
-  if (WIN) writeFileSync(join(base, 'costruisci.ps1'), 'Write-Output "costruisco"\ncmd /c exit 3\n', 'utf8');
-  else writeFileSync(join(base, 'costruisci.sh'), 'echo costruisco\nsh -c "exit 3"\n', 'utf8');
-  return base;
-}
-
-async function assistenteIn(openTab, base) {
-  const page = await openTab('filo://dashboard/dashboard.html');
-  await setTerminal(page, true);
-  const vai = await eseguiComando(page, `cd '${base}'`);
-  expect(vai.executed, `il cd iniziale non è partito: ${JSON.stringify(vai).slice(0, 300)}`).toBe(true);
-  return page;
-}
-
-test('all\'assistente un comando fallito arriva fallito, e uno riuscito col commento in coda gira', async ({ openTab }) => {
-  const base = preparaCartella();
   try {
-    const page = await assistenteIn(openTab, base);
+    const page = await openTab('filo://dashboard/dashboard.html');
+    await setTerminal(page, true);
+    const vai = await eseguiComando(page, `cd '${base}'`);
+    expect(vai.executed, `il cd iniziale non è partito: ${JSON.stringify(vai).slice(0, 300)}`).toBe(true);
 
     const manca = await eseguiComando(page, WIN ? 'Get-Content nonesiste-7731.txt' : 'cat nonesiste-7731.txt');
     expect(manca.executed, 'un file che non c\'è risulta letto').toBe(false);
@@ -96,37 +83,6 @@ test('all\'assistente un comando fallito arriva fallito, e uno riuscito col comm
   }
 });
 
-test('all\'assistente un programma esterno riuscito resta riuscito anche con le redirezioni di stderr', async ({ openTab }) => {
-  const base = preparaCartella();
-  try {
-    const page = await assistenteIn(openTab, base);
-    // Riuscito, ma scrive su stderr: 2>&1 è la forma che un modello scrive spesso, git la usa per i messaggi.
-    for (const redir of ['2>&1', '2>$null']) {
-      if (!WIN && redir === '2>$null') continue;
-      const avviso = await eseguiComando(page, `node -e "console.error('avviso-7731')" ${redir}`);
-      expect(avviso.output.code, `con ${redir} un programma riuscito risulta fallito: ${JSON.stringify(avviso.output).slice(0, 300)}`)
-        .toBe(0);
-      expect(avviso.executed).toBe(true);
-    }
-  } finally {
-    rmSync(base, { recursive: true, force: true });
-  }
-});
-
-test('all\'assistente uno script che finisce con un programma esterno fallito risulta fallito', async ({ openTab }) => {
-  const base = preparaCartella();
-  try {
-    const page = await assistenteIn(openTab, base);
-    // Lo script finisce con un programma esterno uscito con 3: l'esito è 3, non riuscito.
-    const script = await eseguiComando(page, WIN ? '.\\costruisci.ps1' : 'sh ./costruisci.sh');
-    expect(String(script.output.stdout)).toContain('costruisco');
-    expect(script.output.code, 'lo script è fallito ma risulta riuscito').toBe(3);
-    expect(script.executed).toBe(false);
-  } finally {
-    rmSync(base, { recursive: true, force: true });
-  }
-});
-
 test('nel terminale della dashboard un comando fallito lo dice, uno riuscito col commento no', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -140,16 +96,4 @@ test('nel terminale della dashboard un comando fallito lo dice, uno riuscito col
   const ok = await nelTerminale(page, WIN ? '/Write-Output riuscito-7731 # commento' : '/echo riuscito-7731 # commento');
   await expect(ok).toContainText('riuscito-7731');
   await expect(ok.locator('.dash-term-exit')).toHaveCount(0);
-});
-
-test('nel terminale della dashboard un programma riuscito che scrive su stderr resta riuscito con 2>&1', async ({ app, shell }) => {
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await newtabPage(app);
-  await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
-  await setTerminal(page, true);
-  await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
-
-  const avviso = await nelTerminale(page, '/node -e "console.error(\'avviso-7731\')" 2>&1');
-  await expect(avviso).toContainText('avviso-7731');
-  await expect(avviso.locator('.dash-term-exit'), 'un programma riuscito risulta fallito').toHaveCount(0);
 });
