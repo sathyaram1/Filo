@@ -58,6 +58,26 @@ async function fingiFirestore(app, docs) {
     };
     // Le schede pubbliche: il giro non deve toccarle quando non cambia niente.
     FB.getManyPublic = async (ids) => { globalThis.__conta.schede += ids.length; return []; };
+    // I due segni senza orologio (#676, giro 1): l'ora che tiene Firestore per
+    // i feedback seguiti, e il contatore degli invii.
+    FB.versionsOf = async (ids) => {
+      globalThis.__conta.richieste += 1;
+      globalThis.__conta.seguiti += 1;
+      const trovati = globalThis.__docs.filter((d) => ids.includes(d._id));
+      globalThis.__conta.documenti += trovati.length;
+      return trovati.map((d) => ({ _id: d._id, _updateTime: d._updateTime, createdAt: d.createdAt }));
+    };
+    FB.getMany = async (ids) => {
+      globalThis.__conta.richieste += 1;
+      const trovati = globalThis.__docs.filter((d) => ids.includes(d._id));
+      globalThis.__conta.documenti += trovati.length;
+      return trovati;
+    };
+    FB.submissionCount = async () => {
+      globalThis.__conta.richieste += 1;
+      globalThis.__conta.documenti += 1;
+      return globalThis.__invii;
+    };
     // Il ritmo del giro lo legge chi accende il timer: accorciarlo qui basta.
     globalThis.SN_FEEDBACK_LIVE.POLL_MS = ritmo;
   }, { docs, ritmo: RITMO });
