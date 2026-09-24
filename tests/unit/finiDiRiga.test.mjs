@@ -80,7 +80,7 @@ function tuttiIFileDiTest(cartella, dentro = []) {
     if (nome.name === 'node_modules' || nome.name.startsWith('.')) continue;
     const p = join(cartella, nome.name);
     if (nome.isDirectory()) tuttiIFileDiTest(p, dentro);
-    else if (nome.name.endsWith('.mjs')) dentro.push(p);
+    else if (/\.[mc]?js$/.test(nome.name)) dentro.push(p);
   }
   return dentro;
 }
