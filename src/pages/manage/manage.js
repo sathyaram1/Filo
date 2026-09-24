@@ -2854,6 +2854,10 @@
     // cambio di stato non parte se lei non è arrivata: chiudere una
     // segnalazione buttando via l'unica frase che il mittente leggerà è il
     // modo più facile di perderla, e succedeva in silenzio.
+    // Il commento della revisione si legge PRIMA dell'attesa qui sotto: nel
+    // frattempo la casella può svuotarsi, e il "perché" andrebbe perso senza
+    // che niente lo dica.
+    const comment = (mgAcceptComment && !mgAcceptComment.hidden) ? (mgAcceptComment.value || '').trim() : '';
     setActionsBusy(true);
     const fraseOk = await fraseAlSicuro();
     if (!fraseOk) {
