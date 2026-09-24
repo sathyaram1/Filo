@@ -124,11 +124,15 @@ export async function segnaPreapprovazione(id, valore, opts = {}) {
   const pub = doc.fields?.statusPublic?.stringValue || 'open';
   if (valore && pub === 'closed') return { ok: false, motivo: 'pratica chiusa: il segno non conterebbe' };
   const fields = {};
-  const mask = ['mergePreapproved'];
+  // #676: ogni scrittura firma l'ora, o la dashboard non vede il cambiamento
+  // fino al riallineamento (che è raro per scelta).
+  const mask = ['mergePreapproved', 'updatedAt'];
+  fields.updatedAt = { timestampValue: new Date().toISOString() };
   const segno = valore ? { by: chiScrive(bearer), at: new Date().toISOString() } : null;
   if (segno) fields.mergePreapproved = toFsValue(segno);
   if (opts.dryRun) return { ok: true, dryRun: true, campi: mask, segno };
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=mergePreapproved`, {
+  const qsSegno = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${qsSegno}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
