@@ -901,11 +901,13 @@
   // Toglierlo svuoterebbe la ricerca invece di alleggerirla.
   const CAMPI_DETTAGLIO = ['notes', 'livelli', 'reviewComment', 'images', 'files'];
 
-  // I campi che un elenco mostra, ordina o filtra. È l'insieme di TUTTI i campi
-  // che le regole Firestore ammettono, meno quelli di dettaglio: un campo nuovo
-  // che nessuno aggiunge qui sparirebbe dagli elenchi senza un errore, quindi
-  // la sentinella `tests/unit/feedbackCampiLista.test.mjs` confronta questi due
-  // elenchi con `firestore.rules` e diventa rossa se divergono.
+  // I campi che un elenco mostra, ordina o filtra: tutti quelli che le regole
+  // Firestore ammettono meno quelli di dettaglio, più `pipeline` (lo scrive il
+  // server con l'SDK admin, che le regole non attraversa, e da lì viene il
+  // colore del bordo di ogni riga). Un campo nuovo dimenticato qui sparirebbe
+  // dagli elenchi senza un errore, quindi la sentinella
+  // `tests/unit/feedbackCampiLista.test.mjs` confronta questi due elenchi con
+  // `firestore.rules` e diventa rossa se divergono.
   const CAMPI_LISTA = [
     'archiveOverride', 'beatAt', 'blockReason', 'branch', 'capabilityGapId',
     'claimExpiresAt', 'claimNum', 'claimedAt', 'claimedBy', 'clientId',
