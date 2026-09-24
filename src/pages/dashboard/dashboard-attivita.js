@@ -831,8 +831,32 @@
     a._confirmed = true;
     a._executed = true;
     a._output = { ...(a._output || {}), ...esito, proposta: false, fatto: true };
+    scriviEsito(a, activity);
+  }
+
+  // L'altra metà: l'utente ha cliccato, e non è successo niente. Senza questa,
+  // il tentativo mai partito si legge come il lavoro riuscito che non aveva
+  // nulla da fare.
+  function segnaFallita(a, activity, motivo = '') {
+    if (!a) return;
+    a._executed = false;
+    a._output = { ...(a._output || {}), proposta: false, fatto: false, ok: false, detail: motivo };
+    scriviEsito(a, activity);
+  }
+
+  // Quel che l'utente porta a termine cliccando in chat va scritto in tre
+  // posti, o non è successo per nessuno: nel diario, che è dove lo rilegge
+  // adesso; nell'archivio, che è dove lo rilegge fra un mese; e sull'azione,
+  // che è quello che il modello si ritrova nel contesto al turno dopo.
+  function scriviEsito(a, activity) {
+    const E = self.SN_ESITO;
+    const esito = E.esitoAzione(a);
     const row = activityRowFor(a);
-    if (activity && row) activity.compiuta(a.type, row.icon, row.text);
+    if (activity && row) activity.esitoDelClick(chiaveRiga(a), a.type, row.icon, row.text, esito);
+    const id = chatIdCorrente();
+    if (id && a._callId) {
+      try { send({ type: MSG.FILO_CHAT_AZIONE, id, azione: String(a._callId), esito }); } catch (_) {}
+    }
   }
 
   function renderActionButton(a, { onAck, activity = null } = {}) {
