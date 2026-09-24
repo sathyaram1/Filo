@@ -1117,9 +1117,120 @@
   // Le sole "versioni" dei feedback: per ciascuno id + `_updateTime`, niente
   // campi. È la domanda che la dashboard fa a ogni giro per restare aggiornata
   // senza riscaricare tutto (≈130 KB invece di 5 MB per 500 feedback).
+  // `createdAt` e non `__name__`: costa le stesse letture (Firestore le conta
+  // per documento, non per campo) e dice dov'è il bordo della finestra, cioè
+  // quali feedback la pagina mostra e quali no.
   async function listVersions({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0 } = {}) {
-    const rows = await list({ pageSize, timeoutMs, fields: ['__name__'] });
-    return rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime }));
+    const rows = await list({ pageSize, timeoutMs, fields: ['createdAt'] });
+    return rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime, createdAt: r.createdAt || null }));
+  }
+
+  // ── Il giro al minuto: solo quello che è cambiato ────────────────────────
+  //
+  // Chiedere i nomi di tutta la collezione a ogni giro costa una lettura per
+  // feedback anche quando non è cambiato niente: con la dashboard aperta erano
+  // 500 letture al minuto a database fermo. Qui la domanda è «chi è stato
+  // scritto dopo questo istante?», e un giro a vuoto costa una lettura sola.
+  //
+  // L'ordinamento è (updatedAt, nome): il nome fa da spareggio fra due
+  // scritture nello stesso istante, e Firestore lo mette in coda a ogni indice
+  // a campo singolo — nessun indice composto da dichiarare.
+  //
+  // Un feedback SENZA `updatedAt` non compare in questa domanda: è il prezzo
+  // del campo, e per questo la riconciliazione completa resta (vedi
+  // SN_FEEDBACK_LIVE.RECONCILE_MS).
+  async function listChangedDirect({ since, after = null, pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '' } = {}) {
+    const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
+    const structuredQuery = {
+      from: [{ collectionId: COLLECTION }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'updatedAt' },
+          op: 'GREATER_THAN',
+          value: { timestampValue: String(since) },
+        },
+      },
+      orderBy: [
+        { field: { fieldPath: 'updatedAt' }, direction: 'ASCENDING' },
+        { field: { fieldPath: '__name__' }, direction: 'ASCENDING' },
+      ],
+      limit: Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE)),
+    };
+    if (after && after.name) {
+      structuredQuery.startAt = {
+        before: false,
+        values: [{ timestampValue: String(after.at) }, { referenceValue: String(after.name) }],
+      };
+    }
+    const headers = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    const opts = { method: 'POST', headers, body: JSON.stringify({ structuredQuery }) };
+    let timer = null;
+    let timedOut = false;
+    if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
+      const controller = new AbortController();
+      opts.signal = controller.signal;
+      timer = setTimeout(() => { timedOut = true; try { controller.abort(); } catch (_) {} }, timeoutMs);
+    }
+    let res;
+    try {
+      res = await fetch(endpoint, opts);
+    } catch (e) {
+      if (timedOut) throw new Error('firestore cambiati: timeout di rete');
+      throw e;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`firestore cambiati fallito (${res.status}): ${errText.slice(0, 300)}`);
+    }
+    const arr = await res.json();
+    const rows = [];
+    for (const row of Array.isArray(arr) ? arr : []) {
+      if (!row.document) continue;
+      rows.push(fsDocToObject(row.document));
+    }
+    return rows;
+  }
+
+  // Tutti i cambiati, paginati. Il tetto di pagina è largo e `maxPages` è un
+  // freno contro un ciclo infinito, non un tetto di prodotto: se scatta la
+  // risposta lo DICE (`complete: false`), non taglia in silenzio.
+  // `cursor` è dove riprendere: {at, name} dell'ultima riga letta, o quello
+  // ricevuto se non è arrivato niente.
+  async function listChangedSince({ since, after = null, pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX } = {}) {
+    const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
+    const rows = [];
+    const visti = new Set();
+    let cursor = after || null;
+    let complete = false;
+    for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
+      const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.listChangedDirect) || listChangedDirect;
+      // eslint-disable-next-line no-await-in-loop
+      const batch = await porta({ since, after: cursor, pageSize: limit, timeoutMs, idToken });
+      const arr = Array.isArray(batch) ? batch : [];
+      let nuove = 0;
+      for (const r of arr) {
+        const id = String((r && r._id) || '');
+        if (id && visti.has(id)) continue;
+        if (id) visti.add(id);
+        rows.push(r);
+        nuove += 1;
+      }
+      const ultima = arr[arr.length - 1];
+      const nome = nomeDocumento(COLLECTION, ultima);
+      // Una sorgente che ignora il cursore (una prova con un elenco fisso)
+      // tornerebbe sempre la stessa pagina: se non arriva niente di nuovo si è
+      // già in fondo, e continuare sarebbe un ciclo.
+      if (arr.length < limit || nuove === 0 || !nome) { complete = true; break; }
+      cursor = { at: String((ultima && ultima.updatedAt) || since), name: nome };
+    }
+    const ultima = rows[rows.length - 1];
+    if (ultima && nomeDocumento(COLLECTION, ultima)) {
+      cursor = { at: String(ultima.updatedAt || since), name: nomeDocumento(COLLECTION, ultima) };
+    }
+    return { rows, complete, cursor };
   }
 
   // Legge i documenti indicati (interi) in UNA richiesta (batchGet). Ritorna
