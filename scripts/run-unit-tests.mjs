@@ -174,7 +174,7 @@ function main() {
     console.error('[test:unit] il binario di Filo non è installato: gli unit test girano lo stesso (nessuno lo apre).');
   }
 
-  const r = spawnSync(process.execPath, ['--test', ...flags, ...files], {
+  const r = spawnSync(process.execPath, ['--require', PRELOAD_FINI_RIGA, '--test', ...flags, ...files], {
     stdio: 'inherit',
     // I test si aspettano la root del repo come cartella corrente, come quando
     // li lanciava npm. Così `npm run test:unit` e un lancio da fuori danno lo
