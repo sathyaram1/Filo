@@ -933,16 +933,20 @@
         // #146.6 — comando confermato (livello 2/3): l'esito è un passo del
         // lavoro e va nel diario, come quello di un comando di sola lettura.
         // Sotto la risposta lo si mostrava senza che il riassunto lo contasse.
+        // L'esito deve raggiungere anche l'archivio: la riga qui sotto vive
+        // finché la chat è aperta, e chi la riapre fra un mese legge da lì.
+        segnalaArchivio(a);
+        const chiaveEsito = `${chiaveRiga(a)}#esito`;
         if (isCmd) {
           btn.textContent = a._executed ? `✓ ${short}` : `✗ ${short}`;
           const out = r && r.output;
           if (out && !out.blocked && activity) activity.addCommand(out);
           else if (out && !activity) btn.after(renderCommandResult(out));
-          else if (out && row && activity) { activity.addRow(a.type, row.icon, row.text, true); btn.after(renderCommandResult(out)); }
+          else if (out && row && activity) { activity.addRow(a.type, row.icon, row.text, true, chiaveEsito); btn.after(renderCommandResult(out)); }
           if (out) applyCommandCwd([{ _output: out }]);
           return;
         }
-        if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
+        if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, chiaveEsito);
         // A cosa fatta il bottone è una ricevuta: la spunta davanti a «Filo vuole
         // impostare…» diceva insieme che è fatto e che deve ancora succedere. E
         // quando non è riuscita dice PERCHÉ: «Non eseguita» non si può leggere.
