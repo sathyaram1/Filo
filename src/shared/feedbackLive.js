@@ -16,12 +16,17 @@
   // rete di sicurezza, non il giro.
   const RECONCILE_MS = 30 * 60 * 1000;
 
-  // Quanti feedback per volta si controllano con l'ora vera di Firestore, che
-  // costa una lettura ciascuno a ogni giro. Le routine ne tengono una o due in
-  // mano e prendono la successiva dalla TESTA della coda: chi sta più in fondo
-  // non può muoversi senza prima arrivare in testa, quindi un tetto basso non
-  // lascia fuori niente che si stia muovendo davvero.
+  // Quanti ne prende dalla TESTA della coda, da cui esce la prossima presa in
+  // carico. È un campione, non una garanzia: costa una lettura ciascuno a ogni
+  // giro, e seguire una coda intera costerebbe quanto il giro che si è tolto.
   const SEGUITI_MAX = 12;
+
+  // Il tetto del giro. Le segnalazioni IN MANO alle routine vanno seguite
+  // tutte, ovunque siano in lista, e sono poche per natura (quante ne lavora
+  // il server insieme): il tetto è largo perché non le tagli mai. Se lo supera
+  // il giro lo DICE e si riallinea, invece di lasciar fuori qualcuno in
+  // silenzio per mezz'ora.
+  const SEGUITI_TETTO = 60;
 
   // Quanto si torna indietro rispetto all'inizio del giro precedente. `updatedAt`
   // lo scrive chi scrive, con il SUO orologio: due minuti di margine assorbono
