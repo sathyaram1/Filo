@@ -909,6 +909,17 @@ module.exports = function register(on, ctx) {
       pageSize: FB.LIST_PAGE_SIZE,
       broadcast: liveBroadcast,
       onWarn: (m) => console.warn('[feedback] giro:', m),
+      seguiti: () => {
+        const out = new Set();
+        for (const ids of liveSubs.values()) for (const id of ids) out.add(id);
+        return Array.from(out);
+      },
+      versionsOf: async (ids) => FB.versionsOf(ids, { timeoutMs: 20000, idToken: await token() }),
+      readRows: async (ids) => {
+        const rows = await FB.getMany(ids, { timeoutMs: 20000, idToken: await token() });
+        return mergeCardFields(rows, { ids });
+      },
+      submissionCount: async () => FB.submissionCount({ timeoutMs: 20000, idToken: await token() }),
       listVersions: async () => FB.listVersions({
         pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000, idToken: await token(),
       }),
