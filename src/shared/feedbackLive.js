@@ -161,7 +161,7 @@
     let inFlight = null;
     let versioniSeguite = new Map();  // id → ora d'ultima scrittura secondo Firestore
     let inviiVisti = null;            // valore del contatore all'ultimo giro
-    let avvioVisto = null;            // ultimo worker delle routine partito, all'ultimo giro
+    let avvioVisto = null;            // ultimo worker partito; null = non ancora letto
 
     function since() {
       const base = lastTickAt || (now() - overlapMs);
@@ -280,7 +280,7 @@
       // senza firmare l'ora. Ci si riallinea al giro dopo, una volta per
       // avvio, invece di seguire a vuoto le prime della coda.
       const avvio = await ultimoAvvio(avvioVisto);
-      if (avvio && avvioVisto && avvio !== avvioVisto) lastReconcileAt = 0;
+      if (avvioVisto !== null && avvio !== null && avvio !== avvioVisto) lastReconcileAt = 0;
       avvioVisto = avvio;
 
       const perId = new Map();

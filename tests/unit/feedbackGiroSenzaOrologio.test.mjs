@@ -35,7 +35,10 @@ function giro(mondo) {
         _id: id, _updateTime, createdAt: '2026-09-01T00:00:00Z',
       }));
     },
-    listChangedSince: async () => { log.cambiati += 1; return { rows: [], complete: true }; },
+    listChangedSince: async () => {
+      log.cambiati += 1;
+      return { rows: (mondo.cambiati || []).slice(), complete: true };
+    },
     seguiti: () => mondo.seguiti,
     versionsOf: async (ids) => {
       log.versionsOf += 1;
@@ -51,6 +54,11 @@ function giro(mondo) {
       log.contatori += 1;
       if (mondo.contatoreRotto) throw new Error('contatore non raggiungibile');
       return mondo.invii;
+    },
+    ultimoAvvioRoutine: async () => {
+      log.registri = (log.registri || 0) + 1;
+      if (mondo.registroRotto) throw new Error('registro non raggiungibile');
+      return mondo.avvio === undefined ? null : mondo.avvio;
     },
   });
   return { w, log, avanza: (ms) => { t += ms; } };
@@ -92,16 +100,24 @@ test('nessun feedback da seguire: il giro non chiede niente in più', async () =
   assert.equal(log.versionsOf, 0);
 });
 
-test('si seguono al massimo SEGUITI_MAX feedback: la testa della coda, non tutta', async () => {
-  const tanti = Array.from({ length: LIVE.SEGUITI_MAX + 7 }, (_, i) => `q${i}`);
+test('oltre il tetto dei seguiti il giro avvisa e si riallinea, invece di tagliare in silenzio', async () => {
+  const tanti = Array.from({ length: LIVE.SEGUITI_TETTO + 7 }, (_, i) => `q${i}`);
   const mondo = { ore: {}, seguiti: tanti, invii: 10 };
   for (const id of tanti) mondo.ore[id] = 't1';
   const { w, log, avanza } = giro(mondo);
   await w.tick({ force: true });
+  assert.equal(log.versioni, 1);
+
   avanza(LIVE.POLL_MS);
   await w.tick({ force: true });
-  assert.equal(log.ultimiChiesti.length, LIVE.SEGUITI_MAX);
-  assert.deepEqual(log.ultimiChiesti, tanti.slice(0, LIVE.SEGUITI_MAX));
+  assert.equal(log.ultimiChiesti.length, LIVE.SEGUITI_TETTO);
+  assert.ok(log.avvisi.some((m) => typeof m === 'string' && m.includes('tetto')));
+
+  // Chi è rimasto fuori non resta invisibile fino alla mezz'ora: il giro dopo
+  // è un riallineamento completo.
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  assert.equal(log.versioni, 2);
 });
 
 test('un invio nuovo che la domanda per data non vede fa riallineare al giro dopo', async () => {
