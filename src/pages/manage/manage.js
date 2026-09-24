@@ -4111,8 +4111,11 @@
     return mergeLive(fresh, { removed });
   }
 
-  // Un giro completo chiesto dalla pagina (apertura, rientro in vista, prove).
-  // Un giro già in corso viene riusato, non raddoppiato.
+  // Il riallineamento chiesto dalla pagina invece che dal main: è la porta
+  // degli spec (`pollNow`), che sostituiscono `liveSources` e non hanno un
+  // main da far battere. In produzione il rientro in finestra CHIEDE un giro
+  // al main: una rilettura completa a ogni rientro costerebbe quanto il giro
+  // che questo lavoro ha tolto.
   function refreshFromRemote() {
     if (liveTick) return liveTick;
     liveTick = (async () => {
