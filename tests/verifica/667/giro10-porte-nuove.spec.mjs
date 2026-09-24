@@ -99,6 +99,25 @@ test('il pulsante «Prova» del suono delle notifiche a volume zero lo dice', as
     'premere Prova a volume zero deve dare un suono o una risposta, non il nulla').toBeTruthy();
 });
 
+test('il pulsante «Prova» della suoneria a volume zero lo dice', async ({ openTab }) => {
+  const prefs = await openTab('filo://preferences/preferences.html');
+  await prefs.waitForSelector('#timerRingtoneVolume');
+
+  await prefs.locator('#timerRingtoneVolume').fill('0');
+  await expect.poll(async () => (await salvate(prefs)).timerRingtoneVolume, { timeout: 8_000 }).toBe(0);
+
+  await spiaVolume(prefs);
+  const primaDelClic = await prefs.evaluate(() => document.body.innerText);
+  await prefs.locator('#timerRingtonePreview').click();
+  await prefs.waitForTimeout(600);
+
+  const p = await picchi(prefs);
+  const uscitoSuono = p.filter((v) => v > 0).length > 0;
+  const dopoIlClic = await prefs.evaluate(() => document.body.innerText);
+  expect(uscitoSuono || dopoIlClic !== primaDelClic,
+    'premere Prova a volume zero deve dare un suono o una risposta, non il nulla').toBeTruthy();
+});
+
 // ── Famiglia 2: il campo con il fuoco in una scheda in secondo piano ──────
 
 test('lo stile dell’assistente chiesto a parole resta, anche col suo campo lasciato col fuoco', async ({ shell, openTab }) => {
