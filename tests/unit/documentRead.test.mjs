@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { writeFileSync, rmSync, mkdirSync } from 'node:fs';
+import { writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
