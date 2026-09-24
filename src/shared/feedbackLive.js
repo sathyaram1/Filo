@@ -96,15 +96,13 @@
   // Una riga più VECCHIA di quella in mano non vince: il giro vive nel main e
   // avvisa tutte le pagine, e una pagina appena caricata riceve anche l'ultimo
   // annuncio — che di quel feedback può avere una copia precedente.
-  function applyChanges(list, { fresh = [], removed = [], keepIds = null } = {}) {
+  function applyChanges(list, { fresh = [], removed = [] } = {}) {
     const drop = new Set((removed || []).map(String));
-    const keep = keepIds ? new Set(Array.from(keepIds, String)) : null;
     const byId = new Map();
     for (const fb of Array.isArray(list) ? list : []) {
       if (!fb || !fb._id) continue;
       const id = String(fb._id);
       if (drop.has(id)) continue;
-      if (keep && !keep.has(id)) continue;
       byId.set(id, fb);
     }
     for (const fb of Array.isArray(fresh) ? fresh : []) {
