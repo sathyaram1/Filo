@@ -286,6 +286,11 @@ export async function scrivi(id, to, nota, opts = {}) {
   // Una consegna reale azzera il contatore delle interruzioni.
   if (to !== 'working' && to !== 'todo') set('workingResets', 0);
 
+  // #676: ogni scrittura firma l'ora, o la dashboard non vede il cambiamento
+  // fino al riallineamento (che è raro per scelta).
+  set('updatedAt', undefined);
+  fields.updatedAt = { timestampValue: new Date().toISOString() };
+
   if (opts.dryRun) return { ok: true, from, to, dryRun: true, campi: mask };
 
   const q = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
