@@ -208,6 +208,16 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // L'esito di un'azione che l'utente ha portato a termine cliccando: arriva
+  // dopo che il turno è già nell'archivio, e senza di lui la conversazione
+  // riaperta racconta la proposta al posto del fatto.
+  on(MSG.FILO_CHAT_AZIONE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const E = globalThis.SN_ESITO;
+    if (!msg.id || !msg.azione || !E.valido(msg.esito)) return { ok: false, error: 'esito non valido' };
+    return { ok: !!(await FiloChats.setActionEsito(msg.id, String(msg.azione), msg.esito)) };
+  });
+
   // #525 — titolo e tipo scelti a mano dall'utente (menu del tasto destro in
   // Cronologia). Da qui in poi il classificatore non li riscrive più.
   on(MSG.FILO_CHAT_UPDATE, async (msg, sender, origin) => {
