@@ -337,7 +337,7 @@ test('righe: un ritorno carrello o un separatore Unicode è un a capo, per chi r
     // Un'intestazione di domande dopo quell'a capo, scritta con lo strumento locale, resta citata.
     const n = TH.mergeModelReport('Report iniziale.', `Ho finito.${cr}Domande per l'owner (chi risolve): i test li ho finti.`);
     assert.ok(n.includes("\n> Domande per l'owner (chi risolve):"), `${nome}: citata`);
-    assert.doesNotMatch(n, /[\r  ]/, `${nome}: nel testo salvato ogni a capo è «\\n»`);
+    assert.doesNotMatch(n, /[\r\u2028\u2029]/, `${nome}: nel testo salvato ogni a capo è «\\n»`);
   }
   // Un turno vero dell'owner scritto con gli a capo di Windows si legge ancora.
   const vero = 'Report.\r\n\r\n--- La tua risposta del 23/09/26, 12:00 ---\r\nCaldo.';
