@@ -1254,15 +1254,55 @@
     return batchGetDirect(VIEW_COLLECTION, wanted, { timeoutMs, idToken });
   }
 
-  async function batchGetDirect(collectionId, wanted, { timeoutMs = 0, idToken = '' } = {}) {
+  // Le VERSIONI dei soli id indicati: `_updateTime`, che scrive Firestore, non
+  // chi scrive il documento. È il controllo che regge anche su un cammino che
+  // non firma `updatedAt` (oggi il server delle routine) e su un orologio
+  // scentrato. La maschera tiene i byte a zero: le letture le paga Firestore
+  // per documento, i megabyte no.
+  async function versionsOf(ids, { timeoutMs = 0, idToken = '' } = {}) {
+    const wanted = (Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean);
+    if (wanted.length === 0) return [];
+    const rows = await batchGetDirect(COLLECTION, wanted, { timeoutMs, idToken, mask: ['createdAt'] });
+    return rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime, createdAt: r.createdAt || null }));
+  }
+
+  // Quanti invii ci sono stati in tutto: il contatore che ogni invio fa
+  // avanzare PRIMA di scrivere il documento. Una lettura, e nessun orologio di
+  // mezzo: una segnalazione nuova si vede anche se la macchina che l'ha mandata
+  // ha l'ora indietro, cioè quando la domanda per data non la troverebbe.
+  // `null` = non lo so (contatore assente o lettura fallita): chi chiama non
+  // deve scambiarlo per «niente di nuovo».
+  async function submissionCount({ timeoutMs = 0, idToken = '' } = {}) {
+    const url = `${FIRESTORE_BASE}/${COUNTERS_COLLECTION}/${SEQ_COUNTER}?key=${API_KEY}`;
+    const headers = {};
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    const opts = { headers };
+    let timer = null;
+    if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
+      const controller = new AbortController();
+      opts.signal = controller.signal;
+      timer = setTimeout(() => { try { controller.abort(); } catch (_) {} }, timeoutMs);
+    }
+    let res;
+    try { res = await fetch(url, opts); } finally { if (timer) clearTimeout(timer); }
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`firestore contatore invii fallito (${res.status})`);
+    const doc = await res.json();
+    const n = Number(fromFsValue(doc.fields?.value));
+    return Number.isInteger(n) && n >= 0 ? n : null;
+  }
+
+  async function batchGetDirect(collectionId, wanted, { timeoutMs = 0, idToken = '', mask = null } = {}) {
     const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
     const prefix = `${FIRESTORE_BASE}/${collectionId}/`;
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    const corpo = { documents: wanted.map((id) => prefix + id) };
+    if (Array.isArray(mask) && mask.length) corpo.mask = { fieldPaths: mask.map(String) };
     const opts = {
       method: 'POST',
       headers,
-      body: JSON.stringify({ documents: wanted.map((id) => prefix + id) }),
+      body: JSON.stringify(corpo),
     };
     let timer = null;
     let timedOut = false;
