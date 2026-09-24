@@ -9,9 +9,10 @@
 // Qui si prova quello che il giro 1 non aveva provato:
 //   1. il cammino ONESTO deve ancora arrivare in fondo (una difesa che ferma
 //      anche chi non ha fatto niente di storto è peggio del buco);
-//   2. la VERIFICA FUNZIONALE — l'altro dei due esiti ragionati — deve
-//      comportarsi come il controllo di sicurezza: impronta con l'esito, e
-//      fusione che si ferma se il contenuto è cambiato dopo;
+//   2. la VERIFICA FUNZIONALE — l'altro dei due esiti ragionati — porta
+//      l'impronta con l'esito; se il contenuto cambia dopo, la mossa la
+//      giudica il server (regola del 24/09/2026: il rifiuto locale dettava un
+//      rientro in verifica che il server nega a chi chiede la fusione);
 //   3. l'impronta non si detta nemmeno sulla strada della verifica funzionale
 //      (il giro 1 aveva chiuso solo quella del controllo di sicurezza);
 //   4. quando da questa macchina non risulta su quale contenuto è stato dato
