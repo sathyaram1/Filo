@@ -1,12 +1,6 @@
-// Aggiornamento continuo della lista dei feedback (dashboard di gestione).
-//
-// Il giro NON rilegge la collezione: chiede i soli feedback scritti dopo
-// l'ultimo giro, e ogni tanto si riallinea per intero (le cancellazioni non
-// compaiono in una domanda per data). Qui vive la logica pura — confronto,
-// fusione, decisione del giro — così si può provare senza rete.
-//
-// Espone SN_FEEDBACK_LIVE = { POLL_MS, RECONCILE_MS, OVERLAP_MS, diffVersions,
-// applyChanges, windowFloor, inWindow, makeWatcher }.
+// Aggiornamento continuo della lista dei feedback (dashboard di gestione):
+// logica pura — confronto, fusione, decisione del giro — senza rete.
+// La regola sta in patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md.
 
 (function (global) {
   'use strict';
