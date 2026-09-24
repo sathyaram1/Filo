@@ -121,4 +121,12 @@ test('il giro al minuto chiede solo i cambiati, e il cambiato compare in lista',
   expect(dopo.documenti - fermo.documenti).toBe(1);
   expect(dopo.versioni).toBe(1, 'un cambiamento non fa rileggere tutta la collezione');
   expect(dopo.schede).toBe(1, 'le schede si rileggono per il solo id cambiato');
+
+  // Gestione chiusa: il giro si ferma. Nessuno che guarda, niente da pagare —
+  // ed è anche la prova che una scheda andata altrove non resta iscritta.
+  await page.goto('about:blank');
+  await new Promise((r) => setTimeout(r, RITMO * 4));
+  const chiuso = await conta(app);
+  await new Promise((r) => setTimeout(r, RITMO * 4));
+  expect((await conta(app)).richieste).toBe(chiuso.richieste);
 });
