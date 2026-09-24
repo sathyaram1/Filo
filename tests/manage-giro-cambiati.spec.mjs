@@ -200,3 +200,36 @@ test('quello che le routine scrivono senza firmare l\'ora arriva lo stesso entro
   });
   await expect(page.locator('.mg-item-title')).toHaveText(['Lavorazione finita', 'In attesa'], { timeout: 5000 });
 });
+
+// Il campione della coda non deve spingere fuori le segnalazioni IN MANO alle
+// routine (#676): sono quelle che si muovono davvero, e una lasciata fuori
+// resta ferma in dashboard fino al riallineamento, cioè mezz'ora.
+test('con molti lavori aperti insieme, nessuno di quelli in mano resta fuori dal giro', async ({ app, openTab }) => {
+  const quanti = 14;
+  const docs = [];
+  for (let i = 1; i <= quanti; i += 1) {
+    docs.push(fakeFb(`mano-${String(i).padStart(2, '0')}`, `Lavoro ${i}`, {
+      seq: 300 + i, status: 'working',
+      createdAt: `2026-09-${String(28 - i).padStart(2, '0')}T10:00:00Z`,
+    }));
+  }
+  // E una in coda, che il campione può anche non prendere.
+  docs.push(fakeFb('mano-coda', 'In attesa', { seq: 999, status: 'todo', createdAt: '2026-08-01T10:00:00Z' }));
+  await fingiFirestore(app, docs);
+
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(({ docs }) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData(docs);
+    window.__mgTest.setTab('queue');
+    window.__mgTest.resumeLive();
+  }, { docs });
+
+  const seguiti = await page.evaluate(() => window.__mgTest.idsDaSeguire());
+  for (let i = 1; i <= quanti; i += 1) {
+    expect(seguiti).toContain(`mano-${String(i).padStart(2, '0')}`);
+  }
+});

@@ -64,13 +64,24 @@ servita a niente, una volta.
 6. **La data firmata è una scorciatoia, non l'unica sorgente.** La firma chi
    scrive, e non tutti la firmano: il server delle routine non la mette, una
    macchina con l'orologio indietro la mette nel passato. Chi guarda in
-   continuo tiene perciò almeno un segno che nessun orologio tocca. Qui sono
-   due: l'ora d'ultima scrittura che Firestore mantiene da sé, chiesta per i
-   soli documenti che la pagina dichiara di seguire (una lettura ciascuno, e
-   la pagina segue chi si sta muovendo, non tutto), e il contatore degli
-   invii, che ogni invio fa avanzare prima di scrivere. Se un contatore non
-   si legge, si tiene il valore di prima: «non lo so» non vale «niente di
-   nuovo».
+   continuo tiene perciò dei segni che nessun orologio tocca. Qui sono tre:
+   l'ora d'ultima scrittura che Firestore mantiene da sé, chiesta per i soli
+   documenti che la pagina dichiara di seguire (una lettura ciascuno, e la
+   pagina segue chi si sta muovendo, non tutto); il contatore degli invii, che
+   ogni invio fa avanzare prima di scrivere; e il registro dei worker, che dice
+   quando le routine hanno preso in mano un lavoro.
+7. **Un segno di scorta si conta, non si annusa.** «Ne è arrivata almeno una»
+   lascia passare la seconda di due arrivate insieme: si confronta quante ne
+   annuncia il contatore con quante ne ha portate la domanda, e se il conto non
+   torna ci si riallinea.
+8. **Chi non si può indovinare, si chiede a chi lo sa.** Quale segnalazione
+   stiano lavorando le routine non si deduce dall'ordine della coda in pagina:
+   il server sceglie con un ordine suo. Lo dice il registro dei worker, che
+   costa una lettura, e un avvio nuovo fa riallineare il giro dopo.
+9. **Un tetto non taglia in silenzio.** Sopra il tetto dei seguiti il giro lo
+   dice e si riallinea: chi resta fuori dall'elenco non deve restare invisibile
+   per mezz'ora. Se un segno non si legge, si tiene il valore di prima: «non lo
+   so» non vale «niente di nuovo».
 
 ## Riferimenti
 
