@@ -82,6 +82,16 @@ test('Novita è escluso: host che ha restituito la risposta di un\'altra richies
   }
 });
 
+test("Alibaba è escluso col nome che OpenRouter dà all'host, non solo col prefisso qwen/", () => {
+  const list = C.DEFAULT_EXCLUDED_PROVIDERS;
+  // È il nome che OpenRouter riporta nel campo `provider` della risposta (slug `alibaba`).
+  for (const served of ['Alibaba', 'alibaba', 'Alibaba Cloud']) {
+    assert.equal(C.isProviderExcluded(served, list), true, served);
+  }
+  assert.ok(C.providerIgnoreList(list).includes('Alibaba'));
+  assert.ok(C.providerIgnoreList(list).includes('Qwen'));
+});
+
 // ── Deriva fra la lista del codice e quella scritta a mano ───────────────────
 // La lista remota (config/models) SOSTITUISCE quella di build: un'esclusione
 // aggiunta al codice non arriva dove esiste già una lista scritta a mano. Questa
