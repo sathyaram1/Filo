@@ -4174,7 +4174,7 @@
     // può chiudersi ora che la bozza non c'è più: il giro del main non manda
     // niente quando non è cambiato niente, quindi questo tocca a noi.
     closeDetailIfGone();
-    sendToMain({ type: LIVE_SUBSCRIBE, now: true }).catch(() => {});
+    inviaSeguiti({ now: true });
   }
 
   // I feedback che il giro deve seguire con l'ora vera di Firestore invece che
