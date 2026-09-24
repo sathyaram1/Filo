@@ -1555,6 +1555,7 @@
       fields.verifiedAt = { timestampValue: new Date().toISOString() };
       mask.push('verifiedAt');
     }
+    touchUpdatedAt(fields, mask);
     const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
     const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
     const headers = { 'Content-Type': 'application/json' };
