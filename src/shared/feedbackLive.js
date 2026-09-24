@@ -114,9 +114,20 @@
   // Vive nel processo main, uno solo: dieci schede di Gestione aperte sono
   // dieci pagine che ascoltano, non dieci giri che pagano.
   //
+  // La domanda per data è la SCORCIATOIA, non la sola sorgente: `updatedAt` lo
+  // scrive chi scrive, e chi non lo firma (il server delle routine) o lo firma
+  // con un orologio indietro sparirebbe dal giro. Perciò ogni giro guarda
+  // anche due segni che nessun orologio tocca: l'ora d'ultima scrittura che
+  // Firestore tiene da sé, per i soli feedback che la dashboard sta seguendo,
+  // e il contatore degli invii, che ogni invio fa avanzare.
+  //
   // deps:
   //   listChangedSince({ since }) → { rows, complete }   i cambiati dopo `since`
   //   listVersions()              → [{ _id, _updateTime, createdAt }]
+  //   seguiti()                   → [id] i feedback che le pagine stanno seguendo da vicino
+  //   versionsOf(ids)             → [{ _id, _updateTime }] l'ora vera di Firestore
+  //   readRows(ids)               → [documenti interi]
+  //   submissionCount()           → intero | null  quanti invii in tutto
   //   broadcast(msg)              avvisa le pagine
   //   now()                       l'orologio (i test lo fissano)
   //
