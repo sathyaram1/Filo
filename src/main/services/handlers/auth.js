@@ -869,6 +869,41 @@ module.exports = function register(on, ctx) {
   let lastSyncAt = 0;
   const SYNC_MIN_GAP_MS = 60_000;
 
+  // ── Da quando ricontrollare le chiusure ──────────────────────────────────
+  //
+  // La data dell'ultimo giro RIUSCITO, tenuta anche su disco: un riavvio non
+  // deve ricomprare la finestra dei cinquecento chiusi più di recente. Il
+  // margine toglie un'ora alla data scritta, perché la data di chiusura la
+  // mette chi chiude (un'altra macchina, il server) e due orologi non
+  // combaciano: senza, una chiusura arrivata con l'orologio indietro cadrebbe
+  // fuori dal filtro e non entrerebbe mai in bacheca.
+  const MARGINE_SINCRO_MS = 60 * 60 * 1000;
+  let sincroIso = null;   // null = non ancora letta da disco
+  function chiaveSincro() {
+    return (globalThis.SN_CONST && globalThis.SN_CONST.STORAGE_KEYS
+      && globalThis.SN_CONST.STORAGE_KEYS.FEEDBACK_SYNC_AT) || 'feedbackSyncAt';
+  }
+  async function caricaUltimaSincro() {
+    if (sincroIso !== null) return sincroIso;
+    sincroIso = '';
+    try {
+      const raw = await globalThis.SN_STORAGE?.getRaw(chiaveSincro(), '');
+      if (typeof raw === 'string' && raw) sincroIso = raw;
+    } catch (_) { /* senza memoria si riparte dalla finestra intera: costa, non sbaglia */ }
+    return sincroIso;
+  }
+  function ultimaSincroIso() {
+    if (!sincroIso) return '';
+    const t = Date.parse(sincroIso);
+    if (!Number.isFinite(t)) return '';
+    return new Date(t - MARGINE_SINCRO_MS).toISOString();
+  }
+  async function segnaSincroRiuscita() {
+    sincroIso = new Date().toISOString();
+    try { await globalThis.SN_STORAGE?.setRaw(chiaveSincro(), sincroIso); }
+    catch (_) { /* resta in memoria per questa sessione */ }
+  }
+
   /**
    * La scheda pubblica di UN feedback, per id: la scrive, l'aggiorna o la
    * toglie secondo quello che dice il feedback adesso.
