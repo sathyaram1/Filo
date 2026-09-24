@@ -644,5 +644,7 @@
     ATTACH_PREFIX,
     USER_TURN_RE,
     MODEL_TURN_RE,
+    A_CAPO_RE,
+    righe,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
