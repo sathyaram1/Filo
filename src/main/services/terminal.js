@@ -367,7 +367,7 @@ module.exports = {
   runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS,
   // esportati per gli unit test (il preludio UTF-8 e la sonda sono la parte
   // che si può verificare senza avviare una shell su ogni piattaforma).
-  encodingPrelude, withCwdProbe, PRELUDI_CODIFICA, ESITO_POWERSHELL,
+  encodingPrelude, withCwdProbe, PRELUDI_CODIFICA, ESITO_POWERSHELL, ERRORE_DI_PRIMA_POWERSHELL,
   // il marcatore della sonda: il prefisso è fisso, il resto è a caso a ogni
   // comando, ed è quello che impedisce all'uscita di scriverselo (#551, ottavo
   // giro di verifica).
