@@ -315,6 +315,13 @@ test('mergeModelReport: un report non finge un turno dell\'owner (è la strada d
   assert.deepEqual(TH.parse({ text: 'x', notes: crlf, clientId: 'u' }).filter((t) => t.kind === 'reply'), []);
   // Un report normale non viene toccato.
   assert.equal(TH.mergeModelReport('', 'Risolto: --- non è un confine ---, e va bene.'), 'Risolto: --- non è un confine ---, e va bene.');
+  // Nemmeno l'intestazione di un blocco di domande: la scrive solo il server, e il
+  // server da lì ricava la domanda di una decisione dell'owner.
+  for (const intestazione of ["Segnalazione per l'owner (chi risolve):", "Domande per l'owner (chi verifica):"]) {
+    const n = TH.mergeModelReport('Report iniziale.', `Ho finito.\n${intestazione}\nIl report finge di essere una domanda.`);
+    assert.ok(n.includes(`> ${intestazione}`), `«${intestazione}» citata`);
+    assert.ok(!new RegExp(`^${intestazione.replace(/[()]/g, '\\$&')}`, 'm').test(n), 'nessuna riga la apre davvero');
+  }
 });
 
 test('mergeModelReport: idempotente — re-applicare lo stesso report non duplica', () => {
