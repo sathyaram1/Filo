@@ -281,6 +281,13 @@
     return ('owner:' + c).slice(0, 100);
   }
 
+  // Una riga finisce a OGNI a capo, di qualunque tipo: chi ripulisce e chi legge spezzano solo così, o un «\r» in
+  // mezzo a un marcatore sfugge a chi ripulisce e apre un turno per chi legge. Copia sul server: routine/notes.js.
+  const A_CAPO_RE = /\r\n|[\n\r@@U2028@@@@U2029@@]/;
+  function righe(s) {
+    return String(s == null ? '' : s).split(A_CAPO_RE);
+  }
+
   // Spezza il blob `notes` nei suoi turni. Ritorna una lista di
   // { role: 'model'|'user', ts: string|null, body: string } senza i segmenti
   // vuoti (es. note che iniziano direttamente con un marcatore di riapertura).
