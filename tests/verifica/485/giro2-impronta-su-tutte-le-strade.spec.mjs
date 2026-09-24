@@ -154,11 +154,13 @@ test('anche la verifica funzionale vale per il contenuto: registrata su uno, se 
     g(['commit', '-qm', 'sostituito dopo la verifica']);
     expect(punta()).not.toBe(provato);
 
+    // Il server tollera le sole prove del giro tolte e altrimenti azzera la
+    // verifica da sé: qui si chiede, dichiarando la punta, e lo si dice.
     const gate = await lancia(GATE, ['worker/485'], env, dir);
     const richiesta = ricevuti.find((x) => x.url.includes('routineMerge'));
-    expect(!richiesta && gate.status !== 0,
-      `la fusione è partita col solo esito della verifica funzionale dato su ${provato.slice(0, 8)} (busta: ${JSON.stringify(richiesta?.body || null)})`).toBe(true);
-    expect(`${gate.stdout}\n${gate.stderr}`).toContain('la verifica');
+    expect(String(richiesta?.body?.sha || ''), gate.stderr).toBe(punta());
+    expect(gate.stderr, 'la nota deve dire su quale contenuto la verifica ha dato l\'ok').toContain(provato.slice(0, 12));
+    expect(gate.stderr).not.toContain('revision_capability');
   } finally {
     srv.close();
     rmSync(dir, { recursive: true, force: true });
