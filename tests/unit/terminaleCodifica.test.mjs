@@ -448,6 +448,50 @@ test('nel terminale della dashboard un comando fallito risulta fallito', async (
   }
 });
 
+// Con lo stderr rediretto PowerShell spegne $? a ogni riga che un programma scrive lì, anche se è riuscito:
+// git lo fa a ogni checkout o push, e il modello scrive 2>&1 spesso. Conta il codice del programma.
+test('un programma esterno riuscito che scrive su stderr resta riuscito anche con lo stderr rediretto', async () => {
+  const node = SU_WINDOWS ? `& "${process.execPath}"` : `"${process.execPath}"`;
+  const avvisa = `${node} -e "console.error('avviso')"`;
+  const redirezioni = SU_WINDOWS ? ['2>&1', '2>$null', '*>&1', '2>&1 | Out-String'] : ['2>&1', '2>/dev/null'];
+  const manca = SU_WINDOWS ? `Get-Content "${join(TMP, 'manca.txt')}"` : `cat "${join(TMP, 'manca.txt')}"`;
+  const casi = [
+    ...redirezioni.map((r) => [`${avvisa} ${r}`, 0]),
+    [`${node} -e "console.error('avviso'); process.exit(4)" 2>&1`, 4],
+    // Il segno dello stderr non deve coprire un comando fallito dopo di lui.
+    [`${avvisa} 2>&1; ${manca}`, 'fallito'],
+  ];
+  const giusto = (code, atteso) => (atteso === 'fallito' ? code !== 0 : code === atteso);
+
+  for (const [comando, atteso] of casi) {
+    const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+    assert.ok(giusto(out.code, atteso), `assistente, «${comando}»: codice ${out.code}, atteso ${atteso}`);
+  }
+
+  const S = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
+  const sessione = S.createSession({ shell: 'powershell', cwd: TMP });
+  const esegui = (comando) => new Promise((risolvi, rifiuta) => {
+    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto: ${comando}`)), 30_000);
+    sessione.exec(comando, {
+      onExit: ({ code }) => { clearTimeout(stop); risolvi(code); },
+      onError: ({ message }) => { clearTimeout(stop); rifiuta(new Error(message)); },
+    });
+  });
+  try {
+    for (const [comando, atteso] of casi) {
+      const code = await esegui(comando);
+      assert.ok(giusto(code, atteso), `dashboard, «${comando}»: codice ${code}, atteso ${atteso}`);
+    }
+    if (SU_WINDOWS) {
+      // Nella sessione restano gli errori dei comandi di prima: uno vecchio non decide l'esito di quello dopo.
+      const zitto = await esegui(`${manca} -ErrorAction Ignore`);
+      assert.notEqual(zitto, 0, 'un comando fallito in silenzio risulta riuscito per colpa di un errore vecchio');
+    }
+  } finally {
+    sessione.kill();
+  }
+});
+
 // La cartella com'è scritta nel sistema: la shell riporta la forma canonica.
 function TMP_CANONICO(p) {
   try { return realpathSync.native(p); } catch (_) { return p; }
