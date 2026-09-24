@@ -129,6 +129,19 @@ function sfuggito(corpo, i) {
   return barre % 2 === 1;
 }
 
+/** Il carattere in posizione `i` sta dentro una classe `[…]`? */
+// Dentro una classe `$` è un dollaro letterale e `\n` un'alternativa, non una
+// fine riga da ancorare: `[A-Za-z_$]` accusato era un falso allarme.
+function dentroClasse(corpo, i) {
+  let aperta = false;
+  for (let j = 0; j < i; j += 1) {
+    if (corpo[j] === '\\') { j += 1; continue; }
+    if (!aperta && corpo[j] === '[') aperta = true;
+    else if (aperta && corpo[j] === ']') aperta = false;
+  }
+  return aperta;
+}
+
 /** I motivi per cui le ricerche di questa riga non reggono un CRLF. */
 function ricercheFragili(riga) {
   const motivi = new Set();
