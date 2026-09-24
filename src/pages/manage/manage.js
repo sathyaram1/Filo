@@ -4180,16 +4180,14 @@
   function startLive() {
     if (!LIVE || liveEnabled || liveBlocked) return;
     liveEnabled = true;
-    // Il giro lo tiene il main: qui ci si iscrive e basta. Se il canale non
-    // c'è (una prova senza ponte) resta il rientro in vista qui sotto.
+    // Il giro lo tiene il main: qui ci si iscrive e basta, e ci si toglie
+    // quando la pagina se ne va (senza iscritti il main non paga niente).
     sendToMain({ type: LIVE_SUBSCRIBE }).catch(() => {});
     window.addEventListener('pagehide', () => {
       sendToMain({ type: LIVE_SUBSCRIBE, off: true }).catch(() => {});
     });
-    // Scheda tornata in vista o finestra tornata in primo piano: se è passato
-    // abbastanza tempo, non aspettare il prossimo avviso.
-    document.addEventListener('visibilitychange', () => liveTickIfDue(false));
-    window.addEventListener('focus', () => liveTickIfDue(false));
+    document.addEventListener('visibilitychange', () => liveTickIfDue());
+    window.addEventListener('focus', () => liveTickIfDue());
   }
 
   function stopLive() {
