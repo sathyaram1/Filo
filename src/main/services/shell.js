@@ -177,7 +177,9 @@ function shellConfig(shell, sid, startCwd) {
     file: 'powershell.exe',
     args: ['-NoLogo', '-NoProfile', '-Command', '-'],
     options: { cwd: startCwd || undefined, windowsHide: true },
-    ready: `${PRELUDI_CODIFICA.powershell}"FILO_RDY_${sid}"\n`,
+    // PSReadLine su una pipe non può leggere e lascia un errore in $Error a ogni riga: l'esito guarda l'errore
+    // più recente del comando (ESITO_POWERSHELL), quindi il modulo si toglie prima che parta qualunque comando.
+    ready: `Remove-Module PSReadLine -ErrorAction Ignore\n${PRELUDI_CODIFICA.powershell}"FILO_RDY_${sid}"\n`,
     wrap: (command) =>
       `$global:LASTEXITCODE=0\n$__filo_ok=$false\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
       + `${comandoPerPowerShell(`${command}\n$__filo_ok=$?`)}\n` +
