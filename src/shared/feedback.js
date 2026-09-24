@@ -1903,6 +1903,11 @@
     maxSeq,
     // Tetto del caricamento e resa onesta dei conteggi che ne derivano (#495).
     LIST_PAGE_SIZE,
+    // La proiezione degli elenchi e il suo complemento: chi elenca chiede
+    // CAMPI_LISTA, chi apre un feedback completa con CAMPI_DETTAGLIO.
+    CAMPI_LISTA,
+    CAMPI_DETTAGLIO,
+    soloLista,
     listHitCap,
     countLabel,
     COUNT_CAP_HINT,
