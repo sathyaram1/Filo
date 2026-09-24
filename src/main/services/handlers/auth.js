@@ -1069,6 +1069,7 @@ module.exports = function register(on, ctx) {
       // due passate che questo caricamento pagava. Le scritture sotto buttano
       // la memoria breve da sé, quindi il giro dopo rilegge comunque.
       const published = await publicCards();
+      await caricaUltimaSincro();
       const { rows: raw, aggiunti, schedeCoperte } = await conLeSegnalazioniFuoriPagina(base, idToken, published, ultimaSincroIso());
       const decifrati = new Array(raw.length);
       let next = 0;
