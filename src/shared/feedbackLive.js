@@ -177,6 +177,7 @@
       // versioni le porta lui, e il contatore degli invii riparte da qui.
       versioniSeguite = new Map(remote.map((v) => [String(v._id), v._updateTime || null]));
       inviiVisti = await contaInvii(inviiVisti);
+      avvioVisto = await ultimoAvvio(avvioVisto);
       lastReconcileAt = startedAt;
       lastTickAt = startedAt;
       broadcast({ kind: 'reconcile', versions: remote });
