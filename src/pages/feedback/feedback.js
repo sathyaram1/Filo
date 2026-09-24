@@ -1592,7 +1592,6 @@
         return ka.seq - kb.seq || ka.sub - kb.sub;
       });
     }
-    if (sezioni) updateTabCounts();
     render(filtered);
   }
 
