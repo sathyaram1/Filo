@@ -328,16 +328,27 @@
     PULISCI_TAB: () => 'riordinato le schede',
     CANCELLA_ARCHIVIO: () => 'svuotato una parte dell’archivio',
   };
+  // `voci`: le azioni del turno col loro esito (anche i soli nomi di una chat
+  // archiviata prima che l'esito esistesse). Un esito che non si può vantare —
+  // conferma mai data, tentativo fallito — non entra nel riassunto.
   // `hasReasoning`: il modello ha davvero ragionato. Senza, un blocco che
   // contiene solo una frase intermedia non può intitolarsi «Ragionamento».
-  // `fatti`: i tipi che l'utente ha portato a termine cliccando (Set).
-  function summarizeActivity(types, hasReasoning = true, fatti = null) {
+  function summarizeActivity(voci, hasReasoning = true) {
+    const E = self.SN_ESITO;
     const counts = new Map();
-    for (const t of types) counts.set(t, (counts.get(t) || 0) + 1);
+    for (const v of E.voci(voci)) {
+      if (!E.conta(v.esito)) continue;
+      const c = counts.get(v.type) || { compiute: 0, altre: 0 };
+      // Il verbo di chi ha cliccato esiste solo per le azioni che Filo lascia
+      // finire all'utente; per tutte le altre vale quello di sempre.
+      if (v.esito === E.COMPIUTO && ACTIVITY_VERBS_FATTI[v.type]) c.compiute += 1;
+      else c.altre += 1;
+      counts.set(v.type, c);
+    }
     const parts = [];
-    for (const [t, n] of counts) {
-      const fn = (fatti && fatti.has(t) && ACTIVITY_VERBS_FATTI[t]) || ACTIVITY_VERBS[t];
-      if (fn) parts.push(fn(n));
+    for (const [t, c] of counts) {
+      if (c.compiute) parts.push(ACTIVITY_VERBS_FATTI[t](c.compiute));
+      if (c.altre && ACTIVITY_VERBS[t]) parts.push(ACTIVITY_VERBS[t](c.altre));
     }
     if (!parts.length) return hasReasoning ? 'Ragionamento' : 'Come ha lavorato';
     const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}` : parts[0];
