@@ -594,9 +594,11 @@ La regola, uguale per tutti e due:
   se non ci riesce, per costruzione lo scrive nei log e prosegue — i via libera
   parlano di un contenuto che non atterrerà mai e ad atterrare è quello
   vecchio: si spedisce il ramo. Se in cima c'è DI PIÙ, spedire non c'entra: là
-  c'è lavoro che qui non c'è, sovrascriverlo lo butterebbe via, e gli esiti
-  sono decaduti come per un ramo mosso sotto i piedi, quindi si registra il
-  rientro in verifica. «Il contenuto esaminato è arrivato là» non è la domanda
+  c'è lavoro che qui non c'è, sovrascriverlo lo butterebbe via: la directory
+  si porta su quel contenuto (`git merge --ff-only`, il comando lo detta il
+  rifiuto) e il rilancio dice cosa rileggere, con le regole di un ramo mosso
+  sotto i piedi: il verdetto di sicurezza si registra di nuovo, la verifica la
+  giudica il server. «Il contenuto esaminato è arrivato là» non è la domanda
   giusta: un commit può stare nella storia del ramo senza essere quello che
   atterra, e con il solo contenimento un ramo più avanti passava in silenzio
   (verifica del giro 4). La punta vera si chiede a origin (`ls-remote`), non al
