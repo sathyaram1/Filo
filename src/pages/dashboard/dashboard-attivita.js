@@ -1212,6 +1212,21 @@
     return '';
   }
 
+  // L'esito del riordino come lo legge l'utente. Una frase sola per le tre
+  // strade che lo chiedono (bottone in chat, suggerimento della home,
+  // «/pulisci»): tre copie divergono, e il caso mai partito torna a somigliare
+  // a quello riuscito su due strade su tre.
+  function esitoRiordino(r) {
+    const n = (r && r.archived) || 0;
+    const motivo = motivoRiordinoMancato(r, n);
+    if (motivo) return { ok: false, testo: 'Riordino non riuscito', motivo };
+    return {
+      ok: true,
+      motivo: '',
+      testo: n > 0 ? `Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}` : 'Nessuna scheda da archiviare',
+    };
+  }
+
   // §5 — pannello di cancellazione retroattiva: cerca le schede pertinenti nella
   // cronologia e le elimina DEFINITIVAMENTE dopo conferma esplicita.
   function renderDeleteArchivePanel(query, onFatto = null) {
