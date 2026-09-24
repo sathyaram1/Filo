@@ -42,7 +42,8 @@ async function fingiFirestore(app, docs) {
     auth.getIdToken = async () => 'token-finto';
 
     globalThis.__docs = docs;
-    globalThis.__conta = { richieste: 0, documenti: 0, versioni: 0, schede: 0 };
+    globalThis.__invii = 2;
+    globalThis.__conta = { richieste: 0, documenti: 0, versioni: 0, schede: 0, seguiti: 0 };
     const FB = globalThis.SN_FEEDBACK;
     FB.listVersions = async () => {
       globalThis.__conta.richieste += 1;
