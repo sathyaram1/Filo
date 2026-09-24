@@ -4087,7 +4087,7 @@
       } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
     }
     const prima = allFeedbacks.length;
-    allFeedbacks = LIVE.applyChanges(allFeedbacks, { fresh: righe, removed, keepIds });
+    allFeedbacks = LIVE.applyChanges(allFeedbacks, { fresh: righe, removed });
     reindexByClient();
     // Il segno «fondi senza chiedermelo» può arrivare da fuori — dallo script
     // dell'owner o da un'altra finestra — e allora la richiesta ferma è la
