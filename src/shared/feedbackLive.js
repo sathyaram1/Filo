@@ -1,20 +1,32 @@
 // Aggiornamento continuo della lista dei feedback (dashboard di gestione).
 //
-// La dashboard non ricarica mai tutto: a ogni giro chiede a Firestore le sole
-// VERSIONI (id + ultima scrittura, pochi byte), confronta con quello che ha
-// già in mano, e riscarica soltanto i documenti cambiati o nuovi. Qui vive la
-// logica pura — confronto e fusione — così si può provare senza rete.
+// Il giro NON rilegge la collezione: chiede i soli feedback scritti dopo
+// l'ultimo giro, e ogni tanto si riallinea per intero (le cancellazioni non
+// compaiono in una domanda per data). Qui vive la logica pura — confronto,
+// fusione, decisione del giro — così si può provare senza rete.
 //
-// Espone SN_FEEDBACK_LIVE = { POLL_MS, diffVersions, applyChanges }.
+// Espone SN_FEEDBACK_LIVE = { POLL_MS, RECONCILE_MS, OVERLAP_MS, diffVersions,
+// applyChanges, windowFloor, inWindow, makeWatcher }.
 
 (function (global) {
   'use strict';
 
-  // Ogni quanto la dashboard chiede "cosa è cambiato?". Un giro costa una
-  // lettura per feedback in pagina (500 al tetto), quindi il ritmo è anche una
-  // spesa: un minuto tiene la lista al passo con le routine (che lavorano per
-  // minuti, non secondi) per pochi euro al mese di letture.
+  // Ogni quanto la dashboard chiede "cosa è cambiato?". L'owner vuole la lista
+  // al passo col lavoro delle routine, che si misura in minuti.
   const POLL_MS = 60 * 1000;
+
+  // Ogni quanto ci si riallinea PER INTERO. Serve a due cose che una domanda
+  // per data non sa dire: le cancellazioni (un documento che non c'è più non
+  // compare in nessuna query) e le scritture fatte da un cammino che non firma
+  // `updatedAt`. Raro perché costa una lettura per feedback in pagina: è la
+  // rete di sicurezza, non il giro.
+  const RECONCILE_MS = 30 * 60 * 1000;
+
+  // Quanto si torna indietro rispetto all'inizio del giro precedente. `updatedAt`
+  // lo scrive chi scrive, con il SUO orologio: due minuti di margine assorbono
+  // lo scarto fra le macchine senza far ripagare niente quando non cambia
+  // niente (la domanda resta a vuoto, cioè una lettura).
+  const OVERLAP_MS = 2 * 60 * 1000;
 
   // Confronta la lista locale con le versioni appena lette.
   //   local:  documenti in mano (con `_id` e, se arrivano da Firestore, `_updateTime`)
@@ -52,23 +64,149 @@
     return Number.isFinite(t) ? t : 0;
   }
 
+  // Il bordo della finestra: la data d'invio del più vecchio fra i feedback in
+  // pagina, ma SOLO se la pagina è piena. Se ce ne stanno tutti non c'è nessun
+  // bordo, e un feedback qualunque che cambia è roba che la lista mostra.
+  function windowFloor(versions, pageSize) {
+    const arr = Array.isArray(versions) ? versions : [];
+    const cap = Number(pageSize) > 0 ? Number(pageSize) : 0;
+    if (!cap || arr.length < cap) return null;
+    let min = Infinity;
+    for (const v of arr) {
+      const t = createdMs(v);
+      if (t && t < min) min = t;
+    }
+    return Number.isFinite(min) ? min : null;
+  }
+
+  // Un feedback che il caricamento non mostrerebbe non va aggiunto dal giro:
+  // comparirebbe per un minuto e sparirebbe al riallineamento. Senza bordo (o
+  // senza data d'invio: non si butta via per un campo assente) sta dentro.
+  function inWindow(fb, floor) {
+    if (!floor) return true;
+    const t = createdMs(fb);
+    return !t || t >= floor;
+  }
+
   // Applica un giro alla lista: i documenti `fresh` sostituiscono (o
   // aggiungono) quelli con lo stesso id, gli id `removed` escono. Ritorna una
   // lista NUOVA, dal più recente al più vecchio come quella del caricamento
   // iniziale; la lista d'ingresso non viene toccata.
-  function applyChanges(list, { fresh = [], removed = [] } = {}) {
+  //
+  // Una riga più VECCHIA di quella in mano non vince: il giro vive nel main e
+  // avvisa tutte le pagine, e una pagina appena caricata riceve anche l'ultimo
+  // annuncio — che di quel feedback può avere una copia precedente.
+  function applyChanges(list, { fresh = [], removed = [], keepIds = null } = {}) {
     const drop = new Set((removed || []).map(String));
+    const keep = keepIds ? new Set(Array.from(keepIds, String)) : null;
     const byId = new Map();
     for (const fb of Array.isArray(list) ? list : []) {
-      if (fb && fb._id && !drop.has(String(fb._id))) byId.set(String(fb._id), fb);
+      if (!fb || !fb._id) continue;
+      const id = String(fb._id);
+      if (drop.has(id)) continue;
+      if (keep && !keep.has(id)) continue;
+      byId.set(id, fb);
     }
     for (const fb of Array.isArray(fresh) ? fresh : []) {
-      if (fb && fb._id) byId.set(String(fb._id), fb);
+      if (!fb || !fb._id) continue;
+      const id = String(fb._id);
+      const mine = byId.get(id);
+      if (mine && mine._updateTime && fb._updateTime && fb._updateTime < mine._updateTime) continue;
+      byId.set(id, fb);
     }
     return Array.from(byId.values()).sort((a, b) => createdMs(b) - createdMs(a));
   }
 
-  global.SN_FEEDBACK_LIVE = { POLL_MS, diffVersions, applyChanges };
+  // ── Il giro, con l'I/O iniettato ─────────────────────────────────────────
+  //
+  // Vive nel processo main, uno solo: dieci schede di Gestione aperte sono
+  // dieci pagine che ascoltano, non dieci giri che pagano.
+  //
+  // deps:
+  //   listChangedSince({ since }) → { rows, complete }   i cambiati dopo `since`
+  //   listVersions()              → [{ _id, _updateTime, createdAt }]
+  //   getMany(ids)                → righe intere
+  //   broadcast(msg)              avvisa le pagine
+  //   now()                       l'orologio (i test lo fissano)
+  function makeWatcher({
+    listChangedSince, listVersions, getMany, broadcast,
+    now = () => Date.now(), pollMs = POLL_MS, reconcileMs = RECONCILE_MS,
+    overlapMs = OVERLAP_MS, pageSize = 500, onWarn = null,
+  } = {}) {
+    let versions = new Map();   // id → _updateTime dell'ultimo riallineamento
+    let floor = null;           // bordo della finestra (data d'invio)
+    let lastTickAt = 0;         // inizio dell'ultimo giro riuscito
+    let lastReconcileAt = 0;
+    let inFlight = null;
+
+    function since() {
+      const base = lastTickAt || (now() - overlapMs);
+      return new Date(Math.max(0, base - overlapMs)).toISOString();
+    }
+
+    async function reconcile() {
+      const startedAt = now();
+      const remote = await listVersions();
+      if (!Array.isArray(remote)) throw new Error('versioni non lette');
+      const locali = Array.from(versions.entries(), ([_id, _updateTime]) => ({ _id, _updateTime }));
+      const { changed, added, removed } = diffVersions(locali, remote);
+      const ids = changed.concat(added);
+      const rows = ids.length ? await getMany(ids) : [];
+      versions = new Map(remote.map((v) => [String(v._id), v._updateTime || null]));
+      floor = windowFloor(remote, pageSize);
+      lastReconcileAt = startedAt;
+      lastTickAt = startedAt;
+      broadcast({
+        kind: 'reconcile',
+        rows,
+        ids: remote.map((v) => String(v._id)),
+        removed,
+      });
+      return { kind: 'reconcile', changed: ids.length, removed: removed.length };
+    }
+
+    async function incremental() {
+      const startedAt = now();
+      const out = await listChangedSince({ since: since() });
+      const tutte = (out && Array.isArray(out.rows)) ? out.rows : [];
+      // Il freno sulle pagine è scattato: non si finge che fosse tutto. Si
+      // dice, e il riallineamento completo riparte al giro dopo.
+      if (out && out.complete === false) {
+        if (onWarn) onWarn('cambiati: troppe pagine, riallineamento completo al giro dopo');
+        lastReconcileAt = 0;
+      }
+      const rows = tutte.filter((r) => inWindow(r, floor));
+      lastTickAt = startedAt;
+      for (const r of rows) if (r && r._id) versions.set(String(r._id), r._updateTime || null);
+      if (rows.length) broadcast({ kind: 'changed', rows });
+      return { kind: 'changed', changed: rows.length, removed: 0 };
+    }
+
+    async function run(force) {
+      if (!force && lastTickAt && (now() - lastTickAt) < pollMs / 2) return { kind: 'skipped' };
+      if (!lastReconcileAt || (now() - lastReconcileAt) >= reconcileMs) return reconcile();
+      return incremental();
+    }
+
+    /** Un giro per volta: una raffica si fonde nel giro già in corso. */
+    function tick(opts) {
+      if (inFlight) return inFlight;
+      inFlight = run(!!(opts && opts.force)).finally(() => { inFlight = null; });
+      return inFlight;
+    }
+
+    return {
+      tick,
+      /** Il prossimo giro è un riallineamento completo (apertura di una pagina). */
+      forceReconcile() { lastReconcileAt = 0; },
+      _state() { return { size: versions.size, floor, lastTickAt, lastReconcileAt }; },
+    };
+  }
+
+  global.SN_FEEDBACK_LIVE = {
+    POLL_MS, RECONCILE_MS, OVERLAP_MS,
+    diffVersions, applyChanges, windowFloor, inWindow, makeWatcher,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 
 if (typeof module !== 'undefined' && module.exports) {
