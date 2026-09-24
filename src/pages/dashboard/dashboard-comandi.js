@@ -157,10 +157,8 @@
     if (!ok) return;
     showFiloLine('🧹 Riordino in corso…', chat);
     const r = await send({ type: MSG.RUN_TAB_TRIAGE });
-    const n = (r && r.archived) || 0;
-    showFiloLine(n > 0
-      ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}.`
-      : '✓ Nessuna scheda da archiviare.', chat);
+    const e = global.SN_DASH_ATTIVITA.esitoRiordino(r);
+    showFiloLine(e.ok ? `✓ ${e.testo}.` : `✗ ${e.testo}: ${e.motivo}`, chat);
   }
 
   // "/riordina": riordina la striscia delle schede per colore, esattamente come
