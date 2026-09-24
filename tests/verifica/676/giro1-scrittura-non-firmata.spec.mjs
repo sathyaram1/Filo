@@ -191,5 +191,6 @@ test('una segnalazione nuova da una macchina con l’orologio indietro arriva lo
     return { kind: dopo.kind, ids: (dopo.rows || dopo.versions || []).map((r) => r._id) };
   });
 
-  expect(esito.ids, 'la segnalazione nuova non arriva col giro al minuto').not.toContain('nuovo');
+  expect(esito.ids, 'una segnalazione nuova deve arrivare entro il giro, comunque sia l’orologio di chi la manda')
+    .toContain('nuovo');
 });
