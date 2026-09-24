@@ -2,11 +2,13 @@
 
 [← Tutti i pattern](../PATTERNS.md)
 
-**La regola.** Un file del repo che una sentinella legge e analizza si legge con
-`leggiTestoRepo()` (`tests/helpers/testo.mjs`), e non ci si cerca dentro niente
-che un `\r` di troppo faccia sparire: un «a capo» in mezzo a una stringa o a una
-regex, un `$` di fine riga. I fini riga non li decide il repo: li decide il
-checkout della macchina che esegue i test.
+**La regola.** A un unit test un file del repo arriva già coi fini riga del
+repo: il lanciatore carica `tests/helpers/finiRigaDelRepo.cjs`, che normalizza
+ogni lettura di TESTO di un file del repo, qualunque forma abbia la lettura. Chi
+deve vedere un `\r` legge i byte. Fuori dagli unit test la porta si chiama a
+mano, `leggiTestoRepo()` (`tests/helpers/testo.mjs`), e lì vale ancora la
+seconda metà: non cercarci dentro niente che un `\r` di troppo faccia sparire —
+un «a capo» in mezzo a una stringa o a una regex, un `$` di fine riga.
 
 ## Il caso
 
