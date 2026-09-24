@@ -137,12 +137,18 @@ test('la durata delle notifiche chiesta a parole resta, anche col suo campo lasc
     .toBe(30);
 });
 
-test('il limite di spesa chiesto a parole resta, anche col suo campo lasciato col fuoco', async ({ shell, openTab }) => {
+test('il limite di spesa chiesto a parole resta, anche col suo campo lasciato col fuoco', async ({ openTab }) => {
+  const chat = await openTab('filo://newtab/');
   const opz = await openTab('filo://options/options.html');
   await opz.waitForSelector('#monthlyLimit');
 
   await opz.locator('#monthlyLimit').click();
-  await aParoleShell(shell, 'limite_spesa', 20);
+  // Il limite di spesa Filo lo fa confermare prima di toccarlo: la strada a
+  // parole passa da lì, non dall'esecuzione diretta.
+  await chat.evaluate(() => chrome.runtime.sendMessage({
+    type: window.SN_MSG.MSG.FILO_CONFIRM_ACTION,
+    action: { type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: 20 },
+  }));
   await expect.poll(async () => (await salvate(opz)).monthlyLimitEur, { timeout: 8_000 }).toBe(20);
 
   await opz.locator('#useDefaultModels').click();
