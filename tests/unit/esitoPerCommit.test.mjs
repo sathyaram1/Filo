@@ -623,7 +623,7 @@ test('i comandi del rifiuto puntano agli attrezzi del giro, non a quelli del ram
   // giorni e senza dirlo. È la stessa riscrittura che riceve ogni file-ruolo.
   const fissato = absolutizeRecipe(crudo, '/strumenti/del-giro', '/il/deposito');
   // Su Windows il percorso prende davanti la lettera del disco.
-  assert.match(fissato, /node "(?:[A-Za-z]:)?\/strumenti\/del-giro\/scripts\/routine-channel\.mjs"/);
+  assert.match(fissato, /node "(?:[A-Za-z]:)?\/strumenti\/del-giro\/scripts\/dispatch\.mjs"/);
   assert.ok(!/node scripts\//.test(fissato), 'e non resta nemmeno una scorciatoia dentro il ramo');
 
   // In locale le due radici coincidono e il testo non si tocca.
@@ -711,9 +711,19 @@ test('la fusione non parte se su origin il ramo è più avanti del contenuto esa
     assert.equal(dopo.status, 1, 'in cima al ramo c\'è un contenuto che nessuno ha esaminato: la fusione non si chiede');
     assert.match(dopo.stderr, /più avanti/);
     assert.ok(dopo.stderr.includes(inCima.slice(0, 12)), 'e si dice cosa ci sarebbe in cima');
-    assert.match(dopo.stderr, /revision_capability/, 'la decadenza si registra, non resta a schermo');
+    assert.doesNotMatch(dopo.stderr, /revision_capability/, 'un passaggio che al controllo di sicurezza il server nega');
     assert.ok(!/git push/.test(dopo.stderr), 'e non si suggerisce di spedire: là c\'è lavoro che qui non c\'è');
     assert.equal(buste.length, quante, 'il server non viene nemmeno chiamato');
+
+    // Il rimedio stampato porta la directory in cima; da lì il gate dice cosa rileggere.
+    const ff = /git merge --ff-only ([0-9a-f]{12})/.exec(dopo.stderr);
+    assert.ok(ff, `il rimedio deve essere un comando da copiare: ${dopo.stderr}`);
+    g(['merge', '-q', '--ff-only', ff[1]]);
+    const riletto = await lancia();
+    assert.equal(riletto.status, 1);
+    assert.match(riletto.stderr, new RegExp(`git diff ${esaminato.slice(0, 12)} ${inCima.slice(0, 12)}`));
+    assert.match(riletto.stderr, /--record-secaudit ID1/);
+    assert.equal(buste.length, quante, 'finché il controllo di sicurezza non ha letto il pezzo nuovo, il server non viene chiamato');
   } finally {
     srv.close();
     for (const d of [dir, remoto, altra, fuori]) rmSync(d, { recursive: true, force: true });
