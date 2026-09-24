@@ -117,7 +117,7 @@ test('Automazioni: i quattro bilanci del server (5, 4, 1, 0) si leggono, e il 3 
       await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } });
     }, tema);
     await page.waitForTimeout(400);
-    await page.locator('#mgCap3').scrollIntoViewIfNeeded();
+    await page.locator('#mgCap3').evaluate((el) => el.scrollIntoView({ block: 'start' }));
     await page.screenshot({ path: join(ROOT, 'tests', '.shots', `giro5-bilanci-${tema}.png`) });
   }
 });
