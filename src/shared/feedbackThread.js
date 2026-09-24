@@ -283,7 +283,7 @@
 
   // Una riga finisce a OGNI a capo, di qualunque tipo: chi ripulisce e chi legge spezzano solo così, o un «\r» in
   // mezzo a un marcatore sfugge a chi ripulisce e apre un turno per chi legge. Copia sul server: routine/notes.js.
-  const A_CAPO_RE = /\r\n|[\n\r@@U2028@@@@U2029@@]/;
+  const A_CAPO_RE = /\r\n|[\n\r\u2028\u2029]/;
   function righe(s) {
     return String(s == null ? '' : s).split(A_CAPO_RE);
   }

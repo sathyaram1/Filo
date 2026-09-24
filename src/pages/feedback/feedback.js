@@ -683,7 +683,7 @@
     if (!s) return { head: '', tail: '' };
     const T = window.SN_FEEDBACK_THREAD;
     if (!T || !T.USER_TURN_RE) return { head: s, tail: '' };
-    const lines = s.split('\n');
+    const lines = T.righe ? T.righe(s) : s.split('\n');
     for (let i = 0; i < lines.length; i++) {
       if (T.USER_TURN_RE.test(lines[i]) || (T.MODEL_TURN_RE && T.MODEL_TURN_RE.test(lines[i]))) {
         const head = lines.slice(0, i).join('\n').replace(/\n+$/, '');
