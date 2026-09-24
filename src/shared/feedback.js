@@ -1403,12 +1403,18 @@
   async function listAllPublic(opts = {}) {
     const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.listPublic) || listPublic;
     const fresca = !!(opts && opts.fresh);
-    if (!fresca && allCache.rows && allCache.porta === porta
+    // Una lettura PROIETTATA non entra in questa memoria e non la consuma: le
+    // righe hanno meno campi, e servirle a chi vuole la scheda intera
+    // farebbe sparire dei dati senza un errore.
+    const proiettata = Array.isArray(opts && opts.fields) && opts.fields.length > 0;
+    if (!fresca && !proiettata && allCache.rows && allCache.porta === porta
         && (Date.now() - allCache.at) < ALL_CACHE_TTL_MS) {
       return allCache.rows;
     }
     const { rows, complete } = await listAllPublicPaged(opts);
-    allCache = complete ? { at: Date.now(), rows, porta } : { at: 0, rows: null, porta: null };
+    if (!proiettata) {
+      allCache = complete ? { at: Date.now(), rows, porta } : { at: 0, rows: null, porta: null };
+    }
     return rows;
   }
 
