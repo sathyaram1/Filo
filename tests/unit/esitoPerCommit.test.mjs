@@ -259,8 +259,49 @@ test('la fusione: parte dichiarando il commit esaminato, e non parte se il ramo 
     const quante = buste.length;
     const secondo = await lancia();
     assert.equal(secondo.status, 1, 'il ramo si è mosso: la fusione non si chiede');
-    assert.match(secondo.stderr, /si è mosso dopo i via libera/);
+    assert.match(secondo.stderr, /si è mosso dopo il tuo controllo di sicurezza/);
     assert.equal(buste.length, quante, 'e il server non viene nemmeno chiamato');
+  } finally {
+    srv.close();
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(fuori, { recursive: true, force: true });
+  }
+});
+
+// Dopo un pass il verificatore toglie le prove dei rilievi usciti in feedback loro:
+// è un commit dopo il suo verdetto, e il server lo tollera. Qui la richiesta si
+// fermava prima di arrivargli, e il lavoro restava con due via libera e nessuno
+// che lo riprendesse (#676, #667, #569, #663, #567 il 24/09/2026).
+test('la fusione di un ramo verificato su un commit più vecchio la chiede lo stesso: decide il server', async () => {
+  const { srv, ricevuti: buste, port } = await fintoServer({ ok: true, result: 'merged', sha: 'z'.repeat(40) });
+  const { dir, g, punta } = deposito('filo-676-fusione-');
+  const fuori = cartellaTemporanea('filo-676-fusione-fuori-');
+  const statoDir = resolve(fuori, 'stato');
+  try {
+    const verificato = punta();
+    g(['commit', '-q', '--allow-empty', '-m', 'via le prove del giro']);
+    const controllato = punta();
+    mkdirSync(statoDir, { recursive: true });
+    writeFileSync(resolve(statoDir, 'ID1.json'), JSON.stringify({
+      id: 'ID1', branch: 'worker/485', verifierVerdict: 'pass', verifierSha: verificato,
+      secauditDone: true, secauditVerdict: 'pass', secauditSha: controllato,
+    }), 'utf8');
+    const env = {
+      ...process.env,
+      FILO_REPO_ROOT: dir,
+      FILO_TOOLS_ROOT: dir,
+      FILO_DISPATCH_STATE_DIR: statoDir,
+      FILO_NO_BEAT: '1',
+      FILO_ROUTINE_TICKET: 'biglietto-finto',
+      FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+    };
+    const r = await new Promise((res2) => execFile(process.execPath, [GATE, 'worker/485'], { env, cwd: dir },
+      (err, so, se) => res2({ status: err ? (err.code ?? 1) : 0, stderr: String(se || '') })));
+    assert.equal(r.status, 0, `la fusione doveva partire: ${r.stderr}`);
+    const richiesta = buste.find((x) => x.url.includes('routineMerge'));
+    assert.ok(richiesta, 'la richiesta deve arrivare al server, che sa quali commit dopo il verdetto tollerare');
+    assert.equal(richiesta.body.sha, controllato);
+    assert.match(r.stderr, /la verifica ha dato l'ok su .* Lo giudica il server/, 'e chi legge sa perché non si è fermata');
   } finally {
     srv.close();
     rmSync(dir, { recursive: true, force: true });
