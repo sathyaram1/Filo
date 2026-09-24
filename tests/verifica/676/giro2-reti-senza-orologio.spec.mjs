@@ -46,12 +46,17 @@ async function fingiFirestore(app, docs, invii) {
     auth.getIdToken = async () => 'token-finto';
     globalThis.__docs = docs;
     globalThis.__invii = invii;
+    globalThis.__giri = { pieni: 0, leggeri: 0 };
     const FB = globalThis.SN_FEEDBACK;
-    FB.listVersions = async () => globalThis.__docs
-      .map((d) => ({ _id: d._id, _updateTime: d._updateTime, createdAt: d.createdAt }));
-    FB.listChangedSince = async ({ since }) => ({
-      rows: globalThis.__docs.filter((d) => d.updatedAt > since), complete: true,
-    });
+    FB.listVersions = async () => {
+      globalThis.__giri.pieni += 1;
+      return globalThis.__docs
+        .map((d) => ({ _id: d._id, _updateTime: d._updateTime, createdAt: d.createdAt }));
+    };
+    FB.listChangedSince = async ({ since }) => {
+      globalThis.__giri.leggeri += 1;
+      return { rows: globalThis.__docs.filter((d) => d.updatedAt > since), complete: true };
+    };
     FB.getManyPublic = async () => [];
     FB.versionsOf = async (ids) => globalThis.__docs.filter((d) => ids.includes(d._id))
       .map((d) => ({ _id: d._id, _updateTime: d._updateTime, createdAt: d.createdAt }));
@@ -103,7 +108,10 @@ test('in coda oltre il dodicesimo, quello che scrivono le routine non arriva', a
   expect(seguiti).not.toContain('coda-14');
 
   await riaccendiGiro(page);
-  await expect.poll(() => app.evaluate(() => globalThis.__docs.length), { timeout: 5000 }).toBe(14);
+  // Il riallineamento d'apertura è passato e il giro è in regime leggero: solo
+  // così quello che segue misura il giro al minuto e non l'apertura.
+  await expect.poll(() => app.evaluate(() => globalThis.__giri.leggeri), { timeout: 5000 })
+    .toBeGreaterThanOrEqual(3);
 
   // Le routine la prendono in carico: scrivono stato e titolo SENZA firmare
   // l'ora, come fa il server oggi. Solo l'ora di Firestore cambia.
@@ -122,8 +130,8 @@ test('in coda oltre il dodicesimo, quello che scrivono le routine non arriva', a
 });
 
 test('due segnalazioni nello stesso giro: quella con l\'ora indietro non entra in lista', async ({ app, openTab }) => {
-  const A = fakeFb('inv-a', 'Prima', { seq: 1 });
-  const B = fakeFb('inv-b', 'Seconda', { seq: 2, createdAt: '2026-09-02T10:00:00Z' });
+  const A = fakeFb('inv-a', 'Prima', { seq: 1, status: 'new' });
+  const B = fakeFb('inv-b', 'Seconda', { seq: 2, status: 'new', createdAt: '2026-09-02T10:00:00Z' });
   await fingiFirestore(app, [A, B], 2);
 
   const page = await openTab(URL_MANAGE);
@@ -131,8 +139,10 @@ test('due segnalazioni nello stesso giro: quella con l\'ora indietro non entra i
   await expect.poll(() => page.locator('.mg-item-title').allTextContents(), { timeout: 5000 })
     .toEqual(['Seconda', 'Prima']);
   await riaccendiGiro(page);
-  // Un paio di giri a vuoto: il contatore degli invii è ormai in pari.
-  await new Promise((r) => setTimeout(r, RITMO * 4));
+  // Un paio di giri a vuoto: il riallineamento d'apertura è passato e il
+  // contatore degli invii è ormai in pari.
+  await expect.poll(() => app.evaluate(() => globalThis.__giri.leggeri), { timeout: 5000 })
+    .toBeGreaterThanOrEqual(3);
 
   // Due invii nello stesso minuto. Il terzo arriva da una macchina con l'ora
   // giusta, il quarto da una con l'orologio indietro di ore: la domanda per
