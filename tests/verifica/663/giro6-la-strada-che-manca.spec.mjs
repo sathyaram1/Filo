@@ -86,20 +86,6 @@ async function chiediSpiegazione(app, page) {
   });
 }
 
-// Il riquadro «Modifica testo»: selezione dentro un campo, tasto destro sopra
-// la selezione, voce «Modifica».
-async function apriModifica(page) {
-  await page.click('#t');
-  await page.evaluate(() => {
-    const t = document.getElementById('t');
-    t.focus(); t.setSelectionRange(0, 20);
-  });
-  await page.locator('#t').click({ button: 'right', position: { x: 20, y: 8 } });
-  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 15_000 });
-  await page.locator('.sn-menu .sn-menu-item', { hasText: /^Modifica$/ }).click();
-  await expect(page.locator('.sn-editbox')).toBeVisible({ timeout: 15_000 });
-}
-
 test('senza chiave, il tasto dell’Aiuto apre davvero la pagina Crediti', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
   await configModelli(app, { chiave: '' });
