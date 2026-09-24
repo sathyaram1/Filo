@@ -4207,6 +4207,9 @@
     // Aggiornamento continuo: un giro subito (ritorna { changed }), e le
     // sorgenti finte { listVersions(opts), getMany(ids) } con cui farlo.
     pollNow() { return refreshFromRemote(); },
+    // L'avviso del giro del main, come se fosse arrivato dal canale: gli spec
+    // provano le due forme senza dover fingere anche l'IPC.
+    liveMessage(m) { return onLiveMessage(m); },
     // Un giro di ridisegno da aggiornamento remoto, su richiesta: i test lo
     // usano per verificare che una bozza in corso lo trattenga (ritorna false).
     rerenderIfIdle(id) { return rerenderAfterLive(new Set([id])); },
