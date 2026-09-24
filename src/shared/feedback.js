@@ -888,6 +888,42 @@
   // restano fuori e nessun conteggio calcolato in pagina può vederli.
   const LIST_PAGE_SIZE = 500;
 
+  // ── Cosa si scarica per ELENCARE, e cosa solo per APRIRE ─────────────────
+  //
+  // Un feedback può pesare oltre cento KB, e quasi tutto sta in cinque campi
+  // che una riga d'elenco non mostra mai. Moltiplicati per il tetto qui sopra
+  // sono i dieci MB che ogni apertura di Gestione scaricava per disegnare
+  // cinquecento titoli. La lista chiede una PROIEZIONE; il resto arriva quando
+  // l'owner apre quel feedback.
+  //
+  // `text` resta nella proiezione di proposito: è il titolo di ripiego dei
+  // feedback senza `name` ed è il campo su cui cercano tutte e due le pagine.
+  // Toglierlo svuoterebbe la ricerca invece di alleggerirla.
+  const CAMPI_DETTAGLIO = ['notes', 'livelli', 'reviewComment', 'images', 'files'];
+
+  // I campi che un elenco mostra, ordina o filtra. È l'insieme di TUTTI i campi
+  // che le regole Firestore ammettono, meno quelli di dettaglio: un campo nuovo
+  // che nessuno aggiunge qui sparirebbe dagli elenchi senza un errore, quindi
+  // la sentinella `tests/unit/feedbackCampiLista.test.mjs` confronta questi due
+  // elenchi con `firestore.rules` e diventa rossa se divergono.
+  const CAMPI_LISTA = [
+    'archiveOverride', 'beatAt', 'blockReason', 'branch', 'capabilityGapId',
+    'claimExpiresAt', 'claimNum', 'claimedAt', 'claimedBy', 'clientId',
+    'clientIdHash', 'createdAt', 'mergePreapproved', 'name', 'parentId',
+    'priority', 'priorityManual', 'reopenRequests', 'resolvedAt',
+    'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'seq', 'stalls',
+    'starred', 'status', 'statusPublic', 'statusReason', 'subSeq', 'text',
+    'title', 'url', 'userAgent', 'userNote', 'verifiedAt', 'votes',
+    'walletPseudonym', 'workingResets', 'workingSince',
+  ];
+
+  // Un documento letto con la proiezione della lista porta questo marchio: chi
+  // sta per mostrare il dettaglio sa di doverlo completare, invece di mostrare
+  // una conversazione vuota credendola vuota davvero.
+  function soloLista(fb) {
+    return !!(fb && fb._proiezione);
+  }
+
   // Il caricamento ha toccato il tetto? Allora ogni numero che ne deriva è un
   // "almeno N", non un totale.
   function listHitCap(loaded, pageSize) {
