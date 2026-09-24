@@ -965,13 +965,6 @@ module.exports = function register(on, ctx) {
     };
   }));
 
-  // Gli spec non hanno né Firestore né una sessione admin: qui si sostituiscono
-  // le due letture del giro e lo si fa battere a comando.
-  ctx.__feedbackLiveTest = {
-    tick: (opts) => liveTick(opts),
-    setWatcher: (w) => { liveWatcher = w; },
-    subs: liveSubs,
-  };
 
   // ── Chi pubblica la vista, e quando ──────────────────────────────────────
   //
