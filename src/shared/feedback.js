@@ -1140,6 +1140,25 @@
     if (Array.isArray(fields) && fields.length > 0) {
       body.structuredQuery.select = { fields: fields.map((f) => ({ fieldPath: String(f) })) };
     }
+    if (where && where.field && where.timestamp) {
+      body.structuredQuery.where = {
+        fieldFilter: {
+          field: { fieldPath: String(where.field) },
+          op: String(where.op || 'GREATER_THAN'),
+          value: { timestampValue: String(where.timestamp) },
+        },
+      };
+    }
+    if (startAfter && startAfter.timestamp) {
+      body.structuredQuery.orderBy.push({ field: { fieldPath: '__name__' }, direction: 'DESCENDING' });
+      body.structuredQuery.startAt = {
+        before: false,
+        values: [
+          { timestampValue: String(startAfter.timestamp) },
+          { referenceValue: String(startAfter.name || '') },
+        ],
+      };
+    }
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const opts = {
