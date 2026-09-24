@@ -180,7 +180,7 @@ test('il controllo di sicurezza parte prima che la prova tolta arrivi: seguendo 
         expect(d.status, d.stderr).toBe(0);
         letto = d.stdout;
         // La strada del canale al posto di quella dettata: registra lo stesso esito, e deve valere uguale.
-        const rr = await lancia(CANALE, ['deliver', 'secaudit', '--verdict', 'pass', '--testo', 'Riletto il pezzo nuovo: solo una prova del giro tolta.'], envB, B);
+        const rr = await lancia(CANALE, ['deliver', 'secaudit', '--verdict', 'pass', '--notes','Riletto il pezzo nuovo: solo una prova del giro tolta.'], envB, B);
         expect(rr.status, rr.stderr + rr.stdout).toBe(0);
       } else {
         throw new Error(`rifiuto senza un rimedio eseguibile:\n${ultimo.stderr}`);
