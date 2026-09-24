@@ -810,7 +810,12 @@
         // S1.F2.1: statusPublic SEMPRE in chiaro anche se status fine è cifrato.
         // Un feedback nuovo parte da 'new' → mappa su 'open'.
         statusPublic: toFsValue('open'),
-        createdAt: { timestampValue: new Date().toISOString() },
+        createdAt: { timestampValue: nowIso },
+        // L'ORA DELL'ULTIMA SCRITTURA, scritta da chi scrive. È il campo su cui
+        // la dashboard chiede «cosa è cambiato da allora?»: un feedback che non
+        // ce l'ha non compare più in quella domanda, quindi OGNI cammino che
+        // tocca un feedback deve rimetterlo (vedi `touchUpdatedAt`).
+        updatedAt: { timestampValue: nowIso },
       },
     };
     if (seq) {
