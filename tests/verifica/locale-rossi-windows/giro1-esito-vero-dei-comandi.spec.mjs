@@ -40,15 +40,16 @@ async function newtabPage(app) {
 
 // Scrive il comando nella barra della dashboard e aspetta che la bolla finisca; torna la bolla.
 async function nelTerminale(page, comando) {
-  const prima = await page.locator('.dash-term-out').count();
+  const bolle = page.locator('.dash-bubble.dash-term');
+  const prima = await bolle.count();
   await page.evaluate((v) => {
     const input = document.getElementById('input');
     input.value = v;
     document.getElementById('inputForm').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
   }, comando);
-  await expect(page.locator('.dash-term-out')).toHaveCount(prima + 1, { timeout: 12_000 });
+  await expect(bolle).toHaveCount(prima + 1, { timeout: 12_000 });
   await expect(page.locator('.dash-term-controls')).toHaveCount(0, { timeout: 30_000 });
-  return page.locator('.dash-term-out').last();
+  return bolle.last();
 }
 
 function preparaCartella() {
