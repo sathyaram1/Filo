@@ -208,14 +208,16 @@ function withCwdProbe(shell, command, mark = nuovoMarcatore()) {
 // così non si perde il marcatore in coda quando l'output è enorme.
 function extractCwdMark(rawStdout, mark) {
   const i = rawStdout.lastIndexOf(mark + ':');
-  if (i === -1) return { stdout: rawStdout, code: null, cwd: undefined };
-  const m = rawStdout.slice(i + mark.length + 1).match(/^(-?\d+):([^\r\n]*)/);
+  if (i === -1) return { stdout: rawStdout, trovato: false, code: null, cwd: undefined };
+  const m = rawStdout.slice(i + mark.length + 1).match(/^(-?\d*):([^\r\n]*)/);
   let cut = i;
   if (rawStdout[cut - 1] === '\n') cut--;
   if (rawStdout[cut - 1] === '\r') cut--;
   return {
     stdout: rawStdout.slice(0, cut),
-    code: m ? (parseInt(m[1], 10) || 0) : null,
+    trovato: !!m,
+    // Vuoto = la sonda la cartella la sa, l'esito no: resta quello del processo.
+    code: m && m[1] !== '' ? (parseInt(m[1], 10) || 0) : null,
     cwd: m ? (m[2].trim() || undefined) : undefined,
   };
 }
