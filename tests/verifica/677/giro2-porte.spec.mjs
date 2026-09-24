@@ -126,11 +126,18 @@ test('riaprire un fix uscito non cancella il report della lavorazione', async ({
   await page.locator('#mgReopenText').fill('Manca il caso con lo schermo piccolo.');
   await page.locator('#mgReopenConfirmBtn').click();
 
-  await expect.poll(async () => (await page.evaluate(() => window.__inviati)).length, { timeout: 15_000 })
-    .toBeGreaterThan(0);
-  const [inviato] = await page.evaluate(() => window.__inviati);
-  expect(inviato.notes, 'il report della lavorazione deve restare in coda alla conversazione').toContain(REPORT);
-  expect(inviato.notes).toContain('Manca il caso con lo schermo piccolo.');
+  // La riapertura scrive lo stato: è quella la scrittura che porta il motivo
+  // in coda alla conversazione (prima parte, da sola, la frase per chi ha
+  // segnalato).
+  await expect.poll(
+    async () => (await page.evaluate(() => window.__inviati)).filter((m) => m.status).length,
+    { timeout: 15_000 },
+  ).toBeGreaterThan(0);
+  const inviati = await page.evaluate(() => window.__inviati);
+  const riapertura = inviati.find((m) => m.status === 'todo');
+  expect(riapertura, `scritture: ${JSON.stringify(inviati)}`).toBeTruthy();
+  expect(riapertura.notes, 'il report della lavorazione deve restare in coda alla conversazione').toContain(REPORT);
+  expect(riapertura.notes).toContain('Manca il caso con lo schermo piccolo.');
 });
 
 // ── 3. Un allegato NON immagine nel dettaglio di Gestione ───────────────────
