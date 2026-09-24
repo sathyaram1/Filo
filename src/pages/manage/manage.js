@@ -2968,7 +2968,6 @@
     }
     const oldNotes = String(fb.notes || '');
     if (conversazioneIlleggibile(fb)) { setActionMsg(RIAPERTURA_ILLEGGIBILE, 'err'); return; }
-    const reason = mgReopenText ? (mgReopenText.value || '').trim() : '';
     let extra = null;
     if (reason) {
       const T = window.SN_FEEDBACK_THREAD;
