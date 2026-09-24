@@ -500,7 +500,7 @@
   // Diverso da splitNotes(): qui NON si perde nulla (marcatori, righe vuote,
   // allegati restano dove sono) perché il risultato torna su Firestore.
   function rawBlocks(notes) {
-    const lines = String(notes || '').split('\n');
+    const lines = righe(notes || '');
     const blocks = [];
     let current = [];
     for (const line of lines) {
