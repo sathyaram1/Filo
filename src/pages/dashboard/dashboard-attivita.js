@@ -221,7 +221,7 @@
       // output, nella cronologia — non nella bolla della risposta.
       addCommand(out) {
         closeTurnReasoning();
-        doneTypes.push('ESEGUI_COMANDO');
+        voci.push({ type: 'ESEGUI_COMANDO', esito: self.SN_ESITO.FATTO, chiave: '' });
         const el = renderCommandResult(out);
         el.classList.add('dash-activity-cmd');
         append(el);
