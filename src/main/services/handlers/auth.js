@@ -1018,7 +1018,7 @@ module.exports = function register(on, ctx) {
         console.warn('[feedback] feedback delle schede fuori pagina non letti:', e?.message || e);
       }
     }
-    return { rows, aggiunti, schedeCoperte };
+    return { rows, aggiunti, schedeCoperte, chiusiLetti };
   }
 
   /**
