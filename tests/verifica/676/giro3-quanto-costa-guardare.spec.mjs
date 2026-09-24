@@ -161,6 +161,8 @@ test('con le routine al lavoro la dashboard rilegge di nuovo tutta la pagina a o
   const dopo = await conta(app);
   const rilettureComplete = dopo.versioni - apertura.versioni;
   const documentiRiletti = dopo.documenti - apertura.documenti;
+  console.log('DIAG', JSON.stringify({ apertura, dopo }));
+  expect(dopo.richieste - apertura.richieste, 'il giro deve aver girato').toBeGreaterThan(5);
   // Il successo che si vorrebbe: un avvio costa la segnalazione che il registro
   // NOMINA, non l'elenco di tutta la pagina.
   expect(rilettureComplete,
