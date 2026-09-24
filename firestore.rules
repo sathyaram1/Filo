@@ -518,7 +518,9 @@ service cloud.firestore {
       allow update: if
         isRoutine()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'notes', 'resolvedAt', 'statusReason', 'workingSince', 'branch', 'livelli'])
+          // `updatedAt` (#676): il server firma l'ora come chiunque altro, o
+          // la dashboard non vede più quello che scrive fino al riallineamento.
+          .hasOnly(['status', 'notes', 'resolvedAt', 'statusReason', 'workingSince', 'branch', 'livelli', 'updatedAt'])
         && request.resource.data.get('status', 'new') in
              ['todo', 'working', 'revision_capability', 'revision_security', 'done', 'design', 'clarify']
         && request.resource.data.get('statusReason', '') is string
