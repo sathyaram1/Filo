@@ -466,11 +466,10 @@
       if (btn) btn.disabled = true;
       if (testo) testo.textContent = 'Riordino in corso…';
       const r = await send({ type: MSG.RUN_TAB_TRIAGE });
-      const n = (r && r.archived) || 0;
-      if (testo) {
-        testo.textContent = n > 0
-          ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}`
-          : '✓ Nessuna scheda da archiviare';
+      const e = Att.esitoRiordino(r);
+      if (testo) testo.textContent = `${e.ok ? '✓' : '✗'} ${e.testo}`;
+      if (!e.ok) {
+        if (btn) { btn.disabled = false; btn.title = `${e.motivo} Puoi riprovare.`; }
       }
       return;
     }
