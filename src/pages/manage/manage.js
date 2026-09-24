@@ -2950,8 +2950,10 @@
     if (mgReopenText) mgReopenText.focus();
   }
 
-  function confermaRiapertura() {
-    const fb = allFeedbacks.find((f) => f._id === selectedId);
+  async function confermaRiapertura() {
+    // La conversazione su cui si appende va letta PRIMA: dall'elenco arriva
+    // senza note, e appenderci sopra il motivo le cancellerebbe.
+    const fb = await feedbackCompleto(selectedId);
     if (!fb) return;
     const azione = MR.ownerActionFor(fb, 'reopen', { releasedVersion });
     if (!azione) {
