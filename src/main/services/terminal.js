@@ -331,7 +331,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
         const inCoda = extractCwdMark(codaOut, mark);
         const parsed = extractCwdMark(rawOut, mark);
         rawOut = parsed.stdout;
-        const letto = inCoda.code !== null ? inCoda : parsed;
+        const letto = inCoda.trovato ? inCoda : parsed;
         if (letto.code !== null) realCode = letto.code;
         if (letto.cwd) resultCwd = letto.cwd;
       }
