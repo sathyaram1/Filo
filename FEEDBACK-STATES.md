@@ -317,13 +317,17 @@ dashboard scriveva "in attesa di ripresa". Adesso:
    I `pipeline.*` grezzi restano per audit, ma nessun consumer li legge più per lo stato.
 2. Mittenti fidati: mai attack/spam (come oggi in classifyBlock); flag identità su fidato
    → `unlabeled` per ri-giudizio.
-2b. **`updatedAt` su OGNI scrittura di un feedback** (#676, DA FARE nel server). Dal
-   2026-09-24 la dashboard non rilegge più la collezione a ogni giro: chiede «chi è
-   stato scritto dopo questo istante?» filtrando su `updatedAt`. L'app e gli script
-   lo scrivono; il server no, e finché non lo fa quello che scrive lui (stato, claim,
-   battiti) compare in dashboard solo alla riconciliazione completa, che è rara per
-   scelta (mezz'ora). Le regole lo ammettono già in tutti e tre i rami
-   (create, update admin, update routine).
+2b. **`updatedAt` su OGNI scrittura di un feedback** (#676, da fare nel server: utile,
+   non più necessario). Dal 2026-09-24 la dashboard non rilegge più la collezione a
+   ogni giro: chiede «chi è stato scritto dopo questo istante?» filtrando su
+   `updatedAt`. L'app e gli script lo scrivono, il server no. Perché la dashboard
+   veda lo stesso quello che scrive lui (stato, claim, battiti) il giro controlla, per
+   i soli feedback in mano alle routine, l'ora d'ultima scrittura che tiene Firestore:
+   costa una lettura per feedback seguito, non per feedback esistente. Se il server
+   firmasse l'ora, quel controllo diventerebbe superfluo e il giro tornerebbe a una
+   lettura sola. Le regole ammettono il campo in tutti e tre i rami (create, update
+   admin, update routine) e pretendono che sia una DATA: scritto come testo il
+   confronto per data non lo riconosce.
 3. Gate deterministico file sospetti (vive QUI, decisione owner): gira PRIMA dei giudici
    su ogni feedback con allegati; flag → `suspicious_file` e NON va al panel finché
    l'owner non decide. Contesto noto: il widget accetta via drag&drop tipi non ammessi

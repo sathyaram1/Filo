@@ -158,3 +158,45 @@ test('il giro al minuto chiede solo i cambiati, e il cambiato compare in lista',
   await new Promise((r) => setTimeout(r, RITMO * 4));
   expect((await conta(app)).richieste).toBe(chiuso.richieste);
 });
+
+// Il giro non si fida della data che firma chi scrive (#676, giro 1). Il server
+// delle routine non la firma affatto: quello che scrive lui (presa in carico,
+// stato, battiti) è proprio ciò che l'owner guarda mentre tiene aperta la
+// dashboard. Per i feedback in mano alle routine il giro chiede a Firestore
+// l'ora che tiene LUI, e il cambiamento arriva entro il giro come ogni altro.
+test('quello che le routine scrivono senza firmare l\'ora arriva lo stesso entro il giro', async ({ app, openTab }) => {
+  const A = fakeFb('coda-a', 'Presa in carico', { seq: 31, status: 'working' });
+  const B = fakeFb('coda-b', 'In attesa', { seq: 32, status: 'todo', createdAt: '2026-09-02T10:00:00Z' });
+  await fingiFirestore(app, [A, B]);
+
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(({ A, B }) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([B, A]);
+    window.__mgTest.setTab('queue');
+    window.__mgTest.resumeLive();
+  }, { A, B });
+  await expect(page.locator('.mg-item-title')).toHaveText(['Presa in carico', 'In attesa']);
+
+  // La pagina dice al giro chi seguire da vicino: prima chi è in mano alle
+  // routine, poi la testa della coda, da cui esce la prossima presa in carico.
+  expect(await page.evaluate(() => window.__mgTest.idsDaSeguire())).toEqual(['coda-a', 'coda-b']);
+
+  await page.evaluate(async () => {
+    await window.filo.message({ type: 'feedback_live_subscribe', off: true });
+    await window.filo.message({ type: 'feedback_live_subscribe', watch: window.__mgTest.idsDaSeguire() });
+  });
+  await expect.poll(() => conta(app).then((c) => c.seguiti), { timeout: 5000 }).toBeGreaterThanOrEqual(1);
+
+  // Il server riscrive il feedback e NON tocca la data firmata: solo l'ora di
+  // Firestore cambia. Il successo è che l'owner lo vede lo stesso.
+  await app.evaluate(() => {
+    const d = globalThis.__docs.find((x) => x._id === 'coda-a');
+    d.name = 'Lavorazione finita';
+    d._updateTime = 't2';
+  });
+  await expect(page.locator('.mg-item-title')).toHaveText(['Lavorazione finita', 'In attesa'], { timeout: 5000 });
+});
