@@ -23,12 +23,13 @@ const LIVE = globalThis.SN_FEEDBACK_LIVE;
  * la cambiano come farebbe una scrittura che non firma niente.
  */
 function giro(mondo) {
-  const log = { versioni: 0, cambiati: 0, versionsOf: 0, letti: [], avvisi: [], contatori: 0 };
+  const log = { versioni: 0, cambiati: 0, versionsOf: 0, letti: [], avvisi: [], lamentele: [], contatori: 0 };
   let t = 1_000_000;
   const w = LIVE.makeWatcher({
     now: () => t,
     pageSize: 100,
     broadcast: (m) => log.avvisi.push(m),
+    onWarn: (m) => log.lamentele.push(String(m)),
     listVersions: async () => {
       log.versioni += 1;
       return Object.entries(mondo.ore).map(([id, _updateTime]) => ({
@@ -111,7 +112,7 @@ test('oltre il tetto dei seguiti il giro avvisa e si riallinea, invece di taglia
   avanza(LIVE.POLL_MS);
   await w.tick({ force: true });
   assert.equal(log.ultimiChiesti.length, LIVE.SEGUITI_TETTO);
-  assert.ok(log.avvisi.some((m) => typeof m === 'string' && m.includes('tetto')));
+  assert.ok(log.lamentele.some((m) => m.includes('tetto')), 'il giro dice che qualcuno è rimasto fuori');
 
   // Chi è rimasto fuori non resta invisibile fino alla mezz'ora: il giro dopo
   // è un riallineamento completo.
@@ -228,4 +229,92 @@ test('il contatore degli invii: una lettura, e «non lo so» non è zero', async
   globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' });
   try { assert.equal(await FB.submissionCount(), null, 'contatore assente: non lo so, non zero'); }
   finally { globalThis.fetch = vere; }
+});
+
+// Due invii nello stesso giro, uno con l'ora giusta e uno con l'ora indietro.
+// Guardare se ne è arrivata ALMENO UNA non basta: la prima coprirebbe la
+// seconda, e quella mandata non entrerebbe mai in lista.
+test('di due invii nello stesso giro, quello con l\'ora indietro fa riallineare lo stesso', async () => {
+  const mondo = { ore: { a: 't1' }, seguiti: [], invii: 10 };
+  const { w, log, avanza } = giro(mondo);
+  await w.tick({ force: true });
+  assert.equal(log.versioni, 1);
+
+  // Ne arrivano due: la domanda per data porta solo quella con l'ora giusta.
+  mondo.invii = 12;
+  mondo.cambiati = [{ _id: 'nuova', seq: 11, _updateTime: 't1' }];
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  assert.equal(log.versioni, 1, 'il giro con la domanda per data non rilegge tutto');
+
+  // Il conto non torna (una sola arrivata su due invii), quindi il giro dopo
+  // è un riallineamento completo: è lì che la seconda compare.
+  mondo.cambiati = [];
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  assert.equal(log.versioni, 2);
+});
+
+test('quando il conto degli invii torna, non si rilegge niente', async () => {
+  const mondo = { ore: { a: 't1' }, seguiti: [], invii: 10 };
+  const { w, log, avanza } = giro(mondo);
+  await w.tick({ force: true });
+
+  mondo.invii = 12;
+  mondo.cambiati = [{ _id: 'n1', seq: 11 }, { _id: 'n2', seq: 12 }];
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  mondo.cambiati = [];
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  assert.equal(log.versioni, 1, 'due invii annunciati, due arrivati: niente da riallineare');
+});
+
+// Quale segnalazione prendano in mano le routine, la dashboard non lo può
+// indovinare: il server sceglie con un ordine suo, e riscrive senza firmare
+// l'ora. Il registro dei worker lo dice, e costa una lettura.
+test('un worker delle routine che parte fa riallineare al giro dopo', async () => {
+  const mondo = { ore: { a: 't1' }, seguiti: [], invii: 10, avvio: '' };
+  const { w, log, avanza } = giro(mondo);
+  await w.tick({ force: true });
+  assert.equal(log.versioni, 1);
+
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  assert.equal(log.versioni, 1, 'registro fermo: niente da riallineare');
+
+  // Il server fa partire un lavoro su una segnalazione qualunque della coda.
+  mondo.avvio = '2026-09-24T18:00:00Z|#700|solver';
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  assert.equal(log.versioni, 2, 'il giro dopo rilegge, e la presa in carico compare');
+
+  // Una sola volta per avvio: il registro fermo non fa ripagare niente.
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  assert.equal(log.versioni, 2);
+});
+
+test('un registro dei worker non raggiungibile non si scambia per «niente di nuovo»', async () => {
+  const mondo = { ore: { a: 't1' }, seguiti: [], invii: 10, avvio: 'x|#1|solver' };
+  const { w, log, avanza } = giro(mondo);
+  await w.tick({ force: true });
+
+  mondo.registroRotto = true;
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  assert.equal(log.versioni, 1, 'una lettura fallita non è un avvio');
+  assert.ok(log.lamentele.some((m) => m.includes('registro')));
+
+  // Torna raggiungibile, col valore di prima: nessun falso allarme.
+  mondo.registroRotto = false;
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  avanza(LIVE.POLL_MS);
+  await w.tick({ force: true });
+  assert.equal(log.versioni, 1);
 });

@@ -4182,12 +4182,12 @@
   // I feedback che il giro deve seguire con l'ora vera di Firestore invece che
   // con quella firmata da chi scrive, che il server delle routine non scrive.
   //
-  // Quelli IN MANO alle routine ci vanno TUTTI, presi da tutta la lista e non
-  // dalla sola sezione «In coda»: il server può portarne uno altrove (in
-  // «Design» finisce fra i ricevuti) e continuare a scriverlo, e uno lasciato
-  // fuori resta fermo fino al riallineamento. Sono pochi per natura: tanti
-  // quanti il server ne lavora insieme. La testa della coda riempie quello che
-  // resta, perché da lì esce la prossima presa in carico.
+  // Quelli IN MANO alle routine ci vanno TUTTI: il tetto non li tocca, o con
+  // molti lavori aperti insieme il campione della coda li spingerebbe fuori
+  // proprio mentre si muovono. Sono pochi per natura, quanti il server ne
+  // lavora insieme. La testa della coda riempie quello che resta: è un
+  // campione, e da solo non basta (quale segnalazione il server prenda in
+  // carico lo dice il registro dei worker, che il giro guarda a parte).
   function idsDaSeguire() {
     const inMano = (allFeedbacks || []).filter((fb) => MR.workProgress(fb));
     const presi = new Set(inMano.map((fb) => fb && fb._id).filter(Boolean));
