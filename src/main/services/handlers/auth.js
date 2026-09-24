@@ -957,6 +957,10 @@ module.exports = function register(on, ctx) {
       try { wc.once('destroyed', () => { liveSubs.delete(wc); if (liveSubs.size === 0) liveStop(); }); } catch (_) {}
     }
     liveStart();
+    // «Sono tornato a guardare»: un giro adesso, senza aspettare il battito —
+    // ma col freno del giro, o un rientro in finestra ripetuto sarebbe una
+    // raffica di domande.
+    if (msg && msg.now === true) liveTick();
     return {
       ok: true,
       subscribed: true,
