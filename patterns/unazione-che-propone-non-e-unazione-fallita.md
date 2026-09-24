@@ -43,8 +43,11 @@ famiglia è la sentinella che legge il registro delle azioni.
   conferma e il suggerimento della home, che deve dire com'è andata lì dove
   l'utente ha cliccato.
 
+Il racconto deve anche sopravvivere alla chiusura della chat:
+[l'esito si archivia](quel-che-e-successo-si-archivia-col-suo-esito.md).
+
 Dove: `executeFiloAction` in `src/main/services/handlers.js`, `activityRowFor`,
-`rigaEBottone`, `segnaCompiuta` e `compiuta` in
+`rigaEBottone`, `segnaCompiuta` e `esitoDelClick` in
 `src/pages/dashboard/dashboard-attivita.js`. Test:
 `tests/dashboard-chat-diario.spec.mjs` (casi G e I) e la sentinella
 `tests/unit/diarioAzioniCoperte.test.mjs`.
