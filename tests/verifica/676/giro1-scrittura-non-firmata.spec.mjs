@@ -118,13 +118,12 @@ test('un feedback riscritto senza firmare l’ora arriva lo stesso col giro al m
   expect(esito.conFirma.kind).toBe('changed');
   expect(esito.conFirma.ids).toContain('fb-1');
 
-  // B) chi NON firma l'ora non arriva col giro: l'annuncio è ancora quello di
-  //    prima (nessun nuovo `changed` con fb-2).
-  expect(esito.senzaFirma.ids, 'una scrittura senza firma non arriva col giro').not.toContain('fb-2');
-
-  // C) solo il riallineamento (mezz'ora) lo riporta a galla.
-  expect(esito.dopoRiallineamento.kind).toBe('reconcile');
-  expect(esito.dopoRiallineamento.ids).toContain('fb-2');
+  // B) IL RILIEVO: chi NON firma l'ora — oggi il server delle routine, che
+  //    scrive stato, claim e battiti — deve arrivare lo stesso entro il giro.
+  //    Per l'owner è il caso normale: è lì che guarda mentre le routine
+  //    lavorano. Oggi non arriva, e si vede solo al riallineamento (mezz'ora).
+  expect(esito.senzaFirma.ids, 'anche una scrittura senza firma deve arrivare entro il giro')
+    .toContain('fb-2');
 });
 
 test('una segnalazione nuova da una macchina con l’orologio indietro non arriva col giro', async ({ app }) => {
