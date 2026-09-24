@@ -240,9 +240,14 @@ service cloud.firestore {
            'files', 'createdAt', 'seq', 'subSeq', 'parentId',
            'statusPublic',   // S1.F2.1: aggiunto statusPublic (sempre in chiaro, nuovo nei submit)
            'capabilityGapId', // F4: id gap capacità per dedup auto-feedback (F5)
-           'walletPseudonym' // #652: pseudonimo del portafoglio — a chi accreditare il premio
+           'walletPseudonym', // #652: pseudonimo del portafoglio — a chi accreditare il premio
+           'updatedAt'       // #676: l'ora dell'ultima scrittura — la dashboard ci chiede "cosa è cambiato?"
           ]
         )
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt is timestamp
+            || (request.resource.data.updatedAt is string
+                && request.resource.data.updatedAt.size() <= 40))
         // #652: se c'è, è uno pseudonimo di portafoglio (16 hex). Facoltativo:
         // chi non ha un portafoglio manda il feedback e basta.
         && request.resource.data.get('walletPseudonym', '') is string
