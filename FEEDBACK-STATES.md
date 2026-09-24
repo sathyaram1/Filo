@@ -327,7 +327,7 @@ dashboard scriveva "in attesa di ripresa". Adesso:
    server ne lavora insieme); il contatore degli invii, CONFRONTATO col numero di
    segnalazioni che la domanda per data ha portato; e il registro dei worker, perché
    quale feedback il server prenda in carico non si deduce dall'ordine della coda in
-   dashboard — un avvio nuovo fa riallineare il giro dopo. Se il server firmasse
+   dashboard, e un avvio nuovo fa riallineare il giro dopo. Se il server firmasse
    l'ora, tutti e tre diventerebbero superflui e il giro tornerebbe a una lettura
    sola. Le regole ammettono il campo in tutti e tre i rami (create, update admin,
    update routine) e pretendono che sia una DATA: scritto come testo il confronto per
