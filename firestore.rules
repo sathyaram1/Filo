@@ -539,6 +539,10 @@ service cloud.firestore {
         // che poi bloccano l'owner.
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 60000
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt is timestamp
+            || (request.resource.data.updatedAt is string
+                && request.resource.data.updatedAt.size() <= 40))
         && livelliValidi(request.resource.data);
 
       // Cancellazione: solo admin.
