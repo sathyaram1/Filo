@@ -346,6 +346,10 @@
     // esattamente come quelle delle immagini, e tenerne una sola delle due
     // avrebbe lasciato metà del difetto in piedi.
     fileWhyCache.clear();
+    // Il giro del main accetta solo l'amministratore: chi apre Gestione e FA
+    // L'ACCESSO DOPO si era visto rifiutare l'iscrizione, e da lì la lista non
+    // si aggiornava più fino a un ricaricamento a mano.
+    if (nuovo && liveEnabled) sendToMain({ type: LIVE_SUBSCRIBE }).catch(() => {});
   }
 
   async function refreshAuth() {
