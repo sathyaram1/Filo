@@ -572,8 +572,8 @@ La regola, uguale per tutti e due:
   del giro** (`absolutizeRecipe`), non con `scripts/…`, che riporterebbe alla
   copia che il ramo si porta dietro;
 - **la memoria del confronto la scrive OGNI strada che registra un esito.**
-  Il rifiuto del citofono si regge sullo specchio locale («la verifica ha dato
-  l'ok su X, il controllo di sicurezza su Y»). Finché lo scriveva solo
+  Il rifiuto e le note del citofono si reggono sullo specchio locale («la
+  verifica ha dato l'ok su X, il controllo di sicurezza su Y»). Finché lo scriveva solo
   `dispatch --record-*`, bastava registrare lo stesso esito dal canale
   (`deliver verdict|secaudit`) perché lo specchio restasse vuoto e la fusione
   ripartisse a foglio sostituito: la difesa si spegneva scegliendo l'ingresso.
