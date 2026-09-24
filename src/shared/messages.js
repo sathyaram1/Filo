@@ -418,6 +418,17 @@
     //   { op: 'getMany', ids: [...], timeoutMs? }       → { ok, rows }
     //   → { ok:false, error } se non sei admin o la lettura fallisce.
     FEEDBACK_FETCH: 'feedback_fetch',
+    // #676 — il giro al minuto della dashboard vive nel MAIN, uno solo: dieci
+    // schede di Gestione aperte sono dieci pagine che ascoltano, non dieci giri
+    // che pagano. La pagina si iscrive ({ off:true } per smettere) e riceve
+    // FEEDBACK_LIVE_CHANGED. Solo origini filo://, solo admin.
+    //   { off?: bool } → { ok, subscribed, pollMs }
+    FEEDBACK_LIVE_SUBSCRIBE: 'feedback_live_subscribe',
+    // Avviso del giro alle sole pagine iscritte. Due forme:
+    //   { kind:'changed',   rows:[…] }      le righe scritte dall'ultimo giro
+    //   { kind:'reconcile', versions:[…] }  id + ultima scrittura di tutta la
+    //     pagina: la riconciliazione rara, l'unica che vede le cancellazioni.
+    FEEDBACK_LIVE_CHANGED: 'feedback_live_changed',
     // S1.3: decifratura campi feedback lato main (la chiave privata NON lascia
     // mai il main process). Il renderer manda i campi con valori potenzialmente
     // cifrati; il main li decifra e torna il plaintext. Owner-only.
