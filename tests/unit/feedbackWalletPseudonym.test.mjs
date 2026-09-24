@@ -80,13 +80,31 @@ test('uno pseudonimo di forma sbagliata non parte: le regole lo rifiuterebbero e
 
 test('se il server rifiuta i campi nuovi, il feedback parte lo stesso senza pseudonimo', async () => {
   // Le regole si deployano a mano: finché non ci sono, un 403 non deve far
-  // perdere la segnalazione. Si riprova con lo schema vecchio.
-  const f = installFetch([403, 200]);
+  // perdere la segnalazione. Si riprova a scalare, e in fondo c'è lo schema
+  // vecchio.
+  const f = installFetch([403, 403, 200]);
   const via = conPortafoglio('abcdef0123456789');
   try {
     const r = await FB.submit({ text: 'ciao', submissionId: 'a-4' });
-    assert.equal(f.corpi.length, 2, 'ci deve essere un secondo tentativo');
-    assert.equal('walletPseudonym' in f.corpi[1].fields, false);
+    assert.equal(f.corpi.length, 3, 'ci devono essere i due tentativi in più');
+    assert.equal('walletPseudonym' in f.corpi[2].fields, false);
     assert.ok(r && r.id, 'la segnalazione è comunque arrivata');
+  } finally { via(); f.restore(); }
+});
+
+test('il primo rifiuto toglie SOLO il campo più recente: numero e titolo restano', async () => {
+  // `updatedAt` (#676) è l'ultimo arrivato nelle regole. Buttare giù tutto lo
+  // schema al primo rifiuto vorrebbe dire far arrivare ogni segnalazione senza
+  // numero né titolo solo perché il deploy delle regole non è ancora girato.
+  const f = installFetch([403, 200]);
+  const via = conPortafoglio('abcdef0123456789');
+  try {
+    const r = await FB.submit({ text: 'ciao', submissionId: 'a-5' });
+    assert.equal(f.corpi.length, 2);
+    assert.ok('updatedAt' in f.corpi[0].fields, 'il primo tentativo firma l\'ora');
+    assert.equal('updatedAt' in f.corpi[1].fields, false);
+    assert.ok('seq' in f.corpi[1].fields, 'il numero non si perde per un campo nuovo');
+    assert.deepEqual(f.corpi[1].fields.walletPseudonym, { stringValue: 'abcdef0123456789' });
+    assert.ok(r && r.seq, 'la segnalazione tiene il suo numero');
   } finally { via(); f.restore(); }
 });
