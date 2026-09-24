@@ -4217,6 +4217,10 @@
     // L'avviso del giro del main, come se fosse arrivato dal canale: gli spec
     // provano le due forme senza dover fingere anche l'IPC.
     liveMessage(m) { return onLiveMessage(m); },
+    // Dopo `setData` il canale resta chiuso, o il giro vero rimpiazzerebbe i
+    // dati finti. Uno spec che vuole provare il giro INTERO (main → pagina)
+    // lo riapre da qui, coi dati finti già in pagina.
+    resumeLive() { liveBlocked = false; liveEnabled = true; },
     // Un giro di ridisegno da aggiornamento remoto, su richiesta: i test lo
     // usano per verificare che una bozza in corso lo trattenga (ritorna false).
     rerenderIfIdle(id) { return rerenderAfterLive(new Set([id])); },
