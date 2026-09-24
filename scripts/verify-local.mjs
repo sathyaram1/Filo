@@ -15,8 +15,8 @@
 //
 // IL GIRO (feedback #561)
 //   Stessa struttura del giro in cloud. Chi verifica registra la CRITICA coi
-//   livelli; questo strumento calcola l'esito dai livelli e dai tre bilanci
-//   (le stesse regole del server, src/shared/verifierRound.js) e lo stampa.
+//   livelli; questo strumento calcola l'esito dai livelli e dai bilanci, uno
+//   per livello (le stesse regole del server, src/shared/verifierRound.js).
 //   Chiuso il giro serve un'altra verifica, fatta da un'altra istanza.
 //
 // COME SI USA
@@ -49,11 +49,10 @@
 //   Il verdetto vale per il commit su cui è stato dato. Se dopo il PASS si
 //   tocca ancora il codice, il verdetto decade e va rifatto: altrimenti
 //   basterebbe farsi approvare una versione e pubblicarne un'altra.
-//   UNICA eccezione (#661): i marcatori di rosso atteso (`test.fail`) che chi
-//   verifica scrive sulle prove del giro per i rilievi messi da parte. Lì
-//   quello che gira non cambia, e il verdetto regge sul commit che li
-//   aggiunge — a patto che in quel commit non cambi altro, e niente fuori da
-//   `tests/verifica/`.
+//   UNICA eccezione (#661): dopo il verdetto dalle PROVE DEL GIRO si può solo
+//   TOGLIERE — una prova intera o un suo caso, quelli dei rilievi diventati un
+//   feedback loro. Il verdetto regge sul commit che lo fa, se lì non si
+//   aggiunge né si cambia una riga e niente sta fuori da `tests/verifica/`.
 //
 // DOVE VIVE
 //   `.claude/verify-local.json`, effimero e gitignorato come gli altri
@@ -73,30 +72,30 @@ const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : 
 
 // Le regole del giro: le stesse del server e degli strumenti delle routine
 // (fonte unica). Lette dal progetto, accanto a questo file: in locale non c'è
-// una copia fissata degli strumenti. I BILANCI (cap2/cap1/cap0) invece non
-// stanno in nessun file: si leggono dal server (leggiBilanciDalServer).
+// una copia fissata degli strumenti. I BILANCI (uno per livello, cap3…cap0)
+// invece non stanno in nessun file: si leggono dal server (leggiBilanciDalServer).
 const require = createRequire(import.meta.url);
 require(resolve(__dirname, '..', 'src', 'shared', 'feedbackTransitions.js'));
 require(resolve(__dirname, '..', 'src', 'shared', 'verifierRound.js'));
 const ROUND = globalThis.SN_VERIFIER_ROUND;
-const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap2', 'cap1', 'cap0'];
+const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
 
 // ─── I bilanci del giro si leggono dal server ────────────────────────────────
 //
 // Fino al 2026-09-16 questo script ragionava con un default scritto nel
-// codice (5/2/0) mentre l'owner in dashboard aveva 10/1/0: i giri locali
-// facevano i conti coi numeri sbagliati. Decisione dell'owner: i tre bilanci
-// si leggono dal documento che la dashboard scrive (`config/routines`, campi
-// cap2/cap1/cap0, Gestione → Automazioni), con l'identità dell'owner — lo
-// stesso token admin degli altri script locali (FILO_ADMIN_REFRESH_TOKEN, in
+// codice mentre l'owner in dashboard aveva altri numeri: i giri locali
+// facevano i conti coi numeri sbagliati. Decisione dell'owner: i bilanci si
+// leggono dal documento che la dashboard scrive (`config/routines`, i campi di
+// CAP_KEYS, Gestione → Automazioni), con l'identità dell'owner — lo stesso
+// token admin degli altri script locali (FILO_ADMIN_REFRESH_TOKEN, in
 // tests/agent/.env del checkout principale) — e NON c'è un ripiego: se il
-// token manca, se la lettura fallisce o se il documento non ha i tre numeri,
+// token manca, se la lettura fallisce o se al documento manca un numero,
 // ci si ferma con un errore che dice cosa manca e dove si mette.
 //
 // `FILO_ROUTINE_CONFIG_URL` e `FILO_ADMIN_ID_TOKEN` esistono per i controlli
 // (un server finto in ascolto in locale, un token già coniato): non sono un
 // ripiego, in produzione non sono impostate e la lettura resta quella vera.
-export const SENZA_TOKEN_MSG = 'Manca FILO_ADMIN_REFRESH_TOKEN: i bilanci del giro (cap2/cap1/cap0) si leggono dal server con l\'identità dell\'owner. '
+export const SENZA_TOKEN_MSG = `Manca FILO_ADMIN_REFRESH_TOKEN: i bilanci del giro (${CAP_KEYS.join('/')}) si leggono dal server con l'identità dell'owner. `
   + 'Mettilo in tests/agent/.env del checkout principale (riga FILO_ADMIN_REFRESH_TOKEN=…, lo genera `node scripts/admin-login.mjs`) '
   + 'oppure esportalo nell\'ambiente. Senza, la verifica non parte: non c\'è un default.';
 
@@ -111,9 +110,9 @@ export function numeroFirestore(campo) {
 }
 
 /**
- * I tre bilanci come stanno nel documento del server. Lancia con un messaggio
- * che dice cosa manca; mai un numero al posto di quello dell'owner.
- * @returns {Promise<{cap2:number, cap1:number, cap0:number, fixInstructions:string, giroStretto:boolean}>}
+ * I bilanci come stanno nel documento del server, uno per livello. Lancia con
+ * un messaggio che dice cosa manca; mai un numero al posto di quello dell'owner.
+ * @returns {Promise<{cap3:number, cap2:number, cap1:number, cap0:number, fixInstructions:string, giroStretto:boolean}>}
  */
 export async function leggiBilanciDalServer({ fetchImpl = fetch, env = process.env, trovaRefresh = null } = {}) {
   const fa = await import('./lib/firestore-auth.mjs');
@@ -131,7 +130,7 @@ export async function leggiBilanciDalServer({ fetchImpl = fetch, env = process.e
     throw new Error(`config/routines non letto dal server (rete): ${String((e && e.message) || e)}. Senza i bilanci la verifica non parte.`);
   }
   if (res.status === 404) {
-    throw new Error('config/routines non esiste sul server: l\'owner deve salvare i tre bilanci in Gestione → Automazioni. Non c\'è un default.');
+    throw new Error('config/routines non esiste sul server: l\'owner deve salvare i bilanci in Gestione → Automazioni. Non c\'è un default.');
   }
   if (!res.ok) {
     const testo = await res.text().catch(() => '');
@@ -225,13 +224,11 @@ export function checkVerdict(entry, headSha, dirty = false, leggiDiff = null) {
     return { ok: false, reason: `la verifica ha bocciato il lavoro: ${entry.critique || '(nessuna critica registrata)'}` };
   }
   if (!headSha || entry.sha !== headSha) {
-    // Unica eccezione (#661): dopo la verifica sono cambiati solo i marcatori
-    // di rosso atteso nelle prove del giro. Quello che gira è lo stesso, e il
-    // verdetto riguarda quello. `leggiDiff` legge i due contenuti da git: chi
-    // non lo passa (i controlli sulla sola logica) ha il cancello stretto di
-    // sempre.
+    // Unica eccezione (#661): dopo la verifica dalle prove del giro si è solo
+    // tolto. `leggiDiff` legge i due contenuti da git: chi non lo passa (i
+    // controlli sulla sola logica) ha il cancello stretto di sempre.
     const tol = (typeof leggiDiff === 'function' && entry.sha && headSha)
-      ? soloMarcatori(leggiDiff(entry.sha, headSha))
+      ? soloProveTolte(leggiDiff(entry.sha, headSha))
       : null;
     if (!tol || !tol.ok) {
       const perche = tol && tol.motivo ? ` (${tol.motivo})` : '';
@@ -246,7 +243,7 @@ export function checkVerdict(entry, headSha, dirty = false, leggiDiff = null) {
         tollerato: true,
         files: tol.files,
         reason: tol.files.length
-          ? `verifica superata su ${String(entry.sha).slice(0, 8)}: dopo di lei nelle prove del giro sono cambiati solo i marcatori di rosso atteso (${tol.files.join(', ')}), e quello che gira è lo stesso`
+          ? `verifica superata su ${String(entry.sha).slice(0, 8)}: dopo di lei dalle prove del giro sono state solo tolte prove o casi (${tol.files.join(', ')}), e quello che gira non è cresciuto`
           : `verifica superata su ${String(entry.sha).slice(0, 8)}: dopo di lei il contenuto non è cambiato`,
       };
     }
@@ -504,27 +501,17 @@ export function cartellaProveGiro(branch) {
   return `${PROVE_GIRO}locale-${slug}`;
 }
 
-// ─── Il verdetto non decade per i soli marcatori di rosso atteso (#661) ─────
+// ─── Il verdetto non decade per le prove del giro TOLTE (#661) ──────────────
 //
-// Quando il giro mette da parte un rilievo (bilancio esaurito) e dice «si può
-// pubblicare», le prove del giro che riproducono quel rilievo restano rosse:
-// la chiusura le rilancia e si ferma lì. Chi verifica le segna come rosso
-// atteso (`test.fail`) e le committa — e quel commit sposta la punta del ramo
-// DOPO il verdetto, che vale per il commit di prima. La chiusura respingeva
-// («il codice è cambiato dopo la verifica») e serviva un giro intero in più,
-// di un'altra istanza, per riverificare un ramo in cui era cambiata una riga
-// di test. È successo due volte: il 10/09 sul ramo della suite locale e il
-// 18/09 su quello del ripiego crediti (#629), dove il quarto giro è servito
-// solo a questo.
+// Quando il giro mette da parte un rilievo e dice «si può pubblicare», la prova
+// del giro che lo riproduce si CANCELLA: il rilievo vive nel feedback appena
+// nato. Quel commit sposta la punta DOPO il verdetto, e senza questa eccezione
+// costava un giro intero di un'altra istanza (10/09 e 18/09, #629).
 //
-// LA REGOLA: il verdetto regge su un commit successivo se quello che è
-// cambiato non cambia niente di quello che GIRA, e sta tutto nelle prove del
-// giro. Non si leggono le righe del diff una per una: si riducono i due
-// contenuti a ciò che fa girare — via commenti, righe vuote e marcatori — e si
-// confrontano. Così un marcatore aggiunto, tolto o riscritto passa, e una riga
-// di codice cambiata dentro una prova del giro no. Il resto del cancello non
-// si muove: una prova del giro rossa SENZA marcatore ferma la chiusura come
-// prima, perché la chiusura quelle prove le lancia davvero.
+// LA REGOLA è la stessa del cancello di fusione del server: dopo il verdetto,
+// dentro `tests/verifica/`, si può solo TOGLIERE — un file intero o delle righe
+// (un caso) da un file. Nessuna riga aggiunta o cambiata, nemmeno un marcatore
+// di rosso atteso o un commento: quello va nel commit di una correzione.
 
 /** Dove vivono le prove dei giri di verifica: l'unica cartella tollerata. */
 export const PROVE_GIRO = 'tests/verifica/';
@@ -535,113 +522,48 @@ export function dentroProveGiro(percorso) {
   return p.startsWith(PROVE_GIRO) && !p.split('/').includes('..');
 }
 
-// Un marcatore di rosso atteso, nelle due forme che Playwright accetta:
-//   · modificatore dentro il corpo — `test.fail(true, 'motivo');`
-//   · dichiarazione — `test.fail('titolo', async () => { … });`
-// Il primo argomento distingue: una stringa è il TITOLO di una prova, quindi
-// è la dichiarazione; tutto il resto (niente, una condizione, una funzione) è
-// il modificatore. `test.skip` non è qui di proposito: non dice «questo è
-// rosso e lo so», toglie la prova dal giro.
-const MARCATORE = /^(?:await\s+)?test\s*\.\s*(?:fail|fixme)\s*\(/;
-const MARCATORE_DICHIARAZIONE = /^test\s*\.\s*(?:fail|fixme)\s*\(\s*['"`]/;
-const APRE_MARCATORE = /test\s*\.\s*(?:fail|fixme)\s*\(/;
-// Quante righe al massimo può occupare un marcatore: un motivo lungo va a capo
-// una volta o due, non otto.
-const MAX_RIGHE_MARCATORE = 8;
-
-/** Saldo delle tonde di una riga. */
-function saldoTonde(riga) {
-  let s = 0;
-  for (const c of String(riga)) {
-    if (c === '(') s += 1;
-    else if (c === ')') s -= 1;
-  }
-  return s;
-}
-
 /**
- * L'ultima riga del marcatore che comincia a `i`, o -1 se quella riga non è un
- * marcatore intero. In quel caso vale come una riga qualunque e si confronta
- * com'è: meglio un verdetto che decade di uno che tollera una riga di codice
- * inghiottita da un marcatore scritto male.
+ * Una voce del diff è un file TOLTO dalle prove del giro? PURA.
  *
- * Una virgoletta dimenticata (`test.fail(true, 'motivo;`) lascia le tonde
- * aperte, e chiudono solo sul `});` che chiude la prova: senza i due paletti
- * qui sotto il marcatore si sarebbe mangiato il CORPO della prova, e due corpi
- * diversi sarebbero risultati uguali. Quindi una riga di continuazione è il
- * resto di un argomento e nient'altro: niente graffe, niente frecce, e niente
- * punto e virgola prima che le tonde si chiudano.
+ * `stato` è la lettera di `git diff --name-status` e vale più del contenuto:
+ * senza di lei un file illeggibile (git muto su `show`) somiglierebbe a un file
+ * cancellato, e si tollererebbe una modifica vera. Dove la lettera non c'è —
+ * una voce costruita a mano — resta il ripiego sul contenuto.
  */
-function fineIstruzione(righe, i) {
-  let saldo = 0;
-  for (let j = i; j < righe.length && j - i < MAX_RIGHE_MARCATORE; j += 1) {
-    const r = righe[j];
-    if (j > i && (/[{}]/.test(r) || r.includes('=>'))) return -1;
-    saldo += saldoTonde(r);
-    if (saldo <= 0) return j;
-    if (j > i && r.trim().endsWith(';')) return -1;
-  }
-  return -1;
+function cancellata(f) {
+  if (f.stato) return String(f.stato).toUpperCase().startsWith('D');
+  return String(f.prima ?? '') !== '' && String(f.dopo ?? '') === '';
 }
 
 /**
- * Riduce una prova del giro a ciò che FA GIRARE: via le righe vuote, via i
- * commenti, via i marcatori di rosso atteso. PURA.
- *
- * Righe vuote e commenti non cambiano cosa fa una prova, e chi segna un rosso
- * atteso quasi sempre scrive accanto anche il perché: se contassero, il giro
- * in più tornerebbe per una riga di commento. Una riga che diventa un commento
- * (`// expect(…)`) invece si vede eccome: quello che c'era prima sparisce dal
- * confronto e il verdetto decade, com'è giusto.
+ * `dopo` si ottiene da `prima` solo togliendo righe? PURA. Vuoto da una parte o
+ * dall'altra è un no: un file svuotato si cancella, uno illeggibile non passa.
  */
-export function corpoSenzaMarcatori(testo) {
-  const righe = String(testo ?? '').replace(/\r\n?/g, '\n').split('\n');
-  const out = [];
-  let blocco = false;
-  for (let i = 0; i < righe.length; i += 1) {
-    const riga = righe[i];
-    const t = riga.trim();
-    if (blocco) {
-      const k = riga.indexOf('*/');
-      if (k < 0) continue;
-      blocco = false;
-      // Codice dopo la chiusura del commento: la riga conta, e conta com'è.
-      if (riga.slice(k + 2).trim()) out.push(riga);
-      continue;
-    }
-    if (!t) continue;
-    if (t.startsWith('//')) continue;
-    if (t.startsWith('/*')) {
-      const k = riga.indexOf('*/');
-      if (k < 0) { blocco = true; continue; }
-      if (riga.slice(k + 2).trim()) out.push(riga);
-      continue;
-    }
-    if (MARCATORE_DICHIARAZIONE.test(t)) {
-      // `test.fail('titolo', …)` e `test('titolo', …)` sono la stessa prova
-      // con e senza marcatore: si confrontano nella forma senza.
-      out.push(riga.replace(APRE_MARCATORE, 'test('));
-      continue;
-    }
-    if (MARCATORE.test(t)) {
-      const fine = fineIstruzione(righe, i);
-      if (fine >= 0) { i = fine; continue; }
-    }
-    out.push(riga);
+export function soloRigheTolte(prima, dopo) {
+  const a = String(prima ?? '');
+  const b = String(dopo ?? '');
+  if (!a || !b) return false;
+  const righeA = a.replace(/\r\n?/g, '\n').split('\n');
+  const righeB = b.replace(/\r\n?/g, '\n').split('\n');
+  let i = 0;
+  for (const riga of righeB) {
+    while (i < righeA.length && righeA[i] !== riga) i += 1;
+    if (i >= righeA.length) return false;
+    i += 1;
   }
-  return out.join('\n');
+  return true;
 }
 
 /**
- * Le differenze fra il commit verificato e quello di adesso sono SOLO
- * marcatori di rosso atteso nelle prove del giro? PURA.
+ * Fra il commit verificato e quello di adesso dalle prove del giro si è solo
+ * tolto (file interi o righe)? PURA.
  *
- * `files`: `[{ path, prima, dopo }]` — il contenuto ai due commit, stringa
- * vuota dove il file non c'era (aggiunto o cancellato); `null` quando non si è
- * riuscito a leggere il diff, che NON è un via libera. Ritorna
+ * `files`: `[{ path, prima, dopo, stato }]` — il contenuto ai due commit,
+ * stringa vuota dove il file non c'era, e la lettera di stato di git; `null`
+ * quando non si è riuscito a leggere il diff, che NON è un via libera. Ritorna
  * `{ ok, motivo, files }`: `motivo` è già la frase da mostrare a chi pubblica.
  */
-export function soloMarcatori(files) {
+export function soloProveTolte(files) {
   if (!Array.isArray(files)) return { ok: false, motivo: 'non sono riuscito a leggere cosa è cambiato dopo la verifica', files: [] };
   const elenco = files.filter((f) => f && f.path);
   const fuori = elenco.filter((f) => !dentroProveGiro(f.path)).map((f) => f.path);
@@ -649,35 +571,40 @@ export function soloMarcatori(files) {
     const primi = fuori.slice(0, 5).join(', ');
     return { ok: false, files: [], motivo: `fuori dalle prove del giro: ${primi}${fuori.length > 5 ? ` e altri ${fuori.length - 5}` : ''}` };
   }
-  const veri = elenco.filter((f) => corpoSenzaMarcatori(f.prima) !== corpoSenzaMarcatori(f.dopo)).map((f) => f.path);
+  const veri = elenco
+    .filter((f) => !cancellata(f) && (String(f.stato || '').toUpperCase().startsWith('A') || !soloRigheTolte(f.prima, f.dopo)))
+    .map((f) => f.path);
   if (veri.length) {
     const primi = veri.slice(0, 5).join(', ');
-    return { ok: false, files: [], motivo: `nelle prove del giro non sono cambiati solo i marcatori di rosso atteso: ${primi}${veri.length > 5 ? ` e altri ${veri.length - 5}` : ''}` };
+    return { ok: false, files: [], motivo: `nelle prove del giro c'è dell'altro, oltre a prove e casi tolti (righe aggiunte o cambiate, file nuovi): ${primi}${veri.length > 5 ? ` e altri ${veri.length - 5}` : ''}` };
   }
   return { ok: true, motivo: '', files: elenco.map((f) => f.path) };
 }
 
 /**
- * Cosa fare delle prove del giro che restano rosse quando un rilievo è messo
- * da parte. PURA. Si stampa col pass, che è l'unico momento in cui chi
- * verifica ha in mano insieme i rilievi non corretti e un ramo da chiudere.
+ * Cosa fare delle prove del giro che riproducono i rilievi non corretti. PURA.
+ * Si stampa col pass, che è l'unico momento in cui chi verifica ha in mano
+ * insieme i rilievi diventati un feedback loro e un ramo da chiudere.
  *
  * Senza queste righe la strada la si trova da soli, e le due volte che è
- * successo (10/09 e 18/09, #629) è costata un giro intero: si segnavano i
- * rossi attesi DOPO il verdetto, il commit spostava la punta e la chiusura
- * respingeva. Adesso il verdetto regge su quel commit — ma solo se lì cambiano
- * i marcatori e nient'altro, e questo va detto a chi li scrive.
+ * successo (10/09 e 18/09, #629) è costata un giro intero: si toccavano le
+ * prove DOPO il verdetto, il commit spostava la punta e la chiusura respingeva.
+ * Adesso il verdetto regge su quel commit — ma solo se lì si tolgono prove e
+ * nient'altro, e questo va detto a chi le toglie.
  */
-export function testoRossiAttesi(branch) {
+export function testoProveDaCancellare(branch, derived) {
   const cartella = cartellaProveGiro(branch);
+  const elenco = (Array.isArray(derived) ? derived : []).filter((f) => f && f.text);
   return [
-    'Le prove del giro che riproducono questi rilievi restano rosse, e la chiusura le rilancia.',
-    `Segnale come rosso atteso in ${cartella}, una riga per rilievo.`,
-    "  test.fail(true, 'esterno: <prima frase del rilievo>');          (in testa al corpo della prova)",
-    "  test.fail(true, 'messo da parte: <prima frase del rilievo>');   (per un rilievo interno non corretto)",
-    'Il commit che aggiunge i marcatori NON fa decadere questo verdetto, finché lì cambiano solo',
-    'quelli. Qualunque altra riga, o un file fuori da quella cartella, lo fa decadere e serve un',
-    'altro giro. Una prova rossa senza marcatore ferma la chiusura come prima.',
+    `Adesso togli da ${cartella} le prove che riproducono questi rilievi: il rilievo vive nel feedback`,
+    'che ne nasce, e la cartella del giro non deve crescere di giro in giro. Una per rilievo:',
+    ...(elenco.length ? elenco.map((f) => `  · ${ROUND.primaFrase ? ROUND.primaFrase(f.text) : String(f.text).split('\n')[0]}`) : ['  (quelli elencati qui sopra)']),
+    'Poi `git add -A && git commit`: il commit che le toglie NON fa decadere questo verdetto, finché lì',
+    'si TOGLIE e non si aggiunge niente. Una riga cambiata, una prova aggiunta o un file fuori da quella',
+    'cartella lo fanno decadere, e serve un altro giro.',
+    'Se una prova copre ANCHE un caso che resta aperto qui, non cancellarla: toglile il caso che se ne va',
+    'e lascia il resto. La chiusura le prove del giro non le corre: una lasciata rossa non ferma niente,',
+    'confonde solo il giro dopo.',
   ].join('\n');
 }
 
@@ -691,6 +618,8 @@ export function codaDalServer(testoServer) {
     '',
     'IN LOCALE, quattro differenze da quanto scritto qui sopra:',
     '- le prove del giro stanno nella cartella indicata più su, non in `tests/verifica/<numero>`;',
+    '- qui i rilievi lasciati fuori non prendono un numero di feedback, quindi le prove da togliere sono quelle',
+    '  dei rilievi elencati più su, riconosciute dal loro testo;',
     '- non c\'è `--segnala`, quindi qui una segnalazione non ferma niente da sola: un trade-off vero si scrive',
     '  PER PRIMO nel report, con le strade e i loro costi, e lo porta all\'owner chi guida il giro, che è lui a',
     '  fermare il lavoro. Un rilievo che chiede una sua decisione non si corregge a metà: consegna il resto;',
@@ -708,12 +637,23 @@ export function derivatiText(list) {
   return list.map((f) => `${ROUND.formatFinding(f)}\n  → feedback a parte, priorità ${Number.isFinite(Number(f.priority)) ? Number(f.priority) : Number(f.level) || 0}${f.sede === 'e' ? ' (esterno: non tocca a questo lavoro)' : ' (interno, messo da parte)'}`).join('\n');
 }
 
+/** I bilanci residui in una riga («cap3: n giri residui su m · …»), vuota senza bilanci. PURA. */
+export function bilanciResiduiText(budgets) {
+  if (!budgets || typeof budgets !== 'object') return '';
+  return CAP_KEYS.map((k) => (budgets[k] ? `${k}: ${budgets[k].left} giri residui su ${budgets[k].cap}` : null)).filter(Boolean).join(' · ');
+}
+
+/** La riga che dice dei 2 interni messi da parte (bilancio dei 2 finito), o vuota. PURA. */
+export function dueDaParteText(list) {
+  const n = (Array.isArray(list) ? list : []).filter((f) => f && Number(f.level) === 2 && f.sede !== 'e').length;
+  if (!n) return '';
+  return `Bilancio delle correzioni di livello 2 finito: ${n === 1 ? 'il rilievo interno di livello 2 rimasto esce come feedback a parte' : `i ${n} rilievi interni di livello 2 rimasti escono come feedback a parte`}, a priorità 2. Il lavoro non si ferma.`;
+}
+
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
 export function codaText({ findings, derived, external, budgets, branch, instructions }) {
   const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
-  const b = budgets && typeof budgets === 'object'
-    ? ['cap2', 'cap1', 'cap0'].map((k) => (budgets[k] ? `${k}: ${budgets[k].left} giri residui su ${budgets[k].cap}` : null)).filter(Boolean).join(' · ')
-    : '';
+  const b = bilanciResiduiText(budgets);
   // La coda non sta qui: arriva da quel file. Se manca, si dice dove doveva
   // essere e come si consegna, e basta.
   const testo = String(instructions || '').trim() || [
@@ -721,29 +661,36 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
     'chiedila a chi guida. In ogni caso si correggono SOLO i rilievi dell\'elenco qui sopra, e si consegna con',
     '  node scripts/verify-local.mjs corretto "<report della correzione>"',
   ].join('\n');
-  // Le prove del giro le rilancia CHI CORREGGE, prima di consegnare: è la metà
-  // che rende utile tenerle nel ramo. In cloud sta nelle istruzioni del ruolo;
-  // qui la coda arriva da un file fuori dal repo, che non le nomina — quindi la
-  // riga la mette lo strumento, che è la parte che vive nel repo.
+  // Quali prove del giro si lanciano, e quali si tolgono, lo dice lo strumento:
+  // in cloud sta nelle istruzioni del ruolo, ma qui la coda arriva da un file
+  // fuori dal repo, che non le nomina — e la parte che vive nel repo è questa.
   const cartella = cartellaProveGiro(branch);
   const righe = [
     '══ ESITO: c\'è da correggere ══',
     `Ramo: ${branch}.`,
     'Rilievi da correggere in questo giro (con la loro famiglia: le altre porte della stessa causa):',
     fmt(findings),
-    'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner, e le loro prove del giro',
-    'si marcano attese rosse nello stesso commit della correzione, `test.fail(true, \'messo da parte: <prima frase>\')`):',
+    'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner):',
     derivatiText(derived),
     'Rilievi esterni (non toccano a questo lavoro: ciascuno diventa un feedback suo, lo apre chi guida dal report):',
     derivatiText(external),
   ];
+  const due = dueDaParteText(derived);
+  if (due) righe.push(due);
   if (b) righe.push(`Bilanci: ${b}`);
   righe.push(
     '',
-    `Prima di consegnare rilancia le prove del giro (le tue e quelle dei giri prima): npx playwright test ${cartella}`,
-    'Una che diventa rossa è una regressione della correzione. Se quella cartella non c\'è, non c\'era niente da rilanciare:',
-    'guardala però, non fidarti del messaggio — «No tests found» arriva anche a cartella piena se il percorso è scritto in',
-    'un\'altra forma (solo quello relativo alla radice del repo, con le barre normali, viene riconosciuto).',
+    `Le prove del giro stanno in ${cartella}. Lancia SOLO quelle dei rilievi che stai correggendo, prima e dopo`,
+    '(`npx playwright test <percorso della singola prova>`): la cartella intera la rilancia chi verifica, all\'inizio del',
+    'giro. Il percorso va scritto relativo alla radice del repo e con le barre normali: in ogni altra forma la risposta è',
+    '«No tests found» anche a file esistente.',
+    'Nello stesso commit della correzione TOGLI da quella cartella:',
+    '  · le prove dei rilievi messi da parte e degli esterni elencati qui sopra — ognuno è un feedback suo adesso, e il',
+    '    testo del rilievo viaggia lì: la cartella del giro non deve crescere;',
+    '  · le prove dei rilievi che hai corretto, quando scrivi la prova durevole che li tiene chiusi. Se non ne scrivi una,',
+    '    la prova del giro resta.',
+    'Restano le prove dei rilievi che fermano il lavoro: le tratta chi riprende. Una prova che copre anche un caso ancora',
+    'aperto non si cancella: toglile il caso che se ne va, o segnale il rosso atteso in testa al corpo.',
     '',
     testo,
   );
@@ -927,18 +874,46 @@ export function verdictForCurrentBranch(root = ROOT) {
  */
 export function diffDopoLaVerifica(base, head, root = ROOT) {
   if (!base || !head || base === head) return null;
-  const elenco = tryGit(['diff', '--name-only', '-z', `${base}`, `${head}`], root);
+  const elenco = tryGit(['diff', '--name-status', '-z', `${base}`, `${head}`], root);
   // Git muto non è git contento: senza il diff non si tollera niente.
   if (!elenco.ok) return null;
-  const paths = elenco.out.split('\0').map((p) => p.trim()).filter(Boolean);
-  if (!paths.length || paths.some((p) => !dentroProveGiro(p))) {
-    return paths.map((path) => ({ path, prima: '', dopo: '' }));
+  const voci = vociNameStatus(elenco.out);
+  if (!voci.length || voci.some((v) => !dentroProveGiro(v.path))) {
+    return voci.map((v) => ({ path: v.path, stato: v.stato, prima: '', dopo: '' }));
   }
-  return paths.map((path) => ({
-    path,
-    prima: contenutoAl(base, path, root),
-    dopo: contenutoAl(head, path, root),
+  return voci.map((v) => ({
+    path: v.path,
+    stato: v.stato,
+    prima: contenutoAl(base, v.path, root),
+    dopo: contenutoAl(head, v.path, root),
   }));
+}
+
+/**
+ * L'uscita di `git diff --name-status -z` in `[{ stato, path }]`. PURA.
+ *
+ * Con `-z` i campi sono separati da NUL e i nomi arrivano crudi, senza
+ * virgolette: è l'unica forma in cui un percorso con uno spazio (la macchina di
+ * chi sviluppa ne ha) si legge per intero. Uno spostamento (`R`) porta DUE
+ * nomi e qui diventa due voci, il vecchio tolto e il nuovo aggiunto: un file
+ * che ricompare altrove è roba da girare che nessuno ha ancora provato.
+ */
+export function vociNameStatus(out) {
+  const campi = String(out ?? '').split('\0');
+  const voci = [];
+  for (let i = 0; i < campi.length; i += 1) {
+    const stato = campi[i].trim();
+    if (!stato) continue;
+    const doppio = /^[RC]/i.test(stato);
+    const primo = (campi[i + 1] || '').trim();
+    const secondo = doppio ? (campi[i + 2] || '').trim() : '';
+    i += doppio ? 2 : 1;
+    if (doppio) {
+      if (primo) voci.push({ stato: 'D', path: primo });
+      if (secondo) voci.push({ stato: 'A', path: secondo });
+    } else if (primo) voci.push({ stato: stato[0].toUpperCase(), path: primo });
+  }
+  return voci;
 }
 
 /** Il contenuto di un file a un commit, stringa vuota se lì non c'era. */
@@ -983,6 +958,10 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     '',
     'COSA ERA STATO CHIESTO (l’unica cosa che sai):',
     String(request || '').split('\n').map((l) => `  ${l}`).join('\n'),
+    '',
+    'DECISIONI DELL’OWNER: in un giro locale non c’è la conversazione del feedback, quindi',
+    'qui non ne arrivano a parte; le scelte dell’owner stanno nella richiesta qui sopra e',
+    'valgono come specifica insieme a lei. Una scelta che lui ha già fatto non è un rilievo.',
     ...past,
     '',
     `RAMO DA PROVARE: ${branch} (è già quello su cui sei: non cambiarlo)`,
@@ -997,12 +976,13 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     'LE TUE PROVE RESTANO NEL RAMO, e qui non c\'è un numero di feedback: la cartella',
     `del giro è \`${cartellaProveGiro(branch)}\` — dove la recipe qui sotto dice`,
     '`tests/verifica/<numero>/`, in locale si legge quella. Le spec si chiamano',
-    '`giro<k>-<cosa>.spec.mjs`, si committano prima di registrare la critica e non si',
-    'cancellano: sono la memoria del giro. Se ci sono già le prove dei giri passati,',
-    'lanciale per prime; se la cartella non c\'è, non c\'era niente da rilanciare — ma',
-    'guarda la cartella, non il messaggio: il comando risponde «No tests found» anche a',
-    'cartella piena se il percorso è scritto in un\'altra forma (solo quello relativo alla',
-    'radice del repo, con le barre normali, viene riconosciuto).',
+    '`giro<k>-<cosa>.spec.mjs` e si committano prima di registrare la critica. Sei tu',
+    'l\'unico a rilanciare quelle dei giri passati, e il momento è ADESSO, in partenza:',
+    'sono il controllo delle porte riaperte, e dopo di te nessuno le rilancia. Se la',
+    'cartella non c\'è, non c\'era niente da rilanciare — ma guarda la cartella, non il',
+    'messaggio: il comando risponde «No tests found» anche a cartella piena se il',
+    'percorso è scritto in un\'altra forma (solo quello relativo alla radice del repo,',
+    'con le barre normali, viene riconosciuto).',
     '',
     'QUANDO HAI FINITO registra la critica: una riga per rilievo, con livello E sede davanti',
     'fra quadre, prima la cifra e poi la lettera (3 sicurezza/dati/Filo inutilizzabile · 2 la',
@@ -1219,16 +1199,20 @@ if (isMain) {
       const sospesi = Array.isArray(r.decision.sospesi) && r.decision.sospesi.length
         ? `\nAltri rilievi interni della stessa critica, che restano davanti a chi riprende dopo la risposta dell'owner:\n${ROUND.formatFindings(r.decision.sospesi)}`
         : '';
-      console.log(`══ ESITO: il lavoro si ferma ══\nRilievi interni di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}${sospesi}`);
+      console.log(`══ ESITO: il lavoro si ferma ══\nRilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o un 3/2 che chiede una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}${sospesi}`);
       if (r.decision.external && r.decision.external.length) {
         console.log(`Rilievi esterni (non toccano a questo lavoro): ciascuno diventa un feedback suo, lo apre chi guida dal report.\n${derivatiText(r.decision.external)}`);
       }
+      console.log(`Bilanci: ${bilanciResiduiText(r.decision.budgets)}`);
     } else {
       console.log(`══ ESITO: verifica superata per '${branch}' su ${sha.slice(0, 8)} ══`);
       if (e.derived && e.derived.length) {
         console.log(`Rilievi non corretti, da riportare nel report per l'owner (ciascuno diventa un feedback suo, con quella priorità):\n${derivatiText(e.derived)}`);
-        console.log(testoRossiAttesi(branch));
+        const due = dueDaParteText(r.decision.derived);
+        if (due) console.log(due);
+        console.log(testoProveDaCancellare(branch, e.derived));
       }
+      console.log(`Bilanci: ${bilanciResiduiText(r.decision.budgets)}`);
       // «Si può pubblicare» solo se è vero adesso: il pass vale per l'ultimo
       // salvataggio, e con modifiche non salvate `status` (e la chiusura)
       // dicono di no. Dirlo qui evita di scoprirlo alla chiusura (verifica
@@ -1266,9 +1250,9 @@ if (isMain) {
       console.log(`Nessun commit nuovo dopo la critica: niente da riverificare. Verifica superata per '${branch}' su ${sha.slice(0, 8)}.`);
       console.log(`Rilievi non corretti, da riportare nel report per l'owner (ciascuno diventa un feedback suo, con quella priorità):\n${derivatiText(r.derived)}`);
       // Stessa uscita, stesso consiglio: di qui esce un pass con rilievi
-      // aperti esattamente come da «critica», e le prove del giro sono rosse
-      // nello stesso modo.
-      console.log(testoRossiAttesi(branch));
+      // aperti esattamente come da «critica», e le loro prove del giro vanno
+      // tolte nello stesso modo.
+      console.log(testoProveDaCancellare(branch, r.derived));
       process.exit(0);
     }
     console.log(`Correzione consegnata su '${branch}' (${sha.slice(0, 8)}). Serve un'altra verifica, di un'altra istanza:`);

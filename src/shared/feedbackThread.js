@@ -281,11 +281,18 @@
     return ('owner:' + c).slice(0, 100);
   }
 
+  // Una riga finisce a OGNI a capo, di qualunque tipo: chi ripulisce e chi legge spezzano solo così, o un «\r» in
+  // mezzo a un marcatore sfugge a chi ripulisce e apre un turno per chi legge. Copia sul server: routine/notes.js.
+  const A_CAPO_RE = /\r\n|[\n\r\u2028\u2029]/;
+  function righe(s) {
+    return String(s == null ? '' : s).split(A_CAPO_RE);
+  }
+
   // Spezza il blob `notes` nei suoi turni. Ritorna una lista di
   // { role: 'model'|'user', ts: string|null, body: string } senza i segmenti
   // vuoti (es. note che iniziano direttamente con un marcatore di riapertura).
   function splitNotes(notes) {
-    const lines = String(notes || '').split('\n');
+    const lines = righe(notes || '');
     const segments = [];
     // Il testo prima di qualsiasi marcatore è il turno di Filo (il report/le
     // domande scritte dalla routine).
@@ -433,8 +440,23 @@
   //     duplicati;
   //   - altrimenti → APPENDI il report come nuovo turno dell'agente, conservando
   //     report precedente + annotazione di riapertura dell'utente.
+  // Un report di un agente non può aprire un turno: una riga che imita un
+  // confine («--- La tua risposta del … ---») diventerebbe una decisione
+  // dell'owner. Resta leggibile, citata con «> » davanti (come fa il server).
+  // Lo stesso per l'intestazione di un blocco di domande: le scrive solo il server.
+  const CONFINE_GENERICO_RE = /^---\s.*\sdel\s.*---\s*$/;
+  const CONFINE_PROPRIETARIO_RE = /^---\s*(?:Risposta|Aggiornamento) (?:dell'utente|dell’utente|del proprietario) del .*---\s*$/;
+  const DOMANDA_SERVER_RE = /^(?:Segnalazione|Domande) per l'owner \(chi [^)\n]+\):/;
+  function neutralizzaConfini(report) {
+    return righe(report || '').map((l) => {
+      const confine = USER_TURN_RE.test(l) || MODEL_TURN_RE.test(l) || CONFINE_GENERICO_RE.test(l)
+        || CONFINE_PROPRIETARIO_RE.test(l) || DOMANDA_SERVER_RE.test(l.trim());
+      return confine ? `> ${l}` : l;
+    }).join('\n');
+  }
+
   function mergeModelReport(existingNotes, incomingReport, opts) {
-    const incoming = String(incomingReport || '').trim();
+    const incoming = neutralizzaConfini(String(incomingReport || '').trim());
     const existing = String(existingNotes || '');
     if (!incoming) return existing;
     if (!existing.trim()) return incoming;
@@ -478,7 +500,7 @@
   // Diverso da splitNotes(): qui NON si perde nulla (marcatori, righe vuote,
   // allegati restano dove sono) perché il risultato torna su Firestore.
   function rawBlocks(notes) {
-    const lines = String(notes || '').split('\n');
+    const lines = righe(notes || '');
     const blocks = [];
     let current = [];
     for (const line of lines) {
@@ -622,5 +644,7 @@
     ATTACH_PREFIX,
     USER_TURN_RE,
     MODEL_TURN_RE,
+    A_CAPO_RE,
+    righe,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

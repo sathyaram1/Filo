@@ -582,11 +582,16 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // I tre bilanci dei giri di correzione e il testo della fase 2
-  // (config/routines, campi `cap2`, `cap1`, `cap0`, `fixInstructions` —
+  // I bilanci dei giri di correzione, uno per livello, e il testo della fase 2
+  // (config/routines, campi in VERIFIER_CAP_KEYS più `fixInstructions` —
   // feedback #561). Owner-only. È la fonte di verità che il server applica
   // quando registra la critica: cambiarli qui ha effetto sul prossimo giro.
-  const capsReply = (caps) => ({ ok: true, cap2: caps.cap2, cap1: caps.cap1, cap0: caps.cap0, fixInstructions: caps.fixInstructions, giroStretto: caps.giroStretto === true });
+  const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
+  const capsReply = (caps) => {
+    const out = { ok: true, fixInstructions: caps.fixInstructions, giroStretto: caps.giroStretto === true };
+    for (const k of CAP_KEYS) out[k] = caps[k];
+    return out;
+  };
   on(MSG.AUTOMATION_CAPS_GET, ownerOnly(async () => {
     try {
       const idToken = await auth.getIdToken();
@@ -603,9 +608,9 @@ module.exports = function register(on, ctx) {
     try {
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      return capsReply(await Defaults.setRoutineCaps({
-        cap2: msg.cap2, cap1: msg.cap1, cap0: msg.cap0, fixInstructions: msg.fixInstructions, giroStretto: msg.giroStretto,
-      }, idToken));
+      const patch = { fixInstructions: msg.fixInstructions, giroStretto: msg.giroStretto };
+      for (const k of CAP_KEYS) patch[k] = msg[k];
+      return capsReply(await Defaults.setRoutineCaps(patch, idToken));
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }

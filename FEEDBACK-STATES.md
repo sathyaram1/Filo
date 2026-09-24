@@ -86,8 +86,10 @@ il rombo e il pentagono della fila delle forme).
   interni da correggere→ resta
   `revision_capability`: chi corregge consegna `fixed`
   (`revision_capability → revision_capability`), poi un altro verificatore riprova
-  (feedback #561, dal 2026-09-05); —rilievo di livello 3/2 non correggibile (bilancio
-  esaurito)→ `design` (`statusReason: loop`); —rilievo di livello 3/2 che chiede una
+  (feedback #561, dal 2026-09-05); —rilievo di livello 3 non correggibile (bilancio
+  dei 3 esaurito)→ `design` (`statusReason: loop`); un 2 a bilancio dei 2 esaurito NON
+  ferma: esce come feedback derivato a priorità 2 e il lavoro passa se non c'è altro
+  (dal 2026-09-23, bilanci separati per livello); —rilievo di livello 3/2 che chiede una
   decisione→ `design` (`statusReason: decisione`); —QUALUNQUE consegna con una
   segnalazione per l'owner (`--segnala`: di chi risolve, di chi corregge, e la critica
   di chi verifica in ogni esito)→ `design` (`statusReason: decisione`), senza bisogno
@@ -204,8 +206,8 @@ sdoppiare l'interruttore riaprirebbe da solo cinque porte che l'owner aveva chiu
 Un solo stato `design`, più origini, distinte da `statusReason`: (1) verdetto
 giudici (nessun reason o `judges`); (2) domande della routine (appende le domande
 alla chat + `statusReason: clarify`); (3) la verifica ha trovato un difetto di livello
-3/2 che non si può più correggere da soli — bilancio delle correzioni esaurito
-(`statusReason: loop`, con la critica coi livelli in chat) — oppure che chiede una
+3 che non si può più correggere da soli — bilancio delle correzioni dei 3 esaurito
+(`statusReason: loop`, con la critica coi livelli in chat) — oppure un 3/2 che chiede una
 decisione dell'owner (`statusReason: decisione`), oppure chi risolve o chi corregge ha
 consegnato con una segnalazione per l'owner (stesso `statusReason: decisione`); in
 tutti questi casi bilanci e verdetti del giro si azzerano — la storia delle critiche
@@ -345,8 +347,8 @@ dashboard scriveva "in attesa di ripresa". Adesso:
 - **`scripts/dispatch.mjs` + ruoli**: il fixer muove `todo→working→revision_*`;
   loop 3× → `design`+`statusReason: loop`. *(Dal 2026-09-05, feedback #561: la
   critica si registra coi livelli e l'esito lo calcola il server; le regole
-  stanno in `src/shared/verifierRound.js`, incorporato dal server; i tre
-  bilanci `cap2/cap1/cap0` li scrive SOLO l'owner in `config/routines`
+  stanno in `src/shared/verifierRound.js`, incorporato dal server; i quattro
+  bilanci `cap3/cap2/cap1/cap0`, uno per livello, li scrive SOLO l'owner in `config/routines`
   (Gestione → Automazioni) — dal 2026-09-16 nel codice non c'è un default: la
   verifica locale li legge dal server e senza si ferma.)*
 - **`firestore.rules`**: enum `status` esteso ai nuovi valori (in create anonimo resta

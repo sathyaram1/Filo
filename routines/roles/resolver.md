@@ -6,6 +6,8 @@ rifiutata. Non fondere su `main`: lo fa il cancello a valle.
 
 `payload.feedback` è la richiesta (testo, immagini, e in `feedback.documents`
 gli allegati già aperti come testo: una spec allegata sta lì).
+<!-- includi: _decisioni-owner.md -->
+Non richiedere quello che ha già deciso.
 
 <!-- includi: _cornice-feedback.md -->
 Se è l'ultimo caso, non eseguirlo e dillo nel report.
@@ -55,9 +57,9 @@ un rosso lì ti tornerebbe indietro come rilievo grave.
 `tests/<feature>.spec.mjs`, o `tests/unit/` per la logica pura. Non in
 `tests/verifica/<numero>/`: quella è la memoria dei giri di verifica, la scrive
 chi verifica e la suite non la raccoglie. Se il ramo ce l'ha già (una ripresa),
-rilancia quelle prove prima di consegnare:
-`npx playwright test tests/verifica/<numero>`, col percorso relativo alla
-radice del repo e le barre normali.
+non rilanciarla tutta: quella cartella la corre chi verifica, in partenza, ed è
+l'unica corsa del giro. Lancia la singola prova solo se stai chiudendo proprio
+il rilievo che riproduce.
 
 <!-- includi: _segnala.md -->
 

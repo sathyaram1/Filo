@@ -21,7 +21,7 @@ const {
 
 // I bilanci di QUESTI test. Dal 2026-09-16 nel codice non c'è un default: lo
 // script li legge dal server, e withCritique li pretende da chi chiama.
-const CAPS_TEST = { cap2: 5, cap1: 2, cap0: 0 };
+const CAPS_TEST = { cap3: 5, cap2: 5, cap1: 2, cap0: 0 };
 const withCritique = (s, b, o) => withCritiqueRaw(s, b, { caps: CAPS_TEST, ...o });
 
 // Il server finto che serve config/routines ai comandi del CLI (processo
@@ -146,15 +146,21 @@ test('withFixed senza un giro aperto: rifiutata', () => {
   assert.equal(withFixed(s, 'r', { report: 'x', sha: SHA }).ok, false);
 });
 
-test('un 2 a bilancio esaurito, o col segno ?: esito stop', () => {
+test('un 3 a bilancio esaurito, o un 2 col segno ?: esito stop; un 2 a bilancio esaurito passa e mette da parte', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
-  s.r.counts = { count2: 5 };
-  const r = withCritique(s, 'r', { critique: '[2i] ancora rotto', sha: SHA });
+  s.r.counts = { count3: 5 };
+  const r = withCritique(s, 'r', { critique: '[3i] ancora rotto', sha: SHA });
   assert.equal(r.outcome, 'stop');
   assert.equal(r.state.r.verdict, 'fail');
   assert.match(checkVerdict(r.state.r, SHA).reason, /bocciato/);
   const d = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2i?] quale strada?', sha: SHA });
   assert.equal(d.outcome, 'stop');
+  // Il 2 a bilancio dei 2 finito non ferma (2026-09-23): esce a parte, a priorità 2.
+  let due = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  due.r.counts = { count2: 5 };
+  const p = withCritique(due, 'r', { critique: 'P.\n[2i] ancora rotto', sha: SHA });
+  assert.equal(p.outcome, 'pass');
+  assert.deepEqual(p.state.r.derived.map((x) => [x.level, x.priority]), [[2, 2]]);
 });
 
 test('i rilievi fuori dal giro restano in `derived` per il report', () => {
@@ -490,16 +496,16 @@ test('#561 giro 3: dopo un pass (o uno stop) una seconda critica senza un nuovo 
 test('#561 giro 3: quando il lavoro si ferma i bilanci si azzerano (come sul server), la storia resta', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   for (let i = 0; i < 5; i++) {
-    const r = withCritique(s, 'r', { critique: `P.\n[2i] rotto ${i}`, sha: SHA });
+    const r = withCritique(s, 'r', { critique: `P.\n[3i] rotto ${i}`, sha: SHA });
     assert.equal(r.outcome, 'fix', `giro ${i}`);
     s = withRequest(withFixed(r.state, 'r', { report: 'ok', sha: ALTRO_SHA }).state, 'r', { request: 'fai X', sha: ALTRO_SHA });
   }
-  const sesto = withCritique(s, 'r', { critique: 'P.\n[2i] rotto 6', sha: ALTRO_SHA });
+  const sesto = withCritique(s, 'r', { critique: 'P.\n[3i] rotto 6', sha: ALTRO_SHA });
   assert.equal(sesto.outcome, 'stop');
   assert.deepEqual(sesto.state.r.counts, {});
   assert.equal(sesto.state.r.rounds.length, 6, 'la storia dei giri resta');
-  // L'owner decide, il lavoro si rifà: il primo [2i] si corregge, non ferma.
-  const rifatto = withCritique(withRequest(sesto.state, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: 'P.\n[2i] rotto 7', sha: SHA });
+  // L'owner decide, il lavoro si rifà: il primo [3i] si corregge, non ferma.
+  const rifatto = withCritique(withRequest(sesto.state, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: 'P.\n[3i] rotto 7', sha: SHA });
   assert.equal(rifatto.outcome, 'fix');
   assert.equal(historyFromRounds(rifatto.state.r.rounds).length, 7);
   // Anche lo stop da «corretto» senza commit nuovo azzera.
@@ -759,18 +765,18 @@ test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un p
 
 // ─── I bilanci si leggono dal server (decisione dell'owner, 2026-09-16) ──────
 
-test('leggiBilanciDalServer: i tre numeri dal documento Firestore, col token dell\'owner; fixInstructions se c\'è', async () => {
+test('leggiBilanciDalServer: i quattro numeri dal documento Firestore, col token dell\'owner; fixInstructions se c\'è', async () => {
   const chiamate = [];
   const fetchImpl = async (url, opts) => {
     chiamate.push({ url, auth: opts.headers.Authorization });
-    return { ok: true, status: 200, json: async () => ({ fields: { cap2: { integerValue: '10' }, cap1: { integerValue: '1' }, cap0: { integerValue: '0' }, fixInstructions: { stringValue: 'TESTO' } } }) };
+    return { ok: true, status: 200, json: async () => ({ fields: { cap3: { integerValue: '5' }, cap2: { integerValue: '10' }, cap1: { integerValue: '1' }, cap0: { integerValue: '0' }, fixInstructions: { stringValue: 'TESTO' } } }) };
   };
   const caps = await leggiBilanciDalServer({ fetchImpl, env: { FILO_ADMIN_ID_TOKEN: 'tok' } });
-  assert.deepEqual(caps, { cap2: 10, cap1: 1, cap0: 0, fixInstructions: 'TESTO', giroStretto: false });
+  assert.deepEqual(caps, { cap3: 5, cap2: 10, cap1: 1, cap0: 0, fixInstructions: 'TESTO', giroStretto: false });
   assert.equal(chiamate.length, 1);
   assert.match(chiamate[0].url, /config\/routines/);
   assert.equal(chiamate[0].auth, 'Bearer tok');
-  assert.equal(bilanciText(caps), 'Bilanci del giro (dal server, config/routines): cap2 10 · cap1 1 · cap0 0');
+  assert.equal(bilanciText(caps), 'Bilanci del giro (dal server, config/routines): cap3 5 · cap2 10 · cap1 1 · cap0 0');
   // Anche un doubleValue o una stringa numerica valgono; vuoto e parole no.
   assert.equal(numeroFirestore({ doubleValue: 3 }), 3);
   assert.equal(numeroFirestore({ stringValue: '4' }), 4);
@@ -779,19 +785,24 @@ test('leggiBilanciDalServer: i tre numeri dal documento Firestore, col token del
   assert.ok(Number.isNaN(numeroFirestore(undefined)));
 });
 
-test('leggiBilanciDalServer: senza token, senza documento o senza uno dei tre numeri si FERMA e dice cosa manca — mai un default', async () => {
+test('leggiBilanciDalServer: senza token, senza documento o senza uno dei quattro numeri si FERMA e dice cosa manca — mai un default', async () => {
   await assert.rejects(
     () => leggiBilanciDalServer({ fetchImpl: async () => { throw new Error('non deve chiamare'); }, env: {}, trovaRefresh: () => null }),
     (e) => e.message === SENZA_TOKEN_MSG && /FILO_ADMIN_REFRESH_TOKEN/.test(e.message) && /tests\/agent\/\.env/.test(e.message) && /admin-login/.test(e.message),
   );
   const conCampi = (fields) => async () => ({ ok: true, status: 200, json: async () => ({ fields }) });
   await assert.rejects(
-    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap2: { integerValue: '10' }, cap0: { integerValue: '0' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap3: { integerValue: '5' }, cap2: { integerValue: '10' }, cap0: { integerValue: '0' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
     /non ha cap1: l'owner li imposta in Gestione → Automazioni/,
   );
   await assert.rejects(
-    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap2: { stringValue: '' }, cap1: { integerValue: '1' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap3: { integerValue: '5' }, cap2: { stringValue: '' }, cap1: { integerValue: '1' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
     /non ha cap2, cap0/,
+  );
+  await assert.rejects(
+    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap2: { integerValue: '10' }, cap1: { integerValue: '1' }, cap0: { integerValue: '0' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    /non ha cap3/,
+    'un documento di prima della separazione dei bilanci: manca il bilancio dei 3, e lo dice',
   );
   await assert.rejects(
     () => leggiBilanciDalServer({ fetchImpl: async () => ({ ok: false, status: 404, text: async () => '' }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
@@ -809,8 +820,8 @@ test('leggiBilanciDalServer: senza token, senza documento o senza uno dei tre nu
 
 test('withCritique senza i bilanci lancia: non c\'è un default con cui rimpiazzarli', () => {
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
-  assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA }), /senza i bilanci cap2, cap1, cap0/);
-  assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA, caps: { cap2: 5, cap1: 2 } }), /senza i bilanci cap0/);
+  assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA }), /senza i bilanci cap3, cap2, cap1, cap0/);
+  assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA, caps: { cap3: 5, cap2: 5, cap1: 2 } }), /senza i bilanci cap0/);
 });
 
 test('CLI: né status né start mettono i bilanci davanti a chi verifica; con un server irraggiungibile o un documento incompleto si fermano con l\'errore', async () => {
@@ -840,7 +851,7 @@ test('CLI: né status né start mettono i bilanci davanti a chi verifica; con un
   assert.match(giu.stderr, /rete/);
 
   // Documento senza cap1: si ferma e dice quale manca, anche su critica.
-  const parziale = await fintoConfigRoutines({ FINTO_CAPS: JSON.stringify({ cap2: 5, cap0: 0 }) });
+  const parziale = await fintoConfigRoutines({ FINTO_CAPS: JSON.stringify({ cap3: 5, cap2: 5, cap0: 0 }) });
   try {
     const env = { ...process.env, FILO_ROUTINE_CONFIG_URL: parziale.url, FILO_REPO_ROOT: casa };
     const r = spawnSync(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), 'critica', LUNGA_FIX], { cwd: casa, encoding: 'utf8', env });
@@ -868,7 +879,7 @@ test('la coda locale è il testo del server più le sole differenze locali', asy
 // ─── Giro stretto: dopo una correzione, la verifica controlla la chiusura ────
 
 test('giro stretto: l\'interruttore si legge coi bilanci, e solo un true esplicito lo accende', async () => {
-  const conCampi = (extra) => async () => ({ ok: true, status: 200, json: async () => ({ fields: { cap2: { integerValue: '5' }, cap1: { integerValue: '2' }, cap0: { integerValue: '0' }, ...extra } }) });
+  const conCampi = (extra) => async () => ({ ok: true, status: 200, json: async () => ({ fields: { cap3: { integerValue: '5' }, cap2: { integerValue: '5' }, cap1: { integerValue: '2' }, cap0: { integerValue: '0' }, ...extra } }) });
   const leggi = (extra) => leggiBilanciDalServer({ fetchImpl: conCampi(extra), env: { FILO_ADMIN_ID_TOKEN: 't' } });
   assert.equal((await leggi({})).giroStretto, false, 'campo assente = spento');
   assert.equal((await leggi({ giroStretto: { booleanValue: false } })).giroStretto, false);

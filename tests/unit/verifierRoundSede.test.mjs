@@ -14,7 +14,7 @@ const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 require(resolve(ROOT, 'src', 'shared', 'feedbackTransitions.js'));
 require(resolve(ROOT, 'src', 'shared', 'verifierRound.js'));
 const R = globalThis.SN_VERIFIER_ROUND;
-const CAPS = { cap2: 5, cap1: 2, cap0: 0 };
+const CAPS = { cap3: 5, cap2: 5, cap1: 2, cap0: 0 };
 
 const f = (level, sede, text, decision = false) => ({ level, sede, text, decision });
 const decide = (findings, counts = {}, caps = CAPS) => R.decideRound({ findings, caps, counts });
@@ -157,6 +157,6 @@ test('roundNote dice quanti esterni escono, e che il lavoro si ferma solo per un
   const fermo = decide([f(2, 'i', 'qui', true), f(2, 'e', 'altrove')]);
   const nota = R.roundNote({ summary: 's', findings: [f(2, 'i', 'qui', true), f(2, 'e', 'altrove')], decision: fermo });
   assert.match(nota, /Un rilievo è esterno/);
-  assert.match(nota, /rilievo interno di livello 2 o 3/);
+  assert.match(nota, /rilievo interno di livello 3 o 2 che chiede una tua decisione/);
   assert.match(nota, /- \[2i\?\] qui\n- \[2e\] altrove/);
 });

@@ -81,7 +81,7 @@ test('dal server il perimetro viaggia solo verso chi verifica', async () => {
 
 test('in locale la chiusura vale solo con l’interruttore acceso e subito dopo una correzione', async () => {
   const v = await carica('scripts/verify-local.mjs');
-  const caps = { cap2: 3, cap1: 1, cap0: 0 };
+  const caps = { cap3: 3, cap2: 3, cap1: 1, cap0: 0 };
   const ramo = 'claude/prova';
   let s = v.withRequest({}, ramo, { request: 'fai la cosa', sha: 'a'.repeat(40) });
   expect(v.ambitoLocale({ ...caps, giroStretto: true }, s[ramo])).toBe('pieno'); // primo giro: sempre pieno

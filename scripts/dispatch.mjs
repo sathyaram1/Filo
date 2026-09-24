@@ -111,8 +111,8 @@ const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 // fetchRoutineConfig per il perché.
 const ROUTINES_DOC = 'config/routines';
 
-// I tre bilanci dei giri di correzione (feedback #561: cap2 per i rilievi
-// di livello 3/2, cap1 per gli 1, cap0 per gli 0) li CONSUMA il SERVER quando
+// I bilanci dei giri di correzione, uno per livello (feedback #561: cap3 per
+// i rilievi di livello 3, cap2 per i 2, cap1, cap0) li CONSUMA il SERVER quando
 // registra la critica, coi numeri che l'owner scrive in config/routines: qui
 // non esistono, nemmeno come riferimento (fino al 2026-09-16 c'era una copia
 // del default con un paracadute 5/2/0, e un numero che nessuno applica è un
@@ -654,6 +654,12 @@ export function readRoleInstructions(role, { scope, caso } = {}) {
  * @param {object} bucket  bucket costruito dalla busta del server
  * @param {object} ctx     { diff?, feedback? } dati già raccolti dal chiamante
  */
+// Le decisioni dell'owner fanno parte della richiesta per chi verifica, risolve
+// e corregge: il server le mette nel payload, e qui non si perdono per strada.
+function conDecisioni(ctx) {
+  return Array.isArray(ctx && ctx.decisioni) && ctx.decisioni.length ? { decisioni: ctx.decisioni } : {};
+}
+
 export function buildPayload(bucket, ctx = {}) {
   switch (bucket.role) {
     case 'secaudit':
@@ -667,6 +673,7 @@ export function buildPayload(bucket, ctx = {}) {
       return {
         branch: bucket.branch, id: bucket.id, num: bucket.num,
         feedback: ctx.feedback || null,
+        ...conDecisioni(ctx),
         history: Array.isArray(ctx.history) ? ctx.history : [],
         historyDropped: Number(ctx.historyDropped) || 0,
         scope: verifierScope(ctx.scope).scope,
@@ -680,7 +687,7 @@ export function buildPayload(bucket, ctx = {}) {
       if (rip) {
         return {
           case: 'ripresa', branch: bucket.branch, id: bucket.id, num: bucket.num,
-          feedback: ctx.feedback || null, ripresa: rip,
+          feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx),
           history: Array.isArray(ctx.history) ? ctx.history : [],
           historyDropped: Number(ctx.historyDropped) || 0,
         };
@@ -694,10 +701,11 @@ export function buildPayload(bucket, ctx = {}) {
         id: bucket.id,
         num: bucket.num,
         feedback: ctx.feedback || null,
+        ...conDecisioni(ctx),
       };
     }
     case 'new-work': {
-      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
+      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null, ...conDecisioni(ctx) };
       // Chi lo ha preceduto aveva chiesto prima di avere un ramo, e l'owner ha
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
@@ -1033,14 +1041,23 @@ export function verifierReplyText(reply) {
   const r = reply && typeof reply === 'object' ? reply : {};
   const fmt = (list) => (Array.isArray(list) && list.length ? VERIFIER_ROUND.formatFindings(list) : '  (nessuno)');
   const b = (r.phase2 && r.phase2.budgets) || r.budgets;
+  // I bilanci come li manda il server, nell'ordine dei livelli: uno che il
+  // server non manda (un server vecchio) non si inventa.
+  const capKeys = Array.isArray(VERIFIER_ROUND.CAP_KEYS) ? VERIFIER_ROUND.CAP_KEYS : ['cap3', 'cap2', 'cap1', 'cap0'];
   const budgets = b && typeof b === 'object'
-    ? ['cap2', 'cap1', 'cap0'].map((k) => (b[k] ? `${k}: ${b[k].left} giri residui su ${b[k].cap}` : null)).filter(Boolean).join(' · ')
+    ? capKeys.map((k) => (b[k] ? `${k}: ${b[k].left} giri residui su ${b[k].cap}` : null)).filter(Boolean).join(' · ')
     : '';
   const derivati = derivatiAperti(r.phase2 ? r.phase2.derived : r.derived);
-  // Le prove del giro dei rilievi interni messi da parte le marca chi
-  // corregge, col numero del loro feedback, nello stesso commit: la riga è
-  // pronta da copiare. Quelle degli esterni le ha già marcate il verificatore.
-  const daMarcare = derivati.filter((d) => !d.esterno);
+  // I 2 interni messi da parte: il bilancio dei 2 è finito, e a differenza dei
+  // 3 non fermano il lavoro; il server li ha già aperti a priorità 2.
+  const dueDaParte = derivati.filter((d) => !d.esterno && d.priority === 2).length;
+  const dueRiga = dueDaParte
+    ? `Bilancio delle correzioni di livello 2 finito: ${dueDaParte === 1 ? 'il rilievo interno di livello 2 rimasto è uscito come feedback a parte' : `i ${dueDaParte} rilievi interni di livello 2 rimasti sono usciti come feedback a parte`}, a priorità 2 (elencati sopra). Il lavoro non si ferma.`
+    : null;
+  // Un rilievo diventato un feedback suo non lascia una prova rossa nel ramo:
+  // il testo vive nel feedback, e la cartella del giro si svuota invece di
+  // crescere. Le righe sono pronte da spuntare, col numero di ciascuno.
+  const daTogliere = derivati.map((d) => `  · la prova che riproduce ${d.num || '(numero non comunicato)'}: ${d.frase}`).join('\n');
   if (r.outcome === 'fix' && r.phase2) {
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
@@ -1048,8 +1065,9 @@ export function verifierReplyText(reply) {
       fmt(r.phase2.findings),
       'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu):',
       derivatiRighe(derivati),
-      daMarcare.length ? 'Prove del giro da marcare attese rosse nello stesso commit della correzione, in testa al corpo della prova:' : null,
-      daMarcare.length ? daMarcare.map((d) => `  test.fail(true, '${d.num}: ${d.frase.replace(/'/g, '’')}');`).join('\n') : null,
+      derivati.length ? 'Prove del giro da TOGLIERE dal ramo, nello stesso commit della correzione (quelle dei rilievi esterni le ha già tolte chi ha verificato: se non ci sono più, vai avanti):' : null,
+      derivati.length ? daTogliere : null,
+      dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
       '',
       String(r.phase2.instructions || ''),
@@ -1068,10 +1086,11 @@ export function verifierReplyText(reply) {
       '══ RISPOSTA DEL SERVER: il lavoro si ferma ══',
       perSegnalazione
         ? 'La segnalazione è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
-        : 'Rilievi interni di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l\'owner.',
+        : 'Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o un 3/2 che chiede una decisione): decide l\'owner.',
       perSegnalazione ? null : fmt(r.blocking),
       sospesi.length ? `Rilievi interni che restano davanti a chi riprende dopo la risposta:\n${fmt(sospesi)}` : null,
       derivati.length ? `Feedback derivati aperti dal server (esterni: escono comunque):\n${derivatiRighe(derivati)}` : null,
+      budgets ? `Bilanci: ${budgets}` : null,
       'Non c\'è niente da correggere adesso: rilascia il biglietto.',
     ].filter((l) => l !== null).join('\n');
   }
@@ -1079,8 +1098,18 @@ export function verifierReplyText(reply) {
     return [
       '══ RISPOSTA DEL SERVER: verifica superata ══',
       derivati.length ? `Rilievi non corretti, diventati feedback loro (priorità uguale al livello):\n${derivatiRighe(derivati)}` : 'Nessun rilievo da mettere da parte.',
+      dueRiga,
+      budgets ? `Bilanci: ${budgets}` : null,
+      derivati.length ? 'Prove del giro da TOGLIERE adesso, prima di rilasciare il biglietto:' : null,
+      derivati.length ? daTogliere : null,
+      // Toglierle è un commit, e un commit dopo il verdetto lo farebbe decadere:
+      // qui è tollerato, e dirlo serve a non lasciarle rosse per paura. Solo
+      // TOGLIERE però: una riga aggiunta dopo il verdetto lo fa decadere.
+      derivati.length ? '  Poi `git add -A && git commit`, e spingi: quel commit non fa decadere il verdetto, finché lì si TOGLIE' : null,
+      derivati.length ? '  e non si aggiunge niente. Una prova che copre anche un caso ancora aperto non si cancella: toglile il caso' : null,
+      derivati.length ? '  che se ne va, e lascia il resto.' : null,
       'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',
-    ].join('\n');
+    ].filter((l) => l !== null).join('\n');
   }
   // Il server ha accettato la critica ma non ha detto l'esito: non è un pass,
   // e non lo si inventa qui.
@@ -1652,6 +1681,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
     // manda e qui arriva semplicemente vuoto.
     return {
       feedback: (payload && payload.feedback) || null,
+      decisioni: Array.isArray(payload && payload.decisioni) ? payload.decisioni : [],
       history: Array.isArray(payload && payload.history) ? payload.history : [],
       // Quante critiche più vecchie il server ha tolto dalla serie: si stampa
       // nell'avvertenza, così i giri mancanti non passano per inesistenti.

@@ -1,8 +1,8 @@
 // Prove del giro 1 (verifica locale) sul lavoro «seguito del giro»,
-// punto A: i bilanci del giro di verifica locale (cap2/cap1/cap0) si leggono
-// dal server, con l'identità dell'owner, e nel codice pubblico non c'è più un
-// numero di ripiego. Senza token, senza documento, senza uno dei tre numeri:
-// errore evidente e stop, niente toccato.
+// punto A: i bilanci del giro di verifica locale (uno per livello, cap3…cap0)
+// si leggono dal server, con l'identità dell'owner, e nel codice pubblico non
+// c'è più un numero di ripiego. Senza token, senza documento, senza uno dei
+// numeri: errore evidente e stop, niente toccato.
 //
 // Lo strumento si prova COME LO USA L'OWNER: il comando vero (`status`,
 // `critica`) lanciato in un sotto-processo, con un server finto in ascolto in
@@ -55,8 +55,11 @@ async function serverFinto() {
   return { stato, url, chiudi: () => new Promise((ok) => srv.close(ok)) };
 }
 
-const doc = (cap2, cap1, cap0) => ({
+// Il bilancio dei 3 (dal 2026-09-23) c'è sempre, salvo chiederne l'assenza con `null`
+// (un `undefined` esplicito prenderebbe il valore di serie).
+const doc = (cap2, cap1, cap0, cap3 = { integerValue: '5' }) => ({
   fields: {
+    ...(cap3 !== undefined && cap3 !== null ? { cap3 } : {}),
     ...(cap2 !== undefined ? { cap2 } : {}),
     ...(cap1 !== undefined ? { cap1 } : {}),
     ...(cap0 !== undefined ? { cap0 } : {}),
@@ -87,7 +90,7 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
       .rejects.toThrow(/FILO_ADMIN_REFRESH_TOKEN/);
   });
 
-  test('`status`: documento assente, numero mancante, numero non numerico, server che rifiuta, rete giù → esce con errore e lo dice; con i tre numeri (anche 0) li stampa', async () => {
+  test('`status`: documento assente, numero mancante, numero non numerico, server che rifiuta, rete giù → esce con errore e lo dice; con i quattro numeri (anche 0) va avanti senza stamparli', async () => {
     const repo = repoTemporaneo();
     const s = await serverFinto();
     try {
@@ -119,10 +122,20 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
       r = await lancia(repo, s.url, 'status');
       expect(r.status).toBe(1);
       expect(r.stderr).toMatch(/HTTP 403/);
-      // I tre numeri ci sono, lo 0 compreso e uno scritto come stringa numerica: si va avanti.
+      // Manca il bilancio dei 3 (un documento di prima della separazione): si ferma e lo dice.
+      s.stato.risposta = { status: 200, body: doc(int(10), int(1), int(0), null) };
+      r = await lancia(repo, s.url, 'status');
+      expect(r.status).toBe(1);
+      expect(r.stderr).toMatch(/non ha cap3/);
+      // I quattro numeri ci sono, lo 0 compreso e uno scritto come stringa numerica: si va avanti.
+      // I numeri però non si stampano davanti a chi verifica (saperli orienta il livello):
+      // `status` dice solo che li ha letti.
       s.stato.risposta = { status: 200, body: doc(int(10), { stringValue: '1' }, { doubleValue: 0 }) };
       r = await lancia(repo, s.url, 'status');
-      expect(r.stdout).toMatch(/Bilanci del giro \(dal server, config\/routines\): cap2 10 · cap1 1 · cap0 0/);
+      // Senza una verifica avviata `status` esce 1 per conto suo: qui conta che i bilanci siano stati letti.
+      expect(r.stderr).not.toMatch(/BILANCI DEL GIRO NON LETTI/);
+      expect(r.stdout).toMatch(/Server raggiunto/);
+      expect(r.stdout).not.toMatch(/cap3 5|cap2 10|Bilanci del giro/);
       // Il token dell'owner è arrivato al server, non un altro.
       expect(s.stato.richieste.every((q) => q.auth === 'Bearer token-finto-di-prova')).toBe(true);
     } finally {
@@ -140,9 +153,9 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
     const statoFile = join(repo, '.claude', 'verify-local.json');
     writeFileSync(statoFile, JSON.stringify({ 'claude/prova': { request: 'la richiesta', requestedSha: sha, requestedAt: '2026-09-17T00:00:00.000Z', counts: {}, derived: [], rounds: [] } }, null, 2));
     const prima = readFileSync(statoFile, 'utf8');
-    const critica = 'Provato: il comando con e senza server, i tre numeri, lo zero. Funziona tutto quello che ho toccato.\n'
-      + '[2] il pulsante Salva non salva col titolo vuoto: passi, apri, lascia vuoto, premi.\n'
-      + '[1] il bordo del riquadro è grigio freddo dove il resto di Filo è caldo.';
+    const critica = 'Provato: il comando con e senza server, i quattro numeri, lo zero. Funziona tutto quello che ho toccato.\n'
+      + '[2i] il pulsante Salva non salva col titolo vuoto: passi, apri, lascia vuoto, premi.\n'
+      + '[1i] il bordo del riquadro è grigio freddo dove il resto di Filo è caldo.';
     const s = await serverFinto();
     try {
       s.stato.risposta = { status: 200, body: doc(undefined, int(0), int(0)) };
@@ -168,11 +181,12 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
   });
 
   test('il calcolo dell\'esito senza uno dei bilanci lancia, non inventa', () => {
-    expect(() => withCritique({}, 'b', { critique: 'x'.repeat(100), sha: 'abc', caps: { cap2: 10, cap1: 1 } })).toThrow(/cap0/);
-    expect(() => withCritique({}, 'b', { critique: 'x'.repeat(100), sha: 'abc', caps: null })).toThrow(/cap2, cap1, cap0/);
+    expect(() => withCritique({}, 'b', { critique: 'x'.repeat(100), sha: 'abc', caps: { cap3: 5, cap2: 10, cap1: 1 } })).toThrow(/cap0/);
+    expect(() => withCritique({}, 'b', { critique: 'x'.repeat(100), sha: 'abc', caps: { cap2: 10, cap1: 1, cap0: 0 } })).toThrow(/cap3/);
+    expect(() => withCritique({}, 'b', { critique: 'x'.repeat(100), sha: 'abc', caps: null })).toThrow(/cap3, cap2, cap1, cap0/);
   });
 
-  test('nel codice pubblico non resta un numero di ripiego per cap2/cap1/cap0', () => {
+  test('nel codice pubblico non resta un numero di ripiego per cap3/cap2/cap1/cap0', () => {
     const cartelle = ['scripts', 'src/shared', 'src/main', 'routines', '.claude/hooks', '.claude/skills'];
     const trovati = [];
     const cammina = (dir) => {
@@ -184,7 +198,7 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
         const testo = readFileSync(p, 'utf8');
         for (const [i, riga] of testo.split(/\r?\n/).entries()) {
           if (/^\s*(\/\/|#|\*)/.test(riga)) continue; // i commenti raccontano la storia (5/2/0), non sono un default
-          if (/\bcap[210]\s*[:=]\s*\d/.test(riga) || /\bDEFAULT_CAPS\b/.test(riga)) trovati.push(`${p}:${i + 1}: ${riga.trim()}`);
+          if (/\bcap[3210]\s*[:=]\s*\d/.test(riga) || /\bDEFAULT_CAPS\b/.test(riga)) trovati.push(`${p}:${i + 1}: ${riga.trim()}`);
         }
       }
     };

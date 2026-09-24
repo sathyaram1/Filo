@@ -25,7 +25,7 @@
 //   depositato).
 //
 // USO
-//   node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 1..3]
+//   node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 0..3]
 //                                                         [--url <indirizzo>]
 //                                                         [--allega <file>]…
 //                                                         [--dry-run]
@@ -148,15 +148,17 @@ export function exitCodeForError(err) {
 
 /**
  * Priorità richiesta dalla riga di comando. PURA.
- * Ammessi 1, 2, 3 (0 = nessuna, come nel resto del sistema). Qualunque altra
- * cosa è un errore d'uso: meglio fermarsi che scrivere una priorità inventata.
+ * La scala è 3/2/1/0 (lo 0 è un gradino della scala, non «nessuna»: assente
+ * = non impostata). Qualunque altra cosa è un errore d'uso: meglio fermarsi
+ * che scrivere una priorità inventata.
  * @returns {{ ok: true, valore: number|null } | { ok: false, motivo: string }}
  */
+export const PRIORITA_AMMESSE = Object.freeze([0, 1, 2, 3]);
 export function parsePriorita(raw) {
   if (raw === undefined || raw === null || raw === '') return { ok: true, valore: null };
   const n = Number(raw);
-  if (!Number.isInteger(n) || n < 1 || n > 3) {
-    return { ok: false, motivo: `priorità "${raw}" non valida: ammessi 1, 2, 3` };
+  if (!Number.isInteger(n) || !PRIORITA_AMMESSE.includes(n)) {
+    return { ok: false, motivo: `priorità "${raw}" non valida: ammessi ${PRIORITA_AMMESSE.join(', ')}` };
   }
   return { ok: true, valore: n };
 }
@@ -236,7 +238,7 @@ function leggiStdin() {
 }
 
 function uso() {
-  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 1..3] [--url <indirizzo>] [--allega <file>]… [--dry-run]');
+  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--dry-run]');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
   console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
 }
@@ -319,7 +321,7 @@ export async function main(argvIn) {
     return r.uso ? EXIT.USO : (r.codice || EXIT.RIFIUTATO);
   }
   if (r.dryRun) {
-    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}${p.valore ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}.`);
+    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}.`);
     return EXIT.FATTO;
   }
 
@@ -334,7 +336,8 @@ export async function main(argvIn) {
     console.error(`ALLEGATO NON CARICATO: ${f.name} (${f.reason}). Il feedback esiste ma senza questo documento.`);
   }
 
-  if (p.valore) {
+  // `!= null`, non un controllo di verità: lo 0 è una priorità da scrivere.
+  if (p.valore != null) {
     const pr = await applicaPriorita(r.id, p.valore);
     if (pr.ok) console.log(`Priorità ${p.valore} impostata.`);
     else console.log(`Priorità NON impostata (${pr.motivo}): mettila dalla dashboard.`);

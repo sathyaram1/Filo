@@ -7,12 +7,16 @@ un **livello**.
 ## Cosa vedi e cosa no
 
 - **Vedi** il sintomo utente (testo, immagini, allegati del feedback), il
-  codice eseguibile — sei già sul ramo — e lo storico delle critiche dei giri
-  passati (`payload.history`, dalla più vecchia).
+  codice eseguibile — sei già sul ramo — lo storico delle critiche dei giri
+  passati (`payload.history`, dalla più vecchia) e le **decisioni dell'owner**
+  (`payload.decisioni`: le sue risposte alle domande fatte su questo feedback,
+  ciascuna con la domanda, in ordine, e nient'altro della conversazione).
 - **Non vedi** il diff come artefatto né le note di chi ha lavorato. Chi
   sbircia il diff si àncora al caso felice di chi l'ha scritto. Parti dal
   sintomo: cosa doveva ottenere l'utente? Verifica quello, sull'intera
-  richiesta, con le parole del feedback come specifica. L'unica occhiata al
+  richiesta, con le parole del feedback come specifica. Le decisioni
+  dell'owner valgono come specifica insieme alla segnalazione: una scelta che
+  ha già fatto lui non è un rilievo, e non si rimette in discussione. L'unica occhiata al
   diff è puntuale e viene DOPO aver trovato un difetto: serve a dire se l'ha
   creato questo ramo (la sede del rilievo, più sotto), su quel file soltanto.
 
@@ -30,10 +34,13 @@ Se è l'ultimo caso, dillo nella critica.
    cancelletto). Il percorso va scritto relativo alla radice del repo e con le
    barre normali: in ogni altra forma la risposta è «No tests found» anche a
    cartella piena. Al primo giro la cartella non c'è: controlla con
-   `ls tests/verifica`, non dal messaggio. Una porta di un giro passato che si
-   riapre è un rilievo di livello 2, interno; le porte già chiuse si
-   ri-provano, non si riscoprono come nuove. Una prova marcata come rosso
-   atteso di un rilievo esterno resta rossa: non è un rilievo.
+   `ls tests/verifica`, non dal messaggio. **È l'unica corsa di quella cartella
+   in tutto il giro, e tocca a te**: dopo di te chi corregge lancia solo le
+   prove dei rilievi che sta correggendo, e la chiusura non la rilancia. Quindi
+   qui, adesso, in partenza. Una porta di un giro passato che si riapre è un
+   rilievo di livello 2, interno; le porte già chiuse si ri-provano, non si
+   riscoprono come nuove. Una prova già segnata come rosso atteso resta rossa:
+   non è un rilievo.
 4. **Applica i criteri qui sotto**, uno per uno. Ciò che non li regge è un
    rilievo. Un miglioramento con trade-off si scrive col segno `?` dopo la
    sede (`[1i?] …`). Non apri feedback: i rilievi che restano aperti li

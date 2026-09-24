@@ -378,8 +378,8 @@ modifica:
   ramo, senza pubblicare. Una regressione è rara: non vale un'ora d'attesa a
   ogni consegna;
 - **al suo posto**, nelle routine come in locale, chi verifica lancia
-  `npm run finish:check` (unit test più gli spec delle aree toccate dal ramo:
-  è lo stesso controllo del cancello di `npm run finish`) e le prove del giro,
+  `npm run finish:check` (unit test più gli spec delle aree toccate dal ramo) e
+  le prove del giro,
   `npx playwright test tests/verifica/<numero>` — quel percorso scritto
   relativo alla radice del repo e con le barre normali (vedi più sotto). Un
   rosso fuori dai rossi noti torna a chi risolve con l'elenco degli spec
@@ -404,15 +404,32 @@ Quale prova scrivere lo dicono i minimi qui sopra: se non c'è niente da aprire
 
 Quello che trovi lo correggi adesso, non lo lasci a chi verifica.
 
-Le prove di un **giro di verifica** non si cancellano: restano nel ramo, in
+Le prove di un **giro di verifica** restano nel ramo, in
 `tests/verifica/<numero>/` (in locale, dove un numero non c'è, la cartella la
-dice il compito che riceve chi verifica). Chi corregge le rilancia prima di
-consegnare, per numero: `npx playwright test tests/verifica/<numero>`. Quel
+dice il compito che riceve chi verifica), e **si corrono una volta per giro**:
+le rilancia chi verifica, in partenza, ed è il controllo delle porte riaperte.
+Chi corregge lancia solo le prove dei rilievi che sta correggendo, e la chiusura
+non le rilancia affatto. Il comando è
+`npx playwright test tests/verifica/<numero>`. Quel
 percorso va scritto **relativo alla radice del repo e con le barre normali**:
 con le barre di Windows (la forma che il completamento del terminale produce da
 solo) o per intero dalla radice del disco, la risposta è «No tests found» anche
 a cartella piena — la stessa che dà una cartella che non c'è. Prima di
-concludere che non c'era niente da rilanciare, guarda la cartella. La
+concludere che non c'era niente da rilanciare, guarda la cartella.
+
+**La cartella si svuota invece di crescere.** La prova di un rilievo che esce di
+lì in un feedback suo — esterno, o interno lasciato fuori dal giro — si
+CANCELLA: il testo del rilievo viaggia nel feedback, e una prova rossa lasciata
+indietro è un rosso da rispiegare a ogni giro. Si cancella anche quella di un
+rilievo corretto, nello stesso commit in cui si scrive la prova durevole che lo
+tiene chiuso (se prova durevole non ce n'è, la prova del giro resta). Restano le
+prove dei rilievi che hanno fermato il lavoro: le tratta chi riprende. Una prova
+che copre anche un caso ancora aperto non si cancella: le si toglie il caso che
+se ne va. Nel commit di una correzione c'è anche il ripiego del rosso atteso
+(`test.fail(true, '<motivo>')` in testa al corpo); **dopo un verdetto invece si
+può solo TOGLIERE** — una riga aggiunta lì fa decadere il verdetto e costa un
+giro intero, e i due cancelli (la chiusura in locale, il cancello di fusione del
+server) lo controllano. La
 suite completa non le raccoglie (quelle di un solo feedback costano otto
 minuti e mezzo); `FILO_TEST_VERIFICA=1` le include tutte. In quella cartella ci
 vanno **davvero**, e in una che porta il numero: una prova di giro lasciata
@@ -472,8 +489,8 @@ la scrittura chiara.
   unit test confronta le voci verificabili (scorciatoie, pagine interne) col
   codice reale e diventa rossa se derivano.
 - **`src/shared/feedbackTransitions.js`** — le TABELLE della macchina a stati
-  (stati, transizioni, statusPublic, imbottitura, i NOMI dei tre bilanci del
-  verificatore — i numeri NON stanno nel codice: li scrive l'owner in
+  (stati, transizioni, statusPublic, imbottitura, i NOMI dei bilanci del
+  verificatore, uno per livello — i numeri NON stanno nel codice: li scrive l'owner in
   Gestione → Automazioni, e chi ne ha bisogno li legge dal server o si ferma)
   come DATI. La dashboard le legge da qui; il server di
   filo-security le INCORPORA al deploy (predeploy `bake-shared`), insieme a

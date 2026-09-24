@@ -46,14 +46,14 @@
   const MAX_FINDING_TEXT = 12000;
 
   /**
-   * A quale bilancio appartiene un livello. I livelli 3 e 2 condividono lo
-   * stesso bilancio (x): entrambi sono "la cosa chiesta non si ottiene", e la
-   * differenza fra loro conta per la priorità, non per quante correzioni si
-   * pagano. PURA.
+   * A quale bilancio appartiene un livello: uno per livello. Fino al
+   * 2026-09-23 il 3 pagava dal bilancio del 2; separarli è ciò che permette
+   * al 2 di non fermare il lavoro a bilancio finito (decideRound). PURA.
    */
   function capKeyOf(level) {
     const n = Number(level);
-    if (n >= 2) return 'cap2';
+    if (n >= 3) return 'cap3';
+    if (n === 2) return 'cap2';
     if (n === 1) return 'cap1';
     return 'cap0';
   }
@@ -417,15 +417,16 @@
 
   // ── I bilanci ─────────────────────────────────────────────────────────────
   //
-  // Tre bilanci per feedback (spec §4): x giri per i livelli 3 e 2, y per gli 1,
-  // z per gli 0. I numeri li detta SOLO l'owner dalla dashboard
-  // (config/routines): nel codice non c'è un default (decisione del
+  // Quattro bilanci per feedback, uno per livello (dal 2026-09-23; prima i
+  // livelli 3 e 2 ne condividevano uno). I numeri li detta SOLO l'owner dalla
+  // dashboard (config/routines): nel codice non c'è un default (decisione del
   // 2026-09-16), e un bilancio mancante non vale 0 né altro — decideRound si
   // ferma con un errore che dice quale manca. Il tetto alto è lo stesso della
-  // dashboard.
+  // dashboard. I NOMI sono anche in feedbackTransitions.js (VERIFIER_CAP_KEYS)
+  // e nei campi della dashboard: una sentinella li confronta.
   const CAP_MIN = 0;
   const CAP_MAX = 10;
-  const CAP_KEYS = ['cap2', 'cap1', 'cap0'];
+  const CAP_KEYS = ['cap3', 'cap2', 'cap1', 'cap0'];
 
   /** I bilanci che mancano (né in `caps` né in `defaults`): [] se ci sono tutti. PURA. */
   function missingCaps(caps, defaults) {
@@ -464,8 +465,12 @@
    *
    * Regole:
    *   - un rilievo di livello 3 o 2 che chiede una decisione ferma il lavoro;
-   *   - un rilievo di livello 3/2 si corregge se il SUO bilancio ha ancora
-   *     giri; a bilancio finito ferma il lavoro;
+   *   - un 3 si corregge se il bilancio dei 3 ha ancora giri; a bilancio
+   *     finito ferma il lavoro (è l'unico livello che ferma per bilancio);
+   *   - un 2 si corregge se nello stesso giro si corregge anche un 3 (il giro
+   *     lo paga il 3) oppure se il bilancio dei 2 ha ancora giri; a bilancio
+   *     finito NON ferma: va nel feedback derivato, a priorità 2, e il giro
+   *     passa se non c'è altro (decisione dell'owner del 2026-09-23);
    *   - un 1 si corregge se nello stesso giro si corregge anche un 3/2 (il
    *     giro lo paga già il livello più alto, e un altro verificatore arriva
    *     comunque: decisione dell'owner del 2026-09-16) oppure se il suo
@@ -476,7 +481,7 @@
    *     giri al loro bilancio; altrimenti vanno nel feedback derivato;
    *   - un giro consuma UN giro dal bilancio del livello più alto corretto;
    *   - se il lavoro si ferma, non si corregge niente: decide l'owner su tutto;
-   *   - senza uno dei tre bilanci LANCIA (`bilanci del verificatore
+   *   - senza uno dei quattro bilanci LANCIA (`bilanci del verificatore
    *     mancanti: …`): un numero inventato al posto di quello dell'owner è
    *     peggio di un errore (decisione del 2026-09-16).
    *
@@ -487,11 +492,11 @@
    * non ferma niente: la domanda viaggia nel suo feedback. Anche i rilievi
    * interni messi da parte (`derived`) portano `priority` = livello.
    *
-   * @param {object} p { findings, caps:{cap2,cap1,cap0}, counts:{count2,count1,count0} }
+   * @param {object} p { findings, caps:{cap3,cap2,cap1,cap0}, counts:{count3,count2,count1,count0} }
    * @returns {{
    *   stop: boolean, blocking: object[], sospesi: object[], fix: object[], derived: object[], external: object[],
-   *   consume: 'cap2'|'cap1'|'cap0'|null, counts: object,
-   *   budgets: { cap2:{cap,used,left}, cap1:…, cap0:… }
+   *   consume: 'cap3'|'cap2'|'cap1'|'cap0'|null, counts: object,
+   *   budgets: { cap3:{cap,used,left}, cap2:…, cap1:…, cap0:… }
    * }}
    *   `sospesi` (solo allo stop): gli altri interni della stessa critica, che
    *   restano davanti a chi riprende dopo la risposta dell'owner.
@@ -512,17 +517,29 @@
     const blocking = [];
     const fixable = [];
     const derived = [];
+    const twos = [];
     const ones = [];
     const zeros = [];
     for (const f of findings) {
-      if (f.level >= 2) {
-        if (f.decision || left('cap2') <= 0) blocking.push(f);
+      if (f.level >= 3) {
+        if (f.decision || left('cap3') <= 0) blocking.push(f);
         else fixable.push(f);
+      } else if (f.level === 2) {
+        if (f.decision) blocking.push(f);
+        else twos.push(f);
       } else if (f.level === 1) {
         ones.push(f);
       } else {
         zeros.push(f);
       }
+    }
+    // I 2: con un 3 da correggere nello stesso giro si correggono pure loro
+    // (il giro lo paga il 3); da soli seguono il loro bilancio, e a bilancio
+    // finito non fermano: vanno da parte, ciascuno un feedback a priorità 2.
+    const withThree = fixable.length > 0;
+    for (const f of twos) {
+      if (withThree || left('cap2') > 0) fixable.push(f);
+      else derived.push(f);
     }
     // Gli 1: con un 3/2 da correggere nello stesso giro si correggono pure
     // loro (il giro lo paga il 3/2); da soli seguono il loro bilancio.
@@ -599,8 +616,11 @@
     if (esterni) {
       parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non tocca a questo lavoro): diventa' : `${esterni} rilievi sono esterni (non toccano a questo lavoro): diventano`} feedback a parte, con priorità uguale al livello.`);
     }
+    // I 2 interni messi da parte: il bilancio dei 2 è finito, e a differenza
+    // dei 3 non fermano il lavoro; escono come feedback a priorità 2.
+    const dueDaParte = Array.isArray(d.derived) ? d.derived.filter((f) => f && Number(f.level) === 2 && f.sede !== 'e').length : 0;
     if (d.stop) {
-      parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 2 o 3 che non si può correggere da soli (bilancio esaurito, o chiede una tua decisione).');
+      parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 3 che non si può correggere da soli (bilancio esaurito), o un rilievo interno di livello 3 o 2 che chiede una tua decisione.');
       const sospesi = Array.isArray(d.sospesi) ? d.sospesi.length : 0;
       if (sospesi) parts.push(`${sospesi === 1 ? 'Un altro rilievo interno resta' : `Altri ${sospesi} rilievi interni restano`} davanti a chi riprende dopo la tua risposta.`);
     } else if (Array.isArray(d.fix) && d.fix.length) {
@@ -609,6 +629,9 @@
       parts.push(esterni === list.length
         ? 'Nessun rilievo interno: il lavoro prosegue.'
         : 'Nessun rilievo interno da correggere adesso: il lavoro prosegue e i rilievi messi da parte vanno in feedback derivati.');
+    }
+    if (dueDaParte) {
+      parts.push(`Il bilancio delle correzioni di livello 2 è finito: ${dueDaParte === 1 ? 'il rilievo interno di livello 2 rimasto esce come feedback a parte' : `i ${dueDaParte} rilievi interni di livello 2 rimasti escono come feedback a parte`}, a priorità 2.`);
     }
     parts.push(formatFindings(list));
     return parts.join('\n');

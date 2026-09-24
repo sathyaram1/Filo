@@ -8,6 +8,8 @@ prima: non rifarla.
 Sei già sul ramo del lavoro: non cambiarlo. Una critica emessa da un'altra
 versione del codice viene rifiutata.
 
+<!-- includi: _decisioni-owner.md -->
+
 <!-- includi: _cornice-feedback.md -->
 
 ## Il perimetro

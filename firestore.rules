@@ -171,9 +171,9 @@ service cloud.firestore {
     //     non consegna nulla a nessuno.
     //   - `proberWhenIdle` (bool; assente = true): a coda vuota le routine
     //     esplorano l'app in cerca di problemi (#448).
-    //   - `cap2`, `cap1`, `cap0` (int 0-10): giri di correzione per livello di
-    //     rilievo, e `fixInstructions` (string): il testo della fase 2. Senza
-    //     default nel codice — assenti, la verifica si ferma (#561).
+    //   - `cap3`, `cap2`, `cap1`, `cap0` (int 0-10): giri di correzione per
+    //     livello di rilievo, e `fixInstructions` (string): il testo della fase
+    //     2. Senza default nel codice — assenti, la verifica si ferma (#561).
     //   - `failCap` (int): quanti fallimenti di fila prima di fermarsi.
     //   - `routineId` / `routineIdB` (string): le routine dei due account.
     //   - `pacemakerDailyCap` (int): tetto di giri al giorno del pacemaker.

@@ -11,7 +11,7 @@ require('../../../src/shared/feedbackTransitions.js');
 require('../../../src/shared/verifierRound.js');
 const V = globalThis.SN_VERIFIER_ROUND;
 
-const CAPS = { cap2: 10, cap1: 1, cap0: 0 };
+const CAPS = { cap3: 10, cap2: 10, cap1: 1, cap0: 0 };
 const F = (s) => V.parseFindings(s).findings;
 const decide = (s, counts = {}) => V.decideRound({ findings: F(s), caps: CAPS, counts });
 const sigla = (f) => `${f.level}${f.sede}${f.decision ? '?' : ''}`;
@@ -69,7 +69,7 @@ test('un 1 o uno 0 interno oltre il bilancio non si perde: diventa un feedback s
   const d = decide('[2i] a\n[1i] b\n[0i] c', { count1: 1 });
   expect(d.fix.map(sigla)).toEqual(['2i', '1i', '0i']);
   expect(d.consume).toBe('cap2');
-  expect(d.counts).toEqual({ count2: 1, count1: 1, count0: 0 });
+  expect(d.counts).toEqual({ count3: 0, count2: 1, count1: 1, count0: 0 });
 });
 
 test('allo stop gli altri rilievi interni della stessa critica non si perdono: o restano davanti a chi riprende, o diventano feedback loro', () => {
@@ -79,10 +79,13 @@ test('allo stop gli altri rilievi interni della stessa critica non si perdono: o
   expect(d.stop).toBe(true);
   expect(tenutiDa(d)).toContain('b');
   expect(tenutiDa(d)).toContain('c');
-  // Lo stesso quando a fermare è il bilancio del 2 esaurito.
-  const d2 = decide('[2i] a\n[1i] b', { count2: 10 });
+  // Lo stesso quando a fermare è il bilancio del 3 esaurito (dal 2026-09-23 il 2 a bilancio finito non ferma: esce a parte).
+  const d2 = decide('[3i] a\n[1i] b', { count3: 10 });
   expect(d2.stop).toBe(true);
   expect(tenutiDa(d2)).toContain('b');
+  const d3 = decide('[2i] a\n[1i] b', { count2: 10 });
+  expect(d3.stop).toBe(false);
+  expect(d3.derived.map((f) => [f.text, f.priority])).toEqual([['a', 2]]);
 });
 
 test('il compito stampato in locale insegna il formato che il lettore accetta: i suoi esempi passano la registrazione', () => {

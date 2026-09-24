@@ -34,6 +34,9 @@ l'attaccante raggiunge solo con una condizione rara è un 2, non un 3. Un
 rilievo di livello basso non si perde: alzargli il livello per salvarlo non
 serve, e costa.
 
+Accertati che ogni rilievo sia reale: se hai un dubbio, verificalo prima di
+scriverlo. Se sei in dubbio sul livello, scegli il più basso.
+
 ### La sede: interno o esterno
 
 **Interno** (`i`) se una delle due:
@@ -122,14 +125,14 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
 - **Le prove restano nel ramo**, in
   `tests/verifica/<numero>/giro<k>-<cosa>.spec.mjs` (con `FILO_TEST_SCALE` e le
   fixture del repo, come ogni spec). In un giro locale la cartella te la dice
-  il compito ricevuto. Sono la memoria del giro: il giro dopo le rilancia. Una
-  prova che era solo esplorazione (dipende dall'ambiente, non asserisce niente)
-  si cancella. Quelle scritte per un rilievo **esterno** le marchi subito come
-  attese rosse — `test.fail(true, 'esterno: <prima frase del rilievo>');` in
-  testa al corpo — perché in questo ramo non verranno corrette e il giro dopo
-  le rilancia: un rosso marcato così non è un rilievo. Quelle di un rilievo
-  interno che il server mette da parte le marca chi corregge, col numero del
-  feedback derivato che il server gli dà.
+  il compito ricevuto. Sono la memoria del giro, e a rilanciarle sei solo tu,
+  in partenza. Una prova che era solo esplorazione (dipende dall'ambiente, non
+  asserisce niente) si cancella. Si cancella anche quella di un rilievo
+  **esterno**, nello stesso commit: quel rilievo esce di qui dentro un feedback
+  suo, col suo testo, e la prova lasciata indietro sarebbe solo un rosso da
+  rispiegare per sempre. Quelle dei rilievi che la risposta del server lascia
+  fuori dal giro le toglie chi corregge, coi numeri che il server gli dà; se la
+  risposta invece dice che il lavoro passa, le togli tu, seguendola.
 - **Prima di registrare porta la directory a un commit**
   (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`): il
   salvataggio automatico parte solo da un Edit o da un Write, non da un `rm` o

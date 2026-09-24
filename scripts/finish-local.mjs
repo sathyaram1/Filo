@@ -355,6 +355,30 @@ export function esitoVerificaPerCheck({ checkOnly, ok, reason }) {
 }
 
 /**
+ * Gli spec delle aree toccate si rilanciano, o li ha già corsi chi ha
+ * verificato sullo stesso contenuto? PURA.
+ *
+ * Sono la parte lunga della chiusura (da quindici a quarantacinque minuti), e
+ * chi verifica li lancia in partenza per obbligo del suo ruolo: rifarli qui,
+ * sullo stesso commit, è la stessa ora pagata due volte. Si saltano solo con un
+ * verdetto valido in mano, che è già legato a quel contenuto — senza verifica
+ * superata non cambia niente. `--check` non salta mai: promette «i controlli e
+ * basta», e chi lo lancia è spesso proprio chi sta verificando.
+ *
+ * La logica pura NON si salta: le prove del giro che chi verifica committa
+ * dopo aver lanciato i controlli passano solo di qui (le sentinelle su quella
+ * cartella stanno negli unit test), e costa millisecondi.
+ */
+export function specDaRilanciare({ checkOnly, ok, sha, tollerato }) {
+  if (checkOnly || !ok) return { rilancia: true, nota: '' };
+  const dove = String(sha || '').slice(0, 8) || '—';
+  return {
+    rilancia: false,
+    nota: `▸ Spec delle aree toccate: li ha già corsi la verifica indipendente su ${dove}${tollerato ? ' (da lì il ramo si è mosso solo dentro le prove del giro)' : ''}, non li rifaccio.\n  La logica pura gira lo stesso: le prove del giro committate dopo quel controllo passano solo di qui.`,
+  };
+}
+
+/**
  * Spezza l'elenco degli spec in lotti che stanno in UNA riga di comando. PURA.
  * Su Windows la riga ha un tetto di ~8.000 caratteri: con tutto `src` toccato
  * gli spec mirati sono stati 245 e il lancio moriva con «riga troppo lunga»
@@ -472,6 +496,12 @@ async function main() {
     if (nota) console.log(`\n${nota}`);
   }
 
+  // L'esito della verifica si legge PRIMA dei controlli: è lui a dire se gli
+  // spec delle aree sono già stati corsi su questo contenuto (il cancello vero
+  // resta più sotto, dopo i controlli, dov'è sempre stato).
+  const v = verdictForCurrentBranch(ROOT);
+  const spec = specDaRilanciare({ checkOnly, ok: v.ok, sha: v.entry && v.entry.sha, tollerato: v.tollerato });
+
   {
     // 1. Logica pura — veloce, nessuna finestra che si apre.
     if (!run('npm', ['run', 'test:unit'], 'Controlli di logica')) {
@@ -482,7 +512,8 @@ async function main() {
     //    Actions, nel lavoro di release, ogni sei ore prima di pubblicare
     //    (dal 2026-09-15: nessun ruolo e nessuna sessione la lancia): qui
     //    serve il segnale rapido.
-    const changed = git(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean);
+    if (!spec.rilancia) console.log(`\n${spec.nota}`);
+    const changed = spec.rilancia ? git(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean) : [];
     // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
     // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
     // l'elenco degli spec tracciati e filtriamo in memoria.
@@ -503,7 +534,7 @@ async function main() {
         ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
         : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');
     }
-    if (!specs.length) {
+    if (spec.rilancia && !specs.length) {
       console.log('\n(nessuno spec mirato per le aree toccate: il lavoro verrà comunque ricontrollato prima della pubblicazione agli utenti)');
     }
   }
@@ -514,7 +545,6 @@ async function main() {
   //    ha fatto il lavoro, quindi hanno i suoi stessi punti ciechi. In cloud
   //    questo passaggio c'è da sempre; qui mancava, e si pubblicava senza.
   {
-    const v = verdictForCurrentBranch(ROOT);
     const esito = esitoVerificaPerCheck({ checkOnly, ok: v.ok, reason: v.reason });
     if (esito.nota) console.log(`\n${esito.nota}`);
     if (esito.ferma) {
@@ -530,13 +560,13 @@ async function main() {
     }
     if (v.ok) {
       console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
-      // Il verdetto vale per un commit. Se la punta si è mossa solo per i
-      // marcatori di rosso atteso nelle prove del giro, regge lo stesso
-      // (#661): quando succede si DICE quali file sono passati, perché un
-      // cancello che si apre in silenzio è indistinguibile da uno che non c'è.
+      // Il verdetto vale per un commit. Se dopo di lui dalle prove del giro si
+      // è solo tolto, regge lo stesso (#661): quando succede si DICE quali file
+      // sono passati, perché un cancello che si apre in silenzio è
+      // indistinguibile da uno che non c'è.
       if (v.tollerato) {
-        console.log(`  Il ramo si è mosso dopo la verifica, ma solo per i marcatori di rosso atteso: ${(v.files || []).join(', ')}`);
-        console.log('  Quello che gira è lo stesso contenuto verificato, quindi il verdetto regge.');
+        console.log(`  Il ramo si è mosso dopo la verifica, ma solo togliendo prove o casi dalle prove del giro: ${(v.files || []).join(', ')}`);
+        console.log('  Quello che gira non è cresciuto rispetto al contenuto verificato, quindi il verdetto regge.');
       }
     }
   }

@@ -112,6 +112,26 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
   assert.ok(fix.indexOf('FERMA il lavoro') > fix.indexOf('FASE 2 — correggi'), 'dopo le istruzioni, non al loro posto');
   assert.match(verifierReplyText({ outcome: 'pass', derived: { num: '#42.1' } }), /#42\.1/);
   assert.match(verifierReplyText({ outcome: 'stop', blocking: [{ level: 3, text: 'grave' }] }), /si ferma[\s\S]*\[3i\] grave/);
+
+  // Un rilievo diventato un feedback suo non lascia una prova rossa nel ramo: la
+  // prova si TOGLIE, e la risposta dice quali per numero (regola del
+  // 23/09/2026). Chi le toglie cambia con l'esito: chi corregge se c'è una fase
+  // 2, chi ha verificato se il lavoro passa.
+  assert.match(fix, /Prove del giro da TOGLIERE dal ramo, nello stesso commit della correzione/);
+  assert.doesNotMatch(fix, /test\.fail\(true/, 'il marcatore non è più la strada principale');
+  const passConFigli = verifierReplyText({
+    outcome: 'pass',
+    derived: [{ level: 2, sede: 'e', text: 'la pagina non si apre. Passi: aprila.', priority: 2, num: '#42.3' }],
+  });
+  assert.match(passConFigli, /Prove del giro da TOGLIERE adesso/);
+  assert.match(passConFigli, /#42\.3/);
+  assert.match(passConFigli, /non fa decadere il verdetto/, 'o restano rosse per paura di perdere il pass');
+  // Dopo un verdetto si può solo TOGLIERE: un marcatore aggiunge una riga, e il
+  // cancello di fusione del server non lo tollera. Proporlo qui sarebbe una
+  // trappola: il commit costerebbe il giro che questa finestra serve a salvare.
+  assert.doesNotMatch(passConFigli, /test\.fail/);
+  // Senza figli non si stampa un elenco vuoto.
+  assert.doesNotMatch(verifierReplyText({ outcome: 'pass', derived: [] }), /TOGLIERE/);
   // Un «ok» senza esito non è un pass: dirlo superato mandava a rilasciare il
   // biglietto anche con un rilievo di livello 2 nella critica (verifica del
   // giro 3 sul lavoro di lancio delle routine).
@@ -171,6 +191,25 @@ test('buildPayload new-work: feedback completo', () => {
 
 test('buildPayload prober: payload vuoto', () => {
   assert.deepEqual(buildPayload({ role: 'prober' }), {});
+});
+
+// ─── Le decisioni dell'owner: dalla busta del server al compito del lavoratore ─
+
+test('le decisioni dell\'owner arrivano a chi verifica, risolve, riprende e riallinea; non al controllo di sicurezza', () => {
+  const decisioni = [{ domanda: 'A destra o a sinistra?', risposta: 'A destra.' }, { domanda: '', risposta: 'Tieni la scorciatoia.' }];
+  const busta = (extra = {}) => ({ payload: { feedback: { text: 's', num: '#7' }, history: [], decisioni, ...extra } });
+  const compito = (role, extra) => {
+    const b = { role, id: 'A', num: '#7', branch: 'worker/A' };
+    return buildPayload(b, serverCtx(b, busta(extra), role === 'secaudit' ? 'DIFF' : ''));
+  };
+  assert.deepEqual(compito('verifier').decisioni, decisioni);
+  assert.deepEqual(compito('new-work').decisioni, decisioni);
+  assert.deepEqual(compito('fixer', { ripresa: { domanda: 'q', risposta: 'r', rilievi: [] } }).decisioni, decisioni);
+  assert.deepEqual(compito('fixer').decisioni, decisioni, 'anche chi riallinea deve tenere le scelte dell\'owner');
+  assert.equal(compito('secaudit').decisioni, undefined);
+  // Un server che non le manda: nessun campo, non un elenco inventato.
+  const b = { role: 'verifier', id: 'A', num: '#7', branch: 'worker/A' };
+  assert.equal(buildPayload(b, serverCtx(b, { payload: { feedback: { text: 's' } } })).decisioni, undefined);
 });
 
 // ─── Lo storico delle critiche (caso #502: sei giri per un difetto da due) ────

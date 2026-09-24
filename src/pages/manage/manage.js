@@ -43,9 +43,12 @@
   const mgProberIdle      = document.getElementById('mgProberIdle');
   const mgProberIdleMsg   = document.getElementById('mgProberIdleMsg');
   const mgProberIdleBlock = document.getElementById('mgProberIdleBlock');
-  // I tre bilanci dei giri di correzione (feedback #561): cap2 = giri
-  // per i rilievi di livello 3/2, cap1 = per gli 1, cap0 = per i soli 0; più il
-  // testo in coda alla risposta (fixInstructions).
+  // I bilanci dei giri di correzione, uno per livello (feedback #561): cap3 =
+  // giri per i rilievi di livello 3, cap2 = per i 2, cap1 = per gli 1, cap0 =
+  // per i soli 0; più il testo in coda alla risposta (fixInstructions).
+  const mgCap3     = document.getElementById('mgCap3');
+  const mgCap3Save = document.getElementById('mgCap3Save');
+  const mgCap3Msg  = document.getElementById('mgCap3Msg');
   const mgCap2     = document.getElementById('mgCap2');
   const mgCap2Save = document.getElementById('mgCap2Save');
   const mgCap2Msg  = document.getElementById('mgCap2Msg');
@@ -310,6 +313,7 @@
     }
     return arr;
   }
+  const CAP3_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP3) || 'filo_automation_cap3';
   const CAP2_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP2) || 'filo_automation_cap2';
   const CAP1_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP1) || 'filo_automation_cap1';
   const CAP0_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP0) || 'filo_automation_cap0';
@@ -375,7 +379,7 @@
     if (mgRoutinesToggle) mgRoutinesToggle.checked = routinesOn;
     if (mgRoutinesState)  mgRoutinesState.textContent = routinesOn ? 'On' : 'Off';
     if (mgProberIdleBlock) mgProberIdleBlock.classList.toggle('mg-auto-block--off', !routinesOn);
-    for (const id of ['mgCap2Block', 'mgCap1Block', 'mgCap0Block', 'mgFixInstructionsBlock']) {
+    for (const id of ['mgCap3Block', 'mgCap2Block', 'mgCap1Block', 'mgCap0Block', 'mgFixInstructionsBlock']) {
       const el = document.getElementById(id);
       if (el) el.classList.toggle('mg-auto-block--off', !routinesOn);
     }
@@ -553,7 +557,7 @@
     // Le due impostazioni che valgono solo per le routine: senza routine non
     // decidono niente, quindi non si toccano (come i mittenti con l'automatica
     // spenta). Restano visibili: sono una scelta dell'owner, non un segreto.
-    for (const el of [mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save, mgFixInstructions, mgFixInstructionsSave]) {
+    for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save, mgFixInstructions, mgFixInstructionsSave]) {
       if (el) el.disabled = !isAdmin || !routinesOn;
     }
     if (mgProberIdle)  mgProberIdle.disabled = !isAdmin || !routinesOn;
@@ -570,10 +574,12 @@
     applyAutoApproveGate();
   }
 
-  // ── I tre bilanci dei giri di correzione (tab Automazioni) ────────
-  // Quattro campi sul doc Firestore config/routines (feedback #561, §4):
-  //   cap2  giri di correzione per i rilievi di livello 3 e 2 (a bilancio
-  //         finito un 3/2 ferma la pratica e chiama l'owner);
+  // ── I bilanci dei giri di correzione, uno per livello (tab Automazioni) ──
+  // Cinque campi sul doc Firestore config/routines (feedback #561, §4):
+  //   cap3  giri di correzione per i rilievi di livello 3 (a bilancio finito
+  //         un 3 ferma la pratica e chiama l'owner);
+  //   cap2  giri per i rilievi di livello 2 (a bilancio finito escono come
+  //         feedback a priorità 2, il lavoro non si ferma);
   //   cap1  giri per i rilievi di livello 1 (a bilancio finito vanno nel
   //         feedback derivato);
   //   cap0  giri per i soli rilievi di livello 0 (0 = mai da soli);
@@ -592,8 +598,10 @@
   const CAPS_GET = (window.SN_MSG?.MSG?.AUTOMATION_CAPS_GET) || 'automation_caps_get';
   const CAPS_SET = (window.SN_MSG?.MSG?.AUTOMATION_CAPS_SET) || 'automation_caps_set';
 
-  // I tre bilanci condividono il meccanismo: descrizione una volta sola.
+  // I bilanci condividono il meccanismo: descrizione una volta sola. L'ordine
+  // e i nomi sono quelli di VERIFIER_CAP_KEYS (una sentinella li confronta).
   const CAP_FIELDS = {
+    cap3: { input: mgCap3, save: mgCap3Save, msg: mgCap3Msg, cacheKey: CAP3_KEY, min: AUTOMATION.CAP_MIN },
     cap2: { input: mgCap2, save: mgCap2Save, msg: mgCap2Msg, cacheKey: CAP2_KEY, min: AUTOMATION.CAP_MIN },
     cap1: { input: mgCap1, save: mgCap1Save, msg: mgCap1Msg, cacheKey: CAP1_KEY, min: AUTOMATION.CAP_MIN },
     cap0: { input: mgCap0, save: mgCap0Save, msg: mgCap0Msg, cacheKey: CAP0_KEY, min: AUTOMATION.CAP_MIN },
@@ -655,7 +663,7 @@
   async function saveCap(field) {
     const f = CAP_FIELDS[field];
     if (!f.input) return;
-    // Un campo vuoto non è uno zero (per i difetti gravi lo 0 ferma il lavoro
+    // Un campo vuoto non è uno zero (per il livello 3 lo 0 ferma il lavoro
     // al primo rilievo) e non è nemmeno «torno al default»: un default non
     // c'è più (2026-09-16). Vuoto = non si salva, e la scritta lo dice.
     const val = clampCap(f.input.value, f.min);

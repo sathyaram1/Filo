@@ -15,7 +15,7 @@ require(resolve(ROOT, 'src', 'shared', 'verifierRound.js'));
 const R = globalThis.SN_VERIFIER_ROUND;
 // I bilanci di QUESTI test: nel codice non esiste un default (2026-09-16), i
 // numeri veri li scrive l'owner in config/routines.
-const CAPS = { cap2: 5, cap1: 2, cap0: 0 };
+const CAPS = { cap3: 5, cap2: 5, cap1: 2, cap0: 0 };
 
 const f = (level, text, decision = false) => ({ level, text, decision });
 const decide = (findings, counts = {}, caps = CAPS) => R.decideRound({ findings, caps, counts });
@@ -63,14 +63,14 @@ test('normalizeFindings: tetti su numero e lunghezza, decision solo se true', ()
 
 // ── I bilanci (spec §4) ──────────────────────────────────────────────────────
 
-test('nessun default nel codice: senza uno dei tre bilanci decideRound si ferma e dice quale manca', () => {
+test('nessun default nel codice: senza uno dei quattro bilanci decideRound si ferma e dice quale manca', () => {
   assert.equal(globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS, undefined);
-  assert.throws(() => R.decideRound({ findings: [f(2, 'rotto')], caps: { cap2: 5, cap0: 0 } }), /bilanci del verificatore mancanti: cap1/);
-  assert.throws(() => R.decideRound({ findings: [], caps: null }), /cap2, cap1, cap0/);
-  assert.throws(() => R.decideRound({ findings: [], caps: { cap2: '', cap1: 'due', cap0: 0 } }), /cap2, cap1/);
-  assert.deepEqual(R.missingCaps({ cap2: 5, cap1: 2, cap0: 0 }), []);
-  assert.deepEqual(R.missingCaps({ cap2: 5 }, { cap1: 2, cap0: 0 }), [], 'i default espliciti del chiamante contano');
-  assert.equal(R.capKeyOf(3), 'cap2', 'i livelli 3 e 2 condividono il bilancio');
+  assert.throws(() => R.decideRound({ findings: [f(2, 'rotto')], caps: { cap3: 5, cap2: 5, cap0: 0 } }), /bilanci del verificatore mancanti: cap1/);
+  assert.throws(() => R.decideRound({ findings: [], caps: null }), /cap3, cap2, cap1, cap0/);
+  assert.throws(() => R.decideRound({ findings: [], caps: { cap3: 5, cap2: '', cap1: 'due', cap0: 0 } }), /cap2, cap1/);
+  assert.deepEqual(R.missingCaps({ cap3: 5, cap2: 5, cap1: 2, cap0: 0 }), []);
+  assert.deepEqual(R.missingCaps({ cap2: 5 }, { cap3: 5, cap1: 2, cap0: 0 }), [], 'i default espliciti del chiamante contano');
+  assert.equal(R.capKeyOf(3), 'cap3', 'un bilancio per livello: il 3 non paga più dal 2');
   assert.equal(R.capKeyOf(2), 'cap2');
   assert.equal(R.capKeyOf(1), 'cap1');
   assert.equal(R.capKeyOf(0), 'cap0');
@@ -113,10 +113,10 @@ test('cap0 a zero: soli 0 → derivato; in elenco con livelli più alti rientran
 });
 
 test('cap0 alzato dall\'owner: soli 0 → fix, il giro si conta su cap0', () => {
-  const d = decide([f(0, 'raro')], {}, { cap2: 5, cap1: 2, cap0: 1 });
+  const d = decide([f(0, 'raro')], {}, { cap3: 5, cap2: 5, cap1: 2, cap0: 1 });
   assert.equal(d.fix.length, 1);
   assert.equal(d.consume, 'cap0');
-  const dopo = decide([f(0, 'raro')], d.counts, { cap2: 5, cap1: 2, cap0: 1 });
+  const dopo = decide([f(0, 'raro')], d.counts, { cap3: 5, cap2: 5, cap1: 2, cap0: 1 });
   assert.deepEqual(dopo.fix, [], 'al secondo giro il bilancio è finito');
 });
 
@@ -135,28 +135,35 @@ test('un 1 entra nel giro di un 2, anche a cap1 finito (decisione owner 2026-09-
   assert.equal(d.consume, 'cap2', 'il giro lo paga il livello più alto');
   assert.equal(d.counts.count1, 2, 'cap1 non si tocca');
   // Con cap1 a zero dall'owner vale lo stesso.
-  const zero = decide([f(1, 'bordo'), f(2, 'rotto')], {}, { cap2: 10, cap1: 0, cap0: 0 });
+  const zero = decide([f(1, 'bordo'), f(2, 'rotto')], {}, { cap3: 10, cap2: 10, cap1: 0, cap0: 0 });
   assert.deepEqual(zero.fix.map((x) => x.level), [1, 2], 'ordine della critica conservato');
   assert.equal(zero.consume, 'cap2');
 });
 
-test('un 1 col segno ? resta derivato anche accanto a un 2 da correggere; se il 2 ferma il lavoro, si ferma tutto', () => {
+test('un 1 col segno ? resta derivato anche accanto a un 2 da correggere; se un 3 ferma il lavoro, si ferma tutto', () => {
   const d = decide([f(2, 'rotto'), f(1, 'gusto?', true)], { count1: 2 });
   assert.deepEqual(d.fix.map((x) => x.level), [2]);
   assert.equal(d.derived.length, 1, 'la domanda non si corregge da soli');
-  const stop = decide([f(2, 'rotto'), f(1, 'bordo')], { count2: 5, count1: 2 });
+  const stop = decide([f(3, 'rotto'), f(1, 'bordo')], { count3: 5, count1: 2 });
   assert.equal(stop.stop, true);
   assert.deepEqual(stop.fix, [], 'fermandosi non si corregge nemmeno l\'1');
+  // Un 2 a bilancio finito invece non ferma: va da parte, e l'1 segue il suo bilancio.
+  const daParte = decide([f(2, 'rotto'), f(1, 'bordo')], { count2: 5, count1: 2 });
+  assert.equal(daParte.stop, false);
+  assert.deepEqual(daParte.derived.map((x) => x.level), [2, 1]);
 });
 
-test('livello 2 o 3 con cap2 esaurito → stop, decide l\'owner', () => {
-  const d = decide([f(2, 'rotto'), f(1, 'bordo'), f(0, 'raro')], { count2: 5 });
+test('livello 3 con cap3 esaurito → stop, decide l\'owner; un 2 a cap2 esaurito non ferma', () => {
+  const d = decide([f(3, 'rotto'), f(1, 'bordo'), f(0, 'raro')], { count3: 5 });
   assert.equal(d.stop, true);
   assert.equal(d.blocking.length, 1);
   assert.deepEqual(d.fix, []);
   assert.deepEqual(d.derived, [], 'fermandosi non si mette da parte niente: l\'owner vede tutto');
   assert.equal(d.consume, null);
-  assert.equal(d.counts.count2, 5, 'fermarsi non paga un giro');
+  assert.equal(d.counts.count3, 5, 'fermarsi non paga un giro');
+  const due = decide([f(2, 'rotto')], { count2: 5 });
+  assert.equal(due.stop, false);
+  assert.deepEqual(due.derived.map((x) => x.priority), [2]);
 });
 
 test('il segno ? → stop ai livelli 3/2, derivato ai livelli 1 e 0', () => {
@@ -172,23 +179,31 @@ test('il segno ? → stop ai livelli 3/2, derivato ai livelli 1 e 0', () => {
 });
 
 test('i bilanci si normalizzano: fuori scala si stringe, assenti → i default ESPLICITI del chiamante, contatori negativi → 0', () => {
-  assert.deepEqual(R.normalizeCaps({ cap2: 99, cap1: -3 }, CAPS), { cap2: 10, cap1: 0, cap0: 0 });
+  assert.deepEqual(R.normalizeCaps({ cap2: 99, cap1: -3 }, CAPS), { cap3: 5, cap2: 10, cap1: 0, cap0: 0 });
   assert.deepEqual(R.normalizeCaps(null, CAPS), CAPS);
-  assert.deepEqual(R.normalizeCounts({ count2: -1, count1: '2' }), { count2: 0, count1: 2, count0: 0 });
+  assert.deepEqual(R.normalizeCounts({ count2: -1, count1: '2' }), { count3: 0, count2: 0, count1: 2, count0: 0 });
 });
 
-test('cap2 a zero: il primo 2 → stop subito (scelta possibile dell\'owner)', () => {
-  assert.equal(decide([f(2, 'rotto')], {}, { cap2: 0, cap1: 2, cap0: 0 }).stop, true);
+test('cap3 a zero: il primo 3 → stop subito (scelta possibile dell\'owner); cap2 a zero: il primo 2 va da parte, non ferma', () => {
+  assert.equal(decide([f(3, 'rotto')], {}, { cap3: 0, cap2: 5, cap1: 2, cap0: 0 }).stop, true);
+  const due = decide([f(2, 'rotto')], {}, { cap3: 5, cap2: 0, cap1: 2, cap0: 0 });
+  assert.equal(due.stop, false);
+  assert.equal(due.derived.length, 1);
 });
 
-test('la sequenza intera: cinque giri di livello 2, il sesto → stop', () => {
-  let counts = {};
-  for (let i = 0; i < 5; i++) {
-    const d = decide([f(2, `giro ${i}`)], counts);
-    assert.equal(d.stop, false, `giro ${i} si corregge`);
-    counts = d.counts;
+test('la sequenza intera: cinque giri di livello 3, il sesto → stop; cinque di livello 2, il sesto passa e mette da parte', () => {
+  for (const [level, ferma] of [[3, true], [2, false]]) {
+    let counts = {};
+    for (let i = 0; i < 5; i++) {
+      const d = decide([f(level, `giro ${i}`)], counts);
+      assert.equal(d.stop, false, `giro ${i} si corregge`);
+      assert.equal(d.fix.length, 1);
+      counts = d.counts;
+    }
+    const sesto = decide([f(level, 'ancora')], counts);
+    assert.equal(sesto.stop, ferma, `livello ${level} al sesto giro`);
+    assert.deepEqual(sesto.fix, []);
   }
-  assert.equal(decide([f(2, 'ancora')], counts).stop, true);
 });
 
 // ── Testi ────────────────────────────────────────────────────────────────────
