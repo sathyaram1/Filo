@@ -1116,7 +1116,15 @@
 
   // La query vera e propria, senza ponti: la usano il main (col token
   // dell'owner), gli script e la vista pubblica (che non ha bisogno di token).
-  async function listDirect(collectionId, { pageSize = 200, timeoutMs = 0, fields = null, idToken = '', orderField = 'createdAt' } = {}) {
+  // `where` ({ field, op, timestamp }) e `startAfter` ({ timestamp, name })
+  // servono a chi chiede «solo quello che è cambiato da allora»: senza, ogni
+  // giro ripaga la finestra intera per trovarci in media niente. Il cursore
+  // nomina anche il documento perché due chiusure possono cadere nello stesso
+  // istante, e senza il nome la pagina dopo le salterebbe o le ripeterebbe.
+  async function listDirect(collectionId, {
+    pageSize = 200, timeoutMs = 0, fields = null, idToken = '',
+    orderField = 'createdAt', where = null, startAfter = null,
+  } = {}) {
     // structuredQuery via runQuery, ordinamento decrescente sul campo chiesto
     // (per data d'invio salvo che il chiamante ne chieda un altro).
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
