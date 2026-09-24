@@ -254,3 +254,82 @@ test('una sezione lunga si completa tutta, non solo il primo blocco', async ({ o
   await expect(page.locator('.fb-card[data-id="m259"] .fb-notes')).toHaveValue('NOTA DI m259');
   await expect(page.locator('.fb-card[data-id="m0"] .fb-notes')).toHaveValue('NOTA DI m0');
 });
+
+// La sezione si chiede UNA volta, anche se l'owner tocca la pagina mentre
+// arriva. Ogni gesto durante l'attesa (una lettera nella ricerca, un cambio di
+// sezione, la casella «Solo automatici») ridisegna la lista, e senza il
+// registro delle richieste già partite ogni ridisegno ricomprava la sezione
+// intera: dodici lettere, tredici volte gli stessi documenti con dentro gli
+// allegati. Senza il fix queste due sono rosse sul conteggio.
+
+const LENTE = [0, 1, 2, 3, 4, 5].map((i) => ({
+  _id: `fbL${i}`,
+  _proiezione: true,
+  seq: 900 + i,
+  subSeq: 0,
+  name: `Segnalazione lenta ${i}`,
+  text: `Testo della segnalazione lenta ${i}`,
+  status: 'unlabeled',
+  statusPublic: 'open',
+  clientId: 'tester-1',
+  createdAt: `2026-09-2${i % 10}T10:00:00.000Z`,
+}));
+
+async function sezioneLenta(page, rows) {
+  await page.evaluate((r) => {
+    window.__chiesti = [];
+    window.SN_FEEDBACK.list = async () => JSON.parse(JSON.stringify(r));
+    window.SN_FEEDBACK.getMany = async (ids) => {
+      window.__chiesti.push(...ids);
+      // Lenta apposta: è la finestra in cui l'owner tocca la pagina.
+      await new Promise((res) => setTimeout(res, 1500));
+      return ids.map((id) => {
+        const base = r.find((x) => x._id === id);
+        if (!base) return null;
+        const { _proiezione, ...resto } = JSON.parse(JSON.stringify(base));
+        return { ...resto, notes: `Report della lavorazione di ${id}`, images: [], files: [] };
+      }).filter(Boolean);
+    };
+  }, rows);
+}
+
+async function ripetuti(page) {
+  const chiesti = await page.evaluate(() => window.__chiesti);
+  const conteggi = {};
+  for (const id of chiesti) conteggi[id] = (conteggi[id] || 0) + 1;
+  return { conteggi, ripetuti: Object.entries(conteggi).filter(([, n]) => n > 1) };
+}
+
+async function pronta(openTab) {
+  const page = await openTab(PAGINA_FEEDBACK);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
+  await admin(page);
+  await sezioneLenta(page, LENTE);
+  await page.evaluate(() => window.__fbTest.setAdmin(true, { email: 'owner@example.invalid' }));
+  await page.evaluate(async () => {
+    const lista = await window.SN_FEEDBACK.list({ pageSize: 500, fields: window.SN_FEEDBACK.CAMPI_LISTA });
+    window.__fbTest.setData(lista);
+  });
+  await expect(page.locator('#list')).toContainText('Caricamento', { timeout: 5000 });
+  return page;
+}
+
+test('scrivere nella ricerca mentre la sezione arriva non la ricompra', async ({ openTab }) => {
+  const page = await pronta(openTab);
+  await page.locator('#search').type('segnalazione', { delay: 40 });
+  await expect(page.locator('.fb-card').first()).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(1500);
+  const { conteggi, ripetuti: doppi } = await ripetuti(page);
+  expect(doppi, `documenti chiesti più di una volta: ${JSON.stringify(conteggi)}`).toEqual([]);
+});
+
+test('cambiare sezione mentre arriva non ricompra la sezione di prima', async ({ openTab }) => {
+  const page = await pronta(openTab);
+  await page.evaluate(() => window.__fbTest.setTab('resolved'));
+  await page.evaluate(() => window.__fbTest.setTab('inbox'));
+  await expect(page.locator('.fb-card').first()).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(1500);
+  const { conteggi, ripetuti: doppi } = await ripetuti(page);
+  expect(doppi, `documenti chiesti più di una volta: ${JSON.stringify(conteggi)}`).toEqual([]);
+});
