@@ -210,3 +210,47 @@ test('rispondere a un chiarimento non cancella il report della lavorazione', asy
   expect(inviato.notes).toContain(REPORT);
   expect(inviato.notes).toContain('Prendi la seconda.');
 });
+
+// Una sezione più grande di un blocco di lettura: i dettagli arrivano a
+// gruppi, e alla fine OGNI scheda ha la sua conversazione — anche l'ultima.
+// Una scheda rimasta senza mostrerebbe una conversazione vuota, che si legge
+// come «non c'è niente da leggere».
+test('una sezione lunga si completa tutta, non solo il primo blocco', async ({ openTab }) => {
+  const QUANTI = 260;
+  const page = await openTab(PAGINA_FEEDBACK);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 15_000 });
+  await admin(page);
+
+  await page.evaluate((quanti) => {
+    const righe = Array.from({ length: quanti }, (_, i) => ({
+      _id: `m${i}`,
+      _proiezione: true,
+      seq: 1000 + i,
+      subSeq: 0,
+      name: `Segnalazione ${i}`,
+      text: `Testo ${i}`,
+      status: 'unlabeled',
+      statusPublic: 'open',
+      clientId: 'tester',
+      createdAt: new Date(Date.UTC(2026, 8, 20) - i * 3600_000).toISOString(),
+    }));
+    window.__blocchi = 0;
+    window.SN_FEEDBACK.getMany = async (ids) => {
+      window.__blocchi += 1;
+      return ids.map((id) => {
+        const r = righe.find((x) => x._id === id);
+        const { _proiezione, ...resto } = r;
+        return { ...resto, notes: `NOTA DI ${id}` };
+      });
+    };
+    window.__fbTest.setAdmin(true, { email: 'owner@example.invalid' });
+    window.__fbTest.setData(righe.map((r) => ({ ...r })));
+  }, QUANTI);
+
+  await expect(page.locator('.fb-card')).toHaveCount(QUANTI, { timeout: 30_000 });
+  // Più di un blocco di lettura, e l'ULTIMA scheda ha la sua conversazione.
+  expect(await page.evaluate(() => window.__blocchi)).toBeGreaterThan(1);
+  await expect(page.locator('.fb-card[data-id="m259"] .fb-notes')).toHaveValue('NOTA DI m259');
+  await expect(page.locator('.fb-card[data-id="m0"] .fb-notes')).toHaveValue('NOTA DI m0');
+});

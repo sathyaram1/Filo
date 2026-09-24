@@ -1101,7 +1101,14 @@ module.exports = function register(on, ctx) {
       // bacheca, in silenzio. La domanda giusta è un'altra e non costa niente
       // in più: il feedback di OGNI scheda in bacheca l'abbiamo appena
       // chiesto (`schedeCoperte`), quindi quello che non è tornato non esiste.
-      const complete = schedeCoperte || base.length < FB.LIST_PAGE_SIZE;
+      //
+      // E vale solo se non abbiamo SCARTATO niente: una segnalazione pescata
+      // fuori pagina con lo stato illeggibile non entra in `feedbacks`, e per
+      // chi fa il piano è indistinguibile da una cancellata. Toglierle la
+      // scheda vorrebbe dire far sparire dalla bacheca un fix buono perché
+      // una decifratura non è riuscita.
+      const scartate = decifrati.length !== feedbacks.length;
+      const complete = !scartate && (schedeCoperte || base.length < FB.LIST_PAGE_SIZE);
       const plan = V.planSync(published, feedbacks, { complete });
       for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
       for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
