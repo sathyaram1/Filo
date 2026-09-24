@@ -260,15 +260,8 @@ export function testoNonPubblicato(punta, suOrigin, ramo = '') {
 }
 
 /**
- * Il rifiuto per un ramo che su origin è andato OLTRE il contenuto esaminato.
- * PURA.
- *
- * Qui spedire non c'entra: là c'è già tutto, e c'è pure dell'altro. Il danno è
- * quello della segnalazione #485 all'ultimo passo possibile: chi fonde prende
- * la punta, e la punta è un contenuto che nessuno ha guardato. Il rimedio è lo
- * stesso del ramo mosso sotto i piedi, perché la causa è la stessa: gli esiti
- * parlano di un'altra versione, quindi decadono e il giro si rifà su quella
- * nuova. E si REGISTRA, invece di restare a schermo su questa macchina.
+ * Il rifiuto per un ramo che su origin è andato OLTRE il contenuto esaminato. PURA.
+ * Chi fonde prende la punta di origin (#485): la directory la raggiunge, e il pezzo in più si legge prima di fondere.
  */
 export function testoPiuAvanti(punta, suOrigin, ramo = '') {
   const p = String(punta || '').slice(0, 12);
@@ -277,10 +270,10 @@ export function testoPiuAvanti(punta, suOrigin, ramo = '') {
   return 'fusione non chiesta: su origin il ramo è più avanti del contenuto esaminato, e chi fonde prende la PUNTA del ramo, non quello che c\'è in questa directory.\n'
     + `  qui i via libera valgono per ${p}\n`
     + `  su origin il ramo ${r} è in cima a ${o}\n`
-    + 'Quello che verrebbe fuso è il contenuto in cima, che nessuno ha esaminato. Non spedire niente e non riportare indietro il ramo: là c\'è lavoro che qui non c\'è, e sovrascriverlo lo butterebbe via.\n'
-    + 'Gli esiti parlano di un\'altra versione, quindi sono decaduti: il giro va rifatto su quel contenuto, e la decadenza va registrata invece di restare su questa macchina.\n'
-    + `  node scripts/routine-channel.mjs deliver status --status revision_capability --branch ${r} --notes "su origin il ramo è più avanti del contenuto esaminato: verifica e controllo di sicurezza vanno rifatti su ${o}"\n`
-    + 'Se il server rifiuta quel passaggio, dichiaralo nel rilascio del biglietto con --guasto e la stessa frase: quello che non è registrato non è successo.';
+    + 'Quello che verrebbe fuso è il contenuto in cima, che qui non è stato esaminato. Non spedire niente e non riportare indietro il ramo: là c\'è lavoro che qui non c\'è, e sovrascriverlo lo butterebbe via.\n'
+    + 'Porta la directory su quel contenuto e rilancia questo comando, che ti dirà cosa rileggere:\n'
+    + `  git merge --ff-only ${o}\n`
+    + 'Se il merge non va avanti da solo (le due storie si sono separate), dichiaralo nel rilascio del biglietto con --guasto e questa frase: quello che non è registrato non è successo.';
 }
 
 /**
