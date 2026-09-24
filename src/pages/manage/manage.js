@@ -2524,6 +2524,18 @@
     return p;
   }
 
+  // Il feedback COMPLETO, aspettando la lettura se ancora non c'è. Chi APPENDE
+  // alla conversazione deve passare di qui: una riga d'elenco non ha le note,
+  // e scriverci sopra la risposta cancellerebbe tutto il report al posto di
+  // aggiungersi in coda. Torna null se nel frattempo la riga non c'è più.
+  async function feedbackCompleto(id) {
+    const key = String(id || '');
+    const riga = allFeedbacks.find((f) => f._id === key);
+    if (!riga || !FB.soloLista(riga)) return riga || null;
+    await completaDettaglio(key);
+    return allFeedbacks.find((f) => f._id === key) || null;
+  }
+
   function openDetail(id, opts) {
     const ridisegno = !!(opts && opts.ridisegno && id === selectedId);
     // Quello che c'è nella casella della frase e non è ancora partito parte
