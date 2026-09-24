@@ -165,10 +165,46 @@
       const remote = await listVersions();
       if (!Array.isArray(remote)) throw new Error('versioni non lette');
       floor = windowFloor(remote, pageSize);
+      // Il riallineamento rimette in pari anche i due segni senza orologio: le
+      // versioni le porta lui, e il contatore degli invii riparte da qui.
+      versioniSeguite = new Map(remote.map((v) => [String(v._id), v._updateTime || null]));
+      inviiVisti = await contaInvii(inviiVisti);
       lastReconcileAt = startedAt;
       lastTickAt = startedAt;
       broadcast({ kind: 'reconcile', versions: remote });
       return { kind: 'reconcile', versions: remote.length };
+    }
+
+    async function contaInvii(precedente) {
+      if (typeof submissionCount !== 'function') return precedente;
+      try {
+        const n = await submissionCount();
+        return Number.isInteger(n) ? n : precedente;
+      } catch (e) {
+        // Un contatore non letto non è «niente di nuovo»: si tiene il valore di
+        // prima, così il confronto del giro dopo resta onesto.
+        if (onWarn) onWarn(`contatore invii non letto: ${e && e.message ? e.message : e}`);
+        return precedente;
+      }
+    }
+
+    // I feedback che le pagine stanno seguendo da vicino (quelli in mano alle
+    // routine): di loro si chiede a Firestore l'ora che tiene LUI, perché chi
+    // li scrive non firma la sua. Ritorna i documenti interi dei soli mossi.
+    async function daiSeguiti() {
+      if (typeof seguiti !== 'function' || typeof versionsOf !== 'function' || typeof readRows !== 'function') return [];
+      const ids = Array.from(new Set((seguiti() || []).map(String).filter(Boolean))).slice(0, seguitiMax);
+      if (ids.length === 0) return [];
+      const vers = await versionsOf(ids);
+      const mossi = [];
+      for (const v of Array.isArray(vers) ? vers : []) {
+        if (!v || !v._id) continue;
+        const id = String(v._id);
+        const mio = versioniSeguite.get(id);
+        if (mio !== undefined && mio !== (v._updateTime || null)) mossi.push(id);
+        versioniSeguite.set(id, v._updateTime || null);
+      }
+      return mossi.length ? await readRows(mossi) : [];
     }
 
     async function incremental() {
@@ -181,7 +217,21 @@
         if (onWarn) onWarn('cambiati: troppe pagine, riallineamento completo al giro dopo');
         lastReconcileAt = 0;
       }
-      const rows = tutte.filter((r) => inWindow(r, floor));
+      // Un invio in più che la domanda per data non ha portato: l'ha mandato
+      // una macchina con l'ora indietro. Si riallinea al giro dopo, che è
+      // l'unica domanda che vede ciò che nessuna data racconta.
+      const invii = await contaInvii(inviiVisti);
+      if (Number.isInteger(invii) && Number.isInteger(inviiVisti) && invii > inviiVisti
+          && !tutte.some((r) => Number(r && r.seq) > inviiVisti)) {
+        lastReconcileAt = 0;
+      }
+      inviiVisti = invii;
+
+      const perId = new Map();
+      for (const r of tutte) if (r && r._id) perId.set(String(r._id), r);
+      for (const r of await daiSeguiti()) if (r && r._id) perId.set(String(r._id), r);
+
+      const rows = Array.from(perId.values()).filter((r) => inWindow(r, floor));
       lastTickAt = startedAt;
       if (rows.length) broadcast({ kind: 'changed', rows });
       return { kind: 'changed', changed: rows.length };
