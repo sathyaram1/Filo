@@ -1302,7 +1302,7 @@
     for (const row of Array.isArray(arr) ? arr : []) {
       if (row && row.found) out.push(fsDocToObject(row.found));
     }
-    return out;
+    return marcaProiezione(out, fields);
   }
 
   // ── La vista pubblica (#583) ──────────────────────────────────────────────
