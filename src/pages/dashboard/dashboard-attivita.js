@@ -1293,6 +1293,7 @@
     tellActionInActivity,
     stepTrace,
     isType,
+    esitoRiordino,
     // #525 — «Ha aperto una pagina e avviato un timer»: la stessa frase del
     // diario del turno, per chi RIAPRE una chat archiviata. Lì i bottoni non
     // si rimettono (un'azione da confermare non si può ri-offrire giorni
