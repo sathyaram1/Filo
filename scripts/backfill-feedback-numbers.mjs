@@ -128,11 +128,19 @@ async function listAll(bearer) {
 }
 
 async function patchSeq(id, seq, bearer) {
-  const qs = 'updateMask.fieldPaths=seq&updateMask.fieldPaths=subSeq';
+  // `updatedAt` (#676): ogni scrittura firma l'ora, o la dashboard non vede il
+  // cambiamento fino al riallineamento (che è raro per scelta).
+  const qs = 'updateMask.fieldPaths=seq&updateMask.fieldPaths=subSeq&updateMask.fieldPaths=updatedAt';
   const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${qs}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-    body: JSON.stringify({ fields: { seq: { integerValue: String(seq) }, subSeq: { integerValue: '0' } } }),
+    body: JSON.stringify({
+      fields: {
+        seq: { integerValue: String(seq) },
+        subSeq: { integerValue: '0' },
+        updatedAt: { timestampValue: new Date().toISOString() },
+      },
+    }),
   });
   return { ok: res.ok, status: res.status, body: res.ok ? '' : (await res.text()).slice(0, 200) };
 }
