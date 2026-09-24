@@ -3044,7 +3044,9 @@
     const id = selectedId;
     const reply = (mgClarifyText.value || '').trim();
     if (!reply) { mgClarifyText.focus(); return; }
-    const fb = allFeedbacks.find((f) => f._id === id);
+    // Come la riapertura: la conversazione si legge intera prima di
+    // appenderci la risposta, o al suo posto resterebbe la sola risposta.
+    const fb = await feedbackCompleto(id);
     const oldNotes = (fb && fb.notes) || '';
     // Da quando il report viaggia cifrato, la conversazione può arrivare qui
     // illeggibile (chiave assente, o decifratura fallita e al suo posto un
