@@ -126,7 +126,7 @@ test('un feedback riscritto senza firmare l’ora arriva lo stesso col giro al m
     .toContain('fb-2');
 });
 
-test('una segnalazione nuova da una macchina con l’orologio indietro non arriva col giro', async ({ app }) => {
+test('una segnalazione nuova da una macchina con l’orologio indietro arriva lo stesso col giro', async ({ app }) => {
   const esito = await app.evaluate(async () => {
     const FB = globalThis.SN_FEEDBACK;
     const LIVE = globalThis.SN_FEEDBACK_LIVE;
