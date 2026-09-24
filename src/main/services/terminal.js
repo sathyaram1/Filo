@@ -181,7 +181,13 @@ function nuovoMarcatore() {
 
 // L'esito di un comando PowerShell, con $__filo_ok = il $? preso subito dopo. $LASTEXITCODE lo scrivono solo
 // i programmi esterni: un cmdlet fallito lo lascia a 0, e a dirlo resta $? (#714). Vale anche per shell.js.
-const ESITO_POWERSHELL = 'if ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEXITCODE } else { 1 }';
+// Con lo stderr rediretto (2>&1, 2>$null) ogni riga di un programma riuscito diventa un errore e spegne $?:
+// se l'ultimo errore nuovo ($__filo_e = quello di prima) viene da lì, conta il codice del programma.
+const ESITO_POWERSHELL = 'if ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEXITCODE } '
+  + 'elseif ($Error.Count -and -not [object]::ReferenceEquals($Error[0], $__filo_e) '
+  + "-and $Error[0].FullyQualifiedErrorId -like 'NativeCommandError*') { 0 } else { 1 }";
+// Da mettere prima del comando: l'errore più recente che c'era già, perché uno vecchio non decida l'esito.
+const ERRORE_DI_PRIMA_POWERSHELL = '$__filo_e=if ($Error.Count) { $Error[0] } else { $null }';
 
 // Appende al comando una "sonda" che stampa <marcatore>:<exitcode>:<cwd>. La
 // sonda gira SEMPRE (anche se il comando fallisce) e cattura l'exit code reale
