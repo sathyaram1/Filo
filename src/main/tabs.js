@@ -1229,7 +1229,11 @@ class TabManager {
   // (feed consumati, dead-end, impostazioni ormai chiuse) e applica le decisioni.
   // Se l'LLM manca o fallisce, i duplicati vengono comunque collassati.
   async runAutoTriage({ trigger = 'idle' } = {}) {
-    if (this.incognito || this._triageRunning) return { archived: 0 };
+    if (this.incognito) return { archived: 0 };
+    // Chi chiede il riordino mentre ne gira già uno non ha ottenuto niente:
+    // rispondergli «nessuna scheda da archiviare» è la frase di un riordino
+    // riuscito, e i due casi si confondono.
+    if (this._triageRunning) return { archived: 0, giaInCorso: true };
     const cands = this._triageCandidates();
     if (!cands.length) return { archived: 0 };
     this._triageRunning = true;
