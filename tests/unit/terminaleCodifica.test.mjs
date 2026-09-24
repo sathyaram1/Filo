@@ -365,6 +365,89 @@ test('l\'uscita di un comando non può scriversi la riga di servizio', async () 
   rmSync(dir, { recursive: true, force: true });
 });
 
+// ── #714: l'esito che arriva all'assistente è quello vero ───────────────────
+// In PowerShell $LASTEXITCODE lo scrivono solo i programmi esterni: un cmdlet
+// fallito lo lasciava a 0, e l'assistente leggeva «riuscito» un comando fallito.
+
+const SU_WINDOWS = process.platform === 'win32';
+
+test('un comando fallito risulta fallito, con la cartella tracciata come senza', async () => {
+  const altrove = join(TMP, 'cartella-che-non-esiste');
+  const casi = SU_WINDOWS
+    ? [`Get-Content "${join(TMP, 'manca.txt')}"`, `Get-Content "${join(TMP, 'relazione — attività mancante.txt')}"`,
+      `Set-Location "${altrove}"`]
+    : [`cat "${join(TMP, 'manca.txt')}"`, `cat "${join(TMP, 'relazione — attività mancante.txt')}"`, `cd "${altrove}"`];
+  for (const comando of casi) {
+    const conSonda = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+    const senza = await T.runCommand(comando, { cwd: TMP, timeoutMs: 30_000 });
+    assert.notEqual(conSonda.code, 0, `riportato come riuscito: ${comando}`);
+    assert.equal(conSonda.code, senza.code, `la sonda cambia l'esito di: ${comando}`);
+    assert.equal(conSonda.cwd, TMP, `dopo il fallimento Filo crede di essere altrove: ${conSonda.cwd}`);
+  }
+});
+
+test('un errore che interrompe il comando lo fa risultare fallito, nella cartella raggiunta', async () => {
+  // In sh non c'è un errore che salta il resto senza chiudere la shell: l'equivalente è un comando fallito in coda.
+  const sotto = join(TMP, 'fermo-qui');
+  mkdirSync(sotto, { recursive: true });
+  const comando = SU_WINDOWS ? `Set-Location "${sotto}"; throw "fermo"` : `cd "${sotto}"; false`;
+  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+  assert.notEqual(out.code, 0, 'un comando interrotto da un errore risulta riuscito');
+  assert.equal(out.cwd, sotto);
+});
+
+test('exit decide l\'esito anche con la cartella tracciata', async () => {
+  // exit salta la riga della sonda che calcola l'esito: lì deve valere quello del processo, zero compreso.
+  for (const [comando, atteso] of [['exit 3', 3], ['exit 0', 0]]) {
+    const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+    assert.equal(out.code, atteso, `«${comando}» riportato con codice ${out.code}`);
+  }
+});
+
+test('come in bash, conta l\'esito dell\'ultimo comando', async () => {
+  const manca = join(TMP, 'manca-anche-questo.txt');
+  const comando = SU_WINDOWS ? `Get-Content "${manca}"; Write-Output ok` : `cat "${manca}"; echo ok`;
+  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+  assert.equal(out.code, 0, 'l\'ultimo comando è riuscito');
+  assert.equal(out.stdout.trim(), 'ok');
+});
+
+test('un commento in coda non impedisce al comando di girare', async () => {
+  const comando = SU_WINDOWS ? 'Write-Output ciao # saluto' : 'echo ciao # saluto';
+  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+  assert.equal(out.stdout.trim(), 'ciao', `il comando non è girato: ${out.stderr.slice(0, 160)}`);
+  assert.equal(out.code, 0);
+  assert.equal(out.cwd, TMP);
+});
+
+test('nel terminale della dashboard un comando fallito risulta fallito', async () => {
+  // Il comando accentato viaggia codificato (vedi sopra): il suo esito va preso dentro, non dopo.
+  const S = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
+  const sessione = S.createSession({ shell: 'powershell', cwd: TMP });
+  const esegui = (comando) => new Promise((risolvi, rifiuta) => {
+    let uscita = '';
+    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto: ${comando}`)), 30_000);
+    sessione.exec(comando, {
+      onData: ({ chunk, stream }) => { if (stream === 'stdout') uscita += chunk; },
+      onExit: ({ code }) => { clearTimeout(stop); risolvi({ code, uscita }); },
+      onError: ({ message }) => { clearTimeout(stop); rifiuta(new Error(message)); },
+    });
+  });
+  const leggi = SU_WINDOWS ? 'Get-Content' : 'cat';
+  const scrivi = SU_WINDOWS ? 'Write-Output' : 'echo';
+  try {
+    for (const nome of ['manca.txt', 'relazione — attività mancante.txt']) {
+      const r = await esegui(`${leggi} "${join(TMP, nome)}"`);
+      assert.notEqual(r.code, 0, `«${nome}» mancante risulta letto`);
+    }
+    const ok = await esegui(`${scrivi} "città"`);
+    assert.equal(ok.code, 0, 'un comando accentato riuscito risulta fallito');
+    assert.equal(ok.uscita.trim(), 'città');
+  } finally {
+    sessione.kill();
+  }
+});
+
 // La cartella com'è scritta nel sistema: la shell riporta la forma canonica.
 function TMP_CANONICO(p) {
   try { return realpathSync.native(p); } catch (_) { return p; }
