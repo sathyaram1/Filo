@@ -547,3 +547,184 @@ test('I — quello che l\'utente finisce col bottone si raggiunge e finisce nel 
 
   await restore(app, '__fakeI2');
 });
+
+// (L) Il racconto deve sopravvivere alla chiusura della chat. Dell'azione
+// l'archivio teneva il solo NOME, e la conversazione riaperta dalla Cronologia
+// dava per riuscito tutto: «Ha cancellato la memoria» di una conferma mai data,
+// «Ha eseguito un comando» di un comando mai partito, «Ha proposto un evento»
+// di un appuntamento già nel calendario.
+const archivio = (app) => app.evaluate(() => globalThis.SN_FILO_CHATS.list());
+
+async function chatConAzione(app, tipo) {
+  for (let i = 0; i < 40; i += 1) {
+    const c = await archivio(app);
+    const ha = (m) => Array.isArray(m.actions) && m.actions.some((a) => (a && a.type ? a.type : a) === tipo);
+    if (c.length && c[0].messages.some(ha)) return c[0];
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return (await archivio(app))[0] || null;
+}
+
+async function raccontoRiaperto(openTab, id) {
+  const riaperta = await openTab(`filo://dashboard/dashboard.html?chat=${id}`);
+  await expect(riaperta.locator('.dash-bubble').first()).toBeVisible({ timeout: 10_000 });
+  return (await riaperta.locator('.dash-bubble-note[data-replay="1"]').allTextContents()).join(' | ');
+}
+
+test('L — la conversazione riaperta racconta com’è andata, non solo cosa Filo aveva nominato', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
+
+  // Una conferma che l'utente legge e non dà: la memoria è intatta.
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'l1', name: 'CANCELLA_MEMORIA', arguments: '{}' }] },
+    { text: 'Posso cancellare tutto quello che so di te.' },
+  ], '__fakeL1');
+  await page.locator('#input').fill('dimentica tutto quello che sai di me');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Posso cancellare' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.dash-action-btn').first()).toBeVisible();
+  const chatMem = await chatConAzione(app, 'CANCELLA_MEMORIA');
+  expect(chatMem, 'la chat non è arrivata nell’archivio').toBeTruthy();
+  const raccontoMem = await raccontoRiaperto(openTab, chatMem.id);
+  expect(raccontoMem, 'niente da leggere nella chat riaperta').not.toBe('');
+  expect(raccontoMem, `la memoria non è stata cancellata, e la chat riaperta racconta: ${raccontoMem}`)
+    .not.toContain('cancellato la memoria');
+  await restore(app, '__fakeL1');
+
+  // Un comando che non è mai partito: la modalità terminale è spenta.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: false } }); });
+  const page2 = await newtabPage(app);
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'l2', name: 'ESEGUI_COMANDO', arguments: '{"comando":"ls -la"}' }] },
+    { text: 'Ecco.' },
+  ], '__fakeL2');
+  await page2.locator('#input').fill('elenca i file');
+  await page2.locator('#sendBtn').click();
+  await expect(page2.locator('.dash-bubble-filo', { hasText: 'Ecco.' })).toBeVisible({ timeout: 15_000 });
+  await expect(page2.locator('.dash-cmd-blocked')).toBeVisible();
+  const chatCmd = await chatConAzione(app, 'ESEGUI_COMANDO');
+  const raccontoCmd = await raccontoRiaperto(openTab, chatCmd.id);
+  expect(raccontoCmd, `il comando non è partito, e la chat riaperta racconta: ${raccontoCmd}`)
+    .not.toMatch(/eseguito un comando/i);
+  await restore(app, '__fakeL2');
+});
+
+test('L2 — l’evento aggiunto col bottone resta aggiunto anche nella chat riaperta', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
+
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'l3', name: 'EVENTO_CALENDARIO', arguments: '{"titolo":"Cena con Anna","data":"2026-10-02","ora":"20:30"}' }] },
+    { text: 'Te lo segno.' },
+  ], '__fakeL3');
+  await page.locator('#input').fill('segnami la cena con Anna venerdì alle 20:30');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Te lo segno.' })).toBeVisible({ timeout: 15_000 });
+  await page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' }).click();
+  await expect(page.locator('.dash-activity .dash-activity-label').first())
+    .toContainText('aggiunto un evento al calendario', { timeout: 15_000 });
+
+  const chat = await chatConAzione(app, 'EVENTO_CALENDARIO');
+  const racconto = await raccontoRiaperto(openTab, chat.id);
+  expect(racconto, `l’evento è nel calendario, e la chat riaperta racconta: ${racconto}`)
+    .toContain('aggiunto un evento al calendario');
+  await restore(app, '__fakeL3');
+});
+
+// (M) Due azioni dello stesso tipo nella stessa risposta restano due: il diario
+// teneva una riga sola per tipo, e aggiungendo il primo appuntamento il secondo
+// spariva dal racconto sostituito da una copia del primo.
+test('M — due appuntamenti chiesti insieme restano due nel diario', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
+
+  await fakeProvider(app, [
+    {
+      toolCalls: [
+        { id: 'm1', name: 'EVENTO_CALENDARIO', arguments: '{"titolo":"Cena con Anna","data":"2026-10-02","ora":"20:30"}' },
+        { id: 'm2', name: 'EVENTO_CALENDARIO', arguments: '{"titolo":"Pranzo con Bruno","data":"2026-10-03","ora":"13:00"}' },
+      ],
+    },
+    { text: 'Te li segno tutti e due.' },
+  ], '__fakeM');
+  await page.locator('#input').fill('segnami la cena con Anna venerdì e il pranzo con Bruno sabato');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Te li segno tutti e due.' })).toBeVisible({ timeout: 15_000 });
+
+  const bottoni = page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' });
+  await expect(bottoni).toHaveCount(2, { timeout: 10_000 });
+  await bottoni.first().click();
+  await expect(page.locator('.dash-action-btn', { hasText: /Aperto nel calendario|Evento salvato/ }))
+    .toBeVisible({ timeout: 10_000 });
+
+  const activity = page.locator('.dash-activity');
+  await activity.locator('.dash-activity-head').click();
+  const righe = await activity.locator('.dash-activity-body .dash-activity-row').allTextContents();
+  expect(righe.join(' | '), `il secondo appuntamento è sparito dal diario: ${JSON.stringify(righe)}`).toContain('Bruno');
+  expect(righe.filter((t) => /aggiunt/i.test(t)).length, `un solo evento aggiunto: ${JSON.stringify(righe)}`).toBe(1);
+  await expect(activity.locator('.dash-activity-label')).not.toContainText('aggiunto 2 eventi');
+
+  await restore(app, '__fakeM');
+});
+
+// (N) Il riordino che non è potuto partire lo DICE. Il giudizio sulle schede
+// può mancare (crediti finiti, chiave sbagliata, rete giù): Filo se lo teneva
+// per sé e rispondeva «Nessuna scheda da archiviare», cioè la stessa frase di
+// un riordino riuscito in cui non c'era niente da chiudere.
+test('N — il riordino delle schede che non è potuto partire non si legge come riuscito', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await openTab(testServer.html('<html><body><h1>una</h1></body></html>'));
+  await openTab(testServer.html('<html><body><h1>due</h1></body></html>'));
+  await app.evaluate(() => {
+    globalThis.__nOrig = globalThis.SN_TAB_TRIAGE_DECIDE;
+    globalThis.SN_TAB_TRIAGE_DECIDE = async () => { throw new Error('crediti finiti'); };
+  });
+
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
+
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'n1', name: 'PULISCI_TAB', arguments: '{}' }] },
+    { text: 'Valuto le schede aperte.' },
+  ], '__fakeN');
+  await page.locator('#input').fill('riordina le schede e archivia quelle che non servono');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Valuto le schede aperte.' })).toBeVisible({ timeout: 15_000 });
+
+  // Il bottone si prende per posizione: il suo testo cambia al click.
+  const btn = page.locator('.dash-bubble-actions .dash-action-btn').first();
+  await expect(btn).toHaveText(/Riordina e archivia/);
+  await btn.click();
+  await clickConfirm(page, 'ok', { timeout: 10_000 });
+  await expect.poll(async () => ((await btn.textContent()) || '').trim(), { timeout: 30_000 })
+    .not.toContain('Riordino in corso');
+
+  const esito = ((await btn.textContent()) || '').trim();
+  expect(esito, 'il riordino non è partito e il bottone dice l’esito di uno riuscito')
+    .not.toContain('Nessuna scheda da archiviare');
+  expect(esito).toContain('non riuscito');
+
+  // E il diario non se ne vanta.
+  const activity = page.locator('.dash-activity');
+  await activity.locator('.dash-activity-head').click();
+  await expect(activity.locator('.dash-activity-label')).not.toContainText('riordinato le schede');
+
+  await app.evaluate(() => { globalThis.SN_TAB_TRIAGE_DECIDE = globalThis.__nOrig; });
+  await restore(app, '__fakeN');
+});
