@@ -23,6 +23,9 @@
   let send = null;
   let faviconUrl = () => '';
   let applyCommandCwd = () => {};
+  // La chat in corso: serve a far arrivare nell'archivio l'esito di un click
+  // che succede quando il turno è già finito.
+  let chatIdCorrente = () => '';
 
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
