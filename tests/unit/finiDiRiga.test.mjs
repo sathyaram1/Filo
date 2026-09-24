@@ -233,6 +233,7 @@ test('le due reti riconoscono le forme che un CRLF rompe, e lasciano stare le al
   assert.deepEqual(ricercheFragili('/\\n\\s*allow /.exec(resto)'), []);
   assert.deepEqual(ricercheFragili('/function\\s+tipoPassivo\\(\\)\\s*\\{([\\s\\S]*?)\\n\\s*\\}/'), []);
   assert.deepEqual(ricercheFragili('/^\\s*Giudici\\s*$/m'), []);
+  assert.deepEqual(ricercheFragili('src.matchAll(/^ {2}function\\s+([A-Za-z_$][\\w$]*)/gm)'), []);
 });
 
 test('un file del repo che una sentinella analizza si legge dalla porta, non a mano', () => {
