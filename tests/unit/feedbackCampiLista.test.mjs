@@ -64,12 +64,12 @@ test('i campi che pesano non stanno nella proiezione', () => {
 test('i campi che una riga mostra, ordina o filtra ci sono', () => {
   // `pipeline` da solo vale il test: lo scrive il server con l'SDK admin, le
   // regole non lo nominano, e da lì viene il colore del bordo di ogni riga.
-  for (const f of ['_id_non_e_un_campo'].slice(1).concat([
+  for (const f of [
     'pipeline', 'status', 'statusPublic', 'statusReason', 'priority', 'starred',
     'name', 'text', 'seq', 'subSeq', 'createdAt', 'resolvedAt', 'resolvedInVersion',
     'clientId', 'userNote', 'votes', 'reopenRequests', 'blockReason',
     'reviewDecision', 'mergePreapproved', 'stalls', 'workingResets', 'claimedBy', 'beatAt',
-  ])) {
+  ]) {
     assert.ok(FB.CAMPI_LISTA.includes(f), `${f} serve alle righe d'elenco`);
   }
 });
