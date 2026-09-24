@@ -102,5 +102,5 @@ test('#572 — nel clone alla maniera di Windows i controlli che eseguono gli ho
   const esito = execFileSync(process.execPath,
     ['--test', 'tests/unit/autoCommitGate.test.mjs', 'tests/unit/fineRigaLf.test.mjs'],
     { cwd: clone, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 150_000 });
-  expect(esito).toMatch(/\n# fail 0\n/);
+  expect(esito).toMatch(/\r?\n# fail 0\r?\n/);
 });
