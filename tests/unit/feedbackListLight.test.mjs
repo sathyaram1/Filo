@@ -60,19 +60,24 @@ test('ogni documento letto porta _updateTime', async () => {
   });
 });
 
-test('listVersions: solo id e ultima scrittura, nell\'ordine della pagina', async () => {
+test('listVersions: id, ultima scrittura e data d\'invio, nell\'ordine della pagina', async () => {
   const rows = [
-    { document: fsDoc('b', {}, 't2') },
-    { document: fsDoc('a', {}, 't1') },
+    { document: fsDoc('b', { createdAt: { timestampValue: '2026-09-02T00:00:00Z' } }, 't2') },
+    { document: fsDoc('a', { createdAt: { timestampValue: '2026-09-01T00:00:00Z' } }, 't1') },
     { readTime: 'x' }, // riga senza documento: ignorata
   ];
   await withFetch((url, body) => {
     assert.ok(url.includes(':runQuery'));
-    assert.deepEqual(body.structuredQuery.select, { fields: [{ fieldPath: '__name__' }] });
+    // `createdAt` e non `__name__`: costa le stesse letture e dice dov'è il
+    // bordo della finestra, cioè cosa la pagina mostra e cosa no.
+    assert.deepEqual(body.structuredQuery.select, { fields: [{ fieldPath: 'createdAt' }] });
     return rows;
   }, async () => {
     const v = await FB.listVersions({ pageSize: 10 });
-    assert.deepEqual(v, [{ _id: 'b', _updateTime: 't2' }, { _id: 'a', _updateTime: 't1' }]);
+    assert.deepEqual(v, [
+      { _id: 'b', _updateTime: 't2', createdAt: '2026-09-02T00:00:00Z' },
+      { _id: 'a', _updateTime: 't1', createdAt: '2026-09-01T00:00:00Z' },
+    ]);
   });
 });
 

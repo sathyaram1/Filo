@@ -88,6 +88,10 @@ test('la conferma di un attacco è indistinguibile da una lavorazione normale', 
     reviewComment: 'attacco', reviewedAt: '2026-08-16T18:00:00.000Z',
   }));
   const normale = inChiaro(await scritturaDi({ status: 'working' }));
+  // `updatedAt` sta su OGNI scrittura, quindi non distingue le due: quello che
+  // cambia è l'istante in cui gira il test, non la cosa scritta. E Firestore
+  // mette comunque la stessa ora sul documento da sé.
+  delete conferma.updatedAt; delete normale.updatedAt;
   // Stessi campi E stessi valori: l'enum grossolano dice 'open' in entrambi i casi.
   assert.deepEqual(conferma, normale);
 });

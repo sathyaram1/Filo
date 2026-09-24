@@ -42,7 +42,9 @@ const fields = () => (JSON.parse(lastCall.opts.body || '{}').fields || {});
 
 test('mettere il segno scrive la mappa { by, at } e la nomina nella maschera', async () => {
   await FB.updateStatus('doc-1', { mergePreapproved: { by: 'owner@esempio', at: '2026-09-13T08:00:00.000Z' } }, { idToken: 'x' });
-  assert.deepEqual(mask(), ['mergePreapproved']);
+  // `updatedAt` c'è su OGNI scrittura (#676): è l'ora su cui la dashboard
+  // chiede «cosa è cambiato?».
+  assert.deepEqual(mask(), ['mergePreapproved', 'updatedAt']);
   assert.deepEqual(fields().mergePreapproved, {
     mapValue: { fields: { by: { stringValue: 'owner@esempio' }, at: { stringValue: '2026-09-13T08:00:00.000Z' } } },
   });
@@ -50,7 +52,7 @@ test('mettere il segno scrive la mappa { by, at } e la nomina nella maschera', a
 
 test('togliere il segno CANCELLA il campo: maschera sì, valore no', async () => {
   await FB.updateStatus('doc-1', { mergePreapproved: null }, { idToken: 'x' });
-  assert.deepEqual(mask(), ['mergePreapproved']);
+  assert.deepEqual(mask(), ['mergePreapproved', 'updatedAt']);
   assert.equal('mergePreapproved' in fields(), false, 'un null scritto come valore resterebbe sul documento');
 });
 
