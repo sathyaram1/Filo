@@ -794,16 +794,48 @@ module.exports = function register(on, ctx) {
     return rows;
   }
 
-  async function mergeCardFields(rows) {
+  // Le sole schede che servono, e di quelle i soli campi che servono.
+  //
+  // Prima si rileggeva TUTTA la collezione delle schede per riunire i voti a
+  // una manciata di feedback appena cambiati — centinaia di letture per
+  // ritrovarne tre — e la memoria breve durava mezzo minuto mentre il giro ne
+  // dura uno, quindi non serviva mai. Per un pugno di id si va a colpo sicuro
+  // (una batchGet); per la lista intera resta la lettura completa, ma dei due
+  // soli campi che `mergeUserFields` guarda.
+  async function mergeCardFields(rows, { ids = null } = {}) {
     const V = PUBLIC_VIEW();
+    const FB = FEEDBACK();
     if (!V || !Array.isArray(rows) || rows.length === 0) return rows;
     let cards;
-    try { cards = await publicCards(); }
-    catch (e) {
+    try {
+      if (ids && FB && typeof FB.getManyPublic === 'function') {
+        const idToken = await auth.getIdToken();
+        cards = await FB.getManyPublic(ids, { timeoutMs: 20000, idToken });
+      } else {
+        cards = await userFieldCards();
+      }
+    } catch (e) {
       console.warn('[feedback] schede pubbliche non lette:', e?.message || e);
       return rows; // meglio i voti storici che nessun feedback
     }
     return V.mergeUserFields(rows, cards);
+  }
+
+  // Le schede con i soli `USER_FIELDS`: memoria breve sua, perché sono righe
+  // POTATE e non possono finire dove serve la scheda intera (la pubblicazione
+  // della vista le riscriverebbe vuote).
+  let userCardsCache = { at: 0, rows: [] };
+  async function userFieldCards() {
+    const FB = FEEDBACK();
+    const V = PUBLIC_VIEW();
+    if (!FB) return [];
+    if (Date.now() - userCardsCache.at < CARDS_TTL_MS) return userCardsCache.rows;
+    const fields = (V && V.USER_FIELDS) ? Array.from(V.USER_FIELDS) : ['votes', 'reopenRequests'];
+    const rows = FB.listAllPublic
+      ? await FB.listAllPublic({ timeoutMs: 20000, fields })
+      : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000, fields });
+    userCardsCache = { at: Date.now(), rows };
+    return rows;
   }
 
   on(MSG.FEEDBACK_FETCH, ownerOnly(async (msg) => {
