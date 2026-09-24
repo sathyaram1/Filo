@@ -151,6 +151,7 @@
   function makeWatcher({
     listChangedSince, listVersions, broadcast,
     seguiti = null, versionsOf = null, readRows = null, submissionCount = null,
+    ultimoAvvioRoutine = null,
     now = () => Date.now(), pollMs = POLL_MS, reconcileMs = RECONCILE_MS,
     overlapMs = OVERLAP_MS, pageSize = 500, onWarn = null, seguitiMax = SEGUITI_TETTO,
   } = {}) {
