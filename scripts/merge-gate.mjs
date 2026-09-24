@@ -311,12 +311,12 @@ const USO = [
   '  i controlli e fonde con la sua identità. Qui non ci sono opzioni.',
   '  Serve il biglietto del giro, che si rilegge da solo dal promemoria.',
   '  <ramo> dev\'essere quello su cui sta la directory: da lì si legge tutto.',
-  '  La richiesta dichiara il COMMIT: se il ramo si è mosso dopo i via libera,',
+  '  La richiesta dichiara il COMMIT: se il ramo si è mosso dopo il controllo di sicurezza,',
   '  se nella directory c\'è qualcosa fuori dai commit, o se in cima al ramo su',
   '  origin (da dove il server lo prende) non c\'è il contenuto esaminato, non parte.',
   '  Exit: 0 fuso · 10 fermato dal cancello di sicurezza (decide l’owner)',
   '        20 conflitto · 1 uso sbagliato, ramo diverso da quello della directory,',
-  '           ramo mosso dopo i via libera, contenuto che non è quello in cima',
+  '           ramo mosso dopo il controllo di sicurezza, contenuto che non è quello in cima',
   '           su origin, o rifiuto del server',
 ].join('\n');
 
