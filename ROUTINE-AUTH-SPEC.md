@@ -533,7 +533,11 @@ La regola, uguale per tutti e due:
 - **se il contenuto cambia, l'esito decade** e quel controllo va rifatto — la
   stessa cosa che già succede alle richieste di fusione in attesa. Al passo 2
   del cancello i PASS si leggono sullo **sha** risolto al passo 3, non sul nome
-  del ramo;
+  del ramo. Unica eccezione: dopo il pass il verificatore toglie le prove dei
+  rilievi usciti in feedback loro, e se fra il commit verificato e la punta
+  (che deve discenderne) ci sono solo prove del giro tolte il server fonde;
+  altrimenti azzera verifica e controllo di sicurezza e rimette il lavoro in
+  giro da sé;
 - **l'esito vale per un commit, quindi si registra da un commit.** Con
   modifiche fuori dai commit il salvataggio automatico le committa *dopo* la
   registrazione, la punta si sposta e l'esito nasce già decaduto. Le tre
