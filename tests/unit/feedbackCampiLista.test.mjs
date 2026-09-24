@@ -19,21 +19,26 @@ const FB = globalThis.SN_FEEDBACK;
 // tutto ciò che un elenco potrebbe voler mostrare.
 function campiDalleRegole() {
   const rules = readFileSync(resolve(ROOT, 'firestore.rules'), 'utf8');
-  // Solo i blocchi `hasOnly([...])` che riguardano la collezione dei feedback:
-  // quelli delle sotto-mappe (livelli, voti, contatori) nominano chiavi di
-  // un'altra cosa e non sono campi del documento.
+  // Solo il blocco della collezione `feedback`: le altre (le schede pubbliche,
+  // i crediti) hanno campi loro, che qui non c'entrano.
+  const da = rules.indexOf('match /feedback/{');
+  const a = rules.indexOf('match /feedback-public/{');
+  assert.ok(da > 0 && a > da, 'firestore.rules: blocco della collezione feedback non trovato');
+  const blocco = rules.slice(da, a);
+  // I blocchi `hasOnly([...])` delle sotto-mappe (una voce di `livelli`, un
+  // voto) nominano chiavi di un'altra cosa, non campi del documento.
   const esclusi = new Set([
     'esito', 'at', 'ruolo', 'by', 'testo',      // una voce di `livelli`
     'l3', 'l4',                                  // le chiavi di `livelli`
     'vote', 'credibilitySnapshot',               // una voce di `votes`
-    'value', 'pseudonym', 'action', 'model', 'servedBy', // altre collezioni
   ]);
   const out = new Set();
-  for (const m of rules.matchAll(/hasOnly\(\s*\[([\s\S]*?)\]\s*\)/g)) {
+  for (const m of blocco.matchAll(/hasOnly\(\s*\[([\s\S]*?)\]\s*\)/g)) {
     for (const q of m[1].matchAll(/'([A-Za-z_][A-Za-z0-9_]*)'/g)) {
       if (!esclusi.has(q[1])) out.add(q[1]);
     }
   }
+  assert.ok(out.size > 20, 'firestore.rules: elenco dei campi del feedback non riconosciuto');
   return out;
 }
 
