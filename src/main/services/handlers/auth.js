@@ -964,8 +964,16 @@ module.exports = function register(on, ctx) {
       if (liveSubs.size === 0) liveStop();
       return { ok: true, subscribed: false };
     }
-    if (!liveSubs.has(wc)) {
-      liveSubs.add(wc);
+    // Tetto sulla lista che arriva dalla pagina: è un elenco di id, non un
+    // posto dove far crescere il lavoro del giro senza che nessuno se ne accorga.
+    if (Array.isArray(msg && msg.watch)) {
+      const max = (LIVE && LIVE.SEGUITI_MAX) || 40;
+      liveSubs.set(wc, new Set(msg.watch.map((s) => String(s || '')).filter(Boolean).slice(0, max)));
+    } else if (!liveSubs.has(wc)) {
+      liveSubs.set(wc, new Set());
+    }
+    if (!wc.__filoLiveBound) {
+      wc.__filoLiveBound = true;
       // Una scheda chiusa non deve lasciare il giro acceso per sempre.
       try { wc.once('destroyed', () => { liveSubs.delete(wc); if (liveSubs.size === 0) liveStop(); }); } catch (_) {}
     }
