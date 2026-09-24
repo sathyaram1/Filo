@@ -128,6 +128,15 @@ export function binarioScaricato() {
  * detto dove cercarlo, lo dichiara. Con il binario installato l'ambiente esce
  * identico a com'è entrato.
  */
+/**
+ * Il modulo caricato PRIMA di ogni unit test: fa arrivare i file del repo coi
+ * fini riga del repo, qualunque cosa abbia scritto sul disco la macchina che
+ * ha clonato. È qui e non nei singoli test perché una regola che ogni test deve
+ * ricordarsi di seguire prima o poi non la segue qualcuno, e il rosso arriva
+ * sulla sola macchina che pubblica (#565, #569).
+ */
+export const PRELOAD_FINI_RIGA = resolve(REPO_ROOT, 'tests', 'helpers', 'finiRigaDelRepo.cjs');
+
 export function ambienteDeiTest(env = process.env, { scaricato = true, root = REPO_ROOT } = {}) {
   const fuori = { ...env };
   if (!scaricato && !fuori.ELECTRON_OVERRIDE_DIST_PATH) {
