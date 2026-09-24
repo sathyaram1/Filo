@@ -1562,6 +1562,10 @@
     const q = (searchEl.value || '').trim().toLowerCase();
     const sezioni = mostraSezioni();
     const base = sectionItems();
+    // I numeri delle sezioni si sanno già dalla proiezione: si scrivono subito,
+    // anche mentre le schede di questa sezione stanno arrivando.
+    if (sezioni) updateTabCounts();
+    if (inAttesaDiDettagli(base)) return;
     const filtered = q
       ? base.filter((f) => {
           const num = SN_FEEDBACK.formatNum(f.seq, f.subSeq);
