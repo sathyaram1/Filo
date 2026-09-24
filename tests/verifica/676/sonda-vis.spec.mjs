@@ -10,24 +10,38 @@ test('sonda: setVisible(false) rende nascosta la pagina?', async ({ app, openTab
   await stato('subito');
   await openTab(testServer.html('<html><body>altro</body></html>'));
   await new Promise((r) => setTimeout(r, 600));
-  const info = await app.evaluate(() => {
-    const tm = globalThis.__filoTabs || globalThis.tabs || null;
-    if (!tm) return 'nessun tab manager su globalThis';
-    return { activeId: tm.activeId, tabs: (tm.tabs || []).map((t) => ({ id: t.id, url: t.view?.webContents?.getURL?.() })) };
-  });
-  console.log('SONDA tabs', JSON.stringify(info));
   await stato('dopo-altra-scheda');
 
-  // Il meccanismo vero, chiamato a mano sulla view di Gestione.
-  const esito = await app.evaluate(({ webContents }) => {
-    const wc = webContents.getAllWebContents().find((w) => String(w.getURL()).includes('manage/manage.html'));
-    if (!wc) return 'nessuna webContents di Gestione';
-    try { wc.hostWebContents; } catch (_) {}
-    const view = wc.__filoView || null;
-    if (view && view.setVisible) { view.setVisible(false); return 'setVisible(false) chiamato sulla view'; }
-    return 'view non raggiungibile da webContents';
+  const esito = await app.evaluate(({ BaseWindow }) => {
+    const out = [];
+    for (const w of BaseWindow.getAllWindows()) {
+      const scan = (v) => {
+        const wc = v.webContents;
+        if (wc) out.push({ url: String(wc.getURL()).slice(0, 60), visible: v.getVisible ? v.getVisible() : 'n/d' });
+        for (const c of (v.children || [])) scan(c);
+      };
+      scan(w.contentView);
+    }
+    return out;
   });
-  console.log('SONDA esito', esito);
-  await new Promise((r) => setTimeout(r, 600));
+  console.log('SONDA viste', JSON.stringify(esito));
+
+  const fatto = await app.evaluate(({ BaseWindow }) => {
+    for (const w of BaseWindow.getAllWindows()) {
+      const scan = (v) => {
+        const wc = v.webContents;
+        if (wc && String(wc.getURL()).includes('manage/manage.html') && v.setVisible) {
+          v.setVisible(false);
+          return true;
+        }
+        for (const c of (v.children || [])) if (scan(c)) return true;
+        return false;
+      };
+      if (scan(w.contentView)) return 'setVisible(false) chiamato';
+    }
+    return 'view di Gestione non trovata';
+  });
+  console.log('SONDA fatto', fatto);
+  await new Promise((r) => setTimeout(r, 800));
   await stato('dopo-setVisible-false');
 });
