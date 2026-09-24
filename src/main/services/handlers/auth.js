@@ -729,7 +729,7 @@ module.exports = function register(on, ctx) {
         };
       }
       try {
-        return await handler(msg);
+        return await handler(msg, sender, origin);
       } catch (e) {
         return { ok: false, error: e?.message || String(e) };
       }
