@@ -1251,7 +1251,7 @@
   // campi. È la domanda che la dashboard fa a ogni giro per restare aggiornata
   // senza riscaricare tutto (≈130 KB invece di 5 MB per 500 feedback).
   async function listVersions({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0 } = {}) {
-    const rows = await list({ pageSize, timeoutMs, fields: ['__name__'] });
+    const rows = await list({ pageSize, timeoutMs, fields: ['__name__'], op: 'versions' });
     return rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime }));
   }
 
