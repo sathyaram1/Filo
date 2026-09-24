@@ -43,6 +43,11 @@ globalThis.SN_STORAGE = {
   async setRaw(k, v) { memoria.set(k, v); },
 };
 
+// Senza chiave privata il giro si ferma prima di guardare la bacheca: qui i
+// dati sono in chiaro, quindi la chiave non deve decifrare niente — deve solo
+// esserci, come sulla macchina dell'owner.
+process.env.FILO_FEEDBACK_PRIVKEY = 'chiave-finta-per-la-prova';
+
 const register = require(resolve(ROOT, 'src', 'main', 'services', 'handlers', 'auth.js'));
 
 function feedbackChiuso(i, extra = {}) {
@@ -61,9 +66,11 @@ function feedbackChiuso(i, extra = {}) {
 }
 
 // Registra gli handler su una porta finta e restituisce quello dei feedback,
-// più il registro di cosa il giro ha chiesto alla collezione.
-function apparecchia(feedbacks, schede) {
-  memoria.clear();
+// più il registro di cosa il giro ha chiesto alla collezione. La memoria
+// locale si azzera solo quando lo si chiede: fra un giro e l'altro è proprio
+// lei a ricordare da quando ricontrollare le chiusure.
+function apparecchia(feedbacks, schede, { azzeraMemoria = true } = {}) {
+  if (azzeraMemoria) memoria.clear();
   const conto = { letti: 0, chiamate: [], since: [], scritte: [], tolte: [] };
   const perData = feedbacks.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
@@ -106,34 +113,60 @@ function apparecchia(feedbacks, schede) {
   return { conto, porta: porte.get(MSG.FEEDBACK_FETCH) };
 }
 
-// Il giro parte due secondi dopo il caricamento: qui si aspetta che finisca.
-async function aspettaIlGiro() {
-  for (let i = 0; i < 60; i += 1) {
+// Il giro parte due secondi dopo il caricamento. `maxSeq` è la sua ultima
+// lettura: quando arriva, il giro è finito.
+async function aspettaIlGiro(conto) {
+  for (let i = 0; i < 80; i += 1) {
+    if (conto.chiamate.includes('maxSeq')) return true;
     // eslint-disable-next-line no-await-in-loop
     await new Promise((r) => setTimeout(r, 100));
-    if (globalThis.__sincroFatta) return;
   }
+  return conto.chiamate.includes('maxSeq');
 }
 
-test('una sola apertura di Gestione non legge due volte le schede pubbliche', async () => {
-  process.env.FILO_FEEDBACK_PRIVKEY = '';
+const CARICA = { op: 'list', pageSize: FB.LIST_PAGE_SIZE, fields: FB.CAMPI_LISTA };
+const DA_GESTIONE = 'filo://manage/manage.html';
+
+test('una sola apertura di Gestione legge le schede pubbliche una volta sola', async () => {
   const feedbacks = Array.from({ length: 30 }, (_, i) => feedbackChiuso(i + 1));
-  const schede = [];
-  const { conto, porta } = apparecchia(feedbacks, schede);
+  const { conto, porta } = apparecchia(feedbacks, []);
   assert.ok(porta, 'la porta di lettura dei feedback deve esistere');
 
-  const r = await porta({ op: 'list', pageSize: FB.LIST_PAGE_SIZE, fields: FB.CAMPI_LISTA }, null, 'filo://manage/manage.html');
+  const r = await porta(CARICA, null, DA_GESTIONE);
   assert.equal(r.ok, true);
   assert.equal(r.rows.length, 30);
   // La proiezione arriva fino alla query: è lì che si risparmiano i byte.
   assert.deepEqual(conto.campiChiesti, FB.CAMPI_LISTA);
 
-  // Il caricamento legge le schede una volta sola (per riunire voti e
-  // riaperture). La seconda passata, quella che il giro faceva subito dopo
-  // con `fresh`, non c'è più: il giro riusa queste.
-  await new Promise((res) => setTimeout(res, 2500));
+  assert.equal(await aspettaIlGiro(conto), true, 'il giro della bacheca non è partito');
   const letture = conto.chiamate.filter((c) => c === 'listAllPublic').length;
-  assert.ok(letture <= 1, `schede pubbliche lette ${letture} volte in un caricamento solo`);
+  assert.equal(letture, 1, 'la seconda passata sulle schede era una lettura pagata due volte');
+  // E i feedback non si rileggono: il giro riusa le righe del caricamento.
+  assert.equal(conto.chiamate.filter((c) => c === 'list').length, 1);
+  // Le schede si scrivono comunque: il risparmio non toglie niente al lavoro.
+  assert.equal(conto.scritte.length, 30);
+});
+
+test('al giro dopo si chiedono le chiusure NUOVE, non le ultime cinquecento', async () => {
+  const vecchi = Array.from({ length: 30 }, (_, i) => feedbackChiuso(i + 1, { resolvedAt: '2026-09-10T10:00:00Z' }));
+  const primo = apparecchia(vecchi, []);
+  await primo.porta(CARICA, null, DA_GESTIONE);
+  assert.equal(await aspettaIlGiro(primo.conto), true);
+  assert.deepEqual(primo.conto.since, [''], 'il primo giro non ha una data da cui ripartire');
+
+  // Stessa memoria, giro nuovo: ora la data c'è. Una segnalazione chiusa DOPO
+  // arriva; quelle chiuse prima non vengono nemmeno rilette.
+  const chiusoOggi = feedbackChiuso(900, { _id: 'chiuso-oggi', resolvedAt: new Date().toISOString() });
+  const secondo = apparecchia([...vecchi, chiusoOggi], [], { azzeraMemoria: false });
+  await secondo.porta(CARICA, null, DA_GESTIONE);
+  assert.equal(await aspettaIlGiro(secondo.conto), true);
+
+  assert.equal(secondo.conto.since.length, 1);
+  assert.notEqual(secondo.conto.since[0], '', 'la data dell_ultimo giro riuscito non è arrivata');
+  assert.ok(Date.parse(secondo.conto.since[0]) <= Date.now(), 'data non valida');
+  // Il feedback chiuso oggi ha la sua scheda.
+  assert.ok(secondo.conto.scritte.some((s) => s.id === 'chiuso-oggi'),
+    'una segnalazione chiusa dopo l_ultimo giro deve finire in bacheca');
 });
 
 test('il giro leggero del battito non tocca le schede pubbliche', async () => {
