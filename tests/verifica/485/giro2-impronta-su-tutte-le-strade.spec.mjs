@@ -130,7 +130,7 @@ test('il cammino onesto arriva in fondo: niente si è mosso, la fusione parte e 
   }
 });
 
-test('anche la verifica funzionale vale per il contenuto: registrata su uno, la fusione si ferma se il ramo si è mosso', async () => {
+test('anche la verifica funzionale vale per il contenuto: registrata su uno, se il ramo si è mosso la fusione la chiede al server dicendolo', async () => {
   const { srv, ricevuti, port } = await fintoServer(RISPOSTE);
   const { dir, g, punta } = deposito('filo-485-verifica-');
   const fuori = cartellaTemporanea('filo-485-verifica-fuori-');
