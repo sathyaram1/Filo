@@ -201,7 +201,8 @@ function withCwdProbe(shell, command, mark = nuovoMarcatore()) {
   if (sh === 'powershell') {
     // Il comando su righe sue: un commento in coda si mangiava la chiusura del try. Se non arriva in fondo
     // (exit, errore che ferma tutto) l'esito resta vuoto e lo dà il codice del processo, l'unico che lo sa.
-    return `$global:LASTEXITCODE=0\n$__filo_c=''\ntry {\n${command}\n$__filo_ok=$?\n$__filo_c=${ESITO_POWERSHELL}\n}`
+    return `$global:LASTEXITCODE=0\n$__filo_c=''\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
+      + `try {\n${command}\n$__filo_ok=$?\n$__filo_c=${ESITO_POWERSHELL}\n}`
       + ` finally { Write-Output "${mark}:$($__filo_c):$((Get-Location).Path)" }`;
   }
   // bash / sh (incluse le routine cloud Linux): cattura $? subito dopo il
