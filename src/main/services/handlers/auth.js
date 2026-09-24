@@ -878,6 +878,8 @@ module.exports = function register(on, ctx) {
   // combaciano: senza, una chiusura arrivata con l'orologio indietro cadrebbe
   // fuori dal filtro e non entrerebbe mai in bacheca.
   const MARGINE_SINCRO_MS = 60 * 60 * 1000;
+  // Quante schede fuori pagina si chiedono per richiesta (batchGet).
+  const SCHEDE_PER_VOLTA = 200;
   let sincroIso = null;   // null = non ancora letta da disco
   function chiaveSincro() {
     return (globalThis.SN_CONST && globalThis.SN_CONST.STORAGE_KEYS
