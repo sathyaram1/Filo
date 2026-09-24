@@ -54,6 +54,11 @@
     // background finché riescono; persistiti così sopravvivono al riavvio.
     // Array di { id, payload, name, prepared, queuedAt, attempts }.
     FEEDBACK_OUTBOX: 'feedbackOutbox',
+    // Quando la bacheca è stata rimessa in pari l'ultima volta (data ISO). Da
+    // lì riparte la domanda «cosa si è chiuso da allora?»: senza, ogni giro
+    // rileggeva le ultime cinquecento chiusure per trovarci quasi sempre
+    // niente. Persistita perché un riavvio non deve ricomprare quella pagina.
+    FEEDBACK_SYNC_AT: 'feedbackSyncAt',
     // Percorsi condivisi dell'Aiuto in attesa di essere spediti (#584). Non è
     // una coda per la rete come quella sopra: è una coda che RITARDA apposta,
     // perché l'ora in cui Firestore riceve un percorso torna a chiunque legga
