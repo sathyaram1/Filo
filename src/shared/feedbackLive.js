@@ -140,6 +140,7 @@
   //   versionsOf(ids)             → [{ _id, _updateTime }] l'ora vera di Firestore
   //   readRows(ids)               → [documenti interi]
   //   submissionCount()           → intero | null  quanti invii in tutto
+  //   ultimoAvvioRoutine()        → stringa | null  quando è partito l'ultimo worker
   //   broadcast(msg)              avvisa le pagine
   //   now()                       l'orologio (i test lo fissano)
   //
