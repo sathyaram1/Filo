@@ -137,13 +137,16 @@
   // pagine — è il caso frequente, ed è lì che si paga.
   function makeWatcher({
     listChangedSince, listVersions, broadcast,
+    seguiti = null, versionsOf = null, readRows = null, submissionCount = null,
     now = () => Date.now(), pollMs = POLL_MS, reconcileMs = RECONCILE_MS,
-    overlapMs = OVERLAP_MS, pageSize = 500, onWarn = null,
+    overlapMs = OVERLAP_MS, pageSize = 500, onWarn = null, seguitiMax = SEGUITI_MAX,
   } = {}) {
     let floor = null;           // bordo della finestra (data d'invio)
     let lastTickAt = 0;         // inizio dell'ultimo giro riuscito
     let lastReconcileAt = 0;
     let inFlight = null;
+    let versioniSeguite = new Map();  // id → ora d'ultima scrittura secondo Firestore
+    let inviiVisti = null;            // valore del contatore all'ultimo giro
 
     function since() {
       const base = lastTickAt || (now() - overlapMs);
