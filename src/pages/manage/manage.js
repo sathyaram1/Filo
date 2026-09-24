@@ -2489,6 +2489,41 @@
   // pannello che si ridipinge da solo (un aggiornamento arrivato da remoto).
   // La differenza conta per la frase: una sezione che l'owner ha aperto non
   // deve richiudersi da sé mentre lui la sta guardando.
+  // ── Il resto del feedback, quando serve davvero ──────────────────────────
+  //
+  // L'elenco scarica una proiezione: niente conversazione, livelli, allegati.
+  // Sono i campi che pesano, e una riga non ne mostra nessuno — ma il pannello
+  // sì. Qui si completa il feedback aperto, una lettura sola, e si ridisegna.
+  // La richiesta in corso si ricorda per id: passare due volte sulla stessa
+  // riga non la chiede due volte.
+  const dettagliInCorso = new Map();
+  function completaDettaglio(id) {
+    const key = String(id || '');
+    if (!key) return Promise.resolve(null);
+    if (dettagliInCorso.has(key)) return dettagliInCorso.get(key);
+    const p = (async () => {
+      let rows = await FB.getMany([key]);
+      if (isAdmin && rows.length > 0) {
+        try {
+          const r = await sendToMain({ type: 'feedback_decrypt_fields', list: rows });
+          if (r && r.ok && Array.isArray(r.list)) rows = r.list;
+        } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
+      }
+      const pieno = rows[0];
+      if (!pieno) return null;
+      // La riga può essere cambiata nel frattempo (giro dal vivo): si tiene
+      // quella, completata — non si riporta indietro lo stato appena letto.
+      const i = allFeedbacks.findIndex((f) => f._id === key);
+      if (i < 0) return null;
+      const { _proiezione, ...resto } = allFeedbacks[i];
+      allFeedbacks[i] = { ...pieno, ...resto };
+      reindexByClient();
+      return allFeedbacks[i];
+    })().finally(() => { dettagliInCorso.delete(key); });
+    dettagliInCorso.set(key, p);
+    return p;
+  }
+
   function openDetail(id, opts) {
     const ridisegno = !!(opts && opts.ridisegno && id === selectedId);
     // Quello che c'è nella casella della frase e non è ancora partito parte
@@ -3936,7 +3971,7 @@
       // (ricaricamento dopo un errore) si legge da capo.
       const pending = firstListPromise;
       firstListPromise = null;
-      const fresh = await (pending || FB.list({ pageSize: FB.LIST_PAGE_SIZE }));
+      const fresh = await (pending || FB.list({ pageSize: FB.LIST_PAGE_SIZE, fields: FB.CAMPI_LISTA }));
       // Nel frattempo uno spec ha iniettato dati finti? Quelli vincono: la
       // lista vera arrivata dopo non li sovrascrive (era una gara persa a caso,
       // e più il caricamento è veloce più spesso la si perdeva).
@@ -4001,7 +4036,7 @@
   // Sorgenti sostituibili dagli spec (che non hanno Firestore).
   const liveSources = {
     listVersions: (o) => FB.listVersions(o),
-    getMany: (ids) => FB.getMany(ids),
+    getMany: (ids) => FB.getMany(ids, { fields: FB.CAMPI_LISTA }),
   };
   let liveEnabled = false;
   let liveBlocked = false;  // dati finti iniettati: il giro non parte più, nemmeno se l'avvio finisce dopo
@@ -6097,7 +6132,7 @@
     // La lista è la cosa più lenta (secondi di rete): parte SUBITO, e le altre
     // letture di avvio girano mentre viaggia, invece di metterlesi davanti in
     // fila. loadData la aspetta; un errore lo raccoglie lì, non qui.
-    firstListPromise = FB.list({ pageSize: FB.LIST_PAGE_SIZE });
+    firstListPromise = FB.list({ pageSize: FB.LIST_PAGE_SIZE, fields: FB.CAMPI_LISTA });
     firstListPromise.catch(() => {});
     injectSearchIcons();
     await loadLayout();
