@@ -1,5 +1,7 @@
 # Chi guarda in continuo chiede cosa è cambiato, non tutto
 
+[← Tutti i pattern](../PATTERNS.md)
+
 **Regola.** Una superficie che si tiene aggiornata da sola non rilegge la
 raccolta a ogni giro: chiede le sole righe scritte dopo l'ultimo giro, su un
 campo che OGNI scrittura firma. Una domanda per data però non vede le
