@@ -4001,9 +4001,10 @@
     listVersions: (o) => FB.listVersions(o),
     getMany: (ids) => FB.getMany(ids),
   };
+  const LIVE_SUBSCRIBE = (window.SN_MSG?.MSG?.FEEDBACK_LIVE_SUBSCRIBE) || 'feedback_live_subscribe';
+  const LIVE_CHANGED = (window.SN_MSG?.MSG?.FEEDBACK_LIVE_CHANGED) || 'feedback_live_changed';
   let liveEnabled = false;
   let liveBlocked = false;  // dati finti iniettati: il giro non parte più, nemmeno se l'avvio finisce dopo
-  let liveTimer   = null;
   let liveTick    = null;   // promessa del giro in corso: uno alla volta
   let liveLastAt  = 0;      // quando la lista è stata allineata l'ultima volta
 
