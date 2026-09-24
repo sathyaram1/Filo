@@ -872,13 +872,17 @@ module.exports = function register(on, ctx) {
   // Dieci schede di Gestione aperte sono dieci pagine che ascoltano, non dieci
   // giri che pagano; e senza iscritti non si paga niente. Le due forme del
   // giro e il perché stanno in src/shared/feedbackLive.js.
-  const liveSubs = new Set();
+  // wc → gli id che QUELLA pagina sta seguendo da vicino (i feedback in mano
+  // alle routine). Di loro il giro chiede a Firestore l'ora che tiene lui: chi
+  // li scrive non firma la sua, e senza questo il loro avanzamento si vedrebbe
+  // solo al riallineamento.
+  const liveSubs = new Map();
   let liveWatcher = null;
   let liveTimer = null;
 
   function liveBroadcast(payload) {
     const msg = { type: MSG.FEEDBACK_LIVE_CHANGED, ...payload };
-    for (const wc of Array.from(liveSubs)) {
+    for (const wc of Array.from(liveSubs.keys())) {
       try {
         if (!wc || (wc.isDestroyed && wc.isDestroyed())) { liveSubs.delete(wc); continue; }
         // La scheda che si era iscritta può essere andata altrove: la stessa
