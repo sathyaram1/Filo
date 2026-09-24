@@ -9,6 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import '../../src/shared/esitoAzione.js';
 import '../../src/shared/chatArchive.js';
 
 const CA = globalThis.SN_CHAT_ARCHIVE;
