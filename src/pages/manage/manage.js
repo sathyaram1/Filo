@@ -4068,41 +4068,73 @@
     return false;
   }
 
-  // Un giro: versioni → differenze → documenti cambiati → decifratura → fusione.
-  // Ritorna { changed } (quanti feedback sono stati toccati). Un giro già in
-  // corso viene riusato, non raddoppiato.
-  async function refreshFromRemote() {
+  // Fonde righe già lette (arrivano dal giro del main) nella lista, con la
+  // decifratura e il ridisegno di sempre. `removed`/`keepIds` servono al
+  // riallineamento, che è l'unico a sapere chi è sparito.
+  async function mergeLive(fresh, { removed = [], keepIds = null } = {}) {
+    let righe = Array.isArray(fresh) ? fresh : [];
+    if (righe.length === 0 && removed.length === 0 && !keepIds) {
+      // Niente di nuovo, ma una scheda sparita in un giro precedente (tenuta
+      // aperta per una bozza) può chiudersi ora che la bozza non c'è più.
+      closeDetailIfGone();
+      return { changed: 0 };
+    }
+    if (isAdmin && righe.length > 0) {
+      try {
+        const r = await sendToMain({ type: 'feedback_decrypt_fields', list: righe });
+        if (r && r.ok && Array.isArray(r.list)) righe = r.list;
+      } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
+    }
+    const prima = allFeedbacks.length;
+    allFeedbacks = LIVE.applyChanges(allFeedbacks, { fresh: righe, removed, keepIds });
+    reindexByClient();
+    // Il segno «fondi senza chiedermelo» può arrivare da fuori — dallo script
+    // dell'owner o da un'altra finestra — e allora la richiesta ferma è la
+    // stessa di prima: nessuno avvisa, e senza questo giro il ramo resta fermo
+    // finché la pagina non viene riaperta.
+    fondiPreapprovateInAttesa();
+    rerenderAfterLive(new Set(righe.map((f) => f && f._id).filter(Boolean)));
+    return { changed: righe.length + Math.max(0, prima - allFeedbacks.length) };
+  }
+
+  // Il riallineamento: versioni → differenze → rilettura dei soli cambiati.
+  // Lo fa la pagina e non il main perché la lista ce l'ha lei: solo lei sa
+  // quali documenti le mancano davvero.
+  async function reconcileFrom(remote) {
+    // Una risposta che non è un elenco non è "tutto sparito": è un guasto,
+    // e un guasto lascia la lista com'è.
+    if (!Array.isArray(remote)) throw new Error('versioni non lette');
+    const { changed, added, removed } = LIVE.diffVersions(allFeedbacks, remote);
+    const ids = changed.concat(added);
+    const fresh = ids.length > 0 ? await liveSources.getMany(ids) : [];
+    return mergeLive(fresh, { removed });
+  }
+
+  // Un giro completo chiesto dalla pagina (apertura, rientro in vista, prove).
+  // Un giro già in corso viene riusato, non raddoppiato.
+  function refreshFromRemote() {
     if (liveTick) return liveTick;
     liveTick = (async () => {
       const remote = await liveSources.listVersions({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
-      // Una risposta che non è un elenco non è "tutto sparito": è un guasto,
-      // e un guasto lascia la lista com'è.
-      if (!Array.isArray(remote)) throw new Error('versioni non lette');
-      const { changed, added, removed } = LIVE.diffVersions(allFeedbacks, remote);
-      const ids = changed.concat(added);
-      if (ids.length === 0 && removed.length === 0) {
-        // Niente di nuovo, ma una scheda sparita in un giro precedente (tenuta
-        // aperta per una bozza) può chiudersi ora che la bozza non c'è più.
-        closeDetailIfGone();
-        return { changed: 0 };
-      }
-      let fresh = ids.length > 0 ? await liveSources.getMany(ids) : [];
-      if (isAdmin && fresh.length > 0) {
-        try {
-          const r = await sendToMain({ type: 'feedback_decrypt_fields', list: fresh });
-          if (r && r.ok && Array.isArray(r.list)) fresh = r.list;
-        } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
-      }
-      allFeedbacks = LIVE.applyChanges(allFeedbacks, { fresh, removed });
-      reindexByClient();
-      // Il segno «fondi senza chiedermelo» può arrivare da fuori — dallo script
-      // dell'owner o da un'altra finestra — e allora la richiesta ferma è la
-      // stessa di prima: nessuno avvisa, e senza questo giro il ramo resta fermo
-      // finché la pagina non viene riaperta.
-      fondiPreapprovateInAttesa();
-      rerenderAfterLive(new Set(ids));
-      return { changed: ids.length + removed.length };
+      return reconcileFrom(remote);
     })().finally(() => { liveTick = null; liveLastAt = Date.now(); });
+    return liveTick;
+  }
+
+  // L'avviso del giro del main. Una pagina che non ha ancora la lista non ha
+  // niente in cui fondere: prima si carica.
+  function onLiveMessage(m) {
+    if (!liveEnabled || liveBlocked || !m) return Promise.resolve(null);
+    if (!dataLoaded) { loadData().catch(() => {}); return Promise.resolve(null); }
+    const prima = liveTick || Promise.resolve();
+    liveTick = prima.then(() => (
+      m.kind === 'reconcile'
+        ? reconcileFrom(m.versions)
+        : mergeLive(m.rows)
+    )).catch((e) => {
+      console.warn('[manage] aggiornamento:', e?.message || e);
+      return null;
+    }).finally(() => { liveLastAt = Date.now(); });
     return liveTick;
   }
 
@@ -4118,9 +4150,14 @@
   function startLive() {
     if (!LIVE || liveEnabled || liveBlocked) return;
     liveEnabled = true;
-    liveTimer = setInterval(() => liveTickIfDue(true), LIVE.POLL_MS);
+    // Il giro lo tiene il main: qui ci si iscrive e basta. Se il canale non
+    // c'è (una prova senza ponte) resta il rientro in vista qui sotto.
+    sendToMain({ type: LIVE_SUBSCRIBE }).catch(() => {});
+    window.addEventListener('pagehide', () => {
+      sendToMain({ type: LIVE_SUBSCRIBE, off: true }).catch(() => {});
+    });
     // Scheda tornata in vista o finestra tornata in primo piano: se è passato
-    // abbastanza tempo, non aspettare il prossimo battito.
+    // abbastanza tempo, non aspettare il prossimo avviso.
     document.addEventListener('visibilitychange', () => liveTickIfDue(false));
     window.addEventListener('focus', () => liveTickIfDue(false));
   }
@@ -4128,6 +4165,7 @@
   function stopLive() {
     liveEnabled = false;
     if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+    sendToMain({ type: LIVE_SUBSCRIBE, off: true }).catch(() => {});
   }
 
   // ── Hook di test ────────────────────────────────────────────────────────
