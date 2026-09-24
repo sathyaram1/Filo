@@ -13,26 +13,25 @@
 //   come «vuoto»), chiuso però solo in quel file: un anno dopo è rientrato da
 //   quella accanto. Per questo la regola adesso è una sola e vale per tutti.
 //
-// LE DUE METÀ DELLA REGOLA
+// LE TRE METÀ DELLA REGOLA, E QUAL È QUELLA CHE GARANTISCE
 //   1. `.gitattributes` pretende LF da qualunque checkout: la differenza fra
 //      macchine sparisce alla radice, per le copie scaricate d'ora in poi.
-//   2. `tests/helpers/testo.mjs` normalizza quello che un test legge: copre
-//      anche le copie già sul disco, dove i CRLF restano finché il file non
-//      viene riscritto (è il caso della macchina di chi sviluppa Filo).
-//   Servono tutte e due: la prima senza la seconda lascia rossa la macchina di
-//   casa, la seconda senza la prima lascia il problema a chiunque legga un file
-//   del repo senza passare dalla porta.
+//   2. Il lanciatore degli unit test carica `tests/helpers/finiRigaDelRepo.cjs`,
+//      che normalizza OGNI lettura di testo di un file del repo. È questa la
+//      garanzia: copre anche le copie già storte sul disco, e non dipende da
+//      come un test è scritto. Chi deve vedere un `\r` legge i byte.
+//   3. `tests/helpers/testo.mjs` resta la porta da usare a mano, per chi legge
+//      un file del repo fuori dagli unit test (gli spec Playwright).
 //
-// LE DUE RETI GUARDANO LA FORMA, NON IL NOME
-//   Questo difetto è già rientrato due volte dalla porta accanto, e le due reti
-//   qui sotto lo hanno imparato: non sorvegliano `readFileSync` e `indexOf`,
-//   sorvegliano LEGGERE UN FILE DEL REPO SENZA NORMALIZZARLO e CERCARCI DENTRO
-//   UNA COSA CHE UN `\r` DI TROPPO FA SPARIRE. Quindi la lettura vale anche
-//   asincrona (`readFile` di node:fs/promises è la stessa lettura grezza con un
-//   `await` davanti), e la ricerca vale anche scritta come regex con un «a
-//   capo» dentro, come `replace`/`match`/`search`, o come `$` di fine riga in
-//   una regex multiriga (era il #565: `\r` sta prima della fine riga, e il `$`
-//   non ci arriva mai).
+// LE DUE RETI QUI SOTTO SONO UN AVVISO IN ANTICIPO, NON LA GARANZIA
+//   Per quattro giri di verifica la difesa è stata riconoscere i modi di
+//   scrivere la lettura e la ricerca, e a ogni giro ne entrava uno nuovo
+//   (il percorso in un altro modulo, la stringa su due righe, la lettura
+//   affidata a una funzione, la regex costruita). Non rincorrere altre forme:
+//   quello che deve reggere lo misura `tests/unit/finiRigaLetturaNormalizzata.test.mjs`,
+//   che prova il fatto invece della grafia. Queste due reti restano perché un
+//   avviso sulla macchina di chi scrive costa meno di un rosso a valle, e
+//   perché fuori dagli unit test la normalizzazione automatica non c'è.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
