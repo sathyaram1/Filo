@@ -1307,12 +1307,15 @@
   // il cursore con cui `listAllPublic` arriva in fondo alla raccolta. Il nome è
   // unico e stabile, quindi non salta né ripete righe; una data no (due schede
   // possono averla identica).
-  async function listPublic({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = null } = {}) {
+  // `fields` (opzionale): i soli campi da scaricare. Chi deve solo riunire i
+  // voti e le riaperture ai feedback non ha bisogno del resto della scheda, e
+  // il resto della scheda è la parte grossa.
+  async function listPublic({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = null, fields = null } = {}) {
     if (typeof afterName === 'string') {
-      const { rows } = await listByNameDirect(VIEW_COLLECTION, { pageSize, timeoutMs, afterName });
+      const { rows } = await listByNameDirect(VIEW_COLLECTION, { pageSize, timeoutMs, afterName, fields });
       return rows;
     }
-    return listDirect(VIEW_COLLECTION, { pageSize, timeoutMs });
+    return listDirect(VIEW_COLLECTION, { pageSize, timeoutMs, fields });
   }
 
   // ── TUTTE le schede, non una pagina ───────────────────────────────────────
