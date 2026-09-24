@@ -61,6 +61,16 @@ servita a niente, una volta.
 5. **Le letture accessorie vanno a colpo sicuro.** Per una manciata di id si
    chiedono quegli id (`batchGet`); dove serve l'elenco intero si chiedono i
    soli campi che chi riunisce guarda davvero.
+6. **La data firmata è una scorciatoia, non l'unica sorgente.** La firma chi
+   scrive, e non tutti la firmano: il server delle routine non la mette, una
+   macchina con l'orologio indietro la mette nel passato. Chi guarda in
+   continuo tiene perciò almeno un segno che nessun orologio tocca. Qui sono
+   due: l'ora d'ultima scrittura che Firestore mantiene da sé, chiesta per i
+   soli documenti che la pagina dichiara di seguire (una lettura ciascuno, e
+   la pagina segue chi si sta muovendo, non tutto), e il contatore degli
+   invii, che ogni invio fa avanzare prima di scrivere. Se un contatore non
+   si legge, si tiene il valore di prima: «non lo so» non vale «niente di
+   nuovo».
 
 ## Riferimenti
 
