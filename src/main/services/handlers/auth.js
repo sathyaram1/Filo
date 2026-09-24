@@ -888,6 +888,11 @@ module.exports = function register(on, ctx) {
     for (const wc of Array.from(liveSubs)) {
       try {
         if (!wc || (wc.isDestroyed && wc.isDestroyed())) { liveSubs.delete(wc); continue; }
+        // La scheda che si era iscritta può essere andata altrove: la stessa
+        // webContents ora mostra un sito, e lì dentro gira il suo content
+        // script. L'iscrizione si è fatta da una pagina di Filo, ma quello che
+        // conta è dove si CONSEGNA — la posta dell'owner non esce da filo://.
+        if (!String(wc.getURL() || '').startsWith('filo://')) { liveSubs.delete(wc); continue; }
         wc.send('filo:broadcast', msg);
       } catch (_) { liveSubs.delete(wc); }
     }
