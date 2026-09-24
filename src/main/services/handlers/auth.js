@@ -920,6 +920,14 @@ module.exports = function register(on, ctx) {
         return mergeCardFields(rows, { ids });
       },
       submissionCount: async () => FB.submissionCount({ timeoutMs: 20000, idToken: await token() }),
+      // Il registro dei worker lo scrive il server quando ne fa partire uno: è
+      // l'unico posto dove «le routine hanno appena preso in mano qualcosa»
+      // sta scritto senza dipendere da un'ora che il server non firma.
+      ultimoAvvioRoutine: async () => {
+        const entries = await Defaults.getWorkerLog(await token());
+        const prima = Array.isArray(entries) ? entries[0] : null;
+        return prima ? `${prima.startedAt}|${prima.num}|${prima.role}` : null;
+      },
       listVersions: async () => FB.listVersions({
         pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000, idToken: await token(),
       }),
