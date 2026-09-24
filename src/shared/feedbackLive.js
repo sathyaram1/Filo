@@ -198,7 +198,14 @@
     // li scrive non firma la sua. Ritorna i documenti interi dei soli mossi.
     async function daiSeguiti() {
       if (typeof seguiti !== 'function' || typeof versionsOf !== 'function' || typeof readRows !== 'function') return [];
-      const ids = Array.from(new Set((seguiti() || []).map(String).filter(Boolean))).slice(0, seguitiMax);
+      const tutti = Array.from(new Set((seguiti() || []).map(String).filter(Boolean)));
+      const ids = tutti.slice(0, seguitiMax);
+      // Oltre il tetto non si taglia e basta: chi resta fuori non si vedrebbe
+      // muovere per mezz'ora, e nessuno saprebbe perché.
+      if (tutti.length > ids.length) {
+        if (onWarn) onWarn(`seguiti: ${tutti.length} sopra il tetto di ${seguitiMax}, riallineamento completo al giro dopo`);
+        lastReconcileAt = 0;
+      }
       if (ids.length === 0) return [];
       const vers = await versionsOf(ids);
       const mossi = [];
