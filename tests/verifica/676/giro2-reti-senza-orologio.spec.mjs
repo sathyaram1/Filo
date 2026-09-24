@@ -115,7 +115,10 @@ test('in coda oltre il dodicesimo, quello che scrivono le routine non arriva', a
   });
 
   // Il successo è che l'owner lo veda entro il giro, come per le prime dodici.
-  await expect(page.locator('.mg-item-title')).toContainText(['Numero 14, presa in carico'], { timeout: 5000 });
+  await expect.poll(
+    () => page.locator('.mg-item-title').allTextContents(),
+    { timeout: 5000 },
+  ).toContain('Numero 14, presa in carico');
 });
 
 test('due segnalazioni nello stesso giro: quella con l\'ora indietro non entra in lista', async ({ app, openTab }) => {
