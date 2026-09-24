@@ -38,9 +38,8 @@ test('un riordino che non aveva niente da archiviare non deve diventare «schede
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
-  await app.evaluate(() => {
+  await app.evaluate(({ BrowserWindow }) => {
     globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
-    const { BrowserWindow } = require('electron');
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     // Il riordino gira davvero e non trova niente da chiudere: è l'esito che il
     // diario adesso chiama «Nessuna scheda da archiviare».
