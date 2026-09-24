@@ -1,7 +1,11 @@
-// Verifica #676 — giro 1. Un feedback riscritto da un cammino che NON firma
-// l'ora: la dashboard lo vede ancora? Il giro al minuto chiede «chi è stato
-// scritto dopo questo istante?» guardando un campo che scrive chi scrive, non
-// Firestore. Chi non lo rimette resta invisibile fino al riallineamento.
+// Verifica #676 — giro 1. ROSSE FINCHÉ IL RILIEVO È APERTO.
+// Il giro al minuto chiede «chi è stato scritto dopo questo istante?» a un
+// campo che deve scrivere chi scrive, non Firestore. Queste due prove
+// asseriscono il SUCCESSO per l'owner — la dashboard mostra il cambiamento
+// entro il giro — nei due casi in cui quel campo non è affidabile: chi scrive
+// senza firmarlo (oggi il server delle routine) e chi lo firma con un orologio
+// indietro. Diventano verdi quando il giro smette di dipendere da una data
+// scritta a mano.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
