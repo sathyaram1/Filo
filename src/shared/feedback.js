@@ -1416,6 +1416,16 @@
     return true;
   }
 
+  // Ogni scrittura su un feedback firma l'ora: è l'unico modo che ha la
+  // dashboard di chiedere «cosa è cambiato da allora?» invece di rileggere la
+  // collezione intera a ogni giro. Un cammino che scrive senza passare di qui
+  // rende quel cambiamento invisibile fino alla riconciliazione.
+  function touchUpdatedAt(fields, mask, iso) {
+    fields.updatedAt = { timestampValue: String(iso || new Date().toISOString()) };
+    if (Array.isArray(mask) && !mask.includes('updatedAt')) mask.push('updatedAt');
+    return fields;
+  }
+
   // Aggiorna stato/note di un feedback esistente. status ∈ new|todo|done|verified|ignored.
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
