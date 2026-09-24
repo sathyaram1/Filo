@@ -149,7 +149,7 @@ test('con le routine al lavoro la dashboard rilegge di nuovo tutta la pagina a o
 
   // Un worker che parte, come durante un giro di routine.
   let n = 0;
-  const avvio = () => app.evaluate((k) => {
+  const avvio = () => app.evaluate((_electron, k) => {
     globalThis.__avvii = [{ role: 'resolver', startedAt: `2026-09-24T10:${String(k).padStart(2, '0')}:00Z`, num: `#${500 + k}` }];
   }, (n += 1));
 
