@@ -4266,6 +4266,8 @@
       reindexByClient();
       renderList();
     },
+    // Chi la pagina chiede al giro di seguire con l'ora vera di Firestore.
+    idsDaSeguire,
     // Aggiornamento continuo: un giro subito (ritorna { changed }), e le
     // sorgenti finte { listVersions(opts), getMany(ids) } con cui farlo.
     pollNow() { return refreshFromRemote(); },

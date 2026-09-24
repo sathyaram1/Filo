@@ -150,3 +150,46 @@ test('un contatore non letto non vale «niente di nuovo»', async () => {
   await w.tick({ force: true });
   assert.equal(log.versioni, 2, 'l\'invio arrivato durante il guasto non si perde');
 });
+
+// ── le due domande, come arrivano a Firestore ───────────────────────────────
+
+require(join(SRC, 'feedback.js'));
+const FB = globalThis.SN_FEEDBACK;
+
+async function conFetch(risposta, fn) {
+  const vere = globalThis.fetch;
+  const chiamate = [];
+  globalThis.fetch = async (url, opts) => {
+    chiamate.push({ url: String(url), body: opts && opts.body ? JSON.parse(opts.body) : null });
+    return { ok: true, status: 200, json: async () => risposta, text: async () => '' };
+  };
+  try { return await fn(chiamate); } finally { globalThis.fetch = vere; }
+}
+
+test('l\'ora vera dei seguiti si chiede in UNA richiesta, e senza tirarsi dietro i testi', async () => {
+  const doc = {
+    name: 'projects/p/databases/(default)/documents/feedback/a',
+    fields: { createdAt: { timestampValue: '2026-09-01T00:00:00Z' } },
+    updateTime: 't9',
+  };
+  await conFetch([{ found: doc }], async (chiamate) => {
+    const out = await FB.versionsOf(['a', 'b']);
+    assert.equal(chiamate.length, 1, 'una richiesta sola per tutti gli id');
+    assert.ok(chiamate[0].url.includes(':batchGet'));
+    assert.equal(chiamate[0].body.documents.length, 2);
+    assert.deepEqual(chiamate[0].body.mask.fieldPaths, ['createdAt'], 'niente note né allegati');
+    assert.deepEqual(out, [{ _id: 'a', _updateTime: 't9', createdAt: '2026-09-01T00:00:00Z' }]);
+  });
+});
+
+test('il contatore degli invii: una lettura, e «non lo so» non è zero', async () => {
+  await conFetch({ fields: { value: { integerValue: '774' } } }, async (chiamate) => {
+    assert.equal(await FB.submissionCount(), 774);
+    assert.equal(chiamate.length, 1);
+    assert.ok(chiamate[0].url.includes('counters/feedbackSeq'));
+  });
+  const vere = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' });
+  try { assert.equal(await FB.submissionCount(), null, 'contatore assente: non lo so, non zero'); }
+  finally { globalThis.fetch = vere; }
+});
