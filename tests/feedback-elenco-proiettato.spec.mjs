@@ -333,3 +333,152 @@ test('cambiare sezione mentre arriva non ricompra la sezione di prima', async ({
   const { conteggi, ripetuti: doppi } = await ripetuti(page);
   expect(doppi, `documenti chiesti più di una volta: ${JSON.stringify(conteggi)}`).toEqual([]);
 });
+
+// ── Un ridisegno non porta via quello che l'owner sta scrivendo ─────────────
+//
+// Il pannello si ridisegna da solo quando il resto del documento arriva, e
+// ridisegnare RIEMPIE le sue caselle col feedback: su una bozza in corso vuol
+// dire cancellarla. La scrittura che parte dopo legge la casella ormai vuota,
+// e la segnalazione si riapre senza il motivo senza che niente lo dica.
+// Senza il fix tutte e quattro sono rosse: la casella torna vuota.
+const LENTO_MS = 1500;
+
+async function gestionePronta(openTab, riga, extra) {
+  const page = await openTab(PAGINA_GESTIONE);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
+  await page.evaluate(({ r, ex, lento }) => {
+    window.__inviati = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'auth_status') {
+        return { ok: true, isAdmin: true, profile: { email: 'owner@example.invalid' } };
+      }
+      if (msg && msg.type === 'feedback_decrypt_fields') return { ok: true, list: msg.list };
+      if (msg && msg.type === 'feedback_update') { window.__inviati.push(msg); return { ok: true }; }
+      return orig(msg);
+    };
+    window.__mgTest.setLiveSources({
+      listVersions: async () => [],
+      getMany: async () => [],
+      // Lenta apposta: è la finestra in cui l'owner scrive e il ridisegno
+      // arriva addosso. Sul vero è la latenza di una lettura.
+      getDettagli: async (ids) => {
+        await new Promise((x) => setTimeout(x, lento));
+        const pieno = JSON.parse(JSON.stringify(r));
+        delete pieno._proiezione;
+        pieno.notes = 'Report della lavorazione.';
+        return ids.includes(pieno._id) ? [pieno] : [];
+      },
+    });
+    window.__mgTest.setAdmin(true);
+    if (ex && ex.releasedVersion) window.__mgTest.setReleasedVersion(ex.releasedVersion);
+    window.__mgTest.setData([JSON.parse(JSON.stringify(r))]);
+    if (ex && ex.tab) window.__mgTest.setTab(ex.tab);
+  }, { r: riga, ex: extra || null, lento: LENTO_MS });
+  await page.locator(`.mg-item[data-id="${riga._id}"]`).click();
+  return page;
+}
+
+const USCITO = {
+  _id: 'fb677r',
+  _proiezione: true,
+  seq: 6771,
+  subSeq: 0,
+  name: 'Fix uscito da riaprire',
+  text: 'Manca ancora un pezzo.',
+  status: 'done',
+  statusPublic: 'closed',
+  resolvedInVersion: '0.0.1',
+  resolvedAt: '2026-09-21T09:00:00.000Z',
+  clientId: 'tester-1',
+  createdAt: '2026-09-20T09:00:00.000Z',
+};
+
+const DA_DECIDERE = {
+  _id: 'fb677d',
+  _proiezione: true,
+  seq: 6774,
+  subSeq: 0,
+  name: 'Segnalazione bloccata da decidere',
+  text: 'Filo l_ha fermata.',
+  status: 'design',
+  statusReason: 'l2',
+  statusPublic: 'open',
+  clientId: 'tester-1',
+  createdAt: '2026-09-23T10:00:00.000Z',
+};
+
+const IN_CHIARIMENTO_2 = {
+  _id: 'fb677c',
+  _proiezione: true,
+  seq: 6773,
+  subSeq: 0,
+  name: 'Domanda aperta',
+  text: 'Quale delle due strade?',
+  status: 'design',
+  statusReason: 'clarify',
+  statusPublic: 'open',
+  clientId: 'tester-1',
+  createdAt: '2026-09-23T09:00:00.000Z',
+};
+
+test('riaprire un fix uscito porta con sé il motivo, anche scritto durante l_attesa', async ({ openTab }) => {
+  const page = await gestionePronta(openTab, USCITO, { releasedVersion: '9.9.9', tab: 'resolved' });
+  await page.locator('#mgActions button', { hasText: 'Riapri' }).click();
+  await page.locator('#mgReopenText').fill('Manca il caso con lo schermo piccolo.');
+  await page.locator('#mgReopenConfirmBtn').click();
+
+  await expect.poll(
+    async () => (await page.evaluate(() => window.__inviati)).filter((m) => m.status === 'todo').length,
+    { timeout: 20_000 },
+  ).toBeGreaterThan(0);
+  const inviati = await page.evaluate(() => window.__inviati);
+  const riapertura = inviati.find((m) => m.status === 'todo');
+  expect(riapertura.notes, 'il motivo della riapertura deve arrivare al server').toContain('Manca il caso con lo schermo piccolo.');
+  expect(riapertura.notes, 'e il report della lavorazione deve restare').toContain('Report della lavorazione.');
+});
+
+test('la risposta a un chiarimento scritta durante l_attesa resta nella casella', async ({ openTab }) => {
+  const page = await gestionePronta(openTab, IN_CHIARIMENTO_2);
+  await page.locator('#mgClarifyText').fill('Prendi la seconda strada.');
+  await page.waitForTimeout(LENTO_MS + 1000);
+  await expect(page.locator('#mgClarifyText')).toHaveValue('Prendi la seconda strada.');
+});
+
+test('la frase per chi ha segnalato scritta durante l_attesa resta nella riga', async ({ openTab }) => {
+  const page = await gestionePronta(openTab, IN_CHIARIMENTO_2);
+  await page.locator('#mgUserNoteToggle').click();
+  await page.locator('#mgUserNoteText').fill('Adesso funziona, riprova.');
+  await page.waitForTimeout(LENTO_MS + 1000);
+  await expect(page.locator('#mgUserNoteText')).toHaveValue('Adesso funziona, riprova.');
+});
+
+test('il commento della revisione scritto durante l_attesa arriva al server', async ({ openTab }) => {
+  const page = await gestionePronta(openTab, DA_DECIDERE);
+  await expect(page.locator('#mgAcceptComment')).toBeVisible({ timeout: 10_000 });
+  await page.locator('#mgAcceptComment').fill('Sbloccata: è una richiesta legittima.');
+  await page.locator('#mgActions button').first().click();
+
+  await expect.poll(
+    async () => (await page.evaluate(() => window.__inviati)).filter((m) => m.reviewDecision).length,
+    { timeout: 20_000 },
+  ).toBeGreaterThan(0);
+  const inviati = await page.evaluate(() => window.__inviati);
+  const revisione = inviati.find((m) => m.reviewDecision);
+  expect(revisione.reviewComment, 'il perché della decisione deve arrivare al server')
+    .toBe('Sbloccata: è una richiesta legittima.');
+});
+
+// La bozza rimanda il ridisegno, non lo annulla: appena la casella si svuota
+// la conversazione arriva, invece di restare per sempre su «Caricamento…».
+test('finita la bozza, la conversazione arriva lo stesso', async ({ openTab }) => {
+  const page = await gestionePronta(openTab, IN_CHIARIMENTO_2);
+  await page.locator('#mgClarifyText').fill('bozza');
+  await page.waitForTimeout(LENTO_MS + 800);
+  await expect(page.locator('#mgThread')).toContainText('Caricamento della conversazione');
+  // Bozza cancellata e cursore altrove: non c'è più niente da perdere.
+  await page.locator('#mgClarifyText').fill('');
+  await page.locator('#mgThread').click();
+  await expect(page.locator('#mgThread')).toContainText('Report della lavorazione.', { timeout: 10_000 });
+});
