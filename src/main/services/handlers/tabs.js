@@ -43,7 +43,14 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     if (win && win._filoTabs) {
       const res = await win._filoTabs.runAutoTriage({ trigger: 'manual' });
-      return { ok: true, archived: (res && res.archived) || 0 };
+      return {
+        ok: true,
+        archived: (res && res.archived) || 0,
+        // Chi ha chiesto il riordino deve poter distinguere «non c'era niente
+        // da archiviare» da «il riordino non è partito».
+        giudizioMancato: !!(res && res.giudizioMancato),
+        giaInCorso: !!(res && res.giaInCorso),
+      };
     }
     return { ok: false, archived: 0 };
   });
