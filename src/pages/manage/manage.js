@@ -3567,6 +3567,15 @@
       appendBubble('user', `Tu (revisione${when})`, corpo);
     }
 
+    // Il resto del documento sta arrivando (l'elenco è una proiezione): finché
+    // non c'è, la conversazione non si dichiara vuota — direbbe il falso
+    // proprio su un feedback lavorato.
+    if (FB.soloLista(fb)) {
+      appendBubble('model', 'Filo', '<em>Caricamento della conversazione…</em>');
+      appendFraseBubble(fb);
+      return;
+    }
+
     // Turni della lavorazione: le note contengono i report delle istanze che
     // hanno implementato, gli esiti del controllo funzionalità e le risposte
     // dell'owner ai chiarimenti, in ordine. Il parser condiviso li separa.
