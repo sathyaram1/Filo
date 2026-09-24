@@ -1487,6 +1487,62 @@
     return agentOnly ? items.filter(isAgent) : items;
   }
 
+  // ── Qui la scheda È il dettaglio ─────────────────────────────────────────
+  //
+  // Ogni scheda mostra la conversazione intera, gli allegati, il testo: il
+  // caricamento non può chiederli per tutti, o si torna ai dieci MB per
+  // apertura. Li chiede per la SEZIONE che si sta guardando, una volta sola
+  // (chi è già completo non si ridomanda), e lo dice mentre lo fa.
+  const DETTAGLI_PER_VOLTA = 200;
+
+  async function completaDettagli(ids) {
+    const chiesti = new Set(ids);
+    for (let i = 0; i < ids.length; i += DETTAGLI_PER_VOLTA) {
+      const pezzo = ids.slice(i, i + DETTAGLI_PER_VOLTA);
+      // eslint-disable-next-line no-await-in-loop
+      let rows = await SN_FEEDBACK.getMany(pezzo, { timeoutMs: 20000 });
+      if (isAdmin && rows.length > 0) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const r = await sendToMain({ type: 'feedback_decrypt_fields', list: rows });
+          if (r && r.ok && Array.isArray(r.list)) rows = r.list;
+        } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
+      }
+      const perId = new Map(rows.map((r) => [String(r && r._id), r]));
+      all = all.map((f) => {
+        if (!chiesti.has(f._id)) return f;
+        const pieno = perId.get(f._id);
+        // Il marchio si toglie ANCHE a chi non è tornato (cancellato nel
+        // frattempo): lasciarcelo rimanderebbe la pagina a richiederlo in
+        // eterno, un giro di caricamento dopo l'altro.
+        if (!pieno) { const { _proiezione, ...resto } = f; return resto; }
+        const { _proiezione, ...resto } = f;
+        return sanitizeReportForReader({ ...pieno, ...resto });
+      });
+    }
+  }
+
+  // Torna true se la sezione non è ancora completa: allora disegna l'attesa e
+  // ridisegnerà da sé. `applyFilter` si ferma qui.
+  function inAttesaDiDettagli(items) {
+    const mancanti = items.filter((f) => SN_FEEDBACK.soloLista(f)).map((f) => f._id).filter(Boolean);
+    if (!mancanti.length) return false;
+    listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
+    emptyEl.hidden = true;
+    countEl.textContent = '';
+    const gen = loadGen;
+    completaDettagli(mancanti)
+      .then(() => { if (gen === loadGen) applyFilter(); })
+      .catch((e) => {
+        if (gen !== loadGen) return;
+        console.error('[feedback] dettagli non caricati:', e);
+        showLoadError((window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
+          ? SN_CHAT_ERRORS.sentence(e)
+          : 'Non è stato possibile caricare questi feedback: controlla la connessione e riprova.');
+      });
+    return true;
+  }
+
   // Mostra o nasconde la barra delle sezioni. Non è una decorazione: se gli
   // stati non si leggono, quella barra scriverebbe numeri inventati.
   function mostraSezioni() {
