@@ -4165,7 +4165,6 @@
 
   function stopLive() {
     liveEnabled = false;
-    if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
     sendToMain({ type: LIVE_SUBSCRIBE, off: true }).catch(() => {});
   }
 
