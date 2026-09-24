@@ -43,6 +43,7 @@ async function cancello(diff) {
     writeState: async () => {},
     github: {
       branchHead: async () => ({ ok: true, sha: H }),
+      isAncestor: async (base, sha) => ({ ok: true, ancestor: base === V && sha === H }),
       compareDiff: async (sha, opts) => (opts && opts.base ? { ok: true, diff } : { ok: true, diff: 'diff --git a/x b/x\n' }),
       mergeSha: async () => ({ ok: true, sha: 'c'.repeat(40) }),
     },
