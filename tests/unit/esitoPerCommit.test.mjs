@@ -599,7 +599,8 @@ test('in cima al ramo, dove chi fonde va a prendere, dev\'esserci il contenuto e
   const piuAvanti = testoPiuAvanti(P, O, 'worker/485-xyz');
   assert.match(piuAvanti, new RegExp(`${'p'.repeat(12)}`), 'quale contenuto è stato esaminato');
   assert.match(piuAvanti, new RegExp(`${'o'.repeat(12)}`), 'e cosa c\'è in cima al ramo');
-  assert.match(piuAvanti, /revision_capability/, 'la decadenza si registra, non resta a schermo');
+  assert.match(piuAvanti, new RegExp(`git merge --ff-only ${'o'.repeat(12)}`), 'la directory raggiunge ciò che verrà fuso');
+  assert.doesNotMatch(piuAvanti, /revision_capability/, 'un passaggio che al controllo di sicurezza il server nega');
   assert.ok(!/git push/.test(piuAvanti),
     'e non si suggerisce di spedire: là c\'è lavoro che qui non c\'è, e sovrascriverlo lo butterebbe via');
 
