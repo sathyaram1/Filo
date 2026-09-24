@@ -1000,8 +1000,10 @@ module.exports = function register(on, ctx) {
       // conto. Alla prima sincronizzazione dopo l'avvio la data non c'è e si
       // riparte dalla finestra intera, una volta.
       const campi = Array.isArray(FB.CAMPI_LISTA) ? FB.CAMPI_LISTA : null;
-      try { aggiungi(await FB.listResolved({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken, sinceIso, fields: campi })); }
-      catch (e) { console.warn('[feedback] chiusi di recente non letti:', e?.message || e); }
+      try {
+        aggiungi(await FB.listResolved({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken, sinceIso, fields: campi }));
+        chiusiLetti = true;
+      } catch (e) { console.warn('[feedback] chiusi di recente non letti:', e?.message || e); }
     }
 
     const tutteLeMancanti = (Array.isArray(schede) ? schede : [])
