@@ -1240,8 +1240,22 @@
     if (wanted.length === 0) return [];
     const bridge = pageBridge();
     if (bridge) return readViaMain(bridge, { op: 'getMany', ids: wanted, timeoutMs });
+    return batchGetDirect(COLLECTION, wanted, { timeoutMs, idToken });
+  }
+
+  // Le SCHEDE pubbliche dei soli id indicati, in una richiesta. Il giro della
+  // dashboard tocca una manciata di feedback per volta: rileggere tutta la
+  // collezione delle schede per riunirci voti e riaperture costava centinaia
+  // di letture per riunirne tre.
+  async function getManyPublic(ids, { timeoutMs = 0, idToken = '' } = {}) {
+    const wanted = (Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean);
+    if (wanted.length === 0) return [];
+    return batchGetDirect(VIEW_COLLECTION, wanted, { timeoutMs, idToken });
+  }
+
+  async function batchGetDirect(collectionId, wanted, { timeoutMs = 0, idToken = '' } = {}) {
     const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
-    const prefix = `${FIRESTORE_BASE}/${COLLECTION}/`;
+    const prefix = `${FIRESTORE_BASE}/${collectionId}/`;
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const opts = {
