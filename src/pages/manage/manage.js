@@ -3974,6 +3974,7 @@
 
     reindexByClient();
     renderList();
+    aggiornaSeguiti();
     liveLastAt = Date.now();
   }
 
