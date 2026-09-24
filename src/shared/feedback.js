@@ -847,6 +847,19 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(doc),
     });
+    const riprova = () => fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(doc),
+    });
+    if (res.status === 403 && doc.fields.updatedAt) {
+      // Regole non ancora deployate col campo più recente: si toglie SOLO
+      // quello. Buttare giù tutto lo schema al primo rifiuto farebbe arrivare
+      // ogni segnalazione senza numero né titolo per il solo fatto che
+      // `npm run deploy:regole` non è ancora girato.
+      delete doc.fields.updatedAt;
+      res = await riprova();
+    }
     if (res.status === 403) {
       // Rules non ancora aggiornate ai campi nuovi (name/seq/subSeq/parentId/clientIdHash):
       // meglio un feedback senza numero/titolo/collegamento che un invio
@@ -857,13 +870,8 @@
       delete doc.fields.parentId;
       delete doc.fields.clientIdHash; // S1.F2.2: rules vecchie potrebbero rifiutarlo
       delete doc.fields.walletPseudonym; // #652: idem, finché le regole non sono deployate
-      delete doc.fields.updatedAt; // regole non ancora deployate: meglio senza che respinto
       seq = null;
-      res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(doc),
-      });
+      res = await riprova();
     }
     // 409 ALREADY_EXISTS con documentId → il feedback è già stato scritto da un
     // tentativo precedente (identico submissionId). Non è un errore: successo
