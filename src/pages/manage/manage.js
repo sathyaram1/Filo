@@ -2560,7 +2560,7 @@
     // che manca lo dice invece di sembrare vuota.
     if (FB.soloLista(fb)) {
       completaDettaglio(id).then((pieno) => {
-        if (pieno && selectedId === id) openDetail(id, { ridisegno: true });
+        if (pieno && selectedId === id) ridisegnaRispettandoLaBozza(id);
       }).catch((e) => console.warn('[manage] dettaglio non completato:', e?.message || e));
     }
 
