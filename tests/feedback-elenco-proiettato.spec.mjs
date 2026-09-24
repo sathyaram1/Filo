@@ -139,6 +139,7 @@ test('in Gestione la lista è la stessa, e il dettaglio si completa aprendolo', 
   await expect(page.locator('#mgThread')).toContainText('caricamento chiede i documenti interi', { timeout: 10_000 });
   await expect(page.locator('#mgThread .mg-bubble-body').first()).toContainText('Gestione ci mette una vita');
   await expect(page.locator('#mgThread img[data-url]')).toHaveCount(1);
+  await expect(page.locator('#mgThread')).toContainText('console.log.txt');
 
   // Una lettura sola, per il feedback aperto.
   expect(await page.evaluate(() => window.__chiesti)).toEqual(['fb677']);
