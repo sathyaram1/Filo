@@ -9,7 +9,7 @@
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
-test('un feedback riscritto senza firmare l’ora non arriva col giro al minuto', async ({ app }) => {
+test('un feedback riscritto senza firmare l’ora arriva lo stesso col giro al minuto', async ({ app }) => {
   const esito = await app.evaluate(async () => {
     const FB = globalThis.SN_FEEDBACK;
     const LIVE = globalThis.SN_FEEDBACK_LIVE;
