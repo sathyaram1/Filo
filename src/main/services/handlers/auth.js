@@ -1026,11 +1026,15 @@ module.exports = function register(on, ctx) {
       }
       const base = (Array.isArray(rows) && rows.length)
         ? rows
-        : await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken });
+        : await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken, fields: FB.CAMPI_LISTA });
       // Le schede già in bacheca si leggono una volta sola e servono due volte:
       // per pescare i feedback fuori pagina che ne hanno una, e per il piano.
-      const published = await publicCards({ fresh: true });
-      const { rows: raw, aggiunti } = await conLeSegnalazioniFuoriPagina(base, idToken, published);
+      // Una volta sola DAVVERO: il giro parte due secondi dopo il caricamento
+      // che le ha appena lette, e ripeterlo con `fresh` era la seconda delle
+      // due passate che questo caricamento pagava. Le scritture sotto buttano
+      // la memoria breve da sé, quindi il giro dopo rilegge comunque.
+      const published = await publicCards();
+      const { rows: raw, aggiunti, schedeCoperte } = await conLeSegnalazioniFuoriPagina(base, idToken, published, ultimaSincroIso());
       const decifrati = new Array(raw.length);
       let next = 0;
       const worker = async () => {
