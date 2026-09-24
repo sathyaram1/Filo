@@ -4180,20 +4180,25 @@
   }
 
   // I feedback che il giro deve seguire con l'ora vera di Firestore invece che
-  // con quella firmata da chi scrive: quelli in mano alle routine, che scrivono
-  // senza firmarla, e la testa della coda, da cui esce la prossima presa in
-  // carico. Più in fondo nessuno si muove senza prima arrivare in testa.
-  const STATI_IN_MANO = ['working', 'revision_capability', 'revision_security'];
+  // con quella firmata da chi scrive, che il server delle routine non scrive.
+  //
+  // Quelli IN MANO alle routine ci vanno TUTTI, presi da tutta la lista e non
+  // dalla sola sezione «In coda»: il server può portarne uno altrove (in
+  // «Design» finisce fra i ricevuti) e continuare a scriverlo, e uno lasciato
+  // fuori resta fermo fino al riallineamento. Sono pochi per natura: tanti
+  // quanti il server ne lavora insieme. La testa della coda riempie quello che
+  // resta, perché da lì esce la prossima presa in carico.
   function idsDaSeguire() {
-    const inMano = [];
+    const inMano = (allFeedbacks || []).filter((fb) => MR.workProgress(fb));
+    const presi = new Set(inMano.map((fb) => fb && fb._id).filter(Boolean));
     const coda = [];
     for (const fb of MR.listForManageTab(allFeedbacks, 'queue', { releasedVersion })) {
-      (STATI_IN_MANO.includes(String(fb && fb.status || '')) ? inMano : coda).push(fb);
+      const id = fb && fb._id;
+      if (!id || presi.has(id)) continue;
+      if (presi.size + coda.length >= LIVE.SEGUITI_MAX) break;
+      coda.push(id);
     }
-    return inMano.concat(coda)
-      .map((fb) => fb && fb._id)
-      .filter(Boolean)
-      .slice(0, LIVE.SEGUITI_MAX);
+    return Array.from(presi).concat(coda);
   }
 
   let seguitiInviati = '';
