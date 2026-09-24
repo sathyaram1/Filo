@@ -189,11 +189,13 @@
     // indovinare: quale segnalazione stiano toccando adesso. Se si provasse a
     // indovinarla dalla coda si sbaglierebbe ogni volta che l'ordine del
     // server non è quello che la dashboard mostra.
+    // Il registro vuoto è `''`, non «non lo so»: se fosse la stessa cosa, il
+    // primo worker che parte da registro vuoto non si vedrebbe partire.
     async function ultimoAvvio(precedente) {
       if (typeof ultimoAvvioRoutine !== 'function') return precedente;
       try {
         const t = await ultimoAvvioRoutine();
-        return t == null ? precedente : String(t);
+        return t == null ? '' : String(t);
       } catch (e) {
         // Non letto non è «non è partito niente»: si tiene il valore di prima.
         if (onWarn) onWarn(`avvio worker non letto: ${e && e.message ? e.message : e}`);

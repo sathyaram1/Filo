@@ -62,6 +62,10 @@ async function fingiFirestore(app, docs, invii) {
       .map((d) => ({ _id: d._id, _updateTime: d._updateTime, createdAt: d.createdAt }));
     FB.getMany = async (ids) => globalThis.__docs.filter((d) => ids.includes(d._id));
     FB.submissionCount = async () => globalThis.__invii;
+    // Il registro dei worker: il server ne scrive uno quando fa partire un
+    // lavoro, ed è così che si sa che le routine hanno preso qualcosa in mano.
+    globalThis.__worker = [];
+    globalThis.__filoDefaults.getWorkerLog = async () => globalThis.__worker;
     // Il riallineamento completo è la rete di ultima istanza, mezz'ora dopo:
     // qui deve restare fuori portata, o coprirebbe proprio ciò che si misura.
     globalThis.SN_FEEDBACK_LIVE.POLL_MS = ritmo;
@@ -120,6 +124,9 @@ test('in coda oltre il dodicesimo, quello che scrivono le routine non arriva', a
     d.name = 'Numero 14, presa in carico';
     d.status = 'working';
     d._updateTime = 't2';
+    // Il server fa partire il worker, e lo scrive nel registro: è il solo
+    // segno che non dipende da un'ora che nessuno firma.
+    globalThis.__worker = [{ role: 'solver', startedAt: new Date().toISOString(), num: '#114' }];
   });
 
   // Il successo è che l'owner lo veda entro il giro, come per le prime dodici.
