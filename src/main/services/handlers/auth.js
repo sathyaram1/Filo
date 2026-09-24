@@ -869,16 +869,9 @@ module.exports = function register(on, ctx) {
   }));
 
   // ── #676: il giro della dashboard, uno solo, qui nel main ────────────────
-  //
-  // Prima ogni pagina di Gestione aperta chiedeva a Firestore i nomi di TUTTA
-  // la collezione ogni sessanta secondi: 500 letture al minuto a database
-  // fermo, moltiplicate per le schede aperte. Adesso il giro è uno, vive qui,
-  // e le pagine ascoltano. Due forme, e il perché sta in feedbackLive.js:
-  // al minuto i soli feedback scritti da poco (un giro a vuoto = una lettura),
-  // ogni mezz'ora le versioni di tutta la pagina — l'unica domanda che vede
-  // una CANCELLAZIONE, che per data non comparirebbe mai.
-  //
-  // Nessun iscritto, nessun giro: con Gestione chiusa non si paga niente.
+  // Dieci schede di Gestione aperte sono dieci pagine che ascoltano, non dieci
+  // giri che pagano; e senza iscritti non si paga niente. Le due forme del
+  // giro e il perché stanno in src/shared/feedbackLive.js.
   const liveSubs = new Set();
   let liveWatcher = null;
   let liveTimer = null;
