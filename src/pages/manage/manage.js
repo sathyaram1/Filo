@@ -4510,6 +4510,7 @@
   if (window.filo?.onBroadcast) {
     window.filo.onBroadcast((m) => {
       if (m && m.type === MERGE_APPROVALS_CHANGED) loadMergeApprovals(m);
+      if (m && m.type === LIVE_CHANGED) onLiveMessage(m);
     });
   }
 
