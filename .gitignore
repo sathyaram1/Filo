@@ -68,3 +68,6 @@ test-results/
 # gli altri marcatori — e soprattutto NON deve tornare nel repo, che e' il
 # posto da cui questa roba e' appena stata tolta.
 .claude/routine-state/
+
+# La sonda della sentinella sui fini riga: nasce e muore dentro il test.
+tests/.sonda-fini-riga/
