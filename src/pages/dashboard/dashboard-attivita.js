@@ -1245,6 +1245,7 @@
     send = deps.send;
     if (deps.faviconUrl) faviconUrl = deps.faviconUrl;
     if (deps.applyCommandCwd) applyCommandCwd = deps.applyCommandCwd;
+    if (deps.chatId) chatIdCorrente = deps.chatId;
   }
 
   global.SN_DASH_ATTIVITA = {
