@@ -816,7 +816,8 @@ module.exports = function register(on, ctx) {
 
     if (op === 'getMany') {
       const ids = Array.isArray(msg.ids) ? msg.ids : [];
-      const rows = await FB.getMany(ids, { timeoutMs, idToken });
+      const soloCampi = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
+      const rows = await FB.getMany(ids, { timeoutMs, idToken, fields: soloCampi });
       return { ok: true, rows: await mergeCardFields(rows) };
     }
     // La lettura COMPLETA (#496): la chiede la scheda delle statistiche, che
