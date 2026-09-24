@@ -643,6 +643,11 @@
     // può essere finita fra i comandi. Quello che sceglie l'utente vince e non
     // viene più riscritto dal classificatore. { id, title?, kind? } → { ok, chats }
     FILO_CHAT_UPDATE: 'filo_chat_update',
+    // Com'è andata un'azione che l'utente ha finito CLICCANDO, dopo che il
+    // turno era già archiviato: la conferma nel popup, l'evento aggiunto al
+    // calendario, il riordino delle schede. Senza, la conversazione riaperta
+    // racconta la proposta invece del fatto. { id, azione, esito } → { ok }
+    FILO_CHAT_AZIONE: 'filo_chat_azione',
     // Porta l'utente alla scheda dove una conversazione è ANCORA APERTA, invece
     // di aprirgliene una seconda copia. { id } → { ok, portato }
     FILO_CHAT_FOCUS: 'filo_chat_focus',
