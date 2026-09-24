@@ -2805,9 +2805,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
   if (chatId) {
+    // Le azioni RESE, non quelle chiamate: sono le sole che portano l'esito
+    // («in attesa di conferma», «non riuscita»), ed è quello che l'utente ha
+    // visto. Con le altre la chat riaperta raccontava come riuscito tutto.
     const dopo = await appendToChatArchive(
       chatId,
-      { role: 'filo', text: textReply, actions: actionsToRun },
+      { role: 'filo', text: textReply, actions: renderedActions },
       { onboarding: onbActive },
     );
     // La chat può essere finita mentre Filo stava ancora rispondendo: l'utente
