@@ -43,7 +43,9 @@ const INTERO = {
   _proiezione: undefined,
   notes: 'Guardato: il caricamento chiede i documenti interi.',
   images: [ALLEGATO],
-  files: [],
+  // Gli allegati sono due campi, e tutti e due stanno fuori dalla proiezione:
+  // un log allegato dal tester deve ricomparire come l'immagine.
+  files: [{ name: 'console.log.txt', url: `${ALLEGATO}&f=1`, type: 'text/plain' }],
 };
 
 async function admin(page) {
