@@ -35,6 +35,15 @@ si aspetta, anche quando il caricamento del dettaglio è già partito da solo:
 «quasi sempre è già arrivato» non è una garanzia (`feedbackCompleto` in
 `src/pages/manage/manage.js`).
 
+**Il conto dell'attesa: un ridisegno in più.** Quando il documento arriva il
+pannello si ridisegna, e ridisegnare RIEMPIE le sue caselle col feedback: su
+una bozza in corso vuol dire cancellarla. Chi preme subito dopo legge la
+casella ormai vuota, e la segnalazione si riapre senza il motivo mentre tutto
+sembra riuscito. Due regole, e valgono per qualunque ridisegno automatico:
+aspettare che la bozza non ci sia più prima di ridisegnare (e ridisegnare
+appena sparisce, o il pannello resta a dire «Caricamento…»), e leggere quello
+che l'utente ha scritto PRIMA di ogni `await`, non dopo.
+
 **Dove una scheda È il dettaglio.** Se l'elenco mostra già tutto — la pagina
 dei feedback disegna la conversazione dentro ogni scheda — la proiezione da
 sola svuoterebbe la pagina. Lì si completa la SEZIONE che si sta guardando, una
