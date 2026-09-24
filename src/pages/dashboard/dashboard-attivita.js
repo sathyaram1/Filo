@@ -181,34 +181,41 @@
       // conta — «Ha avviato un timer» su un timer non avviato è una bugia.
       // A lavoro finito il riassunto si rifà: la riga dell'impostazione
       // confermata nel popup arriva dopo, e il titolo deve contarla.
-      addRow(type, rowIcon, text, failed = false) {
+      addRow(type, rowIcon, text, failed = false, chiave = '') {
         closeTurnReasoning();
         const t = String(type || '').toUpperCase();
-        if (!failed) doneTypes.push(t);
+        const E = self.SN_ESITO;
+        if (t) voci.push({ type: t, esito: failed ? E.FALLITO : E.FATTO, chiave });
         const riga = makeActivityRow(rowIcon, text);
-        if (t) righePerTipo.set(t, riga);
+        if (chiave) righePerChiave.set(chiave, riga);
         append(riga);
         if (phase !== 'done') setPhase('act', text);
         else renderSummary();
       },
-      // L'utente ha finito da sé, col bottone in chat, un'azione che Filo aveva
-      // solo proposto. La riga di quella proposta diventa l'esito e il riassunto
-      // smette di chiamarla proposta: erano due frasi che si contraddicevano
-      // nella stessa schermata.
-      compiuta(type, rowIcon, text) {
+      // L'esito di un'azione che l'UTENTE ha finito da sé, col bottone in chat.
+      // La riga di quella proposta diventa l'esito e il riassunto smette di
+      // chiamarla proposta: erano due frasi che si contraddicevano nella stessa
+      // schermata. `esito` distingue la riuscita dal tentativo andato a vuoto.
+      esitoDelClick(chiave, type, rowIcon, text, esito) {
         const t = String(type || '').toUpperCase();
         if (!t) return;
-        fatti.add(t);
-        const riga = righePerTipo.get(t);
+        const voce = chiave ? voci.find((v) => v.chiave === chiave) : null;
+        if (voce) voce.esito = esito;
+        const riga = chiave ? righePerChiave.get(chiave) : null;
         if (riga && riga.isConnected) {
           const [ic, tx] = riga.children;
           if (ic) ic.textContent = rowIcon || '';
           if (tx) tx.textContent = String(text || '').trim();
-          if (!doneTypes.includes(t)) doneTypes.push(t);
+          if (!voce) voci.push({ type: t, esito, chiave });
           if (phase === 'done') renderSummary();
           return;
         }
-        this.addRow(t, rowIcon, text);
+        this.addRow(t, rowIcon, text, esito === self.SN_ESITO.FALLITO, chiave);
+        if (esito === self.SN_ESITO.COMPIUTO) {
+          const v = voci[voci.length - 1];
+          if (v) v.esito = esito;
+          if (phase === 'done') renderSummary();
+        }
       },
       // Esito di un comando eseguito subito (livello 1): riga di comando e
       // output, nella cronologia — non nella bolla della risposta.
