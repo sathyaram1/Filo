@@ -4077,7 +4077,16 @@
   // decifratura e il ridisegno di sempre. `removed`/`keepIds` servono al
   // riallineamento, che è l'unico a sapere chi è sparito.
   async function mergeLive(fresh, { removed = [] } = {}) {
-    let righe = Array.isArray(fresh) ? fresh : [];
+    // La domanda del giro torna indietro di qualche minuto per non farsi
+    // mangiare una scrittura da un orologio scentrato, quindi rimanda anche
+    // righe già viste: fonderle di nuovo ridisegnerebbe il pannello aperto
+    // sotto le dita dell'owner per una cosa che non è cambiata.
+    const inMano = new Map(allFeedbacks.map((f) => [String(f && f._id), f && f._updateTime]));
+    let righe = (Array.isArray(fresh) ? fresh : []).filter((r) => {
+      if (!r || !r._id) return false;
+      const mio = inMano.get(String(r._id));
+      return !mio || !r._updateTime || r._updateTime > mio;
+    });
     if (righe.length === 0 && removed.length === 0) {
       // Niente di nuovo, ma una scheda sparita in un giro precedente (tenuta
       // aperta per una bozza) può chiudersi ora che la bozza non c'è più.
