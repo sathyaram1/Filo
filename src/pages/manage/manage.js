@@ -4072,9 +4072,9 @@
   // Fonde righe già lette (arrivano dal giro del main) nella lista, con la
   // decifratura e il ridisegno di sempre. `removed`/`keepIds` servono al
   // riallineamento, che è l'unico a sapere chi è sparito.
-  async function mergeLive(fresh, { removed = [], keepIds = null } = {}) {
+  async function mergeLive(fresh, { removed = [] } = {}) {
     let righe = Array.isArray(fresh) ? fresh : [];
-    if (righe.length === 0 && removed.length === 0 && !keepIds) {
+    if (righe.length === 0 && removed.length === 0) {
       // Niente di nuovo, ma una scheda sparita in un giro precedente (tenuta
       // aperta per una bozza) può chiudersi ora che la bozza non c'è più.
       closeDetailIfGone();
