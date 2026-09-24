@@ -552,18 +552,23 @@ La regola, uguale per tutti e due:
   che sul cammino locale c'erano da sempre e qui mancavano: non chiede la
   fusione se nella directory c'è qualcosa fuori dai commit (il salvataggio
   automatico lo committerebbe e lo spedirebbe, e il server fonderebbe la punta
-  NUOVA), e non la chiede se un via libera registrato su questa macchina parla
-  di un altro commit. Se su questa macchina non risulta su quale commit sono
-  stati dati, lo **dice** e prosegue: astenersi in silenzio è la classe di
-  guasto che questa spec toglie dappertutto;
-- **il decadimento si registra, non si stampa e basta.** Il rifiuto della
-  fusione dice quale passo lo mette a registro: il rientro in verifica
-  (`revision_security` → `revision_capability`, la stessa strada del
-  riallineamento), col comando già scritto e il ramo dentro, e il rilascio con
-  `--guasto` come via d'uscita se il server rifiuta quel passaggio. Fermarsi e
-  basta lascia la notizia su una macchina sola, mentre sul canale i due via
-  libera continuano a risultare buoni per quel ramo: la segnalazione #485
-  spostata di un passo. I comandi del rifiuto si stampano con gli **attrezzi
+  NUOVA), e non la chiede se il verdetto del controllo di sicurezza registrato
+  su questa macchina parla di un altro commit. Se la verifica ha dato l'ok su
+  un altro commit lo **dice** in una nota e chiede lo stesso: quella mossa la
+  giudica il server (punto sopra). Se su questa macchina non risulta su quale
+  commit sono stati dati i via libera, lo **dice** e prosegue: astenersi in
+  silenzio è la classe di guasto che questa spec toglie dappertutto;
+- **il decadimento si registra, e con un passo che chi legge il rifiuto può
+  fare.** Fermarsi e basta lascia la notizia su una macchina sola, mentre sul
+  canale i due via libera continuano a risultare buoni per quel ramo: la
+  segnalazione #485 spostata di un passo. Ma chi chiede la fusione è il
+  controllo di sicurezza, e il rientro in verifica il server a lui lo nega:
+  dettarlo lasciava il lavoro con due via libera e nessuno che lo portasse
+  avanti (cinque lavori fermi, settembre 2026, per le sole prove del giro
+  tolte dopo il pass). Quindi la verifica decaduta la registra il server dentro
+  `routineMerge`, e il rifiuto locale resta solo per il verdetto di sicurezza:
+  detta la rilettura del pezzo nuovo (`git diff <controllato> <punta>`) e una
+  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto si stampano con gli **attrezzi
   del giro** (`absolutizeRecipe`), non con `scripts/…`, che riporterebbe alla
   copia che il ramo si porta dietro;
 - **la memoria del confronto la scrive OGNI strada che registra un esito.**
