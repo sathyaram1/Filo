@@ -4074,8 +4074,8 @@
   }
 
   // Fonde righe già lette (arrivano dal giro del main) nella lista, con la
-  // decifratura e il ridisegno di sempre. `removed`/`keepIds` servono al
-  // riallineamento, che è l'unico a sapere chi è sparito.
+  // decifratura e il ridisegno di sempre. `removed` lo porta solo il
+  // riallineamento: è l'unico che sa chi è sparito.
   async function mergeLive(fresh, { removed = [] } = {}) {
     // La domanda del giro torna indietro di qualche minuto per non farsi
     // mangiare una scrittura da un orologio scentrato, quindi rimanda anche
