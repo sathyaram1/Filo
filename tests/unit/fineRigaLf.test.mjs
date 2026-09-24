@@ -110,7 +110,9 @@ describe('fine riga: LF in ogni copia di lavoro', () => {
     const hooks = fileTracciati().filter((f) => f.startsWith('.claude/hooks/') && f.endsWith('.sh'));
     assert.ok(hooks.length > 0, 'nessun hook .sh trovato: il controllo non sta guardando niente');
     const rotti = hooks.filter((f) => {
-      const prima = readFileSync(join(ROOT, f), 'utf8').split('\n')[0];
+      // In byte apposta: la lettura di TESTO di un file del repo arriva già
+      // normalizzata (tests/helpers/finiRigaDelRepo.cjs), e qui il `\r` è la cosa da vedere.
+      const prima = readFileSync(join(ROOT, f)).toString('utf8').split('\n')[0];
       return !prima.startsWith('#!') || prima.includes('\r');
     });
     assert.equal(rotti.length, 0,
