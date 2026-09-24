@@ -1495,7 +1495,33 @@
   // (chi è già completo non si ridomanda), e lo dice mentre lo fa.
   const DETTAGLI_PER_VOLTA = 200;
 
+  // Le richieste già partite, per id. Ogni gesto fatto durante l'attesa (una
+  // lettera nella ricerca, un cambio di sezione, la casella «Solo automatici»)
+  // ridisegna, e senza questo registro ogni ridisegno ricomprava la sezione
+  // intera: dodici lettere, tredici volte gli stessi documenti.
+  const dettagliInCorso = new Map();
+
   async function completaDettagli(ids) {
+    const attese = [];
+    const nuovi = [];
+    for (const id of ids) {
+      const inCorso = dettagliInCorso.get(id);
+      if (inCorso) attese.push(inCorso);
+      else nuovi.push(id);
+    }
+    if (nuovi.length) {
+      const giro = chiediDettagli(nuovi);
+      for (const id of nuovi) dettagliInCorso.set(id, giro);
+      attese.push(giro.finally(() => {
+        // Solo i propri: un giro più recente può già aver preso in carico un id
+        // che questo non è riuscito a completare.
+        for (const id of nuovi) if (dettagliInCorso.get(id) === giro) dettagliInCorso.delete(id);
+      }));
+    }
+    await Promise.all(attese);
+  }
+
+  async function chiediDettagli(ids) {
     for (let i = 0; i < ids.length; i += DETTAGLI_PER_VOLTA) {
       const pezzo = ids.slice(i, i + DETTAGLI_PER_VOLTA);
       // Il gruppo di QUESTO blocco, non tutti: togliere il marchio a chi non è
