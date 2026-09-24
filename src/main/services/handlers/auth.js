@@ -981,7 +981,8 @@ module.exports = function register(on, ctx) {
     const FB = FEEDBACK();
     const rows = Array.isArray(base) ? base.slice() : [];
     const aggiunti = new Set();
-    if (!FB || !idToken) return { rows, aggiunti, schedeCoperte: false };
+    let chiusiLetti = false;
+    if (!FB || !idToken) return { rows, aggiunti, schedeCoperte: false, chiusiLetti };
     const visti = new Set(rows.map((r) => String((r && r._id) || '')).filter(Boolean));
     const aggiungi = (arr) => {
       for (const r of Array.isArray(arr) ? arr : []) {
