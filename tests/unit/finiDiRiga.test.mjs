@@ -157,7 +157,7 @@ function ricercheFragili(riga) {
     }
     if (!opzioni.includes('m')) continue;
     for (let i = 0; i < corpo.length; i += 1) {
-      if (corpo[i] !== '$' || sfuggito(corpo, i)) continue;
+      if (corpo[i] !== '$' || sfuggito(corpo, i) || dentroClasse(corpo, i)) continue;
       if (TESTO_PRIMA.test(corpo.slice(0, i))) motivi.add('un `$` di fine riga in una regex multiriga (il `\\r` sta prima: era il #565)');
     }
   }
