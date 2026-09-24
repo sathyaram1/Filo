@@ -4106,6 +4106,34 @@
     return false;
   }
 
+  // ── Un ridisegno non porta via quello che l'owner sta scrivendo ──────────
+  //
+  // Ridisegnare il pannello RIEMPIE le sue caselle col feedback: motivo della
+  // riapertura, risposta al chiarimento, commento della revisione, frase per
+  // chi ha segnalato. Su una bozza in corso vuol dire cancellarla, e la
+  // scrittura che parte dopo legge la casella ormai vuota: la segnalazione si
+  // riapre senza il motivo, e nessun errore lo dice. Quindi un ridisegno
+  // aspetta che la bozza non ci sia più, e allora riparte — senza il rinvio
+  // resterebbe in eterno sulla riga «Caricamento della conversazione…».
+  let ridisegnoRimandato = null;
+  function ridisegnaRispettandoLaBozza(id) {
+    if (selectedId !== id) { ridisegnoRimandato = null; return; }
+    if (detailBeingEdited()) { ridisegnoRimandato = id; return; }
+    ridisegnoRimandato = null;
+    openDetail(id, { ridisegno: true });
+  }
+  function riprendiRidisegnoRimandato() {
+    if (ridisegnoRimandato === null) return;
+    ridisegnaRispettandoLaBozza(ridisegnoRimandato);
+  }
+  if (mgDetail) {
+    // `focusout` arriva mentre il fuoco è ancora sul campo che lo perde: il
+    // rinvio di un giro fa trovare a detailBeingEdited() la situazione vera.
+    const piuTardi = () => setTimeout(riprendiRidisegnoRimandato, 0);
+    mgDetail.addEventListener('input', piuTardi);
+    mgDetail.addEventListener('focusout', piuTardi);
+  }
+
   // La scheda aperta non è più in pagina: il pannello non può mostrare un
   // feedback che non c'è. Si chiude (senza toccare una bozza in corso: quella
   // resta finché l'owner non la svuota, e al giro dopo si chiude).
