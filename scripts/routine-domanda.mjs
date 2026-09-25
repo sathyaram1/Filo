@@ -95,9 +95,8 @@ async function chiama(data) {
     body: JSON.stringify({ data }),
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg = body?.error?.message || (res.status === 404 ? 'la funzione routineClosingAdmin non esiste sul server (non ancora pubblicata?)' : `errore ${res.status}`);
-    console.error(`Non riuscito: ${msg}`);
+  if (!res.ok || (body.result && body.result.ok === false)) {
+    console.error(`Non riuscito: ${messaggioErrore(res.status, body)}`);
     process.exit(1);
   }
   return body.result || {};
