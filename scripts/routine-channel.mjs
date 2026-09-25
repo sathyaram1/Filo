@@ -917,15 +917,43 @@ if (isMain) {
     // la copia fissata, `scripts/…` porterebbe a quello del ramo di lavoro —
     // cioè proprio la cosa che il contratto dei worker vieta di scrivere a mano.
     const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
-    console.error(`Uso: node "${io}" <probe|ticket|work|heartbeat|release|deliver|compare> <segreto> [...]`);
+    console.error(`Uso: node "${io}" <probe|ticket|work|heartbeat|release|deliver|compare|domanda|risposta> <segreto> [...]`);
     process.exit(1);
   };
 
-  // `heartbeat` è l'unico comando che può girare senza posizionali: il ciclo lo
-  // avvia dispatch e il biglietto viaggia nell'ambiente, mai fra gli argomenti.
-  if (!cmd || (!args[0] && cmd !== 'heartbeat')) usage();
+  // `heartbeat` può girare senza posizionali (il biglietto viaggia nell'ambiente);
+  // `domanda` e `risposta` del worker hanno il biglietto in `--biglietto`.
+  if (!cmd || (!args[0] && !['heartbeat', 'domanda', 'risposta'].includes(cmd))) usage();
 
-  if (cmd === 'probe') {
+  if (cmd === 'domanda' || cmd === 'risposta') {
+    const a = argomentiChiusura(cmd, args, data);
+    if (a.errore) { console.error(`${a.errore} — non ho mandato niente.`); process.exit(1); }
+    if (cmd === 'domanda') {
+      const r = await domandaChiusura(a.cred);
+      if (r.esito === 'assente') { console.error(`nessuna domanda (${r.reason}): chiudi senza rispondere.`); process.exit(EXIT_CHIUSURA.assente); }
+      if (r.esito === 'rifiutato') { console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato); }
+      const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
+      console.log(`${r.question.trim()}\n\nPer rispondere:\n${comandoRisposta(io, a.cred, r.id)}`);
+      process.exit(0);
+    }
+    // Il testo arriva da stdin (heredoc): sulla riga di comando gli apostrofi
+    // italiani romperebbero la shell. Da un terminale senza tubo si aspetterebbe per sempre.
+    let testo = '';
+    if (!process.stdin.isTTY) {
+      const pezzi = [];
+      for await (const p of process.stdin) pezzi.push(p);
+      testo = Buffer.concat(pezzi).toString('utf8').trim();
+    }
+    if (!testo) {
+      console.error('Nessuna risposta su stdin — non ho mandato niente. Il testo va fra due righe FINE:');
+      console.error(`  … risposta ${a.cred.ticket ? '--biglietto <biglietto>' : '"<parola-d-ordine>" <id>'} <<'FINE'\n  niente\n  FINE`);
+      process.exit(1);
+    }
+    const r = await rispostaChiusura(a.cred, testo);
+    if (r.esito === 'ok') { console.log('OK: risposta registrata.'); process.exit(0); }
+    if (r.esito === 'assente') { console.error(`risposta non arrivata (${r.reason}): chiudi comunque, senza insistere.`); process.exit(EXIT_CHIUSURA.assente); }
+    console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato);
+  } else if (cmd === 'probe') {
     const r = await probe(args[0]);
     if (r.outcome === 'work') { console.log('c’è lavoro'); process.exit(0); }
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
