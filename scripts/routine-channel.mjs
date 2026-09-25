@@ -79,6 +79,11 @@
 //         scelto il server, e consuma il biglietto. Serve solo nella fase in
 //         cui i due canali convivono.
 //
+//   node scripts/routine-channel.mjs domanda <parola-d-ordine> | domanda --biglietto <biglietto>
+//       → la domanda di fine sessione e il comando per rispondere. Exit 0 = domanda, 2 = nessuna (chiudi e basta), 4 = rifiutato.
+//   node scripts/routine-channel.mjs risposta <parola-d-ordine> <id> | risposta --biglietto <biglietto>   (testo da stdin)
+//       → registra la risposta. Exit come sopra; `answer_too_big` stampa i byte e il massimo.
+//
 //   La FUSIONE su main non ha un sottocomando qui: passa da
 //   `scripts/merge-gate.mjs <branch>`, che usa merge() di questo modulo. Il
 //   merge lo fa il SERVER (SPEC-RIDISEGNO-MAX.md §10): verdetti registrati,
@@ -930,7 +935,7 @@ if (isMain) {
     if (a.errore) { console.error(`${a.errore} — non ho mandato niente.`); process.exit(1); }
     if (cmd === 'domanda') {
       const r = await domandaChiusura(a.cred);
-      if (r.esito === 'assente') { console.error(`nessuna domanda (${r.reason}): chiudi senza rispondere.`); process.exit(EXIT_CHIUSURA.assente); }
+      if (r.esito === 'assente') { console.error(`nessuna domanda (${r.reason}): niente da rispondere, chiudi o rilascia come sempre.`); process.exit(EXIT_CHIUSURA.assente); }
       if (r.esito === 'rifiutato') { console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato); }
       const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
       console.log(`${r.question.trim()}\n\nPer rispondere:\n${comandoRisposta(io, a.cred, r.id)}`);
