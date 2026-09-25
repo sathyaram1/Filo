@@ -145,7 +145,8 @@ I feedback arrivano spesso poco specificati. Il tuo lavoro è ricostruire
 - **Invarianti UX ovvie**: si fanno, sempre. Se si può aggiungere X si deve
   poter rimuovere X; se l'app salva N cose l'utente deve poterle vedere tutte;
   cammini equivalenti (scorciatoia e menu) fanno la stessa cosa.
-- **Miglioramenti SENZA trade-off**: si fanno.
+- **Miglioramenti SENZA trade-off** (non costano servizi a pagamento, non
+  complicano l'uso, non chiudono strade future): nel dubbio si fanno.
 - **Trade-off VERO** (velocità vs costo, semplicità vs potenza, dati
   dell'utente, scelte di gusto): NON decidere tu, segnala all'owner.
 
