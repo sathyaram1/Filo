@@ -80,7 +80,8 @@ riga si ripaga a ogni lettura del file. Quindi:
   nel commento.
 - **Una regola vive in un posto solo**, in quest'ordine di preferenza:
   sentinella in `tests/unit/` > file di pattern > CLAUDE.md > commento. Gli
-  altri posti rimandano, non copiano.
+  altri posti rimandano, non copiano. Un «NON cambiare» che si può verificare a
+  macchina è una sentinella, non un commento.
 - **Intestazione di file: tre righe al massimo.** Cos'è, cosa non deve fare,
   dove stanno le sue regole.
 - **Niente cronologia** (la tiene git) e niente commento che ripete il nome
