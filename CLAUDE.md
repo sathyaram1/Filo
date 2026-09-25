@@ -169,8 +169,8 @@ osservato. Minimi per tipo di modifica:
 - **la suite completa non la lancia nessuno**, da nessuna parte: gira in GitHub
   nel lavoro di release, ogni sei ore, e un rosso nuovo ferma la patch e
   diventa un feedback. Al suo posto chi verifica lancia `npm run finish:check`
-  (unit più gli spec delle aree toccate). Se temi una regressione precisa,
-  lancia quello spec.
+  (unit più gli spec delle aree toccate). Le regressioni restano di chi le
+  introduce: se ne temi una precisa, lancia quello spec.
 
 **Prima di consegnare, la verifica te la fai tu**, con gli stessi criteri che
 userà chi ti verifica: **`routines/roles/_criteri-verifica.md`** (nelle routine
