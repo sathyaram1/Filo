@@ -436,7 +436,7 @@ export function leggiRispostaChiusura(status, body) {
   // Un 404 senza motivo del server è la funzione che non esiste (pagina HTML);
   // `bad_closing` è un 404 vero del server, e resta un rifiuto.
   const senzaServer = status === 0 || status >= 500 || b.reason === 'malformed_response' || (status === 404 && !b.reason);
-  if (senzaServer) return { esito: 'assente', reason };
+  if (senzaServer) return { esito: 'assente', reason: status === 404 ? 'endpoint_assente' : reason };
   const out = { esito: 'rifiutato', reason };
   if (b.detail) out.detail = String(b.detail);
   if (b.bytes !== undefined) out.bytes = b.bytes;
