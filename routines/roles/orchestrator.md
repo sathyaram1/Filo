@@ -99,7 +99,7 @@ risposta valida, ed è la più comune: non cercare cose da dire.
 
 ```bash
 node scripts/routine-channel.mjs risposta "<parola-d-ordine>" <id> <<'FINE'
-niente
+<la tua risposta>
 FINE
 ```
 
