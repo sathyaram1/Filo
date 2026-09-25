@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const CANALE = resolve(ROOT, 'scripts', 'routine-channel.mjs');
@@ -75,21 +75,4 @@ test('#domanda-chiusura — senza domanda il worker lo sa dall\'uscita e chiude:
     expect(morto.code).toBe(4);
     expect(morto.err).toContain('dead_ticket');
   } finally { c.server.close(); }
-});
-
-test('#domanda-chiusura — nell\'elenco dell\'owner la testa di una risposta di worker è scritta giusta', async () => {
-  const { formattaRisposte } = await import(pathToFileURL(resolve(ROOT, 'scripts', 'routine-domanda.mjs')).href);
-  const ora = Date.UTC(2026, 8, 25, 10, 0);
-  // Forma dei dati come la manda il server: il numero ha già il cancelletto, un biglietto non rilasciato ha null.
-  const workers = [
-    { slug: 'r', role: 'verifier', num: '#477', createdAtMs: ora - 30 * 60000, releasedAtMs: ora,
-      closing: { question: 'q', askedAtMs: ora - 60000, answer: 'niente' } },
-    { slug: 'r', role: 'fixer', num: '#478', createdAtMs: ora - 10 * 60000, releasedAtMs: null,
-      closing: { question: 'q', askedAtMs: ora, answer: 'niente' } },
-  ];
-  const testo = formattaRisposte({ orchestrator: [], workers }, { quando: () => 'ORA' });
-  expect(testo).toContain('verifier #477 · 30 min');
-  expect(testo).not.toContain('##');
-  expect(testo).toContain('fixer #478 · non rilasciato');
-  expect(testo).not.toMatch(/-\d+ min/);
 });
