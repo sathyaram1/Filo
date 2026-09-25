@@ -200,8 +200,8 @@ riscrive. Sono TRE testi distinti:
 
 1. **Report per l'owner**: conferma in una riga; scelte funzionali diverse dal
    chiesto col perché; scelte tecniche non ovvie che ricadono su di lui. MAI:
-   ridescrivere il problema, raccontare come hai verificato, nomi di
-   file/funzioni.
+   ridescrivere il problema, raccontare come hai verificato, vantare
+   comportamenti attesi, nomi di file/funzioni.
 2. **Frase per chi ha segnalato** (una riga): cosa può fare adesso. Se non
    cambia niente di visibile, non si scrive.
 3. **Riga di changelog** in `src/shared/patchNotes.js`: solo se un utente
