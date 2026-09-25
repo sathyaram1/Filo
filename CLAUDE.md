@@ -159,7 +159,9 @@ richieste implicite, come un punto indicato in uno screenshot).
 Un task è finito quando il codice toccato è stato **eseguito** e l'esito
 osservato. Minimi per tipo di modifica:
 
-- **logica pura** → unit test in `tests/unit/` + `npm run test:unit`;
+- **niente da aprire** (logica pura, testi, strumenti da riga di comando) →
+  controllo veloce in `tests/unit/` + `npm run test:unit`, non una spec che
+  apre Filo per non guardarci niente;
 - **feature o fix con UI/flusso app** → spec Playwright mirato
   (`npx playwright test tests/<feature>.spec.mjs`); se non esiste, scrivilo;
 - **modifica visiva** → in più `npm run test:shoot -- "<scenario>"` e GUARDA lo
