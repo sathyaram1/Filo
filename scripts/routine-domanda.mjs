@@ -75,9 +75,9 @@ export function formattaDomande(result) {
   const r = result || {};
   const slots = r.slots && typeof r.slots === 'object' ? r.slots : {};
   const nomi = Object.keys(slots).sort();
-  const righe = nomi.map((s) => `${s}\n  ${String(slots[s] && slots[s].text || '').replace(/\n/g, '\n  ')}`);
+  const righe = nomi.map((s) => `${visibile(s)}\n  ${visibile((slots[s] && slots[s].text) || '').replace(/\n/g, '\n  ')}`);
   if (!nomi.length) righe.push('Nessuna domanda impostata: vale per tutti il ripiego.');
-  righe.push(`ripiego (orchestratore senza slot suo; worker senza slot del ruolo né «worker»)\n  ${String(r.default || '?')}`);
+  righe.push(`ripiego (orchestratore senza slot suo; worker senza slot del ruolo né «worker»)\n  ${visibile(r.default || '?').replace(/\n/g, '\n  ')}`);
   return righe.join('\n\n');
 }
 
