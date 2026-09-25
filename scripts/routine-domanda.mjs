@@ -1,12 +1,44 @@
 // routine-domanda.mjs — la domanda di fine sessione delle routine, dalla parte dell'owner.
-// Imposta le domande (slot orchestrator, worker o un ruolo) e legge le risposte; le
-// sessioni la chiedono con routine-channel.mjs domanda/risposta, solo alla fine. Uso: USO qui sotto.
+// Imposta le domande per slot e legge le risposte, stampate coi caratteri di controllo resi
+// visibili; le sessioni la chiedono con routine-channel.mjs domanda/risposta, solo alla fine.
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineClosingAdmin';
-const USO = 'Uso: node scripts/routine-domanda.mjs [mostra | imposta <slot> "<testo>" (o il testo da stdin) | togli <slot> | risposte [--n N]]';
+// Gli slot li decide il server (gli altri li rifiuta con `bad_slot`): qui servono solo all'aiuto.
+const SLOT = 'orchestrator, worker, new-work, fixer, verifier, secaudit, prober';
+const USO = 'Uso: node scripts/routine-domanda.mjs [mostra | imposta <slot> "<testo>" (o il testo da stdin) | togli <slot> | risposte [--n N]]'
+  + `\nslot: ${SLOT}`;
+
+/**
+ * Il testo intero, coi caratteri di controllo resi visibili (tranne a capo e tab): le risposte
+ * vengono da sessioni che leggono testo non fidato, e una sequenza ESC/OSC sul terminale
+ * dell'owner scrive negli appunti, cambia il titolo o nasconde righe. PURA.
+ */
+export function visibile(testo) {
+  const CONTROLLO = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]/g;
+  return String(testo ?? '').replace(CONTROLLO, (c) => {
+    const n = c.charCodeAt(0);
+    return n <= 0xff ? `\\x${n.toString(16).padStart(2, '0')}` : `\\u${n.toString(16).padStart(4, '0')}`;
+  });
+}
+
+/** Il motivo di un errore della callable, con l'elenco quando il server lo manda (`bad_slot`). PURA. */
+export function messaggioErrore(status, body) {
+  const b = body || {};
+  const err = b.error || {};
+  const res = b.result && b.result.ok === false ? b.result : null;
+  let msg = err.message || (res && (res.detail || res.message || res.reason))
+    || (status === 404 ? 'la funzione routineClosingAdmin non esiste sul server (non ancora pubblicata?)' : `errore ${status}`);
+  if (res && res.reason && !String(msg).includes(res.reason)) msg = `${res.reason}: ${msg}`;
+  const det = (err.details && typeof err.details === 'object') ? err.details : (res || {});
+  const elenco = det.allowed || det.slots || det.valid;
+  if (Array.isArray(elenco) && elenco.length && !elenco.every((x) => String(msg).includes(String(x)))) {
+    msg += ` (ammessi: ${elenco.join(', ')})`;
+  }
+  return visibile(msg);
+}
 
 /** Le parole della riga di comando. PURA. @returns {{ cmd, slot?, testo?, n? } | { errore }} */
 export function leggiArgomenti(argv) {
