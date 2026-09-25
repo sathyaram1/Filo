@@ -30,7 +30,7 @@ const fs = require('node:fs');
 // su Linux e Mac la voce "Bash" delle Preferenze non faceva niente.
 // I preludi che mettono la shell di Windows in UTF-8 (#551) stanno in un posto
 // solo, accanto ai comandi one-shot dell'assistente: due copie divergono.
-const { resolveShell, PRELUDI_CODIFICA } = require('./terminal');
+const { resolveShell, PRELUDI_CODIFICA, ESITO_POWERSHELL, ERRORE_DI_PRIMA_POWERSHELL } = require('./terminal');
 
 function defaultCwd() {
   return os.homedir();
@@ -166,9 +166,9 @@ function shellConfig(shell, sid, startCwd) {
     };
   }
   // PowerShell (default). `-Command -` legge ed esegue da stdin in modo
-  // incrementale, senza prompt. Azzeriamo $LASTEXITCODE prima di ogni comando
-  // così i cmdlet (che non lo toccano) riportano 0 invece dell'ultimo codice
-  // nativo rimasto appeso.
+  // incrementale, senza prompt. $LASTEXITCODE si azzera prima di ogni comando
+  // perché non resti appeso quello nativo di prima; l'esito dei cmdlet lo dà $?.
+  // $? va preso DENTRO il testo codificato: dopo Invoke-Expression vale il suo, non quello del comando.
   // La prima cosa che scriviamo è il preludio UTF-8 (#551): la console di
   // Windows scrive di suo nella tabella OEM, dove il trattino lungo diventa
   // «-» e la «à» un byte che qui arriva come «<27>». Gemello del preludio in
@@ -177,10 +177,13 @@ function shellConfig(shell, sid, startCwd) {
     file: 'powershell.exe',
     args: ['-NoLogo', '-NoProfile', '-Command', '-'],
     options: { cwd: startCwd || undefined, windowsHide: true },
-    ready: `${PRELUDI_CODIFICA.powershell}"FILO_RDY_${sid}"\n`,
+    // PSReadLine su una pipe non può leggere e lascia un errore in $Error a ogni riga: l'esito guarda l'errore
+    // più recente del comando (ESITO_POWERSHELL), quindi il modulo si toglie prima che parta qualunque comando.
+    ready: `Remove-Module PSReadLine -ErrorAction Ignore\n${PRELUDI_CODIFICA.powershell}"FILO_RDY_${sid}"\n`,
     wrap: (command) =>
-      `$global:LASTEXITCODE=0\n${comandoPerPowerShell(command)}\n` +
-      `"FILO_META_${sid}:$($LASTEXITCODE):$((Get-Location).Path)"\n`,
+      `$global:LASTEXITCODE=0\n$__filo_ok=$false\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
+      + `${comandoPerPowerShell(`${command}\n$__filo_ok=$?`)}\n` +
+      `"FILO_META_${sid}:$(${ESITO_POWERSHELL}):$((Get-Location).Path)"\n`,
   };
 }
 

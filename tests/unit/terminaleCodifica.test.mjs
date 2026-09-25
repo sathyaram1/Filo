@@ -76,15 +76,24 @@ test('bash e sh non hanno preludio: lo stdout è già UTF-8', () => {
 });
 
 test('il preludio precede il comando dell\'utente, non lo segue', () => {
-  // Su Linux `resolveShell` risolve tutto in sh, quindi il preludio di Windows
-  // da qui non si vede mai girare: l'ORDINE si controlla sul codice. Se il
-  // preludio finisse dopo il comando, la console avrebbe già scritto l'output
-  // con la codifica sbagliata e il nome sarebbe perso.
+  // L'ORDINE si controlla sul codice, uguale su ogni sistema. Se il preludio
+  // finisse dopo il comando, la console avrebbe già scritto l'output con la
+  // codifica sbagliata e il nome sarebbe perso.
   const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'terminal.js'), 'utf8');
   assert.match(src, /const toRun = encodingPrelude\(usedShell\) \+ \(/);
-  // Fuori da Windows non si tocca niente.
-  assert.equal(T.encodingPrelude('sh'), '');
-  assert.equal(T.encodingPrelude('bash'), '');
+});
+
+test('il preludio è quello della shell che gira, non di quella chiesta', () => {
+  // Su Windows «sh» gira come PowerShell, fuori da Windows «powershell» gira
+  // come sh: il preludio sbagliato arriva a una shell che non lo capisce (#714).
+  for (const chiesta of ['sh', 'bash', 'powershell', 'cmd', 'zsh', '', undefined]) {
+    const vera = T.resolveShell(chiesta);
+    assert.equal(typeof T.PRELUDI_CODIFICA[vera], 'string', `nessun preludio per la shell ${vera}`);
+    assert.equal(
+      T.encodingPrelude(chiesta), T.PRELUDI_CODIFICA[vera],
+      `chiesta «${chiesta}», gira «${vera}»: il preludio non è il suo`,
+    );
+  }
 });
 
 // ───────────── la shell persistente della dashboard usa lo stesso ────────────
@@ -354,6 +363,133 @@ test('l\'uscita di un comando non può scriversi la riga di servizio', async () 
   assert.notEqual(ko.cwd, altrove, 'e intanto si sposta dove dice il file');
 
   rmSync(dir, { recursive: true, force: true });
+});
+
+// ── #714: l'esito che arriva all'assistente è quello vero ───────────────────
+// In PowerShell $LASTEXITCODE lo scrivono solo i programmi esterni: un cmdlet
+// fallito lo lasciava a 0, e l'assistente leggeva «riuscito» un comando fallito.
+
+const SU_WINDOWS = process.platform === 'win32';
+
+test('un comando fallito risulta fallito, con la cartella tracciata come senza', async () => {
+  const altrove = join(TMP, 'cartella-che-non-esiste');
+  const casi = SU_WINDOWS
+    ? [`Get-Content "${join(TMP, 'manca.txt')}"`, `Get-Content "${join(TMP, 'relazione — attività mancante.txt')}"`,
+      `Set-Location "${altrove}"`]
+    : [`cat "${join(TMP, 'manca.txt')}"`, `cat "${join(TMP, 'relazione — attività mancante.txt')}"`, `cd "${altrove}"`];
+  for (const comando of casi) {
+    const conSonda = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+    const senza = await T.runCommand(comando, { cwd: TMP, timeoutMs: 30_000 });
+    assert.notEqual(conSonda.code, 0, `riportato come riuscito: ${comando}`);
+    assert.equal(conSonda.code, senza.code, `la sonda cambia l'esito di: ${comando}`);
+    assert.equal(conSonda.cwd, TMP, `dopo il fallimento Filo crede di essere altrove: ${conSonda.cwd}`);
+  }
+});
+
+test('un errore che interrompe il comando lo fa risultare fallito, nella cartella raggiunta', async () => {
+  // In sh non c'è un errore che salta il resto senza chiudere la shell: l'equivalente è un comando fallito in coda.
+  const sotto = join(TMP, 'fermo-qui');
+  mkdirSync(sotto, { recursive: true });
+  const comando = SU_WINDOWS ? `Set-Location "${sotto}"; throw "fermo"` : `cd "${sotto}"; false`;
+  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+  assert.notEqual(out.code, 0, 'un comando interrotto da un errore risulta riuscito');
+  assert.equal(out.cwd, sotto);
+});
+
+test('exit decide l\'esito anche con la cartella tracciata', async () => {
+  // exit salta la riga della sonda che calcola l'esito: lì deve valere quello del processo, zero compreso.
+  for (const [comando, atteso] of [['exit 3', 3], ['exit 0', 0]]) {
+    const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+    assert.equal(out.code, atteso, `«${comando}» riportato con codice ${out.code}`);
+  }
+});
+
+test('come in bash, conta l\'esito dell\'ultimo comando', async () => {
+  const manca = join(TMP, 'manca-anche-questo.txt');
+  const comando = SU_WINDOWS ? `Get-Content "${manca}"; Write-Output ok` : `cat "${manca}"; echo ok`;
+  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+  assert.equal(out.code, 0, 'l\'ultimo comando è riuscito');
+  assert.equal(out.stdout.trim(), 'ok');
+});
+
+test('un commento in coda non impedisce al comando di girare', async () => {
+  const comando = SU_WINDOWS ? 'Write-Output ciao # saluto' : 'echo ciao # saluto';
+  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+  assert.equal(out.stdout.trim(), 'ciao', `il comando non è girato: ${out.stderr.slice(0, 160)}`);
+  assert.equal(out.code, 0);
+  assert.equal(out.cwd, TMP);
+});
+
+test('nel terminale della dashboard un comando fallito risulta fallito', async () => {
+  // Il comando accentato viaggia codificato (vedi sopra): il suo esito va preso dentro, non dopo.
+  const S = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
+  const sessione = S.createSession({ shell: 'powershell', cwd: TMP });
+  const esegui = (comando) => new Promise((risolvi, rifiuta) => {
+    let uscita = '';
+    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto: ${comando}`)), 30_000);
+    sessione.exec(comando, {
+      onData: ({ chunk, stream }) => { if (stream === 'stdout') uscita += chunk; },
+      onExit: ({ code }) => { clearTimeout(stop); risolvi({ code, uscita }); },
+      onError: ({ message }) => { clearTimeout(stop); rifiuta(new Error(message)); },
+    });
+  });
+  const leggi = SU_WINDOWS ? 'Get-Content' : 'cat';
+  const scrivi = SU_WINDOWS ? 'Write-Output' : 'echo';
+  try {
+    for (const nome of ['manca.txt', 'relazione — attività mancante.txt']) {
+      const r = await esegui(`${leggi} "${join(TMP, nome)}"`);
+      assert.notEqual(r.code, 0, `«${nome}» mancante risulta letto`);
+    }
+    const ok = await esegui(`${scrivi} "città"`);
+    assert.equal(ok.code, 0, 'un comando accentato riuscito risulta fallito');
+    assert.equal(ok.uscita.trim(), 'città');
+  } finally {
+    sessione.kill();
+  }
+});
+
+// Con lo stderr rediretto PowerShell spegne $? a ogni riga che un programma scrive lì, anche se è riuscito:
+// git lo fa a ogni checkout o push, e il modello scrive 2>&1 spesso. Conta il codice del programma.
+test('un programma esterno riuscito che scrive su stderr resta riuscito anche con lo stderr rediretto', async () => {
+  const node = SU_WINDOWS ? `& "${process.execPath}"` : `"${process.execPath}"`;
+  const avvisa = `${node} -e "console.error('avviso')"`;
+  const redirezioni = SU_WINDOWS ? ['2>&1', '2>$null', '*>&1', '2>&1 | Out-String'] : ['2>&1', '2>/dev/null'];
+  const manca = SU_WINDOWS ? `Get-Content "${join(TMP, 'manca.txt')}"` : `cat "${join(TMP, 'manca.txt')}"`;
+  const casi = [
+    ...redirezioni.map((r) => [`${avvisa} ${r}`, 0]),
+    [`${node} -e "console.error('avviso'); process.exit(4)" 2>&1`, 4],
+    // Il segno dello stderr non deve coprire un comando fallito dopo di lui.
+    [`${avvisa} 2>&1; ${manca}`, 'fallito'],
+  ];
+  const giusto = (code, atteso) => (atteso === 'fallito' ? code !== 0 : code === atteso);
+
+  for (const [comando, atteso] of casi) {
+    const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+    assert.ok(giusto(out.code, atteso), `assistente, «${comando}»: codice ${out.code}, atteso ${atteso}`);
+  }
+
+  const S = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
+  const sessione = S.createSession({ shell: 'powershell', cwd: TMP });
+  const esegui = (comando) => new Promise((risolvi, rifiuta) => {
+    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto: ${comando}`)), 30_000);
+    sessione.exec(comando, {
+      onExit: ({ code }) => { clearTimeout(stop); risolvi(code); },
+      onError: ({ message }) => { clearTimeout(stop); rifiuta(new Error(message)); },
+    });
+  });
+  try {
+    for (const [comando, atteso] of casi) {
+      const code = await esegui(comando);
+      assert.ok(giusto(code, atteso), `dashboard, «${comando}»: codice ${code}, atteso ${atteso}`);
+    }
+    if (SU_WINDOWS) {
+      // Nella sessione restano gli errori dei comandi di prima: uno vecchio non decide l'esito di quello dopo.
+      const zitto = await esegui(`${manca} -ErrorAction Ignore`);
+      assert.notEqual(zitto, 0, 'un comando fallito in silenzio risulta riuscito per colpa di un errore vecchio');
+    }
+  } finally {
+    sessione.kill();
+  }
 });
 
 // La cartella com'è scritta nel sistema: la shell riporta la forma canonica.

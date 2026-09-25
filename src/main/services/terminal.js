@@ -179,6 +179,16 @@ function nuovoMarcatore() {
     + Date.now().toString(36).slice(-5);
 }
 
+// L'esito di un comando PowerShell, con $__filo_ok = il $? preso subito dopo. $LASTEXITCODE lo scrivono solo
+// i programmi esterni: un cmdlet fallito lo lascia a 0, e a dirlo resta $? (#714). Vale anche per shell.js.
+const ESITO_POWERSHELL = 'if ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEXITCODE } '
+  // Con lo stderr rediretto (2>&1, 2>$null) ogni riga di un programma riuscito diventa un errore e spegne $?:
+  // se l'ultimo errore nuovo ($__filo_e = quello di prima) viene da lì, decide il codice del programma.
+  + 'elseif ($Error.Count -and -not [object]::ReferenceEquals($Error[0], $__filo_e) '
+  + "-and $Error[0].FullyQualifiedErrorId -like 'NativeCommandError*') { 0 } else { 1 }";
+// Da mettere prima del comando: l'errore più recente che c'era già, perché uno vecchio non decida l'esito.
+const ERRORE_DI_PRIMA_POWERSHELL = '$__filo_e=if ($Error.Count) { $Error[0] } else { $null }';
+
 // Appende al comando una "sonda" che stampa <marcatore>:<exitcode>:<cwd>. La
 // sonda gira SEMPRE (anche se il comando fallisce) e cattura l'exit code reale
 // del comando, non quello della sonda. Specifica per shell.
@@ -189,9 +199,11 @@ function withCwdProbe(shell, command, mark = nuovoMarcatore()) {
     return `${command}\r\necho ${mark}:%errorlevel%:%cd%`;
   }
   if (sh === 'powershell') {
-    // try/finally: il marcatore esce anche su errore terminante. Azzeriamo
-    // $LASTEXITCODE prima così i cmdlet (che non lo toccano) riportano 0.
-    return `$global:LASTEXITCODE=0\ntry { ${command} } finally { Write-Output "${mark}:$($LASTEXITCODE):$((Get-Location).Path)" }`;
+    // Il comando su righe sue: un commento in coda si mangiava la chiusura del try. Se non arriva in fondo
+    // (exit, errore che ferma tutto) l'esito resta vuoto e lo dà il codice del processo, l'unico che lo sa.
+    return `$global:LASTEXITCODE=0\n$__filo_c=''\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
+      + `try {\n${command}\n$__filo_ok=$?\n$__filo_c=${ESITO_POWERSHELL}\n}`
+      + ` finally { Write-Output "${mark}:$($__filo_c):$((Get-Location).Path)" }`;
   }
   // bash / sh (incluse le routine cloud Linux): cattura $? subito dopo il
   // comando, poi stampa il marcatore (sempre eseguito, su riga propria).
@@ -203,14 +215,16 @@ function withCwdProbe(shell, command, mark = nuovoMarcatore()) {
 // così non si perde il marcatore in coda quando l'output è enorme.
 function extractCwdMark(rawStdout, mark) {
   const i = rawStdout.lastIndexOf(mark + ':');
-  if (i === -1) return { stdout: rawStdout, code: null, cwd: undefined };
-  const m = rawStdout.slice(i + mark.length + 1).match(/^(-?\d+):([^\r\n]*)/);
+  if (i === -1) return { stdout: rawStdout, trovato: false, code: null, cwd: undefined };
+  const m = rawStdout.slice(i + mark.length + 1).match(/^(-?\d*):([^\r\n]*)/);
   let cut = i;
   if (rawStdout[cut - 1] === '\n') cut--;
   if (rawStdout[cut - 1] === '\r') cut--;
   return {
     stdout: rawStdout.slice(0, cut),
-    code: m ? (parseInt(m[1], 10) || 0) : null,
+    trovato: !!m,
+    // Vuoto = la sonda la cartella la sa, l'esito no: resta quello del processo.
+    code: m && m[1] !== '' ? (parseInt(m[1], 10) || 0) : null,
     cwd: m ? (m[2].trim() || undefined) : undefined,
   };
 }
@@ -324,7 +338,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
         const inCoda = extractCwdMark(codaOut, mark);
         const parsed = extractCwdMark(rawOut, mark);
         rawOut = parsed.stdout;
-        const letto = inCoda.code !== null ? inCoda : parsed;
+        const letto = inCoda.trovato ? inCoda : parsed;
         if (letto.code !== null) realCode = letto.code;
         if (letto.cwd) resultCwd = letto.cwd;
       }
@@ -353,7 +367,7 @@ module.exports = {
   runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS,
   // esportati per gli unit test (il preludio UTF-8 e la sonda sono la parte
   // che si può verificare senza avviare una shell su ogni piattaforma).
-  encodingPrelude, withCwdProbe, PRELUDI_CODIFICA,
+  encodingPrelude, withCwdProbe, PRELUDI_CODIFICA, ESITO_POWERSHELL, ERRORE_DI_PRIMA_POWERSHELL,
   // il marcatore della sonda: il prefisso è fisso, il resto è a caso a ogni
   // comando, ed è quello che impedisce all'uscita di scriverselo (#551, ottavo
   // giro di verifica).
