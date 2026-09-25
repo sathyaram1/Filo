@@ -189,7 +189,7 @@ l'assenza di un errore, e **senza il fix è rosso**. Se la verifica non è
 possibile, dichiaralo: «implementato ma non verificato perché X».
 
 Gli spec Playwright non mostrano la finestra (`FILO_TEST_VISIBLE=1` per
-vederla). Fixture: `tests/fixtures/electron.mjs` (userData isolato, `openTab`,
+vederla; `test:shoot` e `test:smoke` sì, lì la finestra è il risultato). Fixture: `tests/fixtures/electron.mjs` (userData isolato, `openTab`,
 mini server; seleziona i WebContentsView per hostname, mai
 `waitForEvent('window')`).
 
