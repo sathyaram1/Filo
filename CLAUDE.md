@@ -205,7 +205,8 @@ riscrive. Sono TRE testi distinti:
 2. **Frase per chi ha segnalato** (una riga): cosa può fare adesso. Se non
    cambia niente di visibile, non si scrive.
 3. **Riga di changelog** in `src/shared/patchNotes.js`: solo se un utente
-   qualunque può usare la cosa; una riga, orientata al beneficio.
+   qualunque può usare la cosa (superfici owner e parti interne no); una
+   riga, orientata al beneficio.
 
 Prima di consegnare un testo destinato a un umano applica
 **`.claude/skills/unslop/SKILL.md`**.
