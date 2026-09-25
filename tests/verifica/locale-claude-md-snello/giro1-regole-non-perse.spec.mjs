@@ -15,7 +15,7 @@ const regole = [
   ['il report per l\'owner non vanta comportamenti attesi', /comportamenti attesi/i],
   ['un «NON cambiare» verificabile a macchina è una sentinella, non un commento', /sentinella,? non (un )?commento/i],
   ['senza niente da aprire (testi, strumenti da riga di comando) la prova è il controllo veloce, non una spec',
-    /per non guardarci niente|niente da aprire/i],
+    /per non guardarci niente|controllo veloce/i],
   ['i segnali che si sta curando il sintomo («se l\'utente riprova adesso, gli funziona?»)', /riprova adesso/i],
 ];
 
