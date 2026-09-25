@@ -78,16 +78,17 @@ export function formattaRisposte(result, { n = 50, quando = dataOra } = {}) {
   const r = result || {};
   const voci = [];
   for (const o of Array.isArray(r.orchestrator) ? r.orchestrator : []) {
-    voci.push({ t: Number(o.askedAtMs), testa: `orchestratore · ${visibile(o.slug || '?')}`, domanda: o.question, answered: !!o.answered, risposta: o.answer });
+    voci.push({ t: istante(o.askedAtMs), testa: `orchestratore · ${visibile(o.slug || '?')}`, domanda: o.question, answered: !!o.answered, risposta: o.answer });
   }
   for (const w of Array.isArray(r.workers) ? r.workers : []) {
     const c = w.closing;
-    if (!c || !Number.isFinite(Number(c.askedAtMs))) continue;
-    const inizio = Number(w.createdAtMs); const fine = Number(w.releasedAtMs);
+    if (!c || !Number.isFinite(istante(c.askedAtMs))) continue;
+    const inizio = istante(w.createdAtMs); const fine = istante(w.releasedAtMs);
     const durata = Number.isFinite(inizio) && Number.isFinite(fine) ? `${Math.round((fine - inizio) / 60000)} min` : 'non rilasciato';
-    const num = w.num ? ` #${visibile(w.num)}` : '';
+    // Il server manda il numero già col cancelletto («#477»); uno solo in ogni caso.
+    const num = w.num ? ` #${visibile(String(w.num).replace(/^#+/, ''))}` : '';
     const testa = `${visibile(w.role || 'worker')}${num} · ${durata} · ${visibile(w.slug || '?')}`;
-    voci.push({ t: Number(c.askedAtMs), testa, domanda: c.question, answered: typeof c.answer === 'string', risposta: c.answer });
+    voci.push({ t: istante(c.askedAtMs), testa, domanda: c.question, answered: typeof c.answer === 'string', risposta: c.answer });
   }
   voci.sort((x, y) => y.t - x.t);
   const scelte = voci.slice(0, n);
