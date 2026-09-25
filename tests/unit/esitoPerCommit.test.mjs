@@ -212,8 +212,12 @@ test('esitiDecaduti: un via libera dato su un altro commit non vale per questo c
   const A = 'a'.repeat(40);
   const B = 'b'.repeat(40);
   assert.deepEqual(esitiDecaduti({ verifierSha: A, secauditSha: A }, A), [], 'ramo fermo: niente decade');
-  assert.equal(esitiDecaduti({ verifierSha: A, secauditSha: A }, B).length, 2, 'ramo mosso: decadono tutti e due');
-  assert.equal(esitiDecaduti({ verifierSha: '', secauditSha: A }, B).length, 1,
+  assert.deepEqual(esitiDecaduti({ verifierSha: A, secauditSha: A }, B).map((d) => d.quale), ['il controllo di sicurezza'],
+    'ramo mosso: qui decade il controllo di sicurezza; la verifica la giudica il server, che tollera le prove del giro tolte');
+  assert.deepEqual(esitiDecaduti({ verifierSha: A, secauditSha: B }, B), [],
+    'verifica su un commit più vecchio: non si ferma qui (#676, #667, #569: fermi con due via libera)');
+  assert.equal(esitiDecaduti({ verifierSha: '', secauditSha: A }, B).length, 1);
+  assert.deepEqual(esitiDecaduti({ verifierSha: A, secauditSha: '' }, B), [],
     'un esito senza commit scritto accanto non decade: viene da uno strumento vecchio, e a giudicarlo resta il server');
   assert.deepEqual(esitiDecaduti(null, B), [], 'nessuno stato locale: non si inventa un decadimento');
   assert.deepEqual(esitiDecaduti({ secauditSha: A }, ''), [], 'punta sconosciuta: il confronto non si fa qui');
@@ -255,8 +259,49 @@ test('la fusione: parte dichiarando il commit esaminato, e non parte se il ramo 
     const quante = buste.length;
     const secondo = await lancia();
     assert.equal(secondo.status, 1, 'il ramo si è mosso: la fusione non si chiede');
-    assert.match(secondo.stderr, /si è mosso dopo i via libera/);
+    assert.match(secondo.stderr, /si è mosso dopo il tuo controllo di sicurezza/);
     assert.equal(buste.length, quante, 'e il server non viene nemmeno chiamato');
+  } finally {
+    srv.close();
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(fuori, { recursive: true, force: true });
+  }
+});
+
+// Dopo un pass il verificatore toglie le prove dei rilievi usciti in feedback loro:
+// è un commit dopo il suo verdetto, e il server lo tollera. Qui la richiesta si
+// fermava prima di arrivargli, e il lavoro restava con due via libera e nessuno
+// che lo riprendesse (#676, #667, #569, #663, #567 il 24/09/2026).
+test('la fusione di un ramo verificato su un commit più vecchio la chiede lo stesso: decide il server', async () => {
+  const { srv, ricevuti: buste, port } = await fintoServer({ ok: true, result: 'merged', sha: 'z'.repeat(40) });
+  const { dir, g, punta } = deposito('filo-676-fusione-');
+  const fuori = cartellaTemporanea('filo-676-fusione-fuori-');
+  const statoDir = resolve(fuori, 'stato');
+  try {
+    const verificato = punta();
+    g(['commit', '-q', '--allow-empty', '-m', 'via le prove del giro']);
+    const controllato = punta();
+    mkdirSync(statoDir, { recursive: true });
+    writeFileSync(resolve(statoDir, 'ID1.json'), JSON.stringify({
+      id: 'ID1', branch: 'worker/485', verifierVerdict: 'pass', verifierSha: verificato,
+      secauditDone: true, secauditVerdict: 'pass', secauditSha: controllato,
+    }), 'utf8');
+    const env = {
+      ...process.env,
+      FILO_REPO_ROOT: dir,
+      FILO_TOOLS_ROOT: dir,
+      FILO_DISPATCH_STATE_DIR: statoDir,
+      FILO_NO_BEAT: '1',
+      FILO_ROUTINE_TICKET: 'biglietto-finto',
+      FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+    };
+    const r = await new Promise((res2) => execFile(process.execPath, [GATE, 'worker/485'], { env, cwd: dir },
+      (err, so, se) => res2({ status: err ? (err.code ?? 1) : 0, stderr: String(se || '') })));
+    assert.equal(r.status, 0, `la fusione doveva partire: ${r.stderr}`);
+    const richiesta = buste.find((x) => x.url.includes('routineMerge'));
+    assert.ok(richiesta, 'la richiesta deve arrivare al server, che sa quali commit dopo il verdetto tollerare');
+    assert.equal(richiesta.body.sha, controllato);
+    assert.match(r.stderr, /la verifica ha dato l'ok su .* Lo giudica il server/, 'e chi legge sa perché non si è fermata');
   } finally {
     srv.close();
     rmSync(dir, { recursive: true, force: true });
@@ -387,14 +432,16 @@ test('la fusione fermata dal decadimento dice quale passo registrare, col ramo d
   const A = 'a'.repeat(40);
   const B = 'b'.repeat(40);
   const decaduti = esitiDecaduti({ verifierSha: A, secauditSha: A }, B);
-  const testo = testoEsitiDecaduti(decaduti, B, 'worker/485-xyz');
+  const testo = testoEsitiDecaduti(decaduti, B, 'worker/485-xyz', 'ID42');
 
-  assert.match(testo, /la verifica ha dato l'ok su a{12}/);
   assert.match(testo, /il controllo di sicurezza ha dato l'ok su a{12}/);
   assert.match(testo, /la directory adesso è su b{12}/);
-  assert.match(testo, /revision_capability/, 'il passo che registra la decadenza, per nome');
-  assert.ok(testo.includes('worker/485-xyz'), 'col ramo dentro: il comando si copia, non si ricostruisce');
-  assert.match(testo, /--guasto/, 'e la via d\'uscita se il server rifiuta quel passaggio');
+  assert.match(testo, /git diff a{12} b{12}/, 'cosa rileggere, già pronto');
+  assert.match(testo, /--record-secaudit ID42 <pass\|fail>/, 'il passo che registra il verdetto sul contenuto nuovo');
+  // Il ritorno in verifica al controllo di sicurezza il server lo nega: proporlo
+  // lasciava il lavoro fermo con due via libera (24/09/2026).
+  assert.doesNotMatch(testo, /revision_capability/);
+  assert.ok(testo.includes('worker/485-xyz'), 'col ramo dentro: chi legge sa di quale lavoro si parla');
   assert.ok(!/chi ha cambiato il ramo lo rimette in verifica/.test(testo),
     'non si nomina una persona che non esiste al posto di un passo da registrare');
 });
@@ -552,7 +599,8 @@ test('in cima al ramo, dove chi fonde va a prendere, dev\'esserci il contenuto e
   const piuAvanti = testoPiuAvanti(P, O, 'worker/485-xyz');
   assert.match(piuAvanti, new RegExp(`${'p'.repeat(12)}`), 'quale contenuto è stato esaminato');
   assert.match(piuAvanti, new RegExp(`${'o'.repeat(12)}`), 'e cosa c\'è in cima al ramo');
-  assert.match(piuAvanti, /revision_capability/, 'la decadenza si registra, non resta a schermo');
+  assert.match(piuAvanti, new RegExp(`git merge --ff-only ${'o'.repeat(12)}`), 'la directory raggiunge ciò che verrà fuso');
+  assert.doesNotMatch(piuAvanti, /revision_capability/, 'un passaggio che al controllo di sicurezza il server nega');
   assert.ok(!/git push/.test(piuAvanti),
     'e non si suggerisce di spedire: là c\'è lavoro che qui non c\'è, e sovrascriverlo lo butterebbe via');
 
@@ -568,14 +616,14 @@ test('i comandi del rifiuto puntano agli attrezzi del giro, non a quelli del ram
   const A = 'a'.repeat(40);
   const B = 'b'.repeat(40);
   const crudo = testoEsitiDecaduti(esitiDecaduti({ secauditSha: A }, B), B, 'worker/485');
-  assert.match(crudo, /node scripts\/routine-channel\.mjs/, 'la ricetta si scrive come si legge');
+  assert.match(crudo, /node scripts\/dispatch\.mjs/, 'la ricetta si scrive come si legge');
 
   // In un giro vero gli attrezzi stanno fuori dal deposito: `scripts/…` qui
   // dentro riporterebbe alla copia che il ramo si porta dietro, vecchia di
   // giorni e senza dirlo. È la stessa riscrittura che riceve ogni file-ruolo.
   const fissato = absolutizeRecipe(crudo, '/strumenti/del-giro', '/il/deposito');
   // Su Windows il percorso prende davanti la lettera del disco.
-  assert.match(fissato, /node "(?:[A-Za-z]:)?\/strumenti\/del-giro\/scripts\/routine-channel\.mjs"/);
+  assert.match(fissato, /node "(?:[A-Za-z]:)?\/strumenti\/del-giro\/scripts\/dispatch\.mjs"/);
   assert.ok(!/node scripts\//.test(fissato), 'e non resta nemmeno una scorciatoia dentro il ramo');
 
   // In locale le due radici coincidono e il testo non si tocca.
@@ -663,9 +711,19 @@ test('la fusione non parte se su origin il ramo è più avanti del contenuto esa
     assert.equal(dopo.status, 1, 'in cima al ramo c\'è un contenuto che nessuno ha esaminato: la fusione non si chiede');
     assert.match(dopo.stderr, /più avanti/);
     assert.ok(dopo.stderr.includes(inCima.slice(0, 12)), 'e si dice cosa ci sarebbe in cima');
-    assert.match(dopo.stderr, /revision_capability/, 'la decadenza si registra, non resta a schermo');
+    assert.doesNotMatch(dopo.stderr, /revision_capability/, 'un passaggio che al controllo di sicurezza il server nega');
     assert.ok(!/git push/.test(dopo.stderr), 'e non si suggerisce di spedire: là c\'è lavoro che qui non c\'è');
     assert.equal(buste.length, quante, 'il server non viene nemmeno chiamato');
+
+    // Il rimedio stampato porta la directory in cima; da lì il gate dice cosa rileggere.
+    const ff = /git merge --ff-only ([0-9a-f]{12})/.exec(dopo.stderr);
+    assert.ok(ff, `il rimedio deve essere un comando da copiare: ${dopo.stderr}`);
+    g(['merge', '-q', '--ff-only', ff[1]]);
+    const riletto = await lancia();
+    assert.equal(riletto.status, 1);
+    assert.match(riletto.stderr, new RegExp(`git diff ${esaminato.slice(0, 12)} ${inCima.slice(0, 12)}`));
+    assert.match(riletto.stderr, /--record-secaudit ID1/);
+    assert.equal(buste.length, quante, 'finché il controllo di sicurezza non ha letto il pezzo nuovo, il server non viene chiamato');
   } finally {
     srv.close();
     for (const d of [dir, remoto, altra, fuori]) rmSync(d, { recursive: true, force: true });

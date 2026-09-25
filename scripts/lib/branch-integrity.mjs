@@ -336,8 +336,8 @@ export const CAMPI_ESITO = Object.freeze({
  * quando arriva una correzione).
  *
  * PERCHÉ NON STA SOLO DOVE STAVA (feedback #485, giro 3)
- *   Il rifiuto che ferma la fusione quando il ramo si è mosso dopo i via libera
- *   si regge su questo fogliettino. Se lo scrive una sola delle due strade con
+ *   Il rifiuto che ferma la fusione quando il ramo si è mosso dopo il controllo
+ *   di sicurezza (e la nota sulla verifica) si regge su questo fogliettino. Se lo scrive una sola delle due strade con
  *   cui un esito si registra, basta usare l'altra perché la fusione riparta a
  *   foglio sostituito: la difesa si spegne scegliendo l'ingresso. Qui c'è la
  *   porta unica, e la chiamano tutte e due.

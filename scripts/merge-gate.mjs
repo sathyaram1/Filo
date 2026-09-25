@@ -95,53 +95,49 @@ export function parseArgs(argv) {
  * che il server ha già messo a registro.
  */
 /**
- * I via libera registrati che NON parlano del contenuto che si sta per far
- * fondere. PURA.
- *
- * Un esito vale per la versione esaminata. Verifica e controllo di sicurezza
- * lasciano scritto su quale commit sono stati dati; se la punta del ramo si è
- * mossa dopo, quegli esiti parlano di un contenuto diverso da quello che
- * atterrerebbe su main, e il giro va rifatto invece che chiuso (feedback
- * #485). Un esito senza commit scritto accanto non decade: viene da uno
- * strumento vecchio, e a giudicarlo resta il server.
+ * Il via libera del controllo di sicurezza, se parla di un altro commit (#485). PURA.
+ * Quello della verifica lo giudica il server: tollera le sole prove del giro tolte e
+ * altrimenti rimanda il verificatore; un rifiuto qui fermava il lavoro per sempre.
  */
 export function esitiDecaduti(state, punta) {
   const s = state && typeof state === 'object' ? state : {};
   const p = String(punta || '');
-  if (!p) return [];
-  const fuori = [];
-  for (const [campo, quale] of [['verifierSha', 'la verifica'], ['secauditSha', 'il controllo di sicurezza']]) {
-    const sha = String(s[campo] || '');
-    if (sha && sha !== p) fuori.push({ quale, sha });
-  }
-  return fuori;
+  const sha = String(s.secauditSha || '');
+  return p && sha && sha !== p ? [{ quale: 'il controllo di sicurezza', sha }] : [];
+}
+
+/** La nota per una verifica data su un commit più vecchio della punta. PURA. '' se non serve. */
+export function notaVerificaSuAltroCommit(state, punta) {
+  const s = state && typeof state === 'object' ? state : {};
+  const v = String(s.verifierSha || '');
+  const p = String(punta || '');
+  if (!v || !p || v === p) return '';
+  return `[merge-gate] nota: la verifica ha dato l'ok su ${v.slice(0, 12)}, la punta è ${p.slice(0, 12)}. Lo giudica il server: `
+    + 'se dopo il verdetto sono state solo TOLTE prove del giro, fonde; altrimenti azzera il verdetto e rimanda un '
+    + 'verificatore da sé, e qui arriva un rifiuto (not_approved). In quel caso non c\'è altro da registrare: rilascia il biglietto.';
 }
 
 /**
- * Il rifiuto per un via libera che parla di un altro commit. PURA.
- *
- * Il rifiuto dice anche COSA REGISTRARE. Fermarsi e basta lascia la notizia su
- * questa macchina: sul canale i due via libera continuano a risultare buoni per
- * questo ramo, che è la segnalazione #485 spostata di un passo. Il passo che la
- * registra è il rientro in verifica (`revision_security` → `revision_capability`
- * nella macchina a stati: la stessa strada del riallineamento, dove il
- * contenuto cambia e verifica e controllo di sicurezza si rifanno su quello
- * nuovo). Chi legge non deve inventarsi il comando, né accontentarsi di un
- * guasto, che dice «non riesco a lavorare» e non «gli esiti non parlano più di
- * questo contenuto».
+ * Il rifiuto per un controllo di sicurezza dato su un altro commit. PURA.
+ * Il rimedio è rileggere il pezzo nuovo e registrare di nuovo il verdetto: il ritorno
+ * in verifica, al controllo di sicurezza, il server non lo concede.
  */
-export function testoEsitiDecaduti(decaduti, punta, ramo = '') {
+export function testoEsitiDecaduti(decaduti, punta, ramo = '', id = '') {
   const righe = (Array.isArray(decaduti) ? decaduti : [])
     .map((d) => `  ${d.quale} ha dato l'ok su ${String(d.sha).slice(0, 12)}`);
+  const primo = (Array.isArray(decaduti) ? decaduti : [])[0];
+  const da = primo ? String(primo.sha).slice(0, 12) : '<commit controllato>';
   const p = String(punta || '').slice(0, 12);
   const r = String(ramo || '<ramo>');
-  return 'fusione non chiesta: il ramo si è mosso dopo i via libera, che valgono per il contenuto esaminato e non per il nome del ramo.\n'
+  const i = String(id || '<id>');
+  return 'fusione non chiesta: il ramo si è mosso dopo il tuo controllo di sicurezza, che vale per il contenuto esaminato e non per il nome del ramo.\n'
     + `${righe.join('\n')}\n`
-    + `  la directory adesso è su ${p}\n`
-    + 'Quello che verrebbe fuso contiene righe che nessuno ha letto: il giro va rifatto su questo contenuto, non chiuso.\n'
-    + 'Non fermarti qui. Finché la notizia resta su questa macchina, sul canale i due via libera continuano a risultare buoni per questo ramo. Registrala rimettendo il lavoro in verifica sul contenuto nuovo:\n'
-    + `  node scripts/routine-channel.mjs deliver status --status revision_capability --branch ${r} --notes "il ramo si è mosso dopo i via libera: verifica e controllo di sicurezza vanno rifatti su ${p}"\n`
-    + 'Se il server rifiuta quel passaggio, dichiaralo nel rilascio del biglietto con --guasto e la stessa frase: quello che non è registrato non è successo.';
+    + `  la directory adesso è su ${p} (ramo ${r})\n`
+    + 'Quello che verrebbe fuso contiene righe che non hai letto. Leggile adesso, per intero:\n'
+    + `  git diff ${da} ${p}\n`
+    + 'Poi registra di nuovo il verdetto, che parte timbrato col contenuto nuovo (nella nota scrivi anche cosa hai letto in più):\n'
+    + `  node scripts/dispatch.mjs --record-secaudit ${i} <pass|fail> --nota <file.md>\n`
+    + 'e, se è pass, rilancia questo comando. La verifica funzionale non la rifai tu: se il pezzo nuovo non è fatto solo di prove del giro tolte, il server la rimette in giro da sé quando chiedi la fusione.';
 }
 
 /**
@@ -264,15 +260,8 @@ export function testoNonPubblicato(punta, suOrigin, ramo = '') {
 }
 
 /**
- * Il rifiuto per un ramo che su origin è andato OLTRE il contenuto esaminato.
- * PURA.
- *
- * Qui spedire non c'entra: là c'è già tutto, e c'è pure dell'altro. Il danno è
- * quello della segnalazione #485 all'ultimo passo possibile: chi fonde prende
- * la punta, e la punta è un contenuto che nessuno ha guardato. Il rimedio è lo
- * stesso del ramo mosso sotto i piedi, perché la causa è la stessa: gli esiti
- * parlano di un'altra versione, quindi decadono e il giro si rifà su quella
- * nuova. E si REGISTRA, invece di restare a schermo su questa macchina.
+ * Il rifiuto per un ramo che su origin è andato OLTRE il contenuto esaminato. PURA.
+ * Chi fonde prende la punta di origin (#485): la directory la raggiunge, e il pezzo in più si legge prima di fondere.
  */
 export function testoPiuAvanti(punta, suOrigin, ramo = '') {
   const p = String(punta || '').slice(0, 12);
@@ -281,10 +270,10 @@ export function testoPiuAvanti(punta, suOrigin, ramo = '') {
   return 'fusione non chiesta: su origin il ramo è più avanti del contenuto esaminato, e chi fonde prende la PUNTA del ramo, non quello che c\'è in questa directory.\n'
     + `  qui i via libera valgono per ${p}\n`
     + `  su origin il ramo ${r} è in cima a ${o}\n`
-    + 'Quello che verrebbe fuso è il contenuto in cima, che nessuno ha esaminato. Non spedire niente e non riportare indietro il ramo: là c\'è lavoro che qui non c\'è, e sovrascriverlo lo butterebbe via.\n'
-    + 'Gli esiti parlano di un\'altra versione, quindi sono decaduti: il giro va rifatto su quel contenuto, e la decadenza va registrata invece di restare su questa macchina.\n'
-    + `  node scripts/routine-channel.mjs deliver status --status revision_capability --branch ${r} --notes "su origin il ramo è più avanti del contenuto esaminato: verifica e controllo di sicurezza vanno rifatti su ${o}"\n`
-    + 'Se il server rifiuta quel passaggio, dichiaralo nel rilascio del biglietto con --guasto e la stessa frase: quello che non è registrato non è successo.';
+    + 'Quello che verrebbe fuso è il contenuto in cima, che qui non è stato esaminato. Non spedire niente e non riportare indietro il ramo: là c\'è lavoro che qui non c\'è, e sovrascriverlo lo butterebbe via.\n'
+    + 'Porta la directory su quel contenuto e rilancia questo comando, che ti dirà cosa rileggere:\n'
+    + `  git merge --ff-only ${o}\n`
+    + 'Se il merge non va avanti da solo (le due storie si sono separate), dichiaralo nel rilascio del biglietto con --guasto e questa frase: quello che non è registrato non è successo.';
 }
 
 /**
@@ -322,12 +311,12 @@ const USO = [
   '  i controlli e fonde con la sua identità. Qui non ci sono opzioni.',
   '  Serve il biglietto del giro, che si rilegge da solo dal promemoria.',
   '  <ramo> dev\'essere quello su cui sta la directory: da lì si legge tutto.',
-  '  La richiesta dichiara il COMMIT: se il ramo si è mosso dopo i via libera,',
+  '  La richiesta dichiara il COMMIT: se il ramo si è mosso dopo il controllo di sicurezza,',
   '  se nella directory c\'è qualcosa fuori dai commit, o se in cima al ramo su',
   '  origin (da dove il server lo prende) non c\'è il contenuto esaminato, non parte.',
   '  Exit: 0 fuso · 10 fermato dal cancello di sicurezza (decide l’owner)',
   '        20 conflitto · 1 uso sbagliato, ramo diverso da quello della directory,',
-  '           ramo mosso dopo i via libera, contenuto che non è quello in cima',
+  '           ramo mosso dopo il controllo di sicurezza, contenuto che non è quello in cima',
   '           su origin, o rifiuto del server',
 ].join('\n');
 
@@ -395,18 +384,18 @@ async function main() {
   // contenuto? Il muro vero resta il server, che risolve la punta da GitHub;
   // questo è il controllo che si può fare qui, e che sul cammino locale
   // (`npm run finish`) c'è da sempre.
-  const statoRamo = (() => {
-    const id = findStateIdByBranch(ROOT, source);
-    return id ? readBranchState(ROOT, id) : null;
-  })();
+  const idStato = findStateIdByBranch(ROOT, source);
+  const statoRamo = idStato ? readBranchState(ROOT, idStato) : null;
   const decaduti = esitiDecaduti(statoRamo, punta);
   if (decaduti.length) {
     // I comandi del rimedio con gli attrezzi del GIRO, non con quelli che il
     // ramo si porta dietro: `scripts/…` qui dentro è la copia del ramo, che può
     // essere vecchia di giorni e non fare quello che chi legge crede.
-    console.error(absolutizeRecipe(testoEsitiDecaduti(decaduti, punta, source), TOOLS_ROOT, ROOT));
+    console.error(absolutizeRecipe(testoEsitiDecaduti(decaduti, punta, source, idStato || ''), TOOLS_ROOT, ROOT));
     process.exit(1);
   }
+  const notaVerifica = notaVerificaSuAltroCommit(statoRamo, punta);
+  if (notaVerifica) console.error(notaVerifica);
   // Astenersi si dice, e si dice PER CIASCUNO dei due: se di uno non risulta il
   // commit, quel via libera non l'ho controllato, e chi legge il registro non
   // deve credere il contrario perché l'altro tornava.
