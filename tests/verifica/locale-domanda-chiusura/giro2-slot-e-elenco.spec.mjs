@@ -60,6 +60,7 @@ function caricaServer() {
   };
   const storePath = req.resolve('./src/routine/store');
   req.cache[storePath] = { id: storePath, filename: storePath, loaded: true, exports: store };
+  delete req.cache[req.resolve('./src/routine/closing')];
   const closing = req('./src/routine/closing');
   return { closing, mem, secrets };
 }
