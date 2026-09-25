@@ -220,8 +220,8 @@ Prima di consegnare un testo destinato a un umano applica
   codice.
 - **`src/shared/feedbackTransitions.js`**: le tabelle della macchina a stati
   come DATI (i numeri dei bilanci no: li scrive l'owner in Gestione →
-  Automazioni, e chi ne ha bisogno li legge dal server o si ferma). Il server di filo-security le incorpora al deploy insieme a
-  **`filo_filosofia.txt`**: se tocchi transizioni o filosofia, **rideploya le
+  Automazioni, e chi ne ha bisogno li legge dal server o si ferma). Il server
+  di filo-security le incorpora al deploy insieme a **`filo_filosofia.txt`**: se tocchi transizioni o filosofia, **rideploya le
   functions**.
 
 ## Run / test
