@@ -95,7 +95,7 @@ export function formattaRisposte(result, { n = 50, quando = dataOra } = {}) {
     const testa = `${visibile(w.role || 'worker')}${num} · ${durata} · ${visibile(w.slug || '?')}`;
     voci.push({ t: istante(c.askedAtMs), testa, domanda: c.question, answered: typeof c.answer === 'string', risposta: c.answer });
   }
-  voci.sort((x, y) => y.t - x.t);
+  voci.sort((x, y) => (y.t || 0) - (x.t || 0));
   const scelte = voci.slice(0, n);
   if (!scelte.length) return 'Nessuna risposta.';
   const righe = scelte.map((v) => [
