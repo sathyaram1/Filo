@@ -457,7 +457,10 @@ export function testoRifiutoChiusura(r) {
 }
 
 export async function domandaChiusura(cred, opts) {
-  const { status, body } = await call('routineClosing', corpoChiusura('question', cred), opts);
+  // Un id per invocazione, uguale in tutti i ritentativi di call(): il server ritrova lo
+  // stesso documento invece di crearne uno orfano per ogni 5xx arrivato dopo la scrittura.
+  const requestId = cred.passphrase ? randomUUID() : '';
+  const { status, body } = await call('routineClosing', corpoChiusura('question', { ...cred, requestId }), opts);
   const r = leggiRispostaChiusura(status, body);
   // Senza testo, o senza l'id con cui rispondere, non c'è una domanda a cui rispondere.
   if (r.esito === 'ok' && (!r.question.trim() || (cred.passphrase && !r.id))) return { esito: 'assente', reason: 'busta_incompleta' };
