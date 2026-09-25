@@ -131,8 +131,11 @@ saperlo (rifiuto col numero, o un avviso) e scegliere lui cosa tenere.
 ## Sintomo vs causa
 
 La prima domanda non è «come faccio sparire questo errore» ma **«cosa stava
-cercando di fare l'utente, e perché non gli è riuscito»**. Segnale di causa
-vera: due cammini simili che divergono in modo sospetto.
+cercando di fare l'utente, e perché non gli è riuscito»**. Stai fissando il
+sintomo se cambi solo una stringa per un bug funzionale, se fai passare il test
+sbagliando meno, o se non sai rispondere a «se l'utente riprova adesso, gli
+funziona?». Segnale di causa vera: due cammini simili che divergono in modo
+sospetto.
 
 ## Iniziativa: nel dubbio, completa
 
