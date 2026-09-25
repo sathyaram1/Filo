@@ -70,6 +70,11 @@ function dataOra(ms) {
   return new Date(ms).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+/** Un istante in ms, o NaN se manca: il server scrive `null` per «non ancora», e `Number(null)` è 0. PURA. */
+function istante(v) {
+  return v === null || v === undefined || v === '' ? NaN : Number(v);
+}
+
 /**
  * Le risposte di orchestratori e worker in un elenco solo, dal più recente, al
  * massimo `n` voci. Domanda e risposta sempre intere. PURA (`quando` formatta l'ora).
