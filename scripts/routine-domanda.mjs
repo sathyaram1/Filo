@@ -46,23 +46,24 @@ export function formattaRisposte(result, { n = 50, quando = dataOra } = {}) {
   const r = result || {};
   const voci = [];
   for (const o of Array.isArray(r.orchestrator) ? r.orchestrator : []) {
-    voci.push({ t: Number(o.askedAtMs), testa: `orchestratore · ${o.slug || '?'}`, domanda: o.question, answered: !!o.answered, risposta: o.answer });
+    voci.push({ t: Number(o.askedAtMs), testa: `orchestratore · ${visibile(o.slug || '?')}`, domanda: o.question, answered: !!o.answered, risposta: o.answer });
   }
   for (const w of Array.isArray(r.workers) ? r.workers : []) {
     const c = w.closing;
     if (!c || !Number.isFinite(Number(c.askedAtMs))) continue;
     const inizio = Number(w.createdAtMs); const fine = Number(w.releasedAtMs);
     const durata = Number.isFinite(inizio) && Number.isFinite(fine) ? `${Math.round((fine - inizio) / 60000)} min` : 'non rilasciato';
-    const num = w.num ? ` #${w.num}` : '';
-    voci.push({ t: Number(c.askedAtMs), testa: `${w.role || 'worker'}${num} · ${durata} · ${w.slug || '?'}`, domanda: c.question, answered: typeof c.answer === 'string', risposta: c.answer });
+    const num = w.num ? ` #${visibile(w.num)}` : '';
+    const testa = `${visibile(w.role || 'worker')}${num} · ${durata} · ${visibile(w.slug || '?')}`;
+    voci.push({ t: Number(c.askedAtMs), testa, domanda: c.question, answered: typeof c.answer === 'string', risposta: c.answer });
   }
   voci.sort((x, y) => y.t - x.t);
   const scelte = voci.slice(0, n);
   if (!scelte.length) return 'Nessuna risposta.';
   const righe = scelte.map((v) => [
     `${quando(v.t)}  ${v.testa}`,
-    `  D: ${String(v.domanda || '').replace(/\n/g, '\n     ')}`,
-    `  R: ${v.answered ? String(v.risposta || '').replace(/\n/g, '\n     ') : '(nessuna risposta)'}`,
+    `  D: ${visibile(v.domanda || '').replace(/\n/g, '\n     ')}`,
+    `  R: ${v.answered ? visibile(v.risposta || '').replace(/\n/g, '\n     ') : '(nessuna risposta)'}`,
   ].join('\n'));
   // Più voci di quelle mostrate: si dice, non si tace.
   const altre = voci.length - scelte.length;
