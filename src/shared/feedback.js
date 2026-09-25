@@ -501,7 +501,11 @@
     return null;
   }
 
-  async function readViaMain(bridge, payload) {
+  // La risposta GREZZA del main, con gli errori già tradotti. Sta a parte da
+  // `readViaMain` perché la lettura completa ha bisogno anche di `complete`:
+  // sapere che il freno è scattato è metà della risposta, e buttarlo via qui
+  // vorrebbe dire far passare un troncamento per un totale (#496).
+  async function replyViaMain(bridge, payload) {
     // 'feedback_fetch' = MSG.FEEDBACK_FETCH (src/shared/messages.js). Qui il
     // vocabolario non è caricato: questo modulo gira anche fuori dalle pagine.
     const r = await bridge({ type: 'feedback_fetch', ...payload });
@@ -517,6 +521,11 @@
       }
       throw new Error((r && r.error) || 'lettura dei feedback non riuscita');
     }
+    return r;
+  }
+
+  async function readViaMain(bridge, payload) {
+    const r = await replyViaMain(bridge, payload);
     return Array.isArray(r.rows) ? r.rows : [];
   }
 
@@ -971,6 +980,16 @@
   // la sostituisce in una prova sostituisce anche questa, e il freno sulle
   // pagine non mente — se scatta, la risposta lo dice.
   async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX } = {}) {
+    // Da una pagina filo:// il cursore non è percorribile: `list` rifiuta
+    // apposta `afterName` (le credenziali stanno nel main, non qui). Quindi la
+    // lettura completa la fa il main e torna di là, col suo `complete`. Senza
+    // questo ramo una pagina che chiede l'insieme si prendeva un'eccezione
+    // alla prima riga (#496).
+    const bridge = pageBridge();
+    if (bridge) {
+      const r = await replyViaMain(bridge, { op: 'listAll', timeoutMs });
+      return { rows: Array.isArray(r.rows) ? r.rows : [], complete: r.complete !== false };
+    }
     const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
     const rows = [];
     const visti = new Set();

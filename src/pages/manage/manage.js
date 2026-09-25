@@ -346,6 +346,12 @@
     // esattamente come quelle delle immagini, e tenerne una sola delle due
     // avrebbe lasciato metà del difetto in piedi.
     fileWhyCache.clear();
+    // Le statistiche dicono «riservata all'owner» finché non lo sei. Se
+    // l'accesso arriva mentre quella scheda è aperta, deve accorgersene da
+    // aperta: senza, restava il rifiuto finché non si cambiava scheda e si
+    // tornava indietro (patterns/vai-a-guardare-in-quellaltro-posto-quel-posto.md).
+    const panFs = document.getElementById('panel-fbstats');
+    if (nuovo && panFs && panFs.classList.contains('mg-panel--active')) loadFsData();
   }
 
   async function refreshAuth() {
@@ -1359,7 +1365,8 @@
   // ── Tab bar ───────────────────────────────────────────────────────────────
   // Le tab-lista (inbox/queue/resolved/archived) condividono il pannello
   // `panel-list`: cambia solo quale sottoinsieme di feedback popola la lista a
-  // sinistra. Le tab segnaposto (stats/models) hanno il loro pannello.
+  // sinistra. Le altre (fbstats/stats/models/automation/log) hanno il loro
+  // pannello, `panel-<nome>`.
   function selectTab(tab) {
     // Cambiando scheda la ricerca si chiude da sola: vedi la scheda scelta.
     if (searchMode) closeSearch({ keepList: true });
@@ -4079,6 +4086,10 @@
         // Niente di nuovo, ma una scheda sparita in un giro precedente (tenuta
         // aperta per una bozza) può chiudersi ora che la bozza non c'è più.
         closeDetailIfGone();
+        // Nessuna segnalazione è cambiata, ma il registro delle routine può
+        // essere cresciuto lo stesso (un'esplorazione che non trova niente):
+        // le statistiche seguono anche questo giro (feedback #496).
+        fsSegueLive([], []).catch(() => {});
         return { changed: 0 };
       }
       let fresh = ids.length > 0 ? await liveSources.getMany(ids) : [];
@@ -4096,6 +4107,9 @@
       // finché la pagina non viene riaperta.
       fondiPreapprovateInAttesa();
       rerenderAfterLive(new Set(ids));
+      // Anche le statistiche seguono il giro: quello che la pagina ha appena
+      // imparato vale per i numeri quanto per la lista (feedback #496).
+      fsSegueLive(fresh, removed).catch(() => {});
       return { changed: ids.length + removed.length };
     })().finally(() => { liveTick = null; liveLastAt = Date.now(); });
     return liveTick;
@@ -4460,6 +4474,1443 @@
     loadMergeApprovals();
   });
 
+  // ══ Tab "Statistiche feedback" (#496) ═══════════════════════════════════
+  //
+  // DUE SORGENTI, DUE DATE, e non sono intercambiabili (il perché sta in
+  // src/shared/feedbackStats.js, che fa i conti):
+  //   · l'INSIEME dei feedback, letto per intero — non i 500 più recenti che
+  //     riempiono la lista a sinistra. Qui le domande sono sul totale
+  //     («quanti ne sono arrivati»), e a una domanda sul totale una finestra
+  //     sui più recenti risponde sbagliato in silenzio
+  //     (patterns/una-pagina-dei-piu-recenti-non-e-tutto.md);
+  //   · il REGISTRO DEI WORKER, che porta la data di LAVORAZIONE.
+  //
+  // Tutto si ricalcola in pagina a ogni cambio di finestra o di filtro: i dati
+  // si leggono una volta per apertura, i conti costano microsecondi.
+  const FS = window.SN_FEEDBACK_STATS;
+  // La scelta della scheda, tutta intera: la finestra, le due date scritte a
+  // mano e il filtro per mittente. Prima si ricordava la sola finestra, e
+  // «Scegli tu» tornava con i campi vuoti: una finestra senza estremi vuol
+  // dire TUTTO, quindi i numeri sullo schermo erano quelli di sempre sotto una
+  // pasticca che prometteva un periodo scelto da te. Metà di una scelta
+  // ricordata è peggio di nessuna.
+  const FS_SCELTA_KEY = 'filo_manage_fs_scelta';
+  const FS_RANGE_KEY  = 'filo_manage_fs_range';   // la vecchia chiave, letta come ripiego
+  // I colori delle fette: un gradino per quanto è costato il lavoro, dal verde
+  // di «passato subito» al rosso di «fermato, decidi tu» — lo stesso rosso con
+  // cui la coda segna quello che aspetta l'owner. Palette fissa e non token di
+  // tema: servono cinque colori distinguibili su chiaro e su scuro
+  // (patterns/grafici-chart-svg-generato-a-mano-niente-librerie-esterne.md).
+  const FS_COLORI = {
+    g0: '#3bbf7a', g1: '#c9a13b', g2: '#c45a3b', g3: '#8a4fc4', fermati: '#c0392b',
+  };
+
+  const mgFsBody     = document.getElementById('mgFsBody');
+  const mgFsDenied   = document.getElementById('mgFsDenied');
+  const mgFsLoading  = document.getElementById('mgFsLoading');
+  const mgFsRangeBar = document.getElementById('mgFsRange');
+  const mgFsCustom   = document.getElementById('mgFsCustom');
+  const mgFsFinestra = document.getElementById('mgFsFinestra');
+  const mgFsFrom     = document.getElementById('mgFsFrom');
+  const mgFsTo       = document.getElementById('mgFsTo');
+  const mgFsCreators = document.getElementById('mgFsCreators');
+  const mgFsNota     = document.getElementById('mgFsNota');
+  const mgFsTiles    = document.getElementById('mgFsTiles');
+  const mgFsPie      = document.getElementById('mgFsPie');
+  const mgFsPieMid   = document.getElementById('mgFsPieMid');
+  const mgFsPieHint  = document.getElementById('mgFsPieHint');
+  const mgFsPieVuoto = document.getElementById('mgFsPieVuoto');
+  const mgFsLegend   = document.getElementById('mgFsLegend');
+  const mgFsEsiti    = document.getElementById('mgFsEsiti');
+  const mgFsTrend    = document.getElementById('mgFsTrend');
+  const mgFsTrendAxis = document.getElementById('mgFsTrendAxis');
+  const mgFsTrendHint = document.getElementById('mgFsTrendHint');
+  const mgFsAltro    = document.getElementById('mgFsAltro');
+  const mgFsDrill      = document.getElementById('mgFsDrill');
+  const mgFsDrillTitle = document.getElementById('mgFsDrillTitle');
+  const mgFsDrillList  = document.getElementById('mgFsDrillList');
+  const mgFsDrillClose = document.getElementById('mgFsDrillClose');
+
+  let fsRangeKey = '30g';
+  let fsCustom   = { da: '', a: '' };
+  let fsCreators = [];       // vuoto = tutti i mittenti
+  let fsAperto   = '';       // quale riquadro è espanso
+  let fsFeedbacks = null;    // l'insieme completo (null = non ancora letto)
+  let fsCompleto  = true;    // il freno sulle pagine non è scattato
+  let fsRipiego   = false;   // lettura completa fallita: si usa la lista in pagina
+  let fsLog       = [];
+  let fsLogOk     = false;
+  let fsCaricato  = false;
+  let fsCaricando = false;
+  let fsErrore    = '';
+
+  // Una data buona è quella che i due campi sanno scrivere: 'AAAA-MM-GG'.
+  // Qualunque altra cosa trovata in memoria si butta invece di farla arrivare
+  // ai conti.
+  const FS_DATA_OK = /^\d{4}-\d{2}-\d{2}$/;
+
+  function fsLeggiScelta() {
+    let salvata = null;
+    try { salvata = JSON.parse(localStorage.getItem(FS_SCELTA_KEY) || 'null'); } catch (_) { salvata = null; }
+    if (!salvata || typeof salvata !== 'object') {
+      // Chi aveva già scelto una finestra prima di oggi non la perde.
+      try {
+        const vecchia = localStorage.getItem(FS_RANGE_KEY);
+        if (vecchia && FS && FS.presetOf(vecchia)) fsRangeKey = vecchia;
+      } catch (_) { /* senza memoria si riparte da 30 giorni */ }
+      return;
+    }
+    if (FS && FS.presetOf(salvata.range)) fsRangeKey = salvata.range;
+    const da = FS_DATA_OK.test(String(salvata.da || '')) ? String(salvata.da) : '';
+    const a  = FS_DATA_OK.test(String(salvata.a  || '')) ? String(salvata.a)  : '';
+    fsCustom = { da, a };
+    if (Array.isArray(salvata.creatori) && FS) {
+      fsCreators = salvata.creatori.filter((k) => FS.CREATORI.indexOf(k) >= 0);
+    }
+  }
+
+  function fsSalvaScelta() {
+    try {
+      localStorage.setItem(FS_SCELTA_KEY, JSON.stringify({
+        range: fsRangeKey, da: fsCustom.da || '', a: fsCustom.a || '', creatori: fsCreators.slice(),
+      }));
+    } catch (_) { /* senza memoria la scelta vale per questa volta */ }
+  }
+
+  if (FS) fsLeggiScelta();
+
+  function fsRange() {
+    return FS.rangeOf(fsRangeKey, Date.now(), fsCustom);
+  }
+
+  // I dati della scheda: l'insieme dei feedback (dal main, col cursore) e il
+  // registro dei worker. Si rileggono a ogni apertura della scheda — lavoro
+  // nuovo può essere successo nel frattempo, e una fotografia vecchia qui vale
+  // meno di niente.
+  async function loadFsData() {
+    if (fsCaricando) return;
+    fsCaricando = true;
+    fsErrore = '';
+    if (!isAdmin) {
+      fsCaricando = false;
+      renderFs();
+      return;
+    }
+    if (!fsCaricato) { mgFsLoading.hidden = false; mgFsBody.hidden = true; }
+    // Le due letture non dipendono l'una dall'altra: partono insieme.
+    const [lista, log] = await Promise.all([
+      (async () => {
+        try {
+          const r = await FB.listAllPaged({});
+          return { rows: r.rows, complete: r.complete !== false, ripiego: false };
+        } catch (err) {
+          // La lettura completa non è passata. Meglio i numeri della lista già
+          // in pagina che una scheda muta — ma si DICE, perché quei numeri
+          // sono minimi e non totali.
+          console.error('[manage] statistiche: lettura completa non riuscita:', err);
+          return { rows: allFeedbacks, complete: false, ripiego: true, err };
+        }
+      })(),
+      (async () => {
+        try {
+          const r = await sendToMain({ type: WORKER_LOG_GET });
+          if (!r || r.ok === false) return { entries: [], ok: false };
+          return { entries: r.entries || [], ok: true };
+        } catch (err) {
+          console.error('[manage] statistiche: registro dei worker non letto:', err);
+          return { entries: [], ok: false };
+        }
+      })(),
+    ]);
+
+    fsFeedbacks = Array.isArray(lista.rows) ? lista.rows : [];
+    fsCompleto  = lista.complete;
+    fsRipiego   = lista.ripiego;
+    if (lista.ripiego && lista.err && lista.err.code === 'FEEDBACK_READ_DENIED') {
+      fsErrore = 'I feedback li vede chi li gestisce: accedi con un account amministratore.';
+    }
+    fsLog   = log.entries;
+    fsLogOk = log.ok;
+
+    // Lo stato viaggia cifrato: senza decifrarlo ogni categoria sarebbe
+    // «non leggibile». Una sola IPC per tutta la lista, come fa il caricamento
+    // della dashboard.
+    if (fsFeedbacks.length && !fsRipiego) {
+      try {
+        const r = await sendToMain({ type: 'feedback_decrypt_fields', list: fsFeedbacks });
+        if (r && r.ok && Array.isArray(r.list)) fsFeedbacks = r.list;
+      } catch (_) { /* senza chiave i conti restano, le categorie no: lo dice la voce «non leggibile» */ }
+    }
+
+    fsCaricato = true;
+    fsCaricando = false;
+    renderFs();
+  }
+
+  // La pagina si rimette in pari da sola ogni tot secondi. Finché questa
+  // scheda non seguiva quel giro, chi la lasciava aperta guardava i numeri di
+  // quando l'aveva aperta: proprio mentre le routine lavorano, che è quando li
+  // si guarda. I documenti freschi li ha già letti il giro della pagina, quindi
+  // qui non si ricarica niente dalla rete: si applicano.
+  async function fsSegueLive(fresh, removed) {
+    if (!fsCaricato || !Array.isArray(fsFeedbacks)) return;
+    const via = new Set(Array.isArray(removed) ? removed : []);
+    const nuovi = Array.isArray(fresh) ? fresh : [];
+    const aperto = fsPannelloAperto();
+    if (!nuovi.length && !via.size && !aperto) return;
+    if (nuovi.length || via.size) {
+      const perId = new Map();
+      for (const f of fsFeedbacks) if (f && f._id && !via.has(f._id)) perId.set(f._id, f);
+      for (const f of nuovi) if (f && f._id) perId.set(f._id, f);
+      fsFeedbacks = Array.from(perId.values());
+    }
+    // Il registro delle esecuzioni è l'ALTRA sorgente, e cammina per conto
+    // suo: un'esplorazione che non trova niente lo fa crescere senza toccare
+    // nessuna segnalazione. Finché lo si rileggeva solo a rimorchio di una
+    // segnalazione cambiata, tre numeri della stessa riga (esplorazioni,
+    // lavorati, lanci) restavano fermi all'apertura della scheda mentre
+    // quelli accanto camminavano, e niente lo diceva. Costa una lettura al
+    // minuto, e solo mentre la scheda è davanti agli occhi.
+    if (aperto) {
+      try {
+        const r = await sendToMain({ type: WORKER_LOG_GET });
+        if (r && r.ok !== false) { fsLog = r.entries || []; fsLogOk = true; }
+      } catch (_) { /* il registro resta quello di prima: la nota lo dice già */ }
+    }
+    renderFs();
+  }
+
+  function fsPannelloAperto() {
+    const p = document.getElementById('panel-fbstats');
+    return !!(p && p.classList.contains('mg-panel--active'));
+  }
+
+  // ── La barra della finestra e quella dei mittenti ────────────────────────
+  function renderFsBars(stat) {
+    // Ogni pasticca dice, passandoci sopra, DA CHE GIORNO parte davvero: «30
+    // giorni» conta anche oggi, e senza le date vere si resta a indovinare.
+    mgFsRangeBar.innerHTML = '<span class="mg-fs-bar-label">Finestra</span>'
+      + FS.PRESETS.map((p) => {
+        const r = FS.rangeOf(p.key, Date.now(), fsCustom);
+        // «Tutto» non ha nemmeno una fine: tiene dentro apposta anche le
+        // segnalazioni con la data spostata in avanti dall'orologio storto di
+        // chi le ha mandate. Scrivere «a oggi» prometteva un limite che quella
+        // finestra non ha.
+        const quando = r.da == null
+          ? (r.a == null ? 'tutte le segnalazioni, senza limiti di data' : `da sempre al ${FS.dataBreve(r.a)}`)
+          : `dal ${FS.dataBreve(r.da)} a oggi`;
+        return `<button type="button" class="mg-chip${p.key === fsRangeKey ? ' mg-chip--on' : ''}"`
+          + ` data-fs-range="${esc(p.key)}" aria-pressed="${p.key === fsRangeKey}"`
+          + ` title="${esc(p.custom ? 'Scegli tu le due date' : quando)}">${esc(p.label)}</button>`;
+      }).join('');
+    mgFsCustom.hidden = fsRangeKey !== 'custom';
+    // I due campi dicono la finestra che la scheda sta davvero usando, anche
+    // quando quella finestra arriva dalla memoria e non da un clic di adesso.
+    // Non si tocca il campo su cui sta scrivendo qualcuno: la data si legge a
+    // pezzi mentre la si scrive, e riscriverla sotto le dita la cancella.
+    for (const [campo, valore] of [[mgFsFrom, fsCustom.da], [mgFsTo, fsCustom.a]]) {
+      if (campo && campo !== document.activeElement && campo.value !== (valore || '')) {
+        campo.value = valore || '';
+      }
+    }
+    // Quale finestra stai guardando DAVVERO, scritta come le altre date della
+    // scheda. Serve a due cose: i due campi seguono la lingua del sistema (su
+    // un computer non italiano scrivono mm/gg/aaaa), e due date messe al
+    // contrario si raddrizzano da sole, cosa che prima non diceva nessuno.
+    if (mgFsFinestra) {
+      const r = stat ? stat.range : FS.rangeOf(fsRangeKey, Date.now(), fsCustom);
+      const rovescio = !!(fsCustom.da && fsCustom.a && fsCustom.da > fsCustom.a);
+      let testo = '';
+      if (r.da == null && r.a == null) testo = 'Scegli le due date, o lascia vuota una delle due.';
+      else if (r.da == null) testo = `Guardi tutto fino al ${FS.dataBreve(r.a)}.`;
+      else if (r.a == null) testo = `Guardi dal ${FS.dataBreve(r.da)} in poi.`;
+      else testo = `Guardi dal ${FS.dataBreve(r.da)} al ${FS.dataBreve(r.a)}.`;
+      mgFsFinestra.textContent = testo + (rovescio ? ' Le due date erano al contrario: le ho raddrizzate.' : '');
+    }
+
+    // Un mittente per pasticca, col conteggio dentro la finestra: la barra dei
+    // filtri dice anche quanto contiene ogni voce, come la barra delle sezioni.
+    // Il conteggio è quello SENZA filtro: è il numero che serve per decidere
+    // quale pasticca accendere dopo, e calcolarlo col filtro attivo mandava a
+    // zero tutte quelle spente.
+    const conti = Object.create(null);
+    for (const c of (stat ? stat.ricevuti.creatoriTutti : [])) conti[c.kind] = c.n;
+    const tuttiOn = fsCreators.length === 0;
+    // Le due pasticche di gruppo: «quanto è arrivato dalle persone» e «quanto
+    // hanno prodotto le routine» sono le due domande che ci si fa qui, e con
+    // una pasticca per mittente costavano sei clic e la conoscenza di quale
+    // voce è una routine. La segnalazione chiedeva per esempio i feedback
+    // «lanciati da prober o altre routine cloud».
+    const gruppi = FS.GRUPPI_CREATORI.map((gr) => {
+      const on = fsGruppoAcceso(gr);
+      const n = gr.kinds.reduce((s, k) => s + (conti[k] || 0), 0);
+      return `<button type="button" class="mg-chip${on ? ' mg-chip--on' : ''}" data-fs-creator="${esc(gr.key)}"`
+        + ` aria-pressed="${on}" title="${esc(`${gr.label}: ${gr.kinds.map((k) => fsEtichettaCreatore(k)).join(', ')}`)}">`
+        + `${esc(gr.label)}<span class="mg-chip-n">${esc(fsNum(n))}</span></button>`;
+    }).join('');
+    const voci = gruppi + FS.CREATORI.map((kind) => {
+      const meta = AUTHOR_META[kind] || AUTHOR_META.user;
+      const on = fsCreators.indexOf(kind) >= 0;
+      const n = conti[kind] || 0;
+      return `<button type="button" class="mg-chip${on ? ' mg-chip--on' : ''}" data-fs-creator="${esc(kind)}"`
+        + ` aria-pressed="${on}" title="${esc(meta.label)}">${meta.icon} ${esc(meta.label)}`
+        + `<span class="mg-chip-n">${esc(fsNum(n))}</span></button>`;
+    }).join('');
+    // Anche «Tutti» porta il suo numero, come ogni altra pasticca della barra:
+    // era l'unica senza, e senza numero non aveva nemmeno niente da offrire col
+    // tasto destro.
+    const tuttiN = FS.CREATORI.reduce((s, k) => s + (conti[k] || 0), 0)
+      + (conti[FS.CREATORE_ILLEGGIBILE] || 0);
+    mgFsCreators.innerHTML = '<span class="mg-fs-bar-label">Creatore</span>'
+      + `<button type="button" class="mg-chip${tuttiOn ? ' mg-chip--on' : ''}" data-fs-creator="__tutti"`
+      + ` aria-pressed="${tuttiOn}" title="Tutti i mittenti, senza filtro">Tutti`
+      + `<span class="mg-chip-n">${esc(fsNum(tuttiN))}</span></button>` + voci;
+  }
+
+  // ── Da dove partono davvero i numeri ─────────────────────────────────────
+  // Un conteggio che afferma un totale che non conosce è peggio di nessun
+  // conteggio (CLAUDE.md § Limiti). Qui si dice, in una riga, fin dove
+  // arrivano le due sorgenti.
+  function renderFsNota(stat) {
+    const righe = [];
+    if (fsRipiego) {
+      righe.push(fsErrore
+        ? fsErrore
+        : `Non è riuscita la lettura di tutte le segnalazioni: qui sotto ci sono solo le ${FB.LIST_PAGE_SIZE} più recenti già in pagina, quindi i numeri sono minimi, non totali.`);
+    } else if (!fsCompleto) {
+      righe.push('La lettura delle segnalazioni si è fermata prima della fine: i numeri sulle segnalazioni sono minimi, non totali.');
+    }
+    const cop = stat.copertura;
+    if (!fsLogOk) {
+      righe.push('Il registro delle esecuzioni delle routine non si è letto: esplorazioni, lavorati, lanci e giri di verifica non si sanno finché non torna, e al loro posto c\'è un trattino.');
+    } else if (cop.logVuoto) {
+      righe.push('Il registro delle esecuzioni delle routine è vuoto: esplorazioni, lavorati e giri di verifica non hanno ancora niente da contare.');
+    } else if (cop.logCorto) {
+      righe.push(`Il registro delle esecuzioni tiene le ultime: parte dal ${FS.dataBreve(cop.logDa)}. Esplorazioni, lavorati e giri di verifica contano da lì, non dall'inizio della finestra.`);
+    }
+    // Una segnalazione con la data d'arrivo mancante o illeggibile non cade in
+    // nessuna finestra, «Tutto» compreso. Sparire in silenzio da un totale è la
+    // cosa che non deve succedere: qui si dice quante sono.
+    const sd = stat.ricevuti.senzaData;
+    if (sd > 0) {
+      righe.push(sd === 1
+        ? 'Una segnalazione non ha una data d\'arrivo leggibile: resta fuori da ogni finestra, «Tutto» compreso.'
+        : `${fsNum(sd)} segnalazioni non hanno una data d'arrivo leggibile: restano fuori da ogni finestra, «Tutto» compreso.`);
+    }
+    // Il mittente viaggia cifrato come lo stato. Senza la chiave privata non si
+    // legge, e la ripartizione per mittente (una delle cose chieste) non può
+    // essere completa: si dice, invece di attribuirli tutti a una persona.
+    const mi = stat.ricevuti.mittentiIgnoti;
+    if (mi > 0) {
+      righe.push(mi === 1
+        ? 'Di una segnalazione non si è potuto leggere il mittente: serve la chiave dell\'owner su questo computer. Nel filtro per creatore non c\'è.'
+        : `Di ${fsNum(mi)} segnalazioni non si è potuto leggere il mittente: serve la chiave dell'owner su questo computer. Nel filtro per creatore non ci sono.`);
+    }
+    mgFsNota.textContent = righe.join(' ');
+    mgFsNota.hidden = righe.length === 0;
+  }
+
+  // ── I riquadri ───────────────────────────────────────────────────────────
+  // Cosa conta ogni riquadro, e SU QUALE DATA. È la differenza che la scheda
+  // non può mostrare coi numeri: i ricevuti vanno sulla data d'invio, i
+  // lavorati e i lanci sulla data in cui le routine hanno girato. Passandoci
+  // sopra si legge, invece di doverlo dedurre da due numeri che non tornano.
+  const FS_SPIEGA = {
+    ricevuti: 'Segnalazioni la cui DATA D\'INVIO cade nella finestra. Cliccalo per la divisione per categoria e per mittente.',
+    lavorati: 'Segnalazioni su cui una routine ha lavorato nella finestra, contate sulla DATA DI LAVORAZIONE: una segnalazione vecchia lavorata ieri conta qui, non fra i ricevuti.',
+    prober: 'Quante volte è partita l\'esplorazione dell\'app. Un lancio non ha un mittente, quindi il filtro per creatore non lo tocca.',
+    lanci: 'Tutte le esecuzioni delle routine nella finestra, di qualunque mestiere. Un\'esecuzione non ha un mittente, quindi il filtro per creatore non la tocca. Cliccalo per la divisione per mestiere.',
+    attesa: 'Quanto è rimasta in attesa una segnalazione prima che tu la prendessi in mano, al centro dell\'ordine.',
+    durata: 'Dal primo all\'ultimo passaggio di lavorazione della stessa segnalazione, al centro dell\'ordine.',
+    audit: 'Il controllo di sicurezza sul lavoro fatto, sulle segnalazioni lavorate in questa finestra.',
+    arenati: 'Lavorazioni che si sono fermate e che il server ha rimesso in coda da solo.',
+  };
+
+  // Il nome del mittente di una riga della ripartizione. Un mittente che non
+  // si è potuto leggere (chiave privata assente) NON è «Utente»: ha un nome
+  // suo, lo stesso che la scheda usa già per la categoria illeggibile.
+  function fsEtichettaCreatore(kind) {
+    if (kind === FS.CREATORE_ILLEGGIBILE) return FS.ETICHETTA_ILLEGGIBILE;
+    const gr = FS.GRUPPI_CREATORI.find((x) => x.key === kind);
+    if (gr) return gr.label;
+    return (AUTHOR_META[kind] || AUTHOR_META.user).label;
+  }
+
+  // Un gruppo è acceso quando il filtro è ESATTAMENTE quel gruppo: se ci si
+  // aggiunge o si toglie un mittente a mano, la pasticca si spegne invece di
+  // dichiarare una selezione che non è più la sua.
+  function fsGruppoAcceso(gr) {
+    return gr.kinds.length === fsCreators.length && gr.kinds.every((k) => fsCreators.includes(k));
+  }
+
+  /**
+   * Un riquadro. `modo`:
+   *   'espandi' → si apre qui sotto sulla sua ripartizione;
+   *   'apri'    → apre l'elenco delle segnalazioni che ha contato;
+   *   false     → dietro non c'è niente da aprire, e non finge di esserci.
+   */
+  // Un numero che non si conosce si scrive col trattino, mai con uno zero: uno
+  // zero grande si legge «non è successo niente», che è il contrario di «non lo
+  // so». I conti tornano `null` quando la sorgente non ha risposto.
+  // I numeri si scrivono all'italiana, come ovunque in Filo: il punto separa
+  // le migliaia e la virgola i decimali (Intl.NumberFormat('it-IT')).
+  const FS_FMT = (() => {
+    try { return new Intl.NumberFormat('it-IT'); } catch (_) { return null; }
+  })();
+  function fsCifra(v, decimali) {
+    if (typeof v !== 'number' || !Number.isFinite(v)) return String(v);
+    try {
+      return decimali
+        ? v.toLocaleString('it-IT', { minimumFractionDigits: decimali, maximumFractionDigits: decimali })
+        : (FS_FMT ? FS_FMT.format(v) : String(v));
+    } catch (_) { return decimali ? v.toFixed(decimali) : String(v); }
+  }
+  function fsNum(v) { return v == null ? '—' : fsCifra(v); }
+  // «Nome: conto», per ogni etichetta che porta un numero, compresi i
+  // suggerimenti col mouse: lì il conto si leggeva «1200» e la legenda «1.200».
+  function fsRigaConto(label, n) { return `${label}: ${fsNum(n)}`; }
+
+  /**
+   * `sottoId`: il sottotitolo conta delle segnalazioni SUE, diverse da quelle
+   * del numero grande, e si apre su quelle. Serve al riquadro delle
+   * esplorazioni, dove il numero grande conta PARTENZE — che non sono
+   * segnalazioni e non si aprono su niente — mentre la riga piccola conta i
+   * ritrovamenti. Finché ad aprirsi era il riquadro intero, un numero che
+   * diceva cinque apriva un elenco di uno, e il tasto destro sopra quel cinque
+   * offriva «Mostra la segnalazione contata»
+   * (patterns/un-numero-si-apre-su-cosa-ha-contato.md: un numero apre ciò che
+   * HA contato, e dove non c'è niente da aprire la superficie non finge).
+   */
+  function fsTile(id, n, titolo, sotto, modo, sottoId) {
+    const dettaglio = modo === 'espandi';
+    const apribile = modo === 'apri';
+    const aperto = dettaglio && fsAperto === id;
+    // Un riquadro che si apre è un PULSANTE, tanto quando si espande qui sotto
+    // quanto quando apre l'elenco delle segnalazioni. Finché il secondo era un
+    // riquadro qualunque, il fuoco lo saltava: si apriva col mouse e col tasto
+    // destro, e da tastiera quel numero non portava da nessuna parte, contro
+    // la regola scritta in patterns/un-numero-si-apre-su-cosa-ha-contato.md
+    // (clic, Invio o Spazio, tasto destro). Da pulsante, Invio e Spazio
+    // diventano un clic da soli.
+    const tag = (dettaglio || apribile) ? 'button' : 'div';
+    const cls = 'mg-tile' + (dettaglio || apribile ? ' mg-tile--click' : '') + (aperto ? ' mg-tile--open' : '');
+    // Se è un numero lo si decide sul valore crudo: dopo la formattazione
+    // all'italiana «1.200» sarebbe ancora un numero per `Number()`, ma «12 ore»
+    // no, ed è quello il caso che questa classe distingue.
+    const testo = typeof n !== 'number' && !Number.isFinite(Number(n));
+    n = fsNum(n);
+    const spiega = FS_SPIEGA[id] ? ` title="${esc(FS_SPIEGA[id])}"` : '';
+    // `data-fs-id` sta su TUTTI i riquadri (è il nome della cosa contata);
+    // `data-fs-tile` solo su quelli che si aprono, perché è quello che
+    // l'ascoltatore del clic cerca.
+    return `<${tag} class="${cls}" data-fs-id="${esc(id)}"${spiega}`
+      + `${tag === 'button' ? ' type="button"' : ''}`
+      + `${dettaglio ? ` data-fs-tile="${esc(id)}" aria-expanded="${aperto}"` : ''}>`
+      + `<span class="mg-tile-n${testo ? ' mg-tile-n--txt' : ''}">${esc(String(n))}</span>`
+      + `<span class="mg-tile-t">${esc(titolo)}</span>`
+      + (sotto
+        ? (sottoId
+          ? `<button type="button" class="mg-tile-sub mg-tile-sub--click" data-fs-id="${esc(sottoId)}"`
+            + ` title="Mostra le segnalazioni contate">${esc(sotto)}</button>`
+          : `<span class="mg-tile-sub">${esc(sotto)}</span>`)
+        : '')
+      + (dettaglio ? `<span class="mg-tile-more"><span class="mg-tile-caret">›</span>${aperto ? 'chiudi' : 'vedi il dettaglio'}</span>` : '')
+      + (apribile ? '<span class="mg-tile-more"><span class="mg-tile-caret">›</span>vedi le segnalazioni</span>' : '')
+      + `</${tag}>`;
+  }
+
+  // Un elenco a barre: etichetta, barra proporzionale, numero. Una riga che ha
+  // delle segnalazioni dietro è un pulsante, e si apre su quelle: ogni numero
+  // della scheda porta a cosa ha contato.
+  function fsBars(voci, gruppo) {
+    if (!voci.length) return '<p class="mg-fs-empty">Niente in questa finestra.</p>';
+    const max = Math.max.apply(null, voci.map((v) => v.n)) || 1;
+    return '<ul class="mg-bars">' + voci.map((v) => {
+      const apribile = !!((v.ids && v.ids.length) || (v.mancanti && v.mancanti.length));
+      const tag = apribile ? 'button' : 'div';
+      return `<li><${tag} class="mg-bar-row${apribile ? ' mg-bar-row--click' : ''}"`
+        + ` data-fs-bar="${esc(v.key)}"${gruppo ? ` data-fs-bargroup="${esc(gruppo)}"` : ''}`
+        + (apribile ? ` type="button" title="${esc(`Mostra le ${v.n === 1 ? 'segnalazione contata' : 'segnalazioni contate'}`)}"` : '')
+        + '>'
+        + `<span class="mg-bar-label" title="${esc(v.label)}">${esc(v.label)}</span>`
+        + `<span class="mg-bar-track"><span class="mg-bar-fill" style="width:${Math.round((v.n / max) * 100)}%"></span></span>`
+        + `<span class="mg-bar-n">${esc(fsNum(v.n))}</span></${tag}></li>`;
+    }).join('') + '</ul>';
+  }
+
+  function fsDettaglio(stat) {
+    if (fsAperto === 'ricevuti') {
+      return { titolo: 'Feedback ricevuti, divisi per categoria', html: fsBars(stat.ricevuti.categorie, 'categorie')
+        + '<h4 style="margin-top:14px">…e per chi li ha mandati</h4>'
+        + fsBars(stat.ricevuti.creatori.map((c) => ({
+          key: c.kind, n: c.n, ids: c.ids, label: fsEtichettaCreatore(c.kind),
+        })), 'creatori') };
+    }
+    if (fsAperto === 'lavorati') {
+      return { titolo: 'Dove sono arrivati, oggi', html: fsBars(stat.lavorati.stati, 'stati') };
+    }
+    if (fsAperto === 'audit') {
+      // Tre numeri in un riquadro solo: aperto, diventano tre righe, e ognuna
+      // porta alle segnalazioni che ha contato come tutte le altre.
+      return { titolo: 'Il controllo di sicurezza sui lavori di questa finestra', html: fsBars([
+        { key: 'pass',    n: stat.audit.pass,    ids: stat.auditIds.pass,    label: 'Passati' },
+        { key: 'fail',    n: stat.audit.fail,    ids: stat.auditIds.fail,    label: 'Bocciati' },
+        { key: 'saltato', n: stat.audit.saltato, ids: stat.auditIds.saltato, label: 'Saltati da te' },
+      ].filter((v) => v.n > 0), 'audit') };
+    }
+    if (fsAperto === 'lanci') {
+      // Un lancio non è una segnalazione: qui non c'è niente da aprire, e
+      // infatti le righe non fanno finta di essere pulsanti.
+      return { titolo: 'Lanci per mestiere', html: fsBars(stat.lanci.perRuolo.map((r) => ({
+        key: r.role, n: r.n, label: roleLabel(r.role),
+      })), 'ruoli') };
+    }
+    return null;
+  }
+
+  // Quali riquadri si aprono qui sotto: i tre in cima. Il quarto pannello
+  // ('audit') vive sotto l'altra fila, e senza questa distinzione la sua
+  // ripartizione compariva in mezzo ai riquadri sbagliati.
+  const FS_DETTAGLI_TILES = ['ricevuti', 'lavorati', 'lanci'];
+
+  function renderFsTiles(stat) {
+    const det = FS_DETTAGLI_TILES.includes(fsAperto) ? fsDettaglio(stat) : null;
+    // Col registro non letto i tre riquadri che ne vivono non hanno un numero.
+    // Il trattino da solo non basta: lo dicono anche sul riquadro, perché la
+    // riga sopra sta in dodici pixel e il numero grande ne ha trenta.
+    const ko = stat.copertura.registroLetto === false;
+    const noto = ko ? 'registro delle routine non letto' : '';
+    const fbKo = stat.copertura.feedbackLetti === false;
+    mgFsTiles.innerHTML = [
+      fsTile('ricevuti', stat.ricevuti.totale, 'Feedback ricevuti',
+        fbKo ? 'segnalazioni non lette' : '', fbKo ? false : 'espandi'),
+      // «in tutto» prometteva un totale che questo numero non ha: conta le
+      // verifiche partite DENTRO la finestra, mentre la torta qui sotto conta
+      // le critiche di un lavoro su tutto il registro. Con una finestra
+      // stretta le due cose si contraddicevano a vista («1 verifica in tutto»
+      // sopra, «2 critiche» sotto, stesso lavoro).
+      fsTile('lavorati', stat.lavorati.totale, 'Feedback lavorati',
+        ko ? noto : (stat.lavorati.verifiche
+          ? `${fsNum(stat.lavorati.verifiche)} ${stat.lavorati.verifiche === 1 ? 'verifica partita' : 'verifiche partite'} in questa finestra`
+          : ''), ko ? false : 'espandi'),
+      // Il numero grande conta PARTENZE dell'esplorazione: non sono
+      // segnalazioni e non si aprono su niente, quindi il riquadro non promette
+      // di aprirsi. A portare alle segnalazioni è la riga piccola, che è
+      // l'unica delle due a contarle.
+      fsTile('prober', stat.prober.lanciati, 'Esplorazioni lanciate',
+        // I ritrovamenti vengono dalle segnalazioni: quelli si sanno lo stesso.
+        (ko ? noto + ' · ' : '')
+          + (fbKo
+            ? 'segnalazioni dell\'esploratore non lette'
+            : `${fsNum(stat.prober.ritrovamenti)} ${stat.prober.ritrovamenti === 1 ? 'segnalazione' : 'segnalazioni'} dall'esploratore`),
+        false,
+        stat.prober.ritrovamentiIds.length ? 'proberTrovate' : ''),
+      fsTile('lanci', stat.lanci.totale, 'Lanci delle routine', ko ? noto : '', ko ? false : 'espandi'),
+    ].join('') + (det
+      ? `<div class="mg-fs-detail"><h4>${esc(det.titolo)}</h4>${det.html}</div>`
+      : '');
+  }
+
+  // ── La torta dei giri ────────────────────────────────────────────────────
+  // SVG a mano, una fetta per gruppo con `data-group` (così uno spec può
+  // asserire QUALI fette ci sono e quanto valgono) e un buco al centro dove
+  // sta la media — la risposta alla domanda che il grafico pone.
+  function renderFsPie(stat) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const fette = stat.giri.fette;
+    const totale = fette.reduce((s, f) => s + f.n, 0);
+    mgFsPie.innerHTML = '';
+    mgFsLegend.innerHTML = '';
+
+    // Chi entra nella torta e chi no, detto dove si guarda. I lavori ancora in
+    // mezzo al giro restano fuori: le loro critiche possono ancora aumentare, e
+    // contarli fra i «passati subito» faceva dire alla scheda che il lavoro più
+    // aperto di tutti era il più economico.
+    const aperti = stat.giri.aperti;
+    const ignoti = stat.giri.ignoti;
+    const senzaGiri = stat.giri.senzaGiri;
+    const statoIgnoto = stat.giri.statoIgnoto || 0;
+    // Ogni numero di questa frase è un conto come gli altri e si apre su ciò
+    // che ha contato: erano gli ultimi rimasti muti, e il caso più comune —
+    // il registro conserva solo le ultime esecuzioni — finisce proprio qui.
+    const coda = [];
+    const numeroApribile = (chiave, n) =>
+      `<button type="button" class="mg-fs-quanti" data-fs-esito="${esc(chiave)}"`
+      + ` title="${esc(`Mostra ${n === 1 ? 'la segnalazione contata' : 'le segnalazioni contate'}`)}">${esc(fsNum(n))}</button>`;
+    if (aperti) coda.push(`${numeroApribile('aperti', aperti)} ${aperti === 1 ? 'lavoro è ancora in mezzo al giro e non entra' : 'lavori sono ancora in mezzo al giro e non entrano'} nel conto.`);
+    // Senza la chiave dell'owner lo stato non si legge, e dove sia arrivato
+    // quel lavoro è proprio la domanda a cui la torta risponde: si dichiara,
+    // invece di darlo per ancora aperto (che su un lavoro già chiuso è il
+    // contrario del vero).
+    if (statoIgnoto) {
+      coda.push(`${numeroApribile('statoIgnoto', statoIgnoto)} ${statoIgnoto === 1
+        ? 'lavoro ha lo stato cifrato e non leggibile con questa chiave: dov\'è arrivato non si sa, quindi resta fuori dal conto.'
+        : 'lavori hanno lo stato cifrato e non leggibile con questa chiave: dove sono arrivati non si sa, quindi restano fuori dal conto.'}`);
+    }
+    if (senzaGiri) coda.push(`${numeroApribile('senzaGiri', senzaGiri)} ${senzaGiri === 1 ? 'lavoro ha avuto il via libera ma le sue verifiche sono più vecchie del registro' : 'lavori hanno avuto il via libera ma le loro verifiche sono più vecchie del registro'}: quanto ${senzaGiri === 1 ? 'è costato' : 'sono costati'} non si sa.`);
+    if (ignoti) coda.push(`${numeroApribile('ignoti', ignoti)} ${ignoti === 1 ? 'lavoro non è' : 'lavori non sono'} fra le segnalazioni caricate, quindi non se ne conosce l'esito.`);
+    // La frase diceva «su tutta la storia del lavoro», e la riga in cima alla
+    // scheda diceva il contrario: il registro tiene le ultime esecuzioni, e i
+    // giri più vecchi di così non si contano. Due frasi opposte sulla stessa
+    // schermata, con la media che passava per esatta.
+    // Il registro non si è letto: questa sezione non ha guardato niente, e
+    // dirlo è tutto quello che può fare. Scrivere «nessun lavoro verificato»
+    // sarebbe un'affermazione su dati che non ha letto nessuno.
+    const registroKo = stat.copertura.registroLetto === false;
+    if (registroKo) {
+      mgFsPieHint.textContent = 'Quanto è costato ogni lavoro si conta sul registro delle esecuzioni delle routine, '
+        + 'e quel registro non si è letto: finché non torna, qui non c\'è niente da contare.';
+      fsTortaVuota('Il registro delle esecuzioni non si è letto, quindi quanto è costato ogni lavoro non si sa.');
+      return;
+    }
+    const soloRegistro = stat.copertura.logCorto
+      ? `Si contano i giri che il registro conserva, che parte dal ${FS.dataBreve(stat.copertura.logDa)}: un lavoro cominciato prima può risultare più economico di quanto è stato. `
+      : 'Le critiche si contano su tutta la storia del lavoro che il registro conserva, anche i giri successi fuori dalla finestra. ';
+    mgFsPieHint.innerHTML = esc('Un lavoro esce dal giro automatico quando la verifica non ha più niente da ridire. '
+      + 'Ogni verifica in più è una critica che l\'ha rimandato indietro. '
+      + soloRegistro
+      + 'Quelli fermati aspettano una tua decisione e non entrano nella media. ')
+      + coda.join(' ');
+
+    if (!totale) {
+      fsTortaVuota(aperti
+        ? 'Nessun lavoro è ancora arrivato al via libera in questa finestra.'
+        : (statoIgnoto
+          ? 'Lo stato di questi lavori non si legge con questa chiave.'
+          : 'Nessun lavoro verificato in questa finestra.'));
+      return;
+    }
+    fsTortaVisibile(true);
+
+    const cx = 100, cy = 100, r = 92, rInt = 58;
+    if (fette.length === 1) {
+      // Un gruppo solo: un anello pieno. L'arco da 0 a 2π collasserebbe.
+      const c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', cx); c.setAttribute('cy', cy);
+      c.setAttribute('r', (r + rInt) / 2);
+      c.setAttribute('fill', 'none');
+      c.setAttribute('stroke', FS_COLORI[fette[0].key] || FS_COLORI.g0);
+      c.setAttribute('stroke-width', r - rInt);
+      c.dataset.group = fette[0].key;
+      c.dataset.n = fette[0].n;
+      const t0 = document.createElementNS(NS, 'title');
+      t0.textContent = fsRigaConto(fette[0].label, fette[0].n);
+      c.appendChild(t0);
+      mgFsPie.appendChild(c);
+    } else {
+      let ang = -Math.PI / 2;   // si parte da ore 12
+      for (const f of fette) {
+        const next = ang + (f.n / totale) * Math.PI * 2;
+        const p = document.createElementNS(NS, 'path');
+        p.setAttribute('d', fsAnello(cx, cy, r, rInt, ang, next));
+        p.setAttribute('fill', FS_COLORI[f.key] || FS_COLORI.g0);
+        p.dataset.group = f.key;
+        p.dataset.n = f.n;
+        const el = document.createElementNS(NS, 'title');
+        el.textContent = fsRigaConto(f.label, f.n);
+        p.appendChild(el);
+        mgFsPie.appendChild(p);
+        ang = next;
+      }
+    }
+
+    const media = stat.giri.media;
+    mgFsPieMid.innerHTML = media == null
+      ? '<span>Nessun via libera in questa finestra</span>'
+      : `<b>${esc(fsCifra(media, 1))}</b><span>critiche in media prima del via libera</span>`;
+
+    mgFsLegend.innerHTML = fette.map((f) => `<li data-group="${esc(f.key)}" tabindex="0" role="button"`
+      + ` title="${esc(`Mostra ${f.n === 1 ? 'la segnalazione contata' : 'le segnalazioni contate'}`)}">`
+      + `<span class="mg-fs-sw" style="background:${FS_COLORI[f.key] || FS_COLORI.g0}"></span>`
+      + `<span>${esc(f.label)}</span>`
+      + `<span class="mg-fs-legend-n">${esc(fsNum(f.n))}</span></li>`).join('');
+  }
+
+  // Lo stato vuoto della sezione: la ciambella si TOGLIE invece di lasciare un
+  // quadrato bianco di 200×200 con dentro, nel buco di un anello che non c'è,
+  // la frase mandata a capo tre volte. La spiegazione va dove la si cerca,
+  // sotto il titolo della sezione, e una volta sola.
+  function fsTortaVisibile(on) {
+    const box = mgFsPie && mgFsPie.closest('.mg-fs-pie');
+    if (box) box.hidden = !on;
+    if (mgFsPieVuoto) mgFsPieVuoto.hidden = on;
+  }
+  function fsTortaVuota(frase) {
+    mgFsPieMid.innerHTML = '';
+    mgFsLegend.innerHTML = '';
+    if (mgFsPieVuoto) mgFsPieVuoto.textContent = frase;
+    fsTortaVisibile(false);
+  }
+
+  // Una fetta di ANELLO: arco esterno in senso orario, arco interno indietro.
+  function fsAnello(cx, cy, r, ri, start, end) {
+    const grande = end - start > Math.PI ? 1 : 0;
+    const x1 = cx + r * Math.cos(start), y1 = cy + r * Math.sin(start);
+    const x2 = cx + r * Math.cos(end),   y2 = cy + r * Math.sin(end);
+    const x3 = cx + ri * Math.cos(end),  y3 = cy + ri * Math.sin(end);
+    const x4 = cx + ri * Math.cos(start), y4 = cy + ri * Math.sin(start);
+    return `M${x1.toFixed(2)} ${y1.toFixed(2)} A${r} ${r} 0 ${grande} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} `
+      + `L${x3.toFixed(2)} ${y3.toFixed(2)} A${ri} ${ri} 0 ${grande} 0 ${x4.toFixed(2)} ${y4.toFixed(2)} Z`;
+  }
+
+  // I due esiti che il grafico non racconta da solo: quanti sono stati fermati
+  // e passati all'owner, e quanti sono passati lasciando indietro dei rilievi.
+  function renderFsEsiti(stat) {
+    const voce = (key, n, testo) => {
+      const apribile = n > 0;
+      return `<div class="mg-fs-esito${apribile ? ' mg-fs-esito--click' : ''}" data-fs-esito="${esc(key)}"`
+        + (apribile ? ` tabindex="0" role="button" title="${esc(`Mostra ${n === 1 ? 'la segnalazione contata' : 'le segnalazioni contate'}`)}"` : '')
+        + `><b>${esc(fsNum(n))}</b>${testo}</div>`;
+    };
+    mgFsEsiti.innerHTML = [
+      voce('fermati', stat.giri.fermati, 'fermati: il giro automatico non ce l\'ha fatta e aspettano te'),
+      voce('rimandati', stat.giri.rimandati, 'passati lasciando indietro dei rilievi, raccolti in una segnalazione derivata'),
+      voce('aperti', stat.giri.aperti, 'ancora in mezzo al giro: quanto costeranno non si sa ancora'),
+    ].join('');
+  }
+
+  // ── L'andamento nel tempo ────────────────────────────────────────────────
+  // Il passo lo sceglie il conto sulla lunghezza della finestra, e va fino
+  // all'anno: un elenco che si fermava al mese faceva scrivere «Una colonna
+  // per undefined» su ogni finestra scritta a mano più lunga di dieci anni.
+  // Il ripiego sul nome tecnico vale per il passo che verrà aggiunto dopo.
+  const FS_PASSO_LABEL = { giorno: 'giorno', settimana: 'settimana', mese: 'mese', anno: 'anno' };
+  function renderFsTrend(stat) {
+    const serie = stat.ricevuti.serie;
+    const punti = serie.punti;
+    mgFsTrendHint.textContent = punti.length
+      ? `Una colonna per ${FS_PASSO_LABEL[serie.passo] || serie.passo}: quante segnalazioni sono arrivate.`
+      : '';
+    if (!punti.length) {
+      mgFsTrend.innerHTML = '';
+      mgFsTrend.style.maxWidth = '';
+      mgFsTrendAxis.style.maxWidth = '';
+      mgFsTrendAxis.innerHTML = '<span class="mg-fs-empty">Nessuna segnalazione in questa finestra.</span>';
+      return;
+    }
+    const max = Math.max.apply(null, punti.map((p) => p.n)) || 1;
+    // Il tetto di larghezza delle colonne serve solo quando sono UNA o DUE:
+    // lì senza tetto una colonna diventa un blocco a tutta pagina. Da tre in
+    // su le colonne si allargano e riempiono il riquadro — sette colonne larghe
+    // sono un grafico settimanale normale, mentre col tetto acceso fin sotto
+    // le otto «7 giorni» disegnava in un angolo e lasciava bianco il 72% del
+    // riquadro.
+    //
+    // E quando il tetto è acceso, il disegno e la SCALA devono stare sullo
+    // stesso pezzo di riquadro: la riga delle date è giustificata agli estremi,
+    // quindi con le colonne rimpicciolite la data di fine finiva a mezzo metro
+    // di schermo dall'ultima colonna che nominava. Si stringono tutti e due
+    // alla larghezza davvero disegnata.
+    const poche = punti.length < 3;
+    const disegnato = punti.length * 48 + (punti.length - 1) * 2;
+    mgFsTrend.classList.toggle('mg-fs-trend--poche', poche);
+    mgFsTrend.style.maxWidth = poche ? `${disegnato}px` : '';
+    // La riga delle date non scende sotto una misura leggibile: con una colonna
+    // sola, stretta a 48 pixel, la data e la punta si accavallavano.
+    if (mgFsTrendAxis) mgFsTrendAxis.style.maxWidth = poche ? `${Math.max(disegnato, 240)}px` : '';
+    // Una colonna per periodo della finestra, anche per i periodi vuoti: il
+    // silenzio è metà di quello che un grafico degli arrivi deve far vedere.
+    // Un periodo a zero non è un pulsante (dietro non c'è niente da aprire) e
+    // resta una tacca sulla linea di base, non una colonnina che sembra un uno.
+    mgFsTrend.innerHTML = punti.map((p) => {
+      const titolo = esc(fsRigaConto(p.label, p.n));
+      // Una colonna vuota non è un pulsante (dietro non c'è niente da aprire)
+      // ma resta un periodo: il tasto destro le offre «Restringi la finestra a
+      // questo periodo» come a quelle piene. Guardare da vicino un silenzio è
+      // un modo legittimo di usare questo grafico, e due colonne identiche che
+      // rispondevano in due modi erano l'asimmetria di sempre.
+      if (!p.n) return `<span class="mg-fs-trend-col mg-fs-trend-col--zero" data-fs-punto="${esc(p.chiave)}" title="${titolo}"></span>`;
+      return `<button type="button" class="mg-fs-trend-col" data-fs-punto="${esc(p.chiave)}"`
+        + ` style="height:${Math.max(4, Math.round((p.n / max) * 100))}%"`
+        + ` title="${titolo}"></button>`;
+    }).join('');
+    // Le date si scrivono come nel resto della scheda (25/8/2026), non nella
+    // forma tecnica con cui le colonne sono raggruppate.
+    // Con un solo punto i due estremi sono la stessa data: scriverla due volte
+    // sembra un errore di conto, non una scala.
+    const ultimo = punti[punti.length - 1];
+    mgFsTrendAxis.innerHTML = `<span>${esc(punti[0].label)}</span>`
+      + `<span>punta: ${esc(fsNum(max))}</span>`
+      + (ultimo.chiave === punti[0].chiave ? '<span></span>' : `<span>${esc(ultimo.label)}</span>`);
+  }
+
+  // ── Tempi, controllo di sicurezza, arenamenti ────────────────────────────
+  function renderFsAltro(stat) {
+    const t = stat.tempi;
+    // Anche qui ogni numero che ha contato delle segnalazioni si apre su
+    // quelle: erano gli ultimi quattro rimasti muti.
+    const ko = stat.copertura.registroLetto === false;
+    const noto = 'registro delle routine non letto';
+    const auditN = ko ? 0 : stat.audit.pass + stat.audit.fail + stat.audit.saltato;
+    const det = fsAperto === 'audit' ? fsDettaglio(stat) : null;
+    mgFsAltro.innerHTML = [
+      fsTile('attesa', FS.durata(t.presaInCarico.mediana), 'Attesa prima che tu lo prendessi in mano',
+        stat.copertura.feedbackLetti === false
+          ? 'segnalazioni non lette'
+          : (t.presaInCarico.n ? `mediana su ${fsNum(t.presaInCarico.n)}` : 'nessuno preso in mano qui'),
+        t.presaInCarico.ids.length ? 'apri' : false),
+      fsTile('durata', FS.durata(t.lavorazione.mediana), 'Durata di una lavorazione',
+        ko ? noto : (t.lavorazione.n ? `mediana su ${fsNum(t.lavorazione.n)}` : 'nessuna lavorazione chiusa qui'),
+        t.lavorazione.ids.length ? 'apri' : false),
+      // Il controllo di sicurezza e gli arenamenti si leggono sulle lavorazioni
+      // della finestra, e quali siano lo dice il registro: senza, non sono zero.
+      fsTile('audit', stat.audit.pass, 'Controlli di sicurezza passati',
+        ko ? noto : `${fsNum(stat.audit.fail)} bocciati · ${fsNum(stat.audit.saltato)} saltati da te`,
+        auditN ? 'espandi' : false),
+      // Il numero grande conta ARENAMENTI: una segnalazione arenata due volte
+      // ne vale due, quindi non è un conto di segnalazioni e non si apre.
+      // Ad aprirle è la riga piccola, come nel riquadro delle esplorazioni.
+      fsTile('arenati', stat.arenati.lavorazioni, 'Lavorazioni arenate e rimesse in coda',
+        ko ? noto : (stat.arenati.feedback
+          ? `su ${fsNum(stat.arenati.feedback)} ${stat.arenati.feedback === 1 ? 'segnalazione' : 'segnalazioni'}`
+          : 'nessuna'),
+        false,
+        stat.arenati.ids.length ? 'arenatiFeedback' : ''),
+    ].join('') + (det
+      ? `<div class="mg-fs-detail"><h4>${esc(det.titolo)}</h4>${det.html}</div>`
+      : '');
+  }
+
+  // ── Da un numero alle segnalazioni che ci stanno dietro ──────────────────
+  // Ogni conto della scheda dice QUANTE e apre su QUALI: col clic, da tastiera
+  // e col tasto destro. Un numero che non porta da nessuna parte lascia l'owner
+  // a cercarlo a mano nella lista, che è il lavoro che la scheda dovrebbe
+  // togliergli.
+  let fsStat  = null;   // l'ultimo conto fatto: da qui si risolvono gli id
+  // Cosa è aperto sotto i riquadri: NON gli id, ma la riga che è stata
+  // cliccata. Tenendo gli id, l'elenco restava quello dell'istante in cui lo
+  // avevi aperto mentre la riga sopra camminava coi feedback nuovi: due numeri
+  // della stessa cosa, sulla stessa schermata, che non erano d'accordo.
+  // Tenendo la riga, si rilegge dal conto fresco a ogni ridisegno.
+  let fsDrill = null;   // { tipo, chiave, gruppo } o null
+  let fsDrillChiave = '';   // finestra e filtro con cui l'elenco è stato aperto
+  // Da dove l'elenco è stato aperto: chiudendolo il fuoco ci torna, invece di
+  // cadere sul corpo della pagina e far ripartire il Tab dall'inizio.
+  let fsDrillDaDove = '';
+
+  // Da un elemento cliccato alla RIGA che rappresenta. Solo DOM: non guarda i
+  // conti, così la stessa riga si può risolvere di nuovo più tardi.
+  function fsDescrizione(el) {
+    if (!el) return null;
+    const bar = el.closest('[data-fs-bar]');
+    if (bar) return { tipo: 'bar', chiave: bar.dataset.fsBar, gruppo: bar.dataset.fsBargroup };
+    const gruppo = el.closest('[data-group]');
+    if (gruppo) return { tipo: 'fetta', chiave: gruppo.dataset.group };
+    const punto = el.closest('[data-fs-punto]');
+    if (punto) return { tipo: 'punto', chiave: punto.dataset.fsPunto };
+    const esito = el.closest('[data-fs-esito]');
+    if (esito) return { tipo: 'esito', chiave: esito.dataset.fsEsito };
+    const tile = el.closest('[data-fs-id]');
+    if (tile) return { tipo: 'tile', chiave: tile.dataset.fsId };
+    // La pasticca del mittente porta un conteggio come tutto il resto: il clic
+    // resta il filtro, ma quel numero si può aprire come gli altri.
+    const chip = el.closest('[data-fs-creator]');
+    if (chip) return { tipo: 'creatore', chiave: chip.dataset.fsCreator };
+    return null;
+  }
+
+  // Dalla riga a «cosa ha contato», sul conto di ADESSO. Torna null se dietro
+  // non c'è nessuna segnalazione (i lanci delle routine, per esempio: un lancio
+  // non è una segnalazione).
+  function fsRisolvi(desc) {
+    if (!desc || !fsStat) return null;
+    const trova = (voci, chiave) => (voci || []).find((v) => String(v.key ?? v.kind ?? v.role) === chiave);
+    const chiave = desc.chiave;
+
+    if (desc.tipo === 'bar') {
+      let v = null;
+      if (desc.gruppo === 'categorie') v = trova(fsStat.ricevuti.categorie, chiave);
+      else if (desc.gruppo === 'creatori') v = trova(fsStat.ricevuti.creatori, chiave);
+      else if (desc.gruppo === 'stati') v = trova(fsStat.lavorati.stati, chiave);
+      else if (desc.gruppo === 'audit') {
+        const ids = (fsStat.auditIds && fsStat.auditIds[chiave]) || [];
+        const nomi = { pass: 'Controllo di sicurezza passato', fail: 'Controllo di sicurezza bocciato', saltato: 'Controllo di sicurezza saltato da te' };
+        v = ids.length ? { label: nomi[chiave] || chiave, ids } : null;
+      }
+      if (!v) return null;
+      const idsBar = v.ids || [];
+      const manBar = v.mancanti || [];
+      if (!idsBar.length && !manBar.length) return null;
+      const nome = v.label || fsEtichettaCreatore(chiave) || chiave;
+      return { ...desc, titolo: nome, ids: idsBar, mancanti: manBar };
+    }
+
+    if (desc.tipo === 'fetta') {
+      const f = trova(fsStat.giri.fette, chiave);
+      if (!f || !f.ids || !f.ids.length) return null;
+      return { ...desc, titolo: f.label, ids: f.ids };
+    }
+
+    if (desc.tipo === 'punto') {
+      const p = (fsStat.ricevuti.serie.punti || []).find((x) => x.chiave === chiave);
+      if (!p || !p.ids || !p.ids.length) return null;
+      return { ...desc, titolo: `Arrivate il ${p.label}`, ids: p.ids, punto: p };
+    }
+
+    if (desc.tipo === 'esito') {
+      // Anche i tre numeri scritti nella frase sotto il titolo: sono conti come
+      // gli altri, e prima erano gli unici a non portare da nessuna parte.
+      const mappa = {
+        fermati:     { titolo: 'Fermati: aspettano una tua decisione', ids: fsStat.giri.fermatiIds },
+        rimandati:   { titolo: 'Passati lasciando indietro dei rilievi', ids: fsStat.giri.rimandatiIds },
+        aperti:      { titolo: 'Ancora in mezzo al giro', ids: fsStat.giri.apertiIds },
+        statoIgnoto: { titolo: 'Stato cifrato: non leggibile con questa chiave', ids: fsStat.giri.statoIgnotoIds },
+        senzaGiri:   { titolo: 'Passati, ma le loro verifiche sono più vecchie del registro', ids: fsStat.giri.senzaGiriIds },
+        ignoti:      { titolo: 'Lavorati, ma non fra le segnalazioni caricate', ids: [], mancanti: fsStat.giri.ignotiNumeri },
+      };
+      const v = mappa[chiave];
+      if (!v) return null;
+      const man = v.mancanti || [];
+      if (!v.ids.length && !man.length) return null;
+      return { ...desc, titolo: v.titolo, ids: v.ids, mancanti: man };
+    }
+
+    if (desc.tipo === 'creatore') {
+      // Il numero della pasticca è quello SENZA filtro, e si apre su quelle.
+      const tutti = (fsStat.ricevuti.creatoriTutti || []);
+      const gr = FS.GRUPPI_CREATORI.find((x) => x.key === chiave);
+      let ids = [];
+      let titolo = '';
+      if (chiave === '__tutti') { ids = tutti.reduce((a, c) => a.concat(c.ids || []), []); titolo = 'Tutti i mittenti'; }
+      else if (gr) { ids = tutti.filter((c) => gr.kinds.indexOf(c.kind) >= 0).reduce((a, c) => a.concat(c.ids || []), []); titolo = gr.label; }
+      else { const v = tutti.find((c) => c.kind === chiave); ids = (v && v.ids) || []; titolo = fsEtichettaCreatore(chiave); }
+      if (!ids.length) return null;
+      return { ...desc, titolo, ids };
+    }
+
+    if (desc.tipo === 'tile') {
+      // Ogni riquadro che ha contato delle segnalazioni, compresi i quattro
+      // della fila in fondo: un numero si apre su cosa ha contato, e i loro
+      // sottotitoli contano segnalazioni esattamente come gli altri.
+      // Il terzo posto sono i NUMERI che il conto ha contato senza una
+      // segnalazione dietro: l'elenco li nomina, così numero ed elenco dicono
+      // la stessa cifra invece di divergere in silenzio.
+      const dietro = {
+        ricevuti: ['Feedback ricevuti in questa finestra', fsStat.ricevuti.ids],
+        lavorati: ['Feedback lavorati in questa finestra', fsStat.lavorati.ids, fsStat.lavorati.mancanti],
+        // `prober` e `arenati` (i numeri grandi) contano partenze e
+        // arenamenti, non segnalazioni: non stanno qui apposta. A contare
+        // segnalazioni è la riga piccola sotto.
+        proberTrovate: ['Segnalazioni trovate dall\'esploratore', fsStat.prober.ritrovamentiIds],
+        attesa:   ['Segnalazioni che hai preso in mano', fsStat.tempi.presaInCarico.ids],
+        durata:   ['Lavorazioni misurate in questa finestra', fsStat.tempi.lavorazione.ids, fsStat.tempi.lavorazione.mancanti],
+        audit:    ['Controllo di sicurezza passato', (fsStat.auditIds || {}).pass],
+        arenatiFeedback: ['Segnalazioni la cui lavorazione si è arenata', fsStat.arenati.ids],
+      }[chiave];
+      if (!dietro) return null;
+      const ids = dietro[1] || [];
+      const man = dietro[2] || [];
+      if (ids.length || man.length) return { ...desc, titolo: dietro[0], ids, mancanti: man };
+    }
+    return null;
+  }
+
+  function fsSorgente(el) { return fsRisolvi(fsDescrizione(el)); }
+
+  function fsApriDrill(src) {
+    if (!src) return;
+    fsDrillDaDove = fsFuocoOra();
+    fsDrill = { tipo: src.tipo, chiave: src.chiave, gruppo: src.gruppo };
+    renderFsDrill();
+    if (mgFsDrill) mgFsDrill.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  /** L'unica via di chiusura dell'elenco: qualunque porta, stesso ritorno del fuoco. */
+  function fsChiudiDrill() {
+    const daDove = fsDrillDaDove;
+    fsDrillDaDove = '';
+    fsDrill = null;
+    renderFsDrill();
+    fsRiprendiFuoco(daDove);
+  }
+
+  function renderFsDrill() {
+    if (!mgFsDrill) return;
+    // Si rilegge dal conto di adesso: l'elenco e la riga che l'ha aperto dicono
+    // sempre lo stesso numero, anche mentre arrivano segnalazioni nuove.
+    const src = fsRisolvi(fsDrill);
+    if (!src) { mgFsDrill.hidden = true; mgFsDrillList.innerHTML = ''; return; }
+    mgFsDrill.hidden = false;
+    const mancanti = src.mancanti || [];
+    const n = src.ids.length + mancanti.length;
+    mgFsDrillTitle.textContent = `${src.titolo} · ${fsNum(n)} ${n === 1 ? 'segnalazione' : 'segnalazioni'}`;
+    const perId = new Map((fsFeedbacks || []).map((f) => [f._id, f]));
+    // Prima quelle che si possono guardare, poi i numeri che il registro cita
+    // e la lista non ha: restano contati e nominati, invece di sparire.
+    const righeMancanti = mancanti.map((num) => '<li><button type="button" class="mg-fs-drill-row" disabled'
+      + ' title="Il registro delle esecuzioni la cita, ma non è fra le segnalazioni caricate">'
+      + `<span class="mg-fs-drill-num">#${esc(String(num))}</span>`
+      + '<span class="mg-fs-drill-t">Lavorata, ma non è fra le segnalazioni caricate.</span></button></li>').join('');
+    mgFsDrillList.innerHTML = src.ids.map((id) => {
+      const fb = perId.get(id);
+      if (!fb) {
+        return '<li><button type="button" class="mg-fs-drill-row" disabled>'
+          + '<span class="mg-fs-drill-num">—</span>'
+          + '<span class="mg-fs-drill-t">Questa segnalazione non è più fra quelle caricate.</span></button></li>';
+      }
+      const num = FB.formatNum(fb.seq, fb.subSeq);
+      // Un titolo fatto di soli spazi non è un titolo: lasciava la riga con un
+      // vuoto fra il numero e la categoria, mentre il ripiego c'era già.
+      const titolo = String(fb.name || '').trim() || FB.fallbackName(fb.text) || '(senza titolo)';
+      const cat = FS.categoriaDi(fb);
+      // Le segnalazioni caricate qui sono l'INSIEME, la lista a sinistra sono
+      // le più recenti: una che sta qui e non lì non si può aprire, e la riga
+      // lo dice invece di non fare niente al clic.
+      const apribile = allFeedbacks.some((f) => f._id === id);
+      return `<li><button type="button" class="mg-fs-drill-row" data-fs-open="${esc(id)}"${apribile ? '' : ' disabled'}`
+        + ` title="${esc(apribile ? 'Apri la segnalazione' : 'Non è fra le segnalazioni caricate nella lista: aprila dalla colonna di sinistra')}">`
+        + `<span class="mg-fs-drill-num">${num ? '#' + esc(num) : '—'}</span>`
+        + `<span class="mg-fs-drill-t">${esc(titolo)}</span>`
+        + `<span class="mg-fs-drill-cat">${esc(cat.label)}</span></button></li>`;
+    }).join('') + righeMancanti;
+  }
+
+  // Il menu del tasto destro della scheda: le stesse azioni del clic, più la
+  // copia del numero. Stessa forma del menu di ordinamento della lista.
+  let fsMenu = null;
+  function fsChiudiMenu() {
+    if (!fsMenu) return;
+    fsMenu.remove();
+    fsMenu = null;
+    document.removeEventListener('mousedown', fsFuoriMenu, true);
+    document.removeEventListener('keydown', fsEscMenu, true);
+    window.removeEventListener('resize', fsChiudiMenu);
+  }
+  function fsFuoriMenu(e) { if (fsMenu && !fsMenu.contains(e.target)) fsChiudiMenu(); }
+  // Il menu si prende l'Esc: sotto c'è l'elenco, che con lo stesso tasto si
+  // chiuderebbe anche lui. Un Esc chiude una cosa sola, quella più in alto.
+  function fsEscMenu(e) {
+    if (e.key !== 'Escape' || !fsMenu) return;
+    fsChiudiMenu();
+    e.stopPropagation();
+  }
+  function fsApriMenu(x, y, voci) {
+    fsChiudiMenu();
+    if (!voci.length) return;
+    const menu = document.createElement('div');
+    menu.className = 'sn-select-pop mg-ctxmenu';
+    menu.setAttribute('role', 'menu');
+    for (const v of voci) {
+      const opt = document.createElement('div');
+      opt.className = 'sn-select-option';
+      opt.setAttribute('role', 'menuitem');
+      opt.textContent = v.label;
+      opt.addEventListener('click', () => { fsChiudiMenu(); v.run(); });
+      menu.appendChild(opt);
+    }
+    document.body.appendChild(menu);
+    const vw = window.innerWidth, vh = window.innerHeight;
+    menu.style.left = `${Math.max(4, Math.min(x, vw - menu.offsetWidth - 4))}px`;
+    menu.style.top = `${Math.max(4, Math.min(y, vh - menu.offsetHeight - 4))}px`;
+    fsMenu = menu;
+    setTimeout(() => {
+      document.addEventListener('mousedown', fsFuoriMenu, true);
+      document.addEventListener('keydown', fsEscMenu, true);
+      window.addEventListener('resize', fsChiudiMenu);
+    }, 0);
+  }
+
+  // «Mostra le N segnalazioni contate», dove dietro il numero ce n'è davvero
+  // qualcuna. Una voce sola, uguale su ogni superficie che porta un conteggio.
+  function vociMostra(el, voci) {
+    const src = fsSorgente(el);
+    if (!src) return null;
+    const n = src.ids.length + ((src.mancanti || []).length);
+    voci.push({
+      label: `Mostra ${n === 1 ? 'la segnalazione contata' : `le ${fsNum(n)} segnalazioni contate`}`,
+      run: () => fsApriDrill(src),
+    });
+    return src;
+  }
+
+  // Cosa può volere l'owner sopra questo pezzo di scheda.
+  function fsVociMenu(el) {
+    const voci = [];
+    // Una riga dell'elenco: le stesse due cose che si vogliono fare a una
+    // segnalazione ovunque nella dashboard.
+    const riga = el.closest('[data-fs-open]');
+    if (riga) {
+      const fb = (fsFeedbacks || []).find((f) => f._id === riga.dataset.fsOpen);
+      const num = fb ? FB.formatNum(fb.seq, fb.subSeq) : '';
+      if (!riga.disabled) {
+        voci.push({ label: 'Apri la segnalazione', run: () => fsApriSegnalazione(riga.dataset.fsOpen) });
+      }
+      if (num) voci.push({ label: 'Copia il numero', run: () => fsCopia('#' + num) });
+      return voci;
+    }
+    // Le due barre in cima: portano una scelta e un numero, quindi il tasto
+    // destro ha di che riempirsi. Prima rispondeva il menu generale della
+    // pagina, quello che esce anche su uno spazio bianco.
+    const chipR = el.closest('[data-fs-range]');
+    if (chipR) {
+      const key = chipR.dataset.fsRange;
+      const p = FS.presetOf(key);
+      const r = FS.rangeOf(key, Date.now(), fsCustom);
+      const quando = r.da == null
+        ? (r.a == null ? 'tutte le segnalazioni, senza limiti di data' : `da sempre al ${FS.dataBreve(r.a)}`)
+        : `dal ${FS.dataBreve(r.da)} a oggi`;
+      if (key !== fsRangeKey) voci.push({ label: 'Guarda questa finestra', run: () => fsScegliFinestra(key) });
+      voci.push({ label: 'Copia la finestra', run: () => fsCopia(`${(p && p.label) || key}: ${quando}`) });
+      return voci;
+    }
+    const chipC = el.closest('[data-fs-creator]');
+    if (chipC) {
+      const kind = chipC.dataset.fsCreator;
+      if (kind === '__tutti') {
+        // Era l'unica pasticca della barra a non offrire niente: col filtro già
+        // tolto usciva il menu generale della pagina, quello di uno spazio
+        // bianco, mentre le sue dieci vicine avevano le loro voci.
+        if (fsCreators.length) voci.push({ label: 'Togli tutti i filtri', run: () => fsImpostaCreatori([]) });
+        const n = chipC.querySelector('.mg-chip-n');
+        vociMostra(chipC, voci);
+        voci.push({ label: 'Copia riga e numero', run: () => fsCopia(`Tutti: ${n ? n.textContent.trim() : 0}`) });
+        return voci;
+      }
+      const gr = FS.GRUPPI_CREATORI.find((x) => x.key === kind);
+      if (gr) {
+        const acceso = fsGruppoAcceso(gr);
+        if (!acceso) voci.push({ label: `Solo ${gr.label.toLowerCase()}`, run: () => fsImpostaCreatori(gr.kinds.slice()) });
+        else voci.push({ label: 'Togli il filtro', run: () => fsImpostaCreatori([]) });
+        const tot = gr.kinds.reduce((s, k) => {
+          const v = fsStat && (fsStat.ricevuti.creatoriTutti || []).find((c) => c.kind === k);
+          return s + ((v && v.n) || 0);
+        }, 0);
+        vociMostra(chipC, voci);
+        voci.push({ label: 'Copia riga e numero', run: () => fsCopia(`${gr.label}: ${fsNum(tot)}`) });
+        return voci;
+      }
+      const nome = fsEtichettaCreatore(kind);
+      const acceso = fsCreators.indexOf(kind) >= 0;
+      voci.push({ label: `Solo ${nome}`, run: () => fsImpostaCreatori([kind]) });
+      voci.push(acceso
+        ? { label: 'Togli dal filtro', run: () => fsImpostaCreatori(fsCreators.filter((k) => k !== kind)) }
+        : { label: 'Aggiungi al filtro', run: () => fsImpostaCreatori(fsCreators.concat([kind])) });
+      const v = fsStat && (fsStat.ricevuti.creatoriTutti || []).find((c) => c.kind === kind);
+      vociMostra(chipC, voci);
+      voci.push({ label: 'Copia riga e numero', run: () => fsCopia(`${nome}: ${fsNum((v && v.n) || 0)}`) });
+      return voci;
+    }
+    const src = vociMostra(el, voci);
+    if (!src && el && el.querySelectorAll) {
+      // Una FRASE che contiene dei numeri (quella sotto il titolo della torta):
+      // il tasto destro sulla frase offre i conti che ci stanno dentro, uno per
+      // voce, invece del menu generale della pagina. Sul numero da solo resta
+      // il suo menu, più corto.
+      for (const b of el.querySelectorAll('[data-fs-esito]')) {
+        const s2 = fsSorgente(b);
+        if (!s2) continue;
+        const n2 = s2.ids.length + ((s2.mancanti || []).length);
+        voci.push({ label: `Mostra ${s2.titolo.toLowerCase()} (${fsNum(n2)})`, run: () => fsApriDrill(s2) });
+      }
+    }
+    // Nome e numero della cosa sotto il dito, pronti da incollare altrove.
+    const testo = fsTestoRiga(el, src);
+    if (testo) voci.push({ label: 'Copia riga e numero', run: () => fsCopia(testo) });
+    const punto = el.closest('[data-fs-punto]');
+    if (punto && fsStat) {
+      const p = (fsStat.ricevuti.serie.punti || []).find((x) => x.chiave === punto.dataset.fsPunto);
+      if (p) {
+        voci.push({
+          label: 'Restringi la finestra a questo periodo',
+          run: () => fsRestringi(p),
+        });
+      }
+    }
+    return voci;
+  }
+
+  // «Nome: numero», costruito dai pezzi veri della riga invece che dal testo
+  // grezzo del nodo, che verrebbe fuori senza spazi fra un pezzo e l'altro.
+  function fsTestoRiga(el, src) {
+    const bar = el.closest('[data-fs-bar]');
+    if (bar) {
+      const l = bar.querySelector('.mg-bar-label');
+      const n = bar.querySelector('.mg-bar-n');
+      if (l && n) return `${l.textContent.trim()}: ${n.textContent.trim()}`;
+    }
+    const leg = el.closest('.mg-fs-legend li[data-group]');
+    if (leg) {
+      const n = leg.querySelector('.mg-fs-legend-n');
+      return `${leg.childNodes[1] ? leg.childNodes[1].textContent.trim() : ''}: ${n ? n.textContent.trim() : ''}`.trim();
+    }
+    const esito = el.closest('[data-fs-esito]');
+    if (esito) {
+      const b = esito.querySelector('b');
+      // Senza il numero in grassetto è uno dei conti scritti dentro una frase:
+      // lì il nome della cosa contata lo sa solo il conto, non il DOM attorno.
+      if (b) {
+        const resto = esito.textContent.slice(b.textContent.length).trim();
+        return `${resto}: ${b.textContent.trim()}`;
+      }
+      if (src) return `${src.titolo}: ${fsNum(src.ids.length + ((src.mancanti || []).length))}`;
+    }
+    const punto = el.closest('[data-fs-punto]');
+    if (punto) return punto.getAttribute('title') || '';
+    const tile = el.closest('[data-fs-id]');
+    if (tile) {
+      const n = tile.querySelector('.mg-tile-n');
+      const t = tile.querySelector('.mg-tile-t');
+      if (n && t) return `${t.textContent.trim()}: ${n.textContent.trim()}`;
+    }
+    if (src) return `${src.titolo}: ${fsNum(src.ids.length + ((src.mancanti || []).length))}`;
+    return '';
+  }
+
+  async function fsCopia(testo) {
+    // La conferma parte DOPO che gli appunti hanno risposto: dire «copiato» a
+    // un rifiuto è una bugia piccola e fastidiosa.
+    try {
+      await navigator.clipboard.writeText(testo);
+      toast('Copiato');
+    } catch (_) {
+      toast('Gli appunti non hanno accettato la copia');
+    }
+  }
+
+  // Le stesse due mosse del clic sulle pasticche, richiamabili dal menu.
+  function fsScegliFinestra(key) {
+    fsRangeKey = key;
+    fsSalvaScelta();
+    renderFs();
+  }
+  function fsImpostaCreatori(lista) {
+    fsCreators = Array.from(new Set(lista));
+    fsSalvaScelta();
+    renderFs();
+  }
+
+  // Dal gruppo di una colonna alla finestra scritta a mano che lo contiene.
+  function fsRestringi(p) {
+    const passo = fsStat.ricevuti.serie.passo;
+    const inizio = new Date(p.t);
+    const fine = new Date(p.t);
+    // Un passo per riga, e l'anno va scritto come gli altri: finché mancava,
+    // restringere su una colonna che valeva un anno dava il primo gennaio e
+    // basta, e le segnalazioni che la colonna aveva appena contato sparivano.
+    if (passo === 'anno') fine.setMonth(11, 31);
+    else if (passo === 'mese') fine.setMonth(fine.getMonth() + 1, 0);
+    else if (passo === 'settimana') fine.setDate(fine.getDate() + 6);
+    fsRangeKey = 'custom';
+    fsCustom = { da: FS.giornoDi(inizio.getTime()), a: FS.giornoDi(fine.getTime()) };
+    if (mgFsFrom) mgFsFrom.value = fsCustom.da;
+    if (mgFsTo) mgFsTo.value = fsCustom.a;
+    fsSalvaScelta();
+    renderFs();
+  }
+
+  // ── Il fuoco della tastiera sopravvive al ridisegno ──────────────────────
+  // Il giro di aggiornamento della pagina passa ogni minuto e ridisegna questa
+  // scheda da capo, anche quando non è cambiato niente (il registro delle
+  // routine cammina per conto suo). Riscrivere pasticche, riquadri, legenda ed
+  // elenco butta il fuoco sul corpo della pagina: chi sta navigando senza
+  // mouse ricominciava dall'inizio una volta al minuto, senza che niente lo
+  // dicesse. Il resto della pagina già si guarda da questo — la lista tiene il
+  // suo scorrimento, la conversazione non si ridisegna mentre la si scrive, e
+  // qui i due campi delle date non vengono riscritti sotto le dita.
+  //
+  // Si ricorda la RIGA, non il nodo: il nodo dopo il ridisegno non esiste più.
+  const FS_ANCORE = [
+    'data-fs-open', 'data-fs-range', 'data-fs-creator', 'data-fs-tile',
+    'data-fs-esito', 'data-fs-punto', 'data-group', 'data-fs-bar', 'data-fs-id',
+  ];
+  function fsFuocoOra() {
+    const el = document.activeElement;
+    const root = document.getElementById('mgFsRoot');
+    if (!el || !root || el === root || !root.contains(el)) return '';
+    const q = (v) => (window.CSS && CSS.escape ? CSS.escape(String(v)) : String(v).replace(/["\\]/g, '\\$&'));
+    for (const attr of FS_ANCORE) {
+      const host = el.closest(`[${attr}]`);
+      if (!host) continue;
+      let sel = `[${attr}="${q(host.getAttribute(attr))}"]`;
+      // Due righe di ripartizione possono avere la stessa chiave in gruppi
+      // diversi, e `data-group` sta sia sulla fetta sia sulla sua voce di
+      // legenda: senza il secondo pezzo il fuoco tornerebbe sulla gemella.
+      if (attr === 'data-fs-bar' && host.dataset.fsBargroup) {
+        sel += `[data-fs-bargroup="${q(host.dataset.fsBargroup)}"]`;
+      }
+      if (attr === 'data-group' && host.closest('#mgFsLegend')) sel = `#mgFsLegend ${sel}`;
+      return sel;
+    }
+    return el.id ? `#${q(el.id)}` : '';
+  }
+  function fsRiprendiFuoco(sel) {
+    if (!sel) return;
+    const root = document.getElementById('mgFsRoot');
+    const n = sel.charAt(0) === '#' ? document.querySelector(sel) : (root && root.querySelector(sel));
+    // Solo se il fuoco non se n'è già andato altrove per mano di chi guarda.
+    if (n && typeof n.focus === 'function' && document.activeElement !== n) {
+      if (document.activeElement === document.body || root.contains(document.activeElement)) {
+        n.focus({ preventScroll: true });
+      }
+    }
+  }
+
+  function renderFs() {
+    if (!FS || !mgFsBody) return;
+    const admin = isAdmin;
+    mgFsDenied.hidden = admin;
+    mgFsLoading.hidden = !admin || fsCaricato || !fsCaricando;
+    mgFsBody.hidden = !admin || !fsCaricato;
+    if (!admin || !fsCaricato) return;
+
+    let stat;
+    try {
+      stat = FS.compute({
+        feedbacks: fsFeedbacks || [],
+        workerLog: fsLog,
+        range: fsRange(),
+        creatori: fsCreators,
+        feedbackParziali: !fsCompleto,
+        // Registro non letto: i suoi numeri tornano `null`, non zero. Stessa
+        // cosa dall'altra sorgente: se la lettura delle segnalazioni è fallita
+        // e in pagina non c'è nemmeno un ripiego, quei numeri non si sanno.
+        registroLetto: fsLogOk,
+        feedbackLetti: !(fsRipiego && !(fsFeedbacks || []).length),
+      });
+    } catch (err) {
+      // Un conto che non si può fare si dice, non si disegna a zero.
+      console.error('[manage] statistiche: conti non riusciti:', err);
+      mgFsNota.textContent = 'I conti non si sono potuti fare: ' + (err && err.message ? err.message : 'guasto sconosciuto');
+      mgFsNota.hidden = false;
+      return;
+    }
+    fsStat = stat;
+    // L'elenco aperto su un conto vecchio non vale più: cambiata la finestra o
+    // il filtro, quei numeri non sono più quelli. Si richiude da solo invece di
+    // restare lì a dire una cosa che la scheda sopra non dice più.
+    const chiave = `${fsRangeKey}|${fsCustom.da}|${fsCustom.a}|${fsCreators.join(',')}`;
+    if (fsDrillChiave !== chiave) { fsDrill = null; fsDrillDaDove = ''; fsDrillChiave = chiave; }
+    // Dov'era il fuoco e a che punto era sceso l'elenco: si rimettono dopo.
+    const fuoco = fsFuocoOra();
+    const scorrimento = mgFsDrillList ? mgFsDrillList.scrollTop : 0;
+    renderFsBars(stat);
+    renderFsNota(stat);
+    renderFsTiles(stat);
+    renderFsPie(stat);
+    renderFsEsiti(stat);
+    renderFsTrend(stat);
+    renderFsAltro(stat);
+    renderFsDrill();
+    if (mgFsDrillList && scorrimento) mgFsDrillList.scrollTop = scorrimento;
+    fsRiprendiFuoco(fuoco);
+  }
+
+  // Finestra, mittenti e riquadri: un solo ascoltatore per la scheda.
+  if (mgFsBody) {
+    document.getElementById('mgFsRoot').addEventListener('click', (e) => {
+      const chipR = e.target.closest('[data-fs-range]');
+      if (chipR) {
+        fsRangeKey = chipR.dataset.fsRange;
+        fsSalvaScelta();
+        renderFs();
+        return;
+      }
+      const chipC = e.target.closest('[data-fs-creator]');
+      if (chipC) {
+        const kind = chipC.dataset.fsCreator;
+        const gruppo = FS.GRUPPI_CREATORI.find((x) => x.key === kind);
+        if (kind === '__tutti') fsCreators = [];
+        // Una pasticca di gruppo si comporta come le altre: cliccata accende
+        // il gruppo, ricliccata da accesa torna a «Tutti».
+        else if (gruppo) fsCreators = fsGruppoAcceso(gruppo) ? [] : gruppo.kinds.slice();
+        else {
+          const i = fsCreators.indexOf(kind);
+          if (i >= 0) fsCreators.splice(i, 1); else fsCreators.push(kind);
+        }
+        fsSalvaScelta();
+        renderFs();
+        return;
+      }
+      // Una riga dell'elenco aperto: apre la segnalazione nella colonna di
+      // sinistra, nella sua sezione.
+      const apri = e.target.closest('[data-fs-open]');
+      if (apri) {
+        fsApriSegnalazione(apri.dataset.fsOpen);
+        return;
+      }
+      if (e.target.closest('#mgFsDrillClose')) { fsChiudiDrill(); return; }
+
+      const tile = e.target.closest('[data-fs-tile]');
+      if (tile) {
+        fsAperto = fsAperto === tile.dataset.fsTile ? '' : tile.dataset.fsTile;
+        renderFs();
+        return;
+      }
+      // Tutto il resto che porta un numero: fetta, voce di legenda, riga di
+      // ripartizione, colonna del grafico, esito. Clic = «fammi vedere quali».
+      const src = fsSorgente(e.target);
+      if (src) fsApriDrill(src);
+    });
+
+    // Invio e spazio valgono il clic su ciò che non è già un pulsante (le voci
+    // di legenda e gli esiti): stessa funzione, dalla tastiera.
+    document.getElementById('mgFsRoot').addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const el = e.target.closest('[data-group], [data-fs-esito]');
+      if (!el || el.tagName === 'BUTTON') return;
+      const src = fsSorgente(el);
+      if (!src) return;
+      e.preventDefault();
+      fsApriDrill(src);
+    });
+
+    // Esc chiude l'elenco aperto sotto un numero. È un riquadro aperto come un
+    // altro, e in Filo Esc chiude prima il riquadro aperto
+    // (patterns/esc-chiude-prima-il-riquadro-aperto-poi-la-modalita.md): finché
+    // non lo faceva, l'unica via d'uscita era la scritta «chiudi» in alto a
+    // destra, mentre lo stesso tasto chiudeva il menu del tasto destro della
+    // stessa scheda. Il tasto si ascolta sul documento e IN CAPTURE: il menu
+    // del tasto destro si prende l'Esc fermandone la corsa, e un ascolto in
+    // risalita non lo vedeva mai arrivare. In capture si arriva prima, e la
+    // precedenza resta al menu — se è aperto, l'Esc è suo e qui non si tocca
+    // niente.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || fsMenu) return;
+      if (!mgFsDrill || mgFsDrill.hidden || !fsPannelloAperto()) return;
+      fsChiudiDrill();
+    }, true);
+
+    // Tasto destro: «voglio fare qualcosa qui».
+    document.getElementById('mgFsRoot').addEventListener('contextmenu', (e) => {
+      const voci = fsVociMenu(e.target);
+      if (!voci.length) return;
+      e.preventDefault();
+      fsApriMenu(e.clientX, e.clientY, voci);
+    });
+
+    const suDate = () => {
+      fsCustom = { da: mgFsFrom.value || '', a: mgFsTo.value || '' };
+      fsSalvaScelta();
+      renderFs();
+    };
+    mgFsFrom.addEventListener('change', suDate);
+    mgFsTo.addEventListener('change', suDate);
+  }
+
+  // Apre una segnalazione dell'elenco nella colonna di sinistra, nella sezione
+  // che le compete: da un numero si arriva alla segnalazione vera, non a una
+  // riga da cercare a mano.
+  function fsApriSegnalazione(id) {
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb) { toast('Questa segnalazione non è fra quelle caricate nella lista'); return; }
+    const ST = window.SN_FB_STATUS;
+    let tab = 'inbox';
+    try {
+      const n = MR.normalizeStatus(fb) || {};
+      if (n.status && ST && ST.tabFor) tab = ST.tabFor(n.status) || 'inbox';
+    } catch (_) { /* senza stato leggibile si apre dai Ricevuti */ }
+    selectTab(tab);
+    openDetail(id);
+  }
+
+  // La scheda si rilegge a OGNI apertura: nel frattempo le routine possono
+  // aver lavorato, e una fotografia vecchia qui è peggio di nessuna.
+  mgTabs.addEventListener('click', (e) => {
+    const btn = e.target.closest('.mg-tab');
+    if (!btn || btn.dataset.tab !== 'fbstats') return;
+    loadFsData();
+  });
+
   // …e anche a pagina ferma: il main avvisa quando l'elenco cambia (una
   // fusione bloccata da `npm run finish`, o una decisa da un'altra finestra).
   // Senza questo, una pagina di Gestione lasciata aperta continuerebbe a
@@ -4486,6 +5937,27 @@
   // ri-lettura via IPC per gli spec che stubbano la risposta.
   window.__mgTest.renderWorkerLog = (entries) => { renderWorkerLog(entries); logLoaded = true; };
   window.__mgTest.loadWorkerLog = loadWorkerLog;
+  // Tab "Statistiche feedback": dati finti al posto delle due letture vere
+  // (negli spec non c'è né una sessione da proprietario né Firestore). Da qui
+  // in poi la scheda esercita il codice VERO — conti, riquadri, torta.
+  window.__mgTest.setFsData = (dati) => {
+    const d = dati || {};
+    fsFeedbacks = Array.isArray(d.feedbacks) ? d.feedbacks : [];
+    fsLog       = Array.isArray(d.workerLog) ? d.workerLog : [];
+    fsCompleto  = d.complete !== false;
+    fsRipiego   = d.ripiego === true;
+    fsLogOk     = d.logOk !== false;
+    fsCaricato  = true;
+    fsCaricando = false;
+    renderFs();
+  };
+  window.__mgTest.setFsRange = (key, custom) => {
+    fsRangeKey = key;
+    if (custom) { fsCustom = custom; if (mgFsFrom) mgFsFrom.value = custom.da || ''; if (mgFsTo) mgFsTo.value = custom.a || ''; }
+    renderFs();
+  };
+  window.__mgTest.getFsState = () => ({ rangeKey: fsRangeKey, creatori: fsCreators.slice(), aperto: fsAperto });
+  window.__mgTest.loadFsData = loadFsData;
   window.__mgTest.renderChannelLog = renderChannelLog;
   // Fusioni in attesa: rilettura via IPC dopo lo stub (in test non c'è né una
   // sessione da proprietario né il server di sicurezza).

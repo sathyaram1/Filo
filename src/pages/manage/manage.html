@@ -26,6 +26,9 @@
   <script src="filo://shared/feedbackStatus.js"></script>
   <script src="filo://shared/feedbackThread.js"></script>
   <script src="filo://shared/manageReview.js"></script>
+  <!-- #496 — va DOPO feedbackThread e manageReview: da lì prende la categoria d'autore e lo stato
+       normalizzato, e se mancano si ferma dicendolo. -->
+  <script src="filo://shared/feedbackStats.js"></script>
   <script src="filo://shared/manageSearch.js"></script>
   <script src="filo://shared/boardArchive.js"></script>
   <script src="filo://shared/mergeApprovals.js"></script>
@@ -288,6 +291,248 @@
     .mg-log-section { margin-top: 32px; }
     .mg-log-section h3 { font-size: 15px; margin: 0 0 4px; }
     .mg-log-role--deny { color: var(--sn-error); }
+
+    /* Tab Statistiche feedback (#496): una colonna sola, niente box attorno al contenuto della pagina
+       (filo_design.txt § Estetica). Le misure ricorrenti stanno qui una volta sola. */
+    .mg-fs { --mg-fs-gap: 14px; padding-bottom: 40px; }
+    .mg-fs h2 { font-size: 18px; margin: 0 0 4px; }
+    .mg-fs-intro { font-size: 13px; color: var(--sn-muted); margin: 0 0 18px; }
+    .mg-fs-denied, .mg-fs-loading { font-size: 13px; color: var(--sn-muted); padding: 24px 0; }
+
+    /* Barra della finestra + filtro per creatore: due file di pasticche. */
+    .mg-fs-bar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      margin-bottom: 10px;
+    }
+    .mg-fs-bar-label {
+      font-size: 12px; font-weight: 600; color: var(--sn-muted);
+      letter-spacing: 0.03em; text-transform: uppercase;
+      flex: 0 0 auto; margin-right: 2px;
+    }
+    .mg-chip {
+      appearance: none; -webkit-appearance: none;
+      font: inherit; font-size: 12.5px; line-height: 1;
+      padding: 7px 12px; border-radius: 999px;
+      border: 1px solid var(--sn-border);
+      background: transparent; color: var(--sn-muted);
+      cursor: pointer; transition: background 0.14s, color 0.14s, border-color 0.14s;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .mg-chip:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-chip:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+    .mg-chip--on {
+      background: var(--sn-accent); border-color: var(--sn-accent);
+      color: #fff;
+    }
+    .mg-chip--on:hover { background: var(--sn-accent); color: #fff; }
+    .mg-chip-n { opacity: 0.75; font-variant-numeric: tabular-nums; }
+
+    /* Le due date della finestra scelta a mano: compaiono solo con «Scegli tu». */
+    .mg-fs-custom {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      font-size: 12.5px; color: var(--sn-muted);
+    }
+    .mg-fs-custom[hidden] { display: none; }
+    .mg-fs-custom input {
+      font: inherit; font-size: 12.5px; color: var(--sn-fg);
+      background: var(--sn-overlay-bg);
+      border: 1px solid var(--sn-border); border-radius: 8px;
+      padding: 6px 8px;
+    }
+    .mg-fs-custom input:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+    /* Il calendario dentro al campo lo disegna il browser: senza dirgli con che tema restava chiaro anche
+       a Filo scuro, e `color-scheme` è l'unico modo di chiederglielo. */
+    :root[data-sn-theme="dark"] .mg-fs-custom input { color-scheme: dark; }
+    :root[data-sn-theme="light"] .mg-fs-custom input { color-scheme: light; }
+    /* La finestra che stai davvero guardando, scritta come le altre date della scheda: i due campi seguono
+       la lingua del sistema e, scritti al rovescio, si raddrizzano da soli senza dirlo. */
+    .mg-fs-finestra { color: var(--sn-fg); font-size: 12.5px; }
+
+    /* Frase di copertura: da quando partono davvero i numeri che seguono. */
+    .mg-fs-nota {
+      font-size: 12px; color: var(--sn-muted); margin: 2px 0 20px;
+      line-height: 1.5; max-width: 760px;
+    }
+    .mg-fs-nota[hidden] { display: none; }
+
+    /* I riquadri dei numeri: si espandono cliccandoli. */
+    .mg-fs-tiles {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: var(--mg-fs-gap); margin-bottom: 28px;
+    }
+    .mg-tile {
+      border: 1px solid var(--sn-border); border-radius: 12px;
+      background: var(--sn-overlay-bg);
+      padding: 14px 16px; text-align: left;
+      font: inherit; color: var(--sn-fg);
+      display: flex; flex-direction: column; gap: 2px;
+      transition: border-color 0.14s, background 0.14s;
+    }
+    .mg-tile--click { cursor: pointer; appearance: none; -webkit-appearance: none; }
+    .mg-tile--click:hover { border-color: var(--sn-accent); background: var(--sn-hover); }
+    .mg-tile--click:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+    .mg-tile-n {
+      font-size: 30px; font-weight: 650; line-height: 1.05;
+      font-variant-numeric: tabular-nums;
+    }
+    /* Un valore che non è un numero (una durata: «3 giorni») è più lungo e a
+       30px uscirebbe dal riquadro nelle finestre strette. */
+    .mg-tile-n--txt { font-size: 21px; }
+    .mg-tile-t { font-size: 12.5px; color: var(--sn-muted); }
+    .mg-tile-sub { font-size: 11.5px; color: var(--sn-muted); opacity: 0.85; margin-top: 2px; }
+    /* Un sottotitolo che conta segnalazioni sue e si apre su quelle: resta
+       identico all'occhio, ma è un pulsante vero (clic, Invio, Spazio). */
+    .mg-tile-sub--click {
+      font-family: inherit; text-align: left; align-self: flex-start;
+      background: none; border: 0; padding: 0; cursor: pointer;
+      text-decoration: underline; text-decoration-style: dotted;
+      text-underline-offset: 3px;
+    }
+    .mg-tile-sub--click:hover { color: var(--sn-fg); opacity: 1; }
+    .mg-tile-sub--click:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; border-radius: 4px; }
+    /* La freccia dice che c'è dell'altro sotto, e ruota da aperta. */
+    .mg-tile-more {
+      font-size: 11px; color: var(--sn-muted); margin-top: 6px;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .mg-tile-caret { transition: transform 0.16s; display: inline-block; }
+    .mg-tile--open .mg-tile-caret { transform: rotate(90deg); }
+    .mg-tile--open { border-color: var(--sn-accent); }
+
+    /* Il dettaglio di un riquadro aperto: una riga per voce, con la barra. */
+    .mg-fs-detail {
+      grid-column: 1 / -1;
+      border: 1px solid var(--sn-border); border-radius: 12px;
+      background: var(--sn-overlay-bg);
+      padding: 14px 16px;
+    }
+    .mg-fs-detail[hidden] { display: none; }
+    .mg-fs-detail h4 { font-size: 13px; margin: 0 0 10px; color: var(--sn-muted); font-weight: 600; }
+    .mg-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+    .mg-bar-row {
+      display: grid; grid-template-columns: minmax(120px, 210px) 1fr auto; gap: 10px;
+      align-items: center; font-size: 12.5px;
+      width: 100%; text-align: left; font-family: inherit;
+      background: none; border: 0; color: inherit;
+      padding: 3px 5px; margin: 0 -5px; border-radius: 6px;
+    }
+    .mg-bar-row--click { cursor: pointer; }
+    .mg-bar-row--click:hover { background: var(--sn-hover); }
+    .mg-bar-row--click:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+    .mg-bar-label { color: var(--sn-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mg-bar-track { height: 8px; border-radius: 999px; background: var(--sn-hover); overflow: hidden; }
+    /* `display: block` non è decorazione: su uno <span>, che resta in linea, altezza e larghezza in
+       percentuale non valgono, e la barra nasceva larga zero qualunque fosse il numero. */
+    .mg-bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--sn-accent); min-width: 2px; }
+    .mg-bar-n { font-variant-numeric: tabular-nums; color: var(--sn-muted); min-width: 40px; text-align: right; }
+    .mg-fs-empty { font-size: 12.5px; color: var(--sn-muted); padding: 6px 0; }
+
+    /* L'elenco delle segnalazioni dietro un numero: si apre cliccando il
+       numero, la fetta, la colonna o la riga che le ha contate. */
+    .mg-fs-drill {
+      border: 1px solid var(--sn-accent); border-radius: 12px;
+      background: var(--sn-overlay-bg); padding: 12px 14px; margin: 0 0 26px;
+    }
+    .mg-fs-drill[hidden] { display: none; }
+    .mg-fs-drill-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+    .mg-fs-drill-head h4 { font-size: 13px; margin: 0; font-weight: 600; }
+    .mg-fs-drill-close {
+      margin-left: auto; appearance: none; background: none; border: 0;
+      color: var(--sn-muted); font: inherit; font-size: 12px; cursor: pointer;
+      padding: 2px 6px; border-radius: 6px;
+    }
+    .mg-fs-drill-close:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-fs-drill-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; }
+    .mg-fs-drill-row {
+      display: flex; align-items: baseline; gap: 10px; width: 100%;
+      appearance: none; background: none; border: 0; color: inherit;
+      font: inherit; font-size: 12.5px; text-align: left;
+      padding: 5px 6px; border-radius: 6px; cursor: pointer;
+    }
+    .mg-fs-drill-row:hover { background: var(--sn-hover); }
+    .mg-fs-drill-row:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+    .mg-fs-drill-row[disabled] { cursor: default; opacity: 0.65; }
+    .mg-fs-drill-row[disabled]:hover { background: none; }
+    .mg-fs-drill-num { font-variant-numeric: tabular-nums; color: var(--sn-muted); flex: 0 0 auto; min-width: 56px; }
+    .mg-fs-drill-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mg-fs-drill-cat { margin-left: auto; color: var(--sn-muted); font-size: 11.5px; flex: 0 0 auto; padding-left: 10px; }
+
+    /* Le superfici che si aprono su cosa hanno contato lo dicono col puntatore. */
+    .mg-fs-legend li[data-group] { cursor: pointer; padding: 3px 6px; margin: 0 -6px; border-radius: 6px; }
+    .mg-fs-legend li[data-group]:hover { background: var(--sn-hover); }
+    #mgFsPie [data-group] { cursor: pointer; }
+    #mgFsPie [data-group]:hover { opacity: 0.85; }
+    .mg-fs-esito--click { cursor: pointer; }
+    .mg-fs-esito--click:hover b { color: var(--sn-accent); }
+    /* Un numero dentro una frase: resta parte della frase, ma si apre. */
+    .mg-fs-quanti {
+      font: inherit; color: inherit; background: none; border: 0; padding: 0;
+      cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+    }
+    .mg-fs-quanti:hover { color: var(--sn-accent); }
+
+    /* Le sezioni sotto i riquadri. */
+    .mg-fs-sec { margin-bottom: 30px; }
+    .mg-fs-sec h3 { font-size: 15px; margin: 0 0 3px; }
+    .mg-fs-sec-hint { font-size: 12px; color: var(--sn-muted); margin: 0 0 14px; max-width: 760px; line-height: 1.5; }
+
+    /* La torta dei giri: grafico a sinistra, legenda a destra, incolonnati
+       sotto i 560px (la scheda sta anche in una finestra stretta). */
+    .mg-fs-pie { display: flex; align-items: center; gap: 26px; flex-wrap: wrap; }
+    /* Niente da disegnare: la ciambella se ne va davvero, invece di lasciare un
+       quadrato bianco di 200×200 (`display:flex` batte l'attributo `hidden`). */
+    .mg-fs-pie[hidden] { display: none; }
+    .mg-fs-pie-wrap { position: relative; flex: 0 0 auto; }
+    .mg-fs-pie-wrap svg { display: block; }
+    /* Il numero medio sta nel buco della ciambella: è la risposta alla domanda
+       che il grafico pone, e non deve costare una seconda lettura. */
+    .mg-fs-pie-mid {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; pointer-events: none; text-align: center;
+    }
+    .mg-fs-pie-mid b { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+    .mg-fs-pie-mid span { font-size: 10.5px; color: var(--sn-muted); max-width: 96px; line-height: 1.25; }
+    /* La legenda non si allarga a tutto lo spazio che avanza: il numero in
+       fondo alla riga finirebbe lontanissimo dalla sua etichetta. */
+    .mg-fs-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 200px; max-width: 300px; }
+    .mg-fs-legend li { display: flex; align-items: center; gap: 9px; font-size: 13px; }
+    .mg-fs-sw { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; }
+    .mg-fs-legend-n { margin-left: auto; color: var(--sn-muted); font-variant-numeric: tabular-nums; }
+
+    /* Gli esiti che affiancano la torta: «fermati» e «rilievi rimandati». */
+    .mg-fs-esiti { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 16px; }
+    .mg-fs-esito { font-size: 12.5px; color: var(--sn-muted); }
+    .mg-fs-esito b { display: block; font-size: 20px; color: var(--sn-fg); font-variant-numeric: tabular-nums; }
+
+    /* Una colonna per giorno/settimana/mese, con un TETTO di larghezza: con un periodo solo, una colonna
+       elastica diventava un blocco a tutta pagina — che non è un grafico, è una macchia. */
+    .mg-fs-trend {
+      display: flex; align-items: flex-end; justify-content: flex-start; gap: 2px;
+      height: 96px; padding-top: 4px;
+      border-bottom: 1px solid var(--sn-border);
+      /* Le colonne hanno una larghezza minima, quindi una finestra lunga tre secoli ne chiede più di quante
+         ce ne stiano: il troppo scorre qui dentro, non sulla pagina di gestione. */
+      overflow-x: auto;
+    }
+    /* Allineate a sinistra, non centrate: la prima colonna sta sotto la data d'inizio scritta nella riga
+       qui sotto, e le due cose si leggono insieme. */
+    .mg-fs-trend-col {
+      flex: 1 1 0; min-width: 2px;
+      background: var(--sn-accent); border-radius: 3px 3px 0 0; opacity: 0.82;
+      appearance: none; border: 0; padding: 0; cursor: pointer;
+    }
+    .mg-fs-trend-col:hover { opacity: 1; }
+    /* Tetto per quando le colonne sono UNA o DUE; da tre in su si allargano. Col tetto acceso il JS stringe
+       alla stessa misura la riga delle date, se no la data di fine finisce lontana dalla colonna che nomina. */
+    .mg-fs-trend--poche .mg-fs-trend-col { max-width: 48px; }
+    /* Un periodo senza arrivi: una tacca sulla linea di base, che tiene il suo
+       posto nella scala del tempo senza sembrare un uno. */
+    .mg-fs-trend-col--zero {
+      height: 2px; opacity: 0.3; cursor: default; align-self: flex-end;
+      border-radius: 1px;
+    }
+    .mg-fs-trend-col:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+    .mg-fs-trend-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--sn-muted); margin-top: 5px; }
 
     /* Le colonne esterne hanno la larghezza che l'utente ha trascinato (il JS riscrive grid-template-columns e la
        ricorda), la centrale assorbe il resto. I 12px dei divisori fanno da spaziatura, quindi gap: 0. */
@@ -967,6 +1212,7 @@
       <button type="button" class="mg-tab" data-tab="queue" role="tab">In coda</button>
       <button type="button" class="mg-tab" data-tab="resolved" role="tab">Risolti</button>
       <button type="button" class="mg-tab" data-tab="archived" role="tab">Archiviati</button>
+      <button type="button" class="mg-tab" data-tab="fbstats" role="tab">Statistiche feedback</button>
       <button type="button" class="mg-tab" data-tab="stats" role="tab">Statistiche Red Team</button>
       <button type="button" class="mg-tab" data-tab="models" role="tab">Modelli di supporto</button>
       <button type="button" class="mg-tab" data-tab="automation" role="tab">Automazioni</button>
@@ -1153,6 +1399,80 @@
           </div>
         </div>
 
+      </div>
+    </section>
+
+    <!-- Due sorgenti, due date: i feedback (data d'invio) e il registro dei worker (data di lavorazione).
+         Finestra e creatore valgono su tutta la scheda; i conti li fa src/shared/feedbackStats.js. -->
+    <section class="mg-panel" id="panel-fbstats" data-panel="fbstats">
+      <div class="mg-fs" id="mgFsRoot">
+        <h2>Statistiche feedback</h2>
+        <p class="mg-fs-intro">Cosa è arrivato, cosa è stato lavorato e quanto è costato, nella finestra che scegli.</p>
+
+        <div class="mg-fs-denied" id="mgFsDenied" hidden>Questa sezione è riservata all'owner.</div>
+        <div class="mg-fs-loading" id="mgFsLoading" hidden>Caricamento…</div>
+
+        <div class="mg-fs-body" id="mgFsBody" hidden>
+          <!-- Finestra di riferimento -->
+          <div class="mg-fs-bar" id="mgFsRange" role="group" aria-label="Finestra di riferimento"></div>
+          <div class="mg-fs-custom" id="mgFsCustom" hidden>
+            <label for="mgFsFrom">Dal</label>
+            <input type="date" id="mgFsFrom" />
+            <label for="mgFsTo">al</label>
+            <input type="date" id="mgFsTo" />
+            <span class="mg-fs-finestra" id="mgFsFinestra"></span>
+          </div>
+
+          <!-- Filtro per creatore -->
+          <div class="mg-fs-bar" id="mgFsCreators" role="group" aria-label="Filtro per creatore"></div>
+
+          <!-- Da dove partono davvero i numeri qui sotto -->
+          <p class="mg-fs-nota" id="mgFsNota" hidden></p>
+
+          <!-- I tre riquadri chiesti, più quello dei giri -->
+          <div class="mg-fs-tiles" id="mgFsTiles"></div>
+
+          <!-- Le segnalazioni dietro il numero che hai appena cliccato: ogni
+               conto della scheda si apre su quello che ha contato. -->
+          <div class="mg-fs-drill" id="mgFsDrill" hidden>
+            <div class="mg-fs-drill-head">
+              <h4 id="mgFsDrillTitle"></h4>
+              <button type="button" class="mg-fs-drill-close" id="mgFsDrillClose">chiudi</button>
+            </div>
+            <ul class="mg-fs-drill-list" id="mgFsDrillList"></ul>
+          </div>
+
+          <!-- Torta dei giri di verifica -->
+          <section class="mg-fs-sec">
+            <h3>Quanto è costato ogni lavoro</h3>
+            <p class="mg-fs-sec-hint" id="mgFsPieHint"></p>
+            <div class="mg-fs-pie">
+              <div class="mg-fs-pie-wrap">
+                <svg id="mgFsPie" width="200" height="200" viewBox="0 0 200 200" role="img" aria-label="Giri di verifica prima del via libera"></svg>
+                <div class="mg-fs-pie-mid" id="mgFsPieMid"></div>
+              </div>
+              <ul class="mg-fs-legend" id="mgFsLegend"></ul>
+            </div>
+            <!-- Niente da disegnare: la ciambella si toglie e la spiegazione
+                 resta qui, sotto il titolo a cui appartiene. -->
+            <p class="mg-fs-empty" id="mgFsPieVuoto" hidden></p>
+            <div class="mg-fs-esiti" id="mgFsEsiti"></div>
+          </section>
+
+          <!-- Andamento nel tempo -->
+          <section class="mg-fs-sec">
+            <h3>Quando sono arrivati</h3>
+            <p class="mg-fs-sec-hint" id="mgFsTrendHint"></p>
+            <div class="mg-fs-trend" id="mgFsTrend"></div>
+            <div class="mg-fs-trend-axis" id="mgFsTrendAxis"></div>
+          </section>
+
+          <!-- Tempi, controllo di sicurezza, arenamenti -->
+          <section class="mg-fs-sec">
+            <h3>Altro che vale la pena sapere</h3>
+            <div class="mg-fs-tiles" id="mgFsAltro"></div>
+          </section>
+        </div>
       </div>
     </section>
 
