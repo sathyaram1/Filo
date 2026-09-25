@@ -41,6 +41,7 @@ test('endpoint che non esiste (404 senza motivo del server), rete giù, 5xx → 
     assert.equal(r.esito, 'assente', `${s} ${JSON.stringify(b)}`);
     assert.equal(canale.EXIT_CHIUSURA[r.esito], 2);
   }
+  assert.equal(canale.leggiRispostaChiusura(404, {}).reason, 'endpoint_assente');
 });
 
 test('un no del server è un rifiuto (exit 4), anche quando è un 404 col suo motivo', () => {
