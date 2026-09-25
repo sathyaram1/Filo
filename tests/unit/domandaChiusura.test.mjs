@@ -67,8 +67,31 @@ test('domanda: va a routineClosing col corpo giusto e torna testo e id', async (
   const fetchImpl = async (u, init) => { url = u; corpo = JSON.parse(init.body); return reply(200, { ok: true, id: 'c9', question: 'Cosa non ha funzionato?' }); };
   const r = await canale.domandaChiusura({ passphrase: 'p' }, { fetchImpl, ...piano });
   assert.match(url, /\/routineClosing$/);
-  assert.deepEqual(corpo, { passphrase: 'p', op: 'question' });
+  const { requestId, ...resto } = corpo;
+  assert.deepEqual(resto, { passphrase: 'p', op: 'question' });
+  assert.match(requestId, /^[A-Za-z0-9_-]{8,128}$/);
   assert.deepEqual(r, { esito: 'ok', question: 'Cosa non ha funzionato?', id: 'c9' });
+});
+
+test('domanda: i ritentativi della stessa invocazione portano lo stesso requestId, un\'altra invocazione no', async () => {
+  const visti = [];
+  let n = 0;
+  const fetchImpl = async (u, init) => {
+    visti.push(JSON.parse(init.body).requestId);
+    n += 1;
+    return n === 1 ? reply(503, { ok: false, reason: 'server_error' }) : reply(200, { ok: true, id: 'c1', question: 'D?' });
+  };
+  const r = await canale.domandaChiusura({ passphrase: 'p' }, { fetchImpl, ...piano });
+  assert.equal(r.esito, 'ok');
+  assert.equal(visti.length, 2);
+  assert.match(visti[0], /^[A-Za-z0-9_-]{8,128}$/);
+  assert.equal(visti[1], visti[0]);
+  await canale.domandaChiusura({ passphrase: 'p' }, { fetchImpl, ...piano });
+  assert.notEqual(visti[2], visti[0]);
+  // Col biglietto il documento è già quello del biglietto: niente id.
+  let corpo = null;
+  await canale.domandaChiusura({ ticket: 't' }, { fetchImpl: async (u, init) => { corpo = JSON.parse(init.body); return reply(200, { ok: true, question: 'D?' }); }, ...piano });
+  assert.equal('requestId' in corpo, false);
 });
 
 test('domanda: un ok senza testo, o senza l\'id per rispondere, non è una domanda', async () => {
