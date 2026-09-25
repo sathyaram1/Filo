@@ -1,18 +1,12 @@
 // routine-domanda.mjs — la domanda di fine sessione delle routine, dalla parte dell'owner.
 // Imposta le domande (slot orchestrator, worker o un ruolo) e legge le risposte; le
-// sessioni la chiedono con routine-channel.mjs domanda/risposta, solo alla fine.
-//
-// USO
-//   node scripts/routine-domanda.mjs mostra
-//   node scripts/routine-domanda.mjs imposta <slot> "<testo>"      (o il testo da stdin)
-//   node scripts/routine-domanda.mjs togli <slot>
-//   node scripts/routine-domanda.mjs risposte [--n N]
+// sessioni la chiedono con routine-channel.mjs domanda/risposta, solo alla fine. Uso: USO qui sotto.
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineClosingAdmin';
-const USO = 'Uso: node scripts/routine-domanda.mjs [mostra | imposta <slot> "<testo>" | togli <slot> | risposte [--n N]]';
+const USO = 'Uso: node scripts/routine-domanda.mjs [mostra | imposta <slot> "<testo>" (o il testo da stdin) | togli <slot> | risposte [--n N]]';
 
 /** Le parole della riga di comando. PURA. @returns {{ cmd, slot?, testo?, n? } | { errore }} */
 export function leggiArgomenti(argv) {
@@ -72,7 +66,7 @@ export function formattaRisposte(result, { n = 50, quando = dataOra } = {}) {
   ].join('\n'));
   // Più voci di quelle mostrate: si dice, non si tace.
   const altre = voci.length - scelte.length;
-  return righe.join('\n\n') + (altre > 0 ? `\n\n(altre ${altre} più vecchie: --n ${voci.length} per vederle)` : '');
+  return righe.join('\n\n') + (altre > 0 ? `\n\n(altre ${altre} più vecchie fra quelle arrivate: alza --n per vederle)` : '');
 }
 
 /** Le domande impostate e il ripiego, come le risolve il server. PURA. */
