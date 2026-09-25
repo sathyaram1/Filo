@@ -124,7 +124,7 @@ test('argomenti: parola d\'ordine per l\'orchestratore, --biglietto per il worke
   assert.ok(a('risposta', ['p'], {}).errore, 'manca l\'id');
   assert.ok(a('domanda', ['p', 'avanzo'], {}).errore, 'una parola in più non si ignora');
   assert.ok(a('domanda', ['p'], { biglietto: 't' }).errore, 'due credenziali');
-  assert.ok(a('risposta', [], { biglietto: 't', role: 'resolver' }).errore, 'un campo che qui non vale');
+  assert.ok(a('risposta', [], { biglietto: 't', role: 'new-work' }).errore, 'un campo che qui non vale');
 });
 
 test('il comando stampato per rispondere: heredoc, id vero, parola d\'ordine MAI in chiaro', () => {
@@ -182,7 +182,9 @@ test('CLI: domanda → exit 0, stampa la domanda e il comando esatto per rispond
     assert.match(r.stdout, /Cosa ti ha rallentato\?/);
     assert.match(r.stdout, /routine-channel\.mjs" risposta "<parola-d-ordine>" c42 <<'FINE'/);
     assert.ok(!r.stdout.includes('parola-segreta'));
-    assert.deepEqual(richieste[0].body, { passphrase: 'parola-segreta', op: 'question' });
+    assert.equal(richieste[0].body.passphrase, 'parola-segreta');
+    assert.equal(richieste[0].body.op, 'question');
+    assert.match(richieste[0].body.requestId, /^[A-Za-z0-9_-]{8,128}$/);
   } finally { srv.close(); }
 });
 
@@ -220,7 +222,7 @@ test('owner: sottocomandi e --n', () => {
   const l = owner.leggiArgomenti;
   assert.deepEqual(l([]), { cmd: 'mostra' });
   assert.deepEqual(l(['imposta', 'worker', 'Cosa', 'manca?']), { cmd: 'imposta', slot: 'worker', testo: 'Cosa manca?' });
-  assert.deepEqual(l(['imposta', 'resolver']), { cmd: 'imposta', slot: 'resolver', testo: '' });
+  assert.deepEqual(l(['imposta', 'fixer']), { cmd: 'imposta', slot: 'fixer', testo: '' });
   assert.deepEqual(l(['togli', 'orchestrator']), { cmd: 'togli', slot: 'orchestrator' });
   assert.deepEqual(l(['risposte']), { cmd: 'risposte' });
   assert.deepEqual(l(['risposte', '--n', '7']), { cmd: 'risposte', n: 7 });
@@ -239,14 +241,14 @@ test('owner: risposte in un elenco solo dal più recente, con ruolo, #numero, du
       { id: 'b', slug: 'cloud-a', askedAtMs: 1000, question: 'D vecchia?', answered: false },
     ],
     workers: [
-      { slug: 'cloud-b', role: 'resolver', num: '712', createdAtMs: 0, releasedAtMs: 38 * 60000, closing: { question: 'D w?', askedAtMs: 2000, answer: lunga } },
+      { slug: 'cloud-b', role: 'new-work', num: '712', createdAtMs: 0, releasedAtMs: 38 * 60000, closing: { question: 'D w?', askedAtMs: 2000, answer: lunga } },
       { slug: 'cloud-b', role: 'verifier', num: '9', createdAtMs: 0, closing: null },
     ],
   }, { n: 10, quando: (ms) => `t${ms}` });
   const blocchi = out.split('\n\n');
   assert.equal(blocchi.length, 3, 'il worker senza domanda non compare');
   assert.match(blocchi[0], /^t3000 {2}orchestratore · cloud-a/);
-  assert.match(blocchi[1], /^t2000 {2}resolver #712 · 38 min · cloud-b/);
+  assert.match(blocchi[1], /^t2000 {2}new-work #712 · 38 min · cloud-b/);
   assert.ok(blocchi[1].includes(lunga), 'la risposta non si taglia');
   assert.match(blocchi[2], /R: \(nessuna risposta\)/);
 });
@@ -256,6 +258,36 @@ test('owner: oltre --n si dice quante ne restano fuori', () => {
   const out = owner.formattaRisposte({ orchestrator, workers: [] }, { n: 2, quando: (ms) => `t${ms}` });
   assert.equal((out.match(/^t\d/gm) || []).length, 2);
   assert.match(out, /altre 1 più vecchie/);
+});
+
+test('owner: una risposta con OSC 52 esce senza ESC né BEL, e intera', () => {
+  const ostile = 'prima\u001b]52;c;cm0gLXJmIH4=\u0007dopo\u009b2J‮accapo\nriga\ttab';
+  const out = owner.formattaRisposte({
+    orchestrator: [{ slug: 's\u001b[8m', askedAtMs: 1, question: 'D\u001b]0;titolo\u0007', answered: true, answer: ostile }],
+    workers: [{ slug: 'w', role: 'fixer\u001b', num: '1', createdAtMs: 0, releasedAtMs: 60000, closing: { question: 'D', askedAtMs: 2, answer: ostile } }],
+  }, { quando: (ms) => `t${ms}` });
+  assert.doesNotMatch(out, /[\u0000-\u0008\u000b-\u001f\u007f-\u009f‮]/, 'nessun carattere di controllo arriva al terminale');
+  assert.ok(out.includes('prima\\x1b]52;c;cm0gLXJmIH4=\\x07dopo\\x9b2J\\u202eaccapo'), 'il testo resta intero, coi caratteri resi visibili');
+  assert.ok(out.includes('\ttab'), 'tab resta');
+  const domande = owner.formattaDomande({ slots: { worker: { text: 'x\u001b]52;c;QQ==\u0007' } }, default: 'd\u0007' });
+  assert.doesNotMatch(domande, /[\u001b\u0007]/);
+});
+
+test('owner: un rifiuto bad_slot si legge, col messaggio e l\'elenco del server', () => {
+  const daErrore = owner.messaggioErrore(400, { error: { status: 'INVALID_ARGUMENT', message: 'bad_slot: resolver', details: { allowed: ['orchestrator', 'worker', 'new-work'] } } });
+  assert.match(daErrore, /bad_slot: resolver/);
+  assert.match(daErrore, /orchestrator, worker, new-work/);
+  const daRisultato = owner.messaggioErrore(200, { result: { ok: false, reason: 'bad_slot', slots: ['orchestrator', 'fixer'] } });
+  assert.match(daRisultato, /bad_slot/);
+  assert.match(daRisultato, /orchestrator, fixer/);
+  assert.match(owner.messaggioErrore(404, {}), /routineClosingAdmin non esiste/);
+  assert.doesNotMatch(owner.messaggioErrore(400, { error: { message: 'x\u001b]52;c;QQ==\u0007' } }), /[\u001b\u0007]/);
+});
+
+test('owner: l\'aiuto elenca gli slot veri', () => {
+  const e = owner.leggiArgomenti(['inventato']).errore;
+  assert.match(e, /orchestrator, worker, new-work, fixer, verifier, secaudit, prober/);
+  assert.doesNotMatch(e, /resolver/);
 });
 
 test('owner: mostra gli slot e il ripiego', () => {
