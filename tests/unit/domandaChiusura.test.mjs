@@ -253,6 +253,24 @@ test('owner: risposte in un elenco solo dal più recente, con ruolo, #numero, du
   assert.match(blocchi[2], /R: \(nessuna risposta\)/);
 });
 
+test('owner: coi dati come li manda il server, un cancelletto solo e niente durata negativa', () => {
+  const ora = Date.UTC(2026, 8, 25, 10, 0);
+  const out = owner.formattaRisposte({
+    orchestrator: [],
+    workers: [
+      { slug: 'r', role: 'verifier', num: '#477', createdAtMs: ora - 30 * 60000, releasedAtMs: ora,
+        closing: { question: 'q', askedAtMs: ora - 60000, answer: 'niente' } },
+      { slug: 'r', role: 'fixer', num: '#478.2', createdAtMs: ora - 10 * 60000, releasedAtMs: null,
+        closing: { question: 'q', askedAtMs: ora, answer: 'niente' } },
+    ],
+  }, { quando: () => 'ORA' });
+  assert.match(out, /verifier #477 · 30 min/);
+  assert.match(out, /fixer #478\.2 · non rilasciato/);
+  assert.doesNotMatch(out, /##/);
+  assert.doesNotMatch(out, /-\d+ min/);
+  assert.ok(out.indexOf('fixer') < out.indexOf('verifier'), 'dal più recente');
+});
+
 test('owner: oltre --n si dice quante ne restano fuori', () => {
   const orchestrator = [1, 2, 3].map((i) => ({ slug: 's', askedAtMs: i, question: 'D', answered: true, answer: 'x' }));
   const out = owner.formattaRisposte({ orchestrator, workers: [] }, { n: 2, quando: (ms) => `t${ms}` });
