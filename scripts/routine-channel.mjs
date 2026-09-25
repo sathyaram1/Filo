@@ -404,6 +404,92 @@ export async function releaseConRapporto(t, fault, report, opts) {
   return { ...r, rapporto: 'allegato' };
 }
 
+// ─── Domanda di fine sessione (endpoint routineClosing) ─────────────────────
+
+/** Il corpo della richiesta: una credenziale sola, il server ne rifiuta due o nessuna. PURA. */
+export function corpoChiusura(op, { passphrase = '', ticket = '', id = '', answer } = {}) {
+  if (!passphrase === !ticket) throw new Error('serve esattamente una fra parola d\'ordine e biglietto');
+  const corpo = passphrase ? { passphrase: String(passphrase), op } : { ticket: String(ticket), op };
+  if (op === 'answer') {
+    if (passphrase) corpo.id = String(id || '');
+    corpo.answer = String(answer ?? '');
+  }
+  return corpo;
+}
+
+/**
+ * Traduce la risposta di `routineClosing`. PURA.
+ * 'assente' = nessuna domanda da avere (endpoint che non c'è, rete, 5xx): si
+ * chiude comunque. 'rifiutato' = il server ha guardato e ha detto no.
+ */
+export function leggiRispostaChiusura(status, body) {
+  const b = body || {};
+  if (status === 200 && b.ok) {
+    return { esito: 'ok', question: typeof b.question === 'string' ? b.question : '', id: b.id ? String(b.id) : '' };
+  }
+  const reason = String(b.reason || `http_${status}`);
+  // Un 404 senza motivo del server è la funzione che non esiste (pagina HTML);
+  // `bad_closing` è un 404 vero del server, e resta un rifiuto.
+  const senzaServer = status === 0 || status >= 500 || b.reason === 'malformed_response' || (status === 404 && !b.reason);
+  if (senzaServer) return { esito: 'assente', reason };
+  const out = { esito: 'rifiutato', reason };
+  if (b.detail) out.detail = String(b.detail);
+  if (b.bytes !== undefined) out.bytes = b.bytes;
+  if (b.max !== undefined) out.max = b.max;
+  return out;
+}
+
+export const EXIT_CHIUSURA = { ok: 0, assente: 2, rifiutato: 4 };
+
+/** La riga da stampare su un rifiuto: su `answer_too_big` coi numeri, perché chi scrive accorci lui. PURA. */
+export function testoRifiutoChiusura(r) {
+  if (r.reason === 'answer_too_big') {
+    return `RIFIUTATO dal server: answer_too_big — la risposta è di ${r.bytes ?? '?'} byte, il massimo è ${r.max ?? '?'}. `
+      + 'Non è stato salvato niente: accorciala tu e rilancia.';
+  }
+  return `RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`;
+}
+
+export async function domandaChiusura(cred, opts) {
+  const { status, body } = await call('routineClosing', corpoChiusura('question', cred), opts);
+  const r = leggiRispostaChiusura(status, body);
+  // Senza testo, o senza l'id con cui rispondere, non c'è una domanda a cui rispondere.
+  if (r.esito === 'ok' && (!r.question.trim() || (cred.passphrase && !r.id))) return { esito: 'assente', reason: 'busta_incompleta' };
+  return r;
+}
+
+export async function rispostaChiusura(cred, answer, opts) {
+  const { status, body } = await call('routineClosing', corpoChiusura('answer', { ...cred, answer }), opts);
+  return leggiRispostaChiusura(status, body);
+}
+
+/**
+ * Le parole di `domanda` e `risposta`: la parola d'ordine (orchestratore) o
+ * `--biglietto` (worker), mai tutte e due. PURA.
+ * @returns {{ cred: object } | { errore: string }}
+ */
+export function argomentiChiusura(cmd, args, data = {}) {
+  const uso = cmd === 'risposta'
+    ? 'risposta "<parola-d-ordine>" <id>  oppure  risposta --biglietto <biglietto>, col testo da stdin'
+    : 'domanda "<parola-d-ordine>"  oppure  domanda --biglietto <biglietto>';
+  const estranei = Object.keys(data).filter((k) => k !== 'biglietto');
+  if (estranei.length) return { errore: `--${estranei[0]} non vale qui. Uso: ${uso}` };
+  const biglietto = typeof data.biglietto === 'string' ? data.biglietto.trim() : '';
+  if (biglietto) {
+    if (args.length) return { errore: `Argomento non capito: "${String(args[0]).slice(0, 40)}": col biglietto non serve altro. Uso: ${uso}` };
+    return { cred: { ticket: biglietto } };
+  }
+  const attesi = cmd === 'risposta' ? 2 : 1;
+  if (args.length !== attesi || args.some((a) => !String(a).trim())) return { errore: `Uso: ${uso}` };
+  return { cred: cmd === 'risposta' ? { passphrase: args[0], id: args[1] } : { passphrase: args[0] } };
+}
+
+/** Il comando esatto per rispondere, stampato insieme alla domanda. La parola d'ordine resta segnaposto. PURA. */
+export function comandoRisposta(io, cred, id) {
+  const chi = cred.ticket ? `--biglietto ${cred.ticket}` : `"<parola-d-ordine>" ${id}`;
+  return `node "${io}" risposta ${chi} <<'FINE'\n<la tua risposta>\nFINE`;
+}
+
 /**
  * Spedisce il ramo corrente su origin, prima del rilascio. L'hook di
  * salvataggio parte solo su Edit/Write: un `git commit` fatto a mano dal
