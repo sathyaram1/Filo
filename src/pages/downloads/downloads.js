@@ -105,6 +105,9 @@
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_CONFIRM, id: r.id, allow: !!allow });
     items = (res && res.items) || items;
     render();
+    // Due clic di fretta sulla stessa voce: la seconda risposta non ha più
+    // niente a cui rispondere, e dirlo è meglio che confermare due volte.
+    if (res && res.ok === false) { flash(res.error || 'Risposta non registrata'); return; }
     flash(allow ? 'Scaricamento avviato' : 'Programma non scaricato');
   }
   async function openFolder(r) {

@@ -271,6 +271,12 @@ async function loadHistory() {
         // Una conferma non sopravvive al riavvio: chi l'avrebbe data non è più
         // davanti a quell'avviso. Il programma resta fuori dalla cartella e la
         // voce dice che non è stato scaricato (#588).
+        // Cronologia scritta prima del #588: la marca non c'era, e senza
+        // ricalcolarla un .exe già in elenco si aprirebbe senza conferma.
+        if (rec.exe === undefined) {
+          try { rec.exe = ESE().eEseguibile(rec.filename); } catch (_) { rec.exe = false; }
+          if (!rec.site) { try { rec.site = ESE().sito(rec.url); } catch (_) {} }
+        }
         if (rec.state === 'pending') {
           rec._quarantena = true;
           rimuoviQuarantena(rec);
