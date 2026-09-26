@@ -38,9 +38,11 @@
     .bd-loading, .bd-empty { color: var(--sn-muted); font-size: 14px; padding: 24px 4px; }
     /* Quando non si può stimare il tempo, una rotella: la pagina non deve restare muta a "Caricamento…". */
     .bd-loading { display: flex; align-items: center; gap: 10px; }
-    /* `display: flex` (regola d'autore) vince sull'attributo `hidden`: senza questo, `el.hidden = true` non
-       nasconde più il loader. Stesso trucco di .fb-admin-banner[hidden] nella dashboard. */
-    .bd-loading[hidden], .bd-error[hidden] { display: none; }
+    /* Un `display` in una classe batte il `display: none` di `[hidden]`, e `el.hidden = true` non nasconde più:
+       una riga per OGNI classe. patterns/una-classe-che-scrive-display-deve-lasciarsi-nascondere.md */
+    .bd-auth[hidden], .bd-loading[hidden], .bd-error[hidden], .bd-retry[hidden], .bd-list[hidden],
+    .bd-more[hidden], .bd-card[hidden], .bd-vote[hidden], .bd-vote-btn[hidden],
+    .bd-reopen-actions[hidden] { display: none; }
     .bd-spinner {
       width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%;
       border: 2px solid var(--sn-border); border-top-color: var(--sn-accent);

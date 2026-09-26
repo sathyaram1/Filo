@@ -780,10 +780,12 @@
       // invece di ripiegare sul vuoto.
       console.error('[board] errore caricamento:', err);
       if (schedeImposteDaFuori) return;
-      // Con la copia su disco davanti agli occhi un guasto del giro di
-      // aggiornamento non deve portare via i miglioramenti già mostrati: le
-      // schede ci sono, sono solo vecchie di poco.
-      if (dataLoaded && allFeedbacks.length) return;
+      // Un guasto del GIRO DI AGGIORNAMENTO non porta via le schede già sotto
+      // gli occhi: sono vecchie di poco e nessuno ne ha chieste altre. Da capo
+      // invece erano già state tolte per sostituirle: tacere lì lascia la
+      // pagina sulla rotella per sempre (#708).
+      if (!daCapo && dataLoaded && allFeedbacks.length) return;
+      if (daCapo) { allFeedbacks = []; dataLoaded = false; }
       lastLoadError = err;
       showLoadError(err);
       return;
