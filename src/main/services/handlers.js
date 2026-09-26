@@ -809,7 +809,12 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   const hasTools = Array.isArray(tools) && tools.length > 0;
   const cached = (noCache || hasTools) ? null : await AICache.get({ provider: settings.provider, model, messages });
   if (cached) {
-    return { text: cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
+    // Una risposta ripescata dalla cache è nata dalla stessa roba di altri:
+    // salta la chiamata al modello, non il giudizio (#536).
+    const v = daGuardare
+      ? await passaDalSecondoModello({ testo: cached.text, classe: classeFonti, concreteModel: model, action, payload, origin })
+      : null;
+    return { text: v ? v.testo : cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true, ...(v ? { guardiano: { esito: v.esito, motivo: v.motivo } } : {}) };
   }
 
   const attemptsRaw = buildAttemptChain(settings, model, action);
