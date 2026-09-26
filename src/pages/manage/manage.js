@@ -2537,16 +2537,18 @@
     return p;
   }
 
-  // Riprova a leggere il resto, su richiesta dell'owner: il segno se ne va e
-  // la richiesta riparte da capo.
-  function riprovaDettaglio(id) {
+  // Riprova a leggere il resto, su richiesta dell'owner.
+  function riprovaDettaglio(id, btn) {
     const key = String(id || '');
     const riga = allFeedbacks.find((f) => f._id === key);
     if (!riga) return;
     delete riga._dettaglioMancato;
-    // Ridisegnare basta: il pannello, trovando la riga senza segno e ancora
-    // incompleta, rifà la richiesta da sé.
-    if (selectedId === key) openDetail(key, { ridisegno: true });
+    // Risponde il tasto, non un ridisegno: ridisegnare adesso cancellerebbe
+    // una bozza in corso, che è il danno già visto su questo pannello.
+    if (btn) { btn.disabled = true; btn.textContent = 'Riprovo…'; }
+    completaDettaglio(key)
+      .catch((e) => console.warn('[manage] dettaglio non completato:', e?.message || e))
+      .finally(() => { if (selectedId === key) ridisegnaRispettandoLaBozza(key); });
   }
 
   // Il feedback COMPLETO, aspettando la lettura se ancora non c'è. Chi APPENDE
