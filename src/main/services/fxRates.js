@@ -74,10 +74,19 @@
 
   // Ritorna sempre qualcosa (cache fresca, cache stale, o fallback).
   // Aggiorna in background se la cache è scaduta ma utilizzabile.
+  // Quello che è in memoria vale solo se l'ha prodotto la richiesta di ADESSO:
+  // dopo l'aggiornamento che ha allargato l'elenco, i cambi salvati il giorno
+  // prima avevano ancora dieci valute e «3000 rupie» restava senza cambio per
+  // un giorno intero. La richiesta si porta dietro sé stessa, così qualunque
+  // cambiamento futuro scade da solo senza che nessuno se lo ricordi (#724).
+  function dellaRichiestaDiAdesso(c) {
+    return !!c && c.req === URL;
+  }
+
   async function get() {
     const cached = await readCache();
     const now = Date.now();
-    if (cached && cached.fetchedAt && (now - cached.fetchedAt) < TTL_MS) {
+    if (dellaRichiestaDiAdesso(cached) && cached.fetchedAt && (now - cached.fetchedAt) < TTL_MS) {
       return cached;
     }
     if (inflight) {
