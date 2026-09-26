@@ -144,8 +144,12 @@ function packageVersion() {
   } catch (_) { return ''; }
 }
 
-async function getDoc(id, bearer) {
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}`, {
+// `campi`: i soli campi che chi chiama guarda. Senza maschera qui arrivava la
+// segnalazione INTERA — testo cifrato, note, allegati — per leggerne due (#680).
+async function getDoc(id, bearer, campi = null) {
+  const maschera = (Array.isArray(campi) && campi.length)
+    ? `?${campi.map((f) => `mask.fieldPaths=${encodeURIComponent(f)}`).join('&')}` : '';
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}${maschera}`, {
     headers: { Authorization: `Bearer ${bearer}` },
   });
   if (res.status === 404) return null;
