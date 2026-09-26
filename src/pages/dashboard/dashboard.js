@@ -668,6 +668,15 @@
       b.addEventListener('click', onRiprova);
       div.appendChild(b);
     }
+    if (registro && onRegistro) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dash-live-link';
+      b.textContent = 'Vedi cosa ho fermato';
+      b.title = 'Apre il registro degli avvisi fermati';
+      b.addEventListener('click', onRegistro);
+      div.appendChild(b);
+    }
     if (Array.isArray(link) && link.length) {
       const box = document.createElement('div');
       box.className = 'dash-live-links';
