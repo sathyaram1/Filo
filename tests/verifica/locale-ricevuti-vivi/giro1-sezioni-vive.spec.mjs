@@ -126,9 +126,10 @@ test('il segno nato da un clic «Approva» arriva da solo e si distingue da quel
   await expect(segnoMano).toBeVisible();
   const [tClic, tMano] = [await segnoClic.innerText(), await segnoMano.innerText()];
   expect(tClic).not.toBe(tMano);
+  await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-lista.png' });
   // Distinto anche a colpo d'occhio, non solo nelle parole.
   const stile = (l) => l.evaluate((el) => { const s = getComputedStyle(el); return `${s.color}|${s.backgroundColor}|${s.borderColor}|${s.borderStyle}`; });
-  expect(await stile(segnoClic)).not.toBe(await stile(segnoMano));
+  expect.soft(await stile(segnoClic)).not.toBe(await stile(segnoMano));
   // L'email con la coda tecnica non si mostra grezza.
   await scheda(page, 'clic').click();
   const riga = page.locator('#mgPreapprovedInfo');
