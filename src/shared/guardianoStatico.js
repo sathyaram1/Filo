@@ -141,14 +141,14 @@
 
     // Tutte le occorrenze, non la prima: la parola che conta può essere la
     // terza, e fermarsi alla prima lascia passare il resto della mail.
-    const cerca = new RegExp(PAROLE_CODICE.source, 'gi');
+    const cerca = new RegExp(MARCHI_MONOUSO.source, 'gi');
     let parola;
     while ((parola = cerca.exec(s))) {
       const i = parola.index;
       const prima = s.slice(Math.max(0, i - RAGGIO), i);
       const dopo = s.slice(i + parola[0].length, i + parola[0].length + RAGGIO);
       if (FORMA_CODICE.test(prima) || FORMA_CODICE.test(dopo)) {
-        return { blocca: true, regola: 'codice', motivo: 'conteneva un codice di accesso o una password' };
+        return { blocca: true, regola: 'codice', motivo: 'conteneva un codice usa e getta' };
       }
     }
 
