@@ -822,6 +822,21 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   }
 
   if (!hasTools) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage }).catch(() => {});
+
+  // Il secondo giudizio, prima che questo testo torni a chi lo mostrerà.
+  if (daGuardare) {
+    const vagliato = await passaDalSecondoModello({
+      testo: result.text, classe: classeFonti, concreteModel, action, payload, origin,
+    });
+    if (vagliato) {
+      return {
+        text: vagliato.testo, toolCalls: [], reasoningDetails: [], finishReason: 'guardiano',
+        model: concreteModel, provider: usedProvider, costEur, usage: result.usage, timing,
+        guardiano: { esito: vagliato.esito, motivo: vagliato.motivo },
+        keyFallback: result.keyFallback || null,
+      };
+    }
+  }
   return {
     text: result.text, toolCalls, reasoningDetails, finishReason: result.finishReason || null,
     model: concreteModel, provider: usedProvider, costEur, usage: result.usage, timing,
