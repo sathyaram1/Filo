@@ -160,7 +160,13 @@ async function refresh() {
     // uso per un account che non può più leggerle).
     remoteSecrets = null;
   }
-  lastFetchTs = Date.now();
+  // Solo una lettura a cui il server HA risposto rimanda la prossima (#679).
+  // Se Filo si apre mentre la rete non c'è ancora, la configurazione non
+  // arriva e nessuna funzione ha un modello da usare: segnare quel tentativo
+  // come fatto teneva l'app senza modelli fino alla scadenza lunga, anche se
+  // la rete tornava un istante dopo. Riprovare subito non è un ciclo: qui ci
+  // si passa solo all'avvio, all'accesso e quando una pagina chiede la config.
+  if (risposto) lastFetchTs = Date.now();
   return get();
 }
 
