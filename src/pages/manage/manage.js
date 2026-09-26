@@ -2997,7 +2997,7 @@
     // La conversazione su cui si appende va letta PRIMA: dall'elenco arriva
     // senza note, e appenderci sopra il motivo le cancellerebbe.
     const fb = await feedbackCompleto(selectedId);
-    if (!fb) return;
+    if (!fb) { setActionMsg(CONVERSAZIONE_NON_ARRIVATA, 'err'); return; }
     const azione = MR.ownerActionFor(fb, 'reopen', { releasedVersion });
     if (!azione) {
       chiudiRiapertura();
