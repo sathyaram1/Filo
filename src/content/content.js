@@ -1704,6 +1704,14 @@
       items.push(TranslatePage.buildRestoreOriginalItem());
     }
 
+    // 2d. Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
+    // lo stato meno visibile che il tasto destro può raccontare: una pagina
+    // rimasta zoomata da un'altra visita spiega da sé perché è così, e la voce
+    // è anche la via d'uscita. Il livello lo sa il preload: glielo si chiede
+    // con un evento, la risposta arriva nel dataset nello stesso dispatch.
+    const zoomItem = buildZoomItem();
+    if (zoomItem) items.push(zoomItem);
+
     // 3. Zona contestuale — assente se non c'è contesto utile.
     const contextItems = buildContextualItems({
       selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
@@ -1733,6 +1741,31 @@
       icon: ricon,
       label: 'Invia attacco (Red-team)',
       onClick: () => openSurface('redteam', () => self.SN_REDTEAM_ATTACK_UI?.open()),
+    };
+  }
+
+  // Livello di zoom della pagina, o null se è alla dimensione reale.
+  function zoomCorrente() {
+    try {
+      document.dispatchEvent(new Event('filo:zoom-chiedi'));
+      const p = parseInt(document.documentElement.dataset.filoZoom || '', 10);
+      return Number.isFinite(p) && p !== 100 ? p : null;
+    } catch (_) { return null; }
+  }
+
+  function buildZoomItem() {
+    const p = zoomCorrente();
+    if (p == null) return null;
+    const zicon = (self.SN_ICONS && typeof self.SN_ICONS.zoom === 'function')
+      ? self.SN_ICONS.zoom(16) : undefined;
+    return {
+      type: 'item',
+      icon: zicon,
+      // Stesso nome della voce nella barra dei menu: due strade per la stessa
+      // cosa non si chiamano in due modi.
+      label: `Dimensione reale (ora ${p}%)`,
+      shortcut: Tasti.etichetta('Ctrl+0'),
+      onClick: () => { try { document.dispatchEvent(new Event('filo:zoom-azzera')); } catch (_) {} },
     };
   }
 

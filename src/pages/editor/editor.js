@@ -2431,6 +2431,14 @@
   for (const [evento, dir] of [['filo:zoom-in', 'in'], ['filo:zoom-out', 'out'], ['filo:zoom-reset', 'reset']]) {
     document.addEventListener(evento, () => zoomVerso(dir));
   }
+  // #686 — «zoom al 150%» chiesto in chat. La percentuale arriva nel dataset e
+  // non in `detail`: fra il mondo del preload e questo un `detail` non passa.
+  document.addEventListener('filo:zoom-set', () => {
+    const grezzo = parseFloat(document.documentElement.dataset.filoZoomTarget || '');
+    if (!Number.isFinite(grezzo) || grezzo <= 0) return;
+    zoomLevel = grezzo / 100;
+    applyZoom();
+  });
   docWrap.addEventListener('wheel', (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
     // deltaY<0 (pinch-out / scroll su) → ingrandisci. Passo proporzionale al

@@ -36,6 +36,7 @@
         title: t.title || '',
         active: !!t.active,
         lastAccessed: t.lastAccessed || null,
+        zoomPercent: typeof t.zoomPercent === 'number' ? t.zoomPercent : null,
       }));
     } catch (_) {
       return [];
@@ -208,6 +209,15 @@
       lines.push(E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n') }));
     }
     lines.push('');
+    // ZOOM — #686: il livello della scheda davanti, come Filo vede il titolo.
+    // Sempre, anche al 100%: senza la riga, a «a quanto è lo zoom?» il modello
+    // rispondeva a naso. È un dato di Filo, non del sito: fuori dalla busta.
+    const davanti = state.tabs.find((t) => t.active) || state.tabs[0];
+    if (davanti && typeof davanti.zoomPercent === 'number') {
+      lines.push('ZOOM DELLA PAGINA');
+      lines.push(`Scheda davanti: ${davanti.zoomPercent}% (100% = dimensione reale; si cambia con ZOOM_PAGINA)`);
+      lines.push('');
+    }
     // PROCESSI
     lines.push('PROCESSI ATTIVI');
     if (!state.timers.length) lines.push('(nessuno)');
