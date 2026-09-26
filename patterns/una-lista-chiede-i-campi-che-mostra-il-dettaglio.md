@@ -35,6 +35,20 @@ si aspetta, anche quando il caricamento del dettaglio è già partito da solo:
 «quasi sempre è già arrivato» non è una garanzia (`feedbackCompleto` in
 `src/pages/manage/manage.js`).
 
+**E se il documento intero non arriva.** Prendere il documento prima di
+scrivere protegge solo finché quella lettura riesce. Se fallisce, va in
+timeout, o torna vuota perché il documento non c'è più, chi chiede «dammelo
+intero» si ritrova in mano la riga proiettata di prima, che è indistinguibile
+da un feedback senza note: la scrittura riparte e cancella il report, come se
+non ci fosse stata nessuna difesa. Quindi la funzione che completa NON torna
+mai una riga ancora proiettata: torna niente, e chi ha chiesto lo dice
+all'utente invece di procedere o di tacere. La lettura mancata si SEGNA sulla
+riga, per tre motivi: il pannello può dire «non è arrivato» invece di restare
+su «Caricamento…» a tempo indeterminato, può offrire un «Riprova», e riaprire
+la stessa riga non ricompra all'infinito una lettura che continua a non
+arrivare. E la lettura del dettaglio ha sempre un tempo massimo: senza, una
+richiesta appesa blocca dietro di sé tutti i tasti che scrivono.
+
 **Il conto dell'attesa: un ridisegno in più.** Quando il documento arriva il
 pannello si ridisegna, e ridisegnare RIEMPIE le sue caselle col feedback: su
 una bozza in corso vuol dire cancellarla. Chi preme subito dopo legge la

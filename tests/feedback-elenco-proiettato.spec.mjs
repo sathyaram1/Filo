@@ -497,3 +497,111 @@ test('finita la bozza, la conversazione arriva lo stesso', async ({ openTab }) =
   await page.locator('#mgThread').click();
   await expect(page.locator('#mgThread')).toContainText('Report della lavorazione.', { timeout: 10_000 });
 });
+
+// ── Quando il resto della segnalazione NON arriva ─────────────────────────
+//
+// L'elenco è una proiezione, quindi la conversazione si legge aprendo la
+// segnalazione. Se quella lettura non torna (rete giù, tempo scaduto,
+// documento sparito) la riga d'elenco NON è «un feedback senza note»: è un
+// feedback di cui non sappiamo le note. Trattarla come vuota è la perdita:
+// «Invia risposta» e «Conferma riapertura» appendono alla conversazione, e su
+// una conversazione mai letta scriverebbero il loro testo al posto del report.
+//
+// Senza il fix: il pannello resta su «Caricamento della conversazione…» per
+// sempre, i due tasti non fanno niente e non lo dicono (lettura in errore),
+// oppure spediscono il solo testo nuovo (lettura vuota).
+
+const ROTTA = {
+  _id: 'fb677x',
+  _proiezione: true,
+  seq: 6775,
+  subSeq: 0,
+  name: 'Domanda aperta',
+  text: 'Quale delle due strade?',
+  status: 'design',
+  statusReason: 'clarify',
+  statusPublic: 'open',
+  clientId: 'tester-1',
+  createdAt: '2026-09-23T09:00:00.000Z',
+};
+
+// `modo`: 'guasto' = la lettura del dettaglio fallisce, 'sparito' = torna
+// vuota, 'poi-ok' = fallisce la prima volta e riesce dalla seconda.
+async function gestioneDettaglioRotto(openTab, riga, modo, extra) {
+  const page = await openTab(PAGINA_GESTIONE);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
+  await admin(page);
+  await page.evaluate(({ r, m, ex }) => {
+    window.__inviati = [];
+    window.__chiesti = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') { window.__inviati.push(msg); return { ok: true }; }
+      if (msg && msg.type === 'auth_status') return { ok: true, isAdmin: true, profile: { email: 'owner@example.invalid' } };
+      if (msg && msg.type === 'feedback_decrypt_fields') return { ok: true, list: msg.list };
+      return orig(msg);
+    };
+    window.__mgTest.setLiveSources({
+      listVersions: async () => [],
+      getMany: async () => [],
+      getDettagli: async (ids) => {
+        window.__chiesti.push(...ids);
+        await new Promise((x) => setTimeout(x, 150));
+        if (m === 'guasto') throw new Error('Failed to fetch');
+        if (m === 'poi-ok' && window.__chiesti.length === 1) throw new Error('Failed to fetch');
+        if (m === 'sparito') return [];
+        const pieno = JSON.parse(JSON.stringify(r));
+        delete pieno._proiezione;
+        pieno.notes = 'Report della lavorazione, con dentro la domanda per te.';
+        return ids.includes(pieno._id) ? [pieno] : [];
+      },
+    });
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([JSON.parse(JSON.stringify(r))]);
+    if (ex && ex.releasedVersion) window.__mgTest.setReleasedVersion(ex.releasedVersion);
+    if (ex && ex.tab) window.__mgTest.setTab(ex.tab);
+  }, { r: riga, m: modo, ex: extra || null });
+  await page.locator(`.mg-item[data-id="${riga._id}"]`).click();
+  return page;
+}
+
+test('il resto che non arriva si legge nel pannello, e «Riprova» lo va a prendere', async ({ openTab }) => {
+  const page = await gestioneDettaglioRotto(openTab, ROTTA, 'poi-ok');
+  await expect(page.locator('#mgThread')).toContainText('non è arrivato', { timeout: 10_000 });
+  await page.locator('#mgRiprovaDettaglio').click();
+  await expect(page.locator('#mgThread')).toContainText('Report della lavorazione', { timeout: 10_000 });
+});
+
+test('la lettura che non è tornata non si ricompra a ogni clic', async ({ openTab }) => {
+  const page = await gestioneDettaglioRotto(openTab, ROTTA, 'guasto');
+  await expect(page.locator('#mgThread')).toContainText('non è arrivato', { timeout: 10_000 });
+  for (let i = 0; i < 4; i += 1) {
+    await page.locator('#mgThread').click();
+    await page.locator(`.mg-item[data-id="${ROTTA._id}"]`).click();
+    await page.waitForTimeout(200);
+  }
+  const chiesti = await page.evaluate(() => window.__chiesti);
+  expect(chiesti.length, `letture chieste: ${JSON.stringify(chiesti)}`).toBe(1);
+});
+
+test('con la conversazione non letta, «Invia risposta» non la sostituisce: lo dice', async ({ openTab }) => {
+  const page = await gestioneDettaglioRotto(openTab, ROTTA, 'sparito');
+  await page.locator('#mgClarifyText').fill('Prendi la seconda strada.');
+  await page.locator('#mgClarifyBtn').click();
+  await expect(page.locator('#mgClarifyMsg')).toContainText('non è arrivata', { timeout: 10_000 });
+  const inviati = await page.evaluate(() => window.__inviati);
+  expect(inviati, `non deve partire nessuna scrittura: ${JSON.stringify(inviati)}`).toEqual([]);
+});
+
+test('con la conversazione non letta, «Conferma riapertura» non la sostituisce: lo dice', async ({ openTab }) => {
+  const page = await gestioneDettaglioRotto(
+    openTab, { ...USCITO, _id: 'fb677y' }, 'sparito', { releasedVersion: '9.9.9', tab: 'resolved' },
+  );
+  await page.locator('#mgActions button', { hasText: 'Riapri' }).click();
+  await page.locator('#mgReopenText').fill('Manca il caso con lo schermo piccolo.');
+  await page.locator('#mgReopenConfirmBtn').click();
+  await expect(page.locator('#mgActionMsg')).toContainText('non è arrivata', { timeout: 10_000 });
+  const inviati = await page.evaluate(() => window.__inviati);
+  expect(inviati, `non deve partire nessuna scrittura: ${JSON.stringify(inviati)}`).toEqual([]);
+});
