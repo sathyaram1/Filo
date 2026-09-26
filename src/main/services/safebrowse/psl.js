@@ -65,8 +65,8 @@ const PRIVATE = new Set([
   'github.io', 'githubusercontent.com', 'gitlab.io', 'pages.dev', 'workers.dev',
   'vercel.app', 'netlify.app', 'web.app', 'firebaseapp.com', 'herokuapp.com',
   'appspot.com', 'blogspot.com', 'azurewebsites.net', 'onrender.com', 'fly.dev',
-  'surge.sh', 'glitch.me', 'neocities.org', 'notion.site', 'core.windows.net',
-  'amazonaws.com', 'googleapis.com', 'googleusercontent.com', 'sharepoint.com',
+  'surge.sh', 'glitch.me', 'neocities.org', 'notion.site', 'blob.core.windows.net', 'web.core.windows.net',
+  'amazonaws.com', 's3.amazonaws.com', 'googleapis.com', 'googleusercontent.com', 'sharepoint.com',
   'wordpress.com', 'medium.com',
 ]);
 

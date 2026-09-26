@@ -40,9 +40,9 @@ const BRANDS = [
   { token: 'ledger', display: 'Ledger', domains: ['ledger.com'] },
 
   // Email / account / cloud
-  { token: 'google', display: 'Google', domains: ['google.com', 'google.it', 'gmail.com', 'googlemail.com'] },
+  { token: 'google', display: 'Google', domains: ['google.com', 'google.it', 'gmail.com', 'googlemail.com', 'googleblog.blogspot.com'] },
   { token: 'gmail', display: 'Gmail', domains: ['gmail.com', 'google.com'] },
-  { token: 'microsoft', display: 'Microsoft', domains: ['microsoft.com', 'live.com', 'office.com', 'office365.com'] },
+  { token: 'microsoft', display: 'Microsoft', domains: ['microsoft.com', 'live.com', 'office.com', 'office365.com', 'microsoft.sharepoint.com'] },
   { token: 'outlook', display: 'Outlook', domains: ['outlook.com', 'live.com', 'microsoft.com'] },
   { token: 'office365', display: 'Microsoft 365', domains: ['office.com', 'office365.com', 'microsoft.com'] },
   { token: 'apple', display: 'Apple', domains: ['apple.com', 'icloud.com', 'me.com'] },
@@ -70,8 +70,8 @@ const BRANDS = [
   { token: 'shopify', display: 'Shopify', domains: ['shopify.com'] },
 
   // Dev / lavoro
-  { token: 'github', display: 'GitHub', domains: ['github.com'] },
-  { token: 'gitlab', display: 'GitLab', domains: ['gitlab.com'] },
+  { token: 'github', display: 'GitHub', domains: ['github.com', 'github.io'] },
+  { token: 'gitlab', display: 'GitLab', domains: ['gitlab.com', 'gitlab.io'] },
 ];
 
 // Indice per lookup veloce: eTLD+1 legittimo → brand (per non flaggare il vero).
