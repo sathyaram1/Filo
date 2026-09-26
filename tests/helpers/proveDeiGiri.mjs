@@ -74,6 +74,15 @@ export function importRelativi(src) {
     .map((s) => s.testo);
 }
 
+/**
+ * Il file registra dei casi di prova (`test(…)`, `test.describe(…)`, `it(…)`)? Un aiuto che
+ * esporta `expect` o uno script da lanciare con node no. PURA.
+ */
+export function registraProve(src) {
+  return /(^|[;{}\n])\s*(test|it|describe)(\.(describe|serial|only|skip|fixme|fail|slow|parallel))*\s*\(/
+    .test(scorri(src).codice);
+}
+
 /** La prova contiene almeno un controllo che può diventare rosso? PURA. */
 export function asserisceQualcosa(src) {
   return /\b(expect|assert)\s*[.(]/.test(scorri(src).codice);
