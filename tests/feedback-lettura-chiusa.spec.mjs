@@ -15,10 +15,22 @@
 //      la chiede al main, che la esegue con le credenziali dell'owner e la
 //      NEGA a chi non è admin;
 //   3. l'invio di un feedback dall'app continua a funzionare (è il cammino che
-//      non deve mai chiedere credenziali).
+//      non deve mai chiedere credenziali);
+//   4. il ricaricamento della bacheca RILEGGE davvero, anche quando il giro
+//      prima è andato a buon fine.
 //
 // Senza il fix: (1) è rosso perché la bacheca interroga `feedback`; (2) è rosso
 // perché la pagina fa la fetch da sé (nessun messaggio al main).
+//
+// (4) esiste perché (1) da solo si spegne in silenzio (#665). La bacheca ricorda
+// la vista pubblica per trenta secondi e ne tiene una copia su disco: se il
+// ricaricamento di prova non butta via l'una e l'altra, risponde con le schede
+// del giro prima senza chiedere niente al server, e il controllo di (1) non
+// guarda più nessuna richiesta. Dove la rete non c'è — il contenitore delle
+// routine — il primo caricamento fallisce, la memoria resta vuota e (1) resta
+// verde comunque: rosso solo su una macchina che la vista pubblica la raggiunge
+// davvero. (4) mette la memoria piena PRIMA di rileggere, quindi la stessa
+// rottura è rossa dappertutto.
 
 import { test, expect } from './fixtures/electron.mjs';
 
