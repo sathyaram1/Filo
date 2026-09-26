@@ -3653,7 +3653,7 @@
         btn.className = 'sn-btn sn-btn-secondary';
         btn.id = 'mgRiprovaDettaglio';
         btn.textContent = '↻ Riprova';
-        btn.addEventListener('click', () => riprovaDettaglio(fb._id));
+        btn.addEventListener('click', () => riprovaDettaglio(fb._id, btn));
         riga.appendChild(btn);
         mgThread.appendChild(riga);
       } else {
