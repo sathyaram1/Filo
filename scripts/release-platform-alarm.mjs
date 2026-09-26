@@ -142,7 +142,6 @@ export function componiAllarme({ piattaforma, versione, passo, esecuzione, repo,
   // release e' incompleta, non assente) né meno: senza un elenco di file persi
   // non si annuncia un elenco, o esce «manca» e poi niente, con il testo sotto
   // che dice il contrario (#733, secondo giro di verifica).
-  const coda = p ? ` (passo «${p}»)` : ' (passo non identificato)';
   const titolo = (!conf || !persi || !persi.length)
     ? `Il lavoro che attacca Filo per ${nome} alla release ${v} si è fermato${coda}`
     : persi.includes(conf.scarica)
