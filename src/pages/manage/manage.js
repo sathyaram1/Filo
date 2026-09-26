@@ -2539,15 +2539,15 @@
 
   // Riprova a leggere il resto, su richiesta dell'owner: il segno se ne va e
   // la richiesta riparte da capo.
-  async function riprovaDettaglio(id) {
+  function riprovaDettaglio(id) {
     const key = String(id || '');
     const i = allFeedbacks.findIndex((f) => f._id === key);
     if (i < 0) return;
     const { _dettaglioMancato, ...resto } = allFeedbacks[i];
     allFeedbacks[i] = resto;
+    // Ridisegnare basta: il pannello, trovando la riga senza segno e ancora
+    // incompleta, rifà la richiesta da sé.
     if (selectedId === key) openDetail(key, { ridisegno: true });
-    try { await completaDettaglio(key); } catch (_) { /* il segno lo rimette completaDettaglio */ }
-    if (selectedId === key) ridisegnaRispettandoLaBozza(key);
   }
 
   // Il feedback COMPLETO, aspettando la lettura se ancora non c'è. Chi APPENDE
