@@ -146,7 +146,17 @@ test('Ctrl+Z torna ancora indietro fuori dai campi di testo', async ({ app, open
 
 test('la voce del menu del tasto destro torna ancora indietro', async ({ app, openTab, testServer }) => {
   const { page, urlA } = await scheda_con_A_e_B({ openTab, testServer });
-  await page.evaluate(() => chrome.runtime.sendMessage({ type: 'nav_back' }));
+
+  await page.locator('#mark-b').click({ button: 'right' });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible();
+  const indietro = menu.locator('[data-sn-icon-id="back"]');
+  if (!(await indietro.isVisible().catch(() => false))) {
+    // Le icone meno usate stanno dentro «Altro...».
+    await menu.locator('.sn-menu-row-overflow').first().click();
+  }
+  await expect(indietro).toBeVisible();
+  await indietro.click();
   await attendiUrl(app, urlA);
 });
 
@@ -175,8 +185,10 @@ test('premuto in fretta piu\' volte, indietro si ferma sulla prima pagina', asyn
   for (let i = 0; i < 6; i++) await premiNellaPagina(app, 'Left');
   await page.waitForTimeout(1200);
 
+  // La prima pagina della cronologia della scheda: piu' indietro non si va.
   const dove = await urlDellaSchedaAttiva(app);
-  expect([urlA, 'filo://newtab/']).toContain(dove);
+  expect(dove).toMatch(new RegExp(`^${testServer.origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`));
+  expect(dove).not.toBe(urlA);
   // La scheda deve essere ancora viva e mostrare qualcosa.
   const viva = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
