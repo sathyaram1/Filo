@@ -176,12 +176,25 @@ export function shaDelRiallineamento(marker) {
   return m.role === 'verifier' && /^[0-9a-f]{7,40}$/i.test(sha) ? sha : '';
 }
 
-/** I file cambiati dal commit verificato alla punta, o null se quel commit qui non c'è. */
-function cambiatiDal(sha) {
-  const c = git(['cat-file', '-e', `${sha}^{commit}`]).ok || git(['fetch', 'origin', sha]).ok;
-  if (!c) return null;
-  const r = git(['diff', '--name-only', sha, 'HEAD']);
-  return r.ok ? r.out.split('\n').filter(Boolean) : null;
+/**
+ * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche
+ * quelli cambiati dal commit verificato alla punta. `{ changed, nota }`; la nota va stampata.
+ */
+export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
+  const g = (args) => git(args, { cwd: root });
+  const changed = g(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean);
+  const dal = shaDelRiallineamento(marker);
+  if (!dal) return { changed, nota: '' };
+  const c = g(['cat-file', '-e', `${dal}^{commit}`]).ok || g(['fetch', 'origin', dal]).ok;
+  const r = c ? g(['diff', '--name-only', dal, 'HEAD']) : { ok: false };
+  if (!r.ok) {
+    return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} qui non c'è: scelgo gli spec solo dal ramo contro main, e il lato arrivato da main resta scoperto.` };
+  }
+  const lato = r.out.split('\n').filter(Boolean);
+  return {
+    changed: [...new Set([...changed, ...lato])],
+    nota: `Giro di riallineamento: scelgo gli spec anche dai ${lato.length} file cambiati da ${dal.slice(0, 8)} (il commit verificato) alla punta, cioè il lato arrivato da main e i file in conflitto.`,
+  };
 }
 
 /**
