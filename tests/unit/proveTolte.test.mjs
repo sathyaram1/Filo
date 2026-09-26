@@ -142,6 +142,64 @@ test('senza schermo e senza xvfb la consegna si ferma e dice perché, invece di 
   }
 });
 
+// Critica sulla vecchia base; poi main cambia e cancella prove di un altro lavoro, e il ramo si riallinea.
+function riallineatoDopoLaCritica() {
+  const dir = cartellaTemporanea('prove-tolte-riallineo-');
+  const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
+  g('init', '-q', '-b', 'main');
+  g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+  scrivi('tests/verifica/99/giro1-cambiata.spec.mjs', 'ROSSA\n');
+  scrivi('tests/verifica/99/giro1-cancellata.spec.mjs', 'ROSSA\n');
+  g('add', '-A'); g('commit', '-qm', 'main: un altro lavoro');
+  g('checkout', '-q', '-b', 'lavoro');
+  scrivi('tests/verifica/679/giro1-rossa.spec.mjs', 'ROSSA\n');
+  scrivi('tests/verifica/679/giro1-verde.spec.mjs', 'VERDE\n');
+  scrivi('src/x.js', '1\n');
+  g('add', '-A'); g('commit', '-qm', 'critica');
+  const critica = g('rev-parse', 'HEAD');
+  g('checkout', '-q', 'main');
+  scrivi('tests/verifica/99/giro1-cambiata.spec.mjs', 'VERDE: l\'altro lavoro ha tolto il suo caso\n');
+  g('rm', '-q', 'tests/verifica/99/giro1-cancellata.spec.mjs');
+  g('commit', '-qam', 'main: l\'altro lavoro svuota la sua cartella');
+  g('checkout', '-q', 'lavoro');
+  g('rebase', '-q', 'main');
+  return { dir, g, scrivi, critica };
+}
+
+test('dopo un riallineamento le prove che ha cambiato main non entrano nel rilancio; quelle del ramo sì', () => {
+  const { dir, g, scrivi, critica } = riallineatoDopoLaCritica();
+  try {
+    scrivi('src/x.js', 'corretto\n');
+    g('commit', '-qam', 'correzione che non tocca prove');
+    const visti = [];
+    const lancia = playwrightFinto(dir, visti);
+    assert.deepEqual(controllaProveTolte({ shaPrima: critica, root: dir, lancia, prepara: preparaFinto, log: () => {} }), { ferma: false, testo: '' });
+    assert.equal(visti.length, 0, 'le prove dell\'altro lavoro non sono state rilanciate');
+    g('rm', '-q', 'tests/verifica/679/giro1-rossa.spec.mjs'); g('commit', '-qm', 'tolta la rossa');
+    const e = controllaProveTolte({ shaPrima: critica, root: dir, lancia, prepara: preparaFinto, log: () => {} });
+    assert.equal(e.ferma, true, 'la prova rossa tolta dal ramo ferma ancora la consegna');
+    assert.match(e.testo, /679\/giro1-rossa\.spec\.mjs/);
+    assert.doesNotMatch(e.testo, /tests\/verifica\/99\//);
+    assert.deepEqual(visti.map((v) => v.file.split('/').pop()), ['giro1-rossa.spec.mjs']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('dopo un riallineamento una prova già su main che il ramo cambia entra ancora nel rilancio', () => {
+  const { dir, g, scrivi, critica } = riallineatoDopoLaCritica();
+  try {
+    scrivi('tests/verifica/99/giro1-cambiata.spec.mjs', 'VERDE: ritoccata anche dal ramo\n');
+    g('commit', '-qam', 'il ramo tocca una prova che main aveva già cambiato');
+    const visti = [];
+    controllaProveTolte({ shaPrima: critica, root: dir, lancia: playwrightFinto(dir, visti), prepara: preparaFinto, log: () => {} });
+    assert.deepEqual(visti.map((v) => v.file.split('/').pop()), ['giro1-cambiata.spec.mjs']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('le due consegne, locale e routine, passano da questo controllo', () => {
   const locale = readFileSync(resolve(ROOT, 'scripts', 'verify-local.mjs'), 'utf8');
   const routine = readFileSync(resolve(ROOT, 'scripts', 'dispatch.mjs'), 'utf8');

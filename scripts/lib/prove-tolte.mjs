@@ -74,7 +74,7 @@ export function proveTolteDal(shaPrima, root, principale = riferimentoPrincipale
 
 export function riferimentoPrincipale(root) {
   for (const r of ['origin/main', 'main']) {
-    try { gitOut(['rev-parse', '--verify', '-q', `${r}^{commit}`], root); return r; } catch (_) { /* il prossimo */ }
+    try { gitOut(['rev-parse', '--verify', '-q', `${r}^{commit}`], root); return r; } catch (_) { continue; }
   }
   return '';
 }
