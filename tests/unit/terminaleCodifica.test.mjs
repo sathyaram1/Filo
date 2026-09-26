@@ -272,6 +272,7 @@ test('un comando che stampa moltissimo non fa perdere cartella ed esito', async 
     ? `1..${righe} | ForEach-Object { "riga-di-elenco" }; cmd /c exit 3`
     : `for i in $(seq 1 ${righe}); do echo riga-di-elenco; done; exit 3`;
   const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: ATTESA, trackCwd: true });
+  assert.equal(out.timedOut, false, `il comando non è finito in ${ATTESA / 1000} s: macchina bloccata, non l'esito`);
   assert.equal(out.truncated, true, 'l\'output doveva sfondare il tetto');
   assert.equal(out.code, 3, `l'esito del comando si è perso: ${out.code}`);
   assert.ok(out.cwd, 'la cartella riportata si è persa');
