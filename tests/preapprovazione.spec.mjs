@@ -247,3 +247,46 @@ test('il segno nato da un sì a una richiesta si legge per quello che è, e un c
   await expect(btn).toHaveAttribute('aria-pressed', 'false');
   await expect(badge).toHaveCount(0);
 });
+
+test('il segno nato da un sì si toglie da solo, senza fondere la richiesta ferma che la pratica ha davanti', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({
+    status: 'design', statusReason: 'l5',
+    mergePreapproved: { by: 'owner@esempio · approvazione ab12cd34ef56ab12cd34ef56', at: '2026-09-26T10:26:00Z' },
+  });
+  // La richiesta aperta dopo il riallineamento, per i soli blocchi nuovi.
+  const nuova = {
+    id: 'cd34ef56ab12cd34ef56ab12', supersedes: 'ab12cd34ef56ab12cd34ef56', branch: 'claude/regole', sha: SHA,
+    who: 'secaudit', num: '#581', feedbackId: fb._id, origin: 'routine',
+    blocks: [{ gate: 'guard_the_guards', label: 'Tocca aree protette', items: ['firestore.rules'], more: 0 }],
+    createdAtMs: Date.now() - 60000, expiresAtMs: Date.now() + 86400000, expired: false, used: false, discarded: false,
+  };
+  await apri(page, [fb], { pending: [nuova], tab: 'inbox' });
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  const togli = page.locator('#mgPreapproveRevokeBtn');
+  await expect(togli).toBeVisible();
+  await expect(togli).toHaveText('Chiedimi prima di fondere');
+  await togli.click();
+  await expect.poll(() => page.evaluate(() => window.__updates.map((u) => u.mergePreapproved))).toEqual([false]);
+  await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => window.__fusioni)).toEqual([]);
+  await expect(page.locator(`.mg-item[data-id="${fb._id}"] .mg-preapproved`)).toHaveCount(0);
+  await expect(page.locator('#mgPreapprovedInfo')).toBeHidden();
+  await expect(togli).toBeHidden();
+  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Fondi senza chiedermelo');
+});
+
+test('col segno pieno o senza segno il tasto per togliere quello da un sì non c’è', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const piena = pratica({ mergePreapproved: { by: 'owner@esempio', at: '2026-09-26T10:26:00Z' } });
+  const senza = pratica({ _id: 'fb-preapprova-2', seq: 582 });
+  await apri(page, [piena, senza]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), piena._id);
+  await expect(page.locator('#mgPreapproveBtn')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#mgPreapproveRevokeBtn')).toBeHidden();
+  await page.evaluate((id) => window.__mgTest.openDetail(id), senza._id);
+  await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
+  await expect(page.locator('#mgPreapproveRevokeBtn')).toBeHidden();
+});
