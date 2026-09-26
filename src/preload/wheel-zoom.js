@@ -254,6 +254,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   if (pageZoom) {
     // La pagina zooma da sé (vedi commento in testa): non ci mettiamo in mezzo.
     function pageHandlesZoom() {
+      if (!interna) return false;
       try { return document.documentElement.dataset.filoOwnZoom === '1'; }
       catch (_) { return false; }
     }
