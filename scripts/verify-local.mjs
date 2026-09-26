@@ -1205,6 +1205,11 @@ if (isMain) {
     // critica ristampa la risposta (persa), un'altra è respinta.
     const stato = statoDirectory(ROOT);
     if (!stato.ok) { console.error(statoIllegibileText(stato.motivo)); process.exit(1); }
+    // A correzione in sospeso il codice si muove di diritto (la stessa critica ristampa la risposta).
+    if (!stato.lines.length && prev.verdict !== 'fix-pending') {
+      const fermo = codiceCambiatoDallAvvio(prev.requestedSha, ROOT);
+      if (fermo.cambiati.length) { console.error(testoCodiceCambiato(fermo.cambiati, prev.requestedSha)); process.exit(1); }
+    }
     // I bilanci dal server, PRIMA di calcolare l'esito: nessun default.
     const caps = await bilanciOStop();
     const r = withCritique(readState(), branch, { critique: text, sha, caps, dirtyFiles: stato.lines });
