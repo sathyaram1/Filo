@@ -1712,6 +1712,16 @@ class TabManager {
       Object.assign(tab, patch);
       this._broadcast();
     };
+    // Una pagina di Filo che scala il proprio contenuto (l'editor scala il
+    // foglio) dichiara qui a quanto sta: il livello della finestra per lei
+    // resta 100%, e senza questo Filo riferirebbe in chat il numero sbagliato
+    // (#686). Il canale è quello della singola scheda: muore con lei.
+    try {
+      wc.ipc.on('filo:zoom-proprio', (_e, perc) => {
+        const n = Math.round(Number(perc));
+        tab.zoomProprio = Number.isFinite(n) && n > 0 ? n : null;
+      });
+    } catch (_) {}
     // In modalità "contenuto a tutto schermo" la pagina copre la barra, quindi
     // Esc deve riportare la shell. Intercettiamo il tasto prima che la pagina lo
     // gestisca (vale anche per i siti esterni, senza dipendere dai content script).
@@ -2010,6 +2020,9 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // Documento nuovo: lo zoom che la pagina vecchia dichiarava di sé non
+      // vale più (#686).
+      tab.zoomProprio = null;
       // Documento nuovo: chi rispondeva era quello vecchio. Il nuovo si
       // ripresenterà da solo appena montato (MSG.FULLSCREEN_STATE); fino ad
       // allora vale l'attesa corta, quella di chi non risponde.

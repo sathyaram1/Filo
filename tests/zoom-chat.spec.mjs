@@ -232,3 +232,55 @@ test('anche una pagina di Filo si ingrandisce a parole, e il tasto destro ne mos
   await voce.click();
   await expect.poll(async () => percentOf(app, page)).toBe(100);
 });
+
+// #686 (secondo giro) — I GESTI CHE MUOVONO LO ZOOM SONO QUELLI DELL'UTENTE.
+// Un sito arriva agli stessi listener della tastiera e della rotella scrivendosi
+// da solo un evento: così rimetteva la pagina alla misura che voleva subito dopo
+// un «zoom al 200%», e poteva anche aprire da sé la modalità zoom della rotella.
+// Senza il fix: questi tre casi riportano la pagina dove vuole il sito → rosso.
+test('un sito non muove lo zoom fingendo i gesti dell\'utente', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, PAGINA);
+  await execAction(app, { type: 'ZOOM_PAGINA', percentuale: 200 });
+  await expect.poll(async () => percentOf(app, page)).toBe(200);
+
+  await page.evaluate(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      key: '0', code: 'Digit0', ctrlKey: true, bubbles: true, cancelable: true,
+    }));
+    for (let i = 0; i < 40; i++) {
+      document.dispatchEvent(new WheelEvent('wheel', {
+        deltaY: 100, ctrlKey: true, bubbles: true, cancelable: true,
+      }));
+    }
+    document.dispatchEvent(new MouseEvent('mousedown', { button: 1, bubbles: true, cancelable: true }));
+  });
+  await page.waitForTimeout(400);
+  expect(await percentOf(app, page)).toBe(200);
+  expect(await page.locator('#__filo-zoom-badge').count()).toBe(0);
+
+  // I gesti veri continuano a funzionare: il freno è sul finto, non su tutti.
+  await page.locator('h1').click();
+  await page.keyboard.press('Control+0');
+  await expect.poll(async () => percentOf(app, page)).toBe(100);
+});
+
+// #686 (secondo giro) — L'EDITOR SCALA IL FOGLIO, E IL NUMERO CHE FILO DICE È
+// QUELLO DEL FOGLIO. Prima Filo leggeva il livello della finestra, fermo al
+// 100%: subito dopo aver ingrandito il documento rispondeva «100%».
+test('sull\'editor Filo riferisce lo zoom del foglio, non quello della finestra', async ({ app, openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(1500);
+
+  const r = await execAction(app, { type: 'ZOOM_PAGINA', percentuale: 150 });
+  expect(r.executed).toBe(true);
+  expect(r.output.percentuale).toBe(150);
+  await expect.poll(async () => page.evaluate(() => document.getElementById('doc').style.zoom)).toBe('1.5');
+
+  const testo = await app.evaluate(async () => (await globalThis.SN_FILO_STATE.assemble()).stateText);
+  expect(testo).toMatch(/Scheda davanti: 150%/);
+
+  // …e si torna indietro dalla chat come da ogni altra strada.
+  await execAction(app, { type: 'ZOOM_PAGINA', verso: 'reset' });
+  await expect.poll(async () => page.evaluate(() => document.getElementById('doc').style.zoom)).toBe('');
+});
