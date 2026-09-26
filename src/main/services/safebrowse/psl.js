@@ -109,7 +109,7 @@ function getDomainInfo(host) {
       suffixLabels = labels.length - i - 1;
       break;
     }
-    if (NORMAL.has(candidate)) {
+    if (NORMAL.has(candidate) || (i > 0 && PRIVATE.has(candidate))) {
       suffixLabels = labels.length - i;
       break;
     }
