@@ -2528,7 +2528,7 @@
       // quella, completata — non si riporta indietro lo stato appena letto.
       const i = allFeedbacks.findIndex((f) => f._id === key);
       if (i < 0) return null;
-      const { _proiezione, _dettaglioMancato, ...resto } = allFeedbacks[i];
+      const { _proiezione, _dettaglioMancato, _dettaglioVecchio, ...resto } = allFeedbacks[i];
       allFeedbacks[i] = { ...pieno, ...resto };
       reindexByClient();
       return allFeedbacks[i];
@@ -2551,21 +2551,29 @@
       .finally(() => { if (selectedId === key) ridisegnaRispettandoLaBozza(key); });
   }
 
-  // Il feedback COMPLETO, aspettando la lettura se ancora non c'è. Chi APPENDE
-  // alla conversazione deve passare di qui: una riga d'elenco non ha le note,
-  // e scriverci sopra la risposta cancellerebbe tutto il report al posto di
-  // aggiungersi in coda. Torna null se nel frattempo la riga non c'è più.
+  // La conversazione in mano non è quella di adesso: o non è mai arrivata
+  // (riga d'elenco), o il documento è cambiato sul server dopo che l'avevamo
+  // letta. In tutti e due i casi va riletta prima di scriverci sopra.
+  function dettaglioDaRileggere(fb) {
+    return !!fb && (FB.soloLista(fb) || !!fb._dettaglioVecchio);
+  }
+
+  // Il feedback COMPLETO E AGGIORNATO, aspettando la lettura se serve. Chi
+  // APPENDE alla conversazione deve passare di qui: una riga d'elenco non ha
+  // le note, e una copia vecchia non ha i turni arrivati dopo — scriverci
+  // sopra la risposta cancellerebbe il report invece di aggiungersi in coda.
+  // Torna null se nel frattempo la riga non c'è più.
   async function feedbackCompleto(id) {
     const key = String(id || '');
     const riga = allFeedbacks.find((f) => f._id === key);
-    if (!riga || !FB.soloLista(riga)) return riga || null;
-    try { await completaDettaglio(key); } catch (_) { /* sotto: una riga ancora proiettata è un no */ }
+    if (!riga || !dettaglioDaRileggere(riga)) return riga || null;
+    try { await completaDettaglio(key); } catch (_) { /* sotto: una riga non riletta è un no */ }
     const dopo = allFeedbacks.find((f) => f._id === key) || null;
-    // Ancora una riga d'elenco: la conversazione NON è stata letta. Tornarla
-    // com'è la farebbe passare per «questo feedback non ha note», e chi
-    // appende la risposta o il motivo della riapertura scriverebbe il suo
-    // testo AL POSTO di tutto il report. Meglio niente: chi chiama lo dice.
-    return (dopo && FB.soloLista(dopo)) ? null : dopo;
+    // La lettura non è riuscita. Tornare la riga com'è la farebbe passare per
+    // «questo feedback non ha altro», e chi appende la risposta o il motivo
+    // della riapertura scriverebbe il suo testo AL POSTO del report. Meglio
+    // niente: chi chiama lo dice.
+    return dettaglioDaRileggere(dopo) ? null : dopo;
   }
 
   // ── Rendering pannello centrale ───────────────────────────────────────────
@@ -2597,7 +2605,7 @@
     // che manca lo dice invece di sembrare vuota.
     // Una lettura già fallita riparte solo dal «Riprova»: altrimenti tornare
     // sulla stessa segnalazione la ricomprava a ogni clic, senza fine.
-    if (FB.soloLista(fb) && !fb._dettaglioMancato) {
+    if (dettaglioDaRileggere(fb) && !fb._dettaglioMancato) {
       completaDettaglio(id)
         .catch((e) => console.warn('[manage] dettaglio non completato:', e?.message || e))
         // Anche quando non è arrivato: è il ridisegno che lo fa dire.
@@ -3473,7 +3481,7 @@
     }
 
     mgLivelliRow.hidden = false;
-    for (const liv of MR.livelli(fb, { fusioni })) {
+    for (const liv of MR.livelli(fb, { fusioni, dettaglioLetto: !FB.soloLista(fb) })) {
       if (liv.key !== 'l2') { mgForme.appendChild(formaEl(liv, fb)); continue; }
       // I giudici: un cerchio per giudice ATTESO, non per verdetto. Un panel
       // parziale mostra i mancanti tratteggiati, non un panel accorciato — e
@@ -3639,26 +3647,33 @@
     // Il resto del documento sta arrivando (l'elenco è una proiezione): finché
     // non c'è, la conversazione non si dichiara vuota — direbbe il falso
     // proprio su un feedback lavorato.
+    // La lettura del resto non è tornata. Lo si dice e si offre di riprovare,
+    // che sia una conversazione mai arrivata o una copia rimasta indietro: in
+    // tutti e due i casi quello che si vede non è quello che c'è sul server.
+    function appendRiprovaDettaglio() {
+      const vecchia = !FB.soloLista(fb);
+      appendBubble('model', 'Filo', `<em>${fb._dettaglioMancato === 'sparito'
+        ? 'Il resto di questa segnalazione non è arrivato: sul server non c&#39;è più.'
+        : (vecchia
+          ? 'Questa conversazione è quella di prima: l&#39;aggiornamento non è arrivato, controlla la connessione.'
+          : 'Il resto di questa segnalazione non è arrivato: controlla la connessione.')}</em>`);
+      const riga = document.createElement('div');
+      riga.className = 'mg-actions-row';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn sn-btn-secondary';
+      btn.id = 'mgRiprovaDettaglio';
+      btn.textContent = '↻ Riprova';
+      btn.addEventListener('click', () => riprovaDettaglio(fb._id, btn));
+      riga.appendChild(btn);
+      mgThread.appendChild(riga);
+    }
+
     if (FB.soloLista(fb)) {
-      if (fb._dettaglioMancato) {
-        // Senza questo il pannello restava su «Caricamento…» a tempo
-        // indeterminato: è la stessa cura della gemella, che dice e offre Riprova.
-        appendBubble('model', 'Filo', `<em>${fb._dettaglioMancato === 'sparito'
-          ? 'Il resto di questa segnalazione non è arrivato: sul server non c&#39;è più.'
-          : 'Il resto di questa segnalazione non è arrivato: controlla la connessione.'}</em>`);
-        const riga = document.createElement('div');
-        riga.className = 'mg-actions-row';
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'sn-btn sn-btn-secondary';
-        btn.id = 'mgRiprovaDettaglio';
-        btn.textContent = '↻ Riprova';
-        btn.addEventListener('click', () => riprovaDettaglio(fb._id, btn));
-        riga.appendChild(btn);
-        mgThread.appendChild(riga);
-      } else {
-        appendBubble('model', 'Filo', '<em>Caricamento della conversazione…</em>');
-      }
+      // Senza questo il pannello restava su «Caricamento…» a tempo
+      // indeterminato: è la stessa cura della gemella, che dice e offre Riprova.
+      if (fb._dettaglioMancato) appendRiprovaDettaglio();
+      else appendBubble('model', 'Filo', '<em>Caricamento della conversazione…</em>');
       appendFraseBubble(fb);
       return;
     }
@@ -3671,12 +3686,14 @@
     if (TH && TH.reportUnreadable && TH.reportUnreadable(notes)) {
       appendBubble('model', 'Filo', esc('Il report della lavorazione è cifrato e questo computer non ha la chiave privata per leggerlo.'));
       appendFraseBubble(fb);
+      if (fb._dettaglioMancato) appendRiprovaDettaglio();
       return;
     }
     if (!TH) {
       // Fallback senza parser: mostra il blob intero come un turno unico.
       if (notes.trim()) appendBubble('model', 'Filo (lavorazione)', esc(notes));
       appendFraseBubble(fb);
+      if (fb._dettaglioMancato) appendRiprovaDettaglio();
       return;
     }
     for (const seg of TH.splitNotes(notes)) {
@@ -3685,6 +3702,10 @@
       appendBubble(seg.role === 'user' ? 'user' : 'model', who, esc(seg.body), seg.attachments);
     }
     appendFraseBubble(fb);
+    // La copia che si sta leggendo è rimasta indietro e il tentativo di
+    // rileggerla non è tornato: si dice in coda alla conversazione, dove
+    // l'owner sta già guardando.
+    if (fb._dettaglioMancato) appendRiprovaDettaglio();
   }
 
   // La riga che leggerà chi ha segnalato è l'ULTIMO turno della conversazione:
@@ -3758,7 +3779,7 @@
   // fusioni) e «Salta il controllo» dell'audit.
   function openSidebarLivello(fb, key) {
     if (!fb) return;
-    const liv = MR.livelloPer(fb, key, { fusioni });
+    const liv = MR.livelloPer(fb, key, { fusioni, dettaglioLetto: !FB.soloLista(fb) });
     if (!liv) return;
     segnaForma(key);
     giudiceAperto = null;

@@ -1055,7 +1055,10 @@
       // La routine ha domande: `design` con motivo `clarify`. Vive nei Ricevuti
       // (è una decisione che aspetta l'owner), non più in una sezione sua.
       const clarifyReply = isAdmin && MR.aspettaRisposta(f);
-      const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply
+      // Con la conversazione non arrivata la casella non si offre: quello che
+      // ci si scrive dentro non si può salvare (sostituirebbe il report), e
+      // offrirla vorrebbe dire far scrivere l'owner per niente.
+      const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply && !f._dettaglioMancato
         && (currentTab === 'inbox' || currentTab === 'queue');
       // Render di un turno come bolla di sola lettura (segnalazione esclusa).
       const convoBubble = (t) => {
@@ -1108,7 +1111,18 @@
       } else {
         convoHtml = convoTurns.map(convoBubble).join('');
       }
-      const threadHtml = `<div class="fb-thread">${reportBubble}${convoHtml}</div>`;
+      // Il resto non è arrivato: si dice, con le stesse parole della gemella in
+      // Gestione e con lo stesso tasto. Senza, la scheda si disegnava come se
+      // la conversazione fosse vuota e l'owner decideva su metà segnalazione.
+      const mancatoHtml = f._dettaglioMancato
+        ? `<div class="fb-bubble fb-bubble--model fb-dettaglio-mancato">
+             <div class="fb-bubble-body"><em>${f._dettaglioMancato === 'sparito'
+               ? 'Il resto di questa segnalazione non è arrivato: sul server non c&#39;è più.'
+               : 'Il resto di questa segnalazione non è arrivato: controlla la connessione.'}</em></div>
+             <button type="button" class="fb-load-retry fb-riprova-dettaglio" data-id="${escapeHtml(f._id)}">↻ Riprova</button>
+           </div>`
+        : '';
+      const threadHtml = `<div class="fb-thread">${reportBubble}${convoHtml}${mancatoHtml}</div>`;
       const tailThreadHtml = tailBubblesHtml ? `<div class="fb-thread fb-thread--tail">${tailBubblesHtml}</div>` : '';
       // Su "Ricevuti" la casella è un COMMENTO al volo (poi lo metti in coda);
       // altrove è la nota di triage/decisioni di design.
@@ -1165,6 +1179,10 @@
         </article>
       `;
     }).join('');
+
+    listEl.querySelectorAll('.fb-riprova-dettaglio').forEach((btn) => {
+      btn.addEventListener('click', () => riprovaDettaglio(btn.dataset.id));
+    });
 
     listEl.querySelectorAll('.fb-imgs img').forEach((img) => {
       img.addEventListener('click', () => {
@@ -1528,14 +1546,53 @@
     await Promise.all(attese);
   }
 
+  // Il marchio «questa lettura non è tornata» sulle righe di un blocco: la
+  // scheda lo dice e offre di riprovare, e nessun ridisegno la ricompra.
+  function segnaMancate(chiesti, motivo) {
+    all = all.map((f) => {
+      if (!chiesti.has(f._id)) return f;
+      const { _proiezione, ...resto } = f;
+      return { ...resto, _dettaglioMancato: motivo };
+    });
+  }
+
+  // Riprova la lettura di UNA segnalazione, su richiesta di chi guarda.
+  function riprovaDettaglio(id) {
+    all = all.map((f) => {
+      if (f._id !== id) return f;
+      const { _dettaglioMancato, ...resto } = f;
+      return { ...resto, _proiezione: true };
+    });
+    applyFilter();
+  }
+
+  // Che cosa serve davvero del documento intero. Quando NESSUNO stato si
+  // legge, su questo computer manca la chiave privata: la conversazione non
+  // comparirà in nessun caso, quindi chiederla vorrebbe dire pagare cento KB a
+  // segnalazione per buttarli. Restano gli allegati, che si vedono lo stesso.
+  // `null` = il documento intero, il caso normale.
+  function campiDettaglio() {
+    return sezioniAttendibili() ? null : ['images', 'files', 'userNote'];
+  }
+
   async function chiediDettagli(ids) {
     for (let i = 0; i < ids.length; i += DETTAGLI_PER_VOLTA) {
       const pezzo = ids.slice(i, i + DETTAGLI_PER_VOLTA);
       // Il gruppo di QUESTO blocco, non tutti: togliere il marchio a chi non è
       // ancora stato chiesto lo lascerebbe per sempre senza conversazione.
       const chiesti = new Set(pezzo);
-      // eslint-disable-next-line no-await-in-loop
-      let rows = await SN_FEEDBACK.getMany(pezzo, { timeoutMs: 20000 });
+      let rows;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        rows = await SN_FEEDBACK.getMany(pezzo, { timeoutMs: 20000, fields: campiDettaglio() });
+      } catch (e) {
+        // La lettura non è tornata. Va SCRITTO sulle righe, o al ridisegno
+        // dopo il primo gesto (una lettera nella ricerca, un cambio di
+        // sezione) sembrerebbero ancora da chiedere e ripartirebbero: la
+        // stessa spesa, moltiplicata per i gesti fatti nell'attesa.
+        segnaMancate(chiesti, 'rete');
+        throw e;
+      }
       if (isAdmin && rows.length > 0) {
         try {
           // eslint-disable-next-line no-await-in-loop
@@ -1552,9 +1609,21 @@
         // eterno, un giro di caricamento dopo l'altro. Ma la scheda lo disegna
         // senza conversazione, e su una conversazione mai letta un salvataggio
         // scrive al posto del report: chi scrive deve saperlo.
-        if (!pieno) { const { _proiezione, ...resto } = f; return { ...resto, _dettaglioMancato: true }; }
+        if (!pieno) { const { _proiezione, ...resto } = f; return { ...resto, _dettaglioMancato: 'sparito' }; }
         const { _proiezione, ...resto } = f;
-        return sanitizeReportForReader({ ...pieno, ...resto });
+        // `pieno` porta con sé il marchio della proiezione quando abbiamo
+        // chiesto i soli allegati: toglierlo qui, o la riga resterebbe per
+        // sempre «da completare» e la pagina la richiederebbe a ogni disegno.
+        const fuso = { ...pieno, ...resto };
+        delete fuso._proiezione;
+        if (campiDettaglio()) {
+          // Senza la chiave il report non si legge comunque: al suo posto va
+          // la frase in chiaro, e la casella resta spenta.
+          fuso.notes = String(fuso.userNote || '').trim();
+          fuso.reportIllegibile = true;
+          return fuso;
+        }
+        return sanitizeReportForReader(fuso);
       });
     }
   }
