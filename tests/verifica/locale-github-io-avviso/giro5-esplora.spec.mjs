@@ -23,7 +23,7 @@ for (const [url, host] of [['https://google.github.io/styleguide/', 'google.gith
       visti.push(l && l.level);
       await page.waitForTimeout(1000);
     }
-    console.log(host, JSON.stringify(visti), JSON.stringify(await tabInfo(app, host)), await page.title());
+    const banner = await page.getByText(/Controlla l.indirizzo/).count(); console.log(host, JSON.stringify(visti), banner, await page.title());
     expect(visti.length).toBeGreaterThan(0);
   });
 }
