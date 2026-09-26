@@ -189,9 +189,11 @@ function safeImageFilename(name) {
   return n.slice(0, 200);
 }
 
-// #711 — un tetto largo: un JPEG da fotocamera sta in pochi MB, e oltre questa
-// misura il chiamante riceve un rifiuto col motivo, mai un silenzio.
-const MAX_BYTE_PROVENIENZA = 256 * 1024 * 1024;
+// #711 — il controllo è lavoro SINCRONO nel processo principale, e questo canale
+// lo può chiamare anche una pagina web: il tetto tiene una singola chiamata sotto
+// il decimo di secondo. Largo lo stesso (un PNG da 60 megapixel ci sta dentro), e
+// oltre il tetto il chiamante riceve un rifiuto col motivo, mai un silenzio.
+const MAX_BYTE_PROVENIENZA = 64 * 1024 * 1024;
 
 function bytesDaDataUrl(dataUrl) {
   const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrl || ''));

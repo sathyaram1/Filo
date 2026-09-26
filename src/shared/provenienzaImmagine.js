@@ -775,12 +775,12 @@ softwareImage: null,
     const chi = pulisci(res.dichiarante);
 
     if (res.prova === 'firma-rotta') {
-      return 'Ha credenziali di origine, ma la firma non è valida: non dicono niente su questa immagine.';
+      return 'Ha credenziali di origine, ma la firma non è valida. Non dicono niente su questa immagine.';
     }
     if (res.avvisi && res.avvisi.includes('file_cambiato')) {
       return chi
-        ? `Le credenziali firmate da ${chi} non valgono più: il file è stato cambiato dopo la firma.`
-        : 'Le credenziali firmate non valgono più: il file è stato cambiato dopo la firma.';
+        ? `Il file è stato cambiato dopo la firma di ${chi}, quindi le sue credenziali non valgono più.`
+        : 'Il file è stato cambiato dopo la firma, quindi le credenziali non valgono più.';
     }
     const cosa = COSA[res.origine];
     if (!cosa) return '';
@@ -789,17 +789,17 @@ softwareImage: null,
       const debole = (res.avvisi || []).some((a) => a === 'legame_assente' || a === 'asserzioni_scoperte' || a === 'catena_rotta' || a === 'certificato_scaduto');
       if (!res.riconosciuto) {
         return chi
-          ? `${cosa}: lo dicono credenziali firmate da ${chi}, un ente che Filo non riconosce.`
-          : `${cosa}: lo dicono credenziali firmate, ma Filo non riconosce chi le ha firmate.`;
+          ? `${cosa} secondo credenziali firmate da ${chi}, un ente che Filo non riconosce.`
+          : `${cosa} secondo credenziali firmate, ma Filo non riconosce chi le ha firmate.`;
       }
-      if (debole) return `${cosa}: lo dichiara ${chi}, ma le credenziali sono incomplete.`;
+      if (debole) return `${cosa} secondo ${chi}, ma le sue credenziali sono incomplete.`;
       if (res.origine === 'fotocamera') return `Scattata con una fotocamera, firmata da ${chi}.`;
       if (res.origine === 'ai-modificata') return `Modificata con l’AI, credenziali di ${chi}.`;
       return `Generata con l’AI, lo dichiara ${chi} nelle credenziali firmate.`;
     }
     return chi
-      ? `${cosa}: lo dichiara il file stesso (${chi}), senza firma che lo confermi.`
-      : `${cosa}: lo dichiara il file stesso, senza firma che lo confermi.`;
+      ? `${cosa} secondo il file stesso (${chi}), senza firma che lo confermi.`
+      : `${cosa} secondo il file stesso, senza firma che lo confermi.`;
   }
 
   // Quello che l'agente deve sapere quando gli si chiede «è fatta con l'AI?»:

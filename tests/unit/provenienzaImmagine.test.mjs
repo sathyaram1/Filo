@@ -94,7 +94,7 @@ test('l’etichetta IPTC/XMP senza firma si presenta come dichiarazione del file
   const r = P.analizza(pngConXmp(pngSpoglio(), xmp));
   assert.equal(r.origine, 'ai');
   assert.equal(r.prova, 'dichiarata');
-  assert.equal(P.frase(r), 'Generata con l’AI: lo dichiara il file stesso (Adobe), senza firma che lo confermi.');
+  assert.equal(P.frase(r), 'Generata con l’AI secondo il file stesso (Adobe), senza firma che lo confermi.');
 });
 
 test('compositeWithTrainedAlgorithmicMedia in XMP resta «modificata»', () => {
