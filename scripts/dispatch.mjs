@@ -1159,6 +1159,18 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   if (stato.lines.length) {
     return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines, 'consegna') };
   }
+  // Stessa guardia di «verify-local.mjs corretto»: una prova del giro cancellata ancora rossa è
+  // una porta aperta che la verifica dopo non rilancerebbe più (#679).
+  const shaCritica = String(guard.state?.verifierSha || '');
+  if (shaCritica && shaCritica !== headSha(ROOT)) {
+    const r = guard.state.reply || {};
+    const tolte = controllaProveTolte({
+      shaPrima: shaCritica, root: ROOT, messiDaParte: derivatiAperti(r.phase2 ? r.phase2.derived : r.derived).length,
+      log: (m) => process.stderr.write(`${m}\n`),
+    });
+    if (tolte.ferma) return { rejected: true, formatRejected: true, message: tolte.testo };
+    if (tolte.testo) process.stderr.write(`${tolte.testo}\n`);
+  }
   const next = applyFixed({ ...(guard.state || defaultState(id, '')), id });
   next.id = id;
 
