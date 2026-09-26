@@ -125,12 +125,11 @@ jobs:
           ref: ${{ inputs.solo_suite && github.ref || 'main' }}
           fetch-depth: 0
 
-      # Il commit che questa suite prova. La seconda meta' (release) lo
-      # confronta con quello che sta per costruire: la suite dura un'ora e un
-      # quarto, e in quell'ora su main possono entrare altre fusioni — codice
-      # mai passato di qui, che senza il confronto uscirebbe agli utenti
-      # (giro del 14/09, verifica). Si legge PRIMA del controllo "c'e'
-      # qualcosa di nuovo", cosi' c'e' anche quando la suite non gira.
+      # Il commit che questa suite prova: la seconda meta' (release) costruisce
+      # e pubblica ESATTAMENTE questo, non la punta di main, dove nell'ora di
+      # suite possono essere entrate fusioni mai provate (decisione owner
+      # 17/09/2026, #641). Si legge PRIMA del controllo "c'e' qualcosa di
+      # nuovo", cosi' c'e' anche quando la suite non gira.
       - name: Il commit che la suite prova
         id: provato
         shell: bash
@@ -159,7 +158,9 @@ jobs:
             echo "Nessun tag precedente -> si prova."
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
-            AHEAD=$(git rev-list --count "${LAST_TAG}..HEAD")
+            # Il tag sta sul commit provato e pubblicato; il commit del numero
+            # di versione che il server scrive dopo non e' codice nuovo.
+            AHEAD=$(git rev-list --count --invert-grep --grep='^release: v[0-9]' "${LAST_TAG}..HEAD")
             echo "Commit dopo $LAST_TAG: $AHEAD"
             if [ "$AHEAD" -gt 0 ]; then
               echo "run=true" >> "$GITHUB_OUTPUT"
@@ -300,12 +301,12 @@ jobs:
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
       version: ${{ steps.bump.outputs.version }}
-      sha: ${{ steps.allinea.outputs.sha }}
+      sha: ${{ steps.applica.outputs.sha }}
     steps:
-      - name: Checkout main (con storia e tag completi)
+      - name: Checkout del commit provato dalla suite (con storia e tag completi)
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ needs.suite.outputs.sha }}
           fetch-depth: 0
 
       - name: Setup Node
@@ -317,42 +318,29 @@ jobs:
         id: check
         shell: bash
         run: |
+          # Senza lo sha della suite il checkout sarebbe caduto sul ramo di
+          # default: si pubblicherebbe codice mai provato.
+          PROVATO="${{ needs.suite.outputs.sha }}"
+          QUI=$(git rev-parse HEAD)
+          if [ -z "$PROVATO" ] || [ "$QUI" != "$PROVATO" ]; then
+            echo "::error::la suite non ha detto quale commit ha provato (${PROVATO:-niente}), qui c'e' $QUI: non pubblico codice mai provato."
+            exit 1
+          fi
           git fetch --tags --force
           LAST_TAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
           if [ -z "$LAST_TAG" ]; then
             echo "Nessun tag precedente -> si rilascia."
             echo "should_release=true" >> "$GITHUB_OUTPUT"
           else
-            AHEAD=$(git rev-list --count "${LAST_TAG}..HEAD")
+            # Il tag sta sul commit provato e pubblicato; il commit del numero
+            # di versione che il server scrive dopo non e' codice nuovo.
+            AHEAD=$(git rev-list --count --invert-grep --grep='^release: v[0-9]' "${LAST_TAG}..HEAD")
             echo "Commit dopo $LAST_TAG: $AHEAD"
             if [ "$AHEAD" -gt 0 ]; then
               echo "should_release=true" >> "$GITHUB_OUTPUT"
             else
               echo "should_release=false" >> "$GITHUB_OUTPUT"
             fi
-          fi
-          # ─── SI PUBBLICA SOLO IL COMMIT CHE LA SUITE HA PROVATO ────────
-          # La suite ha provato main com'era un'ora e un quarto fa; se nel
-          # frattempo su main e' entrato altro, questa corsa NON pubblica
-          # (l'ultima riga vince) e non apre feedback: la prossima, sei ore
-          # dopo, riprova sul main nuovo. Senza un commit provato non si
-          # pubblica alla cieca.
-          PROVATO="${{ needs.suite.outputs.sha }}"
-          QUI=$(git rev-parse HEAD)
-          if [ "$QUI" != "$PROVATO" ]; then
-            echo "main e' a $QUI, la suite ha provato ${PROVATO:-(niente)}: questa corsa NON pubblica; la prossima riprova sul main nuovo."
-            echo "should_release=false" >> "$GITHUB_OUTPUT"
-            # Il riassunto del lavoro lo dice a chi guarda Actions: se main
-            # riceve qualcosa durante OGNI corsa, nessuna versione esce e da
-            # nessun'altra parte si vede (giro 6 della verifica, 16/09/2026:
-            # scelta dell'owner non aprire un feedback, ma il caso va visto).
-            {
-              echo "## Pubblicazione ferma: main si e' mosso durante la suite"
-              echo ""
-              echo "La suite ha provato \`${PROVATO:-(niente)}\`; main ora e' a \`$QUI\`."
-              echo "Questa corsa NON pubblica; la prossima, fra sei ore, riprova sul main nuovo."
-              echo "Se succede a ogni corsa, nessuna versione esce: guardare la frequenza delle fusioni su main."
-            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Install dipendenze
@@ -477,47 +465,40 @@ jobs:
           VERSION=$(node scripts/release-bump.mjs)
           echo "version=v${VERSION}" >> "$GITHUB_OUTPUT"
 
-      # La copia di lavoro è rimasta a prima del commit del server: senza questa
-      # lettura, electron-builder costruirebbe col numero VECCHIO e pubblicherebbe
-      # sopra una release già esistente. È una lettura e basta — nessuna scrittura
-      # su main parte da qui.
-      - name: Allinea la copia di lavoro a main (lettura)
+      # Si costruisce il commit PROVATO, non la punta di main (#641): il numero
+      # che il server ha appena scritto su main si applica qui, in locale, al
+      # manifesto di questo albero, e non si spinge niente. Le fusioni entrate
+      # durante la suite non fermano la pubblicazione: escono alla corsa dopo,
+      # e il riassunto del lavoro lo dice.
+      - name: Applica il numero al commit provato (in locale)
         if: steps.check.outputs.should_release == 'true'
-        id: allinea
+        id: applica
         shell: bash
         run: |
           set -e
-          git pull --rebase origin main
-          LOCALE=$(node -p "require('./package.json').version")
-          ATTESA="${{ steps.bump.outputs.version }}"
-          if [ "v${LOCALE}" != "$ATTESA" ]; then
-            echo "::error::il manifesto qui dice v${LOCALE}, il server ha scritto ${ATTESA}: non costruisco alla cieca."
-            exit 1
-          fi
-          # Sotto il commit di release del server deve esserci ESATTAMENTE il
-          # commit che la suite ha provato: fra il controllo di prima e il
-          # numero di versione passano minuti, e una fusione in quei minuti
-          # farebbe costruire codice mai provato. Qui un numero di versione
-          # e' gia' stato consumato: resta un buco nella numerazione, che
-          # non fa male; pubblicare codice mai provato si'.
           PROVATO="${{ needs.suite.outputs.sha }}"
-          SOTTO=$(git rev-parse HEAD~1)
-          if [ "$SOTTO" != "$PROVATO" ]; then
-            echo "::error::su main e' entrato altro fra la suite e il numero di versione (provato ${PROVATO:-(niente)}, sotto la release c'e' ${SOTTO}): non costruisco codice mai provato. La prossima corsa riprova."
-            {
-              echo "## Pubblicazione ferma: main si e' mosso fra la suite e il numero di versione"
-              echo ""
-              echo "La suite ha provato \`${PROVATO:-(niente)}\`; sotto il commit di release c'e' \`$SOTTO\`."
-              echo "Il numero ${ATTESA} resta consumato (un buco nella numerazione, che non fa male); la prossima corsa riprova."
-            } >> "$GITHUB_STEP_SUMMARY"
+          ATTESA="${{ steps.bump.outputs.version }}"
+          node scripts/release-apply-version.mjs "$ATTESA"
+          QUI=$(git rev-parse HEAD)
+          if [ "$QUI" != "$PROVATO" ]; then
+            echo "::error::qui c'e' $QUI, la suite ha provato ${PROVATO:-(niente)}: non costruisco codice mai provato."
             exit 1
           fi
-          # Il commit ESATTO che si sta costruendo. Serve alla meta' Mac, che
-          # deve partire dallo stesso codice: il tag della release nasce solo
-          # alla pubblicazione e punta a dove sta `main` in QUEL momento, che
-          # dopo un merge nel frattempo non e' piu' questo commit.
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "Si costruisce ${ATTESA} da $(git rev-parse HEAD)."
+          echo "sha=$QUI" >> "$GITHUB_OUTPUT"
+          echo "Si costruisce ${ATTESA} da ${QUI}."
+          # Solo una nota: se la lettura di main non riesce, si pubblica lo stesso.
+          if git fetch --quiet origin main 2>/dev/null; then
+            MAIN_ORA=$(git rev-parse FETCH_HEAD)
+            DOPO=$(git rev-list --count --invert-grep --grep='^release: v[0-9]' "${PROVATO}..${MAIN_ORA}" 2>/dev/null || echo "?")
+            if [ "$DOPO" != "0" ]; then
+              {
+                echo "## main si e' mosso durante la suite: si pubblica comunque il commit provato"
+                echo ""
+                echo "La suite ha provato \`${PROVATO}\`, pubblicato come ${ATTESA}; main ora e' a \`${MAIN_ORA}\`."
+                echo "Commit entrati dopo, non in questa versione: ${DOPO}. Escono alla prossima corsa, dopo essere passati dalla suite."
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
 
       - name: Build e upload su GitHub Releases (come bozza)
         if: steps.check.outputs.should_release == 'true'
@@ -564,7 +545,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
-        run: gh release edit "${{ steps.bump.outputs.version }}" --draft=false --latest
+        # --target: il tag nasce sul commit costruito, non sulla punta di main
+        # al momento della pubblicazione (il confronto "c'e' qualcosa di nuovo"
+        # conta da li').
+        run: gh release edit "${{ steps.bump.outputs.version }}" --draft=false --latest --target "${{ steps.applica.outputs.sha }}"
 
       - name: Riepilogo
         if: steps.check.outputs.should_release == 'true'
@@ -584,11 +568,10 @@ jobs:
   # versione, come quello per Windows.
   #
   # DUE COSE DA SAPERE
-  #   1. Costruisce lo STESSO commit che ha costruito Windows (`needs...sha`),
-  #      non il tag: il tag nasce alla pubblicazione e punta a dove sta `main`
-  #      in quel momento — se nel frattempo e' entrato un merge, non e' piu' il
-  #      codice pubblicato per Windows, e i due file avrebbero lo stesso numero
-  #      di versione con dentro codice diverso.
+  #   1. Costruisce lo STESSO commit che ha costruito Windows (`needs...sha`,
+  #      cioe' quello provato dalla suite) e gli applica in locale lo stesso
+  #      numero di versione: quel commit sul repo porta ancora il numero
+  #      vecchio, il nuovo sta solo nel commit del server sulla punta di main.
   #   2. Per una decina di minuti — il tempo di questa meta' — la release e'
   #      gia' pubblicata ma il file per Mac non c'e' ancora: in quella finestra
   #      il collegamento del sito risponde 404. E' il prezzo di non far
@@ -683,8 +666,8 @@ jobs:
         id: dipendenze
         run: npm ci
 
-      # Guardia: se il manifesto qui non dice il numero che il server ha
-      # scritto, si sta costruendo un codice diverso da quello pubblicato per
+      # Guardia: se qui non c'e' il codice che il server ha scritto per questa
+      # versione, si sta costruendo un codice diverso da quello pubblicato per
       # Windows. Meglio fermarsi che allegare alla release un pacchetto Mac che
       # non corrisponde.
       - name: Il codice qui e' davvero quello di questa versione
@@ -692,10 +675,17 @@ jobs:
         shell: bash
         run: |
           set -e
-          LOCALE=$(node -p "require('./package.json').version")
           ATTESA="${{ steps.bersaglio.outputs.versione }}"
+          CODICE="${{ steps.bersaglio.outputs.codice }}"
+          # Il commit provato dalla suite porta ancora il numero vecchio: il
+          # nuovo sta solo nel commit del server sulla punta di main (#641), e
+          # si applica qui in locale. Lo script si ferma se non e' piu' alto.
+          LOCALE=$(node -p "require('./package.json').version")
           if [ "v${LOCALE}" != "$ATTESA" ]; then
-            echo "::error::qui il manifesto dice v${LOCALE}, la release e' ${ATTESA}: non allego un pacchetto sbagliato."
+            node scripts/release-apply-version.mjs "$ATTESA"
+          fi
+          if [ -z "$CODICE" ] || [ "$(git rev-parse HEAD)" != "$(git rev-parse "${CODICE}^{commit}")" ]; then
+            echo "::error::qui non c'e' il codice di ${ATTESA} (${CODICE:-niente}): non allego un pacchetto sbagliato."
             exit 1
           fi
 
@@ -905,19 +895,26 @@ jobs:
         id: dipendenze
         run: npm ci
 
-      # Stessa guardia della meta' Mac: se il manifesto qui non dice il numero
-      # che il server ha scritto, si sta costruendo un codice diverso da quello
-      # pubblicato per Windows. Meglio fermarsi che allegare alla release un
-      # pacchetto Linux che non corrisponde.
+      # Stessa guardia della meta' Mac: se qui non c'e' il codice che il server
+      # ha scritto per questa versione, si sta costruendo un codice diverso da
+      # quello pubblicato per Windows. Meglio fermarsi che allegare alla release
+      # un pacchetto Linux che non corrisponde.
       - name: Il codice qui e' davvero quello di questa versione
         id: versione
         shell: bash
         run: |
           set -e
-          LOCALE=$(node -p "require('./package.json').version")
           ATTESA="${{ steps.bersaglio.outputs.versione }}"
+          CODICE="${{ steps.bersaglio.outputs.codice }}"
+          # Il commit provato dalla suite porta ancora il numero vecchio: il
+          # nuovo sta solo nel commit del server sulla punta di main (#641), e
+          # si applica qui in locale. Lo script si ferma se non e' piu' alto.
+          LOCALE=$(node -p "require('./package.json').version")
           if [ "v${LOCALE}" != "$ATTESA" ]; then
-            echo "::error::qui il manifesto dice v${LOCALE}, la release e' ${ATTESA}: non allego un pacchetto sbagliato."
+            node scripts/release-apply-version.mjs "$ATTESA"
+          fi
+          if [ -z "$CODICE" ] || [ "$(git rev-parse HEAD)" != "$(git rev-parse "${CODICE}^{commit}")" ]; then
+            echo "::error::qui non c'e' il codice di ${ATTESA} (${CODICE:-niente}): non allego un pacchetto sbagliato."
             exit 1
           fi
 
