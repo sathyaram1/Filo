@@ -98,7 +98,12 @@ function fsDocToObject(doc) {
 
 // Legge un documento Firestore. Ritorna l'oggetto, {} se 404 (non esiste
 // ancora), oppure null se la lettura non è consentita/è fallita (403/altro).
-async function fetchDoc(docPath, idToken) {
+// Legge un documento DICENDO com'è andata, non solo cosa ha portato (#679).
+// «Non esiste» e «non ti riguarda» sono risposte definitive del server; «non
+// ho potuto chiedere» no, e chi tiene una copia in memoria deve distinguerle:
+// contare un tentativo fallito come una lettura fatta lascia Filo con la
+// configurazione che non ha fino alla scadenza lunga.
+async function leggiDoc(docPath, idToken) {
   const url = `${FIRESTORE_BASE}/${docPath}?key=${API_KEY}`;
   const headers = {};
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
@@ -106,16 +111,21 @@ async function fetchDoc(docPath, idToken) {
   try {
     res = await fetch(url, { headers });
   } catch (_) {
-    return null; // offline o rete giù → usa i fallback
+    return { risposto: false, doc: null }; // offline o rete giù → usa i fallback
   }
-  if (res.status === 404) return {};
-  if (!res.ok) return null;
+  if (res.status === 404) return { risposto: true, doc: {} };
+  if (res.status === 401 || res.status === 403) return { risposto: true, doc: null };
+  if (!res.ok) return { risposto: false, doc: null };
   try {
     const json = await res.json();
-    return fsDocToObject(json);
+    return { risposto: true, doc: fsDocToObject(json) };
   } catch (_) {
-    return null;
+    return { risposto: false, doc: null };
   }
+}
+
+async function fetchDoc(docPath, idToken) {
+  return (await leggiDoc(docPath, idToken)).doc;
 }
 
 // ── API ──────────────────────────────────────────────────────────────────────
