@@ -124,3 +124,36 @@ test('la prova a secco non scrive niente, e l\'applicazione riusa la sua lettura
   await conFetch(dopo, () => backfillNumbers('tok', { dry: false, now: t0 + 40_000, copiaDir: dir }));
   assert.equal(dopo.chiamate.scansioni.length, 1);
 });
+
+test('se dalla prova a secco le segnalazioni sono cambiate, la lettura si rifà invece di dare numeri già presi', async () => {
+  // I numeri si assegnano contando quelli che ci sono. Una segnalazione
+  // arrivata dopo la prova a secco il numero se lo prende da sé, ed è il primo
+  // che questo giro sta per dare: senza rilettura due segnalazioni finiscono
+  // con lo stesso numero, e un numero doppio non si aggiusta da sé.
+  const dir = cartellaTemporanea('backfill-5-');
+  const prima = [doc('a', 1, '2026-01-01T00:00:00Z'), doc('b', 0, '2026-01-02T00:00:00Z')];
+  const t0 = 1_700_000_000_000;
+
+  const secco = firestoreFinto({ totale: 2, numerati: 1, documenti: prima });
+  await conFetch(secco, () => backfillNumbers('tok', { dry: true, now: t0, copiaDir: dir }));
+
+  // Nel frattempo ne arriva una, che si prende il #2.
+  const dopo = [...prima, doc('c', 2, '2026-01-03T00:00:00Z')];
+  const applica = firestoreFinto({ totale: 3, numerati: 2, documenti: dopo });
+  const { r, dette } = await conFetch(applica, () => backfillNumbers('tok', { dry: false, now: t0 + 30_000, copiaDir: dir }));
+  assert.equal(applica.chiamate.scansioni.length, 1, 'ha tenuto l\'elenco vecchio e assegnerebbe un numero già preso');
+  assert.equal(r.total, 3, 'ha deciso su due segnalazioni mentre sul server ne sono tre');
+  assert.match(dette, /sono cambiate/, 'una rilettura silenziosa non dice a chi lancia perché sta ripagando');
+});
+
+test('se invece non è cambiato niente la lettura resta una: la guardia non ripaga per abitudine', async () => {
+  const dir = cartellaTemporanea('backfill-6-');
+  const documenti = [doc('a', 1, '2026-01-01T00:00:00Z'), doc('b', 0, '2026-01-02T00:00:00Z')];
+  const t0 = 1_700_000_000_000;
+  const secco = firestoreFinto({ totale: 2, numerati: 1, documenti });
+  await conFetch(secco, () => backfillNumbers('tok', { dry: true, now: t0, copiaDir: dir }));
+  const applica = firestoreFinto({ totale: 2, numerati: 1, documenti });
+  const { dette } = await conFetch(applica, () => backfillNumbers('tok', { dry: false, now: t0 + 30_000, copiaDir: dir }));
+  assert.deepEqual(applica.chiamate.scansioni, []);
+  assert.doesNotMatch(dette, /sono cambiate/);
+});

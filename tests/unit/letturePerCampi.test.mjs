@@ -30,15 +30,21 @@ require(join(ROOT, 'src', 'shared', 'feedbackPublicView.js'));
 const FB = globalThis.SN_FEEDBACK;
 const BA = globalThis.SN_BOARD_ARCHIVE;
 
+// I nomi VERI dei metodi di lettura del modulo, chiesti al modulo: un elenco
+// scritto a mano invecchia, e con l'elenco `listAll` e `listAllPublicPaged`
+// passavano davanti al freno senza una parola (#680, primo giro).
+const METODI_LISTA = Object.keys(FB).filter((k) => /^list/.test(k) && typeof FB[k] === 'function');
+
 // Le tre forme con cui uno script chiede una collezione, e come si dice «solo
 // questi campi» in ognuna.
 const FORME = [
   {
     nome: 'le liste dei feedback (SN_FEEDBACK)',
-    // Ogni `list…` del modulo, non un elenco di nomi: con l'elenco, `listAll`
-    // e `listAllPublicPaged` — le due scorciatoie per «dammi tutto» — passavano
-    // davanti al freno senza una parola (#680, primo giro).
-    chiamata: /\b(?:FB|SN_FEEDBACK)\.list[A-Za-z]*\s*\(/,
+    // Il RICEVITORE è qualunque: il modulo lo si tiene in una variabile, e
+    // chiamarla `segnalazioni` invece di `FB` non deve spegnere il freno
+    // (#680, secondo giro). Sono i NOMI dei metodi a essere esatti, così
+    // `server.listen(` e simili non finiscono nel mucchio.
+    chiamata: new RegExp(`\\b[A-Za-z_$][\\w$]*\\s*\\.\\s*(?:${METODI_LISTA.join('|')})\\s*\\(`),
     campi: /fields\s*:/,
     perChiamata: true,
     rimedio: 'passa `fields: [...]` (es. SN_BOARD_ARCHIVE.CAMPI_DECISIONE)',
@@ -46,6 +52,10 @@ const FORME = [
   {
     nome: 'una structuredQuery scritta a mano',
     chiamata: /structuredQuery\s*[=.]/,
+    // Solo dove la query porta via DOCUMENTI: un conteggio
+    // (`:runAggregationQuery`) non ne consegna nessuno e non ha niente da
+    // proiettare.
+    soloSe: /:runQuery\b/,
     campi: /\.select\s*=|select\s*:/,
     rimedio: 'aggiungi `select: { fields: [...] }` alla structuredQuery',
   },
@@ -70,11 +80,17 @@ function argomentiDellaChiamata(testo, da) {
   return testo.slice(da);
 }
 
-function scriptDiManutenzione() {
+// Tutta la cartella degli strumenti, sottocartelle comprese: gli attrezzi
+// condivisi (la copia, il conteggio, la lettura riusata) stanno in una
+// sottocartella, ed è il primo posto dove finirà la prossima scansione
+// (#680, secondo giro).
+function scriptDiManutenzione(dir = SCRIPTS, prefisso = '') {
   const out = [];
-  for (const nome of readdirSync(SCRIPTS)) {
-    if (!nome.endsWith('.mjs')) continue;
-    out.push({ nome, testo: readFileSync(join(SCRIPTS, nome), 'utf8') });
+  for (const voce of readdirSync(dir, { withFileTypes: true })) {
+    const nome = `${prefisso}${voce.name}`;
+    if (voce.isDirectory()) { out.push(...scriptDiManutenzione(join(dir, voce.name), `${nome}/`)); continue; }
+    if (!voce.name.endsWith('.mjs')) continue;
+    out.push({ nome, testo: readFileSync(join(dir, voce.name), 'utf8') });
   }
   return out;
 }
@@ -90,6 +106,7 @@ function colpevoliIn(nome, testo) {
       }
       continue;
     }
+    if (forma.soloSe && !forma.soloSe.test(testo)) continue;
     if (!forma.chiamata.test(testo)) continue;
     if (forma.campi.test(testo)) continue;
     colpevoli.push(`scripts/${nome} — ${forma.nome}: ${forma.rimedio}`);
@@ -108,6 +125,10 @@ test('il freno riconosce OGNI modo di chiedere l\'elenco, non solo quelli che gl
     'FB.list({ pageSize: 500 })',
     'FB.listResolved({ sinceIso: s })',
     'SN_FEEDBACK.listAll({})',
+    // Il modulo tenuto in una variabile con un altro nome: è come lo scriverà
+    // il prossimo, e prima passava (#680, secondo giro).
+    'segnalazioni.listAll({ idToken: t })',
+    'elenco.listAllPaged({ idToken: t })',
   ];
   for (const riga of scansioni) {
     assert.equal(colpevoliIn('finto.mjs', `export const x = ${riga};`).length, 1,
@@ -115,6 +136,17 @@ test('il freno riconosce OGNI modo di chiedere l\'elenco, non solo quelli che gl
     assert.deepEqual(colpevoliIn('finto.mjs', `export const x = ${riga.replace(/\(\{/, '({ fields: CAMPI,')};`), [],
       `«${riga}» dice quali campi gli servono e il freno lo ferma lo stesso`);
   }
+  // Un metodo che si chiama quasi come una lista ma non è del modulo non deve
+  // finire nel mucchio: il freno che grida a vuoto lo si spegne.
+  assert.deepEqual(colpevoliIn('finto.mjs', 'server.listen(0, "127.0.0.1", ok);'), []);
+});
+
+test('il freno guarda in TUTTA la cartella degli strumenti, sottocartelle comprese', () => {
+  // Gli attrezzi condivisi di questo lavoro stanno in una sottocartella: una
+  // scansione messa lì passava senza una parola (#680, secondo giro).
+  const visti = scriptDiManutenzione().map((f) => f.nome);
+  assert.ok(visti.some((n) => n.includes('/')), `nessuna sottocartella guardata: ${visti.length} file`);
+  assert.ok(visti.includes('lib/scansione-secco.mjs'), `gli attrezzi comuni non sono guardati: ${visti.join(', ')}`);
 });
 
 test('nessuno script scansiona la collezione dei feedback senza dire quali campi gli servono', () => {

@@ -198,14 +198,28 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
     console.warn('AVVISO: il server non ha saputo contare i feedback: scansiono la collezione (una lettura per segnalazione).');
   }
 
-  const { dati: docs } = await scansione({
-    nome: COPIA, dry, now, dir: copiaDir, usaCopia,
-    scansiona: async () => {
-      const letti = await listAll(bearer || '');
-      letture.aggiungi(letti.length, 'segnalazioni');
-      return letti;
-    },
+  const leggi = async () => {
+    const letti = await listAll(bearer || '');
+    letture.aggiungi(letti.length, 'segnalazioni');
+    return letti;
+  };
+  const { dati: primi, dallaCopia } = await scansione({
+    nome: COPIA, dry, now, dir: copiaDir, usaCopia, scansiona: leggi,
   });
+  let docs = primi;
+  // La copia descrive il server di qualche minuto fa, e i numeri si assegnano
+  // contando quelli che ci sono: se nel frattempo è arrivata una segnalazione,
+  // il numero che si prende da sé è il primo che questo giro sta per dare, e
+  // due segnalazioni finirebbero con lo stesso numero. Il conto vero ce
+  // l'abbiamo già in mano (l'abbiamo appena chiesto): se non combacia con la
+  // copia, si rilegge — costa una scansione, un numero doppio non si aggiusta
+  // da sé (#680, secondo giro).
+  if (dallaCopia && contati
+      && (conto.totale !== docs.length || conto.numerati !== docs.filter((d) => intField(d, 'seq') > 0).length)) {
+    console.warn(`AVVISO: dalla prova a secco le segnalazioni sono cambiate (${docs.length} → ${conto.totale}): `
+      + 'rileggo, o assegnerei numeri già presi.');
+    docs = await leggi();
+  }
   const withSeq = docs.filter((d) => intField(d, 'seq') > 0);
   const missing = docs.filter((d) => intField(d, 'seq') === 0);
   let next = withSeq.reduce((m, d) => Math.max(m, intField(d, 'seq')), 0) + 1;
