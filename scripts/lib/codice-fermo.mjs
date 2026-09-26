@@ -6,11 +6,11 @@ import { execFileSync } from 'node:child_process';
 
 const PROVE_GIRO = 'tests/verifica/';
 
-/** I file cambiati che non sono prove dei giri. PURA. */
+// I file cambiati che non sono prove: gli spec di esplorazione di chi verifica vanno e vengono, il codice no. PURA.
 export function fuoriDalleProve(files) {
   return (Array.isArray(files) ? files : [])
     .map((f) => String(f || '').replace(/\\/g, '/'))
-    .filter((f) => f && !f.startsWith(PROVE_GIRO));
+    .filter((f) => f && !f.startsWith(PROVE_GIRO) && !/\.spec\.m?js$/.test(f));
 }
 
 /** `{ cambiati, motivo }`: i file cambiati da `shaAvvio` a HEAD fuori dalle prove. Senza sha, niente. */
