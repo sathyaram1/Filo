@@ -621,3 +621,39 @@ test('«Riprova» non porta via quello che l_owner sta scrivendo', async ({ open
   await page.locator('#mgThread').click();
   await expect(page.locator('#mgThread')).toContainText('Report della lavorazione', { timeout: 10_000 });
 });
+
+// La gemella, stessa causa: nella pagina dei feedback una scheda il cui
+// documento non è tornato si disegna senza conversazione, e la casella delle
+// note vuota invita a scriverci. Salvare lì metterebbe quelle righe al posto
+// del report. Senza il fix la scrittura parte e riesce.
+test('nella pagina dei feedback una conversazione mai arrivata non si sovrascrive', async ({ openTab }) => {
+  const page = await openTab(PAGINA_FEEDBACK);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
+  await admin(page);
+  await page.evaluate((r) => {
+    window.__inviati = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') { window.__inviati.push(msg); return { ok: true }; }
+      if (msg && msg.type === 'auth_status') return { ok: true, isAdmin: true, profile: { email: 'owner@example.invalid' } };
+      if (msg && msg.type === 'feedback_decrypt_fields') return { ok: true, list: msg.list };
+      return orig(msg);
+    };
+    window.__avvisi = [];
+    window.alert = (t) => { window.__avvisi.push(String(t)); };
+    // Il documento non torna: la scheda nasce senza conversazione.
+    window.SN_FEEDBACK.getMany = async () => [];
+    window.__fbTest.setAdmin(true, { email: 'owner@example.invalid' });
+    window.__fbTest.setData([JSON.parse(JSON.stringify(r))]);
+  }, RIGA);
+
+  const note = page.locator('.fb-card[data-id="fb677"] .fb-notes');
+  await expect(note).toBeVisible({ timeout: 15_000 });
+  await note.fill('Nota scritta sopra una conversazione che non ho letto.');
+  await note.blur();
+  await page.waitForTimeout(1000);
+  const inviati = await page.evaluate(() => window.__inviati);
+  expect(inviati, `non deve partire nessuna scrittura: ${JSON.stringify(inviati)}`).toEqual([]);
+  expect((await page.evaluate(() => window.__avvisi)).join(' ')).toContain('non è arrivato');
+});
