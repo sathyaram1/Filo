@@ -118,10 +118,12 @@ describe('`solo_suite`: provare la suite su un ramo senza pubblicare', () => {
   });
 });
 
-// La suite prova main all'inizio e dura un'ora e un quarto; il lavoro Windows
-// riprendeva main COM'È dopo, e quello che era entrato nel frattempo usciva
-// senza essere mai passato dalla suite (giro del 14/09, verifica).
-describe('si pubblica SOLO il commit che la suite ha provato', () => {
+// Si pubblica ESATTAMENTE il commit che la suite ha provato (#641, decisione
+// owner 17/09/2026). Col vecchio fermo «main si è mosso», con le routine che
+// fondono di continuo, nessuna patch usciva più e nessuno lo diceva.
+describe('si pubblica il commit che la suite ha provato, anche se main si è mosso', () => {
+  const release = () => senzaCommenti(job('release'));
+
   test('la suite dice quale commit ha provato, prima ancora di decidere se girare', () => {
     const suite = senzaCommenti(job('suite'));
     assert.match(suite, /outputs:\s*\n\s*sha:\s*\$\{\{\s*steps\.provato\.outputs\.sha\s*\}\}/, 'la suite deve esporre il commit provato');
@@ -130,33 +132,64 @@ describe('si pubblica SOLO il commit che la suite ha provato', () => {
       'si legge PRIMA del controllo "c\'è qualcosa di nuovo": deve esserci anche quando la suite non gira');
   });
 
-  test('il lavoro Windows lo confronta due volte: prima del numero di versione e dopo l\'allineamento', () => {
-    const release = senzaCommenti(job('release'));
-    const primaDelBump = release.slice(0, release.indexOf('release-bump.mjs'));
-    assert.match(primaDelBump, /needs\.suite\.outputs\.sha/, 'prima di chiedere il numero: se main si è mosso non si pubblica');
-    assert.match(primaDelBump, /should_release=false/, 'main mosso → should_release=false, senza feedback: la prossima corsa riprova');
-    const dopoIlPull = release.slice(release.indexOf('git pull --rebase origin main'));
-    assert.match(dopoIlPull, /needs\.suite\.outputs\.sha/, 'dopo il pull: sotto il commit di release deve esserci il commit provato');
-    assert.match(dopoIlPull, /HEAD~1/);
-    assert.match(dopoIlPull, /exit 1/, 'codice mai provato non si costruisce');
+  test('il lavoro Windows fa il checkout del commit provato, non di main, e non rilegge main nell\'albero', () => {
+    const r = release();
+    assert.match(r, /uses: actions\/checkout@v4\s*\n\s*with:\s*\n\s*ref:\s*\$\{\{\s*needs\.suite\.outputs\.sha\s*\}\}/,
+      'il checkout deve partire dallo sha della suite');
+    assert.doesNotMatch(r, /ref:\s*main\b/, 'costruire la punta di main pubblicherebbe codice mai provato');
+    assert.doesNotMatch(r, /git (pull|merge|rebase|reset|checkout)\b/, 'niente deve spostare l\'albero dal commit provato');
   });
 
-  // Giro 6 della verifica (16/09/2026): se main riceve qualcosa durante OGNI
-  // corsa, nessuna versione esce e nessuno lo sa. Non si risolve (scelta
-  // dell'owner), ma il caso si vede: nel riassunto del lavoro, con i due sha.
-  test('quando main si e\' mosso, il riassunto del lavoro lo dice, con lo sha provato e quello attuale', () => {
-    const release = senzaCommenti(job('release'));
-    const primaDelBump = release.slice(0, release.indexOf('release-bump.mjs'));
-    const blocco1 = primaDelBump.slice(primaDelBump.indexOf('if [ "$QUI" != "$PROVATO" ]'));
-    assert.match(blocco1, /GITHUB_STEP_SUMMARY/, 'il primo fermo scrive nel riassunto del lavoro');
-    assert.match(blocco1, /\$\{PROVATO[^}]*\}[\s\S]*\$QUI/, 'con lo sha provato e quello attuale di main');
-    assert.match(blocco1, /main si e' mosso/);
-    const dopoIlPull = release.slice(release.indexOf('git pull --rebase origin main'));
-    const blocco2 = dopoIlPull.slice(dopoIlPull.indexOf('if [ "$SOTTO" != "$PROVATO" ]'));
-    assert.match(blocco2, /GITHUB_STEP_SUMMARY/, 'anche il secondo fermo scrive nel riassunto');
-    assert.match(blocco2, /\$\{PROVATO[^}]*\}[\s\S]*\$SOTTO/, 'con lo sha provato e quello sotto la release');
-    assert.ok(blocco2.indexOf('GITHUB_STEP_SUMMARY') < blocco2.indexOf('exit 1'), 'il riassunto si scrive PRIMA di uscire');
+  test('senza lo sha della suite non si pubblica (il checkout cadrebbe sul ramo di default)', () => {
+    const r = release();
+    const check = r.slice(r.indexOf('id: check'), r.indexOf('git fetch --tags --force'));
+    assert.match(check, /-z "\$PROVATO"/);
+    assert.match(check, /"\$QUI" != "\$PROVATO"/);
+    assert.match(check, /exit 1/);
   });
+
+  test('il numero del server si applica in locale al commit provato, dopo il bump e prima della build', () => {
+    const r = release();
+    const bump = r.indexOf('release-bump.mjs');
+    const applica = r.indexOf('release-apply-version.mjs');
+    const build = r.indexOf('npm run release');
+    assert.ok(bump >= 0 && applica > bump && build > applica, 'ordine: numero dal server, applicato in locale, poi build');
+    assert.match(r, /release-apply-version\.mjs "\$ATTESA"/);
+    assert.match(r, /ATTESA="\$\{\{ steps\.bump\.outputs\.version \}\}"/);
+    assert.match(r, /sha:\s*\$\{\{\s*steps\.applica\.outputs\.sha\s*\}\}/, 'Mac e Linux ricevono lo sha costruito');
+  });
+
+  test('main mosso durante la suite: resta una nota nel riassunto, con i due sha, e la pubblicazione prosegue', () => {
+    const r = release();
+    const passo = r.slice(r.indexOf('id: applica'), r.indexOf('name: Build e upload su GitHub Releases'));
+    const nota = passo.slice(passo.indexOf('git fetch --quiet origin main'));
+    assert.ok(passo.includes('git fetch --quiet origin main'), 'main si legge solo per la nota');
+    assert.match(nota, /GITHUB_STEP_SUMMARY/);
+    assert.match(nota, /\$\{PROVATO\}[\s\S]*\$\{MAIN_ORA\}/, 'con lo sha provato e quello attuale di main');
+    assert.match(nota, /main si e' mosso/);
+    assert.doesNotMatch(nota, /exit 1|should_release=false/, 'main mosso non ferma più la pubblicazione');
+    assert.doesNotMatch(r, /main si e' mosso[^\n]*\n[\s\S]{0,400}should_release=false/, 'il vecchio fermo non deve tornare');
+  });
+
+  test('il tag nasce sul commit costruito, e il commit del numero del server non conta come codice nuovo', () => {
+    const r = release();
+    assert.match(r, /gh release edit "\$\{\{ steps\.bump\.outputs\.version \}\}" --draft=false --latest --target "\$\{\{ steps\.applica\.outputs\.sha \}\}"/,
+      'senza --target il tag cadrebbe sulla punta di main e le fusioni non pubblicate risulterebbero già uscite');
+    for (const nome of ['suite', 'release']) {
+      assert.match(senzaCommenti(job(nome)), /git rev-list --count --invert-grep --grep='\^release: v\[0-9\]' "\$\{LAST_TAG\}\.\.HEAD"/,
+        `${nome}: senza escludere il commit del server ogni corsa rilascerebbe di nuovo`);
+    }
+  });
+
+  for (const nome of ['release-mac', 'release-linux']) {
+    test(`${nome} ricostruisce lo stesso sha con lo stesso numero applicato in locale`, () => {
+      const j = senzaCommenti(job(nome));
+      assert.match(j, /ref:\s*\$\{\{\s*needs\.release\.outputs\.sha\s*\}\}/);
+      const applica = j.indexOf('release-apply-version.mjs "${{ needs.release.outputs.version }}"');
+      assert.ok(applica >= 0, 'il numero va applicato anche qui, o il pacchetto esce col numero vecchio');
+      assert.ok(applica < j.indexOf('npm run release:'), 'prima della build');
+    });
+  }
 });
 
 // Nel contenitore delle routine (Linux, senza schermo, da root) un comando
