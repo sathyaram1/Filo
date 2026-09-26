@@ -190,8 +190,19 @@
   // sigle si elencano perché un [A-Z]{3} qualunque prenderebbe anche "KM".
   const SIGLE = 'EUR|USD|GBP|CHF|JPY|CNY|CAD|AUD|SEK|NOK|DKK|INR|BRL|MXN|TRY|PLN|HUF|CZK|KRW|ZAR|THB|ILS|IDR|ISK|MYR|NZD|PHP|RON|SGD|HKD|BGN|RUB';
   const SIMBOLI = '€|\\$|£|¥|₹|₩|₪|₫|₱|₺|₽|฿|R\\$|zł|Kč|kr';
-  const VALUTA_DOPO = new RegExp(`^[\\s\\u00A0]*(?:${SIMBOLI}|(?:${SIGLE})\\b|[Ee]uro\\b|EURO\\b|[Ee]uri\\b)`);
-  const VALUTA_PRIMA = new RegExp(`(?:${SIMBOLI})[\\s\\u00A0]*$`);
+  // Fra il numero e la valuta il modello infila la formattazione: grassetto,
+  // corsivo, parentesi, virgolette. Nella resa finale sparisce, quindi
+  // guardare solo il carattere attaccato al marker riportava le dodici cifre
+  // proprio dove l'utente legge «€» (#724, primo giro di verifica). Gli
+  // orpelli non valgono dopo un a capo: lì un asterisco è il punto di un
+  // elenco, non il grassetto di questo numero.
+  const ORPELLI = '[*_`~()\\[\\]«»"\'“”]*';
+  const VALUTA = `(?:${SIMBOLI}|\\b(?:${SIGLE})\\b|\\b[Ee]ur[oi]\\b|\\bEURO\\b)`;
+  const VALUTA_DOPO = new RegExp(`^[ \\t\\u00A0]*${ORPELLI}[\\s\\u00A0]*${VALUTA}`);
+  const VALUTA_PRIMA = new RegExp(`${VALUTA}[\\s\\u00A0]*${ORPELLI}[ \\t\\u00A0]*$`);
+  // In streaming «non si sa ancora» dura finché dietro al marker c'è solo
+  // spazio o formattazione: la valuta arriva nel pezzo dopo.
+  const SOLO_ORPELLI = new RegExp(`^[\\s\\u00A0]*${ORPELLI}[\\s\\u00A0]*$`);
 
   // ----------------------------------------------------------------
   // Sostituisce i marker [[calc: <espressione>]] emessi dall'LLM
