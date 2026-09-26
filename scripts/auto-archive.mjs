@@ -129,7 +129,10 @@ export async function runAutoArchive({
     const note = `auto-archiviato (DC3): punteggio ${score} dopo 24h+ dalla messa in produzione (${ver || 'n/d'}).`;
     archivedDetails.push({ id, num: fb ? FB.formatNum(fb.seq, fb.subSeq) : '', score, note });
     if (!dryRun) {
-      const r = await scrivi(id, 'archived', note, { attore: 'owner' });
+      // Archiviare rilegge la segnalazione: è una lettura come le altre e va
+      // nella riga del costo, o il giro che riusa la scansione dichiara zero
+      // mentre paga (#680).
+      const r = await scrivi(id, 'archived', note, { attore: 'owner', letture });
       if (!r.ok) console.warn(`  ! ${id} non archiviato: ${r.motivo}`);
     }
   }
