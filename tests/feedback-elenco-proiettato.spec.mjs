@@ -605,3 +605,19 @@ test('con la conversazione non letta, «Conferma riapertura» non la sostituisce
   const inviati = await page.evaluate(() => window.__inviati);
   expect(inviati, `non deve partire nessuna scrittura: ${JSON.stringify(inviati)}`).toEqual([]);
 });
+
+// Il «Riprova» è un ridisegno in più, e questo pannello sui ridisegni ha già
+// perso una bozza una volta: premerlo mentre si sta scrivendo non deve
+// cancellare quello che c'è nella casella.
+test('«Riprova» non porta via quello che l_owner sta scrivendo', async ({ openTab }) => {
+  const page = await gestioneDettaglioRotto(openTab, { ...ROTTA, _id: 'fb677z' }, 'poi-ok');
+  await expect(page.locator('#mgThread')).toContainText('non è arrivato', { timeout: 10_000 });
+  await page.locator('#mgClarifyText').fill('Prendi la seconda strada.');
+  await page.locator('#mgRiprovaDettaglio').click();
+  await page.waitForTimeout(1500);
+  await expect(page.locator('#mgClarifyText')).toHaveValue('Prendi la seconda strada.');
+  // E finita la bozza la conversazione arriva lo stesso.
+  await page.locator('#mgClarifyText').fill('');
+  await page.locator('#mgThread').click();
+  await expect(page.locator('#mgThread')).toContainText('Report della lavorazione', { timeout: 10_000 });
+});
