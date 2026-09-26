@@ -344,11 +344,18 @@ module.exports = function register(on, ctx) {
   // testo è proprio quello che nessuno ha ancora guardato, e mandarlo in
   // pagina sarebbe mostrarlo.
   function perLaPagina(n) {
-    if (n.stato !== 'attesa') return n;
-    const chi = Guardiano ? Guardiano.fonteVisibile(n.fonte) : 'una fonte sconosciuta';
+    const chi = Guardiano ? Guardiano.fonteVisibile(n.fonte) : '';
+    // Il mittente lo scrive chi manda: in pagina va solo la parte verificabile
+    // (indirizzo o sito), mai il nome libero che ci ha messo intorno.
+    if (n.stato !== 'attesa') return n.fonte ? { ...n, fonte: chi } : n;
+    // Se manca il modello del guardiano, aspettare non serve: chi legge deve
+    // sapere che c'è una casella da riempire, non credere a una rete giù.
+    const coda = n.motivoAttesa === 'senza-guardiano'
+      ? `Un avviso nato da ${chi} non può comparire: al controllo di sicurezza manca un modello suo, diverso da quello che scrive i testi. Si sceglie in Opzioni → Modelli → «Guardiano degli avvisi».`
+      : `Un avviso nato da ${chi} è in attesa del controllo.`;
     return {
       ...n,
-      text: `Un avviso nato da ${chi} è in attesa del controllo.`,
+      text: coda,
       // La fonte la nomina già la riga qui sopra: ripeterla sotto sarebbe
       // scriverla due volte nella stessa scheda.
       fonte: '',
