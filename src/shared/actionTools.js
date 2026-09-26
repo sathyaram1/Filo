@@ -37,6 +37,35 @@
     return { shellPref: '"powershell" | "cmd" | "bash" | "zsh"', esempioPercorso: '~/Documenti/bolletta.pdf' };
   }
 
+  // I documenti di trasparenza che ESISTONO davvero. L'elenco non si scrive a
+  // mano: lo dà SN_TRANSPARENCY, generato dai markdown in transparency/.
+  // Scritto a mano prometteva quattro documenti quando ne esisteva uno solo
+  // (#515): a «che fine fanno i miei dati?» l'agente chiedeva «privacy» e
+  // tornava a mani vuote. Un elenco derivato non può mentire in nessuno dei due
+  // versi: il documento che l'owner scrive domani entra nel prompt da sé.
+  function docsTrasparenza() {
+    try {
+      const T = global.SN_TRANSPARENCY;
+      if (T && typeof T.all === 'function') {
+        return T.all()
+          .map((d) => ({
+            id: String(d.id || ''),
+            title: String(d.title || ''),
+            sezioni: (Array.isArray(d.sections) ? d.sections : []).map((x) => String((x && x.title) || '')).filter(Boolean),
+          }))
+          .filter((d) => d.id);
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  // Titolo e sezioni, non il sottotitolo: quello è scritto per chi apre la
+  // pagina e al modello non dice cosa c'è dentro (#515).
+  function elencoTrasparenza(docs) {
+    return docs.map((d) => d.id + ' («' + d.title + '»'
+      + (d.sezioni.length ? '; sezioni: ' + d.sezioni.join(', ') : '') + ')').join('; ');
+  }
+
   const RIPETI = {
     description: 'Ricorrenza: un array di giorni ["lun","mer"] (token: lun mar mer gio ven sab dom) oppure una scorciatoia "feriali" | "weekend" | "ogni giorno".',
     anyOf: [
@@ -45,10 +74,11 @@
     ],
   };
 
-  // Ogni voce: `description` (testo o funzione del contesto), `properties`,
-  // `required`. `risultato: true` marca gli strumenti il cui esito (risultati
-  // di ricerca, testo di un documento, output di un comando) torna al modello
-  // per intero: gli altri tornano una riga di conferma.
+  // Ogni voce: `description` e `properties` (testo/oggetto, oppure una funzione
+  // del contesto quando dipendono da cosa esiste a runtime), `required`.
+  // `risultato: true` marca gli strumenti il cui esito (risultati di ricerca,
+  // testo di un documento, output di un comando) torna al modello per intero:
+  // gli altri tornano una riga di conferma.
   const TOOLS = {
     NAVIGA: {
       description: 'APRE SUBITO un sito in una nuova scheda. Usalo quando l\'utente chiede di aprire qualcosa. Con `background: true` la scheda si apre in SECONDO PIANO (l\'utente resta dov\'è, la musica parte lo stesso): usalo per ciò che si ascolta e basta, o quando l\'utente chiede di non cambiare scheda. Se stai solo PROPONENDO dei siti tra cui scegliere, non usarlo: elenca i link nel testo.',
@@ -155,8 +185,22 @@
       risultato: true,
     },
     LEGGI_TRASPARENZA: {
-      description: 'Chiede il testo di un documento di trasparenza di Filo. USALO SEMPRE prima di rispondere quando l\'utente chiede perché Filo usa un certo modello o una certa azienda, se Filo usa ChatGPT/Gemini/Grok, dove finiscono i suoi soldi o i suoi dati: sono scelte documentate per iscritto e NON vanno ricostruite a memoria. Rispondi citando il testo, senza aggiungere motivazioni tue.',
-      properties: { doc: S('Quale documento: models (quali modelli AI usa Filo e perché, quali aziende sono escluse, come vengono trattati i dati verso i fornitori), privacy, security, business. Senza `doc` torna l\'elenco di quelli disponibili.', { enum: ['models', 'privacy', 'security', 'business'] }) },
+      description: () => {
+        const docs = docsTrasparenza();
+        const base = 'Chiede il testo di un documento di trasparenza di Filo. USALO SEMPRE prima di rispondere quando l\'utente chiede perché Filo usa un certo modello o una certa azienda, se Filo usa ChatGPT/Gemini/Grok, dove finiscono i suoi soldi o i suoi dati: sono scelte documentate per iscritto e NON vanno ricostruite a memoria. Rispondi citando il testo, senza aggiungere motivazioni tue.';
+        if (!docs.length) return base + ' In questo momento non c\'è nessun documento scritto: non chiamarlo.';
+        return base + ' I documenti scritti sono questi, e sono gli unici che esistono: '
+          + elencoTrasparenza(docs) + '. I titoli non dicono tutto: se la domanda può toccare uno di questi'
+          + ' documenti, leggilo prima di rispondere. Solo se nel testo la risposta non c\'è, dillo all\'utente'
+          + ' invece di rispondere a memoria.';
+      },
+      properties: () => {
+        const docs = docsTrasparenza();
+        const testo = docs.length
+          ? 'Quale documento: ' + elencoTrasparenza(docs) + '. Sono gli unici che esistono. Senza `doc` torna l\'elenco di quelli disponibili.'
+          : 'Quale documento. Al momento non ne esiste nessuno: senza `doc` torna l\'elenco, che sarà vuoto.';
+        return { doc: S(testo, docs.length ? { enum: docs.map((d) => d.id) } : null) };
+      },
       required: [],
       risultato: true,
     },
@@ -326,7 +370,11 @@
           description,
           parameters: {
             type: 'object',
-            properties: t.properties || {},
+            // `properties` può essere una funzione del contesto come
+            // `description`: serve a chi deve dichiarare un elenco che il
+            // codice conosce solo a runtime (i documenti di trasparenza che
+            // esistono davvero) invece di ricopiarlo a mano.
+            properties: (typeof t.properties === 'function' ? t.properties(ctx) : t.properties) || {},
             required: Array.isArray(t.required) ? t.required : [],
           },
         },

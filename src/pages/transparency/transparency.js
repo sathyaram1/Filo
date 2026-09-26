@@ -18,10 +18,24 @@
 
   function $(id) { return document.getElementById(id); }
 
-  function currentId() {
+  // Il documento chiesto nell'indirizzo, così com'è scritto. Serve anche quando
+  // non esiste: chi arriva da un link che prometteva la privacy deve leggere
+  // che quella sezione non è scritta, non trovarsi un altro documento al suo
+  // posto mentre l'indirizzo continua a dire «privacy» (#515).
+  // Normalizzato come lo normalizza la chat: «Models», « models » e «MODELS»
+  // sono lo stesso documento. Un indirizzo lo si scrive a mano o lo si ricopia
+  // da un messaggio, e la maiuscola ci finisce da sé; negare un documento che
+  // esiste è la bugia da cui parte tutto questo (#515).
+  function requestedId() {
     const q = new URLSearchParams(window.location.search).get('doc');
+    return String(q == null ? '' : q).replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 60);
+  }
+
+  function currentId() {
+    const q = requestedId();
     const ids = T.ids();
-    return ids.includes(q) ? q : ids[0];
+    if (ids.includes(q)) return q;
+    return q ? '' : ids[0];
   }
 
   function renderNav(activeId) {
@@ -29,29 +43,60 @@
     nav.textContent = '';
     for (const item of T.NAV) {
       const doc = T.get(item.id);
-      if (!doc) {
-        // Sezione non ancora scritta: resta visibile e spenta. Farla sparire
-        // darebbe l'impressione che Filo non abbia niente da dire su privacy o
-        // sicurezza, che è il contrario di quello che questa pagina promette.
-        const span = document.createElement('span');
-        span.className = 'sn-nav-item is-soon';
-        span.textContent = item.label;
-        span.title = 'in arrivo';
-        nav.appendChild(span);
-        continue;
-      }
       const a = document.createElement('a');
-      a.className = 'sn-nav-item' + (item.id === activeId ? ' is-active' : '');
+      a.className = 'sn-nav-item' + (doc ? '' : ' is-soon') + (item.id === activeId ? ' is-active' : '');
       a.href = '?doc=' + encodeURIComponent(item.id);
       a.textContent = item.label;
+      // Anche le sezioni non ancora scritte si cliccano, e portano alla pagina
+      // che lo dice: spente e mute erano un vicolo cieco, e "in arrivo" lo
+      // sapeva solo chi ci fermava sopra il mouse (#515).
+      if (!doc) {
+        a.title = 'in arrivo';
+        a.setAttribute('aria-label', item.label + ': non ancora scritta');
+      }
       nav.appendChild(a);
     }
   }
 
+  // La sezione chiesta non c'è: lo si dice, e si dice cosa c'è. Mostrare al suo
+  // posto un altro documento senza avvisare è la stessa promessa a vuoto che
+  // questa pagina esiste per non fare.
+  function renderMissing(chiesto) {
+    const voce = T.NAV.find((n) => n.id === chiesto);
+    const nome = chiesto ? (voce ? voce.label : chiesto) : 'Trasparenza';
+    document.title = 'Filo — ' + nome;
+    $('title').textContent = nome;
+    // Senza niente nell'indirizzo non c'è nessuna sezione da negare: qui non
+    // c'è proprio ancora niente di scritto, e lo dice il corpo della pagina.
+    $('subtitle').textContent = !chiesto ? ''
+      : (voce ? 'Questa sezione non è ancora scritta.' : 'Questa sezione non esiste.');
+    $('meta').textContent = '';
+
+    const body = $('doc-body');
+    body.textContent = '';
+    const p = document.createElement('p');
+    const docs = T.all();
+    if (!docs.length) {
+      p.textContent = 'Non c’è ancora nessun documento di trasparenza.';
+    } else {
+      p.appendChild(document.createTextNode('Quello che c’è scritto: '));
+      docs.forEach((d, i) => {
+        if (i) p.appendChild(document.createTextNode(', '));
+        const a = document.createElement('a');
+        a.href = '?doc=' + encodeURIComponent(d.id);
+        a.textContent = d.title;
+        p.appendChild(a);
+      });
+      p.appendChild(document.createTextNode('.'));
+    }
+    body.appendChild(p);
+    renderNav(chiesto);
+  }
+
   function render() {
     const id = currentId();
-    const doc = T.get(id);
-    if (!doc) return;
+    const doc = id ? T.get(id) : null;
+    if (!doc) { renderMissing(requestedId()); return; }
 
     document.title = 'Filo — ' + doc.title;
     $('title').textContent = doc.title;

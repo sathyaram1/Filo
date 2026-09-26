@@ -53,6 +53,14 @@ function escapeHtml(s) {
   })[c]);
 }
 
+// Inverso esatto di escapeHtml, in una passata sola (così «&amp;quot;» torna
+// «&quot;» e non «"»).
+function unescapeHtml(s) {
+  return String(s).replace(/&(amp|lt|gt|quot|#39);/g, (_m, e) => ({
+    amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'",
+  })[e]);
+}
+
 function slugify(s) {
   return String(s || '')
     .toLowerCase()
@@ -88,7 +96,10 @@ function renderInline(text, sources) {
     const clean = url.replace(/&amp;/g, '&');
     let idx = sources.findIndex((s) => s.url === clean);
     if (idx === -1) {
-      sources.push({ url: clean, label: label.replace(/\*\*/g, ''), domain: domainOf(clean) });
+      // L'etichetta si conserva IN CHIARO: la catturiamo dal testo già escapato,
+      // e l'elenco delle fonti la escapa di nuovo (sulla pagina «&quot;» si
+      // leggeva così com'è) mentre il testo per l'agente la prende tale e quale.
+      sources.push({ url: clean, label: unescapeHtml(label.replace(/\*\*/g, '')), domain: domainOf(clean) });
       idx = sources.length - 1;
     }
     const n = idx + 1;
@@ -307,9 +318,11 @@ function buildDocs() {
     return {
       id: meta.id || file.replace(/\.md$/, ''),
       title: meta.title || file,
+      nav: meta.nav || '',
       subtitle: meta.subtitle || '',
       updated: meta.updated || '',
       order: Number(meta.order || 99),
+      ordineDichiarato: !!meta.order,
       sections,
       sources,
       html: html + '\n' + renderSources(sources),
@@ -320,16 +333,33 @@ function buildDocs() {
   return { docs, glossary };
 }
 
-// Le quattro voci della navigazione. Quelle senza documento compaiono comunque,
-// spente: dire "in arrivo" è più onesto che far finta che la sezione non esista.
-const NAV = [
-  { id: 'models', label: 'Modelli' },
-  { id: 'privacy', label: 'Privacy' },
-  { id: 'security', label: 'Sicurezza' },
-  { id: 'business', label: 'Come si sostiene' },
+// Le aree ANNUNCIATE: compaiono nella barra anche senza documento, perché dire
+// "in arrivo" è più onesto che far finta che la sezione non esista.
+const AREE_ANNUNCIATE = [
+  { id: 'models', label: 'Modelli', order: 1 },
+  { id: 'privacy', label: 'Privacy', order: 2 },
+  { id: 'security', label: 'Sicurezza', order: 3 },
+  { id: 'business', label: 'Come si sostiene', order: 4 },
 ];
 
+// La barra: OGNI documento scritto, più le aree annunciate che non ne hanno
+// ancora uno. Un documento decide lui nome corto (`nav`) e posto (`order`);
+// l'area annunciata è solo il segnaposto finché il documento non c'è (#515).
+function buildNav(docs) {
+  const voci = AREE_ANNUNCIATE.filter((a) => !docs.some((d) => d.id === a.id)).map((a) => ({ ...a }));
+  for (const d of docs) {
+    const area = AREE_ANNUNCIATE.find((a) => a.id === d.id);
+    voci.push({
+      id: d.id,
+      label: d.nav || (area ? area.label : d.title),
+      order: d.ordineDichiarato || !area ? d.order : area.order,
+    });
+  }
+  return voci.sort((a, b) => a.order - b.order).map(({ id, label }) => ({ id, label }));
+}
+
 function emitModule({ docs, glossary }) {
+  const NAV = buildNav(docs);
   const payload = docs.map((d) => ({
     id: d.id, title: d.title, subtitle: d.subtitle, updated: d.updated,
     sections: d.sections, sources: d.sources, html: d.html, text: d.text,
@@ -354,14 +384,21 @@ function emitModule({ docs, glossary }) {
   function ids() { return DOCS.map((d) => d.id); }
 
   // Testo per l'agente. Senza id torna l'indice dei documenti disponibili, così
-  // può scegliere quale leggere invece di indovinare.
+  // può scegliere quale leggere invece di indovinare. Con un id che NON esiste
+  // lo dice in chiaro, nominandolo: prima tornava l'elenco e basta, che a valle
+  // si legge come una risposta qualunque — l'agente chiedeva «privacy», riceveva
+  // «disponibili: models» e rispondeva lo stesso, a memoria (#515).
   function asText(id) {
-    const doc = get(id);
-    if (!doc) {
-      return 'Documenti di trasparenza disponibili: '
-        + DOCS.map((d) => d.id + ' (' + d.title + ')').join(', ') + '.';
-    }
-    return doc.title + (doc.updated ? ' — aggiornato ' + doc.updated : '') + '\\n\\n' + doc.text;
+    const key = String(id == null ? '' : id).replace(/\\s+/g, ' ').trim().toLowerCase().slice(0, 120);
+    const doc = get(key);
+    if (doc) return doc.title + (doc.updated ? ' — aggiornato ' + doc.updated : '') + '\\n\\n' + doc.text;
+    const elenco = DOCS.map((d) => d.id + ' (' + d.title + ')').join(', ');
+    if (!key) return 'Documenti di trasparenza disponibili: ' + elenco + '.';
+    const previsto = NAV.some((n) => n.id === key);
+    return 'Il documento "' + key + '" NON esiste'
+      + (previsto ? ' ancora: è una sezione prevista, ma non è stata scritta' : '')
+      + '. Non c\\'è niente da citare, e non va ricostruito a memoria: dillo all\\'utente. '
+      + 'Documenti di trasparenza disponibili: ' + elenco + '.';
   }
 
   global.SN_TRANSPARENCY = { NAV, GLOSSARY, all, get, ids, asText };
@@ -383,13 +420,22 @@ ${UI_RUNTIME}
 `;
 }
 
-function emitSitePage(doc, { docs, glossary }, css) {
-  const navHtml = NAV.map((n) => {
-    const has = docs.some((d) => d.id === n.id);
-    if (!has) return `<span class="sn-nav-item is-soon" title="in arrivo">${n.label}</span>`;
-    const active = n.id === doc.id ? ' is-active' : '';
-    return `<a class="sn-nav-item${active}" href="./${n.id}.html">${n.label}</a>`;
+// La barra: una VOCE PER OGNI area, anche quelle senza documento. Anche lì si
+// clicca, e si finisce su una pagina che dice che la sezione non è scritta e
+// dove andare invece. Un elemento spento che al clic non fa niente non è
+// un'informazione, è un vicolo cieco (#515).
+function navSito(voceAttiva, docs) {
+  return buildNav(docs).map((n) => {
+    const scritto = docs.some((d) => d.id === n.id);
+    const active = n.id === voceAttiva ? ' is-active' : '';
+    const soon = scritto ? '' : ' is-soon';
+    const etichetta = scritto ? '' : ` title="in arrivo" aria-label="${escapeHtml(n.label)}: non ancora scritta"`;
+    return `<a class="sn-nav-item${active}${soon}" href="./${n.id}.html"${etichetta}>${n.label}</a>`;
   }).join('\n      ');
+}
+
+function emitSitePage(doc, { docs, glossary }, css) {
+  const navHtml = navSito(doc.id, docs);
 
   return `<!DOCTYPE html>
 <html lang="it">
@@ -433,6 +479,42 @@ ${UI_RUNTIME}
 `;
 }
 
+// La pagina di un'area annunciata ma non ancora scritta. Sul sito una voce
+// senza pagina sarebbe un 404; dentro Filo la stessa sezione si spiega già.
+function emitSiteSoonPage(voce, { docs }, css) {
+  const elenco = docs.length
+    ? 'Quello che c’è scritto: ' + docs.map((d) => `<a href="./${d.id}.html">${escapeHtml(d.title)}</a>`).join(', ') + '.'
+    : 'Non c’è ancora nessun documento di trasparenza.';
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Filo — ${escapeHtml(voce.label)}</title>
+<meta name="description" content="Questa sezione non è ancora scritta." />
+<style>
+${css}
+</style>
+</head>
+<body>
+<main class="sn-doc">
+  <header class="sn-doc-head">
+    <a class="sn-doc-brand" href="../">Filo</a>
+    <nav class="sn-nav">
+      ${navSito(voce.id, docs)}
+    </nav>
+  </header>
+  <h1>${escapeHtml(voce.label)}</h1>
+  <p class="sn-doc-sub">Questa sezione non è ancora scritta.</p>
+  <article id="doc-body">
+<p>${elenco}</p>
+  </article>
+</main>
+</body>
+</html>
+`;
+}
+
 function main() {
   const check = process.argv.includes('--check');
   const built = buildDocs();
@@ -452,6 +534,11 @@ function main() {
   for (const doc of built.docs) {
     const page = emitSitePage(doc, built, css);
     for (const dir of siteDirs) outputs.push([join(dir, `${doc.id}.html`), page]);
+  }
+  for (const voce of buildNav(built.docs)) {
+    if (built.docs.some((d) => d.id === voce.id)) continue;
+    const page = emitSiteSoonPage(voce, built, css);
+    for (const dir of siteDirs) outputs.push([join(dir, `${voce.id}.html`), page]);
   }
 
   let stale = 0;

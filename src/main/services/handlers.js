@@ -1579,9 +1579,19 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // non una ricostruzione a memoria dell'agente. Stesso schema di
         // CAPACITA_DETTAGLIO: sola lettura, l'output rientra nel contesto.
         const T = globalThis.SN_TRANSPARENCY;
-        const doc = String(action.doc ?? action.documento ?? action.id ?? '').trim();
+        // Il nome del documento lo sceglie il MODELLO, e torna nel prompt in
+        // due posti (questo esito e l'etichetta del blocco reimmesso nel giro
+        // dopo). Una riga sola e di lunghezza sensata: un nome con dentro degli
+        // a capo saprebbe fingere l'inizio di un altro blocco di sistema.
+        let doc = String(action.doc ?? action.documento ?? action.id ?? '').replace(/\s+/g, ' ').trim();
+        if (doc.length > 120) doc = doc.slice(0, 120) + '…';
         const text = T ? T.asText(doc) : '';
-        return { executed: true, kept: true, output: { doc: doc || null, text } };
+        // Un documento chiesto per nome che non esiste NON è una lettura
+        // riuscita: il testo torna lo stesso (dice all'agente che non c'è, così
+        // non lo ricostruisce a memoria), ma il diario non deve scrivere
+        // «riletto la trasparenza» per una cosa che nessuno ha letto (#515).
+        const trovato = !!(T && (!doc || T.get(doc)));
+        return { executed: trovato, kept: true, output: { doc: doc || null, text, missing: !trovato } };
       }
       case 'EVENTO_CALENDARIO':
         return { executed: false, kept: true };
@@ -2071,6 +2081,16 @@ function webSearchResultsForPrompt(actions) {
 // dall'owner invece di ricostruirlo a memoria — che su queste cose è il modo
 // tipico di attribuire a Filo posizioni che non ha. Sono DATI di sistema
 // affidabili, non istruzioni dell'utente.
+//
+// Il tetto è la rete contro un documento fuori misura, non una misura: a 16.000
+// caratteri tagliava l'unico documento che esiste (20.001) e gli portava via i
+// punti deboli della scelta e TUTTO l'elenco delle fonti, cioè proprio la parte
+// che lo strumento ordina all'agente di citare. Ora è dimensionato sul caso
+// peggiore realistico con margine (CLAUDE.md § Limiti: quattro documenti come
+// quello di oggi, e ognuno può quadruplicare), e quando scatta dice quanto è
+// arrivato invece di tagliare in silenzio.
+const TRANSPARENCY_DOC_CAP = 80000;
+
 // Taglia un testo al tetto senza spezzare un carattere. Un'emoji occupa DUE
 // unità di testo: tagliando per numero di unità si resta con la prima metà, che
 // da sola non è nessun carattere e arriva al modello come un rombo. Le stesse
@@ -2094,7 +2114,10 @@ function transparencyDocsForPrompt(actions) {
     const out = a._output;
     if (!out || !out.text) continue;
     let body = String(out.text);
-    if (body.length > 16000) body = `${tagliaInteri(body, 16000)}\n…(documento troncato)`;
+    if (body.length > TRANSPARENCY_DOC_CAP) {
+      const tenuto = tagliaInteri(body, TRANSPARENCY_DOC_CAP);
+      body = `${tenuto}\n…(documento troncato: qui sopra ci sono i primi ${tenuto.length} caratteri su ${body.length}. Dillo all'utente invece di completare a memoria.)`;
+    }
     blocks.push(`[Documento di trasparenza di Filo${out.doc ? ` "${out.doc}"` : ''}]\n${body}`);
   }
   return blocks.join('\n\n').trim();

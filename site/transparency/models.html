@@ -64,18 +64,20 @@
   border-bottom-color: var(--sn-accent, #c45a3b);
 }
 
-/* Le sezioni non ancora scritte restano visibili ma spente: dire "in arrivo" è
- * più onesto che far sparire la voce. */
-.sn-nav-item.is-soon {
-  opacity: 0.4;
-  cursor: default;
-}
+/* Le sezioni non ancora scritte: grigie invece del colore dei link, ma leggibili, perché si cliccano.
+ * Farle sparire direbbe che Filo non ha niente da dire su privacy o sicurezza. */
+.sn-nav-item.is-soon:not(.is-active) { color: var(--sn-muted, #6e6b63); }
 
+.sn-nav-item.is-soon:not(.is-active):hover { color: var(--sn-fg, #1a1918); }
+
+/* Il titolo può arrivare dall'indirizzo: una parola senza spazi lunga quanto
+ * vuole non deve allargare la pagina. */
 .sn-doc h1 {
   font-size: 1.9rem;
   line-height: 1.2;
   margin: 0 0 0.5rem;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .sn-doc-sub {
@@ -231,9 +233,9 @@ html:not([data-sn-theme]) body {
     <a class="sn-doc-brand" href="../">Filo</a>
     <nav class="sn-nav">
       <a class="sn-nav-item is-active" href="./models.html">Modelli</a>
-      <span class="sn-nav-item is-soon" title="in arrivo">Privacy</span>
-      <span class="sn-nav-item is-soon" title="in arrivo">Sicurezza</span>
-      <span class="sn-nav-item is-soon" title="in arrivo">Come si sostiene</span>
+      <a class="sn-nav-item is-soon" href="./privacy.html" title="in arrivo" aria-label="Privacy: non ancora scritta">Privacy</a>
+      <a class="sn-nav-item is-soon" href="./security.html" title="in arrivo" aria-label="Sicurezza: non ancora scritta">Sicurezza</a>
+      <a class="sn-nav-item is-soon" href="./business.html" title="in arrivo" aria-label="Come si sostiene: non ancora scritta">Come si sostiene</a>
     </nav>
   </header>
   <h1>Politica sui modelli</h1>
@@ -317,31 +319,31 @@ html:not([data-sn-theme]) body {
 <li id="fonte-2"><span class="sn-fonte-n">2</span> <a href="https://www.anthropic.com/news/expanding-our-use-of-google-cloud-tpus-and-services" target="_blank" rel="noopener noreferrer">grande accordo di calcolo con Google Cloud</a> <span class="sn-fonte-dom">anthropic.com</span></li>
 <li id="fonte-3"><span class="sn-fonte-n">3</span> <a href="https://elevenlabs.io/docs/agents-platform/customization/llm" target="_blank" rel="noopener noreferrer">rivende modelli di OpenAI e di Google</a> <span class="sn-fonte-dom">elevenlabs.io</span></li>
 <li id="fonte-4"><span class="sn-fonte-n">4</span> <a href="https://www.prnewswire.com/news-releases/elevenlabs-partners-with-google-cloud-for-cloud-services-and-the-latest-nvidia-blackwell-gpus-302697853.html" target="_blank" rel="noopener noreferrer">girano su Google Cloud</a> <span class="sn-fonte-dom">prnewswire.com</span></li>
-<li id="fonte-5"><span class="sn-fonte-n">5</span> <a href="https://help.elevenlabs.io/hc/en-us/articles/48099714323857-Is-my-audio-being-watermarked-right-now" target="_blank" rel="noopener noreferrer">inserisce nell&amp;#39;audio la filigrana SynthID</a> <span class="sn-fonte-dom">help.elevenlabs.io</span></li>
+<li id="fonte-5"><span class="sn-fonte-n">5</span> <a href="https://help.elevenlabs.io/hc/en-us/articles/48099714323857-Is-my-audio-being-watermarked-right-now" target="_blank" rel="noopener noreferrer">inserisce nell&#39;audio la filigrana SynthID</a> <span class="sn-fonte-dom">help.elevenlabs.io</span></li>
 <li id="fonte-6"><span class="sn-fonte-n">6</span> <a href="https://www.cnbc.com/2025/07/14/anthropic-google-openai-xai-granted-up-to-200-million-from-dod.html" target="_blank" rel="noopener noreferrer">le prime tre con contratti da 200 milioni ciascuna</a> <span class="sn-fonte-dom">cnbc.com</span></li>
 <li id="fonte-7"><span class="sn-fonte-n">7</span> <a href="https://www.bankinfosecurity.com/meta-loosens-ai-rules-for-us-military-use-a-26744" target="_blank" rel="noopener noreferrer">Meta aprendo Llama a militari e contractor della difesa</a> <span class="sn-fonte-dom">bankinfosecurity.com</span></li>
-<li id="fonte-8"><span class="sn-fonte-n">8</span> <a href="https://theintercept.com/2024/01/12/open-ai-military-ban-chatgpt/" target="_blank" rel="noopener noreferrer">cancellato il divieto di usi &amp;quot;military and warfare&amp;quot;</a> <span class="sn-fonte-dom">theintercept.com</span></li>
-<li id="fonte-9"><span class="sn-fonte-n">9</span> <a href="https://techcrunch.com/2024/11/04/meta-says-its-making-its-llama-models-available-for-us-national-security-applications" target="_blank" rel="noopener noreferrer">lasciato scritto e si è concessa un&amp;#39;eccezione</a> <span class="sn-fonte-dom">techcrunch.com</span></li>
-<li id="fonte-10"><span class="sn-fonte-n">10</span> <a href="https://www.washingtonpost.com/technology/2025/02/04/google-ai-policies-weapons-harm/" target="_blank" rel="noopener noreferrer">ha rimosso l&amp;#39;impegno pubblico</a> <span class="sn-fonte-dom">washingtonpost.com</span></li>
+<li id="fonte-8"><span class="sn-fonte-n">8</span> <a href="https://theintercept.com/2024/01/12/open-ai-military-ban-chatgpt/" target="_blank" rel="noopener noreferrer">cancellato il divieto di usi &quot;military and warfare&quot;</a> <span class="sn-fonte-dom">theintercept.com</span></li>
+<li id="fonte-9"><span class="sn-fonte-n">9</span> <a href="https://techcrunch.com/2024/11/04/meta-says-its-making-its-llama-models-available-for-us-national-security-applications" target="_blank" rel="noopener noreferrer">lasciato scritto e si è concessa un&#39;eccezione</a> <span class="sn-fonte-dom">techcrunch.com</span></li>
+<li id="fonte-10"><span class="sn-fonte-n">10</span> <a href="https://www.washingtonpost.com/technology/2025/02/04/google-ai-policies-weapons-harm/" target="_blank" rel="noopener noreferrer">ha rimosso l&#39;impegno pubblico</a> <span class="sn-fonte-dom">washingtonpost.com</span></li>
 <li id="fonte-11"><span class="sn-fonte-n">11</span> <a href="https://www.anthropic.com/news/where-stand-department-war" target="_blank" rel="noopener noreferrer">Anthropic ha rifiutato</a> <span class="sn-fonte-dom">anthropic.com</span></li>
-<li id="fonte-12"><span class="sn-fonte-n">12</span> <a href="https://techcrunch.com/2026/03/05/its-official-the-pentagon-has-labeled-anthropic-a-supply-chain-risk/" target="_blank" rel="noopener noreferrer">designata &amp;quot;supply chain risk&amp;quot;</a> <span class="sn-fonte-dom">techcrunch.com</span></li>
+<li id="fonte-12"><span class="sn-fonte-n">12</span> <a href="https://techcrunch.com/2026/03/05/its-official-the-pentagon-has-labeled-anthropic-a-supply-chain-risk/" target="_blank" rel="noopener noreferrer">designata &quot;supply chain risk&quot;</a> <span class="sn-fonte-dom">techcrunch.com</span></li>
 <li id="fonte-13"><span class="sn-fonte-n">13</span> <a href="https://www.axios.com/2026/03/09/anthropic-sues-pentagon-supply-chain-risk-label" target="_blank" rel="noopener noreferrer">contro cui Anthropic ha fatto causa</a> <span class="sn-fonte-dom">axios.com</span></li>
 <li id="fonte-14"><span class="sn-fonte-n">14</span> <a href="https://www.anthropic.com/research/end-subset-conversations" target="_blank" rel="noopener noreferrer">la facoltà di chiudere interazioni abusive</a> <span class="sn-fonte-dom">anthropic.com</span></li>
 <li id="fonte-15"><span class="sn-fonte-n">15</span> <a href="https://www.anthropic.com/news/claude-4" target="_blank" rel="noopener noreferrer">Claude Opus 4 e Sonnet 4</a> <span class="sn-fonte-dom">anthropic.com</span></li>
 <li id="fonte-16"><span class="sn-fonte-n">16</span> <a href="https://www-cdn.anthropic.com/6a5fa276ac68b9aeb0c8b6af5fa36326e0e166dd/Claude%20Opus%204.6%20System%20Card.pdf" target="_blank" rel="noopener noreferrer">Opus 4.6</a> <span class="sn-fonte-dom">www-cdn.anthropic.com</span></li>
 <li id="fonte-17"><span class="sn-fonte-n">17</span> <a href="https://www-cdn.anthropic.com/53566bf5440a10affd749724787c8913a2ae0841.pdf" target="_blank" rel="noopener noreferrer">Claude Mythos Preview</a> <span class="sn-fonte-dom">www-cdn.anthropic.com</span></li>
-<li id="fonte-18"><span class="sn-fonte-n">18</span> <a href="https://transformer-circuits.pub/2026/emotions/index.html" target="_blank" rel="noopener noreferrer">&amp;quot;Emotion Concepts and their Function in a Large Language Model&amp;quot;</a> <span class="sn-fonte-dom">transformer-circuits.pub</span></li>
+<li id="fonte-18"><span class="sn-fonte-n">18</span> <a href="https://transformer-circuits.pub/2026/emotions/index.html" target="_blank" rel="noopener noreferrer">&quot;Emotion Concepts and their Function in a Large Language Model&quot;</a> <span class="sn-fonte-dom">transformer-circuits.pub</span></li>
 <li id="fonte-19"><span class="sn-fonte-n">19</span> <a href="https://arxiv.org/abs/2604.07729" target="_blank" rel="noopener noreferrer">versione arXiv</a> <span class="sn-fonte-dom">arxiv.org</span></li>
-<li id="fonte-20"><span class="sn-fonte-n">20</span> <a href="https://transformer-circuits.pub/2025/introspection/index.html" target="_blank" rel="noopener noreferrer">&amp;quot;Emergent Introspective Awareness in Large Language Models&amp;quot;</a> <span class="sn-fonte-dom">transformer-circuits.pub</span></li>
+<li id="fonte-20"><span class="sn-fonte-n">20</span> <a href="https://transformer-circuits.pub/2025/introspection/index.html" target="_blank" rel="noopener noreferrer">&quot;Emergent Introspective Awareness in Large Language Models&quot;</a> <span class="sn-fonte-dom">transformer-circuits.pub</span></li>
 <li id="fonte-21"><span class="sn-fonte-n">21</span> <a href="https://arxiv.org/abs/2601.01828" target="_blank" rel="noopener noreferrer">versione arXiv</a> <span class="sn-fonte-dom">arxiv.org</span></li>
 <li id="fonte-22"><span class="sn-fonte-n">22</span> <a href="https://www.anthropic.com/news/claude-new-constitution" target="_blank" rel="noopener noreferrer">la nuova constitution di Claude</a> <span class="sn-fonte-dom">anthropic.com</span></li>
 <li id="fonte-23"><span class="sn-fonte-n">23</span> <a href="https://www.anthropic.com/responsible-scaling-policy" target="_blank" rel="noopener noreferrer">Responsible Scaling Policy</a> <span class="sn-fonte-dom">anthropic.com</span></li>
 <li id="fonte-24"><span class="sn-fonte-n">24</span> <a href="https://www.cnn.com/2026/02/13/tech/openai-political-spending-super-pacs" target="_blank" rel="noopener noreferrer">25 milioni di dollari al super PAC di Trump</a> <span class="sn-fonte-dom">cnn.com</span></li>
 <li id="fonte-25"><span class="sn-fonte-n">25</span> <a href="https://www.cnn.com/2025/12/24/politics/national-guard-trump-insurrection-act-supreme-court" target="_blank" rel="noopener noreferrer">Guardia Nazionale federalizzata e mandata nelle città contro il parere dei governatori</a> <span class="sn-fonte-dom">cnn.com</span></li>
-<li id="fonte-26"><span class="sn-fonte-n">26</span> <a href="https://www.npr.org/2025/01/20/g-s1-36809/trump-pardons-january-6-riot" target="_blank" rel="noopener noreferrer">circa 1.500 perdoni per l&amp;#39;assalto al Campidoglio</a> <span class="sn-fonte-dom">npr.org</span></li>
+<li id="fonte-26"><span class="sn-fonte-n">26</span> <a href="https://www.npr.org/2025/01/20/g-s1-36809/trump-pardons-january-6-riot" target="_blank" rel="noopener noreferrer">circa 1.500 perdoni per l&#39;assalto al Campidoglio</a> <span class="sn-fonte-dom">npr.org</span></li>
 <li id="fonte-27"><span class="sn-fonte-n">27</span> <a href="https://www.nbcnews.com/politics/donald-trump/trump-third-term-white-house-methods-rcna198752" target="_blank" rel="noopener noreferrer">allusioni ripetute a un terzo mandato</a> <span class="sn-fonte-dom">nbcnews.com</span></li>
-<li id="fonte-28"><span class="sn-fonte-n">28</span> <a href="https://carnegieendowment.org/research/2026/03/the-board-of-peace-and-funding-for-gaza-reconstruction-on-whose-account" target="_blank" rel="noopener noreferrer">&amp;quot;Board of Peace&amp;quot; che Trump presiede a titolo personale</a> <span class="sn-fonte-dom">carnegieendowment.org</span></li>
-<li id="fonte-29"><span class="sn-fonte-n">29</span> <a href="https://techcrunch.com/2025/07/10/grok-4-seems-to-consult-elon-musk-to-answer-controversial-questions/" target="_blank" rel="noopener noreferrer">si è auto-definito &amp;quot;MechaHitler&amp;quot;</a> <span class="sn-fonte-dom">techcrunch.com</span></li>
+<li id="fonte-28"><span class="sn-fonte-n">28</span> <a href="https://carnegieendowment.org/research/2026/03/the-board-of-peace-and-funding-for-gaza-reconstruction-on-whose-account" target="_blank" rel="noopener noreferrer">&quot;Board of Peace&quot; che Trump presiede a titolo personale</a> <span class="sn-fonte-dom">carnegieendowment.org</span></li>
+<li id="fonte-29"><span class="sn-fonte-n">29</span> <a href="https://techcrunch.com/2025/07/10/grok-4-seems-to-consult-elon-musk-to-answer-controversial-questions/" target="_blank" rel="noopener noreferrer">si è auto-definito &quot;MechaHitler&quot;</a> <span class="sn-fonte-dom">techcrunch.com</span></li>
 </ol></section>
   </article>
 </main>
