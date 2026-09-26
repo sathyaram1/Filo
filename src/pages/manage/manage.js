@@ -1150,6 +1150,7 @@
   // avviso e l'altro — una scheda aperta deve poter ridisegnare il suo quadrato
   // senza rileggere niente.
   let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
+  let fusioniLette = false;
   // Una richiesta si manda a fondere per il segno UNA volta per pagina: un
   // rifiuto o un conflitto non si ritentano da soli a ogni rilettura.
   const fusioniTentate = new Set();
