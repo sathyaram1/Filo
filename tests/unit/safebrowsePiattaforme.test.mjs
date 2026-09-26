@@ -68,6 +68,7 @@ test('gli indirizzi ufficiali dei marchi non fanno scattare l\'avviso', () => {
     'https://fuzzy-space-8080.app.github.dev/', 'https://www.amazon.nl/', 'https://www.amazon.ca/',
     'https://www.ebay.de/', 'https://www.google.ch/', 'https://www.paypal.it/', 'https://negozio.myshopify.com/',
     'https://myshopify.com/', 'https://dl.dropboxusercontent.com/s/x', 'https://app.auth.us-east-1.amazoncognito.com/login',
+    'https://m365.cloud.microsoft/', 'https://outlook.cloud.microsoft/mail/',
   ]) assert.equal(livello(url), 'safe', url);
 });
 
@@ -83,4 +84,10 @@ test('i cookie della modalità privacy seguono solo le piattaforme che il web gi
   const { readFileSync } = await import('node:fs');
   const cookies = readFileSync(new URL('../../src/main/services/cookies.js', import.meta.url), 'utf8');
   assert.match(cookies, /SB\.normalize\(url, \{ soloPsl: true \}\)/);
+});
+
+test('un Microsoft Form su cloud.microsoft resta una pagina ospitata da giudicare', () => {
+  const v = evaluate('https://forms.cloud.microsoft/r/abc', { hasPassword: true });
+  assert.equal(v.whitelisted, false);
+  assert.equal(v.needsLlm, true, JSON.stringify(v.reasons));
 });
