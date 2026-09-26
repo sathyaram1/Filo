@@ -39,7 +39,7 @@ export function esitoProveTolte({ rosse = [], messiDaParte = 0, shaPrima = '' } 
     return {
       ferma: false,
       testo: [
-        'Queste prove del giro sono state cancellate o cambiate, e com'erano sono ancora rosse sul codice nuovo:',
+        'Queste prove del giro sono state cancellate o cambiate, e com\'erano sono ancora rosse sul codice nuovo:',
         elenco,
         `Il giro ha messo da parte ${messiDaParte} rilievi, e la loro prova si cancella rossa: se una di queste`,
         'riproduce invece un rilievo che hai corretto, la porta è ancora aperta. Rimettila e correggi.',
