@@ -81,11 +81,20 @@ export function scriviCopia(chiave, dati, { dir = null, now = Date.now() } = {})
  */
 export function leggiCopia(chiave, { dir = null, now = Date.now(), ttlMs = 60_000 } = {}) {
   const file = percorsoCopia(chiave, dir);
+  if (!file) return null;
   let json = null;
+  let fd = null;
   try {
-    json = JSON.parse(readFileSync(file, 'utf8'));
+    // Una copia che non abbiamo scritto noi non è una copia: è quello che ci ha
+    // lasciato lì un altro utente della macchina, e per le routine sarebbero i
+    // numeri e l'interruttore con cui parte il giro.
+    fd = openSync(file, constants.O_RDONLY | NO_SYMLINK);
+    if (!nostro(fstatSync(fd))) return null;
+    json = JSON.parse(readFileSync(fd, 'utf8'));
   } catch (_) {
     return null;
+  } finally {
+    if (fd !== null) { try { closeSync(fd); } catch (_) { /* già chiuso */ } }
   }
   if (!json || typeof json !== 'object') return null;
   if (String(json.chiave || '') !== String(chiave)) return null;
