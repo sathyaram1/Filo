@@ -195,8 +195,14 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   // needsLlm: c'è un segnale non conclusivo che merita il giudizio LLM (mai su
   // siti puliti senza alcun indizio, mai whitelist). Qui scatta se c'è un
   // indizio debole isolato (es. http+nessun altro) e mancano i dati di rete.
-  const weakHint = sigs.some((s) => s.kind === 'insecure_transport') || (ageDays == null && (broad || sensitive));
-  return { level: 'safe', reasons: reasons.length ? reasons : ['clean'], norm, message: null, needsLlm: !!weakHint && !whitelisted, whitelisted };
+  // Su una pagina ospitata l'età del dominio è quella della piattaforma: non dice niente su chi chiede la password.
+  const weakHint = sigs.some((s) => s.kind === 'insecure_transport') || (ageDays == null && (broad || sensitive))
+    || (hosted && sensitive);
+  return { level: 'safe', reasons: reasons.length ? reasons : ['clean'], norm, message: null, needsLlm: !!weakHint && !whitelisted, whitelisted, hosted };
+}
+
+function pathOf(url) {
+  try { return new URL(String(url)).pathname; } catch (_) { return '/'; }
 }
 
 function checkSync(url, ctx = {}) {
