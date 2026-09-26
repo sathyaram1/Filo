@@ -119,7 +119,8 @@ export function chiScrive(bearer) {
  */
 export async function segnaPreapprovazione(id, valore, opts = {}) {
   const bearer = opts.bearer || await acquireBearer();
-  const doc = await getDoc(id, bearer);
+  const doc = await getDoc(id, bearer, ['statusPublic']);
+  if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
   const pub = doc.fields?.statusPublic?.stringValue || 'open';
   if (valore && pub === 'closed') return { ok: false, motivo: 'pratica chiusa: il segno non conterebbe' };
@@ -225,7 +226,11 @@ export async function scrivi(id, to, nota, opts = {}) {
     return { ok: false, motivo: `lo stato «${to}» chiude la pratica: il segno «fondi senza chiedermelo» non conterebbe. Ometti --preapprova (o usa --chiedi-prima).` };
   }
   const bearer = await acquireBearer();
-  const doc = await getDoc(id, bearer);
+  // Di questo documento si guardano lo stato (per sapere se il passaggio è
+  // legale) e le note (per fondere il report): basta chiedere quei due, e la
+  // lettura va nel conto di chi ci ha mandato qui (#680).
+  const doc = await getDoc(id, bearer, ['status', 'notes']);
+  if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
 
   const { from, leggibile } = await statoAttuale(doc);

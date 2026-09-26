@@ -11,11 +11,17 @@ export function contatoreLetture() {
   const voci = [];
   let totale = 0;
   return {
+    // Due letture con la stessa etichetta si sommano in una voce sola: chi
+    // conta una segnalazione alla volta (il passo che archivia) altrimenti
+    // riempirebbe la riga della stessa parola ripetuta.
     aggiungi(n, etichetta = '') {
       const v = Math.max(0, Math.trunc(Number(n)));
       if (!Number.isFinite(v)) return;
       totale += v;
-      voci.push({ n: v, etichetta: String(etichetta || '') });
+      const nome = String(etichetta || '');
+      const gia = nome ? voci.find((x) => x.etichetta === nome) : null;
+      if (gia) gia.n += v;
+      else voci.push({ n: v, etichetta: nome });
     },
     get totale() { return totale; },
     get voci() { return voci.slice(); },
