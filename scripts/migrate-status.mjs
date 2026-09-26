@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
-import { leggiCopia, scriviCopia, scordaCopia, rigaCopiaRiusata } from './lib/copia-su-file.mjs';
+import { scansione, dopoApplicazione } from './lib/scansione-secco.mjs';
 // IIFE su globalThis, nell'ordine giusto: crypto → feedback → vocabolario → normalize.
 import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedback.js';
@@ -65,7 +65,6 @@ function toFsValue(v) {
 export const CAMPI_STATO = ['status', 'statusReason', 'reviewDecision', 'pipeline', 'blockReason', 'clientId'];
 
 const COPIA = 'migrate-status/segnalazioni';
-const COPIA_TTL_MS = 5 * 60_000;
 
 // Scarica TUTTI i documenti della collezione (paging), coi soli campi dello stato.
 async function listAll(bearer) {
@@ -90,16 +89,14 @@ async function main() {
   const letture = contatoreLetture();
   // La prova a secco (il giro senza `--apply`) mette da parte quello che ha
   // letto: l'applicazione che la segue non ripaga la stessa scansione (#680).
-  const pronta = APPLY ? leggiCopia(COPIA, { ttlMs: COPIA_TTL_MS }) : null;
-  let docs;
-  if (pronta && Array.isArray(pronta.dati)) {
-    console.log(rigaCopiaRiusata(pronta.etaMs));
-    docs = pronta.dati;
-  } else {
-    docs = await listAll(bearer);
-    letture.aggiungi(docs.length, 'segnalazioni');
-    if (!APPLY) scriviCopia(COPIA, docs);
-  }
+  const { dati: docs } = await scansione({
+    nome: COPIA, dry: !APPLY,
+    scansiona: async () => {
+      const letti = await listAll(bearer);
+      letture.aggiungi(letti.length, 'segnalazioni');
+      return letti;
+    },
+  });
   console.log(`${docs.length} feedback totali${APPLY ? '' : ' (DRY-RUN: niente scritture, usa --apply)'}.`);
 
   const counts = {};
@@ -164,7 +161,7 @@ async function main() {
   for (const [k, n] of Object.entries(counts).sort()) console.log(`  ${String(n).padStart(4)}  ${k}`);
   console.log(`\n${APPLY ? 'Migrati' : 'Da migrare'}: ${migrated} · già canonici: ${skipped} · errori: ${failures}`);
   // Applicato: la copia non descrive più il server.
-  if (APPLY) scordaCopia(COPIA);
+  dopoApplicazione(COPIA, { dry: !APPLY });
   console.log(letture.riga());
   if (failures) process.exit(1);
 }

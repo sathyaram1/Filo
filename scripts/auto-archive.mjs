@@ -38,7 +38,7 @@ import { scrivi } from './owner-feedback.mjs';
 // questo script scrive), e i voti stanno sulle schede pubbliche.
 import { acquireBearer } from './lib/firestore-auth.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
-import { leggiCopia, scriviCopia, scordaCopia, rigaCopiaRiusata } from './lib/copia-su-file.mjs';
+import { scansione, dopoApplicazione } from './lib/scansione-secco.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -71,12 +71,8 @@ function packageVersion() {
 // campi è il conto di Firestore di settembre 2026 (#680).
 const CAMPI_SEGNALAZIONI = [...BA.CAMPI_DECISIONE, 'seq', 'subSeq'];
 
-// Il nome con cui la lettura di questo giro si mette da parte: la prova a secco
-// e l'applicazione che la segue non devono pagare due volte la stessa lettura.
+// Il nome con cui la lettura di questo giro si mette da parte (lib/scansione-secco).
 const COPIA = 'auto-archive/segnalazioni';
-// Qualche minuto: il tempo di guardare l'elenco della prova a secco e decidere
-// di applicarlo. Oltre, il database può essere cambiato e si rilegge.
-const COPIA_TTL_MS = 5 * 60_000;
 
 export async function runAutoArchive({
   dryRun = false, now = Date.now(), releasedVersion, copiaDir = null, usaCopia = true,
@@ -84,49 +80,43 @@ export async function runAutoArchive({
   const ver = releasedVersion || packageVersion();
   const letture = contatoreLetture();
 
-  // La lettura della prova a secco, se è ancora fresca. Vale solo per
-  // l'applicazione: una prova a secco deve guardare il database di adesso.
-  const pronta = (usaCopia && !dryRun)
-    ? leggiCopia(COPIA, { now, ttlMs: COPIA_TTL_MS, dir: copiaDir })
-    : null;
-  let feedbacks;
-  let complete;
-  if (pronta && Array.isArray(pronta.dati && pronta.dati.righe)) {
-    console.log(rigaCopiaRiusata(pronta.etaMs));
-    feedbacks = pronta.dati.righe;
-    complete = pronta.dati.complete !== false;
-  } else {
-    const bearer = await acquireBearer();
-    // TUTTE le segnalazioni, paginate. Una finestra sulle 500 più recenti per
-    // data d'invio lasciava fuori le più vecchie, che sono esattamente quelle che
-    // questo giro dovrebbe archiviare per prime: i loro fix non uscivano mai
-    // dalla bacheca, restavano votabili e riapribili a pagamento, e per loro non
-    // si accendeva nemmeno «gli utenti dicono che non va». Con 711 segnalazioni
-    // ne restavano fuori 211, e il numero cresceva da solo.
-    const r = typeof FB.listAllPaged === 'function'
-      ? await FB.listAllPaged({ idToken: bearer, fields: CAMPI_SEGNALAZIONI })
-      : { rows: await FB.list({ pageSize: 500, idToken: bearer, fields: CAMPI_SEGNALAZIONI }), complete: false };
-    const grezzi = r.rows;
-    complete = r.complete;
-    letture.aggiungi(grezzi.length, 'segnalazioni');
-    if (!complete) {
-      console.warn('AVVISO: non sono riuscito a leggere TUTTE le segnalazioni: '
-        + `questo giro decide su ${grezzi.length}, le più vecchie restano fuori.`);
-    }
-    // I voti (DB4) si scrivono sulla scheda pubblica: senza riunirli, il
-    // punteggio sarebbe quello dei soli voti storici e non archivierebbe più
-    // niente. Della scheda servono SOLO i campi degli utenti (voti e richieste
-    // di riapertura): è l'unica cosa che `mergeUserFields` guarda.
-    // TUTTE le schede, paginate: i voti stanno lì, e una finestra sulle 500 più
-    // recenti per data d'invio lascerebbe senza voti proprio le segnalazioni più
-    // vecchie — quelle che questo giro dovrebbe archiviare per prime.
-    const cards = typeof FB.listAllPublic === 'function'
-      ? await FB.listAllPublic({ fields: [...PV.USER_FIELDS] })
-      : await FB.listPublic({ pageSize: 500, fields: [...PV.USER_FIELDS] });
-    letture.aggiungi(cards.length, 'schede');
-    feedbacks = PV.mergeUserFields(grezzi, cards);
-    // Quello che la prova a secco ha letto lo ritrova l'applicazione.
-    if (usaCopia && dryRun) scriviCopia(COPIA, { righe: feedbacks, complete }, { now, dir: copiaDir });
+  const { dati } = await scansione({
+    nome: COPIA, dry: dryRun, now, dir: copiaDir, usaCopia,
+    scansiona: async () => {
+      const bearer = await acquireBearer();
+      // TUTTE le segnalazioni, paginate. Una finestra sulle 500 più recenti per
+      // data d'invio lasciava fuori le più vecchie, che sono esattamente quelle che
+      // questo giro dovrebbe archiviare per prime: i loro fix non uscivano mai
+      // dalla bacheca, restavano votabili e riapribili a pagamento, e per loro non
+      // si accendeva nemmeno «gli utenti dicono che non va». Con 711 segnalazioni
+      // ne restavano fuori 211, e il numero cresceva da solo.
+      const r = typeof FB.listAllPaged === 'function'
+        ? await FB.listAllPaged({ idToken: bearer, fields: CAMPI_SEGNALAZIONI })
+        : { rows: await FB.list({ pageSize: 500, idToken: bearer, fields: CAMPI_SEGNALAZIONI }), complete: false };
+      const grezzi = r.rows;
+      const complete = r.complete;
+      letture.aggiungi(grezzi.length, 'segnalazioni');
+      // I voti (DB4) si scrivono sulla scheda pubblica: senza riunirli, il
+      // punteggio sarebbe quello dei soli voti storici e non archivierebbe più
+      // niente. Della scheda servono SOLO i campi degli utenti (voti e richieste
+      // di riapertura): è l'unica cosa che `mergeUserFields` guarda.
+      // TUTTE le schede, paginate: i voti stanno lì, e una finestra sulle 500 più
+      // recenti per data d'invio lascerebbe senza voti proprio le segnalazioni più
+      // vecchie — quelle che questo giro dovrebbe archiviare per prime.
+      const cards = typeof FB.listAllPublic === 'function'
+        ? await FB.listAllPublic({ fields: [...PV.USER_FIELDS] })
+        : await FB.listPublic({ pageSize: 500, fields: [...PV.USER_FIELDS] });
+      letture.aggiungi(cards.length, 'schede');
+      return { righe: PV.mergeUserFields(grezzi, cards), complete };
+    },
+  });
+  const feedbacks = Array.isArray(dati && dati.righe) ? dati.righe : [];
+  const complete = !(dati && dati.complete === false);
+  // L'avviso sta FUORI dalla scansione: vale anche quando le righe arrivano
+  // dalla copia, o un giro riusato deciderebbe su un elenco parziale in silenzio.
+  if (!complete) {
+    console.warn('AVVISO: non sono riuscito a leggere TUTTE le segnalazioni: '
+      + `questo giro decide su ${feedbacks.length}, le più vecchie restano fuori.`);
   }
   const { toArchive, toFlag } = BA.applyAutoArchive(feedbacks, { now, releasedVersion: ver });
 
@@ -142,9 +132,9 @@ export async function runAutoArchive({
     }
   }
 
-  // Applicato: quello che la copia descrive non è più il database. Tenerla
-  // vorrebbe dire far ripartire un secondo giro sui feedback già archiviati.
-  if (!dryRun && usaCopia) scordaCopia(COPIA, { dir: copiaDir });
+  // Tenere la copia dopo un'applicazione vorrebbe dire far ripartire un secondo
+  // giro sui feedback già archiviati.
+  dopoApplicazione(COPIA, { dry: dryRun, usaCopia, dir: copiaDir });
 
   return {
     releasedVersion: ver, toArchive: archivedDetails, toFlag, dryRun, complete,

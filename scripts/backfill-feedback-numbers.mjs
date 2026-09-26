@@ -21,7 +21,7 @@ import { dirname, resolve } from 'node:path';
 import { acquireBearer, FIRESTORE_BASE, FIREBASE_API_KEY } from './lib/firestore-auth.mjs';
 import { contaDocumenti } from './lib/firestore-conta.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
-import { leggiCopia, scriviCopia, scordaCopia, rigaCopiaRiusata } from './lib/copia-su-file.mjs';
+import { scansione, dopoApplicazione } from './lib/scansione-secco.mjs';
 
 // #583: i numeri nuovi escono da `counters/feedbackSeq`. Chi ne assegna a mano
 // deve rimettere il contatore in pari, o i prossimi invii ripartirebbero da un
@@ -87,9 +87,8 @@ export function ordinaPerArrivo(docs) {
 export const CAMPI_NUMERAZIONE = ['name', 'createdAt', 'seq', 'subSeq'];
 
 // Il nome con cui la lettura si mette da parte fra la prova a secco e
-// l'applicazione, e per quanto vale: il tempo di guardare l'elenco e decidere.
+// l'applicazione (lib/scansione-secco).
 const COPIA = 'backfill-feedback-numbers/segnalazioni';
-const COPIA_TTL_MS = 5 * 60_000;
 
 /**
  * Quanti sono, e quanti hanno già un numero. Due conteggi chiesti al server
@@ -196,19 +195,14 @@ async function backfillNumbers(bearer, { dry = false, now = Date.now(), copiaDir
     console.warn('AVVISO: il server non ha saputo contare i feedback: scansiono la collezione (una lettura per segnalazione).');
   }
 
-  // La lettura della prova a secco, se è ancora fresca: l'applicazione che la
-  // segue non deve ripagarla. Solo per l'applicazione — una prova a secco
-  // guarda il database di adesso.
-  const pronta = (usaCopia && !dry) ? leggiCopia(COPIA, { now, ttlMs: COPIA_TTL_MS, dir: copiaDir }) : null;
-  let docs;
-  if (pronta && Array.isArray(pronta.dati)) {
-    console.log(rigaCopiaRiusata(pronta.etaMs));
-    docs = pronta.dati;
-  } else {
-    docs = await listAll(bearer || '');
-    letture.aggiungi(docs.length, 'segnalazioni');
-    if (usaCopia && dry) scriviCopia(COPIA, docs, { now, dir: copiaDir });
-  }
+  const { dati: docs } = await scansione({
+    nome: COPIA, dry, now, dir: copiaDir, usaCopia,
+    scansiona: async () => {
+      const letti = await listAll(bearer || '');
+      letture.aggiungi(letti.length, 'segnalazioni');
+      return letti;
+    },
+  });
   const withSeq = docs.filter((d) => intField(d, 'seq') > 0);
   const missing = docs.filter((d) => intField(d, 'seq') === 0);
   let next = withSeq.reduce((m, d) => Math.max(m, intField(d, 'seq')), 0) + 1;
@@ -231,7 +225,7 @@ async function backfillNumbers(bearer, { dry = false, now = Date.now(), copiaDir
   const maxSeq = Math.max(next - 1, withSeq.reduce((m, d) => Math.max(m, intField(d, 'seq')), 0));
   await allineaContatore(maxSeq, bearer, dry);
   // Applicato: i numeri sul server non sono più quelli che la copia descrive.
-  if (!dry && usaCopia) scordaCopia(COPIA, { dir: copiaDir });
+  dopoApplicazione(COPIA, { dry, usaCopia, dir: copiaDir });
   console.log(letture.riga());
   return { total: docs.length, numbered: missing.length - failures, failures, dry, letture: letture.totale };
 }

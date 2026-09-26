@@ -38,7 +38,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
-import { leggiCopia, scriviCopia, scordaCopia, rigaCopiaRiusata } from './lib/copia-su-file.mjs';
+import { scansione, dopoApplicazione } from './lib/scansione-secco.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -79,7 +79,6 @@ const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mj
 export const CAMPI_PADDING = ['status', 'statusPublic', 'reviewDecision', 'reviewComment', 'reviewedAt'];
 
 const COPIA = 'migrate-status-padding/segnalazioni';
-const COPIA_TTL_MS = 5 * 60_000;
 
 async function tuttiIFeedback(bearer) {
   const out = [];
@@ -103,16 +102,14 @@ async function main() {
   const letture = contatoreLetture();
   // La prova a secco mette da parte quello che ha letto; l'applicazione che la
   // segue lo riusa invece di ripagare la scansione (#680).
-  const pronta = DRY ? null : leggiCopia(COPIA, { ttlMs: COPIA_TTL_MS });
-  let docs;
-  if (pronta && Array.isArray(pronta.dati)) {
-    console.log(rigaCopiaRiusata(pronta.etaMs));
-    docs = pronta.dati;
-  } else {
-    docs = await tuttiIFeedback(bearer);
-    letture.aggiungi(docs.length, 'segnalazioni');
-    if (DRY) scriviCopia(COPIA, docs);
-  }
+  const { dati: docs } = await scansione({
+    nome: COPIA, dry: DRY,
+    scansiona: async () => {
+      const letti = await tuttiIFeedback(bearer);
+      letture.aggiungi(letti.length, 'segnalazioni');
+      return letti;
+    },
+  });
   console.log(`${docs.length} feedback da esaminare${DRY ? ' (dry-run)' : ''}.`);
 
   let riscritti = 0; let giaApposto = 0; let illeggibili = 0; let pubblicoCorretto = 0;
@@ -209,7 +206,7 @@ async function main() {
 
   console.log(`\nFatto: ${riscritti} riscritti (${pubblicoCorretto} con l'enum grossolano corretto), ${giaApposto} già a posto, ${illeggibili} non decifrabili (lasciati intatti).`);
   // Applicato: la copia non descrive più il server.
-  if (!DRY) scordaCopia(COPIA);
+  dopoApplicazione(COPIA, { dry: DRY });
   console.log(letture.riga());
 }
 

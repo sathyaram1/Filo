@@ -20,6 +20,8 @@ const { leggiCopia, scriviCopia, scordaCopia, percorsoCopia, rigaCopiaRiusata } 
   await import('../../scripts/lib/copia-su-file.mjs');
 const { campiDaCopia, salvaCampiInCopia, copiaAttiva, TTL_MS } =
   await import('../../scripts/lib/config-routine-copia.mjs');
+const { scansione, dopoApplicazione, TTL_MS: TTL_SCANSIONE } =
+  await import('../../scripts/lib/scansione-secco.mjs');
 
 const URL_VERO = 'https://firestore.example/config/routines?key=k';
 const CAMPI = { enabled: { booleanValue: false }, cap3: { integerValue: '5' } };
@@ -101,48 +103,57 @@ test('la frase a video dice che si sta riusando una lettura, e da quanto', () =>
 test('l\'applicazione riusa la lettura della prova a secco, e dopo aver scritto la butta', async () => {
   const dir = cartellaTemporanea('copia-secco-');
   const t0 = 1_700_000_000_000;
-  const { runAutoArchive } = await import('../../scripts/auto-archive.mjs');
+  let letture = 0;
+  const detto = [];
+  const giro = (dry, now) => scansione({
+    nome: 'prova/segnalazioni',
+    dry,
+    now,
+    dir,
+    log: (r) => detto.push(r),
+    scansiona: async () => { letture += 1; return [{ _id: 'a' }, { _id: 'b' }]; },
+  });
 
-  const FB = globalThis.SN_FEEDBACK;
-  const letture = { segnalazioni: 0, schede: 0 };
-  const vere = { list: FB.list, listPublic: FB.listPublic };
-  FB.list = async () => { letture.segnalazioni += 1; return []; };
-  FB.listPublic = async () => { letture.schede += 1; return []; };
-  try {
-    const secco = await runAutoArchive({ dryRun: true, now: t0, releasedVersion: '1.0.0', copiaDir: dir });
-    assert.equal(letture.segnalazioni, 1, 'la prova a secco legge una volta');
-    assert.match(secco.rigaLetture, /Documenti letti/);
+  const secco = await giro(true, t0);
+  assert.equal(letture, 1, 'la prova a secco legge');
+  assert.equal(secco.dallaCopia, false);
 
-    // L'applicazione che segue non ripaga la stessa scansione.
-    await runAutoArchive({ dryRun: false, now: t0 + 30_000, releasedVersion: '1.0.0', copiaDir: dir });
-    assert.equal(letture.segnalazioni, 1, 'l\'applicazione ha riletto quello che la prova a secco aveva già letto');
+  // L'applicazione che segue non ripaga la stessa scansione, e lo dice.
+  const applica = await giro(false, t0 + 30_000);
+  assert.equal(letture, 1, 'l\'applicazione ha riletto quello che la prova a secco aveva già letto');
+  assert.equal(applica.dallaCopia, true);
+  assert.deepEqual(applica.dati, [{ _id: 'a' }, { _id: 'b' }]);
+  assert.match(detto.join(' '), /Riuso la lettura della prova a secco/);
 
-    // E dopo aver scritto la copia non descrive più il database.
-    await runAutoArchive({ dryRun: false, now: t0 + 40_000, releasedVersion: '1.0.0', copiaDir: dir });
-    assert.equal(letture.segnalazioni, 2, 'dopo un\'applicazione la copia deve essere buttata');
-  } finally {
-    FB.list = vere.list;
-    FB.listPublic = vere.listPublic;
-    FB.forgetAllPublic();
-  }
+  // Applicato: la copia va buttata, o un secondo giro deciderebbe sui documenti
+  // che il primo ha già cambiato.
+  dopoApplicazione('prova/segnalazioni', { dry: false, dir });
+  await giro(false, t0 + 40_000);
+  assert.equal(letture, 2, 'dopo un\'applicazione la copia deve essere buttata');
 });
 
 test('una prova a secco non risponde con quello che ha letto un\'altra prova a secco', async () => {
   const dir = cartellaTemporanea('copia-secco-2-');
   const t0 = 1_700_000_000_000;
-  const { runAutoArchive } = await import('../../scripts/auto-archive.mjs');
-  const FB = globalThis.SN_FEEDBACK;
-  let letti = 0;
-  const vere = { list: FB.list, listPublic: FB.listPublic };
-  FB.list = async () => { letti += 1; return []; };
-  FB.listPublic = async () => [];
-  try {
-    await runAutoArchive({ dryRun: true, now: t0, releasedVersion: '1.0.0', copiaDir: dir });
-    await runAutoArchive({ dryRun: true, now: t0 + 1_000, releasedVersion: '1.0.0', copiaDir: dir });
-    assert.equal(letti, 2, 'una prova a secco deve guardare il database di adesso, non una copia');
-  } finally {
-    FB.list = vere.list;
-    FB.listPublic = vere.listPublic;
-    FB.forgetAllPublic();
-  }
+  let letture = 0;
+  const giro = (now) => scansione({
+    nome: 'prova2/segnalazioni', dry: true, now, dir, log: () => {},
+    scansiona: async () => { letture += 1; return [1]; },
+  });
+  await giro(t0);
+  await giro(t0 + 1_000);
+  assert.equal(letture, 2, 'una prova a secco deve guardare il database di adesso, non una copia');
+});
+
+test('passata la finestra, l\'applicazione rilegge: una copia vecchia non descrive più il server', async () => {
+  const dir = cartellaTemporanea('copia-secco-3-');
+  const t0 = 1_700_000_000_000;
+  let letture = 0;
+  const giro = (dry, now) => scansione({
+    nome: 'prova3/segnalazioni', dry, now, dir, log: () => {},
+    scansiona: async () => { letture += 1; return [1]; },
+  });
+  await giro(true, t0);
+  await giro(false, t0 + TTL_SCANSIONE + 1);
+  assert.equal(letture, 2);
 });
