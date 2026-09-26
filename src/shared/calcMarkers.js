@@ -190,12 +190,10 @@
   // sigle si elencano perché un [A-Z]{3} qualunque prenderebbe anche "KM".
   const SIGLE = 'EUR|USD|GBP|CHF|JPY|CNY|CAD|AUD|SEK|NOK|DKK|INR|BRL|MXN|TRY|PLN|HUF|CZK|KRW|ZAR|THB|ILS|IDR|ISK|MYR|NZD|PHP|RON|SGD|HKD|BGN|RUB';
   const SIMBOLI = '€|\\$|£|¥|₹|₩|₪|₫|₱|₺|₽|฿|R\\$|zł|Kč|kr';
-  // Fra il numero e la valuta il modello infila la formattazione: grassetto,
-  // corsivo, parentesi, virgolette. Nella resa finale sparisce, quindi
-  // guardare solo il carattere attaccato al marker riportava le dodici cifre
-  // proprio dove l'utente legge «€» (#724, primo giro di verifica). Gli
-  // orpelli non valgono dopo un a capo: lì un asterisco è il punto di un
-  // elenco, non il grassetto di questo numero.
+  // La formattazione fra numero e valuta sparisce nella resa: guardando solo
+  // il carattere attaccato al marker, «**27,45** €» tornava a dodici cifre
+  // proprio dove l'utente legge «€» (#724). Dopo un a capo gli orpelli non
+  // valgono: lì un asterisco è un elenco, non un grassetto.
   const ORPELLI = '[*_`~()\\[\\]«»"\'“”]*';
   const VALUTA = `(?:${SIMBOLI}|\\b(?:${SIGLE})\\b|\\b[Ee]ur[oi]\\b|\\bEURO\\b)`;
   const VALUTA_DOPO = new RegExp(`^[ \\t\\u00A0]*${ORPELLI}[\\s\\u00A0]*${VALUTA}`);
