@@ -1,5 +1,5 @@
-// Le prove del giro che chi corregge ha cancellato si rilanciano sul codice nuovo, una volta: una
-// ancora rossa ferma la consegna. Lo usano verify-local (corretto) e dispatch (--record-fixed).
+// Le prove del giro che chi corregge ha cancellato o cambiato si rilanciano com'erano, sul codice nuovo:
+// una ancora rossa ferma la consegna. Lo usano verify-local (corretto) e dispatch (--record-fixed).
 // Regola: patterns/le-prove-di-un-giro-stanno-nel-ramo-e-la-cartella-si-svuota.md.
 
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -39,7 +39,7 @@ export function esitoProveTolte({ rosse = [], messiDaParte = 0, shaPrima = '' } 
     return {
       ferma: false,
       testo: [
-        'Queste prove del giro sono state cancellate e sul codice nuovo sono ancora rosse:',
+        'Queste prove del giro sono state cancellate o cambiate, e com'erano sono ancora rosse sul codice nuovo:',
         elenco,
         `Il giro ha messo da parte ${messiDaParte} rilievi, e la loro prova si cancella rossa: se una di queste`,
         'riproduce invece un rilievo che hai corretto, la porta è ancora aperta. Rimettila e correggi.',
@@ -49,12 +49,12 @@ export function esitoProveTolte({ rosse = [], messiDaParte = 0, shaPrima = '' } 
   return {
     ferma: true,
     testo: [
-      'Consegna respinta: hai cancellato prove del giro che sul codice nuovo sono ancora rosse.',
+      'Consegna respinta: hai cancellato o cambiato prove del giro che, com'erano, sul codice nuovo sono ancora rosse.',
       elenco,
       'Nessun rilievo di questo giro è stato messo da parte, quindi ognuna riproduce un rilievo che dovevi',
       `chiudere: la porta è ancora aperta. Rimetti la prova (git checkout ${String(shaPrima).slice(0, 12) || '<commit della critica>'} -- <file>),`,
-      'correggi finché è verde, e consegna di nuovo. Una prova si cancella solo verde, insieme alla prova',
-      'durevole che la sostituisce.',
+      'correggi finché è verde, e consegna di nuovo. Una prova, o un suo caso, si toglie solo verde, insieme',
+      'alla prova durevole che la sostituisce.',
     ].join('\n'),
   };
 }
@@ -63,10 +63,11 @@ function gitOut(args, root) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26, stdio: ['ignore', 'pipe', 'ignore'] });
 }
 
-/** Le prove del giro cancellate fra `shaPrima` e HEAD. null se git non risponde. */
+// Le prove del giro cancellate o cambiate fra `shaPrima` e HEAD (null se git non risponde): togliere il
+// caso rosso e tenere il file è la stessa porta aperta che cancellarlo.
 export function proveTolteDal(shaPrima, root) {
   try {
-    const out = gitOut(['diff', '--name-only', '-z', '--no-renames', '--diff-filter=D', shaPrima, 'HEAD', '--', PROVE_GIRO], root);
+    const out = gitOut(['diff', '--name-only', '-z', '--no-renames', '--diff-filter=DM', shaPrima, 'HEAD', '--', PROVE_GIRO], root);
     return proveTolte(out.split('\0').filter(Boolean));
   } catch (_) { return null; }
 }
@@ -90,7 +91,7 @@ export function rilanciaProveTolte(prove, shaPrima, root, { lancia = spawnSync, 
         writeFileSync(dest, execFileSync('git', ['show', `${shaPrima}:${f}`], { cwd: root, maxBuffer: 1 << 26, stdio: ['ignore', 'pipe', 'ignore'] }));
       }
     }
-    log(`Rilancio ${prove.length} ${prove.length === 1 ? 'prova' : 'prove'} del giro cancellate in questa correzione, sul codice nuovo:`);
+    log(`Rilancio com'${prove.length === 1 ? 'era' : 'erano'} ${prove.length} ${prove.length === 1 ? 'prova' : 'prove'} del giro cancellate o cambiate in questa correzione, sul codice nuovo:`);
     for (const p of prove) {
       const l = prepara('npx', ['playwright', 'test', percorsoRipristino(p, etichetta), '--retries=1']);
       const r = lancia(l.cmd, l.args, { cwd: root, stdio: 'inherit', shell: process.platform === 'win32', ...(l.env ? { env: l.env } : {}) });
@@ -110,10 +111,10 @@ export function rilanciaProveTolte(prove, shaPrima, root, { lancia = spawnSync, 
  */
 export function controllaProveTolte({ shaPrima, root, messiDaParte = 0, log = console.log, lancia, prepara } = {}) {
   if (!/^[0-9a-f]{7,40}$/i.test(String(shaPrima || ''))) {
-    return { ferma: false, testo: 'Non so da che commit è partita la correzione: le prove del giro cancellate non le rilancio.' };
+    return { ferma: false, testo: 'Non so da che commit è partita la correzione: le prove del giro cancellate o cambiate non le rilancio.' };
   }
   const prove = proveTolteDal(shaPrima, root);
-  if (prove === null) return { ferma: false, testo: 'Git non mi dice quali prove del giro sono state cancellate: non le rilancio.' };
+  if (prove === null) return { ferma: false, testo: 'Git non mi dice quali prove del giro sono state cancellate o cambiate: non le rilancio.' };
   if (!prove.length) return { ferma: false, testo: '' };
   const r = rilanciaProveTolte(prove, shaPrima, root, { log, ...(lancia ? { lancia } : {}), ...(prepara ? { prepara } : {}) });
   if (r.motivo) return { ferma: true, testo: `Consegna respinta: ${r.motivo}` };

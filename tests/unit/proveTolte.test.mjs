@@ -111,6 +111,23 @@ test('cancellare una prova diventata verde passa, e senza prove tolte non si lan
   }
 });
 
+test('togliere il caso rosso e tenere il file ferma la consegna come cancellare la prova', () => {
+  const { dir, g, scrivi, critica } = repoConProve();
+  try {
+    scrivi('tests/verifica/679/giro1-rossa.spec.mjs', 'VERDE: il caso rosso non c\'è più\n');
+    scrivi('tests/verifica/679/giro1-verde.spec.mjs', 'VERDE, con un commento in più\n');
+    g('commit', '-qam', 'correzione che toglie il caso');
+    const visti = [];
+    const e = controllaProveTolte({ shaPrima: critica, root: dir, lancia: playwrightFinto(dir, visti), prepara: preparaFinto, log: () => {} });
+    assert.equal(e.ferma, true, 'la prova com\'era è ancora rossa: la porta è aperta');
+    assert.match(e.testo, /giro1-rossa\.spec\.mjs/);
+    assert.doesNotMatch(e.testo, /giro1-verde/, 'una prova cambiata che com\'era è verde non ferma niente');
+    assert.equal(visti.length, 2);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('senza schermo e senza xvfb la consegna si ferma e dice perché, invece di passare', () => {
   const { dir, g, critica } = repoConProve();
   try {
