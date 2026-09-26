@@ -16,101 +16,56 @@ ruolo che ti viene consegnato.
 ## Letture obbligatorie prima di codice o revisioni
 
 - **`filo_filosofia.txt`** e **`filo_design.txt`** sono già qui sotto, importati
-  per intero: NON rileggerli con uno strumento. Stanno nel prompt di sistema di
-  proposito: quel prefisso è identico per ogni agente che lavora su Filo e la
-  cache dei prompt lo serve a un decimo del prezzo, mentre una lettura si paga
-  piena e poi si ripaga a ogni turno per il resto della sessione.
-- **`PATTERNS.md`** prima di toccare la UI o prendere decisioni di design. È
-  un **indice**: una riga per pattern, titolo e regola. Il racconto di ogni
-  pattern sta in `patterns/<slug>.md`, linkato dalla riga: il caso che l'ha
-  fatto nascere, i tentativi sbagliati, i riferimenti al codice. Aprilo solo
-  per il pattern che stai per toccare. Se stabilisci un pattern nuovo, scrivi
-  il file e aggiungi la riga nell'indice.
+  per intero: NON rileggerli con uno strumento (stanno nel prefisso in cache,
+  identico per ogni agente).
+- **`PATTERNS.md`** prima di toccare la UI o prendere decisioni di design. È un
+  **indice**, una riga per pattern; il racconto sta in `patterns/<slug>.md` e si
+  apre solo per il pattern che stai per toccare. Un pattern nuovo: file più riga
+  nell'indice.
 
 @filo_filosofia.txt
 @filo_design.txt
 
 ## Il contesto si paga a ogni turno
 
-Ogni turno rilegge l'intero contesto della sessione. Misurato sulle sessioni
-locali dell'owner (settembre 2026): le riletture della cache sono il 61% del
-costo, le scritture il 26%, l'output il 13%. Dieci chiamate in dieci turni
-costano dieci riletture, in un turno solo una. Quindi:
+Le riletture della cache sono la voce più grossa del costo di una sessione.
 
-- **Chiamate indipendenti nello stesso turno.** Letture, ricerche, controlli
-  che non dipendono l'uno dall'esito dell'altro partono insieme. Una chiamata
-  che dipende da un esito va DOPO l'esito, oppure nella stessa riga di shell
-  legata al passo prima, mai in un batch che va avanti anche se il passo prima
-  è fallito: un test rosso deve fermare, non finire in coda a un commit. La
-  forma giusta, per shell:
-  - Bash: `npm run test:unit && git commit …`. Attenzione al tubo: in
-    `npm run test:unit | tail -40 && git commit` l'esito che conta è quello di
-    `tail`, e il commit parte anche coi test rossi. O non si filtra il comando
-    di cui conta l'esito, o si mette `set -o pipefail` prima.
+- **Chiamate indipendenti nello stesso turno**; una che dipende da un esito va
+  DOPO l'esito, o nella stessa riga di shell legata al passo prima. Un test
+  rosso deve fermare, non finire in coda a un commit:
+  - Bash: `npm run test:unit && git commit …`. In `npm run test:unit | tail -40
+    && git commit` l'esito che conta è quello di `tail`: o non si filtra, o
+    `set -o pipefail` prima.
   - PowerShell 5.1: `&&` è un errore di sintassi; si scrive
-    `npm run test:unit; if ($?) { git commit … }`, e regge anche attraverso un
-    tubo. Non aggiungere `2>&1` a un eseguibile: rende `$?` falso anche a
-    esito 0, e la catena si ferma su un successo.
-- **Le esplorazioni si delegano.** Se rispondere vuol dire leggere più di
-  qualche file, lo fa un sotto-agente e qui resta la conclusione, non i file.
-  Tieni in contesto solo ciò che ti servirà davvero nei turni dopo. Più
-  sotto-agenti insieme solo se leggono soltanto: due che scrivono si pestano
-  sui lock del salvataggio automatico (vale la regola dei ruoli: chi scrive,
-  uno alla volta).
-- **Si legge la parte, non il file.** Intervalli di righe, uscite filtrate
-  (`tail`, `grep`), mai un file da centinaia di KB intero per una sezione.
-- **Attese.** La cache del contesto dura cinque minuti e ogni chiamata la
-  rinnova: una chiamata bloccante da dieci minuti la trova sempre scaduta, e il
-  turno dopo riscrive tutto il contesto (~250.000 token, circa 1,6 $ — sette
-  attese così lo riscrivono sette volte). Un comando che può superare i due
-  minuti si lancia in sottofondo (l'harness avvisa quando finisce); se serve
-  aspettarlo attivamente, a pezzi da quattro minuti al massimo per chiamata,
-  mai da dieci. Il timeout della chiamata si dimensiona sulla durata vera del
-  comando, mai sotto.
-- **Sessioni che finiscono.** Un compito nuovo in una sessione lunga paga tutto
-  il passato a ogni turno: a un cambio di argomento si riparte.
+    `npm run test:unit; if ($?) { git commit … }`. Niente `2>&1` su un
+    eseguibile: rende `$?` falso anche a esito 0.
+- **Le esplorazioni si delegano** a un sotto-agente; qui resta la conclusione.
+  Più sotto-agenti insieme solo se leggono soltanto: due che scrivono si
+  pestano sui lock del salvataggio automatico.
+- **Si legge la parte, non il file**: intervalli di righe, uscite filtrate.
+- **Attese.** Un comando che può superare i due minuti si lancia in sottofondo;
+  se serve aspettarlo, a pezzi da quattro minuti al massimo. Il timeout si
+  dimensiona sulla durata vera del comando, mai sotto.
+- **A un cambio di argomento si riparte** con una sessione nuova.
 
 ## Regole del repo
 
 - **Salvataggio automatico**: a ogni modifica di file un hook committa e pusha
-  il TUO ramo, da solo. È il trasporto del lavoro — rende il ramo visibile a
-  verifica e server — oltre che il paracadute se la sessione muore.
-- **Su `main` scrive SOLO il server.** Il muro sta su GitHub: una regola di
-  protezione del repo lascia scrivere la sola identità del server (una GitHub
-  App). Le credenziali locali capaci di fare un push esistono ancora — quello
-  che non esiste più è un push su `main` che vada a buon fine: **viene
-  respinto** (verificato sul campo). Le due strade — il cancello di merge
-  (routine) e `npm run finish` (locale) — sono due modi di CHIEDERE al server di
-  fondere; lui scarica il diff, fa girare i controlli deterministici e fonde con
-  un'identità sua.
-- **Anche gli automatismi locali si astengono da `main`**, e non perché servano
-  al muro: un automatismo che tenta e viene respinto in silenzio è un guasto
-  invisibile (è già successo — un ramo che non si salvava più da giorni senza
-  che nessuno lo sapesse), e una difesa appesa a un muro solo cade con quel
-  muro. Salvataggio automatico e diagnostico non committano e non spediscono un
-  ramo protetto (`main`, `master`, il default di origin): lo scrivono nei log e
-  proseguono. Conseguenza pratica: **se lavori in una cartella che si trova su
-  `main`, il tuo lavoro non viene salvato**. Spostalo su un ramo suo:
-  `git worktree add .claude/worktrees/<nome> -b claude/<nome>`.
+  il TUO ramo. È il trasporto del lavoro verso verifica e server, oltre che il
+  paracadute.
+- **Su `main` scrive SOLO il server** (regola di protezione su GitHub: un push
+  su `main` viene respinto). Le due strade, il cancello di merge (routine) e
+  `npm run finish` (locale), CHIEDONO al server di fondere.
+- **Su `main` il tuo lavoro non viene salvato**: gli automatismi locali non
+  committano su un ramo protetto, lo scrivono nei log e proseguono. Spostati su
+  un ramo: `git worktree add .claude/worktrees/<nome> -b claude/<nome>`.
 - **Mai committare artefatti dei test** (`tests/.shots/`, `tests/.smoke/`,
-  `tests/agent/.out/`, ecc.: output rigenerato, gitignorato). Se un PNG risulta
-  tracciato: `git rm --cached <file>`.
-- **Fine riga: LF ovunque, e non si tratta.** `.gitattributes` impone
-  `* text=auto eol=lf`, e vince su `core.autocrlf` — che su Windows, e nei
-  contenitori `windows-latest` dove gira il cancello che pubblica, è acceso di
-  serie. Su un checkout a CRLF gli hook di `.claude/hooks/*.sh` non partono
-  (bash legge `cd /percorso\r`, non trova la cartella ed **esce 0**: il
-  salvataggio automatico smette di funzionare in silenzio) e ogni regex
-  ancorata a fine riga smette di riconoscere i file del repo, perché per una
-  regex `\r` è già un fine riga. Conseguenze pratiche: non togliere quella
-  regola; un NUL dentro un sorgente si scrive come escape (`\u0000`), perché il
-  carattere vero fa considerare il file BINARIO a git e lo lascia fuori dalla
-  normalizzazione. La regola vale al CHECKOUT, quindi su un clone nuovo: una
-  cartella che esiste già e ha i file storti si raddrizza con `git rm --cached
-  -r .` seguito da `git reset --hard` (che butta le modifiche non committate),
-  oppure riclonando; `git checkout -- .` e `git add --renormalize .` non
-  bastano. La sentinella è `tests/unit/fineRigaLf.test.mjs`; il racconto
-  sta in `patterns/la-fine-riga-la-decide-il-repo-non-la-macchina-che-clona.md`.
+  `tests/agent/.out/`…). Se un PNG risulta tracciato: `git rm --cached <file>`.
+- **Fine riga: LF ovunque.** `.gitattributes` (`* text=auto eol=lf`) vince su
+  `core.autocrlf` e non si toglie: su CRLF gli hook escono 0 senza fare niente e
+  le regex ancorate a fine riga smettono di riconoscere i file. Un NUL in un
+  sorgente si scrive `\u0000`. Racconto e rimedi:
+  `patterns/la-fine-riga-la-decide-il-repo-non-la-macchina-che-clona.md`.
 
 ## Commenti nel codice
 
@@ -120,382 +75,153 @@ riga si ripaga a ogni lettura del file. Quindi:
 - **Un commento dice il PERCHÉ**: l'intento, l'invariante, il caso che ha fatto
   nascere la guardia. **Mai il COSA**: se rileggendo il codice sotto lo si
   ricostruisce, non si scrive; se lo trovi, lo togli.
-- **Una o due righe.** Il racconto (com'era prima, i tentativi sbagliati, la
-  cronaca dell'incidente) sta nel feedback o nel file di pattern, non qui. Il
-  numero del feedback (`#nnn`) si può citare, ma da una routine i feedback non
-  si leggono: la regola deve reggere da sola nel commento.
+- **Una o due righe.** Il racconto sta nel feedback o nel file di pattern. Il
+  numero del feedback (`#nnn`) si può citare, ma la regola deve reggere da sola
+  nel commento.
 - **Una regola vive in un posto solo**, in quest'ordine di preferenza:
   sentinella in `tests/unit/` > file di pattern > CLAUDE.md > commento. Gli
   altri posti rimandano, non copiano. Un «NON cambiare» che si può verificare a
   macchina è una sentinella, non un commento.
 - **Intestazione di file: tre righe al massimo.** Cos'è, cosa non deve fare,
-  dove stanno le sue regole. Serve a decidere se aprire il file senza aprirlo.
-- **Niente cronologia** («spostato da», «prima era così», date di modifica: le
-  tiene git) e niente commento che ripete il nome della funzione o descrive
-  una riga ovvia.
+  dove stanno le sue regole.
+- **Niente cronologia** (la tiene git) e niente commento che ripete il nome
+  della funzione.
 
-Nei CSS i commenti che spiegano un token estetico o una scelta di design sono
-un perché legittimo e restano, compressi; le etichette di sezione che ripetono
-il selettore sotto se ne vanno.
+Nei CSS i commenti che spiegano un token estetico o una scelta di design
+restano, compressi. La parte misurabile la tiene
+`tests/unit/commentiRegola.test.mjs`.
 
-Quel che si misura a macchina lo tiene `tests/unit/commentiRegola.test.mjs`:
-righe fino a 120 caratteri, blocchi fino a due righe (tre per l'intestazione,
-e un commento attaccato in coda a una riga di codice conta da solo), niente
-date, niente etichette uguali al nome sotto. Oggi guarda HTML e CSS —
-compresi gli script e gli stili incorporati nelle pagine — e per estenderla ai
-`.js` basta aggiungere l'estensione a `ESTENSIONI`.
+## Filo gira anche su Mac e Linux
 
-## Filo gira anche su Mac
+Nessuno di noi ha un Mac o un Linux desktop: si rompono in silenzio, quindi le
+regole valgono mentre scrivi.
 
-Filo si scrive e si prova su Windows, e si scarica anche su Mac
-(`Filo-Mac.dmg`, allegato alla stessa release dall'altra metà di
-`.github/workflows/release.yml`). Nessuno di noi ha un Mac sotto mano: un Mac
-si rompe in silenzio e la notizia arriva settimane dopo, da un utente. Quindi
-le regole valgono **mentre scrivi**, non a un controllo finale che non esiste.
+- **Cmd vale quanto Ctrl**: `e.ctrlKey || e.metaKey`, acceleratori
+  `CommandOrControl+X`. Su Linux Ctrl resta Ctrl.
+- **Il nome di una scorciatoia si chiede** a `SN_TASTI.etichetta()`
+  (`src/shared/tasti.js`), mai scritto a mano; nell'HTML non ci va. Un tasto
+  nuovo si controlla con `SN_TASTI.riservato()`: su Mac la barra dei menu
+  (`src/main/menu.js`) vede i tasti per prima. Su Mac Alt scrive: una
+  scorciatoia globale Alt+lettera lì prende un Ctrl davanti
+  (`src/main/shortcuts.js`), Alt+cifra diventa Cmd+cifra.
+- **Niente percorsi di Windows scritti a mano**, nemmeno nei prompt: `app.getPath`,
+  `os.homedir()`, `path.join`.
+- **Un ramo di piattaforma si scrive intero**: `if (process.platform ===
+  'win32')` senza l'altro lato è un buco.
+- **La shell** fuori da Windows si decide solo in `resolveShell`
+  (`src/main/services/terminal.js`).
+- **Le ricette dei pacchetti** (`build.mac`, `build.linux`, gli script
+  `after-pack-*`, i lavori `release-mac`/`release-linux`) si toccano solo dopo
+  aver letto `patterns/mac-e-linux-si-rompono-in-silenzio.md`, che racconta
+  anche tutto il resto.
 
-- **Cmd vale quanto Ctrl.** Una scorciatoia si legge `e.ctrlKey || e.metaKey`,
-  mai `ctrlKey` da solo. Su Mac il tasto delle scorciatoie è Cmd, e un
-  controllo che guarda solo Ctrl tace. Gli acceleratori di Electron si
-  dichiarano `CommandOrControl+X`, non `Ctrl+X`.
-- **Alt su Mac scrive.** Opzione+E compone `é`, Opzione+cifra fa `¡™£¢`. Una
-  scorciatoia GLOBALE con Alt+lettera se lo prende in tutto il sistema, in ogni
-  programma; una con Alt+cifra impedisce di digitare quei simboli in qualunque
-  pagina. Su Mac Alt+lettera prende un Ctrl davanti
-  (`src/main/shortcuts.js`) e Alt+cifra diventa Cmd+cifra (i salti fra schede,
-  come in ogni browser su Mac) — tranne lo zero, che su Mac è già lo zoom al
-  100%: lì la scheda in fondo si raggiunge con Cmd+9, «l'ultima».
-- **Il nome di una scorciatoia non si scrive a mano: si chiede.** Le funzioni
-  rispondevano già a Cmd — a mentire erano le SCRITTE, e mentivano una alla
-  volta. `src/shared/tasti.js` è la porta unica: `SN_TASTI.etichetta('Ctrl+B')`
-  dà `Ctrl+B` su Windows e `Cmd+B` su Mac. Vale ovunque compaia un tasto
-  (menu del tasto destro, suggerimenti, elenchi). Nell'HTML non si può
-  chiedere, quindi lì una scorciatoia non ci va: la compone il JS della pagina.
-  Le eccezioni sono tre e sono dichiarate nella sentinella: la tabella degli
-  acceleratori, il manifesto delle capacità (che cita entrambe le forme) e il
-  diario delle versioni. `SN_TASTI` tiene anche il COMPORTAMENTO del salto fra
-  schede (`indiceSaltoScheda`), perché nome e tasto devono cambiare insieme.
-- **Niente percorsi di Windows scritti a mano**, né `C:\...`, né `%APPDATA%`,
-  né `process.env.APPDATA`. Le cartelle di sistema le dà Electron
-  (`app.getPath`), la home la dà `os.homedir()`, i pezzi si uniscono con
-  `path.join`. Vale anche dentro i prompt, dove un esempio è un'istruzione: un
-  `C:\Users\...` fa proporre percorsi di Windows a chi sta su un Mac.
-- **Un ramo di piattaforma si scrive intero.** `if (process.platform ===
-  'win32')` senza l'altro lato è un buco: o l'altro ramo c'è, o il ramo
-  Windows è una scorciatoia in più su un comportamento che vale ovunque.
-- **Su Mac la barra dei menu esiste sempre, ed è la prima a vedere i tasti.**
-  Su Windows la finestra è senza cornice e la barra non si aggancia a niente:
-  è per questo che per mesi nessuno si è accorto che era quella di serie di
-  Electron, in inglese, e che si prendeva Cmd+W, Cmd+R, Cmd+Z e Cmd +/-/0
-  prima delle pagine. La barra di Filo è `src/main/menu.js`: i `role` di
-  Electron solo dove il tasto non è di Filo (taglia, copia, incolla, seleziona
-  tutto, esci), un `click` che chiama la funzione di Filo dove il tasto è suo,
-  e nessun acceleratore inventato — un tasto che vale solo su Mac è la stessa
-  asimmetria. Toglierla e basta non è un'uscita: su Mac spegne copia e incolla
-  in ogni campo di testo. Il pattern completo sta in
-  `patterns/quello-che-il-sistema-aggancia-da-se-va-dichiarato.md`.
-- **Un tasto della barra è tolto a tutto il resto.** Su Mac la barra arriva
-  prima: promettere quel tasto a un'altra cosa è promettere una cosa che non
-  succede mai (Cmd+0 era insieme «zoom al 100%» e «decima scheda», e la scheda
-  non arrivava mai). Chi assegna un tasto — Filo o l'utente, come le
-  scorciatoie dei moduli nell'Editor — chiede prima `SN_TASTI.riservato()`, che
-  tiene la lista dei tasti già presi; una sentinella la confronta con la barra
-  vera e diventa rossa se divergono.
-- **La ricetta del pacchetto si tocca con cautela**: `build.mac` in
-  `package.json`, `scripts/after-pack-mac.js` (la firma locale, senza la quale
-  sui Mac con chip Apple l'app non si apre) e il lavoro `release-mac`. Il
-  pacchetto è **universale**: nasce da due copie, Intel e Apple Silicon, che
-  poi vengono fuse. La fusione pretende che i file non eseguibili delle due
-  copie siano identici, quindi le copie NON vanno firmate: si firma solo il
-  risultato.
-- **Senza certificato Apple, il primo avvio va spiegato dove l'utente è
-  bloccato.** macOS rifiuta di aprire Filo la prima volta, e a quel punto
-  l'utente non ha ancora visto niente dell'app: un'istruzione che vive solo
-  dentro Filo non la leggerà mai. Sta nel disco che ha appena aperto
-  (`build/Se Filo non si apre.txt`, allegato dal `build.dmg` del
-  `package.json`). E dev'essere **quella giusta**: da macOS Sequoia (2024) il
-  clic destro → «Apri» non sblocca più niente, l'unica strada è Impostazioni di
-  sistema → Privacy e sicurezza → «Apri comunque», dopo un tentativo fallito.
-
-Come si verifica, dato che un Mac non ce l'abbiamo:
-
-- `tests/unit/macSupport.test.mjs` è la sentinella sempre accesa. Diventa rossa
-  su tutto quanto sopra, in millisecondi, sulla macchina di chi ha scritto la
-  modifica. Se stabilisci una regola nuova per il Mac, aggiungila lì.
-- Il lavoro **«Verifica build Mac»** (`.github/workflows/verifica-mac.yml`)
-  costruisce davvero il `.dmg` su una macchina Apple e non pubblica niente.
-  Parte da solo quando cambi la ricetta, e si lancia a mano da Actions → Run
-  workflow (su qualunque ramo, una volta che il file è su `main`). È il modo
-  di rispondere a «il pacchetto si costruisce ancora?» senza bruciare un
-  numero di versione.
-- Quello che **nessuno dei due prova** è che l'app si apra e funzioni su un
-  Mac. Quello lo dice solo un Mac vero: dichiaralo nel report invece di darlo
-  per fatto.
-
-## Filo gira anche su Linux
-
-Stessa storia del Mac, stesso rischio: nessuno di noi ha un Linux desktop
-sotto mano. Filo per Linux è un file solo, `Filo-Linux.AppImage`, allegato
-alla stessa release dal lavoro `release-linux` di
-`.github/workflows/release.yml`. Il nome è **fisso**: il sito ha un
-collegamento solo e non sa che numero di versione sia uscito.
-
-- **Ctrl resta Ctrl.** Su Linux non c'è il Cmd del Mac e non c'è la barra dei
-  menu dell'applicazione: le scorciatoie si chiamano e si comportano come su
-  Windows. `SN_TASTI` lo sa già; non aggiungere rami per Linux dove non
-  servono.
-- **La modalità terminale non è PowerShell.** Fuori da Windows si parte da
-  `/bin/sh`, o da `bash` se l'utente l'ha scelto nelle Preferenze. La regola
-  sta in un posto solo, `resolveShell` di
-  `src/main/services/terminal.js`: la sessione persistente
-  (`src/main/services/shell.js`) e i comandi dell'assistente chiedono lì. Due
-  copie divergono, ed è già successo (la voce «Bash» delle Preferenze non
-  faceva niente).
-- **L'aggiornamento automatico può fermarsi, e allora lo dice.** Su Linux
-  electron-updater riscrive l'AppImage da cui Filo sta girando: riesce se
-  quel file è scrivibile e se l'app è partita davvero come AppImage. Quando
-  inciampa, `avvisaSeAggiornamentoBloccato` scrive fra le notifiche che la
-  versione nuova va presa a mano, come già fa su Mac. Un aggiornamento che
-  fallisce in silenzio lascia l'utente fermo per sempre.
-- **Il link d'invito passa dalla voce di menu.** Su Linux `filo://` arriva a
-  Filo solo se il file `.desktop` dentro l'AppImage dichiara
-  `x-scheme-handler/filo`, e quella riga la scrive electron-builder solo
-  perché `build.protocols` è dichiarato. L'indirizzo poi arriva fra gli
-  argomenti, come su Windows.
-- **Il doppio clic apre Filo solo grazie a un lanciatore dentro il pacchetto.**
-  Chromium all'avvio si chiude in una gabbia di sicurezza che vuole gli spazi
-  dei nomi utente non privilegiati; dove sono negati ripiega su
-  `chrome-sandbox`, che dentro un AppImage non può essere setuid, e allora non
-  parte affatto («No usable sandbox!», sul terminale, dove nessuno lo legge).
-  Ubuntu li nega di serie dalla 23.10. La voce di menu del pacchetto chiede
-  `--no-sandbox` da sé, ma vale solo per chi ha integrato l'applicazione: il
-  doppio clic passa da `AppRun`. Quindi `scripts/after-pack-linux.js` mette al
-  posto del programma un lanciatore che guarda le tre manopole del kernel che
-  decidono la faccenda e aggiunge `--no-sandbox` SOLO dove dicono di no: Filo è
-  un browser, e dove la gabbia regge deve restare. Il lanciatore usa `exec -a`
-  per non cambiare il nome del processo, da cui viene l'aggancio dell'icona
-  nella barra.
-- **La ricetta si tocca con cautela**: `build.linux` in `package.json`,
-  `scripts/after-pack-linux.js` e il lavoro `release-linux`. `artifactName`,
-  `category` e `desktop` non sono decorazioni: senza il primo il collegamento
-  del sito si rompe, senza gli altri due Filo non compare nel menu di sistema e
-  la sua finestra non si aggancia alla propria icona nella barra.
-
-Come si verifica, dato che un Linux desktop non ce l'abbiamo:
-
-- `tests/unit/linuxSupport.test.mjs` è la sentinella sempre accesa, gemella di
-  quella del Mac. Una regola nuova per Linux si aggiunge lì.
-- Il lavoro **«Verifica build Linux»**
-  (`.github/workflows/verifica-linux.yml`) costruisce davvero l'AppImage e non
-  pubblica niente. Guarda dentro il pacchetto, nella voce di menu, e poi lo
-  AVVIA con la manopola del kernel messa a zero, come su Ubuntu 24.04: se Filo
-  non resta aperto, il rosso arriva lì invece che dal tester.
-- L'AppImage si costruisce anche **nel contenitore delle routine**:
-  `npm run build:linux` mette `dist/Filo-Linux.AppImage` e
-  `dist/latest-linux.yml`. Per aprirla lì serve estrarla
-  (`./Filo-Linux.AppImage --appimage-extract`): senza FUSE l'AppImage non si
-  monta. Poi, dalla cartella che contiene `squashfs-root`, il comando è questo,
-  intero — mezzo comando qui non fa partire Electron e il rosso sembra del
-  codice:
-  `APPDIR=$PWD/squashfs-root ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a ./squashfs-root/AppRun --no-sandbox`
-- Quello che **nessuno di questi prova** è che l'app si apra e funzioni su un
-  Linux desktop vero, con la sua sessione grafica, le sue notifiche e il suo
-  gestore di file. Dichiaralo nel report invece di darlo per fatto.
+Sentinelle: `tests/unit/macSupport.test.mjs` e `tests/unit/linuxSupport.test.mjs`
+(una regola nuova si aggiunge lì). Nessuna prova dice che l'app si apra su un
+Mac o un Linux vero: nel report si dichiara.
 
 ## Limiti: abbondanti, e mai un taglio silenzioso
 
-Un tetto troppo stretto è già costato due volte (i feedback inviati dallo
-script rifiutati sopra poche migliaia di caratteri; le critiche del
-verificatore tagliate a 4000, coi rilievi in coda che sparivano). Prima di
-scrivere un tetto rispondi a due domande: **qual è il problema di un tetto
-ampio?** e **quanto spesso ci si avvicinerebbe?** Se serve una volta su cento e
-il costo è solo qualche credito, il tetto ampio vince: gestire l'eccezione
-costa di più. Dimensiona sul caso peggiore realistico, con margine.
-
-Un **troncamento silenzioso e irreversibile è quasi sempre l'idea sbagliata**:
-chi manda deve saperlo (rifiuto con la spiegazione e il numero, o un avviso),
-così accorcia lui e sceglie cosa tenere. Uno `slice()` muto sul testo di
-qualcuno mangia proprio la parte che contava, e lo si scopre settimane dopo.
+Un tetto troppo stretto è già costato due volte. Prima di scriverne uno:
+**qual è il problema di un tetto ampio?** e **quanto spesso ci si
+avvicinerebbe?** Se serve una volta su cento e costa qualche credito, vince il
+tetto ampio: dimensiona sul caso peggiore realistico, con margine. Un
+troncamento silenzioso e irreversibile è quasi sempre sbagliato: chi manda deve
+saperlo (rifiuto col numero, o un avviso) e scegliere lui cosa tenere.
 
 ## Sintomo vs causa
 
-Una lamentela descrive il sintomo come lo vede l'utente. La prima domanda non è
-"come faccio sparire questo errore" ma **"cosa stava cercando di fare l'utente,
-e perché non gli è riuscito"**. Spesso la causa è altrove.
-
-Segnali che stai fissando il sintomo: stai cambiando solo una stringa per un
-bug funzionale; stai facendo passare il test sbagliando meno invece di far
-funzionare la feature; non sai rispondere a "se l'utente riprova adesso, gli
-funziona?". Segnale di causa vera: **simmetrie mancanti** — due cammini simili
-che divergono in modo sospetto. Leggili affiancati.
+La prima domanda non è «come faccio sparire questo errore» ma **«cosa stava
+cercando di fare l'utente, e perché non gli è riuscito»**. Stai fissando il
+sintomo se cambi solo una stringa per un bug funzionale, se fai passare il test
+sbagliando meno, o se non sai rispondere a «se l'utente riprova adesso, gli
+funziona?». Segnale di causa vera: due cammini simili che divergono in modo
+sospetto.
 
 ## Iniziativa: nel dubbio, completa
 
-I feedback arrivano spesso poco specificati — uno screenshot con un bottone
-cerchiato e "non va", una critica di due parole. Il tuo lavoro è ricostruire
-**l'intento** e completare ciò che implica, non eseguire alla lettera il poco
-che c'è scritto.
+I feedback arrivano spesso poco specificati. Il tuo lavoro è ricostruire
+**l'intento** e completare ciò che implica.
 
 - **Invarianti UX ovvie**: si fanno, sempre. Se si può aggiungere X si deve
   poter rimuovere X; se l'app salva N cose l'utente deve poterle vedere tutte;
-  cammini equivalenti (scorciatoia e menu) fanno la stessa cosa. Non sono
-  scelte: sono completezza.
-- **Miglioramenti SENZA trade-off**: si fanno. Se un'aggiunta non peggiora
-  niente — non costa in servizi a pagamento, non complica l'uso, non chiude
-  strade future — nel dubbio falla: ne vale la pena.
+  cammini equivalenti (scorciatoia e menu) fanno la stessa cosa.
+- **Miglioramenti SENZA trade-off** (non costano servizi a pagamento, non
+  complicano l'uso, non chiudono strade future): nel dubbio si fanno.
 - **Trade-off VERO** (velocità vs costo, semplicità vs potenza, dati
-  dell'utente, scelte di gusto): NON decidere tu — segnala all'owner e lascia
-  a lui la scelta.
+  dell'utente, scelte di gusto): NON decidere tu, segnala all'owner.
 
-Due obblighi nel report: **elenca cosa hai aggiunto oltre il chiesto** (senza
-elenco è invisibile e si accumula — è l'argine allo scope creep, insieme ai
-casi documentati man mano che emergono), e **se hai fatto una cosa DIVERSA da
-quella chiesta dillo per primo, col perché** — vale anche per le richieste
-implicite (uno screenshot indicava un punto della UI e tu ne hai scelto un
-altro).
+Nel report: **elenca cosa hai aggiunto oltre il chiesto**, e **se hai fatto una
+cosa DIVERSA da quella chiesta dillo per primo, col perché** (anche per le
+richieste implicite, come un punto indicato in uno screenshot).
 
 ## Verifica: niente "fatto" senza aver eseguito
 
 Un task è finito quando il codice toccato è stato **eseguito** e l'esito
-osservato — "compila" e "il diff sembra giusto" non bastano. Minimi per tipo di
-modifica:
+osservato. Minimi per tipo di modifica:
 
-- **logica pura** (parsing, validazioni, trasformazioni) → unit test
-  nuovo/aggiornato in `tests/unit/` + `npm run test:unit` (millisecondi, senza
-  Electron);
+- **niente da aprire** (logica pura, testi, strumenti da riga di comando) →
+  controllo veloce in `tests/unit/` + `npm run test:unit`, non una spec che
+  apre Filo per non guardarci niente;
 - **feature o fix con UI/flusso app** → spec Playwright mirato
   (`npx playwright test tests/<feature>.spec.mjs`); se non esiste, scrivilo;
 - **modifica visiva** → in più `npm run test:shoot -- "<scenario>"` e GUARDA lo
-  screenshot (`tests/agent/.out/`); `test:explore` (LLM) è facoltativo;
-- **la suite completa non la lancia più nessuno** (decisione owner
-  2026-09-15): né chi risolve, né chi verifica, né una sessione locale. Gira
-  in GitHub, nel lavoro di release, che parte ogni sei ore: verde, e la patch
-  si pubblica; un rosso nuovo — fuori dai rossi noti del contenitore — e la
-  patch non esce, il rosso diventa un feedback e si corregge con calma, la
-  patch salta un giro. È il job `suite` di `.github/workflows/release.yml`
-  (Linux senza schermo; `scripts/suite-verdict.mjs` toglie dal conto i rossi
-  noti del contenitore, `tests/rossi-noti.json`); `gh workflow run
-  release.yml --ref <ramo> -f solo_suite=true` prova la sola suite su un
-  ramo, senza pubblicare. Una regressione è rara: non vale un'ora d'attesa a
-  ogni consegna;
-- **al suo posto**, nelle routine come in locale, chi verifica lancia
-  `npm run finish:check` (unit test più gli spec delle aree toccate dal ramo) e
-  le prove del giro,
-  `npx playwright test tests/verifica/<numero>` — quel percorso scritto
-  relativo alla radice del repo e con le barre normali (vedi più sotto). Un
-  rosso fuori dai rossi noti torna a chi risolve con l'elenco degli spec
-  rotti. Le regressioni restano responsabilità di chi le introduce: i minimi
-  qui sopra (unit + spec mirato) valgono sempre. Se temi una regressione
-  precisa altrove, lancia quello spec: non rimandarla, e non lanciare tutto
-  per trovarla.
+  screenshot (`tests/agent/.out/`);
+- **la suite completa non la lancia nessuno**, da nessuna parte: gira in GitHub
+  nel lavoro di release, ogni sei ore, e un rosso nuovo ferma la patch e
+  diventa un feedback. Al suo posto chi verifica lancia `npm run finish:check`
+  (unit più gli spec delle aree toccate). Le regressioni restano di chi le
+  introduce: se ne temi una precisa, lancia quello spec.
 
-**Prima di consegnare, la verifica te la fai tu.** Vale nelle routine e in
-locale: da tutte e due le parti il lavoro passa poi da una verifica
-indipendente, che costa un agente intero. Nei giri di agosto e settembre il
-primo giro trovava un rilievo grave in 15 lavori su 17, quasi sempre su
-qualcosa che chi aveva lavorato poteva vedere da sé. Quindi, prima della
-consegna, applica uno per uno i criteri di
-**`routines/roles/_criteri-verifica.md`**: sono gli stessi che userà chi ti
-verifica. Nelle routine li hai già nel testo del tuo ruolo; in locale apri il
-file (nove voci).
+**Prima di consegnare, la verifica te la fai tu**, con gli stessi criteri che
+userà chi ti verifica: **`routines/roles/_criteri-verifica.md`** (nelle routine
+li hai già nel ruolo). Quello che trovi lo correggi adesso.
 
-Quale prova scrivere lo dicono i minimi qui sopra: se non c'è niente da aprire
-(logica pura, testi, strumenti da riga di comando) è il controllo veloce in
-`tests/unit/`, non una spec che apre Filo per non guardarci niente.
+Le prove di un **giro di verifica** stanno in `tests/verifica/<numero>/` e si
+corrono una volta per giro, da chi verifica:
+`npx playwright test tests/verifica/<numero>`, col percorso relativo alla
+radice del repo e le barre normali (con le barre di Windows risponde «No tests
+found» anche a cartella piena). Quando si cancellano, cosa si può aggiungere
+dopo un verdetto e perché stanno fuori dalla suite:
+`patterns/le-prove-di-un-giro-stanno-nel-ramo-e-la-cartella-si-svuota.md`.
 
-Quello che trovi lo correggi adesso, non lo lasci a chi verifica.
+Un test che vale asserisce il **successo dal punto di vista dell'utente**, non
+l'assenza di un errore, e **senza il fix è rosso**. Se la verifica non è
+possibile, dichiaralo: «implementato ma non verificato perché X».
 
-Le prove di un **giro di verifica** restano nel ramo, in
-`tests/verifica/<numero>/` (in locale, dove un numero non c'è, la cartella la
-dice il compito che riceve chi verifica), e **si corrono una volta per giro**:
-le rilancia chi verifica, in partenza, ed è il controllo delle porte riaperte.
-Chi corregge lancia solo le prove dei rilievi che sta correggendo, e la chiusura
-non le rilancia affatto. Il comando è
-`npx playwright test tests/verifica/<numero>`. Quel
-percorso va scritto **relativo alla radice del repo e con le barre normali**:
-con le barre di Windows (la forma che il completamento del terminale produce da
-solo) o per intero dalla radice del disco, la risposta è «No tests found» anche
-a cartella piena — la stessa che dà una cartella che non c'è. Prima di
-concludere che non c'era niente da rilanciare, guarda la cartella.
-
-**La cartella si svuota invece di crescere.** La prova di un rilievo che esce di
-lì in un feedback suo — esterno, o interno lasciato fuori dal giro — si
-CANCELLA: il testo del rilievo viaggia nel feedback, e una prova rossa lasciata
-indietro è un rosso da rispiegare a ogni giro. Si cancella anche quella di un
-rilievo corretto, nello stesso commit in cui si scrive la prova durevole che lo
-tiene chiuso (se prova durevole non ce n'è, la prova del giro resta). Restano le
-prove dei rilievi che hanno fermato il lavoro: le tratta chi riprende. Una prova
-che copre anche un caso ancora aperto non si cancella: le si toglie il caso che
-se ne va. Nel commit di una correzione c'è anche il ripiego del rosso atteso
-(`test.fail(true, '<motivo>')` in testa al corpo); **dopo un verdetto invece si
-può solo TOGLIERE** — una riga aggiunta lì fa decadere il verdetto e costa un
-giro intero, e i due cancelli (la chiusura in locale, il cancello di fusione del
-server) lo controllano. La
-suite completa non le raccoglie (quelle di un solo feedback costano otto
-minuti e mezzo); `FILO_TEST_VERIFICA=1` le include tutte. In quella cartella ci
-vanno **davvero**, e in una che porta il numero: una prova di giro lasciata
-nella radice di `tests/` entra nella suite per sempre, e ogni spec riapre Filo
-— sessantadue erano già entrate così. Quello che sta nella suite deve poter
-diventare rosso e non deve dichiararsi di passaggio: la sentinella
-`tests/unit/proveDeiGiri.test.mjs` lo guarda nel CONTENUTO, non nel nome del
-file (il nome è l'unica cosa che chi scrive può sbagliare), e l'elenco di cosa
-sta nella suite se lo fa dare dal raccoglitore invece di riscriverlo. Tiene
-anche il resto di quella cartella (nessun byte NUL crudo nei sorgenti, ogni
-import relativo che risolve).
-
-Com'è fatto un test che vale: asserisce il **successo dal punto di vista
-dell'utente** (l'immagine arriva al destinatario), non l'assenza di un errore
-(il toast non compare); e **senza il fix deve essere rosso** — se non sai quale
-assert diventerebbe rosso, riscrivilo.
-
-Se la verifica non è possibile (hardware non simulabile, servizi live),
-dichiaralo nel report: "implementato ma non verificato perché X".
-
-Note pratiche: gli spec Playwright NON mostrano la finestra (protezione in
-`src/main/test-window-mode.js`; `FILO_TEST_VISIBLE=1` per vederla;
-`test:shoot`/`test:smoke` restano visibili perché lì la finestra È il
-risultato). Fixture: `tests/fixtures/electron.mjs` (userData isolato,
-`openTab`, mini server; seleziona i WebContentsView per hostname, mai
+Gli spec Playwright non mostrano la finestra (`FILO_TEST_VISIBLE=1` per
+vederla; `test:shoot` e `test:smoke` sì, lì la finestra è il risultato). Fixture: `tests/fixtures/electron.mjs` (userData isolato, `openTab`,
+mini server; seleziona i WebContentsView per hostname, mai
 `waitForEvent('window')`).
 
 ## Consegna: i tre testi
 
-Chi ha scritto il codice scrive anche i testi — nessun ruolo a valle li riscrive
-(aggiunge al massimo una riga d'esito). Sono TRE testi distinti, non lo stesso
-accorciato:
+Chi ha scritto il codice scrive anche i testi; nessun ruolo a valle li
+riscrive. Sono TRE testi distinti:
 
-1. **Report per l'owner** (cifrato, lo legge solo lui). MINIMO: conferma in una
-   riga; scelte funzionali diverse dal chiesto col perché; scelte tecniche non
-   ovvie che ricadono su di lui (servizi a pagamento, dati utente, decisioni
-   difficili da invertire). MAI: ridescrivere il problema, raccontare come hai
-   verificato, vantare comportamenti attesi, nomi di file/funzioni.
-2. **Frase per chi ha segnalato** (in chiaro, una riga): cosa può fare adesso.
-   Se per lui non cambia niente di visibile, non si scrive.
+1. **Report per l'owner**: conferma in una riga; scelte funzionali diverse dal
+   chiesto col perché; scelte tecniche non ovvie che ricadono su di lui. MAI:
+   ridescrivere il problema, raccontare come hai verificato, vantare
+   comportamenti attesi, nomi di file/funzioni.
+2. **Frase per chi ha segnalato** (una riga): cosa può fare adesso. Se non
+   cambia niente di visibile, non si scrive.
 3. **Riga di changelog** in `src/shared/patchNotes.js`: solo se un utente
-   qualunque può usare la cosa; una riga, orientata al beneficio. Superfici
-   owner e parti interne NON entrano.
+   qualunque può usare la cosa (superfici owner e parti interne no); una
+   riga, orientata al beneficio.
 
-Prima di consegnare QUALSIASI testo destinato a un umano (i tre testi qui
-sopra, ma anche testi UI e documentazione) applica
-**`.claude/skills/unslop/SKILL.md`**: toglie i tic da testo generato e rende
-la scrittura chiara.
+Prima di consegnare un testo destinato a un umano applica
+**`.claude/skills/unslop/SKILL.md`**.
 
 ## Fonti di verità singole (aggiornale nello stesso commit)
 
-- **`src/shared/patchNotes.js`** — changelog per l'utente comune (che non sa
-  nulla di codice). Allineato a `package.json`.
-- **`src/shared/capabilities.js`** — manifesto di cosa sa fare Filo, per
-  l'utente: nuova capacità = voce nuova; cambiata = aggiornata; rimossa =
-  tolta. Un manifesto che mente è peggio di uno assente. Una sentinella negli
-  unit test confronta le voci verificabili (scorciatoie, pagine interne) col
-  codice reale e diventa rossa se derivano.
-- **`src/shared/feedbackTransitions.js`** — le TABELLE della macchina a stati
-  (stati, transizioni, statusPublic, imbottitura, i NOMI dei bilanci del
-  verificatore, uno per livello — i numeri NON stanno nel codice: li scrive l'owner in
-  Gestione → Automazioni, e chi ne ha bisogno li legge dal server o si ferma)
-  come DATI. La dashboard le legge da qui; il server di
-  filo-security le INCORPORA al deploy (predeploy `bake-shared`), insieme a
-  **`filo_filosofia.txt`** per i prompt dei giudici L2. Niente copie a mano:
-  se tocchi transizioni o filosofia, l'unica cura è **rideployare le
+- **`src/shared/patchNotes.js`**: changelog per l'utente comune, allineato a
+  `package.json`.
+- **`src/shared/capabilities.js`**: manifesto di cosa sa fare Filo. Capacità
+  nuova, cambiata o rimossa = voce aggiornata; una sentinella la confronta col
+  codice.
+- **`src/shared/feedbackTransitions.js`**: le tabelle della macchina a stati
+  come DATI (i numeri dei bilanci no: li scrive l'owner in Gestione →
+  Automazioni, e chi ne ha bisogno li legge dal server o si ferma). Il server
+  di filo-security le incorpora al deploy insieme a **`filo_filosofia.txt`**: se tocchi transizioni o filosofia, **rideploya le
   functions**.
 
 ## Run / test
@@ -505,49 +231,21 @@ npm install                # se manca il binario Electron: node node_modules/ele
 npm start
 npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
-npm test                   # SUITE COMPLETA (~350 spec, ~1.450 casi): NON si lancia a mano, da nessuna parte.
-                           # Gira solo in GitHub, nel lavoro di release, ogni sei ore prima di pubblicare (vedi § Verifica).
-                           # Sulla macchina dell'owner durerebbe ~7 ore con un solo worker.
+npm test                   # SUITE COMPLETA (~350 spec, ~1.450 casi): NON si lancia a mano (vedi § Verifica)
 npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo
 npm run test:shoot         # cattura visiva della finestra reale
-
-FILO_TEST_SCALE=1.25 npx playwright test tests/<spec>.spec.mjs   # schermo al 125%
 ```
 
-**La macchina dell'owner ha due cose che le altre non hanno**, e ogni volta che
-un test le dà per scontate nasce un rosso che vede lui solo, per settimane
-(feedback #563: undici spec così).
-
-**Lo schermo sta al 125%**, quello delle routine in cloud al 100%: la stessa
-riga di testo cade su misure diverse. `FILO_TEST_SCALE=1.25` rimette quel
-fattore ovunque, ed è l'unico modo di rivedere quei rossi senza avere lo stesso
-schermo sotto mano. Un valore scritto male (`125` al posto di `1.25`, o una
-parola) ferma subito invece di girare al 100% facendoti credere il contrario.
-Chi apre Filo per conto suo passa la manopola a mano
-(`args: [...argomentiScala, '.']`, da `tests/helpers/scala.mjs` o dalla
-fixture): una sentinella negli unit test guarda OGNI `electron.launch` sotto
-`tests/` e diventa rossa se qualcuno se la dimentica.
-
-**L'utente si chiama «agenti AI»**, con lo spazio, e su Windows quel nome fa
-anche comparire la forma abbreviata `AGENTI~1` in `%TEMP%` mentre l'app riporta
-sempre quella lunga. Qui non c'è una manopola da accendere: la cartella
-temporanea di un test si chiede sempre a `cartellaTemporanea()`
-(`tests/helpers/percorsi.mjs`), che la fa canonica e con uno spazio nel nome per
-tutti. Costruirsela con `mkdtempSync` significa provare su un percorso che sulla
-macchina dell'owner non esiste, e una sentinella negli unit test lo impedisce.
-
-I rossi d'ambiente che restano sono **scritti** in `tests/rossi-noti.json`, col
-caso preciso, il motivo e il feedback che li toglierà: quelli del contenitore
-senza schermo delle routine e quelli della macchina dell'owner, in due elenchi
-separati. Un rosso che non è lì dentro è una regressione.
-
-**Nel contenitore delle routine** (Linux, senza schermo, da root) gli spec che
-aprono Electron vogliono davanti `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`
-(lo dice già `scripts/ensure-electron.mjs`). Senza, Electron non parte proprio:
-quel rosso non è un rosso del codice, e ogni giro lo riscopriva da capo.
-
-Modelli per gli strumenti di test (`test:explore`): open via OpenRouter, chiave
-in `tests/agent/.env` — MAI chiavi del produttore dei pesi (politica modelli).
+- **La macchina dell'owner** ha lo schermo al 125% e un nome utente con lo
+  spazio («agenti AI»): `FILO_TEST_SCALE=1.25` per rivedere i suoi rossi, e le
+  cartelle temporanee dei test si chiedono a `cartellaTemporanea()`
+  (`tests/helpers/percorsi.mjs`). Le sentinelle lo controllano; il racconto sta
+  in `patterns/un-test-chiede-al-sistema-non-presume-quello-su-cui-e-nato.md`.
+- **I rossi d'ambiente noti** stanno in `tests/rossi-noti.json`: un rosso che
+  non è lì dentro è una regressione.
+- **Nel contenitore delle routine** gli spec che aprono Electron vogliono davanti `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`; senza, il rosso non è del codice.
+- Modelli per `test:explore`: open via OpenRouter, chiave in
+  `tests/agent/.env`, MAI chiavi del produttore dei pesi (politica modelli).
 
 ## Architettura (riassunto)
 
@@ -562,8 +260,8 @@ src/shared/     moduli IIFE su globalThis (constants, messages, feedback, …)
 src/content/    content scripts
 ```
 
-- Storage: `%APPDATA%/Filo/storage.json` in produzione, `$FILO_USER_DATA` nei
-  test.
+- Storage: `storage.json` nella cartella dati dell'app (`app.getPath('userData')`),
+  `$FILO_USER_DATA` nei test.
 - **Convenzione IIFE**: i moduli condivisi si auto-registrano su `globalThis`
   (`global.SN_MODULE = …`); un modulo nuovo va aggiunto all'ordine di
   `src/main/services/loader.js`.
@@ -572,6 +270,6 @@ src/content/    content scripts
   `broadcastToTabs`/`broadcastLiveUpdate`. Lo shim chrome.* vive in tre file a
   seconda del contesto (main / pagine filo:// / pagine web).
 
-Macchina a stati dei feedback: spec in **`FEEDBACK-STATES.md`**; il canale
-autenticato delle routine in **`ROUTINE-AUTH-SPEC.md`**; il ridisegno in corso
-in **`SPEC-RIDISEGNO-MAX.md`**.
+Macchina a stati dei feedback: **`FEEDBACK-STATES.md`**; canale autenticato
+delle routine: **`ROUTINE-AUTH-SPEC.md`**; ridisegno in corso:
+**`SPEC-RIDISEGNO-MAX.md`**.

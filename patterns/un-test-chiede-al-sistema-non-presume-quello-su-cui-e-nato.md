@@ -42,3 +42,21 @@ Tre unit test rossi solo su Windows.
 
 Riferimenti: `tests/unit/documentRead.test.mjs` (nomi ambigui, maiuscole),
 `tests/unit/terminaleCodifica.test.mjs` (preludio per shell, esito dei comandi).
+
+## La macchina dell'owner (#563)
+
+Due proprietà che le altre macchine non hanno, e ogni test che le dava per scontate
+nasceva rosso solo per l'owner, per settimane (undici spec così):
+
+- **Lo schermo sta al 125%**, quello delle routine al 100%: la stessa riga di testo cade
+  su misure diverse. `FILO_TEST_SCALE=1.25` rimette quel fattore ovunque; un valore
+  scritto male (`125`, o una parola) ferma subito invece di girare al 100%. Chi apre Filo
+  per conto suo passa la manopola a mano (`args: [...argomentiScala, '.']`, da
+  `tests/helpers/scala.mjs` o dalla fixture); una sentinella guarda ogni
+  `electron.launch` sotto `tests/`.
+- **L'utente si chiama «agenti AI»**, con lo spazio, e su Windows quel nome fa comparire
+  anche la forma abbreviata `AGENTI~1` in `%TEMP%`, mentre l'app riporta sempre quella
+  lunga. La cartella temporanea di un test si chiede a `cartellaTemporanea()`
+  (`tests/helpers/percorsi.mjs`), che la fa canonica e con uno spazio nel nome per tutti:
+  una costruita con `mkdtempSync` prova su un percorso che sulla macchina dell'owner non
+  esiste, e una sentinella lo impedisce.
