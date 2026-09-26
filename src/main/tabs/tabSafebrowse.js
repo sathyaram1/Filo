@@ -122,8 +122,8 @@ const safebrowseMethods = {
         if (r && r.hasPayment) hints.hasPayment = true;
       } catch (_) {}
     }));
-    if (wc.isDestroyed() || tab._sbScanGiro !== giro || wc.getURL() !== url) return;
-    if (hints.hasPassword || hints.hasPayment) {
+    if (wc.isDestroyed() || tab._sbScanGiro !== giro) return;
+    if ((hints.hasPassword || hints.hasPayment) && wc.getURL() === url) {
       tab._sbCampiUrl = url;
       try {
         const v = SB.analyze(url, hints, (next) => this._sbBroadcast(tab, url, this._sbApplyState(tab, next)));
