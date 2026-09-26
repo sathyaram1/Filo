@@ -123,6 +123,6 @@ test('il recap di aggiornamento ha le righe nuove di tutte e due le parti', asyn
   const fixes = page.locator('.dash-recap-fixes .dash-recap-list li');
   await expect(page.locator('#recapOverlay')).toBeVisible();
   await expect(fixes.filter({ hasText: 'rupie' })).toHaveCount(1);
-  await expect(fixes.filter({ hasText: 'imita l’indirizzo di un sito noto' })).toHaveCount(1);
+  await expect(fixes.filter({ hasText: 'indirizzo di un sito noto' })).toHaveCount(1);
   await expect(fixes.filter({ hasText: 'una voce di menu che non esiste' })).toHaveCount(1);
 });
