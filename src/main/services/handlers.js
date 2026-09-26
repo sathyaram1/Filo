@@ -739,8 +739,11 @@ function vestiComeLOriginale(originale, riga) {
   if (i >= 0) {
     try {
       const o = JSON.parse(s.slice(i, s.lastIndexOf('}') + 1));
-      if (o && typeof o === 'object' && !Array.isArray(o) && 'text' in o) {
-        return JSON.stringify({ text: riga, actions: [] });
+      if (o && typeof o === 'object' && !Array.isArray(o)) {
+        // I due involucri che girano: la chat ({text, actions}) e il saluto
+        // della home ({message, suggestions}). Si riempiono tutti e due, così
+        // chi legge trova la spiegazione e non un campo vuoto.
+        return JSON.stringify({ text: riga, actions: [], message: riga, suggestions: [] });
       }
     } catch (_) {}
   }
