@@ -1258,6 +1258,14 @@ if (isMain) {
     }
     const statoC = statoDirectory(ROOT);
     if (!statoC.ok) { console.error(statoIllegibileText(statoC.motivo, 'consegna')); process.exit(1); }
+    const aperto = readState()[branch];
+    if (aperto && aperto.verdict === 'fix-pending' && aperto.pending && aperto.pending.sha && aperto.pending.sha !== sha && !statoC.lines.length) {
+      const { controllaProveTolte } = await import('./lib/prove-tolte.mjs');
+      const messiDaParte = [aperto.pending.derived, aperto.pending.external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
+      const tolte = controllaProveTolte({ shaPrima: aperto.pending.sha, root: ROOT, messiDaParte });
+      if (tolte.ferma) { console.error(tolte.testo); process.exit(1); }
+      if (tolte.testo) console.log(tolte.testo);
+    }
     const r = withFixed(readState(), branch, { report, sha, dirtyFiles: statoC.lines });
     if (!r.ok) { console.error(r.reason); process.exit(1); }
     writeState(r.state);
