@@ -127,12 +127,12 @@
     {
       id: 'explain-selection', title: 'Spiega il testo selezionato', category: 'selection',
       desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione. Se la selezione contiene un importo in valuta straniera o una misura non metrica, accanto trovi l’equivalente in euro — col cambio del giorno della Banca centrale europea, per tutte le valute che pubblica — o in metri, chili e gradi centigradi. I conti li fa Filo, non il modello.',
-      invoke: 'Seleziona il testo e usa Alt+E (Ctrl+Alt+E su Mac), oppure menu del tasto destro → "Spiegazione". "Approfondisci" apre una spiegazione più estesa.',
+      invoke: 'Seleziona il testo e apri il menu del tasto destro: la spiegazione arriva da sola in fondo al menu, non c’è una voce da cliccare. Alt+E (Ctrl+Alt+E su Mac), o la freccia accanto alla spiegazione, ne apre una più estesa in un riquadro sopra la selezione.',
     },
     {
       id: 'translate-selection', title: 'Traduci il testo selezionato', category: 'selection',
       desc: 'Traduce il testo selezionato e mostra il risultato in un riquadro.',
-      invoke: 'Seleziona il testo e usa Alt+T (Ctrl+Alt+T su Mac), oppure menu del tasto destro → "Traduci".',
+      invoke: 'Seleziona il testo e usa Alt+T (Ctrl+Alt+T su Mac): la traduzione compare in un riquadro sopra la selezione. Il menu del tasto destro non ha una voce per questo — la sua icona "Traduci" traduce tutta la pagina.',
     },
     {
       id: 'edit-selection', title: 'Riscrivi il testo selezionato', category: 'writing',
@@ -186,7 +186,7 @@
     {
       id: 'translate-page', title: 'Traduci l’intera pagina', category: 'reading',
       desc: 'Traduce tutto il testo visibile della pagina — titolo, sommario, didascalie, riquadri laterali, voci di menu e testo dei link, non solo i paragrafi, compreso il testo dentro i componenti con cui sono costruiti i siti moderni — mantenendo impaginazione, link, immagini e illustrazioni; mentre lavora mostra a che punto è arrivata, e puoi tornare all’originale quando vuoi. Cambia lingua anche il nome della scheda in alto. Traduce anche le scritte che non stanno nel testo: il grigio dentro i campi di ricerca, i suggerimenti che compaiono fermando il mouse, le descrizioni delle immagini, le voci dei menu a tendina e le scritte sui bottoni dei moduli. Entra anche nei riquadri incorporati, che sono pagine dentro la pagina: i post di altri siti, i blocchi commenti, i moduli di iscrizione. Il testo che il sito carica mentre la traduzione sta ancora lavorando entra nello stesso giro. Quello che arriva dopo — scorrendo, cambiando schermata senza ricaricare — e quello che scopri aprendo una sezione ripiegata si traducono dal menu, senza rifare il resto. Se si interrompe a metà (rete che salta, credito finito) te lo dice, con il motivo e il punto in cui si è fermata, e puoi riprenderla: completa solo i pezzi mancanti senza rifare quelli già tradotti. Le pagine lunghissime le traduce a tratti: te lo dice, e la ripresa arriva in fondo.',
-      invoke: 'Menu del tasto destro → "Traduci la pagina"; mentre lavora la stessa icona diventa "Mostra originale" e la ferma, a traduzione finita riporta la pagina in lingua originale, se si è interrotta diventa "Riprendi traduzione", e se c\'è del testo nuovo diventa "Traduci il testo nuovo" (in questi due casi "Mostra originale" resta lì sotto come voce).',
+      invoke: 'Menu del tasto destro → "Traduci"; mentre lavora la stessa icona diventa "Mostra originale" e la ferma, a traduzione finita riporta la pagina in lingua originale, se si è interrotta diventa "Riprendi traduzione", e se c\'è del testo nuovo diventa "Traduci il testo nuovo" (in questi due casi "Mostra originale" resta lì sotto come voce).',
       doesNot: 'Non traduce il testo dentro le immagini, i video, i riquadri di codice, le illustrazioni (grafici, loghi, icone disegnate nella pagina) e le formule, che restano intatte con i loro colori; non tocca quello che scrivi tu nei campi né i valori che il sito rimanda indietro quando invii un modulo (per questo la scritta su un bottone di invio che porta con sé un valore resta com\'è); non traduce quello che al momento è ripiegato o nascosto — lo offre quando lo apri; non traduce le pagine dove non trova testo (in quel caso te lo dice). Se un sito tiene chiusi certi suoi componenti, o chiude a chiave un riquadro incorporato, quel testo non è leggibile da nessuno script e resta nella lingua originale: in quel caso l’avviso dice che una parte è rimasta fuori, invece di dichiarare la pagina tradotta.',
     },
 
@@ -194,7 +194,7 @@
     {
       id: 'explain-image', title: 'Spiega un’immagine', category: 'media',
       desc: 'Descrive un’immagine della pagina, direttamente lì sotto.',
-      invoke: 'Clic destro su un’immagine → "Spiega immagine".',
+      invoke: 'Clic destro su un’immagine: la descrizione arriva da sola in fondo al menu, non c’è una voce da cliccare.',
     },
     {
       id: 'copy-download-image', title: 'Copia o scarica un’immagine', category: 'media',
@@ -256,7 +256,7 @@
     {
       id: 'explain-link', title: 'Spiega un link', category: 'links',
       desc: 'Spiega dove porta un link senza aprirlo, e segnala se sembra sospetto (phishing).',
-      invoke: 'Clic destro su un link → "Spiega link".',
+      invoke: 'Clic destro su un link: la spiegazione arriva da sola in fondo al menu, non c’è una voce da cliccare. Se l’indirizzo ha qualcosa che non torna, sopra la spiegazione compare un avviso che dice cosa.',
       doesNot: 'Non apre il link; l’analisi di sicurezza è basata su indizi nell’indirizzo, non su un database in tempo reale.',
     },
     {
