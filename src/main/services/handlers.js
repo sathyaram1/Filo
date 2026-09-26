@@ -32,6 +32,8 @@ const FiloMem = globalThis.SN_FILO_MEMORY;
 const FiloState = globalThis.SN_FILO_STATE;
 const Onboarding = globalThis.SN_ONBOARDING;
 const DashboardRefresh = globalThis.SN_DASHBOARD_REFRESH;
+const Esterno = globalThis.SN_ESTERNO;         // #593 — la porta del contenuto esterno IN
+const Fiducia = globalThis.SN_FIDUCIA;         // #536 — quanto vale una fonte
 
 // #155 — intervallo minimo tra due ricalcoli in background della home: la nuova
 // scheda serve sempre la cache all'istante; il ricalcolo (costoso, con l'LLM)
