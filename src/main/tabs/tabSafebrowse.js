@@ -91,8 +91,9 @@ const safebrowseMethods = {
 
   // Sulle pagine ospitate il modulo sta spesso in un riquadro incorporato, che il content script della pagina non vede.
   // Solo lì si guardano i riquadri: altrove il dominio parla già per la pagina.
-  _sbOnFrameLoad(tab) {
+  _sbOnFrameLoad(tab, isMainFrame) {
     if (!tab) return;
+    if (isMainFrame) tab._sbCampiUrl = null;
     clearTimeout(tab._sbFrameTimer);
     const giro = (tab._sbScanGiro || 0) + 1;
     tab._sbScanGiro = giro;
