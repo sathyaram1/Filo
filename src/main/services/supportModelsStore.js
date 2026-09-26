@@ -105,7 +105,12 @@ function fsDocToObject(doc) {
   return out;
 }
 
-async function fetchDoc(docPath, idToken) {
+// Legge un documento DICENDO com'è andata (#679). «Non esiste» e «non ti
+// riguarda» sono risposte del server, definitive finché non cambia chi usa
+// Filo; «non ho potuto chiedere» no. Senza questa distinzione il permesso
+// negato, che è la risposta normale per chiunque non gestisca Filo, passava
+// per un guasto di passaggio e faceva ripartire le letture ogni mezzo minuto.
+async function leggiDoc(docPath, idToken) {
   const url = `${FIRESTORE_BASE}/${docPath}?key=${API_KEY}`;
   const headers = {};
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
@@ -113,16 +118,21 @@ async function fetchDoc(docPath, idToken) {
   try {
     res = await fetch(url, { headers });
   } catch (_) {
-    return null;
+    return { risposto: false, doc: null };
   }
-  if (res.status === 404) return {};
-  if (!res.ok) return null;
+  if (res.status === 404) return { risposto: true, doc: {} };
+  if (res.status === 401 || res.status === 403) return { risposto: true, doc: null };
+  if (!res.ok) return { risposto: false, doc: null };
   try {
     const json = await res.json();
-    return fsDocToObject(json);
+    return { risposto: true, doc: fsDocToObject(json) };
   } catch (_) {
-    return null;
+    return { risposto: false, doc: null };
   }
+}
+
+async function fetchDoc(docPath, idToken) {
+  return (await leggiDoc(docPath, idToken)).doc;
 }
 
 async function patchDoc(docPath, fields, mask, idToken) {
