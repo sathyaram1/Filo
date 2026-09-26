@@ -89,12 +89,13 @@ test('giro 5: «Scarica» risponde al primo clic anche mentre il programma sta a
     await expect(si).toBeEnabled({ timeout: 10000 });
     await shell.waitForTimeout(1500);
     const b = await si.boundingBox();
-    // Un clic umano: il tasto resta giù un attimo.
+    // Un clic lento ma umano: il tasto resta giù più a lungo di un avanzamento
+    // (così il rosso non dipende dalla fortuna; a 120 ms va a vuoto uno su due).
     await app.evaluate(async ({ BrowserWindow }, [x, y]) => {
       const w = BrowserWindow.getAllWindows().find((z) => z._filoTabs);
       w.webContents.sendInputEvent({ type: 'mouseMove', x, y });
       w.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
-      await new Promise((r) => setTimeout(r, 120));
+      await new Promise((r) => setTimeout(r, 650));
       w.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
     }, [Math.round(b.x + b.width / 2), Math.round(b.y + b.height / 2)]);
     await expect.poll(() => statoDi(shell, 'lento.exe'), { timeout: 3000, message: 'il primo clic su «Scarica» è andato a vuoto' }).not.toBe('pending');
