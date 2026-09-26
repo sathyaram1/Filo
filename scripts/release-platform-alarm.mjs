@@ -119,12 +119,16 @@ export function componiAllarme({ piattaforma, versione, passo, esecuzione, repo,
   const conf = PIATTAFORME[nome];
   const persi = mancantiNoti({ piattaforma: nome, esiti, mancanti });
 
-  // Il titolo non deve gridare piu' del guasto: se il pacchetto da scaricare e'
-  // salito e manca un file di contorno, la release e' incompleta, non assente.
+  // Il titolo non deve gridare piu' del guasto (se manca un file di contorno la
+  // release e' incompleta, non assente) né meno: senza un elenco di file persi
+  // non si annuncia un elenco, o esce «manca» e poi niente, con il testo sotto
+  // che dice il contrario (#733, secondo giro di verifica).
   const coda = p ? ` (passo «${p}»)` : ' (passo non identificato)';
-  const titolo = (conf && persi && !persi.includes(conf.scarica))
-    ? `La release ${v} è incompleta per ${nome}: manca ${persi.join(', ')}${coda}`
-    : `Filo per ${nome} non è nella release ${v}${coda}`;
+  const titolo = (!conf || !persi || !persi.length)
+    ? `Il lavoro che attacca Filo per ${nome} alla release ${v} si è fermato${coda}`
+    : persi.includes(conf.scarica)
+      ? `Filo per ${nome} non è nella release ${v}${coda}`
+      : `La release ${v} è incompleta per ${nome}: manca ${persi.join(', ')}${coda}`;
 
   const righe = [
     `Il lavoro che costruisce Filo per ${nome} e lo attacca alla release ${v} è fallito. La versione per Windows è uscita ed è valida: resta com'è, non va tolta né ripubblicata.`,
