@@ -11,7 +11,7 @@ const cartella = (d) => readdirSync(join(ROOT, d)).filter((f) => f.endsWith('.md
 const tutto = () => [leggi('CLAUDE.md'), ...cartella('routines/roles')].join('\n');
 
 test('i testi di consegna dicono che il report per l\'owner è cifrato e la frase per chi ha segnalato no', () => {
-  expect(tutto(), 'il report per l\'owner è privato: la regola è sparita').toMatch(/cifrat[oa][^\n]{0,40}(solo lui|owner)|solo lui/i);
+  expect(tutto(), 'il report per l\'owner è privato: la regola è sparita').toMatch(/owner[^\n]{0,40}cifrat|cifrat[oa][^\n]{0,40}solo lui/i);
   expect(tutto(), 'la frase per chi ha segnalato viaggia in chiaro: la regola è sparita')
     .toMatch(/segnalato[^\n]{0,40}in chiaro|in chiaro[^\n]{0,60}segnalato/i);
 });
