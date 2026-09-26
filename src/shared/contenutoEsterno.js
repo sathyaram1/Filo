@@ -413,8 +413,40 @@
       + 'all\'inizio.';
   }
 
+  // I tipi di contenuto esterno presenti in un prompt già montato (#536).
+  //
+  // Serve a chi sta per mostrare all'utente il testo che ne esce: qui è già
+  // scritto, in un posto solo, se questo compito ha letto roba di altri. La
+  // risposta è affidabile perché `neutralizza` toglie al contenuto i nomi
+  // delle marcature: una marcatura nel prompt l'ha messa Filo, non chi scrive
+  // dall'altra parte. Una superficie nuova che imbusta contenuto esterno
+  // finisce qui dentro da sola, senza che nessuno la aggiunga a un elenco.
+  function tipiPresenti(prompt) {
+    const s = typeof prompt === 'string' ? prompt : testoDi(prompt);
+    const out = [];
+    for (const tipo of Object.keys(TIPI)) {
+      if (s.includes(`<<<${tipo}>>>`)) out.push(tipo);
+    }
+    return out;
+  }
+
+  // Un prompt arriva come stringa, come lista di messaggi, o come messaggio con
+  // il contenuto a pezzi (testo e immagini).
+  function testoDi(v) {
+    if (v == null) return '';
+    if (typeof v === 'string') return v;
+    if (Array.isArray(v)) return v.map(testoDi).join('\n');
+    if (typeof v === 'object') {
+      if (typeof v.content === 'string') return v.content;
+      if (v.content != null) return testoDi(v.content);
+      if (typeof v.text === 'string') return v.text;
+    }
+    return '';
+  }
+
   global.SN_ESTERNO = {
     TIPI,
+    tipiPresenti,
     marcature,
     imbusta,
     imbustaCampi,
