@@ -7,7 +7,7 @@ const PAGINA_FEEDBACK = 'filo://feedback/feedback.html';
 const RIGA = {
   _id: 'fbA', _proiezione: true, _updateTime: 'v1', seq: 900, subSeq: 0,
   name: 'Segnalazione in lavorazione', text: 'Il testo di chi ha segnalato.',
-  status: 'working', statusPublic: 'open', priority: 2,
+  status: 'unlabeled', statusPublic: 'open', priority: 2,
   clientId: 'tester-1', createdAt: '2026-09-21T10:00:00.000Z',
 };
 
