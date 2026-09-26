@@ -719,7 +719,10 @@ async function passaDalSecondoModello({ testo, classe, concreteModel, action, pa
   const G = globalThis.SN_GUARDIANO_AVVISI;
   if (!G) return null;
   const p = payload || {};
-  const fonte = p.url || p.pageUrl || (p.page && p.page.url) || origin || '';
+  // Solo una fonte di fuori: un indirizzo interno di Filo non è «chi ha
+  // scritto», e nella riga di blocco diventerebbe rumore.
+  const grezza = p.url || p.pageUrl || (p.page && p.page.url) || origin || '';
+  const fonte = /^filo:/i.test(String(grezza)) ? '' : grezza;
   const richiesta = p.userMessage || p.question || p.query || p.text || '';
   let esito;
   try {
@@ -733,7 +736,7 @@ async function passaDalSecondoModello({ testo, classe, concreteModel, action, pa
   }
   if (esito.esito === 'passa') return null;
   const riga = esito.esito === 'blocca'
-    ? G.rigaDiBlocco(fonte, esito.motivo)
+    ? G.rigaDiBlocco(fonte, esito.motivo, classe)
     : (esito.regola === 'senza-guardiano'
       ? 'Ho la risposta pronta, ma non posso mostrartela: al controllo di sicurezza manca un modello suo, diverso da quello che scrive le risposte. Si sceglie in Opzioni → Modelli → «Guardiano degli avvisi».'
       : 'Ho la risposta pronta, ma il controllo di sicurezza non risponde. Riprova fra poco.');

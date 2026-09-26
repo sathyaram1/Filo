@@ -42,7 +42,7 @@ function inFila(fn) {
 
 function G() { return globalThis.SN_GUARDIANO; }
 function GS() { return globalThis.SN_GUARDIANO_STATICO; }
-function F() { return globalThis.SN_FIDUCIA; }
+function F_() { return globalThis.SN_FIDUCIA; }
 function Mem() { return globalThis.SN_FILO_MEMORY; }
 
 // I segreti che Filo custodisce, per il confronto letterale. Solo quelli che
@@ -61,16 +61,18 @@ function segretiDi(settings) {
 // tutto il resto del campo lo scrive chi manda: un nome di mittente è testo
 // libero, e lasciarcelo passare rimetterebbe nella riga l'esca appena tolta
 // (un numero da chiamare non ha bisogno di nessun collegamento).
+const IGNOTA = 'una fonte che non si è identificata';
+
 function fonteVisibile(fonte) {
   const C = globalThis.SN_CONST;
   const st = GS();
   const grezza = C ? C.unaRigaDiDati(fonte, 200) : String(fonte || '').trim();
-  if (!grezza) return 'una fonte che non si è identificata';
+  if (!grezza) return IGNOTA;
   const posta = grezza.match(/[^\s<>()@,;:"]+@[a-z0-9.-]+\.[a-z]{2,}/i);
   if (posta) return posta[0].toLowerCase();
   const host = st ? st.hostNominato(grezza) : '';
   if (host) return host;
-  return 'una fonte che non si è identificata';
+  return IGNOTA;
 }
 
 // I collegamenti escono dalla frase e si etichettano con la destinazione vera:
@@ -95,7 +97,7 @@ function separaLink(testo) {
 // Esiti: 'passa' | 'blocca' | 'attesa'. 'attesa' NON è un passa: è «non lo so»,
 // e chi chiama non mostra niente.
 async function vaglia({ testo, classe, fonte, richiesta, modelloProduttore, link } = {}) {
-  const fid = F();
+  const fid = F_();
   const cls = fid ? fid.normalizza(classe) : String(classe || 'messaggio');
   if (fid && !fid.contaminata(cls)) return { esito: 'passa', regola: '', motivo: '', motivoChiave: '' };
 
@@ -189,7 +191,7 @@ async function registraBlocco({ fonte, classe, testo, esito }) {
     }));
   } catch (_) {}
   return inFila(() => mem.addNotification({
-    kind: 'alert', classe: 'filo', text: rigaDiBlocco(fonte, esito.motivo),
+    kind: 'alert', classe: 'filo', text: rigaDiBlocco(fonte, esito.motivo, classe),
     action: { tipo: 'guardiano-blocco', regola: esito.regola },
   }));
 }
