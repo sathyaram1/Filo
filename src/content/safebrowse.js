@@ -38,15 +38,11 @@
   function css(el, obj) { try { Object.assign(el.style, obj); } catch (_) {} }
 
   // Indizi di pagina: la presenza di campi sensibili alza la gravità lato motore.
+  let hintsOf = null;
+  try { hintsOf = require('./safebrowseHints.js').pageHints; } catch (_) {}
   function pageHints() {
-    let hasPassword = false, hasPayment = false;
-    try { hasPassword = !!document.querySelector('input[type="password"]'); } catch (_) {}
-    try {
-      hasPayment = !!document.querySelector(
-        'input[autocomplete*="cc-"], input[autocomplete="cc-number"], input[name*="card" i], input[name*="cardnumber" i]'
-      );
-    } catch (_) {}
-    return { hasPassword, hasPayment };
+    try { if (hintsOf) return hintsOf(document); } catch (_) {}
+    return { hasPassword: false, hasPayment: false };
   }
 
   function sameHost(a, b) {

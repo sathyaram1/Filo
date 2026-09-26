@@ -18,7 +18,7 @@
 
 const BRANDS = [
   // Pagamenti / finanza
-  { token: 'paypal', display: 'PayPal', domains: ['paypal.com', 'paypal.me'] },
+  { token: 'paypal', display: 'PayPal', domains: ['paypal.com', 'paypal.me', 'paypal.it', 'paypal.de', 'paypal.fr', 'paypal.es', 'paypal.co.uk'] },
   { token: 'stripe', display: 'Stripe', domains: ['stripe.com'] },
   { token: 'venmo', display: 'Venmo', domains: ['venmo.com'] },
   { token: 'wise', display: 'Wise', domains: ['wise.com'] },
@@ -40,14 +40,14 @@ const BRANDS = [
   { token: 'ledger', display: 'Ledger', domains: ['ledger.com'] },
 
   // Email / account / cloud
-  { token: 'google', display: 'Google', domains: ['google.com', 'google.it', 'gmail.com', 'googlemail.com'] },
+  { token: 'google', display: 'Google', domains: ['google.com', 'google.it', 'gmail.com', 'googlemail.com', 'googleblog.blogspot.com', 'google.ch', 'google.at', 'google.nl', 'google.be', 'google.pl', 'google.pt', 'google.ca', 'google.com.au', 'google.co.jp', 'google.com.br', 'google.co.in'] },
   { token: 'gmail', display: 'Gmail', domains: ['gmail.com', 'google.com'] },
-  { token: 'microsoft', display: 'Microsoft', domains: ['microsoft.com', 'live.com', 'office.com', 'office365.com'] },
+  { token: 'microsoft', display: 'Microsoft', domains: ['microsoft.com', 'live.com', 'office.com', 'office365.com', 'microsoft.sharepoint.com', 'microsoftonline.com', 'microsoft365.com', 'cloud.microsoft'] },
   { token: 'outlook', display: 'Outlook', domains: ['outlook.com', 'live.com', 'microsoft.com'] },
-  { token: 'office365', display: 'Microsoft 365', domains: ['office.com', 'office365.com', 'microsoft.com'] },
+  { token: 'office365', display: 'Microsoft 365', domains: ['office.com', 'office365.com', 'microsoft.com', 'microsoft365.com'] },
   { token: 'apple', display: 'Apple', domains: ['apple.com', 'icloud.com', 'me.com'] },
   { token: 'icloud', display: 'iCloud', domains: ['icloud.com', 'apple.com'] },
-  { token: 'dropbox', display: 'Dropbox', domains: ['dropbox.com'] },
+  { token: 'dropbox', display: 'Dropbox', domains: ['dropbox.com', 'dropboxusercontent.com'] },
   { token: 'yahoo', display: 'Yahoo', domains: ['yahoo.com', 'yahoo.it'] },
   { token: 'proton', display: 'Proton', domains: ['proton.me', 'protonmail.com'] },
 
@@ -64,14 +64,14 @@ const BRANDS = [
   { token: 'steam', display: 'Steam', domains: ['steampowered.com', 'steamcommunity.com'] },
 
   // Shopping
-  { token: 'amazon', display: 'Amazon', domains: ['amazon.com', 'amazon.it', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.es'] },
-  { token: 'ebay', display: 'eBay', domains: ['ebay.com', 'ebay.it'] },
+  { token: 'amazon', display: 'Amazon', domains: ['amazon.com', 'amazon.it', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.es', 'amazon.nl', 'amazon.ca', 'amazon.se', 'amazon.pl', 'amazon.ae', 'amazon.sg', 'amazon.in', 'amazon.co.jp', 'amazon.com.au', 'amazon.com.br', 'amazoncognito.com'] },
+  { token: 'ebay', display: 'eBay', domains: ['ebay.com', 'ebay.it', 'ebay.de', 'ebay.co.uk', 'ebay.fr', 'ebay.es', 'ebay.ca', 'ebay.com.au', 'ebay.at', 'ebay.ch', 'ebay.nl', 'ebay.be', 'ebay.ie', 'ebay.pl'] },
   { token: 'aliexpress', display: 'AliExpress', domains: ['aliexpress.com'] },
-  { token: 'shopify', display: 'Shopify', domains: ['shopify.com'] },
+  { token: 'shopify', display: 'Shopify', domains: ['shopify.com', 'myshopify.com'] },
 
   // Dev / lavoro
-  { token: 'github', display: 'GitHub', domains: ['github.com'] },
-  { token: 'gitlab', display: 'GitLab', domains: ['gitlab.com'] },
+  { token: 'github', display: 'GitHub', domains: ['github.com', 'github.io', 'github.dev'] },
+  { token: 'gitlab', display: 'GitLab', domains: ['gitlab.com', 'gitlab.io'] },
 ];
 
 // Indice per lookup veloce: eTLD+1 legittimo → brand (per non flaggare il vero).

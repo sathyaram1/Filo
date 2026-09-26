@@ -59,6 +59,26 @@ const NORMAL = new Set([
   'co.at', 'or.at', 'gv.at', 'ac.at',
 ]);
 
+// Piattaforme dove ogni sottodominio è di un utente diverso: senza, `utente.github.io` diventa `github.io` («GitHub
+// su .io») e un dominio in whitelist copre ogni pagina ospitata. L'host uguale alla piattaforma resta suo.
+// Queste le separa già il web (sezione privata della PSL): valgono anche per i cookie della modalità privacy.
+const PRIVATE_PSL = new Set([
+  'github.io', 'githubusercontent.com', 'gitlab.io', 'pages.dev', 'workers.dev',
+  'vercel.app', 'netlify.app', 'web.app', 'firebaseapp.com', 'herokuapp.com',
+  'appspot.com', 'blogspot.com', 'azurewebsites.net', 'onrender.com', 'fly.dev',
+  'surge.sh', 'glitch.me', 'neocities.org', 'blob.core.windows.net', 'web.core.windows.net',
+  's3.amazonaws.com', 'googleapis.com', 'myshopify.com',
+]);
+// Gli indirizzi di S3 per regione e da sito statico, uno per regione nella PSL: il secchio è il sito, non la regione.
+const S3 = /^s3(?:[.-][a-z0-9-]+){0,3}\.amazonaws\.com$/;
+// Così le pagine d'accesso di Cognito, <prefisso>.auth.<regione>.amazoncognito.com: il prefisso lo sceglie l'utente.
+const COGNITO = /^auth(?:-fips)?\.[a-z0-9-]+\.amazoncognito\.com$/;
+// Queste il web NON le separa (un login su wordpress.com vale sui blog): solo per il giudizio, mai per i cookie.
+const PRIVATE_AVVISO = new Set([
+  'notion.site', 'amazonaws.com', 'amazoncognito.com', 'googleusercontent.com', 'app.github.dev',
+  'sharepoint.com', 'wordpress.com', 'medium.com', 'dropboxusercontent.com',
+]);
+
 // Suffissi serviti come "wildcard": ogni etichetta sotto di essi è un suffisso
 // pubblico (es. `*.ck` → `foo.ck` è suffisso). Raro, ma incluso per correttezza.
 const WILDCARD = new Set([
@@ -75,7 +95,7 @@ const EXCEPTION = new Set([
 // `host` deve già essere in forma ascii/punycode minuscola e senza porta.
 // Ritorna { registrable, publicSuffix, sld, labels } oppure null per input
 // invalido (IP, host vuoto, singola etichetta senza punto).
-function getDomainInfo(host) {
+function getDomainInfo(host, { soloPsl = false } = {}) {
   if (!host || typeof host !== 'string') return null;
   host = host.replace(/\.$/, '').toLowerCase();
   if (!host || host.includes(' ')) return null;
@@ -91,6 +111,7 @@ function getDomainInfo(host) {
 
   // Cerca, dalla regola più specifica (più etichette) alla meno specifica.
   let suffixLabels = 0; // numero di etichette del public suffix scelto
+  let ospitato = false;
   for (let i = 0; i < labels.length; i++) {
     const candidate = labels.slice(i).join('.');
     if (EXCEPTION.has(candidate)) {
@@ -100,6 +121,12 @@ function getDomainInfo(host) {
     }
     if (NORMAL.has(candidate)) {
       suffixLabels = labels.length - i;
+      break;
+    }
+    const soloAvviso = !soloPsl && (PRIVATE_AVVISO.has(candidate) || COGNITO.test(candidate));
+    if (i > 0 && (PRIVATE_PSL.has(candidate) || S3.test(candidate) || soloAvviso)) {
+      suffixLabels = labels.length - i;
+      ospitato = true;
       break;
     }
     // Wildcard: se la parte DOPO la prima etichetta del candidato è una
@@ -125,7 +152,7 @@ function getDomainInfo(host) {
   const registrable = labels.slice(labels.length - regLabels).join('.');
   const publicSuffix = labels.slice(labels.length - suffixLabels).join('.');
   const sld = labels[labels.length - regLabels]; // etichetta "di brand"
-  return { registrable, publicSuffix, sld, labels };
+  return { registrable, publicSuffix, sld, labels, ospitato };
 }
 
 function isIpAddress(host) {
@@ -139,4 +166,4 @@ function isIpAddress(host) {
   return false;
 }
 
-module.exports = { getDomainInfo, isIpAddress };
+module.exports = { getDomainInfo, isIpAddress, S3 };

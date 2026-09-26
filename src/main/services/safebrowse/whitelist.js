@@ -12,6 +12,7 @@
 'use strict';
 
 const { BRANDS } = require('./brands');
+const { S3 } = require('./psl');
 
 const EXTRA = [
   // Motori / portali
@@ -63,4 +64,27 @@ function isWhitelisted(registrable) {
   return !!registrable && WHITELIST.has(registrable);
 }
 
-module.exports = { WHITELIST, isWhitelisted };
+// Pagine che chiunque pubblica sotto un dominio in whitelist: il dominio dice chi ospita, non chi ha scritto.
+// Restano fuori gli accessi della piattaforma stessa e OneDrive, che non mostra pagine caricate.
+const HOSTED = [
+  { host: /^sites\.google\.com$/, platform: 'Google Sites' },
+  { host: /^docs\.google\.com$/, platform: 'Google Documenti e Moduli' },
+  { host: /^script\.google\.com$/, path: /^\/(a\/macros\/[^/]+\/|(a\/[^/]+\/)?macros\/)/, platform: 'Google Apps Script' },
+  { host: /^(forms|sway)\.(office\.com|cloud\.microsoft)$/, platform: 'Microsoft Forms e Sway' },
+  { host: /^ia\d+\.us\.archive\.org$/, platform: 'archive.org' },
+  { host: /^(www\.)?archive\.org$/, path: /^\/download\//, platform: 'archive.org' },
+  { host: /^(www\.)?notion\.so$/, path: /^\/(?!(login|signup)(\/|$))[^/]+/, platform: 'Notion' },
+  { host: /^(www\.)?canva\.com$/, path: /^\/design\//, platform: 'Canva' },
+  // Indirizzi per percorso: s3.amazonaws.com/<secchio>/<file>, storage.googleapis.com/<secchio>/<file>.
+  { host: S3, path: /^\/[^/]+\/./, platform: 'Amazon S3' },
+  { host: /^(storage|firebasestorage)\.googleapis\.com$/, path: /^\/[^/]+\/./, platform: 'Google Cloud Storage' },
+];
+
+function hostedPlatform(host, path) {
+  const h = String(host || '').toLowerCase();
+  const p = String(path || '/');
+  const r = HOSTED.find((x) => x.host.test(h) && (!x.path || x.path.test(p)));
+  return r ? r.platform : null;
+}
+
+module.exports = { WHITELIST, isWhitelisted, hostedPlatform };

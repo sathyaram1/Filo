@@ -14,7 +14,7 @@
 'use strict';
 
 const { normalize } = require('./normalize');
-const { isWhitelisted } = require('./whitelist');
+const { isWhitelisted, hostedPlatform } = require('./whitelist');
 const { localSignals } = require('./signals');
 
 const YOUNG_DOMAIN_DAYS = 30;     // sotto: dominio "giovane" → rinforzo sospetto
@@ -55,8 +55,8 @@ function gsbText(category) {
 
 // Costruisce il messaggio specifico dai segnali fidati. `lead` è il segnale
 // guida; gli altri diventano frasi di rinforzo.
-function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPayment, sandbox }) {
-  const dom = norm.registrableUnicode || norm.registrable || norm.host;
+function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPayment, sandbox, hosted }) {
+  const dom = hosted ? (norm.hostUnicode || norm.host) : (norm.registrableUnicode || norm.registrable || norm.host);
   // 1) Blacklist: prevale su tutto.
   if (gsb && gsb.listed) {
     return {
@@ -118,14 +118,17 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   }
 
   const { gsb, ageDays, cert, sandbox, llm } = asyncData;
-  const whitelisted = isWhitelisted(norm.registrable);
+  const hosted = hostedPlatform(norm.host, pathOf(url));
+  // Conferma e chiusura di un avviso valgono per il sito; su una pagina ospitata solo per quella pagina.
+  const scope = hosted ? norm.host + pathOf(url) : norm.registrable;
+  const whitelisted = !hosted && isWhitelisted(norm.registrable);
   const sigs = localSignals(norm, ctx);
-  const reasons = sigs.map((s) => s.kind);
+  const reasons = sigs.map((s) => s.kind).concat(hosted ? ['hosted_content'] : []);
 
   // Blacklist: prevale su tutto, anche sulla whitelist.
   if (gsb && gsb.listed) {
-    const message = buildMessage({ level: 'pericoloso', norm, gsb });
-    return { level: 'pericoloso', reasons: ['gsb_' + (gsb.category || 'listed')], norm, message, gsb, needsLlm: false, whitelisted };
+    const message = buildMessage({ level: 'pericoloso', norm, gsb, hosted });
+    return { level: 'pericoloso', reasons: ['gsb_' + (gsb.category || 'listed')], norm, message, gsb, needsLlm: false, whitelisted, hosted, scope };
   }
 
   const strict = sigs.find((s) => s.kind === 'strict_impersonation') || null;
@@ -159,11 +162,11 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     (imp && sensitive && certBad) ||
     (doubleExt && (young || certBad));
   if (strict || strongCombo) {
-    const message = buildMessage({ level: 'pericoloso', norm, imp, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox });
+    const message = buildMessage({ level: 'pericoloso', norm, imp, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox, hosted });
     return {
       level: 'pericoloso',
       reasons: reasons.concat(young ? ['young_domain'] : [], certBad ? ['cert_' + cert.status] : [], sandboxBad ? ['sandbox_dangerous'] : []),
-      norm, message, imp, ageDays, cert, needsLlm: false, whitelisted,
+      norm, message, imp, ageDays, cert, needsLlm: false, whitelisted, hosted, scope,
     };
   }
 
@@ -171,7 +174,14 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   const llmSus = llm && llm.suspicious;
   const suspectTriggers = !!(broad || young || certBad || (sigs.some((s) => s.kind === 'insecure_transport') && sensitive) || doubleExt || sandboxSus || llmSus);
   if (suspectTriggers) {
-    const message = buildMessage({ level: 'sospetto', norm, imp: broad, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox });
+    let message = buildMessage({ level: 'sospetto', norm, imp: broad, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox });
+    // Su una pagina ospitata il dominio è della piattaforma: nominarlo farebbe credere che la pagina sia sua.
+    if (hosted && !broad && !certBad) {
+      message = {
+        title: 'Pagina pubblicata da un utente',
+        body: `Questa pagina è su ${hosted}, dove chiunque può pubblicare: non l'ha scritta chi gestisce ${norm.hostUnicode || norm.host}.`,
+      };
+    }
     // LLM rinforza il testo se ha una motivazione fissa.
     if (llmSus && llm.reason && !broad && !young && !certBad) {
       message.body = `${message.body} ${llm.reason}`.trim();
@@ -179,7 +189,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     return {
       level: 'sospetto',
       reasons: reasons.concat(young ? ['young_domain'] : [], certBad ? ['cert_' + cert.status] : [], llmSus ? ['llm'] : []),
-      norm, message, imp: broad, ageDays, cert, needsLlm: false, whitelisted,
+      norm, message, imp: broad, ageDays, cert, needsLlm: false, whitelisted, hosted, scope,
     };
   }
 
@@ -187,8 +197,14 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   // needsLlm: c'è un segnale non conclusivo che merita il giudizio LLM (mai su
   // siti puliti senza alcun indizio, mai whitelist). Qui scatta se c'è un
   // indizio debole isolato (es. http+nessun altro) e mancano i dati di rete.
-  const weakHint = sigs.some((s) => s.kind === 'insecure_transport') || (ageDays == null && (broad || sensitive));
-  return { level: 'safe', reasons: reasons.length ? reasons : ['clean'], norm, message: null, needsLlm: !!weakHint && !whitelisted, whitelisted };
+  // Su una pagina ospitata l'età del dominio è quella della piattaforma: non dice niente su chi chiede la password.
+  const weakHint = sigs.some((s) => s.kind === 'insecure_transport') || (ageDays == null && (broad || sensitive))
+    || (hosted && sensitive);
+  return { level: 'safe', reasons: reasons.length ? reasons : ['clean'], norm, message: null, needsLlm: !!weakHint && !whitelisted, whitelisted, hosted };
+}
+
+function pathOf(url) {
+  try { return new URL(String(url)).pathname; } catch (_) { return '/'; }
 }
 
 function checkSync(url, ctx = {}) {

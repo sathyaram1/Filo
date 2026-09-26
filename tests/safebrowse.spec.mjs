@@ -244,3 +244,134 @@ test('popup "sospetto": è un popup di conferma e si chiude solo con "Continua" 
   await proceed.click();
   await expect(page.getByText('Sito potenzialmente sospetto')).toHaveCount(0, { timeout: 6_000 });
 });
+
+test('pagina pubblicata da un utente: chiudere l\'avviso su un modulo non silenzia gli altri moduli nella scheda', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, '<title>SB_HOSTED</title><p>contenuto</p>');
+  const r = await app.evaluate(({ BrowserWindow }) => {
+    const SB = globalThis.SN_SAFEBROWSE;
+    for (const w of BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      if (!tm) continue;
+      const tab = tm.tabs.find((t) => /^https?:/.test(t.view?.webContents?.getURL?.() || ''));
+      if (!tab) continue;
+      const a = 'https://docs.google.com/forms/d/e/MODULO-A/viewform';
+      const b = 'https://docs.google.com/forms/d/e/MODULO-B/viewform';
+      const sus = { llm: { suspicious: true, reason: null } };
+      tm.safebrowseDismiss(tab.id, a);
+      return {
+        a: tm._sbApplyState(tab, SB.evaluate(a, {}, sus)).level,
+        b: tm._sbApplyState(tab, SB.evaluate(b, {}, sus)).level,
+      };
+    }
+    return null;
+  });
+  expect(r).toEqual({ a: 'safe', b: 'sospetto' });
+});
+
+// Le pagine ospitate come sono fatte davvero: il modulo di Google Sites e di Apps Script sta in un riquadro, e un
+// modulo Google chiede la password in un campo di testo. Pagine servite intercettando https; il giudice fa ciò che
+// il suo prompt chiede, cioè sospetta una pagina ospitata che chiede password o pagamento.
+async function servi(app, pagine) {
+  await app.evaluate(async ({ session, net }, pg) => {
+    try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
+    session.defaultSession.protocol.handle('https', (req) => {
+      const u = new URL(req.url);
+      const html = pg[u.hostname + u.pathname] || pg[u.hostname];
+      if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+      return net.fetch(req, { bypassCustomProtocolHandlers: true });
+    });
+    globalThis.SN_SAFEBROWSE.setProviders({
+      sandbox: null,
+      llm: async (meta) => (meta.hostedOn && (meta.hasPassword || meta.hasPayment)
+        ? { suspicious: true, reasonKey: 'hosted_credentials', reason: null, confidence: 'high' } : { suspicious: false, reason: null }),
+    });
+  }, pagine);
+}
+
+async function livelloScheda(app, host, ms = 9000) {
+  const fine = Date.now() + ms;
+  let l = null;
+  while (Date.now() < fine) {
+    l = await app.evaluate(({ BrowserWindow }, h) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        for (const t of (w._filoTabs && w._filoTabs.tabs) || []) {
+          try { if (new URL(t.view.webContents.getURL()).hostname === h) return t.sbLevel || null; } catch (_) {}
+        }
+      }
+      return null;
+    }, host);
+    if (l === 'sospetto' || l === 'pericoloso') return l;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  return l;
+}
+
+const ACCESSO = '<form><input name="email" placeholder="Email"><input type="password" name="pw"><button>Accedi</button></form>';
+
+test('Google Sites: un modulo d\'accesso nel riquadro incorporato fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'sites.google.com/view/paypal-login': '<h1>PayPal - Accedi</h1>'
+      + '<iframe src="https://1234-atari-embeds.googleusercontent.com/embeds/abc/inner.html" width="500" height="300"></iframe>',
+    '1234-atari-embeds.googleusercontent.com': ACCESSO,
+  });
+  await openTab('https://sites.google.com/view/paypal-login');
+  expect(await livelloScheda(app, 'sites.google.com')).toBe('sospetto');
+});
+
+test('Apps Script: la pagina dell\'utente in un riquadro dentro un riquadro fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'script.google.com/macros/s/AKfy123/exec': '<iframe src="https://n-abc-0lu-script.googleusercontent.com/panel" width="600" height="400"></iframe>',
+    'n-abc-0lu-script.googleusercontent.com': '<iframe src="https://n-abc-1lu-script.googleusercontent.com/user" width="580" height="380"></iframe>',
+    'n-abc-1lu-script.googleusercontent.com': `<h1>Microsoft 365</h1>${ACCESSO}`,
+  });
+  await openTab('https://script.google.com/macros/s/AKfy123/exec');
+  expect(await livelloScheda(app, 'script.google.com')).toBe('sospetto');
+});
+
+test('modulo Google: la password chiesta in un campo di testo fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'docs.google.com/forms/d/e/1FAIpQL/viewform': '<h1>Verifica account di posta</h1><form>'
+      + '<span id="i1">Indirizzo email</span><input type="text" aria-labelledby="i1">'
+      + '<span id="i5">Password della posta</span><input type="text" aria-labelledby="i5">'
+      + '<button>Invia</button></form>',
+  });
+  await openTab('https://docs.google.com/forms/d/e/1FAIpQL/viewform');
+  expect(await livelloScheda(app, 'docs.google.com')).toBe('sospetto');
+});
+
+test('modulo Google: i dati della carta chiesti in campi di testo fanno comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'docs.google.com/forms/d/e/1FAIpQLcarta/viewform': '<h1>Rimborso: conferma la carta</h1><form>'
+      + '<span id="i1">Numero della carta di credito</span><input type="text" aria-labelledby="i1">'
+      + '<span id="i5">CVV</span><input type="text" aria-labelledby="i5"><button>Invia</button></form>',
+  });
+  await openTab('https://docs.google.com/forms/d/e/1FAIpQLcarta/viewform');
+  expect(await livelloScheda(app, 'docs.google.com')).toBe('sospetto');
+});
+
+test('Microsoft Forms: la password chiesta nella seconda sezione, dopo «Avanti», fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'forms.cloud.microsoft/r/Sez2': '<div id="form"><span id="q1">Email aziendale</span>'
+      + '<input data-automation-id="textInput" aria-labelledby="q1">'
+      + '<button id="avanti" onclick="document.getElementById(\'form\').innerHTML = '
+      + '\'<span id=q2>Password</span><input data-automation-id=textInput aria-labelledby=q2>\'">Avanti</button></div>',
+  });
+  const page = await openTab('https://forms.cloud.microsoft/r/Sez2');
+  await page.waitForLoadState('load').catch(() => {});
+  await page.waitForTimeout(3500);
+  expect(await livelloScheda(app, 'forms.cloud.microsoft', 500)).toBe('safe');
+  await page.click('#avanti');
+  await expect(page.getByText('Password')).toBeVisible();
+  expect(await livelloScheda(app, 'forms.cloud.microsoft')).toBe('sospetto');
+});
+
+test('Google Sites: un modulo montato secondi dopo il caricamento del riquadro fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'sites.google.com/view/posta-lenta': '<h1>Accesso alla posta</h1>'
+      + '<iframe src="https://5678-atari-embeds.googleusercontent.com/embeds/x/user.html" width="500" height="300"></iframe>',
+    '5678-atari-embeds.googleusercontent.com': '<p>Caricamento…</p><script>'
+      + `setTimeout(() => { document.body.innerHTML = ${JSON.stringify(ACCESSO)}; }, 4000);</script>`,
+  });
+  await openTab('https://sites.google.com/view/posta-lenta');
+  expect(await livelloScheda(app, 'sites.google.com', 12000)).toBe('sospetto');
+});

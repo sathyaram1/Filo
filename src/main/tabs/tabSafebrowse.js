@@ -10,6 +10,8 @@
 // funzionano identici a quando vivevano inline in tabs.js. Le dipendenze sono
 // solo i globali SN_SAFEBROWSE / SN_MSG (caricati dal loader), come prima.
 
+const { pageHints } = require('../../content/safebrowseHints.js');
+
 const safebrowseMethods = {
   _sbState(tab) {
     if (!tab.sbBypass) tab.sbBypass = new Set();      // domini confermati su "pericoloso"
@@ -21,7 +23,7 @@ const safebrowseMethods = {
   // per questo dominio in questo tab.
   _sbApplyState(tab, verdict) {
     if (!verdict || verdict.level === 'safe') return verdict;
-    const reg = verdict.norm && verdict.norm.registrable;
+    const reg = verdict.scope || (verdict.norm && verdict.norm.registrable);
     if (!reg) return verdict;
     this._sbState(tab);
     if (verdict.level === 'pericoloso' && tab.sbBypass.has(reg)) {
@@ -87,6 +89,52 @@ const safebrowseMethods = {
     } catch (_) {}
   },
 
+  // Sulle pagine ospitate il modulo sta spesso in un riquadro incorporato, che il content script della pagina non vede.
+  // Solo lì si guardano i riquadri: altrove il dominio parla già per la pagina.
+  _sbOnFrameLoad(tab, isMainFrame) {
+    if (!tab) return;
+    if (isMainFrame) tab._sbCampiUrl = null;
+    clearTimeout(tab._sbFrameTimer);
+    const giro = (tab._sbScanGiro || 0) + 1;
+    tab._sbScanGiro = giro;
+    tab._sbFrameTimer = setTimeout(() => this._sbScanFrames(tab, giro), 400);
+  },
+
+  // I campi compaiono quando vuole il codice dell'utente: dopo un «Avanti» che non ricarica, dopo un avvio lento.
+  // Finché la pagina ospitata resta aperta la si riguarda, fino al primo campo sensibile.
+  async _sbScanFrames(tab, giro) {
+    const SB = globalThis.SN_SAFEBROWSE;
+    const wc = tab.view && tab.view.webContents;
+    if (!SB || !wc || wc.isDestroyed() || tab._sbScanGiro !== giro) return;
+    const url = wc.getURL();
+    let ospitata = null;
+    try { const u = new URL(url); ospitata = SB.whitelist.hostedPlatform(u.hostname, u.pathname); } catch (_) {}
+    if (!ospitata || tab._sbCampiUrl === url) return;
+    const hints = { hasPassword: false, hasPayment: false };
+    const codice = `(${pageHints.toString()})(document)`;
+    let frames = [];
+    try { frames = wc.mainFrame.framesInSubtree; } catch (_) {}
+    await Promise.all(frames.map(async (f) => {
+      try {
+        // Un riquadro ostile non deve tenere ferma l'analisi.
+        const scade = new Promise((ok) => setTimeout(() => ok(null), 1000));
+        const r = await Promise.race([f.executeJavaScript(codice), scade]);
+        if (r && r.hasPassword) hints.hasPassword = true;
+        if (r && r.hasPayment) hints.hasPayment = true;
+      } catch (_) {}
+    }));
+    if (wc.isDestroyed() || tab._sbScanGiro !== giro) return;
+    if ((hints.hasPassword || hints.hasPayment) && wc.getURL() === url) {
+      tab._sbCampiUrl = url;
+      try {
+        const v = SB.analyze(url, hints, (next) => this._sbBroadcast(tab, url, this._sbApplyState(tab, next)));
+        if (v && v.level !== 'safe') this._sbBroadcast(tab, url, this._sbApplyState(tab, v));
+      } catch (_) {}
+      return;
+    }
+    tab._sbFrameTimer = setTimeout(() => this._sbScanFrames(tab, giro), 1500);
+  },
+
   // L'utente ha scritto "confermo" sull'interstitial "pericoloso": registra il
   // bypass per (tab, dominio) e ridisegna (l'overlay sparisce).
   safebrowseProceed(tabId, url) {
@@ -95,8 +143,8 @@ const safebrowseMethods = {
     if (!tab) return { ok: false };
     this._sbState(tab);
     try {
-      const norm = SB && SB.normalize(url);
-      if (norm && norm.registrable) tab.sbBypass.add(norm.registrable);
+      const key = SB && SB.scopeOf(url);
+      if (key) tab.sbBypass.add(key);
     } catch (_) {}
     this._sbBroadcast(tab, url, { level: 'safe', message: null });
     return { ok: true };
@@ -110,8 +158,8 @@ const safebrowseMethods = {
     if (!tab) return { ok: false };
     this._sbState(tab);
     try {
-      const norm = SB && SB.normalize(url);
-      if (norm && norm.registrable) tab.sbDismissed.add(norm.registrable);
+      const key = SB && SB.scopeOf(url);
+      if (key) tab.sbDismissed.add(key);
     } catch (_) {}
     this._sbBroadcast(tab, url, { level: 'safe', message: null });
     return { ok: true };

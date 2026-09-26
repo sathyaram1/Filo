@@ -73,7 +73,8 @@ function matchBrands(norm) {
       continue;
     }
     // ── STRICT: typo puro (bassa distanza di edit sulla label) ──────────
-    if (!strict && sld !== token) {
+    // Non sul nome di un sito ospitato: lì è una parola scelta dall'utente (email.github.io, team.netlify.app).
+    if (!strict && sld !== token && !norm.ospitato) {
       const th = typoThreshold(token.length);
       if (th > 0 && Math.abs(sld.length - token.length) <= th) {
         const dist = osaDistance(sld, token);
