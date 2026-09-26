@@ -2542,10 +2542,9 @@
   // la richiesta riparte da capo.
   function riprovaDettaglio(id) {
     const key = String(id || '');
-    const i = allFeedbacks.findIndex((f) => f._id === key);
-    if (i < 0) return;
-    const { _dettaglioMancato, ...resto } = allFeedbacks[i];
-    allFeedbacks[i] = resto;
+    const riga = allFeedbacks.find((f) => f._id === key);
+    if (!riga) return;
+    delete riga._dettaglioMancato;
     // Ridisegnare basta: il pannello, trovando la riga senza segno e ancora
     // incompleta, rifà la richiesta da sé.
     if (selectedId === key) openDetail(key, { ridisegno: true });
