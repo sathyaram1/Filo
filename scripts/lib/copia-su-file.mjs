@@ -110,7 +110,9 @@ export function leggiCopia(chiave, { dir = null, now = Date.now(), ttlMs = 60_00
 
 /** Butta la copia: dopo un'applicazione, i dati letti non descrivono più il server. */
 export function scordaCopia(chiave, { dir = null } = {}) {
-  try { unlinkSync(percorsoCopia(chiave, dir)); return true; } catch (_) { return false; }
+  const file = percorsoCopia(chiave, dir);
+  if (!file) return false;
+  try { unlinkSync(file); return true; } catch (_) { return false; }
 }
 
 /** Come si dice a video che si sta riusando una lettura, invece di rifarla. */
