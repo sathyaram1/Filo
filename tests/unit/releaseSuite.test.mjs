@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..');
 const YML = readFileSync(resolve(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
+const { PASSI } = await import('../../scripts/release-platform-alarm.mjs');
 
 // I commenti raccontano: si guardano solo le righe di comando/configurazione.
 const senzaCommenti = (s) => s.split(/\r?\n/).filter((r) => !/^\s*#/.test(r)).join('\n');
@@ -189,4 +190,78 @@ test('il passo della suite ha un tetto suo, sotto quello del job: scaduto, il ve
   assert.ok(m, 'il passo che lancia Playwright deve avere un timeout-minutes suo');
   assert.ok(Number(m[1]) < 240, 'il tetto del passo deve stare sotto quello del job, o è il job a morire prima del verdetto');
   assert.match(suite, /tetto del passo/, 'l\'allarme deve dire che la suite può essere stata interrotta dal tetto');
+});
+
+// ─── #733: una meta' di piattaforma che fallisce non tace ────────────────────
+// `release-mac` e `release-linux` sono `continue-on-error` perche' un guasto su
+// Linux non deve togliere l'aggiornamento a chi sta su Windows. Il prezzo era il
+// silenzio: la release usciva con due file su tre, il lavoro diventava rosso in
+// una pagina che nessuno apre, e per sei giorni nessuno ha saputo che Filo per
+// Linux non c'era. Qui si legge che l'allarme c'e' ancora, in tutti e due.
+describe('una meta\' di piattaforma che fallisce apre un feedback', () => {
+  /** I passi di un job: nome, corpo e id (senza id l'allarme non sa nominarlo). */
+  const passi = (testoJob) => testoJob.split(/^ {6}- name: /m).slice(1).map((corpo) => ({
+    nome: corpo.split('\n')[0].trim(),
+    corpo,
+    id: (corpo.match(/^ {8}id: (\S+)$/m) || [])[1] || '',
+  }));
+
+  for (const [nomeJob, piattaforma] of [['release-mac', 'Mac'], ['release-linux', 'Linux']]) {
+    describe(nomeJob, () => {
+      const testo = senzaCommenti(job(nomeJob));
+      const elenco = passi(testo);
+      const iAllarme = elenco.findIndex((p) => /release-platform-alarm\.mjs/.test(p.corpo) && !/--attesi/.test(p.corpo));
+
+      test('un guasto qui non toglie la release Windows', () => {
+        assert.match(testo, /continue-on-error:\s*true/, 'un problema su una piattaforma non deve fermare le altre');
+      });
+
+      test('a guasto apre un feedback, con la stessa credenziale del cancello unit', () => {
+        assert.ok(iAllarme > 0, 'manca il passo che a guasto apre il feedback: il rosso resterebbe muto');
+        const allarme = elenco[iAllarme];
+        assert.match(allarme.corpo, /if:\s*failure\(\)/, 'l\'allarme deve partire da QUALSIASI passo rosso, non solo dall\'ultimo');
+        assert.match(allarme.corpo, /secrets\.FILO_BUILD_PASSPHRASE/, 'stessa credenziale del cancello unit e della suite rossa');
+        assert.match(allarme.corpo, new RegExp(`PIATTAFORMA: ${piattaforma}`), 'il feedback deve nominare la piattaforma');
+        assert.match(allarme.corpo, /VERSIONE: \$\{\{ needs\.release\.outputs\.version \}\}/, 'e la versione');
+        assert.match(allarme.corpo, /github\.run_id/, 'e portare il link all\'esecuzione');
+        assert.match(allarme.corpo, /ESITI: \$\{\{ toJSON\(steps\) \}\}/, 'senza gli esiti dei passi non si sa quale si e\' fermato');
+        assert.ok(iAllarme === elenco.length - 2, 'l\'allarme sta in fondo, prima del solo riepilogo: piu\' su non vedrebbe i passi dopo di lui');
+      });
+
+      test('ogni passo prima dell\'allarme ha un id, e lo script sa dire cosa stava facendo', () => {
+        for (const p of elenco.slice(0, iAllarme)) {
+          assert.ok(p.id, `il passo «${p.nome}» non ha un id: l'allarme non potrebbe nominarlo`);
+          assert.ok(PASSI[p.id], `l'id «${p.id}» manca in PASSI (scripts/release-platform-alarm.mjs): il feedback direbbe solo l'id`);
+        }
+      });
+
+      test('il controllo finale chiede i file attesi allo script, ed elenca TUTTI quelli mancanti', () => {
+        const controllo = elenco.find((p) => p.id === 'controllo');
+        assert.ok(controllo, 'manca il controllo "i file sono davvero nella release?"');
+        assert.match(controllo.corpo, new RegExp(`release-platform-alarm\\.mjs --attesi ${piattaforma}`),
+          'i file attesi si chiedono allo script: qui e nel testo del feedback devono essere gli stessi');
+        assert.doesNotMatch(controllo.corpo, /Filo-(Mac|Linux)\./,
+          'l\'elenco dei file vive in un posto solo (PIATTAFORME dello script), qui non si ripete');
+        assert.match(controllo.corpo, /mancanti=\$\{MANCANTI% \}/, 'i mancanti vanno passati all\'allarme');
+        assert.match(controllo.corpo, /if \[ -n "\$MANCANTI" \]/, 'si guardano tutti i file, non si esce al primo che manca');
+      });
+    });
+  }
+});
+
+// La regola sulla CAUSA, non sulla porta vista: `continue-on-error` su un
+// lavoro vuol dire «se questo fallisce, la corsa resta verde». Un lavoro così
+// che non apra un feedback è un rosso che nessuno vedrà mai — è esattamente
+// come Filo per Linux è mancato da tutte le release per sei giorni.
+test('ogni lavoro che può fallire lasciando la corsa verde apre un feedback', () => {
+  const jobs = YML.slice(YML.search(/^jobs:\s*$/m));
+  const nomi = [...jobs.matchAll(/^ {2}([a-z][\w-]*):\s*$/gm)].map((m) => m[1]);
+  // `continue-on-error` del LAVORO sta a quattro spazi; quello di un passo a otto.
+  const silenziosi = nomi.filter((n) => /^ {4}continue-on-error:\s*true\s*$/m.test(job(n)));
+  assert.ok(silenziosi.includes('release-mac') && silenziosi.includes('release-linux'),
+    'i due lavori di piattaforma devono restare continue-on-error: un guasto lì non toglie la release Windows');
+  for (const n of silenziosi) {
+    assert.match(senzaCommenti(job(n)), /-alarm\.mjs/,
+      `\`${n}\` è continue-on-error: se fallisce la corsa resta verde, quindi DEVE aprire un feedback`);
+  }
 });

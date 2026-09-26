@@ -27,6 +27,9 @@ import { readFileSync, existsSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
+// I file che devono stare nella release vivono in un posto solo dal #733:
+// il controllo del workflow li chiede a questo script invece di nominarli.
+const { PIATTAFORME } = await import('../../scripts/release-platform-alarm.mjs');
 
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 
@@ -246,8 +249,10 @@ test('il pacchetto Linux viene allegato alla release, non solo costruito', () =>
   const job = linuxJob();
   assert.match(job, /gh release view/,
     'manca il controllo finale: senza, un mancato allegato passa inosservato');
+  assert.match(job, /release-platform-alarm\.mjs --attesi Linux/,
+    'il controllo finale non chiede l\'elenco dei file attesi: senza elenco non guarda niente e resta verde');
   for (const file of ['Filo-Linux.AppImage', 'latest-linux.yml']) {
-    assert.ok(job.includes(file), `il controllo finale non cerca ${file}`);
+    assert.ok(PIATTAFORME.Linux.attesi.includes(file), `il controllo finale non cerca ${file}`);
   }
 });
 
@@ -307,8 +312,7 @@ test('il foglietto sale nella release, con un nome fisso che il sito può linkar
     `il lavoro di pubblicazione non nomina più ${FOGLIETTO}`);
   // Deve stare anche nel controllo finale, altrimenti un allegato mancato
   // passa inosservato esattamente come passerebbe per l'AppImage.
-  const controllo = job.slice(job.indexOf('gh release view'));
-  assert.ok(controllo.includes(FOGLIETTO),
+  assert.ok(PIATTAFORME.Linux.attesi.includes(FOGLIETTO),
     'il controllo finale non pretende il foglietto: un giorno non salirebbe e nessuno se ne accorgerebbe');
 });
 
@@ -327,7 +331,7 @@ test('il recap degli aggiornamenti non promette un doppio clic che non funziona'
 test("l'aggiornamento automatico su Linux ha da dove partire", () => {
   // `latest-linux.yml` è il file che electron-updater legge su Linux: senza,
   // chi ha scaricato l'AppImage resta fermo a quella versione per sempre.
-  assert.ok(linuxJob().includes('latest-linux.yml'),
+  assert.ok(PIATTAFORME.Linux.attesi.includes('latest-linux.yml') && /--attesi Linux/.test(linuxJob()),
     'nessuno controlla che latest-linux.yml finisca nella release: l\'aggiornamento automatico su Linux resterebbe muto');
 });
 

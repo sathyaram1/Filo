@@ -112,6 +112,9 @@ test('la firma NON tocca le due copie intermedie della build universale', () => 
 // ── La pubblicazione automatica ─────────────────────────────────────────────
 
 const WORKFLOW = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
+// I file che devono stare nella release vivono in un posto solo dal #733:
+// il controllo del workflow li chiede a questo script invece di nominarli.
+const { PIATTAFORME } = await import('../../scripts/release-platform-alarm.mjs');
 
 test('la pubblicazione automatica costruisce anche la versione per Mac', () => {
   assert.match(WORKFLOW, /^\s{2}release-mac:/m, 'il lavoro che costruisce la versione Mac è sparito dalla pubblicazione automatica');
@@ -140,8 +143,12 @@ test('il pacchetto Mac viene allegato alla release, non solo costruito', () => {
   const macJob = WORKFLOW.slice(WORKFLOW.search(/^\s{2}release-mac:/m));
   assert.match(macJob, /gh release view/,
     'manca il controllo finale: senza, un mancato allegato passa inosservato');
+  // Dal #733 i nomi non stanno più nel workflow: il controllo li chiede allo
+  // script dell'allarme, così il feedback che si apre nomina gli stessi file.
+  assert.match(macJob, /release-platform-alarm\.mjs --attesi Mac/,
+    'il controllo finale non chiede l\'elenco dei file attesi: senza elenco non guarda niente e resta verde');
   for (const file of ['Filo-Mac.dmg', 'Filo-Mac.zip', 'latest-mac.yml']) {
-    assert.ok(macJob.includes(file), `il controllo finale non cerca ${file}`);
+    assert.ok(PIATTAFORME.Mac.attesi.includes(file), `il controllo finale non cerca ${file}`);
   }
 });
 

@@ -103,3 +103,24 @@ aggiunge lì.
   `APPDIR=$PWD/squashfs-root ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a ./squashfs-root/AppRun --no-sandbox`
 - Nessuna di queste prove dice che l'app si apra e funzioni su un Mac o su un Linux
   desktop vero, con la sua sessione grafica e le sue notifiche. Nel report si dichiara.
+
+## Se la mezza release di una piattaforma fallisce, apre un feedback
+
+`release-mac` e `release-linux` sono `continue-on-error`, e deve restare così: un guasto
+su Linux non deve togliere l'aggiornamento a chi sta su Windows. Il prezzo è che la corsa
+resta verde e il lavoro diventa rosso in una pagina che nessuno apre — Filo per Linux è
+mancato da OGNI release per sei giorni senza che nessuno lo sapesse (#733).
+
+Quindi ogni lavoro di piattaforma finisce con un passo `if: failure()` che chiama
+`scripts/release-platform-alarm.mjs`: il guasto diventa un feedback in coda, con
+piattaforma, versione, passo fallito e link all'esecuzione, e la release Windows non si
+tocca. Ogni passo prima di lui ha un `id`, perché è da quelli che si capisce quale si è
+fermato. I file che devono stare nella release (`PIATTAFORME` nello script) vivono lì e
+basta: il controllo finale del lavoro li chiede con `--attesi <piattaforma>`.
+
+Un lavoro nuovo marcato `continue-on-error` senza l'allarme non nasce:
+`tests/unit/releaseSuite.test.mjs` lo ferma.
+
+**Una versione già pubblicata non si ripubblica rilanciando il lavoro**: decide se
+pubblicare contando i commit dopo l'ultimo tag, quindi senza commit nuovi non rifà nulla.
+I file mancanti vanno rimessi su quella stessa release.
