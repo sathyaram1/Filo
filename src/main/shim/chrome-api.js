@@ -82,6 +82,9 @@ const chromeShim = {
     // qui se ne espone la vista piatta che il chiamante si aspetta.
     async query() {
       const zoomDi = (t) => {
+        // Una pagina che scala il proprio contenuto (l'editor scala il foglio)
+        // lascia la finestra al 100%: il numero vero lo dichiara lei (#686).
+        if (typeof t.zoomProprio === 'number') return t.zoomProprio;
         try { return Math.round(t.view.webContents.getZoomFactor() * 100); }
         catch (_) { return null; }
       };

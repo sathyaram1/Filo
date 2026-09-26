@@ -267,6 +267,26 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       catch (_) { return false; }
     }
 
+    // Quanto è ingrandita una pagina che zooma da sé: il livello della finestra
+    // lì resta fermo al 100%, quindi il numero lo deve dire lei.
+    function percentualePropria() {
+      if (!pageHandlesZoom()) return null;
+      try {
+        const p = Z ? Z.leggiPercentuale(document.documentElement.dataset.filoOwnZoomPercent) : null;
+        return p == null ? null : Math.round(p);
+      } catch (_) { return null; }
+    }
+
+    // …e lo deve dire anche al main, che altrimenti riferirebbe in chat il
+    // 100% della finestra mentre il foglio è al 150% (#686, secondo giro).
+    // Non muove niente: è solo il numero che la pagina dichiara di sé.
+    if (interna && ipc && typeof ipc.send === 'function') {
+      document.addEventListener('filo:zoom-proprio', () => {
+        const p = percentualePropria();
+        if (p != null) { try { ipc.send('filo:zoom-proprio', p); } catch (_) {} }
+      });
+    }
+
     // Pinch del trackpad e Ctrl+rotella → wheel con ctrlKey=true. Passo
     // proporzionale al delta così il pinch (incrementi piccoli) resta fluido.
     // In modalità rotella ci pensa già l'handler sopra: qui ci tiriamo fuori.
@@ -334,19 +354,26 @@ module.exports = function setupWheelZoom(webFrame, opts) {
         // isolato del preload e quello della pagina un `detail` non passa. Una
         // percentuale esatta passa dal dataset, che il DOM condivide.
         if (pageHandlesZoom()) {
+          const chiesto = Z ? Z.leggiPercentuale(spec.percentuale) : null;
           try {
-            const perc = Z ? Z.leggiPercentuale(spec.percentuale) : null;
-            if (perc != null) {
-              document.documentElement.dataset.filoZoomTarget = String(perc);
+            if (chiesto != null) {
+              document.documentElement.dataset.filoZoomTarget = String(chiesto);
               document.dispatchEvent(new Event('filo:zoom-set'));
             } else {
               const nomi = { in: 'filo:zoom-in', out: 'filo:zoom-out', reset: 'filo:zoom-reset' };
               if (nomi[spec.verso]) document.dispatchEvent(new Event(nomi[spec.verso]));
             }
           } catch (_) {}
-          // Quanto zoom abbia il foglio dell'editor lo sa solo l'editor: qui
-          // non si inventa un numero da riferire.
-          rispondi(null);
+          // Il numero lo dichiara la pagina (l'evento qui sopra è sincrono,
+          // quindi a questo punto è già aggiornato); se tace, non se ne
+          // inventa uno. Il foglio ha limiti suoi, più stretti di quelli della
+          // finestra: se ci si ferma prima, chi ha chiesto deve saperlo.
+          const p = percentualePropria();
+          rispondi(p == null ? null : {
+            percentuale: p,
+            richiesto: chiesto == null ? null : Math.round(chiesto),
+            limitato: chiesto != null && Math.round(chiesto) !== p,
+          });
           return;
         }
         const esito = Z ? Z.risolvi(letturaLivello(), spec) : null;

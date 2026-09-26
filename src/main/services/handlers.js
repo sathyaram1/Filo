@@ -2463,8 +2463,11 @@ function toolResultText({ action, res, rendered }) {
     const o = res.output;
     if (o.zoom === 'propria') return 'Zoom della pagina cambiato. Questa pagina scala il proprio contenuto: la percentuale esatta non la so, non inventarla.';
     if (typeof o.percentuale === 'number') {
+      // I limiti li ha solo chi zooma la finestra: una pagina che scala il
+      // proprio contenuto ha i suoi, e non li dichiara.
+      const limiti = (typeof o.min === 'number' && typeof o.max === 'number') ? ` (${o.min}–${o.max}%)` : '';
       const tagliato = o.limitato
-        ? ` Il ${o.richiesto}% chiesto è fuori dai limiti (${o.min}–${o.max}%): dillo all'utente.`
+        ? ` Il ${o.richiesto}% chiesto non era raggiungibile${limiti}: si è fermato qui. Dillo all'utente.`
         : '';
       return `Zoom della pagina ora al ${o.percentuale}%.${tagliato}`;
     }

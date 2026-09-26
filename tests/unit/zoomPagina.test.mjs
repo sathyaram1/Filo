@@ -131,3 +131,21 @@ test('nessun testo promette che lo zoom sopravviva alla chiusura di Filo', () =>
     );
   }
 });
+
+// #686 (secondo giro) — LO ZOOM SI MUOVE PER I GESTI VERI DELL'UTENTE.
+// Gli eventi che una pagina si scrive da sola arrivano agli stessi listener di
+// tastiera e rotella: un sito li usava per rimettersi la misura che voleva
+// subito dopo un «zoom al 200%» e per aprire da sé la modalità rotella. Ogni
+// listener che muove lo zoom (o la modalità) deve passare da `gestoVero`, anche
+// quelli che verranno aggiunti dopo.
+test('ogni gesto che muove lo zoom della pagina è filtrato da gestoVero', () => {
+  const { readFileSync } = require('node:fs');
+  const src = readFileSync(join(__dirname, '..', '..', 'src', 'preload', 'wheel-zoom.js'), 'utf8');
+  const pezzi = src.split(/document\.addEventListener\(\s*'(mousedown|wheel|keydown)'/);
+  assert.ok(pezzi.length > 1, 'i listener dei gesti esistono');
+  for (let i = 1; i < pezzi.length; i += 2) {
+    const nome = pezzi[i];
+    const testa = pezzi[i + 1].slice(0, 260);
+    assert.match(testa, /gestoVero\(e\)/, `il listener '${nome}' non filtra i gesti finti`);
+  }
+});
