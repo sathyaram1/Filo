@@ -2407,6 +2407,13 @@
   function applyZoom() {
     zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(zoomLevel * 100) / 100));
     docEl.style.zoom = zoomLevel === 1 ? '' : String(zoomLevel);
+    // Chi zooma da sé deve DIRE a quanto sta: il livello della finestra qui
+    // resta fermo al 100%, e senza questo Filo risponderebbe 100% mentre il
+    // foglio è ingrandito (#686, secondo giro di verifica).
+    try {
+      document.documentElement.dataset.filoOwnZoomPercent = String(Math.round(zoomLevel * 100));
+      document.dispatchEvent(new Event('filo:zoom-proprio'));
+    } catch (_) {}
   }
   function zoomVerso(dir) {
     if (dir === 'in') zoomLevel += 0.1;
