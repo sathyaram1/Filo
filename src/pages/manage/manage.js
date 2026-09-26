@@ -2593,14 +2593,12 @@
     // Aperto da un elenco proiettato: il resto arriva adesso e il pannello si
     // ridisegna da sé. Nel frattempo quello che c'è si vede già, e la parte
     // che manca lo dice invece di sembrare vuota.
-    // Una lettura già fallita non si rifà a ogni clic: la riga porta il segno,
-    // il pannello lo dice e riparte solo dal «Riprova». Senza questo, tornare
-    // sulla stessa segnalazione ricomprava all'infinito la lettura mancata.
+    // Una lettura già fallita riparte solo dal «Riprova»: altrimenti tornare
+    // sulla stessa segnalazione la ricomprava a ogni clic, senza fine.
     if (FB.soloLista(fb) && !fb._dettaglioMancato) {
       completaDettaglio(id)
         .catch((e) => console.warn('[manage] dettaglio non completato:', e?.message || e))
-        // Anche quando NON è arrivato: il pannello deve poter dire che non è
-        // arrivato, invece di restare su «Caricamento della conversazione…».
+        // Anche quando non è arrivato: è il ridisegno che lo fa dire.
         .finally(() => { if (selectedId === id) ridisegnaRispettandoLaBozza(id); });
     }
 
