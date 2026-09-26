@@ -274,6 +274,30 @@ test('la stessa scena senza riuso della lettura assegna numeri liberi', () => {
   expect(scritti.filter((s) => presi.has(s.seq))).toEqual([]);
 });
 
+test('la prova a secco si paga una volta per OGNI strumento, non solo per uno', () => {
+  // La segnalazione lo chiede per tutti: il primo giro l'aveva provato su uno.
+  const coppie = [
+    ['auto-archive.mjs', ['--dry-run'], []],
+    ['backfill-feedback-numbers.mjs', ['--dry-run'], []],
+    ['migrate-status.mjs', [], ['--apply']],
+    ['migrate-status-padding.mjs', ['--dry-run'], []],
+  ];
+  for (const [script, secco, applica] of coppie) {
+    const copie = join(BASE, `copie-riuso-${script.replace(/\W+/g, '-')}`);
+    mkdirSync(copie, { recursive: true });
+    const a = lancia(script, secco, { copie });
+    expect(a.code, `${script} (prova a secco): ${a.out}`).toBe(0);
+    const b = lancia(script, applica, { copie });
+    expect(b.code, `${script} (applicazione): ${b.out}`).toBe(0);
+    expect(b.pulito, `${script}: l'applicazione non riusa la lettura della prova a secco, o non lo dice`)
+      .toMatch(/Riuso la lettura della prova a secco/);
+    // E dopo l'applicazione la copia non descrive più il server: si butta.
+    const c = lancia(script, applica, { copie });
+    expect(c.pulito, `${script}: la copia è rimasta lì dopo un'applicazione`)
+      .not.toMatch(/Riuso la lettura della prova a secco/);
+  }
+});
+
 test('ogni script dichiara il suo conto, e il conto è quello vero, anche a mani vuote', () => {
   const vuota = { feedback: [], 'feedback-public': [], counters: [] };
   for (const [script, argv] of [
