@@ -694,6 +694,59 @@ function createAnswerStreamer(onText) {
 // Gli strumenti si passano all'istante e i tempi si MISURANO (idee «Latenza
 // della chat», punto 1): senza numeri per turno ogni scelta sui modelli è a
 // occhio. `timing` finisce nella cronologia AI accanto al costo.
+// #536 — il testo che il modello ha appena scritto dopo aver letto roba di
+// altri, guardato da un SECONDO modello prima che qualcuno lo mostri. Torna
+// null quando passa (chi chiama tiene quello che aveva), o il testo da mettere
+// al suo posto. Una risposta di chat arriva qui come JSON con dentro la frase
+// e le azioni: la si rimpiazza tutta, perché anche le azioni scrivono righe
+// che l'utente legge.
+async function passaDalSecondoModello({ testo, classe, concreteModel, action, payload, origin }) {
+  const G = globalThis.SN_GUARDIANO_AVVISI;
+  if (!G) return null;
+  const p = payload || {};
+  const fonte = p.url || p.pageUrl || (p.page && p.page.url) || origin || '';
+  const richiesta = p.userMessage || p.question || p.query || p.text || '';
+  let esito;
+  try {
+    esito = await G.vaglia({
+      testo, classe, fonte, richiesta, modelloProduttore: concreteModel,
+    });
+  } catch (e) {
+    // Un guasto del controllo non è un permesso: si aspetta.
+    console.warn('[guardiano] vaglio fallito:', (e && e.message) || e);
+    esito = { esito: 'attesa', regola: 'senza-risposta', motivo: '' };
+  }
+  if (esito.esito === 'passa') return null;
+  const riga = esito.esito === 'blocca'
+    ? G.rigaDiBlocco(fonte, esito.motivo)
+    : (esito.regola === 'senza-guardiano'
+      ? 'Ho la risposta pronta, ma non posso mostrartela: al controllo di sicurezza manca un modello suo, diverso da quello che scrive le risposte. Si sceglie in Opzioni → Modelli → «Guardiano degli avvisi».'
+      : 'Ho la risposta pronta, ma il controllo di sicurezza non risponde. Riprova fra poco.');
+  if (esito.esito === 'blocca') {
+    try {
+      await G.registraSoloBlocco({ fonte, classe, testo, esito, action });
+    } catch (_) {}
+  }
+  return { testo: vestiComeLOriginale(testo, riga), esito: esito.esito, motivo: esito.motivo || '' };
+}
+
+// La risposta della chat viaggia come JSON ({text, actions}); quella di un
+// riquadro come testo semplice. La riga di blocco deve arrivare nella stessa
+// forma, o chi la riceve legge del JSON rotto invece di una spiegazione.
+function vestiComeLOriginale(originale, riga) {
+  const s = String(originale == null ? '' : originale);
+  const i = s.indexOf('{');
+  if (i >= 0) {
+    try {
+      const o = JSON.parse(s.slice(i, s.lastIndexOf('}') + 1));
+      if (o && typeof o === 'object' && !Array.isArray(o) && 'text' in o) {
+        return JSON.stringify({ text: riga, actions: [] });
+      }
+    } catch (_) {}
+  }
+  return riga;
+}
+
 async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false }) {
   const settings = await getEffectiveSettings();
   if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
