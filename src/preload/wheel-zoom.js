@@ -207,6 +207,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   // badge la chiude. Sui link, fuori dalla modalità, il click centrale resta
   // nativo (apre in nuova scheda).
   document.addEventListener('mousedown', (e) => {
+    if (!gestoVero(e)) return;
     if (e.button === 1) {
       if (!zoomMode && isOnLink(e.target)) return;
       e.preventDefault();   // niente autoscroll
@@ -234,7 +235,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
 
   // La rotella, in modalità zoom, zooma invece di scrollare.
   document.addEventListener('wheel', (e) => {
-    if (!zoomMode) return;
+    if (!zoomMode || !gestoVero(e)) return;
     e.preventDefault();
     e.stopPropagation();
     const dir = e.deltaY < 0 ? 1 : -1; // rotella su = zoom in
@@ -247,7 +248,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   // Qualsiasi tasto chiude la modalità — tranne mentre si edita la percentuale
   // nel badge (gestito dal listener sull'input, che ferma la propagazione).
   document.addEventListener('keydown', (e) => {
-    if (!zoomMode) return;
+    if (!zoomMode || !gestoVero(e)) return;
     if (isInBadge(e.target)) return;
     e.preventDefault();
     e.stopPropagation();
@@ -270,7 +271,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     // proporzionale al delta così il pinch (incrementi piccoli) resta fluido.
     // In modalità rotella ci pensa già l'handler sopra: qui ci tiriamo fuori.
     document.addEventListener('wheel', (e) => {
-      if (zoomMode) return;
+      if (zoomMode || !gestoVero(e)) return;
       if (!(e.ctrlKey || e.metaKey)) return;
       if (pageHandlesZoom()) return;
       e.preventDefault();
@@ -286,7 +287,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     // Da tastiera: Ctrl + / Ctrl - / Ctrl 0. Accettiamo anche il tastierino
     // numerico via `code` (lì `key` è già '+'/'-'/'0', ma non su tutti i layout).
     document.addEventListener('keydown', (e) => {
-      if (zoomMode) return; // in modalità rotella un tasto qualsiasi esce
+      if (zoomMode || !gestoVero(e)) return; // in modalità rotella un tasto qualsiasi esce
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
       if (pageHandlesZoom()) return;
       const k = e.key;
