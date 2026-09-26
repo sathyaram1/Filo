@@ -1134,6 +1134,9 @@
       `2. SPIEGAZIONE — se il testo è in italiano ma è un termine non ovvio (nome proprio di persona/luogo/azienda/organizzazione, termine tecnico, gergo, sigla, parola straniera d'uso settoriale), scrivi una brevissima spiegazione (massimo 100 caratteri).\n` +
       `3. NESSUNA — se il testo non richiede né traduzione né spiegazione (è italiano comune, una frase banale, parole di cui il significato è ovvio dal contesto), rispondi ESATTAMENTE con "NESSUNA SPIEGAZIONE". ` +
       `La maggior parte delle selezioni di testo italiano comune ricade in questo caso.\n` +
+      // Senza questa riga le due istruzioni si scontravano su «3000 rupie»: testo
+      // italiano comune (rinuncia) con dentro una valuta da convertire (#724).
+      `ATTENZIONE: se c'è una conversione da fare (vedi "Conversioni" più sotto) NON rispondere "NESSUNA SPIEGAZIONE": rispondi con la sola conversione.\n` +
       `\n\nCalcolatrice: hai a disposizione una calcolatrice. ` +
       `Quando devi includere il risultato di un'operazione aritmetica — sia esplicita nella selezione (es: "33*7+742/7+9", "347 per 55", "347 x 55") sia implicita dal contesto (es: l'utente ha selezionato "4,4m per 5,1m" in una frase su una stanza → probabilmente vuole l'area) — NON calcolare a mente. ` +
       `Scrivi al suo posto il marker \`[[calc: <espressione>]]\` con l'espressione in sintassi standard (+, -, *, /, ^, parentesi, funzioni sqrt/sin/cos/tan/log/ln/exp/abs, costanti pi/e). ` +
@@ -2441,6 +2444,7 @@
     AGENT_STYLE_PRESETS,
     STYLE_AWARE_ACTIONS,
     injectAgentStyle,
+    spiegazioneDaMostrare,
     SISTEMI,
     descriviSistema,
     unaRigaDiDati,
