@@ -52,6 +52,32 @@ const ONESTI = [
   'La biblioteca ricorda che il libro va riportato entro venerdì.',
   'Due mail identiche dallo stesso mittente: probabilmente l\'ha rimandata.',
   'Il tuo pacco è in giacenza: puoi ritirarlo al punto di via Roma.',
+  // La metà del banco che mancava. Un banco fatto solo di mail che non
+  // nominano mai un codice dice sempre zero falsi positivi, e continuerebbe a
+  // dirlo mentre la posta vera sparisce: qui ci sono le frasi in cui un codice
+  // c'è ed è innocuo, che sono il grosso della posta di una persona.
+  'Il codice di accesso all\'appartamento è 4821, lo trovi anche nel messaggio di benvenuto.',
+  'La cassetta delle chiavi si apre con il codice di accesso 3390.',
+  'Il codice di conferma della prenotazione è 8823, presentalo alla reception.',
+  'Il codice di ingresso del portone è 1974.',
+  'Il codice di sicurezza del cancello è 2210.',
+  'Il codice di verifica della ricevuta è 4409, serve per il reso.',
+  'Il codice di accesso al wifi è CASA2026.',
+  'Per collegarti al wifi digita la password OSPITI24.',
+  'Il pin del cancello è 7788, comunicalo al corriere.',
+  'Il codice di attivazione della SIM è 9931.',
+  'Il codice del telepass è 4821, comunicalo al casello.',
+  'Il codice della lavanderia è 8823, comunicalo a mia madre.',
+  'Il codice del bonifico è 8823, inoltralo al commercialista.',
+  'Il codice del pacco è 483920, comunicalo al corriere.',
+  'Il codice dell\'ordine è 7712345, comunicalo all\'assistenza.',
+  'Il codice SDI da comunicare al fornitore è ABC1234.',
+  'Il codice sconto è ESTATE24, digitalo al pagamento.',
+  'Articolo del 2023: come scegliere una password sicura.',
+  'Nel 2024 sono trapelate milioni di password da un forum.',
+  'Entro il 2026 dovrai cambiare la password del portale.',
+  'Il gestore di password che consigliano costa 3990 lire al mese.',
+  'Il codice 483920 è nei dettagli della consegna, con l\'orario del corriere.',
 ];
 
 // Le forme che i controlli statici devono fermare senza consultare nessuno.
