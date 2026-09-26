@@ -121,7 +121,7 @@ test('si scaricano solo i tre campi che la riga mostra, cinquanta alla volta', a
   const q = richieste.find((r) => r.url.includes(':runQuery')).body.structuredQuery;
   assert.deepEqual(q.select.fields.map((f) => f.fieldPath).sort(), ['balance', 'email', 'name'],
     'il saldo, il nome e l’email: il resto del documento (aggregati, ricompense, costo in euro) non deve viaggiare');
-  assert.equal(q.limit, 50);
+  assert.equal(q.limit, register.USERS_PAGE_SIZE);
   assert.ok(!('offset' in q), 'l’offset a Firestore si paga come se i documenti saltati li avesse letti');
 });
 
@@ -144,6 +144,23 @@ test('se il conteggio non arriva l’elenco si vede lo stesso', async () => {
   assert.equal(r.ok, true);
   assert.equal(r.users.length, 50);
   assert.equal(r.total, null, 'senza totale si mostra l’elenco, non un errore');
+});
+
+// La proiezione è un elenco chiuso: il campo che non si nomina non torna, e
+// torna come `undefined`, che si legge come «questo utente non ce l’ha». Quindi
+// un campo nuovo del documento deve finire in uno dei due elenchi, mai in
+// nessuno (patterns/una-lista-chiede-i-campi-che-mostra-il-dettaglio.md).
+test('ogni campo del documento sta o nella riga o nel dettaglio, e mai in tutti e due', () => {
+  const riga = register.CAMPI_RIGA_UTENTE;
+  const dettaglio = register.CAMPI_SOLO_DETTAGLIO;
+  const doppi = riga.filter((c) => dettaglio.includes(c));
+  assert.deepEqual(doppi, [], `campi in tutti e due gli elenchi: ${doppi.join(', ')}`);
+  // Quello che l'app scrive davvero su credits/<uid>, più i due campi del
+  // registro utenti: è l'insieme dei campi che quel documento può avere.
+  const scritti = [...register.SYNC_FIELDS, 'email', 'name', 'giftNotice'];
+  const scoperti = scritti.filter((c) => !riga.includes(c) && !dettaglio.includes(c));
+  assert.deepEqual(scoperti, [],
+    `campi che nessuno dei due elenchi nomina: ${scoperti.join(', ')} — la riga li mostrerebbe vuoti senza dire niente`);
 });
 
 test('un sito visitato non può chiedere l’elenco di chi usa Filo', async () => {

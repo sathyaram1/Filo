@@ -12,6 +12,27 @@ const { soloFilo } = require('./origine');
 // tecnica dalle note del feedback risolto (C5). Idempotente se già caricato.
 require('../../../shared/feedbackThread.js');
 
+// I campi del doc `credits/<uid>`, divisi fra quelli che una RIGA dell'elenco
+// dell'owner mostra e tutti gli altri. Stanno dichiarati insieme perché un
+// campo nuovo deve finire in uno dei due e mai in nessuno: quello che la
+// proiezione non nomina non arriva, e arriva come `undefined`, che si legge
+// come «questo utente non ce l'ha». La somma la tiene ferma
+// `tests/unit/elencoUtentiPagine.test.mjs`.
+const CAMPI_RIGA_UTENTE = ['email', 'name', 'balance'];
+const CAMPI_SOLO_DETTAGLIO = [
+  'lastRefillDate', 'byUsage', 'byAction', 'totalSpentCredits', 'totalCostEur',
+  'rewards', 'rewardedFeedback', 'giftNotice',
+];
+
+// Campi sincronizzati: tutto lo stato del motore (saldo, refill, aggregati,
+// ricompense). Il costo € resta nel doc privato dell'utente ma non lascia mai
+// il main verso la UI (la vista pubblica lo elimina).
+const SYNC_FIELDS = ['balance', 'lastRefillDate', 'byUsage', 'byAction',
+  'totalSpentCredits', 'totalCostEur', 'rewards', 'rewardedFeedback'];
+
+// Quanti utenti per pagina nell'elenco dell'owner.
+const USERS_PAGE_SIZE = 50;
+
 module.exports = function register(on, ctx) {
   const { MSG, broadcastToTabs } = ctx;
   const Credits = globalThis.SN_CREDITS;
@@ -23,11 +44,6 @@ module.exports = function register(on, ctx) {
   const currentUid = auth.getUid;
 
   // ── REST Firestore sul doc credits/<uid> ────────────────────────────────────
-  // Campi sincronizzati: tutto lo stato del motore (saldo, refill, aggregati,
-  // ricompense). Il costo € resta nel doc privato dell'utente ma non lascia mai
-  // il main verso la UI (la vista pubblica lo elimina).
-  const SYNC_FIELDS = ['balance', 'lastRefillDate', 'byUsage', 'byAction',
-    'totalSpentCredits', 'totalCostEur', 'rewards', 'rewardedFeedback'];
 
   async function loadRemote(uid) {
     if (!FB?.rest) return null;
@@ -80,8 +96,7 @@ module.exports = function register(on, ctx) {
   // il conto degli iscritti si ricavava dalla lunghezza di quella lista. Ora i
   // documenti arrivano proiettati, cinquanta alla volta, e il totale lo dà una
   // query di conteggio che i documenti non li legge affatto.
-  const USERS_PAGE_SIZE = 50;
-
+  //
   // Il filtro «ha un'email» è anche l'ordinamento: paginare per email rende la
   // pagina dopo ripetibile senza `offset`, che a Firestore si paga come se i
   // documenti saltati li avesse letti.
@@ -92,7 +107,7 @@ module.exports = function register(on, ctx) {
       from: [{ collectionId: 'credits' }],
       where: SOLO_CON_EMAIL,
       orderBy: [{ field: { fieldPath: 'email' }, direction: 'ASCENDING' }],
-      select: { fields: [{ fieldPath: 'email' }, { fieldPath: 'name' }, { fieldPath: 'balance' }] },
+      select: { fields: CAMPI_RIGA_UTENTE.map((f) => ({ fieldPath: f })) },
       limit: USERS_PAGE_SIZE,
     };
     // `before: false` su `startAt` vuol dire «comincia DOPO questo valore»:
@@ -310,7 +325,9 @@ module.exports = function register(on, ctx) {
   on(MSG.OWNER_LIST_USERS, soloFilo(async (msg) => {
     if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
     try {
-      const { users, total, next } = await adminListUsers({ after: String(msg?.after || '') });
+      // Il segnalibro è un'email: più lungo del massimo che un'email può essere
+      // non è un segnalibro, è solo corpo della richiesta in più.
+      const { users, total, next } = await adminListUsers({ after: String(msg?.after || '').slice(0, 320) });
       return { ok: true, users, total, next };
     }
     catch (e) { return { ok: false, error: e?.message || String(e) }; }
@@ -472,3 +489,8 @@ module.exports = function register(on, ctx) {
     }
   });
 };
+
+module.exports.CAMPI_RIGA_UTENTE = CAMPI_RIGA_UTENTE;
+module.exports.CAMPI_SOLO_DETTAGLIO = CAMPI_SOLO_DETTAGLIO;
+module.exports.SYNC_FIELDS = SYNC_FIELDS;
+module.exports.USERS_PAGE_SIZE = USERS_PAGE_SIZE;
