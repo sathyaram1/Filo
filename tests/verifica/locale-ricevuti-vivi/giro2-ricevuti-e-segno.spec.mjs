@@ -166,13 +166,12 @@ test('il segno nato da un clic si può togliere senza fondere la richiesta ferma
   await tab(page, 'inbox').click();
   await scheda(page, 'fb515').click();
   await expect(page.locator('#mgPreapprovedInfo')).toContainText('blocchi che hai già approvato');
-  const btn = page.locator('#mgPreapproveBtn');
-  await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-g2-togli.png' });
-  // L'owner vuole che d'ora in poi gli si chieda sempre: il primo gesto a disposizione è questo tasto.
-  await btn.click();
+  // L'owner vuole che d'ora in poi gli si chieda sempre: serve un gesto che tolga questo segno.
+  const togli = page.locator('#mgDetail').getByRole('button', { name: /togli|chiedimi prima/i });
+  await expect(togli).toBeVisible({ timeout: 3000 });
+  await togli.click();
   await page.waitForTimeout(2500);
   const chiamate = await page.evaluate(() => window.__chiamate.map((c) => ({ type: c.type, id: c.id, m: c.mergePreapproved })));
-  console.log('chiamate dopo un clic:', JSON.stringify(chiamate));
   expect(chiamate.filter((c) => c.type === 'merge_approval_approve')).toHaveLength(0);
   expect(chiamate.some((c) => c.type === 'feedback_update' && c.m === false)).toBe(true);
 });
