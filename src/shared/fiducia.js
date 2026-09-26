@@ -58,6 +58,15 @@
     ISTRUZIONI_SITO: 'sito',
     DATI_LINK: 'sito',
     CONVERSAZIONE_ARCHIVIATA: 'sito',
+    // I titoli delle schede aperte che Filo si porta dietro in ogni
+    // conversazione sono contesto d'ambiente, non una lettura di questo
+    // compito: contarli renderebbe contaminato ogni turno di chat, e
+    // «chiedere a un secondo modello che ore sono» è lo spreco che il
+    // feedback dice di evitare. Resta un buco noto, ed è nella segnalazione
+    // all'owner: un titolo di scheda può ancora provare a dettare una
+    // risposta. Dove sono i titoli il MATERIALE di una risposta (il saluto
+    // della home) arrivano come DATI_PAGINA, che contamina.
+    STATO_FINESTRA: 'filo',
   };
 
   function classeDeiTipi(tipi) {
