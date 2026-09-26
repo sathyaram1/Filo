@@ -3917,6 +3917,15 @@ try {
     getSettings: getEffectiveSettings,
     runOneShot,
     modelForAction,
+    // I nomi CONCRETI a cui una catena di soprannomi arriva davvero, con le
+    // stesse regole della richiesta vera: è l'unico confronto che regge quando
+    // qualcuno riscrive i soprannomi per strada.
+    modelliConcreti: (settings, refs, action) => {
+      if (!refs || !String(refs).trim()) return [];
+      try {
+        return buildAttemptChain(settings, refs, action).map((a) => a.model).filter(Boolean);
+      } catch (_) { return []; }
+    },
   });
 } catch (e) {
   console.error('[guardiano] non configurato:', (e && e.message) || e);
