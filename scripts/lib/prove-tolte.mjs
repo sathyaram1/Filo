@@ -75,8 +75,8 @@ export function proveTolteDal(shaPrima, root) {
  * Rilancia le prove tolte, ciascuna nella sua cartella com'era a `shaPrima` e col codice di adesso.
  * `{ rosse, motivo }`: `motivo` non vuoto = non si è potuto rilanciare, e non è un via libera.
  */
-export function rilanciaProveTolte(prove, shaPrima, root, { lancia = spawnSync, log = console.log } = {}) {
-  const schermo = preparaLancioElectron('npx', []);
+export function rilanciaProveTolte(prove, shaPrima, root, { lancia = spawnSync, log = console.log, prepara = preparaLancioElectron } = {}) {
+  const schermo = prepara('npx', []);
   if (!schermo.ok) return { rosse: [], motivo: schermo.motivo };
   const etichetta = `${process.pid}`;
   const cartelle = [...new Set(prove.map((p) => p.split('/').slice(0, 3).join('/')))];
@@ -92,7 +92,7 @@ export function rilanciaProveTolte(prove, shaPrima, root, { lancia = spawnSync, 
     }
     log(`Rilancio ${prove.length} ${prove.length === 1 ? 'prova' : 'prove'} del giro cancellate in questa correzione, sul codice nuovo:`);
     for (const p of prove) {
-      const l = preparaLancioElectron('npx', ['playwright', 'test', percorsoRipristino(p, etichetta), '--retries=1']);
+      const l = prepara('npx', ['playwright', 'test', percorsoRipristino(p, etichetta), '--retries=1']);
       const r = lancia(l.cmd, l.args, { cwd: root, stdio: 'inherit', shell: process.platform === 'win32', ...(l.env ? { env: l.env } : {}) });
       if (!r || r.status !== 0) rosse.push(p);
     }
@@ -108,14 +108,14 @@ export function rilanciaProveTolte(prove, shaPrima, root, { lancia = spawnSync, 
  * Tutto il controllo, per chi consegna: `{ ferma, testo }`. Senza il commit della critica non si
  * sa cosa è stato tolto: lo si dice e non si ferma (l'altra verifica rilancia comunque la cartella).
  */
-export function controllaProveTolte({ shaPrima, root, messiDaParte = 0, log = console.log, lancia } = {}) {
+export function controllaProveTolte({ shaPrima, root, messiDaParte = 0, log = console.log, lancia, prepara } = {}) {
   if (!/^[0-9a-f]{7,40}$/i.test(String(shaPrima || ''))) {
     return { ferma: false, testo: 'Non so da che commit è partita la correzione: le prove del giro cancellate non le rilancio.' };
   }
   const prove = proveTolteDal(shaPrima, root);
   if (prove === null) return { ferma: false, testo: 'Git non mi dice quali prove del giro sono state cancellate: non le rilancio.' };
   if (!prove.length) return { ferma: false, testo: '' };
-  const r = rilanciaProveTolte(prove, shaPrima, root, { log, ...(lancia ? { lancia } : {}) });
+  const r = rilanciaProveTolte(prove, shaPrima, root, { log, ...(lancia ? { lancia } : {}), ...(prepara ? { prepara } : {}) });
   if (r.motivo) return { ferma: true, testo: `Consegna respinta: ${r.motivo}` };
   return esitoProveTolte({ rosse: r.rosse, messiDaParte, shaPrima });
 }

@@ -315,6 +315,16 @@ test('emit: consegnare un ruolo lo registra per chi accoderà feedback', () => {
   assert.equal(readRole(TMP), 'verifier');
 });
 
+// finish:check sceglie gli spec anche dal lato arrivato da main solo se sa da che commit guardare.
+test('emit: un giro di riallineamento lascia nel marcatore il commit che aveva passato la verifica', async () => {
+  const { readMarker } = await import('../../scripts/lib/routine-role.mjs');
+  const sha = 'abcdef1234567890abcdef1234567890abcdef12';
+  silently(() => emit({ role: 'verifier', id: 'x', branch: 'worker/x' }, { scope: 'riallineamento', perimetro: { shaVerificato: sha } }));
+  assert.equal(readMarker(TMP).dal, sha);
+  silently(() => emit({ role: 'verifier', id: 'x', branch: 'worker/x' }, { scope: 'pieno', perimetro: { shaVerificato: sha } }));
+  assert.equal(readMarker(TMP).dal, undefined, 'fuori dal riallineamento il ramo contro main basta');
+});
+
 test('emit: un GUASTO cancella il marcatore invece di lasciare quello vecchio', () => {
   silently(() => emit({ role: 'new-work', id: 'y' }, {}));
   assert.equal(readRole(TMP), 'new-work');
