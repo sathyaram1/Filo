@@ -80,7 +80,7 @@ test('la sezione che arriva non deve portar via quello che sto scrivendo ADESSO'
   await page.waitForTimeout(700);
 
   // Quello che l'owner stava scrivendo deve essere ancora lì.
-  await expect(nota).toHaveValue('Questa riga la sto scrivendo adesso');
+  await expect(nota).toHaveValue(scritto);
 });
 
 // ── Sonda 2 ──────────────────────────────────────────────────────────────
