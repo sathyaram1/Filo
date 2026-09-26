@@ -58,24 +58,37 @@ function configureFromSettings(settings) {
 }
 
 // Un programma da un sito che l'utente ha dichiarato fidato scende come un PDF.
-// Accetta il nome del sito (quello deciso da sitoDi) o l'indirizzo.
-function chiedeConferma(sito) {
+// La fiducia vale solo per un sito CERTO: un file che può venire da un
+// riquadro di altri non prende quella della pagina che lo ospita (#588).
+function chiedeConferma(sito, incerto) {
   if (!chiediEseguibili) return false;
+  if (incerto) return true;
   try { return !ESE().fidato(sito, sitiFidati); } catch (_) { return true; }
 }
 
-// Da quale sito arriva il programma: è la cosa su cui l'utente decide, e il
-// sito non deve poterla togliere scegliendo COME consegnare il file. Un `blob:`
-// o un `data:` fabbricati nella pagina non hanno un host, ma la pagina che li
-// ha fatti partire sì: si decide qui, una volta, e tutto il resto legge questo
-// nome (#588).
+// Da quale sito arriva il programma, deciso qui una volta per tutte le
+// superfici. Regola unica: vale solo un'origine che il browser garantisce.
+// L'indirizzo del file la porta quasi sempre; un `data:` o un `blob:null` no,
+// e allora vale la pagina solo se TUTTI i suoi riquadri sono di quel sito: con
+// un riquadro di altri (una pubblicità) il file può venire da lui, e il sito
+// resta nominato ma incerto (#588).
 function sitoDi(url, webContents) {
   const leggi = (x) => { try { return ESE().sito(x); } catch (_) { return ''; } };
-  let dalla = '';
+  const dalFile = leggi(url);
+  if (dalFile) return { sito: dalFile, incerto: false };
+  let pagina = '';
+  let incerto = true;
   try {
-    if (webContents && !webContents.isDestroyed?.()) dalla = webContents.getURL() || '';
-  } catch (_) {}
-  return leggi(url) || leggi(dalla);
+    if (webContents && !webContents.isDestroyed?.()) {
+      pagina = leggi(webContents.getURL() || '');
+      const riquadri = webContents.mainFrame ? webContents.mainFrame.framesInSubtree : [];
+      incerto = !pagina || riquadri.some((f) => {
+        const h = leggi(f.origin);
+        return !(h && (h === pagina || h.endsWith('.' + pagina)));
+      });
+    }
+  } catch (_) { incerto = true; }
+  return { sito: pagina, incerto };
 }
 
 // Record vivi (id → dati). Include gli scaricamenti in corso E la cronologia
