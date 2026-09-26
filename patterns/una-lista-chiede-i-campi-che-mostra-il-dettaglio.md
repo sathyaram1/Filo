@@ -64,9 +64,28 @@ sola svuoterebbe la pagina. Lì si completa la SEZIONE che si sta guardando, una
 volta sola, dicendolo mentre si fa. Costa una lettura per scheda vista, e la fa
 solo chi quella sezione la apre davvero.
 
+**Una riga riletta non prende il posto di un documento intero.** Il giro al
+minuto rilegge PROIEZIONI: lasciargliele sostituire alle righe in mano butta
+via la conversazione già pagata e la nota «questa lettura non è tornata». Il
+pannello si svuota sotto gli occhi di chi legge, e la pagina ricompra. Si
+fonde: i campi d'elenco arrivano dalla riga nuova, i campi di dettaglio
+restano quelli che c'erano, con un marchio che dice «da rileggere». Poi, chi
+rilegge il documento intero deve buttare la copia vecchia dei campi di
+dettaglio prima di fondere, o riscriverebbe sopra il turno appena arrivato.
+Il marchio della lettura fallita, invece, lo toglie solo un «Riprova»: un giro
+in sottofondo che lo dimentica rimette in circolo la stessa lettura persa.
+
+**Quello che non si mostrerà non si scarica.** Su una macchina senza la chiave
+privata nessuno stato si legge e la conversazione non compare in nessun caso:
+chiederla vuol dire pagare il campo più grosso per buttarlo. Si chiedono i
+soli campi che quella pagina disegnerà davvero.
+
 **Nel codice.** `CAMPI_LISTA` e `CAMPI_DETTAGLIO` in `src/shared/feedback.js`;
 il marchio `_proiezione` che distingue «non ce l'ha» da «non l'ho chiesto»
-(`soloLista`); `completaDettaglio` in `src/pages/manage/manage.js` e
-`completaDettagli` in `src/pages/feedback/feedback.js`.
+(`soloLista`), `_dettaglioVecchio` per «ce l'ho ma è di prima» e
+`_dettaglioMancato` per «non è tornata»; la fusione in `applyChanges`
+(`src/shared/feedbackLive.js`); `completaDettaglio` in
+`src/pages/manage/manage.js` e `completaDettagli` in
+`src/pages/feedback/feedback.js`.
 
 Vicino: [Una pagina dei più recenti non è tutto](una-pagina-dei-piu-recenti-non-e-tutto.md).
