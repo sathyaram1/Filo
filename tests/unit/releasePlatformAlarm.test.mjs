@@ -5,8 +5,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mkdirSync, copyFileSync, symlinkSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(resolve(ROOT, 'package.json'));
@@ -175,11 +178,11 @@ describe('il feedback che si apre', () => {
   // avviato, non fa niente ed esce 0: l'allarme resta muto e il controllo
   // finale riceve un elenco vuoto, cioè passa verde senza guardare un file.
   test('avviato da una copia, dietro un collegamento, lo script lavora lo stesso', () => {
-    const base = mkdtempSync(join(tmpdir(), 'filo-allarme-'));
+    const base = cartellaTemporanea('filo-allarme-');
     const vero = join(base, 'vero', 'scripts');
     mkdirSync(vero, { recursive: true });
     for (const f of ['release-platform-alarm.mjs', 'build-alarm.mjs']) {
-      copyFileSync(join(RADICE, 'scripts', f), join(vero, f));
+      copyFileSync(join(ROOT, 'scripts', f), join(vero, f));
     }
     symlinkSync(join(base, 'vero'), join(base, 'link'), 'dir');
     const uscita = execFileSync(process.execPath,
