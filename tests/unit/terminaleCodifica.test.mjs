@@ -28,6 +28,10 @@ const ROOT = join(__dirname, '..', '..');
 
 const T = require(join(ROOT, 'src', 'main', 'services', 'terminal.js'));
 
+// Da solo un comando qui dura pochi secondi; fra gli unit test in parallelo PowerShell sulla macchina dell'owner
+// ne ha presi 61 e il tetto di 60 faceva un rosso finto. Le prove misurano l'esito, non la velocità.
+const ATTESA = 300_000;
+
 // Il nome che rompeva tutto: un trattino lungo e una «à». Entrambi assenti
 // dalla tabella OEM di Windows.
 const NOME_DIFFICILE = 'RELAZIONE — attività finale.txt';
@@ -155,7 +159,7 @@ test('elencare una cartella restituisce il nome col trattino lungo e la «à» i
   // Il comando di elenco della shell vera della piattaforma: Get-ChildItem su
   // Windows (dove il guasto vive), `ls` altrove.
   const comando = process.platform === 'win32' ? 'Get-ChildItem -Name' : 'ls';
-  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: ATTESA });
   assert.equal(out.code, 0, `il comando è fallito: ${out.stderr}`);
   assert.ok(
     out.stdout.includes(NOME_DIFFICILE),
@@ -169,7 +173,7 @@ test('elencare una cartella restituisce il nome col trattino lungo e la «à» i
 test('il marcatore della cartella corrente sopravvive al preludio', async () => {
   // Il preludio si infila prima della sonda: se rompesse il protocollo, la cwd
   // smetterebbe di persistere tra un comando e l'altro dell'assistente.
-  const out = await T.runCommand('echo ciao', { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+  const out = await T.runCommand('echo ciao', { cwd: TMP, trackCwd: true, timeoutMs: ATTESA });
   assert.equal(out.code, 0);
   assert.equal(out.stdout.trim(), 'ciao');
   assert.equal(out.cwd, TMP);
@@ -196,7 +200,7 @@ test('il nome non si rompe se l\'output del comando arriva in due pezzi', async 
     ? '[Console]::Out.Write("RELAZIONE $([char]0x2014) attivit"); Start-Sleep -Milliseconds 500; '
       + '[Console]::Out.Write("$([char]0xE0) finale.txt`n")'
     : `printf 'RELAZIONE \\342\\200\\224 attivit\\303'; sleep 0.5; printf '\\240 finale.txt\\n'`;
-  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: 30_000 });
+  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: ATTESA });
   assert.ok(
     !out.stdout.includes('�'),
     `un carattere si è perso fra una lettura e l'altra: ${JSON.stringify(out.stdout)}`,
@@ -213,7 +217,7 @@ test('anche un messaggio di errore spezzato a metà carattere arriva intero', as
   const comando = process.platform === 'win32'
     ? '[Console]::Error.Write("citt"); Start-Sleep -Milliseconds 500; [Console]::Error.Write("$([char]0xE0) non trovata")'
     : `printf 'citt\\303' >&2; sleep 0.5; printf '\\240 non trovata\\n' >&2`;
-  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: 30_000 });
+  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: ATTESA });
   assert.ok(
     !out.stderr.includes('�'),
     `un carattere si è perso nel messaggio di errore: ${JSON.stringify(out.stderr)}`,
@@ -229,7 +233,7 @@ test('il taglio dell\'output enorme non lascia mezza emoji in fondo', async () =
   const comando = process.platform === 'win32'
     ? `[Console]::Out.Write("${riempimento}"); [Console]::Out.Write([char]::ConvertFromUtf32(0x1F4C4) + " finale")`
     : `printf '%s' '${riempimento}'; printf '\\360\\237\\223\\204 finale\\n'`;
-  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: 30_000 });
+  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: ATTESA });
   assert.equal(out.truncated, true, 'l\'output doveva essere tagliato');
   const mezzoCarattere = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
   assert.ok(
@@ -267,7 +271,7 @@ test('un comando che stampa moltissimo non fa perdere cartella ed esito', async 
   const comando = process.platform === 'win32'
     ? `1..${righe} | ForEach-Object { "riga-di-elenco" }; cmd /c exit 3`
     : `for i in $(seq 1 ${righe}); do echo riga-di-elenco; done; exit 3`;
-  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: 60_000, trackCwd: true });
+  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: ATTESA, trackCwd: true });
   assert.equal(out.truncated, true, 'l\'output doveva sfondare il tetto');
   assert.equal(out.code, 3, `l'esito del comando si è perso: ${out.code}`);
   assert.ok(out.cwd, 'la cartella riportata si è persa');
@@ -284,7 +288,7 @@ test('la cartella in cui il comando è finito torna anche con un output enorme',
   const comando = process.platform === 'win32'
     ? `mkdir "${sotto}" | Out-Null; Set-Location "${sotto}"; 1..${righe} | ForEach-Object { "riga-di-elenco" }`
     : `mkdir -p "${sotto}"; cd "${sotto}"; for i in $(seq 1 ${righe}); do echo riga-di-elenco; done`;
-  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: 60_000, trackCwd: true });
+  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: ATTESA, trackCwd: true });
   assert.equal(out.cwd, sotto, `dopo un output lungo Filo crede di essere altrove: ${out.cwd}`);
 });
 
@@ -297,11 +301,11 @@ test('se la cartella di prima non c\'è più, il comando gira lo stesso e lo dic
   // che parla del programma («spawn … ENOENT») e non della cartella.
   const sparita = join(TMP, 'cartella-che-sparisce');
   mkdirSync(sparita, { recursive: true });
-  const prima = await T.runCommand('echo ciao', { cwd: sparita, trackCwd: true });
+  const prima = await T.runCommand('echo ciao', { cwd: sparita, trackCwd: true, timeoutMs: ATTESA });
   assert.ok(prima.stdout.includes('ciao'), 'il comando non gira nemmeno a cartella viva');
   rmSync(sparita, { recursive: true, force: true });
 
-  const dopo = await T.runCommand('echo ciao', { cwd: sparita, trackCwd: true });
+  const dopo = await T.runCommand('echo ciao', { cwd: sparita, trackCwd: true, timeoutMs: ATTESA });
   assert.ok(
     dopo.stdout.includes('ciao'),
     `il comando non gira più: ${JSON.stringify(dopo.stderr.slice(0, 120))}`,
@@ -317,7 +321,7 @@ test('da una cartella sparita si può ancora andare altrove', async () => {
   mkdirSync(sparita, { recursive: true });
   rmSync(sparita, { recursive: true, force: true });
   const dove = process.platform === 'win32' ? `Set-Location "${TMP}"` : `cd "${TMP}"`;
-  const out = await T.runCommand(dove, { cwd: sparita, trackCwd: true });
+  const out = await T.runCommand(dove, { cwd: sparita, trackCwd: true, timeoutMs: ATTESA });
   assert.equal(out.cwd, TMP, `non si riesce ad andarsene: ${out.cwd} (${out.stderr.slice(0, 120)})`);
 });
 
@@ -349,7 +353,7 @@ test('l\'uscita di un comando non può scriversi la riga di servizio', async () 
   writeFileSync(file, riga.repeat(200) + finto + riga.repeat(6000), 'utf8');
 
   const leggi = process.platform === 'win32' ? `Get-Content "${file}"` : `cat "${file}"`;
-  const out = await T.runCommand(leggi, { cwd: dir, trackCwd: true, timeoutMs: 60_000 });
+  const out = await T.runCommand(leggi, { cwd: dir, trackCwd: true, timeoutMs: ATTESA });
   assert.notEqual(out.cwd, altrove, 'la cartella la sceglie chi ha scritto il file');
   assert.equal(out.cwd, TMP_CANONICO(dir), `cartella riportata: ${out.cwd}`);
 
@@ -358,7 +362,7 @@ test('l\'uscita di un comando non può scriversi la riga di servizio', async () 
   const fallisce = process.platform === 'win32'
     ? `Get-Content "${file}"; Get-Content "${manca}"`
     : `cat "${file}" "${manca}"`;
-  const ko = await T.runCommand(fallisce, { cwd: dir, trackCwd: true, timeoutMs: 60_000 });
+  const ko = await T.runCommand(fallisce, { cwd: dir, trackCwd: true, timeoutMs: ATTESA });
   assert.notEqual(ko.code, 0, 'un comando fallito viene riportato come riuscito');
   assert.notEqual(ko.cwd, altrove, 'e intanto si sposta dove dice il file');
 
@@ -378,8 +382,8 @@ test('un comando fallito risulta fallito, con la cartella tracciata come senza',
       `Set-Location "${altrove}"`]
     : [`cat "${join(TMP, 'manca.txt')}"`, `cat "${join(TMP, 'relazione — attività mancante.txt')}"`, `cd "${altrove}"`];
   for (const comando of casi) {
-    const conSonda = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
-    const senza = await T.runCommand(comando, { cwd: TMP, timeoutMs: 30_000 });
+    const conSonda = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: ATTESA });
+    const senza = await T.runCommand(comando, { cwd: TMP, timeoutMs: ATTESA });
     assert.notEqual(conSonda.code, 0, `riportato come riuscito: ${comando}`);
     assert.equal(conSonda.code, senza.code, `la sonda cambia l'esito di: ${comando}`);
     assert.equal(conSonda.cwd, TMP, `dopo il fallimento Filo crede di essere altrove: ${conSonda.cwd}`);
@@ -391,7 +395,7 @@ test('un errore che interrompe il comando lo fa risultare fallito, nella cartell
   const sotto = join(TMP, 'fermo-qui');
   mkdirSync(sotto, { recursive: true });
   const comando = SU_WINDOWS ? `Set-Location "${sotto}"; throw "fermo"` : `cd "${sotto}"; false`;
-  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: ATTESA });
   assert.notEqual(out.code, 0, 'un comando interrotto da un errore risulta riuscito');
   assert.equal(out.cwd, sotto);
 });
@@ -399,7 +403,7 @@ test('un errore che interrompe il comando lo fa risultare fallito, nella cartell
 test('exit decide l\'esito anche con la cartella tracciata', async () => {
   // exit salta la riga della sonda che calcola l'esito: lì deve valere quello del processo, zero compreso.
   for (const [comando, atteso] of [['exit 3', 3], ['exit 0', 0]]) {
-    const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+    const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: ATTESA });
     assert.equal(out.code, atteso, `«${comando}» riportato con codice ${out.code}`);
   }
 });
@@ -407,14 +411,14 @@ test('exit decide l\'esito anche con la cartella tracciata', async () => {
 test('come in bash, conta l\'esito dell\'ultimo comando', async () => {
   const manca = join(TMP, 'manca-anche-questo.txt');
   const comando = SU_WINDOWS ? `Get-Content "${manca}"; Write-Output ok` : `cat "${manca}"; echo ok`;
-  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: ATTESA });
   assert.equal(out.code, 0, 'l\'ultimo comando è riuscito');
   assert.equal(out.stdout.trim(), 'ok');
 });
 
 test('un commento in coda non impedisce al comando di girare', async () => {
   const comando = SU_WINDOWS ? 'Write-Output ciao # saluto' : 'echo ciao # saluto';
-  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+  const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: ATTESA });
   assert.equal(out.stdout.trim(), 'ciao', `il comando non è girato: ${out.stderr.slice(0, 160)}`);
   assert.equal(out.code, 0);
   assert.equal(out.cwd, TMP);
@@ -464,7 +468,7 @@ test('un programma esterno riuscito che scrive su stderr resta riuscito anche co
   const giusto = (code, atteso) => (atteso === 'fallito' ? code !== 0 : code === atteso);
 
   for (const [comando, atteso] of casi) {
-    const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: 30_000 });
+    const out = await T.runCommand(comando, { cwd: TMP, trackCwd: true, timeoutMs: ATTESA });
     assert.ok(giusto(out.code, atteso), `assistente, «${comando}»: codice ${out.code}, atteso ${atteso}`);
   }
 
