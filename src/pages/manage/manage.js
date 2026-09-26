@@ -2492,12 +2492,30 @@
   // La richiesta in corso si ricorda per id: passare due volte sulla stessa
   // riga non la chiede due volte.
   const dettagliInCorso = new Map();
+
+  // La lettura non è tornata (guasto, tempo scaduto, documento sparito). Si
+  // SEGNA sulla riga invece di lasciarla identica a una mai chiesta: così il
+  // pannello può dirlo, i tasti che scrivono sulla conversazione sanno di non
+  // averla, e riaprire la stessa riga non ricompra all'infinito una lettura
+  // che continua a non arrivare. Il «Riprova» toglie il segno.
+  function segnaDettaglioMancato(key, motivo) {
+    const i = allFeedbacks.findIndex((f) => f._id === key);
+    if (i < 0) return;
+    allFeedbacks[i] = { ...allFeedbacks[i], _dettaglioMancato: motivo || 'rete' };
+  }
+
   function completaDettaglio(id) {
     const key = String(id || '');
     if (!key) return Promise.resolve(null);
     if (dettagliInCorso.has(key)) return dettagliInCorso.get(key);
     const p = (async () => {
-      let rows = await liveSources.getDettagli([key]);
+      let rows;
+      try {
+        rows = await liveSources.getDettagli([key]);
+      } catch (e) {
+        segnaDettaglioMancato(key, 'rete');
+        throw e;
+      }
       if (isAdmin && rows.length > 0) {
         try {
           const r = await sendToMain({ type: 'feedback_decrypt_fields', list: rows });
@@ -2505,18 +2523,31 @@
         } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
       }
       const pieno = rows[0];
-      if (!pieno) return null;
+      if (!pieno) { segnaDettaglioMancato(key, 'sparito'); return null; }
       // La riga può essere cambiata nel frattempo (giro dal vivo): si tiene
       // quella, completata — non si riporta indietro lo stato appena letto.
       const i = allFeedbacks.findIndex((f) => f._id === key);
       if (i < 0) return null;
-      const { _proiezione, ...resto } = allFeedbacks[i];
+      const { _proiezione, _dettaglioMancato, ...resto } = allFeedbacks[i];
       allFeedbacks[i] = { ...pieno, ...resto };
       reindexByClient();
       return allFeedbacks[i];
     })().finally(() => { dettagliInCorso.delete(key); });
     dettagliInCorso.set(key, p);
     return p;
+  }
+
+  // Riprova a leggere il resto, su richiesta dell'owner: il segno se ne va e
+  // la richiesta riparte da capo.
+  async function riprovaDettaglio(id) {
+    const key = String(id || '');
+    const i = allFeedbacks.findIndex((f) => f._id === key);
+    if (i < 0) return;
+    const { _dettaglioMancato, ...resto } = allFeedbacks[i];
+    allFeedbacks[i] = resto;
+    if (selectedId === key) openDetail(key, { ridisegno: true });
+    try { await completaDettaglio(key); } catch (_) { /* il segno lo rimette completaDettaglio */ }
+    if (selectedId === key) ridisegnaRispettandoLaBozza(key);
   }
 
   // Il feedback COMPLETO, aspettando la lettura se ancora non c'è. Chi APPENDE
