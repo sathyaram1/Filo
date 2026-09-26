@@ -659,6 +659,8 @@
   }
 
   // Sezione inline "Spiega immagine": stessa filosofia di buildInlineExplain ma con dataUrl.
+  // I byte si scaricano UNA volta: la descrizione del modello e il controllo
+  // locale delle etichette di origine (#711) partono insieme da quegli stessi byte.
   function buildInlineExplainImage(imgEl) {
     return {
       type: 'inline',
@@ -673,13 +675,42 @@
           el.classList.add('sn-menu-inline-error');
           return () => {};
         }
+        const origine = document.createElement('div');
+        origine.className = 'sn-menu-origine';
+        origine.hidden = true;
+        const body = document.createElement('div');
+        body.className = 'sn-menu-inline-body';
+        body.textContent = I18n.t('menu_explain_loading');
+        el.textContent = '';
+        el.append(origine, body);
+
         let cancelled = false;
         (async () => {
+          let dataUrl;
           try {
             const r = await fetch(src);
             const blob = await r.blob();
-            const dataUrl = await blobToDataUrl(blob);
+            dataUrl = await blobToDataUrl(blob);
+          } catch (_) {
             if (cancelled) return;
+            el.classList.remove('sn-menu-inline-loading');
+            el.classList.add('sn-menu-inline-error');
+            body.textContent = I18n.t('err_provider_failed');
+            return;
+          }
+          if (cancelled) return;
+
+          // Locale e senza crediti: arriva molto prima della descrizione, e si
+          // mostra appena c'è invece di aspettarla.
+          chrome.runtime.sendMessage({ type: MSG.IMAGE_PROVENANCE, dataUrl }).then((p) => {
+            if (cancelled || !p || !p.ok || !p.frase) return;
+            origine.textContent = p.frase;
+            origine.title = I18n.t('menu_origin_hint');
+            origine.classList.toggle('sn-menu-origine-debole', p.prova !== 'firmata');
+            origine.hidden = false;
+          }).catch(() => {});
+
+          try {
             const res = await chrome.runtime.sendMessage({
               type: MSG.AI_REQUEST,
               action: ACTIONS.DESCRIBE_IMAGE,
@@ -689,15 +720,15 @@
             el.classList.remove('sn-menu-inline-loading');
             if (!res?.ok || !res.text) {
               el.classList.add('sn-menu-inline-error');
-              el.textContent = res?.error || I18n.t('err_provider_failed');
+              body.textContent = res?.error || I18n.t('err_provider_failed');
               return;
             }
-            el.textContent = res.text;
+            body.textContent = res.text;
           } catch (e) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
             el.classList.add('sn-menu-inline-error');
-            el.textContent = I18n.t('err_provider_failed');
+            body.textContent = I18n.t('err_provider_failed');
           }
         })();
         return () => { cancelled = true; };

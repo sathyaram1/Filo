@@ -193,8 +193,9 @@
     // ─────────────────── Immagini e cattura schermo ──────────────────────────
     {
       id: 'explain-image', title: 'Spiega un’immagine', category: 'media',
-      desc: 'Descrive un’immagine della pagina, direttamente lì sotto.',
-      invoke: 'Clic destro su un’immagine → "Spiega immagine".',
+      desc: 'Descrive un’immagine della pagina, direttamente lì sotto. In cima alla descrizione, quando il file se la porta dietro, compare l’etichetta di origine: se l’immagine si dichiara generata o modificata con l’AI, oppure scattata con una fotocamera, e chi lo dichiara. Filo legge le credenziali firmate (Content Credentials/C2PA: ne verifica la firma, chi l’ha messa e se il file è cambiato dopo), l’etichetta IPTC/XMP «Digital Source Type» e i parametri di generazione che alcuni programmi scrivono dentro i PNG. Tutto sul tuo computer, senza rete e senza consumare crediti, sugli stessi byte che servono alla descrizione. La stessa lettura vale se lo chiedi a voce o in chat («questa foto è fatta con l’AI?»).',
+      invoke: 'Clic destro su un’immagine → "Spiega immagine", anche quando l’immagine sta dentro un link o sotto un velo trasparente; oppure allegala a una chat con Filo e chiediglielo.',
+      doesNot: 'Non guarda i pixel e non tira a indovinare: se il file non porta etichette, sull’origine non compare niente — e quel silenzio non vuol dire immagine autentica, perché uno screenshot, una ricompressione o il caricamento su un social cancellano le etichette e molti generatori non le scrivono affatto. Non legge i marchi invisibili: SynthID (Google, e le immagini di ChatGPT), TrustMark di Adobe, quello di Stable Diffusion. Non dà percentuali né verdetti propri: riporta ciò che il file dichiara, e dice quando la firma è di un ente che non riconosce, quando non è valida o quando il file è cambiato dopo la firma.',
     },
     {
       id: 'copy-download-image', title: 'Copia o scarica un’immagine', category: 'media',

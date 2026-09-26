@@ -21,6 +21,9 @@
     // infinito, schermate che cambiano senza ricaricare).
     menu_translate_new_content: 'Traduci il testo nuovo',
     menu_explain: 'Spiegazione',
+    // #711 — l'hover della riga di origine: dice il CONFINE della lettura, cioè
+    // perché l'assenza di quella riga non vuol dire niente.
+    menu_origin_hint: 'Filo legge solo le etichette che il file porta con sé. Uno screenshot, una ricompressione o un social le cancellano, e molti generatori non le scrivono.',
     menu_explain_deep: 'Approfondisci',
     menu_paste_history: 'Cronologia incolla',
     menu_paste_search: 'Cerca…',

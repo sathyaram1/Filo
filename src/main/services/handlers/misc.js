@@ -189,6 +189,19 @@ function safeImageFilename(name) {
   return n.slice(0, 200);
 }
 
+// #711 — un tetto largo: un JPEG da fotocamera sta in pochi MB, e oltre questa
+// misura il chiamante riceve un rifiuto col motivo, mai un silenzio.
+const MAX_BYTE_PROVENIENZA = 256 * 1024 * 1024;
+
+function bytesDaDataUrl(dataUrl) {
+  const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrl || ''));
+  if (!m) return null;
+  try {
+    const b = Buffer.from(m[1], 'base64');
+    return b.length ? b : null;
+  } catch (_) { return null; }
+}
+
 module.exports = function register(on, ctx) {
   const { MSG, winOf, getEffectiveSettings, modelForAction, buildAttemptChain, broadcastToTabs } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
@@ -386,6 +399,24 @@ module.exports = function register(on, ctx) {
 
   on(MSG.DOWNLOAD_IMAGE, handleDownload);
   on(MSG.DOWNLOAD_MEDIA, handleDownload);
+
+  // #711 — le etichette di origine di un'immagine, lette dai suoi byte. Nessun
+  // gate d'origine: la risposta parla solo dei byte che il chiamante ha mandato.
+  on(MSG.IMAGE_PROVENANCE, async (msg) => {
+    const byte = bytesDaDataUrl(msg && msg.dataUrl);
+    if (!byte) return { ok: false, error: 'immagine non leggibile' };
+    if (byte.length > MAX_BYTE_PROVENIENZA) {
+      return { ok: false, error: 'immagine troppo grande per il controllo delle etichette', tooBig: true };
+    }
+    const P = globalThis.SN_PROVENIENZA;
+    if (!P) return { ok: false, error: 'controllo non disponibile' };
+    try {
+      const res = P.analizza(byte);
+      return { ok: true, frase: P.frase(res), ...res };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'controllo fallito' };
+    }
+  });
 
   // "Salva file" su un link a un file (#410.2). A differenza di
   // DOWNLOAD_IMAGE/MEDIA (byte scaricati a mano nel main), qui facciamo partire

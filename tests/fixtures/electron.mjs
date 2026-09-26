@@ -131,9 +131,18 @@ export const test = base.extend({
   // serviamo HTML su 127.0.0.1.
   testServer: async ({}, use) => {
     const pages = new Map();
+    // File binari serviti come li servirebbe un sito: un'immagine di prova deve
+    // arrivare coi suoi byte veri, non riscritta da un data: URL.
+    const assets = new Map();
     let nextId = 0;
     const server = createServer((req, res) => {
       const id = req.url.replace(/^\//, '').split('?')[0];
+      const asset = assets.get(id);
+      if (asset) {
+        res.writeHead(200, { 'Content-Type': asset.type, 'Content-Length': asset.body.length });
+        res.end(asset.body);
+        return;
+      }
       const html = pages.get(id);
       if (!html) { res.writeHead(404); res.end('not found'); return; }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -145,6 +154,12 @@ export const test = base.extend({
       html(body) {
         const id = String(++nextId);
         pages.set(id, body);
+        return `http://127.0.0.1:${port}/${id}`;
+      },
+      /** Serve dei byte a un indirizzo di questo server e torna la URL. */
+      asset(body, type = 'application/octet-stream') {
+        const id = `a${++nextId}`;
+        assets.set(id, { body: Buffer.from(body), type });
         return `http://127.0.0.1:${port}/${id}`;
       },
       origin: `http://127.0.0.1:${port}`,

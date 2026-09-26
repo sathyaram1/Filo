@@ -78,6 +78,9 @@ require(path.join(SHARED, 'wallet.js'));      // #598 — crediti sul server: ri
 require(path.join(SHARED, 'campoNumero.js'));
 // Come partono le sessioni delle routine: stesse regole in pagina e nel main.
 require(path.join(SHARED, 'routineSessioni.js'));
+// #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.
+// Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).
+require(path.join(SHARED, 'provenienzaImmagine.js'));
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
 require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SHARED, 'actionTools.js'));  // le azioni come strumenti del modello (tool calling nativo)

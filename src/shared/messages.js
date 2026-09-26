@@ -228,6 +228,13 @@
     // veniva ignorato e la scheda NAVIGAVA sull'immagine senza scaricare nulla
     // (#274). { url } → { ok, path?, filename? } | { ok:false, cancelled?, error? }
     // (la risposta arriva a download concluso/annullato).
+    // #711 — che cosa DICHIARA un'immagine sulla propria origine (credenziali
+    // C2PA firmate, etichetta IPTC/XMP, parametri di generazione nei PNG).
+    // Tutto in locale, niente rete e niente modelli. Aperto anche ai content
+    // script: la risposta parla SOLO dei byte che la pagina ha appena mandato,
+    // non tocca disco, impostazioni né identità.
+    // { dataUrl } → { ok, frase, origine, prova, dichiarante, riconosciuto, avvisi }
+    IMAGE_PROVENANCE: 'image_provenance',
     DOWNLOAD_IMAGE: 'download_image',
     // "Salva video/audio come…" dal menu contestuale su <video>/<audio>.
     // Stesso identico cammino di DOWNLOAD_IMAGE (il download avviene nel main

@@ -95,6 +95,28 @@ function formatKnownPathsForPrompt(rawPaths) {
 // al modello nei turni dopo, e due composizioni a mano divergerebbero in
 // silenzio. La cronologia è proprio il posto dove un testo avvelenato
 // resterebbe per tutta la sessione.
+// #711 — l'esito del controllo locale delle etichette di origine delle immagini
+// allegate. La nota è voce di Filo, la frase del file viaggia imbustata: i nomi
+// dentro li scrive chi ha prodotto l'immagine.
+function noteProvenienzaImmagini(dataUrls) {
+  const P = globalThis.SN_PROVENIENZA;
+  const E = globalThis.SN_ESTERNO;
+  if (!P || !E || !Array.isArray(dataUrls) || !dataUrls.length) return '';
+  const blocchi = [];
+  dataUrls.forEach((dataUrl, i) => {
+    const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrl || ''));
+    if (!m) return;
+    let nota;
+    try { nota = P.notaPerModello(P.analizza(Buffer.from(m[1], 'base64'))); } catch (_) { return; }
+    const quale = dataUrls.length > 1 ? ` (immagine ${i + 1})` : '';
+    const testa = `(Sistema${quale}: ${E.perCanaleSistema(nota.sistema)}.)`;
+    blocchi.push(nota.etichetta
+      ? `${testa}\n${E.imbusta({ tipo: 'ETICHETTA_FILE', testo: nota.etichetta, conIntestazione: true, unaRiga: true })}`
+      : testa);
+  });
+  return blocchi.join('\n\n');
+}
+
 function testoDelTurnoAutomatico(payload) {
   return PROMPTS.turnoAutomaticoAiuto({
     nota: payload.userAction || '',
@@ -2686,6 +2708,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const parts = [];
     if (userMessage) parts.push({ type: 'text', text: String(userMessage) });
     for (const im of imageList) parts.push({ type: 'image_url', image_url: { url: im } });
+    // #711 — «questa foto è fatta con l'AI?» deve avere in chat la stessa
+    // risposta del tasto destro, quindi il controllo si fa SEMPRE: capire
+    // dall'intento quando serve sarebbe una promessa affidata al modello.
+    const origine = noteProvenienzaImmagini(imageList);
+    if (origine) parts.push({ type: 'text', text: origine });
     threadMessages.push({ role: 'user', content: parts });
   } else {
     threadMessages.push({ role: 'user', content: String(userMessage || '') });
