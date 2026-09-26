@@ -37,6 +37,10 @@ async function configura(app) {
       models: {
         [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
         [C.ACTIONS.FILO_DASHBOARD]: 'deepseek-flash',
+        // #536 — un turno che ha letto roba di altri passa da un secondo
+        // modello prima di tornare indietro: senza, la risposta resta in coda
+        // e qui non arriverebbe nessun prompt da guardare.
+        [C.ACTIONS.NOTICE_GUARD]: 'gemma-lite, claude',
       },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
@@ -49,6 +53,15 @@ function promptChat(app, threadHistory, userMessage) {
     const cap = {};
     const orig = globalThis.SN_PROVIDERS.completeWithFallback;
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      // La domanda del guardiano (#536) passa di qui anche lei: le si risponde
+      // da guardiano, e non è lei il prompt che questa prova guarda.
+      const testa = (messages[0] && messages[0].content) || '';
+      if (typeof testa === 'string' && testa.startsWith('Sei il guardiano')) {
+        return {
+          text: '{"passa":true,"motivo":null}',
+          model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        };
+      }
       cap.messages = messages;
       return {
         text: JSON.stringify({ text: 'ok', actions: [] }),
@@ -131,8 +144,10 @@ test('il titolo di una scheda aperta arriva all\'assistente, e arriva imbustato'
 
   // La funzione serve a qualcosa: l'assistente vede davvero le schede aperte.
   expect(prompt).toContain(titolo.slice(1, 40));
-  // E il titolo, che lo scrive il sito, sta dentro la recinzione.
-  expect(await dentroLaBusta(app, prompt, 'DATI_PAGINA', titolo.slice(1, 40))).toBe(true);
+  // E il titolo, che lo scrive il sito, sta dentro la recinzione. Busta sua
+  // (#536): i titoli delle schede sono contesto d'ambiente, non una pagina che
+  // il compito è andato ad aprire, e il guardiano deve poterli distinguere.
+  expect(await dentroLaBusta(app, prompt, 'STATO_FINESTRA', titolo.slice(1, 40))).toBe(true);
 });
 
 test('il titolo di una pagina salvata per dopo arriva imbustato al generatore della nuova scheda', async ({ app, openTab }) => {
@@ -145,6 +160,13 @@ test('il titolo di una pagina salvata per dopo arriva imbustato al generatore de
     const cap = {};
     const orig = globalThis.SN_PROVIDERS.completeWithFallback;
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      const testa = (messages[0] && messages[0].content) || '';
+      if (typeof testa === 'string' && testa.startsWith('Sei il guardiano')) {
+        return {
+          text: '{"passa":true,"motivo":null}',
+          model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        };
+      }
       cap.messages = messages;
       return {
         text: JSON.stringify({ message: 'ok', suggestions: [] }),

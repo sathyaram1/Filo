@@ -25,7 +25,12 @@ async function stubSequenceAndSearch(app, turns, results) {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      // #536 — dopo una ricerca il turno è contaminato e la risposta passa da
+      // un secondo modello: senza il suo, resterebbe in coda.
+      models: {
+        [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
+        [C.ACTIONS.NOTICE_GUARD]: 'gemma-lite, claude',
+      },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__filoTurnCount = 0;
@@ -43,10 +48,14 @@ async function stubSequenceAndSearch(app, turns, results) {
         model: attempts[0].model, provider: attempts[0].provider, usage: {},
       };
     };
-    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => ({
-      text: JSON.stringify({ text: '', actions: [] }),
-      model: attempts[0].model, provider: attempts[0].provider, usage: {},
-    });
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      const testa = (messages && messages[0] && messages[0].content) || '';
+      const guardiano = typeof testa === 'string' && testa.startsWith('Sei il guardiano');
+      return {
+        text: guardiano ? '{"passa":true,"motivo":null}' : JSON.stringify({ text: '', actions: [] }),
+        model: attempts[0].model, provider: attempts[0].provider, usage: {},
+      };
+    };
     // Ricerca web deterministica: niente rete nel test.
     globalThis.SN_WEB_SEARCH.search = async () => ({ ok: true, provider: 'stub', results });
   }, { turns, results });

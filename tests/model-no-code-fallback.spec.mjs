@@ -58,6 +58,9 @@ test('una funzione senza modello si ferma e lo dice; le altre continuano a funzi
         [C.ACTIONS.TRANSLATE_SELECTION]: '',   // nessun modello impostato
         [C.ACTIONS.EXPLAIN_LINK]: 'fantasma',  // scorciatoia inesistente
         [C.ACTIONS.CATEGORIZE]: 'mio, mio-2',  // catena di ripiego voluta
+        // #536 — «Spiega» legge il testo della pagina, quindi la risposta
+        // passa da un secondo modello: qui gliene serve uno suo, diverso.
+        [C.ACTIONS.NOTICE_GUARD]: 'mio-2',
       },
     });
 
@@ -65,7 +68,16 @@ test('una funzione senza modello si ferma e lo dice; le altre continuano a funzi
     // modello della catena fallisce, così si vede se il ripiego voluto scatta.
     const calledModels = [];
     const origComplete = globalThis.SN_PROVIDERS.completeWithFallback;
-    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => {
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      // La domanda del guardiano (#536) non è una chiamata della funzione in
+      // prova: non entra nel conto dei modelli chiamati.
+      const testa = (messages && messages[0] && messages[0].content) || '';
+      if (typeof testa === 'string' && testa.startsWith('Sei il guardiano')) {
+        return {
+          text: '{"passa":true,"motivo":null}',
+          model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        };
+      }
       for (const a of attempts) {
         calledModels.push(a.model);
         if (a.model === 'test/modello-uno' && globalThis.__failFirst) continue;
