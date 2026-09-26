@@ -14,13 +14,11 @@
     menu_select_all: 'Seleziona tutto',
 
     // Menu — AI
-    menu_translate_selection: 'Traduci',
     menu_show_original: 'Mostra originale',
     menu_resume_translation: 'Riprendi traduzione',
     // Traduzione finita, ma il sito ha aggiunto altro testo dopo (scorrimento
     // infinito, schermate che cambiano senza ricaricare).
     menu_translate_new_content: 'Traduci il testo nuovo',
-    menu_explain: 'Spiegazione',
     menu_explain_deep: 'Approfondisci',
     menu_paste_history: 'Cronologia incolla',
     menu_paste_search: 'Cerca…',
@@ -34,7 +32,6 @@
     menu_help: 'Aiuto',
     menu_save_for_later: 'Salva per dopo',
     menu_open_for_later: 'Aperti per dopo',
-    menu_translate_page: 'Traduci la pagina',
     menu_fullscreen: 'Schermo intero',
     menu_exit_fullscreen: 'Esci da schermo intero',
 
@@ -77,8 +74,6 @@
     toast_media_loop_off: 'Ripetizione disattivata',
     toast_pip_failed: 'Finestra mobile non disponibile per questo video',
     menu_share_link: 'Condividi link',
-    menu_explain_link: 'Spiega link',
-    menu_explain_image: 'Spiega immagine',
     menu_edit_selection: 'Modifica',
     menu_read_aloud: 'Leggi',
     menu_stop_reading: 'Interrompi lettura',
@@ -132,7 +127,6 @@
     menu_dictate_empty: 'Nessun audio comprensibile',
     menu_overflow_soon: 'Pannello completo in arrivo',
     menu_link_loading: 'Analizzo il link…',
-    menu_link_suspicious: '⚠️ Link sospetto',
 
     // Edit box
     edit_box_title: 'Modifica testo',
