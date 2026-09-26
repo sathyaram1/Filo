@@ -399,6 +399,9 @@
     if (chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
       chrome.runtime.onMessage.addListener((msg) => {
         if (msg && msg.type === MSG.DOWNLOADS_UPDATED) scheduleReload();
+        // Il ritorno sulla scheda: in una scheda di Filo `visibilitychange`
+        // non arriva, lo annuncia il main.
+        if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) scheduleReload();
       });
     }
   });

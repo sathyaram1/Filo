@@ -322,6 +322,35 @@ class TabManager {
     this.loadProxyRules().catch(() => {});
     // Ctrl +/-/0 premuti mentre il focus è sulla barra (vedi _wireShellZoomKeys).
     this._wireShellZoomKeys();
+    for (const ev of ['minimize', 'restore', 'hide', 'show']) {
+      try { this.win.on?.(ev, () => this._annunciaVista()); } catch (_) {}
+    }
+  }
+
+  // Chi guarda: la scheda attiva di una finestra né nascosta né ridotta a
+  // icona. `document.hidden` in una WebContentsView non lo dice (resta falso).
+  inVista(tabId) {
+    if (!tabId || tabId !== this.activeId) return false;
+    try {
+      if (this.win.isDestroyed?.() || this.win.isMinimized?.()) return false;
+      if (this.win.isVisible && !this.win.isVisible()) return false;
+    } catch (_) { return false; }
+    return true;
+  }
+
+  // Alle pagine filo:// che hanno cambiato stato, e solo a loro: chi legge a
+  // intervalli (la Gestione) smette da nascosta e si riallinea al rientro.
+  _annunciaVista() {
+    for (const t of this.tabs) {
+      const ora = this.inVista(t.id);
+      if (t._inVista === ora) continue;
+      t._inVista = ora;
+      const wc = t.view?.webContents;
+      try {
+        if (!wc || wc.isDestroyed?.() || !String(wc.getURL() || '').startsWith('filo://')) continue;
+        wc.send('filo:broadcast', { type: 'tab_in_vista', inVista: ora });
+      } catch (_) {}
+    }
   }
 
   // Aggiorna le impostazioni di sicurezza e le riapplica a tutti i tab esistenti.
@@ -2444,6 +2473,7 @@ class TabManager {
     try {
       this.win.webContents.send('tabs:updated', this.snapshot());
     } catch (_) { /* shell non ancora caricata */ }
+    this._annunciaVista();
     this._persistSession();
   }
 

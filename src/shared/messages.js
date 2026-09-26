@@ -347,6 +347,14 @@
     // main; la shell lo applica attenuato alle tab INATTIVE.
     TAB_IDENTITY_COLOR: 'tab_identity_color',        // { color: 'rgb(r,g,b)' | null }
 
+    // La scheda è sotto gli occhi di qualcuno (attiva, finestra né nascosta né
+    // ridotta a icona)? In una WebContentsView `document.hidden` resta falso
+    // anche in secondo piano, quindi chi legge dalla rete a intervalli lo
+    // chiede qui. Il main lo spinge anche da sé, a ogni cambio, come broadcast
+    // TAB_IN_VISTA (solo alle pagine filo://).
+    TAB_IN_VISTA_GET: 'tab_in_vista_get',            // {} → { ok, inVista }
+    TAB_IN_VISTA: 'tab_in_vista',                    // broadcast { inVista }
+
     // §2.1 — segnali di attività della tab riportati dal content script, per la
     // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty? }
     TAB_ACTIVITY: 'tab_activity',

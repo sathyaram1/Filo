@@ -27,6 +27,13 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  on(MSG.TAB_IN_VISTA_GET, async (msg, sender) => {
+    const win = winOf(sender);
+    const tabs = win && win._filoTabs;
+    if (!tabs || !sender?.tab?.id) return { ok: true, inVista: true };
+    return { ok: true, inVista: tabs.inVista(sender.tab.id) };
+  });
+
   on(MSG.TAB_IDENTITY_COLOR, async (msg, sender) => {
     // Colore identità del sito (§1.2) → cachato per dominio dal TabManager e
     // applicato attenuato alle tab inattive.
