@@ -114,10 +114,29 @@ export function mancantiNoti({ piattaforma, esiti, mancanti } = {}) {
  */
 export function componiAllarme({ piattaforma, versione, passo, esecuzione, repo, mancanti, esiti } = {}) {
   const nome = String(piattaforma || '').trim() || '(piattaforma non indicata)';
-  const v = String(versione || '').trim() || '(versione non indicata)';
+  const v = String(versione || '').trim();
   const p = String(passo || '').trim();
   const conf = PIATTAFORME[nome];
-  const persi = mancantiNoti({ piattaforma: nome, esiti, mancanti });
+  // Senza versione il lavoro si è fermato prima di sapere a quale release
+  // attaccarsi: nessuna release è stata toccata, e dedurre file mancanti dai
+  // passi direbbe rotto un download che nessuno ha sfiorato.
+  const persi = v ? mancantiNoti({ piattaforma: nome, esiti, mancanti }) : null;
+
+  const coda = p ? ` (passo «${p}»)` : ' (passo non identificato)';
+  if (!v) {
+    return {
+      titolo: `Il lavoro che attacca Filo per ${nome} a una release si è fermato subito${coda}`,
+      testo: [
+        `Il lavoro che costruisce Filo per ${nome} si è fermato prima di sapere a quale release attaccarsi: nessuna release è stata toccata, e nessun file è andato perso. Succede quando lo si avvia a mano senza scrivere il numero della versione nella sua casella.`,
+        '',
+        p ? `Passo fallito: «${p}»${PASSI[p] ? ` — ${PASSI[p]}.` : ' (non è uno dei passi noti: cercalo nel registro).'}`
+          : 'Passo fallito: non identificato. Il registro dell\'esecuzione dice quale si è fermato.',
+        ...(esecuzione ? [`Registro dell'esecuzione: ${esecuzione}`] : []),
+        '',
+        `Cosa fare: riavvia a mano il lavoro di pubblicazione con la casella «${casella(nome)}» e il numero della versione scritto per intero.`,
+      ].join('\n'),
+    };
+  }
 
   // Il titolo non deve gridare piu' del guasto (se manca un file di contorno la
   // release e' incompleta, non assente) né meno: senza un elenco di file persi
