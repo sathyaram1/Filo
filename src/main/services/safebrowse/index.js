@@ -76,22 +76,32 @@ function recordCert(registrable, status) {
   if (registrable && status) certCache.set(registrable, { status });
 }
 
+// Una pagina ospitata ha un verdetto suo: con la chiave del solo host un modulo segnalato colpirebbe tutti gli altri.
+function pageKey(norm, url) {
+  const hosted = url && whitelist.hostedPlatform(norm.host, pathOf(url));
+  return hosted ? norm.host + pathOf(url) : norm.host;
+}
+
+function pathOf(url) {
+  try { return new URL(String(url)).pathname; } catch (_) { return '/'; }
+}
+
 // Assembla i dati di rete già noti (da cache) per il dominio.
-function assembleCached(norm) {
+function assembleCached(norm, url) {
   if (!norm || !norm.registrable) return {};
   const reg = norm.registrable;
   return {
-    gsb: gsbCache.get('u:' + norm.host) || gsbCache.get(reg),
+    gsb: gsbCache.get('u:' + pageKey(norm, url)) || gsbCache.get(reg),
     ageDays: ageCache.get(reg),
     cert: certCache.get(reg),
-    sandbox: sandboxCache.get(norm.host),
-    llm: llmCache.get(norm.host),
+    sandbox: sandboxCache.get(pageKey(norm, url)),
+    llm: llmCache.get(pageKey(norm, url)),
   };
 }
 
 function checkSync(url, ctx = {}) {
   const norm = normalizeMod.normalize(url);
-  const asyncData = norm ? assembleCached(norm) : {};
+  const asyncData = norm ? assembleCached(norm, url) : {};
   return engine.evaluate(url, ctx, asyncData);
 }
 
@@ -100,7 +110,7 @@ function checkSync(url, ctx = {}) {
 function analyze(url, ctx = {}, onUpdate) {
   const norm = normalizeMod.normalize(url);
   if (!norm || !norm.ok) return engine.evaluate(url, ctx, {});
-  const first = engine.evaluate(url, ctx, assembleCached(norm));
+  const first = engine.evaluate(url, ctx, assembleCached(norm, url));
 
   // Se è già pericoloso da blacklist/strict, non serve altro.
   if (first.level === 'pericoloso' && (first.reasons || []).some((r) => /^gsb_|strict/.test(r))) {
@@ -109,11 +119,12 @@ function analyze(url, ctx = {}, onUpdate) {
 
   const reg = norm.registrable;
   const tasks = [];
-  const need = assembleCached(norm);
+  const need = assembleCached(norm, url);
+  const key = pageKey(norm, url);
 
   if (providers.gsb && need.gsb === undefined) {
     tasks.push(Promise.resolve(providers.gsb(url, norm)).then((r) => {
-      if (r) gsbCache.set('u:' + norm.host, r);
+      if (r) gsbCache.set('u:' + key, r);
     }).catch(() => {}));
   }
   if (providers.rdap && need.ageDays === undefined) {
@@ -133,18 +144,18 @@ function analyze(url, ctx = {}, onUpdate) {
   const worthDeepening = first.level === 'sospetto' || first.needsLlm;
   if (worthDeepening && providers.llm && need.llm === undefined) {
     tasks.push(Promise.resolve(providers.llm(buildLlmMeta(norm, ctx, first))).then((r) => {
-      if (r) llmCache.set(norm.host, r);
+      if (r) llmCache.set(key, r);
     }).catch(() => {}));
   }
   if (worthDeepening && providers.sandbox && need.sandbox === undefined) {
     tasks.push(Promise.resolve(providers.sandbox(url, norm)).then((r) => {
-      if (r) sandboxCache.set(norm.host, r);
+      if (r) sandboxCache.set(key, r);
     }).catch(() => {}));
   }
 
   if (tasks.length && typeof onUpdate === 'function') {
     Promise.allSettled(tasks).then(() => {
-      const next = engine.evaluate(url, ctx, assembleCached(norm));
+      const next = engine.evaluate(url, ctx, assembleCached(norm, url));
       if (verdictChanged(first, next)) onUpdate(next);
     });
   }
