@@ -60,6 +60,11 @@
   // dominio la butta subito: chi ha appena insegnato una strada a Filo deve
   // ritrovarla, non aspettare il quarto d'ora.
   const CACHE_TTL_MS = 15 * 60 * 1000;
+  // Quanti domini si tengono insieme. Serve solo a non far crescere la memoria
+  // di una sessione lunghissima: chi apre l'Aiuto su duecento siti diversi
+  // nello stesso quarto d'ora non esiste, e a chi ci arrivasse costa una
+  // rilettura.
+  const CACHE_MAX_DOMINI = 200;
   const cache = new Map();
   let adesso = () => Date.now();
 
@@ -268,6 +273,8 @@
       if (onlySuccess && obj.success !== true) continue;
       out.push(obj);
     }
+    // La Map rende le chiavi in ordine d'inserimento: la più vecchia è la prima.
+    if (cache.size >= CACHE_MAX_DOMINI) cache.delete(cache.keys().next().value);
     cache.set(chiave, { ts: adesso(), righe: out });
     return out.slice();
   }

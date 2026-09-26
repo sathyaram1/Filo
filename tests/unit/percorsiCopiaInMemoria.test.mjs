@@ -172,6 +172,17 @@ test('chi riceve i percorsi non può modificare la copia condivisa', async () =>
   });
 });
 
+test('la memoria non cresce all’infinito: oltre il tetto si butta il dominio più vecchio', async () => {
+  await conRete(ok([fsDoc('a', 'vedere gli ordini')]), async (letture) => {
+    await P.listByDomain('primo.it');
+    for (let i = 0; i < 205; i++) await P.listByDomain(`sito${i}.it`);
+    const dopoIRiempitivi = letture.length;
+    await P.listByDomain('primo.it');
+    assert.equal(letture.length, dopoIRiempitivi + 1,
+      'il dominio più vecchio esce dalla copia: costa una rilettura, non memoria che cresce senza fine');
+  });
+});
+
 test('si chiedono tanti percorsi quanti ne entrano nel prompt, non cinquanta', async () => {
   const Safety = globalThis.SN_PATHS_SAFETY;
   assert.ok(P.rest.DEFAULT_PAGE_SIZE <= 30,
