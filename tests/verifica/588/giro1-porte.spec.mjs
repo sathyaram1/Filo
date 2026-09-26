@@ -84,11 +84,8 @@ test('un nome che inganna l’occhio chiede comunque, e anche le estensioni di M
     for (let i = 0; i < nomi.length; i++) {
       await page.locator(`#l${i}`).click();
       // La voce in attesa si riconosce: è marcata come programma e dice il sito.
-      const attesa = await expect.poll(async () => {
-        const inAttesa = (await elenco(shell)).filter((r) => r.state === 'pending');
-        return inAttesa.length;
-      }, { timeout: 30000 }).toBe(1).then(() => null).catch(() => null);
-      void attesa;
+      await expect.poll(async () => (await elenco(shell)).filter((r) => r.state === 'pending').length,
+        { timeout: 30000 }).toBe(1);
       const rec = (await elenco(shell)).find((r) => r.state === 'pending');
       expect(rec, `«${nomi[i]}» non si è fermato`).toBeTruthy();
       expect(rec.exe, `«${nomi[i]}» non è marcato come programma`).toBe(true);
