@@ -83,6 +83,25 @@ test('coi tempi veri dell\'orologio, entro un giro, e la sezione d\'arrivo lo se
   await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-arrivo.png' });
 });
 
+test('col segno del clic sulla scheda il titolo si legge ancora', async ({ openTab }) => {
+  const page = await apri(openTab);
+  const segno = { by: `owner@example.com · approvazione ${RICHIESTA}`, at: '2026-09-25T08:30:00.000Z' };
+  await dalVivo(page, [
+    fb('lungo', { status: 'working', name: 'La Gestione non aggiorna le sezioni da sola', mergePreapproved: segno }),
+    fb('fermo', { seq: 516, status: 'design', statusReason: 'l5', name: 'Fusione ferma sulle regole', mergePreapproved: segno }),
+  ]);
+  await tab(page, 'queue').click();
+  const titolo = scheda(page, 'lungo').locator('.mg-item-title');
+  await expect(titolo).toBeVisible();
+  await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-titolo.png' });
+  const largo = await titolo.evaluate((el) => el.getBoundingClientRect().width);
+  expect(largo).toBeGreaterThan(60);
+  await tab(page, 'inbox').click();
+  await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-titolo-ricevuti.png' });
+  const largoFermo = await scheda(page, 'fermo').locator('.mg-item-title').evaluate((el) => el.getBoundingClientRect().width);
+  expect(largoFermo).toBeGreaterThan(60);
+});
+
 test('col mouse fermo sopra la lista la scheda cambia sezione lo stesso', async ({ openTab }) => {
   const page = await apri(openTab);
   await dalVivo(page, [fb('fb515'), fb('altro', { seq: 600 })]);
