@@ -77,6 +77,12 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   let percentInput = null;
   let suppressContextMenu = false;
 
+  // Lo zoom si muove per i gesti VERI dell'utente. Un evento che la pagina si
+  // scrive da sola arriva identico a questi listener, e un sito lo userebbe per
+  // rimettersi la misura che vuole (o per aprire da sé la modalità rotella)
+  // quante volte gli pare: #686, secondo giro di verifica.
+  function gestoVero(e) { return !!(e && e.isTrusted); }
+
   // Percentuale di zoom corrente (100 = nessuno zoom).
   function currentPercent() {
     try { return Math.round(webFrame.getZoomFactor() * 100); }
