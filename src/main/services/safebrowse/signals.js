@@ -6,10 +6,11 @@
 // `ctx` e non sono mai l'unica base di un avviso ad alta gravità.
 //
 // Tipi di impersonazione (vedi spec):
-//   strict  — confusable (omoglifi UTS-39) o typo puro sulla label di brand.
-//             Da solo basta per "Pericoloso".
-//   broad   — combosquat (brand + altre parole), nome esatto su suffisso non
-//             ufficiale, o brand come sottodominio con eTLD+1 altro. → "Sospetto".
+//   strict    — confusable (omoglifi UTS-39) o typo su un brand lungo.
+//               Da solo basta per "Pericoloso".
+//   weak_typo — typo su un brand corto: da solo vale "Sospetto".
+//   broad     — combosquat (brand + altre parole), nome esatto su suffisso non
+//               ufficiale, o brand come sottodominio con eTLD+1 altro. → "Sospetto".
 
 'use strict';
 
@@ -47,8 +48,13 @@ function typoThreshold(tokenLen) {
   return 1;
 }
 
+// #728 — sotto questa lunghezza una distanza di una lettera è quasi sempre una
+// parola comune (team/steam, email/gmail, apply/apple), non un sosia: il typo
+// da solo avvisa, e blocca solo con un secondo segnale.
+const TYPO_BLOCCO_MIN_LEN = 8;
+
 // Cerca la migliore corrispondenza di impersonazione fra i brand noti.
-// Ritorna { strict, broad } dove ciascuno è null o { brand, reason, ... }.
+// Ritorna { strict, weak, broad } dove ciascuno è null o { brand, reason, ... }.
 function matchBrands(norm) {
   // Confronti SEMPRE sulla forma Unicode decodificata (un dominio camuffato in
   // punycode, es. xn--80ak6aa92e, va confrontato per ciò che mostra: "аррӏе").
@@ -59,11 +65,12 @@ function matchBrands(norm) {
   const subLabels = uLabels.slice(0, Math.max(0, uLabels.length - regLabelCount));
 
   let strict = null;
+  let weak = null;
   let broad = null;
 
   for (const brand of BRANDS) {
     // Non flaggare mai i domini legittimi del brand stesso.
-    if (brand.domains.includes(norm.registrable)) return { strict: null, broad: null };
+    if (brand.domains.includes(norm.registrable)) return { strict: null, weak: null, broad: null };
     const token = brand.token;
     const tokenSkel = skeleton(token);
 
@@ -72,13 +79,18 @@ function matchBrands(norm) {
       strict = { brand, reason: 'confusable', sld };
       continue;
     }
-    // ── STRICT: typo puro (bassa distanza di edit sulla label) ──────────
+    // ── TYPO puro (bassa distanza di edit sulla label) ──────────────────
     // Non sul nome di un sito ospitato: lì è una parola scelta dall'utente (email.github.io, team.netlify.app).
     if (!strict && sld !== token && !norm.ospitato) {
       const th = typoThreshold(token.length);
       if (th > 0 && Math.abs(sld.length - token.length) <= th) {
         const dist = osaDistance(sld, token);
-        if (dist > 0 && dist <= th) { strict = { brand, reason: 'typo', sld, distance: dist }; continue; }
+        if (dist > 0 && dist <= th) {
+          const hit = { brand, reason: 'typo', sld, distance: dist };
+          if (token.length >= TYPO_BLOCCO_MIN_LEN) strict = hit;
+          else if (!weak) weak = hit;
+          continue;
+        }
       }
     }
 
@@ -95,8 +107,8 @@ function matchBrands(norm) {
       }
     }
   }
-  // Strict prevale: se c'è strict, ignoriamo il broad dello stesso giro.
-  return { strict, broad: strict ? null : broad };
+  // Il segnale più forte prevale: gli altri dello stesso giro si ignorano.
+  return { strict, weak: strict ? null : weak, broad: (strict || weak) ? null : broad };
 }
 
 // Doppia estensione eseguibile nell'URL (es. fattura.pdf.exe): forte indizio
@@ -111,8 +123,9 @@ function localSignals(norm, ctx = {}) {
   if (!norm || !norm.ok) return out;
 
   if (!norm.isIp && !norm.single && !norm.suffixOnly) {
-    const { strict, broad } = matchBrands(norm);
+    const { strict, weak, broad } = matchBrands(norm);
     if (strict) out.push({ kind: 'strict_impersonation', ...strict });
+    else if (weak) out.push({ kind: 'weak_typo', ...weak });
     else if (broad) out.push({ kind: 'broad_impersonation', ...broad });
   }
 

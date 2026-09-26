@@ -33,6 +33,8 @@ test('motore: impersonazioni → pericoloso, domini legittimi → safe', async (
       gusercontent: v('https://googleusercontent.com/'),
       cyrillicApple: v('https://xn--80ak6aa92e.com/', { hasPassword: true }),
       paypalTypo: v('https://paypa1.com/', { hasPassword: true }),
+      parolaComune: v('https://team.com/'),
+      parolaComuneConPassword: v('https://team.com/', { hasPassword: true }),
     };
   });
 
@@ -47,6 +49,11 @@ test('motore: impersonazioni → pericoloso, domini legittimi → safe', async (
   expect(verdicts.cyrillicApple.hasMsg).toBe(true);
   expect(verdicts.paypalTypo.level).toBe('pericoloso');
   expect(verdicts.paypalTypo.hasMsg).toBe(true);
+
+  // #728 — una parola comune a una lettera da un marchio corto avvisa e basta;
+  // il blocco torna appena un secondo segnale lo conferma.
+  expect(verdicts.parolaComune.level).toBe('sospetto');
+  expect(verdicts.parolaComuneConPassword.level).toBe('pericoloso');
 });
 
 test('pagina Sicurezza: controlli personali default ON e persistenti; nessun campo chiave (è condivisa)', async ({ openTab }) => {
@@ -374,4 +381,21 @@ test('Google Sites: un modulo montato secondi dopo il caricamento del riquadro f
   });
   await openTab('https://sites.google.com/view/posta-lenta');
   expect(await livelloScheda(app, 'sites.google.com', 12000)).toBe('sospetto');
+});
+
+test('parola comune vicina a un marchio: avviso richiudibile, non il blocco a pagina piena (#728)', async ({ app, openTab }) => {
+  // team.com dista una lettera da "steam": prima l'utente trovava l'interstitial
+  // che si toglie solo scrivendo "confermo".
+  await servi(app, { 'team.com': '<title>SB_PAROLA_COMUNE</title><h1>Team</h1><p>contenuto della pagina</p>' });
+  const page = await openTab('https://team.com/');
+
+  const continua = page.getByRole('button', { name: 'Continua' });
+  await expect(continua).toBeVisible({ timeout: 12_000 });
+  await expect(page.getByRole('button', { name: 'Procedi comunque' })).toHaveCount(0);
+  await expect(page.getByText(/assomiglia all'indirizzo di Steam/)).toBeVisible();
+
+  // Un clic e l'utente è sulla pagina che voleva.
+  await continua.click();
+  await expect(continua).toHaveCount(0, { timeout: 6_000 });
+  await expect(page.getByRole('heading', { name: 'Team' })).toBeVisible();
 });
