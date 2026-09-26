@@ -20,22 +20,47 @@ contesti sullo stesso modello condividono le stesse debolezze e cadono insieme.
 
 ## Come si fa
 
+- **Chi è contaminato lo dice il prompt, non un elenco di superfici.** Il
+  contenuto esterno entra nei prompt IMBUSTATO, da una porta sola
+  ([Il canale fidato non trasporta testo di fuori](il-canale-fidato-non-trasporta-testo-di-fuori.md)), e il contenuto non può forgiare
+  una busta. Quindi basta guardare il prompt già montato: se c'è dentro una
+  busta, quello che ne esce passa dal guardiano. Sette giri di questo feedback
+  sono andati dietro a un elenco di superfici tenuto a mano, e ce n'era sempre
+  una fuori (la chat, il saluto della home, il riquadro del tasto destro, la
+  chat dell'editor, l'assistente sulla pagina, il testo lasciato in un timer).
+- **Il verso della regola è la regola.** Di serie una funzione è guardata;
+  l'elenco è quello delle ECCEZIONI, con la ragione di ognuna
+  (`SN_CONST.SENZA_GUARDIANO`), e una funzione nuova nasce protetta senza che
+  nessuno se ne ricordi. Sono fuori solo le funzioni che ridanno il testo di
+  qualcun altro trasformato (traduzioni, trascrizioni, correzioni) e quelle che
+  prendono una decisione interna senza scrivere una frase.
 - **Una porta sola, e chi la salta si rompe.** Il magazzino delle notifiche
   RIFIUTA una voce contaminata senza il timbro del controllo: non è un
-  promemoria da ricordarsi, è un errore. Una superficie nuova che se ne
-  dimentica lo scopre subito, invece di mostrare a un utente quello che gli ha
-  scritto un estraneo.
-- **Prima quello che non costa niente.** Codici usa e getta, chiavi, coordinate
-  bancarie, un segreto custodito da Filo, un collegamento che non porta dove
-  dice: sono forme, si riconoscono in locale, funzionano a rete staccata e non
-  chiamano nessun modello.
+  promemoria da ricordarsi, è un errore.
+- **I controlli locali riconoscono FORME, non intenzioni.** Un segreto
+  custodito da Filo, la forma di una chiave, un IBAN valido, un numero di carta
+  che torna, un collegamento che non porta dove dice, un marchio di codice
+  monouso (otp, usa e getta, di recupero). Tutto qui. Sette giri hanno provato
+  a insegnargli quando un «codice di accesso» è una credenziale e quando è il
+  portone di casa, e ogni giro trovava un'altra parola comune da fermare:
+  telepass, posteggio, lavanderia, wifi, prenotazione. Quelle frasi le legge il
+  guardiano, che ha davanti la frase intera; finché non ha risposto il testo non
+  compare comunque, quindi non si perde niente.
 - **Il modello diverso è un requisito, non una preferenza.** La catena del
-  guardiano perde i soprannomi usati da chi ha scritto il testo; se non resta
-  niente, l'avviso va in coda.
+  guardiano perde i soprannomi usati da chi ha scritto il testo, e il confronto
+  si rifà sui modelli CONCRETI quando la catena è già costruita: fra la scelta
+  e la chiamata c'è chi riscrive i soprannomi (l'interruttore «solo modelli a
+  pesi aperti» sostituisce ogni proprietario col suo equivalente aperto, e due
+  nomi diversi possono arrivare allo stesso modello). Se non resta niente, il
+  testo va in coda.
 - **I motivi sono chiusi.** Il guardiano sceglie una chiave da un elenco, non
   scrive la frase: la riga che l'utente legge nasce nel codice, quindi un testo
   ostile non arriva a scriverla nemmeno convincendo il modello. Stessa idea del
   giudice dei siti pericolosi.
+- **Della fonte si mostra solo l'identità verificabile.** L'indirizzo di posta
+  o il sito, mai il nome libero che chi manda si è scelto: dentro la riga «ho
+  fermato un avviso» quel campo è un megafono, e un numero verde da chiamare
+  non ha bisogno di nessun collegamento.
 - **I blocchi devono restare rari, e si devono poter contare.** Un guardiano
   che grida al lupo viene spento: il registro dei blocchi sta in Preferenze e si
   legge anche quando è vuoto. Del testo fermato non si conserva un'anteprima
@@ -48,7 +73,11 @@ contesti sullo stesso modello condividono le stesse debolezze e cadono insieme.
 
 ## Dove vive
 
-- `src/shared/fiducia.js` — quanto ci si fida delle fonti di un compito.
+- `src/shared/contenutoEsterno.js` — `tipiPresenti`: chi ha letto roba di altri.
+- `src/shared/fiducia.js` — quanto vale ogni tipo di contenuto esterno.
+- `src/shared/constants.js` — `SENZA_GUARDIANO`: le eccezioni, con la ragione.
+- `src/main/services/handlers.js` — il punto in cui ogni testo del modello
+  passa di qui prima di tornare a chi lo mostra.
 - `src/shared/guardianoStatico.js` — i controlli deterministici.
 - `src/shared/guardiano.js` — la domanda, i motivi chiusi, la regola del
   modello diverso.
