@@ -144,7 +144,7 @@ test('l\'archiviazione automatica non si fa consegnare le segnalazioni aperte, e
   // Il verdetto: quello che va archiviato e quello che gli utenti dicono rotto.
   // Filtrare non deve cambiarlo di una virgola.
   expect(out, out).toMatch(/Da archiviare \(1\)/);
-  expect(out, out).toMatch(/gli utenti dicono che non va \(1[^)]*\): d-rotta/);
+  expect(out, out).toMatch(/gli utenti dicono che non va[^(]*\(1[^)]*\): d-rotta/);
 
   const consegnate = JSON.parse(readFileSync(stat, 'utf8')).consegnate;
   const apertePagate = consegnate.filter((id) => APERTE.includes(id));
