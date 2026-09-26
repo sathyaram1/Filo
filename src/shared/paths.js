@@ -48,11 +48,13 @@
   const MAX_PAGE_SIZE = 200;
 
   // Quanti percorsi si chiedono quando il chiamante non dice un numero. Il
-  // prompt dell'Aiuto ne imbusta al massimo ventinove di dimensione normale
-  // prima di finire il suo tetto di ventimila caratteri
-  // (pathsSafety → KNOWN_PATHS_BUDGET_CHARS): chiederne cinquanta voleva dire
-  // pagare venti letture che non arrivavano mai al modello (#679).
-  const DEFAULT_PAGE_SIZE = 30;
+  // tetto del prompt (pathsSafety → KNOWN_PATHS_BUDGET_CHARS) ne tiene
+  // quarantotto lunghi otto passi e centotrentacinque corti: abbassare qui a
+  // trenta toglieva all'Aiuto strade che nel messaggio ci sarebbero entrate,
+  // e con la copia in memoria le letture risparmiate erano poche decine
+  // all'ora (#679, primo giro). Il numero si misura, non si indovina:
+  // tests/unit/percorsiCopiaInMemoria.test.mjs.
+  const DEFAULT_PAGE_SIZE = 50;
 
   // Una copia in memoria per dominio. L'agente Aiuto rilegge i percorsi a OGNI
   // turno sulla stessa pagina, e ogni rilettura è `limit` letture di Firestore
