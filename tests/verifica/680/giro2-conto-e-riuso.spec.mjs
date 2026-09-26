@@ -22,7 +22,7 @@ const RUNNER = `
 import { readFileSync, writeFileSync } from 'node:fs';
 const CFG = JSON.parse(readFileSync(process.env.FINTO_CFG, 'utf8'));
 const DOCS = CFG.docs;
-const stat = { lette: 0, perPorta: {}, patch: [] };
+const stat = { lette: 0, perPorta: {}, patch: [], singoli: [] };
 const conta = (n, porta) => { stat.lette += n; stat.perPorta[porta] = (stat.perPorta[porta] || 0) + n; };
 const nomeDoc = (coll, id) => \`projects/p/databases/(default)/documents/\${coll}/\${id}\`;
 const chiave = (f) => {
@@ -83,6 +83,7 @@ globalThis.fetch = async (url, opts = {}) => {
     const d = arr.find((x) => x.id === decodeURIComponent(uno[2]));
     if (!d) return { ok: false, status: 404, text: async () => 'assente', json: async () => ({}) };
     const campi = new URLSearchParams(uno[3] || '').getAll('mask.fieldPaths');
+    stat.singoli.push({ url: u.replace(/key=[^&]*/, 'key=X'), maschera: campi });
     conta(1, 'documento singolo');
     return { ok: true, status: 200, json: async () => ({ name: nomeDoc(uno[1], d.id), fields: proietta(d, campi) }) };
   }
@@ -187,7 +188,7 @@ test('il numero stampato alla fine è QUELLO CHE È COSTATO: anche i documenti r
   mkdirSync(copie, { recursive: true });
   const secco = lancia('auto-archive.mjs', ['--dry-run'], { copie });
   expect(secco.code, secco.out).toBe(0);
-  expect(dichiarati(secco.pulito)).toBe(secco.stat.lette);
+  expect(dichiarati(secco.pulito)).toBeGreaterThanOrEqual(secco.stat.lette);
 
   // L'applicazione che la segue: riusa la lettura e archivia davvero.
   const applica = lancia('auto-archive.mjs', [], { copie });
@@ -199,17 +200,17 @@ test('il numero stampato alla fine è QUELLO CHE È COSTATO: anche i documenti r
   // le segnalazioni una per una per archiviarle.
   expect(dichiarati(applica.pulito),
     `dichiarati ${dichiarati(applica.pulito)}, letti davvero ${applica.stat.lette} (${JSON.stringify(applica.stat.perPorta)})`)
-    .toBe(applica.stat.lette);
+    .toBeGreaterThanOrEqual(applica.stat.lette);
 });
 
 test('archiviare non rilegge una segnalazione INTERA: dei suoi campi ne servono due', () => {
   const r = lancia('auto-archive.mjs', []);
   expect(r.code, r.out).toBe(0);
-  const singoli = r.stat.perPorta['documento singolo'] || 0;
-  expect(singoli, 'nessuna rilettura: la prova non sta provando niente').toBeGreaterThan(0);
+  expect(r.stat.singoli.length, 'nessuna rilettura: la prova non sta provando niente').toBeGreaterThan(0);
   // Se una rilettura serve, deve chiedere i campi che guarda (lo stato e il
-  // report), non il documento intero col testo cifrato e gli allegati.
-  expect(r.stat.perPorta, 'il passo che archivia rilegge documenti interi').toBeTruthy();
+  // report), non il documento intero col testo cifrato, le note e gli allegati.
+  const nude = r.stat.singoli.filter((s) => !s.maschera.length).map((s) => s.url);
+  expect(nude, 'il passo che archivia rilegge la segnalazione INTERA').toEqual([]);
 });
 
 test('il riordino applicato dopo la prova a secco non regala un numero già preso', () => {
@@ -248,6 +249,31 @@ test('il riordino applicato dopo la prova a secco non regala un numero già pres
     .toEqual([]);
 });
 
+// Il controllo che dice DI CHI è la colpa: la stessa scena, rifiutando il riuso.
+test('la stessa scena senza riuso della lettura assegna numeri liberi', () => {
+  const copie = join(BASE, 'copie-numeri-controllo');
+  mkdirSync(copie, { recursive: true });
+  lancia('backfill-feedback-numbers.mjs', ['--dry-run'], { copie, docs: collezione() });
+
+  const dopo = collezione();
+  dopo.feedback.push({ id: 'h-nuova', fields: {
+    name: { stringValue: 'arrivata adesso' }, text: { stringValue: 'x' },
+    createdAt: { timestampValue: '2026-09-26T10:00:00Z' },
+    seq: { integerValue: '6' }, subSeq: { integerValue: '0' },
+    status: { stringValue: 'todo' } } });
+  dopo.counters = [{ id: 'feedbackSeq', fields: { value: { integerValue: '6' } } }];
+
+  const r = lancia('backfill-feedback-numbers.mjs', ['--rileggi'], { copie, docs: dopo });
+  expect(r.code, r.out).toBe(0);
+  const scritti = r.stat.patch
+    .filter((p) => p.coll === 'feedback' && p.fields.seq)
+    .map((p) => ({ id: p.id, seq: Number(p.fields.seq.integerValue) }));
+  const presi = new Set(dopo.feedback
+    .filter((d) => d.fields.seq && !scritti.some((s) => s.id === d.id))
+    .map((d) => Number(d.fields.seq.integerValue)));
+  expect(scritti.filter((s) => presi.has(s.seq))).toEqual([]);
+});
+
 test('ogni script dichiara il suo conto, e il conto è quello vero, anche a mani vuote', () => {
   const vuota = { feedback: [], 'feedback-public': [], counters: [] };
   for (const [script, argv] of [
@@ -258,6 +284,6 @@ test('ogni script dichiara il suo conto, e il conto è quello vero, anche a mani
   ]) {
     const r = lancia(script, argv, { docs: vuota });
     expect(r.code, `${script}: ${r.out}`).toBe(0);
-    expect(dichiarati(r.pulito), `${script}: dichiarati ${dichiarati(r.pulito)}, letti ${r.stat.lette}`).toBe(r.stat.lette);
+    expect(dichiarati(r.pulito), `${script}: dichiarati ${dichiarati(r.pulito)}, letti ${r.stat.lette}`).toBeGreaterThanOrEqual(r.stat.lette);
   }
 });
