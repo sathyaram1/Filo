@@ -541,15 +541,9 @@ async function main() {
     // Gli spec si scelgono PRIMA dei controlli di logica: se non potranno partire, ci si ferma
     // adesso e non dopo gli unit test.
     if (!spec.rilancia) console.log(`\n${spec.nota}`);
-    let changed = spec.rilancia ? git(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean) : [];
-    const dal = spec.rilancia ? shaDelRiallineamento(readMarker(ROOT)) : '';
-    if (dal) {
-      const lato = cambiatiDal(dal);
-      console.log(lato
-        ? `\nGiro di riallineamento: scelgo gli spec anche dai ${lato.length} file cambiati da ${dal.slice(0, 8)} (il commit verificato) alla punta, cioè il lato arrivato da main e i file in conflitto.`
-        : `\nGiro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} qui non c'è: scelgo gli spec solo dal ramo contro main, e il lato arrivato da main resta scoperto.`);
-      if (lato) changed = [...new Set([...changed, ...lato])];
-    }
+    const scelta = spec.rilancia ? cambiatiPerLaScelta({ base, marker: readMarker(ROOT) }) : { changed: [], nota: '' };
+    if (scelta.nota) console.log(`\n${scelta.nota}`);
+    const changed = scelta.changed;
     // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
     // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
     // l'elenco degli spec tracciati e filtriamo in memoria.
