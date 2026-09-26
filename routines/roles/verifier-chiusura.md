@@ -34,6 +34,8 @@ a questo testo, sotto «Perimetro di questo giro». Guardi tre cose.
    salvataggio automatico committa da solo, e `HEAD` contiene già la
    correzione. Poi torna con `git checkout HEAD -- <file>`, senza modificare
    altri file nel frattempo, o il salvataggio committa la versione vecchia.
+   Se succede, la registrazione della critica lo vede (il codice non è più
+   quello dell'avvio) e ti dice quali file rimettere.
 
 <!-- includi: _criteri-verifica.md -->
 
