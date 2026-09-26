@@ -722,10 +722,10 @@ async function passaDalSecondoModello({ testo, classe, concreteModel, action, pa
     : (esito.regola === 'senza-guardiano'
       ? 'Ho la risposta pronta, ma non posso mostrartela: al controllo di sicurezza manca un modello suo, diverso da quello che scrive le risposte. Si sceglie in Opzioni → Modelli → «Guardiano degli avvisi».'
       : 'Ho la risposta pronta, ma il controllo di sicurezza non risponde. Riprova fra poco.');
+  // Il blocco si conta e si rilegge: la riga nella colonna degli avvisi porta
+  // il pulsante che apre il registro, e resta anche se la chat viene chiusa.
   if (esito.esito === 'blocca') {
-    try {
-      await G.registraSoloBlocco({ fonte, classe, testo, esito, action });
-    } catch (_) {}
+    try { await G.registraBlocco({ fonte, classe, testo, esito }); } catch (_) {}
   }
   return { testo: vestiComeLOriginale(testo, riga), esito: esito.esito, motivo: esito.motivo || '' };
 }
