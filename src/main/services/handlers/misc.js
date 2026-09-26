@@ -521,6 +521,11 @@ module.exports = function register(on, ctx) {
       // l'utente (l'unico canale disponibile dal main verso le pagine è il
       // broadcast di un toast). Il feedback è comunque partito col resto.
       onDone: (_item, result) => {
+        // #678 — l'id resta scritto qui: è così che il popup delle ricompense
+        // può chiedere LE PROPRIE schede invece di scaricare la bacheca intera
+        // per cercarsi dentro. Best-effort: un registro mancato costa una
+        // ricompensa in ritardo, non un feedback perso.
+        try { globalThis.SN_FEEDBACK_MINE?.ricordaId?.(result?.id); } catch (_) {}
         const failed = Array.isArray(result?.failed) ? result.failed : [];
         if (!failed.length) return;
         const names = failed.map((f) => f?.name || 'allegato').join(', ');

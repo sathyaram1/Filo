@@ -43,10 +43,49 @@
   // muta è attrito).
   const LOAD_TIMEOUT_MS = 8000;
 
+  // Quante schede per pagina, quali campi, e quanto vale una copia su disco.
+  // La bacheca rileggeva TUTTE le schede a ogni apertura (#678): con 550 fix
+  // erano 550 letture per apertura e per utente, e il numero cresce da sé a
+  // ogni fix che esce. Adesso si chiede una pagina per volta, già ordinata dal
+  // server, con i soli campi che si vedono; il resto arriva scorrendo.
+  const PAGINA = Number(FB.BOARD_PAGE_SIZE) || 50;
+
+  // I campi che la bacheca DISEGNA o su cui FILTRA. Fuori restano la frase per
+  // chi ha segnalato, l'impronta del segnalatore e la cifra della ricompensa:
+  // sulla bacheca non si vedono, e quello che non arriva non si può nemmeno
+  // leggere per sbaglio.
+  const CAMPI = [
+    'name', 'seq', 'subSeq',
+    'status', 'statusPublic', 'resolvedInVersion',
+    'createdAt', 'publishedAt',
+    'votes', 'reopenRequests',
+  ];
+
+  // La copia su disco fa comparire la bacheca SUBITO, senza aspettare la rete.
+  // Dopo questo tempo si ricomincia da capo: è il ritardo massimo con cui la
+  // pagina si accorge che una scheda è stata tolta (succede quando un fix
+  // torna in lavorazione), perché una scheda sparita non compare in nessuna
+  // domanda su «cosa è cambiato».
+  const CACHE_KEY = 'sn_board_schede';
+  const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+  // Freno contro un ciclo: le schede cambiate si chiedono a pagine, e se sono
+  // più di così tanto vale ricominciare dalla prima pagina.
+  const CAMBIATE_MAX_PAGINE = 10;
+
   // ── Stato ──────────────────────────────────────────────────────────────
   let signedIn = false;
   let uid = null;               // uid Firebase REALE (claim id token), per votes.<uid>
   let allFeedbacks = [];
+  // Dove riprendere lo scorrimento, se c'è altro, e se una pagina è in volo.
+  let cursore = null;
+  let completo = false;
+  let caricandoAltre = false;
+  let erroreAltre = false;
+  // Il `publishedAt` più alto già visto: è il segnalibro con cui si chiede
+  // «cosa è cambiato da quando non guardavo» pagando una lettura per scheda
+  // cambiata invece che per scheda esistente.
+  let segnalibro = '';
+  let osservatore = null;
   // I miglioramenti sono arrivati davvero, e — se no — perché. Serve a ogni
   // ridisegno, non solo al primo: un re-render (es. dopo un login) ripartirebbe
   // da una lista vuota e scriverebbe "Nessun miglioramento…" al posto
@@ -133,11 +172,17 @@
     const items = MR.listBoardTab(allFeedbacks, { releasedVersion });
     bdLoading.hidden = true;
     if (bdError) bdError.hidden = true;
+    rimuoviSentinella(); // il nodo vecchio sparisce con la lista: l'osservatore no
     bdList.innerHTML = '';
 
-    if (!items.length) {
+    // Vuoto NON vuol dire «non c'è niente» finché c'è una pagina dopo: le
+    // schede arrivano a pagine, e una pagina intera può essere tutta di fix non
+    // ancora usciti in produzione. Dirgli «Nessun miglioramento» mentre le
+    // altre stanno arrivando sarebbe falso.
+    if (!items.length && completo) {
       bdEmpty.hidden = false;
       bdList.hidden = true;
+      rimuoviSentinella();
       return;
     }
     bdEmpty.hidden = true;
@@ -146,6 +191,7 @@
     for (const fb of items) {
       bdList.appendChild(renderCard(fb));
     }
+    montaSentinella();
 
     if (scrivevaIn && scrivevaIn.id) {
       const campo = bdList.querySelector(`.bd-reopen-text[data-fb-id="${CSS.escape(scrivevaIn.id)}"]`);
@@ -323,6 +369,7 @@
         if (r && r.ok) {
           fb.reopenRequests = { ...(fb.reopenRequests || {}), [uid]: { at: new Date().toISOString() } };
           bozzeRiapertura.delete(id);
+          salvaCache(); // la riapertura appena chiesta non torna indietro
           renderList();
         } else {
           errEl.textContent = (r && r.error) || 'Invio non riuscito, riprova.';
@@ -420,6 +467,7 @@
           fb.votes = (r.votes && typeof r.votes === 'object') ? r.votes : fb.votes;
           if (r.uid) uid = r.uid;
           if (r.awarded && r.credits) flyCreditsFromButton(originRect, r.credits);
+          salvaCache(); // il proprio voto si rivede anche riaprendo la pagina
         } else {
           // Errore: torna allo stato precedente al click.
           fb.votes = prevVotes;
@@ -509,6 +557,118 @@
     } catch (_) {}
   }
 
+  // ── Lo scorrimento chiede la pagina dopo ────────────────────────────────
+  // In fondo alla lista c'è una riga che dice che si sta caricando: appena
+  // entra in vista, arriva la pagina successiva. L'attesa non è mai muta
+  // (filo_design: se non si può stimare il tempo, una rotella).
+  function montaSentinella() {
+    if (completo) { rimuoviSentinella(); return; }
+    const riga = document.createElement('div');
+    riga.className = 'bd-more';
+    riga.id = 'bdMore';
+    bdList.appendChild(riga);
+    // Una pagina che non è arrivata lascerebbe una rotella che gira per
+    // sempre: si dice cosa è successo e si dà il modo di riprovare, perché
+    // lo scorrimento da solo non ci ripassa più.
+    if (erroreAltre) {
+      const testo = document.createElement('span');
+      testo.textContent = 'Non sono riuscito a caricarne altri.';
+      const riprova = document.createElement('button');
+      riprova.type = 'button';
+      riprova.className = 'bd-retry';
+      riprova.textContent = '↻ Riprova';
+      riprova.addEventListener('click', () => { erroreAltre = false; renderList(); caricaAltre(); });
+      riga.append(testo, riprova);
+      return;
+    }
+    riga.innerHTML = '<span class="bd-spinner" aria-hidden="true"></span><span>Carico altri miglioramenti…</span>';
+    if (!osservatore && typeof IntersectionObserver === 'function') {
+      osservatore = new IntersectionObserver((voci) => {
+        if (voci.some((v) => v.isIntersecting)) caricaAltre();
+      }, { rootMargin: '200px' });
+    }
+    if (osservatore) osservatore.observe(riga);
+    // Senza IntersectionObserver (o con una finestra così alta che la
+    // sentinella è già in vista e non "entra" mai) la pagina dopo la chiede
+    // comunque qualcuno: qui, subito.
+    else caricaAltre();
+  }
+
+  function rimuoviSentinella() {
+    try { if (osservatore) osservatore.disconnect(); } catch (_) {}
+    const vecchia = document.getElementById('bdMore');
+    if (vecchia) vecchia.remove();
+  }
+
+  // ── La copia su disco ───────────────────────────────────────────────────
+  // Serve a far comparire la bacheca senza aspettare la rete. Non è la
+  // verità: la verità è il server, e la copia vale finché non scade.
+  async function leggiCache() {
+    try {
+      const r = await chrome.storage.local.get(CACHE_KEY);
+      const c = r && r[CACHE_KEY];
+      if (!c || !Array.isArray(c.cards) || !c.cards.length) return null;
+      if (Date.now() - (Number(c.at) || 0) >= CACHE_TTL_MS) return null;
+      return c;
+    } catch (_) { return null; }
+  }
+
+  function salvaCache() {
+    try {
+      const p = chrome.storage.local.set({
+        [CACHE_KEY]: {
+          at: Date.now(),
+          cards: allFeedbacks,
+          after: cursore,
+          complete: completo,
+          segnalibro,
+        },
+      });
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (_) {}
+  }
+
+  function scordaCache() {
+    try {
+      const p = chrome.storage.local.set({ [CACHE_KEY]: null });
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (_) {}
+  }
+
+  // ── Fondere quello che arriva con quello che c'è ────────────────────────
+  // L'ordine è quello della query (dalla più recente per data d'invio, e a
+  // parità di data per identificativo): ricostruirlo qui con un criterio suo
+  // farebbe apparire le schede in un ordine diverso da quello in cui
+  // arrivano le pagine dopo.
+  function fondi(arrivate) {
+    const perId = new Map();
+    for (const c of allFeedbacks) {
+      const id = String((c && c._id) || '');
+      if (id) perId.set(id, c);
+    }
+    for (const r of Array.isArray(arrivate) ? arrivate : []) {
+      const id = String((r && r._id) || '');
+      if (!id) continue;
+      perId.set(id, r);
+      const p = String(r.publishedAt || '');
+      if (p > segnalibro) segnalibro = p;
+    }
+    allFeedbacks = [...perId.values()].sort((a, b) => {
+      const ca = String((a && a.createdAt) || '');
+      const cb = String((b && b.createdAt) || '');
+      if (ca !== cb) return ca < cb ? 1 : -1;
+      return String((b && b._id) || '').localeCompare(String((a && a._id) || ''));
+    });
+  }
+
+  // Una scheda cambiata che sta SOTTO l'ultima caricata non si aggiunge: la
+  // sua posizione è in una pagina che non è ancora arrivata, e metterla qui la
+  // farebbe comparire da sola in mezzo a un buco. Arriverà scorrendo.
+  function dentroLaFinestra(r) {
+    if (completo || !cursore) return true;
+    return String((r && r.createdAt) || '') >= String(cursore.createdAt || '');
+  }
+
   // ── Caricamento ─────────────────────────────────────────────────────────
   // Stato d'errore, DISTINTO dal vuoto: se la fetch fallisce (niente rete, rete
   // caduta) mostriamo un messaggio comprensibile + "Riprova", invece di ripiegare
@@ -519,6 +679,7 @@
     bdLoading.hidden = true;
     bdList.hidden = true;
     bdEmpty.hidden = true;
+    rimuoviSentinella();
     if (!bdError || !bdErrorMsg) return;
     const msg = (window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
       ? SN_CHAT_ERRORS.sentence(err)
@@ -528,42 +689,90 @@
     if (bdRetry) bdRetry.disabled = false;
   }
 
-  async function loadData() {
-    bdLoading.hidden = false;
+  async function versioneRilasciata() {
+    if (releasedVersion) return;
+    try {
+      const r = await sendToMain({ type: 'get_update_recap' });
+      if (r && r.current) releasedVersion = r.current;
+    } catch (_) { /* senza versione il gate è inattivo: done→bacheca come prima */ }
+  }
+
+  // #583: la bacheca legge la VISTA pubblica (`feedback-public`), non i
+  // feedback. Prima scaricava i documenti interi — testo, URL, user agent,
+  // link agli screenshot — e decideva qui cosa disegnare: ma "filtrato in
+  // pagina" vuol dire solo "non disegnato", il resto era già arrivato. Adesso
+  // ogni scheda contiene SOLO i campi pubblici, e le schede esistono solo per
+  // i fix chiusi e mai segnalati dalla sicurezza (la decisione sta in
+  // src/shared/feedbackPublicView.js, dove lo status si può leggere davvero).
+  // I filtri di `listBoardTab` restano: sono la seconda rete, e il gate
+  // "uscito in produzione" (DB3) dipende dalla versione che gira su QUESTA
+  // macchina, quindi va applicato qui.
+  //
+  // #678: una PAGINA per volta, ordinata dal server. Il tetto non c'è più (le
+  // schede più vecchie arrivano scorrendo) e il costo di un'apertura non
+  // cresce più con il numero di fix usciti.
+  async function caricaPrimaPagina() {
+    const r = await FB.listPublicPage({ pageSize: PAGINA, fields: CAMPI, timeoutMs: LOAD_TIMEOUT_MS });
+    allFeedbacks = [];
+    segnalibro = '';
+    cursore = r.after;
+    completo = !!r.complete;
+    fondi(r.rows);
+  }
+
+  // Cosa è cambiato da quando non guardavo. Costa una lettura per scheda
+  // cambiata — quasi sempre nessuna — invece di una per scheda esistente.
+  async function aggiornaDalSegnalibro() {
+    let since = segnalibro;
+    for (let giro = 0; giro < CAMBIATE_MAX_PAGINE; giro += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const r = await FB.listPublicChangedSince({
+        since, pageSize: PAGINA, fields: CAMPI, timeoutMs: LOAD_TIMEOUT_MS,
+      });
+      const righe = (r.rows || []).filter(dentroLaFinestra);
+      if (righe.length) fondi(righe);
+      // Il segnalibro avanza anche sulle schede scartate perché fuori
+      // finestra: sono già state viste, e richiederle a ogni apertura
+      // rifarebbe pagare la stessa lettura per sempre.
+      for (const x of r.rows || []) {
+        const p = String((x && x.publishedAt) || '');
+        if (p > segnalibro) segnalibro = p;
+      }
+      if (r.complete) return;
+      if (segnalibro === since) return; // nessun avanzamento: niente cicli
+      since = segnalibro;
+    }
+  }
+
+  async function loadData({ daCapo = false } = {}) {
+    erroreAltre = false;
     bdList.hidden = true;
     bdEmpty.hidden = true;
     if (bdError) bdError.hidden = true;
 
-    if (!releasedVersion) {
-      try {
-        const r = await sendToMain({ type: 'get_update_recap' });
-        if (r && r.current) releasedVersion = r.current;
-      } catch (_) { /* senza versione il gate è inattivo: done→bacheca come prima */ }
+    await versioneRilasciata();
+
+    // La copia su disco: la bacheca compare subito, poi si rimette in pari.
+    const cache = daCapo ? null : await leggiCache();
+    if (cache && !schedeImposteDaFuori) {
+      allFeedbacks = cache.cards;
+      cursore = cache.after || null;
+      completo = !!cache.complete;
+      segnalibro = String(cache.segnalibro || '');
+      dataLoaded = true;
+      lastLoadError = null;
+      renderList();
+    } else {
+      bdLoading.hidden = false;
     }
 
     try {
-      // #583: la bacheca legge la VISTA pubblica (`feedback-public`), non i
-      // feedback. Prima scaricava i documenti interi — testo, URL, user agent,
-      // link agli screenshot — e decideva qui cosa disegnare: ma "filtrato in
-      // pagina" vuol dire solo "non disegnato", il resto era già arrivato.
-      // Adesso ogni scheda contiene SOLO i campi pubblici, e le schede
-      // esistono solo per i fix chiusi e mai segnalati dalla sicurezza (la
-      // decisione sta in src/shared/feedbackPublicView.js, dove lo status si
-      // può leggere davvero). I filtri qui sotto restano: sono la seconda
-      // rete, e il gate "uscito in produzione" (DB3) dipende dalla versione
-      // che gira su QUESTA macchina, quindi va applicato qui.
-      //
-      // TUTTE le schede, paginate: un fix vecchio pubblicato in bacheca deve
-      // comparire in bacheca. Il tetto per data d'invio faceva sparire dalla
-      // vetrina le schede oltre la cinquecentesima, che esistevano e che nessun
-      // filtro qui sotto aveva scartato.
-      const arrivate = FB.listAllPublic
-        ? await FB.listAllPublic({ timeoutMs: LOAD_TIMEOUT_MS })
-        : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
+      if (cache) await aggiornaDalSegnalibro();
+      else await caricaPrimaPagina();
       if (schedeImposteDaFuori) return;
-      allFeedbacks = arrivate;
       dataLoaded = true;
       lastLoadError = null;
+      salvaCache();
     } catch (err) {
       // Il caricamento è FALLITO: non fingere "lista vuota". Mostra l'errore con
       // il tasto Riprova e fermati qui (renderList mostrerebbe #bdEmpty).
@@ -571,6 +780,10 @@
       // invece di ripiegare sul vuoto.
       console.error('[board] errore caricamento:', err);
       if (schedeImposteDaFuori) return;
+      // Con la copia su disco davanti agli occhi un guasto del giro di
+      // aggiornamento non deve portare via i miglioramenti già mostrati: le
+      // schede ci sono, sono solo vecchie di poco.
+      if (dataLoaded && allFeedbacks.length) return;
       lastLoadError = err;
       showLoadError(err);
       return;
@@ -580,13 +793,41 @@
     renderList();
   }
 
+  // La pagina dopo, chiesta dallo scorrimento. Un guasto qui NON cancella
+  // quello che si sta già guardando: la sentinella resta, e il prossimo
+  // scorrimento riprova.
+  async function caricaAltre() {
+    if (caricandoAltre || completo || !dataLoaded) return;
+    caricandoAltre = true;
+    try {
+      const r = await FB.listPublicPage({
+        pageSize: PAGINA, fields: CAMPI, timeoutMs: LOAD_TIMEOUT_MS, after: cursore,
+      });
+      if (schedeImposteDaFuori) return;
+      erroreAltre = false;
+      if (r.after) cursore = r.after;
+      completo = !!r.complete;
+      fondi(r.rows);
+      salvaCache();
+      renderList();
+    } catch (err) {
+      console.error('[board] pagina successiva non caricata:', err);
+      erroreAltre = true;
+      renderList();
+    } finally {
+      caricandoAltre = false;
+    }
+  }
+
   // "Riprova": ritenta il caricamento (il tasto si disabilita mentre è in volo,
   // così un doppio click non lancia due fetch). loadData rimette a posto loader/
   // stato a ogni giro.
   if (bdRetry) {
     bdRetry.addEventListener('click', () => {
       bdRetry.disabled = true;
-      loadData();
+      // Si riparte dalla prima pagina, non dalla copia su disco: se si è
+      // arrivati qui la copia non c'era o non bastava.
+      loadData({ daCapo: true });
     });
   }
 
@@ -600,7 +841,10 @@
     // Dati iniettati = dati arrivati: azzera anche l'eventuale guasto ricordato.
     setData(fbs) {
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
+      // Dati messi da fuori vuol dire TUTTI i dati: niente pagina dopo da
+      // chiedere, e una lista vuota è un vuoto vero.
       dataLoaded = true; lastLoadError = null; schedeImposteDaFuori = true;
+      completo = true; erroreAltre = false; cursore = null;
       renderList();
     },
     setSignedIn(email) { signedIn = !!email; uid = email || null; reflectAuth(); renderList(); },
@@ -619,7 +863,8 @@
     reload() {
       schedeImposteDaFuori = false;
       try { if (FB.forgetAllPublic) FB.forgetAllPublic(); } catch (_) {}
-      return loadData();
+      scordaCache();
+      return loadData({ daCapo: true });
     },
     // Sostituisce la sorgente dati usata da loadData con una funzione di test
     // (che risolve o rigetta). Va scritta sulla stessa reference `FB` che
@@ -629,7 +874,19 @@
     // `listAllPublic` è la sorgente vera della bacheca: va sostituita anche
     // lei, o la prova crederebbe di aver messo dei dati finti e la pagina
     // leggerebbe la rete.
-    setList(fn) { if (typeof fn === 'function') { FB.listAllPublic = fn; FB.listPublic = fn; FB.list = fn; } },
+    setList(fn) {
+      if (typeof fn !== 'function') return;
+      FB.listAllPublic = fn; FB.listPublic = fn; FB.list = fn;
+      // Le domande vere della bacheca (#678) vanno sostituite anche loro, o la
+      // prova crederebbe di aver messo dati finti e la pagina leggerebbe la
+      // rete. Una sorgente di prova torna tutto in una volta: una pagina sola,
+      // e niente da aggiornare dopo.
+      FB.listPublicPage = async (opts) => {
+        const rows = await fn(opts);
+        return { rows: Array.isArray(rows) ? rows : [], after: null, complete: true };
+      };
+      FB.listPublicChangedSince = async () => ({ rows: [], complete: true });
+    },
   };
 
   if (document.readyState === 'loading') {

@@ -110,6 +110,38 @@ la memoria non combacia più e si rilegge, quindi una prova non si ritrova mai
 davanti i dati della scena precedente. E si ricorda **solo una lettura
 completa**: memorizzare un troncamento vuol dire ripeterlo per mezzo minuto.
 
+## La memoria breve limita le ripetizioni, non il costo (#678)
+
+Una memoria di trenta secondi toglie le riletture DENTRO una sessione. Non
+toglie la lettura: resta una per apertura, per riga e **per utente**. Con 550
+schede e cento tester sono oltre un milione di letture al giorno, per due
+domande che di righe ne volevano poche.
+
+Il passo dopo non è una memoria più lunga: è **cambiare domanda**.
+
+- «Mi spetta una ricompensa?» non è una domanda sull'insieme: riguarda le
+  poche segnalazioni di CHI CHIEDE, e i loro identificativi li sa la sua
+  macchina. Da #678 li scrive man mano che le manda
+  (`src/shared/feedbackMine.js`), e chiede quelle schede per nome
+  (`getManyPublic`): zero letture quando non c'è niente da sapere. L'impronta
+  sulla scheda non si può interrogare, ed è voluto — è diversa su ogni scheda
+  apposta, perché nessuno possa raggruppare i fix per segnalatore (#583).
+- «Cosa mostra la bacheca?» è una domanda sulla PRIMA SCHERMATA: una pagina
+  ordinata dal server (`listPublicPage`, cursore su data più nome del
+  documento), le altre allo scorrimento. Le righe già viste stanno su disco, e
+  al server si chiede solo cosa è cambiato da allora (`listPublicChangedSince`,
+  sul timbro `publishedAt`): una lettura per scheda cambiata, non per scheda
+  esistente.
+
+Il prezzo, dichiarato: una scheda TOLTA non compare in nessuna domanda su «cosa
+è cambiato», quindi la copia su disco scade — sei ore — e dopo si riparte dalla
+prima pagina. Un tetto sul tempo, non sul numero di righe.
+
+E chi segnalava già PRIMA che il registro esistesse non ha i propri
+identificativi da nessuna parte: per un mese continua a cercarsi le schede
+leggendole tutte, una volta al giorno invece che a ogni apertura, poi smette. È
+una finestra che si chiude da sola; le installazioni nuove non ci passano mai.
+
 ## Da una pagina la lettura completa la fa il main
 
 Le porte complete paginano col cursore, e `list` il cursore lo RIFIUTA quando
