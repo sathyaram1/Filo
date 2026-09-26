@@ -57,6 +57,12 @@ const NORMAL = new Set([
   'com.es', 'org.es', 'gob.es', 'edu.es',
   'com.pt', 'gov.pt', 'edu.pt',
   'co.at', 'or.at', 'gv.at', 'ac.at',
+  // Sezione privata della PSL: piattaforme che danno un sottodominio a ogni utente. Senza, `utente.github.io`
+  // diventa `github.io` («GitHub su .io», falso allarme) e `vercel.app` in whitelist copre ogni pagina ospitata.
+  'github.io', 'githubusercontent.com', 'gitlab.io', 'pages.dev', 'workers.dev',
+  'vercel.app', 'netlify.app', 'web.app', 'firebaseapp.com', 'herokuapp.com',
+  'appspot.com', 'blogspot.com', 'azurewebsites.net', 'onrender.com', 'fly.dev',
+  'surge.sh', 'glitch.me', 'neocities.org',
 ]);
 
 // Suffissi serviti come "wildcard": ogni etichetta sotto di essi è un suffisso
