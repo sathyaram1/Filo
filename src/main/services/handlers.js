@@ -3341,13 +3341,27 @@ function cosineInt(a, b) {
 
 // Completamento LLM one-shot per un'azione (risolve modello/chiave/limite e
 // registra il costo). Ritorna il testo. Usato da riassunto, triage, re-rank.
-async function runOneShot(action, messages, { modelRef } = {}) {
+async function runOneShot(action, messages, { modelRef, escludiModelli } = {}) {
   const settings = await getEffectiveSettings();
   // `modelRef` serve a chi deve restringere la catena della sua azione: il
   // guardiano degli avvisi (#536) toglie da lì il modello che ha scritto il
   // testo. Senza, vale la catena configurata per l'azione.
   const model = modelRef || modelForAction(settings, action);
-  const attempts = await applyLimitToChain(settings, buildAttemptChain(settings, model, action));
+  let attempts = await applyLimitToChain(settings, buildAttemptChain(settings, model, action));
+  // `escludiModelli` guarda i modelli CONCRETI, dopo che la catena è stata
+  // costruita: fra la scelta dei soprannomi e la chiamata c'è chi li riscrive
+  // (#536, l'interruttore sui pesi aperti), e due soprannomi diversi possono
+  // arrivare allo stesso modello.
+  if (Array.isArray(escludiModelli) && escludiModelli.length) {
+    const fuori = new Set(escludiModelli.map((m) => String(m || '').toLowerCase()));
+    const resta = attempts.filter((a) => !fuori.has(String(a.model || '').toLowerCase()));
+    if (!resta.length) {
+      const e = new Error('nessun modello indipendente da quello che ha scritto il testo');
+      e.code = 'GUARDIANO_NON_INDIPENDENTE';
+      throw e;
+    }
+    attempts = resta;
+  }
   const result = await Providers.completeWithFallback({ attempts, messages });
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
