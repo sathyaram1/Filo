@@ -96,7 +96,7 @@ export async function tutti(base, qs, token) {
 let i = 0;
 for (const [come, corpo] of Object.entries(GRAFIE)) {
   i += 1;
-  test(`il freno NON scatta: ${come}`, () => {
+  test(`il freno scatta anche se la scansione è scritta così: ${come}`, () => {
     expect(frenoScatta(`__prova-freno-${i}.mjs`, corpo),
       `«${come}» scarica la collezione intera e la sentinella resta verde`).toBe(true);
   });
