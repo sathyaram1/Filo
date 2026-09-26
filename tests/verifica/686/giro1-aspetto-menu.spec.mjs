@@ -34,7 +34,7 @@ test('la voce dello zoom nel menu: chiaro e scuro', async ({ app, openTab, testS
       document.documentElement.dataset.snTheme = t;
       document.documentElement.setAttribute('data-theme', t);
     }, tema);
-    await page.locator('h1').click({ button: 'right' });
+    await page.locator('h1').click({ button: 'right', position: { x: 8, y: 8 } });
     const menu = page.locator('.sn-menu').first();
     await expect(menu).toBeVisible();
     await expect(menu.getByText(/Dimensione reale \(ora 150%\)/)).toBeVisible();
