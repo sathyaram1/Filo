@@ -284,3 +284,96 @@ test('sull\'editor Filo riferisce lo zoom del foglio, non quello della finestra'
   await execAction(app, { type: 'ZOOM_PAGINA', verso: 'reset' });
   await expect.poll(async () => page.evaluate(() => document.getElementById('doc').style.zoom)).toBe('');
 });
+
+// #686 (terzo giro) — LO ZOOM RESTA DELL'UTENTE, DALLE ULTIME DUE STRADE.
+// Il sito ci riprovava dal campo della percentuale (che sta nel suo documento:
+// gli bastava scriverci un numero) e mettendosi davanti ai gesti per zittirli,
+// lasciando la pagina dove voleva lui.
+
+test('il riquadro dello zoom applica il numero BATTUTO, non quello che ci scrive il sito', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, PAGINA);
+  await execAction(app, { type: 'ZOOM_PAGINA', percentuale: 200 });
+  await expect.poll(async () => percentOf(app, page)).toBe(200);
+
+  // L'utente apre il riquadro col clic sulla rotella.
+  await page.mouse.click(200, 200, { button: 'middle' });
+  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+
+  // Il sito scrive nel campo e finge l'Invio.
+  await page.evaluate(() => {
+    const i = document.getElementById('__filo-zoom-percent');
+    i.value = '25';
+    i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  await page.waitForTimeout(300);
+  expect(await percentOf(app, page)).toBe(200);
+
+  // …finge l'uscita dal campo.
+  await page.evaluate(() => {
+    const i = document.getElementById('__filo-zoom-percent');
+    i.value = '25';
+    i.dispatchEvent(new FocusEvent('blur'));
+  });
+  await page.waitForTimeout(300);
+  expect(await percentOf(app, page)).toBe(200);
+
+  // …e non finge niente: scrive, mette dentro il cursore e aspetta un clic
+  // vero dell'utente da qualunque parte.
+  await page.evaluate(() => {
+    const i = document.getElementById('__filo-zoom-percent');
+    i.value = '25';
+    i.focus();
+  });
+  await page.mouse.click(300, 300);
+  await page.waitForTimeout(300);
+  expect(await percentOf(app, page)).toBe(200);
+
+  // Quello che batte l'utente invece vale.
+  await page.mouse.click(200, 200, { button: 'middle' });
+  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+  await page.locator('#__filo-zoom-percent').fill('');
+  await page.locator('#__filo-zoom-percent').type('50');
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => percentOf(app, page)).toBe(50);
+});
+
+test('un sito non può zittire i gesti dello zoom: tasti, rotella e clic centrale rispondono lo stesso', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.locator('h1').click();
+
+  // Il sito si registra sulla finestra in cattura e ferma tutto sul nascere.
+  await page.evaluate(() => {
+    for (const tipo of ['keydown', 'wheel', 'mousedown']) {
+      window.addEventListener(tipo, (e) => { e.stopImmediatePropagation(); }, { capture: true });
+    }
+  });
+
+  await page.keyboard.press('Control+=');
+  await expect.poll(async () => percentOf(app, page)).toBeGreaterThan(100);
+  await page.keyboard.press('Control+0');
+  await expect.poll(async () => percentOf(app, page)).toBe(100);
+
+  // Il clic centrale apre lo stesso il riquadro, e lì la rotella zooma.
+  await page.mouse.click(200, 200, { button: 'middle' });
+  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+  await page.mouse.wheel(0, -300);
+  await expect.poll(async () => percentOf(app, page)).toBeGreaterThan(100);
+});
+
+test('editor: il tasto destro dice il livello del foglio e lo riporta alla dimensione reale', async ({ app, openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(1500);
+
+  await execAction(app, { type: 'ZOOM_PAGINA', percentuale: 150 });
+  await expect.poll(async () => page.evaluate(() => document.getElementById('doc').style.zoom)).toBe('1.5');
+
+  // Prima il menu taceva: leggeva il livello della finestra, fermo al 100%,
+  // mentre la chat diceva 150%. Due strade per la stessa cosa, due risposte.
+  await page.locator('#doc').click({ button: 'right' });
+  const voce = page.locator('.sn-menu').getByText(/Dimensione reale \(ora 150%\)/);
+  await expect(voce).toBeVisible();
+
+  await voce.click();
+  await expect.poll(async () => page.evaluate(() => document.getElementById('doc').style.zoom)).toBe('');
+});
