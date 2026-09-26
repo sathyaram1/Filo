@@ -210,7 +210,9 @@ describe('una meta\' di piattaforma che fallisce apre un feedback', () => {
     describe(nomeJob, () => {
       const testo = senzaCommenti(job(nomeJob));
       const elenco = passi(testo);
-      const iAllarme = elenco.findIndex((p) => /release-platform-alarm\.mjs/.test(p.corpo) && !/--attesi/.test(p.corpo));
+      // Il passo dell'allarme è quello che parte A GUASTO: lo strumento lo
+      // nominano anche il passo che lo mette al riparo e il controllo finale.
+      const iAllarme = elenco.findIndex((p) => /release-platform-alarm\.mjs/.test(p.corpo) && /if:\s*failure\(\)/.test(p.corpo));
 
       test('un guasto qui non toglie la release Windows', () => {
         assert.match(testo, /continue-on-error:\s*true/, 'un problema su una piattaforma non deve fermare le altre');
@@ -245,8 +247,51 @@ describe('una meta\' di piattaforma che fallisce apre un feedback', () => {
         assert.match(controllo.corpo, /mancanti=\$\{MANCANTI% \}/, 'i mancanti vanno passati all\'allarme');
         assert.match(controllo.corpo, /if \[ -n "\$MANCANTI" \]/, 'si guardano tutti i file, non si esce al primo che manca');
       });
+
+      // Lo strumento che apre il feedback sta nel codice del progetto, e la
+      // copia di lavoro diventa quella della versione a cui ci si attacca: un
+      // tag vecchio che quello strumento non ce l'ha, o niente se il prelievo
+      // fallisce. Finché l'avviso dipendeva da lì, un guasto nei primi passi lo
+      // lasciava muto con la corsa verde (#733, secondo giro di verifica).
+      test('lo strumento dell\'avviso è al sicuro prima di qualunque passo che possa fallire', () => {
+        assert.ok(/actions\/checkout/.test(elenco[0].corpo),
+          'il primo passo non preleva il codice: quello che fallisce prima lascia l\'avviso senza lo strumento per partire');
+        const riparo = elenco.find((p) => /cp .*release-platform-alarm\.mjs/.test(p.corpo));
+        assert.ok(riparo, 'lo strumento dell\'avviso non viene messo al riparo: il prelievo della versione se lo porta via');
+        assert.match(riparo.corpo, /runner\.temp/, 'il riparo deve stare fuori dalla copia di lavoro, che il prelievo ripulisce');
+        assert.doesNotMatch(elenco[iAllarme].corpo, /node scripts\/release-platform-alarm\.mjs/,
+          'l\'avviso usa ancora lo strumento della copia di lavoro: su un tag vecchio non c\'è');
+      });
+
+      // Il feedback è l'unica cosa che fa sapere il guasto a qualcuno, perché il
+      // lavoro è continue-on-error e la corsa resta verde comunque. Un passo che
+      // si mangia il proprio esito rimette il silenzio da cui è nato il #733.
+      test('un avviso che non è partito non finisce verde, e lo dice a chi guarda', () => {
+        const allarme = elenco[iAllarme];
+        assert.doesNotMatch(allarme.corpo, /\|\|\s*echo/,
+          'il passo che apre il feedback inghiotte il proprio esito: se il feedback non parte resta verde');
+        assert.match(allarme.corpo, /esito=\$\{ESITO\}" >> "\$GITHUB_OUTPUT"/,
+          'l\'esito dell\'avviso non esce dal passo: fuori nessuno può sapere che è rimasto muto');
+        assert.match(allarme.corpo, /GITHUB_STEP_SUMMARY/, 'chi apre la corsa deve leggere che il feedback non si è aperto');
+        assert.match(senzaCommenti(job(nomeJob)), /^ {4}outputs:\s*$[\s\S]{0,120}?allarme: \$\{\{ steps\.allarme\.outputs\.esito \}\}/m,
+          'il lavoro non espone se l\'avviso è partito: nessun altro lavoro può accorgersene');
+      });
     });
   }
+
+  // Ultima rete. Se l'avviso non è partito, la corsa verde è l'unico posto in
+  // cui il guasto poteva ancora vedersi: va fatta diventare rossa.
+  test('se l\'avviso non è partito la corsa non resta verde', () => {
+    const jobs = YML.slice(YML.search(/^jobs:\s*$/m));
+    const nomi = [...jobs.matchAll(/^ {2}([a-z][\w-]*):\s*$/gm)].map((m) => m[1]);
+    const rete = nomi.filter((n) => /needs\.release-(mac|linux)\.outputs\.allarme == 'muto'/.test(job(n)));
+    assert.ok(rete.length, 'nessun lavoro si accorge di un avviso rimasto muto: il guasto non lo saprebbe nessuno');
+    for (const n of rete) {
+      assert.doesNotMatch(job(n), /^ {4}continue-on-error:\s*true\s*$/m,
+        `\`${n}\` è l'ultimo segnale rimasto: se anche lui lascia la corsa verde non segnala niente`);
+      assert.match(job(n), /exit 1/, `\`${n}\` deve far diventare rossa la corsa`);
+    }
+  });
 });
 
 // La regola sulla CAUSA, non sulla porta vista: `continue-on-error` su un
