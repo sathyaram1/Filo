@@ -85,6 +85,10 @@ test('porta del giro 1: il segno «blocchi già approvati» non schiaccia il tit
   await expect(scheda(page, 'fb515')).toBeVisible();
   const wRic = await larghezzaTitolo(page, 'fb515');
   await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-g2-ricevuti.png' });
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
+  await scheda(page, 'fb515').click();
+  await expect(page.locator('#mgPreapprovedInfo')).toBeVisible();
+  await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-g2-scuro.png' });
   // Un titolo di cui si leggono almeno una decina di lettere.
   expect(wCoda).toBeGreaterThan(70);
   expect(wRic).toBeGreaterThan(70);
