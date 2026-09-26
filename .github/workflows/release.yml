@@ -779,7 +779,24 @@ jobs:
     if: ${{ !cancelled() && (inputs.ripubblica_linux || (needs.release.result == 'success' && needs.release.outputs.should_release == 'true' && needs.release.outputs.version != '')) }}
     runs-on: ubuntu-latest
     continue-on-error: true
+    outputs:
+      allarme: ${{ steps.allarme.outputs.esito }}
     steps:
+      # Stesso motivo della meta' Mac: lo strumento che apre il feedback deve
+      # essere qui prima che la copia di lavoro diventi quella della versione a
+      # cui ci si attacca, e prima di qualunque passo che possa fallire.
+      - name: Il codice di questa corsa (porta lo strumento dell'avviso)
+        id: strumento
+        uses: actions/checkout@v4
+
+      - name: Lo strumento dell'avviso al riparo dalla copia di lavoro
+        id: riparo
+        shell: bash
+        run: |
+          set -e
+          mkdir -p "${{ runner.temp }}/allarme/scripts"
+          cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
+
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'
       # Windows, e il codice e' il COMMIT che ha costruito lei, non il tag (il
