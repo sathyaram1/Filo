@@ -127,7 +127,7 @@
     {
       id: 'explain-selection', title: 'Spiega il testo selezionato', category: 'selection',
       desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione. Se la selezione contiene un importo in valuta straniera o una misura non metrica, accanto trovi l’equivalente in euro — col cambio del giorno della Banca centrale europea, per tutte le valute che pubblica — o in metri, chili e gradi centigradi. I conti li fa Filo, non il modello.',
-      invoke: 'Seleziona il testo e apri il menu del tasto destro: la spiegazione arriva da sola in fondo al menu, non c’è una voce da cliccare. Alt+E (Ctrl+Alt+E su Mac), o la freccia accanto alla spiegazione, ne apre una più estesa in un riquadro sopra la selezione.',
+      invoke: 'Seleziona il testo e apri il menu del tasto destro: la spiegazione arriva da sola dentro il menu, non c’è una voce da cliccare. Con Alt+E (Ctrl+Alt+E su Mac), o con la freccia accanto alla spiegazione, ne apri una più estesa in un riquadro sopra la selezione.',
     },
     {
       id: 'translate-selection', title: 'Traduci il testo selezionato', category: 'selection',
@@ -194,7 +194,7 @@
     {
       id: 'explain-image', title: 'Spiega un’immagine', category: 'media',
       desc: 'Descrive un’immagine della pagina, direttamente lì sotto.',
-      invoke: 'Clic destro su un’immagine: la descrizione arriva da sola in fondo al menu, non c’è una voce da cliccare.',
+      invoke: 'Clic destro su un’immagine: la descrizione arriva da sola dentro il menu, non c’è una voce da cliccare.',
     },
     {
       id: 'copy-download-image', title: 'Copia o scarica un’immagine', category: 'media',
@@ -256,7 +256,7 @@
     {
       id: 'explain-link', title: 'Spiega un link', category: 'links',
       desc: 'Spiega dove porta un link senza aprirlo, e segnala se sembra sospetto (phishing).',
-      invoke: 'Clic destro su un link: la spiegazione arriva da sola in fondo al menu, non c’è una voce da cliccare. Se l’indirizzo ha qualcosa che non torna, sopra la spiegazione compare un avviso che dice cosa.',
+      invoke: 'Clic destro su un link: la spiegazione arriva da sola dentro il menu, non c’è una voce da cliccare. Se l’indirizzo ha qualcosa che non torna, sopra la spiegazione compare un avviso che dice cosa.',
       doesNot: 'Non apre il link; l’analisi di sicurezza è basata su indizi nell’indirizzo, non su un database in tempo reale.',
     },
     {
