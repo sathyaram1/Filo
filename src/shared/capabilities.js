@@ -299,12 +299,12 @@
     {
       id: 'archive', title: 'Cronologia delle schede', category: 'save',
       desc: 'La cronologia principale: le schede chiuse raggruppate per giorno, una riga per giorno, colorate come le tab in alto; puoi cercarle anche per contenuto e riaprirle.',
-      invoke: 'Icona «Cronologia» in alto a destra nella home (o dalla home → "Cronologia"), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu Riapri/Elimina.',
+      invoke: 'Icona «Cronologia» in alto a destra nella home (o dalla home → "Cronologia"), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu: «Riapri» o «Elimina».',
     },
     {
       id: 'chat-archive', title: 'Ritrova le chat con Filo', category: 'save',
       desc: 'Le chat che fai con Filo nella nuova scheda restano sul tuo computer, per intero, e si ritrovano nella stessa pagina delle schede chiuse. Anche i comandi che dai al terminale, se lo tieni acceso, restano dentro la chat dove li hai scritti, con il loro esito. Le discussioni sono in vista; le chat che erano solo un comando ("metti una sveglia") stanno sotto un interruttore, e ci restano finché non le cancelli tu. Cerca una parola e ti trova la chat che la conteneva, anche a metà conversazione; se cerchi una frase intera e nessuna chat la contiene tutta, Filo cerca con le parole che contano e ti dice con quali ha trovato. Clicca una chat per riaprirla per intero e continuare a scrivere da dove eravate. Il titolo lo scrive Filo, ma è tuo: puoi riscriverlo, e puoi spostare una chat fra le conversazioni e i comandi quando l’ha messa nel posto sbagliato.',
-      invoke: 'Pagina filo://archive/archive.html, sezione «Chat con Filo» in alto. Clicca una chat per riaprirla; tasto destro per il menu: Riapri, Rinomina, Sposta fra le conversazioni o fra i comandi, Elimina. La cancellazione chiede conferma. Una conversazione che stai ancora facendo è segnata «In corso» e cliccandola torni alla scheda dov’è aperta, invece di aprirne una seconda copia.',
+      invoke: 'Pagina filo://archive/archive.html, sezione «Chat con Filo» in alto. Clicca una chat per riaprirla; tasto destro per il menu: «Riapri la chat», «Rinomina», «Sposta fra le conversazioni» o «Sposta fra i comandi», «Elimina la chat». La cancellazione chiede conferma. Una conversazione che stai ancora facendo è segnata «In corso» e cliccandola torni alla scheda dov’è aperta, invece di aprirne una seconda copia.',
       doesNot: 'Niente sparisce da solo: non c’è una pulizia automatica, e nessuna chat esce dal tuo computer. Le chat fatte in una finestra in incognito non vengono salvate. Non entrano qui le conversazioni con l’Aiuto che compare sopra le pagine web: quelle vivono finché la pagina è aperta. Le immagini che incolli in chat non si conservano; rileggendo la chat trovi scritto quante ce n’erano.',
     },
     {

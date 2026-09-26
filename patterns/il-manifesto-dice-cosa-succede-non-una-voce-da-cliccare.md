@@ -38,9 +38,14 @@ nome della funzione, non dell'etichetta: il manifesto deve citare la seconda.
 etichette, `src/content/menuIcons.js` e `src/content/content.js` per quello che
 il menu costruisce davvero.
 
-Sentinelle in `tests/unit/capabilities.test.mjs`: una incrocia ogni «tasto
-destro → "X"» del manifesto con le etichette che il menu mostra davvero
-(chiavi `menu_*` nominate dai content script, più le etichette scritte a mano
-lì), l'altra tiene insieme le tre spiegazioni inline e la loro descrizione. La
-sentinella più vecchia, quella delle icone ritirate (#252), non bastava:
+Sentinelle in `tests/unit/capabilities.test.mjs`: una incrocia ogni voce che il
+manifesto promette per il tasto destro con le etichette che il menu mostra
+davvero, l'altra tiene insieme le tre spiegazioni inline e la loro descrizione.
+La sentinella più vecchia, quella delle icone ritirate (#252), non bastava:
 guardava solo le icone, e «Spiega link» non era un'icona.
+
+**Una voce si nomina fra virgolette, sempre.** Il manifesto la introduce in tre
+modi — la freccia, «scegli», l'elenco dopo «menu:» — e la sentinella riconosce
+tutti e tre, ma solo su testo fra virgolette: un elenco scritto in prosa non lo
+controlla nessuno. Le etichette le cerca fra i content script E fra le pagine
+`filo://`, che hanno un menu loro.

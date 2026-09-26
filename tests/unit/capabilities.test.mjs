@@ -377,15 +377,31 @@ function menuVoiceLabels() {
   const dir = join(ROOT, 'src', 'content');
   const content = readdirSync(dir).filter((f) => f.endsWith('.js'))
     .map((f) => readFileSync(join(dir, f), 'utf8')).join('\n');
+  // Anche le pagine filo:// hanno il loro menu del tasto destro, e il manifesto
+  // ne promette le voci: cercarle solo fra i content script le dava per assenti.
+  const pagesDir = join(ROOT, 'src', 'pages');
+  let pages = '';
+  for (const sub of readdirSync(pagesDir, { withFileTypes: true })) {
+    if (!sub.isDirectory()) continue;
+    const d = join(pagesDir, sub.name);
+    for (const f of readdirSync(d)) {
+      if (f.endsWith('.js')) pages += '\n' + readFileSync(join(d, f), 'utf8');
+    }
+  }
   const labels = new Set();
   for (const m of i18n.matchAll(/^ {4}(menu_[a-z0-9_]+):\s*'([^']+)'/gm)) {
     if (new RegExp(`'${m[1]}'`).test(content)) labels.add(m[2]);
   }
-  for (const m of content.matchAll(/label:\s*'([^']+)'/g)) labels.add(m[1]);
+  // Una riga `label:` può scegliere fra due etichette con un ternario: le
+  // prendiamo tutte, sono tutte voci che l'utente può vedersi davanti.
+  for (const riga of (content + pages).split('\n')) {
+    if (!/\blabel:/.test(riga)) continue;
+    for (const m of riga.slice(riga.indexOf('label:')).matchAll(/'([^']+)'/g)) labels.add(m[1]);
+  }
   return labels;
 }
 
-test('ogni voce promessa come "tasto destro → «X»" esiste davvero nel menu', () => {
+test('ogni voce promessa per il tasto destro esiste davvero nel menu', () => {
   // Drift #725, fratello maggiore di #252: il manifesto prometteva «clic destro
   // su un link → "Spiega link"», ma quella voce non è mai stata nel menu — la
   // spiegazione compare da sola, senza niente da cliccare. Il controllo sulle
@@ -398,16 +414,21 @@ test('ogni voce promessa come "tasto destro → «X»" esiste davvero nel menu',
   const labels = menuVoiceLabels();
   assert.ok(labels.size >= 30, `mi aspetto ≥30 etichette vere nel menu, trovate ${labels.size}`);
 
-  // Dopo la freccia (o dopo "scegli", che è l'altra forma con cui il manifesto
-  // nomina una voce): la voce, più le alternative attaccate con "/" o "," o " e ".
-  const PROMESSE = /(?:tasto destro|clic destro)[^"“«]*?(?:→|scegli)\s*((?:["“«][^"”»]+["”»])(?:\s*(?:\/|,|\se\s)\s*["“«][^"”»]+["”»])*)/gi;
+  // Le tre forme con cui il manifesto nomina una voce del tasto destro: la
+  // freccia, "scegli" e l'elenco dopo "menu" / "menu:". La catena si ferma al
+  // primo pezzo che non è un separatore fra voci, altrimenti si porta dentro le
+  // frasi da dire all'assistente, che voci di menu non sono.
+  const VOCE = '["\u201c\u00ab][^"\u201d\u00bb]+["\u201d\u00bb]';
+  const SEPARATORE = '\\s*(?:\\/|,|\\se\\s|\\sed\\s|\\so\\s|\\sod\\s|\\soppure\\s)\\s*';
+  const PROMESSE = new RegExp(
+    `(?:tasto destro|clic destro)[^"\u201c\u00ab]{0,80}?(?:\u2192|scegli|menu:?)\\s*((?:${VOCE})(?:${SEPARATORE}${VOCE})*)`, 'gi');
   let promesse = 0;
   for (const c of CAP.CAPABILITIES) {
     for (const m of String(c.invoke || '').matchAll(PROMESSE)) {
-      for (const q of m[1].matchAll(/["“«]([^"”»]+)["”»]/g)) {
+      for (const q of m[1].matchAll(/["\u201c\u00ab]([^"\u201d\u00bb]+)["\u201d\u00bb]/g)) {
         promesse++;
         assert.ok(labels.has(q[1].trim()),
-          `la capacità "${c.id}" promette «tasto destro → ${q[1].trim()}», ma nel menu quella voce non esiste: `
+          `la capacità "${c.id}" promette la voce «${q[1].trim()}» nel menu del tasto destro, ma quella voce non esiste: `
           + 'correggi il manifesto (se la cosa succede da sola, scrivilo) o rimetti la voce');
       }
     }

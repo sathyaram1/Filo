@@ -124,3 +124,61 @@ test('l’avviso non afferma più di quello che il controllo sa', () => {
     assert.match(f, /potrebbe|può|sembra/i, `la frase di "${c}" afferma invece di ipotizzare: ${f}`);
   }
 });
+
+test('gli indirizzi di tutti i giorni non vengono accusati di imitarne un altro', () => {
+  // #725 — il confronto correva su TUTTO l'indirizzo con due lettere di
+  // tolleranza fisse: così gitlab.com «imitava» github.com, ogni indirizzo di
+  // una o due lettere «imitava» x.com e amazon.de «imitava» amazon.it. Un
+  // avviso rosso sui link di ogni giorno smette di essere letto proprio quando
+  // servirebbe. Il successo per chi legge è non vedere niente su questi.
+  const innocenti = [
+    'https://gitlab.com/gitlab-org/gitlab',
+    'https://t.co/AbCdEf1234',
+    'https://g.co/kgs/abc',
+    'https://a.co/d/abcdef',
+    'https://fb.com/pagina',
+    'https://vk.com/id1',
+    'https://3m.com/',
+    'https://ge.com/',
+    'https://amazon.de/dp/B00ABCDEF',
+    'https://google.co/search?q=filo',
+    'https://utente.github.io/blog/',
+  ];
+  for (const u of innocenti) {
+    assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
+  }
+});
+
+test('un titolo che si chiama come un’azione non è un pulsante', () => {
+  // #725 — bastava la parola isolata nell'indirizzo: la voce di enciclopedia
+  // «Delete» diventava «aprirlo può bastare a eseguire qualcosa».
+  for (const u of ['https://it.wikipedia.org/wiki/Delete', 'https://esempio.it/blog/Cancel']) {
+    assert.ok(!LS.analizza(u).includes('side_effect'), `avviso a sproposito su ${u}`);
+  }
+  // L'azione vera continua a scattare, nel percorso e nella parte dopo il «?».
+  for (const u of [
+    'https://esempio.it/newsletter/unsubscribe',
+    'https://esempio.it/logout',
+    'https://esempio.it/azione?do=Confirm',
+  ]) {
+    assert.ok(LS.analizza(u).includes('side_effect'), `nessun avviso su ${u}`);
+  }
+});
+
+test('le imitazioni vere continuano a farsi riconoscere', () => {
+  // Il contrappeso del test qui sopra: stringere la tolleranza non deve
+  // spegnere il controllo. Comprese le scritture con una lettera che ne vale
+  // un'altra, che prima passavano o passavano per un pelo.
+  const sosia = {
+    'https://paypa1.com/login': 'paypal.com',
+    'https://gooogle.com/': 'google.com',
+    'https://amazn.com/': 'amazon.com',
+    'https://arnazon.com/': 'amazon.com',
+    'https://micros0ft.com/': 'microsoft.com',
+    'https://linkedln.com/in/tizio': 'linkedin.com',
+    'https://facebok.com/': 'facebook.com',
+  };
+  for (const [u, atteso] of Object.entries(sosia)) {
+    assert.deepEqual(LS.analizza(u), ['typosquatting:' + atteso], `nessun avviso su ${u}`);
+  }
+});
