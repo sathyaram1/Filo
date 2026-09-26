@@ -58,9 +58,24 @@ function configureFromSettings(settings) {
 }
 
 // Un programma da un sito che l'utente ha dichiarato fidato scende come un PDF.
-function chiedeConferma(url) {
+// Accetta il nome del sito (quello deciso da sitoDi) o l'indirizzo.
+function chiedeConferma(sito) {
   if (!chiediEseguibili) return false;
-  try { return !ESE().fidato(url, sitiFidati); } catch (_) { return true; }
+  try { return !ESE().fidato(sito, sitiFidati); } catch (_) { return true; }
+}
+
+// Da quale sito arriva il programma: è la cosa su cui l'utente decide, e il
+// sito non deve poterla togliere scegliendo COME consegnare il file. Un `blob:`
+// o un `data:` fabbricati nella pagina non hanno un host, ma la pagina che li
+// ha fatti partire sì: si decide qui, una volta, e tutto il resto legge questo
+// nome (#588).
+function sitoDi(url, webContents) {
+  const leggi = (x) => { try { return ESE().sito(x); } catch (_) { return ''; } };
+  let dalla = '';
+  try {
+    if (webContents && !webContents.isDestroyed?.()) dalla = webContents.getURL() || '';
+  } catch (_) {}
+  return leggi(url) || leggi(dalla);
 }
 
 // Record vivi (id → dati). Include gli scaricamenti in corso E la cronologia
@@ -413,12 +428,13 @@ function onWillDownload(item, webContents) {
   })() || 'download');
 
   const url = item.getURL();
+  const sito = sitoDi(url, webContents);
   let exe = false;
   try { exe = ESE().eEseguibile(filename); } catch (_) {}
   // Un programma si ferma PRIMA della cartella Download: i byte scendono in
   // quarantena e ci restano finché l'utente non risponde (#588). Il resto dei
   // file non cambia di una virgola: l'attrito va solo dove serve.
-  const attesa = exe && chiedeConferma(url);
+  const attesa = exe && chiedeConferma(sito);
 
   // Salvataggio diretto nella cartella Download (niente dialogo "Salva come":
   // vedi nota di filosofia in testa al file). setSavePath disattiva il dialogo
@@ -443,7 +459,7 @@ function onWillDownload(item, webContents) {
     paused: false,
     canResume: false,
     exe,
-    site: (() => { try { return ESE().sito(url); } catch (_) { return ''; } })(),
+    site: sito,
     _quarantena: attesa,
   };
   records.set(id, rec);
@@ -456,7 +472,7 @@ function onWillDownload(item, webContents) {
     // Chiuderlo con la X lascia la voce in attesa nell'elenco, dove le stesse
     // due risposte restano a portata.
     let testo = `«${rec.filename}» è un programma: scaricarlo?`;
-    try { testo = ESE().testoScarica(rec.filename, url); } catch (_) {}
+    try { testo = ESE().testoScarica(rec.filename, sito); } catch (_) {}
     shellToast(testo, {
       durationSec: 0,
       actions: [
@@ -824,10 +840,10 @@ function openFile(id, opts) {
   // e qui non si passa senza una seconda risposta. Il gate sta nel main perché
   // le superfici che offrono "Apri file" sono tre (avviso, barra, pagina) e una
   // regola per porta sarebbe una porta dimenticata.
-  if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.url)) {
+  if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.site)) {
     let text = `«${rec.filename}» è un programma: aprirlo vuol dire eseguirlo.`;
     let title = 'Aprire un programma?';
-    try { text = ESE().testoApri(rec.filename, rec.url); title = ESE().TITOLO_APRI; } catch (_) {}
+    try { text = ESE().testoApri(rec.filename, rec.site); title = ESE().TITOLO_APRI; } catch (_) {}
     return { ok: false, needsConfirm: true, exe: true, title, text };
   }
   try {

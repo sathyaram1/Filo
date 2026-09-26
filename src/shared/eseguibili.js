@@ -56,10 +56,26 @@
   // Il sito da cui arriva, come lo si mostra a chi deve decidere: senza `www.`
   // e senza porta. Vuoto se l'indirizzo non è leggibile.
   function sito(url) {
+    let s = String(url || '').trim();
+    // `blob:https://sito.it/uuid`: l'origine di chi l'ha fabbricato sta dentro
+    // l'indirizzo, e senza toglierla il nome del sito si perderebbe proprio
+    // dove è il sito a scegliere come consegnare il file (#588).
+    if (/^blob:/i.test(s)) s = s.slice(5);
     try {
-      const h = new URL(String(url || '')).hostname.toLowerCase();
+      const h = new URL(s).hostname.toLowerCase();
       return h.replace(/^www\./, '');
     } catch (_) { return ''; }
+  }
+
+  // Da dove arriva un file lo si decide UNA volta, all'inizio dello
+  // scaricamento; da lì in poi gira come nome di sito, non come indirizzo.
+  // Chi confronta o scrive una frase accetta le due forme, o la stessa regola
+  // direbbe due cose diverse a seconda di chi la chiama (#588).
+  function comeSito(x) {
+    const s = String(x == null ? '' : x).trim();
+    if (!s) return '';
+    if (/[:/]/.test(s)) return sito(s);
+    return /^[a-z0-9.-]+$/i.test(s) ? s.toLowerCase().replace(/^www\./, '') : '';
   }
 
   // Righe scritte a mano nelle impostazioni → elenco di domini confrontabili.
@@ -81,7 +97,7 @@
   // Un dominio in elenco vale anche per i suoi sottodomini (`sito.it` copre
   // `cdn.sito.it`), mai al contrario: `sito.it` non deve coprire `sito.it.evil.com`.
   function fidato(url, elenco) {
-    const host = sito(url);
+    const host = comeSito(url);
     if (!host) return false;
     for (const d of normalizzaSiti(elenco)) {
       if (host === d || host.endsWith('.' + d)) return true;
@@ -94,7 +110,7 @@
   const ETICHETTA = 'Programma';
 
   function daSito(url) {
-    const s = sito(url);
+    const s = comeSito(url);
     return s ? ` da ${s}` : '';
   }
 
@@ -114,6 +130,7 @@
     estensione,
     eEseguibile,
     sito,
+    comeSito,
     normalizzaSiti,
     fidato,
     ETICHETTA,

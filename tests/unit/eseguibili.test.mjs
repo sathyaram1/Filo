@@ -111,3 +111,30 @@ test('le frasi nominano il file e il sito: sono quelle su cui si decide', () => 
   const senza = E.testoScarica('setup.exe', '');
   assert.ok(!/ da /.test(senza), senza);
 });
+
+test('un programma fabbricato dalla pagina porta con sé il sito che l’ha fatto', () => {
+  // `blob:` incapsula l'origine di chi l'ha creato: leggerla è l'unico modo di
+  // dire da dove arriva un file che il sito non ha servito da un indirizzo.
+  assert.equal(E.sito('blob:https://www.dubbio.example/2f1c-44'), 'dubbio.example');
+  assert.equal(E.sito('blob:http://127.0.0.1:8080/2f1c-44'), '127.0.0.1');
+  // Un `data:` non porta nulla: chi chiama deve andarlo a chiedere alla pagina.
+  assert.equal(E.sito('data:application/octet-stream;base64,TVo='), '');
+});
+
+test('il sito deciso una volta vale come l’indirizzo, per il confronto e per la frase', () => {
+  // Il record conserva il NOME del sito, non l'indirizzo: le stesse regole
+  // devono rispondere uguale alle due forme, o la deroga e la frase si
+  // scollegherebbero dalla domanda che le ha precedute.
+  assert.equal(E.comeSito('mozilla.org'), 'mozilla.org');
+  assert.equal(E.comeSito('www.Mozilla.org'), 'mozilla.org');
+  assert.equal(E.comeSito('127.0.0.1'), '127.0.0.1');
+  assert.equal(E.comeSito(''), '');
+
+  assert.equal(E.fidato('mozilla.org', ['mozilla.org']), true);
+  assert.equal(E.fidato('download.mozilla.org', ['mozilla.org']), true);
+  assert.equal(E.fidato('mozilla.org.evil.com', ['mozilla.org']), false);
+  assert.equal(E.fidato('', ['mozilla.org']), false);
+
+  assert.ok(E.testoScarica('setup.exe', 'dubbio.example').includes('da dubbio.example'));
+  assert.ok(E.testoApri('setup.exe', 'dubbio.example').includes('da dubbio.example'));
+});

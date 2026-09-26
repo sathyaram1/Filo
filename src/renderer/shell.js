@@ -1142,21 +1142,34 @@
       if (!all.length) { dlBtn.hidden = true; if (panelOpen) closePanel(); return; }
       dlBtn.hidden = false;
       const active = all.filter(isActive);
-      if (active.length) {
+      // #588 — un programma che aspetta una risposta conta quanto uno in corso:
+      // l'avviso si può chiudere con la ×, e se l'indicatore tacesse l'unico
+      // segno che la domanda è ancora lì sparirebbe con lui.
+      const attesa = all.filter((r) => r && r.state === 'pending');
+      dlBtn.classList.toggle('attesa', attesa.length > 0);
+      dlBtn.dataset.tip = attesa.length
+        ? (attesa.length === 1 ? 'Un programma aspetta la tua risposta' : `${attesa.length} programmi aspettano la tua risposta`)
+        : 'Scaricamenti';
+      if (active.length || attesa.length) {
         dlCount.hidden = false;
-        dlCount.textContent = String(active.length);
+        dlCount.textContent = String(active.length + attesa.length);
         // Avanzamento aggregato: byte ricevuti / totali sui download con totale
         // noto. Se nessuno ha un totale, barra indeterminata (animata via CSS).
         let recv = 0; let total = 0; let known = 0;
         for (const r of active) { if (r.totalBytes > 0) { recv += r.receivedBytes; total += r.totalBytes; known++; } }
-        if (known && total > 0) {
+        if (!active.length) {
+          // Solo attese: niente barra, che direbbe «sto scaricando» a un file
+          // che aspetta l'utente e non si muove.
+          dlBtn.classList.remove('indeterminate', 'active');
+          dlFill.style.width = '0%';
+        } else if (known && total > 0) {
           dlBtn.classList.remove('indeterminate');
           dlFill.style.width = `${Math.min(100, Math.round((recv / total) * 100))}%`;
+          dlBtn.classList.add('active');
         } else {
-          dlBtn.classList.add('indeterminate');
+          dlBtn.classList.add('indeterminate', 'active');
           dlFill.style.width = '40%';
         }
-        dlBtn.classList.add('active');
       } else {
         dlBtn.classList.remove('active', 'indeterminate');
         dlCount.hidden = true;
