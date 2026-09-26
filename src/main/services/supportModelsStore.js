@@ -153,12 +153,17 @@ async function patchDoc(docPath, fields, mask, idToken) {
 //
 // `get()` legge DUE documenti, e chi risolve uno slot di supporto la chiama a
 // ogni chiamata di modello: erano due letture di Firestore per ogni giudizio
-// (#679). La copia dura cinque minuti, la butta il salvataggio, e non la
-// avvelena una rete caduta: una lettura fallita non sostituisce mai una copia
-// buona, si limita a rimandare il prossimo tentativo di mezzo minuto.
+// (#679). La copia dura cinque minuti e la butta il salvataggio.
+//
+// Si mette via SOLO una risposta intera. Quella arrivata a metà si serve e
+// basta: se la si archiviasse, sopravviverebbe al ritorno della rete, e per
+// tutta la sua durata la schermata direbbe che la chiave dei giudici non c'è o
+// i controlli interni userebbero il modello scritto nel codice invece di
+// quello scelto dall'owner (#679, secondo giro). Riprovare subito non è un
+// ciclo e non costa letture: una lettura che non è partita non si paga.
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const CACHE_TTL_ERRORE_MS = 30 * 1000;
 
+// Solo risposte intere: { identita, ts, valore }.
 let cache = null;
 let adesso = () => Date.now();
 
@@ -189,7 +194,8 @@ function invalidaCache() { cache = null; }
 // ancora creato o slot non ancora impostato) hanno valore ''.
 async function get() {
   const chi = identita();
-  if (cache && cache.identita === chi && adesso() - cache.ts < cache.ttl) return clona(cache.valore);
+  const ultimaBuona = cache && cache.identita === chi ? cache : null;
+  if (ultimaBuona && adesso() - ultimaBuona.ts < CACHE_TTL_MS) return clona(ultimaBuona.valore);
 
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
@@ -198,36 +204,25 @@ async function get() {
     leggiDoc(JUDGE_SECRETS_DOC, idToken),
   ]);
 
-  // Non siamo riusciti a chiedere gli slot: la configurazione vuota che ne
-  // uscirebbe NON prende il posto di una copia buona, o chi risolve uno slot
-  // ricadrebbe sui modelli scritti nel codice per un singhiozzo di rete.
-  if (!doc.risposto && cache && cache.identita === chi && cache.buona) {
-    cache.ts = adesso();
-    cache.ttl = CACHE_TTL_ERRORE_MS;
-    return clona(cache.valore);
-  }
-
-  const out = doc.doc ? sanitize(doc.doc) : emptyModels();
+  // Quello che non è arrivato vale l'ultima risposta buona, anche scaduta, mai
+  // un vuoto: con un vuoto chi risolve uno slot ricadrebbe sui modelli scritti
+  // nel codice per un singhiozzo di rete.
+  const out = doc.risposto
+    ? (doc.doc ? sanitize(doc.doc) : emptyModels())
+    : (ultimaBuona ? clona(ultimaBuona.valore) : emptyModels());
   // La chiave vera non esce mai da qui: solo presente/assente. Se la sua
-  // lettura non è partita non si inventa un «non c'è»: vale l'ultima risposta
-  // buona, e la copia non si tiene per cinque minuti (#679, primo giro).
+  // lettura non è partita non si inventa un «non c'è» (#679, primo giro).
   if (secrets.risposto) {
     const key = secrets.doc && typeof secrets.doc.openrouterKey === 'string' ? secrets.doc.openrouterKey.trim() : '';
     out.openrouterKeyPresent = Boolean(key);
   } else {
-    out.openrouterKeyPresent = Boolean(cache && cache.identita === chi && cache.buona && cache.valore.openrouterKeyPresent);
+    out.openrouterKeyPresent = Boolean(ultimaBuona && ultimaBuona.valore.openrouterKeyPresent);
   }
 
   // Il server ha risposto su entrambi, fosse anche «non ti riguarda»: è una
-  // risposta, e vale i cinque minuti pieni. Altrimenti si riprova presto.
-  const completa = doc.risposto && secrets.risposto;
-  cache = {
-    identita: chi,
-    ts: adesso(),
-    ttl: completa ? CACHE_TTL_MS : CACHE_TTL_ERRORE_MS,
-    valore: out,
-    buona: completa,
-  };
+  // risposta intera, e si tiene. A metà no: la prossima chiamata riprova, e
+  // appena la rete torna Filo ha il valore giusto invece di quello di ripiego.
+  if (doc.risposto && secrets.risposto) cache = { identita: chi, ts: adesso(), valore: out };
   return clona(out);
 }
 
@@ -322,7 +317,6 @@ module.exports = {
   clampTimeoutMs,
   invalidaCache,
   CACHE_TTL_MS,
-  CACHE_TTL_ERRORE_MS,
   // L'orologio si sostituisce solo nei test: aspettare cinque minuti veri non
   // è una prova che si possa correre.
   _setAdesso: (fn) => { adesso = typeof fn === 'function' ? fn : Date.now; },

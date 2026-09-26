@@ -108,7 +108,7 @@ test('una lettura fallita non avvelena la copia buona', async () => {
     assert.equal((await Support.get()).sanitizer, 'kimi',
       'con la rete giù si usa la configurazione buona, non una vuota che fa ricadere sui modelli scritti nel codice');
     stato.giu = false;
-    orologio += Support.CACHE_TTL_ERRORE_MS + 1;
+    orologio += 1000;
     assert.equal((await Support.get()).sanitizer, 'kimi');
   });
 });
@@ -199,7 +199,7 @@ test('un singhiozzo sulla sola chiave dei giudici non si tiene per cinque minuti
     // La rete torna. Chi gestisce Filo riapre la schermata dei modelli di
     // supporto: la chiave c'è, e la schermata deve dirlo.
     stato.judgeSecrets = 'ok';
-    orologio += Support.CACHE_TTL_ERRORE_MS + 1000;
+    orologio += 1000;
     const secondo = await Support.get();
     assert.equal(secondo.openrouterKeyPresent, true,
       'una risposta a metà non va messa via come buona: la schermata direbbe che la chiave non c’è per cinque minuti');
@@ -215,5 +215,36 @@ test('persa la chiave per un istante, l’ultima risposta buona vale più di un 
     orologio += Support.CACHE_TTL_MS + 1000;
     assert.equal((await Support.get()).openrouterKeyPresent, true,
       'un singhiozzo non deve far sparire una chiave che c’è');
+  });
+});
+
+// Una risposta arrivata a metà non si archivia: se la si archiviasse
+// sopravviverebbe al ritorno della rete, e Filo continuerebbe a servire il
+// valore di ripiego per tutta la durata della copia (#679, secondo giro).
+test('gli slot letti a metà non restano fermi quando la rete torna', async () => {
+  admin = true;
+  profilo = { email: 'owner@esempio.it' };
+  const stato = { supportModels: 'giu' };
+  Support.invalidaCache();
+  await conRisposte({ get supportModels() { return stato.supportModels; }, judgeSecrets: 'ok' }, async () => {
+    assert.equal((await Support.get()).sanitizer, '', 'premessa: gli slot non si sono potuti leggere');
+    stato.supportModels = 'ok';
+    orologio += 1000; // un secondo dopo: la rete e' tornata
+    assert.equal((await Support.get()).sanitizer, 'flash',
+      'i controlli interni userebbero il modello scritto nel codice invece di quello scelto dall’owner');
+  });
+});
+
+test('una risposta a metà non si mette via: la chiamata dopo ripassa dal server', async () => {
+  admin = true;
+  profilo = { email: 'owner@esempio.it' };
+  Support.invalidaCache();
+  await conRisposte({ supportModels: 'ok', judgeSecrets: 'giu' }, async (conto) => {
+    await Support.get();
+    assert.equal(conto.supportModels, 1, 'premessa: la prima volta si chiede');
+    orologio += 1000;
+    await Support.get();
+    assert.equal(conto.supportModels, 2,
+      'con metà risposta archiviata la schermata resterebbe indietro anche a rete tornata');
   });
 });

@@ -102,3 +102,31 @@ test('«/users» resta un comando riconosciuto anche con «altri» dietro', () =
   assert.equal(C.classifyInput('/users'), 'filo');
   assert.equal(C.classifyInput('/users altri'), 'filo');
 });
+
+// Con un numero di iscritti multiplo della pagina l'ultima pagina piena è
+// anche l'ultima, e il server manda comunque il segnalibro. Il totale è già
+// sullo schermo: invitare a chiedere «gli altri» quando non ce ne sono manda
+// l'owner a sbattere (#679, secondo giro).
+test('con esattamente una pagina di iscritti non si offre una pagina che non c’è', async () => {
+  const cinquanta = TUTTI.slice(0, 50);
+  C.init({
+    send: async (msg) => {
+      richieste.push(msg);
+      if (msg.type !== MSG.OWNER_LIST_USERS) return { ok: true };
+      const dopo = String(msg.after || '');
+      const pagina = cinquanta.filter((u) => !dopo || u.email > dopo).slice(0, 50);
+      return { ok: true, users: pagina, total: cinquanta.length, next: pagina.length >= 50 ? pagina[pagina.length - 1].email : '' };
+    },
+    bubblesEl: null,
+    inputEl: { value: '', classList: { toggle() {} } },
+    makeBubble: () => null,
+    goHome() {}, goThread() {},
+    autoGrowInput() {}, refreshLive() {},
+    archiviaRiga: (testo) => { righe.push(String(testo)); },
+    chatDellaRiga: () => 'chat-1',
+    inChatAperta: () => false,
+  });
+  const riga = await comando('/users');
+  assert.match(riga, /Utenti registrati 1-50 di 50:/);
+  assert.ok(!/\/users altri/.test(riga), 'sono tutti qui: non si invita a chiederne altri');
+});

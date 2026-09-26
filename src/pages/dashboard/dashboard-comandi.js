@@ -125,6 +125,11 @@
     usersMostrati += users.length;
     usersSegnalibro = typeof r.next === 'string' ? r.next : '';
     const totale = Number.isFinite(Number(r.total)) && r.total != null ? Number(r.total) : null;
+    // Il segnalibro arriva ogni volta che la pagina era piena, e con un numero
+    // di iscritti multiplo della pagina l'ultima piena è anche l'ultima: il
+    // totale è già sullo schermo, e invitare a chiedere «gli altri» quando non
+    // ce ne sono è una strada morta (#679, secondo giro).
+    if (totale != null && usersMostrati >= totale) usersSegnalibro = '';
     const testa = totale != null
       ? `Utenti registrati ${primo}-${usersMostrati} di ${totale}:`
       : `Utenti registrati (${usersMostrati}):`;
