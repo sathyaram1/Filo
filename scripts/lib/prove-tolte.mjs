@@ -1,6 +1,6 @@
 // Le prove del giro che chi corregge ha cancellato si rilanciano sul codice nuovo, una volta: una
 // ancora rossa ferma la consegna. Lo usano verify-local (corretto) e dispatch (--record-fixed).
-// Regola: patterns/le-prove-di-un-giro-stanno-nel-ramo-e-la-cartella-si-svuota.md; test: tests/unit/proveTolte.test.mjs.
+// Regola: patterns/le-prove-di-un-giro-stanno-nel-ramo-e-la-cartella-si-svuota.md.
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -32,7 +32,7 @@ export function percorsoRipristino(prova, etichetta) {
  * lasciati fuori): la loro prova si cancella ancora rossa di diritto, e da qui non si sa quale
  * prova sia di quale rilievo. Allora le rosse si elencano e non fermano.
  */
-export function esitoProveTolte({ rosse = [], messiDaParte = 0 } = {}) {
+export function esitoProveTolte({ rosse = [], messiDaParte = 0, shaPrima = '' } = {}) {
   if (!rosse.length) return { ferma: false, testo: '' };
   const elenco = rosse.map((f) => `  · ${f}`).join('\n');
   if (Number(messiDaParte) > 0) {
@@ -52,7 +52,7 @@ export function esitoProveTolte({ rosse = [], messiDaParte = 0 } = {}) {
       'Consegna respinta: hai cancellato prove del giro che sul codice nuovo sono ancora rosse.',
       elenco,
       'Nessun rilievo di questo giro è stato messo da parte, quindi ognuna riproduce un rilievo che dovevi',
-      'chiudere: la porta è ancora aperta. Rimetti la prova (`git checkout <commit della critica> -- <file>`),',
+      `chiudere: la porta è ancora aperta. Rimetti la prova (git checkout ${String(shaPrima).slice(0, 12) || '<commit della critica>'} -- <file>),`,
       'correggi finché è verde, e consegna di nuovo. Una prova si cancella solo verde, insieme alla prova',
       'durevole che la sostituisce.',
     ].join('\n'),
@@ -117,5 +117,5 @@ export function controllaProveTolte({ shaPrima, root, messiDaParte = 0, log = co
   if (!prove.length) return { ferma: false, testo: '' };
   const r = rilanciaProveTolte(prove, shaPrima, root, { log, ...(lancia ? { lancia } : {}) });
   if (r.motivo) return { ferma: true, testo: `Consegna respinta: ${r.motivo}` };
-  return esitoProveTolte({ rosse: r.rosse, messiDaParte });
+  return esitoProveTolte({ rosse: r.rosse, messiDaParte, shaPrima });
 }
