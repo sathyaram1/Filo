@@ -137,6 +137,45 @@ test('clic «Approva» nel quadrato, poi il server mette il segno: arriva da sol
   await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-g2-dopo-approva.png' });
 });
 
+test('arrivata In coda a pagina aperta: il punto d\'arrivo sta sulla riga del titolo, non su una riga sua', async ({ openTab }) => {
+  const page = await apri(openTab, [fb('fb515', { status: 'design', statusReason: 'l5' })]);
+  await tab(page, 'queue').click();
+  await page.evaluate(() => {
+    window.__stato.docs.fb515 = Object.assign({}, window.__stato.docs.fb515, { _updateTime: 't2', status: 'working', statusReason: '' });
+  });
+  const card = scheda(page, 'fb515');
+  await expect(card).toHaveClass(/mg-item--arrivata/, { timeout: 10000 });
+  const { punto, titolo } = await card.evaluate((el) => {
+    const p = getComputedStyle(el, '::before');
+    const t = el.querySelector('.mg-item-title').getBoundingClientRect();
+    const c = el.getBoundingClientRect();
+    return { punto: { h: parseFloat(p.height) }, titolo: { top: t.top - c.top } };
+  });
+  await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-g2-arrivo-coda.png' });
+  expect(punto.h).toBeGreaterThan(0);
+  // Scheda di In coda: bordo più imbottitura in cima sono ~9 px; un punto su una riga sua spinge il titolo giù.
+  expect(titolo.top).toBeLessThan(14);
+});
+
+test('il segno nato da un clic si può togliere senza fondere la richiesta ferma che ha davanti', async ({ openTab }) => {
+  const segno = { by: `owner@example.com · approvazione ${RICHIESTA}`, at: '2026-09-25T08:30:00.000Z' };
+  const nuova = richiesta({ id: 'bbbbbbbbbbbbbbbbbbbbbbbb', supersedes: RICHIESTA });
+  const page = await apri(openTab, [fb('fb515', { status: 'design', statusReason: 'l5', mergePreapproved: segno })],
+    { pending: [nuova] });
+  await tab(page, 'inbox').click();
+  await scheda(page, 'fb515').click();
+  await expect(page.locator('#mgPreapprovedInfo')).toContainText('blocchi che hai già approvato');
+  const btn = page.locator('#mgPreapproveBtn');
+  await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-g2-togli.png' });
+  // L'owner vuole che d'ora in poi gli si chieda sempre: il primo gesto a disposizione è questo tasto.
+  await btn.click();
+  await page.waitForTimeout(2500);
+  const chiamate = await page.evaluate(() => window.__chiamate.map((c) => ({ type: c.type, id: c.id, m: c.mergePreapproved })));
+  console.log('chiamate dopo un clic:', JSON.stringify(chiamate));
+  expect(chiamate.filter((c) => c.type === 'merge_approval_approve')).toHaveLength(0);
+  expect(chiamate.some((c) => c.type === 'feedback_update' && c.m === false)).toBe(true);
+});
+
 test('un segno col markup nel nome non diventa markup', async ({ openTab }) => {
   const page = await apri(openTab, [fb('x', { status: 'working',
     mergePreapproved: { by: `<img src=x onerror="window.__xss=1"> · approvazione ${RICHIESTA}`, at: 'non una data' } })]);
