@@ -58,7 +58,8 @@
     {
       id: 'navigate-back-forward', title: 'Indietro / Avanti', category: 'navigation',
       desc: 'Torna alla pagina precedente o va a quella successiva nella cronologia della scheda.',
-      invoke: 'Menu del tasto destro → "Indietro" / "Avanti" (dentro "Altro…"). Ctrl+Z (Cmd+Z su Mac) torna alla pagina precedente (quando non stai scrivendo in un campo di testo).',
+      invoke: 'Alt+\u2190 e Alt+\u2192 (su Mac Cmd+[ e Cmd+], perch\u00e9 l\u00ec Alt+freccia sposta il cursore), i due tasti laterali del mouse, oppure su Mac lo scorrimento orizzontale a due dita. Funziona su qualsiasi pagina, anche mentre scrivi in un campo di testo. In pi\u00f9: menu del tasto destro \u2192 "Indietro" / "Avanti" (dentro "Altro\u2026"), e Ctrl+Z (Cmd+Z su Mac) torna alla pagina precedente quando non stai scrivendo in un campo di testo.',
+      doesNot: 'Se non c\u2019\u00e8 nessuna pagina dove andare non succede niente. Lo scorrimento a due dita funziona solo se \u00e8 acceso nelle impostazioni del Mac.',
     },
     {
       id: 'switch-tab-by-number', title: 'Salta a una scheda col numero', category: 'navigation',

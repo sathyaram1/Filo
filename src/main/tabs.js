@@ -21,7 +21,7 @@ const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
 require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei download (logica pura)
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
-const { indiceSaltoScheda } = globalThis.SN_TASTI;
+const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
@@ -1581,6 +1581,17 @@ class TabManager {
     }
   }
 
+  // Indietro/avanti della scheda che l'utente sta guardando. Tutte le porte
+  // passano di qui (scorciatoia, barra dei menu, tasti laterali del mouse,
+  // scorrimento a due dita su Mac) così "la scheda corrente" e il "non c'è dove
+  // andare" hanno una definizione sola (#685).
+  navigaCronologia(verso, id) {
+    const target = id || this.activeId;
+    if (!target) return;
+    if (verso === 'avanti') this.goForward(target);
+    else this.goBack(target);
+  }
+
   goForward(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
@@ -1667,6 +1678,15 @@ class TabManager {
       if (!active) return;
       try { active.view.webContents.send('filo:zoom-key', dir); } catch (_) {}
     });
+    // Stessa asimmetria per indietro/avanti: appena si clicca una scheda il
+    // fuoco lascia la pagina e da lì il tasto non passava da nessuna parte.
+    shellWc.on('before-input-event', (event, input) => {
+      if (input.type !== 'keyDown') return;
+      const verso = comandoNavigazione(input);
+      if (!verso) return;
+      event.preventDefault();
+      this.navigaCronologia(verso);
+    });
   }
 
   // ─── eventi della WebContents → aggiorna stato + broadcast ─────────────
@@ -1733,6 +1753,20 @@ class TabManager {
             event.preventDefault();
             this.activate(target.id);
           }
+        }
+      }
+      // Indietro e avanti (#685). Qui, nel main, e non nel content script:
+      // `before-input-event` arriva PRIMA che il documento veda il tasto, così
+      // la combinazione vale anche con un campo di testo a fuoco e anche sulle
+      // pagine dove i content script non girano (le filo:// e quelle bloccate).
+      // Quale combinazione sia lo decide src/shared/tasti.js: su Mac è Cmd+[ e
+      // Cmd+], perché lì Opzione+freccia muove il cursore.
+      if (input.type === 'keyDown') {
+        const verso = comandoNavigazione(input);
+        if (verso) {
+          event.preventDefault();
+          this.navigaCronologia(verso, tab.id);
+          return;
         }
       }
       // #404 — Ctrl/Cmd+T/W/L/R "da browser". La shell (src/renderer/shell.js)

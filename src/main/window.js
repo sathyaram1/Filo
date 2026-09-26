@@ -75,6 +75,28 @@ function wireWindowCommon(win, tabs) {
     if (input.type !== 'keyDown' || input.key !== 'Escape') return;
     if (tabs.handleFullscreenEscape(null)) event.preventDefault();
   });
+
+  // Indietro e avanti senza tastiera (#685). Le due strade non si sovrappongono
+  // mai — Electron manda gli app-command su Windows e Linux, lo swipe su Mac —
+  // quindi si ascoltano tutte e due senza ramo di piattaforma: una `if` su
+  // win32 qui lascerebbe scoperto uno dei due sistemi.
+  //   · tasti laterali del mouse → app-command browser-backward/forward;
+  //   · scorrimento orizzontale a due dita su Mac → swipe (l'utente lo accende
+  //     nelle impostazioni di sistema; se è spento l'evento non arriva e basta).
+  // Dove andare lo decide tabs.navigaCronologia: senza cronologia è un no-op.
+  win.on('app-command', (event, comando) => {
+    if (comando === 'browser-backward') tabs.navigaCronologia('indietro');
+    else if (comando === 'browser-forward') tabs.navigaCronologia('avanti');
+    else return;
+    // Senza questo Windows lascia agire anche il comportamento di serie.
+    try { event.preventDefault(); } catch (_) {}
+  });
+  // La direzione è quella delle dita: si spinge la pagina a destra per tornare
+  // indietro, come in ogni browser su Mac.
+  win.on('swipe', (event, direzione) => {
+    if (direzione === 'right') tabs.navigaCronologia('indietro');
+    else if (direzione === 'left') tabs.navigaCronologia('avanti');
+  });
 }
 
 function createMainWindow() {

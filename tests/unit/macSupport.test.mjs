@@ -543,6 +543,13 @@ const TASTI_DI_FILO = {
   'CommandOrControl+W': 'chiudi la SCHEDA (il role "close" chiuderebbe la finestra con dentro tutte le altre)',
   'CommandOrControl+R': 'ricarica la pagina (il role "reload" ricaricherebbe la fila delle schede)',
   'CommandOrControl+L': 'vai a scrivere un indirizzo',
+  // Indietro e avanti stanno su combinazioni DIVERSE fra i due sistemi: su Mac
+  // Opzione+freccia muove il cursore di una parola, e la convenzione dei
+  // browser lì è Cmd+[ / Cmd+] (src/shared/tasti.js).
+  'Alt+Left': 'torna alla pagina precedente',
+  'Alt+Right': 'vai alla pagina successiva',
+  'Cmd+[': 'torna alla pagina precedente (la forma del Mac)',
+  'Cmd+]': 'vai alla pagina successiva (la forma del Mac)',
   'CommandOrControl+Z': 'torna alla pagina precedente, o annulla se si sta scrivendo',
   'CommandOrControl+Shift+Z': 'ripeti, mentre si scrive',
   'CommandOrControl+Plus': 'ingrandisci la PAGINA (il role "zoomIn" ingrandirebbe la fila delle schede)',
@@ -554,7 +561,10 @@ const TASTI_DI_FILO = {
 // I `role` che, su Mac, farebbero la cosa sbagliata al posto di Filo.
 const RUOLI_VIETATI = ['undo', 'redo', 'close', 'reload', 'forcereload', 'zoomin', 'zoomout', 'resetzoom', 'toggledevtools'];
 
-function vociDellaBarra() {
+// La barra si costruisce per una piattaforma a scelta: senza, da Windows o
+// Linux si leggerebbe una barra che su Mac non esiste — e su Mac è l'unico
+// posto dove quella barra si vede davvero.
+function vociDellaBarra(piattaforma) {
   const { template } = require(join(ROOT, 'src', 'main', 'menu.js'));
   const piatte = [];
   const scendi = (voci) => {
@@ -563,7 +573,7 @@ function vociDellaBarra() {
       if (v.submenu) scendi(v.submenu);
     }
   };
-  scendi(template());
+  scendi(template(piattaforma));
   return piatte;
 }
 
@@ -576,7 +586,7 @@ test('la barra dei menu non si prende le scorciatoie che Filo gestisce da sé', 
 });
 
 test('ogni scorciatoia di Filo che sta nella barra la esegue Filo', () => {
-  const voci = vociDellaBarra();
+  const voci = [...vociDellaBarra('win32'), ...vociDellaBarra('darwin')];
   const guasti = [];
   for (const v of voci) {
     if (!v.accelerator || !TASTI_DI_FILO[v.accelerator]) continue;
@@ -585,18 +595,19 @@ test('ogni scorciatoia di Filo che sta nella barra la esegue Filo', () => {
   }
   assert.deepEqual(guasti, [], guasti.join('\n'));
 
-  // E le quattro che l'utente Mac si è vista portare via devono esserci: se una
-  // sparisce dalla barra, su Mac torna a prendersela Electron.
-  const presenti = new Set(voci.map((v) => v.accelerator).filter(Boolean));
-  for (const accel of ['CommandOrControl+W', 'CommandOrControl+R', 'CommandOrControl+Z', 'CommandOrControl+0']) {
+  // E quelle che l'utente Mac si è vista portare via devono esserci: se una
+  // sparisce dalla barra, su Mac torna a prendersela Electron. Indietro e
+  // avanti si chiamano diversamente sui due sistemi, ed è il punto: la barra
+  // del Mac deve promettere il tasto che su Mac funziona davvero.
+  const presenti = new Set(vociDellaBarra('darwin').map((v) => v.accelerator).filter(Boolean));
+  for (const accel of ['CommandOrControl+W', 'CommandOrControl+R', 'CommandOrControl+Z', 'CommandOrControl+0', 'Cmd+[', 'Cmd+]']) {
     assert.ok(presenti.has(accel),
       `${accel} non è più nella barra: su Mac la barra di serie se lo riprende (${TASTI_DI_FILO[accel]})`);
   }
 });
 
 test('su Windows e Linux la barra non toglie i tasti alle pagine', () => {
-  if (process.platform === 'darwin') return; // là il tasto se lo prende la barra, ed è il punto
-  const restati = vociDellaBarra()
+  const restati = vociDellaBarra('win32')
     .filter((v) => v.accelerator && TASTI_DI_FILO[v.accelerator] && v.registerAccelerator !== false)
     .map((v) => v.accelerator);
   assert.deepEqual(restati, [],
@@ -686,7 +697,7 @@ test('la barra dei menu non inventa scorciatoie che valgono solo su Mac', () => 
   // no sarebbe di nuovo una promessa vera su un sistema e falsa sull'altro:
   // esattamente l'asimmetria da cui nasce tutto questo. Qui dentro ci vanno
   // SOLO tasti che Filo fa già ovunque.
-  const inventati = vociDellaBarra()
+  const inventati = [...vociDellaBarra('win32'), ...vociDellaBarra('darwin')]
     .map((v) => v.accelerator)
     .filter((a) => a && !TASTI_DI_FILO[a]);
   assert.deepEqual(inventati, [],
@@ -707,7 +718,7 @@ test('la lista dei tasti già presi non si stacca dalla barra dei menu', () => {
   require(join(ROOT, 'src', 'shared', 'tasti.js'));
   const T = globalThis.SN_TASTI;
 
-  const scoperti = vociDellaBarra()
+  const scoperti = vociDellaBarra('darwin')
     .map((v) => v.accelerator)
     .filter(Boolean)
     // "CommandOrControl" è come lo scrive Electron; la regola parla in Ctrl.
