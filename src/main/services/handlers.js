@@ -32,8 +32,6 @@ const FiloMem = globalThis.SN_FILO_MEMORY;
 const FiloState = globalThis.SN_FILO_STATE;
 const Onboarding = globalThis.SN_ONBOARDING;
 const DashboardRefresh = globalThis.SN_DASHBOARD_REFRESH;
-const Esterno = globalThis.SN_ESTERNO;         // #593 — la porta del contenuto esterno IN
-const Fiducia = globalThis.SN_FIDUCIA;         // #536 — quanto vale una fonte
 
 // #155 — intervallo minimo tra due ricalcoli in background della home: la nuova
 // scheda serve sempre la cache all'istante; il ricalcolo (costoso, con l'LLM)
@@ -694,6 +692,23 @@ function createAnswerStreamer(onText) {
 // Gli strumenti si passano all'istante e i tempi si MISURANO (idee «Latenza
 // della chat», punto 1): senza numeri per turno ogni scelta sui modelli è a
 // occhio. `timing` finisce nella cronologia AI accanto al costo.
+// #536 — questo compito ha letto roba scritta da altri? La risposta sta già
+// nel prompt: il contenuto esterno ci entra imbustato, da una porta sola, e il
+// contenuto non può forgiare una busta. Quindi non c'è nessun elenco di
+// superfici da tenere aggiornato: chi imbusta è guardato, e basta.
+function valutaFonti(action, messages) {
+  const E = globalThis.SN_ESTERNO;
+  const F = globalThis.SN_FIDUCIA;
+  if (!E || !F) return { daGuardare: false, classeFonti: 'utente' };
+  const sorgenti = E.tipiPresenti(messages);
+  const classeFonti = F.classeDeiTipi(sorgenti);
+  return {
+    classeFonti,
+    daGuardare: Boolean(sorgenti.length && F.contaminata(classeFonti)
+      && SN_CONST.passaDalGuardiano(action)),
+  };
+}
+
 // #536 — il testo che il modello ha appena scritto dopo aver letto roba di
 // altri, guardato da un SECONDO modello prima che qualcuno lo mostri. Torna
 // null quando passa (chi chiama tiene quello che aveva), o il testo da mettere
@@ -779,10 +794,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   // prompt: il contenuto esterno ci entra imbustato, da una porta sola, e il
   // contenuto non può forgiare una busta. Quindi qui non c'è nessun elenco di
   // superfici da tenere aggiornato: chi imbusta è guardato, e basta.
-  const sorgenti = Esterno ? Esterno.tipiPresenti(messages) : [];
-  const classeFonti = Fiducia ? Fiducia.classeDeiTipi(sorgenti) : 'utente';
-  const daGuardare = sorgenti.length && SN_CONST.passaDalGuardiano(action)
-    && Fiducia && Fiducia.contaminata(classeFonti);
+  const { daGuardare, classeFonti } = valutaFonti(action, messages);
   // Quello che non è stato guardato non scorre sotto gli occhi mentre viene
   // scritto: una frase letta a metà è già arrivata.
   if (daGuardare) { onReasoning = null; onText = null; }
@@ -917,10 +929,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   // #536 — stessa regola del cammino non-streaming: se nel prompt c'è roba
   // scritta da altri, quello che ne esce non scorre sotto gli occhi prima che
   // il secondo modello l'abbia guardato. Arriva tutto insieme alla fine.
-  const sorgenti = Esterno ? Esterno.tipiPresenti(messages) : [];
-  const classeFonti = Fiducia ? Fiducia.classeDeiTipi(sorgenti) : 'utente';
-  const daGuardare = sorgenti.length && SN_CONST.passaDalGuardiano(action)
-    && Fiducia && Fiducia.contaminata(classeFonti);
+  const { daGuardare, classeFonti } = valutaFonti(action, messages);
 
   const cached = await AICache.get({ provider: settings.provider, model, messages });
   if (cached) {
