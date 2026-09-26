@@ -317,7 +317,19 @@
       // Le dipendenze possono essere risolte pigramente (deps.resolve) per
       // leggere gli override più freschi al momento del click.
       const resolved = typeof deps.resolve === 'function' ? deps.resolve() : deps;
-      Promise.resolve(resolved).then((d) => openOverlay(action, d || deps));
+      Promise.resolve(resolved).then((d) => {
+        const dd = { ...(d || deps) };
+        // Il campione segue ogni ritocco (e l'Annulla che lo disfa): un
+        // campione fermo sul colore di partenza direbbe il falso.
+        if (mark.className === 'sn-refine-trigger-swatch') {
+          const live = dd.applyLive;
+          dd.applyLive = (ov) => {
+            try { mark.style.background = Tokens.effectiveValue(name, ov, dd.theme) || mark.style.background; } catch (_) {}
+            if (live) live(ov);
+          };
+        }
+        openOverlay(action, dd);
+      });
     });
     return btn;
   }

@@ -158,6 +158,12 @@ test('la chat mostra il bottone di raffinamento e il picker scrive il nuovo colo
     expect(css).toContain('#112233');
   }).toPass({ timeout: 4_000 });
 
+  // Il campione nel bottone segue il ritocco: fermo direbbe il colore sbagliato.
+  await expect(async () => {
+    const bg = await page.locator('.sn-refine-trigger-swatch').evaluate((e) => getComputedStyle(e).backgroundColor);
+    expect(bg.replace(/\s/g, '')).toBe('rgb(17,34,51)');
+  }).toPass({ timeout: 4_000 });
+
   // Persistenza: è stata inviata una UPDATE_SETTINGS col token al nuovo valore.
   await expect(async () => {
     const saved = await page.evaluate(() => window.__filoCaptured || []);
