@@ -732,9 +732,21 @@
       dismissed: false,
     };
     list.unshift(entry);
-    if (list.length > NOTIFICATIONS_CAP) list.length = NOTIFICATIONS_CAP;
+    potaNotifiche(list);
     await setRaw(KEYS.FILO_NOTIFICATIONS, list);
     return entry;
+  }
+
+  // #536 — un avviso «in attesa del controllo» è una promessa fatta a chi usa
+  // Filo, quindi il tetto non lo tocca: si butta il più vecchio fra quelli già
+  // mostrati. Se restassero solo attese, il tetto cede prima della promessa.
+  function potaNotifiche(list) {
+    while (list.length > NOTIFICATIONS_CAP) {
+      let i = list.length - 1;
+      while (i >= 0 && list[i].stato === 'attesa') i--;
+      if (i < 0) return;
+      list.splice(i, 1);
+    }
   }
 
   // Aggiorna una voce in attesa dopo un nuovo giro del guardiano. Torna la
