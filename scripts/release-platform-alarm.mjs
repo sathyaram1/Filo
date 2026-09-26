@@ -140,7 +140,7 @@ export function componiAllarme({ piattaforma, versione, passo, esecuzione, repo,
   if (conf && persi === null) {
     righe.push(`Cosa sia arrivato nella release ${v} non si sa da qui: guardala. Devono esserci ${conf.attesi.join(', ')}.`, '');
   } else if (conf && persi.length === 0) {
-    righe.push(`I file per ${nome} risultano tutti nella release ${v}: il lavoro si è fermato per altro, e il registro dice dove.`, '');
+    righe.push(`I passi che caricano i file per ${nome} sono andati a buon fine, quindi nella release ${v} dovrebbero esserci tutti; il controllo che va a guardarla non è riuscito a farlo. Aprila e verifica.`, '');
   } else if (conf) {
     const danni = [`Nella release ${v} mancano: ${persi.join(', ')}.`];
     if (repo && persi.includes(conf.scarica)) {
