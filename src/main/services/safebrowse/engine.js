@@ -55,8 +55,8 @@ function gsbText(category) {
 
 // Costruisce il messaggio specifico dai segnali fidati. `lead` è il segnale
 // guida; gli altri diventano frasi di rinforzo.
-function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPayment, sandbox }) {
-  const dom = norm.registrableUnicode || norm.registrable || norm.host;
+function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPayment, sandbox, hosted }) {
+  const dom = hosted ? (norm.hostUnicode || norm.host) : (norm.registrableUnicode || norm.registrable || norm.host);
   // 1) Blacklist: prevale su tutto.
   if (gsb && gsb.listed) {
     return {
@@ -127,7 +127,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
 
   // Blacklist: prevale su tutto, anche sulla whitelist.
   if (gsb && gsb.listed) {
-    const message = buildMessage({ level: 'pericoloso', norm, gsb });
+    const message = buildMessage({ level: 'pericoloso', norm, gsb, hosted });
     return { level: 'pericoloso', reasons: ['gsb_' + (gsb.category || 'listed')], norm, message, gsb, needsLlm: false, whitelisted, hosted, scope };
   }
 
@@ -162,7 +162,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     (imp && sensitive && certBad) ||
     (doubleExt && (young || certBad));
   if (strict || strongCombo) {
-    const message = buildMessage({ level: 'pericoloso', norm, imp, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox });
+    const message = buildMessage({ level: 'pericoloso', norm, imp, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox, hosted });
     return {
       level: 'pericoloso',
       reasons: reasons.concat(young ? ['young_domain'] : [], certBad ? ['cert_' + cert.status] : [], sandboxBad ? ['sandbox_dangerous'] : []),
