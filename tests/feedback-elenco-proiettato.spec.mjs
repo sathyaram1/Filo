@@ -623,10 +623,11 @@ test('«Riprova» non porta via quello che l_owner sta scrivendo', async ({ open
 });
 
 // La gemella, stessa causa: nella pagina dei feedback una scheda il cui
-// documento non è tornato si disegna senza conversazione, e la casella delle
-// note vuota invita a scriverci. Salvare lì metterebbe quelle righe al posto
-// del report. Senza il fix la scrittura parte e riesce.
-test('nella pagina dei feedback una conversazione mai arrivata non si sovrascrive', async ({ openTab }) => {
+// documento non è tornato si disegnava senza conversazione e con la casella
+// delle note vuota, che invita a scriverci. Adesso la scheda lo dice con le
+// parole della gemella in Gestione, offre «Riprova», e la casella non c'è:
+// non si può scrivere al posto di un report che non si è letto.
+test('nella pagina dei feedback una conversazione mai arrivata si dice, e non si sovrascrive', async ({ openTab }) => {
   const page = await openTab(PAGINA_FEEDBACK);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
@@ -648,12 +649,13 @@ test('nella pagina dei feedback una conversazione mai arrivata non si sovrascriv
     window.__fbTest.setData([JSON.parse(JSON.stringify(r))]);
   }, RIGA);
 
-  const note = page.locator('.fb-card[data-id="fb677"] .fb-notes');
-  await expect(note).toBeVisible({ timeout: 15_000 });
-  await note.fill('Nota scritta sopra una conversazione che non ho letto.');
-  await note.blur();
-  await page.waitForTimeout(1000);
+  const card = page.locator('.fb-card[data-id="fb677"]');
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await expect(card).toContainText('non è arrivato');
+  await expect(card.locator('.fb-riprova-dettaglio')).toBeVisible();
+  // La casella che scriverebbe sopra il report non viene nemmeno offerta.
+  await expect(card.locator('.fb-notes')).toHaveCount(0);
+  await page.waitForTimeout(600);
   const inviati = await page.evaluate(() => window.__inviati);
   expect(inviati, `non deve partire nessuna scrittura: ${JSON.stringify(inviati)}`).toEqual([]);
-  expect((await page.evaluate(() => window.__avvisi)).join(' ')).toContain('non è arrivato');
 });

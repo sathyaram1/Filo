@@ -1,9 +1,9 @@
-// Verifica #677, quinto giro: la stessa famiglia di sempre — quello che è già
-// stato scaricato viene buttato via e ricomprato.
+// Verifica #677, quinto giro: quello che è già stato scaricato non si butta.
 //
-// Una causa sola, in parole da owner: la pagina non tiene conto di quello che
-// ha già in mano (la conversazione arrivata, la lettura che NON è tornata), e
-// il primo aggiornamento che passa glielo cancella. Da lì ogni gesto ricompra.
+// Una causa sola: la riga riletta dal giro al minuto (una proiezione: niente
+// conversazione, niente allegati) prendeva il posto del documento intero già
+// in mano, e con lui se ne andava anche la nota «questa lettura non è
+// tornata». Da lì il pannello si svuotava e la pagina ricomprava.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const PAGINA_GESTIONE = 'filo://manage/manage.html';
@@ -28,48 +28,54 @@ async function admin(page) {
   });
 }
 
-// Le sorgenti di Gestione: la RIGA (quella che rilegge il giro al minuto) e il
-// DOCUMENTO INTERO (quello che si paga aprendo la segnalazione).
-async function sorgenti(page, riga, { dettaglioRompe = false } = {}) {
-  await page.evaluate(({ r, rompe }) => {
-    window.__dettagli = 0;
+test('Gestione: il giro al minuto non svuota il pannello che si sta leggendo', async ({ openTab }) => {
+  const page = await openTab(PAGINA_GESTIONE);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK, null, { timeout: 25_000 });
+  await admin(page);
+  await page.evaluate((r) => {
     window.__ver = 'v1';
+    window.__report = 'PRIMO GIRO DELLA LAVORAZIONE';
     window.__mgTest.setLiveSources({
       listVersions: async () => [{ _id: r._id, _updateTime: window.__ver }],
       getMany: async (ids) => ids.map(() => ({
         ...JSON.parse(JSON.stringify(r)), _updateTime: window.__ver, _proiezione: true,
       })),
       getDettagli: async (ids) => {
-        window.__dettagli += 1;
-        if (rompe) throw new Error('Failed to fetch');
+        // La rete ci mette il suo: è la finestra in cui il pannello si
+        // svuotava e l'owner perdeva di vista il report.
+        await new Promise((ok) => setTimeout(ok, 1500));
         const pieno = JSON.parse(JSON.stringify(r));
         delete pieno._proiezione;
-        pieno.notes = 'REPORT DELLA LAVORAZIONE';
+        pieno.notes = window.__report;
+        pieno._updateTime = window.__ver;
         return ids.map(() => pieno);
       },
     });
     window.__mgTest.setAdmin(true);
     window.__mgTest.setData([JSON.parse(JSON.stringify(r))]);
-  }, { r: riga, rompe: dettaglioRompe });
-}
-
-test('Gestione: il giro al minuto non ricompra la conversazione già arrivata', async ({ openTab }) => {
-  const page = await openTab(PAGINA_GESTIONE);
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK, null, { timeout: 25_000 });
-  await admin(page);
-  await sorgenti(page, RIGA);
+  }, RIGA);
 
   await page.locator('.mg-item[data-id="fbA"]').click();
-  await expect(page.locator('#mgThread')).toContainText('REPORT DELLA LAVORAZIONE', { timeout: 15_000 });
-  expect(await page.evaluate(() => window.__dettagli)).toBe(1);
+  await expect(page.locator('#mgThread')).toContainText('PRIMO GIRO DELLA LAVORAZIONE', { timeout: 20_000 });
 
-  // Una segnalazione in lavorazione la riscrive di continuo la routine che ci
-  // lavora: il giro al minuto la trova cambiata a ogni passaggio.
-  await page.evaluate(async () => { window.__ver = 'v2'; await window.__mgTest.pollNow(); });
-  await page.waitForTimeout(1500);
-  await expect(page.locator('#mgThread')).toContainText('REPORT DELLA LAVORAZIONE');
-  expect(await page.evaluate(() => window.__dettagli)).toBe(1);
+  // La routine scrive un altro turno: il giro al minuto trova la segnalazione
+  // cambiata, come succede a ogni passaggio finché ci sta lavorando.
+  await page.evaluate(async () => {
+    window.__ver = 'v2';
+    window.__report = 'PRIMO GIRO DELLA LAVORAZIONE\n--- Filo ---\nSECONDO GIRO';
+    window.__mgTest.pollNow();
+  });
+
+  // Mentre il nuovo documento viaggia, il report resta sotto gli occhi.
+  for (let i = 0; i < 6; i += 1) {
+    const testo = await page.locator('#mgThread').textContent();
+    expect(testo, 'il report non deve sparire durante l_aggiornamento').toContain('PRIMO GIRO');
+    expect(testo).not.toContain('Caricamento della conversazione');
+    await page.waitForTimeout(250);
+  }
+  // E il turno nuovo arriva.
+  await expect(page.locator('#mgThread')).toContainText('SECONDO GIRO', { timeout: 20_000 });
 });
 
 test('Gestione: dopo un giro al minuto una lettura già fallita resta tale', async ({ openTab }) => {
@@ -77,23 +83,40 @@ test('Gestione: dopo un giro al minuto una lettura già fallita resta tale', asy
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK, null, { timeout: 25_000 });
   await admin(page);
-  await sorgenti(page, RIGA, { dettaglioRompe: true });
+  await page.evaluate((r) => {
+    window.__dettagli = 0;
+    window.__ver = 'v1';
+    window.__mgTest.setLiveSources({
+      listVersions: async () => [{ _id: r._id, _updateTime: window.__ver }],
+      getMany: async (ids) => ids.map(() => ({
+        ...JSON.parse(JSON.stringify(r)), _updateTime: window.__ver, _proiezione: true,
+      })),
+      getDettagli: async () => { window.__dettagli += 1; throw new Error('Failed to fetch'); },
+    });
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([JSON.parse(JSON.stringify(r))]);
+  }, RIGA);
 
   await page.locator('.mg-item[data-id="fbA"]').click();
   await expect(page.locator('#mgRiprovaDettaglio')).toBeVisible({ timeout: 15_000 });
   expect(await page.evaluate(() => window.__dettagli)).toBe(1);
 
-  // Prima del giro la cura regge: andare e tornare non ricompra.
+  // Andata e ritorno: la lettura non riparte. È la cura del terzo giro.
   await page.evaluate(() => window.__mgTest.openDetail('fbA'));
   await page.waitForTimeout(400);
   expect(await page.evaluate(() => window.__dettagli)).toBe(1);
 
-  // Dopo il giro al minuto, la stessa andata e ritorno.
+  // Un giro al minuto in mezzo non la deve rimettere in circolo: il tasto
+  // «Riprova» è l'unica strada, ed è di chi guarda.
   await page.evaluate(async () => { window.__ver = 'v2'; await window.__mgTest.pollNow(); });
   await page.waitForTimeout(500);
   await page.evaluate(() => window.__mgTest.openDetail('fbA'));
   await page.waitForTimeout(800);
   expect(await page.evaluate(() => window.__dettagli)).toBe(1);
+
+  // E il «Riprova» funziona ancora.
+  await page.locator('#mgRiprovaDettaglio').click();
+  await expect.poll(() => page.evaluate(() => window.__dettagli), { timeout: 10_000 }).toBe(2);
 });
 
 test('pagina feedback: con la rete giù i gesti non ricomprano la lettura fallita', async ({ openTab }) => {
@@ -118,6 +141,10 @@ test('pagina feedback: con la rete giù i gesti non ricomprano la lettura fallit
   await page.locator('[data-tab="queue"]').click();
   await page.locator('[data-tab="inbox"]').click();
   await page.waitForTimeout(1000);
-
   expect(await page.evaluate(() => window.__n)).toBe(primo);
+
+  // Il «Riprova» della scheda, invece, ci riprova davvero.
+  await page.locator('#search').fill('');
+  await page.locator('.fb-card[data-id="fbA"] .fb-riprova-dettaglio').click();
+  await expect.poll(() => page.evaluate(() => window.__n), { timeout: 10_000 }).toBe(primo + 1);
 });
