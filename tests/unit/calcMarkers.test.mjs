@@ -39,7 +39,7 @@ test('la formattazione fra il numero e la valuta non riporta le dodici cifre', (
   assert.equal(risolvi('prezzo: EUR [[calc: 50/1.08]]'), 'prezzo: EUR 46,30');
   assert.equal(risolvi('prezzo: euro **[[calc: 50/1.08]]**'), 'prezzo: euro **46,30**');
   // In streaming il numero aspetta anche quando il risalto arriva per primo.
-  assert.equal(risolvi('circa **[[calc: 50/1.08]]**', { streaming: true }), 'circa …');
+  assert.equal(risolvi('circa **[[calc: 50/1.08]]**', { streaming: true }), 'circa **…**');
 });
 
 test('un asterisco a capo è un elenco, non il grassetto del numero', () => {
