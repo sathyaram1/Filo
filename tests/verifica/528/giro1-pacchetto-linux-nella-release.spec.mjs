@@ -77,7 +77,7 @@ test('se il file non arriva nella pubblicazione, il lavoro diventa rosso invece 
   expect(blocco, 'nessuno controlla la pubblicazione vera').toMatch(/gh release view/);
   // Dal #733 i nomi dei file non stanno piu' nel workflow: il controllo li
   // chiede allo script dell'allarme, che e' la fonte unica.
-  expect(blocco, 'il controllo non chiede l\'elenco dei file attesi').toMatch(/release-platform-alarm\.mjs --attesi Linux/);
+  expect(blocco, 'il controllo non chiede l\'elenco dei file attesi').toMatch(/release-platform-alarm\.mjs"? --attesi Linux/);
   const attesi = leggi('scripts/release-platform-alarm.mjs');
   expect(attesi).toContain(NOME_FISSO);
   // Senza questo, chi scarica resta fermo alla prima versione per sempre.

@@ -145,7 +145,7 @@ test('il pacchetto Mac viene allegato alla release, non solo costruito', () => {
     'manca il controllo finale: senza, un mancato allegato passa inosservato');
   // Dal #733 i nomi non stanno più nel workflow: il controllo li chiede allo
   // script dell'allarme, così il feedback che si apre nomina gli stessi file.
-  assert.match(macJob, /release-platform-alarm\.mjs --attesi Mac/,
+  assert.match(macJob, /release-platform-alarm\.mjs"? --attesi Mac/,
     'il controllo finale non chiede l\'elenco dei file attesi: senza elenco non guarda niente e resta verde');
   for (const file of ['Filo-Mac.dmg', 'Filo-Mac.zip', 'latest-mac.yml']) {
     assert.ok(PIATTAFORME.Mac.attesi.includes(file), `il controllo finale non cerca ${file}`);

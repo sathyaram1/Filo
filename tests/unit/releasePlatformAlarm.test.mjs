@@ -140,7 +140,10 @@ describe('il feedback che si apre', () => {
     assert.ok(titolo.length > 0);
     assert.doesNotMatch(titolo + testo, /undefined|null|\[object/);
     assert.match(titolo, /piattaforma non indicata/);
-    assert.match(titolo + testo, /versione non indicata/);
+    // Senza versione il lavoro non ha ancora toccato nessuna release: il testo
+    // dice quello, e NON che dei file sono andati persi (#733, secondo giro).
+    assert.match(testo, /nessuna release è stata toccata/);
+    assert.doesNotMatch(testo, /404|aggiornamento automatico/);
   });
 
   test('ogni passo del workflow ha una descrizione, e nessuna è vuota', () => {

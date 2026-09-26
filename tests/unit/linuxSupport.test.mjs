@@ -249,7 +249,7 @@ test('il pacchetto Linux viene allegato alla release, non solo costruito', () =>
   const job = linuxJob();
   assert.match(job, /gh release view/,
     'manca il controllo finale: senza, un mancato allegato passa inosservato');
-  assert.match(job, /release-platform-alarm\.mjs --attesi Linux/,
+  assert.match(job, /release-platform-alarm\.mjs"? --attesi Linux/,
     'il controllo finale non chiede l\'elenco dei file attesi: senza elenco non guarda niente e resta verde');
   for (const file of ['Filo-Linux.AppImage', 'latest-linux.yml']) {
     assert.ok(PIATTAFORME.Linux.attesi.includes(file), `il controllo finale non cerca ${file}`);

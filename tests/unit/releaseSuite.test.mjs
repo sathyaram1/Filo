@@ -238,7 +238,7 @@ describe('una meta\' di piattaforma che fallisce apre un feedback', () => {
       test('il controllo finale chiede i file attesi allo script, ed elenca TUTTI quelli mancanti', () => {
         const controllo = elenco.find((p) => p.id === 'controllo');
         assert.ok(controllo, 'manca il controllo "i file sono davvero nella release?"');
-        assert.match(controllo.corpo, new RegExp(`release-platform-alarm\\.mjs --attesi ${piattaforma}`),
+        assert.match(controllo.corpo, new RegExp(`release-platform-alarm\\.mjs\"? --attesi ${piattaforma}`),
           'i file attesi si chiedono allo script: qui e nel testo del feedback devono essere gli stessi');
         assert.doesNotMatch(controllo.corpo, /Filo-(Mac|Linux)\./,
           'l\'elenco dei file vive in un posto solo (PIATTAFORME dello script), qui non si ripete');
