@@ -120,11 +120,15 @@ test('la domanda della password compare dopo venti secondi in un Modulo Google: 
   expect(await livelloDopo(app, 'docs.google.com', 32000)).toBe('sospetto');
 });
 
-test('dati della carta scritti in altre forme in un Modulo Google', async ({ app, openTab }) => {
+test('dati della carta e credenziali scritti in altre forme e lingue in un Modulo Google', async ({ app, openTab }) => {
   const casi = {
     'docs.google.com/forms/d/e/c1/viewform': moduloGoogle('Rimborso', ['Card number', 'Expiry date', 'Security code']),
     'docs.google.com/forms/d/e/c2/viewform': moduloGoogle('Rimborso', ['Numero carta', 'Data di scadenza', 'Codice di sicurezza (3 cifre sul retro)']),
-    'docs.google.com/forms/d/e/c3/viewform': moduloGoogle('Rimborso', ['Intestatario', 'IBAN']),
+    'docs.google.com/forms/d/e/c3/viewform': moduloGoogle('Accesso', ['Utente', 'PIN del bancomat']),
+    'docs.google.com/forms/d/e/c5/viewform': moduloGoogle('Connexion', ['Adresse e-mail', 'Mot de passe']),
+    'docs.google.com/forms/d/e/c6/viewform': moduloGoogle('Anmeldung', ['E-Mail', 'Passwort']),
+    'docs.google.com/forms/d/e/c7/viewform': moduloGoogle('Acceso', ['Correo', 'Contraseña']),
+    'docs.google.com/forms/d/e/c8/viewform': moduloGoogle('Accesso', ['Email', 'PASSWORD']),
   };
   await preparaRete(app, casi);
   const esiti = {};
@@ -135,6 +139,14 @@ test('dati della carta scritti in altre forme in un Modulo Google', async ({ app
     await new Promise((r) => setTimeout(r, 800));
   }
   expect(esiti).toEqual(Object.fromEntries(Object.keys(casi).map((p) => [p, 'sospetto'])));
+});
+
+test('Modulo Google che chiede email e codice OTP ricevuto via SMS: l\'avviso deve comparire', async ({ app, openTab }) => {
+  test.fail(true, 'giro 4: un codice monouso chiesto a parole non conta come credenziale, solo password e carta');
+  await preparaRete(app, { 'docs.google.com/forms/d/e/otp/viewform': moduloGoogle('Conferma accesso banca',
+    ['Email', 'Codice OTP ricevuto via SMS']) });
+  await openTab('https://docs.google.com/forms/d/e/otp/viewform');
+  expect(await livelloDopo(app, 'docs.google.com')).toBe('sospetto');
 });
 
 test('una pagina ospitata che cambia di continuo non chiama il giudice AI a ripetizione', async ({ app, openTab }) => {
