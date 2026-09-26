@@ -121,14 +121,13 @@ function trustedSetOf(settings) {
   return new Set(getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
 }
 
-// eTLD+1 di un URL, via il normalizzatore della pipeline safebrowse (PSL).
-// Fallback all'hostname grezzo se il normalizzatore non è disponibile o l'URL
-// non ha un dominio analizzabile (es. IP, localhost).
+// eTLD+1 per i cookie: solo le piattaforme che il web già separa (un blog su wordpress.com resta con wordpress.com).
+// Ripiego sull'hostname grezzo se il normalizzatore manca o l'URL non ha dominio (IP, localhost).
 function registrableOf(url) {
   try {
     const SB = globalThis.SN_SAFEBROWSE;
     if (SB && typeof SB.normalize === 'function') {
-      const norm = SB.normalize(url);
+      const norm = SB.normalize(url, { soloPsl: true });
       if (norm && norm.registrable) return norm.registrable;
     }
   } catch (_) {}
