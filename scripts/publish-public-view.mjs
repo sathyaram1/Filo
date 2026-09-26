@@ -45,6 +45,9 @@ require(resolve(ROOT, 'src', 'shared', 'feedbackPublicView.js'));
 const FB = globalThis.SN_FEEDBACK;
 const PV = globalThis.SN_FEEDBACK_PUBLIC_VIEW;
 
+// Quante schede fuori pagina si chiedono per richiesta (batchGet).
+const SCHEDE_PER_VOLTA = 200;
+
 // Le segnalazioni che la pagina PER DATA D'INVIO non vede, e che qui servono
 // lo stesso. È la stessa domanda che l'app dell'owner fa dentro Filo
 // (`conLeSegnalazioniFuoriPagina` in src/main/services/handlers/auth.js), e va
@@ -60,6 +63,8 @@ const PV = globalThis.SN_FEEDBACK_PUBLIC_VIEW;
 //
 // Best-effort: se una delle due domande non riesce si prosegue con quello che
 // si ha, invece di non pubblicare niente.
+// Torna anche `schedeCoperte`: se il feedback di OGNI scheda in bacheca è
+// passato di qui, una scheda rimasta sola è un orfano vero.
 async function conLeSegnalazioniFuoriPagina(base, bearer, schede) {
   const rows = Array.isArray(base) ? base.slice() : [];
   const visti = new Set(rows.map((r) => String((r && r._id) || '')).filter(Boolean));
@@ -73,31 +78,45 @@ async function conLeSegnalazioniFuoriPagina(base, bearer, schede) {
   };
 
   if (typeof FB.listResolved === 'function') {
-    try { aggiungi(await FB.listResolved({ pageSize: FB.LIST_PAGE_SIZE, idToken: bearer })); }
+    try { aggiungi(await FB.listResolved({ pageSize: FB.LIST_PAGE_SIZE, idToken: bearer, fields: FB.CAMPI_LISTA })); }
     catch (e) { console.warn(`AVVISO: chiusi di recente non letti (${e?.message || e})`); }
   }
 
+  // TUTTE le schede fuori pagina, a blocchi: fermarsi al tetto lasciava
+  // indietro proprio le più vecchie, che nessun'altra strada guarda.
   const mancanti = (Array.isArray(schede) ? schede : [])
     .map((c) => String((c && c._id) || ''))
-    .filter((id) => id && !visti.has(id))
-    .slice(0, FB.LIST_PAGE_SIZE);
-  if (mancanti.length && typeof FB.getMany === 'function') {
-    try { aggiungi(await FB.getMany(mancanti, { idToken: bearer })); }
-    catch (e) { console.warn(`AVVISO: feedback delle schede fuori pagina non letti (${e?.message || e})`); }
+    .filter((id) => id && !visti.has(id));
+  let schedeCoperte = true;
+  if (typeof FB.getMany === 'function') {
+    for (let i = 0; i < mancanti.length; i += SCHEDE_PER_VOLTA) {
+      const pezzo = mancanti.slice(i, i + SCHEDE_PER_VOLTA);
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        aggiungi(await FB.getMany(pezzo, { idToken: bearer, fields: FB.CAMPI_LISTA }));
+      } catch (e) {
+        schedeCoperte = false;
+        console.warn(`AVVISO: feedback delle schede fuori pagina non letti (${e?.message || e})`);
+      }
+    }
+  } else if (mancanti.length) {
+    schedeCoperte = false;
   }
-  return rows;
+  return { rows, schedeCoperte };
 }
 
 export async function publishPublicView({ dryRun = false } = {}) {
   const bearer = await acquireBearer();
-  const base = await FB.list({ pageSize: FB.LIST_PAGE_SIZE, idToken: bearer });
+  // Decidere una scheda non richiede il documento intero: la stessa
+  // proiezione delle liste dell'app (conversazione, livelli e allegati fuori).
+  const base = await FB.list({ pageSize: FB.LIST_PAGE_SIZE, idToken: bearer, fields: FB.CAMPI_LISTA });
   // TUTTE le schede già pubblicate, paginate: con una finestra sui 500 più
   // recenti per data d'invio, le schede oltre quel tetto non le poteva togliere
   // più nessuno, e non servivano nemmeno a ripescare i feedback fuori pagina.
   const published = typeof FB.listAllPublic === 'function'
     ? await FB.listAllPublic()
     : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE });
-  const grezzi = await conLeSegnalazioniFuoriPagina(base, bearer, published);
+  const { rows: grezzi, schedeCoperte } = await conLeSegnalazioniFuoriPagina(base, bearer, published);
   const feedbacks = await decryptFeedbackList(grezzi);
 
   // Senza chiave privata ogni status è illeggibile: non si pubblicherebbe
@@ -110,12 +129,17 @@ export async function publishPublicView({ dryRun = false } = {}) {
     );
   }
 
-  // `complete`: il caricamento PER DATA D'INVIO non ha toccato il tetto, quindi
-  // questi sono TUTTI i feedback che esistono, e solo allora una scheda senza
-  // feedback è un orfano da togliere. Si guarda la pagina di partenza, non il
-  // totale: le segnalazioni ripescate sono un'aggiunta, e contarle direbbe
-  // «pagina piena» anche quando non lo era.
-  const complete = base.length < FB.LIST_PAGE_SIZE;
+  // Due domande diverse, e confonderle costa caro.
+  //   · `complete` decide se una scheda rimasta senza feedback è un orfano da
+  //     togliere: lo è quando il feedback di ogni scheda l'abbiamo chiesto
+  //     davvero. Legarlo al tetto della pagina per data d'invio voleva dire,
+  //     passati i cinquecento feedback, non togliere mai più niente.
+  //   · `tuttiLetti` decide se il massimo `seq` qui sotto è il massimo VERO:
+  //     lo è solo se la pagina non ha toccato il tetto. Su questo si può
+  //     ABBASSARE il contatore dei numeri, e abbassarlo su un massimo parziale
+  //     rimetterebbe in circolo numeri già assegnati.
+  const tuttiLetti = base.length < FB.LIST_PAGE_SIZE;
+  const complete = schedeCoperte || tuttiLetti;
   const plan = PV.planSync(published, feedbacks, { complete });
 
   if (!dryRun) {
@@ -129,9 +153,9 @@ export async function publishPublicView({ dryRun = false } = {}) {
   // `allowLower` solo se abbiamo letto TUTTI i feedback: un contatore più alto
   // del massimo `seq` esistente l'ha gonfiato qualcuno (farlo avanzare di uno è
   // alla portata di chiunque) e va riportato in pari.
-  if (maxSeq > 0 && !dryRun) counter = await FB.ensureSeqCounter(maxSeq, { idToken: bearer, allowLower: complete });
+  if (maxSeq > 0 && !dryRun) counter = await FB.ensureSeqCounter(maxSeq, { idToken: bearer, allowLower: tuttiLetti });
 
-  return { letti: feedbacks.length, complete, plan, maxSeq, counter, dryRun };
+  return { letti: feedbacks.length, complete, tuttiLetti, plan, maxSeq, counter, dryRun };
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
@@ -154,7 +178,8 @@ if (isMain) {
   try {
     const r = await publishPublicView({ dryRun });
     const prefisso = dryRun ? '[dry-run] ' : '';
-    console.log(`Feedback letti: ${r.letti}${r.complete ? '' : ' (tetto raggiunto: le schede più vecchie non si toccano)'}`);
+    console.log(`Feedback letti: ${r.letti}${r.tuttiLetti ? '' : ` (tetto di ${FB.LIST_PAGE_SIZE} raggiunto: i più vecchi per data d'invio non sono in questa lettura)`}`);
+    if (!r.complete) console.log('Schede orfane: non si toccano (non tutte le schede in bacheca hanno potuto essere confrontate).');
     console.log(`${prefisso}Schede da scrivere: ${r.plan.upsert.length}`);
     for (const u of r.plan.upsert) console.log(`  + ${u.id} — #${u.card.seq || '?'} ${u.card.name || '(senza titolo)'}`);
     console.log(`${prefisso}Schede da togliere: ${r.plan.remove.length}`);

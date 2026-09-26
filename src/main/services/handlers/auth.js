@@ -816,7 +816,8 @@ module.exports = function register(on, ctx) {
 
     if (op === 'getMany') {
       const ids = Array.isArray(msg.ids) ? msg.ids : [];
-      const rows = await FB.getMany(ids, { timeoutMs, idToken });
+      const soloCampi = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
+      const rows = await FB.getMany(ids, { timeoutMs, idToken, fields: soloCampi });
       return { ok: true, rows: await mergeCardFields(rows) };
     }
     // La lettura COMPLETA (#496): la chiede la scheda delle statistiche, che
@@ -832,16 +833,18 @@ module.exports = function register(on, ctx) {
       const { rows, complete } = await FB.listAllPaged({ timeoutMs, idToken });
       return { ok: true, rows, complete };
     }
-    if (op !== 'list') return { ok: false, error: `lettura non prevista: ${op}` };
+    if (op !== 'list' && op !== 'versions') return { ok: false, error: `lettura non prevista: ${op}` };
 
     const fields = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
     const pageSize = Math.max(1, Math.min(FB.LIST_PAGE_SIZE, Number(msg.pageSize) || FB.LIST_PAGE_SIZE));
     const rows = await FB.list({ pageSize, timeoutMs, fields, idToken });
-    // Una PROIEZIONE (il giro leggero che chiede solo "cosa è cambiato") non
-    // porta campi da riunire, e non deve pagare la lettura delle schede a ogni
-    // battito. La lista intera invece sì — ed è anche il momento buono per
-    // rimettere in pari la vista pubblica.
-    if (fields) return { ok: true, rows };
+    // Il giro leggero del battito ("cosa è cambiato?") non porta campi da
+    // riunire e non deve pagare la lettura delle schede a ogni minuto. Una
+    // lista vera invece sì, anche quando è una proiezione — ed è anche il
+    // momento buono per rimettere in pari la vista pubblica. La differenza la
+    // dichiara chi chiede (`op`): dedurla dai campi era indovinare, e da
+    // quando anche le liste sono proiezioni sbagliava sempre.
+    if (op === 'versions') return { ok: true, rows };
     // Le righe appena lette sono le stesse che servirebbero alla
     // sincronizzazione: gliele passiamo invece di far rileggere mezzo database
     // un attimo dopo.
@@ -865,6 +868,43 @@ module.exports = function register(on, ctx) {
   let syncing = false;
   let lastSyncAt = 0;
   const SYNC_MIN_GAP_MS = 60_000;
+
+  // ── Da quando ricontrollare le chiusure ──────────────────────────────────
+  //
+  // La data dell'ultimo giro RIUSCITO, tenuta anche su disco: un riavvio non
+  // deve ricomprare la finestra dei cinquecento chiusi più di recente. Il
+  // margine toglie un'ora alla data scritta, perché la data di chiusura la
+  // mette chi chiude (un'altra macchina, il server) e due orologi non
+  // combaciano: senza, una chiusura arrivata con l'orologio indietro cadrebbe
+  // fuori dal filtro e non entrerebbe mai in bacheca.
+  const MARGINE_SINCRO_MS = 60 * 60 * 1000;
+  // Quante schede fuori pagina si chiedono per richiesta (batchGet).
+  const SCHEDE_PER_VOLTA = 200;
+  let sincroIso = null;   // null = non ancora letta da disco
+  function chiaveSincro() {
+    return (globalThis.SN_CONST && globalThis.SN_CONST.STORAGE_KEYS
+      && globalThis.SN_CONST.STORAGE_KEYS.FEEDBACK_SYNC_AT) || 'feedbackSyncAt';
+  }
+  async function caricaUltimaSincro() {
+    if (sincroIso !== null) return sincroIso;
+    sincroIso = '';
+    try {
+      const raw = await globalThis.SN_STORAGE?.getRaw(chiaveSincro(), '');
+      if (typeof raw === 'string' && raw) sincroIso = raw;
+    } catch (_) { /* senza memoria si riparte dalla finestra intera: costa, non sbaglia */ }
+    return sincroIso;
+  }
+  function ultimaSincroIso() {
+    if (!sincroIso) return '';
+    const t = Date.parse(sincroIso);
+    if (!Number.isFinite(t)) return '';
+    return new Date(t - MARGINE_SINCRO_MS).toISOString();
+  }
+  async function segnaSincroRiuscita() {
+    sincroIso = new Date().toISOString();
+    try { await globalThis.SN_STORAGE?.setRaw(chiaveSincro(), sincroIso); }
+    catch (_) { /* resta in memoria per questa sessione */ }
+  }
 
   /**
    * La scheda pubblica di UN feedback, per id: la scrive, l'aggiorna o la
@@ -935,13 +975,16 @@ module.exports = function register(on, ctx) {
    *
    * Best-effort: se una delle due domande non riesce, il giro prosegue con
    * quello che ha invece di fermarsi. Torna anche gli id aggiunti, perché su
-   * quelli chi pubblica è più prudente (vedi `statusLeggibile`).
+   * quelli chi pubblica è più prudente (vedi `statusLeggibile`), e
+   * `schedeCoperte`: se ogni scheda in bacheca ha il suo feedback sotto gli
+   * occhi, una scheda rimasta sola è un orfano vero e si può togliere.
    */
-  async function conLeSegnalazioniFuoriPagina(base, idToken, schede) {
+  async function conLeSegnalazioniFuoriPagina(base, idToken, schede, sinceIso) {
     const FB = FEEDBACK();
     const rows = Array.isArray(base) ? base.slice() : [];
     const aggiunti = new Set();
-    if (!FB || !idToken) return { rows, aggiunti };
+    let chiusiLetti = false;
+    if (!FB || !idToken) return { rows, aggiunti, schedeCoperte: false, chiusiLetti };
     const visti = new Set(rows.map((r) => String((r && r._id) || '')).filter(Boolean));
     const aggiungi = (arr) => {
       for (const r of Array.isArray(arr) ? arr : []) {
@@ -954,19 +997,35 @@ module.exports = function register(on, ctx) {
     };
 
     if (typeof FB.listResolved === 'function') {
-      try { aggiungi(await FB.listResolved({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken })); }
-      catch (e) { console.warn('[feedback] chiusi di recente non letti:', e?.message || e); }
+      // Solo le chiusure arrivate DOPO l'ultimo giro riuscito: quelle di prima
+      // hanno già la loro scheda, e rileggerle ogni minuto era il grosso del
+      // conto. Alla prima sincronizzazione dopo l'avvio la data non c'è e si
+      // riparte dalla finestra intera, una volta.
+      const campi = Array.isArray(FB.CAMPI_LISTA) ? FB.CAMPI_LISTA : null;
+      try {
+        aggiungi(await FB.listResolved({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken, sinceIso, fields: campi }));
+        chiusiLetti = true;
+      } catch (e) { console.warn('[feedback] chiusi di recente non letti:', e?.message || e); }
     }
 
+    // Le schede fuori pagina si chiedono TUTTE, a blocchi: fermarsi al tetto
+    // lasciava indietro proprio le schede più vecchie, che sono quelle che
+    // nessun'altra strada guarda.
     const mancanti = (Array.isArray(schede) ? schede : [])
       .map((c) => String((c && c._id) || ''))
-      .filter((id) => id && !visti.has(id))
-      .slice(0, FB.LIST_PAGE_SIZE);
-    if (mancanti.length) {
-      try { aggiungi(await FB.getMany(mancanti, { idToken, timeoutMs: 30000 })); }
-      catch (e) { console.warn('[feedback] feedback delle schede fuori pagina non letti:', e?.message || e); }
+      .filter((id) => id && !visti.has(id));
+    let schedeCoperte = true;
+    for (let i = 0; i < mancanti.length; i += SCHEDE_PER_VOLTA) {
+      const pezzo = mancanti.slice(i, i + SCHEDE_PER_VOLTA);
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        aggiungi(await FB.getMany(pezzo, { idToken, timeoutMs: 30000, fields: Array.isArray(FB.CAMPI_LISTA) ? FB.CAMPI_LISTA : null }));
+      } catch (e) {
+        schedeCoperte = false;
+        console.warn('[feedback] feedback delle schede fuori pagina non letti:', e?.message || e);
+      }
     }
-    return { rows, aggiunti };
+    return { rows, aggiunti, schedeCoperte, chiusiLetti };
   }
 
   /**
@@ -1012,11 +1071,16 @@ module.exports = function register(on, ctx) {
       }
       const base = (Array.isArray(rows) && rows.length)
         ? rows
-        : await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken });
+        : await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken, fields: FB.CAMPI_LISTA });
       // Le schede già in bacheca si leggono una volta sola e servono due volte:
       // per pescare i feedback fuori pagina che ne hanno una, e per il piano.
-      const published = await publicCards({ fresh: true });
-      const { rows: raw, aggiunti } = await conLeSegnalazioniFuoriPagina(base, idToken, published);
+      // Una volta sola DAVVERO: il giro parte due secondi dopo il caricamento
+      // che le ha appena lette, e ripeterlo con `fresh` era la seconda delle
+      // due passate che questo caricamento pagava. Le scritture sotto buttano
+      // la memoria breve da sé, quindi il giro dopo rilegge comunque.
+      const published = await publicCards();
+      await caricaUltimaSincro();
+      const { rows: raw, aggiunti, schedeCoperte, chiusiLetti } = await conLeSegnalazioniFuoriPagina(base, idToken, published, ultimaSincroIso());
       const decifrati = new Array(raw.length);
       let next = 0;
       const worker = async () => {
@@ -1030,13 +1094,21 @@ module.exports = function register(on, ctx) {
         (f) => !aggiunti.has(String((f && f._id) || '')) || statusLeggibile(f),
       );
 
-      // `complete`: il caricamento PER DATA D'INVIO non ha toccato il tetto,
-      // quindi questi sono TUTTI i feedback che esistono, e solo allora una
-      // scheda senza feedback è un orfano (feedback cancellato) da togliere.
-      // Si guarda la pagina di partenza, non il totale: le segnalazioni pescate
-      // per data di chiusura sono un'aggiunta, e contarle direbbe «pagina
-      // piena» anche quando non lo era.
-      const complete = base.length < FB.LIST_PAGE_SIZE;
+      // `complete` decide una cosa sola: se una scheda rimasta senza feedback
+      // è un orfano da togliere. Guardava se la pagina per data d'invio aveva
+      // toccato il tetto — e passati i cinquecento feedback la risposta è
+      // sempre «sì», cioè da allora nessuna scheda orfana è più uscita dalla
+      // bacheca, in silenzio. La domanda giusta è un'altra e non costa niente
+      // in più: il feedback di OGNI scheda in bacheca l'abbiamo appena
+      // chiesto (`schedeCoperte`), quindi quello che non è tornato non esiste.
+      //
+      // E vale solo se non abbiamo SCARTATO niente: una segnalazione pescata
+      // fuori pagina con lo stato illeggibile non entra in `feedbacks`, e per
+      // chi fa il piano è indistinguibile da una cancellata. Toglierle la
+      // scheda vorrebbe dire far sparire dalla bacheca un fix buono perché
+      // una decifratura non è riuscita.
+      const scartate = decifrati.length !== feedbacks.length;
+      const complete = !scartate && (schedeCoperte || base.length < FB.LIST_PAGE_SIZE);
       const plan = V.planSync(published, feedbacks, { complete });
       for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
       for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
@@ -1068,6 +1140,10 @@ module.exports = function register(on, ctx) {
       }
 
       lastSyncAt = Date.now();
+      // La data si sposta solo se la domanda sulle chiusure è andata a buon
+      // fine: spostarla dopo un giro che non le ha lette lascerebbe indietro
+      // per sempre proprio quelle che non ha guardato.
+      if (chiusiLetti) await segnaSincroRiuscita();
       if (plan.upsert.length || plan.remove.length) {
         cardsCache = { at: 0, rows: [] }; // la prossima lettura rilegge davvero
         // E anche la memoria breve della lettura completa: le schede sono

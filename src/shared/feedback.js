@@ -888,6 +888,44 @@
   // restano fuori e nessun conteggio calcolato in pagina può vederli.
   const LIST_PAGE_SIZE = 500;
 
+  // ── Cosa si scarica per ELENCARE, e cosa solo per APRIRE ─────────────────
+  //
+  // Un feedback può pesare oltre cento KB, e quasi tutto sta in cinque campi
+  // che una riga d'elenco non mostra mai. Moltiplicati per il tetto qui sopra
+  // sono i dieci MB che ogni apertura di Gestione scaricava per disegnare
+  // cinquecento titoli. La lista chiede una PROIEZIONE; il resto arriva quando
+  // l'owner apre quel feedback.
+  //
+  // `text` resta nella proiezione di proposito: è il titolo di ripiego dei
+  // feedback senza `name` ed è il campo su cui cercano tutte e due le pagine.
+  // Toglierlo svuoterebbe la ricerca invece di alleggerirla.
+  const CAMPI_DETTAGLIO = ['notes', 'livelli', 'reviewComment', 'images', 'files'];
+
+  // I campi che un elenco mostra, ordina o filtra: tutti quelli che le regole
+  // Firestore ammettono meno quelli di dettaglio, più `pipeline` (lo scrive il
+  // server con l'SDK admin, che le regole non attraversa, e da lì viene il
+  // colore del bordo di ogni riga). Un campo nuovo dimenticato qui sparirebbe
+  // dagli elenchi senza un errore, quindi la sentinella
+  // `tests/unit/feedbackCampiLista.test.mjs` confronta questi due elenchi con
+  // `firestore.rules` e diventa rossa se divergono.
+  const CAMPI_LISTA = [
+    'archiveOverride', 'beatAt', 'blockReason', 'branch', 'capabilityGapId',
+    'claimExpiresAt', 'claimNum', 'claimedAt', 'claimedBy', 'clientId',
+    'clientIdHash', 'createdAt', 'mergePreapproved', 'name', 'parentId', 'pipeline',
+    'priority', 'priorityManual', 'reopenRequests', 'resolvedAt',
+    'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'seq', 'stalls',
+    'starred', 'status', 'statusPublic', 'statusReason', 'subSeq', 'text',
+    'title', 'url', 'userAgent', 'userNote', 'verifiedAt', 'votes',
+    'walletPseudonym', 'workingResets', 'workingSince',
+  ];
+
+  // Un documento letto con la proiezione della lista porta questo marchio: chi
+  // sta per mostrare il dettaglio sa di doverlo completare, invece di mostrare
+  // una conversazione vuota credendola vuota davvero.
+  function soloLista(fb) {
+    return !!(fb && fb._proiezione);
+  }
+
   // Il caricamento ha toccato il tetto? Allora ogni numero che ne deriva è un
   // "almeno N", non un totale.
   function listHitCap(loaded, pageSize) {
@@ -927,7 +965,11 @@
   // pagina è ordinata per NOME del documento e comincia dopo quello passato. È
   // il cursore di `listAll`, e non passa dal ponte con il main: da una pagina
   // filo:// una lettura completa della collezione vera non si fa.
-  async function list({ pageSize = 200, timeoutMs = 0, fields = null, idToken = '', afterName = null } = {}) {
+  // `op`: che cosa sta chiedendo chi legge, non come. Il main se ne serve per
+  // sapere se vale la pena riunire le schede pubbliche e rimettere in pari la
+  // bacheca (una lista vera sì, il giro leggero del battito no) — e la
+  // domanda non si può dedurre dai campi senza indovinare.
+  async function list({ pageSize = 200, timeoutMs = 0, fields = null, idToken = '', afterName = null, op = 'list' } = {}) {
     // Da una pagina filo:// la lettura passa dal main, che ha il token admin
     // (#583): qui non c'è nessuna credenziale, e la collezione non è più
     // pubblica. Il main torna le righe già decodificate.
@@ -936,13 +978,24 @@
       if (typeof afterName === 'string') {
         throw new Error('lettura completa dei feedback non disponibile da una pagina: passa dal main');
       }
-      return readViaMain(bridge, { op: 'list', pageSize, timeoutMs, fields });
+      return marcaProiezione(await readViaMain(bridge, { op, pageSize, timeoutMs, fields }), fields);
     }
     if (typeof afterName === 'string') {
       const { rows } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken });
       return rows;
     }
-    return listDirect(COLLECTION, { pageSize, timeoutMs, fields, idToken });
+    return marcaProiezione(await listDirect(COLLECTION, { pageSize, timeoutMs, fields, idToken }), fields);
+  }
+
+  // Una riga arrivata da una proiezione va marcata: chi mostra il dettaglio
+  // deve poter distinguere «questo feedback non ha note» da «le note non sono
+  // state chieste», o mostrerebbe una conversazione vuota credendola vuota.
+  function marcaProiezione(rows, fields) {
+    if (!Array.isArray(fields) || fields.length === 0) return rows;
+    for (const r of Array.isArray(rows) ? rows : []) {
+      if (r && typeof r === 'object') r._proiezione = true;
+    }
+    return rows;
   }
 
   // I feedback CHIUSI più di recente (data di chiusura decrescente), non i più
@@ -954,8 +1007,51 @@
   // chiaro sul documento, quindi si può ordinare; i feedback che non sono mai
   // stati chiusi non ce l'hanno e Firestore li lascia fuori da sé.
   // Serve il token dell'owner: la collezione non si legge senza.
-  async function listResolved({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '' } = {}) {
-    return listDirect(COLLECTION, { pageSize, timeoutMs, idToken, orderField: 'resolvedAt' });
+  //
+  // `sinceIso`: la data dell'ultima sincronizzazione riuscita. Chiedere ogni
+  // volta gli ultimi cinquecento chiusi vuol dire rileggere cinquecento
+  // documenti per trovarne, quasi sempre, zero o uno: quelli chiusi PRIMA
+  // dell'ultimo giro hanno già la loro scheda. Con la data il conto scende a
+  // quello che è davvero cambiato, e il tetto diventa una rete di sicurezza
+  // invece del solito prezzo. Senza data (primo giro dopo l'avvio, o memoria
+  // persa) si torna alla finestra di prima: meglio pagare una volta che
+  // saltare una chiusura.
+  //
+  // `fields`: chi vuole solo decidere la scheda non ha bisogno del documento
+  // intero (vedi CAMPI_LISTA).
+  async function listResolved({
+    pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', sinceIso = '',
+    fields = null, maxPages = ALL_PAGES_MAX,
+  } = {}) {
+    const since = String(sinceIso || '').trim();
+    const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
+    const comune = { timeoutMs, idToken, fields, orderField: 'resolvedAt' };
+    if (!since) return listDirect(COLLECTION, { ...comune, pageSize: limit });
+    // Con il filtro la risposta è di solito cortissima, ma non si può contare
+    // su questo: se l'app è rimasta chiusa un mese le chiusure arretrate sono
+    // tante, e una finestra sola le taglierebbe di nuovo in silenzio.
+    const rows = [];
+    const visti = new Set();
+    let cursore = null;
+    for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const batch = await listDirect(COLLECTION, {
+        ...comune, pageSize: limit, where: { field: 'resolvedAt', op: 'GREATER_THAN', timestamp: since }, startAfter: cursore,
+      });
+      let nuove = 0;
+      for (const r of batch) {
+        const id = String((r && r._id) || '');
+        if (id && visti.has(id)) continue;
+        if (id) visti.add(id);
+        rows.push(r);
+        nuove += 1;
+      }
+      const ultimo = batch[batch.length - 1];
+      const coda = ultimo && ultimo.resolvedAt ? String(ultimo.resolvedAt) : '';
+      if (batch.length < limit || nuove === 0 || !coda) break;
+      cursore = { timestamp: coda, name: nomeDocumento(COLLECTION, ultimo) };
+    }
+    return rows;
   }
 
   // ── TUTTE le segnalazioni, non una pagina ────────────────────────────────
@@ -1022,7 +1118,15 @@
 
   // La query vera e propria, senza ponti: la usano il main (col token
   // dell'owner), gli script e la vista pubblica (che non ha bisogno di token).
-  async function listDirect(collectionId, { pageSize = 200, timeoutMs = 0, fields = null, idToken = '', orderField = 'createdAt' } = {}) {
+  // `where` ({ field, op, timestamp }) e `startAfter` ({ timestamp, name })
+  // servono a chi chiede «solo quello che è cambiato da allora»: senza, ogni
+  // giro ripaga la finestra intera per trovarci in media niente. Il cursore
+  // nomina anche il documento perché due chiusure possono cadere nello stesso
+  // istante, e senza il nome la pagina dopo le salterebbe o le ripeterebbe.
+  async function listDirect(collectionId, {
+    pageSize = 200, timeoutMs = 0, fields = null, idToken = '',
+    orderField = 'createdAt', where = null, startAfter = null,
+  } = {}) {
     // structuredQuery via runQuery, ordinamento decrescente sul campo chiesto
     // (per data d'invio salvo che il chiamante ne chieda un altro).
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
@@ -1037,6 +1141,25 @@
     };
     if (Array.isArray(fields) && fields.length > 0) {
       body.structuredQuery.select = { fields: fields.map((f) => ({ fieldPath: String(f) })) };
+    }
+    if (where && where.field && where.timestamp) {
+      body.structuredQuery.where = {
+        fieldFilter: {
+          field: { fieldPath: String(where.field) },
+          op: String(where.op || 'GREATER_THAN'),
+          value: { timestampValue: String(where.timestamp) },
+        },
+      };
+    }
+    if (startAfter && startAfter.timestamp) {
+      body.structuredQuery.orderBy.push({ field: { fieldPath: '__name__' }, direction: 'DESCENDING' });
+      body.structuredQuery.startAt = {
+        before: false,
+        values: [
+          { timestampValue: String(startAfter.timestamp) },
+          { referenceValue: String(startAfter.name || '') },
+        ],
+      };
     }
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
@@ -1130,25 +1253,29 @@
   // campi. È la domanda che la dashboard fa a ogni giro per restare aggiornata
   // senza riscaricare tutto (≈130 KB invece di 5 MB per 500 feedback).
   async function listVersions({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0 } = {}) {
-    const rows = await list({ pageSize, timeoutMs, fields: ['__name__'] });
+    const rows = await list({ pageSize, timeoutMs, fields: ['__name__'], op: 'versions' });
     return rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime }));
   }
 
   // Legge i documenti indicati (interi) in UNA richiesta (batchGet). Ritorna
   // solo quelli trovati: un id cancellato nel frattempo non compare. Vuoto → [].
-  async function getMany(ids, { timeoutMs = 0, idToken = '' } = {}) {
+  async function getMany(ids, { timeoutMs = 0, idToken = '', fields = null } = {}) {
     const wanted = (Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean);
     if (wanted.length === 0) return [];
     const bridge = pageBridge();
-    if (bridge) return readViaMain(bridge, { op: 'getMany', ids: wanted, timeoutMs });
+    if (bridge) return marcaProiezione(await readViaMain(bridge, { op: 'getMany', ids: wanted, timeoutMs, fields }), fields);
     const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
     const prefix = `${FIRESTORE_BASE}/${COLLECTION}/`;
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    const corpo = { documents: wanted.map((id) => prefix + id) };
+    // Stessa proiezione delle liste: chi rilegge una riga d'elenco non deve
+    // riscaricare note e allegati per riscrivere un titolo.
+    if (Array.isArray(fields) && fields.length > 0) corpo.mask = { fieldPaths: fields.map((f) => String(f)) };
     const opts = {
       method: 'POST',
       headers,
-      body: JSON.stringify({ documents: wanted.map((id) => prefix + id) }),
+      body: JSON.stringify(corpo),
     };
     let timer = null;
     let timedOut = false;
@@ -1175,7 +1302,7 @@
     for (const row of Array.isArray(arr) ? arr : []) {
       if (row && row.found) out.push(fsDocToObject(row.found));
     }
-    return out;
+    return marcaProiezione(out, fields);
   }
 
   // ── La vista pubblica (#583) ──────────────────────────────────────────────
@@ -1782,6 +1909,11 @@
     maxSeq,
     // Tetto del caricamento e resa onesta dei conteggi che ne derivano (#495).
     LIST_PAGE_SIZE,
+    // La proiezione degli elenchi e il suo complemento: chi elenca chiede
+    // CAMPI_LISTA, chi apre un feedback completa con CAMPI_DETTAGLIO.
+    CAMPI_LISTA,
+    CAMPI_DETTAGLIO,
+    soloLista,
     listHitCap,
     countLabel,
     COUNT_CAP_HINT,

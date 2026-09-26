@@ -720,6 +720,13 @@
         + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Configura la chiave e riprova.');
       return false;
     }
+    // Stessa regola, altro motivo: la conversazione non è mai arrivata, quindi
+    // la casella è vuota perché non sappiamo, non perché non c'è niente.
+    if (item._dettaglioMancato && payload && typeof payload.notes === 'string') {
+      alert('Il resto di questa segnalazione non è arrivato: salvare adesso sostituirebbe la conversazione '
+        + 'con quello che vedi a schermo. Premi «Aggiorna» e riprova.');
+      return false;
+    }
     // Un cambio di stato passa SOLO se è una delle azioni che la segnalazione
     // offre in questo momento (la stessa tabella che disegna i pulsanti). Il
     // guardiano sta qui e non sui pulsanti: uno stato può essere cambiato
@@ -1048,7 +1055,10 @@
       // La routine ha domande: `design` con motivo `clarify`. Vive nei Ricevuti
       // (è una decisione che aspetta l'owner), non più in una sezione sua.
       const clarifyReply = isAdmin && MR.aspettaRisposta(f);
-      const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply
+      // Con la conversazione non arrivata la casella non si offre: quello che
+      // ci si scrive dentro non si può salvare (sostituirebbe il report), e
+      // offrirla vorrebbe dire far scrivere l'owner per niente.
+      const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply && !f._dettaglioMancato
         && (currentTab === 'inbox' || currentTab === 'queue');
       // Render di un turno come bolla di sola lettura (segnalazione esclusa).
       const convoBubble = (t) => {
@@ -1101,7 +1111,18 @@
       } else {
         convoHtml = convoTurns.map(convoBubble).join('');
       }
-      const threadHtml = `<div class="fb-thread">${reportBubble}${convoHtml}</div>`;
+      // Il resto non è arrivato: si dice, con le stesse parole della gemella in
+      // Gestione e con lo stesso tasto. Senza, la scheda si disegnava come se
+      // la conversazione fosse vuota e l'owner decideva su metà segnalazione.
+      const mancatoHtml = f._dettaglioMancato
+        ? `<div class="fb-bubble fb-bubble--model fb-dettaglio-mancato">
+             <div class="fb-bubble-body"><em>${f._dettaglioMancato === 'sparito'
+               ? 'Il resto di questa segnalazione non è arrivato: sul server non c&#39;è più.'
+               : 'Il resto di questa segnalazione non è arrivato: controlla la connessione.'}</em></div>
+             <button type="button" class="fb-load-retry fb-riprova-dettaglio" data-id="${escapeHtml(f._id)}">↻ Riprova</button>
+           </div>`
+        : '';
+      const threadHtml = `<div class="fb-thread">${reportBubble}${convoHtml}${mancatoHtml}</div>`;
       const tailThreadHtml = tailBubblesHtml ? `<div class="fb-thread fb-thread--tail">${tailBubblesHtml}</div>` : '';
       // Su "Ricevuti" la casella è un COMMENTO al volo (poi lo metti in coda);
       // altrove è la nota di triage/decisioni di design.
@@ -1158,6 +1179,10 @@
         </article>
       `;
     }).join('');
+
+    listEl.querySelectorAll('.fb-riprova-dettaglio').forEach((btn) => {
+      btn.addEventListener('click', () => riprovaDettaglio(btn.dataset.id));
+    });
 
     listEl.querySelectorAll('.fb-imgs img').forEach((img) => {
       img.addEventListener('click', () => {
@@ -1487,6 +1512,143 @@
     return agentOnly ? items.filter(isAgent) : items;
   }
 
+  // ── Qui la scheda È il dettaglio ─────────────────────────────────────────
+  //
+  // Ogni scheda mostra la conversazione intera, gli allegati, il testo: il
+  // caricamento non può chiederli per tutti, o si torna ai dieci MB per
+  // apertura. Li chiede per la SEZIONE che si sta guardando, una volta sola
+  // (chi è già completo non si ridomanda), e lo dice mentre lo fa.
+  const DETTAGLI_PER_VOLTA = 200;
+
+  // Le richieste già partite, per id. Ogni gesto fatto durante l'attesa (una
+  // lettera nella ricerca, un cambio di sezione, la casella «Solo automatici»)
+  // ridisegna, e senza questo registro ogni ridisegno ricomprava la sezione
+  // intera: dodici lettere, tredici volte gli stessi documenti.
+  const dettagliInCorso = new Map();
+
+  async function completaDettagli(ids) {
+    const attese = [];
+    const nuovi = [];
+    for (const id of ids) {
+      const inCorso = dettagliInCorso.get(id);
+      if (inCorso) attese.push(inCorso);
+      else nuovi.push(id);
+    }
+    if (nuovi.length) {
+      const giro = chiediDettagli(nuovi);
+      for (const id of nuovi) dettagliInCorso.set(id, giro);
+      attese.push(giro.finally(() => {
+        // Solo i propri: un giro più recente può già aver preso in carico un id
+        // che questo non è riuscito a completare.
+        for (const id of nuovi) if (dettagliInCorso.get(id) === giro) dettagliInCorso.delete(id);
+      }));
+    }
+    await Promise.all(attese);
+  }
+
+  // Il marchio «questa lettura non è tornata» sulle righe di un blocco: la
+  // scheda lo dice e offre di riprovare, e nessun ridisegno la ricompra.
+  function segnaMancate(chiesti, motivo) {
+    all = all.map((f) => {
+      if (!chiesti.has(f._id)) return f;
+      const { _proiezione, ...resto } = f;
+      return { ...resto, _dettaglioMancato: motivo };
+    });
+  }
+
+  // Riprova la lettura di UNA segnalazione, su richiesta di chi guarda.
+  function riprovaDettaglio(id) {
+    all = all.map((f) => {
+      if (f._id !== id) return f;
+      const { _dettaglioMancato, ...resto } = f;
+      return { ...resto, _proiezione: true };
+    });
+    applyFilter();
+  }
+
+  // Che cosa serve davvero del documento intero. Quando NESSUNO stato si
+  // legge, su questo computer manca la chiave privata: la conversazione non
+  // comparirà in nessun caso, quindi chiederla vorrebbe dire pagare cento KB a
+  // segnalazione per buttarli. Restano gli allegati, che si vedono lo stesso.
+  // `null` = il documento intero, il caso normale.
+  function campiDettaglio() {
+    return sezioniAttendibili() ? null : ['images', 'files', 'userNote'];
+  }
+
+  async function chiediDettagli(ids) {
+    for (let i = 0; i < ids.length; i += DETTAGLI_PER_VOLTA) {
+      const pezzo = ids.slice(i, i + DETTAGLI_PER_VOLTA);
+      // Il gruppo di QUESTO blocco, non tutti: togliere il marchio a chi non è
+      // ancora stato chiesto lo lascerebbe per sempre senza conversazione.
+      const chiesti = new Set(pezzo);
+      let rows;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        rows = await SN_FEEDBACK.getMany(pezzo, { timeoutMs: 20000, fields: campiDettaglio() });
+      } catch (e) {
+        // La lettura non è tornata. Va SCRITTO sulle righe, o al ridisegno
+        // dopo il primo gesto (una lettera nella ricerca, un cambio di
+        // sezione) sembrerebbero ancora da chiedere e ripartirebbero: la
+        // stessa spesa, moltiplicata per i gesti fatti nell'attesa.
+        segnaMancate(chiesti, 'rete');
+        throw e;
+      }
+      if (isAdmin && rows.length > 0) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const r = await sendToMain({ type: 'feedback_decrypt_fields', list: rows });
+          if (r && r.ok && Array.isArray(r.list)) rows = r.list;
+        } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
+      }
+      const perId = new Map(rows.map((r) => [String(r && r._id), r]));
+      all = all.map((f) => {
+        if (!chiesti.has(f._id)) return f;
+        const pieno = perId.get(f._id);
+        // Il marchio si toglie ANCHE a chi non è tornato (cancellato nel
+        // frattempo): lasciarcelo rimanderebbe la pagina a richiederlo in
+        // eterno, un giro di caricamento dopo l'altro. Ma la scheda lo disegna
+        // senza conversazione, e su una conversazione mai letta un salvataggio
+        // scrive al posto del report: chi scrive deve saperlo.
+        if (!pieno) { const { _proiezione, ...resto } = f; return { ...resto, _dettaglioMancato: 'sparito' }; }
+        const { _proiezione, ...resto } = f;
+        // `pieno` porta con sé il marchio della proiezione quando abbiamo
+        // chiesto i soli allegati: toglierlo qui, o la riga resterebbe per
+        // sempre «da completare» e la pagina la richiederebbe a ogni disegno.
+        const fuso = { ...pieno, ...resto };
+        delete fuso._proiezione;
+        if (campiDettaglio()) {
+          // Senza la chiave il report non si legge comunque: al suo posto va
+          // la frase in chiaro, e la casella resta spenta.
+          fuso.notes = String(fuso.userNote || '').trim();
+          fuso.reportIllegibile = true;
+          return fuso;
+        }
+        return sanitizeReportForReader(fuso);
+      });
+    }
+  }
+
+  // Torna true se la sezione non è ancora completa: allora disegna l'attesa e
+  // ridisegnerà da sé. `applyFilter` si ferma qui.
+  function inAttesaDiDettagli(items) {
+    const mancanti = items.filter((f) => SN_FEEDBACK.soloLista(f)).map((f) => f._id).filter(Boolean);
+    if (!mancanti.length) return false;
+    listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
+    emptyEl.hidden = true;
+    countEl.textContent = '';
+    const gen = loadGen;
+    completaDettagli(mancanti)
+      .then(() => { if (gen === loadGen) applyFilter(); })
+      .catch((e) => {
+        if (gen !== loadGen) return;
+        console.error('[feedback] dettagli non caricati:', e);
+        showLoadError((window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
+          ? SN_CHAT_ERRORS.sentence(e)
+          : 'Non è stato possibile caricare questi feedback: controlla la connessione e riprova.');
+      });
+    return true;
+  }
+
   // Mostra o nasconde la barra delle sezioni. Non è una decorazione: se gli
   // stati non si leggono, quella barra scriverebbe numeri inventati.
   function mostraSezioni() {
@@ -1506,6 +1668,10 @@
     const q = (searchEl.value || '').trim().toLowerCase();
     const sezioni = mostraSezioni();
     const base = sectionItems();
+    // I numeri delle sezioni si sanno già dalla proiezione: si scrivono subito,
+    // anche mentre le schede di questa sezione stanno arrivando.
+    if (sezioni) updateTabCounts();
+    if (inAttesaDiDettagli(base)) return;
     const filtered = q
       ? base.filter((f) => {
           const num = SN_FEEDBACK.formatNum(f.seq, f.subSeq);
@@ -1532,7 +1698,6 @@
         return ka.seq - kb.seq || ka.sub - kb.sub;
       });
     }
-    if (sezioni) updateTabCounts();
     render(filtered);
   }
 
@@ -1620,7 +1785,12 @@
     try {
       // timeoutMs: offline la fetch resta muta ~13 s prima che il sistema la
       // lasci cadere. Ci arrendiamo prima e mostriamo l'errore (con Riprova).
-      let list = await SN_FEEDBACK.list({ pageSize: SN_FEEDBACK.LIST_PAGE_SIZE, timeoutMs: 8000 });
+      // La PROIEZIONE della lista: titoli, stati, numeri e tutto ciò su cui
+      // le sezioni contano e la ricerca filtra. Conversazione e allegati — la
+      // parte che pesa — arrivano per la sezione che si guarda davvero.
+      let list = await SN_FEEDBACK.list({
+        pageSize: SN_FEEDBACK.LIST_PAGE_SIZE, timeoutMs: 8000, fields: SN_FEEDBACK.CAMPI_LISTA,
+      });
       // S1.3: decifratura batch dei campi FENC1: — una sola IPC per tutta la lista.
       // Graceful fallback: se l'utente non è admin o l'IPC fallisce, i valori
       // restano invariati (la dashboard non si rompe, mostra il ciphertext).

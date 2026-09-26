@@ -1124,8 +1124,21 @@
   }
 
   /** Livello 3: quello che Claude ha segnalato lavorando. PURA. */
-  function livelloL3(fb) {
+  // Il documento intero non è mai stato letto (l'elenco porta una proiezione):
+  // `livelli` e `notes` non ci sono, e le due forme che li leggono direbbero
+  // «non fatto» su una domanda che nessuno ha ancora posto al server.
+  function nonLetto(key, tipo, titolo) {
+    return forma(key, tipo, titolo, null, 'nonletto', {
+      titolo,
+      righe: [],
+      testo: 'Il resto di questa segnalazione non è ancora arrivato: finché non arriva, questo non si sa.',
+      azioni: [],
+    });
+  }
+
+  function livelloL3(fb, opts) {
     const titolo = 'Segnalazione di Claude';
+    if (opts && opts.dettaglioLetto === false) return nonLetto('l3', 'rombo', titolo);
     const l = livelliOf(fb).l3;
     const attesa = aspettaRisposta(fb);
     const domanda = attesa ? ultimaDomanda(fb) : null;
@@ -1184,8 +1197,9 @@
   };
 
   /** Livello 4: l'audit di sicurezza sul lavoro fatto. PURA. */
-  function livelloL4(fb) {
+  function livelloL4(fb, opts) {
     const titolo = 'Audit di sicurezza';
+    if (opts && opts.dettaglioLetto === false) return nonLetto('l4', 'pentagono', titolo);
     const l = livelliOf(fb).l4;
     const esito = String((l && l.esito) || '').trim();
     const info = L4_ESITI[esito];
@@ -1313,7 +1327,7 @@
    * `opts.fusioni` = gli elenchi del server (vedi livelloL5).
    */
   function livelli(fb, opts) {
-    return [livelloL1(fb), livelloL2(fb), livelloL3(fb), livelloL4(fb), livelloL5(fb, opts)];
+    return [livelloL1(fb), livelloL2(fb), livelloL3(fb, opts), livelloL4(fb, opts), livelloL5(fb, opts)];
   }
 
   /** La voce di un livello per chiave ('l1'…'l5'), o null. PURA. */

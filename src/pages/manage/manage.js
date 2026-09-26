@@ -2484,6 +2484,103 @@
     }
   });
 
+  // ── Il resto del feedback, quando serve davvero ──────────────────────────
+  //
+  // L'elenco scarica una proiezione: niente conversazione, livelli, allegati.
+  // Sono i campi che pesano, e una riga non ne mostra nessuno — ma il pannello
+  // sì. Qui si completa il feedback aperto, una lettura sola, e si ridisegna.
+  // La richiesta in corso si ricorda per id: passare due volte sulla stessa
+  // riga non la chiede due volte.
+  const dettagliInCorso = new Map();
+
+  // Una riga la cui lettura NON è tornata (guasto, tempo scaduto, documento
+  // sparito) non è uguale a una mai chiesta: senza il segno il pannello resta
+  // su «Caricamento…», chi scrive crede che la conversazione sia vuota, e ogni
+  // clic ricompra la stessa lettura mancata.
+  function segnaDettaglioMancato(key, motivo) {
+    // Sul posto: la stessa riga sta anche nell'indice per mittente e nella
+    // lista disegnata, e sostituirla lascerebbe quelle copie senza il segno.
+    const riga = allFeedbacks.find((f) => f._id === key);
+    if (riga) riga._dettaglioMancato = motivo || 'rete';
+  }
+
+  function completaDettaglio(id) {
+    const key = String(id || '');
+    if (!key) return Promise.resolve(null);
+    if (dettagliInCorso.has(key)) return dettagliInCorso.get(key);
+    const p = (async () => {
+      let rows;
+      try {
+        rows = await liveSources.getDettagli([key]);
+      } catch (e) {
+        segnaDettaglioMancato(key, 'rete');
+        throw e;
+      }
+      if (isAdmin && rows.length > 0) {
+        try {
+          const r = await sendToMain({ type: 'feedback_decrypt_fields', list: rows });
+          if (r && r.ok && Array.isArray(r.list)) rows = r.list;
+        } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
+      }
+      const pieno = rows[0];
+      if (!pieno) { segnaDettaglioMancato(key, 'sparito'); return null; }
+      // La riga può essere cambiata nel frattempo (giro dal vivo): si tiene
+      // quella, completata — non si riporta indietro lo stato appena letto.
+      const i = allFeedbacks.findIndex((f) => f._id === key);
+      if (i < 0) return null;
+      const { _proiezione, _dettaglioMancato, _dettaglioVecchio, ...resto } = allFeedbacks[i];
+      // Della riga si tiene quello che un ELENCO sa: lo stato appena riletto
+      // vince su quello di prima. I campi del dettaglio no: quelli qui sono la
+      // copia vecchia, e rimetterli sopra il documento appena arrivato
+      // cancellerebbe proprio il turno nuovo che si stava aspettando.
+      for (const campo of (FB.CAMPI_DETTAGLIO || [])) delete resto[campo];
+      allFeedbacks[i] = { ...pieno, ...resto };
+      reindexByClient();
+      return allFeedbacks[i];
+    })().finally(() => { dettagliInCorso.delete(key); });
+    dettagliInCorso.set(key, p);
+    return p;
+  }
+
+  // Riprova a leggere il resto, su richiesta dell'owner.
+  function riprovaDettaglio(id, btn) {
+    const key = String(id || '');
+    const riga = allFeedbacks.find((f) => f._id === key);
+    if (!riga) return;
+    delete riga._dettaglioMancato;
+    // Risponde il tasto, non un ridisegno: ridisegnare adesso cancellerebbe
+    // una bozza in corso, che è il danno già visto su questo pannello.
+    if (btn) { btn.disabled = true; btn.textContent = 'Riprovo…'; }
+    completaDettaglio(key)
+      .catch((e) => console.warn('[manage] dettaglio non completato:', e?.message || e))
+      .finally(() => { if (selectedId === key) ridisegnaRispettandoLaBozza(key); });
+  }
+
+  // La conversazione in mano non è quella di adesso: o non è mai arrivata
+  // (riga d'elenco), o il documento è cambiato sul server dopo che l'avevamo
+  // letta. In tutti e due i casi va riletta prima di scriverci sopra.
+  function dettaglioDaRileggere(fb) {
+    return !!fb && (FB.soloLista(fb) || !!fb._dettaglioVecchio);
+  }
+
+  // Il feedback COMPLETO E AGGIORNATO, aspettando la lettura se serve. Chi
+  // APPENDE alla conversazione deve passare di qui: una riga d'elenco non ha
+  // le note, e una copia vecchia non ha i turni arrivati dopo — scriverci
+  // sopra la risposta cancellerebbe il report invece di aggiungersi in coda.
+  // Torna null se nel frattempo la riga non c'è più.
+  async function feedbackCompleto(id) {
+    const key = String(id || '');
+    const riga = allFeedbacks.find((f) => f._id === key);
+    if (!riga || !dettaglioDaRileggere(riga)) return riga || null;
+    try { await completaDettaglio(key); } catch (_) { /* sotto: una riga non riletta è un no */ }
+    const dopo = allFeedbacks.find((f) => f._id === key) || null;
+    // La lettura non è riuscita. Tornare la riga com'è la farebbe passare per
+    // «questo feedback non ha altro», e chi appende la risposta o il motivo
+    // della riapertura scriverebbe il suo testo AL POSTO del report. Meglio
+    // niente: chi chiama lo dice.
+    return dettaglioDaRileggere(dopo) ? null : dopo;
+  }
+
   // ── Rendering pannello centrale ───────────────────────────────────────────
   // `opts.ridisegno` = questo non è l'owner che apre una segnalazione, è il
   // pannello che si ridipinge da solo (un aggiornamento arrivato da remoto).
@@ -2507,6 +2604,18 @@
 
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb) return;
+
+    // Aperto da un elenco proiettato: il resto arriva adesso e il pannello si
+    // ridisegna da sé. Nel frattempo quello che c'è si vede già, e la parte
+    // che manca lo dice invece di sembrare vuota.
+    // Una lettura già fallita riparte solo dal «Riprova»: altrimenti tornare
+    // sulla stessa segnalazione la ricomprava a ogni clic, senza fine.
+    if (dettaglioDaRileggere(fb) && !fb._dettaglioMancato) {
+      completaDettaglio(id)
+        .catch((e) => console.warn('[manage] dettaglio non completato:', e?.message || e))
+        // Anche quando non è arrivato: è il ridisegno che lo fa dire.
+        .finally(() => { if (selectedId === id) ridisegnaRispettandoLaBozza(id); });
+    }
 
     mgDetailEmpty.hidden = true;
     mgDetail.hidden = false;
@@ -2798,6 +2907,10 @@
     // cambio di stato non parte se lei non è arrivata: chiudere una
     // segnalazione buttando via l'unica frase che il mittente leggerà è il
     // modo più facile di perderla, e succedeva in silenzio.
+    // Il commento della revisione si legge PRIMA dell'attesa qui sotto: nel
+    // frattempo la casella può svuotarsi, e il "perché" andrebbe perso senza
+    // che niente lo dica.
+    const comment = (mgAcceptComment && !mgAcceptComment.hidden) ? (mgAcceptComment.value || '').trim() : '';
     setActionsBusy(true);
     const fraseOk = await fraseAlSicuro();
     if (!fraseOk) {
@@ -2811,7 +2924,6 @@
     if (selectedId !== id) { setActionsBusy(false); return; }
     const payload = { type: 'feedback_update', id, status: action.to };
     const locale = { status: action.to };
-    const comment = (mgAcceptComment && !mgAcceptComment.hidden) ? (mgAcceptComment.value || '').trim() : '';
     if (action.kind === 'accept' || action.kind === 'reject') {
       const decision = action.kind === 'accept' ? 'accepted' : 'rejected';
       payload.reviewDecision = decision;
@@ -2882,6 +2994,12 @@
   const RIAPERTURA_ILLEGGIBILE = 'La conversazione di questo feedback non è leggibile su questo computer '
     + '(manca la chiave privata): riaprirlo adesso sostituirebbe il report. Configura la chiave e riprova.';
 
+  // Il resto della segnalazione non è arrivato: scrivere adesso metterebbe
+  // questo testo al posto del report. Vale per tutti i tasti che appendono
+  // alla conversazione, quindi la frase sta in un posto solo.
+  const CONVERSAZIONE_NON_ARRIVATA = 'La conversazione di questa segnalazione non è arrivata: '
+    + 'scrivere adesso la sostituirebbe. Riprova dal pannello qui sopra.';
+
   function apriRiapertura() {
     if (!mgReopen) return;
     const fb = allFeedbacks.find((f) => f._id === selectedId);
@@ -2894,9 +3012,15 @@
     if (mgReopenText) mgReopenText.focus();
   }
 
-  function confermaRiapertura() {
-    const fb = allFeedbacks.find((f) => f._id === selectedId);
-    if (!fb) return;
+  async function confermaRiapertura() {
+    // Quello che l'owner ha scritto si legge PRIMA di ogni attesa, come nella
+    // gemella che risponde a un chiarimento: durante l'attesa la casella può
+    // svuotarsi, e allora si riaprirebbe la segnalazione senza il motivo.
+    const reason = mgReopenText ? (mgReopenText.value || '').trim() : '';
+    // La conversazione su cui si appende va letta PRIMA: dall'elenco arriva
+    // senza note, e appenderci sopra il motivo le cancellerebbe.
+    const fb = await feedbackCompleto(selectedId);
+    if (!fb) { setActionMsg(CONVERSAZIONE_NON_ARRIVATA, 'err'); return; }
     const azione = MR.ownerActionFor(fb, 'reopen', { releasedVersion });
     if (!azione) {
       chiudiRiapertura();
@@ -2906,7 +3030,6 @@
     }
     const oldNotes = String(fb.notes || '');
     if (conversazioneIlleggibile(fb)) { setActionMsg(RIAPERTURA_ILLEGGIBILE, 'err'); return; }
-    const reason = mgReopenText ? (mgReopenText.value || '').trim() : '';
     let extra = null;
     if (reason) {
       const T = window.SN_FEEDBACK_THREAD;
@@ -2986,8 +3109,11 @@
     const id = selectedId;
     const reply = (mgClarifyText.value || '').trim();
     if (!reply) { mgClarifyText.focus(); return; }
-    const fb = allFeedbacks.find((f) => f._id === id);
-    const oldNotes = (fb && fb.notes) || '';
+    // Come la riapertura: la conversazione si legge intera prima di
+    // appenderci la risposta, o al suo posto resterebbe la sola risposta.
+    const fb = await feedbackCompleto(id);
+    if (!fb) { setClarifyMsg(CONVERSAZIONE_NON_ARRIVATA, 'err'); return; }
+    const oldNotes = fb.notes || '';
     // Da quando il report viaggia cifrato, la conversazione può arrivare qui
     // illeggibile (chiave assente, o decifratura fallita e al suo posto un
     // segnaposto). Appenderci sopra la risposta e risalvare cancellerebbe il
@@ -3360,7 +3486,7 @@
     }
 
     mgLivelliRow.hidden = false;
-    for (const liv of MR.livelli(fb, { fusioni })) {
+    for (const liv of MR.livelli(fb, { fusioni, dettaglioLetto: !FB.soloLista(fb) })) {
       if (liv.key !== 'l2') { mgForme.appendChild(formaEl(liv, fb)); continue; }
       // I giudici: un cerchio per giudice ATTESO, non per verdetto. Un panel
       // parziale mostra i mancanti tratteggiati, non un panel accorciato — e
@@ -3523,6 +3649,40 @@
       appendBubble('user', `Tu (revisione${when})`, corpo);
     }
 
+    // Il resto del documento sta arrivando (l'elenco è una proiezione): finché
+    // non c'è, la conversazione non si dichiara vuota — direbbe il falso
+    // proprio su un feedback lavorato.
+    // La lettura del resto non è tornata. Lo si dice e si offre di riprovare,
+    // che sia una conversazione mai arrivata o una copia rimasta indietro: in
+    // tutti e due i casi quello che si vede non è quello che c'è sul server.
+    function appendRiprovaDettaglio() {
+      const vecchia = !FB.soloLista(fb);
+      appendBubble('model', 'Filo', `<em>${fb._dettaglioMancato === 'sparito'
+        ? 'Il resto di questa segnalazione non è arrivato: sul server non c&#39;è più.'
+        : (vecchia
+          ? 'Questa conversazione è quella di prima: l&#39;aggiornamento non è arrivato, controlla la connessione.'
+          : 'Il resto di questa segnalazione non è arrivato: controlla la connessione.')}</em>`);
+      const riga = document.createElement('div');
+      riga.className = 'mg-actions-row';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn sn-btn-secondary';
+      btn.id = 'mgRiprovaDettaglio';
+      btn.textContent = '↻ Riprova';
+      btn.addEventListener('click', () => riprovaDettaglio(fb._id, btn));
+      riga.appendChild(btn);
+      mgThread.appendChild(riga);
+    }
+
+    if (FB.soloLista(fb)) {
+      // Senza questo il pannello restava su «Caricamento…» a tempo
+      // indeterminato: è la stessa cura della gemella, che dice e offre Riprova.
+      if (fb._dettaglioMancato) appendRiprovaDettaglio();
+      else appendBubble('model', 'Filo', '<em>Caricamento della conversazione…</em>');
+      appendFraseBubble(fb);
+      return;
+    }
+
     // Turni della lavorazione: le note contengono i report delle istanze che
     // hanno implementato, gli esiti del controllo funzionalità e le risposte
     // dell'owner ai chiarimenti, in ordine. Il parser condiviso li separa.
@@ -3531,12 +3691,14 @@
     if (TH && TH.reportUnreadable && TH.reportUnreadable(notes)) {
       appendBubble('model', 'Filo', esc('Il report della lavorazione è cifrato e questo computer non ha la chiave privata per leggerlo.'));
       appendFraseBubble(fb);
+      if (fb._dettaglioMancato) appendRiprovaDettaglio();
       return;
     }
     if (!TH) {
       // Fallback senza parser: mostra il blob intero come un turno unico.
       if (notes.trim()) appendBubble('model', 'Filo (lavorazione)', esc(notes));
       appendFraseBubble(fb);
+      if (fb._dettaglioMancato) appendRiprovaDettaglio();
       return;
     }
     for (const seg of TH.splitNotes(notes)) {
@@ -3545,6 +3707,10 @@
       appendBubble(seg.role === 'user' ? 'user' : 'model', who, esc(seg.body), seg.attachments);
     }
     appendFraseBubble(fb);
+    // La copia che si sta leggendo è rimasta indietro e il tentativo di
+    // rileggerla non è tornato: si dice in coda alla conversazione, dove
+    // l'owner sta già guardando.
+    if (fb._dettaglioMancato) appendRiprovaDettaglio();
   }
 
   // La riga che leggerà chi ha segnalato è l'ULTIMO turno della conversazione:
@@ -3618,7 +3784,7 @@
   // fusioni) e «Salta il controllo» dell'audit.
   function openSidebarLivello(fb, key) {
     if (!fb) return;
-    const liv = MR.livelloPer(fb, key, { fusioni });
+    const liv = MR.livelloPer(fb, key, { fusioni, dettaglioLetto: !FB.soloLista(fb) });
     if (!liv) return;
     segnaForma(key);
     giudiceAperto = null;
@@ -3936,7 +4102,7 @@
       // (ricaricamento dopo un errore) si legge da capo.
       const pending = firstListPromise;
       firstListPromise = null;
-      const fresh = await (pending || FB.list({ pageSize: FB.LIST_PAGE_SIZE }));
+      const fresh = await (pending || FB.list({ pageSize: FB.LIST_PAGE_SIZE, fields: FB.CAMPI_LISTA }));
       // Nel frattempo uno spec ha iniettato dati finti? Quelli vincono: la
       // lista vera arrivata dopo non li sovrascrive (era una gara persa a caso,
       // e più il caricamento è veloce più spesso la si perdeva).
@@ -4001,7 +4167,12 @@
   // Sorgenti sostituibili dagli spec (che non hanno Firestore).
   const liveSources = {
     listVersions: (o) => FB.listVersions(o),
-    getMany: (ids) => FB.getMany(ids),
+    // Il giro dal vivo rilegge le RIGHE: stessa proiezione del caricamento.
+    getMany: (ids) => FB.getMany(ids, { fields: FB.CAMPI_LISTA }),
+    // Il documento intero, per il feedback che l'owner ha aperto. Col tempo
+    // massimo: una richiesta appesa terrebbe il pannello su «Caricamento…» e
+    // dietro di sé tutti i tasti che scrivono sulla conversazione.
+    getDettagli: (ids) => FB.getMany(ids, { timeoutMs: 20000 }),
   };
   let liveEnabled = false;
   let liveBlocked = false;  // dati finti iniettati: il giro non parte più, nemmeno se l'avvio finisce dopo
@@ -4032,6 +4203,34 @@
       if (String(mgUserNoteText.value || '') !== String(mgUserNoteText.dataset.saved || '')) return true;
     }
     return false;
+  }
+
+  // ── Un ridisegno non porta via quello che l'owner sta scrivendo ──────────
+  //
+  // Ridisegnare il pannello RIEMPIE le sue caselle col feedback: motivo della
+  // riapertura, risposta al chiarimento, commento della revisione, frase per
+  // chi ha segnalato. Su una bozza in corso vuol dire cancellarla, e la
+  // scrittura che parte dopo legge la casella ormai vuota: la segnalazione si
+  // riapre senza il motivo, e nessun errore lo dice. Quindi un ridisegno
+  // aspetta che la bozza non ci sia più, e allora riparte — senza il rinvio
+  // resterebbe in eterno sulla riga «Caricamento della conversazione…».
+  let ridisegnoRimandato = null;
+  function ridisegnaRispettandoLaBozza(id) {
+    if (selectedId !== id) { ridisegnoRimandato = null; return; }
+    if (detailBeingEdited()) { ridisegnoRimandato = id; return; }
+    ridisegnoRimandato = null;
+    openDetail(id, { ridisegno: true });
+  }
+  function riprendiRidisegnoRimandato() {
+    if (ridisegnoRimandato === null) return;
+    ridisegnaRispettandoLaBozza(ridisegnoRimandato);
+  }
+  if (mgDetail) {
+    // `focusout` arriva mentre il fuoco è ancora sul campo che lo perde: il
+    // rinvio di un giro fa trovare a detailBeingEdited() la situazione vera.
+    const piuTardi = () => setTimeout(riprendiRidisegnoRimandato, 0);
+    mgDetail.addEventListener('input', piuTardi);
+    mgDetail.addEventListener('focusout', piuTardi);
   }
 
   // La scheda aperta non è più in pagina: il pannello non può mostrare un
@@ -6097,7 +6296,7 @@
     // La lista è la cosa più lenta (secondi di rete): parte SUBITO, e le altre
     // letture di avvio girano mentre viaggia, invece di metterlesi davanti in
     // fila. loadData la aspetta; un errore lo raccoglie lì, non qui.
-    firstListPromise = FB.list({ pageSize: FB.LIST_PAGE_SIZE });
+    firstListPromise = FB.list({ pageSize: FB.LIST_PAGE_SIZE, fields: FB.CAMPI_LISTA });
     firstListPromise.catch(() => {});
     injectSearchIcons();
     await loadLayout();
