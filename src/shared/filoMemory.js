@@ -753,11 +753,14 @@
 
   // Aggiorna una voce in attesa dopo un nuovo giro del guardiano. Torna la
   // voce aggiornata, o null se nel frattempo è sparita.
-  async function segnaEsitoGuardiano(id, { stato, tentativi } = {}) {
+  async function segnaEsitoGuardiano(id, { stato, tentativi, motivoAttesa } = {}) {
     const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
     const idx = list.findIndex((n) => n.id === id);
     if (idx < 0) return null;
     if (stato) list[idx].stato = stato;
+    // Perché è ferma: chi aspetta deve poter distinguere una rete giù da una
+    // casella mai riempita, che aspettando non si riempie da sola.
+    if (motivoAttesa !== undefined) list[idx].motivoAttesa = String(motivoAttesa || '');
     if (Number.isFinite(tentativi)) list[idx].tentativi = tentativi;
     list[idx].ultimoTentativo = new Date().toISOString();
     if (stato === 'bloccato') list[idx].dismissed = true;
