@@ -18,9 +18,8 @@
     try { u = new URL(rawUrl); } catch (_) { return ['url_invalido']; }
     const query = (u.search || '').toLowerCase();
     const AZIONI = /(^|[/?&=])(unsubscribe|optout|opt-out|logout|signout|sign-out|delete|remove|confirm|verify|reset|cancel)([/?&=]|$)/;
-    // #725 — il percorso si guarda COSÌ COM'È, senza abbassarlo a minuscole:
-    // un indirizzo che esegue un'azione si scrive in minuscolo, mentre
-    // «/wiki/Delete» è il titolo di una voce di enciclopedia, non un pulsante.
+    // #725 — il percorso NON si abbassa a minuscole: un indirizzo che esegue
+    // un'azione è minuscolo, «/wiki/Delete» è il titolo di una voce.
     if (AZIONI.test(u.pathname) || AZIONI.test(query)) flags.push('side_effect');
     if (haCredenziale(query)) flags.push('token_in_url');
 
@@ -45,9 +44,8 @@
   // Suffissi di secondo livello: in 'amazon.co.uk' il nome del sito è 'amazon'.
   const SUFFISSI_2L = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac']);
 
-  // #725 — il nome del sito, non l'indirizzo intero: confrontare anche il
-  // dominio di primo livello faceva passare per imitazione ogni cambio di
-  // Paese (amazon.de contro amazon.it) e ogni accorciatore (t.co contro x.com).
+  // #725 — si confronta il nome, non l'indirizzo intero: col primo livello
+  // dentro, ogni cambio di Paese era un'imitazione (amazon.de contro amazon.it).
   function nomeSito(host) {
     const parti = host.split('.').filter(Boolean);
     if (parti.length < 2) return host;
@@ -56,17 +54,15 @@
     return parti[parti.length - 1] || host;
   }
 
-  // #725 — quanto può sbagliare un nome prima di essere un altro sito. Due
-  // lettere su un nome corto sono un altro sito (gitlab non imita github), e su
-  // un nome di una lettera qualunque differenza lo è: lì non si indovina.
+  // #725 — una soglia fissa grida al lupo: due lettere su un nome corto sono
+  // un altro sito (gitlab non imita github), e su un nome di una non si indovina.
   function tolleranza(nome) {
     if (nome.length <= 4) return 0;
     return nome.length <= 7 ? 1 : 2;
   }
 
-  // Le lettere che a occhio ne valgono un'altra: è così che si scrive un nome
-  // che sembra quello vero (paypa1, micros0ft, arnazon) anche quando la
-  // distanza fra le due scritture è troppa per la tolleranza.
+  // Le lettere che a occhio ne valgono un'altra: recuperano i sosia (paypa1,
+  // micros0ft, arnazon) che la tolleranza più stretta lascerebbe passare.
   function normalizzaSosia(nome) {
     return nome
       .replace(/rn/g, 'm').replace(/vv/g, 'w')
