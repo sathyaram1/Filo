@@ -2398,7 +2398,7 @@
   // Pinch sul trackpad e Ctrl+rotella generano wheel events con ctrlKey=true;
   // da tastiera Ctrl+= / Ctrl+- / Ctrl+0. Lo zoom scala l'intero documento
   // (testo e immagini) via la proprietà CSS `zoom`, senza toccare il modello
-  // salvato. (Vedi handleZoomKey() nel keydown globale per le scorciatoie.)
+  // salvato.
   const ZOOM_MIN = 0.5, ZOOM_MAX = 3;
   let zoomLevel = 1;
   // L'editor zooma il foglio, non la finestra: il preload deve stare fuori
@@ -2422,19 +2422,10 @@
     else return;
     applyZoom();
   }
-  function handleZoomKey(e) {
-    const k = e.key;
-    if (k === '+' || k === '=') { e.preventDefault(); zoomVerso('in'); return true; }
-    if (k === '-' || k === '_') { e.preventDefault(); zoomVerso('out'); return true; }
-    if (k === '0') { e.preventDefault(); zoomVerso('reset'); return true; }
-    return false;
-  }
-  // Su Mac il tasto dello zoom non arriva mai a questa pagina: se lo prende la
-  // barra dei menu in cima allo schermo, che lo gira alla scheda attiva. Il
-  // preload lo consegna qui perché l'editor scala il FOGLIO, non la finestra —
-  // senza questa strada, su Mac lo zoom dell'editor non succedeva affatto.
-  // (Su Windows e Linux il tasto arriva al keydown qui sopra e questa strada
-  // non viene mai percorsa: nessun doppio zoom.)
+  // Il tasto dello zoom non lo legge questa pagina: lo prende Filo prima di
+  // tutti (src/preload/wheel-zoom.js) e lo consegna qui come evento, perché
+  // l'editor scala il FOGLIO e non la finestra. Una strada sola su tutti i
+  // sistemi: su Mac il tasto se lo prende comunque la barra dei menu.
   for (const [evento, dir] of [['filo:zoom-in', 'in'], ['filo:zoom-out', 'out'], ['filo:zoom-reset', 'reset']]) {
     document.addEventListener(evento, () => zoomVerso(dir));
   }
@@ -4266,7 +4257,6 @@
   window.addEventListener('keydown', (e) => {
     const meta = e.ctrlKey || e.metaKey;
     if (meta && e.key.toLowerCase() === 's') { e.preventDefault(); save(true); return; }
-    if (meta && handleZoomKey(e)) return;
     if (meta && e.key === '\\') { e.preventDefault(); toggleSidebar(); return; }
     if (meta && e.key.toLowerCase() === 'f') {
       const sr = doc.modules.find((m) => m.type === 'search-replace');
