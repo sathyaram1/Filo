@@ -162,6 +162,7 @@ test('revoca e subito dopo il segno pieno: il secondo clic fonde, il primo non h
   expect((await chiamate(page, 'feedback_update'))[1].mergePreapproved).toBe(true);
   await expect(page.locator('#mgPreapproveBtn')).toHaveAttribute('aria-pressed', 'true');
   await expect(scheda(page, 'fb515').locator('.mg-preapproved')).toHaveText('senza chiedere');
+  await expect.poll(() => chiamate(page, 'merge_approval_approve')).toHaveLength(1);
 });
 
 test('segno di un clic su una pratica chiusa: né etichetta né tasto per toglierlo', async ({ openTab }) => {
@@ -175,4 +176,27 @@ test('segno di un clic su una pratica chiusa: né etichetta né tasto per toglie
   await scheda(page, 'chiusa').click();
   await expect(scheda(page, 'chiusa').locator('.mg-preapproved')).toHaveCount(0);
   await expect(page.locator('#mgPreapproveRevokeBtn')).toBeHidden();
+});
+
+test('l\'owner passa a un\'altra scheda e torna: la Gestione si aggiorna subito, coi tempi veri', async ({ openTab, shell }) => {
+  test.setTimeout(150000);
+  const page = await apri(openTab, [fb('fb515', { status: 'revision_security' })]);
+  await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 60000, clockMs: 5000, rientroMs: 15000 }));
+  await tab(page, 'queue').click();
+  await expect(scheda(page, 'fb515')).toBeVisible();
+  const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  const lista = Array.isArray(snap) ? snap : (snap.tabs || []);
+  const gestione = lista.find((t) => String(t.url || '').startsWith('filo://manage'));
+  expect(gestione).toBeTruthy();
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://history/history.html'));
+  await page.waitForTimeout(17000);
+  await page.evaluate(() => {
+    window.__stato.docs.fb515 = Object.assign({}, window.__stato.docs.fb515, { _updateTime: 't2', status: 'design', statusReason: 'l5' });
+  });
+  const tornata = Date.now();
+  await shell.evaluate((id) => window.filoShell.tabs.activate(id), gestione.id);
+  await expect(scheda(page, 'fb515')).toHaveCount(0, { timeout: 8000 });
+  expect(Date.now() - tornata).toBeLessThan(8000);
+  await expect(tab(page, 'inbox')).toContainText('(1)');
+  await expect(tab(page, 'inbox')).toHaveClass(/mg-tab--arrivi/);
 });
