@@ -123,7 +123,8 @@ function getDomainInfo(host, { soloPsl = false } = {}) {
       suffixLabels = labels.length - i;
       break;
     }
-    if (i > 0 && (PRIVATE_PSL.has(candidate) || S3.test(candidate) || (!soloPsl && (PRIVATE_AVVISO.has(candidate) || COGNITO.test(candidate))))) {
+    const soloAvviso = !soloPsl && (PRIVATE_AVVISO.has(candidate) || COGNITO.test(candidate));
+    if (i > 0 && (PRIVATE_PSL.has(candidate) || S3.test(candidate) || soloAvviso)) {
       suffixLabels = labels.length - i;
       ospitato = true;
       break;
