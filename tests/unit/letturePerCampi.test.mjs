@@ -79,23 +79,47 @@ function scriptDiManutenzione() {
   return out;
 }
 
+function colpevoliIn(nome, testo) {
+  const colpevoli = [];
+  for (const forma of FORME) {
+    if (forma.perChiamata) {
+      for (const m of testo.matchAll(new RegExp(forma.chiamata, 'g'))) {
+        const args = argomentiDellaChiamata(testo, m.index + m[0].length - 1);
+        if (forma.campi.test(args)) continue;
+        colpevoli.push(`scripts/${nome} — ${m[0].trim()} ${forma.nome}: ${forma.rimedio}`);
+      }
+      continue;
+    }
+    if (!forma.chiamata.test(testo)) continue;
+    if (forma.campi.test(testo)) continue;
+    colpevoli.push(`scripts/${nome} — ${forma.nome}: ${forma.rimedio}`);
+  }
+  return colpevoli;
+}
+
+// Un freno che non si sa fermare non frena: qui si guida contro il muro apposta.
+test('il freno riconosce OGNI modo di chiedere l\'elenco, non solo quelli che gli script usano oggi', () => {
+  const scansioni = [
+    'FB.listAllPaged({ idToken: t })',
+    'FB.listAll({ idToken: t })',
+    'FB.listAllPublic({})',
+    'FB.listAllPublicPaged({})',
+    'FB.listPublic({ pageSize: 500 })',
+    'FB.list({ pageSize: 500 })',
+    'FB.listResolved({ sinceIso: s })',
+    'SN_FEEDBACK.listAll({})',
+  ];
+  for (const riga of scansioni) {
+    assert.equal(colpevoliIn('finto.mjs', `export const x = ${riga};`).length, 1,
+      `«${riga}» scarica la collezione intera e il freno non se ne accorge`);
+    assert.deepEqual(colpevoliIn('finto.mjs', `export const x = ${riga.replace(/\(\{/, '({ fields: CAMPI,')};`), [],
+      `«${riga}» dice quali campi gli servono e il freno lo ferma lo stesso`);
+  }
+});
+
 test('nessuno script scansiona la collezione dei feedback senza dire quali campi gli servono', () => {
   const colpevoli = [];
-  for (const { nome, testo } of scriptDiManutenzione()) {
-    for (const forma of FORME) {
-      if (forma.perChiamata) {
-        for (const m of testo.matchAll(new RegExp(forma.chiamata, 'g'))) {
-          const args = argomentiDellaChiamata(testo, m.index + m[0].length - 1);
-          if (forma.campi.test(args)) continue;
-          colpevoli.push(`scripts/${nome} — ${m[0].trim()} ${forma.nome}: ${forma.rimedio}`);
-        }
-        continue;
-      }
-      if (!forma.chiamata.test(testo)) continue;
-      if (forma.campi.test(testo)) continue;
-      colpevoli.push(`scripts/${nome} — ${forma.nome}: ${forma.rimedio}`);
-    }
-  }
+  for (const { nome, testo } of scriptDiManutenzione()) colpevoli.push(...colpevoliIn(nome, testo));
   assert.deepEqual(colpevoli, [],
     `questi script scaricano documenti interi per guardarne qualche campo:\n  ${colpevoli.join('\n  ')}`);
 });
