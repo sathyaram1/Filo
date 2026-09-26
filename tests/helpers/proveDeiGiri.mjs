@@ -1,6 +1,7 @@
 // Come si riconosce una prova usa-e-getta guardandola DENTRO, non dal nome.
 // Il nome è l'unica cosa che chi scrive può sbagliare; il contenuto no.
-// La regola narrata sta in CLAUDE.md § Verifica, la sentinella in tests/unit/proveDeiGiri.test.mjs.
+// Regola narrata: patterns/le-prove-di-un-giro-stanno-nel-ramo-e-la-cartella-si-svuota.md;
+// sentinella: tests/unit/proveDeiGiri.test.mjs.
 
 const APRE_REGEX = /[([{,;:=!&|?+\-*%<>~^]$|\b(return|typeof|instanceof|case|in|of|do|else|yield|await|void|delete|new)$/;
 
