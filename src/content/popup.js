@@ -5,7 +5,7 @@
   'use strict';
 
   const { MSG, PORTS } = global.SN_MSG;
-  const { PROMPTS, ACTIONS } = global.SN_CONST;
+  const { PROMPTS, ACTIONS, spiegazioneDaMostrare } = global.SN_CONST;
   const I18n = global.SN_I18N;
 
   // Stack di popup aperti. L'ultimo è il topmost.
@@ -16,180 +16,11 @@
   const Z_STEP = 1;
 
   // ----------------------------------------------------------------
-  // Calcolatrice locale: valuta espressioni matematiche client-side senza
-  // chiamare l'LLM. Più affidabile e gratis. Parser ricorsivo discendente.
-  // Grammatica:
-  //   expr   = term  (('+'|'-') term)*
-  //   term   = power (('*'|'/'|'%') power)*
-  //   power  = unary ('^' power)?              (^ destra-associativo, ** alias)
-  //   unary  = ('+'|'-') unary | postfix
-  //   postfix= atom ('!')*
-  //   atom   = number | '(' expr ')' | ident ['(' expr ')'] | ident
+  // Calcolatrice locale e marker [[calc: ...]]: logica pura, sta in
+  // src/shared/calcMarkers.js (regole di formato in tests/unit/).
   // ----------------------------------------------------------------
-  function tryMathEval(input) {
-    if (input == null) return { ok: false };
-    let s = String(input).trim();
-    if (!s) return { ok: false };
-
-    // Normalizza simboli matematici Unicode tipici
-    s = s
-      .replace(/×/g, '*')     // ×
-      .replace(/÷/g, '/')     // ÷
-      .replace(/−/g, '-')     // −
-      .replace(/[–—]/g, '-') // – —
-      .replace(/∕/g, '/')     // ∕
-      .replace(/√/g, 'sqrt')  // √
-      .replace(/π/g, 'pi')    // π
-      .replace(/²/g, '^2')    // ²
-      .replace(/³/g, '^3')    // ³
-      .replace(/\*\*/g, '^');
-
-    // Decimali italiani: virgola tra cifre -> punto
-    s = s.replace(/(\d),(\d)/g, '$1.$2');
-    // Separatori delle migliaia con spazi tra cifre: rimuovili
-    s = s.replace(/(\d)\s+(?=\d)/g, '$1');
-    // Rimuovi un eventuale segno '=' finale (es. "2+2=")
-    s = s.replace(/=\s*$/, '').trim();
-
-    // Whitelist caratteri ammessi
-    if (!/^[0-9+\-*/^%().\s a-zA-Z!]+$/.test(s)) return { ok: false };
-    // Deve "sembrare" matematica: almeno un operatore, fattoriale, funzione o costante
-    const hasMathToken = /[+\-*/^%!]/.test(s)
-      || /\b(sqrt|cbrt|sin|cos|tan|asin|acos|atan|log|ln|exp|abs|floor|ceil|round|pi|e)\b/i.test(s);
-    if (!hasMathToken) return { ok: false };
-
-    let i = 0;
-    const skip = () => { while (i < s.length && /\s/.test(s[i])) i++; };
-    const eat = (ch) => { skip(); if (s[i] === ch) { i++; return true; } return false; };
-
-    function parseExpr() {
-      let v = parseTerm();
-      while (true) {
-        if (eat('+')) v += parseTerm();
-        else if (eat('-')) v -= parseTerm();
-        else break;
-      }
-      return v;
-    }
-    function parseTerm() {
-      let v = parsePower();
-      while (true) {
-        if (eat('*')) v *= parsePower();
-        else if (eat('/')) v /= parsePower();
-        else if (eat('%')) v %= parsePower();
-        else break;
-      }
-      return v;
-    }
-    function parsePower() {
-      let v = parseUnary();
-      if (eat('^')) v = Math.pow(v, parsePower());
-      return v;
-    }
-    function parseUnary() {
-      skip();
-      if (eat('+')) return parseUnary();
-      if (eat('-')) return -parseUnary();
-      return parsePostfix();
-    }
-    function parsePostfix() {
-      let v = parseAtom();
-      while (eat('!')) v = factorial(v);
-      return v;
-    }
-    function parseAtom() {
-      skip();
-      const rest = s.slice(i);
-      const numM = rest.match(/^(?:\d+(?:\.\d+)?|\.\d+)/);
-      if (numM) { i += numM[0].length; return parseFloat(numM[0]); }
-      const idM = rest.match(/^[a-zA-Z]+/);
-      if (idM) {
-        const name = idM[0].toLowerCase();
-        i += idM[0].length;
-        skip();
-        if (s[i] === '(') {
-          i++;
-          const arg = parseExpr();
-          if (!eat(')')) throw new Error('paren');
-          return applyFunc(name, arg);
-        }
-        return applyConst(name);
-      }
-      if (eat('(')) {
-        const v = parseExpr();
-        if (!eat(')')) throw new Error('paren');
-        return v;
-      }
-      throw new Error('atom');
-    }
-    function applyFunc(name, x) {
-      switch (name) {
-        case 'sqrt': return Math.sqrt(x);
-        case 'cbrt': return Math.cbrt(x);
-        case 'sin': return Math.sin(x);
-        case 'cos': return Math.cos(x);
-        case 'tan': return Math.tan(x);
-        case 'asin': return Math.asin(x);
-        case 'acos': return Math.acos(x);
-        case 'atan': return Math.atan(x);
-        case 'log': return Math.log10(x);
-        case 'ln': return Math.log(x);
-        case 'exp': return Math.exp(x);
-        case 'abs': return Math.abs(x);
-        case 'floor': return Math.floor(x);
-        case 'ceil': return Math.ceil(x);
-        case 'round': return Math.round(x);
-      }
-      throw new Error('fn');
-    }
-    function applyConst(name) {
-      if (name === 'pi') return Math.PI;
-      if (name === 'e') return Math.E;
-      throw new Error('const');
-    }
-    function factorial(n) {
-      if (!Number.isInteger(n) || n < 0 || n > 170) throw new Error('fact');
-      let r = 1; for (let k = 2; k <= n; k++) r *= k; return r;
-    }
-
-    try {
-      const value = parseExpr();
-      skip();
-      if (i !== s.length) return { ok: false };
-      if (!Number.isFinite(value)) return { ok: false };
-      return { ok: true, value, normalized: s };
-    } catch (_) {
-      return { ok: false };
-    }
-  }
-
-  function formatMathResult(n) {
-    if (Number.isInteger(n)) return String(n);
-    // Limita precisione per evitare 0.30000000000000004
-    let str = parseFloat(n.toPrecision(12)).toString();
-    // Notazione italiana: punto -> virgola decimale
-    if (str.includes('e')) return str; // notazione esponenziale: lascia invariata
-    return str.replace('.', ',');
-  }
-
-  // ----------------------------------------------------------------
-  // Sostituisce i marker [[calc: <espressione>]] emessi dall'LLM
-  // con il risultato calcolato in locale. I marker incompleti
-  // (in streaming, "]]" non ancora arrivato) vengono nascosti con "…"
-  // per evitare flicker visivo. Marker invalidi restano visibili.
-  // ----------------------------------------------------------------
-  const CALC_MARKER_RE = /\[\[calc:\s*([^\[\]]+?)\s*\]\]/g;
-  function resolveCalcMarkers(text) {
-    if (!text) return text;
-    let out = text.replace(CALC_MARKER_RE, (m, expr) => {
-      const r = tryMathEval(expr);
-      return r.ok ? formatMathResult(r.value) : m;
-    });
-    // Nasconde marker incompleti in coda durante lo streaming
-    // (anche solo "[[", "[[c", "[[ca", ecc. mentre arrivano i delta)
-    out = out.replace(/\[\[(?:c(?:a(?:l(?:c(?::[^\]]*)?)?)?)?)?$/, '…');
-    return out;
-  }
+  const Calc = global.SN_CALC;
+  const resolveCalcMarkers = (text, opts) => (Calc ? Calc.resolveCalcMarkers(text, opts) : (text || ''));
 
   // ----------------------------------------------------------------
   // Renderer Markdown: delega alla sorgente unica condivisa SN_MARKDOWN (#418),
@@ -1143,7 +974,7 @@
   // Avvia un turno di streaming. messages è la cronologia COMPLETA
   // (incluso il nuovo messaggio user finale).
   // ----------------------------------------------------------------
-  function startTurn(popup, messages, onAssistantDone) {
+  function startTurn(popup, messages, onAssistantDone, opts) {
     // Disconnetti eventuale port precedente
     try { popup.activePort?.disconnect(); } catch (_) {}
 
@@ -1168,6 +999,9 @@
     port.onMessage.addListener((m) => {
       if (m.type === 'meta') {
         popup.model = m.model; popup.provider = m.provider;
+        // Il prompt vero è quello composto dal main: le domande successive
+        // devono ripartire da lì, non dalla copia locale senza cambi (#724).
+        if (Array.isArray(m.messages) && m.messages.length) popup.conversation = m.messages.slice();
         setMeta(popup, `${I18n.t('popup_model')}: ${popup.model}`);
       } else if (m.type === 'delta') {
         if (firstDelta) {
@@ -1179,7 +1013,7 @@
         // prossimo disegno (#502). E la lettura resta dov'è se l'utente era
         // tornato su a rileggere.
         scrollaConservando(popup, () => {
-          bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(buf));
+          bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(buf, { streaming: true }));
         });
       } else if (m.type === 'reset') {
         // Il provider è caduto a metà risposta e il sistema riparte da zero su
@@ -1205,11 +1039,13 @@
         // stava rileggendo a metà si ritrova sbalzato dal clamp del browser.
         scrollaConservando(popup, () => {
           if (vuota) bubble.text.textContent = '';
-          if (popup.action === ACTIONS.EXPLAIN && /NESSUNA SPIEGAZIONE/i.test(resolved.trim())) {
+          const daMostrare = popup.action === ACTIONS.EXPLAIN
+            ? spiegazioneDaMostrare(resolved) : resolved;
+          if (popup.action === ACTIONS.EXPLAIN && !daMostrare) {
             bubble.text.textContent = I18n.t('popup_no_explanation');
             bubble.wrap.classList.add('sn-msg-muted');
           } else {
-            bubble.text.innerHTML = renderMarkdown(resolved);
+            bubble.text.innerHTML = renderMarkdown(daMostrare);
           }
           setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`);
         });
@@ -1230,7 +1066,7 @@
     port.postMessage({
       type: 'start',
       action: popup.action,
-      payload: { messages },
+      payload: (opts && opts.payload) || { messages },
       origin: location.href,
     });
   }
@@ -1270,7 +1106,18 @@
 
     startTurn(popup, popup.conversation, (assistantText) => {
       popup.conversation.push({ role: 'assistant', content: assistantText });
-    });
+    }, { payload: payloadDaComporreNelMain(action, payload) });
+  }
+
+  // I cambi del giorno li ha solo il main: «Spiega» e «Approfondisci» gli
+  // mandano il testo selezionato e si fanno comporre il prompt da lui, come già
+  // fa la spiegazione nel menu del tasto destro. Qui il prompt si costruisce
+  // comunque, ma solo come storia da cui ripartono le domande successive
+  // finché non torna quella vera. #724
+  function payloadDaComporreNelMain(action, payload) {
+    if (action !== ACTIONS.EXPLAIN && action !== ACTIONS.EXPLAIN_DEEP) return null;
+    const sel = payload?.selection || '';
+    return { selection: sel, sentence: payload?.sentence || sel };
   }
 
   function buildInitialPrompt(action, payload) {

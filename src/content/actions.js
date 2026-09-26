@@ -11,7 +11,7 @@
 (function (global) {
   'use strict';
 
-  const { ACTIONS } = global.SN_CONST;
+  const { ACTIONS, spiegazioneDaMostrare } = global.SN_CONST;
   const { MSG } = global.SN_MSG;
   const I18n = global.SN_I18N;
   const Popup = global.SN_POPUP;
@@ -546,7 +546,8 @@
   }
 
   // Sezione inline: avvia subito una richiesta EXPLAIN e mostra il risultato nel menu.
-  // Se la risposta è "NESSUNA SPIEGAZIONE" la sezione viene nascosta.
+  // La sezione si nasconde solo se il modello rinuncia E non ha lasciato altro
+  // (una conversione accanto alla rinuncia resta: #724).
   // ------------------------------------------------------------
   // Prefetch "Spiega" su selezione di testo (riduce latenza del menu)
   // ------------------------------------------------------------
@@ -644,14 +645,14 @@
             body.textContent = (res && res.error) || I18n.t('err_provider_failed');
             return;
           }
-          const resolved = Popup.resolveCalcMarkers(res.text);
-          if (/NESSUNA SPIEGAZIONE/i.test(resolved.trim())) {
+          const daMostrare = spiegazioneDaMostrare(Popup.resolveCalcMarkers(res.text));
+          if (!daMostrare) {
             const prev = el.previousElementSibling;
             if (prev && prev.classList.contains('sn-menu-sep')) prev.remove();
             el.remove();
             return;
           }
-          body.innerHTML = Popup.renderMarkdown(resolved);
+          body.innerHTML = Popup.renderMarkdown(daMostrare);
         });
         return () => { cancelled = true; };
       },

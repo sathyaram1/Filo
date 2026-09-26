@@ -1134,6 +1134,9 @@
       `2. SPIEGAZIONE — se il testo è in italiano ma è un termine non ovvio (nome proprio di persona/luogo/azienda/organizzazione, termine tecnico, gergo, sigla, parola straniera d'uso settoriale), scrivi una brevissima spiegazione (massimo 100 caratteri).\n` +
       `3. NESSUNA — se il testo non richiede né traduzione né spiegazione (è italiano comune, una frase banale, parole di cui il significato è ovvio dal contesto), rispondi ESATTAMENTE con "NESSUNA SPIEGAZIONE". ` +
       `La maggior parte delle selezioni di testo italiano comune ricade in questo caso.\n` +
+      // Senza questa riga le due istruzioni si scontravano su «3000 rupie»: testo
+      // italiano comune (rinuncia) con dentro una valuta da convertire (#724).
+      `ATTENZIONE: se c'è una conversione da fare (vedi "Conversioni" più sotto) NON rispondere "NESSUNA SPIEGAZIONE": rispondi con la sola conversione.\n` +
       `\n\nCalcolatrice: hai a disposizione una calcolatrice. ` +
       `Quando devi includere il risultato di un'operazione aritmetica — sia esplicita nella selezione (es: "33*7+742/7+9", "347 per 55", "347 x 55") sia implicita dal contesto (es: l'utente ha selezionato "4,4m per 5,1m" in una frase su una stanza → probabilmente vuole l'area) — NON calcolare a mente. ` +
       `Scrivi al suo posto il marker \`[[calc: <espressione>]]\` con l'espressione in sintassi standard (+, -, *, /, ^, parentesi, funzioni sqrt/sin/cos/tan/log/ln/exp/abs, costanti pi/e). ` +
@@ -1142,9 +1145,11 @@
       `Per le espressioni puramente matematiche (es. l'utente seleziona "33*7+742/7+9"), la spiegazione è il risultato: rispondi solo con "[[calc: 33*7+742/7+9]]".` +
       `\n\nConversioni: se la selezione (o la frase) contiene importi in valute non-EUR o unità non metriche/non italiane, ` +
       `aggiungi tra parentesi l'equivalente in euro o in unità italiane usando il marker [[calc: ...]] con i tassi/fattori qui sotto. ` +
-      `Esempi (assumendo 1 EUR = 1.08 USD): "$50" → "$50 ([[calc: 50/1.08]] €)"; "3 miles" → "3 miglia ([[calc: 3*1.609]] km)"; "70°F" → "70°F ([[calc: (70-32)*5/9]] °C)"; "5 lb" → "5 lb ([[calc: 5*0.4536]] kg)". ` +
+      `Esempi (assumendo 1 EUR = 1.08 USD): "$50" → "$50 ([[calc: 50/1.08 | eur]] €)"; "3 miles" → "3 miglia ([[calc: 3*1.609]] km)"; "70°F" → "70°F ([[calc: (70-32)*5/9]] °C)"; "5 lb" → "5 lb ([[calc: 5*0.4536]] kg)". ` +
       `Fattori da usare: 1 mi = 1.609 km, 1 ft = 0.3048 m, 1 in = 2.54 cm, 1 yd = 0.9144 m, 1 mi² = 2.59 km², 1 acre = 4046.86 m², 1 lb = 0.4536 kg, 1 oz = 28.35 g, 1 gal (US) = 3.785 L, 1 fl oz (US) = 29.57 mL, °C = (°F-32)*5/9. ` +
-      (fxLine ? fxLine + ' Per convertire X di una valuta in EUR usa [[calc: X/<tasso>]].\n' : '') +
+      (fxLine ? fxLine + ' Per convertire X di una valuta in EUR usa [[calc: X/<tasso> | eur]]: la parte dopo la barra dice a Filo che quel risultato è un importo in euro e va scritto come un prezzo, mettila SEMPRE. Poi scrivi «€» subito dopo il marker. ' +
+        'Vale per OGNI sigla dell\'elenco, anche quando la selezione la chiama col nome comune in italiano o in un\'altra lingua (rupie = INR, real = BRL, zloty = PLN, won = KRW, rand = ZAR, baht = THB, lira turca = TRY, fiorino = HUF, corona ceca = CZK, peso messicano = MXN). ' +
+        'Se la valuta NON è nell\'elenco non convertire e non inventare il tasso a memoria.\n' : '') +
       `Se non ci sono valute o unità da convertire, NON aggiungere nulla. Una sola conversione per importo, accanto al valore originale, senza spiegare la formula.` +
       `\n\nRispondi in italiano. Non aggiungere preamboli o spiegazioni meta sulla tua risposta.`,
 
@@ -1161,7 +1166,9 @@
       `Il sistema sostituisce il marker col risultato. Esempio: "Il prodotto è [[calc: 347*55]], cioè circa [[calc: 347*55/1000]] migliaia."` +
       `\n\nConversioni: se compaiono importi in valute non-EUR o unità non metriche/non italiane, aggiungi tra parentesi l'equivalente in EUR/unità italiane usando [[calc: ...]]. ` +
       `Fattori: 1 mi = 1.609 km, 1 ft = 0.3048 m, 1 in = 2.54 cm, 1 yd = 0.9144 m, 1 mi² = 2.59 km², 1 acre = 4046.86 m², 1 lb = 0.4536 kg, 1 oz = 28.35 g, 1 gal (US) = 3.785 L, °C = (°F-32)*5/9. ` +
-      (fxLine ? fxLine + ' Per convertire X di una valuta in EUR usa [[calc: X/<tasso>]].\n' : '') +
+      (fxLine ? fxLine + ' Per convertire X di una valuta in EUR usa [[calc: X/<tasso> | eur]]: la parte dopo la barra dice a Filo che quel risultato è un importo in euro e va scritto come un prezzo, mettila SEMPRE. Poi scrivi «€» subito dopo il marker. ' +
+        'Vale per OGNI sigla dell\'elenco, anche quando la selezione la chiama col nome comune in italiano o in un\'altra lingua (rupie = INR, real = BRL, zloty = PLN, won = KRW, rand = ZAR, baht = THB, lira turca = TRY, fiorino = HUF, corona ceca = CZK, peso messicano = MXN). ' +
+        'Se la valuta NON è nell\'elenco non convertire e non inventare il tasso a memoria.\n' : '') +
       `Una sola conversione per importo, accanto al valore originale, senza esibire la formula.` +
       `\n\nRispondi in italiano. Non aggiungere preamboli o note meta.`,
 
@@ -2322,6 +2329,21 @@
   // dopo la parte immutabile del prompt e non ne rompe il riuso fra chiamate.
   // Se un giorno lo si mettesse in testa, ogni utente con uno stile personale
   // avrebbe un prefisso diverso e il riuso morirebbe per tutti.
+  // «NESSUNA SPIEGAZIONE» è la rinuncia di «Spiega», ma lo stesso prompt chiede
+  // al modello anche la conversione degli importi: una risposta che porta tutte
+  // e due non si butta via intera, o l'utente resta senza il prezzo in euro
+  // (#724). Torna cosa mostrare: stringa vuota = rinuncia vera.
+  const RINUNCIA_SPIEGA = /NESSUNA\s+SPIEGAZIONE/i;
+  function spiegazioneDaMostrare(text) {
+    let t = String(text == null ? '' : text).trim();
+    if (!RINUNCIA_SPIEGA.test(t)) return t;
+    t = t.replace(/NESSUNA\s+SPIEGAZIONE/ig, ' ').trim();
+    if (!/[\p{L}\p{N}]/u.test(t)) return '';
+    t = t.replace(/^[\s:,;.\-–—]+/, '').trim();
+    const solaParentesi = t.match(/^\(([^()]*)\)$/s);
+    return solaParentesi ? solaParentesi[1].trim() : t;
+  }
+
   function injectAgentStyle(messages, action, styleText) {
     const style = typeof styleText === 'string' ? styleText.trim() : '';
     if (!Array.isArray(messages) || !style) return messages;
@@ -2422,6 +2444,7 @@
     AGENT_STYLE_PRESETS,
     STYLE_AWARE_ACTIONS,
     injectAgentStyle,
+    spiegazioneDaMostrare,
     SISTEMI,
     descriviSistema,
     unaRigaDiDati,

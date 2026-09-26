@@ -126,7 +126,7 @@
     // ─────────────────────── Azioni sul testo selezionato ────────────────────
     {
       id: 'explain-selection', title: 'Spiega il testo selezionato', category: 'selection',
-      desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione.',
+      desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione. Se la selezione contiene un importo in valuta straniera o una misura non metrica, accanto trovi l’equivalente in euro — col cambio del giorno della Banca centrale europea, per tutte le valute che pubblica — o in metri, chili e gradi centigradi. I conti li fa Filo, non il modello.',
       invoke: 'Seleziona il testo e usa Alt+E (Ctrl+Alt+E su Mac), oppure menu del tasto destro → "Spiegazione". "Approfondisci" apre una spiegazione più estesa.',
     },
     {
