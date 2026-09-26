@@ -49,6 +49,7 @@ function buildUserMessage(meta) {
     `suffisso_pubblico: ${meta.publicSuffix || ''}`,
     `somiglia_a_brand: ${meta.looksLikeBrand || 'nessuno'}`,
     `tipo_somiglianza: ${meta.impersonationKind || 'nessuna'}`,
+    `pagina_pubblicata_da_un_utente_su: ${meta.hostedOn || 'no'}`,
     `eta_dominio_giorni: ${meta.ageDays == null ? 'sconosciuta' : Math.round(meta.ageDays)}`,
     `stato_certificato: ${meta.certStatus || 'sconosciuto'}`,
     `connessione_sicura: ${meta.secure ? 'si' : 'no'}`,
