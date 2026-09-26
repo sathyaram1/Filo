@@ -56,6 +56,28 @@
   // aggiungono) quelli con lo stesso id, gli id `removed` escono. Ritorna una
   // lista NUOVA, dal più recente al più vecchio come quella del caricamento
   // iniziale; la lista d'ingresso non viene toccata.
+  // La riga appena riletta prende il posto di quella vecchia SOLO se ne sa
+  // almeno altrettanto. Il giro rilegge una proiezione (niente conversazione,
+  // niente allegati): lasciargliela sostituire buttava via il documento intero
+  // già in mano e la nota che una lettura non era tornata, e la pagina le
+  // ricomprava al primo clic mostrando intanto «Caricamento…» al posto di un
+  // report che aveva già.
+  function fondi(vecchio, nuovo) {
+    if (!vecchio || !nuovo || !nuovo._proiezione) return nuovo;
+    const fuso = { ...vecchio, ...nuovo };
+    if (!vecchio._proiezione) {
+      // Il documento c'è, ma sul server è cambiato: si mostra questo e si
+      // rilegge quando serve, invece di svuotare il pannello adesso.
+      delete fuso._proiezione;
+      fuso._dettaglioVecchio = true;
+    }
+    // Una lettura che non è tornata resta tale finché non è l'utente a
+    // riprovare: un giro in sottofondo che la dimentica la fa ricomprare a
+    // ogni clic, che è il conto che non si voleva più pagare.
+    if (vecchio._dettaglioMancato) fuso._dettaglioMancato = vecchio._dettaglioMancato;
+    return fuso;
+  }
+
   function applyChanges(list, { fresh = [], removed = [] } = {}) {
     const drop = new Set((removed || []).map(String));
     const byId = new Map();
@@ -63,7 +85,7 @@
       if (fb && fb._id && !drop.has(String(fb._id))) byId.set(String(fb._id), fb);
     }
     for (const fb of Array.isArray(fresh) ? fresh : []) {
-      if (fb && fb._id) byId.set(String(fb._id), fb);
+      if (fb && fb._id) byId.set(String(fb._id), fondi(byId.get(String(fb._id)), fb));
     }
     return Array.from(byId.values()).sort((a, b) => createdMs(b) - createdMs(a));
   }
