@@ -664,10 +664,11 @@
     /* Icona d'autore (chi ha scritto il feedback): owner/utente/Claude/Filo. */
     .mg-item-author { flex: 0 0 auto; font-size: 13px; line-height: 1; align-self: center; }
     .mg-item-num { font-size: 11px; color: var(--sn-muted); font-weight: 600; flex: 0 0 auto; }
-    /* Base zero: col titolo che non chiede spazio suo, a mandare a capo sono le etichette, non lui. */
+    /* Base zero: col titolo che non chiede spazio suo, a mandare a capo sono le etichette, non lui. Il minimo
+       lo tiene leggibile: sotto, sono le etichette ad andare a capo invece di ridurlo a una lettera. */
     .mg-item-title {
       font-size: 13px; line-height: 1.4;
-      flex: 1 1 0; min-width: 0;
+      flex: 1 1 0; min-width: min(var(--mg-title-min, 8em), 100%);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     /* Aperta/Chiusa è l'unica cosa che si sa di una segnalazione il cui stato fine è cifrato: stesse parole e
