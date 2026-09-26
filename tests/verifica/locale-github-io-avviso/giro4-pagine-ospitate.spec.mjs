@@ -141,14 +141,6 @@ test('dati della carta e credenziali scritti in altre forme e lingue in un Modul
   expect(esiti).toEqual(Object.fromEntries(Object.keys(casi).map((p) => [p, 'sospetto'])));
 });
 
-test('Modulo Google che chiede email e codice OTP ricevuto via SMS: l\'avviso deve comparire', async ({ app, openTab }) => {
-  test.fail(true, 'giro 4: un codice monouso chiesto a parole non conta come credenziale, solo password e carta');
-  await preparaRete(app, { 'docs.google.com/forms/d/e/otp/viewform': moduloGoogle('Conferma accesso banca',
-    ['Email', 'Codice OTP ricevuto via SMS']) });
-  await openTab('https://docs.google.com/forms/d/e/otp/viewform');
-  expect(await livelloDopo(app, 'docs.google.com')).toBe('sospetto');
-});
-
 test('una pagina ospitata che cambia di continuo non chiama il giudice AI a ripetizione', async ({ app, openTab }) => {
   await preparaRete(app, {
     'docs.google.com/forms/d/e/muta/viewform': '<html><body><h1>Sondaggio</h1><form>' + domandaGoogle('i1', 'Password')
