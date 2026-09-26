@@ -11,7 +11,7 @@ import { test, expect } from './../../fixtures/electron.mjs';
 const RIGA_BACHECA = 'La bacheca si apre subito';
 const RIGHE_AVVISI_SITI = [
   'I siti personali pubblicati su GitHub Pages',
-  'Niente più «Controlla l'indirizzo» sui siti veri',
+  "Niente più «Controlla l'indirizzo» sui siti veri",
 ];
 
 // Mette la versione "vista l'ultima volta" appena sotto il blocco in cui le due
