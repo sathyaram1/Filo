@@ -37,6 +37,7 @@ const FORME = [
     nome: 'le liste dei feedback (SN_FEEDBACK)',
     chiamata: /\bFB\.(?:listAllPaged|listAllPublic|listPublic|list)\s*\(/,
     campi: /fields\s*:/,
+    perChiamata: true,
     rimedio: 'passa `fields: [...]` (es. SN_BOARD_ARCHIVE.CAMPI_DECISIONE)',
   },
   {
@@ -53,6 +54,19 @@ const FORME = [
   },
 ];
 
+// Gli argomenti di UNA chiamata, dalla parentesi aperta alla sua: la regola è
+// per chiamata, non per file. Un file che altrove passa i campi non assolve la
+// scansione che li ha dimenticati.
+function argomentiDellaChiamata(testo, da) {
+  let profondita = 0;
+  for (let i = da; i < testo.length; i += 1) {
+    const c = testo[i];
+    if (c === '(') profondita += 1;
+    else if (c === ')') { profondita -= 1; if (profondita === 0) return testo.slice(da, i + 1); }
+  }
+  return testo.slice(da);
+}
+
 function scriptDiManutenzione() {
   const out = [];
   for (const nome of readdirSync(SCRIPTS)) {
@@ -66,6 +80,14 @@ test('nessuno script scansiona la collezione dei feedback senza dire quali campi
   const colpevoli = [];
   for (const { nome, testo } of scriptDiManutenzione()) {
     for (const forma of FORME) {
+      if (forma.perChiamata) {
+        for (const m of testo.matchAll(new RegExp(forma.chiamata, 'g'))) {
+          const args = argomentiDellaChiamata(testo, m.index + m[0].length - 1);
+          if (forma.campi.test(args)) continue;
+          colpevoli.push(`scripts/${nome} — ${m[0].trim()} ${forma.nome}: ${forma.rimedio}`);
+        }
+        continue;
+      }
       if (!forma.chiamata.test(testo)) continue;
       if (forma.campi.test(testo)) continue;
       colpevoli.push(`scripts/${nome} — ${forma.nome}: ${forma.rimedio}`);
