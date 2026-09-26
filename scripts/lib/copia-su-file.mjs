@@ -56,11 +56,19 @@ export function percorsoCopia(chiave, dir = null) {
  */
 export function scriviCopia(chiave, dati, { dir = null, now = Date.now() } = {}) {
   const file = percorsoCopia(chiave, dir);
+  if (!file) return '';
+  let fd = null;
   try {
-    writeFileSync(file, JSON.stringify({ at: now, chiave: String(chiave), dati }), { encoding: 'utf8', mode: 0o600 });
+    // Senza O_NOFOLLOW un rimando lasciato lì da qualcun altro ci fa riscrivere
+    // il file che punta lui.
+    fd = openSync(file, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | NO_SYMLINK, 0o600);
+    if (!nostro(fstatSync(fd))) return '';
+    writeFileSync(fd, JSON.stringify({ at: now, chiave: String(chiave), dati }), { encoding: 'utf8' });
     return file;
   } catch (_) {
     return '';
+  } finally {
+    if (fd !== null) { try { closeSync(fd); } catch (_) { /* già chiuso */ } }
   }
 }
 
