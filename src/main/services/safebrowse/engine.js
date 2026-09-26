@@ -14,7 +14,7 @@
 'use strict';
 
 const { normalize } = require('./normalize');
-const { isWhitelisted } = require('./whitelist');
+const { isWhitelisted, hostedPlatform } = require('./whitelist');
 const { localSignals } = require('./signals');
 
 const YOUNG_DOMAIN_DAYS = 30;     // sotto: dominio "giovane" → rinforzo sospetto
