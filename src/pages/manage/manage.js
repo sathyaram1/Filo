@@ -2977,6 +2977,12 @@
   const RIAPERTURA_ILLEGGIBILE = 'La conversazione di questo feedback non è leggibile su questo computer '
     + '(manca la chiave privata): riaprirlo adesso sostituirebbe il report. Configura la chiave e riprova.';
 
+  // Il resto della segnalazione non è arrivato: scrivere adesso metterebbe
+  // questo testo al posto del report. Vale per tutti i tasti che appendono
+  // alla conversazione, quindi la frase sta in un posto solo.
+  const CONVERSAZIONE_NON_ARRIVATA = 'La conversazione di questa segnalazione non è arrivata: '
+    + 'scrivere adesso la sostituirebbe. Riprova dal pannello qui sopra.';
+
   function apriRiapertura() {
     if (!mgReopen) return;
     const fb = allFeedbacks.find((f) => f._id === selectedId);
