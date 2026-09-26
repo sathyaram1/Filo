@@ -1,6 +1,6 @@
 // Dove stanno le prove dei giri di verifica, e cosa non devono contenere.
 // Non deve fermare: guarda i file del repo, senza aprire Filo.
-// La regola narrata sta in CLAUDE.md § Verifica; qui è quella verificabile.
+// La regola narrata sta in patterns/le-prove-di-un-giro-stanno-nel-ramo-e-la-cartella-si-svuota.md.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
