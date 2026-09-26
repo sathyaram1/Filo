@@ -13,8 +13,9 @@
 //   quello che Filo promette. La barra è la stessa su tutti i sistemi, quindi
 //   lo spec vale anche dove non si vede.
 //
-//   Una porta per test, tutte e quattro quelle da cui il difetto entrava:
-//   chiudi scheda, torna indietro (e annulla mentre si scrive), ricarica, zoom.
+//   Una porta per test, tutte quelle da cui il difetto entrava: chiudi scheda,
+//   torna indietro (e annulla mentre si scrive), ricarica, zoom. Più indietro e
+//   avanti, che nella barra sono arrivati dopo (#685).
 import { test, expect } from './fixtures/electron.mjs';
 
 // Aziona una voce della barra per etichetta, come farebbe il tasto su Mac.
@@ -120,6 +121,28 @@ test('«Annulla» mentre si scrive annulla il testo e NON porta via la pagina', 
   await expect.poll(async () => page.inputValue('#c'), {
     message: 'dentro un campo di testo Ctrl/Cmd+Z deve annullare quello che si sta scrivendo',
   }).not.toBe('una riga appena scritta');
+});
+
+// #685 — indietro e avanti sono arrivati nella barra insieme alla scorciatoia:
+// su Mac è da lì che passa il tasto (Cmd+[ e Cmd+]), quindi la voce deve fare
+// la stessa cosa che fa Alt+freccia altrove.
+test('«Indietro» e «Avanti» muovono la scheda nella sua cronologia', async ({ app, shell, openTab, testServer }) => {
+  const partenza = testServer.html('<html><body><h1>partenza</h1></body></html>');
+  const arrivo = testServer.html('<html><body><h1>arrivo</h1></body></html>');
+
+  const page = await openTab(partenza);
+  await page.goto(arrivo);
+  await expect.poll(async () => (await stato(app)).urlAttiva).toBe(arrivo);
+
+  await voceDellaBarra(app, 'Indietro');
+  await expect.poll(async () => (await stato(app)).urlAttiva, {
+    message: 'la voce «Indietro» non ha riportato la scheda alla pagina precedente',
+  }).toBe(partenza);
+
+  await voceDellaBarra(app, 'Avanti');
+  await expect.poll(async () => (await stato(app)).urlAttiva, {
+    message: 'la voce «Avanti» non ha rimandato la scheda alla pagina successiva',
+  }).toBe(arrivo);
 });
 
 test('«Ricarica» ricarica il sito che si sta guardando', async ({ app, shell, openTab, testServer }) => {

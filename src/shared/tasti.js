@@ -98,6 +98,14 @@
     const haAlt = modificatori.some((m) => ALT.test(m.toLowerCase()));
     const altri = modificatori.filter((m) => !CTRL.test(m.toLowerCase()) && !ALT.test(m.toLowerCase()));
 
+    // Alt+freccia: indietro e avanti. Su Mac Opzione+freccia sposta il cursore
+    // di una parola dentro OGNI campo di testo: prendersela vorrebbe dire
+    // togliere quel movimento in tutta l'app. Lì la convenzione dei browser è
+    // Cmd+[ e Cmd+], che non scrivono e non muovono niente.
+    if (haAlt && !haCtrl && (tastoFinale === '\u2190' || tastoFinale === '\u2192')) {
+      return `Cmd+${tastoFinale === '\u2190' ? '[' : ']'}`;
+    }
+
     // Alt+cifra: salto di scheda. Su Mac Opzione+cifra scrive un simbolo, quindi
     // la forma è Cmd+cifra — quella di ogni browser su Mac. Lo zero fa
     // eccezione: su Mac Cmd+0 è lo zoom al 100%, e la decima scheda si raggiunge
@@ -124,6 +132,19 @@
     return `${testo} (${etichetta(accel, esplicita)})`;
   }
 
+  // Un modificatore arriva con due nomi diversi a seconda di chi porta
+  // l'evento: quello del DOM (altKey) e quello di `before-input-event` del main
+  // (alt). Nessuna delle due forme li ha entrambi, quindi si chiedono tutti e
+  // due.
+  const NOMI_MODIFICATORI = {
+    alt: ['altKey', 'alt'],
+    ctrl: ['ctrlKey', 'control'], meta: ['metaKey', 'meta'],
+    shift: ['shiftKey', 'shift'],
+  };
+  function modificatore(ev, quale) {
+    return NOMI_MODIFICATORI[quale].some((nome) => !!ev[nome]);
+  }
+
   // ── Il salto da una scheda all'altra ───────────────────────────────────────
   // Sta qui, accanto al suo nome, perché nome e comportamento devono cambiare
   // INSIEME: erano due posti diversi, e su Mac dicevano due cose diverse.
@@ -148,15 +169,7 @@
   // chi non lo passa ottiene la nona (il comportamento di prima).
   function indiceSaltoScheda(ev, esplicita, quante) {
     if (!ev) return null;
-    // I due nomi con cui ogni modificatore può arrivare: quello del DOM e
-    // quello del main. Nessuno dei due è presente in entrambe le forme, quindi
-    // basta chiedere tutti e due.
-    const NOMI = {
-      alt: ['altKey', 'alt'],
-      ctrl: ['ctrlKey', 'control'], meta: ['metaKey', 'meta'],
-      shift: ['shiftKey', 'shift'],
-    };
-    const premuto = (quale) => NOMI[quale].some((nome) => !!ev[nome]);
+    const premuto = (quale) => modificatore(ev, quale);
     const alt = premuto('alt');
     const ctrl = premuto('ctrl');
     const meta = premuto('meta');
@@ -202,6 +215,47 @@
       : 'Vai alla scheda in quella posizione (0 = la decima)';
   }
 
+  // ── Indietro e avanti ──────────────────────────────────────────────────────
+  // Chi arriva da un browser qualunque prova Alt+freccia e i due tasti laterali
+  // del mouse. Nome e comportamento stanno qui insieme per lo stesso motivo del
+  // salto di scheda: su Mac la combinazione è un'ALTRA (Cmd+[ e Cmd+]), perché
+  // Opzione+freccia lì sposta il cursore di una parola in ogni campo di testo.
+  //
+  // L'evento arriva sia dal DOM sia da `before-input-event` del main. Torna
+  // 'indietro', 'avanti' o null.
+  function comandoNavigazione(ev, esplicita) {
+    if (!ev) return null;
+    if (modificatore(ev, 'shift')) return null;
+    const alt = modificatore(ev, 'alt');
+    const ctrl = modificatore(ev, 'ctrl');
+    const meta = modificatore(ev, 'meta');
+    // Il tasto si legge prima dal codice FISICO (regge qualunque layout e su
+    // Mac Opzione trasformerebbe comunque il carattere); `key` è il ripiego per
+    // gli eventi sintetici dei test.
+    const code = String(ev.code || '');
+    const key = String(ev.key || '');
+
+    if (suMac(esplicita)) {
+      if (!(meta && !ctrl && !alt)) return null;
+      if (code === 'BracketLeft' || key === '[') return 'indietro';
+      if (code === 'BracketRight' || key === ']') return 'avanti';
+      return null;
+    }
+    if (!(alt && !ctrl && !meta)) return null;
+    if (code === 'ArrowLeft' || key === 'ArrowLeft') return 'indietro';
+    if (code === 'ArrowRight' || key === 'ArrowRight') return 'avanti';
+    return null;
+  }
+
+  function etichettaIndietro(esplicita) { return etichetta('Alt+\u2190', esplicita); }
+  function etichettaAvanti(esplicita) { return etichetta('Alt+\u2192', esplicita); }
+
+  // La stessa scorciatoia nella forma che Electron capisce: nella barra dei
+  // menu le frecce hanno un nome, non un simbolo. È l'unico posto che la chiede.
+  function acceleratoreElectron(accel, esplicita) {
+    return etichetta(accel, esplicita).replace(/\u2190/g, 'Left').replace(/\u2192/g, 'Right');
+  }
+
   // ── I tasti che a una pagina non arrivano mai ─────────────────────────────
   //
   // Chi fa scegliere una scorciatoia all'utente (le scorciatoie dei moduli
@@ -217,7 +271,13 @@
   // Forma confrontabile di un acceleratore: modificatori normalizzati + tasto
   // finale. "Cmd+Shift+Z", "ctrl + shift + z" e "Control+Shift+Z" coincidono
   // (Cmd e Ctrl sono lo stesso tasto logico nelle scorciatoie di Filo).
-  const SINONIMI_TASTO = { '=': '+', plus: '+', minus: '-', esc: 'escape' };
+  const SINONIMI_TASTO = {
+    '=': '+', plus: '+', minus: '-', esc: 'escape',
+    // Le frecce arrivano con tre nomi diversi a seconda di chi le scrive
+    // (simbolo nei testi, `Left`/`Right` in un acceleratore di Electron,
+    // `ArrowLeft`/`ArrowRight` in un evento del DOM): una forma sola.
+    left: '\u2190', arrowleft: '\u2190', right: '\u2192', arrowright: '\u2192',
+  };
   function forma(accel) {
     // Un "+" in ultima posizione è il TASTO più, non un separatore: "Ctrl++"
     // si spezzerebbe in ["Ctrl"] e sparirebbe dalla lista.
@@ -237,6 +297,10 @@
   const PRESI_OVUNQUE = [
     // La shell del browser se li prende prima della pagina (src/main/tabs.js).
     'Ctrl+T', 'Ctrl+W', 'Ctrl+L', 'Ctrl+R',
+    // Indietro e avanti: Alt+freccia qui, Cmd+[ e Cmd+] su Mac (la riscrittura
+    // la fa `etichetta`, e con lei il fatto che su Mac Alt+freccia resti libera
+    // per il movimento del cursore).
+    'Alt+\u2190', 'Alt+\u2192',
   ];
   const PRESI_SU_MAC = [
     // Le voci della barra dei menu (src/main/menu.js).
@@ -272,8 +336,9 @@
   }
 
   global.SN_TASTI = {
-    piattaforma, suMac, etichetta, frase,
+    piattaforma, suMac, etichetta, frase, acceleratoreElectron,
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
+    comandoNavigazione, etichettaIndietro, etichettaAvanti,
     tastiRiservati, riservato,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

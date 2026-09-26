@@ -43,13 +43,9 @@
 // la forma della barra, cioè la parte che va tenuta d'occhio — si legge anche
 // dalla sentinella negli unit test, che gira in Node puro e in millisecondi
 // sulla macchina di chi scrive la modifica.
-const MAC = process.platform === 'darwin';
-
-// Tasti che le pagine di Filo gestiscono già da sé: su Windows e Linux la voce
-// mostra la scritta ma NON registra il tasto (là arriva alla pagina, e la
-// pagina sa cosa farne). Su Mac la barra lo registra comunque — ed è per questo
-// che la voce deve fare la cosa giusta.
-const SOLO_SCRITTA = MAC ? {} : { registerAccelerator: false };
+// Il nome di una scorciatoia non si scrive a mano nemmeno qui: su Mac indietro
+// e avanti stanno su un'altra combinazione (src/shared/tasti.js).
+require('../shared/tasti');
 
 // ─── a chi si parla ─────────────────────────────────────────────────────────
 
@@ -127,6 +123,19 @@ function ricarica() {
   try { c && c.tabs.reload(c.tab.id); } catch (_) {}
 }
 
+// Indietro e avanti passano dalla stessa porta di tutte le altre strade
+// (scorciatoia, tasti laterali del mouse, swipe): se non c'è dove andare non
+// succede niente.
+function indietro() {
+  const c = schedaAttiva();
+  try { c && c.tabs.navigaCronologia('indietro', c.tab.id); } catch (_) {}
+}
+
+function avanti() {
+  const c = schedaAttiva();
+  try { c && c.tabs.navigaCronologia('avanti', c.tab.id); } catch (_) {}
+}
+
 function vaiAScrivereUnIndirizzo() {
   const c = schedaAttiva();
   if (c) { try { c.tabs.navigate(c.tab.id, 'filo://newtab/'); } catch (_) {} return; }
@@ -183,7 +192,17 @@ async function ripeti() {
 
 // ─── la barra ───────────────────────────────────────────────────────────────
 
-function template() {
+function template(piattaforma) {
+  // La piattaforma si può passare: così la sentinella legge la barra VERA del
+  // Mac anche mentre gira su Windows o Linux, dove quelle voci non si vedono.
+  const MAC = (piattaforma || process.platform) === 'darwin';
+  // Tasti che le pagine di Filo gestiscono già da sé: su Windows e Linux la
+  // voce mostra la scritta ma NON registra il tasto (là arriva alla pagina, e
+  // la pagina sa cosa farne). Su Mac la barra lo registra comunque — ed è per
+  // questo che la voce deve fare la cosa giusta.
+  const SOLO_SCRITTA = MAC ? {} : { registerAccelerator: false };
+  const tasto = (accel) => globalThis.SN_TASTI.acceleratoreElectron(accel, MAC ? 'darwin' : 'win32');
+
   const menuFilo = {
     label: 'Filo',
     submenu: [
@@ -209,6 +228,9 @@ function template() {
     submenu: [
       { label: 'Nuova scheda', accelerator: 'CommandOrControl+T', click: nuovaScheda, ...SOLO_SCRITTA },
       { label: 'Nuova finestra in incognito', click: finestraIncognito },
+      { type: 'separator' },
+      { label: 'Indietro', accelerator: tasto('Alt+\u2190'), click: indietro, ...SOLO_SCRITTA },
+      { label: 'Avanti', accelerator: tasto('Alt+\u2192'), click: avanti, ...SOLO_SCRITTA },
       { type: 'separator' },
       { label: 'Vai a un indirizzo', accelerator: 'CommandOrControl+L', click: vaiAScrivereUnIndirizzo, ...SOLO_SCRITTA },
       { label: 'Ricarica', accelerator: 'CommandOrControl+R', click: ricarica, ...SOLO_SCRITTA },

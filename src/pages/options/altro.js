@@ -40,6 +40,8 @@
         T ? T.etichettaSaltoScheda() : 'Alt+cifra',
         T ? T.descrizioneSaltoScheda() : 'Vai alla scheda in quella posizione (0 = la decima)',
       ],
+      [T ? T.etichettaIndietro() : 'Alt+\u2190', 'Torna alla pagina precedente'],
+      [T ? T.etichettaAvanti() : 'Alt+\u2192', 'Vai alla pagina successiva'],
     ].forEach(([k, v]) => {
       const li = document.createElement('li');
       li.textContent = `${k} — ${v}`;
