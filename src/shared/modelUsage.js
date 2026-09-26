@@ -107,7 +107,7 @@
     user('safebrowse-judge', 'Giudizio sui siti pericolosi', 'Sicurezza', A.SAFEBROWSE_JUDGE),
     user('geoblock-classify', 'Riconoscimento dei blocchi geografici', 'Sicurezza', A.GEOBLOCK_CLASSIFY),
     user('notice-guard', 'Guardiano degli avvisi', 'Sicurezza', A.NOTICE_GUARD,
-      'Un secondo modello guarda gli avvisi nati da una mail o da una pagina prima che compaiano. Deve essere DIVERSO da quello che scrive il testo: se coincidono, l\'avviso resta in attesa invece di comparire senza controllo.'),
+      'Un secondo modello guarda quello che Filo scrive dopo aver letto una mail, una pagina o un documento, prima che compaia: risposte in chat, saluto della home, spiegazioni del tasto destro, avvisi. Deve essere DIVERSO da quelli che scrivono i testi: se coincidono, il testo resta in attesa invece di comparire senza controllo.'),
 
     // Feedback
     user('feedback-title', 'Titolo automatico di un feedback', 'Feedback', A.FEEDBACK_TITLE),
