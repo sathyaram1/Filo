@@ -10,6 +10,16 @@ import { leggiCopia, scriviCopia, scordaCopia, rigaCopiaRiusata } from './copia-
 export const TTL_MS = 5 * 60_000;
 
 /**
+ * Il riuso si può rifiutare: `--rileggi` sulla riga di comando, o
+ * `FILO_RILEGGI=1`. Serve a chi ha cambiato qualcosa sul server fra la prova a
+ * secco e l'applicazione e vuole ripartire dai dati di adesso. PURA.
+ */
+export function copiaChiesta(argv = process.argv, env = process.env) {
+  if ((Array.isArray(argv) ? argv : []).includes('--rileggi')) return false;
+  return !['1', 'true', 'on', 'yes'].includes(String((env && env.FILO_RILEGGI) || '').trim().toLowerCase());
+}
+
+/**
  * @param {object} o
  * @param {string} o.nome     come si chiama questa scansione (una per script)
  * @param {boolean} o.dry     è una prova a secco? allora si legge e si salva

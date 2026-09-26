@@ -21,7 +21,7 @@ import { dirname, resolve } from 'node:path';
 import { acquireBearer, FIRESTORE_BASE, FIREBASE_API_KEY } from './lib/firestore-auth.mjs';
 import { contaDocumenti } from './lib/firestore-conta.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
-import { scansione, dopoApplicazione } from './lib/scansione-secco.mjs';
+import { scansione, dopoApplicazione, copiaChiesta } from './lib/scansione-secco.mjs';
 
 // #583: i numeri nuovi escono da `counters/feedbackSeq`. Chi ne assegna a mano
 // deve rimettere il contatore in pari, o i prossimi invii ripartirebbero da un
@@ -174,7 +174,7 @@ async function patchSeq(id, seq, bearer) {
 // Esegue il backfill. `dry` = solo lettura, nessuna scrittura. Le credenziali
 // servono in entrambi i casi: dal 2026-09 (#583) la collezione dei feedback non
 // si legge senza (il vecchio dry-run senza bearer si prendeva un 403).
-export async function backfillNumbers(bearer, { dry = false, now = Date.now(), copiaDir = null, usaCopia = true } = {}) {
+export async function backfillNumbers(bearer, { dry = false, now = Date.now(), copiaDir = null, usaCopia = copiaChiesta() } = {}) {
   const letture = contatoreLetture();
 
   // Prima si CHIEDE quanti sono, invece di scaricarli per contarli: se tutti
@@ -255,19 +255,20 @@ if (isMain) {
   // doveva essere un giro a vuoto scriva davvero (feedback #565).
   if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) {
     console.log([
-      'Uso: node scripts/backfill-feedback-numbers.mjs [--dry-run]',
-      '  assegna i numeri ai feedback che non ce l\'hanno; --dry-run mostra solo cosa farebbe',
+      'Uso: node scripts/backfill-feedback-numbers.mjs [--dry-run] [--rileggi]',
+      '  assegna i numeri ai feedback che non ce l\'hanno; --dry-run mostra solo cosa farebbe,',
+      '  --rileggi non riusa la lettura della prova a secco',
     ].join('\n'));
     process.exit(0);
   }
   const { controllaArgomenti, argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   // Vedi auto-archive: le opzioni mangiate da npm si riprendono dall'ambiente
   // (feedback #565).
-  const storpiata = opzioneStorpiata(process.env, ['--dry-run']);
+  const storpiata = opzioneStorpiata(process.env, ['--dry-run', '--rileggi']);
 if (storpiata) { console.error(`RIFIUTATO: ${storpiata}`); process.exit(1); }
-const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run'] });
+const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run', '--rileggi'] });
   if (daNpm.nota) { console.error(daNpm.nota); process.argv.push(...daNpm.args); }
-  const male = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'], senzaParoleLibere: true });
+  const male = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run', '--rileggi'], senzaParoleLibere: true });
   if (male) {
     console.error(`RIFIUTATO: ${male}`);
     process.exit(1);

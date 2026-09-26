@@ -169,3 +169,25 @@ test('passata la finestra, l\'applicazione rilegge: una copia vecchia non descri
   await giro(false, t0 + TTL_SCANSIONE + 1);
   assert.equal(letture, 2);
 });
+
+test('il riuso si può rifiutare: `--rileggi` o FILO_RILEGGI=1', async () => {
+  // Chi ha cambiato qualcosa sul server fra la prova a secco e l'applicazione
+  // deve poter ripartire dai dati di adesso: ciò che si aggiunge si può togliere.
+  const { copiaChiesta } = await import('../../scripts/lib/scansione-secco.mjs');
+  assert.equal(copiaChiesta(['node', 'x.mjs'], {}), true);
+  assert.equal(copiaChiesta(['node', 'x.mjs', '--rileggi'], {}), false);
+  assert.equal(copiaChiesta(['node', 'x.mjs'], { FILO_RILEGGI: '1' }), false);
+  assert.equal(copiaChiesta(['node', 'x.mjs'], { FILO_RILEGGI: '0' }), true);
+
+  // E col rifiuto la lettura si rifà davvero.
+  const dir = cartellaTemporanea('copia-rileggi-');
+  const t0 = 1_700_000_000_000;
+  let letture = 0;
+  const giro = (dry, usaCopia) => scansione({
+    nome: 'prova4/segnalazioni', dry, usaCopia, now: t0, dir, log: () => {},
+    scansiona: async () => { letture += 1; return [1]; },
+  });
+  await giro(true, true);
+  await giro(false, false);
+  assert.equal(letture, 2, 'con `--rileggi` l\'applicazione deve tornare al server');
+});

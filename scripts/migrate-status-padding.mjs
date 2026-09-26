@@ -38,7 +38,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
-import { scansione, dopoApplicazione } from './lib/scansione-secco.mjs';
+import { scansione, dopoApplicazione, copiaChiesta } from './lib/scansione-secco.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -51,19 +51,20 @@ const C = globalThis.SN_FEEDBACK_CRYPTO;
 const FS = globalThis.SN_FB_STATUS;
 if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) {
   console.log([
-    'Uso: node scripts/migrate-status-padding.mjs [--dry-run]',
-    '  rifà l\'imbottitura degli stati dei feedback; --dry-run mostra solo cosa farebbe',
+    'Uso: node scripts/migrate-status-padding.mjs [--dry-run] [--rileggi]',
+    '  rifà l\'imbottitura degli stati dei feedback; --dry-run mostra solo cosa farebbe,',
+    '  --rileggi non riusa la lettura della prova a secco',
   ].join('\n'));
   process.exit(0);
 }
 const { controllaArgomenti, argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
 // Vedi auto-archive: le opzioni mangiate da npm si riprendono dall'ambiente
 // (feedback #565).
-const storpiata = opzioneStorpiata(process.env, ['--dry-run']);
+const storpiata = opzioneStorpiata(process.env, ['--dry-run', '--rileggi']);
 if (storpiata) { console.error(`RIFIUTATO: ${storpiata}`); process.exit(1); }
-const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run'] });
+const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run', '--rileggi'] });
 if (daNpm.nota) { console.error(daNpm.nota); process.argv.push(...daNpm.args); }
-const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'], senzaParoleLibere: true });
+const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run', '--rileggi'], senzaParoleLibere: true });
 if (argomentiSbagliati) {
   console.error(`RIFIUTATO: ${argomentiSbagliati}`);
   process.exit(1);
@@ -103,7 +104,7 @@ async function main() {
   // La prova a secco mette da parte quello che ha letto; l'applicazione che la
   // segue lo riusa invece di ripagare la scansione (#680).
   const { dati: docs } = await scansione({
-    nome: COPIA, dry: DRY,
+    nome: COPIA, dry: DRY, usaCopia: copiaChiesta(),
     scansiona: async () => {
       const letti = await tuttiIFeedback(bearer);
       letture.aggiungi(letti.length, 'segnalazioni');

@@ -38,7 +38,7 @@ import { scrivi } from './owner-feedback.mjs';
 // questo script scrive), e i voti stanno sulle schede pubbliche.
 import { acquireBearer } from './lib/firestore-auth.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
-import { scansione, dopoApplicazione } from './lib/scansione-secco.mjs';
+import { scansione, dopoApplicazione, copiaChiesta } from './lib/scansione-secco.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -77,7 +77,7 @@ const COPIA = 'auto-archive/segnalazioni';
 // `bearer`: il token, se chi chiama ce l'ha già. Serve solo alla lettura, quindi
 // quando le righe arrivano dalla copia non si chiede a nessuno.
 export async function runAutoArchive({
-  dryRun = false, now = Date.now(), releasedVersion, copiaDir = null, usaCopia = true, bearer = '',
+  dryRun = false, now = Date.now(), releasedVersion, copiaDir = null, usaCopia = copiaChiesta(), bearer = '',
 } = {}) {
   const ver = releasedVersion || packageVersion();
   const letture = contatoreLetture();
@@ -150,18 +150,18 @@ if (isMain) {
   // un trattino o una lettera sbagliati in «--dry-run» perché quello che
   // doveva essere un giro a vuoto scriva davvero (feedback #565).
   if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) {
-    console.log('Uso: node scripts/auto-archive.mjs [--dry-run]\n  archivia i feedback risolti oltre la soglia; --dry-run mostra solo cosa farebbe');
+    console.log('Uso: node scripts/auto-archive.mjs [--dry-run] [--rileggi]\n  archivia i feedback risolti oltre la soglia; --dry-run mostra solo cosa farebbe,\n  --rileggi non riusa la lettura della prova a secco');
     process.exit(0);
   }
   const { controllaArgomenti, argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   // npm si mangia le opzioni scritte prima dei due trattini (e su PowerShell
   // anche quelle scritte dopo): le riprendiamo dall'ambiente, invece di fare
   // la cosa vera a chi aveva chiesto un giro a vuoto (feedback #565).
-  const storpiata = opzioneStorpiata(process.env, ['--dry-run']);
+  const storpiata = opzioneStorpiata(process.env, ['--dry-run', '--rileggi']);
 if (storpiata) { console.error(`RIFIUTATO: ${storpiata}`); process.exit(1); }
-const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run'] });
+const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run', '--rileggi'] });
   if (daNpm.nota) { console.error(daNpm.nota); process.argv.push(...daNpm.args); }
-  const male = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'], senzaParoleLibere: true });
+  const male = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run', '--rileggi'], senzaParoleLibere: true });
   if (male) {
     console.error(`RIFIUTATO: ${male}`);
     process.exit(1);

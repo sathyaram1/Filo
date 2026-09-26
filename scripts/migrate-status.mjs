@@ -11,6 +11,7 @@
 // USO:
 //   node scripts/migrate-status.mjs            # DRY-RUN: stampa cosa farebbe
 //   node scripts/migrate-status.mjs --apply    # scrive davvero
+//   ... --rileggi                              # non riusa la lettura del dry-run
 //
 // Serve il token admin dell'owner (vedi scripts/admin-login.mjs): acquireBearer.
 
@@ -18,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
-import { scansione, dopoApplicazione } from './lib/scansione-secco.mjs';
+import { scansione, dopoApplicazione, copiaChiesta } from './lib/scansione-secco.mjs';
 // IIFE su globalThis, nell'ordine giusto: crypto → feedback → vocabolario → normalize.
 import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedback.js';
@@ -90,7 +91,7 @@ async function main() {
   // La prova a secco (il giro senza `--apply`) mette da parte quello che ha
   // letto: l'applicazione che la segue non ripaga la stessa scansione (#680).
   const { dati: docs } = await scansione({
-    nome: COPIA, dry: !APPLY,
+    nome: COPIA, dry: !APPLY, usaCopia: copiaChiesta(),
     scansiona: async () => {
       const letti = await listAll(bearer);
       letture.aggiungi(letti.length, 'segnalazioni');
