@@ -29,8 +29,10 @@
   // Quando il buffer di lezioni supera questa soglia in caratteri, il
   // Compattatore va eseguito (vedi spec sezione 4.2).
   const LESSONS_BUFFER_TRIGGER_CHARS = 3000;
-  // Cap difensivo per le notifiche.
-  const NOTIFICATIONS_CAP = 100;
+  // Cap difensivo per le notifiche. Abbondante di proposito: il conto include
+  // anche quelle già lette, e con un tetto stretto qualche settimana d'uso
+  // basta a far sparire un avviso che sta ancora aspettando il controllo (#536).
+  const NOTIFICATIONS_CAP = 500;
   // Registro dei blocchi del guardiano (#536): abbondante, perché il suo
   // mestiere è far vedere quanto spesso blocca, e un registro corto darebbe
   // sempre la stessa risposta rassicurante.
