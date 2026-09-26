@@ -126,14 +126,48 @@ test('la bacheca mostra i miglioramenti leggendo la vista pubblica, mai la colle
   await expect(page.locator('.bd-card-title')).toHaveText('Migliorata la cattura schermo');
 
   const chieste = await page.evaluate(() => window.__chieste);
+  soloLaVista(chieste);
+});
+
+// Quello che la bacheca chiede è la VISTA, e solo quella. Un elenco vuoto non
+// passa: «non ha chiesto niente» non è «non ha chiesto la collezione», ed è
+// esattamente il modo in cui questo controllo si era spento (#665).
+function soloLaVista(chieste) {
   expect(chieste.length).toBeGreaterThan(0);
-  // Quello che la bacheca chiede è la VISTA, e solo quella.
   expect(chieste.some((c) => c.body.includes('feedback-public'))).toBe(true);
   for (const c of chieste) {
     expect(c.body).not.toMatch(/"collectionId"\s*:\s*"feedback"/);
     expect(c.url).not.toMatch(/documents\/feedback(\?|\/|$)/);
     expect(c.url).not.toMatch(/documents:batchGet/);
   }
+}
+
+test('la bacheca riletta chiede di nuovo al server, e non ripropone le schede del giro prima', async ({ openTab }) => {
+  const page = await openTab(BOARD);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__boardTest && window.SN_FEEDBACK);
+  await page.locator('#bdLoading').waitFor({ state: 'hidden' });
+
+  // Primo giro ANDATO A BUON FINE: da qui in poi la bacheca ha una memoria da
+  // buttare via (trenta secondi) e una copia su disco. È la condizione di una
+  // macchina normale, dove la vista pubblica si raggiunge davvero.
+  await spiaFetch(page, [SCHEDA]);
+  await page.evaluate(() => {
+    window.__boardTest.setReleasedVersion('0.2.71');
+    return window.__boardTest.reload();
+  });
+  await expect(page.locator('.bd-card-title')).toHaveText('Migliorata la cattura schermo');
+
+  // Secondo giro: il server ora ha un'altra scheda. Quella che si vede è la
+  // sua, non quella di prima.
+  await spiaFetch(page, [ALTRA_SCHEDA]);
+  await page.evaluate(() => window.__boardTest.reload());
+
+  await expect(page.locator('.bd-card')).toHaveCount(1);
+  await expect(page.locator('.bd-card-title')).toHaveText('Le schede si riaprono dove le avevi lasciate');
+
+  const chieste = await page.evaluate(() => window.__chieste);
+  soloLaVista(chieste);
 });
 
 test('da una pagina di Filo la lettura passa dal main, che la nega a chi non è admin', async ({ openTab }) => {
