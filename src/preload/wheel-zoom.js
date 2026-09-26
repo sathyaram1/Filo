@@ -36,6 +36,13 @@
 //   al momento dell'evento, quindi il marker può essere messo quando vuole:
 //   senza, lo zoom verrebbe applicato due volte.
 //
+//   LO ZOOM CHIESTO A PAROLE (#686)
+//   La chat non zooma da sé: manda `filo:zoom-key` come i tasti, con un verso
+//   oppure una percentuale esatta, e riceve indietro su `filo:zoom-applicato`
+//   la percentuale che è stata davvero applicata (chi chiede un valore fuori
+//   scala deve poterlo dire all'utente). Passo e limiti stanno in
+//   src/shared/zoomPagina.js: una regola sola per tasti, rotella, badge e chat.
+//
 //   QUANDO IL FOCUS È SULLA BARRA DI FILO
 //   Se l'utente ha appena cliccato una scheda, i tasti vanno alla barra e non
 //   alla pagina: nessun keydown arriva qui. Il main (tabs.js) intercetta lì
