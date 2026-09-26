@@ -59,8 +59,36 @@ test('riallineamento: il commit verificato arriva dal marcatore di chi verifica,
   assert.equal(shaDelRiallineamento(null), '');
 });
 
-test('riallineamento: finish-local aggiunge i file cambiati dal commit verificato', () => {
-  const src = readFileSync(resolve(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
-  assert.match(src, /shaDelRiallineamento\(readMarker\(ROOT\)\)/);
-  assert.match(src, /\['diff', '--name-only', sha, 'HEAD'\]/);
+// Un ramo verificato, poi main che tocca un'altra area, poi il ramo riallineato con un conflitto
+// risolto: la scelta deve vedere anche l'area arrivata da main e il file in conflitto.
+test('riallineamento: la scelta include il lato arrivato da main e il file in conflitto', () => {
+  const dir = cartellaTemporanea('riallineamento-');
+  const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
+  try {
+    g('init', '-q', '-b', 'main');
+    g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+    scrivi('src/pages/editor/a.js', '1\n'); scrivi('src/pages/history/h.js', '1\n');
+    g('add', '-A'); g('commit', '-qm', 'base');
+    g('checkout', '-qb', 'lavoro');
+    scrivi('src/pages/editor/a.js', 'lavoro\n'); g('commit', '-qam', 'lavoro');
+    const verificato = g('rev-parse', 'HEAD');
+    g('checkout', '-q', 'main');
+    scrivi('src/pages/history/h.js', 'main\n'); scrivi('src/pages/editor/a.js', 'main\n'); g('commit', '-qam', 'main');
+    g('checkout', '-q', 'lavoro');
+    try { g('rebase', 'main'); } catch (_) { /* conflitto atteso su a.js */ }
+    scrivi('src/pages/editor/a.js', 'risolto\n'); g('add', '-A');
+    execFileSync('git', ['-c', 'core.editor=true', 'rebase', '--continue'], { cwd: dir, stdio: 'ignore' });
+
+    const senza = cambiatiPerLaScelta({ base: 'main', marker: null, root: dir });
+    assert.deepEqual(senza.changed, ['src/pages/editor/a.js'], 'il ramo contro main vede solo la sua area');
+    const con = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: verificato }, root: dir });
+    assert.deepEqual(con.changed.sort(), ['src/pages/editor/a.js', 'src/pages/history/h.js']);
+    assert.match(con.nota, /lato arrivato da main/);
+    const perso = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: 'f'.repeat(40) }, root: dir });
+    assert.deepEqual(perso.changed, ['src/pages/editor/a.js']);
+    assert.match(perso.nota, /qui non c'è/, 'un commit introvabile si dice, non si salta in silenzio');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
