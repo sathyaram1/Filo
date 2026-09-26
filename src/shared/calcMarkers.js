@@ -219,7 +219,7 @@
       // In streaming la valuta arriva un pezzo DOPO il marker: finché dietro
       // non c'è niente non si sa se il risultato è un prezzo, e un numero a
       // dodici cifre che un istante dopo diventa «27,45 €» è uno sfarfallio.
-      if (streaming && /^[\s\u00A0]*$/.test(dopo)) return '…';
+      if (streaming && SOLO_ORPELLI.test(dopo)) return '…';
       const r = tryMathEval(expr);
       if (!r.ok) return m;
       const valuta = VALUTA_DOPO.test(dopo) || VALUTA_PRIMA.test(full.slice(0, offset));

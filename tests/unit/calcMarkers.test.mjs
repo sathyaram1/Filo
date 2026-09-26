@@ -28,6 +28,27 @@ test('due decimali comunque sia scritta la valuta accanto al risultato', () => {
   assert.equal(risolvi('[[calc: 3000*1.08]] $'), '3.240,00 $');
 });
 
+test('la formattazione fra il numero e la valuta non riporta le dodici cifre', () => {
+  // Il modello mette in risalto il numero e lascia l'euro fuori dal risalto:
+  // nella resa il risalto sparisce e resta un prezzo da leggere.
+  assert.equal(risolvi('circa **[[calc: 50/1.08]]** €'), 'circa **46,30** €');
+  assert.equal(risolvi('circa *[[calc: 50/1.08]]* euro'), 'circa *46,30* euro');
+  assert.equal(risolvi('circa _[[calc: 50/1.08]]_ EUR'), 'circa _46,30_ EUR');
+  assert.equal(risolvi('50 $ ([[calc: 50/1.08]]) €'), '50 $ (46,30) €');
+  // Stessa causa dall'altro lato: la valuta scritta prima del numero.
+  assert.equal(risolvi('prezzo: EUR [[calc: 50/1.08]]'), 'prezzo: EUR 46,30');
+  assert.equal(risolvi('prezzo: euro **[[calc: 50/1.08]]**'), 'prezzo: euro **46,30**');
+  // In streaming il numero aspetta anche quando il risalto arriva per primo.
+  assert.equal(risolvi('circa **[[calc: 50/1.08]]**', { streaming: true }), 'circa …');
+});
+
+test('un asterisco a capo è un elenco, non il grassetto del numero', () => {
+  // Altrimenti la voce dopo, se comincia con una valuta, arrotonderebbe una
+  // misura che non è un prezzo.
+  assert.equal(risolvi('Superficie [[calc: 4.4*5.1]]\n* USD 50'), 'Superficie 22,44\n* USD 50');
+  assert.equal(risolvi('Distanza [[calc: 3*1.609]] km'), 'Distanza 4,827 km');
+});
+
 test('un importo sotto il centesimo non viene azzerato', () => {
   // «0,00 €» sarebbe una bugia: l'importo c'è, sono le cifre a dover crescere.
   const out = risolvi('[[calc: 0.001/1.08]] €');
