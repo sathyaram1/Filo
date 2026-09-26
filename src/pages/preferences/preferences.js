@@ -384,6 +384,15 @@
   }
 
   async function svuotaBlocchi() {
+    // Il registro non ha un cestino: una volta svuotato non si sa più quante
+    // volte il guardiano aveva bloccato, ed è l'unica misura che c'era.
+    const Ui = window.SN_CONFIRM_UI;
+    const text = 'Cancella l’elenco degli avvisi fermati. Non si può annullare, '
+      + 'e senza quell’elenco non si vede più quanto spesso il controllo blocca.';
+    const ok = Ui
+      ? await Ui.confirm({ title: 'Svuota il registro', text, okLabel: 'Svuota' })
+      : window.confirm(`${text} Procedo?`);
+    if (!ok) return;
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.FILO_CLEAR_BLOCCHI_GUARDIANO });
       if (r?.ok) { renderBlocchi([]); flashSaved(); }

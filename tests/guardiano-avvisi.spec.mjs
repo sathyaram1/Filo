@@ -10,6 +10,7 @@
 // mezzo cammino.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { clickConfirm, confirmText } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -103,6 +104,17 @@ test('una mail che imita la banca non diventa una notifica: diventa una riga che
   await expect(pref.locator('#guardianoBlocchi .grd-row')).toHaveCount(1);
   await expect(pref.locator('#guardianoBlocchi .grd-motivo')).toContainText('credenziali');
   await expect(pref.locator('#guardianoVuoto')).toBeHidden();
+
+  // Il registro si svuota, ma non per sbaglio: prima chiede, e un no lo lascia
+  // dov'era.
+  await pref.locator('#guardianoSvuota').click();
+  await expect.poll(() => confirmText(pref)).toContain('Svuota il registro');
+  await clickConfirm(pref, 'cancel');
+  await expect(pref.locator('#guardianoBlocchi .grd-row')).toHaveCount(1);
+  await pref.locator('#guardianoSvuota').click();
+  await clickConfirm(pref, 'ok');
+  await expect(pref.locator('#guardianoVuoto')).toBeVisible();
+  await expect(pref.locator('#guardianoSvuota')).toBeHidden();
 
   // Il secondo giudizio NON è girato sul modello che ha scritto il testo.
   const modelli = await app.evaluate(() => globalThis.__guardModelli);

@@ -5,14 +5,12 @@
 (function (global) {
   'use strict';
 
-  // Dalla più fidata alla meno. L'ordine è la scala: un compito vale quanto la
-  // sua fonte peggiore, quindi «più bassa» vuol dire «più avanti in questa
-  // lista».
+  // Dalla più fidata alla meno: un compito vale quanto la sua fonte peggiore,
+  // quindi «più bassa» vuol dire «più avanti qui».
   const SCALA = ['utente', 'filo', 'sito', 'messaggio'];
 
-  // Da dove in giù un compito è contaminato: ha letto testo che ha scritto
-  // qualcun altro, e quel qualcuno poteva avere interesse a parlare all'utente
-  // con la voce di Filo.
+  // Da dove in giù il compito ha letto testo di qualcun altro, che poteva
+  // avere interesse a parlare all'utente con la voce di Filo.
   const PRIMA_CONTAMINATA = SCALA.indexOf('sito');
 
   const ETICHETTE = {
@@ -22,9 +20,8 @@
     messaggio: 'un messaggio ricevuto',
   };
 
-  // Una classe che non conosciamo vale come la peggiore: una fonte nuova che
-  // nessuno ha classificato non può passare per fidata solo perché il suo nome
-  // non è in questa lista.
+  // Una classe sconosciuta vale come la peggiore: una fonte che nessuno ha
+  // classificato non è fidata solo perché il suo nome manca dalla lista.
   function rango(classe) {
     const i = SCALA.indexOf(String(classe || ''));
     return i < 0 ? SCALA.length - 1 : i;

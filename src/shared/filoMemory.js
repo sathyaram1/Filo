@@ -702,10 +702,8 @@
     return includeDismissed ? list : list.filter((n) => !n.dismissed);
   }
 
-  // #536 — un avviso nato da roba scritta da altri non entra qui senza il
-  // timbro del guardiano. È la porta, non un promemoria: una superficie nuova
-  // che si dimentica del controllo si rompe subito e rumorosamente, invece di
-  // mostrare all'utente quello che gli ha scritto un estraneo.
+  // #536 — la porta, non un promemoria: una superficie che si dimentica del
+  // controllo si rompe, invece di mostrare il testo di un estraneo.
   function timbro(classe, guardiano) {
     const F = global.SN_FIDUCIA;
     const cls = F ? F.normalizza(classe || 'filo') : String(classe || 'filo');

@@ -76,6 +76,9 @@ html, body {
   color: var(--sn-link);
 }
 
+/* Il `display` scritto qui sopra batte quello che il browser dà a [hidden]:
+   senza questa riga un pulsante nascosto resta a schermo. */
+.sn-page button.sn-btn[hidden] { display: none; }
 .sn-page button.sn-btn:hover:not(:disabled) { opacity: 0.85; }
 
 /* Un bottone spento da una regola deve VEDERSI spento, altrimenti sembra rotto: ci si clicca e non

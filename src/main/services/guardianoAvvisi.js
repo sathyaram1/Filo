@@ -12,14 +12,12 @@ const TENTATIVI = 2;
 const RIPRESA_MS = 5 * 60 * 1000;
 // Quanto del testo fermato finisce nel registro: abbastanza per riconoscerlo.
 const ANTEPRIMA = 160;
-// Un avviso più lungo di così si RIFIUTA, non si taglia: quello che non entra
-// nella domanda del guardiano verrebbe mostrato senza essere stato guardato,
-// e l'esca si scriverebbe dopo il taglio. Per questo il tetto NON è un numero
-// suo: è quello del guardiano.
+// Un avviso più lungo si RIFIUTA, non si taglia: l'esca si scriverebbe dopo il
+// taglio. Per questo il tetto non è un numero suo, è quello del guardiano.
 const MAX_TESTO = () => (globalThis.SN_GUARDIANO && globalThis.SN_GUARDIANO.MAX_PEZZO) || 1500;
 
-// Le regole che scattano PERCHÉ il testo contiene un segreto: la loro
-// anteprima nel registro sarebbe una seconda copia del segreto.
+// Le regole che scattano perché il testo contiene un segreto: l'anteprima nel
+// registro ne sarebbe una seconda copia.
 const REGOLE_SENZA_ANTEPRIMA = new Set(['segreto', 'chiave', 'codice', 'iban', 'carta']);
 
 let deps = { getSettings: null, runOneShot: null, modelForAction: null };
@@ -30,6 +28,16 @@ let giroInCorso = null;
 
 function configure(d) {
   deps = { ...deps, ...(d || {}) };
+}
+
+// Un giro di posta propone più avvisi insieme, e chi rilegge tutta la lista per
+// riscriverla perde in silenzio quella del vicino: si scrive in fila
+// (patterns/chi-rilegge-tutto-e-riscrive-tutto-mette-le-scritture-in-fila.md).
+let fila = Promise.resolve();
+function inFila(fn) {
+  const prossimo = fila.then(fn, fn);
+  fila = prossimo.catch(() => {});
+  return prossimo;
 }
 
 function G() { return globalThis.SN_GUARDIANO; }
@@ -48,9 +56,8 @@ function segretiDi(settings) {
   return out;
 }
 
-// Chi ha scritto, come lo si scrive nella riga di blocco. Un indirizzo scritto
-// per esteso dentro il nome del mittente servirebbe solo a rimettere nella
-// riga l'esca che abbiamo appena tolto.
+// Chi ha scritto, come compare nella riga di blocco: un indirizzo dentro il
+// nome del mittente rimetterebbe lì l'esca appena tolta.
 function fonteVisibile(fonte) {
   const C = globalThis.SN_CONST;
   const grezza = C ? C.unaRigaDiDati(fonte, 200) : String(fonte || '').trim();
@@ -59,9 +66,8 @@ function fonteVisibile(fonte) {
   return grezza.replace(/\bhttps?:\/\/\S+/gi, '…').slice(0, 80);
 }
 
-// I collegamenti escono dal testo e diventano voci a sé, etichettate con la
-// loro destinazione vera: dentro una frase la scritta la sceglie chi ha
-// scritto la frase (pattern «Un collegamento dice dove porta»).
+// I collegamenti escono dalla frase e si etichettano con la destinazione vera:
+// dentro la frase la scritta la sceglie chi l'ha scritta.
 function separaLink(testo) {
   const FB = globalThis.SN_FEEDBACK;
   const st = GS();
@@ -79,8 +85,8 @@ function separaLink(testo) {
   return { testo: out, link };
 }
 
-// Il giudizio, senza toccare lo storage. Esiti: 'passa' | 'blocca' | 'attesa'.
-// 'attesa' NON è un passa: è «non lo so», e chi chiama non mostra niente.
+// Esiti: 'passa' | 'blocca' | 'attesa'. 'attesa' NON è un passa: è «non lo so»,
+// e chi chiama non mostra niente.
 async function vaglia({ testo, classe, fonte, richiesta, modelloProduttore, link } = {}) {
   const fid = F();
   const cls = fid ? fid.normalizza(classe) : String(classe || 'messaggio');
@@ -137,16 +143,16 @@ function rigaDiBlocco(fonte, motivo) {
 async function registraBlocco({ fonte, classe, testo, esito }) {
   const mem = Mem();
   try {
-    await mem.addBloccoGuardiano({
+    await inFila(() => mem.addBloccoGuardiano({
       fonte, classe, motivo: esito.motivo, regola: esito.regola,
       anteprima: REGOLE_SENZA_ANTEPRIMA.has(esito.regola)
         ? '' : globalThis.SN_CONST.unaRigaDiDati(testo, ANTEPRIMA),
-    });
+    }));
   } catch (_) {}
-  return mem.addNotification({
+  return inFila(() => mem.addNotification({
     kind: 'alert', classe: 'filo', text: rigaDiBlocco(fonte, esito.motivo),
     action: { tipo: 'guardiano-blocco', regola: esito.regola },
-  });
+  }));
 }
 
 // L'unico modo di proporre un avviso nato da roba di altri. Torna
@@ -167,7 +173,7 @@ async function proponiAvviso({ testo, classe, fonte, richiesta, modelloProduttor
     return { esito: 'blocca', notifica, motivo: esito.motivo };
   }
 
-  const notifica = await mem.addNotification({
+  const notifica = await inFila(() => mem.addNotification({
     kind: kind || 'alert',
     text: separato.testo,
     classe, fonte,
@@ -178,7 +184,7 @@ async function proponiAvviso({ testo, classe, fonte, richiesta, modelloProduttor
       ...(action || {}), link: separato.link,
       richiesta: richiesta || '', modelloProduttore: modelloProduttore || '',
     },
-  });
+  }));
   return { esito: esito.esito, notifica };
 }
 
@@ -211,14 +217,14 @@ async function giraSullaCoda(forza) {
         link: (n.action && n.action.link) || [],
       });
       if (esito.esito === 'attesa') {
-        await mem.segnaEsitoGuardiano(n.id, { tentativi: (n.tentativi || 0) + 1 });
+        await inFila(() => mem.segnaEsitoGuardiano(n.id, { tentativi: (n.tentativi || 0) + 1 }));
         continue;
       }
       if (esito.esito === 'blocca') {
-        await mem.segnaEsitoGuardiano(n.id, { stato: 'bloccato' });
+        await inFila(() => mem.segnaEsitoGuardiano(n.id, { stato: 'bloccato' }));
         await registraBlocco({ fonte: n.fonte, classe: n.classe, testo: n.text, esito });
       } else {
-        await mem.segnaEsitoGuardiano(n.id, { stato: 'visibile' });
+        await inFila(() => mem.segnaEsitoGuardiano(n.id, { stato: 'visibile' }));
       }
       cambiate++;
     }
@@ -233,7 +239,7 @@ async function giraSullaCoda(forza) {
 
 const API = {
   configure, vaglia, proponiAvviso, riprendiInAttesa,
-  segretiDi, fonteVisibile, separaLink, rigaDiBlocco,
+  segretiDi, fonteVisibile, separaLink, rigaDiBlocco, inFila,
   TENTATIVI, RIPRESA_MS, MAX_TESTO,
 };
 

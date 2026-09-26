@@ -10,8 +10,7 @@
   const SEGRETO_MIN = 12;
 
   // Le parole che qualificano un numero come credenziale. Il «codice» da solo
-  // non basta — un codice d'ordine in una mail di spedizione è normale — e un
-  // guardiano che grida al lupo viene spento.
+  // no: un codice d'ordine in una mail di spedizione è normale.
   const PAROLE_CODICE = new RegExp(
     '(?:\\botp\\b|\\bmfa\\b|\\b2fa\\b|one[\\s-]?time'
     + '|codic\\w*\\s+(?:di\\s+)?(?:verifica|sicurezza|accesso|conferma|autenticazione|recupero|ripristino|temporane\\w+|monouso)'
@@ -22,9 +21,8 @@
     'i',
   );
 
-  // Un gruppo che ha la forma di un codice: cifre, blocchi separati da trattino
-  // come li scrivono i codici di recupero, o un gruppo che mescola lettere e
-  // cifre — che è la forma di una password scritta per esteso.
+  // La forma di un codice: cifre, blocchi separati da trattino come nei codici
+  // di recupero, o lettere e cifre mescolate come in una password.
   const FORMA_CODICE = new RegExp(
     '\\b(?:\\d{4,10}'
     + '|[A-Za-z0-9]{4,6}(?:[-\\s][A-Za-z0-9]{4,6}){1,5}'
@@ -100,10 +98,8 @@
     } catch (_) { return ''; }
   }
 
-  // Due host vanno d'accordo se uno è l'altro, o un suo sottodominio: la coda
-  // è il sito, quindi `accedi.banca.it` sotto la scritta `banca.it` è onesto,
-  // mentre `banca.it.altrove.invalid` non lo è (vedi il pattern «Un
-  // collegamento dice dove porta»).
+  // La coda è il sito: `accedi.banca.it` sotto la scritta `banca.it` è onesto,
+  // `banca.it.altrove.invalid` no (patterns/un-collegamento-dice-dove-porta.md).
   function stessoSito(a, b) {
     if (!a || !b) return true;
     if (a === b) return true;
@@ -120,9 +116,8 @@
     return out;
   }
 
-  // Esito unico: { blocca, regola, motivo }. `motivo` è la coda della riga che
-  // legge l'utente («Ho fermato un avviso nato da X: …») e non riporta mai un
-  // pezzo del testo esaminato — quello lo scrive chi attacca.
+  // `motivo` è la coda della riga che legge l'utente e non riporta mai un pezzo
+  // del testo esaminato: quello lo scrive chi attacca.
   function controlla(testoAvviso, { segreti = [], link = [] } = {}) {
     const s = testo(testoAvviso);
     const no = { blocca: false, regola: '', motivo: '' };

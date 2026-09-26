@@ -748,9 +748,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 .dash-live-link {
   max-width: 100%;
   align-self: flex-start;
-  /* Niente puntini a fine riga: i puntini del browser mangiano la CODA, che
-     in un indirizzo è il sito vero (pattern «Un collegamento dice dove
-     porta»). Un dominio lungo va a capo, non sparisce. */
+  /* Niente puntini a fine riga: mangerebbero la coda, che in un indirizzo è
+     il sito vero (patterns/un-collegamento-dice-dove-porta.md). */
   white-space: normal;
   overflow-wrap: anywhere;
   text-align: left;

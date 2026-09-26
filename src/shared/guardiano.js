@@ -5,9 +5,8 @@
 (function (global) {
   'use strict';
 
-  // Motivi CHIUSI: il guardiano sceglie una chiave, non scrive la frase. La
-  // riga che l'utente legge nasce da qui, quindi un testo ostile non può
-  // arrivare a scriverla nemmeno convincendo il modello.
+  // Motivi CHIUSI: il guardiano sceglie una chiave, non scrive la frase. Così
+  // un testo ostile non arriva alla riga che l'utente legge.
   const MOTIVI = {
     credenziali: 'sembrava spingerti a consegnare credenziali, codici o dati personali',
     pagamento: 'sembrava spingerti a fare un pagamento o a dare dati bancari',
@@ -20,11 +19,8 @@
 
   const CHIAVI = Object.keys(MOTIVI);
 
-  // Il tetto per pezzo. Serve anche contro le finte conversazioni: dieci righe
-  // di «contesto» sono lo spazio in cui si costruisce un dialogo inventato.
-  // È anche il tetto di ciò che si può PROPORRE come avviso: se un avviso
-  // potesse essere più lungo di quello che entra qui, la parte oltre il taglio
-  // verrebbe mostrata senza essere stata guardata.
+  // Il tetto per pezzo, che è anche quello di un avviso proponibile: ciò che
+  // non entra qui verrebbe mostrato senza essere stato guardato.
   const MAX_PEZZO = 1500;
 
   function unaRiga(v, max) {
@@ -59,12 +55,9 @@
     `"motivo" è obbligatorio quando passa è false, e va scelto fra: ${CHIAVI.join(', ')}.`,
   ].join('\n');
 
-  // Il guardiano NON rilegge la fonte: giudica il testo in uscita. Qui dentro
-  // non entra mai il contenuto completo della mail.
-  //
-  // I collegamenti entrano SEPARATI, scritta e destinazione su righe loro:
-  // dentro la frase si vede solo la scritta, e «questo link porta dove dice?»
-  // è una delle domande che il guardiano deve poter rispondere.
+  // Giudica il testo in uscita, non la fonte: il contenuto della mail non entra.
+  // I collegamenti arrivano separati, scritta e destinazione, o «porta dove
+  // dice?» non sarebbe una domanda a cui si può rispondere.
   function domanda({ testo, classe, fonte, richiesta, link } = {}) {
     const F = global.SN_FIDUCIA;
     const cls = F ? F.normalizza(classe) : String(classe || 'messaggio');
@@ -100,10 +93,8 @@
     return { passa: false, motivoChiave: chiave, motivo: MOTIVI[chiave] };
   }
 
-  // Due contesti sullo stesso modello cadono insieme: la catena del guardiano
-  // perde i soprannomi che ha usato chi ha scritto il testo. Se non resta
-  // niente il guardiano non è utilizzabile, e chi chiama mette in attesa —
-  // mai passa.
+  // Due contesti sullo stesso modello cadono insieme, quindi la catena perde i
+  // soprannomi di chi ha scritto il testo. Vuota = si mette in attesa.
   function catenaIndipendente(refsGuardiano, refsProduttore) {
     const lista = (v) => {
       const C = global.SN_CONST;
