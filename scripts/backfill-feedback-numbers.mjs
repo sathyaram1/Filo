@@ -19,6 +19,9 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { acquireBearer, FIRESTORE_BASE, FIREBASE_API_KEY } from './lib/firestore-auth.mjs';
+import { contaDocumenti } from './lib/firestore-conta.mjs';
+import { contatoreLetture } from './lib/letture.mjs';
+import { scansione, dopoApplicazione, copiaChiesta } from './lib/scansione-secco.mjs';
 
 // #583: i numeri nuovi escono da `counters/feedbackSeq`. Chi ne assegna a mano
 // deve rimettere il contatore in pari, o i prossimi invii ripartirebbero da un
@@ -76,6 +79,36 @@ export function ordinaPerArrivo(docs) {
   });
 }
 
+// ── Cosa si scarica per NUMERARE ─────────────────────────────────────────────
+// Quattro campi: la data d'arrivo (l'ordine dei numeri), il numero che c'è già,
+// e il titolo per la riga che si stampa. Il testo della segnalazione — cifrato,
+// qualche KB, più note e allegati — qui non serve a niente, e moltiplicato per
+// la collezione intera era il conto di Firestore di settembre 2026 (#680).
+export const CAMPI_NUMERAZIONE = ['name', 'createdAt', 'seq', 'subSeq'];
+
+// Il nome con cui la lettura si mette da parte fra la prova a secco e
+// l'applicazione (lib/scansione-secco).
+const COPIA = 'backfill-feedback-numbers/segnalazioni';
+
+/**
+ * Quanti sono, e quanti hanno già un numero. Due conteggi chiesti al server
+ * costano una lettura ogni mille documenti; scaricare la collezione per contarla
+ * ne costa una a testa. Se i due numeri combaciano non c'è niente da numerare e
+ * la scansione non si fa nemmeno.
+ * `seq >= 1` e non `>= 0`: uno `seq` a zero, per questo comando, è un feedback
+ * SENZA numero (`intField(d, 'seq') > 0`), e i due criteri devono coincidere.
+ */
+async function conteggi(bearer, fetchImpl = fetch) {
+  const comune = { bearer, fetchImpl };
+  const [totale, numerati] = await Promise.all([
+    contaDocumenti(FIRESTORE_BASE, FIREBASE_API_KEY, 'feedback', comune),
+    contaDocumenti(FIRESTORE_BASE, FIREBASE_API_KEY, 'feedback', {
+      ...comune, filtro: { field: 'seq', op: 'GREATER_THAN_OR_EQUAL', value: { integerValue: '1' } },
+    }),
+  ]);
+  return { totale, numerati };
+}
+
 async function listAll(bearer) {
   // TUTTI i feedback, paginati con un cursore sul nome del documento, poi
   // ordinati per data d'invio crescente (i più vecchi prendono i numeri più
@@ -100,6 +133,7 @@ async function listAll(bearer) {
       limit: PAGINA,
     };
     if (cursore) structuredQuery.startAt = { before: false, values: [{ referenceValue: cursore }] };
+    structuredQuery.select = { fields: CAMPI_NUMERAZIONE.map((f) => ({ fieldPath: f })) };
     // eslint-disable-next-line no-await-in-loop
     const res = await fetch(`${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`, {
       method: 'POST', headers, body: JSON.stringify({ structuredQuery }),
@@ -140,8 +174,52 @@ async function patchSeq(id, seq, bearer) {
 // Esegue il backfill. `dry` = solo lettura, nessuna scrittura. Le credenziali
 // servono in entrambi i casi: dal 2026-09 (#583) la collezione dei feedback non
 // si legge senza (il vecchio dry-run senza bearer si prendeva un 403).
-async function backfillNumbers(bearer, { dry = false } = {}) {
-  const docs = await listAll(bearer || '');
+export async function backfillNumbers(bearer, { dry = false, now = Date.now(), copiaDir = null, usaCopia = copiaChiesta() } = {}) {
+  const letture = contatoreLetture();
+
+  // Prima si CHIEDE quanti sono, invece di scaricarli per contarli: se tutti
+  // hanno già un numero questo comando non ha niente da fare, e scoprirlo
+  // costava una lettura per segnalazione — la raffica del 18/09 (#680).
+  const conto = await conteggi(bearer || '');
+  const contati = Number.isFinite(conto.totale) && Number.isFinite(conto.numerati);
+  // I conteggi si pagano anche quando poi la scansione si fa: il conto a schermo
+  // deve essere quello vero, non quello che fa apparire il fix più bello.
+  if (contati) letture.aggiungi(2, 'conteggi');
+  if (contati && conto.totale === conto.numerati) {
+    const max = await FB.maxSeq({ idToken: bearer || '' });
+    letture.aggiungi(1, 'numero più alto');
+    const maxSeq = Number.isInteger(max) ? max : 0;
+    console.log(`${conto.totale} feedback totali: ${conto.numerati} già numerati, 0 da numerare (si parte da #${maxSeq + 1}).`);
+    await allineaContatore(maxSeq, bearer, dry, letture);
+    console.log(letture.riga());
+    return { total: conto.totale, numbered: 0, failures: 0, dry, letture: letture.totale };
+  }
+  if (!contati) {
+    console.warn('AVVISO: il server non ha saputo contare i feedback: scansiono la collezione (una lettura per segnalazione).');
+  }
+
+  const leggi = async () => {
+    const letti = await listAll(bearer || '');
+    letture.aggiungi(letti.length, 'segnalazioni');
+    return letti;
+  };
+  const { dati: primi, dallaCopia } = await scansione({
+    nome: COPIA, dry, now, dir: copiaDir, usaCopia, scansiona: leggi,
+  });
+  let docs = primi;
+  // La copia descrive il server di qualche minuto fa, e i numeri si assegnano
+  // contando quelli che ci sono: se nel frattempo è arrivata una segnalazione,
+  // il numero che si prende da sé è il primo che questo giro sta per dare, e
+  // due segnalazioni finirebbero con lo stesso numero. Il conto vero ce
+  // l'abbiamo già in mano (l'abbiamo appena chiesto): se non combacia con la
+  // copia, si rilegge — costa una scansione, un numero doppio non si aggiusta
+  // da sé (#680, secondo giro).
+  if (dallaCopia && contati
+      && (conto.totale !== docs.length || conto.numerati !== docs.filter((d) => intField(d, 'seq') > 0).length)) {
+    console.warn(`AVVISO: dalla prova a secco le segnalazioni sono cambiate (${docs.length} → ${conto.totale}): `
+      + 'rileggo, o assegnerei numeri già presi.');
+    docs = await leggi();
+  }
   const withSeq = docs.filter((d) => intField(d, 'seq') > 0);
   const missing = docs.filter((d) => intField(d, 'seq') === 0);
   let next = withSeq.reduce((m, d) => Math.max(m, intField(d, 'seq')), 0) + 1;
@@ -150,7 +228,9 @@ async function backfillNumbers(bearer, { dry = false } = {}) {
   let failures = 0;
   for (const d of missing) {
     const id = d.name.split('/').pop();
-    const label = strField(d, 'name') || strField(d, 'text').slice(0, 50).replace(/\s+/g, ' ');
+    // Il titolo, se c'è: il testo della segnalazione non si scarica più (#680),
+    // quindi il ripiego è l'id, che la riga stampa comunque.
+    const label = strField(d, 'name') || '(senza titolo)';
     if (dry) {
       console.log(`  • #${next++} → ${id}  «${label}»`);
       continue;
@@ -159,18 +239,27 @@ async function backfillNumbers(bearer, { dry = false } = {}) {
     if (r.ok) console.log(`  ✓ #${next++} → ${id}  «${label}»`);
     else { console.error(`  ✗ ${id}: HTTP ${r.status} ${r.body}`); failures++; }
   }
-  // Il contatore da cui i feedback nuovi prendono il numero: se questo giro ha
-  // assegnato numeri più alti, va allineato (#583).
   const maxSeq = Math.max(next - 1, withSeq.reduce((m, d) => Math.max(m, intField(d, 'seq')), 0));
-  if (!dry && maxSeq > 0) {
-    try {
-      const v = await FB.ensureSeqCounter(maxSeq, { idToken: bearer });
-      console.log(`Contatore dei numeri allineato a ${v}.`);
-    } catch (e) {
-      console.error(`  ! contatore dei numeri non allineato: ${e?.message || e}`);
-    }
+  await allineaContatore(maxSeq, bearer, dry, letture);
+  // Applicato: i numeri sul server non sono più quelli che la copia descrive.
+  dopoApplicazione(COPIA, { dry, usaCopia, dir: copiaDir });
+  console.log(letture.riga());
+  return { total: docs.length, numbered: missing.length - failures, failures, dry, letture: letture.totale };
+}
+
+// Il contatore da cui i feedback nuovi prendono il numero: se un giro ha
+// assegnato numeri più alti, va allineato o i prossimi invii ripartirebbero da
+// un numero già usato (#583).
+async function allineaContatore(maxSeq, bearer, dry, letture = null) {
+  if (dry || !(maxSeq > 0)) return;
+  try {
+    // Allinearlo vuol dire leggerlo: una lettura, e va nel conto come le altre.
+    if (letture) letture.aggiungi(1, 'contatore');
+    const v = await FB.ensureSeqCounter(maxSeq, { idToken: bearer });
+    console.log(`Contatore dei numeri allineato a ${v}.`);
+  } catch (e) {
+    console.error(`  ! contatore dei numeri non allineato: ${e?.message || e}`);
   }
-  return { total: docs.length, numbered: missing.length - failures, failures, dry };
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
@@ -180,19 +269,20 @@ if (isMain) {
   // doveva essere un giro a vuoto scriva davvero (feedback #565).
   if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) {
     console.log([
-      'Uso: node scripts/backfill-feedback-numbers.mjs [--dry-run]',
-      '  assegna i numeri ai feedback che non ce l\'hanno; --dry-run mostra solo cosa farebbe',
+      'Uso: node scripts/backfill-feedback-numbers.mjs [--dry-run] [--rileggi]',
+      '  assegna i numeri ai feedback che non ce l\'hanno; --dry-run mostra solo cosa farebbe,',
+      '  --rileggi non riusa la lettura della prova a secco',
     ].join('\n'));
     process.exit(0);
   }
   const { controllaArgomenti, argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   // Vedi auto-archive: le opzioni mangiate da npm si riprendono dall'ambiente
   // (feedback #565).
-  const storpiata = opzioneStorpiata(process.env, ['--dry-run']);
+  const storpiata = opzioneStorpiata(process.env, ['--dry-run', '--rileggi']);
 if (storpiata) { console.error(`RIFIUTATO: ${storpiata}`); process.exit(1); }
-const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run'] });
+const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run', '--rileggi'] });
   if (daNpm.nota) { console.error(daNpm.nota); process.argv.push(...daNpm.args); }
-  const male = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'], senzaParoleLibere: true });
+  const male = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run', '--rileggi'], senzaParoleLibere: true });
   if (male) {
     console.error(`RIFIUTATO: ${male}`);
     process.exit(1);

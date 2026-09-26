@@ -114,15 +114,24 @@ export function numeroFirestore(campo) {
  * un messaggio che dice cosa manca; mai un numero al posto di quello dell'owner.
  * @returns {Promise<{cap3:number, cap2:number, cap1:number, cap0:number, fixInstructions:string, giroStretto:boolean}>}
  */
-export async function leggiBilanciDalServer({ fetchImpl = fetch, env = process.env, trovaRefresh = null } = {}) {
+export async function leggiBilanciDalServer({
+  fetchImpl = fetch, env = process.env, trovaRefresh = null, copiaDir = null, now = Date.now(),
+} = {}) {
   const fa = await import('./lib/firestore-auth.mjs');
-  let idToken = String(env.FILO_ADMIN_ID_TOKEN || '').trim();
-  if (!idToken) {
-    const refresh = env.FILO_ADMIN_REFRESH_TOKEN || (trovaRefresh || fa.findAdminRefreshToken)();
-    if (!refresh) throw new Error(SENZA_TOKEN_MSG);
-    idToken = await fa.mintIdToken(refresh);
-  }
+  // Il token si pretende SEMPRE, anche quando la copia risparmia la lettura: i
+  // bilanci del giro sono dell'owner, e «manca il token» resta un rifiuto, non
+  // un caso in cui si tira avanti con dei numeri trovati in giro.
+  const idTokenPronto = String(env.FILO_ADMIN_ID_TOKEN || '').trim();
+  const refresh = idTokenPronto ? '' : (env.FILO_ADMIN_REFRESH_TOKEN || (trovaRefresh || fa.findAdminRefreshToken)());
+  if (!idTokenPronto && !refresh) throw new Error(SENZA_TOKEN_MSG);
   const url = env.FILO_ROUTINE_CONFIG_URL || `${fa.FIRESTORE_BASE}/config/routines?key=${fa.FIREBASE_API_KEY}`;
+  // Lo stesso documento che legge dispatch, e lo leggevano entrambi a ogni
+  // invocazione: UNA copia da un minuto, la stessa per tutti e due (#680).
+  const copia = await import('./lib/config-routine-copia.mjs');
+  const attiva = copia.copiaAttiva(env);
+  const pronta = attiva ? copia.campiDaCopia(url, { now, dir: copiaDir }) : null;
+  if (pronta) return bilanciDaCampi(pronta.fields);
+  const idToken = idTokenPronto || await fa.mintIdToken(refresh);
   let res;
   try {
     res = await fetchImpl(url, { headers: { Authorization: `Bearer ${idToken}` } });
@@ -138,6 +147,16 @@ export async function leggiBilanciDalServer({ fetchImpl = fetch, env = process.e
   }
   const json = await res.json();
   const fields = (json && json.fields) || {};
+  if (attiva) copia.salvaCampiInCopia(url, fields, { now, dir: copiaDir });
+  return bilanciDaCampi(fields);
+}
+
+/**
+ * I bilanci dai campi Firestore, che arrivino dal server o dalla copia: una
+ * strada sola, o le due diverrebbero due regole. Lancia con un messaggio che
+ * dice cosa manca; mai un numero al posto di quello dell'owner. PURA.
+ */
+export function bilanciDaCampi(fields) {
   const out = { fixInstructions: '' };
   const mancanti = [];
   for (const k of CAP_KEYS) {
