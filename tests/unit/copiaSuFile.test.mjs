@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, statSync } from 'node:fs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
-const { leggiCopia, scriviCopia, scordaCopia, percorsoCopia, rigaCopiaRiusata } =
+const { leggiCopia, scriviCopia, scordaCopia, percorsoCopia, rigaCopiaRiusata, cartellaCopie } =
   await import('../../scripts/lib/copia-su-file.mjs');
 const { campiDaCopia, salvaCampiInCopia, copiaAttiva, TTL_MS } =
   await import('../../scripts/lib/config-routine-copia.mjs');
@@ -46,13 +46,13 @@ test('una copia illeggibile o di un altro documento non risponde: si rilegge dal
 
   // Troncata a metà (il processo è morto mentre scriveva).
   salvaCampiInCopia(URL_VERO, CAMPI, { now: t0, dir });
-  const file = percorsoCopia(`config-routines|pubblico|${URL_VERO}`, dir);
+  const file = percorsoCopia(`config-routines|${URL_VERO}`, dir);
   const intero = readFileSync(file, 'utf8');
   writeFileSync(file, intero.slice(0, Math.floor(intero.length / 2)));
   assert.equal(campiDaCopia(URL_VERO, { now: t0 + 1_000, dir }), null, 'una copia troncata non deve valere');
 
   // JSON valido ma senza i campi.
-  writeFileSync(file, JSON.stringify({ at: t0, chiave: `config-routines|pubblico|${URL_VERO}`, dati: { altro: 1 } }));
+  writeFileSync(file, JSON.stringify({ at: t0, chiave: `config-routines|${URL_VERO}`, dati: { altro: 1 } }));
   assert.equal(campiDaCopia(URL_VERO, { now: t0 + 1_000, dir }), null);
 
   // Data nel futuro (orologio spostato): rileggere costa una lettura, fidarsi
@@ -64,13 +64,15 @@ test('una copia illeggibile o di un altro documento non risponde: si rilegge dal
   assert.equal(campiDaCopia('https://altro/doc', { now: t0, dir }), null);
 });
 
-test('chi legge col token dell\'owner e chi legge senza non condividono la copia', () => {
+test('chi legge col token dell\'owner e chi legge senza trovano la STESSA copia', () => {
+  // Il documento è uno e le regole lo aprono a chiunque: due copie vorrebbero
+  // dire pagarlo ancora due volte nello stesso minuto (#680, primo giro).
   const dir = cartellaTemporanea('copia-identita-');
   const t0 = 1_700_000_000_000;
-  salvaCampiInCopia(URL_VERO, CAMPI, { now: t0, dir, conToken: false });
-  assert.equal(campiDaCopia(URL_VERO, { now: t0, dir, conToken: true }), null,
-    'le due identità possono vedere documenti diversi, e una copia non è il posto dove scoprirlo');
-  assert.ok(campiDaCopia(URL_VERO, { now: t0, dir, conToken: false }));
+  salvaCampiInCopia(URL_VERO, CAMPI, { now: t0, dir });
+  const dallAltro = campiDaCopia(URL_VERO, { now: t0 + 1_000, dir });
+  assert.ok(dallAltro, 'lo stesso documento resta letto due volte nello stesso minuto');
+  assert.deepEqual(dallAltro.fields, CAMPI);
 });
 
 test('col server finto dei controlli la copia è spenta: lì si controlla la lettura vera', () => {
@@ -190,4 +192,57 @@ test('il riuso si può rifiutare: `--rileggi` o FILO_RILEGGI=1', async () => {
   await giro(true, true);
   await giro(false, false);
   assert.equal(letture, 2, 'con `--rileggi` l\'applicazione deve tornare al server');
+});
+
+// ── La copia si difende da quello che trova già lì ─────────────────────────
+// Su Mac e Linux la cartella temporanea è di tutti e il nome di una copia è
+// ricavabile: chi la prepara per primo deciderebbe cosa leggiamo e dove
+// scriviamo (#680, primo giro). Su Windows `%TEMP%` sta dentro il profilo
+// dell'utente e queste prove non hanno un caso da esercitare.
+const CONDIVISA = process.platform !== 'win32';
+
+test('la cartella delle copie nasce chiusa agli altri utenti della macchina', { skip: !CONDIVISA }, async () => {
+  const { chmodSync, mkdirSync: crea } = await import('node:fs');
+  const { join: unisci } = await import('node:path');
+  const dentro = unisci(cartellaTemporanea('copia-permessi-cartella-'), 'copie');
+  assert.equal(cartellaCopie(dentro), dentro);
+  assert.equal(statSync(dentro).mode & 0o077, 0);
+
+  // E una cartella che qualcun altro ha lasciato aperta non si usa: meglio
+  // ripagare la lettura che fidarsi di quello che c'è dentro.
+  const aperta = unisci(cartellaTemporanea('copia-cartella-aperta-'), 'loro');
+  crea(aperta, { recursive: true });
+  chmodSync(aperta, 0o777);
+  assert.equal(cartellaCopie(aperta), '');
+  assert.equal(percorsoCopia('x', aperta), '');
+  assert.equal(scriviCopia('x', { a: 1 }, { dir: aperta }), '');
+  assert.equal(leggiCopia('x', { dir: aperta }), null);
+});
+
+test('un rimando lasciato lì da qualcun altro non fa scrivere lo strumento dove dice lui', { skip: !CONDIVISA }, async () => {
+  const { symlinkSync, mkdirSync: crea } = await import('node:fs');
+  const { join: unisci } = await import('node:path');
+  const base = cartellaTemporanea('copia-rimando-');
+  const dir = unisci(base, 'copie');
+  crea(dir, { recursive: true, mode: 0o700 });
+  const altrui = unisci(base, 'file-di-un-altro.txt');
+  writeFileSync(altrui, 'originale', 'utf8');
+  symlinkSync(altrui, percorsoCopia('prova/rimando', dir));
+
+  assert.equal(scriviCopia('prova/rimando', [{ _id: 'x' }], { dir }), '');
+  assert.equal(readFileSync(altrui, 'utf8'), 'originale');
+  // E nemmeno si legge attraverso il rimando.
+  assert.equal(leggiCopia('prova/rimando', { dir }), null);
+});
+
+test('una copia che non abbiamo scritto noi non si rilegge', { skip: !CONDIVISA }, async () => {
+  const { chmodSync, mkdirSync: crea } = await import('node:fs');
+  const { join: unisci } = await import('node:path');
+  const dir = unisci(cartellaTemporanea('copia-non-nostra-'), 'copie');
+  crea(dir, { recursive: true, mode: 0o700 });
+  scriviCopia('prova/nostra', { enabled: false }, { dir });
+  // Leggibile da chiunque = qualcuno ci può scrivere dentro quello che vuole:
+  // per le routine sarebbero i numeri e l'interruttore con cui parte il giro.
+  chmodSync(percorsoCopia('prova/nostra', dir), 0o666);
+  assert.equal(leggiCopia('prova/nostra', { dir }), null);
 });

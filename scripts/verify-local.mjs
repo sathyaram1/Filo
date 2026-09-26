@@ -126,10 +126,10 @@ export async function leggiBilanciDalServer({
   if (!idTokenPronto && !refresh) throw new Error(SENZA_TOKEN_MSG);
   const url = env.FILO_ROUTINE_CONFIG_URL || `${fa.FIRESTORE_BASE}/config/routines?key=${fa.FIREBASE_API_KEY}`;
   // Lo stesso documento che legge dispatch, e lo leggevano entrambi a ogni
-  // invocazione: una copia da un minuto, condivisa (#680).
+  // invocazione: UNA copia da un minuto, la stessa per tutti e due (#680).
   const copia = await import('./lib/config-routine-copia.mjs');
   const attiva = copia.copiaAttiva(env);
-  const pronta = attiva ? copia.campiDaCopia(url, { conToken: true, now, dir: copiaDir }) : null;
+  const pronta = attiva ? copia.campiDaCopia(url, { now, dir: copiaDir }) : null;
   if (pronta) return bilanciDaCampi(pronta.fields);
   const idToken = idTokenPronto || await fa.mintIdToken(refresh);
   let res;
@@ -147,7 +147,7 @@ export async function leggiBilanciDalServer({
   }
   const json = await res.json();
   const fields = (json && json.fields) || {};
-  if (attiva) copia.salvaCampiInCopia(url, fields, { conToken: true, now, dir: copiaDir });
+  if (attiva) copia.salvaCampiInCopia(url, fields, { now, dir: copiaDir });
   return bilanciDaCampi(fields);
 }
 

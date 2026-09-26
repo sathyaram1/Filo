@@ -33,8 +33,18 @@ export function cartellaCopie(dir = null) {
   const base = scelta || join(tmpdir(), 'filo-copie');
   try { mkdirSync(base, { recursive: true, mode: 0o700 }); } catch (_) { /* c'è già: lo dice il controllo qui sotto */ }
   try {
-    const st = lstatSync(base);
-    if (!st.isDirectory() || !nostro(st)) return '';
+    let st = lstatSync(base);
+    // Un rimando al posto della cartella, o una cartella di qualcun altro: è
+    // roba preparata, non nostra, e non ci si mette dentro niente.
+    if (!st.isDirectory() || st.isSymbolicLink()) return '';
+    if (!WINDOWS && typeof process.getuid === 'function' && st.uid !== process.getuid()) return '';
+    // Nostra ma aperta agli altri (l'ha lasciata così una versione di prima):
+    // si chiude, invece di smettere di funzionare in silenzio.
+    if (!nostro(st)) {
+      chmodSync(base, 0o700);
+      st = lstatSync(base);
+      if (!nostro(st)) return '';
+    }
   } catch (_) { return ''; }
   return base;
 }

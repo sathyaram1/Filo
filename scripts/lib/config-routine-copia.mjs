@@ -6,11 +6,12 @@ import { leggiCopia, scriviCopia } from './copia-su-file.mjs';
 
 export const TTL_MS = 60_000;
 
-// L'identità con cui si legge fa parte della chiave: una lettura con la sola
-// chiave pubblica e una col token dell'owner possono vedere documenti diversi,
-// e una copia non è il posto dove scoprirlo.
-function chiave(url, conToken) {
-  return `config-routines|${conToken ? 'owner' : 'pubblico'}|${String(url || '')}`;
+// UNA chiave per tutti: il documento è lo stesso e le regole lo aprono a
+// chiunque, quindi chi legge col token dell'owner e chi legge senza trovano la
+// stessa cosa. Due chiavi vorrebbero dire pagarlo ancora due volte al minuto
+// (#680, primo giro).
+function chiave(url) {
+  return `config-routines|${String(url || '')}`;
 }
 
 /**
@@ -26,8 +27,8 @@ export function copiaAttiva(env = process.env) {
  * I campi Firestore del documento, se la copia è ancora valida.
  * @returns {{fields:object, etaMs:number}|null}
  */
-export function campiDaCopia(url, { conToken = false, now = Date.now(), ttlMs = TTL_MS, dir = null } = {}) {
-  const c = leggiCopia(chiave(url, conToken), { now, ttlMs, dir });
+export function campiDaCopia(url, { now = Date.now(), ttlMs = TTL_MS, dir = null } = {}) {
+  const c = leggiCopia(chiave(url), { now, ttlMs, dir });
   if (!c || !c.dati || typeof c.dati !== 'object') return null;
   const fields = c.dati.fields;
   // `{}` è una risposta legittima (documento mai scritto: 404 ⇒ default), ma
@@ -37,6 +38,6 @@ export function campiDaCopia(url, { conToken = false, now = Date.now(), ttlMs = 
 }
 
 /** Mette da parte i campi appena letti dal server. */
-export function salvaCampiInCopia(url, fields, { conToken = false, now = Date.now(), dir = null } = {}) {
-  return scriviCopia(chiave(url, conToken), { fields: (fields && typeof fields === 'object') ? fields : {} }, { now, dir });
+export function salvaCampiInCopia(url, fields, { now = Date.now(), dir = null } = {}) {
+  return scriviCopia(chiave(url), { fields: (fields && typeof fields === 'object') ? fields : {} }, { now, dir });
 }
