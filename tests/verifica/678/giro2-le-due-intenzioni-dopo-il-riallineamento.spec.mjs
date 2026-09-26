@@ -37,8 +37,8 @@ async function righeCorrezioni(page) {
 test('dopo l’aggiornamento l’utente legge sia la bacheca che si apre subito sia gli avvisi sui siti', async ({ app, openTab }) => {
   const page = await openTab('filo://newtab/');
   await page.waitForLoadState('domcontentloaded');
-  const { precedente, corrente } = await segnaVersionePrecedente(app);
-  expect(precedente, 'serve una versione precedente nel changelog').toBeTruthy();
+  const { precedente, corrente } = await segnaVersionePrecedente(app, RIGA_BACHECA);
+  expect(precedente, 'la novità della bacheca non è in nessun blocco del changelog').toBeTruthy();
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
 
