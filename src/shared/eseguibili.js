@@ -109,17 +109,25 @@
   // barra, la pagina elenco, il pannello): devono dire la stessa cosa.
   const ETICHETTA = 'Programma';
 
-  function daSito(url) {
+  // `incerto`: il file non porta la sua origine e la pagina ha riquadri di
+  // altri siti, quindi il sito della pagina non basta a dire chi l'ha fatto.
+  function provenienza(url, incerto) {
     const s = comeSito(url);
-    return s ? ` da ${s}` : '';
+    if (!s) return '';
+    return incerto ? `da una pagina di ${s} con parti di altri siti` : `da ${s}`;
   }
 
-  function testoScarica(nome, url) {
-    return `«${nomeVisibile(nome)}» è un programma${daSito(url)}. Se lo apri può cambiare il computer. Scaricarlo?`;
+  function daSito(url, incerto) {
+    const p = provenienza(url, incerto);
+    return p ? ` ${p}` : '';
   }
 
-  function testoApri(nome, url) {
-    return `«${nomeVisibile(nome)}» è un programma scaricato${daSito(url)}. Aprirlo vuol dire eseguirlo. Fallo solo se sai da chi arriva.`;
+  function testoScarica(nome, url, incerto) {
+    return `«${nomeVisibile(nome)}» è un programma${daSito(url, incerto)}. Se lo apri può cambiare il computer. Scaricarlo?`;
+  }
+
+  function testoApri(nome, url, incerto) {
+    return `«${nomeVisibile(nome)}» è un programma scaricato${daSito(url, incerto)}. Aprirlo vuol dire eseguirlo. Fallo solo se sai da chi arriva.`;
   }
 
   const TITOLO_APRI = 'Aprire un programma?';
@@ -134,6 +142,7 @@
     normalizzaSiti,
     fidato,
     ETICHETTA,
+    provenienza,
     testoScarica,
     testoApri,
     TITOLO_APRI,

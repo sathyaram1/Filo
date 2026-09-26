@@ -1298,7 +1298,8 @@
       } else if (r.state === 'pending') {
         // Da quale sito arriva è la cosa che fa decidere: sta nella riga, non
         // solo nell'avviso che l'utente può aver già chiuso.
-        meta.textContent = r.site ? `${stateLabel(r)} · da ${r.site}` : stateLabel(r);
+        const da = provenienza(r);
+        meta.textContent = da ? `${stateLabel(r)} · ${da}` : stateLabel(r);
       } else {
         meta.textContent = `${stateLabel(r)} · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       }
@@ -1426,8 +1427,13 @@
       else if (panelOpen) renderPanel();
     });
 
+    function provenienza(r) {
+      try { return window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain); } catch (_) {}
+      return r.site ? `da ${r.site}` : '';
+    }
+
     function testoScarica(r) {
-      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site); } catch (_) {}
+      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site, r.siteUncertain); } catch (_) {}
       return `«${r.filename}» è un programma. Scaricarlo?`;
     }
 

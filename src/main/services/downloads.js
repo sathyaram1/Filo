@@ -274,6 +274,7 @@ function publicRecord(r) {
     // cosa da guardare prima di decidere.
     exe: !!r.exe,
     site: r.site || '',
+    siteUncertain: !!r.siteUncertain,
   };
 }
 
@@ -459,13 +460,13 @@ function onWillDownload(item, webContents) {
   })() || 'download');
 
   const url = item.getURL();
-  const sito = sitoDi(url, webContents);
+  const { sito, incerto } = sitoDi(url, webContents);
   let exe = false;
   try { exe = ESE().eEseguibile(filename); } catch (_) {}
   // Un programma si ferma PRIMA della cartella Download: i byte scendono in
   // quarantena e ci restano finché l'utente non risponde (#588). Il resto dei
   // file non cambia di una virgola: l'attrito va solo dove serve.
-  const attesa = exe && chiedeConferma(sito);
+  const attesa = exe && chiedeConferma(sito, incerto);
 
   // Salvataggio diretto nella cartella Download (niente dialogo "Salva come":
   // vedi nota di filosofia in testa al file). setSavePath disattiva il dialogo
@@ -491,6 +492,7 @@ function onWillDownload(item, webContents) {
     canResume: false,
     exe,
     site: sito,
+    siteUncertain: incerto,
     _quarantena: attesa,
   };
   records.set(id, rec);
@@ -860,10 +862,10 @@ function openFile(id, opts) {
   // e qui non si passa senza una seconda risposta. Il gate sta nel main perché
   // le superfici che offrono "Apri file" sono tre (avviso, barra, pagina) e una
   // regola per porta sarebbe una porta dimenticata.
-  if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.site)) {
+  if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.site, rec.siteUncertain)) {
     let text = `«${rec.filename}» è un programma: aprirlo vuol dire eseguirlo.`;
     let title = 'Aprire un programma?';
-    try { text = ESE().testoApri(rec.filename, rec.site); title = ESE().TITOLO_APRI; } catch (_) {}
+    try { text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain); title = ESE().TITOLO_APRI; } catch (_) {}
     return { ok: false, needsConfirm: true, exe: true, title, text };
   }
   try {
