@@ -609,6 +609,21 @@
     .mg-item:not(.mg-item--staged) { flex-wrap: wrap; }
     .mg-item:hover { background: var(--sn-hover); }
     .mg-item--selected { background: var(--sn-hover); }
+    /* Arrivata qui a pagina aperta: un punto caldo in testa, finché non la si apre. Con un ordinamento a scelta
+       può cadere a metà lista, e senza un segno l'arrivo non si vede. */
+    .mg-item--arrivata::before {
+      content: ''; flex: 0 0 auto; align-self: center;
+      width: var(--mg-arrivo-size, 7px); height: var(--mg-arrivo-size, 7px); border-radius: 50%;
+      background: var(--mg-arrivo-color, var(--sn-accent));
+    }
+    .mg-tab--arrivi::after {
+      content: ''; display: inline-block; vertical-align: super;
+      width: 5px; height: 5px; margin-left: 3px; border-radius: 50%;
+      background: var(--mg-arrivo-color, var(--sn-accent));
+    }
+    /* Lista che non riesce più ad allinearsi: il titolo si spegne, l'hover dice da quando. */
+    #mgListHead.mg-list-head--ferma { opacity: var(--mg-ferma-opacity, 0.55); }
+    #mgListHead.mg-list-head--ferma::after { content: ' · ferma'; font-weight: 400; }
     /* "Non filtrato": il colore del bordo è bianco. Per renderlo leggibile su
        qualunque tema affianchiamo al bordo bianco una sottile linea grigia. */
     .mg-item--unfiltered {

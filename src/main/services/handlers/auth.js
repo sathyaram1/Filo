@@ -794,12 +794,21 @@ module.exports = function register(on, ctx) {
     return rows;
   }
 
-  async function mergeCardFields(rows) {
+  // Per pochi feedback si chiedono le loro sole schede: il giro della Gestione
+  // rileggeva tutte le schede (centinaia di letture) per riunirne due o tre.
+  const SCHEDE_MIRATE_MAX = 100;
+
+  async function mergeCardFields(rows, { mirate = false } = {}) {
     const V = PUBLIC_VIEW();
     if (!V || !Array.isArray(rows) || rows.length === 0) return rows;
     let cards;
-    try { cards = await publicCards(); }
-    catch (e) {
+    const FB = FEEDBACK();
+    const ids = rows.map((r) => r && r._id).filter(Boolean);
+    try {
+      cards = (mirate && FB && FB.getManyPublic && ids.length <= SCHEDE_MIRATE_MAX)
+        ? await FB.getManyPublic(ids, { timeoutMs: 20000 })
+        : await publicCards();
+    } catch (e) {
       console.warn('[feedback] schede pubbliche non lette:', e?.message || e);
       return rows; // meglio i voti storici che nessun feedback
     }
@@ -818,7 +827,7 @@ module.exports = function register(on, ctx) {
       const ids = Array.isArray(msg.ids) ? msg.ids : [];
       const soloCampi = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
       const rows = await FB.getMany(ids, { timeoutMs, idToken, fields: soloCampi });
-      return { ok: true, rows: await mergeCardFields(rows) };
+      return { ok: true, rows: await mergeCardFields(rows, { mirate: true }) };
     }
     // La lettura COMPLETA (#496): la chiede la scheda delle statistiche, che
     // fa domande sull'INSIEME («quanti ne sono arrivati in tutto»), e a una
