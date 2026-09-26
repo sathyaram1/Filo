@@ -145,12 +145,14 @@ async function refresh() {
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
 
-  const models = await fetchDoc(MODELS_DOC, idToken);
-  if (models) remoteModels = models;
+  const models = await leggiDoc(MODELS_DOC, idToken);
+  if (models.doc) remoteModels = models.doc;
+  let risposto = models.risposto;
 
   if (idToken && isAdminUser()) {
-    const secrets = await fetchDoc(SECRETS_DOC, idToken);
-    if (secrets) remoteSecrets = secrets;
+    const secrets = await leggiDoc(SECRETS_DOC, idToken);
+    if (secrets.doc) remoteSecrets = secrets.doc;
+    risposto = risposto && secrets.risposto;
   } else {
     // Chi non è admin non ha override: azzerare invece di lasciare la cache
     // com'era tiene onesta la precedenza anche dopo un logout dell'owner sulla
