@@ -220,6 +220,16 @@ async function main() {
   await inviaAllarme(titolo, testo);
 }
 
-const eseguitoDirettamente = process.argv[1]
-  && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (eseguitoDirettamente) await main();
+// Il workflow lancia una COPIA di questo file, fuori dalla copia di lavoro: se
+// un pezzo di quel percorso è un collegamento, Node scioglie i collegamenti in
+// `import.meta.url` e non in `argv[1]`, i due non combaciano e lo script non
+// farebbe niente restando verde — muto l'allarme, e l'elenco dei file attesi
+// vuoto, cioè un controllo che passa senza guardare (#733, secondo giro).
+const stessoFile = (a, b) => {
+  try {
+    return realpathSync(a) === realpathSync(b);
+  } catch {
+    return resolve(a) === b;
+  }
+};
+if (process.argv[1] && stessoFile(process.argv[1], fileURLToPath(import.meta.url))) await main();
