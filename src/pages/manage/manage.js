@@ -3642,12 +3642,11 @@
     // proprio su un feedback lavorato.
     if (FB.soloLista(fb)) {
       if (fb._dettaglioMancato) {
-        // La lettura non è tornata. Dirlo, e dare la strada per riprovare: la
-        // gemella (pagina dei feedback) fa così, e senza questo il pannello
-        // restava su «Caricamento…» a tempo indeterminato.
-        appendBubble('model', 'Filo', `<em>${esc(fb._dettaglioMancato === 'sparito'
-          ? 'Il resto di questa segnalazione non è arrivato: sul server non c\'è più.'
-          : 'Il resto di questa segnalazione non è arrivato: controlla la connessione.')}</em>`);
+        // Senza questo il pannello restava su «Caricamento…» a tempo
+        // indeterminato: è la stessa cura della gemella, che dice e offre Riprova.
+        appendBubble('model', 'Filo', `<em>${fb._dettaglioMancato === 'sparito'
+          ? 'Il resto di questa segnalazione non è arrivato: sul server non c&#39;è più.'
+          : 'Il resto di questa segnalazione non è arrivato: controlla la connessione.'}</em>`);
         const riga = document.createElement('div');
         riga.className = 'mg-actions-row';
         const btn = document.createElement('button');
