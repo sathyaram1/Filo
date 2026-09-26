@@ -194,27 +194,40 @@ async function get() {
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
   const [doc, secrets] = await Promise.all([
-    fetchDoc(SUPPORT_MODELS_DOC, idToken),
-    fetchDoc(JUDGE_SECRETS_DOC, idToken),
+    leggiDoc(SUPPORT_MODELS_DOC, idToken),
+    leggiDoc(JUDGE_SECRETS_DOC, idToken),
   ]);
-  const out = doc ? sanitize(doc) : emptyModels();
-  // La chiave vera non esce mai da qui: solo presente/assente.
-  const key = secrets && typeof secrets.openrouterKey === 'string' ? secrets.openrouterKey.trim() : '';
-  out.openrouterKeyPresent = Boolean(key);
 
-  if (doc) {
-    cache = { identita: chi, ts: adesso(), ttl: CACHE_TTL_MS, valore: out, buona: true };
-    return clona(out);
-  }
-  // Lettura non riuscita (rete giù, permesso negato): la configurazione vuota
-  // che ne esce NON prende il posto di una copia buona — chi risolve uno slot
+  // Non siamo riusciti a chiedere gli slot: la configurazione vuota che ne
+  // uscirebbe NON prende il posto di una copia buona, o chi risolve uno slot
   // ricadrebbe sui modelli scritti nel codice per un singhiozzo di rete.
-  if (cache && cache.identita === chi && cache.buona) {
+  if (!doc.risposto && cache && cache.identita === chi && cache.buona) {
     cache.ts = adesso();
     cache.ttl = CACHE_TTL_ERRORE_MS;
     return clona(cache.valore);
   }
-  cache = { identita: chi, ts: adesso(), ttl: CACHE_TTL_ERRORE_MS, valore: out, buona: false };
+
+  const out = doc.doc ? sanitize(doc.doc) : emptyModels();
+  // La chiave vera non esce mai da qui: solo presente/assente. Se la sua
+  // lettura non è partita non si inventa un «non c'è»: vale l'ultima risposta
+  // buona, e la copia non si tiene per cinque minuti (#679, primo giro).
+  if (secrets.risposto) {
+    const key = secrets.doc && typeof secrets.doc.openrouterKey === 'string' ? secrets.doc.openrouterKey.trim() : '';
+    out.openrouterKeyPresent = Boolean(key);
+  } else {
+    out.openrouterKeyPresent = Boolean(cache && cache.identita === chi && cache.buona && cache.valore.openrouterKeyPresent);
+  }
+
+  // Il server ha risposto su entrambi, fosse anche «non ti riguarda»: è una
+  // risposta, e vale i cinque minuti pieni. Altrimenti si riprova presto.
+  const completa = doc.risposto && secrets.risposto;
+  cache = {
+    identita: chi,
+    ts: adesso(),
+    ttl: completa ? CACHE_TTL_MS : CACHE_TTL_ERRORE_MS,
+    valore: out,
+    buona: completa,
+  };
   return clona(out);
 }
 
