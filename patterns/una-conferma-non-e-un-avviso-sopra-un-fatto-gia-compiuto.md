@@ -53,6 +53,17 @@ Essere una riga la lega allo stato della voce: la domanda c'è finché la voce
 aspetta, e sparisce da sola quando qualcuno risponde altrove. Mai dentro la
 pagina stessa: il sito potrebbe toccarla o imitarla.
 
+## Il sì non lo dà il clic che ha fatto comparire la domanda
+
+La riga nasce in alto a destra, al posto della pagina, un attimo dopo il clic
+che ha fatto partire lo scaricamento: un sito che mette un suo pulsante in quel
+punto riceve il «Scarica» dal secondo clic di un doppio clic, senza che la
+domanda sia mai stata letta (quarto giro di verifica). I pulsanti che dicono sì
+(«Scarica», «Apri comunque») restano spenti finché l'elenco del pannello non è
+fermo da un secondo; ogni riga che entra, esce o cambia domanda riapre l'attesa,
+e così la riapertura del pannello. I no restano sempre attivi: un no dato per
+sbaglio non costa niente.
+
 Corollario sui nomi: la decisione si prende sul nome **vero**, la si mostra col
 nome **leggibile**. `fattura‮txt.exe` si legge «fatturatxt.exe» e resta un
 eseguibile; punti e spazi in coda su Windows non contano (`setup.exe.` apre lo

@@ -1108,6 +1108,14 @@
     // nella riga che li ha chiesti (id → testo).
     const domandeApri = new Map();
     const avvisiRiga = new Map();
+    // #588 — il «sì» di una domanda sui programmi non si dà col clic che l'ha
+    // fatta comparire: la riga nasce dove la pagina ha appena mandato il
+    // cursore, e un doppio clic risponderebbe senza leggerla. I pulsanti che
+    // dicono sì si armano solo quando l'elenco è fermo da ARMA_MS.
+    const ARMA_MS = 1000;
+    let elencoFermoDa = 0;
+    let firmaElenco = '';
+    let timerArma = null;
 
     const ACTIVE = new Set(['progressing', 'paused']);
     const isActive = (r) => r && ACTIVE.has(r.state);
@@ -1232,7 +1240,13 @@
         empty.textContent = 'Nessuno scaricamento';
         list.appendChild(empty);
       }
+      const firma = all.map((r) => `${r.id}:${r.state === 'pending' ? 'p' : ''}${domandeApri.has(r.id) ? 'a' : ''}`).join('|');
+      if (firma !== firmaElenco) { firmaElenco = firma; elencoFermoDa = Date.now(); }
       for (const r of all) list.appendChild(renderRow(r));
+      const manca = elencoFermoDa + ARMA_MS - Date.now();
+      if (manca > 0 && !timerArma) {
+        timerArma = setTimeout(() => { timerArma = null; if (panelOpen) renderPanel(); }, manca + 20);
+      }
       // Il pannello ha cambiato altezza: aggiorna lo spazio riservato.
       if (panelOpen) reserveForPanel();
     }
@@ -1309,11 +1323,12 @@
 
       const actions = document.createElement('div');
       actions.className = 'dl-row-actions';
-      const addBtn = (label, fn) => {
+      const addBtn = (label, fn, dice) => {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'dl-row-btn';
         b.textContent = label;
+        if (dice === 'si' && Date.now() - elencoFermoDa < ARMA_MS) b.disabled = true;
         b.addEventListener('click', fn);
         actions.appendChild(b);
       };
@@ -1325,7 +1340,7 @@
           if (res && res.items) syncFromList(res.items);
           else if (panelOpen) renderPanel();
         }).catch(() => {});
-        addBtn('Scarica', () => rispondi(true));
+        addBtn('Scarica', () => rispondi(true), 'si');
         addBtn('Non scaricare', () => rispondi(false));
       } else if (isActive(r)) {
         // Gli scaricamenti "a mano" (Salva immagine/video come…) non si mettono
@@ -1337,7 +1352,7 @@
         addBtn('Annulla', () => api.downloads.cancel(r.id).catch(() => {}));
       } else if (apri) {
         const rispondi = (fn) => { domandeApri.delete(r.id); if (fn) fn(); renderPanel(); };
-        addBtn('Apri comunque', () => rispondi(() => openDownloadFile(r.id, true)));
+        addBtn('Apri comunque', () => rispondi(() => openDownloadFile(r.id, true)), 'si');
         addBtn('Apri cartella', () => rispondi(() => openDownloadFolder(r.id)));
         addBtn('Annulla', () => rispondi(null));
       } else if (r.state === 'completed') {
@@ -1378,6 +1393,7 @@
       // un programma in attesa resta in attesa (l'indicatore lo conta).
       domandeApri.clear();
       avvisiRiga.clear();
+      firmaElenco = '';
       if (panel) panel.hidden = true;
       dlBtn.classList.remove('open');
       try { api.tabs.reserveTop && api.tabs.reserveTop(0); } catch (_) {}

@@ -662,6 +662,8 @@ html[data-feedback-dim="1"] .shell {
   cursor: pointer;
 }
 .dl-row-btn:hover { background: var(--tab-active); }
+/* #588 — un «sì» appena comparso non risponde ancora: si vede spento finché si arma. */
+.dl-row-btn:disabled { opacity: 0.45; cursor: default; background: var(--tab-bg); }
 /* #588 — marca "è un programma": si legge prima del nome, che è la parte di cui
    il sito decide il testo. Colore d'avviso, non allarme rosso. */
 .dl-row-tag {

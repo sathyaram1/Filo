@@ -403,3 +403,78 @@ test('risposto altrove, la domanda nel pannello si ritira', async ({ app, shell,
     await srv.close();
   }
 });
+
+// Il pannello si apre dove la pagina ha appena mandato il cursore: il «sì»
+// non deve poter arrivare dal secondo clic di un doppio clic sulla pagina.
+async function vistaAttiva(app) {
+  return app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const tm = w && w._filoTabs;
+    const t = tm && tm.tabs.find((x) => x.id === tm.activeId);
+    return t ? t.view.getBounds() : null;
+  });
+}
+const clicNellaFinestra = (app, x, y) => app.evaluate(({ BrowserWindow }, [cx, cy]) => {
+  const w = BrowserWindow.getAllWindows().find((z) => z._filoTabs);
+  w.webContents.sendInputEvent({ type: 'mouseDown', x: cx, y: cy, button: 'left', clickCount: 1 });
+  w.webContents.sendInputEvent({ type: 'mouseUp', x: cx, y: cy, button: 'left', clickCount: 1 });
+}, [Math.round(x), Math.round(y)]);
+
+test('un doppio clic sulla pagina non risponde «Scarica» né «Apri comunque»', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServer();
+  try {
+    const dir = await cartellaDownload(app);
+    await app.evaluate(({ shell: sh }) => {
+      globalThis.__aperti = [];
+      sh.openPath = (p) => { globalThis.__aperti.push(p); return Promise.resolve(''); };
+    });
+    const page = await apriPagina(srv.base, { openTab, testServer },
+      `<a id="trappola" href="${srv.base}/trappola.exe" style="position:absolute;left:-100px;top:-100px;width:12px;height:12px;display:block"></a>`);
+    const v0 = await vistaAttiva(app);
+
+    // Dove comparirà «Scarica»: lo misura un primo programma, rifiutato.
+    await page.locator('#exe').click();
+    const prima = domanda(shell, 'setup.exe');
+    await expect(risposta(prima, /^Scarica$/)).toBeEnabled({ timeout: 10000 });
+    const b = await risposta(prima, /^Scarica$/).boundingBox();
+    await risposta(prima, 'Non scaricare').click();
+    await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 10000 }).toBe('cancelled');
+    await shell.locator('#dl-indicator').click();
+    await expect(shell.locator('#dl-panel')).toBeHidden();
+    await expect.poll(async () => (await vistaAttiva(app)).y).toBe(v0.y);
+
+    // La pagina mette un suo pulsante esattamente lì, e l'utente ci fa doppio clic.
+    const cx = b.x + b.width / 2; const cy = b.y + b.height / 2;
+    await page.evaluate(([x, y]) => {
+      const t = document.getElementById('trappola');
+      t.style.left = `${x - 6}px`; t.style.top = `${y - 6}px`;
+    }, [cx - v0.x, cy - v0.y]);
+    await page.mouse.click(cx - v0.x, cy - v0.y);
+    const dopo = domanda(shell, 'trappola.exe');
+    await expect(dopo).toBeVisible({ timeout: 10000 });
+    await clicNellaFinestra(app, cx, cy);
+    await shell.waitForTimeout(600);
+    expect(await statoDi(shell, 'trappola.exe')).toBe('pending');
+    expect(contenuto(dir)).not.toContain('trappola.exe');
+
+    // Chi ha letto la domanda risponde, un attimo dopo, come sempre.
+    await risposta(dopo, /^Scarica$/).click();
+    await expect.poll(() => statoDi(shell, 'trappola.exe'), { timeout: 20000 }).toBe('completed');
+    expect(contenuto(dir)).toContain('trappola.exe');
+
+    // Stessa regola sulla seconda domanda: «Apri comunque» appena comparso non apre.
+    const finito = shell.locator('#dl-panel .dl-row', { hasText: 'trappola.exe' });
+    await finito.locator('.dl-row-btn', { hasText: 'Apri file' }).click();
+    const apri = finito.locator('.dl-row-btn', { hasText: 'Apri comunque' });
+    await expect(apri).toBeVisible({ timeout: 5000 });
+    const a = await apri.boundingBox();
+    await clicNellaFinestra(app, a.x + a.width / 2, a.y + a.height / 2);
+    await shell.waitForTimeout(600);
+    expect(await app.evaluate(() => globalThis.__aperti.length)).toBe(0);
+    await apri.click();
+    await expect.poll(() => app.evaluate(() => globalThis.__aperti.length), { timeout: 10000 }).toBe(1);
+  } finally {
+    await srv.close();
+  }
+});
