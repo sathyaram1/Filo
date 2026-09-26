@@ -768,6 +768,13 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 }
 .dash-live-link:hover { background: var(--dash-line); color: var(--dash-ink); }
 
+/* Un pulsante che dice cosa fare non è un indirizzo: niente monospazio. */
+.dash-live-link.dash-live-azione {
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--dash-ink-soft);
+}
+
 /* L'avviso che aspetta il controllo si vede ma non si legge: il colore dice
    che non è un avviso, è un posto tenuto. */
 .dash-live-card[data-attesa="1"] { border-style: dashed; }

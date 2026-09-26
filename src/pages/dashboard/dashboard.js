@@ -663,7 +663,7 @@
     if (attesa && onRiprova) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'dash-live-link';
+      b.className = 'dash-live-link dash-live-azione';
       b.textContent = 'Controlla adesso';
       b.addEventListener('click', onRiprova);
       div.appendChild(b);
@@ -671,7 +671,7 @@
     if (registro && onRegistro) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'dash-live-link';
+      b.className = 'dash-live-link dash-live-azione';
       b.textContent = 'Vedi cosa ho fermato';
       b.title = 'Apre il registro degli avvisi fermati';
       b.addEventListener('click', onRegistro);

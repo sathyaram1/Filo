@@ -98,6 +98,11 @@ test('una mail che imita la banca non diventa una notifica: diventa una riga che
   // La cosa che conta: il testo della mail non è arrivato sotto gli occhi.
   expect(viste[0].testo).not.toContain('antifrode');
 
+  // Dalla riga si arriva a vedere cosa è stato fermato: chi legge che Filo gli
+  // ha nascosto qualcosa vuole guardarci, ed è la prima cosa che farà.
+  await expect(dash.locator('.dash-live-card button', { hasText: 'Vedi cosa ho fermato' })).toBeVisible();
+  try { await dash.screenshot({ path: 'tests/.shots/guardiano-riga-di-blocco.png' }); } catch (_) {}
+
   // E il blocco si ritrova in Preferenze, perché un guardiano che grida al
   // lupo si riconosce solo contandone i blocchi.
   const pref = await openTab('filo://preferences/preferences.html');
