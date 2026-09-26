@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, resolve, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { importRelativi, asserisceQualcosa, siDichiaraTemporanea, scorri } from '../helpers/proveDeiGiri.mjs';
+import { importRelativi, asserisceQualcosa, siDichiaraTemporanea, scorri, registraProve } from '../helpers/proveDeiGiri.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
