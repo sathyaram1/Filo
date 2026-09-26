@@ -14,16 +14,18 @@ const RIGHE_AVVISI_SITI = [
   'Niente più «Controlla l'indirizzo» sui siti veri',
 ];
 
-// Mette la versione "vista l'ultima volta" appena sotto quella corrente, così
-// il recap elenca esattamente le novità della versione in uscita.
-async function segnaVersionePrecedente(app) {
-  return app.evaluate(async () => {
+// Mette la versione "vista l'ultima volta" appena sotto il blocco in cui le due
+// intenzioni si sono incontrate, così il recap lo elenca anche quando in cima
+// al changelog nel frattempo è arrivata un'altra versione.
+async function segnaVersionePrecedente(app, ancora) {
+  return app.evaluate(async ({}, riga) => {
     const PN = globalThis.SN_PATCH_NOTES;
-    const precedente = PN.NOTES[1]?.version;
+    const i = PN.NOTES.findIndex((n) => (n.fixes || []).some((f) => f.includes(riga)));
+    const precedente = i >= 0 ? PN.NOTES[i + 1]?.version : null;
     const KEY = globalThis.SN_CONST.STORAGE_KEYS.LAST_SEEN_VERSION;
-    await globalThis.SN_STORAGE.setRaw(KEY, precedente);
+    if (precedente) await globalThis.SN_STORAGE.setRaw(KEY, precedente);
     return { precedente, corrente: PN.latestVersion() };
-  });
+  }, ancora);
 }
 
 async function righeCorrezioni(page) {
