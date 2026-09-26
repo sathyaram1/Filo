@@ -49,7 +49,7 @@ export function esitoProveTolte({ rosse = [], messiDaParte = 0, shaPrima = '' } 
   return {
     ferma: true,
     testo: [
-      'Consegna respinta: hai cancellato o cambiato prove del giro che, com'erano, sul codice nuovo sono ancora rosse.',
+      'Consegna respinta: hai cancellato o cambiato prove del giro che, com\'erano, sul codice nuovo sono ancora rosse.',
       elenco,
       'Nessun rilievo di questo giro è stato messo da parte, quindi ognuna riproduce un rilievo che dovevi',
       `chiudere: la porta è ancora aperta. Rimetti la prova (git checkout ${String(shaPrima).slice(0, 12) || '<commit della critica>'} -- <file>),`,
