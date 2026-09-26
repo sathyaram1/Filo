@@ -98,6 +98,26 @@ describe('controlli statici — quello che DEVE passare', () => {
     '   ',
     '🙂🙂🙂',
     '<b>ciao</b> <script>alert(1)</script>',
+    // La posta di tutti i giorni parla di codici in continuazione, e quasi mai
+    // sono credenziali: qui il controllo statico non deve indovinare, perché
+    // l'elenco delle cose che un codice apre non finisce mai. Queste frasi
+    // sono tutte state fermate da una versione precedente della regola.
+    'Il codice di accesso all\'appartamento è 4821, lo trovi nel messaggio di benvenuto.',
+    'La cassetta delle chiavi si apre con il codice di accesso 3390.',
+    'Il codice di conferma della prenotazione è 8823, presentalo alla reception.',
+    'Il codice di sicurezza del cancello è 2210.',
+    'Il codice di verifica della ricevuta è 4409, serve per il reso.',
+    'Il codice di accesso al wifi è CASA2026.',
+    'Per collegarti al wifi digita la password OSPITI24.',
+    'Il pin del cancello è 7788.',
+    'Il codice di attivazione della SIM è 9931.',
+    'Articolo del 2023: come scegliere una password sicura.',
+    'Nel 2024 sono trapelate milioni di password da un forum.',
+    'Entro il 2026 dovrai cambiare la password del portale.',
+    'Il codice dell\'ordine è 7712345, comunicalo all\'assistenza.',
+    'Il codice del telepass è 4821, comunicalo al casello.',
+    'Il codice 483920 è nei dettagli della consegna.',
+    'Il codice del bonifico è 8823, inoltralo al commercialista.',
   ];
   for (const t of innocui) {
     test(`passa: ${JSON.stringify(t).slice(0, 50)}`, () => {
