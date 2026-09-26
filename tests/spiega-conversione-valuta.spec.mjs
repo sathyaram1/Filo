@@ -100,6 +100,40 @@ test('l\'importo convertito si legge come un prezzo', async ({ app, openTab }) =
   await ripristinaModello(app);
 });
 
+// Primo giro di verifica: il modello mette in risalto il numero e lascia il
+// «€» fuori dal risalto. Il risalto sparisce nella resa, quindi l'utente si
+// ritrovava davanti le dodici cifre della segnalazione con l'euro accanto.
+test('l\'importo in grassetto con l\'euro fuori resta un prezzo', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const page = await openTab('filo://newtab/');
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__origProviderValuta = globalThis.__origProviderValuta || globalThis.SN_PROVIDER_OPENROUTER;
+    globalThis.SN_PROVIDER_OPENROUTER = {
+      ...globalThis.__origProviderValuta,
+      streamComplete: async ({ onDelta }) => {
+        const pezzi = ['3000 rupie indiane sono ', 'circa **[[calc: 3000/109.3]]**', ' € al cambio di oggi.'];
+        for (const p of pezzi) { onDelta(p); await new Promise((r) => setTimeout(r, 30)); }
+        return { text: pezzi.join(''), usage: {} };
+      },
+    };
+  });
+  await spiega(page, '3000 rupie');
+  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 30_000 });
+
+  const testo = await page.locator('.sn-popup-body').innerText();
+  expect(testo, `l'importo non si legge come un prezzo: ${testo}`).toContain('27,45');
+  expect(testo, 'tornano le dodici cifre della segnalazione').not.toContain('27,4473924977');
+
+  await ripristinaModello(app);
+});
+
 test('la domanda dopo riparte dal prompt vero, non da una copia senza cambi', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   const page = await openTab('filo://newtab/');
