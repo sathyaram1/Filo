@@ -156,3 +156,37 @@ test('la domanda dopo riparte dal prompt vero, non da una copia senza cambi', as
   expect(prompt, 'la risposta di prima è sparita dalla conversazione').toContain('27,45 €');
   expect(prompt).toMatch(/\d[\d.]*\s+INR\b/);
 });
+
+// Secondo giro di verifica: fra il numero e l'euro c'è una PAROLA, non un
+// asterisco. Il vicinato del numero non poteva bastare — l'unità la dichiara
+// il marker, e la frase può essere scritta come capita.
+test('l\'importo resta un prezzo anche con una parola fra il numero e l\'euro', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const page = await openTab('filo://newtab/');
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__origProviderValuta = globalThis.__origProviderValuta || globalThis.SN_PROVIDER_OPENROUTER;
+    globalThis.SN_PROVIDER_OPENROUTER = {
+      ...globalThis.__origProviderValuta,
+      streamComplete: async ({ onDelta }) => {
+        const pezzi = ['3000 rupie indiane sono ', 'circa [[calc: 3000/109.3 | eur]]', ' in euro al cambio di oggi.'];
+        for (const p of pezzi) { onDelta(p); await new Promise((r) => setTimeout(r, 30)); }
+        return { text: pezzi.join(''), usage: {} };
+      },
+    };
+  });
+  await spiega(page, '3000 rupie');
+  await expect(page.locator('.sn-popup-body')).toContainText('al cambio di oggi', { timeout: 60_000 });
+
+  const testo = await page.locator('.sn-popup-body').innerText();
+  expect(testo, `l'importo non si legge come un prezzo: ${testo}`).toContain('27,45');
+  expect(testo, 'tornano le dodici cifre della segnalazione').not.toContain('27,4473924977');
+
+  await ripristinaModello(app);
+});

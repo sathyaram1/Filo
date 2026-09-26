@@ -100,3 +100,15 @@ test('un cambio che non è un numero positivo non entra nel prompt', () => {
   });
   assert.equal(riga, 'Cambi attuali al 2026-09-26: 1 EUR = 1.080 USD.');
 });
+
+// #724, secondo giro — la calcolatrice sa leggere l'unità dichiarata nel
+// marker, ma serve a qualcosa solo se il prompt la chiede davvero.
+test('il prompt delle conversioni chiede di dichiarare l\'importo in euro', () => {
+  require(join(ROOT, 'src', 'shared', 'constants.js'));
+  const PROMPTS = globalThis.SN_CONST.PROMPTS;
+  const fxLine = Fx.formatForPrompt({ rates: { INR: 109.3 }, date: '2026-09-26' });
+  for (const nome of ['explain', 'explainDeep']) {
+    const testo = PROMPTS[nome]({ selection: '3000 rupie', sentence: '3000 rupie', fxLine });
+    assert.ok(testo.includes('| eur]]'), `${nome}: il prompt non chiede l'unità nel marker`);
+  }
+});

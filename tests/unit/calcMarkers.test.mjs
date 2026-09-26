@@ -87,3 +87,29 @@ test('un marker che non è un conto resta visibile e non rompe il testo', () => 
   assert.equal(risolvi('[[calc: 1/0]] €'), '[[calc: 1/0]] €');
   assert.equal(risolvi('🙂 [[calc: 2+2]] €'), '🙂 4,00 €');
 });
+
+// Secondo giro di verifica del #724 — il vicinato del numero non basta: basta
+// una parola fra il risultato e l'euro («circa 27,45 in euro») e tornavano le
+// dodici cifre della segnalazione. A dire che quel numero è un prezzo dev'essere
+// chi ORDINA il conto, non le parole che gli finiscono intorno.
+test('l\'unità dichiarata nel marker vale comunque sia scritta la frase', () => {
+  assert.equal(risolvi('sono circa [[calc: 3000/109.3 | eur]] in euro'), 'sono circa 27,45 in euro');
+  assert.equal(risolvi('sono circa [[calc: 3000/109.3 | eur]], cioè poco'), 'sono circa 27,45, cioè poco');
+  assert.equal(risolvi('| INR | [[calc: 3000/109.3|eur]] | € |'), '| INR | 27,45 | € |');
+  assert.equal(risolvi('[[calc: 3000/109.3 | EUR]]'), '27,45');
+  assert.equal(risolvi('[[calc: 1500000/109.3 | euro]]'), '13.723,70');
+});
+
+test('senza unità dichiarata il vicinato resta un ripiego, non sparisce', () => {
+  assert.equal(risolvi('[[calc: 50/1.08]] €'), '46,30 €');
+  assert.equal(risolvi('[[calc: 1/3]]').startsWith('0,3333'), true);
+});
+
+test('un\'unità che Filo non conosce non toglie le cifre né rompe il conto', () => {
+  assert.equal(risolvi('[[calc: 3*1.609 | km]] km'), '4,827 km');
+  assert.equal(risolvi('[[calc: nonsenso | eur]]'), '[[calc: nonsenso | eur]]');
+});
+
+test('col prezzo dichiarato in streaming non c\'è niente da aspettare', () => {
+  assert.equal(risolvi('costa [[calc: 3000/109.3 | eur]]', { streaming: true }), 'costa 27,45');
+});
