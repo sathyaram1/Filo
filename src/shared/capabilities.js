@@ -422,7 +422,7 @@
     },
     {
       id: 'board', title: 'Bacheca dei miglioramenti', category: 'pages',
-      desc: 'La pagina dove ritrovi i miglioramenti già rilasciati e puoi dire se funzionano o no, votando con un tocco. Leggono tutti; per votare basta accedere. Il primo voto su ogni miglioramento regala 10 crediti, e puoi sempre cambiare idea o ritirare il voto. Se un miglioramento risulta ancora rotto, puoi segnalarlo con "Ancora rotto?": pochi crediti di spesa per evitare segnalazioni a caso, e la segnalazione torna nell\'iter normale collegata all\'originale.',
+      desc: 'La pagina dove ritrovi i miglioramenti già rilasciati e puoi dire se funzionano o no, votando con un tocco. Compare subito e mostra i più recenti in cima; gli altri arrivano mentre scorri. Leggono tutti; per votare basta accedere. Il primo voto su ogni miglioramento regala 10 crediti, e puoi sempre cambiare idea o ritirare il voto. Se un miglioramento risulta ancora rotto, puoi segnalarlo con "Ancora rotto?": pochi crediti di spesa per evitare segnalazioni a caso, e la segnalazione torna nell\'iter normale collegata all\'originale.',
       invoke: 'Menu App → "Bacheca", oppure filo://board/board.html.',
       doesNot: 'Non mostra segnalazioni in lavorazione né dettagli tecnici o di sicurezza: solo i miglioramenti già usciti. Ogni miglioramento si può segnalare come "ancora rotto" una volta sola.',
     },

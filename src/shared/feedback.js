@@ -1273,10 +1273,21 @@
   // invece di scaricare la bacheca intera per cercarsi dentro. Niente token:
   // questa collezione si legge senza credenziali.
   async function getManyPublic(ids, { timeoutMs = 0 } = {}) {
-    const wanted = (Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean);
+    const wanted = [...new Set((Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean))];
     if (wanted.length === 0) return [];
-    return batchGetDirect(VIEW_COLLECTION, wanted, { timeoutMs });
+    // A pezzi, e TUTTI: chi ha mandato molte segnalazioni non ne deve perdere
+    // una per strada. Una richiesta sola con centinaia di documenti dentro è
+    // il modo di scoprirlo il giorno in cui il server la rifiuta.
+    const out = [];
+    for (let i = 0; i < wanted.length; i += BATCH_GET_MAX) {
+      // eslint-disable-next-line no-await-in-loop
+      const parte = await batchGetDirect(VIEW_COLLECTION, wanted.slice(i, i + BATCH_GET_MAX), { timeoutMs });
+      for (const r of parte) out.push(r);
+    }
+    return out;
   }
+
+  const BATCH_GET_MAX = 100;
 
   async function batchGetDirect(collectionId, wanted, { timeoutMs = 0, idToken = '', fields = null } = {}) {
     const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;

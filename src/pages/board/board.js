@@ -80,6 +80,7 @@
   let cursore = null;
   let completo = false;
   let caricandoAltre = false;
+  let erroreAltre = false;
   // Il `publishedAt` più alto già visto: è il segnalibro con cui si chiede
   // «cosa è cambiato da quando non guardavo» pagando una lettura per scheda
   // cambiata invece che per scheda esistente.
@@ -565,8 +566,22 @@
     const riga = document.createElement('div');
     riga.className = 'bd-more';
     riga.id = 'bdMore';
-    riga.innerHTML = '<span class="bd-spinner" aria-hidden="true"></span><span>Carico altri miglioramenti…</span>';
     bdList.appendChild(riga);
+    // Una pagina che non è arrivata lascerebbe una rotella che gira per
+    // sempre: si dice cosa è successo e si dà il modo di riprovare, perché
+    // lo scorrimento da solo non ci ripassa più.
+    if (erroreAltre) {
+      const testo = document.createElement('span');
+      testo.textContent = 'Non sono riuscito a caricarne altri.';
+      const riprova = document.createElement('button');
+      riprova.type = 'button';
+      riprova.className = 'bd-retry';
+      riprova.textContent = '↻ Riprova';
+      riprova.addEventListener('click', () => { erroreAltre = false; renderList(); caricaAltre(); });
+      riga.append(testo, riprova);
+      return;
+    }
+    riga.innerHTML = '<span class="bd-spinner" aria-hidden="true"></span><span>Carico altri miglioramenti…</span>';
     if (!osservatore && typeof IntersectionObserver === 'function') {
       osservatore = new IntersectionObserver((voci) => {
         if (voci.some((v) => v.isIntersecting)) caricaAltre();
@@ -730,6 +745,7 @@
   }
 
   async function loadData({ daCapo = false } = {}) {
+    erroreAltre = false;
     bdList.hidden = true;
     bdEmpty.hidden = true;
     if (bdError) bdError.hidden = true;
@@ -788,6 +804,7 @@
         pageSize: PAGINA, fields: CAMPI, timeoutMs: LOAD_TIMEOUT_MS, after: cursore,
       });
       if (schedeImposteDaFuori) return;
+      erroreAltre = false;
       if (r.after) cursore = r.after;
       completo = !!r.complete;
       fondi(r.rows);
@@ -795,6 +812,8 @@
       renderList();
     } catch (err) {
       console.error('[board] pagina successiva non caricata:', err);
+      erroreAltre = true;
+      renderList();
     } finally {
       caricandoAltre = false;
     }
@@ -822,7 +841,10 @@
     // Dati iniettati = dati arrivati: azzera anche l'eventuale guasto ricordato.
     setData(fbs) {
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
+      // Dati messi da fuori vuol dire TUTTI i dati: niente pagina dopo da
+      // chiedere, e una lista vuota è un vuoto vero.
       dataLoaded = true; lastLoadError = null; schedeImposteDaFuori = true;
+      completo = true; erroreAltre = false; cursore = null;
       renderList();
     },
     setSignedIn(email) { signedIn = !!email; uid = email || null; reflectAuth(); renderList(); },
