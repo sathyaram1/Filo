@@ -99,11 +99,11 @@
   }
 
   function testoScarica(nome, url) {
-    return `«${nomeVisibile(nome)}» è un programma${daSito(url)}: aprendolo può cambiare il computer. Scaricarlo?`;
+    return `«${nomeVisibile(nome)}» è un programma${daSito(url)}. Se lo apri può cambiare il computer. Scaricarlo?`;
   }
 
   function testoApri(nome, url) {
-    return `«${nomeVisibile(nome)}» è un programma scaricato${daSito(url)}. Aprirlo vuol dire eseguirlo: fallo solo se sai da chi arriva.`;
+    return `«${nomeVisibile(nome)}» è un programma scaricato${daSito(url)}. Aprirlo vuol dire eseguirlo. Fallo solo se sai da chi arriva.`;
   }
 
   const TITOLO_APRI = 'Aprire un programma?';

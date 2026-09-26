@@ -441,11 +441,11 @@
     options_security_downloads: 'Chiedi prima di scaricare un programma',
     options_security_downloads_desc:
       'I file che il computer ESEGUE (.exe, .msi, .bat, .dmg, .pkg, .sh, .jar…) ' +
-      'non entrano nella cartella Download senza il tuo sì: Filo ti dice da quale ' +
+      'non entrano nella cartella Download senza il tuo sì. Filo ti dice da quale ' +
       'sito arrivano e aspetta. Anche “Apri file” su un programma chiede conferma, ' +
       'perché aprirlo vuol dire eseguirlo. Tutti gli altri file scendono come sempre.',
     options_security_downloads_trusted_label:
-      'Siti di cui ti fidi: i programmi scendono senza chiedere (uno per riga)',
+      'Siti di cui ti fidi, uno per riga. Da questi i programmi scendono senza chiedere',
     options_security_downloads_trusted_invalid:
       'Queste righe non sono domini validi e verranno ignorate (usa un dominio ' +
       'con estensione, es. mozilla.org): %s',
