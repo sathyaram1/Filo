@@ -2812,14 +2812,16 @@
 
   // Mette o toglie il segno. Il CHI lo scrive il main dalla sessione: da qui
   // parte solo sì/no.
-  async function togglePreapproved() {
+  async function togglePreapproved(forza) {
     if (!selectedId || !mgPreapproveBtn) return;
     const id = selectedId;
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb) return;
     const UI = window.SN_MERGE_APPROVALS;
-    const next = UI && UI.segnoAlClic ? UI.segnoAlClic(preapprovedOf(fb)) : !preapprovedOf(fb);
+    const next = typeof forza === 'boolean' ? forza
+      : (UI && UI.segnoAlClic ? UI.segnoAlClic(preapprovedOf(fb)) : !preapprovedOf(fb));
     mgPreapproveBtn.disabled = true;
+    if (mgPreapproveRevokeBtn) mgPreapproveRevokeBtn.disabled = true;
     setManageMsg(next ? 'Segno la pratica…' : 'Tolgo il segno…', '');
     try {
       const r = await sendToMain({ type: 'feedback_update', id, mergePreapproved: next });
