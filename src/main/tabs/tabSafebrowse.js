@@ -116,21 +116,22 @@ const safebrowseMethods = {
     await Promise.all(frames.map(async (f) => {
       try {
         // Un riquadro ostile non deve tenere ferma l'analisi.
-        const r = await Promise.race([f.executeJavaScript(codice), new Promise((ok) => setTimeout(() => ok(null), 1000))]);
+        const scade = new Promise((ok) => setTimeout(() => ok(null), 1000));
+        const r = await Promise.race([f.executeJavaScript(codice), scade]);
         if (r && r.hasPassword) hints.hasPassword = true;
         if (r && r.hasPayment) hints.hasPayment = true;
       } catch (_) {}
     }));
+    if (wc.isDestroyed() || tab._sbScanGiro !== giro || wc.getURL() !== url) return;
     if (hints.hasPassword || hints.hasPayment) {
+      tab._sbCampiUrl = url;
       try {
-        const SB = globalThis.SN_SAFEBROWSE;
         const v = SB.analyze(url, hints, (next) => this._sbBroadcast(tab, url, this._sbApplyState(tab, next)));
         if (v && v.level !== 'safe') this._sbBroadcast(tab, url, this._sbApplyState(tab, v));
       } catch (_) {}
-    } else if (giro === 0) {
-      // Il codice dell'utente monta spesso il modulo dopo il caricamento del riquadro.
-      tab._sbFrameTimer = setTimeout(() => this._sbScanFrames(tab, url, 1), 2000);
+      return;
     }
+    tab._sbFrameTimer = setTimeout(() => this._sbScanFrames(tab, giro), 1500);
   },
 
   // L'utente ha scritto "confermo" sull'interstitial "pericoloso": registra il
