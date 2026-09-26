@@ -169,7 +169,11 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       borderBottom: '1px dashed rgba(255,255,255,0.55)',
       font: 'inherit', padding: '0 1px', margin: '0', outline: 'none',
     });
+    // Il valore lo segna chi BATTE: un `input.value` scritto dal sito non
+    // genera questo evento, e quindi non diventa mai lo zoom della pagina.
+    input.addEventListener('input', (e) => { if (gestoVero(e)) valoreBattuto = input.value; });
     input.addEventListener('keydown', (e) => {
+      if (!gestoVero(e)) return;
       // Mentre si edita la percentuale, i tasti NON chiudono la modalità.
       e.stopPropagation();
       if (e.key === 'Enter') {
@@ -178,7 +182,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
         input.blur();
       }
     });
-    input.addEventListener('blur', () => { applyPercentFromInput(); });
+    input.addEventListener('blur', (e) => { if (gestoVero(e)) applyPercentFromInput(); });
     el.appendChild(input);
     percentInput = input;
 
