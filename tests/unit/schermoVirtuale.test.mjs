@@ -3,11 +3,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { preparaLancioElectron, senzaSchermo } from '../../scripts/lib/schermo-virtuale.mjs';
-import { shaDelRiallineamento } from '../../scripts/finish-local.mjs';
+import { shaDelRiallineamento, cambiatiPerLaScelta } from '../../scripts/finish-local.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mai = () => { throw new Error('xvfb cercato dove non serve'); };
