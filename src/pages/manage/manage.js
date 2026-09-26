@@ -1168,7 +1168,7 @@
     if (!fb) return;
     // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
     // la segnalazione è già lì.
-    if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, { releasedVersion }));
+    if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, { releasedVersion, fusioni }));
     openDetail(fb._id);
   }
 
@@ -1310,6 +1310,11 @@
       return spegni();
     }
     if (!r || r.ok === false) return spegni();
+    // Una richiesta nuova sposta la pratica nei Ricevuti: quello è un arrivo come un cambio di stato.
+    // Non alla prima lettura, dove niente è «arrivato» mentre la pagina era aperta.
+    const primaDelleFusioni = fusioniLette && LIVE
+      ? new Map(allFeedbacks.map((f) => [String(f._id), sezioneDi(f)]))
+      : null;
     fusioni = {
       pending: r.pending || [],
       failed: r.failed || [],
@@ -1864,7 +1869,7 @@
     // ricomparire al primo dato leggibile che non passa da renderList.
     if (!sezioniAttendibili()) return;
     const counts = dataLoaded
-      ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly })
+      ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly, fusioni })
       : null;
     const capped = counts ? loadHitCap() : false;
     // Una sezione che ha ricevuto schede mentre si guardava altro lo dice.
@@ -1928,7 +1933,7 @@
       // davvero in produzione; i done-ma-non-ancora-spediti restano in "In coda".
       // Macchina a stati: la tab deriva SOLO dallo status (la modalità
       // automatica non è più una lente sulle liste).
-      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion });
+      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion, fusioni });
     }
 
     // Override di ordinamento scelto dall'owner dal menu contestuale (tasto
@@ -4244,7 +4249,7 @@
 
   function sezioneDi(fb) {
     if (!sezioniAttendibili() || !statoLeggibile(fb)) return null;
-    return MR.manageTabFor(fb, { releasedVersion });
+    return MR.manageTabFor(fb, { releasedVersion, fusioni });
   }
 
   function segnaArrivi(prima, fresh) {
