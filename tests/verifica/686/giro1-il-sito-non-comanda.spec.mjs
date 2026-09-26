@@ -55,3 +55,25 @@ test('un sito non può disfare lo zoom che l\'utente ha chiesto', async ({ app, 
   // Lo zoom dell'utente è ancora il suo.
   expect(await percentOf(app, page), 'il sito ha riportato la pagina al 100% da solo').toBe(200);
 });
+
+// Seconda porta della stessa causa: il segnale «questa pagina si zooma da sé»
+// (nato per l'editor di Filo, che scala il foglio invece della finestra) è
+// scritto nella pagina, quindi un sito qualunque può mettercelo.
+const SITO_CHE_SI_FINGE_EDITOR = `<!doctype html><html><head><meta charset="utf-8"><title>finto editor</title></head>
+<body><h1>niente zoom qui</h1>
+<script>
+  document.documentElement.dataset.filoOwnZoom = '1';
+</script>
+</body></html>`;
+
+test('un sito non può sottrarsi allo zoom fingendo di zoomarsi da sé — e Filo non deve dire «fatto»', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO_CHE_SI_FINGE_EDITOR);
+
+  const r = await execAction(app, { type: 'ZOOM_PAGINA', percentuale: 200 });
+  await page.waitForTimeout(500);
+
+  // Quello che l'utente ha chiesto è successo.
+  expect(await percentOf(app, page), 'il sito si è sottratto allo zoom').toBe(200);
+  // E se non fosse successo, Filo non deve riferire un «fatto» che non c'è.
+  expect(r.output && r.output.zoom, 'Filo riferisce «fatto» a una pagina che non si è mossa').not.toBe('propria');
+});
