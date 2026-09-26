@@ -3,7 +3,7 @@
 // La shell parla con il main via IPC (tabs:* canali); il main risponde con
 // broadcast tabs:updated alla shell perché ridisegni la barra.
 
-const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow } = require('electron');
+const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
@@ -1680,7 +1680,6 @@ class TabManager {
     const wc = active.view.webContents;
     const rid = `zoom-${randomUUID()}`;
     return new Promise((resolve) => {
-      const { ipcMain } = require('electron');
       let chiuso = false;
       const fine = (v) => {
         if (chiuso) return;
