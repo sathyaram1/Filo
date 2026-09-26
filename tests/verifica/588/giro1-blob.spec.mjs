@@ -38,6 +38,7 @@ test('un programma fabbricato dalla pagina si ferma come gli altri, e dice da do
   const page = await testServer.openReady(openTab, PAGINA);
   const origine = new URL(page.url()).hostname;
 
+  const mancanti = [];
   for (const [bottone, nome] of [['blob', 'daBlob.exe'], ['data', 'daData.exe']]) {
     await page.locator(`#${bottone}`).click();
     // 1) La domanda arriva: un programma non entra nella cartella da solo,
@@ -48,9 +49,13 @@ test('un programma fabbricato dalla pagina si ferma come gli altri, e dice da do
 
     const rec = (await elenco(shell)).find((r) => r.filename === nome);
     expect(rec.exe).toBe(true);
+
     // 2) E dice da quale sito arriva: è la cosa su cui l'utente decide, e il
     //    sito non deve poterla togliere scegliendo come consegnare il file.
-    expect(rec.site, `«${nome}»: la domanda non nomina il sito`).toBe(origine);
+    const avviso = shell.locator('.shell-notif', { hasText: nome });
+    await expect(avviso).toBeVisible({ timeout: 15000 });
+    await expect(avviso).toContainText('programma');
+    mancanti.push([nome, rec.site]);
 
     await shell.evaluate((id) => window.filoShell.downloads.confirm(id, false), rec.id);
     await expect.poll(async () => (await elenco(shell)).find((r) => r.filename === nome)?.state,
@@ -58,4 +63,7 @@ test('un programma fabbricato dalla pagina si ferma come gli altri, e dice da do
   }
 
   expect(contenuto(dir)).toEqual([]);
+  for (const [nome, sito] of mancanti) {
+    expect(sito, `«${nome}»: la domanda non nomina il sito`).toBe(origine);
+  }
 });

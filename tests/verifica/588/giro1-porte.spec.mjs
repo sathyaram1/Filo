@@ -241,3 +241,30 @@ test('la marca «Programma» si legge in tema chiaro e in tema scuro', async ({ 
     await srv.close();
   }
 });
+
+test('chiuso l’avviso, l’indicatore dice ancora che una risposta è in sospeso', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const srv = await apriServer();
+  try {
+    const page = await apriPagina(srv.base, { openTab, testServer }, ['setup.exe']);
+    await page.locator('#l0').click();
+    await expect.poll(async () => (await elenco(shell)).find((r) => r.filename === 'setup.exe')?.state,
+      { timeout: 30000 }).toBe('pending');
+
+    // L'avviso ha una × accanto alle due risposte: chiuderlo è facile quanto
+    // rispondere, e da quel momento la domanda esce dagli occhi.
+    const avviso = shell.locator('.shell-notif', { hasText: 'setup.exe' });
+    await expect(avviso).toBeVisible({ timeout: 15000 });
+    await avviso.locator('.shell-notif-close').click();
+    await expect(avviso).toBeHidden({ timeout: 10000 });
+
+    // Lo scaricamento è fermo e aspetta l'utente: l'indicatore in alto deve
+    // dirlo, altrimenti per chi guarda non è successo niente e il file non
+    // arriverà mai.
+    const indicatore = shell.locator('#dl-indicator');
+    await expect(indicatore).toBeVisible();
+    await expect(indicatore.locator('#dl-ind-count')).toBeVisible({ timeout: 10000 });
+  } finally {
+    await srv.close();
+  }
+});
