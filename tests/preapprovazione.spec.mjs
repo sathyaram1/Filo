@@ -36,9 +36,10 @@ function pratica(over = {}) {
 }
 
 /** Il canale verso il main: proprietario, e le scritture registrate. */
-async function stubMain(page, { preapproved = [] } = {}) {
+async function stubMain(page, { preapproved = [], pending = [] } = {}) {
   await page.evaluate((cfg) => {
     window.__updates = [];
+    window.__fusioni = [];
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
       const t = msg && msg.type;
