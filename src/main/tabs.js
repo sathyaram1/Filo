@@ -1695,9 +1695,12 @@ class TabManager {
         if (e.sender !== wc) return;
         fine(msg);
       };
-      const scadenza = setTimeout(() => fine(null), 2000);
+      // Nessuna risposta: la pagina non ha il nostro preload (un visualizzatore
+      // interno, una pagina d'errore) o non è ancora in piedi. È diverso da
+      // «non c'è nessuna scheda», e chi riferisce all'utente deve poterlo dire.
+      const scadenza = setTimeout(() => fine({ muto: true }), 2000);
       ipcMain.on('filo:zoom-applicato', onEco);
-      try { wc.send('filo:zoom-key', { ...spec, rid }); } catch (_) { fine(null); }
+      try { wc.send('filo:zoom-key', { ...spec, rid }); } catch (_) { fine({ muto: true }); }
     });
   }
 

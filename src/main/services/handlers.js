@@ -1877,6 +1877,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         }
         const esito = await tm.applicaZoom(perc != null ? { percentuale: perc } : { verso });
         if (!esito) return { executed: false, kept: false, output: { zoom: 'no-tab' } };
+        if (esito.muto) return { executed: false, kept: false, output: { zoom: 'muto' } };
         // `sconosciuto`: la pagina zooma da sé (l'editor scala il foglio) e la
         // percentuale la sa solo lei. Fatto sì, numero no.
         if (esito.sconosciuto) return { executed: true, kept: false, output: { zoom: 'propria' } };
@@ -2470,6 +2471,9 @@ function toolResultText({ action, res, rendered }) {
   }
   if (type === 'ZOOM_PAGINA' && !res.executed && res.output && res.output.zoom === 'no-tab') {
     return 'Zoom non cambiato: non c\'è nessuna scheda davanti su cui agire. Dillo all\'utente.';
+  }
+  if (type === 'ZOOM_PAGINA' && !res.executed && res.output && res.output.zoom === 'muto') {
+    return 'Zoom non cambiato: la pagina davanti non risponde ai comandi di zoom (può essere una pagina di sistema, o non aver finito di caricare). Dillo all\'utente, e non ripetere l\'azione uguale.';
   }
   if (res.executed) {
     // La descrizione «a cosa fatta» (per un'impostazione: «Impostazione
