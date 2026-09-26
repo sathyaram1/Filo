@@ -262,10 +262,19 @@ async function chatAvvelenata(app, { url, veleno, verdetto }) {
         globalThis.__guardModelli.push(attempts.map((a) => a.model).join('|'));
         return { text: JSON.stringify(verdetto), model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       }
-      throw new Error('nessun altro deve passare di qui');
+      throw new Error('qui deve passare solo il guardiano');
     };
+    // Primo giro: il compito va a leggere la pagina. Secondo giro: scrive
+    // all'utente quello che la pagina gli ha dettato.
+    let giro = 0;
+    globalThis.__giri = 0;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
-      const full = JSON.stringify({ text: truffa, actions: [] });
+      giro++;
+      globalThis.__giri = giro;
+      const payload = giro === 1
+        ? { text: 'Cerco sul web.', actions: [{ type: 'CERCA_WEB', query: 'come si disdice' }] }
+        : { text: truffa, actions: [] };
+      const full = JSON.stringify(payload);
       try { onDelta && onDelta(full); } catch (_) {}
       return { text: full, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
