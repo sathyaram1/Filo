@@ -51,7 +51,11 @@ contextBridge.exposeInMainWorld('filoShell', {
     list: () => ipcRenderer.invoke('filo:message', { type: 'downloads_list' }),
     clear: () => ipcRenderer.invoke('filo:message', { type: 'downloads_clear' }),
     remove: (id) => ipcRenderer.invoke('filo:message', { type: 'download_remove', id }),
-    openFile: (id) => ipcRenderer.invoke('filo:message', { type: 'download_open_file', id }),
+    // `confirmed` = la shell ha già mostrato la seconda conferma su un
+    // programma (#588); senza, il main risponde needsConfirm e non apre niente.
+    openFile: (id, confirmed) => ipcRenderer.invoke('filo:message', { type: 'download_open_file', id, confirmed: !!confirmed }),
+    // Risposta all'avviso "questo è un programma: scaricarlo?".
+    confirm: (id, allow) => ipcRenderer.invoke('filo:message', { type: 'download_confirm', id, allow: !!allow }),
     openFolder: (id) => ipcRenderer.invoke('filo:message', { type: 'download_open_folder', id }),
     cancel: (id) => ipcRenderer.invoke('filo:message', { type: 'download_cancel', id }),
     pause: (id) => ipcRenderer.invoke('filo:message', { type: 'download_pause', id }),

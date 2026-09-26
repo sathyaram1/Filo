@@ -36,6 +36,9 @@
     $('sec-siteblock-desc').textContent = I18n.t('options_security_siteblock_desc');
     $('sec-siteblock-lists-label').textContent = I18n.t('options_security_siteblock_lists');
     $('sec-siteblock-blacklist-label').textContent = I18n.t('options_security_siteblock_blacklist_label');
+    $('sec-dl-exe-label').textContent = I18n.t('options_security_downloads');
+    $('sec-dl-exe-desc').textContent = I18n.t('options_security_downloads_desc');
+    $('sec-dl-trusted-label').textContent = I18n.t('options_security_downloads_trusted_label');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
     $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
     $('sec-proxy-box-title').textContent = I18n.t('options_security_proxy_box_title');
@@ -208,6 +211,13 @@
     // subito che non bloccheranno nulla invece di lasciarle passare mute.
     setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
     syncSiteBlockEnabled();
+    // #588 — conferma prima di scaricare/aprire un programma. Default ON: la
+    // chiave assente vale "chiedi", come nel main.
+    const dl = sec.downloads || {};
+    $('sec-dl-exe').checked = dl.confirmExecutables !== false;
+    $('sec-dl-trusted').value = (Array.isArray(dl.trustedSites) ? dl.trustedSites : []).join('\n');
+    setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+    syncDownloadsEnabled();
     const sb = sec.safeBrowse || {};
     $('sec-safebrowse').checked = sb.enabled !== false;
     $('sec-safebrowse-network').checked = sb.networkSignals !== false;
@@ -384,6 +394,27 @@
     $('sec-siteblock-blacklist').disabled = !on;
   }
 
+  function syncDownloadsEnabled() {
+    const on = !!$('sec-dl-exe').checked;
+    const sub = $('sec-dl-exe-sub');
+    if (sub) sub.style.opacity = on ? '1' : '0.45';
+    $('sec-dl-trusted').disabled = !on;
+  }
+
+  // Le righe scartate si dicono, come per la blacklist: un dominio scritto male
+  // qui non allenta nessuna difesa, ma chi l'ha scritto crede di sì.
+  function setTrustedError(invalidRows) {
+    const el = $('sec-dl-trusted-error');
+    if (!el) return;
+    if (invalidRows && invalidRows.length) {
+      el.textContent = I18n.t('options_security_downloads_trusted_invalid', invalidRows.join(', '));
+      el.style.display = 'block';
+    } else {
+      el.textContent = '';
+      el.style.display = 'none';
+    }
+  }
+
   // Mostra (o nasconde, con lista vuota) un avviso inline sotto la blacklist
   // che nomina le righe scartate perché non sono domini validi. Senza questo,
   // una voce tipo "facebook" veniva salvata muta ma non bloccava mai il sito.
@@ -420,6 +451,8 @@
   }
 
   async function save() {
+    const { valid: dlTrusted, invalid: dlInvalid } = parseBlacklist($('sec-dl-trusted').value);
+    setTrustedError(dlInvalid);
     const { valid: blacklist, invalid } = parseBlacklist($('sec-siteblock-blacklist').value);
     setBlacklistError(invalid);
     const partial = {
@@ -437,6 +470,11 @@
           networkSignals: !!$('sec-safebrowse-network').checked,
           llmJudge: !!$('sec-safebrowse-llm').checked,
           sandbox: !!$('sec-safebrowse-sandbox').checked,
+        },
+        // #588 — conferma sui programmi scaricati, e i siti che ne sono esenti.
+        downloads: {
+          confirmExecutables: !!$('sec-dl-exe').checked,
+          trustedSites: dlTrusted,
         },
         // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
         autoFeedback: !!$('sec-auto-feedback').checked,
@@ -461,6 +499,9 @@
     // Mentre l'utente corregge le righe, togli l'avviso precedente (rivalutato
     // al prossimo salvataggio su blur).
     $('sec-siteblock-blacklist').addEventListener('input', () => setBlacklistError([]));
+    $('sec-dl-exe').addEventListener('change', () => { syncDownloadsEnabled(); save(); });
+    $('sec-dl-trusted').addEventListener('change', save);
+    $('sec-dl-trusted').addEventListener('input', () => setTrustedError([]));
     $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
     $('sec-safebrowse-network').addEventListener('change', save);
     $('sec-safebrowse-llm').addEventListener('change', save);

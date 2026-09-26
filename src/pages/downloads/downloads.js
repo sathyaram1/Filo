@@ -38,6 +38,7 @@
       case 'cancelled': return 'Annullato';
       case 'interrupted': return 'Interrotto';
       case 'paused': return 'In pausa';
+      case 'pending': return 'In attesa di conferma';
       default: return 'In corso';
     }
   }
@@ -82,11 +83,29 @@
   // cestinato): il main se ne accorge guardando il disco e risponde
   // { ok:false, missing:true, error } con la frase da mostrare. La riga viene
   // ridisegnata subito come "non più disponibile", così l'utente non riprova.
-  async function openFile(r) {
-    const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FILE, id: r.id });
+  async function openFile(r, confirmed) {
+    const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FILE, id: r.id, confirmed: !!confirmed });
     if (!res || res.ok !== false) return;
+    // #588 — è un programma: il main non lo apre finché non torna un sì. Il
+    // popup lo chiede qui, con le parole che il main ha scritto per l'utente.
+    if (res.needsConfirm) {
+      const ok = window.SN_CONFIRM_UI
+        ? await window.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, okLabel: 'Apri comunque' })
+        : window.confirm(res.text);
+      if (ok) await openFile(r, true);
+      return;
+    }
     flash(res.error || 'Impossibile aprire il file');
     if (res.missing) reload();
+  }
+
+  // Risposta all'avviso "questo è un programma: scaricarlo?" (#588). La stessa
+  // che offre la barra in alto: chi ha chiuso l'avviso la ritrova qui.
+  async function confirmExe(r, allow) {
+    const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_CONFIRM, id: r.id, allow: !!allow });
+    items = (res && res.items) || items;
+    render();
+    flash(allow ? 'Scaricamento avviato' : 'Programma non scaricato');
   }
   async function openFolder(r) {
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id });
@@ -157,7 +176,10 @@
     // azione compare solo quando ha senso (niente "Apri file" su un download mai
     // completato). Invariante UX: si può sempre RIMUOVERE ciò che è in lista.
     const acts = [];
-    if (isActive(r)) {
+    if (r.state === 'pending') {
+      acts.push(['Scarica', () => confirmExe(r, true)]);
+      acts.push(['Non scaricare', () => confirmExe(r, false)]);
+    } else if (isActive(r)) {
       // canPause === false: scaricamento "a mano" (Salva immagine/video come…),
       // che non si può sospendere. Meglio non offrire l'azione che offrirne una
       // muta.
@@ -232,7 +254,15 @@
 
     const name = document.createElement('div');
     name.className = 'dl-name';
-    name.textContent = r.filename || 'download';
+    // #588 — la marca precede il nome: l'estensione sta in coda a un testo che
+    // sceglie il sito, e non è lì che l'occhio guarda.
+    if (r.exe) {
+      const tag = document.createElement('span');
+      tag.className = 'dl-tag';
+      tag.textContent = 'Programma';
+      name.appendChild(tag);
+    }
+    name.appendChild(document.createTextNode(r.filename || 'download'));
     name.title = r.filename || '';
     row.appendChild(name);
 
@@ -243,6 +273,11 @@
       meta.textContent = p != null
         ? `${stateLabel(r)} · ${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
         : `${stateLabel(r)} · ${fmtBytes(r.receivedBytes)} scaricati`;
+    } else if (r.state === 'pending') {
+      // Da quale sito arriva è la cosa su cui si decide: sta nella riga, non
+      // solo nell'avviso che l'utente può aver già chiuso.
+      const da = r.site ? ` · da ${r.site}` : '';
+      meta.textContent = `${stateLabel(r)}${da} · ${formatDate(r.startedAt)}`;
     } else {
       const size = fmtBytes(r.totalBytes || r.receivedBytes);
       const label = r.missing ? 'Non più sul disco' : stateLabel(r);
@@ -280,7 +315,10 @@
       b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
       actions.appendChild(b);
     };
-    if (isActive(r)) {
+    if (r.state === 'pending') {
+      addBtn('Scarica', () => confirmExe(r, true));
+      addBtn('Non scaricare', () => confirmExe(r, false));
+    } else if (isActive(r)) {
       if (r.canPause !== false) {
         if (r.state === 'paused') addBtn('Riprendi', () => resume(r));
         else addBtn('Pausa', () => pause(r));
@@ -373,7 +411,9 @@
     load();
     $('search').addEventListener('input', render);
     $('clear').addEventListener('click', async () => {
-      const hasTerminal = items.some((r) => !isActive(r));
+      // Una voce in attesa di conferma NON è conclusa: "Svuota" non deve
+      // promettere di toglierla (il main la tiene, e giustamente) (#588).
+      const hasTerminal = items.some((r) => !isActive(r) && r.state !== 'pending');
       if (!hasTerminal) { flash('Nessuno scaricamento concluso da rimuovere'); return; }
       const text = 'Rimuovere dall’elenco tutti gli scaricamenti conclusi? Gli scaricamenti in corso restano.';
       const ok = window.SN_CONFIRM_UI

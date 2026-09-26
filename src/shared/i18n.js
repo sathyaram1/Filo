@@ -438,6 +438,17 @@
     options_security_siteblock_blacklist_invalid:
       'Queste righe non sono domini validi e non bloccheranno nulla (usa un dominio ' +
       'con estensione, es. facebook.com — niente IP o nomi senza punto): %s',
+    options_security_downloads: 'Chiedi prima di scaricare un programma',
+    options_security_downloads_desc:
+      'I file che il computer ESEGUE (.exe, .msi, .bat, .dmg, .pkg, .sh, .jar…) ' +
+      'non entrano nella cartella Download senza il tuo sì: Filo ti dice da quale ' +
+      'sito arrivano e aspetta. Anche “Apri file” su un programma chiede conferma, ' +
+      'perché aprirlo vuol dire eseguirlo. Tutti gli altri file scendono come sempre.',
+    options_security_downloads_trusted_label:
+      'Siti di cui ti fidi: i programmi scendono senza chiedere (uno per riga)',
+    options_security_downloads_trusted_invalid:
+      'Queste righe non sono domini validi e verranno ignorate (usa un dominio ' +
+      'con estensione, es. mozilla.org): %s',
     options_security_p2p_box_title: 'Cosa succede ai servizi P2P se attivi la protezione IP',
     options_security_p2p_box_body:
       'Servizi tipo Snapdrop, ToffeeShare, alcuni giochi browser e alcune feature di scoperta dispositivi ' +

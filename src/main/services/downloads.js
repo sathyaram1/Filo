@@ -38,7 +38,30 @@ const HISTORY_LIMIT = 200;
 // Stati non terminali: se li ritroviamo all'avvio (record salvato mentre un
 // download era in corso, poi l'app si è chiusa) il DownloadItem non esiste più,
 // quindi la voce va normalizzata a 'interrupted'.
-const NON_TERMINAL = new Set(['progressing', 'paused']);
+const NON_TERMINAL = new Set(['progressing', 'paused', 'pending']);
+
+// #588 — un file che il sistema ESEGUE non entra nella cartella Download senza
+// una risposta: scende in una cartella riservata (`quarantena` dentro i dati
+// dell'app), e da lì si sposta solo se l'utente dice di sì. Stato 'pending'.
+// La lista delle estensioni e le frasi stanno in src/shared/eseguibili.js.
+function ESE() { return globalThis.SN_ESEGUIBILI; }
+
+// Config letta dalle impostazioni (security.downloads). Il default CHIEDE:
+// finché le impostazioni non sono arrivate, un programma si ferma comunque.
+let chiediEseguibili = true;
+let sitiFidati = [];
+
+function configureFromSettings(settings) {
+  const d = (settings && settings.security && settings.security.downloads) || {};
+  chiediEseguibili = d.confirmExecutables !== false;
+  sitiFidati = Array.isArray(d.trustedSites) ? d.trustedSites.slice() : [];
+}
+
+// Un programma da un sito che l'utente ha dichiarato fidato scende come un PDF.
+function chiedeConferma(url) {
+  if (!chiediEseguibili) return false;
+  try { return !ESE().fidato(url, sitiFidati); } catch (_) { return true; }
+}
 
 // Record vivi (id → dati). Include gli scaricamenti in corso E la cronologia
 // caricata da storage. La mappa è la fonte di verità in memoria.
@@ -75,7 +98,12 @@ function storageKey() {
 // `_`, e `../../pwned` si presenta come `_.._.._pwned`. Ogni fila di due o più
 // punti si comprime a uno, ovunque sia; i punti singoli (`a.b.txt`) restano.
 function safeName(name) {
-  let s = String(name || '').trim().replace(/[\x00-\x1f]/g, '');
+  // I caratteri di direzione (U+202E & co.) non cambiano l'estensione vera ma
+  // capovolgono come si LEGGE il nome: «fattura<RLO>txt.exe» si mostra come
+  // «fatturaexe.txt». Il file su disco non deve poterlo fare (#588).
+  let s = String(name || '');
+  try { s = ESE().nomeVisibile(s); } catch (_) {}
+  s = s.trim().replace(/[\x00-\x1f]/g, '');
   s = s.split(/[\\/]/).pop() || '';
   s = s.replace(/[<>:"|?*]/g, '_').replace(/\.{2,}/g, '.').replace(/^\.+/, '').trim();
   if (!s || s === '.' || s === '..') s = 'download';
@@ -117,6 +145,37 @@ function uniquePath(dir, filename) {
     n++;
   }
   return candidate;
+}
+
+// Cartella di quarantena: dentro i dati dell'app, MAI dentro Download. Un
+// programma in attesa di risposta sta qui, dove nessun gestore file lo mostra e
+// nessun doppio clic lo trova.
+function quarantineDir() {
+  let base = '';
+  try { base = electron().app.getPath('userData'); } catch (_) { base = downloadsDir(); }
+  const dir = path.join(base, 'quarantena');
+  try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+  return dir;
+}
+
+// Sposta il file approvato dalla quarantena alla cartella Download. La rinomina
+// fallisce fra volumi diversi (userData e Download possono stare su dischi
+// diversi): in quel caso si copia e si cancella. Ritorna false se non ce l'ha
+// fatta — chi chiama lo DICE, non finge che il file sia arrivato.
+function spostaFile(src, dst) {
+  try { fs.renameSync(src, dst); return true; } catch (_) {}
+  try { fs.copyFileSync(src, dst); } catch (_) { return false; }
+  try { fs.unlinkSync(src); } catch (_) { /* copiato: il doppione in quarantena non è un guasto */ }
+  return true;
+}
+
+// Il file in quarantena non serve più (rifiutato, rimosso, o app riavviata).
+function rimuoviQuarantena(rec) {
+  const p = rec && rec._quarantena && rec.savePath;
+  if (!p) return;
+  try { fs.unlinkSync(p); } catch (_) {}
+  forgetExists(p);
+  rec._quarantena = false;
 }
 
 // ─── il file può sparire DOPO lo scaricamento ───────────────────────────
@@ -168,7 +227,9 @@ function publicRecord(r) {
     totalBytes: r.totalBytes || 0,
     receivedBytes: r.receivedBytes || 0,
     state: r.state,
-    savePath: r.savePath || '',
+    // Finché il file è in quarantena il percorso NON esce: è una cartella
+    // interna di Filo, e mostrarla (o lasciarla copiare) inviterebbe ad andarci.
+    savePath: r.state === 'pending' ? '' : (r.savePath || ''),
     startedAt: r.startedAt || null,
     endedAt: r.endedAt || null,
     paused: !!r.paused,
@@ -180,6 +241,11 @@ function publicRecord(r) {
     // Il file scaricato non è più al suo posto (spostato, rinominato,
     // cestinato): le superfici lo mostrano attenuato e senza "Apri file".
     missing: isMissing(r),
+    // #588 — è un file che il sistema ESEGUE: le superfici lo marcano a vista e
+    // "Apri file" chiede conferma. `site` è il sito da cui arriva, che è la
+    // cosa da guardare prima di decidere.
+    exe: !!r.exe,
+    site: r.site || '',
   };
 }
 
@@ -202,9 +268,18 @@ async function loadHistory() {
       for (const raw of arr) {
         if (!raw || !raw.id) continue;
         const rec = { ...raw };
-        // Un download che risultava "in corso" alla chiusura non può più
-        // proseguire: il suo DownloadItem è morto. Lo marchiamo interrotto.
-        if (NON_TERMINAL.has(rec.state)) { rec.state = 'interrupted'; rec.paused = false; rec.canResume = false; }
+        // Una conferma non sopravvive al riavvio: chi l'avrebbe data non è più
+        // davanti a quell'avviso. Il programma resta fuori dalla cartella e la
+        // voce dice che non è stato scaricato (#588).
+        if (rec.state === 'pending') {
+          rec._quarantena = true;
+          rimuoviQuarantena(rec);
+          rec.state = 'cancelled'; rec.savePath = ''; rec.paused = false; rec.canResume = false;
+        } else if (NON_TERMINAL.has(rec.state)) {
+          // Un download che risultava "in corso" alla chiusura non può più
+          // proseguire: il suo DownloadItem è morto. Lo marchiamo interrotto.
+          rec.state = 'interrupted'; rec.paused = false; rec.canResume = false;
+        }
         records.set(rec.id, rec);
       }
     }
@@ -284,6 +359,45 @@ function notifyDownloadStarted(webContents) {
   } catch (_) {}
 }
 
+// Chiude uno scaricamento arrivato in fondo: se veniva dalla quarantena (#588)
+// il file entra ORA nella cartella Download, e solo se ci entra davvero la voce
+// dice "completato".
+function completa(rec) {
+  if (rec._quarantena) {
+    const dest = uniquePath(downloadsDir(), rec.filename);
+    if (spostaFile(rec.savePath, dest)) {
+      forgetExists(rec.savePath);
+      rec.savePath = dest;
+      rec.filename = path.basename(dest);
+      rec._quarantena = false;
+    } else {
+      // Il file non è arrivato dove l'utente lo cercherà: dirlo è l'unica
+      // risposta onesta (e la quarantena si svuota, così non resta un programma
+      // in un posto che nessuno guarda).
+      rimuoviQuarantena(rec);
+      rec.state = 'interrupted';
+      rec.savePath = '';
+      persist();
+      broadcast('error', rec);
+      shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8 });
+      return;
+    }
+  }
+  rec.state = 'completed';
+  if (!rec.endedAt) rec.endedAt = new Date().toISOString();
+  persist();
+  broadcast('done', rec);
+  // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
+  // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
+  shellToast(`Scaricato: ${shortName(rec.filename)}`, {
+    durationSec: 8,
+    actions: [
+      { label: 'Apri file', openDownloadId: rec.id },
+      { label: 'Apri cartella', revealDownloadId: rec.id },
+    ],
+  });
+}
+
 // ─── intercettazione ────────────────────────────────────────────────────
 function onWillDownload(item, webContents) {
   const id = uuid();
@@ -292,33 +406,59 @@ function onWillDownload(item, webContents) {
     catch (_) { return ''; }
   })() || 'download');
 
+  const url = item.getURL();
+  let exe = false;
+  try { exe = ESE().eEseguibile(filename); } catch (_) {}
+  // Un programma si ferma PRIMA della cartella Download: i byte scendono in
+  // quarantena e ci restano finché l'utente non risponde (#588). Il resto dei
+  // file non cambia di una virgola: l'attrito va solo dove serve.
+  const attesa = exe && chiedeConferma(url);
+
   // Salvataggio diretto nella cartella Download (niente dialogo "Salva come":
   // vedi nota di filosofia in testa al file). setSavePath disattiva il dialogo
   // nativo — indispensabile anche per i test headless.
   let savePath = '';
   try {
-    savePath = uniquePath(downloadsDir(), filename);
+    savePath = uniquePath(attesa ? quarantineDir() : downloadsDir(), filename);
     item.setSavePath(savePath);
   } catch (_) { /* se fallisce, Electron mostrerà comunque il suo dialogo */ }
 
   const rec = {
     id,
     filename: path.basename(savePath || filename),
-    url: item.getURL(),
+    url,
     mime: item.getMimeType() || '',
     totalBytes: item.getTotalBytes() || 0,
     receivedBytes: item.getReceivedBytes() || 0,
-    state: 'progressing',
+    state: attesa ? 'pending' : 'progressing',
     savePath,
     startedAt: new Date().toISOString(),
     endedAt: null,
     paused: false,
     canResume: false,
+    exe,
+    site: (() => { try { return ESE().sito(url); } catch (_) { return ''; } })(),
+    _quarantena: attesa,
   };
   records.set(id, rec);
   liveItems.set(id, item);
   persist();
   broadcast('start', rec);
+  if (attesa) {
+    // L'avviso NON scade: se sparisse da solo, la risposta di default
+    // diventerebbe "il file resta in un posto che l'utente non conosce".
+    // Chiuderlo con la X lascia la voce in attesa nell'elenco, dove le stesse
+    // due risposte restano a portata.
+    let testo = `«${rec.filename}» è un programma: scaricarlo?`;
+    try { testo = ESE().testoScarica(rec.filename, url); } catch (_) {}
+    shellToast(testo, {
+      durationSec: 0,
+      actions: [
+        { label: 'Scarica', confirmDownloadId: id, allow: true },
+        { label: 'Non scaricare', confirmDownloadId: id, allow: false },
+      ],
+    });
+  }
   // #412 — chiudi la scheda "vuota" aperta apposta da un link Scarica
   // target=_blank. Deferito così il ciclo di vita del download (già preso in
   // carico qui sopra) è completamente cablato prima di toccare l'albero delle view.
@@ -411,19 +551,15 @@ function onWillDownload(item, webContents) {
     rec.filename = rec.savePath ? path.basename(rec.savePath) : rec.filename;
 
     if (state === 'completed') {
-      rec.state = 'completed';
-      persist();
-      broadcast('done', rec);
-      // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
-      // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
-      shellToast(`Scaricato: ${shortName(rec.filename)}`, {
-        durationSec: 8,
-        actions: [
-          { label: 'Apri file', openDownloadId: rec.id },
-          { label: 'Apri cartella', revealDownloadId: rec.id },
-        ],
-      });
+      // I byte sono arrivati ma il programma aspetta ancora una risposta: resta
+      // in quarantena, e nessun avviso dice "scaricato" per un file che non è
+      // nella cartella Download (#588). Ci pensa confirm(), quando l'utente
+      // risponde.
+      if (rec.state === 'pending') { rec._arrivato = true; persist(); broadcast('progress', rec); return; }
+      completa(rec);
     } else {
+      // Rifiutato, caduto o annullato: il pezzo in quarantena non deve restare.
+      rimuoviQuarantena(rec);
       // 'cancelled' (annullato dall'utente) o 'interrupted' (rete caduta, 4xx/5xx,
       // spazio finito): niente silenzio.
       rec.state = state === 'cancelled' ? 'cancelled' : 'interrupted';
@@ -449,7 +585,13 @@ function onWillDownload(item, webContents) {
     // "perdona" le cadute precedenti (è il caso della rete ballerina).
     if (recv > maxRecv) { maxRecv = recv; clearInterruptGrace(); armWatchdog(); }
 
-    if (rec.paused) {
+    // In attesa di risposta (#588): i byte scendono in quarantena, ma la voce
+    // NON diventa "in corso" — non lo è, finché non c'è un sì. Gli argini
+    // contro il silenzio restano attivi: un trasferimento morto va dichiarato
+    // anche mentre l'avviso è a schermo.
+    const inAttesa = rec.state === 'pending';
+
+    if (rec.paused && !inAttesa) {
       // Pausa volontaria dell'utente: non è un guasto, sospendi ogni timer.
       rec.state = 'paused';
       clearInterruptGrace();
@@ -458,10 +600,10 @@ function onWillDownload(item, webContents) {
       // Chromium dichiara caduto il trasferimento: gli concediamo la finestra di
       // grazia per riprendersi da solo. Per l'utente resta "in corso" — se
       // riparte davvero non deve vedere allarmi inutili.
-      rec.state = 'progressing';
+      if (!inAttesa) rec.state = 'progressing';
       armInterruptGrace();
     } else {
-      rec.state = 'progressing';
+      if (!inAttesa) rec.state = 'progressing';
       if (!rec._stallTimer) armWatchdog();   // ripreso dopo una pausa
     }
     broadcast('progress', rec);
@@ -493,7 +635,13 @@ function finalizeManual(rec, state, savePath) {
   rec.endedAt = new Date().toISOString();
   rec.paused = false;
   rec.canResume = false;
-  if (savePath) { rec.savePath = savePath; rec.filename = path.basename(savePath); }
+  if (savePath) {
+    rec.savePath = savePath;
+    rec.filename = path.basename(savePath);
+    // Il nome definitivo lo sceglie l'utente nel dialogo di salvataggio: la
+    // marca "è un programma" si rifà su QUELLO, non sul nome proposto.
+    try { rec.exe = ESE().eEseguibile(rec.filename); } catch (_) {}
+  }
   rec.state = state;
   persist();
   broadcast(state === 'completed' ? 'done' : 'error', rec);
@@ -503,10 +651,17 @@ function finalizeManual(rec, state, savePath) {
 
 function beginManual({ url, filename, totalBytes } = {}) {
   const id = uuid();
+  const nome = safeName(filename || 'download');
+  const indirizzo = String(url || '');
+  const marca = (fn, ripiego) => { try { return fn(); } catch (_) { return ripiego; } };
   const rec = {
     id,
-    filename: safeName(filename || 'download'),
-    url: String(url || ''),
+    filename: nome,
+    url: indirizzo,
+    // Anche "Salva immagine/video come…" può depositare un programma: la voce
+    // lo dichiara e "Apri file" chiede conferma come per ogni altro (#588).
+    exe: marca(() => ESE().eEseguibile(nome), false),
+    site: marca(() => ESE().sito(indirizzo), ''),
     mime: '',
     totalBytes: Number(totalBytes) > 0 ? Number(totalBytes) : 0,
     receivedBytes: 0,
@@ -565,6 +720,15 @@ function attachSession(ses) {
 
 async function init() {
   await loadHistory();
+  // Nessuna attesa sopravvive a un riavvio (loadHistory le chiude): quello che
+  // resta in quarantena è orfano, e un programma orfano non deve restare su
+  // disco. Si svuota all'avvio, quando non può esserci niente di vivo dentro.
+  try {
+    const dir = quarantineDir();
+    for (const nome of fs.readdirSync(dir)) {
+      try { fs.rmSync(path.join(dir, nome), { recursive: true, force: true }); } catch (_) {}
+    }
+  } catch (_) {}
   try { attachSession(electron().session.defaultSession); } catch (_) {}
 }
 
@@ -584,6 +748,11 @@ function remove(id) {
   // Vale per entrambi i cammini, nativo e "a mano".
   if (liveItems.has(id)) { try { liveItems.get(id).cancel(); } catch (_) {} }
   if (liveManual.has(id)) { try { liveManual.get(id).cancel(); } catch (_) {} }
+  // Togliere dall'elenco una voce in attesa È una risposta: il programma in
+  // quarantena se ne va con lei, invece di restare su disco senza più nessuno
+  // che possa deciderne la sorte (#588).
+  const rec = records.get(id);
+  if (rec) rimuoviQuarantena(rec);
   records.delete(id);
   liveItems.delete(id);
   liveManual.delete(id);
@@ -596,9 +765,46 @@ function remove(id) {
 const MISSING_TEXT = 'Il file non c’è più: forse è stato spostato o cancellato';
 const MISSING_FOLDER_TEXT = 'La cartella non c’è più: forse è stata spostata o cancellata';
 
-function openFile(id) {
+// #588 — risposta alla domanda "questo programma lo scarico?". `allow` viene da
+// un clic dell'utente: un no cancella il file dalla quarantena, un sì lo fa
+// proseguire (o lo sposta subito, se i byte sono già tutti arrivati).
+function confirmDownload(id, allow) {
+  const rec = records.get(id);
+  if (!rec || rec.state !== 'pending') {
+    return { ok: false, error: 'Questo scaricamento non aspetta più una risposta', items: listRecords() };
+  }
+  if (!allow) {
+    const item = liveItems.get(id);
+    rec._final = true;   // il 'done' che segue cancel() non deve riscrivere l'esito
+    if (rec._stallTimer) { clearTimeout(rec._stallTimer); rec._stallTimer = null; }
+    if (rec._resumeTimer) { clearTimeout(rec._resumeTimer); rec._resumeTimer = null; }
+    if (item) { try { item.cancel(); } catch (_) {} }
+    liveItems.delete(id);
+    rimuoviQuarantena(rec);
+    rec.state = 'cancelled';
+    rec.savePath = '';
+    rec.paused = false;
+    rec.canResume = false;
+    rec.endedAt = new Date().toISOString();
+    persist();
+    broadcast('error', rec);
+    return { ok: true, items: listRecords() };
+  }
+  if (rec._arrivato) { completa(rec); return { ok: true, items: listRecords() }; }
+  // Ancora in corso: prosegue come un download qualsiasi, e il file esce dalla
+  // quarantena quando arriva in fondo (completa()).
+  rec.state = 'progressing';
+  persist();
+  broadcast('progress', rec);
+  return { ok: true, items: listRecords() };
+}
+
+function openFile(id, opts) {
   const rec = records.get(id);
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
+  if (rec.state === 'pending') {
+    return { ok: false, error: 'Questo programma non è stato scaricato: rispondi prima all’avviso' };
+  }
   // Guarda il disco PRIMA di tentare (vedi nota su fileExists): l'esito
   // dell'apertura non è affidabile su tutte le piattaforme.
   forgetExists(rec.savePath);
@@ -607,6 +813,16 @@ function openFile(id) {
     // superfici aperte così la vedono attenuata senza dover ricaricare.
     broadcast('missing', rec);
     return { ok: false, missing: true, error: MISSING_TEXT };
+  }
+  // #588 — l'UNICA porta verso shell.openPath: aprire un programma è eseguirlo,
+  // e qui non si passa senza una seconda risposta. Il gate sta nel main perché
+  // le superfici che offrono "Apri file" sono tre (avviso, barra, pagina) e una
+  // regola per porta sarebbe una porta dimenticata.
+  if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.url)) {
+    let text = `«${rec.filename}» è un programma: aprirlo vuol dire eseguirlo.`;
+    let title = 'Aprire un programma?';
+    try { text = ESE().testoApri(rec.filename, rec.url); title = ESE().TITOLO_APRI; } catch (_) {}
+    return { ok: false, needsConfirm: true, exe: true, title, text };
   }
   try {
     const r = electron().shell.openPath(rec.savePath);
@@ -677,6 +893,8 @@ module.exports = {
   list,
   clearCompleted,
   remove,
+  confirmDownload,
+  configureFromSettings,
   openFile,
   openFolder,
   cancel,

@@ -259,8 +259,14 @@
     DOWNLOADS_CLEAR: 'downloads_clear',
     // Rimuove UNA voce dalla cronologia. { id } → { ok, items }
     DOWNLOAD_REMOVE: 'download_remove',
-    // Apre il file scaricato col programma di sistema. { id } → { ok } | { ok:false, error }
+    // Apre il file scaricato col programma di sistema. Su un PROGRAMMA (#588)
+    // risponde { ok:false, needsConfirm:true, text } finché non arriva
+    // { id, confirmed:true }: aprirlo lo esegue, e chi lo fa deve saperlo.
+    // { id, confirmed? } → { ok } | { ok:false, error }
     DOWNLOAD_OPEN_FILE: 'download_open_file',
+    // #588 — risposta alla conferma di uno scaricamento in attesa (un programma
+    // fermo fuori dalla cartella Download). { id, allow } → { ok, items }
+    DOWNLOAD_CONFIRM: 'download_confirm',
     // Mostra il file nella cartella (evidenziato). { id } → { ok } | { ok:false, error }
     DOWNLOAD_OPEN_FOLDER: 'download_open_folder',
     // Comandi sul download in corso. { id } → { ok }

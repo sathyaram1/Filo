@@ -200,6 +200,9 @@ app.whenReady().then(async () => {
     // Blocco apertura siti in blacklist (#170.3): legge la config dalle
     // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}
+    // #588 — conferma prima di scaricare/aprire un programma: la config va
+    // letta PRIMA del primo will-download, che è sincrono e non può attenderla.
+    try { require('./services/downloads').configureFromSettings(s); } catch (_) {}
     // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
     // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
     try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}

@@ -2229,6 +2229,18 @@
         useAdblockLists: true,
         blacklist: [],
       },
+      // #588 — scaricamento di un file che il sistema ESEGUE (.exe, .dmg, .sh…
+      // elenco in src/shared/eseguibili.js). Un programma arriva in cartella
+      // Download solo dopo una conferma che dice da quale sito viene, e
+      // "Apri file" su un programma ne chiede una seconda. Il resto dei file
+      // scende come sempre: l'attrito va solo dove serve.
+      // - confirmExecutables: chiedi sempre prima di scaricare/aprire un programma.
+      // - trustedSites: domini da cui i programmi scendono senza domande (un
+      //   dominio vale anche per i suoi sottodomini).
+      downloads: {
+        confirmExecutables: true,
+        trustedSites: [],
+      },
     },
     // Modalità terminale della dashboard: quando attiva, ogni comando con `/`
     // che non è un comando interno di Filo viene eseguito da una shell di

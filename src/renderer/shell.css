@@ -656,6 +656,22 @@ html[data-feedback-dim="1"] .shell {
   cursor: pointer;
 }
 .dl-row-btn:hover { background: var(--tab-active); }
+/* #588 — marca "è un programma": si legge prima del nome, che è la parte di cui
+   il sito decide il testo. Colore d'avviso, non allarme rosso. */
+.dl-row-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font: 600 10px/1.5 system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  vertical-align: baseline;
+}
+.dl-row[data-state="pending"] .dl-row-name { color: var(--fg); }
 .dl-row[data-state="interrupted"] .dl-row-name,
 .dl-row[data-state="cancelled"] .dl-row-name { color: var(--fg-soft); }
 /* Scaricato ma non più al suo posto: la riga si attenua, così si vede prima ancora di cliccare. */

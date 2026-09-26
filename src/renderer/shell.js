@@ -1016,10 +1016,23 @@
   // risposta veniva buttata via e il clic non produceva nulla: il silenzio è
   // indistinguibile da un'app bloccata. Ora l'esito diventa un avviso, con la
   // cartella come via d'uscita (il file potrebbe essere lì rinominato).
-  function openDownloadFile(id) {
+  function openDownloadFile(id, confirmed) {
     if (!api.downloads) return Promise.resolve();
-    return api.downloads.openFile(id).then((res) => {
+    return api.downloads.openFile(id, confirmed).then((res) => {
       if (!res || res.ok !== false) return;
+      // #588 — è un programma: aprirlo lo esegue. Il main non lo tocca finché
+      // non torna un "sì" esplicito; la via di mezzo (guardare dov'è finito
+      // senza eseguirlo) resta a un clic.
+      if (res.needsConfirm) {
+        NOTIFS.show(res.text, {
+          durationSec: 0,
+          actions: [
+            { label: 'Apri comunque', onClick: () => openDownloadFile(id, true) },
+            { label: 'Apri cartella', onClick: () => openDownloadFolder(id) },
+          ],
+        });
+        return;
+      }
       const opts = res.missing
         ? { actions: [{ label: 'Apri cartella', onClick: () => openDownloadFolder(id) }] }
         : undefined;
@@ -1067,6 +1080,12 @@
             const id = a.revealDownloadId;
             return { label: a.label, onClick: () => openDownloadFolder(id) };
           }
+          // #588 — risposta all'avviso "questo è un programma: scaricarlo?".
+          if (a && a.confirmDownloadId && !a.onClick && api.downloads) {
+            const id = a.confirmDownloadId;
+            const allow = !!a.allow;
+            return { label: a.label, onClick: () => api.downloads.confirm(id, allow).catch(() => {}) };
+          }
           return a;
         }),
       };
@@ -1113,6 +1132,7 @@
         case 'cancelled': return 'Annullato';
         case 'interrupted': return 'Interrotto';
         case 'paused': return 'In pausa';
+        case 'pending': return 'In attesa di conferma';
         default: return 'In corso';
       }
     }
@@ -1217,7 +1237,15 @@
 
       const name = document.createElement('div');
       name.className = 'dl-row-name';
-      name.textContent = r.filename || 'download';
+      // #588 — un programma si riconosce PRIMA di cliccare: la marca sta
+      // accanto al nome, non dentro un'estensione che l'occhio non legge.
+      if (r.exe) {
+        const tag = document.createElement('span');
+        tag.className = 'dl-row-tag';
+        tag.textContent = 'Programma';
+        name.appendChild(tag);
+      }
+      name.appendChild(document.createTextNode(r.filename || 'download'));
       name.title = r.filename || '';
       row.appendChild(name);
 
@@ -1242,6 +1270,10 @@
           : `${fmtBytes(r.receivedBytes)} scaricati`;
       } else if (r.missing) {
         meta.textContent = `Non più sul disco · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
+      } else if (r.state === 'pending') {
+        // Da quale sito arriva è la cosa che fa decidere: sta nella riga, non
+        // solo nell'avviso che l'utente può aver già chiuso.
+        meta.textContent = r.site ? `${stateLabel(r)} · da ${r.site}` : stateLabel(r);
       } else {
         meta.textContent = `${stateLabel(r)} · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       }
@@ -1257,7 +1289,12 @@
         b.addEventListener('click', fn);
         actions.appendChild(b);
       };
-      if (isActive(r)) {
+      if (r.state === 'pending') {
+        // Le stesse due risposte dell'avviso: chiuderlo non deve togliere la
+        // possibilità di rispondere (#588).
+        addBtn('Scarica', () => api.downloads.confirm(r.id, true).catch(() => {}));
+        addBtn('Non scaricare', () => api.downloads.confirm(r.id, false).catch(() => {}));
+      } else if (isActive(r)) {
         // Gli scaricamenti "a mano" (Salva immagine/video come…) non si mettono
         // in pausa: meglio nessun pulsante che uno che non fa niente.
         if (r.canPause !== false) {

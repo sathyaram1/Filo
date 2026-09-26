@@ -311,6 +311,23 @@
       },
     },
     {
+      keys: ['conferma_programmi', 'conferma programmi', 'conferma prima di scaricare un programma',
+        'chiedi prima di scaricare un programma', 'avviso programmi scaricati', 'download eseguibili',
+        'scaricamento programmi', 'file eseguibili'],
+      level: 2,
+      risk: 'Controlla l’avviso prima che un programma (.exe, .msi, .dmg, .sh…) entri nella cartella '
+        + 'Download e prima che “Apri file” lo esegua. Disattivarlo fa scendere e aprire i programmi '
+        + 'senza domande, anche quelli di un sito sbagliato.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return {
+          partial: { security: { downloads: { confirmExecutables: b } } },
+          label: `Conferma prima di scaricare un programma → ${b ? 'attiva' : 'disattivata'}`,
+        };
+      },
+    },
+    {
       keys: ['gestione_cookie', 'gestione cookie', 'gestione dei cookie', 'cookie', 'banner cookie', 'banner dei cookie'],
       level: 2,
       risk: 'Decide come Filo gestisce i cookie dei siti. Le modalità più permissive aumentano '
