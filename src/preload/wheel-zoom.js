@@ -100,10 +100,16 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   // menu del tasto destro gira nello stesso mondo isolato di questo file,
   // mentre il documento lo condividiamo col sito, che userebbe la stessa porta
   // per rimettersi la pagina come vuole lui (#686, primo giro di verifica).
+  // La percentuale è quella che l'utente VEDE: su una pagina che scala il
+  // proprio contenuto è la sua, non il 100% fermo della finestra (#686, terzo
+  // giro: il tasto destro diceva «tutto normale» su un foglio ingrandito).
   try {
     globalThis.SN_ZOOM_PAGINA = {
-      percentuale: () => currentPercent(),
-      azzera: () => setLevel(0),
+      percentuale: () => {
+        const p = percentualePropria();
+        return p == null ? currentPercent() : p;
+      },
+      azzera: () => { eseguiZoom({ verso: 'reset' }); },
     };
   } catch (_) {}
 
@@ -115,14 +121,14 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     refreshPercent();
   }
 
-  // Applica la percentuale digitata nel campo, con gli stessi limiti di ogni
+  // Applica la percentuale BATTUTA nel campo, con gli stessi limiti di ogni
   // altra strada (prima il badge accettava valori che i tasti non sanno
   // reggere: il primo Ctrl+ dopo un 400% riportava indietro di colpo).
   function applyPercentFromInput() {
     if (!percentInput) return;
-    const esito = Z ? Z.risolvi(letturaLivello(), { percentuale: percentInput.value }) : null;
+    const esito = Z ? Z.risolvi(letturaLivello(), { percentuale: valoreBattuto }) : null;
     if (esito) setLevel(esito.livello);
-    if (percentInput) percentInput.value = String(currentPercent());
+    refreshPercent();
   }
 
   function letturaLivello() {
