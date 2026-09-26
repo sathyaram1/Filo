@@ -3902,6 +3902,7 @@ try {
   require('./guardianoAvvisi').configure({
     getSettings: getEffectiveSettings,
     runOneShot,
+    modelForAction,
   });
 } catch (e) {
   console.error('[guardiano] non configurato:', (e && e.message) || e);

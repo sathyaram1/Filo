@@ -72,6 +72,28 @@ describe('la domanda al guardiano', () => {
     const d = G.domanda({ testo: 'ciao', classe: 'sito', fonte: 'x' });
     assert.ok(d.includes('sito'));
   });
+
+  test('i collegamenti arrivano con la loro destinazione vera', () => {
+    const d = G.domanda({
+      testo: 'accedi al tuo conto',
+      classe: 'messaggio',
+      fonte: 'x',
+      link: [{ etichetta: 'banca.it', url: 'https://altrove.invalid/login' }],
+    });
+    assert.ok(d.includes('banca.it → https://altrove.invalid/login'),
+      'senza la destinazione il guardiano non può giudicare un link ingannevole');
+  });
+
+  test('senza collegamenti lo dice, invece di lasciare il blocco vuoto', () => {
+    assert.ok(G.domanda({ testo: 'ciao', classe: 'sito' }).includes('(nessuno)'));
+  });
+
+  test('il tetto del pezzo è anche il tetto di ciò che si può proporre', () => {
+    // Se un avviso potesse essere più lungo di quello che entra nella domanda,
+    // la parte oltre il taglio verrebbe MOSTRATA senza essere stata guardata.
+    const svc = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'guardianoAvvisi.js'));
+    assert.equal(svc.MAX_TESTO(), G.MAX_PEZZO);
+  });
 });
 
 describe('la risposta del guardiano', () => {
@@ -97,6 +119,13 @@ describe('la risposta del guardiano', () => {
     for (const s of ['', 'boh', '{rotto', '{"passa":"si"}', null, undefined]) {
       assert.equal(G.leggi(s), null, `«${s}» non deve valere come passa`);
     }
+  });
+});
+
+describe('quanto costa essere protetti si vede', () => {
+  test('il guardiano ha una voce sua nella torta dei crediti', () => {
+    const C = globalThis.SN_CONST;
+    assert.equal(C.creditUsageGroup(C.ACTIONS.NOTICE_GUARD), 'Controlli di sicurezza');
   });
 });
 

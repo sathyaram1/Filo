@@ -494,6 +494,8 @@
         text: n.text,
         link: (n.action && n.action.link) || [],
         attesa: !!n.inAttesa,
+        fonte: n.fonte || '',
+        onRiprova: () => send({ type: MSG.FILO_RIPRENDI_ATTESA }).then(refreshLive),
         onDismiss: () => send({ type: MSG.FILO_DISMISS_NOTIFICATION, id: n.id }).then(refreshLive),
       }));
     }
@@ -631,7 +633,7 @@
     return div;
   }
 
-  function renderLiveCard({ kind, text, paused, onToggle, onDismiss, link, attesa }) {
+  function renderLiveCard({ kind, text, paused, onToggle, onDismiss, link, attesa, fonte, onRiprova }) {
     const div = document.createElement('div');
     div.className = 'dash-live-card';
     div.dataset.kind = kind;
@@ -643,6 +645,24 @@
     // #536 — i collegamenti di una notifica si mostrano con la destinazione
     // vera (l'etichetta la calcola il main con la fonte unica), mai con la
     // scritta che ha messo chi ha prodotto il testo.
+    // #536 — di un avviso nato da fuori si legge sempre CHI l'ha scritto: un
+    // avviso senza mittente è una frase che sembra di Filo.
+    if (fonte) {
+      const f = document.createElement('div');
+      f.className = 'dash-live-meta';
+      f.textContent = `da ${fonte}`;
+      div.appendChild(f);
+    }
+    // Un avviso in coda riparte da solo quando qualcuno guarda: chi non vuole
+    // aspettare deve poterlo chiedere, altrimenti la coda è un vicolo cieco.
+    if (attesa && onRiprova) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dash-live-link';
+      b.textContent = 'Controlla adesso';
+      b.addEventListener('click', onRiprova);
+      div.appendChild(b);
+    }
     if (Array.isArray(link) && link.length) {
       const box = document.createElement('div');
       box.className = 'dash-live-links';

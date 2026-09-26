@@ -693,6 +693,9 @@
     // qualcun altro: lo mostra il main, e solo dopo il guardiano.
     // { testo, classe, fonte, richiesta?, modelloProduttore? }
     FILO_AVVISO_PROPOSTO: 'filo_avviso_proposto',
+    // «Controlla adesso» su un avviso rimasto in coda: la coda riparte da sola
+    // solo quando qualcuno guarda, e aspettare senza poter riprovare è attrito.
+    FILO_RIPRENDI_ATTESA: 'filo_riprendi_attesa',
     // Registro degli avvisi fermati, per capire se il guardiano grida al lupo.
     FILO_GET_BLOCCHI_GUARDIANO: 'filo_get_blocchi_guardiano',
     FILO_CLEAR_BLOCCHI_GUARDIANO: 'filo_clear_blocchi_guardiano',

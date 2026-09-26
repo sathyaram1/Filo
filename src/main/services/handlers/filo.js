@@ -349,6 +349,9 @@ module.exports = function register(on, ctx) {
     return {
       ...n,
       text: `Un avviso nato da ${chi} è in attesa del controllo.`,
+      // La fonte la nomina già la riga qui sopra: ripeterla sotto sarebbe
+      // scriverla due volte nella stessa scheda.
+      fonte: '',
       action: { ...(n.action || {}), link: [] },
       inAttesa: true,
     };
@@ -378,8 +381,22 @@ module.exports = function register(on, ctx) {
       modelloProduttore: (msg && msg.modelloProduttore) || '',
       kind: (msg && msg.kind) || 'alert',
     });
+    // Il rifiuto dice il numero: chi manda sceglie cosa tenere, invece di
+    // ritrovarsi mostrato un pezzo di quello che aveva scritto.
+    if (r.esito === 'rifiutato') {
+      return { ok: false, code: 'troppo_lungo', error: r.motivo, max: r.max };
+    }
     broadcastLiveUpdate();
     return { ok: true, esito: r.esito, motivo: r.motivo || '' };
+  });
+
+  on(MSG.FILO_RIPRENDI_ATTESA, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!Guardiano) return { ok: false, error: 'guardiano non disponibile' };
+    await Guardiano.riprendiInAttesa({ forza: true });
+    broadcastLiveUpdate();
+    const list = await FiloMem.listNotifications();
+    return { ok: true, notifications: list.map(perLaPagina) };
   });
 
   on(MSG.FILO_GET_BLOCCHI_GUARDIANO, async (msg, sender, origin) => {

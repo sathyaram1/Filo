@@ -12,13 +12,21 @@ const TENTATIVI = 2;
 const RIPRESA_MS = 5 * 60 * 1000;
 // Quanto del testo fermato finisce nel registro: abbastanza per riconoscerlo.
 const ANTEPRIMA = 160;
+// Un avviso più lungo di così si RIFIUTA, non si taglia: quello che non entra
+// nella domanda del guardiano verrebbe mostrato senza essere stato guardato,
+// e l'esca si scriverebbe dopo il taglio. Per questo il tetto NON è un numero
+// suo: è quello del guardiano.
+const MAX_TESTO = () => (globalThis.SN_GUARDIANO && globalThis.SN_GUARDIANO.MAX_PEZZO) || 1500;
 
 // Le regole che scattano PERCHÉ il testo contiene un segreto: la loro
 // anteprima nel registro sarebbe una seconda copia del segreto.
 const REGOLE_SENZA_ANTEPRIMA = new Set(['segreto', 'chiave', 'codice', 'iban', 'carta']);
 
-let deps = { getSettings: null, runOneShot: null };
-let ripresaInCorso = false;
+let deps = { getSettings: null, runOneShot: null, modelForAction: null };
+// Il giro in corso, per non sovrapporne due sulla stessa coda. Chi FORZA
+// aspetta quello in volo e poi rifà il suo: una richiesta dell'utente non si
+// risolve rispondendogli «sto già facendo altro».
+let giroInCorso = null;
 
 function configure(d) {
   deps = { ...deps, ...(d || {}) };
@@ -60,10 +68,13 @@ function separaLink(testo) {
   const link = [];
   let out = String(testo == null ? '' : testo);
   if (!st) return { testo: out, link };
+  const visti = new Set();
   for (const l of st.linkNelTesto(out)) {
     const etichetta = FB && typeof FB.linkLabel === 'function' ? FB.linkLabel(l.url) : '';
     out = out.replace(`[${l.etichetta}](${l.url})`, l.etichetta);
-    if (etichetta) link.push({ etichetta, url: l.url });
+    if (!etichetta || visti.has(l.url)) continue;
+    visti.add(l.url);
+    link.push({ etichetta, url: l.url });
   }
   return { testo: out, link };
 }
@@ -85,7 +96,11 @@ async function vaglia({ testo, classe, fonte, richiesta, modelloProduttore, link
 
   const guard = G();
   const C = globalThis.SN_CONST;
-  const refGuardiano = (settings.models && settings.models[C.ACTIONS.NOTICE_GUARD]) || '';
+  // Dal punto che risolve i modelli per tutti: un soprannome deprecato lo
+  // rimappa lui, e una copia a mano qui diverge in silenzio.
+  const refGuardiano = deps.modelForAction
+    ? deps.modelForAction(settings, C.ACTIONS.NOTICE_GUARD)
+    : ((settings.models && settings.models[C.ACTIONS.NOTICE_GUARD]) || '');
   const catena = guard.catenaIndipendente(refGuardiano, modelloProduttore);
   // Nessun modello diverso da quello che ha scritto il testo: due contesti
   // sullo stesso modello cadono insieme, quindi qui non c'è controllo. Si
@@ -96,7 +111,7 @@ async function vaglia({ testo, classe, fonte, richiesta, modelloProduttore, link
 
   const messages = [
     { role: 'system', content: guard.SISTEMA },
-    { role: 'user', content: guard.domanda({ testo, classe: cls, fonte, richiesta }) },
+    { role: 'user', content: guard.domanda({ testo, classe: cls, fonte, richiesta, link }) },
   ];
   for (let i = 0; i < TENTATIVI; i++) {
     let risposta = null;
@@ -138,6 +153,10 @@ async function registraBlocco({ fonte, classe, testo, esito }) {
 // { esito, notifica }.
 async function proponiAvviso({ testo, classe, fonte, richiesta, modelloProduttore, kind, action } = {}) {
   const mem = Mem();
+  const tetto = MAX_TESTO();
+  if (String(testo || '').length > tetto) {
+    return { esito: 'rifiutato', motivo: `l'avviso supera ${tetto} caratteri`, max: tetto };
+  }
   const separato = separaLink(testo);
   const esito = await vaglia({
     testo: separato.testo, classe, fonte, richiesta, modelloProduttore, link: separato.link,
@@ -153,16 +172,29 @@ async function proponiAvviso({ testo, classe, fonte, richiesta, modelloProduttor
     text: separato.testo,
     classe, fonte,
     guardiano: { esito: esito.esito },
-    action: { ...(action || {}), link: separato.link, richiesta: richiesta || '' },
+    // `modelloProduttore` resta appiccicato alla voce: se finisce in coda, il
+    // giro dopo deve sapere di nuovo quale modello NON può fare da guardiano.
+    action: {
+      ...(action || {}), link: separato.link,
+      richiesta: richiesta || '', modelloProduttore: modelloProduttore || '',
+    },
   });
   return { esito: esito.esito, notifica };
 }
 
 // Le voci rimaste in attesa ripassano dal guardiano. Non blocca chi la chiama:
 // il risultato arriva alla dashboard col prossimo aggiornamento live.
-async function riprendiInAttesa() {
-  if (ripresaInCorso) return 0;
-  ripresaInCorso = true;
+async function riprendiInAttesa({ forza = false } = {}) {
+  if (giroInCorso) {
+    const atteso = await giroInCorso.catch(() => 0);
+    if (!forza) return atteso;
+  }
+  const giro = giraSullaCoda(forza);
+  giroInCorso = giro;
+  try { return await giro; } finally { if (giroInCorso === giro) giroInCorso = null; }
+}
+
+async function giraSullaCoda(forza) {
   let cambiate = 0;
   try {
     const mem = Mem();
@@ -171,7 +203,7 @@ async function riprendiInAttesa() {
     for (const n of lista) {
       if (n.stato !== 'attesa') continue;
       const ultimo = n.ultimoTentativo ? Date.parse(n.ultimoTentativo) : 0;
-      if (ultimo && ora - ultimo < RIPRESA_MS) continue;
+      if (!forza && ultimo && ora - ultimo < RIPRESA_MS) continue;
       const esito = await vaglia({
         testo: n.text, classe: n.classe, fonte: n.fonte,
         richiesta: (n.action && n.action.richiesta) || '',
@@ -192,8 +224,6 @@ async function riprendiInAttesa() {
     }
   } catch (e) {
     console.warn('[guardiano] ripresa fallita:', (e && e.message) || e);
-  } finally {
-    ripresaInCorso = false;
   }
   if (cambiate) {
     try { require('./handlers').broadcastLiveUpdate(); } catch (_) {}
@@ -204,7 +234,7 @@ async function riprendiInAttesa() {
 const API = {
   configure, vaglia, proponiAvviso, riprendiInAttesa,
   segretiDi, fonteVisibile, separaLink, rigaDiBlocco,
-  TENTATIVI, RIPRESA_MS,
+  TENTATIVI, RIPRESA_MS, MAX_TESTO,
 };
 
 globalThis.SN_GUARDIANO_AVVISI = API;
