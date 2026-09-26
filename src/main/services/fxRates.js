@@ -65,6 +65,7 @@
         date: json.date || new Date().toISOString().slice(0, 10),
         rates: json.rates,
         fetchedAt: Date.now(),
+        req: URL,
       };
     } finally {
       clearTimeout(to);
