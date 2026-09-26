@@ -1770,7 +1770,7 @@
       // cosa non si chiamano in due modi.
       label: `Dimensione reale (ora ${p}%)`,
       shortcut: Tasti.etichetta('Ctrl+0'),
-      onClick: () => { try { document.dispatchEvent(new Event('filo:zoom-azzera')); } catch (_) {} },
+      onClick: () => { try { zoomPagina()?.azzera(); } catch (_) {} },
     };
   }
 
