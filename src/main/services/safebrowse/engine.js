@@ -119,6 +119,8 @@ function evaluate(url, ctx = {}, asyncData = {}) {
 
   const { gsb, ageDays, cert, sandbox, llm } = asyncData;
   const hosted = hostedPlatform(norm.host, pathOf(url));
+  // Conferma e chiusura di un avviso valgono per il sito; su una pagina ospitata solo per quella pagina.
+  const scope = hosted ? norm.host + pathOf(url) : norm.registrable;
   const whitelisted = !hosted && isWhitelisted(norm.registrable);
   const sigs = localSignals(norm, ctx);
   const reasons = sigs.map((s) => s.kind).concat(hosted ? ['hosted_content'] : []);
@@ -126,7 +128,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   // Blacklist: prevale su tutto, anche sulla whitelist.
   if (gsb && gsb.listed) {
     const message = buildMessage({ level: 'pericoloso', norm, gsb });
-    return { level: 'pericoloso', reasons: ['gsb_' + (gsb.category || 'listed')], norm, message, gsb, needsLlm: false, whitelisted };
+    return { level: 'pericoloso', reasons: ['gsb_' + (gsb.category || 'listed')], norm, message, gsb, needsLlm: false, whitelisted, hosted, scope };
   }
 
   const strict = sigs.find((s) => s.kind === 'strict_impersonation') || null;
@@ -164,7 +166,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     return {
       level: 'pericoloso',
       reasons: reasons.concat(young ? ['young_domain'] : [], certBad ? ['cert_' + cert.status] : [], sandboxBad ? ['sandbox_dangerous'] : []),
-      norm, message, imp, ageDays, cert, needsLlm: false, whitelisted,
+      norm, message, imp, ageDays, cert, needsLlm: false, whitelisted, hosted, scope,
     };
   }
 
@@ -187,7 +189,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     return {
       level: 'sospetto',
       reasons: reasons.concat(young ? ['young_domain'] : [], certBad ? ['cert_' + cert.status] : [], llmSus ? ['llm'] : []),
-      norm, message, imp: broad, ageDays, cert, needsLlm: false, whitelisted, hosted,
+      norm, message, imp: broad, ageDays, cert, needsLlm: false, whitelisted, hosted, scope,
     };
   }
 

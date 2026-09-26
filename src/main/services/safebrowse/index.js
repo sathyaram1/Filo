@@ -188,8 +188,15 @@ function verdictChanged(a, b) {
   return am !== bm;
 }
 
+function scopeOf(url) {
+  const norm = normalizeMod.normalize(url);
+  if (!norm || !norm.ok) return null;
+  return whitelist.hostedPlatform(norm.host, pathOf(url)) ? norm.host + pathOf(url) : norm.registrable;
+}
+
 const API = {
   checkSync,
+  scopeOf,
   analyze,
   evaluate: engine.evaluate,
   recordCert,

@@ -21,7 +21,7 @@ const safebrowseMethods = {
   // per questo dominio in questo tab.
   _sbApplyState(tab, verdict) {
     if (!verdict || verdict.level === 'safe') return verdict;
-    const reg = verdict.norm && verdict.norm.registrable;
+    const reg = verdict.scope || (verdict.norm && verdict.norm.registrable);
     if (!reg) return verdict;
     this._sbState(tab);
     if (verdict.level === 'pericoloso' && tab.sbBypass.has(reg)) {
@@ -95,8 +95,8 @@ const safebrowseMethods = {
     if (!tab) return { ok: false };
     this._sbState(tab);
     try {
-      const norm = SB && SB.normalize(url);
-      if (norm && norm.registrable) tab.sbBypass.add(norm.registrable);
+      const key = SB && SB.scopeOf(url);
+      if (key) tab.sbBypass.add(key);
     } catch (_) {}
     this._sbBroadcast(tab, url, { level: 'safe', message: null });
     return { ok: true };
@@ -110,8 +110,8 @@ const safebrowseMethods = {
     if (!tab) return { ok: false };
     this._sbState(tab);
     try {
-      const norm = SB && SB.normalize(url);
-      if (norm && norm.registrable) tab.sbDismissed.add(norm.registrable);
+      const key = SB && SB.scopeOf(url);
+      if (key) tab.sbDismissed.add(key);
     } catch (_) {}
     this._sbBroadcast(tab, url, { level: 'safe', message: null });
     return { ok: true };
