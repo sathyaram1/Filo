@@ -644,14 +644,14 @@
             body.textContent = (res && res.error) || I18n.t('err_provider_failed');
             return;
           }
-          const resolved = Popup.resolveCalcMarkers(res.text);
-          if (/NESSUNA SPIEGAZIONE/i.test(resolved.trim())) {
+          const daMostrare = spiegazioneDaMostrare(Popup.resolveCalcMarkers(res.text));
+          if (!daMostrare) {
             const prev = el.previousElementSibling;
             if (prev && prev.classList.contains('sn-menu-sep')) prev.remove();
             el.remove();
             return;
           }
-          body.innerHTML = Popup.renderMarkdown(resolved);
+          body.innerHTML = Popup.renderMarkdown(daMostrare);
         });
         return () => { cancelled = true; };
       },

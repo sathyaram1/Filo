@@ -5,7 +5,7 @@
   'use strict';
 
   const { MSG, PORTS } = global.SN_MSG;
-  const { PROMPTS, ACTIONS } = global.SN_CONST;
+  const { PROMPTS, ACTIONS, spiegazioneDaMostrare } = global.SN_CONST;
   const I18n = global.SN_I18N;
 
   // Stack di popup aperti. L'ultimo è il topmost.
