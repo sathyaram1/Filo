@@ -37,15 +37,24 @@
     return 'color';
   }
 
-  // Etichetta del bottone che apre il box, in base al tipo di controllo.
+  // Cosa succede al click, per tipo di controllo: sta nell'hover del bottone,
+  // non nella sua etichetta (vedi triggerLabel).
+  const HINTS = {
+    opacity: 'Regola l’opacità',
+    size: 'Regola la dimensione',
+    font: 'Cambia il font',
+    color: 'Scegli il colore esatto',
+  };
+  function triggerHint(name, Tokens) {
+    return HINTS[controlTypeFor(name, Tokens)] || HINTS.color;
+  }
+
+  // Etichetta del bottone: il NOME dell'impostazione dal registro. Col solo
+  // verbo, una risposta che cambiava cinque colori metteva cinque bottoni
+  // identici e nessuno diceva quale colore regolasse (#726).
   function triggerLabel(name, Tokens) {
-    switch (controlTypeFor(name, Tokens)) {
-      case 'opacity': return 'Regola l’opacità';
-      case 'size': return 'Regola la dimensione';
-      case 'font': return 'Cambia il font';
-      case 'color':
-      default: return 'Scegli il colore esatto';
-    }
+    const t = Tokens && Tokens.get && Tokens.get(name);
+    return (t && t.label) || triggerHint(name, Tokens);
   }
 
   // Converte un valore colore valido (#rgb, #rrggbb, rgb()/rgba()) nel formato
@@ -280,10 +289,30 @@
     const Tokens = deps && deps.Tokens;
     if (!doc || !Tokens) return null;
     const name = action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
+    // Token sconosciuto: openOverlay non aprirebbe nulla e resterebbe un
+    // bottone che al click non fa niente (PATTERNS: in chat non deve esistere).
+    if (!(Tokens.get && Tokens.get(name))) return null;
     const btn = doc.createElement('button');
     btn.type = 'button';
     btn.className = 'dash-action-btn sn-refine-trigger';
-    btn.textContent = `🎨 ${triggerLabel(name, Tokens)}`;
+    btn.title = triggerHint(name, Tokens);
+    // Campione del colore appena applicato: distingue due bottoni vicini prima
+    // ancora di leggerne il nome. Il valore passa dalla whitelist dei token.
+    const value = action.valore ?? action.value ?? action.val ?? action.colore;
+    const mark = doc.createElement('span');
+    mark.setAttribute('aria-hidden', 'true');
+    if (controlTypeFor(name, Tokens) === 'color' && Tokens.validate(name, value)) {
+      mark.className = 'sn-refine-trigger-swatch';
+      mark.style.background = String(value).trim();
+    } else {
+      mark.className = 'sn-refine-trigger-icon';
+      mark.textContent = '🎨';
+    }
+    btn.appendChild(mark);
+    const text = doc.createElement('span');
+    text.className = 'sn-refine-trigger-name';
+    text.textContent = triggerLabel(name, Tokens);
+    btn.appendChild(text);
     btn.addEventListener('click', () => {
       // Le dipendenze possono essere risolte pigramente (deps.resolve) per
       // leggere gli override più freschi al momento del click.
@@ -296,6 +325,7 @@
   global.SN_AESTHETIC_REFINER = {
     controlTypeFor,
     triggerLabel,
+    triggerHint,
     toHexColor,
     buildButton,
     openOverlay,

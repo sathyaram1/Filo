@@ -382,8 +382,12 @@
     },
     IMPOSTA_ESTETICA: (a) => {
       const tok = a.token || a.nome || a.name || a.chiave || a.elemento || '';
+      // Il nome leggibile sta nel registro dei token: `button.bg` non dice
+      // niente a chi ha chiesto di cambiare l'aspetto (#726).
+      const T = window.SN_THEME_TOKENS;
+      const t = T && T.get && T.get(tok);
       const val = a.valore ?? a.value ?? a.val ?? a.colore;
-      return { icon: '🎨', text: `Aspetto · ${tok}${val ? ` = ${val}` : ''}` };
+      return { icon: '🎨', text: `Aspetto · ${(t && t.label) || tok}${val ? ` = ${val}` : ''}` };
     },
     PROXY_TAB: (a) => ({ icon: '🌍', text: `Scheda aperta da · ${String(a.country || a.paese || '').toUpperCase()}` }),
     RIMUOVI_PROXY: () => ({ icon: '🌍', text: 'Scheda riportata in Italia' }),
