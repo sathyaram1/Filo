@@ -1383,14 +1383,19 @@
     function syncFromList(items) {
       dls.clear();
       if (Array.isArray(items)) for (const r of items) dls.set(r.id, r);
+      for (const id of Array.from(domandeScarico.keys())) {
+        if (dls.get(id)?.state !== 'pending') ritiraDomanda(id);
+      }
       renderIndicator();
       if (panelOpen) renderPanel();
     }
 
-    // Aggiornamenti live dal main (start/progress/done/error).
+    // Aggiornamenti live dal main (start/progress/done/error/removed).
     api.downloads.onEvent((info) => {
       if (!info || !info.item) return;
-      dls.set(info.item.id, info.item);
+      if (info.kind === 'removed') dls.delete(info.item.id);
+      else dls.set(info.item.id, info.item);
+      if (info.kind === 'removed' || info.item.state !== 'pending') ritiraDomanda(info.item.id);
       renderIndicator();
       if (panelOpen) renderPanel();
     });
