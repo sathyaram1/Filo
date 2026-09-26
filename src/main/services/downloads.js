@@ -383,6 +383,21 @@ function notifyDownloadStarted(webContents) {
   } catch (_) {}
 }
 
+// #588 — la domanda «scaricarlo?» è la riga in attesa del pannello scaricamenti,
+// che la barra apre sopra la pagina: un avviso della barra nell'area pagina
+// resterebbe sotto la vista nativa, invisibile. Solo la finestra da cui parte.
+function chiediNellaFinestra(webContents, rec) {
+  try {
+    const { BrowserWindow } = electron();
+    const finestre = BrowserWindow.getAllWindows().filter((w) => w && !w.isDestroyed?.() && w._filoTabs);
+    const tiene = (w) => (w._filoTabs.tabs || []).some((t) => {
+      try { return t.view.webContents === webContents; } catch (_) { return false; }
+    });
+    const win = finestre.find(tiene) || BrowserWindow.getFocusedWindow() || finestre[0];
+    if (win && !win.isDestroyed?.()) win.webContents.send('shell:download', { kind: 'ask', item: publicRecord(rec) });
+  } catch (_) {}
+}
+
 // Chiude uno scaricamento arrivato in fondo: se veniva dalla quarantena (#588)
 // il file entra ORA nella cartella Download, e solo se ci entra davvero la voce
 // dice "completato".
