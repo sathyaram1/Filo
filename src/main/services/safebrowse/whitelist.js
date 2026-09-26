@@ -63,4 +63,24 @@ function isWhitelisted(registrable) {
   return !!registrable && WHITELIST.has(registrable);
 }
 
-module.exports = { WHITELIST, isWhitelisted };
+// Pagine che chiunque pubblica sotto un dominio in whitelist, riconosciute da host e percorso: il dominio dice chi
+// ospita, non chi ha scritto. Fuori i percorsi della piattaforma stessa (i suoi accessi) e OneDrive, che non mostra pagine.
+const HOSTED = [
+  { host: /^sites\.google\.com$/, platform: 'Google Sites' },
+  { host: /^docs\.google\.com$/, platform: 'Google Documenti e Moduli' },
+  { host: /^script\.google\.com$/, path: /^\/(a\/[^/]+\/)?macros\//, platform: 'Google Apps Script' },
+  { host: /^(forms|sway)\.office\.com$/, platform: 'Microsoft Forms e Sway' },
+  { host: /^ia\d+\.us\.archive\.org$/, platform: 'archive.org' },
+  { host: /^(www\.)?archive\.org$/, path: /^\/download\//, platform: 'archive.org' },
+  { host: /^(www\.)?notion\.so$/, path: /^\/(?!(login|signup)(\/|$))[^/]+/, platform: 'Notion' },
+  { host: /^(www\.)?canva\.com$/, path: /^\/design\//, platform: 'Canva' },
+];
+
+function hostedPlatform(host, path) {
+  const h = String(host || '').toLowerCase();
+  const p = String(path || '/');
+  const r = HOSTED.find((x) => x.host.test(h) && (!x.path || x.path.test(p)));
+  return r ? r.platform : null;
+}
+
+module.exports = { WHITELIST, isWhitelisted, hostedPlatform };
