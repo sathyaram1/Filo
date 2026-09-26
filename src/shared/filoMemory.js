@@ -729,6 +729,7 @@
       color: color || null, // override del colore della barra laterale
       classe: t.classe,
       stato: t.stato, // 'visibile' | 'attesa' (in attesa del controllo)
+      motivoAttesa: t.stato === 'attesa' ? String(motivoAttesa || '') : '',
       fonte: fonte ? String(fonte).slice(0, 200) : '',
       tentativi: 0,
       dismissed: false,
