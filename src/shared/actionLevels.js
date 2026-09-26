@@ -436,6 +436,22 @@
       level: 1,
       describe: () => 'Togliere le modifiche di stile applicate alla pagina',
     },
+    // ── zoom della pagina via chat (#686) ────────────────────────────────────
+    // Livello 1: è la stessa cosa che fanno Ctrl +/- e Ctrl 0, visibile e
+    // reversibile in un tasto.
+    ZOOM_PAGINA: {
+      level: 1,
+      describe: (a) => {
+        const Z = global.SN_ZOOM;
+        const perc = Z ? Z.leggiPercentuale(a && (a.percentuale ?? a.percent ?? a.valore)) : null;
+        if (perc != null) return `Portare lo zoom della pagina al ${Math.round(perc)}%`;
+        const verso = String((a && (a.verso ?? a.direzione ?? a.direction)) || '').trim().toLowerCase();
+        if (verso === 'in') return 'Ingrandire la pagina di un passo';
+        if (verso === 'out') return 'Rimpicciolire la pagina di un passo';
+        if (verso === 'reset') return 'Riportare la pagina alla dimensione reale (100%)';
+        return 'Cambiare lo zoom della pagina';
+      },
+    },
   };
 
   // Livello dell'azione: 1|2|3, oppure null se l'azione NON è registrata

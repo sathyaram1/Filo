@@ -48,9 +48,17 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   const pageZoom = !!(opts && opts.pageZoom);
   const ipc = (opts && opts.ipcRenderer) || null;
 
-  const ZOOM_STEP = 0.5;   // come un passo di Ctrl +/- (in "zoom level")
-  const MIN_LEVEL = -5;
-  const MAX_LEVEL = 5;
+  // Passo e limiti stanno in un posto solo (src/shared/zoomPagina.js): tasti,
+  // rotella, badge e chat devono zoomare della stessa quantità e fermarsi dove
+  // si ferma Chrome, altrimenti due strade sullo stesso zoom divergono.
+  try {
+    const path = require('node:path');
+    require(path.join(__dirname, '..', 'shared', 'zoomPagina.js'));
+  } catch (_) {}
+  const Z = (typeof globalThis !== 'undefined' && globalThis.SN_ZOOM) || null;
+  const ZOOM_STEP = Z ? Z.PASSO : 0.5;   // come un passo di Ctrl +/- (in "zoom level")
+  const MIN_LEVEL = Z ? Z.MIN_LIVELLO : -5;
+  const MAX_LEVEL = Z ? Z.MAX_LIVELLO : 5;
 
   let zoomMode = false;
   let badge = null;
@@ -64,21 +72,54 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   }
 
   function refreshPercent() {
+    pubblicaPercentuale();
     // Non sovrascrivere mentre l'utente sta digitando nel campo.
     if (percentInput && document.activeElement !== percentInput) {
       percentInput.value = String(currentPercent());
     }
   }
 
-  // Applica la percentuale digitata nel campo come fattore di zoom esatto.
+  // Il livello corrente scritto sul documento: è così che la pagina (il menu
+  // del tasto destro, che vive in un altro mondo JS e non ha il webFrame) sa a
+  // quanto sta lo zoom senza un giro di messaggi.
+  function pubblicaPercentuale() {
+    try {
+      const p = currentPercent();
+      if (p === 100) delete document.documentElement.dataset.filoZoom;
+      else document.documentElement.dataset.filoZoom = String(p);
+    } catch (_) {}
+  }
+
+  // Chi sta nella pagina chiede «a quanto è lo zoom?» con un evento: la
+  // risposta è sincrona (stesso dispatch), e si legge nel dataset.
+  try {
+    document.addEventListener('filo:zoom-chiedi', pubblicaPercentuale);
+    // Il menu del tasto destro sta nella pagina e non ha il webFrame: per
+    // riportare al 100% chiede qui, dall'unico punto che scrive lo zoom.
+    document.addEventListener('filo:zoom-azzera', () => setLevel(0));
+  } catch (_) {}
+  pubblicaPercentuale();
+
+  // Applica un livello di zoom dentro i limiti condivisi. Unico punto che
+  // scrive lo zoom del webFrame: rotella, badge, tasti e chat passano da qui.
+  function setLevel(level) {
+    const clamped = Z ? Z.limita(level) : Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level));
+    try { webFrame.setZoomLevel(clamped); } catch (_) {}
+    refreshPercent();
+  }
+
+  // Applica la percentuale digitata nel campo, con gli stessi limiti di ogni
+  // altra strada (prima il badge accettava valori che i tasti non sanno
+  // reggere: il primo Ctrl+ dopo un 400% riportava indietro di colpo).
   function applyPercentFromInput() {
     if (!percentInput) return;
-    const v = parseInt(String(percentInput.value).replace(/[^\d]/g, ''), 10);
-    if (Number.isFinite(v) && v > 0) {
-      const factor = Math.max(0.25, Math.min(5, v / 100));
-      try { webFrame.setZoomFactor(factor); } catch (_) {}
-    }
+    const esito = Z ? Z.risolvi(letturaLivello(), { percentuale: percentInput.value }) : null;
+    if (esito) setLevel(esito.livello);
     if (percentInput) percentInput.value = String(currentPercent());
+  }
+
+  function letturaLivello() {
+    try { return webFrame.getZoomLevel(); } catch (_) { return 0; }
   }
 
   function makeBadge() {
@@ -217,12 +258,6 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       catch (_) { return false; }
     }
 
-    function setLevel(level) {
-      const clamped = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level));
-      try { webFrame.setZoomLevel(clamped); } catch (_) {}
-      refreshPercent();
-    }
-
     // Pinch del trackpad e Ctrl+rotella → wheel con ctrlKey=true. Passo
     // proporzionale al delta così il pinch (incrementi piccoli) resta fluido.
     // In modalità rotella ci pensa già l'handler sopra: qui ci tiriamo fuori.
@@ -267,8 +302,19 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     // (fila delle schede): lì i tasti non arrivano alla pagina, quindi il main
     // li inoltra qui. Passano dallo STESSO punto degli altri, così l'opt-out
     // delle pagine che zoomano da sé vale anche per questa strada.
+    //
+    // Dalla stessa porta entra anche lo zoom chiesto a parole in chat, che
+    // oltre al verso può portare una percentuale esatta e un `rid` a cui
+    // rispondere: chi ha chiesto «al 900%» deve poter sapere dove è finito.
     if (ipc && typeof ipc.on === 'function') {
-      ipc.on('filo:zoom-key', (_e, dir) => {
+      ipc.on('filo:zoom-key', (_e, payload) => {
+        // Il verso da solo (i tasti) o un oggetto {verso|percentuale, rid}.
+        const spec = (payload && typeof payload === 'object') ? payload : { verso: payload };
+        const rid = spec.rid ? String(spec.rid) : '';
+        const rispondi = (esito) => {
+          if (!rid || typeof ipc.send !== 'function') return;
+          try { ipc.send('filo:zoom-applicato', { rid, ...(esito || { sconosciuto: true }) }); } catch (_) {}
+        };
         // La pagina che zooma da sé (l'editor scala il foglio) non deve essere
         // zoomata da qui — ma il tasto va comunque CONSEGNATO, altrimenti su
         // Mac il suo zoom muore in silenzio: là questa è l'unica strada, perché
@@ -276,19 +322,28 @@ module.exports = function setupWheelZoom(webFrame, opts) {
         // Su Windows e Linux il keydown della pagina arriva e basta a sé.
         //
         // Il verso sta nel NOME dell'evento, non in `detail`: fra il mondo
-        // isolato del preload e quello della pagina un `detail` non passa.
+        // isolato del preload e quello della pagina un `detail` non passa. Una
+        // percentuale esatta passa dal dataset, che il DOM condivide.
         if (pageHandlesZoom()) {
           try {
-            const nomi = { in: 'filo:zoom-in', out: 'filo:zoom-out', reset: 'filo:zoom-reset' };
-            if (nomi[dir]) document.dispatchEvent(new Event(nomi[dir]));
+            const perc = Z ? Z.leggiPercentuale(spec.percentuale) : null;
+            if (perc != null) {
+              document.documentElement.dataset.filoZoomTarget = String(perc);
+              document.dispatchEvent(new Event('filo:zoom-set'));
+            } else {
+              const nomi = { in: 'filo:zoom-in', out: 'filo:zoom-out', reset: 'filo:zoom-reset' };
+              if (nomi[spec.verso]) document.dispatchEvent(new Event(nomi[spec.verso]));
+            }
           } catch (_) {}
+          // Quanto zoom abbia il foglio dell'editor lo sa solo l'editor: qui
+          // non si inventa un numero da riferire.
+          rispondi(null);
           return;
         }
-        try {
-          if (dir === 'reset') setLevel(0);
-          else if (dir === 'in') setLevel(webFrame.getZoomLevel() + ZOOM_STEP);
-          else if (dir === 'out') setLevel(webFrame.getZoomLevel() - ZOOM_STEP);
-        } catch (_) {}
+        const esito = Z ? Z.risolvi(letturaLivello(), spec) : null;
+        if (!esito) { rispondi(null); return; }
+        setLevel(esito.livello);
+        rispondi({ percentuale: currentPercent(), richiesto: esito.richiesto, limitato: esito.limitato, min: esito.min, max: esito.max });
       });
     }
   }

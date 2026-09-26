@@ -335,6 +335,14 @@
       properties: {},
       required: [],
     },
+    ZOOM_PAGINA: {
+      description: 'INGRANDISCE o RIMPICCIOLISCE tutta la pagina che l\'utente sta guardando — testo E immagini insieme, come Ctrl +/-/0. Per "ingrandisci la pagina", "zoom al 150%", "è troppo piccolo", "rimpicciolisci", "torna alla dimensione normale". NON confonderlo con la dimensione del testo nelle impostazioni (IMPOSTA_PREFERENZA, che cambia l\'interfaccia di Filo) né con STILE_PAGINA (che cambia il carattere di un pezzo di pagina): qui si scala la pagina intera. Passa `percentuale` quando l\'utente dice un numero, altrimenti `verso`. Il livello attuale è nello STATO: usalo per capire "un po\' più grande". Lo zoom resta sul sito, anche dopo il riavvio.',
+      properties: {
+        percentuale: I('Livello esatto in percentuale (100 = dimensione reale). Da 25 a 500: oltre, il sistema si ferma al limite e te lo dice.'),
+        verso: S('Un passo per volta, come i tasti: "in" più grande, "out" più piccolo, "reset" torna al 100%.', { enum: ['in', 'out', 'reset'] }),
+      },
+      required: [],
+    },
     COMANDO_FINESTRA: {
       description: 'Aziona un controllo del browser Filo (la finestra e la barra in alto), non il sito. "fullscreen" = schermo intero immersivo (la pagina attiva copre tutta la finestra, barre nascoste, Esc esce), non il pulsante del lettore video dentro il sito. NON esiste un comando per CHIUDERE la finestra o le schede. Esegue subito.',
       properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (menu Account).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account'] }) },

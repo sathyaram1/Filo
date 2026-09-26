@@ -1669,6 +1669,39 @@ class TabManager {
     });
   }
 
+  // Zoom della scheda attiva chiesto da fuori la tastiera (oggi: la chat).
+  // Passa dalla STESSA porta dei tasti, così la memoria per sito e l'opt-out
+  // delle pagine che zoomano da sé restano di chi già li tiene. Il preload
+  // risponde con la percentuale che ha davvero applicato: chi chiede un valore
+  // fuori scala deve poterlo dire all'utente invece di tacere il taglio.
+  applicaZoom(spec) {
+    const active = this.tabs.find((t) => t.id === this.activeId);
+    if (!active || !active.view) return Promise.resolve(null);
+    const wc = active.view.webContents;
+    const rid = `zoom-${randomUUID()}`;
+    return new Promise((resolve) => {
+      const { ipcMain } = require('electron');
+      let chiuso = false;
+      const fine = (v) => {
+        if (chiuso) return;
+        chiuso = true;
+        clearTimeout(scadenza);
+        try { ipcMain.removeListener('filo:zoom-applicato', onEco); } catch (_) {}
+        resolve(v);
+      };
+      // Solo la scheda a cui l'abbiamo chiesto può rispondere: un'altra pagina
+      // non deve poter mettere un numero in bocca a Filo.
+      const onEco = (e, msg) => {
+        if (!msg || String(msg.rid || '') !== rid) return;
+        if (e.sender !== wc) return;
+        fine(msg);
+      };
+      const scadenza = setTimeout(() => fine(null), 2000);
+      ipcMain.on('filo:zoom-applicato', onEco);
+      try { wc.send('filo:zoom-key', { ...spec, rid }); } catch (_) { fine(null); }
+    });
+  }
+
   // ─── eventi della WebContents → aggiorna stato + broadcast ─────────────
 
   _wireEvents(tab) {
