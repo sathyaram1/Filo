@@ -136,8 +136,15 @@ async function vaglia({ testo, classe, fonte, richiesta, modelloProduttore, link
   for (let i = 0; i < TENTATIVI; i++) {
     let risposta = null;
     try {
-      risposta = await deps.runOneShot(C.ACTIONS.NOTICE_GUARD, messages, { modelRef: catena.join(',') });
+      risposta = await deps.runOneShot(C.ACTIONS.NOTICE_GUARD, messages, {
+        modelRef: catena.join(','), escludiModelli: vietati,
+      });
     } catch (e) {
+      // Restare senza tentativi perché tutti finivano sul modello che ha
+      // scritto il testo non è un guasto di rete: aspettare non lo risolve.
+      if (e && e.code === 'GUARDIANO_NON_INDIPENDENTE') {
+        return { esito: 'attesa', regola: 'senza-guardiano', motivo: '', motivoChiave: '' };
+      }
       console.warn('[guardiano] tentativo fallito:', (e && e.message) || e);
       continue;
     }
