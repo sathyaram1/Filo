@@ -53,6 +53,25 @@ paga. Ma due filtri che sembrerebbero ovvi non si possono scrivere:
   un taglio silenzioso su una decisione, non su un elenco. Restano la proiezione e
   il conteggio.
 
+## Una copia in una cartella di tutti si difende da sola
+
+La copia vive in `os.tmpdir()`, che su Mac e Linux è di tutti, e il suo nome è
+l'impronta di una chiave che chiunque può ricavare. Chi crea quella cartella per
+primo deciderebbe due cose: cosa ci troviamo dentro (per le routine sarebbero i
+bilanci del giro e l'interruttore che le accende) e dove finisce quello che
+scriviamo, se al posto del file lascia un rimando. Quindi:
+
+- la cartella si crea `0700`; se esiste ed è di qualcun altro, o è un rimando, la
+  copia non si fa e si rilegge dal server; se è nostra ma aperta (l'ha lasciata
+  così una versione di prima) si chiude, invece di smettere di funzionare zitta;
+- i file si aprono con `O_NOFOLLOW`, in lettura e in scrittura, e si scartano se
+  non sono nostri o sono leggibili da altri;
+- su Windows niente di tutto questo serve e `O_NOFOLLOW` non esiste: `%TEMP%` sta
+  già dentro il profilo dell'utente. Il ramo di piattaforma è scritto intero.
+
+Una copia rifiutata non è un errore: chi legge torna al server, come quando la
+copia è scaduta.
+
 ## Dove vive
 
 `scripts/lib/copia-su-file.mjs` (la copia con scadenza),
@@ -65,8 +84,11 @@ minuto, condivisa fra dispatch e verify-local),
 Le sentinelle: `tests/unit/letturePerCampi.test.mjs` diventa rossa su una
 scansione in `scripts/` che non dice quali campi le servono — per chiamata, non
 per file, così uno script che altrove passa i campi non assolve la scansione che
-li ha dimenticati. `tests/unit/copiaSuFile.test.mjs` tiene le regole della copia:
-fresca risponde, scaduta o illeggibile no, e dopo un'applicazione si butta.
+li ha dimenticati, e su OGNI `list…` del modulo, non su un elenco di nomi: con
+l'elenco, `listAll` e `listAllPublicPaged` passavano davanti senza una parola.
+`tests/unit/copiaSuFile.test.mjs` tiene le regole della copia: fresca risponde,
+scaduta o illeggibile no, dopo un'applicazione si butta, e quello che qualcun
+altro ha preparato nella cartella temporanea non si legge né si riscrive.
 
 Vicino: [Una pagina dei più recenti non è «tutto»](una-pagina-dei-piu-recenti-non-e-tutto.md)
 — lì il difetto è l'opposto e la cura si incontra a metà: si leggono tutte le

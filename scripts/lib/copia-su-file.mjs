@@ -3,7 +3,7 @@
 // Regole e perché: patterns/una-scansione-chiede-i-campi-che-usa-e-si-paga-una-volta.md
 
 import {
-  constants, closeSync, fstatSync, lstatSync, mkdirSync, openSync,
+  chmodSync, constants, closeSync, fstatSync, lstatSync, mkdirSync, openSync,
   readFileSync, writeFileSync, unlinkSync,
 } from 'node:fs';
 import { createHash } from 'node:crypto';

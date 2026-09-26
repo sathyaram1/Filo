@@ -208,15 +208,29 @@ test('la cartella delle copie nasce chiusa agli altri utenti della macchina', { 
   assert.equal(cartellaCopie(dentro), dentro);
   assert.equal(statSync(dentro).mode & 0o077, 0);
 
-  // E una cartella che qualcun altro ha lasciato aperta non si usa: meglio
-  // ripagare la lettura che fidarsi di quello che c'è dentro.
-  const aperta = unisci(cartellaTemporanea('copia-cartella-aperta-'), 'loro');
+  // Una cartella nostra lasciata aperta da una versione di prima si chiude,
+  // invece di far smettere di funzionare la copia in silenzio.
+  const aperta = unisci(cartellaTemporanea('copia-cartella-aperta-'), 'copie');
   crea(aperta, { recursive: true });
   chmodSync(aperta, 0o777);
-  assert.equal(cartellaCopie(aperta), '');
-  assert.equal(percorsoCopia('x', aperta), '');
-  assert.equal(scriviCopia('x', { a: 1 }, { dir: aperta }), '');
-  assert.equal(leggiCopia('x', { dir: aperta }), null);
+  assert.equal(cartellaCopie(aperta), aperta);
+  assert.equal(statSync(aperta).mode & 0o077, 0);
+});
+
+test('una cartella preparata da qualcun altro non si usa', { skip: !CONDIVISA }, async () => {
+  const { symlinkSync, mkdirSync: crea } = await import('node:fs');
+  const { join: unisci } = await import('node:path');
+  // Un rimando al posto della cartella: chi lo lascia lì deciderebbe dove
+  // finisce quello che abbiamo letto. Meglio ripagare la lettura.
+  const base = cartellaTemporanea('copia-cartella-altrui-');
+  const altrove = unisci(base, 'roba-sua');
+  crea(altrove, { recursive: true, mode: 0o700 });
+  const finta = unisci(base, 'copie');
+  symlinkSync(altrove, finta);
+  assert.equal(cartellaCopie(finta), '');
+  assert.equal(percorsoCopia('x', finta), '');
+  assert.equal(scriviCopia('x', { a: 1 }, { dir: finta }), '');
+  assert.equal(leggiCopia('x', { dir: finta }), null);
 });
 
 test('un rimando lasciato lì da qualcun altro non fa scrivere lo strumento dove dice lui', { skip: !CONDIVISA }, async () => {
