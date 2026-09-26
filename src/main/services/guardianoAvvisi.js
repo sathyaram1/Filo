@@ -56,14 +56,21 @@ function segretiDi(settings) {
   return out;
 }
 
-// Chi ha scritto, come compare nella riga di blocco: un indirizzo dentro il
-// nome del mittente rimetterebbe lì l'esca appena tolta.
+// Chi ha scritto, come compare nella riga di blocco. Di una fonte si tiene
+// SOLO l'identità verificabile — l'indirizzo di posta, o il sito — perché
+// tutto il resto del campo lo scrive chi manda: un nome di mittente è testo
+// libero, e lasciarcelo passare rimetterebbe nella riga l'esca appena tolta
+// (un numero da chiamare non ha bisogno di nessun collegamento).
 function fonteVisibile(fonte) {
   const C = globalThis.SN_CONST;
+  const st = GS();
   const grezza = C ? C.unaRigaDiDati(fonte, 200) : String(fonte || '').trim();
-  if (!grezza) return 'una fonte sconosciuta';
-  if (/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(grezza)) return grezza;
-  return grezza.replace(/\bhttps?:\/\/\S+/gi, '…').slice(0, 80);
+  if (!grezza) return 'una fonte che non si è identificata';
+  const posta = grezza.match(/[^\s<>()@,;:"]+@[a-z0-9.-]+\.[a-z]{2,}/i);
+  if (posta) return posta[0].toLowerCase();
+  const host = st ? st.hostNominato(grezza) : '';
+  if (host) return host;
+  return 'una fonte che non si è identificata';
 }
 
 // I collegamenti escono dalla frase e si etichettano con la destinazione vera:
