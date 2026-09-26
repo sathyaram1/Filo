@@ -30,11 +30,12 @@
 //   lo zoom deve funzionare allo stesso modo ovunque.
 //
 //   OPT-OUT PER LE PAGINE CHE ZOOMANO DA SÉ
-//   Una pagina che implementa il proprio zoom (l'editor scala il foglio via CSS
-//   invece dell'intera finestra) si tira fuori marcando
+//   Una pagina di Filo che implementa il proprio zoom (l'editor scala il foglio
+//   via CSS invece dell'intera finestra) si tira fuori marcando
 //   `document.documentElement.dataset.filoOwnZoom = '1'`. Il controllo avviene
 //   al momento dell'evento, quindi il marker può essere messo quando vuole:
-//   senza, lo zoom verrebbe applicato due volte.
+//   senza, lo zoom verrebbe applicato due volte. Vale SOLO con `opts.interna`:
+//   il marcatore sta nel documento, e su un sito lo scriverebbe il sito.
 //
 //   LO ZOOM CHIESTO A PAROLE (#686)
 //   La chat non zooma da sé: manda `filo:zoom-key` come i tasti, con un verso

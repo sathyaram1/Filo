@@ -1744,11 +1744,19 @@
     };
   }
 
-  // Livello di zoom della pagina, o null se è alla dimensione reale.
+  // Livello di zoom della pagina, o null se è alla dimensione reale. Il numero
+  // lo tiene il preload, che gira nello stesso mondo isolato di questo file:
+  // passare dal documento lo metterebbe a portata del sito, che lo userebbe per
+  // rimettersi lo zoom come vuole lui (#686, primo giro di verifica).
+  function zoomPagina() {
+    return (typeof self !== 'undefined' && self.SN_ZOOM_PAGINA) || null;
+  }
+
   function zoomCorrente() {
+    const Z = zoomPagina();
+    if (!Z) return null;
     try {
-      document.dispatchEvent(new Event('filo:zoom-chiedi'));
-      const p = parseInt(document.documentElement.dataset.filoZoom || '', 10);
+      const p = Z.percentuale();
       return Number.isFinite(p) && p !== 100 ? p : null;
     } catch (_) { return null; }
   }
