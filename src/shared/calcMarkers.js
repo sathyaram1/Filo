@@ -202,6 +202,20 @@
   // spazio o formattazione: la valuta arriva nel pezzo dopo.
   const SOLO_ORPELLI = new RegExp(`^[\\s\\u00A0]*${ORPELLI}[\\s\\u00A0]*$`);
 
+  // A dire che quel numero è un prezzo dev'essere chi ORDINA il conto: il
+  // marker porta l'unità dopo una barra, [[calc: 3000/109.3 | eur]]. Leggerlo
+  // dalle parole intorno chiude un modo di scrivere la frase per volta (#724).
+  const UNITA_VALUTA = new Set(['eur', 'euro', '€', 'valuta']);
+
+  function separaUnita(raw) {
+    const i = String(raw).lastIndexOf('|');
+    if (i < 0) return { espr: raw, valuta: false };
+    return {
+      espr: raw.slice(0, i).trim(),
+      valuta: UNITA_VALUTA.has(raw.slice(i + 1).trim().toLowerCase()),
+    };
+  }
+
   // ----------------------------------------------------------------
   // Sostituisce i marker [[calc: <espressione>]] emessi dall'LLM
   // con il risultato calcolato in locale. I marker incompleti
@@ -212,15 +226,20 @@
   function resolveCalcMarkers(text, opts) {
     if (!text) return text;
     const streaming = !!(opts && opts.streaming);
-    let out = text.replace(CALC_MARKER_RE, (m, expr, offset, full) => {
+    let out = text.replace(CALC_MARKER_RE, (m, raw, offset, full) => {
+      const { espr, valuta: dichiarata } = separaUnita(raw);
       const dopo = full.slice(offset + m.length);
       // In streaming la valuta arriva un pezzo DOPO il marker: finché dietro
       // non c'è niente non si sa se il risultato è un prezzo, e un numero a
       // dodici cifre che un istante dopo diventa «27,45 €» è uno sfarfallio.
-      if (streaming && SOLO_ORPELLI.test(dopo)) return '…';
-      const r = tryMathEval(expr);
+      // Se l'unità è dichiarata non c'è niente da aspettare.
+      if (!dichiarata && streaming && SOLO_ORPELLI.test(dopo)) return '…';
+      const r = tryMathEval(espr);
       if (!r.ok) return m;
-      const valuta = VALUTA_DOPO.test(dopo) || VALUTA_PRIMA.test(full.slice(0, offset));
+      // Il vicinato resta un RIPIEGO, per il modello che l'unità non la
+      // dichiara: può solo aggiungere un prezzo, mai toglierne uno.
+      const valuta = dichiarata
+        || VALUTA_DOPO.test(dopo) || VALUTA_PRIMA.test(full.slice(0, offset));
       return formatMathResult(r.value, { valuta });
     });
     // Nasconde marker incompleti in coda durante lo streaming
