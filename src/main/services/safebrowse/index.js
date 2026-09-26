@@ -171,6 +171,7 @@ function buildLlmMeta(norm, ctx, verdict) {
     publicSuffix: norm.publicSuffix,
     looksLikeBrand: imp ? imp.brand.display : null,
     impersonationKind: imp ? imp.kind : null,
+    hostedOn: verdict.hosted || null,
     ageDays: assembleCached(norm).ageDays ?? null,
     certStatus: assembleCached(norm).cert?.status ?? null,
     linkOrigin: ctx.linkOrigin || null,
