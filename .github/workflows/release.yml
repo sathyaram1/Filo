@@ -577,7 +577,29 @@ jobs:
     if: ${{ !cancelled() && (inputs.ripubblica_mac || (needs.release.result == 'success' && needs.release.outputs.should_release == 'true' && needs.release.outputs.version != '')) }}
     runs-on: macos-latest
     continue-on-error: true
+    outputs:
+      allarme: ${{ steps.allarme.outputs.esito }}
     steps:
+      # ─── L'AVVISO DEVE POTER PARLARE PRIMA DI TUTTO IL RESTO ─────────────
+      #   Lo strumento che apre il feedback vive nel codice del progetto, e la
+      #   copia di lavoro qui sotto diventa quella della versione a cui ci si
+      #   attacca: un tag vecchio, che quello strumento non ce l'ha, o niente
+      #   affatto se il prelievo fallisce. Finche' l'avviso dipendeva da quella
+      #   copia, un guasto nei primi passi lo lasciava muto e la corsa verde —
+      #   lo stesso silenzio del #733. Qui si prende il codice di QUESTA corsa e
+      #   lo si mette al riparo fuori dalla copia di lavoro.
+      - name: Il codice di questa corsa (porta lo strumento dell'avviso)
+        id: strumento
+        uses: actions/checkout@v4
+
+      - name: Lo strumento dell'avviso al riparo dalla copia di lavoro
+        id: riparo
+        shell: bash
+        run: |
+          set -e
+          mkdir -p "${{ runner.temp }}/allarme/scripts"
+          cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
+
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'
       # Windows, e il codice e' il COMMIT che ha costruito lei, non il tag (il
