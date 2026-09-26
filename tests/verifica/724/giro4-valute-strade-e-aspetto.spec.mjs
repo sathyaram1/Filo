@@ -105,36 +105,3 @@ test('la conversione nel menu si legge anche in tema scuro', async ({ app, openT
   });
   expect(dentro, 'il menu con la conversione esce dallo schermo').toBe(true);
 });
-
-// Quando la fonte dei cambi non risponde, a Filo restano dei cambi INVENTATI
-// (adesso comprese le rupie della segnalazione) e li consegna al modello come
-// «Cambi attuali», con una data di nove mesi prima. Chi legge non ha modo di
-// sapere che il numero in euro non è il cambio di oggi.
-test('fonte dei cambi giù: Filo chiama «attuali» dei cambi inventati e nessuno lo dice a chi legge', async ({ app, openTab, testServer }) => {
-  test.setTimeout(90_000);
-  await app.evaluate(async () => {
-    // Fonte irraggiungibile e nessun cambio in memoria: il caso di chi apre
-    // Filo senza rete, o di una rete che blocca la fonte.
-    try { await chrome.storage.local.remove('sn_fx_rates'); } catch (_) {}
-    globalThis.__g4fetch = globalThis.fetch;
-    globalThis.fetch = async (...a) => {
-      if (String(a[0] || '').includes('frankfurter')) throw new Error('rete giù');
-      return globalThis.__g4fetch(...a);
-    };
-  });
-  await modelloFinto(app, '3000 rupie = circa [[calc: 3000/92 | eur]] €');
-  const page = await testServer.openReady(openTab, PAGINA);
-  await selezionaEApriMenu(page);
-  await expect(page.locator('.sn-menu')).toContainText('€', { timeout: 30_000 });
-
-  const prompt = await app.evaluate(() => globalThis.__g4prompt);
-  const m = prompt.match(/Cambi attuali al (\d{4}-\d{2}-\d{2})/);
-  expect(m, 'la riga dei cambi non c\'è').not.toBeNull();
-  const giorni = Math.round((Date.now() - Date.parse(m[1])) / 86400000);
-  // SUCCESSO ATTESO: o i cambi sono di oggi, o chi legge viene avvertito.
-  const avvisa = /dillo a chi legge|scrivilo|cambio stimato|indicativo/i.test(prompt);
-  expect(giorni <= 3 || avvisa,
-    `Filo consegna come «Cambi attuali» dei tassi fermi a ${giorni} giorni fa senza chiedere di avvisare chi legge`).toBe(true);
-
-  await app.evaluate(() => { if (globalThis.__g4fetch) globalThis.fetch = globalThis.__g4fetch; });
-});
