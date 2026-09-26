@@ -155,6 +155,7 @@
   // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
   const mgPreapproveBtn = document.getElementById('mgPreapproveBtn');
+  const mgPreapproveRevokeBtn = document.getElementById('mgPreapproveRevokeBtn');
   const mgPreapprovedInfo = document.getElementById('mgPreapprovedInfo');
   const mgPreapproveLine = document.getElementById('mgPreapproveLine');
   const mgStarBtn    = document.getElementById('mgStarBtn');
