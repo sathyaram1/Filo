@@ -144,3 +144,20 @@ test('il numero della versione si accetta anche scritto con la V maiuscola', () 
     "spazi incollati per sbaglio e la «v» dimenticata sono perdonati, una V maiuscola no: diventa «vV0.2.229», il prelievo non trova niente e il giro e' a vuoto",
   ).toMatch(/\[Vv\]|tr '\[:upper:\]'|tolower/);
 });
+
+// PORTA 4 — l'ultima rete guarda solo un avviso che ha PROVATO a partire e non
+// ce l'ha fatta. Se il lavoro viene stroncato invece che fallire (il tetto di
+// tempo del lavoro, la macchina che muore), il passo dell'avviso non parte
+// nemmeno, il suo esito resta vuoto, la rete non scatta e la corsa resta verde
+// per il `continue-on-error`: di nuovo il silenzio del #733.
+test("la rete finale scatta anche quando l'avviso non e' proprio partito", () => {
+  const nomi = [...YML.slice(YML.search(/^jobs:\s*$/m)).matchAll(/^ {2}([a-z][\w-]*):\s*$/gm)].map((m) => m[1]);
+  const rete = nomi.filter((n) => /needs\.release-(mac|linux)\.outputs\.allarme/.test(job(n)));
+  expect(rete.length, 'nessun lavoro si accorge di un avviso che non ha parlato').toBeGreaterThan(0);
+  for (const n of rete) {
+    expect(
+      senzaCommenti(job(n)),
+      `\`${n}\` scatta solo se l'avviso ha provato a partire ed e' fallito. Se il lavoro viene stroncato dal suo tetto di tempo o dalla macchina, quel passo non gira, l'esito resta vuoto e la corsa resta verde: il guasto non lo sa nessuno`,
+    ).toMatch(/allarme != 'aperto'|allarme == ''|outputs\.finito|always\(\)/);
+  }
+});
