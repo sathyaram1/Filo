@@ -1,27 +1,29 @@
 import { test, expect } from '../../fixtures/electron.mjs';
 
-test('esplora verdetti', async ({ app }) => {
-  const urls = [
-    'https://google.github.io/styleguide/', 'https://googlechromelabs.github.io/chrome-for-testing/',
-    'https://microsoft.github.io/monaco-editor/', 'https://facebook.github.io/react-native/',
-    'https://github.github.io/fetch/', 'https://paypal.github.io/', 'https://shopify.github.io/',
-    'https://netflix.github.io/', 'https://linkedin.github.io/', 'https://yahoo.github.io/', 'https://dropbox.github.io/',
-    'https://facebookresearch.github.io/', 'https://krakenjs.github.io/', 'https://discord-bot-guide.github.io/',
-    'https://pineapple.github.io/', 'https://otherwise.github.io/', 'https://sathyarampontillo.github.io/',
-    'https://octocat.github.io/', 'https://paypal-login.github.io/', 'https://paypa1.github.io/',
-    'https://fonts.googleapis.com/css2', 'https://www.googleapis.com/', 'https://microsoft.sharepoint.com/',
-    'https://paypal.sharepoint.com/', 'https://contoso-my.sharepoint.com/personal/x',
-    'https://google.gitlab.io/', 'https://gitlab-org.gitlab.io/', 'https://microsoft.netlify.app/',
-    'https://GOOGLE.GITHUB.IO/styleguide/', 'https://google.github.io./',
-    'https://cdn.jsdelivr.net/gh/x/y', 'https://raw.githubusercontent.com/google/x/main/a',
-    'https://objects.githubusercontent.com/', 'https://user-images.githubusercontent.com/1/a.png',
-    'https://avatars.githubusercontent.com/u/1', 'https://gist.githubusercontent.com/a/b/raw',
-    'https://github-io.github.io/', 'https://github.io/', 'https://pages.github.com/',
-  ];
-  const v = await app.evaluate((_, us) => {
-    const SB = globalThis.SN_SAFEBROWSE;
-    return us.map((u) => { const x = SB.checkSync(u, {}); return [u, x.level, x.whitelisted ? 'wl' : '', x.message && x.message.title]; });
-  }, urls);
-  console.log(JSON.stringify(v, null, 1));
-  expect(v.length).toBeGreaterThan(0);
-});
+const tabInfo = (app, host) => app.evaluate(({ BrowserWindow }, h) => {
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (!w._filoTabs) continue;
+    for (const t of w._filoTabs.tabs) {
+      let u = '';
+      try { u = new URL(t.view.webContents.getURL()).hostname; } catch (_) {}
+      if (u === h) return { level: t.sbLevel || null, keys: Object.keys(t).filter((k) => /sb/i.test(k)), v: t.sbVerdict ? JSON.stringify(t.sbVerdict).slice(0, 300) : null };
+    }
+  }
+  return null;
+}, host);
+
+for (const [url, host] of [['https://google.github.io/styleguide/', 'google.github.io'], ['https://github.github.io/fetch/', 'github.github.io']]) {
+  test('rete vera ' + host, async ({ app, openTab, shell }) => {
+    const page = await openTab(url);
+    await page.waitForLoadState('load').catch(() => {});
+    const visti = [];
+    const fine = Date.now() + 15_000;
+    while (Date.now() < fine) {
+      const l = await tabInfo(app, host);
+      visti.push(l && l.level);
+      await page.waitForTimeout(1000);
+    }
+    console.log(host, JSON.stringify(visti), JSON.stringify(await tabInfo(app, host)), await page.title());
+    expect(visti.length).toBeGreaterThan(0);
+  });
+}
