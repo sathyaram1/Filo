@@ -59,12 +59,15 @@ export function isFresh(marker, nowMs = Date.now(), maxAgeMs = MAX_AGE_MS) {
   return nowMs - t <= maxAgeMs && nowMs - t >= -60 * 1000; // tolleranza di un minuto sull'orologio
 }
 
-export function writeRole(root, role) {
+// `dal`: in un giro di riallineamento, il commit che aveva passato la verifica. finish:check
+// sceglie gli spec anche dai file cambiati da lì, cioè il lato arrivato da main.
+export function writeRole(root, role, { dal = '' } = {}) {
   const r = normalizeRole(role);
   if (!r) return null;
   try {
     mkdirSync(resolve(root, '.claude'), { recursive: true });
-    const marker = { role: r, since: new Date().toISOString() };
+    const sha = String(dal || '').trim();
+    const marker = { role: r, since: new Date().toISOString(), ...(/^[0-9a-f]{7,40}$/i.test(sha) ? { dal: sha } : {}) };
     writeFileSync(roleFile(root), JSON.stringify(marker, null, 2) + '\n', 'utf8');
     return marker;
   } catch (_) {
@@ -93,29 +96,32 @@ function readMarkerFrom(dir) {
 }
 
 /**
- * Il ruolo dell'istanza corrente, o '' se non si sa.
+ * Il marcatore valido dell'istanza corrente, o null.
  *
- * Precedenza: variabile d'ambiente esplicita > marcatore di QUESTA directory >
- * marcatore del checkout principale. L'ultimo passaggio serve ai ruoli che
- * lavorano dentro una cartella di lavoro separata (`.claude/worktrees/…`): lì
- * `.claude/` è un'altra cartella, ma il marcatore l'ha scritto il dispatcher nel
- * checkout principale. Stesso trucco già usato per ritrovare la chiave privata.
+ * Precedenza: marcatore di QUESTA directory > marcatore del checkout
+ * principale. L'ultimo passaggio serve ai ruoli che lavorano dentro una
+ * cartella di lavoro separata (`.claude/worktrees/…`): lì `.claude/` è
+ * un'altra cartella, ma il marcatore l'ha scritto il dispatcher nel checkout
+ * principale.
  */
-export function readRole(root, { now = Date.now() } = {}) {
-  const fromEnv = normalizeRole(process.env.FILO_ROUTINE_ROLE);
-  if (fromEnv) return fromEnv;
-
+export function readMarker(root, { now = Date.now() } = {}) {
   const here = readMarkerFrom(root);
-  if (isFresh(here, now)) return normalizeRole(here.role);
-
+  if (isFresh(here, now)) return here;
   try {
     const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
       { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (common) {
       const main = readMarkerFrom(resolve(common, '..'));
-      if (isFresh(main, now)) return normalizeRole(main.role);
+      if (isFresh(main, now)) return main;
     }
   } catch (_) { /* niente git o repo nudo: pazienza */ }
+  return null;
+}
 
-  return '';
+/** Il ruolo dell'istanza corrente, o '' se non si sa. La variabile d'ambiente vince sul marcatore. */
+export function readRole(root, { now = Date.now() } = {}) {
+  const fromEnv = normalizeRole(process.env.FILO_ROUTINE_ROLE);
+  if (fromEnv) return fromEnv;
+  const m = readMarker(root, { now });
+  return m ? normalizeRole(m.role) : '';
 }

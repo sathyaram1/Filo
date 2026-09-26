@@ -1802,12 +1802,12 @@ export function emit(bucket, ctx) {
   // Un guasto (`halt`) non è un ruolo: si cancella il marcatore, altrimenti
   // quello del giro precedente sopravviverebbe a un giro che non ha lavorato e
   // finirebbe nella provenienza di un feedback altrui.
+  const ambito = bucket.role === 'verifier' ? verifierScope(ctx && ctx.scope) : { scope: '', sconosciuto: false };
   if (bucket.role === 'halt') clearRole(ROOT);
-  else writeRole(ROOT, bucket.role);
+  else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? ctx?.perimetro?.shaVerificato : '' });
   const payload = buildPayload(bucket, ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
-  const ambito = bucket.role === 'verifier' ? verifierScope(ctx && ctx.scope) : { scope: '', sconosciuto: false };
   if (ambito.sconosciuto) process.stderr.write(`[dispatch] ambito di verifica sconosciuto («${unaRiga(ctx.scope).slice(0, 40)}»): consegno la verifica piena\n`);
   // Nei giri stretti la serie non si consegna: inviterebbe alla ricerca larga
   // che il testo del ruolo dice di non rifare.
