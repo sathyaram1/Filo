@@ -937,7 +937,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
     onDelta: (delta) => { if (!daGuardare && onDelta) onDelta(delta); },
     // Il provider è caduto DOPO aver già streamato dei delta: avvisa il
     // renderer di buttare il testo parziale prima che arrivi il fallback (#273).
-    onReset: (info) => { if (onReset) onReset(info); },
+    onReset: (info) => { if (!daGuardare && onReset) onReset(info); },
   });
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
@@ -955,6 +955,12 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   });
 
   AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage }).catch(() => {});
+  if (daGuardare) {
+    const v = await passaDalSecondoModello({
+      testo: result.text, classe: classeFonti, concreteModel, action, payload, origin,
+    });
+    if (onDelta) onDelta(v ? v.testo : result.text);
+  }
   return { costEur, usage: result.usage, provider: usedProvider, model: concreteModel };
 }
 
