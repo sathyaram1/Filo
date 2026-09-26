@@ -7,12 +7,6 @@
 
 const { ipcRenderer, webFrame } = require('electron');
 
-// Modalità zoom con la rotella attivata dal click centrale (sostituisce
-// l'autoscroll nativo) + zoom con Ctrl/Cmd (rotella, pinch del trackpad,
-// Ctrl +/-/0): sulle pagine interne funziona come su quelle web. Le pagine che
-// zoomano da sé si tirano fuori con `dataset.filoOwnZoom`. Vedi wheel-zoom.js.
-try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer, interna: true }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
-
 // ─── SICUREZZA: gate d'origine ─────────────────────────────────────────────
 // Questo preload è PRIVILEGIATO: espone window.filo (IPC, shell, AI stream) e
 // uno shim chrome.* con accesso a storage (chiavi API + TUTTI i dati utente) e
@@ -27,6 +21,15 @@ try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer, intern
 const IS_FILO_ORIGIN = (() => {
   try { return location.protocol === 'filo:'; } catch (_) { return false; }
 })();
+
+// Modalità zoom con la rotella attivata dal click centrale (sostituisce
+// l'autoscroll nativo) + zoom con Ctrl/Cmd (rotella, pinch del trackpad,
+// Ctrl +/-/0): sulle pagine interne funziona come su quelle web. Le pagine che
+// zoomano da sé si tirano fuori con `dataset.filoOwnZoom`. Vedi wheel-zoom.js.
+// Quel marcatore vale solo se il documento è davvero filo://: se un documento
+// non nostro finisse a girare qui (il caso che teme il gate qui sopra) se lo
+// scriverebbe da sé per rendersi impossibile da ingrandire (#686).
+try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer, interna: IS_FILO_ORIGIN }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
 
 let streamCounter = 0;
 
