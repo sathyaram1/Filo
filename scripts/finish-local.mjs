@@ -423,7 +423,8 @@ function runSpecsALotti(specs, label) {
   let ok = true;
   lotti.forEach((lotto, i) => {
     const suffisso = lotti.length > 1 ? ` — lotto ${i + 1}/${lotti.length}, ${lotto.length} spec` : '';
-    if (!run('npx', ['playwright', 'test', ...lotto], label + suffisso)) ok = false;
+    const l = preparaLancioElectron('npx', ['playwright', 'test', ...lotto]);
+    if (!l.ok || !run(l.cmd, l.args, label + suffisso, l.env)) ok = false;
   });
   return ok;
 }
