@@ -457,10 +457,10 @@
       invoke: 'Pagina filo://security/security.html.',
     },
     {
-      id: 'notice-guard', title: 'Un secondo modello controlla gli avvisi', category: 'settings',
-      desc: 'Gli avvisi che Filo ti mostra dopo aver letto una mail o una pagina non compaiono subito. Prima un controllo automatico cerca codici, chiavi, coordinate bancarie e collegamenti che non portano dove dicono. Poi un secondo modello, diverso da quello che ha scritto l\'avviso, si chiede se il testo stia cercando di farti fare qualcosa di rischioso. Se ferma qualcosa te lo dice in una riga, dicendo cosa ha visto. Se non riesce a controllare, l\'avviso resta in attesa e compare dopo: senza controllo non compare mai. I collegamenti dentro un avviso mostrano sempre dove portano davvero.',
-      invoke: 'Succede da solo. Gli avvisi fermati stanno in Preferenze → "Avvisi fermati". Il modello che fa da controllo si sceglie in Opzioni → Modelli → "Guardiano degli avvisi".',
-      doesNot: 'Non controlla quello che chiedi tu a Filo: solo i testi nati da contenuto scritto da altri. Non legge al posto tuo la mail intera: guarda l\'avviso in uscita.',
+      id: 'notice-guard', title: 'Un secondo modello controlla quello che Filo ti scrive', category: 'settings',
+      desc: 'Quando Filo ha letto qualcosa scritto da altri (una pagina, i risultati di una ricerca, una mail, un documento, l\'uscita di un comando), quello che poi ti scrive non compare subito. Vale per la risposta in chat, per il saluto della home, per le spiegazioni del tasto destro e per gli avvisi. Prima un controllo automatico cerca codici usa e getta, chiavi, coordinate bancarie e collegamenti che non portano dove dicono. Poi un secondo modello, diverso da quello che ha scritto il testo, si chiede se quel testo stia cercando di farti fare qualcosa di rischioso. Se ferma qualcosa te lo dice in una riga, dicendo cosa ha visto. Se non riesce a controllare, il testo non compare: un avviso resta in coda e arriva dopo, una risposta te la puoi richiedere. I collegamenti dentro un avviso mostrano sempre dove portano davvero.',
+      invoke: 'Succede da solo. Quello che è stato fermato sta in Preferenze → "Avvisi fermati". Il modello che fa da controllo si sceglie in Opzioni → Modelli → "Guardiano degli avvisi".',
+      doesNot: 'Non controlla quello che chiedi tu a Filo quando non ha letto niente di altri. Non legge al posto tuo la mail intera: guarda il testo in uscita. Non tocca le traduzioni, le trascrizioni e le correzioni, che ti ridanno un testo già tuo o già dell\'altro.',
     },
     {
       id: 'data-export-import', title: 'Esporta e importa i tuoi dati', category: 'settings',
