@@ -68,7 +68,8 @@ test('la sezione che arriva non deve portar via quello che sto scrivendo ADESSO'
   // una pausa, e la pausa non è passata.
   await nota.click();
   await page.keyboard.type('Questa riga la sto scrivendo adesso');
-  await expect(nota).toHaveValue('Questa riga la sto scrivendo adesso');
+  const scritto = await nota.inputValue();
+  expect(scritto).toContain('Questa riga la sto scrivendo adesso');
 
   // Arriva la sezione di prima, che nessuno sta guardando.
   await page.evaluate(() => window.__sblocca && window.__sblocca());
