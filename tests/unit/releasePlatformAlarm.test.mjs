@@ -170,6 +170,24 @@ describe('il feedback che si apre', () => {
     }
   });
 
+  // Il workflow lancia una COPIA dello script fuori dalla copia di lavoro. Se
+  // quel percorso passa da un collegamento e lo script non si riconosce come
+  // avviato, non fa niente ed esce 0: l'allarme resta muto e il controllo
+  // finale riceve un elenco vuoto, cioè passa verde senza guardare un file.
+  test('avviato da una copia, dietro un collegamento, lo script lavora lo stesso', () => {
+    const base = mkdtempSync(join(tmpdir(), 'filo-allarme-'));
+    const vero = join(base, 'vero', 'scripts');
+    mkdirSync(vero, { recursive: true });
+    for (const f of ['release-platform-alarm.mjs', 'build-alarm.mjs']) {
+      copyFileSync(join(RADICE, 'scripts', f), join(vero, f));
+    }
+    symlinkSync(join(base, 'vero'), join(base, 'link'), 'dir');
+    const uscita = execFileSync(process.execPath,
+      [join(base, 'link', 'scripts', 'release-platform-alarm.mjs'), '--attesi', 'Linux'], { encoding: 'utf8' });
+    assert.deepEqual(uscita.trim().split('\n'), PIATTAFORME.Linux.attesi,
+      'lo script non si riconosce come avviato: esce verde senza fare niente, e chi lo chiama non se ne accorge');
+  });
+
   test('ogni passo del workflow ha una descrizione, e nessuna è vuota', () => {
     for (const [id, descrizione] of Object.entries(PASSI)) {
       assert.ok(descrizione && descrizione.trim().length > 3, `il passo ${id} non dice cosa stava facendo`);

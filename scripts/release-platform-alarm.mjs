@@ -17,6 +17,7 @@
 //     passo di controllo del workflow, così l'elenco vive in un posto solo.
 
 import { resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { inviaAllarme } from './build-alarm.mjs';
 
