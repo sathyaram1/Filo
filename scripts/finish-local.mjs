@@ -159,10 +159,29 @@ function defaultBranch() {
   return r.ok ? r.out : '';
 }
 
-function run(cmd, args, label) {
+function run(cmd, args, label, env = undefined) {
   process.stdout.write(`\n▸ ${label}\n`);
-  const r = spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+  const r = spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32', ...(env ? { env } : {}) });
   return r.status === 0;
+}
+
+/**
+ * Il commit da cui prendere ANCHE i file cambiati, in un giro di riallineamento: quello che
+ * aveva passato la verifica, scritto da dispatch nel marcatore del ruolo. '' altrimenti. PURA.
+ * Il ramo contro main non vede il lato arrivato da main né il file in conflitto.
+ */
+export function shaDelRiallineamento(marker) {
+  const m = marker && typeof marker === 'object' ? marker : {};
+  const sha = String(m.dal || '').trim();
+  return m.role === 'verifier' && /^[0-9a-f]{7,40}$/i.test(sha) ? sha : '';
+}
+
+/** I file cambiati dal commit verificato alla punta, o null se quel commit qui non c'è. */
+function cambiatiDal(sha) {
+  const c = git(['cat-file', '-e', `${sha}^{commit}`]).ok || git(['fetch', 'origin', sha]).ok;
+  if (!c) return null;
+  const r = git(['diff', '--name-only', sha, 'HEAD']);
+  return r.ok ? r.out.split('\n').filter(Boolean) : null;
 }
 
 /**
