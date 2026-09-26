@@ -1542,8 +1542,10 @@
         const pieno = perId.get(f._id);
         // Il marchio si toglie ANCHE a chi non è tornato (cancellato nel
         // frattempo): lasciarcelo rimanderebbe la pagina a richiederlo in
-        // eterno, un giro di caricamento dopo l'altro.
-        if (!pieno) { const { _proiezione, ...resto } = f; return resto; }
+        // eterno, un giro di caricamento dopo l'altro. Ma la scheda lo disegna
+        // senza conversazione, e su una conversazione mai letta un salvataggio
+        // scrive al posto del report: chi scrive deve saperlo.
+        if (!pieno) { const { _proiezione, ...resto } = f; return { ...resto, _dettaglioMancato: true }; }
         const { _proiezione, ...resto } = f;
         return sanitizeReportForReader({ ...pieno, ...resto });
       });
