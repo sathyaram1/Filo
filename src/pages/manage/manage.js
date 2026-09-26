@@ -2529,6 +2529,11 @@
       const i = allFeedbacks.findIndex((f) => f._id === key);
       if (i < 0) return null;
       const { _proiezione, _dettaglioMancato, _dettaglioVecchio, ...resto } = allFeedbacks[i];
+      // Della riga si tiene quello che un ELENCO sa: lo stato appena riletto
+      // vince su quello di prima. I campi del dettaglio no: quelli qui sono la
+      // copia vecchia, e rimetterli sopra il documento appena arrivato
+      // cancellerebbe proprio il turno nuovo che si stava aspettando.
+      for (const campo of (FB.CAMPI_DETTAGLIO || [])) delete resto[campo];
       allFeedbacks[i] = { ...pieno, ...resto };
       reindexByClient();
       return allFeedbacks[i];
