@@ -105,7 +105,12 @@ function fsDocToObject(doc) {
   return out;
 }
 
-async function fetchDoc(docPath, idToken) {
+// Legge un documento DICENDO com'è andata (#679). «Non esiste» e «non ti
+// riguarda» sono risposte del server, definitive finché non cambia chi usa
+// Filo; «non ho potuto chiedere» no. Senza questa distinzione il permesso
+// negato, che è la risposta normale per chiunque non gestisca Filo, passava
+// per un guasto di passaggio e faceva ripartire le letture ogni mezzo minuto.
+async function leggiDoc(docPath, idToken) {
   const url = `${FIRESTORE_BASE}/${docPath}?key=${API_KEY}`;
   const headers = {};
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
@@ -113,16 +118,21 @@ async function fetchDoc(docPath, idToken) {
   try {
     res = await fetch(url, { headers });
   } catch (_) {
-    return null;
+    return { risposto: false, doc: null };
   }
-  if (res.status === 404) return {};
-  if (!res.ok) return null;
+  if (res.status === 404) return { risposto: true, doc: {} };
+  if (res.status === 401 || res.status === 403) return { risposto: true, doc: null };
+  if (!res.ok) return { risposto: false, doc: null };
   try {
     const json = await res.json();
-    return fsDocToObject(json);
+    return { risposto: true, doc: fsDocToObject(json) };
   } catch (_) {
-    return null;
+    return { risposto: false, doc: null };
   }
+}
+
+async function fetchDoc(docPath, idToken) {
+  return (await leggiDoc(docPath, idToken)).doc;
 }
 
 async function patchDoc(docPath, fields, mask, idToken) {
@@ -139,6 +149,43 @@ async function patchDoc(docPath, fields, mask, idToken) {
   }
 }
 
+// ── Copia in memoria ─────────────────────────────────────────────────────────
+//
+// `get()` legge DUE documenti, e chi risolve uno slot di supporto la chiama a
+// ogni chiamata di modello: erano due letture di Firestore per ogni giudizio
+// (#679). La copia dura cinque minuti e la butta il salvataggio.
+//
+// Si mette via SOLO una risposta intera. Quella arrivata a metà si serve e
+// basta: se la si archiviasse, sopravviverebbe al ritorno della rete, e per
+// tutta la sua durata la schermata direbbe che la chiave dei giudici non c'è o
+// i controlli interni userebbero il modello scritto nel codice invece di
+// quello scelto dall'owner (#679, secondo giro). Riprovare subito non è un
+// ciclo e non costa letture: una lettura che non è partita non si paga.
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+// Solo risposte intere: { identita, ts, valore }.
+let cache = null;
+let adesso = () => Date.now();
+
+// La risposta dipende da CHI sta usando Filo: i segreti dei giudici li legge
+// solo l'owner. Senza questa firma, un logout lascerebbe in circolo per cinque
+// minuti la risposta dell'account di prima.
+function identita() {
+  let email = '';
+  try { email = String((auth.getProfile && auth.getProfile()) ? auth.getProfile().email || '' : '').toLowerCase(); } catch (_) {}
+  let admin = false;
+  try { admin = Boolean(auth.isAdmin && auth.isAdmin()); } catch (_) {}
+  return `${email}|${admin ? 1 : 0}`;
+}
+
+// Chi chiama non deve poter modificare la copia condivisa scrivendo nel
+// risultato: sono dati semplici, una copia profonda basta.
+function clona(v) {
+  return JSON.parse(JSON.stringify(v));
+}
+
+function invalidaCache() { cache = null; }
+
 // ── API ──────────────────────────────────────────────────────────────────────
 
 // Legge il doc config/supportModels. Richiede il Firebase ID token admin (per
@@ -146,17 +193,37 @@ async function patchDoc(docPath, fields, mask, idToken) {
 // Ritorna un oggetto con i campi degli slot (stringhe). I campi assenti (doc non
 // ancora creato o slot non ancora impostato) hanno valore ''.
 async function get() {
+  const chi = identita();
+  const ultimaBuona = cache && cache.identita === chi ? cache : null;
+  if (ultimaBuona && adesso() - ultimaBuona.ts < CACHE_TTL_MS) return clona(ultimaBuona.valore);
+
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
   const [doc, secrets] = await Promise.all([
-    fetchDoc(SUPPORT_MODELS_DOC, idToken),
-    fetchDoc(JUDGE_SECRETS_DOC, idToken),
+    leggiDoc(SUPPORT_MODELS_DOC, idToken),
+    leggiDoc(JUDGE_SECRETS_DOC, idToken),
   ]);
-  const out = doc ? sanitize(doc) : emptyModels();
-  // La chiave vera non esce mai da qui: solo presente/assente.
-  const key = secrets && typeof secrets.openrouterKey === 'string' ? secrets.openrouterKey.trim() : '';
-  out.openrouterKeyPresent = Boolean(key);
-  return out;
+
+  // Quello che non è arrivato vale l'ultima risposta buona, anche scaduta, mai
+  // un vuoto: con un vuoto chi risolve uno slot ricadrebbe sui modelli scritti
+  // nel codice per un singhiozzo di rete.
+  const out = doc.risposto
+    ? (doc.doc ? sanitize(doc.doc) : emptyModels())
+    : (ultimaBuona ? clona(ultimaBuona.valore) : emptyModels());
+  // La chiave vera non esce mai da qui: solo presente/assente. Se la sua
+  // lettura non è partita non si inventa un «non c'è» (#679, primo giro).
+  if (secrets.risposto) {
+    const key = secrets.doc && typeof secrets.doc.openrouterKey === 'string' ? secrets.doc.openrouterKey.trim() : '';
+    out.openrouterKeyPresent = Boolean(key);
+  } else {
+    out.openrouterKeyPresent = Boolean(ultimaBuona && ultimaBuona.valore.openrouterKeyPresent);
+  }
+
+  // Il server ha risposto su entrambi, fosse anche «non ti riguarda»: è una
+  // risposta intera, e si tiene. A metà no: la prossima chiamata riprova, e
+  // appena la rete torna Filo ha il valore giusto invece di quello di ripiego.
+  if (doc.risposto && secrets.risposto) cache = { identita: chi, ts: adesso(), valore: out };
+  return clona(out);
 }
 
 // Scrive (PATCH per-campo) il doc config/supportModels. Richiede ID token admin.
@@ -197,6 +264,8 @@ async function update(partial, idToken) {
       idToken
     );
   }
+  // Chi ha appena salvato deve vedere il salvato, non la copia di prima.
+  invalidaCache();
   return get();
 }
 
@@ -240,4 +309,15 @@ function sanitizeRegistry(reg) {
   return out;
 }
 
-module.exports = { get, update, SLOTS, sanitizeRegistry, clampTimeoutMs };
+module.exports = {
+  get,
+  update,
+  SLOTS,
+  sanitizeRegistry,
+  clampTimeoutMs,
+  invalidaCache,
+  CACHE_TTL_MS,
+  // L'orologio si sostituisce solo nei test: aspettare cinque minuti veri non
+  // è una prova che si possa correre.
+  _setAdesso: (fn) => { adesso = typeof fn === 'function' ? fn : Date.now; },
+};

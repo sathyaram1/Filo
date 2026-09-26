@@ -56,6 +56,7 @@ let remoteModels = null;  // { provider?, models?, modelRegistry? }
 // null e le chiavi effettive sono quelle del build.
 let remoteSecrets = null; // { apiKeys?: { openrouter?, tavily? }, safeBrowsingKey? }
 let lastFetchTs = 0;
+let adesso = () => Date.now();
 
 // ── Firestore Value <-> JS ───────────────────────────────────────────────────
 function toFsValue(v) {
@@ -98,7 +99,12 @@ function fsDocToObject(doc) {
 
 // Legge un documento Firestore. Ritorna l'oggetto, {} se 404 (non esiste
 // ancora), oppure null se la lettura non è consentita/è fallita (403/altro).
-async function fetchDoc(docPath, idToken) {
+// Legge un documento DICENDO com'è andata, non solo cosa ha portato (#679).
+// «Non esiste» e «non ti riguarda» sono risposte definitive del server; «non
+// ho potuto chiedere» no, e chi tiene una copia in memoria deve distinguerle:
+// contare un tentativo fallito come una lettura fatta lascia Filo con la
+// configurazione che non ha fino alla scadenza lunga.
+async function leggiDoc(docPath, idToken) {
   const url = `${FIRESTORE_BASE}/${docPath}?key=${API_KEY}`;
   const headers = {};
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
@@ -106,16 +112,21 @@ async function fetchDoc(docPath, idToken) {
   try {
     res = await fetch(url, { headers });
   } catch (_) {
-    return null; // offline o rete giù → usa i fallback
+    return { risposto: false, doc: null }; // offline o rete giù → usa i fallback
   }
-  if (res.status === 404) return {};
-  if (!res.ok) return null;
+  if (res.status === 404) return { risposto: true, doc: {} };
+  if (res.status === 401 || res.status === 403) return { risposto: true, doc: null };
+  if (!res.ok) return { risposto: false, doc: null };
   try {
     const json = await res.json();
-    return fsDocToObject(json);
+    return { risposto: true, doc: fsDocToObject(json) };
   } catch (_) {
-    return null;
+    return { risposto: false, doc: null };
   }
+}
+
+async function fetchDoc(docPath, idToken) {
+  return (await leggiDoc(docPath, idToken)).doc;
 }
 
 // ── API ──────────────────────────────────────────────────────────────────────
@@ -135,12 +146,14 @@ async function refresh() {
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
 
-  const models = await fetchDoc(MODELS_DOC, idToken);
-  if (models) remoteModels = models;
+  const models = await leggiDoc(MODELS_DOC, idToken);
+  if (models.doc) remoteModels = models.doc;
+  let risposto = models.risposto;
 
   if (idToken && isAdminUser()) {
-    const secrets = await fetchDoc(SECRETS_DOC, idToken);
-    if (secrets) remoteSecrets = secrets;
+    const secrets = await leggiDoc(SECRETS_DOC, idToken);
+    if (secrets.doc) remoteSecrets = secrets.doc;
+    risposto = risposto && secrets.risposto;
   } else {
     // Chi non è admin non ha override: azzerare invece di lasciare la cache
     // com'era tiene onesta la precedenza anche dopo un logout dell'owner sulla
@@ -148,13 +161,27 @@ async function refresh() {
     // uso per un account che non può più leggerle).
     remoteSecrets = null;
   }
-  lastFetchTs = Date.now();
+  // Solo una lettura a cui il server HA risposto rimanda la prossima (#679).
+  // Se Filo si apre mentre la rete non c'è ancora, la configurazione non
+  // arriva e nessuna funzione ha un modello da usare: segnare quel tentativo
+  // come fatto teneva l'app senza modelli fino alla scadenza lunga, anche se
+  // la rete tornava un istante dopo. Riprovare subito non è un ciclo: qui ci
+  // si passa solo all'avvio, all'accesso e quando una pagina chiede la config.
+  if (risposto) lastFetchTs = adesso();
   return get();
 }
 
+// Ogni quanto la config remota si rilegge da sola. Cinque minuti erano
+// trecento letture di Firestore al giorno PER UTENTE, per un documento che
+// cambia quando l'owner lo tocca (#679). Mezz'ora perché la rilettura
+// periodica serve solo alle installazioni ALTRUI: su quella di chi salva il
+// documento la config torna aggiornata subito, perché `update()` chiude
+// chiamando `refresh()`.
+const DEFAULT_MAX_AGE_MS = 30 * 60 * 1000;
+
 // Refresh "pigro": rinfresca al massimo una volta ogni `maxAgeMs`.
-async function refreshIfStale(maxAgeMs = 5 * 60 * 1000) {
-  if (Date.now() - lastFetchTs < maxAgeMs) return get();
+async function refreshIfStale(maxAgeMs = DEFAULT_MAX_AGE_MS) {
+  if (adesso() - lastFetchTs < maxAgeMs) return get();
   return refresh();
 }
 
@@ -358,6 +385,10 @@ async function update(partial, idToken) {
   }
   if (secretMask.length) await patchDoc(SECRETS_DOC, secretFields, secretMask, idToken);
 
+  // La rilettura qui NON è un lusso: è ciò che rende immediata la modifica
+  // sulla macchina di chi salva. La rilettura periodica è lenta apposta
+  // (DEFAULT_MAX_AGE_MS), e senza questa riga l'owner cambierebbe un modello e
+  // continuerebbe a usare il vecchio per mezz'ora.
   await refresh();
   return getPublicForAdmin();
 }
@@ -682,6 +713,10 @@ module.exports = {
   getPublicForAdmin,
   refresh,
   refreshIfStale,
+  DEFAULT_MAX_AGE_MS,
+  // L'orologio si sostituisce solo nei test: far scadere una mezz'ora
+  // aspettandola davvero non è una prova che si possa correre.
+  _setAdesso: (fn) => { adesso = typeof fn === 'function' ? fn : Date.now; },
   update,
   getAutomationGate,
   setAutomationGate,

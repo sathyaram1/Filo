@@ -147,8 +147,11 @@
     // triage. { id, text } → { ok, feedbackId, balance } | { ok:false, error }.
     BOARD_REOPEN: 'board_reopen',
     // Comandi proprietario (#210). Riservati all'owner (auth.isAdmin()).
-    // OWNER_LIST_USERS: elenco email degli utenti registrati (campo `email` sui
-    //   doc credits/<uid>). { } → { ok, users:[{email,name,balance}] } | { ok:false, error }.
+    // OWNER_LIST_USERS: una PAGINA dell'elenco degli utenti registrati (campo
+    //   `email` sui doc credits/<uid>), ordinata per email. `after` è l'ultima
+    //   email già ricevuta; `next` la riporta se c'è un'altra pagina, `total`
+    //   è il conteggio di tutti (null se non è arrivato).
+    //   { after? } → { ok, users:[{email,name,balance}], total, next } | { ok:false, error }.
     OWNER_LIST_USERS: 'owner_list_users',
     // OWNER_GIFT_CREDITS: regala `amount` crediti all'utente con `email`.
     //   { amount, email } → { ok, email, amount, balance } | { ok:false, error }.

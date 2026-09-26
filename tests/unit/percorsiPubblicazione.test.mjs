@@ -37,6 +37,8 @@ const indici = JSON.parse(readFileSync(join(ROOT, 'firestore.indexes.json'), 'ut
 
 // La query vera che parte per leggere i percorsi riusciti di un sito.
 async function queryDiLettura() {
+  // La lettura ha una copia in memoria (#679): qui serve la richiesta VERA.
+  P._internal.svuotaCache();
   const orig = globalThis.fetch;
   let corpo = null;
   globalThis.fetch = async (_url, opts) => {

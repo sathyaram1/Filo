@@ -129,7 +129,7 @@ async function buildMessages(action, payload) {
     })();
     const [llmsRes, pathsRes] = await Promise.all([
       domain ? LlmsTxt.get(domain).catch(() => null) : Promise.resolve(null),
-      domain ? Paths.listByDomain(domain, { pageSize: 50, onlySuccess: true }).catch(() => []) : Promise.resolve([]),
+      domain ? Paths.listByDomain(domain, { onlySuccess: true }).catch(() => []) : Promise.resolve([]),
     ]);
     const siteKnowledge = (llmsRes && llmsRes.present && llmsRes.text) ? llmsRes.text : '';
     const knownPaths = formatKnownPathsForPrompt(pathsRes || []);
