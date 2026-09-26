@@ -290,6 +290,7 @@ test('la cartella in cui il comando è finito torna anche con un output enorme',
     ? `mkdir "${sotto}" | Out-Null; Set-Location "${sotto}"; 1..${righe} | ForEach-Object { "riga-di-elenco" }`
     : `mkdir -p "${sotto}"; cd "${sotto}"; for i in $(seq 1 ${righe}); do echo riga-di-elenco; done`;
   const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: ATTESA, trackCwd: true });
+  assert.equal(out.timedOut, false, `il comando non è finito in ${ATTESA / 1000} s: macchina bloccata, non l'esito`);
   assert.equal(out.cwd, sotto, `dopo un output lungo Filo crede di essere altrove: ${out.cwd}`);
 });
 
