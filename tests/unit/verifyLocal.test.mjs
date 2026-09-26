@@ -765,13 +765,19 @@ test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un p
 
 // ─── I bilanci si leggono dal server (decisione dell'owner, 2026-09-16) ──────
 
+// `config/routines` da oggi si rilegge da una copia su file valida un minuto,
+// condivisa con dispatch (#680). Ogni prova qui sotto vuole la lettura VERA:
+// una cartella sua per chiamata, o risponderebbe quello che ha letto la prova
+// prima — o, peggio, un'esecuzione di ieri.
+const leggiBilanci = (o) => leggiBilanciDalServer({ copiaDir: cartellaTemporanea('bilanci-copia-'), ...o });
+
 test('leggiBilanciDalServer: i quattro numeri dal documento Firestore, col token dell\'owner; fixInstructions se c\'è', async () => {
   const chiamate = [];
   const fetchImpl = async (url, opts) => {
     chiamate.push({ url, auth: opts.headers.Authorization });
     return { ok: true, status: 200, json: async () => ({ fields: { cap3: { integerValue: '5' }, cap2: { integerValue: '10' }, cap1: { integerValue: '1' }, cap0: { integerValue: '0' }, fixInstructions: { stringValue: 'TESTO' } } }) };
   };
-  const caps = await leggiBilanciDalServer({ fetchImpl, env: { FILO_ADMIN_ID_TOKEN: 'tok' } });
+  const caps = await leggiBilanci({ fetchImpl, env: { FILO_ADMIN_ID_TOKEN: 'tok' } });
   assert.deepEqual(caps, { cap3: 5, cap2: 10, cap1: 1, cap0: 0, fixInstructions: 'TESTO', giroStretto: false });
   assert.equal(chiamate.length, 1);
   assert.match(chiamate[0].url, /config\/routines/);
@@ -785,35 +791,61 @@ test('leggiBilanciDalServer: i quattro numeri dal documento Firestore, col token
   assert.ok(Number.isNaN(numeroFirestore(undefined)));
 });
 
+test('config/routines si rilegge una volta al minuto, non a ogni invocazione — e mai senza il token dell\'owner', async () => {
+  // Lo stesso documento lo leggevano dispatch e verify-local a ogni
+  // invocazione: decine di letture per sessione, per nove sessioni (#680).
+  const dir = cartellaTemporanea('bilanci-riuso-');
+  const t0 = 1_700_000_000_000;
+  let chiamate = 0;
+  const fetchImpl = async () => {
+    chiamate += 1;
+    return { ok: true, status: 200, json: async () => ({ fields: { cap3: { integerValue: '5' }, cap2: { integerValue: '5' }, cap1: { integerValue: '2' }, cap0: { integerValue: '0' } } }) };
+  };
+  const leggi = (now) => leggiBilanciDalServer({ fetchImpl, env: { FILO_ADMIN_ID_TOKEN: 'tok' }, copiaDir: dir, now });
+
+  assert.equal((await leggi(t0)).cap3, 5);
+  assert.equal((await leggi(t0 + 30_000)).cap1, 2);
+  assert.equal(chiamate, 1, 'la seconda invocazione ha ripagato la stessa lettura');
+  await leggi(t0 + 61_000);
+  assert.equal(chiamate, 2, 'oltre il minuto si rilegge: un bilancio che l\'owner ha appena cambiato deve arrivare');
+
+  // La copia è fresca, ma i bilanci sono dell'owner: senza il suo token non si
+  // tira avanti con dei numeri trovati in giro.
+  await assert.rejects(
+    () => leggiBilanciDalServer({ fetchImpl, env: {}, trovaRefresh: () => null, copiaDir: dir, now: t0 + 61_500 }),
+    (e) => e.message === SENZA_TOKEN_MSG,
+  );
+});
+
 test('leggiBilanciDalServer: senza token, senza documento o senza uno dei quattro numeri si FERMA e dice cosa manca — mai un default', async () => {
   await assert.rejects(
-    () => leggiBilanciDalServer({ fetchImpl: async () => { throw new Error('non deve chiamare'); }, env: {}, trovaRefresh: () => null }),
+    () => leggiBilanci({ fetchImpl: async () => { throw new Error('non deve chiamare'); }, env: {}, trovaRefresh: () => null }),
     (e) => e.message === SENZA_TOKEN_MSG && /FILO_ADMIN_REFRESH_TOKEN/.test(e.message) && /tests\/agent\/\.env/.test(e.message) && /admin-login/.test(e.message),
   );
   const conCampi = (fields) => async () => ({ ok: true, status: 200, json: async () => ({ fields }) });
   await assert.rejects(
-    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap3: { integerValue: '5' }, cap2: { integerValue: '10' }, cap0: { integerValue: '0' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    () => leggiBilanci({ fetchImpl: conCampi({ cap3: { integerValue: '5' }, cap2: { integerValue: '10' }, cap0: { integerValue: '0' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
     /non ha cap1: l'owner li imposta in Gestione → Automazioni/,
   );
   await assert.rejects(
-    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap3: { integerValue: '5' }, cap2: { stringValue: '' }, cap1: { integerValue: '1' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    () => leggiBilanci({ fetchImpl: conCampi({ cap3: { integerValue: '5' }, cap2: { stringValue: '' }, cap1: { integerValue: '1' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
     /non ha cap2, cap0/,
   );
   await assert.rejects(
-    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap2: { integerValue: '10' }, cap1: { integerValue: '1' }, cap0: { integerValue: '0' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    () => leggiBilanci({ fetchImpl: conCampi({ cap2: { integerValue: '10' }, cap1: { integerValue: '1' }, cap0: { integerValue: '0' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
     /non ha cap3/,
     'un documento di prima della separazione dei bilanci: manca il bilancio dei 3, e lo dice',
   );
   await assert.rejects(
-    () => leggiBilanciDalServer({ fetchImpl: async () => ({ ok: false, status: 404, text: async () => '' }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    () => leggiBilanci({ fetchImpl: async () => ({ ok: false, status: 404, text: async () => '' }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
     /config\/routines non esiste sul server/,
   );
   await assert.rejects(
-    () => leggiBilanciDalServer({ fetchImpl: async () => ({ ok: false, status: 403, text: async () => 'PERMISSION_DENIED' }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    () => leggiBilanci({ fetchImpl: async () => ({ ok: false, status: 403, text: async () => 'PERMISSION_DENIED' }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
     /HTTP 403.*PERMISSION_DENIED/,
   );
   await assert.rejects(
-    () => leggiBilanciDalServer({ fetchImpl: async () => { throw new Error('ECONNREFUSED'); }, env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    () => leggiBilanci({ fetchImpl: async () => { throw new Error('ECONNREFUSED'); }, env: { FILO_ADMIN_ID_TOKEN: 't' } }),
     /rete.*ECONNREFUSED/,
   );
 });
@@ -880,7 +912,7 @@ test('la coda locale è il testo del server più le sole differenze locali', asy
 
 test('giro stretto: l\'interruttore si legge coi bilanci, e solo un true esplicito lo accende', async () => {
   const conCampi = (extra) => async () => ({ ok: true, status: 200, json: async () => ({ fields: { cap3: { integerValue: '5' }, cap2: { integerValue: '5' }, cap1: { integerValue: '2' }, cap0: { integerValue: '0' }, ...extra } }) });
-  const leggi = (extra) => leggiBilanciDalServer({ fetchImpl: conCampi(extra), env: { FILO_ADMIN_ID_TOKEN: 't' } });
+  const leggi = (extra) => leggiBilanci({ fetchImpl: conCampi(extra), env: { FILO_ADMIN_ID_TOKEN: 't' } });
   assert.equal((await leggi({})).giroStretto, false, 'campo assente = spento');
   assert.equal((await leggi({ giroStretto: { booleanValue: false } })).giroStretto, false);
   assert.equal((await leggi({ giroStretto: { stringValue: 'true' } })).giroStretto, false, 'un tipo storto non accende');

@@ -79,6 +79,18 @@ test('col server finto dei controlli la copia è spenta: lì si controlla la let
   assert.equal(copiaAttiva({ FILO_ROUTINE_CONFIG_URL: '   ' }), true);
 });
 
+test('la copia della configurazione è UNA, condivisa dai due script che la leggono', async () => {
+  // «Condivisa fra i due script»: se uno dei due si scrivesse la sua, la
+  // seconda copia sarebbe una seconda verità con una scadenza sua.
+  const { readFileSync: leggi } = await import('node:fs');
+  const { join: unisci } = await import('node:path');
+  const radice = new URL('../../', import.meta.url).pathname;
+  for (const nome of ['dispatch.mjs', 'verify-local.mjs']) {
+    assert.match(leggi(unisci(radice, 'scripts', nome), 'utf8'), /config-routine-copia/,
+      `${nome} non passa dalla copia condivisa di config/routines`);
+  }
+});
+
 test('la copia si scrive solo per chi la lancia (0600) e si può buttare', () => {
   const dir = cartellaTemporanea('copia-permessi-');
   const file = scriviCopia('prova', { a: 1 }, { dir });
