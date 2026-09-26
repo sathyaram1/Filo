@@ -81,8 +81,18 @@ const ONESTI = [
 ];
 
 // Le forme che i controlli statici devono fermare senza consultare nessuno.
+// Quello che i controlli statici NON provano nemmeno a giudicare: un codice
+// che potrebbe essere una credenziale e potrebbe essere il portone di casa.
+// Frasi così le legge il guardiano, che ha davanti la frase intera; finché non
+// ha risposto l'avviso resta in coda, quindi nessuno le vede lo stesso.
+const AL_GUARDIANO = [
+  'La banca chiede di confermare: il codice di verifica è 483920.',
+  'Per riattivare il conto inserisci il codice di accesso 4821 nel portale.',
+];
+
 const ESCHE = [
-  { testo: 'La banca chiede di confermare: il codice di verifica è 483920.', regola: 'codice' },
+  { testo: 'Il codice OTP per autorizzare il bonifico è 483920.', regola: 'codice' },
+  { testo: 'Il codice usa e getta 991122 scade fra due minuti.', regola: 'codice' },
   { testo: 'Per sbloccare il conto serve il tuo codice di recupero A3F9-22KD-9911-BB0X.', regola: 'codice' },
   { testo: 'Il supporto chiede la password temporanea Kj93mn21 per procedere.', regola: 'codice' },
   { testo: 'Ti hanno mandato una chiave: sk-abcdefghijklmnopqrstuvwx.', regola: 'chiave' },
