@@ -1909,7 +1909,7 @@ class TabManager {
       }
     });
 
-    wc.on('did-frame-finish-load', (_e, isMainFrame) => { if (!isMainFrame) this._sbOnFrameLoad(tab); });
+    wc.on('did-frame-finish-load', (_e, isMainFrame) => this._sbOnFrameLoad(tab, isMainFrame));
 
     // §3.1 — ripristino scroll alla riapertura da archivio: a caricamento finito
     // riportiamo la pagina alla percentuale registrata, una sola volta. Best-effort
