@@ -1,12 +1,6 @@
-// La copia breve di `config/routines`, condivisa fra dispatch e verify-local.
-//
-// Lo stesso documento lo rileggevano tutti e due a ogni invocazione: decine di
-// letture per sessione, per nove sessioni, per una risposta che cambia quando
-// l'owner tocca un interruttore (#680).
-//
-// SESSANTA SECONDI, non più: la copia non deve mai far partire un giro con
-// impostazioni che l'owner ha cambiato da più di un minuto. Scaduta, assente o
-// illeggibile → si rilegge dal server, che è il comportamento di sempre.
+// La copia breve di `config/routines`, una per dispatch e verify-local: lo stesso
+// documento lo rileggevano tutti e due a ogni invocazione (#680). SESSANTA
+// SECONDI, non più: un interruttore spento da un minuto deve essere già arrivato.
 
 import { leggiCopia, scriviCopia } from './copia-su-file.mjs';
 

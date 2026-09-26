@@ -1,11 +1,6 @@
-// Una scansione della collezione pagata UNA volta per giro.
-//
-// Uno script di manutenzione si lancia due o tre volte di seguito: prova a
-// secco, applicazione, controllo. Ogni giro rileggeva la collezione intera
-// (#680). Qui la prova a secco mette da parte quello che ha letto e
-// l'applicazione che la segue lo riusa, dicendolo a video.
-//
-// La regola sta in questo file solo, non in ognuno dei quattro script.
+// Una scansione della collezione pagata UNA volta per giro: la prova a secco
+// mette da parte quello che ha letto, l'applicazione che la segue lo riusa.
+// La regola e il perché: patterns/una-scansione-chiede-i-campi-che-usa-e-si-paga-una-volta.md
 
 import { leggiCopia, scriviCopia, scordaCopia, rigaCopiaRiusata } from './copia-su-file.mjs';
 
