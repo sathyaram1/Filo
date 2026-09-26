@@ -4078,8 +4078,11 @@
     listVersions: (o) => FB.listVersions(o),
     // Il giro dal vivo rilegge le RIGHE: stessa proiezione del caricamento.
     getMany: (ids) => FB.getMany(ids, { fields: FB.CAMPI_LISTA }),
-    // Il documento intero, per il feedback che l'owner ha aperto.
-    getDettagli: (ids) => FB.getMany(ids),
+    // Il documento intero, per il feedback che l'owner ha aperto. Col tempo
+    // massimo: senza, una richiesta appesa lascia il pannello su «Caricamento
+    // della conversazione…» per sempre, e i tasti che scrivono sulla
+    // conversazione restano bloccati dietro di lei.
+    getDettagli: (ids) => FB.getMany(ids, { timeoutMs: 20000 }),
   };
   let liveEnabled = false;
   let liveBlocked = false;  // dati finti iniettati: il giro non parte più, nemmeno se l'avvio finisce dopo
