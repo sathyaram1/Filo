@@ -49,8 +49,12 @@ export function testoEntroIlTetto(text, max = TETTO_TESTO) {
   return s.slice(0, Math.max(0, max - nota.length)) + nota;
 }
 
-async function main() {
-  const [name, text] = process.argv.slice(2);
+/**
+ * Spedisce l'allarme e ferma il processo se non arriva. La usa anche
+ * `release-platform-alarm.mjs`: una sola strada verso il server, una sola
+ * credenziale, un solo taglio del testo.
+ */
+export async function inviaAllarme(name, text) {
   const passphrase = process.env.FILO_BUILD_PASSPHRASE;
 
   if (!passphrase) {
@@ -58,7 +62,7 @@ async function main() {
     process.exit(1);
   }
   if (!name) {
-    console.error('Uso: node scripts/build-alarm.mjs "<titolo>" "<testo>"');
+    console.error('[allarme] titolo assente: non spedisco un feedback senza nome.');
     process.exit(1);
   }
 
@@ -83,6 +87,15 @@ async function main() {
     console.error(`[allarme] server non raggiungibile: ${e.message}`);
     process.exit(1);
   }
+}
+
+async function main() {
+  const [name, text] = process.argv.slice(2);
+  if (!name) {
+    console.error('Uso: node scripts/build-alarm.mjs "<titolo>" "<testo>"');
+    process.exit(1);
+  }
+  await inviaAllarme(name, text);
 }
 
 const eseguitoDirettamente = process.argv[1]
