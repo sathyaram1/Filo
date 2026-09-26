@@ -717,7 +717,7 @@
     return { classe: cls, stato: esito === 'attesa' ? 'attesa' : 'visibile' };
   }
 
-  async function addNotification({ kind, text, action, color, classe, fonte, guardiano }) {
+  async function addNotification({ kind, text, action, color, classe, fonte, guardiano, motivoAttesa }) {
     const t = timbro(classe, guardiano);
     const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
     const entry = {
