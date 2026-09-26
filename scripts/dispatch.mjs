@@ -179,12 +179,24 @@ async function fetchRoutineConfig() {
   // un segreto e non cambia niente in produzione, dove non è impostata.
   const url = process.env.FILO_ROUTINE_CONFIG_URL
     || `${fa.FIRESTORE_BASE}/${ROUTINES_DOC}?key=${fa.FIREBASE_API_KEY}`;
+  // Lo stesso documento lo rileggevano dispatch e verify-local a ogni
+  // invocazione, decine di volte per sessione. La copia vale un minuto: oltre,
+  // un interruttore che l'owner ha appena spento potrebbe non essere ancora
+  // arrivato, e qui «spento» deve voler dire spento (#680).
+  const copia = await import('./lib/config-routine-copia.mjs');
+  const attiva = copia.copiaAttiva(process.env);
+  const pronta = attiva ? copia.campiDaCopia(url) : null;
+  if (pronta) return parseRoutineConfig(pronta.fields);
   const read = async () => {
     const res = await fetch(url);
-    if (res.status === 404) return {};            // mai scritto: default
+    // Mai scritto (404) = «l'owner non ha mai toccato niente»: default, e vale
+    // la pena ricordarselo come qualsiasi altra risposta.
+    if (res.status === 404) { if (attiva) copia.salvaCampiInCopia(url, {}); return {}; }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
-    return parseRoutineConfig((json && json.fields) || {});
+    const fields = (json && json.fields) || {};
+    if (attiva) copia.salvaCampiInCopia(url, fields);
+    return parseRoutineConfig(fields);
   };
   try {
     return await withRetry(read, `lettura di ${ROUTINES_DOC}`);

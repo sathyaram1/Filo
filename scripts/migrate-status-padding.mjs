@@ -37,6 +37,8 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
+import { contatoreLetture } from './lib/letture.mjs';
+import { leggiCopia, scriviCopia, scordaCopia, rigaCopiaRiusata } from './lib/copia-su-file.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -70,11 +72,21 @@ const DRY = process.argv.includes('--dry-run');
 
 const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
 
+// ── Cosa si scarica per RI-CIFRARE ───────────────────────────────────────────
+// Lo stato, l'enum grossolano e i tre campi della revisione: sono gli unici che
+// questa passata guarda e riscrive. Il resto del documento — testo, note,
+// allegati — è la quasi totalità dei suoi KB e qui non serve (#680).
+export const CAMPI_PADDING = ['status', 'statusPublic', 'reviewDecision', 'reviewComment', 'reviewedAt'];
+
+const COPIA = 'migrate-status-padding/segnalazioni';
+const COPIA_TTL_MS = 5 * 60_000;
+
 async function tuttiIFeedback(bearer) {
   const out = [];
   let pageToken = '';
+  const maschera = CAMPI_PADDING.map((f) => `mask.fieldPaths=${encodeURIComponent(f)}`).join('&');
   do {
-    const url = `${FIRESTORE_BASE}/feedback?pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+    const url = `${FIRESTORE_BASE}/feedback?pageSize=300&${maschera}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${bearer}` } });
     if (!res.ok) throw new Error(`lettura feedback fallita: HTTP ${res.status}`);
     const json = await res.json();
@@ -88,7 +100,19 @@ async function tuttiIFeedback(bearer) {
 
 async function main() {
   const bearer = await acquireBearer();
-  const docs = await tuttiIFeedback(bearer);
+  const letture = contatoreLetture();
+  // La prova a secco mette da parte quello che ha letto; l'applicazione che la
+  // segue lo riusa invece di ripagare la scansione (#680).
+  const pronta = DRY ? null : leggiCopia(COPIA, { ttlMs: COPIA_TTL_MS });
+  let docs;
+  if (pronta && Array.isArray(pronta.dati)) {
+    console.log(rigaCopiaRiusata(pronta.etaMs));
+    docs = pronta.dati;
+  } else {
+    docs = await tuttiIFeedback(bearer);
+    letture.aggiungi(docs.length, 'segnalazioni');
+    if (DRY) scriviCopia(COPIA, docs);
+  }
   console.log(`${docs.length} feedback da esaminare${DRY ? ' (dry-run)' : ''}.`);
 
   let riscritti = 0; let giaApposto = 0; let illeggibili = 0; let pubblicoCorretto = 0;
@@ -184,6 +208,9 @@ async function main() {
   }
 
   console.log(`\nFatto: ${riscritti} riscritti (${pubblicoCorretto} con l'enum grossolano corretto), ${giaApposto} già a posto, ${illeggibili} non decifrabili (lasciati intatti).`);
+  // Applicato: la copia non descrive più il server.
+  if (!DRY) scordaCopia(COPIA);
+  console.log(letture.riga());
 }
 
 main().catch((e) => { console.error('Errore:', e.message); process.exit(1); });

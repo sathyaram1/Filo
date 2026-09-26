@@ -37,6 +37,8 @@ import { scrivi } from './owner-feedback.mjs';
 // #583: leggere i feedback vuole le credenziali dell'owner (le stesse con cui
 // questo script scrive), e i voti stanno sulle schede pubbliche.
 import { acquireBearer } from './lib/firestore-auth.mjs';
+import { contatoreLetture } from './lib/letture.mjs';
+import { leggiCopia, scriviCopia, scordaCopia, rigaCopiaRiusata } from './lib/copia-su-file.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -62,32 +64,70 @@ function packageVersion() {
   }
 }
 
-export async function runAutoArchive({ dryRun = false, now = Date.now(), releasedVersion } = {}) {
+// ── Cosa si scarica per DECIDERE ─────────────────────────────────────────────
+// La decisione guarda cinque campi (SN_BOARD_ARCHIVE.CAMPI_DECISIONE) e il
+// numero leggibile serve solo alla riga che si stampa. Un feedback pesa qualche
+// KB per testo cifrato, note e allegati: scaricarlo intero per guardarne sette
+// campi è il conto di Firestore di settembre 2026 (#680).
+const CAMPI_SEGNALAZIONI = [...BA.CAMPI_DECISIONE, 'seq', 'subSeq'];
+
+// Il nome con cui la lettura di questo giro si mette da parte: la prova a secco
+// e l'applicazione che la segue non devono pagare due volte la stessa lettura.
+const COPIA = 'auto-archive/segnalazioni';
+// Qualche minuto: il tempo di guardare l'elenco della prova a secco e decidere
+// di applicarlo. Oltre, il database può essere cambiato e si rilegge.
+const COPIA_TTL_MS = 5 * 60_000;
+
+export async function runAutoArchive({
+  dryRun = false, now = Date.now(), releasedVersion, copiaDir = null, usaCopia = true,
+} = {}) {
   const ver = releasedVersion || packageVersion();
-  const bearer = await acquireBearer();
-  // TUTTE le segnalazioni, paginate. Una finestra sulle 500 più recenti per
-  // data d'invio lasciava fuori le più vecchie, che sono esattamente quelle che
-  // questo giro dovrebbe archiviare per prime: i loro fix non uscivano mai
-  // dalla bacheca, restavano votabili e riapribili a pagamento, e per loro non
-  // si accendeva nemmeno «gli utenti dicono che non va». Con 711 segnalazioni
-  // ne restavano fuori 211, e il numero cresceva da solo.
-  const { rows: grezzi, complete } = typeof FB.listAllPaged === 'function'
-    ? await FB.listAllPaged({ idToken: bearer })
-    : { rows: await FB.list({ pageSize: 500, idToken: bearer }), complete: false };
-  if (!complete) {
-    console.warn('AVVISO: non sono riuscito a leggere TUTTE le segnalazioni: '
-      + `questo giro decide su ${grezzi.length}, le più vecchie restano fuori.`);
+  const letture = contatoreLetture();
+
+  // La lettura della prova a secco, se è ancora fresca. Vale solo per
+  // l'applicazione: una prova a secco deve guardare il database di adesso.
+  const pronta = (usaCopia && !dryRun)
+    ? leggiCopia(COPIA, { now, ttlMs: COPIA_TTL_MS, dir: copiaDir })
+    : null;
+  let feedbacks;
+  let complete;
+  if (pronta && Array.isArray(pronta.dati && pronta.dati.righe)) {
+    console.log(rigaCopiaRiusata(pronta.etaMs));
+    feedbacks = pronta.dati.righe;
+    complete = pronta.dati.complete !== false;
+  } else {
+    const bearer = await acquireBearer();
+    // TUTTE le segnalazioni, paginate. Una finestra sulle 500 più recenti per
+    // data d'invio lasciava fuori le più vecchie, che sono esattamente quelle che
+    // questo giro dovrebbe archiviare per prime: i loro fix non uscivano mai
+    // dalla bacheca, restavano votabili e riapribili a pagamento, e per loro non
+    // si accendeva nemmeno «gli utenti dicono che non va». Con 711 segnalazioni
+    // ne restavano fuori 211, e il numero cresceva da solo.
+    const r = typeof FB.listAllPaged === 'function'
+      ? await FB.listAllPaged({ idToken: bearer, fields: CAMPI_SEGNALAZIONI })
+      : { rows: await FB.list({ pageSize: 500, idToken: bearer, fields: CAMPI_SEGNALAZIONI }), complete: false };
+    const grezzi = r.rows;
+    complete = r.complete;
+    letture.aggiungi(grezzi.length, 'segnalazioni');
+    if (!complete) {
+      console.warn('AVVISO: non sono riuscito a leggere TUTTE le segnalazioni: '
+        + `questo giro decide su ${grezzi.length}, le più vecchie restano fuori.`);
+    }
+    // I voti (DB4) si scrivono sulla scheda pubblica: senza riunirli, il
+    // punteggio sarebbe quello dei soli voti storici e non archivierebbe più
+    // niente. Della scheda servono SOLO i campi degli utenti (voti e richieste
+    // di riapertura): è l'unica cosa che `mergeUserFields` guarda.
+    // TUTTE le schede, paginate: i voti stanno lì, e una finestra sulle 500 più
+    // recenti per data d'invio lascerebbe senza voti proprio le segnalazioni più
+    // vecchie — quelle che questo giro dovrebbe archiviare per prime.
+    const cards = typeof FB.listAllPublic === 'function'
+      ? await FB.listAllPublic({ fields: [...PV.USER_FIELDS] })
+      : await FB.listPublic({ pageSize: 500, fields: [...PV.USER_FIELDS] });
+    letture.aggiungi(cards.length, 'schede');
+    feedbacks = PV.mergeUserFields(grezzi, cards);
+    // Quello che la prova a secco ha letto lo ritrova l'applicazione.
+    if (usaCopia && dryRun) scriviCopia(COPIA, { righe: feedbacks, complete }, { now, dir: copiaDir });
   }
-  // I voti (DB4) si scrivono sulla scheda pubblica: senza riunirli, il
-  // punteggio sarebbe quello dei soli voti storici e non archivierebbe più
-  // niente.
-  // TUTTE le schede, paginate: i voti stanno lì, e una finestra sulle 500 più
-  // recenti per data d'invio lascerebbe senza voti proprio le segnalazioni più
-  // vecchie — quelle che questo giro dovrebbe archiviare per prime.
-  const cards = typeof FB.listAllPublic === 'function'
-    ? await FB.listAllPublic()
-    : await FB.listPublic({ pageSize: 500 });
-  const feedbacks = PV.mergeUserFields(grezzi, cards);
   const { toArchive, toFlag } = BA.applyAutoArchive(feedbacks, { now, releasedVersion: ver });
 
   const archivedDetails = [];
@@ -102,7 +142,14 @@ export async function runAutoArchive({ dryRun = false, now = Date.now(), release
     }
   }
 
-  return { releasedVersion: ver, toArchive: archivedDetails, toFlag, dryRun };
+  // Applicato: quello che la copia descrive non è più il database. Tenerla
+  // vorrebbe dire far ripartire un secondo giro sui feedback già archiviati.
+  if (!dryRun && usaCopia) scordaCopia(COPIA, { dir: copiaDir });
+
+  return {
+    releasedVersion: ver, toArchive: archivedDetails, toFlag, dryRun, complete,
+    letture: letture.totale, rigaLetture: letture.riga(),
+  };
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
@@ -139,4 +186,6 @@ const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run'] });
   if (result.toFlag.length) {
     console.log(`Segnalati come "gli utenti dicono che non va" (${result.toFlag.length}, NON archiviati né riaperti): ${result.toFlag.join(', ')}`);
   }
+  // Il costo del giro sullo schermo, non in fattura.
+  console.log(result.rigaLetture);
 }

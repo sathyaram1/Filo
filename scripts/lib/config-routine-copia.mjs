@@ -12,13 +12,20 @@ import { leggiCopia, scriviCopia } from './copia-su-file.mjs';
 
 export const TTL_MS = 60_000;
 
-// La chiave è l'URL: `FILO_ROUTINE_CONFIG_URL` punta a un server finto durante
-// i controlli, e la sua copia non deve mai rispondere per quella vera.
 // L'identità con cui si legge fa parte della chiave: una lettura con la sola
 // chiave pubblica e una col token dell'owner possono vedere documenti diversi,
 // e una copia non è il posto dove scoprirlo.
 function chiave(url, conToken) {
   return `config-routines|${conToken ? 'owner' : 'pubblico'}|${String(url || '')}`;
+}
+
+/**
+ * La copia è un risparmio di PRODUZIONE. `FILO_ROUTINE_CONFIG_URL` esiste per i
+ * controlli, che fanno rispondere a un server finto cose diverse a ogni passo:
+ * lì la lettura deve restare quella vera, o si controllerebbe una copia.
+ */
+export function copiaAttiva(env = process.env) {
+  return !String((env && env.FILO_ROUTINE_CONFIG_URL) || '').trim();
 }
 
 /**
