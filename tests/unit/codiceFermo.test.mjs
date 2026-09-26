@@ -25,9 +25,11 @@ function repo() {
   return { dir, g, scrivi, avvio: g('rev-parse', 'HEAD') };
 }
 
-test('le prove dei giri si muovono di diritto, il resto no', () => {
-  assert.deepEqual(fuoriDalleProve(['tests/verifica/77/giro1-a.spec.mjs', 'src\\x.js', 'tests/boot.spec.mjs', '']),
-    ['src/x.js', 'tests/boot.spec.mjs']);
+test('prove dei giri e spec di esplorazione si muovono di diritto, il codice e gli unit test no', () => {
+  assert.deepEqual(fuoriDalleProve([
+    'tests/verifica/77/giro1-a.spec.mjs', 'src\\x.js', 'tests/verify-tmp.spec.mjs', 'tests/verifica/77/aiuto.mjs',
+    'tests/unit/x.test.mjs', 'scripts/lib/y.mjs', '',
+  ]), ['src/x.js', 'tests/unit/x.test.mjs', 'scripts/lib/y.mjs']);
 });
 
 test('il codice rimesso com\'era prima della correzione e committato si vede; le prove nuove no', () => {
