@@ -133,3 +133,21 @@ Un guasto lo si racconta **per quello che è**: ogni file atteso sa da quale pas
 (`attaccaDa`), quindi quando cade il caricamento del foglietto il feedback non dichiara
 rotto anche il download. Dare per perso tutto manda chi lo prende a cercare un guasto più
 grosso di quello vero (#733, primo giro di verifica).
+
+**L'allarme deve poter parlare prima di tutto il resto.** Lo strumento che apre il
+feedback vive nel repo, e la copia di lavoro del lavoro di piattaforma diventa quella del
+tag a cui ci si attacca: un tag vecchio non ce l'ha, e se il prelievo fallisce non c'è
+niente. Quindi il primo passo preleva il codice di QUESTA corsa e il secondo ne copia
+`release-platform-alarm.mjs` e `build-alarm.mjs` sotto `runner.temp`; da lì in poi
+l'allarme e il controllo finale usano quella copia, non `scripts/`.
+
+**E se l'allarme non parte, la corsa non resta verde.** Il passo riprova tre volte, poi
+scrive `esito=muto` fra gli output del lavoro, lo dice nel riepilogo della corsa ed esce
+rosso; il lavoro `avviso-mancato` legge quell'output e fa fallire la corsa. È l'ultimo
+segnale rimasto: senza, un feedback non consegnato riportava esattamente il silenzio da
+cui è nato il #733 (secondo giro di verifica). Un `|| echo` su quel passo è il bug.
+
+**Il titolo dice solo quello che si è guardato.** Se nessuno ha letto la pagina della
+versione non si annuncia un elenco di file mancanti, e se il lavoro si è fermato prima di
+sapere a quale versione attaccarsi non si dichiara rotto nessun download: le sentinelle
+in `tests/unit/releasePlatformAlarm.test.mjs` lo tengono fermo.
