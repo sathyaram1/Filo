@@ -190,3 +190,42 @@ test('l\'importo resta un prezzo anche con una parola fra il numero e l\'euro', 
 
   await ripristinaModello(app);
 });
+
+// Terzo giro di verifica: «3000 rupie» dentro una frase italiana è testo comune
+// (niente da spiegare) CON dentro un importo da convertire. Il prompt chiede
+// tutte e due le cose; Filo buttava via la risposta intera e nel menu non
+// compariva niente.
+test('la conversione resta anche quando non c\'è niente da spiegare', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EXPLAIN]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__origProviderValuta = globalThis.__origProviderValuta || globalThis.SN_PROVIDER_OPENROUTER;
+    globalThis.SN_PROVIDER_OPENROUTER = {
+      ...globalThis.__origProviderValuta,
+      complete: async () => ({
+        text: 'NESSUNA SPIEGAZIONE (3000 rupie = circa [[calc: 3000/92 | eur]] €)',
+        toolCalls: [], reasoningDetails: [], usage: {},
+      }),
+    };
+  });
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
+    <p id="p">Il biglietto costa 3000 rupie.</p></body></html>`);
+  await page.evaluate(() => {
+    const p = document.querySelector('#p');
+    const r = document.createRange();
+    r.selectNodeContents(p);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
+  await page.locator('#p').click({ button: 'right' });
+  // SUCCESSO: chi ha selezionato legge quanto fanno in euro.
+  await expect(page.locator('.sn-menu')).toContainText('32,61 €', { timeout: 30_000 });
+  await expect(page.locator('.sn-menu')).not.toContainText('NESSUNA SPIEGAZIONE');
+
+  await ripristinaModello(app);
+});

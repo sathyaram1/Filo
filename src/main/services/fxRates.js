@@ -89,8 +89,12 @@
     if (dellaRichiestaDiAdesso(cached) && cached.fetchedAt && (now - cached.fetchedAt) < TTL_MS) {
       return cached;
     }
+    // Se la rete non risponde si ripiega su quello che c'è, ma un elenco preso
+    // con la richiesta di prima non copre le valute di adesso: meglio le stime,
+    // che almeno le contengono tutte e si dichiarano stime.
+    const ripiego = () => (dellaRichiestaDiAdesso(cached) ? cached : FALLBACK);
     if (inflight) {
-      try { return await inflight; } catch (_) { return cached || FALLBACK; }
+      try { return await inflight; } catch (_) { return ripiego(); }
     }
     inflight = (async () => {
       try {
@@ -98,7 +102,7 @@
         await writeCache(fresh);
         return fresh;
       } catch (e) {
-        return cached || FALLBACK;
+        return ripiego();
       } finally {
         inflight = null;
       }

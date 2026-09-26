@@ -112,3 +112,39 @@ test('il prompt delle conversioni chiede di dichiarare l\'importo in euro', () =
     assert.ok(testo.includes('| eur]]'), `${nome}: il prompt non chiede l'unità nel marker`);
   }
 });
+
+// #724 (terzo giro) — i cambi restano buoni un giorno, e nessuno guardava QUALI
+// valute contenessero. Chi aggiornava Filo avendo usato «Spiega» poche ore
+// prima si portava dietro l'elenco corto di dieci valute, e per un giorno
+// intero «3000 rupie» tornava a non avere un cambio.
+test('i cambi presi con una richiesta diversa da quella di adesso non si riusano', async () => {
+  const vecchi = {
+    base: 'EUR', date: '2026-09-26', fetchedAt: Date.now(),
+    rates: { USD: 1.08, GBP: 0.85, CHF: 0.94, JPY: 165, CNY: 7.8, CAD: 1.47, AUD: 1.65, SEK: 11.2, NOK: 11.5, DKK: 7.46 },
+  };
+  let salvato = null;
+  globalThis.chrome = { storage: { local: {
+    get: async () => ({ sn_fx_rates: vecchi }),
+    set: async (o) => { salvato = o.sn_fx_rates; },
+  } } };
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ base: 'EUR', date: '2026-09-27', rates: { USD: 1.08, INR: 92 } }),
+  });
+  const riga = Fx.formatForPrompt(await Fx.get());
+  assert.ok(riga.includes(' INR'), `i cambi vecchi hanno tenuto fuori le rupie: ${riga}`);
+  assert.ok(salvato && salvato.req, 'i cambi si salvano insieme alla richiesta che li ha prodotti');
+});
+
+test('i cambi presi con la richiesta di adesso non si riscaricano ogni volta', async () => {
+  const freschi = {
+    base: 'EUR', date: '2026-09-27', fetchedAt: Date.now(), rates: { USD: 1.08, INR: 92 },
+    req: 'https://api.frankfurter.dev/v1/latest?base=EUR',
+  };
+  let chiamate = 0;
+  globalThis.chrome = { storage: { local: { get: async () => ({ sn_fx_rates: freschi }), set: async () => {} } } };
+  globalThis.fetch = async () => { chiamate++; throw new Error('non dovrebbe servire'); };
+  const riga = Fx.formatForPrompt(await Fx.get());
+  assert.equal(chiamate, 0, 'i cambi del giorno si riusano, non si riscaricano a ogni spiegazione');
+  assert.ok(riga.includes(' INR'));
+});
