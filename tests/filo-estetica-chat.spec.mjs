@@ -129,10 +129,11 @@ test('la chat mostra il bottone di raffinamento e il picker scrive il nuovo colo
   await input.fill('rendi i bottoni verdi');
   await page.locator('#sendBtn').click();
 
-  // 1) Compare il bottone di raffinamento (etichetta da color token).
+  // 1) Compare il bottone di raffinamento, col NOME dell'impostazione (#726).
   const trigger = page.locator('.sn-refine-trigger');
   await expect(trigger).toBeVisible({ timeout: 8_000 });
-  await expect(trigger).toContainText(/colore/i);
+  await expect(trigger).toContainText('Sfondo dei bottoni primari');
+  await expect(trigger).toHaveAttribute('title', 'Scegli il colore esatto');
 
   // 2) Click → il box in sovrimpressione col color picker.
   await trigger.click();
@@ -155,6 +156,12 @@ test('la chat mostra il bottone di raffinamento e il picker scrive il nuovo colo
       return el ? el.textContent : '';
     });
     expect(css).toContain('#112233');
+  }).toPass({ timeout: 4_000 });
+
+  // Il campione nel bottone segue il ritocco: fermo direbbe il colore sbagliato.
+  await expect(async () => {
+    const bg = await page.locator('.sn-refine-trigger-swatch').evaluate((e) => getComputedStyle(e).backgroundColor);
+    expect(bg.replace(/\s/g, '')).toBe('rgb(17,34,51)');
   }).toPass({ timeout: 4_000 });
 
   // Persistenza: è stata inviata una UPDATE_SETTINGS col token al nuovo valore.
@@ -209,4 +216,64 @@ test("una modifica estetica si applica DAVVERO alla dashboard (--dash-* segue i 
     return c;
   });
   expect(bubbleRed.replace(/\s/g, '')).toBe('rgb(255,0,0)');
+});
+
+// #726 — con piu' colori cambiati nella stessa risposta i bottoni erano tutti
+// «Scegli il colore esatto»: nessuno diceva quale colore regolava. Ora ogni
+// bottone porta il nome della sua impostazione, e aprirlo porta a QUEL token.
+test('cinque colori cambiati insieme: cinque bottoni, ognuno col suo nome', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  const input = page.locator('#input');
+  await expect(input).toBeVisible({ timeout: 8_000 });
+
+  await page.evaluate(() => {
+    const { MSG } = window.SN_MSG;
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (msg, cb) => {
+      if (msg && msg.type === MSG.FILO_CHAT) {
+        cb && cb({
+          ok: true,
+          text: 'Fatto, ho reso Filo piu\u2019 retro\u2019.',
+          actions: [
+            { type: 'IMPOSTA_ESTETICA', token: 'background', valore: '#f2e6c9' },
+            { type: 'IMPOSTA_ESTETICA', token: 'text', valore: '#2b2118' },
+            { type: 'IMPOSTA_ESTETICA', token: 'accent', valore: '#8a5a2b' },
+            { type: 'IMPOSTA_ESTETICA', token: 'border', valore: '#c8b48a' },
+            { type: 'IMPOSTA_ESTETICA', token: 'topbar', valore: '#e4d2a8' },
+          ],
+        });
+        return;
+      }
+      if (msg && msg.type === MSG.UPDATE_SETTINGS) { cb && cb({ ok: true }); return; }
+      return orig(msg, cb);
+    };
+  });
+
+  await input.fill('fammi Filo piu\u2019 retro\u2019');
+  await page.locator('#sendBtn').click();
+
+  const triggers = page.locator('.sn-refine-trigger');
+  await expect(triggers).toHaveCount(5, { timeout: 8_000 });
+
+  // Il successo: cinque etichette DIVERSE, ognuna il nome dell'impostazione.
+  const nomi = await triggers.allInnerTexts();
+  expect(new Set(nomi.map((t) => t.trim())).size).toBe(5);
+  for (const atteso of ['Colore di sfondo', 'Colore del testo', "Colore d'accento", 'Colore dei bordi', 'Barra in alto']) {
+    expect(nomi.some((t) => t.includes(atteso))).toBe(true);
+  }
+
+  // E ogni campione porta il colore appena applicato a QUEL token.
+  const campioni = await page.locator('.sn-refine-trigger-swatch').evaluateAll(
+    (els) => els.map((e) => getComputedStyle(e).backgroundColor),
+  );
+  expect(campioni).toHaveLength(5);
+  expect(new Set(campioni).size).toBe(5);
+
+  // Anche il diario dice i nomi: `background = #f2e6c9` non voleva dir niente.
+  await page.locator('.dash-activity-head').first().click();
+  await expect(page.locator('.dash-activity-body').first()).toContainText('Colore di sfondo', { timeout: 8_000 });
+
+  // Il bottone «Barra in alto» apre il box di QUEL token, non di un altro.
+  await triggers.filter({ hasText: 'Barra in alto' }).click();
+  await expect(page.locator('.sn-refine-title')).toHaveText('Regola: Barra in alto', { timeout: 8_000 });
 });

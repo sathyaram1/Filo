@@ -644,6 +644,16 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   border: 1px solid var(--dash-line);
   border-radius: 10px;
 }
+/* Il bottone in chat porta il nome dell'impostazione: il campione dice QUALE colore regola
+   (bordo su currentColor perché la pill si inverte in hover). */
+.sn-refine-trigger-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+  flex-shrink: 0;
+}
+
 .sn-refine-swatch {
   width: 26px;
   height: 26px;
