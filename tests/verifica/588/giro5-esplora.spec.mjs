@@ -84,15 +84,15 @@ test('un programma da un riquadro di terzi (data:) dentro un sito: a chi viene a
   } finally { await srv.close(); }
 });
 
-test('«Scarica» mentre il programma scende lento: quanti clic vanno a vuoto', async ({ app, shell, openTab }) => {
+for (const nomeFile of ['setup.exe', 'lento.exe']) test(`«Scarica» su ${nomeFile}: quanti clic vanno a vuoto`, async ({ app, shell, openTab }) => {
   test.setTimeout(150_000);
   const pagine = {};
   const srv = await server(pagine);
   try {
-    pagine['/p.html'] = `<!doctype html><html><body style="padding:40px"><a id="l" href="/lento.exe">lento</a></body></html>`;
+    pagine['/p.html'] = `<!doctype html><html><body style="padding:40px"><a id="l" href="/${nomeFile}">lento</a></body></html>`;
     const page = await openTab(`http://127.0.0.1:${srv.porta}/p.html`);
     await page.locator('#l').click();
-    const riga = shell.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: 'lento.exe' });
+    const riga = shell.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: nomeFile });
     const si = riga.locator('.dl-row-btn', { hasText: /^Scarica$/ });
     await expect(si).toBeEnabled({ timeout: 10000 });
     // Quanto spesso il pulsante viene rifatto.
