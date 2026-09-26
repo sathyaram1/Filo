@@ -457,6 +457,12 @@
       invoke: 'Pagina filo://security/security.html.',
     },
     {
+      id: 'notice-guard', title: 'Un secondo modello controlla gli avvisi', category: 'settings',
+      desc: 'Gli avvisi che Filo ti mostra dopo aver letto una mail o una pagina non compaiono subito: prima un controllo automatico cerca codici, chiavi, coordinate bancarie e collegamenti che non portano dove dicono, poi un secondo modello — diverso da quello che ha scritto l\'avviso — si chiede se il testo stia cercando di farti fare qualcosa di rischioso. Se ferma qualcosa te lo dice in una riga, con cosa ha visto. Se non riesce a controllare, l\'avviso resta in attesa e compare dopo, mai senza controllo. I collegamenti dentro un avviso mostrano sempre dove portano davvero.',
+      invoke: 'Succede da solo. Gli avvisi fermati stanno in Preferenze → "Avvisi fermati"; il modello che fa da controllo si sceglie in Opzioni → Modelli → "Guardiano degli avvisi".',
+      doesNot: 'Non controlla quello che chiedi tu a Filo: solo i testi nati da contenuto scritto da altri. Non legge al posto tuo la mail intera: guarda l\'avviso in uscita.',
+    },
+    {
       id: 'data-export-import', title: 'Esporta e importa i tuoi dati', category: 'settings',
       desc: 'Salva tutto quello che Filo sa di te (memorie degli agenti, pagine salvate, cronologia, appunti copiati, costi e impostazioni) in un unico file .zip, e lo ricarica quando vuoi — sullo stesso computer come backup, o su un altro per portarti dietro il tuo Filo. Le immagini copiate finiscono nell\'archivio come file veri, sfogliabili, e al ritorno tornano al loro posto. Prima di scrivere qualsiasi cosa, l\'importazione ti dice cosa contiene il file scelto (di quando è il backup, quante sezioni e quante immagini) e chiede conferma: quello che hai già non viene cancellato, le liste si uniscono senza duplicati e, dove lo stesso dato esiste da entrambe le parti, vince quello del backup. Le impostazioni ripristinate (tema, sicurezza, cookie) diventano attive subito, senza riavviare.',
       invoke: 'Impostazioni → Sicurezza, in fondo: "Esporta dati (.zip)" e "Importa dati (.zip)".',

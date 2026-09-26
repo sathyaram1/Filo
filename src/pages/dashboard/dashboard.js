@@ -492,6 +492,8 @@
       liveEl.appendChild(renderLiveCard({
         kind: n.kind === 'alert' ? 'alert' : (n.kind || 'info'),
         text: n.text,
+        link: (n.action && n.action.link) || [],
+        attesa: !!n.inAttesa,
         onDismiss: () => send({ type: MSG.FILO_DISMISS_NOTIFICATION, id: n.id }).then(refreshLive),
       }));
     }
@@ -629,14 +631,33 @@
     return div;
   }
 
-  function renderLiveCard({ kind, text, paused, onToggle, onDismiss }) {
+  function renderLiveCard({ kind, text, paused, onToggle, onDismiss, link, attesa }) {
     const div = document.createElement('div');
     div.className = 'dash-live-card';
     div.dataset.kind = kind;
+    if (attesa) div.dataset.attesa = '1';
     const t = document.createElement('div');
     t.className = 'dash-live-text';
     t.textContent = text;
     div.appendChild(t);
+    // #536 — i collegamenti di una notifica si mostrano con la destinazione
+    // vera (l'etichetta la calcola il main con la fonte unica), mai con la
+    // scritta che ha messo chi ha prodotto il testo.
+    if (Array.isArray(link) && link.length) {
+      const box = document.createElement('div');
+      box.className = 'dash-live-links';
+      for (const l of link) {
+        if (!l || !l.etichetta || !l.url) continue;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'dash-live-link';
+        b.textContent = l.etichetta;
+        b.title = `Apri ${l.etichetta}`;
+        b.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: l.url }));
+        box.appendChild(b);
+      }
+      if (box.childElementCount) div.appendChild(box);
+    }
     // Pausa/ripresa: solo per i countdown (chi passa onToggle). Il pulsante sta
     // accanto alla × e cambia icona/etichetta in base allo stato.
     if (onToggle) {

@@ -159,6 +159,10 @@
     [A.TTS]: 'kokoro',
     [A.SAFEBROWSE_JUDGE]: 'deepseek-flash',
     [A.GEOBLOCK_CLASSIFY]: 'deepseek-flash',
+    // #536 — il guardiano degli avvisi: catena VOLUTAMENTE diversa da quella
+    // di chat e riassunti, così nei test si vede che il secondo giudizio gira
+    // su un modello che non ha scritto il testo.
+    [A.NOTICE_GUARD]: 'claude, gemma-lite',
     [A.FEEDBACK_TITLE]: 'deepseek-flash',
     [A.EDITOR_TITLE]: 'deepseek-flash, gemma-lite',
     [A.EDITOR_SUMMARY]: 'deepseek-flash, gemma-lite',

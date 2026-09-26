@@ -100,6 +100,9 @@
     FILO_TIMERS: 'filo_timers',
     // Notifiche live nella colonna destra. Array di {id, ts, kind, text, action?, dismissed?}.
     FILO_NOTIFICATIONS: 'filo_notifications',
+    // Registro degli avvisi FERMATI dal guardiano (#536): serve a capire se
+    // grida al lupo, quindi lo si legge anche quando non è successo niente.
+    FILO_BLOCCHI_GUARDIANO: 'filo_blocchi_guardiano',
     // Stato sessione corrente dashboard: ultima interazione, contatori, ecc.
     FILO_SESSION: 'filo_session',
     // Flag "già accolto": true quando la micro-intervista di benvenuto è
@@ -256,6 +259,11 @@
     SAFEBROWSE_JUDGE: 'safebrowse_judge',
     // Classificatore della coda ambigua del rilevamento geo-block.
     GEOBLOCK_CLASSIFY: 'geoblock_classify',
+    // Guardiano degli avvisi (#536): un SECONDO modello guarda il testo che
+    // sta per comparire all'utente dopo che Filo ha letto roba di altri. Deve
+    // essere diverso da quello che il testo l'ha scritto — due contesti sullo
+    // stesso modello cadono insieme.
+    NOTICE_GUARD: 'notice_guard',
     // Titolo breve generato all'invio di un feedback.
     FEEDBACK_TITLE: 'feedback_title',
     // === Editor ===
@@ -371,6 +379,9 @@
     [ACTIONS.FILO_TAB_SUMMARY]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SEARCH]: 'Gestione schede',
     [ACTIONS.FILO_CHAT_TRIAGE]: 'Chat con Filo',
+    // Voce a sé: chi guarda la torta deve poter vedere quanto gli costa essere
+    // protetto, invece di trovarselo dentro «Altro».
+    [ACTIONS.NOTICE_GUARD]: 'Controlli di sicurezza',
   };
 
   function creditUsageGroup(action) {
@@ -414,6 +425,7 @@
     [ACTIONS.DECKS_SEARCH_FILTER]: 'Mazzi — filtro ricerca',
     [ACTIONS.SAFEBROWSE_JUDGE]: 'Siti pericolosi — giudizio',
     [ACTIONS.GEOBLOCK_CLASSIFY]: 'Blocco geografico — riconoscimento',
+    [ACTIONS.NOTICE_GUARD]: 'Guardiano degli avvisi',
     [ACTIONS.FEEDBACK_TITLE]: 'Titolo del feedback',
     [ACTIONS.EDITOR_TITLE]: 'Editor — titolo del documento',
     [ACTIONS.EDITOR_SUMMARY]: 'Editor — riassunto del documento',
@@ -485,6 +497,7 @@
     [ACTIONS.TTS]: '',
     [ACTIONS.SAFEBROWSE_JUDGE]: '',
     [ACTIONS.GEOBLOCK_CLASSIFY]: '',
+    [ACTIONS.NOTICE_GUARD]: '',
     [ACTIONS.FEEDBACK_TITLE]: '',
     [ACTIONS.EDITOR_TITLE]: '',
     [ACTIONS.EDITOR_SUMMARY]: '',

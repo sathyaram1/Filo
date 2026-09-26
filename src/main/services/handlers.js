@@ -3341,9 +3341,12 @@ function cosineInt(a, b) {
 
 // Completamento LLM one-shot per un'azione (risolve modello/chiave/limite e
 // registra il costo). Ritorna il testo. Usato da riassunto, triage, re-rank.
-async function runOneShot(action, messages) {
+async function runOneShot(action, messages, { modelRef } = {}) {
   const settings = await getEffectiveSettings();
-  const model = modelForAction(settings, action);
+  // `modelRef` serve a chi deve restringere la catena della sua azione: il
+  // guardiano degli avvisi (#536) toglie da lì il modello che ha scritto il
+  // testo. Senza, vale la catena configurata per l'azione.
+  const model = modelRef || modelForAction(settings, action);
   const attempts = await applyLimitToChain(settings, buildAttemptChain(settings, model, action));
   const result = await Providers.completeWithFallback({ attempts, messages });
   const usedProvider = result.provider || attempts[0].provider;
@@ -3890,6 +3893,19 @@ async function wireSafebrowse(settingsArg) {
 // Esposto su globalThis così il TabManager (src/main/tabs.js) può chiamare la
 // decisione LLM senza creare un ciclo di require fra tabs.js e handlers.js.
 globalThis.SN_TAB_TRIAGE_DECIDE = runTabTriageDecision;
+
+// #536 — il guardiano degli avvisi vive in un servizio suo e ha bisogno di due
+// cose che stanno qui: le impostazioni effettive e la chiamata a un modello che
+// registra il costo. Gliele si passa invece di fargli require questo file, che
+// è anche chi lo carica.
+try {
+  require('./guardianoAvvisi').configure({
+    getSettings: getEffectiveSettings,
+    runOneShot,
+  });
+} catch (e) {
+  console.error('[guardiano] non configurato:', (e && e.message) || e);
+}
 
 // Livello 2 del rilevamento geo-block (proxy-per-tab-spec.md §4): classificatore
 // LLM per la coda ambigua (403, pagina vuota, "non disponibile" generico). Come

@@ -31,6 +31,10 @@
   const LESSONS_BUFFER_TRIGGER_CHARS = 3000;
   // Cap difensivo per le notifiche.
   const NOTIFICATIONS_CAP = 100;
+  // Registro dei blocchi del guardiano (#536): abbondante, perché il suo
+  // mestiere è far vedere quanto spesso blocca, e un registro corto darebbe
+  // sempre la stessa risposta rassicurante.
+  const BLOCCHI_CAP = 300;
 
   function uuid() {
     if (global.crypto?.randomUUID) return global.crypto.randomUUID();
@@ -698,7 +702,23 @@
     return includeDismissed ? list : list.filter((n) => !n.dismissed);
   }
 
-  async function addNotification({ kind, text, action, color }) {
+  // #536 — un avviso nato da roba scritta da altri non entra qui senza il
+  // timbro del guardiano. È la porta, non un promemoria: una superficie nuova
+  // che si dimentica del controllo si rompe subito e rumorosamente, invece di
+  // mostrare all'utente quello che gli ha scritto un estraneo.
+  function timbro(classe, guardiano) {
+    const F = global.SN_FIDUCIA;
+    const cls = F ? F.normalizza(classe || 'filo') : String(classe || 'filo');
+    if (!F || !F.contaminata(cls)) return { classe: cls, stato: 'visibile' };
+    const esito = guardiano && guardiano.esito;
+    if (esito !== 'passa' && esito !== 'attesa') {
+      throw new Error('avviso contaminato senza controllo del guardiano');
+    }
+    return { classe: cls, stato: esito === 'attesa' ? 'attesa' : 'visibile' };
+  }
+
+  async function addNotification({ kind, text, action, color, classe, fonte, guardiano }) {
+    const t = timbro(classe, guardiano);
     const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
     const entry = {
       id: uuid(),
@@ -707,12 +727,61 @@
       text: String(text || ''),
       action: action || null,
       color: color || null, // override del colore della barra laterale
+      classe: t.classe,
+      stato: t.stato, // 'visibile' | 'attesa' (in attesa del controllo)
+      fonte: fonte ? String(fonte).slice(0, 200) : '',
+      tentativi: 0,
       dismissed: false,
     };
     list.unshift(entry);
     if (list.length > NOTIFICATIONS_CAP) list.length = NOTIFICATIONS_CAP;
     await setRaw(KEYS.FILO_NOTIFICATIONS, list);
     return entry;
+  }
+
+  // Aggiorna una voce in attesa dopo un nuovo giro del guardiano. Torna la
+  // voce aggiornata, o null se nel frattempo è sparita.
+  async function segnaEsitoGuardiano(id, { stato, tentativi } = {}) {
+    const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
+    const idx = list.findIndex((n) => n.id === id);
+    if (idx < 0) return null;
+    if (stato) list[idx].stato = stato;
+    if (Number.isFinite(tentativi)) list[idx].tentativi = tentativi;
+    list[idx].ultimoTentativo = new Date().toISOString();
+    if (stato === 'bloccato') list[idx].dismissed = true;
+    await setRaw(KEYS.FILO_NOTIFICATIONS, list);
+    return list[idx];
+  }
+
+  // ===== Registro dei blocchi del guardiano (#536) =====
+
+  async function listBlocchiGuardiano() {
+    return getRaw(KEYS.FILO_BLOCCHI_GUARDIANO, []);
+  }
+
+  // `anteprima` la decide chi chiama: per le regole che scattano PERCHÉ il
+  // testo contiene un segreto, conservarlo qui sarebbe copiare il segreto in
+  // un secondo posto.
+  async function addBloccoGuardiano({ fonte, motivo, regola, anteprima, classe }) {
+    const list = await getRaw(KEYS.FILO_BLOCCHI_GUARDIANO, []);
+    const entry = {
+      id: uuid(),
+      ts: new Date().toISOString(),
+      fonte: String(fonte || '').slice(0, 200),
+      motivo: String(motivo || '').slice(0, 300),
+      regola: String(regola || '').slice(0, 40),
+      anteprima: String(anteprima || '').slice(0, 200),
+      classe: String(classe || ''),
+    };
+    list.unshift(entry);
+    if (list.length > BLOCCHI_CAP) list.length = BLOCCHI_CAP;
+    await setRaw(KEYS.FILO_BLOCCHI_GUARDIANO, list);
+    return entry;
+  }
+
+  async function clearBlocchiGuardiano() {
+    await setRaw(KEYS.FILO_BLOCCHI_GUARDIANO, []);
+    return [];
   }
 
   async function dismissNotification(id, { acted = false } = {}) {
@@ -831,7 +900,9 @@
     normalizeRepeat, parseClock, nextRecurrence, nextAlarmOccurrence, formatRepeat, isRecurring,
     resolveTimerRefs, removeTimersByRef, updateTimersByRef,
     // notifications
-    listNotifications, addNotification, dismissNotification,
+    listNotifications, addNotification, dismissNotification, segnaEsitoGuardiano,
+    // registro dei blocchi del guardiano (#536)
+    listBlocchiGuardiano, addBloccoGuardiano, clearBlocchiGuardiano,
     // dashboard cache
     getDashboardCache, setDashboardCache,
     // proxy: regole persistenti per dominio (#152)

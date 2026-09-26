@@ -12,6 +12,7 @@ module.exports = function register(on, ctx) {
   const Onboarding = globalThis.SN_ONBOARDING;
   const FiloChats = globalThis.SN_FILO_CHATS;
   const ChatArchive = globalThis.SN_CHAT_ARCHIVE;
+  const Guardiano = globalThis.SN_GUARDIANO_AVVISI;
 
   // I messaggi che leggono o riscrivono la memoria dell'utente non sono roba da
   // pagine web: il canale `filo:message` è uno solo e ci arrivano anche i
@@ -339,7 +340,57 @@ module.exports = function register(on, ctx) {
     return { ok: true, timers: list };
   });
 
-  on(MSG.FILO_GET_NOTIFICATIONS, async () => ({ ok: true, notifications: await FiloMem.listNotifications() }));
+  // #536 — un avviso in attesa del controllo si SA, ma non si LEGGE: il suo
+  // testo è proprio quello che nessuno ha ancora guardato, e mandarlo in
+  // pagina sarebbe mostrarlo.
+  function perLaPagina(n) {
+    if (n.stato !== 'attesa') return n;
+    const chi = Guardiano ? Guardiano.fonteVisibile(n.fonte) : 'una fonte sconosciuta';
+    return {
+      ...n,
+      text: `Un avviso nato da ${chi} è in attesa del controllo.`,
+      action: { ...(n.action || {}), link: [] },
+      inAttesa: true,
+    };
+  }
+
+  on(MSG.FILO_GET_NOTIFICATIONS, async () => {
+    const list = await FiloMem.listNotifications();
+    // La ripresa non fa aspettare chi ha chiesto l'elenco: quando finisce
+    // manda un aggiornamento live e la dashboard si ridisegna.
+    if (Guardiano && list.some((n) => n.stato === 'attesa')) {
+      Promise.resolve().then(() => Guardiano.riprendiInAttesa()).catch(() => {});
+    }
+    return { ok: true, notifications: list.map(perLaPagina) };
+  });
+
+  // Solo dalle superfici di Filo: un sito visitato non propone avvisi.
+  on(MSG.FILO_AVVISO_PROPOSTO, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!Guardiano) return { ok: false, error: 'guardiano non disponibile' };
+    const testo = String((msg && msg.testo) || '').trim();
+    if (!testo) return { ok: false, error: 'testo mancante' };
+    const r = await Guardiano.proponiAvviso({
+      testo,
+      classe: (msg && msg.classe) || 'messaggio',
+      fonte: (msg && msg.fonte) || '',
+      richiesta: (msg && msg.richiesta) || '',
+      modelloProduttore: (msg && msg.modelloProduttore) || '',
+      kind: (msg && msg.kind) || 'alert',
+    });
+    broadcastLiveUpdate();
+    return { ok: true, esito: r.esito, motivo: r.motivo || '' };
+  });
+
+  on(MSG.FILO_GET_BLOCCHI_GUARDIANO, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    return { ok: true, blocchi: await FiloMem.listBlocchiGuardiano() };
+  });
+
+  on(MSG.FILO_CLEAR_BLOCCHI_GUARDIANO, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    return { ok: true, blocchi: await FiloMem.clearBlocchiGuardiano() };
+  });
 
   on(MSG.FILO_DISMISS_NOTIFICATION, async (msg) => {
     const list = await FiloMem.dismissNotification(msg.id, { acted: !!msg.acted });

@@ -40,6 +40,22 @@
     .onb-line { display: flex; gap: 8px; line-height: 1.45; }
     .onb-who { flex: 0 0 auto; font-weight: 600; opacity: 0.75; }
     .onb-what { white-space: pre-wrap; }
+
+    /* Avvisi fermati dal guardiano: un registro si legge a colpo d'occhio, una
+       riga per blocco, il motivo in evidenza e il resto sottovoce. */
+    .grd-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+    .grd-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 10px 12px;
+      border: 1px solid var(--sn-border);
+      border-radius: 10px;
+    }
+    .grd-motivo { font-weight: 600; }
+    .grd-meta { font-size: 0.85em; opacity: 0.7; display: flex; gap: 10px; flex-wrap: wrap; }
+    .grd-anteprima { font-size: 0.9em; opacity: 0.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+    [hidden] { display: none; }
   </style>
 </head>
 <body>
@@ -158,6 +174,14 @@
         <select id="notifSound"></select>
         <button type="button" class="sn-btn sn-btn-secondary" id="notifSoundPreview">Prova</button>
       </div>
+    </section>
+
+    <section id="sec-guardiano">
+      <h2>Avvisi fermati</h2>
+      <p class="sn-muted">Gli avvisi nati da una mail o da una pagina passano da un secondo controllo prima di comparire. Qui trovi quelli che ha fermato: se ne vedi di innocui, segnalacelo.</p>
+      <div id="guardianoVuoto" class="sn-muted">Nessun avviso fermato finora.</div>
+      <div id="guardianoBlocchi" class="grd-list" hidden></div>
+      <button type="button" class="sn-btn sn-btn-secondary" id="guardianoSvuota" style="margin-top:12px;" hidden>Svuota il registro</button>
     </section>
 
     <section>

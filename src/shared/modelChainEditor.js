@@ -64,6 +64,7 @@
       [A.FILO_COMPACT, 'options_action_filo_compact'],
       [A.SAFEBROWSE_JUDGE, 'options_action_safebrowse_judge'],
       [A.GEOBLOCK_CLASSIFY, 'options_action_geoblock_classify'],
+      [A.NOTICE_GUARD, 'options_action_notice_guard'],
       [A.FEEDBACK_TITLE, 'options_action_feedback_title'],
       [A.EDITOR_TITLE, 'options_action_editor_title'],
       [A.EDITOR_SUMMARY, 'options_action_editor_summary'],

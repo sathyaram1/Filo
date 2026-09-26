@@ -736,6 +736,37 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 .dash-live-card[data-kind="info"]::before { background: var(--dash-green); }
 
 .dash-live-card .dash-live-text { white-space: pre-wrap; }
+
+/* #536 — la scritta di un collegamento in una notifica è la sua destinazione
+   vera: chi ha scritto il testo non decide cosa si legge sul pulsante. */
+.dash-live-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.dash-live-link {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-family: var(--dash-font-mono, ui-monospace, monospace);
+  color: var(--dash-blue);
+  background: transparent;
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 999px;
+  padding: 2px 10px;
+  cursor: pointer;
+  transition: background var(--dash-anim, 140ms) ease, color var(--dash-anim, 140ms) ease;
+}
+.dash-live-link:hover { background: var(--dash-line); color: var(--dash-ink); }
+
+/* L'avviso che aspetta il controllo si vede ma non si legge: il colore dice
+   che non è un avviso, è un posto tenuto. */
+.dash-live-card[data-attesa="1"] { border-style: dashed; }
+.dash-live-card[data-attesa="1"]::before { background: var(--dash-ink-mute); }
+.dash-live-card[data-attesa="1"] .dash-live-text { color: var(--dash-ink-mute); font-style: italic; }
 .dash-live-card .dash-live-meta {
   font-size: 11px;
   color: var(--dash-ink-mute);

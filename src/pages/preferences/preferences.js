@@ -327,6 +327,69 @@
     } catch (_) {}
   }
 
+  // ── Sezione "avvisi fermati" (#536) ──────────────────────────────────────
+  // Il guardiano esiste per non mostrare all'utente quello che gli ha scritto
+  // un estraneo, ma un guardiano che blocca troppo viene spento: questo
+  // registro è il modo di accorgersene, quindi si legge anche quando è vuoto.
+  function quando(ts) {
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function renderBlocchi(list) {
+    const box = $('guardianoBlocchi');
+    const vuoto = $('guardianoVuoto');
+    const svuota = $('guardianoSvuota');
+    if (!box) return;
+    box.innerHTML = '';
+    const ce = Array.isArray(list) && list.length > 0;
+    box.hidden = !ce;
+    if (vuoto) vuoto.hidden = ce;
+    if (svuota) svuota.hidden = !ce;
+    if (!ce) return;
+    for (const b of list) {
+      const row = document.createElement('div');
+      row.className = 'grd-row';
+      const motivo = document.createElement('div');
+      motivo.className = 'grd-motivo';
+      motivo.textContent = b.motivo || 'Fermato senza motivo registrato';
+      row.appendChild(motivo);
+      const meta = document.createElement('div');
+      meta.className = 'grd-meta';
+      const q = document.createElement('span');
+      q.textContent = quando(b.ts);
+      const f = document.createElement('span');
+      f.textContent = b.fonte ? `da ${b.fonte}` : 'fonte sconosciuta';
+      meta.appendChild(q);
+      meta.appendChild(f);
+      row.appendChild(meta);
+      // L'anteprima manca apposta quando il testo fermato conteneva un
+      // segreto: copiarlo qui sarebbe conservarlo un'altra volta.
+      if (b.anteprima) {
+        const a = document.createElement('div');
+        a.className = 'grd-anteprima';
+        a.textContent = b.anteprima;
+        row.appendChild(a);
+      }
+      box.appendChild(row);
+    }
+  }
+
+  async function loadBlocchi() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.FILO_GET_BLOCCHI_GUARDIANO });
+      if (r?.ok) renderBlocchi(r.blocchi || []);
+    } catch (_) {}
+  }
+
+  async function svuotaBlocchi() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.FILO_CLEAR_BLOCCHI_GUARDIANO });
+      if (r?.ok) { renderBlocchi([]); flashSaved(); }
+    } catch (_) {}
+  }
+
   // ── Sezione "colore identità delle tab" (Preferenze avanzate) ────────────
   // Stessa estetica "a codice" dei token: una riga per ognuno dei sei parametri
   // di src/shared/tabColor.js, con nome, valore numerico editabile, intervallo
@@ -933,6 +996,10 @@
     const onbBtn = $('restartOnboarding');
     if (onbBtn) onbBtn.addEventListener('click', restartOnboarding);
     loadOnboardingArchive();
+
+    const svuotaBtn = $('guardianoSvuota');
+    if (svuotaBtn) svuotaBtn.addEventListener('click', svuotaBlocchi);
+    loadBlocchi();
 
     // Con tema "Come il sistema", il tema risolto può cambiare quando l'OS passa
     // chiaro↔scuro: ridisegna le righe così i default mostrati restano corretti.

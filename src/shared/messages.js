@@ -689,6 +689,13 @@
     FILO_STOP_TIMER_ALARM: 'filo_stop_timer_alarm', // { id } — silenzia/rimuove un timer che sta suonando
     FILO_GET_NOTIFICATIONS: 'filo_get_notifications',
     FILO_DISMISS_NOTIFICATION: 'filo_dismiss_notification', // { id }
+    // #536 — un'automazione PROPONE un avviso nato da roba che ha scritto
+    // qualcun altro: lo mostra il main, e solo dopo il guardiano.
+    // { testo, classe, fonte, richiesta?, modelloProduttore? }
+    FILO_AVVISO_PROPOSTO: 'filo_avviso_proposto',
+    // Registro degli avvisi fermati, per capire se il guardiano grida al lupo.
+    FILO_GET_BLOCCHI_GUARDIANO: 'filo_get_blocchi_guardiano',
+    FILO_CLEAR_BLOCCHI_GUARDIANO: 'filo_clear_blocchi_guardiano',
     // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
     // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
     FILO_CONFIRM_ACTION: 'filo_confirm_action',

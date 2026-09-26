@@ -51,6 +51,12 @@ require(path.join(SHARED, 'paths.js'));
 // Elenco e stato della micro-intervista di benvenuto (#524): logica pura, va
 // PRIMA di filoMemory (che ci passa lo stato letto dallo storage).
 require(path.join(SHARED, 'onboarding.js'));
+// #536 — quanto ci si fida delle fonti di un compito, i controlli statici
+// sugli avvisi e la domanda del guardiano. Vanno PRIMA di filoMemory, che
+// rifiuta di salvare un avviso contaminato senza il timbro del controllo.
+require(path.join(SHARED, 'fiducia.js'));
+require(path.join(SHARED, 'guardianoStatico.js'));
+require(path.join(SHARED, 'guardiano.js'));
 require(path.join(SHARED, 'filoMemory.js'));
 require(path.join(SHARED, 'filoState.js'));
 // #525 — archivio delle chat con Filo: titoli, tipi, ricerca (logica pura).
@@ -130,6 +136,9 @@ require(path.join(SVC, 'llmsTxt.js'));
 require(path.join(SVC, 'webSearch.js'));
 require(path.join(SVC, 'fxRates.js'));
 require(path.join(SVC, 'safebrowse', 'index.js'));
+// #536 — la porta unica degli avvisi nati da roba scritta da altri. Dipende
+// dai moduli condivisi fiducia/guardiano, già caricati sopra.
+require(path.join(SVC, 'guardianoAvvisi.js'));
 require(path.join(SVC, 'geoBlock.js'));
 require(path.join(SVC, 'geoBlockClassifier.js'));
 require(path.join(SVC, 'geoBlockRules.js'));

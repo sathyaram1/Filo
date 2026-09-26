@@ -140,6 +140,11 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_STOP_TIMER_ALARM: 'filo-timers',
     FILO_GET_NOTIFICATIONS: 'filo-notifications',
     FILO_DISMISS_NOTIFICATION: 'filo-notifications',
+    // #536 — la porta da cui passa un avviso nato da roba scritta da altri, e
+    // il registro di quelli fermati.
+    FILO_AVVISO_PROPOSTO: 'notice-guard',
+    FILO_GET_BLOCCHI_GUARDIANO: 'notice-guard',
+    FILO_CLEAR_BLOCCHI_GUARDIANO: 'notice-guard',
     FILO_GET_ONBOARDING: 'onboarding',
     FILO_RESTART_ONBOARDING: 'onboarding',
     FILO_CLOSE_ONBOARDING: 'onboarding',
