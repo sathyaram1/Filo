@@ -469,21 +469,7 @@ function onWillDownload(item, webContents) {
   liveItems.set(id, item);
   persist();
   broadcast('start', rec);
-  if (attesa) {
-    // L'avviso NON scade: se sparisse da solo, la risposta di default
-    // diventerebbe "il file resta in un posto che l'utente non conosce".
-    // Chiuderlo con la X lascia la voce in attesa nell'elenco, dove le stesse
-    // due risposte restano a portata.
-    let testo = `«${rec.filename}» è un programma: scaricarlo?`;
-    try { testo = ESE().testoScarica(rec.filename, sito); } catch (_) {}
-    shellToast(testo, {
-      durationSec: 0,
-      actions: [
-        { label: 'Scarica', confirmDownloadId: id, allow: true },
-        { label: 'Non scaricare', confirmDownloadId: id, allow: false },
-      ],
-    });
-  }
+  if (attesa) chiediNellaFinestra(webContents, rec);
   // #412 — chiudi la scheda "vuota" aperta apposta da un link Scarica
   // target=_blank. Deferito così il ciclo di vita del download (già preso in
   // carico qui sopra) è completamente cablato prima di toccare l'albero delle view.
