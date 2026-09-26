@@ -25,7 +25,7 @@ const premi = (app, keyCode, sullaBarra = false) => app.evaluate(({ BrowserWindo
 }, { keyCode, sullaBarra, mods: keyCode === '0' || keyCode === '=' ? ['control'] : ['alt'] });
 const stato = (app) => app.evaluate(async () => (await globalThis.SN_FILO_STATE.assemble()).stateText);
 
-test('zoom in chat su un sito, indietro e avanti fra due siti: ognuno ritrova il suo zoom', async ({ app, openTab, testServer }) => {
+test('zoom in chat, poi indietro e avanti fra due siti: le due strade non si pestano', async ({ app, openTab, testServer }) => {
   const a = testServer.html('<!doctype html><title>A</title><h1>A</h1>');
   const b = testServer.html('<!doctype html><title>B</title><h1>B</h1>').replace('127.0.0.1', 'localhost');
   const page = await openTab(a);
