@@ -1050,8 +1050,19 @@
     }).catch(() => {});
   }
 
+  // #588 — domanda «scaricarlo?» aperta, per id di scaricamento: la risposta può
+  // arrivare da altre superfici, e allora la domanda si ritira invece di restare.
+  const domandeScarico = new Map();
+  function ritiraDomanda(id) {
+    const card = domandeScarico.get(id);
+    if (!card) return;
+    domandeScarico.delete(id);
+    NOTIFS.dismiss(card);
+  }
+
   if (api.onToast) api.onToast((info) => {
     if (!info || !info.text) return;
+    let domandaDi = null;
     // Le azioni che arrivano dal main non possono trasportare funzioni: le
     // codifichiamo in modo dichiarativo e le traduciamo qui in onClick.
     // - openUrl → apri quel sito bypassando il blocco (#170.3 "Apri comunque").
