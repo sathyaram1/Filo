@@ -39,22 +39,38 @@ test('senza la chiave la pagina non chiede il documento intero di tutte le segna
       });
     }
     window.__chiesti = [];
+    window.__campi = null;
     window.SN_FEEDBACK.list = async () => JSON.parse(JSON.stringify(righe));
-    window.SN_FEEDBACK.getMany = async (ids) => {
+    window.SN_FEEDBACK.getMany = async (ids, opts) => {
       window.__chiesti.push(...ids);
+      window.__campi = (opts && opts.fields) || null;
       return ids.map((id) => {
         const { _proiezione, ...resto } = righe.find((x) => x._id === id);
-        return { ...resto, notes: 'report', images: [], files: [] };
+        // Il server torna solo i campi chiesti.
+        return { ...resto, images: [], files: [] };
       });
     };
     window.__fbTest.setAdmin(true, { email: 'o@e.invalid' });
     window.__fbTest.setData(JSON.parse(JSON.stringify(righe)));
     await new Promise((r) => setTimeout(r, 1500));
-    return { chiesti: window.__chiesti.length, sezioni: !document.getElementById('tabs').hidden };
+    return {
+      chiesti: window.__chiesti.length,
+      campi: window.__campi,
+      sezioni: !document.getElementById('tabs').hidden,
+      schede: document.querySelectorAll('.fb-card').length,
+    };
   });
 
-  // L'elenco unico è voluto (gli stati non si leggono): a non esserlo è il
-  // conto che ci viene dietro.
+  // L'elenco unico è voluto: gli stati non si leggono. A non esserlo era il
+  // conto che ci veniva dietro.
   expect(esito.sezioni).toBe(false);
-  expect(esito.chiesti).toBeLessThan(40);
+  expect(esito.schede).toBe(40);
+  // La parte che pesa (report, livelli, commento di revisione) non si chiede:
+  // senza la chiave la conversazione non comparirebbe comunque.
+  expect(Array.isArray(esito.campi), 'il documento intero non va chiesto').toBe(true);
+  expect(esito.campi).not.toContain('notes');
+  expect(esito.campi).not.toContain('livelli');
+  // Gli allegati sì: quelli si vedono anche senza chiave.
+  expect(esito.campi).toContain('images');
+  expect(esito.campi).toContain('files');
 });
