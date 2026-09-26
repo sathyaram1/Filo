@@ -827,7 +827,11 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   const model = modelForAction(settings, action);
   let messages = await buildMessages(action, payload);
   messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
-  if (onMeta) onMeta({ model, provider: settings.provider });
+  // Quando il prompt l'ha composto il main (chi chiama ha mandato il dato
+  // grezzo, non i messaggi) glielo si restituisce: è l'unico che ha i cambi del
+  // giorno, e le domande successive devono partire dallo stesso testo. #724
+  const compostoQui = !(payload && Array.isArray(payload.messages) && payload.messages.length);
+  if (onMeta) onMeta({ model, provider: settings.provider, messages: compostoQui ? messages : null });
 
   const cached = await AICache.get({ provider: settings.provider, model, messages });
   if (cached) {

@@ -1144,7 +1144,9 @@
       `aggiungi tra parentesi l'equivalente in euro o in unità italiane usando il marker [[calc: ...]] con i tassi/fattori qui sotto. ` +
       `Esempi (assumendo 1 EUR = 1.08 USD): "$50" → "$50 ([[calc: 50/1.08]] €)"; "3 miles" → "3 miglia ([[calc: 3*1.609]] km)"; "70°F" → "70°F ([[calc: (70-32)*5/9]] °C)"; "5 lb" → "5 lb ([[calc: 5*0.4536]] kg)". ` +
       `Fattori da usare: 1 mi = 1.609 km, 1 ft = 0.3048 m, 1 in = 2.54 cm, 1 yd = 0.9144 m, 1 mi² = 2.59 km², 1 acre = 4046.86 m², 1 lb = 0.4536 kg, 1 oz = 28.35 g, 1 gal (US) = 3.785 L, 1 fl oz (US) = 29.57 mL, °C = (°F-32)*5/9. ` +
-      (fxLine ? fxLine + ' Per convertire X di una valuta in EUR usa [[calc: X/<tasso>]].\n' : '') +
+      (fxLine ? fxLine + ' Per convertire X di una valuta in EUR usa [[calc: X/<tasso>]], e scrivi «€» subito dopo il marker. ' +
+        'Vale per OGNI sigla dell\'elenco, anche quando la selezione la chiama col nome comune in italiano o in un\'altra lingua (rupie = INR, real = BRL, zloty = PLN, won = KRW, rand = ZAR, baht = THB, lira turca = TRY, fiorino = HUF, corona ceca = CZK, peso messicano = MXN). ' +
+        'Se la valuta NON è nell\'elenco non convertire e non inventare il tasso a memoria.\n' : '') +
       `Se non ci sono valute o unità da convertire, NON aggiungere nulla. Una sola conversione per importo, accanto al valore originale, senza spiegare la formula.` +
       `\n\nRispondi in italiano. Non aggiungere preamboli o spiegazioni meta sulla tua risposta.`,
 
@@ -1161,7 +1163,9 @@
       `Il sistema sostituisce il marker col risultato. Esempio: "Il prodotto è [[calc: 347*55]], cioè circa [[calc: 347*55/1000]] migliaia."` +
       `\n\nConversioni: se compaiono importi in valute non-EUR o unità non metriche/non italiane, aggiungi tra parentesi l'equivalente in EUR/unità italiane usando [[calc: ...]]. ` +
       `Fattori: 1 mi = 1.609 km, 1 ft = 0.3048 m, 1 in = 2.54 cm, 1 yd = 0.9144 m, 1 mi² = 2.59 km², 1 acre = 4046.86 m², 1 lb = 0.4536 kg, 1 oz = 28.35 g, 1 gal (US) = 3.785 L, °C = (°F-32)*5/9. ` +
-      (fxLine ? fxLine + ' Per convertire X di una valuta in EUR usa [[calc: X/<tasso>]].\n' : '') +
+      (fxLine ? fxLine + ' Per convertire X di una valuta in EUR usa [[calc: X/<tasso>]], e scrivi «€» subito dopo il marker. ' +
+        'Vale per OGNI sigla dell\'elenco, anche quando la selezione la chiama col nome comune in italiano o in un\'altra lingua (rupie = INR, real = BRL, zloty = PLN, won = KRW, rand = ZAR, baht = THB, lira turca = TRY, fiorino = HUF, corona ceca = CZK, peso messicano = MXN). ' +
+        'Se la valuta NON è nell\'elenco non convertire e non inventare il tasso a memoria.\n' : '') +
       `Una sola conversione per importo, accanto al valore originale, senza esibire la formula.` +
       `\n\nRispondi in italiano. Non aggiungere preamboli o note meta.`,
 

@@ -9,15 +9,29 @@
   const STORAGE_KEY = 'sn_fx_rates';
   const TTL_MS = 24 * 60 * 60 * 1000;
   const TIMEOUT_MS = 4000;
-  const SYMBOLS = ['USD', 'GBP', 'CHF', 'JPY', 'CNY', 'CAD', 'AUD', 'SEK', 'NOK', 'DKK'];
-  const URL = `https://api.frankfurter.dev/v1/latest?base=EUR&symbols=${SYMBOLS.join(',')}`;
+  // Nessun elenco di valute nella richiesta: la fonte manda TUTTE quelle che la
+  // BCE pubblica. Con dieci sigle scelte a mano «3000 rupie» finiva a memoria
+  // del modello, e una valuta nuova sarebbe rimasta fuori per sempre (#724).
+  const URL = 'https://api.frankfurter.dev/v1/latest?base=EUR';
+  // Le SIGLE arrivano dalla rete e finiscono nel prompt come frase di Filo:
+  // o sono tre lettere maiuscole o non si scrivono. Stessa regola della data.
+  const SIGLA_RE = /^[A-Z]{3}$/;
+  // Tetto di guardia su una risposta malformata: la BCE ne pubblica una
+  // trentina, cento è fuori da qualunque caso vero.
+  const MAX_SIGLE = 100;
 
   // Fallback statico se la fetch fallisce al primo uso e non c'è cache.
   // Valori indicativi ~2026, usati solo come ultima spiaggia.
   const FALLBACK = {
     base: 'EUR',
     date: '2026-01-01',
-    rates: { USD: 1.08, GBP: 0.85, CHF: 0.94, JPY: 165, CNY: 7.8, CAD: 1.47, AUD: 1.65, SEK: 11.2, NOK: 11.5, DKK: 7.46 },
+    rates: {
+      USD: 1.08, GBP: 0.85, CHF: 0.94, JPY: 165, CNY: 7.8, CAD: 1.47, AUD: 1.65,
+      SEK: 11.2, NOK: 11.5, DKK: 7.46, INR: 92, BRL: 5.9, MXN: 19.5, TRY: 41,
+      PLN: 4.3, HUF: 395, CZK: 25.2, RON: 4.97, BGN: 1.96, ISK: 150, KRW: 1480,
+      ZAR: 19.8, THB: 37, IDR: 17200, ILS: 4.0, MYR: 4.9, NZD: 1.8, PHP: 62,
+      SGD: 1.45, HKD: 8.4,
+    },
     stale: true,
   };
 
@@ -95,8 +109,10 @@
 
   function formatForPrompt(data) {
     if (!data || !data.rates) return '';
-    const parts = SYMBOLS
-      .filter((s) => typeof data.rates[s] === 'number')
+    const parts = Object.keys(data.rates)
+      .filter((s) => SIGLA_RE.test(s) && Number.isFinite(data.rates[s]) && data.rates[s] > 0)
+      .sort()
+      .slice(0, MAX_SIGLE)
       .map((s) => `${trimNum(data.rates[s])} ${s}`);
     if (!parts.length) return '';
     const date = DATA_RE.test(String(data.date || '')) ? String(data.date) : '';
