@@ -128,11 +128,12 @@ test('clic «Approva» nel quadrato, poi il server mette il segno: arriva da sol
       mergePreapproved: { by: `owner@example.com · approvazione ${r}`, at: new Date().toISOString() },
     });
   }, RICHIESTA);
-  await expect(scheda(page, 'fb515').locator('.mg-preapproved')).toHaveText('blocchi già approvati', { timeout: 15000 });
+  await expect(tab(page, 'inbox')).toContainText('(0)', { timeout: 15000 });
   await expect(page.locator('#mgPreapprovedInfo')).toContainText('blocchi che hai già approvato');
   await expect(page.locator('#mgPreapprovedInfo')).not.toContainText(RICHIESTA);
   await expect(page.locator('#mgPreapproveBtn')).toHaveAttribute('aria-pressed', 'false');
-  await expect(tab(page, 'inbox')).toContainText('(0)');
+  await tab(page, 'queue').click();
+  await expect(scheda(page, 'fb515').locator('.mg-preapproved')).toHaveText('blocchi già approvati');
   await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-g2-dopo-approva.png' });
 });
 
