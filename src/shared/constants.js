@@ -2431,6 +2431,8 @@
     ACTION_LABELS,
     actionLabel,
     DEFAULT_MODELS,
+    SENZA_GUARDIANO,
+    passaDalGuardiano,
     DEFAULT_MODEL_REGISTRY,
     resolveModel,
     parseModelRefs,
