@@ -118,9 +118,10 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   }
 
   const { gsb, ageDays, cert, sandbox, llm } = asyncData;
-  const whitelisted = isWhitelisted(norm.registrable);
+  const hosted = hostedPlatform(norm.host, pathOf(url));
+  const whitelisted = !hosted && isWhitelisted(norm.registrable);
   const sigs = localSignals(norm, ctx);
-  const reasons = sigs.map((s) => s.kind);
+  const reasons = sigs.map((s) => s.kind).concat(hosted ? ['hosted_content'] : []);
 
   // Blacklist: prevale su tutto, anche sulla whitelist.
   if (gsb && gsb.listed) {
