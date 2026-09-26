@@ -720,6 +720,13 @@
         + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Configura la chiave e riprova.');
       return false;
     }
+    // Stessa regola, altro motivo: la conversazione non è mai arrivata, quindi
+    // la casella è vuota perché non sappiamo, non perché non c'è niente.
+    if (item._dettaglioMancato && payload && typeof payload.notes === 'string') {
+      alert('Il resto di questa segnalazione non è arrivato: salvare adesso sostituirebbe la conversazione '
+        + 'con quello che vedi a schermo. Premi «Aggiorna» e riprova.');
+      return false;
+    }
     // Un cambio di stato passa SOLO se è una delle azioni che la segnalazione
     // offre in questo momento (la stessa tabella che disegna i pulsanti). Il
     // guardiano sta qui e non sui pulsanti: uno stato può essere cambiato
