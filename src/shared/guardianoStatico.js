@@ -9,15 +9,18 @@
   // fermerebbe avvisi innocui che la contengono per caso.
   const SEGRETO_MIN = 12;
 
-  // Le parole che qualificano un numero come credenziale. Il «codice» da solo
-  // no: un codice d'ordine in una mail di spedizione è normale.
-  const PAROLE_CODICE = new RegExp(
+  // Qui NON si indovina se un codice è una credenziale: si riconoscono solo le
+  // forme che in una frase onesta non compaiono. Un codice «di verifica», «di
+  // accesso», «di conferma» descrive quasi sempre un portone, una
+  // prenotazione, un wifi o una SIM, e sette giri di correzioni hanno mostrato
+  // che l'elenco delle cose innocue non finisce mai: quelle frasi le legge il
+  // guardiano, che vede la frase intera. Qui restano i marchi del codice
+  // MONOUSO, che nessuno usa per il cancello di casa (#536).
+  const MARCHI_MONOUSO = new RegExp(
     '(?:\\botp\\b|\\bmfa\\b|\\b2fa\\b|one[\\s-]?time'
-    + '|codic\\w*\\s+(?:di\\s+)?(?:verifica|sicurezza|accesso|conferma|autenticazione|recupero|ripristino|temporane\\w+|monouso)'
-    + '|codic\\w*\\s+usa\\s+e\\s+getta'
-    + '|(?:verification|security|recovery|access|login|backup)\\s+code'
-    + '|\\bpin\\b|password|passphrase|parola\\s+d\'?ordine'
-    + '|chiav\\w*\\s+(?:di\\s+)?(?:recupero|ripristino|accesso))',
+    + '|(?:codic|chiav|password|passphrase)\\w*\\s+(?:di\\s+|da\\s+)?'
+    + '(?:recupero|ripristino|temporane\\w+|monouso|usa\\s+e\\s+getta)'
+    + '|(?:recovery|backup|one[\\s-]?time)\\s+code)',
     'i',
   );
 
