@@ -26,6 +26,10 @@
   --dash-ink-mute: #7e7567;
   --dash-line: rgba(236, 230, 218, 0.10);
   --dash-line-strong: rgba(236, 230, 218, 0.20);
+  /* Il blu del tema chiaro su carta scura si stacca meno del doppio dal fondo:
+     la destinazione di un collegamento diventava la cosa meno leggibile della
+     riga, proprio dove serve leggerla (#536). */
+  --dash-blue: #8fc4e8;
 }
 
 html, body {
