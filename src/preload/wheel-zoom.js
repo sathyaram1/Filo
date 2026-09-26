@@ -79,7 +79,6 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   }
 
   function refreshPercent() {
-    pubblicaPercentuale();
     // Non sovrascrivere mentre l'utente sta digitando nel campo.
     if (percentInput && document.activeElement !== percentInput) {
       percentInput.value = String(currentPercent());
