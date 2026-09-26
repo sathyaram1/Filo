@@ -58,6 +58,28 @@ const SCHEDA = {
   },
 };
 
+// La scheda del secondo giro: un'altra, per distinguere «ha riletto» da «si è
+// ricordato».
+const ALTRA_SCHEDA = {
+  document: {
+    name: 'projects/p/databases/(default)/documents/feedback-public/fb-2',
+    createTime: '2026-06-23T10:00:00Z',
+    updateTime: '2026-06-24T10:00:00Z',
+    fields: {
+      name: { stringValue: 'Le schede si riaprono dove le avevi lasciate' },
+      seq: { integerValue: '43' },
+      subSeq: { integerValue: '0' },
+      status: { stringValue: 'done' },
+      statusPublic: { stringValue: 'closed' },
+      resolvedInVersion: { stringValue: '0.2.70' },
+      createdAt: { stringValue: '2026-06-23T10:00:00Z' },
+      resolvedAt: { stringValue: '2026-06-24T10:00:00Z' },
+      clientIdHash: { stringValue: 'b'.repeat(32) },
+      userNote: { stringValue: 'Riaprendo torna tutto com’era.' },
+    },
+  },
+};
+
 // Sostituisce fetch nella pagina registrando ogni URL: quello che conta non è
 // solo cosa si vede, ma COSA SI CHIEDE al server.
 //
