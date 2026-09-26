@@ -610,7 +610,7 @@
     .mg-item:hover { background: var(--sn-hover); }
     .mg-item--selected { background: var(--sn-hover); }
     /* Arrivata a pagina aperta: un punto caldo in testa finché non la si apre (con un ordinamento a scelta può
-       cadere a metà lista). Nelle schede In coda sta nella riga del titolo: da figlio della colonna avrebbe una riga sua. */
+       cadere a metà lista). In coda sta nella riga del titolo: da figlio della colonna avrebbe una riga sua. */
     .mg-item--arrivata:not(.mg-item--staged)::before,
     .mg-item--staged.mg-item--arrivata > .mg-item-row:first-child::before {
       content: ''; flex: 0 0 auto; align-self: center;
