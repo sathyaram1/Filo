@@ -121,6 +121,13 @@ async function vaglia({ testo, classe, fonte, richiesta, modelloProduttore, link
   if (!catena.length) {
     return { esito: 'attesa', regola: 'senza-guardiano', motivo: '', motivoChiave: '' };
   }
+  // I soprannomi non bastano: fra la scelta e la chiamata c'è chi li riscrive
+  // (l'interruttore «solo modelli a pesi aperti» sostituisce ogni modello
+  // proprietario col suo equivalente aperto). L'indipendenza si verifica sui
+  // modelli che partono DAVVERO, qui, dove la lista dei tentativi è già fatta.
+  const vietati = deps.modelliConcreti
+    ? deps.modelliConcreti(settings, modelloProduttore, C.ACTIONS.NOTICE_GUARD)
+    : [];
 
   const messages = [
     { role: 'system', content: guard.SISTEMA },
