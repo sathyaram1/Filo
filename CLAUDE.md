@@ -198,12 +198,13 @@ mini server; seleziona i WebContentsView per hostname, mai
 Chi ha scritto il codice scrive anche i testi; nessun ruolo a valle li
 riscrive. Sono TRE testi distinti:
 
-1. **Report per l'owner**: conferma in una riga; scelte funzionali diverse dal
-   chiesto col perché; scelte tecniche non ovvie che ricadono su di lui. MAI:
-   ridescrivere il problema, raccontare come hai verificato, vantare
-   comportamenti attesi, nomi di file/funzioni.
-2. **Frase per chi ha segnalato** (una riga): cosa può fare adesso. Se non
-   cambia niente di visibile, non si scrive.
+1. **Report per l'owner** (cifrato, lo legge solo lui): conferma in una riga;
+   scelte funzionali diverse dal chiesto col perché; scelte tecniche non ovvie
+   che ricadono su di lui. MAI: ridescrivere il problema, raccontare come hai
+   verificato, vantare comportamenti attesi, nomi di file/funzioni.
+2. **Frase per chi ha segnalato** (in chiaro, la può leggere chiunque; una
+   riga): cosa può fare adesso. Mai i dettagli di un buco di sicurezza: quelli
+   stanno solo nel report. Se non cambia niente di visibile, non si scrive.
 3. **Riga di changelog** in `src/shared/patchNotes.js`: solo se un utente
    qualunque può usare la cosa (superfici owner e parti interne no); una
    riga, orientata al beneficio.
