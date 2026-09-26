@@ -138,23 +138,20 @@ test('clic «Approva» nel quadrato, poi il server mette il segno: arriva da sol
 });
 
 test('arrivata In coda a pagina aperta: il punto d\'arrivo sta sulla riga del titolo, non su una riga sua', async ({ openTab }) => {
-  const page = await apri(openTab, [fb('fb515', { status: 'design', statusReason: 'l5' })]);
+  const page = await apri(openTab, [fb('fb515', { status: 'design', statusReason: 'l5' }),
+    fb('gia', { seq: 600, status: 'working' })]);
   await tab(page, 'queue').click();
+  const alto = (id) => scheda(page, id).evaluate((el) =>
+    el.querySelector('.mg-item-title').getBoundingClientRect().top - el.getBoundingClientRect().top);
+  const riferimento = await alto('gia');
   await page.evaluate(() => {
     window.__stato.docs.fb515 = Object.assign({}, window.__stato.docs.fb515, { _updateTime: 't2', status: 'working', statusReason: '' });
   });
-  const card = scheda(page, 'fb515');
-  await expect(card).toHaveClass(/mg-item--arrivata/, { timeout: 10000 });
-  const { punto, titolo } = await card.evaluate((el) => {
-    const p = getComputedStyle(el, '::before');
-    const t = el.querySelector('.mg-item-title').getBoundingClientRect();
-    const c = el.getBoundingClientRect();
-    return { punto: { h: parseFloat(p.height) }, titolo: { top: t.top - c.top } };
-  });
+  await expect(scheda(page, 'fb515')).toHaveClass(/mg-item--arrivata/, { timeout: 10000 });
+  const arrivata = await alto('fb515');
   await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-g2-arrivo-coda.png' });
-  expect(punto.h).toBeGreaterThan(0);
-  // Scheda di In coda: bordo più imbottitura in cima sono ~9 px; un punto su una riga sua spinge il titolo giù.
-  expect(titolo.top).toBeLessThan(14);
+  // Il titolo di una scheda arrivata sta alla stessa altezza di quello di una scheda qualunque della sezione.
+  expect(Math.abs(arrivata - riferimento)).toBeLessThan(3);
 });
 
 test('il segno nato da un clic si può togliere senza fondere la richiesta ferma che ha davanti', async ({ openTab }) => {
