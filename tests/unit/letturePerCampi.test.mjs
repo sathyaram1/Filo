@@ -35,7 +35,10 @@ const BA = globalThis.SN_BOARD_ARCHIVE;
 const FORME = [
   {
     nome: 'le liste dei feedback (SN_FEEDBACK)',
-    chiamata: /\bFB\.(?:listAllPaged|listAllPublic|listPublic|list)\s*\(/,
+    // Ogni `list…` del modulo, non un elenco di nomi: con l'elenco, `listAll`
+    // e `listAllPublicPaged` — le due scorciatoie per «dammi tutto» — passavano
+    // davanti al freno senza una parola (#680, primo giro).
+    chiamata: /\b(?:FB|SN_FEEDBACK)\.list[A-Za-z]*\s*\(/,
     campi: /fields\s*:/,
     perChiamata: true,
     rimedio: 'passa `fields: [...]` (es. SN_BOARD_ARCHIVE.CAMPI_DECISIONE)',
