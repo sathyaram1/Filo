@@ -911,9 +911,21 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
   if (onMeta) onMeta({ model, provider: settings.provider });
 
+  // #536 — stessa regola del cammino non-streaming: se nel prompt c'è roba
+  // scritta da altri, quello che ne esce non scorre sotto gli occhi prima che
+  // il secondo modello l'abbia guardato. Arriva tutto insieme alla fine.
+  const sorgenti = Esterno ? Esterno.tipiPresenti(messages) : [];
+  const classeFonti = Fiducia ? Fiducia.classeDeiTipi(sorgenti) : 'utente';
+  const daGuardare = sorgenti.length && SN_CONST.passaDalGuardiano(action)
+    && Fiducia && Fiducia.contaminata(classeFonti);
+
   const cached = await AICache.get({ provider: settings.provider, model, messages });
   if (cached) {
-    if (onDelta) onDelta(cached.text);
+    // Una risposta ripescata dalla cache è comunque nata da roba di altri.
+    const v = daGuardare
+      ? await passaDalSecondoModello({ testo: cached.text, classe: classeFonti, concreteModel: model, action, payload, origin })
+      : null;
+    if (onDelta) onDelta(v ? v.testo : cached.text);
     return { costEur: 0, usage: cached.usage || {}, cached: true, provider: settings.provider, model };
   }
 
@@ -922,7 +934,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
 
   const result = await Providers.streamCompleteWithFallback({
     attempts, messages, signal,
-    onDelta: (delta) => { if (onDelta) onDelta(delta); },
+    onDelta: (delta) => { if (!daGuardare && onDelta) onDelta(delta); },
     // Il provider è caduto DOPO aver già streamato dei delta: avvisa il
     // renderer di buttare il testo parziale prima che arrivi il fallback (#273).
     onReset: (info) => { if (onReset) onReset(info); },
