@@ -1023,16 +1023,9 @@
       // #588 — è un programma: aprirlo lo esegue. Il main non lo tocca finché
       // non torna un "sì" esplicito; la via di mezzo (guardare dov'è finito
       // senza eseguirlo) resta a un clic.
-      if (res.needsConfirm) {
-        NOTIFS.show(res.text, {
-          durationSec: 0,
-          actions: [
-            { label: 'Apri comunque', onClick: () => openDownloadFile(id, true) },
-            { label: 'Apri cartella', onClick: () => openDownloadFolder(id) },
-          ],
-        });
-        return;
-      }
+      // La domanda sta nella riga del pannello: un avviso in basso finirebbe
+      // sotto la pagina, e il clic sembrerebbe non fare niente.
+      if (res.needsConfirm && chiediApertura) { chiediApertura(id, res.text); return; }
       const opts = res.missing
         ? { actions: [{ label: 'Apri cartella', onClick: () => openDownloadFolder(id) }] }
         : undefined;
@@ -1050,19 +1043,12 @@
     }).catch(() => {});
   }
 
-  // #588 — domanda «scaricarlo?» aperta, per id di scaricamento: la risposta può
-  // arrivare da altre superfici, e allora la domanda si ritira invece di restare.
-  const domandeScarico = new Map();
-  function ritiraDomanda(id) {
-    const card = domandeScarico.get(id);
-    if (!card) return;
-    domandeScarico.delete(id);
-    NOTIFS.dismiss(card);
-  }
+  // #588 — impostata dal pannello scaricamenti: porta lì la domanda «aprire un
+  // programma?», dove la pagina non la copre.
+  let chiediApertura = null;
 
   if (api.onToast) api.onToast((info) => {
     if (!info || !info.text) return;
-    let domandaDi = null;
     // Le azioni che arrivano dal main non possono trasportare funzioni: le
     // codifichiamo in modo dichiarativo e le traduciamo qui in onClick.
     // - openUrl → apri quel sito bypassando il blocco (#170.3 "Apri comunque").
@@ -1091,27 +1077,11 @@
             const id = a.revealDownloadId;
             return { label: a.label, onClick: () => openDownloadFolder(id) };
           }
-          // #588 — risposta all'avviso "questo è un programma: scaricarlo?".
-          if (a && a.confirmDownloadId && !a.onClick && api.downloads) {
-            const id = a.confirmDownloadId;
-            const allow = !!a.allow;
-            domandaDi = id;
-            return {
-              label: a.label,
-              onClick: () => api.downloads.confirm(id, allow).then((res) => {
-                if (res && res.ok === false) NOTIFS.show(res.error || 'Risposta non registrata');
-              }).catch(() => {}),
-            };
-          }
           return a;
         }),
       };
     }
-    const card = NOTIFS.show(info.text, opts);
-    if (card && domandaDi) {
-      ritiraDomanda(domandaDi);
-      domandeScarico.set(domandaDi, card);
-    }
+    NOTIFS.show(info.text, opts);
   });
   // Esposta per test e per usi programmatici dalla shell stessa.
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
@@ -1132,6 +1102,12 @@
     const dls = new Map();
     let panelOpen = false;
     let panel = null;
+    // #588 — le domande sui programmi sono righe del pannello, che si apre sopra
+    // la pagina: la riga in attesa È «scaricarlo?», e qui stanno le «aprirlo?»
+    // (id → testo) finché non si risponde. Gli esiti andati storti restano
+    // nella riga che li ha chiesti (id → testo).
+    const domandeApri = new Map();
+    const avvisiRiga = new Map();
 
     const ACTIVE = new Set(['progressing', 'paused']);
     const isActive = (r) => r && ACTIVE.has(r.state);
@@ -1245,9 +1221,9 @@
       const list = panel.querySelector('#dl-panel-list');
       list.textContent = '';
       const all = Array.from(dls.values()).sort((a, b) => {
-        // Attivi in cima, poi per data d'inizio decrescente.
-        const aa = isActive(a) ? 0 : 1; const bb = isActive(b) ? 0 : 1;
-        if (aa !== bb) return aa - bb;
+        // Le domande in cima, poi gli attivi, poi per data d'inizio decrescente.
+        const rank = (r) => ((r.state === 'pending' || domandeApri.has(r.id)) ? 0 : (isActive(r) ? 1 : 2));
+        if (rank(a) !== rank(b)) return rank(a) - rank(b);
         return String(b.startedAt || '').localeCompare(String(a.startedAt || ''));
       });
       if (!all.length) {
@@ -1265,6 +1241,7 @@
       const row = document.createElement('div');
       row.className = 'dl-row';
       row.dataset.state = r.state;
+      row.dataset.id = r.id;
       // Il file non è più al suo posto: la riga lo dice PRIMA del clic (testo
       // attenuato) e non offre "Apri file", che non avrebbe niente da aprire.
       if (r.missing) row.dataset.missing = '1';
@@ -1313,6 +1290,23 @@
       }
       row.appendChild(meta);
 
+      const apri = r.state === 'completed' && !r.missing ? domandeApri.get(r.id) : '';
+      const domanda = r.state === 'pending' ? testoScarica(r) : apri;
+      if (domanda) {
+        row.dataset.chiede = '1';
+        const ask = document.createElement('div');
+        ask.className = 'dl-row-ask';
+        ask.textContent = domanda;
+        row.appendChild(ask);
+      }
+      if (avvisiRiga.has(r.id)) {
+        const nota = document.createElement('div');
+        nota.className = 'dl-row-note';
+        nota.setAttribute('role', 'status');
+        nota.textContent = avvisiRiga.get(r.id);
+        row.appendChild(nota);
+      }
+
       const actions = document.createElement('div');
       actions.className = 'dl-row-actions';
       const addBtn = (label, fn) => {
@@ -1327,7 +1321,9 @@
         // Le stesse due risposte dell'avviso: chiuderlo non deve togliere la
         // possibilità di rispondere (#588).
         const rispondi = (allow) => api.downloads.confirm(r.id, allow).then((res) => {
-          if (res && res.ok === false) NOTIFS.show(res.error || 'Risposta non registrata');
+          if (res && res.ok === false) avvisiRiga.set(r.id, res.error || 'Risposta non registrata');
+          if (res && res.items) syncFromList(res.items);
+          else if (panelOpen) renderPanel();
         }).catch(() => {});
         addBtn('Scarica', () => rispondi(true));
         addBtn('Non scaricare', () => rispondi(false));
@@ -1339,6 +1335,11 @@
           else addBtn('Pausa', () => api.downloads.pause(r.id).catch(() => {}));
         }
         addBtn('Annulla', () => api.downloads.cancel(r.id).catch(() => {}));
+      } else if (apri) {
+        const rispondi = (fn) => { domandeApri.delete(r.id); if (fn) fn(); renderPanel(); };
+        addBtn('Apri comunque', () => rispondi(() => openDownloadFile(r.id, true)));
+        addBtn('Apri cartella', () => rispondi(() => openDownloadFolder(r.id)));
+        addBtn('Annulla', () => rispondi(null));
       } else if (r.state === 'completed') {
         if (!r.missing) addBtn('Apri file', () => openDownloadFile(r.id));
         addBtn('Apri cartella', () => openDownloadFolder(r.id));
@@ -1373,6 +1374,10 @@
     }
     function closePanel() {
       panelOpen = false;
+      // Chiudere il pannello è non rispondere: «aprirlo?» si ritira, mentre
+      // un programma in attesa resta in attesa (l'indicatore lo conta).
+      domandeApri.clear();
+      avvisiRiga.clear();
       if (panel) panel.hidden = true;
       dlBtn.classList.remove('open');
       try { api.tabs.reserveTop && api.tabs.reserveTop(0); } catch (_) {}
@@ -1386,8 +1391,8 @@
     function syncFromList(items) {
       dls.clear();
       if (Array.isArray(items)) for (const r of items) dls.set(r.id, r);
-      for (const id of Array.from(domandeScarico.keys())) {
-        if (dls.get(id)?.state !== 'pending') ritiraDomanda(id);
+      for (const id of Array.from(domandeApri.keys())) {
+        if (dls.get(id)?.state !== 'completed') domandeApri.delete(id);
       }
       renderIndicator();
       if (panelOpen) renderPanel();
@@ -1398,10 +1403,31 @@
       if (!info || !info.item) return;
       if (info.kind === 'removed') dls.delete(info.item.id);
       else dls.set(info.item.id, info.item);
-      if (info.kind === 'removed' || info.item.state !== 'pending') ritiraDomanda(info.item.id);
+      if (info.item.state !== 'completed' || info.kind === 'removed') domandeApri.delete(info.item.id);
       renderIndicator();
-      if (panelOpen) renderPanel();
+      // Il main manda 'ask' solo alla finestra da cui parte lo scaricamento.
+      if (info.kind === 'ask') mostraRiga(info.item.id);
+      else if (panelOpen) renderPanel();
     });
+
+    function testoScarica(r) {
+      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site); } catch (_) {}
+      return `«${r.filename}» è un programma. Scaricarlo?`;
+    }
+
+    // Apre il pannello (che fa spazio sopra la pagina) e porta in vista la riga.
+    function mostraRiga(id) {
+      if (panelOpen) renderPanel(); else openPanel();
+      requestAnimationFrame(() => {
+        const row = panel && Array.from(panel.querySelectorAll('.dl-row')).find((x) => x.dataset.id === id);
+        try { row && row.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+      });
+    }
+
+    chiediApertura = (id, testo) => {
+      domandeApri.set(id, testo || 'È un programma: aprirlo vuol dire eseguirlo.');
+      mostraRiga(id);
+    };
 
     // Cronologia iniziale (sopravvive al riavvio).
     api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});

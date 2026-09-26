@@ -393,7 +393,7 @@ function chiediNellaFinestra(webContents, rec) {
     const tiene = (w) => (w._filoTabs.tabs || []).some((t) => {
       try { return t.view.webContents === webContents; } catch (_) { return false; }
     });
-    const win = finestre.find(tiene) || BrowserWindow.getFocusedWindow() || finestre[0];
+    const win = finestre.find(tiene) || finestre.find((w) => w.isFocused?.()) || finestre[0];
     if (win && !win.isDestroyed?.()) win.webContents.send('shell:download', { kind: 'ask', item: publicRecord(rec) });
   } catch (_) {}
 }

@@ -3,8 +3,8 @@
 //
 // Si asserisce il SUCCESSO dal punto di vista di chi usa Filo:
 //   1. un PDF scende come sempre, senza domande (l'attrito va solo dove serve);
-//   2. un .exe si ferma: compare l'avviso che dice che è un programma e da
-//      quale sito arriva, e nella cartella Download il file NON c'è;
+//   2. un .exe si ferma: si apre SOPRA la pagina la domanda che dice che è un
+//      programma e da quale sito arriva, e nella cartella Download non c'è;
 //   3. "Non scaricare" lo chiude e il file non compare mai;
 //   4. "Scarica" lo fa arrivare davvero nella cartella;
 //   5. "Apri file" su un programma NON chiama shell.openPath prima della
@@ -64,6 +64,31 @@ const voce = async (shell, nome) => {
 };
 const statoDi = async (shell, nome) => (await voce(shell, nome))?.state ?? null;
 
+// La domanda è la riga del pannello scaricamenti, che la barra apre da sola
+// sopra la pagina: un avviso della barra nell'area pagina resterebbe sotto la
+// vista nativa, presente nel DOM ma invisibile a schermo.
+const domanda = (shell, nome) => shell.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: `«${nome}»` });
+const risposta = (riga, testo) => riga.locator('.dl-row-btn', { hasText: testo });
+async function apriPannello(shell) {
+  if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
+  await expect(shell.locator('#dl-panel')).toBeVisible({ timeout: 10000 });
+}
+// Vero se nessun pezzo del riquadro cade sotto la pagina attiva.
+async function sopraLaPagina(app, loc) {
+  const box = await loc.boundingBox();
+  const vista = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const tm = w && w._filoTabs;
+    const t = tm && tm.tabs.find((x) => x.id === tm.activeId);
+    if (!t || (t.view.getVisible && !t.view.getVisible())) return null;
+    return t.view.getBounds();
+  });
+  if (!box) return false;
+  if (!vista) return true;
+  return !(box.x < vista.x + vista.width && vista.x < box.x + box.width
+    && box.y < vista.y + vista.height && vista.y < box.y + box.height);
+}
+
 async function cartellaDownload(app) {
   return app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
 }
@@ -92,20 +117,22 @@ test('un PDF scende senza domande, un programma si ferma e chiede', async ({ app
     // Il percorso della quarantena non esce verso le superfici.
     expect(rec.savePath).toBe('');
 
-    // L'avviso dice che è un programma e da dove arriva, e offre le due risposte.
-    const avviso = shell.locator('.shell-notif', { hasText: 'setup.exe' });
+    // La domanda si apre da sola, SOPRA la pagina: dice che è un programma e
+    // da dove arriva, e offre le due risposte.
+    const avviso = domanda(shell, 'setup.exe');
     await expect(avviso).toBeVisible({ timeout: 10000 });
     await expect(avviso).toContainText('programma');
     await expect(avviso).toContainText('127.0.0.1');
-    await expect(avviso.locator('.shell-notif-action', { hasText: /^Scarica$/ })).toBeVisible();
-    await expect(avviso.locator('.shell-notif-action', { hasText: 'Non scaricare' })).toBeVisible();
+    await expect.poll(() => sopraLaPagina(app, avviso), { timeout: 10000, message: 'la domanda c’è ma la pagina la copre' }).toBe(true);
+    await expect(risposta(avviso, /^Scarica$/)).toBeVisible();
+    await expect(risposta(avviso, 'Non scaricare')).toBeVisible();
 
     // 3) Senza conferma il file NON è nella cartella Download. È il cuore del
     //    feedback: l'attesa non deve essere solo un avviso sopra un file già lì.
     expect(contenuto(dir)).not.toContain('setup.exe');
 
     // 4) "Non scaricare": la voce si chiude e il file non compare mai.
-    await avviso.locator('.shell-notif-action', { hasText: 'Non scaricare' }).click();
+    await risposta(avviso, 'Non scaricare').click();
     await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 10000 }).toBe('cancelled');
     expect(contenuto(dir)).not.toContain('setup.exe');
   } finally {
@@ -131,9 +158,9 @@ test('«Scarica» fa arrivare davvero il programma, e aprirlo chiede una seconda
     await page.locator('#exe').click();
     await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 20000 }).toBe('pending');
 
-    const avviso = shell.locator('.shell-notif', { hasText: 'setup.exe' });
+    const avviso = domanda(shell, 'setup.exe');
     await expect(avviso).toBeVisible({ timeout: 10000 });
-    await avviso.locator('.shell-notif-action', { hasText: /^Scarica$/ }).click();
+    await risposta(avviso, /^Scarica$/).click();
 
     // Il sì fa arrivare il file dove l'utente lo cercherà.
     await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 20000 }).toBe('completed');
@@ -150,21 +177,26 @@ test('«Scarica» fa arrivare davvero il programma, e aprirlo chiede una seconda
 
     // Il cammino vero: il pannello della barra in alto. Marca "Programma" a
     // vista, e "Apri file" porta alla seconda conferma invece di eseguire.
-    await shell.locator('#dl-indicator').click();
+    await apriPannello(shell);
     const riga = shell.locator('.dl-row', { hasText: 'setup.exe' });
     await expect(riga).toBeVisible({ timeout: 10000 });
     await expect(riga.locator('.dl-row-tag')).toHaveText('Programma');
     await riga.locator('.dl-row-btn', { hasText: 'Apri file' }).click();
     expect(await aperti()).toEqual([]);
 
-    // La shell mostra la seconda conferma con le due vie d'uscita.
-    const conferma = shell.locator('.shell-notif', { hasText: 'Aprirlo vuol dire eseguirlo' });
+    // La seconda conferma, nella riga e sopra la pagina, con le vie d'uscita.
+    const conferma = domanda(shell, 'setup.exe').filter({ hasText: 'eseguirlo' });
     await expect(conferma).toBeVisible({ timeout: 10000 });
-    await expect(conferma.locator('.shell-notif-action', { hasText: 'Apri comunque' })).toBeVisible();
-    await expect(conferma.locator('.shell-notif-action', { hasText: 'Apri cartella' })).toBeVisible();
+    await expect.poll(() => sopraLaPagina(app, conferma), { timeout: 10000, message: '«Apri file»: la domanda sta sotto la pagina' }).toBe(true);
+    await expect(risposta(conferma, 'Apri comunque')).toBeVisible();
+    await expect(risposta(conferma, 'Apri cartella')).toBeVisible();
 
-    // Solo dopo il sì il file viene aperto davvero.
-    await conferma.locator('.shell-notif-action', { hasText: 'Apri comunque' }).click();
+    // «Annulla» ritira la domanda senza aprire niente; chiesta di nuovo, il sì apre.
+    await risposta(conferma, 'Annulla').click();
+    await expect(conferma).toHaveCount(0);
+    expect(await aperti()).toEqual([]);
+    await riga.locator('.dl-row-btn', { hasText: 'Apri file' }).click();
+    await risposta(conferma, 'Apri comunque').click();
     await expect.poll(aperti, { timeout: 10000 }).toEqual([rec.savePath]);
   } finally {
     await srv.close();
@@ -291,20 +323,20 @@ test('un programma fabbricato dalla pagina si ferma, e la domanda dice da quale 
     expect(rec.exe).toBe(true);
     expect(rec.site, `«${nome}»: la domanda non nomina il sito`).toBe(sito);
 
-    const avviso = shell.locator('.shell-notif', { hasText: nome });
+    const avviso = domanda(shell, nome);
     await expect(avviso).toBeVisible({ timeout: 10000 });
     await expect(avviso).toContainText(sito);
 
-    await avviso.locator('.shell-notif-action', { hasText: 'Non scaricare' }).click();
+    await risposta(avviso, 'Non scaricare').click();
     await expect.poll(() => statoDi(shell, nome), { timeout: 10000 }).toBe('cancelled');
   }
   expect(contenuto(dir)).toEqual([]);
 });
 
-// L'avviso ha una × accanto alle due risposte: chiuderlo è facile quanto
-// rispondere. Da quel momento l'unico segno che la domanda è ancora aperta è
-// l'indicatore in alto, che deve dirlo invece di somigliare a un elenco fermo.
-test('chiuso l’avviso, l’indicatore dice ancora che una risposta è in sospeso', async ({ app, shell, openTab, testServer }) => {
+// Chiudere il pannello senza rispondere è facile quanto rispondere. Da quel
+// momento l'unico segno che la domanda è ancora aperta è l'indicatore in alto,
+// che deve dirlo invece di somigliare a un elenco fermo.
+test('chiuso il pannello, l’indicatore dice ancora che una risposta è in sospeso', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const srv = await apriServer();
   try {
@@ -312,12 +344,11 @@ test('chiuso l’avviso, l’indicatore dice ancora che una risposta è in sospe
     await page.locator('#exe').click();
     await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 20000 }).toBe('pending');
 
-    const avviso = shell.locator('.shell-notif', { hasText: 'setup.exe' });
-    await expect(avviso).toBeVisible({ timeout: 10000 });
-    await avviso.locator('.shell-notif-close').click();
-    await expect(avviso).toBeHidden({ timeout: 10000 });
-
+    await expect(domanda(shell, 'setup.exe')).toBeVisible({ timeout: 10000 });
     const indicatore = shell.locator('#dl-indicator');
+    await indicatore.click();
+    await expect(shell.locator('#dl-panel')).toBeHidden({ timeout: 10000 });
+
     await expect(indicatore).toBeVisible();
     await expect(indicatore.locator('#dl-ind-count')).toHaveText('1', { timeout: 10000 });
     await expect(indicatore).toHaveAttribute('data-tip', /aspetta la tua risposta/);
@@ -326,54 +357,48 @@ test('chiuso l’avviso, l’indicatore dice ancora che una risposta è in sospe
 
     // E da lì le due risposte sono a un clic.
     await indicatore.click();
-    const riga = shell.locator('.dl-row', { hasText: 'setup.exe' });
-    await expect(riga.locator('.dl-row-btn', { hasText: /^Scarica$/ })).toBeVisible({ timeout: 10000 });
+    await expect(risposta(domanda(shell, 'setup.exe'), /^Scarica$/)).toBeVisible({ timeout: 10000 });
   } finally {
     await srv.close();
   }
 });
 
-// La domanda compare in tre posti (avviso in alto, pannello della barra, pagina
-// Scaricamenti) e l'avviso non scade da solo: chi risponde altrove non deve
-// ritrovarsi in alto una domanda che non aspetta più niente, coi due pulsanti
-// che non fanno più nulla. Senza il fix i tre avvisi restano a schermo → rosso.
-test('risposto altrove, la domanda in alto si ritira', async ({ app, shell, openTab, testServer }) => {
+// La domanda si può risolvere in tre posti (pannello della barra, pagina
+// Scaricamenti, tasto destro sulla voce): chi risponde altrove non deve
+// ritrovarsi nel pannello una domanda che non aspetta più niente.
+test('risposto altrove, la domanda nel pannello si ritira', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(150_000);
   const srv = await apriServer();
   try {
     const page = await apriPagina(srv.base, { openTab, testServer },
       ['uno', 'due', 'tre'].map((n) => `<a id="${n}" href="${srv.base}/${n}.exe">${n}</a>`).join('\n'));
-    const domanda = (nome) => shell.locator('.shell-notif', { hasText: `«${nome}»` }).filter({ hasText: 'Scaricarlo?' });
 
     for (const n of ['uno', 'due', 'tre']) {
       await page.locator(`#${n}`).click();
       await expect.poll(() => statoDi(shell, `${n}.exe`), { timeout: 20000 }).toBe('pending');
-      await expect(domanda(`${n}.exe`)).toBeVisible({ timeout: 10000 });
+      await expect(domanda(shell, `${n}.exe`)).toBeVisible({ timeout: 10000 });
     }
 
     // 1) «Non scaricare» dalla pagina Scaricamenti.
     const dl = await openTab('filo://downloads/downloads.html');
+    await apriPannello(shell);
     const rigaDl = (nome) => dl.locator('.dl-item[data-state="pending"]', { has: dl.locator('.dl-name', { hasText: nome }) });
     await expect(rigaDl('uno.exe')).toBeVisible({ timeout: 15000 });
     await rigaDl('uno.exe').locator('.dl-btn', { hasText: 'Non scaricare' }).click();
     await expect.poll(() => statoDi(shell, 'uno.exe'), { timeout: 10000 }).toBe('cancelled');
-    await expect(domanda('uno.exe')).toBeHidden({ timeout: 10000 });
+    await expect(domanda(shell, 'uno.exe')).toHaveCount(0, { timeout: 10000 });
 
     // 2) «Scarica» dal pannello della barra in alto.
-    await shell.locator('#dl-indicator').click();
-    const rigaPannello = shell.locator('.dl-row', { hasText: 'due.exe' });
-    await expect(rigaPannello).toBeVisible({ timeout: 10000 });
-    await rigaPannello.locator('.dl-row-btn', { hasText: /^Scarica$/ }).click();
+    await risposta(domanda(shell, 'due.exe'), /^Scarica$/).click();
     await expect.poll(() => statoDi(shell, 'due.exe'), { timeout: 20000 }).toBe('completed');
-    await expect(domanda('due.exe')).toBeHidden({ timeout: 10000 });
-    await shell.locator('#dl-indicator').click();
+    await expect(domanda(shell, 'due.exe')).toHaveCount(0, { timeout: 10000 });
 
     // 3) Voce tolta dall'elenco col tasto destro, senza rispondere.
     await expect(rigaDl('tre.exe')).toBeVisible({ timeout: 15000 });
     await rigaDl('tre.exe').click({ button: 'right' });
     await dl.locator('.dl-ctxmenu .sn-select-option', { hasText: 'Rimuovi dalla lista' }).click();
     await expect.poll(() => voce(shell, 'tre.exe'), { timeout: 10000 }).toBeNull();
-    await expect(domanda('tre.exe')).toBeHidden({ timeout: 10000 });
+    await expect(domanda(shell, 'tre.exe')).toHaveCount(0, { timeout: 10000 });
   } finally {
     await srv.close();
   }
