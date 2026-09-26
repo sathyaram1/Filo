@@ -638,7 +638,7 @@
     return div;
   }
 
-  function renderLiveCard({ kind, text, paused, onToggle, onDismiss, link, attesa, fonte, onRiprova }) {
+  function renderLiveCard({ kind, text, paused, onToggle, onDismiss, link, attesa, fonte, onRiprova, registro, onRegistro }) {
     const div = document.createElement('div');
     div.className = 'dash-live-card';
     div.dataset.kind = kind;
