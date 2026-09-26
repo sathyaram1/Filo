@@ -33,10 +33,18 @@ una risposta che cambia quando l'owner tocca un interruttore.
    niente da fare, la scansione non si fa. Se il server non sa contare si torna
    alla scansione **dichiarandolo**, non in silenzio.
 3. **Il costo a schermo.** L'ultima riga dice quanti documenti sono stati letti.
-   Chi lancia il comando vede il prezzo subito, non in fattura.
+   Chi lancia il comando vede il prezzo subito, non in fattura. Ci va TUTTO il
+   giro, anche le letture che fa il passo che scrive: un comando che riusa la
+   scansione e poi rilegge una riga per ognuna che tocca dichiarava zero mentre
+   pagava.
 4. **Una volta per giro.** La prova a secco mette da parte quello che ha letto;
    l'applicazione che la segue lo riusa e lo dice. Una prova a secco invece **non**
-   riusa niente: chi la lancia vuole vedere il database di adesso.
+   riusa niente: chi la lancia vuole vedere il database di adesso. E se il
+   conteggio appena chiesto al server NON combacia con quello che la copia
+   descrive, la copia è di un altro server e si rilegge: il riordino della
+   numerazione assegna i numeri contando quelli che ci sono, e una segnalazione
+   arrivata dopo la prova a secco si prende da sé il primo numero libero — cioè
+   quello che il giro sta per dare a un'altra.
 
 ## Quello che il database non sa filtrare
 
@@ -84,8 +92,15 @@ minuto, condivisa fra dispatch e verify-local),
 Le sentinelle: `tests/unit/letturePerCampi.test.mjs` diventa rossa su una
 scansione in `scripts/` che non dice quali campi le servono — per chiamata, non
 per file, così uno script che altrove passa i campi non assolve la scansione che
-li ha dimenticati, e su OGNI `list…` del modulo, non su un elenco di nomi: con
-l'elenco, `listAll` e `listAllPublicPaged` passavano davanti senza una parola.
+li ha dimenticati. Tre cose l'hanno già aggirata, e sono tre cose da non
+rimettere: i nomi dei metodi si chiedono al modulo (`Object.keys`), o `listAll` e
+`listAllPublicPaged` ripassano davanti; il RICEVITORE è qualunque, o basta tenere
+il modulo in una variabile che non si chiama `FB`; e si guarda tutta la cartella,
+`lib/` compresa, che è dove stanno gli attrezzi comuni e dove finirà la prossima
+scansione. Un conteggio (`:runAggregationQuery`) non porta via documenti e non ha
+niente da proiettare: la forma della `structuredQuery` vale solo dove c'è anche
+`:runQuery`.
+`tests/unit/archiviazioneLetture.test.mjs` tiene il conto del passo che scrive.
 `tests/unit/copiaSuFile.test.mjs` tiene le regole della copia: fresca risponde,
 scaduta o illeggibile no, dopo un'applicazione si butta, e quello che qualcun
 altro ha preparato nella cartella temporanea non si legge né si riscrive.
