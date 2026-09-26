@@ -42,7 +42,11 @@ test('una piattaforma in whitelist non copre più le pagine che ospita', () => {
     'https://paypal-verifica.vercel.app/', 'https://paypal-verifica.netlify.app/',
     'https://paypal-conto.s3.amazonaws.com/index.html', 'https://intesa-accesso.sharepoint.com/',
     'https://poste-rimborso.wordpress.com/', 'https://binance-premi.medium.com/',
+    'https://paypal-login.s3.us-east-1.amazonaws.com/', 'https://paypal-login.s3.eu-west-1.amazonaws.com/index.html',
+    'https://paypal-login.s3-website-us-east-1.amazonaws.com/', 'https://paypal-login.s3-website.eu-west-1.amazonaws.com/',
   ]) assert.notEqual(livello(url), 'safe', url);
+  assert.equal(dominio('paypal-login.s3.us-east-1.amazonaws.com'), 'paypal-login.s3.us-east-1.amazonaws.com');
+  assert.equal(livello('https://mio-sito.s3-website.eu-west-1.amazonaws.com/'), 'safe');
 });
 
 test('GitHub su un suffisso che non è suo resta sospetto', () => {

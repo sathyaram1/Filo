@@ -12,6 +12,7 @@
 'use strict';
 
 const { BRANDS } = require('./brands');
+const { S3 } = require('./psl');
 
 const EXTRA = [
   // Motori / portali
@@ -69,11 +70,14 @@ const HOSTED = [
   { host: /^sites\.google\.com$/, platform: 'Google Sites' },
   { host: /^docs\.google\.com$/, platform: 'Google Documenti e Moduli' },
   { host: /^script\.google\.com$/, path: /^\/(a\/[^/]+\/)?macros\//, platform: 'Google Apps Script' },
-  { host: /^(forms|sway)\.office\.com$/, platform: 'Microsoft Forms e Sway' },
+  { host: /^(forms|sway)\.(office\.com|cloud\.microsoft)$/, platform: 'Microsoft Forms e Sway' },
   { host: /^ia\d+\.us\.archive\.org$/, platform: 'archive.org' },
   { host: /^(www\.)?archive\.org$/, path: /^\/download\//, platform: 'archive.org' },
   { host: /^(www\.)?notion\.so$/, path: /^\/(?!(login|signup)(\/|$))[^/]+/, platform: 'Notion' },
   { host: /^(www\.)?canva\.com$/, path: /^\/design\//, platform: 'Canva' },
+  // Indirizzi per percorso: s3.amazonaws.com/<secchio>/<file>, storage.googleapis.com/<secchio>/<file>.
+  { host: S3, path: /^\/[^/]+\/./, platform: 'Amazon S3' },
+  { host: /^(storage|firebasestorage)\.googleapis\.com$/, path: /^\/[^/]+\/./, platform: 'Google Cloud Storage' },
 ];
 
 function hostedPlatform(host, path) {

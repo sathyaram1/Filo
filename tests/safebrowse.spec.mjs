@@ -267,3 +267,74 @@ test('pagina pubblicata da un utente: chiudere l\'avviso su un modulo non silenz
   });
   expect(r).toEqual({ a: 'safe', b: 'sospetto' });
 });
+
+// Le pagine ospitate come sono fatte davvero: il modulo di Google Sites e di Apps Script sta in un riquadro, e un
+// modulo Google chiede la password in un campo di testo. Pagine servite intercettando https; il giudice fa ciò che
+// il suo prompt chiede, cioè sospetta una pagina ospitata che chiede password o pagamento.
+async function servi(app, pagine) {
+  await app.evaluate(async ({ session, net }, pg) => {
+    try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
+    session.defaultSession.protocol.handle('https', (req) => {
+      const u = new URL(req.url);
+      const html = pg[u.hostname + u.pathname] || pg[u.hostname];
+      if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+      return net.fetch(req, { bypassCustomProtocolHandlers: true });
+    });
+    globalThis.SN_SAFEBROWSE.setProviders({
+      sandbox: null,
+      llm: async (meta) => (meta.hostedOn && (meta.hasPassword || meta.hasPayment)
+        ? { suspicious: true, reasonKey: 'hosted_credentials', reason: null, confidence: 'high' } : { suspicious: false, reason: null }),
+    });
+  }, pagine);
+}
+
+async function livelloScheda(app, host, ms = 9000) {
+  const fine = Date.now() + ms;
+  let l = null;
+  while (Date.now() < fine) {
+    l = await app.evaluate(({ BrowserWindow }, h) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        for (const t of (w._filoTabs && w._filoTabs.tabs) || []) {
+          try { if (new URL(t.view.webContents.getURL()).hostname === h) return t.sbLevel || null; } catch (_) {}
+        }
+      }
+      return null;
+    }, host);
+    if (l === 'sospetto' || l === 'pericoloso') return l;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  return l;
+}
+
+const ACCESSO = '<form><input name="email" placeholder="Email"><input type="password" name="pw"><button>Accedi</button></form>';
+
+test('Google Sites: un modulo d\'accesso nel riquadro incorporato fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'sites.google.com/view/paypal-login': '<h1>PayPal - Accedi</h1>'
+      + '<iframe src="https://1234-atari-embeds.googleusercontent.com/embeds/abc/inner.html" width="500" height="300"></iframe>',
+    '1234-atari-embeds.googleusercontent.com': ACCESSO,
+  });
+  await openTab('https://sites.google.com/view/paypal-login');
+  expect(await livelloScheda(app, 'sites.google.com')).toBe('sospetto');
+});
+
+test('Apps Script: la pagina dell\'utente in un riquadro dentro un riquadro fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'script.google.com/macros/s/AKfy123/exec': '<iframe src="https://n-abc-0lu-script.googleusercontent.com/panel" width="600" height="400"></iframe>',
+    'n-abc-0lu-script.googleusercontent.com': '<iframe src="https://n-abc-1lu-script.googleusercontent.com/user" width="580" height="380"></iframe>',
+    'n-abc-1lu-script.googleusercontent.com': `<h1>Microsoft 365</h1>${ACCESSO}`,
+  });
+  await openTab('https://script.google.com/macros/s/AKfy123/exec');
+  expect(await livelloScheda(app, 'script.google.com')).toBe('sospetto');
+});
+
+test('modulo Google: la password chiesta in un campo di testo fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'docs.google.com/forms/d/e/1FAIpQL/viewform': '<h1>Verifica account di posta</h1><form>'
+      + '<span id="i1">Indirizzo email</span><input type="text" aria-labelledby="i1">'
+      + '<span id="i5">Password della posta</span><input type="text" aria-labelledby="i5">'
+      + '<button>Invia</button></form>',
+  });
+  await openTab('https://docs.google.com/forms/d/e/1FAIpQL/viewform');
+  expect(await livelloScheda(app, 'docs.google.com')).toBe('sospetto');
+});

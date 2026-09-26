@@ -18,6 +18,10 @@ const OSPITATE = [
   'https://ia800100.us.archive.org/1/items/pacco/login.html',
   'https://www.notion.so/qualcuno/Pagina-abc123',
   'https://www.canva.com/design/DAF123/view',
+  'https://s3.amazonaws.com/secchio/login.html',
+  'https://s3.eu-west-1.amazonaws.com/secchio/login.html',
+  'https://storage.googleapis.com/secchio/login.html',
+  'https://firebasestorage.googleapis.com/v0/b/x.appspot.com/o/login.html',
 ];
 
 test('una pagina pubblicata da un utente sotto un dominio fidato non è fidata e, se chiede la password, va giudicata', () => {
@@ -74,4 +78,36 @@ test('confermare o chiudere un avviso su una pagina ospitata non silenzia le alt
   assert.equal(SB.scopeOf('https://sathya.github.io/la-soglia/'), 'sathya.github.io');
   const v = SB.evaluate('https://sites.google.com/view/x', {}, { llm: { suspicious: true, reason: null } });
   assert.equal(v.scope, 'sites.google.com/view/x');
+});
+
+test('una pagina ospitata che chiede la password va giudicata anche quando l\'età della piattaforma è già nota', () => {
+  for (const url of OSPITATE) {
+    assert.equal(SB.evaluate(url, { hasPassword: true }, { ageDays: 6000 }).needsLlm, true, url);
+  }
+  assert.equal(SB.scopeOf('https://s3.amazonaws.com/secchio-a/login.html'), 's3.amazonaws.com/secchio-a/login.html');
+});
+
+test('Microsoft Forms è riconosciuto anche all\'indirizzo dove oggi rimanda il vecchio', () => {
+  assert.equal(SB.whitelist.hostedPlatform('forms.cloud.microsoft', '/r/abc123'), 'Microsoft Forms e Sway');
+  assert.equal(SB.whitelist.hostedPlatform('forms.office.com', '/r/abc123'), 'Microsoft Forms e Sway');
+});
+
+// Un finto documento basta: la regola sta nelle etichette dei campi, non nel motore di rendering.
+function documento({ password = false, campi = [], etichette = {} } = {}) {
+  const el = (attr, labels = []) => ({ getAttribute: (k) => (k in attr ? attr[k] : null), labels });
+  return {
+    querySelector: (sel) => (sel === 'input[type="password"]' && password ? {} : null),
+    querySelectorAll: () => campi.map((c) => el(c.attr || {}, (c.labels || []).map((t) => ({ textContent: t })))),
+    getElementById: (id) => (id in etichette ? { textContent: etichette[id] } : null),
+  };
+}
+
+test('la password chiesta in un campo di testo conta come una password, come fanno i moduli ospitati', () => {
+  const { pageHints } = require('../../src/content/safebrowseHints.js');
+  assert.equal(pageHints(documento({ password: true })).hasPassword, true);
+  assert.equal(pageHints(documento({ campi: [{ attr: { 'aria-labelledby': 'i1 i4' } }], etichette: { i1: 'Password della posta', i4: '' } })).hasPassword, true);
+  assert.equal(pageHints(documento({ campi: [{ attr: { placeholder: 'Contraseña' } }] })).hasPassword, true);
+  assert.equal(pageHints(documento({ campi: [{ labels: ['Codice PIN della carta'] }] })).hasPassword, true);
+  assert.equal(pageHints(documento({ campi: [{ attr: { 'aria-label': 'Nome' } }, { labels: ['Il tuo passaporto'] }] })).hasPassword, false);
+  assert.equal(pageHints(documento()).hasPassword, false);
 });

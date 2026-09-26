@@ -1,5 +1,5 @@
 // Indizi di pagina per il rilevamento siti pericolosi: la pagina chiede una password o i dati di pagamento?
-// Autonoma di proposito, senza niente di esterno: il main la esegue anche nei riquadri incorporati passandone il sorgente.
+// Autonoma di proposito, senza niente di esterno: il main la esegue anche nei riquadri incorporati, dal sorgente.
 // Un modulo ospitato non ha campi password: la password si chiede in un campo di testo, e lo dice la sua etichetta.
 
 'use strict';
