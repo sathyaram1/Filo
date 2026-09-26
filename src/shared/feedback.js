@@ -981,8 +981,8 @@
       return marcaProiezione(await readViaMain(bridge, { op, pageSize, timeoutMs, fields }), fields);
     }
     if (typeof afterName === 'string') {
-      const { rows } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken });
-      return rows;
+      const { rows } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken, fields });
+      return marcaProiezione(rows, fields);
     }
     return marcaProiezione(await listDirect(COLLECTION, { pageSize, timeoutMs, fields, idToken }), fields);
   }
@@ -1075,7 +1075,7 @@
   // stabile, si passa sempre dalla porta ESPOSTA (`SN_FEEDBACK.list`) così chi
   // la sostituisce in una prova sostituisce anche questa, e il freno sulle
   // pagine non mente — se scatta, la risposta lo dice.
-  async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX } = {}) {
+  async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX, fields = null } = {}) {
     // Da una pagina filo:// il cursore non è percorribile: `list` rifiuta
     // apposta `afterName` (le credenziali stanno nel main, non qui). Quindi la
     // lettura completa la fa il main e torna di là, col suo `complete`. Senza
@@ -1094,7 +1094,7 @@
     for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
       const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.list) || list;
       // eslint-disable-next-line no-await-in-loop
-      const batch = await porta({ pageSize: limit, timeoutMs, idToken, afterName: cursor });
+      const batch = await porta({ pageSize: limit, timeoutMs, idToken, afterName: cursor, fields });
       const arr = Array.isArray(batch) ? batch : [];
       let nuove = 0;
       for (const r of arr) {
@@ -1272,7 +1272,7 @@
   // dei propri feedback, quindi chiede quelli — zero, una o due letture —
   // invece di scaricare la bacheca intera per cercarsi dentro. Niente token:
   // questa collezione si legge senza credenziali.
-  async function getManyPublic(ids, { timeoutMs = 0 } = {}) {
+  async function getManyPublic(ids, { timeoutMs = 0, fields = null } = {}) {
     const wanted = [...new Set((Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean))];
     if (wanted.length === 0) return [];
     // A pezzi, e TUTTI: chi ha mandato molte segnalazioni non ne deve perdere
@@ -1281,7 +1281,7 @@
     const out = [];
     for (let i = 0; i < wanted.length; i += BATCH_GET_MAX) {
       // eslint-disable-next-line no-await-in-loop
-      const parte = await batchGetDirect(VIEW_COLLECTION, wanted.slice(i, i + BATCH_GET_MAX), { timeoutMs });
+      const parte = await batchGetDirect(VIEW_COLLECTION, wanted.slice(i, i + BATCH_GET_MAX), { timeoutMs, fields });
       for (const r of parte) out.push(r);
     }
     return out;
@@ -1347,12 +1347,12 @@
   // il cursore con cui `listAllPublic` arriva in fondo alla raccolta. Il nome è
   // unico e stabile, quindi non salta né ripete righe; una data no (due schede
   // possono averla identica).
-  async function listPublic({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = null } = {}) {
+  async function listPublic({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = null, fields = null } = {}) {
     if (typeof afterName === 'string') {
-      const { rows } = await listByNameDirect(VIEW_COLLECTION, { pageSize, timeoutMs, afterName });
-      return rows;
+      const { rows } = await listByNameDirect(VIEW_COLLECTION, { pageSize, timeoutMs, afterName, fields });
+      return marcaProiezione(rows, fields);
     }
-    return listDirect(VIEW_COLLECTION, { pageSize, timeoutMs });
+    return marcaProiezione(await listDirect(VIEW_COLLECTION, { pageSize, timeoutMs, fields }), fields);
   }
 
   // ── TUTTE le schede, non una pagina ───────────────────────────────────────
@@ -1382,7 +1382,7 @@
   // essere tutto. Chi vuole solo le righe usa `listAllPublic`.
   const ALL_PAGES_MAX = 40;
 
-  async function listAllPublicPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, maxPages = ALL_PAGES_MAX } = {}) {
+  async function listAllPublicPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, maxPages = ALL_PAGES_MAX, fields = null } = {}) {
     const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
     const rows = [];
     const visti = new Set();
@@ -1395,7 +1395,7 @@
       // vera sotto una pagina che crede finta.
       const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.listPublic) || listPublic;
       // eslint-disable-next-line no-await-in-loop
-      const batch = await porta({ pageSize: limit, timeoutMs, afterName: cursor });
+      const batch = await porta({ pageSize: limit, timeoutMs, afterName: cursor, fields });
       const arr = Array.isArray(batch) ? batch : [];
       let nuove = 0;
       for (const r of arr) {
@@ -1434,23 +1434,33 @@
   // non si ritrova mai davanti le schede della scena precedente. E si ricorda
   // solo una lettura COMPLETA: memorizzare un troncamento vorrebbe dire
   // ripeterlo per mezzo minuto.
+  //
+  // La memoria ricorda anche QUALI CAMPI erano stati chiesti: chi legge una
+  // proiezione non deve poter far trovare a chi vuole il documento intero delle
+  // righe mutilate (né viceversa pagare una lettura intera già fatta).
   const ALL_CACHE_TTL_MS = 30_000;
-  let allCache = { at: 0, rows: null, porta: null };
+  let allCache = { at: 0, rows: null, porta: null, campi: null };
+
+  /** Firma dei campi chiesti: due letture combaciano solo se chiedono lo stesso. */
+  function firmaCampi(fields) {
+    return Array.isArray(fields) && fields.length ? fields.map((f) => String(f)).join(',') : '';
+  }
 
   async function listAllPublic(opts = {}) {
     const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.listPublic) || listPublic;
     const fresca = !!(opts && opts.fresh);
-    if (!fresca && allCache.rows && allCache.porta === porta
+    const campi = firmaCampi(opts && opts.fields);
+    if (!fresca && allCache.rows && allCache.porta === porta && allCache.campi === campi
         && (Date.now() - allCache.at) < ALL_CACHE_TTL_MS) {
       return allCache.rows;
     }
     const { rows, complete } = await listAllPublicPaged(opts);
-    allCache = complete ? { at: Date.now(), rows, porta } : { at: 0, rows: null, porta: null };
+    allCache = complete ? { at: Date.now(), rows, porta, campi } : { at: 0, rows: null, porta: null, campi: null };
     return rows;
   }
 
   /** Butta via la memoria breve: dopo aver scritto o tolto una scheda. */
-  function forgetAllPublic() { allCache = { at: 0, rows: null, porta: null }; }
+  function forgetAllPublic() { allCache = { at: 0, rows: null, porta: null, campi: null }; }
 
   // ── Le domande MIRATE alla bacheca (#678) ────────────────────────────────
   //
@@ -1604,13 +1614,20 @@
   // righe non serve — ordina lui come gli pare. `idToken` serve per la
   // collezione vera, che senza credenziali non si legge (#583); la vista
   // pubblica lo lascia vuoto.
-  async function listByNameDirect(collectionId, { pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = '', idToken = '' } = {}) {
+  async function listByNameDirect(collectionId, { pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = '', idToken = '', fields = null } = {}) {
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const structuredQuery = {
       from: [{ collectionId }],
       orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
       limit: pageSize,
     };
+    // La proiezione vale anche qui: è la porta da cui passano le letture
+    // COMPLETE (il cursore sul nome), cioè quelle che pagano di più. Senza,
+    // chiedere tutta la collezione voleva dire scaricarne i documenti interi
+    // anche per guardarne tre campi (#680).
+    if (Array.isArray(fields) && fields.length > 0) {
+      structuredQuery.select = { fields: fields.map((f) => ({ fieldPath: String(f) })) };
+    }
     if (afterName) {
       structuredQuery.startAt = { before: false, values: [{ referenceValue: afterName }] };
     }

@@ -1,0 +1,79 @@
+// Una copia su file di qualcosa che si è già letto dal server, con scadenza.
+// NON è una cache di prodotto: serve agli script lanciati più volte di seguito.
+// Regole e perché: patterns/una-lettura-pagata-una-volta.md
+
+import { mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+// La cartella temporanea la decide il sistema (`os.tmpdir()`), mai un percorso
+// scritto a mano: gli script girano anche su Mac e Linux.
+// `FILO_COPIE_DIR` esiste per le prove, che devono poter guardare il file.
+export function cartellaCopie(dir = null) {
+  const scelta = String(dir || process.env.FILO_COPIE_DIR || '').trim();
+  const base = scelta || join(tmpdir(), 'filo-copie');
+  try { mkdirSync(base, { recursive: true }); } catch (_) { /* c'è già, o non si può: lo scopre chi scrive */ }
+  return base;
+}
+
+// Il nome del file non contiene la chiave: una chiave può essere un URL intero,
+// con caratteri che su Windows non stanno in un nome di file.
+export function percorsoCopia(chiave, dir = null) {
+  const impronta = createHash('sha256').update(String(chiave)).digest('hex').slice(0, 24);
+  return join(cartellaCopie(dir), `${impronta}.json`);
+}
+
+/**
+ * Scrive la copia. `0600`: la copia di una lettura dei feedback non deve essere
+ * leggibile dagli altri utenti della macchina.
+ * Un guasto di scrittura NON è un errore del chiamante: la copia è un risparmio,
+ * non un pezzo del lavoro. Ritorna il percorso scritto, o '' se non ci è riuscita.
+ */
+export function scriviCopia(chiave, dati, { dir = null, now = Date.now() } = {}) {
+  const file = percorsoCopia(chiave, dir);
+  try {
+    writeFileSync(file, JSON.stringify({ at: now, chiave: String(chiave), dati }), { encoding: 'utf8', mode: 0o600 });
+    return file;
+  } catch (_) {
+    return '';
+  }
+}
+
+/**
+ * Rilegge la copia se è ancora valida. Tre modi di dire «no, rileggi dal
+ * server», tutti indistinguibili per chi chiama: assente, scaduta, illeggibile
+ * (JSON rotto, troncata, di un'altra chiave). Una copia scaduta di un minuto
+ * non deve mai far partire un giro con impostazioni che l'owner ha cambiato.
+ * @returns {{dati:any, etaMs:number}|null}
+ */
+export function leggiCopia(chiave, { dir = null, now = Date.now(), ttlMs = 60_000 } = {}) {
+  const file = percorsoCopia(chiave, dir);
+  let json = null;
+  try {
+    json = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (_) {
+    return null;
+  }
+  if (!json || typeof json !== 'object') return null;
+  if (String(json.chiave || '') !== String(chiave)) return null;
+  const at = Number(json.at);
+  if (!Number.isFinite(at) || at <= 0) return null;
+  const eta = now - at;
+  // Una copia con la data nel futuro (orologio spostato) non vale: rileggere
+  // costa una lettura, fidarsi di una data impossibile costa una decisione.
+  if (eta < 0 || eta > Math.max(0, Number(ttlMs) || 0)) return null;
+  if (json.dati === undefined) return null;
+  return { dati: json.dati, etaMs: eta };
+}
+
+/** Butta la copia: dopo un'applicazione, i dati letti non descrivono più il server. */
+export function scordaCopia(chiave, { dir = null } = {}) {
+  try { unlinkSync(percorsoCopia(chiave, dir)); return true; } catch (_) { return false; }
+}
+
+/** Come si dice a video che si sta riusando una lettura, invece di rifarla. */
+export function rigaCopiaRiusata(etaMs) {
+  const s = Math.max(0, Math.round(Number(etaMs) / 1000));
+  return `Riuso la lettura della prova a secco (${s} s fa): nessuna richiesta al server.`;
+}
