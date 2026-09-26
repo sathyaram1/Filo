@@ -23,6 +23,7 @@ const REASONS = {
   credential_request: 'Chiede credenziali o dati personali su un dominio non ufficiale.',
   suspicious_origin: 'Il link proviene da una fonte poco affidabile.',
   payment_request: 'Chiede dati di pagamento su un dominio non verificato.',
+  hosted_credentials: 'Chiede password o pagamenti in una pagina scritta da un utente, non dal servizio che la ospita.',
 };
 
 const SYSTEM = [
