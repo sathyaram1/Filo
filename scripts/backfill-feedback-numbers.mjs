@@ -174,7 +174,7 @@ async function patchSeq(id, seq, bearer) {
 // Esegue il backfill. `dry` = solo lettura, nessuna scrittura. Le credenziali
 // servono in entrambi i casi: dal 2026-09 (#583) la collezione dei feedback non
 // si legge senza (il vecchio dry-run senza bearer si prendeva un 403).
-async function backfillNumbers(bearer, { dry = false, now = Date.now(), copiaDir = null, usaCopia = true } = {}) {
+export async function backfillNumbers(bearer, { dry = false, now = Date.now(), copiaDir = null, usaCopia = true } = {}) {
   const letture = contatoreLetture();
 
   // Prima si CHIEDE quanti sono, invece di scaricarli per contarli: se tutti

@@ -1,6 +1,6 @@
 // Una copia su file di qualcosa che si è già letto dal server, con scadenza.
 // NON è una cache di prodotto: serve agli script lanciati più volte di seguito.
-// Regole e perché: patterns/una-lettura-pagata-una-volta.md
+// Regole e perché: patterns/una-scansione-chiede-i-campi-che-usa-e-si-paga-una-volta.md
 
 import { mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { createHash } from 'node:crypto';
