@@ -398,8 +398,9 @@ test('ogni voce promessa come "tasto destro → «X»" esiste davvero nel menu',
   const labels = menuVoiceLabels();
   assert.ok(labels.size >= 30, `mi aspetto ≥30 etichette vere nel menu, trovate ${labels.size}`);
 
-  // Dopo la freccia: la voce, più le alternative attaccate con "/" o "," o " e ".
-  const PROMESSE = /(?:tasto destro|clic destro)[^"“«]*?→\s*((?:["“«][^"”»]+["”»])(?:\s*(?:\/|,|\se\s)\s*["“«][^"”»]+["”»])*)/gi;
+  // Dopo la freccia (o dopo "scegli", che è l'altra forma con cui il manifesto
+  // nomina una voce): la voce, più le alternative attaccate con "/" o "," o " e ".
+  const PROMESSE = /(?:tasto destro|clic destro)[^"“«]*?(?:→|scegli)\s*((?:["“«][^"”»]+["”»])(?:\s*(?:\/|,|\se\s)\s*["“«][^"”»]+["”»])*)/gi;
   let promesse = 0;
   for (const c of CAP.CAPABILITIES) {
     for (const m of String(c.invoke || '').matchAll(PROMESSE)) {
@@ -411,7 +412,7 @@ test('ogni voce promessa come "tasto destro → «X»" esiste davvero nel menu',
       }
     }
   }
-  assert.ok(promesse >= 10, `mi aspetto ≥10 voci promesse dal manifesto, trovate ${promesse}`);
+  assert.ok(promesse >= 12, `mi aspetto ≥12 voci promesse dal manifesto, trovate ${promesse}`);
 });
 
 test('nessuna capacità descrive come voce da cliccare una spiegazione che arriva da sola', () => {
@@ -427,7 +428,7 @@ test('nessuna capacità descrive come voce da cliccare una spiegazione che arriv
   for (const id of ['explain-selection', 'explain-image', 'explain-link']) {
     const cap = CAP.get(id);
     assert.ok(cap, `manca la capacità "${id}"`);
-    assert.ok(!/(?:tasto destro|clic destro)[^"“«]*?→\s*["“«]/i.test(cap.invoke),
+    assert.ok(!/(?:tasto destro|clic destro)[^"“«]*?(?:→|scegli)\s*["“«]/i.test(cap.invoke),
       `la capacità "${id}" promette una voce del tasto destro, ma la spiegazione compare da sola`);
     assert.match(cap.invoke, /da sola|automaticamente/i,
       `la capacità "${id}" deve dire che la spiegazione arriva da sola, senza niente da cliccare`);

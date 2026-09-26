@@ -19,7 +19,7 @@
     const path = (u.pathname + '?' + u.search).toLowerCase();
     const sideEffectPatterns = /(^|[/?&=])(unsubscribe|optout|opt-out|logout|signout|sign-out|delete|remove|confirm|verify|reset|cancel)([/?&=]|$)/;
     if (sideEffectPatterns.test(path)) flags.push('side_effect');
-    if (/[?&](token|key|sig|signature|hash|t)=/.test(path)) flags.push('token_in_url');
+    if (haCredenziale(path)) flags.push('token_in_url');
 
     const host = u.hostname.toLowerCase().replace(/^www\./, '');
     for (const p of POPULAR) {
@@ -29,6 +29,19 @@
       if (levenshteinSmall(host, p, 2)) { flags.push('typosquatting:' + p); break; }
     }
     return flags;
+  }
+
+  // #725 — il nome del parametro da solo non basta: chiamarsi «t» o «hash» è
+  // la norma nei segnatempo e nei contatori, e l'avviso accusava di portare una
+  // chiave d'accesso un normalissimo link a un video. Serve anche un VALORE che
+  // possa essere una credenziale: abbastanza lungo, e non un numero.
+  const MIN_CREDENZIALE = 12;
+  function haCredenziale(path) {
+    for (const m of path.matchAll(/[?&](token|key|sig|signature|hash|auth|access_token)=([^&#]*)/g)) {
+      const valore = m[2];
+      if (valore.length >= MIN_CREDENZIALE && !/^\d+$/.test(valore)) return true;
+    }
+    return false;
   }
 
   // Levenshtein limitata a `max` (early-exit). True se distance ≤ max e ≥ 1.
@@ -61,7 +74,7 @@
   const FRASI = {
     url_invalido: 'Questo non è un indirizzo valido: Filo non riesce a capire dove porterebbe.',
     side_effect: 'Aprirlo può bastare a eseguire qualcosa sul sito — disiscriverti, uscire, confermare o cancellare — senza chiederti altro.',
-    token_in_url: 'Nell’indirizzo c’è un codice che vale come la tua chiave: chi lo riceve entra al posto tuo.',
+    token_in_url: 'Nell’indirizzo c’è un codice che può valere come una chiave d’accesso. Chi lo riceve potrebbe entrare al posto tuo.',
   };
 
   function frasePerCodice(codice) {

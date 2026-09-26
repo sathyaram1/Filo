@@ -27,7 +27,7 @@ test('si registra su globalThis con la sua API', () => {
 test('riconosce il dominio-imitazione, l’azione a effetto e il codice nell’indirizzo', () => {
   assert.deepEqual(LS.analizza('https://paypa1.com/login'), ['typosquatting:paypal.com']);
   assert.ok(LS.analizza('https://esempio.it/unsubscribe').includes('side_effect'));
-  assert.ok(LS.analizza('https://esempio.it/a?token=abc').includes('token_in_url'));
+  assert.ok(LS.analizza('https://esempio.it/a?token=9f2ba71c4de80a13').includes('token_in_url'));
   assert.deepEqual(LS.analizza('non-un-indirizzo'), ['url_invalido']);
   // Il dominio vero, e un suo sottodominio, non sono sospetti.
   assert.deepEqual(LS.analizza('https://www.paypal.com/it'), []);
@@ -63,7 +63,7 @@ test('ogni codice prodotto dall’euristica ha la sua frase', () => {
 });
 
 test('più avvisi insieme restano leggibili, e i casi vuoti non mostrano niente', () => {
-  const codici = LS.analizza('https://paypa1.com/unsubscribe?token=abc');
+  const codici = LS.analizza('https://paypa1.com/unsubscribe?token=9f2ba71c4de80a13');
   assert.ok(codici.length >= 3, `mi aspetto tre avvisi insieme, trovati ${codici.join(', ')}`);
   const avviso = LS.avviso(codici);
   assert.equal(avviso.split('⚠️').length, 2, 'un solo simbolo di avviso, in testa');
@@ -88,4 +88,39 @@ test('l’euristica vive in un posto solo: actions.js la chiede qui', () => {
   const mount = actions.slice(actions.indexOf('function buildInlineExplainLink'));
   assert.ok(mount.indexOf('LinkSospetto.avviso') < mount.indexOf('port.onMessage'),
     'l’avviso sul link sospetto viene mostrato solo insieme alla risposta del modello');
+});
+
+test('un parametro che si chiama come una chiave ma non lo è non fa scattare l’avviso', () => {
+  // #725 — il nome da solo accusava di portare una chiave d'accesso i link di
+  // tutti i giorni: il segnatempo di un video, il contatore anti-cache. Il
+  // successo per chi legge è non vedere niente di rosso su un link normale, così
+  // che l'avviso conti ancora quando compare.
+  const normali = [
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42',
+    'https://youtu.be/dQw4w9WgXcQ?t=90',
+    'https://esempio.it/articolo?t=1699999999999',
+    'https://esempio.it/pagina?key=2',
+    'https://esempio.it/lista?hash=1234567890123',
+  ];
+  for (const u of normali) {
+    assert.ok(!LS.analizza(u).includes('token_in_url'), `avviso a sproposito su ${u}`);
+    assert.ok(!/chiave/.test(LS.avviso(LS.analizza(u))), `l’avviso parla di chiavi su ${u}`);
+  }
+  // E il caso vero continua a scattare.
+  for (const u of [
+    'https://esempio.it/entra?sig=Ab3kZ9qX1p7LmN4r',
+    'https://esempio.it/a?access_token=eyJhbGciOiJIUzI1NiJ9',
+  ]) {
+    assert.ok(LS.analizza(u).includes('token_in_url'), `nessun avviso su ${u}`);
+  }
+});
+
+test('l’avviso non afferma più di quello che il controllo sa', () => {
+  // Il controllo guarda l'indirizzo, non il sito: nessuna delle frasi può
+  // dichiarare un fatto. Una che afferma trasforma ogni falso allarme in
+  // un'accusa, e chi legge smette di crederci (#725).
+  for (const c of ['side_effect', 'token_in_url', 'typosquatting:paypal.com']) {
+    const f = LS.frasi([c])[0];
+    assert.match(f, /potrebbe|può|sembra/i, `la frase di "${c}" afferma invece di ipotizzare: ${f}`);
+  }
 });
