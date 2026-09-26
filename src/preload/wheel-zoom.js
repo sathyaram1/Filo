@@ -54,6 +54,10 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   if (!webFrame || typeof document === 'undefined') return;
   const pageZoom = !!(opts && opts.pageZoom);
   const ipc = (opts && opts.ipcRenderer) || null;
+  // Solo le pagine di Filo possono dire «lo zoom me lo faccio io»: il marcatore
+  // sta nel documento, e su un sito lo scriverebbe il sito per rendersi
+  // impossibile da ingrandire (#686, primo giro di verifica).
+  const interna = !!(opts && opts.interna);
 
   // Passo e limiti stanno in un posto solo (src/shared/zoomPagina.js): tasti,
   // rotella, badge e chat devono zoomare della stessa quantità e fermarsi dove
