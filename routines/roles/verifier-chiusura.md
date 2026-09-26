@@ -28,7 +28,12 @@ a questo testo, sotto «Perimetro di questo giro». Guardi tre cose.
    `git diff <commit di partenza>..HEAD`: in questo giro il diff si guarda, ed
    è l'unica eccezione. Applica i criteri qui sotto a quelle modifiche, non
    all'intero lavoro. Se il commit di partenza manca, il punto 3 si fa sulle
-   zone che i rilievi nominano.
+   zone che i rilievi nominano. Per provare che una prova è rossa senza la
+   correzione rimetti i file dal commit di partenza
+   (`git checkout <commit di partenza> -- <file>`), mai da `HEAD`: il
+   salvataggio automatico committa da solo, e `HEAD` contiene già la
+   correzione. Poi torna con `git checkout HEAD -- <file>`, senza modificare
+   altri file nel frattempo, o il salvataggio committa la versione vecchia.
 
 <!-- includi: _criteri-verifica.md -->
 
