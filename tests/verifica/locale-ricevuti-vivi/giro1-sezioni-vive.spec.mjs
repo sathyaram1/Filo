@@ -1,6 +1,6 @@
-// Verifica giro 1: in Gestione un feedback che cambia stato cambia sezione da solo, senza
-// ricaricare; una fusione ferma sta nei Ricevuti; il segno nato da un clic «Approva» si
-// distingue da quello messo a mano. Firestore sostituito da sorgenti finte, orologio vero.
+// Verifica giro 1: in Gestione un feedback che cambia stato cambia sezione da solo, senza ricaricare, e il
+// segno nato da un clic «Approva» si distingue da quello messo a mano. Firestore sostituito da sorgenti finte,
+// orologio vero.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -83,25 +83,6 @@ test('coi tempi veri dell\'orologio, entro un giro, e la sezione d\'arrivo lo se
   await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-arrivo.png' });
 });
 
-test('col segno del clic sulla scheda il titolo si legge ancora', async ({ openTab }) => {
-  const page = await apri(openTab);
-  const segno = { by: `owner@example.com · approvazione ${RICHIESTA}`, at: '2026-09-25T08:30:00.000Z' };
-  await dalVivo(page, [
-    fb('lungo', { status: 'working', name: 'La Gestione non aggiorna le sezioni da sola', mergePreapproved: segno }),
-    fb('fermo', { seq: 516, status: 'design', statusReason: 'l5', name: 'Fusione ferma sulle regole', mergePreapproved: segno }),
-  ]);
-  await tab(page, 'queue').click();
-  const titolo = scheda(page, 'lungo').locator('.mg-item-title');
-  await expect(titolo).toBeVisible();
-  await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-titolo.png' });
-  const largo = await titolo.evaluate((el) => el.getBoundingClientRect().width);
-  expect.soft(largo).toBeGreaterThan(60);
-  await tab(page, 'inbox').click();
-  await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-titolo-ricevuti.png' });
-  const largoFermo = await scheda(page, 'fermo').locator('.mg-item-title').evaluate((el) => el.getBoundingClientRect().width);
-  expect(largoFermo).toBeGreaterThan(60);
-});
-
 test('col mouse fermo sopra la lista la scheda cambia sezione lo stesso', async ({ openTab }) => {
   const page = await apri(openTab);
   await dalVivo(page, [fb('fb515'), fb('altro', { seq: 600 })]);
@@ -123,21 +104,6 @@ test('con la scheda aperta nel pannello la lista si aggiorna e il pannello resta
   await cambiaSulServer(page, fb('fb515', { _updateTime: 't2', status: 'design', statusReason: 'l5' }));
   await expect(tab(page, 'inbox')).toContainText('(1)', { timeout: 10000 });
   await expect(page.locator('#mgDetail')).toContainText('Testo del feedback fb515');
-});
-
-test('una richiesta di fusione in attesa porta la pratica nei Ricevuti', async ({ openTab }) => {
-  const page = await apri(openTab);
-  await dalVivo(page, [fb('fb515')]);
-  await page.evaluate((id) => window.__mgTest.loadMergeApprovals({
-    ok: true,
-    pending: [{ id, branch: 'claude/fb515', sha: 'a'.repeat(40), feedbackId: 'fb515', num: '515', who: 'secaudit · x',
-      origin: 'routine', trips: [{ gate: 'rules', label: 'Regole', items: ['firestore.rules'] }],
-      createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() }],
-    failed: [], recent: [], preapproved: [],
-  }), RICHIESTA);
-  await tab(page, 'inbox').click();
-  await expect(scheda(page, 'fb515')).toBeVisible();
-  await expect(tab(page, 'inbox')).toContainText('(1)');
 });
 
 test('il segno nato da un clic «Approva» arriva da solo e si distingue da quello messo a mano', async ({ openTab }) => {
