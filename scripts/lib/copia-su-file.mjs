@@ -2,26 +2,50 @@
 // NON è una cache di prodotto: serve agli script lanciati più volte di seguito.
 // Regole e perché: patterns/una-scansione-chiede-i-campi-che-usa-e-si-paga-una-volta.md
 
-import { mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import {
+  constants, closeSync, fstatSync, lstatSync, mkdirSync, openSync,
+  readFileSync, writeFileSync, unlinkSync,
+} from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+// Su Mac e Linux la cartella temporanea è di tutti, e il nome di una copia è
+// ricavabile: chi la crea per primo decide cosa ci troviamo dentro e dove
+// scriviamo. Quindi apriamo senza seguire i collegamenti, e ci fidiamo solo di
+// una cartella nostra e chiusa agli altri. Su Windows non serve: `%TEMP%` sta
+// già dentro il profilo dell'utente, e queste due bandiere lì non esistono.
+const WINDOWS = process.platform === 'win32';
+const NO_SYMLINK = WINDOWS ? 0 : (constants.O_NOFOLLOW || 0);
+function nostro(st) {
+  if (WINDOWS) return true;
+  if (typeof process.getuid === 'function' && st.uid !== process.getuid()) return false;
+  return (st.mode & 0o077) === 0;
+}
+
 // La cartella temporanea la decide il sistema (`os.tmpdir()`), mai un percorso
 // scritto a mano: gli script girano anche su Mac e Linux.
 // `FILO_COPIE_DIR` esiste per le prove, che devono poter guardare il file.
+// Torna '' se la cartella non è nostra o è aperta agli altri: allora la copia
+// non si fa, e chi chiama rilegge dal server.
 export function cartellaCopie(dir = null) {
   const scelta = String(dir || process.env.FILO_COPIE_DIR || '').trim();
   const base = scelta || join(tmpdir(), 'filo-copie');
-  try { mkdirSync(base, { recursive: true }); } catch (_) { /* c'è già, o non si può: lo scopre chi scrive */ }
+  try { mkdirSync(base, { recursive: true, mode: 0o700 }); } catch (_) { /* c'è già: lo dice il controllo qui sotto */ }
+  try {
+    const st = lstatSync(base);
+    if (!st.isDirectory() || !nostro(st)) return '';
+  } catch (_) { return ''; }
   return base;
 }
 
 // Il nome del file non contiene la chiave: una chiave può essere un URL intero,
 // con caratteri che su Windows non stanno in un nome di file.
 export function percorsoCopia(chiave, dir = null) {
+  const base = cartellaCopie(dir);
+  if (!base) return '';
   const impronta = createHash('sha256').update(String(chiave)).digest('hex').slice(0, 24);
-  return join(cartellaCopie(dir), `${impronta}.json`);
+  return join(base, `${impronta}.json`);
 }
 
 /**
