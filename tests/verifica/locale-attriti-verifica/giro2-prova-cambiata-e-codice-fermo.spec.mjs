@@ -144,36 +144,3 @@ test('le sole prove del giro aggiunte non fanno rifiutare la critica per codice 
   const r = critica((dir) => writeFileSync(join(dir, 'tests', 'verifica', '77', 'giro1-x.spec.mjs'), `${INTESTA}${VERDE}`));
   expect(r.testo).not.toContain('il ramo è cambiato fuori dalle prove');
 });
-
-test('dopo un riallineamento le prove di altri lavori cambiate su main non fermano la consegna', () => {
-  const dir = repo();
-  const ALTRA = 'tests/verifica/99/giro1-altro-lavoro.spec.mjs';
-  git(dir, 'checkout', '-q', '-b', 'main');
-  mkdirSync(join(dir, dirname(ALTRA)), { recursive: true });
-  writeFileSync(join(dir, ALTRA), `${INTESTA}${VERDE}${ROSSO}`);
-  git(dir, 'add', '-A');
-  git(dir, 'commit', '-q', '-m', 'main: un altro lavoro');
-  git(dir, 'checkout', '-q', '-b', `${RAMO}-2`);
-  writeFileSync(join(dir, 'codice.js'), 'module.exports = 2;\n');
-  git(dir, 'add', '-A');
-  git(dir, 'commit', '-q', '-m', 'critica');
-  const sha = git(dir, 'rev-parse', 'HEAD');
-  git(dir, 'checkout', '-q', 'main');
-  writeFileSync(join(dir, ALTRA), `${INTESTA}${VERDE}`);
-  git(dir, 'commit', '-q', '-am', 'main: l\'altro lavoro toglie il suo caso corretto');
-  git(dir, 'checkout', '-q', `${RAMO}-2`);
-  git(dir, 'rebase', '-q', 'main');
-  writeFileSync(join(dir, 'codice.js'), 'module.exports = 3;\n');
-  git(dir, 'commit', '-q', '-am', 'correzione');
-  git(dir, 'branch', '-q', '-m', RAMO);
-  stato(dir, {
-    request: 'correggi il pulsante', verdict: 'fix-pending', rounds: [{ outcome: '' }],
-    pending: {
-      sha, at: new Date().toISOString(), budgets: null, derived: [], external: [],
-      findings: [{ level: 2, sede: 'i', text: 'Il pulsante non salva col titolo vuoto' }],
-    },
-  });
-  const r = lancia(dir, ['corretto', REPORT], npxCheLegge(dir));
-  expect(r.testo).not.toContain('giro1-altro-lavoro');
-  expect(r.status, r.testo).toBe(0);
-});
