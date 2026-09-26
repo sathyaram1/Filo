@@ -495,6 +495,11 @@
         link: (n.action && n.action.link) || [],
         attesa: !!n.inAttesa,
         fonte: n.fonte || '',
+        // #536 — chi legge «ho fermato un avviso» vuole vedere cos'era, ed è la
+        // prima cosa che farà: la strada parte da qui, non dal sapere per conto
+        // proprio che esiste una voce nelle Preferenze.
+        registro: !!(n.action && n.action.tipo === 'guardiano-blocco'),
+        onRegistro: () => send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html#sec-guardiano' }),
         onRiprova: () => send({ type: MSG.FILO_RIPRENDI_ATTESA }).then(refreshLive),
         onDismiss: () => send({ type: MSG.FILO_DISMISS_NOTIFICATION, id: n.id }).then(refreshLive),
       }));
