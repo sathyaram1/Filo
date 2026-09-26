@@ -124,7 +124,6 @@ test('il «Riprova» di una scheda non deve svuotare tutto l_elenco', async ({ o
 
   // L'altra scheda, che era già arrivata per intero, deve restare a schermo.
   await expect(buona).toBeVisible();
-  await page.screenshot({ path: 'tests/.shots/677-giro6-riprova-una-scheda.png' });
 
   await page.evaluate(() => window.__sblocca2 && window.__sblocca2());
 });
