@@ -2493,15 +2493,14 @@
   // riga non la chiede due volte.
   const dettagliInCorso = new Map();
 
-  // La lettura non è tornata (guasto, tempo scaduto, documento sparito). Si
-  // SEGNA sulla riga invece di lasciarla identica a una mai chiesta: così il
-  // pannello può dirlo, i tasti che scrivono sulla conversazione sanno di non
-  // averla, e riaprire la stessa riga non ricompra all'infinito una lettura
-  // che continua a non arrivare. Il «Riprova» toglie il segno.
+  // Una riga la cui lettura NON è tornata (guasto, tempo scaduto, documento
+  // sparito) non è uguale a una mai chiesta: senza il segno il pannello resta
+  // su «Caricamento…», chi scrive crede che la conversazione sia vuota, e ogni
+  // clic ricompra la stessa lettura mancata.
   function segnaDettaglioMancato(key, motivo) {
+    // Sul posto: la stessa riga sta anche nell'indice per mittente e nella
+    // lista disegnata, e sostituirla lascerebbe quelle copie senza il segno.
     const riga = allFeedbacks.find((f) => f._id === key);
-    // Sul posto: la stessa riga è anche nell'indice per mittente e nella lista
-    // disegnata, e sostituirla lascerebbe quelle copie senza il segno.
     if (riga) riga._dettaglioMancato = motivo || 'rete';
   }
 
