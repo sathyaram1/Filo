@@ -48,15 +48,22 @@
       const T = global.SN_TRANSPARENCY;
       if (T && typeof T.all === 'function') {
         return T.all()
-          .map((d) => ({ id: String(d.id || ''), title: String(d.title || ''), subtitle: String(d.subtitle || '') }))
+          .map((d) => ({
+            id: String(d.id || ''),
+            title: String(d.title || ''),
+            sezioni: (Array.isArray(d.sections) ? d.sections : []).map((x) => String((x && x.title) || '')).filter(Boolean),
+          }))
           .filter((d) => d.id);
       }
     } catch (_) {}
     return [];
   }
 
+  // Titolo e sezioni, non il sottotitolo: quello è scritto per chi apre la
+  // pagina e al modello non dice cosa c'è dentro (#515).
   function elencoTrasparenza(docs) {
-    return docs.map((d) => d.id + ' (' + (d.subtitle || d.title) + ')').join(', ');
+    return docs.map((d) => d.id + ' («' + d.title + '»'
+      + (d.sezioni.length ? '; sezioni: ' + d.sezioni.join(', ') : '') + ')').join('; ');
   }
 
   const RIPETI = {
@@ -183,8 +190,9 @@
         const base = 'Chiede il testo di un documento di trasparenza di Filo. USALO SEMPRE prima di rispondere quando l\'utente chiede perché Filo usa un certo modello o una certa azienda, se Filo usa ChatGPT/Gemini/Grok, dove finiscono i suoi soldi o i suoi dati: sono scelte documentate per iscritto e NON vanno ricostruite a memoria. Rispondi citando il testo, senza aggiungere motivazioni tue.';
         if (!docs.length) return base + ' In questo momento non c\'è nessun documento scritto: non chiamarlo.';
         return base + ' I documenti scritti sono questi, e sono gli unici che esistono: '
-          + elencoTrasparenza(docs) + '. Su un argomento che nessuno di questi copre non c\'è niente da leggere:'
-          + ' dillo all\'utente invece di rispondere a memoria.';
+          + elencoTrasparenza(docs) + '. I titoli non dicono tutto: se la domanda può toccare uno di questi'
+          + ' documenti, leggilo prima di rispondere. Solo se nel testo la risposta non c\'è, dillo all\'utente'
+          + ' invece di rispondere a memoria.';
       },
       properties: () => {
         const docs = docsTrasparenza();

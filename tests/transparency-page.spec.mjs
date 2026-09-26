@@ -161,3 +161,35 @@ test('un documento che non esiste per niente non diventa un altro documento', as
   await expect(page.locator('#subtitle')).toContainText('non esiste');
   await expect(page.locator('#doc-body a[href*="doc=models"]')).toHaveCount(1);
 });
+
+// #515 — Le sezioni non scritte si cliccano e sono l'unica strada per sapere
+// che arriveranno: sbiadite a 1,8:1 non le vedeva nessuno. 3:1 è il minimo
+// per un elemento d'interfaccia.
+for (const tema of ['light', 'dark']) {
+  test(`le sezioni non ancora scritte nella barra si leggono sul tema ${tema}`, async ({ app, openTab }) => {
+    const mancanti = await app.evaluate(() => {
+      const T = globalThis.SN_TRANSPARENCY;
+      return T.NAV.filter((n) => !T.ids().includes(n.id)).length;
+    });
+    test.skip(!mancanti, 'tutte le sezioni sono scritte');
+    const page = await openTab(URL);
+    await expect(page.locator('#title')).toBeVisible({ timeout: 10_000 });
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    const contrasto = await page.evaluate(() => {
+      const lum = (c) => {
+        const l = c.map((v) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; });
+        return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2];
+      };
+      const rgb = (str) => (String(str).match(/rgba?\(([^)]+)\)/) || [0, '0,0,0'])[1].split(',').slice(0, 3).map(parseFloat);
+      const voce = document.querySelector('#nav .is-soon');
+      const st = getComputedStyle(voce);
+      const corpo = rgb(getComputedStyle(document.body).backgroundColor);
+      const sfondo = corpo.some((v) => v > 0) ? corpo : rgb(getComputedStyle(document.documentElement).backgroundColor);
+      const a = parseFloat(st.opacity);
+      const visto = rgb(st.color).map((v, i) => sfondo[i] + a * (v - sfondo[i]));
+      const [x, y] = [lum(visto), lum(sfondo)];
+      return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+    });
+    expect(contrasto, `contrasto ${contrasto.toFixed(2)}:1 sul tema ${tema}`).toBeGreaterThanOrEqual(3);
+  });
+}

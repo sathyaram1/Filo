@@ -53,6 +53,14 @@ function escapeHtml(s) {
   })[c]);
 }
 
+// Inverso esatto di escapeHtml, in una passata sola (così «&amp;quot;» torna
+// «&quot;» e non «"»).
+function unescapeHtml(s) {
+  return String(s).replace(/&(amp|lt|gt|quot|#39);/g, (_m, e) => ({
+    amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'",
+  })[e]);
+}
+
 function slugify(s) {
   return String(s || '')
     .toLowerCase()
@@ -88,7 +96,10 @@ function renderInline(text, sources) {
     const clean = url.replace(/&amp;/g, '&');
     let idx = sources.findIndex((s) => s.url === clean);
     if (idx === -1) {
-      sources.push({ url: clean, label: label.replace(/\*\*/g, ''), domain: domainOf(clean) });
+      // L'etichetta si conserva IN CHIARO: la catturiamo dal testo già escapato,
+      // e l'elenco delle fonti la escapa di nuovo (sulla pagina «&quot;» si
+      // leggeva così com'è) mentre il testo per l'agente la prende tale e quale.
+      sources.push({ url: clean, label: unescapeHtml(label.replace(/\*\*/g, '')), domain: domainOf(clean) });
       idx = sources.length - 1;
     }
     const n = idx + 1;
@@ -311,6 +322,7 @@ function buildDocs() {
       subtitle: meta.subtitle || '',
       updated: meta.updated || '',
       order: Number(meta.order || 99),
+      ordineDichiarato: !!meta.order,
       sections,
       sources,
       html: html + '\n' + renderSources(sources),
@@ -330,15 +342,18 @@ const AREE_ANNUNCIATE = [
   { id: 'business', label: 'Come si sostiene', order: 4 },
 ];
 
-// La barra non è un elenco a mano: le aree annunciate più OGNI documento
-// scritto. Un elenco fisso avrebbe nascosto un documento su un tema non
-// previsto — esiste, la chat lo offre, ma sfogliando non lo trova nessuno
-// (#515). L'etichetta corta la dà il front matter `nav`, altrimenti il titolo.
+// La barra: OGNI documento scritto, più le aree annunciate che non ne hanno
+// ancora uno. Un documento decide lui nome corto (`nav`) e posto (`order`);
+// l'area annunciata è solo il segnaposto finché il documento non c'è (#515).
 function buildNav(docs) {
-  const voci = AREE_ANNUNCIATE.map((a) => ({ ...a }));
+  const voci = AREE_ANNUNCIATE.filter((a) => !docs.some((d) => d.id === a.id)).map((a) => ({ ...a }));
   for (const d of docs) {
-    if (voci.some((v) => v.id === d.id)) continue;
-    voci.push({ id: d.id, label: d.nav || d.title, order: Number.isFinite(d.order) ? d.order : 99 });
+    const area = AREE_ANNUNCIATE.find((a) => a.id === d.id);
+    voci.push({
+      id: d.id,
+      label: d.nav || (area ? area.label : d.title),
+      order: d.ordineDichiarato || !area ? d.order : area.order,
+    });
   }
   return voci.sort((a, b) => a.order - b.order).map(({ id, label }) => ({ id, label }));
 }

@@ -293,3 +293,80 @@ test('i documenti citati per nome nel prompt di accoglienza esistono', () => {
     assert.ok(T.ids().includes(id), `l'accoglienza manda l'agente a leggere "${id}", che non esiste`);
   }
 });
+
+// Genera su una COPIA del repo, coi markdown in più che la prova vuole.
+function generaCopia(extra) {
+  const tmp = cartellaTemporanea('filo-trasparenza-');
+  mkdirSync(join(tmp, 'scripts'), { recursive: true });
+  cpSync(join(ROOT, 'scripts', 'build-transparency.mjs'), join(tmp, 'scripts', 'build-transparency.mjs'));
+  cpSync(join(ROOT, 'transparency'), join(tmp, 'transparency'), { recursive: true });
+  mkdirSync(join(tmp, 'src', 'styles'), { recursive: true });
+  cpSync(join(ROOT, 'src', 'styles', 'transparency.css'), join(tmp, 'src', 'styles', 'transparency.css'));
+  for (const [nome, righe] of Object.entries(extra)) {
+    writeFileSync(join(tmp, 'transparency', nome), righe.join('\n'), 'utf8');
+  }
+  execFileSync(process.execPath, [join(tmp, 'scripts', 'build-transparency.mjs')], { encoding: 'utf8' });
+  const leggi = (...p) => readFileSync(join(tmp, ...p), 'utf8');
+  return { tmp, leggi };
+}
+
+// #515 — Un documento scritto in un'area annunciata decide lui nome corto e
+// posto nella barra: l'area era solo il segnaposto.
+test('un documento scritto in un\'area annunciata porta nella barra il suo nome e il suo posto', () => {
+  const { tmp, leggi } = generaCopia({
+    'privacy.md': [
+      '---', 'id: privacy', 'title: Dove finiscono i tuoi dati', 'nav: I tuoi dati',
+      'subtitle: Cosa esce dal tuo computer.', 'updated: 2026-09-26', 'order: 9', '---',
+      '', 'Filo tiene i tuoi dati sul tuo computer.', '', '## Cosa esce da qui', '', 'Solo quello che chiedi tu.', '',
+    ],
+  });
+  const modulo = leggi('src', 'shared', 'transparency.js');
+  const nav = JSON.parse(/const NAV = (\[[\s\S]*?\]);/.exec(modulo)[1]);
+  assert.deepEqual(nav.map((n) => n.label), ['Modelli', 'Sicurezza', 'Come si sostiene', 'I tuoi dati'],
+    'la barra non usa il nome corto e l\'ordine che il documento si dà');
+  const barra = leggi('site', 'transparency', 'models.html').split('<nav class="sn-nav">')[1].split('</nav>')[0];
+  assert.ok(barra.includes('>I tuoi dati<'), 'sul sito la barra tiene il nome dell\'area invece di quello del documento');
+  rmSync(tmp, { recursive: true, force: true });
+});
+
+// #515 — L'etichetta di una fonte veniva presa dal testo già escapato: sulla
+// pagina si leggeva «&quot;», e il modello la citava così.
+test('le fonti si leggono come testo, sulla pagina e per il modello', () => {
+  const { T } = loadModules();
+  const entita = /&(quot|amp|lt|gt|apos|nbsp|#\d+|#x[0-9a-f]+);/i;
+  for (const d of T.all()) {
+    assert.doesNotMatch(d.text, entita, `"${d.id}": il testo per il modello contiene entità HTML`);
+    assert.doesNotMatch(d.html, /&amp;(quot|#39|lt|gt|amp);/, `"${d.id}": sulla pagina un'entità escapata due volte`);
+  }
+  // L'escape resta: un'etichetta con dentro del markup non diventa markup.
+  const { tmp, leggi } = generaCopia({
+    'zz-prova.md': [
+      '---', 'id: zz-prova', 'title: Prova', 'order: 50', '---',
+      '', 'Un [titolo "tra virgolette" con <b>markup</b> e l\'apostrofo](https://example.com/a?x=1&y=2).', '',
+    ],
+  });
+  const html = leggi('site', 'transparency', 'zz-prova.html');
+  const voce = html.split('id="fonte-1"')[1].split('</li>')[0];
+  assert.ok(voce.includes('&quot;tra virgolette&quot; con &lt;b&gt;markup&lt;/b&gt; e l&#39;apostrofo'), `fonte resa male: ${voce}`);
+  assert.ok(voce.includes('href="https://example.com/a?x=1&amp;y=2"'), `indirizzo della fonte reso male: ${voce}`);
+  const testo = leggi('src', 'shared', 'transparency.js');
+  assert.ok(testo.includes('[1] titolo \\"tra virgolette\\" con <b>markup</b> e l\'apostrofo — https://example.com/a?x=1&y=2'),
+    'il testo per il modello non riporta la fonte com\'è scritta');
+  rmSync(tmp, { recursive: true, force: true });
+});
+
+// #515 — Presentato col sottotitolo («le motivazioni etiche…»), il documento
+// sui modelli sembrava non rispondere a «che fine fanno i miei dati?».
+test('lo strumento dice al modello cosa c\'è dentro ogni documento, e di leggerlo prima di dire che non c\'è', () => {
+  const { T } = loadModules();
+  const fn = toolTrasparenza();
+  for (const d of T.all()) {
+    for (const s of d.sections) {
+      assert.ok(fn.description.includes(s.title), `"${d.id}": lo strumento non nomina la sezione «${s.title}»`);
+    }
+    if (d.subtitle) {
+      assert.ok(!fn.description.includes(d.subtitle), `"${d.id}": presentato con la frase scritta per la pagina`);
+    }
+  }
+  assert.match(fn.description, /leggilo prima di rispondere/);
+});

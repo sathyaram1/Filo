@@ -56,13 +56,11 @@
   border-bottom-color: var(--sn-accent, #c45a3b);
 }
 
-/* Le sezioni non ancora scritte restano visibili e più tenui: farle sparire
- * direbbe che Filo non ha niente da dire su privacy o sicurezza. */
-.sn-nav-item.is-soon {
-  opacity: 0.45;
-}
+/* Le sezioni non ancora scritte: grigie invece del colore dei link, ma leggibili, perché si cliccano.
+ * Farle sparire direbbe che Filo non ha niente da dire su privacy o sicurezza. */
+.sn-nav-item.is-soon:not(.is-active) { color: var(--sn-muted, #6e6b63); }
 
-.sn-nav-item.is-soon:hover { opacity: 0.75; }
+.sn-nav-item.is-soon:not(.is-active):hover { color: var(--sn-fg, #1a1918); }
 
 /* Il titolo può arrivare dall'indirizzo: una parola senza spazi lunga quanto
  * vuole non deve allargare la pagina. */
