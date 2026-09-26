@@ -16,7 +16,7 @@ const VERDE = "test('una porta chiusa davvero', () => { expect(1).toBe(1); });";
 const REPORT = 'Corretto il rilievo del giro: il pulsante ora salva anche col titolo vuoto, provato a mano e con la prova.';
 
 function git(dir, ...args) {
-  return execFileSync('git', ['-c', 'user.name=prova', '-c', 'user.email=prova@prova', ...args], { cwd: dir, encoding: 'utf8' }).trim();
+  return execFileSync('git', ['-c', 'user.name=prova', '-c', 'user.email=prova@prova', '-c', 'core.autocrlf=false', ...args], { cwd: dir, encoding: 'utf8' }).trim();
 }
 
 // Un npx finto che risponde «rosso» a ogni prova: così la prova tolta, rilanciata, è ancora rossa.
@@ -32,6 +32,7 @@ function npxRosso(dir) {
 /** Un giro locale aperto: la critica su `prima`, poi il commit di chi corregge. */
 function giroAperto({ contenutoPrima, contenutoDopo, external }) {
   const dir = cartellaTemporanea('giro-prove-tolte-');
+  cartelle.push(dir);
   git(dir, 'init', '-q', '-b', RAMO);
   writeFileSync(join(dir, '.gitignore'), '.claude/\ntests/verifica/_tolte-*/\n');
   mkdirSync(join(dir, dirname(PROVA)), { recursive: true });
@@ -66,6 +67,11 @@ function consegna(dir) {
   const stato = JSON.parse(readFileSync(join(dir, '.claude', 'verify-local.json'), 'utf8'))[RAMO];
   return { status: r.status, testo: `${r.stdout}\n${r.stderr}`, verdict: stato.verdict };
 }
+
+const cartelle = [];
+test.afterAll(() => {
+  for (const d of cartelle) rmSync(d, { recursive: true, force: true });
+});
 
 const intesta = "import { test, expect } from '@playwright/test';\n";
 
