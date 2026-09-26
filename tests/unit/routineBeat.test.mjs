@@ -335,7 +335,15 @@ test('il giro col biglietto fa arrivare un battito al server, senza che nessuno 
   } finally {
     // Il processo è staccato apposta: se non lo si ferma resta a battere.
     const m = readBeat(casa);
-    if (m && m.pid) { try { process.kill(Number(m.pid)); } catch (_) { /* già morto */ } }
+    if (m && m.pid) {
+      const pid = Number(m.pid);
+      try { process.kill(pid); } catch (_) { /* già morto */ }
+      // Su Windows il processo ucciso tiene la cartella finché non è uscito davvero: sotto carico rmSync dava EBUSY.
+      for (const fine = Date.now() + 30000; Date.now() < fine;) {
+        try { process.kill(pid, 0); } catch (_) { break; }
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
     srv.close();
     await new Promise((r) => setTimeout(r, 200));
     rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
