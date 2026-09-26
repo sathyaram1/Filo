@@ -32,7 +32,9 @@ la cartella.
 - La consegna della correzione (`verify-local.mjs corretto`, `dispatch.mjs --record-fixed`)
   rilancia una volta le prove cancellate o cambiate, com'erano, sul codice nuovo: una ancora
   rossa la respinge (#679, una prova rossa cancellata insieme alla correzione; togliere il
-  solo caso rosso e tenere il file è la stessa porta). Se il giro ha messo da parte
+  solo caso rosso e tenere il file è la stessa porta). Dopo un riallineamento contano solo
+  le prove che ha toccato il ramo: quelle che main ha cambiato nel frattempo sono di altri
+  lavori e non si rilanciano. Se il giro ha messo da parte
   dei rilievi le rosse si elencano soltanto, perché da lì non si sa quale prova sia di
   quale rilievo (`scripts/lib/prove-tolte.mjs`).
 
