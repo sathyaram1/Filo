@@ -528,13 +528,23 @@
 
   // ── Dashboard unificata (DB1): mappatura feedback → tab ───────────────────
   // Lookup PURA sul vocabolario (spec §4): niente pipeline, niente isApproved,
-  // niente modalità automatica. L'unico ingrediente extra è il gate DB3
+  // niente modalità automatica. Ingredienti extra: il gate DB3
   // (`opts.releasedVersion`): un `done` è "Risolti" solo se davvero spedito,
-  // altrimenti resta visibile "In coda".
+  // altrimenti resta visibile "In coda"; e `opts.fusioni` (vedi sotto).
   function manageTabFor(fb, opts) {
     const { status } = normalizeStatus(fb);
     const shipped = status === 'done' ? isShipped(fb, opts && opts.releasedVersion) : false;
-    return FS().tabFor(status, { shipped });
+    const tab = FS().tabFor(status, { shipped });
+    // Una richiesta di fusione che aspetta l'owner è una sua decisione: Ricevuti anche se lo stato
+    // non è arrivato al cancello. Solo `pending`: una fallita per conflitto la riallinea la routine.
+    if (tab && tab !== 'archived' && richiestaInAttesa(fb, opts)) return 'inbox';
+    return tab;
+  }
+
+  function richiestaInAttesa(fb, opts) {
+    const f = opts && opts.fusioni;
+    const pending = f && Array.isArray(f.pending) ? f.pending : [];
+    return pending.some((r) => richiestaDiQuesto(r, fb));
   }
 
   // ── Le AZIONI dell'owner: UNA tabella per tutte le superfici ──────────────
