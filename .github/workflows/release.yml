@@ -54,6 +54,26 @@ on:
         description: 'Solo la suite Playwright sul ramo scelto: non pubblica niente'
         type: boolean
         default: false
+      # RIMETTERE I FILE DI UNA PIATTAFORMA SU UNA VERSIONE GIA' USCITA
+      #   Se la meta' Mac o Linux fallisce, la release esce senza i suoi file e
+      #   il collegamento del sito risponde 404. Rilanciare la pubblicazione non
+      #   li rimette: decide se pubblicare contando i commit dopo l'ultimo tag,
+      #   e senza commit nuovi non fa niente. Con queste caselle si ricostruisce
+      #   il codice DI QUELLA versione (il tag) e si allegano i suoi file alla
+      #   release che c'e' gia'. Non pubblica niente di nuovo e non fa girare la
+      #   suite: il pacchetto e' quello di una versione gia' provata.
+      ripubblica_mac:
+        description: "Rimetti i file per Mac su una versione gia' uscita"
+        type: boolean
+        default: false
+      ripubblica_linux:
+        description: "Rimetti i file per Linux su una versione gia' uscita"
+        type: boolean
+        default: false
+      ripubblica_versione:
+        description: 'La versione a cui riattaccarli, per esempio v0.2.229'
+        type: string
+        default: ''
 
 permissions:
   contents: write            # creare e pubblicare la Release (non serve piu' per scrivere su main)
@@ -88,6 +108,9 @@ jobs:
   # aprire feedback: è il modo di provare la suite su un ramo.
   #   gh workflow run release.yml --ref <ramo> -f solo_suite=true
   suite:
+    # Riallegare i file di una versione gia' uscita non prova niente di nuovo:
+    # il codice e' quello di un tag, la suite ci e' gia' passata sopra.
+    if: ${{ !inputs.ripubblica_mac && !inputs.ripubblica_linux }}
     runs-on: ubuntu-latest
     timeout-minutes: 240
     outputs:
@@ -547,15 +570,57 @@ jobs:
   # l'aggiornamento a chi e' su Windows.
   release-mac:
     needs: release
-    if: needs.release.outputs.should_release == 'true' && needs.release.outputs.version != ''
+    # Due strade per arrivare qui: la pubblicazione appena uscita, oppure un
+    # avvio a mano per rimettere i file su una versione gia' uscita. Sulla
+    # seconda il lavoro Windows non gira nemmeno, e senza `!cancelled()` questo
+    # verrebbe saltato con lui.
+    if: ${{ !cancelled() && (inputs.ripubblica_mac || (needs.release.result == 'success' && needs.release.outputs.should_release == 'true' && needs.release.outputs.version != '')) }}
     runs-on: macos-latest
     continue-on-error: true
     steps:
-      - name: Checkout dello stesso commit costruito per Windows
+      # Il numero della versione e il codice da costruire vengono da due posti
+      # diversi a seconda della strada. Appena uscita: li passa la meta'
+      # Windows, e il codice e' il COMMIT che ha costruito lei, non il tag (il
+      # tag nasce alla pubblicazione e punta a dove sta main in quel momento).
+      # A mano: il numero lo scrive chi avvia, e il codice e' quel tag, che e'
+      # esattamente quello che gli utenti hanno gia'.
+      - name: A quale versione ci si attacca
+        id: bersaglio
+        shell: bash
+        env:
+          A_MANO: ${{ inputs.ripubblica_mac }}
+          VERSIONE_A_MANO: ${{ inputs.ripubblica_versione }}
+          VERSIONE_APPENA_USCITA: ${{ needs.release.outputs.version }}
+          COMMIT_APPENA_USCITO: ${{ needs.release.outputs.sha }}
+        run: |
+          set -e
+          if [ "$A_MANO" = "true" ]; then
+            # Il numero lo scrive una persona in una casella: spazi incollati
+            # per sbaglio e la "v" dimenticata non devono costare un giro a
+            # vuoto (il tag e' sempre vX.Y.Z).
+            CHIESTA=$(printf '%s' "$VERSIONE_A_MANO" | tr -d '[:space:]')
+            case "$CHIESTA" in v*) ;; ?*) CHIESTA="v${CHIESTA}" ;; esac
+            # Senza numero non si sa dove attaccare: fermarsi e' meglio che
+            # allegare i file alla versione sbagliata.
+            if [ -z "$CHIESTA" ]; then
+              echo "::error::avvio a mano senza il numero della versione: scrivilo nella casella (per esempio v0.2.229)."
+              exit 1
+            fi
+            VERSIONE="$CHIESTA"
+            CODICE="$CHIESTA"
+          else
+            VERSIONE="$VERSIONE_APPENA_USCITA"
+            CODICE="$COMMIT_APPENA_USCITO"
+          fi
+          echo "versione=${VERSIONE}" >> "$GITHUB_OUTPUT"
+          echo "codice=${CODICE}" >> "$GITHUB_OUTPUT"
+          echo "Ci si attacca a ${VERSIONE}, costruendo ${CODICE}."
+
+      - name: Checkout del codice di questa versione
         id: checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release.outputs.sha }}
+          ref: ${{ steps.bersaglio.outputs.codice }}
 
       - name: Setup Node
         id: node
@@ -571,13 +636,13 @@ jobs:
       # scritto, si sta costruendo un codice diverso da quello pubblicato per
       # Windows. Meglio fermarsi che allegare alla release un pacchetto Mac che
       # non corrisponde.
-      - name: Stesso numero di versione della meta' Windows
+      - name: Il codice qui e' davvero quello di questa versione
         id: versione
         shell: bash
         run: |
           set -e
           LOCALE=$(node -p "require('./package.json').version")
-          ATTESA="${{ needs.release.outputs.version }}"
+          ATTESA="${{ steps.bersaglio.outputs.versione }}"
           if [ "v${LOCALE}" != "$ATTESA" ]; then
             echo "::error::qui il manifesto dice v${LOCALE}, la release e' ${ATTESA}: non allego un pacchetto sbagliato."
             exit 1
@@ -625,7 +690,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          ELENCO=$(gh release view "${{ needs.release.outputs.version }}" \
+          ELENCO=$(gh release view "${{ steps.bersaglio.outputs.versione }}" \
             --repo "${{ github.repository }}" --json assets \
             --jq '.assets[].name')
           echo "Allegati nella release:"
@@ -641,7 +706,7 @@ jobs:
           # feedback deve sapere quanto manca, non scoprirlo un file alla volta.
           echo "mancanti=${MANCANTI% }" >> "$GITHUB_OUTPUT"
           if [ -n "$MANCANTI" ]; then
-            echo "::error::mancano nella release ${{ needs.release.outputs.version }}: ${MANCANTI% }"
+            echo "::error::mancano nella release ${{ steps.bersaglio.outputs.versione }}: ${MANCANTI% }"
             exit 1
           fi
 
@@ -655,7 +720,7 @@ jobs:
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
           PIATTAFORMA: Mac
-          VERSIONE: ${{ needs.release.outputs.version }}
+          VERSIONE: ${{ steps.bersaglio.outputs.versione }}
           REPO: ${{ github.repository }}
           ESECUZIONE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           # Quale passo si e' fermato lo dicono gli esiti dei passi con un id.
@@ -665,7 +730,7 @@ jobs:
         run: node scripts/release-platform-alarm.mjs || echo "::warning::allarme non consegnato"
 
       - name: Riepilogo
-        run: echo "Aggiunto il pacchetto Mac a ${{ needs.release.outputs.version }}"
+        run: echo "Aggiunto il pacchetto Mac a ${{ steps.bersaglio.outputs.versione }}"
 
   # ─── TERZA META': LA VERSIONE PER LINUX ──────────────────────────────────
   # Stessa forma del lavoro per Mac, e per gli stessi motivi: parte DOPO che la
@@ -685,15 +750,57 @@ jobs:
   # i due lavori sono indipendenti e girano in parallelo.
   release-linux:
     needs: release
-    if: needs.release.outputs.should_release == 'true' && needs.release.outputs.version != ''
+    # Due strade per arrivare qui: la pubblicazione appena uscita, oppure un
+    # avvio a mano per rimettere i file su una versione gia' uscita. Sulla
+    # seconda il lavoro Windows non gira nemmeno, e senza `!cancelled()` questo
+    # verrebbe saltato con lui.
+    if: ${{ !cancelled() && (inputs.ripubblica_linux || (needs.release.result == 'success' && needs.release.outputs.should_release == 'true' && needs.release.outputs.version != '')) }}
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - name: Checkout dello stesso commit costruito per Windows
+      # Il numero della versione e il codice da costruire vengono da due posti
+      # diversi a seconda della strada. Appena uscita: li passa la meta'
+      # Windows, e il codice e' il COMMIT che ha costruito lei, non il tag (il
+      # tag nasce alla pubblicazione e punta a dove sta main in quel momento).
+      # A mano: il numero lo scrive chi avvia, e il codice e' quel tag, che e'
+      # esattamente quello che gli utenti hanno gia'.
+      - name: A quale versione ci si attacca
+        id: bersaglio
+        shell: bash
+        env:
+          A_MANO: ${{ inputs.ripubblica_linux }}
+          VERSIONE_A_MANO: ${{ inputs.ripubblica_versione }}
+          VERSIONE_APPENA_USCITA: ${{ needs.release.outputs.version }}
+          COMMIT_APPENA_USCITO: ${{ needs.release.outputs.sha }}
+        run: |
+          set -e
+          if [ "$A_MANO" = "true" ]; then
+            # Il numero lo scrive una persona in una casella: spazi incollati
+            # per sbaglio e la "v" dimenticata non devono costare un giro a
+            # vuoto (il tag e' sempre vX.Y.Z).
+            CHIESTA=$(printf '%s' "$VERSIONE_A_MANO" | tr -d '[:space:]')
+            case "$CHIESTA" in v*) ;; ?*) CHIESTA="v${CHIESTA}" ;; esac
+            # Senza numero non si sa dove attaccare: fermarsi e' meglio che
+            # allegare i file alla versione sbagliata.
+            if [ -z "$CHIESTA" ]; then
+              echo "::error::avvio a mano senza il numero della versione: scrivilo nella casella (per esempio v0.2.229)."
+              exit 1
+            fi
+            VERSIONE="$CHIESTA"
+            CODICE="$CHIESTA"
+          else
+            VERSIONE="$VERSIONE_APPENA_USCITA"
+            CODICE="$COMMIT_APPENA_USCITO"
+          fi
+          echo "versione=${VERSIONE}" >> "$GITHUB_OUTPUT"
+          echo "codice=${CODICE}" >> "$GITHUB_OUTPUT"
+          echo "Ci si attacca a ${VERSIONE}, costruendo ${CODICE}."
+
+      - name: Checkout del codice di questa versione
         id: checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release.outputs.sha }}
+          ref: ${{ steps.bersaglio.outputs.codice }}
 
       - name: Setup Node
         id: node
@@ -709,13 +816,13 @@ jobs:
       # che il server ha scritto, si sta costruendo un codice diverso da quello
       # pubblicato per Windows. Meglio fermarsi che allegare alla release un
       # pacchetto Linux che non corrisponde.
-      - name: Stesso numero di versione della meta' Windows
+      - name: Il codice qui e' davvero quello di questa versione
         id: versione
         shell: bash
         run: |
           set -e
           LOCALE=$(node -p "require('./package.json').version")
-          ATTESA="${{ needs.release.outputs.version }}"
+          ATTESA="${{ steps.bersaglio.outputs.versione }}"
           if [ "v${LOCALE}" != "$ATTESA" ]; then
             echo "::error::qui il manifesto dice v${LOCALE}, la release e' ${ATTESA}: non allego un pacchetto sbagliato."
             exit 1
@@ -767,7 +874,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          gh release upload "${{ needs.release.outputs.version }}" \
+          gh release upload "${{ steps.bersaglio.outputs.versione }}" \
             "build/Se-Filo-non-si-apre-Linux.txt" \
             --repo "${{ github.repository }}" --clobber
 
@@ -782,7 +889,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          ELENCO=$(gh release view "${{ needs.release.outputs.version }}" \
+          ELENCO=$(gh release view "${{ steps.bersaglio.outputs.versione }}" \
             --repo "${{ github.repository }}" --json assets \
             --jq '.assets[].name')
           echo "Allegati nella release:"
@@ -798,7 +905,7 @@ jobs:
           # feedback deve sapere quanto manca, non scoprirlo un file alla volta.
           echo "mancanti=${MANCANTI% }" >> "$GITHUB_OUTPUT"
           if [ -n "$MANCANTI" ]; then
-            echo "::error::mancano nella release ${{ needs.release.outputs.version }}: ${MANCANTI% }"
+            echo "::error::mancano nella release ${{ steps.bersaglio.outputs.versione }}: ${MANCANTI% }"
             exit 1
           fi
 
@@ -812,7 +919,7 @@ jobs:
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
           PIATTAFORMA: Linux
-          VERSIONE: ${{ needs.release.outputs.version }}
+          VERSIONE: ${{ steps.bersaglio.outputs.versione }}
           REPO: ${{ github.repository }}
           ESECUZIONE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           # Quale passo si e' fermato lo dicono gli esiti dei passi con un id.
@@ -822,4 +929,4 @@ jobs:
         run: node scripts/release-platform-alarm.mjs || echo "::warning::allarme non consegnato"
 
       - name: Riepilogo
-        run: echo "Aggiunto il pacchetto Linux a ${{ needs.release.outputs.version }}"
+        run: echo "Aggiunto il pacchetto Linux a ${{ steps.bersaglio.outputs.versione }}"

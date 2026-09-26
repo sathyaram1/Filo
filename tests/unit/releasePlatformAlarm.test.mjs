@@ -12,7 +12,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(resolve(ROOT, 'package.json'));
 const PKG = require('./package.json');
 
-const { PIATTAFORME, PASSI, passoFallito, leggiEsiti, componiAllarme } =
+const { PIATTAFORME, PASSI, passoFallito, leggiEsiti, componiAllarme, mancantiNoti, casella } =
   await import('../../scripts/release-platform-alarm.mjs');
 
 const ESITI_ESEMPIO = JSON.stringify({
@@ -77,12 +77,62 @@ describe('il feedback che si apre', () => {
   });
 
   test('vale per il Mac con gli stessi pezzi, e un passo sconosciuto si porta dietro il suo nome', () => {
-    const { titolo, testo } = componiAllarme({ ...dati, piattaforma: 'Mac', passo: 'pippo', mancanti: '' });
+    const esiti = { bersaglio: { outcome: 'success' }, build: { outcome: 'failure' } };
+    const { titolo, testo } = componiAllarme({ ...dati, piattaforma: 'Mac', passo: 'pippo', mancanti: '', esiti });
     assert.match(titolo, /Mac/);
     assert.match(titolo, /pippo/);
     assert.match(testo, /pippo/, 'un id fuori tabella si scrive com\'è: si cerca nel registro');
     assert.match(testo, /releases\/latest\/download\/Filo-Mac\.dmg/);
-    assert.doesNotMatch(testo, /File attesi e non trovati/, 'senza mancanti non si scrive una riga vuota');
+  });
+
+  // #733 giro 1: il feedback diceva SEMPRE che il download rispondeva 404 e che
+  // l'aggiornamento automatico era muto, anche quando mancava il solo foglietto
+  // del primo avvio. Chi lo prendeva in mano leggeva due cose che si
+  // contraddicevano, e cercava un guasto più grosso di quello vero.
+  describe('dichiara rotto solo quello che è rotto davvero', () => {
+    const riuscito = { outcome: 'success' };
+    const perso = (o) => componiAllarme({ ...dati, mancanti: '', esiti: o });
+
+    test('il controllo finale ha guardato la release: il suo elenco vince', () => {
+      const { titolo, testo } = componiAllarme({
+        ...dati, passo: 'controllo', mancanti: 'Se-Filo-non-si-apre-Linux.txt',
+        esiti: { build: riuscito, istruzioni: riuscito, controllo: { outcome: 'failure' } },
+      });
+      assert.doesNotMatch(testo, /404/, 'il pacchetto è nella release: il download non risponde 404');
+      assert.doesNotMatch(testo, /aggiornamento automatico legge/, 'il manifesto è nella release: l\'aggiornamento funziona');
+      assert.match(testo, /mancano: Se-Filo-non-si-apre-Linux\.txt/);
+      assert.doesNotMatch(titolo, /non è nella release/, 'la release è incompleta, non vuota');
+    });
+
+    test('fermo dopo la costruzione: c\'è già tutto tranne quello che manca da caricare', () => {
+      const { testo } = perso({ bersaglio: riuscito, checkout: riuscito, build: riuscito, istruzioni: { outcome: 'failure' } });
+      assert.match(testo, /mancano: Se-Filo-non-si-apre-Linux\.txt/);
+      assert.doesNotMatch(testo, /404/);
+    });
+
+    test('fermo prima della costruzione: nella release non c\'è niente, e si dice', () => {
+      const { titolo, testo } = perso({ bersaglio: riuscito, checkout: riuscito, build: { outcome: 'failure' } });
+      for (const file of PIATTAFORME.Linux.attesi) assert.ok(testo.includes(file), `manca ${file} dall'elenco`);
+      assert.match(testo, /404/, 'qui il download è davvero rotto e va detto');
+      assert.match(testo, /aggiornamento automatico legge/);
+      assert.match(titolo, /non è nella release/);
+    });
+
+    test('esiti illeggibili: non si indovina, si manda a guardare la release', () => {
+      const { testo } = componiAllarme({ ...dati, mancanti: '', esiti: null });
+      assert.doesNotMatch(testo, /404/, 'senza esiti non si può affermare che il download sia rotto');
+      assert.match(testo, /non si sa da qui/);
+      assert.match(testo, /Filo-Linux\.AppImage/, 'va comunque detto cosa deve esserci');
+    });
+
+    test('ogni file atteso sa da quale passo arriva, o non si può sapere cosa manca', () => {
+      for (const [nome, conf] of Object.entries(PIATTAFORME)) {
+        for (const file of conf.attesi) {
+          assert.ok(conf.attaccaDa[file], `${nome}: nessuno dice quale passo attacca ${file}`);
+          assert.ok(PASSI[conf.attaccaDa[file]], `${nome}: il passo che attacca ${file} non è fra quelli del workflow`);
+        }
+      }
+    });
   });
 
   test('senza niente in mano spedisce lo stesso, senza scrivere «undefined»', () => {
