@@ -2794,6 +2794,13 @@
     mgPreapproveBtn.title = m
       ? 'Oggi il lavoro delle automazioni su questa pratica si fonde da solo anche se i controlli lo fermano. Toglilo per tornare a ricevere la richiesta da approvare.'
       : 'Se i controlli di sicurezza fermano il lavoro delle automazioni su questa pratica, il server fonde lo stesso, senza aspettare il tuo click. Quello che era stato fermato lo trovi poi in Automazioni.';
+    // Il segno nato da un «Approva» si toglie da qui: con l'interruttore passerebbe prima per il pieno,
+    // che fonde subito la richiesta ferma.
+    if (mgPreapproveRevokeBtn) {
+      mgPreapproveRevokeBtn.disabled = false;
+      mgPreapproveRevokeBtn.hidden = !(aperta && segno && segno.tipo === 'approvazione');
+      mgPreapproveRevokeBtn.title = 'Toglie il sì dato col clic: da ora anche i riallineamenti di questa pratica aspettano il tuo via libera.';
+    }
     if (mgPreapprovedInfo) {
       const UI = window.SN_MERGE_APPROVALS;
       mgPreapprovedInfo.hidden = !(segno && aperta);
