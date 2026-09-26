@@ -89,6 +89,25 @@ test('una pratica fermata al cancello arriva nei Ricevuti da sola, in cima anche
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).not.toHaveClass(/mg-tab--arrivi/);
 });
 
+test('arrivata In coda: il punto sta nella riga del titolo, che resta all\'altezza delle altre schede', async ({ openTab }) => {
+  const page = await apri(openTab, [
+    fb('f515', 515, 'design', { statusReason: 'l5' }),
+    fb('f600', 600, 'working', { workingSince: new Date().toISOString() }),
+  ]);
+  await page.evaluate(() => window.__mgTest.setTab('queue'));
+  const altezzaTitolo = (id) => page.locator(`.mg-item[data-id="${id}"]`).evaluate((el) =>
+    el.querySelector('.mg-item-title').getBoundingClientRect().top - el.getBoundingClientRect().top);
+  const riferimento = await altezzaTitolo('f600');
+
+  await ilServerScrive(page, 'f515', { status: 'working', statusReason: null, workingSince: new Date().toISOString() });
+  const arrivata = page.locator('.mg-item[data-id="f515"]');
+  await expect(arrivata).toHaveClass(/mg-item--arrivata/, { timeout: 10_000 });
+  const riga = arrivata.locator('.mg-item-row').first();
+  expect(await riga.evaluate((el) => getComputedStyle(el, '::before').content)).not.toBe('none');
+  expect(await arrivata.evaluate((el) => getComputedStyle(el, '::before').content)).toBe('none');
+  expect(Math.abs(await altezzaTitolo('f515') - riferimento)).toBeLessThan(3);
+});
+
 test('in secondo piano o ridotta a icona non legge; tornando in vista si allinea subito', async ({ openTab, shell, app }) => {
   const docs = [fb('f716', 716, 'design'), fb('f515', 515, 'working')];
   const page = await apri(openTab, docs, { tempi: { pollMs: 800, rientroMs: 300, clockMs: 200 } });
