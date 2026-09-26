@@ -15,10 +15,14 @@ import { test, expect } from './fixtures/electron.mjs';
 const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>zoom</title></head>
 <body><h1>una pagina qualunque</h1><p>testo da ingrandire</p></body></html>`;
 
-// Esegue un'azione Filo nel main, come farebbe la chat della home.
+// Esegue un'azione Filo nel main COL MITTENTE, come fa la chat della home:
+// senza, l'azione ripiegherebbe sulla prima finestra e la prova resterebbe
+// verde anche se la strada vera fosse rotta (patterns/lo-stato-che-dura…).
 const execAction = (app, action) =>
-  app.evaluate((_electron, { action }) =>
-    globalThis.SN_EXECUTE_FILO_ACTION(action), { action });
+  app.evaluate(({ BrowserWindow }, { action }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    return globalThis.SN_EXECUTE_FILO_ACTION(action, { sender: { win, wc: win.webContents } });
+  }, { action });
 
 // La percentuale di zoom di UNA pagina precisa: le schede del test stanno tutte
 // sullo stesso host, quindi si cerca per URL intero e non per host.
