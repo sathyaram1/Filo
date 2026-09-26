@@ -161,6 +161,19 @@ function rigaDiBlocco(fonte, motivo) {
   return `Ho fermato un avviso nato da ${chi}: ${motivo || 'non diceva la verità su dove portava'}.`;
 }
 
+// Nel registro va la frase che l'utente avrebbe letto, non l'involucro con cui
+// viaggiava: una risposta di chat arriva come JSON con dentro il testo.
+function parteLeggibile(testo) {
+  const s = String(testo == null ? '' : testo);
+  const i = s.indexOf('{');
+  if (i < 0) return s;
+  try {
+    const o = JSON.parse(s.slice(i, s.lastIndexOf('}') + 1));
+    if (o && typeof o.text === 'string') return o.text;
+  } catch (_) {}
+  return s;
+}
+
 async function registraBlocco({ fonte, classe, testo, esito }) {
   const mem = Mem();
   try {
