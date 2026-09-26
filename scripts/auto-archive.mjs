@@ -74,8 +74,10 @@ const CAMPI_SEGNALAZIONI = [...BA.CAMPI_DECISIONE, 'seq', 'subSeq'];
 // Il nome con cui la lettura di questo giro si mette da parte (lib/scansione-secco).
 const COPIA = 'auto-archive/segnalazioni';
 
+// `bearer`: il token, se chi chiama ce l'ha già. Serve solo alla lettura, quindi
+// quando le righe arrivano dalla copia non si chiede a nessuno.
 export async function runAutoArchive({
-  dryRun = false, now = Date.now(), releasedVersion, copiaDir = null, usaCopia = true,
+  dryRun = false, now = Date.now(), releasedVersion, copiaDir = null, usaCopia = true, bearer = '',
 } = {}) {
   const ver = releasedVersion || packageVersion();
   const letture = contatoreLetture();
@@ -83,7 +85,7 @@ export async function runAutoArchive({
   const { dati } = await scansione({
     nome: COPIA, dry: dryRun, now, dir: copiaDir, usaCopia,
     scansiona: async () => {
-      const bearer = await acquireBearer();
+      const token = bearer || await acquireBearer();
       // TUTTE le segnalazioni, paginate. Una finestra sulle 500 più recenti per
       // data d'invio lasciava fuori le più vecchie, che sono esattamente quelle che
       // questo giro dovrebbe archiviare per prime: i loro fix non uscivano mai
@@ -91,8 +93,8 @@ export async function runAutoArchive({
       // si accendeva nemmeno «gli utenti dicono che non va». Con 711 segnalazioni
       // ne restavano fuori 211, e il numero cresceva da solo.
       const r = typeof FB.listAllPaged === 'function'
-        ? await FB.listAllPaged({ idToken: bearer, fields: CAMPI_SEGNALAZIONI })
-        : { rows: await FB.list({ pageSize: 500, idToken: bearer, fields: CAMPI_SEGNALAZIONI }), complete: false };
+        ? await FB.listAllPaged({ idToken: token, fields: CAMPI_SEGNALAZIONI })
+        : { rows: await FB.list({ pageSize: 500, idToken: token, fields: CAMPI_SEGNALAZIONI }), complete: false };
       const grezzi = r.rows;
       const complete = r.complete;
       letture.aggiungi(grezzi.length, 'segnalazioni');

@@ -181,17 +181,20 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
   // hanno già un numero questo comando non ha niente da fare, e scoprirlo
   // costava una lettura per segnalazione — la raffica del 18/09 (#680).
   const conto = await conteggi(bearer || '');
-  if (Number.isFinite(conto.totale) && Number.isFinite(conto.numerati) && conto.totale === conto.numerati) {
-    letture.aggiungi(2, 'conteggi');
+  const contati = Number.isFinite(conto.totale) && Number.isFinite(conto.numerati);
+  // I conteggi si pagano anche quando poi la scansione si fa: il conto a schermo
+  // deve essere quello vero, non quello che fa apparire il fix più bello.
+  if (contati) letture.aggiungi(2, 'conteggi');
+  if (contati && conto.totale === conto.numerati) {
     const max = await FB.maxSeq({ idToken: bearer || '' });
     letture.aggiungi(1, 'numero più alto');
     const maxSeq = Number.isInteger(max) ? max : 0;
     console.log(`${conto.totale} feedback totali: ${conto.numerati} già numerati, 0 da numerare (si parte da #${maxSeq + 1}).`);
-    await allineaContatore(maxSeq, bearer, dry);
+    await allineaContatore(maxSeq, bearer, dry, letture);
     console.log(letture.riga());
     return { total: conto.totale, numbered: 0, failures: 0, dry, letture: letture.totale };
   }
-  if (!Number.isFinite(conto.totale) || !Number.isFinite(conto.numerati)) {
+  if (!contati) {
     console.warn('AVVISO: il server non ha saputo contare i feedback: scansiono la collezione (una lettura per segnalazione).');
   }
 
@@ -223,7 +226,7 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
     else { console.error(`  ✗ ${id}: HTTP ${r.status} ${r.body}`); failures++; }
   }
   const maxSeq = Math.max(next - 1, withSeq.reduce((m, d) => Math.max(m, intField(d, 'seq')), 0));
-  await allineaContatore(maxSeq, bearer, dry);
+  await allineaContatore(maxSeq, bearer, dry, letture);
   // Applicato: i numeri sul server non sono più quelli che la copia descrive.
   dopoApplicazione(COPIA, { dry, usaCopia, dir: copiaDir });
   console.log(letture.riga());
@@ -233,9 +236,11 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
 // Il contatore da cui i feedback nuovi prendono il numero: se un giro ha
 // assegnato numeri più alti, va allineato o i prossimi invii ripartirebbero da
 // un numero già usato (#583).
-async function allineaContatore(maxSeq, bearer, dry) {
+async function allineaContatore(maxSeq, bearer, dry, letture = null) {
   if (dry || !(maxSeq > 0)) return;
   try {
+    // Allinearlo vuol dire leggerlo: una lettura, e va nel conto come le altre.
+    if (letture) letture.aggiungi(1, 'contatore');
     const v = await FB.ensureSeqCounter(maxSeq, { idToken: bearer });
     console.log(`Contatore dei numeri allineato a ${v}.`);
   } catch (e) {

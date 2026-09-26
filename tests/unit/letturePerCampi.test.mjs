@@ -209,3 +209,50 @@ test('la riga del costo dice un numero, e non diventa NaN per un conto che non s
   assert.match(c.riga(), /segnalazioni 763/);
   assert.equal(rigaLetture(0), 'Documenti letti dal server in questo giro: 0.');
 });
+
+// ── L'archiviazione automatica decide la stessa cosa, pagando meno ──────────
+
+test('la proiezione non cambia il verdetto: stessi archiviati, stessi segnalati', async () => {
+  const { runAutoArchive } = await import('../../scripts/auto-archive.mjs');
+  const { cartellaTemporanea } = await import('../helpers/percorsi.mjs');
+  const ORA = Date.parse('2026-09-20T12:00:00Z');
+  const vecchio = new Date(ORA - 5 * 24 * 3600_000).toISOString();
+
+  // Tre casi: uno da archiviare, uno da segnalare, uno che l'owner ha
+  // esplicitamente deciso di non archiviare.
+  const righe = [
+    { _id: 'ok', status: 'done', resolvedAt: vecchio, resolvedInVersion: '1.0.0', seq: 1, subSeq: 0 },
+    { _id: 'rotto', status: 'done', resolvedAt: vecchio, resolvedInVersion: '1.0.0', seq: 2, subSeq: 0 },
+    { _id: 'tenuto', status: 'done', resolvedAt: vecchio, resolvedInVersion: '1.0.0', seq: 3, subSeq: 0, archiveOverride: 'keep_open' },
+  ];
+  const voto = (esito) => ({ a: { vote: esito, at: vecchio, weight: 3 }, b: { vote: esito, at: vecchio, weight: 3 } });
+  const schede = [
+    { _id: 'ok', votes: voto('works') },
+    { _id: 'rotto', votes: voto('broken') },
+    { _id: 'tenuto', votes: voto('works') },
+  ];
+
+  const chieste = { righe: null, schede: null };
+  const vere = { list: FB.list, listPublic: FB.listPublic };
+  FB.list = async (o) => { chieste.righe = o.fields; return o.afterName ? [] : righe.map((r) => ({ ...r })); };
+  FB.listPublic = async (o) => { chieste.schede = o.fields; return o.afterName ? [] : schede.map((c) => ({ ...c })); };
+  try {
+    const r = await runAutoArchive({
+      dryRun: true, now: ORA, releasedVersion: '1.0.0', bearer: 'tok',
+      copiaDir: cartellaTemporanea('auto-archive-campi-'),
+    });
+    assert.deepEqual(r.toArchive.map((a) => a.id), ['ok']);
+    assert.deepEqual(r.toFlag, ['rotto'], 'il segnale «gli utenti dicono che non va» non deve sparire');
+    // I campi che sono stati chiesti sono quelli che la decisione legge, più il
+    // numero leggibile della riga stampata: niente testo, note o allegati.
+    for (const c of BA.CAMPI_DECISIONE) assert.ok(chieste.righe.includes(c), `manca ${c}`);
+    assert.ok(!chieste.righe.includes('text') && !chieste.righe.includes('notes') && !chieste.righe.includes('images'));
+    assert.deepEqual(chieste.schede, ['votes', 'reopenRequests']);
+    assert.match(r.rigaLetture, /segnalazioni 3/);
+    assert.match(r.rigaLetture, /schede 3/);
+  } finally {
+    FB.list = vere.list;
+    FB.listPublic = vere.listPublic;
+    FB.forgetAllPublic();
+  }
+});

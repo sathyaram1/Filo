@@ -75,5 +75,6 @@ export function scordaCopia(chiave, { dir = null } = {}) {
 /** Come si dice a video che si sta riusando una lettura, invece di rifarla. */
 export function rigaCopiaRiusata(etaMs) {
   const s = Math.max(0, Math.round(Number(etaMs) / 1000));
-  return `Riuso la lettura della prova a secco (${s} s fa): nessuna richiesta al server.`;
+  const quando = s < 1 ? 'appena fatta' : `${s} s fa`;
+  return `Riuso la lettura della prova a secco (${quando}): nessuna richiesta al server.`;
 }
