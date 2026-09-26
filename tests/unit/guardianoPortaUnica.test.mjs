@@ -150,7 +150,7 @@ describe('un giro di posta propone più avvisi insieme', () => {
       async runOneShot() { chiamate++; return '{"passa":true}'; },
     });
     const r = await Porta.proponiAvviso({
-      testo: 'Il codice di verifica è 483920.', classe: 'messaggio',
+      testo: 'Il codice OTP è 483920.', classe: 'messaggio',
       fonte: 'banca@example.invalid', modelloProduttore: 'scrittore',
     });
     assert.equal(r.esito, 'blocca');
