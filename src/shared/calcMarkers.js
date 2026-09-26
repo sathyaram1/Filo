@@ -190,7 +190,7 @@
   // sigle si elencano perché un [A-Z]{3} qualunque prenderebbe anche "KM".
   const SIGLE = 'EUR|USD|GBP|CHF|JPY|CNY|CAD|AUD|SEK|NOK|DKK|INR|BRL|MXN|TRY|PLN|HUF|CZK|KRW|ZAR|THB|ILS|IDR|ISK|MYR|NZD|PHP|RON|SGD|HKD|BGN|RUB';
   const SIMBOLI = '€|\\$|£|¥|₹|₩|₪|₫|₱|₺|₽|฿|R\\$|zł|Kč|kr';
-  const VALUTA_DOPO = new RegExp(`^[\\s\\u00A0]*(?:${SIMBOLI}|(?:${SIGLE})\\b|euro\\b|euri\\b)`);
+  const VALUTA_DOPO = new RegExp(`^[\\s\\u00A0]*(?:${SIMBOLI}|(?:${SIGLE})\\b|[Ee]uro\\b|EURO\\b|[Ee]uri\\b)`);
   const VALUTA_PRIMA = new RegExp(`(?:${SIMBOLI})[\\s\\u00A0]*$`);
 
   // ----------------------------------------------------------------
