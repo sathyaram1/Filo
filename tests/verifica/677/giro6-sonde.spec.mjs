@@ -132,3 +132,49 @@ test('il «Riprova» di una scheda non deve svuotare tutto l_elenco', async ({ o
 
   await page.evaluate(() => window.__sblocca2 && window.__sblocca2());
 });
+
+// ── Sonda 3 ──────────────────────────────────────────────────────────────
+// Stessa causa, il conto più caro: se il «Riprova» di UNA scheda non torna,
+// al posto dell'elenco resta l'errore di pagina, e l'unico tasto rimasto
+// ricompra la lista intera e tutte le schede della sezione.
+test('il «Riprova» di una scheda che non torna non deve costare tutta la pagina', async ({ openTab }) => {
+  const page = await openTab(PAGINA_FEEDBACK);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
+  await admin(page);
+
+  await page.evaluate(() => {
+    const righe = [
+      { _id: 'buono2', _proiezione: true, seq: 821, subSeq: 0, name: 'Questa c_è',
+        text: 'Testo buono', status: 'unlabeled', statusPublic: 'open', clientId: 't',
+        createdAt: '2026-09-21T10:00:00.000Z' },
+      { _id: 'rotto2', _proiezione: true, seq: 822, subSeq: 0, name: 'Questa no',
+        text: 'Testo rotto', status: 'unlabeled', statusPublic: 'open', clientId: 't',
+        createdAt: '2026-09-22T10:00:00.000Z' },
+    ];
+    window.__giri = 0;
+    window.__liste = 0;
+    window.SN_FEEDBACK.list = async () => { window.__liste += 1; return JSON.parse(JSON.stringify(righe)); };
+    window.SN_FEEDBACK.getMany = async (ids) => {
+      window.__giri += 1;
+      if (window.__giri > 1) throw new Error('Failed to fetch');
+      return ids.filter((id) => id !== 'rotto2').map((id) => {
+        const base = righe.find((x) => x._id === id);
+        const { _proiezione, ...resto } = JSON.parse(JSON.stringify(base));
+        return { ...resto, notes: `NOTA DI ${id}` };
+      });
+    };
+    window.__fbTest.setAdmin(true, { email: 'owner@example.invalid' });
+    window.__fbTest.setData(JSON.parse(JSON.stringify(righe)));
+  });
+
+  const buona = page.locator('.fb-card[data-id="buono2"]');
+  await expect(buona).toBeVisible({ timeout: 15_000 });
+
+  await page.locator('.fb-card[data-id="rotto2"] .fb-riprova-dettaglio').click();
+  await page.waitForTimeout(800);
+
+  // La scheda già arrivata resta, e la lista non si rilegge da capo.
+  await expect(buona).toBeVisible();
+  expect(await page.evaluate(() => window.__liste)).toBe(0);
+});
