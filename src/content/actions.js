@@ -11,7 +11,7 @@
 (function (global) {
   'use strict';
 
-  const { ACTIONS } = global.SN_CONST;
+  const { ACTIONS, spiegazioneDaMostrare } = global.SN_CONST;
   const { MSG } = global.SN_MSG;
   const I18n = global.SN_I18N;
   const Popup = global.SN_POPUP;
@@ -546,7 +546,8 @@
   }
 
   // Sezione inline: avvia subito una richiesta EXPLAIN e mostra il risultato nel menu.
-  // Se la risposta è "NESSUNA SPIEGAZIONE" la sezione viene nascosta.
+  // La sezione si nasconde solo se il modello rinuncia E non ha lasciato altro
+  // (una conversione accanto alla rinuncia resta: #724).
   // ------------------------------------------------------------
   // Prefetch "Spiega" su selezione di testo (riduce latenza del menu)
   // ------------------------------------------------------------
