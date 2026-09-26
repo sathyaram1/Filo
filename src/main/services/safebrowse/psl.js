@@ -72,7 +72,7 @@ const PRIVATE_PSL = new Set([
 // Queste il web NON le separa (un login su wordpress.com vale sui blog): solo per il giudizio, mai per i cookie.
 const PRIVATE_AVVISO = new Set([
   'notion.site', 'amazonaws.com', 'amazoncognito.com', 'googleusercontent.com', 'app.github.dev',
-  'sharepoint.com', 'wordpress.com', 'medium.com',
+  'sharepoint.com', 'wordpress.com', 'medium.com', 'dropboxusercontent.com',
 ]);
 
 // Suffissi serviti come "wildcard": ogni etichetta sotto di essi è un suffisso

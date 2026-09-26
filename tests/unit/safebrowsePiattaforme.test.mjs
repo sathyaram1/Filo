@@ -48,3 +48,35 @@ test('una piattaforma in whitelist non copre più le pagine che ospita', () => {
 test('GitHub su un suffisso che non è suo resta sospetto', () => {
   assert.notEqual(livello('https://github.co/'), 'safe');
 });
+
+test('il nome di un sito ospitato non passa per un errore di battitura del marchio', () => {
+  for (const url of [
+    'https://email.github.io/', 'https://posts.github.io/', 'https://apply.github.io/', 'https://photon.github.io/',
+    'https://team.netlify.app/', 'https://stream.vercel.app/',
+  ]) assert.equal(livello(url), 'safe', url);
+  // Il sosia fatto di lettere che si somigliano resta un blocco, anche ospitato.
+  assert.equal(livello('https://paypa1.github.io/'), 'pericoloso');
+});
+
+test('gli indirizzi ufficiali dei marchi non fanno scattare l\'avviso', () => {
+  for (const url of [
+    'https://login.microsoftonline.com/', 'https://www.microsoft365.com/', 'https://github.dev/',
+    'https://fuzzy-space-8080.app.github.dev/', 'https://www.amazon.nl/', 'https://www.amazon.ca/',
+    'https://www.ebay.de/', 'https://www.google.ch/', 'https://www.paypal.it/', 'https://negozio.myshopify.com/',
+    'https://myshopify.com/', 'https://dl.dropboxusercontent.com/s/x', 'https://app.auth.us-east-1.amazoncognito.com/login',
+  ]) assert.equal(livello(url), 'safe', url);
+});
+
+test('i cookie della modalità privacy seguono solo le piattaforme che il web già separa', async () => {
+  const { normalize } = require('../../src/main/services/safebrowse/normalize.js');
+  const perCookie = (url) => normalize(url, { soloPsl: true }).registrable;
+  assert.equal(perCookie('https://myblog.wordpress.com/'), 'wordpress.com');
+  assert.equal(perCookie('https://someone.medium.com/'), 'medium.com');
+  assert.equal(perCookie('https://contoso-my.sharepoint.com/'), 'sharepoint.com');
+  assert.equal(perCookie('https://sathya.github.io/'), 'sathya.github.io');
+  // Per il giudizio invece il blog è un sito a sé.
+  assert.equal(normalize('https://myblog.wordpress.com/').registrable, 'myblog.wordpress.com');
+  const { readFileSync } = await import('node:fs');
+  const cookies = readFileSync(new URL('../../src/main/services/cookies.js', import.meta.url), 'utf8');
+  assert.match(cookies, /SB\.normalize\(url, \{ soloPsl: true \}\)/);
+});
