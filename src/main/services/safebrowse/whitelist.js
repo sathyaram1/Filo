@@ -63,8 +63,8 @@ function isWhitelisted(registrable) {
   return !!registrable && WHITELIST.has(registrable);
 }
 
-// Pagine che chiunque pubblica sotto un dominio in whitelist, riconosciute da host e percorso: il dominio dice chi
-// ospita, non chi ha scritto. Fuori i percorsi della piattaforma stessa (i suoi accessi) e OneDrive, che non mostra pagine.
+// Pagine che chiunque pubblica sotto un dominio in whitelist: il dominio dice chi ospita, non chi ha scritto.
+// Restano fuori gli accessi della piattaforma stessa e OneDrive, che non mostra pagine caricate.
 const HOSTED = [
   { host: /^sites\.google\.com$/, platform: 'Google Sites' },
   { host: /^docs\.google\.com$/, platform: 'Google Documenti e Moduli' },
