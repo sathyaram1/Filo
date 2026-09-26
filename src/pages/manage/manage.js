@@ -2558,8 +2558,13 @@
     const key = String(id || '');
     const riga = allFeedbacks.find((f) => f._id === key);
     if (!riga || !FB.soloLista(riga)) return riga || null;
-    await completaDettaglio(key);
-    return allFeedbacks.find((f) => f._id === key) || null;
+    try { await completaDettaglio(key); } catch (_) { /* sotto: una riga ancora proiettata è un no */ }
+    const dopo = allFeedbacks.find((f) => f._id === key) || null;
+    // Ancora una riga d'elenco: la conversazione NON è stata letta. Tornarla
+    // com'è la farebbe passare per «questo feedback non ha note», e chi
+    // appende la risposta o il motivo della riapertura scriverebbe il suo
+    // testo AL POSTO di tutto il report. Meglio niente: chi chiama lo dice.
+    return (dopo && FB.soloLista(dopo)) ? null : dopo;
   }
 
   // ── Rendering pannello centrale ───────────────────────────────────────────
