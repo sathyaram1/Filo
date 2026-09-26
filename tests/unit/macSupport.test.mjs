@@ -154,8 +154,16 @@ test('il pacchetto Mac viene allegato alla release, non solo costruito', () => {
 
 test('la versione Mac si costruisce dallo stesso codice di quella Windows', () => {
   const macJob = WORKFLOW.slice(WORKFLOW.search(/^\s{2}release-mac:/m));
-  assert.match(macJob, /ref:\s*\$\{\{\s*needs\.release\.outputs\.sha\s*\}\}/,
+  // Dal #733 il codice da costruire lo sceglie un passo, perché ci si arriva
+  // anche a mano per riattaccare i file a una versione già uscita. Sulla strada
+  // automatica deve restare il COMMIT costruito per Windows: il tag nasce alla
+  // pubblicazione e punta a dove sta main in quel momento.
+  assert.match(macJob, /ref:\s*\$\{\{\s*steps\.bersaglio\.outputs\.codice\s*\}\}/,
+    'il lavoro Mac non prende più il codice dal passo che lo sceglie');
+  assert.match(macJob, /COMMIT_APPENA_USCITO:\s*\$\{\{\s*needs\.release\.outputs\.sha\s*\}\}/,
     'il lavoro Mac non parte dal commit costruito per Windows: due file con lo stesso numero di versione e dentro codice diverso');
+  assert.match(macJob, /CODICE="\$CHIESTA"/,
+    'riattaccando a mano si deve costruire il codice DI QUELLA versione, non main');
 });
 
 // ── Sentinella sul codice: le scorciatoie devono valere anche su Mac ────────

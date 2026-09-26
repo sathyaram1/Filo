@@ -336,8 +336,16 @@ test("l'aggiornamento automatico su Linux ha da dove partire", () => {
 });
 
 test('la versione Linux si costruisce dallo stesso codice di quella Windows', () => {
-  assert.match(linuxJob(), /ref:\s*\$\{\{\s*needs\.release\.outputs\.sha\s*\}\}/,
+  // Dal #733 il codice da costruire lo sceglie un passo, perché ci si arriva
+  // anche a mano per riattaccare i file a una versione già uscita. Sulla strada
+  // automatica deve restare il COMMIT costruito per Windows: il tag nasce alla
+  // pubblicazione e punta a dove sta main in quel momento.
+  assert.match(linuxJob(), /ref:\s*\$\{\{\s*steps\.bersaglio\.outputs\.codice\s*\}\}/,
+    'il lavoro Linux non prende più il codice dal passo che lo sceglie');
+  assert.match(linuxJob(), /COMMIT_APPENA_USCITO:\s*\$\{\{\s*needs\.release\.outputs\.sha\s*\}\}/,
     'il lavoro Linux non parte dal commit costruito per Windows: due file con lo stesso numero di versione e dentro codice diverso');
+  assert.match(linuxJob(), /CODICE="\$CHIESTA"/,
+    'riattaccando a mano si deve costruire il codice DI QUELLA versione, non main');
 });
 
 test('esiste un modo di provare la build Linux senza bruciare una versione', () => {

@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..');
 const YML = readFileSync(resolve(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
-const { PASSI } = await import('../../scripts/release-platform-alarm.mjs');
+const { PASSI, casella } = await import('../../scripts/release-platform-alarm.mjs');
 
 // I commenti raccontano: si guardano solo le righe di comando/configurazione.
 const senzaCommenti = (s) => s.split(/\r?\n/).filter((r) => !/^\s*#/.test(r)).join('\n');
@@ -222,7 +222,7 @@ describe('una meta\' di piattaforma che fallisce apre un feedback', () => {
         assert.match(allarme.corpo, /if:\s*failure\(\)/, 'l\'allarme deve partire da QUALSIASI passo rosso, non solo dall\'ultimo');
         assert.match(allarme.corpo, /secrets\.FILO_BUILD_PASSPHRASE/, 'stessa credenziale del cancello unit e della suite rossa');
         assert.match(allarme.corpo, new RegExp(`PIATTAFORMA: ${piattaforma}`), 'il feedback deve nominare la piattaforma');
-        assert.match(allarme.corpo, /VERSIONE: \$\{\{ needs\.release\.outputs\.version \}\}/, 'e la versione');
+        assert.match(allarme.corpo, /VERSIONE: \$\{\{ steps\.bersaglio\.outputs\.versione \}\}/, 'e la versione a cui il lavoro si stava attaccando');
         assert.match(allarme.corpo, /github\.run_id/, 'e portare il link all\'esecuzione');
         assert.match(allarme.corpo, /ESITI: \$\{\{ toJSON\(steps\) \}\}/, 'senza gli esiti dei passi non si sa quale si e\' fermato');
         assert.ok(iAllarme === elenco.length - 2, 'l\'allarme sta in fondo, prima del solo riepilogo: piu\' su non vedrebbe i passi dopo di lui');
@@ -263,5 +263,60 @@ test('ogni lavoro che può fallire lasciando la corsa verde apre un feedback', (
   for (const n of silenziosi) {
     assert.match(senzaCommenti(job(n)), /-alarm\.mjs/,
       `\`${n}\` è continue-on-error: se fallisce la corsa resta verde, quindi DEVE aprire un feedback`);
+  }
+});
+
+// ─── #733: rimettere i file di una piattaforma su una versione gia' uscita ───
+// L'allarme qui sopra dice a chi lo prende in mano di rimettere i file SU
+// QUELLA STESSA release, e avverte che rilanciare la pubblicazione non basta
+// (senza commit nuovi non rifa' niente). Per un giro quel gesto non si poteva
+// fare da nessuna parte: nessuno di noi ha un Mac o un Linux, e il lavoro che
+// verifica la build costruisce senza pubblicare. Il feedback si apriva e
+// restava li'. Qui si legge che la strada c'e' ancora.
+describe('rimettere i file di una piattaforma su una versione già uscita', () => {
+  const avvioAMano = YML.slice(0, YML.search(/^jobs:/m));
+
+  test('si chiede a mano, per Mac o per Linux, dicendo a quale versione', () => {
+    for (const voce of ['ripubblica_mac', 'ripubblica_linux', 'ripubblica_versione']) {
+      assert.match(avvioAMano, new RegExp(`^ {6}${voce}:$`, 'm'),
+        `senza la voce \`${voce}\` non c'è modo di riattaccare i file a una versione già uscita`);
+    }
+  });
+
+  test('il feedback manda a una casella che esiste davvero', () => {
+    for (const piattaforma of ['Mac', 'Linux']) {
+      assert.ok(YML.includes(casella(piattaforma)),
+        `il feedback dice di spuntare «${casella(piattaforma)}», che nel workflow non si chiama così: chi lo legge la cerca e non la trova`);
+    }
+  });
+
+  test('non fa girare la suite: il codice è quello di una versione già provata', () => {
+    assert.match(senzaCommenti(job('suite')), /if:\s*\$\{\{ !inputs\.ripubblica_mac && !inputs\.ripubblica_linux \}\}/,
+      'un\'ora e un quarto di suite per riallegare un file già costruito');
+  });
+
+  for (const [nomeJob, piattaforma] of [['release-mac', 'mac'], ['release-linux', 'linux']]) {
+    test(`\`${nomeJob}\` parte anche senza la metà Windows, e si attacca alla versione chiesta`, () => {
+      const testo = senzaCommenti(job(nomeJob));
+      // Sulla strada a mano la metà Windows non gira: senza `!cancelled()`
+      // questo lavoro verrebbe saltato insieme a lei e non ripubblicherebbe niente.
+      assert.match(testo, /if:\s*\$\{\{ !cancelled\(\)/, 'saltato insieme alla metà Windows, che a mano non gira');
+      assert.match(testo, new RegExp(`inputs\\.ripubblica_${piattaforma}`), 'la casella dell\'avvio a mano non fa partire niente');
+      assert.match(testo, /needs\.release\.result == 'success'/,
+        'sulla strada automatica si parte solo se la metà Windows è andata bene: attaccarsi a una release che non è uscita apre un feedback per niente');
+      // Il numero lo scrive una persona: se lo dimentica, i file finirebbero
+      // sulla release sbagliata o su nessuna.
+      assert.match(testo, /avvio a mano senza il numero della versione/, 'senza numero il lavoro deve fermarsi, non indovinare');
+      // Il codice da costruire è quello di QUELLA versione, non main.
+      assert.match(testo, /CODICE="\$CHIESTA"/, 'a mano si deve ricostruire il codice della versione a cui ci si attacca');
+      assert.match(testo, /tr -d '\[:space:\]'/, 'uno spazio incollato per sbaglio nel numero non deve costare un giro a vuoto');
+      assert.match(testo, /CHIESTA="v\$\{CHIESTA\}"/, 'la «v» dimenticata davanti al numero non deve costare un giro a vuoto');
+      // La versione viene da un posto solo: quella del lavoro Windows entra nel
+      // passo che sceglie, e da lì in poi si usa quella scelta.
+      const passi = testo.slice(testo.indexOf('    steps:'));
+      const occorrenze = (passi.match(/needs\.release\.outputs\.version/g) || []).length;
+      assert.equal(occorrenze, 1,
+        'la versione del lavoro Windows va letta una volta sola, nel passo che la sceglie: negli altri passi sarebbe vuota sulla strada a mano');
+    });
   }
 });

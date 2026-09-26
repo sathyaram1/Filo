@@ -123,4 +123,13 @@ Un lavoro nuovo marcato `continue-on-error` senza l'allarme non nasce:
 
 **Una versione già pubblicata non si ripubblica rilanciando il lavoro**: decide se
 pubblicare contando i commit dopo l'ultimo tag, quindi senza commit nuovi non rifà nulla.
-I file mancanti vanno rimessi su quella stessa release.
+Per rimettere i file su quella stessa release si avvia `release.yml` a mano con
+`ripubblica_mac` o `ripubblica_linux` e il numero in `ripubblica_versione`: il lavoro
+costruisce il codice di QUEL tag e gli riattacca i suoi file, senza far girare la suite e
+senza pubblicare una versione nuova. Il feedback dell'allarme manda proprio lì, e il nome
+della casella vive in `casella()` dello script, così i due non divergono.
+
+Un guasto lo si racconta **per quello che è**: ogni file atteso sa da quale passo arriva
+(`attaccaDa`), quindi quando cade il caricamento del foglietto il feedback non dichiara
+rotto anche il download. Dare per perso tutto manda chi lo prende a cercare un guasto più
+grosso di quello vero (#733, primo giro di verifica).
