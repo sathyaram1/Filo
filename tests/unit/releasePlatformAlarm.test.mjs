@@ -146,6 +146,30 @@ describe('il feedback che si apre', () => {
     assert.doesNotMatch(testo, /404|aggiornamento automatico/);
   });
 
+  // L'avviso racconta solo quello che ha guardato. Quando il controllo finale
+  // non riesce a leggere la pagina della versione, dedurre dai passi che i file
+  // ci sono tutti faceva uscire un titolo che annunciava i mancanti senza
+  // nominarne nessuno, contro un testo che diceva il contrario (#733, giro 2).
+  test('il titolo non annuncia mai un elenco vuoto, e non contraddice il testo', () => {
+    const S = (o) => ({ outcome: o });
+    for (const nome of Object.keys(PIATTAFORME)) {
+      const { titolo, testo } = componiAllarme({
+        piattaforma: nome,
+        versione: 'v0.2.229',
+        repo: 'sathyaram1/Filo',
+        passo: 'controllo',
+        mancanti: '',
+        esiti: { build: S('success'), istruzioni: S('success'), controllo: S('failure') },
+      });
+      assert.doesNotMatch(titolo, /manca\s*$|manca\s+\(/, `il titolo annuncia i file mancanti e non ne nomina nessuno: «${titolo}»`);
+      assert.ok(!(/incompleta/.test(titolo) && /dovrebbero esserci tutti/.test(testo)),
+        `il titolo dice incompleta e il testo dice che i file ci sono: «${titolo}»`);
+      for (const f of PIATTAFORME[nome].attesi) {
+        assert.ok(!titolo.includes(f), `il titolo dà per perso ${f}, che nessuno è andato a guardare`);
+      }
+    }
+  });
+
   test('ogni passo del workflow ha una descrizione, e nessuna è vuota', () => {
     for (const [id, descrizione] of Object.entries(PASSI)) {
       assert.ok(descrizione && descrizione.trim().length > 3, `il passo ${id} non dice cosa stava facendo`);
