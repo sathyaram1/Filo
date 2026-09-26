@@ -38,8 +38,20 @@ dimenticarne una — e la quarta superficie, quella di domani, nascerebbe senza.
 Il controllo sta **in `openFile()` nel main**, l'unica funzione che chiama
 `shell.openPath`: senza `confirmed` risponde `needsConfirm` con la frase da
 mostrare, e ogni superficie decide solo *come* chiederlo (popup nella pagina,
-notifica nella barra). Chi aggiunge una superficie nuova eredita la difesa senza
-saperlo.
+riga del pannello scaricamenti nella barra). Chi aggiunge una superficie nuova
+eredita la difesa senza saperlo.
+
+## La domanda è una riga, e sta sopra la pagina
+
+Nella barra le due domande («scaricarlo?», «aprirlo?») sono **righe del
+pannello scaricamenti**, che si apre da solo e fa spazio sopra la pagina. Un
+avviso della barra nell'angolo in basso sta nell'area della pagina, e la vista
+nativa lo copre: esiste nel DOM, a schermo no (tre giri di verifica ci sono
+passati sopra, vedi
+[animazioni che coprono la pagina](animazioni-che-coprono-la-pagina-vivono-nel-content-overlay.md)).
+Essere una riga la lega allo stato della voce: la domanda c'è finché la voce
+aspetta, e sparisce da sola quando qualcuno risponde altrove. Mai dentro la
+pagina stessa: il sito potrebbe toccarla o imitarla.
 
 Corollario sui nomi: la decisione si prende sul nome **vero**, la si mostra col
 nome **leggibile**. `fattura‮txt.exe` si legge «fatturatxt.exe» e resta un
@@ -51,6 +63,7 @@ frasi in `src/shared/eseguibili.js`, casi limite in
 ## Dove vive
 
 - `src/main/services/downloads.js` — quarantena, `completa()`, `confirmDownload()`, il cancello in `openFile()`.
+- `src/renderer/shell.js` — le due domande come righe del pannello (`mostraRiga`, `chiediApertura`).
 - `src/shared/eseguibili.js` — la lista delle estensioni, il nome leggibile, i siti fidati, le frasi.
 - `tests/downloads-eseguibili.spec.mjs` — senza il sì il file non è in cartella; `shell.openPath` non viene chiamata prima della seconda conferma.
 
