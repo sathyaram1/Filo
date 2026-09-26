@@ -3095,7 +3095,8 @@
     // Come la riapertura: la conversazione si legge intera prima di
     // appenderci la risposta, o al suo posto resterebbe la sola risposta.
     const fb = await feedbackCompleto(id);
-    const oldNotes = (fb && fb.notes) || '';
+    if (!fb) { setClarifyMsg(CONVERSAZIONE_NON_ARRIVATA, 'err'); return; }
+    const oldNotes = fb.notes || '';
     // Da quando il report viaggia cifrato, la conversazione può arrivare qui
     // illeggibile (chiave assente, o decifratura fallita e al suo posto un
     // segnaposto). Appenderci sopra la risposta e risalvare cancellerebbe il
