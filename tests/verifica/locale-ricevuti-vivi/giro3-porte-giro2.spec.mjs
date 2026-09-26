@@ -134,7 +134,8 @@ test('porta del giro 2: il segno di un clic «Approva» si toglie senza fondere 
   await expect(page.locator('#mgPreapproveBtn')).toHaveText('Fondi senza chiedermelo');
   await expect(page.locator('#mgPreapprovedInfo')).toBeHidden();
   await expect(tab(page, 'inbox')).toContainText('(1)');
-  await expect(page.locator('#mgDetail')).toContainText('Tocca aree protette');
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+  await expect(page.locator('#mgSideBody .sn-mac-btn-go')).toBeVisible();
 
   // Il server conferma (documento riscritto senza segno): niente ritorna.
   await page.evaluate(() => {
