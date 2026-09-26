@@ -72,6 +72,18 @@ un elemento invisibile e se lo toglieva a ogni Esc si teneva l'utente dentro
 allo schermo intero a tempo indeterminato. L'elenco vive nel mondo isolato dei
 content script e la pagina non può scriverci: da lì passa la decisione.
 
+La stessa regola è tornata sullo zoom (#686, primo giro di verifica), e vale la
+pena rileggerla lì perché la forma era diversa. Il menu del tasto destro
+chiedeva «a quanto sta lo zoom?» e «riportalo al 100%» con due eventi sul
+documento, e la pagina dell'editor si tirava fuori dallo zoom della finestra con
+un attributo. Nessuna delle due cose è un attributo di stile: sono un canale e
+una dichiarazione di competenza, cioè proprio le domande a cui il documento non
+può rispondere. Un sito rimetteva la pagina alla dimensione reale quando voleva,
+o si dichiarava padrone del proprio zoom e si rendeva impossibile da ingrandire,
+con Filo che rispondeva «fatto» a una pagina ferma. La cura è la stessa di qui:
+il canale è una funzione nel mondo isolato, dove il menu già vive, e
+l'attributo lo si guarda solo sulle pagine di Filo.
+
 **Non si resta mai chiusi dentro.** È la parte che conta più della regola, e
 nessuna prova vale all'infinito. Se la pagina non risponde affatto (nessun
 content script, renderer bloccato) il main esce da solo allo scadere

@@ -173,3 +173,62 @@ test('tasto destro: quando la pagina non è al 100% il menu lo dice e riporta al
   await voce.click();
   await expect.poll(async () => percentOf(app, page)).toBe(100);
 });
+
+// ── Lo zoom è dell'utente, non del sito (#686, primo giro di verifica) ──────
+// Il menu del tasto destro deve sapere a quanto sta lo zoom e saperlo azzerare.
+// Finché se lo diceva con un segnale dentro il documento, la stessa porta era
+// aperta al sito: bastavano due righe di JavaScript per rimettere la pagina
+// alla dimensione reale, o per dichiararsi «mi zoomo da solo» e sottrarsi del
+// tutto — e in quel secondo caso Filo rispondeva anche «fatto» a una pagina
+// rimasta ferma. Un sito che non vuole essere ingrandito non deve poterlo
+// impedire a chi ha bisogno di leggere grande.
+
+const SITO_CHE_RIMETTE = `<!doctype html><html><head><meta charset="utf-8"><title>ostile</title></head>
+<body><h1>niente zoom qui</h1><script>
+  window.__rimetti = () => { document.dispatchEvent(new Event('filo:zoom-azzera')); };
+</script></body></html>`;
+
+const SITO_CHE_SI_FINGE_EDITOR = `<!doctype html><html><head><meta charset="utf-8"><title>finto editor</title></head>
+<body><h1>niente zoom qui</h1><script>
+  document.documentElement.dataset.filoOwnZoom = '1';
+</script></body></html>`;
+
+test('un sito non può rimettere al 100% lo zoom che l\'utente ha chiesto', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO_CHE_RIMETTE);
+  await execAction(app, { type: 'ZOOM_PAGINA', percentuale: 200 });
+  await expect.poll(async () => percentOf(app, page)).toBe(200);
+
+  await page.evaluate(() => window.__rimetti());
+  await page.waitForTimeout(400);
+  expect(await percentOf(app, page), 'il sito ha riportato la pagina alla dimensione reale').toBe(200);
+});
+
+test('un sito non può sottrarsi allo zoom dichiarando di zoomarsi da sé', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO_CHE_SI_FINGE_EDITOR);
+
+  const r = await execAction(app, { type: 'ZOOM_PAGINA', percentuale: 200 });
+  await expect.poll(async () => percentOf(app, page)).toBe(200);
+  // …e il numero riferito è quello vero, non un «fatto» senza percentuale.
+  expect(r.output.zoom).toBe('ok');
+  expect(r.output.percentuale).toBe(200);
+
+  // Anche i tasti: la dichiarazione del sito non li spegne.
+  await page.locator('h1').click();
+  await page.keyboard.press('Control+0');
+  await expect.poll(async () => percentOf(app, page)).toBe(100);
+});
+
+test('anche una pagina di Filo si ingrandisce a parole, e il tasto destro ne mostra il livello', async ({ app, openTab }) => {
+  const page = await openTab('filo://history/history.html');
+  await page.waitForLoadState('domcontentloaded');
+
+  const r = await execAction(app, { type: 'ZOOM_PAGINA', percentuale: 150 });
+  expect(r.output.percentuale).toBe(150);
+  await expect.poll(async () => percentOf(app, page)).toBe(150);
+
+  await page.locator('body').click({ button: 'right', position: { x: 12, y: 12 } });
+  const voce = page.locator('.sn-menu').first().getByText(/Dimensione reale \(ora 150%\)/);
+  await expect(voce).toBeVisible();
+  await voce.click();
+  await expect.poll(async () => percentOf(app, page)).toBe(100);
+});

@@ -108,3 +108,26 @@ test('un livello corrente illeggibile vale come 100%', () => {
   assert.equal(Z.risolvi(undefined, { verso: 'reset' }).percentuale, 100);
   assert.equal(Z.risolvi(NaN, { verso: 'in' }).percentuale, Z.risolvi(0, { verso: 'in' }).percentuale);
 });
+
+// #686, primo giro di verifica — Filo diceva al modello che lo zoom di un sito
+// «resta anche dopo il riavvio». Non resta: alla riapertura le pagine tornano
+// al 100%, perché nessuno salva il livello su disco. Chi chiedeva «resta così?»
+// si sentiva dire di sì. Finché il livello non si salva davvero, nessuno dei
+// testi con cui Filo si descrive può prometterlo.
+test('nessun testo promette che lo zoom sopravviva alla chiusura di Filo', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'actionTools.js'));
+  require(join(__dirname, '..', '..', 'src', 'shared', 'capabilities.js'));
+
+  const strumento = globalThis.SN_ACTION_TOOLS.TOOLS.ZOOM_PAGINA.description;
+  const voce = globalThis.SN_CAPABILITIES.all().find((c) => c.id === 'page-zoom');
+  assert.ok(voce, 'la voce page-zoom del manifesto esiste');
+
+  for (const [dove, testo] of [['strumento', strumento], ['manifesto', `${voce.desc} ${voce.invoke}`]]) {
+    assert.match(testo, /riavvi|riapr|chiud/i, `${dove}: dice cosa succede quando Filo si chiude`);
+    assert.doesNotMatch(
+      testo,
+      /(resta|rimane|dura|si mantiene)[^.]{0,60}anche dopo il riavvio/i,
+      `${dove}: promette una persistenza che non c'è`,
+    );
+  }
+});
