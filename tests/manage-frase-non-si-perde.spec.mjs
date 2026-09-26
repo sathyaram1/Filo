@@ -218,10 +218,36 @@ test('la frase già scritta si legge nella conversazione, senza aprire niente', 
   await expect(bolla).toContainText('per chi ha segnalato');
 });
 
-test('anche con quattro azioni i tasti restano su una riga sola', async ({ openTab }) => {
+// Le due prove qui sotto MISURANO dove cadono i tasti della barra dell'owner,
+// e dove cadono dipende da due cose che cambiano da macchina a macchina: la
+// larghezza della finestra e la larghezza del testo, cioè i font installati.
+// Alla larghezza di serie la stessa pagina dava una riga sulla macchina di chi
+// sviluppa Filo e due sul contenitore di GitHub, e quei due rossi erano spenti
+// da mesi (#708). Qui la finestra si fissa, larga abbastanza perché i sei
+// tasti ci stiano anche col testo più largo: così il controllo torna a parlare
+// dell'IMPAGINAZIONE — un settimo tasto, un'etichetta lunga il doppio, una
+// regola di flex rotta vanno ancora a capo — invece che dei font di chi lancia.
+const LARGHEZZA_FISSA = 1600;
+
+async function finestraLarga(app, px) {
+  const dato = await app.evaluate(({ BrowserWindow }, l) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    if (!w) return 0;
+    if (w.isMaximized()) w.unmaximize();
+    const [, h] = w.getContentSize();
+    w.setContentSize(l, h);
+    return w.getContentSize()[0];
+  }, px);
+  // Se la finestra non è diventata larga come chiesto la misura dopo parlerebbe
+  // di un'altra pagina: meglio dirlo qui che vedere un numero di righe strano.
+  expect(dato).toBe(px);
+}
+
+test('anche con quattro azioni i tasti restano su una riga sola', async ({ app, openTab }) => {
   // Un file sospetto offre il massimo dei pulsanti: "In coda", "Conferma
   // attacco", "Conferma spam", "Archivia" — più preferito e frase. Prima gli
   // ultimi due finivano su una seconda riga.
+  await finestraLarga(app, LARGHEZZA_FISSA);
   const page = await openTab(URL);
   await prepara(page, [{ ...BASE, _id: 'fb-sosp', seq: 912, status: 'suspicious_file', statusPublic: 'open' }], 'inbox', 'fb-sosp');
   const misure = await page.evaluate(() => {
@@ -232,7 +258,8 @@ test('anche con quattro azioni i tasti restano su una riga sola', async ({ openT
   expect(misure.righe).toBe(1);
 });
 
-test('un messaggio d esito lungo non manda i tasti a capo', async ({ openTab }) => {
+test('un messaggio d esito lungo non manda i tasti a capo', async ({ app, openTab }) => {
+  await finestraLarga(app, LARGHEZZA_FISSA);
   const page = await openTab(URL);
   await prepara(page, [IN_CODA], 'queue', 'fb-coda');
   await page.evaluate(() => {

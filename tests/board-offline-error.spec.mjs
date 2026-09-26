@@ -142,3 +142,55 @@ test('caricamento fallito: un login (o altro ridisegno) non cancella l\'errore',
   await expect(page.locator('#bdError')).toBeHidden();
   await expect(page.locator('.bd-card')).toHaveCount(1);
 });
+
+// Le tre prove qui sopra partono da una pagina che non ha ancora NIENTE: è la
+// condizione di chi apre la bacheca senza rete. Con la rete, invece, il primo
+// caricamento riesce e i miglioramenti sono già in pagina — e lì il guasto del
+// giro successivo veniva ingoiato dalla guardia che difende le schede già
+// mostrate, lasciando la pagina sulla rotella (#708: la suite in GitHub, dove
+// la rete c'è, era rossa su queste prove mentre nei contenitori senza rete
+// erano verdi).
+//
+// La guardia difende il giro di AGGIORNAMENTO, che nessuno ha chiesto. Una
+// ricarica da capo le schede le aveva già tolte dallo schermo: se fallisce non
+// c'è più niente da difendere, e il guasto va detto.
+test('con i miglioramenti già in pagina, una ricarica da capo fallita lo dice lo stesso', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await ready(page);
+
+  // Primo giro RIUSCITO: la bacheca ha davvero delle schede, come con la rete.
+  await page.evaluate((shipped) => {
+    window.__boardTest.setReleasedVersion('0.2.71');
+    window.__boardTest.setList(() => Promise.resolve([shipped]));
+  }, SHIPPED);
+  await page.evaluate(() => window.__boardTest.reload());
+  await expect(page.locator('.bd-card')).toHaveCount(1);
+
+  // Secondo giro, da capo, che fallisce.
+  await page.evaluate(() => {
+    window.__boardTest.setList(() => Promise.reject(new TypeError('Failed to fetch')));
+  });
+  await page.evaluate(() => window.__boardTest.reload());
+
+  // Lo stato d'errore c'è, con la via d'uscita — e la rotella si è fermata.
+  await expect(page.locator('#bdError')).toBeVisible();
+  await expect(page.locator('#bdRetry')).toBeVisible();
+  await expect(page.locator('#bdLoading')).toBeHidden();
+  await expect(page.locator('#bdEmpty')).toBeHidden();
+  // Le schede di prima non restano davanti agli occhi a spacciarsi per attuali.
+  await expect(page.locator('#bdList')).toBeHidden();
+
+  // E il guasto è RICORDATO: un ridisegno (il login) non lo cancella.
+  await page.evaluate(() => window.__boardTest.setSignedIn('tester@example.com'));
+  await expect(page.locator('#bdError')).toBeVisible();
+  await expect(page.locator('#bdEmpty')).toBeHidden();
+
+  // Riprova funziona ancora: rete tornata → i miglioramenti ricompaiono.
+  await page.evaluate((shipped) => {
+    window.__boardTest.setList(() => Promise.resolve([shipped]));
+  }, SHIPPED);
+  await page.locator('#bdRetry').click();
+  await expect(page.locator('#bdError')).toBeHidden();
+  await expect(page.locator('.bd-card')).toHaveCount(1);
+});
