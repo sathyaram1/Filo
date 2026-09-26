@@ -507,6 +507,42 @@
     [ACTIONS.PROVIDER_TEST]: '',
   };
 
+  // #536 — chi NON passa dal guardiano quando il compito ha letto roba di
+  // altri, e perché. Il verso conta: di serie una funzione è guardata, e
+  // un'azione nuova nasce protetta senza che nessuno se ne ricordi. Sette giri
+  // di questa famiglia hanno mostrato il costo del verso opposto, cioè di un
+  // elenco di superfici da aggiungere a mano: ce n'era sempre una fuori.
+  // Una voce qui è un controllo spento: ha bisogno di una ragione, e la
+  // sentinella la pretende.
+  const SENZA_GUARDIANO = {
+    [ACTIONS.NOTICE_GUARD]: 'è il guardiano: chiederebbe a se stesso',
+    [ACTIONS.TRANSLATE_PAGE]: 'ridà il testo dell\'altro tradotto, non parole di Filo',
+    [ACTIONS.TRANSLATE_SELECTION]: 'ridà il testo dell\'altro tradotto, non parole di Filo',
+    [ACTIONS.TRANSCRIBE_IMAGE]: 'ridà quello che c\'è scritto nell\'immagine',
+    [ACTIONS.TRANSCRIBE_AUDIO]: 'ridà quello che è stato detto',
+    [ACTIONS.SPELLCHECK_SEMANTIC]: 'lavora sul testo che sta scrivendo l\'utente',
+    [ACTIONS.SPELLCHECK_WORD]: 'lavora sul testo che sta scrivendo l\'utente',
+    [ACTIONS.EDIT_TEXT]: 'lavora sul testo che sta scrivendo l\'utente',
+    [ACTIONS.TTS]: 'legge ad alta voce un testo già passato di qui',
+    [ACTIONS.CATEGORIZE]: 'sceglie un\'etichetta, non scrive una frase',
+    [ACTIONS.SAFEBROWSE_JUDGE]: 'decide sì o no, non scrive una frase',
+    [ACTIONS.GEOBLOCK_CLASSIFY]: 'decide sì o no, non scrive una frase',
+    [ACTIONS.HELP_INTENT_GUESS]: 'decide un passo interno, non scrive una frase',
+    [ACTIONS.HELP_INTENT_JUDGE]: 'decide un passo interno, non scrive una frase',
+    [ACTIONS.FILO_TAB_TRIAGE]: 'decide un passo interno, non scrive una frase',
+    [ACTIONS.FILO_CHAT_TRIAGE]: 'decide un passo interno, non scrive una frase',
+    [ACTIONS.DECKS_AUTOTAG]: 'sceglie etichette, non scrive una frase',
+    [ACTIONS.DECKS_SEARCH_FILTER]: 'costruisce un filtro, non scrive una frase',
+    [ACTIONS.MANAGE_SEARCH]: 'costruisce un filtro, non scrive una frase',
+    [ACTIONS.ARCHIVE_EMBED]: 'produce numeri per la ricerca',
+    [ACTIONS.PROVIDER_TEST]: 'prova che il fornitore risponda',
+    [ACTIONS.FILO_COMPACT]: 'riscrive la memoria, che poi rientra nei prompt guardati',
+  };
+
+  function passaDalGuardiano(action) {
+    return !Object.prototype.hasOwnProperty.call(SENZA_GUARDIANO, action);
+  }
+
   // ── Politica sui fornitori (host upstream) ───────────────────────────────────
   // La politica sui modelli di Filo ammette i modelli di Anthropic e i modelli a
   // pesi aperti SOLO se serviti da fornitori INDIPENDENTI, mai dai server di chi
