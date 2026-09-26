@@ -73,10 +73,6 @@ test('la sezione che arriva non deve portar via quello che sto scrivendo ADESSO'
 
   // Arriva la sezione di prima, che nessuno sta guardando.
   await page.evaluate(() => window.__sblocca && window.__sblocca());
-  await page.waitForFunction(() => {
-    const c = document.querySelector('.fb-card[data-id="lento1"]');
-    return true;
-  });
   await page.waitForTimeout(700);
 
   // Quello che l'owner stava scrivendo deve essere ancora lì.
