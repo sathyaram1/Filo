@@ -23,6 +23,7 @@ function git(dir, ...args) {
 function npxRosso(dir) {
   const bin = join(dir, '..', `${dir.split(/[\\/]/).pop()}-bin`);
   mkdirSync(bin, { recursive: true });
+  cartelle.push(bin);
   writeFileSync(join(bin, 'npx.cmd'), '@echo prova rossa\r\n@exit /b 1\r\n');
   writeFileSync(join(bin, 'npx'), '#!/bin/sh\necho prova rossa\nexit 1\n');
   try { chmodSync(join(bin, 'npx'), 0o755); } catch (_) {}
