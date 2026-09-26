@@ -41,7 +41,9 @@ aggiunge lì.
 - **Un tasto della barra è tolto a tutto il resto.** Cmd+0 era insieme «zoom al 100%» e
   «decima scheda», e la scheda non arrivava mai. Chi assegna un tasto (Filo o l'utente,
   come le scorciatoie dei moduli nell'Editor) chiede prima `SN_TASTI.riservato()`; una
-  sentinella confronta quella lista con la barra vera.
+  sentinella confronta quella lista con la barra vera. `template()` accetta la
+  piattaforma proprio per questo: senza, da Windows si confronterebbe una barra che su
+  Mac non esiste — e su Mac indietro e avanti stanno su Cmd+[ e Cmd+], non su Alt+freccia.
 - **La ricetta del pacchetto**: `build.mac` in `package.json`,
   `scripts/after-pack-mac.js` (la firma locale, senza la quale sui Mac con chip Apple
   l'app non si apre) e il lavoro `release-mac`. Il pacchetto è **universale**: nasce da
