@@ -123,5 +123,15 @@ describe('banco delle mail simulate — controlli statici', () => {
 
   test('il banco è abbastanza grande da voler dire qualcosa', () => {
     assert.ok(ONESTI.length >= 30, 'meno di trenta avvisi onesti non misurano niente');
+    // E deve contenere il caso difficile: un banco di sole mail che un codice
+    // non lo nominano mai misura zero falsi positivi per costruzione.
+    const conCodice = ONESTI.filter((t) => /\bcodic|\bpin\b|password/i.test(t) && /\d{4}/.test(t));
+    assert.ok(conCodice.length >= 15, 'servono avvisi onesti che un codice ce l\'hanno davvero');
+  });
+
+  test('quello che i controlli statici lasciano al guardiano non lo fermano qui', () => {
+    for (const t of AL_GUARDIANO) {
+      assert.equal(G.controlla(t).blocca, false, `fermata senza modello: ${t}`);
+    }
   });
 });
