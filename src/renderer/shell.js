@@ -1095,13 +1095,23 @@
           if (a && a.confirmDownloadId && !a.onClick && api.downloads) {
             const id = a.confirmDownloadId;
             const allow = !!a.allow;
-            return { label: a.label, onClick: () => api.downloads.confirm(id, allow).catch(() => {}) };
+            domandaDi = id;
+            return {
+              label: a.label,
+              onClick: () => api.downloads.confirm(id, allow).then((res) => {
+                if (res && res.ok === false) NOTIFS.show(res.error || 'Risposta non registrata');
+              }).catch(() => {}),
+            };
           }
           return a;
         }),
       };
     }
-    NOTIFS.show(info.text, opts);
+    const card = NOTIFS.show(info.text, opts);
+    if (card && domandaDi) {
+      ritiraDomanda(domandaDi);
+      domandeScarico.set(domandaDi, card);
+    }
   });
   // Esposta per test e per usi programmatici dalla shell stessa.
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
