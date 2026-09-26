@@ -106,6 +106,28 @@
   }
 
   /**
+   * Timbra il controllo appena fatto, e impara gli identificativi trovati
+   * strada facendo. RILEGGE il registro invece di sovrascriverlo con la copia
+   * di prima: nel frattempo l'utente può aver mandato una segnalazione, e
+   * quell'identificativo non si può perdere (sarebbe una ricompensa che non
+   * arriva mai). Se ne è arrivato uno che questo controllo NON ha guardato,
+   * l'attesa resta azzerata e la prossima apertura ci torna sopra.
+   *
+   * @param {number} at quando è stato fatto il controllo
+   * @param {{visti?: string[], impara?: string[], scansione?: boolean}} opts
+   */
+  async function segnaControllo(at, { visti = [], impara = [], scansione = false } = {}) {
+    let s = await leggi();
+    for (const id of Array.isArray(impara) ? impara : []) s = conId(s, id);
+    const guardati = new Set((Array.isArray(visti) ? visti : []).map(String));
+    const tuttoGuardato = s.ids.every((id) => guardati.has(id));
+    s.checkedAt = tuttoGuardato ? (Number(at) || 0) : 0;
+    if (scansione) s.ereditaUltimoGiro = Number(at) || 0;
+    await scrivi(s);
+    return s;
+  }
+
+  /**
    * Il registro non esisteva e questa installazione aveva già mandato
    * feedback: accende la finestra dell'eredità. Su un'installazione nuova
    * (nessun identificativo di segnalazione) non si accende, e la scansione
@@ -140,6 +162,7 @@
     leggi,
     scrivi,
     ricordaId,
+    segnaControllo,
     inauguraSeServe,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

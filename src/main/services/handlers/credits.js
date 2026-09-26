@@ -332,16 +332,17 @@ module.exports = function register(on, ctx) {
       const avevaSegnalato = Object.keys(rewarded).length > 0
         || (Array.isArray(state.rewards) && state.rewards.some((r) => r && r.kind === 'feedback_sent'));
       await MINE.inauguraSeServe(adesso, avevaSegnalato);
-      let registro = await MINE.leggi();
+      const registro = await MINE.leggi();
 
       // L'eredità: un'installazione che segnalava già prima del registro si
       // cerca le schede leggendole tutte, una volta al giorno e per un mese.
       // Le installazioni nuove non passano mai di qui.
       const scansione = MINE.toccaScansione(registro, adesso);
       if (!scansione && !MINE.scaduto(registro, adesso)) return empty;
-      const daChiedere = registro.ids.filter((fid) => !rewarded[fid]);
+      const guardati = registro.ids.slice();
+      const daChiedere = guardati.filter((fid) => !rewarded[fid]);
       if (!scansione && daChiedere.length === 0) {
-        await MINE.scrivi({ ...registro, checkedAt: adesso });
+        await MINE.segnaControllo(adesso, { visti: guardati });
         return empty;
       }
 
@@ -357,11 +358,7 @@ module.exports = function register(on, ctx) {
         console.warn('[credits] schede dei feedback non disponibili:', e?.message || e);
         return empty;
       }
-      registro = {
-        ...registro,
-        checkedAt: adesso,
-        ereditaUltimoGiro: scansione ? adesso : registro.ereditaUltimoGiro,
-      };
+      const imparati = [];
 
       // Dal più recente, come le vedeva chi chiedeva una pagina ordinata per
       // data d'invio. La lettura completa arriva nell'ordine interno del
@@ -418,7 +415,7 @@ module.exports = function register(on, ctx) {
         const fid = f._id;
         // La scansione dell'eredità è anche il momento in cui il registro
         // impara gli id di prima: dalla volta dopo bastano quelli.
-        if (scansione && fid) registro = MINE.conId(registro, fid);
+        if (scansione && fid) { imparati.push(fid); guardati.push(fid); }
         if (!fid || rewarded[fid]) continue;            // già premiato: niente doppio premio
         // #583 — quanto vale la segnalazione lo dice la SCHEDA (`reward`), non
         // il feedback: la priorità è un giudizio interno e sulla scheda non
@@ -440,10 +437,7 @@ module.exports = function register(on, ctx) {
           credits,
         });
       }
-      // `conId` azzera l'attesa quando impara un id nuovo: qui il controllo
-      // l'abbiamo appena fatto, quindi il timbro va rimesso o la prossima
-      // apertura richiederebbe tutto daccapo.
-      await MINE.scrivi({ ...registro, checkedAt: adesso });
+      await MINE.segnaControllo(adesso, { visti: guardati, impara: imparati, scansione });
       const totalCredits = rewards.reduce((s, r) => s + r.credits, 0);
       return { ok: true, rewards, totalCredits };
     } catch (e) {

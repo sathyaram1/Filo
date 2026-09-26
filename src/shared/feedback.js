@@ -1524,6 +1524,10 @@
   //
   // Torna il cursore per la pagina dopo (`after`) e se la raccolta è finita
   // (`complete`). Chi chiama NON deve indovinarlo dalla lunghezza.
+  // Ordinare per un campo ESCLUDE i documenti che non ce l'hanno: chi pubblica
+  // una scheda scrive sempre `createdAt`, anche vuoto, ed è ciò che tiene in
+  // piedi questa lettura. Se un giorno una scheda nascesse senza, sparirebbe
+  // dalla bacheca senza che niente lo dica.
   async function listPublicPage({ pageSize = BOARD_PAGE_SIZE, timeoutMs = 0, fields = null, after = null } = {}) {
     const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || BOARD_PAGE_SIZE));
     const structuredQuery = {
