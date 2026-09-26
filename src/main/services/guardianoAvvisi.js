@@ -156,8 +156,13 @@ async function vaglia({ testo, classe, fonte, richiesta, modelloProduttore, link
   return { esito: 'attesa', regola: 'senza-risposta', motivo: '', motivoChiave: '' };
 }
 
-function rigaDiBlocco(fonte, motivo) {
-  const chi = fonteVisibile(fonte);
+// Quando la fonte non si identifica (una risposta nata da più letture, non da
+// un mittente solo) la riga dice almeno di che genere era: «nato da una fonte
+// sconosciuta» non aiuta nessuno a capire di cosa fidarsi.
+function rigaDiBlocco(fonte, motivo, classe) {
+  const F = F_();
+  const visto = fonteVisibile(fonte);
+  const chi = visto === IGNOTA && F && classe ? F.etichetta(classe) : visto;
   return `Ho fermato un avviso nato da ${chi}: ${motivo || 'non diceva la verità su dove portava'}.`;
 }
 
