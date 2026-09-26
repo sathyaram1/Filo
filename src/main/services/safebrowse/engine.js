@@ -172,7 +172,14 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   const llmSus = llm && llm.suspicious;
   const suspectTriggers = !!(broad || young || certBad || (sigs.some((s) => s.kind === 'insecure_transport') && sensitive) || doubleExt || sandboxSus || llmSus);
   if (suspectTriggers) {
-    const message = buildMessage({ level: 'sospetto', norm, imp: broad, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox });
+    let message = buildMessage({ level: 'sospetto', norm, imp: broad, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox });
+    // Su una pagina ospitata il dominio è della piattaforma: nominarlo farebbe credere che la pagina sia sua.
+    if (hosted && !broad && !certBad) {
+      message = {
+        title: 'Pagina pubblicata da un utente',
+        body: `Questa pagina è su ${hosted}, dove chiunque può pubblicare: non viene da chi gestisce ${norm.hostUnicode || norm.host}.`,
+      };
+    }
     // LLM rinforza il testo se ha una motivazione fissa.
     if (llmSus && llm.reason && !broad && !young && !certBad) {
       message.body = `${message.body} ${llm.reason}`.trim();
@@ -180,7 +187,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     return {
       level: 'sospetto',
       reasons: reasons.concat(young ? ['young_domain'] : [], certBad ? ['cert_' + cert.status] : [], llmSus ? ['llm'] : []),
-      norm, message, imp: broad, ageDays, cert, needsLlm: false, whitelisted,
+      norm, message, imp: broad, ageDays, cert, needsLlm: false, whitelisted, hosted,
     };
   }
 
