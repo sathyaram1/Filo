@@ -86,26 +86,16 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     }
   }
 
-  // Il livello corrente scritto sul documento: è così che la pagina (il menu
-  // del tasto destro, che vive in un altro mondo JS e non ha il webFrame) sa a
-  // quanto sta lo zoom senza un giro di messaggi.
-  function pubblicaPercentuale() {
-    try {
-      const p = currentPercent();
-      if (p === 100) delete document.documentElement.dataset.filoZoom;
-      else document.documentElement.dataset.filoZoom = String(p);
-    } catch (_) {}
-  }
-
-  // Chi sta nella pagina chiede «a quanto è lo zoom?» con un evento: la
-  // risposta è sincrona (stesso dispatch), e si legge nel dataset.
+  // Lo zoom si chiede e si azzera da QUI, non con un evento sul documento: il
+  // menu del tasto destro gira nello stesso mondo isolato di questo file,
+  // mentre il documento lo condividiamo col sito, che userebbe la stessa porta
+  // per rimettersi la pagina come vuole lui (#686, primo giro di verifica).
   try {
-    document.addEventListener('filo:zoom-chiedi', pubblicaPercentuale);
-    // Il menu del tasto destro sta nella pagina e non ha il webFrame: per
-    // riportare al 100% chiede qui, dall'unico punto che scrive lo zoom.
-    document.addEventListener('filo:zoom-azzera', () => setLevel(0));
+    globalThis.SN_ZOOM_PAGINA = {
+      percentuale: () => currentPercent(),
+      azzera: () => setLevel(0),
+    };
   } catch (_) {}
-  pubblicaPercentuale();
 
   // Applica un livello di zoom dentro i limiti condivisi. Unico punto che
   // scrive lo zoom del webFrame: rotella, badge, tasti e chat passano da qui.
