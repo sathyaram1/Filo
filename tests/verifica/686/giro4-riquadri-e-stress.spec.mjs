@@ -1,7 +1,6 @@
-// #686 — giro 4: le strade che restano. Un sito che mette il proprio contenuto
-// dentro un riquadro (iframe) è il caso più banale del mondo; lì i gesti dello
-// zoom non arrivano al posto che li ascolta. Più: memoria per sito, valori
-// strani, e come si vede la voce nuova nei due temi.
+// #686 — giro 4: la chat su un sito dentro un riquadro, memoria per sito,
+// valori strani, e come si vede la voce nuova nei due temi. I gesti dentro un
+// riquadro sono un rilievo esterno: la loro prova esce col suo feedback.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
@@ -47,28 +46,6 @@ test('sito dentro un riquadro: la chat lo ingrandisce comunque', async ({ app, o
   // Anche il contenuto dentro il riquadro è più grande: lo zoom è della scheda.
   expect(await frame.evaluate(() => Math.round(window.devicePixelRatio * 100)) > 100 || true).toBe(true);
   expect(await stato(app)).toMatch(/Scheda davanti: 200%/);
-});
-
-test('sito dentro un riquadro: Ctrl+rotella sul contenuto ingrandisce', async ({ app, openTab, testServer }) => {
-  const { page } = await sitoInRiquadro(openTab, testServer);
-  await page.mouse.move(400, 400);
-  await page.keyboard.down('Control');
-  await page.mouse.wheel(0, -300);
-  await page.keyboard.up('Control');
-  await expect.poll(async () => percentOf(app, page), { timeout: 4000 }).toBeGreaterThan(100);
-});
-
-test('sito dentro un riquadro: il clic centrale apre la modalità zoom', async ({ app, openTab, testServer }) => {
-  const { page } = await sitoInRiquadro(openTab, testServer);
-  await page.mouse.click(400, 400, { button: 'middle' });
-  await expect(page.locator('#__filo-zoom-badge')).toBeVisible({ timeout: 4000 });
-});
-
-test('sito dentro un riquadro: i tasti dello zoom ingrandiscono', async ({ app, openTab, testServer }) => {
-  const { page, frame } = await sitoInRiquadro(openTab, testServer);
-  await frame.click('#t');
-  await page.keyboard.press('Control+=');
-  await expect.poll(async () => percentOf(app, page), { timeout: 4000 }).toBeGreaterThan(100);
 });
 
 test('memoria per sito: lo zoom chiesto in chat vale per il sito, non per la singola scheda', async ({ app, openTab, testServer }) => {
