@@ -2499,9 +2499,10 @@
   // averla, e riaprire la stessa riga non ricompra all'infinito una lettura
   // che continua a non arrivare. Il «Riprova» toglie il segno.
   function segnaDettaglioMancato(key, motivo) {
-    const i = allFeedbacks.findIndex((f) => f._id === key);
-    if (i < 0) return;
-    allFeedbacks[i] = { ...allFeedbacks[i], _dettaglioMancato: motivo || 'rete' };
+    const riga = allFeedbacks.find((f) => f._id === key);
+    // Sul posto: la stessa riga è anche nell'indice per mittente e nella lista
+    // disegnata, e sostituirla lascerebbe quelle copie senza il segno.
+    if (riga) riga._dettaglioMancato = motivo || 'rete';
   }
 
   function completaDettaglio(id) {
