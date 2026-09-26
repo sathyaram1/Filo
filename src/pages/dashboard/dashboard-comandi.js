@@ -64,7 +64,7 @@
     '/pulizia': (text, chat) => { runTabCleanup(chat); },
     '/riordina': (text, chat) => { runTabReorder(chat); },
     '/set': (text, chat) => { handleSetCommand(text, chat); },
-    '/users': (text, chat) => { handleUsersCommand(chat); },
+    '/users': (text, chat) => { handleUsersCommand(text, chat); },
     '/gift': (text, chat) => { handleGiftCommand(text, chat); },
     '/help': (text, chat) => {
       if (document.body.dataset.state !== 'thread') goThread();
@@ -95,16 +95,42 @@
     },
   };
 
-  // "/users": elenca le email degli utenti registrati. Riservato al proprietario
-  // (il main rifiuta i non-admin con un messaggio chiaro).
-  async function handleUsersCommand(chat) {
-    showFiloLine('Recupero gli utenti registrati…', chat);
-    const r = await send({ type: MSG.OWNER_LIST_USERS });
+  // "/users": elenca gli utenti registrati. Riservato al proprietario (il main
+  // rifiuta i non-admin con un messaggio chiaro).
+  //
+  // #679 — arrivano a pagine: il main ne manda cinquanta per volta col totale
+  // vero, invece di scaricare l'intera collezione per stampare tre campi.
+  // Il segnalibro è l'ultima email mostrata, e sta qui finché la home è aperta:
+  // "/users" riparte da capo, "/users altri" continua.
+  let usersSegnalibro = '';
+  let usersMostrati = 0;
+
+  async function handleUsersCommand(text, chat) {
+    const ancora = /^\/users\s+(altri|ancora|avanti)\s*$/i.test(String(text || '').trim());
+    if (!ancora) { usersSegnalibro = ''; usersMostrati = 0; }
+    if (ancora && !usersSegnalibro) {
+      showFiloLine('Non ho altri utenti da mostrare. Scrivi /users per ripartire dall\'inizio.', chat);
+      return;
+    }
+    showFiloLine(ancora ? 'Recupero gli altri utenti…' : 'Recupero gli utenti registrati…', chat);
+    const r = await send({ type: MSG.OWNER_LIST_USERS, after: ancora ? usersSegnalibro : '' });
     if (!r || r.ok === false) { showFiloLine(r?.error || 'Non sono riuscito a recuperare gli utenti.', chat); return; }
     const users = Array.isArray(r.users) ? r.users : [];
-    if (!users.length) { showFiloLine('Nessun utente registrato.', chat); return; }
+    if (!users.length) {
+      usersSegnalibro = '';
+      showFiloLine(ancora ? 'Non ci sono altri utenti.' : 'Nessun utente registrato.', chat);
+      return;
+    }
+    const primo = usersMostrati + 1;
+    usersMostrati += users.length;
+    usersSegnalibro = typeof r.next === 'string' ? r.next : '';
+    const totale = Number.isFinite(Number(r.total)) && r.total != null ? Number(r.total) : null;
+    const testa = totale != null
+      ? `Utenti registrati ${primo}-${usersMostrati} di ${totale}:`
+      : `Utenti registrati (${usersMostrati}):`;
     const lines = users.map((u) => `• ${u.email}${u.name ? ` (${u.name})` : ''} — ${u.balance} crediti`);
-    showFiloLine(`Utenti registrati (${users.length}):\n${lines.join('\n')}`, chat);
+    const coda = usersSegnalibro ? '\n\nScrivi /users altri per i prossimi.' : '';
+    showFiloLine(`${testa}\n${lines.join('\n')}${coda}`, chat);
   }
 
   // "/gift NUMERO EMAIL": regala crediti a un utente. Riservato al proprietario.
@@ -456,6 +482,10 @@
   }
 
   function init(deps) {
+    // Una home appena aperta riparte dal primo iscritto: il segnalibro di
+    // /users è di quella sessione di pagina, non della precedente.
+    usersSegnalibro = '';
+    usersMostrati = 0;
     send = deps.send;
     bubblesEl = deps.bubblesEl;
     inputEl = deps.inputEl;

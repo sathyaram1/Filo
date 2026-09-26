@@ -139,6 +139,38 @@ async function patchDoc(docPath, fields, mask, idToken) {
   }
 }
 
+// ── Copia in memoria ─────────────────────────────────────────────────────────
+//
+// `get()` legge DUE documenti, e chi risolve uno slot di supporto la chiama a
+// ogni chiamata di modello: erano due letture di Firestore per ogni giudizio
+// (#679). La copia dura cinque minuti, la butta il salvataggio, e non la
+// avvelena una rete caduta: una lettura fallita non sostituisce mai una copia
+// buona, si limita a rimandare il prossimo tentativo di mezzo minuto.
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_ERRORE_MS = 30 * 1000;
+
+let cache = null;
+let adesso = () => Date.now();
+
+// La risposta dipende da CHI sta usando Filo: i segreti dei giudici li legge
+// solo l'owner. Senza questa firma, un logout lascerebbe in circolo per cinque
+// minuti la risposta dell'account di prima.
+function identita() {
+  let email = '';
+  try { email = String((auth.getProfile && auth.getProfile()) ? auth.getProfile().email || '' : '').toLowerCase(); } catch (_) {}
+  let admin = false;
+  try { admin = Boolean(auth.isAdmin && auth.isAdmin()); } catch (_) {}
+  return `${email}|${admin ? 1 : 0}`;
+}
+
+// Chi chiama non deve poter modificare la copia condivisa scrivendo nel
+// risultato: sono dati semplici, una copia profonda basta.
+function clona(v) {
+  return JSON.parse(JSON.stringify(v));
+}
+
+function invalidaCache() { cache = null; }
+
 // ── API ──────────────────────────────────────────────────────────────────────
 
 // Legge il doc config/supportModels. Richiede il Firebase ID token admin (per
@@ -146,6 +178,9 @@ async function patchDoc(docPath, fields, mask, idToken) {
 // Ritorna un oggetto con i campi degli slot (stringhe). I campi assenti (doc non
 // ancora creato o slot non ancora impostato) hanno valore ''.
 async function get() {
+  const chi = identita();
+  if (cache && cache.identita === chi && adesso() - cache.ts < cache.ttl) return clona(cache.valore);
+
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
   const [doc, secrets] = await Promise.all([
@@ -156,7 +191,21 @@ async function get() {
   // La chiave vera non esce mai da qui: solo presente/assente.
   const key = secrets && typeof secrets.openrouterKey === 'string' ? secrets.openrouterKey.trim() : '';
   out.openrouterKeyPresent = Boolean(key);
-  return out;
+
+  if (doc) {
+    cache = { identita: chi, ts: adesso(), ttl: CACHE_TTL_MS, valore: out, buona: true };
+    return clona(out);
+  }
+  // Lettura non riuscita (rete giù, permesso negato): la configurazione vuota
+  // che ne esce NON prende il posto di una copia buona — chi risolve uno slot
+  // ricadrebbe sui modelli scritti nel codice per un singhiozzo di rete.
+  if (cache && cache.identita === chi && cache.buona) {
+    cache.ts = adesso();
+    cache.ttl = CACHE_TTL_ERRORE_MS;
+    return clona(cache.valore);
+  }
+  cache = { identita: chi, ts: adesso(), ttl: CACHE_TTL_ERRORE_MS, valore: out, buona: false };
+  return clona(out);
 }
 
 // Scrive (PATCH per-campo) il doc config/supportModels. Richiede ID token admin.
@@ -197,6 +246,8 @@ async function update(partial, idToken) {
       idToken
     );
   }
+  // Chi ha appena salvato deve vedere il salvato, non la copia di prima.
+  invalidaCache();
   return get();
 }
 
@@ -240,4 +291,16 @@ function sanitizeRegistry(reg) {
   return out;
 }
 
-module.exports = { get, update, SLOTS, sanitizeRegistry, clampTimeoutMs };
+module.exports = {
+  get,
+  update,
+  SLOTS,
+  sanitizeRegistry,
+  clampTimeoutMs,
+  invalidaCache,
+  CACHE_TTL_MS,
+  CACHE_TTL_ERRORE_MS,
+  // L'orologio si sostituisce solo nei test: aspettare cinque minuti veri non
+  // è una prova che si possa correre.
+  _setAdesso: (fn) => { adesso = typeof fn === 'function' ? fn : Date.now; },
+};

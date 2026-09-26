@@ -152,8 +152,16 @@ async function refresh() {
   return get();
 }
 
+// Ogni quanto la config remota si rilegge da sola. Cinque minuti erano
+// trecento letture di Firestore al giorno PER UTENTE, per un documento che
+// cambia quando l'owner lo tocca (#679). Mezz'ora perché la rilettura
+// periodica serve solo alle installazioni ALTRUI: su quella di chi salva il
+// documento la config torna aggiornata subito, perché `update()` chiude
+// chiamando `refresh()`.
+const DEFAULT_MAX_AGE_MS = 30 * 60 * 1000;
+
 // Refresh "pigro": rinfresca al massimo una volta ogni `maxAgeMs`.
-async function refreshIfStale(maxAgeMs = 5 * 60 * 1000) {
+async function refreshIfStale(maxAgeMs = DEFAULT_MAX_AGE_MS) {
   if (Date.now() - lastFetchTs < maxAgeMs) return get();
   return refresh();
 }
@@ -358,6 +366,10 @@ async function update(partial, idToken) {
   }
   if (secretMask.length) await patchDoc(SECRETS_DOC, secretFields, secretMask, idToken);
 
+  // La rilettura qui NON è un lusso: è ciò che rende immediata la modifica
+  // sulla macchina di chi salva. La rilettura periodica è lenta apposta
+  // (DEFAULT_MAX_AGE_MS), e senza questa riga l'owner cambierebbe un modello e
+  // continuerebbe a usare il vecchio per mezz'ora.
   await refresh();
   return getPublicForAdmin();
 }
@@ -682,6 +694,7 @@ module.exports = {
   getPublicForAdmin,
   refresh,
   refreshIfStale,
+  DEFAULT_MAX_AGE_MS,
   update,
   getAutomationGate,
   setAutomationGate,

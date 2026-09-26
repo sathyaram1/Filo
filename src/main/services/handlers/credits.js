@@ -72,28 +72,86 @@ module.exports = function register(on, ctx) {
   // rules (match /credits/{uid} … allow read,write: if isAdmin()). Le scritture
   // cross-account usano l'ID token dell'owner come Bearer.
 
-  // Elenco di tutti gli utenti registrati (doc credits con campo `email`).
-  async function adminListUsers() {
-    if (!FB?.rest) return [];
-    const idToken = await auth.getIdToken();
-    if (!idToken) throw new Error('Sessione scaduta: rifai l\'accesso.');
-    const endpoint = `${FB.rest.FIRESTORE_BASE}:runQuery?key=${FB.rest.API_KEY}`;
-    const body = { structuredQuery: { from: [{ collectionId: 'credits' }], limit: 1000 } };
+  // Elenco degli utenti registrati (doc credits con campo `email`), UNA PAGINA
+  // per volta e coi soli tre campi che la riga mostra.
+  //
+  // #679 — prima scaricava fino a MILLE documenti interi (saldo, aggregati per
+  // tipo d'uso, ricompense, costo in euro) per stamparne email, nome e saldo, e
+  // il conto degli iscritti si ricavava dalla lunghezza di quella lista. Ora i
+  // documenti arrivano proiettati, cinquanta alla volta, e il totale lo dà una
+  // query di conteggio che i documenti non li legge affatto.
+  const USERS_PAGE_SIZE = 50;
+
+  // Il filtro «ha un'email» è anche l'ordinamento: paginare per email rende la
+  // pagina dopo ripetibile senza `offset`, che a Firestore si paga come se i
+  // documenti saltati li avesse letti.
+  const SOLO_CON_EMAIL = { unaryFilter: { field: { fieldPath: 'email' }, op: 'IS_NOT_NULL' } };
+
+  function corpoElencoUtenti(after) {
+    const q = {
+      from: [{ collectionId: 'credits' }],
+      where: SOLO_CON_EMAIL,
+      orderBy: [{ field: { fieldPath: 'email' }, direction: 'ASCENDING' }],
+      select: { fields: [{ fieldPath: 'email' }, { fieldPath: 'name' }, { fieldPath: 'balance' }] },
+      limit: USERS_PAGE_SIZE,
+    };
+    // `before: false` su `startAt` vuol dire «comincia DOPO questo valore»:
+    // il segnalibro è l'ultima email già mostrata.
+    if (after) q.startAt = { values: [{ stringValue: String(after) }], before: false };
+    return { structuredQuery: q };
+  }
+
+  // Quanti sono in tutto. Un conteggio non è un errore che valga la pena
+  // mostrare: se non arriva, l'elenco si mostra lo stesso senza il totale.
+  async function adminCountUsers(idToken) {
+    const endpoint = `${FB.rest.FIRESTORE_BASE}:runAggregationQuery?key=${FB.rest.API_KEY}`;
+    const body = {
+      structuredAggregationQuery: {
+        structuredQuery: { from: [{ collectionId: 'credits' }], where: SOLO_CON_EMAIL },
+        aggregations: [{ alias: 'totale', count: {} }],
+      },
+    };
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (!res.ok) throw new Error(`users count ${res.status}`);
+    const rows = await res.json();
+    for (const r of Array.isArray(rows) ? rows : []) {
+      const campo = r?.result?.aggregateFields?.totale;
+      if (!campo) continue;
+      const n = Number(campo.integerValue ?? campo.doubleValue);
+      if (Number.isFinite(n)) return n;
+    }
+    return null;
+  }
+
+  async function adminListUsers({ after = '' } = {}) {
+    if (!FB?.rest) return { users: [], total: null, next: '' };
+    const idToken = await auth.getIdToken();
+    if (!idToken) throw new Error('Sessione scaduta: rifai l\'accesso.');
+    const endpoint = `${FB.rest.FIRESTORE_BASE}:runQuery?key=${FB.rest.API_KEY}`;
+    const [res, total] = await Promise.all([
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(corpoElencoUtenti(after)),
+      }),
+      adminCountUsers(idToken).catch(() => null),
+    ]);
     if (!res.ok) throw new Error(`users ${res.status}`);
     const rows = await res.json();
     const users = [];
-    for (const r of rows) {
+    for (const r of Array.isArray(rows) ? rows : []) {
       if (!r.document) continue;
       const o = FB.fsDocToObject(r.document);
       if (o.email) users.push({ email: o.email, name: o.name || '', balance: Math.round(Number(o.balance) || 0) });
     }
-    users.sort((a, b) => a.email.localeCompare(b.email));
-    return users;
+    // Il segnalibro esce solo se la pagina era piena: una pagina corta è
+    // l'ultima, e offrire «gli altri» che non ci sono è una strada morta.
+    const next = users.length >= USERS_PAGE_SIZE ? users[users.length - 1].email : '';
+    return { users, total, next };
   }
 
   // Trova il doc credits il cui campo `email` corrisponde (esatto). Ritorna
@@ -249,9 +307,12 @@ module.exports = function register(on, ctx) {
   // due comandi si scrivono nella chat della dashboard, che è una pagina di
   // Filo; un sito visitato non deve poter chiedere l'elenco di chi usa Filo né
   // regalare crediti a un indirizzo che sceglie lui.
-  on(MSG.OWNER_LIST_USERS, soloFilo(async () => {
+  on(MSG.OWNER_LIST_USERS, soloFilo(async (msg) => {
     if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
-    try { return { ok: true, users: await adminListUsers() }; }
+    try {
+      const { users, total, next } = await adminListUsers({ after: String(msg?.after || '') });
+      return { ok: true, users, total, next };
+    }
     catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }));
 

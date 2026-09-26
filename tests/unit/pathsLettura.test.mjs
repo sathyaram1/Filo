@@ -16,7 +16,7 @@
 // `where domain == …`, e il corpo della create portava `clientId` e
 // `userAgent`.
 
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -67,6 +67,10 @@ function fsDoc(id, { initialUrl, intent, steps, success, createdAt }) {
     },
   };
 }
+
+// La lettura tiene una copia in memoria per dominio (#679): qui si guarda cosa
+// va sul filo, quindi ogni test parte senza copie di quello prima.
+beforeEach(() => { P._internal.svuotaCache(); });
 
 // fetch finta: registra le chiamate e risponde con quanto passato.
 function withFetch(respond, fn) {

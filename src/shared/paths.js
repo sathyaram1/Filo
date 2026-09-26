@@ -47,6 +47,38 @@
   // grande viene ridotta a questo, non respinta.
   const MAX_PAGE_SIZE = 200;
 
+  // Quanti percorsi si chiedono quando il chiamante non dice un numero. Il
+  // prompt dell'Aiuto ne imbusta al massimo ventinove di dimensione normale
+  // prima di finire il suo tetto di ventimila caratteri
+  // (pathsSafety → KNOWN_PATHS_BUDGET_CHARS): chiederne cinquanta voleva dire
+  // pagare venti letture che non arrivavano mai al modello (#679).
+  const DEFAULT_PAGE_SIZE = 30;
+
+  // Una copia in memoria per dominio. L'agente Aiuto rilegge i percorsi a OGNI
+  // turno sulla stessa pagina, e ogni rilettura è `limit` letture di Firestore
+  // (#679). La copia scade da sola, e un percorso nuovo spedito per quel
+  // dominio la butta subito: chi ha appena insegnato una strada a Filo deve
+  // ritrovarla, non aspettare il quarto d'ora.
+  const CACHE_TTL_MS = 15 * 60 * 1000;
+  const cache = new Map();
+  let adesso = () => Date.now();
+
+  function chiaveCache(dominio, limit, onlySuccess) {
+    return `${dominio}\u0000${limit}\u0000${onlySuccess ? 1 : 0}`;
+  }
+
+  // Butta tutte le varianti (limiti, filtro esito) di un dominio: chi invalida
+  // sa il dominio, non con che parametri qualcun altro l'ha chiesto.
+  function invalidaDominio(domain) {
+    const Safety = global.SN_PATHS_SAFETY;
+    const d = Safety ? Safety._internal.normalizzaHost(domain) : String(domain || '').toLowerCase();
+    if (!d) return;
+    const prefisso = `${d}\u0000`;
+    for (const k of Array.from(cache.keys())) {
+      if (k.startsWith(prefisso)) cache.delete(k);
+    }
+  }
+
   // Il dominio diventa l'ID di un documento Firestore: deve essere un nome di
   // host e nient'altro. Fuori da questo insieme (una barra, uno spazio, un ID
   // riservato `__…__`) non si ripiega su qualcosa di simile: si torna stringa
@@ -155,6 +187,9 @@
     if (!r || r.saved === false) {
       throw new Error(`pathSubmit ha rifiutato il percorso: ${(r && r.reason) || 'motivo non dichiarato'}`);
     }
+    // Il percorso appena insegnato deve tornare al turno dopo, non fra un
+    // quarto d'ora: la copia in memoria di questo dominio non vale più.
+    invalidaDominio(pulito.doc && pulito.doc.domain);
     return { id: (r && r.id) || '' };
   }
 
@@ -197,17 +232,33 @@
     return res.json();
   }
 
-  async function listByDomain(domain, { pageSize = 50, onlySuccess = true } = {}) {
+  async function listByDomain(domain, { pageSize = DEFAULT_PAGE_SIZE, onlySuccess = true } = {}) {
     const dominio = segmentoDominio(domain);
     if (!dominio) return [];
-    const limit = Math.max(1, Math.min(MAX_PAGE_SIZE, Number(pageSize) || 50));
+    const limit = Math.max(1, Math.min(MAX_PAGE_SIZE, Number(pageSize) || DEFAULT_PAGE_SIZE));
+
+    const chiave = chiaveCache(dominio, limit, onlySuccess);
+    const inCache = cache.get(chiave);
+    if (inCache && adesso() - inCache.ts < CACHE_TTL_MS) return inCache.righe.slice();
 
     let arr;
     try {
       arr = await chiedi(dominio, corpoQuery({ limit, onlySuccess }));
     } catch (e) {
-      if (!onlySuccess) throw e;
-      arr = await chiedi(dominio, corpoQuery({ limit, onlySuccess: false }));
+      let secondo = e;
+      if (onlySuccess) {
+        try {
+          arr = await chiedi(dominio, corpoQuery({ limit, onlySuccess: false }));
+          secondo = null;
+        } catch (e2) { secondo = e2; }
+      }
+      if (secondo) {
+        // Una rete che cade non cancella la copia buona: scaduta è comunque
+        // meglio del nulla, e l'errore resta un errore solo se non c'è niente
+        // da servire.
+        if (inCache) return inCache.righe.slice();
+        throw secondo;
+      }
     }
 
     const out = [];
@@ -217,14 +268,22 @@
       if (onlySuccess && obj.success !== true) continue;
       out.push(obj);
     }
-    return out;
+    cache.set(chiave, { ts: adesso(), righe: out });
+    return out.slice();
   }
 
   global.SN_PATHS = {
     submit,
     listByDomain,
     configPublic: { projectId: PROJECT_ID, collection: COLLECTION, subcollection: SUBCOLLECTION },
-    rest: { FIRESTORE_BASE, MAX_PAGE_SIZE },
-    _internal: { segmentoDominio, corpoQuery },
+    invalidaDominio,
+    rest: { FIRESTORE_BASE, MAX_PAGE_SIZE, DEFAULT_PAGE_SIZE, CACHE_TTL_MS },
+    _internal: {
+      segmentoDominio, corpoQuery,
+      svuotaCache: () => cache.clear(),
+      // L'orologio si sostituisce solo nei test: far scadere una copia di un
+      // quarto d'ora aspettandola davvero non è una prova che si possa correre.
+      _setAdesso: (fn) => { adesso = typeof fn === 'function' ? fn : Date.now; },
+    },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
