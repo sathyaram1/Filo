@@ -65,11 +65,37 @@ function gitOut(args, root) {
 
 // Le prove del giro cancellate o cambiate fra `shaPrima` e HEAD (null se git non risponde): togliere il
 // caso rosso e tenere il file è la stessa porta aperta che cancellarlo.
-export function proveTolteDal(shaPrima, root) {
+export function proveTolteDal(shaPrima, root, principale = riferimentoPrincipale(root)) {
   try {
     const out = gitOut(['diff', '--name-only', '-z', '--no-renames', '--diff-filter=DM', shaPrima, 'HEAD', '--', PROVE_GIRO], root);
-    return proveTolte(out.split('\0').filter(Boolean));
+    return toccateDalRamo(proveTolte(out.split('\0').filter(Boolean)), shaPrima, root, principale);
   } catch (_) { return null; }
+}
+
+export function riferimentoPrincipale(root) {
+  for (const r of ['origin/main', 'main']) {
+    try { gitOut(['rev-parse', '--verify', '-q', `${r}^{commit}`], root); return r; } catch (_) { /* il prossimo */ }
+  }
+  return '';
+}
+
+function oggetto(rev, f, root) {
+  try { return gitOut(['rev-parse', '-q', '--verify', `${rev}:${f}`], root).trim(); } catch (_) { return ''; }
+}
+
+// Dopo un riallineamento il commit della critica sta sulla vecchia base: il diff da lì porta dentro le prove di altri
+// lavori che main ha cambiato nel frattempo. Resta solo ciò che il ramo ha toccato, prima o dopo la critica.
+export function toccateDalRamo(prove, shaPrima, root, principale = riferimentoPrincipale(root)) {
+  if (!principale || !prove.length) return prove;
+  let vecchia = '';
+  let nuova = '';
+  try {
+    vecchia = gitOut(['merge-base', shaPrima, principale], root).trim();
+    nuova = gitOut(['merge-base', 'HEAD', principale], root).trim();
+  } catch (_) { return prove; }
+  if (!vecchia || !nuova || vecchia === nuova) return prove;
+  return prove.filter((f) => oggetto(shaPrima, f, root) !== oggetto(vecchia, f, root)
+    || oggetto('HEAD', f, root) !== oggetto(nuova, f, root));
 }
 
 /**
