@@ -92,24 +92,27 @@ const safebrowseMethods = {
   // Sulle pagine ospitate il modulo sta spesso in un riquadro incorporato, che il content script della pagina non vede.
   // Solo lì si guardano i riquadri: altrove il dominio parla già per la pagina.
   _sbOnFrameLoad(tab) {
+    if (!tab) return;
+    clearTimeout(tab._sbFrameTimer);
+    const giro = (tab._sbScanGiro || 0) + 1;
+    tab._sbScanGiro = giro;
+    tab._sbFrameTimer = setTimeout(() => this._sbScanFrames(tab, giro), 400);
+  },
+
+  // I campi compaiono quando vuole il codice dell'utente: dopo un «Avanti» senza ricaricare, dopo un caricamento lento.
+  // Finché la pagina ospitata resta aperta la si riguarda, fino al primo campo sensibile.
+  async _sbScanFrames(tab, giro) {
     const SB = globalThis.SN_SAFEBROWSE;
-    const wc = tab && tab.view && tab.view.webContents;
-    if (!SB || !wc || wc.isDestroyed()) return;
+    const wc = tab.view && tab.view.webContents;
+    if (!SB || !wc || wc.isDestroyed() || tab._sbScanGiro !== giro) return;
     const url = wc.getURL();
     let ospitata = null;
     try { const u = new URL(url); ospitata = SB.whitelist.hostedPlatform(u.hostname, u.pathname); } catch (_) {}
-    if (!ospitata) return;
-    clearTimeout(tab._sbFrameTimer);
-    tab._sbFrameTimer = setTimeout(() => this._sbScanFrames(tab, url, 0), 400);
-  },
-
-  async _sbScanFrames(tab, url, giro) {
-    const wc = tab.view && tab.view.webContents;
-    if (!wc || wc.isDestroyed() || wc.getURL() !== url) return;
+    if (!ospitata || tab._sbCampiUrl === url) return;
     const hints = { hasPassword: false, hasPayment: false };
     const codice = `(${pageHints.toString()})(document)`;
     let frames = [];
-    try { frames = wc.mainFrame.framesInSubtree.filter((f) => f !== wc.mainFrame); } catch (_) {}
+    try { frames = wc.mainFrame.framesInSubtree; } catch (_) {}
     await Promise.all(frames.map(async (f) => {
       try {
         // Un riquadro ostile non deve tenere ferma l'analisi.
