@@ -2326,6 +2326,21 @@
   // dopo la parte immutabile del prompt e non ne rompe il riuso fra chiamate.
   // Se un giorno lo si mettesse in testa, ogni utente con uno stile personale
   // avrebbe un prefisso diverso e il riuso morirebbe per tutti.
+  // «NESSUNA SPIEGAZIONE» è la rinuncia di «Spiega», ma lo stesso prompt chiede
+  // al modello anche la conversione degli importi: una risposta che porta tutte
+  // e due non si butta via intera, o l'utente resta senza il prezzo in euro
+  // (#724). Torna cosa mostrare: stringa vuota = rinuncia vera.
+  const RINUNCIA_SPIEGA = /NESSUNA\s+SPIEGAZIONE/i;
+  function spiegazioneDaMostrare(text) {
+    let t = String(text == null ? '' : text).trim();
+    if (!RINUNCIA_SPIEGA.test(t)) return t;
+    t = t.replace(/NESSUNA\s+SPIEGAZIONE/ig, ' ').trim();
+    if (!/[\p{L}\p{N}]/u.test(t)) return '';
+    t = t.replace(/^[\s:,;.\-–—]+/, '').trim();
+    const solaParentesi = t.match(/^\(([^()]*)\)$/s);
+    return solaParentesi ? solaParentesi[1].trim() : t;
+  }
+
   function injectAgentStyle(messages, action, styleText) {
     const style = typeof styleText === 'string' ? styleText.trim() : '';
     if (!Array.isArray(messages) || !style) return messages;
