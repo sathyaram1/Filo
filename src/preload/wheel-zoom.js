@@ -137,7 +137,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     if (!percentInput) return;
     const esito = Z ? Z.risolvi(letturaLivello(), { percentuale: valoreBattuto }) : null;
     if (esito) setLevel(esito.livello);
-    refreshPercent();
+    mostraPercentuale();
   }
 
   function letturaLivello() {
