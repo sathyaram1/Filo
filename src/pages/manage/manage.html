@@ -611,7 +611,9 @@
     .mg-item--selected { background: var(--sn-hover); }
     /* Arrivata qui a pagina aperta: un punto caldo in testa, finché non la si apre. Con un ordinamento a scelta
        può cadere a metà lista, e senza un segno l'arrivo non si vede. */
-    .mg-item--arrivata::before {
+    /* Nelle schede In coda (a colonne) il punto va nella riga del titolo: da figlio della scheda prenderebbe una riga sua. */
+    .mg-item--arrivata:not(.mg-item--staged)::before,
+    .mg-item--staged.mg-item--arrivata > .mg-item-row:first-child::before {
       content: ''; flex: 0 0 auto; align-self: center;
       width: var(--mg-arrivo-size, 7px); height: var(--mg-arrivo-size, 7px); border-radius: 50%;
       background: var(--mg-arrivo-color, var(--sn-accent));
