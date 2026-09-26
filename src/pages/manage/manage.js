@@ -3636,7 +3636,26 @@
     // non c'è, la conversazione non si dichiara vuota — direbbe il falso
     // proprio su un feedback lavorato.
     if (FB.soloLista(fb)) {
-      appendBubble('model', 'Filo', '<em>Caricamento della conversazione…</em>');
+      if (fb._dettaglioMancato) {
+        // La lettura non è tornata. Dirlo, e dare la strada per riprovare: la
+        // gemella (pagina dei feedback) fa così, e senza questo il pannello
+        // restava su «Caricamento…» a tempo indeterminato.
+        appendBubble('model', 'Filo', `<em>${esc(fb._dettaglioMancato === 'sparito'
+          ? 'Il resto di questa segnalazione non è arrivato: sul server non c\'è più.'
+          : 'Il resto di questa segnalazione non è arrivato: controlla la connessione.')}</em>`);
+        const riga = document.createElement('div');
+        riga.className = 'mg-actions-row';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sn-btn sn-btn-secondary';
+        btn.id = 'mgRiprovaDettaglio';
+        btn.textContent = '↻ Riprova';
+        btn.addEventListener('click', () => riprovaDettaglio(fb._id));
+        riga.appendChild(btn);
+        mgThread.appendChild(riga);
+      } else {
+        appendBubble('model', 'Filo', '<em>Caricamento della conversazione…</em>');
+      }
       appendFraseBubble(fb);
       return;
     }
