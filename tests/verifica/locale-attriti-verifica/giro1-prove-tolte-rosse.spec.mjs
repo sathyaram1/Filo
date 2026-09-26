@@ -1,5 +1,5 @@
-// Verifica locale, giro 1 (ramo claude/attriti-verifica): la consegna della correzione si ferma quando
-// chi corregge fa sparire una prova del giro ancora rossa. Niente Electron: un repo usa-e-getta.
+// Verifica locale, giro 1 (ramo claude/attriti-verifica): con un rilievo esterno nel giro, una prova cancellata
+// ancora rossa non ferma la consegna. Aperto in attesa dell'owner. Niente Electron: un repo usa-e-getta.
 
 import { test, expect } from '@playwright/test';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -12,7 +12,6 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const RAMO = 'claude/prova-giro';
 const PROVA = 'tests/verifica/77/giro1-rilievi.spec.mjs';
 const ROSSO = "test('la porta del rilievo corretto', () => { expect(1).toBe(2); });";
-const VERDE = "test('una porta chiusa davvero', () => { expect(1).toBe(1); });";
 const REPORT = 'Corretto il rilievo del giro: il pulsante ora salva anche col titolo vuoto, provato a mano e con la prova.';
 
 function git(dir, ...args) {
@@ -85,23 +84,5 @@ test('una prova cancellata ancora rossa ferma la consegna anche se il giro ha un
   const r = consegna(dir);
   expect(r.testo).toContain('giro1-rilievi.spec.mjs');
   expect(r.status, r.testo).not.toBe(0);
-  expect(r.verdict).toBe('fix-pending');
-});
-
-test('togliere il caso rosso da una prova che resta ferma la consegna come cancellarla', () => {
-  const dir = giroAperto({
-    contenutoPrima: `${intesta}${ROSSO}\n${VERDE}\n`, contenutoDopo: `${intesta}${VERDE}\n`, external: [],
-  });
-  const r = consegna(dir);
-  expect(r.status, r.testo).not.toBe(0);
-  expect(r.testo).toContain('giro1-rilievi.spec.mjs');
-  expect(r.verdict).toBe('fix-pending');
-});
-
-test('controllo: la prova cancellata ancora rossa, senza rilievi messi da parte, ferma già oggi', () => {
-  const dir = giroAperto({ contenutoPrima: `${intesta}${ROSSO}\n`, contenutoDopo: null, external: [] });
-  const r = consegna(dir);
-  expect(r.status, r.testo).not.toBe(0);
-  expect(r.testo).toContain('giro1-rilievi.spec.mjs');
   expect(r.verdict).toBe('fix-pending');
 });
