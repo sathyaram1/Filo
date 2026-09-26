@@ -239,7 +239,9 @@ async function giraSullaCoda(forza) {
         link: (n.action && n.action.link) || [],
       });
       if (esito.esito === 'attesa') {
-        await inFila(() => mem.segnaEsitoGuardiano(n.id, { tentativi: (n.tentativi || 0) + 1 }));
+        await inFila(() => mem.segnaEsitoGuardiano(n.id, {
+          tentativi: (n.tentativi || 0) + 1, motivoAttesa: esito.regola,
+        }));
         continue;
       }
       if (esito.esito === 'blocca') {
