@@ -199,6 +199,7 @@ async function proponiAvviso({ testo, classe, fonte, richiesta, modelloProduttor
     text: separato.testo,
     classe, fonte,
     guardiano: { esito: esito.esito },
+    motivoAttesa: esito.regola,
     // `modelloProduttore` resta appiccicato alla voce: se finisce in coda, il
     // giro dopo deve sapere di nuovo quale modello NON può fare da guardiano.
     action: {
