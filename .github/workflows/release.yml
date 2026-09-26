@@ -709,6 +709,7 @@ jobs:
         id: controllo
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALLARME: ${{ runner.temp }}/allarme/scripts
         shell: bash
         run: |
           set -e
@@ -719,7 +720,7 @@ jobs:
           echo "$ELENCO"
           # I file attesi stanno in UN posto solo (lo script dell'allarme): qui
           # si chiedono, cosi' il controllo e il testo del feedback non divergono.
-          ATTESI=$(node scripts/release-platform-alarm.mjs --attesi Mac)
+          ATTESI=$(node "$ALLARME/release-platform-alarm.mjs" --attesi Mac)
           MANCANTI=""
           for ATTESO in $ATTESI; do
             echo "$ELENCO" | grep -qx "$ATTESO" || MANCANTI="${MANCANTI}${ATTESO} "
@@ -739,6 +740,7 @@ jobs:
       # strada della suite rossa. La release Windows non si tocca.
       - name: Fallito - apri un feedback (la release Windows resta)
         if: failure()
+        id: allarme
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
           PIATTAFORMA: Mac
@@ -748,8 +750,31 @@ jobs:
           # Quale passo si e' fermato lo dicono gli esiti dei passi con un id.
           ESITI: ${{ toJSON(steps) }}
           MANCANTI: ${{ steps.controllo.outputs.mancanti }}
+          ALLARME: ${{ runner.temp }}/allarme/scripts
         shell: bash
-        run: node scripts/release-platform-alarm.mjs || echo "::warning::allarme non consegnato"
+        # Il feedback e' l'UNICA cosa che fa sapere il guasto a qualcuno: il
+        # lavoro e' continue-on-error, quindi la corsa resta verde comunque.
+        # Prima un `|| echo` si mangiava l'esito e il passo finiva verde anche
+        # quando l'avviso non partiva (#733, secondo giro di verifica): adesso
+        # si riprova, e se non parte il passo e' rosso, il riepilogo lo dice e
+        # il lavoro `avviso-mancato` fa diventare rossa la corsa.
+        run: |
+          # `set -e` e' acceso da GitHub: ogni comando che puo' uscire diverso
+          # da zero sta dentro un `if`, o il passo muore prima di riprovare.
+          ESITO=muto
+          for ATTESA in 15 30 0; do
+            if node "$ALLARME/release-platform-alarm.mjs"; then ESITO=aperto; break; fi
+            if [ "$ATTESA" -gt 0 ]; then sleep "$ATTESA"; fi
+          done
+          echo "esito=${ESITO}" >> "$GITHUB_OUTPUT"
+          if [ "$ESITO" = "aperto" ]; then exit 0; fi
+          echo "::error::l'avviso per Mac non e' partito: il guasto non e' diventato un feedback."
+          {
+            echo "## L'avviso per Mac non e' partito"
+            echo ""
+            echo "Il lavoro e' fallito e il feedback NON si e' aperto: di questo guasto non sa niente nessuno, fuori da questa pagina."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       - name: Riepilogo
         run: echo "Aggiunto il pacchetto Mac a ${{ steps.bersaglio.outputs.versione }}"
@@ -925,6 +950,7 @@ jobs:
         id: controllo
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALLARME: ${{ runner.temp }}/allarme/scripts
         shell: bash
         run: |
           set -e
@@ -935,7 +961,7 @@ jobs:
           echo "$ELENCO"
           # I file attesi stanno in UN posto solo (lo script dell'allarme): qui
           # si chiedono, cosi' il controllo e il testo del feedback non divergono.
-          ATTESI=$(node scripts/release-platform-alarm.mjs --attesi Linux)
+          ATTESI=$(node "$ALLARME/release-platform-alarm.mjs" --attesi Linux)
           MANCANTI=""
           for ATTESO in $ATTESI; do
             echo "$ELENCO" | grep -qx "$ATTESO" || MANCANTI="${MANCANTI}${ATTESO} "
@@ -955,6 +981,7 @@ jobs:
       # strada della suite rossa. La release Windows non si tocca.
       - name: Fallito - apri un feedback (la release Windows resta)
         if: failure()
+        id: allarme
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
           PIATTAFORMA: Linux
@@ -964,8 +991,49 @@ jobs:
           # Quale passo si e' fermato lo dicono gli esiti dei passi con un id.
           ESITI: ${{ toJSON(steps) }}
           MANCANTI: ${{ steps.controllo.outputs.mancanti }}
+          ALLARME: ${{ runner.temp }}/allarme/scripts
         shell: bash
-        run: node scripts/release-platform-alarm.mjs || echo "::warning::allarme non consegnato"
+        # Il feedback e' l'UNICA cosa che fa sapere il guasto a qualcuno: il
+        # lavoro e' continue-on-error, quindi la corsa resta verde comunque.
+        # Prima un `|| echo` si mangiava l'esito e il passo finiva verde anche
+        # quando l'avviso non partiva (#733, secondo giro di verifica): adesso
+        # si riprova, e se non parte il passo e' rosso, il riepilogo lo dice e
+        # il lavoro `avviso-mancato` fa diventare rossa la corsa.
+        run: |
+          # `set -e` e' acceso da GitHub: ogni comando che puo' uscire diverso
+          # da zero sta dentro un `if`, o il passo muore prima di riprovare.
+          ESITO=muto
+          for ATTESA in 15 30 0; do
+            if node "$ALLARME/release-platform-alarm.mjs"; then ESITO=aperto; break; fi
+            if [ "$ATTESA" -gt 0 ]; then sleep "$ATTESA"; fi
+          done
+          echo "esito=${ESITO}" >> "$GITHUB_OUTPUT"
+          if [ "$ESITO" = "aperto" ]; then exit 0; fi
+          echo "::error::l'avviso per Linux non e' partito: il guasto non e' diventato un feedback."
+          {
+            echo "## L'avviso per Linux non e' partito"
+            echo ""
+            echo "Il lavoro e' fallito e il feedback NON si e' aperto: di questo guasto non sa niente nessuno, fuori da questa pagina."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       - name: Riepilogo
         run: echo "Aggiunto il pacchetto Linux a ${{ steps.bersaglio.outputs.versione }}"
+
+  # ─── L'ULTIMA RETE: UN AVVISO CHE NON E' PARTITO ─────────────────────────
+  # Le due meta' di piattaforma sono `continue-on-error`, quindi un loro guasto
+  # lascia la corsa verde. E' giusto finche' il guasto diventa un feedback: e'
+  # quello, non il colore della corsa, a farlo sapere a qualcuno. Se pero'
+  # l'avviso NON e' partito, la corsa verde e' l'ultimo posto in cui il guasto
+  # poteva ancora vedersi, ed e' esattamente il silenzio del #733. Qui la corsa
+  # diventa rossa: e' l'unico segnale rimasto.
+  avviso-mancato:
+    needs: [release-mac, release-linux]
+    if: ${{ !cancelled() && (needs.release-mac.outputs.allarme == 'muto' || needs.release-linux.outputs.allarme == 'muto') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: La corsa resta rossa perche' il guasto non e' diventato un feedback
+        shell: bash
+        run: |
+          echo "::error::una meta' di piattaforma e' fallita e il feedback non si e' aperto: apri i lavori Mac e Linux di questa esecuzione."
+          exit 1
