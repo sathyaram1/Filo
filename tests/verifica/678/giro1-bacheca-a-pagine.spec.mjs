@@ -171,6 +171,8 @@ test('la riga di caricamento si legge in chiaro e in scuro', async ({ openTab })
     });
     expect(c.testo).not.toBe('rgba(0, 0, 0, 0)');
     expect(c.bordo).not.toBe('rgba(0, 0, 0, 0)');
+    // Guardata davvero: la riga sta in fondo, si porta in vista prima dello scatto.
+    await page.evaluate(() => document.getElementById('bdMore')?.scrollIntoView({ block: 'center' }));
     await page.screenshot({ path: `tests/.shots/678-bacheca-${tema}.png` });
   }
 });
