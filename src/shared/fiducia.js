@@ -45,6 +45,27 @@
     return rango(classe) >= PRIMA_CONTAMINATA;
   }
 
+  // Quanto vale un tipo di contenuto esterno (`SN_ESTERNO.TIPI`). Chi non è
+  // nominato qui vale come la classe peggiore: un tipo nuovo di contenuto
+  // esterno nasce contaminato, e chi lo aggiunge non deve ricordarsi di
+  // scriverlo anche qui perché la protezione lo copra.
+  const CLASSE_DEL_TIPO = {
+    RICERCA_WEB: 'sito',
+    ELEMENTO_PAGINA: 'sito',
+    DATI_PAGINA: 'sito',
+    TESTO_IN_PAGINA: 'sito',
+    OUTLINE_PAGINA: 'sito',
+    ISTRUZIONI_SITO: 'sito',
+    DATI_LINK: 'sito',
+    CONVERSAZIONE_ARCHIVIATA: 'sito',
+  };
+
+  function classeDeiTipi(tipi) {
+    const list = Array.isArray(tipi) ? tipi : [tipi];
+    if (!list.length) return 'utente';
+    return piuBassa(list.map((t) => CLASSE_DEL_TIPO[String(t || '')] || 'messaggio'));
+  }
+
   function etichetta(classe) {
     return ETICHETTE[normalizza(classe)] || ETICHETTE.messaggio;
   }
