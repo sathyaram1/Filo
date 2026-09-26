@@ -253,3 +253,82 @@ test('la domanda si toglie dalle impostazioni: per un sito fidato, o del tutto',
     await srv.close();
   }
 });
+
+// Il sito può consegnare il programma senza passare da un indirizzo: se lo
+// fabbrica nella pagina (blob:) o lo incolla dentro il link (data:). Per chi
+// usa Filo è lo stesso gesto, quindi deve fermarsi alla stessa domanda, e la
+// domanda deve dire da dove arriva: è la cosa su cui si decide, e il sito non
+// deve poterla togliere scegliendo COME consegnare il file.
+// Senza il fix l'avviso è «è un programma, scaricarlo?» e basta → rosso.
+const PAGINA_FABBRICA = `<!doctype html><html><body style="padding:40px">
+<button id="blob">blob</button>
+<button id="data">data</button>
+<script>
+  function scarica(href, nome) {
+    const a = document.createElement('a');
+    a.href = href; a.download = nome;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  document.getElementById('blob').onclick = () => {
+    const b = new Blob([new Uint8Array([77, 90, 1, 2, 3, 4])], { type: 'application/octet-stream' });
+    scarica(URL.createObjectURL(b), 'daBlob.exe');
+  };
+  document.getElementById('data').onclick = () => scarica('data:application/octet-stream;base64,TVoBAgME', 'daData.exe');
+</script></body></html>`;
+
+test('un programma fabbricato dalla pagina si ferma, e la domanda dice da quale sito arriva', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const dir = await cartellaDownload(app);
+  const page = await testServer.openReady(openTab, PAGINA_FABBRICA);
+  const sito = new URL(page.url()).hostname;
+
+  for (const [bottone, nome] of [['blob', 'daBlob.exe'], ['data', 'daData.exe']]) {
+    await page.locator(`#${bottone}`).click();
+    await expect.poll(() => statoDi(shell, nome), { timeout: 20000 }).toBe('pending');
+    expect(contenuto(dir)).not.toContain(nome);
+
+    const rec = await voce(shell, nome);
+    expect(rec.exe).toBe(true);
+    expect(rec.site, `«${nome}»: la domanda non nomina il sito`).toBe(sito);
+
+    const avviso = shell.locator('.shell-notif', { hasText: nome });
+    await expect(avviso).toBeVisible({ timeout: 10000 });
+    await expect(avviso).toContainText(sito);
+
+    await avviso.locator('.shell-notif-action', { hasText: 'Non scaricare' }).click();
+    await expect.poll(() => statoDi(shell, nome), { timeout: 10000 }).toBe('cancelled');
+  }
+  expect(contenuto(dir)).toEqual([]);
+});
+
+// L'avviso ha una × accanto alle due risposte: chiuderlo è facile quanto
+// rispondere. Da quel momento l'unico segno che la domanda è ancora aperta è
+// l'indicatore in alto, che deve dirlo invece di somigliare a un elenco fermo.
+test('chiuso l’avviso, l’indicatore dice ancora che una risposta è in sospeso', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServer();
+  try {
+    const page = await apriPagina(srv.base, { openTab, testServer });
+    await page.locator('#exe').click();
+    await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 20000 }).toBe('pending');
+
+    const avviso = shell.locator('.shell-notif', { hasText: 'setup.exe' });
+    await expect(avviso).toBeVisible({ timeout: 10000 });
+    await avviso.locator('.shell-notif-close').click();
+    await expect(avviso).toBeHidden({ timeout: 10000 });
+
+    const indicatore = shell.locator('#dl-indicator');
+    await expect(indicatore).toBeVisible();
+    await expect(indicatore.locator('#dl-ind-count')).toHaveText('1', { timeout: 10000 });
+    await expect(indicatore).toHaveAttribute('data-tip', /aspetta la tua risposta/);
+    // Niente barra: un file fermo in attesa non sta scaricando.
+    await expect(indicatore).not.toHaveClass(/\bactive\b/);
+
+    // E da lì le due risposte sono a un clic.
+    await indicatore.click();
+    const riga = shell.locator('.dl-row', { hasText: 'setup.exe' });
+    await expect(riga.locator('.dl-row-btn', { hasText: /^Scarica$/ })).toBeVisible({ timeout: 10000 });
+  } finally {
+    await srv.close();
+  }
+});
