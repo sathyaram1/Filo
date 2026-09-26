@@ -102,8 +102,9 @@ test('la spiegazione estesa converte la valuta straniera, come promette la stess
   expect(prompt, 'il cambio della valuta non arriva al modello').toMatch(/\d[\d.]*\s+INR\b/);
 
   // E il numero resta un prezzo, non dodici cifre dopo la virgola.
-  const meta = ((await page.locator('.sn-popup .sn-popup-meta').textContent()) || '');
-  expect(meta).toMatch(/2[7-8][.,]\d{1,2}\s*€/);
+  const corpo = await page.locator('.sn-popup-body').innerText();
+  expect(corpo, `la conversione non si legge come un prezzo: ${corpo}`).toContain('27,45 €');
+  expect(corpo).not.toContain('27,4473924977');
 
   await app.evaluate(() => { if (globalThis.__origGiro4) globalThis.SN_PROVIDER_OPENROUTER = globalThis.__origGiro4; });
 });
