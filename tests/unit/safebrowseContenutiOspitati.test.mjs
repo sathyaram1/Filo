@@ -13,6 +13,8 @@ const OSPITATE = [
   'https://sites.google.com/view/paypal-login',
   'https://docs.google.com/forms/d/e/1FAIpQL/viewform',
   'https://script.google.com/macros/s/AKfy/exec',
+  'https://script.google.com/a/macros/contoso.com/s/AKfy/exec',
+  'https://script.google.com/a/contoso.com/macros/s/AKfy/exec',
   'https://forms.office.com/r/abc123',
   'https://archive.org/download/pacco/login.html',
   'https://ia800100.us.archive.org/1/items/pacco/login.html',
@@ -110,4 +112,17 @@ test('la password chiesta in un campo di testo conta come una password, come fan
   assert.equal(pageHints(documento({ campi: [{ labels: ['Codice PIN della carta'] }] })).hasPassword, true);
   assert.equal(pageHints(documento({ campi: [{ attr: { 'aria-label': 'Nome' } }, { labels: ['Il tuo passaporto'] }] })).hasPassword, false);
   assert.equal(pageHints(documento()).hasPassword, false);
+});
+
+test('i dati della carta chiesti in un campo di testo contano come dati di pagamento', () => {
+  const { pageHints } = require('../../src/content/safebrowseHints.js');
+  const conCampi = (...titoli) => documento({ campi: titoli.map((t, i) => ({ attr: { 'aria-labelledby': 'q' + i } })),
+    etichette: Object.fromEntries(titoli.map((t, i) => ['q' + i, t])) });
+  assert.equal(pageHints(conCampi('Nome', 'Numero della carta di credito')).hasPayment, true);
+  assert.equal(pageHints(conCampi('CVV')).hasPayment, true);
+  assert.equal(pageHints(conCampi('Card number')).hasPayment, true);
+  assert.equal(pageHints(conCampi('Nome', 'Scadenza del contratto', 'Codice fiscale')).hasPayment, false);
+  // Il main la esegue nei riquadri dal sorgente: deve reggere da sola, senza niente attorno.
+  const daSorgente = new Function(`return (${pageHints.toString()})`)();
+  assert.equal(daSorgente(conCampi('CVV')).hasPayment, true);
 });

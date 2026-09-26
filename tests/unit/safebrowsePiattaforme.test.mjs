@@ -47,6 +47,10 @@ test('una piattaforma in whitelist non copre più le pagine che ospita', () => {
   ]) assert.notEqual(livello(url), 'safe', url);
   assert.equal(dominio('paypal-login.s3.us-east-1.amazonaws.com'), 'paypal-login.s3.us-east-1.amazonaws.com');
   assert.equal(livello('https://mio-sito.s3-website.eu-west-1.amazonaws.com/'), 'safe');
+  // Cognito: il prefisso della pagina d'accesso lo sceglie l'utente, la regione no.
+  assert.notEqual(livello('https://paypal-login.auth.us-east-1.amazoncognito.com/login'), 'safe');
+  assert.notEqual(livello('https://paypal-login.auth-fips.us-gov-west-1.amazoncognito.com/login'), 'safe');
+  assert.equal(dominio('paypal-login.auth.eu-west-1.amazoncognito.com'), 'paypal-login.auth.eu-west-1.amazoncognito.com');
 });
 
 test('GitHub su un suffisso che non è suo resta sospetto', () => {

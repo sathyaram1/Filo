@@ -338,3 +338,40 @@ test('modulo Google: la password chiesta in un campo di testo fa comparire l\'av
   await openTab('https://docs.google.com/forms/d/e/1FAIpQL/viewform');
   expect(await livelloScheda(app, 'docs.google.com')).toBe('sospetto');
 });
+
+test('modulo Google: i dati della carta chiesti in campi di testo fanno comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'docs.google.com/forms/d/e/1FAIpQLcarta/viewform': '<h1>Rimborso: conferma la carta</h1><form>'
+      + '<span id="i1">Numero della carta di credito</span><input type="text" aria-labelledby="i1">'
+      + '<span id="i5">CVV</span><input type="text" aria-labelledby="i5"><button>Invia</button></form>',
+  });
+  await openTab('https://docs.google.com/forms/d/e/1FAIpQLcarta/viewform');
+  expect(await livelloScheda(app, 'docs.google.com')).toBe('sospetto');
+});
+
+test('Microsoft Forms: la password chiesta nella seconda sezione, dopo «Avanti», fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'forms.cloud.microsoft/r/Sez2': '<div id="form"><span id="q1">Email aziendale</span>'
+      + '<input data-automation-id="textInput" aria-labelledby="q1">'
+      + '<button id="avanti" onclick="document.getElementById(\'form\').innerHTML = '
+      + '\'<span id=q2>Password</span><input data-automation-id=textInput aria-labelledby=q2>\'">Avanti</button></div>',
+  });
+  const page = await openTab('https://forms.cloud.microsoft/r/Sez2');
+  await page.waitForLoadState('load').catch(() => {});
+  await page.waitForTimeout(3500);
+  expect(await livelloScheda(app, 'forms.cloud.microsoft', 500)).toBe('safe');
+  await page.click('#avanti');
+  await expect(page.getByText('Password')).toBeVisible();
+  expect(await livelloScheda(app, 'forms.cloud.microsoft')).toBe('sospetto');
+});
+
+test('Google Sites: un modulo montato secondi dopo il caricamento del riquadro fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'sites.google.com/view/posta-lenta': '<h1>Accesso alla posta</h1>'
+      + '<iframe src="https://5678-atari-embeds.googleusercontent.com/embeds/x/user.html" width="500" height="300"></iframe>',
+    '5678-atari-embeds.googleusercontent.com': '<p>Caricamento…</p><script>'
+      + `setTimeout(() => { document.body.innerHTML = ${JSON.stringify(ACCESSO)}; }, 4000);</script>`,
+  });
+  await openTab('https://sites.google.com/view/posta-lenta');
+  expect(await livelloScheda(app, 'sites.google.com', 12000)).toBe('sospetto');
+});

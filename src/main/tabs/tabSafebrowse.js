@@ -100,7 +100,7 @@ const safebrowseMethods = {
     tab._sbFrameTimer = setTimeout(() => this._sbScanFrames(tab, giro), 400);
   },
 
-  // I campi compaiono quando vuole il codice dell'utente: dopo un «Avanti» senza ricaricare, dopo un caricamento lento.
+  // I campi compaiono quando vuole il codice dell'utente: dopo un «Avanti» che non ricarica, dopo un avvio lento.
   // Finché la pagina ospitata resta aperta la si riguarda, fino al primo campo sensibile.
   async _sbScanFrames(tab, giro) {
     const SB = globalThis.SN_SAFEBROWSE;
