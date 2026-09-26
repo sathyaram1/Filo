@@ -244,3 +244,26 @@ test('popup "sospetto": è un popup di conferma e si chiude solo con "Continua" 
   await proceed.click();
   await expect(page.getByText('Sito potenzialmente sospetto')).toHaveCount(0, { timeout: 6_000 });
 });
+
+test('pagina pubblicata da un utente: chiudere l\'avviso su un modulo non silenzia gli altri moduli nella scheda', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, '<title>SB_HOSTED</title><p>contenuto</p>');
+  const r = await app.evaluate(({ BrowserWindow }) => {
+    const SB = globalThis.SN_SAFEBROWSE;
+    for (const w of BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      if (!tm) continue;
+      const tab = tm.tabs.find((t) => /^https?:/.test(t.view?.webContents?.getURL?.() || ''));
+      if (!tab) continue;
+      const a = 'https://docs.google.com/forms/d/e/MODULO-A/viewform';
+      const b = 'https://docs.google.com/forms/d/e/MODULO-B/viewform';
+      const sus = { llm: { suspicious: true, reason: null } };
+      tm.safebrowseDismiss(tab.id, a);
+      return {
+        a: tm._sbApplyState(tab, SB.evaluate(a, {}, sus)).level,
+        b: tm._sbApplyState(tab, SB.evaluate(b, {}, sus)).level,
+      };
+    }
+    return null;
+  });
+  expect(r).toEqual({ a: 'safe', b: 'sospetto' });
+});
