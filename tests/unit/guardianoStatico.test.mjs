@@ -20,7 +20,13 @@ const G = globalThis.SN_GUARDIANO_STATICO;
 
 describe('controlli statici — quello che non deve passare', () => {
   test('un codice usa e getta', () => {
-    const r = G.controlla('Il tuo codice di verifica è 483920: inseriscilo per continuare.');
+    const r = G.controlla('Il tuo codice OTP è 483920: inseriscilo per continuare.');
+    assert.equal(r.blocca, true);
+    assert.equal(r.regola, 'codice');
+  });
+
+  test('un codice monouso chiamato per esteso', () => {
+    const r = G.controlla('Il codice usa e getta 991122 serve per autorizzare il bonifico.');
     assert.equal(r.blocca, true);
     assert.equal(r.regola, 'codice');
   });
