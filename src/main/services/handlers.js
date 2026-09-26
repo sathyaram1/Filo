@@ -726,8 +726,13 @@ async function passaDalSecondoModello({ testo, classe, concreteModel, action, pa
   const richiesta = p.userMessage || p.question || p.query || p.text || '';
   let esito;
   try {
+    // I collegamenti escono dalla frase prima della domanda: dentro il testo
+    // la scritta la sceglie chi l'ha scritta, e «porta dove dice?» senza la
+    // destinazione vera non è una domanda a cui si può rispondere.
+    const separato = G.separaLink(testo);
     esito = await G.vaglia({
-      testo, classe, fonte, richiesta, modelloProduttore: concreteModel,
+      testo: separato.testo, classe, fonte, richiesta,
+      modelloProduttore: concreteModel, link: separato.link,
     });
   } catch (e) {
     // Un guasto del controllo non è un permesso: si aspetta.
