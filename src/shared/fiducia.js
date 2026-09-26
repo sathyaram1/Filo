@@ -70,5 +70,8 @@
     return ETICHETTE[normalizza(classe)] || ETICHETTE.messaggio;
   }
 
-  global.SN_FIDUCIA = { SCALA, normalizza, rango, piuBassa, contaminata, etichetta };
+  global.SN_FIDUCIA = {
+    SCALA, normalizza, rango, piuBassa, contaminata, etichetta,
+    CLASSE_DEL_TIPO, classeDeiTipi,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
