@@ -1264,8 +1264,23 @@
     if (wanted.length === 0) return [];
     const bridge = pageBridge();
     if (bridge) return marcaProiezione(await readViaMain(bridge, { op: 'getMany', ids: wanted, timeoutMs, fields }), fields);
+    return batchGetDirect(COLLECTION, wanted, { timeoutMs, idToken, fields });
+  }
+
+  // Le SCHEDE pubbliche indicate, in una richiesta sola. È la domanda «mi
+  // spetta una ricompensa?» fatta bene (#678): chi ha segnalato conosce gli id
+  // dei propri feedback, quindi chiede quelli — zero, una o due letture —
+  // invece di scaricare la bacheca intera per cercarsi dentro. Niente token:
+  // questa collezione si legge senza credenziali.
+  async function getManyPublic(ids, { timeoutMs = 0 } = {}) {
+    const wanted = (Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean);
+    if (wanted.length === 0) return [];
+    return batchGetDirect(VIEW_COLLECTION, wanted, { timeoutMs });
+  }
+
+  async function batchGetDirect(collectionId, wanted, { timeoutMs = 0, idToken = '', fields = null } = {}) {
     const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
-    const prefix = `${FIRESTORE_BASE}/${COLLECTION}/`;
+    const prefix = `${FIRESTORE_BASE}/${collectionId}/`;
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const corpo = { documents: wanted.map((id) => prefix + id) };
@@ -1425,6 +1440,142 @@
 
   /** Butta via la memoria breve: dopo aver scritto o tolto una scheda. */
   function forgetAllPublic() { allCache = { at: 0, rows: null, porta: null }; }
+
+  // ── Le domande MIRATE alla bacheca (#678) ────────────────────────────────
+  //
+  // Leggere tutte le schede è la risposta giusta a «quali schede esistono?»,
+  // e la risposta sbagliata alle due domande che si fanno da una macchina
+  // utente: «cosa metto nella prima schermata della bacheca?» e «mi spetta una
+  // ricompensa?». Costavano una lettura per scheda a ogni apertura di pagina,
+  // per ogni utente: con 550 schede e cento tester, oltre un milione di letture
+  // al giorno per una risposta che cambia una volta ogni mai.
+  //
+  // Le tre domande mirate qui sotto rispondono con le letture che servono:
+  // una pagina (`listPublicPage`), solo ciò che è cambiato
+  // (`listPublicChangedSince`), solo le proprie (`getManyPublic`).
+
+  // Quante schede per pagina nella bacheca. Non è il tetto di niente: è quanto
+  // si mostra prima di dover scorrere, e lo scorrimento chiede la pagina dopo.
+  const BOARD_PAGE_SIZE = 50;
+
+  // Il corpo comune di ogni lettura via `runQuery`: fetch con timeout
+  // opzionale, errore parlante, righe già decodificate.
+  async function runQueryDirect(structuredQuery, { timeoutMs = 0, idToken = '', what = 'list' } = {}) {
+    const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    const opts = { method: 'POST', headers, body: JSON.stringify({ structuredQuery }) };
+    let timer = null;
+    let timedOut = false;
+    if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
+      const controller = new AbortController();
+      opts.signal = controller.signal;
+      timer = setTimeout(() => { timedOut = true; try { controller.abort(); } catch (_) {} }, timeoutMs);
+    }
+    let res;
+    try {
+      res = await fetch(endpoint, opts);
+    } catch (e) {
+      if (timedOut) throw new Error(`firestore ${what}: timeout di rete`);
+      throw e;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`firestore ${what} fallito (${res.status}): ${t.slice(0, 300)}`);
+    }
+    const arr = await res.json();
+    const out = [];
+    for (const row of Array.isArray(arr) ? arr : []) {
+      if (row && row.document) out.push(fsDocToObject(row.document));
+    }
+    return out;
+  }
+
+  function selectFields(fields) {
+    const arr = (Array.isArray(fields) ? fields : []).map((f) => String(f || '')).filter(Boolean);
+    if (!arr.length) return null;
+    // `__name__` sempre dentro: senza, le righe tornerebbero senza id e il
+    // cursore della pagina dopo non si potrebbe nemmeno scrivere.
+    if (!arr.includes('__name__')) arr.push('__name__');
+    return { fields: arr.map((f) => ({ fieldPath: f })) };
+  }
+
+  // UNA pagina di schede nell'ordine in cui la bacheca le mostra (dalla più
+  // recente per data d'invio), con i soli campi chiesti.
+  //
+  // Il cursore porta anche il NOME del documento: due schede con la stessa
+  // data d'invio, senza quel secondo criterio, farebbero saltare o ripetere
+  // una riga al confine fra due pagine. L'ordine `createdAt DESC, __name__
+  // DESC` lo serve l'indice che Firestore tiene da sé su ogni campo: non c'è
+  // nessun indice composto da creare.
+  //
+  // Torna il cursore per la pagina dopo (`after`) e se la raccolta è finita
+  // (`complete`). Chi chiama NON deve indovinarlo dalla lunghezza.
+  async function listPublicPage({ pageSize = BOARD_PAGE_SIZE, timeoutMs = 0, fields = null, after = null } = {}) {
+    const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || BOARD_PAGE_SIZE));
+    const structuredQuery = {
+      from: [{ collectionId: VIEW_COLLECTION }],
+      orderBy: [
+        { field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' },
+        { field: { fieldPath: '__name__' }, direction: 'DESCENDING' },
+      ],
+      limit,
+    };
+    const sel = selectFields(fields);
+    if (sel) structuredQuery.select = sel;
+    if (after && after.name) {
+      structuredQuery.startAt = {
+        before: false,
+        values: [
+          { stringValue: String(after.createdAt || '') },
+          { referenceValue: String(after.name) },
+        ],
+      };
+    }
+    const rows = await runQueryDirect(structuredQuery, { timeoutMs, what: 'pagina della bacheca' });
+    const ultima = rows[rows.length - 1] || null;
+    const cursore = ultima
+      ? { createdAt: String(ultima.createdAt || ''), name: nomeDocumento(VIEW_COLLECTION, ultima) }
+      : null;
+    return { rows, after: cursore, complete: rows.length < limit };
+  }
+
+  // Le schede scritte (o riscritte) dopo `since`. `publishedAt` è il timbro che
+  // il publisher mette a ogni pubblicazione, e lo mette SOLO quando la scheda
+  // è davvero cambiata: è la domanda «cosa è successo da quando non guardavo»,
+  // e costa una lettura per scheda cambiata invece che per scheda esistente.
+  //
+  // `since` vuoto vuol dire «dall'inizio»: allora è una pagina come le altre.
+  async function listPublicChangedSince({ since = '', pageSize = BOARD_PAGE_SIZE, timeoutMs = 0, fields = null } = {}) {
+    const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || BOARD_PAGE_SIZE));
+    const structuredQuery = {
+      from: [{ collectionId: VIEW_COLLECTION }],
+      // Crescente: la pagina si ferma alle più vecchie fra le cambiate, e chi
+      // chiama sa che oltre il cursore c'è altro da chiedere.
+      orderBy: [{ field: { fieldPath: 'publishedAt' }, direction: 'ASCENDING' }],
+      limit,
+    };
+    if (since) {
+      structuredQuery.where = {
+        fieldFilter: {
+          field: { fieldPath: 'publishedAt' },
+          op: 'GREATER_THAN',
+          value: { stringValue: String(since) },
+        },
+      };
+    }
+    const sel = selectFields(fields);
+    if (sel) {
+      // Senza `publishedAt` nella proiezione chi chiama non potrebbe spostare
+      // il proprio segnalibro e richiederebbe le stesse schede per sempre.
+      if (!sel.fields.some((f) => f.fieldPath === 'publishedAt')) sel.fields.push({ fieldPath: 'publishedAt' });
+      structuredQuery.select = sel;
+    }
+    const rows = await runQueryDirect(structuredQuery, { timeoutMs, what: 'schede cambiate' });
+    return { rows, complete: rows.length < limit };
+  }
 
   // Il nome intero del documento, quello che Firestore vuole come cursore.
   function nomeDocumento(collectionId, row) {
@@ -1897,6 +2048,13 @@
     // che sull'asse della data d'invio non si possono chiedere.
     listAllPublic,
     listAllPublicPaged,
+    // #678 — le domande MIRATE, quelle che una macchina utente deve poter fare
+    // senza pagare una lettura per scheda esistente: una pagina della bacheca,
+    // solo ciò che è cambiato, solo le schede dei propri feedback.
+    listPublicPage,
+    listPublicChangedSince,
+    getManyPublic,
+    BOARD_PAGE_SIZE,
     // La memoria breve di `listAllPublic` si butta via da qui, dopo aver
     // scritto o tolto una scheda.
     forgetAllPublic,

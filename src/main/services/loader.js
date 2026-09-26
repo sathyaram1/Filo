@@ -58,6 +58,7 @@ require(path.join(SHARED, 'filoState.js'));
 require(path.join(SHARED, 'chatArchive.js'));
 require(path.join(SHARED, 'dashboardRefresh.js'));
 require(path.join(SHARED, 'feedback.js'));
+require(path.join(SHARED, 'feedbackMine.js')); // #678 — il registro dei feedback mandati da questa installazione
 require(path.join(SHARED, 'feedbackLive.js')); // confronto versioni + fusione per l'aggiornamento continuo della dashboard
 require(path.join(SHARED, 'feedbackTransitions.js')); // DATI della macchina a stati (fonte unica, SPEC-RIDISEGNO-MAX.md §7)
 require(path.join(SHARED, 'verifierRound.js')); // regole del giro di verifica (fonte unica, feedback #561)

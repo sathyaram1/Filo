@@ -161,6 +161,10 @@ module.exports = function register(on, ctx) {
           parentId: id,
           name: '',
         });
+        // #678 — la riapertura è una segnalazione di questa installazione:
+        // entra nel registro, e la prossima apertura della home va a vedere
+        // subito se c'è una ricompensa da dare (l'attesa si azzera).
+        try { await globalThis.SN_FEEDBACK_MINE?.ricordaId?.(created?.id); } catch (_) {}
       } catch (e) {
         // Compensazione best-effort: il segnale/feedback non è andato a buon
         // fine dopo aver già scalato — restituiamo i crediti invece di

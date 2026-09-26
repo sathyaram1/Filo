@@ -303,7 +303,7 @@ module.exports = function register(on, ctx) {
       // quello vero anche dopo un cambio dispositivo) prima di premiare.
       await ensureAccountSync().catch(() => {});
       const id = await globalThis.SN_STORAGE?.getRaw?.('sn_feedback_client_id', null);
-      if (!id || !(FB?.listAllPublic || FB?.listPublic)) return empty;
+      if (!id || !FB) return empty;
 
       // #583: si leggono le SCHEDE pubbliche, non i feedback. La collezione
       // vera non si apre senza credenziali (e questa macchina non ne ha: il
@@ -312,20 +312,56 @@ module.exports = function register(on, ctx) {
       // la frase per chi ha segnalato e la cifra che gli spetta — e niente dei
       // feedback altrui.
       //
-      // TUTTE le schede, non una pagina. La pagina era dei 200 più recenti PER
-      // DATA D'INVIO: una segnalazione vecchia chiusa oggi ha una data d'invio
-      // vecchia, quindi la sua scheda nasceva già fuori e chi l'aveva mandata
-      // non riceveva né l'annuncio né i crediti — mentre il suo fix compariva
-      // in bacheca sotto i suoi occhi. Chiedere una finestra sull'asse
-      // sbagliato è la stessa causa che la verifica del #583 ha visto rientrare
-      // da tre porte.
+      // #678: si chiedono le PROPRIE schede, per id, e non più tutte. La
+      // domanda «mi spetta una ricompensa?» riguarda le poche segnalazioni di
+      // questa installazione, e gli id li sa questa installazione: leggere
+      // l'intera bacheca per cercarsi dentro costava una lettura per scheda
+      // esistente, a ogni apertura di scheda nuova e per ogni utente. Adesso
+      // costa una lettura per propria segnalazione non ancora premiata — di
+      // solito zero — e non più di una volta ogni quattro ore, salvo che
+      // l'utente abbia appena mandato o riaperto qualcosa.
+      const MINE = globalThis.SN_FEEDBACK_MINE;
+      if (!MINE) return empty;
+      const adesso = Date.now();
+      const state = await Credits.load();
+      const rewarded = state.rewardedFeedback || {};
+
+      // Ha mandato segnalazioni PRIMA che il registro esistesse? Il registro
+      // nasce al primo invio, quindi se non c'è ancora l'unica traccia di una
+      // storia precedente sta nel portafoglio.
+      const avevaSegnalato = Object.keys(rewarded).length > 0
+        || (Array.isArray(state.rewards) && state.rewards.some((r) => r && r.kind === 'feedback_sent'));
+      await MINE.inauguraSeServe(adesso, avevaSegnalato);
+      let registro = await MINE.leggi();
+
+      // L'eredità: un'installazione che segnalava già prima del registro si
+      // cerca le schede leggendole tutte, una volta al giorno e per un mese.
+      // Le installazioni nuove non passano mai di qui.
+      const scansione = MINE.toccaScansione(registro, adesso);
+      if (!scansione && !MINE.scaduto(registro, adesso)) return empty;
+      const daChiedere = registro.ids.filter((fid) => !rewarded[fid]);
+      if (!scansione && daChiedere.length === 0) {
+        await MINE.scrivi({ ...registro, checkedAt: adesso });
+        return empty;
+      }
+
       let lette;
       try {
-        lette = FB.listAllPublic
-          ? await FB.listAllPublic({ timeoutMs: 15000 })
-          : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 15000 });
+        if (!scansione) lette = await FB.getManyPublic(daChiedere, { timeoutMs: 15000 });
+        else if (FB.listAllPublic) lette = await FB.listAllPublic({ timeoutMs: 15000 });
+        else lette = await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 15000 });
       }
-      catch (e) { console.warn('[credits] schede dei feedback non disponibili:', e?.message || e); return empty; }
+      catch (e) {
+        // Il registro NON si segna come controllato: una rete caduta non è una
+        // risposta, e chiedere di nuovo fra poco è giusto.
+        console.warn('[credits] schede dei feedback non disponibili:', e?.message || e);
+        return empty;
+      }
+      registro = {
+        ...registro,
+        checkedAt: adesso,
+        ereditaUltimoGiro: scansione ? adesso : registro.ereditaUltimoGiro,
+      };
 
       // Dal più recente, come le vedeva chi chiedeva una pagina ordinata per
       // data d'invio. La lettura completa arriva nell'ordine interno del
@@ -352,8 +388,6 @@ module.exports = function register(on, ctx) {
         if (H && H.hashClientId) localIdHash = await H.hashClientId(id);
       } catch (_) {}
 
-      const state = await Credits.load();
-      const rewarded = state.rewardedFeedback || {};
       const rewards = [];
       for (const f of all) {
         // S1.F2.1: la macchina UTENTE non ha la chiave privata → non può leggere
@@ -382,6 +416,9 @@ module.exports = function register(on, ctx) {
         })();
         if (!matched) continue; // solo i feedback DI questo install
         const fid = f._id;
+        // La scansione dell'eredità è anche il momento in cui il registro
+        // impara gli id di prima: dalla volta dopo bastano quelli.
+        if (scansione && fid) registro = MINE.conId(registro, fid);
         if (!fid || rewarded[fid]) continue;            // già premiato: niente doppio premio
         // #583 — quanto vale la segnalazione lo dice la SCHEDA (`reward`), non
         // il feedback: la priorità è un giudizio interno e sulla scheda non
@@ -403,6 +440,10 @@ module.exports = function register(on, ctx) {
           credits,
         });
       }
+      // `conId` azzera l'attesa quando impara un id nuovo: qui il controllo
+      // l'abbiamo appena fatto, quindi il timbro va rimesso o la prossima
+      // apertura richiederebbe tutto daccapo.
+      await MINE.scrivi({ ...registro, checkedAt: adesso });
       const totalCredits = rewards.reduce((s, r) => s + r.credits, 0);
       return { ok: true, rewards, totalCredits };
     } catch (e) {
