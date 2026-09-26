@@ -49,11 +49,12 @@ async function stubMain(page, { preapproved = [], pending = [] } = {}) {
         return msg.mergePreapproved ? { ok: true, by: 'owner@esempio' } : { ok: true };
       }
       if (t === 'merge_approvals_get') {
-        return { ok: true, pending: [], failed: [], recent: [], preapproved: cfg.preapproved, ttlMs: 7 * 24 * 60 * 60 * 1000 };
+        return { ok: true, pending: cfg.pending, failed: [], recent: [], preapproved: cfg.preapproved, ttlMs: 7 * 24 * 60 * 60 * 1000 };
       }
+      if (t === 'merge_approval_approve') { window.__fusioni.push(msg.id); return { ok: true, result: 'merged', sha: 'deadbeefcafe' }; }
       return orig(msg);
     };
-  }, { preapproved });
+  }, { preapproved, pending });
 }
 
 async function apri(page, fbs, opts) {
