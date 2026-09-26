@@ -71,6 +71,8 @@ const PRIVATE_PSL = new Set([
 ]);
 // Gli indirizzi di S3 per regione e da sito statico, uno per regione nella PSL: il secchio è il sito, non la regione.
 const S3 = /^s3(?:[.-][a-z0-9-]+){0,3}\.amazonaws\.com$/;
+// Così le pagine d'accesso di Cognito, <prefisso>.auth.<regione>.amazoncognito.com: il prefisso lo sceglie l'utente.
+const COGNITO = /^auth(?:-fips)?\.[a-z0-9-]+\.amazoncognito\.com$/;
 // Queste il web NON le separa (un login su wordpress.com vale sui blog): solo per il giudizio, mai per i cookie.
 const PRIVATE_AVVISO = new Set([
   'notion.site', 'amazonaws.com', 'amazoncognito.com', 'googleusercontent.com', 'app.github.dev',
@@ -121,7 +123,7 @@ function getDomainInfo(host, { soloPsl = false } = {}) {
       suffixLabels = labels.length - i;
       break;
     }
-    if (i > 0 && (PRIVATE_PSL.has(candidate) || S3.test(candidate) || (!soloPsl && PRIVATE_AVVISO.has(candidate)))) {
+    if (i > 0 && (PRIVATE_PSL.has(candidate) || S3.test(candidate) || (!soloPsl && (PRIVATE_AVVISO.has(candidate) || COGNITO.test(candidate))))) {
       suffixLabels = labels.length - i;
       ospitato = true;
       break;

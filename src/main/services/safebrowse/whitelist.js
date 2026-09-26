@@ -69,7 +69,7 @@ function isWhitelisted(registrable) {
 const HOSTED = [
   { host: /^sites\.google\.com$/, platform: 'Google Sites' },
   { host: /^docs\.google\.com$/, platform: 'Google Documenti e Moduli' },
-  { host: /^script\.google\.com$/, path: /^\/(a\/[^/]+\/)?macros\//, platform: 'Google Apps Script' },
+  { host: /^script\.google\.com$/, path: /^\/(a\/macros\/[^/]+\/|(a\/[^/]+\/)?macros\/)/, platform: 'Google Apps Script' },
   { host: /^(forms|sway)\.(office\.com|cloud\.microsoft)$/, platform: 'Microsoft Forms e Sway' },
   { host: /^ia\d+\.us\.archive\.org$/, platform: 'archive.org' },
   { host: /^(www\.)?archive\.org$/, path: /^\/download\//, platform: 'archive.org' },
