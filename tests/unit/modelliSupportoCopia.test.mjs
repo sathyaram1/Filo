@@ -132,3 +132,88 @@ test('chi riceve la configurazione non può modificare la copia condivisa', asyn
     assert.equal((await Support.get()).sanitizer, 'kimi');
   });
 });
+
+// ── Com'è andata la lettura, non solo cosa ha portato (#679, primo giro) ─────
+//
+// Tre esiti diversi finivano nello stesso cassetto: documento letto, permesso
+// negato, richiesta non partita. Il secondo è la risposta NORMALE per chiunque
+// non gestisca Filo, e trattarlo da guasto di passaggio faceva ripartire le due
+// letture ogni mezzo minuto invece che ogni cinque minuti.
+
+// Rete che risponde per ogni documento quello che le si dice: 'ok', 'negato'
+// (403, come le regole del server a chi non gestisce Filo) o 'giu' (niente
+// risposta). Rende il conto delle richieste partite.
+function conRisposte(perDoc, fn) {
+  const orig = { token: auth.getIdToken, admin: auth.isAdmin, profilo: auth.getProfile, fetch: global.fetch };
+  const conto = { supportModels: 0, judgeSecrets: 0 };
+  auth.getIdToken = async () => 'finto-id-token';
+  auth.isAdmin = () => admin;
+  auth.getProfile = () => profilo;
+  global.fetch = async (url) => {
+    const quale = String(url).includes('judgeSecrets') ? 'judgeSecrets' : 'supportModels';
+    conto[quale] += 1;
+    const come = perDoc[quale];
+    if (come === 'giu') throw new Error('rete');
+    if (come === 'negato') return { ok: false, status: 403, async json() { return {}; }, async text() { return 'denied'; } };
+    return {
+      ok: true, status: 200,
+      async json() {
+        return quale === 'judgeSecrets'
+          ? { fields: { openrouterKey: { stringValue: 'sk-vera' } } }
+          : { fields: { sanitizer: { stringValue: 'flash' } } };
+      },
+      async text() { return ''; },
+    };
+  };
+  return Promise.resolve()
+    .then(() => fn(conto))
+    .finally(() => {
+      auth.getIdToken = orig.token; auth.isAdmin = orig.admin;
+      auth.getProfile = orig.profilo; global.fetch = orig.fetch;
+    });
+}
+
+test('a chi non gestisce Filo il permesso negato vale i cinque minuti come una lettura riuscita', async () => {
+  admin = false;
+  profilo = { email: 'persona@esempio.it' };
+  Support.invalidaCache();
+  await conRisposte({ supportModels: 'negato', judgeSecrets: 'negato' }, async (conto) => {
+    await Support.get();
+    assert.equal(conto.supportModels, 1, 'premessa: la prima volta si chiede');
+    orologio += 60 * 1000; // un minuto dopo, dentro i cinque minuti
+    await Support.get();
+    assert.equal(conto.supportModels, 1,
+      'il «non ti riguarda» è la risposta normale per quasi tutti: non deve far ripartire le letture ogni mezzo minuto');
+    orologio += 5 * 60 * 1000; // passati i cinque minuti si richiede
+    await Support.get();
+    assert.equal(conto.supportModels, 2);
+  });
+});
+
+test('un singhiozzo sulla sola chiave dei giudici non si tiene per cinque minuti', async () => {
+  const stato = { judgeSecrets: 'giu' };
+  Support.invalidaCache();
+  await conRisposte({ supportModels: 'ok', get judgeSecrets() { return stato.judgeSecrets; } }, async () => {
+    const primo = await Support.get();
+    assert.equal(primo.openrouterKeyPresent, false, 'premessa: la chiave non si è potuta leggere');
+    // La rete torna. Chi gestisce Filo riapre la schermata dei modelli di
+    // supporto: la chiave c'è, e la schermata deve dirlo.
+    stato.judgeSecrets = 'ok';
+    orologio += Support.CACHE_TTL_ERRORE_MS + 1000;
+    const secondo = await Support.get();
+    assert.equal(secondo.openrouterKeyPresent, true,
+      'una risposta a metà non va messa via come buona: la schermata direbbe che la chiave non c’è per cinque minuti');
+  });
+});
+
+test('persa la chiave per un istante, l’ultima risposta buona vale più di un «non c’è» inventato', async () => {
+  const stato = { judgeSecrets: 'ok' };
+  Support.invalidaCache();
+  await conRisposte({ supportModels: 'ok', get judgeSecrets() { return stato.judgeSecrets; } }, async () => {
+    assert.equal((await Support.get()).openrouterKeyPresent, true, 'premessa: la chiave c’è');
+    stato.judgeSecrets = 'giu';
+    orologio += Support.CACHE_TTL_MS + 1000;
+    assert.equal((await Support.get()).openrouterKeyPresent, true,
+      'un singhiozzo non deve far sparire una chiave che c’è');
+  });
+});

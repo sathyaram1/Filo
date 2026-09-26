@@ -56,6 +56,7 @@ let remoteModels = null;  // { provider?, models?, modelRegistry? }
 // null e le chiavi effettive sono quelle del build.
 let remoteSecrets = null; // { apiKeys?: { openrouter?, tavily? }, safeBrowsingKey? }
 let lastFetchTs = 0;
+let adesso = () => Date.now();
 
 // ── Firestore Value <-> JS ───────────────────────────────────────────────────
 function toFsValue(v) {
@@ -166,7 +167,7 @@ async function refresh() {
   // come fatto teneva l'app senza modelli fino alla scadenza lunga, anche se
   // la rete tornava un istante dopo. Riprovare subito non è un ciclo: qui ci
   // si passa solo all'avvio, all'accesso e quando una pagina chiede la config.
-  if (risposto) lastFetchTs = Date.now();
+  if (risposto) lastFetchTs = adesso();
   return get();
 }
 
@@ -180,7 +181,7 @@ const DEFAULT_MAX_AGE_MS = 30 * 60 * 1000;
 
 // Refresh "pigro": rinfresca al massimo una volta ogni `maxAgeMs`.
 async function refreshIfStale(maxAgeMs = DEFAULT_MAX_AGE_MS) {
-  if (Date.now() - lastFetchTs < maxAgeMs) return get();
+  if (adesso() - lastFetchTs < maxAgeMs) return get();
   return refresh();
 }
 
@@ -713,6 +714,9 @@ module.exports = {
   refresh,
   refreshIfStale,
   DEFAULT_MAX_AGE_MS,
+  // L'orologio si sostituisce solo nei test: far scadere una mezz'ora
+  // aspettandola davvero non è una prova che si possa correre.
+  _setAdesso: (fn) => { adesso = typeof fn === 'function' ? fn : Date.now; },
   update,
   getAutomationGate,
   setAutomationGate,

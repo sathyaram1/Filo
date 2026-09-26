@@ -183,22 +183,40 @@ test('la memoria non cresce all’infinito: oltre il tetto si butta il dominio p
   });
 });
 
-test('si chiedono tanti percorsi quanti ne entrano nel prompt, non cinquanta', async () => {
+// Quanti percorsi si chiedono al server. Il numero si MISURA sul prompt, non
+// si indovina sul caso peggiore: un tetto sotto quello che il messaggio
+// userebbe toglie all'Aiuto strade che l'utente gli ha insegnato, e con la
+// copia in memoria le letture risparmiate sono poche decine all'ora
+// (#679, primo giro: trenta contro le quarantotto che ci stavano).
+test('si chiedono tanti percorsi quanti ne entrano nel prompt', async () => {
   const Safety = globalThis.SN_PATHS_SAFETY;
-  assert.ok(P.rest.DEFAULT_PAGE_SIZE <= 30,
-    'il prompt dell’Aiuto ne imbusta una trentina prima di finire il tetto: chiederne di più è pagare letture che nessuno legge');
+
+  // Percorsi distinti come quelli che la raccolta registra davvero: un intento
+  // in una riga e una manciata di clic con l'etichetta dell'elemento.
+  const quantiCeNeStanno = (passi, lunghezzaEtichetta) => {
+    const tanti = Array.from({ length: 300 }, (_, i) => ({
+      domain: 'esempio.it', initialUrl: `/area${i}/pagina`,
+      intent: `compito numero ${i} da svolgere sul sito`,
+      steps: Array.from({ length: passi }, (_, k) => ({
+        action: 'click', selector: `bottone ${i}-${k} `.padEnd(lunghezzaEtichetta, 'x'),
+      })),
+      success: true,
+    }));
+    return (Safety.formatKnownPathsForPrompt(tanti).match(/^## "/gm) || []).length;
+  };
+
+  const medi = quantiCeNeStanno(8, 30);   // otto clic, etichette lunghe
+  const corti = quantiCeNeStanno(3, 14);  // tre clic, etichette brevi
+  assert.ok(P.rest.DEFAULT_PAGE_SIZE >= Math.min(medi, corti),
+    `il prompt ne tiene ${medi} di lunghezza media (${corti} se corti), ma se ne chiedono `
+    + `${P.rest.DEFAULT_PAGE_SIZE}: su un sito con molte strade registrate l’Aiuto ne vedrebbe `
+    + 'meno di quante ne userebbe');
+
   await conRete(ok([]), async (letture) => {
     await P.listByDomain('esempio.it', { onlySuccess: true });
     assert.equal(letture[0].body.structuredQuery.limit, P.rest.DEFAULT_PAGE_SIZE);
   });
-  // E il numero scelto sta davvero dentro il tetto del prompt, coi percorsi
-  // grossi come quelli veri: se il tetto scende, questo test lo dice.
-  const finti = Array.from({ length: P.rest.DEFAULT_PAGE_SIZE }, (_, i) => ({
-    domain: 'esempio.it', initialUrl: 'https://esempio.it/area',
-    intent: `cosa numero ${i}`,
-    steps: Array.from({ length: 8 }, (_, k) => ({ action: 'click', selector: `Pulsante ${i}-${k} ${'x'.repeat(40)}` })),
-    success: true,
-  }));
-  const prompt = Safety.formatKnownPathsForPrompt(finti);
-  assert.ok(prompt.length <= Safety.LIMITI.KNOWN_PATHS_BUDGET_CHARS);
+
+  // E il tetto del server resta il muro: più di così non si chiede comunque.
+  assert.ok(P.rest.DEFAULT_PAGE_SIZE <= P.rest.MAX_PAGE_SIZE);
 });

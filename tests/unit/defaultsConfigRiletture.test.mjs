@@ -97,3 +97,48 @@ test('chi salva la config la vede cambiata subito, non alla scadenza', async () 
     });
   });
 });
+
+// ── Una lettura non riuscita non è una lettura fatta (#679, primo giro) ──────
+//
+// Se Filo si apre mentre la rete non c'è ancora, la config condivisa non
+// arriva, e senza di lei nessuna funzione ha un modello da usare. Segnare quel
+// tentativo come fatto teneva l'app senza modelli fino alla scadenza lunga,
+// anche quando la rete tornava un istante dopo.
+
+test('una lettura che non è arrivata non rimanda la prossima di mezz’ora', async () => {
+  const origToken = auth.getIdToken;
+  const origAdmin = auth.isAdmin;
+  const origFetch = global.fetch;
+  auth.getIdToken = async () => 'finto-id-token';
+  auth.isAdmin = () => false;
+  let orologio = 5_000_000;
+  let rete = 'su';
+  const chiamate = [];
+  global.fetch = async (url) => {
+    chiamate.push(String(url));
+    if (rete === 'giu') throw new Error('offline');
+    return {
+      ok: true, status: 200,
+      async json() { return { fields: { provider: { stringValue: 'openrouter' } } }; },
+      async text() { return ''; },
+    };
+  };
+  Defaults._setAdesso(() => orologio);
+  try {
+    await Defaults.refresh();               // una lettura buona, ore fa
+    orologio += 3 * 60 * 60 * 1000;
+    rete = 'giu';
+    await Defaults.refresh();               // Filo si riapre senza rete
+    rete = 'su';                            // la rete torna un istante dopo
+    orologio += 1000;
+    const prima = chiamate.length;
+    await Defaults.refreshIfStale();
+    assert.ok(chiamate.length > prima,
+      'il tentativo fallito conta come lettura fatta: l’app resta senza modelli per mezz’ora anche se la rete è tornata');
+  } finally {
+    auth.getIdToken = origToken;
+    auth.isAdmin = origAdmin;
+    global.fetch = origFetch;
+    Defaults._setAdesso(null);
+  }
+});
