@@ -89,11 +89,20 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     catch (_) { return 100; }
   }
 
+  // Ciò che l'utente ha BATTUTO nel campo del riquadro. Il campo sta nel
+  // documento, dove arriva anche il sito: applicare `input.value` gli
+  // basterebbe per rimettersi la pagina come vuole lui, scrivendoci un numero
+  // e aspettando un clic qualsiasi (#686, terzo giro di verifica).
+  let valoreBattuto = '100';
+
+  function mostraPercentuale() {
+    valoreBattuto = String(currentPercent());
+    if (percentInput) percentInput.value = valoreBattuto;
+  }
+
   function refreshPercent() {
     // Non sovrascrivere mentre l'utente sta digitando nel campo.
-    if (percentInput && document.activeElement !== percentInput) {
-      percentInput.value = String(currentPercent());
-    }
+    if (percentInput && document.activeElement !== percentInput) mostraPercentuale();
   }
 
   // Lo zoom si chiede e si azzera da QUI, non con un evento sul documento: il
