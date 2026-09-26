@@ -58,7 +58,8 @@ test('«3000 rupie»: anche con una parola fra il numero e l\'euro si legge un p
     ' in euro al cambio di oggi.',
   ]);
   await spiega(page, '3000 rupie');
-  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 30_000 });
+  // La risposta è finita quando il marker è sparito e il numero è a vista.
+  await expect(page.locator('.sn-popup-body')).toContainText('al cambio di oggi', { timeout: 60_000 });
 
   const testo = await page.locator('.sn-popup-body').innerText();
   // SUCCESSO: quello che chi ha segnalato voleva leggere.
