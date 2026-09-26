@@ -262,7 +262,7 @@ async function giraSullaCoda(forza) {
 }
 
 const API = {
-  configure, vaglia, proponiAvviso, riprendiInAttesa,
+  configure, vaglia, proponiAvviso, riprendiInAttesa, registraBlocco,
   segretiDi, fonteVisibile, separaLink, rigaDiBlocco, inFila,
   TENTATIVI, RIPRESA_MS, MAX_TESTO,
 };
