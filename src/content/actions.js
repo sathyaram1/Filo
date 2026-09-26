@@ -1,7 +1,7 @@
 // Azioni del content script: clipboard (copia/taglia/incolla + cronologia),
 // screenshot (pieno e ritaglio), trascrizione OCR, salva/condividi/cerca,
-// color picker, QR code, spiegazioni inline (testo/immagine/link) e analisi
-// euristica dei link sospetti.
+// color picker, QR code e spiegazioni inline (testo/immagine/link; l'euristica
+// dei link sospetti sta in src/shared/linkSospetto.js).
 //
 // Estratto da content.js — viene caricato prima di lui dai preload. content.js
 // chiama init() passando le dipendenze che restano sue: il pasteContext
@@ -19,6 +19,7 @@
   // Le scorciatoie si NOMINANO da qui: su Mac hanno un'altra forma e scriverle
   // a mano è il modo con cui il menu del tasto destro è tornato a mentire.
   const Tasti = global.SN_TASTI;
+  const LinkSospetto = global.SN_LINK_SOSPETTO;
 
   // Dipendenze iniettate da content.js (vedi init in fondo).
   let deps = {
@@ -718,7 +719,24 @@
         (async () => {
           const url = linkEl.href;
           const anchorText = (linkEl.textContent || '').trim().slice(0, 200);
-          const flags = analyzeLinkSuspicious(url);
+          const flags = LinkSospetto.analizza(url);
+
+          // L'avviso sull'indirizzo lo calcola Filo, non il modello: si mostra
+          // SUBITO e resta anche se la spiegazione non arriva mai. Prima
+          // compariva col primo pezzo della risposta, e su un provider caduto
+          // il link sospetto passava senza che nessuno lo dicesse (#725).
+          const avvisoSospetto = LinkSospetto.avviso(flags);
+          el.textContent = '';
+          if (avvisoSospetto) {
+            const w = document.createElement('div');
+            w.className = 'sn-menu-link-warn';
+            w.textContent = avvisoSospetto;
+            el.appendChild(w);
+          }
+          const body = document.createElement('div');
+          body.className = 'sn-menu-link-body';
+          body.textContent = I18n.t('menu_link_loading');
+          el.appendChild(body);
 
           // Fetch leggero dei metadati OG via background (CORS-safe). Saltato se url sospetto in modo grave.
           let ogTitle = '', ogDescription = '';
@@ -737,42 +755,29 @@
           } catch (_) {
             el.classList.remove('sn-menu-inline-loading');
             el.classList.add('sn-menu-inline-error');
-            el.textContent = I18n.t('err_provider_failed');
+            body.textContent = I18n.t('err_provider_failed');
             return;
           }
           let buf = '';
           let firstDelta = true;
-          let warned = false;
           port.onMessage.addListener((m) => {
             if (m.type === 'delta') {
               if (firstDelta) {
                 el.classList.remove('sn-menu-inline-loading');
-                el.textContent = '';
-                if (flags.length && !warned) {
-                  const w = document.createElement('div');
-                  w.className = 'sn-menu-link-warn';
-                  w.textContent = I18n.t('menu_link_suspicious') + ': ' + flags.join(', ');
-                  el.appendChild(w);
-                  warned = true;
-                }
                 firstDelta = false;
               }
               buf += m.delta;
               // Sicurezza: niente HTML, è testo.
-              const txt = document.createElement('div');
-              txt.textContent = buf;
-              el.querySelector('.sn-menu-link-body')?.remove();
-              txt.className = 'sn-menu-link-body';
-              el.appendChild(txt);
+              body.textContent = buf;
             } else if (m.type === 'reset') {
               // Provider caduto a metà risposta, si riparte col fallback:
               // butta il testo parziale (l'avviso sicurezza resta).
               buf = '';
-              el.querySelector('.sn-menu-link-body')?.remove();
+              body.textContent = '';
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
-              el.textContent = m.message || I18n.t('err_provider_failed');
+              body.textContent = m.message || I18n.t('err_provider_failed');
             }
           });
           port.postMessage({
@@ -785,52 +790,6 @@
         return () => { cancelled = true; };
       },
     };
-  }
-
-  // Euristica sicurezza link: pattern noti pericolosi (unsubscribe/logout/delete/confirm/token)
-  // e typosquatting grossolano su domini popolari. Restituisce array di flag.
-  function analyzeLinkSuspicious(rawUrl) {
-    const flags = [];
-    let u;
-    try { u = new URL(rawUrl); } catch (_) { return ['url_invalido']; }
-    const path = (u.pathname + '?' + u.search).toLowerCase();
-    const sideEffectPatterns = /(^|[/?&=])(unsubscribe|optout|opt-out|logout|signout|sign-out|delete|remove|confirm|verify|reset|cancel)([/?&=]|$)/;
-    if (sideEffectPatterns.test(path)) flags.push('side_effect');
-    if (/[?&](token|key|sig|signature|hash|t)=/.test(path)) flags.push('token_in_url');
-
-    const POPULAR = ['google.com', 'amazon.com', 'amazon.it', 'apple.com', 'microsoft.com', 'facebook.com', 'youtube.com', 'paypal.com', 'netflix.com', 'instagram.com', 'twitter.com', 'x.com', 'linkedin.com', 'github.com'];
-    const host = u.hostname.toLowerCase().replace(/^www\./, '');
-    for (const p of POPULAR) {
-      if (host === p) break;
-      if (host.endsWith('.' + p)) break;
-      // typosquatting: distanza Levenshtein ≤ 2 sul dominio principale
-      if (levenshteinSmall(host, p, 2)) { flags.push('typosquatting:' + p); break; }
-    }
-    return flags;
-  }
-
-  // Levenshtein limitata a `max` (early-exit). True se distance ≤ max e ≥ 1.
-  function levenshteinSmall(a, b, max) {
-    if (a === b) return false;
-    if (Math.abs(a.length - b.length) > max) return false;
-    const m = a.length, n = b.length;
-    if (m === 0 || n === 0) return false;
-    const prev = new Array(n + 1);
-    const cur = new Array(n + 1);
-    for (let j = 0; j <= n; j++) prev[j] = j;
-    for (let i = 1; i <= m; i++) {
-      cur[0] = i;
-      let rowMin = cur[0];
-      for (let j = 1; j <= n; j++) {
-        const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
-        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
-        if (cur[j] < rowMin) rowMin = cur[j];
-      }
-      if (rowMin > max) return false;
-      for (let j = 0; j <= n; j++) prev[j] = cur[j];
-    }
-    const d = prev[n];
-    return d >= 1 && d <= max;
   }
 
   // ------------------------------------------------------------
@@ -1895,7 +1854,6 @@
     buildInlineExplain,
     buildInlineExplainImage,
     buildInlineExplainLink,
-    analyzeLinkSuspicious,
     // salva / condividi / cerca / immagini
     buildSavePayload,
     savePage,

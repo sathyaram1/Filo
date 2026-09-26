@@ -127,7 +127,6 @@
     menu_dictate_empty: 'Nessun audio comprensibile',
     menu_overflow_soon: 'Pannello completo in arrivo',
     menu_link_loading: 'Analizzo il link…',
-    menu_link_suspicious: '⚠️ Link sospetto',
 
     // Edit box
     edit_box_title: 'Modifica testo',

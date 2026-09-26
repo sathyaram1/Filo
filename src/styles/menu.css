@@ -437,6 +437,9 @@
   color: var(--sn-error, #b94a48);
   font-weight: 600;
   font-size: 11px;
+  /* è una frase, non un'etichetta: deve andare a capo senza allargare il menu */
+  line-height: 1.35;
+  word-break: break-word;
   margin-bottom: 4px;
 }
 .sn-menu-link-body {

@@ -366,3 +366,70 @@ test('nessuna capacità cita la barra in alto / degli indirizzi, rimossa dalla s
     }
   }
 });
+
+// Etichette che il menu del tasto destro MOSTRA davvero: i valori italiani
+// delle chiavi `menu_*` nominate dai content script (anche dentro un ternario,
+// perché cerchiamo la chiave come stringa) più le etichette scritte a mano lì.
+// Una chiave rimasta in i18n ma che nessuno nomina NON è una voce: è il residuo
+// di una voce tolta, ed è esattamente da lì che il manifesto ha copiato.
+function menuVoiceLabels() {
+  const i18n = readFileSync(join(ROOT, 'src', 'shared', 'i18n.js'), 'utf8');
+  const dir = join(ROOT, 'src', 'content');
+  const content = readdirSync(dir).filter((f) => f.endsWith('.js'))
+    .map((f) => readFileSync(join(dir, f), 'utf8')).join('\n');
+  const labels = new Set();
+  for (const m of i18n.matchAll(/^ {4}(menu_[a-z0-9_]+):\s*'([^']+)'/gm)) {
+    if (new RegExp(`'${m[1]}'`).test(content)) labels.add(m[2]);
+  }
+  for (const m of content.matchAll(/label:\s*'([^']+)'/g)) labels.add(m[1]);
+  return labels;
+}
+
+test('ogni voce promessa come "tasto destro → «X»" esiste davvero nel menu', () => {
+  // Drift #725, fratello maggiore di #252: il manifesto prometteva «clic destro
+  // su un link → "Spiega link"», ma quella voce non è mai stata nel menu — la
+  // spiegazione compare da sola, senza niente da cliccare. Il controllo sulle
+  // icone RITIRATE non se ne accorgeva, perché "Spiega link" non era un'icona:
+  // era solo una stringa in i18n che nessun codice nominava più.
+  //
+  // Qui la promessa è quella esplicita: il testo dopo la freccia in un'invocazione
+  // che parla di tasto/clic destro. Se una voce non si può più cliccare, il
+  // manifesto deve dire come si ottiene DAVVERO quella cosa, non citarla lo stesso.
+  const labels = menuVoiceLabels();
+  assert.ok(labels.size >= 30, `mi aspetto ≥30 etichette vere nel menu, trovate ${labels.size}`);
+
+  // Dopo la freccia: la voce, più le alternative attaccate con "/" o "," o " e ".
+  const PROMESSE = /(?:tasto destro|clic destro)[^"“«]*?→\s*((?:["“«][^"”»]+["”»])(?:\s*(?:\/|,|\se\s)\s*["“«][^"”»]+["”»])*)/gi;
+  let promesse = 0;
+  for (const c of CAP.CAPABILITIES) {
+    for (const m of String(c.invoke || '').matchAll(PROMESSE)) {
+      for (const q of m[1].matchAll(/["“«]([^"”»]+)["”»]/g)) {
+        promesse++;
+        assert.ok(labels.has(q[1].trim()),
+          `la capacità "${c.id}" promette «tasto destro → ${q[1].trim()}», ma nel menu quella voce non esiste: `
+          + 'correggi il manifesto (se la cosa succede da sola, scrivilo) o rimetti la voce');
+      }
+    }
+  }
+  assert.ok(promesse >= 10, `mi aspetto ≥10 voci promesse dal manifesto, trovate ${promesse}`);
+});
+
+test('nessuna capacità descrive come voce da cliccare una spiegazione che arriva da sola', () => {
+  // #725 — la causa dietro al drift: le tre spiegazioni inline (testo, immagine,
+  // link) sono sezioni che si riempiono da sole all'apertura del menu. Nessuna
+  // di loro ha, o deve avere, una voce: buildInlineExplain* le costruisce come
+  // `type: 'inline'`, che il menu monta senza onClick.
+  const actions = readFileSync(join(ROOT, 'src', 'content', 'actions.js'), 'utf8');
+  for (const fn of ['buildInlineExplain', 'buildInlineExplainImage', 'buildInlineExplainLink']) {
+    assert.match(actions, new RegExp(`function ${fn}\\([^)]*\\)\\s*\\{[\\s\\S]{0,400}?type: 'inline'`),
+      `${fn} non costruisce più una sezione inline: se è tornata una voce cliccabile, aggiorna manifesto e test`);
+  }
+  for (const id of ['explain-selection', 'explain-image', 'explain-link']) {
+    const cap = CAP.get(id);
+    assert.ok(cap, `manca la capacità "${id}"`);
+    assert.ok(!/(?:tasto destro|clic destro)[^"“«]*?→\s*["“«]/i.test(cap.invoke),
+      `la capacità "${id}" promette una voce del tasto destro, ma la spiegazione compare da sola`);
+    assert.match(cap.invoke, /da sola|automaticamente/i,
+      `la capacità "${id}" deve dire che la spiegazione arriva da sola, senza niente da cliccare`);
+  }
+});
