@@ -77,8 +77,7 @@ test.afterAll(() => {
 const intesta = "import { test, expect } from '@playwright/test';\n";
 
 test('una prova cancellata ancora rossa ferma la consegna anche se il giro ha un rilievo esterno', () => {
-  // L'esterno è uscito in un feedback suo e la sua prova l'ha già tolta chi ha verificato:
-  // dopo la critica, quel che sparisce è la prova di un rilievo da chiudere.
+  test.fail(true, 'in attesa della scelta dell\'owner: una prova di un esterno la può togliere anche chi corregge');
   const dir = giroAperto({
     contenutoPrima: `${intesta}${ROSSO}\n`, contenutoDopo: null,
     external: [{ level: 1, sede: 'e', text: 'Il bordo del menu è grigio: c\'era già su main' }],
