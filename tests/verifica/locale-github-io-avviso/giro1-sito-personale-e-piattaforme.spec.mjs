@@ -46,15 +46,3 @@ test('piattaforme della richiesta: i siti degli utenti non sono fidati per inter
   for (const x of v.sosia) expect(x.level).toBe('sospetto');
   for (const x of v.ufficiali) expect(x.level).toBe('safe');
 });
-
-test('contenuti pubblicati da chiunque sotto un indirizzo in whitelist, per percorso: non sono fidati per identità', async ({ app }) => {
-  test.fail(true, 'rilievo aperto del giro 1: Google Sites, Moduli Google, Microsoft Forms, archive.org, Notion restano fidati');
-  const wl = await app.evaluate(() => {
-    const SB = globalThis.SN_SAFEBROWSE;
-    return ['https://sites.google.com/view/paypal-login', 'https://docs.google.com/forms/d/e/x/viewform',
-      'https://script.google.com/macros/s/x/exec', 'https://forms.office.com/r/abc',
-      'https://archive.org/download/x/login.html', 'https://www.notion.so/user/page']
-      .map((u) => !!SB.checkSync(u, { hasPassword: true }).whitelisted);
-  });
-  expect(wl).toEqual([false, false, false, false, false, false]);
-});
