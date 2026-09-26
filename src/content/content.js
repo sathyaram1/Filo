@@ -1756,11 +1756,8 @@
   function buildZoomItem() {
     const p = zoomCorrente();
     if (p == null) return null;
-    const zicon = (self.SN_ICONS && typeof self.SN_ICONS.zoom === 'function')
-      ? self.SN_ICONS.zoom(16) : undefined;
     return {
       type: 'item',
-      icon: zicon,
       // Stesso nome della voce nella barra dei menu: due strade per la stessa
       // cosa non si chiamano in due modi.
       label: `Dimensione reale (ora ${p}%)`,
