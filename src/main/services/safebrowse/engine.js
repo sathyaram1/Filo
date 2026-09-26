@@ -179,7 +179,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     if (hosted && !broad && !certBad) {
       message = {
         title: 'Pagina pubblicata da un utente',
-        body: `Questa pagina è su ${hosted}, dove chiunque può pubblicare: non viene da chi gestisce ${norm.hostUnicode || norm.host}.`,
+        body: `Questa pagina è su ${hosted}, dove chiunque può pubblicare: non l'ha scritta chi gestisce ${norm.hostUnicode || norm.host}.`,
       };
     }
     // LLM rinforza il testo se ha una motivazione fissa.
