@@ -14,6 +14,7 @@
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 const CORPO = Buffer.from('MZ finto contenuto di prova\n' + 'z'.repeat(1024));
 
@@ -47,10 +48,8 @@ const elenco = async (shell) => {
 };
 const contenuto = (dir) => (existsSync(dir) ? readdirSync(dir) : []);
 const cartellaDownload = (app) => app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
-const cartellaQuarantena = (app) => app.evaluate(({ app: a }) => {
-  const p = require('node:path');
-  return p.join(a.getPath('userData'), 'quarantena');
-});
+const cartellaQuarantena = async (app) => join(
+  await app.evaluate(({ app: a }) => a.getPath('userData')), 'quarantena');
 
 // Una pagina sola con tutti i link: la fixture seleziona il WebContentsView per
 // hostname, e una seconda scheda dello stesso mini server tornerebbe la prima.
@@ -192,31 +191,51 @@ test('la marca «Programma» si legge in tema chiaro e in tema scuro', async ({ 
     await expect(riga).toBeVisible({ timeout: 20000 });
     await expect(riga.locator('.dl-tag')).toHaveText('Programma');
 
-    const rapporto = () => dl.evaluate(() => {
-      const el = document.querySelector('.dl-item[data-state="pending"] .dl-tag');
-      const num = (s) => (s.match(/[\d.]+/g) || []).map(Number);
+    // Contrasto di un elemento sul fondo vero della riga (il primo antenato con
+    // un colore opaco): sotto 3 non si legge.
+    const rapporto = (sel) => dl.evaluate((s) => {
+      const el = document.querySelector(s);
+      if (!el) return 0;
+      const num = (v) => (String(v).match(/[\d.]+/g) || []).map(Number);
       const lum = ([r, g, b]) => {
         const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
         return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
       };
-      // Il fondo vero: il primo antenato con un colore non trasparente.
       let fondo = [255, 255, 255];
       for (let n = el; n; n = n.parentElement) {
         const c = num(getComputedStyle(n).backgroundColor);
         if (c.length >= 3 && (c[3] === undefined || c[3] > 0.5)) { fondo = c.slice(0, 3); break; }
       }
-      return (() => {
-        const a = lum(num(getComputedStyle(el).color).slice(0, 3));
-        const b = lum(fondo);
-        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-      })();
-    });
+      const a = lum(num(getComputedStyle(el).color).slice(0, 3));
+      const b = lum(fondo);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    }, sel);
+
+    const mirini = [
+      ['.dl-item[data-state="pending"] .dl-tag', 'la marca «Programma»'],
+      ['.dl-item[data-state="pending"] .dl-meta', 'la riga «In attesa di conferma · da …»'],
+    ];
 
     for (const tema of ['light', 'dark']) {
-      await dl.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
-      const r = await rapporto();
+      // Il tema VERO: themeTokens riscrive html[data-sn-theme] al cambio, e
+      // forzare l'attributo a mano lascerebbe indietro i token generati.
+      await dl.evaluate(async (t) => {
+        await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } });
+      }, tema);
+      await expect.poll(() => dl.evaluate(() => document.documentElement.getAttribute('data-sn-theme')),
+        { timeout: 15000 }).toBe(tema);
+      await dl.waitForTimeout(400);
       await dl.screenshot({ path: `tests/.shots/588-programma-${tema}.png` });
-      expect(r, `marca «Programma», tema ${tema}: contrasto ${r.toFixed(2)}`).toBeGreaterThan(3);
+      for (const [sel, nome] of mirini) {
+        const r = await rapporto(sel);
+        expect(r, `${nome}, tema ${tema}: contrasto ${r.toFixed(2)}`).toBeGreaterThan(3);
+      }
+      // I due pulsanti della risposta devono restare leggibili: è lì che si
+      // decide se un programma entra nel computer.
+      for (const etichetta of ['Scarica', 'Non scaricare']) {
+        const b = riga.locator('.dl-btn', { hasText: new RegExp(`^${etichetta}$`) });
+        await expect(b, `pulsante «${etichetta}», tema ${tema}`).toBeVisible();
+      }
     }
   } finally {
     await srv.close();
