@@ -25,6 +25,12 @@ REGISTRATO con gli script, mentre lavori:
   `--segnala` e `--nota` si scrivono FUORI dal repo, nella cartella temporanea
   del sistema (per esempio `../segnala-<numero>.md`): la consegna rifiuta una
   directory con file non committati;
+- la domanda di fine sessione dell'owner → subito prima del rilascio, anche di
+  uno con `--guasto`: `node scripts/routine-channel.mjs domanda --biglietto <biglietto>`
+  la stampa insieme al comando per rispondere, col testo da stdin fra due
+  righe `FINE` (`risposta --biglietto <biglietto> <<'FINE'`). Rispondi su ciò
+  che hai visto tu in questa sessione; «niente» va benissimo ed è la risposta
+  più frequente. Se la domanda non arriva (exit diverso da 0), rilascia e basta;
 - il claim → il rilascio, quando hai finito (`node scripts/routine-channel.mjs
   release <biglietto> --role <il tuo ruolo>`: il rilascio allega da solo il
   rapporto di fine sessione, e il ruolo è la firma di quel rapporto. Senza,

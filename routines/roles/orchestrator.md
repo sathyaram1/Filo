@@ -89,6 +89,24 @@ lavorando": nessun flag da lasciare in giro, nessuna ripresa del lavoro a
 metà — il ramo di un worker morto si abbandona, si riparte da capo al giro
 dopo.
 
+**Ultima cosa prima di chiudere, la domanda dell'owner**, qualunque sia il
+motivo della chiusura (tranne dopo un preflight uscito con 2 o 3 e dopo un
+session limit / 429): `node scripts/routine-channel.mjs domanda
+"<parola-d-ordine>"` stampa la domanda e il comando per rispondere. Rispondi
+con quello che hai visto TU in questo giro; non riaprire worker per chiedere a
+loro, perché ciascuno ha già risposto da sé alla propria. «niente» è una
+risposta valida, ed è la più comune: non cercare cose da dire.
+
+```bash
+node scripts/routine-channel.mjs risposta "<parola-d-ordine>" <id> <<'FINE'
+<la tua risposta>
+FINE
+```
+
+Se la domanda non arriva (exit diverso da 0) chiudi e basta, senza ritentare.
+Solo un rifiuto `answer_too_big` (stampa i byte e il massimo) si accorcia e si
+rilancia.
+
 L'orchestratore NON riaccende mai il giro successivo: chiude e basta, per
 qualunque motivo (fine coda, contesto pieno, guasto, crash). Il pacemaker se
 ne accorge dai battiti e riaccende lui.

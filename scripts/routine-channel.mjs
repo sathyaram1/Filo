@@ -79,6 +79,11 @@
 //         scelto il server, e consuma il biglietto. Serve solo nella fase in
 //         cui i due canali convivono.
 //
+//   node scripts/routine-channel.mjs domanda <parola-d-ordine> | domanda --biglietto <biglietto>
+//       → la domanda di fine sessione e il comando per rispondere. Exit 0 = domanda, 2 = nessuna (chiudi e basta), 4 = rifiutato.
+//   node scripts/routine-channel.mjs risposta <parola-d-ordine> <id> | risposta --biglietto <biglietto>   (testo da stdin)
+//       → registra la risposta. Exit come sopra; `answer_too_big` stampa i byte e il massimo.
+//
 //   La FUSIONE su main non ha un sottocomando qui: passa da
 //   `scripts/merge-gate.mjs <branch>`, che usa merge() di questo modulo. Il
 //   merge lo fa il SERVER (SPEC-RIDISEGNO-MAX.md §10): verdetti registrati,
@@ -89,6 +94,7 @@ import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 import { isProtectedBranch, headSha } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
@@ -404,6 +410,96 @@ export async function releaseConRapporto(t, fault, report, opts) {
   return { ...r, rapporto: 'allegato' };
 }
 
+// ─── Domanda di fine sessione (endpoint routineClosing) ─────────────────────
+
+/** Il corpo della richiesta: una credenziale sola, il server ne rifiuta due o nessuna. PURA. */
+export function corpoChiusura(op, { passphrase = '', ticket = '', id = '', answer, requestId = '' } = {}) {
+  if (!passphrase === !ticket) throw new Error('serve esattamente una fra parola d\'ordine e biglietto');
+  const corpo = passphrase ? { passphrase: String(passphrase), op } : { ticket: String(ticket), op };
+  if (op === 'question' && passphrase && requestId) corpo.requestId = String(requestId);
+  if (op === 'answer') {
+    if (passphrase) corpo.id = String(id || '');
+    corpo.answer = String(answer ?? '');
+  }
+  return corpo;
+}
+
+/**
+ * Traduce la risposta di `routineClosing`. PURA.
+ * 'assente' = nessuna domanda da avere (endpoint che non c'è, rete, 5xx): si
+ * chiude comunque. 'rifiutato' = il server ha guardato e ha detto no.
+ */
+export function leggiRispostaChiusura(status, body) {
+  const b = body || {};
+  if (status === 200 && b.ok) {
+    return { esito: 'ok', question: typeof b.question === 'string' ? b.question : '', id: b.id ? String(b.id) : '' };
+  }
+  const reason = String(b.reason || `http_${status}`);
+  // Un 404 senza motivo del server è la funzione che non esiste (pagina HTML);
+  // `bad_closing` è un 404 vero del server, e resta un rifiuto.
+  const senzaServer = status === 0 || status >= 500 || b.reason === 'malformed_response' || (status === 404 && !b.reason);
+  if (senzaServer) return { esito: 'assente', reason: status === 404 ? 'endpoint_assente' : reason };
+  const out = { esito: 'rifiutato', reason };
+  if (b.detail) out.detail = String(b.detail);
+  if (b.bytes !== undefined) out.bytes = b.bytes;
+  if (b.max !== undefined) out.max = b.max;
+  return out;
+}
+
+export const EXIT_CHIUSURA = { ok: 0, assente: 2, rifiutato: 4 };
+
+/** La riga da stampare su un rifiuto: su `answer_too_big` coi numeri, perché chi scrive accorci lui. PURA. */
+export function testoRifiutoChiusura(r) {
+  if (r.reason === 'answer_too_big') {
+    return `RIFIUTATO dal server: answer_too_big — la risposta è di ${r.bytes ?? '?'} byte, il massimo è ${r.max ?? '?'}. `
+      + 'Non è stato salvato niente: accorciala tu e rilancia.';
+  }
+  return `RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`;
+}
+
+export async function domandaChiusura(cred, opts) {
+  // Un id per invocazione, uguale in tutti i ritentativi di call(): il server ritrova lo
+  // stesso documento invece di crearne uno orfano per ogni 5xx arrivato dopo la scrittura.
+  const requestId = cred.passphrase ? randomUUID() : '';
+  const { status, body } = await call('routineClosing', corpoChiusura('question', { ...cred, requestId }), opts);
+  const r = leggiRispostaChiusura(status, body);
+  // Senza testo, o senza l'id con cui rispondere, non c'è una domanda a cui rispondere.
+  if (r.esito === 'ok' && (!r.question.trim() || (cred.passphrase && !r.id))) return { esito: 'assente', reason: 'busta_incompleta' };
+  return r;
+}
+
+export async function rispostaChiusura(cred, answer, opts) {
+  const { status, body } = await call('routineClosing', corpoChiusura('answer', { ...cred, answer }), opts);
+  return leggiRispostaChiusura(status, body);
+}
+
+/**
+ * Le parole di `domanda` e `risposta`: la parola d'ordine (orchestratore) o
+ * `--biglietto` (worker), mai tutte e due. PURA.
+ * @returns {{ cred: object } | { errore: string }}
+ */
+export function argomentiChiusura(cmd, args, data = {}) {
+  const uso = cmd === 'risposta'
+    ? 'risposta "<parola-d-ordine>" <id>  oppure  risposta --biglietto <biglietto>, col testo da stdin'
+    : 'domanda "<parola-d-ordine>"  oppure  domanda --biglietto <biglietto>';
+  const estranei = Object.keys(data).filter((k) => k !== 'biglietto');
+  if (estranei.length) return { errore: `--${estranei[0]} non vale qui. Uso: ${uso}` };
+  const biglietto = typeof data.biglietto === 'string' ? data.biglietto.trim() : '';
+  if (biglietto) {
+    if (args.length) return { errore: `Argomento non capito: "${String(args[0]).slice(0, 40)}": col biglietto non serve altro. Uso: ${uso}` };
+    return { cred: { ticket: biglietto } };
+  }
+  const attesi = cmd === 'risposta' ? 2 : 1;
+  if (args.length !== attesi || args.some((a) => !String(a).trim())) return { errore: `Uso: ${uso}` };
+  return { cred: cmd === 'risposta' ? { passphrase: args[0], id: args[1] } : { passphrase: args[0] } };
+}
+
+/** Il comando esatto per rispondere, stampato insieme alla domanda. La parola d'ordine resta segnaposto. PURA. */
+export function comandoRisposta(io, cred, id) {
+  const chi = cred.ticket ? `--biglietto ${cred.ticket}` : `"<parola-d-ordine>" ${id}`;
+  return `node "${io}" risposta ${chi} <<'FINE'\n<la tua risposta>\nFINE`;
+}
+
 /**
  * Spedisce il ramo corrente su origin, prima del rilascio. L'hook di
  * salvataggio parte solo su Edit/Write: un `git commit` fatto a mano dal
@@ -701,7 +797,7 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop',
+    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -726,7 +822,7 @@ if (isMain) {
   // vuol dire consegnare a vuoto.
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
-    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role',
+    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'biglietto',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -831,15 +927,43 @@ if (isMain) {
     // la copia fissata, `scripts/…` porterebbe a quello del ramo di lavoro —
     // cioè proprio la cosa che il contratto dei worker vieta di scrivere a mano.
     const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
-    console.error(`Uso: node "${io}" <probe|ticket|work|heartbeat|release|deliver|compare> <segreto> [...]`);
+    console.error(`Uso: node "${io}" <probe|ticket|work|heartbeat|release|deliver|compare|domanda|risposta> <segreto> [...]`);
     process.exit(1);
   };
 
-  // `heartbeat` è l'unico comando che può girare senza posizionali: il ciclo lo
-  // avvia dispatch e il biglietto viaggia nell'ambiente, mai fra gli argomenti.
-  if (!cmd || (!args[0] && cmd !== 'heartbeat')) usage();
+  // `heartbeat` può girare senza posizionali (il biglietto viaggia nell'ambiente);
+  // `domanda` e `risposta` del worker hanno il biglietto in `--biglietto`.
+  if (!cmd || (!args[0] && !['heartbeat', 'domanda', 'risposta'].includes(cmd))) usage();
 
-  if (cmd === 'probe') {
+  if (cmd === 'domanda' || cmd === 'risposta') {
+    const a = argomentiChiusura(cmd, args, data);
+    if (a.errore) { console.error(`${a.errore} — non ho mandato niente.`); process.exit(1); }
+    if (cmd === 'domanda') {
+      const r = await domandaChiusura(a.cred);
+      if (r.esito === 'assente') { console.error(`nessuna domanda (${r.reason}): niente da rispondere, chiudi o rilascia come sempre.`); process.exit(EXIT_CHIUSURA.assente); }
+      if (r.esito === 'rifiutato') { console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato); }
+      const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
+      console.log(`${r.question.trim()}\n\nPer rispondere:\n${comandoRisposta(io, a.cred, r.id)}`);
+      process.exit(0);
+    }
+    // Il testo arriva da stdin (heredoc): sulla riga di comando gli apostrofi
+    // italiani romperebbero la shell. Da un terminale senza tubo si aspetterebbe per sempre.
+    let testo = '';
+    if (!process.stdin.isTTY) {
+      const pezzi = [];
+      for await (const p of process.stdin) pezzi.push(p);
+      testo = Buffer.concat(pezzi).toString('utf8').trim();
+    }
+    if (!testo) {
+      console.error('Nessuna risposta su stdin — non ho mandato niente. Il testo va fra due righe FINE:');
+      console.error(`  … risposta ${a.cred.ticket ? '--biglietto <biglietto>' : '"<parola-d-ordine>" <id>'} <<'FINE'\n  niente\n  FINE`);
+      process.exit(1);
+    }
+    const r = await rispostaChiusura(a.cred, testo);
+    if (r.esito === 'ok') { console.log('OK: risposta registrata.'); process.exit(0); }
+    if (r.esito === 'assente') { console.error(`risposta non arrivata (${r.reason}): chiudi comunque, senza insistere.`); process.exit(EXIT_CHIUSURA.assente); }
+    console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato);
+  } else if (cmd === 'probe') {
     const r = await probe(args[0]);
     if (r.outcome === 'work') { console.log('c’è lavoro'); process.exit(0); }
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }

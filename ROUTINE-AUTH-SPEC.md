@@ -740,3 +740,14 @@ ma a scriverlo è il server.
   sopra una release già esistente.
 - Nel lavoro di pubblicazione non è rimasto **nessun** `git push`, `git commit`
   o `npm version`, e una sentinella negli unit test diventa rossa se ci tornano.
+
+## 13. La domanda di fine sessione: `routineClosing` (2026-09-25)
+
+A fine sessione orchestratore e worker rispondono a una domanda che l'owner
+imposta; ognuno risponde per sé (l'orchestratore non legge mai i worker).
+
+- **`routineClosing` `{ passphrase | ticket, op: 'question' | 'answer', id?, answer?, requestId? }`** — domanda e risposta (`requestId`, uno per invocazione, fa ritrovare lo stesso documento ai ritentativi); mai rifiutata per `fault_declared` né a routine spente; `answer` oltre 32768 byte → `answer_too_big` con `bytes` e `max`, mai troncata.
+- **`routineClosingAdmin` (callable owner)** `{ op: 'get' | 'set' | 'clear' | 'answers' }` — slot `orchestrator`, `worker`, `new-work`, `fixer`, `verifier`, `secaudit`, `prober` (gli altri: `bad_slot` con l'elenco); ripiego nel server.
+- `routine-channel.mjs domanda "<parola>"` | `domanda --biglietto <b>` — stampa la domanda e il comando per rispondere; exit 0 · 2 nessuna domanda (404, rete) · 4 rifiutata.
+- `routine-channel.mjs risposta "<parola>" <id>` | `risposta --biglietto <b>` — il testo da stdin (`<<'FINE'`); stessi exit.
+- `routine-domanda.mjs mostra | imposta <slot> "<testo>" | togli <slot> | risposte [--n N]` — lo strumento dell'owner; stampa i testi coi caratteri di controllo resi visibili (`\x1b`), perché le risposte vengono da sessioni che leggono testo non fidato.
