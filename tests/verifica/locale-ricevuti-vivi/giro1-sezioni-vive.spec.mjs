@@ -70,6 +70,19 @@ test('fermato al cancello di fusione mentre la pagina è aperta: passa da In cod
   await expect(scheda(page, 'fb515')).toBeVisible();
 });
 
+test('coi tempi veri dell\'orologio, entro un giro, e la sezione d\'arrivo lo segnala', async ({ openTab }) => {
+  test.setTimeout(150000);
+  const page = await apri(openTab);
+  await dalVivo(page, [fb('fb515')]);
+  await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 60000, clockMs: 5000, rientroMs: 15000 }));
+  await tab(page, 'queue').click();
+  await expect(scheda(page, 'fb515')).toBeVisible();
+  await cambiaSulServer(page, fb('fb515', { _updateTime: 't2', status: 'design', statusReason: 'l5' }));
+  await expect(scheda(page, 'fb515')).toHaveCount(0, { timeout: 80000 });
+  await expect(tab(page, 'inbox')).toHaveClass(/mg-tab--arrivi/);
+  await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-arrivo.png' });
+});
+
 test('col mouse fermo sopra la lista la scheda cambia sezione lo stesso', async ({ openTab }) => {
   const page = await apri(openTab);
   await dalVivo(page, [fb('fb515'), fb('altro', { seq: 600 })]);
