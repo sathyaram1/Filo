@@ -316,6 +316,9 @@ function persist() {
 
 // ─── broadcast verso la shell ───────────────────────────────────────────
 function broadcast(kind, rec) {
+  // Una voce tolta dall'elenco non torna nella barra con l'esito tardivo del
+  // suo annullamento.
+  if (kind !== 'removed' && rec && !records.has(rec.id)) { notifyTabs(); return; }
   try {
     const { BrowserWindow } = electron();
     const payload = { kind, item: publicRecord(rec) };
@@ -779,6 +782,9 @@ function remove(id) {
   liveItems.delete(id);
   liveManual.delete(id);
   persist();
+  // La barra in alto deve saperlo: una domanda «scaricarlo?» ancora a schermo
+  // per questa voce si ritira (#588).
+  if (rec) broadcast('removed', rec);
   return listRecords();
 }
 

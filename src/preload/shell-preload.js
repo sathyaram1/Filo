@@ -60,7 +60,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     cancel: (id) => ipcRenderer.invoke('filo:message', { type: 'download_cancel', id }),
     pause: (id) => ipcRenderer.invoke('filo:message', { type: 'download_pause', id }),
     resume: (id) => ipcRenderer.invoke('filo:message', { type: 'download_resume', id }),
-    // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error', item }
+    // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error'|'missing'|'removed', item }
     onEvent: (fn) => {
       const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
       ipcRenderer.on('shell:download', wrapped);

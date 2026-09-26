@@ -332,3 +332,49 @@ test('chiuso l’avviso, l’indicatore dice ancora che una risposta è in sospe
     await srv.close();
   }
 });
+
+// La domanda compare in tre posti (avviso in alto, pannello della barra, pagina
+// Scaricamenti) e l'avviso non scade da solo: chi risponde altrove non deve
+// ritrovarsi in alto una domanda che non aspetta più niente, coi due pulsanti
+// che non fanno più nulla. Senza il fix i tre avvisi restano a schermo → rosso.
+test('risposto altrove, la domanda in alto si ritira', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  const srv = await apriServer();
+  try {
+    const page = await apriPagina(srv.base, { openTab, testServer },
+      ['uno', 'due', 'tre'].map((n) => `<a id="${n}" href="${srv.base}/${n}.exe">${n}</a>`).join('\n'));
+    const domanda = (nome) => shell.locator('.shell-notif', { hasText: `«${nome}»` }).filter({ hasText: 'Scaricarlo?' });
+
+    for (const n of ['uno', 'due', 'tre']) {
+      await page.locator(`#${n}`).click();
+      await expect.poll(() => statoDi(shell, `${n}.exe`), { timeout: 20000 }).toBe('pending');
+      await expect(domanda(`${n}.exe`)).toBeVisible({ timeout: 10000 });
+    }
+
+    // 1) «Non scaricare» dalla pagina Scaricamenti.
+    const dl = await openTab('filo://downloads/downloads.html');
+    const rigaDl = (nome) => dl.locator('.dl-item[data-state="pending"]', { has: dl.locator('.dl-name', { hasText: nome }) });
+    await expect(rigaDl('uno.exe')).toBeVisible({ timeout: 15000 });
+    await rigaDl('uno.exe').locator('.dl-btn', { hasText: 'Non scaricare' }).click();
+    await expect.poll(() => statoDi(shell, 'uno.exe'), { timeout: 10000 }).toBe('cancelled');
+    await expect(domanda('uno.exe')).toBeHidden({ timeout: 10000 });
+
+    // 2) «Scarica» dal pannello della barra in alto.
+    await shell.locator('#dl-indicator').click();
+    const rigaPannello = shell.locator('.dl-row', { hasText: 'due.exe' });
+    await expect(rigaPannello).toBeVisible({ timeout: 10000 });
+    await rigaPannello.locator('.dl-row-btn', { hasText: /^Scarica$/ }).click();
+    await expect.poll(() => statoDi(shell, 'due.exe'), { timeout: 20000 }).toBe('completed');
+    await expect(domanda('due.exe')).toBeHidden({ timeout: 10000 });
+    await shell.locator('#dl-indicator').click();
+
+    // 3) Voce tolta dall'elenco col tasto destro, senza rispondere.
+    await expect(rigaDl('tre.exe')).toBeVisible({ timeout: 15000 });
+    await rigaDl('tre.exe').click({ button: 'right' });
+    await dl.locator('.dl-ctxmenu .sn-select-option', { hasText: 'Rimuovi dalla lista' }).click();
+    await expect.poll(() => voce(shell, 'tre.exe'), { timeout: 10000 }).toBeNull();
+    await expect(domanda('tre.exe')).toBeHidden({ timeout: 10000 });
+  } finally {
+    await srv.close();
+  }
+});

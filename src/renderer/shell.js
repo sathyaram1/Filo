@@ -1326,8 +1326,11 @@
       if (r.state === 'pending') {
         // Le stesse due risposte dell'avviso: chiuderlo non deve togliere la
         // possibilità di rispondere (#588).
-        addBtn('Scarica', () => api.downloads.confirm(r.id, true).catch(() => {}));
-        addBtn('Non scaricare', () => api.downloads.confirm(r.id, false).catch(() => {}));
+        const rispondi = (allow) => api.downloads.confirm(r.id, allow).then((res) => {
+          if (res && res.ok === false) NOTIFS.show(res.error || 'Risposta non registrata');
+        }).catch(() => {});
+        addBtn('Scarica', () => rispondi(true));
+        addBtn('Non scaricare', () => rispondi(false));
       } else if (isActive(r)) {
         // Gli scaricamenti "a mano" (Salva immagine/video come…) non si mettono
         // in pausa: meglio nessun pulsante che uno che non fa niente.
