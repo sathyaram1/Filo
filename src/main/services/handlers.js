@@ -717,6 +717,18 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   let messages = await buildMessages(action, { ...payload, modelName });
   messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
 
+  // #536 — il compito ha letto roba scritta da altri? La risposta sta già nel
+  // prompt: il contenuto esterno ci entra imbustato, da una porta sola, e il
+  // contenuto non può forgiare una busta. Quindi qui non c'è nessun elenco di
+  // superfici da tenere aggiornato: chi imbusta è guardato, e basta.
+  const sorgenti = Esterno ? Esterno.tipiPresenti(messages) : [];
+  const classeFonti = Fiducia ? Fiducia.classeDeiTipi(sorgenti) : 'utente';
+  const daGuardare = sorgenti.length && SN_CONST.passaDalGuardiano(action)
+    && Fiducia && Fiducia.contaminata(classeFonti);
+  // Quello che non è stato guardato non scorre sotto gli occhi mentre viene
+  // scritto: una frase letta a metà è già arrivata.
+  if (daGuardare) { onReasoning = null; onText = null; }
+
   // `noCache` salta la LETTURA della cache (la scrittura resta: una risposta
   // buona arrivata al secondo giro sovrascrive quella rotta del primo). Serve
   // ai ritentativi sul JSON illeggibile: la chiave della cache e' identica fra
