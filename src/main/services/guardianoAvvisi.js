@@ -167,7 +167,7 @@ async function registraBlocco({ fonte, classe, testo, esito }) {
     await inFila(() => mem.addBloccoGuardiano({
       fonte, classe, motivo: esito.motivo, regola: esito.regola,
       anteprima: REGOLE_SENZA_ANTEPRIMA.has(esito.regola)
-        ? '' : globalThis.SN_CONST.unaRigaDiDati(testo, ANTEPRIMA),
+        ? '' : globalThis.SN_CONST.unaRigaDiDati(parteLeggibile(testo), ANTEPRIMA),
     }));
   } catch (_) {}
   return inFila(() => mem.addNotification({
