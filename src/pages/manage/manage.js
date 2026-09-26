@@ -2854,9 +2854,11 @@
       setManageMsg(`Segno non messo${dove}: ${e.message || 'Errore'}`, 'err');
     } finally {
       mgPreapproveBtn.disabled = false;
+      if (mgPreapproveRevokeBtn) mgPreapproveRevokeBtn.disabled = false;
     }
   }
-  if (mgPreapproveBtn) mgPreapproveBtn.addEventListener('click', togglePreapproved);
+  if (mgPreapproveBtn) mgPreapproveBtn.addEventListener('click', () => togglePreapproved());
+  if (mgPreapproveRevokeBtn) mgPreapproveRevokeBtn.addEventListener('click', () => togglePreapproved(false));
 
   // L'etichetta di stato NON si scrive più nel dettaglio (scelta owner
   // 2026-09-13): lo stato lo dicono il colore della scheda in lista e le
