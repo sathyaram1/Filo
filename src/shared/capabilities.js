@@ -132,7 +132,7 @@
     {
       id: 'translate-selection', title: 'Traduci il testo selezionato', category: 'selection',
       desc: 'Traduce il testo selezionato e mostra il risultato in un riquadro.',
-      invoke: 'Seleziona il testo e usa Alt+T (Ctrl+Alt+T su Mac): la traduzione compare in un riquadro sopra la selezione. Il menu del tasto destro non ha una voce per questo — la sua icona "Traduci" traduce tutta la pagina.',
+      invoke: 'Seleziona il testo e usa Alt+T (Ctrl+Alt+T su Mac): la traduzione compare in un riquadro sopra la selezione. Il menu del tasto destro non ha una voce per questo. La sua icona "Traduci" traduce tutta la pagina.',
     },
     {
       id: 'edit-selection', title: 'Riscrivi il testo selezionato', category: 'writing',
