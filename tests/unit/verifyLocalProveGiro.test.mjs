@@ -147,9 +147,9 @@ test('la pulizia si registra solo a correzione aperta e con rilievi messi da par
   assert.match(withPulizia({}, 'r', { controllo: buona }).reason, /nessun giro di correzione aperto/);
   assert.match(withPulizia(critica([{ level: 1, text: 'x' }]), 'r', { controllo: { ok: false, motivo: 'c\'è codice' } }).reason, /c'è codice/);
   assert.match(withPulizia(critica([{ level: 1, text: 'x' }]), 'r', { controllo: buona, dirtyFiles: ['a.txt'] }).reason, /pulizia non registrata[\s\S]*a\.txt/);
-  // Due prove tolte per un rilievo messo da parte: una è di un rilievo da correggere (#679 dalla pulizia).
-  const larga = { ...buona, files: [...buona.files, 'tests/verifica/locale-r/giro1-c.spec.mjs'] };
-  assert.match(withPulizia(critica([{ level: 1, text: 'x' }]), 'r', { controllo: larga }).reason, /sono uscite 2 prove[\s\S]*giro1-c/);
+  // La prova del rilievo 1, da correggere, non esce con quella del 2 messo da parte: il numero sta nel nome.
+  const larga = { ...buona, cancellate: [...buona.cancellate, 'tests/verifica/locale-r/giro1-r1-c.spec.mjs'] };
+  assert.match(withPulizia(critica([{ level: 1, text: 'x' }]), 'r', { controllo: larga }).reason, /giro1-r1-c\.spec\.mjs: r1 non è fra/);
   const p = withPulizia(critica([{ level: 1, text: 'x' }]), 'r', { controllo: buona });
   assert.equal(p.ok, true);
   assert.equal(p.state.r.pending.shaPulizia, PULIZIA);
