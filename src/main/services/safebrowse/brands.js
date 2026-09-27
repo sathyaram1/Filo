@@ -40,7 +40,7 @@ const BRANDS = [
   { token: 'ledger', display: 'Ledger', domains: ['ledger.com'] },
 
   // Email / account / cloud
-  { token: 'google', display: 'Google', domains: ['google.com', 'google.it', 'gmail.com', 'googlemail.com', 'googleblog.blogspot.com', 'google.ch', 'google.at', 'google.nl', 'google.be', 'google.pl', 'google.pt', 'google.ca', 'google.com.au', 'google.co.jp', 'google.com.br', 'google.co.in'] },
+  { token: 'google', display: 'Google', domains: ['google.com', 'google.it', 'gmail.com', 'googlemail.com', 'googleblog.blogspot.com', 'google.ch', 'google.at', 'google.nl', 'google.be', 'google.pl', 'google.pt', 'google.ca', 'google.com.au', 'google.co.jp', 'google.com.br', 'google.co.in', 'google-research.github.io', 'google-deepmind.github.io', 'google-developers.appspot.com'] },
   { token: 'gmail', display: 'Gmail', domains: ['gmail.com', 'google.com'] },
   { token: 'microsoft', display: 'Microsoft', domains: ['microsoft.com', 'live.com', 'office.com', 'office365.com', 'microsoft.sharepoint.com', 'microsoftonline.com', 'microsoft365.com', 'cloud.microsoft'] },
   { token: 'outlook', display: 'Outlook', domains: ['outlook.com', 'live.com', 'microsoft.com'] },
@@ -53,7 +53,7 @@ const BRANDS = [
 
   // Social / comunicazione
   { token: 'facebook', display: 'Facebook', domains: ['facebook.com', 'fb.com'] },
-  { token: 'instagram', display: 'Instagram', domains: ['instagram.com'] },
+  { token: 'instagram', display: 'Instagram', domains: ['instagram.com', 'instagram-engineering.com'] },
   { token: 'whatsapp', display: 'WhatsApp', domains: ['whatsapp.com'] },
   { token: 'twitter', display: 'X (Twitter)', domains: ['twitter.com', 'x.com'] },
   { token: 'linkedin', display: 'LinkedIn', domains: ['linkedin.com'] },
@@ -64,7 +64,7 @@ const BRANDS = [
   { token: 'steam', display: 'Steam', domains: ['steampowered.com', 'steamcommunity.com'] },
 
   // Shopping
-  { token: 'amazon', display: 'Amazon', domains: ['amazon.com', 'amazon.it', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.es', 'amazon.nl', 'amazon.ca', 'amazon.se', 'amazon.pl', 'amazon.ae', 'amazon.sg', 'amazon.in', 'amazon.co.jp', 'amazon.com.au', 'amazon.com.br', 'amazoncognito.com'] },
+  { token: 'amazon', display: 'Amazon', domains: ['amazon.com', 'amazon.it', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.es', 'amazon.nl', 'amazon.ca', 'amazon.se', 'amazon.pl', 'amazon.ae', 'amazon.sg', 'amazon.in', 'amazon.co.jp', 'amazon.com.au', 'amazon.com.br', 'amazoncognito.com', 'amazon-science.github.io'] },
   { token: 'ebay', display: 'eBay', domains: ['ebay.com', 'ebay.it', 'ebay.de', 'ebay.co.uk', 'ebay.fr', 'ebay.es', 'ebay.ca', 'ebay.com.au', 'ebay.at', 'ebay.ch', 'ebay.nl', 'ebay.be', 'ebay.ie', 'ebay.pl'] },
   { token: 'aliexpress', display: 'AliExpress', domains: ['aliexpress.com'] },
   { token: 'shopify', display: 'Shopify', domains: ['shopify.com', 'myshopify.com'] },

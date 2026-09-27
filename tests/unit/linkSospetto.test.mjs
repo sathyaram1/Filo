@@ -326,3 +326,27 @@ test('sui servizi dove ognuno apre il suo sito, il sito è di chi l’ha aperto'
     assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
   }
 });
+
+test('il nome vero col trattino si vede in ogni pezzo, non solo nel nome del sito', () => {
+  // #725.2 — i pezzi davanti al sito si confrontavano solo interi: paypal-login.wixsite.com
+  // e login-paypal.com.altro.net passavano, paypal.altro.net no.
+  for (const [u, marchio] of [
+    ['https://paypal-login.evil.com/', 'paypal.com'],
+    ['https://secure-paypal.accesso-sicuro.net/', 'paypal.com'],
+    ['https://login-paypal.com.evil.net/', 'paypal.com'],
+    ['https://login-apple.com.evil.net/', 'apple.com'],
+    ['https://apple-com.net/', 'apple.com'],
+    ['https://paypal-login.wixsite.com/conto', 'paypal.com'],
+    ['https://paypal-login.weebly.com/', 'paypal.com'],
+    ['https://paypal-login.000webhostapp.com/', 'paypal.com'],
+    ['https://paypal-login.ngrok.io/', 'paypal.com'],
+    ['https://secure-paypal:x@evil.net/', 'paypal.com'],
+  ]) {
+    assert.ok(LS.analizza(u).some((c) => c.startsWith('nome_altrui:' + marchio + '|')), `nessun avviso su ${u}`);
+  }
+  // Le pagine ufficiali dei marchi sui servizi di pagine stanno nell'elenco dei loro domini.
+  for (const u of ['https://google-research.github.io/', 'https://amazon-science.github.io/', 'https://google-developers.appspot.com/', 'https://instagram-engineering.com/', 'https://pineapple-com.net/']) {
+    assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
+  }
+  assert.ok(LS.analizza('https://paypal-login.appspot.com/').some((c) => c.startsWith('nome_altrui:paypal.com')));
+});
