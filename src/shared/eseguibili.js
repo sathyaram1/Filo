@@ -15,6 +15,10 @@
     'vbs', 'vbe', 'vb', 'jse', 'wsf', 'wsh', 'ws', 'wsc', 'sct',
     'ps1', 'ps1xml', 'ps2', 'psc1', 'psc2', 'psm1', 'psd1',
     'reg', 'lnk', 'inf', 'scf', 'url', 'chm', 'gadget', 'application', 'jnlp',
+    'appref-ms', 'xll', 'library-ms', 'settingcontent-ms', 'diagcab',
+    // Immagini disco che Windows monta al doppio clic: il programma sta dentro,
+    // e il disco montato non porta la marca di file scaricato (#588.1).
+    'iso', 'img', 'vhd', 'vhdx',
     // Mac: pacchetti, immagini disco e script che il Finder lancia.
     'dmg', 'pkg', 'mpkg', 'app', 'command', 'term', 'workflow', 'action',
     'scpt', 'scptd', 'applescript', 'prefpane', 'kext', 'osax',
@@ -26,6 +30,15 @@
   ];
 
   const SET = new Set(ESTENSIONI);
+
+  // Aprirle non esegue niente: monta un disco dove i programmi sono a un doppio
+  // clic. La frase deve dire questo, o chi legge «è un programma» su un .iso
+  // pensa a un errore e prosegue.
+  const IMMAGINI_DISCO = new Set(['iso', 'img', 'vhd', 'vhdx', 'dmg']);
+
+  function eImmagineDisco(nome) {
+    return IMMAGINI_DISCO.has(estensione(nome));
+  }
 
   // Caratteri che cambiano l'ORDINE di lettura senza cambiare il nome vero:
   // `fattura‮txt.exe` si legge «fatturaexe.txt» e resta un eseguibile.
@@ -123,20 +136,31 @@
   }
 
   function testoScarica(nome, url, incerto) {
+    if (eImmagineDisco(nome)) {
+      return `«${nomeVisibile(nome)}» è un'immagine disco${daSito(url, incerto)}. Aperta diventa un disco, e i programmi che contiene partono con un doppio clic. Scaricarla?`;
+    }
     return `«${nomeVisibile(nome)}» è un programma${daSito(url, incerto)}. Se lo apri può cambiare il computer. Scaricarlo?`;
   }
 
   function testoApri(nome, url, incerto) {
+    if (eImmagineDisco(nome)) {
+      return `«${nomeVisibile(nome)}» è un'immagine disco scaricata${daSito(url, incerto)}. Aperta diventa un disco, e i programmi che contiene partono con un doppio clic. Fallo solo se sai da chi arriva.`;
+    }
     return `«${nomeVisibile(nome)}» è un programma scaricato${daSito(url, incerto)}. Aprirlo vuol dire eseguirlo. Fallo solo se sai da chi arriva.`;
   }
 
   const TITOLO_APRI = 'Aprire un programma?';
+
+  function titoloApri(nome) {
+    return eImmagineDisco(nome) ? 'Aprire un\'immagine disco?' : TITOLO_APRI;
+  }
 
   global.SN_ESEGUIBILI = {
     ESTENSIONI,
     nomeVisibile,
     estensione,
     eEseguibile,
+    eImmagineDisco,
     sito,
     comeSito,
     normalizzaSiti,
@@ -146,5 +170,6 @@
     testoScarica,
     testoApri,
     TITOLO_APRI,
+    titoloApri,
   };
 })(globalThis);

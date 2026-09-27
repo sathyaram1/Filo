@@ -300,9 +300,10 @@ async function loadHistory() {
         // Una conferma non sopravvive al riavvio: chi l'avrebbe data non è più
         // davanti a quell'avviso. Il programma resta fuori dalla cartella e la
         // voce dice che non è stato scaricato (#588).
-        // Cronologia scritta prima del #588: la marca non c'era, e senza
-        // ricalcolarla un .exe già in elenco si aprirebbe senza conferma.
-        if (rec.exe === undefined) {
+        // La marca si ricalcola a ogni avvio perché l'elenco dei tipi cresce:
+        // un .iso scaricato prima che ci entrasse si aprirebbe senza conferma
+        // (#588.1). Solo in aggiunta: una marca già data non si toglie.
+        if (rec.exe !== true) {
           try { rec.exe = ESE().eEseguibile(rec.filename); } catch (_) { rec.exe = false; }
           if (!rec.site) { try { rec.site = ESE().sito(rec.url); } catch (_) {} }
         }
@@ -865,7 +866,7 @@ function openFile(id, opts) {
   if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.site, rec.siteUncertain)) {
     let text = `«${rec.filename}» è un programma: aprirlo vuol dire eseguirlo.`;
     let title = 'Aprire un programma?';
-    try { text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain); title = ESE().TITOLO_APRI; } catch (_) {}
+    try { text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain); title = ESE().titoloApri(rec.filename); } catch (_) {}
     return { ok: false, needsConfirm: true, exe: true, title, text };
   }
   try {

@@ -447,7 +447,7 @@
       'con estensione, es. facebook.com — niente IP o nomi senza punto): %s',
     options_security_downloads: 'Chiedi prima di scaricare un programma',
     options_security_downloads_desc:
-      'I file che il computer ESEGUE (.exe, .msi, .bat, .dmg, .pkg, .sh, .jar…) ' +
+      'I file che il computer ESEGUE (.exe, .msi, .bat, .dmg, .iso, .pkg, .sh, .jar…) ' +
       'non entrano nella cartella Download senza il tuo sì. Filo ti dice da quale ' +
       'sito arrivano e aspetta. Anche “Apri file” su un programma chiede conferma, ' +
       'perché aprirlo vuol dire eseguirlo. Tutti gli altri file scendono come sempre.',

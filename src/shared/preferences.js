@@ -315,7 +315,7 @@
         'chiedi prima di scaricare un programma', 'avviso programmi scaricati', 'download eseguibili',
         'scaricamento programmi', 'file eseguibili'],
       level: 2,
-      risk: 'Controlla l’avviso prima che un programma (.exe, .msi, .dmg, .sh…) entri nella cartella '
+      risk: 'Controlla l’avviso prima che un programma (.exe, .msi, .dmg, .iso, .sh…) entri nella cartella '
         + 'Download e prima che “Apri file” lo esegua. Disattivarlo fa scendere e aprire i programmi '
         + 'senza domande, anche quelli di un sito sbagliato.',
       build(v) {
