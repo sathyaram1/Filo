@@ -88,6 +88,7 @@
         lines.push(
           '/feedback — apri la posta delle segnalazioni (proprietario)',
           '/users — elenca gli utenti registrati (proprietario)',
+          '/users EMAIL — cerca un utente dall\'indirizzo, anche solo l\'inizio (proprietario)',
           '/gift NUMERO EMAIL — regala crediti a un utente (proprietario)',
         );
       }
@@ -95,30 +96,66 @@
     },
   };
 
+  // Un indirizzo si scrive come lo si è copiato: «Mario Rossi <mario@x.it>»,
+  // «mailto:mario@x.it», con la virgola in coda. Vale l'indirizzo che c'è dentro (#679.3).
+  function indirizzoScritto(testo) {
+    const t = String(testo || '').trim();
+    const m = /[^\s<>"'(),;:[\]]+@[^\s<>"'(),;:[\]]*/.exec(t);
+    if (m) return m[0].replace(/[.]+$/, '');
+    return t.replace(/^mailto:/i, '').replace(/^<|>$/g, '').trim();
+  }
+
+  // Due indirizzi diversi nello stesso testo non si riducono al primo in
+  // silenzio: il comando si ferma e li nomina (#679.3, secondo giro).
+  function indirizziDiversi(testo) {
+    const tutti = String(testo || '').match(/[^\s<>"'(),;:[\]]+@[^\s<>"'(),;:[\]]*/g) || [];
+    return [...new Set(tutti.map((a) => a.replace(/[.]+$/, '').toLowerCase()))];
+  }
+
   // "/users": elenca gli utenti registrati. Riservato al proprietario (il main
   // rifiuta i non-admin con un messaggio chiaro).
   //
   // #679 — arrivano a pagine: il main ne manda cinquanta per volta col totale
-  // vero, invece di scaricare l'intera collezione per stampare tre campi.
-  // Il segnalibro è l'ultima email mostrata, e sta qui finché la home è aperta:
-  // "/users" riparte da capo, "/users altri" continua.
+  // vero. Il segnalibro è l'ultima email mostrata, e sta qui finché la home è
+  // aperta: "/users" riparte da capo, "/users altri" continua, "/users mario"
+  // cerca chi ha un indirizzo che comincia così (e "altri" continua la ricerca).
   let usersSegnalibro = '';
   let usersMostrati = 0;
+  let usersCerca = '';
+  let usersGiro = 0;
 
   async function handleUsersCommand(text, chat) {
-    const ancora = /^\/users\s+(altri|ancora|avanti)\s*$/i.test(String(text || '').trim());
-    if (!ancora) { usersSegnalibro = ''; usersMostrati = 0; }
+    const dopo = String(text || '').trim().replace(/^\/users\b/i, '').trim();
+    const ancora = /^(altri|ancora|avanti)$/i.test(dopo);
+    if (!ancora) {
+      const diversi = indirizziDiversi(dopo);
+      if (diversi.length > 1) {
+        showFiloLine(`Ci sono ${diversi.length} indirizzi (${diversi.join(', ')}): scrivine uno per volta.`, chat);
+        return;
+      }
+      usersSegnalibro = '';
+      usersMostrati = 0;
+      usersCerca = /^tutti$/i.test(dopo) ? '' : indirizzoScritto(dopo).toLowerCase();
+    }
     if (ancora && !usersSegnalibro) {
       showFiloLine('Non ho altri utenti da mostrare. Scrivi /users per ripartire dall\'inizio.', chat);
       return;
     }
-    showFiloLine(ancora ? 'Recupero gli altri utenti…' : 'Recupero gli utenti registrati…', chat);
-    const r = await send({ type: MSG.OWNER_LIST_USERS, after: ancora ? usersSegnalibro : '' });
+    const cerca = usersCerca;
+    const giro = ++usersGiro;
+    const conCerca = cerca ? ` con un indirizzo che comincia per «${cerca}»` : '';
+    showFiloLine(ancora ? 'Recupero gli altri utenti…'
+      : cerca ? `Cerco gli utenti${conCerca}…` : 'Recupero gli utenti registrati…', chat);
+    const r = await send({ type: MSG.OWNER_LIST_USERS, after: ancora ? usersSegnalibro : '', cerca });
+    // Un "/users" dato mentre questa risposta viaggiava vale al suo posto: due
+    // pagine in volo contate sullo stesso segnalibro sfaserebbero i numeri.
+    if (giro !== usersGiro) return;
     if (!r || r.ok === false) { showFiloLine(r?.error || 'Non sono riuscito a recuperare gli utenti.', chat); return; }
     const users = Array.isArray(r.users) ? r.users : [];
     if (!users.length) {
       usersSegnalibro = '';
-      showFiloLine(ancora ? 'Non ci sono altri utenti.' : 'Nessun utente registrato.', chat);
+      showFiloLine(ancora ? 'Non ci sono altri utenti.'
+        : cerca ? `Nessun utente${conCerca}. Scrivi /users per vederli tutti.` : 'Nessun utente registrato.', chat);
       return;
     }
     const primo = usersMostrati + 1;
@@ -130,20 +167,29 @@
     // totale è già sullo schermo, e invitare a chiedere «gli altri» quando non
     // ce ne sono è una strada morta (#679, secondo giro).
     if (totale != null && usersMostrati >= totale) usersSegnalibro = '';
-    const testa = totale != null
-      ? `Utenti registrati ${primo}-${usersMostrati} di ${totale}:`
-      : `Utenti registrati (${usersMostrati}):`;
+    const chi = cerca ? `Utenti${conCerca}` : 'Utenti registrati';
+    const esatto = primo === 1 && users.length === 1 && !usersSegnalibro && users[0].email === cerca;
+    const testa = esatto ? 'Trovato:' : totale != null
+      ? `${chi} ${primo}-${usersMostrati} di ${totale}:`
+      : `${chi} (${usersMostrati}):`;
     const lines = users.map((u) => `• ${u.email}${u.name ? ` (${u.name})` : ''} — ${u.balance} crediti`);
-    const coda = usersSegnalibro ? '\n\nScrivi /users altri per i prossimi.' : '';
+    const coda = usersSegnalibro
+      ? `\n\nScrivi /users altri per i prossimi${cerca ? '' : ', o /users e l\'inizio di un indirizzo per cercare una persona'}.`
+      : '';
     showFiloLine(`${testa}\n${lines.join('\n')}${coda}`, chat);
   }
 
   // "/gift NUMERO EMAIL": regala crediti a un utente. Riservato al proprietario.
   async function handleGiftCommand(text, chat) {
-    const m = /^\/gift\s+(\S+)\s+(\S+)\s*$/i.exec(String(text || '').trim());
-    if (!m) { showFiloLine('Uso: /gift NUMERO EMAIL — es. /gift 2000 mario@esempio.com', chat); return; }
+    const m = /^\/gift\s+(\S+)\s+(.+)$/i.exec(String(text || '').trim());
+    const email = m ? indirizzoScritto(m[2]) : '';
+    if (!m || !email.includes('@')) { showFiloLine('Uso: /gift NUMERO EMAIL — es. /gift 2000 mario@esempio.com', chat); return; }
+    const diversi = indirizziDiversi(m[2]);
+    if (diversi.length > 1) {
+      showFiloLine(`Ci sono ${diversi.length} indirizzi (${diversi.join(', ')}): nessun regalo fatto. Scrivi /gift una volta per ciascuno.`, chat);
+      return;
+    }
     const amount = Number(m[1]);
-    const email = m[2];
     if (!Number.isInteger(amount) || amount <= 0) {
       showFiloLine(`"${m[1]}" non è un numero di crediti valido. Usa un intero positivo.`, chat);
       return;
@@ -491,6 +537,7 @@
     // /users è di quella sessione di pagina, non della precedente.
     usersSegnalibro = '';
     usersMostrati = 0;
+    usersCerca = '';
     send = deps.send;
     bubblesEl = deps.bubblesEl;
     inputEl = deps.inputEl;
@@ -520,5 +567,6 @@
     ensureSiteResolved,
     showUnresolvedSite,
     showFiloLine,
+    indirizzoScritto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
