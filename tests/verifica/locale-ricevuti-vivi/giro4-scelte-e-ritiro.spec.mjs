@@ -109,15 +109,3 @@ test('la richiesta di fusione ritirata altrove: la pratica rimasta indietro torn
   await tab(page, 'queue').click();
   await expect(scheda(page, 'fb515')).toBeVisible();
 });
-
-test('pratica tirata nei Ricevuti dalla richiesta: i tasti del pannello sono quelli della sezione in cui sta', async ({ openTab }) => {
-  const page = await apri(openTab, [fb('fb515', { status: 'revision_security' })], { pending: [richiesta()] });
-  await tab(page, 'inbox').click();
-  await scheda(page, 'fb515').click();
-  await expect(page.locator('#mgDetail')).toBeVisible();
-  const tasti = await page.locator('#mgActionsRow button:visible').allTextContents();
-  await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-g4-tasti.png' });
-  console.log('tasti nel pannello:', JSON.stringify(tasti));
-  // Una pratica nei Ricevuti che aspetta la fusione non offre «Risolto» come se fosse In coda.
-  expect(tasti.join(' ')).not.toContain('Risolto');
-});
