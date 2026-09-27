@@ -27,14 +27,30 @@
     // #725.2 — si guarda il nome come lo vede chi legge (unicode), non come
     // viaggia (punycode): «xn--pypal-4ve» a schermo è «раypal».
     const host = daPunycode(u.hostname.toLowerCase().replace(/\.$/, '')).replace(/^www\./, '');
-    const imitato = imitazione(host, etichetteUtente(u));
+    const imitato = sitoFidato(u) ? '' : imitazione(host, etichetteUtente(u));
     if (imitato) flags.push(imitato);
     else if (alfabetoIngannevole(host)) flags.push('alfabeto_ingannevole');
     return flags;
   }
 
-  // Domini ufficiali che portano il nome col trattino: il nome c'è, ed è suo.
-  const UFFICIALI = new Set(['youtube-nocookie.com', 'google-analytics.com', 'amazon-adsystem.com']);
+  // #725.2 — chi è davvero il sito lo dice l'elenco del controllo di
+  // navigazione (domini dei marchi, CDN, piattaforme che ospitano altri): uno
+  // solo per i due controlli, così media-amazon.com o fbcdn.net non gridano al lupo.
+  const SAFEBROWSE = (() => {
+    try {
+      // eslint-disable-next-line no-undef
+      if (typeof require === 'function') {
+        return { ...require('../main/services/safebrowse/whitelist.js'), ...require('../main/services/safebrowse/normalize.js') };
+      }
+    } catch (_) {}
+    return null;
+  })();
+  function sitoFidato(u) {
+    if (!SAFEBROWSE) return false;
+    const norm = SAFEBROWSE.normalize(u.href);
+    if (!norm || !norm.ok) return false;
+    return !SAFEBROWSE.hostedPlatform(norm.host, u.pathname) && SAFEBROWSE.isWhitelisted(norm.registrable);
+  }
 
   // Il nome famoso che l'indirizzo porta addosso senza essere lui a comandare.
   function imitazione(host, esca) {
@@ -42,7 +58,6 @@
       if (host === p || host.endsWith('.' + p)) return '';
     }
     const sito = sitoDi(host);
-    if (UFFICIALI.has(sito.dominio)) return '';
     // Stesso nome, altro dominio di primo livello (amazon.de, google.co): è il
     // sito, e i suoi sottodomini (facebook.github.io) sono affar suo.
     if (POPULAR.some((p) => sitoDi(p).nome === sito.nome)) return '';

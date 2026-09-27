@@ -273,3 +273,33 @@ test('la decodifica del punycode dà il nome che si legge a schermo', async () =
     assert.ok(Array.isArray(LS.analizza(u)));
   }
 });
+
+test('gli indirizzi che le aziende usano davvero non si prendono l’avviso, i loro inquilini sì', () => {
+  // #725.2 — il nome da solo in un pezzo dell'indirizzo accusava la comunità di
+  // PayPal, le immagini di Amazon e lo SharePoint di Microsoft: chi è il sito lo
+  // dice l'elenco del controllo di navigazione, uno solo per i due controlli.
+  for (const u of [
+    'https://www.paypal-community.com/t5/Italia/ct-p/it',
+    'https://m.media-amazon.com/images/I/81abc.jpg',
+    'https://images-na.ssl-images-amazon.com/images/x.jpg',
+    'https://microsoft.sharepoint.com/sites/news',
+    'https://instagram.fmxp6-1.fna.fbcdn.net/v/t51.2885-15/x.jpg',
+    'https://youtube.fandom.com/wiki/YouTube',
+    'https://paypal.wikipedia.org/',
+    'https://www.youtube-nocookie.com/embed/x',
+    'https://c.amazon-adsystem.com/x.js',
+  ]) {
+    assert.deepEqual(LS.analizza(u), [], `falso allarme su ${u}`);
+  }
+  // Sulle piattaforme dove ognuno si prende il suo sottodominio il nome resta
+  // di chi l'ha scritto, non dell'azienda.
+  for (const u of [
+    'https://paypal.sharepoint.com/',
+    'https://paypal.com.s3.amazonaws.com/x',
+    'https://paypal.com.vercel.app/',
+    'https://paypal.wordpress.com/',
+    'https://paypal.com@wikipedia.evil.net/',
+  ]) {
+    assert.ok(LS.analizza(u).some((c) => c.startsWith('nome_altrui:paypal.com')), `nessun avviso su ${u}`);
+  }
+});

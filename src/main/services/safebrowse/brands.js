@@ -18,7 +18,7 @@
 
 const BRANDS = [
   // Pagamenti / finanza
-  { token: 'paypal', display: 'PayPal', domains: ['paypal.com', 'paypal.me', 'paypal.it', 'paypal.de', 'paypal.fr', 'paypal.es', 'paypal.co.uk'] },
+  { token: 'paypal', display: 'PayPal', domains: ['paypal.com', 'paypal.me', 'paypal.it', 'paypal.de', 'paypal.fr', 'paypal.es', 'paypal.co.uk', 'paypal-community.com'] },
   { token: 'stripe', display: 'Stripe', domains: ['stripe.com'] },
   { token: 'venmo', display: 'Venmo', domains: ['venmo.com'] },
   { token: 'wise', display: 'Wise', domains: ['wise.com'] },
