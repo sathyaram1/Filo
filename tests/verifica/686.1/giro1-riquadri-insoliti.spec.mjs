@@ -1,6 +1,7 @@
-// #686.1 — giro 1: i gesti dello zoom dove il preload non c'è o non arriva per
-// primo: il riquadro che la pagina riempie da sé (editor di testo ricco), il
-// documento riscritto con un ascoltatore del sito messo davanti. Riferimento:
+// #686.1 — giro 1: i gesti dello zoom dove il preload non arriva per primo: il
+// documento riscritto con un ascoltatore del sito messo davanti (resta aperto,
+// vedi patterns/lo-zoom-lo-tiene-filo-non-la-pagina.md). Il riquadro riempito
+// dalla pagina è chiuso e sta in tests/zoom-fuori-dalla-pagina.spec.mjs. Riferimento:
 // su una pagina normale un colpo di rotella con Ctrl vale circa un passo, il
 // pizzico del trackpad scorre fluido, la rotella premuta apre il riquadro.
 // I gesti passano da sendInputEvent, la strada degli eventi veri del sistema.
@@ -69,33 +70,8 @@ async function gesti(app, page) {
   await expect.soft(page.locator('#__filo-zoom-badge'), 'la rotella premuta non apre il riquadro dello zoom').toBeVisible({ timeout: 4000 });
 }
 
-test('riquadro riempito dalla pagina (editor di testo ricco): dopo un clic dentro i gesti rispondono', async ({ app, openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
-    <iframe id="f" style="border:0;width:100vw;height:100vh;display:block"></iframe>
-    <script>
-      const d = document.getElementById('f').contentDocument;
-      d.open(); d.write('<!doctype html><html><body contenteditable style="margin:0;height:3000px"><h2>scrivi qui</h2></body></html>'); d.close();
-    </script></body></html>`);
-  await page.mouse.click(300, 300);
-  await gesti(app, page);
-});
-
-test('riquadro srcdoc e riquadri uno dentro l\'altro: i gesti rispondono', async ({ app, openTab, testServer }) => {
-  const interno = testServer.html(`<!doctype html><html><body style="margin:0;height:3000px"><h2 style="margin:0">contenuto</h2></body></html>`);
-  const medioSito = testServer.html(`<!doctype html><html><body style="margin:0">
-    <iframe src="${interno}" style="border:0;width:100vw;height:100vh;display:block"></iframe></body></html>`).replace('127.0.0.1', 'localhost');
-  for (const html of [
-    `<!doctype html><html><body style="margin:0"><iframe srcdoc="<div style='height:3000px'>contenuto</div>" style="border:0;width:100vw;height:100vh;display:block"></iframe></body></html>`,
-    `<!doctype html><html><body style="margin:0"><iframe src="${medioSito}" style="border:0;width:100vw;height:100vh;display:block"></iframe></body></html>`,
-  ]) {
-    const page = await testServer.openReady(openTab, html);
-    await page.waitForTimeout(1200);
-    await page.mouse.click(300, 300);
-    await gesti(app, page);
-  }
-});
-
 test('documento riscritto con un ascoltatore del sito messo davanti a Filo: i gesti restano dell\'utente', async ({ app, openTab, testServer }) => {
+  test.fail(true, '#686.1: Il pizzico del trackpad e la rotella premuta dipendono ancora da un ascoltatore dentro la pagina');
   const page = await testServer.openReady(openTab, `<!doctype html><html><body><h1>x</h1></body></html>`);
   await page.evaluate(() => {
     document.open();

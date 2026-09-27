@@ -21,6 +21,11 @@ dove il sito non arriva, o ci arriva solo per chiedere:
   solo da un sottoframe della stessa scheda, e li gira al frame principale. Lo
   stato della modalità rotella fa il giro inverso (`filo:zoom-modalita` →
   `framesInSubtree`), perché il riquadro deve fermare la rotella e i clic.
+  Un riquadro che la pagina riempie da sé (about:blank scritto, come gli
+  editor di testo ricco) un preload suo non ce l'ha: i suoi gesti li ascolta
+  il frame che lo contiene, agganciandolo quando il puntatore passa sul suo
+  elemento. Chi ha un preload suo lo dice con `__filoZoomQui` nel mondo
+  isolato, e l'aggancio lo salta: un gesto vale una volta sola.
 - **Il campo della percentuale** vale i tasti battuti dopo un clic vero nel
   campo, mai il `value` che ha nel documento: il sito lo scrive anche col
   comando di inserimento testo del browser, che conta come battuto. Si applica
@@ -36,10 +41,13 @@ pagina dal 200% al 25%; un `document.open` spegneva Ctrl +/-/0, Ctrl+rotella e
 clic centrale; un clic dentro un riquadro incorporato portava i tasti dove il
 preload dello zoom non c'era, mentre dalla chat lo zoom lì funzionava.
 
-**Cosa resta.** Un sito che chiama `preventDefault` su Ctrl+rotella o sul clic
-centrale se li tiene (lo fa anche Chrome, ed è così che una mappa zooma se
-stessa); i tasti restano all'utente comunque. Il riquadro con la percentuale
-sta ancora nel documento: il sito può cambiarne l'aspetto, non il numero che
-viene applicato.
+**Cosa resta.** Un sito che riscrive il proprio documento e ci mette dentro,
+nello stesso script, un suo ascoltatore sulla finestra arriva prima che gli
+ascoltatori di Filo siano rimessi (l'osservatore è un microtask): da lì si
+prende pizzico e clic centrale. Il main non può supplire: in Electron 33
+`input-event` non porta né il tasto del mouse né il verso della rotella. Il
+colpo di rotella con Ctrl lo recupera `zoom-changed`, i tasti restano
+all'utente comunque. Il riquadro con la percentuale sta ancora nel documento:
+il sito può cambiarne l'aspetto, non il numero che viene applicato.
 
-Prove: `tests/zoom-fuori-dalla-pagina.spec.mjs`, `tests/unit/zoomPagina.test.mjs`.
+Prove: `tests/zoom-fuori-dalla-pagina.spec.mjs` (con i riquadri riempiti dalla pagina), `tests/unit/zoomPagina.test.mjs`.

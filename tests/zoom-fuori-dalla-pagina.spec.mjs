@@ -224,3 +224,82 @@ test('col fuoco nel riquadro, il tasto destro sul contenuto offre la dimensione 
   await voce.click();
   await expect.poll(async () => percentOf(app, page)).toBe(100);
 });
+
+// I gesti del mouse come li manda il sistema (Playwright passa dal protocollo
+// di debug, che salta la strada dove il main vede il Ctrl+rotella non preso).
+async function manda(app, page, eventi) {
+  const url = await page.evaluate(() => location.href);
+  await app.evaluate(({ webContents }, { u, eventi }) => {
+    for (const wc of webContents.getAllWebContents()) {
+      let here = '';
+      try { here = wc.getURL(); } catch (_) {}
+      if (here !== u) continue;
+      for (const ev of eventi) wc.sendInputEvent(ev);
+    }
+  }, { u: url, eventi });
+}
+const pizzico = { type: 'mouseWheel', x: 300, y: 300, deltaX: 0, deltaY: 4, canScroll: true, hasPreciseScrollingDeltas: true, modifiers: ['control'] };
+const rotella = { type: 'mouseWheel', x: 300, y: 300, deltaX: 0, deltaY: 120, wheelTicksY: 1, canScroll: true, modifiers: [] };
+const medio = [
+  { type: 'mouseDown', x: 300, y: 300, button: 'middle', clickCount: 1 },
+  { type: 'mouseUp', x: 300, y: 300, button: 'middle', clickCount: 1 },
+];
+
+async function gestiDelMouse(app, page) {
+  for (let i = 0; i < 10; i++) { await manda(app, page, [pizzico]); await page.waitForTimeout(30); }
+  await expect.poll(async () => percentOf(app, page), { message: 'il pizzico del trackpad non zooma' }).not.toBe(100);
+  expect(Math.abs((await percentOf(app, page)) - 100), 'il pizzico salta invece di scorrere').toBeLessThan(15);
+  await premi(app, page, '0');
+  await expect.poll(async () => percentOf(app, page)).toBe(100);
+
+  await manda(app, page, medio);
+  await expect(page.locator('#__filo-zoom-badge'), 'la rotella premuta non apre il riquadro').toBeVisible();
+  await manda(app, page, [rotella]);
+  await expect.poll(async () => percentOf(app, page)).not.toBe(100);
+  await manda(app, page, medio);
+  await expect(page.locator('#__filo-zoom-badge')).toHaveCount(0);
+  await premi(app, page, '0');
+  await expect.poll(async () => percentOf(app, page)).toBe(100);
+}
+
+test('riquadro che la pagina riempie da sé (editor di testo ricco): pizzico e rotella premuta rispondono, anche dopo una riscrittura', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+    <iframe id="f" style="border:0;width:100vw;height:100vh;display:block"></iframe>
+    <script>
+      window.scrivi = (t) => { const d = document.getElementById('f').contentDocument;
+        d.open(); d.write('<!doctype html><html><body contenteditable style="margin:0;height:3000px"><h2>' + t + '</h2>' +
+          '<iframe style="border:0;width:100%;height:600px"></iframe></body></html>'); d.close(); };
+      scrivi('scrivi qui');
+    </script></body></html>`);
+  await page.mouse.click(300, 300);
+  await gestiDelMouse(app, page);
+
+  // L'editor riscrive il proprio riquadro mentre l'utente ci lavora.
+  await page.evaluate(() => window.scrivi('di nuovo'));
+  await page.mouse.click(300, 300);
+  await gestiDelMouse(app, page);
+
+  // Un riquadro vuoto dentro quello dell'editor, riempito anche lui dalla pagina.
+  await page.evaluate(() => {
+    const d = document.getElementById('f').contentDocument.querySelector('iframe').contentDocument;
+    d.open(); d.write('<!doctype html><html><body style="margin:0;height:3000px">annidato</body></html>'); d.close();
+  });
+  await page.mouse.move(300, 250);
+  await page.mouse.click(300, 300);
+  await gestiDelMouse(app, page);
+});
+
+test('riquadro srcdoc e riquadro di un altro sito con un riquadro dentro: un gesto vale una volta sola', async ({ app, openTab, testServer }) => {
+  const interno = testServer.html(`<!doctype html><html><body style="margin:0;height:3000px"><h2 style="margin:0">contenuto</h2></body></html>`);
+  const esterno = testServer.html(`<!doctype html><html><body style="margin:0">
+    <iframe src="${interno}" style="border:0;width:100vw;height:100vh;display:block"></iframe></body></html>`).replace('127.0.0.1', 'localhost');
+  for (const html of [
+    `<!doctype html><html><body style="margin:0"><iframe srcdoc="<div style='height:3000px'>contenuto</div>" style="border:0;width:100vw;height:100vh;display:block"></iframe></body></html>`,
+    `<!doctype html><html><body style="margin:0"><iframe src="${esterno}" style="border:0;width:100vw;height:100vh;display:block"></iframe></body></html>`,
+  ]) {
+    const page = await testServer.openReady(openTab, html);
+    await page.waitForTimeout(1000);
+    await page.mouse.click(300, 300);
+    await gestiDelMouse(app, page);
+  }
+});
