@@ -2375,15 +2375,6 @@
     handleMarkdownBlock();
     onDocInput();
   });
-  docEl.addEventListener('keydown', (e) => {
-    const meta = e.ctrlKey || e.metaKey;
-    if (!meta) return;
-    const k = e.key.toLowerCase();
-    if (k === 'b') { e.preventDefault(); exec('bold'); }
-    else if (k === 'i') { e.preventDefault(); exec('italic'); }
-    else if (k === 'u') { e.preventDefault(); exec('underline'); }
-  });
-
   // ── Incolla come testo semplice ─────────────────────────────────────
   // Di default il foglio è un documento "pulito": incollare da una pagina web
   // portava dietro sfondi/colori/font della sorgente (la lamentela: il testo
