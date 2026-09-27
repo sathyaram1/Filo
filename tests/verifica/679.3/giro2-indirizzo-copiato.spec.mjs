@@ -64,3 +64,17 @@ test('l’indirizzo copiato col nome, fra parentesi o come collegamento trova la
   await scrivi(page, '/users');
   await expect(ultima()).toContainText('Utenti registrati 1-50 di 120', { timeout: 8000 });
 });
+
+// Due indirizzi incollati insieme: il regalo non deve arrivare al primo soltanto senza dirlo.
+test('con due indirizzi /gift non regala in silenzio al primo solo', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await page.waitForSelector('#input');
+  await finteRisposte(page);
+  await scrivi(page, '/gift 10 utente001@esempio.it, utente002@esempio.it');
+  const ultima = page.locator('#bubbles .dash-bubble-filo').last();
+  await page.waitForTimeout(1500);
+  const regali = await page.evaluate(() => window.__regali);
+  const entrambi = regali.includes('utente001@esempio.it') && regali.includes('utente002@esempio.it');
+  const detto = /utente002@esempio\.it/.test(await ultima.innerText());
+  expect(entrambi || (regali.length === 0 && detto)).toBe(true);
+});
