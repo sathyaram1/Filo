@@ -104,6 +104,8 @@ test('applyPulizia: ammessa solo a correzione aperta e con rilievi messi da part
   const larga = { ...buona, cancellate: [...buona.cancellate, 'tests/verifica/9/giro1-r2-c.spec.mjs'] };
   assert.match(applyPulizia(aperta, larga).message, /giro1-r2-c\.spec\.mjs: r2 non è fra i rilievi messi da parte/,
     'la prova di un rilievo da correggere non esce nella pulizia');
+  assert.match(applyPulizia({ ...aperta, messiDaParteGiro: { sha: 'a'.repeat(40), n: 1, numeri: [2] } }, buona).message,
+    /giro1-r1-a\.spec\.mjs: r1 non è fra/, 'il numero conta, non quante prove escono');
   // Una critica nuova e una consegna svuotano la base: la pulizia vale per un giro solo.
   assert.equal(applyVerifierVerdict(r.state, 'fix', '[2i] y', 'd'.repeat(40)).puliziaSha, '');
   assert.equal(applyFixed(r.state).puliziaSha, '');
