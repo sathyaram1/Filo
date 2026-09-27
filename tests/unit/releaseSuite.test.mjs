@@ -184,8 +184,10 @@ describe('si pubblica il commit che la suite ha provato, anche se main si è mos
   for (const nome of ['release-mac', 'release-linux']) {
     test(`${nome} ricostruisce lo stesso sha con lo stesso numero applicato in locale`, () => {
       const j = senzaCommenti(job(nome));
-      assert.match(j, /ref:\s*\$\{\{\s*needs\.release\.outputs\.sha\s*\}\}/);
-      const applica = j.indexOf('release-apply-version.mjs "${{ needs.release.outputs.version }}"');
+      // Lo sha di Windows passa dal passo che sceglie il bersaglio (#733).
+      assert.match(j, /COMMIT_APPENA_USCITO:\s*\$\{\{\s*needs\.release\.outputs\.sha\s*\}\}/);
+      assert.match(j, /ref:\s*\$\{\{\s*steps\.bersaglio\.outputs\.codice\s*\}\}/);
+      const applica = j.indexOf('release-apply-version.mjs "$ATTESA"');
       assert.ok(applica >= 0, 'il numero va applicato anche qui, o il pacchetto esce col numero vecchio');
       assert.ok(applica < j.indexOf('npm run release:'), 'prima della build');
     });
