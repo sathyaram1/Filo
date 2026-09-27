@@ -391,8 +391,7 @@
       if (!LEVELS.includes(level)) continue;
       const text = String(f.text == null ? '' : f.text).trim().slice(0, MAX_FINDING_TEXT);
       if (!text) continue;
-      const sede = String(f.sede == null ? '' : f.sede).trim().toLowerCase() === 'e' ? 'e' : 'i';
-      out.push({ level, sede, text, decision: f.decision === true });
+      out.push({ level, sede: sedeDi(f.sede), text, decision: f.decision === true });
       if (out.length >= MAX_FINDINGS) break;
     }
     return out;
