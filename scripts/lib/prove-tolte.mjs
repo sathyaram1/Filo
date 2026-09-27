@@ -65,6 +65,7 @@ export function esitoProveTolte({ rosse = [], dallaPulizia = [], shaPrima = '', 
       rosse.map((f) => `  · ${f}`).join('\n'),
       ...perche,
       'Una prova, o un suo caso, si toglie solo verde, insieme alla prova durevole che la sostituisce.',
+      ...casi,
     ].join('\n'),
   };
 }
