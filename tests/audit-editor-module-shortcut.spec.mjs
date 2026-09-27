@@ -301,3 +301,28 @@ test('un nome di tasto che Filo non riconosce viene rifiutato al salvataggio', a
   await page.click('#cfgSave');
   await expect(page.locator('#overlay')).toBeHidden();
 });
+
+// #545.1: un modificatore col nome italiano conta alla pressione; uno che Filo
+// non sa premere si rifiuta invece di sparire e far scattare la combinazione sbagliata.
+test('Ctrl+Maiusc+2 parte con Ctrl+Shift+2; un modificatore sconosciuto si rifiuta', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#doc')).toBeVisible();
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await page.fill('#cfgShortcut', 'Ctrl+Win+2');
+  await page.click('#cfgSave');
+  await expect(page.locator('#cfgShortcut')).toHaveClass(/ed-field-invalid/);
+  await expect(page.locator('#cfgShortcutTaken')).toContainText('Win');
+  await page.screenshot({ path: 'tests/.shots/audit-editor-shortcut-modificatore-ignoto.png' });
+
+  await page.fill('#cfgShortcut', 'Ctrl+Maiusc+2');
+  await page.click('#cfgSave');
+  await expect(page.locator('#cfgShortcut')).toBeHidden();
+  await exitSettingsMode(page);
+  await page.click('#doc');
+  await page.keyboard.type('una prova', { delay: 10 });
+  await page.keyboard.press('Control+Shift+Digit2');
+  await expect(page.locator('#overlay')).toContainText('Statistiche documento');
+});

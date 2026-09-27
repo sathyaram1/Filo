@@ -79,8 +79,11 @@
     return String(accel || '').split('+').map((p) => p.trim()).filter(Boolean);
   }
 
-  const CTRL = /^(ctrl|control|cmd|command|meta)$/;
-  const ALT = /^(alt|option|opt)$/;
+  // Anche i nomi italiani e i simboli del Mac: un modificatore che non si
+  // riconosce sparirebbe dalla forma e la scorciatoia scatterebbe senza (#545.1).
+  const CTRL = /^(ctrl|control|controllo|cmd|command|comando|meta|\u2318|\u2303)$/;
+  const ALT = /^(alt|option|opt|opzione|\u2325)$/;
+  const SHIFT = /^(shift|maiusc|maiuscolo|maiuscole|\u21e7)$/;
 
   // L'etichetta da MOSTRARE per un acceleratore scritto in forma Windows.
   // Su Windows e Linux torna identica: la forma canonica è quella.
@@ -288,10 +291,16 @@
     'freccia su': '\u2191', 'freccia gi\u00f9': '\u2193', 'freccia giu': '\u2193',
     'freccia sinistra': '\u2190', 'freccia destra': '\u2192',
     su: '\u2191', 'gi\u00f9': '\u2193', giu: '\u2193', sinistra: '\u2190', destra: '\u2192',
+    'barra spaziatrice': 'space', spaziatrice: 'space',
+    'pag su': 'pageup', pagsu: 'pageup', pgsu: 'pageup', 'pag. su': 'pageup',
+    'pag gi\u00f9': 'pagedown', 'pag giu': 'pagedown', 'paggi\u00f9': 'pagedown', paggiu: 'pagedown',
+    'pg gi\u00f9': 'pagedown', 'pggi\u00f9': 'pagedown', pggiu: 'pagedown', 'pag. gi\u00f9': 'pagedown',
+    pausa: 'pause', interr: 'pause', menu: 'contextmenu',
+    stamp: 'printscreen', 'stamp r sist': 'printscreen', prtsc: 'printscreen', print: 'printscreen',
   };
   const TASTI_CON_NOME = new Set([
     'space', 'enter', 'escape', 'tab', 'backspace', 'delete', 'insert',
-    'home', 'end', 'pageup', 'pagedown', 'contextmenu',
+    'home', 'end', 'pageup', 'pagedown', 'contextmenu', 'pause', 'printscreen',
   ]);
   function tastoCanonico(nome) {
     const n = String(nome || '').toLowerCase().replace(/\s+/g, ' ');
@@ -307,7 +316,7 @@
     const mods = parti.slice(0, -1).map((m) => m.toLowerCase());
     const c = mods.some((m) => CTRL.test(m)) ? 'c' : '';
     const a = mods.some((m) => ALT.test(m)) ? 'a' : '';
-    const s = mods.some((m) => m === 'shift') ? 's' : '';
+    const s = mods.some((m) => SHIFT.test(m)) ? 's' : '';
     return `${c}${a}${s}|${tastoCanonico(finale)}`;
   }
 
@@ -367,6 +376,23 @@
     return [...t].length === 1 || TASTI_CON_NOME.has(t) || /^f([1-9]|1[0-9]|2[0-4])$/.test(t);
   }
 
+  // Il modificatore scritto, o '' se non è un modificatore che si sa premere.
+  function tipoModificatore(nome) {
+    const n = String(nome || '').trim().toLowerCase();
+    return CTRL.test(n) ? 'ctrl' : ALT.test(n) ? 'alt' : SHIFT.test(n) ? 'shift' : '';
+  }
+
+  // Il primo pezzo scritto che alla pressione non si riconoscerebbe, o null:
+  // un modificatore ignorato farebbe scattare la combinazione sbagliata.
+  function pezzoSconosciuto(accel) {
+    const testo = String(accel || '').trim().replace(/\+\s*\+$/, '+Plus');
+    const parti = pezzi(testo);
+    if (parti.length < 2) return null;
+    const ignoto = parti.slice(0, -1).find((m) => !tipoModificatore(m));
+    if (ignoto) return { nome: ignoto, modificatore: true };
+    return tastoRiconosciuto(testo) ? null : { nome: parti[parti.length - 1], modificatore: false };
+  }
+
   // I nomi con cui può presentarsi il tasto premuto. `code` è il tasto FISICO
   // (Shift+1 resta "1" anche se `key` dice "!"), `key` copre tutto il resto.
   function tastiDaEvento(ev) {
@@ -401,6 +427,8 @@
   function delSistema(accel, esplicita) {
     const f = forma(accel);
     if (!f) return false;
+    // Stamp lo cattura il sistema (istantanea dello schermo) con qualunque modificatore.
+    if (f.endsWith('|printscreen')) return true;
     const lista = PRESI_DAL_SISTEMA[piattaforma(esplicita)] || PRESI_DAL_SISTEMA.linux;
     return lista.some((a) => forma(a) === f);
   }
@@ -410,6 +438,6 @@
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
     comandoNavigazione, etichettaIndietro, etichettaAvanti,
     tastiRiservati, riservato,
-    tastoRiconosciuto, combacia, delSistema,
+    tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, combacia, delSistema,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

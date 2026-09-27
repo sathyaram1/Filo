@@ -3923,6 +3923,15 @@
     });
     $('cfgSave').addEventListener('click', () => {
       const rawShortcut = cfgShortcut.value.trim();
+      const ignoto = rawShortcut ? TASTI.pezzoSconosciuto(rawShortcut) : null;
+      if (ignoto && ignoto.modificatore) {
+        cfgShortcut.classList.add('ed-field-invalid');
+        cfgShortcutTaken.textContent =
+          `Non riconosco «${ignoto.nome}» come tasto da tenere premuto: usa ${tasto('Ctrl')}, Alt o Shift (Maiusc), es. ${tasto('Ctrl+Shift+1')}.`;
+        cfgShortcutTaken.hidden = false;
+        cfgShortcut.focus();
+        return;
+      }
       // Una scorciatoia senza modificatore (es. la lettera "b") verrebbe premuta
       // di continuo mentre si scrive: la rifiutiamo e mostriamo come correggerla,
       // invece di salvarla e rubare quel tasto in tutto l'editor.
@@ -3939,11 +3948,10 @@
       // gliela rifiutiamo dicendogli chi si prende quel tasto.
       // Un tasto finale che non sappiamo riconoscere alla pressione (un nome
       // sbagliato, "Ctrl+Spazioo") si salverebbe e non partirebbe mai.
-      if (rawShortcut && !TASTI.tastoRiconosciuto(rawShortcut)) {
-        const finale = rawShortcut.split('+').map((p) => p.trim()).filter(Boolean).pop() || '';
+      if (ignoto) {
         cfgShortcut.classList.add('ed-field-invalid');
         cfgShortcutTaken.textContent =
-          `Non riconosco il tasto «${finale}»: usa una lettera, una cifra o un nome come Spazio, Invio, Esc, Tab, Su, Giù, F1… (es. ${tasto('Ctrl+Shift+Spazio')}).`;
+          `Non riconosco il tasto «${ignoto.nome}»: usa una lettera, una cifra o un nome come Spazio, Invio, Esc, Tab, Su, Giù, F1… (es. ${tasto('Ctrl+Shift+Spazio')}).`;
         cfgShortcutTaken.hidden = false;
         cfgShortcut.focus();
         return;
@@ -3976,20 +3984,19 @@
 
   // ── Scorciatoie modulo personalizzate ──────────────────────────────────
   // Nome scritto e tasto premuto si leggono con le stesse regole: SN_TASTI.
-  const SHORTCUT_MODIFIERS = /^(ctrl|control|cmd|command|meta|alt|option|opt|shift)$/;
   function shortcutParts(sc) {
-    return String(sc || '').toLowerCase().split('+').map((s) => s.trim()).filter(Boolean);
+    return String(sc || '').split('+').map((s) => s.trim()).filter(Boolean);
   }
   // Un modificatore "reale" cambia il carattere prodotto: Ctrl/Cmd/Alt. Shift da
   // solo NON basta (Shift+b digita comunque "B"), quindi non conta come reale.
   function shortcutHasRealModifier(sc) {
-    return shortcutParts(sc).slice(0, -1).some((m) => SHORTCUT_MODIFIERS.test(m) && m !== 'shift');
+    return shortcutParts(sc).slice(0, -1).some((m) => ['ctrl', 'alt'].includes(TASTI.tipoModificatore(m)));
   }
   // Valida: un modificatore reale e un tasto finale, così non coincide con la
   // digitazione di una lettera.
   function isValidShortcut(sc) {
     const parts = shortcutParts(sc);
-    if (parts.length < 2 || SHORTCUT_MODIFIERS.test(parts[parts.length - 1])) return false;
+    if (parts.length < 2 || TASTI.tipoModificatore(parts[parts.length - 1])) return false;
     return shortcutHasRealModifier(sc);
   }
   function isEditableTarget(t) {

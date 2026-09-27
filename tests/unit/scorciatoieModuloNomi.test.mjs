@@ -61,6 +61,42 @@ test('un nome di tasto che non conosciamo si riconosce PRIMA di salvarlo', () =>
   }
 });
 
+test('i modificatori col nome italiano o col simbolo del Mac contano alla pressione', () => {
+  const ctrlShift2 = premi({ ctrlKey: true, shiftKey: true, key: '"', code: 'Digit2' });
+  for (const scritto of ['Ctrl+Maiusc+2', 'Controllo+Maiusc+2', '⌘+⇧+2', 'Comando+Shift+2']) {
+    assert.equal(T.combacia(ctrlShift2, scritto), true, scritto);
+    assert.equal(T.pezzoSconosciuto(scritto), null, scritto);
+  }
+  assert.equal(T.combacia(premi({ ctrlKey: true, key: '2', code: 'Digit2' }), 'Ctrl+Maiusc+2'), false);
+  assert.equal(T.combacia(premi({ altKey: true, key: 'p', code: 'KeyP' }), 'Opzione+P'), true);
+  assert.equal(T.combacia(premi({ altKey: true, key: 'p', code: 'KeyP' }), '⌥+P'), true);
+});
+
+test('un modificatore che non sappiamo premere si rifiuta invece di sparire', () => {
+  for (const [scritto, nome] of [['Ctrl+AltGr+2', 'AltGr'], ['Ctrl+Win+2', 'Win'], ['Ctrl+Pippo+2', 'Pippo'], ['Fn+Ctrl+F1', 'Fn']]) {
+    assert.deepEqual(T.pezzoSconosciuto(scritto), { nome, modificatore: true }, scritto);
+  }
+  assert.deepEqual(T.pezzoSconosciuto('Ctrl+Spazioo'), { nome: 'Spazioo', modificatore: false });
+  for (const vuoto of ['', 'b', 'Ctrl+Shift+1', 'Ctrl++']) assert.equal(T.pezzoSconosciuto(vuoto), null, vuoto);
+});
+
+test('i nomi italiani dei tasti sulla tastiera si riconoscono', () => {
+  const casi = [
+    ['Ctrl+Barra spaziatrice', { key: ' ', code: 'Space' }],
+    ['Ctrl+Pag Su', { key: 'PageUp', code: 'PageUp' }],
+    ['Ctrl+PagSu', { key: 'PageUp', code: 'PageUp' }],
+    ['Ctrl+Pag giù', { key: 'PageDown', code: 'PageDown' }],
+    ['Ctrl+Pausa', { key: 'Pause', code: 'Pause' }],
+    ['Ctrl+Menu', { key: 'ContextMenu', code: 'ContextMenu' }],
+  ];
+  for (const [scritto, tasto] of casi) {
+    assert.equal(T.tastoRiconosciuto(scritto), true, scritto);
+    assert.equal(T.combacia(premi({ ctrlKey: true, ...tasto }), scritto), true, scritto);
+  }
+  // Stamp lo cattura il sistema per l'istantanea: si rifiuta dicendolo.
+  for (const p of ['win32', 'darwin', 'linux']) assert.equal(T.delSistema('Ctrl+Stamp', p), true, p);
+});
+
 test('le combinazioni che il sistema operativo si prende sono riconosciute', () => {
   assert.equal(T.delSistema('Ctrl+Esc', 'win32'), true, 'su Windows Ctrl+Esc apre Start');
   assert.equal(T.delSistema('Alt+Tab', 'win32'), true);
@@ -74,7 +110,8 @@ test('le combinazioni che il sistema operativo si prende sono riconosciute', () 
 test("l'Editor non ha un suo parser dei tasti: chiede a SN_TASTI", () => {
   const src = readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8');
   assert.match(src, /TASTI\.combacia\(/, 'la pressione va confrontata con SN_TASTI.combacia');
-  assert.match(src, /TASTI\.tastoRiconosciuto\(/, 'il salvataggio deve rifiutare un tasto sconosciuto');
+  assert.match(src, /TASTI\.pezzoSconosciuto\(/, 'il salvataggio deve rifiutare un nome sconosciuto');
+  assert.doesNotMatch(src, /SHORTCUT_MODIFIERS\s*=/, 'secondo elenco dei modificatori tornato nell\'Editor');
   assert.match(src, /TASTI\.delSistema\(/, 'il salvataggio deve rifiutare un tasto del sistema');
   assert.doesNotMatch(src, /function eventKeyCandidates/, 'secondo parser dei tasti tornato nell\'Editor');
 });
