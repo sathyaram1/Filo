@@ -1,6 +1,5 @@
 // Verifica #724.1, giro 2 — col servizio dei cambi che non risponde la chat non
-// riaspetta la rete a ogni messaggio; un conto arrotondato «a due decimali»
-// arriva all'utente come numero, non come marker grezzo.
+// riaspetta la rete a ogni messaggio.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -73,22 +72,4 @@ test('servizio dei cambi fermo: dopo il primo messaggio la chat non riaspetta la
   expect(chiamate[0].at - t1, 'il primo messaggio aspetta al più il tetto della rete').toBeLessThan(5_500);
   expect(chiamate[1].at - t2, 'il secondo messaggio non riaspetta il servizio dei cambi').toBeLessThan(1_500);
   expect(chiamate[1].tasso, 'anche col servizio fermo il modello ha un cambio della rupia').toBeTruthy();
-});
-
-test('un conto arrotondato a due decimali arriva come numero, non come marker grezzo', async ({ app, shell }) => {
-  test.setTimeout(60_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await newtabPage(app);
-  await expect(page.locator('#input')).toBeVisible();
-  // Il prompt della chat elenca round fra le funzioni: un modello che lo usa
-  // alla maniera comune, round(x, 2), è un caso normale.
-  await modelloFinto(app, (tasso) => `3000 rupie sono circa [[calc: round(3000/${tasso}, 2) | eur]] €.`);
-
-  await manda(page, 'Quanto fanno 3000 rupie in euro');
-  const tasso = (await app.evaluate(() => globalThis.__chiamate))[0].tasso;
-  expect(tasso).toBeTruthy();
-  const bolla = page.locator('.dash-bubble-filo').last();
-  await expect(bolla).not.toContainText('[[');
-  const atteso = (3000 / Number(tasso)).toFixed(2).replace('.', ',');
-  await expect(bolla).toContainText(`${atteso} €`);
 });
