@@ -329,8 +329,6 @@ test('scelto dal catalogo il nome di una voce del codice, l\'avviso lo conta e i
   // Dal menu, stessa cosa.
   await row.locator('.sn-excluded-name').fill('');
   await expect(page.locator('#excludedDrift')).toBeVisible();
-  await row.locator('.sn-excluded-name').blur();
-  await row.locator('.sn-excluded-name').focus();
   await row.locator('.sn-model-id-wrap .sn-select-option', { hasText: 'NovitaAI' }).click();
   await expect(page.locator('#excludedDrift')).toBeHidden();
 });
