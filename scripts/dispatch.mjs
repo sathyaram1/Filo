@@ -1210,6 +1210,7 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
       shaPrima: baseTolte, root: ROOT,
       conPulizia: baseTolte !== shaCritica,
       messi: md && md.sha === shaCritica ? Number(md.n) || 0 : 0,
+      shaCritica,
       log: (m) => process.stderr.write(`${m}\n`),
     });
     if (tolte.ferma) return { rejected: true, formatRejected: true, message: tolte.testo };
