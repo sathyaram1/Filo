@@ -276,15 +276,30 @@ export function rilanciaProveTolte(prove, shaPrima, root, { lancia = spawnSync, 
 /**
  * Tutto il controllo, per chi consegna: `{ ferma, testo }`. `shaPrima` è la base (baseDelConfronto).
  * Senza non si sa cosa è stato tolto: lo si dice e non si ferma (la verifica dopo rilancia la cartella).
+ * Con `shaCritica` si rilanciano anche le prove a cui la pulizia ha tolto un caso, com'erano dopo di lei.
  */
-export function controllaProveTolte({ shaPrima, root, log = console.log, lancia, prepara, conPulizia = true, messi = 0 } = {}) {
+export function controllaProveTolte({ shaPrima, root, log = console.log, lancia, prepara, conPulizia = true, messi = 0, shaCritica = '' } = {}) {
   if (!SHA.test(String(shaPrima || ''))) {
     return { ferma: false, testo: 'Non so da che commit è partita la correzione: le prove del giro cancellate o cambiate non le rilancio.' };
   }
   const prove = proveTolteDal(shaPrima, root);
   if (prove === null) return { ferma: false, testo: 'Git non mi dice quali prove del giro sono state cancellate o cambiate: non le rilancio.' };
-  if (!prove.length) return { ferma: false, testo: '' };
-  const r = rilanciaProveTolte(prove, shaPrima, root, { log, ...(lancia ? { lancia } : {}), ...(prepara ? { prepara } : {}) });
+  const accorciate = conPulizia ? (proveAccorciateDallaPulizia(shaCritica, shaPrima, root) || []).filter((f) => !prove.includes(f)) : [];
+  if (!prove.length && !accorciate.length) return { ferma: false, testo: '' };
+  const r = rilanciaProveTolte([...prove, ...accorciate], shaPrima, root, { log, ...(lancia ? { lancia } : {}), ...(prepara ? { prepara } : {}) });
   if (r.motivo) return { ferma: true, testo: `Consegna respinta: ${r.motivo}` };
-  return esitoProveTolte({ rosse: r.rosse, shaPrima, conPulizia, messi });
+  return esitoProveTolte({
+    rosse: r.rosse.filter((f) => prove.includes(f)), dallaPulizia: r.rosse.filter((f) => accorciate.includes(f)), shaPrima, conPulizia, messi,
+  });
+}
+
+// I file a cui la pulizia ha tolto un caso: quello che resta copre un rilievo da correggere, e chi corregge può
+// non toccarli mai. Senza rilanciarli, un caso da correggere uscito al posto di uno messo da parte non si vedrebbe.
+function proveAccorciateDallaPulizia(shaCritica, shaPulizia, root) {
+  const critica = String(shaCritica || '');
+  if (!SHA.test(critica) || critica === String(shaPulizia)) return null;
+  try {
+    const out = gitOut(['diff', '--name-only', '-z', '--no-renames', '--diff-filter=M', critica, String(shaPulizia), '--', PROVE_GIRO], root);
+    return proveTolte(out.split('\0').filter(Boolean));
+  } catch (_) { return null; }
 }
