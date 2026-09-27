@@ -111,6 +111,25 @@ test('applyPulizia: ammessa solo a correzione aperta e con rilievi messi da part
   assert.equal(applyFixed(r.state).puliziaSha, '');
 });
 
+// Il server rimanda i rilievi col testo e il numero di feedback: il posto nella critica, che le prove portano nel nome,
+// lo ritrova chi ha mandato la critica.
+test('la risposta del server si stampa coi numeri dei rilievi nella critica', async () => {
+  const { numeraRisposta, verifierReplyText, VERIFIER_ROUND } = await import('../../scripts/dispatch.mjs');
+  const critica = VERIFIER_ROUND.parseFindings('Provato.\n[2i] la cosa a non funziona.\n[1i?] il bordo è freddo?\n[1e] un altro lavoro.').findings;
+  const r = numeraRisposta({
+    outcome: 'fix',
+    phase2: {
+      findings: [{ level: 2, sede: 'i', text: 'la cosa a non funziona.' }],
+      derived: [{ level: 1, sede: 'e', text: 'un altro lavoro.', priority: 1, num: '#9.1' }, { level: 1, sede: 'i', text: 'il bordo è freddo?', decision: true, priority: 1, num: '#9.2' }],
+    },
+  }, critica);
+  assert.deepEqual(r.phase2.derived.map((f) => f.n), [3, 2]);
+  const t = verifierReplyText(r, 'X');
+  assert.match(t, /- r1 \[2i\] la cosa a non funziona/);
+  assert.match(t, /- r3 \[1e\] un altro lavoro/);
+  assert.match(t, /le prove con r2 nel nome, per #9\.2/);
+});
+
 test('VERIFIER_ROUND: il parser della critica coi livelli arriva dagli strumenti (fonte unica)', async () => {
   const { VERIFIER_ROUND, VERIFIER_OUTCOMES } = await import('../../scripts/dispatch.mjs');
   const p = VERIFIER_ROUND.parseFindings('funziona\n[2i] rotto\n[1i?] gusto');
