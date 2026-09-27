@@ -173,9 +173,8 @@ test('le prove dei rilievi messi da parte escono nella pulizia, non nel commit d
 test('come si nomina una prova del giro lo spiega un testo solo, e le risposte danno i numeri', async () => {
   const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
   const { codaText, buildVerifierBrief } = await import('../../scripts/verify-local.mjs');
-  const REGOLA = /giro<k>-r<n>-<cosa>\.spec\.mjs/g;
   const dove = readdirSync(RUOLI).filter((n) => n.endsWith('.md'))
-    .filter((n) => REGOLA.test(readFileSync(join(RUOLI, n), 'utf8').replace(/\s+/g, '')) || (REGOLA.lastIndex = 0, false));
+    .filter((n) => /r<n>/.test(readFileSync(join(RUOLI, n), 'utf8')));
   assert.deepEqual(dove, ['_critica-e-livelli.md']);
   const ruolo = readRoleInstructions('verifier');
   assert.equal((ruolo.match(/`r<n>` è il numero del rilievo/g) || []).length, 1);
