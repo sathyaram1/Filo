@@ -36,7 +36,8 @@
 //     input_tokens, cache_creation_input_tokens, cache_read_input_tokens,
 //     output_tokens}, "content":[{type:"tool_use", id, name}]}} — un messaggio
 //   può stare su PIÙ righe (una per blocco di contenuto), con lo stesso `id` e
-//   la stessa `usage` ripetuta: si conta una volta per `id`;
+//   la stessa `usage` ripetuta: si conta una volta per `id`; in cima alla
+//   riga c'è anche `effort` (lo sforzo del turno: "high", "xhigh"…);
 //   righe {"type":"user","message":{"content":[{type:"tool_result",
 //     tool_use_id, is_error, content}]}}.
 //
@@ -118,7 +119,7 @@ function testoDi(content) {
 /** Il rapporto vuoto: ogni chiave al suo posto, così un server che lo legge non trova buchi. */
 export function rapportoVuoto({ role = '', ticket = '' } = {}) {
   return {
-    v: 1,
+    v: 2,
     role: String(role || ''),
     ticket: String(ticket || ''),
     sessionId: '',
@@ -131,6 +132,9 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
     tokens: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 },
     costUsd: 0,
     tools: { total: 0, byName: {}, timeouts: 0, errors: 0 },
+    // Turni per sforzo dichiarato ({ xhigh: 40 }): dice se le definizioni degli
+    // agenti hanno avuto effetto. Un turno senza il campo non si conta.
+    effort: {},
     subagents: 0,
     // I transcript dei sotto-agenti letti e sommati, e la loro parte del costo
     // (che sta gia' dentro costUsd e nei totali qui sopra).
@@ -367,7 +371,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     if (e.type === 'assistant') {
       const u = msg.usage && typeof msg.usage === 'object' ? msg.usage : null;
       const id = typeof msg.id === 'string' && msg.id ? msg.id : `riga-${riga}`;
-      if (u) usi.set(id, { u, model: msg.model });
+      if (u) usi.set(id, { u, model: msg.model, effort: typeof e.effort === 'string' && e.effort ? e.effort : (usi.get(id) || {}).effort });
       const blocchi = Array.isArray(msg.content) ? msg.content : [];
       for (const b of blocchi) {
         if (!b || b.type !== 'tool_use') continue;
@@ -413,13 +417,14 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   // I conti, a fine lettura, con l'ULTIMA usage di ogni messaggio (in ordine
   // di prima comparsa: il primo turno non è mai «freddo»).
   let costo = 0;
-  for (const { u, model } of usi.values()) {
+  for (const { u, model, effort } of usi.values()) {
     const input = Number(u.input_tokens) || 0;
     const { cw5m, cw1h } = scrittureCache(u);
     const cw = cw5m + cw1h;
     const cr = Number(u.cache_read_input_tokens) || 0;
     const out = Number(u.output_tokens) || 0;
     rep.turns += 1;
+    if (effort) rep.effort[chiaveSicura(effort)] = (rep.effort[chiaveSicura(effort)] || 0) + 1;
     if (rep.turns > 1 && cr === 0 && cw >= 20000) rep.coldTurns += 1;
     rep.tokens.input += input;
     rep.tokens.cacheWrite += cw;
@@ -569,7 +574,7 @@ const arrotonda = (x) => Math.round(x * 10000) / 10000;
 
 /**
  * Somma nel rapporto della sessione i numeri di un sotto-agente: costo,
- * token, turni, strumenti, modelli. Muta `rep` e lo restituisce. PURA.
+ * token, turni, sforzo, strumenti, modelli. Muta `rep` e lo restituisce. PURA.
  */
 export function sommaSottoAgente(rep, sub) {
   rep.subagentRuns += 1;
@@ -583,6 +588,7 @@ export function sommaSottoAgente(rep, sub) {
   rep.tools.timeouts += Number(st.timeouts) || 0;
   rep.tools.errors += Number(st.errors) || 0;
   for (const [nome, n] of Object.entries(st.byName || {})) rep.tools.byName[nome] = (rep.tools.byName[nome] || 0) + (Number(n) || 0);
+  for (const [sforzo, n] of Object.entries(sub.effort || {})) rep.effort[sforzo] = (rep.effort[sforzo] || 0) + (Number(n) || 0);
   rep.subagents += Number(sub.subagents) || 0;
   rep.longestToolS = Math.max(rep.longestToolS, Number(sub.longestToolS) || 0);
   for (const m of Array.isArray(sub.models) ? sub.models : []) if (!rep.models.includes(m)) rep.models.push(m);
@@ -635,7 +641,7 @@ export function riassunto(rep) {
   const durata = `${Math.floor(rep.durationS / 60)}m${String(rep.durationS % 60).padStart(2, '0')}s`;
   return [
     `rapporto sessione — ruolo: ${rep.role || '(nessuno)'}, biglietto: ${rep.ticket ? `${rep.ticket.slice(0, 8)}…` : '(nessuno)'}, sessione: ${rep.sessionId || '(sconosciuta)'}`,
-    `durata ${durata}, ${rep.turns} turni (${rep.coldTurns} freddi), modelli: ${rep.models.join(', ') || '(nessuno)'}`,
+    `durata ${durata}, ${rep.turns} turni (${rep.coldTurns} freddi), modelli: ${rep.models.join(', ') || '(nessuno)'}, sforzo: ${Object.entries(rep.effort || {}).map(([k, n]) => `${k} ${n}`).join(', ') || '(non dichiarato)'}`,
     `token: input ${rep.tokens.input}, cache letta ${rep.tokens.cacheRead}, cache scritta ${rep.tokens.cacheWrite}, output ${rep.tokens.output}`,
     `costo stimato: $${rep.costUsd.toFixed(4)}`,
     `strumenti: ${rep.tools.total} (timeout ${rep.tools.timeouts}, errori ${rep.tools.errors}, sotto-agenti ${rep.subagents}, il più lungo ${rep.longestToolS}s) · sotto-agenti letti: ${Number(rep.subagentRuns) || 0}, il loro costo $${(Number(rep.subagentCostUsd) || 0).toFixed(4)}${rep.notes.length ? ` — note: ${rep.notes.join(' | ')}` : ''}`,
