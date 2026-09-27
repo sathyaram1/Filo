@@ -85,9 +85,10 @@ test('nessun test crea un collegamento che Windows nega a chi non è amministrat
   const colpevoli = [];
   for (const p of fileDiTest()) {
     if (p === AMMESSO) continue;
-    const testo = readFileSync(p, 'utf8');
+    // Senza commenti: «un symlink (es. /tmp)» in prosa non è una chiamata. La forma asincrona dà lo stesso EPERM.
+    const testo = readFileSync(p, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
     const soloFuoriDaWindows = /process\.platform\s*!==\s*['"]win32['"]/.test(testo);
-    for (const chiamata of testo.match(/symlinkSync\s*\([^;\n]*/g) || []) {
+    for (const chiamata of testo.match(/\bsymlink(?:Sync)?\s*\([^;\n]*/g) || []) {
       if (!/['"]junction['"]/.test(chiamata) && !soloFuoriDaWindows) colpevoli.push(relative(TESTS, p));
     }
   }
