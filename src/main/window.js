@@ -197,6 +197,7 @@ function createIncognitoWindow() {
   // Alla chiusura dell'ULTIMA finestra incognito, azzera l'overlay in RAM: nulla
   // di ciò che è stato scritto durante la sessione sopravvive.
   win.on('closed', () => {
+    try { require('./services/downloads').forgetScope(partition); } catch (_) {}
     const stillOpen = BrowserWindow.getAllWindows().some((w) => w !== win && w._filoIncognito);
     if (!stillOpen) {
       try { require('./shim/storage').resetIncognito(); } catch (_) {}

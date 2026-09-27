@@ -679,14 +679,12 @@ class TabManager {
     }
     const view = new WebContentsView({ webPreferences });
     // #410.1 — segui gli scaricamenti anche sulle sessioni NON predefinite
-    // (privacy per-sito, proxy "apri da un altro paese"): senza questo, un
-    // download partito da una scheda proxata/privacy resterebbe "al buio".
-    // Le finestre incognito sono ESCLUSE di proposito: "nessuna traccia" vale
-    // anche per i download, che quindi non entrano nella cronologia condivisa
-    // (in incognito il browser usa comunque il suo salvataggio nativo).
-    if (!this.incognito) {
-      try { require('./services/downloads').attachSession(view.webContents.session); } catch (_) {}
-    }
+    // (privacy, proxy, incognito): una sessione non agganciata scarica col
+    // dialogo nativo, senza barra e senza il controllo sui programmi (#588.2).
+    // L'incognito ha il suo ambito: le sue voci non vanno su disco.
+    try {
+      require('./services/downloads').attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
+    } catch (_) {}
     installaPermessi(view.webContents.session);
     return view;
   }

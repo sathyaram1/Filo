@@ -333,7 +333,7 @@ module.exports = function register(on, ctx) {
           const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
           // La voce nella barra in alto: percentuale, peso e "Annulla", gli
           // stessi di un download partito da un link.
-          entry = downloads.beginManual({ url, filename: name, totalBytes });
+          entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win) });
           // Il nome da proporre lo sa solo il server (Content-Disposition):
           // per questo la destinazione si chiede da qui in poi, mai prima.
           askDest = () => pickDestination(name).then((d) => {
@@ -436,17 +436,20 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     return fn(msg, sender, origin);
   };
-  on(MSG.DOWNLOADS_LIST, internalOnly(async () => ({ ok: true, items: DL().list() })));
-  on(MSG.DOWNLOADS_CLEAR, internalOnly(async () => ({ ok: true, items: DL().clearCompleted() })));
-  on(MSG.DOWNLOAD_REMOVE, internalOnly(async (msg) => ({ ok: true, items: DL().remove(msg.id) })));
+  // #588.2 — ogni finestra vede e comanda solo le voci del suo ambito: una
+  // finestra incognito le sue, quella normale la cronologia.
+  const ambito = (sender) => DL().scopeOfWindow(sender && sender.win);
+  on(MSG.DOWNLOADS_LIST, internalOnly(async (_m, s) => ({ ok: true, items: DL().list(ambito(s)) })));
+  on(MSG.DOWNLOADS_CLEAR, internalOnly(async (_m, s) => ({ ok: true, items: DL().clearCompleted(ambito(s)) })));
+  on(MSG.DOWNLOAD_REMOVE, internalOnly(async (msg, s) => ({ ok: true, items: DL().remove(msg.id, ambito(s)) })));
   // #588 — `confirmed` viaggia dalla superficie che ha MOSTRATO la conferma:
   // senza, il main risponde needsConfirm e non tocca shell.openPath.
-  on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg) => DL().openFile(msg.id, { confirmed: !!msg.confirmed })));
-  on(MSG.DOWNLOAD_CONFIRM, internalOnly(async (msg) => DL().confirmDownload(msg.id, !!msg.allow)));
-  on(MSG.DOWNLOAD_OPEN_FOLDER, internalOnly(async (msg) => DL().openFolder(msg.id)));
-  on(MSG.DOWNLOAD_CANCEL, internalOnly(async (msg) => DL().cancel(msg.id)));
-  on(MSG.DOWNLOAD_PAUSE, internalOnly(async (msg) => DL().pause(msg.id)));
-  on(MSG.DOWNLOAD_RESUME, internalOnly(async (msg) => DL().resume(msg.id)));
+  on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg, s) => DL().openFile(msg.id, { confirmed: !!msg.confirmed }, ambito(s))));
+  on(MSG.DOWNLOAD_CONFIRM, internalOnly(async (msg, s) => DL().confirmDownload(msg.id, !!msg.allow, ambito(s))));
+  on(MSG.DOWNLOAD_OPEN_FOLDER, internalOnly(async (msg, s) => DL().openFolder(msg.id, ambito(s))));
+  on(MSG.DOWNLOAD_CANCEL, internalOnly(async (msg, s) => DL().cancel(msg.id, ambito(s))));
+  on(MSG.DOWNLOAD_PAUSE, internalOnly(async (msg, s) => DL().pause(msg.id, ambito(s))));
+  on(MSG.DOWNLOAD_RESUME, internalOnly(async (msg, s) => DL().resume(msg.id, ambito(s))));
 
   on(MSG.FEEDBACK_ANNOTATE, async (msg, sender) => {
     // Il box feedback è appena entrato/uscito dalla modalità annotazione.
