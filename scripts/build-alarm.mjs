@@ -49,12 +49,76 @@ export function testoEntroIlTetto(text, max = TETTO_TESTO) {
   return s.slice(0, Math.max(0, max - nota.length)) + nota;
 }
 
+/** I tetti delle chiavi del contratto di buildAlarm: quante, e quanto lunghe. */
+export const TETTO_CHIAVI = 100;
+export const TETTO_CHIAVE = 200;
+
+/**
+ * Le chiavi dicono al server COSA è rotto: un allarme le cui chiavi stanno già
+ * in un feedback aperto non ne apre un altro, uno con una chiave nuova sì.
+ * Stringhe senza bordi, non vuote, senza doppioni, entro i tetti. PURA.
+ */
+export function normalizzaChiavi(chiavi) {
+  const out = [];
+  for (const c of Array.isArray(chiavi) ? chiavi : []) {
+    if (typeof c !== 'string') continue;
+    const k = c.trim().slice(0, TETTO_CHIAVE);
+    if (k && !out.includes(k)) out.push(k);
+  }
+  return out;
+}
+
+/**
+ * Le chiavi del cancello unit dal suo registro TAP: `unit:<file>` per ogni file
+ * delle righe `location:`, relativo a `radice` e con le barre normali (il
+ * runner è Windows: barre rovesciate, a volte raddoppiate, e la lettera del
+ * disco). Nessun file riconoscibile → `unit`, perché l'allarme ne vuole una. PURA.
+ */
+export function chiaviDelRegistroUnit(registro, radice = '') {
+  const base = String(radice || '').replace(/\\+/g, '/').replace(/\/+$/, '').toLowerCase();
+  const chiavi = [];
+  for (const riga of String(registro || '').split(/\r?\n/)) {
+    const m = riga.match(/^\s*location:\s*['"]?(.+?)['"]?\s*$/);
+    if (!m) continue;
+    let file = m[1].replace(/\\+/g, '/').replace(/(:\d+){1,2}$/, '');
+    if (base && file.toLowerCase().startsWith(`${base}/`)) file = file.slice(base.length + 1);
+    else if (file.includes('/tests/')) file = file.slice(file.lastIndexOf('/tests/') + 1);
+    if (!file || /^([a-z]:)?\//i.test(file)) continue;
+    chiavi.push(`unit:${file}`);
+  }
+  const uniche = normalizzaChiavi(chiavi);
+  return uniche.length ? uniche : ['unit'];
+}
+
+/**
+ * Titolo, testo e opzioni delle chiavi. `--chiave` si ripete; `--chiavi-da`
+ * legge un file con una chiave per riga; `--chiavi-unit` le ricava dal
+ * registro del cancello unit. PURA.
+ */
+export function leggiArgomenti(argv) {
+  const out = { posizionali: [], chiavi: [], chiaviDa: [], chiaviUnit: [] };
+  const campi = { '--chiave': 'chiavi', '--chiavi-da': 'chiaviDa', '--chiavi-unit': 'chiaviUnit' };
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (campi[a]) {
+      if (argv[i + 1] === undefined) throw new Error(`${a} vuole un valore`);
+      out[campi[a]].push(argv[i + 1]);
+      i += 1;
+    } else if (/^--chiav/.test(a)) {
+      throw new Error(`Opzione non capita: ${a}. Opzioni: --chiave <k>, --chiavi-da <file>, --chiavi-unit <registro>`);
+    } else {
+      out.posizionali.push(a);
+    }
+  }
+  return out;
+}
+
 /**
  * Spedisce l'allarme e ferma il processo se non arriva. La usa anche
  * `release-platform-alarm.mjs`: una sola strada verso il server, una sola
  * credenziale, un solo taglio del testo.
  */
-export async function inviaAllarme(name, text) {
+export async function inviaAllarme(name, text, chiavi = []) {
   const passphrase = process.env.FILO_BUILD_PASSPHRASE;
 
   if (!passphrase) {
@@ -71,18 +135,30 @@ export async function inviaAllarme(name, text) {
     console.error(`[allarme] testo di ${String(text).length} caratteri, il server ne tiene ${TETTO_TESTO}: tagliato, e il taglio è scritto in coda al testo.`);
   }
 
+  let keys = normalizzaChiavi(chiavi);
+  if (keys.length > TETTO_CHIAVI) {
+    console.error(`[allarme] ${keys.length} chiavi, il server ne tiene ${TETTO_CHIAVI}: spedisco le prime, le altre non fermano i doppioni.`);
+    keys = keys.slice(0, TETTO_CHIAVI);
+  }
+  if (keys.length) console.log(`[allarme] chiavi: ${keys.join(', ')}`);
+
   try {
     const res = await fetch(`${BASE}/buildAlarm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ passphrase, name, text: testo }),
+      // Senza chiavi il campo non parte: il server resta al comportamento di prima.
+      body: JSON.stringify({ passphrase, name, text: testo, ...(keys.length ? { keys } : {}) }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok || !body.ok) {
       console.error(`[allarme] non consegnato (${res.status}${body.reason ? ' ' + body.reason : ''}).`);
       process.exit(1);
     }
-    console.log(`[allarme] feedback aperto${body.num ? ` (${body.num})` : ''}.`);
+    if (body.duplicate) {
+      console.log(`[allarme] già coperto da un feedback aperto${body.num ? ` (${body.num})` : ''}: nessun feedback nuovo.`);
+    } else {
+      console.log(`[allarme] feedback aperto${body.num ? ` (${body.num})` : ''}.`);
+    }
   } catch (e) {
     console.error(`[allarme] server non raggiungibile: ${e.message}`);
     process.exit(1);
@@ -90,12 +166,24 @@ export async function inviaAllarme(name, text) {
 }
 
 async function main() {
-  const [name, text] = process.argv.slice(2);
-  if (!name) {
-    console.error('Uso: node scripts/build-alarm.mjs "<titolo>" "<testo>"');
+  let arg;
+  try {
+    arg = leggiArgomenti(process.argv.slice(2));
+  } catch (e) {
+    console.error(String(e.message || e));
     process.exit(1);
   }
-  await inviaAllarme(name, text);
+  const [name, text] = arg.posizionali;
+  if (!name) {
+    console.error('Uso: node scripts/build-alarm.mjs "<titolo>" "<testo>" [--chiave <k>]… [--chiavi-da <file>] [--chiavi-unit <registro>]');
+    process.exit(1);
+  }
+  // Un file che manca non ferma l'allarme: meglio un feedback senza chiavi che nessuno.
+  const leggi = (f) => { try { return readFileSync(f, 'utf8'); } catch { return ''; } };
+  const chiavi = [...arg.chiavi];
+  for (const f of arg.chiaviDa) chiavi.push(...leggi(f).split(/\r?\n/));
+  for (const f of arg.chiaviUnit) chiavi.push(...chiaviDelRegistroUnit(leggi(f), process.cwd()));
+  await inviaAllarme(name, text, chiavi);
 }
 
 const eseguitoDirettamente = process.argv[1]
