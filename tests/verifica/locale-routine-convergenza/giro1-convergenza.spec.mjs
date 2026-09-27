@@ -52,13 +52,15 @@ function repoDiProva(ramo) {
   return dir;
 }
 
+// Asincrono: il server finto dei bilanci gira in questo stesso processo, e una chiamata sincrona lo bloccherebbe.
 function verifyLocal(dir, port, args) {
-  const r = spawnSync(process.execPath, [resolve(ROOT, 'scripts', 'verify-local.mjs'), ...args], {
-    cwd: dir,
-    encoding: 'utf8',
-    env: { ...process.env, FILO_REPO_ROOT: dir, FILO_ADMIN_ID_TOKEN: 'finto', FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config` },
+  return new Promise((ok) => {
+    execFile(process.execPath, [resolve(ROOT, 'scripts', 'verify-local.mjs'), ...args], {
+      cwd: dir,
+      encoding: 'utf8',
+      env: { ...process.env, FILO_REPO_ROOT: dir, FILO_ADMIN_ID_TOKEN: 'finto', FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config` },
+    }, (err, stdout, stderr) => ok({ code: err ? err.code : 0, out: `${stdout}\n${stderr}` }));
   });
-  return { code: r.status, out: `${r.stdout}\n${r.stderr}` };
 }
 
 test.describe('vicini come livello 0', () => {
