@@ -10,8 +10,8 @@
 //      visibile, non viene mostrato un crash né un messaggio senza senso).
 //
 // Come i test in board-page.spec.mjs, usa window.__boardTest per iniettare dati
-// sintetici dopo che il caricamento reale (FB.list → Firestore) si è concluso,
-// così l'ambiente headless senza credenziali non interferisce.
+// sintetici dopo che il caricamento reale si è concluso: nelle prove il servizio
+// delle schede è chiuso ovunque (#735.1), quindi quel caricamento finisce in errore.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
@@ -75,16 +75,12 @@ test('la pagina bacheca carica senza errori e mostra gli elementi strutturali', 
   // La sezione auth deve essere presente (il suo contenuto varia con lo stato).
   await expect(page.locator('.bd-auth')).toBeVisible();
 
-  // Almeno uno dei tre stati del contenuto (loading, empty, list) è nel DOM.
-  const loading = page.locator('#bdLoading');
-  const empty   = page.locator('#bdEmpty');
-  const list    = page.locator('#bdList');
-  const anyPresent = await Promise.all([
-    loading.isVisible(),
-    empty.isVisible(),
-    list.isVisible(),
-  ]);
-  expect(anyPresent.some(Boolean), 'Almeno uno tra #bdLoading, #bdEmpty e #bdList deve essere visibile').toBe(true);
+  // Finito il caricamento la pagina non resta bianca: mostra le schede, lo stato
+  // vuoto o l'errore. Nelle prove il servizio è chiuso (#735.1), quindi di solito l'errore.
+  await page.locator('#bdLoading').waitFor({ state: 'hidden', timeout: 20_000 });
+  const stati = ['#bdEmpty', '#bdList', '#bdError'];
+  const visibili = await Promise.all(stati.map((s) => page.locator(s).isVisible()));
+  expect(visibili.some(Boolean), `Almeno uno tra ${stati.join(', ')} deve essere visibile`).toBe(true);
 
   // Screenshot della pagina caricata.
   await page.screenshot({ path: `${SHOTS_DIR}/audit-board-empty.png` });
