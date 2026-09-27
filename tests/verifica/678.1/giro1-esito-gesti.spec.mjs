@@ -181,7 +181,7 @@ test('aspetto: frase d\'errore, fix ritirato e conferma, in chiaro e in scuro', 
   await expect(page.locator('.bd-card-msg')).toHaveCount(2, { timeout: 10_000 });
   for (const tema of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme: tema });
-    await page.evaluate((t) => { document.documentElement.dataset.theme = t; }, tema);
+    await page.evaluate((t) => { document.documentElement.setAttribute("data-sn-theme", t); }, tema);
     await page.waitForTimeout(300);
     await page.screenshot({ path: `tests/.shots/verifica-678.1-${tema}.png`, fullPage: true });
   }
