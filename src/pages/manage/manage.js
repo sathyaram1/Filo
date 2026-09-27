@@ -19,7 +19,6 @@
   const mgAutoToggle = document.getElementById('mgAutoToggle');
   const mgAutoState  = document.getElementById('mgAutoState');
   const mgAutoMsg    = document.getElementById('mgAutoMsg');
-  const mgAutoApproveBlock = document.getElementById('mgAutoApproveBlock');
   // Un interruttore per categoria di mittente (#446): la chiave è il gruppo
   // definito in SN_FEEDBACK_THREAD.AUTO_APPROVE_GROUPS.
   // Un interruttore per ogni categoria d'autore che la lista mostra come icona
@@ -42,7 +41,6 @@
   const mgRoutinesMsg    = document.getElementById('mgRoutinesMsg');
   const mgProberIdle      = document.getElementById('mgProberIdle');
   const mgProberIdleMsg   = document.getElementById('mgProberIdleMsg');
-  const mgProberIdleBlock = document.getElementById('mgProberIdleBlock');
   // I bilanci dei giri di correzione, uno per livello (feedback #561): cap3 =
   // giri per i rilievi di livello 3, cap2 = per i 2, cap1 = per gli 1, cap0 =
   // per i soli 0; più il testo in coda alla risposta (fixInstructions).
@@ -186,10 +184,6 @@
   let releasedVersion = '';     // versione dell'app in esecuzione = ultima rilasciata (DB3)
   let firstListPromise = null;  // prima lettura della lista, avviata da init PRIMA del resto
   let testDataInjected = false; // uno spec ha iniettato la lista: il caricamento vero non la tocca più
-  // Modalità automatica: agisce UNA volta al momento del giudizio (lato
-  // pipeline: sicuro+ON → todo, sicuro+OFF → aligned). NON è più una lente
-  // sulle liste: le tab derivano solo dallo status (macchina a stati).
-  let autoModeOn    = false;
   let searchMode    = false;      // true = la lista mostra i risultati di ricerca
   let searchSeq     = 0;          // guardia anti-race tra ricerche concorrenti
 
@@ -362,6 +356,8 @@
       setIsAdmin(false);
     }
     mgBanner.hidden = isAdmin;
+    // Un accesso fatto dal banner deve sbloccare i controlli senza riaprire la pagina.
+    applyAutoModeGate();
   }
 
   mgSignInBtn.addEventListener('click', () => {
@@ -420,7 +416,6 @@
   // Fino al 2026-08-12 lo switch scriveva SOLO la cache locale: nessuno la
   // leggeva, quindi accenderlo non produceva alcun effetto (feedback #446).
   function reflectAutoMode(on) {
-    autoModeOn = !!on;
     mgAutoToggle.checked = !!on;
     mgAutoState.textContent = on ? 'On' : 'Off';
   }

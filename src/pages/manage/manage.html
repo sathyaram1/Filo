@@ -112,10 +112,6 @@
     .mg-auto-sub-title {
       margin: 0; font-size: 12px; font-weight: 600; color: var(--sn-muted);
     }
-    /* Automatica spenta: i figli non decidono niente, e si vede. */
-    .mg-auto-sub--off { opacity: 0.45; }
-    /* Con le routine spente le impostazioni che valgono solo per loro sono inerti, come i sotto-interruttori qui sopra. */
-    .mg-auto-block--off { opacity: 0.45; }
 
     /* Scelta fra poche alternative: pillole affiancate, una sola accesa. */
     .mg-auto-choice { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
@@ -1648,7 +1644,7 @@
             <span class="mg-action-msg" id="mgAutoMsg" role="status"></span>
           </p>
 
-          <!-- Chi può entrare in coda da solo, per categoria di mittente. Con l'automatica spenta sono inerti, e si vede. -->
+          <!-- Chi può entrare in coda da solo, per categoria di mittente: conta solo con l'automatica accesa. -->
           <div class="mg-auto-sub" id="mgAutoApproveBlock">
             <p class="mg-auto-sub-title">Entrano in coda da soli</p>
             <label class="mg-switch mg-switch--sm" title="I feedback che scrivi tu">
@@ -1699,7 +1695,7 @@
           </div>
         </section>
 
-        <!-- Esplorazione automatica a coda vuota: riguarda solo le routine, e col master spento è inerte. -->
+        <!-- Esplorazione automatica a coda vuota: riguarda solo le routine. -->
         <section class="mg-auto-block" id="mgProberIdleBlock">
           <label class="mg-switch" title="Ferma l'esplorazione automatica quando non ci sono più feedback da lavorare">
             <span class="mg-switch-text">Esplora quando la coda è vuota</span>
