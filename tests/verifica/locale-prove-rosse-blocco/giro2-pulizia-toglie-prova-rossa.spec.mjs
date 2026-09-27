@@ -82,15 +82,15 @@ function vl(dir, ...args) {
 async function giro({ prove, critica, tolteNellaPulizia }) {
   const c = copia(prove);
   try {
-    expect(vl(c.dir, 'start', 'richiesta di prova per la pulizia').status).toBe(0);
-    const crit = vl(c.dir, 'critica', critica);
+    expect((await vl(c.dir, 'start', 'richiesta di prova per la pulizia')).status).toBe(0);
+    const crit = await vl(c.dir, 'critica', critica);
     expect(crit.out).toContain('ESITO: c\'è da correggere');
     for (const k of tolteNellaPulizia) git(['rm', '-q', `${CARTELLA}/giro1-${k}.spec.mjs`], c.dir);
     git(['commit', '-q', '-m', 'pulizia del giro'], c.dir);
-    const pulizia = vl(c.dir, 'pulizia');
+    const pulizia = await vl(c.dir, 'pulizia');
     writeFileSync(join(c.dir, 'stato-a.txt'), 'corretto\n');
     git(['commit', '-q', '-a', '-m', 'correggo solo a'], c.dir);
-    const consegna = vl(c.dir, 'corretto', 'Corretti i rilievi a e c, report abbastanza lungo da superare il minimo della consegna.');
+    const consegna = await vl(c.dir, 'corretto', 'Corretti i rilievi a e c, report abbastanza lungo da superare il minimo della consegna.');
     return { pulizia, consegna };
   } finally {
     butta(c);
