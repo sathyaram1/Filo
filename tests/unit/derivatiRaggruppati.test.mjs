@@ -33,13 +33,14 @@ test('verifierReplyText: il feedback dei rimasti si stampa una volta, coi suoi r
   const pass = verifierReplyText({
     outcome: 'pass',
     derived: [
-      { ...f(2, 'i', 'Non salva.'), priority: 3, num: '#7.3', tipo: 'rimasti' },
-      { ...f(3, 'v', 'Vicino rotto.'), priority: 3, num: '#7.3', tipo: 'rimasti' },
+      { ...f(2, 'i', 'Non salva.'), priority: 3, num: '#7.3', tipo: 'rimasti', n: 1 },
+      { ...f(3, 'v', 'Vicino rotto.'), priority: 3, num: '#7.3', tipo: 'rimasti', n: 3 },
     ],
   });
-  assert.match(pass, /- \[2i\] Non salva\.\n- \[3v\] Vicino rotto\.\n {2}→ feedback #7\.3, priorità 3, rimasti del giro: 2 rilievi \(\[2i\], \[3v\]\)/);
+  assert.match(pass, /- r1 \[2i\] Non salva\.\n- r3 \[3v\] Vicino rotto\.\n {2}→ feedback #7\.3, priorità 3, rimasti del giro: 2 rilievi \(\[2i\], \[3v\]\)/);
   assert.equal(pass.match(/→ feedback #7\.3/g).length, 1, 'un feedback, una riga');
-  assert.match(pass, /· la prova che riproduce #7\.3: Non salva\.\n {2}· la prova che riproduce #7\.3: Vicino rotto\./);
+  // Ogni rilievo accorpato ha le sue prove, riconosciute dal suo numero nella critica.
+  assert.match(pass, /· le prove con r1 nel nome, per #7\.3: Non salva\.\n {2}· le prove con r3 nel nome, per #7\.3: Vicino rotto\./);
   assert.match(pass, /il rilievo interno di livello 2 rimasto è entrato nel feedback dei rimasti/);
 });
 
