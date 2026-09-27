@@ -597,14 +597,73 @@
     return { stop: false, blocking: [], sospesi: [], fix, derived: rest, external, consume, counts, budgets };
   }
 
+  // ── I feedback derivati ───────────────────────────────────────────────────
+
+  /**
+   * Come i rilievi che un lavoro non corregge diventano feedback derivati
+   * (decisione dell'owner del 2026-09-27). PURA. Tre tipi di gruppo:
+   *   - `esterno`: un rilievo con sede `e`, da solo (anche col `?`: la domanda
+   *     viaggia nel suo feedback), così un esterno di livello 3 nasce subito;
+   *   - `decisione`: un interno o vicino col `?`, da solo;
+   *   - `rimasti`: TUTTI gli altri (interni messi da parte dal bilancio, vicini
+   *     non corretti) in un feedback solo, a priorità = il livello scritto più alto.
+   * Accetta un elenco di rilievi o una decisione di decideRound (`external` +
+   * `derived`). I rilievi escono con i campi che avevano (anche `num`, `id`),
+   * più `sede`, `level`, `priority` e `decision` canonici. Ordine: i gruppi da
+   * soli come arrivano, `rimasti` in fondo.
+   * @returns {Array<{ tipo: 'esterno'|'decisione'|'rimasti', priority: number, decision: boolean, findings: object[] }>}
+   */
+  function derivedGroups(input) {
+    let list = input;
+    if (!Array.isArray(list)) {
+      const d = list && typeof list === 'object' ? list : {};
+      list = [].concat(Array.isArray(d.external) ? d.external : [], Array.isArray(d.derived) ? d.derived : []);
+    }
+    const groups = [];
+    let rimasti = null;
+    for (const f of list) {
+      if (!f || typeof f !== 'object') continue;
+      const level = Number(f.level);
+      if (!LEVELS.includes(level)) continue;
+      const priority = LEVELS.includes(Number(f.priority)) ? Number(f.priority) : level;
+      const item = Object.assign({}, f, { level, sede: sedeDi(f.sede), priority, decision: f.decision === true });
+      if (item.sede === 'e') {
+        groups.push({ tipo: 'esterno', priority, decision: item.decision, findings: [item] });
+      } else if (item.decision) {
+        groups.push({ tipo: 'decisione', priority, decision: true, findings: [item] });
+      } else {
+        if (!rimasti) rimasti = { tipo: 'rimasti', priority, decision: false, findings: [] };
+        rimasti.findings.push(item);
+        rimasti.priority = Math.max(rimasti.priority, priority);
+      }
+    }
+    if (rimasti) groups.push(rimasti);
+    return groups;
+  }
+
+  /** «[2i]», «[1v?]»: livello e sede di un rilievo, senza testo. PURA. */
+  function findingTag(f) {
+    return `[${Number(f && f.level) || 0}${sedeDi(f && f.sede)}${f && f.decision ? '?' : ''}]`;
+  }
+
+  /**
+   * Cosa contiene un gruppo, in poche parole: la stessa etichetta nella nota
+   * del server, nelle risposte delle routine e nella verifica locale. PURA.
+   */
+  function groupLabel(g) {
+    const findings = g && Array.isArray(g.findings) ? g.findings : [];
+    if (g && g.tipo === 'esterno') return g.decision ? 'esterno, da decidere' : 'esterno';
+    if (g && g.tipo === 'decisione') return `${findings[0] && sedeDi(findings[0].sede) === 'v' ? 'vicino' : 'interno'}, da decidere`;
+    const n = findings.length;
+    return `rimasti del giro: ${n} ${n === 1 ? 'rilievo' : 'rilievi'} (${findings.map(findingTag).join(', ')})`;
+  }
+
   // ── Testi ─────────────────────────────────────────────────────────────────
 
-  /** Un rilievo come riga di elenco: «- [2i] testo», «- [1e?] testo». PURA. */
+  /** Un rilievo come riga di elenco: «- [2i] testo», «- [1v] testo», «- [1e?] testo». PURA. */
   function formatFinding(f) {
-    const mark = f && f.decision ? '?' : '';
-    const sede = f && String(f.sede || '').toLowerCase() === 'e' ? 'e' : 'i';
     const text = String((f && f.text) || '').replace(/\n/g, '\n  ');
-    return `- [${Number(f && f.level) || 0}${sede}${mark}] ${text}`;
+    return `- ${findingTag(f)} ${text}`;
   }
 
   /** L'elenco puntato dei rilievi, col livello davanti. PURA. */
@@ -633,21 +692,36 @@
       parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non tocca a questo lavoro): diventa' : `${esterni} rilievi sono esterni (non toccano a questo lavoro): diventano`} feedback a parte, con priorità uguale al livello.`);
     }
     // I 2 interni messi da parte: il bilancio dei 2 è finito, e a differenza
-    // dei 3 non fermano il lavoro; escono come feedback a priorità 2.
-    const dueDaParte = Array.isArray(d.derived) ? d.derived.filter((f) => f && Number(f.level) === 2 && f.sede !== 'e').length : 0;
+    // dei 3 non fermano il lavoro. Un vicino di livello scritto 2 non è il caso.
+    const dueDaParte = Array.isArray(d.derived) ? d.derived.filter((f) => f && Number(f.level) === 2 && sedeDi(f.sede) === 'i').length : 0;
     if (d.stop) {
       parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 3 che non si può correggere da soli (bilancio esaurito), o un rilievo interno di livello 3 o 2 che chiede una tua decisione.');
       const sospesi = Array.isArray(d.sospesi) ? d.sospesi.length : 0;
       if (sospesi) parts.push(`${sospesi === 1 ? 'Un altro rilievo interno resta' : `Altri ${sospesi} rilievi interni restano`} davanti a chi riprende dopo la tua risposta.`);
     } else if (Array.isArray(d.fix) && d.fix.length) {
       parts.push(`La correzione riguarda ${d.fix.length === list.length ? 'tutti i rilievi' : `${d.fix.length} su ${list.length}`}; poi un'altra verifica ricontrolla.`);
+      const vicini = d.fix.filter((f) => f && sedeDi(f.sede) === 'v').length;
+      if (vicini) parts.push(`${vicini === 1 ? 'Un rilievo è vicino (di un altro lavoro, ma in un file che il ramo modifica già): si corregge' : `${vicini} rilievi sono vicini (di un altro lavoro, ma in file che il ramo modifica già): si correggono`} insieme al resto.`);
     } else {
       parts.push(esterni === list.length
         ? 'Nessun rilievo interno: il lavoro prosegue.'
         : 'Nessun rilievo interno da correggere adesso: il lavoro prosegue e i rilievi messi da parte vanno in feedback derivati.');
     }
+    const gruppi = derivedGroups({ derived: d.stop ? [] : d.derived });
+    const domande = gruppi.filter((g) => g.tipo === 'decisione').length;
+    if (domande) {
+      parts.push(`${domande === 1 ? 'Un rilievo chiede una tua decisione senza fermare il lavoro: esce in un feedback a parte' : `${domande} rilievi chiedono una tua decisione senza fermare il lavoro: escono ciascuno in un feedback a parte`}, con priorità uguale al livello.`);
+    }
+    const rimasti = gruppi.find((g) => g.tipo === 'rimasti');
+    if (rimasti) {
+      const n = rimasti.findings.length;
+      const voci = rimasti.findings.map((f) => `${findingTag(f)} ${primaFrase(f.text, 80)}`).join('; ');
+      parts.push(n === 1
+        ? `Il rilievo non corretto in questo giro esce in un feedback derivato, a priorità ${rimasti.priority}: ${voci}`
+        : `I ${n} rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità ${rimasti.priority} (il livello più alto fra loro): ${voci}`);
+    }
     if (dueDaParte) {
-      parts.push(`Il bilancio delle correzioni di livello 2 è finito: ${dueDaParte === 1 ? 'il rilievo interno di livello 2 rimasto esce come feedback a parte' : `i ${dueDaParte} rilievi interni di livello 2 rimasti escono come feedback a parte`}, a priorità 2.`);
+      parts.push(`Il bilancio delle correzioni di livello 2 è finito: ${dueDaParte === 1 ? 'il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra' : `i ${dueDaParte} rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano`} nel feedback dei rimasti.`);
     }
     parts.push(formatFindings(list));
     return parts.join('\n');
@@ -656,8 +730,8 @@
   global.SN_VERIFIER_ROUND = {
     LEVELS, SEDI, SPIEGAZIONE_SEDE, MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX,
     capKeyOf, countKeyOf, normalizeCritique, parseFindings, unparsedLevelLines, normalizeFindings, maxLevel, primaFrase,
-    missingCaps, normalizeCaps, normalizeCounts, decideRound,
-    formatFinding, formatFindings, hasDecision, roundNote,
+    sedeDi, effectiveLevel, missingCaps, normalizeCaps, normalizeCounts, decideRound, derivedGroups, groupLabel,
+    findingTag, formatFinding, formatFindings, hasDecision, roundNote,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
