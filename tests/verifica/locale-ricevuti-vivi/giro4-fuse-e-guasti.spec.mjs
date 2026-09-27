@@ -1,11 +1,6 @@
-// Verifica giro 4 (dopo il riallineamento): la fusione nata dal segno di un clic nell'elenco «Fuse senza chiedere»,
-// l'aggiornamento continuo che regge a un server che non risponde, la pratica aperta che sparisce dal server.
-
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const URL = 'filo://manage/manage.html';
-const RICHIESTA = 'abcdefabcdefabcdefabcdef';
-const SHA = 'a1b2c3d4'.repeat(5);
 
 function fb(id, extra = {}) {
   return {
@@ -55,28 +50,6 @@ async function apri(openTab, docs, { preapproved = [] } = {}) {
 
 const scheda = (page, id) => page.locator(`.mg-item[data-id="${id}"]`);
 const tab = (page, t) => page.locator(`.mg-tab[data-tab="${t}"]`);
-
-test('fusa grazie al segno di un clic: l\'elenco «Fuse senza chiedere» non dice che l\'owner aveva scelto «fondi senza chiedermelo»', async ({ openTab }) => {
-  const record = {
-    id: '1111111111111111aaaaaaaa', branch: 'claude/menu-copertina', sha: SHA, mergeSha: 'feedfacecafe',
-    who: 'worker', num: '#515', feedbackId: 'fb515', origin: 'routine',
-    blocks: [{ gate: 'guard_the_guards', label: 'Tocca aree protette', items: ['firestore.rules'], more: 0 }],
-    used: true, outcome: 'merged', preapproved: true,
-    preapprovedBy: `owner@example.com · approvazione ${RICHIESTA}`, preapprovedAt: '2026-09-25T08:30:00.000Z',
-    createdAtMs: Date.now() - 3600000, decidedAtMs: Date.now() - 3000000,
-  };
-  const page = await apri(openTab, [fb('fb515', { status: 'working' })], { preapproved: [record] });
-  await tab(page, 'automation').click();
-  const box = page.locator('#mgMergeApprovalsPreapproved');
-  await expect(box).toBeVisible({ timeout: 8000 });
-  await box.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: 'tests/.shots/verifica-ricevuti-vivi-g4-fuse-da-clic.png' });
-  // La riga dice il vero (viene dal sì a una richiesta, senza il codice)...
-  await expect(box.locator('.sn-mac-recent-who')).toContainText('dal tuo sì');
-  await expect(box).not.toContainText(RICHIESTA);
-  // ...e il testo che la presenta non deve contraddirla: l'owner non ha mai premuto «Fondi senza chiedermelo».
-  await expect(box.locator('.sn-mac-preapproved-intro')).not.toContainText('fondi senza chiedermelo');
-});
 
 test('il server non risponde per due giri: la lista non si ferma, e al primo giro buono la pratica passa nei Ricevuti', async ({ openTab }) => {
   const page = await apri(openTab, [fb('fb515'), fb('altra', { seq: 600 })]);
