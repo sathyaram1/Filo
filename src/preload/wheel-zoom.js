@@ -47,7 +47,18 @@ function haPreload(w) {
   try { return w.__filoZoomQui === true; } catch (_) { return true; }
 }
 
-function vegliaRiquadri(elenco) {
+// Un riquadro dentro un componente chiuso della pagina (shadow DOM) non si vede
+// dal documento: glielo si chiede dal suo interno, nel mondo isolato di Filo
+// (999, dove il sito non scrive), e lui si presenta al primo frame che veglia.
+const MONDO_FILO = 999;
+const PRESENTATI = `(() => { try {
+  if (window.__filoZoomQui === true) return;
+  for (let p = window.parent, prima = window; p && p !== prima; prima = p, p = p.parent) {
+    if (typeof p.__filoZoomAggancia === 'function') { p.__filoZoomAggancia(window); return; }
+  }
+} catch (_) {} })();`;
+
+function vegliaRiquadri(elenco, webFrame) {
   const agganciati = new WeakMap();
   function aggancia(w) {
     if (!w || w === window) return;
