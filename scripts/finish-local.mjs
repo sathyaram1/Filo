@@ -224,43 +224,80 @@ export function resolveDiffBase({ fetchOk, remoteRefOk }) {
 }
 
 /**
- * Il messaggio che ferma la chiusura quando il ramo è rimasto indietro
- * rispetto alla linea principale. '' = via libera. PURA.
+ * Il messaggio che ferma la chiusura quando il ramo è indietro rispetto alla
+ * linea principale E la fusione andrebbe in conflitto. '' = via libera. PURA.
  *
- * Fermarsi QUI, prima dei controlli, è il punto (caso #500): un conflitto di
- * fusione scoperto dopo 15 minuti di spec, o dopo l'approvazione dell'owner,
- * costa un giro intero; scoperto adesso costa cinque secondi. Un conteggio
- * illeggibile non blocca: la guardia non inventa conflitti.
- *
- * Con `--check` non si ferma: nessuna fusione segue, quindi non c'è un
- * conflitto da scoprire in anticipo — e chi verifica in locale ha proprio
- * quel comando al posto della suite intera; fermarlo mentre la linea
- * principale si muove (succede ogni giorno, con le fusioni del server) lo
- * mandava a far ripartire la verifica che era già in corso (giro 3 di
- * suite-locale). Il ramo indietro si dice comunque, come nota:
- * `behindMainNota`.
+ * Un conflitto scoperto dopo 15 minuti di spec o dopo l'approvazione costa un
+ * giro (caso #500); ma fermarsi per un ramo solo indietro non chiudeva mai: con
+ * le routine accese main riceve decine di commit l'ora, e il server fonde lo
+ * stesso se non c'è conflitto. `prova` è l'esito di provaFusione: senza (git
+ * vecchio, prova fallita) ci si ferma come prima, e lo si dice. Un conteggio
+ * illeggibile non blocca: la guardia non inventa conflitti. Con `--check` non
+ * segue nessuna fusione, quindi non si ferma mai (nota: `behindMainNota`).
  */
-export function behindMainStop(behind, { checkOnly = false } = {}) {
+export function behindMainStop(behind, { checkOnly = false, prova = null } = {}) {
   const n = Number(behind);
   if (!Number.isFinite(n) || n <= 0) return '';
   if (checkOnly) return '';
+  const conflitti = prova && Array.isArray(prova.conflitti) ? prova.conflitti : null;
+  if (conflitti && !conflitti.length) return '';
   return [
-    `Il ramo è indietro di ${n} commit rispetto alla linea principale: chiedere la fusione così`,
-    'finisce in conflitto alla fine, a controlli già pagati.',
+    conflitti
+      ? `Il ramo è indietro di ${n} commit rispetto alla linea principale, e la fusione andrebbe in conflitto su:`
+      : `Il ramo è indietro di ${n} commit rispetto alla linea principale: chiedere la fusione così`,
+    ...(conflitti ? conflitti.map((f) => `  · ${f}`) : ['può finire in conflitto alla fine, a controlli già pagati.']),
+    ...(!conflitti && prova && prova.motivo ? [`(Non ho potuto provare la fusione senza toccare l'albero: ${prova.motivo}. Mi fermo come se ci fosse un conflitto.)`] : []),
     'Riallinealo rifacendo la verifica, che se ne occupa da sola in partenza:',
     '  node scripts/verify-local.mjs start "<cosa aveva chiesto l\'owner>"',
   ].join('\n');
 }
 
-/** La stessa informazione, quando non ferma (`--check`). '' = ramo pari. PURA. */
-export function behindMainNota(behind) {
+/** Il ramo indietro quando non ferma: coi soli controlli, o senza conflitti. '' = ramo pari. PURA. */
+export function behindMainNota(behind, { checkOnly = true } = {}) {
   const n = Number(behind);
   if (!Number.isFinite(n) || n <= 0) return '';
+  if (!checkOnly) {
+    return `▸ Il ramo è indietro di ${n} commit rispetto alla linea principale, ma la fusione non va in conflitto: proseguo.`;
+  }
   return [
     `▸ Il ramo è indietro di ${n} commit rispetto alla linea principale. Coi soli controlli non importa`,
-    '  (nessuna fusione segue); `npm run finish` invece si fermerebbe qui. Lo riallinea la prossima',
-    '  verifica in partenza (node scripts/verify-local.mjs start).',
+    '  (nessuna fusione segue); `npm run finish` si fermerebbe qui solo se la fusione andasse in conflitto.',
   ].join('\n');
+}
+
+/** Da `git version` a sì/no su `merge-tree --write-tree` (git 2.38). PURA. */
+export function gitSaProvareFusione(versione) {
+  const m = /(\d+)\.(\d+)/.exec(String(versione || ''));
+  if (!m) return false;
+  const [maj, min] = [Number(m[1]), Number(m[2])];
+  return maj > 2 || (maj === 2 && min >= 38);
+}
+
+/**
+ * L'uscita di `git merge-tree --write-tree --name-only --no-messages`: exit 0 = pulita, 1 = conflitti,
+ * elencati dopo la riga dell'albero. Altro = la prova non è riuscita. PURA.
+ */
+export function leggiMergeTree(status, stdout) {
+  if (status === 0) return { conflitti: [] };
+  if (status !== 1) return { motivo: `git merge-tree è uscito con ${status}` };
+  const righe = String(stdout || '').split(/\r?\n/);
+  const file = [];
+  for (const r of righe.slice(1)) {
+    if (!r.trim()) break;
+    if (!file.includes(r.trim())) file.push(r.trim());
+  }
+  return file.length ? { conflitti: file } : { motivo: 'git merge-tree segnala un conflitto ma non dice su quali file' };
+}
+
+/** Prova la fusione di HEAD con `base` senza toccare albero né indice. */
+export function provaFusione(base, root = ROOT) {
+  const v = spawnSync('git', ['version'], { cwd: root, encoding: 'utf8' });
+  if (!gitSaProvareFusione(v.stdout)) {
+    return { motivo: `${String(v.stdout || 'git').trim() || 'git'} non sa provarla (serve git 2.38 o più)` };
+  }
+  const r = spawnSync('git', ['merge-tree', '--write-tree', '--name-only', '--no-messages', base, 'HEAD'], { cwd: root, encoding: 'utf8' });
+  if (r.error) return { motivo: r.error.message };
+  return leggiMergeTree(r.status, r.stdout);
 }
 
 /**

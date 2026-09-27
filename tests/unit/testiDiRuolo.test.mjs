@@ -143,3 +143,28 @@ test('i criteri di consegna sono gli stessi in locale e nelle routine', () => {
   assert.ok(elenco(primo).length > 500);
   assert.equal(elenco(primo), elenco(verifica));
 });
+
+// Le prove dei rilievi messi da parte escono in un passo a parte, subito dopo la risposta alla critica: da lì una
+// prova rossa tolta ferma sempre la consegna. Un testo che le rimanda al commit della correzione riapre la porta.
+test('le prove dei rilievi messi da parte escono nella pulizia, non nel commit della correzione', async () => {
+  const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
+  const { codaText } = await import('../../scripts/verify-local.mjs');
+  const messo = [{ level: 1, sede: 'i', text: 'il bordo è freddo', priority: 1, num: '#9.1' }];
+  const superfici = [
+    ...readdirSync(RUOLI).filter((n) => n.endsWith('.md')).map((n) => [n, readFileSync(join(RUOLI, n), 'utf8')]),
+    ['risposta del server (routine)', verifierReplyText({ outcome: 'fix', phase2: { findings: [{ level: 2, text: 'rotto' }], derived: messo } })],
+    ['coda del giro locale', codaText({ findings: [{ level: 2, text: 'rotto' }], derived: messo, external: [], budgets: {}, branch: 'claude/x' })],
+  ];
+  for (const [nome, testo] of superfici) {
+    const t = testo.replace(/\s+/g, ' ');
+    assert.doesNotMatch(t, /stesso commit della correzione[^.]*messi da parte|le toglie chi corregge/i, `${nome}: rimanda la pulizia a chi corregge`);
+    // Chi corregge e chi ha scritto la critica non sono dichiarati la stessa istanza, da nessuna parte.
+    assert.doesNotMatch(t, /chi corregge [èe] (la stessa|lo stesso|chi ha (scritto|registrato|verificato))|correggerai tu/i, nome);
+  }
+  const [, risposta] = superfici.at(-2);
+  const [, coda] = superfici.at(-1);
+  assert.match(readRoleInstructions('verifier'), /--record-pulizia/, 'chi registra la critica sa che la pulizia tocca a lui');
+  assert.match(risposta, /--record-pulizia/);
+  assert.match(coda, /verify-local\.mjs pulizia/);
+  for (const t of [risposta, coda]) assert.match(t.replace(/\s+/g, ' '), /ancora rossa non si toglie e non si cambia mai/);
+});
