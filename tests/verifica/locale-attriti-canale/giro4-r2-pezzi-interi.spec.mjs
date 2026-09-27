@@ -53,7 +53,7 @@ test('la consegna di ogni ruolo sta sotto la soglia, il ruolo resta leggibile, i
     for (const [campo, f] of Object.entries(j.payload.fileEsterni || {})) {
       const dentro = readFileSync(f, 'utf8');
       const originale = campo.split('.').reduce((o, k) => (o == null ? o : o[k]), ctx);
-      // Un file che rimanda a sua volta ad altri file costringe a una seconda caccia: il contenuto dev'essere l'originale.
+      // Un file che rimanda ad altri file costringe a una seconda caccia: dentro va l'originale.
       if (typeof originale === 'string') expect(dentro, `${ruolo}: ${nome}: ${campo}`).toBe(originale);
       else expect(JSON.parse(dentro), `${ruolo}: ${nome}: ${campo}`).toEqual(originale);
     }
