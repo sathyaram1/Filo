@@ -34,6 +34,10 @@
       .replace(/³/g, '^3')    // ³
       .replace(/\*\*/g, '^');
 
+    // Dentro round/floor/ceil/log la virgola di primo livello separa gli
+    // argomenti (round(x, 2), log(x, 2)): il modello scrive così, e letta come
+    // decimale italiana «round(3000/92,2)» diventava un altro conto (#724.1).
+    s = proteggiSecondoArgomento(s);
     // Decimali italiani: virgola tra cifre -> punto
     s = s.replace(/(\d),(\d)/g, '$1.$2');
     // Separatori delle migliaia con spazi tra cifre: rimuovili
