@@ -12,10 +12,13 @@ const { avvisoNellaFinestra } = require('../avvisoFinestra');
 
 // Chi accede su un computer senza portachiavi di sistema scopriva solo alla
 // riapertura di essere di nuovo fuori, e pensava a un guasto (#708.1).
+const CHIAVE_AVVISO_NON_RICORDATO = 'accesso-non-ricordato';
 function testoAccessoNonRicordato() {
-  const base = 'Hai fatto l\'accesso, ma questo computer non ha un portachiavi di sistema dove custodirlo: '
+  const base = 'Hai fatto l\'accesso, ma Filo non trova un portachiavi di sistema dove custodirlo: '
     + 'quando chiudi Filo dovrai accedere di nuovo.';
-  if (process.platform === 'linux') return base + ' Per farlo ricordare installa GNOME Keyring o KWallet e riapri Filo.';
+  if (process.platform === 'linux') {
+    return base + ' Per farlo ricordare serve un portachiavi acceso, come GNOME Keyring o KWallet: installalo o avvialo e riapri Filo.';
+  }
   return base;
 }
 
@@ -267,7 +270,9 @@ module.exports = function register(on, ctx) {
       avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile, remembered });
       // Nel main e non nelle pagine: all'accesso si arriva da molte porte
       // (menu account, bacheca, posta, red-team, siti), e l'avviso vale per tutte.
-      if (auth.isSignedIn() && !remembered) avvisoNellaFinestra(testoAccessoNonRicordato());
+      if (auth.isSignedIn() && !remembered) {
+        avvisoNellaFinestra(testoAccessoNonRicordato(), { chiave: CHIAVE_AVVISO_NON_RICORDATO });
+      }
       // Rinfresca la config condivisa in background. Le chiavi ruotate
       // dall'admin NON si leggono più qui (#581: config/secrets è admin-only e
       // le chiavi arrivano col build); resta utile per config/models.

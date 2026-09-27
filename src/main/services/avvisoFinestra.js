@@ -1,7 +1,6 @@
-// Un avviso che DEVE essere visto va nella cornice della finestra (la striscia
-// di notifiche della shell), non nella pagina davanti, e resta finché non lo si
-// chiude. Ritorna false se nessuna finestra era pronta: chi chiama decide se riprovare.
-// Con una `chiave` l'avviso nuovo prende il posto di quello uguale ancora a schermo.
+// Un avviso che DEVE essere visto va nella cornice della finestra, non nella pagina
+// davanti, e resta finché non lo si chiude; con una `chiave` sostituisce quello uguale.
+// Ritorna false se nessuna finestra era pronta: chi chiama decide se riprovare.
 
 function avvisoNellaFinestra(testo, { chiave } = {}) {
   let dette = 0;

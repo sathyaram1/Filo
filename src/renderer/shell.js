@@ -313,6 +313,7 @@
       api.auth.onChanged((m) => {
         authProfile = m.profile || null; isAdmin = !!(m && m.isAdmin);
         authRemembered = m.remembered !== false;
+        if (!authProfile || authRemembered) NOTIFS.dismissKey('accesso-non-ricordato');
         renderAccount();
       });
     }
@@ -946,8 +947,10 @@
     function show(text, opts) {
       if (!text) return null;
       opts = opts || {};
+      if (opts.key) dismissKey(opts.key);
       const card = document.createElement('div');
       card.className = 'shell-notif';
+      if (opts.key) card.dataset.key = String(opts.key);
 
       const msg = document.createElement('div');
       msg.className = 'shell-notif-msg';
@@ -1011,7 +1014,13 @@
       }
       return card;
     }
-    return { show, dismiss };
+    // Un avviso con chiave dice uno stato: quando lo stato cambia se ne va.
+    function dismissKey(key) {
+      for (const c of hostEl().querySelectorAll('.shell-notif')) {
+        if (c.dataset.key === String(key)) dismiss(c);
+      }
+    }
+    return { show, dismiss, dismissKey };
   })();
 
   // Compat: il vecchio toast informativo (es. "Tab riordinate e salvate") ora
