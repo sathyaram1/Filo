@@ -33,8 +33,16 @@ export function percorsoRipristino(prova, etichetta) {
  * Cosa fare dopo il rilancio. PURA. Le prove dei rilievi messi da parte se ne sono andate prima, nel
  * commit della pulizia, che è la base del confronto: qui ogni rossa riproduce un rilievo da chiudere.
  */
-export function esitoProveTolte({ rosse = [], shaPrima = '', conPulizia = true, messi = 0 } = {}) {
-  if (!rosse.length) return { ferma: false, testo: '' };
+export function esitoProveTolte({ rosse = [], dallaPulizia = [], shaPrima = '', conPulizia = true, messi = 0 } = {}) {
+  if (!rosse.length && !dallaPulizia.length) return { ferma: false, testo: '' };
+  // Un file che copriva anche un rilievo messo da parte: la pulizia gli ha tolto un caso, e quello che resta è da correggere.
+  const casi = dallaPulizia.length ? [
+    'Consegna respinta: a queste prove la pulizia ha tolto il caso di un rilievo messo da parte, e il caso che resta',
+    'riproduce un rilievo da correggere. Sul codice nuovo è ancora rosso:',
+    dallaPulizia.map((f) => `  · ${f}`).join('\n'),
+    'Correggi finché è verde, e consegna di nuovo.',
+  ] : [];
+  if (!rosse.length) return { ferma: true, testo: casi.join('\n') };
   const rimetti = `git checkout ${String(shaPrima).slice(0, 12) || '<commit della critica>'} -- <file>`;
   // Senza pulizia registrata una rossa può essere di un rilievo messo da parte: quello aspetta l'owner, non si corregge qui.
   const perche = conPulizia ? [
