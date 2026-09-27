@@ -619,7 +619,65 @@
     return out;
   }
 
-  // ── Interruttore "solo modelli a pesi aperti" ───────────────────────────────
+  // Motivo di ogni voce di `list`: vince quello scritto dall'owner (`saved`),
+  // poi quello di serie; il confronto sul nome è per forma normalizzata. PURA.
+  function excludedProviderReasons(list, saved, defaults) {
+    const clean = (r) => {
+      const kind = r && EXCLUDED_PROVIDER_KINDS.includes(r.kind) ? r.kind : '';
+      const note = r && typeof r.note === 'string' ? r.note.trim() : '';
+      return { kind, note };
+    };
+    const find = (arr, k) => (Array.isArray(arr) ? arr : [])
+      .find((r) => r && normalizeProviderName(r.name) === k);
+    return providerIgnoreList(list).map((name) => {
+      const k = normalizeProviderName(name);
+      const r = find(saved, k) || find(defaults, k);
+      return { name, ...clean(r) };
+    });
+  }
+
+  // Catalogo dei fornitori dello smistatore: [{ name, slug }]. Un nome scritto
+  // nella lista vale solo se copre almeno un fornitore del catalogo (per nome o
+  // per slug): un refuso non copre niente e l'esclusione sarebbe finta. PURA.
+  function providerCoversCatalog(name, catalog) {
+    if (!normalizeProviderName(name)) return false;
+    return (Array.isArray(catalog) ? catalog : []).some((p) => p
+      && (isProviderExcluded(p.name, [name]) || isProviderExcluded(p.slug, [name])));
+  }
+
+  function editDistance(a, b) {
+    const prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+      let diag = prev[0];
+      prev[0] = i;
+      for (let j = 1; j <= b.length; j++) {
+        const tmp = prev[j];
+        prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+        diag = tmp;
+      }
+    }
+    return prev[b.length];
+  }
+
+  // Il nome del catalogo più vicino a `name`, per suggerire la correzione di un
+  // refuso; '' se nessuno è abbastanza vicino da essere lo stesso. PURA.
+  function closestCatalogProvider(name, catalog) {
+    const n = normalizeProviderName(name);
+    if (!n || n.length > 200) return '';
+    let best = '';
+    let bestD = Infinity;
+    for (const p of (Array.isArray(catalog) ? catalog : [])) {
+      if (!p || typeof p.name !== 'string') continue;
+      const cand = normalizeProviderName(p.name);
+      // Confronta anche col prefisso della stessa lunghezza: «Novtia» è vicino
+      // alla forma base di «NovitaAI», non all'intero nome.
+      const d = Math.min(editDistance(n, cand), editDistance(n, cand.slice(0, n.length)) + 1);
+      if (d < bestD) { bestD = d; best = p.name; }
+    }
+    return best && bestD <= Math.max(1, Math.floor(n.length / 3)) ? best : '';
+  }
+
+  // ── Interruttore "solo modelli a pesi aperti"───────────────────────────────
   // La politica sui modelli dice che chi usa Filo può rifiutare TUTTI i modelli
   // proprietari — Anthropic compresa, cioè anche la scelta di chi Filo lo fa —
   // e lavorare solo con modelli a pesi aperti serviti da fornitori indipendenti.
