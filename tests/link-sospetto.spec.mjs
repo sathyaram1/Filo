@@ -88,3 +88,53 @@ test('la spiegazione arriva da sola: nel menu non c’è niente da cliccare', as
   await expect(menu.locator('.sn-menu-inline[data-subject="text"]')).toBeVisible();
   await expect(menu.getByText(/^Spiegazione$/)).toHaveCount(0);
 });
+
+// #725.1 — quando il punto cliccato è un'immagine che apre un collegamento
+// (locandina, banner, logo di una scheda) la sezione del menu parla
+// dell'immagine: l'avviso sull'indirizzo deve esserci lo stesso, in tutte le
+// forme in cui immagine e collegamento stanno insieme.
+const PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+const FALSO = 'https://paypa1.com/login';
+const SCHEDE = {
+  'immagine dentro il link': `<a id="lnk" href="${FALSO}"><img id="clic" src="${PX}" width="240" height="140" style="background:#e07b39"></a>`,
+  'copertina stesa sopra il link': `<div style="position:relative;width:320px;height:180px">
+      <a id="lnk" href="${FALSO}" style="position:absolute;inset:0;display:block"></a>
+      <img id="clic" src="${PX}" style="position:absolute;inset:0;width:100%;height:100%;background:#e07b39"></div>`,
+  'velo dentro il link sopra la copertina': `<a id="lnk" href="${FALSO}" style="position:relative;display:block;width:320px;height:180px">
+      <img src="${PX}" style="position:absolute;inset:0;width:100%;height:100%;background:#e07b39">
+      <span id="clic" style="position:absolute;inset:0;background:rgba(0,0,0,.001)"></span></a>`,
+  'scheda a strati: velo sopra, copertina e link sotto': `<div style="position:relative;width:320px;height:180px">
+      <a id="lnk" href="${FALSO}" style="position:absolute;inset:0;display:block"></a>
+      <img src="${PX}" style="position:absolute;inset:0;width:100%;height:100%;background:#e07b39">
+      <span id="clic" style="position:absolute;inset:0;background:rgba(0,0,0,.001)"></span></div>`,
+};
+
+for (const [forma, scheda] of Object.entries(SCHEDE)) {
+  test(`immagine-link sospetta (${forma}): il menu dice dell'imitazione`, async ({ openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">${scheda}</body></html>`);
+    await page.locator('#clic').click({ button: 'right', position: { x: 20, y: 20 } });
+    const menu = page.locator('.sn-menu');
+    await expect(menu).toBeVisible();
+    // È davvero il menu dell'immagine-link: voci del collegamento e sezione dell'immagine.
+    await expect(menu.getByText('Apri in nuova tab').first()).toBeVisible();
+    const sezione = menu.locator('.sn-menu-inline[data-subject="image"]');
+    await expect(sezione).toBeVisible();
+    const avviso = sezione.locator('.sn-menu-link-warn');
+    await expect(avviso).toBeVisible({ timeout: 3000 });
+    const testo = ((await avviso.textContent()) || '').trim();
+    expect(testo).toContain('paypal.com');
+    expect(testo).toMatch(/imitazione/i);
+    if (forma === 'immagine dentro il link') {
+      await page.screenshot({ path: 'tests/.shots/725-1-immagine-link-sospetta.png' });
+    }
+  });
+}
+
+test('un’immagine dentro un link normale non si prende l’avviso', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px">
+    <a href="https://esempio-tranquillo.test/articolo"><img id="clic" src="${PX}" width="240" height="140" style="background:#e07b39"></a></body></html>`);
+  await page.locator('#clic').click({ button: 'right', position: { x: 20, y: 20 } });
+  await expect(page.locator('.sn-menu .sn-menu-inline[data-subject="image"]')).toBeVisible();
+  await page.waitForTimeout(800);
+  await expect(page.locator('.sn-menu .sn-menu-link-warn')).toHaveCount(0);
+});

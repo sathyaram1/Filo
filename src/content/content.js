@@ -1890,7 +1890,7 @@
       items.push({ type: 'separator' });
       // Una sola sezione "Spiega" (quella dell'immagine, l'elemento cliccato):
       // aggiungerne una seconda firerebbe una seconda chiamata AI a ogni apertura.
-      items.push(Actions.buildInlineExplainImage(imgEl));
+      items.push(Actions.buildInlineExplainImage(imgEl, linkOfImg));
       return items;
     }
 
@@ -1929,7 +1929,7 @@
       // Sul filmato resta il collegamento: una spiegazione del filmato non
       // esiste, ed è già la stessa in tutti e tre i modi di cliccare la scheda.
       items.push(imgInLink
-        ? Actions.buildInlineExplainImage(imgInLink)
+        ? Actions.buildInlineExplainImage(imgInLink, linkEl)
         : Actions.buildInlineExplainLink(linkEl));
       return items;
     }
@@ -1965,12 +1965,13 @@
     // completo mentre il filmatino suonava, menu vuoto un istante dopo (#444).
     if (imgUnder) {
       for (const it of buildImageActionItems(imgUnder)) items.push(it);
-      if (belongsTo(imgUnder, linkUnder, layers)) {
+      const linkOfCover = belongsTo(imgUnder, linkUnder, layers) ? linkUnder : null;
+      if (linkOfCover) {
         items.push({ type: 'separator' });
-        for (const it of buildLinkActionItems(linkUnder)) items.push(it);
+        for (const it of buildLinkActionItems(linkOfCover)) items.push(it);
       }
       items.push({ type: 'separator' });
-      items.push(Actions.buildInlineExplainImage(imgUnder));
+      items.push(Actions.buildInlineExplainImage(imgUnder, linkOfCover));
       return items;
     }
 
