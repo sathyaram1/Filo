@@ -6,14 +6,13 @@ import { test, expect } from '../../fixtures/electron.mjs';
 const SCHEDE = 'https://firestore.googleapis.com/v1/projects/filo-prova/databases/(default)/documents/feedback-public';
 
 test('una pagina web in una scheda non raggiunge le schede', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({ session }) => {
+    globalThis.__erroriPagina = [];
+    session.defaultSession.webRequest.onErrorOccurred({ urls: ['https://*.googleapis.com/*'] }, (d) => globalThis.__erroriPagina.push(d.error));
+  });
   const url = testServer.html('<!doctype html><title>p</title><p>pagina</p>');
   const page = await openTab(url);
   await page.waitForLoadState('domcontentloaded');
-  await app.evaluate(({ webContents }, u) => {
-    globalThis.__erroriPagina = [];
-    const wc = webContents.getAllWebContents().find((w) => w.getURL() === u);
-    wc.session.webRequest.onErrorOccurred({ urls: ['https://*.googleapis.com/*'] }, (d) => globalThis.__erroriPagina.push(d.error));
-  }, url);
   const esito = await page.evaluate(async (s) => {
     try { const r = await fetch(s, { mode: 'no-cors' }); return `raggiunto ${r.type}`; } catch (e) { return 'fallito'; }
   }, SCHEDE);
