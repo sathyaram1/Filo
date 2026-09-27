@@ -1197,7 +1197,10 @@ if (isMain) {
     if (aperto && aperto.verdict === 'fix-pending' && aperto.pending && aperto.pending.sha && !statoC.lines.length) {
       const { controllaProveTolte, baseDelConfronto } = await import('./lib/prove-tolte.mjs');
       const base = baseDelConfronto(aperto.pending.sha, aperto.pending.shaPulizia, ROOT);
-      const tolte = base !== sha ? controllaProveTolte({ shaPrima: base, root: ROOT }) : { ferma: false, testo: '' };
+      const messi = [aperto.pending.derived, aperto.pending.external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
+      const tolte = base !== sha
+        ? controllaProveTolte({ shaPrima: base, root: ROOT, conPulizia: base !== aperto.pending.sha, messi })
+        : { ferma: false, testo: '' };
       if (tolte.ferma) { console.error(tolte.testo); process.exit(1); }
       if (tolte.testo) console.log(tolte.testo);
     }
