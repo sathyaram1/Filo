@@ -13,20 +13,23 @@
 // Senza il fix: (2) e (3) trovano l'exe in cartella subito, (5) apre al primo
 // clic → rossi.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
+import { _electron as electron } from '@playwright/test';
 import { createServer } from 'node:http';
-import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const PDF = Buffer.from('%PDF-1.4\n% finto pdf di prova\n' + 'x'.repeat(2048));
 const EXE = Buffer.from('MZ finto eseguibile di prova\n' + 'z'.repeat(2048));
 
-// Mini server che serve qualunque nome come allegato: `.exe` → finto eseguibile,
-// tutto il resto → finto PDF. Il nome del file è quello nell'indirizzo.
+// Mini server che serve qualunque nome come allegato: `.pdf` → finto PDF,
+// tutto il resto → finto eseguibile. Il nome del file è quello nell'indirizzo.
 async function apriServer() {
   const srv = createServer((req, res) => {
     const nome = (String(req.url || '').split('?')[0].split('/').pop()) || 'file.pdf';
-    const exe = nome.endsWith('.exe');
+    const exe = !nome.endsWith('.pdf');
     res.writeHead(200, {
       'Content-Type': exe ? 'application/octet-stream' : 'application/pdf',
       'Content-Length': exe ? EXE.length : PDF.length,
@@ -598,4 +601,86 @@ test('un nome lungo senza spazi si legge tutto nella domanda, senza scorrere di 
     expect(misure.ask[0], 'il nome esce dal bordo della domanda').toBeLessThanOrEqual(misure.ask[1] + 1);
     expect(misure.lista[0], 'il pannello scorre di lato').toBeLessThanOrEqual(misure.lista[1] + 1);
   } finally { await srv.close(); }
+});
+
+test('un’immagine disco si ferma come un programma, e la domanda dice che è un disco (#588.1)', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServer();
+  try {
+    const dir = await cartellaDownload(app);
+    await app.evaluate(({ shell }) => {
+      globalThis.__aperti = [];
+      shell.openPath = (p) => { globalThis.__aperti.push(p); return Promise.resolve(''); };
+    });
+    const aperti = () => app.evaluate(() => globalThis.__aperti.slice());
+
+    const page = await apriPagina(srv.base, { openTab, testServer }, `<a id="iso" href="${srv.base}/setup.iso">Scarica il disco</a>`);
+    await page.locator('#iso').click();
+    await expect.poll(() => statoDi(shell, 'setup.iso'), { timeout: 20000 }).toBe('pending');
+    expect(contenuto(dir)).not.toContain('setup.iso');
+
+    const avviso = domanda(shell, 'setup.iso');
+    await expect(avviso).toBeVisible({ timeout: 10000 });
+    await expect(avviso).toContainText('immagine disco');
+    await expect(avviso).toContainText('127.0.0.1');
+    await risposta(avviso, /^Scarica$/).click();
+    await expect.poll(() => statoDi(shell, 'setup.iso'), { timeout: 20000 }).toBe('completed');
+    await expect.poll(() => contenuto(dir), { timeout: 10000 }).toContain('setup.iso');
+
+    // «Apri file» monterebbe il disco: la seconda domanda arriva prima.
+    await apriPannello(shell);
+    const riga = shell.locator('.dl-row', { hasText: 'setup.iso' });
+    await expect(riga.locator('.dl-row-tag')).toHaveText('Programma');
+    await riga.locator('.dl-row-btn', { hasText: 'Apri file' }).click();
+    const conferma = domanda(shell, 'setup.iso').filter({ hasText: 'doppio clic' });
+    await expect(conferma).toBeVisible({ timeout: 10000 });
+    await expect(conferma).toContainText('immagine disco');
+    expect(await aperti()).toEqual([]);
+    await risposta(conferma, 'Apri comunque').click();
+    await expect.poll(aperti, { timeout: 10000 }).toEqual([join(dir, 'setup.iso')]);
+  } finally {
+    await srv.close();
+  }
+});
+
+test('un’immagine disco scaricata prima che fosse in lista chiede conferma dopo il riavvio (#588.1)', async () => {
+  test.setTimeout(90_000);
+  // La marca «programma» è scritta nella cronologia al momento dello
+  // scaricamento: una voce vecchia porta exe:false anche per un .iso.
+  const userData = cartellaTemporanea('filo-test-');
+  const dir = join(userData, 'downloads');
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, 'setup.iso');
+  writeFileSync(file, 'finto disco');
+  const quando = new Date().toISOString();
+  writeFileSync(join(userData, 'storage.json'), JSON.stringify({
+    downloads: [{
+      id: 'vecchio-iso', filename: 'setup.iso', url: 'https://dubbio.example/setup.iso',
+      exe: false, site: 'dubbio.example', mime: '', totalBytes: 11, receivedBytes: 11,
+      state: 'completed', savePath: file, startedAt: quando, endedAt: quando,
+      paused: false, canResume: false, canPause: false,
+    }],
+  }));
+  const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const app = await electron.launch({
+    args: [...argomentiScala, '.'],
+    cwd: APP_ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: dir, NODE_ENV: 'test' },
+  });
+  try {
+    const shell = await app.firstWindow();
+    await shell.waitForLoadState('domcontentloaded');
+    await app.evaluate(({ shell }) => {
+      globalThis.__aperti = [];
+      shell.openPath = (p) => { globalThis.__aperti.push(p); return Promise.resolve(''); };
+    });
+    await expect.poll(async () => (await voce(shell, 'setup.iso'))?.exe ?? null, { timeout: 15000 }).toBe(true);
+    const r = await shell.evaluate(() => window.filoShell.downloads.openFile('vecchio-iso'));
+    expect(r.needsConfirm).toBe(true);
+    expect(r.text).toContain('dubbio.example');
+    expect(await app.evaluate(() => globalThis.__aperti.slice())).toEqual([]);
+  } finally {
+    await chiudiApp(app);
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  }
 });

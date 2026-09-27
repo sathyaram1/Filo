@@ -150,3 +150,35 @@ test('un sito incerto si dice incerto, in ogni frase che nomina il sito', () => 
   assert.ok(E.testoApri('setup.exe', 'forum.it', true).includes(incerto));
   assert.equal(E.provenienza('', true), '');
 });
+
+test('i formati che Windows monta o esegue senza essere un .exe sono nella lista (#588.1)', () => {
+  // Un .iso montato mette setup.exe a un doppio clic e non porta la marca di
+  // file scaricato: è la strada più usata per scavalcare i controlli.
+  for (const ext of ['iso', 'img', 'vhd', 'vhdx', 'appref-ms', 'xll', 'library-ms',
+    'settingcontent-ms', 'diagcab']) {
+    assert.equal(E.eEseguibile(`setup.${ext}`), true, `manca .${ext}`);
+    assert.equal(E.eEseguibile(`SETUP.${ext.toUpperCase()}. `), true, `.${ext} maiuscolo con punto in coda`);
+  }
+  assert.equal(E.estensione('app.appref-ms'), 'appref-ms');
+  // Un nome che finisce solo con «-ms» non è l'estensione composta.
+  assert.equal(E.eEseguibile('note-ms.txt'), false);
+});
+
+test('un’immagine disco si dice immagine disco, non «programma»', () => {
+  for (const nome of ['setup.iso', 'disco.IMG', 'win.vhdx', 'app.dmg']) {
+    assert.equal(E.eImmagineDisco(nome), true, nome);
+    const s = E.testoScarica(nome, 'dubbio.example');
+    const a = E.testoApri(nome, 'dubbio.example');
+    assert.match(s, /immagine disco/, s);
+    assert.match(s, /programmi/, s);
+    assert.ok(s.includes('da dubbio.example') && s.includes(nome), s);
+    assert.match(a, /immagine disco/, a);
+    assert.match(a, /doppio clic/, a);
+    assert.ok(a.includes('da dubbio.example'), a);
+    assert.match(E.titoloApri(nome), /immagine disco/);
+  }
+  assert.equal(E.eImmagineDisco('setup.exe'), false);
+  assert.equal(E.titoloApri('setup.exe'), E.TITOLO_APRI);
+  assert.match(E.testoScarica('setup.exe', 'dubbio.example'), /è un programma/);
+  assert.ok(E.testoScarica('setup.iso', 'forum.it', true).includes(E.provenienza('forum.it', true)));
+});
