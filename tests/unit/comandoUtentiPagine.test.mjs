@@ -38,11 +38,13 @@ beforeEach(() => {
       richieste.push(msg);
       if (msg.type !== MSG.OWNER_LIST_USERS) return { ok: true };
       const dopo = String(msg.after || '');
-      const pagina = TUTTI.filter((u) => !dopo || u.email > dopo).slice(0, 50);
+      const cerca = String(msg.cerca || '');
+      const trovati = TUTTI.filter((u) => u.email.startsWith(cerca));
+      const pagina = trovati.filter((u) => !dopo || u.email > dopo).slice(0, 50);
       return {
         ok: true,
         users: pagina,
-        total: TUTTI.length,
+        total: trovati.length,
         next: pagina.length >= 50 ? pagina[pagina.length - 1].email : '',
       };
     },
@@ -129,4 +131,58 @@ test('con esattamente una pagina di iscritti non si offre una pagina che non c�
   const riga = await comando('/users');
   assert.match(riga, /Utenti registrati 1-50 di 50:/);
   assert.ok(!/\/users altri/.test(riga), 'sono tutti qui: non si invita a chiederne altri');
+});
+
+// #679.3 — l'indirizzo scritto dopo il comando era ignorato e arrivava la
+// prima pagina di tutti: la centesima persona la si vedeva solo sfogliando.
+test('«/users» con l’indirizzo mostra quella persona', async () => {
+  const riga = await comando('/users utente099@esempio.it');
+  assert.equal(richieste[richieste.length - 1].cerca, 'utente099@esempio.it');
+  assert.equal(riga, 'Trovato:\n• utente099@esempio.it — 199 crediti');
+  assert.ok(!riga.includes(TUTTI[0].email), 'non la prima pagina di tutti');
+  assert.ok(!/\/users altri/.test(riga));
+});
+
+test('«/users» con l’inizio dell’indirizzo si sfoglia dentro la ricerca', async () => {
+  const prima = await comando('/users Utente');
+  assert.equal(richieste[richieste.length - 1].cerca, 'utente', 'le email stanno in minuscolo');
+  assert.match(prima, /1-50 di 120:/);
+  const seconda = await comando('/users altri');
+  assert.equal(richieste[richieste.length - 1].cerca, 'utente', '«altri» continua la stessa ricerca');
+  assert.match(seconda, /51-100 di 120:/);
+  const breve = await comando('/users utente11');
+  assert.match(breve, /1-10 di 10:/);
+  assert.ok(breve.includes(TUTTI[119].email));
+});
+
+test('una ricerca senza risultati lo dice e indica come vederli tutti', async () => {
+  const riga = await comando('/users nessuno@altrove.it');
+  assert.match(riga, /Nessun utente/);
+  assert.match(riga, /nessuno@altrove\.it/);
+  assert.match(riga, /\/users/);
+  const dopo = await comando('/users altri');
+  assert.match(dopo, /Non ho altri utenti/);
+});
+
+test('«/users tutti» e «/users» a vuoto non filtrano', async () => {
+  await comando('/users tutti');
+  assert.equal(richieste[richieste.length - 1].cerca, '');
+  const riga = await comando('/users   ');
+  assert.equal(richieste[richieste.length - 1].cerca, '');
+  assert.match(riga, /Utenti registrati 1-50 di 120:/);
+});
+
+test('dopo una ricerca «/users» torna a tutti', async () => {
+  await comando('/users utente11');
+  const riga = await comando('/users');
+  assert.equal(richieste[richieste.length - 1].cerca, '');
+  assert.match(riga, /Utenti registrati 1-50 di 120:/);
+});
+
+test('un secondo «/users» dato mentre il primo viaggia vale al suo posto', async () => {
+  C.handleSlashCommand('/users');
+  const riga = await comando('/users utente099');
+  assert.match(riga, /«utente099» 1-1 di 1:/, 'un inizio d’indirizzo resta una ricerca, col suo conto');
+  const altre = righe.filter((r) => /Utenti registrati 1-50/.test(r));
+  assert.equal(altre.length, 0, 'la pagina del primo comando non arriva dopo la ricerca a sfasarla');
 });

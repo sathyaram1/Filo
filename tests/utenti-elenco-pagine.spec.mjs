@@ -23,11 +23,12 @@ async function finteRisposte(page) {
     chrome.runtime.sendMessage = (msg, cb) => {
       if (msg && msg.type === 'owner_list_users') {
         const dopo = String(msg.after || '');
-        const pagina = tutti.filter((u) => !dopo || u.email > dopo).slice(0, 50);
+        const trovati = tutti.filter((u) => u.email.startsWith(String(msg.cerca || '')));
+        const pagina = trovati.filter((u) => !dopo || u.email > dopo).slice(0, 50);
         const r = {
           ok: true,
           users: pagina,
-          total: tutti.length,
+          total: trovati.length,
           next: pagina.length >= 50 ? pagina[pagina.length - 1].email : '',
         };
         if (cb) { cb(r); return; }
@@ -65,4 +66,23 @@ test('l’elenco degli utenti dice quanti sono, quali mostra e come vedere gli a
   await expect(bolle).toContainText('Utenti registrati 101-120 di 120', { timeout: 8000 });
   await expect(bolle).toContainText('utente119@esempio.it');
   await page.screenshot({ path: 'tests/.shots/679-utenti-ultima-pagina.png', fullPage: false });
+});
+
+// #679.3 — la centesima persona si guarda scrivendone l'indirizzo, senza
+// sfogliare e senza passare dal comando che regala crediti.
+test('scrivendo l’indirizzo dopo /users si vede quella persona sola', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await page.waitForSelector('#input');
+  await finteRisposte(page);
+
+  await scrivi(page, '/users utente099@esempio.it');
+  const bolle = page.locator('#bubbles');
+  const ultima = bolle.locator('.dash-bubble-filo').last();
+  await expect(ultima).toContainText('utente099@esempio.it — 199 crediti', { timeout: 8000 });
+  await expect(ultima).toContainText('Trovato:');
+  await expect(bolle).not.toContainText('utente000@esempio.it');
+  await page.screenshot({ path: 'tests/.shots/679-3-utenti-cerca.png', fullPage: false });
+
+  await scrivi(page, '/users nessuno@altrove.it');
+  await expect(bolle.locator('.dash-bubble-filo').last()).toContainText('Nessun utente', { timeout: 8000 });
 });

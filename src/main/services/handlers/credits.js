@@ -102,10 +102,27 @@ module.exports = function register(on, ctx) {
   // documenti saltati li avesse letti.
   const SOLO_CON_EMAIL = { unaryFilter: { field: { fieldPath: 'email' }, op: 'IS_NOT_NULL' } };
 
-  function corpoElencoUtenti(after) {
+  // Chi cerca una persona scrive l'inizio del suo indirizzo: le email stanno
+  // salvate in minuscolo, e `\uf8ff` chiude l'intervallo dopo ogni carattere
+  // che può seguire quell'inizio (#679.3).
+  function filtroUtenti(cerca) {
+    if (!cerca) return SOLO_CON_EMAIL;
+    const campo = { fieldPath: 'email' };
+    return {
+      compositeFilter: {
+        op: 'AND',
+        filters: [
+          { fieldFilter: { field: campo, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: cerca } } },
+          { fieldFilter: { field: campo, op: 'LESS_THAN', value: { stringValue: `${cerca}\uf8ff` } } },
+        ],
+      },
+    };
+  }
+
+  function corpoElencoUtenti(after, cerca = '') {
     const q = {
       from: [{ collectionId: 'credits' }],
-      where: SOLO_CON_EMAIL,
+      where: filtroUtenti(cerca),
       orderBy: [{ field: { fieldPath: 'email' }, direction: 'ASCENDING' }],
       select: { fields: CAMPI_RIGA_UTENTE.map((f) => ({ fieldPath: f })) },
       limit: USERS_PAGE_SIZE,
@@ -118,11 +135,11 @@ module.exports = function register(on, ctx) {
 
   // Quanti sono in tutto. Un conteggio non è un errore che valga la pena
   // mostrare: se non arriva, l'elenco si mostra lo stesso senza il totale.
-  async function adminCountUsers(idToken) {
+  async function adminCountUsers(idToken, cerca = '') {
     const endpoint = `${FB.rest.FIRESTORE_BASE}:runAggregationQuery?key=${FB.rest.API_KEY}`;
     const body = {
       structuredAggregationQuery: {
-        structuredQuery: { from: [{ collectionId: 'credits' }], where: SOLO_CON_EMAIL },
+        structuredQuery: { from: [{ collectionId: 'credits' }], where: filtroUtenti(cerca) },
         aggregations: [{ alias: 'totale', count: {} }],
       },
     };
@@ -142,7 +159,7 @@ module.exports = function register(on, ctx) {
     return null;
   }
 
-  async function adminListUsers({ after = '' } = {}) {
+  async function adminListUsers({ after = '', cerca = '' } = {}) {
     if (!FB?.rest) return { users: [], total: null, next: '' };
     const idToken = await auth.getIdToken();
     if (!idToken) throw new Error('Sessione scaduta: rifai l\'accesso.');
@@ -151,9 +168,9 @@ module.exports = function register(on, ctx) {
       fetch(endpoint, {
         method: 'POST',
         headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(corpoElencoUtenti(after)),
+        body: JSON.stringify(corpoElencoUtenti(after, cerca)),
       }),
-      adminCountUsers(idToken).catch(() => null),
+      adminCountUsers(idToken, cerca).catch(() => null),
     ]);
     if (!res.ok) throw new Error(`users ${res.status}`);
     const rows = await res.json();
@@ -327,8 +344,9 @@ module.exports = function register(on, ctx) {
     try {
       // Il segnalibro è un'email: più lungo del massimo che un'email può essere
       // non è un segnalibro, è solo corpo della richiesta in più.
-      const { users, total, next } = await adminListUsers({ after: String(msg?.after || '').slice(0, 320) });
-      return { ok: true, users, total, next };
+      const cerca = String(msg?.cerca || '').trim().toLowerCase().slice(0, 320);
+      const { users, total, next } = await adminListUsers({ after: String(msg?.after || '').slice(0, 320), cerca });
+      return { ok: true, users, total, next, cerca };
     }
     catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }));

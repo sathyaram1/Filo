@@ -150,8 +150,9 @@
     // OWNER_LIST_USERS: una PAGINA dell'elenco degli utenti registrati (campo
     //   `email` sui doc credits/<uid>), ordinata per email. `after` è l'ultima
     //   email già ricevuta; `next` la riporta se c'è un'altra pagina, `total`
-    //   è il conteggio di tutti (null se non è arrivato).
-    //   { after? } → { ok, users:[{email,name,balance}], total, next } | { ok:false, error }.
+    //   è il conteggio di tutti (null se non è arrivato). `cerca` restringe a
+    //   chi ha un'email che comincia così, e `total` conta solo loro.
+    //   { after?, cerca? } → { ok, users:[{email,name,balance}], total, next, cerca } | { ok:false, error }.
     OWNER_LIST_USERS: 'owner_list_users',
     // OWNER_GIFT_CREDITS: regala `amount` crediti all'utente con `email`.
     //   { amount, email } → { ok, email, amount, balance } | { ok:false, error }.
