@@ -170,13 +170,13 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 let cache = null;
 let adesso = () => Date.now();
 
-// La risposta dipende da CHI sta usando Filo: i segreti dei giudici li legge
-// solo l'owner. Senza questa firma, un logout lascerebbe in circolo per cinque
-// minuti la risposta dell'account di prima.
 function sessioneAperta() {
   try { return Boolean(auth.getProfile && auth.getProfile()); } catch (_) { return false; }
 }
 
+// La risposta dipende da CHI sta usando Filo: i segreti dei giudici li legge
+// solo l'owner. Senza questa firma, un logout lascerebbe in circolo per cinque
+// minuti la risposta dell'account di prima.
 function identita() {
   let email = '';
   try { email = String((auth.getProfile && auth.getProfile()) ? auth.getProfile().email || '' : '').toLowerCase(); } catch (_) {}
