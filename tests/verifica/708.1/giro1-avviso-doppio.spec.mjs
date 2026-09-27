@@ -1,10 +1,6 @@
-// #708.1 giro 1 — senza portachiavi: accesso, uscita, riaccesso e aspetto al buio.
+// #708.1 giro 1 — senza portachiavi: uscita e riaccesso non devono impilare due avvisi uguali.
 import { test, expect } from '../../fixtures/electron.mjs';
-import { mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const SHOTS = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '.shots');
 const EMAIL = 'verifica@prova.test';
 
 async function preparaLogin(app) {
@@ -42,21 +38,18 @@ async function accedi(app, shell) {
   return shell.evaluate(() => window.__esito);
 }
 
-test('uscita e riaccesso: l\'avviso torna, una volta sola a schermo; al buio si legge', async ({ app, shell }) => {
-  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
+test('uscita e riaccesso: l\'avviso torna, una volta sola a schermo', async ({ app, shell }) => {
   await preparaLogin(app);
   const primo = await accedi(app, shell);
   expect(primo.remembered).toBe(false);
   const avviso = shell.locator('.shell-notif-msg', { hasText: 'dovrai accedere di nuovo' });
   await expect(avviso).toHaveCount(1, { timeout: 8_000 });
-  mkdirSync(SHOTS, { recursive: true });
-  await shell.screenshot({ path: join(SHOTS, 'verifica-708.1-scuro.png') });
 
   await shell.evaluate(() => window.filoShell.auth.signOut && window.filoShell.auth.signOut());
   const secondo = await accedi(app, shell);
   expect(secondo.ok).toBe(true);
   expect(secondo.remembered).toBe(false);
-  await shell.waitForTimeout(1500);
-  console.log('avvisi a schermo dopo il riaccesso:', await avviso.count());
   await expect(avviso.first()).toBeVisible();
+  await shell.waitForTimeout(1500);
+  await expect(avviso).toHaveCount(1);
 });
