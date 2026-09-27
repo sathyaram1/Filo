@@ -140,6 +140,15 @@ test('il riconoscitore distingue una prova da un aiuto e da uno script', () => {
   assert.equal(registraProve("// test('commentato')\nconst s = \"test('in stringa')\";\nawait prova();"), false);
 });
 
+// La pulizia riconosce la prova di un rilievo solo da giro<k>-r<n>-<cosa>: un numero scritto in un'altra forma la
+// lascerebbe dentro per sempre, senza che nessuno sappia perché.
+test('una prova del giro che porta il numero di un rilievo lo porta nella forma che la pulizia legge', async () => {
+  const { nomeNumeratoStorto } = await import('../../scripts/lib/prove-tolte.mjs');
+  const storte = nelRepo('tests/verifica').filter((f) => /\.spec\.m?js$/.test(f) && nomeNumeratoStorto(f));
+  assert.deepEqual(storte, [], 'rinominale (git mv) come giro<k>-r<n>-<cosa>.spec.mjs, coi numeri subito dopo il'
+    + ' giro, minuscoli e da 1 in su: più rilievi in fila (giro2-r1-r3-salva.spec.mjs)');
+});
+
 // Le prove di un giro sono la memoria di quel giro: il giro dopo le rilancia
 // nominando il numero della segnalazione, e una cartella senza numero è persa.
 test('ogni cartella di prove di un giro porta il numero che la farà ritrovare', () => {
