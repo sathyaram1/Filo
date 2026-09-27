@@ -496,12 +496,16 @@
    *     mancanti: …`): un numero inventato al posto di quello dell'owner è
    *     peggio di un errore (decisione del 2026-09-16).
    *
-   * Contano SOLO i rilievi interni (sede `i`). Gli esterni non entrano in
+   * Contano i rilievi interni (sede `i`) e i vicini (sede `v`), questi ultimi
+   * come livello 0 qualunque sia il livello scritto: entrano in una correzione
+   * che parte comunque, da soli la fanno partire solo col bilancio `cap0`, e
+   * un `v?` va da parte come uno 0 col `?`. Gli esterni non entrano in
    * nessuna delle regole sopra: tornano a parte in `external`, ciascuno con
    * `priority` uguale al livello, in ogni esito (anche a lavoro fermo: sono
    * di un altro lavoro, ed escono in un feedback loro). Un esterno col `?`
    * non ferma niente: la domanda viaggia nel suo feedback. Anche i rilievi
-   * interni messi da parte (`derived`) portano `priority` = livello.
+   * messi da parte (`derived`) portano `priority` = livello SCRITTO; come
+   * diventano feedback lo dice derivedGroups.
    *
    * @param {object} p { findings, caps:{cap3,cap2,cap1,cap0}, counts:{count3,count2,count1,count0} }
    * @returns {{
