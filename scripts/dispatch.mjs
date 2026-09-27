@@ -1241,7 +1241,7 @@ async function recordPulizia(id) {
   const r = applyPulizia(st, st.verifierSha ? controllaPulizia({ shaCritica: st.verifierSha, root: ROOT }) : null);
   if (!r.ok) return { rejected: true, formatRejected: true, message: r.message };
   // Un punto fermo sul commit della pulizia: un ripristino non deve riportare il ramo alla critica.
-  sealTransition(r.state, 'verifier:pulizia');
+  sealTransition(r.state, 'pulizia');
   return { ...r.state, files: r.files };
 }
 async function recordSecaudit(id, verdict, testo = '') {
@@ -2016,6 +2016,17 @@ if (isMainModule) {
       const s = await recordFixed(id, report, frase, segnalazione.testo, ferma);
       if (s.rejected) esciRespinto(s);
       console.log(fixedReplyText(id, s.reply, ferma || !!segnalazione.testo.trim()));
+      process.exit(0);
+    } else if (flag === '--record-pulizia') {
+      const [, id, ...avanzo] = conBiglietto(argv);
+      if (!id || SEMBRA_OPZIONE(id)) { console.error('Uso: --record-pulizia <id>'); process.exit(1); }
+      if (avanzo.length) {
+        console.error(`Argomento non capito: ${avanzo[0]} — non ho registrato niente. Qui ci va solo l'identificativo: cosa hai tolto lo dice il commit.`);
+        process.exit(1);
+      }
+      const s = await recordPulizia(id);
+      if (s.rejected) esciRespinto(s);
+      console.log(`stato ${id}: pulizia registrata su ${String(s.puliziaSha).slice(0, 8)} (${s.files.length === 1 ? '1 prova tolta' : `${s.files.length} prove tolte`}). Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, se com'era è ancora rossa, la ferma.`);
       process.exit(0);
     } else if (flag === '--record-secaudit') {
       // `--nota <file>` è l'unica opzione, e si toglie prima dei posizionali.
