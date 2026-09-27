@@ -28,35 +28,62 @@ export function percorsoRipristino(prova, etichetta) {
 }
 
 /**
- * Cosa fare dopo il rilancio. PURA. `messiDaParte` = rilievi usciti dal giro (esterni o interni
- * lasciati fuori): la loro prova si cancella ancora rossa di diritto, e da qui non si sa quale
- * prova sia di quale rilievo. Allora le rosse si elencano e non fermano.
+ * Cosa fare dopo il rilancio. PURA. Le prove dei rilievi messi da parte se ne sono andate prima, nel
+ * commit della pulizia, che è la base del confronto: qui ogni rossa riproduce un rilievo da chiudere.
  */
-export function esitoProveTolte({ rosse = [], messiDaParte = 0, shaPrima = '' } = {}) {
+export function esitoProveTolte({ rosse = [], shaPrima = '' } = {}) {
   if (!rosse.length) return { ferma: false, testo: '' };
-  const elenco = rosse.map((f) => `  · ${f}`).join('\n');
-  if (Number(messiDaParte) > 0) {
-    return {
-      ferma: false,
-      testo: [
-        'Queste prove del giro sono state cancellate o cambiate, e com\'erano sono ancora rosse sul codice nuovo:',
-        elenco,
-        `Il giro ha messo da parte ${messiDaParte} rilievi, e la loro prova si cancella rossa: se una di queste`,
-        'riproduce invece un rilievo che hai corretto, la porta è ancora aperta. Rimettila e correggi.',
-      ].join('\n'),
-    };
-  }
   return {
     ferma: true,
     testo: [
       'Consegna respinta: hai cancellato o cambiato prove del giro che, com\'erano, sul codice nuovo sono ancora rosse.',
-      elenco,
-      'Nessun rilievo di questo giro è stato messo da parte, quindi ognuna riproduce un rilievo che dovevi',
-      `chiudere: la porta è ancora aperta. Rimetti la prova (git checkout ${String(shaPrima).slice(0, 12) || '<commit della critica>'} -- <file>),`,
+      rosse.map((f) => `  · ${f}`).join('\n'),
+      'Le prove dei rilievi messi da parte sono uscite prima, nel commit della pulizia: ognuna di queste riproduce',
+      `un rilievo da chiudere, e la porta è ancora aperta. Rimetti la prova (git checkout ${String(shaPrima).slice(0, 12) || '<commit della critica>'} -- <file>),`,
       'correggi finché è verde, e consegna di nuovo. Una prova, o un suo caso, si toglie solo verde, insieme',
       'alla prova durevole che la sostituisce.',
     ].join('\n'),
   };
+}
+
+/**
+ * La base del confronto: il commit della pulizia se discende da quello della critica, altrimenti la
+ * critica. Uno sha di pulizia rimasto da un giro vecchio non deve spostare la base di quello nuovo.
+ */
+export function baseDelConfronto(shaCritica, shaPulizia, root) {
+  const critica = String(shaCritica || '');
+  const pulizia = String(shaPulizia || '');
+  if (!SHA.test(pulizia) || !SHA.test(critica)) return critica;
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', critica, pulizia], { cwd: root, stdio: 'ignore' });
+    return pulizia;
+  } catch (_) { return critica; }
+}
+
+/**
+ * Il commit della pulizia, fra la critica e HEAD: solo prove o casi TOLTI, tutti da una cartella del
+ * giro (`cartella`, o una sola se non la si sa). Stessa regola di «dopo un verdetto si può solo togliere».
+ * `{ ok, motivo, sha, files }`: `motivo` è già la frase per chi l'ha lanciata.
+ */
+export function controllaPulizia({ shaCritica, root, cartella = '' } = {}) {
+  const critica = String(shaCritica || '');
+  if (!SHA.test(critica)) return { ok: false, motivo: 'non so su che commit è stata registrata la critica: senza, non so cosa hai tolto.' };
+  let head = '';
+  try { head = gitOut(['rev-parse', 'HEAD'], root).trim(); } catch (_) { /* resta vuoto */ }
+  if (!head) return { ok: false, motivo: 'git non mi dice su che commit sei.' };
+  if (head === critica || head.startsWith(critica) || critica.startsWith(head)) {
+    return { ok: false, motivo: 'nessun commit dopo la critica. Togli le prove dei rilievi messi da parte, `git add -A && git commit`, poi rilancia.' };
+  }
+  const tol = soloProveTolte(diffDopoLaVerifica(critica, head, root));
+  if (!tol.ok) return { ok: false, motivo: `il commit della pulizia deve solo togliere prove del giro, e qui ${tol.motivo}.` };
+  if (!tol.files.length) return { ok: false, motivo: 'dopo la critica non è stata tolta nessuna prova del giro.' };
+  const cartelle = [...new Set(tol.files.map((f) => f.replace(/\\/g, '/').split('/').slice(0, 3).join('/')))];
+  const attesa = String(cartella || '').replace(/\\/g, '/').replace(/\/+$/, '');
+  const fuori = attesa ? cartelle.filter((c) => c !== attesa) : (cartelle.length > 1 ? cartelle : []);
+  if (fuori.length) {
+    return { ok: false, motivo: `le prove tolte stanno in più cartelle, o fuori da quella del giro${attesa ? ` (${attesa})` : ''}: ${cartelle.join(', ')}.` };
+  }
+  return { ok: true, motivo: '', sha: head, files: tol.files };
 }
 
 function gitOut(args, root) {
