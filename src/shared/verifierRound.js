@@ -375,6 +375,17 @@
     };
   }
 
+  /** La sede canonica: `e` e `v` come scritte, tutto il resto (anche l'assenza) interno. PURA. */
+  function sedeDi(raw) {
+    const s = String(raw == null ? '' : raw).trim().toLowerCase();
+    return s === 'e' || s === 'v' ? s : 'i';
+  }
+
+  /** Il livello con cui un rilievo conta nel giro: un vicino vale 0, qualunque livello porti scritto. PURA. */
+  function effectiveLevel(f) {
+    return f && sedeDi(f.sede) === 'v' ? 0 : Number(f && f.level);
+  }
+
   /**
    * Un elenco di rilievi arrivato da fuori (dal client, da un file) portato
    * alla forma canonica. Scarta quello che non è un rilievo: livello fuori
