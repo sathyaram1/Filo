@@ -376,20 +376,11 @@
   // macchine (le altre impostazioni stavano in un documento che loro non
   // possono leggere, e infatti non le hanno mai viste — vedi #451).
   //
-  // Spento non è "meno lavoro": è nessun lavoro. Le due impostazioni che
-  // riguardano solo le routine restano visibili ma inerti, e si vede.
-  let routinesOn = true;
-
+  // Spento non è "meno lavoro": è nessun lavoro. Le impostazioni che valgono
+  // solo per le routine restano modificabili: si preparano prima di riaccendere.
   function reflectRoutines(on) {
-    routinesOn = !!on;
-    if (mgRoutinesToggle) mgRoutinesToggle.checked = routinesOn;
-    if (mgRoutinesState)  mgRoutinesState.textContent = routinesOn ? 'On' : 'Off';
-    if (mgProberIdleBlock) mgProberIdleBlock.classList.toggle('mg-auto-block--off', !routinesOn);
-    for (const id of ['mgCap3Block', 'mgCap2Block', 'mgCap1Block', 'mgCap0Block', 'mgFixInstructionsBlock']) {
-      const el = document.getElementById(id);
-      if (el) el.classList.toggle('mg-auto-block--off', !routinesOn);
-    }
-    applyAutoModeGate();
+    if (mgRoutinesToggle) mgRoutinesToggle.checked = !!on;
+    if (mgRoutinesState)  mgRoutinesState.textContent = on ? 'On' : 'Off';
   }
 
   function setRoutinesMsg(text, kind) {
@@ -432,7 +423,6 @@
     autoModeOn = !!on;
     mgAutoToggle.checked = !!on;
     mgAutoState.textContent = on ? 'On' : 'Off';
-    applyAutoApproveGate();
   }
 
   function setAutoModeMsg(text, kind) {
@@ -496,8 +486,8 @@
 
   // ── Auto-approvazione per mittente (#446) ─────────────────────────────────
   // Con l'automatica accesa, questi decidono DI CHI ci si fida abbastanza da
-  // farlo entrare in coda senza passare dall'owner. Spenta l'automatica non
-  // contano: restano visibili ma inerti (e lo si vede).
+  // farlo entrare in coda senza passare dall'owner. Spenta non contano, ma si
+  // possono preparare: valgono solo al giudizio, scriverli non muove niente.
   function reflectAutoApprove(map) {
     // Il ripiego sul vecchio interruttore unico di Claude vive nel modulo
     // condiviso: una mappa salvata prima che si sdoppiassero non deve mostrare
@@ -507,13 +497,6 @@
     for (const [group, el] of Object.entries(mgAutoApprove)) {
       if (el) el.checked = m[group] !== false;
     }
-  }
-
-  function applyAutoApproveGate() {
-    for (const el of Object.values(mgAutoApprove)) {
-      if (el) el.disabled = !isAdmin || !autoModeOn;
-    }
-    if (mgAutoApproveBlock) mgAutoApproveBlock.classList.toggle('mg-auto-sub--off', !autoModeOn);
   }
 
   for (const [group, el] of Object.entries(mgAutoApprove)) {
@@ -560,24 +543,14 @@
     mgAutoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgRoutinesToggle) mgRoutinesToggle.disabled = !isAdmin;
     if (mgRoutinesSwitch) mgRoutinesSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
-    // Le due impostazioni che valgono solo per le routine: senza routine non
-    // decidono niente, quindi non si toccano (come i mittenti con l'automatica
-    // spenta). Restano visibili: sono una scelta dell'owner, non un segreto.
-    for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save, mgFixInstructions, mgFixInstructionsSave]) {
-      if (el) el.disabled = !isAdmin || !routinesOn;
-    }
-    if (mgProberIdle)  mgProberIdle.disabled = !isAdmin || !routinesOn;
-    // Vale anche per la verifica locale, che gira a routine spente.
-    if (mgGiroStretto) mgGiroStretto.disabled = !isAdmin;
+    // Solo l'essere owner decide: nessuna impostazione dipende da un'altra
+    // accesa, perché si preparano prima di riaccendere (richiesta owner).
     if (mgGiroStrettoSwitch) mgGiroStrettoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
-    // Le sessioni NON dipendono dalle routine accese: escludere un account, o
-    // ridurre il parallelismo, si decide prima di riaccendere.
-    for (const el of [mgMaxSessions, mgMaxSessionsSave, mgAccountA, mgAccountB, ...mgPriorityRadios]) {
+    for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
+      mgFixInstructions, mgFixInstructionsSave, mgProberIdle, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
+      mgAccountA, mgAccountB, ...mgPriorityRadios, mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove)]) {
       if (el) el.disabled = !isAdmin;
     }
-    if (mgJudgeTimeout)     mgJudgeTimeout.disabled = !isAdmin;
-    if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.disabled = !isAdmin;
-    applyAutoApproveGate();
   }
 
   // ── I bilanci dei giri di correzione, uno per livello (tab Automazioni) ──
