@@ -105,6 +105,13 @@ test('in incognito un programma chiede prima di scendere e la voce resta alla su
     expect(disco).not.toContain('setup.exe');
     expect(disco).not.toContain('report.pdf');
 
+    // «Vedi tutti» dalla barra incognito: la pagina Scaricamenti della stessa
+    // finestra mostra le sue voci.
+    await incog.locator('#dl-panel').getByText('Vedi tutti').click();
+    const pagina = await trovaPagina(app, (u) => u.startsWith('filo://downloads'));
+    await expect(pagina.locator('.dl-item', { has: pagina.locator('.dl-name', { hasText: 'setup.exe' }) })).toBeVisible({ timeout: 15000 });
+    await expect(pagina.locator('.dl-item', { has: pagina.locator('.dl-name', { hasText: 'report.pdf' }) })).toBeVisible();
+
     // Un comando dalla finestra normale non raggiunge le voci dell'incognito.
     const id = (await elenco(incog)).find((it) => it.filename === 'setup.exe').id;
     const tolto = await shell.evaluate((x) => window.filoShell.downloads.remove(x), id);
