@@ -3,6 +3,7 @@
 // L'errore atteso è il blocco di Filo, non un guasto di rete: senza la chiusura qui o si passa o si sbaglia diverso.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { launchFilo, closeFilo } from './agent/driver.mjs';
 
 const SCHEDE = 'https://firestore.googleapis.com/v1/projects/filo-prova/databases/(default)/documents:runQuery';
 
@@ -50,4 +51,18 @@ test('il fetch del main non parte verso le schede e fallisce come senza rete', a
   // Il resto della rete del main resta com'è: la chiusura non è un «offline» generale.
   const locale = await app.evaluate(async (_e, u) => (await fetch(u)).text(), testServer.html('ok'));
   expect(locale).toBe('ok');
+});
+
+// Il pilota degli agenti apre Filo fuori dalla modalità test (cattura composita, test:shoot): chiuso anche lì.
+test('Filo aperto dal pilota degli agenti non raggiunge le schede', async () => {
+  const { app, shell } = await launchFilo();
+  try {
+    await shell.waitForFunction(() => document.readyState === 'complete');
+    const esito = await app.evaluate(async ({ session }, url) => {
+      try { const r = await session.defaultSession.fetch(url, { method: 'POST', body: '{}' }); return `raggiunto: ${r.status}`; } catch (e) { return String(e && e.message); }
+    }, SCHEDE);
+    expect(esito).toContain('ERR_BLOCKED_BY_CLIENT');
+  } finally {
+    await closeFilo(app);
+  }
 });

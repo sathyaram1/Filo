@@ -1,4 +1,4 @@
-// Modalità test (NODE_ENV=test): il servizio vero delle schede non si raggiunge da nessuna porta,
+// Nelle prove (NODE_ENV=test, o FILO_SERVIZI_CHIUSI=1 dal pilota): il servizio vero delle schede non si raggiunge da nessuna porta,
 // né dalle pagine né dal main, così una prova parte uguale in GitHub e nei contenitori senza rete (#735.1).
 // Chi vuole delle schede le finge sopra. Sentinella: tests/unit/testServiziChiusi.test.mjs.
 
@@ -41,17 +41,24 @@ function chiudiFetch(target = globalThis, avvisa = () => {}) {
   return true;
 }
 
+/** Vero in modalità test e quando chi apre Filo per una prova lo chiede a parte (il pilota degli agenti non è in modalità test). */
+function serviziChiusiRichiesti(env = process.env) {
+  return require('./test-window-mode').inModalitaTest(env) || (!!env && env.FILO_SERVIZI_CHIUSI === '1');
+}
+
 /**
- * In modalità test chiude i servizi su ogni porta: il fetch del main e ogni sessione
- * delle pagine, anche quelle nate dopo (incognito, privacy). No-op fuori dai test.
+ * Nelle prove chiude i servizi su ogni porta: il fetch del main e ogni sessione
+ * delle pagine, anche quelle nate dopo (incognito, privacy). No-op altrimenti.
  */
 function chiudiServiziNeiTest({
-  inTest = require('./test-window-mode').inModalitaTest(),
-  app = require('electron').app,
-  cookies = require('./services/cookies'),
+  inTest = serviziChiusiRichiesti(),
+  app,
+  cookies,
   avvisa = (riga) => { try { process.stderr.write(riga + '\n'); } catch (_) {} },
 } = {}) {
   if (!inTest) return false;
+  app = app || require('electron').app;
+  cookies = cookies || require('./services/cookies');
   chiudiFetch(globalThis, avvisa);
   cookies.chiudiHost(hostChiuso);
   app.on('session-created', (ses) => { cookies.ensureRequestHook(ses); });
@@ -61,4 +68,4 @@ function chiudiServiziNeiTest({
   return true;
 }
 
-module.exports = { HOST_CHIUSI, hostChiuso, chiudiFetch, chiudiServiziNeiTest };
+module.exports = { HOST_CHIUSI, hostChiuso, chiudiFetch, serviziChiusiRichiesti, chiudiServiziNeiTest };

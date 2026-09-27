@@ -1,6 +1,6 @@
 // Sentinella #735.1: nelle prove il servizio vero delle schede non si raggiunge da nessuna porta
 // (pagine di ogni sessione, fetch del main), così GitHub e i contenitori senza rete partono uguali.
-// Regola in src/main/test-servizi-chiusi.js; la modalità test è NODE_ENV=test su ogni lancio.
+// Regola in src/main/test-servizi-chiusi.js; la chiedono NODE_ENV=test o FILO_SERVIZI_CHIUSI=1 su ogni lancio.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -90,28 +90,36 @@ test('in modalità test si chiudono tutte le porte, fuori no', () => {
   }
 });
 
-test('il main chiude i servizi proprio nel blocco della modalità test', () => {
+test('il main chiude i servizi fuori da ogni condizione: decide il modulo, anche per il pilota', () => {
   const src = readFileSync(join(ROOT, 'src', 'main', 'main.js'), 'utf8');
-  const blocco = src.slice(src.indexOf("if (process.env.NODE_ENV === 'test') {"));
-  assert.ok(blocco.length < src.length, 'blocco della modalità test non trovato in main.js');
-  const fine = blocco.indexOf('\n}\n');
-  assert.match(blocco.slice(0, fine), /test-servizi-chiusi'\)\.chiudiServiziNeiTest\(\)/);
+  const riga = src.split('\n').find((r) => /test-servizi-chiusi'\)\.chiudiServiziNeiTest\(\)/.test(r));
+  assert.ok(riga, 'chiamata a chiudiServiziNeiTest non trovata in main.js');
+  assert.match(riga, /^try \{/, 'la chiamata sta al primo livello, non dentro il blocco NODE_ENV=test');
 });
 
-// Senza NODE_ENV=test la chiusura non scatta: ogni spec che apre Filo da sé deve impostarlo.
-test('ogni spec che apre Filo lo fa in modalità test', () => {
+test('le prove chiudono i servizi in modalità test o su richiesta del pilota, il resto no', () => {
+  assert.equal(S.serviziChiusiRichiesti({ NODE_ENV: 'test' }), true);
+  assert.equal(S.serviziChiusiRichiesti({ FILO_SERVIZI_CHIUSI: '1' }), true);
+  for (const env of [{}, { NODE_ENV: 'production' }, { FILO_SERVIZI_CHIUSI: '0' }, { FILO_SERVIZI_CHIUSI: '' }, null]) {
+    assert.equal(S.serviziChiusiRichiesti(env), false, JSON.stringify(env));
+  }
+});
+
+// Senza NODE_ENV=test (o FILO_SERVIZI_CHIUSI=1) la chiusura non scatta: ogni file delle prove che apre
+// Filo da sé deve chiederla, spec o aiutante che sia (il pilota degli agenti apre la cattura composita).
+test('ogni file delle prove che apre Filo lo fa coi servizi chiusi', () => {
   const senza = [];
   const giro = (dir) => {
     for (const nome of readdirSync(dir)) {
       if (nome.startsWith('.') || nome === 'node_modules') continue;
       const p = join(dir, nome);
       if (statSync(p).isDirectory()) giro(p);
-      else if (/\.spec\.mjs$|^electron\.mjs$/.test(nome)) {
-        const src = readFileSync(p, 'utf8');
-        if (/electron\.launch\s*\(/.test(src) && !/NODE_ENV:\s*['"]test['"]/.test(src)) senza.push(relative(ROOT, p));
+      else if (/\.m?js$/.test(nome)) {
+        const codice = readFileSync(p, 'utf8').split('\n').filter((r) => !/^\s*(\/\/|\*|\/\*)/.test(r)).join('\n');
+        if (/electron\.launch\s*\(/.test(codice) && !/NODE_ENV:\s*['"]test['"]|FILO_SERVIZI_CHIUSI:\s*['"]1['"]/.test(codice)) senza.push(relative(ROOT, p));
       }
     }
   };
   giro(join(ROOT, 'tests'));
-  assert.deepEqual(senza, [], 'questi file aprono Filo senza NODE_ENV: \'test\' e parlerebbero col servizio vero');
+  assert.deepEqual(senza, [], 'questi file aprono Filo senza NODE_ENV: \'test\' né FILO_SERVIZI_CHIUSI: \'1\' e parlerebbero col servizio vero');
 });
