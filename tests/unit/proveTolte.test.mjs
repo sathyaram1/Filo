@@ -249,7 +249,7 @@ test('le due consegne, locale e routine, passano da questo controllo, con la pul
   const locale = readFileSync(resolve(ROOT, 'scripts', 'verify-local.mjs'), 'utf8');
   const routine = readFileSync(resolve(ROOT, 'scripts', 'dispatch.mjs'), 'utf8');
   assert.match(locale, /baseDelConfronto\(aperto\.pending\.sha, aperto\.pending\.shaPulizia/);
-  assert.match(locale, /controllaProveTolte\(\{ shaPrima: base, root: ROOT \}\)/);
+  assert.match(locale, /controllaProveTolte\(\{ shaPrima: base, root: ROOT,/);
   assert.match(routine, /baseDelConfronto\(shaCritica, guard\.state\?\.puliziaSha/);
   assert.match(routine, /controllaProveTolte\(\{\s*shaPrima: baseTolte/);
   assert.doesNotMatch(`${locale}\n${routine}`, /messiDaParte:/, 'nessuna delle due passa più un lasciapassare');
