@@ -36,7 +36,7 @@ test('una sessione nata dopo l\'avvio (incognito, privacy) è chiusa anche lei',
   expect(esito).toContain('ERR_BLOCKED_BY_CLIENT');
 });
 
-test('il fetch del main non parte verso le schede e fallisce come senza rete', async ({ app }) => {
+test('il fetch del main non parte verso le schede e fallisce come senza rete', async ({ app, testServer }) => {
   const esito = await app.evaluate(async (_e, url) => {
     try { const r = await fetch(url, { method: 'POST', body: '{}' }); return { raggiunto: r.status }; } catch (e) { return { messaggio: e.message, causa: e.cause ? String(e.cause.code || e.cause.message) : null }; }
   }, SCHEDE);
@@ -44,11 +44,6 @@ test('il fetch del main non parte verso le schede e fallisce come senza rete', a
   expect(esito).toEqual({ messaggio: 'fetch failed', causa: null });
 
   // Il resto della rete del main resta com'è: la chiusura non è un «offline» generale.
-  const locale = await app.evaluate(async () => {
-    const http = process.mainModule.require('node:http');
-    const srv = http.createServer((q, r) => r.end('ok'));
-    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
-    try { return await (await fetch(`http://127.0.0.1:${srv.address().port}/`)).text(); } finally { srv.close(); }
-  });
+  const locale = await app.evaluate(async (_e, u) => (await fetch(u)).text(), testServer.html('ok'));
   expect(locale).toBe('ok');
 });
