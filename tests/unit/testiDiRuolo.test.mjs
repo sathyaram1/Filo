@@ -167,3 +167,27 @@ test('le prove dei rilievi messi da parte escono nella pulizia, non nel commit d
   assert.match(coda, /verify-local\.mjs pulizia/);
   for (const t of [risposta, coda]) assert.match(t.replace(/\s+/g, ' '), /ancora rossa non si toglie e non si cambia mai/);
 });
+
+// La pulizia riconosce la prova di un rilievo dal numero nel nome. Come si nomina lo spiega un testo solo, quello che
+// ricevono chi verifica in cloud e in locale; le risposte ripetono il numero davanti a ogni rilievo.
+test('come si nomina una prova del giro lo spiega un testo solo, e le risposte danno i numeri', async () => {
+  const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
+  const { codaText, buildVerifierBrief } = await import('../../scripts/verify-local.mjs');
+  const REGOLA = /giro<k>-r<n>-<cosa>\.spec\.mjs/g;
+  const dove = readdirSync(RUOLI).filter((n) => n.endsWith('.md'))
+    .filter((n) => REGOLA.test(readFileSync(join(RUOLI, n), 'utf8').replace(/\s+/g, '')) || (REGOLA.lastIndex = 0, false));
+  assert.deepEqual(dove, ['_critica-e-livelli.md']);
+  const ruolo = readRoleInstructions('verifier');
+  assert.equal((ruolo.match(/`r<n>` è il numero del rilievo/g) || []).length, 1);
+  const brief = buildVerifierBrief({ request: 'fai X', branch: 'claude/x', recipe: ruolo, history: [] });
+  const primaDellaRicetta = brief.slice(0, brief.indexOf(ruolo));
+  assert.doesNotMatch(primaDellaRicetta, /giro<k>-[^r]/, 'il compito locale non ha una sua forma del nome: rimanda alla ricetta');
+  assert.match(primaDellaRicetta, /Come si chiamano lo dice la\s+recipe/);
+  const messo = [{ level: 1, sede: 'i', text: 'il bordo è freddo', priority: 1, num: '#9.1', n: 2 }];
+  const risposta = verifierReplyText({ outcome: 'fix', phase2: { findings: [{ level: 2, text: 'rotto', n: 1 }], derived: messo } });
+  const coda = codaText({ findings: [{ level: 2, text: 'rotto', n: 1 }], derived: messo, external: [], budgets: {}, branch: 'claude/x' });
+  for (const t of [risposta, coda]) {
+    assert.match(t, /- r1 \[2i\] rotto/);
+    assert.match(t, /- r2 \[1i\] il bordo è freddo/);
+  }
+});
