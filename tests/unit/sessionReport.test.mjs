@@ -78,6 +78,28 @@ test('dieci righe: turni, freddi, token, strumenti, timeout, sotto-agenti, durat
   assert.deepEqual(rep.notes, ['1 righe del transcript non erano JSON e sono state saltate']);
 });
 
+test('lo sforzo di ogni turno, contato una volta per messaggio e unito a quello dei sotto-agenti', async () => {
+  const conSforzo = (riga, effort) => JSON.stringify({ ...JSON.parse(riga), effort, perTurnEffort: effort });
+  const u = { input_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1 };
+  const righe = [
+    conSforzo(assistant('a1', 'claude-opus-5', u, [{ type: 'text', text: 'pensa' }], T('00:01')), 'xhigh'),
+    conSforzo(assistant('a1', 'claude-opus-5', u, [{ type: 'text', text: 'poi scrive' }], T('00:02')), 'xhigh'),
+    conSforzo(assistant('a2', 'claude-opus-5', u, [], T('00:03')), 'xhigh'),
+    conSforzo(assistant('a3', 'claude-opus-5', u, [], T('00:04')), 'high'),
+    assistant('a4', 'claude-opus-5', u, [], T('00:05')),
+  ];
+  const rep = await analizzaRighe(righe);
+  assert.equal(rep.turns, 4);
+  assert.deepEqual(rep.effort, { xhigh: 2, high: 1 }, 'a1 sta su due righe e conta una volta; a4 non dichiara lo sforzo');
+  assert.match(riassunto(rep)[1], /sforzo: xhigh 2, high 1/);
+  assert.deepEqual(rapportoVuoto().effort, {});
+  const sessione = await analizzaRighe(righe.slice(0, 3));
+  sommaSottoAgente(sessione, rep);
+  assert.deepEqual(sessione.effort, { xhigh: 4, high: 1 });
+  sommaSottoAgente(sessione, { costUsd: 0, tokens: {}, tools: {} });
+  assert.deepEqual(sessione.effort, { xhigh: 4, high: 1 }, 'un sotto-agente senza il campo (rapporto vecchio) non rompe la somma');
+});
+
 test('il costo somma le quattro tariffe per famiglia, cache di Fable 5.1 a 0,25 $/M', async () => {
   const rep = await analizzaRighe(RIGHE);
   // opus m1: 100·5 + 30000·6,25 + 0 + 50·25 = 189.250
