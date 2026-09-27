@@ -461,6 +461,135 @@ describe('B — l’identità attesa esposta alla guardia', () => {
     assert.match(bad.err, /worker\/atteso/, 'il messaggio deve dire dove tornare');
   });
 
+  // Il ruolo che riallinea chiede il rebase, e durante un rebase la cartella è staccata per forza:
+  // la guardia deve dire di finirlo, non intimare l'alt; registrare resta rifiutato fino alla fine.
+  function rebaseInterrotto(ramo, { worktree = false } = {}) {
+    const repo = makeRepo();
+    git(repo.work, ['checkout', '-q', '-b', ramo]);
+    commit(repo.work, 'c.txt', 'dal ramo\n');
+    git(repo.work, ['checkout', '-q', 'main']);
+    commit(repo.work, 'c.txt', 'da main\n');
+    let work = repo.work;
+    if (worktree) {
+      // In un worktree `.git` è un file: la cartella del rebase la sa solo git.
+      work = resolve(repo.base, 'wt');
+      git(repo.work, ['worktree', 'add', '-q', work, ramo]);
+    } else {
+      git(work, ['checkout', '-q', ramo]);
+    }
+    try {
+      execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'rebase', 'main'], {
+        cwd: work, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_EDITOR: 'true' },
+      });
+      assert.fail('premessa: il rebase doveva fermarsi sul conflitto');
+    } catch (e) { if (e.code === 'ERR_ASSERTION') throw e; }
+    assert.equal(currentBranch(work), '', 'premessa: durante il rebase la cartella è staccata');
+    return work;
+  }
+  const guardia = (work) => {
+    try {
+      const out = execFileSync('bash', [resolve(ROOT, '.claude', 'hooks', 'branch-guard.sh')], {
+        cwd: work, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: work }, stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      return { code: 0, out, err: '' };
+    } catch (e) { return { code: e.status, out: `${e.stdout || ''}`, err: `${e.stderr || ''}` }; }
+  };
+
+  test('rebase in corso del ramo assegnato: la guardia dice di finirlo, non di fermarsi', () => {
+    const work = rebaseInterrotto('worker/atteso');
+    writeExpectation(work, { branch: 'worker/atteso', id: 'f9' });
+    const r = guardia(work);
+    assert.equal(r.code, 0, `non è una deriva: ${r.err}`);
+    assert.doesNotMatch(r.err + r.out, /FERMATI/);
+    const ctx = JSON.parse(r.out).hookSpecificOutput;
+    assert.equal(ctx.hookEventName, 'PostToolUse');
+    assert.match(ctx.additionalContext, /Rebase del ramo 'worker\/atteso' in corso/);
+    assert.match(ctx.additionalContext, /git rebase --continue/);
+    assert.match(ctx.additionalContext, /PRIMA di registrare/);
+
+    const v = checkDelivery(work, 'worker/atteso');
+    assert.equal(v.ok, false, 'registrare durante il rebase resta vietato');
+    assert.match(v.reason, /rebase in corso del ramo "worker\/atteso"/);
+    assert.match(v.reason, /git rebase --continue/);
+  });
+
+  test('rebase in corso in un worktree: la guardia lo riconosce lo stesso', () => {
+    const work = rebaseInterrotto('worker/atteso', { worktree: true });
+    writeExpectation(work, { branch: 'worker/atteso', id: 'f9' });
+    const r = guardia(work);
+    assert.equal(r.code, 0, r.err);
+    assert.match(JSON.parse(r.out).hookSpecificOutput.additionalContext, /in corso/);
+    assert.match(checkDelivery(work, 'worker/atteso').reason, /rebase in corso/);
+  });
+
+  test('rebase in corso di un ALTRO ramo: resta una deriva, la guardia ferma', () => {
+    const work = rebaseInterrotto('worker/altro');
+    writeExpectation(work, { branch: 'worker/atteso', id: 'f9' });
+    const r = guardia(work);
+    assert.equal(r.code, 2);
+    assert.match(r.err, /FERMATI/);
+  });
+
+  const conStato = (work, fn) => {
+    const prev = process.env.FILO_DISPATCH_STATE_DIR;
+    process.env.FILO_DISPATCH_STATE_DIR = resolve(work, '..', 'stato-rebase');
+    try { return fn(process.env.FILO_DISPATCH_STATE_DIR); } finally {
+      if (prev === undefined) delete process.env.FILO_DISPATCH_STATE_DIR;
+      else process.env.FILO_DISPATCH_STATE_DIR = prev;
+    }
+  };
+
+  test('registrare durante il rebase del ramo assegnato: rifiutato senza contarlo come deriva', () => {
+    const work = rebaseInterrotto('worker/atteso');
+    conStato(work, () => {
+      writeBranchState(work, { id: 'f10', branch: 'worker/atteso' });
+      let escalated = 0;
+      for (let i = 0; i < IDENTITY_REJECT_LIMIT + 1; i++) {
+        const g = guardTransition(work, 'f10', { escalate: () => { escalated++; } });
+        assert.equal(g.ok, false, 'registrare durante il rebase resta vietato');
+        assert.equal(g.rebase, true);
+        assert.match(g.message, /git rebase --continue/);
+      }
+      assert.equal(escalated, 0, 'finire il rebase non è una deriva: il lavoro non va sospeso');
+      assert.equal(readBranchState(work, 'f10').identityRejects, undefined);
+    });
+  });
+
+  test('registrare durante il rebase di un ALTRO ramo: deriva, contata come le altre', () => {
+    const work = rebaseInterrotto('worker/altro');
+    conStato(work, () => {
+      writeBranchState(work, { id: 'f11', branch: 'worker/atteso' });
+      const g = guardTransition(work, 'f11');
+      assert.equal(g.ok, false);
+      assert.notEqual(g.rebase, true);
+      assert.match(g.message, /un altro ramo \("worker\/altro"\)/);
+      assert.equal(readBranchState(work, 'f11').identityRejects, 1);
+    });
+  });
+
+  test('la riga di comando, durante il rebase del ramo assegnato, dà un invito solo: finisci e rilancia', () => {
+    const work = rebaseInterrotto('worker/atteso');
+    conStato(work, (stato) => {
+      writeBranchState(work, { id: 'f12', branch: 'worker/atteso' });
+      const env = { ...process.env, FILO_REPO_ROOT: work, FILO_DISPATCH_STATE_DIR: stato, FILO_NO_BEAT: '1' };
+      delete env.FILO_ROUTINE_TICKET;
+      let r;
+      try {
+        execFileSync(process.execPath, [resolve(ROOT, 'scripts', 'dispatch.mjs'), '--record-fixed', 'f12',
+          'Riallineato il ramo sopra main, risolto il conflitto nel file c, nessun altro cambiamento in questo giro.'],
+        { encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'] });
+        assert.fail('durante il rebase la consegna deve essere rifiutata');
+      } catch (e) {
+        if (e.code === 'ERR_ASSERTION') throw e;
+        r = { code: e.status, err: `${e.stderr || ''}` };
+      }
+      assert.equal(r.code, 1, 'non è il codice del canale giù (3) né del rifiuto del server (4)');
+      assert.match(r.err, /rebase in corso del ramo "worker\/atteso"/);
+      assert.match(r.err, /rilancia lo stesso comando/);
+      assert.doesNotMatch(r.err, /fermati|non corrisponde al branch|guasto identit/i);
+    });
+  });
+
   test('l’attesa scritta per un’altra directory non blocca questa', () => {
     const { work } = makeRepo();
     const hook = resolve(ROOT, '.claude', 'hooks', 'branch-guard.sh');
