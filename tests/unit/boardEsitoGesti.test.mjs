@@ -147,3 +147,20 @@ test('riapertura riuscita: torna il saldo, che la pagina mostra nella conferma',
   assert.equal(r.ok, true);
   assert.equal(r.balance, 80);
 });
+
+test('voto scritto ma rilettura caduta: niente conteggi vuoti che azzerino la scheda', async () => {
+  const vero = globalThis.fetch;
+  try {
+    for (const guasto of [async () => { throw retePersa(); }, async () => ({ ok: false, status: 503 })]) {
+      globalThis.fetch = guasto;
+      for (const r of [await vota(), await ritira()]) {
+        assert.equal(r.ok, true);
+        assert.equal(r.votes, null);
+      }
+    }
+    globalThis.fetch = async () => ({ ok: true, json: async () => ({}) });
+    assert.deepEqual((await vota()).votes, {});
+  } finally {
+    globalThis.fetch = vero;
+  }
+});

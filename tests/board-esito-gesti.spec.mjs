@@ -89,6 +89,25 @@ test('rivotare dopo un errore toglie l\'avviso e, se passa, il voto resta', asyn
   await expect(card.locator('.bd-card-msg')).toHaveCount(0);
 });
 
+// Il main risponde votes: null quando il voto è scritto ma la rilettura dei
+// voti non riesce: la scheda tiene il voto dato, non torna a zero.
+test('voto scritto ma rilettura caduta: il voto resta e i voti degli altri pure', async ({ openTab }) => {
+  const { card } = await apri(openTab, {
+    board_cast_vote: [{ ok: true, uid: 'chi-vota', votes: null, awarded: false }],
+    board_clear_vote: [{ ok: true, uid: 'chi-vota', votes: null }],
+  });
+  await card.locator('.bd-vote-broken').click();
+  await expect(card.locator('.bd-vote-broken')).toHaveAttribute('aria-pressed', 'true', { timeout: 10_000 });
+  await expect(card.locator('.bd-vote-broken')).toBeEnabled();
+  await expect(card.locator('.bd-vote-broken .bd-vote-count')).toHaveText('1');
+  await expect(card.locator('.bd-vote-works .bd-vote-count')).toHaveText('1');
+  await card.locator('.bd-vote-broken').click();
+  await expect(card.locator('.bd-vote-broken')).toHaveAttribute('aria-pressed', 'false', { timeout: 10_000 });
+  await expect(card.locator('.bd-vote-broken')).toBeEnabled();
+  await expect(card.locator('.bd-vote-broken .bd-vote-count')).toHaveText('0');
+  await expect(card.locator('.bd-vote-works .bd-vote-count')).toHaveText('1');
+});
+
 test('un errore del main senza frase (eccezione) non resta muto', async ({ openTab }) => {
   const { card } = await apri(openTab, { board_cast_vote: [{ ok: false }] });
   await card.locator('.bd-vote-broken').click();
@@ -131,6 +150,8 @@ test('riapertura riuscita: la scheda resta con la conferma e i crediti spesi, ni
   await expect(ok).toContainText(`Hai speso ${costo} crediti`);
   await expect(page.locator('#bdEmpty')).toBeHidden();
   await expect(card.locator('.bd-reopen-form')).toHaveCount(0);
+  // Tornato in lavorazione come un fix ritirato: niente più pollici da premere.
+  await expect(card.locator('.bd-vote-btn')).toHaveCount(0);
   await scatta(page, 'riapertura-ok');
 
   // Un ridisegno dopo non la fa sparire.
