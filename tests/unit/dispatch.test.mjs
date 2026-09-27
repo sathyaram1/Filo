@@ -101,9 +101,9 @@ test('applyPulizia: ammessa solo a correzione aperta e con rilievi messi da part
     'il conto di una critica vecchia non vale per questa');
   assert.equal(applyPulizia(applyVerifierVerdict(aperta, 'pass', '', 'a'.repeat(40)), buona).ok, false);
   assert.match(applyPulizia(aperta, { ok: false, motivo: 'qui c\'è codice' }).message, /qui c'è codice/);
-  const larga = { ...buona, files: [...buona.files, 'tests/verifica/9/giro1-c.spec.mjs'] };
-  assert.match(applyPulizia(aperta, larga).message, /sono uscite 2 prove[\s\S]*giro1-c/,
-    'più prove tolte che rilievi messi da parte: una è di un rilievo da correggere');
+  const larga = { ...buona, cancellate: [...buona.cancellate, 'tests/verifica/9/giro1-r2-c.spec.mjs'] };
+  assert.match(applyPulizia(aperta, larga).message, /giro1-r2-c\.spec\.mjs: r2 non è fra i rilievi messi da parte/,
+    'la prova di un rilievo da correggere non esce nella pulizia');
   // Una critica nuova e una consegna svuotano la base: la pulizia vale per un giro solo.
   assert.equal(applyVerifierVerdict(r.state, 'fix', '[2i] y', 'd'.repeat(40)).puliziaSha, '');
   assert.equal(applyFixed(r.state).puliziaSha, '');
