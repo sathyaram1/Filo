@@ -177,7 +177,7 @@ describe('il feedback che si apre', () => {
   // quel percorso passa da un collegamento e lo script non si riconosce come
   // avviato, non fa niente ed esce 0: l'allarme resta muto e il controllo
   // finale riceve un elenco vuoto, cioè passa verde senza guardare un file.
-  test('avviato da una copia, dietro un collegamento, lo script lavora lo stesso', () => {
+  test('avviato da una copia, dietro un collegamento, lo script lavora lo stesso', (t) => {
     const base = cartellaTemporanea('filo-allarme-');
     const vero = join(base, 'vero', 'scripts');
     mkdirSync(vero, { recursive: true });
