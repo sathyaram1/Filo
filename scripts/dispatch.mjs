@@ -338,13 +338,13 @@ export function applyPulizia(state, controllo) {
   if (s.verifierVerdict !== 'fix-pending' || !s.verifierSha) {
     return { ok: false, message: 'nessun giro di correzione aperto: la pulizia si registra subito dopo una critica a cui il server ha risposto «c\'è da correggere», prima di ogni correzione.' };
   }
-  const messi = s.messiDaParteGiro && s.messiDaParteGiro.sha === s.verifierSha ? Number(s.messiDaParteGiro.n) || 0 : 0;
-  if (!messi) {
+  const md = s.messiDaParteGiro && s.messiDaParteGiro.sha === s.verifierSha ? s.messiDaParteGiro : null;
+  if (!md || !(Number(md.n) > 0)) {
     return { ok: false, message: 'la risposta del server a questa critica non ha messo da parte nessun rilievo: non c\'è niente da pulire. Una prova del giro si toglie solo verde, insieme alla prova durevole che la sostituisce.' };
   }
   if (!controllo || !controllo.ok) return { ok: false, message: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
-  const troppe = testoPuliziaTroppoLarga(controllo.files, messi);
-  if (troppe) return { ok: false, message: troppe };
+  const fuori = testoPuliziaFuoriNumero(controllo, md.numeri);
+  if (fuori) return { ok: false, message: fuori };
   s.puliziaSha = controllo.sha;
   return { ok: true, state: s, files: controllo.files };
 }
