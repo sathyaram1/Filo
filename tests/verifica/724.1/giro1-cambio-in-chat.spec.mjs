@@ -88,7 +88,7 @@ test('col servizio dei cambi muto, un messaggio in chat non aspetta i cambi a og
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
-    try { await chrome.storage.local.remove('sn_fx_rates'); } catch (_) {}
+    try { await globalThis.chrome.storage.local.remove('sn_fx_rates'); } catch (_) {}
     const origFetch = globalThis.fetch;
     globalThis.fetch = (url, opts) => {
       if (String(url).includes('frankfurter')) {
