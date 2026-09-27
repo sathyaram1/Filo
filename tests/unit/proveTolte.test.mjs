@@ -38,18 +38,14 @@ test('la cartella delle copie è gitignorata: il salvataggio automatico non la c
   assert.equal(out, null);
 });
 
-test('una prova tolta ancora rossa ferma la consegna, se il giro non ha messo niente da parte', () => {
-  const e = esitoProveTolte({ rosse: ['tests/verifica/679/a.spec.mjs'], messiDaParte: 0, shaPrima: 'abcdef1234567890' });
+test('una prova tolta ancora rossa ferma la consegna, sempre: niente eccezione per i rilievi messi da parte', () => {
+  const e = esitoProveTolte({ rosse: ['tests/verifica/679/a.spec.mjs'], shaPrima: 'abcdef1234567890' });
   assert.equal(e.ferma, true);
   assert.match(e.testo, /tests\/verifica\/679\/a\.spec\.mjs/);
   assert.match(e.testo, /git checkout abcdef123456 -- <file>/);
-});
-
-test('con rilievi messi da parte le rosse si elencano ma non fermano: la loro prova si cancella rossa', () => {
-  const e = esitoProveTolte({ rosse: ['tests/verifica/679/a.spec.mjs'], messiDaParte: 2 });
-  assert.equal(e.ferma, false);
-  assert.match(e.testo, /tests\/verifica\/679\/a\.spec\.mjs/);
-  assert.deepEqual(esitoProveTolte({ rosse: [], messiDaParte: 0 }), { ferma: false, testo: '' });
+  // Il vecchio lasciapassare non esiste più: un argomento in più non lo riapre.
+  assert.equal(esitoProveTolte({ rosse: ['tests/verifica/679/a.spec.mjs'], messiDaParte: 2 }).ferma, true);
+  assert.deepEqual(esitoProveTolte({ rosse: [] }), { ferma: false, testo: '' });
 });
 
 function repoConProve() {
