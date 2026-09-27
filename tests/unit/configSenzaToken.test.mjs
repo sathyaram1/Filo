@@ -124,8 +124,9 @@ test('configurazione condivisa: l’inciampo non fa pagare la chiave del build a
     await Defaults.refresh();
     assert.equal(Defaults.get().apiKeys.openrouter, 'sk-ruotata', 'premessa');
 
+    orologio += Defaults.DEFAULT_MAX_AGE_MS + 1;
     rete.inciampo = true;
-    await Defaults.refresh();
+    await Defaults.refreshIfStale();
     torna();
     assert.equal(Defaults.get().apiKeys.openrouter, 'sk-ruotata',
       'tornato dentro, l’owner usa la sua chiave ruotata e non quella dell’installazione');
