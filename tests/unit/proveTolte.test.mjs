@@ -454,3 +454,131 @@ test('in locale la pulizia si rifiuta senza rilievi messi da parte, o se il comm
     rmSync(altro.dir, { recursive: true, force: true });
   }
 });
+
+// Il caso del giro 2 su claude/prove-rosse-blocco: un rilievo messo da parte senza una prova sua (una domanda, un
+// esterno) non lascia più uscire nella pulizia la prova rossa di un rilievo da correggere. verify-local vero, npx finto.
+const { withRequest, withCritique } = await import('../../scripts/verify-local.mjs');
+
+// Il finto Playwright: una prova è rossa se uno dei file di stato che nomina dice ancora «rotto».
+const NPX_FINTO = [
+  "import { readFileSync } from 'node:fs';",
+  "const f = process.argv.find((a) => /\\.spec\\.mjs$/.test(a));",
+  "const rotti = [...readFileSync(f, 'utf8').matchAll(/stato-([a-z])\\.txt/g)]",
+  "  .filter((m) => readFileSync(`stato-${m[1]}.txt`, 'utf8').includes('rotto'));",
+  "console.log(rotti.length ? `prova rossa: ${f}` : `prova verde: ${f}`);",
+  'process.exit(rotti.length ? 1 : 0);',
+  '',
+].join('\n');
+
+function giroCriticato({ prove, critica }) {
+  const dir = cartellaTemporanea('pulizia-per-numero-giro-');
+  const g = (...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
+  const ramo = 'claude/prova-giro';
+  const cartella = 'tests/verifica/locale-prova-giro';
+  g('init', '-q', '-b', ramo);
+  g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+  scrivi('.gitignore', '.claude/\ntests/verifica/_tolte-*/\nbin/\n');
+  scrivi('bin/npx.mjs', NPX_FINTO);
+  scrivi('bin/npx.cmd', `@"${process.execPath}" "%~dp0npx.mjs" %*\r\n`);
+  scrivi('bin/npx', `#!/bin/sh\nexec "${process.execPath}" "$(dirname "$0")/npx.mjs" "$@"\n`);
+  chmodSync(resolve(dir, 'bin', 'npx'), 0o755);
+  scrivi('codice.js', 'module.exports = 0;\n');
+  g('add', '-A'); g('commit', '-qm', 'avvio della verifica');
+  const avvio = g('rev-parse', 'HEAD');
+  const caso = (x) => `test('rilievo ${x}', () => { expect(readFileSync('stato-${x}.txt', 'utf8')).toContain('corretto'); });`;
+  for (const [nome, rilievi] of Object.entries(prove)) {
+    scrivi(`${cartella}/${nome}.spec.mjs`, `${rilievi.map(caso).join('\n')}\n`);
+    for (const x of rilievi) scrivi(`stato-${x}.txt`, 'rotto\n');
+  }
+  g('add', '-A'); g('commit', '-qm', 'prove del giro');
+  const shaCritica = g('rev-parse', 'HEAD');
+  const r = withCritique(withRequest({}, ramo, { request: 'richiesta di prova', sha: avvio }), ramo, {
+    critique: critica, sha: shaCritica, caps: { cap3: 2, cap2: 2, cap1: 1, cap0: 0 },
+  });
+  assert.equal(r.outcome, 'fix', r.reason);
+  mkdirSync(resolve(dir, '.claude'), { recursive: true });
+  writeFileSync(resolve(dir, '.claude', 'verify-local.json'), JSON.stringify(r.state));
+  const vl = (...args) => {
+    const p = spawnSync(process.execPath, [resolve(ROOT, 'scripts', 'verify-local.mjs'), ...args], {
+      cwd: dir, encoding: 'utf8',
+      env: { ...process.env, FILO_REPO_ROOT: dir, DISPLAY: process.env.DISPLAY || ':0', PATH: `${resolve(dir, 'bin')}${delimiter}${process.env.PATH}` },
+    });
+    const entry = JSON.parse(readFileSync(resolve(dir, '.claude', 'verify-local.json'), 'utf8'))[ramo];
+    return { status: p.status, testo: `${p.stdout}\n${p.stderr}`, entry };
+  };
+  const corretto = (...x) => { for (const k of x) scrivi(`stato-${k}.txt`, 'corretto\n'); g('commit', '-qam', `corretti ${x.join(', ')}`); };
+  return { dir, g, scrivi, cartella, shaCritica, vl, corretto };
+}
+
+test('una domanda per l\'owner senza prova sua non lascia uscire la prova rossa di un rilievo da correggere', () => {
+  const { dir, g, cartella, vl, corretto } = giroCriticato({
+    prove: { 'giro1-r1-a': ['a'], 'giro1-r3-c': ['c'] },
+    critica: 'Provato il giro, riassunto.\n[2i] la cosa a non funziona.\n[1i?] il bordo è freddo: scelta di gusto?\n[1i] la cosa c non funziona.',
+  });
+  try {
+    g('rm', '-q', `${cartella}/giro1-r3-c.spec.mjs`); g('commit', '-qm', 'pulizia del giro');
+    const p = vl('pulizia');
+    assert.notEqual(p.status, 0, p.testo);
+    assert.match(p.testo, /giro1-r3-c\.spec\.mjs: r3 non è fra i rilievi messi da parte/);
+    assert.match(p.testo, /messi da parte: r2\)/);
+    assert.equal(p.entry.pending.shaPulizia, undefined);
+    corretto('a');
+    const c = vl('corretto', REPORT);
+    assert.notEqual(c.status, 0, 'senza pulizia registrata la consegna rilancia la prova tolta, ancora rossa');
+    assert.match(c.testo, /giro1-r3-c\.spec\.mjs/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('un rilievo esterno non allarga la pulizia fino alla prova rossa di un rilievo da correggere', () => {
+  const { dir, g, cartella, shaCritica, vl } = giroCriticato({
+    prove: { 'giro1-r1-a': ['a'], 'giro1-r2-b': ['b'], 'giro1-r3-c': ['c'] },
+    critica: 'Provato il giro, riassunto.\n[2i] la cosa a non funziona.\n[1i?] scelta di gusto sulla b.\n[1i] la cosa c non funziona.\n[1e] un difetto di un altro lavoro.',
+  });
+  try {
+    g('rm', '-q', `${cartella}/giro1-r2-b.spec.mjs`, `${cartella}/giro1-r3-c.spec.mjs`); g('commit', '-qm', 'pulizia larga');
+    const larga = vl('pulizia');
+    assert.notEqual(larga.status, 0, larga.testo);
+    assert.match(larga.testo, /messi da parte: r2, r4\)/);
+    assert.match(larga.testo, /giro1-r3-c\.spec\.mjs: r3/);
+    assert.doesNotMatch(larga.testo, /giro1-r2-b\.spec\.mjs:/);
+    g('checkout', shaCritica, '--', `${cartella}/giro1-r3-c.spec.mjs`); g('commit', '-qm', 'rimessa la prova di c');
+    const giusta = vl('pulizia');
+    assert.equal(giusta.status, 0, giusta.testo);
+    assert.equal(giusta.entry.pending.shaPulizia, g('rev-parse', 'HEAD'));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a una prova che copre anche un rilievo da correggere si toglie solo il caso, e la consegna rilancia il resto', () => {
+  const { dir, g, scrivi, cartella, shaCritica, vl, corretto } = giroCriticato({
+    prove: { 'giro1-r1-a': ['a'], 'giro1-r2-r3-bc': ['b', 'c'] },
+    critica: 'Provato il giro, riassunto.\n[2i] la cosa a non funziona.\n[1i?] scelta di gusto sulla b.\n[1i] la cosa c non funziona.',
+  });
+  const file = `${cartella}/giro1-r2-r3-bc.spec.mjs`;
+  try {
+    g('rm', '-q', file); g('commit', '-qm', 'pulizia che cancella tutto il file');
+    const intera = vl('pulizia');
+    assert.notEqual(intera.status, 0, intera.testo);
+    assert.match(intera.testo, /copre anche r3/);
+    g('checkout', shaCritica, '--', file);
+    scrivi(file, readFileSync(resolve(dir, file), 'utf8').split('\n').filter((l) => !l.includes('stato-b')).join('\n'));
+    g('add', '-A'); g('commit', '-qm', 'pulizia: tolto solo il caso di b');
+    const p = vl('pulizia');
+    assert.equal(p.status, 0, p.testo);
+    corretto('a');
+    const rossa = vl('corretto', REPORT);
+    assert.notEqual(rossa.status, 0, 'il caso di c è rimasto ed è rosso: la consegna si ferma anche se il file non è stato toccato');
+    assert.match(rossa.testo, /il caso che resta[\s\S]*giro1-r2-r3-bc\.spec\.mjs/);
+    assert.equal(rossa.entry.verdict, 'fix-pending');
+    corretto('c');
+    const verde = vl('corretto', REPORT);
+    assert.equal(verde.status, 0, verde.testo);
+    assert.equal(verde.entry.verdict, 'fixed');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
