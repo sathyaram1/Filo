@@ -88,6 +88,24 @@ export function controllaPulizia({ shaCritica, root, cartella = '' } = {}) {
   return { ok: true, motivo: '', sha: head, files: tol.files };
 }
 
+/**
+ * '' se la pulizia regge, altrimenti il rifiuto. Una prova per rilievo messo da parte: di più vuol dire
+ * che è uscita anche quella rossa di un rilievo da correggere, che la consegna poi non rilancerebbe. PURA.
+ * `files` sono TUTTE le prove tolte dalla critica, così una seconda pulizia non allarga il conto.
+ */
+export function testoPuliziaTroppoLarga(files, messi) {
+  const tolte = Array.isArray(files) ? files : [];
+  const n = Number(messi) || 0;
+  if (tolte.length <= n) return '';
+  return [
+    `pulizia non registrata: dalla critica sono uscite ${tolte.length} prove del giro, ma i rilievi messi da parte sono ${n}.`,
+    ...tolte.map((f) => `  · ${f}`),
+    'Nel commit della pulizia va solo la prova di ciascun rilievo messo da parte: quelle dei rilievi da correggere',
+    'restano finché non sono verdi. Rimetti le altre (git checkout <commit della critica> -- <file>), `git add -A &&',
+    'git commit`, e rilancia la pulizia.',
+  ].join('\n');
+}
+
 function gitOut(args, root) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26, stdio: ['ignore', 'pipe', 'ignore'] });
 }
