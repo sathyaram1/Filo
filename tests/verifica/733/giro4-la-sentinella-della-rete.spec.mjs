@@ -7,14 +7,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { tempCanonico } from '../../helpers/percorsi.mjs';
+import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
 const RADICE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const YML = fs.readFileSync(path.join(RADICE, '.github', 'workflows', 'release.yml'), 'utf8');
 
 /** La sentinella dell'allarme, fatta girare su un workflow ritoccato: true se diventa rossa. */
 function sentinellaRossa(ritocco) {
-  const casa = fs.mkdtempSync(path.join(tempCanonico(), 'filo-733-g4-'));
+  const casa = cartellaTemporanea('filo-733-g4-');
   try {
     for (const f of ['tests/unit/releaseSuite.test.mjs', 'scripts/release-platform-alarm.mjs', 'scripts/build-alarm.mjs']) {
       fs.mkdirSync(path.dirname(path.join(casa, f)), { recursive: true });
