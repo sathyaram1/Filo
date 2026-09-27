@@ -29,7 +29,12 @@ dove il sito non arriva, o ci arriva solo per chiedere:
   editor di testo ricco) un preload suo non ce l'ha: i suoi gesti li ascolta
   il frame che lo contiene, agganciandolo quando il puntatore passa sul suo
   elemento. Chi ha un preload suo lo dice con `__filoZoomQui` nel mondo
-  isolato, e l'aggancio lo salta: un gesto vale una volta sola.
+  isolato, e l'aggancio lo salta: un gesto vale una volta sola. Dentro un
+  componente della pagina (shadow DOM) il puntatore arriva col suo ospite: se
+  il componente è aperto il riquadro sta nel percorso dell'evento, se è chiuso
+  lo si chiede all'albero dei frame (`webFrame`), e ogni figlio si presenta dal
+  mondo isolato di Filo (999, dove il sito non arriva) al primo frame che veglia
+  (#686.1 giro 3).
 - **Il campo della percentuale** vale i tasti battuti dopo un clic vero nel
   campo, mai il `value` che ha nel documento: il sito lo scrive anche col
   comando di inserimento testo del browser, che conta come battuto. Si applica

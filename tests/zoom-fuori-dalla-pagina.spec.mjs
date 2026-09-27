@@ -289,20 +289,37 @@ test('riquadro che la pagina riempie da sé (editor di testo ricco): pizzico e r
   await gestiDelMouse(app, page);
 });
 
-test('riquadro srcdoc e riquadro di un altro sito con un riquadro dentro: un gesto vale una volta sola', async ({ app, openTab, testServer }) => {
-  const interno = testServer.html(`<!doctype html><html><body style="margin:0;height:3000px"><h2 style="margin:0">contenuto</h2></body></html>`);
-  const esterno = testServer.html(`<!doctype html><html><body style="margin:0">
-    <iframe src="${interno}" style="border:0;width:100vw;height:100vh;display:block"></iframe></body></html>`).replace('127.0.0.1', 'localhost');
-  for (const html of [
-    `<!doctype html><html><body style="margin:0"><iframe srcdoc="<div style='height:3000px'>contenuto</div>" style="border:0;width:100vw;height:100vh;display:block"></iframe></body></html>`,
-    `<!doctype html><html><body style="margin:0"><iframe src="${esterno}" style="border:0;width:100vw;height:100vh;display:block"></iframe></body></html>`,
-  ]) {
-    const page = await testServer.openReady(openTab, html);
+// Una pagina per test: openTab restituisce la prima scheda con lo stesso host.
+const PIENO = 'border:0;width:100vw;height:100vh;display:block';
+const editorInComponente = (modo) => `<!doctype html><html><head>
+  <meta http-equiv="Content-Security-Policy" content="script-src 'nonce-n1'"></head><body style="margin:0"><div id="h"></div>
+  <script nonce="n1">
+    const r = document.getElementById('h').attachShadow({ mode: '${modo}' });
+    const f = document.createElement('iframe'); f.style.cssText = '${PIENO}'; r.appendChild(f);
+    const d = f.contentDocument; d.open();
+    d.write('<body contenteditable style="margin:0;height:3000px"><h2>scrivi qui</h2></body>'); d.close();
+  </script></body></html>`;
+const casiRiquadro = {
+  'srcdoc': () => `<!doctype html><html><body style="margin:0"><iframe srcdoc="<div style='height:3000px'>contenuto</div>" style="${PIENO}"></iframe></body></html>`,
+  'di un altro sito con un riquadro dentro': (s) => {
+    const interno = s.html(`<!doctype html><html><body style="margin:0;height:3000px"><h2 style="margin:0">contenuto</h2></body></html>`);
+    const esterno = s.html(`<!doctype html><html><body style="margin:0"><iframe src="${interno}" style="${PIENO}"></iframe></body></html>`).replace('127.0.0.1', 'localhost');
+    return `<!doctype html><html><body style="margin:0"><iframe src="${esterno}" style="${PIENO}"></iframe></body></html>`;
+  },
+  // Editor di testo ricco costruito dentro un componente della pagina (shadow DOM).
+  'riempito dalla pagina dentro un componente aperto': () => editorInComponente('open'),
+  'riempito dalla pagina dentro un componente chiuso': () => editorInComponente('closed'),
+  'riempito dalla pagina dentro un componente chiuso, in un riquadro di un altro sito': (s) =>
+    `<!doctype html><html><body style="margin:0"><iframe src="${s.html(editorInComponente('closed')).replace('127.0.0.1', 'localhost')}" style="${PIENO}"></iframe></body></html>`,
+};
+for (const [nome, html] of Object.entries(casiRiquadro)) {
+  test(`riquadro ${nome}: pizzico e rotella premuta rispondono, e un gesto vale una volta sola`, async ({ app, openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, html(testServer));
     await page.waitForTimeout(1000);
     await page.mouse.click(300, 300);
     await gestiDelMouse(app, page);
-  }
-});
+  });
+}
 
 // Chromium segnala il Ctrl+rotella anche quando Filo l'ha già preso: uno scatto
 // deve valere un passo solo, e quello che nessuno prende deve valere lo stesso.

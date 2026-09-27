@@ -118,12 +118,11 @@ function vegliaRiquadri(elenco, webFrame) {
   // che lo si aggancia, anche se è nato o è stato riscritto dopo. Dentro un
   // componente l'evento arriva col suo ospite: il riquadro sta nel percorso
   // se il componente è aperto, altrimenti lo si cerca fra i frame figli.
+  const riquadro = (t) => !!(t && (t.tagName === 'IFRAME' || t.tagName === 'FRAME'));
   function sopra(e) {
     let t = e && e.target;
-    if (t && t.shadowRoot !== undefined && !(t.tagName === 'IFRAME' || t.tagName === 'FRAME')) {
-      try { const p = e.composedPath(); if (p && p[0]) t = p[0]; } catch (_) {}
-    }
-    if (t && (t.tagName === 'IFRAME' || t.tagName === 'FRAME')) { aggancia(t.contentWindow); return; }
+    if (!riquadro(t)) { try { t = e.composedPath()[0]; } catch (_) {} }
+    if (riquadro(t)) { aggancia(t.contentWindow); return; }
     cercaNascosti();
   }
   return sopra;
@@ -471,7 +470,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     ...gesti,
     ['paste', onPaste, true],
     ['input', onInput, true],
-    ['pointerover', vegliaRiquadri(gesti), true],
+    ['pointerover', vegliaRiquadri(gesti, webFrame), true],
   ], () => {
     // Il documento vecchio se n'è andato col riquadro e i suoi ascoltatori.
     const eraAperta = zoomMode;
@@ -614,5 +613,5 @@ module.exports.riquadro = function setupRiquadro(webFrame, opts) {
     ['wheel', onWheel, { capture: true, passive: false }],
     ['keydown', onKeyDown, true],
   ];
-  tieniAscoltatori([...gesti, ['pointerover', vegliaRiquadri(gesti), true]], () => { suppressContextMenu = false; });
+  tieniAscoltatori([...gesti, ['pointerover', vegliaRiquadri(gesti, webFrame), true]], () => { suppressContextMenu = false; });
 };
