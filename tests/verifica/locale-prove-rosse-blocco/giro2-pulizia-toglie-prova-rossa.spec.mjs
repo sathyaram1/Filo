@@ -66,11 +66,17 @@ function butta({ base, dir }) {
   if (!existsSync(nm)) rmSync(base, { recursive: true, force: true });
 }
 
+// Asincrono: il server finto vive in questo processo, e una chiamata sincrona lo lascerebbe senza risposta.
 function vl(dir, ...args) {
   const env = { ...process.env, FILO_ROUTINE_CONFIG_URL: url, FILO_ADMIN_ID_TOKEN: 'finto', FILO_NO_BEAT: '1', FILO_REPO_ROOT: dir };
   delete env.FILO_ADMIN_REFRESH_TOKEN;
-  const r = spawnSync(process.execPath, ['scripts/verify-local.mjs', ...args], { cwd: dir, env, encoding: 'utf8' });
-  return { status: r.status, out: `${r.stdout || ''}${r.stderr || ''}` };
+  return new Promise((ok) => {
+    const p = spawn(process.execPath, ['scripts/verify-local.mjs', ...args], { cwd: dir, env });
+    let out = '';
+    p.stdout.on('data', (d) => { out += d; });
+    p.stderr.on('data', (d) => { out += d; });
+    p.on('close', (status) => ok({ status, out }));
+  });
 }
 
 async function giro({ prove, critica, tolteNellaPulizia }) {
