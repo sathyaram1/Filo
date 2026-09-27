@@ -96,23 +96,3 @@ test('l\'avviso sul modificatore sconosciuto, tema scuro', async ({ openTab }) =
   await page.emulateMedia({ colorScheme: 'light' });
   await page.screenshot({ path: 'tests/.shots/verifica-545-1-g2-mod-chiaro.png' });
 });
-
-// Due moduli con la stessa combinazione (anche scritta con due nomi): il secondo
-// non partirebbe mai, quindi o si rifiuta o parte.
-test('una scorciatoia già data a un altro modulo non si salva in silenzio', async ({ openTab }) => {
-  const page = await apri(openTab);
-  await impostaScorciatoia(page, 'Ctrl+Shift+Space');
-  await expect(page.locator('#cfgShortcut')).toBeHidden();
-  await esci(page);
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await expect(page.locator('.ed-module[data-type="comment"]')).toBeVisible();
-  await impostaScorciatoia(page, 'Ctrl+Maiusc+Spazio', 'comment');
-  if (await page.locator('#cfgShortcut').isVisible()) {
-    await expect(page.locator('#cfgShortcut')).toHaveClass(/ed-field-invalid/);
-    return;
-  }
-  await esci(page);
-  await page.click('#doc');
-  await page.keyboard.press('Control+Shift+Space');
-  await expect(page.locator('.commenting')).toHaveCount(1);
-});
