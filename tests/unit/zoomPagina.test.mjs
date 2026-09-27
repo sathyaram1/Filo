@@ -142,11 +142,11 @@ test('nessun testo promette che lo zoom sopravviva alla chiusura di Filo', () =>
 test('ogni gesto che muove lo zoom della pagina è filtrato da gestoVero', () => {
   const { readFileSync } = require('node:fs');
   const src = readFileSync(join(__dirname, '..', '..', 'src', 'preload', 'wheel-zoom.js'), 'utf8');
-  const pezzi = src.split(/ascolta\(\s*'(mousedown|wheel|keydown)'/);
-  assert.ok(pezzi.length > 1, 'i listener dei gesti esistono');
+  const pezzi = src.split(/function (on(?:MouseDown|Wheel|KeyDown|Paste))\(e\)/);
+  assert.ok(pezzi.length >= 15, 'i listener dei gesti esistono, nel frame principale e nei riquadri');
   for (let i = 1; i < pezzi.length; i += 2) {
     const nome = pezzi[i];
-    const testa = pezzi[i + 1].slice(0, 260);
+    const testa = pezzi[i + 1].slice(0, 120);
     assert.match(testa, /gestoVero\(e\)/, `il listener '${nome}' non filtra i gesti finti`);
   }
 });
@@ -162,4 +162,71 @@ test('i gesti dello zoom si ascoltano sulla finestra, dove la pagina non arriva 
     'un gesto dello zoom ascolta ancora sul documento',
   );
   assert.match(src, /window\.addEventListener\(tipo, fn/, '`ascolta` non registra sulla finestra');
+});
+
+// #686.1 — I TASTI DELLO ZOOM LI PRENDE IL MAIN, E IL CAMPO VALE I TASTI BATTUTI.
+// Un sito che riscriveva il proprio documento cancellava gli ascoltatori del
+// preload, e un clic dentro un riquadro incorporato portava i tasti dove il
+// preload non c'era: Ctrl +/-/0 morti. Il main li vede prima di qualunque
+// documento. E il numero del riquadro lo scriveva anche il sito, col comando
+// di inserimento testo che il browser conta come battuto.
+test('il tasto dello zoom si riconosce uguale da un keydown e da un before-input-event', () => {
+  for (const t of [
+    { key: '=', ctrlKey: true }, { key: '+', control: true }, { code: 'NumpadAdd', meta: true },
+  ]) assert.equal(Z.tastoZoom(t), 'in', JSON.stringify(t));
+  for (const t of [{ key: '-', ctrlKey: true }, { key: '_', metaKey: true }, { code: 'NumpadSubtract', control: true }]) {
+    assert.equal(Z.tastoZoom(t), 'out', JSON.stringify(t));
+  }
+  for (const t of [{ key: '0', control: true }, { code: 'Numpad0', ctrlKey: true }]) {
+    assert.equal(Z.tastoZoom(t), 'reset', JSON.stringify(t));
+  }
+  // Senza Ctrl/Cmd è un carattere; con Alt è AltGr, che scrive.
+  for (const t of [{ key: '=' }, { key: '0' }, { key: '=', control: true, alt: true }, { key: 'a', control: true }, null]) {
+    assert.equal(Z.tastoZoom(t), null, JSON.stringify(t));
+  }
+});
+
+test('un riquadro incorporato passa solo gesti di forma nota', () => {
+  assert.deepEqual(Z.gestoValido({ tipo: 'medio', extra: 'x' }), { tipo: 'medio' });
+  assert.deepEqual(Z.gestoValido({ tipo: 'rotella', dy: -100 }), { tipo: 'rotella', dy: -100 });
+  assert.deepEqual(Z.gestoValido({ tipo: 'ctrl', dy: 1e9 }), { tipo: 'ctrl', dy: 1000 });
+  for (const g of [null, 'medio', { tipo: 'percentuale', dy: 5 }, { tipo: 'rotella' }, { tipo: 'ctrl', dy: 'x' }, { tipo: 'rotella', dy: 0 }]) {
+    assert.equal(Z.gestoValido(g), null, JSON.stringify(g));
+  }
+});
+
+test('il campo della percentuale: il primo tasto sostituisce, poi si accoda; Invio applica, Esc annulla', () => {
+  let s = { valore: '200', fresco: true };
+  s = Z.tastoCampo(s, '5');
+  assert.deepEqual(s, { valore: '5', fresco: false, azione: null });
+  s = Z.tastoCampo(s, '0');
+  assert.equal(s.valore, '50');
+  s = Z.tastoCampo(s, 'x');
+  assert.equal(s.valore, '50', 'una lettera non entra nel numero');
+  s = Z.tastoCampo(s, 'Backspace');
+  assert.equal(s.valore, '5');
+  assert.equal(Z.tastoCampo(s, 'Enter').azione, 'applica');
+  assert.equal(Z.tastoCampo(s, 'Tab').azione, 'applica');
+  assert.equal(Z.tastoCampo(s, 'Escape').azione, 'annulla');
+  assert.equal(Z.tastoCampo({ valore: '200', fresco: true }, 'Backspace').valore, '');
+  assert.equal(Z.tastoCampo({ valore: '123', fresco: false }, 'Delete').valore, '');
+});
+
+test('il campo ha un tetto largo, e oltre non cambia in silenzio quello che c\'è', () => {
+  let s = { valore: '', fresco: false };
+  for (let i = 0; i < Z.CIFRE_CAMPO + 3; i++) s = Z.tastoCampo(s, '9');
+  assert.equal(s.valore.length, Z.CIFRE_CAMPO);
+  // Qualunque numero che ci sta viene poi limitato e DETTO dal riquadro.
+  assert.ok(Z.CIFRE_CAMPO >= String(Z.MAX_PERCENTUALE).length + 1);
+});
+
+test('ogni scheda e ogni finestra di login passano i tasti dello zoom dal main', () => {
+  const { readFileSync } = require('node:fs');
+  const tabs = readFileSync(join(__dirname, '..', '..', 'src', 'main', 'tabs.js'), 'utf8');
+  const cablaggi = tabs.match(/installZoom\((wc|pwc)\)/g) || [];
+  assert.deepEqual(cablaggi.sort(), ['installZoom(pwc)', 'installZoom(wc)'], 'schede e finestre di login');
+  const zoom = readFileSync(join(__dirname, '..', '..', 'src', 'main', 'tabs', 'tabZoom.js'), 'utf8');
+  assert.match(zoom, /before-input-event[\s\S]{0,200}tastoZoom\(input\)[\s\S]{0,120}preventDefault\(\)/);
+  // Un gesto di un riquadro vale solo se viene da un riquadro, e solo in forma nota.
+  assert.match(zoom, /'filo:zoom-gesto'[\s\S]{0,120}principale\(e\)[\s\S]{0,80}gestoValido/);
 });

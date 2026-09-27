@@ -156,9 +156,10 @@ test('rotella: digitare la percentuale imposta lo zoom', async ({ app, openTab, 
   const percent = page.locator('#__filo-zoom-percent');
   await expect(percent).toBeVisible();
 
+  // Si batte davvero: il numero del campo lo scrivono solo i tasti (#686.1).
   await percent.click();
-  await percent.fill('150');
-  await percent.press('Enter');
+  await page.keyboard.type('150');
+  await page.keyboard.press('Enter');
 
   // Lo zoom della pagina è cambiato a ~150% e la modalità è ancora attiva
   // (editare il campo non la chiude).
