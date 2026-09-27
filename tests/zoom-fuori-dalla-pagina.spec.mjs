@@ -68,7 +68,8 @@ test('il sito scrive nel campo col comando di inserimento testo ed esce: lo zoom
   expect(await percentOf(app, page)).toBe(200);
   expect(dopo, 'il campo non deve mostrare un numero che non vale').toBe('200');
 
-  // Anche mentre l'utente sta battendo: il sito inserisce e toglie il fuoco.
+  // Anche mentre l'utente sta battendo: il sito inserisce e gli toglie il
+  // fuoco a metà numero. Non vale niente di suo, e l'utente finisce il numero.
   await page.locator('#__filo-zoom-percent').click();
   await page.keyboard.type('1');
   await page.evaluate(() => {
@@ -78,10 +79,8 @@ test('il sito scrive nel campo col comando di inserimento testo ed esce: lo zoom
   });
   await page.waitForTimeout(300);
   expect(await percentOf(app, page)).toBe(200);
-
-  // Quello che batte l'utente vale, e il campo resta suo fino all'Invio.
-  await page.locator('#__filo-zoom-percent').click();
-  await page.keyboard.type('150');
+  expect(await modalita(page)).toBe('1');
+  await page.keyboard.type('50');
   await page.keyboard.press('Enter');
   await expect.poll(async () => percentOf(app, page)).toBe(150);
   await expect(page.locator('#__filo-zoom-percent')).toHaveValue('150');

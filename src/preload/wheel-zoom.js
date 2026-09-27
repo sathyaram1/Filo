@@ -313,8 +313,11 @@ module.exports = function setupWheelZoom(webFrame, opts) {
 
   function onKeyDown(e) {
     if (!gestoVero(e)) return;
-    if (inModifica && percentInput && document.activeElement === percentInput) {
+    // Il numero si sta battendo: i tasti restano suoi anche se il fuoco se n'è
+    // andato, perché toglierlo a metà numero lo può fare anche il sito.
+    if (inModifica && percentInput) {
       e.stopPropagation();
+      try { if (document.activeElement !== percentInput) percentInput.focus(); } catch (_) {}
       // Ctrl+V incolla (lo prende onPaste); le altre combinazioni non scrivono.
       if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'v') return;
       e.preventDefault();
