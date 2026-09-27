@@ -825,7 +825,11 @@
           bubblesEl.appendChild(streamBubble);
         }
         streamedText += data.delta;
-        streamBubble.textContent = streamedText;
+        // Il marker del conto si vede già come numero mentre scorre: la
+        // risposta finale lo avrà risolto nel main, e le due non devono differire.
+        streamBubble.textContent = globalThis.SN_CALC
+          ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
+          : streamedText;
         followBottomIfNear();
       });
     }

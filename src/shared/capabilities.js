@@ -315,6 +315,12 @@
       doesNot: 'Rilegge solo le conversazioni con te, salvate sul tuo computer: niente di quello che scrivi finisce altrove.',
     },
     {
+      id: 'chat-conti-cambi', title: 'Conti e cambi nella chat', category: 'assistant',
+      desc: 'Chiedi a Filo "quanto fanno 3000 rupie in euro", "50 dollari in sterline" o "quanto fa il 22% di 1480": il conto lo fa Filo, non il modello, e le valute usano il cambio del giorno della Banca centrale europea, per tutte le valute che pubblica. Accanto al risultato trovi di che giorno è il cambio. Vale anche per miglia, libbre, galloni e gradi Fahrenheit.',
+      invoke: 'Chiediglielo a parole nella nuova scheda.',
+      doesNot: 'Per una valuta che la Banca centrale europea non pubblica, Filo cerca il cambio sul web e ti dice da dove l\'ha preso.',
+    },
+    {
       id: 'history', title: 'Cronologia delle richieste AI', category: 'save',
       desc: 'L’elenco delle richieste fatte all’AI (spiegazioni, traduzioni, aiuto…), filtrabile e ricercabile, con il costo di ogni richiesta e quanta parte del testo mandato al modello è stata riusata da una richiesta precedente invece di essere rielaborata; puoi rimuovere una singola voce oppure svuotarla del tutto.',
       invoke: 'Pagina filo://history/history.html. Passa il mouse su una voce e clicca «Rimuovi» per toglierla; «Cancella tutto» svuota l’intera cronologia.',

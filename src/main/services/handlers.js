@@ -26,6 +26,7 @@ const I18n = globalThis.SN_I18N;
 const Categorizer = globalThis.SN_CATEGORIZER;
 const AICache = globalThis.SN_AI_CACHE;
 const Fx = globalThis.SN_FX;
+const Calc = globalThis.SN_CALC;
 const Paths = globalThis.SN_PATHS;
 const LlmsTxt = globalThis.SN_LLMS_TXT;
 const FiloMem = globalThis.SN_FILO_MEMORY;
@@ -2700,6 +2701,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     return { text: bye, actions: [], onboardingClosed: true };
   }
 
+  // I cambi partono subito, in parallelo al resto del contesto: una volta al
+  // giorno vanno presi in rete, e non devono sommarsi all'attesa (#724.1).
+  const cambiP = Fx.get().then((fx) => Fx.formatForPrompt(fx)).catch(() => '');
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
@@ -2781,8 +2785,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const capacita = Caps ? Caps.renderIndexForPrompt() : '';
   const Tools = globalThis.SN_ACTION_TOOLS;
   const tools = Tools ? Tools.definitions({ sistema: process.platform, onboarding: onbActive }) : null;
+  const cambi = await cambiP;
   const payloadBase = {
-    profilo, preferenze, espansioni, lezioni, stato: stateText, capacita,
+    profilo, preferenze, espansioni, lezioni, stato: stateText, capacita, cambi,
     files: fileSummaries,
     onboarding: onboardingText,
     onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
@@ -2839,6 +2844,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           ...a, type: String(a.type || '').toUpperCase(), _callId: a._callId || `json_${round}_${i}`,
         }));
       }
+      // I conti li fa Filo: il marker diventa il numero QUI, prima di archivio,
+      // cronologia del modello e voce, che altrimenti leggerebbero «[[calc: …]]».
+      if (Calc) text = Calc.resolveCalcMarkers(text);
       if (!actions.length) {
         textReply = text;
         reasoningDetails = r.reasoningDetails || [];
