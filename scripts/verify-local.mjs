@@ -29,7 +29,7 @@
 //     si rilancia senza argomenti: riusa la richiesta registrata.
 //
 //   node scripts/verify-local.mjs critica "<una riga per rilievo, col livello davanti>"
-//     Lo lancia l'istanza che ha verificato. Formato: `[2i] testo`, `[2e]` = esterno, `[1i?]` =
+//     Lo lancia l'istanza che ha verificato. Formato: `[2i] testo`, `[2e]` = esterno, `[1v]` = vicino, `[1i?]` =
 //     chiede una decisione dell'owner; le righe prima del primo rilievo sono
 //     il riassunto. Nessun rilievo = verifica superata. Stampa l'esito.
 //     Le quadre col livello dentro sono SEMPRE un rilievo, dovunque stiano
@@ -383,7 +383,7 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
   // farlo finire nel riassunto trasformava un [2] in un pass silenzioso.
   const brutte = ROUND.unparsedLevelLines(critique);
   if (brutte.length) {
-    return { ok: false, state: s, reason: `rilievi non riconosciuti. Le parentesi quadre con dentro un livello sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto e nei passi un livello si cita a parole («il livello 2»), mai «[2i]». Il livello, fra 0 e 3, va a inizio riga seguito dalla sede — «i» se tocca a questo lavoro, «e» se è un altro — e dal testo del rilievo, una riga per rilievo («[2i] testo», «[1e?] testo», anche «- [2i]», «1. [2i]», «### [2i]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
+    return { ok: false, state: s, reason: `rilievi non riconosciuti. Le parentesi quadre con dentro un livello sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto e nei passi un livello si cita a parole («il livello 2»), mai «[2i]». Il livello, fra 0 e 3, va a inizio riga seguito dalla sede — «i» se tocca a questo lavoro, «v» se è di un altro lavoro ma sta in un file che il ramo modifica già, «e» se è un altro lavoro — e dal testo del rilievo, una riga per rilievo («[2i] testo», «[1e?] testo», anche «- [2i]», «1. [2i]», «### [2i]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
   }
   // Il testo si conserva con gli a capo veri (una barra-n scritta come a capo
   // vale come a capo): è quello che il verificatore dopo rilegge nel brief.
@@ -504,14 +504,16 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
   const partenza = prev.pending.shaPulizia || prev.pending.sha || '';
   if (sha && partenza && sha === partenza) {
     if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'non corretto' };
-    const gravi = pending.filter((f) => Number(f.level) >= 2);
+    // Un vicino conta 0 qualunque livello porti scritto: non corretto non ferma, esce coi rimasti.
+    const gravi = pending.filter((f) => ROUND.effectiveLevel(f) >= 2);
+    const lievi = pending.filter((f) => !gravi.includes(f));
     if (gravi.length) {
       // Anche qui il lavoro si ferma e decide l'owner: bilanci azzerati.
       s[branch] = { ...base, verdict: 'fail', critique: ROUND.formatFindings(gravi), rounds, counts: {} };
       return { ok: true, state: s, outcome: 'stop', blocking: gravi };
     }
-    s[branch] = { ...base, verdict: 'pass', derived: (Array.isArray(prev.derived) ? prev.derived : []).concat(senzaNumero(pending)), rounds };
-    return { ok: true, state: s, outcome: 'pass', derived: pending };
+    s[branch] = { ...base, verdict: 'pass', derived: (Array.isArray(prev.derived) ? prev.derived : []).concat(senzaNumero(lievi)), rounds };
+    return { ok: true, state: s, outcome: 'pass', derived: lievi };
   }
   if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'corretto' };
   s[branch] = { ...base, verdict: 'fixed', rounds, chiusura: { rilievi: pending, shaPrima: partenza } };
@@ -614,12 +616,19 @@ export function codaDalServer(testoServer) {
 }
 
 /**
- * I rilievi che questo ramo non corregge, uno per riga con la priorità che
- * avrà il suo feedback (uguale al livello). PURA.
+ * I rilievi che questo ramo non corregge, raggruppati come li apre il server
+ * (derivedGroups): esterni e domande un feedback ciascuno, tutti gli altri in
+ * uno solo, a priorità = il livello scritto più alto. PURA.
  */
 export function derivatiText(list) {
-  if (!Array.isArray(list) || !list.length) return '  (nessuno)';
-  return list.map((f) => `${rigaNumerata(f, ROUND.formatFinding)}\n  → feedback a parte, priorità ${Number.isFinite(Number(f.priority)) ? Number(f.priority) : Number(f.level) || 0}${f.sede === 'e' ? ' (esterno: non tocca a questo lavoro)' : ' (interno, messo da parte)'}`).join('\n');
+  const gruppi = ROUND.derivedGroups(Array.isArray(list) ? list : []);
+  if (!gruppi.length) return '  (nessuno)';
+  return gruppi.map((g) => {
+    const dove = g.tipo === 'rimasti'
+      ? `un solo feedback per ${g.findings.length === 1 ? 'questo rilievo' : `questi ${g.findings.length} rilievi`}`
+      : 'feedback a parte';
+    return `${g.findings.map((f) => rigaNumerata(f, ROUND.formatFinding)).join('\n')}\n  → ${dove}, priorità ${g.priority} (${ROUND.groupLabel(g)})`;
+  }).join('\n');
 }
 
 /** I bilanci residui in una riga («cap3: n giri residui su m · …»), vuota senza bilanci. PURA. */
@@ -630,9 +639,9 @@ export function bilanciResiduiText(budgets) {
 
 /** La riga che dice dei 2 interni messi da parte (bilancio dei 2 finito), o vuota. PURA. */
 export function dueDaParteText(list) {
-  const n = (Array.isArray(list) ? list : []).filter((f) => f && Number(f.level) === 2 && f.sede !== 'e').length;
+  const n = (Array.isArray(list) ? list : []).filter((f) => f && Number(f.level) === 2 && ROUND.sedeDi(f.sede) === 'i').length;
   if (!n) return '';
-  return `Bilancio delle correzioni di livello 2 finito: ${n === 1 ? 'il rilievo interno di livello 2 rimasto esce come feedback a parte' : `i ${n} rilievi interni di livello 2 rimasti escono come feedback a parte`}, a priorità 2. Il lavoro non si ferma.`;
+  return `Bilancio delle correzioni di livello 2 finito: ${n === 1 ? 'il rilievo interno di livello 2 rimasto entra' : `i ${n} rilievi interni di livello 2 rimasti entrano`} nel feedback dei rimasti. Il lavoro non si ferma.`;
 }
 
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
@@ -920,8 +929,9 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     'QUANDO HAI FINITO registra la critica: una riga per rilievo, con livello E sede davanti',
     'fra quadre, prima la cifra e poi la lettera (3 sicurezza/dati/Filo inutilizzabile · 2 la',
     'cosa chiesta non si ottiene o cammino principale · 1 cosmetica/attrito fuori cammino ·',
-    '0 situazione rara; `i` tocca a questo lavoro, `e` è un altro lavoro; `[1i?]` = chiede una',
-    'decisione dell’owner). Una riga col solo livello viene respinta. Le righe prima del',
+    '0 situazione rara; `i` tocca a questo lavoro, `e` è un altro lavoro, `v` è un altro lavoro',
+    'ma sta in un file che questo ramo modifica già; `[1i?]` = chiede una decisione',
+    'dell’owner). Una riga col solo livello viene respinta. Le righe prima del',
     'primo rilievo sono il riassunto di cosa funziona. Nessun rilievo = verifica superata.',
     'LE QUADRE COL LIVELLO DENTRO SONO SEMPRE UN RILIEVO, dovunque stiano nella riga:',
     'nel riassunto E NEI PASSI un livello si cita a parole («il livello 2»), mai',
@@ -1146,7 +1156,7 @@ if (isMain) {
     } else {
       console.log(`══ ESITO: verifica superata per '${branch}' su ${sha.slice(0, 8)} ══`);
       if (e.derived && e.derived.length) {
-        console.log(`Rilievi non corretti, da riportare nel report per l'owner (ciascuno diventa un feedback suo, con quella priorità):\n${derivatiText(e.derived)}`);
+        console.log(`Rilievi non corretti, da riportare nel report per l'owner (esterni e domande un feedback ciascuno, gli altri un feedback solo, come raggruppati qui):\n${derivatiText(e.derived)}`);
         const due = dueDaParteText(r.decision.derived);
         if (due) console.log(due);
         console.log(testoProveDaCancellare(branch, e.derived));
@@ -1219,7 +1229,7 @@ if (isMain) {
     }
     if (r.outcome === 'pass') {
       console.log(`Nessun commit nuovo dopo la critica: niente da riverificare. Verifica superata per '${branch}' su ${sha.slice(0, 8)}.`);
-      console.log(`Rilievi non corretti, da riportare nel report per l'owner (ciascuno diventa un feedback suo, con quella priorità):\n${derivatiText(r.derived)}`);
+      console.log(`Rilievi non corretti, da riportare nel report per l'owner (esterni e domande un feedback ciascuno, gli altri un feedback solo, come raggruppati qui):\n${derivatiText(r.derived)}`);
       // Stessa uscita, stesso consiglio: di qui esce un pass con rilievi
       // aperti esattamente come da «critica», e le loro prove del giro vanno
       // tolte nello stesso modo.
