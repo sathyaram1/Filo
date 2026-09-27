@@ -24,6 +24,9 @@ const pkce = require('./pkce');
 const store = require('./token-store');
 
 let session = null; // { refreshToken, idToken, idTokenExp, email, name, picture }
+// Se la sessione sopravviverà alla chiusura: senza cifratura del sistema resta
+// solo in memoria, e chi ha appena fatto l'accesso deve saperlo subito (#708.1).
+let ricordata = false;
 
 function decodeJwtPayload(jwt) {
   try {
@@ -152,7 +155,7 @@ async function installationToken() {
 
 function persist() {
   if (!session) return;
-  store.save({
+  ricordata = store.save({
     refreshToken: session.refreshToken,
     email: session.email,
     name: session.name,
@@ -179,6 +182,7 @@ function restore() {
   const saved = store.load();
   if (saved?.refreshToken) {
     session = { ...saved, idToken: null, idTokenExp: 0 };
+    ricordata = store.canEncrypt();
   }
   return getProfile();
 }
@@ -275,6 +279,7 @@ async function nuovoFlusso() {
 
 function signOut() {
   session = null;
+  ricordata = false;
   store.clear();
 }
 
@@ -343,6 +348,10 @@ function isSignedIn() {
   return Boolean(session?.refreshToken);
 }
 
+function isRemembered() {
+  return isSignedIn() && ricordata;
+}
+
 // True se l'utente loggato è nell'allowlist admin (gate UX; la garanzia forte
 // è nelle Firestore rules). Senza sessione → false.
 function isAdmin() {
@@ -358,6 +367,7 @@ module.exports = {
   getProfile,
   getTokenClaims,
   isSignedIn,
+  isRemembered,
   isAdmin,
   // esportati per i test
   _internals: { decodeJwtPayload, startLoopback },

@@ -8,6 +8,16 @@ const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
 const { daFilo, soloFilo } = require('./origine');
 const { spiegaErroreAccesso } = require('../../auth/esitoAccesso');
+const { avvisoNellaFinestra } = require('../avvisoFinestra');
+
+// Chi accede su un computer senza portachiavi di sistema scopriva solo alla
+// riapertura di essere di nuovo fuori, e pensava a un guasto (#708.1).
+function testoAccessoNonRicordato() {
+  const base = 'Accesso fatto, ma questo computer non ha un portachiavi di sistema dove custodirlo: '
+    + 'quando chiudi Filo dovrai accedere di nuovo.';
+  if (process.platform === 'linux') return base + ' Per farlo ricordare installa GNOME Keyring o KWallet e riapri Filo.';
+  return base;
+}
 
 // Base delle Cloud Function callable del backend di sicurezza (filo-security):
 // stessa region/progetto del deploy. Override per i test via env.
@@ -247,13 +257,17 @@ module.exports = function register(on, ctx) {
     const isAdmin = auth.isAdmin();
     if (!daFilo(origin, sender)) return { ok: true, signedIn, isAdmin };
     const uid = signedIn ? await auth.getUid() : null;
-    return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid };
+    return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid, remembered: auth.isRemembered() };
   });
 
   on(MSG.AUTH_SIGNIN, async () => {
     try {
       const profile = await auth.signIn();
-      avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
+      const remembered = auth.isRemembered();
+      avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile, remembered });
+      // Nel main e non nelle pagine: all'accesso si arriva da molte porte
+      // (menu account, bacheca, posta, red-team, siti), e l'avviso vale per tutte.
+      if (auth.isSignedIn() && !remembered) avvisoNellaFinestra(testoAccessoNonRicordato());
       // Rinfresca la config condivisa in background. Le chiavi ruotate
       // dall'admin NON si leggono più qui (#581: config/secrets è admin-only e
       // le chiavi arrivano col build); resta utile per config/models.
@@ -261,7 +275,7 @@ module.exports = function register(on, ctx) {
       // Appena l'owner è dentro, la vista pubblica dei feedback si rimette in
       // pari da sola (#583): è il momento in cui il main ha di nuovo il token.
       if (auth.isAdmin()) scheduleViewSync({ delayMs: 4000, force: true });
-      return { ok: true, profile, isAdmin: auth.isAdmin() };
+      return { ok: true, profile, isAdmin: auth.isAdmin(), remembered };
     } catch (e) {
       return { ok: false, ...spiegaErroreAccesso(e) };
     }
