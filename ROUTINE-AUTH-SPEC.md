@@ -735,9 +735,10 @@ ma a scriverlo è il server.
 - **`scripts/release-bump.mjs`** è il citofono: chiede, stampa il numero nuovo
   su stdout e basta. Exit `0` fatto · `2` rifiutato (freno, parola d'ordine,
   manifesto) · `3` server non raggiungibile o funzione assente. Il lavoro di
-  pubblicazione poi **rilegge** `main` (una lettura, `git pull --rebase`) e si
-  ferma se il numero non combacia: costruire col numero vecchio pubblicherebbe
-  sopra una release già esistente.
+  pubblicazione costruisce il commit **provato dalla suite**, non la punta di
+  `main` (#641): `scripts/release-apply-version.mjs` applica quel numero in
+  locale al suo manifesto, senza commit né push, e si ferma se non è più alto
+  di quello dell'albero. Il tag nasce sul commit costruito (`--target`).
 - Nel lavoro di pubblicazione non è rimasto **nessun** `git push`, `git commit`
   o `npm version`, e una sentinella negli unit test diventa rossa se ci tornano.
 
