@@ -78,9 +78,56 @@
     };
   }
 
+  // Il tasto dello zoom, da un keydown del DOM o da un `before-input-event`
+  // del main (che lo vede per primo, in qualunque riquadro): una regola sola.
+  function tastoZoom(t) {
+    if (!t) return null;
+    const ctrl = !!(t.ctrlKey || t.metaKey || t.control || t.meta);
+    const alt = !!(t.altKey || t.alt);
+    if (!ctrl || alt) return null;
+    const k = String(t.key || '');
+    const c = String(t.code || '');
+    if (k === '+' || k === '=' || c === 'NumpadAdd') return 'in';
+    if (k === '-' || k === '_' || c === 'NumpadSubtract') return 'out';
+    if (k === '0' || c === 'Numpad0') return 'reset';
+    return null;
+  }
+
+  // Un riquadro incorporato non zooma da sé: passa il gesto al frame
+  // principale attraverso il main, che lo lascia passare solo in questa forma.
+  const GESTI = ['medio', 'rotella', 'ctrl', 'esci', 'reset'];
+  function gestoValido(g) {
+    if (!g || typeof g !== 'object' || !GESTI.includes(g.tipo)) return null;
+    if (g.tipo !== 'rotella' && g.tipo !== 'ctrl') return { tipo: g.tipo };
+    const dy = Number(g.dy);
+    if (!Number.isFinite(dy) || dy === 0) return null;
+    return { tipo: g.tipo, dy: Math.max(-1000, Math.min(1000, dy)) };
+  }
+
+  // Il campo della percentuale lo scrivono solo i tasti veri dell'utente: il
+  // suo valore nel documento lo può cambiare anche il sito (#686.1). `fresco`
+  // vale per il primo tasto dopo il clic, che sostituisce invece di accodare.
+  const CIFRE_CAMPO = 6;
+  function tastoCampo(stato, key) {
+    const s = stato || {};
+    const valore = String(s.valore == null ? '' : s.valore);
+    const fresco = !!s.fresco;
+    const k = String(key || '');
+    if (k === 'Enter' || k === 'Tab') return { valore, fresco: false, azione: 'applica' };
+    if (k === 'Escape') return { valore, fresco: false, azione: 'annulla' };
+    if (k === 'Backspace') return { valore: fresco ? '' : valore.slice(0, -1), fresco: false, azione: null };
+    if (k === 'Delete') return { valore: '', fresco: false, azione: null };
+    if (/^[0-9]$/.test(k)) {
+      const base = fresco ? '' : valore;
+      return { valore: base.length >= CIFRE_CAMPO ? base : base + k, fresco: false, azione: null };
+    }
+    return { valore, fresco, azione: null };
+  }
+
   global.SN_ZOOM = {
-    BASE, PASSO, VERSI,
+    BASE, PASSO, VERSI, GESTI, CIFRE_CAMPO,
     MIN_LIVELLO, MAX_LIVELLO, MIN_PERCENTUALE, MAX_PERCENTUALE,
     percentuale, livello, limita, leggiPercentuale, risolvi,
+    tastoZoom, gestoValido, tastoCampo,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
