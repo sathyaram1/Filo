@@ -239,7 +239,7 @@ test('i nomi scritti per intero in un’altra lingua, e i siti che usano un nome
     'https://facebook.github.io/react/', 'https://microsoft.github.io/vscode/',
     'https://apple.stackexchange.com/questions/1', 'https://apple-pie.it/', 'https://pineapple.com/',
     'https://appleinsider.com/', 'https://x-plane.com/', 'https://googleblog.com/', 'https://amazonaws.com/',
-    'https://github-readme-stats.vercel.app/api', 'https://www.youtube-nocookie.com/embed/abc',
+    'https://www.youtube-nocookie.com/embed/abc',
     'https://login.microsoftonline.com/', 'https://aws.amazon.com/', 'https://www.amazon.co.uk/',
     'https://paypal.com.co/', 'https://utente:segreto@esempio.it/',
   ];
@@ -301,5 +301,28 @@ test('gli indirizzi che le aziende usano davvero non si prendono l’avviso, i l
     'https://paypal.com@wikipedia.evil.net/',
   ]) {
     assert.ok(LS.analizza(u).some((c) => c.startsWith('nome_altrui:paypal.com')), `nessun avviso su ${u}`);
+  }
+});
+
+test('sui servizi dove ognuno apre il suo sito, il sito è di chi l’ha aperto', () => {
+  // #725.2 — il menu divideva l'indirizzo con una regola sua e credeva che in
+  // paypal-login.vercel.app comandasse Vercel: dove finisce il sito lo dice
+  // l'elenco dei suffissi del controllo di navigazione.
+  for (const [u, dove] of [
+    ['https://paypal-login.vercel.app/', 'paypal-login.vercel.app'],
+    ['https://secure-paypal.web.app/', 'secure-paypal.web.app'],
+    ['https://paypal-secure.netlify.app/', 'paypal-secure.netlify.app'],
+    ['https://paypal-login.github.io/', 'paypal-login.github.io'],
+    ['https://netflix-account.herokuapp.com/', 'netflix-account.herokuapp.com'],
+    ['http://paypal.com@192.168.1.1/login', '192.168.1.1'],
+  ]) {
+    const codici = LS.analizza(u);
+    assert.ok(codici.some((c) => c.startsWith('nome_altrui:') && c.endsWith('|' + dove)), `su ${u}: ${codici}`);
+    assert.ok(LS.avviso(codici).includes(dove), `l’avviso su ${u} non dice dove porta: ${LS.avviso(codici)}`);
+  }
+  assert.deepEqual(LS.analizza('https://paypa1.vercel.app/'), ['typosquatting:paypal.com']);
+  // Lì il nome è una parola scelta da chi l'ha aperto: somigliare non basta.
+  for (const u of ['https://apply.vercel.app/', 'https://ample.netlify.app/', 'https://googly.github.io/', 'https://amazon.com.co/', 'https://amazon.com.mx/']) {
+    assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
   }
 });

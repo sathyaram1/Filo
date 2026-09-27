@@ -27,7 +27,11 @@
     // #725.2 — si guarda il nome come lo vede chi legge (unicode), non come
     // viaggia (punycode): «xn--pypal-4ve» a schermo è «раypal».
     const host = daPunycode(u.hostname.toLowerCase().replace(/\.$/, '')).replace(/^www\./, '');
-    const imitato = sitoFidato(u) ? '' : imitazione(host, etichetteUtente(u));
+    const norm = SAFEBROWSE ? SAFEBROWSE.normalize(u.href) : null;
+    const esca = etichetteUtente(u);
+    // Chi comanda si legge in due modi, e basta uno: il sito secondo l'elenco dei
+    // suffissi (paypal-login.vercel.app) o la piattaforma che lo ospita (paypal.wordpress.com).
+    const imitato = sitoFidato(norm, u) ? '' : (imitazione(host, esca, sitoVero(norm, host)) || imitazione(host, esca, sitoDi(host)));
     if (imitato) flags.push(imitato);
     else if (alfabetoIngannevole(host)) flags.push('alfabeto_ingannevole');
     return flags;
@@ -45,19 +49,16 @@
     } catch (_) {}
     return null;
   })();
-  function sitoFidato(u) {
-    if (!SAFEBROWSE) return false;
-    const norm = SAFEBROWSE.normalize(u.href);
+  function sitoFidato(norm, u) {
     if (!norm || !norm.ok) return false;
     return !SAFEBROWSE.hostedPlatform(norm.host, u.pathname) && SAFEBROWSE.isWhitelisted(norm.registrable);
   }
 
   // Il nome famoso che l'indirizzo porta addosso senza essere lui a comandare.
-  function imitazione(host, esca) {
+  function imitazione(host, esca, sito) {
     for (const p of POPULAR) {
       if (host === p || host.endsWith('.' + p)) return '';
     }
-    const sito = sitoDi(host);
     // Stesso nome, altro dominio di primo livello (amazon.de, google.co): è il
     // sito, e i suoi sottodomini (facebook.github.io) sono affar suo.
     if (POPULAR.some((p) => sitoDi(p).nome === sito.nome)) return '';
@@ -66,7 +67,9 @@
     const straniero = /[^\x00-\x7f]/.test(sito.nome);
     for (const p of POPULAR) {
       const suo = sitoDi(p).nome;
-      if (scritto === suo || levenshteinSmall(scritto, suo, tolleranza(suo))) {
+      // Il nome di un sito ospitato è una parola scelta da chi l'ha aperto
+      // (apply.vercel.app non imita apple): lì conta solo la stessa grafia.
+      if (scritto === suo || (!sito.ospitato && levenshteinSmall(scritto, suo, tolleranza(suo)))) {
         return (straniero ? 'omografo:' : 'typosquatting:') + p;
       }
     }
@@ -101,6 +104,20 @@
     let i = parti.length - 2;
     if (i >= 1 && SUFFISSI_2L.has(parti[i])) i--;
     return { nome: parti[i], dominio: parti.slice(i).join('.'), sotto: parti.slice(0, i) };
+  }
+
+  // #725.2 — dove finisce il sito lo dice l'elenco dei suffissi del controllo di
+  // navigazione: paypal-login.vercel.app è di chi l'ha aperto, non di Vercel.
+  // Dove l'elenco ricade sulla regola generica (amazon.com.co) vale la regola corta.
+  function sitoVero(norm, host) {
+    if (!norm || !norm.ok || !norm.registrable) return sitoDi(host);
+    if (norm.isIp) return { nome: host, dominio: host, sotto: [] };
+    const parti = host.split('.').filter(Boolean);
+    const n = norm.registrable.split('.').length;
+    if (parti.length < n) return sitoDi(host);
+    let i = parti.length - n;
+    if (n === 2 && i >= 1 && SUFFISSI_2L.has(parti[i])) i--;
+    return { nome: parti[i], dominio: parti.slice(i).join('.'), sotto: parti.slice(0, i), ospitato: !!norm.ospitato };
   }
 
   // Le parole prima della «@» (https://paypal.com@altro.net): a schermo
