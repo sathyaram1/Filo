@@ -105,6 +105,13 @@
     return t.replace(/^mailto:/i, '').replace(/^<|>$/g, '').trim();
   }
 
+  // Due indirizzi diversi nello stesso testo non si riducono al primo in
+  // silenzio: il comando si ferma e li nomina (#679.3, secondo giro).
+  function indirizziDiversi(testo) {
+    const tutti = String(testo || '').match(/[^\s<>"'(),;:[\]]+@[^\s<>"'(),;:[\]]*/g) || [];
+    return [...new Set(tutti.map((a) => a.replace(/[.]+$/, '').toLowerCase()))];
+  }
+
   // "/users": elenca gli utenti registrati. Riservato al proprietario (il main
   // rifiuta i non-admin con un messaggio chiaro).
   //
