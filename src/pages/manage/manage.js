@@ -348,7 +348,14 @@
     if (nuovo && panFs && panFs.classList.contains('mg-panel--active')) loadFsData();
   }
 
+  // Vero da quando l'avvio ha chiesto le impostazioni: un accesso arrivato dopo le richiede di nuovo.
+  let impostazioniAvviate = false;
+  function caricaImpostazioni() {
+    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadJudgeTimeout(), loadMergeApprovals()]);
+  }
+
   async function refreshAuth() {
+    const eraAdmin = isAdmin;
     try {
       const r = await sendToMain({ type: 'auth_status' });
       setIsAdmin(!!(r && r.isAdmin));
@@ -358,6 +365,8 @@
     mgBanner.hidden = isAdmin;
     // Un accesso fatto dal banner deve sbloccare i controlli senza riaprire la pagina.
     applyAutoModeGate();
+    // Sbloccati, i campi mostrerebbero ciò che si è letto da non owner (cioè niente): si rilegge dal server.
+    if (isAdmin && !eraAdmin && impostazioniAvviate) await caricaImpostazioni();
   }
 
   mgSignInBtn.addEventListener('click', () => {
