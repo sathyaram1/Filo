@@ -26,8 +26,10 @@
 //   la parte che serviva a chi prende il feedback.
 //
 // USO
-//   node scripts/build-alarm.mjs "<titolo>" "<testo>"
+//   node scripts/build-alarm.mjs "<titolo>" "<testo>" [--chiave <k>]… [--chiavi-da <file>]
+//                                [--chiavi-unit <registro TAP>]
 
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
