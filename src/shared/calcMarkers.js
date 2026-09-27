@@ -104,8 +104,9 @@
         if (s[i] === '(') {
           i++;
           const arg = parseExpr();
+          const arg2 = eat(';') ? parseExpr() : undefined;
           if (!eat(')')) throw new Error('paren');
-          return applyFunc(name, arg);
+          return arg2 === undefined ? applyFunc(name, arg) : applyFunc2(name, arg, arg2);
         }
         return applyConst(name);
       }
