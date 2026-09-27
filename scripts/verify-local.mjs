@@ -515,7 +515,7 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   if (!messi) {
     return { ok: false, reason: 'questo giro non ha messo da parte nessun rilievo: non c'è niente da pulire. Una prova del giro si toglie solo verde, insieme alla prova durevole che la sostituisce.' };
   }
-  if (Array.isArray(dirtyFiles) && dirtyFiles.length) return { ok: false, reason: dirtyTreeText(dirtyFiles) };
+  if (Array.isArray(dirtyFiles) && dirtyFiles.length) return { ok: false, reason: dirtyTreeText(dirtyFiles, 'pulizia') };
   if (!controllo || !controllo.ok) return { ok: false, reason: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
   s[branch] = { ...prev, pending: { ...prev.pending, shaPulizia: controllo.sha } };
   return { ok: true, state: s, files: controllo.files };
@@ -709,6 +709,7 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
   // in cloud sta nelle istruzioni del ruolo, ma qui la coda arriva da un file
   // fuori dal repo, che non le nomina — e la parte che vive nel repo è questa.
   const cartella = cartellaProveGiro(branch);
+  const messi = [derived, external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
   const righe = [
     '══ ESITO: c\'è da correggere ══',
     `Ramo: ${branch}.`,
