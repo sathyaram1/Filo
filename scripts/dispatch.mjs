@@ -1025,7 +1025,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
     // registrato ma che il ramo dà per data è peggio di una mancante.
     return { rejected: true, serverDown: true, message: `critica non registrata: il server non risponde (${sent.reason})` };
   }
-  const reply = sent.reply && typeof sent.reply === 'object' ? sent.reply : {};
+  const reply = numeraRisposta(sent.reply && typeof sent.reply === 'object' ? sent.reply : {}, parsed.findings);
   // Un «ok» senza esito non è un pass: l'esito lo calcola il server, e se non
   // l'ha detto nessuno l'ha calcolato. Darlo per superato stampava «rilascia
   // il biglietto» anche con un rilievo di livello 2 nella critica (verifica
@@ -1033,9 +1033,10 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
   const outcome = VERIFIER_OUTCOMES.includes(reply.outcome) ? reply.outcome : 'non comunicato';
   const next = applyVerifierVerdict(base, outcome, critiqueText, shaProvato);
   next.id = id;
-  // Quanti rilievi il server ha messo da parte su QUESTO commit: la pulizia è ammessa solo se ce ne sono.
+  // I rilievi messi da parte su QUESTO commit, col loro posto nella critica: la pulizia toglie solo le loro prove.
+  const daParte = derivatiAperti(reply.phase2 ? reply.phase2.derived : reply.derived);
   next.messiDaParteGiro = outcome === 'fix'
-    ? { sha: shaProvato, n: derivatiAperti(reply.phase2 ? reply.phase2.derived : reply.derived).length }
+    ? { sha: shaProvato, n: daParte.length, numeri: daParte.map((d) => d.n).filter(Number.isInteger), avvio: avvio || '' }
     : null;
   sealTransition(next, `verifier:${outcome}`);
   next.reply = reply;
