@@ -36,7 +36,11 @@ test('una sessione nata dopo l\'avvio (incognito, privacy) è chiusa anche lei',
   expect(esito).toContain('ERR_BLOCKED_BY_CLIENT');
 });
 
-test('il fetch del main non parte verso le schede e fallisce come senza rete', async ({ app, testServer }) => {
+// Si parte ad avvio finito: un app.evaluate che cade mentre il main carica undici trova il fetch
+// di Node a metà («fetchImpl is not a function»), con o senza chiusura.
+test('il fetch del main non parte verso le schede e fallisce come senza rete', async ({ app, shell, testServer }) => {
+  await shell.waitForFunction(() => document.readyState === 'complete');
+  await expect.poll(() => app.evaluate(() => typeof globalThis.SN_FEEDBACK)).toBe('object');
   const esito = await app.evaluate(async (_e, url) => {
     try { const r = await fetch(url, { method: 'POST', body: '{}' }); return { raggiunto: r.status }; } catch (e) { return { messaggio: e.message, causa: e.cause ? String(e.cause.code || e.cause.message) : null }; }
   }, SCHEDE);
