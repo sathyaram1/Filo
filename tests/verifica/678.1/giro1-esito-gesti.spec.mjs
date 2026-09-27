@@ -186,3 +186,16 @@ test('aspetto: frase d\'errore, fix ritirato e conferma, in chiaro e in scuro', 
     await page.screenshot({ path: `tests/.shots/verifica-678.1-${tema}.png`, fullPage: true });
   }
 });
+
+test('fix appena riaperto: come uno tornato in lavorazione, non offre più il voto', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await prepara(page, [FIX('fb-r4', 8, ALTRI)], {
+    board_reopen: { ok: true, feedbackId: 'fb-figlio', balance: 37 },
+  });
+  const card = page.locator('.bd-card').first();
+  await card.locator('.bd-reopen-link').click();
+  await card.locator('.bd-reopen-text').fill('ancora rotto');
+  await card.locator('.bd-reopen-actions button', { hasText: 'Invia' }).click();
+  await expect(page.locator('.bd-card .bd-reopen-ok')).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.bd-card').first().locator('.bd-vote-btn')).toHaveCount(0);
+});
