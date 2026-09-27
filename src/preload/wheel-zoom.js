@@ -418,13 +418,18 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     if (percentInput && e.target === percentInput && percentInput.value !== campo.valore) mostraCampo();
   }
 
-  tieniAscoltatori([
+  try { globalThis.__filoZoomQui = true; } catch (_) {}
+  const gesti = [
     ['mousedown', onMouseDown, true],
     ['contextmenu', onContextMenu, true],
     ['wheel', onWheel, { capture: true, passive: false }],
     ['keydown', onKeyDown, true],
+  ];
+  tieniAscoltatori([
+    ...gesti,
     ['paste', onPaste, true],
     ['input', onInput, true],
+    ['pointerover', vegliaRiquadri(gesti), true],
   ], () => {
     // Il documento vecchio se n'è andato col riquadro e i suoi ascoltatori.
     const eraAperta = zoomMode;
