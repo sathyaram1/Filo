@@ -38,6 +38,10 @@ la cartella.
   correzione, in un commit che toglie solo quelle registrato da chi ha scritto la critica
   (`verify-local.mjs pulizia`, `dispatch.mjs --record-pulizia`): il confronto parte da lì,
   e una prova tolta ancora rossa ferma la consegna sempre (`scripts/lib/prove-tolte.mjs`).
+  La pulizia riconosce le prove dal nome, che porta il numero del rilievo riprodotto
+  (`giro<k>-r<n>-<cosa>.spec.mjs`, il posto del rilievo nella critica): contare quante ne
+  escono non bastava, perché un rilievo messo da parte senza prova sua lasciava uscire la
+  prova rossa di uno da correggere.
 
 ## Il rosso atteso
 
