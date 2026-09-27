@@ -53,22 +53,36 @@ const llmCache = new TtlCache(HOUR);
 
 // Fetcher di rete iniettabili (default: assenti = best-effort no-op).
 let providers = { gsb: null, rdap: null, ct: null, sandbox: null, llm: null };
-function setProviders(fns) { providers = { ...providers, ...(fns || {}) }; }
+// Chiave GSB letta a ogni verifica: la decide chi è dentro ADESSO (l'admin esce o entra senza ricollegare nulla, #679.4).
+let gsbKeyOf = null;
+function setProviders(fns) {
+  if (fns && 'gsb' in fns) gsbKeyOf = null;
+  providers = { ...providers, ...(fns || {}) };
+}
+function currentGsbKey() {
+  try { return String((gsbKeyOf && gsbKeyOf()) || '').trim(); } catch (_) { return ''; }
+}
 
 // Configura i provider dai moduli reali, usando le impostazioni correnti.
-//   opts.gsbKey       chiave Google Safe Browsing (se assente → stage 1 saltato)
+//   opts.gsbKey       chiave Google Safe Browsing, o funzione che la dà al momento
+//                     della verifica (se assente o vuota → stage 1 saltato)
 //   opts.runLlm       funzione (messages) → testo, per il giudice LLM
 //   opts.enableSandbox  abilita la detonation (default true se Electron c'è)
 //   opts.enableNetwork  abilita RDAP/CT (default true)
 function configure(opts = {}) {
   const { gsbKey, runLlm, enableSandbox = true, enableNetwork = true } = opts;
+  const keyOf = typeof gsbKey === 'function' ? gsbKey : (gsbKey ? () => gsbKey : null);
   setProviders({
-    gsb: gsbKey ? ((rawUrl) => net.safeBrowsingLookup(rawUrl, gsbKey)) : null,
+    gsb: keyOf ? ((rawUrl) => {
+      const k = currentGsbKey();
+      return k ? net.safeBrowsingLookup(rawUrl, k) : null;
+    }) : null,
     rdap: enableNetwork ? ((reg) => net.rdapAgeDays(reg)) : null,
     ct: enableNetwork ? ((reg) => net.ctFirstSeenDays(reg)) : null,
     llm: typeof runLlm === 'function' ? ((meta) => llm.judge(meta, runLlm)) : null,
     sandbox: enableSandbox ? ((url) => sandbox.detonate(url, (finalUrl) => checkSync(finalUrl))) : null,
   });
+  gsbKeyOf = keyOf;
 }
 
 // Esito certificato osservato dalla webview reale (la fonte più affidabile).
@@ -206,7 +220,7 @@ const API = {
   // e test): gsb=true significa che la chiave Google Safe Browsing è in uso.
   activeProviders() {
     return {
-      gsb: !!providers.gsb,
+      gsb: !!providers.gsb && (gsbKeyOf ? !!currentGsbKey() : true),
       rdap: !!providers.rdap,
       ct: !!providers.ct,
       llm: !!providers.llm,

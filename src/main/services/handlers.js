@@ -224,6 +224,11 @@ async function buildMessages(action, payload) {
   throw new Error(`Action sconosciuta: ${action}`);
 }
 
+// Chiave GSB effettiva: la condivisa (build, o quella dell'admin finché è dentro) vince sulla personale.
+function safeBrowsingKeyFor(settings, d = Defaults.get()) {
+  return d.safeBrowsingKey || settings?.security?.safeBrowse?.safeBrowsingKey || '';
+}
+
 // Quando "usa modelli predefiniti" è attivo (default), la risoluzione di
 // modelli/registry/provider usa la config predefinita condivisa, e le chiavi
 // sono quelle di default (build env / override admin via Firestore), con
@@ -240,8 +245,9 @@ function withDefaults(settings) {
   // DAL BUILD (default-keys.js), non da Firestore. Chi passa di qui non tolga
   // la strada del build credendola un doppione: è l'unica che serve tutti.
   const sec = settings.security || {};
-  const security = d.safeBrowsingKey
-    ? { ...sec, safeBrowse: { ...(sec.safeBrowse || {}), safeBrowsingKey: d.safeBrowsingKey } }
+  const sbKey = safeBrowsingKeyFor(settings, d);
+  const security = sbKey
+    ? { ...sec, safeBrowse: { ...(sec.safeBrowse || {}), safeBrowsingKey: sbKey } }
     : sec;
 
   // Politica sui fornitori (#421): è una regola di Filo, non una preferenza
@@ -993,7 +999,7 @@ async function applySettingsUpdate(partial) {
     }
   } catch (_) {}
   try { require('./fingerprint').setMode(merged); } catch (_) {}
-  wireSafebrowse(withDefaults(merged)).catch(() => {});
+  wireSafebrowse(merged).catch(() => {});
   try {
     const Cookies = require('./cookies');
     Cookies.configureFromSettings(merged);
@@ -3935,18 +3941,19 @@ function sendToAllFrames(wc, message) {
   }
 }
 
-// Configura il rilevatore di siti pericolosi (services/safebrowse) con chiavi e
-// provider derivati dalle impostazioni. Va richiamato al boot e a ogni
-// UPDATE_SETTINGS. Best-effort: se SN_SAFEBROWSE non c'è o la feature è spenta,
-// disinnesca tutti i provider di rete/LLM/sandbox (resta solo l'analisi locale
-// deterministica, che non costa nulla e non fa rete).
+// Configura il rilevatore di siti pericolosi (services/safebrowse) dalle
+// impostazioni SALVATE (non quelle con i default già dentro): va richiamato al
+// boot e a ogni UPDATE_SETTINGS. La chiave GSB invece si ricalcola a ogni
+// verifica, perché accesso e uscita dell'admin la cambiano senza toccare
+// le preferenze (#679.4). Feature spenta: resta solo l'analisi locale.
 async function wireSafebrowse(settingsArg) {
   const SB = globalThis.SN_SAFEBROWSE;
   if (!SB || typeof SB.configure !== 'function') return;
   let settings = settingsArg;
   if (!settings) {
-    try { settings = await getEffectiveSettings(); } catch (_) { settings = {}; }
+    try { settings = await Storage.getSettings(); } catch (_) { settings = {}; }
   }
+  settings = settings || {};
   const sb = (settings.security && settings.security.safeBrowse) || {};
   if (sb.enabled === false) {
     SB.configure({ gsbKey: '', runLlm: null, enableSandbox: false, enableNetwork: false });
@@ -3962,7 +3969,7 @@ async function wireSafebrowse(settingsArg) {
     return r.text;
   };
   SB.configure({
-    gsbKey: sb.safeBrowsingKey || '',
+    gsbKey: () => safeBrowsingKeyFor(settings),
     runLlm,
     enableSandbox: sb.sandbox !== false,
     enableNetwork: sb.networkSignals !== false,
