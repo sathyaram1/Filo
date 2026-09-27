@@ -1,5 +1,5 @@
 // Verifica giro 4 (ramo riallineato su main): una scelta pendente che arriva e se ne va a pagina aperta, una
-// richiesta di fusione ritirata altrove, e cosa offre il pannello di una pratica tirata nei Ricevuti dalla richiesta.
+// richiesta di fusione ritirata altrove che rimanda In coda la pratica rimasta indietro.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
