@@ -530,6 +530,8 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   }
   if (Array.isArray(dirtyFiles) && dirtyFiles.length) return { ok: false, reason: dirtyTreeText(dirtyFiles, 'pulizia') };
   if (!controllo || !controllo.ok) return { ok: false, reason: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
+  const troppe = testoPuliziaTroppoLarga(controllo.files, messi);
+  if (troppe) return { ok: false, reason: troppe };
   s[branch] = { ...prev, pending: { ...prev.pending, shaPulizia: controllo.sha } };
   return { ok: true, state: s, files: controllo.files };
 }
