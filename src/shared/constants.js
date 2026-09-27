@@ -590,12 +590,17 @@
   // remota in config/models): senza questo confronto, un'esclusione aggiunta al
   // codice resta lettera morta sulle installazioni che leggono la lista remota,
   // e nessuno se ne accorge finché non ricapita il guasto che l'aveva motivata.
-  function missingExcludedProviders(base, list) {
+  // Con `catalog` una voce è coperta anche quando la lista esclude, sotto un altro
+  // nome, tutti i fornitori del catalogo che la voce esclude («NovitaAI» copre «Novita»).
+  function missingExcludedProviders(base, list, catalog) {
     const out = [];
     for (const b of (Array.isArray(base) ? base : [])) {
       const name = String(b == null ? '' : b).trim();
       if (!name) continue;
       if (isProviderExcluded(name, list)) continue;
+      const covered = catalogProvidersCoveredBy(name, catalog);
+      if (covered.length && covered.every((p) => (Array.isArray(list) ? list : [])
+        .some((l) => catalogProvidersCoveredBy(l, [p]).length))) continue;
       const k = normalizeProviderName(name);
       if (out.some((x) => normalizeProviderName(x) === k)) continue;
       out.push(name);
@@ -639,10 +644,14 @@
   // Catalogo dei fornitori dello smistatore: [{ name, slug }]. Un nome scritto
   // nella lista vale solo se copre almeno un fornitore del catalogo (per nome o
   // per slug): un refuso non copre niente e l'esclusione sarebbe finta. PURA.
-  function providerCoversCatalog(name, catalog) {
-    if (!normalizeProviderName(name)) return false;
-    return (Array.isArray(catalog) ? catalog : []).some((p) => p
+  function catalogProvidersCoveredBy(name, catalog) {
+    if (!normalizeProviderName(name)) return [];
+    return (Array.isArray(catalog) ? catalog : []).filter((p) => p
       && (isProviderExcluded(p.name, [name]) || isProviderExcluded(p.slug, [name])));
+  }
+
+  function providerCoversCatalog(name, catalog) {
+    return catalogProvidersCoveredBy(name, catalog).length > 0;
   }
 
   // Distanza di modifica con lo scambio di due lettere vicine contato come uno:

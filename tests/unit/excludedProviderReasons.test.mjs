@@ -59,6 +59,20 @@ test('un refuso non copre niente e ha la correzione suggerita', () => {
   assert.equal(C.providerCoversCatalog('   ', CATALOG), false);
 });
 
+test('col catalogo, il nome del catalogo copre la voce del codice che esclude lo stesso fornitore', () => {
+  // «NovitaAI» è ciò che il menu e il «Forse …?» scrivono per Novita.
+  assert.deepEqual(C.missingExcludedProviders(['Novita'], ['NovitaAI'], CATALOG), []);
+  assert.deepEqual(C.missingExcludedProviders(['Novita'], ['novita'], CATALOG), []);
+  // Coprire una parte dei fornitori della voce non basta.
+  assert.deepEqual(C.missingExcludedProviders(['Google'], ['Google Vertex'], CATALOG), ['Google']);
+  assert.deepEqual(C.missingExcludedProviders(['Google'], ['Google Vertex', 'Google AI Studio'], CATALOG), []);
+  // Un altro fornitore non copre niente; una voce assente dal catalogo resta alla regola del nome.
+  assert.deepEqual(C.missingExcludedProviders(['Novita'], ['Together'], CATALOG), ['Novita']);
+  assert.deepEqual(C.missingExcludedProviders(['Qwen'], ['NovitaAI'], CATALOG), ['Qwen']);
+  // Senza catalogo vale la regola del nome di sempre.
+  assert.deepEqual(C.missingExcludedProviders(['Novita'], ['NovitaAI']), ['Novita']);
+});
+
 test('i motivi si salvano in un campo a parte e tornano nella config dell\'editor', async () => {
   const realFetch = global.fetch;
   const realToken = auth.getIdToken;

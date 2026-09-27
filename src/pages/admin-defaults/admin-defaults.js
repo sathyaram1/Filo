@@ -329,6 +329,7 @@
       if (res?.ok && Array.isArray(res.items) && res.items.length) {
         providerCatalog = res.items;
         for (const row of $('excludedList').querySelectorAll('.sn-excluded-row')) checkExcludedName(row);
+        renderExcludedDrift();
       }
     } catch (_) { /* senza catalogo il campo resta libero e non si segnala niente */ }
   }
@@ -362,6 +363,7 @@
       fix.textContent = I18n.t('admin_defaults_excluded_guess', guess);
       fix.addEventListener('click', () => {
         input.value = guess;
+        adoptDefaultReason(row);
         checkExcludedName(row);
         renderExcludedDrift();
       });
@@ -387,7 +389,7 @@
     if (window.SN_COMBOBOX) {
       window.SN_COMBOBOX.attach(wrap, input, {
         readOptions: readCatalogOptions,
-        onPick: () => { checkExcludedName(row); renderExcludedDrift(); },
+        onPick: () => { adoptDefaultReason(row); checkExcludedName(row); renderExcludedDrift(); },
       });
     }
 
@@ -487,7 +489,22 @@
   function excludedMissingFromBuild() {
     const C = window.SN_CONST;
     if (!C || typeof C.missingExcludedProviders !== 'function') return [];
-    return C.missingExcludedProviders(C.DEFAULT_EXCLUDED_PROVIDERS || [], collectExcluded());
+    return C.missingExcludedProviders(C.DEFAULT_EXCLUDED_PROVIDERS || [], collectExcluded(), providerCatalog);
+  }
+
+  // Un nome scelto dal catalogo che copre una voce del codice ne prende il motivo
+  // di serie, se la riga non ne ha già uno: stessa regola dell'avviso sopra.
+  function adoptDefaultReason(row) {
+    const C = window.SN_CONST || {};
+    const kind = row.querySelector('.sn-excluded-kind');
+    const note = row.querySelector('.sn-excluded-note');
+    if (kind.value || note.value.trim() || typeof C.missingExcludedProviders !== 'function') return;
+    const name = row.querySelector('.sn-excluded-name').value.trim();
+    const d = (C.DEFAULT_EXCLUDED_PROVIDER_REASONS || [])
+      .find((r) => !C.missingExcludedProviders([r.name], [name], providerCatalog).length);
+    if (!d) return;
+    kind.value = d.kind || '';
+    note.value = d.note || '';
   }
 
   function renderExcludedDrift() {
