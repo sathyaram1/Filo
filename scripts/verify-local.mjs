@@ -670,7 +670,8 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
     ...(messi ? [
       `PRIMA DI OGNI CORREZIONE, chi ha registrato questa critica TOGLIE da ${cartella} le prove dei rilievi messi da`,
       'parte e degli esterni elencati qui sopra, se ci sono ancora (ognuno è un feedback suo adesso, e il testo viaggia',
-      'lì), in un commit che toglie SOLO quelle, e registra la pulizia:',
+      'lì): sono quelle che nel nome portano il loro numero (r<n>, lo stesso che le precede qui sopra), in un commit',
+      'che toglie SOLO quelle, e registra la pulizia:',
       '  git add -A && git commit -m "pulizia del giro"',
       '  node scripts/verify-local.mjs pulizia',
       'Una prova che copre anche un caso ancora aperto non si cancella: le si toglie il caso che se ne va.',
