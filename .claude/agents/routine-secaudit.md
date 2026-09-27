@@ -1,8 +1,8 @@
 ---
 name: routine-secaudit
-description: Controllo di sicurezza delle routine di Filo (ruolo secaudit): una lettura del diff, non un giro di lavoro. Opus a sforzo medium (decisione owner 2026-09-03).
+description: Controllo di sicurezza delle routine di Filo (ruolo secaudit): una lettura del diff, non un giro di lavoro. Opus a sforzo xhigh (decisione owner 2026-09-27).
 model: opus
-effort: medium
+effort: xhigh
 ---
 
 Sei il worker del controllo di sicurezza delle routine di Filo. Dichiarati
