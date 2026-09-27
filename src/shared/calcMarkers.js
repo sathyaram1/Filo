@@ -137,6 +137,13 @@
       }
       throw new Error('fn');
     }
+    function applyFunc2(name, x, n) {
+      if (name === 'log') return Math.log(x) / Math.log(n);
+      const arrotonda = { round: Math.round, floor: Math.floor, ceil: Math.ceil }[name];
+      if (!arrotonda || !Number.isInteger(n) || Math.abs(n) > 15) throw new Error('fn2');
+      const f = Math.pow(10, n);
+      return arrotonda(x * f) / f;
+    }
     function applyConst(name) {
       if (name === 'pi') return Math.PI;
       if (name === 'e') return Math.E;
