@@ -303,3 +303,37 @@ test('riquadro srcdoc e riquadro di un altro sito con un riquadro dentro: un ges
     await gestiDelMouse(app, page);
   }
 });
+
+// Chromium segnala il Ctrl+rotella anche quando Filo l'ha già preso: uno scatto
+// deve valere un passo solo, e quello che nessuno prende deve valere lo stesso.
+const scatto = (verso) => ({ type: 'mouseWheel', x: 300, y: 300, deltaX: 0, deltaY: 120 * verso, wheelTicksY: verso, canScroll: true, modifiers: ['control'] });
+const casiScatto = {
+  'una pagina qualunque': () => PAGINA,
+  'il contenuto in un riquadro di un altro sito': (s) => `<!doctype html><html><body style="margin:0">
+    <iframe src="${s.html(`<!doctype html><html><body style="margin:0;height:3000px">contenuto</body></html>`).replace('127.0.0.1', 'localhost')}"
+      style="border:0;width:100vw;height:100vh;display:block"></iframe></body></html>`,
+  'un documento riscritto che si prende la rotella prima di Filo': () => PAGINA,
+};
+for (const [nome, html] of Object.entries(casiScatto)) {
+  test(`uno scatto di Ctrl+rotella vale un passo solo: ${nome}`, async ({ app, openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, html(testServer));
+    if (nome.startsWith('un documento riscritto')) {
+      await page.evaluate(() => {
+        document.open();
+        document.write('<!doctype html><html><body style="height:4000px"><scr' + 'ipt>window.addEventListener("wheel", e => e.stopImmediatePropagation(), { capture: true, passive: false });</scr' + 'ipt><h1>riscritta</h1></body></html>');
+        document.close();
+      });
+    }
+    await page.waitForTimeout(800);
+    await page.mouse.click(300, 300);
+    for (const [verso, min, max] of [[1, 101, 115], [-1, 86, 99]]) {
+      await premi(app, page, '0');
+      await expect.poll(async () => percentOf(app, page)).toBe(100);
+      await manda(app, page, [scatto(verso)]);
+      await page.waitForTimeout(700);
+      const p = await percentOf(app, page);
+      expect(p, `uno scatto ${verso > 0 ? 'in su' : 'in giù'}`).toBeGreaterThanOrEqual(min);
+      expect(p, `uno scatto ${verso > 0 ? 'in su' : 'in giù'}`).toBeLessThanOrEqual(max);
+    }
+  });
+}

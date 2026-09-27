@@ -15,7 +15,11 @@ dove il sito non arriva, o ci arriva solo per chiedere:
   (prima degli script della pagina), e **rimessi** quando il documento cambia
   radice, perché `document.open` cancella gli ascoltatori della finestra
   insieme ai suoi. Quello che arriva comunque a Chromium senza che nessuno
-  l'abbia preso esce da `zoom-changed`, e il main lo gira alla stessa porta.
+  l'abbia preso esce da `zoom-changed`, e il main lo gira al preload su un
+  canale suo (`filo:zoom-rotella`). Chromium lo segnala anche quando il preload
+  l'ha già preso, e a volte due volte nello stesso istante: il preload lo scarta
+  se ha preso una rotella nell'ultimo secondo, e ne tiene uno per scatto
+  (uno scatto valeva due passi, #686.1 giro 2).
 - **Nei riquadri incorporati** il preload non zooma e non disegna: passa il
   gesto al main (`filo:zoom-gesto`), che accetta solo gesti di forma nota e
   solo da un sottoframe della stessa scheda, e li gira al frame principale. Lo

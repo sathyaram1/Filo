@@ -113,6 +113,8 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   // scriveva un «25» che valeva come battuto, e poi toglieva il fuoco).
   const campo = { valore: '100', fresco: false };
   let inModifica = false;
+  // Quando Filo ha preso l'ultima rotella: la segnalazione di Chromium che segue è un'eco.
+  let rotellaPresa = 0;
 
   function currentPercent() {
     try { return Math.round(webFrame.getZoomFactor() * 100); }
@@ -468,10 +470,26 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     });
   }
 
+  // Ctrl+rotella visto da Chromium: vale solo se nessuno qui l'ha preso, e una
+  // volta per scatto (la segnalazione può arrivare doppia nello stesso istante).
+  // Il gesto di un riquadro arriva per un'altra strada e può passare dopo: si aspetta un poco.
+  if (pageZoom) {
+    let ultimaSegnalazione = 0;
+    ipc.on('filo:zoom-rotella', (_e, verso) => {
+      if (verso !== 'in' && verso !== 'out') return;
+      const ora = Date.now();
+      const prima = rotellaPresa;
+      if (ora - prima < 1000 || ora - ultimaSegnalazione < 30) return;
+      ultimaSegnalazione = ora;
+      setTimeout(() => { if (rotellaPresa === prima) eseguiZoom({ verso }); }, 80);
+    });
+  }
+
   // I gesti fatti dentro un riquadro incorporato, girati qui dal main.
   ipc.on('filo:zoom-gesto', (_e, g) => {
     const gesto = Z ? Z.gestoValido(g) : null;
     if (!gesto) return;
+    if (gesto.tipo === 'rotella' || gesto.tipo === 'ctrl') rotellaPresa = Date.now();
     if (gesto.tipo === 'medio') toggle();
     else if (gesto.tipo === 'esci') exit();
     else if (gesto.tipo === 'rotella') { if (zoomMode) passoModalita(gesto.dy); }
