@@ -2,7 +2,7 @@
 // e verify-local.mjs del ramo lanciato su quel repo. Serve alle prove giro1-* di questa cartella.
 
 import { execFile, execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, rmSync, rmdirSync } from 'node:fs';
 import http from 'node:http';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
