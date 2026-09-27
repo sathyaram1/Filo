@@ -137,10 +137,10 @@ test('riapertura non riuscita: il testo resta e il secondo tentativo passa', asy
   const invia = card.locator('.bd-reopen-actions button', { hasText: 'Invia' });
   await expect(invia).toBeEnabled();
 
-  // Secondo tentativo: passa. Il fix esce dalla bacheca (è tornato in
-  // lavorazione), che è il modo in cui chi riapre vede che è arrivata.
+  // Secondo tentativo: passa, e la scheda resta lì a dirlo (#678.1): prima
+  // spariva senza una parola e chi aveva pagato doveva indovinare.
   await invia.click();
-  await expect(page.locator('.bd-card')).toHaveCount(0, { timeout: 10_000 });
+  await expect(card.locator('.bd-reopen-ok')).toContainText('Segnalazione inviata', { timeout: 10_000 });
   const tentativi = await page.evaluate(() => window.__tentativi.slice());
   expect(tentativi, 'la stessa spiegazione, mandata due volte').toEqual([testo, testo]);
 });
