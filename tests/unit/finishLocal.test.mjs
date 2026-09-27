@@ -183,9 +183,67 @@ describe('la guardia sul ramo rimasto indietro (caso #500)', () => {
     const nota = behindMainNota(31);
     assert.match(nota, /31 commit/);
     assert.match(nota, /npm run finish/, 'la nota dice dove quel ramo indietro fermerebbe davvero');
+    assert.match(nota, /conflitto/, 'e che fermerebbe solo su un conflitto');
     assert.equal(behindMainNota(0), '');
     assert.equal(behindMainNota('fatal'), '');
-    assert.match(SORGENTE, /behindMainStop\(behind, \{ checkOnly \}\)/, 'la chiamata vera passa la modalità');
+    assert.match(SORGENTE, /behindMainStop\(behind, \{ checkOnly, prova \}\)/, 'la chiamata vera passa la modalità e la prova');
+  });
+
+  // Con le routine accese main si muove di continuo: fermarsi per un ramo solo indietro non chiudeva mai.
+  test('ramo indietro senza conflitto → prosegue con una nota; con un conflitto → fermo, coi file', () => {
+    assert.equal(behindMainStop(12, { prova: { conflitti: [] } }), '');
+    assert.match(behindMainNota(12, { checkOnly: false }), /12 commit[\s\S]*non va in conflitto: proseguo/);
+    const fermo = behindMainStop(12, { prova: { conflitti: ['src/a.js', 'docs/b c.md'] } });
+    assert.match(fermo, /12 commit[\s\S]*conflitto su:\n {2}· src\/a\.js\n {2}· docs\/b c\.md/);
+    assert.match(fermo, /verify-local\.mjs start/);
+    // Senza prova (git vecchio o prova fallita) ci si ferma come prima, e lo si dice.
+    const vecchio = behindMainStop(12, { prova: { motivo: 'git version 2.30.1 non sa provarla' } });
+    assert.match(vecchio, /12 commit/);
+    assert.match(vecchio, /2\.30\.1 non sa provarla[\s\S]*Mi fermo/);
+  });
+
+  test('la versione di git e l\'uscita di merge-tree si leggono giuste', async () => {
+    const { gitSaProvareFusione, leggiMergeTree } = await import('../../scripts/finish-local.mjs');
+    assert.equal(gitSaProvareFusione('git version 2.44.0.windows.1'), true);
+    assert.equal(gitSaProvareFusione('git version 2.38.0'), true);
+    assert.equal(gitSaProvareFusione('git version 2.37.9'), false);
+    assert.equal(gitSaProvareFusione('git version 3.0.0'), true);
+    assert.equal(gitSaProvareFusione(''), false);
+    assert.deepEqual(leggiMergeTree(0, 'abc123\n'), { conflitti: [] });
+    assert.deepEqual(leggiMergeTree(1, 'abc123\nsrc/a.js\nsrc/a.js\nb.md\n\nmessaggi\n'), { conflitti: ['src/a.js', 'b.md'] });
+    assert.ok(leggiMergeTree(128, 'fatal').motivo);
+  });
+
+  test('su un repo vero: indietro senza conflitto non ferma, indietro con conflitto sì', async () => {
+    const { provaFusione } = await import('../../scripts/finish-local.mjs');
+    const dir = cartellaTemporanea('finish-ramo-indietro-');
+    const g = (...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const scrivi = (f, t) => writeFileSync(resolve(dir, f), t);
+    try {
+      g('init', '-q', '-b', 'main');
+      g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+      scrivi('comune.txt', 'uno\ndue\ntre\n'); scrivi('altro.txt', 'x\n');
+      g('add', '-A'); g('commit', '-qm', 'base');
+      g('checkout', '-q', '-b', 'claude/lavoro');
+      scrivi('comune.txt', 'uno\nDUE DEL RAMO\ntre\n'); g('commit', '-qam', 'ramo');
+      g('checkout', '-q', 'main');
+      scrivi('altro.txt', 'y\n'); g('commit', '-qam', 'main: altro file');
+      g('checkout', '-q', 'claude/lavoro');
+      const pulita = provaFusione('main', dir);
+      assert.deepEqual(pulita, { conflitti: [] });
+      assert.equal(behindMainStop(1, { prova: pulita }), '', 'un commit altrui su un altro file non ferma');
+      g('checkout', '-q', 'main');
+      scrivi('comune.txt', 'uno\nDUE DI MAIN\ntre\n'); g('commit', '-qam', 'main: stessa riga');
+      g('checkout', '-q', 'claude/lavoro');
+      const prima = g('rev-parse', 'HEAD');
+      const sporca = provaFusione('main', dir);
+      assert.deepEqual(sporca, { conflitti: ['comune.txt'] });
+      assert.match(behindMainStop(2, { prova: sporca }), /conflitto su:\n {2}· comune\.txt/);
+      assert.equal(g('rev-parse', 'HEAD'), prima, 'la prova non tocca il ramo');
+      assert.equal(g('status', '--porcelain'), '', 'né l\'albero');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test('la guardia sta PRIMA dei controlli, non dopo', () => {
