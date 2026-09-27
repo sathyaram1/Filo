@@ -195,7 +195,7 @@ export function rilanciaProveTolte(prove, shaPrima, root, { lancia = spawnSync, 
  * Tutto il controllo, per chi consegna: `{ ferma, testo }`. `shaPrima` è la base (baseDelConfronto).
  * Senza non si sa cosa è stato tolto: lo si dice e non si ferma (la verifica dopo rilancia la cartella).
  */
-export function controllaProveTolte({ shaPrima, root, log = console.log, lancia, prepara } = {}) {
+export function controllaProveTolte({ shaPrima, root, log = console.log, lancia, prepara, conPulizia = true, messi = 0 } = {}) {
   if (!SHA.test(String(shaPrima || ''))) {
     return { ferma: false, testo: 'Non so da che commit è partita la correzione: le prove del giro cancellate o cambiate non le rilancio.' };
   }
