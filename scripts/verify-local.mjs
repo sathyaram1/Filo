@@ -75,6 +75,7 @@ import { VERIFIER_SCOPE_FILE, verifierScope, perimetroNote } from './lib/verifie
 import {
   PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus, diffDopoLaVerifica as diffTraCommit,
 } from './lib/solo-tolte.mjs';
+import { testoPuliziaTroppoLarga } from './lib/prove-tolte.mjs';
 
 export { PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus };
 
