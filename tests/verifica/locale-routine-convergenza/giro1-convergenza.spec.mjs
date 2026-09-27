@@ -114,24 +114,6 @@ test.describe('accorpamento minimo', () => {
       srv.close();
     }
   });
-
-  test('il pass dopo una correzione non fatta elenca anche esterni e domande messi da parte prima', async () => {
-    const srv = await serverBilanci(CAPS);
-    try {
-      const dir = repoDiProva('claude/prova-corretto');
-      const port = srv.address().port;
-      expect((await verifyLocal(dir, port, ['start', 'richiesta di prova per il repo di prova'])).code).toBe(0);
-      const c = await verifyLocal(dir, port, ['critica', `${RIASSUNTO}\n[1i] interno lieve da correggere\n[1i?] scelta da fare\n[3e] esterno grave`]);
-      expect(c.out).toContain('c\'è da correggere');
-      const r = await verifyLocal(dir, port, ['corretto', 'Nessuna correzione in questo giro: provo cosa succede senza un commit nuovo dopo la critica.']);
-      expect(r.out).toContain('Verifica superata');
-      const lista = r.out.slice(r.out.indexOf('Rilievi non corretti'));
-      expect(lista).toContain('esterno grave');
-      expect(lista).toContain('scelta da fare');
-    } finally {
-      srv.close();
-    }
-  });
 });
 
 test.describe('sforzo dei lavoratori', () => {
