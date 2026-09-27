@@ -15,7 +15,7 @@ import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const {
   analizzaRighe, generaRapporto, trovaTranscript, slugProgetto, chiaveSicura,
-  famigliaPrezzo, rapportoVuoto, riassunto, PREZZI,
+  famigliaPrezzo, rapportoVuoto, riassunto, PREZZI, sommaSottoAgente,
 } = await import('../../scripts/session-report.mjs');
 
 const T = (s) => `2026-09-16T10:${s}.000Z`;
