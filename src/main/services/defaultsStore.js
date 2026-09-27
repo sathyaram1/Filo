@@ -217,6 +217,7 @@ function get() {
     safeBrowsingKey: getBuildSafeBrowsingKey(),
   };
 
+  let remoteReasons = [];
   if (remoteModels) {
     if (typeof remoteModels.provider === 'string' && remoteModels.provider) out.provider = remoteModels.provider;
     if (remoteModels.models && typeof remoteModels.models === 'object') {
@@ -248,6 +249,9 @@ function get() {
         .filter((x) => typeof x === 'string' && x.trim())
         .map((x) => x.trim());
     }
+    if (Array.isArray(remoteModels.excludedProviderReasons)) {
+      remoteReasons = remoteModels.excludedProviderReasons;
+    }
     if (typeof remoteModels.providerSort === 'string') {
       out.providerSort = remoteModels.providerSort.trim();
     }
@@ -259,6 +263,12 @@ function get() {
       }
     }
   }
+
+  // Il perché di ogni esclusione: sta in un campo a parte, così i client che
+  // leggono solo `excludedProviders` (array di nomi) restano compatibili.
+  out.excludedProviderReasons = typeof C.excludedProviderReasons === 'function'
+    ? C.excludedProviderReasons(out.excludedProviders, remoteReasons, C.DEFAULT_EXCLUDED_PROVIDER_REASONS)
+    : [];
 
   if (remoteSecrets) {
     if (remoteSecrets.apiKeys && typeof remoteSecrets.apiKeys === 'object') {
@@ -285,6 +295,7 @@ function getPublicForAdmin() {
     models: eff.models,
     modelRegistry: eff.modelRegistry,
     excludedProviders: eff.excludedProviders,
+    excludedProviderReasons: eff.excludedProviderReasons,
     providerSort: eff.providerSort,
     apiKeysPresent: {
       openrouter: Boolean(eff.apiKeys.openrouter),
@@ -348,6 +359,19 @@ async function update(partial, idToken) {
       .map((x) => x.trim());
     modelFields.excludedProviders = toFsValue(clean);
     modelMask.push('excludedProviders');
+  }
+  if (Array.isArray(partial.excludedProviderReasons)) {
+    const C = globalThis.SN_CONST || {};
+    const kinds = C.EXCLUDED_PROVIDER_KINDS || [];
+    const clean = partial.excludedProviderReasons
+      .filter((r) => r && typeof r.name === 'string' && r.name.trim())
+      .map((r) => ({
+        name: r.name.trim(),
+        kind: kinds.includes(r.kind) ? r.kind : '',
+        note: typeof r.note === 'string' ? r.note.trim() : '',
+      }));
+    modelFields.excludedProviderReasons = toFsValue(clean);
+    modelMask.push('excludedProviderReasons');
   }
   if (typeof partial.providerSort === 'string') {
     modelFields.providerSort = toFsValue(partial.providerSort.trim());

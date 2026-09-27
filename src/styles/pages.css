@@ -633,8 +633,22 @@ section:has(#dictList) .sn-spell-add-row {
 }
 
 .sn-excluded-row {
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) 140px minmax(0, 1.4fr) auto;
 }
+/* Intestazione da sola = lista vuota: sparisce, resta il bottone per aggiungere. */
+.sn-excluded-head:last-child { display: none; }
+/* Correzione suggerita di un nome che non copre nessun fornitore: un link nel messaggio, non un
+   altro bottone pieno nella riga. */
+.sn-excluded-guess {
+  background: none;
+  border: none;
+  padding: 0 0 0 6px;
+  font: inherit;
+  color: var(--sn-link);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sn-excluded-guess:hover { color: var(--sn-fg); }
 
 /* Censimento in sola lettura degli altri punti in cui Filo usa un modello: senza cornice, perché è
    un elenco e non una tabella di controlli. */

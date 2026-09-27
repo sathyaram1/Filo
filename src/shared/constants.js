@@ -645,18 +645,21 @@
       && (isProviderExcluded(p.name, [name]) || isProviderExcluded(p.slug, [name])));
   }
 
+  // Distanza di modifica con lo scambio di due lettere vicine contato come uno:
+  // è il refuso più comune («Novtia»).
   function editDistance(a, b) {
-    const prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
     for (let i = 1; i <= a.length; i++) {
-      let diag = prev[0];
-      prev[0] = i;
       for (let j = 1; j <= b.length; j++) {
-        const tmp = prev[j];
-        prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
-        diag = tmp;
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+          d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+        }
       }
     }
-    return prev[b.length];
+    return d[a.length][b.length];
   }
 
   // Il nome del catalogo più vicino a `name`, per suggerire la correzione di un
@@ -668,11 +671,14 @@
     let bestD = Infinity;
     for (const p of (Array.isArray(catalog) ? catalog : [])) {
       if (!p || typeof p.name !== 'string') continue;
-      const cand = normalizeProviderName(p.name);
-      // Confronta anche col prefisso della stessa lunghezza: «Novtia» è vicino
-      // alla forma base di «NovitaAI», non all'intero nome.
-      const d = Math.min(editDistance(n, cand), editDistance(n, cand.slice(0, n.length)) + 1);
-      if (d < bestD) { bestD = d; best = p.name; }
+      // Anche col prefisso lungo quanto il nome scritto: «Novtia» è vicino alla
+      // forma base di «NovitaAI», non all'intero nome.
+      for (const c of [p.name, p.slug]) {
+        const cand = normalizeProviderName(c);
+        if (!cand) continue;
+        const d = Math.min(editDistance(n, cand), editDistance(n, cand.slice(0, n.length)) + 1);
+        if (d < bestD) { bestD = d; best = p.name; }
+      }
     }
     return best && bestD <= Math.max(1, Math.floor(n.length / 3)) ? best : '';
   }
@@ -2500,10 +2506,15 @@
     REASONING_LEVELS,
     normalizeReasoning,
     DEFAULT_EXCLUDED_PROVIDERS,
+    EXCLUDED_PROVIDER_KINDS,
+    DEFAULT_EXCLUDED_PROVIDER_REASONS,
     normalizeProviderName,
     isProviderExcluded,
     missingExcludedProviders,
     providerIgnoreList,
+    excludedProviderReasons,
+    providerCoversCatalog,
+    closestCatalogProvider,
     PRODUCER_DIRECT_PROVIDERS,
     OPEN_WEIGHT_MODEL_FAMILIES,
     OPEN_WEIGHTS_SUBSTITUTES,

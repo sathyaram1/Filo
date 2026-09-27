@@ -291,6 +291,8 @@
     // Catalogo modelli di un provider recuperato dal main con le chiavi
     // predefinite (solo admin). { provider } → { ok, items: [{ id, label }] }
     DEFAULT_MODELS_LIST: 'default_models_list',
+    // Fornitori dello smistatore (solo admin): → { ok, items: [{ name, slug }] }
+    DEFAULT_PROVIDERS_LIST: 'default_providers_list',
 
     OPEN_HOME: 'open_home',
     GO_HOME: 'go_home',                             // naviga la scheda corrente alla home (filo://newtab/)
