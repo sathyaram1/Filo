@@ -800,8 +800,13 @@
     if (!RS) return;
     try {
       const r = await sendToMain({ type: SESSIONS_GET });
-      if (r && r.ok) reflectSessions(r);
-      else sessionsNonLette();
+      if (r && r.ok) {
+        reflectSessions(r);
+        // Una lettura riuscita smentisce l'avviso di una fallita prima (es. prima dell'accesso).
+        for (const el of [mgMaxSessionsMsg, mgPriorityAccountMsg, mgAccountsMsg]) {
+          if (el && el.textContent === SESSIONS_NON_LETTO) setSessionsMsg(el, '', null);
+        }
+      } else sessionsNonLette();
     } catch (_) {
       sessionsNonLette();
     }
