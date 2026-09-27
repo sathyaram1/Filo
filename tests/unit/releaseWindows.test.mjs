@@ -1,14 +1,14 @@
-// La metà Windows di release.yml: la bozza si pubblica solo se installer e manifesto ci sono.
+// La metà Windows di release.yml: la bozza si pubblica solo se installer e manifesto di aggiornamento ci sono.
 // Il passo di controllo si ESEGUE qui, con un `gh` finto: electron-builder può finire verde
 // senza aver caricato niente, e allora la versione uscirebbe senza il programma per Windows.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdtempSync, chmodSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
 import { dirname, join, resolve, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const YML = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
@@ -44,7 +44,7 @@ const haBash = spawnSync('bash', ['-c', 'true']).status === 0;
 
 /** Esegue il passo con un `gh` finto che elenca `allegati`; restituisce esito e riepilogo. */
 function eseguiControllo(allegati, { crlf = false, ghFallisce = false } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'filo-release-win-'));
+  const dir = cartellaTemporanea('filo-release-win-');
   try {
     const elenco = join(dir, 'elenco.txt');
     writeFileSync(elenco, allegati.map((a) => a + (crlf ? '\r\n' : '\n')).join(''));
