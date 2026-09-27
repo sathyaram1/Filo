@@ -39,6 +39,58 @@ function tieniAscoltatori(elenco, alCambio) {
   } catch (_) {}
 }
 
+// Un riquadro che la pagina riempie da sé (about:blank scritto, come negli
+// editor di testo ricco) non ha un preload suo: i suoi gesti li ascolta il
+// frame che lo contiene, con gli stessi ascoltatori (#686.1). Chi ha un preload
+// suo lo dice con `__filoZoomQui`, nel mondo isolato dove il sito non scrive.
+function haPreload(w) {
+  try { return w.__filoZoomQui === true; } catch (_) { return true; }
+}
+
+function vegliaRiquadri(elenco) {
+  const agganciati = new WeakMap();
+  function aggancia(w) {
+    if (!w || w === window) return;
+    let doc = null;
+    try { doc = w.document; } catch (_) { return; }
+    if (!doc || haPreload(w)) return;
+    let stato = agganciati.get(w);
+    if (!stato) {
+      const avvolti = elenco.map(([tipo, fn, o]) => [tipo, (e) => { if (!haPreload(w)) fn(e); }, o]);
+      avvolti.push(['pointerover', sopra, true]);
+      stato = { avvolti, doc: null, radice: null };
+      agganciati.set(w, stato);
+    }
+    for (const [tipo, fn, o] of stato.avvolti) {
+      try { w.addEventListener(tipo, fn, o); } catch (_) {}
+    }
+    if (stato.doc === doc) return;
+    stato.doc = doc;
+    stato.radice = doc.documentElement;
+    try {
+      new MutationObserver(() => {
+        if (doc.documentElement === stato.radice) return;
+        stato.radice = doc.documentElement;
+        aggancia(w);
+      }).observe(doc, { childList: true });
+    } catch (_) {}
+    try { for (const f of doc.querySelectorAll('iframe, frame')) guarda(f); } catch (_) {}
+  }
+  function guarda(el) {
+    try {
+      el.addEventListener('load', () => aggancia(el.contentWindow));
+      aggancia(el.contentWindow);
+    } catch (_) {}
+  }
+  // Il puntatore che entra in un riquadro passa prima dal suo elemento: è lì
+  // che lo si aggancia, anche se è nato o è stato riscritto dopo.
+  function sopra(e) {
+    const t = e && e.target;
+    if (t && (t.tagName === 'IFRAME' || t.tagName === 'FRAME')) aggancia(t.contentWindow);
+  }
+  return sopra;
+}
+
 module.exports = function setupWheelZoom(webFrame, opts) {
   if (!webFrame || typeof document === 'undefined') return;
   const pageZoom = !!(opts && opts.pageZoom);
