@@ -634,7 +634,7 @@ export function dueDaParteText(list) {
 
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
 export function codaText({ findings, derived, external, budgets, branch, instructions }) {
-  const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
+  const fmt = (l) => (Array.isArray(l) && l.length ? l.map((f) => rigaNumerata(f, ROUND.formatFinding)).join('\n') : '  (nessuno)');
   const b = bilanciResiduiText(budgets);
   // La coda non sta qui: arriva da quel file. Se manca, si dice dove doveva
   // essere e come si consegna, e basta.
