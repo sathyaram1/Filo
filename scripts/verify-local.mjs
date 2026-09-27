@@ -35,6 +35,11 @@
 //     Le quadre col livello dentro sono SEMPRE un rilievo, dovunque stiano
 //     nella riga: nel riassunto il livello si cita a parole («il livello 2»).
 //
+//   node scripts/verify-local.mjs pulizia
+//     Lo lancia chi ha registrato una critica che manda a correggere e mette
+//     rilievi da parte, SUBITO dopo: registra il commit che toglie SOLO le
+//     loro prove del giro. Da lì la consegna blocca ogni prova tolta rossa.
+//
 //   node scripts/verify-local.mjs corretto "<report della correzione>"
 //     Lo lancia chi ha corretto: chiude il giro e chiede un'altra verifica
 //     sul commit nuovo.
@@ -513,7 +518,7 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   }
   const messi = [prev.pending.derived, prev.pending.external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
   if (!messi) {
-    return { ok: false, reason: 'questo giro non ha messo da parte nessun rilievo: non c'è niente da pulire. Una prova del giro si toglie solo verde, insieme alla prova durevole che la sostituisce.' };
+    return { ok: false, reason: 'questo giro non ha messo da parte nessun rilievo: non c\'è niente da pulire. Una prova del giro si toglie solo verde, insieme alla prova durevole che la sostituisce.' };
   }
   if (Array.isArray(dirtyFiles) && dirtyFiles.length) return { ok: false, reason: dirtyTreeText(dirtyFiles, 'pulizia') };
   if (!controllo || !controllo.ok) return { ok: false, reason: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
@@ -1081,7 +1086,7 @@ const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.m
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2);
 
-  const USO = 'Comandi: start ["<richiesta>"] | critica "<rilievi coi livelli>" | corretto "<report>" | status';
+  const USO = 'Comandi: start ["<richiesta>"] | critica "<rilievi coi livelli>" | pulizia | corretto "<report>" | status';
   // L’aiuto si stampa e basta, DOVUNQUE stia nella riga. Chiedere aiuto a uno
   // strumento è il primo gesto di chi verifica, e qui era l’unico posto dove
   // al posto dell’aiuto partiva l’azione: `start --help` apriva il giro per
@@ -1281,6 +1286,26 @@ if (isMain) {
     process.exit(0);
   }
 
+  if (cmd === 'pulizia') {
+    if (rest.length) {
+      console.error('«pulizia» non vuole argomenti: non ho toccato niente. Guarda il commit che hai appena fatto.');
+      process.exit(1);
+    }
+    const aperto = readState()[branch];
+    const statoP = statoDirectory(ROOT);
+    if (!statoP.ok) { console.error(statoIllegibileText(statoP.motivo)); process.exit(1); }
+    const { controllaPulizia } = await import('./lib/prove-tolte.mjs');
+    const controllo = aperto && aperto.pending && !statoP.lines.length
+      ? controllaPulizia({ shaCritica: aperto.pending.sha, root: ROOT, cartella: cartellaProveGiro(branch) })
+      : null;
+    const r = withPulizia(readState(), branch, { controllo, dirtyFiles: statoP.lines });
+    if (!r.ok) { console.error(r.reason); process.exit(1); }
+    writeState(r.state);
+    console.log(`Pulizia registrata su ${sha.slice(0, 8)}: ${r.files.length === 1 ? 'tolta 1 prova' : `tolte ${r.files.length} prove`} dei rilievi messi da parte.`);
+    console.log('Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, se com'era è ancora rossa, la ferma.');
+    process.exit(0);
+  }
+
   if (cmd === 'corretto') {
     const report = rest.join(' ').trim();
     // Anche di qui si esce con un verdetto (a rilievi minori, il lavoro
@@ -1295,10 +1320,10 @@ if (isMain) {
     const statoC = statoDirectory(ROOT);
     if (!statoC.ok) { console.error(statoIllegibileText(statoC.motivo, 'consegna')); process.exit(1); }
     const aperto = readState()[branch];
-    if (aperto && aperto.verdict === 'fix-pending' && aperto.pending && aperto.pending.sha && aperto.pending.sha !== sha && !statoC.lines.length) {
-      const { controllaProveTolte } = await import('./lib/prove-tolte.mjs');
-      const messiDaParte = [aperto.pending.derived, aperto.pending.external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
-      const tolte = controllaProveTolte({ shaPrima: aperto.pending.sha, root: ROOT, messiDaParte });
+    if (aperto && aperto.verdict === 'fix-pending' && aperto.pending && aperto.pending.sha && !statoC.lines.length) {
+      const { controllaProveTolte, baseDelConfronto } = await import('./lib/prove-tolte.mjs');
+      const base = baseDelConfronto(aperto.pending.sha, aperto.pending.shaPulizia, ROOT);
+      const tolte = base !== sha ? controllaProveTolte({ shaPrima: base, root: ROOT }) : { ferma: false, testo: '' };
       if (tolte.ferma) { console.error(tolte.testo); process.exit(1); }
       if (tolte.testo) console.log(tolte.testo);
     }
