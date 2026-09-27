@@ -75,7 +75,7 @@ import { VERIFIER_SCOPE_FILE, verifierScope, perimetroNote } from './lib/verifie
 import {
   PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus, diffDopoLaVerifica as diffTraCommit,
 } from './lib/solo-tolte.mjs';
-import { testoPuliziaTroppoLarga } from './lib/prove-tolte.mjs';
+import { numeraRilievi, rigaNumerata, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
 
 export { PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus };
 
@@ -392,6 +392,7 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
   }
   const parsed = ROUND.parseFindings(critique);
   const decision = ROUND.decideRound({ findings: parsed.findings, caps, counts: prev.counts || {} });
+  for (const k of ['fix', 'derived', 'external']) decision[k] = numeraRilievi(parsed.findings, decision[k]);
   const outcome = decision.stop ? 'stop' : decision.fix.length ? 'fix' : 'pass';
   const when = at || new Date().toISOString();
   const entry = {
@@ -525,14 +526,15 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   if (prev.verdict !== 'fix-pending' || !prev.pending) {
     return { ok: false, reason: 'nessun giro di correzione aperto su questo ramo: la pulizia si fa subito dopo una critica che manda a correggere, prima della correzione.' };
   }
-  const messi = [prev.pending.derived, prev.pending.external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
-  if (!messi) {
+  const parte = [prev.pending.derived, prev.pending.external].flatMap((l) => (Array.isArray(l) ? l : []));
+  if (!parte.length) {
     return { ok: false, reason: 'questo giro non ha messo da parte nessun rilievo: non c\'è niente da pulire. Una prova del giro si toglie solo verde, insieme alla prova durevole che la sostituisce.' };
   }
   if (Array.isArray(dirtyFiles) && dirtyFiles.length) return { ok: false, reason: dirtyTreeText(dirtyFiles, 'pulizia') };
   if (!controllo || !controllo.ok) return { ok: false, reason: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
-  const troppe = testoPuliziaTroppoLarga(controllo.files, messi);
-  if (troppe) return { ok: false, reason: troppe };
+  const numeri = numeraRilievi(ROUND.parseFindings(prev.critique || '').findings, parte).map((f) => f.n);
+  const fuori = testoPuliziaFuoriNumero(controllo, numeri);
+  if (fuori) return { ok: false, reason: fuori };
   s[branch] = { ...prev, pending: { ...prev.pending, shaPulizia: controllo.sha } };
   return { ok: true, state: s, files: controllo.files };
 }
@@ -614,7 +616,7 @@ export function codaDalServer(testoServer) {
  */
 export function derivatiText(list) {
   if (!Array.isArray(list) || !list.length) return '  (nessuno)';
-  return list.map((f) => `${ROUND.formatFinding(f)}\n  → feedback a parte, priorità ${Number.isFinite(Number(f.priority)) ? Number(f.priority) : Number(f.level) || 0}${f.sede === 'e' ? ' (esterno: non tocca a questo lavoro)' : ' (interno, messo da parte)'}`).join('\n');
+  return list.map((f) => `${rigaNumerata(f, ROUND.formatFinding)}\n  → feedback a parte, priorità ${Number.isFinite(Number(f.priority)) ? Number(f.priority) : Number(f.level) || 0}${f.sede === 'e' ? ' (esterno: non tocca a questo lavoro)' : ' (interno, messo da parte)'}`).join('\n');
 }
 
 /** I bilanci residui in una riga («cap3: n giri residui su m · …»), vuota senza bilanci. PURA. */
@@ -1169,7 +1171,7 @@ if (isMain) {
     if (!statoP.ok) { console.error(statoIllegibileText(statoP.motivo)); process.exit(1); }
     const { controllaPulizia } = await import('./lib/prove-tolte.mjs');
     const controllo = aperto && aperto.pending && !statoP.lines.length
-      ? controllaPulizia({ shaCritica: aperto.pending.sha, root: ROOT, cartella: cartellaProveGiro(branch) })
+      ? controllaPulizia({ shaCritica: aperto.pending.sha, root: ROOT, cartella: cartellaProveGiro(branch), avvio: aperto.requestedSha })
       : null;
     const r = withPulizia(readState(), branch, { controllo, dirtyFiles: statoP.lines });
     if (!r.ok) { console.error(r.reason); process.exit(1); }
@@ -1199,7 +1201,7 @@ if (isMain) {
       const base = baseDelConfronto(aperto.pending.sha, aperto.pending.shaPulizia, ROOT);
       const messi = [aperto.pending.derived, aperto.pending.external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
       const tolte = base !== sha
-        ? controllaProveTolte({ shaPrima: base, root: ROOT, conPulizia: base !== aperto.pending.sha, messi })
+        ? controllaProveTolte({ shaPrima: base, root: ROOT, conPulizia: base !== aperto.pending.sha, messi, shaCritica: aperto.pending.sha })
         : { ferma: false, testo: '' };
       if (tolte.ferma) { console.error(tolte.testo); process.exit(1); }
       if (tolte.testo) console.log(tolte.testo);
