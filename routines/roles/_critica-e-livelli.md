@@ -37,7 +37,7 @@ serve, e costa.
 Accertati che ogni rilievo sia reale: se hai un dubbio, verificalo prima di
 scriverlo. Se sei in dubbio sul livello, scegli il più basso.
 
-### La sede: interno o esterno
+### La sede: interno, vicino o esterno
 
 **Interno** (`i`) se una delle due:
 
@@ -49,20 +49,37 @@ scriverlo. Se sei in dubbio sul livello, scegli il più basso.
   Prima di scrivere `i` per questo motivo lo controlli sul codice, non a
   intuito: `git diff origin/main...HEAD -- <file>` sul punto che hai davanti.
 
+**Vicino** (`v`): il difetto NON è di questo lavoro (per il resto sarebbe
+esterno), ma sta in un file che il ramo modifica già. Lo controlli sul codice:
+il file è nell'elenco di `git diff --name-only origin/main...HEAD`. Se c'è, è
+`v`; se non c'è, è `e`.
+
 **Esterno** (`e`) tutto il resto: un difetto che c'era già su `main` fuori
-dallo scenario; un'altra porta della stessa classe che la segnalazione non
-nominava; un difetto in qualcosa che il ramo ha aggiunto oltre il chiesto
-(l'aggiunta resta, il suo difetto va in un feedback suo: non si disfa il
-lavoro fatto).
+dallo scenario, in un file che il ramo non tocca; un'altra porta della stessa
+classe che la segnalazione non nominava; un difetto in qualcosa che il ramo ha
+aggiunto oltre il chiesto (l'aggiunta resta, il suo difetto va in un feedback
+suo: non si disfa il lavoro fatto).
 
-La sede non cambia il livello: un 3 esterno resta un 3. Il giro continua solo
-per i rilievi interni; ogni esterno esce subito in un feedback suo, con la
-priorità uguale al livello, e non ferma questo lavoro — nemmeno col `?`: la
-domanda viaggia nel suo feedback.
+La sede non cambia il livello che scrivi: un 3 esterno resta un 3, un 3 vicino
+resta un 3. Cambia come conta nel giro:
 
-**Il segno `?`** dopo la lettera (`[2i?]`, `[1e?]`) dice che il rilievo chiede
-una decisione dell'owner: un trade-off vero, una scelta di prodotto o di
-gusto. Un difetto non chiede decisioni.
+- gli **interni** decidono il giro, col loro livello;
+- i **vicini** contano come livello 0, qualunque livello porti scritto: se il
+  giro corregge comunque qualcosa si correggono insieme (il file è già
+  aperto); da soli fanno partire una correzione solo come farebbe un rilievo
+  di livello 0; se restano fuori escono col livello che hai scritto;
+- ogni **esterno** esce subito in un feedback suo, con la priorità uguale al
+  livello, e non ferma questo lavoro — nemmeno col `?`: la domanda viaggia nel
+  suo feedback.
+
+Quello che il giro non corregge (interni messi da parte dal bilancio, vicini
+non corretti) esce insieme in UN feedback solo, a priorità uguale al livello
+scritto più alto fra loro. Restano separati, uno per rilievo, gli esterni e
+ogni rilievo col `?`.
+
+**Il segno `?`** dopo la lettera (`[2i?]`, `[1v?]`, `[1e?]`) dice che il
+rilievo chiede una decisione dell'owner: un trade-off vero, una scelta di
+prodotto o di gusto. Un difetto non chiede decisioni.
 
 | segnalazione e rilievo | livello e sede |
 |---|---|
@@ -72,6 +89,7 @@ gusto. Un difetto non chiede decisioni.
 | stessa segnalazione: un collegamento scritto in chat porta fuori i dati con un gesto normale | 3e |
 | «il timer non suona»: chiesto a parole, Filo dice che la manopola del volume — aggiunta dalla correzione — non esiste | 1i |
 | stessa segnalazione: la pagina Preferenze aperta in un'altra scheda cancella le modifiche fatte altrove (c'era già su `main`, per tutte le pagine) | 2e |
+| stessa segnalazione: nella pagina del timer, che il ramo modifica, l'etichetta del secondo allarme è tagliata (c'era già su `main`) | 1v |
 | si scrive nelle chiavi SSH con un solo OK, sul cammino della segnalazione | 3i |
 | la finestra ridimensionata a menu aperto non fa rientrare il menu, fuori dallo scenario | 0e |
 
@@ -109,6 +127,7 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
     Passi: apri l'editor, lascia il titolo vuoto, scrivi, premi Salva: il file non compare.
     Con la scorciatoia di salvataggio, uguale.
 [2e] La pagina Preferenze aperta in due schede cancella le modifiche fatte nell'altra: c'era già su main, per tutte le pagine.
+[1v] Nell'editor, che il ramo modifica, il contatore delle parole conta due volte le parole col trattino: c'era già su main.
 [1i?] Il bordo del riquadro è grigio freddo: caldo come il resto di Filo? Scelta di gusto.
 [0i] Con la finestra sotto i 300 pixel il menu esce dallo schermo.
 ```
