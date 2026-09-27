@@ -97,14 +97,14 @@ function fsDocToObject(doc) {
   return out;
 }
 
-// Legge un documento Firestore. Ritorna l'oggetto, {} se 404 (non esiste
-// ancora), oppure null se la lettura non è consentita/è fallita (403/altro).
 // Legge un documento DICENDO com'è andata, non solo cosa ha portato (#679).
 // «Non esiste» e «non ti riguarda» sono risposte definitive del server; «non
 // ho potuto chiedere» no, e chi tiene una copia in memoria deve distinguerle:
 // contare un tentativo fallito come una lettura fatta lascia Filo con la
 // configurazione che non ha fino alla scadenza lunga.
-async function leggiDoc(docPath, idToken) {
+// `tokenMancato`: chi usa Filo è dentro ma la sessione non ha dato il token, e
+// il «non ti riguarda» detto a un anonimo non parla di lui (#679.2).
+async function leggiDoc(docPath, idToken, { tokenMancato = false } = {}) {
   const url = `${FIRESTORE_BASE}/${docPath}?key=${API_KEY}`;
   const headers = {};
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
@@ -115,7 +115,7 @@ async function leggiDoc(docPath, idToken) {
     return { risposto: false, doc: null }; // offline o rete giù → usa i fallback
   }
   if (res.status === 404) return { risposto: true, doc: {} };
-  if (res.status === 401 || res.status === 403) return { risposto: true, doc: null };
+  if (res.status === 401 || res.status === 403) return { risposto: !tokenMancato, doc: null };
   if (!res.ok) return { risposto: false, doc: null };
   try {
     const json = await res.json();
@@ -143,16 +143,28 @@ function isAdminUser() {
 // `config/secrets` si legge SOLO da admin (#581): per tutti gli altri le chiavi
 // sono quelle incastonate dal build, e questo documento non si tocca affatto.
 async function refresh() {
+  // Letto PRIMA del token: un rinnovo che fallisce chiude la sessione, e dopo
+  // l'owner sembrerebbe uno qualunque.
+  const admin = isAdminUser();
+  let dentro = false;
+  try { dentro = Boolean(auth.isSignedIn()); } catch (_) {}
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
+  const tokenMancato = (admin || dentro) && !idToken;
 
-  const models = await leggiDoc(MODELS_DOC, idToken);
+  const models = await leggiDoc(MODELS_DOC, idToken, { tokenMancato });
   if (models.doc) remoteModels = models.doc;
   let risposto = models.risposto;
 
-  if (idToken && isAdminUser()) {
+  if (admin && !idToken) {
+    // Owner senza token: le sue chiavi non si sono potute chiedere. Si tiene
+    // l'ultima copia (la serve `get()` solo se admin c'è) e si riprova presto:
+    // spegnerla faceva pagare la chiave del build per mezz'ora (#679.2).
+    risposto = false;
+  } else if (admin) {
     const secrets = await leggiDoc(SECRETS_DOC, idToken);
-    if (secrets.doc) remoteSecrets = secrets.doc;
+    // Il «non ti riguarda» detto a un token vero è definitivo, e spegne la copia.
+    if (secrets.risposto) remoteSecrets = secrets.doc;
     risposto = risposto && secrets.risposto;
   } else {
     // Chi non è admin non ha override; il cancello che conta sta in `get()`,
@@ -378,7 +390,13 @@ async function update(partial, idToken) {
     modelFields.providerSort = toFsValue(partial.providerSort.trim());
     modelMask.push('providerSort');
   }
-  if (modelMask.length) await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
+  if (modelMask.length) {
+    await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
+    // Il salvato entra subito nella copia: se la rilettura qui sotto non arriva,
+    // la schermata non deve tornare ai valori di prima (#679.2).
+    remoteModels = { ...(remoteModels || {}) };
+    for (const k of modelMask) remoteModels[k] = fromFsValue(modelFields[k]);
+  }
 
   // Doc segreti (chiavi). Scriviamo solo i campi presenti come stringa.
   //
@@ -408,7 +426,12 @@ async function update(partial, idToken) {
     secretFields.safeBrowsingKey = toFsValue(partial.safeBrowsingKey.trim());
     secretMask.push('safeBrowsingKey');
   }
-  if (secretMask.length) await patchDoc(SECRETS_DOC, secretFields, secretMask, idToken);
+  if (secretMask.length) {
+    await patchDoc(SECRETS_DOC, secretFields, secretMask, idToken);
+    const prima = remoteSecrets || {};
+    remoteSecrets = { ...prima, apiKeys: { ...(prima.apiKeys || {}), ...fromFsValue(secretFields.apiKeys || { mapValue: {} }) } };
+    if ('safeBrowsingKey' in secretFields) remoteSecrets.safeBrowsingKey = fromFsValue(secretFields.safeBrowsingKey);
+  }
 
   // La rilettura qui NON è un lusso: è ciò che rende immediata la modifica
   // sulla macchina di chi salva. La rilettura periodica è lenta apposta
