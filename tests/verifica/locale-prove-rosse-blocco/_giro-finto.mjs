@@ -70,6 +70,11 @@ export async function giroFinto() {
   const scrivi = (testo) => writeFileSync(join(dir, 'demo', 'stato.txt'), `${testo}\n`);
   const togli = (...lettere) => git('rm', '-q', ...lettere.map((l) => `tests/verifica/locale-demo/giro1-${l}.spec.mjs`));
   const commit = (msg) => { git('add', '-A'); git('commit', '-qm', msg); };
-  const chiudi = () => { server.close(); rmSync(dir, { recursive: true, force: true }); };
+  // Il collegamento a node_modules si toglie da solo, prima: la pulizia ricorsiva non deve mai seguirlo.
+  const chiudi = () => {
+    server.close();
+    try { rmdirSync(join(dir, 'node_modules')); } catch (_) { return; }
+    rmSync(dir, { recursive: true, force: true });
+  };
   return { dir, verify, scrivi, togli, commit, chiudi };
 }
