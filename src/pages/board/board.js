@@ -103,7 +103,7 @@
   // aspetta il browser, e se non riesce il perché, sulla scheda da cui è partito
   // (in testa se partito da «Accedi»). Vale solo l'ultimo accesso chiesto.
   let accessoSeq = 0;
-  let accessoInCorso = null;   // { seq, id } finché il browser non risponde
+  let accessoInCorso = null;   // { seq, id, dopo, poi } finché il browser non risponde
   let accessoFallito = null;   // frase per la testa
   // Form "Ancora rotto?" aperti e testo scritto dentro, per id: renderList()
   // ricostruisce tutte le schede da zero, e un ridisegno che arriva mentre
@@ -169,21 +169,21 @@
     }
   }
 
-  // Risolve true (accesso fatto), false (non riuscito: il perché è già in
-  // pagina) o null (superato da un accesso chiesto dopo: non tocca più a lui).
-  function accedi(id, dopo) {
+  // `poi(ok)` riprende il gesto a esito noto (il perché di un fallimento è già
+  // in pagina); un accesso superato da uno chiesto dopo non lo chiama.
+  function accedi(id, dopo, poi) {
     const seq = ++accessoSeq;
     for (const [altro, a] of avvisi) if (a.code === 'accesso') avvisi.delete(altro);
     if (id) avvisi.set(id, { testo: `Completa l'accesso nel browser: ${dopo}.`, code: 'accesso' });
-    accessoInCorso = { seq, id: id || null };
+    accessoInCorso = { seq, id: id || null, dopo, poi };
     accessoFallito = null;
     reflectAuth();
     renderList();
-    return sendToMain({ type: 'auth_signin' })
+    sendToMain({ type: 'auth_signin' })
       .catch(() => null)
       .then((r) => refreshAuth().then(() => r))
       .then((r) => {
-        if (seq !== accessoSeq) return null;
+        if (seq !== accessoSeq) return;
         accessoInCorso = null;
         const ok = !!(r && r.ok && signedIn && uid);
         if (id && avvisi.get(id)?.code === 'accesso') avvisi.delete(id);
@@ -193,12 +193,15 @@
           else accessoFallito = testo;
         }
         reflectAuth();
-        return ok;
+        if (poi) poi(ok); else renderList();
       });
   }
 
+  // «Riapri il browser» rilancia lo stesso accesso: il gesto che aspettava resta suo.
   bdSignIn.addEventListener('click', () => {
-    accedi(null).then((esito) => { if (esito !== null) renderList(); });
+    const c = accessoInCorso;
+    if (c) accedi(c.id, c.dopo, c.poi);
+    else accedi(null);
   });
 
   // ── Titolo SICURO di un miglioramento ───────────────────────────────────
@@ -420,8 +423,7 @@
     // dopo l'accesso riuscito, e solo quello, ricrea la scheda col form aperto.
     link.addEventListener('click', () => {
       if (!signedIn || !uid) {
-        accedi(fb._id, 'poi scrivi qui cosa non va').then((ok) => {
-          if (ok === null) return;
+        accedi(fb._id, 'poi scrivi qui cosa non va', (ok) => {
           if (ok) openReopenAfterLogin = fb._id;
           renderList();
           openReopenAfterLogin = null;
@@ -541,8 +543,7 @@
   // il retry richiama onVote con l'`fb` fresco preso dalla lista ricreata.
   function onVote(fb, vote, btn) {
     if (!signedIn || !uid) {
-      accedi(fb._id, 'poi il voto parte da solo').then((ok) => {
-        if (ok === null) return;
+      accedi(fb._id, 'poi il voto parte da solo', (ok) => {
         renderList();
         if (ok) {
           const freshFb = allFeedbacks.find((x) => x._id === fb._id) || fb;

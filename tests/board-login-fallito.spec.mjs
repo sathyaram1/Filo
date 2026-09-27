@@ -135,6 +135,18 @@ test('browser chiuso e voto ripremuto: vale l\'ultimo accesso, il primo non scri
   await expect(card(page).locator('.bd-vote-broken')).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('«Riapri il browser» in testa rilancia lo stesso accesso: il voto che aspettava parte lo stesso', async ({ openTab }) => {
+  const page = await apri(openTab);
+  await card(page).locator('.bd-vote-works').click();
+  await page.locator('#bdSignIn').click();
+  expect(await page.evaluate(() => window.__accessi.length)).toBe(2);
+  await expect(card(page).locator('.bd-card-msg')).toHaveText(/poi il voto parte da solo/);
+
+  await page.evaluate(() => window.__chiudiAccesso({ ok: false, code: 'sostituito', error: 'x' }, 0));
+  await page.evaluate(() => window.__chiudiAccesso({ ok: true }, 1));
+  await expect.poll(() => page.evaluate(() => window.__gesti.map((g) => g.vote))).toEqual(['works']);
+});
+
 test('aspetto: attesa e frase di errore in tema chiaro e scuro', async ({ openTab }) => {
   const page = await apri(openTab);
   for (const tema of ['light', 'dark']) {
