@@ -117,7 +117,11 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
   // prova si TOGLIE, e la risposta dice quali per numero (regola del
   // 23/09/2026). Chi le toglie cambia con l'esito: chi corregge se c'è una fase
   // 2, chi ha verificato se il lavoro passa.
-  assert.match(fix, /Prove del giro da TOGLIERE dal ramo, nello stesso commit della correzione/);
+  // Escono PRIMA di ogni correzione, in un commit registrato: da lì una prova rossa tolta ferma la consegna.
+  assert.match(fix, /Prove del giro da TOGLIERE adesso, PRIMA di ogni correzione/);
+  assert.match(fix, /--record-pulizia <id>/);
+  assert.doesNotMatch(fix, /nello stesso commit della correzione/);
+  assert.match(fix, /ancora rossa non si toglie e non si cambia mai/);
   assert.doesNotMatch(fix, /test\.fail\(true/, 'il marcatore non è più la strada principale');
   const passConFigli = verifierReplyText({
     outcome: 'pass',

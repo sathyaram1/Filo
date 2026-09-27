@@ -6,7 +6,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { preparaLancioElectron } from './schermo-virtuale.mjs';
-import { diffDopoLaVerifica, soloProveTolte } from '../verify-local.mjs';
+import { diffDopoLaVerifica, soloProveTolte } from './solo-tolte.mjs';
 
 const PROVE_GIRO = 'tests/verifica/';
 const SHA = /^[0-9a-f]{7,40}$/i;
