@@ -2420,6 +2420,7 @@
     else return;
     applyZoom();
   }
+  const ZOOM_TASTI = { '+': 'in', '=': 'in', '-': 'out', '_': 'out', 0: 'reset' };
   // Il tasto dello zoom non lo legge questa pagina: lo prende Filo prima di
   // tutti (src/preload/wheel-zoom.js) e lo consegna qui come evento, perché
   // l'editor scala il FOGLIO e non la finestra. Una strada sola su tutti i
