@@ -1,7 +1,6 @@
-// Il freno sulle scansioni: guarda la RICHIESTA che parte, non come è scritto il
-// comando che la fa. Una scansione di Firestore senza proiezione si ferma prima
-// della rete. Si installa da sé con firestore-auth; regole e casi nel pattern
-// `una-scansione-chiede-i-campi-che-usa-e-si-paga-una-volta.md`.
+// Il freno sulle scansioni: guarda la RICHIESTA che parte, non come è scritta, e
+// ferma prima della rete una scansione di Firestore senza proiezione. Si installa
+// da sé. Regole: patterns/una-scansione-chiede-i-campi-che-usa-e-si-paga-una-volta.md
 
 // Una query senza proiezione che porta via al massimo questi documenti, senza
 // cursore, non è una scansione: è una lettura mirata (il massimo di `seq`, i
