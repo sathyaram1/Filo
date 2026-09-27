@@ -13,7 +13,7 @@ function avvisoNellaFinestra(testo, { chiave } = {}) {
       // Una cornice che sta ancora caricando non ascolta ancora.
       if (!wc || wc.isDestroyed?.() || wc.isLoading?.()) continue;
       try {
-        wc.send('shell:toast', { text: testo, opts: { durationSec: 0 } });
+        wc.send('shell:toast', { text: testo, opts: chiave ? { durationSec: 0, key: chiave } : { durationSec: 0 } });
         dette++;
       } catch (_) {}
     }
