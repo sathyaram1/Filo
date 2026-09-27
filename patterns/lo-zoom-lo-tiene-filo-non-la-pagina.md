@@ -1,0 +1,45 @@
+# Lo zoom lo tiene Filo, non la pagina
+
+[← Tutti i pattern](../PATTERNS.md)
+
+**La regola.** Lo zoom di una scheda è dell'utente, e quello che lo muove sta
+dove il sito non arriva, o ci arriva solo per chiedere:
+
+- **I tasti** (Ctrl/Cmd + / - / 0) li prende il main in `before-input-event`
+  (`src/main/tabs/tabZoom.js`), prima del documento e di qualunque riquadro, e
+  li consegna al preload del frame principale su `filo:zoom-key`. Il preload
+  ha una porta sola (`eseguiZoom`) per tasti, barra dei menu, chat e tasto
+  destro, e lì sta l'eccezione dell'editor, che scala il foglio.
+- **Rotella e clic centrale** non hanno un gancio nel main (Electron 33), quindi
+  si ascoltano nel preload: solo eventi `isTrusted`, sulla finestra in cattura
+  (prima degli script della pagina), e **rimessi** quando il documento cambia
+  radice, perché `document.open` cancella gli ascoltatori della finestra
+  insieme ai suoi. Quello che arriva comunque a Chromium senza che nessuno
+  l'abbia preso esce da `zoom-changed`, e il main lo gira alla stessa porta.
+- **Nei riquadri incorporati** il preload non zooma e non disegna: passa il
+  gesto al main (`filo:zoom-gesto`), che accetta solo gesti di forma nota e
+  solo da un sottoframe della stessa scheda, e li gira al frame principale. Lo
+  stato della modalità rotella fa il giro inverso (`filo:zoom-modalita` →
+  `framesInSubtree`), perché il riquadro deve fermare la rotella e i clic.
+- **Il campo della percentuale** vale i tasti battuti dopo un clic vero nel
+  campo, mai il `value` che ha nel documento: il sito lo scrive anche col
+  comando di inserimento testo del browser, che conta come battuto. Si applica
+  su Invio, Tab o un clic fuori; un'uscita dal campo (blur) non applica niente,
+  perché la può fare anche il sito a metà numero.
+
+**Il caso.** #686 aveva chiuso tre porte una dopo l'altra (eventi finti, il
+marcatore «mi zoomo da solo» scritto dal sito, ascoltatori zittiti dal sito
+che si registrava prima). Al quarto giro ne sono uscite altre tre, tutte dalla
+stessa causa, gesti e campo che vivevano solo dentro la pagina (#686.1): il
+campo riempito con `execCommand('insertText')` e lasciato col blur portava la
+pagina dal 200% al 25%; un `document.open` spegneva Ctrl +/-/0, Ctrl+rotella e
+clic centrale; un clic dentro un riquadro incorporato portava i tasti dove il
+preload dello zoom non c'era, mentre dalla chat lo zoom lì funzionava.
+
+**Cosa resta.** Un sito che chiama `preventDefault` su Ctrl+rotella o sul clic
+centrale se li tiene (lo fa anche Chrome, ed è così che una mappa zooma se
+stessa); i tasti restano all'utente comunque. Il riquadro con la percentuale
+sta ancora nel documento: il sito può cambiarne l'aspetto, non il numero che
+viene applicato.
+
+Prove: `tests/zoom-fuori-dalla-pagina.spec.mjs`, `tests/unit/zoomPagina.test.mjs`.

@@ -32,6 +32,21 @@ async function percentOf(app, page) {
   return f == null ? null : Math.round(f * 100);
 }
 
+// I tasti come li manda il sistema: passano da dove passano quelli veri, prima
+// della pagina e di qualunque riquadro (Playwright li consegna al documento).
+async function premi(app, page, keyCode) {
+  const url = await page.evaluate(() => location.href);
+  await app.evaluate(({ webContents }, { u, keyCode }) => {
+    for (const wc of webContents.getAllWebContents()) {
+      let here = '';
+      try { here = wc.getURL(); } catch (_) {}
+      if (here !== u) continue;
+      wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers: ['control'] });
+      wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers: ['control'] });
+    }
+  }, { u: url, keyCode });
+}
+
 const modalita = (page) => page.evaluate(() => document.documentElement.dataset.filoZoomMode || '');
 
 test('il sito scrive nel campo col comando di inserimento testo ed esce: lo zoom resta quello dell\'utente', async ({ app, openTab, testServer }) => {
@@ -97,13 +112,13 @@ test('un sito che riscrive il proprio documento non spegne i gesti dello zoom', 
   });
   await page.locator('#t').click();
 
-  await page.keyboard.press('Control+=');
+  await premi(app, page, '=');
   await expect.poll(async () => percentOf(app, page)).toBeGreaterThan(100);
-  await page.keyboard.press('Control+0');
+  await premi(app, page, '0');
   await expect.poll(async () => percentOf(app, page)).toBe(100);
-  await page.keyboard.press('Control+-');
+  await premi(app, page, '-');
   await expect.poll(async () => percentOf(app, page)).toBeLessThan(100);
-  await page.keyboard.press('Control+0');
+  await premi(app, page, '0');
   await expect.poll(async () => percentOf(app, page)).toBe(100);
 
   await page.mouse.move(300, 300);
@@ -113,7 +128,7 @@ test('un sito che riscrive il proprio documento non spegne i gesti dello zoom', 
   await expect.poll(async () => percentOf(app, page)).toBeGreaterThan(100);
   const scroll = await page.evaluate(() => window.scrollY);
   expect(scroll, 'Ctrl+rotella zooma, non scorre').toBe(0);
-  await page.keyboard.press('Control+0');
+  await premi(app, page, '0');
   await expect.poll(async () => percentOf(app, page)).toBe(100);
 
   // Il clic centrale apre il riquadro, e lì la rotella zooma.
@@ -150,9 +165,9 @@ for (const [nome, stessoSito] of [['di un altro sito', false], ['dello stesso si
     await expect(frame.locator('#c')).toBeVisible();
     await frame.locator('#c').click();
 
-    await page.keyboard.press('Control+=');
+    await premi(app, page, '=');
     await expect.poll(async () => percentOf(app, page)).toBeGreaterThan(100);
-    await page.keyboard.press('Control+0');
+    await premi(app, page, '0');
     await expect.poll(async () => percentOf(app, page)).toBe(100);
 
     await page.mouse.move(300, 300);
@@ -160,7 +175,7 @@ for (const [nome, stessoSito] of [['di un altro sito', false], ['dello stesso si
     await page.mouse.wheel(0, -200);
     await page.keyboard.up('Control');
     await expect.poll(async () => percentOf(app, page)).toBeGreaterThan(100);
-    await page.keyboard.press('Control+0');
+    await premi(app, page, '0');
     await expect.poll(async () => percentOf(app, page)).toBe(100);
 
     // Il clic centrale sul contenuto apre il riquadro della scheda; la rotella
@@ -184,6 +199,9 @@ for (const [nome, stessoSito] of [['di un altro sito', false], ['dello stesso si
     await expect(page.locator('#__filo-zoom-badge')).toHaveCount(0);
 
     // Sul link il clic centrale resta quello del browser.
+    await premi(app, page, '0');
+    await expect.poll(async () => percentOf(app, page)).toBe(100);
+    await frame.locator('#l').scrollIntoViewIfNeeded();
     const box = await frame.locator('#l').boundingBox();
     await page.mouse.click(box.x + 5, box.y + 5, { button: 'middle' });
     await page.waitForTimeout(300);
