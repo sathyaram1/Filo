@@ -58,6 +58,6 @@ test('giri stretti: la stampa sta sotto la soglia, il ruolo è intero e il perim
     const raggiungibile = j.instructions.includes(segno)
       || file.some((f) => existsSync(f) && readFileSync(f, 'utf8').includes(segno));
     expect(raggiungibile, nome).toBe(true);
-    expect(s.length, nome).toBeLessThan(SOGLIA_STAMPA);
+    expect.soft(s.length, nome).toBeLessThan(SOGLIA_STAMPA);
   }
 });
