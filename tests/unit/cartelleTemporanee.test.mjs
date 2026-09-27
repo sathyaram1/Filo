@@ -89,11 +89,13 @@ function creaCollegamentoNegato(sorgente) {
 }
 
 test('la sentinella dei collegamenti riconosce ogni forma di node, e non la prosa', () => {
-  assert.equal(creaCollegamentoNegato("symlinkSync(a, b);"), true);
-  assert.equal(creaCollegamentoNegato("await symlink(a, b);"), true);
-  assert.equal(creaCollegamentoNegato("await fs.promises.symlink(a, b);"), true);
-  assert.equal(creaCollegamentoNegato("symlinkSync(a, b, 'junction');"), false);
-  assert.equal(creaCollegamentoNegato('// os.tmpdir() è un symlink (es. /tmp)'), false);
+  // Spezzati, o la sentinella qui sotto li troverebbe in questo file.
+  const S = 'sym' + 'link';
+  assert.equal(creaCollegamentoNegato(`${S}Sync(a, b);`), true);
+  assert.equal(creaCollegamentoNegato(`await ${S}(a, b);`), true);
+  assert.equal(creaCollegamentoNegato(`await fs.promises.${S}(a, b);`), true);
+  assert.equal(creaCollegamentoNegato(`${S}Sync(a, b, 'junction');`), false);
+  assert.equal(creaCollegamentoNegato(`// os.tmpdir() è un ${S} (es. /tmp)`), false);
 });
 
 test('nessun test crea un collegamento che Windows nega a chi non è amministratore', () => {
