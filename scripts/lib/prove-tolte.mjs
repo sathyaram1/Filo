@@ -78,9 +78,10 @@ export function baseDelConfronto(shaCritica, shaPulizia, root) {
 /**
  * Il commit della pulizia, fra la critica e HEAD: solo prove o casi TOLTI, tutti da una cartella del
  * giro (`cartella`, o una sola se non la si sa). Stessa regola di «dopo un verdetto si può solo togliere».
- * `{ ok, motivo, sha, files }`: `motivo` è già la frase per chi l'ha lanciata.
+ * `{ ok, motivo, sha, files, cancellate, cambiate, vecchie }`: `motivo` è già la frase per chi l'ha lanciata;
+ * `vecchie` (null senza `avvio`) sono le prove tolte che la verifica non ha né scritto né rinominato.
  */
-export function controllaPulizia({ shaCritica, root, cartella = '' } = {}) {
+export function controllaPulizia({ shaCritica, root, cartella = '', avvio = '' } = {}) {
   const critica = String(shaCritica || '');
   if (!SHA.test(critica)) return { ok: false, motivo: 'non so su che commit è stata registrata la critica: senza, non so cosa hai tolto.' };
   let head = '';
