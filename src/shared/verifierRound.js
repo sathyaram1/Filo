@@ -589,7 +589,7 @@
     const rest = findings.filter((f) => derived.includes(f)).map(conPriorita);
     let consume = null;
     if (fix.length) {
-      consume = capKeyOf(maxLevel(fix));
+      consume = capKeyOf(maxLevel(fix.map((f) => ({ level: effectiveLevel(f) }))));
       counts[consume.replace('cap', 'count')] += 1;
       budgets[consume].used += 1;
       budgets[consume].left = Math.max(0, budgets[consume].left - 1);
