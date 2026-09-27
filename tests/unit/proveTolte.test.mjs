@@ -1,15 +1,16 @@
 // Chi corregge non può cancellare una prova del giro ancora rossa: la consegna la rilancia e si ferma.
-// Playwright qui è finto: si guarda cosa viene rimesso, cosa viene lanciato e cosa decide la consegna.
+// Le prove dei rilievi messi da parte escono prima, nella pulizia. Playwright qui è finto.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { delimiter, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import {
-  proveTolte, percorsoRipristino, esitoProveTolte, controllaProveTolte, PREFISSO_RIPRISTINO,
+  proveTolte, percorsoRipristino, esitoProveTolte, controllaProveTolte, controllaPulizia, baseDelConfronto,
+  PREFISSO_RIPRISTINO,
 } from '../../scripts/lib/prove-tolte.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
