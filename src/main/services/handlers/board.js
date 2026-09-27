@@ -272,21 +272,20 @@ module.exports = function register(on, ctx) {
   }));
 
   // Legge SOLO il campo `votes` della scheda pubblica (GET singolo, proiezione
-  // mask) — più leggero di una lista intera per un solo documento. Ritorna {}
-  // se la scheda non ha ancora voti o in caso d'errore (best-effort: il
-  // chiamante ha comunque appena scritto il proprio voto).
+  // mask). {} = la scheda non ha voti; null = rilettura non riuscita, e la
+  // pagina tiene il conteggio che ha: un {} lì azzererebbe un voto già scritto.
   async function fetchVotes(id) {
-    if (!FB?.rest) return {};
+    if (!FB?.rest) return null;
     try {
       const url = `${FB.rest.FIRESTORE_BASE}/${FB.rest.VIEW_COLLECTION}/${encodeURIComponent(id)}` +
         `?mask.fieldPaths=votes&key=${FB.rest.API_KEY}`;
       const res = await fetch(url);
-      if (!res.ok) return {};
+      if (!res.ok) return null;
       const doc = await res.json();
       const obj = FB.fsDocToObject(doc);
       return (obj && typeof obj.votes === 'object' && obj.votes) || {};
     } catch (_) {
-      return {};
+      return null;
     }
   }
 };

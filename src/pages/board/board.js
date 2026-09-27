@@ -278,6 +278,11 @@
       if (avviso) card.appendChild(avviso);
       return card;
     }
+    // Appena riaperto è tornato in lavorazione anche lui: resta la conferma, non il voto.
+    if (riaperteOra.has(fb._id)) {
+      card.appendChild(renderReopen(fb));
+      return card;
+    }
 
     card.appendChild(renderVote(fb));
 
