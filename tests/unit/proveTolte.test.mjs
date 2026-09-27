@@ -49,6 +49,54 @@ test('una prova tolta ancora rossa ferma la consegna, sempre: niente eccezione p
   assert.deepEqual(esitoProveTolte({ rosse: [] }), { ferma: false, testo: '' });
 });
 
+test('senza pulizia registrata la consegna si ferma lo stesso, ma non racconta una pulizia che non c\'è stata', () => {
+  const rosse = ['tests/verifica/679/b.spec.mjs'];
+  const senza = esitoProveTolte({ rosse, shaPrima: 'abcdef1234567890', conPulizia: false, messi: 1 });
+  assert.equal(senza.ferma, true);
+  assert.doesNotMatch(senza.testo, /nel commit della pulizia/);
+  assert.match(senza.testo, /Nessuna pulizia è stata registrata/);
+  assert.match(senza.testo, /lasciala lì/);
+  const niente = esitoProveTolte({ rosse, shaPrima: 'abcdef1234567890', conPulizia: false, messi: 0 });
+  assert.equal(niente.ferma, true);
+  assert.doesNotMatch(niente.testo, /pulizia|messo da parte/);
+  assert.match(esitoProveTolte({ rosse, conPulizia: true }).testo, /nel commit della pulizia/);
+});
+
+test('la pulizia non toglie più prove dei rilievi messi da parte, contando anche quelle di una pulizia prima', () => {
+  assert.equal(testoPuliziaTroppoLarga(['tests/verifica/9/giro1-b.spec.mjs'], 1), '');
+  const due = testoPuliziaTroppoLarga(['tests/verifica/9/giro1-b.spec.mjs', 'tests/verifica/9/giro1-c.spec.mjs'], 1);
+  assert.match(due, /sono uscite 2 prove del giro, ma i rilievi messi da parte sono 1/);
+  assert.match(due, /giro1-c\.spec\.mjs/);
+  assert.notEqual(testoPuliziaTroppoLarga(['tests/verifica/9/a.spec.mjs'], 0), '');
+});
+
+test('in un repo vero la pulizia che toglie anche la prova rossa di un rilievo da correggere è respinta', () => {
+  const dir = cartellaTemporanea('pulizia-larga-');
+  const git = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  try {
+    git('init', '-q', '-b', 'main');
+    git('config', 'user.name', 'prova');
+    git('config', 'user.email', 'prova@example.invalid');
+    mkdirSync(resolve(dir, 'tests', 'verifica', '9'), { recursive: true });
+    for (const l of ['b', 'c']) writeFileSync(resolve(dir, 'tests', 'verifica', '9', `giro1-${l}.spec.mjs`), `// ${l}\n`);
+    git('add', '-A');
+    git('commit', '-qm', 'critica');
+    const critica = git('rev-parse', 'HEAD').trim();
+    git('rm', '-q', 'tests/verifica/9/giro1-b.spec.mjs');
+    git('commit', '-qm', 'pulizia');
+    const una = controllaPulizia({ shaCritica: critica, root: dir });
+    assert.equal(testoPuliziaTroppoLarga(una.files, 1), '');
+    // Una seconda pulizia si misura sempre dalla critica: le prove tolte si sommano.
+    git('rm', '-q', 'tests/verifica/9/giro1-c.spec.mjs');
+    git('commit', '-qm', 'pulizia 2');
+    const due = controllaPulizia({ shaCritica: critica, root: dir });
+    assert.equal(due.files.length, 2);
+    assert.notEqual(testoPuliziaTroppoLarga(due.files, 1), '');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 function repoConProve() {
   const dir = cartellaTemporanea('prove-tolte-');
   const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
