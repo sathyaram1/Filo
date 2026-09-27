@@ -208,3 +208,17 @@ test('l’indirizzo incollato col nome o come collegamento trova la persona, anc
   assert.equal(richieste.length, quante, 'senza un indirizzo non parte nessun regalo');
   assert.match(uso, /Uso: \/gift/);
 });
+
+// #679.3, secondo giro — due indirizzi incollati insieme: prima il regalo andava
+// al primo soltanto, senza dire che il secondo era rimasto fuori.
+test('con due indirizzi diversi nessun regalo parte e Filo li nomina tutti e due', async () => {
+  const riga = await comando('/gift 10 utente001@esempio.it, utente002@esempio.it');
+  assert.equal(richieste.filter((r) => r.type === MSG.OWNER_GIFT_CREDITS).length, 0);
+  assert.ok(riga.includes('utente001@esempio.it') && riga.includes('utente002@esempio.it'), riga);
+  const cerca = await comando('/users utente001@esempio.it utente002@esempio.it');
+  assert.equal(richieste.filter((r) => r.type === MSG.OWNER_LIST_USERS).length, 0);
+  assert.ok(cerca.includes('utente002@esempio.it'), cerca);
+  // Lo stesso indirizzo ripetuto, come lo incolla chi copia un collegamento, resta uno.
+  await comando('/gift 10 Utente001@esempio.it <mailto:utente001@esempio.it>');
+  assert.equal(richieste[richieste.length - 1].email.toLowerCase(), 'utente001@esempio.it');
+});
