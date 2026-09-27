@@ -3943,7 +3943,7 @@
         const finale = rawShortcut.split('+').map((p) => p.trim()).filter(Boolean).pop() || '';
         cfgShortcut.classList.add('ed-field-invalid');
         cfgShortcutTaken.textContent =
-          `Non riconosco il tasto «${finale}»: usa una lettera, una cifra o un nome come Space, Enter, Esc, Tab, Su, Giù, F1… (es. ${tasto('Ctrl+Shift+Space')}).`;
+          `Non riconosco il tasto «${finale}»: usa una lettera, una cifra o un nome come Spazio, Invio, Esc, Tab, Su, Giù, F1… (es. ${tasto('Ctrl+Shift+Spazio')}).`;
         cfgShortcutTaken.hidden = false;
         cfgShortcut.focus();
         return;

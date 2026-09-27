@@ -250,3 +250,54 @@ test('una scorciatoia modulo che Filo si prende prima viene rifiutata', async ({
   await page.click('#cfgSave');
   await expect(page.locator('#overlay')).toBeHidden();
 });
+
+// #545.1: un tasto speciale scritto per nome (Space, Up, Esc) o «Control» come
+// modificatore si salvavano e poi non scattavano mai, perché alla pressione il
+// tasto arrivava con un altro nome. I passi sono quelli dell'utente.
+const NOMI = [
+  { scritto: 'Ctrl+Space', premi: 'Control+Space' },
+  { scritto: 'Ctrl+Spazio', premi: 'Control+Space' },
+  { scritto: 'Ctrl+Up', premi: 'Control+ArrowUp' },
+  { scritto: 'Control+Shift+2', premi: 'Control+Shift+Digit2' },
+  // Su Windows Ctrl+Esc apre Start: lì il campo la rifiuta (prova sotto).
+  ...(process.platform === 'win32' ? [] : [{ scritto: 'Ctrl+Esc', premi: 'Control+Escape' }]),
+];
+for (const { scritto, premi } of NOMI) {
+  test(`la scorciatoia «${scritto}» salvata dall'Editor apre il modulo`, async ({ openTab }) => {
+    const page = await openTab(EDITOR);
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('#doc')).toBeVisible();
+
+    await enterSettingsMode(page);
+    await page.locator('.ed-module[data-type="word-count"]').click();
+    await page.fill('#cfgShortcut', scritto);
+    await page.click('#cfgSave');
+    await expect(page.locator('#overlay')).toBeHidden();
+    await exitSettingsMode(page);
+
+    await page.click('#doc');
+    await page.keyboard.press(premi);
+    await expect(page.locator('#overlay')).toBeVisible();
+    await expect(page.locator('#overlay')).toContainText(/parole/i);
+  });
+}
+
+test('un nome di tasto che Filo non riconosce viene rifiutato al salvataggio', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#doc')).toBeVisible();
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await page.fill('#cfgShortcut', 'Ctrl+Spazioo');
+  await page.click('#cfgSave');
+
+  await expect(page.locator('#cfgShortcutTaken')).toBeVisible();
+  await expect(page.locator('#cfgShortcutTaken')).toContainText('Spazioo');
+  await expect(page.locator('#cfgShortcut')).toHaveClass(/ed-field-invalid/);
+  await page.screenshot({ path: 'tests/.shots/audit-editor-shortcut-nome-sconosciuto.png' });
+
+  await page.fill('#cfgShortcut', 'Ctrl+Spazio');
+  await page.click('#cfgSave');
+  await expect(page.locator('#overlay')).toBeHidden();
+});
