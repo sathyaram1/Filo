@@ -45,8 +45,8 @@
     // Rimuovi un eventuale segno '=' finale (es. "2+2=")
     s = s.replace(/=\s*$/, '').trim();
 
-    // Whitelist caratteri ammessi
-    if (!/^[0-9+\-*/^%().\s a-zA-Z!]+$/.test(s)) return { ok: false };
+    // Whitelist caratteri ammessi (';' è solo il separatore messo qui sopra)
+    if (!/^[0-9+\-*/^%().;\s a-zA-Z!]+$/.test(s)) return { ok: false };
     // Deve "sembrare" matematica: almeno un operatore, fattoriale, funzione o costante
     const hasMathToken = /[+\-*/^%!]/.test(s)
       || /\b(sqrt|cbrt|sin|cos|tan|asin|acos|atan|log|ln|exp|abs|floor|ceil|round|pi|e)\b/i.test(s);
