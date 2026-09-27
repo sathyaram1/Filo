@@ -103,6 +103,14 @@
   // scrivi (i dati che finiscono di caricare, un voto che torna dal server, un
   // login) porterebbe via il form e quello che hai scritto.
   const bozzeRiapertura = new Map();
+  // #678.1 — l'esito di un gesto resta sulla sua scheda anche attraverso i
+  // ridisegni: un voto che non passa lo dice (id → { testo, code }); un fix
+  // tornato in lavorazione resta visibile col perché (`ritirate`); una
+  // riapertura riuscita resta in lista con la conferma finché non si ricarica
+  // (id → { saldo }), invece di sparire in silenzio come fa per listBoardTab.
+  const avvisi = new Map();
+  const ritirate = new Set();
+  const riaperteOra = new Map();
 
   function sendToMain(msg) {
     if (window.filo?.message)                return window.filo.message(msg);
@@ -122,6 +130,9 @@
       uid = (r && r.uid) || null;
     } catch (_) {
       signedIn = false; uid = null;
+    }
+    if (signedIn) {
+      for (const [id, a] of avvisi) if (a.code === 'auth') avvisi.delete(id);
     }
     reflectAuth();
   }
@@ -169,7 +180,7 @@
       ? { id: attivo.dataset.fbId, inizio: attivo.selectionStart, fine: attivo.selectionEnd }
       : null;
 
-    const items = MR.listBoardTab(allFeedbacks, { releasedVersion });
+    const items = schedeVisibili();
     bdLoading.hidden = true;
     if (bdError) bdError.hidden = true;
     rimuoviSentinella(); // il nodo vecchio sparisce con la lista: l'osservatore no
@@ -204,6 +215,42 @@
     }
   }
 
+  // Le schede della bacheca più quelle riaperte in questa visita: per
+  // listBoardTab una riapertura toglie il fix dalla lista, ma chi ha appena
+  // pagato deve vedere la conferma dove ha premuto Invia.
+  function schedeVisibili() {
+    if (!riaperteOra.size) return MR.listBoardTab(allFeedbacks, { releasedVersion });
+    const originale = new Map();
+    const sospese = allFeedbacks.map((fb) => {
+      if (!fb || !riaperteOra.has(fb._id)) return fb;
+      const copia = { ...fb, reopenRequests: null };
+      originale.set(copia, fb);
+      return copia;
+    });
+    return MR.listBoardTab(sospese, { releasedVersion }).map((x) => originale.get(x) || x);
+  }
+
+  // Un gesto rifiutato: la frase del main sulla scheda, e la pagina si mette in
+  // pari con quello che il rifiuto ha scoperto (sessione chiusa, fix ritirato).
+  function ricordaRifiuto(id, r, generico) {
+    const code = (r && r.code) || '';
+    const testo = (r && typeof r.error === 'string' && r.error.trim()) || generico;
+    avvisi.set(id, { testo, code });
+    if (code === 'gone') { ritirate.add(id); salvaCache(); }
+    if (code === 'auth') refreshAuth().then(() => renderList()).catch(() => {});
+    return testo;
+  }
+
+  function renderAvviso(id) {
+    const a = avvisi.get(id);
+    if (!a) return null;
+    const p = document.createElement('p');
+    p.className = 'bd-card-msg';
+    p.setAttribute('role', 'alert');
+    p.textContent = a.testo;
+    return p;
+  }
+
   function renderCard(fb) {
     const card = document.createElement('div');
     card.className = 'bd-card';
@@ -224,7 +271,17 @@
     }
     card.appendChild(main);
 
+    // Fix tornato in lavorazione: niente da votare né da riaprire, resta il perché.
+    if (ritirate.has(fb._id)) {
+      const avviso = renderAvviso(fb._id);
+      if (avviso) card.appendChild(avviso);
+      return card;
+    }
+
     card.appendChild(renderVote(fb));
+
+    const avviso = renderAvviso(fb._id);
+    if (avviso) card.appendChild(avviso);
 
     const reopen = renderReopen(fb);
     if (reopen) card.appendChild(reopen);
@@ -240,6 +297,16 @@
   // l'eventuale ❌ è già stata raccolta nei voti, e la riapertura è UNA volta
   // sola per fix (vedi guard SN_MANAGE_REVIEW.canReopen), non per voto.
   function renderReopen(fb) {
+    if (riaperteOra.has(fb._id)) {
+      const { saldo } = riaperteOra.get(fb._id) || {};
+      const ok = document.createElement('p');
+      ok.className = 'bd-reopen-ok';
+      ok.setAttribute('role', 'status');
+      const costo = SN_CONST.CREDIT.BOARD_REOPEN;
+      const resto = saldo != null && Number.isFinite(Number(saldo)) ? `, te ne restano ${Number(saldo)}` : '';
+      ok.textContent = `Segnalazione inviata: il miglioramento torna in lavorazione. Hai speso ${costo} crediti${resto}.`;
+      return ok;
+    }
     if (MR.hasReopenRequest(fb)) {
       const done = document.createElement('div');
       done.className = 'bd-reopen-done';
@@ -369,7 +436,15 @@
         if (r && r.ok) {
           fb.reopenRequests = { ...(fb.reopenRequests || {}), [uid]: { at: new Date().toISOString() } };
           bozzeRiapertura.delete(id);
+          avvisi.delete(id);
+          riaperteOra.set(id, { saldo: r.balance });
           salvaCache(); // la riapertura appena chiesta non torna indietro
+          renderList();
+        } else if (r && (r.code === 'gone' || r.code === 'auth')) {
+          // Il form qui non serve più (fix ritirato) o va rifatto l'accesso:
+          // la frase sta sulla scheda, dove resta dopo il ridisegno.
+          ricordaRifiuto(id, r, 'La segnalazione non è partita: riprova.');
+          if (r.code === 'gone') bozzeRiapertura.delete(id);
           renderList();
         } else {
           errEl.textContent = (r && r.error) || 'Invio non riuscito, riprova.';
@@ -439,6 +514,7 @@
     }
     const id = fb._id;
     if (!id || pending.has(id)) return;
+    avvisi.delete(id);
 
     // Ottimistico: ri-cliccare la propria scelta la annulla (toggle).
     const prevVotes = (fb.votes && typeof fb.votes === 'object') ? fb.votes : {};
@@ -469,11 +545,15 @@
           if (r.awarded && r.credits) flyCreditsFromButton(originRect, r.credits);
           salvaCache(); // il proprio voto si rivede anche riaprendo la pagina
         } else {
-          // Errore: torna allo stato precedente al click.
+          // Errore: torna allo stato precedente al click, e dice perché.
           fb.votes = prevVotes;
+          ricordaRifiuto(id, r, 'Il voto non è stato registrato: riprova.');
         }
       })
-      .catch(() => { fb.votes = prevVotes; })
+      .catch(() => {
+        fb.votes = prevVotes;
+        ricordaRifiuto(id, null, 'Il voto non è stato registrato: riprova.');
+      })
       .finally(() => {
         pending.delete(id);
         renderList();
@@ -618,7 +698,8 @@
       const p = chrome.storage.local.set({
         [CACHE_KEY]: {
           at: Date.now(),
-          cards: allFeedbacks,
+          // Un fix tornato in lavorazione non ricompare alla prossima apertura.
+          cards: allFeedbacks.filter((c) => !(c && ritirate.has(c._id))),
           after: cursore,
           complete: completo,
           segnalibro,
