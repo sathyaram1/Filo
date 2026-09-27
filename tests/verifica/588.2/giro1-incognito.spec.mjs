@@ -172,3 +172,29 @@ test('due finestre incognito: ciascuna vede solo i suoi scaricamenti', async ({ 
     expect((await voci(b)).map((v) => v.filename)).not.toContain('report.pdf');
   } finally { await srv.close(); }
 });
+
+test('incognito: la pagina «Vedi tutti» della finestra mostra i suoi scaricamenti, anche dal vivo', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServer();
+  try {
+    const inc = await apriIncognito(app, shell);
+    const page = await paginaIn(app, inc, `http://localhost:${srv.porta}/pagina`);
+    await inc.evaluate(() => window.filoShell.tabs.open('filo://downloads/downloads.html'));
+    let dl = null;
+    const fine = Date.now() + 10000;
+    while (Date.now() < fine && !dl) {
+      dl = app.windows().find((w) => w.url().startsWith('filo://downloads'));
+      if (!dl) await new Promise((r) => setTimeout(r, 100));
+    }
+    await dl.waitForLoadState('domcontentloaded');
+    // La scheda della pagina resta nella finestra incognito.
+    await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+      const t = w._filoTabs.tabs.find((x) => /localhost/.test(x.view.webContents.getURL()));
+      w._filoTabs.activate?.(t.id);
+    });
+    await page.locator('#pdf').click();
+    await expect.poll(() => statoDi(inc, 'report.pdf'), { timeout: 20000 }).toBe('completed');
+    await expect(dl.locator('body')).toContainText('report.pdf', { timeout: 10000 });
+  } finally { await srv.close(); }
+});
