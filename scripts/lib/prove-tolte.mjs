@@ -204,5 +204,5 @@ export function controllaProveTolte({ shaPrima, root, log = console.log, lancia,
   if (!prove.length) return { ferma: false, testo: '' };
   const r = rilanciaProveTolte(prove, shaPrima, root, { log, ...(lancia ? { lancia } : {}), ...(prepara ? { prepara } : {}) });
   if (r.motivo) return { ferma: true, testo: `Consegna respinta: ${r.motivo}` };
-  return esitoProveTolte({ rosse: r.rosse, shaPrima });
+  return esitoProveTolte({ rosse: r.rosse, shaPrima, conPulizia, messi });
 }
