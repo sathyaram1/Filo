@@ -113,3 +113,20 @@ test('aspetto: lista di serie con un refuso, tema chiaro e scuro', async ({ open
     await page.locator('#sec-excluded').screenshot({ path: `tests/.shots/verifica-541-${theme}.png` });
   }
 });
+
+// Il nome che il menu (o il «Forse …?») scrive per Novita è quello del catalogo,
+// «NovitaAI»: la pagina stessa deve riconoscerlo come la voce del codice.
+test('scelto dal menu il nome del catalogo, l\'avviso non dice più che quel fornitore manca', async ({ openTab }) => {
+  const page = await openEditor(openTab, {
+    excludedProviders: ['Google', 'OpenAI', 'xAI', 'DeepSeek', 'Mistral', 'Moonshot AI', 'MiniMax', 'Qwen', 'Cohere', 'Meta', 'Z.AI'],
+    excludedProviderReasons: [],
+  });
+  await expect(page.locator('#excludedDriftText')).toContainText('Novita');
+  await page.click('#addExcludedRow');
+  const row = page.locator('#excludedList .sn-excluded-row').last();
+  await row.locator('.sn-excluded-name').fill('Novtia');
+  await row.locator('.sn-excluded-guess').click();
+  await expect(row.locator('.sn-excluded-name')).toHaveValue('NovitaAI');
+  await expect(row.locator('.sn-model-row-msg')).toBeEmpty();
+  await expect(page.locator('#excludedDrift')).toBeHidden();
+});
