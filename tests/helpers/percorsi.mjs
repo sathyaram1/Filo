@@ -58,8 +58,7 @@ export function cartellaTemporanea(prefisso) {
   return percorsoCanonico(mkdtempSync(join(tmpdir(), `${prefisso}${SPAZIO}`)));
 }
 
-// Un collegamento a una CARTELLA che si crea anche su Windows senza privilegi:
-// lì un symlink vuole l'amministratore o la modalità sviluppatore (EPERM, #742),
+// Su Windows un symlink vuole l'amministratore o la modalità sviluppatore (EPERM, #742):
 // una junction no, e Node la risolve allo stesso modo. Altrove resta un symlink.
 export function collegaCartella(verso, collegamento) {
   symlinkSync(verso, collegamento, process.platform === 'win32' ? 'junction' : 'dir');
