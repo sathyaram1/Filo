@@ -4013,6 +4013,82 @@
   function matchShortcut(e, sc) {
     return !!sc && TASTI.combacia(e, sc);
   }
+  // La pressione che una scorciatoia scritta descrive: serve a chiedere a chi
+  // ascolta i tasti se la prenderebbe, con le stesse regole del keydown vero.
+  function pressioneDi(sc) {
+    const parts = shortcutParts(sc);
+    const fin = parts[parts.length - 1] || '';
+    return {
+      ctrlKey: parts.some((p) => ['ctrl', 'control', 'cmd', 'command', 'meta'].includes(p)),
+      metaKey: false,
+      shiftKey: parts.includes('shift'),
+      altKey: parts.includes('alt') || parts.includes('option'),
+      key: fin === 'plus' ? '+' : fin,
+      code: '',
+    };
+  }
+
+  // I tasti che l'Editor serve PRIMA dei moduli: il keydown li legge da qui e il
+  // salvataggio di una scorciatoia li rifiuta da qui, così non possono divergere.
+  // `suo`: il modulo per cui quel tasto fa già la sua cosa, e può averlo.
+  const TASTI_EDITOR = [
+    { tasti: ['s'], cosa: 'salva il documento', fa: () => save(true) },
+    { tasti: ['\\'], cosa: 'mostra e nasconde la barra laterale', fa: toggleSidebar },
+    { tasti: ['f'], cosa: 'porta alla ricerca', suo: 'search-replace',
+      attivo: () => doc.modules.some((x) => x.type === 'search-replace'),
+      fa: () => triggerModuleShortcut(doc.modules.find((x) => x.type === 'search-replace')) },
+    // Shift indifferente: su molte tastiere il "+" si fa con Shift.
+    { cosa: 'zooma il foglio', prende: (e) => !e.altKey && !!ZOOM_TASTI[e.key], fa: (e) => handleZoomKey(e) },
+    { tasti: ['b'], cosa: 'mette il grassetto', suo: 'bold', nelFoglio: true, fa: () => exec('bold') },
+    { tasti: ['i'], cosa: 'mette il corsivo', suo: 'italic', nelFoglio: true, fa: () => exec('italic') },
+    { tasti: ['u'], cosa: 'sottolinea', suo: 'underline', nelFoglio: true, fa: () => exec('underline') },
+    // Li serve il browser (fa: null): un modulo li toglierebbe al foglio.
+    { tasti: ['z'], cosa: 'annulla l\'ultima modifica', suo: 'undo', fa: null },
+    { tasti: ['y'], cosa: 'ripete la modifica annullata', suo: 'redo', fa: null },
+    { tasti: ['z'], shift: true, cosa: 'ripete la modifica annullata', suo: 'redo', fa: null },
+    { tasti: ['x'], cosa: 'taglia', fa: null },
+    { tasti: ['c'], cosa: 'copia', fa: null },
+    { tasti: ['v'], cosa: 'incolla', fa: null },
+    { tasti: ['v'], shift: true, cosa: 'incolla senza formattazione', fa: null },
+    { tasti: ['a'], cosa: 'seleziona tutto', fa: null },
+  ];
+  function prendeIlTasto(t, e) {
+    if (!(e.ctrlKey || e.metaKey)) return false;
+    if (t.prende) return t.prende(e);
+    if (e.altKey || e.shiftKey !== !!t.shift) return false;
+    const cand = eventKeyCandidates(e);
+    return t.tasti.some((k) => cand.has(k));
+  }
+  function tastoEditorDi(sc) {
+    const e = pressioneDi(sc);
+    return TASTI_EDITOR.find((t) => prendeIlTasto(t, e)) || null;
+  }
+  // Perché una scorciatoia non partirebbe mai su questo modulo ('' = va bene).
+  function motivoScorciatoiaPresa(sc, m) {
+    if (!sc) return '';
+    const nome = TASTI ? TASTI.etichetta(sc) : sc;
+    if (TASTI && TASTI.riservato(sc)) {
+      return `${nome} è già di Filo (schede, zoom, annulla…) e non arriverebbe mai a questo modulo`;
+    }
+    const t = tastoEditorDi(sc);
+    if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}: questo modulo non partirebbe mai`;
+    const e = pressioneDi(sc);
+    const altro = doc.modules.find((x) => x !== m && x.data && x.data.shortcut && matchShortcut(e, x.data.shortcut));
+    if (altro) {
+      const etich = (MODULE_TYPES[altro.type] && MODULE_TYPES[altro.type].label) || altro.type;
+      return `${nome} è già la scorciatoia di «${etich}»: partirebbe solo quello`;
+    }
+    return '';
+  }
+  // L'esempio proposto dev'essere libero davvero, non a sua volta rifiutato.
+  function scorciatoiaLibera(m) {
+    for (const d of '123456789') {
+      const sc = `Ctrl+Shift+${d}`;
+      if (!motivoScorciatoiaPresa(sc, m)) return sc;
+    }
+    return 'Ctrl+Alt+Shift+1';
+  }
+
   function triggerModuleShortcut(m) {
     setActivePage(m.z);
     const cell = gridEl.querySelector(`.ed-module[data-id="${m.id}"]`);
