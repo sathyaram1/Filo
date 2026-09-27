@@ -61,6 +61,10 @@ if (process.env.NODE_ENV === 'test') {
   } catch (_) {}
 }
 
+// Nelle prove il servizio vero delle schede non si raggiunge da nessuna porta, anche da quelle
+// che aprono Filo fuori dalla modalità test (vedi test-servizi-chiusi.js). No-op altrimenti.
+try { require('./test-servizi-chiusi').chiudiServiziNeiTest(); } catch (_) {}
+
 const { createMainWindow, revealWindow } = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');

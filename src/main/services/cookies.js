@@ -188,36 +188,56 @@ function applyGpc(ses, enabled) {
 // attivo, ogni richiesta verso un host-tracker viene annullata: lo script non
 // si carica, il cookie non viene creato, nessun dato parte.
 
-const blockState = new WeakMap(); // session → { enabled }
+const blockState = new WeakMap(); // session → { enabled, filtri }
+
+// Host chiusi a prescindere dalla modalità: li accende solo la modalità test
+// (src/main/test-servizi-chiusi.js), che per questo passa dallo stesso listener.
+let hostChiusoFn = null;
+function chiudiHost(fn) { hostChiusoFn = typeof fn === 'function' ? fn : null; }
+
+// Registra (se manca) l'unico listener onBeforeRequest della sessione. Tracker e
+// ad-blocking restano spenti finché applyTrackerBlocking non accende i filtri.
+function ensureRequestHook(ses) {
+  if (!ses || !ses.webRequest) return null;
+  let state = blockState.get(ses);
+  if (state) return state;
+  state = { enabled: false, filtri: false };
+  blockState.set(ses, state);
+  // UNICO choke point onBeforeRequest per sessione: Electron consente un solo
+  // listener per evento per sessione (una seconda registrazione SOSTITUISCE la
+  // prima), quindi il blocco tracker (curato) e il motore ad-blocking (liste)
+  // devono convivere qui dentro. I due hanno gate indipendenti: il tracker è
+  // legato alla modalità cookie (s.enabled), l'ad-blocking ha il suo toggle.
+  ses.webRequest.onBeforeRequest((details, callback) => {
+    if (hostChiusoFn && hostChiusoFn(details.url)) {
+      callback({ cancel: true });
+      return;
+    }
+    const s = blockState.get(ses);
+    if (!s || !s.filtri) {
+      callback({ cancel: false });
+      return;
+    }
+    if (s.enabled && isTrackerUrl(details.url)) {
+      callback({ cancel: true });
+      return;
+    }
+    let ad = null;
+    try { ad = require('./adblock'); } catch (_) {}
+    if (ad && ad.shouldBlock && ad.shouldBlock(details.url)) {
+      callback({ cancel: true });
+      return;
+    }
+    callback({ cancel: false });
+  });
+  return state;
+}
 
 function applyTrackerBlocking(ses, enabled) {
-  if (!ses || !ses.webRequest) return;
-  let state = blockState.get(ses);
-  if (!state) {
-    state = { enabled: !!enabled };
-    blockState.set(ses, state);
-    // UNICO choke point onBeforeRequest per sessione: Electron consente un solo
-    // listener per evento per sessione (una seconda registrazione SOSTITUISCE la
-    // prima), quindi il blocco tracker (curato) e il motore ad-blocking (liste)
-    // devono convivere qui dentro. I due hanno gate indipendenti: il tracker è
-    // legato alla modalità cookie (s.enabled), l'ad-blocking ha il suo toggle.
-    ses.webRequest.onBeforeRequest((details, callback) => {
-      const s = blockState.get(ses);
-      if (s && s.enabled && isTrackerUrl(details.url)) {
-        callback({ cancel: true });
-        return;
-      }
-      let ad = null;
-      try { ad = require('./adblock'); } catch (_) {}
-      if (ad && ad.shouldBlock && ad.shouldBlock(details.url)) {
-        callback({ cancel: true });
-        return;
-      }
-      callback({ cancel: false });
-    });
-  } else {
-    state.enabled = !!enabled;
-  }
+  const state = ensureRequestHook(ses);
+  if (!state) return;
+  state.filtri = true;
+  state.enabled = !!enabled;
 }
 
 // ─── sessioni per-sito (modalità privacy) ─────────────────────────────────
@@ -332,6 +352,8 @@ module.exports = {
   ensureHeaderHook,
   applyGpc,
   applyTrackerBlocking,
+  ensureRequestHook,
+  chiudiHost,
   ensureSiteSession,
   configureForMode,
   configureFromSettings,

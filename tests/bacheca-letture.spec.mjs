@@ -112,15 +112,14 @@ async function pronta(page) {
 
 const conta = (page) => page.evaluate(() => window.__conta);
 
-// La prima apertura parte PRIMA della rete finta: dove c'è rete (in GitHub sì,
-// nel contenitore no) legge la bacheca vera e la lascia nella copia su disco, e
-// al ricaricamento vincerebbero le schede vere (#735). Quindi la copia si butta.
+// La prima apertura parte PRIMA della rete finta: il servizio vero nelle prove è
+// chiuso ovunque (#735.1), quindi non lascia schede su disco e al ricaricamento
+// vince la rete finta.
 async function apri(openTab, docs) {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await pronta(page);
   await reteFinta(page, docs);
-  await page.evaluate(() => chrome.storage.local.set({ sn_board_schede: null }));
   await page.reload();
   await pronta(page);
   // Se la chiave della copia cambiasse, qui si vedrebbe: la prima scheda è della rete finta.
