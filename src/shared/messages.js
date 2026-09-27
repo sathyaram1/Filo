@@ -591,7 +591,7 @@
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai
     // esposti alle pagine. La risposta porta solo il profilo pubblico.
-    AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile: {email,name,picture} | null }
+    AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile } | { ok: false, code, error: frase per l'utente }
     AUTH_SIGNOUT: 'auth_signout',                  // → { ok }
     AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, profile|null }
     AUTH_CHANGED: 'auth_changed',                  // broadcast → { signedIn, profile|null }

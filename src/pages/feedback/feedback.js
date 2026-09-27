@@ -1906,7 +1906,7 @@
         setIsAdmin(r?.isAdmin);
         renderAuthState(r?.profile);
         applyFilter(); // ridisegna con/senza controlli admin
-        if (r?.ok === false) alert('Accesso non riuscito: ' + (r.error || 'errore sconosciuto'));
+        if (r?.ok === false && r.code !== 'sostituito') alert(r.error || 'Accesso non riuscito: riprova.');
       } catch (e) {
         alert('Accesso non riuscito: ' + (e?.message || e));
       } finally {
