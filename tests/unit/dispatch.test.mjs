@@ -91,8 +91,8 @@ test('applyFixed: ri-mette in coda verifier e azzera la critica (i bilanci li ti
 
 test('applyPulizia: ammessa solo a correzione aperta e con rilievi messi da parte su quella critica', async () => {
   const { applyPulizia } = await import('../../scripts/dispatch.mjs');
-  const buona = { ok: true, sha: 'b'.repeat(40), files: ['tests/verifica/9/giro1-a.spec.mjs'] };
-  const aperta = { ...applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2i] x', 'a'.repeat(40)), messiDaParteGiro: { sha: 'a'.repeat(40), n: 1 } };
+  const buona = { ok: true, sha: 'b'.repeat(40), files: ['tests/verifica/9/giro1-r1-a.spec.mjs'], cancellate: ['tests/verifica/9/giro1-r1-a.spec.mjs'] };
+  const aperta = { ...applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2i] x', 'a'.repeat(40)), messiDaParteGiro: { sha: 'a'.repeat(40), n: 1, numeri: [1] } };
   const r = applyPulizia(aperta, buona);
   assert.equal(r.ok, true);
   assert.equal(r.state.puliziaSha, 'b'.repeat(40));
