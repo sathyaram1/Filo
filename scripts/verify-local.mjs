@@ -35,6 +35,11 @@
 //     Le quadre col livello dentro sono SEMPRE un rilievo, dovunque stiano
 //     nella riga: nel riassunto il livello si cita a parole («il livello 2»).
 //
+//   node scripts/verify-local.mjs pulizia
+//     Lo lancia chi ha registrato una critica che manda a correggere e mette
+//     rilievi da parte, SUBITO dopo: registra il commit che toglie SOLO le
+//     loro prove del giro. Da lì la consegna blocca ogni prova tolta rossa.
+//
 //   node scripts/verify-local.mjs corretto "<report della correzione>"
 //     Lo lancia chi ha corretto: chiude il giro e chiede un'altra verifica
 //     sul commit nuovo.
@@ -67,6 +72,15 @@ import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, perimetroNote } from './lib/verifier-scope.mjs';
+import {
+  PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus, diffDopoLaVerifica as diffTraCommit,
+} from './lib/solo-tolte.mjs';
+import { numeraRilievi, rigaNumerata, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
+
+export { PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus };
+
+/** Cosa è cambiato fra il commit verificato e quello di adesso (lib/solo-tolte.mjs). */
+export function diffDopoLaVerifica(base, head, root = ROOT) { return diffTraCommit(base, head, root); }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
@@ -278,6 +292,9 @@ export function checkVerdict(entry, headSha, dirty = false, leggiDiff = null) {
   return { ok: true, reason: 'verifica superata su questo contenuto' };
 }
 
+// Il numero di un rilievo vale per la critica che lo riporta: nella coda dei giri sarebbe il posto in una critica vecchia.
+const senzaNumero = (l) => l.map(({ n: _n, ...f }) => f);
+
 /**
  * Registra l'avvio di una verifica (nessun verdetto ancora). PURA.
  * I bilanci consumati e i rilievi messi da parte nei giri precedenti dello
@@ -339,7 +356,9 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
     // ridà la stessa risposta senza scrivere niente e senza ripagare il giro,
     // come già sul server (verifica del giro 10 su #561). Un testo diverso
     // resta una seconda critica, e viene respinto.
-    if (ROUND.normalizeCritique(critique) === String(prev.critique || '') && String(sha || '') === String(prev.sha || '')) {
+    // Dopo la pulizia la punta è il suo commit: la stessa critica si ristampa anche da lì.
+    const stessoCommit = [prev.sha, prev.pending.shaPulizia].some((x) => x && String(x) === String(sha || ''));
+    if (ROUND.normalizeCritique(critique) === String(prev.critique || '') && stessoCommit) {
       const p = prev.pending;
       return {
         ok: true, state: s, replayed: true, outcome: 'fix',
@@ -376,6 +395,7 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
   }
   const parsed = ROUND.parseFindings(critique);
   const decision = ROUND.decideRound({ findings: parsed.findings, caps, counts: prev.counts || {} });
+  for (const k of ['fix', 'derived', 'external']) decision[k] = numeraRilievi(parsed.findings, decision[k]);
   const outcome = decision.stop ? 'stop' : decision.fix.length ? 'fix' : 'pass';
   const when = at || new Date().toISOString();
   const entry = {
@@ -398,7 +418,7 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
   // priorità uguale al livello. Gli esterni ci entrano in ogni esito (sono di
   // un altro lavoro); in cloud il server li apre come feedback, qui li apre
   // chi guida, dal report.
-  const coda = (Array.isArray(prev.derived) ? prev.derived : []).concat(decision.external);
+  const coda = (Array.isArray(prev.derived) ? prev.derived : []).concat(senzaNumero(decision.external));
   if (outcome === 'stop') {
     entry.verdict = 'fail';
     // Con quello che ha fermato restano anche gli altri interni della critica:
@@ -416,11 +436,11 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
     // Anche i rilievi messi da parte, gli esterni e i bilanci del giro:
     // servono a ristampare la risposta tale e quale se si è persa.
     entry.pending = { findings: decision.fix, sha: sha || '', at: when, derived: decision.derived, external: decision.external, budgets: decision.budgets };
-    entry.derived = coda.concat(decision.derived);
+    entry.derived = coda.concat(senzaNumero(decision.derived));
   } else {
     entry.verdict = 'pass';
     entry.pending = null;
-    entry.derived = coda.concat(decision.derived);
+    entry.derived = coda.concat(senzaNumero(decision.derived));
   }
   s[branch] = entry;
   return { ok: true, state: s, decision, outcome };
@@ -479,9 +499,10 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
     fixedSha: sha || '',
     fixedAt: when,
   };
-  // Nessun commit nuovo dopo la critica: niente è stato corretto, e non c'è
-  // niente da riverificare. Conta una cosa sola, se c'è un commit nuovo o no.
-  if (sha && prev.pending.sha && sha === prev.pending.sha) {
+  // Nessun commit nuovo dopo la critica (o dopo la pulizia): niente è stato
+  // corretto, e non c'è niente da riverificare.
+  const partenza = prev.pending.shaPulizia || prev.pending.sha || '';
+  if (sha && partenza && sha === partenza) {
     if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'non corretto' };
     const gravi = pending.filter((f) => Number(f.level) >= 2);
     if (gravi.length) {
@@ -489,12 +510,36 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
       s[branch] = { ...base, verdict: 'fail', critique: ROUND.formatFindings(gravi), rounds, counts: {} };
       return { ok: true, state: s, outcome: 'stop', blocking: gravi };
     }
-    s[branch] = { ...base, verdict: 'pass', derived: (Array.isArray(prev.derived) ? prev.derived : []).concat(pending), rounds };
+    s[branch] = { ...base, verdict: 'pass', derived: (Array.isArray(prev.derived) ? prev.derived : []).concat(senzaNumero(pending)), rounds };
     return { ok: true, state: s, outcome: 'pass', derived: pending };
   }
   if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'corretto' };
-  s[branch] = { ...base, verdict: 'fixed', rounds, chiusura: { rilievi: pending, shaPrima: prev.pending.sha || '' } };
+  s[branch] = { ...base, verdict: 'fixed', rounds, chiusura: { rilievi: pending, shaPrima: partenza } };
   return { ok: true, state: s, outcome: 'fixed' };
+}
+
+/**
+ * Registra il commit della pulizia: le prove dei rilievi messi da parte tolte PRIMA di correggere.
+ * Da lì parte il confronto della consegna, e ogni prova tolta dopo che è ancora rossa la ferma. PURA:
+ * `controllo` è l'esito di controllaPulizia (lib/prove-tolte.mjs).
+ */
+export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) {
+  const s = (state && typeof state === 'object') ? { ...state } : {};
+  const prev = s[branch] || {};
+  if (prev.verdict !== 'fix-pending' || !prev.pending) {
+    return { ok: false, reason: 'nessun giro di correzione aperto su questo ramo: la pulizia si fa subito dopo una critica che manda a correggere, prima della correzione.' };
+  }
+  const parte = [prev.pending.derived, prev.pending.external].flatMap((l) => (Array.isArray(l) ? l : []));
+  if (!parte.length) {
+    return { ok: false, reason: 'questo giro non ha messo da parte nessun rilievo: non c\'è niente da pulire. Una prova del giro si toglie solo verde, insieme alla prova durevole che la sostituisce.' };
+  }
+  if (Array.isArray(dirtyFiles) && dirtyFiles.length) return { ok: false, reason: dirtyTreeText(dirtyFiles, 'pulizia') };
+  if (!controllo || !controllo.ok) return { ok: false, reason: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
+  const numeri = numeraRilievi(ROUND.parseFindings(prev.critique || '').findings, parte).map((f) => f.n);
+  const fuori = testoPuliziaFuoriNumero(controllo, numeri);
+  if (fuori) return { ok: false, reason: fuori };
+  s[branch] = { ...prev, pending: { ...prev.pending, shaPulizia: controllo.sha } };
+  return { ok: true, state: s, files: controllo.files };
 }
 
 /**
@@ -519,86 +564,6 @@ export function cartellaProveGiro(branch) {
     .toLowerCase()
     .slice(0, 60) || 'giro';
   return `${PROVE_GIRO}locale-${slug}`;
-}
-
-// ─── Il verdetto non decade per le prove del giro TOLTE (#661) ──────────────
-//
-// Quando il giro mette da parte un rilievo e dice «si può pubblicare», la prova
-// del giro che lo riproduce si CANCELLA: il rilievo vive nel feedback appena
-// nato. Quel commit sposta la punta DOPO il verdetto, e senza questa eccezione
-// costava un giro intero di un'altra istanza (10/09 e 18/09, #629).
-//
-// LA REGOLA è la stessa del cancello di fusione del server: dopo il verdetto,
-// dentro `tests/verifica/`, si può solo TOGLIERE — un file intero o delle righe
-// (un caso) da un file. Nessuna riga aggiunta o cambiata, nemmeno un marcatore
-// di rosso atteso o un commento: quello va nel commit di una correzione.
-
-/** Dove vivono le prove dei giri di verifica: l'unica cartella tollerata. */
-export const PROVE_GIRO = 'tests/verifica/';
-
-/** Il percorso sta fra le prove dei giri? PURA. */
-export function dentroProveGiro(percorso) {
-  const p = String(percorso ?? '').replace(/\\/g, '/').replace(/^\.\//, '');
-  return p.startsWith(PROVE_GIRO) && !p.split('/').includes('..');
-}
-
-/**
- * Una voce del diff è un file TOLTO dalle prove del giro? PURA.
- *
- * `stato` è la lettera di `git diff --name-status` e vale più del contenuto:
- * senza di lei un file illeggibile (git muto su `show`) somiglierebbe a un file
- * cancellato, e si tollererebbe una modifica vera. Dove la lettera non c'è —
- * una voce costruita a mano — resta il ripiego sul contenuto.
- */
-function cancellata(f) {
-  if (f.stato) return String(f.stato).toUpperCase().startsWith('D');
-  return String(f.prima ?? '') !== '' && String(f.dopo ?? '') === '';
-}
-
-/**
- * `dopo` si ottiene da `prima` solo togliendo righe? PURA. Vuoto da una parte o
- * dall'altra è un no: un file svuotato si cancella, uno illeggibile non passa.
- */
-export function soloRigheTolte(prima, dopo) {
-  const a = String(prima ?? '');
-  const b = String(dopo ?? '');
-  if (!a || !b) return false;
-  const righeA = a.replace(/\r\n?/g, '\n').split('\n');
-  const righeB = b.replace(/\r\n?/g, '\n').split('\n');
-  let i = 0;
-  for (const riga of righeB) {
-    while (i < righeA.length && righeA[i] !== riga) i += 1;
-    if (i >= righeA.length) return false;
-    i += 1;
-  }
-  return true;
-}
-
-/**
- * Fra il commit verificato e quello di adesso dalle prove del giro si è solo
- * tolto (file interi o righe)? PURA.
- *
- * `files`: `[{ path, prima, dopo, stato }]` — il contenuto ai due commit,
- * stringa vuota dove il file non c'era, e la lettera di stato di git; `null`
- * quando non si è riuscito a leggere il diff, che NON è un via libera. Ritorna
- * `{ ok, motivo, files }`: `motivo` è già la frase da mostrare a chi pubblica.
- */
-export function soloProveTolte(files) {
-  if (!Array.isArray(files)) return { ok: false, motivo: 'non sono riuscito a leggere cosa è cambiato dopo la verifica', files: [] };
-  const elenco = files.filter((f) => f && f.path);
-  const fuori = elenco.filter((f) => !dentroProveGiro(f.path)).map((f) => f.path);
-  if (fuori.length) {
-    const primi = fuori.slice(0, 5).join(', ');
-    return { ok: false, files: [], motivo: `fuori dalle prove del giro: ${primi}${fuori.length > 5 ? ` e altri ${fuori.length - 5}` : ''}` };
-  }
-  const veri = elenco
-    .filter((f) => !cancellata(f) && (String(f.stato || '').toUpperCase().startsWith('A') || !soloRigheTolte(f.prima, f.dopo)))
-    .map((f) => f.path);
-  if (veri.length) {
-    const primi = veri.slice(0, 5).join(', ');
-    return { ok: false, files: [], motivo: `nelle prove del giro c'è dell'altro, oltre a prove e casi tolti (righe aggiunte o cambiate, file nuovi): ${primi}${veri.length > 5 ? ` e altri ${veri.length - 5}` : ''}` };
-  }
-  return { ok: true, motivo: '', files: elenco.map((f) => f.path) };
 }
 
 /**
@@ -638,8 +603,8 @@ export function codaDalServer(testoServer) {
     '',
     'IN LOCALE, quattro differenze da quanto scritto qui sopra:',
     '- le prove del giro stanno nella cartella indicata più su, non in `tests/verifica/<numero>`;',
-    '- qui i rilievi lasciati fuori non prendono un numero di feedback, quindi le prove da togliere sono quelle',
-    '  dei rilievi elencati più su, riconosciute dal loro testo;',
+    '- qui i rilievi lasciati fuori non prendono un numero di feedback: le prove da togliere sono quelle dei rilievi',
+    '  elencati più su, riconosciute dal numero r<n> che le precede e che la prova porta nel nome;',
     '- non c\'è `--segnala`, quindi qui una segnalazione non ferma niente da sola: un trade-off vero si scrive',
     '  PER PRIMO nel report, con le strade e i loro costi, e lo porta all\'owner chi guida il giro, che è lui a',
     '  fermare il lavoro. Un rilievo che chiede una sua decisione non si corregge a metà: consegna il resto;',
@@ -654,7 +619,7 @@ export function codaDalServer(testoServer) {
  */
 export function derivatiText(list) {
   if (!Array.isArray(list) || !list.length) return '  (nessuno)';
-  return list.map((f) => `${ROUND.formatFinding(f)}\n  → feedback a parte, priorità ${Number.isFinite(Number(f.priority)) ? Number(f.priority) : Number(f.level) || 0}${f.sede === 'e' ? ' (esterno: non tocca a questo lavoro)' : ' (interno, messo da parte)'}`).join('\n');
+  return list.map((f) => `${rigaNumerata(f, ROUND.formatFinding)}\n  → feedback a parte, priorità ${Number.isFinite(Number(f.priority)) ? Number(f.priority) : Number(f.level) || 0}${f.sede === 'e' ? ' (esterno: non tocca a questo lavoro)' : ' (interno, messo da parte)'}`).join('\n');
 }
 
 /** I bilanci residui in una riga («cap3: n giri residui su m · …»), vuota senza bilanci. PURA. */
@@ -672,7 +637,7 @@ export function dueDaParteText(list) {
 
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
 export function codaText({ findings, derived, external, budgets, branch, instructions }) {
-  const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
+  const fmt = (l) => (Array.isArray(l) && l.length ? l.map((f) => rigaNumerata(f, ROUND.formatFinding)).join('\n') : '  (nessuno)');
   const b = bilanciResiduiText(budgets);
   // La coda non sta qui: arriva da quel file. Se manca, si dice dove doveva
   // essere e come si consegna, e basta.
@@ -685,6 +650,7 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
   // in cloud sta nelle istruzioni del ruolo, ma qui la coda arriva da un file
   // fuori dal repo, che non le nomina — e la parte che vive nel repo è questa.
   const cartella = cartellaProveGiro(branch);
+  const messi = [derived, external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
   const righe = [
     '══ ESITO: c\'è da correggere ══',
     `Ramo: ${branch}.`,
@@ -704,13 +670,19 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
     '(`npx playwright test <percorso della singola prova>`): la cartella intera la rilancia chi verifica, all\'inizio del',
     'giro. Il percorso va scritto relativo alla radice del repo e con le barre normali: in ogni altra forma la risposta è',
     '«No tests found» anche a file esistente.',
-    'Nello stesso commit della correzione TOGLI da quella cartella:',
-    '  · le prove dei rilievi messi da parte e degli esterni elencati qui sopra — ognuno è un feedback suo adesso, e il',
-    '    testo del rilievo viaggia lì: la cartella del giro non deve crescere;',
-    '  · le prove dei rilievi che hai corretto, quando scrivi la prova durevole che li tiene chiusi. Se non ne scrivi una,',
-    '    la prova del giro resta.',
-    'Restano le prove dei rilievi che fermano il lavoro: le tratta chi riprende. Una prova che copre anche un caso ancora',
-    'aperto non si cancella: toglile il caso che se ne va, o segnale il rosso atteso in testa al corpo.',
+    ...(messi ? [
+      `PRIMA DI OGNI CORREZIONE, chi ha registrato questa critica TOGLIE da ${cartella} le prove dei rilievi messi da`,
+      'parte e degli esterni elencati qui sopra, se ci sono ancora (ognuno è un feedback suo adesso, e il testo viaggia',
+      'lì): sono quelle che nel nome portano il loro numero (r<n>, lo stesso che le precede qui sopra), in un commit',
+      'che toglie SOLO quelle, e registra la pulizia:',
+      '  git add -A && git commit -m "pulizia del giro"',
+      '  node scripts/verify-local.mjs pulizia',
+      'Una prova che copre anche un caso ancora aperto non si cancella: le si toglie il caso che se ne va.',
+    ] : []),
+    'Chi corregge toglie da quella cartella solo le prove dei rilievi corretti, verdi, nel commit della prova durevole che',
+    'li tiene chiusi (se non ne scrive una, la prova del giro resta). Una prova del giro ancora rossa non si toglie e non si',
+    'cambia mai: la consegna la rilancia com\'era e si ferma. Restano anche le prove dei rilievi che fermano il lavoro: le',
+    'tratta chi riprende.',
     '',
     testo,
   );
@@ -884,65 +856,6 @@ export function verdictForCurrentBranch(root = ROOT) {
   return { branch, entry, ...checkVerdict(entry, headSha(root), isDirty(root), (base, head) => diffDopoLaVerifica(base, head, root)) };
 }
 
-/**
- * Cosa è cambiato fra il commit verificato e quello di adesso, contenuto
- * compreso: `[{ path, prima, dopo }]`, o `[]` se git non risponde.
- *
- * I NOMI si guardano per primi, e sono l'uscita a buon mercato: se anche un
- * solo file sta fuori dalle prove del giro non si legge niente, qualunque sia
- * la dimensione del diff.
- */
-export function diffDopoLaVerifica(base, head, root = ROOT) {
-  if (!base || !head || base === head) return null;
-  const elenco = tryGit(['diff', '--name-status', '-z', `${base}`, `${head}`], root);
-  // Git muto non è git contento: senza il diff non si tollera niente.
-  if (!elenco.ok) return null;
-  const voci = vociNameStatus(elenco.out);
-  if (!voci.length || voci.some((v) => !dentroProveGiro(v.path))) {
-    return voci.map((v) => ({ path: v.path, stato: v.stato, prima: '', dopo: '' }));
-  }
-  return voci.map((v) => ({
-    path: v.path,
-    stato: v.stato,
-    prima: contenutoAl(base, v.path, root),
-    dopo: contenutoAl(head, v.path, root),
-  }));
-}
-
-/**
- * L'uscita di `git diff --name-status -z` in `[{ stato, path }]`. PURA.
- *
- * Con `-z` i campi sono separati da NUL e i nomi arrivano crudi, senza
- * virgolette: è l'unica forma in cui un percorso con uno spazio (la macchina di
- * chi sviluppa ne ha) si legge per intero. Uno spostamento (`R`) porta DUE
- * nomi e qui diventa due voci, il vecchio tolto e il nuovo aggiunto: un file
- * che ricompare altrove è roba da girare che nessuno ha ancora provato.
- */
-export function vociNameStatus(out) {
-  const campi = String(out ?? '').split('\0');
-  const voci = [];
-  for (let i = 0; i < campi.length; i += 1) {
-    const stato = campi[i].trim();
-    if (!stato) continue;
-    const doppio = /^[RC]/i.test(stato);
-    const primo = (campi[i + 1] || '').trim();
-    const secondo = doppio ? (campi[i + 2] || '').trim() : '';
-    i += doppio ? 2 : 1;
-    if (doppio) {
-      if (primo) voci.push({ stato: 'D', path: primo });
-      if (secondo) voci.push({ stato: 'A', path: secondo });
-    } else if (primo) voci.push({ stato: stato[0].toUpperCase(), path: primo });
-  }
-  return voci;
-}
-
-/** Il contenuto di un file a un commit, stringa vuota se lì non c'era. */
-function contenutoAl(sha, path, root = ROOT) {
-  try {
-    return execFileSync('git', ['show', `${sha}:${path}`], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
-  } catch (_) { return ''; }
-}
-
 // ─── Il testo consegnato all'istanza che verifica ───────────────────────────
 
 /**
@@ -995,8 +908,8 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     '',
     'LE TUE PROVE RESTANO NEL RAMO, e qui non c\'è un numero di feedback: la cartella',
     `del giro è \`${cartellaProveGiro(branch)}\` — dove la recipe qui sotto dice`,
-    '`tests/verifica/<numero>/`, in locale si legge quella. Le spec si chiamano',
-    '`giro<k>-<cosa>.spec.mjs` e si committano prima di registrare la critica. Sei tu',
+    '`tests/verifica/<numero>/`, in locale si legge quella. Come si chiamano lo dice la',
+    'recipe (il numero del rilievo nel nome), e si committano prima della critica. Sei tu',
     'l\'unico a rilanciare quelle dei giri passati, e il momento è ADESSO, in partenza:',
     'sono il controllo delle porte riaperte, e dopo di te nessuno le rilancia. Se la',
     'cartella non c\'è, non c\'era niente da rilanciare — ma guarda la cartella, non il',
@@ -1022,7 +935,8 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     '',
     'TRE PASSI DELLA RICETTA QUI SOTTO IN LOCALE NON VALGONO, e sono gli ultimi che',
     'leggerai: la critica NON si registra con lo strumento delle routine (non c\'è un',
-    'numero di pratica: si usa `verify-local.mjs critica`, qui sopra); non c\'è',
+    'numero di pratica: si usa `verify-local.mjs critica`, qui sopra, e la pulizia che',
+    'la ricetta registra con `--record-pulizia` qui è `verify-local.mjs pulizia`); non c\'è',
     '`--segnala`, e nemmeno un\'altra opzione (un trade-off vero si segna col `?` e le',
     'scelte coi loro costi si scrivono nella riga del rilievo); non c\'è nessun',
     'biglietto da rilasciare alla fine. Tutto il resto della ricetta vale.',
@@ -1051,7 +965,7 @@ const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.m
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2);
 
-  const USO = 'Comandi: start ["<richiesta>"] | critica "<rilievi coi livelli>" | corretto "<report>" | status';
+  const USO = 'Comandi: start ["<richiesta>"] | critica "<rilievi coi livelli>" | pulizia | corretto "<report>" | status';
   // L’aiuto si stampa e basta, DOVUNQUE stia nella riga. Chiedere aiuto a uno
   // strumento è il primo gesto di chi verifica, e qui era l’unico posto dove
   // al posto dell’aiuto partiva l’azione: `start --help` apriva il giro per
@@ -1251,6 +1165,27 @@ if (isMain) {
     process.exit(0);
   }
 
+  if (cmd === 'pulizia') {
+    if (rest.length) {
+      console.error('«pulizia» non vuole argomenti: non ho toccato niente. Guarda il commit che hai appena fatto.');
+      process.exit(1);
+    }
+    const aperto = readState()[branch];
+    const statoP = statoDirectory(ROOT);
+    if (!statoP.ok) { console.error(statoIllegibileText(statoP.motivo)); process.exit(1); }
+    const { controllaPulizia } = await import('./lib/prove-tolte.mjs');
+    const controllo = aperto && aperto.pending && !statoP.lines.length
+      ? controllaPulizia({ shaCritica: aperto.pending.sha, root: ROOT, cartella: cartellaProveGiro(branch), avvio: aperto.requestedSha })
+      : null;
+    const r = withPulizia(readState(), branch, { controllo, dirtyFiles: statoP.lines });
+    if (!r.ok) { console.error(r.reason); process.exit(1); }
+    writeState(r.state);
+    console.log(`Pulizia registrata su ${sha.slice(0, 8)}: ${r.files.length === 1 ? 'tolta 1 prova' : `tolte ${r.files.length} prove`} dei rilievi messi da parte.`);
+    console.log(r.files.map((f) => `  · ${f}`).join('\n'));
+    console.log('Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, se com\'era è ancora rossa, la ferma.');
+    process.exit(0);
+  }
+
   if (cmd === 'corretto') {
     const report = rest.join(' ').trim();
     // Anche di qui si esce con un verdetto (a rilievi minori, il lavoro
@@ -1265,10 +1200,13 @@ if (isMain) {
     const statoC = statoDirectory(ROOT);
     if (!statoC.ok) { console.error(statoIllegibileText(statoC.motivo, 'consegna')); process.exit(1); }
     const aperto = readState()[branch];
-    if (aperto && aperto.verdict === 'fix-pending' && aperto.pending && aperto.pending.sha && aperto.pending.sha !== sha && !statoC.lines.length) {
-      const { controllaProveTolte } = await import('./lib/prove-tolte.mjs');
-      const messiDaParte = [aperto.pending.derived, aperto.pending.external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
-      const tolte = controllaProveTolte({ shaPrima: aperto.pending.sha, root: ROOT, messiDaParte });
+    if (aperto && aperto.verdict === 'fix-pending' && aperto.pending && aperto.pending.sha && !statoC.lines.length) {
+      const { controllaProveTolte, baseDelConfronto } = await import('./lib/prove-tolte.mjs');
+      const base = baseDelConfronto(aperto.pending.sha, aperto.pending.shaPulizia, ROOT);
+      const messi = [aperto.pending.derived, aperto.pending.external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
+      const tolte = base !== sha
+        ? controllaProveTolte({ shaPrima: base, root: ROOT, conPulizia: base !== aperto.pending.sha, messi, shaCritica: aperto.pending.sha })
+        : { ferma: false, testo: '' };
       if (tolte.ferma) { console.error(tolte.testo); process.exit(1); }
       if (tolte.testo) console.log(tolte.testo);
     }

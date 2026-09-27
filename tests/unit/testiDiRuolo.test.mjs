@@ -143,3 +143,50 @@ test('i criteri di consegna sono gli stessi in locale e nelle routine', () => {
   assert.ok(elenco(primo).length > 500);
   assert.equal(elenco(primo), elenco(verifica));
 });
+
+// Le prove dei rilievi messi da parte escono in un passo a parte, subito dopo la risposta alla critica: da lì una
+// prova rossa tolta ferma sempre la consegna. Un testo che le rimanda al commit della correzione riapre la porta.
+test('le prove dei rilievi messi da parte escono nella pulizia, non nel commit della correzione', async () => {
+  const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
+  const { codaText } = await import('../../scripts/verify-local.mjs');
+  const messo = [{ level: 1, sede: 'i', text: 'il bordo è freddo', priority: 1, num: '#9.1' }];
+  const superfici = [
+    ...readdirSync(RUOLI).filter((n) => n.endsWith('.md')).map((n) => [n, readFileSync(join(RUOLI, n), 'utf8')]),
+    ['risposta del server (routine)', verifierReplyText({ outcome: 'fix', phase2: { findings: [{ level: 2, text: 'rotto' }], derived: messo } })],
+    ['coda del giro locale', codaText({ findings: [{ level: 2, text: 'rotto' }], derived: messo, external: [], budgets: {}, branch: 'claude/x' })],
+  ];
+  for (const [nome, testo] of superfici) {
+    const t = testo.replace(/\s+/g, ' ');
+    assert.doesNotMatch(t, /stesso commit della correzione[^.]*messi da parte|le toglie chi corregge/i, `${nome}: rimanda la pulizia a chi corregge`);
+    assert.doesNotMatch(t, /chi corregge [èe] (la stessa|lo stesso|chi ha (scritto|registrato|verificato))|correggerai tu/i, nome);
+  }
+  const [, risposta] = superfici.at(-2);
+  const [, coda] = superfici.at(-1);
+  assert.match(readRoleInstructions('verifier'), /--record-pulizia/, 'chi registra la critica sa che la pulizia tocca a lui');
+  assert.match(risposta, /--record-pulizia/);
+  assert.match(coda, /verify-local\.mjs pulizia/);
+  for (const t of [risposta, coda]) assert.match(t.replace(/\s+/g, ' '), /ancora rossa non si toglie e non si cambia mai/);
+});
+
+// La pulizia riconosce la prova di un rilievo dal numero nel nome. Come si nomina lo spiega un testo solo, quello che
+// ricevono chi verifica in cloud e in locale; le risposte ripetono il numero davanti a ogni rilievo.
+test('come si nomina una prova del giro lo spiega un testo solo, e le risposte danno i numeri', async () => {
+  const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
+  const { codaText, buildVerifierBrief } = await import('../../scripts/verify-local.mjs');
+  const dove = readdirSync(RUOLI).filter((n) => n.endsWith('.md'))
+    .filter((n) => /r<n>/.test(readFileSync(join(RUOLI, n), 'utf8')));
+  assert.deepEqual(dove, ['_critica-e-livelli.md']);
+  const ruolo = readRoleInstructions('verifier');
+  assert.equal((ruolo.match(/`r<n>` è il numero del rilievo/g) || []).length, 1);
+  const brief = buildVerifierBrief({ request: 'fai X', branch: 'claude/x', recipe: ruolo, history: [] });
+  const primaDellaRicetta = brief.slice(0, brief.indexOf(ruolo));
+  assert.doesNotMatch(primaDellaRicetta, /giro<k>-[^r]/, 'il compito locale non ha una sua forma del nome: rimanda alla ricetta');
+  assert.match(primaDellaRicetta, /Come si chiamano lo dice la\s+recipe/);
+  const messo = [{ level: 1, sede: 'i', text: 'il bordo è freddo', priority: 1, num: '#9.1', n: 2 }];
+  const risposta = verifierReplyText({ outcome: 'fix', phase2: { findings: [{ level: 2, text: 'rotto', n: 1 }], derived: messo } });
+  const coda = codaText({ findings: [{ level: 2, text: 'rotto', n: 1 }], derived: messo, external: [], budgets: {}, branch: 'claude/x' });
+  for (const t of [risposta, coda]) {
+    assert.match(t, /- r1 \[2i\] rotto/);
+    assert.match(t, /- r2 \[1i\] il bordo è freddo/);
+  }
+});

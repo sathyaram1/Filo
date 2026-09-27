@@ -34,9 +34,14 @@ la cartella.
   rossa la respinge (#679, una prova rossa cancellata insieme alla correzione; togliere il
   solo caso rosso e tenere il file è la stessa porta). Dopo un riallineamento contano solo
   le prove che ha toccato il ramo: quelle che main ha cambiato nel frattempo sono di altri
-  lavori e non si rilanciano. Se il giro ha messo da parte
-  dei rilievi le rosse si elencano soltanto, perché da lì non si sa quale prova sia di
-  quale rilievo (`scripts/lib/prove-tolte.mjs`).
+  lavori e non si rilanciano. Le prove dei rilievi messi da parte escono PRIMA di ogni
+  correzione, in un commit che toglie solo quelle registrato da chi ha scritto la critica
+  (`verify-local.mjs pulizia`, `dispatch.mjs --record-pulizia`): il confronto parte da lì,
+  e una prova tolta ancora rossa ferma la consegna sempre (`scripts/lib/prove-tolte.mjs`).
+  La pulizia riconosce le prove dal nome, che porta il numero del rilievo riprodotto
+  (`giro<k>-r<n>-<cosa>.spec.mjs`, il posto del rilievo nella critica): contare quante ne
+  escono non bastava, perché un rilievo messo da parte senza prova sua lasciava uscire la
+  prova rossa di uno da correggere.
 
 ## Il rosso atteso
 

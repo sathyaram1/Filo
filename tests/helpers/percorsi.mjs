@@ -19,7 +19,7 @@
 // riporta il nome lungo. Fuori da Windows fa il suo lavoro di sempre (risolve
 // `/tmp` → `/private/tmp` su macOS), quindi si usa ovunque.
 
-import { mkdtempSync, realpathSync } from 'node:fs';
+import { mkdtempSync, realpathSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -56,4 +56,10 @@ export const SPAZIO = 'con spazio-';
 // vecchia. Il prefisso resta in testa, così la cartella si riconosce a occhio.
 export function cartellaTemporanea(prefisso) {
   return percorsoCanonico(mkdtempSync(join(tmpdir(), `${prefisso}${SPAZIO}`)));
+}
+
+// Su Windows un symlink vuole l'amministratore o la modalità sviluppatore (EPERM, #742):
+// una junction no, e Node la risolve allo stesso modo. Altrove resta un symlink.
+export function collegaCartella(verso, collegamento) {
+  symlinkSync(verso, collegamento, process.platform === 'win32' ? 'junction' : 'dir');
 }

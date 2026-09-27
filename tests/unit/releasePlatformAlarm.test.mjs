@@ -7,9 +7,9 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdirSync, copyFileSync, symlinkSync } from 'node:fs';
+import { mkdirSync, copyFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, collegaCartella } from '../helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(resolve(ROOT, 'package.json'));
@@ -184,7 +184,7 @@ describe('il feedback che si apre', () => {
     for (const f of ['release-platform-alarm.mjs', 'build-alarm.mjs']) {
       copyFileSync(join(ROOT, 'scripts', f), join(vero, f));
     }
-    symlinkSync(join(base, 'vero'), join(base, 'link'), 'dir');
+    collegaCartella(join(base, 'vero'), join(base, 'link'));
     const uscita = execFileSync(process.execPath,
       [join(base, 'link', 'scripts', 'release-platform-alarm.mjs'), '--attesi', 'Linux'], { encoding: 'utf8' });
     assert.deepEqual(uscita.trim().split('\n'), PIATTAFORME.Linux.attesi,

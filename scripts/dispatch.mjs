@@ -49,6 +49,7 @@
 //   node scripts/dispatch.mjs --ticket <biglietto>     # traduce la busta del server
 //   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
 //   node scripts/dispatch.mjs --record-verifier <id> "<critica coi livelli>" [--segnala <file.md>] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-pulizia <id> [--ticket <b>]
 //   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
@@ -79,7 +80,9 @@ import {
   writeExpectation, clearExpectation, stateDir,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
-import { controllaProveTolte } from './lib/prove-tolte.mjs';
+import {
+  baseDelConfronto, controllaProveTolte, controllaPulizia, numeraRilievi, rigaNumerata, testoPuliziaFuoriNumero,
+} from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
@@ -299,6 +302,8 @@ export function applyVerifierVerdict(state, outcome, critique = '', sha = '') {
   // guardato — chi lavora ha per costruzione il permesso di spingere sul
   // proprio ramo, quindi la finestra si apre da sé.
   if (String(sha || '')) s.verifierSha = String(sha);
+  // Una critica nuova apre un giro nuovo: la pulizia di quello prima non ne è la base.
+  s.puliziaSha = '';
   if (outcome === 'pass') s.verifierVerdict = 'pass';
   else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
   else if (outcome === 'stop') s.verifierVerdict = 'stop';
@@ -314,6 +319,7 @@ export function applyFixed(state) {
   s.verifierVerdict = null;
   s.verifierCritique = '';
   s.verifierSha = '';
+  s.puliziaSha = '';
   s.secauditDone = false;
   s.secauditVerdict = null;
   // Gli sha degli esiti se ne vanno con gli esiti: una correzione è contenuto
@@ -321,6 +327,26 @@ export function applyFixed(state) {
   // fatto su un'altra versione (feedback #485).
   s.secauditSha = '';
   return s;
+}
+
+/**
+ * La pulizia dopo la critica: le prove dei rilievi messi da parte tolte PRIMA di correggere. PURA.
+ * `controllo` è l'esito di controllaPulizia; da `puliziaSha` parte il confronto di --record-fixed.
+ */
+export function applyPulizia(state, controllo) {
+  const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
+  if (s.verifierVerdict !== 'fix-pending' || !s.verifierSha) {
+    return { ok: false, message: 'nessun giro di correzione aperto: la pulizia si registra subito dopo una critica a cui il server ha risposto «c\'è da correggere», prima di ogni correzione.' };
+  }
+  const md = s.messiDaParteGiro && s.messiDaParteGiro.sha === s.verifierSha ? s.messiDaParteGiro : null;
+  if (!md || !(Number(md.n) > 0)) {
+    return { ok: false, message: 'la risposta del server a questa critica non ha messo da parte nessun rilievo: non c\'è niente da pulire. Una prova del giro si toglie solo verde, insieme alla prova durevole che la sostituisce.' };
+  }
+  if (!controllo || !controllo.ok) return { ok: false, message: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
+  const fuori = testoPuliziaFuoriNumero(controllo, md.numeri);
+  if (fuori) return { ok: false, message: fuori };
+  s.puliziaSha = controllo.sha;
+  return { ok: true, state: s, files: controllo.files };
 }
 
 /**
@@ -999,7 +1025,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
     // registrato ma che il ramo dà per data è peggio di una mancante.
     return { rejected: true, serverDown: true, message: `critica non registrata: il server non risponde (${sent.reason})` };
   }
-  const reply = sent.reply && typeof sent.reply === 'object' ? sent.reply : {};
+  const reply = numeraRisposta(sent.reply && typeof sent.reply === 'object' ? sent.reply : {}, parsed.findings);
   // Un «ok» senza esito non è un pass: l'esito lo calcola il server, e se non
   // l'ha detto nessuno l'ha calcolato. Darlo per superato stampava «rilascia
   // il biglietto» anche con un rilievo di livello 2 nella critica (verifica
@@ -1007,6 +1033,11 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
   const outcome = VERIFIER_OUTCOMES.includes(reply.outcome) ? reply.outcome : 'non comunicato';
   const next = applyVerifierVerdict(base, outcome, critiqueText, shaProvato);
   next.id = id;
+  // I rilievi messi da parte su QUESTO commit, col loro posto nella critica: la pulizia toglie solo le loro prove.
+  const daParte = derivatiAperti(reply.phase2 ? reply.phase2.derived : reply.derived);
+  next.messiDaParteGiro = outcome === 'fix'
+    ? { sha: shaProvato, n: daParte.length, numeri: daParte.map((d) => d.n).filter(Number.isInteger), avvio: avvio || '' }
+    : null;
   sealTransition(next, `verifier:${outcome}`);
   next.reply = reply;
   return next;
@@ -1042,6 +1073,7 @@ export function derivatiAperti(derived) {
   const list = Array.isArray(derived) ? derived : (derived && derived.num ? [derived] : []);
   return list.filter((f) => f && typeof f === 'object').map((f) => ({
     rilievo: f,
+    n: Number.isInteger(f.n) ? f.n : null,
     num: String(f.num || '').trim(),
     priority: Number.isFinite(Number(f.priority)) ? Number(f.priority) : (Number.isFinite(Number(f.level)) ? Number(f.level) : null),
     esterno: f.sede === 'e',
@@ -1053,13 +1085,25 @@ function derivatiRighe(list) {
   if (!list.length) return '  (nessuno)';
   return list.map((d) => {
     const dove = `feedback ${d.num || '(numero non comunicato)'}${d.priority != null ? `, priorità ${d.priority}, ${d.esterno ? 'esterno' : 'interno messo da parte'}` : ''}`;
-    return d.rilievo.text ? `${VERIFIER_ROUND.formatFinding(d.rilievo)}\n  → ${dove}` : `- ${dove}`;
+    return d.rilievo.text ? `${rigaNumerata(d.rilievo, VERIFIER_ROUND.formatFinding)}\n  → ${dove}` : `- ${dove}`;
   }).join('\n');
 }
 
-export function verifierReplyText(reply) {
+/**
+ * La risposta del server coi rilievi numerati come nella critica mandata (`n`, da 1): il server li rimanda col
+ * testo, e il numero è quello che le prove del giro portano nel nome. PURA.
+ */
+export function numeraRisposta(reply, critica) {
+  const r = { ...(reply || {}) };
+  const numera = (l) => (Array.isArray(l) ? numeraRilievi(critica, l) : l);
+  if (r.phase2 && typeof r.phase2 === 'object') r.phase2 = { ...r.phase2, findings: numera(r.phase2.findings), derived: numera(r.phase2.derived) };
+  for (const k of ['derived', 'blocking', 'sospesi']) if (Array.isArray(r[k])) r[k] = numera(r[k]);
+  return r;
+}
+
+export function verifierReplyText(reply, id = '<id>') {
   const r = reply && typeof reply === 'object' ? reply : {};
-  const fmt = (list) => (Array.isArray(list) && list.length ? VERIFIER_ROUND.formatFindings(list) : '  (nessuno)');
+  const fmt = (list) => (Array.isArray(list) && list.length ? list.map((f) => rigaNumerata(f, VERIFIER_ROUND.formatFinding)).join('\n') : '  (nessuno)');
   const b = (r.phase2 && r.phase2.budgets) || r.budgets;
   // I bilanci come li manda il server, nell'ordine dei livelli: uno che il
   // server non manda (un server vecchio) non si inventa.
@@ -1077,7 +1121,7 @@ export function verifierReplyText(reply) {
   // Un rilievo diventato un feedback suo non lascia una prova rossa nel ramo:
   // il testo vive nel feedback, e la cartella del giro si svuota invece di
   // crescere. Le righe sono pronte da spuntare, col numero di ciascuno.
-  const daTogliere = derivati.map((d) => `  · la prova che riproduce ${d.num || '(numero non comunicato)'}: ${d.frase}`).join('\n');
+  const daTogliere = derivati.map((d) => `  · ${d.n ? `le prove con r${d.n} nel nome` : 'nessuna prova (il rilievo non si ritrova nella critica)'}, per ${d.num || '(numero non comunicato)'}: ${d.frase}`).join('\n');
   if (r.outcome === 'fix' && r.phase2) {
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
@@ -1085,8 +1129,10 @@ export function verifierReplyText(reply) {
       fmt(r.phase2.findings),
       'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu):',
       derivatiRighe(derivati),
-      derivati.length ? 'Prove del giro da TOGLIERE dal ramo, nello stesso commit della correzione (quelle dei rilievi esterni le ha già tolte chi ha verificato: se non ci sono più, vai avanti):' : null,
+      derivati.length ? 'Prove del giro da TOGLIERE adesso, PRIMA di ogni correzione, in un commit che toglie solo queste (quelle dei rilievi esterni sono già uscite col commit della critica: se non ci sono più, vai avanti). Una prova che porta anche il numero di un rilievo da correggere resta: le si toglie solo il caso di questi.' : null,
       derivati.length ? daTogliere : null,
+      derivati.length ? `  Se ne hai tolte, poi \`git add -A && git commit -m "pulizia del giro"\` e \`node scripts/dispatch.mjs --record-pulizia ${id}\`: da quel commit parte il confronto della consegna.` : null,
+      'Una prova del giro ancora rossa non si toglie e non si cambia mai: la consegna la rilancia com\'era e si ferma. Si toglie solo verde, insieme alla prova durevole che la sostituisce.',
       dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
       '',
@@ -1170,10 +1216,14 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   // Stessa guardia di «verify-local.mjs corretto»: una prova del giro cancellata ancora rossa è
   // una porta aperta che la verifica dopo non rilancerebbe più (#679).
   const shaCritica = String(guard.state?.verifierSha || '');
-  if (shaCritica && shaCritica !== headSha(ROOT)) {
-    const r = guard.state.reply || {};
+  const baseTolte = baseDelConfronto(shaCritica, guard.state?.puliziaSha, ROOT);
+  if (baseTolte && baseTolte !== headSha(ROOT)) {
+    const md = guard.state?.messiDaParteGiro;
     const tolte = controllaProveTolte({
-      shaPrima: shaCritica, root: ROOT, messiDaParte: derivatiAperti(r.phase2 ? r.phase2.derived : r.derived).length,
+      shaPrima: baseTolte, root: ROOT,
+      conPulizia: baseTolte !== shaCritica,
+      messi: md && md.sha === shaCritica ? Number(md.n) || 0 : 0,
+      shaCritica,
       log: (m) => process.stderr.write(`${m}\n`),
     });
     if (tolte.ferma) return { rejected: true, formatRejected: true, message: tolte.testo };
@@ -1205,6 +1255,20 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   sealTransition(next, `${readRole(ROOT) || 'fixer'}:${reply.outcome === 'stop' ? 'ferma' : 'consegna'}`);
   next.reply = reply;
   return next;
+}
+async function recordPulizia(id) {
+  const guard = guardIdentity(id);
+  if (!guard.ok) return { rejected: true, message: guard.message };
+  const stato = statoDirectory(ROOT);
+  if (!stato.ok) return { rejected: true, formatRejected: true, message: statoIllegibileText(stato.motivo) };
+  if (stato.lines.length) return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines, 'pulizia') };
+  const st = { ...(guard.state || defaultState(id, '')), id };
+  const avvio = st.messiDaParteGiro && st.messiDaParteGiro.sha === st.verifierSha ? st.messiDaParteGiro.avvio : '';
+  const r = applyPulizia(st, st.verifierSha ? controllaPulizia({ shaCritica: st.verifierSha, root: ROOT, avvio }) : null);
+  if (!r.ok) return { rejected: true, formatRejected: true, message: r.message };
+  // Un punto fermo sul commit della pulizia: un ripristino non deve riportare il ramo alla critica.
+  sealTransition(r.state, 'pulizia');
+  return { ...r.state, files: r.files };
 }
 async function recordSecaudit(id, verdict, testo = '') {
   const guard = guardIdentity(id);
@@ -1457,6 +1521,8 @@ export function usageText() {
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
+    '  --record-pulizia  <id> [--ticket <b>]   dopo una critica che manda a correggere e mette rilievi',
+    '                         da parte: registra il commit che toglie SOLO le loro prove del giro',
     '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]',
     '                         il report non è facoltativo: da qui esce un esito, e l’owner legge questo',
     '  --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]',
@@ -1936,7 +2002,7 @@ if (isMainModule) {
       const s = await recordVerifier(id, critica, segnalazione.testo);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
-      console.log(verifierReplyText(s.reply));
+      console.log(verifierReplyText(s.reply, id));
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const seg = stripFileArg(conBiglietto(argv), 'segnala');
@@ -1978,6 +2044,18 @@ if (isMainModule) {
       const s = await recordFixed(id, report, frase, segnalazione.testo, ferma);
       if (s.rejected) esciRespinto(s);
       console.log(fixedReplyText(id, s.reply, ferma || !!segnalazione.testo.trim()));
+      process.exit(0);
+    } else if (flag === '--record-pulizia') {
+      const [, id, ...avanzo] = conBiglietto(argv);
+      if (!id || SEMBRA_OPZIONE(id)) { console.error('Uso: --record-pulizia <id>'); process.exit(1); }
+      if (avanzo.length) {
+        console.error(`Argomento non capito: ${avanzo[0]} — non ho registrato niente. Qui ci va solo l'identificativo: cosa hai tolto lo dice il commit.`);
+        process.exit(1);
+      }
+      const s = await recordPulizia(id);
+      if (s.rejected) esciRespinto(s);
+      console.log(`stato ${id}: pulizia registrata su ${String(s.puliziaSha).slice(0, 8)} (${s.files.length === 1 ? '1 prova tolta' : `${s.files.length} prove tolte`}). Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, se com'era è ancora rossa, la ferma.`);
+      console.log(s.files.map((f) => `  · ${f}`).join('\n'));
       process.exit(0);
     } else if (flag === '--record-secaudit') {
       // `--nota <file>` è l'unica opzione, e si toglie prima dei posizionali.

@@ -89,6 +89,47 @@ test('applyFixed: ri-mette in coda verifier e azzera la critica (i bilanci li ti
   assert.equal(fixed.verifierCritique, '');
 });
 
+test('applyPulizia: ammessa solo a correzione aperta e con rilievi messi da parte su quella critica', async () => {
+  const { applyPulizia } = await import('../../scripts/dispatch.mjs');
+  const buona = { ok: true, sha: 'b'.repeat(40), files: ['tests/verifica/9/giro1-r1-a.spec.mjs'], cancellate: ['tests/verifica/9/giro1-r1-a.spec.mjs'] };
+  const aperta = { ...applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2i] x', 'a'.repeat(40)), messiDaParteGiro: { sha: 'a'.repeat(40), n: 1, numeri: [1] } };
+  const r = applyPulizia(aperta, buona);
+  assert.equal(r.ok, true);
+  assert.equal(r.state.puliziaSha, 'b'.repeat(40));
+  assert.match(applyPulizia({ ...aperta, messiDaParteGiro: { sha: 'a'.repeat(40), n: 0 } }, buona).message, /nessun rilievo/);
+  assert.equal(applyPulizia({ ...aperta, messiDaParteGiro: { sha: 'c'.repeat(40), n: 2 } }, buona).ok, false,
+    'il conto di una critica vecchia non vale per questa');
+  assert.equal(applyPulizia(applyVerifierVerdict(aperta, 'pass', '', 'a'.repeat(40)), buona).ok, false);
+  assert.match(applyPulizia(aperta, { ok: false, motivo: 'qui c\'è codice' }).message, /qui c'è codice/);
+  const larga = { ...buona, cancellate: [...buona.cancellate, 'tests/verifica/9/giro1-r2-c.spec.mjs'] };
+  assert.match(applyPulizia(aperta, larga).message, /giro1-r2-c\.spec\.mjs: r2 non è fra i rilievi messi da parte/,
+    'la prova di un rilievo da correggere non esce nella pulizia');
+  assert.match(applyPulizia({ ...aperta, messiDaParteGiro: { sha: 'a'.repeat(40), n: 1, numeri: [2] } }, buona).message,
+    /giro1-r1-a\.spec\.mjs: r1 non è fra/, 'il numero conta, non quante prove escono');
+  // Una critica nuova e una consegna svuotano la base: la pulizia vale per un giro solo.
+  assert.equal(applyVerifierVerdict(r.state, 'fix', '[2i] y', 'd'.repeat(40)).puliziaSha, '');
+  assert.equal(applyFixed(r.state).puliziaSha, '');
+});
+
+// Il server rimanda i rilievi col testo e il numero di feedback: il posto nella critica, che le prove portano nel nome,
+// lo ritrova chi ha mandato la critica.
+test('la risposta del server si stampa coi numeri dei rilievi nella critica', async () => {
+  const { numeraRisposta, verifierReplyText, VERIFIER_ROUND } = await import('../../scripts/dispatch.mjs');
+  const critica = VERIFIER_ROUND.parseFindings('Provato.\n[2i] la cosa a non funziona.\n[1i?] il bordo è freddo?\n[1e] un altro lavoro.').findings;
+  const r = numeraRisposta({
+    outcome: 'fix',
+    phase2: {
+      findings: [{ level: 2, sede: 'i', text: 'la cosa a non funziona.' }],
+      derived: [{ level: 1, sede: 'e', text: 'un altro lavoro.', priority: 1, num: '#9.1' }, { level: 1, sede: 'i', text: 'il bordo è freddo?', decision: true, priority: 1, num: '#9.2' }],
+    },
+  }, critica);
+  assert.deepEqual(r.phase2.derived.map((f) => f.n), [3, 2]);
+  const t = verifierReplyText(r, 'X');
+  assert.match(t, /- r1 \[2i\] la cosa a non funziona/);
+  assert.match(t, /- r3 \[1e\] un altro lavoro/);
+  assert.match(t, /le prove con r2 nel nome, per #9\.2/);
+});
+
 test('VERIFIER_ROUND: il parser della critica coi livelli arriva dagli strumenti (fonte unica)', async () => {
   const { VERIFIER_ROUND, VERIFIER_OUTCOMES } = await import('../../scripts/dispatch.mjs');
   const p = VERIFIER_ROUND.parseFindings('funziona\n[2i] rotto\n[1i?] gusto');
@@ -117,7 +158,11 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
   // prova si TOGLIE, e la risposta dice quali per numero (regola del
   // 23/09/2026). Chi le toglie cambia con l'esito: chi corregge se c'è una fase
   // 2, chi ha verificato se il lavoro passa.
-  assert.match(fix, /Prove del giro da TOGLIERE dal ramo, nello stesso commit della correzione/);
+  // Escono PRIMA di ogni correzione, in un commit registrato: da lì una prova rossa tolta ferma la consegna.
+  assert.match(fix, /Prove del giro da TOGLIERE adesso, PRIMA di ogni correzione/);
+  assert.match(fix, /--record-pulizia <id>/);
+  assert.doesNotMatch(fix, /nello stesso commit della correzione/);
+  assert.match(fix, /ancora rossa non si toglie e non si cambia mai/);
   assert.doesNotMatch(fix, /test\.fail\(true/, 'il marcatore non è più la strada principale');
   const passConFigli = verifierReplyText({
     outcome: 'pass',
