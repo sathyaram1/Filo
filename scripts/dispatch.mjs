@@ -1249,7 +1249,8 @@ async function recordPulizia(id) {
   if (!stato.ok) return { rejected: true, formatRejected: true, message: statoIllegibileText(stato.motivo) };
   if (stato.lines.length) return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines, 'pulizia') };
   const st = { ...(guard.state || defaultState(id, '')), id };
-  const r = applyPulizia(st, st.verifierSha ? controllaPulizia({ shaCritica: st.verifierSha, root: ROOT }) : null);
+  const avvio = st.messiDaParteGiro && st.messiDaParteGiro.sha === st.verifierSha ? st.messiDaParteGiro.avvio : '';
+  const r = applyPulizia(st, st.verifierSha ? controllaPulizia({ shaCritica: st.verifierSha, root: ROOT, avvio }) : null);
   if (!r.ok) return { rejected: true, formatRejected: true, message: r.message };
   // Un punto fermo sul commit della pulizia: un ripristino non deve riportare il ramo alla critica.
   sealTransition(r.state, 'pulizia');
