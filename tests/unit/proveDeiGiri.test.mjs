@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, resolve, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { importRelativi, asserisceQualcosa, siDichiaraTemporanea, scorri } from '../helpers/proveDeiGiri.mjs';
+import { importRelativi, asserisceQualcosa, siDichiaraTemporanea, scorri, registraProve } from '../helpers/proveDeiGiri.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -115,6 +115,29 @@ test('la suite di default non raccoglie le prove dei giri', async () => {
     + ' pulizia del #510 si disferebbe da sola');
   assert.ok(!regole.some((r) => r instanceof RegExp && r.test(`${ROOT}/tests/boot.spec.mjs`)),
     'l\'esclusione deve valere solo per tests/verifica/');
+});
+
+// Nominando la cartella l'esclusione si spegne, e decide solo testMatch: chiesto al raccoglitore.
+test('ogni prova di un giro ha un nome che il raccoglitore raccoglie', async () => {
+  const cfg = await configRaccoglitore();
+  const dir = `${resolve(ROOT, cfg.testDir || '.').replace(/\\/g, '/')}/`;
+  const raccolta = (rel) => {
+    const assoluto = `${ROOT.replace(/\\/g, '/')}/${rel}`;
+    return assoluto.startsWith(dir) && regexDi(cfg.testMatch).some((r) => combacia(r, assoluto));
+  };
+  const perse = nelRepo('tests/verifica')
+    .filter((f) => /\.(m?js|cjs)$/.test(f) && !raccolta(f))
+    .filter((f) => registraProve(readFileSync(resolve(ROOT, f), 'utf8')));
+  assert.deepEqual(perse.map((f) => `${f} → ${f.replace(/(\.test)?\.(mjs|cjs|js)$/, '.spec.mjs')}`), [],
+    '`npx playwright test tests/verifica/<numero>` raccoglie solo i file *.spec.mjs: queste prove non'
+    + ' girerebbero mai, e sparirebbero in silenzio. Rinominale come indicato (git mv).');
+});
+
+test('il riconoscitore distingue una prova da un aiuto e da uno script', () => {
+  assert.equal(registraProve("import { test, expect } from '../../fixtures/electron.mjs';\ntest('x', async () => {});"), true);
+  assert.equal(registraProve("import { test } from 'node:test';\ntest.describe('y', () => {});"), true);
+  assert.equal(registraProve("import { expect } from '../../fixtures/electron.mjs';\nexport function aiuto() {}"), false);
+  assert.equal(registraProve("// test('commentato')\nconst s = \"test('in stringa')\";\nawait prova();"), false);
 });
 
 // Le prove di un giro sono la memoria di quel giro: il giro dopo le rilancia

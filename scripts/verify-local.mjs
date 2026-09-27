@@ -64,6 +64,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
+import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, perimetroNote } from './lib/verifier-scope.mjs';
 
@@ -1205,6 +1206,11 @@ if (isMain) {
     // critica ristampa la risposta (persa), un'altra è respinta.
     const stato = statoDirectory(ROOT);
     if (!stato.ok) { console.error(statoIllegibileText(stato.motivo)); process.exit(1); }
+    // A correzione in sospeso il codice si muove di diritto (la stessa critica ristampa la risposta).
+    if (!stato.lines.length && prev.verdict !== 'fix-pending') {
+      const fermo = codiceCambiatoDallAvvio(prev.requestedSha, ROOT);
+      if (fermo.cambiati.length) { console.error(testoCodiceCambiato(fermo.cambiati, prev.requestedSha)); process.exit(1); }
+    }
     // I bilanci dal server, PRIMA di calcolare l'esito: nessun default.
     const caps = await bilanciOStop();
     const r = withCritique(readState(), branch, { critique: text, sha, caps, dirtyFiles: stato.lines });
@@ -1258,6 +1264,14 @@ if (isMain) {
     }
     const statoC = statoDirectory(ROOT);
     if (!statoC.ok) { console.error(statoIllegibileText(statoC.motivo, 'consegna')); process.exit(1); }
+    const aperto = readState()[branch];
+    if (aperto && aperto.verdict === 'fix-pending' && aperto.pending && aperto.pending.sha && aperto.pending.sha !== sha && !statoC.lines.length) {
+      const { controllaProveTolte } = await import('./lib/prove-tolte.mjs');
+      const messiDaParte = [aperto.pending.derived, aperto.pending.external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
+      const tolte = controllaProveTolte({ shaPrima: aperto.pending.sha, root: ROOT, messiDaParte });
+      if (tolte.ferma) { console.error(tolte.testo); process.exit(1); }
+      if (tolte.testo) console.log(tolte.testo);
+    }
     const r = withFixed(readState(), branch, { report, sha, dirtyFiles: statoC.lines });
     if (!r.ok) { console.error(r.reason); process.exit(1); }
     writeState(r.state);

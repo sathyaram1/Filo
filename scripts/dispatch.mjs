@@ -79,12 +79,14 @@ import {
   writeExpectation, clearExpectation, stateDir,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
+import { controllaProveTolte } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
+import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -947,6 +949,12 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
   if (stato.lines.length) {
     return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines) };
   }
+  // L'ultimo punto fermo è il checkout di questo giro. Dopo una critica già data il codice si muove di diritto.
+  const avvio = guard.state?.verifierSha ? '' : lastCheckpoint(guard.state);
+  if (avvio) {
+    const fermo = codiceCambiatoDallAvvio(avvio, ROOT);
+    if (fermo.cambiati.length) return { rejected: true, formatRejected: true, message: testoCodiceCambiato(fermo.cambiati, avvio) };
+  }
   const parsed = VERIFIER_ROUND.parseFindings(critiqueText);
   const base = { ...defaultState(id, ''), ...(guard.state || {}), id };
 
@@ -1158,6 +1166,18 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   }
   if (stato.lines.length) {
     return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines, 'consegna') };
+  }
+  // Stessa guardia di «verify-local.mjs corretto»: una prova del giro cancellata ancora rossa è
+  // una porta aperta che la verifica dopo non rilancerebbe più (#679).
+  const shaCritica = String(guard.state?.verifierSha || '');
+  if (shaCritica && shaCritica !== headSha(ROOT)) {
+    const r = guard.state.reply || {};
+    const tolte = controllaProveTolte({
+      shaPrima: shaCritica, root: ROOT, messiDaParte: derivatiAperti(r.phase2 ? r.phase2.derived : r.derived).length,
+      log: (m) => process.stderr.write(`${m}\n`),
+    });
+    if (tolte.ferma) return { rejected: true, formatRejected: true, message: tolte.testo };
+    if (tolte.testo) process.stderr.write(`${tolte.testo}\n`);
   }
   const next = applyFixed({ ...(guard.state || defaultState(id, '')), id });
   next.id = id;
@@ -1802,12 +1822,12 @@ export function emit(bucket, ctx) {
   // Un guasto (`halt`) non è un ruolo: si cancella il marcatore, altrimenti
   // quello del giro precedente sopravviverebbe a un giro che non ha lavorato e
   // finirebbe nella provenienza di un feedback altrui.
+  const ambito = bucket.role === 'verifier' ? verifierScope(ctx && ctx.scope) : { scope: '', sconosciuto: false };
   if (bucket.role === 'halt') clearRole(ROOT);
-  else writeRole(ROOT, bucket.role);
+  else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? ctx?.perimetro?.shaVerificato : '' });
   const payload = buildPayload(bucket, ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
-  const ambito = bucket.role === 'verifier' ? verifierScope(ctx && ctx.scope) : { scope: '', sconosciuto: false };
   if (ambito.sconosciuto) process.stderr.write(`[dispatch] ambito di verifica sconosciuto («${unaRiga(ctx.scope).slice(0, 40)}»): consegno la verifica piena\n`);
   // Nei giri stretti la serie non si consegna: inviterebbe alla ricerca larga
   // che il testo del ruolo dice di non rifare.

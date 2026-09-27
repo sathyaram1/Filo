@@ -29,12 +29,12 @@ const TESTS = join(__dirname, '..');
 // Il file che DEFINISCE l'helper è l'unico che può costruirla a mano.
 const AMMESSO = join(TESTS, 'helpers', 'percorsi.mjs');
 
-function fileDiTest(dir = TESTS, out = []) {
+function fileDiTest(dir = TESTS, out = [], estensioni = /\.mjs$/) {
   for (const nome of readdirSync(dir)) {
     if (nome.startsWith('.') || nome === 'node_modules') continue;
     const p = join(dir, nome);
-    if (statSync(p).isDirectory()) fileDiTest(p, out);
-    else if (nome.endsWith('.mjs')) out.push(p);
+    if (statSync(p).isDirectory()) fileDiTest(p, out, estensioni);
+    else if (estensioni.test(nome)) out.push(p);
   }
   return out;
 }
@@ -60,4 +60,21 @@ test('la cartella temporanea nasce con uno spazio nel nome e in forma canonica',
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// Da un URL di file, `.pathname` su Windows dà `/C:/Users/agenti%20AI/...`: rosso
+// solo dove il percorso ha una lettera di disco o uno spazio, cioè dall'owner.
+test('nessun test o script ricava un percorso dal pathname di un URL di file', () => {
+  const RADICE = join(TESTS, '..');
+  const colpevoli = [];
+  for (const cartella of ['tests', 'scripts']) {
+    for (const p of fileDiTest(join(RADICE, cartella), [], /\.(mjs|cjs|js)$/)) {
+      if (/import\.meta\.url\s*\)\s*\.pathname/.test(readFileSync(p, 'utf8'))) {
+        colpevoli.push(relative(RADICE, p));
+      }
+    }
+  }
+  assert.deepEqual(colpevoli, [],
+    'questi file ricavano un percorso con `.pathname` da import.meta.url: usa '
+    + '`fileURLToPath(new URL(..., import.meta.url))` da node:url');
 });

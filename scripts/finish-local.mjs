@@ -79,6 +79,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verdictForCurrentBranch } from './verify-local.mjs';
 import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge } from './lib/owner-merge.mjs';
+import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
+import { readMarker } from './lib/routine-role.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -157,10 +159,42 @@ function defaultBranch() {
   return r.ok ? r.out : '';
 }
 
-function run(cmd, args, label) {
+function run(cmd, args, label, env = undefined) {
   process.stdout.write(`\n▸ ${label}\n`);
-  const r = spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+  const r = spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32', ...(env ? { env } : {}) });
   return r.status === 0;
+}
+
+/**
+ * Il commit da cui prendere ANCHE i file cambiati, in un giro di riallineamento: quello che
+ * aveva passato la verifica, scritto da dispatch nel marcatore del ruolo. '' altrimenti. PURA.
+ * Il ramo contro main non vede il lato arrivato da main né il file in conflitto.
+ */
+export function shaDelRiallineamento(marker) {
+  const m = marker && typeof marker === 'object' ? marker : {};
+  const sha = String(m.dal || '').trim();
+  return m.role === 'verifier' && /^[0-9a-f]{7,40}$/i.test(sha) ? sha : '';
+}
+
+/**
+ * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche
+ * quelli cambiati dal commit verificato alla punta. `{ changed, nota }`; la nota va stampata.
+ */
+export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
+  const g = (args) => git(args, { cwd: root });
+  const changed = g(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean);
+  const dal = shaDelRiallineamento(marker);
+  if (!dal) return { changed, nota: '' };
+  const c = g(['cat-file', '-e', `${dal}^{commit}`]).ok || g(['fetch', 'origin', dal]).ok;
+  const r = c ? g(['diff', '--name-only', dal, 'HEAD']) : { ok: false };
+  if (!r.ok) {
+    return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} qui non c'è: scelgo gli spec solo dal ramo contro main, e il lato arrivato da main resta scoperto.` };
+  }
+  const lato = r.out.split('\n').filter(Boolean);
+  return {
+    changed: [...new Set([...changed, ...lato])],
+    nota: `Giro di riallineamento: scelgo gli spec anche dai ${lato.length} file cambiati da ${dal.slice(0, 8)} (il commit verificato) alla punta, cioè il lato arrivato da main e i file in conflitto.`,
+  };
 }
 
 /**
@@ -402,7 +436,8 @@ function runSpecsALotti(specs, label) {
   let ok = true;
   lotti.forEach((lotto, i) => {
     const suffisso = lotti.length > 1 ? ` — lotto ${i + 1}/${lotti.length}, ${lotto.length} spec` : '';
-    if (!run('npx', ['playwright', 'test', ...lotto], label + suffisso)) ok = false;
+    const l = preparaLancioElectron('npx', ['playwright', 'test', ...lotto]);
+    if (!l.ok || !run(l.cmd, l.args, label + suffisso, l.env)) ok = false;
   });
   return ok;
 }
@@ -503,6 +538,23 @@ async function main() {
   const spec = specDaRilanciare({ checkOnly, ok: v.ok, sha: v.entry && v.entry.sha, tollerato: v.tollerato });
 
   {
+    // Gli spec si scelgono PRIMA dei controlli di logica: se non potranno partire, ci si ferma
+    // adesso e non dopo gli unit test.
+    if (!spec.rilancia) console.log(`\n${spec.nota}`);
+    const scelta = spec.rilancia ? cambiatiPerLaScelta({ base, marker: readMarker(ROOT) }) : { changed: [], nota: '' };
+    if (scelta.nota) console.log(`\n${scelta.nota}`);
+    const changed = scelta.changed;
+    // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
+    // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
+    // l'elenco degli spec tracciati e filtriamo in memoria.
+    const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs']).out.split('\n').filter(Boolean));
+    const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
+    const { blocking, informative } = splitKnownRed(specs, readKnownRed(ROOT));
+    if (specs.length) {
+      const schermo = preparaLancioElectron('npx', []);
+      if (!schermo.ok) { console.error(`\n✗ ${schermo.motivo}`); process.exit(1); }
+      if (schermo.nota) console.log(`\n${schermo.nota}`);
+    }
     // 1. Logica pura — veloce, nessuna finestra che si apre.
     if (!run('npm', ['run', 'test:unit'], 'Controlli di logica')) {
       console.error('\n✗ Controlli di logica rossi: non pubblico. Sistema e rilancia.');
@@ -512,14 +564,6 @@ async function main() {
     //    Actions, nel lavoro di release, ogni sei ore prima di pubblicare
     //    (dal 2026-09-15: nessun ruolo e nessuna sessione la lancia): qui
     //    serve il segnale rapido.
-    if (!spec.rilancia) console.log(`\n${spec.nota}`);
-    const changed = spec.rilancia ? git(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean) : [];
-    // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
-    // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
-    // l'elenco degli spec tracciati e filtriamo in memoria.
-    const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs']).out.split('\n').filter(Boolean));
-    const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
-    const { blocking, informative } = splitKnownRed(specs, readKnownRed(ROOT));
     if (blocking.length) {
       if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`)) {
         console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');
