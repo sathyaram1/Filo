@@ -1083,7 +1083,7 @@ function derivatiRighe(list) {
   }).join('\n');
 }
 
-export function verifierReplyText(reply) {
+export function verifierReplyText(reply, id = '<id>') {
   const r = reply && typeof reply === 'object' ? reply : {};
   const fmt = (list) => (Array.isArray(list) && list.length ? VERIFIER_ROUND.formatFindings(list) : '  (nessuno)');
   const b = (r.phase2 && r.phase2.budgets) || r.budgets;
@@ -1113,7 +1113,7 @@ export function verifierReplyText(reply) {
       derivatiRighe(derivati),
       derivati.length ? 'Prove del giro da TOGLIERE adesso, PRIMA di ogni correzione, in un commit che toglie solo queste (quelle dei rilievi esterni sono già uscite col commit della critica: se non ci sono più, vai avanti):' : null,
       derivati.length ? daTogliere : null,
-      derivati.length ? `  Poi \`git add -A && git commit -m "pulizia del giro"\` e \`node scripts/dispatch.mjs --record-pulizia ${id}\`: da quel commit parte il confronto della consegna.` : null,
+      derivati.length ? `  Se ne hai tolte, poi \`git add -A && git commit -m "pulizia del giro"\` e \`node scripts/dispatch.mjs --record-pulizia ${id}\`: da quel commit parte il confronto della consegna.` : null,
       'Una prova del giro ancora rossa non si toglie e non si cambia mai: la consegna la rilancia com\'era e si ferma. Si toglie solo verde, insieme alla prova durevole che la sostituisce.',
       dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
@@ -1979,7 +1979,7 @@ if (isMainModule) {
       const s = await recordVerifier(id, critica, segnalazione.testo);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
-      console.log(verifierReplyText(s.reply));
+      console.log(verifierReplyText(s.reply, id));
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const seg = stripFileArg(conBiglietto(argv), 'segnala');
