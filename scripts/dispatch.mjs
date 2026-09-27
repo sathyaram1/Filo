@@ -1073,6 +1073,7 @@ export function derivatiAperti(derived) {
   const list = Array.isArray(derived) ? derived : (derived && derived.num ? [derived] : []);
   return list.filter((f) => f && typeof f === 'object').map((f) => ({
     rilievo: f,
+    n: Number.isInteger(f.n) ? f.n : null,
     num: String(f.num || '').trim(),
     priority: Number.isFinite(Number(f.priority)) ? Number(f.priority) : (Number.isFinite(Number(f.level)) ? Number(f.level) : null),
     esterno: f.sede === 'e',
