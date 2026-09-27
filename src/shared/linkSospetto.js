@@ -74,18 +74,17 @@
       }
     }
 
-    // #725.2 — il nome vero c'è tutto, ma davanti a un altro dominio
-    // (paypal.com.accesso-sicuro.net, paypal.com@altro.net) o legato a
-    // un'altra parola col trattino (secure-paypal.com, paypal-com.net).
-    const davanti = esca.concat(sito.sotto).map(scheletro);
-    const catena = '.' + davanti.join('.') + '.';
-    const pezzi = sito.nome.split('-').filter(Boolean).map(scheletro);
+    // #725.2 — il nome vero c'è tutto ma non comanda: una regola sola per ogni
+    // pezzo, davanti al sito o nel suo nome, spezzato ai punti e ai trattini
+    // (paypal.com.altro.net, login-paypal.com.altro.net, paypal-login.wixsite.com).
+    const catena = '.' + esca.concat(sito.sotto, [sito.nome]).map(scheletro).join('.') + '.';
+    const pezzi = catena.split(/[.-]/).filter(Boolean);
     for (const p of POPULAR) {
       const suo = sitoDi(p).nome;
-      const intero = davanti.length && catena.includes('.' + p + '.');
+      const intero = new RegExp('[.-]' + p.replace(/\./g, '[.-]') + '[.-]').test(catena);
       // Un nome corto o di tutti i giorni (x, apple) da solo non prova niente:
       // apple.stackexchange.com e apple-pie.it non imitano nessuno.
-      const nudo = suo.length >= NOME_DISTINTIVO && (davanti.includes(suo) || (pezzi.length > 1 && pezzi.includes(suo)));
+      const nudo = suo.length >= NOME_DISTINTIVO && pezzi.includes(suo);
       if (intero || nudo) return 'nome_altrui:' + p + '|' + sito.dominio;
     }
     return '';
