@@ -16,6 +16,22 @@
   //   postfix= atom ('!')*
   //   atom   = number | '(' expr ')' | ident ['(' expr ')'] | ident
   // ----------------------------------------------------------------
+  const DUE_ARGOMENTI_RE = /\b(?:round|floor|ceil|log)\s*\(/gi;
+  function proteggiSecondoArgomento(s) {
+    const c = s.split('');
+    let m;
+    DUE_ARGOMENTI_RE.lastIndex = 0;
+    while ((m = DUE_ARGOMENTI_RE.exec(s))) {
+      let prof = 0;
+      for (let k = m.index + m[0].length - 1; k < c.length; k++) {
+        if (c[k] === '(') prof++;
+        else if (c[k] === ')' && --prof === 0) break;
+        else if (c[k] === ',' && prof === 1) { c[k] = ';'; break; }
+      }
+    }
+    return c.join('');
+  }
+
   function tryMathEval(input) {
     if (input == null) return { ok: false };
     let s = String(input).trim();
