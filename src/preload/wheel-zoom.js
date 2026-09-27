@@ -93,11 +93,38 @@ function vegliaRiquadri(elenco, webFrame) {
       aggancia(el.contentWindow);
     } catch (_) {}
   }
+  let ultimaRicerca = 0;
+  function cercaNascosti() {
+    if (!webFrame) return;
+    const ora = Date.now();
+    if (ora - ultimaRicerca < 200) return;
+    ultimaRicerca = ora;
+    const visita = (f) => {
+      let c = null;
+      try { c = f.firstChild; } catch (_) { return; }
+      for (; c; c = c.nextSibling) {
+        try {
+          const p = c.executeJavaScriptInIsolatedWorld(MONDO_FILO, [{ code: PRESENTATI }]);
+          if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch (_) {}
+        visita(c);
+      }
+    };
+    visita(webFrame);
+  }
+  try { globalThis.__filoZoomAggancia = (w) => aggancia(w); } catch (_) {}
+
   // Il puntatore che entra in un riquadro passa prima dal suo elemento: è lì
-  // che lo si aggancia, anche se è nato o è stato riscritto dopo.
+  // che lo si aggancia, anche se è nato o è stato riscritto dopo. Dentro un
+  // componente l'evento arriva col suo ospite: il riquadro sta nel percorso
+  // se il componente è aperto, altrimenti lo si cerca fra i frame figli.
   function sopra(e) {
-    const t = e && e.target;
-    if (t && (t.tagName === 'IFRAME' || t.tagName === 'FRAME')) aggancia(t.contentWindow);
+    let t = e && e.target;
+    if (t && t.shadowRoot !== undefined && !(t.tagName === 'IFRAME' || t.tagName === 'FRAME')) {
+      try { const p = e.composedPath(); if (p && p[0]) t = p[0]; } catch (_) {}
+    }
+    if (t && (t.tagName === 'IFRAME' || t.tagName === 'FRAME')) { aggancia(t.contentWindow); return; }
+    cercaNascosti();
   }
   return sopra;
 }
