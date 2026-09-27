@@ -13,7 +13,7 @@ const { avvisoNellaFinestra } = require('../avvisoFinestra');
 // Chi accede su un computer senza portachiavi di sistema scopriva solo alla
 // riapertura di essere di nuovo fuori, e pensava a un guasto (#708.1).
 function testoAccessoNonRicordato() {
-  const base = 'Accesso fatto, ma questo computer non ha un portachiavi di sistema dove custodirlo: '
+  const base = 'Hai fatto l\'accesso, ma questo computer non ha un portachiavi di sistema dove custodirlo: '
     + 'quando chiudi Filo dovrai accedere di nuovo.';
   if (process.platform === 'linux') return base + ' Per farlo ricordare installa GNOME Keyring o KWallet e riapri Filo.';
   return base;
