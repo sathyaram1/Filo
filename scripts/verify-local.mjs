@@ -292,6 +292,9 @@ export function checkVerdict(entry, headSha, dirty = false, leggiDiff = null) {
   return { ok: true, reason: 'verifica superata su questo contenuto' };
 }
 
+// Il numero di un rilievo vale per la critica che lo riporta: nella coda dei giri sarebbe il posto in una critica vecchia.
+const senzaNumero = (l) => l.map(({ n: _n, ...f }) => f);
+
 /**
  * Registra l'avvio di una verifica (nessun verdetto ancora). PURA.
  * I bilanci consumati e i rilievi messi da parte nei giri precedenti dello
@@ -415,7 +418,7 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
   // priorità uguale al livello. Gli esterni ci entrano in ogni esito (sono di
   // un altro lavoro); in cloud il server li apre come feedback, qui li apre
   // chi guida, dal report.
-  const coda = (Array.isArray(prev.derived) ? prev.derived : []).concat(decision.external);
+  const coda = (Array.isArray(prev.derived) ? prev.derived : []).concat(senzaNumero(decision.external));
   if (outcome === 'stop') {
     entry.verdict = 'fail';
     // Con quello che ha fermato restano anche gli altri interni della critica:
@@ -433,11 +436,11 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
     // Anche i rilievi messi da parte, gli esterni e i bilanci del giro:
     // servono a ristampare la risposta tale e quale se si è persa.
     entry.pending = { findings: decision.fix, sha: sha || '', at: when, derived: decision.derived, external: decision.external, budgets: decision.budgets };
-    entry.derived = coda.concat(decision.derived);
+    entry.derived = coda.concat(senzaNumero(decision.derived));
   } else {
     entry.verdict = 'pass';
     entry.pending = null;
-    entry.derived = coda.concat(decision.derived);
+    entry.derived = coda.concat(senzaNumero(decision.derived));
   }
   s[branch] = entry;
   return { ok: true, state: s, decision, outcome };
@@ -507,7 +510,7 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
       s[branch] = { ...base, verdict: 'fail', critique: ROUND.formatFindings(gravi), rounds, counts: {} };
       return { ok: true, state: s, outcome: 'stop', blocking: gravi };
     }
-    s[branch] = { ...base, verdict: 'pass', derived: (Array.isArray(prev.derived) ? prev.derived : []).concat(pending), rounds };
+    s[branch] = { ...base, verdict: 'pass', derived: (Array.isArray(prev.derived) ? prev.derived : []).concat(senzaNumero(pending)), rounds };
     return { ok: true, state: s, outcome: 'pass', derived: pending };
   }
   if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'corretto' };
