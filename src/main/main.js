@@ -50,6 +50,8 @@ if (process.env.NODE_ENV === 'test') {
   // più (vedi test-window-mode.js). Le prove che vogliono lo stub lo mettono
   // dopo, per conto loro, sopra a questo.
   try { require('./test-window-mode').silenziaApertureDiSistema(require('electron').shell); } catch (_) {}
+  // Il servizio vero delle schede non si raggiunge da nessuna porta (vedi test-servizi-chiusi.js).
+  try { require('./test-servizi-chiusi').chiudiServiziNeiTest(); } catch (_) {}
   try {
     globalThis.__filoHandlers = require('./services/handlers');
     globalThis.__filoDefaults = require('./services/defaultsStore');
