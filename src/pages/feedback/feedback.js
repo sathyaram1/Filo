@@ -961,7 +961,9 @@
     // decise lasciano il posto, e l'unico in cui la lista si rimescola.
     decise.clear();
     disegnate = items.length;
-    countEl.textContent = items.length ? `${items.length} feedback` : '';
+    // A zero il contatore resta: è proprio lì che dice «la ricerca non ha trovato
+    // niente» (#511). Muto solo finché i dati non sono arrivati.
+    countEl.textContent = dataLoaded ? `${items.length} feedback` : '';
     if (!items.length) {
       listEl.innerHTML = '';
       emptyEl.hidden = false;
