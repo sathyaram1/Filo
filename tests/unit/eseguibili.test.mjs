@@ -138,3 +138,15 @@ test('il sito deciso una volta vale come l’indirizzo, per il confronto e per l
   assert.ok(E.testoScarica('setup.exe', 'dubbio.example').includes('da dubbio.example'));
   assert.ok(E.testoApri('setup.exe', 'dubbio.example').includes('da dubbio.example'));
 });
+
+test('un sito incerto si dice incerto, in ogni frase che nomina il sito', () => {
+  const E = globalThis.SN_ESEGUIBILI;
+  assert.equal(E.provenienza('forum.it', false), 'da forum.it');
+  const incerto = E.provenienza('forum.it', true);
+  assert.match(incerto, /forum\.it/);
+  assert.notEqual(incerto, 'da forum.it');
+  assert.match(incerto, /altri siti/);
+  assert.ok(E.testoScarica('setup.exe', 'forum.it', true).includes(incerto));
+  assert.ok(E.testoApri('setup.exe', 'forum.it', true).includes(incerto));
+  assert.equal(E.provenienza('', true), '');
+});

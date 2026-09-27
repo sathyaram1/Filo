@@ -1227,22 +1227,24 @@
     function renderPanel() {
       ensurePanel();
       const list = panel.querySelector('#dl-panel-list');
-      list.textContent = '';
       const all = Array.from(dls.values()).sort((a, b) => {
         // Le domande in cima, poi gli attivi, poi per data d'inizio decrescente.
         const rank = (r) => ((r.state === 'pending' || domandeApri.has(r.id)) ? 0 : (isActive(r) ? 1 : 2));
         if (rank(a) !== rank(b)) return rank(a) - rank(b);
         return String(b.startedAt || '').localeCompare(String(a.startedAt || ''));
       });
+      const firma = all.map((r) => `${r.id}:${r.state === 'pending' ? 'p' : ''}${domandeApri.has(r.id) ? 'a' : ''}`).join('|');
+      if (firma !== firmaElenco) { firmaElenco = firma; elencoFermoDa = Date.now(); }
       if (!all.length) {
         const empty = document.createElement('div');
         empty.className = 'dl-empty';
         empty.textContent = 'Nessuno scaricamento';
-        list.appendChild(empty);
+        list.replaceChildren(empty);
+      } else if (window.SN_RIGHE_VIVE) {
+        window.SN_RIGHE_VIVE.riconcilia(list, all.map(renderRow), ':scope > .dl-row-actions');
+      } else {
+        list.replaceChildren(...all.map(renderRow));
       }
-      const firma = all.map((r) => `${r.id}:${r.state === 'pending' ? 'p' : ''}${domandeApri.has(r.id) ? 'a' : ''}`).join('|');
-      if (firma !== firmaElenco) { firmaElenco = firma; elencoFermoDa = Date.now(); }
-      for (const r of all) list.appendChild(renderRow(r));
       const manca = elencoFermoDa + ARMA_MS - Date.now();
       if (manca > 0 && !timerArma) {
         timerArma = setTimeout(() => { timerArma = null; if (panelOpen) renderPanel(); }, manca + 20);

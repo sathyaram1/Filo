@@ -478,3 +478,124 @@ test('un doppio clic sulla pagina non risponde «Scarica» né «Apri comunque»
     await srv.close();
   }
 });
+
+// Pagine su richiesta, `/lento.exe` che scende in una ventina di secondi, e
+// qualunque altro nome come programma allegato.
+async function serverPagine(pagine) {
+  const srv = createServer((req, res) => {
+    const p = String(req.url || '').split('?')[0];
+    if (pagine[p]) { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(pagine[p]); return; }
+    if (p === '/lento.exe') {
+      const tot = 64 * 1024 * 200;
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': tot, 'Content-Disposition': 'attachment; filename="lento.exe"' });
+      let mandati = 0;
+      const t = setInterval(() => {
+        if (mandati >= tot || res.destroyed) { clearInterval(t); res.end(); return; }
+        res.write(Buffer.alloc(64 * 1024, 1)); mandati += 64 * 1024;
+      }, 100);
+      return;
+    }
+    const nome = p.split('/').pop() || 'x.exe';
+    res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': EXE.length, 'Content-Disposition': `attachment; filename="${nome}"` });
+    res.end(EXE);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const porta = srv.address().port;
+  return { porta, async close() { try { srv.closeAllConnections?.(); } catch (_) {} await new Promise((r) => srv.close(r)); } };
+}
+
+// Un riquadro di un altro sito (la pubblicità) dentro un sito fidato: il
+// programma che consegna scritto nell'indirizzo può venire da lui.
+test('un programma data: da un riquadro di altri non prende la fiducia del sito che lo ospita, e la domanda lo dice', async ({ app, shell, openTab }) => {
+  test.setTimeout(150_000);
+  const pagine = {};
+  const srv = await serverPagine(pagine);
+  try {
+    const dir = await cartellaDownload(app);
+    pagine['/top.html'] = `<!doctype html><html><body><h1>Forum</h1>
+      <iframe id="ad" src="http://127.0.0.1:${srv.porta}/ad.html" width="400" height="200"></iframe></body></html>`;
+    pagine['/ad.html'] = `<!doctype html><html><body>
+      <a id="data" download="dalriquadro.exe" href="data:application/octet-stream;base64,TVoBAgME">data</a>
+      <a id="http" href="/dalriquadro-http.exe">http</a></body></html>`;
+
+    const sec = await openTab('filo://security/');
+    await sec.locator('#sec-dl-trusted').fill('blocked.test');
+    await sec.locator('#sec-dl-trusted').press('Tab');
+    await expect.poll(() => sec.evaluate(() => window.SN_STORAGE.getSettings().then((x) => x.security.downloads.trustedSites)), { timeout: 10000 }).toEqual(['blocked.test']);
+
+    const page = await openTab(`http://blocked.test:${srv.porta}/top.html`);
+    const ad = page.frameLocator('#ad');
+
+    await ad.locator('#http').click();
+    await expect.poll(() => statoDi(shell, 'dalriquadro-http.exe'), { timeout: 20000 }).toBe('pending');
+    await expect(domanda(shell, 'dalriquadro-http.exe')).toContainText('da 127.0.0.1');
+
+    await ad.locator('#data').click();
+    await expect.poll(() => statoDi(shell, 'dalriquadro.exe'), { timeout: 20000 }).toBe('pending');
+    expect(contenuto(dir)).not.toContain('dalriquadro.exe');
+    const avviso = domanda(shell, 'dalriquadro.exe');
+    await expect(avviso).toBeVisible({ timeout: 10000 });
+    await expect(avviso).toContainText('altri siti');
+    await expect(avviso).not.toContainText('programma da blocked.test.');
+  } finally { await srv.close(); }
+});
+
+// Un programma vero pesa decine di megabyte: mentre si legge la domanda sta
+// ancora scendendo, e il pannello si aggiorna a ogni avanzamento.
+test('«Scarica» risponde al primo clic anche mentre il programma sta ancora scendendo', async ({ app, shell, openTab }) => {
+  test.setTimeout(150_000);
+  const pagine = {};
+  const srv = await serverPagine(pagine);
+  try {
+    pagine['/p.html'] = '<!doctype html><html><body style="padding:40px"><a id="l" href="/lento.exe">scarica</a></body></html>';
+    const page = await openTab(`http://127.0.0.1:${srv.porta}/p.html`);
+    await page.locator('#l').click();
+    const si = risposta(domanda(shell, 'lento.exe'), /^Scarica$/);
+    await expect(si).toBeEnabled({ timeout: 10000 });
+    await shell.waitForTimeout(1500);
+    const b = await si.boundingBox();
+    // Tasto giù più a lungo di un avanzamento: senza la cura il clic si perde sempre.
+    await app.evaluate(async ({ BrowserWindow }, [x, y]) => {
+      const w = BrowserWindow.getAllWindows().find((z) => z._filoTabs);
+      w.webContents.sendInputEvent({ type: 'mouseMove', x, y });
+      w.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+      await new Promise((r) => setTimeout(r, 650));
+      w.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
+    }, [Math.round(b.x + b.width / 2), Math.round(b.y + b.height / 2)]);
+    await expect.poll(() => statoDi(shell, 'lento.exe'), { timeout: 3000, message: 'il primo clic su «Scarica» è andato a vuoto' }).not.toBe('pending');
+
+    // Stessa cosa sulla pagina Scaricamenti, che si aggiorna anche lei da sola.
+    await page.evaluate(() => { location.href = '/lento.exe'; });
+    await expect.poll(async () => (await elenco(shell)).items.filter((x) => x.state === 'pending').length, { timeout: 20000 }).toBe(1);
+    const dl = await openTab('filo://downloads/downloads.html');
+    const bottone = dl.locator('.dl-item[data-state="pending"] .dl-btn', { hasText: /^Scarica$/ });
+    await expect(bottone).toBeVisible({ timeout: 10000 });
+    await dl.waitForTimeout(1000);
+    const c = await bottone.boundingBox();
+    await dl.mouse.move(c.x + c.width / 2, c.y + c.height / 2);
+    await dl.mouse.down();
+    await dl.waitForTimeout(650);
+    await dl.mouse.up();
+    await expect.poll(async () => (await elenco(shell)).items.filter((x) => x.state === 'pending').length, { timeout: 3000 }).toBe(0);
+  } finally { await srv.close(); }
+});
+
+test('un nome lungo senza spazi si legge tutto nella domanda, senza scorrere di lato', async ({ shell, openTab }) => {
+  test.setTimeout(150_000);
+  const pagine = {};
+  const srv = await serverPagine(pagine);
+  try {
+    const lungo = 'Aggiornamento_urgente_del_driver_della_scheda_video_versione_finale_2026_installer_completo.exe';
+    pagine['/p.html'] = `<!doctype html><html><body style="padding:40px"><a id="l" href="/${lungo}">scarica</a></body></html>`;
+    const page = await openTab(`http://127.0.0.1:${srv.porta}/p.html`);
+    await page.locator('#l').click();
+    await expect(domanda(shell, lungo)).toBeVisible({ timeout: 15000 });
+    const misure = await shell.evaluate(() => {
+      const a = document.querySelector('#dl-panel .dl-row[data-chiede="1"] .dl-row-ask');
+      const l = document.querySelector('#dl-panel-list');
+      return { ask: [a.scrollWidth, a.clientWidth], lista: [l.scrollWidth, l.clientWidth] };
+    });
+    expect(misure.ask[0], 'il nome esce dal bordo della domanda').toBeLessThanOrEqual(misure.ask[1] + 1);
+    expect(misure.lista[0], 'il pannello scorre di lato').toBeLessThanOrEqual(misure.lista[1] + 1);
+  } finally { await srv.close(); }
+});

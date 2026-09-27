@@ -368,7 +368,6 @@
     const q = ($('search').value || '').trim().toLowerCase();
     const list = $('list');
     list.setAttribute('role', 'list');
-    list.textContent = '';
 
     let filtered = items;
     if (q) {
@@ -390,11 +389,13 @@
         ? 'Nessuno scaricamento corrisponde alla ricerca.'
         : 'Non hai ancora scaricato nulla.';
       empty.hidden = false;
+      list.textContent = '';
       return;
     }
     $('empty').hidden = true;
 
-    for (const r of filtered) list.appendChild(renderItem(r));
+    if (window.SN_RIGHE_VIVE) window.SN_RIGHE_VIVE.riconcilia(list, filtered.map(renderItem), ':scope > .dl-actions');
+    else list.replaceChildren(...filtered.map(renderItem));
   }
 
   // ─── live: il main segnala "qualcosa è cambiato" (senza dati) → ri-leggiamo ─
