@@ -3,7 +3,7 @@
 // Gira su una copia del ramo con un server finto dei bilanci e un'origine irraggiungibile: niente arriva al repo vero.
 
 import { test, expect } from '@playwright/test';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { existsSync, mkdirSync, rmSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
