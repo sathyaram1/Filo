@@ -549,10 +549,12 @@ module.exports.riquadro = function setupRiquadro(webFrame, opts) {
     manda({ tipo: 'esci' });
   }
 
-  tieniAscoltatori([
+  try { globalThis.__filoZoomQui = true; } catch (_) {}
+  const gesti = [
     ['mousedown', onMouseDown, true],
     ['contextmenu', onContextMenu, true],
     ['wheel', onWheel, { capture: true, passive: false }],
     ['keydown', onKeyDown, true],
-  ], () => { suppressContextMenu = false; });
+  ];
+  tieniAscoltatori([...gesti, ['pointerover', vegliaRiquadri(gesti), true]], () => { suppressContextMenu = false; });
 };
