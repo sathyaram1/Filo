@@ -124,18 +124,30 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   contava): ogni esterno diventa, con queste parole, un feedback a parte, col
   titolo preso dalla prima frase.
 - **Le prove restano nel ramo**, in
-  `tests/verifica/<numero>/giro<k>-<cosa>.spec.mjs` (con `FILO_TEST_SCALE` e le
+  `tests/verifica/<numero>/giro<k>-r<n>-<cosa>.spec.mjs` (con `FILO_TEST_SCALE` e le
   fixture del repo, come ogni spec). In un giro locale la cartella te la dice
   il compito ricevuto. Sono la memoria del giro, e a rilanciarle sei solo tu,
   in partenza. Una prova che era solo esplorazione (dipende dall'ambiente, non
   asserisce niente) si cancella. Si cancella anche quella di un rilievo
   **esterno**, nello stesso commit: quel rilievo esce di qui dentro un feedback
   suo, col suo testo, e la prova lasciata indietro sarebbe solo un rosso da
-  rispiegare per sempre. Quelle dei rilievi che la risposta del server mette da
+  rispiegare per sempre.
+- **`r<n>` è il numero del rilievo che la prova riproduce**: il suo posto nella
+  critica che registri, contando da 1 le righe con livello e sede, interne ed
+  esterne, nell'ordine in cui le scrivi. Una prova che ne copre più d'uno li
+  porta tutti (`giro2-r1-r3-salva.spec.mjs`); una che non ne riproduce nessuno
+  (una porta di un giro passato ri-provata e chiusa) non ha numero. Una prova di
+  un giro passato che riporti di nuovo come rilievo la rinomini (`git mv`) col
+  giro e il numero di adesso: il numero che porta è di una critica vecchia.
+  Serve alla pulizia: quelle dei rilievi che la risposta del server mette da
   parte le togli tu, appena la leggi e prima di ogni correzione, in un commit che
   toglie solo quelle, e lo registri con `--record-pulizia` (la risposta ti dà il
-  comando e i numeri): da quel commit una prova rossa tolta ferma la consegna.
-  Se la risposta dice che il lavoro passa, le togli seguendola.
+  comando e ripete il numero davanti a ogni rilievo). Esce solo una prova che nel
+  nome porta soli numeri di rilievi messi da parte, scritta o rinominata in
+  questa verifica; a una che copre anche un rilievo da correggere togli solo il
+  caso dei messi da parte. Da quel commit una prova rossa tolta ferma la
+  consegna, e una a cui hai tolto un caso si rilancia: quello che resta, se è
+  rosso, la ferma. Se la risposta dice che il lavoro passa, le togli seguendola.
 - **Prima di registrare porta la directory a un commit**
   (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`): il
   salvataggio automatico parte solo da un Edit o da un Write, non da un `rm` o
