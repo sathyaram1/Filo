@@ -58,7 +58,7 @@ const RIGHE = [
 
 test('dieci righe: turni, freddi, token, strumenti, timeout, sotto-agenti, durata', async () => {
   const rep = await analizzaRighe(RIGHE, { role: 'resolver', ticket: 'tkt-1' });
-  assert.equal(rep.v, 1);
+  assert.equal(rep.v, 2);
   assert.equal(rep.role, 'resolver');
   assert.equal(rep.ticket, 'tkt-1');
   assert.equal(rep.sessionId, 'sess-1');
