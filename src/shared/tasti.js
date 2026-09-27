@@ -277,7 +277,26 @@
     // (simbolo nei testi, `Left`/`Right` in un acceleratore di Electron,
     // `ArrowLeft`/`ArrowRight` in un evento del DOM): una forma sola.
     left: '\u2190', arrowleft: '\u2190', right: '\u2192', arrowright: '\u2192',
+    up: '\u2191', arrowup: '\u2191', down: '\u2193', arrowdown: '\u2193',
+    // Un tasto speciale si scrive col nome che viene in mente (anche in
+    // italiano) e il DOM lo chiama in un altro modo (" " per lo spazio): #545.1.
+    ' ': 'space', spacebar: 'space', spazio: 'space', barra: 'space',
+    return: 'enter', invio: 'enter', escape: 'escape',
+    del: 'delete', canc: 'delete', cancella: 'delete', ins: 'insert',
+    pgup: 'pageup', pagesu: 'pageup', pgdn: 'pagedown', pagegi\u00f9: 'pagedown',
+    fine: 'end', inizio: 'home', indietro: 'backspace', bksp: 'backspace',
+    'freccia su': '\u2191', 'freccia gi\u00f9': '\u2193', 'freccia giu': '\u2193',
+    'freccia sinistra': '\u2190', 'freccia destra': '\u2192',
+    su: '\u2191', 'gi\u00f9': '\u2193', giu: '\u2193', sinistra: '\u2190', destra: '\u2192',
   };
+  const TASTI_CON_NOME = new Set([
+    'space', 'enter', 'escape', 'tab', 'backspace', 'delete', 'insert',
+    'home', 'end', 'pageup', 'pagedown', 'contextmenu',
+  ]);
+  function tastoCanonico(nome) {
+    const n = String(nome || '').toLowerCase().replace(/\s+/g, ' ');
+    return SINONIMI_TASTO[n] || n;
+  }
   function forma(accel) {
     // Un "+" in ultima posizione è il TASTO più, non un separatore: "Ctrl++"
     // si spezzerebbe in ["Ctrl"] e sparirebbe dalla lista.
@@ -289,7 +308,7 @@
     const c = mods.some((m) => CTRL.test(m)) ? 'c' : '';
     const a = mods.some((m) => ALT.test(m)) ? 'a' : '';
     const s = mods.some((m) => m === 'shift') ? 's' : '';
-    return `${c}${a}${s}|${SINONIMI_TASTO[finale] || finale}`;
+    return `${c}${a}${s}|${tastoCanonico(finale)}`;
   }
 
   // Scritti in forma canonica (Windows): `riservato` confronta per forma, e
@@ -335,10 +354,62 @@
     return tastiRiservati(esplicita).some((a) => forma(a) === f);
   }
 
+  // ── Una scorciatoia scelta dall'utente ─────────────────────────────────────
+  // Il nome scritto e il tasto premuto passano dalla STESSA `forma`: erano due
+  // parser diversi, e ogni nome che il secondo non conosceva (Space, Up,
+  // Control…) si salvava senza avvisi e non scattava mai (#545.1).
+
+  // Il tasto finale scritto è uno che sappiamo riconoscere alla pressione?
+  function tastoRiconosciuto(accel) {
+    const f = forma(accel);
+    if (!f) return false;
+    const t = f.slice(f.indexOf('|') + 1);
+    return [...t].length === 1 || TASTI_CON_NOME.has(t) || /^f([1-9]|1[0-9]|2[0-4])$/.test(t);
+  }
+
+  // I nomi con cui può presentarsi il tasto premuto. `code` è il tasto FISICO
+  // (Shift+1 resta "1" anche se `key` dice "!"), `key` copre tutto il resto.
+  function tastiDaEvento(ev) {
+    const out = new Set();
+    if (ev.key) out.add(tastoCanonico(ev.key));
+    const code = String(ev.code || '');
+    let m;
+    if ((m = /^(?:Digit|Numpad)(\d)$/.exec(code))) out.add(m[1]);
+    else if ((m = /^Key([A-Z])$/.exec(code))) out.add(m[1].toLowerCase());
+    else if (code === 'Space') out.add('space');
+    return out;
+  }
+
+  // Il tasto premuto è quella scorciatoia? Cmd vale quanto Ctrl.
+  function combacia(ev, accel) {
+    const f = forma(accel);
+    if (!ev || !f) return false;
+    const c = modificatore(ev, 'ctrl') || modificatore(ev, 'meta') ? 'c' : '';
+    const a = modificatore(ev, 'alt') ? 'a' : '';
+    const s = modificatore(ev, 'shift') ? 's' : '';
+    const [mods, tasto] = [f.slice(0, f.indexOf('|')), f.slice(f.indexOf('|') + 1)];
+    return mods === `${c}${a}${s}` && tastiDaEvento(ev).has(tasto);
+  }
+
+  // Combinazioni che il sistema operativo intercetta prima di Filo: il menu
+  // Start, il cambio finestra, Spotlight e le istantanee dello schermo su Mac.
+  const PRESI_DAL_SISTEMA = {
+    win32: ['Ctrl+Escape', 'Ctrl+Shift+Escape', 'Alt+Tab', 'Alt+Shift+Tab', 'Alt+Escape', 'Alt+F4'],
+    darwin: ['Ctrl+Space', 'Ctrl+Alt+Space', 'Ctrl+Shift+3', 'Ctrl+Shift+4', 'Ctrl+Shift+5'],
+    linux: ['Alt+Tab', 'Alt+Shift+Tab', 'Alt+F4'],
+  };
+  function delSistema(accel, esplicita) {
+    const f = forma(accel);
+    if (!f) return false;
+    const lista = PRESI_DAL_SISTEMA[piattaforma(esplicita)] || PRESI_DAL_SISTEMA.linux;
+    return lista.some((a) => forma(a) === f);
+  }
+
   global.SN_TASTI = {
     piattaforma, suMac, etichetta, frase, acceleratoreElectron,
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
     comandoNavigazione, etichettaIndietro, etichettaAvanti,
     tastiRiservati, riservato,
+    tastoRiconosciuto, combacia, delSistema,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
