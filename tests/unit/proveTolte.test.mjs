@@ -366,7 +366,7 @@ function giroLocaleAperto({ external = [], derived = [] } = {}) {
   g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
   scrivi('.gitignore', '.claude/\ntests/verifica/_tolte-*/\nbin/\n');
   scrivi(`${cartella}/giro1-rilievo.spec.mjs`, 'rossa\n');
-  scrivi(`${cartella}/giro1-messo-da-parte.spec.mjs`, 'rossa\n');
+  scrivi(`${cartella}/giro1-r2-messo-da-parte.spec.mjs`, 'rossa\n');
   g('add', '-A'); g('commit', '-qm', 'critica');
   const critica = g('rev-parse', 'HEAD');
   scrivi('bin/npx.cmd', '@echo prova rossa\r\n@exit /b 1\r\n');
@@ -375,6 +375,7 @@ function giroLocaleAperto({ external = [], derived = [] } = {}) {
   const stato = (extra = {}) => writeFileSync(resolve(dir, '.claude', 'verify-local.json'), JSON.stringify({
     [ramo]: {
       request: 'correggi il pulsante', verdict: 'fix-pending', rounds: [{ outcome: '' }],
+      critique: 'Provato il pulsante.\n[2i] Il pulsante non salva col titolo vuoto\n[1i] Il bordo è freddo',
       pending: {
         sha: critica, at: new Date().toISOString(), budgets: null, derived, external,
         findings: [{ level: 2, sede: 'i', text: 'Il pulsante non salva col titolo vuoto' }], ...extra,
@@ -415,7 +416,7 @@ test('in locale la pulizia si registra, e la consegna dopo non rilancia la prova
   const derived = [{ level: 1, sede: 'i', text: 'Il bordo è freddo', priority: 1 }];
   const { dir, g, scrivi, cartella, vl } = giroLocaleAperto({ derived });
   try {
-    g('rm', '-q', `${cartella}/giro1-messo-da-parte.spec.mjs`); g('commit', '-qm', 'pulizia del giro');
+    g('rm', '-q', `${cartella}/giro1-r2-messo-da-parte.spec.mjs`); g('commit', '-qm', 'pulizia del giro');
     const pulizia = g('rev-parse', 'HEAD');
     const p = vl('pulizia');
     assert.equal(p.status, 0, p.testo);
@@ -444,7 +445,7 @@ test('in locale la pulizia si rifiuta senza rilievi messi da parte, o se il comm
   }
   const altro = giroLocaleAperto({ derived: [{ level: 1, sede: 'i', text: 'x', priority: 1 }] });
   try {
-    altro.g('rm', '-q', `${altro.cartella}/giro1-messo-da-parte.spec.mjs`);
+    altro.g('rm', '-q', `${altro.cartella}/giro1-r2-messo-da-parte.spec.mjs`);
     altro.scrivi('codice.js', 'una correzione\n');
     altro.g('add', '-A'); altro.g('commit', '-qm', 'pulizia e correzione insieme');
     const p = altro.vl('pulizia');
