@@ -64,6 +64,15 @@ fermo da un secondo; ogni riga che entra, esce o cambia domanda riapre l'attesa,
 e così la riapertura del pannello. I no restano sempre attivi: un no dato per
 sbaglio non costa niente.
 
+## Da quale sito: solo un'origine che il browser garantisce
+
+Il sito nominato nella domanda, e quello che decide se la fiducia vale, è
+l'host dell'indirizzo del file. Un `data:` o un `blob:null` non ne hanno uno:
+allora vale la pagina, ma solo se tutti i suoi riquadri sono di quel sito. Con
+un riquadro di altri (una pubblicità) il file può venire da lui: la domanda
+nomina la pagina dicendo che contiene altri siti, e un sito fidato non la
+salta (quinto giro; la stessa famiglia era già tornata al primo e al terzo).
+
 Corollario sui nomi: la decisione si prende sul nome **vero**, la si mostra col
 nome **leggibile**. `fattura‮txt.exe` si legge «fatturatxt.exe» e resta un
 eseguibile; punti e spazi in coda su Windows non contano (`setup.exe.` apre lo
