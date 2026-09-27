@@ -310,6 +310,31 @@ test('ogni fornitore escluso dice perché, e il perché si salva', async ({ open
   }
 });
 
+// #541 giro 1: il nome che il menu scrive per Novita è quello del catalogo; la
+// pagina deve riconoscerlo come la voce del codice, e dargli il suo motivo.
+test('scelto dal catalogo il nome di una voce del codice, l\'avviso lo conta e il motivo segue', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, {
+    excludedProviders: ['Google', 'OpenAI', 'xAI', 'DeepSeek', 'Mistral', 'Moonshot AI', 'MiniMax', 'Qwen', 'Cohere', 'Meta', 'Z.AI'],
+  });
+  await expect(page.locator('#excludedDriftText')).toContainText('Novita');
+  await page.click('#addExcludedRow');
+  const row = page.locator('#excludedList .sn-excluded-row').last();
+  await row.locator('.sn-excluded-name').fill('Novtia');
+  await row.locator('.sn-excluded-guess').click();
+  await expect(row.locator('.sn-excluded-name')).toHaveValue('NovitaAI');
+  await expect(page.locator('#excludedDrift')).toBeHidden();
+  await expect(row.locator('.sn-excluded-kind')).toHaveValue('unreliable');
+  await expect(row.locator('.sn-excluded-note')).not.toHaveValue('');
+
+  // Dal menu, stessa cosa.
+  await row.locator('.sn-excluded-name').fill('');
+  await expect(page.locator('#excludedDrift')).toBeVisible();
+  await row.locator('.sn-excluded-name').blur();
+  await row.locator('.sn-excluded-name').focus();
+  await row.locator('.sn-model-id-wrap .sn-select-option', { hasText: 'NovitaAI' }).click();
+  await expect(page.locator('#excludedDrift')).toBeHidden();
+});
+
 test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza stub)', async ({ openTab }) => {
   const page = await openTab(ADMIN_URL);
   await page.waitForSelector('#title', { timeout: 8_000 });
