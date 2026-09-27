@@ -37,6 +37,7 @@ async function preparaLogin(app, { cifra }) {
 
 // Avvia il login come fa la shell e completa il ritorno dal browser di sistema.
 async function accedi(app, shell) {
+  await app.evaluate(() => { globalThis.__urlConsenso = null; });
   await shell.evaluate(() => { window.__esitoLogin = window.filoShell.auth.signIn(); });
   let url = null;
   const scade = Date.now() + 10_000;
@@ -105,4 +106,22 @@ test('col portachiavi: nessun avviso, e il menu account non ne parla', async ({ 
   expect(voci.join('\n')).toContain(EMAIL);
   expect(voci.join('\n')).not.toContain('fino alla chiusura');
   await expect(shell.locator('.shell-notif-msg', { hasText: 'portachiavi' })).toHaveCount(0);
+});
+
+test('uscita e nuovo accesso: l\'avviso se ne va all\'uscita e non si raddoppia al rientro', async ({ app, shell }) => {
+  await preparaLogin(app, { cifra: false });
+  await accedi(app, shell);
+  const avviso = shell.locator('.shell-notif-msg', { hasText: 'dovrai accedere di nuovo' });
+  await expect(avviso).toHaveCount(1, { timeout: 8_000 });
+
+  await shell.evaluate(() => window.filoShell.auth.signOut());
+  await expect(avviso).toHaveCount(0, { timeout: 5_000 });
+
+  const esito = await accedi(app, shell);
+  expect(esito.remembered).toBe(false);
+  await expect(avviso).toHaveCount(1, { timeout: 8_000 });
+  const ancora = await accedi(app, shell);
+  expect(ancora.ok).toBe(true);
+  await shell.waitForTimeout(1_000);
+  await expect(avviso).toHaveCount(1);
 });
