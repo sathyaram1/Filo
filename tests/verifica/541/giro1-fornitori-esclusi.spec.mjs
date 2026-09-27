@@ -64,8 +64,6 @@ test('da tastiera si sceglie dal menu, le maiuscole non contano, un nome lontano
 
   // Il nome del catalogo con markup resta testo nel menu.
   await input.fill('');
-  await input.blur();
-  await input.focus();
   await expect(row.locator('.sn-select-option', { hasText: '<b>Evil</b>' })).toBeVisible();
   expect(await row.locator('.sn-select-pop b').count()).toBe(0);
 });
