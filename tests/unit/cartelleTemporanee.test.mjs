@@ -83,11 +83,13 @@ test('nessun test o script ricava un percorso dal pathname di un URL di file', (
 // EPERM, e la prova è rossa solo dall'owner e ferma ogni chiusura locale (#742).
 // Si guarda ogni volta che il nome compare, non la forma della chiamata: alias, promisify e accessi per stringa
 // sfuggivano. Passano solo il nome importato così com'è e la chiamata diretta con 'junction'.
+// Il nome si compone: scritto intero, questo file troverebbe sé stesso.
+const NOME = `${'sym'}${'link'}(?:Sync)?`;
 function creaCollegamentoNegato(sorgente) {
   const testo = String(sorgente).replace(/(^|[^:])\/\/.*$/gm, '$1');
-  return (testo.match(/\bsymlink(?:Sync)?\b[^;\n]*/g) || []).some((c) => {
-    if (/^symlink(?:Sync)?\s*\(/.test(c)) return !/['"]junction['"]/.test(c);
-    return !/^symlink(?:Sync)?\s*[,}]/.test(c);
+  return (testo.match(new RegExp(`\\b${NOME}\\b[^;\\n]*`, 'g')) || []).some((c) => {
+    if (new RegExp(`^${NOME}\\s*\\(`).test(c)) return !/['"]junction['"]/.test(c);
+    return !new RegExp(`^${NOME}\\s*[,}]`).test(c);
   });
 }
 
