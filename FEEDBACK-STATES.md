@@ -79,16 +79,20 @@ il rombo e il pentagono della fila delle forme).
   in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
 - `revision_capability` —routine, critica del verificatore senza rilievi INTERNI da
   correggere→ `revision_security` (dal 2026-09-23 ogni rilievo porta livello e sede,
-  `[2i]`/`[2e]`: contano solo gli interni; ogni rilievo che il lavoro non corregge —
-  esterno, o interno messo da parte dal bilancio — diventa SUBITO un feedback derivato
-  suo, figlio `#N.k`, con priorità uguale al livello e `priorityManual` perché il
-  giudice non la riabbassi, aperto dal server in ogni esito); —critica con rilievi
+  `[2i]`/`[2e]`: contano gli interni; dal 2026-09-27 anche `[1v]`, il vicino, un
+  difetto di un altro lavoro in un file che il ramo modifica già, che conta come
+  livello 0. Ciò che il lavoro non corregge diventa SUBITO un feedback derivato,
+  figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, aperto dal
+  server in ogni esito: un feedback per ogni esterno e per ogni rilievo col `?`, a
+  priorità uguale al livello; UNO solo per tutti gli altri (interni messi da parte
+  dal bilancio, vicini non corretti), a priorità = il livello scritto più alto
+  fra loro); —critica con rilievi
   interni da correggere→ resta
   `revision_capability`: chi corregge consegna `fixed`
   (`revision_capability → revision_capability`), poi un altro verificatore riprova
   (feedback #561, dal 2026-09-05); —rilievo di livello 3 non correggibile (bilancio
   dei 3 esaurito)→ `design` (`statusReason: loop`); un 2 a bilancio dei 2 esaurito NON
-  ferma: esce come feedback derivato a priorità 2 e il lavoro passa se non c'è altro
+  ferma: entra nel feedback derivato dei rimasti e il lavoro passa se non c'è altro
   (dal 2026-09-23, bilanci separati per livello); —rilievo di livello 3/2 che chiede una
   decisione→ `design` (`statusReason: decisione`); —QUALUNQUE consegna con una
   segnalazione per l'owner (`--segnala`: di chi risolve, di chi corregge, e la critica

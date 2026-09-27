@@ -1070,7 +1070,7 @@ if (isMain) {
         const { readTicketSince } = await import('./lib/routine-ticket.mjs');
         rapporto = await generaRapporto({ role: ruolo, ticket: args[0], cwd: ROOT, since: readTicketSince(ROOT) });
       } catch (e) {
-        rapporto = { v: 1, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
+        rapporto = { v: 2, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
       }
     }
     const r = await releaseConRapporto(args[0], guasto, rapporto);
