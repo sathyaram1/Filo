@@ -1231,6 +1231,19 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   next.reply = reply;
   return next;
 }
+async function recordPulizia(id) {
+  const guard = guardIdentity(id);
+  if (!guard.ok) return { rejected: true, message: guard.message };
+  const stato = statoDirectory(ROOT);
+  if (!stato.ok) return { rejected: true, formatRejected: true, message: statoIllegibileText(stato.motivo) };
+  if (stato.lines.length) return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines, 'pulizia') };
+  const st = { ...(guard.state || defaultState(id, '')), id };
+  const r = applyPulizia(st, st.verifierSha ? controllaPulizia({ shaCritica: st.verifierSha, root: ROOT }) : null);
+  if (!r.ok) return { rejected: true, formatRejected: true, message: r.message };
+  // Un punto fermo sul commit della pulizia: un ripristino non deve riportare il ramo alla critica.
+  sealTransition(r.state, 'verifier:pulizia');
+  return { ...r.state, files: r.files };
+}
 async function recordSecaudit(id, verdict, testo = '') {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
