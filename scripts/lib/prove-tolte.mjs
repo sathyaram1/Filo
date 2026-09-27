@@ -33,17 +33,30 @@ export function percorsoRipristino(prova, etichetta) {
  * Cosa fare dopo il rilancio. PURA. Le prove dei rilievi messi da parte se ne sono andate prima, nel
  * commit della pulizia, che è la base del confronto: qui ogni rossa riproduce un rilievo da chiudere.
  */
-export function esitoProveTolte({ rosse = [], shaPrima = '' } = {}) {
+export function esitoProveTolte({ rosse = [], shaPrima = '', conPulizia = true, messi = 0 } = {}) {
   if (!rosse.length) return { ferma: false, testo: '' };
+  const rimetti = `git checkout ${String(shaPrima).slice(0, 12) || '<commit della critica>'} -- <file>`;
+  // Senza pulizia registrata una rossa può essere di un rilievo messo da parte: quello aspetta l'owner, non si corregge qui.
+  const perche = conPulizia ? [
+    'Le prove dei rilievi messi da parte sono uscite prima, nel commit della pulizia: ognuna di queste riproduce',
+    `un rilievo da chiudere, e la porta è ancora aperta. Rimetti la prova (${rimetti}),`,
+    'correggi finché è verde, e consegna di nuovo.',
+  ] : Number(messi) > 0 ? [
+    'Nessuna pulizia è stata registrata dopo la critica. Se una di queste è la prova di un rilievo messo da parte,',
+    `rimettila com'era (${rimetti}) e lasciala lì: quel rilievo non si corregge in questo giro, e la sua prova`,
+    'esce quando il lavoro passa. Le altre riproducono un rilievo da chiudere: rimettile, correggi finché sono verdi,',
+    'e consegna di nuovo.',
+  ] : [
+    `Ognuna di queste riproduce un rilievo da chiudere, e la porta è ancora aperta. Rimetti la prova (${rimetti}),`,
+    'correggi finché è verde, e consegna di nuovo.',
+  ];
   return {
     ferma: true,
     testo: [
       'Consegna respinta: hai cancellato o cambiato prove del giro che, com\'erano, sul codice nuovo sono ancora rosse.',
       rosse.map((f) => `  · ${f}`).join('\n'),
-      'Le prove dei rilievi messi da parte sono uscite prima, nel commit della pulizia: ognuna di queste riproduce',
-      `un rilievo da chiudere, e la porta è ancora aperta. Rimetti la prova (git checkout ${String(shaPrima).slice(0, 12) || '<commit della critica>'} -- <file>),`,
-      'correggi finché è verde, e consegna di nuovo. Una prova, o un suo caso, si toglie solo verde, insieme',
-      'alla prova durevole che la sostituisce.',
+      ...perche,
+      'Una prova, o un suo caso, si toglie solo verde, insieme alla prova durevole che la sostituisce.',
     ].join('\n'),
   };
 }
