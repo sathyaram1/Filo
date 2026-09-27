@@ -158,7 +158,6 @@ test('le prove dei rilievi messi da parte escono nella pulizia, non nel commit d
   for (const [nome, testo] of superfici) {
     const t = testo.replace(/\s+/g, ' ');
     assert.doesNotMatch(t, /stesso commit della correzione[^.]*messi da parte|le toglie chi corregge/i, `${nome}: rimanda la pulizia a chi corregge`);
-    // Chi corregge e chi ha scritto la critica non sono dichiarati la stessa istanza, da nessuna parte.
     assert.doesNotMatch(t, /chi corregge [èe] (la stessa|lo stesso|chi ha (scritto|registrato|verificato))|correggerai tu/i, nome);
   }
   const [, risposta] = superfici.at(-2);
