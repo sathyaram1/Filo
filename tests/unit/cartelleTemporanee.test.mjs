@@ -78,3 +78,20 @@ test('nessun test o script ricava un percorso dal pathname di un URL di file', (
     'questi file ricavano un percorso con `.pathname` da import.meta.url: usa '
     + '`fileURLToPath(new URL(..., import.meta.url))` da node:url');
 });
+
+// Un symlink su Windows vuole l'amministratore o la modalità sviluppatore: senza,
+// EPERM, e la prova è rossa solo dall'owner e ferma ogni chiusura locale (#742).
+test('nessun test crea un collegamento che Windows nega a chi non è amministratore', () => {
+  const colpevoli = [];
+  for (const p of fileDiTest()) {
+    if (p === AMMESSO) continue;
+    const testo = readFileSync(p, 'utf8');
+    const soloFuoriDaWindows = /process\.platform\s*!==\s*['"]win32['"]/.test(testo);
+    for (const chiamata of testo.match(/symlinkSync\s*\([^;\n]*/g) || []) {
+      if (!/['"]junction['"]/.test(chiamata) && !soloFuoriDaWindows) colpevoli.push(relative(TESTS, p));
+    }
+  }
+  assert.deepEqual([...new Set(colpevoli)], [],
+    'questi file creano un symlink che su Windows senza privilegi dà EPERM: per una cartella usa '
+    + '`collegaCartella(verso, collegamento)` da ./helpers/percorsi.mjs; per un file salta il caso su win32');
+});
