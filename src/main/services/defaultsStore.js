@@ -155,10 +155,8 @@ async function refresh() {
     if (secrets.doc) remoteSecrets = secrets.doc;
     risposto = risposto && secrets.risposto;
   } else {
-    // Chi non è admin non ha override: azzerare invece di lasciare la cache
-    // com'era tiene onesta la precedenza anche dopo un logout dell'owner sulla
-    // stessa installazione (altrimenti le chiavi lette da admin resterebbero in
-    // uso per un account che non può più leggerle).
+    // Chi non è admin non ha override; il cancello che conta sta in `get()`,
+    // qui si libera solo la copia in memoria.
     remoteSecrets = null;
   }
   // Solo una lettura a cui il server HA risposto rimanda la prossima (#679).
@@ -270,7 +268,10 @@ function get() {
     ? C.excludedProviderReasons(out.excludedProviders, remoteReasons, C.DEFAULT_EXCLUDED_PROVIDER_REASONS)
     : [];
 
-  if (remoteSecrets) {
+  // Le chiavi lette da admin valgono solo finché admin c'è ADESSO, non fino alla
+  // prossima rilettura: un logout non rilegge niente, e la copia restava in uso
+  // a chi usava il computer dopo, fino a mezz'ora (#679.1).
+  if (remoteSecrets && isAdminUser()) {
     if (remoteSecrets.apiKeys && typeof remoteSecrets.apiKeys === 'object') {
       // Solo i valori non vuoti sovrascrivono le chiavi di build.
       for (const k of ['openrouter', 'tavily']) {
