@@ -3,9 +3,9 @@
 // un rosso NUOVO, cioè fuori dai rossi noti del contenitore senza schermo.
 //
 // PERCHÉ ESISTE
-//   Dal 2026-09-15 la suite completa gira SOLO in GitHub Actions, nel lavoro
-//   di release, prima di pubblicare (.github/workflows/release.yml, job
-//   `suite`). Lì un rosso non vale per forza «non pubblicare»: nel contenitore
+//   La suite completa gira SOLO in GitHub Actions, a ogni fusione su main
+//   (.github/workflows/suite.yml), e si pubblica solo un commit con la suite
+//   verde. Lì un rosso non vale per forza «non pubblicare»: nel contenitore
 //   senza schermo ci sono casi che sono rossi da sempre e per motivi
 //   d'ambiente (una cattura dello schermo, un sito esterno), scritti in
 //   tests/rossi-noti.json → contenitore.specs. Senza questo confronto la
