@@ -660,17 +660,36 @@
     };
   }
 
+  // L'avviso sull'indirizzo lo calcola Filo, non il modello: si mostra SUBITO e
+  // resta anche se la spiegazione non arriva mai (#725).
+  function mostraAvvisoLink(el, url) {
+    const avviso = LinkSospetto.avviso(LinkSospetto.analizza(url));
+    if (!avviso) return;
+    const w = document.createElement('div');
+    w.className = 'sn-menu-link-warn';
+    w.textContent = avviso;
+    el.appendChild(w);
+  }
+
   // Sezione inline "Spiega immagine": stessa filosofia di buildInlineExplain ma con dataUrl.
-  function buildInlineExplainImage(imgEl) {
+  // `linkEl` è il collegamento che l'immagine apre: l'unica sezione del menu parla
+  // dell'immagine, ma l'avviso sull'indirizzo non si perde (#725.1).
+  function buildInlineExplainImage(imgEl, linkEl) {
     return {
       type: 'inline',
       subject: 'image',
       content: I18n.t('menu_explain_loading'),
       onMount: (el) => {
         el.classList.add('sn-menu-inline-loading');
+        el.textContent = '';
+        if (linkEl && linkEl.href) mostraAvvisoLink(el, linkEl.href);
+        const body = document.createElement('div');
+        body.className = 'sn-menu-link-body';
+        body.textContent = I18n.t('menu_explain_loading');
+        el.appendChild(body);
         const src = imgEl.currentSrc || imgEl.src;
         if (!src) {
-          el.textContent = I18n.t('err_provider_failed');
+          body.textContent = I18n.t('err_provider_failed');
           el.classList.remove('sn-menu-inline-loading');
           el.classList.add('sn-menu-inline-error');
           return () => {};
@@ -691,15 +710,15 @@
             el.classList.remove('sn-menu-inline-loading');
             if (!res?.ok || !res.text) {
               el.classList.add('sn-menu-inline-error');
-              el.textContent = res?.error || I18n.t('err_provider_failed');
+              body.textContent = res?.error || I18n.t('err_provider_failed');
               return;
             }
-            el.textContent = res.text;
+            body.textContent = res.text;
           } catch (e) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
             el.classList.add('sn-menu-inline-error');
-            el.textContent = I18n.t('err_provider_failed');
+            body.textContent = I18n.t('err_provider_failed');
           }
         })();
         return () => { cancelled = true; };
@@ -720,19 +739,8 @@
           const url = linkEl.href;
           const anchorText = (linkEl.textContent || '').trim().slice(0, 200);
           const flags = LinkSospetto.analizza(url);
-
-          // L'avviso sull'indirizzo lo calcola Filo, non il modello: si mostra
-          // SUBITO e resta anche se la spiegazione non arriva mai. Prima
-          // compariva col primo pezzo della risposta, e su un provider caduto
-          // il link sospetto passava senza che nessuno lo dicesse (#725).
-          const avvisoSospetto = LinkSospetto.avviso(flags);
           el.textContent = '';
-          if (avvisoSospetto) {
-            const w = document.createElement('div');
-            w.className = 'sn-menu-link-warn';
-            w.textContent = avvisoSospetto;
-            el.appendChild(w);
-          }
+          mostraAvvisoLink(el, url);
           const body = document.createElement('div');
           body.className = 'sn-menu-link-body';
           body.textContent = I18n.t('menu_link_loading');
