@@ -1302,7 +1302,7 @@ if (isMain) {
     if (!r.ok) { console.error(r.reason); process.exit(1); }
     writeState(r.state);
     console.log(`Pulizia registrata su ${sha.slice(0, 8)}: ${r.files.length === 1 ? 'tolta 1 prova' : `tolte ${r.files.length} prove`} dei rilievi messi da parte.`);
-    console.log('Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, se com'era è ancora rossa, la ferma.');
+    console.log('Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, se com\'era è ancora rossa, la ferma.');
     process.exit(0);
   }
 
