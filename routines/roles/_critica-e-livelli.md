@@ -61,21 +61,11 @@ aggiunto oltre il chiesto (l'aggiunta resta, il suo difetto va in un feedback
 suo: non si disfa il lavoro fatto).
 
 La sede non cambia il livello che scrivi: un 3 esterno resta un 3, un 3 vicino
-resta un 3. Cambia come conta nel giro:
-
-- gli **interni** decidono il giro, col loro livello;
-- i **vicini** contano come livello 0, qualunque livello porti scritto: se il
-  giro corregge comunque qualcosa si correggono insieme (il file è già
-  aperto); da soli fanno partire una correzione solo come farebbe un rilievo
-  di livello 0; se restano fuori escono col livello che hai scritto;
-- ogni **esterno** esce subito in un feedback suo, con la priorità uguale al
-  livello, e non ferma questo lavoro — nemmeno col `?`: la domanda viaggia nel
-  suo feedback.
-
-Quello che il giro non corregge (interni messi da parte dal bilancio, vicini
-non corretti) esce insieme in UN feedback solo, a priorità uguale al livello
-scritto più alto fra loro. Restano separati, uno per rilievo, gli esterni e
-ogni rilievo col `?`.
+resta un 3. Il giro continua per i rilievi interni; un vicino può essere
+corretto insieme a loro, perché il suo file è già aperto, ma non ferma questo
+lavoro; ogni esterno esce subito in un feedback suo, con la priorità uguale al
+livello, e non ferma questo lavoro — nemmeno col `?`: la domanda viaggia nel
+suo feedback.
 
 **Il segno `?`** dopo la lettera (`[2i?]`, `[1v?]`, `[1e?]`) dice che il
 rilievo chiede una decisione dell'owner: un trade-off vero, una scelta di
