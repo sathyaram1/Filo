@@ -3,7 +3,7 @@
 // (verifica locale in un repo di prova, rapporto di sessione su un trascritto, test del collegamento).
 
 import { test, expect } from '@playwright/test';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFile, execFileSync, spawnSync } from 'node:child_process';
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -103,8 +103,8 @@ test.describe('accorpamento minimo', () => {
     try {
       const dir = repoDiProva('claude/prova-pass');
       const port = srv.address().port;
-      expect(verifyLocal(dir, port, ['start', 'richiesta di prova per il repo di prova']).code).toBe(0);
-      const r = verifyLocal(dir, port, ['critica', `${RIASSUNTO}\n[1v] vicino lieve\n[0i] cosmetico raro\n[3e] esterno grave\n[1i?] scelta di gusto\n[2v] vicino di livello due`]);
+      expect((await verifyLocal(dir, port, ['start', 'richiesta di prova per il repo di prova'])).code).toBe(0);
+      const r = await verifyLocal(dir, port, ['critica', `${RIASSUNTO}\n[1v] vicino lieve\n[0i] cosmetico raro\n[3e] esterno grave\n[1i?] scelta di gusto\n[2v] vicino di livello due`]);
       expect(r.code).toBe(0);
       expect(r.out).toContain('verifica superata');
       expect(r.out).toContain('un solo feedback per questi 3 rilievi, priorità 2');
@@ -120,10 +120,10 @@ test.describe('accorpamento minimo', () => {
     try {
       const dir = repoDiProva('claude/prova-corretto');
       const port = srv.address().port;
-      expect(verifyLocal(dir, port, ['start', 'richiesta di prova per il repo di prova']).code).toBe(0);
-      const c = verifyLocal(dir, port, ['critica', `${RIASSUNTO}\n[1i] interno lieve da correggere\n[1i?] scelta da fare\n[3e] esterno grave`]);
+      expect((await verifyLocal(dir, port, ['start', 'richiesta di prova per il repo di prova'])).code).toBe(0);
+      const c = await verifyLocal(dir, port, ['critica', `${RIASSUNTO}\n[1i] interno lieve da correggere\n[1i?] scelta da fare\n[3e] esterno grave`]);
       expect(c.out).toContain('c\'è da correggere');
-      const r = verifyLocal(dir, port, ['corretto', 'Nessuna correzione in questo giro: provo cosa succede senza un commit nuovo dopo la critica.']);
+      const r = await verifyLocal(dir, port, ['corretto', 'Nessuna correzione in questo giro: provo cosa succede senza un commit nuovo dopo la critica.']);
       expect(r.out).toContain('Verifica superata');
       const lista = r.out.slice(r.out.indexOf('Rilievi non corretti'));
       expect(lista).toContain('esterno grave');
