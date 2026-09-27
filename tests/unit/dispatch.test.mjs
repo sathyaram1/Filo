@@ -89,6 +89,23 @@ test('applyFixed: ri-mette in coda verifier e azzera la critica (i bilanci li ti
   assert.equal(fixed.verifierCritique, '');
 });
 
+test('applyPulizia: ammessa solo a correzione aperta e con rilievi messi da parte su quella critica', async () => {
+  const { applyPulizia } = await import('../../scripts/dispatch.mjs');
+  const buona = { ok: true, sha: 'b'.repeat(40), files: ['tests/verifica/9/giro1-a.spec.mjs'] };
+  const aperta = { ...applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2i] x', 'a'.repeat(40)), messiDaParteGiro: { sha: 'a'.repeat(40), n: 1 } };
+  const r = applyPulizia(aperta, buona);
+  assert.equal(r.ok, true);
+  assert.equal(r.state.puliziaSha, 'b'.repeat(40));
+  assert.match(applyPulizia({ ...aperta, messiDaParteGiro: { sha: 'a'.repeat(40), n: 0 } }, buona).message, /nessun rilievo/);
+  assert.equal(applyPulizia({ ...aperta, messiDaParteGiro: { sha: 'c'.repeat(40), n: 2 } }, buona).ok, false,
+    'il conto di una critica vecchia non vale per questa');
+  assert.equal(applyPulizia(applyVerifierVerdict(aperta, 'pass', '', 'a'.repeat(40)), buona).ok, false);
+  assert.match(applyPulizia(aperta, { ok: false, motivo: 'qui c\'è codice' }).message, /qui c'è codice/);
+  // Una critica nuova e una consegna svuotano la base: la pulizia vale per un giro solo.
+  assert.equal(applyVerifierVerdict(r.state, 'fix', '[2i] y', 'd'.repeat(40)).puliziaSha, '');
+  assert.equal(applyFixed(r.state).puliziaSha, '');
+});
+
 test('VERIFIER_ROUND: il parser della critica coi livelli arriva dagli strumenti (fonte unica)', async () => {
   const { VERIFIER_ROUND, VERIFIER_OUTCOMES } = await import('../../scripts/dispatch.mjs');
   const p = VERIFIER_ROUND.parseFindings('funziona\n[2i] rotto\n[1i?] gusto');
