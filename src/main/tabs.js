@@ -3,7 +3,7 @@
 // La shell parla con il main via IPC (tabs:* canali); il main risponde con
 // broadcast tabs:updated alla shell perché ridisegni la barra.
 
-const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow } = require('electron');
+const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
@@ -1687,6 +1687,41 @@ class TabManager {
     });
   }
 
+  // Zoom della scheda attiva chiesto da fuori la tastiera (oggi: la chat).
+  // Passa dalla STESSA porta dei tasti, così la memoria per sito e l'opt-out
+  // delle pagine che zoomano da sé restano di chi già li tiene. Il preload
+  // risponde con la percentuale che ha davvero applicato: chi chiede un valore
+  // fuori scala deve poterlo dire all'utente invece di tacere il taglio.
+  applicaZoom(spec) {
+    const active = this.tabs.find((t) => t.id === this.activeId);
+    if (!active || !active.view) return Promise.resolve(null);
+    const wc = active.view.webContents;
+    const rid = `zoom-${randomUUID()}`;
+    return new Promise((resolve) => {
+      let chiuso = false;
+      const fine = (v) => {
+        if (chiuso) return;
+        chiuso = true;
+        clearTimeout(scadenza);
+        try { ipcMain.removeListener('filo:zoom-applicato', onEco); } catch (_) {}
+        resolve(v);
+      };
+      // Solo la scheda a cui l'abbiamo chiesto può rispondere: un'altra pagina
+      // non deve poter mettere un numero in bocca a Filo.
+      const onEco = (e, msg) => {
+        if (!msg || String(msg.rid || '') !== rid) return;
+        if (e.sender !== wc) return;
+        fine(msg);
+      };
+      // Nessuna risposta: la pagina non ha il nostro preload (un visualizzatore
+      // interno, una pagina d'errore) o non è ancora in piedi. È diverso da
+      // «non c'è nessuna scheda», e chi riferisce all'utente deve poterlo dire.
+      const scadenza = setTimeout(() => fine({ muto: true }), 2000);
+      ipcMain.on('filo:zoom-applicato', onEco);
+      try { wc.send('filo:zoom-key', { ...spec, rid }); } catch (_) { fine({ muto: true }); }
+    });
+  }
+
   // ─── eventi della WebContents → aggiorna stato + broadcast ─────────────
 
   _wireEvents(tab) {
@@ -1695,6 +1730,16 @@ class TabManager {
       Object.assign(tab, patch);
       this._broadcast();
     };
+    // Una pagina di Filo che scala il proprio contenuto (l'editor scala il
+    // foglio) dichiara qui a quanto sta: il livello della finestra per lei
+    // resta 100%, e senza questo Filo riferirebbe in chat il numero sbagliato
+    // (#686). Il canale è quello della singola scheda: muore con lei.
+    try {
+      wc.ipc.on('filo:zoom-proprio', (_e, perc) => {
+        const n = Math.round(Number(perc));
+        tab.zoomProprio = Number.isFinite(n) && n > 0 ? n : null;
+      });
+    } catch (_) {}
     // In modalità "contenuto a tutto schermo" la pagina copre la barra, quindi
     // Esc deve riportare la shell. Intercettiamo il tasto prima che la pagina lo
     // gestisca (vale anche per i siti esterni, senza dipendere dai content script).
@@ -2007,6 +2052,9 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // Documento nuovo: lo zoom che la pagina vecchia dichiarava di sé non
+      // vale più (#686).
+      tab.zoomProprio = null;
       // Documento nuovo: chi rispondeva era quello vecchio. Il nuovo si
       // ripresenterà da solo appena montato (MSG.FULLSCREEN_STATE); fino ad
       // allora vale l'attesa corta, quella di chi non risponde.

@@ -81,6 +81,13 @@ const chromeShim = {
     // non compariva mai. Le schede le possiede il TabManager della finestra:
     // qui se ne espone la vista piatta che il chiamante si aspetta.
     async query() {
+      const zoomDi = (t) => {
+        // Una pagina che scala il proprio contenuto (l'editor scala il foglio)
+        // lascia la finestra al 100%: il numero vero lo dichiara lei (#686).
+        if (typeof t.zoomProprio === 'number') return t.zoomProprio;
+        try { return Math.round(t.view.webContents.getZoomFactor() * 100); }
+        catch (_) { return null; }
+      };
       const win = require('electron').BrowserWindow.getAllWindows()[0];
       const tm = win && win._filoTabs;
       if (!tm || !Array.isArray(tm.tabs)) return [];
@@ -92,6 +99,9 @@ const chromeShim = {
         // Il nome del campo è quello di chrome.tabs: chi legge ordina per
         // ultima attività e ripiega sull'id quando manca.
         lastAccessed: t.lastActiveAt || null,
+        // #686 — lo zoom della pagina entra nello stato della chat: senza, a
+        // «ingrandisci un po'» Filo non sapeva da dove partire.
+        zoomPercent: zoomDi(t),
       }));
     },
     async remove(id) {

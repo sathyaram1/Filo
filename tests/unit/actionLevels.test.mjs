@@ -16,6 +16,8 @@ require(join(__dirname, '..', '..', 'src', 'shared', 'preferences.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'themeTokens.js'));
 // ESEGUI_COMANDO (#146.6) delega il livello al classificatore di comandi.
 require(join(__dirname, '..', '..', 'src', 'shared', 'cmdClassify.js'));
+// ZOOM_PAGINA legge la percentuale chiesta con lo stesso lettore di chi la applica.
+require(join(__dirname, '..', '..', 'src', 'shared', 'zoomPagina.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'actionLevels.js'));
 
 const AL = globalThis.SN_ACTION_LEVELS;

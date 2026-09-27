@@ -1862,6 +1862,39 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const r = await tm.clearPageStyle(tab);
         return { executed: !!(r && r.ok), kept: false };
       }
+      case 'ZOOM_PAGINA': {
+        // #686 — lo zoom della pagina si chiede anche a parole, non solo con
+        // Ctrl +/-/0. Non zooma da qui: gira la richiesta alla scheda attiva
+        // dalla stessa porta dei tasti (tabs.applicaZoom → filo:zoom-key), così
+        // i due cammini non possono scavalcarsi né perdere la memoria per sito.
+        const Z = globalThis.SN_ZOOM;
+        const win = winOf(sender);
+        const tm = win && win._filoTabs;
+        if (!tm || typeof tm.applicaZoom !== 'function') return { executed: false, kept: false };
+        const perc = Z ? Z.leggiPercentuale(action.percentuale ?? action.percent ?? action.valore) : null;
+        const verso = String(action.verso ?? action.direzione ?? action.direction ?? '').trim().toLowerCase();
+        if (perc == null && !(Z && Z.VERSI.includes(verso))) {
+          return { executed: false, kept: false, output: { zoom: 'invalid' } };
+        }
+        const esito = await tm.applicaZoom(perc != null ? { percentuale: perc } : { verso });
+        if (!esito) return { executed: false, kept: false, output: { zoom: 'no-tab' } };
+        if (esito.muto) return { executed: false, kept: false, output: { zoom: 'muto' } };
+        // `sconosciuto`: la pagina zooma da sé (l'editor scala il foglio) e la
+        // percentuale la sa solo lei. Fatto sì, numero no.
+        if (esito.sconosciuto) return { executed: true, kept: false, output: { zoom: 'propria' } };
+        return {
+          executed: true,
+          kept: false,
+          output: {
+            zoom: 'ok',
+            percentuale: esito.percentuale,
+            richiesto: esito.richiesto ?? null,
+            limitato: !!esito.limitato,
+            min: esito.min,
+            max: esito.max,
+          },
+        };
+      }
       case 'COMANDO_FINESTRA': {
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
         // intero, riduci a icona, menu Impostazioni/App/Account, home): prima poteva
@@ -2424,6 +2457,27 @@ function toolResultText({ action, res, rendered }) {
   }
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
     return res.output.updated.length ? `Spostate: ${res.output.updated.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
+  }
+  // #686 — lo zoom lo riferisce il numero VERO, non quello chiesto: un «al
+  // 900%» finisce al massimo, e l'utente deve sentirselo dire.
+  if (type === 'ZOOM_PAGINA' && res.executed && res.output) {
+    const o = res.output;
+    if (o.zoom === 'propria') return 'Zoom della pagina cambiato. Questa pagina scala il proprio contenuto: la percentuale esatta non la so, non inventarla.';
+    if (typeof o.percentuale === 'number') {
+      // I limiti li ha solo chi zooma la finestra: una pagina che scala il
+      // proprio contenuto ha i suoi, e non li dichiara.
+      const limiti = (typeof o.min === 'number' && typeof o.max === 'number') ? ` (${o.min}–${o.max}%)` : '';
+      const tagliato = o.limitato
+        ? ` Il ${o.richiesto}% chiesto non era raggiungibile${limiti}: si è fermato qui. Dillo all'utente.`
+        : '';
+      return `Zoom della pagina ora al ${o.percentuale}%.${tagliato}`;
+    }
+  }
+  if (type === 'ZOOM_PAGINA' && !res.executed && res.output && res.output.zoom === 'no-tab') {
+    return 'Zoom non cambiato: non c\'è nessuna scheda davanti su cui agire. Dillo all\'utente.';
+  }
+  if (type === 'ZOOM_PAGINA' && !res.executed && res.output && res.output.zoom === 'muto') {
+    return 'Zoom non cambiato: la pagina davanti non risponde ai comandi di zoom (può essere una pagina di sistema, o non aver finito di caricare). Dillo all\'utente, e non ripetere l\'azione uguale.';
   }
   if (res.executed) {
     // La descrizione «a cosa fatta» (per un'impostazione: «Impostazione
