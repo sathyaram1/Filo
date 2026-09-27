@@ -424,7 +424,7 @@
 
   function excludedHead() {
     const head = document.createElement('div');
-    head.className = 'sn-model-row sn-model-row-head sn-excluded-row sn-excluded-head';
+    head.className = 'sn-model-row sn-model-row-head sn-excluded-head';
     for (const key of ['admin_defaults_excluded_name', 'admin_defaults_excluded_kind', 'admin_defaults_excluded_note', '']) {
       const c = document.createElement('div');
       c.textContent = key ? I18n.t(key) : '';
@@ -458,7 +458,7 @@
   function excludedRows() {
     const out = [];
     const seen = new Set();
-    for (const row of $('excludedList').querySelectorAll('.sn-excluded-row:not(.sn-excluded-head)')) {
+    for (const row of $('excludedList').querySelectorAll('.sn-excluded-row')) {
       const v = row.querySelector('.sn-excluded-name').value.trim();
       if (!v) continue;
       const k = v.toLowerCase();

@@ -52,6 +52,16 @@ async function openStubbedEditor(openTab, overrides = {}) {
             };
           }
           return { ok: false, error: 'Chiave gemini non configurata' };
+        case 'default_providers_list':
+          return fakeConfig.__catalogFails ? { ok: false, error: 'HTTP 500' } : {
+            ok: true,
+            items: [
+              { name: 'Google Vertex', slug: 'google-vertex' },
+              { name: 'NovitaAI', slug: 'novita' },
+              { name: 'OpenAI', slug: 'openai' },
+              { name: 'Together', slug: 'together' },
+            ],
+          };
         case 'test_default_model':
           // Il main risponderebbe ok solo se riceve la stringa modello.
           if (!msg.model) return { ok: false, error: `Modello "${msg.nickname}" non trovato` };
@@ -67,6 +77,8 @@ async function openStubbedEditor(openTab, overrides = {}) {
               models: (msg.config && msg.config.models) || fakeConfig.models,
               excludedProviders: (msg.config && msg.config.excludedProviders)
                 || fakeConfig.excludedProviders,
+              excludedProviderReasons: (msg.config && msg.config.excludedProviderReasons)
+                || fakeConfig.excludedProviderReasons,
             },
           };
         default:
@@ -229,6 +241,75 @@ test('un salvataggio che non tocca le esclusioni non congela la lista del codice
   expect('excludedProviders' in (upd?.config || {})).toBe(false);
 });
 
+// #541: il nome si sceglie dal catalogo dello smistatore, e un refuso (che non
+// escluderebbe nessuno) si vede sulla riga, con la correzione a un click.
+test('il nome del fornitore escluso si sceglie dal catalogo e un refuso si segnala', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, { excludedProviders: ['Google'] });
+  expect(await page.evaluate(() => window.__sent.some((m) => m.type === 'default_providers_list'))).toBe(true);
+
+  await page.click('#addExcludedRow');
+  const row = page.locator('#excludedList .sn-excluded-row').last();
+  const input = row.locator('.sn-excluded-name');
+
+  // Il menu elenca i fornitori veri; sceglierne uno lo scrive e non segnala niente.
+  await expect(row.locator('.sn-model-id-wrap .sn-select-pop')).toBeVisible({ timeout: 4_000 });
+  await row.locator('.sn-model-id-wrap .sn-select-option', { hasText: 'Together' }).click();
+  await expect(input).toHaveValue('Together');
+  await expect(row.locator('.sn-model-row-msg')).toBeEmpty();
+
+  // Un refuso: la riga lo dice e propone il nome giusto.
+  await input.fill('Novtia');
+  const msg = row.locator('.sn-model-row-msg');
+  await expect(msg).toContainText('non esclude nessuno');
+  await page.screenshot({ path: 'tests/.shots/admin-defaults-excluded-refuso.png', fullPage: true }).catch(() => {});
+  await msg.getByRole('button', { name: 'Forse «NovitaAI»?' }).click();
+  await expect(input).toHaveValue('NovitaAI');
+  await expect(msg).toBeEmpty();
+
+  // La forma base già in lista copre «Google Vertex» del catalogo: nessun avviso.
+  await expect(page.locator('#excludedList .sn-excluded-row').first().locator('.sn-model-row-msg')).toBeEmpty();
+
+  // Se il catalogo non arriva nessun avviso finto: il campo resta libero.
+  const page2 = await openStubbedEditor(openTab, { excludedProviders: ['Novtia'], __catalogFails: true });
+  await expect(page2.locator('#excludedList .sn-excluded-row .sn-model-row-msg')).toBeEmpty();
+});
+
+test('ogni fornitore escluso dice perché, e il perché si salva', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, {
+    excludedProviders: ['Google', 'Novita'],
+    excludedProviderReasons: [
+      { name: 'Google', kind: 'producer', note: '' },
+      { name: 'Novita', kind: 'unreliable', note: 'risposte scambiate' },
+    ],
+  });
+  const rows = page.locator('#excludedList .sn-excluded-row');
+  await expect(rows.nth(0).locator('.sn-excluded-kind')).toHaveValue('producer');
+  await expect(rows.nth(1).locator('.sn-excluded-kind')).toHaveValue('unreliable');
+  await expect(rows.nth(1).locator('.sn-excluded-note')).toHaveValue('risposte scambiate');
+
+  // Cambiare solo il perché non riscrive la lista dei nomi.
+  await rows.nth(1).locator('.sn-excluded-note').fill('30/08: risposte di altre richieste');
+  await page.click('#saveBtn');
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect('excludedProviders' in upd.config).toBe(false);
+  expect(upd.config.excludedProviderReasons).toContainEqual(
+    { name: 'Novita', kind: 'unreliable', note: '30/08: risposte di altre richieste' });
+
+  // Le voci rimesse dall'avviso portano il loro perché di serie.
+  const page2 = await openStubbedEditor(openTab, { excludedProviders: ['OpenAI'] });
+  await page2.locator('#excludedDrift').getByRole('button', { name: 'Rimettili nella lista' }).click();
+  await expect(page2.locator('#excludedDrift')).toBeHidden();
+  const kinds = await page2.locator('#excludedList .sn-excluded-row').evaluateAll((rs) => rs.map((r) => [
+    r.querySelector('.sn-excluded-name').value, r.querySelector('.sn-excluded-kind').value]));
+  expect(kinds).toContainEqual(['Novita', 'unreliable']);
+  expect(kinds).toContainEqual(['Google', 'producer']);
+
+  for (const theme of ['light', 'dark']) {
+    await page2.evaluate((t) => window.SN_PAGE_BOOTSTRAP.applyTheme(t), theme);
+    await page2.locator('#sec-excluded').screenshot({ path: `tests/.shots/admin-defaults-excluded-${theme}.png` }).catch(() => {});
+  }
+});
+
 test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza stub)', async ({ openTab }) => {
   const page = await openTab(ADMIN_URL);
   await page.waitForSelector('#title', { timeout: 8_000 });
@@ -242,4 +323,8 @@ test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza 
   const listRes = await page.evaluate(() => window.filo.message({ type: 'default_models_list', provider: 'openrouter' }));
   expect(listRes.ok).toBe(false);
   expect(String(listRes.error || '')).toMatch(/amministrator/i);
+
+  const provRes = await page.evaluate(() => window.filo.message({ type: 'default_providers_list' }));
+  expect(provRes.ok).toBe(false);
+  expect(String(provRes.error || '')).toMatch(/amministrator/i);
 });

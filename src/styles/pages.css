@@ -632,7 +632,8 @@ section:has(#dictList) .sn-spell-add-row {
   white-space: nowrap;
 }
 
-.sn-excluded-row {
+.sn-excluded-row,
+.sn-excluded-head {
   grid-template-columns: minmax(0, 1fr) 140px minmax(0, 1.4fr) auto;
 }
 /* Intestazione da sola = lista vuota: sparisce, resta il bottone per aggiungere. */
