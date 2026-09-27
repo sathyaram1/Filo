@@ -79,7 +79,7 @@ import {
   writeExpectation, clearExpectation, stateDir,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
-import { controllaProveTolte } from './lib/prove-tolte.mjs';
+import { baseDelConfronto, controllaProveTolte, controllaPulizia } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
@@ -299,6 +299,8 @@ export function applyVerifierVerdict(state, outcome, critique = '', sha = '') {
   // guardato — chi lavora ha per costruzione il permesso di spingere sul
   // proprio ramo, quindi la finestra si apre da sé.
   if (String(sha || '')) s.verifierSha = String(sha);
+  // Una critica nuova apre un giro nuovo: la pulizia di quello prima non ne è la base.
+  s.puliziaSha = '';
   if (outcome === 'pass') s.verifierVerdict = 'pass';
   else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
   else if (outcome === 'stop') s.verifierVerdict = 'stop';
@@ -314,6 +316,7 @@ export function applyFixed(state) {
   s.verifierVerdict = null;
   s.verifierCritique = '';
   s.verifierSha = '';
+  s.puliziaSha = '';
   s.secauditDone = false;
   s.secauditVerdict = null;
   // Gli sha degli esiti se ne vanno con gli esiti: una correzione è contenuto
@@ -321,6 +324,24 @@ export function applyFixed(state) {
   // fatto su un'altra versione (feedback #485).
   s.secauditSha = '';
   return s;
+}
+
+/**
+ * La pulizia dopo la critica: le prove dei rilievi messi da parte tolte PRIMA di correggere. PURA.
+ * `controllo` è l'esito di controllaPulizia; da `puliziaSha` parte il confronto di --record-fixed.
+ */
+export function applyPulizia(state, controllo) {
+  const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
+  if (s.verifierVerdict !== 'fix-pending' || !s.verifierSha) {
+    return { ok: false, message: 'nessun giro di correzione aperto: la pulizia si registra subito dopo una critica a cui il server ha risposto «c\'è da correggere», prima di ogni correzione.' };
+  }
+  const messi = s.messiDaParteGiro && s.messiDaParteGiro.sha === s.verifierSha ? Number(s.messiDaParteGiro.n) || 0 : 0;
+  if (!messi) {
+    return { ok: false, message: 'la risposta del server a questa critica non ha messo da parte nessun rilievo: non c\'è niente da pulire. Una prova del giro si toglie solo verde, insieme alla prova durevole che la sostituisce.' };
+  }
+  if (!controllo || !controllo.ok) return { ok: false, message: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
+  s.puliziaSha = controllo.sha;
+  return { ok: true, state: s, files: controllo.files };
 }
 
 /**
@@ -1007,6 +1028,10 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
   const outcome = VERIFIER_OUTCOMES.includes(reply.outcome) ? reply.outcome : 'non comunicato';
   const next = applyVerifierVerdict(base, outcome, critiqueText, shaProvato);
   next.id = id;
+  // Quanti rilievi il server ha messo da parte su QUESTO commit: la pulizia è ammessa solo se ce ne sono.
+  next.messiDaParteGiro = outcome === 'fix'
+    ? { sha: shaProvato, n: derivatiAperti(reply.phase2 ? reply.phase2.derived : reply.derived).length }
+    : null;
   sealTransition(next, `verifier:${outcome}`);
   next.reply = reply;
   return next;
@@ -1170,10 +1195,10 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   // Stessa guardia di «verify-local.mjs corretto»: una prova del giro cancellata ancora rossa è
   // una porta aperta che la verifica dopo non rilancerebbe più (#679).
   const shaCritica = String(guard.state?.verifierSha || '');
-  if (shaCritica && shaCritica !== headSha(ROOT)) {
-    const r = guard.state.reply || {};
+  const baseTolte = baseDelConfronto(shaCritica, guard.state?.puliziaSha, ROOT);
+  if (baseTolte && baseTolte !== headSha(ROOT)) {
     const tolte = controllaProveTolte({
-      shaPrima: shaCritica, root: ROOT, messiDaParte: derivatiAperti(r.phase2 ? r.phase2.derived : r.derived).length,
+      shaPrima: baseTolte, root: ROOT,
       log: (m) => process.stderr.write(`${m}\n`),
     });
     if (tolte.ferma) return { rejected: true, formatRejected: true, message: tolte.testo };
