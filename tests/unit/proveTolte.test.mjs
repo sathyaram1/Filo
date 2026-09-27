@@ -62,36 +62,76 @@ test('senza pulizia registrata la consegna si ferma lo stesso, ma non racconta u
   assert.match(esitoProveTolte({ rosse, conPulizia: true }).testo, /nel commit della pulizia/);
 });
 
-test('la pulizia non toglie più prove dei rilievi messi da parte, contando anche quelle di una pulizia prima', () => {
-  assert.equal(testoPuliziaTroppoLarga(['tests/verifica/9/giro1-b.spec.mjs'], 1), '');
-  const due = testoPuliziaTroppoLarga(['tests/verifica/9/giro1-b.spec.mjs', 'tests/verifica/9/giro1-c.spec.mjs'], 1);
-  assert.match(due, /sono uscite 2 prove del giro, ma i rilievi messi da parte sono 1/);
-  assert.match(due, /giro1-c\.spec\.mjs/);
-  assert.notEqual(testoPuliziaTroppoLarga(['tests/verifica/9/a.spec.mjs'], 0), '');
+// ─── Il numero del rilievo nel nome: la pulizia sa quale prova va con quale rilievo ───
+
+test('il nome di una prova del giro dice quali rilievi riproduce', () => {
+  assert.deepEqual(numeriDelNome('tests/verifica/9/giro2-r3-salva.spec.mjs'), [3]);
+  assert.deepEqual(numeriDelNome('tests\\verifica\\9\\giro2-r1-r3-salva.spec.mjs'), [1, 3]);
+  assert.deepEqual(numeriDelNome('giro10-r12.spec.mjs'), [12]);
+  for (const senza of ['giro2-salva.spec.mjs', 'giro2-rotto.spec.mjs', 'giro2-r2d2.spec.mjs', 'verify-495-rottura.spec.mjs', 'giro2-r0-x.spec.mjs']) {
+    assert.deepEqual(numeriDelNome(senza), [], senza);
+  }
+  for (const storto of ['giro2-r0-x.spec.mjs', 'giro2-R3-x.spec.mjs', 'giro2-salva-r3.spec.mjs', 'r3-giro2-x.spec.mjs', 'giro2-r1-salva-r3.spec.mjs']) {
+    assert.equal(nomeNumeratoStorto(storto), true, storto);
+  }
+  for (const dritto of ['giro2-r1-r3-salva.spec.mjs', 'giro2-salva.spec.mjs', 'giro2-rotto-round2.spec.mjs']) {
+    assert.equal(nomeNumeratoStorto(dritto), false, dritto);
+  }
 });
 
-test('in un repo vero la pulizia che toglie anche la prova rossa di un rilievo da correggere è respinta', () => {
-  const dir = cartellaTemporanea('pulizia-larga-');
-  const git = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+test('il numero di un rilievo è il suo posto nella critica, interni ed esterni insieme', () => {
+  const tutti = [
+    { level: 2, sede: 'i', text: 'a' }, { level: 1, sede: 'i', text: 'b', decision: true },
+    { level: 1, sede: 'i', text: 'c' }, { level: 1, sede: 'e', text: 'x' }, { level: 1, sede: 'i', text: 'c' },
+  ];
+  const n = (parte) => numeraRilievi(tutti, parte).map((f) => f.n);
+  assert.deepEqual(n([{ level: 1, sede: 'e', text: 'x', priority: 1, num: '#9.1' }, { level: 1, sede: 'i', text: 'b', decision: true }]), [4, 2]);
+  assert.deepEqual(n([{ level: 1, sede: 'i', text: 'c' }, { level: 1, sede: 'i', text: 'c' }]), [3, 5], 'due rilievi uguali, due numeri');
+  assert.deepEqual(n([{ level: 2, sede: 'i', text: 'non c\'è' }]), [null]);
+});
+
+test('la pulizia accetta solo prove coi soli numeri dei rilievi messi da parte', () => {
+  const p = (nome) => `tests/verifica/9/${nome}.spec.mjs`;
+  assert.equal(testoPuliziaFuoriNumero({ cancellate: [p('giro1-r2-b'), p('giro1-r2-r4-bx')] }, [2, 4]), '');
+  const rossa = testoPuliziaFuoriNumero({ cancellate: [p('giro1-r2-b'), p('giro1-r3-c')] }, [2]);
+  assert.match(rossa, /giro1-r3-c\.spec\.mjs: r3 non è fra i rilievi messi da parte/);
+  assert.doesNotMatch(rossa, /giro1-r2-b\.spec\.mjs:/);
+  assert.match(testoPuliziaFuoriNumero({ cancellate: [p('giro1-b')] }, [2]), /giro1-b\.spec\.mjs: il nome non porta il numero/);
+  assert.match(testoPuliziaFuoriNumero({ cancellate: [p('giro1-r2-r3-bc')] }, [2]), /copre anche r3[\s\S]*solo il caso/,
+    'un file che copre anche un rilievo da correggere non si cancella intero');
+  assert.equal(testoPuliziaFuoriNumero({ cambiate: [p('giro1-r2-r3-bc')] }, [2]), '', 'gli si toglie il caso del messo da parte');
+  assert.match(testoPuliziaFuoriNumero({ cambiate: [p('giro1-r3-c')] }, [2]), /r3 non è fra/);
+  assert.match(testoPuliziaFuoriNumero({ cancellate: [p('giro1-r2-b')], vecchie: [p('giro1-r2-b')] }, [2]), /critica passata/);
+  assert.match(testoPuliziaFuoriNumero({ cancellate: [p('giro1-r2-b')] }, [null]), /nessuno porta un numero/);
+  assert.equal(testoPuliziaFuoriNumero({ cancellate: ['tests/verifica/9/helpers/banco.mjs'] }, [2]), '', 'un aiuto non è una prova');
+});
+
+test('in un repo vero la pulizia sa quali prove ha tolto, come, e quali c\'erano già prima della verifica', () => {
+  const dir = cartellaTemporanea('pulizia-per-numero-');
+  const git = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const scrivi = (f, t) => writeFileSync(resolve(dir, 'tests', 'verifica', '9', f), t);
   try {
     git('init', '-q', '-b', 'main');
     git('config', 'user.name', 'prova');
     git('config', 'user.email', 'prova@example.invalid');
     mkdirSync(resolve(dir, 'tests', 'verifica', '9'), { recursive: true });
-    for (const l of ['b', 'c']) writeFileSync(resolve(dir, 'tests', 'verifica', '9', `giro1-${l}.spec.mjs`), `// ${l}\n`);
-    git('add', '-A');
-    git('commit', '-qm', 'critica');
-    const critica = git('rev-parse', 'HEAD').trim();
-    git('rm', '-q', 'tests/verifica/9/giro1-b.spec.mjs');
-    git('commit', '-qm', 'pulizia');
-    const una = controllaPulizia({ shaCritica: critica, root: dir });
-    assert.equal(testoPuliziaTroppoLarga(una.files, 1), '');
-    // Una seconda pulizia si misura sempre dalla critica: le prove tolte si sommano.
-    git('rm', '-q', 'tests/verifica/9/giro1-c.spec.mjs');
-    git('commit', '-qm', 'pulizia 2');
-    const due = controllaPulizia({ shaCritica: critica, root: dir });
-    assert.equal(due.files.length, 2);
-    assert.notEqual(testoPuliziaTroppoLarga(due.files, 1), '');
+    scrivi('giro1-r2-vecchia.spec.mjs', '// di un giro passato\n');
+    git('add', '-A'); git('commit', '-qm', 'giro prima');
+    const avvio = git('rev-parse', 'HEAD');
+    scrivi('giro2-r2-b.spec.mjs', '// b\n');
+    scrivi('giro2-r2-r3-bc.spec.mjs', 'caso b\ncaso c\n');
+    git('add', '-A'); git('commit', '-qm', 'critica');
+    const critica = git('rev-parse', 'HEAD');
+    git('rm', '-q', 'tests/verifica/9/giro2-r2-b.spec.mjs', 'tests/verifica/9/giro1-r2-vecchia.spec.mjs');
+    scrivi('giro2-r2-r3-bc.spec.mjs', 'caso c\n');
+    git('commit', '-qam', 'pulizia');
+    const c = controllaPulizia({ shaCritica: critica, root: dir, avvio });
+    assert.equal(c.ok, true, c.motivo);
+    assert.deepEqual(c.cancellate.sort(), ['tests/verifica/9/giro1-r2-vecchia.spec.mjs', 'tests/verifica/9/giro2-r2-b.spec.mjs']);
+    assert.deepEqual(c.cambiate, ['tests/verifica/9/giro2-r2-r3-bc.spec.mjs']);
+    assert.deepEqual(c.vecchie, ['tests/verifica/9/giro1-r2-vecchia.spec.mjs'], 'il suo r2 è di una critica passata');
+    assert.match(testoPuliziaFuoriNumero(c, [2]), /giro1-r2-vecchia[^\n]*critica passata/);
+    assert.equal(controllaPulizia({ shaCritica: critica, root: dir }).vecchie, null, 'senza avvio non lo si sa');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
