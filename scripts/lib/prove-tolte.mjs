@@ -90,7 +90,8 @@ export function controllaPulizia({ shaCritica, root, cartella = '', avvio = '' }
   if (head === critica || head.startsWith(critica) || critica.startsWith(head)) {
     return { ok: false, motivo: 'nessun commit dopo la critica. Togli le prove dei rilievi messi da parte, `git add -A && git commit`, poi rilancia.' };
   }
-  const tol = soloProveTolte(diffDopoLaVerifica(critica, head, root));
+  const voci = diffDopoLaVerifica(critica, head, root);
+  const tol = soloProveTolte(voci);
   if (!tol.ok) return { ok: false, motivo: `il commit della pulizia deve solo togliere prove del giro, e qui ${tol.motivo}.` };
   if (!tol.files.length) return { ok: false, motivo: 'dopo la critica non è stata tolta nessuna prova del giro.' };
   const cartelle = [...new Set(tol.files.map((f) => f.replace(/\\/g, '/').split('/').slice(0, 3).join('/')))];
