@@ -1,6 +1,6 @@
 // Gestione aperta prima di essere riconosciuti, poi «Accedi» dal banner: la scheda Automazioni si sblocca
 // e deve mostrare i valori del server, non quelli di partenza della pagina.
-import { test, expect } from '../../fixtures/electron.mjs';
+import { test, expect } from './fixtures/electron.mjs';
 
 test('accesso dal banner: le impostazioni sbloccate sono quelle lette dal server', async ({ openTab }) => {
   const page = await openTab('filo://manage/manage.html');
