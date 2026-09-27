@@ -131,9 +131,11 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   asserisce niente) si cancella. Si cancella anche quella di un rilievo
   **esterno**, nello stesso commit: quel rilievo esce di qui dentro un feedback
   suo, col suo testo, e la prova lasciata indietro sarebbe solo un rosso da
-  rispiegare per sempre. Quelle dei rilievi che la risposta del server lascia
-  fuori dal giro le toglie chi corregge, coi numeri che il server gli dà; se la
-  risposta invece dice che il lavoro passa, le togli tu, seguendola.
+  rispiegare per sempre. Quelle dei rilievi che la risposta del server mette da
+  parte le togli tu, appena la leggi e prima di ogni correzione, in un commit che
+  toglie solo quelle, e lo registri con `--record-pulizia` (la risposta ti dà il
+  comando e i numeri): da quel commit una prova rossa tolta ferma la consegna.
+  Se la risposta dice che il lavoro passa, le togli seguendola.
 - **Prima di registrare porta la directory a un commit**
   (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`): il
   salvataggio automatico parte solo da un Edit o da un Write, non da un `rm` o
