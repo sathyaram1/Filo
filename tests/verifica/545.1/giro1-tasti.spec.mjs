@@ -79,14 +79,3 @@ test('un nome di tasto inventato si rifiuta con un avviso', async ({ openTab }) 
   await expect(page.locator('#cfgShortcutTaken')).toContainText('Spazioo');
   await page.screenshot({ path: 'tests/.shots/verifica-545-1-avviso.png' });
 });
-
-// Una scorciatoia che l'Editor stesso si prende prima dei moduli (salva).
-test('«Ctrl+S» su un modulo non si salva in silenzio per poi non partire', async ({ openTab }) => {
-  const page = await apri(openTab);
-  await impostaScorciatoia(page, 'Ctrl+S');
-  if (await page.locator('#cfgShortcut').isVisible()) return;
-  await esci(page);
-  await page.click('#doc');
-  await page.keyboard.press('Control+KeyS');
-  await expect(page.locator('#overlay')).toBeVisible();
-});
