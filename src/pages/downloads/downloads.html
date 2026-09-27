@@ -15,6 +15,8 @@
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
   <script src="filo://shared/icons.js"></script>
+  <script src="filo://shared/eseguibili.js"></script>
+  <script src="filo://shared/righeVive.js"></script>
   <style>
     /* Un file per RIGA, dal più recente. Clic sinistro = azione primaria (apri, se completato), tasto destro =
        tutte le azioni, com'è centrale in Filo. Gli scaricamenti in corso mostrano barra e percentuale live. */
@@ -54,6 +56,24 @@
     .dl-item[data-missing="1"] .dl-name { text-decoration: line-through; color: var(--sn-muted); }
     .dl-item[data-missing="1"] .dl-icon { color: var(--sn-muted); }
     .dl-item[data-missing="1"] .dl-path { text-decoration: line-through; }
+
+    /* #588 — marca "è un programma": si legge PRIMA del nome, che è testo scelto dal sito.
+       Colore d'accento, non allarme: l'avviso vero è la conferma, questo è un promemoria. */
+    .dl-tag {
+      display: inline-block;
+      margin-right: 7px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.03em;
+      color: var(--sn-accent);
+      background: color-mix(in srgb, var(--sn-accent) 14%, transparent);
+      border: 1px solid color-mix(in srgb, var(--sn-accent) 38%, transparent);
+      vertical-align: 1px;
+    }
+    /* In attesa di conferma: il file non è ancora in cartella, quindi niente azione primaria al clic. */
+    .dl-item[data-state="pending"] { cursor: default; }
+    .dl-item[data-state="pending"] .dl-icon { color: var(--sn-accent); }
 
     .dl-name {
       grid-column: 2; grid-row: 1;

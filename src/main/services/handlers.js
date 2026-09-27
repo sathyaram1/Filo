@@ -1001,6 +1001,7 @@ async function applySettingsUpdate(partial) {
   } catch (_) {}
   try { require('./adblock').configureFromSettings(merged); } catch (_) {}
   try { require('./siteBlock').configureFromSettings(merged); } catch (_) {}
+  try { require('./downloads').configureFromSettings(merged); } catch (_) {}
   return merged;
 }
 

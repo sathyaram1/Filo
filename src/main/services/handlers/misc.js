@@ -439,7 +439,10 @@ module.exports = function register(on, ctx) {
   on(MSG.DOWNLOADS_LIST, internalOnly(async () => ({ ok: true, items: DL().list() })));
   on(MSG.DOWNLOADS_CLEAR, internalOnly(async () => ({ ok: true, items: DL().clearCompleted() })));
   on(MSG.DOWNLOAD_REMOVE, internalOnly(async (msg) => ({ ok: true, items: DL().remove(msg.id) })));
-  on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg) => DL().openFile(msg.id)));
+  // #588 — `confirmed` viaggia dalla superficie che ha MOSTRATO la conferma:
+  // senza, il main risponde needsConfirm e non tocca shell.openPath.
+  on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg) => DL().openFile(msg.id, { confirmed: !!msg.confirmed })));
+  on(MSG.DOWNLOAD_CONFIRM, internalOnly(async (msg) => DL().confirmDownload(msg.id, !!msg.allow)));
   on(MSG.DOWNLOAD_OPEN_FOLDER, internalOnly(async (msg) => DL().openFolder(msg.id)));
   on(MSG.DOWNLOAD_CANCEL, internalOnly(async (msg) => DL().cancel(msg.id)));
   on(MSG.DOWNLOAD_PAUSE, internalOnly(async (msg) => DL().pause(msg.id)));

@@ -1016,10 +1016,16 @@
   // risposta veniva buttata via e il clic non produceva nulla: il silenzio è
   // indistinguibile da un'app bloccata. Ora l'esito diventa un avviso, con la
   // cartella come via d'uscita (il file potrebbe essere lì rinominato).
-  function openDownloadFile(id) {
+  function openDownloadFile(id, confirmed) {
     if (!api.downloads) return Promise.resolve();
-    return api.downloads.openFile(id).then((res) => {
+    return api.downloads.openFile(id, confirmed).then((res) => {
       if (!res || res.ok !== false) return;
+      // #588 — è un programma: aprirlo lo esegue. Il main non lo tocca finché
+      // non torna un "sì" esplicito; la via di mezzo (guardare dov'è finito
+      // senza eseguirlo) resta a un clic.
+      // La domanda sta nella riga del pannello: un avviso in basso finirebbe
+      // sotto la pagina, e il clic sembrerebbe non fare niente.
+      if (res.needsConfirm && chiediApertura) { chiediApertura(id, res.text); return; }
       const opts = res.missing
         ? { actions: [{ label: 'Apri cartella', onClick: () => openDownloadFolder(id) }] }
         : undefined;
@@ -1036,6 +1042,10 @@
       if (res.missing) NOTIFS.show('Il file non c’è più: ho aperto la cartella dov’era');
     }).catch(() => {});
   }
+
+  // #588 — impostata dal pannello scaricamenti: porta lì la domanda «aprire un
+  // programma?», dove la pagina non la copre.
+  let chiediApertura = null;
 
   if (api.onToast) api.onToast((info) => {
     if (!info || !info.text) return;
@@ -1092,6 +1102,20 @@
     const dls = new Map();
     let panelOpen = false;
     let panel = null;
+    // #588 — le domande sui programmi sono righe del pannello, che si apre sopra
+    // la pagina: la riga in attesa È «scaricarlo?», e qui stanno le «aprirlo?»
+    // (id → testo) finché non si risponde. Gli esiti andati storti restano
+    // nella riga che li ha chiesti (id → testo).
+    const domandeApri = new Map();
+    const avvisiRiga = new Map();
+    // #588 — il «sì» di una domanda sui programmi non si dà col clic che l'ha
+    // fatta comparire: la riga nasce dove la pagina ha appena mandato il
+    // cursore, e un doppio clic risponderebbe senza leggerla. I pulsanti che
+    // dicono sì si armano solo quando l'elenco è fermo da ARMA_MS.
+    const ARMA_MS = 1000;
+    let elencoFermoDa = 0;
+    let firmaElenco = '';
+    let timerArma = null;
 
     const ACTIVE = new Set(['progressing', 'paused']);
     const isActive = (r) => r && ACTIVE.has(r.state);
@@ -1113,6 +1137,7 @@
         case 'cancelled': return 'Annullato';
         case 'interrupted': return 'Interrotto';
         case 'paused': return 'In pausa';
+        case 'pending': return 'In attesa di conferma';
         default: return 'In corso';
       }
     }
@@ -1122,21 +1147,34 @@
       if (!all.length) { dlBtn.hidden = true; if (panelOpen) closePanel(); return; }
       dlBtn.hidden = false;
       const active = all.filter(isActive);
-      if (active.length) {
+      // #588 — un programma che aspetta una risposta conta quanto uno in corso:
+      // l'avviso si può chiudere con la ×, e se l'indicatore tacesse l'unico
+      // segno che la domanda è ancora lì sparirebbe con lui.
+      const attesa = all.filter((r) => r && r.state === 'pending');
+      dlBtn.classList.toggle('attesa', attesa.length > 0);
+      dlBtn.dataset.tip = attesa.length
+        ? (attesa.length === 1 ? 'Un programma aspetta la tua risposta' : `${attesa.length} programmi aspettano la tua risposta`)
+        : 'Scaricamenti';
+      if (active.length || attesa.length) {
         dlCount.hidden = false;
-        dlCount.textContent = String(active.length);
+        dlCount.textContent = String(active.length + attesa.length);
         // Avanzamento aggregato: byte ricevuti / totali sui download con totale
         // noto. Se nessuno ha un totale, barra indeterminata (animata via CSS).
         let recv = 0; let total = 0; let known = 0;
         for (const r of active) { if (r.totalBytes > 0) { recv += r.receivedBytes; total += r.totalBytes; known++; } }
-        if (known && total > 0) {
+        if (!active.length) {
+          // Solo attese: niente barra, che direbbe «sto scaricando» a un file
+          // che aspetta l'utente e non si muove.
+          dlBtn.classList.remove('indeterminate', 'active');
+          dlFill.style.width = '0%';
+        } else if (known && total > 0) {
           dlBtn.classList.remove('indeterminate');
           dlFill.style.width = `${Math.min(100, Math.round((recv / total) * 100))}%`;
+          dlBtn.classList.add('active');
         } else {
-          dlBtn.classList.add('indeterminate');
+          dlBtn.classList.add('indeterminate', 'active');
           dlFill.style.width = '40%';
         }
-        dlBtn.classList.add('active');
       } else {
         dlBtn.classList.remove('active', 'indeterminate');
         dlCount.hidden = true;
@@ -1189,20 +1227,28 @@
     function renderPanel() {
       ensurePanel();
       const list = panel.querySelector('#dl-panel-list');
-      list.textContent = '';
       const all = Array.from(dls.values()).sort((a, b) => {
-        // Attivi in cima, poi per data d'inizio decrescente.
-        const aa = isActive(a) ? 0 : 1; const bb = isActive(b) ? 0 : 1;
-        if (aa !== bb) return aa - bb;
+        // Le domande in cima, poi gli attivi, poi per data d'inizio decrescente.
+        const rank = (r) => ((r.state === 'pending' || domandeApri.has(r.id)) ? 0 : (isActive(r) ? 1 : 2));
+        if (rank(a) !== rank(b)) return rank(a) - rank(b);
         return String(b.startedAt || '').localeCompare(String(a.startedAt || ''));
       });
+      const firma = all.map((r) => `${r.id}:${r.state === 'pending' ? 'p' : ''}${domandeApri.has(r.id) ? 'a' : ''}`).join('|');
+      if (firma !== firmaElenco) { firmaElenco = firma; elencoFermoDa = Date.now(); }
       if (!all.length) {
         const empty = document.createElement('div');
         empty.className = 'dl-empty';
         empty.textContent = 'Nessuno scaricamento';
-        list.appendChild(empty);
+        list.replaceChildren(empty);
+      } else if (window.SN_RIGHE_VIVE) {
+        window.SN_RIGHE_VIVE.riconcilia(list, all.map(renderRow), ':scope > .dl-row-actions');
+      } else {
+        list.replaceChildren(...all.map(renderRow));
       }
-      for (const r of all) list.appendChild(renderRow(r));
+      const manca = elencoFermoDa + ARMA_MS - Date.now();
+      if (manca > 0 && !timerArma) {
+        timerArma = setTimeout(() => { timerArma = null; if (panelOpen) renderPanel(); }, manca + 20);
+      }
       // Il pannello ha cambiato altezza: aggiorna lo spazio riservato.
       if (panelOpen) reserveForPanel();
     }
@@ -1211,13 +1257,22 @@
       const row = document.createElement('div');
       row.className = 'dl-row';
       row.dataset.state = r.state;
+      row.dataset.id = r.id;
       // Il file non è più al suo posto: la riga lo dice PRIMA del clic (testo
       // attenuato) e non offre "Apri file", che non avrebbe niente da aprire.
       if (r.missing) row.dataset.missing = '1';
 
       const name = document.createElement('div');
       name.className = 'dl-row-name';
-      name.textContent = r.filename || 'download';
+      // #588 — un programma si riconosce PRIMA di cliccare: la marca sta
+      // accanto al nome, non dentro un'estensione che l'occhio non legge.
+      if (r.exe) {
+        const tag = document.createElement('span');
+        tag.className = 'dl-row-tag';
+        tag.textContent = 'Programma';
+        name.appendChild(tag);
+      }
+      name.appendChild(document.createTextNode(r.filename || 'download'));
       name.title = r.filename || '';
       row.appendChild(name);
 
@@ -1242,22 +1297,55 @@
           : `${fmtBytes(r.receivedBytes)} scaricati`;
       } else if (r.missing) {
         meta.textContent = `Non più sul disco · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
+      } else if (r.state === 'pending') {
+        // Da quale sito arriva è la cosa che fa decidere: sta nella riga, non
+        // solo nell'avviso che l'utente può aver già chiuso.
+        const da = provenienza(r);
+        meta.textContent = da ? `${stateLabel(r)} · ${da}` : stateLabel(r);
       } else {
         meta.textContent = `${stateLabel(r)} · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       }
       row.appendChild(meta);
 
+      const apri = r.state === 'completed' && !r.missing ? domandeApri.get(r.id) : '';
+      const domanda = r.state === 'pending' ? testoScarica(r) : apri;
+      if (domanda) {
+        row.dataset.chiede = '1';
+        const ask = document.createElement('div');
+        ask.className = 'dl-row-ask';
+        ask.textContent = domanda;
+        row.appendChild(ask);
+      }
+      if (avvisiRiga.has(r.id)) {
+        const nota = document.createElement('div');
+        nota.className = 'dl-row-note';
+        nota.setAttribute('role', 'status');
+        nota.textContent = avvisiRiga.get(r.id);
+        row.appendChild(nota);
+      }
+
       const actions = document.createElement('div');
       actions.className = 'dl-row-actions';
-      const addBtn = (label, fn) => {
+      const addBtn = (label, fn, dice) => {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'dl-row-btn';
         b.textContent = label;
+        if (dice === 'si' && Date.now() - elencoFermoDa < ARMA_MS) b.disabled = true;
         b.addEventListener('click', fn);
         actions.appendChild(b);
       };
-      if (isActive(r)) {
+      if (r.state === 'pending') {
+        // Le stesse due risposte dell'avviso: chiuderlo non deve togliere la
+        // possibilità di rispondere (#588).
+        const rispondi = (allow) => api.downloads.confirm(r.id, allow).then((res) => {
+          if (res && res.ok === false) avvisiRiga.set(r.id, res.error || 'Risposta non registrata');
+          if (res && res.items) syncFromList(res.items);
+          else if (panelOpen) renderPanel();
+        }).catch(() => {});
+        addBtn('Scarica', () => rispondi(true), 'si');
+        addBtn('Non scaricare', () => rispondi(false));
+      } else if (isActive(r)) {
         // Gli scaricamenti "a mano" (Salva immagine/video come…) non si mettono
         // in pausa: meglio nessun pulsante che uno che non fa niente.
         if (r.canPause !== false) {
@@ -1265,6 +1353,11 @@
           else addBtn('Pausa', () => api.downloads.pause(r.id).catch(() => {}));
         }
         addBtn('Annulla', () => api.downloads.cancel(r.id).catch(() => {}));
+      } else if (apri) {
+        const rispondi = (fn) => { domandeApri.delete(r.id); if (fn) fn(); renderPanel(); };
+        addBtn('Apri comunque', () => rispondi(() => openDownloadFile(r.id, true)), 'si');
+        addBtn('Apri cartella', () => rispondi(() => openDownloadFolder(r.id)));
+        addBtn('Annulla', () => rispondi(null));
       } else if (r.state === 'completed') {
         if (!r.missing) addBtn('Apri file', () => openDownloadFile(r.id));
         addBtn('Apri cartella', () => openDownloadFolder(r.id));
@@ -1299,6 +1392,11 @@
     }
     function closePanel() {
       panelOpen = false;
+      // Chiudere il pannello è non rispondere: «aprirlo?» si ritira, mentre
+      // un programma in attesa resta in attesa (l'indicatore lo conta).
+      domandeApri.clear();
+      avvisiRiga.clear();
+      firmaElenco = '';
       if (panel) panel.hidden = true;
       dlBtn.classList.remove('open');
       try { api.tabs.reserveTop && api.tabs.reserveTop(0); } catch (_) {}
@@ -1312,17 +1410,48 @@
     function syncFromList(items) {
       dls.clear();
       if (Array.isArray(items)) for (const r of items) dls.set(r.id, r);
+      for (const id of Array.from(domandeApri.keys())) {
+        if (dls.get(id)?.state !== 'completed') domandeApri.delete(id);
+      }
       renderIndicator();
       if (panelOpen) renderPanel();
     }
 
-    // Aggiornamenti live dal main (start/progress/done/error).
+    // Aggiornamenti live dal main (start/progress/done/error/removed).
     api.downloads.onEvent((info) => {
       if (!info || !info.item) return;
-      dls.set(info.item.id, info.item);
+      if (info.kind === 'removed') dls.delete(info.item.id);
+      else dls.set(info.item.id, info.item);
+      if (info.item.state !== 'completed' || info.kind === 'removed') domandeApri.delete(info.item.id);
       renderIndicator();
-      if (panelOpen) renderPanel();
+      // Il main manda 'ask' solo alla finestra da cui parte lo scaricamento.
+      if (info.kind === 'ask') mostraRiga(info.item.id);
+      else if (panelOpen) renderPanel();
     });
+
+    function provenienza(r) {
+      try { return window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain); } catch (_) {}
+      return r.site ? `da ${r.site}` : '';
+    }
+
+    function testoScarica(r) {
+      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site, r.siteUncertain); } catch (_) {}
+      return `«${r.filename}» è un programma. Scaricarlo?`;
+    }
+
+    // Apre il pannello (che fa spazio sopra la pagina) e porta in vista la riga.
+    function mostraRiga(id) {
+      if (panelOpen) renderPanel(); else openPanel();
+      requestAnimationFrame(() => {
+        const row = panel && Array.from(panel.querySelectorAll('.dl-row')).find((x) => x.dataset.id === id);
+        try { row && row.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+      });
+    }
+
+    chiediApertura = (id, testo) => {
+      domandeApri.set(id, testo || 'È un programma: aprirlo vuol dire eseguirlo.');
+      mostraRiga(id);
+    };
 
     // Cronologia iniziale (sopravvive al riavvio).
     api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});

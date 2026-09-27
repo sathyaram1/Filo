@@ -554,6 +554,12 @@ html[data-feedback-dim="1"] .shell {
   text-align: center;
 }
 .dl-ind-count[hidden] { display: none; }
+/* #588 — un programma fermo in attesa di risposta: il bordo d'accento dice che
+   qui c'è una domanda aperta, non uno scaricamento che sta andando avanti. */
+.dl-indicator.attesa {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--fg);
+}
 .dl-ind-bar {
   position: absolute;
   left: 0; right: 0; bottom: 0;
@@ -656,6 +662,35 @@ html[data-feedback-dim="1"] .shell {
   cursor: pointer;
 }
 .dl-row-btn:hover { background: var(--tab-active); }
+/* #588 — un «sì» appena comparso non risponde ancora: si vede spento finché si arma. */
+.dl-row-btn:disabled { opacity: 0.45; cursor: default; background: var(--tab-bg); }
+/* #588 — marca "è un programma": si legge prima del nome, che è la parte di cui
+   il sito decide il testo. Colore d'avviso, non allarme rosso. */
+.dl-row-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font: 600 10px/1.5 system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  vertical-align: baseline;
+}
+.dl-row[data-state="pending"] .dl-row-name { color: var(--fg); }
+/* #588 — una riga che chiede (scaricarlo? aprirlo?): è la domanda stessa, quindi
+   si stacca dalle altre con un velo d'accento e il testo pieno. */
+.dl-row[data-chiede="1"] {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+/* Il nome lo sceglie il sito e può non avere spazi: va a capo dove serve, o
+   la sua coda (l'estensione) finirebbe oltre il bordo. */
+.dl-row-ask { font: 12px/1.4 system-ui, sans-serif; color: var(--fg); overflow-wrap: anywhere; }
+.dl-row-note { font: 11px/1.3 system-ui, sans-serif; color: var(--accent); overflow-wrap: anywhere; }
+.dl-row-meta { overflow-wrap: anywhere; }
 .dl-row[data-state="interrupted"] .dl-row-name,
 .dl-row[data-state="cancelled"] .dl-row-name { color: var(--fg-soft); }
 /* Scaricato ma non più al suo posto: la riga si attenua, così si vede prima ancora di cliccare. */
