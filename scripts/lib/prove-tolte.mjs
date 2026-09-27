@@ -100,24 +100,95 @@ export function controllaPulizia({ shaCritica, root, cartella = '', avvio = '' }
   if (fuori.length) {
     return { ok: false, motivo: `le prove tolte stanno in più cartelle, o fuori da quella del giro${attesa ? ` (${attesa})` : ''}: ${cartelle.join(', ')}.` };
   }
-  return { ok: true, motivo: '', sha: head, files: tol.files };
+  const cancellata = (v) => String(v.stato || '').toUpperCase().startsWith('D');
+  return {
+    ok: true, motivo: '', sha: head, files: tol.files,
+    cancellate: voci.filter(cancellata).map((v) => v.path),
+    cambiate: voci.filter((v) => !cancellata(v)).map((v) => v.path),
+    vecchie: proveVecchie(proveTolte(tol.files), avvio, critica, root),
+  };
+}
+
+// Il numero nel nome di una prova che questa verifica non ha scritto né rinominato è di una critica passata, e può
+// coincidere con quello di un rilievo messo da parte adesso. null se non si sa da che commit è partita.
+function proveVecchie(prove, avvio, critica, root) {
+  if (!SHA.test(String(avvio || ''))) return null;
+  try {
+    const out = gitOut(['diff', '--name-only', '-z', '--no-renames', '--diff-filter=AM', String(avvio), critica, '--', PROVE_GIRO], root);
+    const scritte = new Set(out.split('\0').filter(Boolean));
+    return prove.filter((f) => !scritte.has(f));
+  } catch (_) { return null; }
+}
+
+// giro<k>-r<n>[-r<m>…]-<cosa>.spec.mjs: n è il posto del rilievo nella critica che lo riporta, il primo è 1.
+const NUMERI_NEL_NOME = /^giro\d+((?:-r[1-9]\d*)+)(?=[-.])/;
+const nomeDi = (percorso) => String(percorso || '').replace(/\\/g, '/').split('/').pop();
+
+/** I numeri dei rilievi che una prova del giro riproduce, letti dal nome; [] se non ne porta. PURA. */
+export function numeriDelNome(percorso) {
+  const m = NUMERI_NEL_NOME.exec(nomeDi(percorso));
+  return m ? [...new Set(m[1].split('-r').filter(Boolean).map(Number))] : [];
+}
+
+/** Un nome che sembra numerato ma che numeriDelNome non legge per intero (r0, R3, il numero in coda…). PURA. */
+export function nomeNumeratoStorto(percorso) {
+  const nome = nomeDi(percorso);
+  const m = NUMERI_NEL_NOME.exec(nome);
+  return /(?:^|[-_.])r\d+(?=[-_.]|$)/i.test(m ? nome.slice(m[0].length) : nome);
 }
 
 /**
- * '' se la pulizia regge, altrimenti il rifiuto. Una prova per rilievo messo da parte: di più vuol dire
- * che è uscita anche quella rossa di un rilievo da correggere, che la consegna poi non rilancerebbe. PURA.
- * `files` sono TUTTE le prove tolte dalla critica, così una seconda pulizia non allarga il conto.
+ * Ogni rilievo di `parte` col suo posto nella critica (`n`, da 1), ritrovato per livello, sede e testo fra
+ * `tutti` (parseFindings della critica). `n` null se non si ritrova. PURA.
  */
-export function testoPuliziaTroppoLarga(files, messi) {
-  const tolte = Array.isArray(files) ? files : [];
-  const n = Number(messi) || 0;
-  if (tolte.length <= n) return '';
+export function numeraRilievi(tutti, parte) {
+  const chiave = (f) => `${Number(f && f.level)}|${String((f && f.sede) || 'i').toLowerCase()}|${String((f && f.text) || '').trim()}`;
+  const liberi = (Array.isArray(tutti) ? tutti : []).map((f, i) => ({ k: chiave(f), n: i + 1 }));
+  return (Array.isArray(parte) ? parte : []).filter((f) => f && typeof f === 'object').map((f) => {
+    const i = liberi.findIndex((l) => l.k === chiave(f));
+    return { ...f, n: i < 0 ? null : liberi.splice(i, 1)[0].n };
+  });
+}
+
+/** «- r3 [2i] testo»: la riga del rilievo col numero che le sue prove portano nel nome. PURA. */
+export function rigaNumerata(f, formatta) {
+  const riga = formatta(f);
+  return Number.isInteger(f && f.n) ? riga.replace(/^- /, `- r${f.n} `) : riga;
+}
+
+/**
+ * '' se la pulizia regge, altrimenti il rifiuto. Esce intera solo la prova che nel nome porta soli numeri di
+ * rilievi messi da parte; a una che copre anche un rilievo da correggere si toglie solo il caso, e la consegna
+ * rilancia quello che resta. Una senza numero non esce. `numeri`: i posti dei messi da parte nella critica. PURA.
+ */
+export function testoPuliziaFuoriNumero(controllo, numeri) {
+  const c = controllo || {};
+  const messi = new Set((Array.isArray(numeri) ? numeri : []).filter((n) => Number.isInteger(n)));
+  const vecchie = new Set(Array.isArray(c.vecchie) ? c.vecchie : []);
+  const r = (l) => l.map((n) => `r${n}`).join(', ');
+  const fuori = [];
+  const guarda = (f, intera) => {
+    const n = numeriDelNome(f);
+    const altri = n.filter((x) => !messi.has(x));
+    if (!n.length) return `il nome non porta il numero di un rilievo (giro<k>-r<n>-<cosa>.spec.mjs)`;
+    if (altri.length === n.length) return `${r(altri)} non è fra i rilievi messi da parte`;
+    if (intera && altri.length) return `copre anche ${r(altri)}, che non è messo da parte: il file resta, gli si toglie solo il caso dei messi da parte`;
+    if (vecchie.has(f)) return 'c\'era già prima di questa verifica, e il numero nel nome è quello di una critica passata';
+    return '';
+  };
+  for (const [lista, intera] of [[c.cancellate, true], [c.cambiate, false]]) {
+    for (const f of proveTolte(lista)) {
+      const perche = guarda(f, intera);
+      if (perche) fuori.push(`  · ${f}: ${perche}`);
+    }
+  }
+  if (!fuori.length) return '';
+  const elenco = messi.size ? r([...messi].sort((a, b) => a - b)) : 'nessuno porta un numero';
   return [
-    `pulizia non registrata: dalla critica sono uscite ${tolte.length} prove del giro, ma i rilievi messi da parte sono ${n}.`,
-    ...tolte.map((f) => `  · ${f}`),
-    'Nel commit della pulizia va solo la prova di ciascun rilievo messo da parte: quelle dei rilievi da correggere',
-    'restano finché non sono verdi. Rimetti le altre (git checkout <commit della critica> -- <file>), `git add -A &&',
-    'git commit`, e rilancia la pulizia.',
+    `pulizia non registrata: qui esce solo la prova di un rilievo messo da parte, riconosciuta dal numero nel nome (messi da parte: ${elenco}).`,
+    ...fuori,
+    'Rimettile com\'erano (git checkout <commit della critica> -- <file>), `git add -A && git commit`, e rilancia la',
+    'pulizia. Le prove dei rilievi da correggere restano finché non sono verdi.',
   ].join('\n');
 }
 
