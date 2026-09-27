@@ -133,11 +133,7 @@ test('riapertura riuscita: la scheda resta con la conferma e i crediti spesi, ni
   await expect(card.locator('.bd-reopen-form')).toHaveCount(0);
   await scatta(page, 'riapertura-ok');
 
-  // Un voto dopo (che ridisegna tutto) non la fa sparire.
-  await page.evaluate(() => {
-    const fix = window.__boardTest && document.querySelector('.bd-card');
-    return fix;
-  });
+  // Un ridisegno dopo non la fa sparire.
   await page.evaluate(() => window.__boardTest.setSignedIn('chi-vota'));
   await expect(page.locator('.bd-card').first().locator('.bd-reopen-ok')).toBeVisible();
 });
