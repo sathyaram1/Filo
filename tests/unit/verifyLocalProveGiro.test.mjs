@@ -159,6 +159,6 @@ test('la pulizia si registra solo a correzione aperta e con rilievi messi da par
   assert.equal(f.outcome, 'fixed');
   assert.equal(f.state.r.chiusura.shaPrima, PULIZIA);
   // La risposta persa si ristampa anche dal commit della pulizia.
-  const rimandata = withCritique(p.state, 'r', { critique: 'provato tutto.\n[2i] rotto', sha: PULIZIA, caps: { cap3: 5, cap2: 5, cap1: 2, cap0: 0 } });
+  const rimandata = withCritique(p.state, 'r', { critique: 'provato tutto.\n[2i] rotto\n[1i] x', sha: PULIZIA, caps: { cap3: 5, cap2: 5, cap1: 2, cap0: 0 } });
   assert.equal(rimandata.replayed, true);
 });
