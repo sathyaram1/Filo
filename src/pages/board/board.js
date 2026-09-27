@@ -247,7 +247,7 @@
     const p = document.createElement('p');
     // Un fix ritirato non è un errore di chi ha votato: tono neutro.
     p.className = a.code === 'gone' ? 'bd-card-msg bd-card-msg-info' : 'bd-card-msg';
-    p.setAttribute('role', 'alert');
+    p.setAttribute('role', 'status');
     p.textContent = a.testo;
     return p;
   }
