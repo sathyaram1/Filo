@@ -341,6 +341,8 @@ export function applyPulizia(state, controllo) {
     return { ok: false, message: 'la risposta del server a questa critica non ha messo da parte nessun rilievo: non c\'è niente da pulire. Una prova del giro si toglie solo verde, insieme alla prova durevole che la sostituisce.' };
   }
   if (!controllo || !controllo.ok) return { ok: false, message: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
+  const troppe = testoPuliziaTroppoLarga(controllo.files, messi);
+  if (troppe) return { ok: false, message: troppe };
   s.puliziaSha = controllo.sha;
   return { ok: true, state: s, files: controllo.files };
 }
