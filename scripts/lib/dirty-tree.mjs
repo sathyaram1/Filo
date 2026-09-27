@@ -72,6 +72,11 @@ export function dirtyTreeText(lines, cosa = 'critica') {
   // server risolve la punta vera del ramo e fonde QUELLA, e righe che nessuno
   // ha letto atterrano su main, da dove l'aggiornamento automatico le porta a
   // tutti (feedback #485).
+  if (cosa === 'pulizia') {
+    return 'pulizia non registrata: ci sono modifiche non salvate nella directory, e la pulizia vale per un commit che toglie soltanto le prove dei rilievi messi da parte. '
+      + 'Il salvataggio automatico non parte dopo un rm dalla shell: committa tu (git add -A && git commit -m "pulizia del giro"), poi rilancia lo stesso comando.\n'
+      + `${elenco}${altri}`;
+  }
   if (cosa === 'fusione') {
     return 'fusione non chiesta: ci sono modifiche non salvate nella directory, e i via libera valgono per il commit che verifica e controllo di sicurezza hanno esaminato. Il salvataggio automatico le committerebbe e le spedirebbe, il server fonderebbe la punta NUOVA del ramo, e quelle righe arriverebbero agli utenti senza essere passate da nessun controllo. '
       + 'Porta la directory a un commit: il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu va bene (git add -A && git commit -m "pulizia"). '

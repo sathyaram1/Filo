@@ -1,13 +1,15 @@
-// Le prove del giro che chi corregge ha cancellato o cambiato si rilanciano com'erano, sul codice nuovo:
-// una ancora rossa ferma la consegna. Lo usano verify-local (corretto) e dispatch (--record-fixed).
+// Le prove del giro cancellate o cambiate dopo la critica (o dopo la pulizia) si rilanciano com'erano, sul
+// codice nuovo: una ancora rossa ferma la consegna. Lo usano verify-local e dispatch, anche per la pulizia.
 // Regola: patterns/le-prove-di-un-giro-stanno-nel-ramo-e-la-cartella-si-svuota.md.
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { preparaLancioElectron } from './schermo-virtuale.mjs';
+import { diffDopoLaVerifica, soloProveTolte } from '../verify-local.mjs';
 
 const PROVE_GIRO = 'tests/verifica/';
+const SHA = /^[0-9a-f]{7,40}$/i;
 // Stessa profondità della cartella d'origine, così gli import `../../fixtures/…` risolvono uguali.
 // Gitignorata: il salvataggio automatico non deve mai committarla.
 export const PREFISSO_RIPRISTINO = '_tolte-';
@@ -159,11 +161,11 @@ export function rilanciaProveTolte(prove, shaPrima, root, { lancia = spawnSync, 
 }
 
 /**
- * Tutto il controllo, per chi consegna: `{ ferma, testo }`. Senza il commit della critica non si
- * sa cosa è stato tolto: lo si dice e non si ferma (l'altra verifica rilancia comunque la cartella).
+ * Tutto il controllo, per chi consegna: `{ ferma, testo }`. `shaPrima` è la base (baseDelConfronto).
+ * Senza non si sa cosa è stato tolto: lo si dice e non si ferma (la verifica dopo rilancia la cartella).
  */
-export function controllaProveTolte({ shaPrima, root, messiDaParte = 0, log = console.log, lancia, prepara } = {}) {
-  if (!/^[0-9a-f]{7,40}$/i.test(String(shaPrima || ''))) {
+export function controllaProveTolte({ shaPrima, root, log = console.log, lancia, prepara } = {}) {
+  if (!SHA.test(String(shaPrima || ''))) {
     return { ferma: false, testo: 'Non so da che commit è partita la correzione: le prove del giro cancellate o cambiate non le rilancio.' };
   }
   const prove = proveTolteDal(shaPrima, root);
@@ -171,5 +173,5 @@ export function controllaProveTolte({ shaPrima, root, messiDaParte = 0, log = co
   if (!prove.length) return { ferma: false, testo: '' };
   const r = rilanciaProveTolte(prove, shaPrima, root, { log, ...(lancia ? { lancia } : {}), ...(prepara ? { prepara } : {}) });
   if (r.motivo) return { ferma: true, testo: `Consegna respinta: ${r.motivo}` };
-  return esitoProveTolte({ rosse: r.rosse, messiDaParte, shaPrima });
+  return esitoProveTolte({ rosse: r.rosse, shaPrima });
 }

@@ -339,7 +339,9 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
     // ridà la stessa risposta senza scrivere niente e senza ripagare il giro,
     // come già sul server (verifica del giro 10 su #561). Un testo diverso
     // resta una seconda critica, e viene respinto.
-    if (ROUND.normalizeCritique(critique) === String(prev.critique || '') && String(sha || '') === String(prev.sha || '')) {
+    // Dopo la pulizia la punta è il suo commit: la stessa critica si ristampa anche da lì.
+    const stessoCommit = [prev.sha, prev.pending.shaPulizia].some((x) => x && String(x) === String(sha || ''));
+    if (ROUND.normalizeCritique(critique) === String(prev.critique || '') && stessoCommit) {
       const p = prev.pending;
       return {
         ok: true, state: s, replayed: true, outcome: 'fix',
@@ -479,9 +481,10 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
     fixedSha: sha || '',
     fixedAt: when,
   };
-  // Nessun commit nuovo dopo la critica: niente è stato corretto, e non c'è
-  // niente da riverificare. Conta una cosa sola, se c'è un commit nuovo o no.
-  if (sha && prev.pending.sha && sha === prev.pending.sha) {
+  // Nessun commit nuovo dopo la critica (o dopo la pulizia): niente è stato
+  // corretto, e non c'è niente da riverificare.
+  const partenza = prev.pending.shaPulizia || prev.pending.sha || '';
+  if (sha && partenza && sha === partenza) {
     if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'non corretto' };
     const gravi = pending.filter((f) => Number(f.level) >= 2);
     if (gravi.length) {
@@ -493,8 +496,29 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
     return { ok: true, state: s, outcome: 'pass', derived: pending };
   }
   if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'corretto' };
-  s[branch] = { ...base, verdict: 'fixed', rounds, chiusura: { rilievi: pending, shaPrima: prev.pending.sha || '' } };
+  s[branch] = { ...base, verdict: 'fixed', rounds, chiusura: { rilievi: pending, shaPrima: partenza } };
   return { ok: true, state: s, outcome: 'fixed' };
+}
+
+/**
+ * Registra il commit della pulizia: le prove dei rilievi messi da parte tolte PRIMA di correggere.
+ * Da lì parte il confronto della consegna, e ogni prova tolta dopo che è ancora rossa la ferma. PURA:
+ * `controllo` è l'esito di controllaPulizia (lib/prove-tolte.mjs).
+ */
+export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) {
+  const s = (state && typeof state === 'object') ? { ...state } : {};
+  const prev = s[branch] || {};
+  if (prev.verdict !== 'fix-pending' || !prev.pending) {
+    return { ok: false, reason: 'nessun giro di correzione aperto su questo ramo: la pulizia si fa subito dopo una critica che manda a correggere, prima della correzione.' };
+  }
+  const messi = [prev.pending.derived, prev.pending.external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
+  if (!messi) {
+    return { ok: false, reason: 'questo giro non ha messo da parte nessun rilievo: non c'è niente da pulire. Una prova del giro si toglie solo verde, insieme alla prova durevole che la sostituisce.' };
+  }
+  if (Array.isArray(dirtyFiles) && dirtyFiles.length) return { ok: false, reason: dirtyTreeText(dirtyFiles) };
+  if (!controllo || !controllo.ok) return { ok: false, reason: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
+  s[branch] = { ...prev, pending: { ...prev.pending, shaPulizia: controllo.sha } };
+  return { ok: true, state: s, files: controllo.files };
 }
 
 /**
