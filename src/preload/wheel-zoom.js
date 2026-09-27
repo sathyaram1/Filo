@@ -354,12 +354,14 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     if (zoomMode) {
       e.preventDefault();
       e.stopPropagation();
+      rotellaPresa = Date.now();
       passoModalita(e.deltaY);
       return;
     }
     if (!pageZoom || !(e.ctrlKey || e.metaKey) || pageHandlesZoom()) return;
     e.preventDefault();
     e.stopPropagation();
+    rotellaPresa = Date.now();
     ctrlRotella(e.deltaY);
   }
 
