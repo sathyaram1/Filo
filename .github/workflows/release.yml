@@ -503,6 +503,35 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"   # app non firmata: salta la ricerca certificati
         run: npm run release
 
+      # Il passo sopra puo' finire verde senza aver caricato niente (lo
+      # strumento, quando decide di non pubblicare, si limita a un avviso).
+      # Si guarda la bozza VERA prima di renderla pubblica: senza l'installer
+      # il sito risponde 404, senza latest.yml l'aggiornamento automatico tace.
+      - name: I file per Windows sono davvero nella bozza?
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -eo pipefail
+          # tr: una riga con \r in coda non passerebbe grep -x, e bloccherebbe ogni versione.
+          ELENCO=$(gh release view "${{ steps.bump.outputs.version }}" \
+            --repo "${{ github.repository }}" --json assets \
+            --jq '.assets[].name' | tr -d '\r')
+          echo "Allegati nella bozza:"
+          echo "$ELENCO"
+          for ATTESO in Filo-Setup.exe latest.yml; do
+            echo "$ELENCO" | grep -qx "$ATTESO" || {
+              echo "::error::manca $ATTESO nella bozza ${{ steps.bump.outputs.version }}: non la pubblico."
+              {
+                echo "## Pubblicazione ferma: manca $ATTESO"
+                echo ""
+                echo "La bozza ${{ steps.bump.outputs.version }} resta non pubblicata e invisibile agli utenti; il numero resta consumato."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            }
+          done
+
       - name: Pubblica la release (da bozza a pubblicata)
         # electron-builder crea la release come DRAFT. La rendiamo pubblica solo
         # ORA, a build+upload finiti, cosi' l'auto-update non vede mai una
