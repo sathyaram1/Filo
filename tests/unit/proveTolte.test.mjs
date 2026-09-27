@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import {
   proveTolte, percorsoRipristino, esitoProveTolte, controllaProveTolte, controllaPulizia, baseDelConfronto,
-  PREFISSO_RIPRISTINO, testoPuliziaTroppoLarga,
+  PREFISSO_RIPRISTINO, testoPuliziaFuoriNumero, numeriDelNome, nomeNumeratoStorto, numeraRilievi,
 } from '../../scripts/lib/prove-tolte.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
