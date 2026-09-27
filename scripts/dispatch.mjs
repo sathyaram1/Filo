@@ -1202,8 +1202,11 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   const shaCritica = String(guard.state?.verifierSha || '');
   const baseTolte = baseDelConfronto(shaCritica, guard.state?.puliziaSha, ROOT);
   if (baseTolte && baseTolte !== headSha(ROOT)) {
+    const md = guard.state?.messiDaParteGiro;
     const tolte = controllaProveTolte({
       shaPrima: baseTolte, root: ROOT,
+      conPulizia: baseTolte !== shaCritica,
+      messi: md && md.sha === shaCritica ? Number(md.n) || 0 : 0,
       log: (m) => process.stderr.write(`${m}\n`),
     });
     if (tolte.ferma) return { rejected: true, formatRejected: true, message: tolte.testo };
