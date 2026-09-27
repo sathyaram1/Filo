@@ -139,14 +139,15 @@ export const VERIFIER_ROUND = (() => {
     parseFindings(text) {
       const findings = [];
       for (const line of String(text || '').split('\n')) {
-        const m = /^\s*\[\s*([0-3])\s*([ieIE])\s*(\?)?\s*\]\s*(.+)$/.exec(line);
+        const m = /^\s*\[\s*([0-3])\s*([ievIEV])\s*(\?)?\s*\]\s*(.+)$/.exec(line);
         if (m) findings.push({ level: Number(m[1]), sede: m[2].toLowerCase(), text: m[4].trim(), decision: m[3] === '?' });
       }
       return { summary: '', findings, rifiutati: [] };
     },
-    formatFinding(f) { return `- [${f.level}${f.sede === 'e' ? 'e' : 'i'}${f.decision ? '?' : ''}] ${f.text}`; },
+    formatFinding(f) { return `- [${f.level}${f.sede === 'e' || f.sede === 'v' ? f.sede : 'i'}${f.decision ? '?' : ''}] ${f.text}`; },
     formatFindings(list) { return (list || []).map((f) => this.formatFinding(f)).join('\n'); },
     primaFrase(text) { return String(text || '').split('\n')[0].trim().slice(0, 120); },
+    groupLabel(g) { return g.tipo; },
   };
 })();
 
@@ -955,7 +956,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
     // Un rifiuto di FORMATO, non della guardia d'identità: il testo di quella
     // («la directory non corrisponde al branch») mandava il verificatore a
     // controllare ramo e cartella invece della riga (verifica del giro 4).
-    return { rejected: true, formatRejected: true, message: `critica non registrata: rilievi non riconosciuti. Le parentesi quadre con dentro un livello sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto e nei passi un livello si cita a parole («il livello 2»), mai «[2i]». Il livello, fra 0 e 3, va a inizio riga seguito dalla sede — «i» se tocca a questo lavoro, «e» se è un altro — e dal testo del rilievo, una riga per rilievo («[2i] testo», «[1e?] testo», anche «- [2i]», «1. [2i]», «### [2i]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
+    return { rejected: true, formatRejected: true, message: `critica non registrata: rilievi non riconosciuti. Le parentesi quadre con dentro un livello sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto e nei passi un livello si cita a parole («il livello 2»), mai «[2i]». Il livello, fra 0 e 3, va a inizio riga seguito dalla sede — «i» se tocca a questo lavoro, «v» se è di un altro lavoro ma sta in un file che il ramo modifica già, «e» se è un altro lavoro — e dal testo del rilievo, una riga per rilievo («[2i] testo», «[1e?] testo», anche «- [2i]», «1. [2i]», «### [2i]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
   }
   // Stesso tetto del server (12000 caratteri), detto QUI prima del viaggio e
   // col numero: mai un taglio silenzioso (CLAUDE.md § Limiti).
@@ -1036,7 +1037,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
   // I rilievi messi da parte su QUESTO commit, col loro posto nella critica: la pulizia toglie solo le loro prove.
   const daParte = derivatiAperti(reply.phase2 ? reply.phase2.derived : reply.derived);
   next.messiDaParteGiro = outcome === 'fix'
-    ? { sha: shaProvato, n: daParte.length, numeri: daParte.map((d) => d.n).filter(Number.isInteger), avvio: avvio || '' }
+    ? { sha: shaProvato, n: daParte.reduce((k, d) => k + d.rilievi.length, 0), numeri: daParte.flatMap((d) => d.rilievi.map((f) => f.n)).filter(Number.isInteger), avvio: avvio || '' }
     : null;
   sealTransition(next, `verifier:${outcome}`);
   next.reply = reply;
@@ -1065,27 +1066,49 @@ export const FERMA_NOTE = [
 ].join('\n');
 
 /**
- * I feedback derivati aperti dal server per questo giro, come li stampa la
- * risposta: numero, priorità, sede, prima frase. Accetta anche la forma di un
- * server vecchio (un oggetto solo, col numero). PURA.
+ * I feedback derivati aperti dal server per questo giro, uno per feedback: il
+ * numero, la priorità, il tipo del gruppo (derivedGroups) e i rilievi che
+ * contiene. Il server manda un rilievo per voce, e quelli di un feedback
+ * accorpato portano lo stesso numero; qui si rimettono insieme. Accetta anche
+ * voci già raggruppate (`findings`) e la forma di un server vecchio (un
+ * oggetto solo, col numero). PURA.
  */
 export function derivatiAperti(derived) {
   const list = Array.isArray(derived) ? derived : (derived && derived.num ? [derived] : []);
-  return list.filter((f) => f && typeof f === 'object').map((f) => ({
-    rilievo: f,
-    n: Number.isInteger(f.n) ? f.n : null,
-    num: String(f.num || '').trim(),
-    priority: Number.isFinite(Number(f.priority)) ? Number(f.priority) : (Number.isFinite(Number(f.level)) ? Number(f.level) : null),
-    esterno: f.sede === 'e',
-    frase: VERIFIER_ROUND.primaFrase ? VERIFIER_ROUND.primaFrase(f.text) : String(f.text || '').split('\n')[0],
-  }));
+  const voci = [];
+  const perNumero = new Map();
+  for (const f of list) {
+    if (!f || typeof f !== 'object') continue;
+    const rilievi = Array.isArray(f.findings) ? f.findings.filter((x) => x && typeof x === 'object') : [f];
+    const num = String(f.num || '').trim();
+    const priorita = Number.isFinite(Number(f.priority)) ? Number(f.priority) : (Number.isFinite(Number(f.level)) ? Number(f.level) : null);
+    const gia = num ? perNumero.get(num) : null;
+    if (gia) {
+      gia.rilievi.push(...rilievi);
+      if (priorita != null && (gia.priority == null || priorita > gia.priority)) gia.priority = priorita;
+      continue;
+    }
+    const primo = rilievi[0] || {};
+    const tipo = ['esterno', 'decisione', 'rimasti'].includes(f.tipo) ? f.tipo
+      : primo.sede === 'e' ? 'esterno' : primo.decision === true ? 'decisione' : 'rimasti';
+    const voce = { rilievi, num, priority: priorita, tipo, esterno: tipo === 'esterno', frase: frase(primo) };
+    voci.push(voce);
+    if (num) perNumero.set(num, voce);
+  }
+  return voci;
+}
+
+function frase(f) {
+  return VERIFIER_ROUND.primaFrase ? VERIFIER_ROUND.primaFrase(f && f.text) : String((f && f.text) || '').split('\n')[0];
 }
 
 function derivatiRighe(list) {
   if (!list.length) return '  (nessuno)';
   return list.map((d) => {
-    const dove = `feedback ${d.num || '(numero non comunicato)'}${d.priority != null ? `, priorità ${d.priority}, ${d.esterno ? 'esterno' : 'interno messo da parte'}` : ''}`;
-    return d.rilievo.text ? `${rigaNumerata(d.rilievo, VERIFIER_ROUND.formatFinding)}\n  → ${dove}` : `- ${dove}`;
+    const gruppo = { tipo: d.tipo, priority: d.priority, decision: d.rilievi.some((f) => f.decision === true), findings: d.rilievi };
+    const dove = `feedback ${d.num || '(numero non comunicato)'}${d.priority != null ? `, priorità ${d.priority}, ${VERIFIER_ROUND.groupLabel(gruppo)}` : ''}`;
+    const conTesto = d.rilievi.filter((f) => f.text);
+    return conTesto.length ? `${conTesto.map((f) => rigaNumerata(f, VERIFIER_ROUND.formatFinding)).join('\n')}\n  → ${dove}` : `- ${dove}`;
   }).join('\n');
 }
 
@@ -1113,15 +1136,16 @@ export function verifierReplyText(reply, id = '<id>') {
     : '';
   const derivati = derivatiAperti(r.phase2 ? r.phase2.derived : r.derived);
   // I 2 interni messi da parte: il bilancio dei 2 è finito, e a differenza dei
-  // 3 non fermano il lavoro; il server li ha già aperti a priorità 2.
-  const dueDaParte = derivati.filter((d) => !d.esterno && d.priority === 2).length;
+  // 3 non fermano il lavoro; il server li ha già messi nel feedback dei rimasti.
+  const dueDaParte = derivati.filter((d) => d.tipo === 'rimasti')
+    .reduce((n, d) => n + d.rilievi.filter((f) => Number(f.level) === 2 && (f.sede || 'i') === 'i').length, 0);
   const dueRiga = dueDaParte
-    ? `Bilancio delle correzioni di livello 2 finito: ${dueDaParte === 1 ? 'il rilievo interno di livello 2 rimasto è uscito come feedback a parte' : `i ${dueDaParte} rilievi interni di livello 2 rimasti sono usciti come feedback a parte`}, a priorità 2 (elencati sopra). Il lavoro non si ferma.`
+    ? `Bilancio delle correzioni di livello 2 finito: ${dueDaParte === 1 ? 'il rilievo interno di livello 2 rimasto è entrato' : `i ${dueDaParte} rilievi interni di livello 2 rimasti sono entrati`} nel feedback dei rimasti (elencato sopra). Il lavoro non si ferma.`
     : null;
   // Un rilievo diventato un feedback suo non lascia una prova rossa nel ramo:
   // il testo vive nel feedback, e la cartella del giro si svuota invece di
   // crescere. Le righe sono pronte da spuntare, col numero di ciascuno.
-  const daTogliere = derivati.map((d) => `  · ${d.n ? `le prove con r${d.n} nel nome` : 'nessuna prova (il rilievo non si ritrova nella critica)'}, per ${d.num || '(numero non comunicato)'}: ${d.frase}`).join('\n');
+  const daTogliere = derivati.flatMap((d) => d.rilievi.map((f) => `  · ${Number.isInteger(f.n) ? `le prove con r${f.n} nel nome` : 'nessuna prova (il rilievo non si ritrova nella critica)'}, per ${d.num || '(numero non comunicato)'}: ${frase(f)}`)).join('\n');
   if (r.outcome === 'fix' && r.phase2) {
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
@@ -1163,7 +1187,7 @@ export function verifierReplyText(reply, id = '<id>') {
   if (r.outcome === 'pass') {
     return [
       '══ RISPOSTA DEL SERVER: verifica superata ══',
-      derivati.length ? `Rilievi non corretti, diventati feedback loro (priorità uguale al livello):\n${derivatiRighe(derivati)}` : 'Nessun rilievo da mettere da parte.',
+      derivati.length ? `Rilievi non corretti, diventati feedback derivati (esterni e domande uno per rilievo, gli altri insieme nel feedback dei rimasti):\n${derivatiRighe(derivati)}` : 'Nessun rilievo da mettere da parte.',
       dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
       derivati.length ? 'Prove del giro da TOGLIERE adesso, prima di rilasciare il biglietto:' : null,
@@ -1517,7 +1541,7 @@ export function usageText() {
     '  (nessun argomento)     giro locale, senza server (sceglie il bucket qui)',
     '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
     '  --record-verifier <id> "<critica>" [--segnala <file.md>] [--ticket <b>]   una riga per rilievo,',
-    '                         con livello e sede davanti ([2i] …, [2e] …; [1i?] = chiede una decisione);',
+    '                         con livello e sede davanti ([2i] …, [1v] …, [2e] …; [1i?] = chiede una decisione);',
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
