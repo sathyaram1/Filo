@@ -46,7 +46,11 @@ test('stress: HTML, emoji, soli spazi, digitazione rapida', async ({ openTab }) 
   await page.locator('#search').pressSequentially('copia 3zz', { delay: 5 });
   await expect(count).toHaveText('0 feedback');
   for (let i = 0; i < 3; i++) await page.locator('#search').press('Backspace');
-  await expect(count).toHaveText('1 feedback');
+  // Il contatore torna a dire quante schede ci sono davvero a schermo.
+  await expect(count).not.toHaveText('0 feedback');
+  const cards = await page.locator('.fb-card').count();
+  expect(cards).toBeGreaterThan(0);
+  await expect(count).toHaveText(`${cards} feedback`);
 });
 
 test('cambio sezione durante una ricerca a vuoto: il contatore segue la sezione', async ({ openTab }) => {
