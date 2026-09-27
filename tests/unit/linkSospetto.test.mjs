@@ -224,6 +224,8 @@ test('un nome scritto con lettere di un altro alfabeto si fa riconoscere', () =>
   }
   // Un nome che mescola gli alfabeti senza imitare un sito noto resta sospetto.
   assert.deepEqual(LS.analizza('https://exаmple.com/'), ['alfabeto_ingannevole']);
+  // E così un nome fatto solo di lettere che sembrano latine, sotto un dominio latino.
+  assert.deepEqual(LS.analizza('https://сосо.com/'), ['alfabeto_ingannevole']);
   assert.ok(LS.frasi(['alfabeto_ingannevole'])[0].includes('alfabeto'));
 });
 
@@ -233,7 +235,7 @@ test('i nomi scritti per intero in un’altra lingua, e i siti che usano un nome
   // davvero (i loro sottodomini, i domini ufficiali col trattino).
   const innocenti = [
     'https://пример.рф/', 'https://яндекс.рф/', 'https://münchen.de/', 'https://ελληνικά.gr/',
-    'https://日本語.jp/', 'https://😀.com/',
+    'https://日本語.jp/', 'https://😀.com/', 'https://рост.рф/', 'https://сок.ru/', 'https://кот.bg/',
     'https://facebook.github.io/react/', 'https://microsoft.github.io/vscode/',
     'https://apple.stackexchange.com/questions/1', 'https://apple-pie.it/', 'https://pineapple.com/',
     'https://appleinsider.com/', 'https://x-plane.com/', 'https://googleblog.com/', 'https://amazonaws.com/',

@@ -29,7 +29,7 @@
     const host = daPunycode(u.hostname.toLowerCase().replace(/\.$/, '')).replace(/^www\./, '');
     const imitato = imitazione(host, etichetteUtente(u));
     if (imitato) flags.push(imitato);
-    else if (host.split('.').some(alfabetoIngannevole)) flags.push('alfabeto_ingannevole');
+    else if (alfabetoIngannevole(host)) flags.push('alfabeto_ingannevole');
     return flags;
   }
 
@@ -51,8 +51,9 @@
     const straniero = /[^\x00-\x7f]/.test(sito.nome);
     for (const p of POPULAR) {
       const suo = sitoDi(p).nome;
-      if (scritto === suo) return (straniero ? 'omografo:' : 'typosquatting:') + p;
-      if (levenshteinSmall(sito.nome, suo, tolleranza(suo))) return 'typosquatting:' + p;
+      if (scritto === suo || levenshteinSmall(scritto, suo, tolleranza(suo))) {
+        return (straniero ? 'omografo:' : 'typosquatting:') + p;
+      }
     }
 
     // #725.2 — il nome vero c'è tutto, ma davanti a un altro dominio
@@ -122,15 +123,24 @@
   }
 
   const STRANIERE = /[\u0370-\u03ff\u0400-\u04ff\u0500-\u052f\u0530-\u058f]/;
+  // Domini dei Paesi che scrivono in cirillico, greco o armeno: lì una parola
+  // intera come «рост» è una parola, non un travestimento.
+  const TLD_LOCALI = new Set(['ru', 'su', 'by', 'ua', 'kz', 'bg', 'mk', 'rs', 'me', 'ba', 'kg', 'mn', 'tj', 'uz', 'gr', 'cy', 'am']);
   // Un'etichetta che mescola il latino con un alfabeto che gli somiglia, o che
-  // è fatta solo di lettere che sembrano latine: nessun sito vero si scrive così.
-  function alfabetoIngannevole(etichetta) {
-    if (!STRANIERE.test(etichetta)) return false;
-    if (/[a-z]/.test(etichetta)) return true;
-    for (const ch of etichetta) {
-      if (ch.charCodeAt(0) >= 0x80 && !CONFONDIBILI.has(ch)) return false;
-    }
-    return true;
+  // sotto un dominio latino è fatta solo di lettere che sembrano latine.
+  function alfabetoIngannevole(host) {
+    const etichette = host.split('.');
+    const tld = etichette[etichette.length - 1];
+    const travestibile = /^[a-z]+$/.test(tld) && !TLD_LOCALI.has(tld);
+    return etichette.some((e) => {
+      if (!STRANIERE.test(e)) return false;
+      if (/[a-z]/.test(e)) return true;
+      if (!travestibile) return false;
+      for (const ch of e) {
+        if (ch.charCodeAt(0) >= 0x80 && !CONFONDIBILI.has(ch)) return false;
+      }
+      return true;
+    });
   }
 
   // Sottoinsieme UTS-39 (stessa tabella del controllo di navigazione).
