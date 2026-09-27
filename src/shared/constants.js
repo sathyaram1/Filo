@@ -555,6 +555,16 @@
     'Novita',
   ];
 
+  // Perché ogni voce di serie è nella lista: la pagina «Modelli predefiniti» lo
+  // mostra accanto al nome, così fra mesi si sa se un'esclusione ha ancora senso.
+  // `kind`: 'producer' (produce i modelli) | 'unreliable' (serve male).
+  const EXCLUDED_PROVIDER_KINDS = ['producer', 'unreliable'];
+  const DEFAULT_EXCLUDED_PROVIDER_REASONS = [
+    ...['Google', 'OpenAI', 'xAI', 'DeepSeek', 'Mistral', 'Moonshot AI', 'MiniMax', 'Qwen', 'Cohere', 'Meta', 'Z.AI']
+      .map((name) => ({ name, kind: 'producer', note: '' })),
+    { name: 'Novita', kind: 'unreliable', note: 'Banco di prova del 30/08/2026: ha risposto con la risposta di un\'altra richiesta.' },
+  ];
+
   function normalizeProviderName(name) {
     return String(name == null ? '' : name).toLowerCase().replace(/\s+/g, ' ').trim();
   }
