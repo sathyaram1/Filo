@@ -38,9 +38,9 @@ const CASI = [
     scope: 'chiusura', feedback: fb(2000),
     perimetro: { shaPrima: 'abcdef1234567', rilievi: [{ level: 2, sede: 'i', text: 'Rilievo unico.\n' + lungo(11800, 'passo lungo\n') }] },
   }, 'passo lungo'],
-  ['riallineamento con un report da 6.000 caratteri', {
+  ['riallineamento con un report da 10.000 caratteri', {
     scope: 'riallineamento', feedback: fb(2000),
-    perimetro: { shaVerificato: 'abcdef1234567', reportRebase: lungo(6000, 'conflitto risolto nel file tale, logica non toccata\n') },
+    perimetro: { shaVerificato: 'abcdef1234567', reportRebase: lungo(10000,'conflitto risolto nel file tale, logica non toccata\n') },
   }, 'conflitto risolto nel file tale'],
 ];
 
