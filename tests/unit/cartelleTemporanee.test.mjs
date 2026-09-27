@@ -81,16 +81,26 @@ test('nessun test o script ricava un percorso dal pathname di un URL di file', (
 
 // Un symlink su Windows vuole l'amministratore o la modalità sviluppatore: senza,
 // EPERM, e la prova è rossa solo dall'owner e ferma ogni chiusura locale (#742).
+function creaCollegamentoNegato(sorgente) {
+  // Senza commenti: «un symlink (es. /tmp)» in prosa non è una chiamata. La forma asincrona dà lo stesso EPERM.
+  const testo = String(sorgente).replace(/(^|[^:])\/\/.*$/gm, '$1');
+  if (/process\.platform\s*!==\s*['"]win32['"]/.test(testo)) return false;
+  return (testo.match(/\bsymlink(?:Sync)?\s*\([^;\n]*/g) || []).some((c) => !/['"]junction['"]/.test(c));
+}
+
+test('la sentinella dei collegamenti riconosce ogni forma di node, e non la prosa', () => {
+  assert.equal(creaCollegamentoNegato("symlinkSync(a, b);"), true);
+  assert.equal(creaCollegamentoNegato("await symlink(a, b);"), true);
+  assert.equal(creaCollegamentoNegato("await fs.promises.symlink(a, b);"), true);
+  assert.equal(creaCollegamentoNegato("symlinkSync(a, b, 'junction');"), false);
+  assert.equal(creaCollegamentoNegato('// os.tmpdir() è un symlink (es. /tmp)'), false);
+});
+
 test('nessun test crea un collegamento che Windows nega a chi non è amministratore', () => {
   const colpevoli = [];
   for (const p of fileDiTest()) {
     if (p === AMMESSO) continue;
-    // Senza commenti: «un symlink (es. /tmp)» in prosa non è una chiamata. La forma asincrona dà lo stesso EPERM.
-    const testo = readFileSync(p, 'utf8').replace(/(^|[^:])\/\/.*$/gm, '$1');
-    const soloFuoriDaWindows = /process\.platform\s*!==\s*['"]win32['"]/.test(testo);
-    for (const chiamata of testo.match(/\bsymlink(?:Sync)?\s*\([^;\n]*/g) || []) {
-      if (!/['"]junction['"]/.test(chiamata) && !soloFuoriDaWindows) colpevoli.push(relative(TESTS, p));
-    }
+    if (creaCollegamentoNegato(readFileSync(p, 'utf8'))) colpevoli.push(relative(TESTS, p));
   }
   assert.deepEqual([...new Set(colpevoli)], [],
     'questi file creano un symlink che su Windows senza privilegi dà EPERM: per una cartella usa '
