@@ -28,6 +28,7 @@
       ],
       fixes: [
         'Anche in una finestra in incognito un programma scaricato si ferma e ti chiede se tenerlo, dicendoti da quale sito arriva. I file scaricati lì compaiono nell\u2019elenco di quella finestra, che si svuota quando la chiudi.',
+        'Il menu del tasto destro su un link ti avvisa anche delle imitazioni pi\u00f9 comuni nelle mail di phishing: un indirizzo che comincia con il nome di un sito noto ma porta altrove (paypal.com.accesso-sicuro.net), il nome legato a un\u2019altra parola (secure-paypal.com) e il nome scritto con lettere di un altro alfabeto che a schermo sembrano quelle vere.',
         'Se clicchi col tasto destro su un\u2019immagine che apre un link, per esempio il banner o il logo di una scheda, il menu ti avvisa se quel link \u00e8 sospetto, per esempio se imita un sito noto, come gi\u00e0 fa col link scritto.',
         'Quando chiedi a Filo di cambiare l\'aspetto, ogni pulsante sotto la risposta dice quale impostazione regola e mostra il campione del colore appena messo. Prima erano tutti «Scegli il colore esatto» e con cinque colori cambiati insieme non si capiva quale fosse quale.',
         'Selezioni «3000 rupie» e la spiegazione ti dice quanto fanno in euro col cambio di oggi. Adesso vale per tutte le valute che pubblica la Banca centrale europea, non più per dieci soltanto, e l\'importo si legge come un prezzo, «27,45 €», invece che con dodici cifre dopo la virgola. Lo stesso vale per la spiegazione estesa, che prima i cambi non li riceveva affatto.',

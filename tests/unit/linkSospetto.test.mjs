@@ -182,3 +182,92 @@ test('le imitazioni vere continuano a farsi riconoscere', () => {
     assert.deepEqual(LS.analizza(u), ['typosquatting:' + atteso], `nessun avviso su ${u}`);
   }
 });
+
+test('il nome vero c’è tutto, ma a comandare è un altro dominio', () => {
+  // #725.2 — le forme delle mail di phishing: il nome del sito vero davanti a
+  // un altro dominio, prima di una «@», o legato col trattino a un'altra parola.
+  // Il successo per chi legge è vedere quale sito viene usato e dove porta.
+  const casi = {
+    'https://paypal.com.accesso-sicuro.net/login': ['paypal.com', 'accesso-sicuro.net'],
+    'https://www.paypal.com.accesso-sicuro.net/': ['paypal.com', 'accesso-sicuro.net'],
+    'https://paypal.com.verifica.co.uk/': ['paypal.com', 'verifica.co.uk'],
+    'https://secure-paypal.com/': ['paypal.com', 'secure-paypal.com'],
+    'https://paypal-com.net/': ['paypal.com', 'paypal-com.net'],
+    'https://paypal.accesso-sicuro.net/': ['paypal.com', 'accesso-sicuro.net'],
+    'https://www.paypal.com@accesso-sicuro.net/': ['paypal.com', 'accesso-sicuro.net'],
+    'https://apple.com.id-verifica.net/': ['apple.com', 'id-verifica.net'],
+    'https://login-microsoft.com/': ['microsoft.com', 'login-microsoft.com'],
+  };
+  for (const [u, [nome, dove]] of Object.entries(casi)) {
+    const avviso = LS.avviso(LS.analizza(u));
+    assert.ok(avviso.includes(nome) && avviso.includes(dove), `su ${u} l’avviso non nomina ${nome} e ${dove}: «${avviso}»`);
+    assert.match(avviso, /potrebbe/, `su ${u} l’avviso afferma invece di ipotizzare: ${avviso}`);
+  }
+});
+
+test('un nome scritto con lettere di un altro alfabeto si fa riconoscere', () => {
+  // #725.2 — «раураl» in cirillico a schermo è «paypal»; nell'indirizzo viaggia
+  // in punycode (xn--…), e così non somigliava a niente.
+  const casi = {
+    'https://раураl.com/': 'paypal.com',
+    'https://xn--l-7sba6dbr.com/': 'paypal.com',
+    'https://pаypal.com/signin': 'paypal.com',
+    'https://аррӏе.com/': 'apple.com',
+    'https://gооgle.com/': 'google.com',
+    'https://ɡoogle.com/': 'google.com',
+    'https://paypàl.com/': 'paypal.com',
+  };
+  for (const [u, atteso] of Object.entries(casi)) {
+    assert.deepEqual(LS.analizza(u), ['omografo:' + atteso], `nessun avviso su ${u}`);
+    const avviso = LS.avviso(LS.analizza(u));
+    assert.ok(avviso.includes(atteso) && /lettere/.test(avviso), `l’avviso su ${u} non spiega il trucco: ${avviso}`);
+  }
+  // Un nome che mescola gli alfabeti senza imitare un sito noto resta sospetto.
+  assert.deepEqual(LS.analizza('https://exаmple.com/'), ['alfabeto_ingannevole']);
+  assert.ok(LS.frasi(['alfabeto_ingannevole'])[0].includes('alfabeto'));
+});
+
+test('i nomi scritti per intero in un’altra lingua, e i siti che usano un nome famoso di diritto, restano muti', () => {
+  // Il contrappeso: stringere le maglie non deve far gridare al lupo su un
+  // dominio russo, greco o tedesco, né sui siti che un nome famoso lo portano
+  // davvero (i loro sottodomini, i domini ufficiali col trattino).
+  const innocenti = [
+    'https://пример.рф/', 'https://яндекс.рф/', 'https://münchen.de/', 'https://ελληνικά.gr/',
+    'https://日本語.jp/', 'https://😀.com/',
+    'https://facebook.github.io/react/', 'https://microsoft.github.io/vscode/',
+    'https://apple.stackexchange.com/questions/1', 'https://apple-pie.it/', 'https://pineapple.com/',
+    'https://appleinsider.com/', 'https://x-plane.com/', 'https://googleblog.com/', 'https://amazonaws.com/',
+    'https://github-readme-stats.vercel.app/api', 'https://www.youtube-nocookie.com/embed/abc',
+    'https://login.microsoftonline.com/', 'https://aws.amazon.com/', 'https://www.amazon.co.uk/',
+    'https://paypal.com.co/', 'https://utente:segreto@esempio.it/',
+  ];
+  for (const u of innocenti) {
+    assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
+  }
+});
+
+test('ogni forma di imitazione ha la sua frase', () => {
+  for (const c of ['omografo:paypal.com', 'nome_altrui:paypal.com|accesso-sicuro.net', 'alfabeto_ingannevole']) {
+    const f = LS.frasi([c]);
+    assert.equal(f.length, 1, `il codice "${c}" non ha una frase`);
+    assert.ok(!/omografo|nome_altrui|alfabeto_ingannevole|\|/.test(f[0]), `la frase mostra un codice interno: ${f[0]}`);
+    assert.match(f[0], /potrebbe/, `la frase di "${c}" afferma invece di ipotizzare: ${f[0]}`);
+  }
+  // Un codice monco non diventa una frase a metà.
+  assert.deepEqual(LS.frasi(['nome_altrui:paypal.com', 'omografo:']), []);
+});
+
+test('la decodifica del punycode dà il nome che si legge a schermo', async () => {
+  const { domainToASCII } = await import('node:url');
+  for (const nome of ['раураl', 'münchen', 'пример', 'ελληνικά', 'bücher', 'аррӏе']) {
+    const u = 'https://' + domainToASCII(nome + '.com') + '/';
+    // Il nome decodificato è quello che il controllo vede: una delle lettere
+    // cirilliche lo fa sospettare, una tedesca no.
+    const attesoSospetto = ['раураl', 'аррӏе'].includes(nome);
+    assert.equal(LS.analizza(u).length > 0, attesoSospetto, `decodifica sbagliata per ${nome} (${u})`);
+  }
+  // Un'etichetta punycode rotta non fa esplodere niente.
+  for (const u of ['https://xn--zz-zzz.com/', 'https://xn--.com/', 'https://xn--99999999999.com/']) {
+    assert.ok(Array.isArray(LS.analizza(u)));
+  }
+});
