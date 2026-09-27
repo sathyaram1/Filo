@@ -1085,13 +1085,25 @@ function derivatiRighe(list) {
   if (!list.length) return '  (nessuno)';
   return list.map((d) => {
     const dove = `feedback ${d.num || '(numero non comunicato)'}${d.priority != null ? `, priorità ${d.priority}, ${d.esterno ? 'esterno' : 'interno messo da parte'}` : ''}`;
-    return d.rilievo.text ? `${VERIFIER_ROUND.formatFinding(d.rilievo)}\n  → ${dove}` : `- ${dove}`;
+    return d.rilievo.text ? `${rigaNumerata(d.rilievo, VERIFIER_ROUND.formatFinding)}\n  → ${dove}` : `- ${dove}`;
   }).join('\n');
+}
+
+/**
+ * La risposta del server coi rilievi numerati come nella critica mandata (`n`, da 1): il server li rimanda col
+ * testo, e il numero è quello che le prove del giro portano nel nome. PURA.
+ */
+export function numeraRisposta(reply, critica) {
+  const r = { ...(reply || {}) };
+  const numera = (l) => (Array.isArray(l) ? numeraRilievi(critica, l) : l);
+  if (r.phase2 && typeof r.phase2 === 'object') r.phase2 = { ...r.phase2, findings: numera(r.phase2.findings), derived: numera(r.phase2.derived) };
+  for (const k of ['derived', 'blocking', 'sospesi']) if (Array.isArray(r[k])) r[k] = numera(r[k]);
+  return r;
 }
 
 export function verifierReplyText(reply, id = '<id>') {
   const r = reply && typeof reply === 'object' ? reply : {};
-  const fmt = (list) => (Array.isArray(list) && list.length ? VERIFIER_ROUND.formatFindings(list) : '  (nessuno)');
+  const fmt = (list) => (Array.isArray(list) && list.length ? list.map((f) => rigaNumerata(f, VERIFIER_ROUND.formatFinding)).join('\n') : '  (nessuno)');
   const b = (r.phase2 && r.phase2.budgets) || r.budgets;
   // I bilanci come li manda il server, nell'ordine dei livelli: uno che il
   // server non manda (un server vecchio) non si inventa.
