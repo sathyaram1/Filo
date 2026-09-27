@@ -184,6 +184,11 @@
     const m = /^\/gift\s+(\S+)\s+(.+)$/i.exec(String(text || '').trim());
     const email = m ? indirizzoScritto(m[2]) : '';
     if (!m || !email.includes('@')) { showFiloLine('Uso: /gift NUMERO EMAIL — es. /gift 2000 mario@esempio.com', chat); return; }
+    const diversi = indirizziDiversi(m[2]);
+    if (diversi.length > 1) {
+      showFiloLine(`Ci sono ${diversi.length} indirizzi (${diversi.join(', ')}): nessun regalo fatto. Scrivi /gift una volta per ciascuno.`, chat);
+      return;
+    }
     const amount = Number(m[1]);
     if (!Number.isInteger(amount) || amount <= 0) {
       showFiloLine(`"${m[1]}" non è un numero di crediti valido. Usa un intero positivo.`, chat);
