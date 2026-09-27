@@ -128,6 +128,11 @@
     const dopo = String(text || '').trim().replace(/^\/users\b/i, '').trim();
     const ancora = /^(altri|ancora|avanti)$/i.test(dopo);
     if (!ancora) {
+      const diversi = indirizziDiversi(dopo);
+      if (diversi.length > 1) {
+        showFiloLine(`Ci sono ${diversi.length} indirizzi (${diversi.join(', ')}): scrivine uno per volta.`, chat);
+        return;
+      }
       usersSegnalibro = '';
       usersMostrati = 0;
       usersCerca = /^tutti$/i.test(dopo) ? '' : indirizzoScritto(dopo).toLowerCase();
