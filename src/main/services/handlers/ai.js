@@ -595,6 +595,26 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Fornitori che lo smistatore conosce: riempiono il menu dei fornitori
+  // esclusi e fanno scoprire un nome che non esclude nessuno (un refuso).
+  on(MSG.DEFAULT_PROVIDERS_LIST, async () => {
+    try {
+      if (!isAdmin()) {
+        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+      }
+      const res = await fetch('https://openrouter.ai/api/v1/providers');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const items = (Array.isArray(data && data.data) ? data.data : [])
+        .filter((p) => p && typeof p.name === 'string' && p.name.trim())
+        .map((p) => ({ name: p.name.trim(), slug: typeof p.slug === 'string' ? p.slug : '' }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      return { ok: true, items };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
   on(MSG.WEB_SEARCH, async (msg) => {
     try {
       const settings = await getEffectiveSettings();

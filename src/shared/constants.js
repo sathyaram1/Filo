@@ -555,6 +555,16 @@
     'Novita',
   ];
 
+  // Perché ogni voce di serie è nella lista: la pagina «Modelli predefiniti» lo
+  // mostra accanto al nome, così fra mesi si sa se un'esclusione ha ancora senso.
+  // `kind`: 'producer' (produce i modelli) | 'unreliable' (serve male).
+  const EXCLUDED_PROVIDER_KINDS = ['producer', 'unreliable'];
+  const DEFAULT_EXCLUDED_PROVIDER_REASONS = [
+    ...['Google', 'OpenAI', 'xAI', 'DeepSeek', 'Mistral', 'Moonshot AI', 'MiniMax', 'Qwen', 'Cohere', 'Meta', 'Z.AI']
+      .map((name) => ({ name, kind: 'producer', note: '' })),
+    { name: 'Novita', kind: 'unreliable', note: 'Banco di prova del 30/08/2026: ha risposto con la risposta di un\'altra richiesta.' },
+  ];
+
   function normalizeProviderName(name) {
     return String(name == null ? '' : name).toLowerCase().replace(/\s+/g, ' ').trim();
   }
@@ -580,12 +590,17 @@
   // remota in config/models): senza questo confronto, un'esclusione aggiunta al
   // codice resta lettera morta sulle installazioni che leggono la lista remota,
   // e nessuno se ne accorge finché non ricapita il guasto che l'aveva motivata.
-  function missingExcludedProviders(base, list) {
+  // Con `catalog` una voce è coperta anche quando la lista esclude, sotto un altro
+  // nome, tutti i fornitori del catalogo che la voce esclude («NovitaAI» copre «Novita»).
+  function missingExcludedProviders(base, list, catalog) {
     const out = [];
     for (const b of (Array.isArray(base) ? base : [])) {
       const name = String(b == null ? '' : b).trim();
       if (!name) continue;
       if (isProviderExcluded(name, list)) continue;
+      const covered = catalogProvidersCoveredBy(name, catalog);
+      if (covered.length && covered.every((p) => (Array.isArray(list) ? list : [])
+        .some((l) => catalogProvidersCoveredBy(l, [p]).length))) continue;
       const k = normalizeProviderName(name);
       if (out.some((x) => normalizeProviderName(x) === k)) continue;
       out.push(name);
@@ -609,7 +624,75 @@
     return out;
   }
 
-  // ── Interruttore "solo modelli a pesi aperti" ───────────────────────────────
+  // Motivo di ogni voce di `list`: vince quello scritto dall'owner (`saved`),
+  // poi quello di serie; il confronto sul nome è per forma normalizzata. PURA.
+  function excludedProviderReasons(list, saved, defaults) {
+    const clean = (r) => {
+      const kind = r && EXCLUDED_PROVIDER_KINDS.includes(r.kind) ? r.kind : '';
+      const note = r && typeof r.note === 'string' ? r.note.trim() : '';
+      return { kind, note };
+    };
+    const find = (arr, k) => (Array.isArray(arr) ? arr : [])
+      .find((r) => r && normalizeProviderName(r.name) === k);
+    return providerIgnoreList(list).map((name) => {
+      const k = normalizeProviderName(name);
+      const r = find(saved, k) || find(defaults, k);
+      return { name, ...clean(r) };
+    });
+  }
+
+  // Catalogo dei fornitori dello smistatore: [{ name, slug }]. Un nome scritto
+  // nella lista vale solo se copre almeno un fornitore del catalogo (per nome o
+  // per slug): un refuso non copre niente e l'esclusione sarebbe finta. PURA.
+  function catalogProvidersCoveredBy(name, catalog) {
+    if (!normalizeProviderName(name)) return [];
+    return (Array.isArray(catalog) ? catalog : []).filter((p) => p
+      && (isProviderExcluded(p.name, [name]) || isProviderExcluded(p.slug, [name])));
+  }
+
+  function providerCoversCatalog(name, catalog) {
+    return catalogProvidersCoveredBy(name, catalog).length > 0;
+  }
+
+  // Distanza di modifica con lo scambio di due lettere vicine contato come uno:
+  // è il refuso più comune («Novtia»).
+  function editDistance(a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+          d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+        }
+      }
+    }
+    return d[a.length][b.length];
+  }
+
+  // Il nome del catalogo più vicino a `name`, per suggerire la correzione di un
+  // refuso; '' se nessuno è abbastanza vicino da essere lo stesso. PURA.
+  function closestCatalogProvider(name, catalog) {
+    const n = normalizeProviderName(name);
+    if (!n || n.length > 200) return '';
+    let best = '';
+    let bestD = Infinity;
+    for (const p of (Array.isArray(catalog) ? catalog : [])) {
+      if (!p || typeof p.name !== 'string') continue;
+      // Anche col prefisso lungo quanto il nome scritto: «Novtia» è vicino alla
+      // forma base di «NovitaAI», non all'intero nome.
+      for (const c of [p.name, p.slug]) {
+        const cand = normalizeProviderName(c);
+        if (!cand) continue;
+        const d = Math.min(editDistance(n, cand), editDistance(n, cand.slice(0, n.length)) + 1);
+        if (d < bestD) { bestD = d; best = p.name; }
+      }
+    }
+    return best && bestD <= Math.max(1, Math.floor(n.length / 3)) ? best : '';
+  }
+
+  // ── Interruttore "solo modelli a pesi aperti"───────────────────────────────
   // La politica sui modelli dice che chi usa Filo può rifiutare TUTTI i modelli
   // proprietari — Anthropic compresa, cioè anche la scelta di chi Filo lo fa —
   // e lavorare solo con modelli a pesi aperti serviti da fornitori indipendenti.
@@ -2432,10 +2515,15 @@
     REASONING_LEVELS,
     normalizeReasoning,
     DEFAULT_EXCLUDED_PROVIDERS,
+    EXCLUDED_PROVIDER_KINDS,
+    DEFAULT_EXCLUDED_PROVIDER_REASONS,
     normalizeProviderName,
     isProviderExcluded,
     missingExcludedProviders,
     providerIgnoreList,
+    excludedProviderReasons,
+    providerCoversCatalog,
+    closestCatalogProvider,
     PRODUCER_DIRECT_PROVIDERS,
     OPEN_WEIGHT_MODEL_FAMILIES,
     OPEN_WEIGHTS_SUBSTITUTES,
