@@ -186,3 +186,25 @@ test('un secondo «/users» dato mentre il primo viaggia vale al suo posto', asy
   const altre = righe.filter((r) => /Utenti registrati 1-50/.test(r));
   assert.equal(altre.length, 0, 'la pagina del primo comando non arriva dopo la ricerca a sfasarla');
 });
+
+// #679.3 — un indirizzo si incolla come lo dà il programma di posta: col nome
+// davanti fra parentesi angolari, o come collegamento. Conta l'indirizzo dentro.
+test('l’indirizzo incollato col nome o come collegamento trova la persona, anche per regalare', async () => {
+  const riga = await comando('/users Mario Rossi <Utente099@Esempio.it>');
+  assert.equal(richieste[richieste.length - 1].cerca, 'utente099@esempio.it');
+  assert.match(riga, /Trovato:/);
+  assert.ok(riga.includes('utente099@esempio.it'));
+  await comando('/users mailto:utente042@esempio.it,');
+  assert.equal(richieste[richieste.length - 1].cerca, 'utente042@esempio.it');
+  await comando('/gift 100 Mario Rossi <utente099@esempio.it>');
+  const regalo = richieste[richieste.length - 1];
+  assert.equal(regalo.type, MSG.OWNER_GIFT_CREDITS);
+  assert.equal(regalo.email, 'utente099@esempio.it');
+  assert.equal(regalo.amount, 100);
+  await comando('/gift 5 mailto:utente001@esempio.it');
+  assert.equal(richieste[richieste.length - 1].email, 'utente001@esempio.it');
+  const quante = richieste.length;
+  const uso = await comando('/gift 5 Mario Rossi');
+  assert.equal(richieste.length, quante, 'senza un indirizzo non parte nessun regalo');
+  assert.match(uso, /Uso: \/gift/);
+});

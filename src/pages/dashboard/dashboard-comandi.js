@@ -96,6 +96,15 @@
     },
   };
 
+  // Un indirizzo si scrive come lo si è copiato: «Mario Rossi <mario@x.it>»,
+  // «mailto:mario@x.it», con la virgola in coda. Vale l'indirizzo che c'è dentro (#679.3).
+  function indirizzoScritto(testo) {
+    const t = String(testo || '').trim();
+    const m = /[^\s<>"'(),;:[\]]+@[^\s<>"'(),;:[\]]*/.exec(t);
+    if (m) return m[0].replace(/[.]+$/, '');
+    return t.replace(/^mailto:/i, '').replace(/^<|>$/g, '').trim();
+  }
+
   // "/users": elenca gli utenti registrati. Riservato al proprietario (il main
   // rifiuta i non-admin con un messaggio chiaro).
   //
@@ -114,7 +123,7 @@
     if (!ancora) {
       usersSegnalibro = '';
       usersMostrati = 0;
-      usersCerca = /^tutti$/i.test(dopo) ? '' : dopo.toLowerCase();
+      usersCerca = /^tutti$/i.test(dopo) ? '' : indirizzoScritto(dopo).toLowerCase();
     }
     if (ancora && !usersSegnalibro) {
       showFiloLine('Non ho altri utenti da mostrare. Scrivi /users per ripartire dall\'inizio.', chat);
@@ -160,10 +169,10 @@
 
   // "/gift NUMERO EMAIL": regala crediti a un utente. Riservato al proprietario.
   async function handleGiftCommand(text, chat) {
-    const m = /^\/gift\s+(\S+)\s+(\S+)\s*$/i.exec(String(text || '').trim());
-    if (!m) { showFiloLine('Uso: /gift NUMERO EMAIL — es. /gift 2000 mario@esempio.com', chat); return; }
+    const m = /^\/gift\s+(\S+)\s+(.+)$/i.exec(String(text || '').trim());
+    const email = m ? indirizzoScritto(m[2]) : '';
+    if (!m || !email.includes('@')) { showFiloLine('Uso: /gift NUMERO EMAIL — es. /gift 2000 mario@esempio.com', chat); return; }
     const amount = Number(m[1]);
-    const email = m[2];
     if (!Number.isInteger(amount) || amount <= 0) {
       showFiloLine(`"${m[1]}" non è un numero di crediti valido. Usa un intero positivo.`, chat);
       return;
@@ -541,5 +550,6 @@
     ensureSiteResolved,
     showUnresolvedSite,
     showFiloLine,
+    indirizzoScritto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
