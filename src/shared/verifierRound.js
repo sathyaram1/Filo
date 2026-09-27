@@ -536,13 +536,14 @@
     const ones = [];
     const zeros = [];
     for (const f of findings) {
-      if (f.level >= 3) {
+      const level = effectiveLevel(f);
+      if (level >= 3) {
         if (f.decision || left('cap3') <= 0) blocking.push(f);
         else fixable.push(f);
-      } else if (f.level === 2) {
+      } else if (level === 2) {
         if (f.decision) blocking.push(f);
         else twos.push(f);
-      } else if (f.level === 1) {
+      } else if (level === 1) {
         ones.push(f);
       } else {
         zeros.push(f);
