@@ -12,6 +12,7 @@ const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
 const { installSafebrowse } = require('./tabs/tabSafebrowse');
 const { installGeoBlock } = require('./tabs/tabGeoBlock');
+const { installZoom } = require('./tabs/tabZoom');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -1680,25 +1681,15 @@ class TabManager {
   }
 
   // ─── zoom da tastiera quando il focus è sulla barra di Filo ────────────
-  // Ctrl +/-/0 li gestisce il preload della pagina (wheel-zoom.js), ma quel
-  // keydown esiste solo se è la PAGINA ad avere il focus. Appena l'utente
-  // clicca una scheda il focus passa alla barra, i tasti arrivano qui e lo
-  // zoom sembrava morto — stessa asimmetria già vista con Ctrl+T/W/L/R (#404).
-  // Li intercettiamo sulla webContents della shell e li inoltriamo alla scheda
-  // attiva, che li fa rientrare dal solito punto: così la scelta su chi zooma
-  // (e l'opt-out dell'editor, che scala il foglio) resta una sola.
+  // Sulla scheda Ctrl +/-/0 li prende tabs/tabZoom.js; appena l'utente clicca
+  // una scheda il focus passa alla barra e i tasti arrivano qui (#404). Vanno
+  // alla scheda attiva dalla stessa porta, così l'opt-out dell'editor resta uno.
   _wireShellZoomKeys() {
     const shellWc = this.win && this.win.webContents;
     if (!shellWc || typeof shellWc.on !== 'function') return;
     shellWc.on('before-input-event', (event, input) => {
       if (input.type !== 'keyDown') return;
-      if (!(input.control || input.meta) || input.alt) return;
-      const k = String(input.key || '');
-      const c = String(input.code || '');
-      let dir = null;
-      if (k === '+' || k === '=' || c === 'NumpadAdd') dir = 'in';
-      else if (k === '-' || k === '_' || c === 'NumpadSubtract') dir = 'out';
-      else if (k === '0' || c === 'Numpad0') dir = 'reset';
+      const dir = globalThis.SN_ZOOM ? globalThis.SN_ZOOM.tastoZoom(input) : null;
       if (!dir) return;
       event.preventDefault();
       const active = this.tabs.find((t) => t.id === this.activeId);
@@ -1755,6 +1746,8 @@ class TabManager {
 
   _wireEvents(tab) {
     const wc = tab.view.webContents;
+    // Tasti dello zoom e gesti dei riquadri: li tiene il main, non la pagina (#686.1).
+    installZoom(wc);
     const update = (patch) => {
       Object.assign(tab, patch);
       this._broadcast();
@@ -2352,6 +2345,7 @@ class TabManager {
   _hardenAuthPopup(win) {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
+    installZoom(pwc);
     try {
       pwc.setWebRTCIPHandlingPolicy(
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
