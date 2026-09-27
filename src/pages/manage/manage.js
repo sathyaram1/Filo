@@ -6281,7 +6281,8 @@
     applyAutoModeGate();
     // In parallelo e senza che una fallita fermi le altre (ognuna gestisce già
     // il proprio errore; allSettled è la cintura).
-    await Promise.allSettled([loadAutoMode(), loadSortMode(), loadCaps(), loadSessions(), loadJudgeTimeout(), loadMergeApprovals()]);
+    impostazioniAvviate = true;
+    await Promise.allSettled([caricaImpostazioni(), loadSortMode()]);
     await loadData();
     startLive();
   }
