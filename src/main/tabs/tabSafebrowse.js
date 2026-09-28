@@ -61,7 +61,7 @@ const safebrowseMethods = {
     if (!SB || !tab) return { ok: true, level: 'safe', message: null };
     let verdict;
     try {
-      verdict = SB.analyze(url, ctx, (next) => {
+      verdict = SB.analyze(url, { ...ctx, budgetUrl: tab._sbDocUrl }, (next) => {
         this._sbBroadcast(tab, url, this._sbApplyState(tab, next));
       });
     } catch (_) {
@@ -81,6 +81,8 @@ const safebrowseMethods = {
   _sbOnNavigate(tab, url) {
     const SB = globalThis.SN_SAFEBROWSE;
     if (!SB || !tab || !url || /^filo:\/\//i.test(url)) return;
+    // L'indirizzo da cui la pagina è arrivata davvero: quello che la pagina si scrive dopo non sposta il conto (#591).
+    tab._sbDocUrl = url;
     try {
       const verdict = SB.analyze(url, {}, (next) => {
         this._sbBroadcast(tab, url, this._sbApplyState(tab, next));
@@ -110,7 +112,7 @@ const safebrowseMethods = {
     let ospitata = null;
     try { const u = new URL(url); ospitata = SB.whitelist.hostedPlatform(u.hostname, u.pathname); } catch (_) {}
     if (!ospitata || tab._sbCampiUrl === url) return;
-    const hints = { hasPassword: false, hasPayment: false };
+    const hints = { hasPassword: false, hasPayment: false, budgetUrl: tab._sbDocUrl };
     const codice = `(${pageHints.toString()})(document)`;
     let frames = [];
     try { frames = wc.mainFrame.framesInSubtree; } catch (_) {}

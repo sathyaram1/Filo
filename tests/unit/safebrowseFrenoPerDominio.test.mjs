@@ -154,3 +154,84 @@ test('la rete di casa non fa partire nessuno stadio di rete', async () => {
   await analizza('http://accesso.negozio.box/login', { hasPassword: true });
   assert.ok(usciti.length > 0, '.box è un dominio pubblico: un sito che risponde da internet ha i suoi controlli');
 });
+
+// Il conto sta sul proprietario dell'indirizzo, che la pagina non può inventarsi: la rete per gli indirizzi numerici, il
+// secchio o il sito sulle piattaforme riconosciute dal percorso, l'indirizzo davvero navigato se la pagina riscrive il suo.
+const contaProfondi = () => {
+  const n = { giudizi: 0, finestre: 0 };
+  SB.setProviders({
+    llm: async () => { n.giudizi++; return { suspicious: false, reason: null }; },
+    sandbox: async (u) => { n.finestre++; return { verdict: 'clean', finalUrl: u, redirects: [] }; },
+  });
+  return n;
+};
+
+test('indirizzi numerici sempre nuovi della stessa rete: qualche controllo all\'ora, e una rete diversa ha i suoi', async () => {
+  const n = contaProfondi();
+  for (let i = 1; i <= 20; i++) await analizza(`http://[2001:db8:5:${i}::${i.toString(16)}]/login`, ACCESSO);
+  for (let i = 1; i <= 20; i++) await analizza(`http://203.0.113.${i}/login`, ACCESSO);
+  for (let i = 1; i <= 20; i++) await analizza(`http://[::ffff:198.51.100.${i}]/login`, ACCESSO);
+  assert.equal(n.giudizi, 3 * SB.DEEP_BUDGET);
+  assert.equal(n.finestre, 3 * SB.DEEP_BUDGET);
+  await analizza('http://[2001:db8:6::1]/login', ACCESSO);
+  assert.equal(n.giudizi, 3 * SB.DEEP_BUDGET + 1, 'un\'altra rete non paga per la prima');
+});
+
+test('file sempre nuovi dello stesso secchio o documento: qualche controllo all\'ora; un secchio diverso ha i suoi, e il verdetto resta del file', async () => {
+  const basi = ['https://s3.amazonaws.com/secchio-ostile', 'https://storage.googleapis.com/secchio-ostile',
+    'https://firebasestorage.googleapis.com/v0/b/secchio-ostile/o', 'https://sites.google.com/view/sito-ostile',
+    'https://docs.google.com/forms/d/e/MODULO', 'https://ia800.us.archive.org/1/items/oggetto', 'https://archive.org/download/oggetto',
+    'https://www.canva.com/design/DISEGNO', 'https://script.google.com/macros/s/COPIONE'];
+  for (const base of basi) {
+    for (const c of Object.values(SB._caches)) c.m.clear();
+    const n = contaProfondi();
+    for (let i = 0; i < 15; i++) await analizza(`${base}/accesso-${i}`, ACCESSO);
+    assert.equal(n.giudizi, SB.DEEP_BUDGET, base);
+    assert.equal(n.finestre, SB.DEEP_BUDGET, base);
+  }
+  for (const c of Object.values(SB._caches)) c.m.clear();
+  const n = contaProfondi();
+  for (let i = 0; i < 15; i++) await analizza(`https://www.notion.so/Titolo-${i}-0123456789abcdef0123456789abcdef`, ACCESSO);
+  assert.equal(n.giudizi, SB.DEEP_BUDGET, 'Notion: lo stesso documento sotto titoli sempre nuovi');
+  await analizza('https://s3.amazonaws.com/negozio-vero/accesso.html', ACCESSO);
+  assert.equal(n.giudizi, SB.DEEP_BUDGET + 1, 'il secchio di un altro ha il suo controllo');
+  assert.notEqual(SB.ownerOf('https://s3.amazonaws.com/a/x'), SB.ownerOf('https://s3.amazonaws.com/b/x'));
+});
+
+test('una pagina che riscrive il proprio indirizzo senza navigare conta sull\'indirizzo da cui è arrivata', async () => {
+  const n = contaProfondi();
+  const arrivata = 'https://s3.amazonaws.com/secchio-ostile/accesso.html';
+  for (let i = 0; i < 20; i++) {
+    await analizza(`https://s3.amazonaws.com/finto-${i}/accesso-${i}.html`, { ...ACCESSO, budgetUrl: arrivata });
+  }
+  assert.equal(n.giudizi, SB.DEEP_BUDGET);
+  assert.equal(n.finestre, SB.DEEP_BUDGET);
+  await analizza('https://s3.amazonaws.com/negozio-vero/accesso.html', { ...ACCESSO, budgetUrl: 'https://s3.amazonaws.com/negozio-vero/accesso.html' });
+  assert.equal(n.giudizi, SB.DEEP_BUDGET + 1, 'la pagina navigata davvero di un altro secchio ha il suo controllo');
+  await analizza('https://altro-sito.example.com/login', { ...ACCESSO, budgetUrl: arrivata });
+  assert.equal(n.giudizi, SB.DEEP_BUDGET + 2, 'un indirizzo di un\'altra origine non eredita il conto');
+});
+
+test('nella scheda: una pagina ospitata che cambia indirizzo da sola, anche verso secchi inventati, fa qualche controllo', async () => {
+  const { installSafebrowse } = require('../../src/main/tabs/tabSafebrowse.js');
+  class Schede {}
+  installSafebrowse(Schede);
+  const schede = new Schede();
+  let adesso = '';
+  const campo = { executeJavaScript: async () => ({ hasPassword: true, hasPayment: false }) };
+  const wc = { getURL: () => adesso, isDestroyed: () => false, send() {}, mainFrame: { framesInSubtree: [campo] } };
+  const tab = { id: 1, view: { webContents: wc } };
+  schede.tabs = [tab];
+  const n = contaProfondi();
+  adesso = 'https://s3.amazonaws.com/secchio-ostile/accesso.html';
+  schede._sbOnNavigate(tab, adesso);
+  for (let i = 0; i < 20; i++) {
+    adesso = `https://s3.amazonaws.com/${i % 2 ? 'secchio-ostile' : `finto-${i}`}/accesso-${i}.html`;
+    tab._sbScanGiro = i + 1;
+    await schede._sbScanFrames(tab, i + 1);
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  assert.ok(n.giudizi >= 1, 'la pagina ha il suo controllo');
+  assert.ok(n.giudizi <= SB.DEEP_BUDGET, `giudizi: ${n.giudizi}`);
+  assert.ok(n.finestre <= SB.DEEP_BUDGET, `finestre: ${n.finestre}`);
+});

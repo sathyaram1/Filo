@@ -325,3 +325,22 @@ test('in incognito la scheda non chiede al modello del blocco geografico', async
     assert.equal(chiesto, 1, 'caso di riscontro: fuori dall\'incognito il livello 2 parte');
   } finally { globalThis.SN_GEO_CLASSIFY = prima; }
 });
+
+// Lo stesso conto del controllo dei siti pericolosi (#591): per proprietario dell'indirizzo, qualche chiamata all'ora.
+test('classify: percorsi, sottodomini e indirizzi sempre nuovi dello stesso proprietario fanno qualche chiamata, un altro sito ha le sue', async () => {
+  const SB = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'safebrowse', 'index.js'));
+  const cache = C.createCache();
+  let chiamate = 0;
+  const complete = async () => { chiamate++; return 'errore_generico'; };
+  const vuota = (host, url) => C.classify({ title: '', text: '', statusCode: 200, host, url }, { complete, cache });
+  for (let i = 0; i < 20; i++) await vuota('ostile.esempio-geo.com', `https://ostile.esempio-geo.com/pagina-${i}`);
+  for (let i = 0; i < 20; i++) await vuota(`s${i}.esempio-geo.com`, `https://s${i}.esempio-geo.com/`);
+  assert.equal(chiamate, SB.DEEP_BUDGET);
+  for (let i = 0; i < 20; i++) await vuota(`2001:db8:9:${i}::1`, `http://[2001:db8:9:${i}::1]/`);
+  for (let i = 0; i < 20; i++) await vuota('storage.googleapis.com', `https://storage.googleapis.com/secchio-geo/f-${i}.html`);
+  assert.equal(chiamate, 3 * SB.DEEP_BUDGET);
+  const r = await vuota('ostile.esempio-geo.com', 'https://ostile.esempio-geo.com/ancora');
+  assert.equal(r.skipped, true, 'oltre il conto non si chiama e la scheda non fa niente');
+  await vuota('video.altro-sito.it', 'https://video.altro-sito.it/v/1');
+  assert.equal(chiamate, 3 * SB.DEEP_BUDGET + 1, 'un altro sito non paga per quello ostile');
+});
