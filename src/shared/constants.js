@@ -2397,6 +2397,24 @@
   // lo si dice (pagina Preferenze e IMPOSTA_PREFERENZA, #592). Un paragrafo
   // lungo ci sta; un testo che nessuno rilegge nel popup di conferma no.
   const AGENT_STYLE_MAX = 800;
+
+  // Un testo libero che l'utente conferma o rilegge e che poi va in un prompt,
+  // ridotto a quello che si legge: via i caratteri che non si disegnano (i «tag»
+  // Unicode il modello li legge come lettere) e le righe vuote in fila che
+  // spingono il resto oltre il bordo del popup (#592). Restano i giuntori delle
+  // emoji e i selettori di variante, che non portano testo.
+  const NON_SI_DISEGNA_RE = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F­͏؜ᅟᅠ឴឵᠋-᠏‎‏‪-‮⁠-⁯ㅤ﻿ﾠ￰-￸\u{1BCA0}-\u{1BCA3}\u{1D173}-\u{1D17A}\u{E0000}-\u{E0FFF}]/gu;
+  const SPAZI_RE = /[ \t   -   ⠀　]+/g;
+  function testoLeggibile(text) {
+    return String(text == null ? '' : text)
+      .replace(/\r\n?|[  ]/g, '\n')
+      .replace(NON_SI_DISEGNA_RE, '')
+      .replace(SPAZI_RE, ' ')
+      .replace(/ *\n */g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
   function agentStyleLength(text) {
     return Array.from(String(text == null ? '' : text).trim()).length;
   }
