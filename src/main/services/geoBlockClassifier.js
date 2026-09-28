@@ -286,6 +286,20 @@ async function isHomeNetwork(host) {
   return U.isHomeNetworkHost(host);
 }
 
+// Il conto per proprietario dell'indirizzo, lo stesso del controllo dei siti pericolosi (#591): percorsi e sottodomini
+// nuovi di uno stesso sito non fanno ripartire il modello oltre qualche volta all'ora. Uno per cache, come la cache.
+const budgetByCache = new WeakMap();
+function sb() {
+  return globalThis.SN_SAFEBROWSE || require('./safebrowse');
+}
+function spendFor(cache, host, url) {
+  if (!cache) return true;
+  const SB = sb();
+  let budget = budgetByCache.get(cache);
+  if (!budget) { budget = SB.createOwnerBudget(); budgetByCache.set(cache, budget); }
+  return budget.spend(SB.ownerOf(url || `https://${host}/`) || String(host || '').toLowerCase());
+}
+
 async function classify(input = {}, { complete, cache, now = Date.now, signal } = {}) {
   const { title, text, statusCode, host, url } = input;
 
