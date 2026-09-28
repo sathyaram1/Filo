@@ -117,7 +117,18 @@ describe('le chiavi arrivano al server', () => {
     assert.equal(ricevute.length, 1);
     assert.deepEqual(ricevute[0].keys,
       ['rilascio:fermo', 'suite:tests/a.spec.mjs', 'suite:fuori-dai-casi', 'unit:tests/unit/y.test.mjs']);
-    assert.equal(ricevute[0].name, 'Titolo');
+    assert.equal(ricevute[0].name, 'Titolo (a, errori fuori dai casi, y)');
+  });
+
+  test('due guasti diversi arrivano con due titoli diversi, ciascuno col suo', async () => {
+    const titolo = 'Suite Playwright rossa su main: commit non pubblicabile';
+    const a = (await spedisci([titolo, 'testo', '--chiave', 'suite:tests/wallet-credits.spec.mjs'])).ricevute[0].name;
+    const b = (await spedisci([titolo, 'testo', '--chiave', 'suite:tests/board-offline-error.spec.mjs'])).ricevute[0].name;
+    assert.notEqual(a, b);
+    assert.match(a, /wallet-credits/);
+    assert.match(b, /board-offline-error/);
+    const u = (await spedisci(['Controlli automatici rossi', 'testo', '--chiavi-unit', 'unit.log'])).ricevute[0].name;
+    assert.equal(u, 'Controlli automatici rossi (y)');
   });
 
   test('senza chiavi il campo non parte: un server vecchio e uno nuovo fanno quel che facevano', async () => {

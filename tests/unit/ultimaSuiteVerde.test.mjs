@@ -3,6 +3,14 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFile, execFileSync } from 'node:child_process';
+import { chmodSync, copyFileSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { delimiter, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+
+const SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'ultima-suite-verde.mjs');
 
 const {
   scegliUltimoVerde, corseVerdi, rilascioFermo, testoRilascioFermo, rigaCorsa, verdePiuNuovoDelTag, SOGLIA_ORE, CHIAVE_FERMO,
@@ -148,5 +156,95 @@ describe('la pubblicazione ferma', () => {
 
   test('una corsa senza dati si scrive lo stesso, senza «undefined»', () => {
     assert.doesNotMatch(rigaCorsa({}), /undefined/);
+  });
+});
+
+// Lo script vero, contro un main finto (date vere dei commit), un `gh` finto e un buildAlarm finto: la regola sopra
+// serve solo se la scelta la chiama. Su Windows `gh.exe` è node, che esegue lo script `api` della cartella corrente.
+describe('la scelta vera, contro un main finto', () => {
+  const WIN = process.platform === 'win32';
+  const oreFa = (ore) => new Date(Date.now() - ore * 3.6e6).toISOString();
+  const git = (cwd, args, env = {}) => execFileSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, ...env } }).trim();
+  const CORPO_GH = `
+const fs = require('fs');
+const p = process.argv.find((a) => a.startsWith('repos/')) || '';
+const s = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATO, 'utf8'));
+if (p.includes('/actions/workflows/suite.yml/runs')) {
+  const runs = s.runs.filter((r) => !p.includes('status=success') || r.conclusion === 'success');
+  process.stdout.write(JSON.stringify({ workflow_runs: runs }));
+} else if (p.includes('/releases/tags/')) process.stdout.write(JSON.stringify({ published_at: s.pubblicata }));
+else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
+`;
+
+  async function scegli({ oreVersione, oreVerde }) {
+    const tmp = cartellaTemporanea('filo-scelta-vera-');
+    const repo = join(tmp, 'main');
+    const ricevute = [];
+    const srv = createServer((req, res) => {
+      let b = '';
+      req.on('data', (c) => { b += c; });
+      req.on('end', () => {
+        ricevute.push(JSON.parse(b));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, num: '#9', duplicate: false }));
+      });
+    });
+    await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+    try {
+      mkdirSync(repo, { recursive: true });
+      git(repo, ['init', '-q', '-b', 'main']);
+      git(repo, ['config', 'user.email', 'p@f']);
+      git(repo, ['config', 'user.name', 'p']);
+      const sha = [];
+      for (const [ore, msg] of [[oreVersione, 'release: v0.2.228 [skip ci]'], [oreVerde + 2, 'merge-gate: #1 via server'], [1, 'merge-gate: #2 via server']]) {
+        writeFileSync(join(repo, 'f.txt'), `${msg}\n`, { flag: 'a' });
+        git(repo, ['add', 'f.txt']);
+        git(repo, ['commit', '-qm', msg], { GIT_AUTHOR_DATE: oreFa(ore), GIT_COMMITTER_DATE: oreFa(ore) });
+        sha.push(git(repo, ['rev-parse', 'HEAD']));
+      }
+      git(repo, ['tag', 'v0.2.228', sha[0]]);
+      const bin = join(tmp, 'bin');
+      mkdirSync(bin);
+      if (WIN) {
+        try { linkSync(process.execPath, join(bin, 'gh.exe')); } catch { copyFileSync(process.execPath, join(bin, 'gh.exe')); }
+        writeFileSync(join(repo, 'api'), CORPO_GH);
+      } else {
+        writeFileSync(join(bin, 'gh'), `#!${process.execPath}\n${CORPO_GH}`);
+        chmodSync(join(bin, 'gh'), 0o755);
+      }
+      const corsaDi = (s, conclusion, ore) => ({ head_sha: s, conclusion, status: 'completed', event: 'push', head_branch: 'main',
+        created_at: oreFa(ore + 1), updated_at: oreFa(ore), html_url: `https://github.com/o/r/actions/runs/${ore}` });
+      writeFileSync(join(tmp, 'stato.json'), JSON.stringify({
+        pubblicata: oreFa(oreVersione), runs: [corsaDi(sha[2], 'failure', 0.5), corsaDi(sha[1], 'success', oreVerde)],
+      }));
+      const env = {
+        ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}`, FAKE_GH_STATO: join(tmp, 'stato.json'),
+        GITHUB_REPOSITORY: 'o/r', GITHUB_OUTPUT: join(tmp, 'output.txt'), GITHUB_STEP_SUMMARY: join(tmp, 'riassunto.md'),
+        FILO_BUILD_PASSPHRASE: 'prova', FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`,
+        NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost',
+      };
+      const codice = await new Promise((ok) => {
+        execFile(process.execPath, [SCRIPT], { cwd: repo, env }, (err) => ok(err ? (err.code ?? 1) : 0));
+      });
+      return { codice, ricevute, output: readFileSync(join(tmp, 'output.txt'), 'utf8'), verde: sha[1] };
+    } finally {
+      await new Promise((ok) => srv.close(ok));
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+
+  test('ultima versione di 100 ore fa, un verde di 68 ore fa mai uscito: allarme, e il verde si prova lo stesso', async () => {
+    const r = await scegli({ oreVersione: 100, oreVerde: 68 });
+    assert.equal(r.ricevute.length, 1, 'passate le 48 ore senza versioni, un verde fermo deve aprire un feedback');
+    assert.deepEqual(r.ricevute[0].keys, [CHIAVE_FERMO_DOPO_VERDE]);
+    assert.match(r.ricevute[0].text, /68 ore/);
+    assert.equal(r.output.trim(), `sha=${r.verde}`, 'il guasto a valle può essere passato: la pubblicazione si tenta');
+    assert.equal(r.codice, 0);
+  });
+
+  test('un verde appena arrivato dopo una lunga attesa: si pubblica, senza allarme', async () => {
+    const r = await scegli({ oreVersione: 100, oreVerde: 3 });
+    assert.equal(r.ricevute.length, 0);
+    assert.equal(r.output.trim(), `sha=${r.verde}`);
   });
 });
