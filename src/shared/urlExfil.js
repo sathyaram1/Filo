@@ -142,15 +142,12 @@
   // Fallback strutturale: un blocco di dati OPACO in un URL nato da contenuto NON
   // fidato (l'agente sulla pagina, l'output di un comando, una ricerca). Copre i
   // dati cifrati che il taint-match non riconosce. La firma di un carico
-  // codificato è una LUNGA sequenza continua, con dentro cifre o maiuscole
-  // (base64, esadecimale, token, id casuali): un indirizzo leggibile si spezza
-  // su barre, trattini, punti e underscore in parole corte (`wiki`, `storia`,
-  // `ricette`, `bollette`) e non lascia mai un blocco simile. Guardare la sola
-  // LUNGHEZZA del carico invece scambiava ogni percorso un po' lungo per un
-  // payload: è ciò che riportava l'avviso su Wikipedia, una ricetta, un articolo.
-  function struttOpaca(seg) {
-    return seg.length >= STRUCT_BLOB && /[0-9A-Z]/.test(seg) && !/^https?$/i.test(seg);
-  }
+  // codificato è una LUNGA sequenza CONTINUA di caratteri (base64, esadecimale,
+  // token, id casuali). Un indirizzo leggibile si spezza sui separatori umani —
+  // barre, trattini, punti, underscore, `+` — in parole corte (`wiki`, `storia`,
+  // `ricette`, `bollette`): è per questo che si guardano i PEZZI separati, non la
+  // lunghezza totale del carico, che scambiava ogni percorso un po' lungo per un
+  // payload e riportava l'avviso su Wikipedia, una ricetta, un articolo.
   function structural(url) {
     let u;
     try { u = new URL(url); } catch (_) {
@@ -160,7 +157,9 @@
     const hash = u.hash || '';
     const path = (u.pathname && u.pathname !== '/') ? u.pathname : '';
     for (const seg of (search + hash + path).split(/[^A-Za-z0-9]+/)) {
-      if (struttOpaca(seg)) return { reason: 'contiene un blocco di dati codificato' };
+      if (seg.length >= STRUCT_BLOB && !/^https?$/i.test(seg)) {
+        return { reason: 'contiene un blocco di dati codificato' };
+      }
     }
     // Blob opaco singolo (no separatori umani) come sottodominio.
     const host = u.hostname || '';
