@@ -852,6 +852,7 @@ module.exports = {
   senzaRumore,
   RUMORE_TOLLERATO,
   capText,
+  extractPdf,
   MAX_TEXT_CHARS,
   MAX_FILE_BYTES,
 };
