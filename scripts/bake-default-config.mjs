@@ -295,6 +295,12 @@ async function main() {
   }
 }
 
+/** Le chiavi dell'allarme: `bake:<nome>` per ogni chiave che manca, `bake` se l'elenco è vuoto. PURA. */
+export function chiaviAllarmeBake(mancanti) {
+  const chiavi = normalizzaChiavi((mancanti || []).map((c) => `bake:${c?.nome || ''}`).filter((k) => k !== 'bake:'));
+  return chiavi.length ? chiavi : ['bake'];
+}
+
 // Apre un feedback quando la costruzione sta per produrre una versione monca,
 // con le STESSE righe del registro: da lì si deve poter agire senza cercare i log.
 async function avvisa(mancanti, righe) {
