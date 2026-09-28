@@ -1,21 +1,14 @@
 # Release automatica di Filo (Windows + Mac + Linux).
 #
 # COSA FA
-#   A intervalli regolari (cron) controlla se su `main` ci sono commit nuovi
-#   rispetto all'ultima release pubblicata. Se sì: CHIEDE AL SERVER il numero
-#   della versione nuova, builda l'installer NSIS per Windows e lo pubblica come
-#   nuova GitHub Release. L'auto-update dentro Filo (electron-updater) la vede e
-#   aggiorna i tester. Se NON ci sono commit nuovi, non fa nulla (niente release
-#   inutili).
-#
-#   PRIMA della costruzione gira la suite Playwright completa (job `suite`, su
-#   Linux senza schermo, come nel contenitore delle routine): dal 2026-09-15
-#   nessun agente la lancia più a mano, gira solo qui. Verde (o solo rossi noti
-#   del contenitore, tests/rossi-noti.json) → si pubblica ESATTAMENTE il commit
-#   provato, anche se nel frattempo main e' andato avanti; un rosso NUOVO → non
-#   si pubblica, il rosso diventa un feedback e la patch salta un giro.
-#   `solo_suite` (avvio a mano) fa girare la sola suite sul ramo scelto, senza
-#   pubblicare: serve a provarla su un ramo.
+#   Ogni sei ore (cron) il job `scegli` prende il commit PIU' NUOVO di `main`
+#   la cui suite Playwright completa e' verde (la suite gira a ogni fusione, in
+#   suite.yml). Se e' piu' nuovo dell'ultima release: CHIEDE AL SERVER il
+#   numero della versione nuova, builda ESATTAMENTE quel commit (installer NSIS
+#   per Windows, poi Mac e Linux) e lo pubblica come nuova GitHub Release.
+#   L'auto-update dentro Filo (electron-updater) la vede e aggiorna i tester.
+#   Niente di verde e nuovo: non fa nulla; se dura da piu' di 48 ore apre un
+#   feedback e la corsa e' rossa.
 #
 # QUESTO LAVORO NON SCRIVE SU `main` (SPEC-RIDISEGNO-MAX.md §10)
 #   Fino al 18/08/2026 alzava la patch version da sé e la pushava. Su `main`
