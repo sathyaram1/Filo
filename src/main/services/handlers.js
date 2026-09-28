@@ -2456,6 +2456,9 @@ function pageReadsForPrompt(actions) {
     if (!out.testo) {
       if (totale > 0 && da >= totale) {
         blocks.push(`[La pagina "${indirizzo}" finisce al carattere ${totale}: non c'è altro da leggere.]`);
+      } else if (out.fonte === 'scheda') {
+        blocks.push(`[La scheda aperta su "${indirizzo}" non mostra testo da leggere (un video, un'immagine, un'app): `
+          + 'dillo all\'utente e non inventare il contenuto.]');
       } else {
         blocks.push(`[Pagina "${indirizzo}" letta, ma senza testo${out.soloJavaScript ? ': si costruisce in JavaScript' : ''}. `
           + 'Se il dato serve, aprila con NAVIGA con background: true e poi rileggila con LEGGI_PAGINA, che la legge dalla scheda; '

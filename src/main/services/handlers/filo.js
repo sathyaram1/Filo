@@ -23,7 +23,8 @@ module.exports = function register(on, ctx) {
   // content script di un sito, Filo non deve diventare il modo di leggere un altro sito o il disco (#553).
   const perChiChiede = (r, sender, origin) => {
     if (daFilo(origin, sender) || !r || !('output' in r)) return r;
-    const { output: _letto, ...resto } = r;
+    const resto = { ...r };
+    delete resto.output;
     return resto;
   };
 
