@@ -101,6 +101,8 @@
       reject: ['#onetrust-reject-all-handler', '.ot-pc-refuse-all-handler', 'button.ot-pc-refuse-all-handler'],
       openSettings: ['#onetrust-pc-btn-handler', '.ot-sdk-show-settings'],
       rejectInSettings: ['.ot-pc-refuse-all-handler', '#onetrust-reject-all-handler'],
+      // «Impostazioni cookie» resta nel piè di pagina anche dopo la risposta: si apre solo col banner a schermo.
+      showing: ['#onetrust-banner-sdk'],
       com: ['onetrust', 'onetrust_banner', 'onetrust_pcpanel', 'onetrust_pctab', 'onetrust-stackoverflow', 'optanon', 'optanon-alternative', 'optanon_springernature'],
     },
     {
@@ -260,7 +262,7 @@
         for (const root of searchRoots) {
           const inSettings = queryIn(root, cmp.rejectInSettings);
           if (inSettings && clickEl(inSettings)) return { name: cmp.name, rejected: true };
-          if (!openedSettings.has(cmp.name)) {
+          if (!openedSettings.has(cmp.name) && (!cmp.showing || queryIn(root, cmp.showing))) {
             const open = queryIn(root, cmp.openSettings);
             if (open && clickEl(open)) { openedSettings.add(cmp.name); return { name: cmp.name, rejected: false }; }
           }

@@ -370,7 +370,9 @@ function registerIpcHandlers() {
   ipcMain.handle('tabs:cookie-banners', async (event, { id, show } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs || win.webContents !== event.sender) return { ok: false, error: 'forbidden' };
-    return win._filoTabs.setCookieBanners(id, !!show);
+    // In incognito l'elenco dei siti si scrive nella memoria della sessione, non sul disco.
+    const run = () => win._filoTabs.setCookieBanners(id, !!show);
+    return win._filoIncognito ? DiskStorage.runIncognito(run) : run();
   });
   // Stato per il menu della shell: la voce compare solo se un endpoint è
   // configurato; defaultCountry = ultima location usata, altrimenti il default.
