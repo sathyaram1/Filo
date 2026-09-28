@@ -140,8 +140,9 @@ function analyze(url, ctx = {}, onUpdate) {
       }
     }).catch(() => {}));
   }
-  // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist).
-  const worthDeepening = first.level === 'sospetto' || first.needsLlm;
+  // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist). Chi legge una pagina per il
+  // modello (LEGGI_PAGINA) li salta: la sandbox farebbe girare il codice di un sito scelto dal modello (#553).
+  const worthDeepening = (first.level === 'sospetto' || first.needsLlm) && !ctx.senzaApprofondire;
   if (worthDeepening && providers.llm && need.llm === undefined) {
     tasks.push(Promise.resolve(providers.llm(buildLlmMeta(norm, ctx, first))).then((r) => {
       if (r) llmCache.set(key, r);

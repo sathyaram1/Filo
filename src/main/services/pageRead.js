@@ -120,6 +120,8 @@ function serializzaVisibile() {
       let cs = null;
       try { cs = getComputedStyle(x); } catch (_) { break; }
       if (cs.backgroundImage && cs.backgroundImage !== 'none') break;
+      // Un'immagine o un video fra i figli può stare sotto il testo: lì il colore di fondo non dice cosa si vede.
+      if (x.querySelector && x.querySelector(':scope > img, :scope > video, :scope > picture, :scope > canvas, :scope > svg, :scope > iframe')) break;
       const c = colore(cs.backgroundColor);
       if (c && c.a >= 0.9) { esito = c; break; }
       if (cs.position !== 'static' && x !== document.body && x !== document.documentElement) break;
@@ -274,7 +276,7 @@ function verdetto(url) {
   const SB = globalThis.SN_SAFEBROWSE;
   if (!SB) return null;
   try {
-    const v = typeof SB.analyze === 'function' ? SB.analyze(url, {}) : SB.checkSync(url, {});
+    const v = typeof SB.analyze === 'function' ? SB.analyze(url, { senzaApprofondire: true }) : SB.checkSync(url, {});
     return v && v.level ? { livello: v.level, messaggio: v.message || '' } : null;
   } catch (_) { return null; }
 }
@@ -337,10 +339,14 @@ function charsetDi(tipo, buf) {
   return m ? m[1] : 'utf-8';
 }
 
+// Da 0x80 a 0x9F in windows-1252, che è ciò che un browser intende anche per «iso-8859-1». Il decodificatore di
+// Electron li lascia come caratteri di controllo: l'euro di una pagina italiana vecchia sparirebbe.
+const CP1252 = '€\u0081‚ƒ„…†‡ˆ‰Š‹Œ\u008dŽ\u008f\u0090‘’“”•–—˜™š›œ\u009džŸ';
 function decodifica(buf, charset) {
-  try { return new TextDecoder(charset, { fatal: false }).decode(buf); } catch (_) {
-    return new TextDecoder('utf-8', { fatal: false }).decode(buf);
-  }
+  let d;
+  try { d = new TextDecoder(charset, { fatal: false }); } catch (_) { d = new TextDecoder('utf-8', { fatal: false }); }
+  const t = d.decode(buf);
+  return d.encoding === 'windows-1252' ? t.replace(/[\u0080-\u009f]/g, (c) => CP1252[c.charCodeAt(0) - 0x80]) : t;
 }
 
 function pareHtml(testa) {

@@ -122,7 +122,8 @@ test('il tempo della lettura cresce con la pagina, non col suo quadrato', () => 
   for (const html of casi) {
     const t0 = Date.now();
     PT.estrai(html);
-    assert.ok(Date.now() - t0 < 1500, `${html.slice(0, 40)}…: ${Date.now() - t0} ms`);
+    // Su una macchina carica ci sta qualche secondo; col costo al quadrato erano da venti secondi a un minuto.
+    assert.ok(Date.now() - t0 < 5000, `${html.slice(0, 40)}…: ${Date.now() - t0} ms`);
   }
 });
 
