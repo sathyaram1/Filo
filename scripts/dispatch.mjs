@@ -1983,7 +1983,13 @@ export function emit(bucket, ctx) {
 
 const isMainModule = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMainModule) {
-  const argv = process.argv.slice(2);
+  let argv = process.argv.slice(2);
+  // `--ticket <b>` davanti a un `--record-*` (#724.1, #545): l'ordine non deve
+  // contare, e senza questo il comando finiva nel giro nuovo come «argomento
+  // non riconosciuto».
+  if (argv[0] === '--ticket' && String(argv[2] || '').startsWith('--record-')) {
+    argv = [...argv.slice(2), ...argv.slice(0, 2)];
+  }
   const flag = argv[0];
 
   // I `--record-*` accettano `--ticket <codice>` come scorta: il promemoria
