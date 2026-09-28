@@ -75,8 +75,8 @@ test('esplora: le Impostazioni aperte in incognito', async ({ app, shell, openTa
   }).toBe(true);
   await sec.waitForLoadState('domcontentloaded');
   await sleep(1500);
-  const quale = await app.evaluate(({ webContents }) => webContents.getAllWebContents()
-    .filter((x) => x.getURL().startsWith('filo://security/')).map((x) => x.session === require('electron').session.defaultSession));
+  const quale = await app.evaluate(({ webContents, session }) => webContents.getAllWebContents()
+    .filter((x) => x.getURL().startsWith('filo://security/')).map((x) => x.session === session.defaultSession));
   console.log('SICUREZZA DA INCOGNITO: sessione predefinita?', JSON.stringify(quale),
     'elenco:', JSON.stringify(await sec.evaluate(() => document.getElementById('perm-list')?.innerText)));
 });
