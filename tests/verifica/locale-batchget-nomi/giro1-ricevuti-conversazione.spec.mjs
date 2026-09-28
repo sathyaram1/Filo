@@ -7,6 +7,7 @@ import { test, expect } from '../../fixtures/electron.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const ID = 'fb-decisione-711';
+const ALTRA = 'fb-altra-712';
 
 const DOC = {
   text: 'In Gestione non vedo la conversazione della pratica.',
@@ -24,6 +25,11 @@ const DOC = {
     'TURNO-TRE: serve una scelta, A oppure B?',
   ].join('\n'),
   livelli: { l3: { ruolo: 'resolver', at: '2026-09-27T11:00:00Z', esito: 'segnalato', testo: 'DOMANDA-L3: scegli A oppure B.' } },
+};
+const DOCS = {
+  [ID]: DOC,
+  [ALTRA]: { ...DOC, seq: 712, name: 'Un\'altra pratica ferma', notes: 'ALTRA-CONVERSAZIONE: il report dell\'altra pratica.',
+    livelli: { l3: { ...DOC.livelli.l3, testo: 'ALTRA-DOMANDA: C oppure D?' } } },
 };
 
 // Firestore finto nel main: solo batchGet, con la stessa regola sul nome del vero.
@@ -46,7 +52,7 @@ async function firestoreFinto(app, { ritardoMs = 0, guasti = 0 } = {}) {
     };
     const ROOT = 'projects/filo-8b9cb/databases/(default)/documents/';
     globalThis.__fs = { richieste: [], ritardoMs: cfg.ritardoMs, guasti: cfg.guasti,
-      docs: { [`feedback/${cfg.id}`]: Object.fromEntries(Object.entries(cfg.doc).map(([k, v]) => [k, toFs(v)])) } };
+      docs: Object.fromEntries(Object.entries(cfg.docs).map(([id, d]) => [`feedback/${id}`, Object.fromEntries(Object.entries(d).map(([k, v]) => [k, toFs(v)]))])) };
     if (!globalThis.__fetchVero) globalThis.__fetchVero = globalThis.fetch;
     globalThis.fetch = async (url, opts) => {
       const u = String(url);
@@ -71,33 +77,37 @@ async function firestoreFinto(app, { ritardoMs = 0, guasti = 0 } = {}) {
       });
       return new Response(JSON.stringify(out), { status: 200, headers: { 'Content-Type': 'application/json' } });
     };
-  }, { id: ID, doc: DOC, ritardoMs, guasti });
+  }, { docs: DOCS, ritardoMs, guasti });
 }
 
 // La pagina con la sola riga d'elenco (proiezione), come dopo il caricamento vero.
-async function apri(openTab) {
+async function apri(openTab, ids = [ID]) {
   const page = await openTab(MANAGE);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.filo && window.SN_FEEDBACK);
   await page.evaluate(() => window.__mgTest.whenReady());
-  await page.evaluate(({ id, doc }) => {
+  await page.evaluate(({ docs }) => {
+    window.__inviati = [];
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
       const t = msg && msg.type;
       if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
       if (t === 'merge_approvals_get') return { ok: true, pending: [], failed: [], recent: [], preapproved: [], ttlMs: 7 * 86400000 };
       if (t === 'feedback_decrypt_fields') return { ok: true, list: msg.list };
+      if (t === 'feedback_update') { window.__inviati.push(msg); return { ok: true }; }
       return orig(msg);
     };
     window.__mgTest.setAdmin(true);
     const campi = window.SN_FEEDBACK.CAMPI_LISTA;
-    const riga = Object.fromEntries(Object.entries(doc).filter(([k]) => campi.includes(k)));
-    window.__mgTest.setData([{ ...riga, _id: id, _updateTime: '2026-09-27T11:00:00Z', _proiezione: true }]);
-  }, { id: ID, doc: DOC });
+    window.__mgTest.setData(Object.entries(docs).map(([id, doc]) => ({
+      ...Object.fromEntries(Object.entries(doc).filter(([k]) => campi.includes(k))),
+      _id: id, _updateTime: '2026-09-27T11:00:00Z', _proiezione: true,
+    })));
+  }, { docs: Object.fromEntries(ids.map((id) => [id, DOCS[id]])) });
   return page;
 }
 
-const scheda = (page) => page.locator(`.mg-item[data-id="${ID}"]`);
+const scheda = (page, id = ID) => page.locator(`.mg-item[data-id="${id}"]`);
 const rombo = (page) => page.locator('#mgDetail .mg-forma[data-livello="l3"]');
 const pannello = (page) => page.locator('#mgSideCol');
 
