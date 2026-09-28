@@ -102,8 +102,8 @@ function pathOf(url) {
   try { return new URL(String(url)).pathname; } catch (_) { return '/'; }
 }
 
-// Il freno sta sul dominio e sugli indizi che vede il giudice, il verdetto sul sito (#591): sottodomini nuovi con gli stessi
-// indizi non rifanno partire i controlli, e su una piattaforma di hosting il verdetto di un utente non passa agli altri.
+// Freno e risposta hanno la stessa identità (#591): il dominio con gli indizi che vede il giudice. Chi ha la stessa chiave
+// non rifà i controlli ed eredita la risposta; su una piattaforma di hosting la chiave è il sito, così non passa agli altri.
 function brakeKey(norm, url, ctx, verdict) {
   if (whitelist.hostedPlatform(norm.host, pathOf(url))) return norm.host + pathOf(url);
   const imp = verdict.imp || null;
