@@ -584,7 +584,7 @@
   // login riuscito il flusso riprende da solo e il voto viene eseguito subito
   // (niente secondo click). `renderList()` ricrea il DOM (perde `btn`), quindi
   // il retry richiama onVote con l'`fb` fresco preso dalla lista ricreata.
-  function onVote(fb, vote, btn) {
+  function onVote(fb, vote, btn, dopoAccesso = false) {
     if (!signedIn || !uid) {
       accedi(fb._id, 'voto', 'poi il voto parte da solo', (ok) => {
         renderList();
