@@ -66,7 +66,8 @@ const RICORDA = `<title>RICORDA</title>
       onclick="document.cookie='OptanonConsent=rifiutato; path=/; max-age=86400';document.getElementById('onetrust-banner-sdk').remove()">Rifiuta tutto</button>
   </div>
   <script>
-    if (document.cookie.includes('OptanonConsent=')) document.getElementById('onetrust-banner-sdk').remove();
+    window.__giaRisposto = document.cookie.includes('OptanonConsent=');
+    if (window.__giaRisposto) document.getElementById('onetrust-banner-sdk').remove();
   </script>`;
 
 test('Privacy e poi Automatico: il sito visitato in Privacy non finisce sul disco', async ({ app, openTab, testServer, shell }) => {
@@ -113,6 +114,10 @@ test('Automatico, Privacy, Filo chiuso e riaperto, di nuovo Automatico: il menu 
       await expect.poll(async () => (await tabCookies(run.shell))?.rejected, { timeout: 8_000 }).toBe(true);
       await run.app.evaluate(async ({ session }) => { await session.defaultSession.cookies.flushStore(); });
       await sleep(1500);
+      // Il sito non resta aperto: alla riapertura non c'è una sua scheda da ripristinare.
+      const { activeId } = await run.shell.evaluate(() => window.filoShell.tabs.snapshot());
+      await run.shell.evaluate((id) => window.filoShell.tabs.close(id), activeId);
+      await expect.poll(() => a.isClosed(), { timeout: 8_000 }).toBe(true);
       await setModeIn(await run.open('filo://security/', false), 'privacy');
       await sleep(2000);
     } finally {
@@ -124,7 +129,7 @@ test('Automatico, Privacy, Filo chiuso e riaperto, di nuovo Automatico: il menu 
       const b = await run.open(url);
       await sleep(1500);
       // Il sito ricorda il rifiuto: il banner non c'è, ed è il menu che deve dirlo.
-      expect(await b.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(false);
+      expect(await b.evaluate(() => window.__giaRisposto)).toBe(true);
       const menu = await openAndRead(run.app, () => rightClickTab(run.shell), 'Cookie non necessari rifiutati');
       expect(menu).toContain('Mostra il banner dei cookie');
     } finally {

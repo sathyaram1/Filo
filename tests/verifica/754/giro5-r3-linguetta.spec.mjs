@@ -44,3 +44,33 @@ test('rifiutato il banner, alla pagina dopo la linguetta «Privacy e cookie» no
   await sleep(3000);
   expect((await tabCookies(shell)).hidden).toBe(false);
 });
+
+// OneTrust col collegamento «Impostazioni cookie» nel piè di pagina: la lista lo nomina (##.ot-sdk-show-settings).
+const OT_PIEDE = `<title>OT_PIEDE</title>
+  <style>body{margin:0} .page{height:1500px}</style>
+  <div class="page">contenuto</div>
+  <footer><a id="ot-sdk-btn" class="ot-sdk-show-settings" href="#">Impostazioni cookie</a></footer>
+  <div id="onetrust-consent-sdk">
+    <div id="onetrust-banner-sdk" style="position:fixed;bottom:0;left:0;right:0;height:120px;background:#222;color:#fff">
+      <button id="onetrust-accept-btn-handler" style="width:140px;height:40px"
+        onclick="document.cookie='OptanonConsent=accettato; path=/; max-age=86400';document.getElementById('onetrust-banner-sdk').remove()">Accetta tutto</button>
+      <button id="onetrust-reject-all-handler" style="width:140px;height:40px"
+        onclick="document.cookie='OptanonConsent=rifiutato; path=/; max-age=86400';document.getElementById('onetrust-banner-sdk').remove()">Rifiuta tutto</button>
+    </div>
+  </div>
+  <script>
+    if (document.cookie.includes('OptanonConsent=')) document.getElementById('onetrust-banner-sdk').remove();
+  </script>`;
+
+test('OneTrust rifiutato, alla pagina dopo il collegamento «Impostazioni cookie» nel piè di pagina non diventa «Banner dei cookie nascosto»', async ({ app, openTab, testServer, shell }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(() => globalThis.__filoCookieBanners.setListForTest('###onetrust-consent-sdk\n##.ot-sdk-show-settings\n###ot-sdk-btn:not(button)'));
+  const a = await openTab(testServer.html(OT_PIEDE));
+  await a.waitForFunction(() => document.cookie.includes('OptanonConsent=rifiutato'), null, { timeout: 10_000 });
+  await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
+  await sleep(1500);
+  await a.reload();
+  await a.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
+  await sleep(6000);
+  expect((await tabCookies(shell)).hidden).toBe(false);
+});
