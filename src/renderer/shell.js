@@ -202,6 +202,8 @@
   // main (handler DEFAULTS_*) e nelle regole Firestore: qui decidiamo solo se
   // mostrare la voce di menu.
   let isAdmin = false;
+  // Falso quando manca il portachiavi di sistema: l'accesso vale fino alla chiusura.
+  let authRemembered = true;
 
   function shortName(p) {
     if (!p) return '';
@@ -246,6 +248,7 @@
       const r = await api.auth.status();
       authProfile = (r && r.ok && r.signedIn) ? r.profile : null;
       isAdmin = !!(r && r.ok && r.signedIn && r.isAdmin);
+      authRemembered = !(r && r.remembered === false);
     } catch (_) {
       authProfile = null;
       isAdmin = false;
@@ -258,7 +261,7 @@
     authBusy = true; renderAccount();
     try {
       const r = await api.auth.signIn();
-      if (r && r.ok) { authProfile = r.profile; isAdmin = !!r.isAdmin; }
+      if (r && r.ok) { authProfile = r.profile; isAdmin = !!r.isAdmin; authRemembered = r.remembered !== false; }
       else showToast((r && r.error) || 'Accesso non riuscito: riprova.');
     } catch (_) {
       showToast('Accesso non riuscito: riprova.');
@@ -283,6 +286,7 @@
         const label = shortName(authProfile);
         showNativeMenu(accountBtn, [
           { label: authProfile.email || label, disabled: true },
+          ...(authRemembered ? [] : [{ label: 'Accesso valido fino alla chiusura di Filo', disabled: true }]),
           { type: 'separator' },
           { label: 'Crediti', icon: 'credits', url: 'filo://credits/credits.html' },
           { label: 'Nuova finestra incognito', icon: 'incognito', action: 'open-incognito' },
@@ -306,7 +310,12 @@
     }
     // Aggiorna l'icona quando il main segnala un cambio sessione.
     if (api.auth && api.auth.onChanged) {
-      api.auth.onChanged((m) => { authProfile = m.profile || null; isAdmin = !!(m && m.isAdmin); renderAccount(); });
+      api.auth.onChanged((m) => {
+        authProfile = m.profile || null; isAdmin = !!(m && m.isAdmin);
+        authRemembered = m.remembered !== false;
+        if (!authProfile || authRemembered) NOTIFS.dismissKey('accesso-non-ricordato');
+        renderAccount();
+      });
     }
     refreshAuth();
   }
@@ -938,8 +947,10 @@
     function show(text, opts) {
       if (!text) return null;
       opts = opts || {};
+      if (opts.key) dismissKey(opts.key);
       const card = document.createElement('div');
       card.className = 'shell-notif';
+      if (opts.key) card.dataset.key = String(opts.key);
 
       const msg = document.createElement('div');
       msg.className = 'shell-notif-msg';
@@ -1003,7 +1014,13 @@
       }
       return card;
     }
-    return { show, dismiss };
+    // Un avviso con chiave dice uno stato: quando lo stato cambia se ne va.
+    function dismissKey(key) {
+      for (const c of hostEl().querySelectorAll('.shell-notif')) {
+        if (c.dataset.key === String(key)) dismiss(c);
+      }
+    }
+    return { show, dismiss, dismissKey };
   })();
 
   // Compat: il vecchio toast informativo (es. "Tab riordinate e salvate") ora

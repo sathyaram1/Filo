@@ -33,6 +33,18 @@ try {
   if (cleaned) app.userAgentFallback = cleaned;
 } catch (_) { /* best-effort: in peggio resta la UA di default */ }
 
+// Il portachiavi si sceglie solo prima di `ready`: senza, su sway/i3 l'accesso
+// non sopravvive alla chiusura nemmeno col portachiavi acceso (#708.1).
+try {
+  const { portachiaviDaChiedere } = require('./portachiavi');
+  const scelto = portachiaviDaChiedere({
+    platform: process.platform,
+    env: process.env,
+    haSwitch: app.commandLine.hasSwitch('password-store'),
+  });
+  if (scelto) app.commandLine.appendSwitch('password-store', scelto);
+} catch (_) {}
+
 // Carica i moduli "shared/background" portati dall'estensione. Si registrano
 // tutti su `globalThis` (pattern IIFE preservato dal codice extension), così
 // gli altri moduli del main process li trovano via global.
