@@ -4038,15 +4038,40 @@
     }
     return '';
   }
-  // L'esempio proposto dev'essere libero davvero, non a sua volta rifiutato;
-  // esce già coi nomi dei tasti di chi legge.
-  function scorciatoiaLibera(m) {
-    for (const d of '123456789') {
-      const sc = tasto(`Ctrl+Shift+${d}`);
-      if (!motivoScorciatoiaPresa(sc, m)) return sc;
-    }
-    return tasto('Ctrl+Alt+Shift+1');
+  // Perché una scorciatoia scritta non si salva su questo modulo, o null. La
+  // stessa regola rifiuta al salvataggio, avvisa all'apertura e sceglie gli
+  // esempi degli avvisi: un esempio che poi si rifiuta non esce (#545).
+  function rifiuto(sc, m) {
+    if (!sc) return null;
+    const ignoto = TASTI.pezzoSconosciuto(sc);
+    if (ignoto && ignoto.modificatore) return { tipo: 'modificatore', nome: ignoto.nome };
+    // Senza Ctrl/Cmd/Alt la lettera scatterebbe mentre si scrive.
+    if (!isValidShortcut(sc)) return { tipo: 'senzaModificatore' };
+    if (ignoto) return { tipo: 'tasto', nome: ignoto.nome };
+    if (TASTI.delSistema(sc)) return { tipo: 'sistema', nome: TASTI.etichetta(sc) };
+    const motivo = motivoScorciatoiaPresa(sc, m);
+    return motivo ? { tipo: 'presa', motivo } : null;
   }
+  function testoRifiuto(r, m) {
+    const libera = scorciatoiaLibera(m);
+    const perEsempio = libera ? `, per esempio ${libera}` : '';
+    if (r.tipo === 'modificatore') {
+      return `Non riconosco «${r.nome}» come tasto da tenere premuto: usa ${tasto('Ctrl')}, Alt o Shift (Maiusc)${libera ? `, es. ${libera}` : ''}.`;
+    }
+    if (r.tipo === 'tasto') {
+      const conNome = primaLibera(ESEMPI_CON_NOME, m);
+      return `Non riconosco il tasto «${r.nome}»: usa una lettera, una cifra o un nome come Spazio, Invio, Esc, Tab, Su, Giù, F1…${conNome ? ` (es. ${conNome})` : ''}.`;
+    }
+    if (r.tipo === 'sistema') return `${r.nome} se la prende il sistema operativo e non arriverebbe mai a questo modulo: scegline un'altra${perEsempio}.`;
+    return `${r.motivo}: scegline un'altra${perEsempio}.`;
+  }
+  // Gli esempi escono coi nomi dei tasti di chi legge; '' se sono tutti presi.
+  const ESEMPI_LIBERI = ['Ctrl+Shift', 'Ctrl+Alt+Shift'].flatMap((mods) => [...'123456789'].map((d) => `${mods}+${d}`));
+  const ESEMPI_CON_NOME = ['Ctrl+Shift+Spazio', 'Ctrl+Alt+Spazio', 'Ctrl+Shift+Invio', 'Ctrl+Alt+Invio'];
+  function primaLibera(candidati, m) {
+    return candidati.map(tasto).find((sc) => !rifiuto(sc, m)) || '';
+  }
+  function scorciatoiaLibera(m) { return primaLibera(ESEMPI_LIBERI, m); }
 
   // La scorciatoia di un modulo fa quello che fa il suo clic. Un tipo che qui non
   // c'è ha più azioni (o nessuna): il campo non gli offre una scorciatoia (#545).
