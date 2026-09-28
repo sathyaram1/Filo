@@ -131,12 +131,12 @@ jobs:
         id: check
         shell: bash
         run: |
-          # Senza lo sha della suite il checkout sarebbe caduto sul ramo di
+          # Senza lo sha scelto il checkout sarebbe caduto sul ramo di
           # default: si pubblicherebbe codice mai provato.
-          PROVATO="${{ needs.suite.outputs.sha }}"
+          PROVATO="${{ needs.scegli.outputs.sha }}"
           QUI=$(git rev-parse HEAD)
           if [ -z "$PROVATO" ] || [ "$QUI" != "$PROVATO" ]; then
-            echo "::error::la suite non ha detto quale commit ha provato (${PROVATO:-niente}), qui c'e' $QUI: non pubblico codice mai provato."
+            echo "::error::nessun commit con la suite verde scelto (${PROVATO:-niente}), qui c'e' $QUI: non pubblico codice mai provato."
             exit 1
           fi
           git fetch --tags --force
@@ -219,7 +219,8 @@ jobs:
 
 
           ${TAIL}"
-          node scripts/build-alarm.mjs "Controlli automatici rossi: nessuna versione pubblicata" "$TESTO" || echo "::warning::allarme non consegnato"
+          # Una chiave per file di test rosso (`unit:<file>`): un guasto gia' in coda non riapre un feedback.
+          node scripts/build-alarm.mjs "Controlli automatici rossi: nessuna versione pubblicata" "$TESTO" --chiavi-unit unit.log || echo "::warning::allarme non consegnato"
           exit 1
 
       - name: Incastona le chiavi di default nel build (bake)
