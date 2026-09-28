@@ -158,12 +158,56 @@
     Bootstrap.applyThemeTokens(currentOverrides);
   }
 
-  function persistTokens() {
-    chrome.runtime.sendMessage({
-      type: MSG.UPDATE_SETTINGS,
-      settings: { themeTokens: currentOverrides },
-    });
+  // La mappa dei token si salva intera: si parte da quella in memoria adesso e
+  // ci si applicano solo i token toccati qui, o un colore chiesto a Filo con la
+  // pagina aperta sparirebbe al primo ritocco (#592).
+  const tokenDaSalvare = new Set();
+  const tokenInCorso = new Set();
+  let tokenAzzeraTutti = false;
+
+  async function persistTokens() {
+    const nomi = [...tokenDaSalvare];
+    const tutti = tokenAzzeraTutti;
+    tokenDaSalvare.clear();
+    tokenAzzeraTutti = false;
+    for (const name of nomi) {
+      const input = $(`tok-${name}`);
+      const v = input ? input.value.trim() : '';
+      if (v === '' || !Tokens || Tokens.validate(name, v)) tokenInCorso.delete(name);
+    }
+    let next = {};
+    if (!tutti) {
+      const fresh = await Storage.getSettings().catch(() => null);
+      next = { ...((fresh && fresh.themeTokens) || {}) };
+      for (const name of nomi) {
+        if (Object.prototype.hasOwnProperty.call(currentOverrides, name)) next[name] = currentOverrides[name];
+        else delete next[name];
+      }
+    }
+    currentOverrides = { ...next };
+    for (const name of tokenInCorso) {
+      const input = $(`tok-${name}`);
+      const v = input ? input.value.trim() : '';
+      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = v;
+    }
+    chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: next } });
     flashSaved('tokenSavedHint');
+  }
+
+  // Un aggiornamento arrivato da altrove: si ridisegnano i token che l'utente
+  // non sta scrivendo qui, gli altri restano come li ha lasciati.
+  function riallineaToken(mappa) {
+    if (!Tokens) return;
+    const salvati = mappa || {};
+    const nomi = new Set([...Object.keys(currentOverrides), ...Object.keys(salvati)]);
+    for (const name of nomi) {
+      if (tokenInCorso.has(name) || tokenDaSalvare.has(name)) continue;
+      if (Object.prototype.hasOwnProperty.call(salvati, name)) currentOverrides[name] = salvati[name];
+      else delete currentOverrides[name];
+    }
+    for (const name of Tokens.names()) {
+      if (!tokenInCorso.has(name) && !tokenDaSalvare.has(name)) renderTokenRow(name);
+    }
   }
 
   function persistTokensDebounced() {
