@@ -100,6 +100,44 @@ test('#853 dove finisce un URL: i segni attorno restano fuori, le parentesi dell
   assert.match(render('Il pianeta: [Mercurio](https://it.wikipedia.org/wiki/Mercurio_(astronomia)).'), /<\/a>\.<\/p>/);
 });
 
+// L'elenco di ciò che si stacca in coda è CHIUSO: un segno nuovo entra qui
+// col suo perché, e ogni altro carattere ammesso in un URL resta nel link
+// (#853: prima l'elenco cresceva a porte, e ha tagliato _ e ~).
+const STACCATI = {
+  '.': 'fine frase', ',': 'fine frase', ';': 'fine frase', ':': 'fine frase',
+  '!': 'fine frase', '?': 'fine frase', '…': 'puntini di sospensione',
+  "'": 'apostrofo di chiusura', '’': 'apostrofo tipografico di chiusura',
+  '*': 'grassetto e corsivo, che Filo disegna',
+};
+
+test('#853 in coda a un URL nudo si stacca solo l\'elenco chiuso: ogni altro carattere da URL resta nel link', () => {
+  const href = (s) => [...render(s).matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/'/g, '&#39;');
+  // RFC 3986: non riservati, sotto-delimitatori e delimitatori ammessi nel percorso.
+  const ALFABETO = "ABZabz09-._~!$&'()*+,;=:@/?#%[]" + '…’';
+  for (const c of ALFABETO) {
+    if (c === ')' || c === ']') continue; // parentesi: test qui sotto
+    const url = 'https://example.com/a' + c;
+    const atteso = c in STACCATI ? 'https://example.com/a' : esc(url);
+    assert.deepEqual(href(`Vedi ${url} qui`), [atteso], `carattere ${JSON.stringify(c)}`);
+  }
+  assert.deepEqual(href('Vedi https://docs.python.org/3/reference/datamodel.html#object.__init__ qui.'),
+    ['https://docs.python.org/3/reference/datamodel.html#object.__init__']);
+  assert.deepEqual(href('Vedi https://example.com/a) e https://example.com/b(c) e https://example.com/d] qui'),
+    ['https://example.com/a', 'https://example.com/b(c)', 'https://example.com/d']);
+});
+
+test('#853 una coda lunghissima dopo un URL nudo non blocca il disegno', () => {
+  for (const coda of [')', '.', '*', '.)', '&#39;']) {
+    const testo = 'Vedi https://example.com/pagina' + coda.repeat(50_000);
+    const t0 = performance.now();
+    const html = render(testo);
+    const ms = performance.now() - t0;
+    assert.ok(ms < 1000, `coda ${JSON.stringify(coda)}: ${Math.round(ms)} ms`);
+    assert.match(html, /href="https:\/\/example\.com\/pagina"/);
+  }
+});
+
 // ─── sicurezza: contenuto NON FIDATO, niente link verso l'interno dell'app ───
 
 test('#418 un link filo:// (pagina interna) NON diventa cliccabile', () => {
