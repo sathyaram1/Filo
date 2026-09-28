@@ -102,6 +102,20 @@ test('voti su due schede durante l\'attesa: ad accesso fatto partono tutti e due
   await expect(page.locator('#bdAuthMsg')).toContainText('Sei connesso');
 });
 
+test('stessa scheda, pollice e «Ancora rotto?» durante l\'attesa: ad accesso fatto parte il voto e si apre il modulo', async ({ app, openTab }) => {
+  const page = await apriBacheca(app, openTab);
+  await accessoFinto(app, { subito: false });
+  const card = scheda(page, 'fb-a');
+  await card.locator('.bd-vote-broken').click();
+  await card.locator('.bd-reopen-link').click();
+  await expect(card.locator('.bd-card-msg')).toContainText('il voto parte da solo');
+  await expect(card.locator('.bd-card-msg')).toContainText('scrivi qui cosa non va');
+  await app.evaluate(() => globalThis.__faiEntrare());
+  await expect(page.locator('#bdAuthMsg')).toContainText('Sei connesso');
+  await expect.poll(() => page.evaluate(() => window.__voti.slice())).toEqual(['fb-a:broken']);
+  await expect(card.locator('textarea')).toBeVisible();
+});
+
 test('accesso fatto dal menu account a bacheca aperta: la bacheca lo vede e il voto parte senza un altro accesso', async ({ app, openTab, shell }) => {
   const page = await apriBacheca(app, openTab);
   await accessoFinto(app, { subito: true });
