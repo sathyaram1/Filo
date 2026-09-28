@@ -12,16 +12,18 @@ const MAI = new Set([
   'head', 'script', 'style', 'noscript', 'template', 'svg', 'math', 'canvas', 'iframe', 'object', 'embed',
   'video', 'audio', 'picture', 'textarea', 'datalist', 'link', 'meta', 'title', 'noembed', 'noframes', 'xmp', 'map',
 ]);
-// Il NOME di un riquadro decide solo l'ordine (il contorno va in coda), mai il cestino: gli stessi nomi stanno sul
-// contenuto (il listino «menu», il piè di pagina con gli orari, i piani «subscribe»). Nel cestino va solo la
-// navigazione fatta di link, la pubblicità e il banner dei cookie. Prove in tests/unit/pageText.test.mjs.
+// Il NOME di un riquadro decide solo l'ordine (il contorno va in coda), MAI il cestino: gli stessi nomi stanno sul
+// contenuto (il listino «menu», i «cookies» di una pasticceria, i piani «subscribe»). Nel cestino va solo la
+// navigazione DICHIARATA (tag o ruolo) fatta di link. Prove in tests/unit/pageText.test.mjs.
 const NAV_TAG = new Set(['nav', 'menu']);
 const NAV_RUOLI = new Set(['navigation', 'menu', 'menubar']);
-const NAV_NOMI = new Set(['nav', 'navbar', 'navigation', 'menu', 'menubar', 'mainmenu', 'breadcrumb', 'breadcrumbs', 'share', 'sharing', 'social']);
-const CESTINO_NOMI = new Set(['ad', 'ads', 'advert', 'adverts', 'advertisement', 'adsbygoogle', 'cookie', 'cookies', 'consent', 'gdpr', 'skiplink']);
 const CODA_TAG = new Set(['aside']);
 const CODA_RUOLI = new Set(['banner', 'contentinfo', 'complementary', 'search', 'toolbar', 'dialog', 'alertdialog', 'tooltip']);
-const CODA_NOMI = new Set(['promo', 'newsletter', 'subscribe', 'related', 'recommended', 'popup', 'modal', 'sidebar', 'widget', 'sponsor', 'sponsored']);
+const CODA_NOMI = new Set([
+  'nav', 'navbar', 'navigation', 'menu', 'menubar', 'mainmenu', 'breadcrumb', 'breadcrumbs', 'share', 'sharing', 'social',
+  'ad', 'ads', 'advert', 'adverts', 'advertisement', 'adsbygoogle', 'cookie', 'cookies', 'consent', 'gdpr', 'skiplink',
+  'promo', 'newsletter', 'subscribe', 'related', 'recommended', 'popup', 'modal', 'sidebar', 'widget', 'sponsor', 'sponsored',
+]);
 // Quanta parte del testo di una navigazione dev'essere link perché sia solo navigazione.
 const QUOTA_LINK = 0.6;
 const SOLO_LETTORI = /(?:^|\s)(?:sr-only|visually-hidden|visuallyhidden|screen-reader-text|a-offscreen)(?:\s|$)/i;
