@@ -57,6 +57,8 @@ test.beforeEach(() => {
   stato.redeemed = false;
   stato.pendingCode = null;
   stato.modelsDoc = null;
+  stato.trattieni = false;
+  stato.trattenute.length = 0;
 });
 
 async function homePage(app) {
