@@ -294,6 +294,7 @@ test('classify: le pagine della rete di casa non vanno al modello', async () => 
   let called = 0;
   const complete = async () => { called++; return 'bot_block'; };
   // Per nome conta dove ha risposto la pagina: il router intercetta tplinkwifi.net, fritz.box risponde da casa.
+  require(join(__dirname, '..', '..', 'src', 'shared', 'urlNav.js'));
   globalThis.SN_URL_NAV.noteHostAddress('tplinkwifi.net', '192.168.0.1');
   globalThis.SN_URL_NAV.noteHostAddress('fritz.box', '192.168.178.1');
   const casa = ['192.168.1.1', '10.0.0.2', 'nas.local', 'localhost', 'homeassistant', 'speedport.ip', 'tplinkwifi.net', 'fritz.box'];
