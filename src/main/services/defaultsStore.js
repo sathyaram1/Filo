@@ -229,7 +229,7 @@ function get() {
 
   let remoteReasons = [];
   if (remoteModels) {
-    if (typeof remoteModels.provider === 'string' && remoteModels.provider) out.provider = remoteModels.provider;
+    if (fornitoreUsabile(remoteModels.provider, C)) out.provider = remoteModels.provider;
     if (remoteModels.models && typeof remoteModels.models === 'object') {
       out.models = { ...out.models, ...remoteModels.models };
     }
