@@ -16,8 +16,15 @@ const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
 const { MSG } = SN_MSG;
 const Storage = globalThis.SN_STORAGE;
-const Providers = globalThis.SN_PROVIDERS;
 const Costs = globalThis.SN_COSTS;
+const Gate = globalThis.SN_MODEL_GATE.create({
+  getSettings: () => getEffectiveSettings(),
+  buildChain: (s, ref, action) => buildAttemptChain(s, ref, action),
+  modelFor: (s, action) => modelForAction(s, action),
+  routing: (s) => providerRouting(s),
+  noteServed: (s, action, r) => noteServedProvider(s, action, r),
+  costs: Costs,
+});
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
 const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;

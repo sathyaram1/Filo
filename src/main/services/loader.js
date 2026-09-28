@@ -117,6 +117,7 @@ require(path.join(SHARED, 'editorNotes.js'));   // appunti di Filo dentro i file
 require(path.join(SHARED, 'editorSummary.js')); // riassunto per file + estrazione testo (logica pura, #379.5)
 require(path.join(SVC, 'providers', 'openrouter.js'));
 require(path.join(SVC, 'providers', 'index.js'));
+require(path.join(SVC, 'modelGate.js')); // l'unica strada verso i fornitori: limite, costo, chi ha servito (#591)
 require(path.join(SVC, 'feedbackOutbox.js')); // #341 — coda invio feedback offline (dipende da SN_FEEDBACK + SN_STORAGE)
 require(path.join(SVC, 'creditStore.js'));
 require(path.join(SVC, 'costTracker.js'));
@@ -144,7 +145,6 @@ module.exports = {
   get SN_CONST() { return globalThis.SN_CONST; },
   get SN_MSG() { return globalThis.SN_MSG; },
   get SN_STORAGE() { return globalThis.SN_STORAGE; },
-  get SN_PROVIDERS() { return globalThis.SN_PROVIDERS; },
   get SN_COSTS() { return globalThis.SN_COSTS; },
   get SN_CREDITS() { return globalThis.SN_CREDITS; },
   get SN_SAVED_PAGES() { return globalThis.SN_SAVED_PAGES; },
