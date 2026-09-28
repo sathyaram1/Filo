@@ -1,6 +1,6 @@
 // Giro 2 di home-invito: chi è nuovo e riceve il modello con la home aperta vede partire l'intervista lì.
 import { test, expect } from '../../fixtures/electron.mjs';
-import { usaServerFinto, homePage, prepara, riscattaDaCrediti, testoHome } from './_crediti-finti.mjs';
+import { usaServerFinto, homePage, nuovaHome, prepara, riscattaDaCrediti, testoHome } from './_crediti-finti.mjs';
 
 const stato = usaServerFinto(test);
 const BENVENUTO = /Ciao, sono Filo/;
