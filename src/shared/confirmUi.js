@@ -288,13 +288,10 @@
       const row = buttonRow(box);
       const cancel = makeBtn(row, cancelLabel, 'sn-confirm-btn-cancel');
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-ok');
+      const aggiorna = () => inAttesa(ok, !visto());
+      const { visto, avanti } = tuttoVisto(box, aggiorna);
       cancel.addEventListener('click', () => done(false));
-      ok.addEventListener('click', () => done(true));
-      const aggiorna = () => {
-        ok.disabled = !visto();
-        ok.title = ok.disabled ? 'Scorri fino in fondo per confermare' : '';
-      };
-      const visto = tuttoVisto(box, aggiorna);
+      ok.addEventListener('click', () => { if (visto()) done(true); else avanti(); });
       aggiorna();
       // Il popup si apre anche da solo, mentre l'utente scrive altrove: col
       // fuoco su OK il primo spazio o invio lo confermerebbe senza leggerlo (#592).
