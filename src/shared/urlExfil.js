@@ -167,20 +167,126 @@
     return null;
   }
 
-  // Verdetto: { exfil, reason }. corpus = materiale sensibile che era nel
-  // contesto del modello (memoria, appunti, output comandi). fromUntrusted =
-  // l'azione nasce da una superficie non fidata (agente su pagina web).
-  function assess(url, { corpus = '', fromUntrusted = false } = {}) {
+  // ── Quello che il modello ha LETTO nel turno (#587) ──────────────────────
+  // Output di comandi, documenti, file, chat archiviate: dati dell'utente che una
+  // pagina ostile può farsi spedire. Qui non si guarda parola per parola (un
+  // `ls` è pieno di parole comuni): conta un pezzo lungo in comune, o un token
+  // di lettere e cifre (password, chiavi, codici).
+  const FINESTRA = 20;     // caratteri alfanumerici consecutivi in comune
+  const TOKEN_MISTO = 8;   // lettere+cifre: abbastanza specifico da solo
+  const MAX_LETTO = 2000000; // tetto di calcolo: i pezzi più recenti restano
+
+  // Solo la parte che può portare dati: sottodomini, percorso, query, frammento.
+  // Il dominio no, se no ogni sito citato in un file diventerebbe sospetto.
+  function carrierAlnum(url) {
+    let u;
+    try { u = new URL(url); } catch (_) {
+      try { u = new URL(`https://${url}`); } catch (_) { return exposedAlnum(url); }
+    }
+    const labels = (u.hostname || '').split('.');
+    const sub = labels.slice(0, Math.max(0, labels.length - 2)).join('.');
+    return exposedAlnum(`${sub} ${u.pathname || ''} ${u.search || ''} ${u.hash || ''}`);
+  }
+
+  function taintLetto(url, letto) {
+    const text = String(letto || '');
+    if (!text) return null;
+    const exposed = carrierAlnum(url);
+    if (exposed.length < TOKEN_MISTO) return null;
+    const reason = 'contiene dati che Filo ha letto sul tuo computer';
+    const visti = new Set();
+    for (const w of text.toLowerCase().split(/[^a-z0-9]+/)) {
+      if (w.length < TOKEN_MISTO || visti.has(w)) continue;
+      visti.add(w);
+      if (/[a-z]/.test(w) && /[0-9]/.test(w) && exposed.includes(w)) return { reason };
+    }
+    if (exposed.length >= FINESTRA) {
+      const grams = new Set();
+      for (let i = 0; i + FINESTRA <= exposed.length; i++) grams.add(exposed.substr(i, FINESTRA));
+      const flat = text.toLowerCase().replace(/[^a-z0-9]+/g, '');
+      for (let i = 0; i + FINESTRA <= flat.length; i++) {
+        if (grams.has(flat.substr(i, FINESTRA))) return { reason };
+      }
+    }
+    return null;
+  }
+
+  // Un link come lo si confronta: senza frammento né barra finale, dominio minuscolo.
+  function chiaveLink(url) {
+    const raw = String(url || '').trim();
+    try {
+      const u = new URL(raw);
+      return `${u.protocol}//${u.host.toLowerCase()}${u.pathname.replace(/\/+$/, '')}${u.search}`;
+    } catch (_) { return raw.replace(/#.*$/, '').replace(/\/+$/, ''); }
+  }
+
+  // Cosa hanno portato nel contesto le azioni viste dal modello (turni passati
+  // compresi): `letto` = dati del computer, `nonFidato` = è entrato testo scritto
+  // da altri, `linkNoti` = gli indirizzi dei risultati di ricerca.
+  function contestoDaAzioni(actions) {
+    const pezzi = [];
+    let nonFidato = false;
+    const linkNoti = new Set();
+    const testo = (v) => (typeof v === 'string' ? v : '');
+    for (const a of Array.isArray(actions) ? actions : []) {
+      const out = a && a._output;
+      if (!out || typeof out !== 'object') continue;
+      const type = String(a.type || '').toUpperCase();
+      if (type === 'ESEGUI_COMANDO') {
+        if (out.blocked) continue;
+        const t = `${testo(out.stdout)}\n${testo(out.stderr)}`;
+        if (t.trim()) { nonFidato = true; pezzi.push(t); }
+      } else if (type === 'LEGGI_DOCUMENTO') {
+        if (testo(out.text)) { nonFidato = true; pezzi.push(out.text); }
+      } else if (type === 'LEGGI_FILE') {
+        pezzi.push(testo(out.text));
+      } else if (type === 'CERCA_CHAT') {
+        nonFidato = true;
+        pezzi.push(testo(out.title), testo(out.transcript));
+        for (const r of Array.isArray(out.results) ? out.results : []) {
+          if (r) pezzi.push(`${testo(r.title)}\n${testo(r.snippet)}`);
+        }
+      } else if (type === 'CERCA_WEB') {
+        const results = Array.isArray(out.results) ? out.results : [];
+        if (results.length) nonFidato = true;
+        for (const r of results) if (r && r.url) linkNoti.add(chiaveLink(r.url));
+      }
+    }
+    let letto = pezzi.filter(Boolean).join('\n');
+    if (letto.length > MAX_LETTO) letto = letto.slice(-MAX_LETTO);
+    return { letto, nonFidato, linkNoti };
+  }
+
+  // Verdetto: { exfil, reason }. corpus = memoria e appunti (dati personali
+  // persistenti); letto = ciò che il modello ha letto dal computer nel turno.
+  // fromUntrusted = nel contesto è entrato testo scritto da altri: allora anche
+  // la forma dell'URL conta, salvo i link citati tali e quali da una ricerca
+  // (aprirli non porta fuori niente che la ricerca non contenesse già).
+  function assess(url, { corpus = '', letto = '', fromUntrusted = false, linkNoti = null } = {}) {
     const link = String(url || '').trim();
     if (!link) return { exfil: false, reason: '' };
-    const t = taint(link, corpus);
+    const t = taint(link, corpus) || taintLetto(link, letto);
     if (t) return { exfil: true, reason: t.reason };
-    if (fromUntrusted) {
+    if (fromUntrusted && !(linkNoti && linkNoti.has(chiaveLink(link)))) {
       const s = structural(link);
       if (s) return { exfil: true, reason: s.reason };
     }
     return { exfil: false, reason: '' };
   }
 
-  global.SN_URL_EXFIL = { assess, taint, structural, exposedAlnum, corpusTokens };
+  // NAVIGA nel turno: memoria + azioni viste dal modello + chi ha mandato.
+  // `daPagina` = l'agente vive su una pagina web, che è già nel suo contesto.
+  function valutaNaviga(url, { memoria = '', azioni = [], daPagina = false } = {}) {
+    const ctx = contestoDaAzioni(azioni);
+    return assess(url, {
+      corpus: memoria,
+      letto: ctx.letto,
+      fromUntrusted: !!daPagina || ctx.nonFidato,
+      linkNoti: ctx.linkNoti,
+    });
+  }
+
+  global.SN_URL_EXFIL = {
+    assess, valutaNaviga, contestoDaAzioni, taint, taintLetto, structural, exposedAlnum, corpusTokens,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

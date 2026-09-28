@@ -754,11 +754,340 @@
     return 3; // comando non riconosciuto → livello 3 di default
   }
 
-  // Livello di sicurezza del comando: 1 | 2 | 3. Mai null: l'ignoto è 3.
-  function classify(cmd) {
-    if (typeof cmd !== 'string') return 3;
+  // ── Perimetro di lettura (#587) ──────────────────────────────────────────
+  // Una lettura resta livello 1 solo se ciò che stampa sta nella cartella
+  // personale, fuori da file nascosti e cartelle di profilo; il resto chiede un
+  // OK. `cd` resta libero, quindi conta il percorso RISOLTO, non la cartella di
+  // lavoro. Il contesto `{ cwd, home, win, maiuscole }` lo inietta il main.
+  const MOTIVI = {
+    fuori: 'legge fuori dalla tua cartella personale',
+    nascosto: 'legge un file nascosto o di configurazione',
+    ignoto: 'non si sa prima quali file leggerà',
+    ricorsivo: 'cerca dentro intere cartelle, file nascosti compresi',
+    variabili: "legge le variabili d'ambiente",
+    sistema: 'legge dati del sistema che non sono file',
+    processi: 'mostra i programmi aperti con i loro argomenti',
+  };
+  // Stampano il contenuto dei file che ricevono come operandi.
+  const LETTORI = new Set(['cat', 'type', 'more', 'head', 'tail', 'nl', 'cut', 'uniq', 'column', 'get-content', 'gc']);
+  // Guardano nomi e metadati: contano solo i percorsi che non sono file (`env:`, `HKCU:`).
+  const ELENCHI = new Set([
+    'ls', 'dir', 'tree', 'gci', 'get-childitem', 'get-item', 'gi', 'get-itemproperty', 'gp',
+    'get-itempropertyvalue', 'stat', 'du', 'file', 'wc', 'test-path', 'resolve-path',
+    'convert-path', 'md5sum', 'sha1sum', 'sha256sum', 'cksum', 'get-filehash',
+  ]);
+  const ELENCA_CARTELLA = new Set(['ls', 'dir', 'tree', 'gci', 'get-childitem']);
+  // In PowerShell `gci | gc` legge il CONTENUTO dei file elencati: quali, non si sa prima.
+  const ELENCA_OGGETTI = new Set(['ls', 'dir', 'gci', 'get-childitem', 'get-item', 'gi']);
+  const LETTI_DAL_TUBO = new Set(['cat', 'type', 'gc', 'get-content', 'select-string', 'sls']);
+  // Le righe di comando degli altri programmi portano token e password (`ps e` anche l'ambiente).
+  const PROCESSI = new Set(['ps', 'get-process', 'gps', 'w']);
+  const SPOSTAMENTI = new Set(['cd', 'chdir', 'set-location', 'sl', 'pushd', 'popd']);
+  // Cartelle di profilo appena sotto la home (`Application Data` e `Cookies` sono giunzioni verso AppData).
+  const PROFILO = new Set(['appdata', 'application data', 'local settings', 'cookies', 'library', '_netrc']);
+  const JOLLY = /[*?[\]{}\uFFFD]/;
+  // Senza contesto: cartella di lavoro e home coincidono, un relativo si dà per interno.
+  const SENZA_CONTESTO = { cwd: '/~', home: '/~', win: false, maiuscole: false };
+
+  const UNO = { level: 1, motivo: '' };
+  const TRE = { level: 3, motivo: '' };
+  const due = (motivo) => ({ level: 2, motivo });
+  const peggiore = (a, b) => (b.level > a.level ? b : a);
+
+  // Argomenti come li vede la shell: le virgolette raggruppano (un percorso con
+  // spazi è UNO) e `variabile` segna un'espansione, che fuori da `echo` finisce
+  // comunque stampata nei messaggi d'errore.
+  function argomenti(raw) {
+    const out = [];
+    const s = String(raw);
+    let cur = '';
+    let q = '';
+    let aperto = false;
+    let variabile = false;
+    const chiudi = () => {
+      if (cur || aperto) out.push({ testo: cur, variabile });
+      cur = ''; aperto = false; variabile = false;
+    };
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (q) {
+        if (ch === q) { q = ''; continue; }
+        if (q === '"' && ch === '$' && /[\w{(]/.test(s[i + 1] || '')) variabile = true;
+        cur += ch;
+        continue;
+      }
+      if (ch === '"' || ch === '\'') { q = ch; aperto = true; continue; }
+      if (ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
+      if (/\s/.test(ch)) { chiudi(); continue; }
+      if (ch === '$' && /[\w{(]/.test(s[i + 1] || '')) variabile = true;
+      cur += ch;
+    }
+    chiudi();
+    // `%NOME%` si espande in cmd anche fra virgolette; `+%H:%M` è il formato di `date`.
+    for (const a of out) {
+      if (!a.testo.startsWith('+') && /%[A-Za-z_][\w()]*(:[^%]*)?%/.test(a.testo)) a.variabile = true;
+    }
+    return out;
+  }
+
+  function pezzi(s) {
+    return String(s || '').split(/[\\/]+/).filter(Boolean);
+  }
+
+  function normalizza(segs) {
+    const out = [];
+    for (const x of segs) {
+      if (x === '.') continue;
+      if (x === '..') { out.pop(); continue; }
+      out.push(x);
+    }
+    return out;
+  }
+
+  // Dove porta un operando: `{ radice, segs }` assoluto, oppure il motivo per cui non si sa.
+  function dove(p, c) {
+    if (!p) return MOTIVI.ignoto;
+    if (p.includes('$') || /%[A-Za-z_][\w()]*(:[^%]*)?%/.test(p)) return MOTIVI.variabili;
+    if (/^[\\/]{2}/.test(p)) return MOTIVI.fuori; // UNC, `\\?\`, `//server`
+    if (/^[A-Za-z][A-Za-z0-9]+:/.test(p)) return MOTIVI.sistema; // `env:`, `HKCU:`, `Registry::`
+    let r;
+    if (p === '~' || /^~[\\/]/.test(p)) {
+      if (!c.home) return MOTIVI.fuori;
+      r = { radice: c.home.radice, segs: c.home.segs.concat(pezzi(p.slice(1))) };
+    } else if (p.startsWith('~')) {
+      return MOTIVI.fuori; // `~utente`, `~+`, `~-`
+    } else if (/^[A-Za-z]:/.test(p)) {
+      if (!/^[A-Za-z]:[\\/]/.test(p)) return MOTIVI.fuori; // `C:nome` è relativo a un'altra cartella
+      r = { radice: `${p[0].toLowerCase()}:`, segs: pezzi(p.slice(2)) };
+    } else if (c.win && /^\/mnt\/[A-Za-z](\/|$)/.test(p)) {
+      r = { radice: `${p[5].toLowerCase()}:`, segs: pezzi(p.slice(6)) };
+    } else if (/^[\\/]/.test(p)) {
+      if (!c.win) r = { radice: '/', segs: pezzi(p) };
+      else if (c.cwd && c.cwd.radice) r = { radice: c.cwd.radice, segs: pezzi(p) };
+      else return MOTIVI.fuori;
+    } else {
+      if (!c.cwd) return MOTIVI.ignoto;
+      if (c.cwd.provider) return MOTIVI.sistema;
+      r = { radice: c.cwd.radice, segs: c.cwd.segs.concat(pezzi(p)) };
+    }
+    return { radice: r.radice, segs: normalizza(r.segs) };
+  }
+
+  function dentroCasa(r, c) {
+    if (!c.home || r.radice !== c.home.radice || r.segs.length < c.home.segs.length) return false;
+    const eq = c.maiuscole ? (a, b) => a.toLowerCase() === b.toLowerCase() : (a, b) => a === b;
+    return c.home.segs.every((s, i) => eq(s, r.segs[i]));
+  }
+
+  // Windows toglie punti e spazi in coda (`AppData.` è AppData); accenti e maiuscole non contano.
+  function nomeNorm(seg) {
+    return seg.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ')
+      .replace(/[ .]+$/, '').toLowerCase();
+  }
+
+  function contesto(ctx) {
+    const x = ctx && typeof ctx === 'object' ? ctx : SENZA_CONTESTO;
+    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null };
+    const h = dove(String(x.home || ''), c);
+    if (h && typeof h === 'object') c.home = h;
+    const cw = String(x.cwd || '');
+    if (cw) {
+      const r = dove(cw, c);
+      c.cwd = r === MOTIVI.sistema ? { provider: true } : (r && typeof r === 'object' ? r : null);
+    }
+    return c;
+  }
+
+  // '' se l'operando sta nel perimetro, altrimenti il motivo (per il popup).
+  function fuoriDa(p, c) {
+    const op = String(p == null ? '' : p).trim();
+    if (!op) return '';
+    const r = dove(op, c);
+    if (typeof r === 'string') return r;
+    if (!dentroCasa(r, c)) return MOTIVI.fuori;
+    const sotto = r.segs.slice(c.home.segs.length);
+    const propri = new Set(pezzi(op));
+    for (let i = 0; i < sotto.length; i++) {
+      const s = sotto[i];
+      // `~1` è il nome corto 8.3 di Windows: `SSH~1` apre `.ssh`. `:` è un flusso alternativo.
+      if (s.startsWith('.') || /~\d/.test(s) || s.includes(':')) return MOTIVI.nascosto;
+      // Un jolly in testa può prendere un nome nascosto; appena sotto la home, una cartella di profilo.
+      if (propri.has(s) && (JOLLY.test(s[0]) || (i === 0 && JOLLY.test(s)))) return MOTIVI.ignoto;
+      if (i === 0) {
+        const n = nomeNorm(s);
+        if (PROFILO.has(n) || n.startsWith('ntuser')) return MOTIVI.nascosto;
+      }
+    }
+    return '';
+  }
+
+  function primoFuori(lista, c) {
+    for (const p of lista) {
+      const m = fuoriDa(p, c);
+      if (m) return due(m);
+    }
+    return UNO;
+  }
+
+  function operandiLettore(prog, testi) {
+    return testi.filter((t) => t && !t.startsWith('-') && !/^\+\d*$/.test(t)
+      && !(prog === 'more' && /^\/[A-Za-z?]\d*$/.test(t)));
+  }
+
+  // grep: il primo operando è il modello (salvo `-e`/`-f`), `-f FILE` legge un file.
+  function operandiGrep(testi) {
+    const file = [];
+    const extra = [];
+    let modello = false;
+    let ricorsivo = false;
+    for (let i = 0; i < testi.length; i++) {
+      const a = testi[i];
+      if (a === '--') { file.push(...testi.slice(i + 1)); break; }
+      if (/^--(recursive|dereference-recursive)$/.test(a) || a === '--directories=recurse') { ricorsivo = true; continue; }
+      if (a === '--directories') { if (testi[i + 1] === 'recurse') ricorsivo = true; i += 1; continue; }
+      if (a === '-e' || a === '--regexp') { modello = true; i += 1; continue; }
+      if (a.startsWith('--regexp=')) { modello = true; continue; }
+      if (a === '-f' || a === '--file') { modello = true; extra.push(testi[i + 1] || ''); i += 1; continue; }
+      if (a.startsWith('--file=')) { modello = true; extra.push(a.slice(7)); continue; }
+      if (/^--(max-count|context|after-context|before-context|label|include|exclude|exclude-dir|devices|binary-files)$/.test(a)) { i += 1; continue; }
+      if (a.startsWith('--')) continue;
+      if (/^-[A-Za-z0-9]+$/.test(a)) {
+        if (/[rR]/.test(a)) ricorsivo = true;
+        const ultima = a[a.length - 1];
+        if (ultima === 'e') { modello = true; i += 1; } else if (ultima === 'f') { modello = true; extra.push(testi[i + 1] || ''); i += 1; } else if ('ABCmdD'.includes(ultima)) {
+          if (ultima === 'd' && testi[i + 1] === 'recurse') ricorsivo = true;
+          i += 1;
+        }
+        continue;
+      }
+      if (a.startsWith('-') && a.length > 1) continue;
+      file.push(a);
+    }
+    if (!modello) file.shift();
+    return { file: file.concat(extra), ricorsivo, ignoto: false };
+  }
+
+  // findstr: `/s` scende nelle cartelle, `/f:` prende l'elenco dei file da un file.
+  function operandiFindstr(testi) {
+    const file = [];
+    const extra = [];
+    let modello = false;
+    let ricorsivo = false;
+    let ignoto = false;
+    for (const a of testi) {
+      if (/^[/-]c:/i.test(a)) { modello = true; continue; }
+      if (/^[/-]g:/i.test(a)) { modello = true; extra.push(a.slice(3)); continue; }
+      if (/^[/-]f:/i.test(a)) { ignoto = true; continue; }
+      if (/^[/-]d:/i.test(a)) { extra.push(...a.slice(3).split(',')); continue; }
+      if (/^[/-][A-Za-z]+(:\S*)?$/.test(a)) { if (/s/i.test(a.split(':')[0])) ricorsivo = true; continue; }
+      file.push(a);
+    }
+    if (!modello) file.shift();
+    return { file: file.concat(extra), ricorsivo, ignoto };
+  }
+
+  // Select-String: `-Pattern` o il primo posizionale è il modello; `-Path` o il secondo i file.
+  function operandiSls(testi) {
+    const file = [];
+    const pos = [];
+    let modello = false;
+    for (let i = 0; i < testi.length; i++) {
+      const a = testi[i];
+      const low = a.toLowerCase();
+      if (!low.startsWith('-') || low.length < 2) { pos.push(a); continue; }
+      const nome = low.slice(1);
+      if (nome === 'path' || (nome.length >= 2 && 'literalpath'.startsWith(nome))) { file.push(testi[i + 1] || ''); i += 1; continue; }
+      if (nome.length >= 4 && 'pattern'.startsWith(nome)) { modello = true; i += 1; continue; }
+      if (/^(context|encoding|include|exclude|culture)$/.test(nome)) { i += 1; continue; }
+    }
+    if (!modello) pos.shift();
+    return { file: file.concat(pos), ricorsivo: false, ignoto: false };
+  }
+
+  // git: `--no-index` confronta file qualsiasi, `rev:percorso` e ciò che segue `--` sono file.
+  function gitPerimetro(trimmed, c) {
+    if (subcommandOf(trimmed) === 'grep') return due(MOTIVI.ricorsivo);
+    const args = gitArgsAfterSub(trimmed);
+    const libero = args.includes('--no-index');
+    const sep = args.indexOf('--');
+    const percorsi = [];
+    args.forEach((a, i) => {
+      if (a.startsWith('-')) return;
+      if (libero || (sep >= 0 && i > sep)) { percorsi.push(a); return; }
+      const m = /^[^:\\/]*:(.+)$/.exec(a);
+      if (m && !/^[A-Za-z]:[\\/]/.test(a)) percorsi.push(m[1]);
+    });
+    return primoFuori(percorsi, c);
+  }
+
+  // Livello di un comando già riconosciuto come lettura (livello 1 di base).
+  function perimetroDi(raw, c) {
+    const prog = programOf(dequote(raw));
+    const args = argomenti(raw).slice(1);
+    if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
+    if (PROCESSI.has(prog)) return due(MOTIVI.processi);
+    if (prog === 'git') return gitPerimetro(dequote(raw), c);
+    const testi = args.map((a) => a.testo);
+    if (LETTORI.has(prog)) return primoFuori(operandiLettore(prog, testi), c);
+    let cerca = null;
+    if (prog === 'grep') cerca = operandiGrep(testi);
+    else if (prog === 'findstr') cerca = operandiFindstr(testi);
+    else if (prog === 'select-string' || prog === 'sls') cerca = operandiSls(testi);
+    if (cerca) {
+      if (cerca.ricorsivo) return due(MOTIVI.ricorsivo);
+      if (cerca.ignoto) return due(MOTIVI.ignoto);
+      return primoFuori(cerca.file, c);
+    }
+    if (ELENCHI.has(prog)) {
+      const ops = testi.filter((t) => t && !t.startsWith('-'));
+      for (const t of ops) {
+        const d = dove(t, c);
+        if (d === MOTIVI.sistema) return due(d);
+      }
+      if (!ops.length && ELENCA_CARTELLA.has(prog)) {
+        if (c.cwd && c.cwd.provider) return due(MOTIVI.sistema);
+        if (!c.cwd) return due(MOTIVI.ignoto);
+      }
+    }
+    return UNO;
+  }
+
+  function classifyOneDet(raw, c) {
+    const base = classifyOne(raw);
+    return base === 1 ? perimetroDi(raw, c) : { level: base, motivo: '' };
+  }
+
+  // Dopo un `cd` la cartella è quella nuova, o la vecchia se il `cd` fallisce.
+  function spostati(raw, c) {
+    const prog = programOf(dequote(raw));
+    const args = argomenti(raw).slice(1);
+    if (prog === 'popd' || args.some((a) => a.variabile)) return { ...c, cwd: null };
+    let dest = null;
+    for (let i = 0; i < args.length; i++) {
+      const t = args[i].testo;
+      if (/^-(literalpath|path|lp)$/i.test(t)) { dest = args[i + 1] ? args[i + 1].testo : null; break; }
+      if (t === '-' || t === '') break;
+      if (t.startsWith('-') || /^\/[A-Za-z]$/.test(t)) continue;
+      dest = t;
+      break;
+    }
+    if (dest === null) return { ...c, cwd: null };
+    const r = dove(dest, c);
+    if (r === MOTIVI.sistema) return { ...c, cwd: { provider: true } };
+    return { ...c, cwd: r && typeof r === 'object' ? r : null };
+  }
+
+  function chiaveCwd(c) {
+    if (!c.cwd) return '?';
+    return c.cwd.provider ? 'P' : `${c.cwd.radice}/${c.cwd.segs.join('/')}`;
+  }
+
+  // Livello del comando e, se chiede conferma per il perimetro, il perché.
+  function classifyDetail(cmd, ctx) {
+    if (typeof cmd !== 'string') return TRE;
     const trimmed = cmd.trim();
-    if (!trimmed) return 3;
+    if (!trimmed) return TRE;
+    const c = contesto(ctx);
 
     // Sequenza pura di comandi (`&&`/`||`/`;`) → livello = massimo dei pezzi.
     // Vale anche con UN SOLO pezzo: `git checkout .;` (separatore in coda, forma
@@ -766,7 +1095,17 @@
     // sul comando vero, non sul token `.;` che non somiglia a nulla di noto.
     const seq = splitSafeSequence(trimmed);
     if (seq && seq.length) {
-      return seq.reduce((max, part) => Math.max(max, classifyOne(part)), 1);
+      let cands = [c];
+      let det = UNO;
+      for (const part of seq) {
+        for (const cc of cands) det = peggiore(det, classifyOneDet(part, cc));
+        if (!SPOSTAMENTI.has(programOf(dequote(part)))) continue;
+        const visti = new Map();
+        for (const cc of cands.concat(cands.map((x) => spostati(part, x)))) visti.set(chiaveCwd(cc), cc);
+        cands = [...visti.values()];
+        if (cands.length > 8) cands = [c, { ...c, cwd: null }];
+      }
+      return det;
     }
     // Pipeline di sole letture (`Get-ChildItem | Sort-Object | Select-Object
     // -First 5`, `cat file | grep errore`) → livello 1: incanalare una lettura
@@ -774,13 +1113,37 @@
     // Basta UN segmento non riconosciuto — o uno scriptblock che potrebbe
     // invocare qualcosa — e si torna al 3 di prima.
     const pipe = splitSafePipeline(trimmed);
-    if (pipe) return pipe.every((p) => segmentIsRead(p, true)) ? 1 : 3;
+    if (pipe) {
+      if (!pipe.every((p) => segmentIsRead(p, true))) return TRE;
+      const progs = pipe.map((p) => programOf(dequote(p)));
+      const cp = progs.some((x) => SPOSTAMENTI.has(x)) ? { ...c, cwd: null } : c;
+      let det = UNO;
+      let elenco = false;
+      pipe.forEach((p, i) => {
+        if (elenco && LETTI_DAL_TUBO.has(progs[i])) det = peggiore(det, due(MOTIVI.ignoto));
+        if (ELENCA_OGGETTI.has(progs[i])) elenco = true;
+        if (!PS_PIPE_ONLY.has(progs[i])) det = peggiore(det, perimetroDi(p, cp));
+      });
+      return det;
+    }
 
     // Pipe / background / redirezioni / sostituzioni: non riconoscibili → 3.
-    if (!seq && CHAIN_RE.test(trimmed)) return 3;
+    if (!seq && CHAIN_RE.test(trimmed)) return TRE;
 
-    return classifyOne(trimmed);
+    return classifyOneDet(trimmed, c);
   }
 
-  global.SN_CMD_CLASSIFY = { classify, programOf, subcommandOf };
+  // Livello di sicurezza del comando: 1 | 2 | 3. Mai null: l'ignoto è 3.
+  function classify(cmd, ctx) {
+    return classifyDetail(cmd, ctx).level;
+  }
+
+  // Un percorso singolo (LEGGI_DOCUMENTO): '' se sta nel perimetro, altrimenti il motivo.
+  function fuoriPerimetro(percorso, ctx) {
+    let p = String(percorso == null ? '' : percorso).trim();
+    if (/^(["']).*\1$/.test(p)) p = p.slice(1, -1).trim();
+    return fuoriDa(p, contesto(ctx));
+  }
+
+  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, programOf, subcommandOf };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

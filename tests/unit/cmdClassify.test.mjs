@@ -338,7 +338,7 @@ test('le shell dirette restano sempre 3, anche con flag di versione', () => {
 });
 
 test('livello 1 — comandi di diagnostica di sola lettura aggiunti', () => {
-  for (const cmd of ['ps', 'ps aux', 'free -h', 'lscpu', 'lsblk', 'printenv PATH', 'whereis node', 'who', 'sha256sum file']) {
+  for (const cmd of ['free -h', 'lscpu', 'lsblk', 'whereis node', 'who', 'sha256sum file']) {
     assert.equal(lvl(cmd), 1, `"${cmd}" dovrebbe essere livello 1`);
   }
 });
@@ -698,9 +698,8 @@ test('livello 1 — cmdlet PowerShell di sola lettura invocati da soli', () => {
     'Get-ChildItem', 'gci', 'Get-ChildItem -Path C:\\Users -Recurse',
     'Get-ChildItem -Filter *.js -Force',       // -Force qui = mostra i file nascosti
     'Get-Content package.json', 'Get-Content -Raw log.txt', 'gc log.txt -Tail 20',
-    'Get-Item .', 'Get-ItemProperty HKCU:\\Software', 'Get-ItemPropertyValue x y',
+    'Get-Item .', 'Get-ItemPropertyValue x y',
     'Get-Location', 'gl', 'Get-Date', 'Get-Date -Format yyyy-MM-dd',
-    'Get-Process', 'Get-Process -Name filo', 'gps',
     'Select-String errore log.txt', 'sls TODO -Path src',
     'Select-Object -First 5', 'Sort-Object Length', 'Measure-Object -Sum',
     'Test-Path C:\\Users', 'Resolve-Path .', 'Split-Path C:\\a\\b -Parent',
@@ -740,13 +739,11 @@ test('livello 1 — pipeline in cui OGNI segmento è una lettura', () => {
     'Get-Content log.txt | Select-String errore',
     'Get-ChildItem | Measure-Object -Sum Length',
     'Get-ChildItem | Group-Object Extension | Sort-Object Count',
-    'Get-Process | Sort-Object CPU | Select-Object -First 3 | Format-Table',
     'Get-ChildItem | Out-String',
     'gci | select -First 3',
     // le pipeline delle altre shell valgono lo stesso: incanalare una lettura
     // dentro un'altra lettura non fa niente che la prima non facesse già
     'cat file | grep errore',
-    'ls | cat',
     'git log --oneline | head -n 20',
     'cat a.txt | wc -l',
   ]) {
@@ -785,7 +782,6 @@ test('livello 1 — Where-Object/ForEach-Object con uno scriptblock INERTE', () 
     'gci | % { $_.Name }',
     'gci | %{$_.Name}',
     'gci | foreach { $_.Length }',
-    'Get-Process | Where-Object { $_.CPU -gt 10 } | Sort-Object CPU | Select-Object -First 3',
     'Get-ChildItem | Where-Object { $_.Length -gt 100 -and $_.Length -lt 900 } | Measure-Object',
     // Where-Object sa filtrare anche senza blocco (sintassi a proprietà): inerte
     'Get-ChildItem | Where-Object Length -gt 1000',
