@@ -168,7 +168,7 @@ test('lo switch di pagina non è eliminabile e le altre pagine restano raggiungi
 
   // Lo switch apre la SUA configurazione (rinomina pagine) ma NON offre "Elimina".
   await page.locator('.ed-module[data-type="switch"]').click();
-  await expect(page.locator('#cfgShortcut')).toBeVisible();
+  await expect(page.locator('[data-pname]').first()).toBeVisible();
   await expect(page.locator('#cfgDelete')).toHaveCount(0);
   await page.click('#cfgCancel');
 
@@ -466,4 +466,84 @@ test('grassetto, barra laterale e zoom da tastiera funzionano ancora', async ({ 
   expect(await page.evaluate(() => document.getElementById('doc').style.zoom)).not.toBe('');
   await page.keyboard.press('Control+Digit0');
   expect(await page.evaluate(() => document.getElementById('doc').style.zoom)).toBe('');
+});
+
+// #545: la scorciatoia di un modulo fa quello che fa il suo clic, non solo
+// portarlo in vista (Grassetto, Indietro e Chat la salvavano e poi non facevano niente).
+test('la scorciatoia di Grassetto, Indietro e Chat fa la cosa del modulo', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  const CHAT = { id: 'ch-t', type: 'chat', cells: [5, 6, 7].flatMap((x) => [0, 1, 2].map((y) => ({ x, y }))), data: {} };
+  await apriDocConModuli(page, [WC, BOLD, { id: 'u-t', type: 'undo', cells: [{ x: 4, y: 0 }], data: {} }, CHAT]);
+
+  await enterSettingsMode(page);
+  for (const [tipo, sc] of [['bold', 'Ctrl+G'], ['undo', 'Ctrl+Shift+2'], ['chat', 'Ctrl+Shift+4']]) {
+    await page.locator(`.ed-module[data-type="${tipo}"]`).click();
+    await page.fill('#cfgShortcut', sc);
+    await page.click('#cfgSave');
+    await expect(page.locator('#overlay'), sc).toBeHidden();
+  }
+  await exitSettingsMode(page);
+
+  await page.click('#doc');
+  await page.keyboard.press('Control+KeyA');
+  await page.keyboard.press('Control+KeyG');
+  await expect(page.locator('#doc b, #doc strong').first()).toContainText('ciao');
+
+  await page.keyboard.press('End');
+  await page.keyboard.type(' xyz', { delay: 20 });
+  await expect(page.locator('#doc')).toContainText('xyz');
+  await page.keyboard.press('Control+Shift+Digit2');
+  await expect(page.locator('#doc')).not.toContainText('xyz');
+
+  await page.keyboard.press('Control+Shift+Digit4');
+  await expect(page.locator('[data-chat="input"]')).toBeFocused();
+});
+
+// Allineamento ha più azioni: niente scorciatoia da offrire. Una salvata prima
+// si vede con l'avviso e si può togliere.
+test('un modulo senza un\'azione unica non offre la scorciatoia, e una vecchia si toglie', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await apriDocConModuli(page, [
+    { id: 'al-t', type: 'align', cells: [{ x: 0, y: 0 }, { x: 1, y: 0 }], data: {} },
+    { id: 'fo-t', type: 'font', cells: [{ x: 2, y: 0 }, { x: 3, y: 0 }], data: { shortcut: 'Ctrl+Shift+5' } },
+  ]);
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="align"]').click();
+  await expect(page.locator('#cfgShortcut')).toBeHidden();
+  await page.click('#cfgCancel');
+
+  await page.locator('.ed-module[data-type="font"]').click();
+  await expect(page.locator('#cfgShortcut')).toBeVisible();
+  await expect(page.locator('#cfgShortcutTaken')).toContainText('non ha un\'azione unica');
+  await page.click('#cfgSave');
+  await expect(page.locator('#cfgShortcutTaken')).toBeVisible();
+  await page.fill('#cfgShortcut', '');
+  await page.click('#cfgSave');
+  await expect(page.locator('#overlay')).toBeHidden();
+});
+
+// Con Shift un simbolo diventa un altro (la barra rovesciata diventa la barra
+// verticale): scritto con Shift non partirebbe mai; scritto col simbolo che esce sì.
+test('un simbolo con Shift si rifiuta, il simbolo che esce parte', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await apriDocConModuli(page, [WC]);
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  for (const sc of ['Ctrl+Shift+\\', 'Ctrl+Shift+/', 'Ctrl+Maiusc+,', 'Ctrl+Shift+|']) {
+    await page.fill('#cfgShortcut', sc);
+    await page.click('#cfgSave');
+    await expect(page.locator('#cfgShortcutTaken'), sc).toContainText('Con Shift');
+  }
+  await page.fill('#cfgShortcut', 'Ctrl+|');
+  await page.click('#cfgSave');
+  await expect(page.locator('#overlay')).toBeHidden();
+  await exitSettingsMode(page);
+  await page.click('#doc');
+  await page.keyboard.press('Control+Shift+Backslash');
+  await expect(page.locator('#overlay')).toContainText('Statistiche documento');
 });

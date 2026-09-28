@@ -38,3 +38,25 @@ test('l\'Editor non spezza a mano il nome di una scorciatoia', () => {
   assert.doesNotMatch(src, /split\(\s*['"]\+['"]\s*\)/,
     'il nome di una scorciatoia si legge con SN_TASTI.pressioneScritta, non con uno split fatto in casa');
 });
+
+test('di un simbolo conta il carattere che arriva, non Shift', () => {
+  const premi = (o) => ({ ctrlKey: true, metaKey: false, altKey: false, shiftKey: false, ...o });
+  // Americana: la barra verticale è Shift+barra rovesciata. Italiana: la barra è Shift+7.
+  assert.ok(T.combacia(premi({ shiftKey: true, key: '|', code: 'Backslash' }), 'Ctrl+|'));
+  assert.ok(T.combacia(premi({ shiftKey: true, key: '/', code: 'Digit7' }), 'Ctrl+/'));
+  assert.ok(T.combacia(premi({ key: '.', code: 'Period' }), 'Ctrl+.'));
+  assert.equal(T.combacia(premi({ shiftKey: true, key: '|', code: 'Backslash' }), 'Ctrl+\\'), false);
+  assert.equal(T.combacia(premi({ altKey: true, key: '|' }), 'Ctrl+|'), false, 'Alt conta ancora');
+  // Lettere, cifre, frecce e tasti con nome tengono Shift.
+  assert.equal(T.combacia(premi({ key: 'ArrowUp' }), 'Ctrl+Shift+Up'), false);
+  assert.equal(T.combacia(premi({ key: '1', code: 'Digit1' }), 'Ctrl+Shift+1'), false);
+});
+
+test('un simbolo scritto con Shift si riconosce prima di salvarlo', () => {
+  for (const [scritto, simbolo] of [['Ctrl+Shift+\\', '\\'], ['Ctrl+Maiusc+/', '/'], ['Cmd+Shift+,', ','], ['Ctrl+Shift+ò', 'ò'], ['Ctrl+Shift+Minus', '-']]) {
+    assert.equal(T.simboloConShift(scritto), simbolo, scritto);
+  }
+  for (const ok of ['Ctrl+|', 'Ctrl+Shift+1', 'Ctrl+Shift+S', 'Ctrl+Shift+Up', 'Ctrl+Shift+Space', 'Ctrl+Shift+F5', '', 'b']) {
+    assert.equal(T.simboloConShift(ok), '', ok);
+  }
+});
