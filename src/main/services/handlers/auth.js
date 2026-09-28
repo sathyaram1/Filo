@@ -9,6 +9,7 @@ const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp }
 const { daFilo, soloFilo } = require('./origine');
 const { spiegaErroreAccesso } = require('../../auth/esitoAccesso');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { consiglioPortachiavi } = require('../../portachiavi');
 
 // Chi accede su un computer senza portachiavi di sistema scopriva solo alla
 // riapertura di essere di nuovo fuori, e pensava a un guasto (#708.1).
