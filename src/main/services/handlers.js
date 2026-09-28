@@ -3922,14 +3922,11 @@ function broadcastToTabs(message) {
 
 // Broadcast alle sole pagine INTERNE (`filo://`) e alla shell.
 //
-// `broadcastToTabs` parla a tutte le schede, e in una scheda esterna il
-// messaggio arriva al content script del sito visitato. Va benissimo per il
-// tema o le impostazioni (ritagliate da `messaggioPerDestinazione`) — sono cose
-// che quel content script deve applicare — ma NON per un messaggio che porta un dato dell'owner: l'elenco delle fusioni
-// in attesa contiene nomi di rami e percorsi di file, cioè su cosa sta
-// lavorando. La regola è la stessa del gate d'origine sugli handler, vista dal
-// verso opposto: se un sito non lo può CHIEDERE, non glielo si può nemmeno
-// mandare da soli.
+// `broadcastToTabs` parla a tutte le schede; ai siti arrivano solo i tipi che il
+// loro content script ascolta (`messaggioPerDestinazione`). Questa strada è per
+// chi vuole dirlo esplicitamente: un dato dell'owner (l'elenco delle fusioni in
+// attesa ha nomi di rami e percorsi di file) non passa mai il confine. Se un
+// sito non lo può CHIEDERE, non glielo si manda nemmeno da soli.
 //
 // Il frame principale basta: qui non ci sono destinatari nei riquadri
 // incorporati (le pagine filo:// non ne ospitano di privilegiati).
