@@ -210,25 +210,26 @@ function analyze(url, ctx = {}, onUpdate) {
   // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist).
   const worthDeepening = first.level === 'sospetto' || first.needsLlm;
   const bKey = brakeKey(norm, url, ctx, first);
+  let inherited = false;
+  const deep = (t) => { if (t === INHERITED) inherited = true; else if (t) tasks.push(t); };
   if (worthDeepening && providers.llm && need.llm === undefined) {
     const llm = providers.llm;
     const meta = buildLlmMeta(norm, ctx, first);
-    const t = deepen('llm', bKey, llmCache.ttl, () => llm(meta), (r) => llmCache.set(key, r));
-    if (t) tasks.push(t);
+    deep(deepen('llm', bKey, llmCache.ttl, () => llm(meta), (r, ttl) => llmCache.set(key, r, ttl)));
   }
   if (worthDeepening && providers.sandbox && need.sandbox === undefined) {
     const detonate = providers.sandbox;
-    const t = deepen('sb', bKey, sandboxCache.ttl, () => detonate(url, norm), (r) => sandboxCache.set(key, r));
-    if (t) tasks.push(t);
+    deep(deepen('sb', bKey, sandboxCache.ttl, () => detonate(url, norm), (r, ttl) => sandboxCache.set(key, r, ttl)));
   }
 
+  const now = inherited ? engine.evaluate(url, ctx, assembleCached(norm, url)) : first;
   if (tasks.length && typeof onUpdate === 'function') {
     Promise.allSettled(tasks).then(() => {
       const next = engine.evaluate(url, ctx, assembleCached(norm, url));
-      if (verdictChanged(first, next)) onUpdate(next);
+      if (verdictChanged(now, next)) onUpdate(next);
     });
   }
-  return first;
+  return now;
 }
 
 // Metadati (MAI contenuto pagina) passati all'LLM: solo provenienza/identità.
