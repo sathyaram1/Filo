@@ -59,6 +59,7 @@ module.exports = function register(on, ctx) {
     const off = hold || Cookies.isBannerSiteIn(Cookies.getBannerSites(settings), topUrl);
     const res = { ok: true, mode, off, topUrl };
     if (off) return res;
+    res.seen = win && win._filoTabs ? win._filoTabs.cookieSeen(topUrl) : null;
     res.index = require('../consentRules').detectIndex(topUrl);
     if (msg && msg.frame !== 'sub') {
       let host = '';
@@ -66,6 +67,13 @@ module.exports = function register(on, ctx) {
       res.cosmetic = host ? require('../cookieBanners').forHost(host) : null;
     }
     return res;
+  });
+
+  on(MSG.COOKIES_SITES, async (msg, sender, origin) => {
+    if (!String(origin || '').startsWith('filo://')) return { ok: false, error: 'forbidden' };
+    const win = winOf(sender);
+    if (!win || !win._filoTabs) return { ok: true, sites: [] };
+    return { ok: true, sites: win._filoTabs.cookieSites() };
   });
 
   on(MSG.COOKIES_RULE, async (msg) => {

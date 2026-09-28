@@ -166,6 +166,22 @@ if (!IS_SUBFRAME) try {
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
 
+// Il sito è entrato o uscito dall'elenco coi banner dei cookie: la sua risposta va via prima che i suoi script
+// la leggano (regola e chiavi le decide il main, tabs/tabCookies.js). Solo nel frame principale.
+if (!IS_SUBFRAME) try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) {
+    const w = ipcRenderer.sendSync('filo:cookie-wipe', loc);
+    if (w && typeof w.pattern === 'string') {
+      const re = new RegExp(w.pattern, 'i');
+      const extra = new Set(Array.isArray(w.keys) ? w.keys : []);
+      for (const st of [window.localStorage, window.sessionStorage]) {
+        try { for (const k of Object.keys(st)) if (re.test(k) || extra.has(k)) st.removeItem(k); } catch (_) {}
+      }
+    }
+  }
+} catch (e) { /* come sopra: mai bloccare il caricamento */ }
+
 // ─── chrome.* shim per i content script ────────────────────────────────────
 //
 // Gira nel preload context (mondo isolato), invisibile alla pagina. I content

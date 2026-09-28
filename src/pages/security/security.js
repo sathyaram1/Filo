@@ -66,6 +66,7 @@
     $('cookie-wl-input').placeholder = I18n.t('options_cookies_whitelist_placeholder');
     $('cookie-wl-add-btn').textContent = I18n.t('options_cookies_whitelist_add');
     $('sec-cookies-banners-title').textContent = I18n.t('options_cookies_banners_title');
+    $('sec-cookies-done-title').textContent = I18n.t('options_cookies_done_title');
     $('sec-fp-title').textContent = I18n.t('options_fp_title');
     $('sec-fp-desc').textContent = I18n.t('options_fp_desc');
     $('fp-mode-off-label').textContent = I18n.t('options_fp_mode_off');
@@ -235,6 +236,7 @@
     cookieBannerSites = Array.isArray(cookies.bannerSites) ? cookies.bannerSites.slice() : [];
     renderWhitelist();
     renderBannerSites();
+    loadCookieDone();
     syncCookieMode();
 
     const fp = sec.fingerprint || {};
@@ -348,6 +350,55 @@
       btn.addEventListener('click', () => {
         cookieBannerSites = cookieBannerSites.filter((d) => d !== domain);
         renderBannerSites();
+        saveCookies();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
+  // Cosa Filo ha fatto coi banner, sito per sito: la stessa memoria che il menu della scheda legge, tutta.
+  // «Mostra il banner» qui fa quello che fa dal menu: il sito passa all'elenco sopra e dimentica la risposta.
+  let cookieDoneSites = [];
+  let cookieDoneSig = '';
+
+  async function loadCookieDone() {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.COOKIES_SITES }); } catch (_) {}
+    const sites = (r && r.ok && Array.isArray(r.sites) ? r.sites : []).filter((x) => x && !cookieBannerSites.includes(x.site));
+    const sig = sites.map((x) => x.site + (x.rejected ? 'r' : '') + (x.hidden ? 'h' : '')).join('\n');
+    if (sig === cookieDoneSig) return;
+    cookieDoneSig = sig;
+    cookieDoneSites = sites;
+    renderCookieDone();
+  }
+
+  function renderCookieDone() {
+    const box = $('sec-cookies-done');
+    const list = $('cookie-done-list');
+    list.innerHTML = '';
+    box.hidden = !cookieDoneSites.length;
+    for (const it of cookieDoneSites) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = it.site;
+      const what = document.createElement('span');
+      what.className = 'sn-muted';
+      what.style.marginLeft = '8px';
+      what.textContent = I18n.t(it.rejected ? 'options_cookies_done_rejected' : 'options_cookies_done_hidden');
+      span.appendChild(what);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_cookies_done_show');
+      btn.addEventListener('click', () => {
+        if (!cookieBannerSites.includes(it.site)) cookieBannerSites.push(it.site);
+        cookieBannerSites.sort();
+        cookieDoneSites = cookieDoneSites.filter((x) => x.site !== it.site);
+        cookieDoneSig = '';
+        renderBannerSites();
+        renderCookieDone();
         saveCookies();
       });
       li.appendChild(span);
@@ -525,8 +576,11 @@
       if (c.bannerSites.join('\n') === cookieBannerSites.join('\n')) return;
       cookieBannerSites = c.bannerSites.slice();
       renderBannerSites();
+      loadCookieDone();
     });
   }
+  // Filo rifiuta e nasconde mentre si naviga nelle altre schede: tornando qui l'elenco è quello di adesso.
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') loadCookieDone(); });
 
   document.addEventListener('DOMContentLoaded', () => {
     load();

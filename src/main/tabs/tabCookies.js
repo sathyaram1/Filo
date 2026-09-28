@@ -5,11 +5,13 @@
 const Cookies = require('../services/cookies');
 
 // Chiavi della memoria della pagina che i CMP usano per ricordarsi la risposta (stessa idea di isConsentName),
-// più quelle che il sito ha cambiato dopo il clic sul banner.
+// più quelle che il clic sul banner ha creato. La stessa regola la applica il preload (takeCookieWipe).
+const STORAGE_ANSWER = /(consent|cookie|optanon|onetrust|didomi|usercentrics|^uc_|_sp_|^cmp|cmplz|borlabs|^_?iub|iubenda|osano|truste|^cky|gdpr|tcf|klaro|axeptio|tarteaucitron)/i;
+
 function wipeStorageJs(keys) {
   const extra = JSON.stringify(Array.isArray(keys) ? keys.map(String) : []);
   return `(() => {
-  const re = /(consent|cookie|optanon|onetrust|didomi|usercentrics|^uc_|_sp_|^cmp|cmplz|borlabs|^_?iub|iubenda|osano|truste|^cky|gdpr|tcf|klaro|axeptio|tarteaucitron)/i;
+  const re = new RegExp(${JSON.stringify(STORAGE_ANSWER.source)}, 'i');
   const extra = new Set(${extra});
   for (const st of [localStorage, sessionStorage]) {
     try { for (const k of Object.keys(st)) if (re.test(k) || extra.has(k)) st.removeItem(k); } catch (_) {}
@@ -42,7 +44,9 @@ async function loadRemembered() {
     .sort((a, b) => (Number(a[1].at) || 0) - (Number(b[1].at) || 0));
   const fresh = [...remembered];
   remembered.clear();
-  for (const [site, v] of loaded) remembered.set(site, { rejected: !!v.rejected, hidden: !!v.hidden, at: Number(v.at) || 0, ...answerField(v.answer) });
+  for (const [site, v] of loaded) {
+    remembered.set(site, { rejected: !!v.rejected, hidden: !!v.hidden, at: Number(v.at) || 0, ...answerField(v.answer), ...wipeField(v.wipe) });
+  }
   for (const [site, v] of fresh) remembered.set(site, v);
   trim(remembered);
 }
@@ -51,15 +55,18 @@ function trim(map) {
   while (map.size > MAX_REMEMBERED) map.delete(map.keys().next().value);
 }
 
+// Sul disco va solo quello che il sito stesso tiene oltre la sessione: in Privacy i siti non fidati no (#754).
 function saveSoon() {
   if (saveTimer) return;
   saveTimer = setTimeout(() => {
     saveTimer = null;
     const Storage = globalThis.SN_STORAGE;
-    if (Storage) Storage.setRaw(storageKey(), Object.fromEntries(remembered)).catch(() => {});
+    const kept = [...remembered].filter(([site]) => Cookies.keepsSiteData(site));
+    if (Storage) Storage.setRaw(storageKey(), Object.fromEntries(kept)).catch(() => {});
   }, 800);
   if (saveTimer.unref) saveTimer.unref();
 }
+Cookies.setConfigChangeHandler(saveSoon);
 
 function siteMemory(tm) {
   if (!tm.incognito) return remembered;
@@ -82,11 +89,18 @@ function answerField(a) {
   return cookies.length || storage.length ? { answer: { cookies, storage } } : {};
 }
 
+// La memoria della pagina da svuotare della risposta, origine per origine, alla prossima pagina del sito.
+function wipeField(w) {
+  if (!w || typeof w !== 'object') return {};
+  const done = (Array.isArray(w.done) ? w.done : []).filter((o) => typeof o === 'string' && o.length <= 300).slice(-50);
+  return { wipe: { keys: cleanNames(w.keys), done } };
+}
+
 function rememberOutcome(tm, site, outcome) {
   const map = siteMemory(tm);
   const prev = map.get(site) || { rejected: false, hidden: false };
   map.delete(site);
-  map.set(site, { rejected: !!prev.rejected, hidden: !!prev.hidden, [outcome]: true, at: Date.now(), ...answerField(prev.answer) });
+  map.set(site, { rejected: !!prev.rejected, hidden: !!prev.hidden, [outcome]: true, at: Date.now(), ...answerField(prev.answer), ...wipeField(prev.wipe) });
   trim(map);
   if (map === remembered) saveSoon();
 }
@@ -125,10 +139,46 @@ function forgetRejected(tm, site) {
   if (map === remembered) saveSoon();
 }
 
-function forgetSite(tm, site) {
-  if (tm._cookieSites) tm._cookieSites.delete(site);
-  if (!tm.incognito && remembered.delete(site)) saveSoon();
+function incognitoManagers() {
+  try {
+    const { BrowserWindow } = require('electron');
+    return BrowserWindow.getAllWindows().filter((w) => w._filoIncognito && w._filoTabs).map((w) => w._filoTabs);
+  } catch (_) { return []; }
 }
+
+function allManagers() {
+  try {
+    const { BrowserWindow } = require('electron');
+    return BrowserWindow.getAllWindows().map((w) => w._filoTabs).filter(Boolean);
+  } catch (_) { return []; }
+}
+
+// Un sito entra o esce dall'elenco coi banner, da qualunque strada (menu della scheda, Sicurezza, import):
+// Filo dimentica cosa aveva fatto lì, e la prossima pagina del sito parte senza la risposta nella sua memoria.
+// scope: quale profilo ha cambiato elenco (services/cookies.js, wipeChanged).
+function onListChange(site, answer, scope) {
+  const wipe = { keys: cleanNames(answer && answer.storage), done: [] };
+  const managers = [];
+  if (scope && scope.normal) managers.push(...allManagers().filter((tm) => !tm.incognito));
+  if (scope && scope.incognito) managers.push(...incognitoManagers());
+  const maps = new Set();
+  if (scope && scope.normal) maps.add(remembered);
+  for (const tm of managers) if (tm.incognito) maps.add(siteMemory(tm));
+  for (const map of maps) {
+    map.delete(site);
+    map.set(site, { rejected: false, hidden: false, at: Date.now(), wipe });
+    trim(map);
+    if (map === remembered) saveSoon();
+  }
+  for (const tm of managers) {
+    let touched = false;
+    for (const t of tm.tabs || []) {
+      if (t.cookieOutcome && t.cookieOutcome.site === site) { t.cookieOutcome = null; touched = true; }
+    }
+    if (touched) { try { tm._broadcast(); } catch (_) {} }
+  }
+}
+Cookies.setListChangeHandler(onListChange);
 
 const cookieMethods = {
   // Esito arrivato da un frame della scheda: vale per il sito della pagina, non per quello del riquadro.
@@ -161,6 +211,38 @@ const cookieMethods = {
     tab._cookieHold = false;
     if (!tab.cookieOutcome) return;
     if (!isWeb(url) || Cookies.registrableOf(url) !== tab.cookieOutcome.site) tab.cookieOutcome = null;
+  },
+
+  // La pagina che sta per caricarsi, prima degli script del sito: la risposta da togliere, se il sito ha
+  // cambiato elenco (onListChange). Una volta per origine: le altre origini del sito hanno la loro memoria.
+  takeCookieWipe(href) {
+    if (!isWeb(href)) return null;
+    const site = Cookies.registrableOf(href);
+    const map = siteMemory(this);
+    const entry = site && map.get(site);
+    if (!entry || !entry.wipe) return null;
+    let origin = '';
+    try { origin = new URL(href).origin; } catch (_) { return null; }
+    if (entry.wipe.done.includes(origin)) return null;
+    entry.wipe = { keys: entry.wipe.keys, done: [...entry.wipe.done, origin].slice(-50) };
+    if (map === remembered) saveSoon();
+    return { pattern: STORAGE_ANSWER.source, keys: entry.wipe.keys };
+  },
+
+  // Il sito della scheda ha già mostrato un banner senza «rifiuta»: alla pagina dopo si nasconde senza aspettare.
+  cookieSeen(url) {
+    const site = isWeb(url) && Cookies.registrableOf(url);
+    const mem = site && siteMemory(this).get(site);
+    return mem && mem.hidden && !mem.rejected ? 'hidden' : null;
+  },
+
+  // Cosa Filo ha fatto coi banner, sito per sito, per la pagina Sicurezza: ogni riga si può riportare ai banner.
+  cookieSites() {
+    const out = [];
+    for (const [site, v] of siteMemory(this)) {
+      if (v && (v.rejected || v.hidden)) out.push({ site, rejected: !!v.rejected, hidden: !!v.hidden, at: Number(v.at) || 0 });
+    }
+    return out.sort((a, b) => b.at - a.at);
   },
 
   _cookieState(tab) {
@@ -204,7 +286,6 @@ const cookieMethods = {
       try { await Cookies.wipeConsentCookies(wc.session, site, answer.cookies); } catch (_) {}
       try { await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: wipeStorageJs(answer.storage) }]); } catch (_) {}
     }
-    forgetSite(this, site);
     this._broadcast();
     this.reload(tab.id);
     return { ok: true, site, shown: !!show };

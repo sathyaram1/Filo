@@ -53,13 +53,14 @@
     if (!el || el.__filoCookieClicked || !isVisible(el)) return false;
     el.__filoCookieClicked = true;
     lastActionAt = Date.now();
-    watchAnswer();
-    try { el.click(); return true; } catch (_) {}
-    try {
-      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-      return true;
-    } catch (_) {}
-    return false;
+    const base = answerBase();
+    let ok = false;
+    try { el.click(); ok = true; } catch (_) {}
+    if (!ok) {
+      try { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); ok = true; } catch (_) {}
+    }
+    answerAfter(base, true);
+    return ok;
   }
 
   // querySelector che entra anche negli shadow root aperti dei root indicati.
@@ -92,69 +93,64 @@
 
   // ─── la risposta che il sito si scrive dopo un clic sul banner ──────────────
   //
-  // «Mostra il banner» e «Rifiuta in automatico» devono togliere la risposta, qualunque nome le dia il sito:
-  // si confrontano cookie e memoria della pagina prima del clic e poco dopo, e i nomi cambiati vanno al main.
-  // Login e carrello li scarta il main (tabs/tabCookies.js), anche se cambiano nello stesso momento.
+  // «Mostra il banner» e «Rifiuta in automatico» devono togliere la risposta, qualunque nome le dia il sito.
+  // La risposta è quello che il clic CREA mentre il sito lo gestisce: cookie e chiavi della pagina che prima
+  // non c'erano. Quello che c'era già (stato dell'applicazione, accesso) o nasce più tardi resta del sito (#754).
 
-  function cookieJar() {
-    const out = new Map();
+  function cookieNames() {
+    const out = new Set();
     let raw = '';
     try { raw = document.cookie || ''; } catch (_) {}
     for (const part of raw.split(';')) {
       const i = part.indexOf('=');
       const k = (i < 0 ? part : part.slice(0, i)).trim();
-      if (k) out.set(k, i < 0 ? '' : part.slice(i + 1).trim());
+      if (k) out.add(k);
     }
     return out;
   }
 
-  function pageMemory() {
-    const out = new Map();
-    try {
-      for (let i = 0; i < localStorage.length && i < 1000; i++) {
-        const k = localStorage.key(i);
-        const v = localStorage.getItem(k) || '';
-        out.set(k, v.length > 4000 ? '#' + v.length + v.slice(0, 200) : v);
-      }
-    } catch (_) {}
+  function memoryNames() {
+    const out = new Set();
+    try { for (let i = 0; i < localStorage.length && i < 2000; i++) out.add(localStorage.key(i)); } catch (_) {}
     return out;
   }
 
-  let answerBase = null;
-  let answerTimers = [];
   const answerSent = new Set();
 
-  function watchAnswer() {
-    if (!IS_TOP) return;
-    if (!answerBase) answerBase = { c: cookieJar(), s: pageMemory() };
-    for (const t of answerTimers) clearTimeout(t);
-    answerTimers = [0, 400, 1500].map((ms) => setTimeout(diffAnswer, ms));
+  function answerBase() {
+    return IS_TOP ? { c: cookieNames(), s: memoryNames() } : null;
   }
 
-  function changed(base, now, tag) {
+  function created(base, now, tag) {
     const out = [];
-    for (const [k, v] of now) {
-      if (base.get(k) === v || k.length > 200 || answerSent.has(tag + k)) continue;
+    for (const k of now) {
+      if (base.has(k) || k.length > 200 || answerSent.has(tag + k)) continue;
       answerSent.add(tag + k);
       out.push(k);
     }
     return out;
   }
 
-  function diffAnswer() {
-    if (!answerBase) return;
-    const cookies = changed(answerBase.c, cookieJar(), 'c:');
-    const storage = changed(answerBase.s, pageMemory(), 's:');
+  function reportCreated(base) {
+    const cookies = created(base.c, cookieNames(), 'c:');
+    const storage = created(base.s, memoryNames(), 's:');
     if (cookies.length || storage.length) {
       send({ type: T_OUTCOME, outcome: 'answer', cookies: cookies.slice(0, 20), storage: storage.slice(0, 20) });
     }
   }
 
-  // Coi banner mostrati la risposta la dà l'utente: stessa guardia, dal suo clic dentro al banner.
+  // I gestori del sito girano dentro click(); promesse e rinvii a zero finiscono prima del giro dopo.
+  function answerAfter(base, now) {
+    if (!base) return;
+    if (now) reportCreated(base);
+    setTimeout(() => reportCreated(base), 0);
+  }
+
+  // Coi banner mostrati la risposta la dà l'utente: stessa regola, dal suo clic dentro al banner.
   function onUserClick(e) {
     if (!active || banners || !e || !e.isTrusted) return;
     const t = e.target && e.target.nodeType === 1 ? e.target : null;
-    if (t && looksLikeConsent(t)) watchAnswer();
+    if (t && looksLikeConsent(t)) answerAfter(answerBase(), false);
   }
 
   // ─── ruleset CMP scritto a mano ─────────────────────────────────────────────
@@ -356,7 +352,7 @@
         for (const root of searchRoots) {
           const inSettings = queryIn(root, cmp.rejectInSettings);
           if (inSettings && clickEl(inSettings)) return { name: cmp.name, rejected: true };
-          if (!openedSettings.has(cmp.name) && (!cmp.showing || queryIn(root, cmp.showing))) {
+          if (!openedSettings.has(cmp.name) && !seenHidden() && (!cmp.showing || queryIn(root, cmp.showing))) {
             const open = queryIn(root, cmp.openSettings);
             if (open && clickEl(open)) { openedSettings.add(cmp.name); return { name: cmp.name, rejected: false }; }
           }
@@ -422,6 +418,12 @@
     return com.lastWaiting;
   }
 
+  function comClick(t) {
+    const base = answerBase();
+    t.click();
+    answerAfter(base, true);
+  }
+
   function comScan(R, skip, now) {
     const names = R.presentInIndex(cfg.index, new Set([...skip, ...com.tried]));
     let waiting = false;
@@ -429,7 +431,7 @@
       const rule = comRule(name);
       if (rule === undefined) { waiting = true; continue; }
       if (!rule) { com.tried.add(name); continue; }
-      const cmp = R.makeCmp(name, rule, cfg.topUrl || location.href);
+      const cmp = R.makeCmp(name, rule, cfg.topUrl || location.href, { click: comClick });
       if (!cmp.detect()) { com.tried.add(name); continue; }
       if (!com.firstSeen.has(name)) com.firstSeen.set(name, now);
       const showing = cmp.isShowing();
@@ -441,13 +443,11 @@
         continue;
       }
       com.busy = true;
-      lastActionAt = now;
-      watchAnswer();
       cmp.reject().then((res) => {
         com.busy = false;
         com.tried.add(name);
-        lastActionAt = Date.now();
-        watchAnswer();
+        // Una regola che non ha premuto niente non ha cambiato la pagina: non c'è niente da lasciar assestare.
+        if (res && res.clicks > 0) lastActionAt = Date.now();
         if (res && res.clicks > 0 && !res.utility) noteRejected(name);
         scheduleScanIn(150);
       });
@@ -520,6 +520,10 @@
   const CMP_GRACE_MS = 4000;
   const ACTION_GRACE_MS = 1500;
 
+  // Su questo sito Filo ha già trovato un banner senza «rifiuta»: le attese servivano a dare tempo al rifiuto,
+  // e il sito non si segna niente, quindi il banner torna a ogni pagina. Si nasconde subito, senza aprire le impostazioni.
+  function seenHidden() { return !!(cfg && cfg.seen === 'hidden'); }
+
   // Un involucro senza misura sua (le parti visibili sono fisse, come in OneTrust) conta per quello che mostra.
   // Una parte piccola, come l'icona fissa per riaprire le preferenze, non fa di lui un banner aperto.
   const MIN_PART = 0.02;
@@ -561,8 +565,8 @@
       const age = now - at;
       let wait = 0;
       if (now - lastActionAt < ACTION_GRACE_MS) wait = ACTION_GRACE_MS - (now - lastActionAt);
-      if (el.matches('iframe') || el.querySelector('iframe')) wait = Math.max(wait, FRAME_GRACE_MS - age);
-      if (knownCmp) wait = Math.max(wait, CMP_GRACE_MS - age);
+      if (!seenHidden() && (el.matches('iframe') || el.querySelector('iframe'))) wait = Math.max(wait, FRAME_GRACE_MS - age);
+      if (knownCmp && !seenHidden()) wait = Math.max(wait, CMP_GRACE_MS - age);
       if (wait > 0) { recheck = recheck ? Math.min(recheck, wait + 20) : wait + 20; continue; }
       if (B.hide(el)) noteHidden();
     }
@@ -605,7 +609,7 @@
     if (!showing) { frameSeenAt = 0; return; }
     const now = Date.now();
     if (!frameSeenAt) frameSeenAt = now;
-    const wait = Math.max(FRAME_REPORT_MS - (now - frameSeenAt), ACTION_GRACE_MS - (now - lastActionAt));
+    const wait = Math.max((seenHidden() ? 0 : FRAME_REPORT_MS) - (now - frameSeenAt), ACTION_GRACE_MS - (now - lastActionAt));
     if (wait > 0) { scheduleScanIn(wait + 20); return; }
     reported.add('frame');
     send({ type: T_FRAME });
@@ -669,7 +673,7 @@
     try { showing = cmp.isShowing(); } catch (_) {}
     if (!showing) return;
     const now = Date.now();
-    const wait = Math.max(CMP_GRACE_MS - (now - com.shownAt), ACTION_GRACE_MS - (now - lastActionAt));
+    const wait = Math.max((seenHidden() ? 0 : CMP_GRACE_MS) - (now - com.shownAt), ACTION_GRACE_MS - (now - lastActionAt));
     if (wait > 0) { scheduleScanIn(wait + 20); return; }
     com.shownCmp = null;
     let any = false;

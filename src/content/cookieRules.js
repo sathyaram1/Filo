@@ -128,13 +128,13 @@
         if (!t) return;
         const showing = t.offsetHeight !== 0;
         if (showing && a.noTimeout !== true) await wait(a.timeout);
-        try { t.click(); ctx.clicks++; } catch (_) {}
+        try { ctx.click(t); ctx.clicks++; } catch (_) {}
         if (showing && a.noTimeout !== true) await wait(a.timeout);
         return;
       }
       case 'multiclick':
         for (const r of find(ctx, a, true)) {
-          if (r.target) { try { r.target.click(); ctx.clicks++; } catch (_) {} }
+          if (r.target) { try { ctx.click(r.target); ctx.clicks++; } catch (_) {} }
         }
         return;
       case 'consent':
@@ -245,13 +245,15 @@
 
   // ─── una regola (CMP.js / Detector.js) ─────────────────────────────────────
 
-  function makeCmp(name, config, topUrl) {
+  // `opts.click`: chi usa la regola può guardare cosa scrive il sito a ogni clic (la risposta al banner).
+  function makeCmp(name, config, topUrl, opts) {
     const methods = new Map();
     for (const m of asList(config && config.methods)) {
       if (m && m.action != null && typeof m.name === 'string') methods.set(m.name, m);
     }
     const ctx = {
       base: null, topUrl, clicks: 0, stopped: false,
+      click: (opts && typeof opts.click === 'function') ? opts.click : (t) => t.click(),
       noDetect: new WeakSet(), hidden: new Map(), methods,
     };
     const detectors = asList(config && config.detectors);

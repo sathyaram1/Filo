@@ -337,12 +337,28 @@ function incognitoSessions() {
 
 // Un sito che entra o esce dall'elenco coi banner dimentica la risposta data: se no il banner non torna
 // (entra) o resta la scelta fatta a mano (esce). Vale per ogni strada: menu della scheda, Sicurezza, import.
-function wipeChanged(prev, next, sessions) {
+// I cookie si tolgono qui; la memoria della pagina e cosa Filo sapeva del sito li toglie `listChange`.
+function wipeChanged(prev, next, sessions, scope) {
   for (const site of new Set([...prev, ...next])) {
     if (prev.includes(site) === next.includes(site)) continue;
-    const names = answerOf(site).cookies;
-    for (const ses of sessions) wipeConsentCookies(ses, site, names).catch(() => {});
+    const answer = answerOf(site);
+    for (const ses of sessions) wipeConsentCookies(ses, site, answer.cookies).catch(() => {});
+    try { if (listChange) listChange(site, answer, scope); } catch (_) {}
   }
+}
+
+let listChange = null;
+function setListChangeHandler(fn) { listChange = typeof fn === 'function' ? fn : null; }
+
+// Modalità o elenchi cambiati: chi tiene dati per sito li riguarda (tabs/tabCookies.js, cosa resta sul disco).
+let configChange = null;
+function setConfigChangeHandler(fn) { configChange = typeof fn === 'function' ? fn : null; }
+
+// In Privacy un sito non fidato non tiene niente oltre la sessione, nemmeno quello che Filo sa di lui.
+function keepsSiteData(site) {
+  if (_cached.mode !== MODES.PRIVACY) return true;
+  const s = String(site || '').toLowerCase();
+  return _cached.trustedSites.some((d) => String(d || '').toLowerCase() === s);
 }
 
 // I nomi che il sito ha dato alla sua risposta, visti dopo il clic sul banner: li tiene tabs/tabCookies.js.
@@ -358,18 +374,23 @@ function configureFromSettings(settings) {
   if (inIncognito()) {
     const prev = _incognito || _cached;
     _incognito = { mode: getMode(settings), bannerSites: getBannerSites(settings) };
-    wipeChanged(prev.bannerSites, _incognito.bannerSites, incognitoSessions());
+    wipeChanged(prev.bannerSites, _incognito.bannerSites, incognitoSessions(), { normal: false, incognito: true });
     return prev.mode !== _incognito.mode || prev.bannerSites.join('\n') !== _incognito.bannerSites.join('\n');
   }
   const prev = _cached.bannerSites;
   const prevMode = _cached.mode;
+  const prevTrusted = _cached.trustedSites.join('\n');
   _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings), bannerSites: getBannerSites(settings) };
   configureForMode(_cached.mode);
   const changed = prevMode !== _cached.mode || prev.join('\n') !== _cached.bannerSites.join('\n');
   if (_configured) {
-    wipeChanged(prev, _cached.bannerSites, [session.defaultSession, ...siteSessions.values(), ...(_incognito ? [] : incognitoSessions())]);
+    wipeChanged(prev, _cached.bannerSites, [session.defaultSession, ...siteSessions.values(), ...(_incognito ? [] : incognitoSessions())],
+      { normal: true, incognito: !_incognito });
   }
   _configured = true;
+  if (prevMode !== _cached.mode || prevTrusted !== _cached.trustedSites.join('\n')) {
+    try { if (configChange) configChange(); } catch (_) {}
+  }
   return changed;
 }
 
@@ -449,6 +470,9 @@ module.exports = {
   currentMode,
   isConsentName,
   wipeConsentCookies,
+  setListChangeHandler,
+  setConfigChangeHandler,
+  keepsSiteData,
   setAnswerLookup,
   resetIncognito,
   registrableOf,

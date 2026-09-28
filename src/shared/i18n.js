@@ -543,6 +543,10 @@
       'quindi qui non serve aggiungere nulla.',
     options_cookies_banners_title: 'Qui i banner dei cookie li vedi',
     options_cookies_banners_remove: 'Rifiuta in automatico',
+    options_cookies_done_title: 'Qui Filo li ha rifiutati o nascosti',
+    options_cookies_done_rejected: 'cookie rifiutati',
+    options_cookies_done_hidden: 'banner nascosto',
+    options_cookies_done_show: 'Mostra il banner',
     // Protezione anti-fingerprinting
     options_fp_title: 'Protezione fingerprinting',
     options_fp_desc:

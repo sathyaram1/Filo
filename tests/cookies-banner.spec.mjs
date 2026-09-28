@@ -712,3 +712,212 @@ test('nascosto il banner, il riquadro «scegli il paese» del sito tiene il velo
     .toEqual(['block', 'hidden']);
   expect(await page.evaluate(() => window.__accepted)).toBeUndefined();
 });
+
+// ── la risposta è quello che il clic crea: accesso, stato e preferenze del sito restano ─────────────
+
+function iubendaDopo(ms) {
+  return `if (!document.cookie.includes('_iub_cs-1=')) setTimeout(() => {
+      const b = document.createElement('div');
+      b.id = 'iubenda-cs-banner';
+      b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:120px;background:#fff;z-index:9';
+      b.innerHTML = '<p>Usiamo i cookie per la pubblicità.</p>'
+        + '<button class="iubenda-cs-accept-btn" style="width:120px;height:40px">Accetta</button>'
+        + '<button class="iubenda-cs-reject-btn" style="width:120px;height:40px">Rifiuta</button>';
+      b.querySelector('.iubenda-cs-reject-btn').onclick = () => { document.cookie = '_iub_cs-1=rifiutato; path=/; max-age=86400'; b.remove(); };
+      b.querySelector('.iubenda-cs-accept-btn').onclick = () => { document.cookie = '_iub_cs-1=accettato; path=/; max-age=86400'; b.remove(); };
+      document.body.appendChild(b);
+    }, ${ms});`;
+}
+
+// Applicazione a pagina unica che tiene lo stato (accesso compreso) in una chiave sola, riscritta mentre carica.
+const SPA_STATO = `<title>SPA</title>
+  <script>
+    const state = JSON.parse(localStorage.getItem('vuex') || 'null') || { user: null, feed: [] };
+    const save = () => localStorage.setItem('vuex', JSON.stringify(state));
+    save();
+    let n = 0;
+    const t = setInterval(() => { state.feed.push(++n); save(); if (n >= 16) clearInterval(t); }, 250);
+    window.accedi = () => { state.user = 'mario'; save(); };
+    ${iubendaDopo(400)}
+  </script>`;
+
+test('applicazione a pagina unica: Filo rifiuta, l\'utente accede, «Mostra il banner»: l\'accesso resta', async ({ openTab, testServer, shell }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, SPA_STATO);
+  await page.waitForFunction(() => document.cookie.includes('_iub_cs-1=rifiutato'), null, { timeout: 10_000 });
+  await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
+  await sleep(4000);
+  await page.evaluate(() => window.accedi());
+  await bannerSiti(shell, true);
+  await expect.poll(() => page.evaluate(() => !!document.getElementById('iubenda-cs-banner')).catch(() => false), { timeout: 10_000 }).toBe(true);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vuex')).user)).toBe('mario');
+});
+
+// Banner fatto in casa: l'applicazione si segna la risposta nel suo stato, insieme al resto.
+const SPA_CASA = `<title>SPA2</title>
+  <p>applicazione</p>
+  <script>
+    const state = JSON.parse(localStorage.getItem('vuex') || 'null') || { user: null, consent: null };
+    const save = () => localStorage.setItem('vuex', JSON.stringify(state));
+    save();
+    window.accedi = () => { state.user = 'mario'; save(); };
+    if (!state.consent) {
+      const b = document.createElement('div');
+      b.className = 'cookie-banner';
+      b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:120px;background:#fff;z-index:9';
+      b.innerHTML = '<p>Usiamo i cookie.</p><button id="ok" style="width:120px;height:40px">Accetta</button>';
+      b.querySelector('#ok').onclick = () => { state.consent = 'tutti'; save(); b.remove(); };
+      document.body.appendChild(b);
+    }
+  </script>`;
+
+test('coi banner mostrati l\'utente accede e accetta nel banner dell\'applicazione, poi «Rifiuta i cookie in automatico qui»: l\'accesso resta', async ({ app, openTab, testServer, shell }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => {
+    await globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: { bannerSites: ['127.0.0.1'] } } });
+  });
+  const page = await testServer.openReady(openTab, SPA_CASA);
+  await page.waitForSelector('.cookie-banner #ok', { timeout: 8_000 });
+  await sleep(1500);
+  await page.evaluate(() => window.accedi());
+  await page.click('.cookie-banner #ok');
+  await sleep(2500);
+  await bannerSiti(shell, false);
+  await sleep(4000);
+  expect(await page.evaluate(() => (JSON.parse(localStorage.getItem('vuex') || 'null') || {}).user)).toBe('mario');
+});
+
+// Un negozio che scrive la valuta mentre compare il banner: la preferenza non è la risposta.
+const NEGOZIO = `<title>NEGOZIO</title>
+  <p>vetrina</p>
+  <script>
+    setTimeout(() => { if (!document.cookie.includes('valuta=')) document.cookie = 'valuta=CHF; path=/; max-age=86400'; }, 700);
+    ${iubendaDopo(400)}
+  </script>`;
+
+test('negozio: la valuta scelta dall\'utente resta dopo «Mostra il banner»', async ({ openTab, testServer, shell }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, NEGOZIO);
+  await page.waitForFunction(() => document.cookie.includes('_iub_cs-1=rifiutato'), null, { timeout: 10_000 });
+  await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
+  await sleep(2500);
+  await page.evaluate(() => { document.cookie = 'valuta=EUR; path=/; max-age=86400'; });
+  await bannerSiti(shell, true);
+  await expect.poll(() => page.evaluate(() => !!document.getElementById('iubenda-cs-banner')).catch(() => false), { timeout: 10_000 }).toBe(true);
+  await sleep(1500);
+  expect(await page.evaluate(() => document.cookie)).toContain('valuta=EUR');
+});
+
+// ── ogni strada che cambia l'elenco dimentica la risposta, anche quella nella memoria della pagina ─────
+
+// Risposta tenuta solo nella memoria della pagina, come fa Usercentrics.
+const UC_MEMORIA = `<title>UC</title>
+  <p>contenuto</p>
+  <script>
+    if (!localStorage.getItem('uc_settings')) {
+      const b = document.createElement('div');
+      b.className = 'cookie-banner';
+      b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:120px;background:#fff;z-index:9';
+      b.innerHTML = '<p>Usiamo i cookie.</p><button id="acc" style="width:120px;height:40px">Accetta tutto</button>'
+        + '<button id="rif" style="width:120px;height:40px">Rifiuta tutto</button>';
+      b.querySelector('#acc').onclick = () => { localStorage.setItem('uc_settings', 'accettato'); b.remove(); };
+      b.querySelector('#rif').onclick = () => { localStorage.setItem('uc_settings', 'rifiutato'); b.remove(); };
+      document.body.appendChild(b);
+    }
+  </script>`;
+
+test('Sicurezza, «Rifiuta in automatico»: Filo torna a rifiutare anche se il sito tiene la risposta nella memoria della pagina', async ({ openTab, testServer, shell }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, UC_MEMORIA);
+  await page.waitForFunction(() => localStorage.getItem('uc_settings') === 'rifiutato', null, { timeout: 10_000 });
+  await sleep(2000);
+  await bannerSiti(shell, true);
+  await expect.poll(() => page.evaluate(() => !!document.querySelector('.cookie-banner #acc')).catch(() => false), { timeout: 10_000 }).toBe(true);
+  await page.click('.cookie-banner #acc');
+  await sleep(2000);
+  const sec = await openTab('filo://security/');
+  await sec.waitForSelector('#cookie-banners-list li button', { timeout: 8_000 });
+  await sec.locator('#cookie-banners-list li button').first().click();
+  await expect(sec.locator('#sec-cookies-banners')).toBeHidden({ timeout: 6_000 });
+  await sleep(1500);
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('uc_settings')), { timeout: 10_000 }).toBe('rifiutato');
+});
+
+// ── un banner che Filo ha già nascosto su un sito, alla pagina dopo non resta davanti per secondi ─────
+
+function spMuro(testServer) {
+  return `<title>SP_PAY_TOP</title>
+    <style>html.sp-message-open{overflow:hidden!important} body{height:4000px;margin:0}</style>
+    <div id="sp_message_container_1"
+      style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2147483647;display:flex;align-items:center;justify-content:center">
+      <iframe id="sp_message_iframe_1" src="${spAbbonatiFrame(testServer)}" style="width:560px;height:300px;border:0;background:#fff"></iframe>
+    </div>
+    <h1>Articolo</h1><p>contenuto</p>
+    <script>
+      document.documentElement.classList.add('sp-message-open');
+      addEventListener('message', (e) => { if (typeof e.data === 'string' && e.data.startsWith('sp:')) window.__sp = e.data; });
+      const iv = setInterval(() => {
+        const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+        if (el && !el.closest('#sp_message_container_1')) { window.__hiddenAt = performance.now(); clearInterval(iv); }
+      }, 50);
+    </script>`;
+}
+
+test('muro «accetta o abbonati» in un riquadro: al secondo articolo dello stesso sito sparisce subito, e niente è accettato', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await app.evaluate((_e, txt) => globalThis.__filoCookieBanners.setListForTest(txt), ESTRATTO_EASYLIST_COOKIE);
+  const page = await testServer.openReady(openTab, spMuro(testServer));
+  await page.waitForFunction(() => window.__hiddenAt, null, { timeout: 20_000 });
+  await page.goto(testServer.html(spMuro(testServer)));
+  await page.waitForFunction(() => window.__hiddenAt, null, { timeout: 20_000 });
+  expect(await page.evaluate(() => window.__hiddenAt)).toBeLessThan(1500);
+  expect(await page.evaluate(() => window.__sp || null)).toBeNull();
+});
+
+test('OneTrust col solo «Accetta»: alla seconda pagina dello stesso sito il banner sparisce subito, senza aprire le preferenze', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await app.evaluate((_e, l) => globalThis.__filoCookieBanners.setListForTest(l), LISTA_ONETRUST);
+  const conOrologio = oneTrust({ rifiuta: false }) + `<script>
+    const vis = (i) => { const e = document.getElementById(i); const r = e.getBoundingClientRect(); return r.width > 2 && r.height > 2; };
+    document.getElementById('onetrust-pc-btn-handler').addEventListener('click', () => { window.__pc = (window.__pc || 0) + 1; });
+    const iv = setInterval(() => { if (!vis('onetrust-banner-sdk') && !vis('onetrust-pc-sdk')) { window.__hiddenAt = performance.now(); clearInterval(iv); } }, 50);
+  </script>`;
+  const page = await testServer.openReady(openTab, conOrologio);
+  await page.waitForFunction(() => window.__hiddenAt, null, { timeout: 20_000 });
+  await page.goto(testServer.html(conOrologio));
+  await page.waitForFunction(() => window.__hiddenAt, null, { timeout: 20_000 });
+  expect(await page.evaluate(() => window.__hiddenAt)).toBeLessThan(1500);
+  expect(await page.evaluate(() => [window.__pc || 0, window.__acc || null])).toEqual([0, null]);
+});
+
+// ── cosa Filo sa dei siti: in Privacy niente sul disco, e in Sicurezza si vede tutto ──────────────────
+
+test('Privacy: dopo il rifiuto, sul disco non resta che quel sito è stato visitato', async ({ app, openTab, testServer, shell }) => {
+  test.setTimeout(60_000);
+  await setMode(openTab, 'privacy');
+  const page = await testServer.openReady(openTab, RICORDA);
+  await page.waitForFunction(() => !document.getElementById('onetrust-banner-sdk'), null, { timeout: 8_000 });
+  await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
+  await sleep(2000);
+  const salvato = await app.evaluate(async () => globalThis.SN_STORAGE.getRaw('cookieSites', null));
+  expect(salvato && salvato['127.0.0.1']).toBeFalsy();
+});
+
+test('Sicurezza elenca i siti dove Filo ha rifiutato, e da lì «Mostra il banner» lo riporta', async ({ openTab, testServer, shell }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, RICORDA);
+  await page.waitForFunction(() => document.cookie.includes('OptanonConsent=rifiutato'), null, { timeout: 8_000 });
+  await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
+  const sec = await openTab('filo://security/');
+  await expect(sec.locator('#cookie-done-list li')).toHaveText([/127\.0\.0\.1.*cookie rifiutati/], { timeout: 8_000 });
+  await sec.locator('#cookie-done-list li button').click();
+  await expect(sec.locator('#sec-cookies-done')).toBeHidden({ timeout: 6_000 });
+  await expect(sec.locator('#cookie-banners-list li')).toHaveText([/127\.0\.0\.1/], { timeout: 6_000 });
+  await sleep(1000);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => !!document.getElementById('onetrust-banner-sdk')).catch(() => false), { timeout: 10_000 }).toBe(true);
+  await sleep(1500);
+  expect(await page.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(true);
+});

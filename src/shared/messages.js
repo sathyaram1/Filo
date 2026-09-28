@@ -590,7 +590,8 @@
 
     // === Gestione cookie / consenso (src/content/cookies.js) ===
     // { url, frame: 'top'|'sub' } → { mode, off (su questo sito l'utente vuole i banner), index (rilevatori
-    // Consent-O-Matic), cosmetic (solo 'top': regole EasyList Cookie del sito) }.
+    // Consent-O-Matic), cosmetic (solo 'top': regole EasyList Cookie del sito), seen ('hidden' se sul sito
+    // Filo ha già nascosto un banner senza «rifiuta») }.
     COOKIES_CONFIG: 'cookies_config',
     // Broadcast main→content quando la modalità o i siti coi banner cambiano: il content rilegge la config.
     COOKIES_CONFIG_UPDATE: 'cookies_config_update', // → { mode }
@@ -603,6 +604,8 @@
     // suo figlio da nascondere: fra frame si passa dal main, una postMessage la saprebbe scrivere anche il sito.
     COOKIES_FRAME_BANNER: 'cookies_frame_banner',   // (riquadro) {} → { ok }
     COOKIES_HIDE_FRAME: 'cookies_hide_frame',       // main → pagina { url, origin }
+    // Solo pagine filo:// (Sicurezza): cosa Filo ha fatto coi banner, sito per sito, nel profilo della finestra.
+    COOKIES_SITES: 'cookies_sites',                 // {} → { ok, sites: [{ site, rejected, hidden, at }] }
 
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai
