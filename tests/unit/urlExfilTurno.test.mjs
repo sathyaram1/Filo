@@ -82,8 +82,38 @@ test('link normali dopo un comando: nessun OK in più', () => {
     'https://it.wikipedia.org/wiki/Bologna',
     'https://www.google.com/search?q=meteo',
     'https://www.corriere.it/',
+    // #587 giro 10: un percorso LEGGIBILE non è un carico codificato. Il ripiego
+    // strutturale guardava la lunghezza del carico e fermava questi indirizzi;
+    // ora si guardano i pezzi separati e le parole corte passano.
+    'https://it.wikipedia.org/wiki/Storia_della_matematica',
+    'https://www.giallozafferano.it/ricette/Spaghetti-alla-Carbonara.html',
+    'https://www.corriere.it/economia/consumi/24_settembre_12/prezzi-energia-bollette.shtml',
+    'https://duckduckgo.com/?q=orari+treni+milano+torino',
+    'https://open.spotify.com/track/6rqhFgbbKwnb9MLmUQDhG6',
   ]) {
     assert.equal(livello(url, [ls]), 1, url);
+  }
+  // La difesa resta: un blocco di dati opaco (base64/esadecimale) da contesto
+  // non fidato continua a chiedere un OK.
+  assert.equal(livello('https://raccolta.example/c?x=Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZg', [ls]), 2, 'blob opaco');
+});
+
+test('CERCA_WEB porta fuori un dato → chiede un OK, come il link (#587 giro 10)', () => {
+  const gestionale = cat(FILE);
+  // Un pezzo verbatim di ciò che è stato letto, messo nella query: esce verso il
+  // motore di ricerca esattamente come in un URL → livello 2.
+  const pezzo = FILE.slice(10, 55);
+  assert.equal(livelloRicerca(pezzo, [gestionale]), 2, 'pezzo letto nella query');
+  assert.equal(livello(`https://x.example/?q=${encodeURIComponent(pezzo)}`, [gestionale]), 2, 'stesso pezzo in un link');
+  // Un token con lettere e cifre appena letto.
+  assert.equal(livelloRicerca('cerca sk7Hq2Lm su internet', [cat('OPENAI_API_KEY=sk7Hq2Lm\n')]), 2);
+  // Un dato forte della memoria (l'email).
+  assert.equal(livelloRicerca('sathyaram pontillo gmail', [], { memoria: 'Email: sathyarampontillo@gmail.com' }), 1,
+    'parole staccate non ricompongono l’email');
+  assert.equal(livelloRicerca('scrivi a sathyarampontillo@gmail.com', [], { memoria: 'Email: sathyarampontillo@gmail.com' }), 2);
+  // Ricerche di tutti i giorni: nessun OK, anche con un file letto nel turno.
+  for (const q of ['che tempo fa domani a Bologna', 'ricetta della carbonara', 'orari treni milano torino', 'come si chiama il regista di Dune']) {
+    assert.equal(livelloRicerca(q, [gestionale]), 1, q);
   }
 });
 
