@@ -221,12 +221,6 @@ test('deliver con l\'intento storto: si ferma qui e nomina la parola, col biglie
   }
 });
 
-// I biglietti veri sono 43 caratteri base64url: uno su 64 comincia con un trattino, uno su 4096 con due.
-const VERO = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde';
-const VERO_TRATTINO = `-${VERO.slice(1)}`;
-const VERO_DUE_TRATTINI = `--${VERO.slice(2)}`;
-const ALTRO_VERO = `ZZZZ${VERO.slice(4)}`;
-
 test('una regola sola per il biglietto a mano: forme, ripetizioni e valori storti', () => {
   assert.deepEqual(leggiBigliettoAMano(['deliver', '--ticket', VERO]), { args: ['deliver'], ticket: VERO });
   assert.deepEqual(leggiBigliettoAMano([`--ticket=${VERO}`, 'x']), { args: ['x'], ticket: VERO });
