@@ -140,7 +140,6 @@ test('deliver: due biglietti diversi si rifiutano, non se ne sceglie uno in sile
 });
 
 test('una regola sola: il biglietto a mano sostituisce, conferma o si rifiuta in ogni comando', () => {
-  const ALTRO = 'altrobigliettodiprova99';
   assert.deepEqual(bigliettoAMano('release', [], BIGLIETTO), { args: [BIGLIETTO] });
   assert.deepEqual(bigliettoAMano('heartbeat', [], BIGLIETTO), { args: [BIGLIETTO] });
   assert.deepEqual(bigliettoAMano('work', [], BIGLIETTO), { args: [BIGLIETTO] });
@@ -148,15 +147,70 @@ test('una regola sola: il biglietto a mano sostituisce, conferma o si rifiuta in
   assert.deepEqual(bigliettoAMano('deliver', ['status'], BIGLIETTO), { args: [BIGLIETTO, 'status'] });
   assert.deepEqual(bigliettoAMano('release', [BIGLIETTO], BIGLIETTO), { args: [BIGLIETTO] }, 'lo stesso due volte va bene');
   for (const cmd of ['release', 'heartbeat', 'work']) {
-    assert.match(bigliettoAMano(cmd, [ALTRO], BIGLIETTO).errore || '', /Due biglietti diversi/, cmd);
+    assert.match(bigliettoAMano(cmd, [ALTRO_VERO], VERO).errore || '', /Due biglietti diversi/, cmd);
   }
-  assert.match(bigliettoAMano('deliver', [ALTRO, 'status'], BIGLIETTO).errore || '', /Due biglietti diversi/);
+  assert.match(bigliettoAMano('deliver', [ALTRO_VERO, 'status'], VERO).errore || '', /Due biglietti diversi/);
   assert.match(bigliettoAMano('probe', ['parola'], BIGLIETTO).errore || '', /parola d'ordine/, 'probe non lo ignora');
   assert.match(bigliettoAMano('ticket', ['parola'], BIGLIETTO).errore || '', /parola d'ordine/);
-  const storto = bigliettoAMano('deliver', ['fixd'], BIGLIETTO).errore || '';
-  assert.match(storto, /Intento non capito: «fixd»/, 'un intento storto non è un secondo biglietto');
-  assert.doesNotMatch(storto, /biglietti/);
   assert.deepEqual(bigliettoAMano('release', ['x'], ''), { args: ['x'] }, 'senza biglietto a mano non cambia niente');
+});
+
+test('col biglietto a mano, una parola davanti che non ha la forma di un biglietto resta ai controlli del comando', () => {
+  // Chiamarla «secondo biglietto» faceva togliere il biglietto giusto, e senza promemoria la risposta
+  // dopo era «aggiungi il biglietto»: si girava in tondo senza mai sentir nominare l'errore vero.
+  for (const [cmd, lista] of [
+    ['deliver', ['fixd']],
+    ['deliver', ['revision_capability']],
+    ['deliver', ['fixed', 'Report senza il nome del campo davanti.']],
+    ['deliver', ['status', 'revision_capability']],
+    ['deliver', ['feedback', 'titolo']],
+    ['release', ['verifier']],
+    ['release', ['canale giù da un’ora']],
+    ['heartbeat', ['loop']],
+    ['work', ['altrobigliettodiprova99']],
+  ]) {
+    assert.deepEqual(bigliettoAMano(cmd, lista, VERO), { args: [VERO, ...lista] }, `${cmd} ${lista.join(' ')}`);
+  }
+  assert.deepEqual(bigliettoAMano('release', [`${VERO}\n`], VERO), { args: [VERO] }, 'lo stesso biglietto con un a capo lo conferma');
+  assert.deepEqual(bigliettoAMano('deliver', [` ${VERO} `, 'note'], VERO), { args: [VERO, 'note'] });
+  assert.match(bigliettoAMano('release', [`${ALTRO_VERO} `], VERO).errore || '', /Due biglietti diversi/, 'uno diverso con lo spazio resta diverso');
+});
+
+test('battito, lettura del lavoro e confronto nominano la parola in più invece di ignorarla', () => {
+  assert.equal(parolaInPiu('heartbeat', [VERO, 'loop']), 'loop');
+  assert.equal(parolaInPiu('work', [VERO, 'x']), 'x');
+  assert.equal(parolaInPiu('compare', [VERO, 'verifier', '12', 'x']), 'x');
+  assert.equal(parolaInPiu('compare', [VERO, 'verifier', '12']), '');
+  assert.equal(parolaInPiu('heartbeat', []), '');
+  assert.equal(parolaInPiu('heartbeat', [VERO]), '');
+  assert.equal(parolaInPiu('release', [VERO, 'x']), '', 'il rilascio ha il suo testo');
+  assert.equal(parolaInPiu('deliver', [VERO, 'fixed', 'x']), '', 'la consegna ha il suo testo');
+});
+
+test('promemoria perso e una parola in più: la risposta la nomina, col biglietto a mano come col biglietto davanti', async () => {
+  const RIL = ['--senza-push', '--senza-rapporto'];
+  for (const [argv, parola] of [
+    [['deliver', 'fixed', REPORT, '--ticket', VERO], 'Report per l’owner'],
+    [['deliver', 'status', 'revision_capability', '--notes', REPORT, '--ticket', VERO], 'revision_capability'],
+    [['release', 'verifier', ...RIL, '--ticket', VERO], 'verifier'],
+    [['release', '--role', 'verifier', 'canale giù da un’ora', ...RIL, '--ticket', VERO], 'canale giù'],
+    [['heartbeat', 'loop', '--ticket', VERO], 'loop'],
+    [['heartbeat', VERO, 'loop'], 'loop'],
+  ]) {
+    await conServer(async ({ ricevuti, env }) => {
+      const r = await esegui('routine-channel.mjs', argv, env);
+      assert.equal(r.code, 1, `${argv.join(' ')}: ${r.se}`);
+      assert.match(r.se, /Argomento non capito/, argv.join(' '));
+      assert.ok(r.se.includes(parola), `${argv.join(' ')}: ${r.se}`);
+      assert.doesNotMatch(r.se, /biglietti/, argv.join(' '));
+      assert.equal(ricevuti.length, 0, argv.join(' '));
+    });
+  }
+  await conServer(async ({ ricevuti, env }) => {
+    const r = await esegui('routine-channel.mjs', ['release', `${VERO}\n`, '--role', 'verifier', ...RIL, '--ticket', VERO], env);
+    assert.equal(r.code, 0, `stderr: ${r.se}`);
+    assert.equal(ricevuti.find((x) => x.url.includes('routineRelease'))?.body.ticket, VERO);
+  });
 });
 
 async function conServer(fn) {
