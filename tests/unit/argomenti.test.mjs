@@ -189,3 +189,16 @@ test("dove non vanno parole libere, una parola nuda è un'opzione senza trattini
   // Dove le parole libere servono (titolo e testo di un feedback) non cambia niente.
   assert.equal(controllaArgomenti(['titolo', 'testo', '--dry-run'], FEEDBACK), null);
 });
+
+test('nel report di una correzione un trattino con uno spazio dopo è un elenco puntato, non un\'opzione', async () => {
+  const { sembraOpzioneNelReport } = await import('../../scripts/lib/argomenti.mjs');
+  for (const punto of ['- Corretto il pulsante.', '– Corretto', '—\tCorretto', '-\nCorretto']) {
+    assert.equal(sembraOpzioneNelReport(punto), false, JSON.stringify(punto));
+    assert.equal(sembraOpzione(punto), true, 'la regola stretta, quella della critica, non cambia');
+  }
+  for (const opzione of ['--frase', '-frase', '–frase', '--frase=Ora salva.', '--ferma']) {
+    assert.equal(sembraOpzioneNelReport(opzione), true, opzione);
+  }
+  assert.equal(sembraOpzioneNelReport('-3 errori corretti'), false);
+  assert.equal(sembraOpzioneNelReport('Report.'), false);
+});

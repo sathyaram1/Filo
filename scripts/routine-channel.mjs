@@ -28,6 +28,10 @@
 //   fermati: stai ricreando il problema.
 //
 // USO
+//   Nei comandi che usano un biglietto lo si passa davanti oppure con `--ticket <codice>` (o
+//   `--biglietto`); in tutti e due i posti dev'essere lo stesso. Senza biglietto l'uscita è 1, non 3:
+//   il server non è stato chiamato.
+//
 //   node scripts/routine-channel.mjs probe <parola-d-ordine>
 //       → c'è lavoro? Non lega niente. Exit 0 = sì, 2 = niente da fare,
 //         3 = guasto. Da chiedere PRIMA di pagare il setup dell'ambiente.
@@ -99,6 +103,7 @@ import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 import { isProtectedBranch, headSha } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
+import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticket.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -784,11 +789,62 @@ export function testoImprontaDiversa(quale, dichiarato, punta, motivo = 'altro_c
     + 'Niente è stato consegnato: un esito vale per il contenuto che hai davvero davanti, e l\'impronta la timbra lo strumento. Togli --sha e rilancia, oppure posizionati sul commit che hai esaminato.';
 }
 
+/** Gli intenti che una consegna conosce: decidono se la prima parola di `deliver` è un intento o un biglietto. */
+export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback'];
+
+// Quante parole vogliono questi comandi DOPO il biglietto (che sta sempre davanti).
+const POSIZIONALI_DOPO_BIGLIETTO = { work: 0, heartbeat: 0, release: 0, compare: 2, deliver: 1 };
+
+/** «Manca l'intento, o è scritto storto»: il testo è uno, per chi passa il biglietto a mano e per chi no. PURA. */
+export function testoIntentoNonCapito(parola) {
+  const p = String(parola || '');
+  return `${p ? `Intento non capito: «${p.slice(0, 40)}».` : 'Manca l\'intento della consegna.'} Gli intenti sono: ${INTENTI_CONSEGNA.join(', ')}. Non ho consegnato niente.`;
+}
+
+/**
+ * Il biglietto passato a mano (`--ticket` o `--biglietto`) vale allo stesso modo in ogni comando che ne
+ * usa uno, con una regola sola sulla parola davanti: lo stesso biglietto (spazi intorno compresi) lo
+ * conferma, una parola con la forma lunga di un biglietto vero è un secondo biglietto e si rifiuta, ogni
+ * altra parola resta dopo il biglietto e la nominano i controlli del comando. Probe e ticket lo rifiutano
+ * col motivo; `domanda` e `risposta` lo leggono da sé. PURA.
+ * @returns {{ args: string[] } | { errore: string }}
+ */
+export function bigliettoAMano(cmd, args, dato) {
+  const b = String(dato || '').trim();
+  const lista = Array.isArray(args) ? [...args] : [];
+  if (!b) return { args: lista };
+  if (cmd === 'probe' || cmd === 'ticket') {
+    return { errore: `--ticket non vale con «${cmd}»: lì serve la parola d'ordine. Non ho fatto niente.` };
+  }
+  if (POSIZIONALI_DOPO_BIGLIETTO[cmd] === undefined) return { args: lista };
+  const davanti = String(lista[0] ?? '').trim();
+  if (davanti === b) return { args: [b, ...lista.slice(1)] };
+  // Un intento, un ruolo o un valore senza il suo campo chiamati «secondo biglietto» facevano togliere il
+  // biglietto giusto, e senza promemoria la risposta dopo era «aggiungi il biglietto»: un giro a vuoto.
+  if (!haFormaDiBigliettoVero(davanti)) return { args: [b, ...lista] };
+  const senzaIntento = cmd === 'deliver' && lista.length < 2;
+  return {
+    errore: `Due biglietti diversi (${davanti.slice(0, 12)}… e --ticket ${b.slice(0, 12)}…)${senzaIntento ? ', e manca l\'intento' : ''}: non ho fatto niente. `
+      + (senzaIntento ? `Passa un biglietto solo, e dopo l'intento (${INTENTI_CONSEGNA.join(', ')}).` : 'Passane uno solo.'),
+  };
+}
+
+/** La parola in più dopo quelle che il comando vuole, se c'è: rilascio e consegna hanno i loro testi. PURA. */
+export function parolaInPiu(cmd, args) {
+  const dopo = POSIZIONALI_DOPO_BIGLIETTO[cmd];
+  if (!['work', 'heartbeat', 'compare'].includes(cmd) || !Array.isArray(args) || args.length <= dopo + 1) return '';
+  return String(args[dopo + 1]);
+}
+
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
-  const [cmd, ...rest] = process.argv.slice(2);
+  const [cmd, ...tutti] = process.argv.slice(2);
+  // Il biglietto a mano si toglie per primo, con la stessa regola delle registrazioni (#587).
+  const mano = leggiBigliettoAMano(tutti);
+  if (mano.errore) { console.error(`${mano.errore} Non ho fatto niente.`); process.exit(1); }
+  const rest = mano.args;
   // Un passaggio solo: i `--campo valore` diventano dati dell'intento, il resto
   // sono posizionali. Così l'ordine fra flag e posizionali non conta, e un
   // valore che assomiglia a un comando non viene scambiato per tale.
@@ -797,7 +853,7 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto',
+    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -822,7 +878,7 @@ if (isMain) {
   // vuol dire consegnare a vuoto.
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
-    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'biglietto',
+    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -835,6 +891,8 @@ if (isMain) {
   const data = {};
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
+    // Un biglietto vero davanti è un posizionale anche col trattino (o due): nessuna opzione ha la sua forma.
+    if (haFormaDiBigliettoVero(a)) { args.push(a); continue; }
     // Un'opzione scritta storta non è un posizionale: presa per tale, il
     // biglietto veniva rilasciato e il guasto NON dichiarato, con la risposta
     // che diceva «OK» (feedback #565).
@@ -893,6 +951,22 @@ if (isMain) {
   // la stessa cosa: due (uno qui e uno lì) è come si perde un testo per strada.
   if (typeof data.frase === 'string') { data.userNote = data.frase; }
   delete data.frase;
+  // Il biglietto a mano vale in OGNI comando con la stessa regola (#587): accettarlo per poi ignorarlo
+  // faceva rilasciare in silenzio un biglietto diverso da quello passato.
+  if (cmd === 'domanda' || cmd === 'risposta') {
+    if (mano.ticket) data.biglietto = mano.ticket;
+  } else {
+    const conMano = bigliettoAMano(cmd, args, mano.ticket);
+    if (conMano.errore) { console.error(conMano.errore); process.exit(1); }
+    args.splice(0, args.length, ...conMano.args);
+    // Ignorata, `loop` senza trattini dava un battito solo e un «OK».
+    const inPiu = parolaInPiu(cmd, args);
+    if (inPiu) {
+      const cosa = { compare: 'Dopo il biglietto vanno solo il ruolo e il numero.', heartbeat: 'Dopo il biglietto qui non va altro: il battito continuo si chiede con --loop.' }[cmd] || 'Dopo il biglietto qui non va altro.';
+      console.error(`Argomento non capito: "${inPiu.slice(0, 40)}": non ho fatto niente. ${cosa}`);
+      process.exit(1);
+    }
+  }
 
   // `--segnala <file.md>`: la segnalazione per l'owner (L3), letta INTERA dal
   // file con gli stessi controlli di dispatch --record-* (assente, vuoto,
@@ -988,8 +1062,9 @@ if (isMain) {
       biglietto = readTicket(ROOT);
     }
     if (!biglietto) {
-      console.error('Nessun biglietto: non c’è nessun semaforo da tenere vivo.');
-      process.exit(3);
+      // Uscita 1, non 3: per il contratto 3 è «canale giù», e qui il server non è stato chiamato.
+      console.error('NESSUN BIGLIETTO: non c’è nessun semaforo da tenere vivo, e il server non è stato chiamato. Passalo con --ticket <codice>.');
+      process.exit(1);
     }
     if (!flags.includes('--loop')) {
       const r = await heartbeat(biglietto);
@@ -1103,7 +1178,8 @@ if (isMain) {
     // dispatcher dove chi consegna lo trova). Chiedere a chi lavora di
     // ricopiarlo a ogni consegna è la scommessa già persa sulla provenienza dei
     // feedback — su decine di ritrovamenti, uno solo risultava firmato giusto.
-    const INTENTI = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback'];
+    // `--ticket` a mano è già davanti, al posto del biglietto (bigliettoAMano, più su).
+    const INTENTI = INTENTI_CONSEGNA;
     let biglietto = args[0];
     let intento = args[1] || '';
     if (INTENTI.includes(args[0])) {
@@ -1111,8 +1187,10 @@ if (isMain) {
       const { readTicket } = await import('./lib/routine-ticket.mjs');
       biglietto = readTicket(ROOT);
       if (!biglietto) {
-        console.error('Nessun biglietto: questa consegna non ha un lavoro a cui riferirsi.');
-        process.exit(3);
+        // Uscita 1, non 3: per il contratto 3 è «canale giù, fermati», e qui il
+        // server non è stato nemmeno chiamato.
+        console.error('NESSUN BIGLIETTO: questa consegna non ha un lavoro a cui riferirsi, e il server non è stato chiamato. Ripeti lo stesso comando aggiungendo --ticket <codice> (il codice è nelle istruzioni con cui sei partito).');
+        process.exit(1);
       }
     }
     // Un posizionale avanzato NON viene ignorato in silenzio. È la trappola in
@@ -1123,6 +1201,16 @@ if (isMain) {
     if (avanzati.length) {
       console.error(`Argomento non capito: "${avanzati[0].slice(0, 40)}". I dati si passano come --campo valore.`);
       console.error('Il report va in --notes "…", la frase per chi ha mandato il feedback in --frase "…", il testo di un feedback nuovo in --text "…".');
+      process.exit(1);
+    }
+    // Senza intento una parola storta partiva verso il server COME biglietto, e dopo un biglietto COME
+    // intento: la regola è una, l'intento storto si ferma qui con l'elenco.
+    if (!intento) {
+      console.error(testoIntentoNonCapito(haFormaDiBigliettoVero(biglietto) ? '' : biglietto));
+      process.exit(1);
+    }
+    if (!INTENTI.includes(intento)) {
+      console.error(testoIntentoNonCapito(intento));
       process.exit(1);
     }
     // La versione in cui il fix confluisce la sa solo questa macchina (è quella

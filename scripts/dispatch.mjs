@@ -85,13 +85,17 @@ import {
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
-import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
+import {
+  readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket, looksLikeTicket,
+  leggiBigliettoAMano,
+} from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
 import { scaricaPayload, STAMPA_MAX } from './lib/consegna-file.mjs';
+import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -1512,44 +1516,20 @@ export function ticketMissingText(message) {
   ].join('\n');
 }
 
-/**
- * Questo valore ha la FORMA di un biglietto? PURA.
- *
- * Un biglietto vero lo genera il server: 32 byte casuali in base64url, 43
- * caratteri (filo-security, functions/src/secrets.js). L'alfabeto base64url
- * comprende il trattino, quindi un biglietto legittimo PUÒ cominciare con un
- * trattino singolo (~1 su 64): rifiutare "tutto ciò che comincia con -"
- * butterebbe via giri validi. Si valida invece la forma: solo alfabeto
- * base64url, lunghezza da biglietto (soglia larga, per lasciare al server il
- * margine di cambiare taglia), mai doppio trattino. Ogni flag esistente cade
- * fuori: i `--…` per il doppio trattino, `-h` per la lunghezza — ed è così che
- * un flag finito al posto del codice non può più sovrascrivere il promemoria.
- */
-export function looksLikeTicket(v) {
-  const s = String(v || '');
-  return /^[A-Za-z0-9_-]{16,}$/.test(s) && !s.startsWith('--');
-}
+// La forma di un biglietto la decide una regola sola, condivisa col canale: un flag finito al
+// posto del codice non deve poter sovrascrivere il promemoria.
+export { looksLikeTicket };
 
 /**
- * Estrae la coppia `--ticket <codice>` da una lista di argomenti. PURA.
- *
- * Serve ai `--record-*`: il biglietto normalmente si rilegge dal promemoria,
- * ma se il promemoria è andato perso il worker deve poterlo ripassare a mano —
- * il rilascio lo permette da sempre, e l'asimmetria è costata il verdetto di
- * #444 (il worker aveva il biglietto in mano e nessun posto dove metterlo).
- *
- * @returns {{ args: string[], ticket: string, error: boolean }} `error` = flag
- *   presente ma codice mancante o che non ha la forma di un biglietto (il
- *   chiamante esce con un errore d'uso).
+ * Toglie il biglietto passato a mano da una lista di argomenti, con la regola del canale
+ * (leggiBigliettoAMano). PURA.
+ * @returns {{ args: string[], ticket: string, error: boolean, errore?: string }} `error` = biglietto a mano
+ *   mancante, storto o doppio (il chiamante esce con un errore d'uso).
  */
 export function stripTicketArg(list) {
-  const args = Array.isArray(list) ? [...list] : [];
-  const i = args.indexOf('--ticket');
-  if (i === -1) return { args, ticket: '', error: false };
-  const v = String(args[i + 1] || '').trim();
-  args.splice(i, 2);
-  if (!looksLikeTicket(v)) return { args, ticket: '', error: true };
-  return { args, ticket: v, error: false };
+  const r = leggiBigliettoAMano(list);
+  if (r.errore) return { args: Array.isArray(list) ? [...list] : [], ticket: '', error: true, errore: r.errore };
+  return { args: r.args, ticket: r.ticket, error: false };
 }
 
 /**
@@ -1598,6 +1578,7 @@ export function usageText() {
     '',
     'Nei --record-* il biglietto si rilegge da solo dal promemoria',
     '(.claude/routine-ticket.json): `--ticket` serve solo se il promemoria è perso.',
+    'Vale in ogni posizione, anche `--ticket=<b>` o `--biglietto <b>`, come nel canale.',
     '',
     'Exit: 0 ok · 1 uso sbagliato (niente è stato toccato) · 2 niente da fare',
     '      3 guasto · 4 rifiutato dal server (leggere il motivo, non aggirare)',
@@ -1983,27 +1964,31 @@ export function emit(bucket, ctx) {
 
 const isMainModule = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMainModule) {
-  const argv = process.argv.slice(2);
+  // Il biglietto a mano si toglie PRIMA di tutto, con la regola del canale: l'ordine non conta (davanti
+  // a un --record-* finiva «argomento non riconosciuto», #724.1, #545) e un codice storto o doppio si ferma qui.
+  const mano = stripTicketArg(process.argv.slice(2));
+  if (mano.error) { console.error(`${mano.errore} Niente è stato toccato.`); process.exit(1); }
+  const argv = mano.args;
+  const bigliettoAMano = mano.ticket;
   const flag = argv[0];
+  if (bigliettoAMano && (flag === '--preflight' || flag === '--clear-state')) {
+    console.error(`--ticket non vale con ${flag}: lì un biglietto non serve. Niente è stato toccato.`);
+    process.exit(1);
+  }
 
-  // I `--record-*` accettano `--ticket <codice>` come scorta: il promemoria
-  // resta la via maestra, ma se è andato perso il worker — che il codice ce
-  // l'ha nelle istruzioni di partenza — deve poterlo ripassare, come già può
-  // nel rilascio. La coppia si toglie PRIMA di leggere i posizionali, e il
-  // codice viaggia nell'ambiente: readTicket lo trova lì per primo.
+  // Nei `--record-*` il biglietto a mano è la scorta del promemoria perso; viaggia nell'ambiente, dove
+  // readTicket lo trova per primo.
   const conBiglietto = (args) => {
-    const t = stripTicketArg(args);
-    if (t.error) { console.error('Uso: --ticket richiede il codice del biglietto subito dopo'); process.exit(1); }
-    if (t.ticket) process.env.FILO_ROUTINE_TICKET = t.ticket;
+    if (bigliettoAMano) process.env.FILO_ROUTINE_TICKET = bigliettoAMano;
     // RIARMA il battito, comunque sia arrivato il biglietto: il processo
     // staccato avviato all'inizio del giro in cloud non sopravvive a lungo (il
     // beatAt specchiato sui feedback si ferma sempre a pochi secondi dal
     // biglietto), e ogni --record-* è un momento in cui il biglietto è in mano
     // per costruzione. startBeat è idempotente: se il battito è vivo non fa
     // niente.
-    const vivo = t.ticket || process.env.FILO_ROUTINE_TICKET || readRoutineTicket(ROOT);
+    const vivo = process.env.FILO_ROUTINE_TICKET || readRoutineTicket(ROOT);
     if (vivo) startBeat(ROOT, vivo);
-    return t.args;
+    return args;
   };
   // I quattro esiti di un --record-* respinto: biglietto introvabile (esci 1:
   // si rimedia ripassando il codice), canale non raggiungibile (3, come da
@@ -2095,7 +2080,7 @@ if (isMainModule) {
         console.error('--frase vuole la riga per chi ha segnalato dopo di sé — non ho consegnato niente.');
         process.exit(1);
       }
-      const altra = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).find((a) => SEMBRA_OPZIONE(a));
+      const altra = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).find((a) => sembraOpzioneNelReport(a));
       if (altra) {
         console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --frase "…", --segnala <file.md> e --ferma; il resto è il report, un testo solo fra virgolette.`);
         process.exit(1);
@@ -2229,16 +2214,10 @@ if (isMainModule) {
       // sconosciuti: un `--help` battuto a metà lavoro veniva letto come "giro
       // nuovo senza biglietto" e cancellava il promemoria — il verdetto di
       // un'ora di verifica (#444) non si è più potuto registrare.
-      const ti = argv.indexOf('--ticket');
-      const ticket = ti !== -1 ? String(argv[ti + 1] || '') : '';
-      // Il codice deve avere la FORMA di un biglietto (looksLikeTicket): un
-      // flag finito al posto del codice (`--foo`, `-h`) qui sovrascriveva il
-      // promemoria del giro in corso — stessa regola dei --record-*.
-      if (ti !== -1 && !looksLikeTicket(ticket)) {
-        console.error('Uso: node scripts/dispatch.mjs --ticket <biglietto> (vedi --help). Il valore ricevuto non ha la forma di un biglietto. Niente è stato toccato.');
-        process.exit(1);
-      }
-      const estranei = argv.filter((a, i) => ti === -1 || (i !== ti && i !== ti + 1));
+      // Il codice ha già la FORMA di un biglietto (stripTicketArg, in cima): un flag finito al posto del
+      // codice (`--foo`, `-h`) qui sovrascriveva il promemoria del giro in corso.
+      const ticket = bigliettoAMano;
+      const estranei = argv;
       if (estranei.length) {
         console.error(`[dispatch] argomento non riconosciuto: ${estranei[0]} (vedi --help). Niente è stato toccato: promemoria e battito restano come sono.`);
         process.exit(1);

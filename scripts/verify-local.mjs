@@ -1000,8 +1000,8 @@ if (isMain) {
   // STA PRIMA DI TUTTI E TRE I COMANDI, e non è un dettaglio: quando stava
   // dopo, `start` aveva già aperto il giro e per lui non scattava mai.
   if (['critica', 'corretto', 'start'].includes(cmd)) {
-    const { sembraOpzione } = await import('./lib/argomenti.mjs');
-    const opzione = rest.find((a) => sembraOpzione(a));
+    const { sembraOpzione, sembraOpzioneNelReport } = await import('./lib/argomenti.mjs');
+    const opzione = rest.find((a) => (cmd === 'corretto' ? sembraOpzioneNelReport(a) : sembraOpzione(a)));
     if (opzione) {
       console.error(`Argomento non capito: ${opzione} — non ho toccato niente. Qui non ci sono opzioni: il testo va fra virgolette, tutto in un pezzo solo.`);
       process.exit(1);
