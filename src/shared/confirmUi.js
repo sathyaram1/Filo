@@ -113,6 +113,10 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+/* OK in attesa del testo non ancora visto: grigio come un bottone spento, ma il
+   clic fa scorrere il testo, quindi il puntatore resta quello di un bottone. */
+.sn-confirm-btn[aria-disabled="true"] { opacity: 0.45; }
+.sn-confirm-btn[aria-disabled="true"]:hover { opacity: 0.6; }
 .sn-confirm-text {
   scrollbar-width: thin;
   scrollbar-color: var(--sn-border, #e0dcd4) transparent;
