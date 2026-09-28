@@ -417,6 +417,19 @@
     return mods === `${c}${a}${s}` && tastiDaEvento(ev).has(tasto);
   }
 
+  // La pressione che una scorciatoia SCRITTA descrive (o null), letta con le
+  // regole di `combacia`: chi ascolta i tasti la usa per dire se la prenderebbe.
+  function pressioneScritta(accel) {
+    const f = forma(accel);
+    if (!f) return null;
+    const mods = f.slice(0, f.indexOf('|'));
+    return {
+      ctrlKey: mods.includes('c'), metaKey: false,
+      altKey: mods.includes('a'), shiftKey: mods.includes('s'),
+      key: f.slice(f.indexOf('|') + 1), code: '',
+    };
+  }
+
   // Combinazioni che il sistema operativo intercetta prima di Filo: il menu
   // Start, il cambio finestra, Spotlight e le istantanee dello schermo su Mac.
   const PRESI_DAL_SISTEMA = {
