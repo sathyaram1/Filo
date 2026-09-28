@@ -14,7 +14,7 @@ function hostOf(url) {
 function attach(ses) {
   if (!ses || !ses.webRequest || ses._filoReteDiCasa) return false;
   try {
-    ses.webRequest.onResponseStarted({ urls: ['http://*/*', 'https://*/*'] }, (d) => {
+    ses.webRequest.onResponseStarted({ urls: ['http://*/*', 'https://*/*'], types: ['mainFrame'] }, (d) => {
       if (!d || d.resourceType !== 'mainFrame' || !d.ip) return;
       globalThis.SN_URL_NAV.noteHostAddress(hostOf(d.url), d.ip);
     });
