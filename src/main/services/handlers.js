@@ -1262,7 +1262,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
       const url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
       if (Exfil && url) {
         const origin = sender?.tab?.url || sender?.url || '';
-        const fromUntrusted = /^https?:/i.test(origin);
+        // Dalla chat: un indirizzo che il modello si è scritto da sé passa anche dal controllo sulla forma (#553).
+        const fromUntrusted = /^https?:/i.test(origin)
+          || PageRead.formaDaControllare(contesto, type, url, schedeLeggibili(sender).map((s) => s.url));
         const corpus = [await navExfilCorpus(), PageRead.materialeRiservato(url)].filter(Boolean).join('\n');
         const v = Exfil.assess(url, { corpus, fromUntrusted });
         if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
