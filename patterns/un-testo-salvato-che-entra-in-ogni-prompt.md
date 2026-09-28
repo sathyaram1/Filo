@@ -19,8 +19,10 @@ Valgono insieme queste regole:
   il popup mostra il testo per intero, non «stile aggiornato». Si mostra e si
   salva quello che si legge (`testoLeggibile`): via ogni carattere che non si
   disegna (i «tag» Unicode il modello li legge come lettere) e le righe vuote
-  in fila, che spingerebbero il resto oltre il bordo del popup. Anche toglierlo
-  passa dal popup: si perde il testo dell'utente.
+  in fila, che spingerebbero il resto oltre il bordo del popup. Vuota è la riga
+  in cui niente si disegna, non quella senza caratteri: una riga di soli spazi a
+  larghezza zero o giuntori a schermo è bianca. Anche toglierlo passa dal popup:
+  si perde il testo dell'utente.
 - **All'OK vale quello che il popup ha mostrato.** Una conferma su un elenco
   (righe da dimenticare, sveglie da togliere) agisce su quelle voci, non su
   quelle che lo stesso riferimento trova al momento dell'OK.
