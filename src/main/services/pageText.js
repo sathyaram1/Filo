@@ -30,6 +30,16 @@ const CHIUSO = 3;
 const PREFISSI = new Set(['site', 'main', 'top', 'primary', 'global', 'page', 'js', 'is', 'c', 'l', 'o', 'u', 'm']);
 const SUFFISSI = new Set(['bar', 'wrapper', 'wrap', 'container', 'area', 'box', 'block', 'links', 'list', 'section', 'banner', 'notice', 'overlay', 'inner', 'outer', 'holder', 'slot', 'unit']);
 const MAI_SALTARE = new Set(['html', 'body', 'main', 'article']);
+// Chiudono un <p> aperto solo fino a questi: oltre, il paragrafo è di un altro contenitore.
+const FERMA_P = new Set(['div', 'section', 'article', 'main', 'td', 'th', 'li', 'blockquote', 'body']);
+const FERMA_LI = new Set(['ul', 'ol', 'menu']);
+const FERMA_DL = new Set(['dl']);
+const FERMA_TR = new Set(['table', 'tbody', 'thead', 'tfoot']);
+const FERMA_TD = new Set(['tr', 'table']);
+const FERMA_TABELLA = new Set(['table']);
+// Un link dentro un link il browser lo chiude: annidati all'infinito costerebbero il quadrato della pagina.
+const FERMA_A = new Set(['td', 'th', 'table', 'body', 'html']);
+const FERMA_CHIUSURA = new Set(['table', 'body']);
 const BLOCCHI = new Set([
   'address', 'article', 'blockquote', 'center', 'details', 'dialog', 'dl', 'fieldset', 'figure', 'footer', 'form',
   'header', 'hgroup', 'main', 'nav', 'ol', 'p', 'section', 'summary', 'ul', 'aside', 'figcaption', 'caption', 'legend',
