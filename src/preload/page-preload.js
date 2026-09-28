@@ -168,12 +168,12 @@ if (!IS_SUBFRAME) try {
 
 // ─── #586 — quello che la pagina legge dei propri permessi ────────────────
 //
-// In OGNI frame web, riquadri compresi, prima degli script della pagina: senza, un sito a cui nessuno ha risposto
-// legge «negato» e non chiede più, e la strada vecchia per lo schermo scavalca la scelta di Filo. Il sorgente e le
-// sue regole stanno in permessi-pagina.js; l'elenco dei «no» veri lo tiene il main e arriva aggiornato qui.
+// In OGNI frame che non è di Filo, anche i riquadri vuoti che la pagina si crea (about:blank: il preload ci gira alla
+// nascita, prima che la pagina li tocchi), prima degli script della pagina. Il sorgente e le sue regole stanno in
+// permessi-pagina.js; l'elenco dei «no» veri lo tiene il main e arriva aggiornato qui.
 try {
   const loc = String((typeof window !== 'undefined' && window.location && window.location.href) || '');
-  if (/^(https?:|about:srcdoc)/i.test(loc)) {
+  if (/^(https?:|about:|data:|blob:|file:)/i.test(loc)) {
     const { buildPermessiPaginaSource, CANALE } = require('./permessi-pagina.js');
     const negati = ipcRenderer.sendSync('filo:permessi-pagina') || [];
     webFrame.executeJavaScript(buildPermessiPaginaSource(negati), false).catch(() => {});

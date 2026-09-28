@@ -10,7 +10,7 @@ test('dettagli', async ({ app, openTab, testServer }) => {
     window.r = [];
     document.getElementById('b').onclick = () => navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
       .then((s) => r.push('gdm:' + s.getTracks().map((t) => t.kind + ':' + t.label)), (e) => r.push('gdm-err:' + e.name + ':' + e.message));
-    window.vecchia = () => navigator.mediaDevices.getUserMedia({ video: { mandatory: { chromeMediaSource: 'desktop' } } })
+    window.vecchia = () => navigator.mediaDevices.getUserMedia({ video: (() => { let n = 0; return { get mandatory() { return n++ ? { chromeMediaSource: 'desktop' } : {}; } }; })() })
       .then((s) => r.push('old:' + s.getTracks().map((t) => t.kind + ':' + t.label)), (e) => r.push('old-err:' + e.name + ':' + e.message));
     window.cam = () => navigator.mediaDevices.getUserMedia({ video: true })
       .then((s) => r.push('cam:' + s.getTracks().map((t) => t.kind + ':' + t.label)), (e) => r.push('cam-err:' + e.name));
@@ -19,19 +19,19 @@ test('dettagli', async ({ app, openTab, testServer }) => {
     const wc = webContents.getAllWebContents().find((w) => /\/t\//.test(w.getURL()) || w.getTitle() === 'D');
     globalThis.__log = [];
     const ses = wc.session;
-    ses.setPermissionRequestHandler((w, perm, cb, d) => { globalThis.__log.push({ perm, d: JSON.parse(JSON.stringify(d || {})) }); cb(risposta); });
+    ses.setPermissionRequestHandler((w, perm, cb, d) => { globalThis.__disp = false; globalThis.__log.push({ perm, t: Date.now(), types: d.mediaTypes }); cb(risposta); globalThis.__log.push({ dopoCb: globalThis.__disp }); if (perm === 'media' && !(d.mediaTypes || []).length && !globalThis.__disp) { globalThis.__log.push({ uccido: true }); try { w.forcefullyCrashRenderer(); } catch (e) { globalThis.__log.push({ err: String(e) }); } } });
     ses.setPermissionCheckHandler(() => true);
     ses.setDisplayMediaRequestHandler((req, cb) => {
-      globalThis.__log.push({ display: { audioRequested: req.audioRequested, videoRequested: req.videoRequested, userGesture: req.userGesture, securityOrigin: req.securityOrigin } });
+      globalThis.__disp = true; globalThis.__log.push({ t: Date.now(), display: { audioRequested: req.audioRequested, videoRequested: req.videoRequested, userGesture: req.userGesture, securityOrigin: req.securityOrigin } });
       cb({});
     });
-  }, false);
+  }, true);
   await page.click('#b');
   await sleep(1000);
-  await page.evaluate(() => window.vecchia());
-  await sleep(1000);
-  await page.evaluate(() => window.cam());
-  await sleep(1000);
-  console.log('LOG', JSON.stringify(await app.evaluate(() => globalThis.__log), null, 1));
-  console.log('PAGINA', JSON.stringify(await page.evaluate(() => window.r)));
+  console.log('PAGINA1', JSON.stringify(await page.evaluate(() => window.r)));
+  let morta = false; page.on('crash', () => { morta = true; });
+  await page.evaluate(() => { window.vecchia(); }).catch((e) => console.log('EVAL', String(e).slice(0, 80)));
+  await sleep(1500);
+  console.log('MORTA', morta);
+  console.log('LOG', JSON.stringify(await app.evaluate(() => globalThis.__log)));
 });

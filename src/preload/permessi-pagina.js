@@ -19,14 +19,60 @@ function buildPermessiPaginaSource(negati) {
     }, true);
   } catch (_) {}
 
-  function vecchia(c, prof) {
-    if (!c || typeof c !== 'object' || prof > 5) return false;
+  // Quello che la pagina scrive si legge due volte, con le funzioni prese prima di lei, e a Chromium arriva la copia
+  // controllata: una richiesta che cambia mentre la si legge (un getter, un Proxy) non è una richiesta.
+  var RA = Reflect.apply;
+  var GOPD = Object.getOwnPropertyDescriptor;
+  var KEYS = Object.keys;
+  var DEF = Object.defineProperty;
+  var CREA = Object.create;
+  var ARR = Array.isArray;
+  var PROPRIA = Object.prototype.hasOwnProperty;
+  var FONTE_VECCHIA = { chromeMediaSource: 1, chromeMediaSourceId: 1 };
+
+  // Oggetti senza prototipo: quello che Chromium non trova nella copia non lo va a cercare in un prototipo della pagina.
+  function copia(v, prof) {
+    if (v === null || typeof v !== 'object') {
+      if (typeof v === 'function' || typeof v === 'symbol') throw 0;
+      return v;
+    }
+    if (prof > 6) throw 0;
+    var out = ARR(v) ? [] : CREA(null);
+    var chiavi = KEYS(v);
+    for (var i = 0; i < chiavi.length; i++) {
+      var k = chiavi[i];
+      if (RA(PROPRIA, FONTE_VECCHIA, [k])) throw 0;
+      var d = GOPD(v, k);
+      if (!d) continue;
+      var valore = RA(PROPRIA, d, ['value']) ? d.value : (typeof d.get === 'function' ? RA(d.get, v, []) : undefined);
+      var campo = CREA(null);
+      campo.value = copia(valore, prof + 1);
+      campo.enumerable = true;
+      campo.writable = true;
+      campo.configurable = true;
+      DEF(out, k, campo);
+    }
+    return out;
+  }
+
+  function uguali(a, b) {
+    if (a === b) return true;
+    if (a !== a && b !== b) return true;
+    if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object' || ARR(a) !== ARR(b)) return false;
+    var ka = KEYS(a);
+    var kb = KEYS(b);
+    if (ka.length !== kb.length) return false;
+    for (var i = 0; i < ka.length; i++) if (ka[i] !== kb[i] || !uguali(a[ka[i]], b[kb[i]])) return false;
+    return true;
+  }
+
+  // null: la richiesta non si fa (fonte vecchia, funzioni, troppo profonda, diversa alla seconda lettura).
+  function vincoli(c) {
+    if (c === undefined) return c;
     try {
-      if ('chromeMediaSource' in c || 'chromeMediaSourceId' in c) return true;
-      var chiavi = Object.keys(c);
-      for (var i = 0; i < chiavi.length; i++) if (vecchia(c[chiavi[i]], prof + 1)) return true;
-    } catch (_) { return true; }
-    return false;
+      var a = copia(c, 0);
+      return uguali(a, copia(c, 0)) ? a : null;
+    } catch (_) { return null; }
   }
 
   function maschera(fn, orig, nome) {
@@ -34,7 +80,7 @@ function buildPermessiPaginaSource(negati) {
     try { Object.defineProperty(fn, 'length', { value: orig.length, configurable: true }); } catch (_) {}
     try {
       var ts = Function.prototype.toString;
-      Object.defineProperty(fn, 'toString', { value: function toString() { return ts.call(orig); }, configurable: true, writable: true });
+      Object.defineProperty(fn, 'toString', { value: function toString() { return RA(ts, orig, []); }, configurable: true, writable: true });
     } catch (_) {}
     return fn;
   }
@@ -44,14 +90,19 @@ function buildPermessiPaginaSource(negati) {
       if (!w || w.__filoPermessiPagina) return;
       Object.defineProperty(w, '__filoPermessiPagina', { value: true, configurable: false, enumerable: false });
     } catch (_) { return; }
-    var no = function () { return new w.DOMException('Permission denied', 'NotAllowedError'); };
+    var DE = w.DOMException;
+    var PR = w.Promise;
+    var rifiuta = PR && PR.reject;
+    var dopo = w.setTimeout;
+    var no = function () { return new DE('Permission denied', 'NotAllowedError'); };
 
     var MD = w.MediaDevices && w.MediaDevices.prototype;
     if (MD && typeof MD.getUserMedia === 'function') {
       var gum = MD.getUserMedia;
       MD.getUserMedia = maschera(function getUserMedia(c) {
-        if (vecchia(c, 0)) return w.Promise.reject(no());
-        return gum.apply(this, arguments);
+        var pulita = vincoli(c);
+        if (pulita === null) return RA(rifiuta, PR, [no()]);
+        return RA(gum, this, [pulita]);
       }, gum, 'getUserMedia');
     }
     var N = w.Navigator && w.Navigator.prototype;
@@ -59,8 +110,9 @@ function buildPermessiPaginaSource(negati) {
       if (!N || typeof N[k] !== 'function') return;
       var orig = N[k];
       N[k] = maschera(function (c, ok, ko) {
-        if (vecchia(c, 0)) { w.setTimeout(function () { try { if (typeof ko === 'function') ko(no()); } catch (_) {} }, 0); return undefined; }
-        return orig.apply(this, arguments);
+        var pulita = vincoli(c);
+        if (pulita === null) { RA(dopo, w, [function () { try { if (typeof ko === 'function') ko(no()); } catch (_) {} }, 0]); return undefined; }
+        return RA(orig, this, [pulita, ok, ko]);
       }, orig, k);
     });
 
@@ -71,7 +123,7 @@ function buildPermessiPaginaSource(negati) {
       Object.defineProperty(PS, 'state', {
         configurable: true, enumerable: dStato.enumerable,
         get: maschera(function () {
-          var s = leggiStato.call(this);
+          var s = RA(leggiStato, this, []);
           if (s !== 'denied') return s;
           var t = NOMI[this && this.name];
           return t && !NEGATI.has(t) ? 'prompt' : s;
@@ -85,7 +137,7 @@ function buildPermessiPaginaSource(negati) {
       Object.defineProperty(Nt, 'permission', {
         configurable: true, enumerable: dNot.enumerable,
         get: maschera(function () {
-          var s = leggiNot.call(this);
+          var s = RA(leggiNot, this, []);
           return s === 'denied' && !NEGATI.has('notifiche') ? 'default' : s;
         }, leggiNot, 'get permission'),
       });
@@ -102,7 +154,7 @@ function buildPermessiPaginaSource(negati) {
         Object.defineProperty(proto, k, {
           configurable: true, enumerable: d.enumerable,
           get: maschera(function () {
-            var v = leggi.call(this);
+            var v = RA(leggi, this, []);
             try { installa(k === 'contentWindow' ? v : (v && v.defaultView)); } catch (_) {}
             return v;
           }, leggi, 'get ' + k),
