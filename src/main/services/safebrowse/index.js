@@ -126,16 +126,24 @@ function once(key, run) {
   return p;
 }
 
-// Parte un controllo profondo se il sito non ha già il suo verdetto e il freno del dominio non è tirato.
+// Parte un controllo profondo se il freno della chiave non è tirato. Frenato, il sito prende subito la risposta di chi
+// l'ha tirato (INHERITED); arrivato mentre quel controllo è in viaggio, la prende quando torna.
+const INHERITED = Symbol('inherited');
 function deepen(stage, bKey, fullTtl, run, store) {
   const k = stage + ':' + bKey;
-  if (inflight.has(k)) return inflight.get(k).catch(() => {});
-  if (deepBrake.has(k)) return null;
-  deepBrake.set(k, true, FAILED_BRAKE_MS);
+  if (inflight.has(k)) return inflight.get(k).then((r) => { if (r) store(r); }).catch(() => {});
+  const brake = deepBrake.get(k);
+  if (brake !== undefined) {
+    if (!brake.result) return null;
+    store(brake.result, deepBrake.ttlLeft(k));
+    return INHERITED;
+  }
+  deepBrake.set(k, { result: null }, FAILED_BRAKE_MS);
   return once(k, () => Promise.resolve(run()).then((r) => {
-    if (!r) return;
+    if (!r) return null;
     store(r);
-    deepBrake.set(k, true, fullTtl);
+    deepBrake.set(k, { result: r }, fullTtl);
+    return r;
   })).catch(() => {});
 }
 
