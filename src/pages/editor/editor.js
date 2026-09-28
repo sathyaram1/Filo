@@ -4072,14 +4072,24 @@
     return tasto('Ctrl+Alt+Shift+1');
   }
 
+  // La scorciatoia di un modulo fa quello che fa il suo clic. Un tipo che qui non
+  // c'è ha più azioni (o nessuna): il campo non gli offre una scorciatoia (#545).
+  const AZIONE_SCORCIATOIA = {
+    'word-count': () => showStatsOverlay(),
+    'search-replace': (cell) => cell && cell._srFocus && cell._srFocus(),
+    comment: () => startCommenting(),
+    chat: (cell) => { const t = cell && cell.querySelector('[data-chat="input"]'); if (t) t.focus(); },
+    bold: () => SIMPLE_FORMATS.bold.act(),
+    italic: () => SIMPLE_FORMATS.italic.act(),
+    underline: () => SIMPLE_FORMATS.underline.act(),
+    undo: () => SIMPLE_FORMATS.undo.act(),
+    redo: () => SIMPLE_FORMATS.redo.act(),
+  };
   function triggerModuleShortcut(m) {
-    setActivePage(m.z);
-    const cell = gridEl.querySelector(`.ed-module[data-id="${m.id}"]`);
-    if (!cell) return;
-    if (m.type === 'search-replace' && cell._srFocus) cell._srFocus();
-    else if (m.type === 'word-count') showStatsOverlay();
-    else if (m.type === 'comment') startCommenting();
-    else cell.scrollIntoView({ block: 'center' });
+    const fa = AZIONE_SCORCIATOIA[m.type];
+    if (!fa) return;
+    if ((m.z || 0) !== activePage()) setActivePage(m.z);
+    fa(gridEl.querySelector(`.ed-module[data-id="${m.id}"]`));
   }
 
   // ════════════════════════════════════════════════════════════════════
