@@ -24,7 +24,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 // La cartella temporanea si chiede sempre a questo aiuto (CLAUDE.md § Run/test).
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
-import { spiegaChiaviMancanti, descriviEsitoServer } from '../../scripts/bake-default-config.mjs';
+import { spiegaChiaviMancanti, descriviEsitoServer, chiaviAllarmeBake } from '../../scripts/bake-default-config.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RADICE = resolve(__dirname, '..', '..');
