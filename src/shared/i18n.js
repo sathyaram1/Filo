@@ -541,6 +541,17 @@
     options_cookies_trusted_note_other:
       'I siti fidati hanno effetto solo in "Privacy massima". In "Automatico" i tuoi login restano comunque salvati, ' +
       'quindi qui non serve aggiungere nulla.',
+    // #586 — permessi chiesti dai siti
+    security_perm_title: 'Permessi dei siti',
+    security_perm_desc:
+      'Fotocamera, microfono, posizione, notifiche e gli altri permessi che hai dato o negato ai siti. ' +
+      'Un sito che non è qui, prima di usarli, ti chiede con una striscia sotto le schede.',
+    security_perm_empty: 'Nessun sito ha ancora chiesto un permesso.',
+    security_perm_allow: 'Consentito',
+    security_perm_block: 'Bloccato',
+    security_perm_forget_one: 'Torna a chiedere',
+    security_perm_forget_site: 'Dimentica il sito',
+    security_perm_failed: 'Non sono riuscito a salvare la scelta: riprova.',
     // Protezione anti-fingerprinting
     options_fp_title: 'Protezione fingerprinting',
     options_fp_desc:

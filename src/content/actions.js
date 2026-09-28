@@ -113,6 +113,8 @@
   // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
   async function pasteFromClipboard() {
     deps.restorePasteContext();
+    // Gli appunti li legge Filo per l'utente, non il sito: senza, la lettura passerebbe dalla domanda al sito (#586).
+    try { await chrome.runtime.sendMessage({ type: MSG.PERMESSO_FILO, tipo: 'appunti' }); } catch (_) {}
     // Tenta lettura strutturata (testo + immagini)
     try {
       if (navigator.clipboard.read) {

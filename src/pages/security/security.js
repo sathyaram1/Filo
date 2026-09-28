@@ -487,8 +487,112 @@
     save._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
+  // ─── permessi dei siti (#586) ───────────────────────────────────────────────
+  // Le scelte le tiene il main; qui si leggono, si cambiano e si dimenticano, e si rilegge a ogni cambio.
+  const PS = window.SN_PERMESSI_SITI;
+  let permSiti = [];
+  let permTimer = null;
+
+  function setPermError(msg) {
+    const el = $('sec-perm-error');
+    el.textContent = msg || '';
+    el.style.display = msg ? 'block' : 'none';
+  }
+
+  async function loadPermessi() {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.SITE_PERMISSIONS_LIST }); } catch (_) { r = null; }
+    permSiti = r && r.ok && Array.isArray(r.siti) ? r.siti : [];
+    renderPermessi();
+  }
+
+  function scheduleLoadPermessi() {
+    clearTimeout(permTimer);
+    permTimer = setTimeout(loadPermessi, 120);
+  }
+
+  async function mandaPermesso(msg) {
+    setPermError('');
+    let r = null;
+    try { r = await chrome.runtime.sendMessage(msg); } catch (_) { r = null; }
+    if (!r || !r.ok) setPermError(I18n.t('security_perm_failed'));
+    scheduleLoadPermessi();
+  }
+
+  function permButton(text, cls, onClick) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = cls;
+    b.textContent = text;
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  function renderPermessi() {
+    const list = $('perm-list');
+    list.replaceChildren();
+    if (!permSiti.length || !PS) {
+      const li = document.createElement('li');
+      li.className = 'sn-muted sn-perm-vuoto';
+      li.textContent = I18n.t('security_perm_empty');
+      list.appendChild(li);
+      return;
+    }
+    for (const sito of permSiti) {
+      const li = document.createElement('li');
+      li.className = 'sn-perm-sito';
+      li.dataset.origine = sito.origine;
+      const testa = document.createElement('div');
+      testa.className = 'sn-perm-testa';
+      const host = document.createElement('span');
+      host.className = 'sn-perm-host';
+      host.textContent = sito.host;
+      host.title = sito.origine;
+      testa.append(host, permButton(I18n.t('security_perm_forget_site'), 'sn-btn-secondary sn-perm-dimentica',
+        () => mandaPermesso({ type: MSG.SITE_PERMISSIONS_FORGET, origine: sito.origine })));
+      li.appendChild(testa);
+      for (const tipo of Object.keys(PS.TIPI)) {
+        const scelta = sito.scelte[tipo];
+        if (!scelta) continue;
+        const riga = document.createElement('div');
+        riga.className = 'sn-perm-riga';
+        riga.dataset.tipo = tipo;
+        const nome = document.createElement('span');
+        nome.className = 'sn-perm-nome';
+        nome.textContent = PS.TIPI[tipo].nome;
+        const seg = document.createElement('div');
+        seg.className = 'sn-perm-scelta';
+        seg.setAttribute('role', 'group');
+        seg.setAttribute('aria-label', PS.TIPI[tipo].nome);
+        for (const [valore, chiave] of [['consenti', 'security_perm_allow'], ['nega', 'security_perm_block']]) {
+          const b = permButton(I18n.t(chiave), '', () => {
+            if (scelta !== valore) mandaPermesso({ type: MSG.SITE_PERMISSION_SET, origine: sito.origine, tipo, scelta: valore });
+          });
+          b.dataset.valore = valore;
+          b.setAttribute('aria-pressed', scelta === valore ? 'true' : 'false');
+          seg.appendChild(b);
+        }
+        const togli = permButton('×', 'sn-perm-togli',
+          () => mandaPermesso({ type: MSG.SITE_PERMISSION_SET, origine: sito.origine, tipo, scelta: null }));
+        togli.title = I18n.t('security_perm_forget_one');
+        togli.setAttribute('aria-label', `${I18n.t('security_perm_forget_one')}: ${PS.TIPI[tipo].nome}`);
+        riga.append(nome, seg, togli);
+        li.appendChild(riga);
+      }
+      list.appendChild(li);
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    $('sec-perm-title').textContent = I18n.t('security_perm_title');
+    $('sec-perm-desc').textContent = I18n.t('security_perm_desc');
+    loadPermessi();
+    if (chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
+      chrome.runtime.onMessage.addListener((m) => {
+        if (m && m.type === MSG.SITE_PERMISSIONS_UPDATED) scheduleLoadPermessi();
+      });
+    }
     // Niente pulsante "Salva": ogni toggle viene applicato e persistito subito.
     $('sec-protect-ip').addEventListener('change', save);
     $('sec-block-popups').addEventListener('change', save);

@@ -580,6 +580,8 @@
         });
       }
     }
+    ctxPermessiSito = await leggiPermessiScheda(t.id);
+    if (ctxPermessiSito) entries.push({ label: 'Permessi del sito', icon: 'lock', action: 'tab-permessi' });
     entries.push(
       { type: 'separator' },
       { label: 'Chiudi', icon: 'close', action: 'tab-close' },
@@ -629,6 +631,9 @@
       else if (action === 'tab-proxy-clear') api.tabs.clearProxy(id);
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
       else if (action.startsWith('tab-proxy-go:')) proxyTab(id, action.slice('tab-proxy-go:'.length));
+      else if (action === 'tab-permessi') openPermessiMenu();
+      else if (action === 'tab-permessi-gestisci') api.tabs.open('filo://security/security.html#sec-permessi');
+      else if (action.startsWith('tab-permessi-cambia:')) cambiaPermessoScheda(id, action.slice('tab-permessi-cambia:'.length));
     });
   }
 
@@ -748,6 +753,15 @@
         el.appendChild(p);
       }
 
+      // Una scheda in sottofondo che aspetta una risposta sui permessi: la domanda si vede quando ci torni.
+      if (t.id !== state.activeId && Array.isArray(t.permessi) && t.permessi.length) {
+        const pi = document.createElement('span');
+        pi.className = 'perm-ind';
+        pi.dataset.tip = `${PERMESSI.hostCorto(t.permessi[0].host)} aspetta una risposta`;
+        pi.innerHTML = PERMESSI.icona(t.permessi[0].tipi, 12);
+        el.appendChild(pi);
+      }
+
       const title = document.createElement('span');
       title.className = 'title';
       title.textContent = tabLabel(t);
@@ -797,6 +811,7 @@
     // Chrome compatto: la barra indirizzi (icone + URL) si vede SOLO sulla home
     // di Filo. Sui siti resta solo la fila di tab + i controlli finestra.
     applyChrome(isHomeUrl(a ? a.url : null));
+    try { PERMESSI.aggiorna(a); } catch (_) {}
   }
 
   function displayUrl(url) {
@@ -1085,6 +1100,17 @@
   });
   // Esposta per test e per usi programmatici dalla shell stessa.
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
+
+  // Spazio sopra la pagina: la barra dei permessi e il pannello scaricamenti lo chiedono insieme, e la pagina
+  // scende della somma. Il pannello si posa sotto la barra (--perm-h in shell.css).
+  const RISERVE = { permessi: 0, scaricamenti: 0 };
+  function riserva(chi, px) {
+    const v = Math.max(0, Math.round(Number(px) || 0));
+    if (RISERVE[chi] === v) return;
+    RISERVE[chi] = v;
+    document.documentElement.style.setProperty('--perm-h', `${RISERVE.permessi}px`);
+    try { api.tabs.reserveTop && api.tabs.reserveTop(RISERVE.permessi + RISERVE.scaricamenti); } catch (_) {}
+  }
 
   // ─── Scaricamenti della navigazione (#410.1) ───────────────────────────
   // Indicatore nella fila di tab (sempre visibile, non coperto dalla view
@@ -1375,7 +1401,7 @@
       if (!panelOpen || !panel) return;
       requestAnimationFrame(() => {
         const h = Math.ceil(panel.getBoundingClientRect().height);
-        try { api.tabs.reserveTop && api.tabs.reserveTop(h + 6); } catch (_) {}
+        riserva('scaricamenti', h + 6);
       });
     }
     function openPanel() {
@@ -1399,7 +1425,7 @@
       firmaElenco = '';
       if (panel) panel.hidden = true;
       dlBtn.classList.remove('open');
-      try { api.tabs.reserveTop && api.tabs.reserveTop(0); } catch (_) {}
+      riserva('scaricamenti', 0);
     }
     function togglePanel() { panelOpen ? closePanel() : openPanel(); }
 
@@ -1455,6 +1481,165 @@
 
     // Cronologia iniziale (sopravvive al riavvio).
     api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
+  }
+
+  // ─── Permessi chiesti dai siti (#586) ─────────────────────────────────────
+  // La domanda sta qui, fuori dalla pagina: il sito non la può toccare né imitare. Il «sì» si arma solo a barra
+  // ferma da ARMA_MS, come le domande sugli scaricamenti (patterns/una-conferma-non-e-un-avviso-sopra-un-fatto-gia-compiuto.md).
+  const PERMESSI = (() => {
+    const P = window.SN_PERMESSI_SITI;
+    const ARMA_MS = 1000;
+    let bar = null;
+    let firma = '';
+    let fermoDa = 0;
+    let timerArma = null;
+
+    // Si tiene la coda del nome: è lì che si legge di chi è il sito.
+    function hostCorto(host) {
+      const h = String(host || '');
+      return h.length > 48 ? `…${h.slice(-47)}` : h;
+    }
+
+    function icona(tipi, size) {
+      const t = (tipi || [])[0];
+      const nome = (P && P.TIPI[t] && P.TIPI[t].icona) || 'lock';
+      return typeof ICONS[nome] === 'function' ? ICONS[nome](size || 16) : '';
+    }
+
+    function ensureBar() {
+      if (bar) return bar;
+      bar = document.createElement('div');
+      bar.id = 'perm-bar';
+      bar.className = 'perm-bar';
+      bar.setAttribute('role', 'region');
+      bar.setAttribute('aria-label', 'Permessi chiesti dal sito');
+      bar.hidden = true;
+      document.body.appendChild(bar);
+      return bar;
+    }
+
+    function bottone(testo, classe, fn) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = classe;
+      b.textContent = testo;
+      b.addEventListener('click', fn);
+      return b;
+    }
+
+    function rispondi(id, scelta, r) {
+      r.dataset.risposto = '1';
+      for (const b of r.querySelectorAll('button')) b.disabled = true;
+      api.message({ type: 'site_permission_answer', id, scelta }).then((res) => {
+        if (res && res.ok) return;
+        // La domanda non c'è più (pagina cambiata nel frattempo): la riga sparisce col prossimo aggiornamento.
+        showToast('La pagina non aspetta più questa risposta.');
+      }).catch(() => {});
+    }
+
+    function riga(d) {
+      const r = document.createElement('div');
+      r.className = 'perm-row';
+      r.dataset.id = d.id;
+      const ico = document.createElement('span');
+      ico.className = 'perm-ico';
+      ico.innerHTML = icona(d.tipi, 16);
+      const testo = document.createElement('span');
+      testo.className = 'perm-testo';
+      const host = document.createElement('b');
+      host.textContent = hostCorto(d.host);
+      host.title = d.host;
+      testo.append(host, document.createTextNode(` vuole ${P ? P.verbi(d.tipi) : 'usare un permesso'}`));
+      const azioni = document.createElement('div');
+      azioni.className = 'perm-azioni';
+      const schermo = (d.tipi || []).includes('schermo');
+      const si = bottone(schermo ? 'Condividi lo schermo' : 'Consenti', 'perm-btn perm-si', () => rispondi(d.id, 'consenti', r));
+      si.dataset.si = '1';
+      const no = bottone('Nega', 'perm-btn perm-no', () => rispondi(d.id, 'nega', r));
+      const x = bottone('', 'perm-chiudi', () => rispondi(d.id, 'ignora', r));
+      x.dataset.tip = 'Non ora';
+      x.setAttribute('aria-label', 'Non ora');
+      if (typeof ICONS.close === 'function') x.innerHTML = ICONS.close(12);
+      else x.textContent = '×';
+      azioni.append(si, no, x);
+      r.append(ico, testo, azioni);
+      return r;
+    }
+
+    function arma() {
+      if (!bar) return;
+      const manca = fermoDa + ARMA_MS - Date.now();
+      for (const b of bar.querySelectorAll('.perm-row:not([data-risposto]) [data-si="1"]')) b.disabled = manca > 0;
+      if (manca > 0 && !timerArma) timerArma = setTimeout(() => { timerArma = null; arma(); }, manca + 20);
+    }
+
+    function misura() {
+      if (!bar || bar.hidden) { riserva('permessi', 0); return; }
+      requestAnimationFrame(() => { if (bar && !bar.hidden) riserva('permessi', Math.ceil(bar.getBoundingClientRect().height)); });
+    }
+
+    // Si rifà solo quando cambiano le domande: gli aggiornamenti della scheda (titolo, caricamento) sono continui.
+    function aggiorna(tab) {
+      const domande = tab && Array.isArray(tab.permessi) ? tab.permessi : [];
+      const nuova = tab ? `${tab.id}|${domande.map((d) => d.id).join(',')}` : '';
+      ensureBar();
+      if (!domande.length) {
+        firma = nuova;
+        if (!bar.hidden) { bar.hidden = true; bar.replaceChildren(); misura(); }
+        return;
+      }
+      if (nuova === firma && !bar.hidden) return;
+      firma = nuova;
+      fermoDa = Date.now();
+      bar.replaceChildren(...domande.map(riga));
+      bar.hidden = false;
+      arma();
+      misura();
+    }
+
+    window.addEventListener('resize', misura);
+    return { aggiorna, icona, hostCorto };
+  })();
+
+  // Tasto destro sulla scheda: le scelte ricordate per quel sito si revocano da qui.
+  let ctxPermessiSito = null;
+  async function leggiPermessiScheda(tabId) {
+    try {
+      const r = await api.message({ type: 'site_permissions_of_tab', tabId });
+      return r && r.ok && r.sito && Object.keys(r.sito.scelte || {}).length ? r.sito : null;
+    } catch (_) { return null; }
+  }
+
+  function openPermessiMenu() {
+    const sito = ctxPermessiSito;
+    const P = window.SN_PERMESSI_SITI;
+    if (!sito || !P) return;
+    const entries = Object.keys(P.TIPI).filter((t) => sito.scelte[t]).map((t) => ({
+      label: `${sito.scelte[t] === 'consenti' ? 'Revoca' : 'Consenti'} ${P.TIPI[t].nome.toLowerCase()}`,
+      action: `tab-permessi-cambia:${t}`,
+    }));
+    entries.push({ type: 'separator' }, { label: 'Gestisci permessi', icon: 'options', action: 'tab-permessi-gestisci' });
+    api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
+  }
+
+  async function cambiaPermessoScheda(tabId, tipo) {
+    const sito = ctxPermessiSito;
+    const P = window.SN_PERMESSI_SITI;
+    if (!sito || !P || !P.TIPI[tipo]) return;
+    const revoca = sito.scelte[tipo] === 'consenti';
+    let res = null;
+    try {
+      res = await api.message({ type: 'site_permission_set', tabId, origine: sito.origine, tipo, scelta: revoca ? null : 'consenti' });
+    } catch (_) { res = null; }
+    const nome = P.TIPI[tipo].nome.toLowerCase();
+    if (!res || !res.ok) { showToast(`Non sono riuscito a cambiare il permesso (${nome}): riprova.`); return; }
+    if (revoca && P.TIPI[tipo].continuo) {
+      NOTIFS.show(`Permesso tolto a ${sito.host} (${nome}). Quello che la pagina ha già aperto resta acceso finché non la ricarichi.`, {
+        actions: [{ label: 'Ricarica', onClick: () => api.tabs.reload(tabId) }],
+      });
+    } else {
+      showToast(revoca ? `Permesso tolto a ${sito.host} (${nome}): la prossima volta ti chiede.` : `Permesso dato a ${sito.host} (${nome}).`);
+    }
   }
 
   newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/'));

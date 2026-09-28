@@ -23,7 +23,13 @@ module.exports = function register(on, ctx) {
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
   // Le chiavi web non devono MAI vedere i segreti dentro `settings.apiKeys`: il
   // renderer non ne ha bisogno (le richieste AI allegano la chiave nel main).
+  // Cosa un sito ha il permesso di fare lo decide l'utente dalle superfici di Filo: la chiave non esce e non entra dal web.
+  const PERMESSI_KEY = SN_CONST.STORAGE_KEYS.SITE_PERMISSIONS;
   function redactForWeb(value) {
+    if (value && typeof value === 'object' && PERMESSI_KEY in value) {
+      value = { ...value };
+      delete value[PERMESSI_KEY];
+    }
     if (!value || typeof value !== 'object' || !value[SETTINGS_KEY]) return value;
     const s = value[SETTINGS_KEY];
     if (!s || typeof s !== 'object' || !s.apiKeys) return value;
@@ -31,7 +37,7 @@ module.exports = function register(on, ctx) {
   }
   // Una richiesta tocca la chiave `settings`? (set: oggetto; remove: lista chiavi)
   const touchesSettings = (keys) =>
-    (Array.isArray(keys) ? keys : [keys]).some((k) => k === SETTINGS_KEY);
+    (Array.isArray(keys) ? keys : [keys]).some((k) => k === SETTINGS_KEY || k === PERMESSI_KEY);
 
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
   on('_storage:get', async (msg, sender, origin) => {

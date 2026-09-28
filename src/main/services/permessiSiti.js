@@ -4,8 +4,9 @@
 
 const path = require('node:path');
 const P = require(path.join(__dirname, '..', '..', 'shared', 'permessiSiti.js'));
+require(path.join(__dirname, '..', '..', 'shared', 'constants.js'));
 
-const CHIAVE = 'sitePermissions';
+const CHIAVE = globalThis.SN_CONST.STORAGE_KEYS.SITE_PERMISSIONS;
 // Una pagina che chiede a raffica non gonfia la coda: oltre il tetto la risposta è no, subito.
 const TETTO_DOMANDE_PER_SCHEDA = 20;
 const TETTO_ATTESE_PER_DOMANDA = 100;

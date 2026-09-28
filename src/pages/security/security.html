@@ -14,6 +14,7 @@
   <script src="filo://shared/i18n.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/permessiSiti.js"></script>
 </head>
 <body>
   <main class="sn-page" id="page">
@@ -199,6 +200,13 @@
             </span>
           </label>
         </div>
+      </section>
+
+      <section id="sec-permessi" style="margin-top:28px">
+        <h2 id="sec-perm-title" style="font-size:1.05rem;margin-bottom:4px"></h2>
+        <p class="sn-muted" id="sec-perm-desc" style="margin-top:0"></p>
+        <div id="sec-perm-error" role="alert" aria-live="polite" style="display:none;color:var(--sn-error);font-size:12px;margin-bottom:8px"></div>
+        <ul id="perm-list" class="sn-perm-list"></ul>
       </section>
 
       <div class="sn-toggle-row" id="sec-export-row" style="margin-top:28px">

@@ -5,12 +5,13 @@
 (function (global) {
   'use strict';
 
-  // L'ordine è quello in cui si mostrano. `ricorda: false`: la scelta vale per quella volta sola, mai salvata.
+  // L'ordine è quello in cui si mostrano. `ricorda: false`: vale per quella volta sola, mai salvata.
+  // `continuo`: una volta aperto il flusso resta alla pagina; toglierlo vale dalla richiesta dopo.
   const TIPI = {
-    camera: { nome: 'Fotocamera', icona: 'camera', verbo: 'usare la fotocamera' },
-    microfono: { nome: 'Microfono', icona: 'mic', verbo: 'usare il microfono' },
+    camera: { nome: 'Fotocamera', icona: 'camera', verbo: 'usare la fotocamera', continuo: true },
+    microfono: { nome: 'Microfono', icona: 'mic', verbo: 'usare il microfono', continuo: true },
     schermo: { nome: 'Schermo', icona: 'screenshot', verbo: 'vedere il tuo schermo', ricorda: false },
-    posizione: { nome: 'Posizione', icona: 'location', verbo: 'sapere dove ti trovi' },
+    posizione: { nome: 'Posizione', icona: 'location', verbo: 'sapere dove ti trovi', continuo: true },
     notifiche: { nome: 'Notifiche', icona: 'bell', verbo: 'mandarti notifiche' },
     appunti: { nome: 'Appunti', icona: 'clipboard', verbo: 'leggere quello che hai copiato' },
     midi: { nome: 'Strumenti MIDI', icona: 'lock', verbo: 'usare i tuoi strumenti MIDI' },

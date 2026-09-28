@@ -13,6 +13,9 @@
     // un link a un file). Sopravvive al riavvio: la pagina elenco (#410.3) la
     // legge da qui. Schema per voce: vedi src/main/services/downloads.js.
     DOWNLOADS: 'downloads',
+    // #586 — le scelte sui permessi dei siti: { origine → { tipo → 'consenti'|'nega' } }.
+    // Vedi src/main/services/permessiSiti.js; da origine web non si legge né si scrive.
+    SITE_PERMISSIONS: 'sitePermissions',
     // §3.1 — tab archiviate (chiuse = salvate). Metadati per tab: vedi
     // services/archivedTabs.js. Mostrate in filo://archive raggruppate per giorno.
     ARCHIVED_TABS: 'archivedTabs',

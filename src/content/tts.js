@@ -569,6 +569,8 @@
       return;
     }
     let stream;
+    // Il microfono lo apre Filo per dettare, non il sito: senza, finirebbe nella domanda al sito (#586).
+    try { await chrome.runtime.sendMessage({ type: MSG.PERMESSO_FILO, tipo: 'microfono' }); } catch (_) {}
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (_) {

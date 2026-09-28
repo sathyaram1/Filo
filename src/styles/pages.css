@@ -782,3 +782,49 @@ section:has(#dictList) .sn-spell-add-row {
   font-size: 12px;
   padding: 2px 8px;
 }
+
+/* #586 — permessi dei siti in Sicurezza: una scheda per sito, una riga per permesso ricordato. */
+.sn-page .sn-perm-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.sn-page .sn-perm-vuoto { border: none; padding: 0; }
+.sn-page .sn-perm-sito {
+  border: 1px solid var(--sn-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.sn-page .sn-perm-testa { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sn-page .sn-perm-host { font-weight: 600; overflow-wrap: anywhere; min-width: 0; }
+.sn-page .sn-perm-testa button.sn-perm-dimentica { font-size: 12px; padding: 2px 8px; flex: 0 0 auto; }
+.sn-page .sn-perm-riga { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.sn-page .sn-perm-nome { flex: 1 1 auto; min-width: 0; }
+.sn-page .sn-perm-scelta {
+  display: inline-flex;
+  border: 1px solid var(--sn-border);
+  border-radius: 999px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.sn-page .sn-perm-scelta button {
+  border: none;
+  background: transparent;
+  color: var(--sn-fg);
+  font-size: 12px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.sn-page .sn-perm-scelta button:hover { background: var(--sn-hover); }
+.sn-page .sn-perm-scelta button[aria-pressed="true"] { background: var(--sn-btn-bg); color: var(--sn-btn-fg); }
+.sn-page button.sn-perm-togli {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sn-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sn-page button.sn-perm-togli:hover { background: var(--sn-hover); color: var(--sn-fg); }
