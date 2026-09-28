@@ -276,7 +276,17 @@ test('config remota col fornitore gemini: con i crediti Filo funziona', async ({
   const filo = { tab: { id: 8, url: 'filo://newtab/' }, url: 'filo://newtab/' };
   const onb = await app.evaluate(async (_, s) => globalThis.SN_HANDLE_MESSAGE({ type: 'filo_get_onboarding', peek: true }, s), filo);
   expect(onb.ready).toBe(true);
+  const emb = await app.evaluate(async (_, s) => {
+    const P = globalThis.SN_PROVIDERS.getProvider('openrouter');
+    globalThis.__embed = [];
+    P.embed = async ({ model, texts }) => { globalThis.__embed.push(model); return { vectors: texts.map(() => [0.1, 0.2, 0.3]), usage: {} }; };
+    const r = await globalThis.SN_HANDLE_MESSAGE({ type: 'search_archived_tabs', query: 'ricetta' }, s);
+    return { r, modelli: globalThis.__embed };
+  }, filo);
+  console.log('[GEMINI] indicizzazione archivio:', JSON.stringify(emb).slice(0, 300));
   const nuova = await nuovaHome(app, shell);
+  await nuova.waitForTimeout(6000);
+  console.log('[GEMINI] scheda nuova:', JSON.stringify(await stato_home(nuova)));
   await expect(nuova.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 20_000 });
 
   // Chi i modelli li sceglie da sé, con un fornitore «gemini» salvato da una versione vecchia.
