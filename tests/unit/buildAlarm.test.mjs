@@ -53,13 +53,13 @@ test('le chiavi del cancello unit vengono dalle righe location: del registro, re
   // Come le scrive il runner Windows (Node 20 e 22): barre rovesciate, a volte raddoppiate, lettera del disco.
   const registro = [
     'not ok 3 - il conto torna',
-    "    location: 'D:\\a\\Filo\\Filo\\tests\\unit\\conto.test.mjs:12:3'",
+    String.raw`    location: 'D:\\a\\Filo\\Filo\\tests\\unit\\conto.test.mjs:12:3'`,
     'not ok 4 - gruppo',
-    "  location: 'D:\a\Filo\Filo\tests\unit\conto.test.mjs:10:1'",
-    "  location: 'D:\a\Filo\Filo\tests\unit\altro.test.mjs:4:1'",
+    String.raw`  location: 'D:\a\Filo\Filo\tests\unit\conto.test.mjs:10:1'`,
+    String.raw`  location: 'D:\a\Filo\Filo\tests\unit\altro.test.mjs:4:1'`,
     'ok 5 - verde',
   ].join('\r\n');
-  assert.deepEqual(chiaviDelRegistroUnit(registro, 'D:\a\Filo\Filo'),
+  assert.deepEqual(chiaviDelRegistroUnit(registro, String.raw`D:\a\Filo\Filo`),
     ['unit:tests/unit/conto.test.mjs', 'unit:tests/unit/altro.test.mjs']);
   // Senza radice (o con una diversa) si riparte da tests/.
   assert.deepEqual(chiaviDelRegistroUnit(registro, ''), ['unit:tests/unit/conto.test.mjs', 'unit:tests/unit/altro.test.mjs']);
