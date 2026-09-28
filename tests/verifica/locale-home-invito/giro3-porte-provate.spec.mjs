@@ -96,19 +96,6 @@ test('nuovo: scrivo prima dei crediti, poi metto la chiave nelle Impostazioni, e
   await expect(home.locator('#bubbles')).not.toContainText(INVITO);
 });
 
-test('esplora: già accolto, scrivo prima dei crediti, riscatto: cosa resta nella home', async ({ app, openTab }) => {
-  test.setTimeout(180_000);
-  await prepara(app, stato.base);
-  await onboardingFatto(app);
-  const home = await homePage(app);
-  await home.reload();
-  await scriviSenzaCrediti(home);
-  await riscattaDaCrediti(openTab);
-  await home.waitForTimeout(6000);
-  const stato2 = await home.evaluate(() => ({ state: document.body.dataset.state, bolle: document.getElementById('bubbles').innerText, msg: document.getElementById('homeMessage').innerText }));
-  console.log('ESPLORA-GIA-ACCOLTO', JSON.stringify(stato2));
-});
-
 test('config remota su «gemini»: coi crediti la chat della home risponde col modello', async ({ app, openTab }) => {
   test.setTimeout(180_000);
   stato.modelsDoc = {
