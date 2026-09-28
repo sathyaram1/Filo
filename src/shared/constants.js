@@ -68,6 +68,9 @@
     PATHS_OUTBOX: 'pathsOutbox',
     CATEGORIES: 'categories',
     BLOCKLIST: 'blocklist',
+    // #754 — cosa Filo ha fatto col banner dei cookie di ogni sito ({ sito → { rejected, hidden, at } }): il sito
+    // si ricorda il rifiuto e non rimostra il banner, quindi il menu della scheda lo legge da qui. Vedi tabs/tabCookies.js.
+    COOKIE_SITES: 'cookieSites',
     AI_CACHE: 'aiCache',
     CLIPBOARD_HISTORY: 'clipboardHistory',
     PERSONAL_DICT: 'sn_personal_dict',

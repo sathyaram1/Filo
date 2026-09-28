@@ -2,7 +2,12 @@
 // nascosti con la pagina sbloccata, e il segno nel menu della scheda con la strada per rivedere il banner.
 // Le prove di base (GPC, OneTrust, YouTube, tracker) stanno in cookies.spec.mjs.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
+import { _electron as electron } from '@playwright/test';
+import { rmSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -293,4 +298,137 @@ test('Sicurezza: il sito coi banner compare nell\'elenco, anche a pagina già ap
   await sec.locator('#cookie-banners-list button').click();
   await expect(sec.locator('#sec-cookies-banners')).toBeHidden();
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.cookies.bannerSites), { timeout: 6_000 }).toEqual([]);
+});
+
+// ── il sito ricorda il rifiuto: il segno e «Mostra il banner» restano per il sito, non per la scheda ────────
+
+async function aspettaChiusa(page) {
+  await expect.poll(() => page.isClosed(), { timeout: 8_000 }).toBe(true);
+}
+
+test('in una scheda nuova dello stesso sito, senza più il banner, il menu dice ancora cosa è successo e offre di rivederlo', async ({ app, shell, openTab, testServer }) => {
+  const a = await testServer.openReady(openTab, RICORDA);
+  await a.waitForFunction(() => document.cookie.includes('OptanonConsent=rifiutato'), null, { timeout: 8_000 });
+  const { activeId } = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  await shell.evaluate((id) => window.filoShell.tabs.close(id), activeId);
+  await aspettaChiusa(a);
+
+  const b = await testServer.openReady(openTab, RICORDA);
+  await sleep(1500);
+  // Il sito si ricorda il rifiuto e il banner non compare: proprio per questo è il menu che deve dirlo.
+  expect(await b.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(false);
+  const menu = await openAndRead(app, () => rightClickTab(shell), 'Cookie non necessari rifiutati');
+  expect(menu).toContain('Mostra il banner dei cookie');
+});
+
+test('dopo aver riaperto Filo il menu della scheda offre ancora «Mostra il banner dei cookie» sul sito rifiutato', async ({ testServer }) => {
+  test.setTimeout(90_000);
+  const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const userData = cartellaTemporanea('filo-test-');
+  const avvia = async () => {
+    const app = await electron.launch({
+      args: [...argomentiScala, '.'],
+      cwd: APP_ROOT,
+      env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
+    });
+    const shell = await app.firstWindow();
+    await shell.waitForLoadState('domcontentloaded');
+    const open = async (url) => {
+      await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+      let page = null;
+      await expect.poll(() => { page = app.windows().find((w) => w.url() === url); return !!page; }, { timeout: 10_000 }).toBe(true);
+      await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
+      return page;
+    };
+    return { app, shell, open };
+  };
+  const url = testServer.html(RICORDA);
+  try {
+    let run = await avvia();
+    try {
+      const a = await run.open(url);
+      await a.waitForFunction(() => document.cookie.includes('OptanonConsent=rifiutato'), null, { timeout: 8_000 });
+      await openAndRead(run.app, () => rightClickTab(run.shell), 'Cookie non necessari rifiutati');
+      await run.app.evaluate(async ({ session }) => { await session.defaultSession.cookies.flushStore(); });
+      await sleep(1200);
+    } finally {
+      await chiudiApp(run.app);
+    }
+    run = await avvia();
+    try {
+      const b = await run.open(url);
+      await sleep(1500);
+      expect(await b.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(false);
+      const menu = await openAndRead(run.app, () => rightClickTab(run.shell), 'Cookie non necessari rifiutati');
+      expect(menu).toContain('Mostra il banner dei cookie');
+    } finally {
+      await chiudiApp(run.app);
+    }
+  } finally {
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  }
+});
+
+// ── banner senza «rifiuta» dentro un riquadro (Sourcepoint «accetta o abbonati») ─────────────────────────
+
+// Righe vere di EasyList Cookie: la lista non nomina il contenitore di Sourcepoint, se non sito per sito.
+const ESTRATTO_EASYLIST_COOKIE = [
+  '###cookie-banner',
+  '###didomi-notice',
+  '##.qc-cmp2-container',
+  'kooora.com##div[id^="sp_message_container_"]',
+].join('\n');
+
+function spAbbonatiFrame(testServer) {
+  return testServer.html(`<title>SP_PAY_FRAME</title>
+    <div class="message-container"><div id="notice" class="message type-modal" style="padding:20px">
+      <div class="message-component message-row"><p class="message-component">Accetta i cookie per la pubblicità, oppure abbonati.</p></div>
+      <div class="message-component message-row">
+        <button class="message-component message-button no-children focusable sp_choice_type_11" title="Accetta e continua"
+          onclick="parent.postMessage('sp:accept','*')">Accetta e continua</button>
+        <button class="message-component message-button no-children focusable sp_choice_type_9" title="Abbonati"
+          onclick="parent.postMessage('sp:subscribe','*')">Abbonati</button>
+      </div>
+    </div></div>`).replace('127.0.0.1', 'blocked.test');
+}
+
+test('banner «accetta o abbonati» dentro un riquadro (forma Sourcepoint): nascosto, la pagina scorre, niente accettato', async ({ app, openTab, testServer, shell }) => {
+  await app.evaluate((_e, txt) => globalThis.__filoCookieBanners.setListForTest(txt), ESTRATTO_EASYLIST_COOKIE);
+  const page = await testServer.openReady(openTab, `<title>SP_PAY_TOP</title>
+    <style>html.sp-message-open{overflow:hidden!important} body{height:4000px;margin:0}</style>
+    <div id="sp_message_container_1"
+      style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2147483647;display:flex;align-items:center;justify-content:center">
+      <iframe id="sp_message_iframe_1" src="${spAbbonatiFrame(testServer)}" style="width:560px;height:300px;border:0;background:#fff"></iframe>
+    </div>
+    <h1>Articolo</h1><p>contenuto</p>
+    <script>
+      document.documentElement.classList.add('sp-message-open');
+      addEventListener('message', (e) => {
+        if (typeof e.data !== 'string' || !e.data.startsWith('sp:')) return;
+        window.__sp = e.data;
+        if (e.data === 'sp:accept') document.cookie = 'tracking=1; path=/';
+      });
+    </script>`);
+  await expect.poll(() => page.evaluate(() => {
+    const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+    return !!el && !el.closest('#sp_message_container_1');
+  }).catch(() => false), { timeout: 15_000 }).toBe(true);
+  await page.mouse.move(200, 200);
+  await expect.poll(async () => {
+    await page.mouse.wheel(0, 400);
+    return page.evaluate(() => (document.scrollingElement || document.documentElement).scrollTop);
+  }, { timeout: 8_000 }).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.__sp)).toBeUndefined();
+  expect(await page.evaluate(() => document.cookie)).not.toContain('tracking');
+  await expect.poll(async () => (await tabCookies(shell))?.hidden, { timeout: 8_000 }).toBe(true);
+});
+
+test('un riquadro nel flusso della pagina col suo banner senza «rifiuta» resta: è contenuto, non un velo (controprova)', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<title>WIDGET</title>
+    <h1>Prenota un tavolo</h1>
+    <iframe id="widget" src="${spAbbonatiFrame(testServer)}" style="width:560px;height:300px;border:1px solid #ccc"></iframe>
+    <p>contenuto</p>`);
+  await sleep(7000);
+  expect(await page.evaluate(() => getComputedStyle(document.getElementById('widget')).display)).not.toBe('none');
+  expect(await page.evaluate(() => document.getElementById('widget').getBoundingClientRect().height)).toBeGreaterThan(100);
 });

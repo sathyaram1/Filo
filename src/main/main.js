@@ -216,6 +216,8 @@ app.whenReady().then(async () => {
     try { await require('./services/adblock').init(s); } catch (_) {}
     // EasyList Cookie (banner da nascondere): cache su disco e aggiornamento settimanale in sottofondo.
     require('./services/cookieBanners').init(s).catch(() => {});
+    // Cosa Filo ha fatto coi banner dei singoli siti: il menu della scheda lo mostra anche alla visita dopo.
+    try { await require('./tabs/tabCookies').loadRemembered(); } catch (_) {}
     // Blocco apertura siti in blacklist (#170.3): legge la config dalle
     // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}

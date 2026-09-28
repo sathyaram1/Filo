@@ -81,6 +81,22 @@ module.exports = function register(on, ctx) {
     return { ok: true, selectors: require('../cookieBanners').matchTokens(host, clean(msg && msg.ids), clean(msg && msg.classes)) };
   });
 
+  // Il riquadro che l'ha detto può stare più giù nell'albero: la pagina vede solo il suo figlio diretto.
+  on(MSG.COOKIES_FRAME_BANNER, async (msg, sender) => {
+    const wc = sender && sender.wc;
+    const frame = sender && sender.frame;
+    const top = wc && !wc.isDestroyed() && wc.mainFrame;
+    const same = (a, b) => a === b || !!(a && b && a.frameTreeNodeId === b.frameTreeNodeId);
+    if (!top || !frame || same(frame, top)) return { ok: false };
+    let f = frame;
+    while (f.parent && !same(f.parent, top)) f = f.parent;
+    if (!f.parent) return { ok: false };
+    try {
+      top.send('filo:broadcast', { type: MSG.COOKIES_HIDE_FRAME, url: String(f.url || ''), origin: String(f.origin || '') });
+    } catch (_) { return { ok: false }; }
+    return { ok: true };
+  });
+
   on(MSG.COOKIES_OUTCOME, async (msg, sender) => {
     const win = winOf(sender);
     const tabId = sender && sender.tab && sender.tab.id;

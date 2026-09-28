@@ -11,6 +11,8 @@
   const T_RULE = MSG.COOKIES_RULE || 'cookies_rule';
   const T_OUTCOME = MSG.COOKIES_OUTCOME || 'cookies_outcome';
   const T_TOKENS = MSG.COOKIES_BANNER_TOKENS || 'cookies_banner_tokens';
+  const T_FRAME = MSG.COOKIES_FRAME_BANNER || 'cookies_frame_banner';
+  const T_HIDE_FRAME = MSG.COOKIES_HIDE_FRAME || 'cookies_hide_frame';
 
   const IS_TOP = (() => { try { return window.top === window.self; } catch (_) { return false; } })();
 
@@ -309,6 +311,7 @@
     firstSeen: new Map(),
     rules: new Map(),
     asking: new Set(),
+    shownCmp: null,
   };
 
   function comRule(name) {
@@ -347,7 +350,9 @@
       const cmp = R.makeCmp(name, rule, cfg.topUrl || location.href);
       if (!cmp.detect()) { com.tried.add(name); continue; }
       if (!com.firstSeen.has(name)) com.firstSeen.set(name, now);
-      if (!cmp.isShowing()) {
+      const showing = cmp.isShowing();
+      if (showing) com.shownCmp = cmp;
+      if (!showing) {
         // Consent-O-Matic lo riguarda per poco più di un secondo; qui qualche secondo, poi si arrende.
         if (now - com.firstSeen.get(name) > 6000) com.tried.add(name);
         else { waiting = true; scheduleScanIn(400); }
@@ -412,7 +417,11 @@
     reported.add('rejected');
     const go = () => send({ type: T_OUTCOME, outcome: 'rejected', via: String(via || '').slice(0, 60) });
     if (!IS_TOP || !hasTcf()) { go(); return; }
-    tcfConfirmsReject().then((ok) => { if (ok !== false) go(); else reported.delete('rejected'); });
+    tcfConfirmsReject().then((ok) => {
+      if (ok !== false) { go(); return; }
+      reported.delete('rejected');
+      send({ type: T_OUTCOME, outcome: 'unconfirmed' });
+    });
   }
 
   function noteHidden() {
@@ -445,6 +454,85 @@
       if (B.hide(el)) noteHidden();
     }
     if (recheck) scheduleScanIn(recheck);
+  }
+
+  // ─── banner senza «rifiuta» dentro un riquadro: lo nasconde la pagina ───────
+  //
+  // Il riquadro riconosce il banner (regola a mano o Consent-O-Matic) ma non può nascondersi né sbloccare la
+  // pagina: lo dice al main, che passa alla pagina l'indirizzo del riquadro da nascondere.
+
+  const FRAME_REPORT_MS = 3000;
+  let frameSeenAt = 0;
+
+  // Solo il banner a schermo: un «Impostazioni cookie» nel piè di pagina di un riquadro qualsiasi non è un banner.
+  function handShowing() {
+    for (const cmp of CMPS) {
+      if (!cmp.showing) continue;
+      const roots = cmp.shadowHosts ? [document, ...shadowRootsOf(cmp.shadowHosts)] : [document];
+      if (roots.some((r) => queryIn(r, cmp.showing))) return true;
+    }
+    return false;
+  }
+
+  function frameTick(handAny) {
+    if (IS_TOP || reported.has('rejected') || reported.has('frame')) return;
+    let showing = false;
+    try { showing = (!!com.shownCmp && !com.busy && com.shownCmp.isShowing()) || (handAny && handShowing()); } catch (_) {}
+    if (!showing) { frameSeenAt = 0; return; }
+    const now = Date.now();
+    if (!frameSeenAt) frameSeenAt = now;
+    const wait = Math.max(FRAME_REPORT_MS - (now - frameSeenAt), ACTION_GRACE_MS - (now - lastActionAt));
+    if (wait > 0) { scheduleScanIn(wait + 20); return; }
+    reported.add('frame');
+    send({ type: T_FRAME });
+  }
+
+  function originOf(u) {
+    try { return new URL(u, location.href).origin; } catch (_) { return ''; }
+  }
+
+  function sameUrl(a, b) {
+    try {
+      const x = new URL(a, location.href);
+      const y = new URL(b);
+      x.hash = ''; y.hash = '';
+      return x.href === y.href;
+    } catch (_) { return false; }
+  }
+
+  function pinned(el) {
+    try { const p = getComputedStyle(el).position; return p === 'fixed' || p === 'sticky'; } catch (_) { return false; }
+  }
+
+  // Il velo che porta il riquadro: l'antenato fisso più esterno senza contenuto suo, o il riquadro se è fisso lui.
+  // Un riquadro nel flusso della pagina (un widget di prenotazione col suo banner) è contenuto: null, resta.
+  function frameBox(f) {
+    let box = pinned(f) ? f : null;
+    for (let n = f.parentElement; n && n !== document.body && n !== document.documentElement; n = n.parentElement) {
+      if (!pinned(n)) continue;
+      if ((n.innerText || '').trim().length > 300 || n.querySelectorAll('iframe,video').length > 1) break;
+      box = n;
+    }
+    return box;
+  }
+
+  const pendingFrames = [];
+
+  function hideFrame(m) {
+    if (!IS_TOP) return;
+    if (!cfg) { pendingFrames.push(m); return; }
+    const B = global.SN_COOKIE_BANNERS;
+    if (!active || !banners || !B) return;
+    let frames = [];
+    try { frames = [...document.querySelectorAll('iframe')].filter(isVisible); } catch (_) {}
+    const exact = frames.filter((f) => m.url && sameUrl(f.src, m.url));
+    const hits = exact.length ? exact : frames.filter((f) => m.origin && originOf(f.src) === m.origin);
+    let any = false;
+    for (const f of hits) {
+      const box = frameBox(f);
+      if (box && B.hide(box)) any = true;
+    }
+    if (any) noteHidden();
   }
 
   // ─── riscrittura embed YouTube → nocookie ──────────────────────────────────
@@ -502,7 +590,8 @@
       if (comWorking) return;
       const fb = findRejectText(document, false);
       if (fb && clickEl(fb)) { noteRejected('testo'); return; }
-      bannerTick(hand.any || com.firstSeen.size > 0);
+      if (IS_TOP) bannerTick(hand.any || com.firstSeen.size > 0);
+      else frameTick(hand.any);
     } catch (_) {}
   }
 
@@ -586,6 +675,7 @@
     if (!banners && wasBanners) stopBanners();
     scheduleScan();
     hunt();
+    for (const m of pendingFrames.splice(0)) hideFrame(m);
   }
 
   function applyMode(m) {
@@ -604,6 +694,7 @@
   try {
     chrome.runtime.onMessage.addListener((m) => {
       if (m && m.type === T_UPDATE) load();
+      else if (m && m.type === T_HIDE_FRAME) hideFrame(m);
     });
   } catch (_) {}
 

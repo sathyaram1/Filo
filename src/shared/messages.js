@@ -597,8 +597,12 @@
     // Aperti alle pagine web di proposito: li chiede il content script di ogni sito, e non portano dati
     // dell'utente. La regola Consent-O-Matic è pubblica; l'esito vale solo per la scheda di chi lo manda.
     COOKIES_RULE: 'cookies_rule',                   // { name } → { ok, rule }
-    COOKIES_OUTCOME: 'cookies_outcome',             // { outcome: 'rejected'|'hidden' } → { ok }
+    COOKIES_OUTCOME: 'cookies_outcome',             // { outcome: 'rejected'|'hidden'|'unconfirmed' } → { ok }
     COOKIES_BANNER_TOKENS: 'cookies_banner_tokens', // { ids, classes } → { ok, selectors } (quelli della lista)
+    // Un riquadro con un banner che non ha «rifiuta» lo dice al main, che passa alla pagina l'indirizzo del riquadro
+    // suo figlio da nascondere: fra frame si passa dal main, una postMessage la saprebbe scrivere anche il sito.
+    COOKIES_FRAME_BANNER: 'cookies_frame_banner',   // (riquadro) {} → { ok }
+    COOKIES_HIDE_FRAME: 'cookies_hide_frame',       // main → pagina { url, origin }
 
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai
