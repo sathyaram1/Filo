@@ -657,13 +657,22 @@
         c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action });
       } catch (_) {}
       const done = !!(c && c.executed);
-      appendActionLog(done ? `${label}: fatto` : `${label}: non riuscita`);
+      appendActionLog(esitoAzione(label, done, c));
       return done;
     }
 
     const done = !!res.executed;
-    appendActionLog(done ? `${label}: fatto` : `${label}: non riuscita`);
+    appendActionLog(esitoAzione(label, done, res));
     return done;
+  }
+
+  // Un rifiuto spiegato dal main (uno stile oltre il tetto) arriva all'utente col
+  // suo perché, come nel diario della chat: «non riuscita» e basta non dice cosa
+  // cambiare (#592).
+  function esitoAzione(label, done, r) {
+    if (done) return `${label}: fatto`;
+    const perche = r && r.output && typeof r.output.error === 'string' ? r.output.error.trim() : '';
+    return perche ? `${label}: non applicata, ${perche}` : `${label}: non riuscita`;
   }
 
   // ---------- Azioni SULLA PAGINA (parità col menu tasto destro) ----------
