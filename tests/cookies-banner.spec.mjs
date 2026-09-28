@@ -416,7 +416,7 @@ test('banner «accetta o abbonati» dentro un riquadro (forma Sourcepoint): nasc
   await page.mouse.move(200, 200);
   await expect.poll(async () => {
     await page.mouse.wheel(0, 400);
-    return page.evaluate(() => (document.scrollingElement || document.documentElement).scrollTop);
+    return page.evaluate(() => window.scrollY);
   }, { timeout: 8_000 }).toBeGreaterThan(0);
   expect(await page.evaluate(() => window.__sp)).toBeUndefined();
   expect(await page.evaluate(() => document.cookie)).not.toContain('tracking');
@@ -431,4 +431,27 @@ test('un riquadro nel flusso della pagina col suo banner senza «rifiuta» resta
   await sleep(7000);
   expect(await page.evaluate(() => getComputedStyle(document.getElementById('widget')).display)).not.toBe('none');
   expect(await page.evaluate(() => document.getElementById('widget').getBoundingClientRect().height)).toBeGreaterThan(100);
+});
+
+test('banner «accetta o abbonati» che la lista non nomina ma le regole riconoscono (forma contentpass): nascosto, la pagina scorre', async ({ app, openTab, testServer, shell }) => {
+  await app.evaluate((_e, txt) => globalThis.__filoCookieBanners.setListForTest(txt), ESTRATTO_EASYLIST_COOKIE);
+  const page = await testServer.openReady(openTab, `<title>CP_WALL</title>
+    <style>html,body{overflow:hidden} body{height:4000px;margin:0}</style>
+    <div class="privacy-cp-wall" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center">
+      <div class="privacy-cp-wall__wrapper_cmp" style="background:#fff;padding:24px;width:520px">
+        <p>Per continuare a leggere accetta i cookie di profilazione, oppure abbonati.</p>
+        <button onclick="document.cookie='tracking=1; path=/';window.__accepted=true">Accetta e continua</button>
+        <button onclick="window.__subscribe=true">Abbonati</button>
+      </div>
+    </div>
+    <h1>Articolo</h1><p>contenuto</p>`);
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.querySelector('.privacy-cp-wall')).display), { timeout: 15_000 }).toBe('none');
+  await page.mouse.move(200, 200);
+  await expect.poll(async () => {
+    await page.mouse.wheel(0, 400);
+    return page.evaluate(() => window.scrollY);
+  }, { timeout: 8_000 }).toBeGreaterThan(0);
+  expect(await page.evaluate(() => [window.__accepted, window.__subscribe])).toEqual([undefined, undefined]);
+  expect(await page.evaluate(() => document.cookie)).not.toContain('tracking');
+  await expect.poll(async () => (await tabCookies(shell))?.hidden, { timeout: 8_000 }).toBe(true);
 });

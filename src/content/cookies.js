@@ -312,6 +312,7 @@
     rules: new Map(),
     asking: new Set(),
     shownCmp: null,
+    shownAt: 0,
   };
 
   function comRule(name) {
@@ -351,7 +352,7 @@
       if (!cmp.detect()) { com.tried.add(name); continue; }
       if (!com.firstSeen.has(name)) com.firstSeen.set(name, now);
       const showing = cmp.isShowing();
-      if (showing) com.shownCmp = cmp;
+      if (showing && (!com.shownCmp || com.shownCmp.name !== name)) { com.shownCmp = cmp; com.shownAt = now; }
       if (!showing) {
         // Consent-O-Matic lo riguarda per poco più di un secondo; qui qualche secondo, poi si arrende.
         if (now - com.firstSeen.get(name) > 6000) com.tried.add(name);
@@ -535,6 +536,26 @@
     if (any) noteHidden();
   }
 
+  // Banner che le regole riconoscono ma non sanno rifiutare («accetta o abbonati») e che la lista non nomina:
+  // si nasconde quello che la regola stessa nasconde mentre lavora.
+  function comHideTick() {
+    const B = global.SN_COOKIE_BANNERS;
+    const cmp = com.shownCmp;
+    if (!IS_TOP || !B || !B.isRunning() || !cmp || com.busy || reported.has('rejected')) return;
+    let showing = false;
+    try { showing = cmp.isShowing(); } catch (_) {}
+    if (!showing) return;
+    const now = Date.now();
+    const wait = Math.max(CMP_GRACE_MS - (now - com.shownAt), ACTION_GRACE_MS - (now - lastActionAt));
+    if (wait > 0) { scheduleScanIn(wait + 20); return; }
+    com.shownCmp = null;
+    let any = false;
+    for (const el of cmp.hideTargets()) {
+      if (el !== document.body && el !== document.documentElement && isVisible(el) && B.hide(el)) any = true;
+    }
+    if (any) noteHidden();
+  }
+
   // ─── riscrittura embed YouTube → nocookie ──────────────────────────────────
 
   function nocookieUrl(src) {
@@ -590,7 +611,7 @@
       if (comWorking) return;
       const fb = findRejectText(document, false);
       if (fb && clickEl(fb)) { noteRejected('testo'); return; }
-      if (IS_TOP) bannerTick(hand.any || com.firstSeen.size > 0);
+      if (IS_TOP) { bannerTick(hand.any || com.firstSeen.size > 0); comHideTick(); }
       else frameTick(hand.any);
     } catch (_) {}
   }

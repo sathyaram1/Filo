@@ -308,6 +308,18 @@
         }
       },
       stop() { ctx.stopped = true; unhideAll(); },
+      // Quello che la regola nasconde mentre lavora: per chi l'ha scritta è il banner.
+      hideTargets() {
+        const out = [];
+        const walk = (a) => {
+          if (!a) return;
+          if (a.type === 'hide') { const t = find(ctx, a).target; if (t) out.push(t); }
+          for (const x of asList(a.actions)) walk(x);
+        };
+        const m = methods.get('HIDE_CMP');
+        if (m) walk(m.action);
+        return out;
+      },
     };
   }
 
