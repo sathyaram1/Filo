@@ -194,8 +194,12 @@ export async function spedisciAllarme(name, text, chiavi = []) {
     const res = await fetch(`${BASE}/buildAlarm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Senza chiavi il campo non parte: il server resta al comportamento di prima.
-      body: JSON.stringify({ passphrase, name: titolo, text: testo, ...(keys.length ? { keys } : {}) }),
+      // Senza chiavi il campo non parte: il server resta al comportamento di prima. Quali chiavi sono già coperte
+      // lo sa solo il server: con base e nomi intitola il feedback nuovo coi soli guasti suoi; `name` vale per tutte.
+      body: JSON.stringify({
+        passphrase, name: titolo, text: testo,
+        ...(keys.length ? { keys, titoloBase: String(name), nomi: nomiDeiGuasti(keys) } : {}),
+      }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok || !body.ok) {
