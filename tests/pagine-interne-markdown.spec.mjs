@@ -29,7 +29,7 @@ async function preparaModello(app, testo) {
       streamComplete: async ({ onDelta }) => {
         const meta = Math.floor(t.length / 2);
         onDelta(t.slice(0, meta));
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, 1500));
         onDelta(t.slice(meta));
         return { text: t, usage: {} };
       },
