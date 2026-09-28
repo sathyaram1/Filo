@@ -2857,6 +2857,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // chat normale: nessuna schermata a passi, nessun modulo.
   const onboardingText = onbActive ? Onboarding.renderChecklistForPrompt(onbBefore) : '';
   const cleanHistory = Array.isArray(threadHistory) ? threadHistory.slice(-20) : [];
+  // Gli indirizzi che il modello ha trovato (risultati, pagine lette, parole dell'utente) e se nella conversazione è
+  // entrato testo di sconosciuti: il freno contro l'esfiltrazione li guarda per ogni indirizzo che esce (#553).
+  const contesto = PageRead.contestoChat();
+  if (!internal) PageRead.annotaLink(contesto, userMessage);
+  for (const m of cleanHistory) {
+    if (m && m.role !== 'filo') PageRead.annotaLink(contesto, m.text);
+    for (const a of (m && Array.isArray(m.actions) ? m.actions : [])) PageRead.annotaAzione(contesto, a);
+  }
   // Re-immissione dell'output dei comandi nel contesto del modello: l'output di
   // un ESEGUI_COMANDO eseguito in un turno precedente viene accodato al
   // messaggio dell'assistente, così nei turni successivi il modello SA davvero
