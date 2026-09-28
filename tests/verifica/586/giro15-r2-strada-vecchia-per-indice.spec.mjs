@@ -1,4 +1,4 @@
-// Verifica #586 giro 14, rilievo 2: un riquadro nato senza indirizzo e preso per indice (window[0]) scavalca quello che
+// Verifica #586 giro 15, rilievo 2 (era il rilievo 2 del giro 14): un riquadro nato senza indirizzo e preso per indice (window[0]) scavalca quello che
 // Filo mette nel mondo della pagina: la strada vecchia per lo schermo consegna tutto lo schermo e l'audio del computer
 // qualunque cosa si scelga, fa morire la scheda, e lì i permessi mai decisi si leggono «negato».
 import { test, expect } from '../../fixtures/electron.mjs';

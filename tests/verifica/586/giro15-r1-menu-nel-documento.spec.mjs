@@ -1,4 +1,4 @@
-// Verifica #586 giro 14, rilievo 1: il menu di Filo vive nel documento del sito. Dopo un tasto destro vero il sito sposta
+// Verifica #586 giro 15, rilievo 1 (era il rilievo 1 del giro 14): il menu di Filo vive nel documento del sito. Dopo un tasto destro vero il sito sposta
 // «Incolla», «Detta» o la freccia della cronologia fuori dal menu e li preme; e la cronologia aperta si legge dalla pagina.
 import { test, expect } from '../../fixtures/electron.mjs';
 

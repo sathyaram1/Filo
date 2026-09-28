@@ -1,4 +1,4 @@
-// Verifica #586 giro 14, rilievo 3: per cose che nessun browser chiede (l'orientamento del computer, lo spazio tenuto da
+// Verifica #586 giro 15, rilievo 3 (era il rilievo 3 del giro 14): per cose che nessun browser chiede (l'orientamento del computer, lo spazio tenuto da
 // parte) compare una domanda col nome tecnico di Chromium, e non si ricorda.
 import { test, expect } from '../../fixtures/electron.mjs';
 
