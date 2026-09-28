@@ -39,7 +39,6 @@ class TtlCache {
   }
   set(k, v, ttl) { this.m.set(k, { v, exp: Date.now() + (ttl || this.ttl) }); return v; }
   has(k) { return this.get(k) !== undefined; }
-  ttlLeft(k) { const e = this.get(k) !== undefined && this.m.get(k); return e ? Math.max(1, e.exp - Date.now()) : 0; }
   delete(k) { this.m.delete(k); }
 }
 
@@ -102,22 +101,40 @@ function pathOf(url) {
   try { return new URL(String(url)).pathname; } catch (_) { return '/'; }
 }
 
-// Freno e risposta hanno la stessa identità (#591): il dominio con gli indizi che vede il giudice. Chi ha la stessa chiave
-// non rifà i controlli ed eredita la risposta; su una piattaforma di hosting la chiave è il sito, così non passa agli altri.
-function brakeKey(norm, url, ctx, verdict) {
-  if (whitelist.hostedPlatform(norm.host, pathOf(url))) return norm.host + pathOf(url);
+// Il freno conta le chiamate, il verdetto resta del sito (#591): su una piattaforma di hosting che Filo non conosce un
+// dominio è di migliaia di proprietari, e la risposta di uno non vale per un altro. Il conto è per dominio (per sito sulle
+// piattaforme note): qualche controllo all'ora, oltre i siti nuovi restano col verdetto locale.
+const DEEP_BUDGET = 5;
+function budgetKey(norm, url) {
+  return whitelist.hostedPlatform(norm.host, pathOf(url)) ? norm.host + pathOf(url) : norm.registrable;
+}
+
+// Gli indizi che vede il giudice: lo stesso sito con indizi diversi è un'altra domanda.
+function cluesOf(norm, ctx, verdict) {
   const imp = verdict.imp || null;
   return [
-    norm.registrable, imp ? imp.brand.display : '', imp ? imp.kind : '', verdict.hosted || '',
+    imp ? imp.brand.display : '', imp ? imp.kind : '', verdict.hosted || '',
     ctx.linkOrigin || '', ctx.hasPassword ? 'pw' : '', ctx.hasPayment ? 'pay' : '', norm.secure ? 'tls' : '',
   ].join('|');
 }
 
-// Un controllo che non ha dato verdetto (risposta illeggibile, fornitore in errore) frena per poco, poi si riprova.
-const FAILED_BRAKE_MS = 5 * MIN;
-const deepBrake = new TtlCache(HOUR);
+const deepBudget = new TtlCache(HOUR);
+function spend(k) {
+  const now = Date.now();
+  const recent = (deepBudget.get(k) || []).filter((t) => now - t < HOUR);
+  if (recent.length >= DEEP_BUDGET) return false;
+  recent.push(now);
+  deepBudget.set(k, recent);
+  // Tetto largo: un dominio dimenticato riparte col conto pieno, e costa qualche chiamata, non un buco.
+  if (deepBudget.m.size > 5000) deepBudget.m.delete(deepBudget.m.keys().next().value);
+  return true;
+}
 
-// Due analisi con lo stesso freno in volo insieme fanno una chiamata sola.
+// Un controllo che non ha dato verdetto (risposta illeggibile, fornitore in errore) non si ripete sullo stesso sito per poco.
+const FAILED_RETRY_MS = 5 * MIN;
+const deepFailed = new TtlCache(FAILED_RETRY_MS);
+
+// Due analisi dello stesso sito con gli stessi indizi in volo insieme fanno una chiamata sola.
 const inflight = new Map();
 function once(key, run) {
   if (inflight.has(key)) return inflight.get(key);
@@ -126,25 +143,15 @@ function once(key, run) {
   return p;
 }
 
-// Parte un controllo profondo se il freno della chiave non è tirato. Frenato, il sito prende subito la risposta di chi
-// l'ha tirato (INHERITED); arrivato mentre quel controllo è in viaggio, la prende quando torna.
-const INHERITED = Symbol('inherited');
-function deepen(stage, bKey, fullTtl, run, store) {
-  const k = stage + ':' + bKey;
-  if (inflight.has(k)) return inflight.get(k).then((r) => { if (r) store(r); }).catch(() => {});
-  const brake = deepBrake.get(k);
-  if (brake !== undefined) {
-    if (!brake.result) return null;
-    store(brake.result, deepBrake.ttlLeft(k));
-    return INHERITED;
-  }
-  deepBrake.set(k, { result: null }, FAILED_BRAKE_MS);
+function deepen(stage, bKey, siteKey, run, store) {
+  const k = stage + ':' + siteKey;
+  if (inflight.has(k)) return inflight.get(k);
+  if (deepFailed.has(k) || !spend(stage + ':' + bKey)) return null;
   return once(k, () => Promise.resolve(run()).then((r) => {
-    if (!r) return null;
+    if (!r) { deepFailed.set(k, true); return null; }
     store(r);
-    deepBrake.set(k, { result: r }, fullTtl);
     return r;
-  })).catch(() => {});
+  }, () => { deepFailed.set(k, true); return null; }));
 }
 
 // La rete di casa (router, NAS, stampanti, localhost) non ha niente da chiedere fuori: nessuno stadio di rete parte.
@@ -217,27 +224,26 @@ function analyze(url, ctx = {}, onUpdate) {
   }
   // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist).
   const worthDeepening = first.level === 'sospetto' || first.needsLlm;
-  const bKey = brakeKey(norm, url, ctx, first);
-  let inherited = false;
-  const deep = (t) => { if (t === INHERITED) inherited = true; else if (t) tasks.push(t); };
+  const bKey = budgetKey(norm, url);
+  const siteKey = key + '|' + cluesOf(norm, ctx, first);
+  const deep = (t) => { if (t) tasks.push(t); };
   if (worthDeepening && providers.llm && need.llm === undefined) {
     const llm = providers.llm;
     const meta = buildLlmMeta(norm, ctx, first);
-    deep(deepen('llm', bKey, llmCache.ttl, () => llm(meta), (r, ttl) => llmCache.set(key, r, ttl)));
+    deep(deepen('llm', bKey, siteKey, () => llm(meta), (r) => llmCache.set(key, r)));
   }
   if (worthDeepening && providers.sandbox && need.sandbox === undefined) {
     const detonate = providers.sandbox;
-    deep(deepen('sb', bKey, sandboxCache.ttl, () => detonate(url, norm), (r, ttl) => sandboxCache.set(key, r, ttl)));
+    deep(deepen('sb', bKey, siteKey, () => detonate(url, norm), (r) => sandboxCache.set(key, r)));
   }
 
-  const now = inherited ? engine.evaluate(url, ctx, assembleCached(norm, url)) : first;
   if (tasks.length && typeof onUpdate === 'function') {
     Promise.allSettled(tasks).then(() => {
       const next = engine.evaluate(url, ctx, assembleCached(norm, url));
-      if (verdictChanged(now, next)) onUpdate(next);
+      if (verdictChanged(first, next)) onUpdate(next);
     });
   }
-  return now;
+  return first;
 }
 
 // Metadati (MAI contenuto pagina) passati all'LLM: solo provenienza/identità.
@@ -292,7 +298,8 @@ const API = {
     };
   },
   // cache (per test / invalidazione)
-  _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache, deepBrake },
+  DEEP_BUDGET,
+  _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache, deepBudget, deepFailed },
   // sotto-moduli (per test)
   normalize: normalizeMod.normalize,
   parseHost: normalizeMod.parseHost,

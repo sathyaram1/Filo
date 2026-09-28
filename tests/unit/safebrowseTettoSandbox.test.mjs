@@ -79,7 +79,7 @@ test('a coda piena un link nuovo non apre niente e torna subito senza verdetto',
   assert.equal(f.conta().picco, 1);
 });
 
-test('sottodomini sempre nuovi dello stesso dominio: un solo giudizio del modello e una sola sandbox', async () => {
+test('sottodomini sempre nuovi dello stesso dominio: qualche giudizio del modello e qualche sandbox all\'ora, non uno per sottodominio', async () => {
   let giudizi = 0;
   let sandbox = 0;
   for (const c of Object.values(SB._caches)) c.m.clear();
@@ -97,13 +97,13 @@ test('sottodomini sempre nuovi dello stesso dominio: un solo giudizio del modell
     })));
     await giro(20);  // tutti insieme, mentre il primo giudizio è ancora in volo
     await giro(20);  // e dopo, a giudizio già in memoria
-    assert.equal(giudizi, 1);
-    assert.equal(sandbox, 1);
-    // Un altro dominio ha il suo giudizio.
+    assert.equal(giudizi, SB.DEEP_BUDGET);
+    assert.equal(sandbox, SB.DEEP_BUDGET);
+    // Un altro dominio ha il suo conto.
     await giro(1);
     SB.analyze('http://a.altro-dominio.com/', {}, () => {});
     await new Promise((ok) => setTimeout(ok, 30));
-    assert.equal(giudizi, 2);
+    assert.equal(giudizi, SB.DEEP_BUDGET + 1);
   } finally {
     SB.setProviders({ llm: null, sandbox: null });
     for (const c of Object.values(SB._caches)) c.m.clear();

@@ -210,3 +210,19 @@ test('la scheda annota da dove ha risposto la pagina, e un nome che risponde da 
     await app.evaluate(() => { globalThis.SN_URL_NAV.noteHostAddress = globalThis.__annotaVero; });
   }
 });
+
+// Dietro un proxy l'indirizzo che ha risposto è del proxy: la scheda lo sa chiedendo alla sessione come arriva la pagina,
+// e la regola si fida solo di una risposta «DIRECT». Qui la forma di quella risposta nell'Electron vero, con e senza proxy.
+test('la sessione dice se una pagina arriva diretta o da un proxy, nella forma che la rete di casa si aspetta', async ({ app }) => {
+  const risposte = await app.evaluate(async ({ session }) => {
+    const s = session.defaultSession;
+    const diretta = await s.resolveProxy('http://sito-pubblico.test/');
+    await s.setProxy({ proxyRules: 'http=10.0.0.8:3128' });
+    const dalProxy = await s.resolveProxy('http://sito-pubblico.test/');
+    await s.setProxy({ mode: 'direct' });
+    return { diretta, dalProxy };
+  });
+  expect(risposte.diretta).toMatch(/^\s*DIRECT\s*;?\s*$/i);
+  expect(risposte.dalProxy).not.toMatch(/^\s*DIRECT\s*;?\s*$/i);
+  expect(risposte.dalProxy).toContain('10.0.0.8:3128');
+});

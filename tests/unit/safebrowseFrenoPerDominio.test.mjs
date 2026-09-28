@@ -1,6 +1,6 @@
-// Il controllo profondo anti-phishing (#591): freno e risposta stanno sul dominio con i suoi indizi. Sottodomini nuovi
-// con gli stessi indizi non rifanno partire modello e finestra nascosta ma ne ereditano la risposta; il verdetto (e il
-// certificato) di un sito non passa ai vicini di piattaforma; un controllo fallito frena per poco; la rete di casa non esce.
+// Il controllo profondo anti-phishing (#591): il freno conta le chiamate per dominio, il verdetto resta del sito.
+// Sottodomini sempre nuovi non fanno più di qualche controllo all'ora; il verdetto (e il certificato) di un sito non passa
+// ai vicini di piattaforma; un controllo fallito non si ripete sullo stesso sito per poco; la rete di casa non esce.
 
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +10,9 @@ const require = createRequire(import.meta.url);
 const SB = require('../../src/main/services/safebrowse/index.js');
 
 const LOGIN = { linkOrigin: 'email', hasPassword: true };
-const PIATTAFORME = ['weebly.com', '000webhostapp.com', 'r2.dev', 'webflow.io', 'trycloudflare.com'];
+const ACCESSO = { hasPassword: true };
+// Piattaforme che l'elenco interno non separa: il dominio è di migliaia di proprietari.
+const PIATTAFORME = ['weebly.com', '000webhostapp.com', 'r2.dev', 'webflow.io', 'trycloudflare.com', 'wixsite.com', 'square.site', 'godaddysites.com'];
 
 beforeEach(() => {
   for (const c of Object.values(SB._caches)) c.m.clear();
@@ -22,28 +24,40 @@ const analizza = (url, ctx) => new Promise((ok) => {
   setTimeout(ok, 30);
 });
 
-test('la truffa sbarrata su una piattaforma di hosting non sbarra i siti degli altri utenti', async () => {
-  SB.setProviders({ llm: async () => null, sandbox: async (u) => ({ verdict: 'dangerous', finalUrl: u, redirects: [], download: 'x.exe' }) });
+const finestraCheTrova = (aperte) => async (u) => {
+  aperte.push(u);
+  return u.includes('verifica-conto')
+    ? { verdict: 'dangerous', finalUrl: u, redirects: [], download: 'x.exe' }
+    : { verdict: 'clean', finalUrl: u, redirects: [] };
+};
+
+test('la truffa sbarrata su una piattaforma di hosting non sbarra i siti degli altri utenti, neanche con gli stessi indizi', async () => {
   for (const p of PIATTAFORME) {
-    await analizza(`https://verifica-conto.${p}/login`, LOGIN);
-    assert.equal(SB.checkSync(`https://verifica-conto.${p}/login`, LOGIN).level, 'pericoloso', p);
+    for (const c of Object.values(SB._caches)) c.m.clear();
+    const aperte = [];
+    SB.setProviders({ llm: async () => null, sandbox: finestraCheTrova(aperte) });
+    await analizza(`https://verifica-conto.${p}/login`, ACCESSO);
+    assert.equal(SB.checkSync(`https://verifica-conto.${p}/login`, ACCESSO).level, 'pericoloso', p);
     assert.equal(SB.checkSync(`https://forno-di-marco.${p}/`, {}).level, 'safe', p);
+    await analizza(`https://forno-di-marco.${p}/account/login`, ACCESSO);
+    assert.notEqual(SB.checkSync(`https://forno-di-marco.${p}/account/login`, ACCESSO).level, 'pericoloso', p);
+    assert.ok(aperte.includes(`https://forno-di-marco.${p}/account/login`), `${p}: il negozio ha il suo controllo`);
   }
 });
 
-test('un sito pulito controllato per primo non toglie il controllo a una truffa con indizi diversi', async () => {
-  const aperte = [];
-  SB.setProviders({
-    llm: async () => ({ suspicious: false, reason: null }),
-    sandbox: async (u) => { aperte.push(u); return u.includes('negozio') ? { verdict: 'clean', redirects: [] } : { verdict: 'dangerous', redirects: [], download: 'f.exe' }; },
-  });
-  await analizza('https://negozio.weebly.com/account/login', { hasPassword: true });
-  await analizza('https://verifica-conto.weebly.com/login', LOGIN);
-  assert.ok(aperte.includes('https://verifica-conto.weebly.com/login'));
-  assert.equal(SB.checkSync('https://verifica-conto.weebly.com/login', LOGIN).level, 'pericoloso');
+test('un sito pulito controllato per primo non toglie il controllo alla truffa sulla stessa piattaforma', async () => {
+  for (const p of PIATTAFORME) {
+    for (const c of Object.values(SB._caches)) c.m.clear();
+    const aperte = [];
+    SB.setProviders({ llm: async () => ({ suspicious: false, reason: null }), sandbox: finestraCheTrova(aperte) });
+    await analizza(`https://negozio.${p}/account/login`, ACCESSO);
+    await analizza(`https://verifica-conto.${p}/login`, ACCESSO);
+    assert.ok(aperte.includes(`https://verifica-conto.${p}/login`), p);
+    assert.equal(SB.checkSync(`https://verifica-conto.${p}/login`, ACCESSO).level, 'pericoloso', p);
+  }
 });
 
-test('sottodomini sempre nuovi con gli stessi indizi: un giudizio e una finestra, anche mentre il primo è in volo', async () => {
+test('sottodomini sempre nuovi dello stesso dominio: qualche controllo all\'ora, anche arrivando tutti insieme', async () => {
   let giudizi = 0;
   let finestre = 0;
   SB.setProviders({
@@ -52,42 +66,64 @@ test('sottodomini sempre nuovi con gli stessi indizi: un giudizio e una finestra
   });
   await Promise.all(Array.from({ length: 15 }, (_, i) => analizza(`http://x${i}.dominio-ostile.com/`, LOGIN)));
   for (let i = 15; i < 30; i++) await analizza(`http://x${i}.dominio-ostile.com/`, LOGIN);
-  assert.equal(giudizi, 1);
-  assert.equal(finestre, 1);
+  assert.equal(giudizi, SB.DEEP_BUDGET);
+  assert.equal(finestre, SB.DEEP_BUDGET);
+  assert.ok(SB.DEEP_BUDGET < 10);
+  const vero = Date.now;
+  Date.now = () => vero() + 61 * 60 * 1000;
+  try { await analizza('http://dopo-un-ora.dominio-ostile.com/', LOGIN); } finally { Date.now = vero; }
+  assert.equal(giudizi, SB.DEEP_BUDGET + 1, 'passata l\'ora il dominio ha di nuovo i suoi controlli');
 });
 
-test('chi è frenato eredita la risposta di chi ha tirato il freno, anche arrivando mentre quel controllo è in volo', async () => {
+test('il secondo sito dello stesso dominio ha il suo controllo e il suo verdetto, anche arrivando col primo in volo', async () => {
   let giudizi = 0;
   let finestre = 0;
   SB.setProviders({
     llm: async () => { giudizi++; await new Promise((r) => setTimeout(r, 10)); return { suspicious: true, reason: 'x' }; },
     sandbox: async (u) => { finestre++; await new Promise((r) => setTimeout(r, 10)); return { verdict: 'dangerous', finalUrl: u, redirects: [], download: 'f.exe' }; },
   });
+  const aggiornati = [];
   const primo = analizza('https://accesso.dominio-gemello.com/login', LOGIN);
-  const inVolo = analizza('https://verifica.dominio-gemello.com/login', LOGIN);
+  const inVolo = new Promise((ok) => {
+    SB.analyze('https://verifica.dominio-gemello.com/login', LOGIN, (v) => { aggiornati.push(v.level); ok(); });
+    setTimeout(ok, 200);
+  });
   await Promise.all([primo, inVolo]);
-  const dopo = SB.analyze('https://sblocco.dominio-gemello.com/login', LOGIN, () => {});
-  assert.equal(dopo.level, 'pericoloso', 'il verdetto ereditato vale subito, senza aspettare niente');
-  for (const s of ['accesso', 'verifica', 'sblocco']) {
+  assert.deepEqual(aggiornati, ['pericoloso'], 'la pagina dove l\'utente arriva riceve il suo avviso');
+  for (const s of ['accesso', 'verifica']) {
     assert.equal(SB.checkSync(`https://${s}.dominio-gemello.com/login`, LOGIN).level, 'pericoloso', s);
   }
-  assert.equal(giudizi, 1);
-  assert.equal(finestre, 1);
-  await analizza('https://pagamenti.dominio-gemello.com/', { hasPayment: true });
-  assert.equal(giudizi, 2, 'con indizi diversi il sito ha il suo controllo, non l\'eredità');
+  assert.equal(giudizi, 2);
+  assert.equal(finestre, 2);
+  await analizza('https://verifica.dominio-gemello.com/login', LOGIN);
+  assert.equal(giudizi, 2, 'lo stesso sito si ricorda il suo verdetto');
 });
 
-test('un giudizio senza verdetto frena i sottodomini per poco, poi si riprova', async () => {
+test('due analisi dello stesso sito con gli stessi indizi in volo insieme fanno una chiamata', async () => {
+  let giudizi = 0;
+  SB.setProviders({ llm: async () => { giudizi++; await new Promise((r) => setTimeout(r, 10)); return { suspicious: true, reason: 'x' }; } });
+  const aggiornati = [];
+  await Promise.all([1, 2].map(() => new Promise((ok) => {
+    SB.analyze('https://accesso.dominio-doppio.com/login', LOGIN, (v) => { aggiornati.push(v.level); ok(); });
+    setTimeout(ok, 200);
+  })));
+  assert.equal(giudizi, 1);
+  assert.deepEqual(aggiornati, ['sospetto', 'sospetto'], 'tutte e due le analisi ricevono la risposta');
+});
+
+test('un giudizio senza verdetto non si ripete sullo stesso sito per poco, e i sottodomini restano nel conto', async () => {
   let chiamate = 0;
   SB.configure({ runLlm: async () => { chiamate++; return 'Non saprei.'; }, enableSandbox: false, enableNetwork: false });
-  for (let i = 0; i < 10; i++) await analizza(`http://a${i}.dominio-prosa.com/login`, LOGIN);
-  assert.equal(chiamate, 1, 'una risposta illeggibile non deve far ripartire il modello a ogni sottodominio');
+  for (let i = 0; i < 3; i++) await analizza('http://a.dominio-prosa.com/login', LOGIN);
+  assert.equal(chiamate, 1, 'lo stesso sito non richiama il modello a ogni analisi');
+  for (let i = 0; i < 10; i++) await analizza(`http://b${i}.dominio-prosa.com/login`, LOGIN);
+  assert.equal(chiamate, SB.DEEP_BUDGET, 'una risposta illeggibile non fa ripartire il modello a ogni sottodominio');
   const vero = Date.now;
-  Date.now = () => vero() + 6 * 60 * 1000;
+  Date.now = () => vero() + 61 * 60 * 1000;
   try {
-    await analizza('http://b.dominio-prosa.com/login', LOGIN);
+    await analizza('http://a.dominio-prosa.com/login', LOGIN);
   } finally { Date.now = vero; }
-  assert.equal(chiamate, 2, 'passato il freno breve il giudizio si riprova');
+  assert.equal(chiamate, SB.DEEP_BUDGET + 1, 'passato il freno il giudizio si riprova');
   SB.setProviders({ llm: null });
 });
 
