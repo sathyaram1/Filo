@@ -1,6 +1,6 @@
-// Sentinella: `--ticket <codice>` vale in qualunque posizione, in dispatch e in
-// deliver. Il contratto dei worker dice «ripeti aggiungendo --ticket»: dove lo
-// si aggiunge non deve decidere se il comando parte (#724.1, #545, #587).
+// Sentinella: il biglietto a mano (`--ticket <codice>` o `--ticket=<codice>`) vale in qualunque posizione e in
+// ogni comando che usa un biglietto, con la stessa regola: sostituisce, conferma o si rifiuta, mai ignorato.
+// Il contratto dei worker dice «ripeti aggiungendo --ticket» (#724.1, #545, #587).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { rmSync, mkdirSync, writeFileSync } from 'node:fs';
 
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { bigliettoAMano } from '../../scripts/routine-channel.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BIGLIETTO = 'bigliettodiprova0123';
@@ -128,4 +129,87 @@ test('deliver: due biglietti diversi si rifiutano, non se ne sceglie uno in sile
     assert.equal(r.code, 1, `stderr: ${r.se}`);
     assert.equal(ricevuti.length, 0);
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
+});
+
+test('una regola sola: il biglietto a mano sostituisce, conferma o si rifiuta in ogni comando', () => {
+  const ALTRO = 'altrobigliettodiprova99';
+  assert.deepEqual(bigliettoAMano('release', [], BIGLIETTO), { args: [BIGLIETTO] });
+  assert.deepEqual(bigliettoAMano('heartbeat', [], BIGLIETTO), { args: [BIGLIETTO] });
+  assert.deepEqual(bigliettoAMano('work', [], BIGLIETTO), { args: [BIGLIETTO] });
+  assert.deepEqual(bigliettoAMano('compare', ['verifier', '12'], BIGLIETTO), { args: [BIGLIETTO, 'verifier', '12'] });
+  assert.deepEqual(bigliettoAMano('deliver', ['status'], BIGLIETTO), { args: [BIGLIETTO, 'status'] });
+  assert.deepEqual(bigliettoAMano('release', [BIGLIETTO], BIGLIETTO), { args: [BIGLIETTO] }, 'lo stesso due volte va bene');
+  for (const cmd of ['release', 'heartbeat', 'work']) {
+    assert.match(bigliettoAMano(cmd, [ALTRO], BIGLIETTO).errore || '', /Due biglietti diversi/, cmd);
+  }
+  assert.match(bigliettoAMano('deliver', [ALTRO, 'status'], BIGLIETTO).errore || '', /Due biglietti diversi/);
+  assert.match(bigliettoAMano('probe', ['parola'], BIGLIETTO).errore || '', /parola d'ordine/, 'probe non lo ignora');
+  assert.match(bigliettoAMano('ticket', ['parola'], BIGLIETTO).errore || '', /parola d'ordine/);
+  const storto = bigliettoAMano('deliver', ['fixd'], BIGLIETTO).errore || '';
+  assert.match(storto, /Intento non capito: «fixd»/, 'un intento storto non è un secondo biglietto');
+  assert.doesNotMatch(storto, /biglietti/);
+  assert.deepEqual(bigliettoAMano('release', ['x'], ''), { args: ['x'] }, 'senza biglietto a mano non cambia niente');
+});
+
+async function conServer(fn) {
+  const { srv, ricevuti, port } = await fintoServer();
+  const casa = depositoSulRamo();
+  try { await fn({ ricevuti, env: ambiente(port, casa) }); } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
+}
+
+test('rilascio e battito: il biglietto a mano arriva al server, due diversi si rifiutano', async () => {
+  const RIL = ['--role', 'verifier', '--senza-push', '--senza-rapporto'];
+  await conServer(async ({ ricevuti, env }) => {
+    const r = await esegui('routine-channel.mjs', ['release', '--ticket', BIGLIETTO, ...RIL], env);
+    assert.equal(r.code, 0, `stderr: ${r.se}`);
+    assert.equal(ricevuti.find((x) => x.url.includes('routineRelease'))?.body.ticket, BIGLIETTO);
+  });
+  await conServer(async ({ ricevuti, env }) => {
+    const r = await esegui('routine-channel.mjs', ['release', 'altrobigliettodiprova99', '--ticket', BIGLIETTO, ...RIL], env);
+    assert.equal(r.code, 1, `stderr: ${r.se}`);
+    assert.match(r.se, /Due biglietti diversi/);
+    assert.equal(ricevuti.length, 0, 'nessun rilascio in silenzio del biglietto sbagliato');
+  });
+  await conServer(async ({ ricevuti, env }) => {
+    const r = await esegui('routine-channel.mjs', ['heartbeat', '--ticket', BIGLIETTO], env);
+    assert.equal(r.code, 0, `stderr: ${r.se}`);
+    assert.equal(ricevuti.find((x) => x.url.includes('routineHeartbeat'))?.body.ticket, BIGLIETTO);
+  });
+});
+
+test('battito senza biglietto: uscita 1, non 3 («canale giù»), e nessuna chiamata', async () => {
+  await conServer(async ({ ricevuti, env }) => {
+    const r = await esegui('routine-channel.mjs', ['heartbeat'], env);
+    assert.equal(r.code, 1, `stderr: ${r.se}`);
+    assert.match(r.se, /NESSUN BIGLIETTO/);
+    assert.match(r.se, /--ticket/);
+    assert.equal(ricevuti.length, 0);
+  });
+});
+
+test('dispatch: --ticket=<codice> vale come --ticket <codice>, davanti e dopo', async () => {
+  for (const argv of [
+    [`--ticket=${BIGLIETTO}`, '--record-fixed', 'fid-900', REPORT],
+    ['--record-fixed', 'fid-900', REPORT, `--ticket=${BIGLIETTO}`],
+  ]) {
+    await conServer(async ({ ricevuti, env }) => {
+      const r = await esegui('dispatch.mjs', argv, env);
+      assert.equal(r.code, 0, `ordine ${argv[0].slice(0, 10)}: ${r.se}`);
+      assert.equal(ricevuti.find((x) => x.url.includes('routineDeliver'))?.body.ticket, BIGLIETTO);
+    });
+  }
+});
+
+test('deliver con l\'intento storto: si ferma qui e nomina la parola, col biglietto a mano e senza', async () => {
+  for (const argv of [
+    ['deliver', 'fixd', '--ticket', BIGLIETTO, '--notes', 'Report.'],
+    ['deliver', 'fixd', '--notes', 'Report.'],
+  ]) {
+    await conServer(async ({ ricevuti, env }) => {
+      const r = await esegui('routine-channel.mjs', argv, env);
+      assert.equal(r.code, 1, `stderr: ${r.se}`);
+      assert.match(r.se, /Intento non capito: «fixd»/);
+      assert.equal(ricevuti.length, 0, 'la parola storta non parte verso il server come biglietto');
+    });
+  }
 });
