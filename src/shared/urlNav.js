@@ -72,6 +72,11 @@
     return false;
   }
 
+  // Una pagina della rete di casa (router, NAS, localhost): i lavori che Filo fa da solo non la mandano fuori (#591).
+  function isHomeNetworkUrl(url) {
+    try { return isLocalHost(new URL(String(url)).hostname); } catch (_) { return false; }
+  }
+
   // IPv4 dotted-quad con ottetti in range (0-255). Serve a distinguere un IP
   // letterale (127.0.0.1, 192.168.1.1) da un dominio con "TLD" numerico o da un
   // token qualsiasi con dei punti: solo un vero IPv4 conta come indirizzo.
@@ -197,7 +202,7 @@
   }
 
   global.SN_URL_NAV = {
-    isLocalHost, isLocalNetworkName, isIpv4, normalizeUrl, looksLikeAddress,
+    isLocalHost, isHomeNetworkUrl, isLocalNetworkName, isIpv4, normalizeUrl, looksLikeAddress,
     canonicalizeFiloUrl, isShareableAddress,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

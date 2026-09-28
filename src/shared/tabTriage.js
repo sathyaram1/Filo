@@ -30,7 +30,10 @@
 
   // Candidabile al riordino = sito web (http/https) OPPURE pagina interna
   // effimera (home/impostazioni).
+  // Una pagina della rete di casa resta fuori: il riordino manda al modello titolo, indirizzo e testo (#591).
   function isTriageableUrl(url) {
+    const U = global.SN_URL_NAV;
+    if (U && U.isHomeNetworkUrl(url)) return false;
     return /^https?:\/\//i.test(String(url || '')) || isEphemeralInternalUrl(url);
   }
 

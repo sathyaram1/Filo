@@ -86,6 +86,7 @@
       id: 'incognito', title: 'Finestra in incognito', category: 'navigation',
       desc: 'Apre una nuova finestra privata e isolata: la sessione è effimera e non viene archiviata.',
       invoke: 'Menu del tasto destro → "Nuova finestra incognito".',
+      doesNot: 'Non sospende il limite di spesa del mese: quello che si spende lì conta come fuori e resta nel conto. Il testo delle pagine non va al modello per riconoscere i blocchi geografici.',
     },
     {
       id: 'fullscreen', title: 'Schermo intero', category: 'navigation',
@@ -109,7 +110,7 @@
       id: 'auto-archive', title: 'Archiviazione automatica delle schede', category: 'navigation',
       desc: 'Le schede lasciate inattive a lungo vengono archiviate da sole; il riordino collassa anche le schede «Nuova scheda»/home aperte più volte in una sola e chiude le pagine di impostazioni che non stai più usando (restano sempre raggiungibili), per tenere pulita la barra.',
       invoke: 'Automatico (soglia e attivazione in Preferenze); a richiesta con il comando /pulisci o il pulsante «Riordina e archivia le schede» nella home.',
-      doesNot: 'Non tocca le finestre in incognito, la scheda attiva, le schede con audio in riproduzione o con un modulo compilato non inviato, né le pagine di lavoro interne di Filo (Editor, Bacheca, Mazzi, Cronologia).',
+      doesNot: 'Non tocca le finestre in incognito, la scheda attiva, le schede con audio in riproduzione o con un modulo compilato non inviato, le pagine della rete di casa (router, NAS, stampanti), né le pagine di lavoro interne di Filo (Editor, Bacheca, Mazzi, Cronologia).',
     },
     {
       id: 'reorder-tabs', title: 'Riordina le schede per colore', category: 'navigation',

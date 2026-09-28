@@ -991,7 +991,7 @@ class TabManager {
       const coOpenUrls = this.tabs
         .filter((t) => t.id !== tab.id && t.url && /^https?:\/\//i.test(t.url))
         .map((t) => t.url);
-      const enrichPayload = { title: tab.title || '', content: tab.contentExtract || '' };
+      const enrichPayload = { title: tab.title || '', content: tab.contentExtract || '', url };
       Promise.resolve(
         Archive.archive({
           url,

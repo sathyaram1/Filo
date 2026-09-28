@@ -3513,6 +3513,8 @@ function cosineInt(a, b) {
   return s / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
+const isHomeNetworkUrl = (url) => Boolean(url && globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.isHomeNetworkUrl(url));
+
 // Completamento LLM one-shot per un'azione (risolve modello/chiave/limite e
 // registra il costo). Ritorna il testo. Usato da riassunto, triage, re-rank.
 async function runOneShot(action, messages) {
@@ -3844,6 +3846,8 @@ async function reindexArchivedEmbeddings(settings, items) {
 async function enrichArchivedTab(id, payload) {
   try {
     if (!id) return;
+    // Riassunto e indice passano dal modello: una pagina della rete di casa resta in casa (#591).
+    if (payload && typeof payload === 'object' && isHomeNetworkUrl(payload.url)) return;
     const title = (payload && typeof payload === 'object') ? (payload.title || '') : '';
     const content = (payload && typeof payload === 'object')
       ? (payload.content || '')
@@ -3915,7 +3919,7 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
   for (const it of items) {
     const usable = Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model;
     if (usable) { scored.push({ score: cosineInt(qv, it.embedding), it }); continue; }
-    if ((it.title || it.summary || it.snippet) && stale.length < SN_CONST.ARCHIVED_EMBED_LIMIT) stale.push(it);
+    if ((it.title || it.summary || it.snippet) && !isHomeNetworkUrl(it.url) && stale.length < SN_CONST.ARCHIVED_EMBED_LIMIT) stale.push(it);
   }
   if (stale.length) reindexArchivedEmbeddings(settings, stale).catch(() => {});
   scored.sort((a, b) => b.score - a.score);

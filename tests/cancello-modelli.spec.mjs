@@ -136,3 +136,24 @@ test('in incognito il limite del mese ferma le stesse chiamate e la spesa resta 
     await ripristina(app);
   }
 });
+
+// Riassunto e indice delle schede chiuse passano dal modello: una pagina della rete di casa resta in casa.
+test('una scheda chiusa della rete di casa non va al modello per riassunto e indice', async ({ app }) => {
+  await prepara(app);
+  try {
+    const esito = await app.evaluate(async () => {
+      await globalThis.SN_STORAGE.updateSettings({ monthlyLimitEur: 0 });
+      const A = globalThis.SN_ARCHIVED_TABS;
+      const casa = await A.archive({ url: 'http://192.168.1.1/admin', title: 'Router di casa', closedAt: new Date().toISOString() });
+      await globalThis.SN_TAB_ENRICH(casa.id, { title: 'Router di casa', content: 'Password Wi-Fi: segreta', url: 'http://192.168.1.1/admin' });
+      const dopoCasa = globalThis.__cancello.chiamate.length;
+      const fuori = await A.archive({ url: 'https://ricette.esempio.it/torta', title: 'Torta', closedAt: new Date().toISOString() });
+      await globalThis.SN_TAB_ENRICH(fuori.id, { title: 'Torta', content: 'Farina, uova, zucchero', url: 'https://ricette.esempio.it/torta' });
+      return { dopoCasa, dopoFuori: globalThis.__cancello.chiamate.length };
+    });
+    expect(esito.dopoCasa).toBe(0);
+    expect(esito.dopoFuori).toBeGreaterThan(0);
+  } finally {
+    await ripristina(app);
+  }
+});
