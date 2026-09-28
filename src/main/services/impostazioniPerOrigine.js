@@ -29,7 +29,8 @@ const CAMPI_WEB_SCRITTURA = Object.freeze({
 });
 
 // I messaggi spinti a tutte le schede che il codice di Filo dentro le pagine
-// ascolta. Un tipo nuovo non raggiunge i siti finché non lo si aggiunge qui.
+// ascolta. Un tipo nuovo non raggiunge i siti finché non lo si aggiunge qui: ogni
+// spinta a più schede passa da messaggioPerDestinazione (sentinella nei test unit).
 const SPINTE_WEB = Object.freeze(new Set([
   'settings_updated',
   'cookies_config_update',
@@ -37,6 +38,7 @@ const SPINTE_WEB = Object.freeze(new Set([
   'show_toast',
   'tts_global_reading',
   'tts_stop',
+  'fullscreen_changed',
 ]));
 
 // Gli scomparti del magazzino che i content script usano. `settings` si legge
