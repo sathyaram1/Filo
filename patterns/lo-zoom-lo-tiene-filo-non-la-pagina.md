@@ -40,6 +40,12 @@ dove il sito non arriva, o ci arriva solo per chiedere:
   comando di inserimento testo del browser, che conta come battuto. Si applica
   su Invio, Tab o un clic fuori; un'uscita dal campo (blur) non applica niente,
   perché la può fare anche il sito a metà numero.
+- **Il riquadro con la percentuale** sta nello strato superiore del documento
+  (popover), non nel corpo: sopra i frame di un frameset, un dialogo modale e il
+  tutto schermo. Col dialogo modale aperto sta dentro il dialogo, perché il
+  resto della pagina diventa intoccabile, e a ogni scatto ricontrolla il posto.
+  È fatto di elementi HTML anche dove il documento non lo è (un'immagine SVG
+  aperta da sola): prima lì la modalità si apriva senza riquadro (#686.1 giro 5).
 
 **Il caso.** #686 aveva chiuso tre porte una dopo l'altra (eventi finti, il
 marcatore «mi zoomo da solo» scritto dal sito, ascoltatori zittiti dal sito
@@ -57,6 +63,7 @@ prende pizzico e clic centrale. Il main non può supplire: in Electron 33
 `input-event` non porta né il tasto del mouse né il verso della rotella. Il
 colpo di rotella con Ctrl lo recupera `zoom-changed`, i tasti restano
 all'utente comunque. Il riquadro con la percentuale sta ancora nel documento:
-il sito può cambiarne l'aspetto, non il numero che viene applicato.
+un sito che lo cerca apposta può nasconderlo o toglierlo, non cambiare il numero
+che viene applicato.
 
-Prove: `tests/zoom-fuori-dalla-pagina.spec.mjs` (con i riquadri riempiti dalla pagina), `tests/unit/zoomPagina.test.mjs`.
+Prove: `tests/zoom-fuori-dalla-pagina.spec.mjs` (con i riquadri riempiti dalla pagina, il frameset, l'SVG e il dialogo modale), `tests/unit/zoomPagina.test.mjs`.

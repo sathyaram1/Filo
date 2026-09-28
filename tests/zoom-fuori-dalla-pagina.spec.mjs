@@ -9,6 +9,7 @@
 // clic centrale morti sulle ultime due.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { createServer } from 'node:http';
 
 const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>sito</title></head>
 <body style="height:4000px"><h1>un sito qualunque</h1><p>testo</p></body></html>`;
@@ -354,3 +355,72 @@ for (const [nome, html] of Object.entries(casiScatto)) {
     }
   });
 }
+
+// Il riquadro con la percentuale sta nel documento: dove la pagina non lo sa
+// disegnare o lo rende intoccabile, la rotella premuta apriva una modalità che
+// non si vedeva (frameset, immagine SVG, dialogo modale; #686.1 giro 5).
+const clicIn = (x, y, button = 'left') => [
+  { type: 'mouseDown', x, y, button, clickCount: 1 },
+  { type: 'mouseUp', x, y, button, clickCount: 1 },
+];
+async function battiNelCampo(page, testo) {
+  await page.locator('#__filo-zoom-percent').click();
+  await page.keyboard.type(testo);
+  await page.keyboard.press('Enter');
+}
+
+test('pagina a frame: la rotella premuta su un frame mostra il riquadro, e il numero battuto vale', async ({ app, openTab, testServer }) => {
+  const a = testServer.html('<!doctype html><html><body style="margin:0;height:3000px"><h2>indice</h2></body></html>');
+  const b = testServer.html('<!doctype html><html><body style="margin:0;height:3000px"><h2>contenuto</h2></body></html>');
+  const page = await openTab(testServer.html(`<html><frameset cols="70%,*"><frame src="${a}"><frame src="${b}"></frameset></html>`));
+  await page.waitForTimeout(1500);
+  await manda(app, page, clicIn(300, 300));
+  await manda(app, page, clicIn(300, 300, 'middle'));
+  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+  await battiNelCampo(page, '130');
+  await expect.poll(async () => percentOf(app, page)).toBe(130);
+});
+
+test('immagine SVG aperta da sola: la rotella premuta mostra il riquadro, e il numero battuto vale', async ({ app, openTab }) => {
+  const server = createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
+    res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="3000"><rect x="10" y="10" width="400" height="300" fill="#c96"/></svg>');
+  });
+  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+  try {
+    const page = await openTab(`http://127.0.0.1:${server.address().port}/logo.svg`);
+    await page.waitForTimeout(1500);
+    await manda(app, page, clicIn(300, 300, 'middle'));
+    await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+    await battiNelCampo(page, '130');
+    await expect.poll(async () => percentOf(app, page)).toBe(130);
+  } finally {
+    await new Promise((ok) => server.close(ok));
+  }
+});
+
+test('con un dialogo modale aperto il riquadro si tocca, anche se il dialogo si apre a riquadro già aperto', async ({ app, openTab, testServer }) => {
+  const page = await openTab(testServer.html(`<!doctype html><html><body style="height:4000px"><h1>sito</h1>
+    <dialog id="d"><p>Accetti i cookie?</p><button>Accetta</button></dialog>
+    <script>document.getElementById('d').showModal();</script></body></html>`));
+  await page.waitForTimeout(1500);
+  await manda(app, page, clicIn(150, 600, 'middle'));
+  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+  await battiNelCampo(page, '150');
+  await expect.poll(async () => percentOf(app, page)).toBe(150);
+  expect(await modalita(page), 'confermare il numero non chiude la modalità').toBe('1');
+
+  // Il dialogo si chiude e se ne apre un altro mentre la modalità è aperta: al
+  // primo scatto di rotella il riquadro lo segue.
+  await page.evaluate(() => {
+    document.getElementById('d').close();
+    const n = document.createElement('dialog');
+    n.innerHTML = '<p>Iscriviti</p>';
+    document.body.appendChild(n);
+    n.showModal();
+  });
+  await manda(app, page, [rotella]);
+  await expect.poll(async () => percentOf(app, page)).not.toBe(150);
+  await battiNelCampo(page, '120');
+  await expect.poll(async () => percentOf(app, page)).toBe(120);
+});
