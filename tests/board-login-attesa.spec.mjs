@@ -188,3 +188,24 @@ test('menu account, accesso non riuscito: lo dice una notifica di Filo, non una 
   await expect(shell.locator('.shell-notif.show .shell-notif-msg')).toContainText('aprire il browser');
   expect(dialogo).toBeNull();
 });
+
+test('chi aveva già votato e ripreme lo stesso pollice da non connesso: dopo l\'accesso il voto resta', async ({ app, openTab }) => {
+  const page = await apriBacheca(app, openTab);
+  await page.evaluate((a) => {
+    window.__boardTest.setData([{ ...a, votes: { 'uid-1': { vote: 'works', at: '2026-06-21T10:00:00Z', credibilitySnapshot: 1 } } }]);
+    const prima = window.filo.message;
+    window.filo.message = (m) => {
+      if (m && m.type === 'board_clear_vote') { window.__voti.push(`${m.id}:tolto`); return Promise.resolve({ ok: true, votes: {} }); }
+      return prima(m);
+    };
+  }, FIX_A);
+  await accessoFinto(app, { subito: false });
+  const card = scheda(page, 'fb-a');
+  await card.locator('.bd-vote-works').click();
+  await app.evaluate(() => globalThis.__faiEntrare());
+  await expect(page.locator('#bdAuthMsg')).toContainText('Sei connesso');
+  await expect(card.locator('.bd-vote-works')).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => window.__voti.slice())).toEqual([]);
+  await expect(card.locator('.bd-vote-works')).toContainText('1');
+});
