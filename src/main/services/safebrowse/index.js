@@ -337,6 +337,8 @@ function scopeOf(url) {
 const API = {
   checkSync,
   scopeOf,
+  ownerOf,
+  createOwnerBudget,
   analyze,
   evaluate: engine.evaluate,
   recordCert,
