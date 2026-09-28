@@ -1977,17 +1977,16 @@ if (isMainModule) {
   // Nei `--record-*` il biglietto a mano è la scorta del promemoria perso; viaggia nell'ambiente, dove
   // readTicket lo trova per primo.
   const conBiglietto = (args) => {
-    const t = { args, ticket: bigliettoAMano };
-    if (t.ticket) process.env.FILO_ROUTINE_TICKET = t.ticket;
+    if (bigliettoAMano) process.env.FILO_ROUTINE_TICKET = bigliettoAMano;
     // RIARMA il battito, comunque sia arrivato il biglietto: il processo
     // staccato avviato all'inizio del giro in cloud non sopravvive a lungo (il
     // beatAt specchiato sui feedback si ferma sempre a pochi secondi dal
     // biglietto), e ogni --record-* è un momento in cui il biglietto è in mano
     // per costruzione. startBeat è idempotente: se il battito è vivo non fa
     // niente.
-    const vivo = t.ticket || process.env.FILO_ROUTINE_TICKET || readRoutineTicket(ROOT);
+    const vivo = process.env.FILO_ROUTINE_TICKET || readRoutineTicket(ROOT);
     if (vivo) startBeat(ROOT, vivo);
-    return t.args;
+    return args;
   };
   // I quattro esiti di un --record-* respinto: biglietto introvabile (esci 1:
   // si rimedia ripassando il codice), canale non raggiungibile (3, come da
