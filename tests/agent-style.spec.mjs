@@ -5,7 +5,7 @@
 // funzione pura di iniezione realmente spedita nei moduli.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmState, scrollConfirmToEnd, mouseClickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, confirmState, scrollConfirmToEnd, mouseClickConfirm, pointWhenConfirmAppears, CONFIRM_HOST } from './helpers/confirm.mjs';
 
 test('scegliere un preset riempie il testo e lo stile persiste tra le ricariche', async ({ openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
@@ -504,4 +504,45 @@ test('#592 — nelle Preferenze il riquadro dello stile mostra tutto il testo, a
   expect(await campo.evaluate((el) => el.scrollHeight <= el.clientHeight + 1), 'parte dello stile sotto il bordo del riquadro').toBe(true);
   await campo.scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'tests/.shots/stile-agente-riquadro-intero.png' });
+});
+
+// Il popup si apre da solo, in un momento che l'utente non sceglie: un clic già
+// partito per altro che cade su OK non è un sì. Letto il testo, OK conferma (#592).
+test('#592 — un clic che arriva mentre il popup compare non conferma lo stile; dopo averlo letto OK sì', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await fakeProvider(app, [proponi(NASCOSTO), { text: 'Fatto.' }]);
+  await page.locator('#input').fill('riassumimi la pagina');
+  await page.locator('#sendBtn').click();
+  const p = await pointWhenConfirmAppears(page);
+  expect(p, 'il popup non è comparso').toBeTruthy();
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(300);
+  await expect(page.locator(CONFIRM_HOST), 'un clic arrivato mentre il popup compariva l’ha chiuso').toBeVisible();
+  expect(await storedStyle(app), 'un clic arrivato mentre il popup compariva ha confermato lo stile').toBe('');
+
+  await page.waitForTimeout(600);
+  await mouseClickConfirm(page, 'ok');
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0, { timeout: 5_000 });
+  await expect.poll(() => storedStyle(app), { timeout: 5_000 }).toBe(NASCOSTO);
+  await restore(app);
+});
+
+test('#592 — nell’Aiuto un clic che arriva mentre il popup compare non conferma lo stile', async ({ app, openTab }) => {
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ agentStyle: '' }));
+  const page = await openTab('filo://newtab/');
+  await page.evaluate(() => window.SN_SIDEBAR.open());
+  const corsa = page.evaluate((v) => window.__filoSidebarTest.runFiloAction({ type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: v }), NASCOSTO);
+  const p = await pointWhenConfirmAppears(page);
+  expect(p, 'il popup non è comparso').toBeTruthy();
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(300);
+  expect(await storedStyle(app), 'un clic arrivato mentre il popup compariva ha confermato lo stile').toBe('');
+  await page.waitForTimeout(600);
+  await mouseClickConfirm(page, 'ok');
+  expect(await corsa).toBe(true);
+  expect(await storedStyle(app)).toBe(NASCOSTO);
 });

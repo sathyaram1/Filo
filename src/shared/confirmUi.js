@@ -154,6 +154,15 @@
   // questo modulo. `active` serve a done() e agli hook di test qui sotto.
   let active = null; // { host, root }
 
+  // Chi batteva un tasto un attimo fa sta scrivendo: un popup che si apre in
+  // quel momento gli lascia i tasti nel suo campo (#592).
+  let ultimoTasto = -Infinity;
+  try {
+    global.document.addEventListener('keydown', (e) => { if (e.isTrusted) ultimoTasto = performance.now(); }, true);
+  } catch (_) {}
+  const STA_SCRIVENDO_MS = 2000;
+  const RITARDO_SI_MS = 500;
+
   // Costruisce host+shadow(closed)+overlay+box e ritorna { overlay, box, done }
   // dove done(result) smonta tutto e risolve la Promise una sola volta.
   function buildOverlay(resolve) {
@@ -201,6 +210,7 @@
       if (settled) return;
       settled = true;
       doc.removeEventListener('keydown', onKey, true);
+      doc.removeEventListener('visibilitychange', onVisibile);
       host.remove();
       if (active && active.root === root) active = null;
       if (prima && prima.isConnected) { try { prima.focus({ preventScroll: true }); } catch (_) {} }
@@ -216,21 +226,30 @@
     active = { host, root };
 
     // Un popup si apre anche da solo, sotto un gesto già partito per altro (#592):
-    // per mezzo secondo un clic o un invio veri non valgono come sì. I clic del
+    // per mezzo secondo da quando si vede un clic o un invio veri non valgono come
+    // sì. Si conta dal primo fotogramma disegnato, e da capo quando la scheda torna
+    // visibile: un popup nato in una scheda dietro si vede solo lì. I clic del
     // codice (gli hook _test) non arrivano da una pagina: lo shadow root è chiuso.
-    const apertoAlle = performance.now();
-    const troppoPresto = (e) => !!(e && e.isTrusted) && performance.now() - apertoAlle < RITARDO_SI_MS;
+    let visibileDa = Infinity;
+    function onVisibile() {
+      visibileDa = Infinity;
+      if (doc.visibilityState === 'hidden') return;
+      if (typeof global.requestAnimationFrame === 'function') global.requestAnimationFrame(() => { visibileDa = performance.now(); });
+      else visibileDa = performance.now();
+    }
+    doc.addEventListener('visibilitychange', onVisibile);
+    onVisibile();
+    const troppoPresto = (e) => !!(e && e.isTrusted) && !(performance.now() - visibileDa >= RITARDO_SI_MS);
     // Chi stava scrivendo continua a scrivere nel suo campo: il fuoco va al
     // riquadro, che gli gira i tasti, e non al bottone o al campo del popup.
+    const scriveva = scrivibile(prima) && performance.now() - ultimoTasto < STA_SCRIVENDO_MS;
     const fuoco = (bersaglio) => {
-      const el = scrivibile(prima) ? box : bersaglio;
+      const el = scriveva ? box : bersaglio;
       if (el === box) box.tabIndex = -1;
       el.focus();
     };
     return { overlay, box, done, troppoPresto, fuoco };
   }
-
-  const RITARDO_SI_MS = 500;
 
   function header(box, { title, text }) {
     const doc = global.document;

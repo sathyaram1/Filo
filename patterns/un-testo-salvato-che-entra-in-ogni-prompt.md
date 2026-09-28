@@ -29,9 +29,14 @@ Valgono insieme queste regole:
   simbolo che il font disegna vuoto. La regola sta sul riquadro: se il testo non
   ci sta, OK resta grigio finché non lo si fa scorrere fino in fondo, e un clic
   su OK grigio porta avanti il testo di una pagina invece di non rispondere; nelle
-  Preferenze il riquadro dello stile cresce col testo. Il popup non si mangia i
-  tasti battuti per la chat: finiscono nel campo, e alla chiusura il fuoco
-  torna lì.
+  Preferenze il riquadro dello stile cresce col testo.
+- **Un gesto partito per altro non è un sì.** Il popup si apre anche da solo,
+  in un momento che l'utente non sceglie. Vale per tutti e tre i riquadri
+  (conferma, conferma da digitare, avviso): chi stava scrivendo continua a
+  scrivere nel suo campo, e alla chiusura il fuoco torna lì; per mezzo secondo
+  da quando il riquadro si vede davvero (primo fotogramma, o ritorno della
+  scheda in primo piano) un clic o un invio veri su OK non contano. Annulla e
+  Esc valgono subito.
 - **All'OK vale quello che il popup ha mostrato.** Una conferma su un elenco
   (righe da dimenticare, sveglie da togliere) agisce su quelle voci, non su
   quelle che lo stesso riferimento trova al momento dell'OK.

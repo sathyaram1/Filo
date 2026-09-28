@@ -6,7 +6,7 @@
 // dispatch (anche se arrivano già "confermate" dal client).
 
 import { test, expect } from './fixtures/electron.mjs';
-import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, fillConfirmInput, mouseClickConfirm } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, fillConfirmInput, mouseClickConfirm, pointWhenConfirmAppears } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -260,6 +260,50 @@ test('#479: scaricare dopo essersi spostati in una cartella sensibile chiede "co
   // alla conferma leggera (nessuna frizione aggiunta dove non serve).
   const stampa = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'curl http://esempio.test/x' });
   expect(stampa.needsConfirm).toBe(2);
+});
+
+// #592 — un riquadro che si apre da solo non prende come risposta un gesto
+// partito per altro: chi scriveva continua a scrivere nel suo campo, e un clic
+// arrivato mentre compare non vale come sì. Le tre forme del riquadro, una regola.
+test('un riquadro che si apre mentre scrivi lascia i tasti al tuo campo: avviso e conferma da digitare', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  const campo = page.locator('#input');
+  for (const apri of [
+    () => { window.__esito = undefined; window.SN_CONFIRM_UI.notify({ title: 'Crediti in regalo', text: 'Ti sono stati regalati 50 crediti!', okLabel: 'Evviva!' }).then((r) => { window.__esito = r; }); },
+    () => { window.__esito = undefined; window.SN_CONFIRM_UI.confirmTyped({ title: 'Eliminazione', text: 'Eliminare tutto.' }).then((r) => { window.__esito = r; }); },
+  ]) {
+    await campo.fill('');
+    await campo.click();
+    await page.keyboard.type('che tempo', { delay: 20 });
+    await page.evaluate(apri);
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+    await page.keyboard.type(' fa domani', { delay: 20 });
+    await expect(page.locator(CONFIRM_HOST), 'il riquadro si è chiuso col tasto battuto per la chat').toBeVisible();
+    expect(await page.evaluate(() => window.__esito)).toBeUndefined();
+    await clickConfirm(page, (await confirmState(page)).hasInput ? 'cancel' : 'ok');
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+    await expect(campo).toHaveValue('che tempo fa domani');
+  }
+});
+
+test('un clic arrivato mentre il riquadro compare non vale come sì; quello dato dopo sì', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  for (const [apri, bottone] of [
+    [() => { window.__esito = undefined; window.SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Procedo?' }).then((r) => { window.__esito = r; }); }, 'ok'],
+    [() => { window.__esito = undefined; window.SN_CONFIRM_UI.notify({ title: 'Crediti in regalo', text: 'Ti sono stati regalati 50 crediti!' }).then((r) => { window.__esito = r; }); }, 'ok'],
+  ]) {
+    const punto = pointWhenConfirmAppears(page, bottone);
+    await page.evaluate(apri);
+    const p = await punto;
+    expect(p, 'il riquadro non è comparso').toBeTruthy();
+    await page.mouse.click(p.x, p.y);
+    await page.waitForTimeout(200);
+    await expect(page.locator(CONFIRM_HOST), 'un clic arrivato mentre il riquadro compariva l’ha chiuso').toBeVisible();
+    await page.waitForTimeout(500);
+    await mouseClickConfirm(page, bottone);
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+    expect(await page.evaluate(() => window.__esito)).toBe(true);
+  }
 });
 
 test('Esc annulla il popup di conferma', async ({ openTab }) => {
