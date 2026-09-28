@@ -33,16 +33,55 @@ export function ticketFile(root) {
 }
 
 /**
- * Questo valore ha la FORMA di un biglietto? PURA.
- *
- * Il server lo genera in base64url (43 caratteri), e un biglietto vero può
- * cominciare con un trattino singolo (~1 su 64): si valida la forma, non il
- * primo carattere. Ogni flag cade fuori: i `--…` per il doppio trattino, `-h`
- * per la lunghezza. Serve a dispatch e al canale, che la regola la chiedono qui.
+ * La forma lunga di un biglietto del server (32 byte in base64url, 43 caratteri). Nessuna opzione è
+ * lunga così: con questa forma un trattino davanti (1 su 64) o due (1 su 4096) non fanno un'opzione. PURA.
+ */
+export function haFormaDiBigliettoVero(v) {
+  return /^[A-Za-z0-9_-]{32,}$/.test(String(v || ''));
+}
+
+/**
+ * Questo valore ha la FORMA di un biglietto? PURA. Ogni flag cade fuori: `-h` per la lunghezza, i `--…`
+ * se non hanno la forma lunga. Serve a dispatch e al canale, che la regola la chiedono qui.
  */
 export function looksLikeTicket(v) {
   const s = String(v || '');
-  return /^[A-Za-z0-9_-]{16,}$/.test(s) && !s.startsWith('--');
+  return /^[A-Za-z0-9_-]{16,}$/.test(s) && (!s.startsWith('--') || haFormaDiBigliettoVero(s));
+}
+
+const NOMI_A_MANO = ['--ticket', '--biglietto'];
+
+/**
+ * Il biglietto passato a mano, con UNA regola per il canale e per le registrazioni (#587): `--ticket` o
+ * `--biglietto`, col codice dopo o col segno uguale, in ogni posizione; ripetuto vale solo se identico.
+ * Codice mancante, vuoto o senza la forma di un biglietto si ferma qui, prima del server. PURA.
+ * @returns {{ args: string[], ticket: string } | { errore: string }}
+ */
+export function leggiBigliettoAMano(list) {
+  const lista = Array.isArray(list) ? list.map((a) => String(a)) : [];
+  const args = [];
+  const visti = [];
+  for (let i = 0; i < lista.length; i++) {
+    const a = lista[i];
+    const nome = NOMI_A_MANO.find((n) => a === n || a.startsWith(`${n}=`));
+    if (!nome) { args.push(a); continue; }
+    let v = '';
+    if (a === nome) {
+      const dopo = lista[i + 1];
+      if (dopo !== undefined && !(dopo.startsWith('--') && !haFormaDiBigliettoVero(dopo))) { v = dopo; i += 1; }
+    } else {
+      v = a.slice(nome.length + 1);
+    }
+    v = v.trim();
+    if (!v) return { errore: `${nome} vuole il codice del biglietto subito dopo di sé (è nelle istruzioni con cui sei partito).` };
+    if (!looksLikeTicket(v)) return { errore: `${nome} «${v.slice(0, 24)}» non ha la forma di un biglietto: il codice è quello nelle istruzioni con cui sei partito.` };
+    visti.push(v);
+  }
+  const diversi = [...new Set(visti)];
+  if (diversi.length > 1) {
+    return { errore: `Due biglietti diversi passati a mano (${diversi[0].slice(0, 12)}… e ${diversi[1].slice(0, 12)}…): passane uno solo.` };
+  }
+  return { args, ticket: diversi[0] || '' };
 }
 
 /** Il marcatore è ancora credibile? PURA. */
