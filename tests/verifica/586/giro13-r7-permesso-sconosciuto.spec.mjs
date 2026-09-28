@@ -1,4 +1,4 @@
-// Verifica #586 giro 12, rilievo 7: tutto ciò che Filo non conosce ha un nome solo e una memoria sola.
+// Verifica #586 giro 13, rilievo 7: tutto ciò che Filo non conosce ha un nome solo e una memoria sola.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const riga = (shell) => shell.locator('#perm-bar .perm-row');

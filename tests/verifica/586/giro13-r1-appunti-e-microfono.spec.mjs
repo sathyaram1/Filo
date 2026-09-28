@@ -1,4 +1,4 @@
-// Verifica #586 giro 12, rilievo 1: il permesso che Filo si dà per Incolla e Detta lo usa anche il sito.
+// Verifica #586 giro 13, rilievo 1: il permesso che Filo si dà per Incolla e Detta lo usa anche il sito.
 // Successo: il sito non ottiene gli appunti né il microfono senza una domanda a cui l'utente abbia detto sì.
 import { test, expect } from '../../fixtures/electron.mjs';
 

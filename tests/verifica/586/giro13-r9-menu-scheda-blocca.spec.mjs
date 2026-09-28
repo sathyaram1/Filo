@@ -1,4 +1,4 @@
-// Verifica #586 giro 12, rilievo 9: dal tasto destro sulla scheda un permesso si toglie ma non si nega.
+// Verifica #586 giro 13, rilievo 9: dal tasto destro sulla scheda un permesso si toglie ma non si nega.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { tastoDestroScheda, testoMenu, cliccaFinche } from '../../helpers/menuScheda.mjs';
 

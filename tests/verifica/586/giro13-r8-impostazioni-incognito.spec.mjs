@@ -1,4 +1,4 @@
-// Verifica #586 giro 12, rilievo 8: Sicurezza aperta da una finestra incognito non mostra le scelte di sempre.
+// Verifica #586 giro 13, rilievo 8: Sicurezza aperta da una finestra incognito non mostra le scelte di sempre.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const riga = (shell) => shell.locator('#perm-bar .perm-row');

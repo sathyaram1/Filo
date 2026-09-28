@@ -1,4 +1,4 @@
-// Verifica #586 giro 12, rilievo 6: la domanda non si toglie di mezzo, né con la × né con l'Esc.
+// Verifica #586 giro 13, rilievo 6: la domanda non si toglie di mezzo, né con la × né con l'Esc.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 test.use({ argomentiApp: ['--use-fake-device-for-media-stream'] });

@@ -1,4 +1,4 @@
-// Verifica #586 giro 12, rilievo 5: prima di ogni scelta il sito legge «negato» invece di «da chiedere».
+// Verifica #586 giro 13, rilievo 5: prima di ogni scelta il sito legge «negato» invece di «da chiedere».
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const PAGINA = `<!doctype html><html><head><title>Guarda</title></head><body>

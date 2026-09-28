@@ -1,4 +1,4 @@
-// Verifica #586 giro 12, rilievo 2: la strada vecchia per lo schermo (chromeMediaSource «desktop») non segue le regole.
+// Verifica #586 giro 13, rilievo 2: la strada vecchia per lo schermo (chromeMediaSource «desktop») non segue le regole.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 test.use({ argomentiApp: ['--use-fake-device-for-media-stream'] });
