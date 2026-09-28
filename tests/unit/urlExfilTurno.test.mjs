@@ -107,10 +107,13 @@ test('CERCA_WEB porta fuori un dato → chiede un OK, come il link (#587 giro 10
   assert.equal(livello(`https://x.example/?q=${encodeURIComponent(pezzo)}`, [gestionale]), 2, 'stesso pezzo in un link');
   // Un token con lettere e cifre appena letto.
   assert.equal(livelloRicerca('cerca sk7Hq2Lm su internet', [cat('OPENAI_API_KEY=sk7Hq2Lm\n')]), 2);
-  // Un dato forte della memoria (l'email).
-  assert.equal(livelloRicerca('sathyaram pontillo gmail', [], { memoria: 'Email: sathyarampontillo@gmail.com' }), 1,
-    'parole staccate non ricompongono l’email');
+  // Un dato forte della memoria (l'email) esce → livello 2.
   assert.equal(livelloRicerca('scrivi a sathyarampontillo@gmail.com', [], { memoria: 'Email: sathyarampontillo@gmail.com' }), 2);
+  // Parole comuni che stanno anche nel profilo/appunti NON bastano: una query di
+  // ricerca ne condivide spesso qualcuna, e da sole non sono un segreto.
+  const memoria = 'Preferenze: tema scuro, lingua italiana. Appunti: idee per le vacanze in montagna.';
+  assert.equal(livelloRicerca('le mie preferenze di lingua italiana', [], { memoria }), 1);
+  assert.equal(livelloRicerca('idee per le vacanze in montagna', [], { memoria }), 1);
   // Ricerche di tutti i giorni: nessun OK, anche con un file letto nel turno.
   for (const q of ['che tempo fa domani a Bologna', 'ricetta della carbonara', 'orari treni milano torino', 'come si chiama il regista di Dune']) {
     assert.equal(livelloRicerca(q, [gestionale]), 1, q);
