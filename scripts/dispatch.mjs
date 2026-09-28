@@ -1363,8 +1363,8 @@ async function recordSecaudit(id, verdict, testo = '') {
   }
 
   sealTransition(next, `secaudit:${verdict}`);
-  // Il passaggio a `done` (o a `design` su bocciatura) lo fa il ruolo dopo il
-  // cancello di fusione.
+  // Su fail il server porta già in `design`; su pass il passaggio a `done` lo
+  // fa il ruolo dopo il cancello di fusione.
   return next;
 }
 
