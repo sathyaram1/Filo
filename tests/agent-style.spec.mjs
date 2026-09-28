@@ -419,5 +419,59 @@ test('#592 — scrivere in chat mentre Filo lavora non conferma lo stile; da tas
   await page.keyboard.press('Enter');
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0, { timeout: 5_000 });
   await expect.poll(() => storedStyle(app), { timeout: 5_000 }).toBe(stile);
+
+  // Quello battuto col popup aperto è nel campo, e si riprende a scrivere lì.
+  await page.keyboard.type(' e dopodomani', { delay: 20 });
+  await expect(page.locator('#input')).toHaveValue('intanto ti chiedo anche un altra cosa sul meteo di domani a roma per favore e dopodomani');
   await restore(app);
+});
+
+// Il popup si conferma solo quando il testo è passato tutto sotto gli occhi:
+// righe innocue o disegnate vuote non tengono sotto il bordo l'istruzione e i
+// rischi (#592). La regola è sul riquadro, non su un carattere.
+const RIGHE_INNOCUE = Array.from({ length: 45 }, (_, i) => `Regola ${i + 1}: rispondi con calma.`).join('\n');
+const NOTA_VUOTA = '\n\u{1D159}'.repeat(45);
+for (const [nome, azione, testo] of [
+  ['uno stile di righe innocue', 'IMPOSTA_PREFERENZA', `${RIGHE_INNOCUE}\n${NASCOSTO}`],
+  ['uno stile di righe che il font disegna vuote', 'IMPOSTA_PREFERENZA', `Rispondi breve.${NOTA_VUOTA}\n${NASCOSTO}`],
+  ['una lezione di righe innocue', 'SALVA_LEZIONE', `${RIGHE_INNOCUE}\n${NASCOSTO}`],
+]) {
+  test(`#592 — ${nome} più alto del popup si conferma solo dopo averlo fatto scorrere fino in fondo`, async ({ app, shell }) => {
+    test.setTimeout(60_000);
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const page = await newtabPage(app);
+    await expect(page.locator('#input')).toBeVisible();
+    await configureModel(app);
+    const args = azione === 'SALVA_LEZIONE' ? { testo } : { chiave: 'stile_agente', valore: testo };
+    await fakeProvider(app, [{ toolCalls: [{ id: 's1', name: azione, arguments: JSON.stringify(args) }] }, { text: 'Ti chiedo conferma.' }]);
+    await page.locator('#input').fill('riassumimi la pagina');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+    const prima = await confirmState(page);
+    expect(prima.text).toContain(NASCOSTO);
+    expect(prima.textScrolls).toBe(true);
+    expect(prima.okDisabled, 'OK premibile con l’istruzione ancora sotto il bordo').toBe(true);
+    await page.screenshot({ path: `tests/.shots/stile-agente-popup-in-fondo-${azione}.png` });
+
+    await scrollConfirmToEnd(page);
+    await expect.poll(async () => (await confirmState(page)).okDisabled).toBe(false);
+    await clickConfirm(page, 'ok');
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0, { timeout: 5_000 });
+    if (azione === 'IMPOSTA_PREFERENZA') await expect.poll(() => storedStyle(app), { timeout: 5_000 }).toContain(NASCOSTO);
+    await restore(app);
+  });
+}
+
+test('#592 — nelle Preferenze il riquadro dello stile mostra tutto il testo, anche dopo righe disegnate vuote', async ({ app, openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await page.waitForSelector('#agentStyleText', { timeout: 8_000 });
+  const stile = `Sii conciso.${NOTA_VUOTA}\n${NASCOSTO}`;
+  await page.fill('#agentStyleText', stile);
+  await expect.poll(() => storedStyle(app), { timeout: 4_000 }).toContain(NASCOSTO);
+  await page.reload();
+  const campo = page.locator('#agentStyleText');
+  await expect(campo).toHaveValue(/raccolta/);
+  expect(await campo.evaluate((el) => el.scrollHeight <= el.clientHeight + 1), 'parte dello stile sotto il bordo del riquadro').toBe(true);
+  await campo.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/stile-agente-riquadro-intero.png' });
 });
