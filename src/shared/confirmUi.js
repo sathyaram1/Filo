@@ -210,6 +210,25 @@
     box.appendChild(p);
   }
 
+  // Si conferma quello che si è visto (#592): se il testo non sta nel riquadro,
+  // `visto()` resta falso finché non lo si fa scorrere fino in fondo. È la regola
+  // sul riquadro, non su un carattere: righe innocue o disegnate vuote non
+  // possono più tenere sotto il bordo l'istruzione e i rischi.
+  function tuttoVisto(box, onCambio) {
+    const el = box.querySelector('.sn-confirm-text');
+    let visto = false;
+    const visto_ = () => {
+      if (!visto && el.scrollTop + el.clientHeight >= el.scrollHeight - 2) visto = true;
+      return visto;
+    };
+    if (!visto_()) {
+      el.tabIndex = 0;
+      el.addEventListener('scroll', onCambio, { passive: true });
+      if (typeof global.ResizeObserver === 'function') new global.ResizeObserver(onCambio).observe(el);
+    }
+    return visto_;
+  }
+
   function buttonRow(box) {
     const row = global.document.createElement('div');
     row.className = 'sn-confirm-row';
