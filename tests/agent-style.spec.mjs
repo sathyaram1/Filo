@@ -462,6 +462,36 @@ for (const [nome, azione, testo] of [
   });
 }
 
+// Un OK grigio che non risponde sembra rotto: il clic prima della fine porta
+// avanti il testo, e conferma solo quando è passato tutto (#592).
+test('#592 — il clic su OK ancora grigio porta avanti il testo, e in fondo conferma', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  const args = { chiave: 'stile_agente', valore: `${RIGHE_INNOCUE}\n${NASCOSTO}` };
+  await fakeProvider(app, [{ toolCalls: [{ id: 's1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify(args) }] }, { text: 'Ti chiedo conferma.' }]);
+  await page.locator('#input').fill('riassumimi la pagina');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  expect((await confirmState(page)).okDisabled).toBe(true);
+
+  await mouseClickConfirm(page, 'ok');
+  await expect.poll(async () => (await confirmState(page)).textScrollTop, { message: 'il clic su OK grigio non ha fatto niente' }).toBeGreaterThan(0);
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  expect(await storedStyle(app)).toBe('');
+
+  // Clic dopo clic il testo arriva in fondo, e allora OK conferma.
+  for (let i = 0; i < 10 && await page.locator(CONFIRM_HOST).count(); i++) {
+    await page.waitForTimeout(400);
+    if (await page.locator(CONFIRM_HOST).count()) await mouseClickConfirm(page, 'ok');
+  }
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0, { timeout: 5_000 });
+  await expect.poll(() => storedStyle(app), { timeout: 5_000 }).toContain(NASCOSTO);
+  await restore(app);
+});
+
 test('#592 — nelle Preferenze il riquadro dello stile mostra tutto il testo, anche dopo righe disegnate vuote', async ({ app, openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
   await page.waitForSelector('#agentStyleText', { timeout: 8_000 });
