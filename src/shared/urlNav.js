@@ -254,7 +254,8 @@
   }
 
   global.SN_URL_NAV = {
-    isLocalHost, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, isLocalNetworkName, isIpv4,
+    isLocalHost, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
+    noteHostPending, homeNetworkPending, isLocalNetworkName, isIpv4,
     normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
