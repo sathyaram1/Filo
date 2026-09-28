@@ -87,16 +87,36 @@
     return (isIpv4(a) || a.includes(':')) && isLocalHost(a);
   }
 
+  const hostKey = (host) => String(host || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+
   function noteHostAddress(host, ip) {
-    const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+    const h = hostKey(host);
     if (!h || !ip) return;
     answeredFrom.set(h, isLanAddress(ip));
     // Tetto largo e senza perdita di sicurezza: un nome dimenticato torna a valere per la sua forma.
     if (answeredFrom.size > 5000) answeredFrom.delete(answeredFrom.keys().next().value);
   }
 
+  // Una pagina arrivata da un proxy ha risposto dal proxy: il suo indirizzo non dice niente, e il nome torna alla sua forma.
+  function forgetHostAddress(host) {
+    answeredFrom.delete(hostKey(host));
+  }
+
+  // Mentre si accerta se l'indirizzo che ha risposto conta (proxy o no), chi deve decidere se far uscire la pagina aspetta.
+  const pendingFrom = new Map();
+  function noteHostPending(host, until) {
+    const h = hostKey(host);
+    if (!h) return Promise.resolve();
+    const p = Promise.resolve(until).catch(() => {}).then(() => { if (pendingFrom.get(h) === p) pendingFrom.delete(h); });
+    pendingFrom.set(h, p);
+    return p;
+  }
+  function homeNetworkPending(host) {
+    return pendingFrom.get(hostKey(host)) || null;
+  }
+
   function isHomeNetworkHost(host) {
-    const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+    const h = hostKey(host);
     if (!h) return false;
     if (!h.includes('.') && !h.includes(':')) return true; // un nome senza punto su internet non esiste
     if (/^localhost$|\.localhost$|^127\.|^::1$/.test(h)) return true;
