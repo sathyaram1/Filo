@@ -22,14 +22,13 @@
   const Calc = global.SN_CALC;
   const resolveCalcMarkers = (text, opts) => (Calc ? Calc.resolveCalcMarkers(text, opts) : (text || ''));
 
-  // ----------------------------------------------------------------
-  // Renderer Markdown: delega alla sorgente unica condivisa SN_MARKDOWN (#418),
-  // così popup, riquadro "Spiega", sidebar e chat della home rendono la stessa
-  // formattazione leggera (grassetto/corsivo/codice/elenchi/titoli + LINK).
-  // ----------------------------------------------------------------
-  const Md = global.SN_MARKDOWN;
+  // Il risultato va in innerHTML e il testo del modello non è fidato: senza
+  // SN_MARKDOWN (#418) si mostra come testo, mai come HTML (#853).
+  const ESCAPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   function renderMarkdown(text) {
-    return Md ? Md.render(text) : (text || '');
+    const Md = global.SN_MARKDOWN;
+    if (Md) return Md.render(text);
+    return String(text == null ? '' : text).replace(/[&<>"']/g, (c) => ESCAPE[c]).replace(/\n/g, '<br>');
   }
 
   // Un solo listener a livello di documento apre i link renderizzati da Filo
