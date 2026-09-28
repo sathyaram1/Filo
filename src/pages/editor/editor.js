@@ -3989,21 +3989,19 @@
   }
 
   // ── Scorciatoie modulo personalizzate ──────────────────────────────────
-  // Nome scritto e tasto premuto si leggono con le stesse regole: SN_TASTI.
-  function shortcutParts(sc) {
-    return String(sc || '').split('+').map((s) => s.trim()).filter(Boolean);
-  }
+  // Nome scritto e tasto premuto si leggono SOLO con SN_TASTI: ogni lettura fatta
+  // qui in casa divergeva («Ctrl+Minus», «Ctrl++») e salvava tasti morti (#545).
   // Un modificatore "reale" cambia il carattere prodotto: Ctrl/Cmd/Alt. Shift da
   // solo NON basta (Shift+b digita comunque "B"), quindi non conta come reale.
   function shortcutHasRealModifier(sc) {
-    return shortcutParts(sc).slice(0, -1).some((m) => ['ctrl', 'alt'].includes(TASTI.tipoModificatore(m)));
+    const p = TASTI.pressioneScritta(sc);
+    return !!p && (p.ctrlKey || p.altKey);
   }
   // Valida: un modificatore reale e un tasto finale, così non coincide con la
   // digitazione di una lettera.
   function isValidShortcut(sc) {
-    const parts = shortcutParts(sc);
-    if (parts.length < 2 || TASTI.tipoModificatore(parts[parts.length - 1])) return false;
-    return shortcutHasRealModifier(sc);
+    const p = TASTI.pressioneScritta(sc);
+    return !!p && (p.ctrlKey || p.altKey) && !TASTI.tipoModificatore(p.key);
   }
   function isEditableTarget(t) {
     if (!t) return false;
