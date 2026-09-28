@@ -148,9 +148,10 @@
   }
 
   function reflectAuth() {
-    const inCorso = !signedIn && !!accessoInCorso;
+    const inCorso = !signedIn && !!attesa;
     const fallito = !signedIn && !inCorso && accessoFallito;
     bdAuthSpin.hidden = !inCorso;
+    bdAuthLascia.hidden = !inCorso;
     bdAuthMsg.classList.toggle('bd-auth-ko', !!fallito);
     if (signedIn) {
       bdAuthMsg.textContent = 'Sei connesso: vota i miglioramenti qui sotto.';
