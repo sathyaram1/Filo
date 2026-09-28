@@ -3187,10 +3187,8 @@ async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } 
     return { ...payload, cached: false, ts: new Date().toISOString() };
   }
 
-  // La chiave è arrivata dopo (invito riscattato): la home aperta smette subito di mandare a
-  // riscattarlo, e il messaggio vero si chiede in background. La firma non vede la chiave (#651).
-  // Chi non ha ancora fatto l'intervista la vede partire nella home aperta: una home scritta dal
-  // modello per uno sconosciuto sarebbe una chiamata buttata.
+  // La chiave è arrivata dopo (#651): la firma non la vede. Il messaggio vero si chiede in background,
+  // ma non a chi deve ancora fare l'intervista, che parte nella home aperta.
   if (cached && cached.senzaChiave && !force) {
     const onb = Onboarding ? await FiloMem.getOnboarding() : null;
     if (!onb || onb.done) dashboardScheduler().request(openTabsCount);
