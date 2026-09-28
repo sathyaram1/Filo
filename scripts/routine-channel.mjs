@@ -103,6 +103,7 @@ import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 import { isProtectedBranch, headSha } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
+import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticket.mjs';
 import { looksLikeTicket } from './lib/routine-ticket.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
