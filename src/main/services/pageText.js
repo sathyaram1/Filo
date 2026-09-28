@@ -169,7 +169,7 @@ function costruisciAlbero(html) {
     i = fine + 1;
     if (chiusura) {
       if (tag === 'br') { apri('br', Object.create(null)); continue; }
-      if (tag === 'p' || tag === 'li' || tag === 'td' || tag === 'th' || tag === 'tr') chiudiFinoA(tag, new Set(['table', 'body']));
+      if (tag === 'p' || tag === 'li' || tag === 'td' || tag === 'th' || tag === 'tr') chiudiFinoA(tag, FERMA_CHIUSURA);
       else chiudiFinoA(tag);
       continue;
     }
