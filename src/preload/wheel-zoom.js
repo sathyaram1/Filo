@@ -350,6 +350,17 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     return !!(badge && target && (target === badge || (badge.contains && badge.contains(target))));
   }
 
+  // Un clic vero che cade dove si VEDE il riquadro vale per il riquadro, anche se
+  // la pagina lo ha reso intoccabile (dialogo modale, anche dentro un componente chiuso).
+  function cadeSu(el, e) {
+    if (!el || !el.isConnected) return false;
+    try {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0
+        && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    } catch (_) { return false; }
+  }
+
   function passoModalita(deltaY) {
     const dir = deltaY < 0 ? 1 : -1; // rotella su = zoom in
     setLevel(letturaLivello() + dir * ZOOM_STEP);
