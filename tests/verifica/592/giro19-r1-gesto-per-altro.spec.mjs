@@ -104,3 +104,23 @@ test('giro 19 r1 — nell’Aiuto quello che si batte per la chat non finisce ne
   await expect(ta, 'i tasti battuti per la chat sono finiti nel campo della conferma').toHaveValue('adesso ti chiedo un altra cosa');
   expect(s && s.hasInput).toBe(true);
 });
+
+test('giro 19 r1 — un avviso che si apre da solo mentre scrivi in chat non si chiude col tasto battuto per la chat', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  const input = page.locator('#input');
+  await expect(input).toBeVisible();
+  await input.click();
+  await page.keyboard.type('che tempo', { delay: 30 });
+  // Come l'avviso dei crediti regalati, che arriva quando arriva.
+  await page.evaluate(() => { window.__avviso = window.SN_CONFIRM_UI.notify({ title: 'Crediti in regalo', text: 'Ti sono stati regalati 50 crediti!', okLabel: 'Evviva!' }).then(() => { window.__avvisoChiuso = true; }); });
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  await page.keyboard.type(' fa domani', { delay: 30 });
+  await page.waitForTimeout(300);
+  const aperto = await page.locator(CONFIRM_HOST).count();
+  const valore = await input.inputValue();
+  if (aperto) await clickConfirm(page, 'ok');
+  expect(aperto, 'l’avviso si è chiuso da solo col primo spazio battuto per la chat').toBe(1);
+  expect(valore).toBe('che tempo fa domani');
+});
