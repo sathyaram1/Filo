@@ -932,8 +932,15 @@
       const s = sotto[i];
       // `~1` è il nome corto 8.3 di Windows: `SSH~1` apre `.ssh`. `:` è un flusso alternativo.
       if (s.startsWith('.') || /~\d/.test(s) || s.includes(':')) return MOTIVI.nascosto;
-      // Un jolly in testa può prendere un nome nascosto; appena sotto la home, una cartella di profilo.
-      if (propri.has(s) && (JOLLY.test(s[0]) || (i === 0 && JOLLY.test(s)))) return MOTIVI.ignoto;
+      // Un jolly in testa può prendere un nome nascosto; appena sotto la home, una
+      // cartella di profilo. Eccezione: un jolly che è l'ULTIMO pezzo del percorso
+      // e ha un suffisso letterale d'estensione (`*.txt`, `report-*.csv`) prende
+      // solo file visibili con quell'estensione — mai `.ssh`, `_netrc`, AppData —
+      // ed è la lettura di tutti i giorni («i miei .txt»): resta libera.
+      if (propri.has(s) && (JOLLY.test(s[0]) || (i === 0 && JOLLY.test(s)))) {
+        const conEstensione = i === sotto.length - 1 && /\.[A-Za-z0-9]+$/.test(s);
+        if (!conEstensione) return MOTIVI.ignoto;
+      }
       if (i === 0) {
         const n = nomeNorm(s);
         if (PROFILO.has(n) || n.startsWith('ntuser')) return MOTIVI.nascosto;
