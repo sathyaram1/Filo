@@ -105,9 +105,9 @@ server un verdetto raccontato non lo legge).
    nessun git e non si passa nessun verdetto: se il tuo `pass` non è stato
    registrato al passo 1, la fusione viene rifiutata.
 3. Chiudi in base all'exit del gate:
-   - `0` → fuso → `deliver status --status done --notes "<riga>"` +
-     `dispatch.mjs --clear-state <id>`
-   - `10` → BLOCCATO (L5 sul diff) → `deliver status --status design
+   - `0` → fuso → `node scripts/routine-channel.mjs deliver status --status done --notes "<riga>"` +
+     `node scripts/dispatch.mjs --clear-state <id>`
+   - `10` → BLOCCATO (L5 sul diff) → `node scripts/routine-channel.mjs deliver status --status design
      --notes "<spiegazione>" --branch <branch> --reason l5`.
      Il motivo è `l5`, non `secaudit`: il tuo controllo è passato, a fermare è
      stato il cancello del server, e in dashboard sono due forme diverse (il
