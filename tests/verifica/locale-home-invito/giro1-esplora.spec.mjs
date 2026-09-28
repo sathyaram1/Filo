@@ -5,7 +5,7 @@ import { test, expect } from '../../fixtures/electron.mjs';
 
 let server;
 let base;
-const stato = { redeemed: false, pendingCode: null, modelsDoc: null };
+const stato = { redeemed: false, pendingCode: null, modelsDoc: null, trattieni: false, trattenute: [] };
 const PERSONAL = 'sk-or-v1-test-personal';
 
 function json(res, status, body) {
