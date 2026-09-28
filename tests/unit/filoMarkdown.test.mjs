@@ -128,7 +128,7 @@ test('#853 in coda a un URL nudo si stacca solo l\'elenco chiuso: ogni altro car
 });
 
 test('#853 una coda lunghissima dopo un URL nudo non blocca il disegno', () => {
-  for (const coda of [')', '.', '*', '.)', '&#39;']) {
+  for (const coda of [')', '.', '*', '.)', "'"]) {
     const testo = 'Vedi https://example.com/pagina' + coda.repeat(50_000);
     const t0 = performance.now();
     const html = render(testo);
