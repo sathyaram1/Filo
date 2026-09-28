@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { rmSync, mkdirSync, writeFileSync } from 'node:fs';
 
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
-import { bigliettoAMano } from '../../scripts/routine-channel.mjs';
+import { bigliettoAMano, parolaInPiu } from '../../scripts/routine-channel.mjs';
 import { leggiBigliettoAMano } from '../../scripts/lib/routine-ticket.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
