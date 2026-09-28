@@ -311,6 +311,7 @@
     beginSending = deps.beginSending;
     runTurnAndContinue = deps.runTurnAndContinue;
     isHomeMessageVisible = deps.isHomeMessageVisible;
+    soloRisposteSenzaCrediti = deps.soloRisposteSenzaCrediti;
     setSuggestions = deps.setSuggestions;
     loadDashboard = deps.loadDashboard;
   }
