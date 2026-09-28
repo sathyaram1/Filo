@@ -265,7 +265,9 @@ function withDefaults(settings) {
     const own = settings.apiKeys || {};
     const personal = personalOpenrouterKey();
     const apiKeys = own.openrouter || !personal ? own : { ...own, openrouter: personal };
-    return { ...settings, apiKeys, openWeightsOnly, excludedProviders, providerSort, security };
+    // Un fornitore salvato che Filo non ha più (Gemini) spegnerebbe ogni funzione che cerca la sua chiave.
+    const provider = Defaults.fornitoreUsabile(settings.provider) ? settings.provider : d.provider;
+    return { ...settings, provider, apiKeys, openWeightsOnly, excludedProviders, providerSort, security };
   }
   const userKeys = settings.apiKeys || {};
   const apiKeys = {};
