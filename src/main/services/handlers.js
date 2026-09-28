@@ -3961,9 +3961,16 @@ function sendToAllFrames(wc, message) {
   if (!wc || wc.isDestroyed?.()) return;
   let frames = null;
   try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
-  if (!frames || !frames.length) { try { wc.send('filo:broadcast', messaggioPerDestinazione(message, wc.getURL())); } catch (_) {} return; }
+  if (!frames || !frames.length) {
+    try { const m = messaggioPerDestinazione(message, wc.getURL()); if (m) wc.send('filo:broadcast', m); } catch (_) {}
+    return;
+  }
   for (const f of frames) {
-    try { if (!f.detached) f.send('filo:broadcast', messaggioPerDestinazione(message, f.url)); } catch (_) {}
+    try {
+      if (f.detached) continue;
+      const m = messaggioPerDestinazione(message, f.url);
+      if (m) f.send('filo:broadcast', m);
+    } catch (_) {}
   }
 }
 
