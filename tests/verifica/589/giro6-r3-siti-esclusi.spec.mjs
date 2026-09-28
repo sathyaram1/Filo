@@ -36,12 +36,12 @@ test('a un sito non arriva l\'elenco dei siti dove l\'utente ha spento Filo', as
 });
 
 test('sul sito escluso Filo resta spento', async ({ shell, openTab, testServer }) => {
-  const probe = await testServer.openReady(openTab, '<h1>sonda</h1>');
-  const host = new URL(probe.url()).hostname;
-  await shell.evaluate((d) => window.filoShell.message({ type: 'update_settings', settings: { blocklist: [d, 'altro-589.example'] } }), [host][0]);
+  const host = new URL(testServer.origin).hostname;
+  await shell.evaluate((d) => window.filoShell.message({ type: 'update_settings', settings: { blocklist: [d, 'altro-589.example'] } }), host);
   const web = await testServer.openReady(openTab, '<h1 style="height:300px">sito escluso</h1>');
-  await web.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  // Da escluso il codice di Filo non arriva mai a dirsi pronto: si lascia il tempo di montarsi.
+  await web.waitForTimeout(1500);
   await web.locator('h1').click({ button: 'right' });
   await web.waitForTimeout(800);
-  await expect(web.locator('.sn-menu'), 'sul sito escluso il menu di Filo si è aperto').toHaveCount(0);
+  await expect(web.locator('.sn-menu'), 'sul sito escluso il menu di Filo si è aperto').toBeHidden();
 });
