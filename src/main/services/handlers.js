@@ -382,21 +382,6 @@ function openWeightsConfigError(settings, action, droppedRefs) {
   return e;
 }
 
-async function ensureUnderLimit(settings) {
-  if (await Costs.isOverLimit(settings.monthlyLimitEur)) {
-    const e = new Error(I18n.t('err_limit_reached'));
-    e.code = 'LIMIT_REACHED';
-    throw e;
-  }
-}
-
-// Oltre il limite di spesa nessun tentativo parte: non esiste più un fornitore
-// "gratuito" su cui ripiegare (era l'API diretta di Google, oggi fuori da Filo).
-async function applyLimitToChain(settings, attempts) {
-  await ensureUnderLimit(settings);
-  return attempts;
-}
-
 // Catena di tentativi per servire una richiesta. L'UNICA sorgente dei modelli è
 // la configurazione effettiva (condivisa o personale): il registry scritto nel
 // codice NON viene più rifuso qui sotto. Rifonderlo significava che un modello
