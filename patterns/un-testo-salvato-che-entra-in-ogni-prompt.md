@@ -27,7 +27,8 @@ Valgono insieme queste regole:
   sola: tre giri di verifica di fila hanno spinto l'istruzione sotto il bordo
   con righe vuote, poi di spazi a larghezza zero, poi di righe innocue o di un
   simbolo che il font disegna vuoto. La regola sta sul riquadro: se il testo non
-  ci sta, OK resta spento finché non lo si fa scorrere fino in fondo; nelle
+  ci sta, OK resta grigio finché non lo si fa scorrere fino in fondo, e un clic
+  su OK grigio porta avanti il testo di una pagina invece di non rispondere; nelle
   Preferenze il riquadro dello stile cresce col testo. Il popup non si mangia i
   tasti battuti per la chat: finiscono nel campo, e alla chiusura il fuoco
   torna lì.
