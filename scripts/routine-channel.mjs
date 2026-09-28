@@ -944,16 +944,14 @@ if (isMain) {
   // la stessa cosa: due (uno qui e uno lì) è come si perde un testo per strada.
   if (typeof data.frase === 'string') { data.userNote = data.frase; }
   delete data.frase;
-  // `--ticket` è il nome che usano dispatch e il contratto dei worker: qui vale `--biglietto`.
-  if (typeof data.ticket === 'string' && data.biglietto === undefined) data.biglietto = data.ticket;
-  delete data.ticket;
   // Il biglietto a mano vale in OGNI comando con la stessa regola (#587): accettarlo per poi ignorarlo
   // faceva rilasciare in silenzio un biglietto diverso da quello passato.
-  if (cmd !== 'domanda' && cmd !== 'risposta') {
-    const conMano = bigliettoAMano(cmd, args, typeof data.biglietto === 'string' ? data.biglietto : '');
+  if (cmd === 'domanda' || cmd === 'risposta') {
+    if (mano.ticket) data.biglietto = mano.ticket;
+  } else {
+    const conMano = bigliettoAMano(cmd, args, mano.ticket);
     if (conMano.errore) { console.error(conMano.errore); process.exit(1); }
     args.splice(0, args.length, ...conMano.args);
-    delete data.biglietto;
   }
 
   // `--segnala <file.md>`: la segnalazione per l'owner (L3), letta INTERA dal
