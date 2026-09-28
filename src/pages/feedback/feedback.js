@@ -1872,6 +1872,7 @@
     if (automationRow) automationRow.hidden = !isAdmin;
     if (isAdmin) loadAutomation();
     if (!isAdmin && adminBannerText) {
+      adminBannerText.classList.remove('fb-admin-ko');
       // Distingui "non loggato" da "loggato ma non admin": il secondo non può
       // diventare admin cliccando Accedi, quindi nascondiamo il pulsante.
       if (profile?.email) {
@@ -1898,6 +1899,13 @@
     }
   }
 
+  // Il perché di un accesso non riuscito sta nel riquadro dove si è premuto Accedi.
+  function mostraAccessoFallito(frase) {
+    if (!adminBannerText) return;
+    adminBannerText.textContent = (typeof frase === 'string' && frase.trim()) || 'Accesso non riuscito: riprova.';
+    adminBannerText.classList.add('fb-admin-ko');
+  }
+
   if (adminSignInBtn) {
     adminSignInBtn.addEventListener('click', async () => {
       adminSignInBtn.disabled = true;
@@ -1906,9 +1914,9 @@
         setIsAdmin(r?.isAdmin);
         renderAuthState(r?.profile);
         applyFilter(); // ridisegna con/senza controlli admin
-        if (r?.ok === false && r.code !== 'sostituito') alert(r.error || 'Accesso non riuscito: riprova.');
-      } catch (e) {
-        alert('Accesso non riuscito: ' + (e?.message || e));
+        if (r?.ok === false) mostraAccessoFallito(r.error);
+      } catch (_) {
+        mostraAccessoFallito();
       } finally {
         adminSignInBtn.disabled = false;
       }

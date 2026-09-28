@@ -131,7 +131,7 @@
   // non l'email: è la chiave con cui i voti sono salvati in `votes.<uid>` (DB4).
   // Senza questo, dopo un reload "il mio voto" non si riconoscerebbe più
   // (i voti salvati sono sempre per uid reale, mai per email).
-  const CODICI_ACCESSO = new Set(['auth', 'accesso', 'accesso-ko']);
+  const CODICI_ACCESSO = new Set(['auth', 'accesso', 'accesso-ko', 'lasciato']);
   async function refreshAuth() {
     try {
       const r = await sendToMain({ type: 'auth_status' });
@@ -225,7 +225,9 @@
     const a = attesa;
     if (!a) return;
     attesa = null;
-    for (const id of a.gesti.keys()) if (avvisi.get(id)?.code === 'accesso') avvisi.delete(id);
+    for (const id of a.gesti.keys()) {
+      avvisi.set(id, { testo: 'Senza accesso non è partito niente: riprova quando vuoi.', code: 'lasciato' });
+    }
     reflectAuth();
     renderList();
   });
@@ -334,7 +336,7 @@
     if (!a) return null;
     const p = document.createElement('p');
     // Un fix ritirato non è un errore di chi ha votato: tono neutro.
-    p.className = a.code === 'gone' || a.code === 'accesso' ? 'bd-card-msg bd-card-msg-info' : 'bd-card-msg';
+    p.className = a.code === 'gone' || a.code === 'accesso' || a.code === 'lasciato' ? 'bd-card-msg bd-card-msg-info' : 'bd-card-msg';
     p.setAttribute('role', 'status');
     p.textContent = a.testo;
     return p;

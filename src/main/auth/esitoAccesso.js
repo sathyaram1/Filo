@@ -6,7 +6,7 @@ const FRASI = {
   rete: 'Accesso non riuscito: manca la connessione. Riprova quando sei in rete.',
   annullato: 'Accesso annullato nel browser: riprova quando vuoi.',
   scaduto: 'L\'accesso nel browser non è stato completato: riprova.',
-  sostituito: 'Accesso sostituito da quello appena richiesto.',
+  browser: 'Filo non è riuscito ad aprire il browser per l\'accesso: controlla di averne uno predefinito e riprova.',
   'non-configurato': 'In questa versione di Filo l\'accesso non è disponibile.',
   servizio: 'Il servizio di accesso non ha risposto: riprova tra poco.',
 };

@@ -42,7 +42,7 @@ test('un errore sconosciuto, o nessun errore, ha comunque una frase', () => {
   }
 });
 
-test('un accesso interrotto (browser chiuso, sostituito, scaduto) libera la porta e dice perché', async () => {
+test('un accesso interrotto (browser chiuso, scaduto) libera la porta e dice perché', async () => {
   const loop = await _internals.startLoopback('stato');
   const attesa = loop.waitForCode();
   loop.abort(conCodice('scaduto'));
