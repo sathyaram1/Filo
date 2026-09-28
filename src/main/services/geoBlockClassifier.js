@@ -292,16 +292,17 @@ const budgetByCache = new WeakMap();
 function sb() {
   return globalThis.SN_SAFEBROWSE || require('./safebrowse');
 }
-function spendFor(cache, host, url) {
+// `budgetUrl` è l'indirizzo navigato dalla scheda: quello che la pagina si riscrive dopo non sposta il conto.
+function spendFor(cache, host, url, budgetUrl) {
   if (!cache) return true;
   const SB = sb();
   let budget = budgetByCache.get(cache);
   if (!budget) { budget = SB.createOwnerBudget(); budgetByCache.set(cache, budget); }
-  return budget.spend(SB.ownerOf(url || `https://${host}/`) || String(host || '').toLowerCase());
+  return budget.spend(SB.ownerOf(url || `https://${host}/`, budgetUrl) || String(host || '').toLowerCase());
 }
 
 async function classify(input = {}, { complete, cache, now = Date.now, signal } = {}) {
-  const { title, text, statusCode, host, url } = input;
+  const { title, text, statusCode, host, url, budgetUrl } = input;
 
   // 1) Gate: se non è un caso ambiguo, non chiamare il modello.
   if (!shouldClassify({ statusCode, text, deterministicHit: input.deterministicHit }) || await isHomeNetwork(host)) {
