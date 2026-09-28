@@ -124,10 +124,24 @@
     return { valore, fresco, azione: null };
   }
 
+  // Mentre si batte il numero i tasti sono del campo, presi dal main prima di
+  // qualunque frame: il fuoco lo può spostare anche il sito, pure dentro un suo
+  // riquadro (#686.1 giro 7). 'incolla', 'tasto', o null: va dove andrebbe.
+  function tastoPerCampo(t) {
+    if (!t) return null;
+    const k = String(t.key || '');
+    const ctrl = !!(t.ctrlKey || t.metaKey || t.control || t.meta);
+    const alt = !!(t.altKey || t.alt);
+    if (ctrl && !alt && k.toLowerCase() === 'v') return 'incolla';
+    if (ctrl || alt) return null;
+    if (!k || k === 'Unidentified' || /^F\d{1,2}$/.test(k)) return null;
+    return 'tasto';
+  }
+
   global.SN_ZOOM = {
     BASE, PASSO, VERSI, GESTI, CIFRE_CAMPO,
     MIN_LIVELLO, MAX_LIVELLO, MIN_PERCENTUALE, MAX_PERCENTUALE,
     percentuale, livello, limita, leggiPercentuale, risolvi,
-    tastoZoom, gestoValido, tastoCampo,
+    tastoZoom, gestoValido, tastoCampo, tastoPerCampo,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
