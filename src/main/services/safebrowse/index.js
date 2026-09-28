@@ -7,7 +7,7 @@
 //                                  di rete (GSB/RDAP/CT/sandbox/LLM); quando un
 //                                  dato arriva e cambia il verdetto, richiama
 //                                  onUpdate(verdict). Le chiamate NON bloccano.
-//   recordCert(registrable, st)    registra l'esito del certificato visto da
+//   recordCert(host, st)           registra l'esito del certificato visto da
 //                                  Electron (certificate-error / did-navigate).
 //   setProviders(fns)              inietta i fetcher di rete (Task 4/5).
 //
@@ -85,9 +85,10 @@ function configure(opts = {}) {
   gsbKeyOf = keyOf;
 }
 
-// Esito certificato osservato dalla webview reale (la fonte più affidabile).
-function recordCert(registrable, status) {
-  if (registrable && status) certCache.set(registrable, { status });
+// Esito certificato osservato dalla webview reale (la fonte più affidabile). Vale per l'host che l'ha mostrato: su una
+// piattaforma di hosting il certificato rotto di un sito non dice niente dei vicini.
+function recordCert(host, status) {
+  if (host && status) certCache.set(String(host).toLowerCase(), { status });
 }
 
 // Una pagina ospitata ha un verdetto suo: con la chiave del solo host un modulo segnalato colpirebbe tutti gli altri.
@@ -149,7 +150,7 @@ function assembleCached(norm, url) {
   return {
     gsb: gsbCache.get('u:' + pageKey(norm, url)) || gsbCache.get(reg),
     ageDays: ageCache.get(reg),
-    cert: certCache.get(reg),
+    cert: certCache.get(norm.host),
     sandbox: sandboxCache.get(pageKey(norm, url)),
     llm: llmCache.get(pageKey(norm, url)),
   };

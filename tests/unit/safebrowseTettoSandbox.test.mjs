@@ -82,8 +82,7 @@ test('a coda piena un link nuovo non apre niente e torna subito senza verdetto',
 test('sottodomini sempre nuovi dello stesso dominio: un solo giudizio del modello e una sola sandbox', async () => {
   let giudizi = 0;
   let sandbox = 0;
-  SB._caches.llmCache.m.clear();
-  SB._caches.sandboxCache.m.clear();
+  for (const c of Object.values(SB._caches)) c.m.clear();
   SB.setProviders({
     gsb: null, rdap: null, ct: null,
     llm: async () => { giudizi++; await new Promise((ok) => setTimeout(ok, 5)); return { suspicious: false, reason: null }; },
@@ -107,7 +106,6 @@ test('sottodomini sempre nuovi dello stesso dominio: un solo giudizio del modell
     assert.equal(giudizi, 2);
   } finally {
     SB.setProviders({ llm: null, sandbox: null });
-    SB._caches.llmCache.m.clear();
-    SB._caches.sandboxCache.m.clear();
+    for (const c of Object.values(SB._caches)) c.m.clear();
   }
 });

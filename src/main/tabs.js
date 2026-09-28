@@ -2217,7 +2217,7 @@ class TabManager {
       try {
         const SB = globalThis.SN_SAFEBROWSE;
         const norm = SB && SB.normalize(url);
-        if (norm && norm.registrable) SB.recordCert(norm.registrable, mapCertError(error));
+        if (norm && norm.host) SB.recordCert(norm.host, mapCertError(error));
       } catch (_) {}
       try { callback(false); } catch (_) {}
     });
