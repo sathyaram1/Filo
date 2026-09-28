@@ -39,7 +39,11 @@ function conRete(statoRemoto, fn) {
     return {
       ok: true,
       status: 200,
-      async json() { return { fields: { provider: { stringValue: statoRemoto.provider } } }; },
+      async json() {
+        const fields = { provider: { stringValue: statoRemoto.provider } };
+        if (statoRemoto.providerSort) fields.providerSort = { stringValue: statoRemoto.providerSort };
+        return { fields };
+      },
       async text() { return ''; },
     };
   };
