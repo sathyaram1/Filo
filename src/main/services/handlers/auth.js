@@ -7,6 +7,7 @@ const Defaults = require('../defaultsStore');
 const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
 const { daFilo, soloFilo } = require('./origine');
+const { spiegaErroreAccesso } = require('../../auth/esitoAccesso');
 
 // Base delle Cloud Function callable del backend di sicurezza (filo-security):
 // stessa region/progetto del deploy. Override per i test via env.
@@ -262,7 +263,7 @@ module.exports = function register(on, ctx) {
       if (auth.isAdmin()) scheduleViewSync({ delayMs: 4000, force: true });
       return { ok: true, profile, isAdmin: auth.isAdmin() };
     } catch (e) {
-      return { ok: false, error: e?.message || String(e) };
+      return { ok: false, ...spiegaErroreAccesso(e) };
     }
   });
 

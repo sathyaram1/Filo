@@ -16,7 +16,7 @@
 const http = require('node:http');
 // Niente require('electron') a livello di modulo: questo file viene richiesto
 // (transitivamente, via defaultsStore/supportModelsStore) anche dagli unit test
-// node:test che girano fuori da Electron. `shell` serve solo dentro signIn(),
+// node:test che girano fuori da Electron. `shell` e `net` servono solo dentro signIn(),
 // quindi si richiede lazy lì (vedi CLAUDE.md — pattern usato anche altrove,
 // es. adblock.js/proxyTab.js).
 const cfg = require('./config');
@@ -35,11 +35,24 @@ function decodeJwtPayload(jwt) {
   }
 }
 
-// Avvia un server loopback effimero e ritorna { redirectUri, waitForCode }.
+// `code` è la causa per chi ha chiesto l'accesso (esitoAccesso.js ne fa la frase).
+function erroreAccesso(code, message) {
+  const e = new Error(message);
+  e.code = code;
+  return e;
+}
+
+// Chi chiude la scheda del browser non richiama mai il loopback: senza un tetto
+// l'accesso resterebbe in corso per sempre. Largo: consenso, scelta account, 2FA.
+const ATTESA_ACCESSO_MS = 10 * 60 * 1000;
+let flussoInCorso = null;
+
+// Avvia un server loopback effimero e ritorna { redirectUri, waitForCode, abort }.
 function startLoopback(expectedState) {
   return new Promise((resolve, reject) => {
     let resolveCode, rejectCode;
     const codePromise = new Promise((res, rej) => { resolveCode = res; rejectCode = rej; });
+    codePromise.catch(() => {}); // un flusso interrotto prima di waitForCode non è un rifiuto orfano
 
     const server = http.createServer((req, res) => {
       const url = new URL(req.url, 'http://127.0.0.1');
@@ -53,7 +66,7 @@ function startLoopback(expectedState) {
           : 'Accesso a Filo completato. Puoi chiudere questa scheda e tornare all\'app.')
         + '</body>');
       server.close();
-      if (error) return rejectCode(new Error('OAuth: ' + error));
+      if (error) return rejectCode(erroreAccesso(error === 'access_denied' ? 'annullato' : 'servizio', 'OAuth: ' + error));
       if (!code) return rejectCode(new Error('OAuth: nessun code nel redirect'));
       if (state !== expectedState) return rejectCode(new Error('OAuth: state non corrispondente (possibile CSRF)'));
       resolveCode(code);
@@ -63,7 +76,8 @@ function startLoopback(expectedState) {
     // porta 0 = il SO assegna una porta libera, solo su loopback.
     server.listen(0, '127.0.0.1', () => {
       const { port } = server.address();
-      resolve({ redirectUri: `http://127.0.0.1:${port}`, waitForCode: () => codePromise });
+      const abort = (err) => { server.close(() => {}); rejectCode(err); };
+      resolve({ redirectUri: `http://127.0.0.1:${port}`, waitForCode: () => codePromise, abort });
     });
   });
 }
@@ -171,10 +185,54 @@ function restore() {
 
 async function signIn() {
   if (!cfg.isConfigured()) {
-    throw new Error('Login non configurato: manca il Google OAuth Client ID (vedi src/main/auth/config.js).');
+    throw erroreAccesso('non-configurato', 'Login non configurato: manca il Google OAuth Client ID (vedi src/main/auth/config.js).');
   }
+  const { shell, net } = require('electron');
+  if (net && typeof net.isOnline === 'function' && !net.isOnline()) {
+    throw erroreAccesso('rete', 'nessuna connessione');
+  }
+  // Un accesso alla volta: chi lo chiede mentre uno aspetta il browser riapre la
+  // STESSA pagina e ne condivide l'esito, così qualunque scheda completi arriva a Filo.
+  if (flussoInCorso) {
+    const f = await flussoInCorso;
+    if (f.aspettaBrowser) {
+      f.rinnovaAttesa();
+      await apriBrowser(shell, f.url);
+    }
+    return f.esito;
+  }
+  const prossimo = nuovoFlusso();
+  flussoInCorso = prossimo;
+  const libera = () => { if (flussoInCorso === prossimo) flussoInCorso = null; };
+  let f;
+  try {
+    f = await prossimo;
+  } catch (e) {
+    libera();
+    throw e;
+  }
+  f.esito.then(libera, libera);
+  try {
+    await apriBrowser(shell, f.url);
+  } catch (e) {
+    f.loop.abort(e);
+    throw e;
+  }
+  return f.esito;
+}
+
+async function apriBrowser(shell, url) {
+  try {
+    await shell.openExternal(url);
+  } catch (e) {
+    throw erroreAccesso('browser', 'browser non aperto: ' + (e?.message || e));
+  }
+}
+
+async function nuovoFlusso() {
   const { verifier, challenge, method, state } = pkce.createPkce();
-  const { redirectUri, waitForCode } = await startLoopback(state);
+  const loop = await startLoopback(state);
+  const { redirectUri } = loop;
 
   const authUrl = new URL(cfg.authEndpoint);
   authUrl.search = new URLSearchParams({
@@ -189,16 +247,30 @@ async function signIn() {
     prompt: 'consent',
   }).toString();
 
-  const { shell } = require('electron');
-  await shell.openExternal(authUrl.toString());
-
-  const code = await waitForCode();
-  const googleTok = await exchangeCodeForGoogleToken(code, verifier, redirectUri);
-  if (!googleTok.id_token) throw new Error('OAuth: nessun id_token da Google');
-  const fb = await signInWithFirebase(googleTok.id_token);
-  setSession(fb);
-  persist();
-  return getProfile();
+  const f = { url: authUrl.toString(), loop, aspettaBrowser: true };
+  let timer = null;
+  // Il tetto riparte a ogni riapertura: chi riapre il browser ricomincia da capo.
+  f.rinnovaAttesa = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => loop.abort(erroreAccesso('scaduto', 'accesso non completato in tempo')), ATTESA_ACCESSO_MS);
+  };
+  f.rinnovaAttesa();
+  f.esito = (async () => {
+    let code;
+    try {
+      code = await loop.waitForCode();
+    } finally {
+      clearTimeout(timer);
+      f.aspettaBrowser = false;
+    }
+    const googleTok = await exchangeCodeForGoogleToken(code, verifier, redirectUri);
+    if (!googleTok.id_token) throw new Error('OAuth: nessun id_token da Google');
+    const fb = await signInWithFirebase(googleTok.id_token);
+    setSession(fb);
+    persist();
+    return getProfile();
+  })();
+  return f;
 }
 
 function signOut() {
