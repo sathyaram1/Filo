@@ -101,6 +101,11 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     const tabId = sender && sender.tab && sender.tab.id;
     if (!win || !win._filoTabs || !tabId) return { ok: false };
-    return win._filoTabs.cookieOutcome(tabId, msg && msg.outcome);
+    // La risposta del sito la guarda solo la pagina: un riquadro non sceglie quali cookie del sito togliere.
+    if (msg && msg.outcome === 'answer') {
+      const top = sender.wc && !sender.wc.isDestroyed() && sender.wc.mainFrame;
+      if (!top || !sender.frame || sender.frame.frameTreeNodeId !== top.frameTreeNodeId) return { ok: false };
+    }
+    return win._filoTabs.cookieOutcome(tabId, msg && msg.outcome, msg);
   });
 };

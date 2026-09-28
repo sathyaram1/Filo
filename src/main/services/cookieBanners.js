@@ -203,9 +203,12 @@ function offline() {
   return process.env.NODE_ENV === 'test' || !!process.env.FILO_SMOKE;
 }
 
+// Un giro fallito si ritenta a tempo finché la lista serve: vedi retryList.js.
+const refreshInBackground = require('./retryList').makeRetry(() => refresh(), () => enabled && !offline());
+
 function ensurePeriodicRefresh() {
   if (refreshTimer) return;
-  refreshTimer = setInterval(() => { if (enabled) refresh().catch(() => {}); }, REFRESH_INTERVAL_MS);
+  refreshTimer = setInterval(() => { if (enabled) refreshInBackground().catch(() => {}); }, REFRESH_INTERVAL_MS);
   if (refreshTimer.unref) refreshTimer.unref();
 }
 
@@ -219,7 +222,7 @@ async function init(settings) {
   await loadCache();
   if (offline() || !enabled) return;
   ensurePeriodicRefresh();
-  if (!lastUpdatedAt || (Date.now() - lastUpdatedAt) >= REFRESH_INTERVAL_MS) refresh().catch(() => {});
+  if (!lastUpdatedAt || (Date.now() - lastUpdatedAt) >= REFRESH_INTERVAL_MS) refreshInBackground().catch(() => {});
 }
 
 function configureFromSettings(settings) {
@@ -227,7 +230,7 @@ function configureFromSettings(settings) {
   enabled = isOn(settings);
   if (offline() || !enabled) return;
   ensurePeriodicRefresh();
-  if (!was && (!lastUpdatedAt || (Date.now() - lastUpdatedAt) >= REFRESH_INTERVAL_MS)) refresh().catch(() => {});
+  if (!was && (!lastUpdatedAt || (Date.now() - lastUpdatedAt) >= REFRESH_INTERVAL_MS)) refreshInBackground().catch(() => {});
 }
 
 // Solo per i test: una lista scritta a mano, senza rete.

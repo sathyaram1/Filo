@@ -340,8 +340,17 @@ function incognitoSessions() {
 function wipeChanged(prev, next, sessions) {
   for (const site of new Set([...prev, ...next])) {
     if (prev.includes(site) === next.includes(site)) continue;
-    for (const ses of sessions) wipeConsentCookies(ses, site).catch(() => {});
+    const names = answerOf(site).cookies;
+    for (const ses of sessions) wipeConsentCookies(ses, site, names).catch(() => {});
   }
+}
+
+// I nomi che il sito ha dato alla sua risposta, visti dopo il clic sul banner: li tiene tabs/tabCookies.js.
+let answerLookup = null;
+function setAnswerLookup(fn) { answerLookup = typeof fn === 'function' ? fn : null; }
+function answerOf(site) {
+  try { const a = answerLookup && answerLookup(site); if (a) return { cookies: a.cookies || [], storage: a.storage || [] }; } catch (_) {}
+  return { cookies: [], storage: [] };
 }
 
 // Ritorna true se cambia qualcosa che le pagine devono sapere (modalità o siti coi banner).
@@ -413,15 +422,17 @@ function isConsentName(name) {
   return CONSENT_NAME.test(String(name || ''));
 }
 
-async function wipeConsentCookies(ses, site) {
+// `names`: i cookie che il sito ha scritto come risposta dopo il clic, qualunque nome abbiano.
+async function wipeConsentCookies(ses, site, names) {
   if (!ses || !ses.cookies || !site) return 0;
+  const extra = new Set(Array.isArray(names) ? names : []);
   let all = [];
   try { all = await ses.cookies.get({}); } catch (_) { return 0; }
   let removed = 0;
   await Promise.all(all.map(async (c) => {
     const domain = String(c.domain || '').replace(/^\./, '').toLowerCase();
     if (!(domain === site || domain.endsWith('.' + site))) return;
-    if (!isConsentName(c.name)) return;
+    if (!isConsentName(c.name) && !extra.has(c.name)) return;
     const url = (c.secure ? 'https://' : 'http://') + domain + (c.path || '/');
     try { await ses.cookies.remove(url, c.name); removed++; } catch (_) {}
   }));
@@ -438,6 +449,8 @@ module.exports = {
   currentMode,
   isConsentName,
   wipeConsentCookies,
+  setAnswerLookup,
+  answerOf,
   resetIncognito,
   registrableOf,
   isTrackerHost,

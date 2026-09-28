@@ -1,4 +1,4 @@
-// Banner dei cookie che Filo non sa rifiutare: li riconosce con EasyList Cookie, li nasconde e sblocca la pagina rimasta ferma.
+// Banner dei cookie che Filo non sa rifiutare: li riconosce con EasyList Cookie e coi contenitori dei CMP noti, li nasconde e sblocca la pagina.
 // Non clicca niente e non decide quando nascondere: lo decide cookies.js. Solo nel frame principale.
 // Le regole arrivano da src/main/services/cookieBanners.js (lista scaricata, mai impacchettata).
 
@@ -150,10 +150,61 @@
     try { return !!body && body.scrollHeight > window.innerHeight * 1.1; } catch (_) { return false; }
   }
 
+  function filoUi(el) {
+    try { return !!(global.SN_FILO_UI && global.SN_FILO_UI.inside(el)); } catch (_) { return false; }
+  }
+
+  const CONTENT_TAGS = /^(IMG|SVG|VIDEO|IFRAME|INPUT|BUTTON|SELECT|TEXTAREA|CANVAS)$/;
+  function hasContent(el) {
+    return CONTENT_TAGS.test(el.tagName) || (el.innerText || '').trim().length > 3;
+  }
+
+  // Un altro riquadro del sito ancora aperto (scelta del paese, età, abbonamento) tiene il suo velo e il suo blocco:
+  // c'è se in un punto della finestra, sopra il velo, c'è del contenuto che non è il banner nascosto.
+  function veilHasDialog(veil) {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    for (let i = 1; i < 8; i++) {
+      for (let j = 1; j < 8; j++) {
+        let stack = [];
+        try { stack = document.elementsFromPoint((W * i) / 8, (H * j) / 8); } catch (_) {}
+        const at = stack.indexOf(veil);
+        for (let k = 0; k < at; k++) {
+          const el = stack[k];
+          if (!veil.contains(el) && !filoUi(el) && hasContent(el)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function modalOpen() {
+    let list = [];
+    try { list = document.querySelectorAll('dialog[open], [aria-modal="true"]'); } catch (_) {}
+    const min = window.innerWidth * window.innerHeight * 0.05;
+    for (const el of list) {
+      if (filoUi(el)) continue;
+      let r = null;
+      let cs = null;
+      try { r = el.getBoundingClientRect(); cs = getComputedStyle(el); } catch (_) { continue; }
+      if (r.width * r.height < min || cs.display === 'none' || cs.visibility === 'hidden') continue;
+      if ((el.innerText || '').trim().length > 3) return true;
+    }
+    return false;
+  }
+
   // Quello che un banner lascia dietro di sé: scorrimento fermo, pagina inchiodata, clic spenti, velo scuro.
+  // Solo se non resta aperto un altro riquadro del sito: il blocco e il velo sarebbero i suoi.
   function unlock() {
     const html = document.documentElement;
     const body = document.body;
+    let near = [];
+    try { near = document.querySelectorAll('body > *, body > * > *'); } catch (_) {}
+    const veils = [];
+    for (const el of near) {
+      if (!hidden.has(el) && !filoUi(el) && isVeil(el)) veils.push(el);
+    }
+    if (modalOpen() || veils.some(veilHasDialog)) return;
     const locked = contentOverflows(body);
     for (const el of [html, body]) {
       if (!el) continue;
@@ -167,13 +218,7 @@
         if (top < 0) { try { window.scrollTo(0, -top); } catch (_) {} }
       }
     }
-    let fixed = [];
-    try { fixed = document.querySelectorAll('body > *, body > * > *'); } catch (_) {}
-    for (const el of fixed) {
-      if (hidden.has(el)) continue;
-      try { if (global.SN_FILO_UI && global.SN_FILO_UI.inside(el)) continue; } catch (_) {}
-      if (isVeil(el)) { hidden.add(el); hiddenList.push(el); el.style.setProperty('display', 'none', 'important'); }
-    }
+    for (const el of veils) { hidden.add(el); hiddenList.push(el); el.style.setProperty('display', 'none', 'important'); }
   }
 
   // Il sito spesso blocca lo scorrimento DOPO aver mostrato il banner: si ripassa per qualche secondo.

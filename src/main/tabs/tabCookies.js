@@ -4,13 +4,19 @@
 
 const Cookies = require('../services/cookies');
 
-// Chiavi della memoria della pagina che i CMP usano per ricordarsi la risposta (stessa idea di isConsentName).
-const WIPE_STORAGE_JS = `(() => {
+// Chiavi della memoria della pagina che i CMP usano per ricordarsi la risposta (stessa idea di isConsentName),
+// più quelle che il sito ha cambiato dopo il clic sul banner.
+function wipeStorageJs(keys) {
+  const extra = JSON.stringify(Array.isArray(keys) ? keys.map(String) : []);
+  return `(() => {
   const re = /(consent|cookie|optanon|onetrust|didomi|usercentrics|^uc_|_sp_|^cmp|cmplz|borlabs|^_?iub|iubenda|osano|truste|^cky|gdpr|tcf|klaro|axeptio|tarteaucitron)/i;
+  const extra = new Set(${extra});
   for (const st of [localStorage, sessionStorage]) {
-    try { for (const k of Object.keys(st)) if (re.test(k)) st.removeItem(k); } catch (_) {}
+    try { for (const k of Object.keys(st)) if (re.test(k) || extra.has(k)) st.removeItem(k); } catch (_) {}
   }
 })()`;
+}
+const WIPE_STORAGE_JS = wipeStorageJs([]);
 
 function isWeb(url) { return /^https?:/i.test(String(url || '')); }
 
@@ -37,7 +43,7 @@ async function loadRemembered() {
     .sort((a, b) => (Number(a[1].at) || 0) - (Number(b[1].at) || 0));
   const fresh = [...remembered];
   remembered.clear();
-  for (const [site, v] of loaded) remembered.set(site, { rejected: !!v.rejected, hidden: !!v.hidden, at: Number(v.at) || 0 });
+  for (const [site, v] of loaded) remembered.set(site, { rejected: !!v.rejected, hidden: !!v.hidden, at: Number(v.at) || 0, ...answerField(v.answer) });
   for (const [site, v] of fresh) remembered.set(site, v);
   trim(remembered);
 }
@@ -62,14 +68,55 @@ function siteMemory(tm) {
   return tm._cookieSites;
 }
 
+// La risposta del sito (nomi di cookie e di chiavi della pagina), tenuta col resto della memoria del sito.
+const MAX_ANSWER = 40;
+// Cambiati nello stesso momento ma non sono la risposta: toglierli farebbe uscire l'utente o svuoterebbe il carrello.
+const NOT_AN_ANSWER = /(sess|sid|auth|token|login|logged|jwt|csrf|xsrf|account|user|cart|basket|carrello|wishlist)/i;
+function cleanNames(list) {
+  return (Array.isArray(list) ? list : [])
+    .filter((n) => typeof n === 'string' && n && n.length <= 200 && !NOT_AN_ANSWER.test(n))
+    .slice(0, MAX_ANSWER);
+}
+function answerField(a) {
+  const cookies = cleanNames(a && a.cookies);
+  const storage = cleanNames(a && a.storage);
+  return cookies.length || storage.length ? { answer: { cookies, storage } } : {};
+}
+
 function rememberOutcome(tm, site, outcome) {
   const map = siteMemory(tm);
   const prev = map.get(site) || { rejected: false, hidden: false };
   map.delete(site);
-  map.set(site, { rejected: !!prev.rejected, hidden: !!prev.hidden, [outcome]: true, at: Date.now() });
+  map.set(site, { rejected: !!prev.rejected, hidden: !!prev.hidden, [outcome]: true, at: Date.now(), ...answerField(prev.answer) });
   trim(map);
   if (map === remembered) saveSoon();
 }
+
+function rememberAnswer(tm, site, cookies, storage) {
+  const map = siteMemory(tm);
+  const prev = map.get(site) || { rejected: false, hidden: false, at: Date.now() };
+  const old = prev.answer || { cookies: [], storage: [] };
+  const merged = answerField({
+    cookies: [...new Set([...old.cookies, ...cleanNames(cookies)])],
+    storage: [...new Set([...old.storage, ...cleanNames(storage)])],
+  });
+  map.set(site, { ...prev, ...merged });
+  trim(map);
+  if (map === remembered) saveSoon();
+}
+
+// Tutte le risposte note per il sito, nel profilo normale e negli incognito aperti: i nomi sono del sito.
+function answerFor(site) {
+  const out = { cookies: new Set(), storage: new Set() };
+  const add = (v) => { if (v && v.answer) { for (const n of v.answer.cookies) out.cookies.add(n); for (const n of v.answer.storage) out.storage.add(n); } };
+  add(remembered.get(site));
+  try {
+    const { BrowserWindow } = require('electron');
+    for (const w of BrowserWindow.getAllWindows()) { const m = w._filoTabs && w._filoTabs._cookieSites; if (m) add(m.get(site)); }
+  } catch (_) {}
+  return { cookies: [...out.cookies], storage: [...out.storage] };
+}
+Cookies.setAnswerLookup(answerFor);
 
 function forgetRejected(tm, site) {
   const map = siteMemory(tm);
@@ -87,11 +134,15 @@ function forgetSite(tm, site) {
 const cookieMethods = {
   // Esito arrivato da un frame della scheda: vale per il sito della pagina, non per quello del riquadro.
   // 'unconfirmed': il TCF dice che il consenso c'è ancora, quindi il «rifiutati» ricordato per il sito non vale più.
-  cookieOutcome(tabId, outcome) {
+  cookieOutcome(tabId, outcome, msg) {
     const tab = this.tabs.find((t) => t.id === tabId);
-    if (!tab || !isWeb(tab.url) || !['rejected', 'hidden', 'unconfirmed'].includes(outcome)) return { ok: false };
+    if (!tab || !isWeb(tab.url) || !['rejected', 'hidden', 'unconfirmed', 'answer'].includes(outcome)) return { ok: false };
     const site = Cookies.registrableOf(tab.url);
     if (!site) return { ok: false };
+    if (outcome === 'answer') {
+      rememberAnswer(this, site, msg && msg.cookies, msg && msg.storage);
+      return { ok: true };
+    }
     const prev = tab.cookieOutcome && tab.cookieOutcome.site === site ? tab.cookieOutcome : { site, rejected: false, hidden: false };
     if (outcome === 'unconfirmed') {
       forgetRejected(this, site);
@@ -143,16 +194,18 @@ const cookieMethods = {
     if (show) list.push(site);
     list.sort();
     tab.cookieOutcome = null;
-    forgetSite(this, site);
     tab._cookieHold = true;
     setTimeout(() => { tab._cookieHold = false; }, 15000);
+    // La risposta del sito si dimentica dopo averla tolta: serve anche al cambio d'elenco (cookies.js).
+    const answer = answerFor(site);
     const { applySettingsUpdate } = require('../services/handlers');
     await applySettingsUpdate({ security: { cookies: { bannerSites: list } } });
     const wc = tab.view && tab.view.webContents;
     if (wc && !wc.isDestroyed()) {
-      try { await Cookies.wipeConsentCookies(wc.session, site); } catch (_) {}
-      try { await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: WIPE_STORAGE_JS }]); } catch (_) {}
+      try { await Cookies.wipeConsentCookies(wc.session, site, answer.cookies); } catch (_) {}
+      try { await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: wipeStorageJs(answer.storage) }]); } catch (_) {}
     }
+    forgetSite(this, site);
     this._broadcast();
     this.reload(tab.id);
     return { ok: true, site, shown: !!show };
@@ -163,4 +216,4 @@ function installCookies(TabManager) {
   Object.assign(TabManager.prototype, cookieMethods);
 }
 
-module.exports = { installCookies, loadRemembered, WIPE_STORAGE_JS };
+module.exports = { installCookies, loadRemembered, WIPE_STORAGE_JS, wipeStorageJs };

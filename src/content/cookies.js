@@ -53,6 +53,7 @@
     if (!el || el.__filoCookieClicked || !isVisible(el)) return false;
     el.__filoCookieClicked = true;
     lastActionAt = Date.now();
+    watchAnswer();
     try { el.click(); return true; } catch (_) {}
     try {
       el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
@@ -89,6 +90,73 @@
     return roots;
   }
 
+  // ─── la risposta che il sito si scrive dopo un clic sul banner ──────────────
+  //
+  // «Mostra il banner» e «Rifiuta in automatico» devono togliere la risposta, qualunque nome le dia il sito:
+  // si confrontano cookie e memoria della pagina prima del clic e poco dopo, e i nomi cambiati vanno al main.
+  // Login e carrello li scarta il main (tabs/tabCookies.js), anche se cambiano nello stesso momento.
+
+  function cookieJar() {
+    const out = new Map();
+    let raw = '';
+    try { raw = document.cookie || ''; } catch (_) {}
+    for (const part of raw.split(';')) {
+      const i = part.indexOf('=');
+      const k = (i < 0 ? part : part.slice(0, i)).trim();
+      if (k) out.set(k, i < 0 ? '' : part.slice(i + 1).trim());
+    }
+    return out;
+  }
+
+  function pageMemory() {
+    const out = new Map();
+    try {
+      for (let i = 0; i < localStorage.length && i < 1000; i++) {
+        const k = localStorage.key(i);
+        const v = localStorage.getItem(k) || '';
+        out.set(k, v.length > 4000 ? '#' + v.length + v.slice(0, 200) : v);
+      }
+    } catch (_) {}
+    return out;
+  }
+
+  let answerBase = null;
+  let answerTimers = [];
+  const answerSent = new Set();
+
+  function watchAnswer() {
+    if (!IS_TOP) return;
+    if (!answerBase) answerBase = { c: cookieJar(), s: pageMemory() };
+    for (const t of answerTimers) clearTimeout(t);
+    answerTimers = [0, 400, 1500].map((ms) => setTimeout(diffAnswer, ms));
+  }
+
+  function changed(base, now, tag) {
+    const out = [];
+    for (const [k, v] of now) {
+      if (base.get(k) === v || k.length > 200 || answerSent.has(tag + k)) continue;
+      answerSent.add(tag + k);
+      out.push(k);
+    }
+    return out;
+  }
+
+  function diffAnswer() {
+    if (!answerBase) return;
+    const cookies = changed(answerBase.c, cookieJar(), 'c:');
+    const storage = changed(answerBase.s, pageMemory(), 's:');
+    if (cookies.length || storage.length) {
+      send({ type: T_OUTCOME, outcome: 'answer', cookies: cookies.slice(0, 20), storage: storage.slice(0, 20) });
+    }
+  }
+
+  // Coi banner mostrati la risposta la dà l'utente: stessa guardia, dal suo clic dentro al banner.
+  function onUserClick(e) {
+    if (!active || banners || !e || !e.isTrusted) return;
+    const t = e.target && e.target.nodeType === 1 ? e.target : null;
+    if (t && looksLikeConsent(t)) watchAnswer();
+  }
+
   // ─── ruleset CMP scritto a mano ─────────────────────────────────────────────
   //
   // Per ogni CMP: `reject` = selettori del pulsante "rifiuta tutto" diretto.
@@ -96,6 +164,7 @@
   // rifiuto non è in prima battuta. `rejectInSettings` = rifiuto dentro al
   // pannello. `shadowHosts` = id di host shadow-DOM in cui cercare.
   // `com` = regole Consent-O-Matic dello stesso CMP: dove questa lo trova, quelle non partono.
+  // `hide` = il contenitore da nascondere quando non c'è un rifiuto, anche se la lista non lo nomina.
 
   const CMPS = [
     {
@@ -105,6 +174,8 @@
       rejectInSettings: ['.ot-pc-refuse-all-handler', '#onetrust-reject-all-handler'],
       // «Impostazioni cookie» resta nel piè di pagina anche dopo la risposta: si apre solo col banner a schermo.
       showing: ['#onetrust-banner-sdk'],
+      // L'involucro tiene banner, pannello e velo: aperto il pannello senza «Rifiuta tutto», va via tutto insieme.
+      hide: ['#onetrust-consent-sdk'],
       com: ['onetrust', 'onetrust_banner', 'onetrust_pcpanel', 'onetrust_pctab', 'onetrust-stackoverflow', 'optanon', 'optanon-alternative', 'optanon_springernature'],
     },
     {
@@ -143,6 +214,13 @@
         'button[aria-label="Reject All"]',
       ],
       com: ['sourcepoint', 'sourcepointframe', 'sourcepoint_frame_2022', 'sourcepointpopup'],
+    },
+    {
+      // Il riquadro del consenso di Google (Funding Choices): «Non acconsento» c'è solo se il sito lo attiva.
+      name: 'Google',
+      reject: ['.fc-consent-root .fc-cta-do-not-consent'],
+      hide: ['.fc-consent-root'],
+      com: ['bbc_fc'],
     },
     {
       name: 'Usercentrics',
@@ -196,7 +274,10 @@
     'deny', 'rifiuta tutto', 'rifiuta', 'rifiuto', 'non accetto', 'continua senza accettare',
     'continue without accepting', 'tout refuser', 'refuser', 'ablehnen', 'alle ablehnen',
     'rechazar', 'rechazar todo', 'reject non-essential', 'only necessary', 'solo necessari',
+    'non acconsento', 'do not consent',
   ];
+
+  const HAND_HIDE = CMPS.flatMap((c) => c.hide || []);
   // Container che hanno l'aria di un consenso cookie (per limitare il fallback).
   const CONSENT_HINT = /(cookie|consent|gdpr|cmp|privacy|consenso|cmpwrapper|didomi|onetrust|cybot|qc-cmp|sp_message|usercentrics|iubenda|truste)/i;
 
@@ -361,10 +442,12 @@
       }
       com.busy = true;
       lastActionAt = now;
+      watchAnswer();
       cmp.reject().then((res) => {
         com.busy = false;
         com.tried.add(name);
         lastActionAt = Date.now();
+        watchAnswer();
         if (res && res.clicks > 0 && !res.utility) noteRejected(name);
         scheduleScanIn(150);
       });
@@ -437,13 +520,42 @@
   const CMP_GRACE_MS = 4000;
   const ACTION_GRACE_MS = 1500;
 
+  // Un involucro senza misura sua (le parti visibili sono fisse, come in OneTrust) conta per quello che mostra.
+  // Una parte piccola, come l'icona fissa per riaprire le preferenze, non fa di lui un banner aperto.
+  const MIN_PART = 0.02;
+
+  function shows(el) {
+    if (isVisible(el)) return true;
+    try {
+      const s = getComputedStyle(el);
+      if (s.display === 'none' || s.visibility === 'hidden' || parseFloat(s.opacity || '1') < 0.1) return false;
+    } catch (_) { return false; }
+    const min = window.innerWidth * window.innerHeight * MIN_PART;
+    let level = [el];
+    let seen = 0;
+    for (let depth = 0; depth < 3 && level.length && seen < 400; depth++) {
+      const next = [];
+      for (const n of level) {
+        for (const c of n.children || []) {
+          if (++seen > 400) break;
+          let r = null;
+          try { r = c.getBoundingClientRect(); } catch (_) {}
+          if (r && r.width * r.height >= min && isVisible(c)) return true;
+          next.push(c);
+        }
+      }
+      level = next;
+    }
+    return false;
+  }
+
   function bannerTick(knownCmp) {
     const B = global.SN_COOKIE_BANNERS;
-    if (!IS_TOP || !B || !B.isRunning()) return;
+    if (!IS_TOP || !B || !B.isRunning() || reported.has('rejected')) return;
     const now = Date.now();
     let recheck = 0;
     for (const { el, at } of B.pending()) {
-      if (!isVisible(el)) { if (now - at < 10000) recheck = 500; continue; }
+      if (!shows(el)) { if (now - at < 10000) recheck = 500; continue; }
       const btn = findRejectText(el, true);
       if (btn && clickEl(btn)) { B.forget(el); noteRejected('lista'); return; }
       const age = now - at;
@@ -673,7 +785,7 @@
     const B = global.SN_COOKIE_BANNERS;
     if (!IS_TOP || !B || !cfg || !cfg.cosmetic) return;
     B.start({
-      complex: cfg.cosmetic.complex,
+      complex: [...(Array.isArray(cfg.cosmetic.complex) ? cfg.cosmetic.complex : []), ...HAND_HIDE],
       specific: cfg.cosmetic.specific,
       ask: (ids, classes) => ask({ type: T_TOKENS, ids, classes }).then((r) => (r && r.ok && Array.isArray(r.selectors) ? r.selectors : [])),
       onFound: scheduleScan,
@@ -729,6 +841,8 @@
       else if (m && m.type === T_HIDE_FRAME) hideFrame(m);
     });
   } catch (_) {}
+
+  if (IS_TOP) { try { document.addEventListener('click', onUserClick, true); } catch (_) {} }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', load, { once: true });

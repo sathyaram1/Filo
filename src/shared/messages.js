@@ -597,7 +597,7 @@
     // Aperti alle pagine web di proposito: li chiede il content script di ogni sito, e non portano dati
     // dell'utente. La regola Consent-O-Matic è pubblica; l'esito vale solo per la scheda di chi lo manda.
     COOKIES_RULE: 'cookies_rule',                   // { name } → { ok, rule }
-    COOKIES_OUTCOME: 'cookies_outcome',             // { outcome: 'rejected'|'hidden'|'unconfirmed' } → { ok }
+    COOKIES_OUTCOME: 'cookies_outcome',             // { outcome: 'rejected'|'hidden'|'unconfirmed'|'answer', cookies?, storage? } → { ok }
     COOKIES_BANNER_TOKENS: 'cookies_banner_tokens', // { ids, classes } → { ok, selectors } (quelli della lista)
     // Un riquadro con un banner che non ha «rifiuta» lo dice al main, che passa alla pagina l'indirizzo del riquadro
     // suo figlio da nascondere: fra frame si passa dal main, una postMessage la saprebbe scrivere anche il sito.
