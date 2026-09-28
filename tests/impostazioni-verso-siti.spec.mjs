@@ -82,6 +82,12 @@ test('un cambio di impostazioni arriva al sito senza chiavi né proxy, e intero 
   expect(letture).not.toContain('parolasegreta589');
   expect(JSON.parse(letture).get.theme).toBe('dark');
 
+  // Il registro ritagliato basta ancora al menu della dettatura del sito.
+  const dettatura = await nelContentScript(app, testServer.origin,
+    'JSON.stringify((SN_TTS.buildDictateItem().subItems || []).map((i) => i.label || ""))');
+  expect(dettatura).toMatch(/✓ +Whisper/);
+  expect(dettatura).toContain('Nemotron');
+
   // La pagina filo:// riceve l'oggetto intero: le Opzioni ci leggono le chiavi.
   await expect.poll(() => interna.evaluate(() => window.__spia589.length), { timeout: 8000 }).toBeGreaterThan(0);
   const interno = JSON.parse(await interna.evaluate(() => window.__spia589[window.__spia589.length - 1]));
