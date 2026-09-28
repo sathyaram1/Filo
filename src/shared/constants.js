@@ -2410,7 +2410,9 @@
       .replace(/\r\n?|[\u2028\u2029]/g, '\n')
       .replace(NON_SI_DISEGNA_RE, '')
       .replace(SPAZI_RE, ' ')
-      .replace(/ *\n */g, '\n')
+      .split('\n')
+      .map((riga) => (SI_DISEGNA_RE.test(riga) ? riga.trim() : ''))
+      .join('\n')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
   }
