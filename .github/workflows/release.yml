@@ -282,15 +282,14 @@ jobs:
       # Si costruisce il commit PROVATO, non la punta di main (#641): il numero
       # che il server ha appena scritto su main si applica qui, in locale, al
       # manifesto di questo albero, e non si spinge niente. Le fusioni entrate
-      # durante la suite non fermano la pubblicazione: escono alla corsa dopo,
-      # e il riassunto del lavoro lo dice.
+      # dopo il commit verde escono quando la loro suite e' verde.
       - name: Applica il numero al commit provato (in locale)
         if: steps.check.outputs.should_release == 'true'
         id: applica
         shell: bash
         run: |
           set -e
-          PROVATO="${{ needs.suite.outputs.sha }}"
+          PROVATO="${{ needs.scegli.outputs.sha }}"
           ATTESA="${{ steps.bump.outputs.version }}"
           node scripts/release-apply-version.mjs "$ATTESA"
           QUI=$(git rev-parse HEAD)
