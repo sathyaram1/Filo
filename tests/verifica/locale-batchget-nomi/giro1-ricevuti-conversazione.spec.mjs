@@ -186,3 +186,29 @@ test('passare in fretta da una pratica all\'altra mentre arrivano: ognuna mostra
   await expect(detail).not.toContainText('ALTRA-CONVERSAZIONE');
   await expect(rombo(page)).toHaveClass(/mg-forma--design/);
 });
+
+test('la pagina gemella dei feedback, stessa pratica nei Ricevuti: la conversazione arriva intera', async ({ app, openTab }) => {
+  await firestoreFinto(app);
+  const page = await openTab('filo://feedback/feedback.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.filo && window.SN_FEEDBACK);
+  await page.evaluate(({ id, doc }) => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      const t = msg && msg.type;
+      if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
+      if (t === 'feedback_decrypt_fields') return { ok: true, list: msg.list };
+      return orig(msg);
+    };
+    window.__fbTest.setAdmin(true);
+    const campi = window.SN_FEEDBACK.CAMPI_LISTA;
+    window.__fbTest.setData([{
+      ...Object.fromEntries(Object.entries(doc).filter(([k]) => campi.includes(k))),
+      _id: id, _updateTime: '2026-09-27T11:00:00Z', _proiezione: true,
+    }]);
+    window.__fbTest.setTab('inbox');
+  }, { id: ID, doc: DOC });
+  await expect(page.locator('body')).toContainText('TURNO-TRE', { timeout: 15000 });
+  await expect(page.locator('body')).toContainText('TURNO-UNO');
+  await expect(page.locator('body')).not.toContainText('non è arrivato');
+});
