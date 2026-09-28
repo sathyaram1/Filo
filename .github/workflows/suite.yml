@@ -71,8 +71,10 @@ jobs:
           set -o pipefail
           node scripts/suite-verdict.mjs suite-risultati.json --out rossi-nuovi.txt --chiavi chiavi-allarme.txt 2>&1 | tee verdetto.log
 
+      # Un allegato che non si carica non dice niente del commit: rosso, farebbe di una suite verde una «non partita».
       - name: Conserva esito e tracce (7 giorni)
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: suite-playwright-${{ github.run_id }}
