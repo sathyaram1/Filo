@@ -3006,7 +3006,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         const letture = actions.filter((a) => a.type === 'LEGGI_PAGINA' && !a._argsError);
         if (letture.length > 1) {
           for (const a of letture) {
-            const p = executeFiloAction(a, { sender });
+            const p = executeFiloAction(a, { sender, contesto });
             p.catch(() => {});
             inParallelo.set(a, p);
           }
