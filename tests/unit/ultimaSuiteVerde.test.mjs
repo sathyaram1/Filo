@@ -260,3 +260,110 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
     assert.equal(r.output.trim(), `sha=${r.verde}`);
   });
 });
+
+// Il caso di #569: il feedback di un fermo resta aperto (parcheggiato) anche dopo che una versione è uscita. Il server
+// finto applica il contratto: un feedback aperto copre le chiavi del suo alarmKeys, e un allarme coperto non apre niente.
+describe('un fermo dopo una versione uscita apre il suo feedback, anche col feedback del fermo di prima aperto', () => {
+  const WIN = process.platform === 'win32';
+  const oreFa = (ore) => new Date(Date.now() - ore * 3.6e6).toISOString();
+  const git = (cwd, args, env = {}) => execFileSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, ...env } }).trim();
+  const CORPO_GH = `
+const fs = require('fs');
+const p = process.argv.find((a) => a.startsWith('repos/')) || '';
+const s = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATO, 'utf8'));
+if (p.includes('/actions/workflows/suite.yml/runs')) {
+  const runs = s.runs.filter((r) => !p.includes('status=success') || r.conclusion === 'success');
+  process.stdout.write(JSON.stringify({ workflow_runs: runs }));
+} else if (p.includes('/releases/tags/')) process.stdout.write(JSON.stringify({ published_at: s.pubblicata }));
+else process.stdout.write(JSON.stringify({ workflow_runs: [] }));
+`;
+  const corsaDi = (sha, conclusion, ore) => ({ head_sha: sha, conclusion, status: 'completed', event: 'push', head_branch: 'main',
+    created_at: oreFa(ore + 1), updated_at: oreFa(ore), html_url: `https://github.com/o/r/actions/runs/${Math.round(ore)}` });
+
+  async function dueFermi(verdi) {
+    const tmp = cartellaTemporanea('filo-due-fermi-');
+    const repo = join(tmp, 'main');
+    const aperti = [];
+    const srv = createServer((req, res) => {
+      let b = '';
+      req.on('data', (c) => { b += c; });
+      req.on('end', () => {
+        const { keys = [], name } = JSON.parse(b);
+        const coperte = new Set(aperti.flatMap((f) => f.alarmKeys));
+        const nuove = keys.filter((k) => !coperte.has(k));
+        if (nuove.length) aperti.push({ num: `#${aperti.length + 1}`, name, alarmKeys: nuove });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, num: `#${aperti.length}`, duplicate: !nuove.length, nuove }));
+      });
+    });
+    await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+    try {
+      mkdirSync(repo, { recursive: true });
+      git(repo, ['init', '-q', '-b', 'main']);
+      git(repo, ['config', 'user.email', 'p@f']);
+      git(repo, ['config', 'user.name', 'p']);
+      const sha = {};
+      for (const [nome, ore, msg] of [['v300', 250, 'merge-gate: #1 via server'], ['r1', 200, 'merge-gate: #2 via server'],
+        ['v301', 120, 'merge-gate: #3 via server'], ['bump', 118, 'release: v0.2.301 [skip ci]'],
+        ['r2', 90, 'merge-gate: #4 via server'], ['testa', 60, 'merge-gate: #5 via server']]) {
+        writeFileSync(join(repo, 'f.txt'), `${msg}\n`, { flag: 'a' });
+        git(repo, ['add', 'f.txt']);
+        git(repo, ['commit', '-qm', msg], { GIT_AUTHOR_DATE: oreFa(ore), GIT_COMMITTER_DATE: oreFa(ore) });
+        sha[nome] = git(repo, ['rev-parse', 'HEAD']);
+      }
+      git(repo, ['tag', 'v0.2.300', sha.v300]);
+      const bin = join(tmp, 'bin');
+      mkdirSync(bin);
+      if (WIN) {
+        try { linkSync(process.execPath, join(bin, 'gh.exe')); } catch { copyFileSync(process.execPath, join(bin, 'gh.exe')); }
+        writeFileSync(join(repo, 'api'), CORPO_GH);
+      } else {
+        writeFileSync(join(bin, 'gh'), `#!${process.execPath}\n${CORPO_GH}`);
+        chmodSync(join(bin, 'gh'), 0o755);
+      }
+      const env = {
+        ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}`, FAKE_GH_STATO: join(tmp, 'stato.json'),
+        GITHUB_REPOSITORY: 'o/r', GITHUB_OUTPUT: join(tmp, 'output.txt'), GITHUB_STEP_SUMMARY: join(tmp, 'riassunto.md'),
+        FILO_BUILD_PASSPHRASE: 'prova', FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`,
+        NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost',
+      };
+      const giro = (stato) => {
+        writeFileSync(join(tmp, 'stato.json'), JSON.stringify(stato));
+        return new Promise((ok) => { execFile(process.execPath, [SCRIPT], { cwd: repo, env }, () => ok()); });
+      };
+      // Primo fermo alla v0.2.300; il suo feedback resta aperto.
+      git(repo, ['checkout', '-q', sha.r1]);
+      await giro({ pubblicata: oreFa(249), runs: verdi(sha).primo });
+      await giro({ pubblicata: oreFa(249), runs: verdi(sha).primo });
+      // Esce la v0.2.301, e la pubblicazione si ferma di nuovo.
+      git(repo, ['checkout', '-q', sha.testa]);
+      git(repo, ['tag', 'v0.2.301', sha.v301]);
+      await giro({ pubblicata: oreFa(117), runs: verdi(sha).secondo });
+      await giro({ pubblicata: oreFa(117), runs: verdi(sha).secondo });
+      return aperti;
+    } finally {
+      await new Promise((ok) => srv.close(ok));
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+
+  test('senza verdi: il secondo fermo apre il suo feedback, e ogni fermo uno solo', async () => {
+    const aperti = await dueFermi((s) => ({
+      primo: [corsaDi(s.r1, 'failure', 199), corsaDi(s.v300, 'success', 249)],
+      secondo: [corsaDi(s.testa, 'failure', 59), corsaDi(s.r2, 'failure', 89), corsaDi(s.v301, 'success', 119)],
+    }));
+    assert.equal(aperti.length, 2, `feedback aperti: ${JSON.stringify(aperti)}`);
+    assert.deepEqual(aperti.map((f) => f.alarmKeys), [[chiaveDelFermo(CHIAVE_FERMO, 'v0.2.300')], [chiaveDelFermo(CHIAVE_FERMO, 'v0.2.301')]]);
+    assert.match(aperti[1].name, /alla v0\.2\.301/);
+  });
+
+  test('con un verde che non esce: il secondo fermo apre il suo feedback, e ogni fermo uno solo', async () => {
+    const aperti = await dueFermi((s) => ({
+      primo: [corsaDi(s.r1, 'success', 198), corsaDi(s.v300, 'success', 249)],
+      secondo: [corsaDi(s.testa, 'failure', 59), corsaDi(s.r2, 'success', 88), corsaDi(s.v301, 'success', 119)],
+    }));
+    assert.equal(aperti.length, 2, `feedback aperti: ${JSON.stringify(aperti)}`);
+    assert.deepEqual(aperti.map((f) => f.alarmKeys),
+      [[chiaveDelFermo(CHIAVE_FERMO_DOPO_VERDE, 'v0.2.300')], [chiaveDelFermo(CHIAVE_FERMO_DOPO_VERDE, 'v0.2.301')]]);
+  });
+});
