@@ -41,6 +41,7 @@ test('lo stile confermato in chat compare nella pagina aperta e resta dopo un ri
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
+    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
   });
   const prefs = await apri(openTab);
   await expect(prefs.locator('#agentStyleText')).toHaveValue('');

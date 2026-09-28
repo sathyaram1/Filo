@@ -27,10 +27,15 @@ async function configureModel(app) {
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
+    // Fuori dall'intervista di benvenuto: lì a fine turno la conversazione si
+    // ridisegna dal salvato e il diario del turno sparisce.
+    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
   });
 }
 
-// Una risposta per giro del modello; i messaggi ricevuti restano in __mem_calls.
+// Una risposta per giro della CHAT; i messaggi ricevuti restano in __mem_calls.
+// Le altre chiamate (titolo della chat, lezioni, home) non consumano i giri:
+// partono quando vogliono, e prendersi la chiamata dello strumento le toccava.
 async function fakeProvider(app, giri) {
   await app.evaluate(async (_electron, g) => {
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
@@ -38,6 +43,10 @@ async function fakeProvider(app, giri) {
     globalThis.__mem_calls = [];
     let n = 0;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
+      const sys = (messages.find((m) => m.role === 'system') || {}).content || '';
+      if (!String(sys).includes('═══ CONTENUTO ESTERNO ═══')) {
+        return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text: 'NULLA DA IMPARARE', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+      }
       globalThis.__mem_calls.push(JSON.parse(JSON.stringify(messages)));
       const giro = g[Math.min(n, g.length - 1)];
       n += 1;
