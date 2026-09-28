@@ -3995,13 +3995,12 @@
   // solo NON basta (Shift+b digita comunque "B"), quindi non conta come reale.
   function shortcutHasRealModifier(sc) {
     const p = TASTI.pressioneScritta(sc);
-    return !!p && (p.ctrlKey || p.altKey);
+    return !!p && (p.ctrlKey || p.metaKey || p.altKey);
   }
   // Valida: un modificatore reale e un tasto finale, così non coincide con la
   // digitazione di una lettera.
   function isValidShortcut(sc) {
-    const p = TASTI.pressioneScritta(sc);
-    return !!p && (p.ctrlKey || p.altKey) && !TASTI.tipoModificatore(p.key);
+    return shortcutHasRealModifier(sc) && !TASTI.tipoModificatore(TASTI.pressioneScritta(sc).key);
   }
   function isEditableTarget(t) {
     if (!t) return false;
