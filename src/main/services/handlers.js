@@ -3851,8 +3851,12 @@ async function reindexArchivedEmbeddings(settings, items) {
 async function enrichArchivedTab(id, payload) {
   try {
     if (!id) return;
-    // Riassunto e indice passano dal modello: una pagina della rete di casa resta in casa (#591).
-    if (payload && typeof payload === 'object' && isHomeNetworkUrl(payload.url)) return;
+    // Riassunto e indice passano dal modello: una pagina della rete di casa resta in casa (#591). Il segno resta sulla
+    // voce, perché dopo un riavvio Filo non sa più da dove aveva risposto un nome come tplinkwifi.net.
+    if (payload && typeof payload === 'object' && isHomeNetworkUrl(payload.url)) {
+      await ArchivedTabs.update(id, { casa: true });
+      return;
+    }
     const title = (payload && typeof payload === 'object') ? (payload.title || '') : '';
     const content = (payload && typeof payload === 'object')
       ? (payload.content || '')

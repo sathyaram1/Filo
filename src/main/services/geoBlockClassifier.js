@@ -280,7 +280,7 @@ const pendingByCache = new WeakMap();
 // Una pagina della rete di casa non è mai bloccata per paese, e il suo testo non esce di casa (#591).
 function isHomeNetwork(host) {
   const U = globalThis.SN_URL_NAV || (require('../../shared/urlNav.js'), globalThis.SN_URL_NAV);
-  return Boolean(U && U.isLocalHost(host));
+  return Boolean(U && U.isHomeNetworkHost(host));
 }
 
 async function classify(input = {}, { complete, cache, now = Date.now, signal } = {}) {

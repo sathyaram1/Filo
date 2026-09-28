@@ -149,7 +149,7 @@ function deepen(stage, bKey, fullTtl, run, store) {
 
 // La rete di casa (router, NAS, stampanti, localhost) non ha niente da chiedere fuori: nessuno stadio di rete parte.
 const UrlNav = globalThis.SN_URL_NAV || (require('../../../shared/urlNav.js'), globalThis.SN_URL_NAV);
-const isHomeNetwork = (norm) => Boolean(UrlNav && UrlNav.isLocalHost(norm.host));
+const isHomeNetwork = (norm) => Boolean(UrlNav && UrlNav.isHomeNetworkHost(norm.host));
 
 // Assembla i dati di rete già noti (da cache) per il dominio.
 function assembleCached(norm, url) {
