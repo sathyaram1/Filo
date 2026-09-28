@@ -118,6 +118,25 @@ test('"togli tutte le sveglie" elenca cosa sparisce e aspetta l\'OK; i timer res
   expect(left[0].label).toBe('pasta');
 });
 
+// #592: fra la domanda e l'OK la lista può cambiare. L'OK vale per le voci che
+// il popup ha mostrato, non per quelle che lo stesso riferimento trova dopo.
+test('una sveglia aggiunta mentre il popup è aperto non sparisce con l\'OK dato alle altre', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  await page.waitForLoadState('domcontentloaded');
+
+  await execAction(app, { type: 'SVEGLIA', time: '07:00', label: 'palestra' });
+  await execAction(app, { type: 'SVEGLIA', time: '08:00', label: 'treno' });
+  const ask = await execAction(app, { type: 'CANCELLA_SVEGLIA', tutte: true, tipo: 'sveglia' });
+  expect(ask.needsConfirm).toBe(2);
+  expect(ask.describe).not.toContain('antibiotico');
+
+  await execAction(app, { type: 'SVEGLIA', time: '20:00', label: 'antibiotico' });
+  const done = await execAction(app, { type: 'CANCELLA_SVEGLIA', tutte: true, tipo: 'sveglia' }, { confirmed: true });
+  expect(done.executed).toBe(true);
+  const left = await readTimers(page);
+  expect(left.map((t) => t.label)).toEqual(['antibiotico']);
+});
+
 test('una sveglia che non esiste non fa sparire quella che c\'è', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await page.waitForLoadState('domcontentloaded');
