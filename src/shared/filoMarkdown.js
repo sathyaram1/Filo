@@ -64,14 +64,14 @@
   function separaCoda(m) {
     let url = m;
     let trail = '';
-    for (;;) {
-      if (/&amp;$/.test(url)) break;
+    while (!/&amp;$/.test(url)) {
       const tm = /(?:&#39;|[.,;:!?*_~…’”»])$/.exec(url);
       if (tm) { trail = tm[0] + trail; url = url.slice(0, -tm[0].length); continue; }
       const ultimo = url.slice(-1);
       const apre = ultimo === ')' ? '(' : ultimo === ']' ? '[' : '';
-      if (apre && conta(url, apre) < conta(url, ultimo)) { trail = ultimo + trail; url = url.slice(0, -1); continue; }
-      return [url, trail];
+      if (!apre || conta(url, apre) >= conta(url, ultimo)) break;
+      trail = ultimo + trail;
+      url = url.slice(0, -1);
     }
     return [url, trail];
   }
