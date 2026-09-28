@@ -102,6 +102,15 @@ function registerIpcHandlers() {
     event.returnValue = out;
   });
 
+  // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
+  ipcMain.on('filo:permessi-stato', (event, href) => {
+    try {
+      event.returnValue = { notifiche: require('./services/permessiPagine').statoNotifiche(event.sender.session, href) };
+    } catch (_) {
+      event.returnValue = { notifiche: 'default' };
+    }
+  });
+
   // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi
   // riquadri incorporati). Serve alle scorciatoie che lavorano sulla selezione:
   // vanno consegnate a chi ha davvero il testo selezionato. Nessun dato nel
