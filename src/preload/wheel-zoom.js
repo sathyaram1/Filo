@@ -246,7 +246,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     });
     el.appendChild(document.createTextNode('zoom '));
 
-    const input = document.createElement('input');
+    const input = crea('input');
     input.id = '__filo-zoom-percent';
     input.type = 'text';
     input.inputMode = 'numeric';
