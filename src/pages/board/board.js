@@ -104,7 +104,9 @@
   // aspetta il browser, e se non riesce il perché, su ogni scheda che aspettava
   // (in testa se partito da «Accedi»). Un gesto fatto durante l'attesa si unisce
   // agli altri: partono tutti appena l'account è dentro, da dovunque ci entri.
-  let attesa = null;           // { gesti: Map(id → { dopo, poi }), testa } finché l'accesso non si chiude
+  // Un gesto per tipo e scheda: ripremere il pollice cambia il voto, ma il voto e
+  // «Ancora rotto?» sulla stessa scheda partono tutti e due.
+  let attesa = null;           // { gesti: Map(`tipo:id` → { id, dopo, poi }), testa } finché l'accesso non si chiude
   let accessoFallito = null;   // frase per la testa
   // Form "Ancora rotto?" aperti e testo scritto dentro, per id: renderList()
   // ricostruisce tutte le schede da zero, e un ridisegno che arriva mentre
@@ -173,12 +175,13 @@
 
   // Un gesto durante l'attesa non apre un altro browser (un doppio clic ne
   // aprirebbe due): lo riapre solo «Riapri il browser».
-  function accedi(id, dopo, poi) {
+  function accedi(id, tipo, dopo, poi) {
     const nuova = !attesa;
     if (nuova) attesa = { gesti: new Map(), testa: false };
     if (id) {
-      attesa.gesti.set(id, { dopo, poi });
-      avvisi.set(id, { testo: `Completa l'accesso nel browser: ${dopo}.`, code: 'accesso' });
+      attesa.gesti.set(`${tipo}:${id}`, { id, dopo, poi });
+      const promesse = [...attesa.gesti.values()].filter((g) => g.id === id).map((g) => g.dopo);
+      avvisi.set(id, { testo: `Completa l'accesso nel browser: ${promesse.join(', ')}.`, code: 'accesso' });
     } else {
       attesa.testa = true;
     }
@@ -204,10 +207,10 @@
     if (!a || attesa !== a) return;
     attesa = null;
     const ok = !!(signedIn && uid);
-    for (const id of a.gesti.keys()) if (avvisi.get(id)?.code === 'accesso') avvisi.delete(id);
+    for (const { id } of a.gesti.values()) if (avvisi.get(id)?.code === 'accesso') avvisi.delete(id);
     if (!ok) {
       const testo = (r && typeof r.error === 'string' && r.error.trim()) || 'Accesso non riuscito: riprova.';
-      for (const id of a.gesti.keys()) avvisi.set(id, { testo, code: 'accesso-ko' });
+      for (const { id } of a.gesti.values()) avvisi.set(id, { testo, code: 'accesso-ko' });
       if (a.testa || !a.gesti.size) accessoFallito = testo;
     }
     reflectAuth();
@@ -225,7 +228,7 @@
     const a = attesa;
     if (!a) return;
     attesa = null;
-    for (const id of a.gesti.keys()) {
+    for (const { id } of a.gesti.values()) {
       avvisi.set(id, { testo: 'Senza accesso non è partito niente: riprova quando vuoi.', code: 'lasciato' });
     }
     reflectAuth();
@@ -463,7 +466,7 @@
     // dopo l'accesso riuscito, e solo quello, ricrea la scheda col form aperto.
     link.addEventListener('click', () => {
       if (!signedIn || !uid) {
-        accedi(fb._id, 'poi scrivi qui cosa non va', (ok) => {
+        accedi(fb._id, 'modulo', 'poi scrivi qui cosa non va', (ok) => {
           if (ok) openReopenAfterLogin = fb._id;
           renderList();
           openReopenAfterLogin = null;
@@ -583,7 +586,7 @@
   // il retry richiama onVote con l'`fb` fresco preso dalla lista ricreata.
   function onVote(fb, vote, btn) {
     if (!signedIn || !uid) {
-      accedi(fb._id, 'poi il voto parte da solo', (ok) => {
+      accedi(fb._id, 'voto', 'poi il voto parte da solo', (ok) => {
         renderList();
         if (ok) {
           const freshFb = allFeedbacks.find((x) => x._id === fb._id) || fb;
