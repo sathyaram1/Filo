@@ -2,7 +2,7 @@
 //
 // PERCHÉ QUESTI TEST
 //   Da questo script dipende se una versione esce o no: la suite completa gira
-//   solo in GitHub prima di pubblicare, e nel contenitore senza schermo ha
+//   solo in GitHub, a ogni fusione su main, e nel contenitore senza schermo ha
 //   rossi d'ambiente scritti in tests/rossi-noti.json. Le cose che possono
 //   andare male in modo costoso sono opposte:
 //

@@ -167,10 +167,11 @@ osservato. Minimi per tipo di modifica:
 - **modifica visiva** → in più `npm run test:shoot -- "<scenario>"` e GUARDA lo
   screenshot (`tests/agent/.out/`);
 - **la suite completa non la lancia nessuno**, da nessuna parte: gira in GitHub
-  nel lavoro di release, ogni sei ore, e un rosso nuovo ferma la patch e
-  diventa un feedback. Al suo posto chi verifica lancia `npm run finish:check`
-  (unit più gli spec delle aree toccate). Le regressioni restano di chi le
-  introduce: se ne temi una precisa, lancia quello spec.
+  a ogni fusione su main (`suite.yml`), e un rosso nuovo diventa un feedback;
+  ogni sei ore si pubblica il commit più nuovo con la suite verde. Al suo
+  posto chi verifica lancia `npm run finish:check` (unit più gli spec delle
+  aree toccate). Le regressioni restano di chi le introduce: se ne temi una
+  precisa, lancia quello spec.
 
 **Prima di consegnare, la verifica te la fai tu**, con gli stessi criteri che
 userà chi ti verifica: **`routines/roles/_criteri-verifica.md`** (nelle routine
