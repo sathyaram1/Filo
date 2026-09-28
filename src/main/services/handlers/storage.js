@@ -23,7 +23,7 @@ module.exports = function register(on, ctx) {
   // Verso un'origine web passa solo ciò che è nelle liste di impostazioniPerOrigine
   // (campi letti e scritti, scomparti del magazzino): le stesse delle spinte.
   const {
-    isFilo, impostazioniPerOrigine, storagePerOrigine,
+    isFilo, impostazioniPerOrigine, storagePerOrigine, indirizziDelMittente,
     chiaviStoragePerOrigine, scritturaStorageAmmessa, scritturaImpostazioniAmmessa,
   } = require('../impostazioniPerOrigine');
   const vietato = { ok: false, code: 'forbidden', error: 'forbidden' };
@@ -31,7 +31,7 @@ module.exports = function register(on, ctx) {
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
   on('_storage:get', async (msg, sender, origin) => {
     const value = await globalThis.chrome.storage.local.get(chiaviStoragePerOrigine(msg.keys ?? null, origin));
-    return { ok: true, value: storagePerOrigine(value, origin, SETTINGS_KEY) };
+    return { ok: true, value: storagePerOrigine(value, origin, SETTINGS_KEY, indirizziDelMittente(sender)) };
   });
 
   on('_storage:set', async (msg, sender, origin) => {
@@ -63,7 +63,7 @@ module.exports = function register(on, ctx) {
     // un'altra origine quell'indirizzo è illeggibile, e senza questo il menu
     // sarebbe ricomparso proprio nei siti esclusi.
     const pageUrl = String(sender?.tab?.url || '');
-    return { ok: true, pageUrl, settings: impostazioniPerOrigine(settings, origin) };
+    return { ok: true, pageUrl, settings: impostazioniPerOrigine(settings, origin, indirizziDelMittente(sender)) };
   });
 
   on(MSG.UPDATE_SETTINGS, async (msg, sender, origin) => {
@@ -75,7 +75,7 @@ module.exports = function register(on, ctx) {
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato
     // quando Filo cambia una preferenza via chat.
     const merged = await applySettingsUpdate(incoming);
-    return { ok: true, settings: impostazioniPerOrigine(merged, origin) };
+    return { ok: true, settings: impostazioniPerOrigine(merged, origin, indirizziDelMittente(sender)) };
   });
 
   on(MSG.RESET_SETTINGS, async (msg, sender, origin) => {

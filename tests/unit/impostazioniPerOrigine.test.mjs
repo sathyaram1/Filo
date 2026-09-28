@@ -56,7 +56,7 @@ test('la spinta verso un sito https non porta chiavi dei servizi né credenziali
 
 test('verso un sito arriva quello che i content script usano, con i valori veri', () => {
   const s = impostazioniConSegreti();
-  const web = W.impostazioniPerOrigine(s, 'http://127.0.0.1:5555/pagina.html');
+  const web = W.impostazioniPerOrigine(s, 'https://www.esempio.it/pagina.html');
   assert.equal(web.theme, 'dark');
   assert.deepEqual(web.themeTokens, { accent: '#c0662f' });
   assert.deepEqual(web.blocklist, ['esempio.it']);
@@ -67,6 +67,62 @@ test('verso un sito arriva quello che i content script usano, con i valori veri'
   assert.deepEqual(web.modelRegistry.whisper, {
     provider: 'openrouter', model: 'openai/whisper', label: 'Whisper', inputs: ['audio'], outputs: ['text'],
   }, 'di una voce del registro passano solo i campi del menu della dettatura');
+});
+
+test('dei siti esclusi un sito riceve solo la voce che lo riguarda, in ogni strada', () => {
+  const s = { ...impostazioniConSegreti(), blocklist: ['esempio.it', 'banca-utente.example', 'lavoro.example'] };
+  assert.deepEqual(W.impostazioniPerOrigine(s, 'https://altro.example/').blocklist, []);
+  assert.deepEqual(W.impostazioniPerOrigine(s, 'https://www.esempio.it/a').blocklist, ['esempio.it']);
+  // Un riquadro di terze parti dentro la pagina esclusa: conta la scheda che lo contiene.
+  const riquadro = { frame: { url: 'https://widget.example/embed' }, tab: { url: 'https://conto.banca-utente.example/' } };
+  assert.deepEqual(W.impostazioniPerOrigine(s, riquadro.tab.url, W.indirizziDelMittente(riquadro)).blocklist, ['banca-utente.example']);
+  const spinta = W.messaggioPerDestinazione(messaggio(s), 'https://widget.example/embed', 'https://conto.banca-utente.example/');
+  assert.deepEqual(spinta.settings.blocklist, ['banca-utente.example']);
+  assert.deepEqual(W.messaggioPerDestinazione(messaggio(s), 'https://altro.example/').settings.blocklist, []);
+  assert.deepEqual(W.storagePerOrigine({ settings: s }, 'https://lavoro.example/').settings.blocklist, ['lavoro.example']);
+  for (const url of ['about:blank', '', 'blob:https://esempio.it/1', 'https://esempio.it.altro.example/', 'https://nonesempio.it/']) {
+    assert.deepEqual(W.impostazioniPerWeb(s, [url]).blocklist, [], url);
+  }
+  assert.deepEqual(W.impostazioniPerWeb({ blocklist: 'rotto' }, ['https://esempio.it/']).blocklist, []);
+  assert.deepEqual(W.impostazioniPerOrigine(s, 'filo://options/options.html').blocklist, s.blocklist);
+});
+
+test('un riquadro filo:// dentro la scheda di un sito vale come sito', () => {
+  const s = impostazioniConSegreti();
+  for (const pagina of ['https://sito.example/', '', 'about:blank']) {
+    const m = W.messaggioPerDestinazione(messaggio(s), 'filo://newtab/', pagina);
+    assert.equal(m.settings.apiKeys, undefined, `pagina ${pagina || '(vuota)'}`);
+    assert.equal(m.settings.proxy, undefined, `pagina ${pagina || '(vuota)'}`);
+    assert.equal(W.messaggioPerDestinazione({ type: 'filo_dashboard_updated', message: 'x' }, 'filo://newtab/', pagina), null);
+  }
+  assert.equal(W.messaggioPerDestinazione(messaggio(s), 'filo://newtab/', 'filo://options/options.html').settings.apiKeys.openrouter, CHIAVE);
+  assert.equal(W.messaggioPerDestinazione(messaggio(s), 'filo://shell/shell.html').settings.apiKeys.openrouter, CHIAVE);
+});
+
+test('da un sito si chiedono solo le azioni della barra d\'aiuto, confermate o no', () => {
+  const web = 'https://sito.example/';
+  assert.equal(W.azioneAmmessaDa({ type: 'INVIA_FEEDBACK', testo: 'x' }, web), true);
+  assert.equal(W.azioneAmmessaDa({ type: 'invia_feedback' }, web), true);
+  for (const type of ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'SALVA_LEZIONE', 'CANCELLA_MEMORIA', 'ESEGUI_COMANDO', 'NAVIGA', '', undefined]) {
+    assert.equal(W.azioneAmmessaDa({ type }, web), false, String(type));
+    assert.equal(W.azioneAmmessaDa({ type }, 'filo://newtab/'), true, String(type));
+  }
+  for (const url of ['', 'about:blank', 'blob:https://sito.example/1']) {
+    assert.equal(W.azioneAmmessaDa({ type: 'ESEGUI_COMANDO' }, url), false, url || '(vuoto)');
+  }
+  assert.equal(W.azioneAmmessaDa(null, web), false);
+});
+
+// La barra d'aiuto dei siti emette le azioni che il suo prompt le descrive: una
+// che manca dalla lista smetterebbe di funzionare solo sui siti.
+test('sentinella: ogni azione di Filo descritta alla barra d\'aiuto è fra quelle ammesse dai siti', () => {
+  require(join(ROOT, 'src', 'shared', 'preferences.js'));
+  require(join(ROOT, 'src', 'shared', 'actionLevels.js'));
+  const src = readFileSync(join(ROOT, 'src', 'shared', 'constants.js'), 'utf8');
+  const descritte = [...src.matchAll(/"action":\s*"filo",\s*"filo":\s*\{\s*"type":\s*"([A-Z_]+)"/g)].map((m) => m[1]);
+  assert.ok(descritte.includes('INVIA_FEEDBACK'), 'la sentinella non vede più le azioni del prompt della barra d\'aiuto');
+  assert.deepEqual(descritte.filter((t) => !W.AZIONI_WEB.has(t)), [], 'azioni della barra d\'aiuto non ammesse dai siti');
+  for (const t of W.AZIONI_WEB) assert.ok(globalThis.SN_ACTION_LEVELS.levelFor({ type: t }), `azione ammessa inesistente: ${t}`);
 });
 
 test('un campo nuovo non elencato non raggiunge i siti (lista di ammessi, non di esclusi)', () => {

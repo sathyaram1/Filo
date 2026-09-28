@@ -172,3 +172,83 @@ test('a un sito non arriva l\'intervista di benvenuto, e da un sito non si riscr
   expect(vere.settings.models.transcribe_audio).toBe('whisper');
   expect(JSON.stringify(vere.mem)).toContain('MEMORIA-589');
 });
+
+// Chi riceve vale come Filo solo se lo è anche la scheda che lo contiene: un sito
+// può aprire nella sua pagina un riquadro su un indirizzo di Filo.
+test('una pagina di Filo incorporata da un sito riceve le impostazioni ritagliate', async ({ app, shell, openTab, testServer }) => {
+  await shell.evaluate(({ k, p }) => window.filoShell.message({
+    type: 'update_settings', settings: { apiKeys: { openrouter: k }, proxy: { datacenter: p } },
+  }), { k: CHIAVE, p: PROXY });
+  await openTab('filo://options/options.html');
+  await testServer.openReady(openTab,
+    '<h1>sito</h1><iframe src="filo://newtab/"></iframe><iframe src="filo://asset/"></iframe>');
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const tab = win._filoTabs.tabs.find((t) => /^https?:/.test(String(t.url || '')));
+    return tab.view.webContents.mainFrame.framesInSubtree.filter((f) => String(f.url).startsWith('filo://')).length;
+  }), { timeout: 8000 }).toBe(2);
+
+  // Si guarda la consegna a ogni riquadro, con l'indirizzo della scheda che lo contiene.
+  await app.evaluate(({ BrowserWindow }) => {
+    globalThis.__riquadri589 = [];
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const proto = Object.getPrototypeOf(win.webContents.mainFrame);
+    const send = proto.send;
+    proto.send = function (ch, ...a) {
+      if (ch === 'filo:broadcast' && a[0]?.type === 'settings_updated') {
+        globalThis.__riquadri589.push({ url: String(this.url || ''), top: String(this.top?.url || ''), dump: JSON.stringify(a[0].settings ?? null) });
+      }
+      return send.call(this, ch, ...a);
+    };
+  });
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
+  await expect.poll(() => app.evaluate(() => globalThis.__riquadri589.filter((c) => /^https?:/.test(c.top) && c.url.startsWith('filo://')).length), { timeout: 8000 })
+    .toBe(2);
+
+  const consegne = await app.evaluate(() => globalThis.__riquadri589);
+  for (const c of consegne.filter((x) => /^https?:/.test(x.top))) {
+    expect(c.dump, `la chiave è arrivata dentro la pagina del sito, nel riquadro ${c.url}`).not.toContain(CHIAVE);
+    expect(c.dump, `il proxy è arrivato dentro la pagina del sito, nel riquadro ${c.url}`).not.toContain('parolasegreta589');
+  }
+  const scheda = consegne.find((c) => c.url === c.top && c.url.startsWith('filo://options'));
+  expect(scheda?.dump, 'la scheda di Filo deve continuare a ricevere l\'oggetto intero').toContain(CHIAVE);
+});
+
+// Al sito serve sapere se Filo è spento lì, non dove altro l'utente l'ha spento.
+test('a un sito arriva solo la voce dei siti esclusi che lo riguarda', async ({ app, shell, openTab, testServer }) => {
+  const ALTRO = 'banca-dell-utente-589.example';
+  await shell.evaluate((d) => window.filoShell.message({ type: 'update_settings', settings: { blocklist: [d] } }), ALTRO);
+  const sito = await testServer.openReady(openTab, '<h1>sito qualunque</h1>');
+  await sito.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await nelContentScript(app, testServer.origin, `
+    globalThis.__esclusi589 = [];
+    chrome.runtime.onMessage.addListener((m) => { if (m && m.type === 'settings_updated') globalThis.__esclusi589.push(JSON.stringify(m)); });
+    true;
+  `);
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
+  await expect.poll(() => nelContentScript(app, testServer.origin, 'globalThis.__esclusi589.length'), { timeout: 8000 }).toBeGreaterThan(0);
+
+  const visto = await nelContentScript(app, testServer.origin, `
+    (async () => {
+      const get = await chrome.runtime.sendMessage({ type: 'get_settings' });
+      const st = await chrome.storage.local.get('settings');
+      return JSON.stringify({ spinta: globalThis.__esclusi589, get: get.settings.blocklist, storage: st.settings.blocklist });
+    })()
+  `);
+  expect(visto, 'l\'elenco dei siti esclusi è arrivato a un altro sito').not.toContain(ALTRO);
+  expect(JSON.parse(visto).get).toEqual([]);
+
+  const interno = await shell.evaluate(() => window.filoShell.message({ type: 'get_settings' }));
+  expect(interno.settings.blocklist, 'le pagine di Filo vedono tutto l\'elenco').toEqual([ALTRO]);
+});
+
+test('sul sito escluso Filo resta spento', async ({ shell, openTab, testServer }) => {
+  const host = new URL(testServer.origin).hostname;
+  await shell.evaluate((d) => window.filoShell.message({ type: 'update_settings', settings: { blocklist: [d, 'altro-589.example'] } }), host);
+  const web = await testServer.openReady(openTab, '<h1 style="height:300px">sito escluso</h1>');
+  // Da escluso il codice di Filo non arriva mai a dirsi pronto: si lascia il tempo di montarsi.
+  await web.waitForTimeout(1500);
+  await web.locator('h1').click({ button: 'right' });
+  await web.waitForTimeout(800);
+  await expect(web.locator('.sn-menu'), 'sul sito escluso il menu di Filo si è aperto').toBeHidden();
+});

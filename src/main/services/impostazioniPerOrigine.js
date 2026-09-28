@@ -1,5 +1,5 @@
 // Cosa passa il confine fra Filo e una pagina che non è filo:// (i content script di un sito):
-// liste di ciò che è AMMESSO, mai di ciò che si toglie, per spinte, impostazioni e magazzino.
+// liste di ciò che è AMMESSO, mai di ciò che si toglie: spinte, impostazioni, magazzino, azioni.
 // Regole e sentinelle: tests/unit/impostazioniPerOrigine.test.mjs.
 'use strict';
 
@@ -54,7 +54,18 @@ const CHIAVI_STORAGE_WEB = Object.freeze([
 ]);
 const CHIAVI_STORAGE_WEB_SCRITTURA = Object.freeze(CHIAVI_STORAGE_WEB.filter((k) => k !== 'settings'));
 
+// Le azioni di Filo che il codice dentro un sito chiede: la barra d'aiuto propone
+// un feedback. Il resto (preferenze, memoria, terminale) solo dalle pagine di Filo,
+// anche confermato: la conferma disegnata dentro un sito la può dare il sito.
+const AZIONI_WEB = Object.freeze(new Set(['INVIA_FEEDBACK']));
+
 const isFilo = (url) => String(url || '').startsWith('filo://');
+
+// Un destinatario vale come Filo solo se lo è anche la scheda che lo contiene:
+// l'indirizzo di un riquadro lo sceglie la pagina, e un sito può puntarlo su filo://.
+const destinazioneFilo = (url, pagina) => isFilo(url) && (pagina === undefined || isFilo(pagina));
+
+const hostDi = (url) => { try { return new URL(String(url || '')).hostname; } catch (_) { return ''; } };
 
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 
@@ -82,13 +93,36 @@ function dentroLaRegola(valore, regola) {
   });
 }
 
-function impostazioniPerWeb(settings) {
-  if (!settings || typeof settings !== 'object') return settings;
-  return proietta(settings, CAMPI_WEB);
+// Dei siti esclusi arriva solo la voce che tocca `indirizzi` (il riquadro e la
+// scheda che lo contiene), con lo stesso confronto del content script.
+function esclusiDelSito(elenco, indirizzi) {
+  if (!Array.isArray(elenco)) return [];
+  const host = (indirizzi || []).map(hostDi).filter(Boolean);
+  return elenco.filter((d) => typeof d === 'string' && d && host.some((h) => h === d || h.endsWith(`.${d}`)));
 }
 
-function impostazioniPerOrigine(settings, origine) {
-  return isFilo(origine) ? settings : impostazioniPerWeb(settings);
+function impostazioniPerWeb(settings, indirizzi = []) {
+  if (!settings || typeof settings !== 'object') return settings;
+  const out = proietta(settings, CAMPI_WEB);
+  if (own(out, 'blocklist')) out.blocklist = esclusiDelSito(out.blocklist, indirizzi);
+  return out;
+}
+
+function impostazioniPerOrigine(settings, origine, indirizzi = [origine]) {
+  return isFilo(origine) ? settings : impostazioniPerWeb(settings, indirizzi);
+}
+
+// Il riquadro che chiede e la scheda che lo contiene: i due indirizzi che il
+// content script confronta coi siti esclusi.
+function indirizziDelMittente(sender) {
+  let riquadro = '';
+  try { riquadro = String(sender?.frame?.url || ''); } catch (_) { riquadro = ''; }
+  return [riquadro, String(sender?.tab?.url || sender?.url || '')];
+}
+
+function azioneAmmessaDa(action, origine) {
+  if (isFilo(origine)) return true;
+  return !!action && typeof action === 'object' && AZIONI_WEB.has(String(action.type || '').toUpperCase());
 }
 
 // Un salvataggio di preferenze chiesto da un sito passa solo se tocca soltanto
@@ -101,11 +135,12 @@ function scritturaImpostazioniAmmessa(incoming, origine) {
 
 // Per le spinte: `null` vuol dire «a questo destinatario non si manda». Verso un
 // sito passano solo i tipi di SPINTE_WEB, e le impostazioni ritagliate.
-function messaggioPerDestinazione(message, url) {
-  if (isFilo(url) || !message || typeof message !== 'object') return message;
+// `pagina` è l'indirizzo della scheda quando il destinatario è un suo riquadro.
+function messaggioPerDestinazione(message, url, pagina) {
+  if (destinazioneFilo(url, pagina) || !message || typeof message !== 'object') return message;
   if (!SPINTE_WEB.has(message.type)) return null;
   if (!own(message, 'settings')) return message;
-  return { ...message, settings: impostazioniPerWeb(message.settings) };
+  return { ...message, settings: impostazioniPerWeb(message.settings, [url, pagina]) };
 }
 
 // Le chiavi che un sito può chiedere al magazzino, nella stessa forma della
@@ -133,9 +168,9 @@ function scritturaStorageAmmessa(keys, origine) {
 
 // Letture dello storage grezzo (chrome.storage.local.get): la chiave `settings`
 // segue la stessa regola delle risposte e delle spinte.
-function storagePerOrigine(valore, origine, chiave = 'settings') {
+function storagePerOrigine(valore, origine, chiave = 'settings', indirizzi = [origine]) {
   if (isFilo(origine) || !valore || typeof valore !== 'object' || !own(valore, chiave)) return valore;
-  return { ...valore, [chiave]: impostazioniPerWeb(valore[chiave]) };
+  return { ...valore, [chiave]: impostazioniPerWeb(valore[chiave], indirizzi) };
 }
 
 module.exports = {
@@ -143,9 +178,12 @@ module.exports = {
   CAMPI_WEB_SCRITTURA,
   SPINTE_WEB,
   CHIAVI_STORAGE_WEB,
+  AZIONI_WEB,
   isFilo,
   impostazioniPerWeb,
   impostazioniPerOrigine,
+  indirizziDelMittente,
+  azioneAmmessaDa,
   scritturaImpostazioniAmmessa,
   messaggioPerDestinazione,
   chiaviStoragePerOrigine,

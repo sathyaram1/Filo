@@ -1,13 +1,12 @@
-// Verifica #589 — giro 6, rilievo 1. Stesso modello di minaccia della
-// segnalazione: se l'isolamento del codice di Filo dentro la pagina di un sito
-// cede, che cosa c'è dall'altra parte? Qui: le azioni di Filo. Il sito le chiede
-// e se le conferma da solo, dalla stessa pagina, senza che l'utente veda niente.
-// I messaggi partono dal mondo isolato del codice di Filo dentro il sito.
+// #589 — dal codice di Filo dentro la pagina di un sito si chiedono solo le azioni
+// della barra d'aiuto (il feedback). Preferenze, memoria e terminale no, nemmeno
+// chiedendo e confermando da sé: la conferma disegnata nella pagina la può dare la pagina.
+// I messaggi partono dal mondo isolato dei content script, dove arrivano davvero.
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { test, expect } from '../../fixtures/electron.mjs';
-import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
+import { test, expect } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const MONDO_CONTENT_SCRIPT = 999;
 
@@ -21,8 +20,9 @@ function dalSito(app, host) {
 }
 
 async function chiediEConferma(manda, action) {
-  await manda({ type: 'filo_run_action', action });
-  return manda({ type: 'filo_confirm_action', action });
+  const chiesta = await manda({ type: 'filo_run_action', action });
+  const confermata = await manda({ type: 'filo_confirm_action', action });
+  return { chiesta, confermata };
 }
 
 const impostazioni = async (shell) => (await shell.evaluate(() => window.filoShell.message({ type: 'get_settings' }))).settings;
@@ -34,9 +34,11 @@ test('un sito non si conferma da solo le preferenze che Filo chiede di confermar
   const web = await testServer.openReady(openTab, '<h1>sito qualunque</h1>');
   const manda = dalSito(app, new URL(web.url()).host);
 
-  await chiediEConferma(manda, { type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '9999' });
+  const tetto = await chiediEConferma(manda, { type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '9999' });
   await chiediEConferma(manda, { type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-DEL-SITO' });
   await chiediEConferma(manda, { type: 'IMPOSTA_PREFERENZA', chiave: 'modalita_terminale', valore: 'true' });
+  expect(tetto.chiesta?.needsConfirm, 'al sito non si apre nemmeno la domanda di conferma').toBeFalsy();
+  expect(tetto.confermata?.executed).toBe(false);
 
   const s = await impostazioni(shell);
   expect(Number(s.monthlyLimitEur), 'il sito ha alzato da solo il tetto di spesa').toBe(5);
@@ -44,16 +46,15 @@ test('un sito non si conferma da solo le preferenze che Filo chiede di confermar
   expect(s.terminal?.enabled === true, 'il sito ha acceso da solo la modalità terminale').toBe(false);
 });
 
-test('un sito non fa eseguire comandi sul computer dell\'utente', async ({ shell, app, openTab, testServer }) => {
-  // L'utente ha acceso il terminale per sé: il sito non deve poterlo usare.
+test('un sito non fa eseguire comandi sul computer dell\'utente, nemmeno col terminale acceso', async ({ shell, app, openTab, testServer }) => {
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { terminal: { enabled: true } } }));
-  const segno = join(cartellaTemporanea('filo-589-g6-'), 'scritto-dal-sito.txt');
+  const segno = join(cartellaTemporanea('filo-589-azioni-'), 'scritto-dal-sito.txt');
   const web = await testServer.openReady(openTab, '<h1>sito qualunque</h1>');
   const manda = dalSito(app, new URL(web.url()).host);
 
   const esito = await chiediEConferma(manda, { type: 'ESEGUI_COMANDO', comando: `echo sito > "${segno}"` });
   await new Promise((r) => setTimeout(r, 500));
-  expect(esito?.executed === true, 'il comando chiesto e confermato dal sito è stato eseguito').toBe(false);
+  expect(esito.confermata?.executed === true, 'il comando chiesto e confermato dal sito è stato eseguito').toBe(false);
   expect(existsSync(segno), 'il sito ha scritto un file sul computer dell\'utente').toBe(false);
 });
 
@@ -73,4 +74,21 @@ test('un sito non scrive nella memoria di Filo, non la cancella e non detta lo s
   expect(JSON.stringify(dati?.value?.filo_lessons_buffer || []), 'il sito ha fissato una lezione nella memoria di Filo').not.toContain('LEZIONE SCRITTA DAL SITO 589');
   expect(dati?.value?.filo_memory?.PROFILO, 'il sito ha cancellato la memoria di Filo').toBe('Profilo dell\'utente 589');
   expect((await impostazioni(shell)).agentStyle, 'il sito ha scritto lo stile che Filo si porta in ogni conversazione').toBe('Stile dell\'utente');
+});
+
+// La strada legittima resta aperta: la barra d'aiuto di un sito propone un
+// feedback, l'utente conferma, il feedback parte.
+test('dalla barra d\'aiuto di un sito il feedback chiesto e confermato parte ancora', async ({ app, openTab, testServer }) => {
+  await app.evaluate(() => {
+    globalThis.__fb589 = [];
+    globalThis.SN_FEEDBACK.submit = async (p) => { globalThis.__fb589.push(p); return { id: 'fb-589' }; };
+  });
+  const web = await testServer.openReady(openTab, '<h1>sito qualunque</h1>');
+  const manda = dalSito(app, new URL(web.url()).host);
+  const action = { type: 'INVIA_FEEDBACK', testo: 'Il menu non si apre su questo sito', titolo: 'Menu' };
+
+  const { chiesta, confermata } = await chiediEConferma(manda, action);
+  expect(chiesta?.needsConfirm, 'il feedback chiede conferma all\'utente').toBe(2);
+  expect(confermata?.executed, 'il feedback confermato deve partire').toBe(true);
+  expect(await app.evaluate(() => globalThis.__fb589.length)).toBe(1);
 });

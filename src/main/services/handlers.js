@@ -10,7 +10,7 @@
 
 const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
-const { messaggioPerDestinazione } = require('./impostazioniPerOrigine');
+const { messaggioPerDestinazione, azioneAmmessaDa } = require('./impostazioniPerOrigine');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -1220,6 +1220,11 @@ function cleanLabel(v) {
 async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
+  // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
+  // barra d'aiuto, confermate o no. `sender` assente = chiamata interna del main.
+  if (sender && !azioneAmmessaDa(action, sender?.tab?.url || sender?.url || '')) {
+    return { executed: false, kept: false, rejected: true, code: 'forbidden' };
+  }
 
   // IMPOSTA_ESTETICA: il livello (1 normale, 2 se rende il testo illeggibile)
   // dipende dallo stato risultante, che solo il main conosce (ha i token
@@ -3962,10 +3967,12 @@ function sendToAllFrames(wc, message) {
     try { const m = messaggioPerDestinazione(message, wc.getURL()); if (m) wc.send('filo:broadcast', m); } catch (_) {}
     return;
   }
+  let pagina = '';
+  try { pagina = wc.getURL(); } catch (_) { pagina = ''; }
   for (const f of frames) {
     try {
       if (f.detached) continue;
-      const m = messaggioPerDestinazione(message, f.url);
+      const m = messaggioPerDestinazione(message, f.url, pagina);
       if (m) f.send('filo:broadcast', m);
     } catch (_) {}
   }
