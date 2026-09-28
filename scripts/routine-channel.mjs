@@ -1038,8 +1038,9 @@ if (isMain) {
       biglietto = readTicket(ROOT);
     }
     if (!biglietto) {
-      console.error('Nessun biglietto: non c’è nessun semaforo da tenere vivo.');
-      process.exit(3);
+      // Uscita 1, non 3: per il contratto 3 è «canale giù», e qui il server non è stato chiamato.
+      console.error('NESSUN BIGLIETTO: non c’è nessun semaforo da tenere vivo, e il server non è stato chiamato. Passalo con --ticket <codice>.');
+      process.exit(1);
     }
     if (!flags.includes('--loop')) {
       const r = await heartbeat(biglietto);
