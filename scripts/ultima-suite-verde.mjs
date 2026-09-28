@@ -1,16 +1,19 @@
 // ultima-suite-verde.mjs — il commit da pubblicare: il più nuovo di main (primo genitore) con la suite verde.
-// Non pubblica e non scrive su git; se la pubblicazione è ferma da troppo tempo apre un feedback e chiude rossa.
+// Non pubblica e non scrive su git; se la pubblicazione è ferma da troppo tempo, per qualunque motivo, apre un feedback.
 // Garanzie: tests/unit/ultimaSuiteVerde.test.mjs e tests/unit/releaseSuite.test.mjs.
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { inviaAllarme } from './build-alarm.mjs';
+import { inviaAllarme, spedisciAllarme } from './build-alarm.mjs';
 
-/** Oltre questa età dell'ultima versione, senza niente di verde da pubblicare, si grida. */
+/** Oltre questa età dell'ultima versione, con codice nuovo dopo di lei e niente uscito, si grida. */
 export const SOGLIA_ORE = 48;
+/** Un verde pubblicabile da più di queste ore (due giri) che non è uscito: la pubblicazione si ferma dopo la scelta. */
+export const SOGLIA_VERDE_ORE = 12;
 export const CHIAVE_FERMO = 'rilascio:fermo';
+export const CHIAVE_FERMO_DOPO_VERDE = 'rilascio:fermo-dopo-il-verde';
 const EVENTI = new Set(['push', 'workflow_dispatch']);
 const PROFONDITA = 3000;
 
