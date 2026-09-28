@@ -1512,23 +1512,9 @@ export function ticketMissingText(message) {
   ].join('\n');
 }
 
-/**
- * Questo valore ha la FORMA di un biglietto? PURA.
- *
- * Un biglietto vero lo genera il server: 32 byte casuali in base64url, 43
- * caratteri (filo-security, functions/src/secrets.js). L'alfabeto base64url
- * comprende il trattino, quindi un biglietto legittimo PUÒ cominciare con un
- * trattino singolo (~1 su 64): rifiutare "tutto ciò che comincia con -"
- * butterebbe via giri validi. Si valida invece la forma: solo alfabeto
- * base64url, lunghezza da biglietto (soglia larga, per lasciare al server il
- * margine di cambiare taglia), mai doppio trattino. Ogni flag esistente cade
- * fuori: i `--…` per il doppio trattino, `-h` per la lunghezza — ed è così che
- * un flag finito al posto del codice non può più sovrascrivere il promemoria.
- */
-export function looksLikeTicket(v) {
-  const s = String(v || '');
-  return /^[A-Za-z0-9_-]{16,}$/.test(s) && !s.startsWith('--');
-}
+// La forma di un biglietto la decide una regola sola, condivisa col canale: un flag finito al
+// posto del codice non deve poter sovrascrivere il promemoria.
+export { looksLikeTicket };
 
 /**
  * Estrae la coppia `--ticket <codice>` da una lista di argomenti. PURA.
