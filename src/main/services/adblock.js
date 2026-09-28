@@ -330,6 +330,7 @@ function status() {
 
 module.exports = {
   DEFAULT_SOURCES,
+  fetchList,
   parseList,
   normalizeDomain,
   isBlockedHost,
