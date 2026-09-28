@@ -1264,6 +1264,24 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
     } catch (_) {}
   }
 
+  // CERCA_WEB: la query esce dal computer verso il motore di ricerca, come un
+  // NAVIGA porta fuori l'URL. Stessa difesa: se il testo cercato porta un
+  // segreto della memoria o un pezzo di ciò che il modello ha letto nel turno,
+  // `_exfil` PRIMA del gate (mai dall'LLM) → livello 2 con la query mostrata.
+  if (type === 'CERCA_WEB') {
+    try {
+      const Exfil = globalThis.SN_URL_EXFIL;
+      const query = String(action.query ?? action.q ?? action.testo ?? action.text ?? '').trim();
+      if (Exfil && query) {
+        const v = Exfil.valutaRicerca(query, {
+          memoria: await navExfilCorpus(),
+          azioni: Array.isArray(contesto) ? contesto : [],
+        });
+        if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
+      }
+    } catch (_) {}
+  }
+
   // CANCELLA_SVEGLIA / MODIFICA_SVEGLIA: il livello dipende da QUANTE sveglie o
   // timer il riferimento dell'utente prende davvero — cosa che solo il main sa,
   // avendo la lista. Risolviamo il riferimento PRIMA del gate e iniettiamo
