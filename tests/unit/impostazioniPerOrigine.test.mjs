@@ -135,7 +135,9 @@ test('un sito scrive e toglie solo gli scomparti dei content script, mai le impo
 
 test('un sito salva nelle impostazioni solo la voce della dettatura; il resto rifiuta la richiesta intera', () => {
   const web = 'http://127.0.0.1:5555/p.html';
-  assert.equal(W.scritturaImpostazioniAmmessa({ models: { transcribe_audio: 'whisper' } }, web), true);
+  // È la chiave che il menu della dettatura scrive: se l'azione cambia nome, qui diventa rosso.
+  const dettatura = globalThis.SN_CONST.ACTIONS.TRANSCRIBE_AUDIO;
+  assert.equal(W.scritturaImpostazioniAmmessa({ models: { [dettatura]: 'whisper' } }, web), true);
   const vietate = [
     { apiKeys: { openrouter: 'sk-x' } },
     { proxy: { datacenter: PROXY } },
