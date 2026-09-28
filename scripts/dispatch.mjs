@@ -1577,6 +1577,7 @@ export function usageText() {
     '',
     'Nei --record-* il biglietto si rilegge da solo dal promemoria',
     '(.claude/routine-ticket.json): `--ticket` serve solo se il promemoria è perso.',
+    'Vale in ogni posizione, anche `--ticket=<b>` o `--biglietto <b>`, come nel canale.',
     '',
     'Exit: 0 ok · 1 uso sbagliato (niente è stato toccato) · 2 niente da fare',
     '      3 guasto · 4 rifiutato dal server (leggere il motivo, non aggirare)',
