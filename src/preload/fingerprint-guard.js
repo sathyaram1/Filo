@@ -173,17 +173,69 @@ function buildGuardSource(seed, level) {
 
 // GPC nel mondo della pagina, gemello dell'header Sec-GPC: sul prototipo e con getter "nativo",
 // come nei browser che lo implementano, così uno script in <head> lo legge già.
+// I riquadri vuoti (about:blank) non ricevono il preload: il segnale ci arriva da chi li raggiunge.
 function buildGpcSource() {
   return `(function(){
-  try {
-    var P = window.Navigator && window.Navigator.prototype;
+  function nativo(fn, nome) {
+    try {
+      var ts = function toString() { return 'function ' + nome + '() { [native code] }'; };
+      Object.defineProperty(fn, 'name', { value: nome, configurable: true });
+      Object.defineProperty(fn, 'toString', { value: ts, configurable: true, writable: true });
+    } catch (e) {}
+    return fn;
+  }
+  function tocca(el) {
+    var t = el.tagName;
+    if (t === 'IFRAME' || t === 'FRAME' || t === 'OBJECT') { try { void el.contentWindow; } catch (e) {} }
+  }
+  function installa(w) {
+    var P;
+    try { P = w.Navigator && w.Navigator.prototype; } catch (e) { return; }
     if (!P || Object.getOwnPropertyDescriptor(P, 'globalPrivacyControl')) return;
-    var get = function () { return true; };
-    var ts = function toString() { return 'function get globalPrivacyControl() { [native code] }'; };
-    Object.defineProperty(get, 'name', { value: 'get globalPrivacyControl', configurable: true });
-    Object.defineProperty(get, 'toString', { value: ts, configurable: true, writable: true });
-    Object.defineProperty(P, 'globalPrivacyControl', { get: get, enumerable: true, configurable: true });
-  } catch (e) {}
+    Object.defineProperty(P, 'globalPrivacyControl', {
+      get: nativo(function () { return true; }, 'get globalPrivacyControl'), enumerable: true, configurable: true,
+    });
+    ['HTMLIFrameElement', 'HTMLFrameElement', 'HTMLObjectElement'].forEach(function (c) {
+      var CP = w[c] && w[c].prototype;
+      if (!CP) return;
+      ['contentWindow', 'contentDocument'].forEach(function (prop) {
+        var d = Object.getOwnPropertyDescriptor(CP, prop);
+        if (!d || !d.get || !d.configurable) return;
+        var orig = d.get;
+        var g = nativo(function () {
+          var r = orig.call(this);
+          if (r) { try { installa(prop === 'contentWindow' ? r : r.defaultView); } catch (e) {} }
+          return r;
+        }, 'get ' + prop);
+        Object.defineProperty(CP, prop, { get: g, set: d.set, enumerable: d.enumerable, configurable: true });
+      });
+    });
+    // Le cornici scritte nell'HTML si possono leggere da frames[i] senza passare dai getter.
+    try {
+      var doc = w.document;
+      var spazza = function () {
+        ['iframe', 'frame', 'object'].forEach(function (t) {
+          var l = doc.getElementsByTagName(t);
+          for (var i = 0; i < l.length; i++) tocca(l[i]);
+        });
+      };
+      if (doc.readyState !== 'loading') { spazza(); return; }
+      var mo = new w.MutationObserver(function (recs) {
+        for (var i = 0; i < recs.length; i++) {
+          var a = recs[i].addedNodes;
+          for (var j = 0; j < a.length; j++) {
+            var n = a[j];
+            if (n.nodeType !== 1) continue;
+            tocca(n);
+            if (n.firstElementChild) { var l = n.getElementsByTagName('iframe'); for (var k = 0; k < l.length; k++) tocca(l[k]); }
+          }
+        }
+      });
+      mo.observe(doc, { childList: true, subtree: true });
+      doc.addEventListener('DOMContentLoaded', function () { mo.disconnect(); spazza(); }, { once: true });
+    } catch (e) {}
+  }
+  try { installa(window); } catch (e) {}
 })();`;
 }
 
