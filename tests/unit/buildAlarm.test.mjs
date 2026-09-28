@@ -100,7 +100,7 @@ describe('le chiavi arrivano al server', () => {
     const dir = cartellaTemporanea('filo-allarme-chiavi-');
     try {
       writeFileSync(join(dir, 'chiavi.txt'), 'suite:tests/a.spec.mjs\n\nsuite:tests/a.spec.mjs\nsuite:fuori-dai-casi\n');
-      writeFileSync(join(dir, 'unit.log'), "not ok 1 - x\n  location: 'tests\unit\y.test.mjs:1:1'\n");
+      writeFileSync(join(dir, 'unit.log'), `not ok 1 - x\n${String.raw`  location: 'tests\unit\y.test.mjs:1:1'`}\n`);
       const env = { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`, FILO_BUILD_PASSPHRASE: 'prova',
         NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost' };
       const r = await esegui(process.execPath, [CLI, ...argomenti], { cwd: dir, env });
