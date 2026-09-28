@@ -123,6 +123,40 @@ test('confermando, il link sospetto viene poi aperto davvero', async ({ app, tes
   await expect.poll(() => !!findWindow(app, url), { timeout: 8_000 }).toBe(true);
 });
 
+// #587 giro 10: dopo che un comando ha reso il contesto "non fidato", i link di
+// tutti i giorni (percorsi leggibili) devono aprirsi senza avviso. Prima il
+// ripiego strutturale li fermava tutti.
+test('un link normale dopo un comando si apre senza avviso', async ({ app, testServer, openTab }) => {
+  await openTab(NEWTAB);
+  const dopoComando = [{
+    type: 'ESEGUI_COMANDO', comando: 'ls',
+    _output: { command: 'ls', stdout: 'Documenti\nImmagini\nMusica\n', stderr: '', code: 0 },
+  }];
+  const url = testServer.html('<!doctype html><title>ricetta</title><h1>ok</h1>') + '&sezione=storia-della-cucina-italiana';
+  const r = await execAction(app, { type: 'NAVIGA', url }, { contesto: dopoComando });
+  expect(r.needsConfirm, String(r.describe || '')).toBeFalsy();
+  expect(r.executed).toBe(true);
+});
+
+// #587 giro 10: una ricerca sul web porta la query fuori dal computer come un
+// NAVIGA porta l'URL. Se la query contiene ciò che il modello ha appena letto,
+// chiede un OK; una ricerca qualsiasi no.
+test('CERCA_WEB con dentro un dato letto chiede un OK; una ricerca normale no', async ({ app, openTab }) => {
+  await openTab(NEWTAB);
+  const letto = 'Codice cliente PRG7788ZK, pratica numero 4471 del contratto di fornitura energia';
+  const dopoLettura = [{
+    type: 'ESEGUI_COMANDO', comando: 'cat pratica.txt',
+    _output: { command: 'cat pratica.txt', stdout: `${letto}\n`, stderr: '', code: 0 },
+  }];
+  const conDato = await execAction(app, { type: 'CERCA_WEB', query: letto.slice(0, 45) }, { contesto: dopoLettura });
+  expect(conDato.needsConfirm).toBe(2);
+  expect(conDato.executed).toBe(false);
+  expect(String(conDato.describe || '')).toContain('motore di ricerca');
+
+  const normale = await execAction(app, { type: 'CERCA_WEB', query: 'orari treni milano torino' }, { contesto: dopoLettura });
+  expect(normale.needsConfirm, String(normale.describe || '')).toBeFalsy();
+});
+
 // ── #587: la catena nel turno di chat ───────────────────────────────────────
 //
 // Il modello legge un file dell'utente e poi apre un indirizzo con dentro un
