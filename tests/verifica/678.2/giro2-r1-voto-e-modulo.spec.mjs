@@ -1,4 +1,5 @@
-// Verifica #678.2 giro 2: esplorazione dell'accesso dalla bacheca col main vero e il browser finto.
+// Verifica #678.2 giro 2, rilievo 1: due gesti diversi sulla stessa scheda durante l'attesa dell'accesso
+// partono tutti e due, come prima del ramo (il voto non viene sostituito dal modulo).
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -62,16 +63,4 @@ test('stessa scheda: pollice e poi «Ancora rotto?» durante l\'attesa, ad acces
   await expect(page.locator('#bdAuthMsg')).toContainText('Sei connesso');
   await expect(card.locator('textarea')).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__voti.slice()), { timeout: 3000 }).toEqual(['fb-a:broken']);
-});
-
-test('aspetto: attesa e fallimento in testa, chiaro e scuro', async ({ app, openTab }) => {
-  const page = await apriBacheca(app, openTab);
-  for (const tema of ['light', 'dark']) {
-    await page.emulateMedia({ colorScheme: tema });
-    await page.locator('#bdSignIn').click();
-    await expect(page.locator('#bdAuthSpin')).toBeVisible();
-    await page.mouse.move(5, 5);
-    await page.screenshot({ path: `tests/.shots/v678.2-attesa-${tema}.png` });
-    await page.locator('#bdAuthLascia').click();
-  }
 });
