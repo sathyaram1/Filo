@@ -19,6 +19,7 @@
 // chiusura), (4) è rossa (il pulsante non c'è).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { clickConfirm, confirmState } from './helpers/confirm.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -164,7 +165,11 @@ test('quello che Filo impara lo applica subito, lo spunta, e riprende da lì', a
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Piacere Anna' })).toBeVisible({ timeout: 30_000 });
 
-  // Applicato DAVVERO, non promesso: lo stile dell'agente è nelle impostazioni.
+  // Lo stile entra in ogni conversazione: proposto da Filo passa dal popup
+  // col testo esatto (#592). Dato l'OK, è applicato DAVVERO, non promesso.
+  await expect.poll(async () => (await confirmState(page))?.text || '', { timeout: 10_000 })
+    .toContain('Risposte brevi, dà del tu.');
+  await clickConfirm(page, 'ok');
   await expect.poll(
     () => app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.agentStyle || '')),
     { timeout: 15_000 },

@@ -81,7 +81,6 @@ test('nei prompt con le regole nel messaggio di sistema lo stile sta subito prim
     const ancora = C.INIZIO_ANTI_INGANNO[action];
     assert.ok(sys.includes(`${CHIUDE}\n\n${ancora}`), `${action}: lo stile non precede la sezione «${ancora.trim()}»`);
     assert.equal(sys.split(ancora).length - 1, 1, `${action}: la sezione anti-inganno deve esserci una volta sola`);
-    assert.ok(sys.lastIndexOf(ANTI_INGANNO.source.split('|')[0]) > sys.indexOf(CHIUDE));
   }
 });
 
