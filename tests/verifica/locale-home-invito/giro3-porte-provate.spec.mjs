@@ -47,7 +47,7 @@ test('nuovo: scrivo prima dei crediti, «Apri Crediti», riscatto, e nella home 
   // Scheda nuova: la stessa intervista, senza il «ciao» di prima.
   const altra = await nuovaHome(app, shell);
   await expect(altra.locator('#bubbles')).toContainText(BENVENUTO, { timeout: 30_000 });
-  await expect(altra.locator('#bubbles')).not.toContainText(/\bciao\b(?!,)/);
+  await expect(altra.locator('#bubbles .dash-bubble-user', { hasText: /^\s*ciao\s*$/ })).toHaveCount(0);
 });
 
 test('nuovo: scrivo prima che arrivi l’invito del primo avvio, poi arriva, e Filo si presenta nella home', async ({ app }) => {
