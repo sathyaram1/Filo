@@ -81,8 +81,9 @@ module.exports = {
   creaNascita,
   installa: () => nascita().installa(),
   allaNascita: (nome, fn) => nascita().allaNascita(nome, fn),
-  senzaProtezione: (crea) => nascita().senzaProtezione(crea),
+  diServizio: (crea) => nascita().diServizio(crea),
   nate: () => nascita().nate(),
   protezioni: () => nascita().protezioni(),
   eNata: (ses) => nascita().eNata(ses),
+  eDiServizio: (ses) => nascita().eDiServizio(ses),
 };
