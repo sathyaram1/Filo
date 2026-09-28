@@ -293,11 +293,19 @@ test('classify: due campioni della stessa pagina col primo in viaggio fanno una 
 test('classify: le pagine della rete di casa non vanno al modello', async () => {
   let called = 0;
   const complete = async () => { called++; return 'bot_block'; };
-  for (const host of ['192.168.1.1', '10.0.0.2', 'nas.local', 'fritz.box', 'localhost']) {
+  // Per nome conta dove ha risposto la pagina: il router intercetta tplinkwifi.net, fritz.box risponde da casa.
+  globalThis.SN_URL_NAV.noteHostAddress('tplinkwifi.net', '192.168.0.1');
+  globalThis.SN_URL_NAV.noteHostAddress('fritz.box', '192.168.178.1');
+  const casa = ['192.168.1.1', '10.0.0.2', 'nas.local', 'localhost', 'homeassistant', 'speedport.ip', 'tplinkwifi.net', 'fritz.box'];
+  for (const host of casa) {
     const r = await C.classify({ statusCode: 403, text: 'Accesso negato', title: 'admin@casa.it', host, url: `http://${host}/login` }, { complete });
     assert.equal(r.skipped, true, host);
   }
   assert.equal(called, 0);
+  // .box è un dominio pubblico vero: un sito che risponde da internet resta un sito.
+  globalThis.SN_URL_NAV.noteHostAddress('negozio.box', '203.0.113.7');
+  await C.classify({ statusCode: 403, text: 'Accesso negato', title: 'x', host: 'negozio.box', url: 'https://negozio.box/' }, { complete });
+  assert.equal(called, 1);
 });
 
 // #591 — in una finestra in incognito il testo della pagina non parte da solo verso il modello.
