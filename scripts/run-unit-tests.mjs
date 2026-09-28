@@ -1,69 +1,34 @@
-// Lanciatore degli unit test — deterministico, indipendente da shell e Node.
-//
-// PERCHÉ ESISTE
-//   Prima `npm run test:unit` era `node --test "tests/unit/**/*.test.mjs"`.
-//   Quella riga funziona SOLO se qualcuno espande il glob: su questa macchina
-//   (Node 22) lo espande Node; sul runner della pubblicazione (Node 20, bash
-//   su Windows) non lo espande nessuno, e Node cerca un file che si chiama
-//   letteralmente `tests\unit\**\*.test.mjs`, non lo trova ed esce con errore.
-//
-//   Risultato reale, dal 18/08/2026: il cancello prima della pubblicazione era
-//   rosso a ogni giro — non perché un test fallisse, ma perché i test non
-//   partivano — e nessuna versione arrivava più agli utenti. Un difetto
-//   invisibile da qui, perché in locale funzionava.
-//
-//   Qui i file si trovano camminando la cartella e si passano UNO PER UNO a
-//   `node --test`. Non c'è niente da espandere: nessuna shell, nessun glob,
-//   nessuna versione di Node che si comporta diversamente dall'altra.
-//
-// COSA GARANTISCE IN PIÙ
-//   · funziona da QUALUNQUE cartella (i percorsi si calcolano da questo file,
-//     non da dove è stato lanciato, e i test girano con la root del repo come
-//     cartella corrente, esattamente come prima);
-//   · se non trova NESSUN test si ferma con errore invece di uscire verde:
-//     "zero test eseguiti" non deve mai somigliare a "tutto a posto" — è
-//     precisamente il modo in cui un cancello smette di essere un cancello.
-//
-// USO
-//   node scripts/run-unit-tests.mjs                  tutti gli unit test
-//   node scripts/run-unit-tests.mjs --list           stampa i file e basta
-//   node scripts/run-unit-tests.mjs <flag di node>   i flag passano a node --test
-//     (es. --test-name-pattern=…, --test-reporter=…)
+// Lanciatore degli unit test: trova da sé i *.test.mjs (un glob sul runner Node 20 non lo espande nessuno) e li passa a
+// `node --test` relativi alla root e a gruppi, perché la riga di Windows ha un tetto (#765). Zero file = uscita rossa.
+// Uso: `--list` stampa i file; ogni altro argomento è un flag di `node --test`. Sentinella: tests/unit/unitRunner.test.mjs.
 
 import { readdirSync } from 'node:fs';
-import { resolve, dirname, join } from 'node:path';
+import { resolve, dirname, join, relative, isAbsolute, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { lottiPerRigaDiComando, costoArgomentoWindows } from './lib/riga-di-comando.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-/** La root del repo: da QUESTO file, mai da dove è stato lanciato il comando. */
+/** Da QUESTO file, mai da dove è stato lanciato il comando. */
 export const REPO_ROOT = resolve(__dirname, '..');
 
-/**
- * Dove vivono gli unit test. `FILO_UNIT_DIR` esiste SOLO per i test di questo
- * lanciatore (cartelle usa-e-getta), come `FILO_REPO_ROOT` per gli script delle
- * routine: non è un'opzione d'uso.
- */
+/** `FILO_UNIT_DIR` e `FILO_UNIT_TETTO_RIGA` esistono solo per i test di questo lanciatore, non sono opzioni d'uso. */
 export const UNIT_DIR = process.env.FILO_UNIT_DIR
   ? resolve(process.env.FILO_UNIT_DIR)
   : resolve(REPO_ROOT, 'tests', 'unit');
 
-/** Un file di test è un `*.test.mjs`. PURA. */
+// CreateProcess regge 32.767 caratteri; il resto è margine per un flag strano.
+export const TETTO_RIGA = Number(process.env.FILO_UNIT_TETTO_RIGA) || 30000;
+
+/** PURA. */
 export function isTestFile(name) {
   return /\.test\.mjs$/.test(String(name || ''));
 }
 
 /**
- * Tutti i file di test sotto `dir`, ricorsivamente, in ordine stabile.
- *
- * Ricorsiva anche se oggi la cartella è piatta: il giorno in cui qualcuno
- * raggruppa i test in sottocartelle, il lanciatore non deve smettere in
- * silenzio di eseguirne una parte — che è esattamente il guasto che questo
- * file esiste per non ripetere.
- *
- * Percorsi ASSOLUTI: è ciò che rende il lancio indipendente dalla cartella
- * corrente.
+ * Ricorsiva anche se oggi la cartella è piatta: raggruppare i test in sottocartelle non deve farne saltare una parte.
+ * Percorsi assoluti e ordine stabile: due macchine eseguono gli stessi test nello stesso ordine.
  */
 export function collectTestFiles(dir = UNIT_DIR) {
   let entries;
@@ -74,16 +39,28 @@ export function collectTestFiles(dir = UNIT_DIR) {
   }
   const out = [];
   for (const e of entries) {
-    // Niente cartelle nascoste né dipendenze: lì dentro non ci sono i nostri
-    // test, e `node_modules` costerebbe una camminata lunghissima.
     if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
     const full = join(dir, e.name);
     if (e.isDirectory()) out.push(...collectTestFiles(full));
     else if (e.isFile() && isTestFile(e.name)) out.push(full);
   }
-  // Ordine stabile e indipendente dal filesystem: due macchine devono eseguire
-  // gli stessi test nello stesso ordine.
   return out.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
+/**
+ * Relativo alla root, così la riga non cresce col nome della cartella di lavoro; barre normali perché Node 22 legge
+ * gli argomenti di `--test` come glob. Un file fuori dalla root resta assoluto. PURA.
+ */
+export function perLaRiga(file, root = REPO_ROOT) {
+  const r = relative(root, file);
+  if (!r || r === '..' || r.startsWith(`..${sep}`) || isAbsolute(r)) return file;
+  return r.split(sep).join('/');
+}
+
+/** I file di ogni `node --test`, a gruppi la cui riga intera (eseguibile e flag compresi) sta in `tetto`. PURA. */
+export function gruppiDiLancio(files, { root = REPO_ROOT, flags = [], execPath = process.execPath, tetto = TETTO_RIGA } = {}) {
+  const fisso = [execPath, '--test', ...flags].reduce((n, a) => n + costoArgomentoWindows(a), 0);
+  return lottiPerRigaDiComando(files.map((f) => perLaRiga(f, root)), tetto, { fisso, costo: costoArgomentoWindows });
 }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
@@ -102,28 +79,38 @@ function main() {
 
   if (listOnly) {
     for (const f of files) console.log(f);
-    // `exitCode` e non `exit()`: su Windows lo stdout verso una pipe è
-    // asincrono, e uscire di colpo troncherebbe l'elenco.
+    // `exitCode` e non `exit()`: su Windows lo stdout verso una pipe è asincrono, e uscire di colpo troncherebbe l'elenco.
     process.exitCode = 0;
     return;
   }
 
-  const r = spawnSync(process.execPath, ['--test', ...flags, ...files], {
-    stdio: 'inherit',
-    // I test si aspettano la root del repo come cartella corrente, come quando
-    // li lanciava npm. Così `npm run test:unit` e un lancio da fuori danno lo
-    // stesso risultato.
-    cwd: REPO_ROOT,
-  });
-  if (r.error) {
-    console.error(`[test:unit] non sono riuscito a lanciare node: ${r.error.message}`);
-    process.exit(1);
+  const gruppi = gruppiDiLancio(files, { flags });
+  const tanti = gruppi.length > 1;
+  const rossi = [];
+  let esito = 0;
+  if (tanti) console.log(`[test:unit] ${files.length} file in ${gruppi.length} gruppi: tutti insieme non stanno in una riga di comando di Windows.`);
+  for (const [i, gruppo] of gruppi.entries()) {
+    if (tanti) console.log(`\n[test:unit] gruppo ${i + 1} di ${gruppi.length} (${gruppo.length} file)`);
+    // I test si aspettano la root come cartella corrente, come quando li lanciava npm.
+    const r = spawnSync(process.execPath, ['--test', ...flags, ...gruppo], { stdio: 'inherit', cwd: REPO_ROOT });
+    if (r.error) {
+      console.error(`[test:unit] non sono riuscito a lanciare node${tanti ? ` per il gruppo ${i + 1}` : ''}: ${r.error.message}`);
+      rossi.push(i + 1); esito = esito || 1;
+      continue;
+    }
+    // Ucciso da un segnale (Ctrl+C, timeout): non è un successo, e i gruppi dopo non partono.
+    if (r.status === null) { esito = 1; rossi.push(i + 1); break; }
+    if (r.status !== 0) { rossi.push(i + 1); esito = esito || r.status; }
   }
-  // Ucciso da un segnale: non è un successo, e `status` in quel caso è null.
-  process.exit(r.status === null ? 1 : r.status);
+  if (tanti) {
+    console.log(rossi.length
+      ? `\n[test:unit] ROSSO: gruppi ${rossi.join(', ')} di ${gruppi.length}. I test falliti sono nel riepilogo di ciascun gruppo, sopra.`
+      : `\n[test:unit] verde: ${gruppi.length} gruppi, ${files.length} file.`);
+  }
+  process.exit(esito);
 }
 
-// Esegui solo se invocato come script (non quando importato dai test).
+// Solo se invocato come script, non quando importato dai test.
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   main();
 }
