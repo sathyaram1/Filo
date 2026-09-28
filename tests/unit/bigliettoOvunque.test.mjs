@@ -11,6 +11,7 @@ import { rmSync, mkdirSync, writeFileSync } from 'node:fs';
 
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { bigliettoAMano } from '../../scripts/routine-channel.mjs';
+import { leggiBigliettoAMano } from '../../scripts/lib/routine-ticket.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BIGLIETTO = 'bigliettodiprova0123';
@@ -212,4 +213,107 @@ test('deliver con l\'intento storto: si ferma qui e nomina la parola, col biglie
       assert.equal(ricevuti.length, 0, 'la parola storta non parte verso il server come biglietto');
     });
   }
+});
+
+// I biglietti veri sono 43 caratteri base64url: uno su 64 comincia con un trattino, uno su 4096 con due.
+const VERO = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde';
+const VERO_TRATTINO = `-${VERO.slice(1)}`;
+const VERO_DUE_TRATTINI = `--${VERO.slice(2)}`;
+const ALTRO_VERO = `ZZZZ${VERO.slice(4)}`;
+
+test('una regola sola per il biglietto a mano: forme, ripetizioni e valori storti', () => {
+  assert.deepEqual(leggiBigliettoAMano(['deliver', '--ticket', VERO]), { args: ['deliver'], ticket: VERO });
+  assert.deepEqual(leggiBigliettoAMano([`--ticket=${VERO}`, 'x']), { args: ['x'], ticket: VERO });
+  assert.deepEqual(leggiBigliettoAMano(['--biglietto', VERO, 'x']), { args: ['x'], ticket: VERO });
+  assert.deepEqual(leggiBigliettoAMano(['--ticket', VERO, '--biglietto', VERO]), { args: [], ticket: VERO }, 'lo stesso due volte va bene');
+  assert.deepEqual(leggiBigliettoAMano(['--ticket', VERO_TRATTINO]).ticket, VERO_TRATTINO);
+  assert.deepEqual(leggiBigliettoAMano(['--ticket', VERO_DUE_TRATTINI]).ticket, VERO_DUE_TRATTINI);
+  assert.deepEqual(leggiBigliettoAMano([`--ticket=${VERO_DUE_TRATTINI}`]).ticket, VERO_DUE_TRATTINI);
+  assert.match(leggiBigliettoAMano(['--ticket', VERO, '--ticket', ALTRO_VERO]).errore || '', /Due biglietti diversi/);
+  assert.match(leggiBigliettoAMano(['--ticket', VERO, '--biglietto', ALTRO_VERO]).errore || '', /Due biglietti diversi/);
+  for (const storto of [['--ticket'], ['--ticket='], ['--ticket', '  '], ['--ticket', '--notes', 'x'], ['--ticket', 'abc'], ['--ticket', '-h']]) {
+    assert.ok(leggiBigliettoAMano(storto).errore, JSON.stringify(storto));
+  }
+  assert.deepEqual(leggiBigliettoAMano(['release', 'x']), { args: ['release', 'x'], ticket: '' });
+});
+
+test('consegna: una parola che non è un intento è un intento storto, se non ha la forma lunga di un biglietto', () => {
+  const lungo = bigliettoAMano('deliver', ['revision_capability'], VERO).errore || '';
+  assert.match(lungo, /Intento non capito: «revision_capability»/);
+  assert.doesNotMatch(lungo, /biglietti/);
+  assert.match(bigliettoAMano('deliver', [ALTRO_VERO], VERO).errore || '', /Due biglietti diversi.*manca l'intento/);
+});
+
+test('canale: un biglietto vero col trattino davanti è un biglietto, non un\'opzione storta', async () => {
+  await conServer(async ({ ricevuti, env }) => {
+    const r = await esegui('routine-channel.mjs', ['release', VERO_TRATTINO, '--role', 'verifier', '--senza-push', '--senza-rapporto'], env);
+    assert.equal(r.code, 0, `stderr: ${r.se}`);
+    assert.equal(ricevuti.find((x) => x.url.includes('routineRelease'))?.body.ticket, VERO_TRATTINO);
+  });
+  await conServer(async ({ ricevuti, env }) => {
+    const r = await esegui('routine-channel.mjs', ['deliver', VERO_DUE_TRATTINI, 'note', '--text', 'Una nota.'], env);
+    assert.equal(r.code, 0, `stderr: ${r.se}`);
+    assert.equal(ricevuti.find((x) => x.url.includes('routineDeliver'))?.body.ticket, VERO_DUE_TRATTINI);
+  });
+  await conServer(async ({ ricevuti, env }) => {
+    const r = await esegui('routine-channel.mjs', ['release', '-guast', 'x', '--role', 'verifier', '--senza-push', '--senza-rapporto'], env);
+    assert.equal(r.code, 1, 'un\'opzione storta corta resta un errore');
+    assert.match(r.se, /Le opzioni si scrivono con due trattini/);
+    assert.equal(ricevuti.length, 0);
+  });
+});
+
+test('registrazioni: un biglietto vero con due trattini passa col segno uguale', async () => {
+  await conServer(async ({ ricevuti, env }) => {
+    const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-900', REPORT, `--ticket=${VERO_DUE_TRATTINI}`], env);
+    assert.equal(r.code, 0, `stderr: ${r.se}`);
+    assert.equal(ricevuti.find((x) => x.url.includes('routineDeliver'))?.body.ticket, VERO_DUE_TRATTINI);
+  });
+});
+
+test('canale e registrazioni danno lo stesso esito sui casi fuori dal comune del biglietto a mano', async () => {
+  const casi = [
+    { nome: 'due diversi', canale: ['--ticket', VERO, '--ticket', ALTRO_VERO], ok: false },
+    { nome: 'nome italiano diverso', canale: ['--ticket', VERO, '--biglietto', ALTRO_VERO], ok: false },
+    { nome: 'lo stesso due volte', canale: ['--ticket', VERO, '--ticket', VERO], ok: true },
+    { nome: 'valore storto', canale: ['--ticket', 'abc'], ok: false },
+    { nome: 'valore vuoto', canale: ['--ticket='], ok: false },
+  ];
+  for (const c of casi) {
+    for (const [script, argv] of [
+      ['routine-channel.mjs', ['deliver', 'note', '--text', 'Una nota.', ...c.canale]],
+      ['dispatch.mjs', ['--record-fixed', 'fid-900', REPORT, ...c.canale]],
+    ]) {
+      await conServer(async ({ ricevuti, env }) => {
+        const r = await esegui(script, argv, env);
+        const partita = ricevuti.find((x) => x.url.includes('routineDeliver'));
+        if (c.ok) {
+          assert.equal(r.code, 0, `${c.nome} (${script}): ${r.se}`);
+          assert.equal(partita?.body.ticket, VERO, `${c.nome} (${script})`);
+        } else {
+          assert.equal(r.code, 1, `${c.nome} (${script}): ${r.se}`);
+          assert.equal(partita, undefined, `${c.nome} (${script}): niente al server`);
+        }
+      });
+    }
+  }
+});
+
+test('battito: un --ticket= vuoto non ripiega in silenzio sul promemoria', async () => {
+  await conServer(async ({ ricevuti, env }) => {
+    mkdirSync(resolve(env.FILO_REPO_ROOT, '.claude'), { recursive: true });
+    writeFileSync(resolve(env.FILO_REPO_ROOT, '.claude', 'routine-ticket.json'), JSON.stringify({ ticket: VERO, since: new Date().toISOString() }));
+    const r = await esegui('routine-channel.mjs', ['heartbeat', '--ticket='], env);
+    assert.equal(r.code, 1, `stderr: ${r.se}`);
+    assert.equal(ricevuti.length, 0);
+  });
+});
+
+test('consegna con biglietto davanti e intento storto: si ferma qui, non parte verso il server', async () => {
+  await conServer(async ({ ricevuti, env }) => {
+    const r = await esegui('routine-channel.mjs', ['deliver', VERO, 'fixd', '--notes', 'Report.'], env);
+    assert.equal(r.code, 1, `stderr: ${r.se}`);
+    assert.match(r.se, /Intento non capito: «fixd»/);
+    assert.equal(ricevuti.length, 0);
+  });
 });
