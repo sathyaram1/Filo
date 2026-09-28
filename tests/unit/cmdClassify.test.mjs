@@ -961,12 +961,16 @@ test('livello 2 — npm/pip config che SCRIVE (registry incluso) non è lettura'
   }
 });
 
-test('livello 1 — npm/pip config che LEGGE resta lettura', () => {
-  for (const cmd of [
-    'npm config get registry', 'npm config list', 'npm config ls', 'npm config',
-    'pip config list', 'pip config get global.index-url', 'pip config debug',
-  ]) {
-    assert.equal(lvl(cmd), 1, `"${cmd}" (legge config) dovrebbe essere livello 1`);
+test('npm/pip config — help resta 1, il dump della config chiede conferma (#587)', () => {
+  // Bare/`debug` non stampano credenziali → 1.
+  for (const cmd of ['npm config', 'pip config', 'pip config debug']) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" dovrebbe essere livello 1`);
+  }
+  // get/list/ls stampano l'URL del registro/indice, dove finiscono utente,
+  // password o token → conferma.
+  for (const cmd of ['npm config get registry', 'npm config list', 'npm config ls',
+    'pip config list', 'pip config get global.index-url']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (può stampare una credenziale) dovrebbe essere livello 2`);
   }
 });
 
