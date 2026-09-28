@@ -40,6 +40,18 @@ test('gli indirizzi della rete di casa non fanno partire modello e finestra nasc
   expect(partiti, 'sulla rete privata dell\'utente non c\'è niente da giudicare').toEqual({});
 });
 
+test('l\'indirizzo intero di una pagina della rete di casa non va all\'elenco dei siti di truffa né alle domande sull\'età', async () => {
+  pulisci();
+  const usciti = [];
+  SB.setProviders({
+    gsb: async (u) => { usciti.push(u); return null; },
+    rdap: async (r) => { usciti.push(`età di ${r}`); return null; },
+    ct: null, llm: null, sandbox: null,
+  });
+  await new Promise((ok) => { SB.analyze('http://192.168.1.1/cgi-bin/luci?stok=0a1b2c3d', {}, ok); setTimeout(ok, 200); });
+  expect(usciti, 'il codice di sessione del router non deve uscire di casa').toEqual([]);
+});
+
 test('caso di riscontro: localhost è già escluso, un indirizzo pubblico in chiaro no', async () => {
   expect(await controlliProfondi('http://localhost:3000/')).toEqual([]);
   expect((await controlliProfondi('http://accesso-giro12.esempio-pubblico.com/login')).length).toBeGreaterThan(0);
