@@ -1,6 +1,7 @@
-// Giro 3 di home-invito: chi scrive nella home prima dei crediti, da ogni strada, e il fornitore «gemini» in chat.
+// Porte ri-provate e chiuse nel giro 3 di home-invito: chi è nuovo e scrive nella home prima dei crediti, da ogni
+// strada, e la chat della home con la configurazione remota ferma su «gemini».
 import { test, expect } from '../../fixtures/electron.mjs';
-import { usaServerFinto, homePage, nuovaHome, prepara, onboardingFatto, riscattaDaCrediti, testoHome } from './_crediti-finti.mjs';
+import { usaServerFinto, homePage, nuovaHome, prepara, onboardingFatto, riscattaDaCrediti } from './_crediti-finti.mjs';
 
 const stato = usaServerFinto(test);
 const BENVENUTO = /Ciao, sono Filo/;
