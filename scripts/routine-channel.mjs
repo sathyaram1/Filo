@@ -28,6 +28,10 @@
 //   fermati: stai ricreando il problema.
 //
 // USO
+//   Nei comandi che usano un biglietto lo si passa davanti oppure con `--ticket <codice>` (o
+//   `--biglietto`); in tutti e due i posti dev'essere lo stesso. Exit 1 = uso sbagliato o nessun
+//   biglietto: il server non è stato chiamato.
+//
 //   node scripts/routine-channel.mjs probe <parola-d-ordine>
 //       → c'è lavoro? Non lega niente. Exit 0 = sì, 2 = niente da fare,
 //         3 = guasto. Da chiedere PRIMA di pagare il setup dell'ambiente.
