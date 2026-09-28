@@ -273,13 +273,14 @@
       // che porta fuori dati del contesto sale a 2 come NAVIGA (`_exfil` lo calcola il main, mai l'LLM).
       level: (a) => (a && a._exfil ? 2 : 1),
       describe: (a) => {
-        const url = (a && (a.url || a.href || a.link)) || 'una pagina';
+        const url = (a && (a.url || a.href || a.link)) || '';
+        if (!url && a && a.scheda) return `Leggere la pagina aperta nella scheda ${a.scheda}`;
         if (a && a._exfil) {
           const why = a._exfilReason ? ` (${a._exfilReason})` : '';
           return `Filo sta per leggere una pagina il cui indirizzo${why}:\n${url}\n\n`
             + 'Potrebbe inviare tuoi dati a un sito esterno. Conferma solo se l\'hai chiesto tu.';
         }
-        return `Leggere la pagina ${url}`;
+        return url ? `Leggere la pagina ${url}` : 'Leggere una pagina';
       },
     },
     LEGGI_TRASPARENZA: {

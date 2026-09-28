@@ -38,6 +38,10 @@ async function stubModello(app, piani) {
           const tutti = esiti.match(new RegExp(s.urlDa, 'g')) || [];
           args.url = tutti[s.indice || 0] || '';
         }
+        if (s.schedaDa) {
+          const m = new RegExp(s.schedaDa).exec(messages.map((x) => String(x.content || '')).join('\n'));
+          args.scheda = m ? Number(m[1]) : 0;
+        }
         return { id: `c${n}_${i}`, name: s.nome, arguments: JSON.stringify(args) };
       });
       for (const c of toolCalls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
@@ -177,6 +181,29 @@ test('una pagina già aperta si legge dalla scheda, così com\'è resa, anche se
   expect(letto).not.toContain('getElementById');
   await page.locator('.dash-activity-head').click();
   await expect(page.locator('.dash-activity-row', { hasText: 'Leggo la pagina: Museo civico' })).toHaveCount(1);
+});
+
+test('«cosa dice la pagina che ho aperto?»: la scheda si indica col suo numero nello stato, e si legge da lì', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await openTab(NEWTAB);
+  const url = testServer.html(`<!doctype html><html><head><title>Ricetta della nonna</title></head><body><main>
+<h1>Torta di mele</h1><p>Per la torta servono 280 grammi di farina, tre uova, due mele renette e una bustina di lievito.
+Si cuoce a 180 gradi per quaranta minuti, finché la superficie non è dorata.</p></main></body></html>`);
+  await app.evaluate((_e, url) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url, background: true }), url);
+  await expect.poll(() => app.windows().some((w) => { try { return w.url() === url; } catch (_) { return false; } }), { timeout: 10_000 }).toBe(true);
+  await app.windows().find((w) => w.url() === url).waitForLoadState('load');
+
+  await reteDiProva(app, { vietata: true });
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', schedaDa: '(\\d+)\\. (?:\\[FOCUS\\] )?Ricetta della nonna' }] },
+    { finale: { cerca: 'servono (\\d+) grammi', testo: 'RISPOSTA: $1 grammi di farina.' } },
+  ]);
+  await chiedi(page, 'quanta farina serve nella ricetta che ho aperto?');
+
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA: 280 grammi di farina.' })).toBeVisible({ timeout: 20_000 });
+  expect(await app.evaluate(() => globalThis.__scaricati.length)).toBe(0);
+  const giri = await chiamate(app);
+  expect(esitiDi(giri[1]).join('\n')).toContain('letta dalla scheda aperta');
 });
 
 test('un indirizzo della rete locale non si scarica: la pagina non arriva al modello e il diario dice perché', async ({ app, openTab, testServer }) => {

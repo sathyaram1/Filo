@@ -270,5 +270,5 @@
     return lines.join('\n');
   }
 
-  global.SN_FILO_STATE = { assemble, renderForPrompt, formatRelativeTime, formatDate };
+  global.SN_FILO_STATE = { assemble, renderForPrompt, formatRelativeTime, formatDate, listTabs };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

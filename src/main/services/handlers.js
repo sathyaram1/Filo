@@ -1771,13 +1771,25 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       case 'LEGGI_PAGINA': {
         // #553 — il testo di una pagina web torna al modello (dalla scheda se è aperta, se no scaricato):
         // prima poteva solo cercare e aprire, e ogni dato DENTRO una pagina restava da indovinare dagli snippet.
-        const url = action.url ?? action.href ?? action.link ?? action.indirizzo ?? '';
+        let url = action.url ?? action.href ?? action.link ?? action.indirizzo ?? '';
         const da = Number(action.da ?? action.offset ?? action.from ?? 0) || 0;
+        // «Cosa dice la pagina che ho aperto?»: nello STATO il modello vede le schede per titolo e numero, non per
+        // indirizzo. Il numero si risolve qui, sullo stesso elenco nello stesso ordine.
+        const numero = Number(action.scheda ?? action.tab ?? 0);
         let r = null;
-        try {
-          r = await PageRead.leggiPagina(url, { da, schede: schedeLeggibili(sender) });
-        } catch (e) {
-          console.warn('[Filo] lettura pagina fallita', e?.message || e);
+        if (!String(url || '').trim() && Number.isInteger(numero) && numero > 0) {
+          let schede = [];
+          try { schede = await globalThis.SN_FILO_STATE.listTabs(); } catch (_) {}
+          const t = schede[numero - 1];
+          if (!t) r = { pageRead: `scheda ${numero}`, ok: false, errore: 'scheda', dettaglio: `nessuna scheda numero ${numero}`, testo: '' };
+          else url = t.url || '';
+        }
+        if (!r) {
+          try {
+            r = await PageRead.leggiPagina(url, { da, schede: schedeLeggibili(sender) });
+          } catch (e) {
+            console.warn('[Filo] lettura pagina fallita', e?.message || e);
+          }
         }
         if (!r) r = { pageRead: String(url == null ? '' : url), ok: false, errore: 'rete', dettaglio: 'lettura non riuscita', testo: '' };
         return { executed: !!r.ok, kept: true, output: r };
@@ -2406,7 +2418,9 @@ function consiglioPaginaNonLetta(out) {
       return 'Il rilevatore di siti pericolosi di Filo l\'ha segnalato: non leggerlo, non proporlo all\'utente come fonte e cercane un\'altra.';
     case 'schema':
     case 'indirizzo':
-      return 'Serve un indirizzo http o https preso dai risultati, dall\'utente o da una pagina letta.';
+      return 'Serve un indirizzo http o https preso dai risultati, dall\'utente o da una pagina letta, oppure il numero di una scheda web in TAB APERTE. Le pagine di Filo non si leggono così.';
+    case 'scheda':
+      return 'Controlla il numero nell\'elenco TAB APERTE dello STATO.';
     case 'http':
       if (stato === 404 || stato === 410) return 'Prova un altro risultato. Non inventare il contenuto.';
       if (stato === 401 || stato === 403 || stato === 429 || stato === 503) {
