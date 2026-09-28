@@ -110,6 +110,26 @@ export function testoRilascioFermo({ tag, oreDallUltima, commitDopoTag, verde, c
   return { titolo: `Pubblicazione ferma da ${giorni} giorni: nessun commit di main con la suite verde`, testo: righe.join('\n') };
 }
 
+/** Titolo e testo del feedback quando un verde c'è ma la pubblicazione non lo fa uscire. PURA. */
+export function testoFermoDopoIlVerde({ tag, oreDallUltima, commitDopoTag, verde, corsaVerde, oreDalVerde, pubblicazioni, esecuzione, erroreApi } = {}) {
+  const giorni = Math.floor((oreDallUltima || 0) / 24);
+  const righe = [
+    `Nessuna versione nuova di Filo da ${giorni} giorni: l'ultima è ${tag}, e da allora su main sono entrati ${commitDopoTag} commit. Un commit con la suite Playwright verde da pubblicare c'è da ${Math.round(oreDalVerde || 0)} ore, quindi la pubblicazione si ferma DOPO aver scelto il commit: nel lavoro per Windows (controlli unit, chiavi di default, numero di versione, costruzione, file nella bozza) o nel passaggio da bozza a pubblicata.`,
+    '',
+    `Il commit verde più nuovo: ${verde}${corsaVerde?.html_url ? ` (${corsaVerde.html_url})` : ''}.`,
+  ];
+  if (erroreApi) righe.push(`Attenzione: le corse non si sono lette tutte (${erroreApi}).`);
+  righe.push('', 'Ultime corse del lavoro di pubblicazione:');
+  const elenco = Array.isArray(pubblicazioni) ? pubblicazioni : [];
+  righe.push(...(elenco.length ? elenco.map((r) => `  ${rigaCorsa(r)}`) : ['  (nessuna letta)']));
+  righe.push(
+    '',
+    'Cosa fare: apri l\'ultima corsa rossa qui sopra e guarda quale passo si ferma. Se è un passo che apre già il suo feedback (controlli unit, chiavi di default), quel feedback esiste ma è fermo: portalo avanti o chiedi all\'owner. Se il passo non apre niente (numero di versione rifiutato o server che non risponde, costruzione fallita, file mancanti nella bozza), il guasto sta tutto qui.',
+  );
+  if (esecuzione) righe.push('', `Registro di questa esecuzione: ${esecuzione}`);
+  return { titolo: `Pubblicazione ferma da ${giorni} giorni: c'è un commit verde ma la versione non esce`, testo: righe.join('\n') };
+}
+
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const gitForse = (...a) => { try { return git(...a); } catch { return ''; } };
 const ghApi = (percorso) => JSON.parse(execFileSync('gh', ['api', percorso], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
