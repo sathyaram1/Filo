@@ -65,7 +65,7 @@
     let url = m;
     let trail = '';
     while (!/&amp;$/.test(url)) {
-      const tm = /(?:&#39;|[.,;:!?*_~…’”»])$/.exec(url);
+      const tm = /(?:&#39;|[.,;:!?*_~…’])$/.exec(url);
       if (tm) { trail = tm[0] + trail; url = url.slice(0, -tm[0].length); continue; }
       const ultimo = url.slice(-1);
       const apre = ultimo === ')' ? '(' : ultimo === ']' ? '[' : '';

@@ -78,6 +78,28 @@ test('#853 l\'apostrofo dentro un URL nudo fa parte del link, quello in coda no'
   assert.match(apici, /&#39;<a [^>]*href="https:\/\/example\.com\/guida"[^>]*>https:\/\/example\.com\/guida<\/a>&#39;\.<\/p>/);
 });
 
+test('#853 dove finisce un URL: i segni attorno restano fuori, le parentesi dell\'URL dentro', () => {
+  const href = (s) => [...render(s).matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+  const casi = [
+    ['Vedi **https://example.com/guida** qui.', 'https://example.com/guida'],
+    ['Vedi *https://example.com/guida*.', 'https://example.com/guida'],
+    ['La pagina «https://example.com/guida» spiega.', 'https://example.com/guida'],
+    ['La pagina “https://example.com/guida”, poi.', 'https://example.com/guida'],
+    ['Continua su https://example.com/guida…', 'https://example.com/guida'],
+    ['Continua su https://example.com/guida’', 'https://example.com/guida'],
+    ['Il pianeta: https://it.wikipedia.org/wiki/Mercurio_(astronomia).', 'https://it.wikipedia.org/wiki/Mercurio_(astronomia)'],
+    ['(vedi https://it.wikipedia.org/wiki/Java_(linguaggio_di_programmazione))', 'https://it.wikipedia.org/wiki/Java_(linguaggio_di_programmazione)'],
+    ['(vedi https://example.com/guida).', 'https://example.com/guida'],
+    ['Il pianeta: [Mercurio](https://it.wikipedia.org/wiki/Mercurio_(astronomia)).', 'https://it.wikipedia.org/wiki/Mercurio_(astronomia)'],
+    ['Dati: https://example.com/a?x=1&y=2.', 'https://example.com/a?x=1&amp;y=2'],
+  ];
+  for (const [testo, atteso] of casi) assert.deepEqual(href(testo), [atteso], testo);
+  const grassetto = render('Vedi **https://example.com/guida** qui.');
+  assert.match(grassetto, /<strong><a [^>]*>https:\/\/example\.com\/guida<\/a><\/strong>/);
+  assert.match(render('La pagina «https://example.com/guida» spiega.'), /«<a [^>]*>https:\/\/example\.com\/guida<\/a>»/);
+  assert.match(render('Il pianeta: [Mercurio](https://it.wikipedia.org/wiki/Mercurio_(astronomia)).'), /<\/a>\.<\/p>/);
+});
+
 // ─── sicurezza: contenuto NON FIDATO, niente link verso l'interno dell'app ───
 
 test('#418 un link filo:// (pagina interna) NON diventa cliccabile', () => {
