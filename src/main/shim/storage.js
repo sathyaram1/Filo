@@ -115,6 +115,11 @@ function runIncognito(fn) {
   return als.run({ incognito: true }, fn);
 }
 
+// Il contrario di runIncognito: una scrittura che appartiene alla finestra normale anche se parte da una incognito.
+function fuoriIncognito(fn) {
+  return als.exit(fn);
+}
+
 // Azzera l'overlay incognito. Chiamato dalla chiusura dell'ultima finestra
 // incognito: nulla di ciò che è stato navigato/scritto sopravvive.
 function resetIncognito() {
@@ -374,6 +379,7 @@ module.exports = {
   maxFlushOverlap,
   setSync,
   runIncognito,
+  fuoriIncognito,
   resetIncognito,
   inIncognito,
 };

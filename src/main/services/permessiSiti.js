@@ -267,6 +267,12 @@ function urlDiRiferimento(wc, dettagli) {
   return urlDi(wc) || String(d.requestingUrl || '');
 }
 
+// Conta chi chiede, non chi ospita: un riquadro web dentro una pagina filo:// resta un sito.
+function daFilo(wc, dettagli) {
+  const richiedente = String((dettagli && dettagli.requestingUrl) || '');
+  return richiedente ? P.eFilo(richiedente) : P.eFilo(urlDi(wc));
+}
+
 function richiesta(ses, wc, permesso, dettagli, callback) {
   let risposto = false;
   const rispondi = (ok) => {
@@ -276,8 +282,8 @@ function richiesta(ses, wc, permesso, dettagli, callback) {
   };
   try {
     if (permesso === 'fullscreen' && vetoSchermoIntero(wc)) return rispondi(false);
+    if (daFilo(wc, dettagli)) return rispondi(true);
     const url = urlDiRiferimento(wc, dettagli);
-    if (P.eFilo(url) || (!url && P.eFilo(urlDi(wc)))) return rispondi(true);
     const { innocuo, tipi } = P.tipiRichiesta(permesso, dettagli);
     if (innocuo) return rispondi(true);
     const origine = P.origineDi(url);
@@ -301,8 +307,8 @@ function richiesta(ses, wc, permesso, dettagli, callback) {
 function controllo(ses, wc, permesso, origineRichiesta, dettagli) {
   try {
     const d = dettagli || {};
-    const url = urlDi(wc) || String(d.requestingUrl || origineRichiesta || '');
-    if (P.eFilo(url)) return true;
+    if (daFilo(wc, d)) return true;
+    const url = urlDiRiferimento(wc, d) || String(origineRichiesta || '');
     const origine = P.origineDi(url);
     if (!origine) return P.INNOCUI.has(permesso);
     const { tipi } = P.tipiRichiesta(permesso, d);
@@ -375,7 +381,7 @@ function segnaIncognito(ses) { if (ses) stato.sessioniIncognito.add(ses); }
 
 // ── risposte e modifiche dall'interfaccia ───────────────────────────────────
 
-function rispondi(id, scelta) {
+function rispondiDomanda(id, scelta) {
   const v = stato.attese.get(String(id || ''));
   if (!v) return { ok: false, error: 'not_found' };
   if (scelta !== 'consenti' && scelta !== 'nega' && scelta !== 'ignora') return { ok: false, error: 'bad_choice' };
@@ -451,7 +457,7 @@ module.exports = {
   segnaIncognito,
   carica,
   inAttesaPer,
-  rispondi,
+  rispondi: rispondiDomanda,
   imposta,
   dimentica,
   elenco,

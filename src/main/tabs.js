@@ -12,6 +12,7 @@ const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
 const { installSafebrowse } = require('./tabs/tabSafebrowse');
 const { installGeoBlock } = require('./tabs/tabGeoBlock');
+const Permessi = require('./services/permessiSiti');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -57,50 +58,6 @@ const ESC_ATTESA_PAGINA_CHE_RISPONDE_MS = 2500;
 // il budget di chi usa Filo, che i riquadri li impila davvero (#648). Il conto
 // sta qui, dove arriva l'input vero: nella pagina un evento finto lo azzerava.
 const ESC_RIVENDICAZIONI_MAX = 10;
-
-// #514 — la scheda a cui appartiene una WebContents, in qualunque finestra. La
-// sessione è condivisa fra finestre e schede, mentre "l'ultimo tasto era l'Esc"
-// è una cosa della singola scheda: il gestore dei permessi deve poter risalire
-// dall'una all'altra.
-function tabDiWebContents(wc) {
-  try {
-    for (const w of BrowserWindow.getAllWindows()) {
-      const tm = w._filoTabs;
-      if (!tm || !Array.isArray(tm.tabs)) continue;
-      const t = tm.tabs.find((x) => {
-        const c = x && x.view && x.view.webContents;
-        return c && !c.isDestroyed() && c.id === wc.id;
-      });
-      if (t) return t;
-    }
-  } catch (_) {}
-  return null;
-}
-
-// #514 — l'Esc NON è un gesto con cui una pagina può prendersi lo schermo.
-// Da quando il tasto arriva al documento (serve: è quello che chiude i riquadri
-// aperti sopra la pagina, e prendercelo prima li scavalcava), il browser lo
-// conta come gesto dell'utente. Una pagina che chiede lo schermo pieno dentro
-// il proprio gestore dell'Esc lo otteneva senza che nessuno avesse cliccato
-// niente: da lì il tasto di questa segnalazione diventava un testa o croce —
-// un Esc esce, il successivo rientra — perché la modalità tornava "della
-// pagina" e l'Esc dopo era suo. Si rifiuta qui, prima che succeda qualsiasi
-// cosa: un evento di uscita non può essere il permesso per entrare. Su ogni
-// altro permesso si resta al comportamento di prima (senza gestore, Electron
-// concede), e questo è il motivo del `callback(true)` finale.
-function installaPermessi(ses) {
-  if (!ses || ses._filoPermessi) return;
-  ses._filoPermessi = true;
-  try {
-    ses.setPermissionRequestHandler((wc, permission, callback) => {
-      if (permission === 'fullscreen') {
-        const t = tabDiWebContents(wc);
-        if (t && t._ultimoInputEsc) { callback(false); return; }
-      }
-      callback(true);
-    });
-  } catch (_) {}
-}
 
 // #252 — pagina interna filo:// "singleton": ne ha senso UNA sola scheda alla
 // volta (le liste "Aperti per dopo"/Cronologia/Archivio/Scaricamenti, le
@@ -714,7 +671,6 @@ class TabManager {
     try {
       require('./services/downloads').attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
     } catch (_) {}
-    installaPermessi(view.webContents.session);
     return view;
   }
 
@@ -1778,7 +1734,7 @@ class TabManager {
     // non copriva davvero lo schermo. Riusiamo la stessa modalità del menu
     // (view a tutta finestra + fullscreen OS), marcandola come page-initiated.
     // Qui la richiesta è già passata: chi non doveva ottenerla si ferma prima,
-    // nel gestore dei permessi della sessione (#514, `installaPermessi`). Non
+    // nel gestore dei permessi della sessione (#514, services/permessiSiti.js). Non
     // si rifiuta da qui perché quando questo evento arriva la finestra è già a
     // tutto schermo e la modalità è già stata adottata.
     wc.on('enter-html-full-screen', () => {
@@ -2544,6 +2500,8 @@ class TabManager {
         // Proxy per-tab ("Apri da un altro paese"): { country, tier } o null.
         // La shell lo userà per l'indicatore sulla tab (feedback UI separato).
         proxy: t.proxy ? { country: t.proxy.country, tier: t.proxy.tier } : null,
+        // Le domande di permesso che la pagina aspetta: la barra le mostra sulla scheda attiva.
+        permessi: Permessi.inAttesaPer(t.view && t.view.webContents),
       })),
     };
   }

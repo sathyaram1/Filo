@@ -281,6 +281,23 @@
     // Il broadcast raggiunge anche le schede di siti esterni: mandarci i dati
     // esporrebbe i percorsi ASSOLUTI su disco, quindi qui viaggia solo il tipo.
     DOWNLOADS_UPDATED: 'downloads_updated',
+    // Permessi che i siti chiedono (fotocamera, posizione, notifiche…). RISERVATI alle superfici interne
+    // (shell + filo://): chi li chiama decide cosa un sito può fare; da origine http(s) rispondono 'forbidden'.
+    // Scelte ricordate. { tabId? } → { ok, siti: [{ origine, host, scelte: { tipo: 'consenti'|'nega' } }] }
+    SITE_PERMISSIONS_LIST: 'site_permissions_list',
+    // Le scelte del sito aperto in una scheda (col suo ambito: incognito o no). { tabId } → { ok, sito }
+    SITE_PERMISSIONS_OF_TAB: 'site_permissions_of_tab',
+    // Cambia o dimentica (scelta null) una scelta. { origine, tipo, scelta, tabId? } → { ok }
+    SITE_PERMISSION_SET: 'site_permission_set',
+    // Dimentica tutte le scelte di un sito. { origine, tabId? } → { ok }
+    SITE_PERMISSIONS_FORGET: 'site_permissions_forget',
+    // Risposta alla domanda in attesa sulla scheda. { id, scelta: 'consenti'|'nega'|'ignora' } → { ok }
+    SITE_PERMISSION_ANSWER: 'site_permission_answer',
+    // Broadcast senza contenuto alle superfici interne: le scelte sono cambiate, rileggile.
+    SITE_PERMISSIONS_UPDATED: 'site_permissions_updated',
+    // APERTO ai content script, di proposito: Filo sta per leggere gli appunti (Incolla) o il microfono
+    // (Detta) per conto dell'utente, non del sito. Vale secondi e solo per quella scheda. { tipo } → { ok }
+    PERMESSO_FILO: 'permesso_filo',
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
     TEST_PROVIDER: 'test_provider',                 // { provider, apiKey, model? }

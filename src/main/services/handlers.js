@@ -3309,6 +3309,7 @@ require('./handlers/scryfall')(on, handlerCtx);
 require('./handlers/safebrowse')(on, handlerCtx);
 require('./handlers/redteam')(on, handlerCtx);
 require('./handlers/misc')(on, handlerCtx);
+require('./handlers/permessi')(on, handlerCtx);
 
 // ─── handler centrale richiamato dall'IPC ───────────────────────────────────
 

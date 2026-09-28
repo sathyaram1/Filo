@@ -39,6 +39,10 @@ try {
 require('./shim/chrome-api');
 require('./services/loader');
 
+// Prima di qualsiasi sessione: ognuna, anche le partizioni che nasceranno dopo, parte coi gestori dei permessi.
+const Permessi = require('./services/permessiSiti');
+Permessi.installaOvunque(app, session);
+
 // Solo in test: esponi i singleton di handlers/defaults su globalThis così i
 // test Playwright (che girano nel main via app.evaluate, dove `require` non è
 // iniettato) possono esercitare la catena reale chiave-condivisa → motore. Va
@@ -58,6 +62,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
     globalThis.__filoShortcuts = require('./shortcuts');
+    globalThis.__filoPermessi = Permessi;
   } catch (_) {}
 }
 
@@ -174,6 +179,7 @@ function configureSpellchecker() {
 }
 
 app.whenReady().then(async () => {
+  Permessi.carica();
   await registerFiloProtocol();
   registerIpcHandlers();
   configureSpellchecker();

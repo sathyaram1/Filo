@@ -155,6 +155,8 @@ function createIncognitoWindow() {
   // da quella normale e da eventuali altre finestre incognito.
   const partition = 'filo-incognito-' + randomUUID();
   const ses = session.fromPartition(partition);
+  // Le scelte sui permessi fatte qui restano in RAM e muoiono con la finestra.
+  require('./services/permessiSiti').segnaIncognito(ses);
   // filo:// è registrato globalmente solo sulla sessione di default: i tab di
   // questa partizione non lo vedrebbero. Registriamolo qui.
   registerFiloProtocolForSession(ses);
