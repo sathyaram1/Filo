@@ -199,6 +199,27 @@ function fileNelTesto(e, radice) {
   return '';
 }
 
+/**
+ * Il file di tests/ di un errore fuori dai casi, relativo alla radice, o ''. Quello che il testo nomina (per un file
+ * che non si carica è lo spec, anche se l'errore sta in un aiuto); se non ne nomina, lo spec dell'ultimo test del
+ * worker. PURA.
+ */
+export function fileDellErrore(e, radice = ROOT) {
+  const ultimo = ultimoTestDelWorker(e);
+  return fileNelTesto(e, radice) || (ultimo ? `tests/${ultimo.spec}.spec.mjs` : '');
+}
+
+/**
+ * Il caso dopo il quale si è fermato il worker di un errore che il testo non lega a nessun file, se quel caso è
+ * rosso o ripassato solo ai tentativi: l'errore è il suo strascico, non un guasto a sé. null altrimenti. PURA.
+ */
+export function casoDelloStrascico(e, casi, radice = ROOT) {
+  const ultimo = ultimoTestDelWorker(e);
+  if (!ultimo || fileNelTesto(e, radice)) return null;
+  return (Array.isArray(casi) ? casi : []).find((c) => normalizzaSpec(c.spec) === ultimo.spec && c.riga === ultimo.riga
+    && (c.stato === 'unexpected' || c.stato === 'flaky')) || null;
+}
+
 /** La chiave dell'allarme di un file di tests/: quella dei suoi casi se è uno spec. PURA. */
 export function chiaveDelFile(file) {
   return /\.spec\.m?js$/.test(file) ? `suite:tests/${normalizzaSpec(file)}.spec.mjs` : `suite:${file}`;
