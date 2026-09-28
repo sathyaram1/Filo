@@ -14,6 +14,14 @@ export const SOGLIA_ORE = 48;
 export const SOGLIA_VERDE_ORE = 12;
 export const CHIAVE_FERMO = 'rilascio:fermo';
 export const CHIAVE_FERMO_DOPO_VERDE = 'rilascio:fermo-dopo-il-verde';
+
+/**
+ * La chiave di un fermo: il tipo e la versione a cui la pubblicazione è ferma. Un fermo dopo una versione uscita è un
+ * guasto nuovo, e il feedback del fermo di prima rimasto aperto (parcheggiato, come #569) non deve assorbirlo. PURA.
+ */
+export function chiaveDelFermo(tipo, tag) {
+  return tag ? `${tipo}:${tag}` : tipo;
+}
 const EVENTI = new Set(['push', 'workflow_dispatch']);
 const PROFONDITA = 3000;
 
