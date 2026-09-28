@@ -128,6 +128,9 @@ test('Ricevuti: aprire la pratica mostra la conversazione intera, il rombo verde
   await expect(pannello(page)).toContainText('DOMANDA-L3');
   await expect(pannello(page)).toContainText('27/09/2026');
   await expect(pannello(page)).not.toContainText('non è ancora arrivato');
+  await page.screenshot({ path: 'tests/.shots/locale-batchget-nomi-chiaro.png' });
+  await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
+  await page.screenshot({ path: 'tests/.shots/locale-batchget-nomi-scuro.png' });
 
   const richieste = await app.evaluate(() => globalThis.__fs.richieste);
   expect(richieste.flat().some((n) => n.endsWith(`/feedback/${ID}`))).toBe(true);
