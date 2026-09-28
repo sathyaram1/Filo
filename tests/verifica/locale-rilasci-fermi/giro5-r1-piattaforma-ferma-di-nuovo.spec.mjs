@@ -2,7 +2,7 @@
 // anche se quello del suo guasto di prima è ancora aperto (parcheggiato). Server degli allarmi e GitHub finti.
 import { test, expect } from '@playwright/test';
 import { createServer } from 'node:http';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
