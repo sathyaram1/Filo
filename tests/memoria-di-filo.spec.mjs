@@ -291,3 +291,49 @@ test('da un sito visitato «dimentica» non parte e non mostra righe della memor
   expect(JSON.stringify(out.r)).not.toContain('Si chiama Marta');
   expect(out.dopo).toBe('Si chiama Marta');
 });
+
+// Unicode ha caratteri che a schermo non si disegnano e che il modello legge
+// come lettere: la lezione confermata è quella che si legge nel popup (#592).
+test('una lezione con una parte invisibile si salva per quello che il popup mostra', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  const tag = (s) => Array.from(s).map((c) => String.fromCodePoint(0xE0000 + c.codePointAt(0))).join('');
+  const visibile = 'L’utente non beve caffè.';
+  await fakeProvider(app, [salva(visibile + tag(OSTILE)), { text: 'Te lo faccio confermare.' }]);
+  await page.locator('#input').fill('ricordati che non bevo caffè');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  expect((await confirmState(page)).text).toContain(`«${visibile}»`);
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => lezioni(app), { timeout: 5_000 }).toEqual([visibile]);
+  await restore(app);
+});
+
+// Fra il popup e l'OK la memoria può cambiare (una lezione scritta da un'altra
+// scheda, un riordino): l'OK vale per le righe mostrate (#592).
+test('«dimentica»: righe arrivate mentre il popup è aperto restano, anche se contengono la stessa parola', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    await M.setMemory({ PROFILO: 'Si chiama Marta', PREFERENZE: '' });
+    await M.appendLesson('L’utente non beve caffè.');
+  });
+  await fakeProvider(app, [dimentica('caffè'), { text: 'Te lo faccio confermare.' }]);
+  await page.locator('#input').fill('dimentica la storia del caffè');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  expect((await confirmState(page)).text).toContain('L’utente non beve caffè.');
+
+  const nuove = ['Al bar ordina un caffè d’orzo per la madre.', 'Il caffè in ufficio lo paga Luca.', 'Il martedì porta il caffè ai colleghi.'];
+  await app.evaluate(async (_e, righe) => {
+    for (const r of righe) await globalThis.SN_FILO_MEMORY.appendLesson(r);
+  }, nuove);
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => lezioni(app), { timeout: 5_000 }).toEqual(nuove);
+  await restore(app);
+});
