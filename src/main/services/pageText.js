@@ -7,21 +7,26 @@
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
 // Il loro contenuto è testo crudo fino alla chiusura: un «<» lì dentro non apre un tag.
 const RAW = new Set(['script', 'style', 'textarea', 'title', 'noscript', 'xmp', 'iframe', 'noembed', 'noframes']);
-// Mai testo da leggere, in nessuna modalità.
+// Mai testo da leggere, in nessuna modalità. Immagini, bottoni e tendine hanno una regola loro in `scrivi`.
 const MAI = new Set([
   'head', 'script', 'style', 'noscript', 'template', 'svg', 'math', 'canvas', 'iframe', 'object', 'embed',
-  'video', 'audio', 'img', 'picture', 'input', 'select', 'textarea', 'button', 'option', 'datalist', 'link', 'meta',
-  'title', 'noembed', 'noframes', 'xmp', 'map',
+  'video', 'audio', 'picture', 'textarea', 'datalist', 'link', 'meta', 'title', 'noembed', 'noframes', 'xmp', 'map',
 ]);
-// Contorno del sito: via nella lettura stretta, tenuto in quella larga (vedi `estrai`).
-const CONTORNO_TAG = new Set(['nav', 'aside', 'menu']);
-const CONTORNO_RUOLI = new Set(['navigation', 'banner', 'contentinfo', 'complementary', 'search', 'menu', 'menubar', 'toolbar', 'dialog', 'alertdialog', 'tooltip']);
-const CONTORNO_NOMI = new Set([
-  'nav', 'navbar', 'navigation', 'menu', 'menubar', 'mainmenu', 'breadcrumb', 'breadcrumbs', 'cookie', 'cookies',
-  'consent', 'gdpr', 'ad', 'ads', 'advert', 'adverts', 'advertisement', 'adsbygoogle', 'sponsor', 'sponsored', 'promo',
-  'newsletter', 'subscribe', 'share', 'sharing', 'social', 'related', 'recommended', 'popup', 'modal', 'sidebar',
-  'widget', 'skiplink', 'sronly', 'visuallyhidden', 'screenreadertext',
-]);
+// Il NOME di un riquadro decide solo l'ordine (il contorno va in coda), mai il cestino: gli stessi nomi stanno sul
+// contenuto (il listino «menu», il piè di pagina con gli orari, i piani «subscribe»). Nel cestino va solo la
+// navigazione fatta di link, la pubblicità e il banner dei cookie. Prove in tests/unit/pageText.test.mjs.
+const NAV_TAG = new Set(['nav', 'menu']);
+const NAV_RUOLI = new Set(['navigation', 'menu', 'menubar']);
+const NAV_NOMI = new Set(['nav', 'navbar', 'navigation', 'menu', 'menubar', 'mainmenu', 'breadcrumb', 'breadcrumbs', 'share', 'sharing', 'social']);
+const CESTINO_NOMI = new Set(['ad', 'ads', 'advert', 'adverts', 'advertisement', 'adsbygoogle', 'cookie', 'cookies', 'consent', 'gdpr', 'skiplink']);
+const CODA_TAG = new Set(['aside']);
+const CODA_RUOLI = new Set(['banner', 'contentinfo', 'complementary', 'search', 'toolbar', 'dialog', 'alertdialog', 'tooltip']);
+const CODA_NOMI = new Set(['promo', 'newsletter', 'subscribe', 'related', 'recommended', 'popup', 'modal', 'sidebar', 'widget', 'sponsor', 'sponsored']);
+// Quanta parte del testo di una navigazione dev'essere link perché sia solo navigazione.
+const QUOTA_LINK = 0.6;
+const CESTINO = 1;
+const CODA = 2;
+const CHIUSO = 3;
 const PREFISSI = new Set(['site', 'main', 'top', 'primary', 'global', 'page', 'js', 'is', 'c', 'l', 'o', 'u', 'm']);
 const SUFFISSI = new Set(['bar', 'wrapper', 'wrap', 'container', 'area', 'box', 'block', 'links', 'list', 'section', 'banner', 'notice', 'overlay', 'inner', 'outer', 'holder', 'slot', 'unit']);
 const MAI_SALTARE = new Set(['html', 'body', 'main', 'article']);
