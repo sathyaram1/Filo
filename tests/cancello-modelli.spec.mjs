@@ -86,15 +86,17 @@ test('sotto il limite le stesse chiamate partono e il loro costo entra nel conte
       const SB = globalThis.SN_SAFEBROWSE;
       SB.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null });
       SB._caches.llmCache.m.clear();
-      // Sottodomini sempre nuovi dello stesso dominio: un giudizio solo.
-      await Promise.all([1, 2, 3, 4, 5].map((i) => new Promise((ok) => {
+      // Sottodomini sempre nuovi dello stesso dominio: qualche giudizio all'ora, non uno per sottodominio.
+      await Promise.all([1, 2, 3, 4, 5, 6, 7, 8].map((i) => new Promise((ok) => {
         SB.analyze(`http://r${i}x.cancello-prova.test/`, {}, ok);
         setTimeout(ok, 1500);
       })));
     });
     const chiamate = await app.evaluate(() => globalThis.__cancello.chiamate.slice());
     expect(chiamate.filter((c) => c === 'testo')).toHaveLength(1);
-    expect(chiamate.filter((c) => c === 'giudice')).toHaveLength(1);
+    const tetto = await app.evaluate(() => globalThis.SN_SAFEBROWSE.DEEP_BUDGET);
+    expect(tetto).toBeLessThan(8);
+    expect(chiamate.filter((c) => c === 'giudice')).toHaveLength(tetto);
     expect(await spesaPer(app, 'geoblock_classify')).toBeGreaterThan(0);
     expect(await spesaPer(app, 'safebrowse_judge')).toBeGreaterThan(0);
   } finally {
