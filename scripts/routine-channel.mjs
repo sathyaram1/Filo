@@ -821,8 +821,10 @@ export function bigliettoAMano(cmd, args, dato) {
     const nonIntento = cmd === 'deliver' && lista.length > 0 && !INTENTI_CONSEGNA.includes(lista[0]);
     if (!nonIntento) return { args: [b, ...lista] };
     // Una parola sola davanti a una consegna che non è un intento: storto o secondo biglietto. Dirlo
-    // giusto conta, «due biglietti» manda a cercare un guasto che non c'è.
-    if (!looksLikeTicket(lista[0])) return { errore: testoIntentoNonCapito(lista[0]) };
+    // giusto conta, «due biglietti» manda a cercare un guasto che non c'è: è un biglietto solo se ne ha
+    // la forma lunga («revision_capability» ha quella corta, e resta un intento storto).
+    if (!haFormaDiBigliettoVero(lista[0])) return { errore: testoIntentoNonCapito(lista[0]) };
+    return { errore: `Due biglietti diversi (${String(lista[0]).slice(0, 12)}… e --ticket ${b.slice(0, 12)}…), e manca l'intento: non ho fatto niente. Passa un biglietto solo, e dopo l'intento (${INTENTI_CONSEGNA.join(', ')}).` };
   }
   return { errore: `Due biglietti diversi (${String(lista[0]).slice(0, 12)}… e --ticket ${b.slice(0, 12)}…): non ho fatto niente. Passane uno solo.` };
 }
