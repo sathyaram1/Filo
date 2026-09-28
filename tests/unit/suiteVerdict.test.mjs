@@ -157,6 +157,20 @@ describe('le funzioni pure', () => {
     assert.throws(() => leggiArgomenti(['r.json', '--boh']), /non capita/);
     assert.throws(() => leggiArgomenti(['r.json', '--out']), /vuole un percorso/);
   });
+
+  // Una chiave per spec, non per caso: dieci casi rotti dalla stessa modifica
+  // sono un guasto, e il server non deve aprire dieci feedback.
+  test('le chiavi dell\'allarme: una per spec con rossi nuovi, e una per gli errori fuori dai casi', () => {
+    const v = verdetto(jsonSintetico(), NOTI.contenitore.specs);
+    assert.deepEqual(chiaviDelVerdetto(v), ['suite:tests/delta.spec.mjs'], 'i rossi noti coperti non sono chiavi');
+    const due = { nuovi: [
+      { spec: 'delta', titolo: 'a' }, { spec: 'delta', titolo: 'b' }, { spec: 'tests\\wallet-credits.spec.mjs', titolo: 'c' },
+      { spec: FUORI_DAI_CASI, titolo: 'Error: Cannot find module' }, { spec: FUORI_DAI_CASI, titolo: 'altro' },
+    ] };
+    assert.deepEqual(chiaviDelVerdetto(due), ['suite:tests/delta.spec.mjs', 'suite:tests/wallet-credits.spec.mjs', 'suite:fuori-dai-casi']);
+    assert.deepEqual(chiaviDelVerdetto(verdetto(jsonSintetico({ conNuovo: false }), NOTI.contenitore.specs)), []);
+    assert.deepEqual(chiaviDelVerdetto(undefined), []);
+  });
 });
 
 describe('lo script da riga di comando', () => {
