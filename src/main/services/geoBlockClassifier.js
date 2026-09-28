@@ -278,16 +278,19 @@ function createCache({ ttlMs = 6 * 60 * 60 * 1000, now = Date.now, max = 500 } =
 const pendingByCache = new WeakMap();
 
 // Una pagina della rete di casa non è mai bloccata per paese, e il suo testo non esce di casa (#591).
-function isHomeNetwork(host) {
+async function isHomeNetwork(host) {
   const U = globalThis.SN_URL_NAV || (require('../../shared/urlNav.js'), globalThis.SN_URL_NAV);
-  return Boolean(U && U.isHomeNetworkHost(host));
+  if (!U) return false;
+  const pending = U.homeNetworkPending && U.homeNetworkPending(host);
+  if (pending) await pending;
+  return U.isHomeNetworkHost(host);
 }
 
 async function classify(input = {}, { complete, cache, now = Date.now, signal } = {}) {
   const { title, text, statusCode, host, url } = input;
 
   // 1) Gate: se non è un caso ambiguo, non chiamare il modello.
-  if (!shouldClassify({ statusCode, text, deterministicHit: input.deterministicHit }) || isHomeNetwork(host)) {
+  if (!shouldClassify({ statusCode, text, deterministicHit: input.deterministicHit }) || await isHomeNetwork(host)) {
     return { class: null, route: routeForClass(null), cached: false, skipped: true };
   }
 

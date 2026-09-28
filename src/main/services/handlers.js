@@ -3414,6 +3414,13 @@ async function handleMessage(msg, sender = {}) {
 
 // Una pagina della rete di casa (router, NAS, localhost) non va ai lavori automatici col modello (#591).
 const isHomeNetworkUrl = (url) => Boolean(url && globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.isHomeNetworkUrl(url));
+async function isHomeNetworkUrlSettled(url) {
+  let host = '';
+  try { host = new URL(String(url)).hostname; } catch (_) {}
+  const pending = host && globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.homeNetworkPending(host);
+  if (pending) await pending;
+  return isHomeNetworkUrl(url);
+}
 
 // §2.1 — decisione LLM di triage tab. Riceve i metadati/segnali di TUTTE le tab
 // candidate + (opz.) un estratto del contenuto e la memoria a lungo termine, e
@@ -3853,7 +3860,7 @@ async function enrichArchivedTab(id, payload) {
     if (!id) return;
     // Riassunto e indice passano dal modello: una pagina della rete di casa resta in casa (#591). Il segno resta sulla
     // voce, perché dopo un riavvio Filo non sa più da dove aveva risposto un nome come tplinkwifi.net.
-    if (payload && typeof payload === 'object' && isHomeNetworkUrl(payload.url)) {
+    if (payload && typeof payload === 'object' && await isHomeNetworkUrlSettled(payload.url)) {
       await ArchivedTabs.update(id, { casa: true });
       return;
     }
