@@ -227,6 +227,11 @@
     box.appendChild(p);
   }
 
+  function scrivibile(el) {
+    if (!el || el.disabled || el.readOnly) return false;
+    return el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|url|tel|password)?$/i.test(el.getAttribute('type') || ''));
+  }
+
   // Si conferma quello che si è visto (#592): se il testo non sta nel riquadro,
   // `visto()` resta falso finché non lo si fa scorrere fino in fondo. È la regola
   // sul riquadro, non su un carattere: righe innocue o disegnate vuote non
