@@ -231,7 +231,7 @@ async function main() {
       tag, oreDallUltima, commitDopoTag, verde, corsaVerde, oreDalVerde, pubblicazioni, esecuzione, erroreApi,
     });
     console.log(`::error::${titolo}`);
-    if (!(await spedisciAllarme(titolo, testo, [CHIAVE_FERMO_DOPO_VERDE]))) {
+    if (!(await spedisciAllarme(titolo, testo, [chiaveDelFermo(CHIAVE_FERMO_DOPO_VERDE, tag)]))) {
       console.log('::error::l\'allarme della pubblicazione ferma non è partito: il guasto resta solo in questa corsa.');
     }
   }
