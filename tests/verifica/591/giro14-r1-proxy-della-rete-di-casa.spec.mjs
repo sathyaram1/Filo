@@ -74,7 +74,7 @@ test('dietro un proxy della rete locale un sito di internet riceve ancora i cont
     const regole = `http=${privato || '127.0.0.1'}:${proxy.address().port}`;
     const dietro = await controlliPartiti(app, openTab, url.replace(/\/(\d+)$/, '/$1?via=proxy'), regole);
     const annotato = dietro.annotati.filter((r) => r.startsWith(host + ' ')).pop() || '';
-    expect(annotato.endsWith(' ' + (privato || '127.0.0.1')),
+    expect.soft(annotato.endsWith(' ' + (privato || '127.0.0.1')),
       `l'indirizzo annotato per ${host} non deve essere quello del proxy (${annotato})`).toBe(false);
     if (privato) {
       expect(dietro.fuori.length, `dietro il proxy ${privato} lo stesso sito di internet non riceve nessun controllo`).toBeGreaterThan(0);
