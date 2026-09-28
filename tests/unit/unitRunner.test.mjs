@@ -1,29 +1,15 @@
-// La sentinella del lanciatore degli unit test.
-//
-// PERCHÉ ESISTE
-//   Dal 18/08/2026 la pubblicazione agli utenti si è fermata per giorni, e non
-//   perché un test fosse rosso: `npm run test:unit` era
-//   `node --test "tests/unit/**/*.test.mjs"`, e quel glob lo espande QUALCUNO —
-//   in locale Node 22, sul runner della pubblicazione (Node 20, bash su
-//   Windows) nessuno. Là Node cercava un file chiamato letteralmente
-//   `tests\unit\**\*.test.mjs`, non lo trovava, e usciva con errore: cancello
-//   rosso, nessuna versione pubblicata, e in locale tutto verde — quindi
-//   invisibile.
-//
-//   Questi test sorvegliano due cose diverse:
-//     1) che il comando NON torni a dipendere dall'espansione di una shell
-//        (è l'unico modo per accorgersene senza avere un runner sottomano);
-//     2) che il lanciatore trovi davvero tutti i file, anche in sottocartelle,
-//        e funzioni lanciato da una cartella qualsiasi.
+// Sentinella del lanciatore degli unit test: il comando non dipende da un glob da espandere (sul runner Node 20 non
+// lo espande nessuno), trova tutti i file da qualunque cartella, e la riga di comando sta nel tetto di Windows (#765).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
-import { join, dirname, resolve, isAbsolute } from 'node:path';
+import { join, dirname, resolve, isAbsolute, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-import { collectTestFiles, isTestFile, UNIT_DIR, REPO_ROOT } from '../../scripts/run-unit-tests.mjs';
+import { collectTestFiles, isTestFile, UNIT_DIR, REPO_ROOT, gruppiDiLancio, perLaRiga } from '../../scripts/run-unit-tests.mjs';
+import { costoArgomentoWindows } from '../../scripts/lib/riga-di-comando.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -128,5 +114,84 @@ describe('il lanciatore lanciato da fuori', () => {
       assert.equal(r.status, 1, 'una suite vuota deve fallire');
       assert.match(r.stderr, /nessun file/);
     } finally { rmSync(vuota, { recursive: true, force: true }); }
+  });
+});
+
+// Windows rifiuta una riga oltre 32.767 caratteri (CreateProcess): prima ogni file era un percorso assoluto, e in una
+// cartella di lavoro dal nome lungo `npm run test:unit` usciva con ENAMETOOLONG senza eseguire niente.
+const TETTO_WINDOWS = 32767;
+const lunghezzaRiga = (gruppo, flags = []) =>
+  [process.execPath, '--test', ...flags, ...gruppo].reduce((n, a) => n + costoArgomentoWindows(a), 0);
+
+describe('la riga di comando sta nel tetto di Windows', () => {
+  test('la riga non cresce col percorso della cartella di lavoro', () => {
+    const veri = collectTestFiles();
+    const corta = gruppiDiLancio(veri);
+    const lunga = 'C:\\Users\\agenti AI\\Documents\\Filo\\.claude\\worktrees\\' + 'nome-lunghissimo-'.repeat(12);
+    const altrove = resolve(lunga);
+    const spostati = veri.map((f) => join(altrove, relative(REPO_ROOT, f)));
+    assert.deepEqual(gruppiDiLancio(spostati, { root: altrove }), corta, 'stessi gruppi, stessi argomenti, qualunque sia la root');
+    for (const g of corta) for (const f of g) assert.ok(!isAbsolute(f) && f.startsWith('tests/unit/'), `argomento non relativo: ${f}`);
+  });
+
+  test('ogni gruppo sta nel tetto, e insieme sono tutti i file nell’ordine', () => {
+    const veri = collectTestFiles();
+    const tanti = Array.from({ length: 4000 }, (_, i) => join(UNIT_DIR, `prova-${String(i).padStart(4, '0')}-${'x'.repeat(30)}.test.mjs`));
+    for (const files of [veri, tanti]) {
+      const flags = ['--test-reporter=spec', '--test-name-pattern=una "frase" con spazi'];
+      const gruppi = gruppiDiLancio(files, { flags });
+      assert.deepEqual(gruppi.flat(), files.map((f) => perLaRiga(f)), 'nessun file perso, duplicato o spostato');
+      for (const g of gruppi) assert.ok(lunghezzaRiga(g, flags) <= TETTO_WINDOWS, `riga di ${lunghezzaRiga(g, flags)} caratteri`);
+    }
+    assert.ok(gruppiDiLancio(tanti).length > 1, '4.000 file non stanno in una riga sola');
+  });
+
+  test('con la suite di oggi un gruppo solo: l’uscita resta quella di un `node --test` qualunque', () => {
+    assert.equal(gruppiDiLancio(collectTestFiles()).length, 1);
+  });
+
+  test('un file fuori dalla root resta assoluto, e le barre sono quelle normali', () => {
+    const fuori = resolve(REPO_ROOT, '..', 'altrove', 'a.test.mjs');
+    assert.equal(perLaRiga(fuori), fuori);
+    assert.equal(perLaRiga(join(REPO_ROOT, 'tests', 'unit', 'sotto', 'b.test.mjs')), 'tests/unit/sotto/b.test.mjs');
+  });
+
+  test('a gruppi: girano tutti, i flag arrivano a ciascuno, e un gruppo rosso fa rossa l’uscita', () => {
+    const casa = cartellaTemporanea('filo-runner-gruppi-');
+    const marche = join(casa, 'marche');
+    const prove = join(casa, 'prove');
+    try {
+      mkdirSync(marche, { recursive: true });
+      mkdirSync(prove, { recursive: true });
+      const scrivi = (nome, rosso) => writeFileSync(join(prove, nome), [
+        "import { test } from 'node:test';",
+        "import { writeFileSync } from 'node:fs';",
+        "import { join } from 'node:path';",
+        `test('${nome}', () => { writeFileSync(join(process.env.FILO_MARCHE, '${nome}'), ''); ${rosso ? "throw new Error('rosso voluto');" : ''} });`,
+      ].join('\n'));
+      scrivi('a.test.mjs', false);
+      scrivi('b.test.mjs', true);
+      scrivi('c.test.mjs', false);
+      // Tetto minimo: ogni file va nel suo gruppo, come succederebbe su Windows con una suite enorme.
+      // Senza NODE_TEST_CONTEXT: dentro `node --test` il `node --test` annidato riferirebbe al padre, non a noi.
+      const { NODE_TEST_CONTEXT: _, ...ambiente } = process.env;
+      const lancia = () => spawnSync(process.execPath, [LANCIATORE, '--test-reporter=tap'], {
+        cwd: ROOT, encoding: 'utf8',
+        env: { ...ambiente, FILO_UNIT_DIR: prove, FILO_UNIT_TETTO_RIGA: '1', FILO_MARCHE: marche },
+      });
+      const r = lancia();
+      assert.notEqual(r.status, 0, 'un gruppo rosso deve fare rossa l’uscita');
+      assert.deepEqual(readdirSync(marche).sort(), ['a.test.mjs', 'b.test.mjs', 'c.test.mjs'], 'il gruppo dopo il rosso deve girare lo stesso');
+      assert.equal((r.stdout.match(/TAP version/g) || []).length, 3, 'il flag deve arrivare a ogni gruppo');
+      assert.match(r.stdout, /gruppo 3 di 3/);
+      assert.match(r.stdout, /ROSSO: gruppo 2 di 3/);
+
+      scrivi('b.test.mjs', false);
+      rmSync(marche, { recursive: true, force: true }); mkdirSync(marche);
+      const verde = lancia();
+      assert.equal(verde.status, 0, verde.stdout + verde.stderr);
+      assert.equal(readdirSync(marche).length, 3);
+      assert.match(verde.stdout, /verde: 3 gruppi, 3 file/);
+    } finally { rmSync(casa, { recursive: true, force: true }); }
   });
 });

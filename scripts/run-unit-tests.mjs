@@ -74,7 +74,8 @@ function main() {
   if (!files.length) {
     console.error(`[test:unit] nessun file *.test.mjs sotto ${UNIT_DIR}: mi fermo.`);
     console.error('[test:unit] zero test eseguiti non è un successo — controlla la cartella.');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   if (listOnly) {
@@ -87,7 +88,7 @@ function main() {
   const gruppi = gruppiDiLancio(files, { flags });
   const tanti = gruppi.length > 1;
   const rossi = [];
-  let esito = 0;
+  let esito = 0, interrotto = false;
   if (tanti) console.log(`[test:unit] ${files.length} file in ${gruppi.length} gruppi: tutti insieme non stanno in una riga di comando di Windows.`);
   for (const [i, gruppo] of gruppi.entries()) {
     if (tanti) console.log(`\n[test:unit] gruppo ${i + 1} di ${gruppi.length} (${gruppo.length} file)`);
@@ -99,15 +100,16 @@ function main() {
       continue;
     }
     // Ucciso da un segnale (Ctrl+C, timeout): non è un successo, e i gruppi dopo non partono.
-    if (r.status === null) { esito = 1; rossi.push(i + 1); break; }
+    if (r.status === null) { esito = 1; rossi.push(i + 1); interrotto = i + 1 < gruppi.length; break; }
     if (r.status !== 0) { rossi.push(i + 1); esito = esito || r.status; }
   }
   if (tanti) {
     console.log(rossi.length
-      ? `\n[test:unit] ROSSO: gruppi ${rossi.join(', ')} di ${gruppi.length}. I test falliti sono nel riepilogo di ciascun gruppo, sopra.`
+      ? `\n[test:unit] ROSSO: ${rossi.length > 1 ? 'gruppi' : 'gruppo'} ${rossi.join(', ')} di ${gruppi.length}${interrotto ? ' (interrotto: i gruppi dopo non sono partiti)' : ''}. I test falliti sono nel riepilogo di ciascun gruppo, sopra.`
       : `\n[test:unit] verde: ${gruppi.length} gruppi, ${files.length} file.`);
   }
-  process.exit(esito);
+  // `exitCode` e non `exit()`, come sopra: l'ultima riga non deve perdersi.
+  process.exitCode = esito;
 }
 
 // Solo se invocato come script, non quando importato dai test.
