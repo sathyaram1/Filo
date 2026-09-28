@@ -109,6 +109,28 @@ test('lettura fuori perimetro: chiede un OK (livello 2), mai silenziosa', () => 
   }
 });
 
+test('leggere i propri file con un jolly resta libero; il jolly-cartella no (#587 giro 10)', () => {
+  // La lettura di tutti i giorni: un jolly con estensione, ultimo pezzo del
+  // percorso, prende solo file visibili con quell'estensione → livello 1.
+  for (const cmd of [
+    'cat *.txt', 'head -3 *.csv', 'cat Documenti/*.csv', 'head -n 5 Scaricati/report-*.log',
+    'cat appunti-*.md', 'tail progetto/build/*.txt',
+  ]) {
+    assert.equal(lvl(cmd, LINUX), 1, cmd);
+  }
+  for (const cmd of ['type *.txt', 'Get-Content Documents\\*.csv', 'gc note-*.log']) {
+    assert.equal(lvl(cmd, WIN), 1, cmd);
+  }
+  // Restano da confermare: un jolly nudo (prende tutto, `_netrc` compreso), un
+  // jolly che fa da CARTELLA (può essere `.ssh`, `AppData`), le classi/graffe.
+  for (const cmd of [
+    'cat *', 'cat ~/*', 'cat *.*', 'cat ?ssh/id_rsa', 'cat *ssh/config',
+    'cat Documenti/*/segreto', 'cat [.]ssh/id_rsa', 'cat {.ssh,x}/id_rsa',
+  ]) {
+    assert.equal(lvl(cmd, LINUX), 2, cmd);
+  }
+});
+
 test('la cartella di lavoro conta dove porta, non come ci si è arrivati', () => {
   const inSsh = { ...LINUX, cwd: '/home/mario/.ssh' };
   assert.equal(lvl('cat id_rsa', inSsh), 2, 'cwd già dentro ~/.ssh');
