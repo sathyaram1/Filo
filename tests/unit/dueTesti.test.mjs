@@ -56,8 +56,29 @@ function esegui(script, argv, env) {
   });
 }
 
+/**
+ * Un deposito git usa-e-getta, pulito e POSIZIONATO sul ramo del lavoro: le
+ * consegne valgono per un commit e guardano la directory. Sul repo vero una
+ * modifica non committata di chi lancia gli unit faceva rosso questo file.
+ */
+function depositoSulRamo() {
+  const casa = cartellaTemporanea('filo-due-testi-');
+  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: casa });
+  execFileSync('git', ['config', 'user.email', 't@t'], { cwd: casa });
+  execFileSync('git', ['config', 'user.name', 't'], { cwd: casa });
+  writeFileSync(resolve(casa, 'segnaposto.txt'), 'x', 'utf8');
+  // Lo stato del giro sta fuori da git, come nel repo vero
+  // (`.claude/routine-state/` è ignorato).
+  writeFileSync(resolve(casa, '.gitignore'), 'stato/\n', 'utf8');
+  execFileSync('git', ['add', '-A'], { cwd: casa });
+  execFileSync('git', ['commit', '-qm', 'init'], { cwd: casa });
+  execFileSync('git', ['checkout', '-q', '-b', 'worker/900'], { cwd: casa });
+  return casa;
+}
+
 test('il canale manda DUE testi distinti: il report e la frase', async () => {
   const { srv, ricevuti, port } = await fintoServer();
+  const casa = depositoSulRamo();
   try {
     const r = await esegui('routine-channel.mjs', [
       'deliver', 'biglietto-di-prova', 'status',
@@ -65,7 +86,7 @@ test('il canale manda DUE testi distinti: il report e la frase', async () => {
       '--notes', 'Report per l’owner: ho scartato la strada A perché costava una chiamata a pagamento in più.',
       '--frase', 'Ora puoi rimuovere un modello dalle impostazioni.',
       '--branch', 'worker/900',
-    ], { FILO_ROUTINE_API: `http://127.0.0.1:${port}` });
+    ], { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa, FILO_NO_BEAT: '1' });
     assert.equal(r.code, 0, `la consegna doveva essere accettata (stderr: ${r.se})`);
 
     const consegna = ricevuti.find((x) => x.url.includes('routineDeliver'));
