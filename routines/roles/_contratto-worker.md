@@ -43,6 +43,13 @@ REGISTRATO con gli script, mentre lavori:
 Se hai registrato tutto, la tua ultima frase può essere qualsiasi cosa e non
 conta niente. Se non l'hai registrato, non esiste.
 
+## I pezzi lunghi del payload stanno in un file
+
+Un campo del payload troppo lungo per la stampa arriva in un file fuori dal
+progetto, intero: al suo posto c'è `[nel file <percorso>, N caratteri: …]`, e
+`fileEsterni` elenca quali campi sono usciti e dove. Leggi quel file per intero
+come leggeresti il campo: non è un riassunto, è il contenuto.
+
 ## Gli strumenti che ti vengono nominati
 
 I comandi in queste istruzioni hanno un percorso INTERO, che punta fuori dal

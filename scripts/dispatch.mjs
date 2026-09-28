@@ -91,6 +91,7 @@ import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } 
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
+import { scaricaPayload, STAMPA_MAX } from './lib/consegna-file.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -704,8 +705,14 @@ function conDecisioni(ctx) {
 export function buildPayload(bucket, ctx = {}) {
   switch (bucket.role) {
     case 'secaudit':
-      // NESSUN campo del feedback: solo branch + diff.
-      return { branch: bucket.branch, diff: ctx.diff || '', id: bucket.id, num: bucket.num };
+      // NESSUN campo del feedback: solo branch + diff, con la base e la punta su cui è calcolato.
+      return {
+        branch: bucket.branch, diff: ctx.diff || '', id: bucket.id, num: bucket.num,
+        ...(ctx.diffBase && ctx.diffBase.sha ? {
+          diffBase: ctx.diffBase,
+          ...(ctx.diffHead ? { diffHead: ctx.diffHead, diffComando: `git diff ${ctx.diffBase.sha}...${ctx.diffHead}` } : {}),
+        } : {}),
+      };
     case 'verifier':
       // Sintomo (feedback) + branch, MAI il diff né il report del risolutore.
       // Lo STORICO delle critiche dei giri passati invece sì (è linguaggio
@@ -768,8 +775,17 @@ function tryGit(args) {
   catch (e) { return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message }; }
 }
 
-function diffForBranch(branch) {
-  if (!branch) return '';
+// Ritorna anche su quale base e su quale punta il diff è stato calcolato: chi lo ricalcola deve usare
+// quelle, non il `main` locale (nel clone delle routine è indietro e gonfia il diff).
+export function diffForBranch(branch, root = ROOT) {
+  // Il diff non si ripulisce: gli spazi in fondo all'ultima riga fanno parte del ramo.
+  const tryGit = (args, { grezzo = false } = {}) => {
+    try {
+      const out = execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 30 });
+      return { ok: true, out: grezzo ? out : out.trim() };
+    } catch (e) { return { ok: false, out: '' }; }
+  };
+  if (!branch) return { diff: '', base: null, head: '' };
   // La base del confronto DEVE essere lo stato REMOTO di main. In cloud il clone
   // è shallow e il ref locale `main` non viene mai aggiornato (l'orchestratore fa
   // `pull --rebase origin main` sul branch driver `claude/*`, non fa avanzare il
@@ -789,8 +805,15 @@ function diffForBranch(branch) {
     : (tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`]).ok
         ? `origin/${branch}`
         : branch);
-  const r = tryGit(['diff', `${base}...${ref}`]);
-  return r.ok ? r.out : '';
+  const baseSha = tryGit(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]);
+  const headSha = tryGit(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
+  // Fra gli sha, non fra i nomi: il diff è esattamente quello del comando che il payload dichiara.
+  const r = baseSha.ok && headSha.ok ? tryGit(['diff', `${baseSha.out}...${headSha.out}`], { grezzo: true }) : { ok: false, out: '' };
+  return {
+    diff: r.ok ? r.out : '',
+    base: baseSha.ok ? { ref: base, sha: baseSha.out } : null,
+    head: headSha.ok ? headSha.out : '',
+  };
 }
 
 // ─── Retry (esportato, testato in tests/unit/dispatch.test.mjs) ───────────────
@@ -947,7 +970,7 @@ function sealTransition(state, by) {
  */
 async function recordVerifier(id, critiqueText, segnalazione = '') {
   const guard = guardIdentity(id);
-  if (!guard.ok) return { rejected: true, message: guard.message };
+  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, message: guard.message };
   // Un livello fra parentesi quadre che non apre una riga («Rilievo [2]: …»)
   // non è un rilievo, e mandarlo così faceva passare un [2] in silenzio: si
   // ferma qui, prima del server, con la riga da sistemare.
@@ -1223,7 +1246,7 @@ export function fixedReplyText(id, reply, conSegnalazione = false) {
 }
 async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false) {
   const guard = guardIdentity(id);
-  if (!guard.ok) return { rejected: true, message: guard.message };
+  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, message: guard.message };
   // La consegna vale per un commit, come la critica (stessa regola, stessa
   // fonte: lib/dirty-tree.mjs). Con modifiche non salvate il server segnerebbe
   // «corretto» su una correzione che non sta in nessun commit, e la verifica
@@ -1296,7 +1319,7 @@ async function recordPulizia(id) {
 }
 async function recordSecaudit(id, verdict, testo = '') {
   const guard = guardIdentity(id);
-  if (!guard.ok) return { rejected: true, message: guard.message };
+  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, message: guard.message };
   // Un pass senza nota si ferma QUI, prima del server (che comunque lo
   // respingerebbe): la riga di comando lo controlla già, questa è la guardia
   // per chi chiama la funzione da un altro strumento.
@@ -1420,6 +1443,15 @@ export function preflightExitCode(result) {
  * guasto si travestiva da errore d'uso. Stessa classe del `--preflight` mai
  * implementato, tre righe più sotto.
  */
+// Il rebase del ramo assegnato non è una deriva: un invito solo, finirlo e rilanciare, mai «fermati».
+export function rebaseRejectionText(message) {
+  return [
+    `[dispatch] NON REGISTRATO: ${message}`,
+    'Sei sul ramo giusto, a metà del rebase: finiscilo (risolvi i file in conflitto, `git add`,',
+    '`git rebase --continue`), controlla che la cartella sia tornata sul ramo, poi rilancia lo stesso comando.',
+  ].join('\n');
+}
+
 export function rejectionText(message) {
   return [
     `[dispatch] GUASTO (identità): ${message}`,
@@ -1734,7 +1766,8 @@ function positionOnBranch(bucket) {
  *
  * @param {{role:string, branch?:string}} bucket
  * @param {{payload?:object}|null} fromServer  la busta, COM'È
- * @param {string} diff  le differenze del ramo (solo per il controllo sicurezza)
+ * @param {string|{diff:string, base:object|null, head:string}} diff  le differenze del ramo (solo per il
+ *   controllo sicurezza): l'uscita di `diffForBranch`, o il solo testo
  */
 // I ruoli che questa macchina sa eseguire. Un ruolo fuori da qui non è un
 // lavoro: è una busta che non sappiamo aprire.
@@ -1794,7 +1827,10 @@ export function serverCtx(bucket, fromServer, diff = '') {
   // Il controllo di sicurezza: il diff se lo calcola da git, che è pubblico e
   // non chiede nessuna chiave. Del feedback non riceve niente, e non è più una
   // consegna da rispettare — senza chiave, il testo cifrato per lui è un blob.
-  if (role === 'secaudit') return { diff };
+  if (role === 'secaudit') {
+    if (diff && typeof diff === 'object') return { diff: diff.diff || '', diffBase: diff.base || null, diffHead: diff.head || '' };
+    return { diff };
+  }
   if (role === 'verifier' || role === 'fixer' || role === 'new-work') {
     // Il feedback arriva GIÀ DECIFRATO dal server. Non c'è nessun ripiego che
     // se lo vada a rileggere: il ripiego sarebbe la chiave, ed è proprio ciò
@@ -1915,7 +1951,7 @@ export function emit(bucket, ctx) {
   const ambito = bucket.role === 'verifier' ? verifierScope(ctx && ctx.scope) : { scope: '', sconosciuto: false };
   if (bucket.role === 'halt') clearRole(ROOT);
   else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? ctx?.perimetro?.shaVerificato : '' });
-  const payload = buildPayload(bucket, ctx);
+  const pieno = buildPayload(bucket, ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
   if (ambito.sconosciuto) process.stderr.write(`[dispatch] ambito di verifica sconosciuto («${unaRiga(ctx.scope).slice(0, 40)}»): consegno la verifica piena\n`);
@@ -1924,13 +1960,21 @@ export function emit(bucket, ctx) {
   const serial = ambito.scope && ambito.scope !== 'pieno'
     ? perimetroNote(ambito.scope, ctx && ctx.perimetro)
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
-  const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: payload && payload.case });
-  const out = {
-    role: bucket.role,
-    payload,
-    claim: bucket.id || null,
-    instructions: serial ? `${base.replace(/\s+$/, '')}\n\n${serial}` : base,
-  };
+  const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: pieno && pieno.case });
+  const instructions = serial ? `${base.replace(/\s+$/, '')}\n\n${serial}` : base;
+  const stampaCon = (payload) => ({ role: bucket.role, payload, claim: bucket.id || null, instructions });
+  let payload = pieno;
+  try {
+    // Si misura la stampa vera, ruolo e rientri compresi: il testo del ruolo cambia da ruolo a ruolo.
+    payload = scaricaPayload(pieno, {
+      root: ROOT, sempre: ['diff'], max: STAMPA_MAX,
+      misura: (p) => JSON.stringify(stampaCon(p), null, 2).length + 1,
+    });
+  } catch (e) {
+    // Meglio una stampa lunga che un pezzo perso: il payload resta intero, e si dice perché.
+    process.stderr.write(`[dispatch] non riesco a scrivere i pezzi grossi del payload in file (${e.message}): restano nella stampa\n`);
+  }
+  const out = stampaCon(payload);
   lastEmitted = { role: bucket.role, num: bucket.num || '' };
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
 }
@@ -1970,6 +2014,7 @@ if (isMainModule) {
     // Critica scritta male: si sistema la riga e si rilancia (esci 1, come un
     // errore d'uso). Il server non è stato chiamato e niente è stato scritto.
     if (s.formatRejected) { console.error(`[dispatch] ${s.message}\nNiente è stato registrato: sistema le righe e rilancia lo stesso comando.`); process.exit(1); }
+    if (s.rebase) { console.error(rebaseRejectionText(s.message)); process.exit(1); }
     if (s.serverDown) { console.error(serverDownText(s.message)); process.exit(3); }
     console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message));
     process.exit(s.fromChannel ? 4 : 3);
