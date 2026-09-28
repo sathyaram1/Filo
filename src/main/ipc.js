@@ -85,6 +85,16 @@ function registerIpcHandlers() {
     }
   });
 
+  // #586 — i permessi che l'utente ha davvero negato al sito della scheda: il resto, per la pagina, è «da chiedere».
+  // SINCRONO come fp-config: il preload lo installa prima degli script della pagina.
+  ipcMain.on('filo:permessi-pagina', (event) => {
+    try {
+      event.returnValue = require('./services/permessiSiti').negatiPer(event.sender);
+    } catch (_) {
+      event.returnValue = [];
+    }
+  });
+
   // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi
   // riquadri incorporati). Serve alle scorciatoie che lavorano sulla selezione:
   // vanno consegnate a chi ha davvero il testo selezionato. Nessun dato nel

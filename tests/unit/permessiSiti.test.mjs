@@ -247,21 +247,174 @@ test('lo schermo intero rifiutato dopo un Esc resta rifiutato (#514)', async () 
   assert.deepEqual(chiedi(ses, wc, 'fullscreen'), [false]);
 });
 
-test('il permesso che Filo chiede per sé vale per quella scheda e per pochi usi', async () => {
+test('Filo non ha un permesso suo sulla scheda: una lettura degli appunti dal documento chiede come le altre', async () => {
   const ses = sessioneFinta();
   Permessi.installa(ses);
   await Permessi.carica();
   const { wc } = apriScheda('https://sito.example/', ses);
-  const altra = apriScheda('https://sito.example/', ses);
-  assert.equal(Permessi.concediAFilo(wc, 'appunti'), true);
-  assert.equal(Permessi.concediAFilo(wc, 'camera'), false, 'solo quello che Filo usa davvero');
-  assert.deepEqual(chiedi(ses, wc, 'clipboard-read'), [true]);
-  assert.deepEqual(chiedi(ses, altra.wc, 'clipboard-read'), [], 'l’altra scheda chiede come sempre');
-  assert.deepEqual(chiedi(ses, wc, 'notifications'), [], 'non apre altri permessi');
-  chiedi(ses, wc, 'clipboard-read');
-  chiedi(ses, wc, 'clipboard-read');
-  assert.deepEqual(chiedi(ses, wc, 'clipboard-read'), [], 'finiti gli usi, si torna a chiedere');
+  assert.equal(typeof Permessi.concediAFilo, 'undefined', 'nessuna porta apre la scheda a Filo, e quindi al sito');
+  assert.deepEqual(chiedi(ses, wc, 'clipboard-read'), [], 'la lettura aspetta la risposta dell’utente');
+  assert.equal(Permessi.inAttesaPer(wc)[0].testo, 'sito.example vuole leggere quello che hai copiato');
+});
+
+test('chiusa tre volte senza risposta, la domanda smette di tornare, e la scheda dice perché', async () => {
+  const ses = sessioneFinta();
+  Permessi.installa(ses);
+  await Permessi.carica();
+  const { wc } = apriScheda('https://insiste.example/', ses);
+  for (let i = 0; i < 3; i++) {
+    const e = chiedi(ses, wc, 'media', { mediaTypes: ['video'] });
+    const d = Permessi.inAttesaPer(wc)[0];
+    assert.ok(d, `la domanda ${i + 1} c’è`);
+    if (i === 1) assert.equal(Permessi.chiudiPrimaDomanda(wc), true, 'l’Esc chiude come la ×');
+    else Permessi.rispondi(d.id, 'ignora');
+    assert.deepEqual(e, [false]);
+  }
+  assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['video'] }), [false], 'dopo tre chiusure si risponde no senza domanda');
+  assert.equal(Permessi.inAttesaPer(wc).length, 0);
+  assert.deepEqual(Permessi.usiPer(wc).bloccati, [{ tipo: 'camera', motivo: 'smesso' }]);
+  assert.deepEqual(Permessi.perSito(ses, 'https://insiste.example').smesso, ['camera']);
+  assert.deepEqual(Permessi.negatiPer(wc), ['camera'], 'per la pagina è un no vero');
+  // Ridarlo dal menu della scheda o da Sicurezza riapre la strada.
+  Permessi.imposta(ses, 'https://insiste.example', 'camera', null);
+  assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['video'] }), []);
+  assert.equal(Permessi.inAttesaPer(wc).length, 1);
+});
+
+test('un no che non si ricorda (lo schermo, ciò che Filo non conosce) conta come chiusura', async () => {
+  const ses = sessioneFinta();
+  Permessi.installa(ses);
+  await Permessi.carica();
+  const { wc } = apriScheda('https://insiste.example/', ses);
+  for (let i = 0; i < 3; i++) {
+    chiedi(ses, wc, 'permesso-di-domani');
+    Permessi.rispondi(Permessi.inAttesaPer(wc)[0].id, 'nega');
+  }
+  assert.deepEqual(chiedi(ses, wc, 'permesso-di-domani'), [false]);
+  assert.equal(Permessi.inAttesaPer(wc).length, 0);
+});
+
+test('ciò che Filo non conosce si nomina, e un sì vale per quella volta sola', async () => {
+  const ses = sessioneFinta();
+  Permessi.installa(ses);
+  await Permessi.carica();
+  const { wc } = apriScheda('https://ricette.example/', ses);
+  const e = chiedi(ses, wc, 'permesso-di-domani');
+  const d = Permessi.inAttesaPer(wc)[0];
+  assert.match(d.testo, /che Filo non conosce \(«permesso-di-domani»\)/);
+  Permessi.rispondi(d.id, 'consenti');
+  assert.deepEqual(e, [true]);
+  assert.deepEqual(chiedi(ses, wc, 'permesso-di-domani'), [], 'la volta dopo richiede');
   assert.equal(archivio.dati.sitePermissions, undefined, 'e non resta niente di ricordato');
+  assert.equal(ses.gestori.controllo(wc, 'hid', 'https://ricette.example', {}), false, 'i dispositivi restano chiusi');
+  assert.deepEqual(chiedi(ses, wc, 'screen-wake-lock'), [true], 'tenere acceso lo schermo non si chiede');
+});
+
+test('i caratteri del computer: chiesti subito dopo un gesto, mai per una lettura a pagina ferma', async () => {
+  const ses = sessioneFinta();
+  Permessi.installa(ses);
+  await Permessi.carica();
+  let gesto = false;
+  Permessi._perTest({ gestoVeroRecente: () => gesto });
+  const { wc } = apriScheda('https://editor.example/', ses);
+  assert.equal(ses.gestori.controllo(wc, 'local-fonts', 'https://editor.example', {}), false);
+  assert.equal(Permessi.inAttesaPer(wc).length, 0, 'una lettura al caricamento non apre domande');
+  gesto = true;
+  for (let i = 0; i < 3; i++) ses.gestori.controllo(wc, 'local-fonts', 'https://editor.example', {});
+  const domande = Permessi.inAttesaPer(wc);
+  assert.equal(domande.length, 1);
+  assert.equal(domande[0].tardiva, true);
+  assert.equal(domande[0].testo, 'editor.example vuole vedere i caratteri installati sul tuo computer');
+  Permessi.rispondi(domande[0].id, 'consenti');
+  assert.equal(ses.gestori.controllo(wc, 'local-fonts', 'https://editor.example', {}), true);
+});
+
+test('fuori da una scheda si chiede con la finestra di sistema; nascosta, no', async () => {
+  const ses = sessioneFinta();
+  Permessi.installa(ses);
+  await Permessi.carica();
+  const finestra = { visibile: true, isDestroyed: () => false, isVisible() { return this.visibile; } };
+  const dialoghi = [];
+  let risposta = 2;
+  Permessi._perTest({
+    electron: {
+      BrowserWindow: { fromWebContents: () => finestra },
+      dialog: { showMessageBox: async (w, o) => { dialoghi.push(o); return { response: risposta }; } },
+    },
+  });
+  const popup = wcFinto('https://accesso.example/', ses);
+  const e = chiedi(ses, popup, 'media', { mediaTypes: ['video'] });
+  await attendi(); await attendi();
+  assert.deepEqual(e, [true]);
+  assert.equal(dialoghi[0].message, 'accesso.example vuole usare la fotocamera');
+  assert.deepEqual(chiedi(ses, popup, 'media', { mediaTypes: ['video'] }), [true], 'la risposta si ricorda come dalla striscia');
+  risposta = 0;
+  const f = chiedi(ses, popup, 'notifications');
+  await attendi(); await attendi();
+  assert.deepEqual(f, [false], '«Non ora» vale no per quella volta');
+  finestra.visibile = false;
+  assert.deepEqual(chiedi(ses, popup, 'geolocation'), [false], 'una finestra nascosta non chiede');
+  assert.equal(dialoghi.length, 2);
+});
+
+test('lo schermo lo chiede solo un documento web: da un riquadro senza indirizzo no', async () => {
+  const ses = sessioneFinta();
+  Permessi.installa(ses);
+  await Permessi.carica();
+  const { wc } = apriScheda('https://video.example/', ses);
+  assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: [], requestingUrl: 'about:blank', isMainFrame: false }), [false]);
+  assert.equal(Permessi.inAttesaPer(wc).length, 0);
+  chiedi(ses, wc, 'media', { mediaTypes: [] });
+  assert.deepEqual(Permessi.inAttesaPer(wc)[0].tipi, ['schermo']);
+});
+
+test('la scheda sa cosa il sito ha avuto e cosa si è visto negare, fino al documento dopo', async () => {
+  const ses = sessioneFinta();
+  Permessi.installa(ses);
+  await Permessi.carica();
+  const { wc } = apriScheda('https://chiamata.example/', ses);
+  assert.equal(Permessi.usiPer(wc), null);
+  chiedi(ses, wc, 'media', { mediaTypes: ['audio'] });
+  Permessi.rispondi(Permessi.inAttesaPer(wc)[0].id, 'consenti');
+  chiedi(ses, wc, 'media', { mediaTypes: ['video'] });
+  Permessi.rispondi(Permessi.inAttesaPer(wc)[0].id, 'nega');
+  assert.deepEqual(Permessi.usiPer(wc), { host: 'chiamata.example', inUso: ['microfono'], bloccati: [{ tipo: 'camera', motivo: 'negato' }] });
+  wc.emit('did-navigate');
+  assert.equal(Permessi.usiPer(wc), null, 'una pagina nuova riparte pulita');
+});
+
+test('togliere un permesso che la pagina tiene aperto lo dice, da qualunque strada', async () => {
+  const ses = sessioneFinta();
+  Permessi.installa(ses);
+  await Permessi.carica();
+  const { wc } = apriScheda('https://chiamata.example/', ses);
+  const avvisi = [];
+  Permessi._perTest({
+    tutteLeSchede: () => [...schede.entries()].map(([c, s]) => ({ ...s, tab: { ...s.tab, view: { webContents: c } } })),
+    avvisaAcceso: (_s, info) => avvisi.push(info),
+  });
+  chiedi(ses, wc, 'media', { mediaTypes: ['audio'] });
+  Permessi.rispondi(Permessi.inAttesaPer(wc)[0].id, 'consenti');
+  assert.equal(Permessi.imposta(ses, 'https://chiamata.example', 'microfono', 'nega').ancoraAperti, 1);
+  assert.equal(Permessi.dimentica(ses, 'https://chiamata.example').ancoraAperti, 1);
+  assert.equal(Permessi.imposta(ses, 'https://chiamata.example', 'notifiche', null).ancoraAperti, 0, 'le notifiche non restano aperte');
+  assert.deepEqual(avvisi.map((a) => [a.host, a.tipi]), [['chiamata.example', ['microfono']], ['chiamata.example', ['microfono']]]);
+});
+
+test('una scheda da un altro paese aperta in incognito resta nella memoria di quella finestra', async () => {
+  const normale = sessioneFinta();
+  const finestra = sessioneFinta();
+  const paese = sessioneFinta();
+  for (const s of [normale, finestra, paese]) Permessi.installa(s);
+  Permessi.segnaIncognito(finestra);
+  Permessi.segnaIncognito(paese, finestra);
+  await Permessi.carica();
+  const p = apriScheda('https://sito.example/', paese);
+  Permessi.rispondi((chiedi(paese, p.wc, 'notifications'), Permessi.inAttesaPer(p.wc)[0].id), 'consenti');
+  await attendi();
+  assert.equal(archivio.scritture, 0, 'niente su disco');
+  assert.deepEqual(Permessi.elenco(null), [], 'le finestre normali non la vedono');
+  assert.deepEqual(Permessi.elenco(finestra).map((x) => x.host), ['sito.example'], 'la finestra incognito sì');
 });
 
 test('incognito: le scelte restano nella sua sessione e non vanno su disco', async () => {
@@ -350,15 +503,59 @@ test('main.js aggancia il custode prima che nasca qualsiasi sessione', () => {
   }
 });
 
-test('le porte che decidono per un sito sono solo di Filo; quella di Incolla/Detta è aperta', () => {
-  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'permessi.js'), 'utf8');
-  const porte = [...src.matchAll(/on\(MSG\.([A-Z_]+),\s*(soloFilo\()?/g)].map((m) => [m[1], !!m[2]]);
-  assert.deepEqual(Object.fromEntries(porte), {
+function porte(file) {
+  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', file), 'utf8');
+  return Object.fromEntries([...src.matchAll(/on\(MSG\.([A-Z_]+),\s*(soloFilo\()?/g)].map((m) => [m[1], !!m[2]]));
+}
+
+test('le porte che decidono per un sito sono solo di Filo; aperte ai content script solo Incolla e Detta', () => {
+  assert.deepEqual(porte('permessi.js'), {
     SITE_PERMISSIONS_LIST: true,
     SITE_PERMISSIONS_OF_TAB: true,
     SITE_PERMISSION_SET: true,
     SITE_PERMISSIONS_FORGET: true,
     SITE_PERMISSION_ANSWER: true,
-    PERMESSO_FILO: false,
+    SITE_SCREEN_SOURCES: true,
+    FILO_READ_CLIPBOARD: false,
   });
+  assert.deepEqual(porte('dettatura.js'), { DETTATURA_AVVIA: false, DETTATURA_FERMA: false, DETTATURA_EVENTO: true });
+});
+
+test('Incolla e Detta sulle pagine web non passano dal permesso del sito', () => {
+  const actions = readFileSync(join(ROOT, 'src', 'content', 'actions.js'), 'utf8');
+  const tts = readFileSync(join(ROOT, 'src', 'content', 'tts.js'), 'utf8');
+  assert.match(actions, /MSG\.FILO_READ_CLIPBOARD/);
+  assert.doesNotMatch(actions, /navigator\.clipboard\.read\(\)/, 'Incolla non legge gli appunti dal documento del sito');
+  assert.match(tts, /if \(dettaDallaCornice\(\)\) \{ await dettaConLaCornice\(\); return; \}/);
+  for (const f of sorgenti(join(ROOT, 'src'))) assert.doesNotMatch(readFileSync(f, 'utf8'), /PERMESSO_FILO|permesso_filo/, f);
+});
+
+test('il sorgente per il mondo della pagina: «da chiedere» dove nessuno ha negato, e niente strada vecchia per lo schermo', () => {
+  const { buildPermessiPaginaSource } = require(join(ROOT, 'src', 'preload', 'permessi-pagina.js'));
+  const src = buildPermessiPaginaSource(['camera']);
+  let stati = { camera: 'denied', microphone: 'denied', notifications: 'denied' };
+  let permessoNotifiche = 'denied';
+  const chiamate = [];
+  class PermissionStatus { constructor(name) { this.name = name; } }
+  Object.defineProperty(PermissionStatus.prototype, 'state', { configurable: true, get() { return stati[this.name]; } });
+  class Notification {}
+  Object.defineProperty(Notification, 'permission', { configurable: true, get() { return permessoNotifiche; } });
+  class MediaDevices { getUserMedia(c) { chiamate.push(c); return Promise.resolve('flusso'); } }
+  class DOMException extends Error { constructor(m, n) { super(m); this.name = n; } }
+  const doc = { addEventListener() {} };
+  const w = { PermissionStatus, Notification, MediaDevices, DOMException, Promise, setTimeout, Navigator: class {} };
+  new Function('window', 'document', `with (window) { ${src} }`)(w, doc);
+  assert.equal(new PermissionStatus('microphone').state, 'prompt', 'nessuno ha negato il microfono');
+  assert.equal(new PermissionStatus('camera').state, 'denied', 'la fotocamera l’ha negata l’utente');
+  assert.equal(Notification.permission, 'default');
+  stati = { microphone: 'granted' };
+  assert.equal(new PermissionStatus('microphone').state, 'granted');
+  permessoNotifiche = 'granted';
+  assert.equal(Notification.permission, 'granted');
+  const md = new MediaDevices();
+  return Promise.all([
+    md.getUserMedia({ audio: { mandatory: { chromeMediaSource: 'desktop' } } }).then(() => assert.fail('la strada vecchia è passata'), (e) => assert.equal(e.name, 'NotAllowedError')),
+    md.getUserMedia({ video: { optional: [{ chromeMediaSourceId: 'x' }] } }).then(() => assert.fail(), (e) => assert.equal(e.name, 'NotAllowedError')),
+    md.getUserMedia({ audio: true }).then((r) => assert.equal(r, 'flusso')),
+  ]).then(() => assert.equal(chiamate.length, 1, 'al browser arriva solo la richiesta normale'));
 });

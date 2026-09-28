@@ -1864,6 +1864,35 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const r = await tm.clearPageStyle(tab);
         return { executed: !!(r && r.ok), kept: false };
       }
+      case 'PERMESSO_SITO': {
+        // #586 — la stessa porta del tasto destro sulla scheda e di Sicurezza: la memoria dei permessi del custode.
+        const PS = globalThis.SN_PERMESSI_SITI;
+        const Permessi = require('./permessiSiti');
+        const tipo = PS.tipoDaParola(action.permesso ?? action.permission);
+        const scelta = PS.sceltaDaParola(action.scelta ?? action.choice);
+        if (!tipo || !scelta) return { executed: false, kept: false, output: { permesso: 'invalid' } };
+        await Permessi.carica();
+        const { tab } = targetWebTab(sender);
+        const wcTab = tab && tab.view && tab.view.webContents;
+        let origine = '';
+        let ses = null;
+        const scritto = String(action.sito ?? action.site ?? action.dominio ?? '').trim().toLowerCase();
+        if (scritto) {
+          const host = scritto.replace(/^[a-z]+:\/\//, '').replace(/[/?#].*$/, '');
+          const noto = Permessi.elenco(null).find((x) => x.host === host || x.host === `www.${host}` || `www.${x.host}` === host);
+          origine = noto ? noto.origine : PS.origineDi(`https://${host}`);
+        } else if (wcTab && !wcTab.isDestroyed()) {
+          origine = PS.origineDi(wcTab.getURL());
+          ses = wcTab.session;
+        }
+        if (!origine) return { executed: false, kept: false, output: { permesso: 'no-site' } };
+        const r = Permessi.imposta(ses, origine, tipo, scelta === 'chiedi' ? null : scelta);
+        return {
+          executed: !!(r && r.ok),
+          kept: false,
+          output: { permesso: r && r.ok ? scelta : 'failed', sito: PS.hostDi(origine), tipo, ancoraAperti: (r && r.ancoraAperti) || 0 },
+        };
+      }
       case 'ZOOM_PAGINA': {
         // #686 — lo zoom della pagina si chiede anche a parole, non solo con
         // Ctrl +/-/0. Non zooma da qui: gira la richiesta alla scheda attiva
@@ -2474,6 +2503,13 @@ function toolResultText({ action, res, rendered }) {
         : '';
       return `Zoom della pagina ora al ${o.percentuale}%.${tagliato}`;
     }
+  }
+  if (type === 'PERMESSO_SITO' && res.output && !res.executed) {
+    if (res.output.permesso === 'no-site') return 'Permesso non cambiato: non c\'è un sito davanti e non me ne hai nominato uno. Chiedi all\'utente quale.';
+    if (res.output.permesso === 'invalid') return 'Permesso non cambiato: non ho capito quale permesso o quale scelta. I permessi sono fotocamera, microfono, posizione, notifiche, appunti, caratteri…; le scelte consenti, blocca, chiedi.';
+  }
+  if (type === 'PERMESSO_SITO' && res.executed && res.output && res.output.ancoraAperti) {
+    return `Eseguita. La pagina di ${res.output.sito} tiene ancora aperto quello che aveva finché non la si ricarica: dillo all'utente (Filo gli ha già mostrato «Ricarica»).`;
   }
   if (type === 'ZOOM_PAGINA' && !res.executed && res.output && res.output.zoom === 'no-tab') {
     return 'Zoom non cambiato: non c\'è nessuna scheda davanti su cui agire. Dillo all\'utente.';

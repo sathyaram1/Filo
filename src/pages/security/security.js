@@ -490,7 +490,9 @@
   // ─── permessi dei siti (#586) ───────────────────────────────────────────────
   // Le scelte le tiene il main; qui si leggono, si cambiano e si dimenticano, e si rilegge a ogni cambio.
   const PS = window.SN_PERMESSI_SITI;
+  // Le scelte delle finestre normali si vedono da ovunque; quelle di questa finestra incognito solo da qui.
   let permSiti = [];
+  let permIncognito = null;
   let permTimer = null;
 
   function setPermError(msg) {
@@ -503,6 +505,7 @@
     let r = null;
     try { r = await chrome.runtime.sendMessage({ type: MSG.SITE_PERMISSIONS_LIST }); } catch (_) { r = null; }
     permSiti = r && r.ok && Array.isArray(r.siti) ? r.siti : [];
+    permIncognito = r && r.ok && Array.isArray(r.incognito) ? r.incognito : null;
     renderPermessi();
   }
 
@@ -528,17 +531,16 @@
     return b;
   }
 
-  function renderPermessi() {
-    const list = $('perm-list');
+  function renderElencoPermessi(list, siti, ambito) {
     list.replaceChildren();
-    if (!permSiti.length || !PS) {
+    if (!siti.length || !PS) {
       const li = document.createElement('li');
       li.className = 'sn-muted sn-perm-vuoto';
       li.textContent = I18n.t('security_perm_empty');
       list.appendChild(li);
       return;
     }
-    for (const sito of permSiti) {
+    for (const sito of siti) {
       const li = document.createElement('li');
       li.className = 'sn-perm-sito';
       li.dataset.origine = sito.origine;
@@ -549,7 +551,7 @@
       host.textContent = sito.host;
       host.title = sito.origine;
       testa.append(host, permButton(I18n.t('security_perm_forget_site'), 'sn-btn sn-btn-secondary sn-perm-dimentica',
-        () => mandaPermesso({ type: MSG.SITE_PERMISSIONS_FORGET, origine: sito.origine })));
+        () => mandaPermesso({ type: MSG.SITE_PERMISSIONS_FORGET, origine: sito.origine, ambito })));
       li.appendChild(testa);
       for (const tipo of Object.keys(PS.TIPI)) {
         const scelta = sito.scelte[tipo];
@@ -566,14 +568,14 @@
         seg.setAttribute('aria-label', PS.TIPI[tipo].nome);
         for (const [valore, chiave] of [['consenti', 'security_perm_allow'], ['nega', 'security_perm_block']]) {
           const b = permButton(I18n.t(chiave), '', () => {
-            if (scelta !== valore) mandaPermesso({ type: MSG.SITE_PERMISSION_SET, origine: sito.origine, tipo, scelta: valore });
+            if (scelta !== valore) mandaPermesso({ type: MSG.SITE_PERMISSION_SET, origine: sito.origine, tipo, scelta: valore, ambito });
           });
           b.dataset.valore = valore;
           b.setAttribute('aria-pressed', scelta === valore ? 'true' : 'false');
           seg.appendChild(b);
         }
         const togli = permButton('×', 'sn-perm-togli',
-          () => mandaPermesso({ type: MSG.SITE_PERMISSION_SET, origine: sito.origine, tipo, scelta: null }));
+          () => mandaPermesso({ type: MSG.SITE_PERMISSION_SET, origine: sito.origine, tipo, scelta: null, ambito }));
         togli.title = I18n.t('security_perm_forget_one');
         togli.setAttribute('aria-label', `${I18n.t('security_perm_forget_one')}: ${PS.TIPI[tipo].nome}`);
         riga.append(nome, seg, togli);
@@ -581,6 +583,25 @@
       }
       list.appendChild(li);
     }
+  }
+
+  function renderPermessi() {
+    renderElencoPermessi($('perm-list'), permSiti, 'normale');
+    let blocco = $('sec-perm-incognito');
+    if (!permIncognito) { if (blocco) blocco.remove(); return; }
+    if (!blocco) {
+      blocco = document.createElement('div');
+      blocco.id = 'sec-perm-incognito';
+      const h = document.createElement('h3');
+      h.className = 'sn-perm-sotto';
+      h.textContent = I18n.t('security_perm_incognito_title');
+      const ul = document.createElement('ul');
+      ul.id = 'perm-list-incognito';
+      ul.className = 'sn-perm-list';
+      blocco.append(h, ul);
+      $('perm-list').after(blocco);
+    }
+    renderElencoPermessi($('perm-list-incognito'), permIncognito, 'incognito');
   }
 
   document.addEventListener('DOMContentLoaded', () => {

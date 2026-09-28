@@ -651,6 +651,9 @@
   async function onContextMenu(e) {
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch)
     if (e.shiftKey) return;
+    // Sulle pagine web il menu si apre solo per un tasto destro vero: uno finto è la pagina che vuole premere
+    // i bottoni di Filo, «Incolla» e «Detta» compresi (#586).
+    if (e.isTrusted === false && location.protocol !== 'filo:') return;
 
     // Impedisci alla pagina ospite (es. YouTube, Reddit) di gestire l'evento e
     // mostrare il SUO menu: il nostro listener è registrato per primo (vedi sotto
@@ -2117,7 +2120,7 @@
     // Stato lettura ad alta voce condiviso tra le schede: aggiorna il flag
     // globale (per mostrare "Interrompi lettura" anche se legge un'altra scheda)
     // o ferma la lettura locale quando un'altra scheda chiede lo stop globale.
-    if (msg?.type === MSG.TTS_GLOBAL_READING || msg?.type === MSG.TTS_STOP) {
+    if (msg?.type === MSG.TTS_GLOBAL_READING || msg?.type === MSG.TTS_STOP || msg?.type === MSG.DETTATURA_EVENTO) {
       TTS.handleBroadcast(msg);
       return;
     }

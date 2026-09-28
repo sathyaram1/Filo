@@ -122,6 +122,7 @@
     menu_dictate_model_select: 'Modello per dettatura',
     menu_dictate_not_supported: 'Dettatura non supportata in questo browser',
     menu_dictate_no_mic: 'Microfono non disponibile o negato',
+    menu_dictate_no_gesture: 'Premi «Detta» nel menu di Filo per cominciare a dettare',
     menu_dictate_model_set: 'Modello dettatura aggiornato',
     menu_dictate_transcribing: 'Trascrivo l\'audio…',
     menu_dictate_empty: 'Nessun audio comprensibile',
@@ -552,6 +553,7 @@
     security_perm_forget_one: 'Torna a chiedere',
     security_perm_forget_site: 'Dimentica il sito',
     security_perm_failed: 'Non sono riuscito a salvare la scelta: riprova.',
+    security_perm_incognito_title: 'In questa finestra in incognito',
     // Protezione anti-fingerprinting
     options_fp_title: 'Protezione fingerprinting',
     options_fp_desc:

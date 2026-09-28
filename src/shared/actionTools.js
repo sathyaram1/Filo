@@ -343,6 +343,15 @@
       },
       required: [],
     },
+    PERMESSO_SITO: {
+      description: 'Cambia cosa un sito può fare: fotocamera, microfono, posizione, notifiche, appunti, caratteri del computer e gli altri permessi che si danno in Sicurezza → "Permessi dei siti". Per "togli la fotocamera a questo sito", "nega le notifiche a esempio.it", "fai usare il microfono a meet.google.com", "richiedimelo la prossima volta". Senza `sito` vale per il sito della scheda che l\'utente sta guardando. Dare un permesso chiede conferma all\'utente (lo fa il sistema); negarlo o tornare a chiedere si applica subito. Quello che la pagina ha già aperto resta acceso finché non la si ricarica: se l\'utente lo sta usando, diglielo.',
+      properties: {
+        permesso: S('Cosa: "fotocamera", "microfono", "posizione", "notifiche", "appunti", "caratteri", "midi", "cookie", "app"…'),
+        scelta: S('"consenti", "blocca" (il sito non può più chiederlo), "chiedi" (torna a chiederlo la prossima volta).', { enum: ['consenti', 'blocca', 'chiedi'] }),
+        sito: S('Dominio o indirizzo del sito (es. "esempio.it"). Vuoto = il sito della scheda attiva.'),
+      },
+      required: ['permesso', 'scelta'],
+    },
     COMANDO_FINESTRA: {
       description: 'Aziona un controllo del browser Filo (la finestra e la barra in alto), non il sito. "fullscreen" = schermo intero immersivo (la pagina attiva copre tutta la finestra, barre nascoste, Esc esce), non il pulsante del lettore video dentro il sito. NON esiste un comando per CHIUDERE la finestra o le schede. Esegue subito.',
       properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (menu Account).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account'] }) },

@@ -53,6 +53,7 @@
     RIMUOVI_REGOLA_PROXY: 'globeOff',
     COMANDO_FINESTRA: 'windowFrame',
     ZOOM_PAGINA: 'zoomPagina',
+    PERMESSO_SITO: 'lock',
     STILE_PAGINA: 'brush',
     RIPRISTINA_STILE_PAGINA: 'undo',
   };

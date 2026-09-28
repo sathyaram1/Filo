@@ -207,6 +207,7 @@
   // Broadcast in arrivo dal main (instradati da content.js).
   function handleBroadcast(msg) {
     if (!msg) return false;
+    if (msg.type === MSG.DETTATURA_EVENTO) { eventoDettatura(msg); return true; }
     if (msg.type === MSG.TTS_GLOBAL_READING) { globalReading = !!msg.active; return true; }
     if (msg.type === MSG.TTS_STOP) { stopReading(); return true; }
     return false;
@@ -454,7 +455,13 @@
     } catch (_) { return ''; }
   }
 
+  // Sulle pagine web il microfono lo apre la cornice di Filo, non la pagina: il sito non eredita l'ascolto (#586).
+  function dettaDallaCornice() {
+    try { return location.protocol !== 'filo:'; } catch (_) { return true; }
+  }
+
   function dictationSupported() {
+    if (dettaDallaCornice()) return Boolean(global.SN_DICTATION_SEGMENTER);
     return typeof window !== 'undefined'
       && Boolean(navigator?.mediaDevices?.getUserMedia)
       && Boolean(window.AudioContext || window.webkitAudioContext)
@@ -568,9 +575,8 @@
       Popup.showToast(I18n.t('err_provider_failed'));
       return;
     }
+    if (dettaDallaCornice()) { await dettaConLaCornice(); return; }
     let stream;
-    // Il microfono lo apre Filo per dettare, non il sito: senza, finirebbe nella domanda al sito (#586).
-    try { await chrome.runtime.sendMessage({ type: MSG.PERMESSO_FILO, tipo: 'microfono' }); } catch (_) {}
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (_) {
@@ -714,6 +720,76 @@
   function stopDictation() {
     if (!_dictateState || typeof _dictateState.stop !== 'function') return;
     _dictateState.stop().catch(() => {});
+  }
+
+  // Il riquadro «sto ascoltando» nella pagina, per la dettatura che ascolta dalla cornice.
+  function montaRiquadroDettatura() {
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'sn-dictate-pill';
+    const label = document.createElement('span');
+    label.className = 'sn-dictate-pill-label';
+    label.textContent = I18n.t('menu_dictate_listening');
+    const live = document.createElement('span');
+    live.className = 'sn-dictate-pill-live';
+    live.hidden = true;
+    pill.append(label, live);
+    pill.addEventListener('mousedown', (e) => e.preventDefault());
+    Popup.mountToast(pill, { sticky: true });
+    const showLive = (text) => {
+      const t = String(text || '').trim();
+      if (!t) { live.hidden = true; live.textContent = ''; return; }
+      live.textContent = t.length > DICTATE_LIVE_CHARS ? '…' + t.slice(-DICTATE_LIVE_CHARS) : t;
+      live.hidden = false;
+    };
+    return { pill, label, showLive };
+  }
+
+  async function dettaConLaCornice() {
+    let res = null;
+    try {
+      res = await chrome.runtime.sendMessage({ type: MSG.DETTATURA_AVVIA, lang: navigator.language || 'it-IT' });
+    } catch (_) { res = null; }
+    if (!res || !res.ok || !res.id) {
+      Popup.showToast(I18n.t(res && res.error === 'no_gesture' ? 'menu_dictate_no_gesture' : 'err_provider_failed'));
+      return;
+    }
+    const ui = montaRiquadroDettatura();
+    const state = { id: res.id, ui, finals: 0, failed: false, stopped: false };
+    state.stop = async () => {
+      if (state.stopped) return;
+      state.stopped = true;
+      ui.label.textContent = I18n.t('menu_dictate_transcribing');
+      try { await chrome.runtime.sendMessage({ type: MSG.DETTATURA_FERMA, id: state.id }); } catch (_) {}
+    };
+    _dictateState = state;
+    ui.pill.addEventListener('click', () => stopDictation());
+  }
+
+  function eventoDettatura(msg) {
+    const state = _dictateState;
+    if (!state || state.id !== msg.id || !state.ui) return;
+    const { ui } = state;
+    if (msg.tipo === 'provvisoria') { if (!state.stopped) ui.showLive(msg.testo); return; }
+    if (msg.tipo === 'frase') {
+      const text = String(msg.testo || '').trim();
+      if (!text) return;
+      state.finals++;
+      ui.showLive('');
+      deps.insertDictatedText(text + ' ');
+      return;
+    }
+    if (msg.tipo === 'errore') {
+      state.failed = true;
+      if (msg.res && msg.res.code === 'NO_MIC') Popup.showToast(I18n.t('menu_dictate_no_mic'));
+      else explainDictationFailure(msg.res);
+      return;
+    }
+    if (msg.tipo === 'fine') {
+      if (ui.pill.parentNode) Popup.unmountToast(ui.pill);
+      if (!state.finals && !state.failed) Popup.showToast(I18n.t('menu_dictate_empty'));
+      if (_dictateState === state) _dictateState = null;
+    }
   }
 
   function init(d) {

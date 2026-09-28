@@ -14,7 +14,6 @@
 // in Chrome con i content script.
 
 const { ipcRenderer, webFrame } = require('electron');
-try { webFrame.executeJavaScript('window.__segno = String(location.href || "x");'); } catch (_) {} // ESPLORA
 const path = require('node:path');
 
 // ─── #405 — riquadri incorporati (iframe) ───────────────────────────────────
@@ -120,6 +119,7 @@ function replayContextMenu(e) {
     pageX: e.pageX, pageY: e.pageY,
     screenX: e.screenX, screenY: e.screenY,
     button: e.button,
+    isTrusted: e.isTrusted,
     shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey,
     defaultPrevented: false,
     composedPath: () => (node ? [node] : []),
@@ -165,6 +165,23 @@ if (!IS_SUBFRAME) try {
     }
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
+
+// ─── #586 — quello che la pagina legge dei propri permessi ────────────────
+//
+// In OGNI frame web, riquadri compresi, prima degli script della pagina: senza, un sito a cui nessuno ha risposto
+// legge «negato» e non chiede più, e la strada vecchia per lo schermo scavalca la scelta di Filo. Il sorgente e le
+// sue regole stanno in permessi-pagina.js; l'elenco dei «no» veri lo tiene il main e arriva aggiornato qui.
+try {
+  const loc = String((typeof window !== 'undefined' && window.location && window.location.href) || '');
+  if (/^(https?:|about:srcdoc)/i.test(loc)) {
+    const { buildPermessiPaginaSource, CANALE } = require('./permessi-pagina.js');
+    const negati = ipcRenderer.sendSync('filo:permessi-pagina') || [];
+    webFrame.executeJavaScript(buildPermessiPaginaSource(negati), false).catch(() => {});
+    ipcRenderer.on('filo:permessi-pagina', (_e, lista) => {
+      try { document.dispatchEvent(new CustomEvent(CANALE, { detail: JSON.stringify(Array.isArray(lista) ? lista : []) })); } catch (_) {}
+    });
+  }
+} catch (e) { /* non deve MAI bloccare il caricamento della pagina */ }
 
 // ─── chrome.* shim per i content script ────────────────────────────────────
 //

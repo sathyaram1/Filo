@@ -110,72 +110,76 @@
   // ------------------------------------------------------------
   // Incolla (da clipboard e da cronologia)
   // ------------------------------------------------------------
-  // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
+  // Gli appunti li legge Filo dal sistema, per l'utente: col permesso del sito la lettura passerebbe dalla sua domanda,
+  // e un «Consenti» lì lo regalerebbe al sito (#586). Solo le pagine di Filo leggono da sé se il main non risponde.
+  async function leggiAppunti() {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_READ_CLIPBOARD }); } catch (_) { r = null; }
+    if (r && r.ok) return { testo: String(r.testo || ''), immagine: String(r.immagine || '') };
+    let interna = false;
+    try { interna = location.protocol === 'filo:'; } catch (_) {}
+    if (!interna) return null;
+    try { return { testo: String((await navigator.clipboard.readText()) || ''), immagine: '' }; } catch (_) { return null; }
+  }
+
+  // Incolla dagli appunti: prima un'immagine, se c'è, poi il testo.
   async function pasteFromClipboard() {
     deps.restorePasteContext();
-    // Gli appunti li legge Filo per l'utente, non il sito: senza, la lettura passerebbe dalla domanda al sito (#586).
-    try { await chrome.runtime.sendMessage({ type: MSG.PERMESSO_FILO, tipo: 'appunti' }); } catch (_) {}
-    // Tenta lettura strutturata (testo + immagini)
-    try {
-      if (navigator.clipboard.read) {
-        const items = await navigator.clipboard.read();
-        for (const it of items) {
-          // Cerca un'immagine
-          const imgType = it.types.find((t) => t.startsWith('image/'));
-          if (imgType) {
-            const blob = await it.getType(imgType);
-            const dataUrl = await blobToDataUrl(blob);
-            deps.restorePasteContext();
-            const ctx = deps.getPasteContext();
-            const targetKind = ctx?.kind;
-            if (targetKind === 'input') {
-              // input/textarea non supportano immagini: prova a delegare ad
-              // un handler custom (es. il modal feedback) via evento bubbling.
-              const pasteEvt = new CustomEvent('filo:paste-image', {
-                bubbles: true, cancelable: true, detail: { blob },
-              });
-              if (ctx.el && ctx.el.dispatchEvent(pasteEvt) === false) {
-                return;
-              }
-              // Nessun handler ha accettato: ricadi sul testo se presente
-              const textType = it.types.find((t) => t === 'text/plain');
-              if (textType) {
-                const text = await (await it.getType(textType)).text();
-                insertTextAtSelection(text);
-                pushClipboardEntry({ type: 'text', text });
-              } else {
-                Popup.showToast(I18n.t('toast_cannot_paste_image'));
-              }
-              return;
-            }
-            if (targetKind !== 'ce') {
-              // Nessun target editabile valido per un'immagine.
-              Popup.showToast(I18n.t('toast_cannot_paste_image'));
-              return;
-            }
-            const ok = insertImageInEditable(blob, dataUrl);
-            if (!ok) {
-              Popup.showToast(I18n.t('toast_paste_failed'));
-              return;
-            }
-            const description = await describeImage(blob);
-            pushClipboardEntry({ type: 'image', dataUrl, description });
-            Popup.showToast(I18n.t('toast_pasted_image'));
+    const appunti = await leggiAppunti();
+    if (!appunti) { Popup.showToast(I18n.t('toast_paste_failed')); return; }
+    if (appunti.immagine) {
+      let blob = null;
+      try {
+        const [testa, dati] = appunti.immagine.split(',');
+        const tipo = (/^data:([^;,]+)/.exec(testa) || [])[1] || 'image/png';
+        const bin = atob(dati || '');
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        blob = new Blob([bytes], { type: tipo });
+      } catch (_) { blob = null; }
+      if (blob) {
+        const dataUrl = appunti.immagine;
+        deps.restorePasteContext();
+        const ctx = deps.getPasteContext();
+        const targetKind = ctx?.kind;
+        if (targetKind === 'input') {
+          // input/textarea non supportano immagini: prova a delegare ad
+          // un handler custom (es. il modal feedback) via evento bubbling.
+          const pasteEvt = new CustomEvent('filo:paste-image', {
+            bubbles: true, cancelable: true, detail: { blob },
+          });
+          if (ctx.el && ctx.el.dispatchEvent(pasteEvt) === false) {
             return;
           }
+          // Nessun handler ha accettato: ricadi sul testo se presente
+          if (appunti.testo) {
+            insertTextAtSelection(appunti.testo);
+            pushClipboardEntry({ type: 'text', text: appunti.testo });
+          } else {
+            Popup.showToast(I18n.t('toast_cannot_paste_image'));
+          }
+          return;
         }
+        if (targetKind !== 'ce') {
+          // Nessun target editabile valido per un'immagine.
+          Popup.showToast(I18n.t('toast_cannot_paste_image'));
+          return;
+        }
+        const ok = insertImageInEditable(blob, dataUrl);
+        if (!ok) {
+          Popup.showToast(I18n.t('toast_paste_failed'));
+          return;
+        }
+        const description = await describeImage(blob);
+        pushClipboardEntry({ type: 'image', dataUrl, description });
+        Popup.showToast(I18n.t('toast_pasted_image'));
+        return;
       }
-    } catch (_) {
-      // Permessi negati o API non disponibile: ricadi sul testo
     }
-    // Fallback: solo testo
-    try {
-      const text = await navigator.clipboard.readText();
-      if (!text) return;
-      deps.restorePasteContext();
-      insertTextAtSelection(text);
-      pushClipboardEntry({ type: 'text', text });
-    } catch (_) {}
+    if (!appunti.testo) return;
+    deps.restorePasteContext();
+    insertTextAtSelection(appunti.testo);
+    pushClipboardEntry({ type: 'text', text: appunti.testo });
   }
 
   async function pasteHistoryEntry(entry) {

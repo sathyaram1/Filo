@@ -29,6 +29,30 @@
 
   let activeMenu = null;
 
+  // Sulle pagine web il menu vive nel documento del sito: un clic finto della pagina non preme i suoi bottoni
+  // (#586: il sito premeva «Incolla» e «Detta» da solo). I gesti che Filo simula per sé passano da `gestoDiFilo`.
+  let gestoInterno = false;
+  function gestoDiFilo(fn) {
+    gestoInterno = true;
+    try { return fn(); } finally { gestoInterno = false; }
+  }
+  function nelMenu(t) {
+    if (!activeMenu || !t) return false;
+    try { return activeMenu.root.contains(t) || !!(activeMenu.subRoot && activeMenu.subRoot.contains(t)); } catch (_) { return false; }
+  }
+  try {
+    if (typeof window !== 'undefined' && location.protocol !== 'filo:') {
+      for (const tipo of ['click', 'auxclick', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup',
+        'mouseover', 'mouseenter', 'pointerover', 'pointerenter', 'keydown', 'keyup']) {
+        window.addEventListener(tipo, (e) => {
+          if (e.isTrusted || gestoInterno || !nelMenu(e.target)) return;
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }, true);
+      }
+    }
+  } catch (_) {}
+
   function close() {
     try { dismissTooltip?.(); } catch (_) {}
     clearSubCloseTimer();
@@ -1172,7 +1196,7 @@
         if (opener && !isSubMenuOpen()) {
           hoverOpenTimer = setTimeout(() => {
             if (lastHoverOpener === opener && !isSubMenuOpen()) {
-              try { opener.click(); } catch (_) {}
+              try { gestoDiFilo(() => opener.click()); } catch (_) {}
             }
           }, HOVER_OPEN_DELAY);
         }

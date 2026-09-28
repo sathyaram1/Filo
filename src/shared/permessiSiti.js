@@ -176,8 +176,40 @@
     return out;
   }
 
+  // Quello che si dice in chat («togli la fotocamera a questo sito») → il tipo e la scelta di Filo.
+  const PAROLE_TIPO = [
+    [/uscita audio|altoparlant|casse/, 'casse'],
+    [/fotocamer|webcam|videocamer|camera|video/, 'camera'],
+    [/microfon|\bmic\b|audio|voce/, 'microfono'],
+    [/posizion|geoloc|\bgps\b|dove (mi )?trov|luogo|location/, 'posizione'],
+    [/notific/, 'notifiche'],
+    [/appunt|clipboard/, 'appunti'],
+    [/caratter|font/, 'caratteri'],
+    [/midi/, 'midi'],
+    [/popup|finestre|schermi collegati/, 'schermi'],
+    [/presenz|inattiv/, 'presenza'],
+    [/cookie/, 'cookie'],
+    [/app|programm/, 'app'],
+    [/cartell/, 'cartelle'],
+    [/file/, 'file'],
+  ];
+  function tipoDaParola(parola) {
+    const s = String(parola || '').trim().toLowerCase();
+    if (!s) return '';
+    if (eTipo(s) && ricordabile(s)) return s;
+    for (const [re, t] of PAROLE_TIPO) if (re.test(s)) return t;
+    return '';
+  }
+  function sceltaDaParola(parola) {
+    const s = String(parola || '').trim().toLowerCase();
+    if (/^(consenti|permetti|autorizza|abilita|attiva|s[iì]|allow|dai|concedi)/.test(s)) return 'consenti';
+    if (/^(nega|blocca|vieta|togli|disattiva|no\b|deny|block|rifiuta)/.test(s)) return 'nega';
+    if (/^(chiedi|chiedimelo|domanda|reset|dimentica|ogni volta|ask)/.test(s)) return 'chiedi';
+    return '';
+  }
+
   const api = {
-    TIPI, INNOCUI, CHIUSI, NOMI_DI_PAGINA, eTipo, ricordabile, eFilo, origineDi, hostDi,
+    TIPI, INNOCUI, CHIUSI, NOMI_DI_PAGINA, tipoDaParola, sceltaDaParola, eTipo, ricordabile, eFilo, origineDi, hostDi,
     tipiRichiesta, consentitoAlControllo, decidi, verbi, domanda, nomeSchermo, statoLeggibile, normalizza,
   };
   global.SN_PERMESSI_SITI = api;

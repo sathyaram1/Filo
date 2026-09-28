@@ -81,6 +81,18 @@ contextBridge.exposeInMainWorld('filoShell', {
     ipcRenderer.on('shell:trigger-button', wrapped);
     return () => ipcRenderer.removeListener('shell:trigger-button', wrapped);
   },
+  // #586 — un permesso tolto a un sito che lo tiene ancora aperto: { tabId, host, tipi }.
+  onPermessiAcceso: (fn) => {
+    const wrapped = (_event, info) => { try { fn(info || {}); } catch (_) {} };
+    ipcRenderer.on('shell:permessi-acceso', wrapped);
+    return () => ipcRenderer.removeListener('shell:permessi-acceso', wrapped);
+  },
+  // #586 — «Detta» su una pagina web: il microfono lo apre la cornice. { azione: 'avvia'|'ferma', id, lang? }
+  onDettatura: (fn) => {
+    const wrapped = (_event, info) => { try { fn(info || {}); } catch (_) {} };
+    ipcRenderer.on('shell:dettatura', wrapped);
+    return () => ipcRenderer.removeListener('shell:dettatura', wrapped);
+  },
   tooltipShow: (text, x, y) => ipcRenderer.send('shell:tooltip-show', { text, x, y }),
   tooltipHide: () => ipcRenderer.send('shell:tooltip-hide'),
   // §2.3 — toast informativo (es. "Tab riordinate e salvate in cronologia").

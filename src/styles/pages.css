@@ -786,6 +786,7 @@ section:has(#dictList) .sn-spell-add-row {
 /* #586 — permessi dei siti in Sicurezza: una scheda per sito, una riga per permesso ricordato. */
 .sn-page .sn-perm-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
 .sn-page .sn-perm-vuoto { border: none; padding: 0; }
+.sn-page .sn-perm-sotto { font-size: 0.92rem; margin: 18px 0 0; }
 .sn-page .sn-perm-sito {
   border: 1px solid var(--sn-border);
   border-radius: 8px;

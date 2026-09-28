@@ -436,6 +436,25 @@
       level: 1,
       describe: () => 'Togliere le modifiche di stile applicate alla pagina',
     },
+    // ── permessi dei siti via chat (#586) ────────────────────────────────────
+    // Dare un permesso apre qualcosa al sito: conferma. Negarlo o tornare a chiedere chiude soltanto: subito.
+    PERMESSO_SITO: {
+      level: (a) => (['nega', 'chiedi'].includes(permessoScelta(a)) ? 1 : 2),
+      describe: (a) => {
+        const { nome, sito, scelta } = permessoTesto(a);
+        const base = scelta === 'consenti' ? `Filo vuole permettere a ${sito} di usare: ${nome}.`
+          : scelta === 'nega' ? `Bloccare ${nome} per ${sito}` : `Tornare a chiedere ${nome} per ${sito}`;
+        return scelta === 'consenti'
+          ? `${base}\n\nUn sito con questo permesso può usarlo ogni volta che lo apri, senza chiedertelo di nuovo.`
+          : base;
+      },
+      describeDone: (a) => {
+        const { nome, sito, scelta } = permessoTesto(a);
+        if (scelta === 'consenti') return `Permesso dato a ${sito}: ${nome}`;
+        if (scelta === 'nega') return `Bloccato per ${sito}: ${nome}`;
+        return `${sito} ti chiederà di nuovo: ${nome}`;
+      },
+    },
     // ── zoom della pagina via chat (#686) ────────────────────────────────────
     // Livello 1: è la stessa cosa che fanno Ctrl +/- e Ctrl 0, visibile e
     // reversibile in un tasto.
@@ -453,6 +472,18 @@
       },
     },
   };
+
+  function permessoScelta(a) {
+    const PS = global.SN_PERMESSI_SITI;
+    return PS ? PS.sceltaDaParola(a && (a.scelta ?? a.choice)) : '';
+  }
+  function permessoTesto(a) {
+    const PS = global.SN_PERMESSI_SITI;
+    const tipo = PS ? PS.tipoDaParola(a && (a.permesso ?? a.permission)) : '';
+    const nome = tipo && PS ? PS.TIPI[tipo].nome.toLowerCase() : String((a && a.permesso) || 'un permesso');
+    const sito = String((a && (a.sito ?? a.site ?? a.dominio)) || '').trim() || 'questo sito';
+    return { nome, sito, scelta: permessoScelta(a) };
+  }
 
   // Livello dell'azione: 1|2|3, oppure null se l'azione NON è registrata
   // (→ il dispatch deve rifiutarla).

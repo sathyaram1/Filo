@@ -633,7 +633,10 @@
       else if (action.startsWith('tab-proxy-go:')) proxyTab(id, action.slice('tab-proxy-go:'.length));
       else if (action === 'tab-permessi') openPermessiMenu();
       else if (action === 'tab-permessi-gestisci') api.tabs.open('filo://security/security.html#sec-permessi');
-      else if (action.startsWith('tab-permessi-cambia:')) cambiaPermessoScheda(id, action.slice('tab-permessi-cambia:'.length));
+      else if (action.startsWith('tab-permessi-cambia:')) {
+        const [tipo, scelta] = action.slice('tab-permessi-cambia:'.length).split(':');
+        cambiaPermessoScheda(id, tipo, scelta);
+      } else if (action.startsWith('tab-permessi-tipo:')) openPermessiTipoMenu(action.slice('tab-permessi-tipo:'.length));
     });
   }
 
@@ -760,6 +763,21 @@
         pi.dataset.tip = `${PERMESSI.hostCorto(t.permessi[0].host)} aspetta una risposta`;
         pi.innerHTML = PERMESSI.icona(t.permessi[0].tipi, 12);
         el.appendChild(pi);
+      }
+
+      // Cosa il sito usa, o si è visto negare, in questa pagina: su un fisso il microfono non accende nessuna spia.
+      const usi = t.usiPermessi;
+      if (usi && ((usi.inUso && usi.inUso.length) || (usi.bloccati && usi.bloccati.length))) {
+        const inUso = usi.inUso && usi.inUso.length;
+        const u = document.createElement('span');
+        u.className = 'perm-uso' + (inUso ? '' : ' bloccato');
+        u.dataset.tip = PERMESSI.frasiUso(usi);
+        u.setAttribute('role', 'button');
+        u.setAttribute('aria-label', u.dataset.tip);
+        u.innerHTML = PERMESSI.icona(inUso ? [usi.inUso[0]] : [usi.bloccati[0].tipo], 12);
+        u.addEventListener('mousedown', (e) => e.stopPropagation());
+        u.addEventListener('click', (e) => { e.stopPropagation(); apriPermessiScheda(t, e.clientX, e.clientY); });
+        el.appendChild(u);
       }
 
       const title = document.createElement('span');
@@ -1508,6 +1526,28 @@
       return typeof ICONS[nome] === 'function' ? ICONS[nome](size || 16) : '';
     }
 
+    const ARTICOLI = {
+      camera: 'la fotocamera', microfono: 'il microfono', schermo: 'lo schermo', posizione: 'la posizione',
+      notifiche: 'le notifiche', appunti: 'gli appunti', caratteri: 'i caratteri del computer',
+    };
+    function conArticolo(t) { return ARTICOLI[t] || (P && P.TIPI[t] ? P.TIPI[t].nome.toLowerCase() : t); }
+    function elenca(tipi) {
+      const v = (tipi || []).map(conArticolo);
+      return v.length <= 1 ? (v[0] || '') : `${v.slice(0, -1).join(', ')} e ${v[v.length - 1]}`;
+    }
+
+    // Il segno sulla scheda: cosa il sito ha avuto in questo documento, e cosa si è visto negare.
+    function frasiUso(usi) {
+      const parti = [];
+      if (usi.inUso && usi.inUso.length) parti.push(`usa ${elenca(usi.inUso)}`);
+      const b = Array.isArray(usi.bloccati) ? usi.bloccati : [];
+      const negati = b.filter((x) => x.motivo !== 'smesso').map((x) => x.tipo);
+      const smessi = b.filter((x) => x.motivo === 'smesso').map((x) => x.tipo);
+      if (negati.length) parti.push(`non può usare ${elenca(negati)}`);
+      if (smessi.length) parti.push(`ho smesso di chiederti ${elenca(smessi)}`);
+      return `${hostCorto(usi.host)} ${parti.join(', ')}. Clic per cambiare`;
+    }
+
     function ensureBar() {
       if (bar) return bar;
       bar = document.createElement('div');
@@ -1529,20 +1569,102 @@
       return b;
     }
 
-    function rispondi(id, scelta, r) {
+    function rispondi(d, scelta, r, fonte) {
       r.dataset.risposto = '1';
       for (const b of r.querySelectorAll('button')) b.disabled = true;
-      api.message({ type: 'site_permission_answer', id, scelta }).then((res) => {
-        if (res && res.ok) return;
+      api.message({ type: 'site_permission_answer', id: d.id, scelta, fonte }).then((res) => {
+        if (res && res.ok) {
+          // Una lettura dei caratteri non aspetta la risposta: il sito li vede alla prossima richiesta.
+          if (d.tardiva && scelta === 'consenti') showToast(`${hostCorto(d.host)} adesso li vede: riprova sul sito.`);
+          return;
+        }
         // La domanda non c'è più (pagina cambiata nel frattempo): la riga sparisce col prossimo aggiornamento.
         showToast('La pagina non aspetta più questa risposta.');
       }).catch(() => {});
+    }
+
+    // «Condividi lo schermo» apre la scelta di cosa: uno schermo, una scheda, la finestra di un'altra app.
+    const GRUPPI = [['schermo', 'Schermi'], ['scheda', 'Schede'], ['finestra', 'Finestre']];
+    function div(classe, testo) {
+      const el = document.createElement('div');
+      el.className = classe;
+      if (testo != null) el.textContent = testo;
+      return el;
+    }
+
+    function chiudiScelta(r) {
+      r.classList.remove('perm-sceglie');
+      const pannello = r.querySelector('.perm-fonti');
+      if (pannello) pannello.remove();
+      const annulla = r.querySelector('.perm-annulla');
+      if (annulla) annulla.remove();
+      const si = r.querySelector('[data-si="1"]');
+      if (si) si.hidden = false;
+      misura();
+    }
+
+    async function apriScelta(d, r) {
+      if (r.classList.contains('perm-sceglie')) return;
+      r.classList.add('perm-sceglie');
+      const si = r.querySelector('[data-si="1"]');
+      if (si) si.hidden = true;
+      const azioni = r.querySelector('.perm-azioni');
+      azioni.insertBefore(bottone('Annulla', 'perm-btn perm-annulla', () => chiudiScelta(r)), azioni.firstChild);
+      const pannello = div('perm-fonti');
+      pannello.append(div('perm-fonti-attesa', 'Cerco cosa puoi condividere…'));
+      r.appendChild(pannello);
+      misura();
+      let res = null;
+      try { res = await api.message({ type: 'site_screen_sources', id: d.id }); } catch (_) { res = null; }
+      if (!r.isConnected || !r.classList.contains('perm-sceglie')) return;
+      const fonti = res && res.ok && Array.isArray(res.fonti) ? res.fonti : [];
+      if (!fonti.length) {
+        pannello.replaceChildren(div('perm-fonti-attesa', 'Non trovo niente da condividere.'));
+        misura();
+        return;
+      }
+      const gruppi = [];
+      for (const [tipo, titolo] of GRUPPI) {
+        const lista = fonti.filter((f) => f.tipo === tipo);
+        if (!lista.length) continue;
+        const riga = div('perm-fonti-riga');
+        for (const f of lista) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'perm-fonte';
+          b.dataset.fonte = f.id;
+          b.dataset.tipo = f.tipo;
+          b.dataset.tip = f.nome;
+          const vista = document.createElement('span');
+          vista.className = 'perm-fonte-img';
+          if (f.anteprima) {
+            const img = document.createElement('img');
+            img.src = f.anteprima;
+            img.alt = '';
+            vista.appendChild(img);
+          } else {
+            vista.classList.add('vuota');
+          }
+          const nome = document.createElement('span');
+          nome.className = 'perm-fonte-nome';
+          nome.textContent = f.questa ? `${f.nome} (questa)` : f.nome;
+          b.append(vista, nome);
+          b.addEventListener('click', () => rispondi(d, 'consenti', r, f.id));
+          riga.appendChild(b);
+        }
+        const g = div('perm-fonti-gruppo');
+        g.append(div('perm-fonti-titolo', titolo), riga);
+        gruppi.push(g);
+      }
+      pannello.replaceChildren(...gruppi);
+      misura();
     }
 
     function riga(d) {
       const r = document.createElement('div');
       r.className = 'perm-row';
       r.dataset.id = d.id;
+      r._domanda = d;
       const ico = document.createElement('span');
       ico.className = 'perm-ico';
       ico.innerHTML = icona(d.tipi, 16);
@@ -1551,20 +1673,23 @@
       const host = document.createElement('b');
       host.textContent = hostCorto(d.host);
       host.title = d.host;
-      testo.append(host, document.createTextNode(` vuole ${P ? P.verbi(d.tipi) : 'usare un permesso'}`));
+      testo.append(host, document.createTextNode(` vuole ${P ? P.verbi(d.tipi, d.grezzo) : 'usare un permesso'}`));
       const azioni = document.createElement('div');
       azioni.className = 'perm-azioni';
       const schermo = (d.tipi || []).includes('schermo');
-      const si = bottone(schermo ? 'Condividi lo schermo' : 'Consenti', 'perm-btn perm-si', () => rispondi(d.id, 'consenti', r));
+      const si = bottone(schermo ? 'Condividi lo schermo' : 'Consenti', 'perm-btn perm-si',
+        () => (schermo ? apriScelta(d, r) : rispondi(d, 'consenti', r)));
       si.dataset.si = '1';
-      const no = bottone('Nega', 'perm-btn perm-no', () => rispondi(d.id, 'nega', r));
-      const x = bottone('', 'perm-chiudi', () => rispondi(d.id, 'ignora', r));
+      const no = bottone('Nega', 'perm-btn perm-no', () => rispondi(d, 'nega', r));
+      const x = bottone('', 'perm-chiudi', () => rispondi(d, 'ignora', r));
       x.dataset.tip = 'Non ora';
       x.setAttribute('aria-label', 'Non ora');
       if (typeof ICONS.close === 'function') x.innerHTML = ICONS.close(12);
       else x.textContent = '×';
       azioni.append(si, no, x);
-      r.append(ico, testo, azioni);
+      const testa = div('perm-testa');
+      testa.append(ico, testo, azioni);
+      r.append(testa);
       return r;
     }
 
@@ -1599,13 +1724,24 @@
       misura();
     }
 
+    // L'Esc chiude per prima la domanda, come la ×; se è aperta la scelta dello schermo, chiude quella.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !bar || bar.hidden) return;
+      const r = bar.querySelector('.perm-row:not([data-risposto])');
+      if (!r || !r._domanda) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (r.classList.contains('perm-sceglie')) chiudiScelta(r);
+      else rispondi(r._domanda, 'ignora', r);
+    }, true);
+
     window.addEventListener('resize', misura);
-    return { aggiorna, icona, hostCorto };
+    return { aggiorna, icona, hostCorto, frasiUso, elenca };
   })();
 
-  // Tasto destro sulla scheda: le scelte per quel sito si danno e si revocano da qui, anche quelle mai chieste.
-  // Senza risposta il sito legge «bloccato» e certi non chiedono più (patterns/un-permesso-lo-da-lutente-fuori-dalla-pagina-che-lo-chiede.md).
-  const PERMESSI_DI_BASE = ['camera', 'microfono', 'posizione', 'notifiche', 'appunti'];
+  // Tasto destro sulla scheda: le scelte per quel sito si danno, si negano e si tolgono da qui, anche quelle mai chieste.
+  // Senza risposta certi siti non chiedono (patterns/un-permesso-lo-da-lutente-fuori-dalla-pagina-che-lo-chiede.md).
+  const PERMESSI_DI_BASE = ['camera', 'microfono', 'posizione', 'notifiche', 'appunti', 'caratteri'];
   let ctxPermessiSito = null;
   async function leggiPermessiScheda(tabId) {
     try {
@@ -1614,38 +1750,169 @@
     } catch (_) { return null; }
   }
 
+  // Il segno sulla scheda apre lo stesso menu del tasto destro, dove sta il segno.
+  async function apriPermessiScheda(t, x, y) {
+    ctxTabId = t.id;
+    ctxMenuPos = { x: Math.round(x), y: Math.round(y) };
+    ctxPermessiSito = await leggiPermessiScheda(t.id);
+    if (ctxPermessiSito) openPermessiMenu();
+  }
+
   function openPermessiMenu() {
     const sito = ctxPermessiSito;
     const P = window.SN_PERMESSI_SITI;
     if (!sito || !P) return;
-    const tipi = Object.keys(P.TIPI).filter((t) => sito.scelte[t] || PERMESSI_DI_BASE.includes(t));
-    const entries = tipi.map((t) => ({
-      label: `${sito.scelte[t] === 'consenti' ? 'Revoca' : 'Consenti'} ${P.TIPI[t].nome.toLowerCase()}`,
-      action: `tab-permessi-cambia:${t}`,
-    }));
+    const smesso = new Set(sito.smesso || []);
+    const tipi = Object.keys(P.TIPI).filter((t) => P.ricordabile(t) && (sito.scelte[t] || smesso.has(t) || PERMESSI_DI_BASE.includes(t)));
+    // Chi apre questo menu mentre il sito usa qualcosa di solito vuole dire di no: il no è la voce, la freccia il resto.
+    const entries = tipi.map((t) => {
+      const nome = P.TIPI[t].nome.toLowerCase();
+      const consentito = sito.scelte[t] === 'consenti';
+      return {
+        label: `${consentito ? 'Blocca' : 'Consenti'} ${nome}`,
+        action: `tab-permessi-cambia:${t}:${consentito ? 'nega' : 'consenti'}`,
+        subAction: `tab-permessi-tipo:${t}`,
+      };
+    });
     entries.push({ type: 'separator' }, { label: 'Gestisci permessi', icon: 'options', action: 'tab-permessi-gestisci' });
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
   }
 
-  async function cambiaPermessoScheda(tabId, tipo) {
+  function openPermessiTipoMenu(tipo) {
     const sito = ctxPermessiSito;
     const P = window.SN_PERMESSI_SITI;
     if (!sito || !P || !P.TIPI[tipo]) return;
-    const revoca = sito.scelte[tipo] === 'consenti';
+    const s = sito.scelte[tipo] || null;
+    const segno = (x) => (x ? '✓ ' : '');
+    api.popupMenu([
+      { label: `${segno(s === 'consenti')}Consenti`, action: `tab-permessi-cambia:${tipo}:consenti` },
+      { label: `${segno(s === 'nega')}Blocca`, action: `tab-permessi-cambia:${tipo}:nega` },
+      { label: `${segno(!s)}Chiedimelo ogni volta`, action: `tab-permessi-cambia:${tipo}:chiedi` },
+    ], ctxMenuPos.x, ctxMenuPos.y);
+  }
+
+  async function cambiaPermessoScheda(tabId, tipo, scelta) {
+    const sito = ctxPermessiSito;
+    const P = window.SN_PERMESSI_SITI;
+    if (!sito || !P || !P.TIPI[tipo] || !['consenti', 'nega', 'chiedi'].includes(scelta)) return;
     let res = null;
     try {
-      res = await api.message({ type: 'site_permission_set', tabId, origine: sito.origine, tipo, scelta: revoca ? null : 'consenti' });
+      res = await api.message({ type: 'site_permission_set', tabId, origine: sito.origine, tipo, scelta: scelta === 'chiedi' ? null : scelta });
     } catch (_) { res = null; }
     const nome = P.TIPI[tipo].nome.toLowerCase();
     if (!res || !res.ok) { showToast(`Non sono riuscito a cambiare il permesso (${nome}): riprova.`); return; }
-    if (revoca && P.TIPI[tipo].continuo) {
-      NOTIFS.show(`Permesso tolto a ${sito.host} (${nome}). Quello che la pagina ha già aperto resta acceso finché non la ricarichi.`, {
-        actions: [{ label: 'Ricarica', onClick: () => api.tabs.reload(tabId) }],
-      });
-    } else {
-      showToast(revoca ? `Permesso tolto a ${sito.host} (${nome}): la prossima volta ti chiede.` : `Permesso dato a ${sito.host} (${nome}).`);
-    }
+    // Se la pagina tiene ancora aperto quello che le hai tolto, l'avviso con «Ricarica» arriva dal main.
+    if (res.ancoraAperti) return;
+    if (scelta === 'consenti') showToast(`Permesso dato a ${sito.host} (${nome}).`);
+    else if (scelta === 'nega') showToast(`Bloccato per ${sito.host}: ${nome}.`);
+    else showToast(`${sito.host} ti chiederà di nuovo: ${nome}.`);
   }
+
+  if (api.onPermessiAcceso) {
+    api.onPermessiAcceso((info) => {
+      const host = PERMESSI.hostCorto(info.host);
+      NOTIFS.show(`Permesso tolto a ${host} (${PERMESSI.elenca(info.tipi)}). Quello che la pagina ha già aperto resta acceso finché non la ricarichi.`, {
+        actions: [{ label: 'Ricarica', onClick: () => api.tabs.reload(info.tabId) }],
+      });
+    });
+  }
+
+  // ─── Detta sulle pagine web (#586) ────────────────────────────────────────
+  // Il microfono lo apre la cornice, non la pagina: così il sito non eredita l'ascolto. Qui si ascolta e si spezza
+  // il parlato; il testo torna al frame che detta passando dal main.
+  (() => {
+    const Seg = window.SN_DICTATION_SEGMENTER;
+    if (!Seg || !api.onDettatura) return;
+    const RATE = 16000;
+    const MAX_MS = 5 * 60 * 1000;
+    const attive = new Map();
+    const manda = (id, tipo, extra) => api.message({ type: 'dettatura_evento', id, tipo, ...(extra || {}) }).catch(() => {});
+
+    async function avvia(id, lang) {
+      let stream = null;
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (_) { stream = null; }
+      if (!stream) { manda(id, 'errore', { res: { code: 'NO_MIC' } }); manda(id, 'fine'); return; }
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      let ctx = null;
+      let source = null;
+      let proc = null;
+      try {
+        ctx = new Ctx();
+        source = ctx.createMediaStreamSource(stream);
+        proc = ctx.createScriptProcessor(4096, 1, 1);
+        try { if (ctx.state === 'suspended' && ctx.resume) ctx.resume(); } catch (_) {}
+      } catch (_) {
+        try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+        try { if (ctx) ctx.close(); } catch (_) {}
+        manda(id, 'errore', { res: {} });
+        manda(id, 'fine');
+        return;
+      }
+      const state = { stopped: false, interimBusy: false, failed: false, queue: Promise.resolve() };
+      attive.set(id, state);
+      const wav = (seg) => Seg.bytesToBase64(Seg.pcm16ToWav(Seg.floatToInt16(seg.samples), seg.sampleRate));
+      const trascrivi = (seg, interim) => api.message({
+        type: 'ai_request', action: 'transcribe_audio', payload: { audioBase64: wav(seg), format: 'wav', lang, interim },
+      });
+      const segmenter = Seg.createSegmenter({
+        sampleRate: RATE,
+        onInterim: (seg) => {
+          if (state.interimBusy || state.stopped || state.failed) return;
+          state.interimBusy = true;
+          trascrivi(seg, true)
+            .then((res) => { if (res && res.ok && !state.stopped) manda(id, 'provvisoria', { testo: String(res.text || '') }); })
+            .catch(() => {})
+            .finally(() => { state.interimBusy = false; });
+        },
+        onFinal: (seg) => {
+          state.queue = state.queue.then(async () => {
+            if (state.failed) return;
+            let res = null;
+            try { res = await trascrivi(seg, false); } catch (_) { res = null; }
+            if (!res || !res.ok) {
+              state.failed = true;
+              manda(id, 'errore', { res: { code: res && res.code, error: res && res.error } });
+              ferma(id);
+              return;
+            }
+            const testo = String(res.text || '').trim();
+            if (testo) manda(id, 'frase', { testo });
+          });
+        },
+      });
+      proc.onaudioprocess = (e) => {
+        if (state.stopped) return;
+        try { segmenter.push(Seg.downsample(e.inputBuffer.getChannelData(0), ctx.sampleRate, RATE)); } catch (_) {}
+      };
+      source.connect(proc);
+      proc.connect(ctx.destination);
+      state.stop = async () => {
+        if (state.stopped) return;
+        state.stopped = true;
+        try { proc.disconnect(); source.disconnect(); } catch (_) {}
+        try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+        try { await ctx.close(); } catch (_) {}
+        try { segmenter.flush(); } catch (_) {}
+        await state.queue;
+        attive.delete(id);
+        manda(id, 'fine');
+      };
+      manda(id, 'ascolta');
+      setTimeout(() => ferma(id), MAX_MS);
+    }
+
+    function ferma(id) {
+      const s = attive.get(id);
+      if (s && typeof s.stop === 'function') s.stop().catch(() => {});
+    }
+
+    api.onDettatura((info) => {
+      const id = String(info.id || '');
+      if (!id) return;
+      if (info.azione === 'avvia') avvia(id, String(info.lang || 'it-IT'));
+      else if (info.azione === 'ferma') ferma(id);
+    });
+  })();
 
   newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/'));
   backBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.back(a.id); });
