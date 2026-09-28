@@ -224,12 +224,20 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     mostraPercentuale();
   }
 
+  // Elementi HTML anche in un documento che HTML non è (un'immagine SVG aperta
+  // da sola): lì createElement darebbe un nodo senza stile, e il riquadro non c'era.
+  const XHTML = 'http://www.w3.org/1999/xhtml';
+  const crea = (tag) => document.createElementNS(XHTML, tag);
+
   function makeBadge() {
-    const el = document.createElement('div');
+    const el = crea('div');
     el.id = '__filo-zoom-badge';
     el.setAttribute('role', 'status');
+    try { el.setAttribute('popover', 'manual'); } catch (_) {}
     Object.assign(el.style, {
-      position: 'fixed', top: '12px', right: '12px', zIndex: '2147483647',
+      position: 'fixed', inset: 'auto', top: '12px', right: '12px', zIndex: '2147483647',
+      margin: '0', border: 'none', overflow: 'visible', width: 'auto', height: 'auto',
+      maxWidth: 'none', maxHeight: 'none',
       background: 'rgba(20,20,20,0.88)', color: '#fff',
       font: '12px/1.4 system-ui, -apple-system, sans-serif',
       padding: '6px 10px', borderRadius: '8px', pointerEvents: 'auto',
