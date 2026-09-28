@@ -149,6 +149,7 @@ for (const [piattaforma, job, nomeFile] of [['Mac', 'release-mac', 'Filo-Mac.dmg
       figlio.on('close', (status) => fatto({ status, stdout: out, stderr: '' }));
     });
     try {
+      finoA('v0.2.301');
       const primo = await lancia('v0.2.301', { strumento: { outcome: 'success' }, dipendenze: { outcome: 'failure' } });
       expect(primo.status, primo.stdout + primo.stderr).toBe(0);
       expect(stato.feedback).toHaveLength(1);
