@@ -103,10 +103,19 @@ test('da un sito si chiedono solo le azioni della barra d\'aiuto, confermate o n
   const web = 'https://sito.example/';
   assert.equal(W.azioneAmmessaDa({ type: 'INVIA_FEEDBACK', testo: 'x' }, web), true);
   assert.equal(W.azioneAmmessaDa({ type: 'invia_feedback' }, web), true);
-  for (const type of ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'SALVA_LEZIONE', 'CANCELLA_MEMORIA', 'ESEGUI_COMANDO', 'NAVIGA', '', undefined]) {
+  for (const type of ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'SALVA_LEZIONE', 'CANCELLA_MEMORIA', 'ESEGUI_COMANDO', '', undefined]) {
     assert.equal(W.azioneAmmessaDa({ type }, web), false, String(type));
     assert.equal(W.azioneAmmessaDa({ type }, 'filo://newtab/'), true, String(type));
   }
+  // «Apri il link» della barra: indirizzi web sì, pagine di Filo e altri schemi no.
+  for (const url of ['https://altro.example/articolo', 'http://127.0.0.1:8080/x', 'altro.example']) {
+    assert.equal(W.azioneAmmessaDa({ type: 'NAVIGA', url }, web), true, url);
+  }
+  assert.equal(W.azioneAmmessaDa({ type: 'naviga', href: 'https://altro.example/' }, web), true);
+  for (const url of ['filo://options/', ' FILO://newtab/', 'file:///etc/passwd', 'javascript:alert(1)', 'data:text/html,x', '', undefined]) {
+    assert.equal(W.azioneAmmessaDa({ type: 'NAVIGA', url }, web), false, String(url));
+  }
+  assert.equal(W.azioneAmmessaDa({ type: 'NAVIGA', url: 'filo://options/' }, 'filo://newtab/'), true);
   for (const url of ['', 'about:blank', 'blob:https://sito.example/1']) {
     assert.equal(W.azioneAmmessaDa({ type: 'ESEGUI_COMANDO' }, url), false, url || '(vuoto)');
   }

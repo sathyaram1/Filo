@@ -34,6 +34,7 @@
 
 const path = require('node:path');
 const fs = require('node:fs');
+const { spingiAllaScheda } = require('./impostazioniPerOrigine');
 
 // Tetto della cronologia persistita: teniamo le voci più recenti. 200 è ampio
 // per l'uso reale e non gonfia storage.json (poche centinaia di byte a voce).
@@ -359,18 +360,18 @@ function broadcast(kind, rec) {
   const scope = scopeOf(rec);
   try {
     const payload = { kind, item: publicRecord(rec) };
+    // Solo le finestre di Filo: un popup di accesso è la pagina di un sito, e il
+    // record porta il percorso su disco.
     for (const win of windowsOf(scope)) {
+      if (!win._filoTabs) continue;
       try { win.webContents.send('shell:download', payload); } catch (_) {}
     }
   } catch (_) {}
   notifyTabs(scope);
 }
 
-// Segnale CONTENTLESS alle pagine (schede) — serve alla pagina filo://downloads
-// per sapere quando ri-leggere la lista. NON portiamo qui il record: questo
-// canale (`filo:broadcast`) raggiunge ANCHE le schede di siti esterni, e il
-// record contiene il percorso ASSOLUTO su disco (con lo username). La pagina
-// legge i dati veri dal canale DOWNLOADS_LIST, riservato alle superfici interne.
+// Segnale senza contenuto alla pagina filo://downloads, che rilegge la lista dal
+// canale DOWNLOADS_LIST. Ai siti non arriva: passa dalla lista delle spinte.
 function notifyTabs(scope = '') {
   try {
     const type = (globalThis.SN_MSG && globalThis.SN_MSG.MSG.DOWNLOADS_UPDATED) || 'downloads_updated';
@@ -378,9 +379,7 @@ function notifyTabs(scope = '') {
     for (const win of windowsOf(scope)) {
       const tm = win._filoTabs;
       if (tm && Array.isArray(tm.tabs)) {
-        for (const t of tm.tabs) {
-          try { t.view.webContents.send('filo:broadcast', msg); } catch (_) {}
-        }
+        for (const t of tm.tabs) spingiAllaScheda(t.view && t.view.webContents, msg);
       }
     }
   } catch (_) {}
