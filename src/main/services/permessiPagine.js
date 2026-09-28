@@ -1,22 +1,34 @@
-// Microfono, fotocamera, appunti e posizione: una pagina web li ha solo se l'utente dice sì nella cornice (#591.1).
-// Filo stesso (filo://, la shell) resta com'era; Detta e Incolla sulle pagine passano da un lasciapassare di pochi secondi.
+// Permessi delle pagine web (#591.1): microfono, fotocamera, appunti, posizione e notifiche li decide l'utente nella cornice,
+// il resto passa solo se innocuo. Filo stesso (filo://, la shell) resta com'era; Detta e Incolla hanno un lasciapassare breve.
 // Senza gestore Electron concede tutto: ogni sessione che mostra pagine web passa da `installa` o da `negaTutto`.
 
 'use strict';
 
 const { randomUUID } = require('node:crypto');
+const Psl = require('./safebrowse/psl');
 
 const TIPI = {
   media: 'media',
   'clipboard-read': 'appunti',
   'deprecated-sync-clipboard-read': 'appunti',
   geolocation: 'posizione',
+  notifications: 'notifiche',
 };
+// Fuori da TIPI una pagina ha solo questi, senza domanda: gli altri (notifiche escluse, app esterne a parte) sono no.
+const INNOCUI = new Set([
+  'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'keyboardLock', 'mediaKeySystem',
+  'speaker-selection', 'storage-access', 'top-level-storage-access', 'fileSystem', 'midi',
+]);
 // La lettura sincrona degli appunti non sa chiedere: passa solo con un sì già dato.
 const SOLO_CONTROLLO = new Set(['deprecated-sync-clipboard-read']);
+// Notifiche: si chiedono solo subito dopo un gesto dell'utente sulla pagina, e il controllo dice il vero, perché
+// Electron mostra una notifica a chi il controllo dà per concessa.
+const DOPO_UN_GESTO = new Set(['notifications']);
+const GESTO_MS = 5000;
+const GESTI = new Set(['mouseDown', 'mouseUp', 'rawKeyDown', 'keyDown', 'char', 'touchStart', 'touchEnd', 'gestureTap']);
 const LASCIAPASSARE_MS = 5000;
-// Una domanda senza risposta non tiene ferma la pagina: dopo un po' vale no, non ricordato, e il sito può richiedere.
-const ATTESA_MS = 12000;
+// Il lasciapassare di Detta copre il microfono e basta: con la fotocamera la pagina avrebbe un sì mai dato (#591, giro 18).
+const PARTI_LASCIAPASSARE = { media: new Set(['audio']), appunti: new Set(['appunti']) };
 
 const lasciapassari = new Map();
 const inAttesa = new Map();
@@ -50,23 +62,63 @@ function sceltePer(ses) {
   return ses._filoScelte;
 }
 
-function lasciapassareValido(wc, tipo) {
+function lasciapassareValido(wc, tipo, parti) {
   const p = wc && lasciapassari.get(wc.id);
   if (p && p.fino <= Date.now()) { lasciapassari.delete(wc.id); return false; }
-  return Boolean(p && p.tipo === tipo);
+  if (!p || p.tipo !== tipo) return false;
+  const coperte = PARTI_LASCIAPASSARE[tipo];
+  return Boolean(coperte && parti.every((x) => coperte.has(x === tipo ? 'appunti' : x)));
 }
 
 function lasciapassare(wc, tipo) {
-  if (!wc || (tipo !== 'media' && tipo !== 'appunti')) return false;
+  if (!wc || !PARTI_LASCIAPASSARE[tipo]) return false;
   lasciapassari.set(wc.id, { tipo, fino: Date.now() + LASCIAPASSARE_MS });
   return true;
+}
+
+// Il gesto conta per il documento su cui è stato fatto: il clic che porta altrove non vale per la pagina d'arrivo.
+function seguiGesti(wc) {
+  if (!wc || wc._filoGestiSeguiti) return;
+  wc._filoGestiSeguiti = true;
+  try {
+    wc.on('input-event', (_e, input) => {
+      const type = (input && input.type) || '';
+      if (!GESTI.has(type) || String(input.key || '') === 'Escape') return;
+      wc._filoGestoAlle = Date.now();
+    });
+    wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
+      const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
+      const stessa = e && typeof e.isSameDocument === 'boolean' ? e.isSameDocument : isInPlace;
+      if (principale && !stessa) wc._filoGestoAlle = 0;
+    });
+  } catch (_) {}
+}
+
+function gestoRecente(wc) {
+  const t = wc && wc._filoGestoAlle;
+  return Boolean(t && Date.now() - t < GESTO_MS);
+}
+
+// Il dominio registrato va sempre letto: con un indirizzo lungo la parte che sceglie chi attacca è quella davanti.
+function nomeDaMostrare(origine) {
+  let u;
+  try { u = new URL(origine); } catch (_) { return { sotto: '', dominio: String(origine || '') }; }
+  const host = u.hostname;
+  const porta = u.port ? ':' + u.port : '';
+  let registrabile = host;
+  try {
+    if (!Psl.isIpAddress(host)) registrabile = (Psl.getDomainInfo(host) || {}).registrable || host;
+  } catch (_) {}
+  const sotto = host.length > registrabile.length && host.endsWith('.' + registrabile)
+    ? host.slice(0, host.length - registrabile.length - 1)
+    : '';
+  return { sotto, dominio: registrabile + porta };
 }
 
 function chiudi(id, si, { ricorda }) {
   const p = inAttesa.get(id);
   if (!p) return false;
   inAttesa.delete(id);
-  clearTimeout(p.timer);
   if (ricorda) {
     const scelte = sceltePer(p.ses);
     for (const parte of p.parti) scelte.set(`${p.origine}|${parte}`, Boolean(si));
@@ -101,6 +153,7 @@ function seguiPagina(wc) {
   } catch (_) {}
 }
 
+// La domanda resta finché l'utente risponde o la pagina se ne va: una scadenza toglieva il sì a chi rispondeva con calma.
 function chiedi({ ses, wc, origine, tipo, parti, callback, schedaDi }) {
   const dove = schedaDi(wc);
   if (!dove || typeof dove.avvisa !== 'function') { callback(false); return; }
@@ -108,42 +161,51 @@ function chiedi({ ses, wc, origine, tipo, parti, callback, schedaDi }) {
     if (p.wc === wc && p.origine === origine && p.parti.join() === parti.join()) { p.callbacks.push(callback); return; }
   }
   const id = randomUUID();
-  const timer = setTimeout(() => chiudi(id, false, { ricorda: false }), ATTESA_MS);
-  if (timer && typeof timer.unref === 'function') timer.unref();
-  inAttesa.set(id, { ses, wc, origine, tipo, parti, callbacks: [callback], avvisa: dove.avvisa, timer });
+  inAttesa.set(id, { ses, wc, origine, tipo, parti, callbacks: [callback], avvisa: dove.avvisa });
   seguiPagina(wc);
+  const { sotto, dominio } = nomeDaMostrare(origine);
   let host = origine;
   try { host = new URL(origine).host; } catch (_) {}
-  dove.avvisa('chiedi', { id, tabId: dove.tabId, host, tipo, parti });
+  dove.avvisa('chiedi', { id, tabId: dove.tabId, host, sotto, dominio, tipo, parti });
 }
 
 // `schedaDi(wc)` → { tabId, avvisa(evento, dati) } della finestra che mostra la pagina, o null.
-function installa(ses, { schedaDi, prima } = {}) {
+// `esterno(url)` → true per gli indirizzi di altre applicazioni che una pagina può aprire (la stessa lista delle schede).
+function installa(ses, { schedaDi, prima, esterno } = {}) {
   if (!ses || ses._filoPermessi) return;
   ses._filoPermessi = true;
   try {
     ses.setPermissionRequestHandler((wc, permission, callback, details) => {
       if (typeof prima === 'function' && prima(wc, permission, callback, details)) return;
-      const tipo = TIPI[permission];
-      if (!tipo) { callback(true); return; }
       const origine = origineDi(wc, details && details.requestingUrl);
-      if (!origine || lasciapassareValido(wc, tipo)) { callback(true); return; }
+      if (!origine) { callback(true); return; }
+      if (permission === 'openExternal') {
+        const url = details && details.externalURL;
+        callback(Boolean(typeof esterno === 'function' && esterno(url) && gestoRecente(wc)));
+        return;
+      }
+      const tipo = TIPI[permission];
+      if (!tipo) { callback(INNOCUI.has(permission)); return; }
       const parti = partiDi(tipo, details);
+      if (lasciapassareValido(wc, tipo, parti)) { callback(true); return; }
       const decise = parti.map((parte) => sceltePer(ses).get(`${origine}|${parte}`));
       if (decise.every((x) => x === true)) { callback(true); return; }
       if (decise.some((x) => x === false) || SOLO_CONTROLLO.has(permission)) { callback(false); return; }
+      if (DOPO_UN_GESTO.has(permission) && !gestoRecente(wc)) { callback(false); return; }
       chiedi({ ses, wc, origine, tipo, parti, callback, schedaDi: schedaDi || (() => null) });
     });
   } catch (_) {}
   try {
     // «Posso?» risponde sì finché l'utente non ha detto no: un «negato» qui farebbe credere al sito che non valga la pena chiedere.
     ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
-      const tipo = TIPI[permission];
-      if (!tipo) return true;
       const origine = origineDi(wc, (details && details.requestingUrl) || requestingOrigin);
-      if (!origine || lasciapassareValido(wc, tipo)) return true;
-      const decise = partiDi(tipo, details).map((parte) => sceltePer(ses).get(`${origine}|${parte}`));
-      if (SOLO_CONTROLLO.has(permission)) return decise.every((x) => x === true);
+      if (!origine) return true;
+      const tipo = TIPI[permission];
+      if (!tipo) return INNOCUI.has(permission);
+      const parti = partiDi(tipo, details);
+      if (lasciapassareValido(wc, tipo, parti)) return true;
+      const decise = parti.map((parte) => sceltePer(ses).get(`${origine}|${parte}`));
+      if (SOLO_CONTROLLO.has(permission) || DOPO_UN_GESTO.has(permission)) return decise.every((x) => x === true);
       return !decise.some((x) => x === false);
     });
   } catch (_) {}
@@ -163,4 +225,27 @@ function rispondi(id, si) {
   return chiudi(id, si, { ricorda: true });
 }
 
-module.exports = { installa, negaTutto, rispondi, lasciapassare, TIPI, ATTESA_MS, _inAttesa: inAttesa };
+// Quello che l'utente ha deciso per il sito di una pagina: si vede e si toglie dal menu della scheda.
+function scelteDi(wc) {
+  const origine = origineWeb(urlDi(wc));
+  const ses = wc && wc.session;
+  if (!origine || !ses || !ses._filoScelte) return { origine, scelte: [] };
+  const scelte = [];
+  for (const [chiave, si] of ses._filoScelte) {
+    const i = chiave.lastIndexOf('|');
+    if (chiave.slice(0, i) === origine) scelte.push({ parte: chiave.slice(i + 1), si });
+  }
+  return { origine, scelte };
+}
+
+function dimentica(wc) {
+  const { origine, scelte } = scelteDi(wc);
+  if (!scelte.length) return { tolte: 0, cera: false };
+  for (const s of scelte) wc.session._filoScelte.delete(`${origine}|${s.parte}`);
+  return { tolte: scelte.length, cera: scelte.some((s) => s.si) };
+}
+
+module.exports = {
+  installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare,
+  TIPI, INNOCUI, GESTO_MS, _inAttesa: inAttesa,
+};
