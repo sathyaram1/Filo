@@ -91,3 +91,27 @@ test('dalla barra d\'aiuto di un sito il feedback chiesto e confermato parte anc
   expect(confermata?.executed, 'il feedback confermato deve partire').toBe(true);
   expect(await app.evaluate(() => globalThis.__fb589.length)).toBe(1);
 });
+
+// «Apri il link in una nuova scheda» della barra d'aiuto passa per l'azione che
+// apre una pagina: da un sito vale per gli indirizzi web, non per le pagine di Filo.
+test('dalla barra d\'aiuto di un sito «apri il link» apre la scheda, ma non una pagina di Filo', async ({ app, openTab, testServer }) => {
+  const destinazione = testServer.html('<h1>pagina di destinazione</h1>');
+  const web = await testServer.openReady(openTab, `<h1>sito</h1><a id="l" href="${destinazione}">vai</a>`);
+  const host = new URL(web.url()).host;
+  const indirizzi = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .find((w) => w._filoTabs)._filoTabs.tabs.map((t) => String(t.url || '')));
+  const barra = (codice) => app.evaluate(async ({ BrowserWindow }, { h, codice, mondo }) => {
+    const tab = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((t) => String(t.url || '').includes(h));
+    return tab.view.webContents.executeJavaScriptInIsolatedWorld(mondo, [{ code: codice }]);
+  }, { h: host, codice, mondo: MONDO_CONTENT_SCRIPT });
+
+  const aperto = await barra(`globalThis.__filoSidebarTest.runPageAction({ op: 'open_link', selector: '#l' })`);
+  await expect.poll(indirizzi, { timeout: 8000 }).toContain(destinazione);
+  expect(aperto, 'la barra scrive «apri link in nuova scheda: non riuscita»').toBe(true);
+
+  const prima = (await indirizzi()).length;
+  const manda = dalSito(app, host);
+  const esito = await manda({ type: 'filo_run_action', action: { type: 'NAVIGA', url: 'filo://options/options.html' } });
+  expect(esito?.executed === true, 'un sito ha aperto una pagina di Filo').toBe(false);
+  expect((await indirizzi()).length).toBe(prima);
+});

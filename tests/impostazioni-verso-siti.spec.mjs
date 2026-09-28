@@ -252,3 +252,25 @@ test('sul sito escluso Filo resta spento', async ({ shell, openTab, testServer }
   await web.waitForTimeout(800);
   await expect(web.locator('.sn-menu'), 'sul sito escluso il menu di Filo si è aperto').toBeHidden();
 });
+
+// Anche le spinte senza dati passano dalla lista: l'avviso dei dati dal vivo
+// (timer, promemoria) arriva alle pagine di Filo e non ai siti.
+test('l\'avviso dei dati dal vivo arriva alle pagine di Filo e non ai siti', async ({ app, shell, openTab, testServer }) => {
+  const sito = await testServer.openReady(openTab, '<!doctype html><html><body><p>Un sito.</p></body></html>');
+  await sito.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await nelContentScript(app, testServer.origin, `
+    globalThis.__spia589v = [];
+    chrome.runtime.onMessage.addListener((m) => { globalThis.__spia589v.push(m && m.type); });
+    true;
+  `);
+  const interna = await openTab('filo://history/history.html');
+  await interna.waitForFunction(() => !!(window.filo && window.filo.onBroadcast), null, { timeout: 8000 });
+  await interna.evaluate(() => { window.__spia589v = []; window.filo.onBroadcast((m) => window.__spia589v.push(m && m.type)); });
+
+  await shell.evaluate(() => window.filoShell.message({ type: 'filo_add_timer', label: 'pasta', seconds: 600 }));
+  await expect.poll(() => interna.evaluate(() => window.__spia589v.includes('filo_live_updated')), { timeout: 8000 }).toBe(true);
+  // Una spinta che il sito ascolta, dopo: se arriva questa, l'altra aveva avuto tutto il tempo.
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
+  await expect.poll(() => nelContentScript(app, testServer.origin, 'globalThis.__spia589v.includes("settings_updated")'), { timeout: 8000 }).toBe(true);
+  expect(await nelContentScript(app, testServer.origin, 'globalThis.__spia589v'), 'l\'avviso dei dati dal vivo è arrivato al sito').not.toContain('filo_live_updated');
+});

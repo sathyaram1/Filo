@@ -94,15 +94,23 @@ ammesso**, in un file solo (`src/main/services/impostazioniPerOrigine.js`):
 - i **campi delle impostazioni** che un sito riceve (risposte, letture dello
   storage, spinte) e quelli che può **scrivere** (la voce della dettatura);
 - gli **scomparti del magazzino** che un sito legge, scrive o toglie;
-- le **azioni di Filo** che un sito può chiedere (quelle della barra d'aiuto).
-  La conferma disegnata dentro la pagina la può dare anche la pagina: da un sito
-  un'azione fuori lista si rifiuta, confermata o no, anche quando arriva da una
-  chat aperta lì (#589, giro 6: preferenze, memoria e terminale).
+- le **azioni di Filo** che un sito può chiedere: quelle che la barra d'aiuto
+  descrive al modello e quelle che manda da sé (apri il link, solo verso
+  indirizzi web). La conferma disegnata dentro la pagina la può dare anche la
+  pagina: da un sito un'azione fuori lista si rifiuta, confermata o no, anche
+  quando arriva da una chat aperta lì (#589, giro 6: preferenze, memoria e
+  terminale).
 
 Due regole valgono per tutte le liste. Un destinatario è di Filo solo se lo è
 anche la **scheda** che lo contiene: l'indirizzo di un riquadro lo sceglie la
 pagina, e un sito può puntarlo su `filo://`. E di un dato che il sito usa per un
 sì o un no (i siti esclusi) gli arriva solo la parte che lo riguarda.
+
+Ogni spinta che gira su più schede o finestre passa da `spingiAllaScheda` /
+`spingiAllaFinestra` di quel file, o si limita da sé alle superfici di Filo: una
+strada parallela (l'avviso dei dati dal vivo, quello degli scaricamenti, lo
+schermo intero) scavalcava la lista, e un popup di accesso è una finestra che
+contiene un sito (#589, giro 7).
 
 Un content script che comincia ad ascoltare una spinta, leggere un campo o
 usare uno scomparto nuovo lo aggiunge lì: le sentinelle di

@@ -366,3 +366,73 @@ test('sentinella: ogni spinta a tutte le schede che un content script ascolta è
   assert.deepEqual(mancanti, [], 'spinte ascoltate sui siti ma non ammesse in impostazioniPerOrigine.js');
   for (const t of W.SPINTE_WEB) assert.ok(Object.values(MSG).includes(t), `tipo ammesso inesistente: ${t}`);
 });
+
+// Una spinta che gira su tutte le schede o tutte le finestre passa dalla regola del
+// confine (spingiAlla…) o si limita alle superfici di Filo: una strada parallela
+// porterebbe ai siti il primo dato che qualcuno ci mette dentro.
+const INIZIO_FUNZIONE = /^(?:async\s+)?function\s|^\s{2}(?:async\s+)?[_A-Za-z]\w*\([^)]*\)\s*\{\s*$|^\s*(?:const|let)\s+\w+\s*=\s*(?:async\s*)?\([^)]*\)\s*=>\s*\{\s*$/;
+const GIRO_SU_TUTTE = /getAllWindows\(\)|windowsOf\(|for\s*\(\s*const\s+\w+\s+of\s+[\w.?]*\btabs\b/;
+const SOLO_FILO = /isFilo\(|startsWith\('filo:\/\/'\)|_filoTabs\)\s*continue|filter\(\(?\w+\)?\s*=>\s*\w+\._filoTabs\)|spingiAlla/;
+function spinteSenzaRegola(sorgente, nome) {
+  const righe = sorgente.split('\n');
+  const fuori = [];
+  righe.forEach((r, i) => {
+    if (!/\.send\(\s*'(?:filo:broadcast|shell:[\w-]+|tabs:[\w-]+)'/.test(r)) return;
+    let s = i;
+    while (s > 0 && i - s < 60 && !INIZIO_FUNZIONE.test(righe[s])) s--;
+    const zona = righe.slice(s, i + 1).join('\n');
+    if (GIRO_SU_TUTTE.test(zona) && !SOLO_FILO.test(zona)) fuori.push(`${nome}:${i + 1}`);
+  });
+  return fuori;
+}
+
+test('sentinella: ogni spinta a tutte le schede o finestre passa dalla regola del confine', () => {
+  const vecchia = [
+    'function broadcastLiveUpdate() {',
+    '  for (const win of BrowserWindow.getAllWindows()) {',
+    "    try { win.webContents.send('filo:broadcast', msg); } catch (_) {}",
+    '    for (const t of win._filoTabs.tabs) {',
+    "      try { t.view.webContents.send('filo:broadcast', msg); } catch (_) {}",
+    '    }',
+    '  }',
+    '}',
+  ].join('\n');
+  assert.equal(spinteSenzaRegola(vecchia, 'esempio').length, 2, 'la sentinella non riconosce più una spinta senza regola');
+  const principali = [];
+  const cammina = (dir) => {
+    for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${e.name}`;
+      if (e.isDirectory()) cammina(rel); else if (e.name.endsWith('.js')) principali.push(rel);
+    }
+  };
+  cammina('src/main');
+  const fuori = principali.flatMap((f) => spinteSenzaRegola(readFileSync(join(ROOT, f), 'utf8'), f));
+  assert.deepEqual(fuori, [], 'spinte a tutte le schede che non passano da impostazioniPerOrigine.js');
+});
+
+test('la spinta frame per frame ritaglia su ogni indirizzo, e una finestra di un sito vale come sito', () => {
+  const inviati = [];
+  const frame = (url) => ({ url, detached: false, send: (_c, m) => inviati.push({ url, m }) });
+  const scheda = (pagina, riquadri) => ({
+    isDestroyed: () => false,
+    getURL: () => pagina,
+    mainFrame: { framesInSubtree: [frame(pagina), ...riquadri.map(frame)] },
+    send: () => { throw new Error('frame per frame, non al solo principale'); },
+  });
+  const settings = impostazioniConSegreti();
+  W.spingiAllaScheda(scheda('https://sito.example/', ['filo://newtab/', 'https://altro.example/']), messaggio(settings));
+  W.spingiAllaScheda(scheda('filo://newtab/', []), messaggio(settings));
+  W.spingiAllaScheda(scheda('https://sito.example/', []), { type: 'filo_live_updated' });
+  assert.equal(inviati.length, 4);
+  for (const { url, m } of inviati.slice(0, 3)) assert.ok(!testo(m).includes(CHIAVE), `chiave arrivata a ${url} dentro un sito`);
+  assert.ok(testo(inviati[3].m).includes(CHIAVE), 'la pagina filo:// riceve le impostazioni intere');
+
+  const finestre = [];
+  const finestra = (url) => ({ webContents: { isDestroyed: () => false, getURL: () => url, send: (_c, m) => finestre.push({ url, m }) } });
+  W.spingiAllaFinestra(finestra('https://accounts.example/login'), messaggio(settings));
+  W.spingiAllaFinestra(finestra('https://accounts.example/login'), { type: 'filo_live_updated' });
+  W.spingiAllaFinestra(finestra('filo://shell/shell.html'), messaggio(settings));
+  assert.equal(finestre.length, 2);
+  assert.ok(!testo(finestre[0].m).includes(CHIAVE));
+  assert.ok(testo(finestre[1].m).includes(CHIAVE));
+});
