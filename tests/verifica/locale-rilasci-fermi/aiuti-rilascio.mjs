@@ -135,8 +135,7 @@ export function trovaBash() {
 export function eseguiBash(bash, run, cwd, env, espressioni = {}) {
   const testo = run
     .replace(/\$\{\{\s*([^}]+?)\s*\}\}/g, (_, e) => (e in espressioni ? espressioni[e] : ''))
-    .replace(/node scripts\//g, `node "${ROOT.replace(/\\/g, '/')}/scripts/`)
-    .replace(/(node "[^"\s]+?\.mjs)(\s)/g, '$1"$2');
+    .replace(/node scripts\/(\S+?\.mjs)/g, (_, f) => `node "${ROOT.replace(/\\/g, '/')}/scripts/${f}"`);
   return new Promise((r) => {
     execFile(bash, ['-e', '-o', 'pipefail', '-c', testo], { cwd, env: { ...process.env, ...env } }, (err, stdout, stderr) => {
       r({ codice: err ? (err.code ?? 1) : 0, stdout, stderr });
