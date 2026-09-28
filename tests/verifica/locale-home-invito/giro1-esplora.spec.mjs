@@ -233,7 +233,7 @@ test('config remota col fornitore gemini: con i crediti Filo funziona', async ({
   const filo = { tab: { id: 8, url: 'filo://newtab/' }, url: 'filo://newtab/' };
   const onb = await app.evaluate(async (_, s) => globalThis.SN_HANDLE_MESSAGE({ type: 'filo_get_onboarding', peek: true }, s), filo);
   expect(onb.ready).toBe(true);
-  const nuova = await openTab('filo://newtab/');
+  const nuova = await nuovaHome(app, shell);
   await expect(nuova.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 20_000 });
 
   // Chi i modelli li sceglie da sé, con un fornitore «gemini» salvato da una versione vecchia.
