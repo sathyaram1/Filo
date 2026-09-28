@@ -291,13 +291,20 @@
     SITE_PERMISSION_SET: 'site_permission_set',
     // Dimentica tutte le scelte di un sito. { origine, tabId? } → { ok }
     SITE_PERMISSIONS_FORGET: 'site_permissions_forget',
-    // Risposta alla domanda in attesa sulla scheda. { id, scelta: 'consenti'|'nega'|'ignora' } → { ok }
+    // Risposta alla domanda in attesa sulla scheda. { id, scelta: 'consenti'|'nega'|'ignora', fonte? } → { ok }
     SITE_PERMISSION_ANSWER: 'site_permission_answer',
+    // Cosa si può condividere per una domanda sullo schermo: schermi, schede, finestre. { id } → { ok, fonti }
+    SITE_SCREEN_SOURCES: 'site_screen_sources',
     // Broadcast senza contenuto alle superfici interne: le scelte sono cambiate, rileggile.
     SITE_PERMISSIONS_UPDATED: 'site_permissions_updated',
-    // APERTO ai content script, di proposito: Filo sta per leggere gli appunti (Incolla) o il microfono
-    // (Detta) per conto dell'utente, non del sito. Vale secondi e solo per quella scheda. { tipo } → { ok }
-    PERMESSO_FILO: 'permesso_filo',
+    // APERTO ai content script, di proposito: Incolla di Filo legge gli appunti dal sistema, non col permesso
+    // del sito. Risponde solo subito dopo un gesto vero sulla scheda. {} → { ok, testo, immagine }
+    FILO_READ_CLIPBOARD: 'filo_read_clipboard',
+    // Detta sui siti: il microfono lo apre la cornice di Filo, non la pagina. AVVIA e FERMA sono APERTI ai
+    // content script (AVVIA solo dopo un gesto vero); EVENTO lo manda la cornice e torna al frame che detta.
+    DETTATURA_AVVIA: 'dettatura_avvia',             // { lang } → { ok, id }
+    DETTATURA_FERMA: 'dettatura_ferma',             // { id } → { ok }
+    DETTATURA_EVENTO: 'dettatura_evento',           // { id, tipo: 'provvisoria'|'frase'|'errore'|'fine', testo?, res? }
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
     TEST_PROVIDER: 'test_provider',                 // { provider, apiKey, model? }
