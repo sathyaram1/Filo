@@ -272,7 +272,13 @@ test('config remota col fornitore gemini: con i crediti Filo funziona', async ({
     return eff.provider;
   });
   console.log('[GEMINI] fornitore effettivo dopo la config remota:', provider);
+  await onboardingFatto(app);
+  const home = await homePage(app);
+  await home.reload();
+  await expect(home.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 30_000 });
   await riscattaDaCrediti(openTab);
+  await shell.locator('.tab').first().click();
+  await expect(home.locator('#homeMessage')).toContainText('HOME-DAL-MODELLO', { timeout: 30_000 });
   const filo = { tab: { id: 8, url: 'filo://newtab/' }, url: 'filo://newtab/' };
   const onb = await app.evaluate(async (_, s) => globalThis.SN_HANDLE_MESSAGE({ type: 'filo_get_onboarding', peek: true }, s), filo);
   expect(onb.ready).toBe(true);
@@ -285,9 +291,7 @@ test('config remota col fornitore gemini: con i crediti Filo funziona', async ({
   }, filo);
   console.log('[GEMINI] indicizzazione archivio:', JSON.stringify(emb).slice(0, 300));
   const nuova = await nuovaHome(app, shell);
-  await nuova.waitForTimeout(6000);
-  console.log('[GEMINI] scheda nuova:', JSON.stringify(await stato_home(nuova)));
-  await expect(nuova.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 20_000 });
+  await expect(nuova.locator('#homeMessage')).toContainText('HOME-DAL-MODELLO', { timeout: 20_000 });
 
   // Chi i modelli li sceglie da sé, con un fornitore «gemini» salvato da una versione vecchia.
   await app.evaluate(async () => {
