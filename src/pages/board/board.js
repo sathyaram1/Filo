@@ -171,40 +171,76 @@
     }
   }
 
-  // `poi(ok)` riprende il gesto a esito noto (il perché di un fallimento è già
-  // in pagina); un accesso superato da uno chiesto dopo non lo chiama.
+  // Un gesto durante l'attesa non apre un altro browser (un doppio clic ne
+  // aprirebbe due): lo riapre solo «Riapri il browser».
   function accedi(id, dopo, poi) {
-    const seq = ++accessoSeq;
-    for (const [altro, a] of avvisi) if (a.code === 'accesso') avvisi.delete(altro);
-    if (id) avvisi.set(id, { testo: `Completa l'accesso nel browser: ${dopo}.`, code: 'accesso' });
-    accessoInCorso = { seq, id: id || null, dopo, poi };
+    const nuova = !attesa;
+    if (nuova) attesa = { gesti: new Map(), testa: false };
+    if (id) {
+      attesa.gesti.set(id, { dopo, poi });
+      avvisi.set(id, { testo: `Completa l'accesso nel browser: ${dopo}.`, code: 'accesso' });
+    } else {
+      attesa.testa = true;
+    }
     accessoFallito = null;
     reflectAuth();
     renderList();
+    if (nuova) chiediAccesso();
+  }
+
+  // Il main tiene un accesso solo: chiederlo di nuovo riapre il browser sulla
+  // stessa pagina e restituisce lo stesso esito.
+  function chiediAccesso() {
+    const a = attesa;
     sendToMain({ type: 'auth_signin' })
       .catch(() => null)
       .then((r) => refreshAuth().then(() => r))
-      .then((r) => {
-        if (seq !== accessoSeq) return;
-        accessoInCorso = null;
-        const ok = !!(r && r.ok && signedIn && uid);
-        if (id && avvisi.get(id)?.code === 'accesso') avvisi.delete(id);
-        if (!ok) {
-          const testo = (r && typeof r.error === 'string' && r.error.trim()) || 'Accesso non riuscito: riprova.';
-          if (id) avvisi.set(id, { testo, code: 'accesso-ko' });
-          else accessoFallito = testo;
-        }
-        reflectAuth();
-        if (poi) poi(ok); else renderList();
-      });
+      .then((r) => chiudiAttesa(a, r));
   }
 
-  // «Riapri il browser» rilancia lo stesso accesso: il gesto che aspettava resta suo.
+  // `poi(ok)` riprende ogni gesto a esito noto (il perché di un fallimento è già
+  // in pagina). Un'attesa già chiusa, o lasciata stare, non si chiude due volte.
+  function chiudiAttesa(a, r) {
+    if (!a || attesa !== a) return;
+    attesa = null;
+    const ok = !!(signedIn && uid);
+    for (const id of a.gesti.keys()) if (avvisi.get(id)?.code === 'accesso') avvisi.delete(id);
+    if (!ok) {
+      const testo = (r && typeof r.error === 'string' && r.error.trim()) || 'Accesso non riuscito: riprova.';
+      for (const id of a.gesti.keys()) avvisi.set(id, { testo, code: 'accesso-ko' });
+      if (a.testa || !a.gesti.size) accessoFallito = testo;
+    }
+    reflectAuth();
+    renderList();
+    for (const g of a.gesti.values()) if (g.poi) g.poi(ok);
+  }
+
   bdSignIn.addEventListener('click', () => {
-    const c = accessoInCorso;
-    if (c) accedi(c.id, c.dopo, c.poi);
+    if (attesa) chiediAccesso();
     else accedi(null);
   });
+
+  // Chi ha chiuso il browser senza accedere non deve aspettare il tetto del main.
+  bdAuthLascia.addEventListener('click', () => {
+    const a = attesa;
+    if (!a) return;
+    attesa = null;
+    for (const id of a.gesti.keys()) if (avvisi.get(id)?.code === 'accesso') avvisi.delete(id);
+    reflectAuth();
+    renderList();
+  });
+
+  // Un accesso o un'uscita fatti altrove (menu account, un'altra pagina) valgono
+  // anche qui: i gesti in attesa partono appena l'account è dentro.
+  if (window.filo?.onBroadcast) {
+    window.filo.onBroadcast((m) => {
+      if (m?.type !== 'auth_changed') return;
+      refreshAuth().then(() => {
+        if (attesa && signedIn && uid) chiudiAttesa(attesa, { ok: true });
+        else renderList();
+      }).catch(() => {});
+    });
+  }
 
   // ── Titolo SICURO di un miglioramento ───────────────────────────────────
   // Solo il titolo breve già generato (`name`). Mai il testo grezzo (cifrato /
