@@ -74,9 +74,38 @@
     return false;
   }
 
-  // Una pagina della rete di casa (router, NAS, localhost): i lavori che Filo fa da solo non la mandano fuori (#591).
+  // La rete di casa dei lavori che Filo fa da solo (#591): un nome conta per dove ha risposto la pagina (tplinkwifi.net
+  // intercettato dal router, un NAS per nome), e per la sua forma solo finché non lo si sa. Lo annota noteHostAddress.
+  const answeredFrom = new Map();
+
+  // Un indirizzo della rete di casa: privato, link-local, CGNAT (Tailscale). Il loopback no: per nome è la macchina
+  // stessa, cioè sviluppo locale, e localhost o 127.x restano di casa per la loro forma.
+  function isLanAddress(ip) {
+    const a = String(ip || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/^::ffff:(?=\d)/, '');
+    if (!a || /^127\./.test(a) || a === '::1') return false;
+    if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}$/.test(a)) return true;
+    return (isIpv4(a) || a.includes(':')) && isLocalHost(a);
+  }
+
+  function noteHostAddress(host, ip) {
+    const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+    if (!h || !ip) return;
+    answeredFrom.set(h, isLanAddress(ip));
+    // Tetto largo e senza perdita di sicurezza: un nome dimenticato torna a valere per la sua forma.
+    if (answeredFrom.size > 5000) answeredFrom.delete(answeredFrom.keys().next().value);
+  }
+
+  function isHomeNetworkHost(host) {
+    const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+    if (!h) return false;
+    if (answeredFrom.has(h) && !/^localhost$|\.localhost$|^127\.|^::1$/.test(h)) return answeredFrom.get(h);
+    if (!h.includes('.') && !h.includes(':')) return true; // un nome senza punto su internet non esiste
+    // .box è un dominio pubblico vero: fritz.box è di casa perché risponde da casa, non per come si scrive.
+    return isLocalHost(h) && !h.endsWith('.box');
+  }
+
   function isHomeNetworkUrl(url) {
-    try { return isLocalHost(new URL(String(url)).hostname); } catch (_) { return false; }
+    try { return isHomeNetworkHost(new URL(String(url)).hostname); } catch (_) { return false; }
   }
 
   // IPv4 dotted-quad con ottetti in range (0-255). Serve a distinguere un IP
