@@ -653,7 +653,10 @@
     if (sub === 'config') {
       const rest = tokens(cmd).slice(1).map(unquote).filter((t) => !t.startsWith('-'));
       const verb = (rest[1] || '').toLowerCase(); // rest[0] === 'config'
-      if (!verb || verb === 'get' || verb === 'list' || verb === 'ls' || verb === 'debug') return 1;
+      // `get`/`list`/`ls` stampano la configurazione, dove l'URL del registro o
+      // dell'indice porta spesso utente e password o un token → conferma (#587).
+      if (verb === 'get' || verb === 'list' || verb === 'ls') return 2;
+      if (!verb || verb === 'debug') return 1;
       return 2;
     }
     if (NPM_READ.has(sub)) return 1;
