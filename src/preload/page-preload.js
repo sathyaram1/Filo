@@ -182,6 +182,15 @@ if (!IS_SUBFRAME) try {
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
+// Le notifiche si leggono «da chiedere» finché l'utente non ha deciso (#591): regole in preload/stato-permessi.js.
+if (!IS_SUBFRAME) try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) {
+    const { buildStatoPermessiSource } = require('./stato-permessi.js');
+    webFrame.executeJavaScript(buildStatoPermessiSource(ipcRenderer.sendSync('filo:permessi-stato', loc)), true).catch(() => {});
+  }
+} catch (e) { /* come sopra: mai bloccare il caricamento */ }
+
 // ─── chrome.* shim per i content script ────────────────────────────────────
 //
 // Gira nel preload context (mondo isolato), invisibile alla pagina. I content
