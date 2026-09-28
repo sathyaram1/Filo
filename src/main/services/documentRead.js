@@ -23,16 +23,10 @@
 // SOLA LETTURA
 //   Questo modulo apre file e basta: non scrive, non sposta, non esegue nulla.
 //
-// CONFINAMENTO DEI PERCORSI: nessuno, di proposito.
-//   Il terminale di Filo oggi non confina i percorsi (un `type` legge qualunque
-//   file leggibile dall'utente), e i documenti veri stanno spesso fuori dal
-//   profilo: un disco esterno, una chiavetta, la cartella condivisa del NAS.
-//   Un confine sul profilo utente qui bloccherebbe casi legittimi senza togliere
-//   nulla a un attaccante, che il terminale ce l'ha comunque: sarebbe una
-//   sicurezza finta, e una sicurezza finta è peggio di nessuna perché si smette
-//   di cercare quella vera. Il confine reale è un altro: il testo estratto entra
-//   SOLO nel contesto del modello, e il testo di un documento è trattato come
-//   DATO non fidato (vedi il formattatore in handlers.js), mai come istruzioni.
+// CONFINAMENTO DEI PERCORSI: non qui. Il gate dei livelli applica lo stesso
+//   perimetro del terminale (#587, `fuoriPerimetro` in src/shared/cmdClassify.js):
+//   fuori dalla cartella personale, o in un file nascosto, si legge dopo un OK.
+//   Il testo estratto resta comunque un DATO non fidato (formattatore in handlers.js).
 
 'use strict';
 
