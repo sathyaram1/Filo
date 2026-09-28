@@ -321,8 +321,9 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     try {
       const r = badge.getBoundingClientRect();
       if (!(r.width > 0 && r.height > 0)) return false;
-      const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
-      const y = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return false;
       const sopra = document.elementFromPoint(x, y);
       return !!(sopra && sopra !== badge && !badge.contains(sopra));
     } catch (_) { return false; }
