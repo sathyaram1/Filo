@@ -209,7 +209,7 @@ test('chiave propria messa e tolta, identità annullata: la home segue', async (
   console.log('[CHIAVE TOLTA] home:', JSON.stringify(await stato_home(home)));
 });
 
-test('config remota col fornitore gemini: con i crediti Filo funziona', async ({ app, openTab }) => {
+test('config remota col fornitore gemini: con i crediti Filo funziona', async ({ app, shell, openTab }) => {
   test.setTimeout(150_000);
   stato.modelsDoc = {
     fields: {
