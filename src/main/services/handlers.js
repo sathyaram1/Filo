@@ -1229,7 +1229,7 @@ function cleanLabel(v) {
   return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
 }
 
-async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
+async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
 
