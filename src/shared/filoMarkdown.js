@@ -67,22 +67,18 @@
     // Codice inline `...`
     t = t.replace(/`([^`\n]+)`/g, (m, code) => stash('<code>' + code + '</code>'));
 
-    // Link markdown [testo](url)
-    t = t.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (m, label, url) => {
+    // Link markdown [testo](url): l'url può contenere parentesi bilanciate
+    // (wiki/Mercurio_(astronomia)).
+    t = t.replace(/\[([^\]\n]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)/g, (m, label, url) => {
       const safe = safeLinkUrl(url);
       return safe ? stash(anchor(safe, label)) : label;
     });
 
     // Autolink di URL nudi http(s)://... (mostrano l'URL stesso come testo).
-    // Il testo è già escapato: l'URL finisce a un " < > (&quot; &lt; &gt;),
-    // altrimenti `src="https://x">` diventa un link rotto seguito da «;».
-    // L'apostrofo resta dentro (wiki/Valle_d'Aosta): fuori solo quello in coda.
-    t = t.replace(/\bhttps?:\/\/(?:&amp;|&#39;|[^\s&])+/gi, (m) => {
-      let url = m;
-      let trail = '';
-      // La punteggiatura finale (. ) ] , ; : ! ? ') non fa parte dell'URL.
-      const tm = /(?:[.,;:!?)\]]|&#39;)+$/.exec(url);
-      if (tm) { trail = url.slice(url.length - tm[0].length); url = url.slice(0, -tm[0].length); }
+    // Dove finisce l'URL lo decide separaCoda; qui si ferma solo ai caratteri
+    // che in un URL non stanno mai (" < > già escapati, virgolette tipografiche).
+    t = t.replace(/\bhttps?:\/\/(?:&amp;|&#39;|[^\s&«»“”])+/gi, (m) => {
+      const [url, trail] = separaCoda(m);
       const safe = safeLinkUrl(url);
       return (safe ? stash(anchor(safe, url)) : url) + trail;
     });
