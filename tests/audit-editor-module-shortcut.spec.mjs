@@ -326,3 +326,136 @@ test('Ctrl+Maiusc+2 parte con Ctrl+Shift+2; un modificatore sconosciuto si rifiu
   await page.keyboard.press('Control+Shift+Digit2');
   await expect(page.locator('#overlay')).toContainText('Statistiche documento');
 });
+
+// Un documento con i moduli scelti, tutti sulla prima pagina della griglia.
+async function apriDocConModuli(page, modules) {
+  await page.evaluate((mods) => {
+    const now = new Date().toISOString();
+    const raw = {
+      id: 'file-tasti', meta: { title: 'Tasti', created: now, modified: now, version: 1 },
+      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'ciao mondo' }] }] },
+      comments: [],
+      modules: [...mods, { id: 'set-tasti', type: 'settings', cells: [{ x: 11, y: 7 }], data: {} }],
+    };
+    localStorage.setItem('filo.editor.collection', JSON.stringify({ version: 2, activeId: raw.id, files: [raw] }));
+  }, modules);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#doc')).toBeVisible();
+}
+
+const WC = { id: 'wc-t', type: 'word-count', cells: [{ x: 0, y: 0 }], data: { count: 'words' } };
+const SR = { id: 'sr-t', type: 'search-replace', cells: [{ x: 1, y: 0 }, { x: 2, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 1 }], data: {} };
+const BOLD = { id: 'b-t', type: 'bold', cells: [{ x: 3, y: 0 }], data: {} };
+const COMMENT = { id: 'c-t', type: 'comment', cells: [{ x: 4, y: 0 }], data: {} };
+
+// I tasti che l'Editor serve da sé (salva, barra laterale, ricerca, zoom del
+// foglio, grassetto, copia/incolla…) passano PRIMA dei moduli: un modulo che
+// se ne prendeva uno si salvava in silenzio e non partiva mai, mentre il tasto
+// faceva l'altra cosa (#545).
+test('una scorciatoia modulo che l\'Editor usa già viene rifiutata, dicendo cosa fa quel tasto', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await apriDocConModuli(page, [WC, SR]);
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await expect(page.locator('#cfgShortcut')).toBeVisible();
+
+  for (const [sc, dice] of [
+    ['Ctrl+S', 'salva il documento'],
+    ['Ctrl+\\', 'barra laterale'],
+    ['Ctrl+F', 'ricerca'],
+    ['Ctrl+0', 'zooma'],
+    ['Ctrl+=', 'zooma'],
+    ['Ctrl+-', 'zooma'],
+    ['Ctrl+B', 'grassetto'],
+    ['Ctrl+C', 'copia'],
+  ]) {
+    await page.fill('#cfgShortcut', sc);
+    await page.click('#cfgSave');
+    await expect(page.locator('#cfgShortcutTaken'), sc).toBeVisible();
+    await expect(page.locator('#cfgShortcutTaken'), sc).toContainText(dice);
+    await expect(page.locator('#cfgShortcut')).toHaveClass(/ed-field-invalid/);
+  }
+  await page.screenshot({ path: 'tests/.shots/editor-scorciatoia-dell-editor.png' });
+
+  // Una libera passa, e premuta apre davvero il modulo.
+  await page.fill('#cfgShortcut', 'Ctrl+Shift+S');
+  await page.click('#cfgSave');
+  await expect(page.locator('#overlay')).toBeHidden();
+  await exitSettingsMode(page);
+  await page.click('#doc');
+  await page.keyboard.press('Control+Shift+KeyS');
+  await expect(page.locator('#overlay')).toBeVisible();
+});
+
+// Il tasto che fa già la cosa del modulo resta suo: Ctrl+F sul Cerca e
+// sostituisci porta alla ricerca in entrambi i casi.
+test('il modulo a cui il tasto dell\'Editor appartiene può averlo', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await apriDocConModuli(page, [WC, SR, BOLD]);
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="search-replace"]').click();
+  await page.fill('#cfgShortcut', 'Ctrl+F');
+  await page.click('#cfgSave');
+  await expect(page.locator('#overlay')).toBeHidden();
+  await page.locator('.ed-module[data-type="bold"]').click();
+  await page.fill('#cfgShortcut', 'Ctrl+B');
+  await page.click('#cfgSave');
+  await expect(page.locator('#overlay')).toBeHidden();
+});
+
+// Due moduli con la stessa scorciatoia: partiva solo il primo, l'altro mai.
+test('una scorciatoia già di un altro modulo viene rifiutata col nome di quel modulo', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await apriDocConModuli(page, [{ ...WC, data: { count: 'words', shortcut: 'Ctrl+Shift+1' } }, COMMENT]);
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="comment"]').click();
+  // L'esempio proposto è libero davvero: non ripropone quella già presa.
+  await expect(page.locator('#cfgShortcut')).toHaveAttribute('placeholder', /Shift\+2/);
+  await page.fill('#cfgShortcut', 'ctrl+shift+1');
+  await page.click('#cfgSave');
+  await expect(page.locator('#cfgShortcutTaken')).toBeVisible();
+  await expect(page.locator('#cfgShortcutTaken')).toContainText('Conteggio parole');
+  await expect(page.locator('#cfgShortcutTaken')).toContainText('Shift+2');
+});
+
+// Chi l'aveva già salvata prima di questi controlli se lo sente dire appena
+// apre il modulo, non solo se la riscrive.
+test('una scorciatoia morta già salvata è segnalata all\'apertura del modulo', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await apriDocConModuli(page, [{ ...WC, data: { count: 'words', shortcut: 'Ctrl+S' } }]);
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await expect(page.locator('#cfgShortcutTaken')).toBeVisible();
+  await expect(page.locator('#cfgShortcutTaken')).toContainText('salva il documento');
+});
+
+// I tasti dell'Editor, passati per la stessa tabella, fanno ancora la loro cosa.
+test('grassetto, barra laterale e zoom da tastiera funzionano ancora', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await apriDocConModuli(page, [WC]);
+
+  await page.click('#doc');
+  await page.keyboard.press('Control+KeyA');
+  await page.keyboard.press('Control+KeyB');
+  await expect(page.locator('#doc b, #doc strong').first()).toContainText('ciao');
+
+  const nascosta = () => page.evaluate(() => document.getElementById('root').classList.contains('sidebar-hidden'));
+  const prima = await nascosta();
+  await page.keyboard.press('Control+Backslash');
+  expect(await nascosta()).toBe(!prima);
+
+  await page.keyboard.press('Control+Equal');
+  expect(await page.evaluate(() => document.getElementById('doc').style.zoom)).not.toBe('');
+  await page.keyboard.press('Control+Digit0');
+  expect(await page.evaluate(() => document.getElementById('doc').style.zoom)).toBe('');
+});

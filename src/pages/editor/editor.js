@@ -3900,10 +3900,11 @@
     // l'ingranaggio impostazioni, non offriamo il bottone "Elimina" — per ridurre
     // le pagine si rimpicciolisce lo switch (che avverte pagina per pagina).
     const deletable = !isPinned(m);
+    const libera = scorciatoiaLibera(m);
     openOverlay(`<h3>${meta.label}</h3>
       <div class="ed-field"><label>Scorciatoia da tastiera</label>
-        <input type="text" id="cfgShortcut" placeholder="es. ${escapeHtml(tasto('Ctrl+Shift+1'))}" value="${escapeHtml(m.data.shortcut || '')}" />
-        <div class="ed-field-hint" id="cfgShortcutHint" hidden>Usa almeno un modificatore (${escapeHtml(tasto('Ctrl'))} o Alt), es. ${escapeHtml(tasto('Ctrl+Shift+1'))} — così non ruba una lettera mentre scrivi.</div>
+        <input type="text" id="cfgShortcut" placeholder="es. ${escapeHtml(libera)}" value="${escapeHtml(m.data.shortcut || '')}" />
+        <div class="ed-field-hint" id="cfgShortcutHint" hidden>Usa almeno un modificatore (${escapeHtml(tasto('Ctrl'))} o Alt), es. ${escapeHtml(libera)} — così non ruba una lettera mentre scrivi.</div>
         <div class="ed-field-hint" id="cfgShortcutTaken" hidden></div></div>
       ${specific}
       <div class="ed-overlay-actions">
@@ -3926,6 +3927,15 @@
       cfgShortcutHint.hidden = true;
       cfgShortcutTaken.hidden = true;
     });
+    function mostraPresa(motivo) {
+      cfgShortcut.classList.add('ed-field-invalid');
+      cfgShortcutTaken.textContent = `${motivo}: scegline un'altra, per esempio ${libera}.`;
+      cfgShortcutTaken.hidden = false;
+    }
+    // Una scorciatoia salvata prima di questi controlli può essere già morta:
+    // lo si dice all'apertura, non solo quando la si riscrive.
+    const motivoGiaSalvata = motivoScorciatoiaPresa(String(m.data.shortcut || '').trim(), m);
+    if (motivoGiaSalvata) mostraPresa(motivoGiaSalvata);
     $('cfgSave').addEventListener('click', () => {
       const rawShortcut = cfgShortcut.value.trim();
       const ignoto = rawShortcut ? TASTI.pezzoSconosciuto(rawShortcut) : null;
@@ -3946,11 +3956,6 @@
         cfgShortcut.focus();
         return;
       }
-      // Certe combinazioni non arrivano MAI a questa pagina: Filo se le prende
-      // prima (chiudi scheda, ricarica, salto di scheda…) e su Mac ci sono anche
-      // quelle della barra dei menu in cima allo schermo. Salvarle significava
-      // dare all'utente una scorciatoia che sembra valida e non parte mai: qui
-      // gliela rifiutiamo dicendogli chi si prende quel tasto.
       // Un tasto finale che non sappiamo riconoscere alla pressione (un nome
       // sbagliato, "Ctrl+Spazioo") si salverebbe e non partirebbe mai.
       if (ignoto) {
@@ -3969,14 +3974,10 @@
         cfgShortcut.focus();
         return;
       }
-      if (rawShortcut && TASTI.riservato(rawShortcut)) {
-        cfgShortcut.classList.add('ed-field-invalid');
-        cfgShortcutTaken.textContent =
-          `${TASTI.etichetta(rawShortcut)} è già di Filo (schede, zoom, annulla…) e non arriverebbe mai a questo modulo: scegline un'altra, per esempio ${tasto('Ctrl+Shift+1')}.`;
-        cfgShortcutTaken.hidden = false;
-        cfgShortcut.focus();
-        return;
-      }
+      // Un tasto che qualcun altro serve prima (Filo, l'Editor, un altro modulo)
+      // darebbe una scorciatoia che sembra valida e non parte mai.
+      const motivo = motivoScorciatoiaPresa(rawShortcut, m);
+      if (motivo) { mostraPresa(motivo); cfgShortcut.focus(); return; }
       m.data.shortcut = rawShortcut;
       if (m.type === 'word-count') m.data.count = $('cfgCount').value;
       if (m.type === 'switch') {
@@ -4017,12 +4018,12 @@
   // ascolta i tasti se la prenderebbe, con le stesse regole del keydown vero.
   function pressioneDi(sc) {
     const parts = shortcutParts(sc);
-    const fin = parts[parts.length - 1] || '';
+    const fin = (parts[parts.length - 1] || '').toLowerCase();
+    const mods = parts.slice(0, -1).map((p) => TASTI.tipoModificatore(p));
     return {
-      ctrlKey: parts.some((p) => ['ctrl', 'control', 'cmd', 'command', 'meta'].includes(p)),
-      metaKey: false,
-      shiftKey: parts.includes('shift'),
-      altKey: parts.includes('alt') || parts.includes('option'),
+      ctrlKey: mods.includes('ctrl'), metaKey: false,
+      shiftKey: mods.includes('shift'),
+      altKey: mods.includes('alt'),
       key: fin === 'plus' ? '+' : fin,
       code: '',
     };
@@ -4037,8 +4038,9 @@
     { tasti: ['f'], cosa: 'porta alla ricerca', suo: 'search-replace',
       attivo: () => doc.modules.some((x) => x.type === 'search-replace'),
       fa: () => triggerModuleShortcut(doc.modules.find((x) => x.type === 'search-replace')) },
-    // Shift indifferente: su molte tastiere il "+" si fa con Shift.
-    { cosa: 'zooma il foglio', prende: (e) => !e.altKey && !!ZOOM_TASTI[e.key], fa: (e) => handleZoomKey(e) },
+    // Shift indifferente: su molte tastiere il "+" si fa con Shift. Il tasto lo
+    // prende Filo prima di questa pagina (fa: null): qui non va dato a un modulo.
+    { cosa: 'zooma il foglio', prende: (e) => !e.altKey && !!ZOOM_TASTI[e.key], fa: null },
     { tasti: ['b'], cosa: 'mette il grassetto', suo: 'bold', nelFoglio: true, fa: () => exec('bold') },
     { tasti: ['i'], cosa: 'mette il corsivo', suo: 'italic', nelFoglio: true, fa: () => exec('italic') },
     { tasti: ['u'], cosa: 'sottolinea', suo: 'underline', nelFoglio: true, fa: () => exec('underline') },
@@ -4055,9 +4057,7 @@
   function prendeIlTasto(t, e) {
     if (!(e.ctrlKey || e.metaKey)) return false;
     if (t.prende) return t.prende(e);
-    if (e.altKey || e.shiftKey !== !!t.shift) return false;
-    const cand = eventKeyCandidates(e);
-    return t.tasti.some((k) => cand.has(k));
+    return t.tasti.some((k) => TASTI.combacia(e, `${t.shift ? 'Ctrl+Shift' : 'Ctrl'}+${k}`));
   }
   function tastoEditorDi(sc) {
     const e = pressioneDi(sc);
@@ -4071,22 +4071,23 @@
       return `${nome} è già di Filo (schede, zoom, annulla…) e non arriverebbe mai a questo modulo`;
     }
     const t = tastoEditorDi(sc);
-    if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}: questo modulo non partirebbe mai`;
+    if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo modulo non partirebbe mai`;
     const e = pressioneDi(sc);
     const altro = doc.modules.find((x) => x !== m && x.data && x.data.shortcut && matchShortcut(e, x.data.shortcut));
     if (altro) {
       const etich = (MODULE_TYPES[altro.type] && MODULE_TYPES[altro.type].label) || altro.type;
-      return `${nome} è già la scorciatoia di «${etich}»: partirebbe solo quello`;
+      return `${nome} è già la scorciatoia di «${etich}», e partirebbe solo quello`;
     }
     return '';
   }
-  // L'esempio proposto dev'essere libero davvero, non a sua volta rifiutato.
+  // L'esempio proposto dev'essere libero davvero, non a sua volta rifiutato;
+  // esce già coi nomi dei tasti di chi legge.
   function scorciatoiaLibera(m) {
     for (const d of '123456789') {
-      const sc = `Ctrl+Shift+${d}`;
+      const sc = tasto(`Ctrl+Shift+${d}`);
       if (!motivoScorciatoiaPresa(sc, m)) return sc;
     }
-    return 'Ctrl+Alt+Shift+1';
+    return tasto('Ctrl+Alt+Shift+1');
   }
 
   function triggerModuleShortcut(m) {
@@ -4327,12 +4328,12 @@
   if (ICONS.apps) sidebarToggle.innerHTML = ICONS.apps(16);
 
   window.addEventListener('keydown', (e) => {
-    const meta = e.ctrlKey || e.metaKey;
-    if (meta && e.key.toLowerCase() === 's') { e.preventDefault(); save(true); return; }
-    if (meta && e.key === '\\') { e.preventDefault(); toggleSidebar(); return; }
-    if (meta && e.key.toLowerCase() === 'f') {
-      const sr = doc.modules.find((m) => m.type === 'search-replace');
-      if (sr) { e.preventDefault(); triggerModuleShortcut(sr); return; }
+    for (const t of TASTI_EDITOR) {
+      if (!prendeIlTasto(t, e)) continue;
+      if (t.attivo && !t.attivo()) continue;
+      if (t.nelFoglio && !docEl.contains(e.target)) continue;
+      if (t.fa) { e.preventDefault(); t.fa(e); }
+      return;
     }
     // scorciatoie personalizzate dei moduli
     for (const m of doc.modules) {
