@@ -1,5 +1,5 @@
 // Handler di dominio: i permessi che i siti chiedono. Le porte che decidono per un sito passano da soloFilo;
-// FILO_READ_CLIPBOARD è aperta ai content script (Incolla di Filo) e vale solo subito dopo un gesto vero.
+// aperte ai content script solo FILO_READ_CLIPBOARD (Incolla, subito dopo un gesto vero) e PERMESSI_ESC.
 
 const Permessi = require('../permessiSiti');
 const { soloFilo } = require('./origine');
@@ -68,6 +68,8 @@ module.exports = function register(on, ctx) {
   on(MSG.SITE_PERMISSION_ANSWER, soloFilo(async (msg) => Permessi.rispondi(msg && msg.id, msg && msg.scelta, msg && msg.fonte)));
 
   on(MSG.SITE_SCREEN_SOURCES, soloFilo(async (msg) => Permessi.fontiPerDomanda(msg && msg.id)));
+
+  on(MSG.PERMESSI_ESC, async (msg, sender) => ({ ok: true, chiusa: Permessi.chiudiPrimaDomanda(sender && sender.wc) }));
 
   // Gli appunti per Incolla li legge Filo dal sistema: il permesso del sito resta fuori, e la pagina non lo eredita.
   on(MSG.FILO_READ_CLIPBOARD, async (msg, sender) => {

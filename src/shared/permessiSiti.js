@@ -145,11 +145,15 @@
     return quanti > 1 ? `Schermo ${indice + 1}` : 'Schermo intero';
   }
 
-  // Il nome che un sito usa in permissions.query → il tipo di Filo. Serve a dire «da chiedere» quando nessuno ha scelto.
+  // Il nome che `PermissionStatus.name` porta → il tipo di Filo. Serve a dire «da chiedere» quando nessuno ha scelto.
+  // Chromium ci scrive i suoi nomi interni (fotocamera = video_capture), non quelli passati a permissions.query.
   const NOMI_DI_PAGINA = {
-    camera: 'camera', microphone: 'microfono', geolocation: 'posizione', notifications: 'notifiche',
-    'clipboard-read': 'appunti', 'local-fonts': 'caratteri', midi: 'midi', 'window-management': 'schermi',
-    'idle-detection': 'presenza', 'storage-access': 'cookie', 'speaker-selection': 'casse',
+    camera: 'camera', video_capture: 'camera', microphone: 'microfono', audio_capture: 'microfono',
+    geolocation: 'posizione', notifications: 'notifiche',
+    'clipboard-read': 'appunti', clipboard_read: 'appunti', 'local-fonts': 'caratteri', local_fonts: 'caratteri',
+    midi: 'midi', 'window-management': 'schermi', window_management: 'schermi', window_placement: 'schermi',
+    'idle-detection': 'presenza', idle_detection: 'presenza', 'storage-access': 'cookie', storage_access: 'cookie',
+    'speaker-selection': 'casse', speaker_selection: 'casse',
   };
 
   function statoLeggibile(tipo, scelta) {

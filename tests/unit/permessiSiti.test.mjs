@@ -310,7 +310,7 @@ test('ciò che Filo non conosce si nomina, e un sì vale per quella volta sola',
   assert.deepEqual(chiedi(ses, wc, 'screen-wake-lock'), [true], 'tenere acceso lo schermo non si chiede');
 });
 
-test('i caratteri del computer: chiesti subito dopo un gesto, mai per una lettura a pagina ferma', async () => {
+test('i caratteri del computer: una lettura dopo un gesto accende il segno sulla scheda, mai la striscia', async () => {
   const ses = sessioneFinta();
   Permessi.installa(ses);
   await Permessi.carica();
@@ -318,15 +318,14 @@ test('i caratteri del computer: chiesti subito dopo un gesto, mai per una lettur
   Permessi._perTest({ gestoVeroRecente: () => gesto });
   const { wc } = apriScheda('https://editor.example/', ses);
   assert.equal(ses.gestori.controllo(wc, 'local-fonts', 'https://editor.example', {}), false);
-  assert.equal(Permessi.inAttesaPer(wc).length, 0, 'una lettura al caricamento non apre domande');
+  assert.equal(Permessi.usiPer(wc), null, 'una lettura al caricamento non accende niente');
   gesto = true;
   for (let i = 0; i < 3; i++) ses.gestori.controllo(wc, 'local-fonts', 'https://editor.example', {});
-  const domande = Permessi.inAttesaPer(wc);
-  assert.equal(domande.length, 1);
-  assert.equal(domande[0].tardiva, true);
-  assert.equal(domande[0].testo, 'editor.example vuole vedere i caratteri installati sul tuo computer');
-  Permessi.rispondi(domande[0].id, 'consenti');
+  assert.equal(Permessi.inAttesaPer(wc).length, 0, 'una lettura non è una domanda');
+  assert.deepEqual(Permessi.usiPer(wc).bloccati, [{ tipo: 'caratteri', motivo: 'chiedi' }]);
+  Permessi.imposta(ses, 'https://editor.example', 'caratteri', 'consenti');
   assert.equal(ses.gestori.controllo(wc, 'local-fonts', 'https://editor.example', {}), true);
+  assert.equal(Permessi.usiPer(wc), null, 'dato il sì, il segno si spegne');
 });
 
 test('fuori da una scheda si chiede con la finestra di sistema; nascosta, no', async () => {
@@ -508,7 +507,7 @@ function porte(file) {
   return Object.fromEntries([...src.matchAll(/on\(MSG\.([A-Z_]+),\s*(soloFilo\()?/g)].map((m) => [m[1], !!m[2]]));
 }
 
-test('le porte che decidono per un sito sono solo di Filo; aperte ai content script solo Incolla e Detta', () => {
+test('le porte che decidono per un sito sono solo di Filo; aperte ai content script solo Incolla, Detta e l’Esc', () => {
   assert.deepEqual(porte('permessi.js'), {
     SITE_PERMISSIONS_LIST: true,
     SITE_PERMISSIONS_OF_TAB: true,
@@ -516,6 +515,7 @@ test('le porte che decidono per un sito sono solo di Filo; aperte ai content scr
     SITE_PERMISSIONS_FORGET: true,
     SITE_PERMISSION_ANSWER: true,
     SITE_SCREEN_SOURCES: true,
+    PERMESSI_ESC: false,
     FILO_READ_CLIPBOARD: false,
   });
   assert.deepEqual(porte('dettatura.js'), { DETTATURA_AVVIA: false, DETTATURA_FERMA: false, DETTATURA_EVENTO: true });

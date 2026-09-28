@@ -1,23 +1,17 @@
 import { test, expect } from '../../fixtures/electron.mjs';
-const PAGINA = `<!doctype html><html><head><title>V</title></head><body><button id="b">x</button><script>
-  window.wake = () => navigator.wakeLock.request('screen').then(() => 'ok', (e) => 'err:' + e.name);
-  window.fonts = () => window.queryLocalFonts().then((f) => f.length, (e) => 'err:' + e.name);
-  window.q = async (n) => { try { return (await navigator.permissions.query({ name: n })).state; } catch (e) { return 'err:' + e.name; } };
-  window.notif = () => Notification.permission;
-</script></body></html>`;
-test('nomi', async ({ app, openTab, testServer }) => {
-  await app.evaluate(({ session }) => {
-    globalThis.__log = [];
-    const ses = session.defaultSession;
-    ses.setPermissionRequestHandler((wc, p, cb, d) => { globalThis.__log.push({ req: p, d: JSON.stringify(d).slice(0, 300) }); cb(false); });
-    ses.setPermissionCheckHandler((wc, p, o, d) => { globalThis.__log.push({ chk: p, o, d: JSON.stringify(d).slice(0, 300) }); return false; });
+test.use({ argomentiApp: ['--use-fake-device-for-media-stream'] });
+test('esc', async ({ app, shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, '<!doctype html><title>x</title><script>window.unaVolta = () => navigator.mediaDevices.getUserMedia({ video: true }).catch(() => {});</script>');
+  await app.evaluate(({ webContents }) => {
+    globalThis.__inp = [];
+    for (const wc of webContents.getAllWebContents()) wc.on('before-input-event', (e, i) => globalThis.__inp.push(wc.getURL().slice(0, 30) + ' ' + i.type + ' ' + i.key));
   });
-  const page = await testServer.openReady(openTab, PAGINA);
-  const out = {};
-  await page.click('#b'); out.wake = await page.evaluate(() => window.wake());
-  await page.click('#b'); out.fonts = await page.evaluate(() => window.fonts());
-  for (const n of ['local-fonts', 'screen-wake-lock', 'camera', 'notifications', 'window-management', 'clipboard-read']) out['q_' + n] = await page.evaluate((x) => window.q(x), n);
-  out.notif = await page.evaluate(() => window.notif());
-  console.log('out', JSON.stringify(out));
-  for (const l of await app.evaluate(() => globalThis.__log)) console.log('log', JSON.stringify(l));
+  await page.evaluate(() => { window.unaVolta(); });
+  await expect(shell.locator('#perm-bar .perm-row')).toHaveCount(1, { timeout: 10_000 });
+  await page.keyboard.press('Escape');
+  await new Promise((r) => setTimeout(r, 500));
+  console.log('inp', JSON.stringify(await app.evaluate(() => globalThis.__inp)));
+  console.log('righe', await shell.locator('#perm-bar .perm-row').count());
+  const att = await app.evaluate(({ webContents }) => webContents.getAllWebContents().map((wc) => [wc.getURL().slice(0, 40), globalThis.__filoPermessi.inAttesaPer(wc).length]));
+  console.log('att', JSON.stringify(att));
 });

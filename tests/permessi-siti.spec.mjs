@@ -35,6 +35,24 @@ async function avvia(page, fn) {
 const esito = (page) => page.evaluate(() => window.__esito);
 
 const riga = (shell) => shell.locator('#perm-bar .perm-row');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// La freccia accanto a una voce del menu della scheda apre il secondo livello.
+async function freccia(app, ago, etichetta) {
+  for (const w of app.windows()) {
+    try {
+      const ok = await w.evaluate(({ n, l }) => {
+        if (!document.body || !document.body.innerText.includes(n)) return false;
+        const r = [...document.querySelectorAll('.row')].find((x) => new RegExp(l).test(x.querySelector('.item').textContent.trim()));
+        if (!r) return false;
+        r.querySelector('.subarrow').click();
+        return true;
+      }, { n: ago, l: etichetta });
+      if (ok) return true;
+    } catch (_) {}
+  }
+  return false;
+}
 
 async function inAlto(app) {
   return app.evaluate(({ BrowserWindow }) => {
@@ -130,8 +148,9 @@ test('fotocamera e microfono: «Nega» si ricorda, dal tasto destro sulla scheda
     });
   };
 
-  // Un permesso mai chiesto si dà dal tasto destro: chi guarda prima di chiedere legge «denied» e non chiederebbe.
-  expect(await page.evaluate(() => Notification.permission)).toBe('denied');
+  // Prima di ogni scelta la pagina legge «da chiedere», non «negato»; e un permesso mai chiesto si dà anche dal tasto destro.
+  expect(await page.evaluate(() => Notification.permission)).toBe('default');
+  expect(await page.evaluate(() => navigator.permissions.query({ name: 'camera' }).then((s) => s.state))).toBe('prompt');
   await cliccaFinche(app, {
     apri: apriPermessi,
     ago: 'Gestisci permessi',
@@ -166,11 +185,23 @@ test('fotocamera e microfono: «Nega» si ricorda, dal tasto destro sulla scheda
   await expect.poll(() => esito(page), { timeout: 10_000 }).toBe('ok:2');
   await expect(riga(shell)).toHaveCount(0);
 
-  // «Revoca»: il sì se ne va e la volta dopo si torna a chiedere.
+  // Col sì dato, la voce è «Blocca»: chi apre il menu mentre il sito usa la fotocamera vuole dire di no.
   await cliccaFinche(app, {
     apri: apriPermessi,
     ago: 'Gestisci permessi',
-    etichetta: '^Revoca fotocamera$',
+    etichetta: '^Blocca fotocamera$',
+    finche: async () => (await scelte()).camera === 'nega',
+  });
+  await avvia(page, 'chiediCamera');
+  await expect.poll(() => esito(page)).toBe('err:NotAllowedError');
+  // La freccia della voce porta al resto: «Chiedimelo ogni volta» toglie la scelta e la volta dopo si torna a chiedere.
+  await cliccaFinche(app, {
+    apri: async () => {
+      await apriPermessi();
+      for (let i = 0; i < 15; i++) { if (await freccia(app, 'Gestisci permessi', '^Consenti fotocamera$')) break; await sleep(40); }
+    },
+    ago: 'Chiedimelo ogni volta',
+    etichetta: 'Chiedimelo ogni volta$',
     finche: async () => !(await scelte()).camera,
   });
   await avvia(page, 'chiediCamera');
@@ -251,6 +282,24 @@ test('condividere lo schermo: si chiede ogni volta, «Condividi lo schermo» dà
   await expect(si).toHaveText('Condividi lo schermo');
   await expect(si).toBeEnabled();
   await si.click();
+  // Prima si sceglie cosa: lo schermo, una scheda, la finestra di un'altra app. I nomi sono di Filo, in italiano.
+  const schermo = shell.locator('#perm-bar .perm-fonte[data-tipo="schermo"]').first();
+  await expect(schermo).toBeVisible({ timeout: 10_000 });
+  await expect(schermo).toContainText(/^Schermo/);
+  await expect(shell.locator('#perm-bar .perm-fonte[data-tipo="scheda"]', { hasText: '(questa)' })).toHaveCount(1);
+  await shell.screenshot({ path: join(SHOTS, 'permessi-scelta-schermo.png') });
+  expect(await esito(page), 'finché non si sceglie, la pagina non ha niente').toBeNull();
+  await schermo.click();
+  await expect.poll(() => esito(page), { timeout: 10_000 }).toBe('ok:1');
+  // La scheda lo dice finché la pagina è aperta.
+  await expect(shell.locator('.tab.active .perm-uso')).toHaveAttribute('data-tip', /usa lo schermo/);
+
+  // Si può mostrare una scheda sola invece di tutto lo schermo.
+  await page.click('#schermo');
+  await expect(riga(shell)).toHaveCount(1, { timeout: 10_000 });
+  await expect(si).toBeEnabled();
+  await si.click();
+  await shell.locator('#perm-bar .perm-fonte[data-tipo="scheda"]', { hasText: '(questa)' }).click();
   await expect.poll(() => esito(page), { timeout: 10_000 }).toBe('ok:1');
 
   // Non si ricorda: la volta dopo si torna a chiedere, e «Nega» non resta scritto da nessuna parte.

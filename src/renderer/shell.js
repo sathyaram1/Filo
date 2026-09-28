@@ -1541,10 +1541,12 @@
       const parti = [];
       if (usi.inUso && usi.inUso.length) parti.push(`usa ${elenca(usi.inUso)}`);
       const b = Array.isArray(usi.bloccati) ? usi.bloccati : [];
-      const negati = b.filter((x) => x.motivo !== 'smesso').map((x) => x.tipo);
+      const negati = b.filter((x) => x.motivo === 'negato').map((x) => x.tipo);
       const smessi = b.filter((x) => x.motivo === 'smesso').map((x) => x.tipo);
+      const vorrebbe = b.filter((x) => x.motivo === 'chiedi').map((x) => x.tipo);
       if (negati.length) parti.push(`non può usare ${elenca(negati)}`);
       if (smessi.length) parti.push(`ho smesso di chiederti ${elenca(smessi)}`);
+      if (vorrebbe.length) parti.push(`vorrebbe vedere ${elenca(vorrebbe)}`);
       return `${hostCorto(usi.host)} ${parti.join(', ')}. Clic per cambiare`;
     }
 
@@ -1573,11 +1575,7 @@
       r.dataset.risposto = '1';
       for (const b of r.querySelectorAll('button')) b.disabled = true;
       api.message({ type: 'site_permission_answer', id: d.id, scelta, fonte }).then((res) => {
-        if (res && res.ok) {
-          // Una lettura dei caratteri non aspetta la risposta: il sito li vede alla prossima richiesta.
-          if (d.tardiva && scelta === 'consenti') showToast(`${hostCorto(d.host)} adesso li vede: riprova sul sito.`);
-          return;
-        }
+        if (res && res.ok) return;
         // La domanda non c'è più (pagina cambiata nel frattempo): la riga sparisce col prossimo aggiornamento.
         showToast('La pagina non aspetta più questa risposta.');
       }).catch(() => {});

@@ -300,6 +300,9 @@
     // APERTO ai content script, di proposito: Incolla di Filo legge gli appunti dal sistema, non col permesso
     // del sito. Risponde solo subito dopo un gesto vero sulla scheda. {} → { ok, testo, immagine }
     FILO_READ_CLIPBOARD: 'filo_read_clipboard',
+    // APERTO ai content script: un Esc vero sulla pagina chiude per prima la domanda di un permesso della scheda,
+    // come la ×. Serve quando il tasto non passa dal main prima del documento. {} → { ok, chiusa }
+    PERMESSI_ESC: 'permessi_esc',
     // Detta sui siti: il microfono lo apre la cornice di Filo, non la pagina. AVVIA e FERMA sono APERTI ai
     // content script (AVVIA solo dopo un gesto vero); EVENTO lo manda la cornice e torna al frame che detta.
     DETTATURA_AVVIA: 'dettatura_avvia',             // { lang } → { ok, id }

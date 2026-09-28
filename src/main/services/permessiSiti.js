@@ -13,7 +13,7 @@ const TETTO_ATTESE_PER_DOMANDA = 100;
 const DURATA_SCELTA_SCHERMO_MS = 15000;
 // Chi chiude la domanda tre volte di fila senza rispondere vuol dire «smettila»: Filo smette di chiederla.
 const CHIUSURE_PER_SMETTERE = 3;
-// Una lettura dei caratteri installati arriva senza richiesta: vale come domanda solo appena dopo un gesto vero.
+// Una lettura dei caratteri installati arriva senza richiesta: accende il segno solo appena dopo un gesto vero.
 const GESTO_RECENTE_MS = 3000;
 const INPUT_VERI = new Set(['mouseDown', 'mouseUp', 'keyDown', 'rawKeyDown', 'char', 'touchStart', 'touchEnd', 'gestureTap']);
 
@@ -344,20 +344,19 @@ function scopriLaDomanda(wc) {
   } catch (_) {}
 }
 
-function accoda({ ses, wc, origine, tipi, grezzo, rispondi, tardiva }) {
+function accoda({ ses, wc, origine, tipi, grezzo, rispondi }) {
   const chiave = `${wc.id}|${origine}|${tipi.join(',')}|${grezzo || ''}`;
   for (const v of stato.attese.values()) {
     if (v.chiave !== chiave) continue;
-    if (!rispondi) return;
     if (v.richiami.length >= TETTO_ATTESE_PER_DOMANDA) { rispondi(false); return; }
     v.richiami.push(rispondi);
     return;
   }
   const perScheda = Array.from(stato.attese.values()).filter((v) => v.wcId === wc.id).length;
-  if (perScheda >= TETTO_DOMANDE_PER_SCHEDA) { if (rispondi) rispondi(false); return; }
+  if (perScheda >= TETTO_DOMANDE_PER_SCHEDA) { rispondi(false); return; }
   const voce = {
     id: `perm-${prossimoId++}`, chiave, ses, wc, wcId: wc.id, origine, tipi, grezzo: grezzo || '',
-    tardiva: !!tardiva, richiami: rispondi ? [rispondi] : [], at: Date.now(),
+    richiami: [rispondi], at: Date.now(),
   };
   stato.attese.set(voce.id, voce);
   cabla(wc);
@@ -372,7 +371,7 @@ function inAttesaPer(wc) {
     if (v.wcId !== wc.id) continue;
     out.push({
       id: v.id, origine: v.origine, host: P.hostDi(v.origine), tipi: v.tipi.slice(), grezzo: v.grezzo || undefined,
-      tardiva: v.tardiva || undefined, testo: P.domanda(v.origine, v.tipi, v.grezzo),
+      testo: P.domanda(v.origine, v.tipi, v.grezzo),
     });
   }
   return out;
@@ -498,11 +497,12 @@ function richiesta(ses, wc, permesso, dettagli, callback) {
   }
 }
 
-// Chromium non chiede mai i caratteri installati, li legge soltanto: subito dopo un gesto la lettura vale domanda.
-function domandaTardiva(ses, wc, origine, tipi) {
+// Chromium non chiede mai i caratteri installati, li legge soltanto: una lettura subito dopo un gesto accende il segno
+// sulla scheda, da cui si consentono. Niente striscia: una lettura non è una domanda.
+function segnaDaChiedere(ses, wc, origine, tipi) {
   if (!vivo(wc) || !schedaDi(wc) || !gestoVeroRecente(wc)) return;
-  if (P.decidi(scelteDi(ses, origine), tipi).esito !== 'chiedi' || haSmesso(ses, origine, tipi)) return;
-  accoda({ ses, wc, origine, tipi, rispondi: null, tardiva: true });
+  if (P.decidi(scelteDi(ses, origine), tipi).esito !== 'chiedi') return;
+  segnaBlocco(wc, origine, tipi, 'chiedi');
 }
 
 function controllo(ses, wc, permesso, origineRichiesta, dettagli) {
@@ -514,7 +514,7 @@ function controllo(ses, wc, permesso, origineRichiesta, dettagli) {
     if (!origine) return P.INNOCUI.has(permesso);
     if (!stato.caricato) return P.INNOCUI.has(permesso);
     const ok = P.consentitoAlControllo(permesso, d, scelteDi(ses, origine));
-    if (!ok && permesso === 'local-fonts') domandaTardiva(ses, wc, origine, ['caratteri']);
+    if (!ok && permesso === 'local-fonts') segnaDaChiedere(ses, wc, origine, ['caratteri']);
     return ok;
   } catch (_) {
     return false;

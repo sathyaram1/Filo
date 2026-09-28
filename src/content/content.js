@@ -434,6 +434,14 @@
     // (il tasto destro sulle pagine interne apriva solo il menu di Filo). In
     // bubble l'handler della pagina scatta per primo: se ha già gestito il
     // click (e.preventDefault()), il menu di Filo si fa da parte.
+    // L'Esc chiude per prima la domanda di un permesso che sta sopra la pagina (#586). Di solito lo prende il main
+    // prima del documento; da qui passa quando il tasto non è transitato di là. Un Esc finto della pagina non conta.
+    if (location.protocol !== 'filo:') {
+      window.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || !e.isTrusted) return;
+        try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.PERMESSI_ESC })).catch(() => {}); } catch (_) {}
+      }, { capture: true });
+    }
     if (typeof self.__snSetContextMenuHandler === 'function') {
       self.__snSetContextMenuHandler(onContextMenu);
     } else {
