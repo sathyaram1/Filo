@@ -1843,7 +1843,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
       }
       case 'DIMENTICA': {
         if (!righeDaDimenticare.length) {
-          return { executed: false, kept: false, output: { error: 'nella memoria di Filo non c\'è una riga che corrisponda', rifiuto: true } };
+          return { executed: false, kept: false, output: { dimenticate: [] } };
         }
         const tolte = [];
         for (const r of righeDaDimenticare) {
@@ -2539,6 +2539,11 @@ function toolResultText({ action, res, rendered }) {
   }
   if (type === 'CANCELLA_SVEGLIA' && res.output && Array.isArray(res.output.removed)) {
     return res.output.removed.length ? `Tolte: ${res.output.removed.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da togliere. Non ripetere uguale: chiedi all\'utente quale intende.';
+  }
+  if (type === 'DIMENTICA' && res.output && Array.isArray(res.output.dimenticate)) {
+    return res.output.dimenticate.length
+      ? `Dimenticate: ${res.output.dimenticate.map((r) => `«${r}»`).join(', ')}.`
+      : 'Nella memoria nessuna riga corrispondeva: niente da togliere. Non ripetere uguale: copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.';
   }
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
     return res.output.updated.length ? `Spostate: ${res.output.updated.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
