@@ -1971,7 +1971,8 @@ export function emit(bucket, ctx) {
 
 const isMainModule = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMainModule) {
-  let argv = process.argv.slice(2);
+  // `--ticket=<b>` è la forma che il canale accetta già: qui vale uguale, in ogni posizione.
+  let argv = process.argv.slice(2).flatMap((a) => (/^--ticket=\S*$/.test(a) ? ['--ticket', a.slice(9)] : [a]));
   // `--ticket <b>` davanti a un `--record-*` (#724.1, #545): l'ordine non deve
   // contare, e senza questo il comando finiva nel giro nuovo come «argomento
   // non riconosciuto».
