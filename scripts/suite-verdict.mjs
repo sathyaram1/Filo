@@ -256,10 +256,10 @@ export function testoRiassunto(v) {
 
 /** Le opzioni della riga di comando. PURA. */
 export function leggiArgomenti(argv) {
-  const out = { file: '', out: '', rossi: '' };
+  const out = { file: '', out: '', rossi: '', chiavi: '' };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a === '--out' || a === '--rossi') {
+    if (a === '--out' || a === '--rossi' || a === '--chiavi') {
       const k = a.slice(2);
       const val = argv[i + 1];
       if (!val || val.startsWith('--')) throw new Error(`${a} vuole un percorso`);
