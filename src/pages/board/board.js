@@ -31,6 +31,7 @@
   const bdAuthMsg = document.getElementById('bdAuthMsg');
   const bdSignIn  = document.getElementById('bdSignIn');
   const bdAuthSpin = document.getElementById('bdAuthSpin');
+  const bdAuthLascia = document.getElementById('bdAuthLascia');
   const bdLoading = document.getElementById('bdLoading');
   const bdEmpty   = document.getElementById('bdEmpty');
   const bdError   = document.getElementById('bdError');

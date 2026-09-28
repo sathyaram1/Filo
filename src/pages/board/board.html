@@ -35,6 +35,7 @@
     }
     .bd-auth button:hover { border-color: var(--sn-accent); }
     .bd-auth .bd-auth-ko { color: var(--sn-error); }
+    .bd-auth .bd-auth-lascia { background: transparent; }
 
     .bd-loading, .bd-empty { color: var(--sn-muted); font-size: 14px; padding: 24px 4px; }
     /* Quando non si può stimare il tempo, una rotella: la pagina non deve restare muta a "Caricamento…". */
@@ -161,6 +162,7 @@
       <span id="bdAuthSpin" class="bd-spinner" aria-hidden="true" hidden></span>
       <span id="bdAuthMsg" role="status">Accedi per votare i miglioramenti.</span>
       <button id="bdSignIn" type="button">Accedi</button>
+      <button id="bdAuthLascia" class="bd-auth-lascia" type="button" hidden>Lascia stare</button>
     </div>
 
     <div id="bdLoading" class="bd-loading"><span class="bd-spinner" aria-hidden="true"></span><span>Caricamento…</span></div>
