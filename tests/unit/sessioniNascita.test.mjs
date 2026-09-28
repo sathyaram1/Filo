@@ -90,18 +90,19 @@ test('una protezione che fallisce non lascia scoperte le altre', () => {
   assert.deepEqual(visti, ['default', 'proxy:1']);
 });
 
-test('senzaProtezione esenta solo la sessione creata lì dentro', () => {
+test('una sessione di servizio nasce protetta, e il marchio è già lì quando le protezioni la leggono', () => {
   const e = finto();
   const n = creaNascita({ app: e.app, sessioneDefault: () => e.defaultSession });
   const visti = [];
-  n.allaNascita('cookie', (s) => visti.push(s.nome));
-  const esente = n.senzaProtezione(() => e.fromPartition('filo-detonate-1'));
+  n.allaNascita('cookie', (s) => visti.push(`${s.nome}:${n.eDiServizio(s) ? 'servizio' : 'utente'}`));
+  const detonazione = n.diServizio(() => e.fromPartition('filo-detonate-1'));
   e.fromPartition('proxy:2');
-  assert.equal(esente.nome, 'filo-detonate-1');
-  assert.deepEqual(visti, ['default', 'proxy:2']);
-  assert.equal(n.eNata(esente), false);
-  e.app.emit('session-created', esente);
-  assert.deepEqual(visti, ['default', 'proxy:2'], 'un evento ripetuto non la protegge a metà');
+  assert.equal(detonazione.nome, 'filo-detonate-1');
+  assert.deepEqual(visti, ['default:utente', 'filo-detonate-1:servizio', 'proxy:2:utente']);
+  assert.equal(n.eNata(detonazione), true);
+  // Una sessione già nata per l'utente non diventa di servizio perché qualcuno la richiede lì dentro.
+  const proxy = n.diServizio(() => e.fromPartition('proxy:2'));
+  assert.equal(n.eDiServizio(proxy), false);
 });
 
 // ─── sentinelle sul codice ───────────────────────────────────────────────
