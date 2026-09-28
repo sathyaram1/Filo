@@ -15,6 +15,8 @@ const TIPI = {
 // La lettura sincrona degli appunti non sa chiedere: passa solo con un sì già dato.
 const SOLO_CONTROLLO = new Set(['deprecated-sync-clipboard-read']);
 const LASCIAPASSARE_MS = 5000;
+// Una domanda senza risposta non tiene ferma la pagina: dopo un po' vale no, non ricordato, e il sito può richiedere.
+const ATTESA_MS = 12000;
 
 const lasciapassari = new Map();
 const inAttesa = new Map();
@@ -63,6 +65,7 @@ function chiudi(id, si, { ricorda }) {
   const p = inAttesa.get(id);
   if (!p) return false;
   inAttesa.delete(id);
+  clearTimeout(p.timer);
   if (ricorda) {
     const scelte = sceltePer(p.ses);
     for (const parte of p.parti) scelte.set(`${p.origine}|${parte}`, Boolean(si));
@@ -104,7 +107,9 @@ function chiedi({ ses, wc, origine, tipo, parti, callback, schedaDi }) {
     if (p.wc === wc && p.origine === origine && p.parti.join() === parti.join()) { p.callbacks.push(callback); return; }
   }
   const id = randomUUID();
-  inAttesa.set(id, { ses, wc, origine, tipo, parti, callbacks: [callback], avvisa: dove.avvisa });
+  const timer = setTimeout(() => chiudi(id, false, { ricorda: false }), ATTESA_MS);
+  if (timer && typeof timer.unref === 'function') timer.unref();
+  inAttesa.set(id, { ses, wc, origine, tipo, parti, callbacks: [callback], avvisa: dove.avvisa, timer });
   seguiPagina(wc);
   let host = origine;
   try { host = new URL(origine).host; } catch (_) {}
@@ -157,4 +162,4 @@ function rispondi(id, si) {
   return chiudi(id, si, { ricorda: true });
 }
 
-module.exports = { installa, negaTutto, rispondi, lasciapassare, TIPI, _inAttesa: inAttesa };
+module.exports = { installa, negaTutto, rispondi, lasciapassare, TIPI, ATTESA_MS, _inAttesa: inAttesa };

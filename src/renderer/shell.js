@@ -1117,6 +1117,15 @@
   // Esposta per test e per usi programmatici dalla shell stessa.
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
 
+  // Lo spazio sopra la pagina lo chiedono in più (scaricamenti, domande dei permessi): la pagina scende della somma.
+  const riserveSopra = new Map();
+  function riservaSopra(chi, px) {
+    if (px > 0) riserveSopra.set(chi, px); else riserveSopra.delete(chi);
+    let tot = 0;
+    for (const v of riserveSopra.values()) tot += v;
+    try { api.tabs.reserveTop && api.tabs.reserveTop(tot); } catch (_) {}
+  }
+
   // ─── Scaricamenti della navigazione (#410.1) ───────────────────────────
   // Indicatore nella fila di tab (sempre visibile, non coperto dalla view
   // nativa della pagina) + pannello espandibile con i singoli download. Il
@@ -1406,7 +1415,7 @@
       if (!panelOpen || !panel) return;
       requestAnimationFrame(() => {
         const h = Math.ceil(panel.getBoundingClientRect().height);
-        try { api.tabs.reserveTop && api.tabs.reserveTop(h + 6); } catch (_) {}
+        riservaSopra('scaricamenti', h + 6);
       });
     }
     function openPanel() {
@@ -1430,7 +1439,7 @@
       firmaElenco = '';
       if (panel) panel.hidden = true;
       dlBtn.classList.remove('open');
-      try { api.tabs.reserveTop && api.tabs.reserveTop(0); } catch (_) {}
+      riservaSopra('scaricamenti', 0);
     }
     function togglePanel() { panelOpen ? closePanel() : openPanel(); }
 
@@ -1742,6 +1751,109 @@
         if (timer) { clearTimeout(timer); timer = null; }
         try { chip.remove(); } catch (_) {}
       }
+    });
+  }
+
+  // ─── Domande dei permessi (#591.1) ──────────────────────────────────────
+  // Microfono, fotocamera, appunti, posizione: la pagina chiede, risponde l'utente qui, nella cornice, dove la pagina
+  // non la copre e non la può imitare. Si vede solo la domanda della scheda in primo piano; le altre aspettano il loro turno.
+  if (api.tabs.onPermesso && api.tabs.rispondiPermesso) {
+    const domande = [];
+    let bar = null;
+    let mostrata = null;
+    let attiva = null;
+
+    const COSA = (d) => {
+      if (d.tipo === 'appunti') return { testo: 'vuole leggere quello che hai copiato', icone: ['clipboard'] };
+      if (d.tipo === 'posizione') return { testo: 'vuole sapere dove ti trovi', icone: ['location'] };
+      const parti = Array.isArray(d.parti) ? d.parti : [];
+      const mic = parti.includes('audio');
+      const cam = parti.includes('video');
+      if (mic && cam) return { testo: 'vuole usare microfono e fotocamera', icone: ['mic', 'camera'] };
+      if (cam) return { testo: 'vuole usare la fotocamera', icone: ['camera'] };
+      return { testo: 'vuole usare il microfono', icone: ['mic'] };
+    };
+
+    function ensureBar() {
+      if (bar) return bar;
+      bar = document.createElement('div');
+      bar.id = 'permesso-bar';
+      bar.className = 'permesso-bar';
+      bar.hidden = true;
+      document.body.appendChild(bar);
+      return bar;
+    }
+
+    function rispondi(d, si) {
+      const i = domande.indexOf(d);
+      if (i >= 0) domande.splice(i, 1);
+      api.tabs.rispondiPermesso(d.id, si).catch(() => {});
+      render();
+    }
+
+    function render() {
+      const d = domande.find((x) => x.tabId === attiva) || null;
+      if (d === mostrata) return;
+      mostrata = d;
+      const b = ensureBar();
+      if (!d) {
+        b.hidden = true;
+        b.replaceChildren();
+        document.documentElement.style.removeProperty('--sopra-permessi');
+        riservaSopra('permessi', 0);
+        return;
+      }
+      const cosa = COSA(d);
+      const icone = document.createElement('span');
+      icone.className = 'permesso-icone';
+      for (const n of cosa.icone) {
+        const i = document.createElement('span');
+        setIcon(i, n, 16);
+        icone.appendChild(i);
+      }
+      const msg = document.createElement('span');
+      msg.className = 'permesso-msg';
+      const host = document.createElement('strong');
+      host.textContent = d.host || '';
+      msg.append(host, ' ' + cosa.testo);
+      const si = document.createElement('button');
+      si.type = 'button';
+      si.className = 'permesso-btn permesso-si';
+      si.textContent = 'Consenti';
+      si.addEventListener('click', () => rispondi(d, true));
+      const no = document.createElement('button');
+      no.type = 'button';
+      no.className = 'permesso-btn permesso-no';
+      no.textContent = 'Non consentire';
+      no.addEventListener('click', () => rispondi(d, false));
+      b.replaceChildren(icone, msg, no, si);
+      b.hidden = false;
+      requestAnimationFrame(() => {
+        const h = Math.ceil(b.getBoundingClientRect().height);
+        document.documentElement.style.setProperty('--sopra-permessi', h + 'px');
+        riservaSopra('permessi', h);
+      });
+    }
+
+    api.tabs.onPermesso((evento, info) => {
+      if (!info || !info.id) return;
+      if (evento === 'chiedi') {
+        if (!domande.some((x) => x.id === info.id)) domande.push(info);
+      } else {
+        const i = domande.findIndex((x) => x.id === info.id);
+        if (i >= 0) domande.splice(i, 1);
+      }
+      render();
+    });
+    try { api.tabs.snapshot().then((snap) => { if (attiva == null && snap) { attiva = snap.activeId || null; render(); } }).catch(() => {}); } catch (_) {}
+    api.tabs.onUpdate((snap) => {
+      attiva = (snap && snap.activeId) || null;
+      if (snap && Array.isArray(snap.tabs)) {
+        for (let i = domande.length - 1; i >= 0; i--) {
+          if (!snap.tabs.some((t) => t.id === domande[i].tabId)) domande.splice(i, 1);
+        }
+      }
+      render();
     });
   }
 })();

@@ -587,7 +587,7 @@ html[data-feedback-dim="1"] .shell {
 
 .dl-panel {
   position: fixed;
-  top: 40px;                       /* subito sotto la fila di tab */
+  top: calc(40px + var(--sopra-permessi, 0px)); /* sotto la fila di tab e l'eventuale domanda di permesso */
   right: 8px;
   width: 340px;
   max-width: calc(100vw - 16px);
@@ -696,3 +696,38 @@ html[data-feedback-dim="1"] .shell {
 /* Scaricato ma non più al suo posto: la riga si attenua, così si vede prima ancora di cliccare. */
 .dl-row[data-missing="1"] .dl-row-name { color: var(--fg-soft); text-decoration: line-through; }
 .dl-row[data-missing="1"] .dl-row-meta { opacity: 0.8; }
+
+/* Domanda di permesso di una pagina (#591.1): sta nella cornice, subito sotto la fila di tab, e la pagina scende. */
+.permesso-bar {
+  position: fixed;
+  top: 40px;
+  left: 0;
+  right: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  background: var(--tab-active);
+  color: var(--fg);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.permesso-bar[hidden] { display: none; }
+.permesso-icone { display: inline-flex; gap: 4px; color: var(--accent); }
+.permesso-icone > span { display: inline-flex; }
+.permesso-msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.permesso-btn {
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+.permesso-btn:hover { background: rgba(var(--accent-rgb), 0.12); }
+.permesso-btn:active { transform: scale(0.97); }
+.permesso-si { background: var(--accent); border-color: var(--accent); color: #fff; }
+.permesso-si:hover { background: color-mix(in srgb, var(--accent) 85%, #000); }
