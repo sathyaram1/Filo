@@ -209,7 +209,8 @@ function nascosto(nodo) {
   if (String(a['aria-hidden'] || '').toLowerCase() === 'true') return true;
   if (a.style && /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)/i.test(a.style)) return true;
   if (nodo.tag === 'dialog' && !('open' in a)) return true;
-  if (nodo.tag === 'filo-ui' || 'data-sn-ui' in a) return true;
+  // La UI che Filo stesso disegna nella pagina (menu, avvisi) non è la pagina: vedi src/shared/filoUi.js.
+  if ('data-sn-ui' in a) return true;
   return false;
 }
 
@@ -290,10 +291,7 @@ function scriviTabella(nodo, w, ctx) {
 }
 
 function scrivi(nodo, w, ctx) {
-  if (typeof nodo === 'string') {
-    if (ctx.pre) w.inline(nodo); else w.inline(nodo.replace(/\s+/g, ' '));
-    return;
-  }
+  if (typeof nodo === 'string') { w.inline(nodo.replace(/\s+/g, ' ')); return; }
   const tag = nodo.tag;
   if (MAI.has(tag) || nascosto(nodo)) return;
   if (ctx.stretta && diContorno(nodo, ctx)) return;
@@ -319,7 +317,8 @@ function scrivi(nodo, w, ctx) {
     }
     case 'table': scriviTabella(nodo, w, sotto); return;
     case 'ul': case 'ol': case 'menu': {
-      w.blocco();
+      const stacca = () => (ctx.lista ? w.riga() : w.blocco());
+      stacca();
       const livello = (ctx.lista || 0) + 1;
       let n = 0;
       for (const x of nodo.children) {
@@ -333,7 +332,7 @@ function scrivi(nodo, w, ctx) {
           scrivi(x, w, { ...sotto, lista: livello });
         }
       }
-      w.blocco();
+      stacca();
       return;
     }
     case 'li': w.inizia('- '); figli(sotto); w.riga(); return;
@@ -393,10 +392,12 @@ function meta(radice) {
 function sceltaRadice(radice) {
   const corpo = trova(radice, (x) => x.tag === 'body')[0] || radice;
   const principali = trova(corpo, (x) => x.tag === 'main' || String(x.attrs.role || '').toLowerCase() === 'main');
-  const articoli = trova(corpo, (x) => x.tag === 'article' || String(x.attrs.itemprop || '').toLowerCase() === 'articlebody');
-  const conTesto = (x) => testoGrezzo(x).length >= SOGLIA_CONTENUTO;
-  if (articoli.length === 1 && conTesto(articoli[0])) return { nodo: articoli[0], corpo };
-  if (principali.length === 1 && conTesto(principali[0])) return { nodo: principali[0], corpo };
+  const articoli = trova(corpo, (x) => x.tag === 'article');
+  const corpiArticolo = trova(corpo, (x) => String(x.attrs.itemprop || '').toLowerCase() === 'articlebody');
+  const conTesto = (x) => scriviDa(x, { stretta: true, dentroArticolo: true, base: '', lista: 0 }).length >= SOGLIA_CONTENUTO;
+  for (const gruppo of [articoli, principali, corpiArticolo]) {
+    if (gruppo.length === 1 && conTesto(gruppo[0])) return { nodo: gruppo[0], corpo };
+  }
   return { nodo: corpo, corpo };
 }
 
@@ -419,7 +420,7 @@ function estrai(html, { url = '' } = {}) {
   let base = url;
   if (m.base) { try { base = new URL(m.base, url || undefined).href; } catch (_) {} }
   const { nodo, corpo } = sceltaRadice(radice);
-  const ctx = { stretta: true, dentroArticolo: nodo.tag === 'article' || nodo.tag === 'main', base, lista: 0, pre: false };
+  const ctx = { stretta: true, dentroArticolo: nodo !== corpo, base, lista: 0 };
   let testo = scriviDa(nodo, ctx);
   // Un sito che chiama «menu» il contenitore di tutto: la lettura stretta resta a mani vuote, la larga no.
   if (testo.length < 200) {
