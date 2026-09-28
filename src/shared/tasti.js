@@ -424,12 +424,18 @@
     return mods === premuti && tastiDaEvento(ev).has(tasto);
   }
 
-  // Il simbolo scritto dopo Shift (o ''): alla pressione arriva quello che Shift ne
-  // fa, quindi la scorciatoia non combacerebbe mai.
-  function simboloConShift(accel) {
+  // Il modificatore scritto che alla pressione cambia il simbolo (o ''): Shift
+  // ovunque, Alt su Mac, Ctrl+Alt (AltGr) su Windows. Il nome scritto non
+  // combacerebbe mai col carattere che arriva.
+  function modificatoreCheCambiaSimbolo(accel, esplicita) {
     const f = forma(accel);
-    const tasto = f.slice(f.indexOf('|') + 1);
-    return f && f.slice(0, f.indexOf('|')).includes('s') && simbolo(tasto) ? tasto : '';
+    if (!f || !simbolo(f.slice(f.indexOf('|') + 1))) return '';
+    const mods = f.slice(0, f.indexOf('|'));
+    const p = piattaforma(esplicita);
+    if (mods.includes('s')) return 'Shift';
+    if (p === 'darwin' && mods.includes('a')) return 'Alt';
+    if (p === 'win32' && mods.includes('c') && mods.includes('a')) return 'Ctrl+Alt';
+    return '';
   }
 
   // La pressione che una scorciatoia SCRITTA descrive (o null), letta con le
@@ -467,6 +473,6 @@
     comandoNavigazione, etichettaIndietro, etichettaAvanti,
     tastiRiservati, riservato,
     tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, combacia, pressioneScritta, delSistema,
-    simboloConShift,
+    modificatoreCheCambiaSimbolo,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

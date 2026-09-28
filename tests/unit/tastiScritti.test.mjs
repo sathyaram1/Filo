@@ -52,11 +52,18 @@ test('di un simbolo conta il carattere che arriva, non Shift', () => {
   assert.equal(T.combacia(premi({ key: '1', code: 'Digit1' }), 'Ctrl+Shift+1'), false);
 });
 
-test('un simbolo scritto con Shift si riconosce prima di salvarlo', () => {
-  for (const [scritto, simbolo] of [['Ctrl+Shift+\\', '\\'], ['Ctrl+Maiusc+/', '/'], ['Cmd+Shift+,', ','], ['Ctrl+Shift+ò', 'ò'], ['Ctrl+Shift+Minus', '-']]) {
-    assert.equal(T.simboloConShift(scritto), simbolo, scritto);
+test('un simbolo con un modificatore che lo cambia si riconosce prima di salvarlo', () => {
+  for (const sistema of ['win32', 'darwin', 'linux']) {
+    for (const scritto of ['Ctrl+Shift+\\', 'Ctrl+Maiusc+/', 'Cmd+Shift+,', 'Ctrl+Shift+ò', 'Ctrl+Shift+Minus']) {
+      assert.equal(T.modificatoreCheCambiaSimbolo(scritto, sistema), 'Shift', `${scritto} su ${sistema}`);
+    }
+    for (const ok of ['Ctrl+|', 'Ctrl+Shift+1', 'Ctrl+Shift+S', 'Ctrl+Shift+Up', 'Ctrl+Shift+Space', 'Ctrl+Shift+F5', 'Ctrl+Alt+E', '', 'b']) {
+      assert.equal(T.modificatoreCheCambiaSimbolo(ok, sistema), '', `${ok} su ${sistema}`);
+    }
   }
-  for (const ok of ['Ctrl+|', 'Ctrl+Shift+1', 'Ctrl+Shift+S', 'Ctrl+Shift+Up', 'Ctrl+Shift+Space', 'Ctrl+Shift+F5', '', 'b']) {
-    assert.equal(T.simboloConShift(ok), '', ok);
-  }
+  // AltGr su Windows è Ctrl+Alt (Ctrl+Alt+è scrive «[»); su Mac Alt scrive.
+  assert.equal(T.modificatoreCheCambiaSimbolo('Ctrl+Alt+è', 'win32'), 'Ctrl+Alt');
+  assert.equal(T.modificatoreCheCambiaSimbolo('Ctrl+Alt+è', 'linux'), '');
+  assert.equal(T.modificatoreCheCambiaSimbolo('Alt+.', 'darwin'), 'Alt');
+  assert.equal(T.modificatoreCheCambiaSimbolo('Alt+.', 'win32'), '');
 });

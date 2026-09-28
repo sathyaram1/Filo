@@ -4059,7 +4059,9 @@
       return `${nome} è già di Filo (schede, zoom, annulla…) e non arriverebbe mai a questo modulo`;
     }
     // Prima dei tasti dell'Editor: la pressione che descrive non è quella vera.
-    if (TASTI.simboloConShift(sc)) return `Con Shift il simbolo cambia, quindi ${nome} non partirebbe mai (scrivi il simbolo che esce, senza Shift)`;
+    const cambia = TASTI.modificatoreCheCambiaSimbolo(sc);
+    if (cambia === 'Shift') return `Con Shift il simbolo cambia, quindi ${nome} non partirebbe mai (scrivi il simbolo che esce, senza Shift)`;
+    if (cambia) return `Con ${tasto(cambia)} il simbolo cambia, quindi ${nome} non partirebbe mai`;
     const t = tastoEditorDi(sc);
     if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo modulo non partirebbe mai`;
     const e = TASTI.pressioneScritta(sc);
