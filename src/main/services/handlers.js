@@ -1395,6 +1395,13 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
           const tm = win && win._filoTabs;
           if (tm && typeof tm.openTab === 'function') {
             tabId = tm.openTab(url, { activate: !background });
+            // Gli schemi non web sono esclusi qui sopra: una scheda che non
+            // nasce è la lista dei siti bloccati (#590), e la chat lo deve dire.
+            if (!tabId) {
+              let host = '';
+              try { host = new URL(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`).hostname; } catch (_) {}
+              return { executed: false, kept: true, output: { blocked: 'site', host } };
+            }
             opened = true;
           }
         } catch (e) {
@@ -2538,6 +2545,13 @@ function toolResultText({ action, res, rendered }) {
   }
   const obs = observationsForPrompt([rendered]);
   if (obs) return obs;
+  if (type === 'NAVIGA' && res.output && res.output.blocked === 'site') {
+    const sito = res.output.host || 'quel sito';
+    return `Pagina NON aperta: ${sito} è nella lista dei siti bloccati dell'utente. Diglielo in una riga: se vuole aprirla lo stesso c'è «Apri comunque» nella notifica appena comparsa. Non riprovare e non cercare un altro indirizzo per arrivarci.`;
+  }
+  if (type === 'NAVIGA' && res.output && res.output.blocked === 'scheme') {
+    return 'Pagina NON aperta: l\'indirizzo non è una pagina web (ammessi solo http e https). Non riprovare con lo stesso indirizzo.';
+  }
   if (res.output && res.output.blocked === 'disabled') {
     return 'Comando NON eseguito: la modalità terminale è spenta. Proponi all\'utente di attivarla (IMPOSTA_PREFERENZA modalita_terminale true) e non riprovare finché non è attiva.';
   }

@@ -1,29 +1,6 @@
-// Blocco apertura siti in blacklist (#170.3).
-//
-// PERCHÉ ESISTE
-//   L'ad-blocking (adblock.js) annulla le SINGOLE richieste verso domini di
-//   ad/tracker, ma non impedisce di APRIRE la pagina top-level di un sito che
-//   sta in blacklist. Questo modulo decide, a livello di navigazione top-level,
-//   se l'apertura di un sito va bloccata del tutto.
-//
-//   Sorgenti della blacklist:
-//   - le liste pubbliche già scaricate dall'ad-blocker (#170.2: StevenBlack +
-//     EasyList), opzionali (useAdblockLists);
-//   - una blacklist DEDICATA dell'utente (domini aggiunti a mano nelle
-//     Preferenze).
-//
-//   ECCEZIONI (l'apertura è consentita anche se il sito è in blacklist):
-//   a) la navigazione proviene da un MOTORE DI RICERCA (referrer Google/Bing/…):
-//      l'utente l'ha cercato apposta, non lo intercettiamo;
-//   b) la navigazione è ORIGINATA DA FILO (azione NAVIGA dell'assistente o
-//      navigazione interna filo://): è Filo stesso ad aprire, su richiesta
-//      esplicita dell'utente.
-//
-//   Quando invece blocca, il chiamante (tabs.js) mostra una notifica in basso a
-//   destra (#170.1) col sito bloccato e l'opzione "Apri comunque".
-//
-// API: configureFromSettings, shouldBlockNavigation, isSearchEngineUrl,
-//      isBlacklistedHost, setForTest, status.
+// Blocco apertura siti in blacklist (#170.3): decide se una navigazione top-level va bloccata.
+// Non notifica e non conosce le schede: lo chiama solo _maybeBlockNavigation di tabs.js,
+// l'unico passaggio di ogni cambio d'indirizzo (#590). Eccezioni: vedi shouldBlockNavigation.
 
 let enabled = true;
 let useAdblockLists = true;
@@ -60,7 +37,8 @@ const SEARCH_ENGINE_PATTERNS = [
   /(^|\.)kagi\.com$/,
   /(^|\.)mojeek\.com$/,
   /(^|\.)ask\.com$/,
-  /(^|\.)searx\b/, // istanze SearXNG (searx.*)
+  // Solo searx.<suffisso pubblico>: searx.qualunque.com lo registra chiunque (#590).
+  engineOnPublicSuffix('searx'),
 ];
 
 function hostnameOf(url) {
@@ -135,11 +113,10 @@ function isBlacklistedHost(host) {
   return false;
 }
 
-// Decisione centrale. Ritorna { block, host, reason }.
-//   targetUrl: dove si vuole andare.
-//   fromUrl:   pagina di partenza / referrer (per l'eccezione "ricerca").
-//   viaFilo:   true se l'apertura è originata da Filo (eccezione "Filo").
-function shouldBlockNavigation(targetUrl, { fromUrl = '', viaFilo = false } = {}) {
+// Decisione centrale. Ritorna { block, host, reason }. L'unica eccezione è il
+// referrer di un motore di ricerca (l'utente l'ha cercato apposta): un'apertura
+// di Filo o del modello NON è esente (#590), a scavalcare è solo «Apri comunque».
+function shouldBlockNavigation(targetUrl, { fromUrl = '' } = {}) {
   const res = { block: false, host: '', reason: '' };
   if (!enabled) return res;
 
@@ -149,16 +126,12 @@ function shouldBlockNavigation(targetUrl, { fromUrl = '', viaFilo = false } = {}
   } catch (_) {
     return res; // URL non valido: non interferiamo
   }
-  // Solo navigazioni web top-level. filo://, about:, data:, chrome:, ecc. sono
-  // sempre lecite (le pagine interne di Filo non si bloccano mai).
+  // Solo navigazioni web top-level: le pagine interne di Filo non si bloccano mai.
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return res;
 
   const host = u.hostname.toLowerCase();
   res.host = host;
 
-  // Eccezione b) — Filo apre direttamente (NAVIGA / navigazione interna).
-  if (viaFilo) return res;
-  // Eccezione a) — la navigazione proviene da un motore di ricerca.
   if (fromUrl && isSearchEngineHost(hostnameOf(fromUrl))) return res;
 
   if (!isBlacklistedHost(host)) return res;

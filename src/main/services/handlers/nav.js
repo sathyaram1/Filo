@@ -74,7 +74,8 @@ module.exports = function register(on, ctx) {
 
   on(MSG.OPEN_URL, async (msg, sender) => {
     const win = winOf(sender);
-    if (win?._filoTabs && msg.url) win._filoTabs.openTab(msg.url);
+    // La scheda che chiede è la provenienza, come per un link cliccato lì (#590).
+    if (win?._filoTabs && msg.url) win._filoTabs.openTab(msg.url, { fromUrl: sender?.tab?.url || '' });
     return { ok: true };
   });
 
@@ -181,7 +182,7 @@ module.exports = function register(on, ctx) {
 
   on(MSG.OPEN_NEW_TAB, async (msg, sender) => {
     const win = winOf(sender);
-    if (win?._filoTabs) win._filoTabs.openTab(msg.url || 'filo://newtab/');
+    if (win?._filoTabs) win._filoTabs.openTab(msg.url || 'filo://newtab/', { fromUrl: sender?.tab?.url || '' });
     return { ok: true };
   });
 

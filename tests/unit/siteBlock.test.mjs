@@ -1,8 +1,8 @@
 // Unit test per il blocco apertura siti in blacklist (#170.3,
-// src/main/services/siteBlock.js). Assertano i TRE CASI richiesti dalla spec:
+// src/main/services/siteBlock.js):
 //   1) apertura diretta di un sito in blacklist  → BLOCCATO
 //   2) stessa apertura ma con referrer di un motore di ricerca → CONSENTITA
-//   3) stessa apertura ma originata da Filo (viaFilo) → CONSENTITA
+//   3) un'apertura di Filo o del modello non ha esenzioni (#590)
 // più i bordi: schemi non-web, host non in lista, blocco disattivato, match per
 // suffisso/sottodominio. electron è richiesto in modo pigro (solo da adblock),
 // e qui usiamo useAdblockLists:false, quindi il modulo gira senza Electron.
@@ -37,10 +37,22 @@ test('caso 2: apertura da un motore di ricerca (referrer Google) → consentita'
   assert.equal(d.block, false);
 });
 
-test('caso 3: apertura originata da Filo (viaFilo) → consentita', () => {
+test('caso 3 (#590): un\'apertura di Filo o del modello non ha esenzioni', () => {
   reset();
-  const d = SB.shouldBlockNavigation('https://evil.example/page', { viaFilo: true });
-  assert.equal(d.block, false);
+  // Il vecchio lasciapassare `viaFilo` non deve più aprire niente.
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/page', { viaFilo: true }).block, true);
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/page', { fromUrl: 'filo://newtab/' }).block, true);
+});
+
+test('#590: l\'eccezione SearX vale solo per searx.<suffisso pubblico>, non per un host qualunque', () => {
+  reset();
+  for (const ref of ['https://searx.esempio.com/search?q=x', 'https://searx.evil.example/', 'https://searxbad.com/', 'https://a.searx-finto.io/']) {
+    assert.equal(SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block, true, `non deve consentire da ${ref}`);
+    assert.equal(SB.isSearchEngineUrl(ref), false, ref);
+  }
+  for (const ref of ['https://searx.be/search?q=x', 'https://searx.org/', 'https://www.searx.me/']) {
+    assert.equal(SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block, false, `deve consentire da ${ref}`);
+  }
 });
 
 test('referrer di ricerca robusto su TLD e sottodomini diversi', () => {
