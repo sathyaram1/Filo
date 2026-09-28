@@ -80,6 +80,7 @@ import { fileURLToPath } from 'node:url';
 import { verdictForCurrentBranch } from './verify-local.mjs';
 import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge } from './lib/owner-merge.mjs';
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
+import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
