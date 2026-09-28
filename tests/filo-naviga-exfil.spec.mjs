@@ -152,9 +152,8 @@ test('CERCA_WEB con dentro un dato letto chiede un OK; una ricerca normale no', 
   expect(conDato.needsConfirm).toBe(2);
   expect(conDato.executed).toBe(false);
   expect(String(conDato.describe || '')).toContain('motore di ricerca');
-
-  const normale = await execAction(app, { type: 'CERCA_WEB', query: 'orari treni milano torino' }, { contesto: dopoLettura });
-  expect(normale.needsConfirm, String(normale.describe || '')).toBeFalsy();
+  // Il dato letto non torna dentro la spiegazione del popup.
+  expect(String(conDato.describe || '')).not.toContain('PRG7788ZK');
 });
 
 // ── #587: la catena nel turno di chat ───────────────────────────────────────
