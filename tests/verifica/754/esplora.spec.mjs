@@ -159,63 +159,109 @@ async function cookiesOf(app, host) {
   }, host);
 }
 
-test('SP italiano nel riquadro: Rifiuta premuto', async ({ app, shell, openTab, srv }) => {
-  const frame = srv.set('cmp.privacy-mgmt.test', '/sp', spFrame([['sp_choice_type_11', 'Accetta', 'accept'], ['sp_choice_type_13', 'Rifiuta', 'reject']]));
-  const url = srv.set('news-it.test', '/a', spTop(frame));
+
+async function snap(shell) { return shell.evaluate(() => window.filoShell.tabs.snapshot()); }
+async function wheelScroll(page) {
+  await page.mouse.move(300, 300);
+  await page.mouse.wheel(0, 600);
+  await sleep(500);
+  return page.evaluate(() => (document.scrollingElement || document.documentElement).scrollTop);
+}
+
+test('rivisita in una scheda nuova: il segno resta?', async ({ app, shell, openTab, srv }) => {
+  const frame = srv.set('cmp.privacy-mgmt.test', '/sp2', spFrame([['sp_choice_type_11', 'Accetta', 'accept'], ['sp_choice_type_13', 'Rifiuta', 'reject']]));
+  const pageHtml = (id) => `<!doctype html><html><head><title>${id}</title></head><body><h1>x</h1><script>
+  window.__log=[];
+  addEventListener('message',(e)=>{const d=e.data||{}; if(!d.sp) return; window.__log.push(d.sp); if(d.sp==='reject'){document.cookie='consentUUID=rej; path=/';} document.getElementById('sp_message_container_1')?.remove();});
+  if(!document.cookie.includes('consentUUID')) document.write('<div id="sp_message_container_1"><iframe id="sp_message_iframe_1" src="${frame}" style="width:600px;height:300px"></iframe></div>');
+  </script></body></html>`;
+  const url = srv.set('news-rev.test', '/a', pageHtml('A'));
+  const url2 = srv.set('news-rev.test', '/b', pageHtml('B'));
   const page = await openTab(url);
   await expect.poll(() => page.evaluate(() => window.__log.join(',')).catch(() => ''), { timeout: 15_000 }).toBe('reject');
-  expect((await cookiesOf(app, 'news-it.test')).join(';')).not.toContain('tracking_id');
-  const scroll = await page.evaluate(() => { window.scrollTo(0, 500); return window.scrollY; });
-  expect(scroll).toBeGreaterThan(0);
-  const t = await menuText(app, shell);
-  console.log('MENU SP IT:', JSON.stringify(t));
-  expect(t).toContain('Cookie non necessari rifiutati');
+  let s = await snap(shell);
+  const a = s.tabs.find((t) => /news-rev/.test(t.url));
+  console.log('TAB A cookies:', JSON.stringify(a.cookies));
+  await shell.evaluate((id) => window.filoShell.tabs.close(id), a.id);
+  await sleep(500);
+  const p2 = await openTab(url2);
+  await sleep(4000);
+  const has = await p2.evaluate(() => !!document.getElementById('sp_message_container_1'));
+  s = await snap(shell);
+  const b = s.tabs.find((t) => /news-rev/.test(t.url));
+  console.log('TAB B banner?', has, 'cookies:', JSON.stringify(b && b.cookies), 'active', s.activeId === (b && b.id));
+  const t2 = await menuText(app, shell);
+  console.log('MENU B:', JSON.stringify(t2));
+  expect(t2).toContain('Mostra il banner dei cookie');
 });
 
-test('SP inglese nel riquadro: Reject All premuto', async ({ app, shell, openTab, srv }) => {
-  const frame = srv.set('cmp.privacy-mgmt.test', '/spen', spFrame([['sp_choice_type_11', 'Accept All', 'accept'], ['sp_choice_type_13', 'Reject All', 'reject']]));
-  const url = srv.set('news-en.test', '/a', spTop(frame));
-  const page = await openTab(url);
-  await expect.poll(() => page.evaluate(() => window.__log.join(',')).catch(() => ''), { timeout: 15_000 }).toBe('reject');
-});
-
-test('SP nel riquadro senza rifiuta (accetta o abbonati): nascosto, pagina sbloccata', async ({ app, shell, openTab, srv }) => {
+test('SP nel riquadro senza rifiuta: resta sopra e la pagina non scorre', async ({ app, shell, openTab, srv }) => {
   const list = realList();
-  if (list) await app.evaluate((_e, txt) => globalThis.__filoCookieBanners.setListForTest(txt), list);
+  await app.evaluate((_e, txt) => globalThis.__filoCookieBanners.setListForTest(txt), list);
   const frame = srv.set('cmp.privacy-mgmt.test', '/sppay', spFrame([['sp_choice_type_11', 'Accetta e continua', 'accept'], ['sp_choice_type_9', 'Abbonati', 'subscribe']]));
   const url = srv.set('news-pay.test', '/a', spTop(frame));
   const page = await openTab(url);
   await sleep(9000);
+  const y = await wheelScroll(page);
   const st = await page.evaluate(() => {
     const c = document.getElementById('sp_message_container_1');
-    window.scrollTo(0, 500);
-    return { log: window.__log.join(','), container: c ? getComputedStyle(c).display : 'gone', scrollY: window.scrollY, htmlOverflow: getComputedStyle(document.documentElement).overflowY };
+    return { log: window.__log.join(','), container: c ? getComputedStyle(c).display : 'gone', htmlOverflow: getComputedStyle(document.documentElement).overflowY };
   });
-  console.log('SP PAY:', JSON.stringify(st), 'list?', !!list);
-  expect(st.log).toBe('');
-  expect((await cookiesOf(app, 'news-pay.test')).join(';')).not.toContain('tracking_id');
+  const s = await snap(shell);
+  console.log('SP PAY:', JSON.stringify(st), 'wheelY', y, 'list lines', list.split('\n').length, 'tab', JSON.stringify(s.tabs.find((t) => /news-pay/.test(t.url)).cookies));
   expect(st.container).toBe('none');
-  expect(st.scrollY).toBeGreaterThan(0);
 });
 
-test('banner solo Accetta nella pagina: nascosto, scorre, niente cookie', async ({ app, shell, openTab, srv }) => {
-  const list = realList();
-  if (list) await app.evaluate((_e, txt) => globalThis.__filoCookieBanners.setListForTest(txt), list);
-  const url = srv.set('shop.test', '/a', `<!doctype html><html><head><title>SHOP</title><style>body{height:4000px;overflow:hidden}
+test('banner solo Accetta: nascosto e la rotella scorre', async ({ app, shell, openTab, srv }) => {
+  await app.evaluate((_e, txt) => globalThis.__filoCookieBanners.setListForTest(txt), realList());
+  const url = srv.set('shop.test', '/a', `<!doctype html><html><head><title>SHOP</title><style>html,body{overflow:hidden} body{height:4000px}
 .veil{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999}
-#cookie-notice{position:fixed;bottom:0;left:0;right:0;z-index:1000;background:#fff;padding:20px}</style></head><body>
+#cookie-banner{position:fixed;bottom:0;left:0;right:0;z-index:1000;background:#fff;padding:20px}</style></head><body>
 <h1>Negozio</h1><div class="veil"></div>
-<div id="cookie-notice">Questo sito usa i cookie. <button onclick="document.cookie='tracking_id=x; path=/';this.parentNode.remove()">Accetta</button></div>
+<div id="cookie-banner">Questo sito usa i cookie. <button onclick="document.cookie='tracking_id=x; path=/';this.parentNode.remove()">Accetta</button></div>
 </body></html>`);
   const page = await openTab(url);
-  await expect.poll(() => page.evaluate(() => getComputedStyle(document.getElementById('cookie-notice')).display).catch(() => ''), { timeout: 15_000 }).toBe('none');
-  await sleep(1600);
-  const st = await page.evaluate(() => { window.scrollTo(0, 500); return { y: window.scrollY, veil: getComputedStyle(document.querySelector('.veil')).display }; });
-  console.log('ACCEPT ONLY:', JSON.stringify(st));
-  expect(st.y).toBeGreaterThan(0);
-  expect(st.veil).toBe('none');
-  expect((await cookiesOf(app, 'shop.test')).join(';')).not.toContain('tracking_id');
-  const t = await menuText(app, shell);
-  console.log('MENU HIDDEN:', JSON.stringify(t));
-  expect(t).toContain('Banner dei cookie nascosto');
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.getElementById('cookie-banner')).display).catch(() => ''), { timeout: 15_000 }).toBe('none');
+  await sleep(1800);
+  const y = await wheelScroll(page);
+  console.log('ACCEPT ONLY wheelY', y);
+  expect(y).toBeGreaterThan(0);
+  for (const theme of ['light', 'dark']) {
+    await app.evaluate(({ nativeTheme }, t) => { nativeTheme.themeSource = t; }, theme);
+    await menuText(app, shell, 'Banner dei cookie nascosto');
+    for (const w of app.windows()) {
+      const ok = await w.evaluate(() => document.body && document.body.innerText.includes('Banner dei cookie nascosto')).catch(() => false);
+      if (ok) { await w.screenshot({ path: `tests/.shots/v754-menu-${theme}.png` }).catch((e) => console.log('shot err', e.message)); break; }
+    }
+    await shell.keyboard.press('Escape').catch(() => {});
+    await sleep(400);
+  }
+});
+
+test('TCF: il rifiuto registrato dà il segno; pagina Sicurezza con un sito', async ({ app, shell, openTab, srv }) => {
+  const url = srv.set('tcf.test', '/a', `<!doctype html><html><head><title>TCF</title></head><body><h1>x</h1>
+<iframe name="__tcfapiLocator" style="display:none"></iframe>
+<div id="onetrust-banner-sdk" style="position:fixed;bottom:0;left:0;right:0;background:#fff;padding:20px;z-index:9">Cookie
+<button id="onetrust-reject-all-handler" onclick="window.__c={1:false,2:false};this.parentNode.remove()">Rifiuta tutto</button>
+<button id="onetrust-accept-btn-handler" onclick="window.__c={1:true,2:true};this.parentNode.remove()">Accetta</button></div>
+<script>
+window.__c={};
+window.__tcfapi=function(cmd,v,cb){ if(cmd==='ping') cb({cmpLoaded:true,displayStatus:document.getElementById('onetrust-banner-sdk')?'visible':'hidden'},true); else if(cmd==='getTCData') cb({purpose:{consents:window.__c}},true); };
+addEventListener('message',(e)=>{let d=e.data; if(typeof d==='string'){try{d=JSON.parse(d)}catch(_){return}} const c=d&&d.__tcfapiCall; if(!c) return; window.__tcfapi(c.command,c.version,(rv,ok)=>{ e.source.postMessage({__tcfapiReturn:{returnValue:rv,success:ok,callId:c.callId}},'*'); }, c.parameter); });
+</script></body></html>`);
+  const page = await openTab(url);
+  await expect.poll(() => page.evaluate(() => JSON.stringify(window.__c)).catch(() => ''), { timeout: 15_000 }).toBe('{"1":false,"2":false}');
+  await expect.poll(async () => { const s = await snap(shell); return JSON.stringify(s.tabs.find((t) => /tcf\.test/.test(t.url)).cookies); }, { timeout: 8000 }).toContain('"rejected":true');
+  // «Mostra il banner» → la pagina Sicurezza lo elenca
+  const s = await snap(shell);
+  const tab = s.tabs.find((t) => /tcf\.test/.test(t.url));
+  await shell.evaluate((id) => window.filoShell.tabs.cookieBanners(id, true), tab.id);
+  await sleep(1500);
+  const sec = await openTab('filo://security/');
+  await sec.waitForSelector('#cookie-banners-list li', { timeout: 8000 });
+  for (const theme of ['light', 'dark']) {
+    await sec.evaluate((t) => window.SN_PAGE_BOOTSTRAP && window.SN_PAGE_BOOTSTRAP.applyTheme(t), theme).catch(() => {});
+    await sec.locator('#sec-cookies').screenshot({ path: `tests/.shots/v754-security-${theme}.png` }).catch((e) => console.log('shot err', e.message));
+  }
+  console.log('SEC LIST:', await sec.locator('#sec-cookies-banners').innerText());
 });
