@@ -1197,6 +1197,11 @@
   // che nessuno sappia perché.
   const MAX_BLOCCO_PAGINA = 128 * 1024;
 
+  // Una lista sola per «Spiega», «Approfondisci» e la chat: il modello deve
+  // riconoscere «rupie» come INR ovunque gli si chieda un cambio (#724.1).
+  const NOMI_VALUTE = 'rupie = INR, real = BRL, zloty = PLN, won = KRW, rand = ZAR, baht = THB, lira turca = TRY, fiorino = HUF, corona ceca = CZK, peso messicano = MXN, dollari = USD, sterline = GBP, franchi svizzeri = CHF, yen = JPY, yuan = CNY';
+  const FATTORI_UNITA = '1 mi = 1.609 km, 1 ft = 0.3048 m, 1 in = 2.54 cm, 1 yd = 0.9144 m, 1 mi² = 2.59 km², 1 acre = 4046.86 m², 1 lb = 0.4536 kg, 1 oz = 28.35 g, 1 gal (US) = 3.785 L, 1 fl oz (US) = 29.57 mL, °C = (°F-32)*5/9';
+
   // Prompt di sistema. Tutti centralizzati qui per evitare prompt sparsi nel codice.
   const PROMPTS = {
     // #593 — selezione e frase sono testo di una pagina web: chi possiede il
@@ -1229,9 +1234,9 @@
       `\n\nConversioni: se la selezione (o la frase) contiene importi in valute non-EUR o unità non metriche/non italiane, ` +
       `aggiungi tra parentesi l'equivalente in euro o in unità italiane usando il marker [[calc: ...]] con i tassi/fattori qui sotto. ` +
       `Esempi (assumendo 1 EUR = 1.08 USD): "$50" → "$50 ([[calc: 50/1.08 | eur]] €)"; "3 miles" → "3 miglia ([[calc: 3*1.609]] km)"; "70°F" → "70°F ([[calc: (70-32)*5/9]] °C)"; "5 lb" → "5 lb ([[calc: 5*0.4536]] kg)". ` +
-      `Fattori da usare: 1 mi = 1.609 km, 1 ft = 0.3048 m, 1 in = 2.54 cm, 1 yd = 0.9144 m, 1 mi² = 2.59 km², 1 acre = 4046.86 m², 1 lb = 0.4536 kg, 1 oz = 28.35 g, 1 gal (US) = 3.785 L, 1 fl oz (US) = 29.57 mL, °C = (°F-32)*5/9. ` +
+      `Fattori da usare: ${FATTORI_UNITA}. ` +
       (fxLine ? fxLine + ' Per convertire X di una valuta in EUR usa [[calc: X/<tasso> | eur]]: la parte dopo la barra dice a Filo che quel risultato è un importo in euro e va scritto come un prezzo, mettila SEMPRE. Poi scrivi «€» subito dopo il marker. ' +
-        'Vale per OGNI sigla dell\'elenco, anche quando la selezione la chiama col nome comune in italiano o in un\'altra lingua (rupie = INR, real = BRL, zloty = PLN, won = KRW, rand = ZAR, baht = THB, lira turca = TRY, fiorino = HUF, corona ceca = CZK, peso messicano = MXN). ' +
+        'Vale per OGNI sigla dell\'elenco, anche quando la selezione la chiama col nome comune in italiano o in un\'altra lingua (' + NOMI_VALUTE + '). ' +
         'Se la valuta NON è nell\'elenco non convertire e non inventare il tasso a memoria.\n' : '') +
       `Se non ci sono valute o unità da convertire, NON aggiungere nulla. Una sola conversione per importo, accanto al valore originale, senza spiegare la formula.` +
       `\n\nRispondi in italiano. Non aggiungere preamboli o spiegazioni meta sulla tua risposta.`,
@@ -1250,7 +1255,7 @@
       `\n\nConversioni: se compaiono importi in valute non-EUR o unità non metriche/non italiane, aggiungi tra parentesi l'equivalente in EUR/unità italiane usando [[calc: ...]]. ` +
       `Fattori: 1 mi = 1.609 km, 1 ft = 0.3048 m, 1 in = 2.54 cm, 1 yd = 0.9144 m, 1 mi² = 2.59 km², 1 acre = 4046.86 m², 1 lb = 0.4536 kg, 1 oz = 28.35 g, 1 gal (US) = 3.785 L, °C = (°F-32)*5/9. ` +
       (fxLine ? fxLine + ' Per convertire X di una valuta in EUR usa [[calc: X/<tasso> | eur]]: la parte dopo la barra dice a Filo che quel risultato è un importo in euro e va scritto come un prezzo, mettila SEMPRE. Poi scrivi «€» subito dopo il marker. ' +
-        'Vale per OGNI sigla dell\'elenco, anche quando la selezione la chiama col nome comune in italiano o in un\'altra lingua (rupie = INR, real = BRL, zloty = PLN, won = KRW, rand = ZAR, baht = THB, lira turca = TRY, fiorino = HUF, corona ceca = CZK, peso messicano = MXN). ' +
+        'Vale per OGNI sigla dell\'elenco, anche quando la selezione la chiama col nome comune in italiano o in un\'altra lingua (' + NOMI_VALUTE + '). ' +
         'Se la valuta NON è nell\'elenco non convertire e non inventare il tasso a memoria.\n' : '') +
       `Una sola conversione per importo, accanto al valore originale, senza esibire la formula.` +
       `\n\nRispondi in italiano. Non aggiungere preamboli o note meta.`,
@@ -1860,6 +1865,19 @@
       `APRIRE DA UN ALTRO PAESE ("apri questa tab dalla Francia", "apri questo sito dagli USA", "questo è bloccato in Italia, aprilo da fuori") → instrada la scheda web attiva attraverso un IP del paese con PROXY_TAB {country}. "torna in Italia" / "togli il proxy da questa scheda" → RIMUOVI_PROXY. "togli il proxy da tutte le schede" / "riporta tutto in Italia" → RIMUOVI_PROXY_TUTTE. Per una regola PERSISTENTE ("questo sito sempre dagli USA", "apri sempre netflix dalla Francia") → REGOLA_PROXY_DOMINIO {country, dominio}: da lì in poi quel dominio nasce già instradato da quel paese, anche dopo il riavvio. Per togliere la regola ("togli la regola sugli USA per questo sito") → RIMUOVI_REGOLA_PROXY {dominio}. Il paese è un codice ISO a due lettere: us (Stati Uniti), gb (Regno Unito), fr (Francia), de (Germania), es (Spagna), nl (Paesi Bassi), jp (Giappone) — sono accettati anche altri codici a due lettere. Se l'utente non indica il paese, usa us. Per "questa scheda"/"questo sito" senza dominio esplicito ometti {dominio}: il sistema usa la scheda web attiva. Esegui subito, NON chiedere conferma a parole.\n` +
       `COMANDO DELLA FINESTRA ("metti a schermo intero", "togli lo schermo intero", "riduci a icona", "vai alla home", "apri le impostazioni", "apri le app", "apri l'account") → emetti l'azione COMANDO_FINESTRA con {comando}. Aziona i controlli del browser Filo stesso, non il sito. "schermo intero" toglie le barre (schede + indirizzo) e fa occupare alla pagina ATTIVA tutta la finestra — è l'immersione, la stessa del menu tasto destro → Schermo intero; NON preme il pulsante del lettore video DENTRO il sito (quello Filo non sa farlo: se l'utente vuole proprio il fullscreen del player, trattala come una cosa che Filo non sa fare, vedi "QUANDO AMMETTI UNA MANCANZA"). NON esiste un comando per CHIUDERE la finestra o le schede: è escluso di proposito, non proporlo. Esegui subito, conferma in una frase breve.\n` +
       `ZOOM DELLA PAGINA ("ingrandisci la pagina", "un po' più grande", "si legge male, è piccolo", "zoom al 150%", "rimpicciolisci", "torna alla dimensione normale") → emetti l'azione ZOOM_PAGINA con {percentuale} se l'utente dice un numero, altrimenti con {verso} = in | out | reset (un passo per volta, esattamente come Ctrl + / Ctrl - / Ctrl 0). Scala la PAGINA INTERA, testo e immagini insieme: NON è la dimensione del testo dell'interfaccia di Filo (quella è una preferenza) e non è STILE_PAGINA (che ritocca il carattere di un pezzo di pagina) — se l'utente parla della pagina che sta guardando, è questa. Il livello di adesso è nella sezione ZOOM DELLA PAGINA dello STATO: leggilo prima di decidere quanto muoverti, e non dichiarare una percentuale che il sistema non ti ha confermato. Lo zoom resta associato al sito finché Filo è aperto, come per i tasti; alla riapertura di Filo si riparte dal 100%. Esegui subito, conferma in una frase breve.\n\n` +
+      // #724.1 — la chat è la strada più naturale per chiedere un cambio («quanto
+      // fanno 3000 rupie in euro»): stessa calcolatrice e stessi cambi di «Spiega».
+      // I cambi veri stanno nel CONTESTO: qui solo la regola, che non cambia mai.
+      `═══ CONTI E CAMBI (mai a mente) ═══\n` +
+      `Non calcolare MAI a mente: ogni numero che esce da un'operazione (una somma, una percentuale, un'area, una conversione di valuta o di unità) lo scrivi come marker \`[[calc: <espressione>]]\` e Filo, prima che l'utente legga, lo sostituisce col risultato esatto. Sintassi: + - * / ^, parentesi, sqrt/sin/cos/tan/log/ln/exp/abs/round, costanti pi ed e, punto come separatore decimale; una sola operazione per marker. Esempio: "Sono [[calc: 347*55]] mattoni".\n` +
+      `VALUTE: i cambi del giorno sono in CAMBI, nel CONTESTO più sotto, nella forma "1 EUR = <tasso> <SIGLA>". Converti SOLO con quelli, mai con un cambio ricordato:\n` +
+      `- X di una valuta in euro → [[calc: X/<tasso> | eur]] €\n` +
+      `- X euro in un'altra valuta → [[calc: X*<tasso> | valuta]] <SIGLA>\n` +
+      `- X della valuta A nella valuta B → [[calc: X/<tasso di A>*<tasso di B> | valuta]] <SIGLA di B>\n` +
+      `La parte dopo la barra dice a Filo che il risultato è un importo da scrivere come un prezzo: mettila SEMPRE quando converti una valuta. Le valute si riconoscono anche dal nome comune, in italiano o in un'altra lingua (${NOMI_VALUTE}). ` +
+      `Esempio, con "1 EUR = 92.000 INR" in CAMBI: "Quanto fanno 3000 rupie in euro?" → "3000 rupie sono circa [[calc: 3000/92 | eur]] €, al cambio del 26 settembre." Accanto al risultato di' sempre di che giorno è il cambio; se CAMBI li dà come stimati, di' che è una stima. ` +
+      `Se la valuta NON è in CAMBI (o CAMBI manca), cerca il cambio con CERCA_WEB e fai il conto col marker sul tasso trovato, dicendo da dove viene: non inventare mai un tasso.\n` +
+      `UNITÀ: per miglia, piedi, libbre, galloni, Fahrenheit e simili usa questi fattori, sempre col marker: ${FATTORI_UNITA}.\n\n` +
       (capacita
         ? `═══ COSA SA FARE FILO (capacità) ═══\n`
           + `Questo è l'elenco COMPLETO e VERO di ciò che Filo (il browser) sa fare, raggruppato per area. Ogni voce ha tra parentesi quadre il suo id stabile.\n`
@@ -1915,7 +1933,7 @@
         + `Hai uno strumento in più, disponibile solo adesso: ONBOARDING (spunta le voci fatte e/o chiude l'intervista con fine: true).\n\n`
         + `${onboarding}\n\n`),
 
-    filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, history, modelName, files, onboarding, onboardingTurns, onboardingMax }) =>
+    filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, cambi, history, modelName, files, onboarding, onboardingTurns, onboardingMax }) =>
       `═══ CONTESTO (cambia a ogni messaggio) ═══\n` +
       PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax }) +
       (modelName
@@ -1926,6 +1944,7 @@
       (espansioni ? `${espansioni}\n\n` : '') +
       (lezioni ? `LEZIONI RECENTI:\n${lezioni}\n\n` : '') +
       `STATO:\n${stato || '(vuoto)'}\n\n` +
+      (cambi ? `CAMBI:\n${cambi}\n\n` : '') +
       `FILE DELL'EDITOR (riassunti — gli appunti sono file come gli altri):\n${files || '(nessuno)'}\n` +
       `Ogni riga è \`[id] Titolo: riassunto\`. Vedi solo i RIASSUNTI, non il testo intero. Se per rispondere ti serve DAVVERO il contenuto completo di un file, emetti l'azione LEGGI_FILE con il suo id PRIMA di rispondere: il testo integrale ti rientra nel contesto e SOLO ALLORA rispondi. Non chiedere un file se il riassunto basta.\n\n` +
       (history ? `CONVERSAZIONE:\n${history}\n\n` : '') +
