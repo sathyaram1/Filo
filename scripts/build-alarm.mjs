@@ -70,6 +70,39 @@ export function normalizzaChiavi(chiavi) {
   return out;
 }
 
+/** Quanti caratteri di titolo il server tiene (il resto lo taglia senza dirlo). */
+export const TETTO_TITOLO = 200;
+
+/**
+ * Il guasto di una chiave in parole brevi, per il titolo: il file di prova o di test rosso.
+ * Stringa vuota per le chiavi il cui titolo dice già il guasto (bake, piattaforma, rilascio). PURA.
+ */
+export function nomeDelGuasto(chiave) {
+  const k = String(chiave || '').trim();
+  if (k === 'suite:fuori-dai-casi') return 'errori fuori dai casi';
+  if (k === 'suite:non-partita') return 'suite non partita';
+  if (k === 'suite:rossi-noti') return 'elenco dei rossi noti illeggibile';
+  const m = k.match(/^suite:(?:tests\/)?(.+?)(?:\.spec\.m?js)?$/) || k.match(/^unit:(?:tests\/unit\/)?(.+?)(?:\.test\.m?js)?$/);
+  return m ? m[1] : '';
+}
+
+/**
+ * Il titolo con i guasti fra parentesi, così due feedback aperti per guasti diversi non si chiamano uguali.
+ * Entro il tetto del server: se i nomi non ci stanno tutti, il taglio si dice («e altri N»). PURA.
+ */
+export function titoloCoiGuasti(titolo, chiavi, max = TETTO_TITOLO) {
+  const base = String(titolo || '');
+  const nomi = [...new Set(normalizzaChiavi(chiavi).map(nomeDelGuasto).filter(Boolean))];
+  if (!nomi.length) return base;
+  for (let n = nomi.length; n >= 1; n -= 1) {
+    const altri = nomi.length - n;
+    const t = `${base} (${nomi.slice(0, n).join(', ')}${altri ? ` e altri ${altri}` : ''})`;
+    if (t.length <= max) return t;
+  }
+  const t = `${base} (${nomi.length} guasti)`;
+  return t.length <= max ? t : base;
+}
+
 /**
  * Le chiavi del cancello unit dal suo registro TAP: `unit:<file>` per ogni file
  * delle righe `location:`, relativo a `radice` e con le barre normali (il
