@@ -46,21 +46,22 @@ function creaNascita({ app, sessioneDefault } = {}) {
     else if (typeof app.whenReady === 'function') app.whenReady().then(prendiDefault).catch(() => {});
   }
 
-  // Solo per sessioni di servizio che non navigano per l'utente (la detonazione di Safe Browse):
-  // chi la usa dichiara la scelta, e la sentinella tiene l'elenco.
-  function senzaProtezione(crea) {
+  // Sessioni di servizio che aprono pagine al posto dell'utente (la detonazione di Safe Browse):
+  // nascono protette come le altre, col marchio che le protezioni leggono. La sentinella tiene l'elenco.
+  function diServizio(crea) {
     installa();
-    esenzioneInCorso++;
-    try { return crea(); } finally { esenzioneInCorso--; }
+    servizioInCorso++;
+    try { return crea(); } finally { servizioInCorso--; }
   }
 
   return {
     installa,
     allaNascita,
-    senzaProtezione,
+    diServizio,
     nate: () => [...nate],
     protezioni: () => protezioni.map((p) => p.nome),
     eNata: (ses) => nate.has(ses),
+    eDiServizio: (ses) => !!ses && servizio.has(ses),
   };
 }
 
