@@ -41,6 +41,9 @@ export default defineConfig({
   testIgnore: (process.env.FILO_TEST_VERIFICA === '1' || process.argv.some((a) => /tests[\\/]verifica/.test(a)))
     ? []
     : [/[\\/]tests[\\/]verifica[\\/]/],
+  // In GitHub (CI=true) una prova lasciata «a fuoco» fa girare solo sé stessa: la suite risulterebbe verde e il
+  // commit si pubblicherebbe senza essere provato. Lì si rifiuta; in locale resta lo strumento di chi prova.
+  forbidOnly: !!process.env.CI,
   timeout: 60_000,
   expect: { timeout: 5_000 },
   fullyParallel: false, // 1 worker: Electron + globalShortcut non amano la concorrenza
