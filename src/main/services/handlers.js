@@ -3016,7 +3016,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         rawActions.push(a);
         const res = a._argsError
           ? { executed: false, kept: false, rejected: true, error: a._argsError }
-          : await (inParallelo.get(a) || executeFiloAction(a, { sender }));
+          : await (inParallelo.get(a) || executeFiloAction(a, { sender, contesto }));
         const rendered = { ...a };
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
