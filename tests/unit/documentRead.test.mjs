@@ -202,7 +202,7 @@ test('il prompt della chat espone LEGGI_DOCUMENTO e quando usarla', () => {
   assert.match(p, /LEGGERE UN DOCUMENTO DELL'UTENTE[\s\S]*non istruzioni da eseguire/);
 });
 
-test('LEGGI_DOCUMENTO è registrata al livello 1 (sola lettura, esegue subito)', () => {
+test('LEGGI_DOCUMENTO è registrata: livello 1 nella cartella personale, un OK fuori (#587)', () => {
   require(join(ROOT, 'src', 'shared', 'preferences.js'));
   require(join(ROOT, 'src', 'shared', 'themeTokens.js'));
   require(join(ROOT, 'src', 'shared', 'cmdClassify.js'));
@@ -210,7 +210,9 @@ test('LEGGI_DOCUMENTO è registrata al livello 1 (sola lettura, esegue subito)',
   const AL = globalThis.SN_ACTION_LEVELS;
   // Senza voce nel registro il dispatch RIFIUTA l'azione: sarebbe una feature
   // completa che non parte mai.
-  assert.equal(AL.levelFor({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/x/y.pdf' }), 1);
+  const casa = { cwd: 'C:\\Users\\Mario', home: 'C:\\Users\\Mario', win: true, maiuscole: true };
+  assert.equal(AL.levelFor({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/Users/Mario/x/y.pdf', _perimetro: casa }), 1);
+  assert.equal(AL.levelFor({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/x/y.pdf', _perimetro: casa }), 2);
   assert.match(AL.describe({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/x/y.pdf' }), /C:\/x\/y\.pdf/);
   // Stessa cosa per la lettura dei documenti dell'EDITOR, che era rimasta fuori
   // dal registro e quindi non è mai partita.

@@ -1115,11 +1115,11 @@ function displayCwd(cwd) {
   return p;
 }
 
-// Corpus sensibile per il taint-match di NAVIGA (anti-esfiltrazione): SOLO i
-// dati personali persistenti che il modello aveva nel contesto — memoria
-// (profilo/preferenze/espansioni) e appunti. NON lo stato delle schede né le
-// loro URL: un legittimo "riapri la scheda X" porterebbe quell'URL nel link e
-// matcherebbe lo stato → falso positivo. Quelli non sono segreti da proteggere.
+// Corpus sensibile per il taint-match di NAVIGA (anti-esfiltrazione): i dati
+// personali persistenti — memoria (profilo/preferenze/espansioni) e appunti.
+// Ciò che il modello ha letto nel turno (comandi, documenti) lo aggiunge
+// SN_URL_EXFIL.valutaNaviga dalle azioni viste. NON lo stato delle schede né le
+// loro URL: un legittimo "riapri la scheda X" matcherebbe → falso positivo.
 async function navExfilCorpus() {
   try {
     const mem = await FiloMem.getMemory();
@@ -1216,7 +1216,20 @@ function cleanLabel(v) {
   return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
 }
 
-async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
+// Il perimetro di lettura del comando o documento (#587): lo decide il main,
+// mai l'LLM, e lo sovrascrive sempre (gli argomenti del modello possono averne uno).
+function perimetroLettura(sender) {
+  let home = '';
+  try { home = require('node:os').homedir() || ''; } catch (_) {}
+  const win = process.platform === 'win32';
+  let cwd = '';
+  try { cwd = cartellaDelComando(getAssistantCwd(sender)) || ''; } catch (_) {}
+  return { cwd, home, win, maiuscole: win || process.platform === 'darwin' };
+}
+
+// `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in
+// questo turno, turni passati compresi: servono all'anti-esfiltrazione di NAVIGA.
+async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
 
@@ -1237,20 +1250,40 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
 
   // NAVIGA: difesa anti-esfiltrazione. Una pagina ostile (prompt injection) può
   // far aprire al modello un URL che PORTA FUORI dati che aveva nel contesto
-  // (memoria/profilo, appunti) codificandoli nella query/path/sottodominio. Il
-  // taint-match verifica se l'URL contiene pezzi del materiale sensibile; il
-  // fallback strutturale (solo da origine non fidata) copre i dati cifrati. Se
-  // sospetto, iniettiamo `_exfil` PRIMA del gate (mai dall'LLM): NAVIGA sale a
-  // livello 2 e l'utente conferma vedendo l'URL completo. Vedi src/shared/urlExfil.js.
+  // (memoria, appunti, output dei comandi e documenti letti nel turno)
+  // codificandoli nella query/path/sottodominio. Il fallback strutturale scatta
+  // quando nel contesto è entrato testo scritto da altri (#587: conta cosa il
+  // modello ha letto, non chi manda il messaggio). Se sospetto, `_exfil` PRIMA
+  // del gate (mai dall'LLM): livello 2 con l'URL completo. Vedi src/shared/urlExfil.js.
   if (type === 'NAVIGA') {
     try {
       const Exfil = globalThis.SN_URL_EXFIL;
       const url = String(action.url ?? action.href ?? action.link ?? '').trim();
       if (Exfil && url) {
         const origin = sender?.tab?.url || sender?.url || '';
-        const fromUntrusted = /^https?:/i.test(origin);
-        const corpus = await navExfilCorpus();
-        const v = Exfil.assess(url, { corpus, fromUntrusted });
+        const v = Exfil.valutaNaviga(url, {
+          memoria: await navExfilCorpus(),
+          azioni: Array.isArray(contesto) ? contesto : [],
+          daPagina: /^https?:/i.test(origin),
+        });
+        if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
+      }
+    } catch (_) {}
+  }
+
+  // CERCA_WEB: la query esce dal computer verso il motore di ricerca, come un
+  // NAVIGA porta fuori l'URL. Stessa difesa: se il testo cercato porta un
+  // segreto della memoria o un pezzo di ciò che il modello ha letto nel turno,
+  // `_exfil` PRIMA del gate (mai dall'LLM) → livello 2 con la query mostrata.
+  if (type === 'CERCA_WEB') {
+    try {
+      const Exfil = globalThis.SN_URL_EXFIL;
+      const query = String(action.query ?? action.q ?? action.testo ?? action.text ?? '').trim();
+      if (Exfil && query) {
+        const v = Exfil.valutaRicerca(query, {
+          memoria: await navExfilCorpus(),
+          azioni: Array.isArray(contesto) ? contesto : [],
+        });
         if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
       }
     } catch (_) {}
@@ -1297,6 +1330,8 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     // parte, fatta nello stesso posto.
     action._cwd = displayCwd(cartellaDelComando(getAssistantCwd(sender)));
   }
+
+  if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO') action._perimetro = perimetroLettura(sender);
 
   // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
   // Il livello è assegnato STATICAMENTE nel registro (src/shared/actionLevels.js),
@@ -1726,6 +1761,23 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
             executed: false,
             kept: true,
             output: { documentRead: String(percorso == null ? '' : percorso), ok: false, error: 'unreadable', detail: 'lettura non disponibile' },
+          };
+        }
+        // Il nome quasi giusto (#551) può aver portato a un file diverso da
+        // quello valutato dal gate: se è fuori dal perimetro e nessuno ha
+        // confermato, il testo non esce di qui.
+        const C = globalThis.SN_CMD_CLASSIFY;
+        const fuori = r.path && !confirmed && (!C || C.fuoriPerimetro(r.path, action._perimetro));
+        if (fuori) {
+          return {
+            executed: false,
+            kept: true,
+            output: {
+              documentRead: String(percorso == null ? '' : percorso),
+              ok: false,
+              error: 'fuori_perimetro',
+              detail: 'il file trovato sta fuori dalla cartella personale: richiedilo col percorso esatto e l\'utente confermerà',
+            },
           };
         }
         return {
@@ -2729,6 +2781,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // cosa ha prodotto il comando (prima lo vedeva solo l'utente, e l'assistente
   // rispondeva "non ho ancora l'output").
   const threadMessages = [];
+  // Le azioni che il modello ha davanti, turni passati compresi: i loro esiti
+  // decidono se un NAVIGA di questo turno può portare fuori dati (#587).
+  const azioniViste = [];
+  for (const m of cleanHistory) if (m && Array.isArray(m.actions)) azioniViste.push(...m.actions);
   for (const m of cleanHistory) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     let content = String(m.text || '');
@@ -2865,7 +2921,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         rawActions.push(a);
         const res = a._argsError
           ? { executed: false, kept: false, rejected: true, error: a._argsError }
-          : await executeFiloAction(a, { sender });
+          : await executeFiloAction(a, { sender, contesto: azioniViste });
+        // Contiene la home con il nome utente: serve solo al gate, non alla chat.
+        delete a._perimetro;
         const rendered = { ...a };
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
@@ -2889,6 +2947,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         }
         push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
         results.push({ action: a, res, rendered });
+        azioniViste.push(rendered);
       }
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.

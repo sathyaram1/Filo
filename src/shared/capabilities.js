@@ -365,7 +365,7 @@
       id: 'read-user-documents', title: 'Filo legge i tuoi documenti, anche PDF', category: 'assistant',
       desc: 'Indica a Filo un documento sul tuo computer e lui lo legge davvero: bollette, estratti conto, contratti, visure. Vale per i PDF, che prima erano illeggibili, e per i file di testo (txt, csv, md e simili). Puoi chiedergli cose sul contenuto: quant’è la giacenza media, quanto hai pagato di luce a marzo, cosa dice una clausola. Se non ricordi dove hai salvato il file, digli come si chiama più o meno e dove potrebbe essere: lo cerca e poi lo legge.',
       invoke: 'Chiedilo a parole all’assistente (nuova scheda): "leggi l’estratto conto nei Download", "riassumimi il contratto sul desktop", oppure incolla il percorso del file.',
-      doesNot: 'Legge e basta: non modifica né sposta i tuoi file. Su un PDF che è in realtà una scansione o una foto di un foglio non c’è testo da estrarre, e Filo te lo dice invece di inventarsi cosa c’è scritto. Non legge ancora i documenti Word ed Excel, né i file molto grandi; di un documento lunghissimo legge la prima parte e ti avverte che si è fermato lì.',
+      doesNot: 'Legge e basta: non modifica né sposta i tuoi file. Su un PDF che è in realtà una scansione o una foto di un foglio non c’è testo da estrarre, e Filo te lo dice invece di inventarsi cosa c’è scritto. Non legge ancora i documenti Word ed Excel, né i file molto grandi; di un documento lunghissimo legge la prima parte e ti avverte che si è fermato lì. Un file fuori dalla tua cartella personale (un altro disco, una chiavetta, una cartella di sistema) o un file nascosto di configurazione non lo apre senza il tuo OK.',
     },
     {
       id: 'generate-dashboard', title: 'Dashboard personale di Filo', category: 'assistant',
@@ -377,7 +377,7 @@
       id: 'agent-actions', title: 'Filo agisce al posto tuo', category: 'assistant',
       desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, cercare sul web, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
       invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina (Alt+H, Ctrl+Alt+H su Mac).',
-      doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto.',
+      doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto. Se un link che sta per aprire, o una ricerca sul web che sta per fare, contiene dati letti dal tuo computer, prima te lo mostra e aspetta il tuo OK.',
     },
     {
       id: 'filo-memory', title: 'Memoria di Filo', category: 'assistant',

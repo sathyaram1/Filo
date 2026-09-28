@@ -91,6 +91,15 @@
     return M.formatRepeat(raw);
   }
 
+  // Perché LEGGI_DOCUMENTO esce dal perimetro di lettura ('' se ci sta). Senza
+  // classificatore non si sa: si chiede.
+  function documentoFuori(a) {
+    const C = global.SN_CMD_CLASSIFY;
+    if (!C || !C.fuoriPerimetro) return 'non si sa dove legge';
+    const p = a && (a.percorso ?? a.path ?? a.file ?? a.documento ?? a.nome);
+    return C.fuoriPerimetro(p, a && a._perimetro);
+  }
+
   const REGISTRY = {
     NAVIGA: {
       // Aprire un link è di norma innocuo → livello 1, diretto. ECCEZIONE
@@ -103,8 +112,8 @@
       describe: (a) => {
         const url = a.url || a.href || a.link || 'una pagina';
         if (a && a._exfil) {
-          const why = a._exfilReason ? ` (${a._exfilReason})` : '';
-          return `Filo sta per aprire un link che${why}:\n${url}\n\n`
+          const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
+          return `Aprire un link${why}:\n${url}\n\n`
             + 'Potrebbe inviare tuoi dati a un sito esterno. Apri solo se l\'hai chiesto tu.';
         }
         return `Aprire ${url}`;
@@ -200,8 +209,20 @@
       },
     },
     CERCA_WEB: {
-      level: 1,
-      describe: (a) => `Cercare sul web "${a.query || ''}"`,
+      // Cercare è di norma innocuo → livello 1. ECCEZIONE anti-esfiltrazione: se
+      // la query trasporta FUORI un segreto (memoria, o ciò che il modello ha
+      // letto nel turno) sale a livello 2 → conferma con la query mostrata. Il
+      // flag `_exfil` lo calcola il main (→ urlExfil.js); mai l'LLM.
+      level: (a) => (a && a._exfil ? 2 : 1),
+      describe: (a) => {
+        const q = a.query || a.q || a.testo || a.text || '';
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
+          return `Cercare sul web un testo${why}:\n"${q}"\n\n`
+            + 'Potrebbe inviare tuoi dati a un motore di ricerca. Cerca solo se l\'hai chiesto tu.';
+        }
+        return `Cercare sul web "${q}"`;
+      },
     },
     ONBOARDING: {
       // Filo tiene il conto della micro-intervista di benvenuto (#524): spunta
@@ -261,11 +282,13 @@
       // esegue niente, non manda niente fuori dal computer — il testo entra solo
       // nel contesto del modello. Una conferma a ogni documento sarebbe attrito
       // su una cosa che l'utente ha appena chiesto, e una conferma che si accetta
-      // sempre smette di essere un controllo.
-      level: 1,
+      // sempre smette di essere un controllo. Fuori dal perimetro di lettura
+      // (#587: altri dischi, file nascosti, profilo) chiede un OK, come `cat`.
+      level: (a) => (documentoFuori(a) ? 2 : 1),
       describe: (a) => {
         const p = a && (a.percorso ?? a.path ?? a.file ?? a.documento);
-        return `Leggere il documento ${p || ''}`.trim();
+        const perche = documentoFuori(a);
+        return `Leggere il documento ${p || ''}`.trim() + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
       },
     },
     LEGGI_TRASPARENZA: {
@@ -353,7 +376,7 @@
         const C = global.SN_CMD_CLASSIFY;
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
         if (!cmd || !C) return 3;
-        const lvl = C.classify(cmd);
+        const lvl = C.classify(cmd, a._perimetro);
         return lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3;
       },
       describe: (a) => {
@@ -365,8 +388,12 @@
         // dove sovrascrive una chiave. La cartella la inietta il main come
         // `_cwd` (mai l'LLM); il livello non ci si appoggia mai.
         const cwd = String((a && a._cwd) || '').trim();
+        const C = global.SN_CMD_CLASSIFY;
+        let perche = '';
+        try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
         return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`
-          + (cwd ? `\nCartella di lavoro: ${cwd}` : '');
+          + (cwd ? `\nCartella di lavoro: ${cwd}` : '')
+          + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
       },
     },
     // ── proxy per-tab via linguaggio naturale (#152) ──────────────────────────

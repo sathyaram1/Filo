@@ -19,8 +19,9 @@
 //   - niente < / > : nessun tentativo di chiudere un contesto/markup;
 //   - niente @import/@charset/altre at-rule e niente expression( : impedisce di
 //     caricare fogli di stile esterni o vecchie expression IE;
-//   - niente url( : nessuna richiesta di rete dal CSS iniettato (font/img
-//     remoti, beacon); l'estetica del testo non ne ha bisogno;
+//   - niente url( né image-set( / src( (che accettano l'indirizzo come stringa
+//     nuda): nessuna richiesta di rete dal CSS iniettato, che porterebbe fuori
+//     dati letti dal modello (#587); l'estetica del testo non ne ha bisogno;
 //   - niente backslash: gli escape CSS (\75rl( , ur\6c( ) verrebbero decodificati
 //     dal browser in un token vietato (es. url(), aggirando i divieti qui sopra;
 //   - limiti di lunghezza su selettore, dichiarazioni e numero di regole.
@@ -42,7 +43,7 @@
   // vietato, aggirando i controlli letterali qui sotto. L'estetica del testo non
   // ha bisogno di sequenze di escape, quindi qualunque backslash fa scartare la
   // regola: chiude l'intera classe di bypass senza dover normalizzare gli escape.
-  const FORBIDDEN_RE = /[<>{}\\]|@import|@charset|@namespace|expression\s*\(|url\s*\(|javascript:/i;
+  const FORBIDDEN_RE = /[<>{}\\]|@import|@charset|@namespace|expression\s*\(|url\s*\(|image-set\s*\(|\bsrc\s*\(|javascript:/i;
   // Caratteri di controllo (NUL..0x1f, DEL): costruiti via stringa per non
   // mettere byte di controllo nel sorgente.
   const CONTROL_RE = new RegExp('[\\u0000-\\u001f\\u007f]');

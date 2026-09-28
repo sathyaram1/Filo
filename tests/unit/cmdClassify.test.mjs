@@ -38,7 +38,7 @@ test('livello 1 — comandi di sola lettura in whitelist eseguono subito', () =>
 test('livello 1 — git e npm di sola lettura', () => {
   for (const cmd of [
     'git status', 'git log', 'git log --oneline -10', 'git diff', 'git diff HEAD~1',
-    'git show', 'git branch', 'git remote -v', 'git config --get user.name',
+    'git show', 'git branch', 'git remote', 'git config --get user.name',
     'npm list', 'npm ls', 'npm --version', 'npm view react', 'npm outdated',
     'pip list', 'git', 'npm',
   ]) {
@@ -338,7 +338,7 @@ test('le shell dirette restano sempre 3, anche con flag di versione', () => {
 });
 
 test('livello 1 — comandi di diagnostica di sola lettura aggiunti', () => {
-  for (const cmd of ['ps', 'ps aux', 'free -h', 'lscpu', 'lsblk', 'printenv PATH', 'whereis node', 'who', 'sha256sum file']) {
+  for (const cmd of ['free -h', 'lscpu', 'lsblk', 'whereis node', 'who', 'sha256sum file']) {
     assert.equal(lvl(cmd), 1, `"${cmd}" dovrebbe essere livello 1`);
   }
 });
@@ -401,8 +401,13 @@ test('livello 3 — git tag -d / branch -D (cancellazioni) restano conferma-test
 });
 
 test('git config — legge (1), imposta (2), cancella (3) secondo gli argomenti', () => {
-  for (const cmd of ['git config --list', 'git config -l', 'git config --get user.name', 'git config user.name']) {
-    assert.equal(lvl(cmd), 1, `"${cmd}" (legge) dovrebbe essere livello 1`);
+  for (const cmd of ['git config --get user.name', 'git config user.name', 'git config user.email']) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (legge una chiave innocua) dovrebbe essere livello 1`);
+  }
+  // #587: un dump completo o una chiave che porta credenziali (URL di un remoto
+  // col token) stampa un segreto in chiaro → conferma.
+  for (const cmd of ['git config --list', 'git config -l', 'git config --get remote.origin.url', 'git config --get-regexp remote']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (può stampare una credenziale) dovrebbe essere livello 2`);
   }
   for (const cmd of ['git config user.name "Mario"', 'git config --global user.email a@b.c', 'git config --add safe.directory /x', 'git config --replace-all k v']) {
     assert.equal(lvl(cmd), 2, `"${cmd}" (imposta) dovrebbe essere livello 2`);
@@ -413,8 +418,10 @@ test('git config — legge (1), imposta (2), cancella (3) secondo gli argomenti'
 });
 
 test('git remote — elenca/mostra (1), aggiunge/rinomina (2), rimuove (3)', () => {
-  for (const cmd of ['git remote', 'git remote -v', 'git remote show origin', 'git remote get-url origin']) {
-    assert.equal(lvl(cmd), 1, `"${cmd}" (legge) dovrebbe essere livello 1`);
+  assert.equal(lvl('git remote'), 1, '"git remote" (soli nomi) dovrebbe essere livello 1');
+  // #587: `-v`, `show`, `get-url` stampano gli URL, che possono contenere un token.
+  for (const cmd of ['git remote -v', 'git remote show origin', 'git remote get-url origin']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (stampa un URL col token) dovrebbe essere livello 2`);
   }
   for (const cmd of ['git remote add origin http://x/y.git', 'git remote rename origin upstream', 'git remote set-url origin http://z']) {
     assert.equal(lvl(cmd), 2, `"${cmd}" (modifica) dovrebbe essere livello 2`);
@@ -698,9 +705,8 @@ test('livello 1 — cmdlet PowerShell di sola lettura invocati da soli', () => {
     'Get-ChildItem', 'gci', 'Get-ChildItem -Path C:\\Users -Recurse',
     'Get-ChildItem -Filter *.js -Force',       // -Force qui = mostra i file nascosti
     'Get-Content package.json', 'Get-Content -Raw log.txt', 'gc log.txt -Tail 20',
-    'Get-Item .', 'Get-ItemProperty HKCU:\\Software', 'Get-ItemPropertyValue x y',
+    'Get-Item .', 'Get-ItemPropertyValue x y',
     'Get-Location', 'gl', 'Get-Date', 'Get-Date -Format yyyy-MM-dd',
-    'Get-Process', 'Get-Process -Name filo', 'gps',
     'Select-String errore log.txt', 'sls TODO -Path src',
     'Select-Object -First 5', 'Sort-Object Length', 'Measure-Object -Sum',
     'Test-Path C:\\Users', 'Resolve-Path .', 'Split-Path C:\\a\\b -Parent',
@@ -740,13 +746,11 @@ test('livello 1 — pipeline in cui OGNI segmento è una lettura', () => {
     'Get-Content log.txt | Select-String errore',
     'Get-ChildItem | Measure-Object -Sum Length',
     'Get-ChildItem | Group-Object Extension | Sort-Object Count',
-    'Get-Process | Sort-Object CPU | Select-Object -First 3 | Format-Table',
     'Get-ChildItem | Out-String',
     'gci | select -First 3',
     // le pipeline delle altre shell valgono lo stesso: incanalare una lettura
     // dentro un'altra lettura non fa niente che la prima non facesse già
     'cat file | grep errore',
-    'ls | cat',
     'git log --oneline | head -n 20',
     'cat a.txt | wc -l',
   ]) {
@@ -785,7 +789,6 @@ test('livello 1 — Where-Object/ForEach-Object con uno scriptblock INERTE', () 
     'gci | % { $_.Name }',
     'gci | %{$_.Name}',
     'gci | foreach { $_.Length }',
-    'Get-Process | Where-Object { $_.CPU -gt 10 } | Sort-Object CPU | Select-Object -First 3',
     'Get-ChildItem | Where-Object { $_.Length -gt 100 -and $_.Length -lt 900 } | Measure-Object',
     // Where-Object sa filtrare anche senza blocco (sintassi a proprietà): inerte
     'Get-ChildItem | Where-Object Length -gt 1000',
@@ -958,12 +961,16 @@ test('livello 2 — npm/pip config che SCRIVE (registry incluso) non è lettura'
   }
 });
 
-test('livello 1 — npm/pip config che LEGGE resta lettura', () => {
-  for (const cmd of [
-    'npm config get registry', 'npm config list', 'npm config ls', 'npm config',
-    'pip config list', 'pip config get global.index-url', 'pip config debug',
-  ]) {
-    assert.equal(lvl(cmd), 1, `"${cmd}" (legge config) dovrebbe essere livello 1`);
+test('npm/pip config — help resta 1, il dump della config chiede conferma (#587)', () => {
+  // Bare/`debug` non stampano credenziali → 1.
+  for (const cmd of ['npm config', 'pip config', 'pip config debug']) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" dovrebbe essere livello 1`);
+  }
+  // get/list/ls stampano l'URL del registro/indice, dove finiscono utente,
+  // password o token → conferma.
+  for (const cmd of ['npm config get registry', 'npm config list', 'npm config ls',
+    'pip config list', 'pip config get global.index-url']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (può stampare una credenziale) dovrebbe essere livello 2`);
   }
 });
 
