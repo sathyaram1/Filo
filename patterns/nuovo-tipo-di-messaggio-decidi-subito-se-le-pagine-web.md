@@ -78,3 +78,18 @@ dentro le pagine dei siti e da lì decidono cosa mostrare (la griglia del tasto
 destro nasconde l'icona Feedback a chi non gestisce i feedback). Rispondere non
 vuol dire dire tutto: di là dal confine passano i booleani che servono a
 disegnare, non l'identità (indirizzo email, nome, identificativo dell'account).
+
+## Anche quello che si MANDA passa il confine
+
+Il confine vale nei due versi. `broadcastToTabs` raggiunge ogni frame di ogni
+scheda, siti compresi (#589: la spinta `SETTINGS_UPDATED` portava a tutti le
+chiavi dei servizi e le credenziali del proxy che le letture già toglievano).
+
+- Le impostazioni verso un'origine web sono **una lista di campi ammessi**, non
+  di campi tolti: `src/main/services/impostazioniPerOrigine.js`, una funzione
+  sola per risposte, letture dello storage e spinte (frame per frame, secondo
+  il suo indirizzo). Un segreto nuovo resta a casa da sé.
+- Un content script che comincia a leggere un'impostazione nuova la aggiunge
+  lì: la sentinella `tests/unit/impostazioniPerOrigine.test.mjs` diventa rossa
+  finché non lo fa, invece di lasciarla sparire in silenzio solo sui siti.
+- Un dato che un sito non deve vedere affatto va con `broadcastToFiloPages`.

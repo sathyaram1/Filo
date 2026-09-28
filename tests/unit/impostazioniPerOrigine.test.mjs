@@ -115,7 +115,7 @@ test('impostazioni assenti o strane non rompono la proiezione', () => {
 });
 
 test('sentinella: nessun segreto fra i campi ammessi, e ogni campo ammesso esiste davvero', () => {
-  for (const k of ['apiKeys', 'proxy', 'terminal', 'pricing', 'monthlyLimitEur']) {
+  for (const k of ['apiKeys', 'proxy', 'security', 'terminal', 'pricing', 'monthlyLimitEur']) {
     assert.ok(!(k in W.CAMPI_WEB), `${k} non deve raggiungere i siti`);
   }
   for (const k of Object.keys(W.CAMPI_WEB)) {
