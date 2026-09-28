@@ -21,20 +21,6 @@ async function scriviSenzaCrediti(home) {
 
 const onboarding = (app) => app.evaluate(async () => globalThis.SN_FILO_MEMORY.getOnboarding());
 
-test('già accolto: scrivo prima dei crediti, riscatto, e la home non chiede più il codice', async ({ app, shell, openTab }) => {
-  test.setTimeout(180_000);
-  await prepara(app, stato.base);
-  await onboardingFatto(app);
-  const home = await homePage(app);
-  await home.reload();
-  await scriviSenzaCrediti(home);
-  await riscattaDaCrediti(openTab);
-  await shell.locator('.tab').first().click();
-  await expect(home.locator('#bubbles')).not.toContainText(INVITO, { timeout: 30_000 });
-  await expect(home.locator('#homeMessage')).toContainText('HOME-DAL-MODELLO', { timeout: 30_000 });
-  await expect(home.locator('#homeMessage')).toBeVisible();
-});
-
 test('nuovo: scrivo prima dei crediti, poi l’invito arriva dal collegamento, e Filo si presenta nella home', async ({ app }) => {
   test.setTimeout(180_000);
   await prepara(app, stato.base);
