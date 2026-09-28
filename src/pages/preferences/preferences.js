@@ -249,6 +249,7 @@
       const sw = row.querySelector('.sn-token-swatch');
       if (sw) sw.style.background = Tokens.effectiveValue(name, currentOverrides, resolvedTheme()) || '';
     }
+    tokenDaSalvare.add(name);
     renderOtherTokenRows(name);
     applyTokensLive();
     persistTokensDebounced();
@@ -256,6 +257,8 @@
 
   function resetToken(name) {
     delete currentOverrides[name];
+    tokenInCorso.delete(name);
+    tokenDaSalvare.add(name);
     renderTokenRow(name);
     renderOtherTokenRows(name); // se era una categoria, aggiorna chi ereditava
     applyTokensLive();
@@ -264,6 +267,8 @@
 
   function resetAllTokens() {
     currentOverrides = {};
+    tokenInCorso.clear();
+    tokenAzzeraTutti = true;
     if (Tokens) for (const name of Tokens.names()) renderTokenRow(name);
     applyTokensLive();
     persistTokens();
