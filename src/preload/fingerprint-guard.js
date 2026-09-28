@@ -184,6 +184,14 @@ function buildGpcSource() {
     } catch (e) {}
     return fn;
   }
+  var leggiAttr = Element.prototype.getAttribute, haAttr = Element.prototype.hasAttribute;
+  // Toccare il mondo di un riquadro che sta per caricare un documento vero lo fa nascere prima del
+  // preload, e il documento vero erediterebbe quel mondo senza Filo: si toccano solo i riquadri vuoti.
+  function vuoto(el) {
+    if (haAttr.call(el, 'srcdoc')) return false;
+    var s = leggiAttr.call(el, el.tagName === 'OBJECT' ? 'data' : 'src');
+    return !s || /^\\s*about:blank\\s*$/i.test(s);
+  }
   function tocca(el) {
     var t = el.tagName;
     if (t === 'IFRAME' || t === 'FRAME' || t === 'OBJECT') { try { void el.contentWindow; } catch (e) {} }

@@ -261,3 +261,67 @@ test('manuale: spegne GPC anche nelle sessioni già nate, riquadri compresi (con
     expect(srv.richieste.length).toBeGreaterThanOrEqual(6);
   } finally { await srv.close(); }
 });
+
+// La finestra nascosta che pre-apre i link dubbi (ogni sito in http) carica la pagina dal collegamento
+// dell'utente: deve mandare GPC e bloccare i tracker della pagina come la scheda da cui parte.
+test('link dubbio aperto in incognito: anche il pre-caricamento nascosto manda GPC e blocca i tracker', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  const caricamenti = [];
+  const srv = createServer((req, res) => {
+    if (req.url.startsWith('/d')) caricamenti.push(req.headers['sec-gpc'] ?? 'assente');
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<!doctype html><html><head><title>D</title><script src="https://www.google-analytics.com/analytics.js"></script></head><body>d</body></html>');
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  try {
+    await app.evaluate(({ app: a, session }) => {
+      globalThis.__filoGa = [];
+      const osserva = (ses) => {
+        ses.webRequest.onErrorOccurred({ urls: ['*://*.google-analytics.com/*'] }, (d) => globalThis.__filoGa.push(d.error));
+        ses.webRequest.onCompleted({ urls: ['*://*.google-analytics.com/*'] }, (d) => globalThis.__filoGa.push(`caricato ${d.statusCode}`));
+      };
+      osserva(session.defaultSession);
+      a.on('session-created', osserva);
+    });
+    await apriIncognito(app, shell);
+    await apriInIncognito(app, `http://127.0.0.1:${srv.address().port}/d`);
+    // Il pre-caricamento nascosto è il secondo caricamento della stessa pagina.
+    await expect.poll(() => caricamenti.length, { timeout: 20_000 }).toBeGreaterThan(1);
+    await expect.poll(() => app.evaluate(() => globalThis.__filoGa.length), { timeout: 15_000 }).toBeGreaterThan(1);
+    await new Promise((r) => setTimeout(r, 1_000));
+    expect(caricamenti.filter((g) => g !== '1'), JSON.stringify(caricamenti)).toEqual([]);
+    const ga = await app.evaluate(() => globalThis.__filoGa);
+    expect(ga.filter((e) => e !== 'net::ERR_BLOCKED_BY_CLIENT'), JSON.stringify(ga)).toEqual([]);
+  } finally {
+    try { srv.closeAllConnections?.(); } catch (_) {}
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+// I riquadri vuoti (about:blank) non ricevono il preload: il segnale deve arrivarci da ogni strada con
+// cui la pagina li raggiunge, e i getter toccati devono restare quelli di sempre per chi li usa.
+test('riquadri vuoti creati o scritti dalla pagina leggono GPC come la pagina', async ({ openTab, testServer }) => {
+  const url = testServer.html(`<!doctype html><html><head><script>
+    window.__r = { pagina: String(navigator.globalPrivacyControl) };
+    var f = document.createElement('iframe'); document.head.appendChild(f);
+    __r.daScript = String(f.contentWindow.navigator.globalPrivacyControl);
+    var g = f.contentDocument.createElement('iframe'); f.contentDocument.body.appendChild(g);
+    __r.annidato = String(g.contentWindow.navigator.globalPrivacyControl);
+    var h = document.createElement('iframe'); document.head.appendChild(h);
+    __r.daDocumento = String(h.contentDocument.defaultView.navigator.globalPrivacyControl);
+    __r.getterNativo = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow').get.toString();
+  </script></head><body>
+  <iframe src="about:blank"></iframe>
+  <iframe id="fuori" src="${testServer.origin.replace('127.0.0.1', 'localhost')}/nessuna"></iframe>
+  <script>
+    __r.nellHtmlDaFrames = String(frames[2].navigator.globalPrivacyControl);
+    __r.altroSitoRaggiungibile = typeof document.getElementById('fuori').contentWindow.postMessage;
+  </script></body></html>`);
+  const page = await openTab(url);
+  await page.waitForFunction(() => window.__r && window.__r.altroSitoRaggiungibile, null, { timeout: 10_000 });
+  expect(await page.evaluate(() => window.__r)).toEqual({
+    pagina: 'true', daScript: 'true', annidato: 'true', daDocumento: 'true',
+    getterNativo: 'function get contentWindow() { [native code] }',
+    nellHtmlDaFrames: 'true', altroSitoRaggiungibile: 'function',
+  });
+});
