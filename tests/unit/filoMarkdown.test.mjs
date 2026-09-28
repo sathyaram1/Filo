@@ -73,9 +73,9 @@ test('#853 l\'apostrofo dentro un URL nudo fa parte del link, quello in coda no'
   assert.match(wiki, />https:\/\/it\.wikipedia\.org\/wiki\/Valle_d&#39;Aosta<\/a> per la storia/);
   assert.match(wiki, /href="https:\/\/it\.wikipedia\.org\/wiki\/Valle_d&#39;Aosta"/);
   const fine = render("Vedi https://it.wikipedia.org/wiki/L'Aquila.");
-  assert.match(fine, /href="https:\/\/it\.wikipedia\.org\/wiki\/L&#39;Aquila">[^<]*<\/a>\.<\/p>/);
+  assert.match(fine, /href="https:\/\/it\.wikipedia\.org\/wiki\/L&#39;Aquila"[^>]*>[^<]*<\/a>\.<\/p>/);
   const apici = render("Apri 'https://example.com/guida'.");
-  assert.match(apici, /&#39;<a [^>]*href="https:\/\/example\.com\/guida">https:\/\/example\.com\/guida<\/a>&#39;\.<\/p>/);
+  assert.match(apici, /&#39;<a [^>]*href="https:\/\/example\.com\/guida"[^>]*>https:\/\/example\.com\/guida<\/a>&#39;\.<\/p>/);
 });
 
 // ─── sicurezza: contenuto NON FIDATO, niente link verso l'interno dell'app ───
