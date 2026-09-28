@@ -81,12 +81,12 @@ test('il teardown dietro a un rosso noto è il suo strascico: l\'allarme nomina 
 });
 
 test('il file di un teardown è quello dell\'ultimo test del suo worker, mai il primo dell\'elenco', () => {
-  const alla_fine = teardown('1014 tests, last 10 tests were', [CENSUS, NAV]);
-  assert.deepEqual(ultimoTestDelWorker(alla_fine), { spec: 'nav-indietro-avanti', riga: 61 });
-  assert.equal(fileDellErrore(alla_fine, RADICE), 'tests/nav-indietro-avanti.spec.mjs');
+  const allaFine = teardown('1014 tests, last 10 tests were', [CENSUS, NAV]);
+  assert.deepEqual(ultimoTestDelWorker(allaFine), { spec: 'nav-indietro-avanti', riga: 61 });
+  assert.equal(fileDellErrore(allaFine, RADICE), 'tests/nav-indietro-avanti.spec.mjs');
   assert.deepEqual(ultimoTestDelWorker({ message: 'Failed worker ran 2 tests:\n[electron] › tests\\a.spec.mjs:3:1 › x\n[electron] › tests\\b.spec.mjs:9:2 › y' }),
     { spec: 'b', riga: 9 }, 'col progetto davanti e le barre di Windows');
-  const json = { ...CORSA_DI_MAIN, errors: [alla_fine] };
+  const json = { ...CORSA_DI_MAIN, errors: [allaFine] };
   assert.deepEqual(chiaviDelVerdetto(verdetto(json, NOTI)),
     ['suite:tests/wallet-credits.spec.mjs', 'suite:tests/nav-indietro-avanti.spec.mjs'],
     'dopo un caso verde il worker che non chiude è un guasto di quello spec');
