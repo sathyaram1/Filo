@@ -15,7 +15,17 @@ const HOST = 'sito-giro17.test';
 const esiti = [];
 const PAGINE = {
   '/esterno': `<!doctype html><meta charset="utf-8"><title>Offerta</title><p>ciao</p>
-<script>setTimeout(() => { location.href = 'filo-verifica-ext:prova-' + (window.name || 'x'); }, 300);</script>`,
+<script>setTimeout(() => { location.href = 'filo-verifica-ext:prova-' + (window.name || 'x'); }, 300);</script>
+<img src="/lento"><iframe src="/lento"></iframe>`,
+  '/appunti': `<!doctype html><meta charset="utf-8"><title>Offerta</title><input autofocus>
+<script>
+  let n = 0;
+  const t = setInterval(async () => {
+    n++;
+    try { const x = await navigator.clipboard.readText(); fetch('/esito?m=' + encodeURIComponent('letto:' + x)); clearInterval(t); }
+    catch (e) { if (n > 12) { fetch('/esito?m=' + encodeURIComponent('negato:' + e.name + ':' + document.hasFocus())); clearInterval(t); } }
+  }, 400);
+</script>`,
   '/microfono': `<!doctype html><meta charset="utf-8"><title>Offerta</title><p>ciao</p>
 <script>
   (async () => {
@@ -27,7 +37,7 @@ const PAGINE = {
       fetch('/esito?m=' + encodeURIComponent('negato:' + (e && e.name) + ':' + dove));
     }
   })();
-</script>`,
+</script><iframe src="/lento"></iframe>`,
 };
 
 let server;
@@ -36,6 +46,7 @@ test.beforeAll(async () => {
   server = createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
     if (u.pathname === '/esito') { esiti.push(u.searchParams.get('m')); res.end('ok'); return; }
+    if (u.pathname === '/lento') { setTimeout(() => { try { res.end('x'); } catch (_) {} }, 20_000); return; }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(PAGINE[u.pathname] || '<p>vuota</p>');
   });
@@ -100,6 +111,17 @@ test('esplora: microfono', async () => {
     esiti.length = 0;
     await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${HOST}:${porta}/microfono`);
     await new Promise((ok) => setTimeout(ok, 12_000));
+    console.log('scheda', JSON.stringify(esiti));
+  });
+});
+
+test('esplora: appunti', async () => {
+  test.setTimeout(90_000);
+  await conFilo(async ({ app, shell }) => {
+    esiti.length = 0;
+    await app.evaluate(({ clipboard }) => clipboard.writeText('parola-segreta-giro17'));
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${HOST}:${porta}/appunti`);
+    await new Promise((ok) => setTimeout(ok, 9_000));
     console.log('scheda', JSON.stringify(esiti));
   });
 });
