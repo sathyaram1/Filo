@@ -1580,7 +1580,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         if (!built) return { executed: false, kept: false };
         // Un rifiuto spiegato resta nel diario col suo perché: non è successo
         // niente, ma l'utente deve saperlo anche se il modello non lo dice.
-        if (built.rifiuto) return { executed: false, kept: false, output: { error: built.rifiuto } };
+        if (built.rifiuto) return { executed: false, kept: false, output: { error: built.rifiuto, rifiuto: true } };
         await applySettingsUpdate(built.partial);
         return { executed: true, kept: true };
       }

@@ -671,7 +671,8 @@
   // cambiare (#592).
   function esitoAzione(label, done, r) {
     if (done) return `${label}: fatto`;
-    const perche = r && r.output && typeof r.output.error === 'string' ? r.output.error.trim() : '';
+    const o = r && r.output;
+    const perche = o && o.rifiuto && typeof o.error === 'string' ? o.error.trim() : '';
     return perche ? `${label}: non applicata, ${perche}` : `${label}: non riuscita`;
   }
 
