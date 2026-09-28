@@ -77,8 +77,11 @@ server un verdetto raccontato non lo legge).
    controllato. Se ti ferma: guarda cosa sono quei file, portali a un commit,
    e se cambiano il codice rileggi il diff prima di registrare lo stesso
    verdetto.
-2. Su **pass**, chiedi la fusione (su **fail** non fondere: accoda `design`
-   con la tua spiegazione nella nota — decide l'owner):
+2. Su **fail** hai finito: non fondere e non consegnare nessuno stato. Il
+   server, ricevuto il fail del passo 1, porta già da solo il feedback in
+   `design` con la tua nota, e decide l'owner; una consegna di `design` in più
+   verrebbe respinta. Resta solo il rilascio del biglietto.
+   Su **pass**, chiedi la fusione:
    ```bash
    node scripts/merge-gate.mjs <branch>
    ```
