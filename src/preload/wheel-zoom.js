@@ -300,11 +300,28 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     try { ipc.send('filo:zoom-modalita', zoomMode); } catch (_) {}
   }
 
+  // Lo sfondo che un sito dà a ogni livello in primo piano (::backdrop) velerebbe
+  // la pagina intera: la regola dell'utente con !important vince su quelle del sito.
+  let veloTolto = null;
+  function togliVelo() {
+    if (veloTolto != null || !webFrame || typeof webFrame.insertCSS !== 'function') return;
+    try {
+      veloTolto = webFrame.insertCSS('#__filo-zoom-badge::backdrop{background:transparent!important;'
+        + 'backdrop-filter:none!important;filter:none!important;opacity:0!important}', { cssOrigin: 'user' });
+    } catch (_) { veloTolto = null; }
+  }
+  function rimettiVelo() {
+    if (veloTolto == null) return;
+    try { webFrame.removeInsertedCSS(veloTolto); } catch (_) {}
+    veloTolto = null;
+  }
+
   function enter() {
     if (zoomMode) return;
     zoomMode = true;
     try {
       if (!badge) badge = makeBadge();
+      togliVelo();
       mettiInCima();
       inModifica = false;
       mostraPercentuale();
