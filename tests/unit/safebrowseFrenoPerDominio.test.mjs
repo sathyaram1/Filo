@@ -56,6 +56,26 @@ test('sottodomini sempre nuovi con gli stessi indizi: un giudizio e una finestra
   assert.equal(finestre, 1);
 });
 
+test('chi è frenato eredita la risposta di chi ha tirato il freno, anche arrivando mentre quel controllo è in volo', async () => {
+  let giudizi = 0;
+  let finestre = 0;
+  SB.setProviders({
+    llm: async () => { giudizi++; await new Promise((r) => setTimeout(r, 10)); return { suspicious: true, reason: 'x' }; },
+    sandbox: async (u) => { finestre++; await new Promise((r) => setTimeout(r, 10)); return { verdict: 'dangerous', finalUrl: u, redirects: [], download: 'f.exe' }; },
+  });
+  const primo = analizza('https://accesso.dominio-gemello.com/login', LOGIN);
+  const inVolo = analizza('https://verifica.dominio-gemello.com/login', LOGIN);
+  await Promise.all([primo, inVolo]);
+  const dopo = SB.analyze('https://sblocco.dominio-gemello.com/login', LOGIN, () => {});
+  assert.equal(dopo.level, 'pericoloso', 'il verdetto ereditato vale subito, senza aspettare niente');
+  for (const s of ['accesso', 'verifica', 'sblocco']) {
+    assert.equal(SB.checkSync(`https://${s}.dominio-gemello.com/login`, LOGIN).level, 'pericoloso', s);
+  }
+  assert.equal(giudizi, 1);
+  assert.equal(finestre, 1);
+  assert.equal(SB.checkSync('https://sblocco.dominio-gemello.com/', {}).level, 'safe', 'con indizi diversi niente eredità');
+});
+
 test('un giudizio senza verdetto frena i sottodomini per poco, poi si riprova', async () => {
   let chiamate = 0;
   SB.configure({ runLlm: async () => { chiamate++; return 'Non saprei.'; }, enableSandbox: false, enableNetwork: false });
