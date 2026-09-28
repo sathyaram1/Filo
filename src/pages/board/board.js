@@ -590,7 +590,7 @@
         renderList();
         if (ok) {
           const freshFb = allFeedbacks.find((x) => x._id === fb._id) || fb;
-          onVote(freshFb, vote, null);
+          onVote(freshFb, vote, null, true);
         }
       });
       return;
@@ -599,9 +599,12 @@
     if (!id || pending.has(id)) return;
     avvisi.delete(id);
 
-    // Ottimistico: ri-cliccare la propria scelta la annulla (toggle).
+    // Ottimistico: ri-cliccare la propria scelta la annulla (toggle). Un voto
+    // ripreso dopo l'accesso no: da anonimo il proprio voto non si vedeva, e
+    // quel pollice chiedeva di votare, mai di togliere.
     const prevVotes = (fb.votes && typeof fb.votes === 'object') ? fb.votes : {};
     const current = FB.userVote(prevVotes, uid);
+    if (dopoAccesso && current === vote) return;
     const clearing = current === vote;
     const optimistic = { ...prevVotes };
     if (clearing) {
