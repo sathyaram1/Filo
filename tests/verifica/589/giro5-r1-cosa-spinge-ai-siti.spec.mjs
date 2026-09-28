@@ -10,7 +10,9 @@ const RACCONTO = 'Mi chiamo Anna, lavoro al PRONTO-SOCCORSO-G5-589 e ho due figl
 
 async function nelContentScript(app, origine, codice) {
   return app.evaluate(async ({ webContents }, { origine, codice, mondo }) => {
-    const wc = webContents.getAllWebContents().find((w) => String(w.getURL()).startsWith(origine));
+    // L'ultima scheda aperta su quel sito: quelle delle prove precedenti possono esserci ancora.
+    const wc = webContents.getAllWebContents()
+      .filter((w) => !w.isDestroyed() && String(w.getURL()).startsWith(origine)).pop();
     if (!wc) throw new Error('scheda del mini server non trovata');
     return wc.executeJavaScriptInIsolatedWorld(mondo, [{ code: codice }]);
   }, { origine, codice, mondo: MONDO_CONTENT_SCRIPT });

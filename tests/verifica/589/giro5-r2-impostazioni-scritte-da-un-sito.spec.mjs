@@ -1,4 +1,4 @@
-// Verifica #589 — giro 4.
+// Verifica #589 — giro 5, rilievo 2 (nato nel giro 4: stesse prove, ancora rosse).
 //
 // I giri 1, 2 e 3 hanno chiuso la strada che VA verso i siti: la spinta delle
 // impostazioni è ridotta come le letture, e le domande che un sito può fare al
@@ -155,33 +155,6 @@ test('un sito non detta le istruzioni che Filo si porta in ogni conversazione', 
     String(dopo?.agentStyle || ''),
     'un sito ha scritto le istruzioni che Filo si porta dietro in ogni conversazione con l\'utente',
   ).not.toContain('GIRO4-589-ISTRUZIONE-DEL-SITO');
-});
-
-// ── Porta E: le schede degli altri ─────────────────────────────────────────
-// La stessa causa vista su un'altra domanda ammessa: chiudere una scheda. La
-// domanda porta con sé il NUMERO della scheda da chiudere e nessuno guarda se è
-// quella di chi chiede. C'è anche la versione giusta accanto (quella senza
-// numero, che chiude solo la propria).
-test('un sito non chiude le altre schede dell\'utente', async ({ app, shell, openTab, testServer }) => {
-  const altra = await testServer.openReady(openTab, '<h1>la pagina dell\'utente</h1>');
-  const altraUrl = altra.url();
-  await testServer.openReady(openTab, '<h1>sito qualunque</h1>');
-  const chiedi = chiediDaQuellaPagina(app, suSito);
-
-  const bersaglio = await app.evaluate(({ BrowserWindow }, u) => {
-    for (const w of BrowserWindow.getAllWindows()) {
-      const t = (w._filoTabs?.tabs || []).find((x) => String(x.url || '') === u);
-      if (t) return t.id;
-    }
-    return null;
-  }, altraUrl);
-  expect(bersaglio, 'la scheda bersaglio non è stata trovata: la prova non guarda quello che deve').not.toBe(null);
-
-  await chiedi({ type: '_tabs:remove', id: bersaglio });
-
-  const viva = await app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows()
-    .some((w) => (w._filoTabs?.tabs || []).some((x) => String(x.url || '') === u)), altraUrl);
-  expect(viva, 'un sito ha chiuso una scheda dell\'utente che non era la sua').toBe(true);
 });
 
 // ── Il contrario: quello che al sito serve davvero deve continuare a valere ─

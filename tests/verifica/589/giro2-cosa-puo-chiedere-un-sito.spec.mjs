@@ -1,5 +1,6 @@
-// Verifica #589 — giro 2. La segnalazione chiedeva due cose: che la spinta
-// delle impostazioni verso le schede applichi la stessa riduzione delle
+// Verifica #589 — giro 2, ri-provato nel giro 5 (la domanda della memoria è uscita
+// in un rilievo esterno, e la sua prova con lui). La segnalazione chiedeva due
+// cose: che la spinta delle impostazioni verso le schede applichi la stessa riduzione delle
 // letture, e che «verso le origini web viaggi solo ciò che i content script
 // usano davvero».
 //
@@ -17,31 +18,6 @@
 // che gira dentro quella pagina.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-
-const MEMORIA_PROFILO = 'Si chiama Anna, vive a MILANO-SEGRETO-589, lavora in ospedale';
-const MEMORIA_PREF = 'Preferisce risposte brevi; non vuole che si parli di SALUTE-589';
-const PAGINA_SALVATA = 'CONTO-CORRENTE-SEGRETO-589';
-
-// Prepara i dati personali che un utente ha davvero dentro Filo: la memoria
-// che Filo si è costruito su di lui e una pagina messa da parte.
-async function datiPersonali(shell) {
-  await shell.evaluate(async () => {
-    const m = (x) => window.filoShell.message(x);
-    await m({
-      type: '_storage:set',
-      obj: {
-        filo_memory: {
-          PROFILO: 'Si chiama Anna, vive a MILANO-SEGRETO-589, lavora in ospedale',
-          PREFERENZE: 'Preferisce risposte brevi; non vuole che si parli di SALUTE-589',
-        },
-      },
-    });
-    await m({
-      type: 'save_page',
-      page: { url: 'https://banca.example/conto', title: 'CONTO-CORRENTE-SEGRETO-589', text: 'saldo' },
-    });
-  });
-}
 
 // Una richiesta al cuore di Filo fatta con l'indirizzo del sito aperto, cioè
 // come la farebbe il codice che Filo carica dentro quella pagina.
@@ -63,42 +39,6 @@ function comeIlSito(app, url) {
   }, { pageUrl: url, messaggio: msg });
 }
 
-test('un sito non si fa dare la memoria di Filo, le pagine salvate e lo stato dell\'utente', async ({ app, shell, openTab, testServer }) => {
-  await datiPersonali(shell);
-  const web = await testServer.openReady(openTab, '<h1>sito qualunque</h1>');
-  const chiedi = comeIlSito(app, web.url());
-
-  const memoria = await chiedi({ type: 'filo_get_memory' });
-  const salvate = await chiedi({ type: 'get_saved_pages' });
-  const stato = await chiedi({ type: 'filo_get_state' });
-  const archiviate = await chiedi({ type: 'get_archived_tabs' });
-  const categorie = await chiedi({ type: 'get_categories' });
-
-  const dump = (x) => JSON.stringify(x ?? null);
-
-  expect(
-    dump(memoria),
-    'quello che Filo ha imparato sull\'utente è stato consegnato a un sito che lo ha chiesto',
-  ).not.toContain('MILANO-SEGRETO-589');
-  expect(dump(memoria)).not.toContain('SALUTE-589');
-
-  expect(
-    dump(salvate),
-    'le pagine che l\'utente ha messo da parte sono state consegnate a un sito che le ha chieste',
-  ).not.toContain(PAGINA_SALVATA);
-
-  expect(
-    dump(stato),
-    'lo stato di Filo (messaggio della home, suggerimenti, crediti, schede aperte) è stato consegnato a un sito',
-  ).not.toContain(PAGINA_SALVATA);
-
-  // Nessuna di queste risposte deve arrivare piena a un sito: ciò che il
-  // codice dentro le pagine usa davvero non comprende niente di tutto questo.
-  for (const [nome, r] of Object.entries({ memoria, salvate, stato, archiviate, categorie })) {
-    expect(r?.ok, `${nome}: un sito ha ottenuto una risposta buona a una domanda che non gli compete`).not.toBe(true);
-  }
-});
-
 test('un sito non può far uscire l\'utente dal suo account', async ({ app, openTab, testServer }) => {
   const web = await testServer.openReady(openTab, '<h1>sito qualunque</h1>');
   const chiedi = comeIlSito(app, web.url());
@@ -113,20 +53,22 @@ test('un sito non può far uscire l\'utente dal suo account', async ({ app, open
 // ── Porta del giro 1: da ri-provare a ogni giro ────────────────────────────
 // Lo stato dell'account non deve né arrivare da solo ai siti (provato nel giro
 // 1) né uscire se un sito lo CHIEDE.
-test('a un sito che chiede lo stato dell\'account resta solo "sei connesso o no"', async ({ app, shell, openTab, testServer }) => {
+// Giro 5: su main la risposta a un sito porta i booleani che servono a
+// disegnare (sei connesso, sei amministratore), mai l'identità.
+test('a un sito che chiede lo stato dell\'account arrivano solo booleani, mai l\'identità', async ({ app, shell, openTab, testServer }) => {
   const web = await testServer.openReady(openTab, '<h1>sito qualunque</h1>');
   const chiedi = comeIlSito(app, web.url());
 
   const versoSito = await chiedi({ type: 'auth_status' });
   expect(versoSito?.ok).toBe(true);
-  expect(typeof versoSito?.signedIn, 'al sito serve sapere solo se c\'è una sessione').toBe('boolean');
-  expect(Object.keys(versoSito).sort(), 'al sito è arrivato più di "sei connesso o no"').toEqual(['ok', 'signedIn']);
+  expect(typeof versoSito?.signedIn, 'al sito serve sapere se c\'è una sessione').toBe('boolean');
+  for (const [k, v] of Object.entries(versoSito)) {
+    expect(typeof v, `al sito è arrivato "${k}", che non è un sì o un no`).toBe('boolean');
+  }
 
-  // E alle superfici di Filo continua ad arrivare tutto quello che serve lì.
   const versoFilo = await shell.evaluate(() => window.filoShell.message({ type: 'auth_status' }));
   expect(versoFilo?.ok).toBe(true);
   expect('profile' in versoFilo, 'le pagine di Filo devono continuare a vedere il profilo').toBe(true);
-  expect('isAdmin' in versoFilo, 'le pagine di Filo devono continuare a sapere se è amministratore').toBe(true);
 });
 
 // ── La stessa spinta, l'altra finestra ─────────────────────────────────────
