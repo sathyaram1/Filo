@@ -241,3 +241,14 @@ test('ogni azione registrata ha un livello valido e una describe', () => {
     assert.equal(typeof entry.describe, 'function', `${type} senza describe`);
   }
 });
+
+// #553, giro 12: la lettura accettava l'indirizzo nel campo «indirizzo» e il freno guardava solo «url»: la richiesta
+// carica di dati partiva senza conferma. Un campo in più fra chi esegue e chi frena è una porta.
+test('l\'indirizzo di un\'azione che esce in rete si legge da un posto solo, per il freno, il popup e chi esegue', () => {
+  for (const k of ['url', 'href', 'link', 'indirizzo']) assert.equal(AL.indirizzoDi({ [k]: ' https://x.it ' }), 'https://x.it', k);
+  assert.equal(AL.indirizzoDi({ url: '', indirizzo: 'https://y.it' }), 'https://y.it');
+  assert.ok(AL.describe({ type: 'LEGGI_PAGINA', indirizzo: 'https://z.it/?d=1', _exfil: true }).includes('https://z.it/?d=1'));
+  const { readFileSync } = require('node:fs');
+  const src = readFileSync(join(__dirname, '..', '..', 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  assert.ok(!/action\.url\s*(\?\?|\|\|)/.test(src), 'handlers.js legge l\'indirizzo con SN_ACTION_LEVELS.indirizzoDi');
+});

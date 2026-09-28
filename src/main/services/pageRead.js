@@ -624,6 +624,7 @@ const api = {
   ricordaLetturaRiservata,
   materialeRiservato,
   estraiInDisparte,
+  trovaScheda,
   normalizzaUrl,
   chiaveConfronto,
   porzione,

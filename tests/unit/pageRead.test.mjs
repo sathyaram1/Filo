@@ -167,3 +167,51 @@ test('il taglio non spezza un\'emoji', () => {
   assert.ok(!/[\ud800-\udbff]$/.test(p.testo));
   assert.equal(PR.porzione(testo, p.fino).testo.startsWith('😀'), true);
 });
+
+// #553, giro 12: il tetto si sceglieva dall'etichetta, e un PDF servito come file generico finiva tagliato a 5 MB.
+test('un PDF oltre i 5 MB servito come file generico non si rifiuta come «oltre i 25 MB»', async () => {
+  const pdf = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(6 * 1024 * 1024, 32)]);
+  const url = verso('/download?id=42', { tipo: 'application/octet-stream', corpo: pdf });
+  const r = await conRete(() => PR.leggiPagina(url));
+  assert.notEqual(r.errore, 'troppo-grande');
+  assert.ok(!String(r.dettaglio).includes('25 MB'), r.dettaglio);
+});
+
+test('la codifica dichiarata dopo un\'intestazione lunga vale, e l\'euro di windows-1252 resta un euro', async () => {
+  const testa = `<link rel="stylesheet" href="/css/${'x'.repeat(60)}.css">\n`.repeat(70);
+  const html = `<html><head>${testa}<meta charset="iso-8859-1"><title>Trattoria</title></head><body><main><p>Il caff\xe8 costa 1,20 \x80.</p></main></body></html>`;
+  const url = verso('/trattoria', { tipo: 'text/html', corpo: Buffer.from(html, 'latin1') });
+  const r = await conRete(() => PR.leggiPagina(url));
+  assert.ok(r.testo.includes('Il caffè costa 1,20 €'), r.testo);
+});
+
+test('una scheda aperta da Filo si ritrova con l\'indirizzo chiesto anche dopo un rimando, finché resta lì', () => {
+  const eventi = new Map();
+  const wc = { url: 'https://sito.example/it/listino', on: (n, f) => eventi.set(n, f), removeListener() {}, getURL() { return this.url; } };
+  PR.ricordaApertura(wc, 'https://sito.example/listino');
+  eventi.get('did-navigate')({}, 'https://sito.example/it/listino');
+  const scheda = { wc, url: wc.url };
+  assert.equal(PR.trovaScheda('https://sito.example/listino', [scheda]), scheda);
+  wc.url = 'https://altro.example/';
+  assert.equal(PR.trovaScheda('https://sito.example/listino', [scheda]), null, 'se l\'utente è andato altrove non è più lei');
+});
+
+test('il freno conosce i codici letti dove l\'utente ha fatto l\'accesso, non le parole, e lascia seguire i link di quella pagina', () => {
+  PR._riservate.length = 0;
+  PR.ricordaLetturaRiservata('Conto di Mario Rossi, IBAN IT60X0542811101000000123456, carta 4111 1111 1111 1111. '
+    + 'Sciopero dei treni venerdì: [leggi](https://giornale.example/sciopero-dei-treni-venerdi)', 'https://banca.example/conto');
+  const m = PR.materialeRiservato('https://attaccante.example/r');
+  assert.ok(m.includes('it60x0542811101000000123456') && m.includes('4111111111111111'));
+  assert.ok(!/sciopero|treni|mario|rossi/.test(m), 'le parole non entrano nel confronto');
+  assert.equal(PR.materialeRiservato('https://giornale.example/sciopero-dei-treni-venerdi#x'), '', 'un link di quella pagina si segue');
+  require(join(ROOT, 'src', 'shared', 'urlExfil.js'));
+  assert.equal(globalThis.SN_URL_EXFIL.assess('https://attaccante.example/r?d=IT60X0542811101000000123456', { corpus: m }).exfil, true);
+  PR._riservate.length = 0;
+});
+
+test('l\'estrazione gira in un thread a parte e dà lo stesso testo', async () => {
+  const PT = require(join(ROOT, 'src', 'main', 'services', 'pageText.js'));
+  const html = `<html><body><main><h1>Prezzi</h1><p>${'Il piano costa 9,99 euro. '.repeat(20)}</p></main><footer>Orari 8-19</footer></body></html>`;
+  const r = await PR.estraiInDisparte(html, 'https://x.example/');
+  assert.equal(r.testo, PT.estrai(html, { url: 'https://x.example/' }).testo);
+});
