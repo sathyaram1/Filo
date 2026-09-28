@@ -68,6 +68,8 @@ test('nuovo: chiave OpenRouter scritta nelle Impostazioni, torno alla home e Fil
   await prepara(app, stato.base);
   const home = await homeNuova(app);
   const opt = await openTab('filo://options/options.html');
+  await expect(opt.locator('#useDefaultModels')).toBeChecked({ timeout: 20_000 });
+  await opt.locator('#useDefaultModels').uncheck();
   await expect(opt.locator('#apiKey')).toBeVisible({ timeout: 20_000 });
   await opt.fill('#apiKey', 'sk-or-v1-mia');
   await opt.locator('#apiKey').blur();
