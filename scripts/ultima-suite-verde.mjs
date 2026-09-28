@@ -117,8 +117,7 @@ async function main() {
   if (tag && !pubblicataIl) pubblicataIl = gitForse('log', '-1', '--format=%cI', tagSha);
   const oreDallUltima = pubblicataIl ? (Date.now() - Date.parse(pubblicataIl)) / 3.6e6 : NaN;
   const commitDopoTag = tag ? soloCodice(tag, 'HEAD') : 0;
-  // Un verde più vecchio del tag farebbe ripubblicare codice vecchio sotto un numero nuovo.
-  const verdeDopoTag = Boolean(verde) && (!tagSha || (verde !== tagSha && eAntenato(tagSha, verde)));
+  const verdeDopoTag = verdePiuNuovoDelTag(verde, tagSha, eAntenato);
   const sha = verdeDopoTag ? verde : '';
   const corsaVerde = verde ? corseVerdi(runs).get(verde) : null;
   const esecuzione = process.env.GITHUB_RUN_ID
