@@ -344,3 +344,58 @@ test('classify: percorsi, sottodomini e indirizzi sempre nuovi dello stesso prop
   await vuota('video.altro-sito.it', 'https://video.altro-sito.it/v/1');
   assert.equal(chiamate, 3 * SB.DEEP_BUDGET + 1, 'un altro sito non paga per quello ostile');
 });
+
+// Il conto va all'indirizzo navigato (#591): una pagina su un secchio che si riscrive l'indirizzo con secchi inventati
+// resterebbe altrimenti un proprietario nuovo a ogni riscrittura, e il modello senza tetto.
+const secchioInventato = (i) => 'finto' + String.fromCharCode(97 + (i % 26)) + String.fromCharCode(97 + (Math.floor(i / 26) % 26));
+
+test('classify: una pagina che si riscrive l\'indirizzo conta su quello da cui è arrivata', async () => {
+  const SB = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'safebrowse', 'index.js'));
+  const cache = C.createCache();
+  let chiamate = 0;
+  const complete = async () => { chiamate++; return 'errore_generico'; };
+  const arrivata = 'https://storage.googleapis.com/secchio-ostile/vuota.html';
+  const vuota = (url, budgetUrl) => C.classify({ title: '', text: '', statusCode: 200, host: new URL(url).hostname, url, budgetUrl }, { complete, cache });
+  for (let i = 0; i < 20; i++) await vuota(`https://storage.googleapis.com/${secchioInventato(i)}/vuota.html`, arrivata);
+  assert.equal(chiamate, SB.DEEP_BUDGET);
+  await vuota('https://storage.googleapis.com/negozio-vero/vuota.html', 'https://storage.googleapis.com/negozio-vero/vuota.html');
+  assert.equal(chiamate, SB.DEEP_BUDGET + 1, 'il secchio navigato davvero da un altro ha il suo conto');
+  await vuota('https://altro.esempio-geo.com/vuota', arrivata);
+  assert.equal(chiamate, SB.DEEP_BUDGET + 2, 'un indirizzo di un\'altra origine non eredita il conto');
+});
+
+test('nella scheda: una pagina vuota su un secchio che si riscrive l\'indirizzo e si ricarica resta dentro il tetto', async () => {
+  const SB = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'safebrowse', 'index.js'));
+  const { installSafebrowse } = require(join(__dirname, '..', '..', 'src', 'main', 'tabs', 'tabSafebrowse.js'));
+  const { installGeoBlock } = require(join(__dirname, '..', '..', 'src', 'main', 'tabs', 'tabGeoBlock.js'));
+  class Schede {}
+  installSafebrowse(Schede);
+  installGeoBlock(Schede);
+  const schede = new Schede();
+  const prima = globalThis.SN_GEO_CLASSIFY;
+  const cache = C.createCache();
+  let chiamate = 0;
+  globalThis.SN_GEO_CLASSIFY = (input) => C.classify(input, { complete: async () => { chiamate++; return 'errore_generico'; }, cache });
+  let adesso = '';
+  const wc = { getURL: () => adesso, isDestroyed: () => false, send() {}, executeJavaScript: async () => '\n' };
+  const tab = { id: 1, title: '', _lastStatus: 200, view: { webContents: wc } };
+  schede.tabs = [tab];
+  const campione = async () => { schede._geoTextCheck(tab); await new Promise((r) => setTimeout(r, 5)); };
+  try {
+    for (let giro = 0; giro < 10; giro++) {
+      adesso = `https://s3.amazonaws.com/secchio-ostile/vuota.html?n=${giro}`;
+      schede._sbOnNavigate(tab, adesso);
+      for (let k = 0; k < 2; k++) {
+        adesso = `https://s3.amazonaws.com/${secchioInventato(giro * 2 + k)}/vuota.html`;
+        await campione();
+      }
+    }
+    assert.ok(chiamate >= 1, 'la pagina ha il suo riconoscimento');
+    assert.ok(chiamate <= SB.DEEP_BUDGET, `chiamate: ${chiamate}`);
+    const finoA = chiamate;
+    adesso = 'https://s3.amazonaws.com/negozio-vero/vuota.html';
+    schede._sbOnNavigate(tab, adesso);
+    await campione();
+    assert.equal(chiamate, finoA + 1, 'caso di riscontro: un secchio navigato davvero ha il suo conto');
+  } finally { globalThis.SN_GEO_CLASSIFY = prima; }
+});
