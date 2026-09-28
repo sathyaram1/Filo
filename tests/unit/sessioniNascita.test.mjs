@@ -139,11 +139,14 @@ test('ogni gestore dei permessi si installa dal punto di nascita', () => {
   }
 });
 
-test('solo le sessioni di servizio in elenco nascono senza protezione', () => {
-  const ESENTI = ['src/main/services/safebrowse/sandbox.js'];
-  const usano = MAIN.filter((f) => f.rel !== 'src/main/services/sessioni.js' && /senzaProtezione\s*\(/.test(f.testo)).map((f) => f.rel);
-  assert.deepEqual(usano.sort(), ESENTI.sort(),
-    'una sessione nuova senza protezione è una scelta: va motivata e aggiunta a questo elenco');
+test('solo le sessioni di servizio in elenco lasciano passare le navigazioni verso i tracker', () => {
+  const SERVIZIO = ['src/main/services/safebrowse/sandbox.js'];
+  const usano = MAIN.filter((f) => f.rel !== 'src/main/services/sessioni.js' && /diServizio\s*\(/.test(f.testo)).map((f) => f.rel);
+  assert.deepEqual(usano.sort(), SERVIZIO.sort(),
+    'una sessione di servizio è una scelta: va motivata e aggiunta a questo elenco');
+  const cookies = MAIN.find((f) => f.rel === 'src/main/services/cookies.js').testo;
+  assert.match(cookies, /resourceType === 'mainFrame' && Sessioni\.eDiServizio\(ses\)/,
+    'la sessione di servizio segue i redirect della sua finestra, ma blocca tracker e pubblicità nelle risorse della pagina');
 });
 
 test('il punto di nascita è installato prima di ogni altra cosa, e GPC non torna al dom-ready', () => {
