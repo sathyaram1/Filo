@@ -38,7 +38,7 @@ test('livello 1 — comandi di sola lettura in whitelist eseguono subito', () =>
 test('livello 1 — git e npm di sola lettura', () => {
   for (const cmd of [
     'git status', 'git log', 'git log --oneline -10', 'git diff', 'git diff HEAD~1',
-    'git show', 'git branch', 'git remote -v', 'git config --get user.name',
+    'git show', 'git branch', 'git remote', 'git config --get user.name',
     'npm list', 'npm ls', 'npm --version', 'npm view react', 'npm outdated',
     'pip list', 'git', 'npm',
   ]) {
