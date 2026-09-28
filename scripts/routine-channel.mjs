@@ -1178,6 +1178,11 @@ if (isMain) {
       console.error('Il report va in --notes "…", la frase per chi ha mandato il feedback in --frase "…", il testo di un feedback nuovo in --text "…".');
       process.exit(1);
     }
+    // Senza intento una parola storta partiva verso il server COME biglietto: nessuna consegna ha un intento vuoto.
+    if (!intento) {
+      console.error(testoIntentoNonCapito(looksLikeTicket(biglietto) ? '' : biglietto));
+      process.exit(1);
+    }
     // La versione in cui il fix confluisce la sa solo questa macchina (è quella
     // in costruzione, nel manifesto del progetto). Va timbrata da sola: è ciò
     // che regge il "questo è arrivato agli utenti" nella bacheca e
