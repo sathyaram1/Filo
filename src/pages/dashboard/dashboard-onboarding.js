@@ -32,6 +32,7 @@
   let beginSending = null;
   let runTurnAndContinue = null;
   let isHomeMessageVisible = null;
+  let soloRisposteSenzaCrediti = null;
   let setSuggestions = null;
   let loadDashboard = null;
 
