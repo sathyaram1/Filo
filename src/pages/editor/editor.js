@@ -3904,8 +3904,8 @@
     const senzaAzione = !AZIONE_SCORCIATOIA[m.type];
     openOverlay(`<h3>${meta.label}</h3>
       <div class="ed-field"${senzaAzione && !m.data.shortcut ? ' hidden' : ''}><label>Scorciatoia da tastiera</label>
-        <input type="text" id="cfgShortcut" placeholder="es. ${escapeHtml(libera)}" value="${escapeHtml(m.data.shortcut || '')}" />
-        <div class="ed-field-hint" id="cfgShortcutHint" hidden>Usa almeno un modificatore (${escapeHtml(tasto('Ctrl'))} o Alt), es. ${escapeHtml(libera)} — così non ruba una lettera mentre scrivi.</div>
+        <input type="text" id="cfgShortcut" placeholder="${libera ? `es. ${escapeHtml(libera)}` : ''}" value="${escapeHtml(m.data.shortcut || '')}" />
+        <div class="ed-field-hint" id="cfgShortcutHint" hidden>Usa almeno un modificatore (${escapeHtml(tasto('Ctrl'))} o Alt)${libera ? `, es. ${escapeHtml(libera)}` : ''}, così non ruba una lettera mentre scrivi.</div>
         <div class="ed-field-hint" id="cfgShortcutTaken" hidden></div></div>
       ${specific}
       <div class="ed-overlay-actions">
