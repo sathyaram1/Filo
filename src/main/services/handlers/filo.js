@@ -107,13 +107,10 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_MEMORY_FORGET, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
-    if (msg && msg.lezione && typeof msg.lezione === 'object') {
-      return { ok: true, tolta: await FiloMem.forgetLesson({ ts: msg.lezione.ts, text: msg.lezione.text }) };
-    }
-    if (msg && typeof msg.modulo === 'string' && typeof msg.riga === 'string') {
-      return { ok: true, tolta: await FiloMem.forgetModuleLine(msg.modulo, msg.riga) };
-    }
-    return { ok: false, error: 'bad_request' };
+    const lezione = msg && msg.lezione && typeof msg.lezione === 'object';
+    const riga = msg && typeof msg.modulo === 'string' && typeof msg.riga === 'string';
+    if (!lezione && !riga) return { ok: false, error: 'bad_request' };
+    return { ok: true, tolta: await FiloMem.forgetLine(msg) };
   });
 
   // Compattazione FORZATA: porta subito il buffer delle lezioni dentro
