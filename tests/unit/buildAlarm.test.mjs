@@ -74,6 +74,29 @@ test('un registro senza file riconoscibili dà la chiave generica, mai nessuna',
     'un percorso assoluto fuori dal repo non è una chiave');
 });
 
+// Con una chiave per guasto più feedback della costruzione restano aperti insieme: il titolo li distingue.
+const { nomeDelGuasto, titoloCoiGuasti, TETTO_TITOLO } = await import('../../scripts/build-alarm.mjs');
+
+test('il nome di un guasto è il file di prova o di test rosso; le chiavi il cui titolo lo dice già restano mute', () => {
+  assert.equal(nomeDelGuasto('suite:tests/wallet-credits.spec.mjs'), 'wallet-credits');
+  assert.equal(nomeDelGuasto('suite:tests/sotto/prova.spec.js'), 'sotto/prova');
+  assert.equal(nomeDelGuasto('unit:tests/unit/fineRigaLf.test.mjs'), 'fineRigaLf');
+  assert.equal(nomeDelGuasto('suite:fuori-dai-casi'), 'errori fuori dai casi');
+  assert.equal(nomeDelGuasto('suite:non-partita'), 'suite non partita');
+  for (const k of ['unit', 'bake:tavily', 'piattaforma:mac', 'rilascio:fermo', '', undefined]) assert.equal(nomeDelGuasto(k), '', String(k));
+});
+
+test('il titolo porta i guasti fra parentesi, entro il tetto del server, e un taglio si dice', () => {
+  assert.equal(titoloCoiGuasti('T', ['suite:tests/a.spec.mjs', 'suite:tests/a.spec.mjs', 'bake:x']), 'T (a)');
+  assert.equal(titoloCoiGuasti('T', ['piattaforma:linux']), 'T', 'il titolo di una piattaforma la dice già');
+  assert.equal(titoloCoiGuasti('T', []), 'T');
+  const tante = Array.from({ length: 40 }, (_, i) => `suite:tests/prova-numero-${i}.spec.mjs`);
+  const t = titoloCoiGuasti('Suite Playwright rossa su main: commit non pubblicabile', tante);
+  assert.ok(t.length <= TETTO_TITOLO, `${t.length} caratteri`);
+  assert.match(t, /prova-numero-0, /);
+  assert.match(t, /e altri \d+\)$/);
+});
+
 test('gli argomenti: titolo e testo, --chiave ripetibile, --chiavi-da, --chiavi-unit', () => {
   assert.deepEqual(leggiArgomenti(['T', 'x', '--chiave', 'a', '--chiave', 'b', '--chiavi-da', 'k.txt', '--chiavi-unit', 'u.log']),
     { posizionali: ['T', 'x'], chiavi: ['a', 'b'], chiaviDa: ['k.txt'], chiaviUnit: ['u.log'] });
