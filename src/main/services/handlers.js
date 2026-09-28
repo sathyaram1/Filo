@@ -3914,13 +3914,10 @@ function broadcastToTabs(message) {
     for (const win of BrowserWindow.getAllWindows()) {
       if (win._filoTabs) {
         for (const t of win._filoTabs.tabs) {
-          try { sendToAllFrames(t.view.webContents, message); } catch (_) {}
+          try { spingiAllaScheda(t.view.webContents, message); } catch (_) {}
         }
       }
-      try {
-        const m = messaggioPerDestinazione(message, win.webContents.getURL());
-        if (m) win.webContents.send('filo:broadcast', m);
-      } catch (_) {}
+      spingiAllaFinestra(win, message);
     }
   } catch (_) {}
 }
