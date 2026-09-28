@@ -5,6 +5,7 @@ import { test, expect } from '../../fixtures/electron.mjs';
 
 test.use({ argomentiApp: ['--use-fake-device-for-media-stream'] });
 
+const riga = (shell) => shell.locator('#perm-bar .perm-row');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const PAGINA = `<!doctype html><html><head><title>Vecchia</title></head><body>
@@ -30,6 +31,25 @@ const PAGINA = `<!doctype html><html><head><title>Vecchia</title></head><body>
     return out;
   };
 </script></body></html>`;
+
+test('chi sceglie «questa scheda» non consegna tutto lo schermo e l’audio del computer', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.evaluate(() => { window.__e = null; window.schermoEAudio().then((r) => { window.__e = r; }); });
+  await sleep(2500);
+  if (await riga(shell).count()) {
+    await expect(shell.locator('#perm-bar .perm-si')).toBeEnabled();
+    await shell.locator('#perm-bar .perm-si').click();
+    const scheda = shell.locator('#perm-bar .perm-fonte[data-tipo="scheda"]').first();
+    await expect(scheda).toBeVisible({ timeout: 10_000 });
+    await scheda.click();
+  }
+  await expect.poll(() => page.evaluate(() => window.__e), { timeout: 10_000 }).not.toBeNull();
+  const tracce = await page.evaluate(() => window.__e);
+  const lista = Array.isArray(tracce) ? tracce : [];
+  expect(lista.filter((t) => t.startsWith('audio:')), `al sito è arrivato ${JSON.stringify(tracce)}`).toEqual([]);
+  expect(lista.filter((t) => /Screen|screen:/.test(t)), `scelta una scheda, al sito è arrivato ${JSON.stringify(tracce)}`).toEqual([]);
+});
 
 for (const [fn, cosa] of [['soloAudio', 'l’audio del computer senza immagine'], ['schermoEMic', 'lo schermo insieme al microfono']]) {
   test(`chiedere ${cosa} dalla copia intonsa non fa morire la scheda`, async ({ openTab, testServer }) => {
