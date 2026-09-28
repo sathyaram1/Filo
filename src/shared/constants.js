@@ -2480,12 +2480,12 @@
     const blocco = esterno().imbusta({ tipo: 'STILE_UTENTE', testo: style, conIntestazione: true });
     const idx = messages.findIndex((m) => m && m.role === 'system' && typeof m.content === 'string');
     if (idx < 0) return [{ role: 'system', content: blocco }, ...messages];
-    const content = messages[idx].content;
+    const content = senzaStile(messages[idx].content);
     const ancora = INIZIO_ANTI_INGANNO[action];
     const at = ancora ? content.indexOf(ancora) : -1;
-    const nuovo = at >= 0
-      ? `${content.slice(0, at)}${blocco}\n\n${content.slice(at)}`
-      : `${content}\n\n${blocco}`;
+    let nuovo;
+    if (at >= 0) nuovo = `${content.slice(0, at)}${blocco}\n\n${content.slice(at)}`;
+    else nuovo = content ? `${content}\n\n${blocco}` : blocco;
     const copy = messages.slice();
     copy[idx] = { ...copy[idx], content: nuovo };
     return copy;
