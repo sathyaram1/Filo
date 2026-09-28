@@ -612,14 +612,20 @@
       const low = args.map((a) => a.toLowerCase());
       if (low.some((a) => a === '--unset' || a === '--unset-all' || a === '--remove-section')) return 3;
       if (low.some((a) => a === '--add' || a === '--replace-all' || a === '--rename-section' || a === '-e' || a === '--edit')) return 2;
-      // `chiave valore` (≥2 operandi) imposta; `--list`/`--get`/`chiave` (≤1) legge.
-      return args.filter((a) => !a.startsWith('-')).length >= 2 ? 2 : 1;
+      const ops = args.filter((a) => !a.startsWith('-'));
+      if (ops.length >= 2) return 2; // `chiave valore` imposta
+      // Lettura: un dump completo, o una chiave che porta credenziali (URL di un
+      // remoto con token, `credential.helper`), stampa un segreto in chiaro nella
+      // conversazione → conferma (#587). Una chiave innocua (`user.email`) resta 1.
+      if (low.some((a) => a === '--list' || a === '-l' || a === '--get-regexp' || a === '--get-urlmatch')) return 2;
+      return /(^|\.)url$|credential|password|token/.test((ops[0] || '').toLowerCase()) ? 2 : 1;
     },
     remote: (cmd) => {
       const ops = gitArgsAfterSub(cmd).filter((a) => !a.startsWith('-'));
-      if (!ops.length) return 1; // `git remote`, `git remote -v`
+      // `git remote -v` elenca gli URL, che possono contenere un token → conferma.
+      if (!ops.length) return /(^|\s)(-v|--verbose)(\s|$)/.test(cmd) ? 2 : 1;
       const action = ops[0].toLowerCase();
-      if (action === 'show' || action === 'get-url') return 1;
+      if (action === 'show' || action === 'get-url') return 2; // stampano l'URL col token
       if (action === 'remove' || action === 'rm' || action === 'prune') return 3; // cancellazioni
       return 2; // add, rename, set-url, set-head, set-branches, update…
     },
