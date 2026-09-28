@@ -18,7 +18,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 require(join(__dirname, '..', '..', 'src', 'shared', 'feedback.js'));
 const FB = globalThis.SN_FEEDBACK;
 
-const DOC_PREFIX = `${FB.rest.FIRESTORE_BASE}/feedback/`;
+// Per esteso, non ricavato dal modulo: è il contratto di Firestore, e ricavato
+// dal modulo il test confermava un nome che il server rifiuta con un 400.
+const DOC_PREFIX = 'projects/filo-8b9cb/databases/(default)/documents/feedback/';
 
 function fsDoc(id, fields, updateTime) {
   return {

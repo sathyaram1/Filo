@@ -120,7 +120,10 @@ test('le proprie schede si chiedono per identificativo, e solo quelle', async ()
     const { corpo, url } = rete.viste[0];
     assert.ok(url.includes(':batchGet'));
     assert.equal(corpo.documents.length, 2);
-    assert.ok(corpo.documents.every((d) => d.includes('/feedback-public/')));
+    assert.deepEqual(corpo.documents, [
+      'projects/filo-8b9cb/databases/(default)/documents/feedback-public/mia-1',
+      'projects/filo-8b9cb/databases/(default)/documents/feedback-public/mia-2',
+    ], 'il nome di un documento è il percorso, non l\'URL: con l\'URL Firestore risponde 400');
     assert.equal(rows.length, 1);
     assert.equal(rows[0]._id, 'mia-1');
   } finally { rete.ripristina(); }

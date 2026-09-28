@@ -18,7 +18,9 @@
   const COUNTERS_COLLECTION = 'counters';
   const SEQ_COUNTER = 'feedbackSeq';
 
-  const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+  // Il NOME di un documento (batchGet) è il percorso, non l'URL: con l'URL Firestore risponde 400.
+  const DOCS_ROOT = `projects/${PROJECT_ID}/databases/(default)/documents`;
+  const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/${DOCS_ROOT}`;
   const STORAGE_BASE = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o`;
 
   // ---- helpers ----
@@ -1291,7 +1293,7 @@
 
   async function batchGetDirect(collectionId, wanted, { timeoutMs = 0, idToken = '', fields = null } = {}) {
     const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
-    const prefix = `${FIRESTORE_BASE}/${collectionId}/`;
+    const prefix = `${DOCS_ROOT}/${collectionId}/`;
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const corpo = { documents: wanted.map((id) => prefix + id) };
