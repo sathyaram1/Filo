@@ -301,7 +301,20 @@
     });
   }
 
+  // CERCA_WEB nel turno: la query esce verso il motore di ricerca. Sospetta se
+  // porta un segreto della memoria (solo un token forte: le parole comuni di una
+  // query coincidono spesso con gli appunti) o un pezzo di ciò che è stato letto.
+  // Niente ripiego strutturale: una query non ha la forma di un URL.
+  function valutaRicerca(query, { memoria = '', azioni = [] } = {}) {
+    const q = String(query || '').trim();
+    if (!q) return { exfil: false, reason: '' };
+    const ctx = contestoDaAzioni(azioni);
+    const t = taint(q, memoria, { soloForte: true }) || taintTestoLetto(q, ctx.letto);
+    return t ? { exfil: true, reason: t.reason } : { exfil: false, reason: '' };
+  }
+
   global.SN_URL_EXFIL = {
-    assess, valutaNaviga, contestoDaAzioni, taint, taintLetto, structural, exposedAlnum, corpusTokens,
+    assess, valutaNaviga, valutaRicerca, contestoDaAzioni,
+    taint, taintLetto, taintTestoLetto, structural, exposedAlnum, corpusTokens,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
