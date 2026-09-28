@@ -4057,7 +4057,7 @@
   function prendeIlTasto(t, e) {
     if (!(e.ctrlKey || e.metaKey)) return false;
     if (t.prende) return t.prende(e);
-    return t.tasti.some((k) => TASTI.combacia(e, `${t.shift ? 'Ctrl+Shift' : 'Ctrl'}+${k}`));
+    return t.tasti.some((k) => TASTI.combacia(e, ['Ctrl', ...(t.shift ? ['Shift'] : []), k].join('+')));
   }
   function tastoEditorDi(sc) {
     const e = pressioneDi(sc);
