@@ -3157,7 +3157,7 @@ function dashboardScheduler() {
       if (!inputs.hasKey) return;
       const cached = await FiloMem.getDashboardCache();
       // Se nel frattempo gli input sono tornati uguali alla cache, niente AI.
-      if (cached && cached.signature === inputs.signature) return;
+      if (cached && !cached.senzaChiave && cached.signature === inputs.signature) return;
       const result = await generateDashboardFromInputs(inputs);
       // Spinge l'aggiornamento alle home aperte: si aggiornano senza rifare l'LLM.
       broadcastToTabs({
