@@ -220,7 +220,7 @@
   // ereditano (es. link.color da accent) mostrano subito il valore ereditato.
   function renderOtherTokenRows(exceptName) {
     if (!Tokens) return;
-    for (const name of Tokens.names()) if (name !== exceptName) renderTokenRow(name);
+    for (const name of Tokens.names()) if (name !== exceptName && !tokenInCorso.has(name)) renderTokenRow(name);
   }
 
   function onTokenInput(name) {
@@ -228,6 +228,7 @@
     const row = input.closest('.sn-token-row');
     const err = row.querySelector('.sn-token-error');
     const v = input.value.trim();
+    tokenInCorso.add(name);
 
     // Mentre si digita NON mostriamo l'errore (eviterebbe di lampeggiare "non
     // valido" a ogni carattere di un colore scritto a mano): l'errore puntuale
