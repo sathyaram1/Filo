@@ -50,6 +50,6 @@ test('«Mostra il banner dei cookie» in incognito lascia com\'è il profilo nor
   await sleep(1500);
 
   // Il profilo normale non è stato toccato: la risposta del sito c'è ancora, e il suo menu dice ancora «rifiutati».
-  expect(await consensoNormale(app)).toEqual(['rifiutato']);
-  expect(await normale()).toEqual({ rejected: true, hidden: false, shown: false });
+  expect.soft(await consensoNormale(app)).toEqual(['rifiutato']);
+  expect.soft(await normale()).toEqual({ rejected: true, hidden: false, shown: false });
 });
