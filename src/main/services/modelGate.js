@@ -124,8 +124,9 @@
         auditBroken(s, action, e && e.brokenAttempts);
         throw e;
       }
-      auditBroken(s, action, r && r.brokenAttempts);
-      return settleChain(s, action, chain, r);
+      const { brokenAttempts, ...rest } = r || {};
+      auditBroken(s, action, brokenAttempts);
+      return settleChain(s, action, chain, rest);
     }
 
     async function text(opts) {

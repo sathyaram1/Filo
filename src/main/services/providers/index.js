@@ -161,7 +161,8 @@
         return { ...r, provider: a.provider, model: aModel, ...(broken.length ? { brokenAttempts: broken } : {}) };
       } catch (err) {
         lastErr = err;
-        if (broken.length && err && typeof err === 'object') err.brokenAttempts = broken;
+        // Porta le chiavi usate: non enumerabile, un errore si stampa e si serializza.
+        if (broken.length && err && typeof err === 'object') Object.defineProperty(err, 'brokenAttempts', { value: broken, enumerable: false, configurable: true });
         if (stopOnOutOfCredits(err)) throw err;
         console.warn(`[SN] provider ${a.provider} streaming fallito (${i + 1}/${attempts.length}):`, err.message || err);
         const hasNext = i + 1 < attempts.length;

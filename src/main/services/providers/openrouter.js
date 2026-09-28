@@ -355,8 +355,9 @@
     const read = () => reader.read().catch((err) => {
       if (generationId && err && typeof err === 'object') {
         err.generationId = generationId;
-        err.keyUsed = keyUsed;
         err.keySource = keySource;
+        // La chiave serve a rileggere la generazione, ma un errore si stampa e si serializza: non enumerabile.
+        Object.defineProperty(err, 'keyUsed', { value: keyUsed, enumerable: false, configurable: true });
       }
       throw err;
     });
