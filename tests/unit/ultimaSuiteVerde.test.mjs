@@ -236,7 +236,8 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
   test('ultima versione di 100 ore fa, un verde di 68 ore fa mai uscito: allarme, e il verde si prova lo stesso', async () => {
     const r = await scegli({ oreVersione: 100, oreVerde: 68 });
     assert.equal(r.ricevute.length, 1, 'passate le 48 ore senza versioni, un verde fermo deve aprire un feedback');
-    assert.deepEqual(r.ricevute[0].keys, [CHIAVE_FERMO_DOPO_VERDE]);
+    assert.deepEqual(r.ricevute[0].keys, [chiaveDelFermo(CHIAVE_FERMO_DOPO_VERDE, 'v0.2.228')]);
+    assert.match(r.ricevute[0].name, /alla v0\.2\.228/, 'due fermi aperti insieme si distinguono dal titolo');
     assert.match(r.ricevute[0].text, /68 ore/);
     assert.equal(r.output.trim(), `sha=${r.verde}`, 'il guasto a valle può essere passato: la pubblicazione si tenta');
     assert.equal(r.codice, 0);
