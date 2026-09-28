@@ -4,6 +4,8 @@
 
 'use strict';
 
+const Permessi = require('../permessiPagine');
+
 const MAX_CONCURRENT = 2;
 // Oltre questa coda un link nuovo resta senza detonation (il verdetto locale vale comunque) e lo si scrive nel log.
 const MAX_QUEUE = 50;
@@ -72,6 +74,8 @@ function createDetonator({
   function runOne(url, evaluateFinal, partition) {
     const e = el();
     const ses = e.session.fromPartition(partition, { cache: false });
+    // Una pagina sospetta riaperta di nascosto: nessuno può rispondere a una sua domanda, microfono e appunti compresi.
+    Permessi.negaTutto(ses);
 
     let downloadStarted = false;
     let downloadName = '';

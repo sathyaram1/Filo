@@ -363,6 +363,12 @@ function registerIpcHandlers() {
     if (!win?._filoTabs) return { activeId: null, tabs: [] };
     return win._filoTabs.snapshot();
   });
+  // Solo la cornice risponde a una domanda di permesso: è l'unico posto dove l'ha vista l'utente (#591.1).
+  ipcMain.handle('tabs:permesso-risposta', (event, { id, si } = {}) => {
+    const cornice = BrowserWindow.getAllWindows().some((w) => w._filoTabs && (w.webContents === event.sender || w._filoShell?.webContents === event.sender));
+    if (!cornice || !id) return { ok: false };
+    return { ok: require('./services/permessiPagine').rispondi(String(id), si === true) };
+  });
   ipcMain.handle('tabs:open-blocked-popup', (event, { url } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs || !url) return { ok: false };

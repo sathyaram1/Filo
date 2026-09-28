@@ -363,6 +363,8 @@
     // TAB_IN_VISTA (solo alle pagine filo://).
     TAB_IN_VISTA_GET: 'tab_in_vista_get',            // {} → { ok, inVista }
     TAB_IN_VISTA: 'tab_in_vista',                    // broadcast { inVista }
+    // Detta e Incolla di Filo su una pagina web: microfono o appunti per pochi secondi, senza domanda al sito (#591.1).
+    PERMESSO_FILO: 'permesso_filo',                  // { tipo: 'media'|'appunti' } → { ok }
 
     // §2.1 — segnali di attività della tab riportati dal content script, per la
     // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty? }

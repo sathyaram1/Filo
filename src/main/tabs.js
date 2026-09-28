@@ -15,6 +15,7 @@ const GeoBlockRules = require('./services/geoBlockRules');
 const { installSafebrowse } = require('./tabs/tabSafebrowse');
 const { installGeoBlock } = require('./tabs/tabGeoBlock');
 const { installCookies } = require('./tabs/tabCookies');
+const Permessi = require('./services/permessiPagine');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -80,29 +81,41 @@ function tabDiWebContents(wc) {
   return null;
 }
 
-// #514 — l'Esc NON è un gesto con cui una pagina può prendersi lo schermo.
-// Da quando il tasto arriva al documento (serve: è quello che chiude i riquadri
-// aperti sopra la pagina, e prendercelo prima li scavalcava), il browser lo
-// conta come gesto dell'utente. Una pagina che chiede lo schermo pieno dentro
-// il proprio gestore dell'Esc lo otteneva senza che nessuno avesse cliccato
-// niente: da lì il tasto di questa segnalazione diventava un testa o croce —
-// un Esc esce, il successivo rientra — perché la modalità tornava "della
-// pagina" e l'Esc dopo era suo. Si rifiuta qui, prima che succeda qualsiasi
-// cosa: un evento di uscita non può essere il permesso per entrare. Su ogni
-// altro permesso si resta al comportamento di prima (senza gestore, Electron
-// concede), e questo è il motivo del `callback(true)` finale.
+// #514 — l'Esc NON è un gesto con cui una pagina può prendersi lo schermo: chi chiede lo schermo pieno dentro il
+// proprio gestore dell'Esc lo otteneva senza un clic, e un evento di uscita non può essere il permesso per entrare.
+// Microfono, fotocamera, appunti e posizione li decide l'utente (#591.1): regole in services/permessiPagine.js.
 function installaPermessi(ses) {
-  if (!ses || ses._filoPermessi) return;
-  ses._filoPermessi = true;
+  Permessi.installa(ses, {
+    prima: (wc, permission, callback) => {
+      if (permission !== 'fullscreen') return false;
+      const t = tabDiWebContents(wc);
+      if (t && t._ultimoInputEsc) { callback(false); return true; }
+      return false;
+    },
+    schedaDi: schedaPerPermessi,
+  });
+}
+
+// La domanda va alla cornice della finestra che mostra la pagina: lì la pagina non la copre e non la imita.
+function schedaPerPermessi(wc) {
   try {
-    ses.setPermissionRequestHandler((wc, permission, callback) => {
-      if (permission === 'fullscreen') {
-        const t = tabDiWebContents(wc);
-        if (t && t._ultimoInputEsc) { callback(false); return; }
-      }
-      callback(true);
-    });
+    for (const w of BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      const t = tm && Array.isArray(tm.tabs) && tm.tabs.find((x) => {
+        const c = x && x.view && x.view.webContents;
+        return c && !c.isDestroyed() && c.id === wc.id;
+      });
+      if (!t) continue;
+      return {
+        tabId: t.id,
+        avvisa: (evento, dati) => {
+          if (w.isDestroyed() || w.webContents.isDestroyed()) return;
+          w.webContents.send(evento === 'chiedi' ? 'tabs:permesso' : 'tabs:permesso-fine', dati);
+        },
+      };
+    }
   } catch (_) {}
+  return null;
 }
 
 // #252 — pagina interna filo:// "singleton": ne ha senso UNA sola scheda alla
@@ -2357,6 +2370,7 @@ class TabManager {
   _hardenAuthPopup(win) {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
+    installaPermessi(pwc.session);
     try {
       pwc.setWebRTCIPHandlingPolicy(
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
