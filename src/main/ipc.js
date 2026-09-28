@@ -365,6 +365,13 @@ function registerIpcHandlers() {
     if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
     return win._filoTabs.clearTabProxy(id);
   });
+  // #754 — dal menu della scheda: rivedere i banner dei cookie su questo sito (show) o ridarli a Filo.
+  // Solo dalla shell: scrive le impostazioni.
+  ipcMain.handle('tabs:cookie-banners', async (event, { id, show } = {}) => {
+    const win = winFor(event);
+    if (!win?._filoTabs || win.webContents !== event.sender) return { ok: false, error: 'forbidden' };
+    return win._filoTabs.setCookieBanners(id, !!show);
+  });
   // Stato per il menu della shell: la voce compare solo se un endpoint è
   // configurato; defaultCountry = ultima location usata, altrimenti il default.
   ipcMain.handle('tabs:proxy-status', async () => {

@@ -62,7 +62,7 @@ const cookieMethods = {
     }
     tab.cookieOutcome = null;
     this._broadcast();
-    if (wc && !wc.isDestroyed()) { try { wc.reload(); } catch (_) {} }
+    this.reload(tab.id);
     return { ok: true, site, shown: !!show };
   },
 };

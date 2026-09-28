@@ -2292,9 +2292,12 @@
       // trustedSites: domini (eTLD+1) "fidati" → in 'privacy' ricevono una
       //   partizione isolata ma persistente (resti connesso). Negli altri modi
       //   non hanno effetto.
+      // bannerSites: domini (eTLD+1) dove l'utente ha chiesto di rivedere i
+      //   banner dei cookie (menu della scheda): lì Filo non rifiuta e non nasconde.
       cookies: {
         mode: 'default',
         trustedSites: [],
+        bannerSites: [],
       },
       // Protezione anti-fingerprinting: rumore deterministico per-sito sui
       // segnali continui ad alta entropia (canvas 2D, WebGL, audio). Stessa

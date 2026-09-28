@@ -12,6 +12,7 @@ const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
 const { installSafebrowse } = require('./tabs/tabSafebrowse');
 const { installGeoBlock } = require('./tabs/tabGeoBlock');
+const { installCookies } = require('./tabs/tabCookies');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -797,6 +798,8 @@ class TabManager {
       // Proxy per-tab ("Apri da un altro paese"): { country, tier } finché la
       // tab è instradata da un altro paese, null altrimenti. Vedi setTabProxy.
       proxy: null,
+      // #754 — banner dei cookie di questo sito: { site, rejected, hidden } (vedi tabs/tabCookies.js).
+      cookieOutcome: null,
       // #145 — tab nata da un ripristino di sessione: l'autoplay resta bloccato
       // (vedi _makeView). Memorizzato sulla tab così sopravvive a _recreateView
       // (es. se la tab viene proxata alla nascita per una regola di dominio).
@@ -2116,6 +2119,7 @@ class TabManager {
       // appena il main-frame si è committato, prima che la pagina sia
       // interattiva. Best-effort, non blocca mai (vedi _sbOnNavigate).
       this._sbOnNavigate(tab, url);
+      this._cookieOnNavigate(tab, url);
       // Geo-block livello 1 (deterministico): nuova navigazione → il segnale
       // precedente decade; HTTP 451 è conclusivo, altrimenti vale l'eventuale
       // redirect "di blocco" memorizzato durante questa navigazione.
@@ -2544,6 +2548,8 @@ class TabManager {
         // Proxy per-tab ("Apri da un altro paese"): { country, tier } o null.
         // La shell lo userà per l'indicatore sulla tab (feedback UI separato).
         proxy: t.proxy ? { country: t.proxy.country, tier: t.proxy.tier } : null,
+        // Banner dei cookie del sito, per il menu della scheda: null se Filo non li gestisce qui.
+        cookies: this._cookieState(t),
       })),
     };
   }
@@ -2661,6 +2667,7 @@ class TabManager {
 // d'istanza identici a prima del refactor.
 installSafebrowse(TabManager);
 installGeoBlock(TabManager);
+installCookies(TabManager);
 
 // Host di un URL (chiave della cache colore identità §1.2). Solo schemi web:
 // le pagine filo:// interne non hanno identità di sito da tinteggiare.

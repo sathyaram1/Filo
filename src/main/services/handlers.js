@@ -1006,7 +1006,10 @@ async function applySettingsUpdate(partial) {
   try {
     const Cookies = require('./cookies');
     Cookies.configureFromSettings(merged);
+    require('./cookieBanners').configureFromSettings(merged);
     broadcastToTabs({ type: MSG.COOKIES_CONFIG_UPDATE, mode: Cookies.getMode(merged) });
+    // Il menu della scheda dice se su quel sito i banner si vedono: la barra deve saperlo subito.
+    for (const w of BrowserWindow.getAllWindows()) { try { w._filoTabs && w._filoTabs._broadcast(); } catch (_) {} }
   } catch (_) {}
   try { require('./adblock').configureFromSettings(merged); } catch (_) {}
   try { require('./siteBlock').configureFromSettings(merged); } catch (_) {}

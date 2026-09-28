@@ -31,9 +31,10 @@ const path = require('node:path');
 //   - in un riquadro non si carica NIENTE finché l'utente non lo tocca davvero
 //     (tasto destro, clic, tasto premuto, o una scorciatoia globale diretta a
 //     quel frame). Alla prima interazione il riquadro monta l'intero Filo.
-// Le funzioni di PAGINA (colore della scheda, segnali di attività, banner
-// cookie/sito pericoloso, traduzione della pagina) restano appannaggio del
-// frame principale: dentro un riquadro descriverebbero il rettangolo sbagliato.
+// Le funzioni di PAGINA (colore della scheda, segnali di attività, avviso del
+// sito pericoloso, traduzione della pagina) restano appannaggio del frame
+// principale: dentro un riquadro descriverebbero il rettangolo sbagliato.
+// Il modulo cookie è l'eccezione (#754): vedi startCookiesInFrame più sotto.
 const IS_SUBFRAME = (() => {
   try { return window.top !== window.self; } catch (_) { return true; }
 })();
@@ -418,6 +419,8 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'spellcheck.js')); } catch (e) { console.error('[Filo CS] spellcheck', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
+  if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookieRules.js')); } catch (e) { console.error('[Filo CS] cookieRules', e); }
+  if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookieBanners.js')); } catch (e) { console.error('[Filo CS] cookieBanners', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
   try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); } // S1.F2.2
@@ -453,6 +456,20 @@ function start() {
   } catch (_) {}
 }
 
+// #754 — molti banner dei cookie vivono in un riquadro (Sourcepoint, TrustArc, varianti di Didomi e
+// Quantcast): lì il modulo cookie parte da solo, senza il resto di Filo, e solo sulle pagine web.
+function startCookiesInFrame() {
+  let href = '';
+  try { href = window.location.href || ''; } catch (_) {}
+  if (!/^https?:/i.test(href)) return;
+  const go = () => {
+    try { require(path.join(CONTENT_DIR, 'cookieRules.js')); } catch (e) { console.error('[Filo CS] cookieRules (riquadro)', e); }
+    try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies (riquadro)', e); }
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go, { once: true });
+  else go();
+}
+
 // #405 — montaggio dei content script in un riquadro incorporato: una volta
 // sola, alla prima interazione dell'utente con quel riquadro.
 let contentScriptsStarted = false;
@@ -483,6 +500,7 @@ if (!IS_SUBFRAME) {
     start();
   }
 } else {
+  startCookiesInFrame();
   // Un clic, un tasto premuto o il fuoco su un campo dentro il riquadro dicono
   // "sto usando questa cosa": da lì in poi il riquadro deve rispondere come il
   // resto della pagina. Il tasto destro ha il suo cammino (il bridge qui sopra),

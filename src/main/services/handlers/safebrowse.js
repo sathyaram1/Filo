@@ -1,4 +1,4 @@
-// Handler di dominio: rilevamento siti pericolosi e config cookie.
+// Handler di dominio: rilevamento siti pericolosi e cookie/consenso.
 // Il verdetto safebrowse vive nel TabManager (per tab: bypass/dismiss); qui
 // inoltriamo alla finestra MITTENTE così l'overlay/banner agisce sul tab giusto.
 
@@ -46,11 +46,43 @@ module.exports = function register(on, ctx) {
     return win._filoTabs.geoProposeDismiss(tabId, msg.url || origin);
   });
 
-  on(MSG.COOKIES_CONFIG, async () => {
-    // Il content script chiede la modalità corrente per decidere se rifiutare
-    // i banner CMP e riscrivere gli embed YouTube. È una config globale, non
-    // per-tab (settings.security.cookies.mode).
+  // Il content script di ogni frame chiede cosa fare sulla pagina. Aperto ai siti di proposito (vedi messages.js):
+  // la modalità e le regole sono le stesse per tutti, e il sito vale quello della scheda, non quello del riquadro.
+  on(MSG.COOKIES_CONFIG, async (msg, sender, origin) => {
+    const Cookies = require('../cookies');
     const settings = await Storage.getSettings();
-    return { ok: true, mode: require('../cookies').getMode(settings) };
+    const mode = Cookies.getMode(settings);
+    if (mode === Cookies.MODES.MANUAL) return { ok: true, mode };
+    const topUrl = String((sender && sender.url) || origin || '');
+    const off = Cookies.isBannerSiteIn(Cookies.getBannerSites(settings), topUrl);
+    const res = { ok: true, mode, off, topUrl };
+    if (off) return res;
+    res.index = require('../consentRules').detectIndex(topUrl);
+    if (msg && msg.frame !== 'sub') {
+      let host = '';
+      try { host = new URL(topUrl).hostname; } catch (_) {}
+      res.cosmetic = host ? require('../cookieBanners').forHost(host) : null;
+    }
+    return res;
+  });
+
+  on(MSG.COOKIES_RULE, async (msg) => {
+    const rule = require('../consentRules').getRule(msg && msg.name);
+    return rule ? { ok: true, rule } : { ok: false };
+  });
+
+  on(MSG.COOKIES_BANNER_TOKENS, async (msg, sender, origin) => {
+    let host = '';
+    try { host = new URL(String((sender && sender.url) || origin || '')).hostname; } catch (_) {}
+    if (!host) return { ok: false };
+    const clean = (arr) => (Array.isArray(arr) ? arr.filter((x) => typeof x === 'string' && x.length <= 120) : []);
+    return { ok: true, selectors: require('../cookieBanners').matchTokens(host, clean(msg && msg.ids), clean(msg && msg.classes)) };
+  });
+
+  on(MSG.COOKIES_OUTCOME, async (msg, sender) => {
+    const win = winOf(sender);
+    const tabId = sender && sender.tab && sender.tab.id;
+    if (!win || !win._filoTabs || !tabId) return { ok: false };
+    return win._filoTabs.cookieOutcome(tabId, msg && msg.outcome);
   });
 };

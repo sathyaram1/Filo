@@ -589,6 +589,18 @@
         });
       }
     }
+    // #754 — cosa ha fatto Filo col banner dei cookie di questo sito, e la strada per rivederlo.
+    const ck = t.cookies;
+    if (ck && (ck.shown || ck.rejected || ck.hidden)) {
+      entries.push({ type: 'separator' });
+      if (ck.shown) {
+        entries.push({ label: 'Rifiuta i cookie in automatico qui', icon: 'cookie', action: 'tab-cookies-auto' });
+      } else {
+        if (ck.rejected) entries.push({ label: 'Cookie non necessari rifiutati', icon: 'cookie', disabled: true });
+        if (ck.hidden) entries.push({ label: 'Banner dei cookie nascosto', icon: 'cookie', disabled: true });
+        entries.push({ label: 'Mostra il banner dei cookie', icon: 'eye', action: 'tab-cookies-show' });
+      }
+    }
     entries.push(
       { type: 'separator' },
       { label: 'Chiudi', icon: 'close', action: 'tab-close' },
@@ -637,6 +649,8 @@
       else if (action === 'tab-proxy-default') proxyTab(id);
       else if (action === 'tab-proxy-clear') api.tabs.clearProxy(id);
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
+      else if (action === 'tab-cookies-show') api.tabs.cookieBanners(id, true);
+      else if (action === 'tab-cookies-auto') api.tabs.cookieBanners(id, false);
       else if (action.startsWith('tab-proxy-go:')) proxyTab(id, action.slice('tab-proxy-go:'.length));
     });
   }

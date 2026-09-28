@@ -65,6 +65,7 @@
     $('sec-cookies-trusted-note').textContent = I18n.t('options_cookies_trusted_note_other');
     $('cookie-wl-input').placeholder = I18n.t('options_cookies_whitelist_placeholder');
     $('cookie-wl-add-btn').textContent = I18n.t('options_cookies_whitelist_add');
+    $('sec-cookies-banners-title').textContent = I18n.t('options_cookies_banners_title');
     $('sec-fp-title').textContent = I18n.t('options_fp_title');
     $('sec-fp-desc').textContent = I18n.t('options_fp_desc');
     $('fp-mode-off-label').textContent = I18n.t('options_fp_mode_off');
@@ -231,7 +232,9 @@
     if (radio) radio.checked = true;
     const trusted = cookies.trustedSites || cookies.loginWhitelist;
     cookieWhitelist = Array.isArray(trusted) ? trusted.slice() : [];
+    cookieBannerSites = Array.isArray(cookies.bannerSites) ? cookies.bannerSites.slice() : [];
     renderWhitelist();
+    renderBannerSites();
     syncCookieMode();
 
     const fp = sec.fingerprint || {};
@@ -262,6 +265,8 @@
   // ─── gestione cookie ──────────────────────────────────────────────────────
 
   let cookieWhitelist = [];
+  // #754 — siti dove l'utente ha chiesto di rivedere i banner (dal menu della scheda): qui si vedono e si tolgono.
+  let cookieBannerSites = [];
 
   function currentMode() {
     const checked = document.querySelector('input[name="cookie-mode"]:checked');
@@ -327,6 +332,30 @@
     }
   }
 
+  function renderBannerSites() {
+    const box = $('sec-cookies-banners');
+    const list = $('cookie-banners-list');
+    list.innerHTML = '';
+    box.hidden = !cookieBannerSites.length;
+    for (const domain of cookieBannerSites) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = domain;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_cookies_banners_remove');
+      btn.addEventListener('click', () => {
+        cookieBannerSites = cookieBannerSites.filter((d) => d !== domain);
+        renderBannerSites();
+        saveCookies();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
   // Mostra (o nasconde, con msg vuoto) un avviso inline sotto il campo "siti
   // fidati". Senza questo, un input rifiutato spariva senza spiegazione.
   function setWhitelistError(msg) {
@@ -364,7 +393,7 @@
   async function saveCookies() {
     const partial = {
       security: {
-        cookies: { mode: currentMode(), trustedSites: cookieWhitelist.slice() },
+        cookies: { mode: currentMode(), trustedSites: cookieWhitelist.slice(), bannerSites: cookieBannerSites.slice() },
       },
     };
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
@@ -485,6 +514,18 @@
     hint.classList.add('sn-show');
     clearTimeout(save._t);
     save._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
+  }
+
+  // Un sito aggiunto dal menu della scheda mentre questa pagina è aperta deve comparire qui, e un
+  // salvataggio da qui non deve riscrivere l'elenco com'era all'apertura.
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      const c = msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings && msg.settings.security && msg.settings.security.cookies;
+      if (!c || !Array.isArray(c.bannerSites)) return;
+      if (c.bannerSites.join('\n') === cookieBannerSites.join('\n')) return;
+      cookieBannerSites = c.bannerSites.slice();
+      renderBannerSites();
+    });
   }
 
   document.addEventListener('DOMContentLoaded', () => {

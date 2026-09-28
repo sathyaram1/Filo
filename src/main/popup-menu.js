@@ -46,6 +46,16 @@ const ICON_PATHS = {
   close:
     '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
 
+  // Biscotto morsicato — righe del banner dei cookie nel menu della scheda (#754).
+  cookie:
+    '<path d="M12 3a9 9 0 1 0 9 9 3 3 0 0 1-3.6-3.4A3 3 0 0 1 14.4 5 3 3 0 0 1 12 3z"/>' +
+    '<path d="M8.5 9.5h.01"/><path d="M15.5 15h.01"/><path d="M9.5 15.5h.01"/><path d="M12.5 12h.01"/>',
+
+  // Occhio — «Mostra il banner dei cookie».
+  eye:
+    '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>' +
+    '<circle cx="12" cy="12" r="2.8"/>',
+
   duplicate:
     '<rect x="9" y="9" width="11" height="11" rx="2"/>' +
     '<path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
