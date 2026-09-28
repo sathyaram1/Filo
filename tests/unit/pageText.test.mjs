@@ -207,10 +207,12 @@ test('il listino chiamato come un banner o come una navigazione arriva, in coda'
 
 test('i pezzi affiancati senza spazio fra i tag non si incollano in un numero che non esiste', () => {
   const r = PT.estrai(`<html><body><p><span>Lunedì</span><span>7:30</span><span>19:30</span></p>`
-    + '<p><span>Caffè al banco</span><span>2</span><span>1,20 €</span></p><p>10 m<sup>2</sup>, <b>12</b>,50 euro</p></body></html>');
+    + '<p><span>Caffè al banco</span><span>2</span><span>1,20 €</span></p><p>10 m<sup>2</sup>, <b>12</b>,50 euro</p>'
+    + '<p>10<sup>6</sup> token a 12,50<sup>1</sup> euro, H<sub>2</sub>O, il 2<sup>nd</sup> posto</p></body></html>');
   assert.ok(r.testo.includes('Lunedì 7:30 19:30'), r.testo);
   assert.ok(r.testo.includes('Caffè al banco 2 1,20 €'), r.testo);
-  assert.ok(r.testo.includes('10 m2, 12,50 euro'), 'l\'apice e il grassetto dentro un numero restano attaccati');
+  assert.ok(r.testo.includes('10 m², 12,50 euro'), 'il grassetto dentro un numero resta attaccato');
+  assert.ok(r.testo.includes('10⁶ token a 12,50¹ euro, H₂O, il 2nd posto'), r.testo);
 });
 
 test('un riquadro incorporato lascia al modello dove leggerlo; un pixel di tracciamento no', () => {

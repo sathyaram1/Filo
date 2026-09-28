@@ -276,7 +276,8 @@ async function apriInSecondoPiano(app, url, arrivo = url) {
   await app.evaluate((_e, url) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url, background: true }), url);
   await expect.poll(() => app.evaluate(({ BrowserWindow }, arrivo) => BrowserWindow.getAllWindows()
     .some((w) => w._filoTabs && w._filoTabs.tabs.some((t) => t.view.webContents.getURL() === arrivo && !t.view.webContents.isLoading())), arrivo),
-  { timeout: 10_000 }).toBe(true);
+  // Una pagina da 160 mila elementi, qui dentro, ci mette anche tredici secondi a caricarsi.
+  { timeout: 30_000 }).toBe(true);
 }
 const leggi = (app, azione) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), azione);
 

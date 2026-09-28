@@ -491,6 +491,10 @@ function scriviTabella(nodo, w, ctx) {
 
 const pulisci = (s, max) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, max);
 
+// Apici e pedici scritti coi loro caratteri: «10<sup>6</sup>» letto di fila diventerebbe 106, un numero che non esiste.
+const APICI = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', '+': '⁺', '-': '⁻', '=': '⁼', '(': '⁽', ')': '⁾' };
+const PEDICI = { 0: '₀', 1: '₁', 2: '₂', 3: '₃', 4: '₄', 5: '₅', 6: '₆', 7: '₇', 8: '₈', 9: '₉', '+': '₊', '-': '₋', '=': '₌', '(': '₍', ')': '₎' };
+
 function scrivi(nodo, w, ctx) {
   if (typeof nodo === 'string') { w.inline(nodo.replace(/\s+/g, ' ')); return; }
   // L'apice e il pedice stanno attaccati per davvero: m², 10⁶.
@@ -574,6 +578,12 @@ function scriviElemento(nodo, w, ctx) {
       return;
     }
     case 'button': w.inline(' '); figli(sotto); w.inline(' '); return;
+    case 'sup': case 'sub': {
+      const t = inlineDi(nodo.children, sotto);
+      const mappa = tag === 'sup' ? APICI : PEDICI;
+      w.inline(/^[0-9+\-=()]+$/.test(t) ? [...t].map((c) => mappa[c]).join('') : t);
+      return;
+    }
     // Quello che la pagina mostra preso da un altro indirizzo (il menù in PDF, un foglio, un calendario): il testo qui
     // non c'è, e il modello deve sapere che esiste e da dove leggerlo. Un pixel di tracciamento non conta.
     case 'iframe': case 'frame': case 'embed': case 'object': {
