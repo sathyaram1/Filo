@@ -146,7 +146,7 @@ test('utente nuovo: riscatta dalla pagina Crediti con la home aperta', async ({ 
     .not.toMatch(/codice d.invito|riscatta l.invito/i);
   await home.waitForTimeout(8000);
   console.log('[UTENTE NUOVO] home aperta dopo il riscatto:', JSON.stringify(await stato_home(home)));
-  const nuova = await openTab('filo://newtab/');
+  const nuova = await nuovaHome(app, shell);
   await nuova.waitForTimeout(8000);
   console.log('[UTENTE NUOVO] scheda nuova dopo il riscatto:', JSON.stringify(await stato_home(nuova)));
   // Chi arriva ora ha un modello: l'accoglienza parte anche nella home rimasta aperta.
