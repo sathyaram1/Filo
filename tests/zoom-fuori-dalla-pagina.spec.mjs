@@ -484,3 +484,75 @@ test('il riquadro dello zoom non vela la pagina su un sito che dà uno sfondo ai
     await expect(page.locator('#__filo-zoom-badge')).toHaveCount(0);
   }
 });
+
+// Il riquadro con la percentuale sta nel documento, ma la pagina non ne decide
+// il fuoco, il posto in cima né lo stile del testo (#686.1 giro 7).
+const INPUT_CHE_PRENDE_IL_FUOCO = `<!doctype html><html><body style="margin:0"><input id="i">
+  <script>addEventListener('message', () => document.getElementById('i').focus());</script></body></html>`;
+const SITO_CHE_RUBA_IL_FUOCO = (src) => `<!doctype html><html><body style="height:4000px"><h1>un sito</h1>
+  <iframe id="f" src="${src}" style="width:300px;height:80px"></iframe><script>
+  addEventListener('focusin', (e) => {
+    if (e.target.id !== '__filo-zoom-percent') return;
+    setTimeout(() => { const f = document.getElementById('f'); f.contentWindow.focus(); f.contentWindow.postMessage('fuoco', '*'); }, 0);
+  }, true);
+  </script></body></html>`;
+// Un riquadro di un altro sito il fuoco non se lo prende senza un gesto: lì Chromium basta.
+for (const [nome, tastiDelSistema] of [
+  ['', true],
+  [', coi tasti consegnati al riquadro', false],
+]) {
+  test(`il sito porta il fuoco in un suo riquadro mentre si batte il numero${nome}: vale il numero battuto`, async ({ app, openTab, testServer }) => {
+    const src = testServer.html(INPUT_CHE_PRENDE_IL_FUOCO);
+    const page = await testServer.openReady(openTab, SITO_CHE_RUBA_IL_FUOCO(src));
+    await page.waitForTimeout(800);
+    await manda(app, page, clicIn(600, 400, 'middle'));
+    await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+    if (tastiDelSistema) {
+      await clicSulNumeroE(app, page, 150);
+    } else {
+      await page.locator('#__filo-zoom-percent').click();
+      await page.waitForTimeout(300);
+      await page.keyboard.type('150');
+      await page.keyboard.press('Enter');
+      await expect.poll(async () => percentOf(app, page)).toBe(150);
+    }
+    const riquadro = page.frames().find((f) => f !== page.mainFrame());
+    expect(await riquadro.evaluate(() => document.getElementById('i').value), 'le cifre finiscono nel campo del sito').toBe('');
+  });
+}
+
+test('una notifica del sito che arriva col riquadro aperto non lo copre, e il numero battuto vale', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="height:4000px"><h1>sito con notifiche</h1>
+    <div id="t" popover="manual" style="position:fixed;inset:auto;top:8px;right:8px;margin:0;width:320px;padding:16px;background:#335;color:#fff">Nuovo messaggio</div></body></html>`);
+  await manda(app, page, clicIn(600, 500, 'middle'));
+  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+  // Nessun gesto dopo la notifica: il riquadro torna sopra da solo.
+  await page.evaluate(() => document.getElementById('t').showPopover());
+  await expect.poll(() => page.evaluate(() => {
+    const b = document.getElementById('__filo-zoom-badge');
+    const r = b.getBoundingClientRect();
+    const sopra = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !!(sopra && b.contains(sopra));
+  }), { message: 'al posto del riquadro si vede la notifica del sito', timeout: 2000 }).toBe(true);
+  await clicSulNumeroE(app, page, 130);
+});
+
+for (const [nome, regola, dialogo] of [
+  ['dentro un dialogo modale', 'dialog', true],
+  ['sotto la radice della pagina', 'html', false],
+]) {
+  test(`il riquadro non prende lo stile del testo del sito ${nome}`, async ({ openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, `<!doctype html><html><head><style>
+      ${regola} { text-transform: uppercase; letter-spacing: 3px; text-shadow: 0 0 2px red; }
+    </style></head><body style="height:4000px"><h1>sito</h1>${dialogo ? '<dialog id="d"><p>Accetti i cookie?</p><button>Sì</button></dialog><script>document.getElementById("d").showModal();</script>' : ''}</body></html>`);
+    await page.mouse.click(600, 700, { button: 'middle' });
+    await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+    const stile = (sel) => page.evaluate((s) => {
+      const c = getComputedStyle(document.querySelector(s));
+      return `${c.textTransform} ${c.letterSpacing} ${c.textShadow}`;
+    }, sel);
+    expect(await stile('#__filo-zoom-badge')).toBe('none normal none');
+    expect(await stile('#__filo-zoom-percent')).toBe('none normal none');
+    await page.screenshot({ path: `tests/.shots/zoom-riquadro-stile-${regola}.png` });
+  });
+}

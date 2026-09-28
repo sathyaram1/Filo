@@ -31,9 +31,18 @@ function installZoom(wc) {
       return;
     }
     const key = String(input.key || '');
-    if (key === 'Enter' || key === 'Tab' || key === 'Escape') campo = false;
+    if (key === 'Enter' || key === 'Tab' || key === 'Escape') statoCampo(false);
     try { wc.send('filo:zoom-campo-tasto', { key }); } catch (_) {}
   });
+  const riquadri = () => {
+    try { return wc.mainFrame.framesInSubtree.filter((f) => f !== wc.mainFrame); }
+    catch (_) { return []; }
+  };
+  // Anche i riquadri lo sanno: un tasto che arriva comunque a loro va al campo.
+  function statoCampo(aperto) {
+    campo = aperto === true;
+    for (const f of riquadri()) { try { f.send('filo:zoom-campo-stato', campo); } catch (_) {} }
+  }
   const chiudiCampo = () => { campo = false; };
   wc.on('did-start-navigation', (_e, _url, inPagina, principale) => { if (principale && !inPagina) chiudiCampo(); });
   wc.on('render-process-gone', chiudiCampo);
@@ -51,10 +60,6 @@ function installZoom(wc) {
 
   if (!wc.ipc || typeof wc.ipc.on !== 'function') return;
   let modalita = false;
-  const riquadri = () => {
-    try { return wc.mainFrame.framesInSubtree.filter((f) => f !== wc.mainFrame); }
-    catch (_) { return []; }
-  };
   const principale = (e) => { try { return e.senderFrame === wc.mainFrame; } catch (_) { return false; } };
 
   // La modalità rotella la tiene il frame principale; i riquadri devono saperla
@@ -66,11 +71,12 @@ function installZoom(wc) {
   });
   // Il campo si apre solo con un clic vero nel frame principale, e lì si chiude.
   wc.ipc.on('filo:zoom-campo', (e, aperto) => {
-    if (principale(e)) campo = aperto === true;
+    if (principale(e)) statoCampo(aperto === true);
   });
   wc.ipc.on('filo:zoom-ciao', (e) => {
     if (principale(e) || !e.senderFrame) return;
     try { e.senderFrame.send('filo:zoom-modalita', modalita); } catch (_) {}
+    try { e.senderFrame.send('filo:zoom-campo-stato', campo); } catch (_) {}
   });
   wc.ipc.on('filo:zoom-gesto', (e, g) => {
     if (principale(e)) return;

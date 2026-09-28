@@ -662,6 +662,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     else if (gesto.tipo === 'rotella') { if (zoomMode) passoModalita(gesto.dy); }
     else if (gesto.tipo === 'ctrl') { if (pageZoom && !zoomMode && !pageHandlesZoom()) ctrlRotella(gesto.dy); }
     else if (gesto.tipo === 'reset') eseguiZoom({ verso: 'reset' });
+    else if (gesto.tipo === 'tasto') battiNelCampo(gesto.key);
   });
 };
 
@@ -671,11 +672,13 @@ module.exports.riquadro = function setupRiquadro(webFrame, opts) {
   const ipc = (opts && opts.ipcRenderer) || null;
   if (!ipc || typeof ipc.send !== 'function' || typeof document === 'undefined') return;
   let modalita = false;
+  let campoAperto = false;
   let suppressContextMenu = false;
   const manda = (g) => { try { ipc.send('filo:zoom-gesto', g); } catch (_) {} };
 
   try {
     ipc.on('filo:zoom-modalita', (_e, on) => { modalita = on === true; });
+    ipc.on('filo:zoom-campo-stato', (_e, on) => { campoAperto = on === true; });
     ipc.send('filo:zoom-ciao');
   } catch (_) {}
 
@@ -728,8 +731,21 @@ module.exports.riquadro = function setupRiquadro(webFrame, opts) {
     manda({ tipo: 'ctrl', dy: e.deltaY });
   }
 
+  // Col campo della percentuale aperto il tasto è del campo, anche se il fuoco
+  // l'ha portato qui il sito (#686.1 giro 7); di solito lo prende già il main.
   function onKeyDown(e) {
-    if (!gestoVero(e) || !modalita) return;
+    if (!gestoVero(e)) return;
+    if (campoAperto) {
+      if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'v') return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const key = String(e.key || '');
+      if (key === 'Enter' || key === 'Tab' || key === 'Escape') campoAperto = false;
+      manda({ tipo: 'tasto', key });
+      return;
+    }
+    if (!modalita) return;
     e.preventDefault();
     e.stopPropagation();
     modalita = false;

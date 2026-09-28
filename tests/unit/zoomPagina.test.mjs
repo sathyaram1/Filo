@@ -230,3 +230,29 @@ test('ogni scheda e ogni finestra di login passano i tasti dello zoom dal main',
   // Un gesto di un riquadro vale solo se viene da un riquadro, e solo in forma nota.
   assert.match(zoom, /'filo:zoom-gesto'[\s\S]{0,120}principale\(e\)[\s\S]{0,80}gestoValido/);
 });
+
+test('col campo aperto i tasti li prende il main: le cifre e i tasti del campo sì, le scorciatoie no', () => {
+  for (const key of ['1', '0', 'Backspace', 'Delete', 'Enter', 'Tab', 'Escape', 'a', 'ArrowLeft']) {
+    assert.equal(Z.tastoPerCampo({ key }), 'tasto', key);
+  }
+  assert.equal(Z.tastoPerCampo({ key: 'v', control: true }), 'incolla');
+  assert.equal(Z.tastoPerCampo({ key: 'V', meta: true }), 'incolla', 'Cmd+V su Mac');
+  for (const t of [{ key: 't', control: true }, { key: 'Tab', control: true }, { key: '1', alt: true }, { key: 'v', control: true, alt: true }, { key: 'F5' }, { key: 'F11' }, { key: '' }, {}]) {
+    assert.equal(Z.tastoPerCampo(t), null, JSON.stringify(t));
+  }
+});
+
+test('un riquadro passa al campo un tasto solo in forma nota', () => {
+  assert.deepEqual(Z.gestoValido({ tipo: 'tasto', key: '5', altro: 1 }), { tipo: 'tasto', key: '5' });
+  for (const g of [{ tipo: 'tasto' }, { tipo: 'tasto', key: 5 }, { tipo: 'tasto', key: '' }, { tipo: 'tasto', key: 'x'.repeat(21) }]) {
+    assert.equal(Z.gestoValido(g), null, JSON.stringify(g));
+  }
+});
+
+test('una pagina che si riscrive non spegne Filo: il preload si segna gli ascoltatori prima di metterne uno', () => {
+  const { readFileSync } = require('node:fs');
+  const preload = readFileSync(join(__dirname, '..', '..', 'src', 'preload', 'page-preload.js'), 'utf8');
+  const installa = preload.indexOf("require('./riscrittura.js')");
+  assert.ok(installa > 0, 'il preload non installa la regola della riscrittura');
+  assert.ok(installa < preload.indexOf('addEventListener('), 'un ascoltatore messo prima della regola sparisce alla riscrittura');
+});

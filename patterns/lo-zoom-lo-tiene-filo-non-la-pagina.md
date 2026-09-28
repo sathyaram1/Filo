@@ -14,7 +14,8 @@ dove il sito non arriva, o ci arriva solo per chiedere:
   si ascoltano nel preload: solo eventi `isTrusted`, sulla finestra in cattura
   (prima degli script della pagina), e **rimessi** quando il documento cambia
   radice, perché `document.open` cancella gli ascoltatori della finestra
-  insieme ai suoi. Quello che arriva comunque a Chromium senza che nessuno
+  insieme ai suoi (la stessa regola, per tutto Filo:
+  [Un documento riscritto non spegne Filo](un-documento-riscritto-non-spegne-filo.md)). Quello che arriva comunque a Chromium senza che nessuno
   l'abbia preso esce da `zoom-changed`, e il main lo gira al preload su un
   canale suo (`filo:zoom-rotella`). Chromium lo segnala anche quando il preload
   l'ha già preso, e a volte due volte nello stesso istante: il preload lo scarta
@@ -39,7 +40,10 @@ dove il sito non arriva, o ci arriva solo per chiedere:
   campo, mai il `value` che ha nel documento: il sito lo scrive anche col
   comando di inserimento testo del browser, che conta come battuto. Si applica
   su Invio, Tab o un clic fuori; un'uscita dal campo (blur) non applica niente,
-  perché la può fare anche il sito a metà numero.
+  perché la può fare anche il sito a metà numero. Mentre il campo è aperto i
+  tasti li prende il main prima di qualunque frame (`filo:zoom-campo`), e uno che
+  arriva comunque a un riquadro incorporato viene girato al campo: il sito può
+  portare il fuoco anche dentro un suo riquadro (#686.1 giro 7).
 - **Il riquadro con la percentuale** sta nello strato superiore del documento
   (popover), non nel corpo: sopra i frame di un frameset, un dialogo modale e il
   tutto schermo. Col dialogo modale aperto sta dentro il dialogo, perché il
@@ -52,6 +56,11 @@ dove il sito non arriva, o ci arriva solo per chiedere:
   aperto dopo il riquadro); le cifre le prende comunque la finestra. Lo sfondo
   che il sito dà a ogni livello in primo piano (`::backdrop`) lo spegne una
   regola dell'utente con `!important`, che vince su quelle del sito (#686.1 giro 6).
+  Lo stile del testo del sito non lo raggiunge: `all: initial` in testa ai suoi
+  stili, anche dentro il dialogo. Nello strato superiore vince l'ultimo arrivato,
+  quindi mentre è aperto una guardia ogni 250 ms controlla che al suo posto si
+  veda lui, e lo rimette in cima se una notifica del sito gli è arrivata sopra
+  (#686.1 giro 7).
 
 **Il caso.** #686 aveva chiuso tre porte una dopo l'altra (eventi finti, il
 marcatore «mi zoomo da solo» scritto dal sito, ascoltatori zittiti dal sito
@@ -70,6 +79,7 @@ prende pizzico e clic centrale. Il main non può supplire: in Electron 33
 colpo di rotella con Ctrl lo recupera `zoom-changed`, i tasti restano
 all'utente comunque. Il riquadro con la percentuale sta ancora nel documento:
 un sito che lo cerca apposta può nasconderlo o toglierlo, non cambiare il numero
-che viene applicato.
+che viene applicato né prenderne i tasti. Toglierlo del tutto dalla pagina vuol
+dire una vista di Filo sopra la scheda: è una scelta dell'owner.
 
-Prove: `tests/zoom-fuori-dalla-pagina.spec.mjs` (con i riquadri riempiti dalla pagina, il frameset, l'SVG, il dialogo modale anche dentro un componente e lo sfondo dei livelli in primo piano), `tests/unit/zoomPagina.test.mjs`.
+Prove: `tests/zoom-fuori-dalla-pagina.spec.mjs` (con i riquadri riempiti dalla pagina, il frameset, l'SVG, il dialogo modale anche dentro un componente, lo sfondo dei livelli in primo piano, il fuoco portato in un riquadro, la notifica arrivata dopo e lo stile del testo), `tests/unit/zoomPagina.test.mjs`.

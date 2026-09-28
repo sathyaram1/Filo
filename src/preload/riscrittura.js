@@ -21,7 +21,9 @@ module.exports = function tieniFiloNellaRiscrittura() {
 
   proto.addEventListener = function (tipo, fn, o) {
     if (!nostro(this) || typeof fn !== 'function') return aggiungi.call(this, tipo, fn, o);
-    if (trova(this, tipo, fn, o) >= 0) return undefined;
+    // Già segnato: lo si rimette com'era (la riscrittura può averlo appena cancellato).
+    const gia = trova(this, tipo, fn, o);
+    if (gia >= 0) return aggiungi.call(this, tipo, segnati[gia].chiama, o);
     const s = { t: this, tipo, fn, o, cattura: cattura(o), chiama: fn };
     // Un ascoltatore «una volta» già scattato non si rimette.
     if (o && typeof o === 'object' && o.once) {
@@ -81,9 +83,7 @@ module.exports = function tieniFiloNellaRiscrittura() {
   } catch (_) {}
 
   return {
-    // Chi ha messo qualcosa nel documento vecchio (i fogli di stile) lo rimette qui.
+    // Chi aveva messo qualcosa nel documento vecchio (i fogli di stile) lo rimette qui.
     allaRiscrittura(fn) { if (typeof fn === 'function') dopo.push(fn); },
-    // Per aspettare un evento senza segnarlo: serve a chi rimette.
-    aggiungiSenzaSegno: (t, tipo, fn, o) => aggiungi.call(t, tipo, fn, o),
   };
 };

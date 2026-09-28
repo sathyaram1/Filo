@@ -16,6 +16,10 @@
 const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
 
+// Prima di ogni ascoltatore: una pagina che si riscrive non spegne Filo (#686.1).
+let riscrittura = null;
+try { riscrittura = require('./riscrittura.js')(); } catch (e) { console.error('[Filo CS] riscrittura', e); }
+
 // ─── #405 — riquadri incorporati (iframe) ───────────────────────────────────
 //
 // Da quando la scheda usa nodeIntegrationInSubFrames, questo preload gira in
@@ -366,15 +370,26 @@ const STYLES = [
   'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css',
 ];
 
+let stiliMessi = false;
 function injectStyles() {
   // Skip se il documento non è una pagina (es. about:blank, data:, view-source).
   if (!document.head) return;
+  stiliMessi = true;
   for (const f of STYLES) {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'filo://style/' + f;
     document.head.appendChild(link);
   }
+}
+
+// La testa del documento riscritto è nuova: i fogli di Filo vanno rimessi.
+if (riscrittura) {
+  riscrittura.allaRiscrittura(() => {
+    if (!stiliMessi) return;
+    if (document.head) injectStyles();
+    else document.addEventListener('DOMContentLoaded', injectStyles, { once: true });
+  });
 }
 
 const SHARED_DIR = path.join(__dirname, '..', 'shared');

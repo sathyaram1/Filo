@@ -95,9 +95,14 @@
 
   // Un riquadro incorporato non zooma da sé: passa il gesto al frame
   // principale attraverso il main, che lo lascia passare solo in questa forma.
-  const GESTI = ['medio', 'rotella', 'ctrl', 'esci', 'reset'];
+  // `tasto` è una cifra per il campo aperto nel frame principale.
+  const GESTI = ['medio', 'rotella', 'ctrl', 'esci', 'reset', 'tasto'];
   function gestoValido(g) {
     if (!g || typeof g !== 'object' || !GESTI.includes(g.tipo)) return null;
+    if (g.tipo === 'tasto') {
+      const key = typeof g.key === 'string' ? g.key : '';
+      return key && key.length <= 20 ? { tipo: 'tasto', key } : null;
+    }
     if (g.tipo !== 'rotella' && g.tipo !== 'ctrl') return { tipo: g.tipo };
     const dy = Number(g.dy);
     if (!Number.isFinite(dy) || dy === 0) return null;
