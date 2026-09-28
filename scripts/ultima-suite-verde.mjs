@@ -40,6 +40,17 @@ export function scegliUltimoVerde(runs, primoGenitore) {
 }
 
 /**
+ * Il verde si pubblica solo se è DOPO l'ultima versione: uno uguale non ha niente
+ * di nuovo, uno più vecchio ripubblicherebbe codice vecchio sotto un numero nuovo.
+ * `eAntenato(a, b)` dice se a sta nella storia di b. PURA (con la domanda iniettata).
+ */
+export function verdePiuNuovoDelTag(verde, tagSha, eAntenato) {
+  if (!verde) return false;
+  if (!tagSha) return true;
+  return verde !== tagSha && Boolean(eAntenato(tagSha, verde));
+}
+
+/**
  * Pubblicazione ferma: l'ultima versione ha più di `soglia` ore, su main c'è
  * codice nuovo dopo di lei e nessun commit più nuovo ha la suite verde. PURA.
  */
