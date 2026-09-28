@@ -141,6 +141,31 @@ test('la correzione consegna il report E la frase (non solo il report)', async (
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
 });
 
+test('un report a elenco puntato arriva intero anche dalla correzione, come dal canale', async () => {
+  const PUNTI = '- Corretto il pulsante che non salvava col titolo vuoto.\n- Lasciato stare il resto, che era già a posto.';
+  const { srv, ricevuti, port } = await fintoServer();
+  const casa = depositoSulRamo();
+  try {
+    mkdirSync(resolve(casa, 'stato'), { recursive: true });
+    writeFileSync(resolve(casa, 'stato', 'fid-900.json'), JSON.stringify({
+      id: 'fid-900', branch: 'worker/900', loopCount: 1, verifierVerdict: 'fail',
+    }), 'utf8');
+    const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-900', PUNTI, '--frase', 'Ora il pulsante salva.'], {
+      FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+      FILO_REPO_ROOT: casa,
+      FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'),
+      FILO_ROUTINES_ENABLED: '1',
+      FILO_ROUTINE_TICKET: 'biglietto-di-prova',
+      FILO_NO_BEAT: '1',
+    });
+    assert.doesNotMatch(r.se, /Argomento non capito/, 'un elenco puntato non è un\'opzione');
+    const consegna = ricevuti.find((x) => x.url.includes('routineDeliver'));
+    assert.ok(consegna, `la correzione deve arrivare al server (uscita ${r.code}, stderr: ${r.se})`);
+    assert.equal(consegna.body.data?.report, PUNTI);
+    assert.equal(consegna.body.data?.userNote, 'Ora il pulsante salva.');
+  } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
+});
+
 test('a chi ha segnalato arriva la frase, mai il report cifrato', () => {
   const letto = THREAD.explanationForReporter({
     userNote: 'Ora puoi incollare un’immagine direttamente nella chat.',
