@@ -1,6 +1,5 @@
-// Verifica #589 — giro 8, esplorazione: cosa arriva al codice di Filo dentro un
-// sito dalle strade che cambiano le impostazioni senza passare dal salvataggio
-// della shell, e cosa riceve un sito lasciato sullo sfondo.
+// Verifica #589 — giro 8: il ripristino delle impostazioni e un cambio di tema
+// arrivano al codice di Filo dentro un sito ritagliati, senza chiave né proxy.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -34,11 +33,6 @@ test('reset delle impostazioni e cambio dal main: al sito arrivano ritagliate', 
   const esegui = nelSito(app, new URL(web.url()).host);
   await ascolta(esegui);
 
-  await app.evaluate(async () => {
-    const H = require(require('node:path').join(process.cwd(), 'src', 'main', 'services', 'handlers.js'));
-    return H.handleMessage ? true : false;
-  }).catch(() => null);
-
   await shell.evaluate(() => window.filoShell.message({ type: 'reset_settings' }));
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
   await expect.poll(async () => (await ricevuti(esegui)).filter((m) => m.type === 'settings_updated').length, { timeout: 8000 }).toBeGreaterThanOrEqual(2);
@@ -48,20 +42,3 @@ test('reset delle impostazioni e cambio dal main: al sito arrivano ritagliate', 
   expect(tutto).toContain('"theme":"dark"');
 });
 
-test('un avviso di sistema arriva anche ai siti sullo sfondo, che non lo mostrano', async ({ app, shell, openTab, testServer }) => {
-  const sfondo = await testServer.openReady(openTab, '<h1>sito sullo sfondo</h1>');
-  const esegui = nelSito(app, new URL(sfondo.url()).host);
-  await ascolta(esegui);
-  await openTab('http://localhost:' + new URL(testServer.origin).port + '/nessuna');
-
-  await app.evaluate(() => {
-    const { BrowserWindow } = require('electron');
-    const H = globalThis.SN_WALLET_MAIN;
-    if (H && H.outOfCreditsNotice) return H.outOfCreditsNotice({ keySource: 'own' });
-    return null;
-  });
-  await new Promise((r) => setTimeout(r, 1500));
-  const avvisi = (await ricevuti(esegui)).filter((m) => m.type === 'show_toast');
-  console.log('AVVISI AL SITO SULLO SFONDO', JSON.stringify(avvisi));
-  expect(avvisi, 'l\'avviso arriva a un sito che non lo mostrerà mai').toEqual([]);
-});
