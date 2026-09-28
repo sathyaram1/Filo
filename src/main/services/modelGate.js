@@ -10,7 +10,7 @@
   // Le chiamate che fanno lavorare un modello, e quindi costano.
   const PAID = new Set(['complete', 'streamComplete', 'synthesizeSpeech', 'transcribe', 'embed']);
 
-  // Il limite scatta prima di voce e dettatura come prima della chat: con le chiavi condivise di fabbrica paga l'owner.
+  // Il router rende leggibile una generazione qualche secondo dopo: tre tentativi, poi si lascia perdere.
   const AUDIT_DELAYS_MS = [4000, 10000, 25000];
 
   function codeError(message, code) {
