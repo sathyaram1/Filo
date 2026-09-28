@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import {
-  fileDellErrore, chiaviSenzaCasi, chiaviDelVerdetto, verdetto, CHIAVE_NON_PARTITA,
+  fileDellErrore, chiaviSenzaCasi, chiaviDelVerdetto, verdetto, CHIAVE_NON_PARTITA, ultimoTestDelWorker,
 } from '../../scripts/suite-verdict.mjs';
 
 const VERDETTO = fileURLToPath(new URL('../../scripts/suite-verdict.mjs', import.meta.url));
