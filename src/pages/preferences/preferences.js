@@ -1221,7 +1221,9 @@
     $('agentStyleText').addEventListener('change', () => {
       const leggibile = currentStyleText();
       if ($('agentStyleText').value.trim() !== leggibile) $('agentStyleText').value = leggibile;
+      mostraTuttoLoStile();
     });
+    window.addEventListener('resize', mostraTuttoLoStile);
 
     // Token estetici: reset globale ai predefiniti.
     $('resetAllTokens').addEventListener('click', resetAllTokens);
