@@ -104,7 +104,6 @@ import { isProtectedBranch, headSha } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
 import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticket.mjs';
-import { looksLikeTicket } from './lib/routine-ticket.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -834,7 +833,11 @@ export function bigliettoAMano(cmd, args, dato) {
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
-  const [cmd, ...rest] = process.argv.slice(2);
+  const [cmd, ...tutti] = process.argv.slice(2);
+  // Il biglietto a mano si toglie per primo, con la stessa regola delle registrazioni (#587).
+  const mano = leggiBigliettoAMano(tutti);
+  if (mano.errore) { console.error(`${mano.errore} Non ho fatto niente.`); process.exit(1); }
+  const rest = mano.args;
   // Un passaggio solo: i `--campo valore` diventano dati dell'intento, il resto
   // sono posizionali. Così l'ordine fra flag e posizionali non conta, e un
   // valore che assomiglia a un comando non viene scambiato per tale.
