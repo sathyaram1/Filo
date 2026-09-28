@@ -32,6 +32,19 @@ export function ticketFile(root) {
   return resolve(root, '.claude', 'routine-ticket.json');
 }
 
+/**
+ * Questo valore ha la FORMA di un biglietto? PURA.
+ *
+ * Il server lo genera in base64url (43 caratteri), e un biglietto vero può
+ * cominciare con un trattino singolo (~1 su 64): si valida la forma, non il
+ * primo carattere. Ogni flag cade fuori: i `--…` per il doppio trattino, `-h`
+ * per la lunghezza. Serve a dispatch e al canale, che la regola la chiedono qui.
+ */
+export function looksLikeTicket(v) {
+  const s = String(v || '');
+  return /^[A-Za-z0-9_-]{16,}$/.test(s) && !s.startsWith('--');
+}
+
 /** Il marcatore è ancora credibile? PURA. */
 export function isFresh(marker, nowMs = Date.now(), maxAgeMs = MAX_AGE_MS) {
   if (!marker || typeof marker.ticket !== 'string' || !marker.ticket) return false;
