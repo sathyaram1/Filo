@@ -142,7 +142,8 @@ test('Apri comunque premuto tre volte', async ({ app, shell, openTab, testServer
   console.log('TRE CLIC tabs=', (await tabUrls(app)).map((t) => t.url));
 });
 
-test('indirizzo senza schema dal modello verso un sito libero', async ({ app }) => {
+test('indirizzo senza schema dal modello verso un sito libero', async ({ app, shell }) => {
+  await shell.waitForTimeout(1500);
   const out = await app.evaluate(async ({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const id = w._filoTabs.openTab('libero.test/pagina', { activate: true });
@@ -160,7 +161,10 @@ test('Preferenze: riga scritta e poi si cambia scheda', async ({ app, shell, ope
   await page.keyboard.type('blocked.test');
   // l'utente passa a un'altra scheda
   const altro = testServer.html('<h1>altro</h1>');
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), altro);
+  await page.waitForTimeout(300);
+  const tabsInBar = shell.locator('.tab');
+  console.log('schede nella barra', await tabsInBar.count());
+  await tabsInBar.first().click();
   await page.waitForTimeout(1500);
   const saved = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security?.siteBlock?.blacklist || []);
   console.log('PREFERENZE salvato dopo cambio scheda =', saved);
