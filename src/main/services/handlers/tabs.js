@@ -27,6 +27,12 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // Arriva dai content script di Filo, che la pagina non può chiamare: vale solo per la scheda che l'ha mandato.
+  on(MSG.PERMESSO_FILO, async (msg, sender) => {
+    if (!sender || !sender.tab || !sender.wc) return { ok: false };
+    return { ok: require('../permessiPagine').lasciapassare(sender.wc, msg && msg.tipo) };
+  });
+
   on(MSG.TAB_IN_VISTA_GET, async (msg, sender) => {
     const win = winOf(sender);
     const tabs = win && win._filoTabs;
