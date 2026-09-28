@@ -197,6 +197,45 @@ test('primo avvio con un invito in attesa', async ({ app }) => {
   console.log('[PENDING] home:', JSON.stringify(await stato_home(home)));
 });
 
+test('primo avvio: l’invito in attesa arriva quando la home è già su «serve un codice»', async ({ app, shell }) => {
+  test.setTimeout(150_000);
+  stato.pendingCode = 'ABCDEFGH';
+  stato.trattieni = true;
+  await prepara(app);
+  const home = await homePage(app);
+  await expect(home.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 30_000 });
+  await expect.poll(() => stato.trattenute.length, { timeout: 30_000 }).toBeGreaterThan(0);
+  stato.trattieni = false;
+  for (const r of stato.trattenute.splice(0)) r();
+  await expect.poll(() => stato.redeemed, { timeout: 20_000 }).toBe(true);
+  await expect.poll(async () => (await stato_home(home)).msg + (await stato_home(home)).sugg, { timeout: 25_000 })
+    .not.toMatch(/codice d.invito|riscatta l.invito/i);
+  await home.waitForTimeout(8000);
+  console.log('[PENDING TARDIVO] home aperta:', JSON.stringify(await stato_home(home)));
+  const nuova = await nuovaHome(app, shell);
+  await nuova.waitForTimeout(8000);
+  console.log('[PENDING TARDIVO] scheda nuova:', JSON.stringify(await stato_home(nuova)));
+  await expect(home.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 5_000 });
+});
+
+test('identità annullata con la home aperta: torna a chiedere l’invito', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  await prepara(app);
+  await onboardingFatto(app);
+  const home = await homePage(app);
+  await home.reload();
+  await riscattaDaCrediti(openTab);
+  await expect(home.locator('#homeMessage')).toContainText('HOME-DAL-MODELLO', { timeout: 30_000 });
+  const cr = { tab: { id: 6, url: 'filo://credits/credits.html' }, url: 'filo://credits/credits.html' };
+  stato.redeemed = false;
+  await app.evaluate(async (_, s) => globalThis.SN_HANDLE_MESSAGE({ type: 'wallet_reset_identity' }, s), cr);
+  await expect(home.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 25_000 });
+  await riscattaDaCrediti(openTab);
+  await expect(home.locator('#homeMessage')).not.toContainText(/codice d.invito/i, { timeout: 25_000 });
+  await home.waitForTimeout(5000);
+  console.log('[RIENTRO] home dopo il secondo riscatto:', JSON.stringify(await stato_home(home)));
+});
+
 test('chiave propria messa e tolta, identità annullata: la home segue', async ({ app }) => {
   test.setTimeout(150_000);
   await prepara(app);
