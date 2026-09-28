@@ -273,11 +273,15 @@ describe('release.yml: si pubblica il commit più nuovo di main con la suite ver
 // dalle chiavi. Un allarme senza chiavi torna al vecchio «uno per mittente», che
 // ha buttato ogni allarme per tre settimane dietro a un feedback parcheggiato.
 describe('ogni allarme dice al server cosa è rotto', () => {
-  test('ogni chiamata a build-alarm.mjs nei workflow passa le sue chiavi', () => {
+  test('ogni passo che chiama build-alarm.mjs nei workflow passa le sue chiavi', () => {
+    let chiamate = 0;
     for (const [nome, testo] of [['release.yml', YML], ['suite.yml', SUITE_YML]]) {
-      const chiamate = senzaCommenti(testo).split('\n').filter((r) => /node scripts\/build-alarm\.mjs/.test(r));
-      for (const r of chiamate) assert.match(r, /--chiav/, `${nome}: «${r.trim().slice(0, 100)}» senza chiavi`);
+      for (const p of passi(senzaCommenti(testo)).filter((x) => /node scripts\/build-alarm\.mjs/.test(x.corpo))) {
+        chiamate += 1;
+        assert.match(p.corpo, /--chiav/, `${nome}: il passo «${p.nome}» apre un allarme senza chiavi`);
+      }
     }
+    assert.equal(chiamate, 2, 'le chiamate dirette sono due: il cancello unit e la suite rossa');
     assert.match(senzaCommenti(job('release')), /build-alarm\.mjs [^\n]*--chiavi-unit unit\.log/, 'il cancello unit dà una chiave per file di test');
   });
 
