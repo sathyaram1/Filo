@@ -22,9 +22,8 @@
   const Calc = global.SN_CALC;
   const resolveCalcMarkers = (text, opts) => (Calc ? Calc.resolveCalcMarkers(text, opts) : (text || ''));
 
-  // Renderer Markdown: delega alla sorgente unica SN_MARKDOWN (#418). Il
-  // risultato va in innerHTML e il testo del modello non è fidato: senza il
-  // modulo si mostra come testo, mai come HTML (#853).
+  // Il risultato va in innerHTML e il testo del modello non è fidato: senza
+  // SN_MARKDOWN (#418) si mostra come testo, mai come HTML (#853).
   const ESCAPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   function renderMarkdown(text) {
     const Md = global.SN_MARKDOWN;
