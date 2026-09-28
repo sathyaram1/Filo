@@ -314,7 +314,7 @@ test('riquadri vuoti creati o scritti dalla pagina leggono GPC come la pagina', 
   <iframe src="about:blank"></iframe>
   <iframe id="fuori" src="${testServer.origin.replace('127.0.0.1', 'localhost')}/nessuna"></iframe>
   <script>
-    __r.nellHtmlDaFrames = String(frames[2].navigator.globalPrivacyControl);
+    __r.nellHtml = String(document.querySelector('iframe[src="about:blank"]').contentWindow.navigator.globalPrivacyControl);
     __r.altroSitoRaggiungibile = typeof document.getElementById('fuori').contentWindow.postMessage;
   </script></body></html>`);
   const page = await openTab(url);
@@ -322,6 +322,6 @@ test('riquadri vuoti creati o scritti dalla pagina leggono GPC come la pagina', 
   expect(await page.evaluate(() => window.__r)).toEqual({
     pagina: 'true', daScript: 'true', annidato: 'true', daDocumento: 'true',
     getterNativo: 'function get contentWindow() { [native code] }',
-    nellHtmlDaFrames: 'true', altroSitoRaggiungibile: 'function',
+    nellHtml: 'true', altroSitoRaggiungibile: 'function',
   });
 });

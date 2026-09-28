@@ -185,16 +185,12 @@ function buildGpcSource() {
     return fn;
   }
   var leggiAttr = Element.prototype.getAttribute, haAttr = Element.prototype.hasAttribute;
-  // Toccare il mondo di un riquadro che sta per caricare un documento vero lo fa nascere prima del
-  // preload, e il documento vero erediterebbe quel mondo senza Filo: si toccano solo i riquadri vuoti.
+  // Un riquadro col suo documento il segnale lo riceve dal preload. Mai toccarlo in anticipo: il suo
+  // mondo nascerebbe prima del preload e il documento vero lo erediterebbe senza Filo.
   function vuoto(el) {
     if (haAttr.call(el, 'srcdoc')) return false;
     var s = leggiAttr.call(el, el.tagName === 'OBJECT' ? 'data' : 'src');
     return !s || /^\\s*about:blank\\s*$/i.test(s);
-  }
-  function tocca(el) {
-    var t = el.tagName;
-    if (t === 'IFRAME' || t === 'FRAME' || t === 'OBJECT') { try { void el.contentWindow; } catch (e) {} }
   }
   function installa(w) {
     var P;
@@ -218,30 +214,6 @@ function buildGpcSource() {
         Object.defineProperty(CP, prop, { get: g, set: d.set, enumerable: d.enumerable, configurable: true });
       });
     });
-    // Le cornici scritte nell'HTML si possono leggere da frames[i] senza passare dai getter.
-    try {
-      var doc = w.document;
-      var spazza = function () {
-        ['iframe', 'frame', 'object'].forEach(function (t) {
-          var l = doc.getElementsByTagName(t);
-          for (var i = 0; i < l.length; i++) tocca(l[i]);
-        });
-      };
-      if (doc.readyState !== 'loading') { spazza(); return; }
-      var mo = new w.MutationObserver(function (recs) {
-        for (var i = 0; i < recs.length; i++) {
-          var a = recs[i].addedNodes;
-          for (var j = 0; j < a.length; j++) {
-            var n = a[j];
-            if (n.nodeType !== 1) continue;
-            tocca(n);
-            if (n.firstElementChild) { var l = n.getElementsByTagName('iframe'); for (var k = 0; k < l.length; k++) tocca(l[k]); }
-          }
-        }
-      });
-      mo.observe(doc, { childList: true, subtree: true });
-      doc.addEventListener('DOMContentLoaded', function () { mo.disconnect(); spazza(); }, { once: true });
-    } catch (e) {}
   }
   try { installa(window); } catch (e) {}
 })();`;
