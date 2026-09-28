@@ -42,7 +42,7 @@ test.afterAll(async () => { try { server.closeAllConnections?.(); } catch (_) {}
 test.beforeEach(async () => {
   esiti.length = 0;
   userData = cartellaTemporanea('filo-test-esplora-');
-  app = await electron.launch({ args: [...argomentiScala, '.'], cwd: APP_ROOT, env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' } });
+  app = await electron.launch({ args: [...argomentiScala, '--use-fake-device-for-media-stream', '.'], cwd: APP_ROOT, env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' } });
   shell = await app.firstWindow();
   await shell.waitForLoadState('domcontentloaded');
 });
@@ -59,4 +59,54 @@ test('esplora', async () => {
   await new Promise((r) => setTimeout(r, 3000));
   const bar = await shell.evaluate(() => { const b = document.getElementById('permesso-bar'); return b && !b.hidden ? b.innerText : '(nessuna domanda)'; });
   console.log('ESITI', JSON.stringify(esiti, null, 1), 'BARRA', bar);
+});
+
+test('aspetto della domanda, chiaro e scuro, stretto', async () => {
+  test.setTimeout(60_000);
+  const mic = `<!doctype html><title>Riunione</title><script>navigator.mediaDevices.getUserMedia({audio:true,video:true}).catch(()=>{})</script>`;
+  server.removeAllListeners('request');
+  server.on('request', (req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(mic); });
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), origine + '/');
+  await expect(shell.locator('#permesso-bar')).toBeVisible({ timeout: 10_000 });
+  await new Promise((r) => setTimeout(r, 1300));
+  await shell.screenshot({ path: 'tests/.shots/giro19-permesso-chiaro.png' });
+  await shell.emulateMedia({ colorScheme: 'dark' });
+  await new Promise((r) => setTimeout(r, 300));
+  await shell.screenshot({ path: 'tests/.shots/giro19-permesso-scuro.png' });
+  await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); w.setSize(720, 500); });
+  await new Promise((r) => setTimeout(r, 600));
+  await shell.screenshot({ path: 'tests/.shots/giro19-permesso-stretto.png' });
+});
+
+test('nome del permesso', async () => {
+  test.setTimeout(60_000);
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), origine + '/');
+  await expect.poll(() => esiti.length, { timeout: 15_000 }).toBeGreaterThanOrEqual(4);
+  await app.evaluate(({ webContents }, o) => {
+    globalThis.__nomi = [];
+    const wc = webContents.getAllWebContents().find((w) => w.getURL().startsWith(o));
+    wc.session.setPermissionRequestHandler((_w, p, cb) => { globalThis.__nomi.push(p); cb(false); });
+  }, origine);
+  const pagina = app.windows().find((w) => w.url().startsWith(origine));
+  await pagina.click('#b');
+  await new Promise((r) => setTimeout(r, 1500));
+  console.log('NOMI', await app.evaluate(() => globalThis.__nomi));
+});
+
+test('incognito: la domanda compare nella sua cornice', async () => {
+  test.setTimeout(60_000);
+  const mic = `<!doctype html><title>Riunione</title><script>navigator.mediaDevices.getUserMedia({audio:true}).then(()=>fetch('/esito?m=ok'),(e)=>fetch('/esito?m=no:'+e.name))</script>`;
+  server.removeAllListeners('request');
+  server.on('request', (req, res) => { const u = new URL(req.url, 'http://x'); if (u.pathname === '/esito') { esiti.push(u.searchParams.get('m')); res.end('ok'); return; } res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(mic); });
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  let incog = null;
+  await expect.poll(() => { incog = app.windows().find((w) => w.url().includes('incognito=1')); return Boolean(incog); }, { timeout: 10_000 }).toBe(true);
+  await incog.waitForFunction(() => document.documentElement.dataset.incognito === '1', null, { timeout: 10000 });
+  await incog.evaluate((u) => window.filoShell.tabs.open(u), origine + '/');
+  await expect(incog.locator('#permesso-bar')).toBeVisible({ timeout: 10_000 });
+  await new Promise((r) => setTimeout(r, 1200));
+  await incog.screenshot({ path: 'tests/.shots/giro19-permesso-incognito.png' });
+  await incog.locator('#permesso-bar').getByRole('button', { name: 'Consenti', exact: true }).click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toContain('ok');
+  console.log('SHELL NORMALE BARRA', await shell.evaluate(() => { const b = document.getElementById('permesso-bar'); return b && !b.hidden; }));
 });
