@@ -59,8 +59,8 @@
 
   // In coda a un URL nudo si stacca solo ciò che chiude la frase o una
   // formattazione che questo renderer disegna (gli asterischi): ogni altro
-  // carattere da URL (_ ~ = / # …) resta nel link. Elenco chiuso, sentinella
-  // in tests/unit/filoMarkdown.test.mjs.
+  // carattere da URL (_ ~ = / # e gli altri) resta nel link. Elenco chiuso,
+  // sentinella in tests/unit/filoMarkdown.test.mjs.
   const STACCATI_IN_CODA = '.,;:!?…’*';
 
   // Una ) o ] in coda resta solo se chiude una ( o [ dell'URL
