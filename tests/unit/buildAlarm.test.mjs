@@ -68,9 +68,10 @@ test('le chiavi del cancello unit vengono dalle righe location: del registro, re
 });
 
 test('un registro senza file riconoscibili dà la chiave generica, mai nessuna', () => {
-  assert.deepEqual(chiaviDelRegistroUnit('', 'D:\a'), ['unit']);
+  assert.deepEqual(chiaviDelRegistroUnit('', String.raw`D:\a`), ['unit']);
   assert.deepEqual(chiaviDelRegistroUnit('not ok 1 - qualcosa\n# fail 1', ''), ['unit']);
-  assert.deepEqual(chiaviDelRegistroUnit("  location: 'C:\altrove\x.mjs:1:1'", 'D:\a'), ['unit'], 'un percorso assoluto fuori dal repo non è una chiave');
+  assert.deepEqual(chiaviDelRegistroUnit(String.raw`  location: 'C:\altrove\x.mjs:1:1'`, String.raw`D:\a`), ['unit'],
+    'un percorso assoluto fuori dal repo non è una chiave');
 });
 
 test('gli argomenti: titolo e testo, --chiave ripetibile, --chiavi-da, --chiavi-unit', () => {
