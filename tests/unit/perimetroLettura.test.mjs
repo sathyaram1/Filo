@@ -173,3 +173,32 @@ test('LEGGI_DOCUMENTO: stesso perimetro del terminale', () => {
   const a = { type: 'LEGGI_DOCUMENTO', percorso: '~/.aws/credentials', _perimetro: LINUX };
   assert.match(AL.describe(a), /Perché te lo chiedo/);
 });
+
+test('#587 giro 11 — scritture equivalenti del percorso non aggirano il perimetro', () => {
+  // bash `$'…'`/`$"…"`: il $ è prefisso di quoting, la stringa torna com'è.
+  assert.equal(lvl("cat $'.ssh/config'", LINUX), 2);
+  assert.equal(lvl('cat $".ssh/config"', LINUX), 2);
+  assert.equal(lvl("cat $'.config/Filo/storage.json'", LINUX), 2);
+  assert.equal(lvl("head $'.ssh/id_rsa'", LINUX), 2);
+  assert.equal(lvl("cd $'.ssh' && cat config", LINUX), 2);
+  assert.equal(lvl("cat $'/etc/shadow'", LINUX), 2);
+  assert.equal(lvl("cat $'Library/Application Support/Filo/storage.json'", MAC), 2);
+  // Le stesse virgolette per un file legittimo con spazio dentro restano libere.
+  assert.equal(lvl("cat $'nota di spesa.txt'", LINUX), 1);
+  assert.equal(lvl("cat $'Documenti/nota di spesa.txt'", LINUX), 1);
+
+  // PowerShell lega un parametro col due punti: `-Path:valore`.
+  assert.equal(lvl('Get-Content -Path:.ssh\\config', WIN), 2);
+  assert.equal(lvl('Get-Content -LiteralPath:.ssh\\config', WIN), 2);
+  assert.equal(lvl('Get-Content -Path:AppData\\Roaming\\Filo\\storage.json', WIN), 2);
+  assert.equal(lvl('Select-String -Path:.ssh\\config Host', WIN), 2);
+  assert.equal(lvl('Get-ChildItem -Path:env:', WIN), 2);
+  assert.equal(lvl('Get-ItemProperty -Path:HKCU:\\Software\\x', WIN), 2);
+  assert.equal(lvl('Get-Content -Path:Documenti\\a.txt', WIN), 1);
+
+  // La virgola in PowerShell costruisce un array di percorsi: si guardano tutti.
+  assert.equal(lvl('Get-Content Documenti\\a.txt,.ssh\\config', WIN), 2);
+  assert.equal(lvl('Get-Content Documenti\\a.txt,AppData\\Roaming\\Filo\\storage.json', WIN), 2);
+  assert.equal(lvl('Get-ChildItem Documenti,env:', WIN), 2);
+  assert.equal(lvl('Get-Content rel,finale.txt', WIN), 1);
+});
