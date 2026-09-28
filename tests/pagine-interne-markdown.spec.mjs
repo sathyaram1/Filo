@@ -7,7 +7,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 
 const OSTILE = 'filo-853.invalid';
-const RISPOSTA_BELLA = 'Il **grassetto** resta, e la [guida](https://example.com/guida) si apre.';
+const RISPOSTA_BELLA = 'Il **grassetto** resta.\n\n- la [guida](https://example.com/guida) si apre\n- secondo punto';
 const RISPOSTA_OSTILE = `Codice: <img id="spia" src="https://${OSTILE}/spia.png"> e `
   + `<form id="modulo" action="https://${OSTILE}/f"><button>Invia</button></form> fine.`;
 
@@ -102,6 +102,13 @@ for (const [nome, url] of [['Editor', 'filo://editor/'], ['Gestione', 'filo://ma
     await expect(corpo.locator('strong')).toHaveText('grassetto');
     await expect(corpo.locator('a.filo-md-link')).toHaveAttribute('href', 'https://example.com/guida');
     await expect(corpo).not.toContainText('**');
+    // Fra il paragrafo e l'elenco nessuna riga vuota: si legge come un testo solo.
+    const stacco = await corpo.evaluate((el) => {
+      const p = el.querySelector('p').getBoundingClientRect();
+      const ul = el.querySelector('ul').getBoundingClientRect();
+      return ul.top - p.bottom;
+    });
+    expect(stacco).toBeLessThan(14);
 
     const riquadro = await apriRiquadro(page, menu);
     await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 30_000 });
