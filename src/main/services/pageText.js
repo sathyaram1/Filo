@@ -421,15 +421,16 @@ function risolviLink(href, base) {
 const CONFINE_CON_CIFRA = /(?:\p{Nd}[\p{L}\p{N}]|\p{L}\p{Nd})$/u;
 
 class Scrittore {
-  constructor() { this.righe = []; this.cur = ''; this.prefisso = ''; this.spazio = false; this.confine = false; }
-  // Lo spazio in fondo si ricorda in un campo: guardarlo sulla riga a ogni pezzo costava il quadrato della riga.
+  constructor() { this.righe = []; this.cur = ''; this.prefisso = ''; this.spazio = false; this.confine = false; this.ultimo = ''; }
+  // Lo spazio e l'ultimo carattere si ricordano in un campo: guardarli sulla riga a ogni pezzo costava il quadrato della riga.
   inline(t) {
     if (!t) return;
     if (!this.cur || this.spazio) t = t.replace(/^\s+/, '');
     if (!t) return;
-    if (this.confine && this.cur && CONFINE_CON_CIFRA.test(this.cur.slice(-1) + t[0])) t = ` ${t}`;
+    if (this.confine && this.cur && CONFINE_CON_CIFRA.test(this.ultimo + t[0])) t = ` ${t}`;
     this.confine = false;
     this.cur += t;
+    this.ultimo = t[t.length - 1];
     this.spazio = /\s$/.test(t);
   }
   segnaConfine() { this.confine = true; }
@@ -440,12 +441,19 @@ class Scrittore {
     this.prefisso = '';
     this.spazio = false;
     this.confine = false;
+    this.ultimo = '';
   }
   blocco() {
     this.riga();
     if (this.righe.length && this.righe[this.righe.length - 1] !== '') this.righe.push('');
   }
-  inizia(prefisso) { this.riga(); this.cur = prefisso; this.prefisso = prefisso; this.spazio = /\s$/.test(prefisso); }
+  inizia(prefisso) {
+    this.riga();
+    this.cur = prefisso;
+    this.prefisso = prefisso;
+    this.spazio = /\s$/.test(prefisso);
+    this.ultimo = prefisso.slice(-1);
+  }
   crudo(s) { this.riga(); for (const r of String(s).split('\n')) this.righe.push(r.replace(/\s+$/, '')); }
   testo() {
     this.riga();
@@ -733,7 +741,11 @@ function estrai(html, { url = '' } = {}) {
   let p = componi(nodo, corpo, ctx);
   // Poco testo visibile: forse un velo trasparente che gli script tolgono a caricamento finito, forse un'esca. Il testo
   // nascosto arriva, ma fra quello che l'utente potrebbe non vedere, mai mescolato al resto.
-  if (p.principale.length + p.coda.length < 200) p = componi(nodo, corpo, { ...ctx, invisibiliChiusi: true });
+  const visibile = p.principale.length + p.coda.length;
+  if (visibile < 200) {
+    const conVelo = componi(nodo, corpo, { ...ctx, invisibiliChiusi: true });
+    if (conVelo.chiusi.length - p.chiusi.length > 2 * visibile) p = conVelo;
+  }
   let testo = p.principale;
   if (p.coda) testo += `${testo ? '\n\n' : ''}${TITOLO_CODA}\n${p.coda}`;
   if (p.chiusi) testo += `${testo ? '\n\n' : ''}${TITOLO_CHIUSI}\n${p.chiusi}`;

@@ -655,7 +655,7 @@ function annotaLink(ctx, testo) {
   for (const m of s.matchAll(/(?:^|[\s(«"'])(www\.[^\s<>"'`\]]+)/gi)) trovati.push(`https://${m[1]}`);
   for (const u of trovati) {
     // Il link di un testo in markdown finisce alla parentesi; uno di Wikipedia la contiene. Valgono tutte e due.
-    for (const v of [u, u.replace(/[).,;:!?»]+$/, ''), u.split(')')[0]]) {
+    for (const v of [u, u.replace(/[).,;:!?»]+$/, ''), u.replace(/\)[.,;:!?»]*$/, ''), u.split(')')[0]]) {
       const n = normalizzaUrl(v);
       const k = n.url ? chiaveConfronto(n.url) : '';
       if (k) ctx.noti.add(k);

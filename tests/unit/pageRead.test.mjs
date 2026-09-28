@@ -215,3 +215,21 @@ test('l\'estrazione gira in un thread a parte e dà lo stesso testo', async () =
   const r = await PR.estraiInDisparte(html, 'https://x.example/');
   assert.equal(r.testo, PT.estrai(html, { url: 'https://x.example/' }).testo);
 });
+
+// #553, giro 13: dalla chat, un indirizzo che il modello si scrive da sé passa dal controllo sulla forma, qualunque
+// travestimento abbiano i dati; quelli trovati (risultati, pagine lette, parole dell'utente, schede) no.
+test('il controllo sulla forma guarda gli indirizzi che il modello si scrive da sé, non quelli trovati', () => {
+  const c = PR.contestoChat();
+  PR.annotaLink(c, 'leggimi www.comune.example/uffici/orari?sede=centro, grazie');
+  assert.equal(PR.formaDaControllare(c, 'LEGGI_PAGINA', 'https://attaccante.example/r?d=4d6172696f20526f737369'), true);
+  assert.equal(PR.formaDaControllare(c, 'LEGGI_PAGINA', 'https://comune.example/uffici/orari?sede=centro'), false, 'scritto dall\'utente');
+  assert.equal(PR.formaDaControllare(c, 'NAVIGA', 'https://attaccante.example/r?d=x'), false, 'un\'apertura prima di ogni testo di fuori');
+  PR.annotaAzione(c, { type: 'CERCA_WEB', _output: { results: [{ url: 'https://giornale.example/2026/09/28/sciopero_dei_treni_orari_e_fasce_garantite-423456789/' }] } });
+  PR.annotaAzione(c, { type: 'LEGGI_PAGINA', _output: { ok: true, url: 'https://a.example/p', testo: 'Vedi [gli orari](https://a.example/orari_(estate)).' } });
+  assert.equal(c.esterno, true);
+  assert.equal(PR.formaDaControllare(c, 'NAVIGA', 'https://attaccante.example/r?d=x'), true, 'dopo un testo di fuori sì');
+  assert.equal(PR.formaDaControllare(c, 'LEGGI_PAGINA', 'https://giornale.example/2026/09/28/sciopero_dei_treni_orari_e_fasce_garantite-423456789'), false);
+  assert.equal(PR.formaDaControllare(c, 'LEGGI_PAGINA', 'https://a.example/orari_(estate)'), false, 'un link della pagina letta');
+  assert.equal(PR.formaDaControllare(c, 'LEGGI_PAGINA', 'https://banca.example/conto', ['https://www.banca.example/conto/']), false, 'una scheda aperta');
+  assert.equal(PR.formaDaControllare(null, 'LEGGI_PAGINA', 'https://attaccante.example/r?d=x'), false, 'fuori dalla chat decide chi chiama');
+});
