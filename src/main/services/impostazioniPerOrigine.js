@@ -54,9 +54,18 @@ const CHIAVI_STORAGE_WEB = Object.freeze([
 ]);
 const CHIAVI_STORAGE_WEB_SCRITTURA = Object.freeze(CHIAVI_STORAGE_WEB.filter((k) => k !== 'settings'));
 
-// Le azioni di Filo che il codice dentro un sito chiede (la barra d'aiuto propone un
-// feedback). Il resto no, nemmeno confermato: la conferma nella pagina la dà anche il sito.
-const AZIONI_WEB = Object.freeze(new Set(['INVIA_FEEDBACK']));
+// Le azioni di Filo che il codice dentro un sito chiede: la barra d'aiuto propone un
+// feedback e apre i link («apri in una nuova scheda»). Il resto no, nemmeno confermato:
+// la conferma nella pagina la dà anche il sito.
+const AZIONI_WEB = Object.freeze(new Set(['INVIA_FEEDBACK', 'NAVIGA']));
+
+// Da un sito NAVIGA apre solo indirizzi web, che il sito sa già aprire da sé; le
+// pagine di Filo no. Un indirizzo senza schema lo completa l'apertura con https.
+function indirizzoWeb(url) {
+  const s = String(url ?? '').trim();
+  if (!s) return false;
+  try { return ['http:', 'https:'].includes(new URL(s).protocol.toLowerCase()); } catch (_) { return true; }
+}
 
 const isFilo = (url) => String(url || '').startsWith('filo://');
 
