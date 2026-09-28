@@ -137,9 +137,8 @@ function ownerKey(norm, url) {
   return owner !== null ? norm.host + owner : norm.registrable;
 }
 
-// Di chi è un indirizzo, per il conto di ogni chiamata che Filo fa da solo (anche il blocco geografico). Una pagina si
-// riscrive l'indirizzo senza navigare (history.pushState) sulla stessa origine e con qualunque percorso: il conto va a
-// chi l'ha servita davvero, `loadedUrl`, l'ultimo indirizzo navigato dalla scheda.
+// Di chi è un indirizzo, per il conto di ogni chiamata che Filo fa da solo. Una pagina si riscrive il percorso senza
+// navigare (history.pushState): il conto va a chi l'ha servita davvero, `loadedUrl`, l'ultimo indirizzo navigato.
 function ownerOf(url, loadedUrl) {
   const norm = normalizeMod.normalize(url);
   return norm && norm.ok ? budgetKey(norm, url, loadedUrl) : null;
