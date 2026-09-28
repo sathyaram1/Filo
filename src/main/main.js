@@ -15,6 +15,9 @@ if (process.env.FILO_USER_DATA) {
   try { app.setPath('userData', process.env.FILO_USER_DATA); } catch (_) {}
 }
 
+// Prima di ogni altra cosa: nessuna sessione deve nascere senza passare dal punto di nascita.
+try { require('./services/sessioni').installa(); } catch (_) {}
+
 // Su Windows serve un AppUserModelID esplicito perché la taskbar mostri
 // l'icona giusta (e non quella di Electron di default).
 if (process.platform === 'win32') {

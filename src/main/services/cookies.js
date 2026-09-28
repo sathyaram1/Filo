@@ -19,13 +19,15 @@
 //   - blocca le richieste ai tracker noti (onBeforeRequest);
 //   - risolve la sessione/partizione per ogni navigazione top-level;
 //   - ripulisce i cookie dei tracker (wipe mirato, modalità 'default').
+// GPC e blocchi arrivano a OGNI sessione dal punto di nascita (services/sessioni.js).
 // Il rifiuto dei banner CMP e la riscrittura degli embed YouTube vivono nel
-// content script src/content/cookies.js. L'iniezione di
-// navigator.globalPrivacyControl avviene in tabs.js (mondo della pagina).
+// content script src/content/cookies.js; navigator.globalPrivacyControl nel
+// preambolo del preload (preload/fingerprint-guard.js), che chiede gpcAttivo.
 
 'use strict';
 
 const { session } = require('electron');
+const Sessioni = require('./sessioni');
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
 
@@ -182,6 +184,12 @@ function applyGpc(ses, enabled) {
   if (state) state.enabled = !!enabled;
 }
 
+// La proprietà JS segue l'header della STESSA sessione: mai una senza l'altro.
+function gpcAttivo(ses) {
+  const s = ses && gpcState.get(ses);
+  return !!(s && s.enabled);
+}
+
 // ─── blocco tracker: cancella le richieste ai tracker noti ──────────────────
 //
 // Una sola registrazione onBeforeRequest per sessione (come per GPC). Quando
@@ -247,21 +255,14 @@ const { registerFiloProtocolForSession } = require('../protocol');
 const siteSessions = new Map(); // partition name → session
 
 // Ritorna (creando se serve) la sessione effimera/persistente per la partizione
-// data, registrandovi il protocollo filo:// e applicando GPC + blocco tracker.
-function ensureSiteSession(partition, { gpc } = {}) {
+// data, registrandovi il protocollo filo://. Le protezioni arrivano alla nascita.
+function ensureSiteSession(partition) {
   let ses = siteSessions.get(partition);
   if (!ses) {
     ses = session.fromPartition(partition);
     try { registerFiloProtocolForSession(ses); } catch (_) {}
     siteSessions.set(partition, ses);
   }
-  const on = gpc !== false;
-  applyGpc(ses, on);
-  // applyTrackerBlocking registra l'UNICO onBeforeRequest che copre sia il
-  // blocco tracker sia il motore ad-blocking (vedi la nota lì): così anche i
-  // jar per-sito della modalità privacy ricevono l'ad-blocking, non solo la
-  // sessione di default.
-  applyTrackerBlocking(ses, on);
   return ses;
 }
 
@@ -281,29 +282,31 @@ function partitionForTab(url, { mode, incognito, trusted } = {}) {
   );
   const partition = partitionForUrl(url, trustedSet);
   if (!partition) return { partition: null };
-  ensureSiteSession(partition, { gpc: true });
+  ensureSiteSession(partition);
   return { partition };
 }
 
 // ─── configurazione globale (GPC + blocco tracker) ─────────────────────────
 
-// Applica GPC e blocco tracker alla sessione di default in base alla modalità.
-// Chiamato all'avvio e a ogni UPDATE_SETTINGS. Le sessioni per-sito ricevono lo
-// stesso trattamento quando vengono create (ensureSiteSession). In manual tutto
-// è spento.
-function configureForMode(mode) {
-  const on = mode !== MODES.MANUAL;
-  applyGpc(session.defaultSession, on);
-  applyTrackerBlocking(session.defaultSession, on);
-  for (const ses of siteSessions.values()) {
-    applyGpc(ses, on);
-    applyTrackerBlocking(ses, on);
-  }
+// Ultima modalità/siti fidati visti: la legge chi nasce dopo, e before-quit
+// (sincrono) lancia il wipe senza rileggere lo storage.
+let _cached = { mode: MODES.DEFAULT, trustedSites: [] };
+
+// In manual GPC e tracker sono spenti; l'ad-blocking resta sul suo interruttore.
+function proteggi(ses) {
+  const on = _cached.mode !== MODES.MANUAL;
+  applyGpc(ses, on);
+  applyTrackerBlocking(ses, on);
 }
 
-// Ultima modalità/siti fidati visti, così before-quit (sincrono) può lanciare il
-// wipe senza dover rileggere lo storage in modo asincrono.
-let _cached = { mode: MODES.DEFAULT, trustedSites: [] };
+Sessioni.allaNascita('cookie', proteggi);
+
+// Chiamato all'avvio e a ogni UPDATE_SETTINGS: riallinea ogni sessione già nata.
+function configureForMode(mode) {
+  const m = mode === MODES.MANUAL || mode === MODES.PRIVACY ? mode : MODES.DEFAULT;
+  _cached = { ..._cached, mode: m };
+  for (const ses of Sessioni.nate()) proteggi(ses);
+}
 
 function configureFromSettings(settings) {
   _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings) };
@@ -351,6 +354,7 @@ module.exports = {
   partitionForTab,
   ensureHeaderHook,
   applyGpc,
+  gpcAttivo,
   applyTrackerBlocking,
   ensureRequestHook,
   chiudiHost,
