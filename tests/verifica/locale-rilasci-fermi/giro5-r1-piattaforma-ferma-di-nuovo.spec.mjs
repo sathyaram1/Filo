@@ -131,17 +131,23 @@ for (const [piattaforma, job, nomeFile] of [['Mac', 'release-mac', 'Filo-Mac.dmg
     const { server, stato } = serverAllarmi();
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const base = `http://127.0.0.1:${server.address().port}`;
-    const lancia = (versione, esiti, mancanti = '') => spawnSync(process.execPath, ['--import', pathToFileURL(join(dir, 'preload.mjs')).href, script], {
-      encoding: 'utf8',
-      env: {
-        ...process.env, FINTO_GITHUB: finto, FILO_ROUTINE_API: base, FILO_BUILD_PASSPHRASE: 'finta',
-        GH_TOKEN: 'finto', GITHUB_TOKEN: 'finto', GITHUB_REPOSITORY: 'o/r', REPO: 'o/r',
-        PIATTAFORMA: piattaforma, VERSIONE: versione, ESECUZIONE: `https://github.com/o/r/actions/runs/${versione}`,
-        ESITI: JSON.stringify(esiti), MANCANTI: mancanti,
-      },
+    // Asincrono: il server finto gira in questo processo, e uno spawnSync lo terrebbe fermo.
+    const lancia = (versione, esiti, mancanti = '') => new Promise((fatto) => {
+      const figlio = spawn(process.execPath, ['--import', pathToFileURL(join(dir, 'preload.mjs')).href, script], {
+        env: {
+          ...process.env, FINTO_GITHUB: finto, FILO_ROUTINE_API: base, FILO_BUILD_PASSPHRASE: 'finta',
+          GH_TOKEN: 'finto', GITHUB_TOKEN: 'finto', GITHUB_REPOSITORY: 'o/r', REPO: 'o/r',
+          PIATTAFORMA: piattaforma, VERSIONE: versione, ESECUZIONE: `https://github.com/o/r/actions/runs/${versione}`,
+          ESITI: JSON.stringify(esiti), MANCANTI: mancanti,
+        },
+      });
+      let out = '';
+      figlio.stdout.on('data', (c) => { out += c; });
+      figlio.stderr.on('data', (c) => { out += c; });
+      figlio.on('close', (status) => fatto({ status, stdout: out, stderr: '' }));
     });
     try {
-      const primo = lancia('v0.2.301', { strumento: { outcome: 'success' }, dipendenze: { outcome: 'failure' } });
+      const primo = await lancia('v0.2.301', { strumento: { outcome: 'success' }, dipendenze: { outcome: 'failure' } });
       expect(primo.status, primo.stdout + primo.stderr).toBe(0);
       expect(stato.feedback).toHaveLength(1);
       // Il feedback resta aperto: parcheggiato in attesa dell'owner, come #569.
