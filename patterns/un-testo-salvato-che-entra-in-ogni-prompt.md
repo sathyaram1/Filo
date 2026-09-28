@@ -13,12 +13,17 @@ Le sorelle dello stile sono le lezioni che Filo si fissa (SALVA_LEZIONE) e i
 moduli di memoria in cui finiscono (profilo, preferenze apprese): stessa
 portata, stesse regole.
 
-Valgono insieme quattro cose:
+Valgono insieme queste regole:
 
 - **Se lo propone il modello, l'utente conferma il testo esatto.** Livello 2, e
-  il popup mostra il testo per intero (via i caratteri invisibili che lo
-  travestirebbero), non «stile aggiornato». Anche toglierlo passa dal popup: si
-  perde il testo dell'utente.
+  il popup mostra il testo per intero, non «stile aggiornato». Si mostra e si
+  salva quello che si legge (`testoLeggibile`): via ogni carattere che non si
+  disegna (i «tag» Unicode il modello li legge come lettere) e le righe vuote
+  in fila, che spingerebbero il resto oltre il bordo del popup. Anche toglierlo
+  passa dal popup: si perde il testo dell'utente.
+- **All'OK vale quello che il popup ha mostrato.** Una conferma su un elenco
+  (righe da dimenticare, sveglie da togliere) agisce su quelle voci, non su
+  quelle che lo stesso riferimento trova al momento dell'OK.
 - **Un tetto dichiarato, e oltre si rifiuta dicendolo.** Mai un taglio: il
   modello riceve il perché, il diario lo mostra, la pagina Preferenze tiene il
   testo nel campo, dice quanto è lungo e non lo salva finché non si accorcia.
@@ -40,9 +45,10 @@ regole anti-inganno, per non rompere il prefisso comune (#422): le regole la
 nominano, e il recinto le toglie l'autorità di un ordine.
 
 Dove: `stile_agente` e `lezioneDaAzione` in `src/shared/preferences.js`,
-`memoriaImbustata` e `MEMORIA_FILO` accanto allo stile, `injectAgentStyle` e
-`INIZIO_ANTI_INGANNO` in `src/shared/constants.js`, `STILE_UTENTE` in
-`src/shared/contenutoEsterno.js`. Sentinelle in
+`memoriaImbustata` e `MEMORIA_FILO` accanto allo stile, `testoLeggibile`,
+`injectAgentStyle` e `INIZIO_ANTI_INGANNO` in `src/shared/constants.js`,
+`STILE_UTENTE` in `src/shared/contenutoEsterno.js`, `bersagliMostrati` in
+`src/main/services/handlers.js`. Sentinelle in
 `tests/unit/preferences.test.mjs` (ogni setter a testo libero è confermato e
 con tetto, o dichiara di non finire in un prompt) e
 `tests/unit/stileAgentePrompt.test.mjs` (nessuna frase anti-inganno prima dello
