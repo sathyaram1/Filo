@@ -4114,4 +4114,5 @@ module.exports = {
   wireSafebrowse,
   runTabTriageDecision,
   executeFiloAction,
+  applySettingsUpdate,
 };
