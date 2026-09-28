@@ -77,7 +77,7 @@ jobs:
   # ─── PRIMA DI TUTTO: QUALE COMMIT SI PUBBLICA ──────────────────────────────
   # La suite gira a ogni fusione (suite.yml): la punta di main non e' quasi mai verde, il suo ultimo verde si'.
   # Ferma da piu' di 48 ore con codice nuovo: feedback, qualunque sia il motivo. Senza verdi la corsa e' rossa;
-  # con un verde che da piu' di 12 ore non esce si prova lo stesso a pubblicarlo (il guasto a valle puo' essere passato).
+  # con un verde che da piu' di 12 ore non esce si prova lo stesso a pubblicarlo: il guasto a valle puo' essere passato.
   scegli:
     # Riallegare i file di una versione gia' uscita non sceglie niente: il
     # codice e' quello di un tag, gia' provato.
