@@ -3181,8 +3181,15 @@ async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } 
   // Senza chiave API: messaggio istantaneo dalle pagine salvate (come prima).
   if (!inputs.hasKey) {
     const payload = buildNoKeyDashboard(inputs.settings, inputs.saved);
-    await FiloMem.setDashboardCache({ ...payload, signature: inputs.signature });
+    await FiloMem.setDashboardCache({ ...payload, signature: inputs.signature, senzaChiave: true });
     return { ...payload, cached: false, ts: new Date().toISOString() };
+  }
+
+  // La chiave è arrivata dopo (invito riscattato): la home aperta smette subito di mandare a
+  // riscattarlo, e il messaggio vero si chiede in background. La firma non vede la chiave (#651).
+  if (cached && cached.senzaChiave && !force) {
+    dashboardScheduler().request(openTabsCount);
+    return { ...buildNoKeyDashboard(inputs.settings, inputs.saved), cached: false, ts: new Date().toISOString() };
   }
 
   // C'è già una cache e non è un refresh esplicito: la serviamo SUBITO — la
