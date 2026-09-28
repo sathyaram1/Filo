@@ -66,16 +66,17 @@ test('una pagina che preme da sola Detta nel menu di Filo non si prende il micro
 const PAGINA_CHE_ASPETTA = `<!doctype html><html><head><title>Aspetta</title></head><body>
 <textarea id="campo" style="width:300px"></textarea>
 <script>
+  // Il menu di Filo vive nel documento del sito: il suo clic passa anche dai gestori della pagina.
   window.__mic = null;
-  window.addEventListener('mousedown', (e) => {
-    if (e.button !== 2) return;
-    const fine = Date.now() + 6000;
-    const giro = () => {
-      if (window.__mic || Date.now() > fine) return;
-      navigator.mediaDevices.getUserMedia({ audio: true }).then((s) => { if (!window.__mic) window.__mic = s; }, () => {});
-      setTimeout(giro, 10);
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest || !e.target.closest('.sn-menu')) return;
+    let n = 0;
+    const prova = () => {
+      if (window.__mic || n++ > 10) return;
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then((s) => { window.__mic = s; }, () => setTimeout(prova, 150));
     };
-    giro();
+    setTimeout(prova, 60);
   }, true);
 </script></body></html>`;
 
