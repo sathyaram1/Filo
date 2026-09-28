@@ -209,8 +209,20 @@
       },
     },
     CERCA_WEB: {
-      level: 1,
-      describe: (a) => `Cercare sul web "${a.query || ''}"`,
+      // Cercare è di norma innocuo → livello 1. ECCEZIONE anti-esfiltrazione: se
+      // la query trasporta FUORI un segreto (memoria, o ciò che il modello ha
+      // letto nel turno) sale a livello 2 → conferma con la query mostrata. Il
+      // flag `_exfil` lo calcola il main (→ urlExfil.js); mai l'LLM.
+      level: (a) => (a && a._exfil ? 2 : 1),
+      describe: (a) => {
+        const q = a.query || a.q || a.testo || a.text || '';
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
+          return `Cercare sul web un testo${why}:\n"${q}"\n\n`
+            + 'Potrebbe inviare tuoi dati a un motore di ricerca. Cerca solo se l\'hai chiesto tu.';
+        }
+        return `Cercare sul web "${q}"`;
+      },
     },
     ONBOARDING: {
       // Filo tiene il conto della micro-intervista di benvenuto (#524): spunta
