@@ -5,7 +5,7 @@
 // funzione pura di iniezione realmente spedita nei moduli.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmState, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, confirmState, scrollConfirmToEnd, CONFIRM_HOST } from './helpers/confirm.mjs';
 
 test('scegliere un preset riempie il testo e lo stile persiste tra le ricariche', async ({ openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
