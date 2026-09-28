@@ -109,8 +109,13 @@ test('nuovo: scrivo nella home prima dell’invito, poi riscatto da «Apri Credi
   await expect(cr.locator('#redeemMsg')).toContainText('riscattato', { timeout: 20_000 });
   await shell.locator('.tab').first().click();
   await home.waitForTimeout(5000);
-  const bolle = await home.locator('#bubbles').innerText();
-  console.log('BOLLE DOPO IL RISCATTO:\n' + bolle);
+  console.log('BOLLE DOPO IL RISCATTO:\n' + await home.locator('#bubbles').innerText());
   await home.screenshot({ path: 'tests/.shots/giro2-scritto-prima.png' });
-  await intervistaNellaHome(home);
+  await home.locator('#bubbles button', { hasText: 'Riprova' }).click();
+  await home.waitForTimeout(6000);
+  console.log('BOLLE DOPO RIPROVA:\n' + await home.locator('#bubbles').innerText());
+  console.log('ONBOARDING:', JSON.stringify(await app.evaluate(async () => { const o = await globalThis.SN_FILO_MEMORY.getOnboarding(); return { done: o.done, n: (o.thread || []).length }; })));
+  const nuova = await nuovaHome(app, shell);
+  await nuova.waitForTimeout(6000);
+  console.log('NUOVA SCHEDA:\n' + await nuova.locator('#bubbles').innerText() + '\nHOME MSG: ' + await nuova.locator('#homeMessage').innerText());
 });
