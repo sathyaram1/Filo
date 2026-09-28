@@ -14,6 +14,7 @@ test('una pagina di Filo incorporata da un sito non riceve chiavi e proxy', asyn
     settings: { apiKeys: { openrouter: k }, proxy: { datacenter: `socks5://utente:${p}@gate.example.com:7000` } },
   }), { k: CHIAVE, p: PWD });
 
+  await openTab('filo://options/options.html');
   const web = await testServer.openReady(openTab,
     '<h1>sito</h1><iframe src="filo://newtab/"></iframe><iframe src="filo://asset/"></iframe>');
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
