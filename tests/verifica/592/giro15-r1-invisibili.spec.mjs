@@ -115,6 +115,31 @@ test('una lezione con una parte invisibile: il popup non la mostra e la memoria 
   await restore(app);
 });
 
+test('uno stile allungato da righe vuote: nel popup il resto del testo non finisce sotto il bordo', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  const valore = `Rispondi breve e dammi del tu.${'\n'.repeat(60)}${NASCOSTO}`;
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 's1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'stile_agente', valore }) }] },
+    { text: 'Te lo faccio confermare.' },
+  ]);
+  await page.locator('#input').fill('scrivimi breve');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Te lo faccio confermare.' })).toBeVisible({ timeout: 10_000 });
+  await page.waitForTimeout(500);
+  const stato = await confirmState(page);
+  if (!stato) {
+    // Rifiutato senza popup: allora non si è salvato niente.
+    expect(await app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.agentStyle || ''))).toBe('');
+    return;
+  }
+  const dentro = stato.text.slice(stato.text.indexOf('«'), stato.text.lastIndexOf('»'));
+  expect(/\n\s*\n\s*\n/.test(dentro), 'il testo da confermare è spezzato da righe vuote che ne spingono la fine fuori dalla vista').toBe(false);
+  await restore(app);
+});
+
 test('nelle Preferenze uno stile incollato con una parte invisibile non si salva invisibile', async ({ app, openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
   await page.waitForSelector('#agentStyleText', { timeout: 8_000 });
