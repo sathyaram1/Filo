@@ -126,6 +126,13 @@
   // fallito aveva già emesso qualcosa (delta o reasoning) e c'è un attempt dopo.
   async function streamCompleteWithFallback({ attempts, model, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset }) {
     let lastErr = null;
+    // I tentativi rotti dopo che il modello aveva già scritto: il fornitore li fa pagare, chi tiene il conto li deve vedere.
+    const broken = [];
+    const noteBroken = (err, a, aModel) => {
+      if (err && err.generationId) {
+        broken.push({ provider: a.provider, model: aModel, generationId: err.generationId, apiKey: err.keyUsed || a.apiKey, keySource: err.keySource || '' });
+      }
+    };
     for (let i = 0; i < attempts.length; i++) {
       const a = attempts[i];
       const aModel = a.model || model;
@@ -136,13 +143,13 @@
         // prima di ricominciare, esattamente come nel ripiego su un altro
         // provider (#273): se non sa farlo, non ritentiamo.
         const r = await withNetworkRetry(
-          () => getProvider(a.provider).streamComplete({
+          () => Promise.resolve(getProvider(a.provider).streamComplete({
             apiKey: a.apiKey, model: aModel, reasoning: a.reasoning,
             providerRouting: a.providerRouting, messages, tools, toolChoice, signal,
             onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
             onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
             onToolCall: onToolCall ? (c) => { emitted = true; onToolCall(c); } : onToolCall,
-          }),
+          })).catch((err) => { noteBroken(err, a, aModel); throw err; }),
           () => {
             if (!emitted) return true;
             if (!onReset) return false;
@@ -151,9 +158,10 @@
             return true;
           },
         );
-        return { ...r, provider: a.provider, model: aModel };
+        return { ...r, provider: a.provider, model: aModel, ...(broken.length ? { brokenAttempts: broken } : {}) };
       } catch (err) {
         lastErr = err;
+        if (broken.length && err && typeof err === 'object') err.brokenAttempts = broken;
         if (stopOnOutOfCredits(err)) throw err;
         console.warn(`[SN] provider ${a.provider} streaming fallito (${i + 1}/${attempts.length}):`, err.message || err);
         const hasNext = i + 1 < attempts.length;

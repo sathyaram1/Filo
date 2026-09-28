@@ -349,9 +349,19 @@
     const calls = createToolCallAccumulator(onToolCall);
     const details = createReasoningDetailsAccumulator();
     let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0 };
+    let generationId = null;
 
+    // Una risposta rotta a metà si paga per quanto il modello aveva scritto: l'errore porta con sé l'id per chiederne il costo.
+    const read = () => reader.read().catch((err) => {
+      if (generationId && err && typeof err === 'object') {
+        err.generationId = generationId;
+        err.keyUsed = keyUsed;
+        err.keySource = keySource;
+      }
+      throw err;
+    });
     while (true) {
-      const { done, value } = await reader.read();
+      const { done, value } = await read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
@@ -363,6 +373,7 @@
         if (payload === '[DONE]') continue;
         try {
           const obj = JSON.parse(payload);
+          if (!generationId && typeof obj.id === 'string') generationId = obj.id;
           // Chi ha servito arriva in streaming insieme ai chunk (di norma con
           // l'ultimo): teniamo l'ultimo valore visto.
           const sb = extractServedBy(obj);

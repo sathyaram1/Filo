@@ -10,6 +10,10 @@ const MAX_QUEUE = 50;
 const LOAD_TIMEOUT_MS = 9000;
 // Vale anche dopo la fine del caricamento: qualunque cosa faccia la pagina, la finestra muore entro questo tempo.
 const MAX_LIFETIME_MS = 15000;
+// Lo svuotamento della memoria fra due controlli non deve poter tenere fermo il posto.
+const CLEAR_TIMEOUT_MS = 3000;
+let detonators = 0;
+const wait = (ms) => new Promise((ok) => { const t = setTimeout(ok, ms); if (t && t.unref) t.unref(); });
 
 let _electron = null;
 function realElectron() {
@@ -29,19 +33,25 @@ function createDetonator({
   const el = () => (typeof electron === 'function' ? electron() : electron);
   let live = 0;
   const queue = [];
+  // Una memoria isolata per posto, riusata e svuotata fra un controllo e l'altro: Electron non ne libera mai una creata.
+  const detonatorId = ++detonators;
+  const freeSlots = Array.from({ length: maxConcurrent }, (_, i) => `filo-detonate-${detonatorId}-${i}`);
 
   function pump() {
-    while (live < maxConcurrent && queue.length) {
+    while (freeSlots.length && queue.length) {
       const job = queue.shift();
+      const partition = freeSlots.shift();
       live++;
       Promise.resolve()
-        .then(() => runOne(job.url, job.evaluateFinal))
-        .catch(() => null)
-        .then((r) => {
-          live--;
-          job.resolve(r);
-          pump();
-        });
+        .then(() => runOne(job.url, job.evaluateFinal, partition))
+        .catch(() => ({ result: null, cleared: null }))
+        .then(({ result, cleared }) => Promise.race([Promise.resolve(cleared).catch(() => {}), wait(CLEAR_TIMEOUT_MS)])
+          .then(() => {
+            live--;
+            freeSlots.push(partition);
+            job.resolve(result);
+            pump();
+          }));
     }
   }
 
@@ -59,20 +69,18 @@ function createDetonator({
     });
   }
 
-  function runOne(url, evaluateFinal) {
+  function runOne(url, evaluateFinal, partition) {
     const e = el();
-    const partition = `filo-detonate-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const ses = e.session.fromPartition(partition, { cache: false });
 
     let downloadStarted = false;
     let downloadName = '';
-    try {
-      ses.on('will-download', (ev, item) => {
-        downloadStarted = true;
-        try { downloadName = item.getFilename(); } catch (_) {}
-        ev.preventDefault(); // non scaricare davvero nulla
-      });
-    } catch (_) {}
+    const onDownload = (ev, item) => {
+      downloadStarted = true;
+      try { downloadName = item.getFilename(); } catch (_) {}
+      ev.preventDefault(); // non scaricare davvero nulla
+    };
+    try { ses.on('will-download', onDownload); } catch (_) {}
 
     const win = new e.BrowserWindow({
       show: false,
@@ -95,9 +103,11 @@ function createDetonator({
     let finalUrl = url;
     let finished = false;
 
+    let cleared = null;
     const cleanup = () => {
       try { if (!win.isDestroyed()) win.destroy(); } catch (_) {}
-      try { ses.clearStorageData().catch(() => {}); } catch (_) {}
+      try { if (typeof ses.removeListener === 'function') ses.removeListener('will-download', onDownload); } catch (_) {}
+      try { cleared = Promise.resolve(ses.clearStorageData()).catch(() => {}); } catch (_) { cleared = null; }
     };
 
     return new Promise((resolve) => {
@@ -109,7 +119,7 @@ function createDetonator({
         clearTimeout(loadTimer);
         clearTimeout(lifeTimer);
         cleanup();
-        resolve({ verdict, finalUrl, redirects, download: downloadStarted ? (downloadName || true) : false, ...extra });
+        resolve({ result: { verdict, finalUrl, redirects, download: downloadStarted ? (downloadName || true) : false, ...extra }, cleared });
       };
       const byNow = () => (downloadStarted ? 'dangerous' : 'clean');
 
@@ -144,7 +154,7 @@ function createDetonator({
 
         Promise.resolve(wc.loadURL(url)).catch(() => done(byNow()));
       } catch (_) {
-        done(null);
+        if (!finished) { finished = true; clearTimeout(loadTimer); clearTimeout(lifeTimer); cleanup(); resolve({ result: null, cleared }); }
       }
     });
   }

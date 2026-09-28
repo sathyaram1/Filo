@@ -101,3 +101,38 @@ test('sotto il limite le stesse chiamate partono e il loro costo entra nel conte
     await ripristina(app);
   }
 });
+
+// In incognito lo storage nasconde la memoria di navigazione; i conti di Filo no: il limite e la spesa del mese valgono
+// in ogni finestra, e quello che si spende lì resta nel conto quando la finestra si chiude.
+test('in incognito il limite del mese ferma le stesse chiamate e la spesa resta nel conto', async ({ app }) => {
+  await prepara(app);
+  try {
+    const esito = await app.evaluate(async () => {
+      const Storage = globalThis.__filoStorage;
+      const { ACTIONS } = globalThis.SN_CONST;
+      const H = globalThis.__filoHandlers;
+      const chat = () => H.handleStream({ action: ACTIONS.EXPLAIN, payload: { messages: [{ role: 'user', content: 'ciao' }] }, origin: 'test', onDelta: () => {} })
+        .then(() => 'partita', (e) => e.code || e.message);
+      const oltre = await Storage.runIncognito(async () => ({
+        chat: await chat(),
+        geo: (await globalThis.SN_GEO_CLASSIFY({ title: 'Forbidden', text: 'Access denied', statusCode: 403, host: 'incognito.cancello-prova.test', url: 'https://incognito.cancello-prova.test/v/3' })).code,
+        saldo: (await globalThis.SN_CREDITS.getPublic()).balanceExact,
+      }));
+      const saldoFuori = (await globalThis.SN_CREDITS.getPublic()).balanceExact;
+      const chiamateOltre = globalThis.__cancello.chiamate.length;
+      await globalThis.SN_STORAGE.updateSettings({ monthlyLimitEur: 0 });
+      const prima = (await globalThis.SN_COSTS.getMonthly()).totalEur;
+      await Storage.runIncognito(() => chat());
+      Storage.resetIncognito();
+      const dopo = (await globalThis.SN_COSTS.getMonthly()).totalEur;
+      return { oltre, saldoFuori, chiamateOltre, speso: dopo - prima };
+    });
+    expect(esito.oltre.chat).toBe('LIMIT_REACHED');
+    expect(esito.oltre.geo).toBe('LIMIT_REACHED');
+    expect(esito.chiamateOltre).toBe(0);
+    expect(esito.oltre.saldo).toBe(esito.saldoFuori);
+    expect(esito.speso).toBeGreaterThan(0);
+  } finally {
+    await ripristina(app);
+  }
+});

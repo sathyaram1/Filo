@@ -106,11 +106,25 @@
       return settleChain(s, action, chain, r);
     }
 
+    // Un tentativo rotto a metà si è già pagato: il suo costo il router lo dice solo dopo, e lo si chiede come per la voce.
+    function auditBroken(s, action, list) {
+      for (const b of list || []) {
+        auditLater({ s, action, provider: b.provider, model: b.model, apiKey: b.apiKey, generationId: b.generationId, withCost: true, keySource: b.keySource });
+      }
+    }
+
     async function stream({ action, settings, attempts, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset } = {}) {
       const { s, chain } = await chainFor({ action, settings, attempts });
-      const r = await providers().streamCompleteWithFallback({
-        attempts: chain, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset,
-      });
+      let r;
+      try {
+        r = await providers().streamCompleteWithFallback({
+          attempts: chain, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset,
+        });
+      } catch (e) {
+        auditBroken(s, action, e && e.brokenAttempts);
+        throw e;
+      }
+      auditBroken(s, action, r && r.brokenAttempts);
       return settleChain(s, action, chain, r);
     }
 

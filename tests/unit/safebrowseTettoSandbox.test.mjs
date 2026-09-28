@@ -109,3 +109,33 @@ test('sottodomini sempre nuovi dello stesso dominio: un solo giudizio del modell
     for (const c of Object.values(SB._caches)) c.m.clear();
   }
 });
+
+test('le memorie isolate delle finestre nascoste si riusano: tante quanti i posti, qualunque sia il numero di controlli', async () => {
+  const memorie = new Map();
+  class BrowserWindow {
+    constructor() {
+      const ascolti = {};
+      this.webContents = {
+        on: (ev, fn) => { (ascolti[ev] = ascolti[ev] || []).push(fn); },
+        setWindowOpenHandler() {},
+        loadURL: () => { setTimeout(() => (ascolti['did-stop-loading'] || []).forEach((f) => f({})), 1); return Promise.resolve(); },
+      };
+    }
+    isDestroyed() { return false; }
+    destroy() {}
+  }
+  const session = {
+    fromPartition: (nome) => {
+      if (!memorie.has(nome)) {
+        const ascolti = new Set();
+        memorie.set(nome, { ascolti, on: (_ev, fn) => ascolti.add(fn), removeListener: (_ev, fn) => ascolti.delete(fn), clearStorageData: async () => {} });
+      }
+      return memorie.get(nome);
+    },
+  };
+  const D = createDetonator({ electron: { BrowserWindow, session }, maxConcurrent: 2, loadTimeoutMs: 50, maxLifetimeMs: 100 });
+  await Promise.all(Array.from({ length: 12 }, (_, i) => D.detonate(`http://s${i}.esempio.xyz/`)));
+  assert.equal(memorie.size, 2);
+  for (const m of memorie.values()) assert.equal(m.ascolti.size, 0, 'nessun ascolto dei download resta attaccato fra un controllo e l\'altro');
+  assert.deepEqual(D.stats(), { live: 0, queued: 0 });
+});

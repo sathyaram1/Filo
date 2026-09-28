@@ -274,11 +274,20 @@ function createCache({ ttlMs = 6 * 60 * 60 * 1000, now = Date.now, max = 500 } =
 // Ritorna { class, route, cached, error? }. Non lancia mai: in caso di errore
 // di rete/modello cade su errore_generico (= nessuna azione), che è il
 // comportamento prudente per una feature opzionale.
+// Chi arriva mentre la stessa pagina è già dal modello aspetta quella risposta: la scheda campiona due volte (#591).
+const pendingByCache = new WeakMap();
+
+// Una pagina della rete di casa non è mai bloccata per paese, e il suo testo non esce di casa (#591).
+function isHomeNetwork(host) {
+  const U = globalThis.SN_URL_NAV || (require('../../shared/urlNav.js'), globalThis.SN_URL_NAV);
+  return Boolean(U && U.isLocalHost(host));
+}
+
 async function classify(input = {}, { complete, cache, now = Date.now, signal } = {}) {
   const { title, text, statusCode, host, url } = input;
 
   // 1) Gate: se non è un caso ambiguo, non chiamare il modello.
-  if (!shouldClassify({ statusCode, text, deterministicHit: input.deterministicHit })) {
+  if (!shouldClassify({ statusCode, text, deterministicHit: input.deterministicHit }) || isHomeNetwork(host)) {
     return { class: null, route: routeForClass(null), cached: false, skipped: true };
   }
 
@@ -293,26 +302,37 @@ async function classify(input = {}, { complete, cache, now = Date.now, signal } 
   if (typeof complete !== 'function') {
     return { class: CLASSES.ERRORE_GENERICO, route: routeForClass(CLASSES.ERRORE_GENERICO), cached: false, error: 'no_model' };
   }
-  let cls = CLASSES.ERRORE_GENERICO;
-  let error = null;
-  let code = null;
-  try {
-    const { messages } = buildPrompt({ title, text, statusCode, host });
-    const res = await complete({ messages, signal });
-    const raw = typeof res === 'string' ? res : (res && (res.text || res.content)) || '';
-    cls = parseClassification(raw);
-  } catch (err) {
-    error = (err && err.message) || String(err);
-    code = (err && err.code) || null;
-    cls = CLASSES.ERRORE_GENERICO;
+  let pending = null;
+  if (cache) {
+    pending = pendingByCache.get(cache);
+    if (!pending) { pending = new Map(); pendingByCache.set(cache, pending); }
+    if (pending.has(key)) return { ...(await pending.get(key)) };
   }
+  const run = (async () => {
+    let cls = CLASSES.ERRORE_GENERICO;
+    let error = null;
+    let code = null;
+    try {
+      const { messages } = buildPrompt({ title, text, statusCode, host });
+      const res = await complete({ messages, signal });
+      const raw = typeof res === 'string' ? res : (res && (res.text || res.content)) || '';
+      cls = parseClassification(raw);
+    } catch (err) {
+      error = (err && err.message) || String(err);
+      code = (err && err.code) || null;
+      cls = CLASSES.ERRORE_GENERICO;
+    }
 
-  // 4) Memorizza (anche errore_generico: evita di ri-bombardare il modello su
-  // una pagina che non sa classificare; il TTL lo farà riprovare più tardi).
-  // Un rifiuto del limite di spesa no: non ha chiamato nessuno, e alzato il limite la pagina va classificata.
-  if (cache && code !== 'LIMIT_REACHED') { void now; cache.set(key, cls); }
+    // 4) Memorizza (anche errore_generico: evita di ri-bombardare il modello su
+    // una pagina che non sa classificare; il TTL lo farà riprovare più tardi).
+    // Un rifiuto del limite di spesa no: non ha chiamato nessuno, e alzato il limite la pagina va classificata.
+    if (cache && code !== 'LIMIT_REACHED') { void now; cache.set(key, cls); }
 
-  return { class: cls, route: routeForClass(cls), cached: false, ...(error ? { error } : {}), ...(code ? { code } : {}) };
+    return { class: cls, route: routeForClass(cls), cached: false, ...(error ? { error } : {}), ...(code ? { code } : {}) };
+  })();
+  if (!pending) return run;
+  pending.set(key, run);
+  try { return { ...(await run) }; } finally { pending.delete(key); }
 }
 
 const api = {

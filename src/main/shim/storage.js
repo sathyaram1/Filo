@@ -104,6 +104,10 @@ const INCOGNITO_READABLE = new Set([
   'settings', 'blocklist', 'sn_personal_dict', 'sn_autocorrect', 'sn_icon_layout',
 ]);
 
+// I conti di Filo (spesa del mese contro il limite, saldo dei crediti) valgono per tutte le finestre: in incognito si
+// leggono e si scrivono sul disco come fuori, se no il limite di spesa lì dentro non esiste (#591). Sono totali, non navigazione.
+const INCOGNITO_SHARED = new Set(['costs', 'credits']);
+
 function inIncognito() {
   const s = als.getStore();
   return !!(s && s.incognito);
@@ -128,6 +132,7 @@ function resetIncognito() {
 //   3) chiave di config in allowlist → valore dal disco (ereditato)
 //   4) altrimenti (memoria/navigazione) → undefined (invisibile)
 function incognitoReadKey(k) {
+  if (INCOGNITO_SHARED.has(k)) return STATE.data[k];
   if (k in INCOGNITO.data) return INCOGNITO.data[k];
   if (INCOGNITO.tombstones.has(k)) return undefined;
   if (INCOGNITO_READABLE.has(k)) return STATE.data[k];
@@ -247,7 +252,7 @@ async function get(keysOrNull) {
     // tombstoned) + ciò che l'incognito ha scritto nell'overlay.
     const out = {};
     for (const k of Object.keys(STATE.data)) {
-      if (INCOGNITO_READABLE.has(k) && !INCOGNITO.tombstones.has(k)) out[k] = STATE.data[k];
+      if ((INCOGNITO_READABLE.has(k) && !INCOGNITO.tombstones.has(k)) || INCOGNITO_SHARED.has(k)) out[k] = STATE.data[k];
     }
     for (const k of Object.keys(INCOGNITO.data)) out[k] = INCOGNITO.data[k];
     return out;
@@ -275,17 +280,20 @@ async function get(keysOrNull) {
 
 async function set(obj) {
   await loadIfNeeded();
+  let keys = Object.keys(obj);
   if (inIncognito()) {
     // Scrive solo nell'overlay in RAM: niente disco, niente flush e niente
     // emitChange (così non contamina i listener delle finestre normali).
-    for (const k of Object.keys(obj)) {
+    for (const k of keys) {
+      if (INCOGNITO_SHARED.has(k)) continue;
       INCOGNITO.data[k] = obj[k];
       INCOGNITO.tombstones.delete(k);
     }
-    return;
+    keys = keys.filter((k) => INCOGNITO_SHARED.has(k));
+    if (!keys.length) return;
   }
   const changes = {};
-  for (const k of Object.keys(obj)) {
+  for (const k of keys) {
     const oldValue = STATE.data[k];
     const newValue = obj[k];
     STATE.data[k] = newValue;
@@ -297,15 +305,17 @@ async function set(obj) {
 
 async function remove(keys) {
   await loadIfNeeded();
-  const list = Array.isArray(keys) ? keys : [keys];
+  let list = Array.isArray(keys) ? keys : [keys];
   if (inIncognito()) {
     // Rimuove dall'overlay e mette un tombstone: una lettura successiva torna
     // undefined anche se la chiave esiste su disco (finestre normali intatte).
     for (const k of list) {
+      if (INCOGNITO_SHARED.has(k)) continue;
       delete INCOGNITO.data[k];
       INCOGNITO.tombstones.add(k);
     }
-    return;
+    list = list.filter((k) => INCOGNITO_SHARED.has(k));
+    if (!list.length) return;
   }
   const changes = {};
   for (const k of list) {
