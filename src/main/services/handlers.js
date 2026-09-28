@@ -2646,7 +2646,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // funziona: nessuna chiamata al modello, nessuna rete. Vedi
   // `SN_ONBOARDING.isExitRequest`.
   let onbBefore = Onboarding ? await FiloMem.getOnboarding() : { done: true };
-  const onbActive = !!(Onboarding && !onbBefore.done);
+  // L'intervista comincia col benvenuto di Filo: un messaggio scritto prima (senza crediti) non ne è una risposta, e
+  // metterlo nella conversazione la faceva ripartire da lì, senza che Filo si presentasse mai.
+  const onbActive = !!(Onboarding && !onbBefore.done && onbBefore.thread.length > 0);
 
   // #525 — la chat si scrive su disco ADESSO, non alla chiusura: se l'app
   // muore a metà discussione, la discussione c'è lo stesso. I turni interni
