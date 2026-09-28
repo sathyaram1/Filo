@@ -39,6 +39,7 @@ class TtlCache {
   }
   set(k, v, ttl) { this.m.set(k, { v, exp: Date.now() + (ttl || this.ttl) }); return v; }
   has(k) { return this.get(k) !== undefined; }
+  ttlLeft(k) { const e = this.get(k) !== undefined && this.m.get(k); return e ? Math.max(1, e.exp - Date.now()) : 0; }
   delete(k) { this.m.delete(k); }
 }
 
