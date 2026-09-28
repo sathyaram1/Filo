@@ -1841,6 +1841,16 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
           return { executed: false, kept: false };
         }
       }
+      case 'DIMENTICA': {
+        if (!righeDaDimenticare.length) {
+          return { executed: false, kept: false, output: { error: 'nella memoria di Filo non c\'è una riga che corrisponda', rifiuto: true } };
+        }
+        const tolte = [];
+        for (const r of righeDaDimenticare) {
+          if (await FiloMem.forgetLine(r.via)) tolte.push(r.testo);
+        }
+        return { executed: tolte.length > 0, kept: false, output: { dimenticate: tolte } };
+      }
       case 'APRI_FILE':
         return { executed: true, kept: true };
       case 'ESEGUI_COMANDO': {
