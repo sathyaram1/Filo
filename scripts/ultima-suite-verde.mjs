@@ -135,7 +135,7 @@ export function testoFermoDopoIlVerde({ tag, oreDallUltima, commitDopoTag, verde
     'Cosa fare: apri l\'ultima corsa rossa qui sopra e guarda quale passo si ferma. Se è un passo che apre già il suo feedback (controlli unit, chiavi di default), quel feedback esiste ma è fermo: portalo avanti o chiedi all\'owner. Se il passo non apre niente (numero di versione rifiutato o server che non risponde, costruzione fallita, file mancanti nella bozza), il guasto sta tutto qui.',
   );
   if (esecuzione) righe.push('', `Registro di questa esecuzione: ${esecuzione}`);
-  return { titolo: `Pubblicazione ferma da ${giorni} giorni: c'è un commit verde ma la versione non esce`, testo: righe.join('\n') };
+  return { titolo: `Pubblicazione ferma${tag ? ` alla ${tag}` : ''} da ${giorni} giorni: c'è un commit verde ma la versione non esce`, testo: righe.join('\n') };
 }
 
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
