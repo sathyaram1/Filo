@@ -226,6 +226,11 @@ function ensureRequestHook(ses) {
       callback({ cancel: false });
       return;
     }
+    // Una sessione di servizio segue la catena di redirect della sua finestra; le risorse della pagina no.
+    if (details.resourceType === 'mainFrame' && Sessioni.eDiServizio(ses)) {
+      callback({ cancel: false });
+      return;
+    }
     if (s.enabled && isTrackerUrl(details.url)) {
       callback({ cancel: true });
       return;
