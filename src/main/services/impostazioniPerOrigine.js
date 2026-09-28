@@ -130,7 +130,10 @@ function indirizziDelMittente(sender) {
 
 function azioneAmmessaDa(action, origine) {
   if (isFilo(origine)) return true;
-  return !!action && typeof action === 'object' && AZIONI_WEB.has(String(action.type || '').toUpperCase());
+  if (!action || typeof action !== 'object') return false;
+  const type = String(action.type || '').toUpperCase();
+  if (!AZIONI_WEB.has(type)) return false;
+  return type !== 'NAVIGA' || indirizzoWeb(action.url ?? action.href ?? action.link);
 }
 
 // Un salvataggio di preferenze chiesto da un sito passa solo se tocca soltanto
