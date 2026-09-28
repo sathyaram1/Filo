@@ -305,15 +305,20 @@ export const CHIAVE_NON_PARTITA = 'suite:non-partita';
  * Le chiavi dell'allarme per i rossi nuovi: `suite:tests/<spec>.spec.mjs` per
  * ogni spec, e per un errore senza caso quella del file che nomina, o
  * `suite:fuori-dai-casi` se non ne nomina nessuno. Una per spec e non per
- * caso: dieci casi rotti dalla stessa modifica sono un guasto. PURA.
+ * caso: dieci casi rotti dalla stessa modifica sono un guasto. Lo strascico
+ * di un caso rosso non ha chiave sua: il guasto è quel caso. PURA.
  */
 export function chiaviDelVerdetto(v) {
+  const nuovi = Array.isArray(v?.nuovi) ? v.nuovi : [];
   const chiavi = [];
-  for (const c of Array.isArray(v?.nuovi) ? v.nuovi : []) {
+  for (const c of nuovi) {
+    if (c.strascicoDi) continue;
     const k = c.spec !== FUORI_DAI_CASI ? `suite:tests/${normalizzaSpec(c.spec)}.spec.mjs`
       : c.file ? chiaveDelFile(c.file) : 'suite:fuori-dai-casi';
     if (!chiavi.includes(k)) chiavi.push(k);
   }
+  // Un rosso nuovo c'è: l'allarme vuole una chiave, e «non partita» direbbe il falso.
+  if (!chiavi.length && nuovi.length) chiavi.push('suite:fuori-dai-casi');
   return chiavi;
 }
 
