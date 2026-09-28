@@ -154,11 +154,16 @@
   // questo modulo. `active` serve a done() e agli hook di test qui sotto.
   let active = null; // { host, root }
 
-  // Chi batteva un tasto un attimo fa sta scrivendo: un popup che si apre in
-  // quel momento gli lascia i tasti nel suo campo (#592).
+  // Chi batteva un carattere in un campo un attimo fa sta scrivendo: un popup che
+  // si apre in quel momento gli lascia i tasti nel suo campo (#592). L'Invio che
+  // spedisce e i tasti dati a un popup no: dopo, l'utente aspetta Filo.
   let ultimoTasto = -Infinity;
   try {
-    global.document.addEventListener('keydown', (e) => { if (e.isTrusted) ultimoTasto = performance.now(); }, true);
+    global.document.addEventListener('keydown', (e) => {
+      if (!e.isTrusted || active || !scrivibile(e.target)) return;
+      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) ultimoTasto = -Infinity;
+      else if (e.key && (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete')) ultimoTasto = performance.now();
+    }, true);
   } catch (_) {}
   const STA_SCRIVENDO_MS = 2000;
   const RITARDO_SI_MS = 500;
