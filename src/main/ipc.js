@@ -72,17 +72,18 @@ function registerIpcHandlers() {
     shellSessions.clear();
   });
 
-  // Config anti-fingerprinting per la pagina che sta per caricarsi. SINCRONO:
-  // il preload deve installare gli override PRIMA degli script di pagina, non
-  // può aspettare una Promise. Ritorna { level, seed }: il seed è derivato in
-  // main dal master secret (che NON attraversa mai questo confine). Vedi
-  // services/fingerprint.js e preload/fingerprint-guard.js.
-  ipcMain.on('filo:fp-config', (event, href) => {
-    try {
-      event.returnValue = require('./services/fingerprint').configForHref(href);
-    } catch (_) {
-      event.returnValue = { level: 0, seed: 0 };
+  // Preambolo della pagina che sta per caricarsi (preload/page-preload.js). SINCRONO:
+  // va installato PRIMA degli script di pagina. { level, seed } dell'anti-fingerprint
+  // (il master secret non attraversa mai questo confine) e gpc, letto dalla sessione
+  // del mittente perché la proprietà JS dica quello che dice il suo header.
+  ipcMain.on('filo:preambolo', (event, href, opts) => {
+    let gpc = false;
+    try { gpc = require('./services/cookies').gpcAttivo(event.sender && event.sender.session); } catch (_) {}
+    let fp = { level: 0, seed: 0 };
+    if (!(opts && opts.soloGpc)) {
+      try { fp = require('./services/fingerprint').configForHref(href) || fp; } catch (_) {}
     }
+    event.returnValue = { level: fp.level | 0, seed: fp.seed >>> 0, gpc };
   });
 
   // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi

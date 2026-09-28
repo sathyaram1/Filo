@@ -18,7 +18,7 @@
 //   - 'privacy' → attivo (uguale a default qui; l'isolamento del jar è lato main).
 //
 // GPC (navigator.globalPrivacyControl + header Sec-GPC) NON sta qui: la
-// proprietà è iniettata da tabs.js nel main world, l'header da services/cookies.js.
+// proprietà la mette il preambolo del preload, l'header services/cookies.js.
 
 (function (global) {
   'use strict';

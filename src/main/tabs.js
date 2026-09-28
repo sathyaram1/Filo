@@ -7,6 +7,7 @@ const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain 
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
+const Sessioni = require('./services/sessioni');
 const ProxyTab = require('./services/proxyTab');
 const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
@@ -88,9 +89,9 @@ function tabDiWebContents(wc) {
 // cosa: un evento di uscita non può essere il permesso per entrare. Su ogni
 // altro permesso si resta al comportamento di prima (senza gestore, Electron
 // concede), e questo è il motivo del `callback(true)` finale.
+// Si installa dal punto di nascita, come ogni gestore dei permessi (#586 compreso).
 function installaPermessi(ses) {
-  if (!ses || ses._filoPermessi) return;
-  ses._filoPermessi = true;
+  if (!ses) return;
   try {
     ses.setPermissionRequestHandler((wc, permission, callback) => {
       if (permission === 'fullscreen') {
@@ -101,6 +102,7 @@ function installaPermessi(ses) {
     });
   } catch (_) {}
 }
+Sessioni.allaNascita('permessi', installaPermessi);
 
 // #252 — pagina interna filo:// "singleton": ne ha senso UNA sola scheda alla
 // volta (le liste "Aperti per dopo"/Cronologia/Archivio/Scaricamenti, le
@@ -714,7 +716,6 @@ class TabManager {
     try {
       require('./services/downloads').attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
     } catch (_) {}
-    installaPermessi(view.webContents.session);
     return view;
   }
 
@@ -2000,19 +2001,6 @@ class TabManager {
       // d'autore: equivale al <link filo://style/...> ma ignora la CSP della
       // pagina, che altrimenti lo bloccherebbe (YouTube, Reddit, ...).
       try { wc.insertCSS(getContentScriptCss()); } catch (_) {}
-      // GPC (Global Privacy Control): proprietà JS nel mondo della pagina, gemella
-      // dell'header Sec-GPC. executeJavaScript gira nel main world e ignora la CSP
-      // (un <script> iniettato verrebbe bloccato dalla CSP di molti siti). Spenta
-      // in modalità manuale. È un segnale "future-proof": oggi pochi siti UE lo
-      // rispettano, il lavoro vero lo fa il rifiuto del banner CMP.
-      if (this.cookieMode !== Cookies.MODES.MANUAL) {
-        try {
-          wc.executeJavaScript(
-            'try{Object.defineProperty(navigator,"globalPrivacyControl",{get:function(){return true;},configurable:true});}catch(e){}',
-            true,
-          ).catch(() => {});
-        } catch (_) {}
-      }
     });
 
     wc.on('did-frame-finish-load', (_e, isMainFrame) => this._sbOnFrameLoad(tab, isMainFrame));

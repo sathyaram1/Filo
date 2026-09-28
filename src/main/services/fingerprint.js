@@ -8,7 +8,7 @@
 //
 // Questo modulo (main process) custodisce il "master secret" persistente e
 // calcola, per ogni origine, il seed del rumore. Il seed — NON il secret —
-// viene passato al preload via IPC sincrono (vedi ipc.js `filo:fp-config`) e di
+// viene passato al preload via IPC sincrono (vedi ipc.js `filo:preambolo`) e di
 // lì iniettato nel main world della pagina (vedi preload/fingerprint-guard.js).
 // Così il secret non tocca mai il mondo non fidato della pagina.
 //
@@ -102,7 +102,7 @@ function isoWeekId(d = new Date()) {
 function seedForOrigin(origin) {
   // Garantisce un master secret anche se init() non ha ancora caricato/generato
   // quello persistente. Senza questo, una pagina che chiede la config nella
-  // finestra di avvio (IPC sincrono filo:fp-config, prima che whenReady completi
+  // finestra di avvio (IPC sincrono filo:preambolo, prima che whenReady completi
   // init) otterrebbe seed 0 = protezione anti-fingerprint silenziosamente spenta.
   // Il fallback effimero la tiene attiva; init() poi sovrascrive _secret con
   // quello persistente (coerente fra riavvii).

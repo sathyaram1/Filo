@@ -1,5 +1,5 @@
 // Gestione cookie / consenso (src/main/services/cookies.js + content/cookies.js
-// + GPC in tabs.js). I test asseriscono il COMPORTAMENTO visibile all'utente:
+// + preambolo GPC nel preload). I test asseriscono il COMPORTAMENTO visibile all'utente:
 //
 //   - GPC: in modalità "default" le pagine esterne ricevono sia l'header
 //     Sec-GPC:1 sia navigator.globalPrivacyControl === true; in "manuale" NO

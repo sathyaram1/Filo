@@ -69,6 +69,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoHandlers = require('./services/handlers');
     globalThis.__filoDefaults = require('./services/defaultsStore');
     globalThis.__filoCookies = require('./services/cookies');
+    globalThis.__filoSessioni = require('./services/sessioni');
     globalThis.__filoAdblock = require('./services/adblock');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');

@@ -143,27 +143,26 @@ if (!IS_SUBFRAME) {
   try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer }); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
 }
 
-// ─── Protezione anti-fingerprinting ────────────────────────────────────────
+// ─── Preambolo nel MAIN WORLD: GPC e anti-fingerprinting ─────────────────────
 //
-// Inietta nel MAIN WORLD (prima degli script di pagina) gli override di
-// canvas/WebGL/audio che aggiungono rumore deterministico per-sito ai segnali
-// ad alta entropia. Il seed arriva SINCRONO dal main (HMAC col master secret),
-// così il secret non tocca mai il mondo non fidato della pagina. Solo http(s);
-// se la protezione è spenta (livello 0) non iniettiamo nulla.
-// Solo nel frame principale: la protezione si applica alla pagina che l'utente
-// ha aperto. Estenderla a ogni riquadro incorporato cambierebbe i segnali di
-// widget di terze parti (mappe, player) che oggi non tocchiamo — è una scelta
-// a sé, non un effetto collaterale del tasto destro nei riquadri (#405).
-if (!IS_SUBFRAME) try {
+// Gira prima degli script di pagina (webFrame.executeJavaScript valuta nel main
+// world e ignora la CSP). La config arriva SINCRONA dal main: il seed è un HMAC
+// col master secret, che così non tocca mai il mondo non fidato della pagina.
+// GPC vale in ogni frame e segue l'header della sessione (spento in Manuale).
+// L'anti-fingerprint resta al solo frame principale http(s): estenderlo ai
+// riquadri cambierebbe i segnali di widget di terze parti (mappe, player), ed è
+// una scelta a sé (#405).
+try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  if (/^https?:/i.test(loc)) {
-    const cfg = ipcRenderer.sendSync('filo:fp-config', loc) || { level: 0, seed: 0 };
-    if (cfg && cfg.level > 0) {
-      const { buildGuardSource } = require('./fingerprint-guard.js');
+  if (!/^filo:/i.test(loc)) {
+    const cfg = ipcRenderer.sendSync('filo:preambolo', loc, { soloGpc: IS_SUBFRAME }) || {};
+    const { buildGuardSource, buildGpcSource } = require('./fingerprint-guard.js');
+    if (cfg.gpc) webFrame.executeJavaScript(buildGpcSource(), true).catch(() => {});
+    if (!IS_SUBFRAME && cfg.level > 0 && /^https?:/i.test(loc)) {
       webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level), true).catch(() => {});
     }
   }
-} catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
+} catch (e) { /* il preambolo non deve MAI bloccare il caricamento della pagina */ }
 
 // ─── chrome.* shim per i content script ────────────────────────────────────
 //

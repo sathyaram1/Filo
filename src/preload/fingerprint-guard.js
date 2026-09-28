@@ -1,4 +1,4 @@
-// Costruisce il sorgente JS (stringa) della "guardia anti-fingerprint" da
+// Costruisce i sorgenti JS del preambolo (guardia anti-fingerprint e GPC) da
 // iniettare nel MAIN WORLD di una pagina web esterna.
 //
 // Gira PRIMA degli script della pagina (lo inietta page-preload.js via
@@ -171,4 +171,20 @@ function buildGuardSource(seed, level) {
 })();`;
 }
 
-module.exports = { buildGuardSource };
+// GPC nel mondo della pagina, gemello dell'header Sec-GPC: sul prototipo e con getter "nativo",
+// come nei browser che lo implementano, così uno script in <head> lo legge già.
+function buildGpcSource() {
+  return `(function(){
+  try {
+    var P = window.Navigator && window.Navigator.prototype;
+    if (!P || Object.getOwnPropertyDescriptor(P, 'globalPrivacyControl')) return;
+    var get = function () { return true; };
+    var ts = function toString() { return 'function get globalPrivacyControl() { [native code] }'; };
+    Object.defineProperty(get, 'name', { value: 'get globalPrivacyControl', configurable: true });
+    Object.defineProperty(get, 'toString', { value: ts, configurable: true, writable: true });
+    Object.defineProperty(P, 'globalPrivacyControl', { get: get, enumerable: true, configurable: true });
+  } catch (e) {}
+})();`;
+}
+
+module.exports = { buildGuardSource, buildGpcSource };

@@ -34,7 +34,8 @@ async function detonate(url, evaluateFinal) {
   if (!el || !el.BrowserWindow || !el.session) return null;
 
   const partition = `filo-detonate-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const ses = el.session.fromPartition(partition, { cache: false });
+  // Senza GPC né blocchi: un redirect che passa da un host-tracker va seguito fino in fondo.
+  const ses = require('../sessioni').senzaProtezione(() => el.session.fromPartition(partition, { cache: false }));
 
   let downloadStarted = false;
   let downloadName = '';
