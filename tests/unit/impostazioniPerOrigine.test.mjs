@@ -122,15 +122,18 @@ test('da un sito si chiedono solo le azioni della barra d\'aiuto, confermate o n
   assert.equal(W.azioneAmmessaDa(null, web), false);
 });
 
-// La barra d'aiuto dei siti emette le azioni che il suo prompt le descrive: una
-// che manca dalla lista smetterebbe di funzionare solo sui siti.
-test('sentinella: ogni azione di Filo descritta alla barra d\'aiuto è fra quelle ammesse dai siti', () => {
+// La barra d'aiuto dei siti emette le azioni che il suo prompt le descrive e quelle
+// che manda da sé (apri il link): una che manca dalla lista si spegne solo sui siti.
+test('sentinella: ogni azione di Filo che la barra d\'aiuto chiede è fra quelle ammesse dai siti', () => {
   require(join(ROOT, 'src', 'shared', 'preferences.js'));
   require(join(ROOT, 'src', 'shared', 'actionLevels.js'));
   const src = readFileSync(join(ROOT, 'src', 'shared', 'constants.js'), 'utf8');
   const descritte = [...src.matchAll(/"action":\s*"filo",\s*"filo":\s*\{\s*"type":\s*"([A-Z_]+)"/g)].map((m) => m[1]);
   assert.ok(descritte.includes('INVIA_FEEDBACK'), 'la sentinella non vede più le azioni del prompt della barra d\'aiuto');
-  assert.deepEqual(descritte.filter((t) => !W.AZIONI_WEB.has(t)), [], 'azioni della barra d\'aiuto non ammesse dai siti');
+  const siti = scriptDeiSiti().map((x) => x.src).join('\n');
+  const mandate = [...siti.matchAll(/runFiloAction\(\s*\{\s*type:\s*['"]([A-Za-z_]+)['"]/g)].map((m) => m[1].toUpperCase());
+  assert.ok(mandate.includes('NAVIGA'), 'la sentinella non vede più le azioni che la barra manda da sé');
+  assert.deepEqual([...descritte, ...mandate].filter((t) => !W.AZIONI_WEB.has(t)), [], 'azioni della barra d\'aiuto non ammesse dai siti');
   for (const t of W.AZIONI_WEB) assert.ok(globalThis.SN_ACTION_LEVELS.levelFor({ type: t }), `azione ammessa inesistente: ${t}`);
 });
 
