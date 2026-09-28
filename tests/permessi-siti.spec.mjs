@@ -88,8 +88,14 @@ test('notifiche: la pagina aspetta, nessun sì senza risposta; «Consenti» dall
   // E si dimentica: il sito sparisce dalla lista e la prossima volta si torna a chiedere.
   await voce.locator('.sn-perm-dimentica').click();
   await expect(voce).toHaveCount(0);
+  await expect(sec.locator('#perm-list .sn-perm-vuoto')).toBeVisible();
   await avvia(page, 'chiediNotifiche');
+  // La scheda in sottofondo lo segnala; la domanda si vede tornandoci.
+  await expect(shell.locator('.tab .perm-ind')).toHaveCount(1, { timeout: 10_000 });
   await expect(riga(shell)).toHaveCount(0);
+  await shell.locator('.tab', { has: shell.locator('.perm-ind') }).click();
+  await expect(riga(shell)).toHaveCount(1);
+  await expect(shell.locator('.tab .perm-ind')).toHaveCount(0);
 });
 
 test('fotocamera e microfono: «Nega» si ricorda, dal tasto destro sulla scheda si consentono e la pagina riceve il flusso', async ({ app, shell, openTab, testServer }) => {
