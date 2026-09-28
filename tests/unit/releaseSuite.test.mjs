@@ -102,6 +102,8 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     assert.match(passo.corpo, /suite-risultati\.json/);
     assert.match(passo.corpo, /test-results\//, 'senza screenshot e trace dei rossi, chi prende il feedback rilancia un\'ora di suite');
     assert.match(passo.corpo, /if:\s*always\(\)/, 'l\'artifact va caricato anche a suite rossa: è proprio allora che serve');
+    assert.match(passo.corpo, /continue-on-error:\s*true/,
+      'un caricamento fallito farebbe rossa una suite verde, e l\'allarme la chiamerebbe «suite non partita»');
   });
 
   describe('un rosso nuovo su main apre un feedback', () => {
