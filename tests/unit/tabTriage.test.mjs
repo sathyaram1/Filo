@@ -81,14 +81,3 @@ test('un duplicato con form non inviato non viene collassato', () => {
   assert.equal(dup.has(1), false);
   assert.equal(dup.size, 0);
 });
-
-// #591 — il riordino manda al modello titolo, indirizzo e testo: le pagine della rete di casa non sono candidate.
-test('le pagine della rete di casa non entrano nel riordino automatico', async () => {
-  await import('../../src/shared/urlNav.js');
-  const T = globalThis.SN_TAB_TRIAGE;
-  for (const u of ['http://192.168.1.1/', 'http://nas.local:5000/', 'http://localhost:3000/', 'http://[fd00::1]/x']) {
-    assert.equal(T.isTriageableUrl(u), false, u);
-  }
-  assert.equal(T.isTriageableUrl('https://example.com/'), true);
-  assert.equal(T.isTriageableUrl('filo://newtab/newtab.html'), true);
-});

@@ -157,3 +157,29 @@ test('una scheda chiusa della rete di casa non va al modello per riassunto e ind
     await ripristina(app);
   }
 });
+
+// Il riordino automatico delle schede: di una pagina della rete di casa al modello arrivano solo i segnali di Filo.
+test('il riordino non manda al modello titolo, indirizzo e testo delle pagine della rete di casa', async ({ app }) => {
+  await prepara(app);
+  try {
+    const inviato = await app.evaluate(async () => {
+      await globalThis.SN_STORAGE.updateSettings({ monthlyLimitEur: 0 });
+      let testo = '';
+      const P = globalThis.SN_PROVIDERS;
+      const prima = P.completeWithFallback;
+      P.completeWithFallback = async (o) => { testo = JSON.stringify(o.messages); return prima(o); };
+      try {
+        await globalThis.__filoHandlers.runTabTriageDecision({ tabs: [
+          { url: 'http://192.168.1.1/admin?stok=abc', title: 'Router di casa', contentExtract: 'Password Wi-Fi: segreta', idleMin: 300 },
+          { url: 'https://ricette.esempio.it/torta', title: 'Torta di mele', contentExtract: 'Farina e uova', idleMin: 200 },
+        ] });
+      } finally { P.completeWithFallback = prima; }
+      return testo;
+    });
+    expect(inviato).toContain('Torta di mele');
+    expect(inviato).toContain('inattiva da 300min');
+    for (const privato of ['Router di casa', '192.168.1.1', 'stok=abc', 'Password Wi-Fi']) expect(inviato).not.toContain(privato);
+  } finally {
+    await ripristina(app);
+  }
+});

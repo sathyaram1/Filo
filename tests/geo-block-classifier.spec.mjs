@@ -40,7 +40,8 @@ async function startServer() {
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   return {
-    origin: `http://127.0.0.1:${server.address().port}`,
+    // Un nome da internet (la fixture lo porta al loopback): una pagina della rete di casa non va al classificatore (#591).
+    origin: `http://sito-pubblico.test:${server.address().port}`,
     async close() {
       try { server.closeAllConnections?.(); } catch (_) {}
       await new Promise((r) => server.close(r));
@@ -120,7 +121,7 @@ test('geo-block livello 2: solo geo_block dalla coda ambigua emette il segnale (
     const sig = (await signals())[0];
     expect(sig.source).toBe('llm_classifier');
     expect(sig.detail).toBe('geo_block');
-    expect(sig.host).toBe('127.0.0.1');
+    expect(sig.host).toBe('sito-pubblico.test');
     // Col fornitore la matrice d'azione riprova da sola attraverso di lui.
     await expect.poll(async () => (await webTabGeo(app)).proxy, { timeout: 15_000 })
       .toEqual({ country: 'us', tier: 'datacenter' });

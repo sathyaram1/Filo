@@ -3412,6 +3412,9 @@ async function handleMessage(msg, sender = {}) {
   return { ok: false, error: `Tipo messaggio sconosciuto: ${msg.type}` };
 }
 
+// Una pagina della rete di casa (router, NAS, localhost) non va ai lavori automatici col modello (#591).
+const isHomeNetworkUrl = (url) => Boolean(url && globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.isHomeNetworkUrl(url));
+
 // §2.1 — decisione LLM di triage tab. Riceve i metadati/segnali di TUTTE le tab
 // candidate + (opz.) un estratto del contenuto e la memoria a lungo termine, e
 // torna per ciascuna una decisione keep/archive con motivazione. Batch unico.
@@ -3460,7 +3463,11 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
   const E = globalThis.SN_ESTERNO;
   const campo = (v) => E.neutralizza(v, { unaRiga: true });
   const lines = tabs.map((t, i) => {
-    const parts = [`#${i}`, t.title ? `"${campo(String(t.title).slice(0, 120))}"` : '', campo(t.url || '')];
+    // Di una pagina della rete di casa al modello arrivano solo i segnali di Filo: titolo, indirizzo e testo restano qui (#591).
+    const casa = isHomeNetworkUrl(t.url);
+    const parts = casa
+      ? [`#${i}`, '[pagina della rete di casa]']
+      : [`#${i}`, t.title ? `"${campo(String(t.title).slice(0, 120))}"` : '', campo(t.url || '')];
     const sig = [];
     if (typeof t.idleMin === 'number') sig.push(`inattiva da ${t.idleMin}min`);
     if (typeof t.ageMin === 'number') sig.push(`aperta da ${t.ageMin}min`);
@@ -3469,7 +3476,7 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
     if (t.audible) sig.push('audio in riproduzione');
     if (Array.isArray(t.coOpenUrls) && t.coOpenUrls.length) sig.push(`co-aperte: ${t.coOpenUrls.length}`);
     let s = parts.filter(Boolean).join(' ') + (sig.length ? ` [${sig.join(', ')}]` : '');
-    if (t.contentExtract) s += `\n   estratto: ${campo(String(t.contentExtract).slice(0, 500).replace(/\s+/g, ' '))}`;
+    if (t.contentExtract && !casa) s += `\n   estratto: ${campo(String(t.contentExtract).slice(0, 500).replace(/\s+/g, ' '))}`;
     return s;
   }).join('\n');
 
@@ -3512,8 +3519,6 @@ function cosineInt(a, b) {
   if (!na || !nb) return 0;
   return s / (Math.sqrt(na) * Math.sqrt(nb));
 }
-
-const isHomeNetworkUrl = (url) => Boolean(url && globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.isHomeNetworkUrl(url));
 
 // Completamento LLM one-shot per un'azione (risolve modello/chiave/limite e
 // registra il costo). Ritorna il testo. Usato da riassunto, triage, re-rank.
