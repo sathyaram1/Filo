@@ -101,7 +101,7 @@
       // main (src/main/services/handlers.js → src/shared/urlExfil.js); mai l'LLM.
       level: (a) => (a && a._exfil ? 2 : 1),
       describe: (a) => {
-        const url = a.url || a.href || a.link || 'una pagina';
+        const url = indirizzoDi(a) || 'una pagina';
         if (a && a._exfil) {
           const why = a._exfilReason ? ` (${a._exfilReason})` : '';
           return `Filo sta per aprire un link che${why}:\n${url}\n\n`
@@ -273,7 +273,7 @@
       // che porta fuori dati del contesto sale a 2 come NAVIGA (`_exfil` lo calcola il main, mai l'LLM).
       level: (a) => (a && a._exfil ? 2 : 1),
       describe: (a) => {
-        const url = (a && (a.url || a.href || a.link)) || '';
+        const url = indirizzoDi(a);
         if (!url && a && a.scheda) return `Leggere la pagina aperta nella scheda ${a.scheda}`;
         if (a && a._exfil) {
           const why = a._exfilReason ? ` (${a._exfilReason})` : '';
@@ -496,5 +496,17 @@
     try { return (entry.describeDone ? entry.describeDone(action) : entry.describe(action)) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone };
+  // L'indirizzo di un'azione che esce in rete, preso da tutti i campi che l'esecuzione accetta: il freno contro
+  // l'esfiltrazione, il popup e chi esegue leggono lo stesso campo, o un campo in più diventa una porta (#553).
+  const CAMPI_INDIRIZZO = ['url', 'href', 'link', 'indirizzo'];
+  function indirizzoDi(action) {
+    if (!action || typeof action !== 'object') return '';
+    for (const k of CAMPI_INDIRIZZO) {
+      const v = action[k];
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+    return '';
+  }
+
+  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone, indirizzoDi };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

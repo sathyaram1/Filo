@@ -37,7 +37,7 @@ const conRete = async (fn) => {
 
 test('una pagina scaricata torna col suo testo leggibile e il suo titolo', async () => {
   const url = verso('/listino', {
-    corpo: '<html><head><title>Listino</title></head><body><nav>MENU</nav><main><h1>Prezzi</h1>'
+    corpo: '<html><head><title>Listino</title></head><body><nav><a href="/">MENU</a></nav><main><h1>Prezzi</h1>'
       + '<p>Il modello Lampo costa 0,07 dollari per milione di token in ingresso, secondo il listino ufficiale di oggi.</p>'
       + '<p>Il modello Kappa costa 0,95 dollari per milione di token in ingresso e quattro in uscita, più caro ma migliore.</p>'
       + '</main></body></html>',

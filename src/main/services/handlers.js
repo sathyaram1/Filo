@@ -1259,11 +1259,11 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
   if (type === 'NAVIGA' || type === 'LEGGI_PAGINA') {
     try {
       const Exfil = globalThis.SN_URL_EXFIL;
-      const url = String(action.url ?? action.href ?? action.link ?? '').trim();
+      const url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
       if (Exfil && url) {
         const origin = sender?.tab?.url || sender?.url || '';
         const fromUntrusted = /^https?:/i.test(origin);
-        const corpus = await navExfilCorpus();
+        const corpus = [await navExfilCorpus(), PageRead.materialeRiservato(url)].filter(Boolean).join('\n');
         const v = Exfil.assess(url, { corpus, fromUntrusted });
         if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
       }
@@ -1365,7 +1365,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // aprire → vuole arrivarci) — a meno che l'azione chieda il SECONDO
         // PIANO (#376, vedi sotto). La bolla conserva comunque un riferimento
         // cliccabile per riaprirlo (kept:true).
-        const url = String(action.url ?? action.href ?? action.link ?? '').trim();
+        const url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
         if (!url) return { executed: false, kept: false };
         // SICUREZZA: l'agente non apre schemi non-web. Una pagina ostile può
         // iniettare istruzioni nel modello (prompt injection) per fargli aprire
@@ -1395,6 +1395,8 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           if (tm && typeof tm.openTab === 'function') {
             tabId = tm.openTab(url, { activate: !background });
             opened = true;
+            const t = (tm.tabs || []).find((x) => x && x.id === tabId);
+            if (t && t.view) PageRead.ricordaApertura(t.view.webContents, url);
           }
         } catch (e) {
           console.warn('[Filo] apertura link fallita', e?.message || e);
@@ -1742,6 +1744,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
             output: { documentRead: String(percorso == null ? '' : percorso), ok: false, error: 'unreadable', detail: 'lettura non disponibile' },
           };
         }
+        if (r.ok) PageRead.ricordaLetturaRiservata(r.text);
         return {
           executed: !!r.ok,
           kept: true,
@@ -1771,7 +1774,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       case 'LEGGI_PAGINA': {
         // #553 — il testo di una pagina web torna al modello (dalla scheda se è aperta, se no scaricato):
         // prima poteva solo cercare e aprire, e ogni dato DENTRO una pagina restava da indovinare dagli snippet.
-        let url = action.url ?? action.href ?? action.link ?? action.indirizzo ?? '';
+        let url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
         const da = Number(action.da ?? action.offset ?? action.from ?? 0) || 0;
         // «Cosa dice la pagina che ho aperto?»: nello STATO il modello vede le schede per titolo e numero, non per
         // indirizzo. Il numero si risolve qui, sullo stesso elenco nello stesso ordine.
@@ -1834,6 +1837,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const cwd = getAssistantCwd(sender);
         const out = await runCommand(cmd, { shell, cwd, trackCwd: true });
         if (out.cwd) setAssistantCwd(sender, out.cwd);
+        PageRead.ricordaLetturaRiservata(`${out.stdout || ''}\n${out.stderr || ''}`);
         return { executed: out.code === 0, kept: true, output: out };
       }
       // ── proxy per-tab via linguaggio naturale (#152) ───────────────────────
@@ -2482,6 +2486,10 @@ function pageReadsForPrompt(actions) {
         + `richiama LEGGI_PAGINA con lo stesso url e da: ${fino}.]`;
     }
     if (out.scaricataInParte) blocco += '\n[La pagina supera i 5 MB: ne è arrivata solo la prima parte.]';
+    if (out.lettaInParte) {
+      blocco += '\n[La scheda aperta è troppo grande per leggerla tutta: qui sopra c\'è solo la sua prima parte. Se il dato '
+        + 'non c\'è, dillo all\'utente invece di concludere che la pagina non lo contiene.]';
+    }
     if (out.soloJavaScript) {
       blocco += '\n[La pagina è quasi vuota: forse si costruisce in JavaScript. Se il dato non c\'è, aprila con NAVIGA con '
         + 'background: true e poi rileggila con LEGGI_PAGINA, che la legge dalla scheda.]';

@@ -1,5 +1,5 @@
-// Dal codice HTML al testo che Filo legge con LEGGI_PAGINA (#553): il contenuto resta, il contorno del sito no.
-// Il numero dentro una tabella deve arrivare; menu, cookie, pubblicità e script non devono mangiarsi il tetto.
+// Dal codice HTML al testo che Filo legge con LEGGI_PAGINA (#553): prima il contenuto, poi il contorno, poi i chiusi.
+// Il dato chiesto deve arrivare qualunque nome abbia il suo riquadro; navigazione, cookie, pubblicità e script no.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

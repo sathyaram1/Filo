@@ -163,10 +163,10 @@
       // Una riga di azione: icona e due parole («Timer avviato · 5 min»).
       // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la
       // conta — «Ha avviato un timer» su un timer non avviato è una bugia.
-      addRow(type, rowIcon, text, failed = false) {
+      addRow(type, rowIcon, text, failed = false, title = '') {
         closeTurnReasoning();
         if (!failed) doneTypes.push(String(type || '').toUpperCase());
-        append(makeActivityRow(rowIcon, text));
+        append(makeActivityRow(rowIcon, text, title));
         if (phase !== 'done') setPhase('act', text);
       },
       // Esito di un comando eseguito subito (livello 1): riga di comando e
@@ -292,9 +292,10 @@
   // chi disegna una risposta senza blocco (replay, altre superfici) — fra le
   // azioni della bolla. Tiene la classe della traccia (#376): non è un bottone
   // e non deve sembrarlo.
-  function makeActivityRow(rowIcon, text) {
+  function makeActivityRow(rowIcon, text, title = '') {
     const el = document.createElement('div');
     el.className = 'dash-action-step dash-activity-row';
+    if (title) el.title = title;
     const ic = document.createElement('span');
     ic.className = 'dash-activity-row-icon';
     ic.setAttribute('aria-hidden', 'true');
@@ -366,7 +367,7 @@
       return { icon: '📄', text: nome ? `Leggo il documento: ${nome}` : 'Leggo il documento' };
     },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
-    LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a) }),
+    LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a), title: indirizzoLetto(a) }),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
     // del tutto, e l'utente non sapeva dove fosse finito il suo appunto.
     SALVA_APPUNTO: (a) => {
@@ -456,16 +457,22 @@
     return null;
   }
   // «Leggo la pagina: <titolo>». Il titolo lo scrive il sito: una riga sola e corta, e senza titolo si nomina il sito.
+  // Il titolo se lo scrive il sito, quindi da solo non dice dove è andato Filo: accanto il sito, e se la pagina era
+  // la scheda dell'utente (dentro il suo accesso) lo si dice. L'indirizzo intero sta sotto il puntatore.
   function rigaLetturaPagina(a) {
     const o = (a && a._output) || {};
-    let nome = String(o.titolo || '').replace(/[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim();
-    if (!nome) {
-      try { nome = new URL(o.url || a.url || '').hostname.replace(/^www\./, ''); } catch (_) { nome = ''; }
-    }
-    if (nome.length > 80) nome = `${nome.slice(0, 77)}…`;
+    let titolo = String(o.titolo || '').replace(/[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (titolo.length > 60) titolo = `${titolo.slice(0, 57)}…`;
+    let sito = '';
+    try { sito = new URL(o.url || a.url || '').hostname.replace(/^www\./, ''); } catch (_) { sito = ''; }
     const seguito = Number(o.da || a.da || 0) > 0;
     const verbo = seguito ? 'Leggo il seguito della pagina' : 'Leggo la pagina';
-    return nome ? `${verbo}: ${nome}` : verbo;
+    const parti = [titolo, sito !== titolo ? sito : '', o.fonte === 'scheda' ? 'dalla tua scheda' : ''].filter(Boolean);
+    return parti.length ? `${verbo}: ${parti.join(' · ')}` : verbo;
+  }
+  function indirizzoLetto(a) {
+    const o = (a && a._output) || {};
+    return String(o.url || (a && a.url) || '').slice(0, 300);
   }
   // La ragione del fallimento, quando il main la conosce.
   function motivoFallimento(a) {
@@ -494,7 +501,7 @@
       return true;
     }
     const row = activityRowFor(a);
-    if (row) { activity.addRow(a.type, row.icon, row.text, !!row.failed); return true; }
+    if (row) { activity.addRow(a.type, row.icon, row.text, !!row.failed, row.title || ''); return true; }
     return false;
   }
 
@@ -533,7 +540,7 @@
       } else {
         const row = activityRowFor(a);
         if (row) {
-          wrap.appendChild(makeActivityRow(row.icon, row.text));
+          wrap.appendChild(makeActivityRow(row.icon, row.text, row.title || ''));
           if (!anche) continue;
         }
       }
@@ -890,7 +897,9 @@
     }
     if (type === 'LEGGI_PAGINA') {
       // Traccia, non bottone: la pagina l'ha letta Filo per sé, e la risposta cita i link che contano.
-      return stepTrace(`🌐 ${rigaLetturaPagina(a)}`);
+      const traccia = stepTrace(`🌐 ${rigaLetturaPagina(a)}`);
+      traccia.title = indirizzoLetto(a);
+      return traccia;
     }
     if (type === 'LEGGI_TRASPARENZA') {
       // Traccia del passo intermedio: Filo rilegge le scelte dell'owner messe
