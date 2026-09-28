@@ -295,7 +295,7 @@ describe('ogni allarme dice al server cosa è rotto', () => {
       assert.ok(chiamate.length, `${f} non chiama più inviaAllarme`);
       for (const c of chiamate) assert.match(c, /Allarme\([^,]+,[^,]+,[^)]+\)/, `${f}: ${c} senza chiavi`);
     }
-    assert.match(SCEGLI_JS, /spedisciAllarme\(titolo, testo, \[CHIAVE_FERMO_DOPO_VERDE\]\)/,
+    assert.match(SCEGLI_JS, /spedisciAllarme\(titolo, testo, \[chiaveDelFermo\(CHIAVE_FERMO_DOPO_VERDE, tag\)\]\)/,
       'un verde fermo da giorni deve aprire il suo feedback');
     assert.match(readFileSync(resolve(ROOT, 'scripts', 'bake-default-config.mjs'), 'utf8'), /keys: chiaviAllarmeBake\(mancanti\)/);
   });
