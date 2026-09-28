@@ -116,9 +116,7 @@ async function main() {
   const oreDallUltima = pubblicataIl ? (Date.now() - Date.parse(pubblicataIl)) / 3.6e6 : NaN;
   const commitDopoTag = tag ? soloCodice(tag, 'HEAD') : 0;
   // Un verde più vecchio del tag farebbe ripubblicare codice vecchio sotto un numero nuovo.
-  const verdeDopoTag = Boolean(verde) && (!tagSha || (verde !== tagSha
-    && gitForse('merge-base', '--is-ancestor', tagSha, verde) !== null
-    && (() => { try { git('merge-base', '--is-ancestor', tagSha, verde); return true; } catch { return false; } })()));
+  const verdeDopoTag = Boolean(verde) && (!tagSha || (verde !== tagSha && eAntenato(tagSha, verde)));
   const sha = verdeDopoTag ? verde : '';
   const corsaVerde = verde ? corseVerdi(runs).get(verde) : null;
   const esecuzione = process.env.GITHUB_RUN_ID
