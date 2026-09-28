@@ -211,7 +211,8 @@ function fornitoreUsabile(nome, C) {
   if (typeof nome !== 'string' || !nome) return false;
   if ((C.PRODUCER_DIRECT_PROVIDERS || []).includes(nome)) return false;
   if (nome === (C.DEFAULT_PROVIDER || 'openrouter')) return true;
-  try { return Boolean(globalThis.SN_PROVIDERS && globalThis.SN_PROVIDERS.getProvider(nome)); } catch (_) { return false; }
+  const P = globalThis.SN_PROVIDERS;
+  try { return Boolean(P && P.getProvider(nome)); } catch (_) { return false; }
 }
 
 function get() {
