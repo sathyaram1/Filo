@@ -467,5 +467,6 @@
     comandoNavigazione, etichettaIndietro, etichettaAvanti,
     tastiRiservati, riservato,
     tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, combacia, pressioneScritta, delSistema,
+    simboloConShift,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
