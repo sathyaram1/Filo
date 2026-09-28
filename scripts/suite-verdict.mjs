@@ -294,7 +294,9 @@ export function verdetto(json, noti) {
  * «errore fuori dai casi: <testo>» per un rosso senza caso. PURA.
  */
 export function rigaRosso(c) {
-  if (c.spec === FUORI_DAI_CASI) return `errore fuori dai casi: ${c.titolo}`;
+  if (c.spec === FUORI_DAI_CASI) {
+    return `errore fuori dai casi: ${c.titolo}${c.strascicoDi ? ` (strascico di ${c.strascicoDi}, non un guasto a sé)` : ''}`;
+  }
   return `tests/${c.spec}.spec.mjs › ${c.titoloCompleto || c.titolo}`;
 }
 
