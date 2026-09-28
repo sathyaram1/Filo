@@ -156,3 +156,33 @@ test('lettura fallita una volta: Riprova porta conversazione e rombo verde', asy
   await rombo(page).click();
   await expect(pannello(page)).toContainText('DOMANDA-L3');
 });
+
+test('rispondere subito, mentre la conversazione arriva: la risposta si aggiunge in coda, il report resta', async ({ app, openTab }) => {
+  await firestoreFinto(app, { ritardoMs: 2500 });
+  const page = await apri(openTab);
+  await scheda(page).click();
+  await page.locator('#mgClarifyText').fill('Scelgo A.');
+  await page.locator('#mgClarifyBtn').click();
+  await expect.poll(() => page.evaluate(() => window.__inviati.length), { timeout: 15000 }).toBe(1);
+  const inviato = await page.evaluate(() => window.__inviati[0]);
+  expect(inviato.id).toBe(ID);
+  expect(inviato.notes.startsWith(DOC.notes)).toBe(true);
+  expect(inviato.notes).toContain('Scelgo A.');
+});
+
+test('passare in fretta da una pratica all\'altra mentre arrivano: ognuna mostra la sua conversazione', async ({ app, openTab }) => {
+  await firestoreFinto(app, { ritardoMs: 1500 });
+  const page = await apri(openTab, [ID, ALTRA]);
+  await scheda(page).click();
+  await scheda(page, ALTRA).click();
+  const detail = page.locator('#mgDetail');
+  await expect(detail).toContainText('ALTRA-CONVERSAZIONE', { timeout: 15000 });
+  await page.waitForTimeout(2000);
+  await expect(detail).not.toContainText('TURNO-TRE');
+  await rombo(page).click();
+  await expect(pannello(page)).toContainText('ALTRA-DOMANDA');
+  await scheda(page).click();
+  await expect(detail).toContainText('TURNO-TRE', { timeout: 15000 });
+  await expect(detail).not.toContainText('ALTRA-CONVERSAZIONE');
+  await expect(rombo(page)).toHaveClass(/mg-forma--design/);
+});
