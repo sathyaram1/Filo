@@ -1114,6 +1114,10 @@ if (isMain) {
     delete data.biglietto;
     let biglietto = args[0];
     let intento = args[1] || '';
+    if (bigliettoDato && !INTENTI.includes(args[0]) && bigliettoDato !== args[0]) {
+      console.error(`Due biglietti diversi (${String(args[0]).slice(0, 12)}… e --ticket ${bigliettoDato.slice(0, 12)}…): non ho consegnato niente. Passane uno solo.`);
+      process.exit(1);
+    }
     if (INTENTI.includes(args[0])) {
       intento = args[0];
       const { readTicket } = await import('./lib/routine-ticket.mjs');
