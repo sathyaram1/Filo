@@ -33,7 +33,10 @@ Valgono insieme queste regole:
 - **Un gesto partito per altro non è un sì.** Il popup si apre anche da solo,
   in un momento che l'utente non sceglie. Vale per tutti e tre i riquadri
   (conferma, conferma da digitare, avviso): chi stava scrivendo continua a
-  scrivere nel suo campo, e alla chiusura il fuoco torna lì; per mezzo secondo
+  scrivere nel suo campo, e alla chiusura il fuoco torna lì. «Stava scrivendo»
+  vuol dire un carattere battuto in un campo da poco: l'Invio che spedisce e i
+  tasti dati a un popup no, perché dopo l'utente aspetta Filo e la conferma da
+  digitare deve prendere «conferma» nel suo campo. Per mezzo secondo
   da quando il riquadro si vede davvero (primo fotogramma, o ritorno della
   scheda in primo piano) un clic o un invio veri su OK non contano. Annulla e
   Esc valgono subito.
