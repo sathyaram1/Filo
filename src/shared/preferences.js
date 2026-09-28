@@ -7,10 +7,11 @@
 //
 // Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS }.
 // `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk },
-// { rifiuto } col perché, oppure null se chiave/valore non sono validi. Solo le preferenze qui elencate
-// sono scrivibili. Dal #146.5 l'elenco copre TUTTE le impostazioni della pagina
-// Opzioni (modelli, provider, chiavi API, sicurezza/privacy, limite di spesa,
-// funzionalità) oltre a quelle estetiche/comportamentali: ognuna dichiara il
+// { rifiuto } col perché, oppure null se chiave/valore non sono validi. Solo le
+// preferenze qui elencate sono scrivibili. Dal #146.5 l'elenco copre TUTTE le
+// impostazioni della pagina Opzioni (modelli, provider, chiavi API,
+// sicurezza/privacy, limite di spesa, funzionalità) oltre a quelle
+// estetiche/comportamentali: ognuna dichiara il
 // proprio `level` (1 = applica subito, 2 = popup di conferma). Le impostazioni
 // sensibili (sicurezza, modelli, chiavi, provider, costi) sono di livello 2.
 //
