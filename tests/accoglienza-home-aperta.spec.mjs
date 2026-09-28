@@ -115,3 +115,66 @@ test('chiave OpenRouter propria messa dalle Impostazioni: l’intervista parte n
   await app.evaluate(async (_, s) => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { apiKeys: { openrouter: 'sk-or-v1-mia' } } }, s), opzioni);
   await partitaLAccoglienza(app, home);
 });
+
+// Chi scrive nella home prima di avere i crediti riceve «serve un codice d'invito»: arrivati i crediti, quella
+// risposta lascia il posto al benvenuto, e il messaggio scritto prima non entra nell'intervista.
+async function scrittoSenzaCrediti(home) {
+  await home.fill('#input', 'ciao, cosa sai fare?');
+  await home.press('#input', 'Enter');
+  await expect(home.locator('#bubbles button', { hasText: 'Apri Crediti' })).toBeVisible({ timeout: 20_000 });
+}
+
+async function intervistaDalBenvenuto(app) {
+  const thread = await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getOnboarding()).thread);
+  expect(thread[0]).toMatchObject({ role: 'filo', text: expect.stringContaining('Ciao, sono Filo') });
+  expect(JSON.stringify(thread)).not.toContain('cosa sai fare');
+}
+
+test('scritto nella home prima dei crediti, riscatto da «Apri Crediti»: tornato alla home, Filo si presenta', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const home = await homeCheChiedeIlCodice(app);
+  await scrittoSenzaCrediti(home);
+  await home.locator('#bubbles button', { hasText: 'Apri Crediti' }).click();
+  let crediti = null;
+  await expect.poll(() => { crediti = app.windows().find((w) => w.url().startsWith('filo://credits')); return !!crediti; }, { timeout: 15_000 }).toBe(true);
+  await crediti.waitForLoadState('domcontentloaded');
+  await expect(crediti.locator('#redeemForm')).toBeVisible({ timeout: 20_000 });
+  await crediti.fill('#inviteCode', 'ABCD-EFGH');
+  await crediti.click('#redeemBtn');
+  await expect(crediti.locator('#redeemMsg')).toContainText('riscattato', { timeout: 20_000 });
+  await shell.locator('.tab').first().click();
+  await partitaLAccoglienza(app, home);
+  await intervistaDalBenvenuto(app);
+});
+
+test('scritto nella home prima che arrivi l’invito del primo avvio: poi Filo si presenta lì', async ({ app }) => {
+  test.setTimeout(120_000);
+  stato.pendingCode = 'ABCDEFGH';
+  stato.trattieni = true;
+  const home = await homeCheChiedeIlCodice(app);
+  await scrittoSenzaCrediti(home);
+  await expect.poll(() => stato.trattenute.length, { timeout: 30_000 }).toBeGreaterThan(0);
+  stato.trattieni = false;
+  for (const r of stato.trattenute.splice(0)) r();
+  await expect.poll(() => stato.redeemed, { timeout: 20_000 }).toBe(true);
+  await partitaLAccoglienza(app, home);
+  await intervistaDalBenvenuto(app);
+});
+
+test('una conversazione vera nella home non viene interrotta quando arrivano i crediti', async ({ app }) => {
+  test.setTimeout(120_000);
+  const home = await homeCheChiedeIlCodice(app);
+  await scrittoSenzaCrediti(home);
+  await home.evaluate(() => {
+    const b = document.createElement('div');
+    b.className = 'dash-bubble dash-bubble-filo';
+    b.textContent = 'Una risposta vera di Filo.';
+    document.getElementById('bubbles').appendChild(b);
+  });
+  const opzioni = { tab: { id: 5, url: 'filo://options/options.html' }, url: 'filo://options/options.html' };
+  await app.evaluate(async (_, s) => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { apiKeys: { openrouter: 'sk-or-v1-mia' } } }, s), opzioni);
+  await expect.poll(() => home.evaluate(() => document.getElementById('homeMessage').textContent), { timeout: 20_000 }).not.toMatch(/codice d.invito/i);
+  await home.waitForTimeout(2000);
+  await expect(home.locator('#bubbles')).toContainText('Una risposta vera di Filo.');
+  await expect(home.locator('#bubbles')).not.toContainText('Ciao, sono Filo');
+});
