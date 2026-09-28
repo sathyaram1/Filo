@@ -24,14 +24,28 @@
 
   // Il riconoscimento lo fa il motore di stile: ogni selettore della lista accende un'animazione muta,
   // e il suo `animationstart` porta qui l'elemento appena viene disegnato. Nessuna scansione del DOM.
+  const KEYFRAMES = `@keyframes ${ANIM}{from{--filo-cookie-seen:0}to{--filo-cookie-seen:1}}`;
+  let adopted = null;
+
+  // Un <style> che la CSP del sito blocca resta senza foglio: allora un foglio costruito, che la CSP non guarda.
   function ensureSheet() {
     if (sheet) return true;
     try {
       style = document.createElement('style');
-      style.textContent = `@keyframes ${ANIM}{from{--filo-cookie-seen:0}to{--filo-cookie-seen:1}}`;
+      style.textContent = KEYFRAMES;
       (document.head || document.documentElement).appendChild(style);
       sheet = style.sheet;
     } catch (_) { sheet = null; }
+    if (!sheet) {
+      try { if (style) style.remove(); } catch (_) {}
+      style = null;
+      try {
+        adopted = new CSSStyleSheet();
+        adopted.replaceSync(KEYFRAMES);
+        document.adoptedStyleSheets = [...document.adoptedStyleSheets, adopted];
+        sheet = adopted;
+      } catch (_) { adopted = null; sheet = null; }
+    }
     return !!sheet;
   }
 
@@ -178,7 +192,8 @@
     running = false;
     try { document.removeEventListener('animationstart', onAnimation, true); } catch (_) {}
     try { if (style) style.remove(); } catch (_) {}
-    style = null; sheet = null;
+    try { if (adopted) document.adoptedStyleSheets = document.adoptedStyleSheets.filter((x) => x !== adopted); } catch (_) {}
+    style = null; sheet = null; adopted = null;
     inserted.clear();
     candidates.clear();
     askedTokens.clear();

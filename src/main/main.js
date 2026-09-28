@@ -215,7 +215,7 @@ app.whenReady().then(async () => {
     // avvia un refresh in background. Non blocca l'avvio.
     try { await require('./services/adblock').init(s); } catch (_) {}
     // EasyList Cookie (banner da nascondere): cache su disco e aggiornamento settimanale in sottofondo.
-    try { await require('./services/cookieBanners').init(s); } catch (_) {}
+    require('./services/cookieBanners').init(s).catch(() => {});
     // Blocco apertura siti in blacklist (#170.3): legge la config dalle
     // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}

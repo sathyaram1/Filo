@@ -218,6 +218,17 @@
     return !NOT_A_REJECT.test(txt);
   }
 
+  // Un «rifiuta» che porta a un'altra pagina non è il tasto del banner: premerlo porterebbe via l'utente.
+  function leavesPage(a) {
+    if (a.target === '_blank') return true;
+    const href = (a.getAttribute('href') || '').trim();
+    if (!href || href[0] === '#' || /^javascript:/i.test(href)) return false;
+    try {
+      const u = new URL(href, location.href);
+      return u.origin !== location.origin || u.pathname !== location.pathname || u.search !== location.search;
+    } catch (_) { return true; }
+  }
+
   // Un button/link con testo di rifiuto. Dentro `root` qualsiasi; nel resto della pagina solo se
   // sta in un contenitore di consenso. Conservativo per costruzione.
   function findRejectText(root, inConsentBox) {
@@ -227,7 +238,7 @@
       if (el.__filoCookieClicked) continue;
       const probe = el.tagName === 'INPUT' ? { textContent: el.value } : el;
       if (!isRejectText(probe)) continue;
-      if (el.tagName === 'A' && el.target === '_blank') continue;
+      if (el.tagName === 'A' && leavesPage(el)) continue;
       if (!inConsentBox && !looksLikeConsent(el)) continue;
       if (!isVisible(el)) continue;
       return el;
