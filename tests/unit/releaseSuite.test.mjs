@@ -156,6 +156,22 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
   test('nessun passo dopo il verdetto può far finire verde una suite rossa', () => {
     assert.doesNotMatch(suite, /^ {4}continue-on-error:\s*true\s*$/m, 'col lavoro continue-on-error la corsa sarebbe verde a suite rossa');
   });
+
+  test('in GitHub una prova lasciata «a fuoco» ferma la suite invece di farla risultare verde', async () => {
+    const carica = async (ci) => {
+      const prima = process.env.CI;
+      if (ci) process.env.CI = 'true'; else delete process.env.CI;
+      try {
+        const href = new URL(`file://${resolve(ROOT, 'playwright.config.js').replace(/\\/g, '/')}?ci=${ci}`).href;
+        return (await import(href)).default;
+      } finally {
+        if (prima === undefined) delete process.env.CI; else process.env.CI = prima;
+      }
+    };
+    assert.equal((await carica(true)).forbidOnly, true, 'con CI=true, come in GitHub, girerebbe solo la prova a fuoco: verde finto');
+    assert.ok(!(await carica(false)).forbidOnly, 'in locale mettere a fuoco una prova resta lo strumento di chi prova');
+    assert.doesNotMatch(SUITE_YML, /\bCI:\s*(false|'false'|"false"|''|"")/, 'spegnere CI nel lavoro della suite riaprirebbe il verde finto');
+  });
 });
 
 describe('release.yml: si pubblica il commit più nuovo di main con la suite verde', () => {
