@@ -89,10 +89,10 @@ function seguiPagina(wc) {
   };
   try { wc.once('destroyed', ritira); } catch (_) {}
   try {
-    wc.on('did-start-navigation', (d) => {
-      const e = d && typeof d === 'object' && 'isMainFrame' in d ? d : null;
-      const principale = e ? e.isMainFrame : arguments.length === 0;
-      if (e && principale && !e.isSameDocument) ritira();
+    wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
+      const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
+      const stessa = e && typeof e.isSameDocument === 'boolean' ? e.isSameDocument : isInPlace;
+      if (principale && !stessa) ritira();
     });
   } catch (_) {}
 }
