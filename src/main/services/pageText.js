@@ -129,14 +129,15 @@ function costruisciAlbero(html) {
     return false;
   };
   const apri = (tag, attrs) => {
-    if (CHIUDE_P.has(tag)) chiudiFinoA('p', new Set(['div', 'section', 'article', 'main', 'td', 'th', 'li', 'blockquote', 'body']));
-    if (tag === 'li') chiudiFinoA('li', new Set(['ul', 'ol', 'menu']));
-    if (tag === 'dt' || tag === 'dd') { chiudiFinoA('dt', new Set(['dl'])) || chiudiFinoA('dd', new Set(['dl'])); }
-    if (tag === 'tr') chiudiFinoA('tr', new Set(['table', 'tbody', 'thead', 'tfoot']));
-    if (tag === 'td' || tag === 'th') { chiudiFinoA('td', new Set(['tr', 'table'])) || chiudiFinoA('th', new Set(['tr', 'table'])); }
+    if (CHIUDE_P.has(tag)) chiudiFinoA('p', FERMA_P);
+    if (tag === 'li') chiudiFinoA('li', FERMA_LI);
+    if (tag === 'dt' || tag === 'dd') { chiudiFinoA('dt', FERMA_DL) || chiudiFinoA('dd', FERMA_DL); }
+    if (tag === 'tr') chiudiFinoA('tr', FERMA_TR);
+    if (tag === 'td' || tag === 'th') { chiudiFinoA('td', FERMA_TD) || chiudiFinoA('th', FERMA_TD); }
     if (tag === 'tbody' || tag === 'thead' || tag === 'tfoot') {
-      chiudiFinoA('tbody', new Set(['table'])) || chiudiFinoA('thead', new Set(['table'])) || chiudiFinoA('tfoot', new Set(['table']));
+      chiudiFinoA('tbody', FERMA_TABELLA) || chiudiFinoA('thead', FERMA_TABELLA) || chiudiFinoA('tfoot', FERMA_TABELLA);
     }
+    if (tag === 'a') chiudiFinoA('a', FERMA_A);
     const nodo = nuovoNodo(tag, attrs, cur);
     cur.children.push(nodo);
     if (VOID.has(tag)) return nodo;
