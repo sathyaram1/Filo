@@ -338,11 +338,10 @@ function classifica(nodo, ctx) {
   if (!ctx.ignoraInvisibile && invisibile(nodo)) return CESTINO;
   if (nascosto(nodo)) return CHIUSO;
   if (MAI_SALTARE.has(tag)) return 0;
-  const nomi = (a.class || a.id) ? `${a.class || ''} ${a.id || ''}`.split(/\s+/).filter(Boolean).map(partiDelNome) : [];
-  if (nomi.some((n) => CESTINO_NOMI.has(n))) return CESTINO;
   const ruolo = a.role ? String(a.role).toLowerCase().trim() : '';
-  if (NAV_TAG.has(tag) || NAV_RUOLI.has(ruolo) || nomi.some((n) => NAV_NOMI.has(n))) return fattoDiLink(nodo) ? CESTINO : CODA;
-  if (CODA_TAG.has(tag) || CODA_RUOLI.has(ruolo) || nomi.some((n) => CODA_NOMI.has(n))) return CODA;
+  if (NAV_TAG.has(tag) || NAV_RUOLI.has(ruolo)) return fattoDiLink(nodo) ? CESTINO : CODA;
+  if (CODA_TAG.has(tag) || CODA_RUOLI.has(ruolo)) return CODA;
+  if ((a.class || a.id) && `${a.class || ''} ${a.id || ''}`.split(/\s+/).some(nomeDiContorno)) return CODA;
   // L'intestazione e il piede di un ARTICOLO sono contenuto (titolo, autore, data); quelli del sito vanno in coda.
   if ((tag === 'header' || tag === 'footer') && !ctx.dentroArticolo) return CODA;
   return 0;
