@@ -668,7 +668,10 @@
     }
 
     const done = !!res.executed;
-    appendActionLog(esitoAzione(label, done, res));
+    // #590 — un blocco muto sembra un guasto: la lista dei siti bloccati si dice.
+    const bloccato = !done && res.output && res.output.blocked === 'site';
+    appendActionLog(bloccato ? `${label}: ${res.output.host || 'il sito'} è fra i siti bloccati`
+      : esitoAzione(label, done, res));
     return done;
   }
 
