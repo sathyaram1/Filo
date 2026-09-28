@@ -962,7 +962,8 @@ if (isMain) {
     // Ignorata, `loop` senza trattini dava un battito solo e un «OK».
     const inPiu = parolaInPiu(cmd, args);
     if (inPiu) {
-      console.error(`Argomento non capito: "${inPiu.slice(0, 40)}": non ho fatto niente. ${cmd === 'compare' ? 'Dopo il biglietto vanno solo il ruolo e il numero' : 'Dopo il biglietto qui non va altro'}; le opzioni si scrivono con due trattini (--loop).`);
+      const cosa = { compare: 'Dopo il biglietto vanno solo il ruolo e il numero.', heartbeat: 'Dopo il biglietto qui non va altro: il battito continuo si chiede con --loop.' }[cmd] || 'Dopo il biglietto qui non va altro.';
+      console.error(`Argomento non capito: "${inPiu.slice(0, 40)}": non ho fatto niente. ${cosa}`);
       process.exit(1);
     }
   }
