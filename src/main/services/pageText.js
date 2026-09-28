@@ -234,7 +234,7 @@ function partiDelNome(token) {
 
 function nomeDiContorno(token) {
   const n = partiDelNome(token);
-  return !!n && (NAV_NOMI.has(n) || CESTINO_NOMI.has(n) || CODA_NOMI.has(n));
+  return !!n && CODA_NOMI.has(n);
 }
 
 const RE_DICHIARAZIONE = new Map();
