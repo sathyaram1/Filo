@@ -21,6 +21,6 @@ export function lottiPerRigaDiComando(voci, maxChars = 6000, { fisso = 0, costo 
 /** Quanto occupa un argomento nella riga che libuv compone su Windows: virgolette e spazio compresi, per eccesso. PURA. */
 export function costoArgomentoWindows(arg) {
   const s = String(arg);
-  // Ogni " si scappa con una barra, e le barre che la precedono raddoppiano: 2n è il caso peggiore.
-  return (s.includes('"') ? s.length * 2 : s.length) + 3;
+  // Ogni " prende una barra davanti, e le barre prima di una " o della fine raddoppiano: una in più per ciascuna al massimo.
+  return s.length + 3 + (s.match(/["\\]/g) || []).length;
 }
