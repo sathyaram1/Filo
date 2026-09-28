@@ -3931,48 +3931,20 @@ function broadcastToTabs(message) {
 // sito non lo può CHIEDERE, non glielo si manda nemmeno da soli.
 //
 // Il frame principale basta: qui non ci sono destinatari nei riquadri
-// incorporati (le pagine filo:// non ne ospitano di privilegiati).
+// incorporati (le pagine filo:// non ne ospitano di privilegiati). Anche fra le
+// finestre solo quelle di Filo: un popup di accesso è la pagina di un sito.
 function broadcastToFiloPages(message) {
+  const aFilo = (wc) => {
+    try {
+      if (wc && !wc.isDestroyed?.() && isFilo(wc.getURL())) wc.send('filo:broadcast', message);
+    } catch (_) {}
+  };
   try {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (win._filoTabs) {
-        for (const t of win._filoTabs.tabs) {
-          try {
-            const wc = t.view.webContents;
-            if (!wc || wc.isDestroyed?.()) continue;
-            if (!String(wc.getURL() || '').startsWith('filo://')) continue;
-            wc.send('filo:broadcast', message);
-          } catch (_) {}
-        }
-      }
-      try { win.webContents.send('filo:broadcast', message); } catch (_) {}
+      if (win._filoTabs) for (const t of win._filoTabs.tabs) aFilo(t.view?.webContents);
+      aFilo(win.webContents);
     }
   } catch (_) {}
-}
-
-// #405 — `webContents.send` consegna SOLO al frame principale. Da quando i
-// content script girano anche dentro i riquadri incorporati, un riquadro che
-// non riceve gli aggiornamenti di impostazioni (tema, colori, correttore) o lo
-// stato della lettura ad alta voce resta indietro rispetto alla pagina che lo
-// ospita. Raggiungiamo ogni frame vivo della scheda; se l'enumerazione non è
-// disponibile (frame in navigazione) si ripiega sul comportamento di prima.
-function sendToAllFrames(wc, message) {
-  if (!wc || wc.isDestroyed?.()) return;
-  let frames = null;
-  try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
-  if (!frames || !frames.length) {
-    try { const m = messaggioPerDestinazione(message, wc.getURL()); if (m) wc.send('filo:broadcast', m); } catch (_) {}
-    return;
-  }
-  let pagina = '';
-  try { pagina = wc.getURL(); } catch (_) { pagina = ''; }
-  for (const f of frames) {
-    try {
-      if (f.detached) continue;
-      const m = messaggioPerDestinazione(message, f.url, pagina);
-      if (m) f.send('filo:broadcast', m);
-    } catch (_) {}
-  }
 }
 
 // Configura il rilevatore di siti pericolosi (services/safebrowse) dalle
