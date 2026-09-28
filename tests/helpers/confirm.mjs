@@ -38,6 +38,13 @@ export async function scrollConfirmToEnd(page) {
   expect(done, 'testo del dialogo presente').toBe(true);
 }
 
+// Clic vero del mouse su un bottone del dialogo, anche su OK in attesa (#592).
+export async function mouseClickConfirm(page, which = 'ok') {
+  const p = await page.evaluate((w) => window.SN_CONFIRM_UI._test.point(w), which);
+  expect(p, `bottone di conferma "${which}" presente`).toBeTruthy();
+  await page.mouse.click(p.x, p.y);
+}
+
 // Scrive nel campo di testo del dialogo livello 3 (digita-la-parola).
 export async function fillConfirmInput(page, value) {
   const filled = await page.evaluate((v) => window.SN_CONFIRM_UI._test.fill(v), value);
