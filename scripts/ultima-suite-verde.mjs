@@ -79,7 +79,8 @@ const git = (...a) => execFileSync('git', a, { encoding: 'utf8', stdio: ['ignore
 const gitForse = (...a) => { try { return git(...a); } catch { return ''; } };
 const ghApi = (percorso) => JSON.parse(execFileSync('gh', ['api', percorso], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
 const eAntenato = (a, b) => { try { git('merge-base', '--is-ancestor', a, b); return true; } catch { return false; } };
-const soloCodice = (da, a) => Number(gitForse('rev-list', '--count', '--invert-grep', '--grep=^release: v[0-9]', `${da}..${a}`) || 0);
+// Le fusioni su main, non i commit dei rami fusi; il commit del numero di versione non è codice.
+const soloCodice = (da, a) => Number(gitForse('rev-list', '--count', '--first-parent', '--invert-grep', '--grep=^release: v[0-9]', `${da}..${a}`) || 0);
 
 function leggiCorse(repo, filtro) {
   const j = ghApi(`repos/${repo}/actions/workflows/suite.yml/runs?branch=main&${filtro}`);
