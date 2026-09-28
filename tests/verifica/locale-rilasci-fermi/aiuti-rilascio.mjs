@@ -86,19 +86,15 @@ export async function serverAllarmi() {
       try { body = JSON.parse(b); } catch { /* corpo non JSON: resta vuoto */ }
       richieste.push(body);
       const keys = Array.isArray(body.keys) ? body.keys : [];
+      const coperte = keys.map((k) => ({ key: k, num: aperti.find((a) => a.alarmKeys.includes(k))?.num })).filter((c) => c.num);
+      const nuove = keys.filter((k) => !coperte.some((c) => c.key === k));
       let out;
-      if (!keys.length) {
-        out = aperti.length ? { ok: true, duplicate: true, num: aperti[0].num } : null;
-      } else {
-        const coperte = keys.map((k) => ({ key: k, num: aperti.find((a) => a.alarmKeys.includes(k))?.num })).filter((c) => c.num);
-        const nuove = keys.filter((k) => !coperte.some((c) => c.key === k));
-        if (!nuove.length) out = { ok: true, duplicate: true, num: coperte[0].num, nuove: [], coperte };
-        else out = { nuove, coperte };
-      }
-      if (!out || out.nuove?.length) {
+      if (!keys.length && aperti.length) out = { ok: true, duplicate: true, num: aperti[0].num };
+      else if (keys.length && !nuove.length) out = { ok: true, duplicate: true, num: coperte[0].num, nuove: [], coperte };
+      else {
         const num = `#${++seq}`;
-        aperti.push({ num, name: body.name, alarmKeys: out?.nuove || [] });
-        out = { ok: true, duplicate: false, num, nuove: out?.nuove || [], coperte: out?.coperte || [] };
+        aperti.push({ num, name: body.name, alarmKeys: nuove });
+        out = { ok: true, duplicate: false, num, nuove, coperte };
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(out));
