@@ -1097,6 +1097,7 @@
     }
     if (ELENCHI.has(prog)) {
       const ops = testi.filter((t) => t && !t.startsWith('-'));
+      for (const t of testi) { const v = valoreDuePunti(t); if (v) ops.push(v); }
       for (const t of ops) {
         const d = dove(t, c);
         if (d === MOTIVI.sistema) return due(d);
