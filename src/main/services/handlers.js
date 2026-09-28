@@ -1578,7 +1578,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
         const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
         if (!built) return { executed: false, kept: false };
-        if (built.rifiuto) return { executed: false, kept: false, rejected: true, error: built.rifiuto };
+        // Un rifiuto spiegato resta nel diario col suo perché: non è successo
+        // niente, ma l'utente deve saperlo anche se il modello non lo dice.
+        if (built.rifiuto) return { executed: false, kept: false, output: { error: built.rifiuto } };
         await applySettingsUpdate(built.partial);
         return { executed: true, kept: true };
       }
@@ -2550,6 +2552,10 @@ function toolResultText({ action, res, rendered }) {
     try { done = (Levels && Levels.describeDone && Levels.describeDone(action)) || ''; } catch (_) {}
     done = String(done || describe()).replace(/\.+\s*$/, '');
     return `Eseguita: ${done}.`;
+  }
+  if (type === 'IMPOSTA_PREFERENZA' && res.output && res.output.error) {
+    return `Impostazione NON applicata: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
+      + 'dillo all\'utente e, se vuole, riprova con un valore che stia nel limite.';
   }
   // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
   // pulizia schede, cancellazione archivio) che l'utente aziona da sé.

@@ -149,10 +149,7 @@
         const C = global.SN_CONST;
         const n = C.agentStyleLength(s);
         if (n > C.AGENT_STYLE_MAX) {
-          return {
-            rifiuto: `stile di ${n} caratteri, il massimo è ${C.AGENT_STYLE_MAX}. Non l'ho salvato né accorciato: `
-              + 'proponine uno più corto, o chiedi all\'utente cosa tenere',
-          };
+          return { rifiuto: `lo stile è lungo ${n} caratteri e il massimo è ${C.AGENT_STYLE_MAX}` };
         }
         return { partial: { agentStyle: s }, label: "Stile dell'agente", testo: s };
       },

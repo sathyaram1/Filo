@@ -203,7 +203,7 @@ test('#592 — confermato, lo stile entra imbustato e prima delle regole anti-in
   await restore(app);
 });
 
-test('#592 — uno stile troppo lungo dalla chat non apre il popup e torna al modello col perché', async ({ app, shell }) => {
+test('#592 — uno stile troppo lungo dalla chat non apre il popup, e modello e diario sanno perché', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -223,8 +223,14 @@ test('#592 — uno stile troppo lungo dalla chat non apre il popup e torna al mo
     const calls = globalThis.__stile_calls;
     return JSON.stringify(calls[calls.length - 1].filter((m) => m.role === 'tool'));
   });
-  expect(esito).toContain('NON eseguita');
+  expect(esito).toContain('NON applicata');
   expect(esito).toContain(String(max));
+
+  // E l'utente lo legge anche nel diario, col perché.
+  const activity = page.locator('.dash-activity');
+  await activity.locator('.dash-activity-head').click();
+  await expect(activity.locator('.dash-activity-row', { hasText: 'Impostazione non applicata' }))
+    .toContainText(`il massimo è ${max}`);
   await restore(app);
 });
 
@@ -243,6 +249,8 @@ test('#592 — in Preferenze uno stile oltre il tetto non si salva e lo dice', a
   const quasi = 'a'.repeat(Math.ceil(max * 0.9));
   await page.fill('#agentStyleText', quasi);
   await expect(page.locator('#agentStyleNote')).toHaveText(`${quasi.length} / ${max}`);
+  await page.locator('#agentStyleNote').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/stile-agente-conto.png' });
   await expect.poll(() => storedStyle(app), { timeout: 4_000 }).toBe(quasi);
 
   // Oltre: il testo resta nel campo, la nota dice perché, lo stile salvato no.
@@ -255,12 +263,14 @@ test('#592 — in Preferenze uno stile oltre il tetto non si salva e lo dice', a
   await expect(page.locator('#agentStyleText')).toHaveValue(troppo);
   await page.waitForTimeout(800);
   expect(await storedStyle(app)).toBe(quasi);
-  await page.locator('#agentStyleText').scrollIntoViewIfNeeded();
+  await page.locator('#agentStyleText').blur();
+  await nota.scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'tests/.shots/stile-agente-troppo-lungo.png' });
   // Cambiare un'altra impostazione non fa passare lo stile troppo lungo.
   await page.selectOption('#theme', 'dark');
   await expect.poll(() => app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.theme))).toBe('dark');
   expect(await storedStyle(app)).toBe(quasi);
+  await nota.scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'tests/.shots/stile-agente-troppo-lungo-scuro.png' });
 
   // Accorciato, si salva e la nota sparisce.
