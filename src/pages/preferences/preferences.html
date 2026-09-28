@@ -40,6 +40,10 @@
     .onb-line { display: flex; gap: 8px; line-height: 1.45; }
     .onb-who { flex: 0 0 auto; font-weight: 600; opacity: 0.75; }
     .onb-what { white-space: pre-wrap; }
+    /* Lo stile ha un tetto: vicino si vede il conto, oltre il testo non si salva e lo si dice (#592). */
+    .agent-style-note { margin: 6px 0 0; font-size: 12px; color: var(--sn-muted); text-align: right; }
+    .agent-style-note.agent-style-over { color: var(--sn-error); text-align: left; }
+    #agentStyleText.agent-style-over { border-color: var(--sn-error); }
   </style>
 </head>
 <body>
@@ -103,6 +107,7 @@
       <p class="sn-muted">Come deve scrivere Filo quando ti risponde (chat, Aiuto, spiegazioni, chat dell'editor). Scegli uno stile già pronto oppure scrivine uno tuo.</p>
       <select id="agentStylePreset"></select>
       <textarea id="agentStyleText" rows="4" placeholder="Es. Rispondi sempre in italiano, con un tono pacato e qualche esempio pratico." style="width:100%;margin-top:10px;"></textarea>
+      <p id="agentStyleNote" class="agent-style-note" aria-live="polite" hidden></p>
     </section>
 
     <section>

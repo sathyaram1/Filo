@@ -37,6 +37,11 @@
     return { shellPref: '"powershell" | "cmd" | "bash" | "zsh"', esempioPercorso: '~/Documenti/bolletta.pdf' };
   }
 
+  function tettoStile() {
+    const C = global.SN_CONST;
+    return C && C.AGENT_STYLE_MAX ? `al massimo ${C.AGENT_STYLE_MAX} caratteri` : 'con un tetto di lunghezza';
+  }
+
   // I documenti di trasparenza che ESISTONO davvero. L'elenco non si scrive a
   // mano: lo dà SN_TRANSPARENCY, generato dai markdown in transparency/.
   // Scritto a mano prometteva quattro documenti quando ne esisteva uno solo
@@ -243,7 +248,7 @@
         + '• tema: "sistema" | "chiaro" | "scuro"\n'
         + '• dimensione_testo: "piccolo" | "normale" | "grande" | "molto grande" | "enorme"\n'
         + '• commento_home: true | false (commento di Filo al centro della home)\n'
-        + '• stile_agente: testo libero (come deve scrivere Filo)\n'
+        + `• stile_agente: testo libero, ${tettoStile()} (come deve scrivere Filo; "nessuno" lo toglie) [conferma]\n`
         + '• correttore: true | false (correttore ortografico AI)\n'
         + '• sidebar_aiuto: true | false ; categorizzazione: true | false\n'
         + '• archiviazione_automatica: true | false ; archivia_alla_riapertura: true | false ; archivia_se_inattivo: true | false\n'

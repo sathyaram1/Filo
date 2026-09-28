@@ -324,24 +324,28 @@
     IMPOSTA_PREFERENZA: {
       // Livello per-preferenza: lo dichiara il setter in preferences.js
       // (default 1). Preferenza sconosciuta/non valida → 2 per prudenza
-      // (tanto il dispatch non la eseguirà comunque).
+      // (tanto il dispatch non la eseguirà comunque). Un `rifiuto` → 1: non
+      // c'è niente da confermare, il dispatch lo respinge spiegando perché.
       level: (a) => {
         const built = prefBuilt(a);
         return (built && built.level) || (built ? 1 : 2);
       },
       describe: (a) => {
         const built = prefBuilt(a);
-        if (!built) return 'Modificare una preferenza';
+        if (!built || built.rifiuto) return 'Modificare una preferenza';
         // Il popup di conferma spiega COSA Filo sta per fare e, per le
         // impostazioni sensibili (livello 2), anche i RISCHI (#183). Il `risk`
         // arriva dal setter in preferences.js: è obbligatorio per il livello 2.
+        // Un testo libero si mostra per intero: si conferma quello (#592). La
+        // prima riga resta corta perché fa anche da bottone.
         const base = `Filo vuole impostare: ${built.label}.`;
-        return built.risk ? `${base}\n\n${built.risk}` : base;
+        const testo = built.testo ? `\n\nTesto esatto:\n«${built.testo}»` : '';
+        return built.risk ? `${base}${testo}\n\n${built.risk}` : `${base}${testo}`;
       },
       // A cosa fatta (esito allo strumento): niente «vuole», niente rischi.
       describeDone: (a) => {
         const built = prefBuilt(a);
-        return built ? `Impostazione applicata: ${built.label}` : 'Preferenza modificata';
+        return built && !built.rifiuto ? `Impostazione applicata: ${built.label}` : 'Preferenza modificata';
       },
     },
     IMPOSTA_ESTETICA: {

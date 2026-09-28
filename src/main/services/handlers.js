@@ -1578,6 +1578,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
         const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
         if (!built) return { executed: false, kept: false };
+        if (built.rifiuto) return { executed: false, kept: false, rejected: true, error: built.rifiuto };
         await applySettingsUpdate(built.partial);
         return { executed: true, kept: true };
       }

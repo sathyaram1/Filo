@@ -6,8 +6,8 @@
 // esposta dalla pagina Preferenze, e deve restare testabile senza Electron.
 //
 // Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS }.
-// `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk }
-// oppure null se chiave/valore non sono validi. Solo le preferenze qui elencate
+// `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk },
+// { rifiuto } col perché, oppure null se chiave/valore non sono validi. Solo le preferenze qui elencate
 // sono scrivibili. Dal #146.5 l'elenco copre TUTTE le impostazioni della pagina
 // Opzioni (modelli, provider, chiavi API, sicurezza/privacy, limite di spesa,
 // funzionalità) oltre a quelle estetiche/comportamentali: ognuna dichiara il
@@ -19,6 +19,10 @@
 // eventuali rischi. È il testo che il popup di conferma mostra all'utente
 // (lo compone actionLevels.describe). Un setter di livello 2 senza `risk` è
 // un bug: il test tests/unit/preferences.test.mjs lo intercetta.
+//
+// REGOLA (#592): un testo libero che finisce in un prompt è di livello 2, porta
+// il `testo` esatto al popup e oltre il tetto torna un `rifiuto`, mai un taglio
+// (sentinella in tests/unit/preferences.test.mjs).
 
 (function (global) {
   'use strict';
@@ -41,6 +45,16 @@
     if (s.length <= 8) return '••••';
     return `${s.slice(0, 4)}…${s.slice(-4)}`;
   }
+
+  // Un testo libero che finisce in un popup di conferma: via i caratteri che non
+  // si vedono ma cambiano cosa si legge (controllo, direzione del testo), così
+  // quello che l'utente conferma è quello che si salva.
+  const INVISIBILI_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200E\u200F\u202A-\u202E\u2060-\u2064\u206A-\u206F\uFEFF]/g;
+  function testoVisibile(v) {
+    return String(v == null ? '' : v).replace(/\r\n?/g, '\n').replace(INVISIBILI_RE, '').trim();
+  }
+  const NESSUNO_STILE = ['nessuno', 'nessuna', 'niente', 'predefinito', 'default', 'togli', 'toglilo', 'rimuovi',
+    'cancella', 'azzera', 'reset', 'nessuno stile', 'nessuno (predefinito)'];
 
   // Interpreta un numero scritto in linguaggio naturale tollerando il formato
   // italiano (punto = separatore delle migliaia, virgola = decimale) SENZA
@@ -121,10 +135,26 @@
     },
     {
       keys: ['stile_agente', 'stile agente', "stile dell'agente", 'agentstyle', 'stile'],
+      // Entra in ogni prompt conversazionale e ci resta: proposto dal modello,
+      // passa dal popup col testo esatto (#592). Anche toglierlo, che lo perde.
+      level: 2,
+      risk: 'Lo stile di scrittura decide come Filo ti scrive in ogni conversazione (chat, Aiuto, spiegazioni, '
+        + 'editor) e resta finché non lo cambi. Confermalo solo se l\'hai chiesto tu: un testo letto in una '
+        + 'pagina o in un documento potrebbe provare a cambiarlo.',
       build(v) {
-        const s = String(v == null ? '' : v).trim();
-        if (!s) return null;
-        return { partial: { agentStyle: s }, label: "Stile dell'agente aggiornato" };
+        const s = testoVisibile(v);
+        if (!s || NESSUNO_STILE.includes(s.toLowerCase().replace(/[.!]+$/, ''))) {
+          return { partial: { agentStyle: '' }, label: "Stile dell'agente → nessuno (risposte predefinite)" };
+        }
+        const C = global.SN_CONST;
+        const n = C.agentStyleLength(s);
+        if (n > C.AGENT_STYLE_MAX) {
+          return {
+            rifiuto: `stile di ${n} caratteri, il massimo è ${C.AGENT_STYLE_MAX}. Non l'ho salvato né accorciato: `
+              + 'proponine uno più corto, o chiedi all\'utente cosa tenere',
+          };
+        }
+        return { partial: { agentStyle: s }, label: "Stile dell'agente", testo: s };
       },
     },
     {
@@ -498,12 +528,14 @@
   ];
 
   // Trova il setter giusto per una chiave (match esatto, poi fuzzy) e costruisce
-  // il partial. Ritorna { partial, label } o null se chiave/valore non validi.
+  // il partial. Ritorna { partial, label, level, risk, testo? }, { rifiuto } se il
+  // valore va rifiutato spiegando perché, o null se chiave/valore non validi.
   function buildPreferencePartial(rawKey, rawVal) {
     const key = String(rawKey == null ? '' : rawKey).trim().toLowerCase();
     if (!key) return null;
     const withLevel = (setter) => {
       const r = setter.build(rawVal);
+      if (r && r.rifiuto) return { rifiuto: r.rifiuto };
       return r ? { ...r, level: setter.level || 1, risk: setter.risk || '' } : null;
     };
     for (const setter of PREF_SETTERS) {

@@ -6,7 +6,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -460,6 +460,21 @@
     return $('agentStyleText').value;
   }
 
+  // Il conto compare solo vicino al tetto; oltre, il testo resta nel campo ma
+  // non si salva finché non lo si accorcia. Torna se il testo è salvabile.
+  function syncStyleNote() {
+    const n = agentStyleLength(currentStyleText());
+    const over = n > AGENT_STYLE_MAX;
+    const note = $('agentStyleNote');
+    note.hidden = !over && n < AGENT_STYLE_MAX * 0.8;
+    note.classList.toggle('agent-style-over', over);
+    $('agentStyleText').classList.toggle('agent-style-over', over);
+    note.textContent = over
+      ? `Troppo lungo: ${n} caratteri, il massimo è ${AGENT_STYLE_MAX}. Non lo salvo finché non lo accorci.`
+      : `${n} / ${AGENT_STYLE_MAX}`;
+    return !over;
+  }
+
   // Allinea la select dei preset al testo corrente: se combacia con un preset
   // noto seleziona quello, altrimenti "Personalizzato".
   function syncPresetSelect() {
@@ -703,6 +718,7 @@
     const textScale = parseFloat($('textScale').value) || 1;
     const showHomeMessage = $('showHomeMessage').checked;
     const agentStyle = currentStyleText().trim();
+    const styleOk = syncStyleNote();
     const timerRingtone = $('timerRingtone').value || 'default';
     const terminal = {
       enabled: $('terminalEnabled').checked,
@@ -726,10 +742,9 @@
       sound: $('notifSound').value || 'default',
     };
 
-    await chrome.runtime.sendMessage({
-      type: MSG.UPDATE_SETTINGS,
-      settings: { theme, textScale, showHomeMessage, agentStyle, timerRingtone, terminal, tts, autoArchive, notifications },
-    });
+    const settings = { theme, textScale, showHomeMessage, timerRingtone, terminal, tts, autoArchive, notifications };
+    if (styleOk) settings.agentStyle = agentStyle;
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings });
 
     window.SN_PAGE_THEME = theme;
     Bootstrap.applyTheme(theme);
@@ -768,6 +783,7 @@
     buildPresetOptions();
     $('agentStyleText').value = settings.agentStyle || '';
     syncPresetSelect();
+    syncStyleNote();
 
     const aa = settings.autoArchive || {};
     $('autoArchiveEnabled').checked = aa.enabled !== false;
@@ -917,7 +933,10 @@
       }
       persist();
     });
-    $('agentStyleText').addEventListener('input', () => { syncPresetSelect(); persistDebounced(); });
+    $('agentStyleText').addEventListener('input', () => {
+      syncPresetSelect();
+      if (syncStyleNote()) persistDebounced();
+    });
 
     // Token estetici: reset globale ai predefiniti.
     $('resetAllTokens').addEventListener('click', resetAllTokens);
