@@ -416,6 +416,27 @@ test('una scheda da un altro paese aperta in incognito resta nella memoria di qu
   assert.deepEqual(Permessi.elenco(finestra).map((x) => x.host), ['sito.example'], 'la finestra incognito sì');
 });
 
+test('i dispositivi restano chiusi: nessuna scelta automatica di Bluetooth, HID, seriale, USB', () => {
+  const ses = sessioneFinta();
+  const eventi = new EventEmitter();
+  ses.on = (n, fn) => eventi.on(n, fn);
+  Permessi.installa(ses);
+  const wc = new EventEmitter();
+  Permessi.cablaContenuti(wc);
+  const esiti = [];
+  const evento = () => { const e = { prevenuto: false, preventDefault() { e.prevenuto = true; } }; return e; };
+  const eb = evento();
+  wc.emit('select-bluetooth-device', eb, [{ deviceId: 'cuffie' }], (id) => esiti.push(['bt', id]));
+  const eh = evento();
+  eventi.emit('select-hid-device', eh, {}, (id) => esiti.push(['hid', id]));
+  const es = evento();
+  eventi.emit('select-serial-port', es, [{ portId: 'p' }], wc, (id) => esiti.push(['seriale', id]));
+  const eu = evento();
+  eventi.emit('select-usb-device', eu, {}, (id) => esiti.push(['usb', id]));
+  assert.deepEqual(esiti, [['bt', ''], ['hid', undefined], ['seriale', ''], ['usb', undefined]]);
+  assert.ok([eb, eh, es, eu].every((e) => e.prevenuto), 'senza preventDefault Electron sceglie il primo da sé');
+});
+
 test('incognito: le scelte restano nella sua sessione e non vanno su disco', async () => {
   const normale = sessioneFinta();
   const incognito = sessioneFinta();
