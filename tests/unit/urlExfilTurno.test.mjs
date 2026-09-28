@@ -43,6 +43,14 @@ function livello(url, azioni, { daPagina = false, memoria = '' } = {}) {
   return AL.levelFor(action);
 }
 
+// Il livello che il gate darebbe a CERCA_WEB in questo turno.
+function livelloRicerca(query, azioni, { memoria = '' } = {}) {
+  const action = { type: 'CERCA_WEB', query };
+  const v = E.valutaRicerca(query, { memoria, azioni });
+  if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
+  return AL.levelFor(action);
+}
+
 test('cat seguito da NAVIGA con 40 caratteri dell’output: livello 2 (prima era 1)', () => {
   for (let da = 0; da + 40 <= FILE.length; da += 7) {
     const pezzo = FILE.slice(da, da + 40);
