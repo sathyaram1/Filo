@@ -156,6 +156,39 @@ function messaggioPerDestinazione(message, url, pagina) {
   return { ...message, settings: impostazioniPerWeb(message.settings, [url, pagina]) };
 }
 
+// Una spinta a una scheda, frame per frame (#405: `wc.send` raggiunge solo il frame
+// principale, e i content script girano anche nei riquadri), ognuno col messaggio
+// ritagliato sul proprio indirizzo. Ogni spinta a più schede passa da qui.
+function spingiAllaScheda(wc, message) {
+  if (!wc || wc.isDestroyed?.()) return;
+  let pagina = '';
+  try { pagina = String(wc.getURL() || ''); } catch (_) { pagina = ''; }
+  let frames = null;
+  try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
+  if (!frames || !frames.length) {
+    try { const m = messaggioPerDestinazione(message, pagina); if (m) wc.send('filo:broadcast', m); } catch (_) {}
+    return;
+  }
+  for (const f of frames) {
+    try {
+      if (f.detached) continue;
+      const m = messaggioPerDestinazione(message, f.url, pagina);
+      if (m) f.send('filo:broadcast', m);
+    } catch (_) {}
+  }
+}
+
+// Una finestra riceve solo nel frame principale: la shell, oppure una finestra
+// aperta da un sito (i popup di accesso), che vale come sito.
+function spingiAllaFinestra(win, message) {
+  try {
+    const wc = win && win.webContents;
+    if (!wc || wc.isDestroyed?.()) return;
+    const m = messaggioPerDestinazione(message, wc.getURL());
+    if (m) wc.send('filo:broadcast', m);
+  } catch (_) {}
+}
+
 // Le chiavi che un sito può chiedere al magazzino, nella stessa forma della
 // richiesta (null = tutte le sue, stringa, elenco, oggetto coi valori di ripiego).
 function chiaviStoragePerOrigine(keys, origine) {
