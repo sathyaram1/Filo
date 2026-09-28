@@ -93,19 +93,14 @@ test('accesso da una pagina di Filo, portachiavi vero assente: avviso subito, e 
 
 test('con una finestra incognito aperta: l\'avviso arriva in entrambe e all\'uscita se ne va da entrambe', async ({ app, shell }) => {
   await reteFinta(app);
-  const prima = app.windows().length;
-  await shell.evaluate(() => window.filoShell.window.openIncognito?.() ?? window.filoShell.openIncognito?.());
+  await shell.evaluate(() => window.filoShell.openIncognito());
   let inco = null;
   const scade = Date.now() + 10_000;
   while (!inco && Date.now() < scade) {
-    inco = app.windows().find((w) => w !== shell && /shell|index\.html/.test(w.url()) && w.url() !== shell.url() ? true : false) || null;
-    if (!inco) {
-      const tutte = app.windows();
-      if (tutte.length > prima) inco = tutte.find((w) => w !== shell && w.url().startsWith('file:')) || null;
-    }
+    inco = app.windows().find((w) => w.url().startsWith('filo://shell/shell.html?incognito=1')) || null;
     if (!inco) await new Promise((r) => setTimeout(r, 100));
   }
-  test.skip(!inco, 'finestra incognito non trovata');
+  expect(inco, 'finestra incognito').toBeTruthy();
   await inco.waitForLoadState('domcontentloaded');
   await shell.evaluate(() => { window.__esitoLogin = window.filoShell.auth.signIn(); });
   await completaConsenso(app);
