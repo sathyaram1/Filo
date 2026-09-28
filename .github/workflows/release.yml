@@ -8,7 +8,8 @@
 #   per Windows, poi Mac e Linux) e lo pubblica come nuova GitHub Release.
 #   L'auto-update dentro Filo (electron-updater) la vede e aggiorna i tester.
 #   Niente di verde e nuovo: non fa nulla; se dura da piu' di 48 ore apre un
-#   feedback e la corsa e' rossa.
+#   feedback e la corsa e' rossa. Anche un verde che non esce (la meta'
+#   Windows si ferma dopo la scelta) apre un feedback, passate le 48 ore.
 #
 # QUESTO LAVORO NON SCRIVE SU `main` (SPEC-RIDISEGNO-MAX.md §10)
 #   Fino al 18/08/2026 alzava la patch version da sé e la pushava. Su `main`
