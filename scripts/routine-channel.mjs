@@ -884,6 +884,8 @@ if (isMain) {
   const data = {};
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
+    // Un biglietto vero davanti è un posizionale anche col trattino (o due): nessuna opzione ha la sua forma.
+    if (haFormaDiBigliettoVero(a)) { args.push(a); continue; }
     // Un'opzione scritta storta non è un posizionale: presa per tale, il
     // biglietto veniva rilasciato e il guasto NON dichiarato, con la risposta
     // che diceva «OK» (feedback #565).
