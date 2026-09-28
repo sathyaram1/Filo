@@ -338,6 +338,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     applicaCampo();
     zoomMode = false;
     try { if (badge && badge.parentNode) badge.parentNode.removeChild(badge); } catch (_) {}
+    rimettiVelo();
     try { document.documentElement.style.cursor = ''; } catch (_) {}
     try { delete document.documentElement.dataset.filoZoomMode; } catch (_) {}
     avvisaModalita();
