@@ -105,10 +105,16 @@ test('la rete di casa non fa partire nessuno stadio di rete', async () => {
     llm: async (m) => { usciti.push(m.host); return null; },
     sandbox: async (u) => { usciti.push(u); return null; },
   });
-  for (const u of ['http://192.168.1.1/cgi-bin/luci?stok=abc', 'http://10.0.0.5:8080/', 'http://nas.local/', 'http://router.lan/', 'http://169.254.1.1/', 'http://[fd00::1]/']) {
+  globalThis.SN_URL_NAV.noteHostAddress('tplinkwifi.net', '192.168.0.1');
+  for (const u of ['http://192.168.1.1/cgi-bin/luci?stok=abc', 'http://10.0.0.5:8080/', 'http://nas.local/', 'http://router.lan/', 'http://169.254.1.1/', 'http://[fd00::1]/',
+    'http://homeassistant:8123/auth/authorize', 'http://router/cgi-bin/luci/;stok=abc/admin', 'http://speedport.ip/', 'http://tplinkwifi.net/webpages/login.html']) {
     await analizza(u, { hasPassword: true });
   }
   assert.deepEqual(usciti, []);
   await analizza('http://accesso.esempio-pubblico.com/login', { hasPassword: true });
   assert.ok(usciti.length > 0, 'un indirizzo pubblico in chiaro i suoi controlli li riceve');
+  usciti.length = 0;
+  globalThis.SN_URL_NAV.noteHostAddress('accesso.negozio.box', '203.0.113.7');
+  await analizza('http://accesso.negozio.box/login', { hasPassword: true });
+  assert.ok(usciti.length > 0, '.box è un dominio pubblico: un sito che risponde da internet ha i suoi controlli');
 });
