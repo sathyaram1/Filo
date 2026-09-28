@@ -161,11 +161,17 @@
   // già facendo altro — irrompere in una conversazione in corso sarebbe peggio
   // che aspettare la prossima scheda.
   async function maybeOpenOnboardingLater() {
-    if (onboardingActive || isSending()) return;
-    if (document.body.dataset.state !== 'home') return;
+    if (onboardingActive || isSending() || !nienteDaInterrompere()) return;
     const state = await fetchOnboarding();
-    if (!state || onboardingActive || isSending() || document.body.dataset.state !== 'home') return;
+    if (!state || onboardingActive || isSending() || !nienteDaInterrompere()) return;
     await openOnboarding(state);
+  }
+
+  // Una chat in cui Filo ha solo risposto «servono i crediti» non è una conversazione in corso: chi ha scritto
+  // prima di averli deve vedere Filo presentarsi, non la stessa risposta ferma.
+  function nienteDaInterrompere() {
+    if (document.body.dataset.state === 'home') return true;
+    return Boolean(soloRisposteSenzaCrediti && soloRisposteSenzaCrediti());
   }
 
   // Chiusura: l'ultimo atto non è un "fatto", è il risultato — la prima home
