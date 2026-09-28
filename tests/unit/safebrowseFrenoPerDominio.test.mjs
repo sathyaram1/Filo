@@ -1,6 +1,6 @@
-// Il controllo profondo anti-phishing (#591): il freno sta sul dominio, il verdetto sul sito. Sottodomini sempre nuovi
-// con gli stessi indizi non rifanno partire modello e finestra nascosta; il verdetto (e il certificato) di un sito non
-// passa ai vicini di piattaforma; un controllo fallito frena per poco; la rete di casa non esce. Regole in safebrowse/index.js.
+// Il controllo profondo anti-phishing (#591): freno e risposta stanno sul dominio con i suoi indizi. Sottodomini nuovi
+// con gli stessi indizi non rifanno partire modello e finestra nascosta ma ne ereditano la risposta; il verdetto (e il
+// certificato) di un sito non passa ai vicini di piattaforma; un controllo fallito frena per poco; la rete di casa non esce.
 
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
