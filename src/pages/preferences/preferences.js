@@ -1207,10 +1207,10 @@
       if (syncStyleNote()) persistDebounced();
     });
     // Uscendo dal campo si vede quello che è stato salvato, non un testo con
-    // dentro caratteri invisibili o righe vuote in più.
+    // dentro caratteri invisibili o righe vuote in più (gli spazi ai bordi no).
     $('agentStyleText').addEventListener('change', () => {
       const leggibile = currentStyleText();
-      if ($('agentStyleText').value !== leggibile) $('agentStyleText').value = leggibile;
+      if ($('agentStyleText').value.trim() !== leggibile) $('agentStyleText').value = leggibile;
     });
 
     // Token estetici: reset globale ai predefiniti.
