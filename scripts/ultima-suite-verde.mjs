@@ -145,7 +145,7 @@ async function main() {
   if (erroreApi) riassunto.push(`- Le corse della suite non si sono lette: ${erroreApi}.`);
 
   const fermo = rilascioFermo({ oreDallUltima, commitDopoTag, verdeDopoTag });
-  if (!fermo && tag && commitDopoTag > 0 && !verdeDopoTag) {
+  if (!fermo && tag && commitDopoTag > 0 && !verdeDopoTag && Number.isFinite(oreDallUltima)) {
     riassunto.push(`- Nessun commit verde dopo ${tag} da ${Math.round(oreDallUltima)} ore: sopra le ${SOGLIA_ORE} si apre un feedback.`);
   }
   if (fermo) riassunto.push('', `**Pubblicazione ferma da più di ${SOGLIA_ORE} ore: si apre un feedback e la corsa resta rossa.**`);
