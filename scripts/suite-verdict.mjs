@@ -170,8 +170,10 @@ export function primaRiga(e) {
 export function fileDellErrore(e, radice = ROOT) {
   const base = String(radice || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
   const testo = `${e?.message || ''}\n${e?.stack || ''}`.replace(/\[[0-9;]*m/g, '');
-  const candidati = [e?.location?.file, testo.match(/imported from\s+(\S+)/)?.[1],
-    ...[...testo.matchAll(/[^\s'"`()]+\.m?[jt]s\b/g)].map((m) => m[0])];
+  // Un percorso può avere spazi (una cartella utente): «imported from» si prende fino a fine riga.
+  const percorsi = [...testo.matchAll(/[^\s'"`()]+\.m?[jt]s\b/g)].map((m) => m[0]);
+  const candidati = [e?.location?.file, testo.match(/imported from\s+(.+?)['"]?\s*$/m)?.[1],
+    ...percorsi.filter((p) => /\.spec\.m?js$/.test(p)), ...percorsi];
   for (const c of candidati) {
     let f = String(c || '').replace(/^file:\/+/, '/').replace(/\\/g, '/').replace(/^\/([a-z]:)/i, '$1')
       .replace(/(:\d+){1,2}$/, '');
