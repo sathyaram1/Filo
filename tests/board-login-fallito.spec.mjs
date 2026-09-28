@@ -118,33 +118,30 @@ test('«Accedi» in testa: un accesso annullato lo dice in testa e offre «Ripro
   await expect(page.locator('#bdAuthMsg')).not.toHaveClass(/bd-auth-ko/);
 });
 
-test('browser chiuso e voto ripremuto: vale l\'ultimo accesso, il primo non scrive niente', async ({ openTab }) => {
+test('voto ripremuto durante l\'attesa: nessun secondo browser, parte l\'ultima scelta', async ({ openTab }) => {
   const page = await apri(openTab);
   await card(page).locator('.bd-vote-works').click();
-  // Il primo browser è stato chiuso: l'utente ripreme, stavolta su ❌.
   await card(page).locator('.bd-vote-broken').click();
-  expect(await page.evaluate(() => window.__accessi.length)).toBe(2);
-
-  // Il main chiude il primo flusso come sostituito: la pagina non deve dirlo.
-  await page.evaluate(() => window.__chiudiAccesso({ ok: false, code: 'sostituito', error: 'Accesso sostituito da quello appena richiesto.' }, 0));
+  expect(await page.evaluate(() => window.__accessi.length)).toBe(1);
   await expect(card(page).locator('.bd-card-msg')).toHaveText(/Completa l'accesso nel browser/);
-  await expect(page.locator('#bdAuthSpin')).toBeVisible();
 
-  await page.evaluate(() => window.__chiudiAccesso({ ok: true }, 1));
+  await page.evaluate(() => window.__chiudiAccesso({ ok: true }, 0));
   await expect.poll(() => page.evaluate(() => window.__gesti.map((g) => g.vote))).toEqual(['broken']);
   await expect(card(page).locator('.bd-vote-broken')).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('«Riapri il browser» in testa rilancia lo stesso accesso: il voto che aspettava parte lo stesso', async ({ openTab }) => {
+test('«Riapri il browser» chiede di nuovo lo stesso accesso: il voto che aspettava parte una volta sola', async ({ openTab }) => {
   const page = await apri(openTab);
   await card(page).locator('.bd-vote-works').click();
   await page.locator('#bdSignIn').click();
   expect(await page.evaluate(() => window.__accessi.length)).toBe(2);
   await expect(card(page).locator('.bd-card-msg')).toHaveText(/poi il voto parte da solo/);
 
-  await page.evaluate(() => window.__chiudiAccesso({ ok: false, code: 'sostituito', error: 'x' }, 0));
   await page.evaluate(() => window.__chiudiAccesso({ ok: true }, 1));
   await expect.poll(() => page.evaluate(() => window.__gesti.map((g) => g.vote))).toEqual(['works']);
+  await page.evaluate(() => window.__chiudiAccesso({ ok: true }, 0));
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__gesti.length)).toBe(1);
 });
 
 test('aspetto: attesa e frase di errore in tema chiaro e scuro', async ({ openTab }) => {

@@ -41,7 +41,7 @@ async function apriBacheca(app, openTab, { browserRotto = false } = {}) {
 
 // Da qui il main fa entrare l'account senza Google: subito, o quando il test chiama __faiEntrare().
 async function accessoFinto(app, { subito }) {
-  await app.evaluate((immediato) => {
+  await app.evaluate((_, immediato) => {
     const M = process.getBuiltinModule('module');
     const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
     const ga = M._cache[k].exports;
@@ -61,7 +61,7 @@ async function accessoFinto(app, { subito }) {
 }
 
 async function rispondiDalBrowser(app, i, query) {
-  const u = new URL(await app.evaluate((n) => globalThis.__aperture[n], i));
+  const u = new URL(await app.evaluate((_, n) => globalThis.__aperture[n], i));
   const state = encodeURIComponent(u.searchParams.get('state'));
   return fetch(`${u.searchParams.get('redirect_uri')}/?${query}&state=${state}`).then((r) => r.status);
 }
@@ -167,9 +167,10 @@ test('menu account, accesso non riuscito: lo dice una notifica di Filo, non una 
   await app.evaluate(({ shell: s }) => { s.openExternal = async () => { throw new Error('Failed to open'); }; });
   let dialogo = null;
   shell.on('dialog', (d) => { dialogo = d.message(); d.dismiss().catch(() => {}); });
-  await app.evaluate(({ BrowserWindow }) => {
-    BrowserWindow.getAllWindows()[0].webContents.send('shell:menu-action', 'auth-signin');
-  });
+  await app.evaluate(({ BrowserWindow }, url) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x.webContents.getURL() === url);
+    w.webContents.send('shell:menu-action', 'auth-signin');
+  }, shell.url());
   await expect(shell.locator('.shell-notif.show .shell-notif-msg')).toContainText('aprire il browser');
   expect(dialogo).toBeNull();
 });
