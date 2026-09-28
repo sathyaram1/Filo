@@ -375,6 +375,15 @@
       btn.click();
       return true;
     },
+    // Fa scorrere il testo fino in fondo, come chi lo legge tutto.
+    scrollToEnd() {
+      if (!active) return false;
+      const el = active.root.querySelector('.sn-confirm-text');
+      if (!el) return false;
+      el.scrollTop = el.scrollHeight;
+      el.dispatchEvent(new Event('scroll'));
+      return true;
+    },
     // Scrive nel campo del dialogo livello 3 (dispatch dell'evento input).
     fill(value) {
       if (!active) return false;
