@@ -240,24 +240,30 @@ async function nuovoFlusso() {
     prompt: 'consent',
   }).toString();
 
-  const timer = setTimeout(() => loop.abort(erroreAccesso('scaduto', 'accesso non completato in tempo')), ATTESA_ACCESSO_MS);
-  let code;
-  try {
-    await shell.openExternal(authUrl.toString());
-    code = await loop.waitForCode();
-  } catch (e) {
-    loop.abort(e);
-    throw e;
-  } finally {
+  const f = { url: authUrl.toString(), loop, aspettaBrowser: true };
+  let timer = null;
+  // Il tetto riparte a ogni riapertura: chi riapre il browser ricomincia da capo.
+  f.rinnovaAttesa = () => {
     clearTimeout(timer);
-    if (flussoInCorso === loop) flussoInCorso = null;
-  }
-  const googleTok = await exchangeCodeForGoogleToken(code, verifier, redirectUri);
-  if (!googleTok.id_token) throw new Error('OAuth: nessun id_token da Google');
-  const fb = await signInWithFirebase(googleTok.id_token);
-  setSession(fb);
-  persist();
-  return getProfile();
+    timer = setTimeout(() => loop.abort(erroreAccesso('scaduto', 'accesso non completato in tempo')), ATTESA_ACCESSO_MS);
+  };
+  f.rinnovaAttesa();
+  f.esito = (async () => {
+    let code;
+    try {
+      code = await loop.waitForCode();
+    } finally {
+      clearTimeout(timer);
+      f.aspettaBrowser = false;
+    }
+    const googleTok = await exchangeCodeForGoogleToken(code, verifier, redirectUri);
+    if (!googleTok.id_token) throw new Error('OAuth: nessun id_token da Google');
+    const fb = await signInWithFirebase(googleTok.id_token);
+    setSession(fb);
+    persist();
+    return getProfile();
+  })();
+  return f;
 }
 
 function signOut() {
