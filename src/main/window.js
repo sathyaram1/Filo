@@ -47,6 +47,13 @@ function wireWindowCommon(win, tabs) {
   } catch (_) {}
 
   win.on('resize', () => tabs.layout());
+  // Chiudere la finestra chiude le sue pagine: una WebContentsView sopravvive alla finestra, e con lei il microfono
+  // o la fotocamera che la pagina teneva aperti, senza più una scheda che lo dica (#586).
+  win.on('closed', () => {
+    for (const t of (tabs.tabs || []).slice()) {
+      try { if (t.view && t.view.webContents && !t.view.webContents.isDestroyed()) t.view.webContents.close(); } catch (_) {}
+    }
+  });
   // Se la finestra va a tutto schermo per una strada che non è quella di Filo
   // (gesto o scorciatoia del sistema, gestore finestre), adottiamo la modalità
   // invece di limitarci al layout: altrimenti resterebbe uno schermo intero che
