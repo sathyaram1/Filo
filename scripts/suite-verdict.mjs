@@ -162,14 +162,28 @@ export function primaRiga(e) {
     .trim();
 }
 
+const COLORI = /\u001b\[[0-9;]*m/g;
+// L'elenco che Playwright appende all'errore fatale di un worker: una riga per test, «[progetto] › file:riga:col › …».
+const ELENCO_DEL_WORKER = /Failed worker ran [^\n]*:((?:\n(?:\[[^\]\n]*\] › )?[^\n]+?:\d+:\d+ › [^\n]*)*)/;
+
 /**
- * Il file di tests/ che un errore fuori dai casi nomina, relativo alla radice, o ''. Prima la posizione di
- * Playwright (per un file che non si carica è lo spec, anche se l'errore sta in un aiuto), poi chi importava il
- * modulo che manca, poi il primo percorso sotto tests/ nel testo. PURA.
+ * L'ultimo test eseguito dal worker di un errore fatale, { spec, riga }, o null. L'elenco dice cosa il worker ha
+ * eseguito, non cosa è rotto: dei dieci può c'entrare solo l'ultimo, dopo il quale il worker si è fermato. PURA.
  */
-export function fileDellErrore(e, radice = ROOT) {
+export function ultimoTestDelWorker(e) {
+  const m = `${e?.message || ''}\n${e?.stack || ''}`.replace(COLORI, '').match(ELENCO_DEL_WORKER);
+  const righe = m ? m[1].split('\n').filter(Boolean) : [];
+  const ultima = righe.length ? righe[righe.length - 1].match(/^(?:\[[^\]]*\] › )?(.+?):(\d+):\d+ › /) : null;
+  return ultima ? { spec: normalizzaSpec(ultima[1]), riga: Number(ultima[2]) } : null;
+}
+
+/**
+ * Il file che il testo di un errore nomina, relativo alla radice, o '', senza l'elenco dei test del worker. Prima la
+ * posizione di Playwright, poi chi importava il modulo che manca, poi il primo percorso sotto tests/. PURA.
+ */
+function fileNelTesto(e, radice) {
   const base = String(radice || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-  const testo = `${e?.message || ''}\n${e?.stack || ''}`.replace(/\[[0-9;]*m/g, '');
+  const testo = `${e?.message || ''}\n${e?.stack || ''}`.replace(COLORI, '').replace(new RegExp(ELENCO_DEL_WORKER, 'g'), '');
   // Un percorso può avere spazi (una cartella utente): «imported from» si prende fino a fine riga.
   const percorsi = [...testo.matchAll(/[^\s'"`()]+\.m?[jt]s\b/g)].map((m) => m[0]);
   const candidati = [e?.location?.file, testo.match(/imported from\s+(.+?)['"]?\s*$/m)?.[1],
