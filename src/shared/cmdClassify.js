@@ -838,6 +838,11 @@
         if (q === '"') espande += ch;
         continue;
       }
+      // `$'…'` (ANSI-C) e `$"…"` (traduzione locale) di bash: il `$` è prefisso
+      // di quoting, non testo. Toltolo, la stringa torna com'è, e le sequenze di
+      // escape restano col loro backslash — che `pezzi()` tratta da separatore,
+      // così `.ss\x68/config` fa comunque affiorare il pezzo `.ss` riservato.
+      if (ch === '$' && (s[i + 1] === '\'' || s[i + 1] === '"')) { aperto = true; continue; }
       if (ch === '"' || ch === '\'') { q = ch; aperto = true; espande += ' '; continue; }
       if (ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
       if (/\s/.test(ch)) { chiudi(); continue; }
