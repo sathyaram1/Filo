@@ -158,6 +158,8 @@ test('nelle Preferenze si rilegge la memoria e si toglie una riga alla volta', a
     await expect(box.locator('.mem-riga', { hasText: riga })).toHaveCount(1, { timeout: 8_000 });
   }
   await expect(box.locator('.mem-gruppo', { hasText: 'Chi sei' })).toHaveCount(1);
+  await box.scrollIntoViewIfNeeded();
+  await box.locator('.mem-riga').first().hover();
   await page.screenshot({ path: 'tests/.shots/memoria-di-filo.png' });
 
   await box.locator('.mem-riga', { hasText: 'Vive a Lisbona' }).locator('.mem-via').click();
@@ -183,7 +185,7 @@ test('nelle Preferenze si rilegge la memoria e si toglie una riga alla volta', a
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnMemoryChange(null));
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.patchMemory({ PREFERENZE: '' }));
   await box.locator('.mem-riga', { hasText: 'Risposte brevi' }).locator('.mem-via').click();
-  await expect(page.locator('#memoriaHint')).toContainText('Non c’era più'.replace('’', '\''));
+  await expect(page.locator('#memoriaHint')).toContainText("Non c'era più");
   await expect(box.locator('.mem-riga', { hasText: 'Risposte brevi' })).toHaveCount(0, { timeout: 5_000 });
 });
 
