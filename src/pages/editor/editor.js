@@ -1161,6 +1161,13 @@
     return out.slice(-12);
   }
 
+  // La memoria arriva al modello recintata come nella chat: la scrive Filo da
+  // conversazioni che possono aver letto una pagina ostile (#592).
+  function memoriaImbustata(testo) {
+    const E = window.SN_ESTERNO;
+    return E ? E.imbusta({ tipo: 'MEMORIA_FILO', testo, conIntestazione: true }) : '';
+  }
+
   // Estratto della memoria di Filo (profilo + preferenze) come contesto.
   async function filoMemoryText() {
     try {
@@ -1217,7 +1224,7 @@
       parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
         + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
     }
-    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memory);
+    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
     const messages = [
       { role: 'system', content: TITLE_SYSTEM_PROMPT },
       { role: 'user', content: parts.join('\n\n') },
@@ -1314,7 +1321,7 @@
       parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
         + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
     }
-    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memory);
+    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
     const messages = [
       { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
       { role: 'user', content: parts.join('\n\n') },

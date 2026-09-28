@@ -44,6 +44,17 @@
     .agent-style-note { margin: 6px 0 0; font-size: 12px; color: var(--sn-muted); text-align: right; }
     .agent-style-note.agent-style-over { color: var(--sn-error); text-align: left; }
     #agentStyleText.agent-style-over { border-color: var(--sn-error); }
+    /* Memoria di Filo: una riga per cosa imparata, ognuna si toglie da sola (#592). */
+    .mem-box { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+    .mem-gruppo { margin: 12px 0 4px; font-size: 13px; font-weight: 600; opacity: 0.8; }
+    .mem-gruppo:first-child { margin-top: 0; }
+    .mem-riga { display: flex; align-items: flex-start; gap: 10px; padding: 6px 8px; border-radius: 8px; transition: background 0.15s ease; }
+    .mem-riga:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.12)); }
+    .mem-testo { flex: 1 1 auto; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .mem-via { flex: 0 0 auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 6px; opacity: 0.35; transition: opacity 0.15s ease, background 0.15s ease; }
+    .mem-riga:hover .mem-via, .mem-via:focus-visible { opacity: 0.85; }
+    .mem-via:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.18)); color: var(--sn-error); }
+    .mem-via:disabled { cursor: default; opacity: 0.2; }
   </style>
 </head>
 <body>
@@ -108,6 +119,13 @@
       <select id="agentStylePreset"></select>
       <textarea id="agentStyleText" rows="4" placeholder="Es. Rispondi sempre in italiano, con un tono pacato e qualche esempio pratico." style="width:100%;margin-top:10px;"></textarea>
       <p id="agentStyleNote" class="agent-style-note" aria-live="polite" hidden></p>
+    </section>
+
+    <section>
+      <h2>Memoria di Filo</h2>
+      <p class="sn-muted">Quello che Filo ha imparato su di te mentre parlavate. Entra in ogni conversazione: se una riga non ti torna, toglila.</p>
+      <div id="memoria" class="mem-box"></div>
+      <span id="memoriaHint" class="sn-saved-indicator" aria-live="polite">Dimenticato</span>
     </section>
 
     <section>

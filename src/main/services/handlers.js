@@ -918,7 +918,11 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
     const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     for (const line of lines) {
       const m = line.match(/^LEZIONE:\s*(.+)$/i);
-      if (m) await FiloMem.appendLesson(m[1]);
+      if (!m) continue;
+      // Il tetto vale anche per le lezioni che Filo si scrive da solo (#592).
+      const l = global.SN_PREF.lezioneDaAzione({ testo: m[1] });
+      if (l.rifiuto) { console.warn('[Filo] lezione automatica scartata:', l.rifiuto); continue; }
+      if (l.testo) await FiloMem.appendLesson(l.testo);
     }
     if (await FiloMem.lessonsBufferShouldCompact()) {
       maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
@@ -1527,16 +1531,15 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         return { executed: true, kept: false };
       }
       case 'SALVA_LEZIONE': {
-        // Filo fissa una lezione nella PROPRIA memoria su richiesta (o di sua
-        // iniziativa) in chat: la regola entra nel buffer delle lezioni — lo
-        // stesso che l'agente-lezioni riempie da solo — e da subito compare in
-        // LEZIONI RECENTI di ogni conversazione. Visibile e cancellabile
-        // dall'utente fra le memorie, come tutte le lezioni.
-        const lezione = String(action.testo ?? action.text ?? action.lezione ?? '').trim();
+        // Qui ci si arriva solo dopo l'OK dell'utente sul testo esatto (livello
+        // 2, #592). La lezione entra nel buffer e da subito in LEZIONI RECENTI
+        // di ogni conversazione; l'utente la rilegge e la toglie in Preferenze.
+        const l = global.SN_PREF.lezioneDaAzione(action);
+        if (l.rifiuto) return { executed: false, kept: false, output: { error: l.rifiuto, rifiuto: true } };
         let fissata = false;
-        if (lezione) {
+        if (l.testo) {
           try {
-            await FiloMem.appendLesson(lezione);
+            await FiloMem.appendLesson(l.testo);
             fissata = true;
             if (await FiloMem.lessonsBufferShouldCompact()) {
               maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
@@ -2553,9 +2556,10 @@ function toolResultText({ action, res, rendered }) {
     done = String(done || describe()).replace(/\.+\s*$/, '');
     return `Eseguita: ${done}.`;
   }
-  if (type === 'IMPOSTA_PREFERENZA' && res.output && res.output.error) {
-    return `Impostazione NON applicata: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
-      + 'dillo all\'utente e, se vuole, riprova con un valore che stia nel limite.';
+  if (res.output && res.output.rifiuto && res.output.error) {
+    const cosa = type === 'SALVA_LEZIONE' ? 'Lezione NON salvata' : 'Impostazione NON applicata';
+    return `${cosa}: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
+      + 'dillo all\'utente e, se vuole, riprova con un testo che stia nel limite.';
   }
   // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
   // pulizia schede, cancellazione archivio) che l'utente aziona da sé.
@@ -4105,6 +4109,9 @@ globalThis.SN_HANDLE_MESSAGE = handleMessage;
 // e qui la cosa da verificare è proprio CHI riceve (una scheda su un sito
 // qualunque non deve vedere passare i rami dell'owner).
 globalThis.SN_BROADCAST_FILO = broadcastToFiloPages;
+// Le Preferenze mostrano la memoria riga per riga (#592): a ogni scrittura la
+// rileggono. Solo le pagine di Filo: un sito non deve sapere quando Filo impara.
+try { FiloMem.setOnMemoryChange(() => broadcastToFiloPages({ type: MSG.FILO_MEMORY_CHANGED })); } catch (_) {}
 
 module.exports = {
   handleMessage,

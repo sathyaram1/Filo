@@ -997,6 +997,86 @@
     }
   }
 
+  // ── Memoria di Filo (#592) ───────────────────────────────────────────────
+  // Profilo, preferenze apprese e lezioni entrano in ogni conversazione: qui
+  // l'utente le rilegge e ne toglie una riga alla volta.
+  const NOMI_GRUPPO = { PROFILO: 'Chi sei', PREFERENZE: 'Cosa preferisci' };
+  function nomeGruppo(nome) {
+    if (NOMI_GRUPPO[nome]) return NOMI_GRUPPO[nome];
+    const t = String(nome || '').replace(/_+/g, ' ').trim().toLowerCase();
+    return t ? t[0].toUpperCase() + t.slice(1) : 'Altro';
+  }
+
+  let memoriaTimer = null;
+  async function caricaMemoria() {
+    if (!$('memoria')) return;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_MEMORY_VIEW }); } catch (_) {}
+    if (r && r.ok) disegnaMemoria(r);
+  }
+  function caricaMemoriaPresto() {
+    clearTimeout(memoriaTimer);
+    memoriaTimer = setTimeout(caricaMemoria, 120);
+  }
+
+  function disegnaMemoria({ moduli = [], lezioni = [] }) {
+    const box = $('memoria');
+    box.textContent = '';
+    const posto = (n) => (n === 'PROFILO' ? 0 : n === 'PREFERENZE' ? 1 : 2);
+    const gruppi = [];
+    for (const m of [...moduli].sort((a, b) => posto(a.nome) - posto(b.nome))) {
+      if (!Array.isArray(m.righe) || !m.righe.length) continue;
+      gruppi.push({ titolo: nomeGruppo(m.nome), righe: m.righe.map((riga) => ({ testo: riga, via: { modulo: m.nome, riga } })) });
+    }
+    if (lezioni.length) {
+      gruppi.push({ titolo: 'Imparato da poco', righe: lezioni.map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } } })) });
+    }
+    if (!gruppi.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = 'Filo non ha ancora imparato niente su di te.';
+      box.appendChild(p);
+      return;
+    }
+    for (const g of gruppi) {
+      const h = document.createElement('h3');
+      h.className = 'mem-gruppo';
+      h.textContent = g.titolo;
+      box.appendChild(h);
+      for (const r of g.righe) box.appendChild(rigaMemoria(r));
+    }
+  }
+
+  function rigaMemoria({ testo, via }) {
+    const row = document.createElement('div');
+    row.className = 'mem-riga';
+    const t = document.createElement('span');
+    t.className = 'mem-testo';
+    t.textContent = testo;
+    row.appendChild(t);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mem-via';
+    b.textContent = '×';
+    b.title = 'Dimentica';
+    b.setAttribute('aria-label', `Dimentica: ${testo.slice(0, 80)}`);
+    b.addEventListener('click', () => dimentica(b, via));
+    row.appendChild(b);
+    return row;
+  }
+
+  // Si dice «Dimenticato» solo se il main l'ha tolta davvero: con la pagina
+  // rimasta indietro la riga può non esserci più.
+  async function dimentica(b, via) {
+    b.disabled = true;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_MEMORY_FORGET, ...via }); } catch (_) {}
+    const hint = $('memoriaHint');
+    if (hint) hint.textContent = r && r.ok && r.tolta ? 'Dimenticato' : 'Non c\'era più: ecco com\'è adesso';
+    flashSaved('memoriaHint');
+    caricaMemoria();
+  }
+
   let caricato = false;
 
   async function load() {
@@ -1051,9 +1131,11 @@
     try {
       chrome.runtime.onMessage.addListener((msg) => {
         if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) riallinea(msg.settings);
+        if (msg && msg.type === MSG.FILO_MEMORY_CHANGED) caricaMemoriaPresto();
       });
     } catch (_) {}
     load();
+    caricaMemoria();
 
     // Tema e dimensione testo: anteprima immediata + salvataggio.
     $('theme').addEventListener('change', () => {

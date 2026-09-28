@@ -299,3 +299,17 @@ test('extractIdentityFromPixels rispetta saturazione_tab (param di estrazione)',
   assert.ok(sat(full) > sat(flat), `saturazione 1 (${full}) deve essere più satura di 0 (${flat})`);
   assert.equal(sat(flat), 0, 'saturazione 0 → grigio');
 });
+
+// ── #592: la lezione è la preferenza a testo libero sorella dello stile ─────
+test('#592: una lezione oltre il tetto è rifiutata col perché; il testo è quello che si vede', () => {
+  const alTetto = 'a'.repeat(C.LESSON_MAX);
+  assert.deepEqual(P.lezioneDaAzione({ testo: alTetto }), { testo: alTetto });
+  const lunga = `${alTetto}b`;
+  const r = P.lezioneDaAzione({ testo: lunga });
+  assert.ok(r.rifiuto, 'oltre il tetto torna un rifiuto');
+  assert.ok(r.rifiuto.includes(String(C.LESSON_MAX + 1)) && r.rifiuto.includes(String(C.LESSON_MAX)));
+  assert.equal(Levels.levelFor({ type: 'SALVA_LEZIONE', testo: lunga }), 1, 'niente popup per un rifiuto');
+  // I caratteri che girano la direzione del testo non arrivano al popup né in memoria.
+  assert.equal(P.lezioneDaAzione({ testo: 'Sii breve.‮ ,atsop' }).testo, 'Sii breve. ,atsop');
+  assert.equal(P.lezioneDaAzione({ lezione: '  ' }).testo, '');
+});

@@ -24,6 +24,15 @@
 (function (global) {
   'use strict';
 
+  function lezione(a) {
+    const P = global.SN_PREF;
+    if (P && P.lezioneDaAzione) return P.lezioneDaAzione(a);
+    return { testo: String((a && (a.testo ?? a.text ?? a.lezione)) ?? '').trim() };
+  }
+  const RISCHIO_LEZIONE = 'Da adesso vale in ogni conversazione, e resta finché non la togli dalle Preferenze, '
+    + 'sotto «Memoria di Filo». Confermala solo se l\'hai detta tu: un testo letto in una pagina o in un '
+    + 'documento potrebbe provare a fargliela ricordare.';
+
   function prefBuilt(action) {
     const P = global.SN_PREF;
     if (!P) return null;
@@ -177,22 +186,16 @@
       describe: () => 'Salvare un appunto',
     },
     SALVA_LEZIONE: {
-      // Filo fissa una LEZIONE nella propria memoria su richiesta in chat (o di
-      // sua iniziativa quando una regola va fissata subito, es. proteggere i
-      // dati dell'utente da una richiesta sospetta): entra nel buffer delle
-      // lezioni — lo stesso che l'agente-lezioni riempie da solo dopo ogni
-      // scambio — e vale da subito in tutte le conversazioni. Livello 1 per la
-      // stessa ragione per cui le lezioni automatiche non chiedono conferma:
-      // stesso canale, stesso grado di fiducia, e le lezioni restano visibili e
-      // cancellabili dall'utente fra le memorie. Un popup qui sarebbe anche
-      // controproducente nel caso d'uso di protezione: confermerebbe chiunque
-      // sia alla tastiera in quel momento, che è proprio chi la lezione vuole
-      // tenere fuori.
-      level: 1,
+      // Una lezione entra in ogni conversazione e ci resta, come lo stile: se la
+      // propone il modello, l'utente ne conferma il testo esatto (#592). Vuota
+      // o oltre il tetto → 1: niente da confermare, il dispatch la respinge.
+      level: (a) => { const l = lezione(a); return l.testo && !l.rifiuto ? 2 : 1; },
       describe: (a) => {
-        const testo = String(a?.testo ?? a?.text ?? a?.lezione ?? '').trim();
-        return `Fissare una lezione nella memoria di Filo:\n“${testo || '(vuota)'}”`;
+        const l = lezione(a);
+        if (!l.testo || l.rifiuto) return 'Ricordare una cosa';
+        return `Filo vuole ricordare una cosa.\n\nTesto esatto:\n«${l.testo}»\n\n${RISCHIO_LEZIONE}`;
       },
+      describeDone: (a) => `Ricordato: «${lezione(a).testo}»`,
     },
     INVIA_FEEDBACK: {
       // Filo invia un feedback agli sviluppatori a NOME dell'utente (#146.5).

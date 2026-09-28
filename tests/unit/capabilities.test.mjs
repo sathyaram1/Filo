@@ -115,6 +115,9 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_RUN_ACTION: 'agent-actions',
     FILO_CONFIRM_ACTION: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',
+    // #592 — la memoria riga per riga nelle Preferenze: rileggerla e toglierne una.
+    FILO_MEMORY_VIEW: 'filo-memory',
+    FILO_MEMORY_FORGET: 'filo-memory',
     // #525 — l'archivio delle chat: lo consulta la pagina Cronologia
     // (capacità "chat-archive"). La ricerca che fa FILO stesso passa dalle
     // azioni (FILO_RUN_ACTION → CERCA_CHAT) ed è la capacità gemella

@@ -37,6 +37,11 @@
     return { shellPref: '"powershell" | "cmd" | "bash" | "zsh"', esempioPercorso: '~/Documenti/bolletta.pdf' };
   }
 
+  function tettoLezione() {
+    const C = global.SN_CONST;
+    return C && C.LESSON_MAX ? `${C.LESSON_MAX} caratteri` : 'qualche centinaio di caratteri';
+  }
+
   function tettoStile() {
     const C = global.SN_CONST;
     return C && C.AGENT_STYLE_MAX ? `al massimo ${C.AGENT_STYLE_MAX} caratteri` : 'con un tetto di lunghezza';
@@ -139,7 +144,7 @@
       required: ['testo', 'contesto'],
     },
     SALVA_LEZIONE: {
-      description: 'Fissa una LEZIONE nella memoria di Filo (la sezione LEZIONI RECENTI): una regola breve, in terza persona, che vale da subito in TUTTE le conversazioni. L\'utente la vede e può cancellarla fra le memorie. Non usarla per i contenuti dell\'utente (per quelli c\'è SALVA_APPUNTO): è per come TU devi comportarti d\'ora in poi.',
+      description: () => 'Fissa una LEZIONE nella memoria di Filo (la sezione LEZIONI RECENTI): una regola breve, in terza persona, che vale da subito in TUTTE le conversazioni. Il sistema la mostra all\'utente col testo esatto e la salva solo col suo OK: non chiederlo tu a parole. Al massimo ' + tettoLezione() + '. L\'utente la rilegge e la toglie nelle Preferenze, sotto «Memoria di Filo». Non usarla per i contenuti dell\'utente (per quelli c\'è SALVA_APPUNTO): è per come TU devi comportarti d\'ora in poi.',
       properties: { testo: S('La regola, breve e in terza persona ("L\'utente non beve caffè").') },
       required: ['testo'],
     },

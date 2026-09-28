@@ -5,7 +5,7 @@
 // QUALI preferenze sono modificabili e COME interpretarne i valori è la stessa
 // esposta dalla pagina Preferenze, e deve restare testabile senza Electron.
 //
-// Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS }.
+// Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS, lezioneDaAzione }.
 // `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk },
 // { rifiuto } col perché, oppure null se chiave/valore non sono validi. Solo le
 // preferenze qui elencate sono scrivibili. Dal #146.5 l'elenco copre TUTTE le
@@ -545,5 +545,16 @@
     return null;
   }
 
-  global.SN_PREF = { buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS };
+  // Una lezione è la sorella dello stile (#592): il popup mostra il testo che si
+  // salva, e oltre il tetto torna un rifiuto col perché, mai un taglio.
+  function lezioneDaAzione(a) {
+    const testo = testoVisibile(a && (a.testo ?? a.text ?? a.lezione));
+    if (!testo) return { testo: '' };
+    const C = global.SN_CONST;
+    const n = C.agentStyleLength(testo);
+    if (n > C.LESSON_MAX) return { testo, rifiuto: `la lezione è lunga ${n} caratteri e il massimo è ${C.LESSON_MAX}` };
+    return { testo };
+  }
+
+  global.SN_PREF = { buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

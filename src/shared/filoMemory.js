@@ -69,7 +69,14 @@
   }
   async function setRaw(key, value) {
     await chrome.storage.local.set({ [key]: value });
+    if ((key === KEYS.FILO_MEMORY || key === KEYS.FILO_LESSONS_BUFFER) && onMemoriaCambiata) {
+      try { onMemoriaCambiata(); } catch (_) {}
+    }
   }
+
+  // Il main avvisa da qui le pagine che mostrano la memoria (Preferenze, #592).
+  let onMemoriaCambiata = null;
+  function setOnMemoryChange(fn) { onMemoriaCambiata = typeof fn === 'function' ? fn : null; }
 
   // ===== Raw log =====
 
@@ -119,6 +126,17 @@
     await setRaw(KEYS.FILO_LESSONS_BUFFER, []);
   }
 
+  // Toglie UNA lezione, riconosciuta da data e testo: una pagina rimasta indietro
+  // non deve poter togliere la riga sbagliata. Torna se l'ha trovata (#592).
+  async function forgetLesson({ ts, text } = {}) {
+    const buf = await getLessonsBuffer();
+    const i = buf.findIndex((l) => l && l.ts === ts && l.text === text);
+    if (i < 0) return false;
+    buf.splice(i, 1);
+    await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
+    return true;
+  }
+
   // ===== Moduli =====
 
   // Forma in storage: { PROFILO: "...", PREFERENZE: "...", <ESPANSIONE>: "..." }
@@ -130,6 +148,19 @@
 
   async function setMemory(memory) {
     await setRaw(KEYS.FILO_MEMORY, memory);
+  }
+
+  // Toglie UNA riga da un modulo, riconosciuta dal testo esatto. Torna se c'era.
+  async function forgetModuleLine(nome, riga) {
+    const mem = await getMemory();
+    const testo = mem && typeof mem[nome] === 'string' ? mem[nome] : null;
+    if (testo == null || typeof riga !== 'string' || !riga.trim()) return false;
+    const righe = testo.split(/\r?\n/);
+    const i = righe.findIndex((r) => r.trim() === riga.trim());
+    if (i < 0) return false;
+    righe.splice(i, 1);
+    await setMemory({ ...mem, [nome]: righe.join('\n').trim() });
+    return true;
   }
 
   // Aggiorna alcuni moduli senza toccare gli altri (semantica patch).
@@ -821,10 +852,11 @@
     // raw log
     appendRaw, listRaw,
     // lessons
-    getLessonsBuffer, appendLesson, lessonsBufferShouldCompact, clearLessonsBuffer,
+    getLessonsBuffer, appendLesson, lessonsBufferShouldCompact, clearLessonsBuffer, forgetLesson,
     LESSONS_BUFFER_TRIGGER_CHARS,
     // moduli
-    getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt,
+    getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt, forgetModuleLine,
+    setOnMemoryChange,
     // onboarding (#524)
     getOnboarding, setOnboarding,
     // timer + sveglie (#322)
