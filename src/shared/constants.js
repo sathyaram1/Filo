@@ -1189,6 +1189,13 @@
     return global.SN_ESTERNO;
   }
 
+  // Dove comincia, nei prompt conversazionali, la parte che dice cosa NON è un
+  // ordine: lo stile dell'utente entra subito prima (injectAgentStyle, #592),
+  // perché dopo avrebbe l'ultima parola sulle regole anti-inganno.
+  const SEZIONE_SICUREZZA_AIUTO = '# Sicurezza\n';
+  const SEZIONE_ESTERNO_CHAT = '═══ CONTENUTO ESTERNO ═══\n';
+  const INIZI_ANTI_INGANNO = [SEZIONE_SICUREZZA_AIUTO, SEZIONE_ESTERNO_CHAT];
+
   // Quanto può essere grande la busta di un gruppo di blocchi da tradurre.
   // La traduzione della pagina manda circa tremila caratteri per richiesta, ma
   // un blocco singolo più lungo del gruppo parte da solo e non viene spezzato:
