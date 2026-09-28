@@ -83,3 +83,43 @@ test('dietro un proxy della rete locale un sito di internet riceve ancora i cont
     await new Promise((ok) => proxy.close(ok));
   }
 });
+
+// La stessa causa lascia un segno che resta: la scheda chiusa dietro il proxy finisce in archivio come «di casa»,
+// quindi non viene mai riassunta né indicizzata, e la ricerca per significato non la trova neanche dopo.
+async function archiviataComeCasa(app, shell, openTab, url, proxyRules) {
+  await app.evaluate(async ({ webContents, session }, regole) => {
+    const sessioni = new Set([session.defaultSession, ...webContents.getAllWebContents().map((w) => w.session)]);
+    for (const s of sessioni) await s.setProxy(regole ? { proxyRules: regole } : { mode: 'direct' });
+  }, proxyRules);
+  await openTab(url);
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate(async (tid) => window.filoShell.tabs.close(tid), id);
+  let voce = null;
+  const fine = Date.now() + 8000;
+  while (!voce && Date.now() < fine) {
+    voce = await app.evaluate(async (_e, u) => ((await globalThis.SN_ARCHIVED_TABS.list()) || []).find((t) => t.url === u) || null, url);
+    if (!voce) await new Promise((ok) => setTimeout(ok, 200));
+  }
+  await new Promise((ok) => setTimeout(ok, 800));
+  voce = await app.evaluate(async (_e, u) => ((await globalThis.SN_ARCHIVED_TABS.list()) || []).find((t) => t.url === u) || null, url);
+  return voce ? Boolean(voce.casa) : null;
+}
+
+test('una scheda di internet chiusa dietro un proxy della rete locale non finisce in archivio come pagina di casa', async ({ app, shell, openTab, testServer }) => {
+  const privato = indirizzoPrivato();
+  test.skip(!privato, 'serve un indirizzo privato della macchina su cui mettere il proxy');
+  const porta = Number(new URL(testServer.origin).port);
+  const pagina = '<!doctype html><title>Ricetta della focaccia</title><p>Farina, acqua, olio, sale.</p>';
+
+  expect(await archiviataComeCasa(app, shell, openTab, testServer.html(pagina, { pubblico: true }), null),
+    'caso di riscontro: senza proxy la scheda non è di casa').toBe(false);
+
+  const proxy = await avviaProxy(privato, porta);
+  try {
+    const regole = `http=${privato}:${proxy.address().port}`;
+    expect(await archiviataComeCasa(app, shell, openTab, testServer.html(pagina, { pubblico: true }), regole),
+      `dietro il proxy ${privato} la stessa scheda viene archiviata come rete di casa`).toBe(false);
+  } finally {
+    await new Promise((ok) => proxy.close(ok));
+  }
+});
