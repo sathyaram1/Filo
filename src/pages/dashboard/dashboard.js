@@ -1244,7 +1244,7 @@
       renderSuggestions();
       // La home si rifà da sola anche quando arriva un modello (invito, chiave propria): l'intervista
       // che lo aspettava parte qui, non alla prossima scheda.
-      Accoglienza.maybeOpenOnboardingLater();
+      Accoglienza.maybeOpenOnboardingLater().catch(() => {});
     } else if (msg?.type === MSG.SETTINGS_UPDATED) {
       applySavedTheme().catch(() => {});
       if (msg.settings && typeof msg.settings.showHomeMessage === 'boolean') {
