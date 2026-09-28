@@ -618,7 +618,7 @@
     let r = null;
     try { r = await api.tabs.dimenticaPermessi(id); } catch (_) { r = null; }
     if (!r || !r.tolte) return;
-    showToast(r.cera
+    showToast(r.ricarica
       ? 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo. Ricarica la pagina perché valga anche per quello che sta già usando.'
       : 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo.');
   }
