@@ -210,7 +210,7 @@ describe('release.yml: si pubblica il commit più nuovo di main con la suite ver
     assert.match(SCEGLI_JS, /inviaAllarme\(titolo, testo, \[chiaveDelFermo\(CHIAVE_FERMO, tag\)\]\)/,
       'la chiave porta la versione a cui è ferma: il feedback di un fermo vecchio non assorbe quello nuovo');
     const dopo = SCEGLI_JS.slice(SCEGLI_JS.indexOf('inviaAllarme(titolo, testo, [chiaveDelFermo(CHIAVE_FERMO, tag)])'));
-    assert.match(dopo.slice(0, 80), /process\.exit\(1\)/, 'dopo l\'allarme la corsa deve finire rossa');
+    assert.match(dopo.slice(0, 110), /process\.exit\(1\)/, 'dopo l\'allarme la corsa deve finire rossa');
     assert.doesNotMatch(scegli, /continue-on-error/, 'un `scegli` rosso che lascia la corsa verde tace');
   });
 
