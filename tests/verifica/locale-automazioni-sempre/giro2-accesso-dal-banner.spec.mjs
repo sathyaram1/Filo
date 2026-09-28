@@ -102,7 +102,7 @@ test('accesso annullato: i campi restano bloccati, nessun valore inventato diven
   }
 });
 
-test('doppio clic su Accedi: una lettura sola arriva e i valori sono quelli veri', async ({ openTab }) => {
+test('doppio clic su Accedi: i valori mostrati sono quelli veri', async ({ openTab }) => {
   const page = await apriDaNonOwner(openTab);
   await page.locator('#mgSignIn').click();
   await page.locator('#mgSignIn').click({ force: true }).catch(() => {});
