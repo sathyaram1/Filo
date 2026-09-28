@@ -210,7 +210,7 @@ const geoBlockMethods = {
     if (this.incognito) return;
     let host = '';
     try { host = new URL(url).hostname; } catch (_) { return; }
-    const input = { title: tab.title || '', text, statusCode: tab._lastStatus || 0, host, url };
+    const input = { title: tab.title || '', text, statusCode: tab._lastStatus || 0, host, url, budgetUrl: tab._urlNavigato };
     this.proxyAvailable()
       .then((ok) => (ok ? classify(input) : null))
       .then((res) => {
