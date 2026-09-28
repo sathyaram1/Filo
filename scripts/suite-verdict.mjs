@@ -271,13 +271,19 @@ export function verdetto(json, noti) {
       else v.nuovi.push(c);
     }
   }
-  const globali = classificaErroriGlobali(json?.errors, v.nuovi.length > 0);
-  const fileDi = new Map();
-  for (const e of Array.isArray(json?.errors) ? json.errors : []) {
-    if (!fileDi.get(primaRiga(e))) fileDi.set(primaRiga(e), fileDellErrore(e));
-  }
-  for (const riga of globali.rossi) {
-    v.nuovi.push({ spec: FUORI_DAI_CASI, titolo: riga, titoloCompleto: riga, file: fileDi.get(riga) || '' });
+  const errori = Array.isArray(json?.errors) ? json.errors : [];
+  const globali = classificaErroriGlobali(errori, v.nuovi.length > 0);
+  // Stesso ordine e stessa scelta di classificaErroriGlobali, ma errore per errore: tre teardown con la stessa prima
+  // riga possono venire da tre worker diversi.
+  const eTeardown = (e) => /^Worker teardown timeout/i.test(primaRiga(e));
+  const rossi = [...errori.filter((e) => !eTeardown(e)), ...(globali.avvisi.length ? [] : errori.filter(eTeardown))];
+  for (const e of rossi) {
+    const riga = primaRiga(e);
+    const strascico = casoDelloStrascico(e, casi);
+    v.nuovi.push({
+      spec: FUORI_DAI_CASI, titolo: riga, titoloCompleto: riga, file: strascico ? '' : fileDellErrore(e),
+      ...(strascico ? { strascicoDi: `tests/${strascico.spec}.spec.mjs:${strascico.riga}` } : {}),
+    });
   }
   v.avvisi = globali.avvisi;
   return v;
