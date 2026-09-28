@@ -6,7 +6,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 test('applicazione col corpo fermo per disegno: nascosto il banner, la rotella non porta via l\'applicazione', async ({ app, openTab, testServer }) => {
   await app.evaluate(() => globalThis.__filoCookieBanners.setListForTest('###cookie-notice'));
-  const page = await testServer.openReady(openTab, `<title>APP</title>
+  const page = await testServer.openReady(openTab, `<!doctype html><title>APP</title>
     <style>html,body{margin:0;height:100%;overflow:hidden} .shell{display:flex;height:100%} nav{width:200px;background:#eee}
       main{flex:1;overflow:auto} .tall{height:3000px} .drawer{position:absolute;top:100%;left:0;width:300px;height:600px;background:#ccc}</style>
     <div class="shell"><nav>menu dell'applicazione</nav><main><div class="tall">contenuto</div></main></div>
