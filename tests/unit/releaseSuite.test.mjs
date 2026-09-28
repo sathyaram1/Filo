@@ -285,13 +285,15 @@ describe('ogni allarme dice al server cosa è rotto', () => {
     assert.match(senzaCommenti(job('release')), /build-alarm\.mjs [^\n]*--chiavi-unit unit\.log/, 'il cancello unit dà una chiave per file di test');
   });
 
-  test('ogni chiamata a inviaAllarme negli script passa le sue chiavi', () => {
+  test('ogni chiamata a inviaAllarme o spedisciAllarme negli script passa le sue chiavi', () => {
     for (const f of ['release-platform-alarm.mjs', 'ultima-suite-verde.mjs']) {
       const src = readFileSync(resolve(ROOT, 'scripts', f), 'utf8');
-      const chiamate = src.match(/await inviaAllarme\([^)]*\)/g) || [];
+      const chiamate = src.match(/await (?:invia|spedisci)Allarme\([^)]*\)/g) || [];
       assert.ok(chiamate.length, `${f} non chiama più inviaAllarme`);
-      for (const c of chiamate) assert.match(c, /inviaAllarme\([^,]+,[^,]+,[^)]+\)/, `${f}: ${c} senza chiavi`);
+      for (const c of chiamate) assert.match(c, /Allarme\([^,]+,[^,]+,[^)]+\)/, `${f}: ${c} senza chiavi`);
     }
+    assert.match(SCEGLI_JS, /spedisciAllarme\(titolo, testo, \[CHIAVE_FERMO_DOPO_VERDE\]\)/,
+      'un verde fermo da giorni deve aprire il suo feedback');
     assert.match(readFileSync(resolve(ROOT, 'scripts', 'bake-default-config.mjs'), 'utf8'), /keys: chiaviAllarmeBake\(mancanti\)/);
   });
 });
