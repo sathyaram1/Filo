@@ -401,8 +401,13 @@ test('livello 3 — git tag -d / branch -D (cancellazioni) restano conferma-test
 });
 
 test('git config — legge (1), imposta (2), cancella (3) secondo gli argomenti', () => {
-  for (const cmd of ['git config --list', 'git config -l', 'git config --get user.name', 'git config user.name']) {
-    assert.equal(lvl(cmd), 1, `"${cmd}" (legge) dovrebbe essere livello 1`);
+  for (const cmd of ['git config --get user.name', 'git config user.name', 'git config user.email']) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (legge una chiave innocua) dovrebbe essere livello 1`);
+  }
+  // #587: un dump completo o una chiave che porta credenziali (URL di un remoto
+  // col token) stampa un segreto in chiaro → conferma.
+  for (const cmd of ['git config --list', 'git config -l', 'git config --get remote.origin.url', 'git config --get-regexp remote']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (può stampare una credenziale) dovrebbe essere livello 2`);
   }
   for (const cmd of ['git config user.name "Mario"', 'git config --global user.email a@b.c', 'git config --add safe.directory /x', 'git config --replace-all k v']) {
     assert.equal(lvl(cmd), 2, `"${cmd}" (imposta) dovrebbe essere livello 2`);
