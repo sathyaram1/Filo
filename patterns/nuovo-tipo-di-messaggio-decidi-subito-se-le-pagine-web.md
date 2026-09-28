@@ -83,13 +83,21 @@ disegnare, non l'identità (indirizzo email, nome, identificativo dell'account).
 
 Il confine vale nei due versi. `broadcastToTabs` raggiunge ogni frame di ogni
 scheda, siti compresi (#589: la spinta `SETTINGS_UPDATED` portava a tutti le
-chiavi dei servizi e le credenziali del proxy che le letture già toglievano).
+chiavi dei servizi e le credenziali del proxy che le letture già toglievano; poi
+l'intervista di benvenuto, che un sito non poteva chiedere, arrivava da sola).
 
-- Le impostazioni verso un'origine web sono **una lista di campi ammessi**, non
-  di campi tolti: `src/main/services/impostazioniPerOrigine.js`, una funzione
-  sola per risposte, letture dello storage e spinte (frame per frame, secondo
-  il suo indirizzo). Un segreto nuovo resta a casa da sé.
-- Un content script che comincia a leggere un'impostazione nuova la aggiunge
-  lì: la sentinella `tests/unit/impostazioniPerOrigine.test.mjs` diventa rossa
-  finché non lo fa, invece di lasciarla sparire in silenzio solo sui siti.
-- Un dato che un sito non deve vedere affatto va con `broadcastToFiloPages`.
+Tutto quello che attraversa il confine con un sito sta in **liste di ciò che è
+ammesso**, in un file solo (`src/main/services/impostazioniPerOrigine.js`):
+
+- i **tipi di messaggio** spinti che raggiungono un frame non `filo://` (quelli
+  che un content script ascolta); un tipo nuovo resta nelle pagine di Filo;
+- i **campi delle impostazioni** che un sito riceve (risposte, letture dello
+  storage, spinte) e quelli che può **scrivere** (la voce della dettatura);
+- gli **scomparti del magazzino** che un sito legge, scrive o toglie.
+
+Un content script che comincia ad ascoltare una spinta, leggere un campo o
+usare uno scomparto nuovo lo aggiunge lì: le sentinelle di
+`tests/unit/impostazioniPerOrigine.test.mjs` diventano rosse finché non lo fa,
+invece di lasciarlo spegnere in silenzio solo sui siti. Un dato che un sito non
+deve vedere affatto può andare anche con `broadcastToFiloPages`, che lo dice
+esplicitamente.

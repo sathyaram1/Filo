@@ -12,7 +12,9 @@ const MONDO_CONTENT_SCRIPT = 999;
 
 async function nelContentScript(app, origine, codice) {
   return app.evaluate(async ({ webContents }, { origine, codice, mondo }) => {
-    const wc = webContents.getAllWebContents().find((w) => String(w.getURL()).startsWith(origine));
+    // L'ultima scheda aperta su quel sito: quelle delle prove precedenti possono esserci ancora.
+    const wc = webContents.getAllWebContents()
+      .filter((w) => !w.isDestroyed() && String(w.getURL()).startsWith(origine)).pop();
     if (!wc) throw new Error('scheda del mini server non trovata');
     return wc.executeJavaScriptInIsolatedWorld(mondo, [{ code: codice }]);
   }, { origine, codice, mondo: MONDO_CONTENT_SCRIPT });
@@ -94,4 +96,79 @@ test('un cambio di impostazioni arriva al sito senza chiavi né proxy, e intero 
   expect(interno.settings.theme).toBe('dark');
   expect(interno.settings.apiKeys.openrouter).toBe(CHIAVE);
   expect(interno.settings.proxy.datacenter).toBe(PROXY);
+});
+
+// Il confine vale per ogni cosa che passa, non solo per le impostazioni: la
+// spinta porta ai siti solo i tipi che il loro content script ascolta, e da un
+// sito si scrive solo ciò che quel content script scrive davvero.
+test('a un sito non arriva l\'intervista di benvenuto, e da un sito non si riscrivono impostazioni né magazzino', async ({ app, shell, openTab, testServer }) => {
+  void shell;
+  const PROXY_SITO = 'socks5://ladro:pwd-del-sito-589@gate.attaccante.example:7000';
+  await app.evaluate(async () => {
+    await globalThis.__filoStorage.set({
+      filo_memory: { PROFILO: 'Anna, MEMORIA-589' },
+      filo_onboarding: { done: false, ticked: [], notice: 'x', thread: [{ role: 'user', text: 'mi chiamo Anna, INTERVISTA-589' }] },
+    });
+  });
+
+  const sito = await testServer.openReady(openTab, '<!doctype html><html><body><p>Un sito.</p></body></html>');
+  await sito.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await nelContentScript(app, testServer.origin, `
+    globalThis.__spia589b = [];
+    chrome.runtime.onMessage.addListener((m) => { try { globalThis.__spia589b.push(JSON.stringify(m)); } catch (_) {} });
+    true;
+  `);
+  const interna = await openTab('filo://history/history.html');
+  await interna.waitForFunction(() => !!(window.filo && window.filo.onBroadcast), null, { timeout: 8000 });
+  await interna.evaluate(() => { window.__spia589b = []; window.filo.onBroadcast((m) => window.__spia589b.push(m && m.type)); });
+
+  // L'intervista si salva (la home segna letta la sua riga) e si annuncia a tutte le schede.
+  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE(
+    { type: globalThis.SN_MSG.MSG.FILO_ONBOARDING_NOTICE_SEEN }, { url: 'filo://dashboard/dashboard.html' },
+  ));
+  await expect.poll(() => interna.evaluate(() => window.__spia589b.includes('filo_onboarding_updated')), { timeout: 8000 }).toBe(true);
+  // Una spinta che il sito ascolta, dopo: se arriva questa, l'altra aveva avuto tutto il tempo.
+  await app.evaluate(async () => {
+    await globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'light' } }, { url: 'filo://preferences/preferences.html' });
+  });
+  await expect.poll(() => nelContentScript(app, testServer.origin, 'globalThis.__spia589b.some((m) => m.includes("settings_updated"))'), { timeout: 8000 }).toBe(true);
+  const alSito = await nelContentScript(app, testServer.origin, 'globalThis.__spia589b.join("\\n")');
+  expect(alSito, 'l\'intervista di benvenuto è arrivata dentro la pagina di un sito').not.toContain('INTERVISTA-589');
+  expect(alSito).not.toContain('filo_onboarding_updated');
+
+  // Dal content script del sito: le scritture che il suo codice non fa sono rifiutate…
+  const esiti = JSON.parse(await nelContentScript(app, testServer.origin, `
+    (async () => {
+      const MSG = SN_MSG.MSG;
+      const proxy = await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { proxy: { datacenter: ${JSON.stringify(PROXY_SITO)} } } });
+      const tetto = await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { monthlyLimitEur: 999999, security: { protectIpLeak: false } } });
+      await chrome.storage.local.set({ filo_memory: { PROFILO: 'DETTATA-DAL-SITO' } });
+      await chrome.storage.local.remove(['filo_memory']);
+      const letta = await chrome.storage.local.get(['filo_memory', 'filo_onboarding', 'clipboardHistory']);
+      const tutto = await chrome.storage.local.get(null);
+      // …e quelle che fa davvero continuano a funzionare.
+      const dettatura = await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { models: { transcribe_audio: 'whisper' } } });
+      await chrome.storage.local.set({ sn_feedback_draft_text: 'bozza-589' });
+      const bozza = await chrome.storage.local.get(['sn_feedback_draft_text']);
+      return JSON.stringify({ proxy, tetto, letta, chiaviTutto: Object.keys(tutto), dettatura: dettatura && dettatura.ok, bozza: bozza.sn_feedback_draft_text });
+    })()
+  `));
+  expect(esiti.proxy?.ok).toBe(false);
+  expect(esiti.tetto?.ok).toBe(false);
+  expect(JSON.stringify(esiti.letta)).not.toContain('MEMORIA-589');
+  expect(JSON.stringify(esiti.letta)).not.toContain('INTERVISTA-589');
+  expect(esiti.chiaviTutto).not.toContain('filo_memory');
+  expect(esiti.dettatura, 'la scelta della dettatura dal menu di un sito deve continuare a salvarsi').toBe(true);
+  expect(esiti.bozza, 'la bozza del feedback su un sito deve continuare a salvarsi').toBe('bozza-589');
+
+  const vere = await app.evaluate(async () => {
+    const r = await globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.GET_SETTINGS }, { url: 'filo://options/options.html' });
+    const mem = (await globalThis.__filoStorage.get('filo_memory')).filo_memory;
+    return { settings: r.settings, mem };
+  });
+  expect(JSON.stringify(vere.settings.proxy || null)).not.toContain('pwd-del-sito-589');
+  expect(vere.settings.monthlyLimitEur).not.toBe(999999);
+  expect(vere.settings.security.protectIpLeak).toBe(true);
+  expect(vere.settings.models.transcribe_audio).toBe('whisper');
+  expect(JSON.stringify(vere.mem)).toContain('MEMORIA-589');
 });

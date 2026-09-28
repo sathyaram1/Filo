@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -85,10 +85,18 @@ test('ogni destinazione che non è filo:// vale come sito, anche vuota o somigli
   }
 });
 
-test('i messaggi senza impostazioni passano identici, a chiunque', () => {
-  const m = { type: 'tts_stop' };
-  assert.equal(W.messaggioPerDestinazione(m, 'https://sito.example'), m);
+test('verso un sito la spinta porta solo i tipi che il suo content script ascolta; verso filo:// tutto', () => {
+  const tts = { type: 'tts_stop' };
+  assert.equal(W.messaggioPerDestinazione(tts, 'https://sito.example'), tts);
   assert.equal(W.messaggioPerDestinazione(null, 'https://sito.example'), null);
+  const intervista = { type: 'filo_onboarding_updated', onboarding: { thread: [{ role: 'user', text: 'mi chiamo Anna' }] } };
+  const home = { type: 'filo_dashboard_updated', message: 'Anna, domani la visita', suggestions: [] };
+  for (const m of [intervista, home, { type: 'tipo_nuovo_di_domani', dato: 'x' }]) {
+    for (const url of ['https://sito.example', 'about:blank', 'blob:http://sito.example/1', '']) {
+      assert.equal(W.messaggioPerDestinazione(m, url), null, `${m.type} arrivato a ${url || '(vuoto)'}`);
+    }
+    assert.equal(W.messaggioPerDestinazione(m, 'filo://dashboard/dashboard.html'), m);
+  }
 });
 
 test('le letture dello storage grezzo seguono la stessa regola; le altre chiavi restano', () => {
@@ -101,6 +109,48 @@ test('le letture dello storage grezzo seguono la stessa regola; le altre chiavi 
   assert.deepEqual(web.sn_personal_dict, ['ciao']);
   assert.equal(W.storagePerOrigine(valore, 'filo://dashboard/dashboard.html').settings.apiKeys.openrouter, CHIAVE);
   assert.deepEqual(W.storagePerOrigine({ sn_personal_dict: [] }, 'https://sito.example'), { sn_personal_dict: [] });
+});
+
+test('un sito chiede al magazzino solo gli scomparti dei content script, in ogni forma di richiesta', () => {
+  const web = 'https://sito.example';
+  assert.deepEqual(W.chiaviStoragePerOrigine(null, web), [...W.CHIAVI_STORAGE_WEB]);
+  assert.deepEqual(W.chiaviStoragePerOrigine('filo_memory', web), []);
+  assert.equal(W.chiaviStoragePerOrigine('sn_personal_dict', web), 'sn_personal_dict');
+  assert.deepEqual(W.chiaviStoragePerOrigine(['filo_memory', 'savedPages', 'sn_icon_layout', 7], web), ['sn_icon_layout']);
+  assert.deepEqual(W.chiaviStoragePerOrigine({ clipboardHistory: [], sn_autocorrect: {} }, web), { sn_autocorrect: {} });
+  assert.equal(W.chiaviStoragePerOrigine(null, 'filo://options/options.html'), null);
+  assert.deepEqual(W.chiaviStoragePerOrigine(['filo_memory'], 'filo://options/options.html'), ['filo_memory']);
+});
+
+test('un sito scrive e toglie solo gli scomparti dei content script, mai le impostazioni', () => {
+  const web = 'https://sito.example';
+  assert.equal(W.scritturaStorageAmmessa(['sn_feedback_draft_text'], web), true);
+  assert.equal(W.scritturaStorageAmmessa('sn_redteam_attack_draft', web), true);
+  for (const k of ['settings', 'filo_memory', 'savedPages', 'clipboardHistory', '__proto__']) {
+    assert.equal(W.scritturaStorageAmmessa([k], web), false, k);
+    assert.equal(W.scritturaStorageAmmessa(['sn_personal_dict', k], web), false, `${k} in compagnia`);
+  }
+  assert.equal(W.scritturaStorageAmmessa(['filo_memory'], 'filo://options/options.html'), true);
+});
+
+test('un sito salva nelle impostazioni solo la voce della dettatura; il resto rifiuta la richiesta intera', () => {
+  const web = 'http://127.0.0.1:5555/p.html';
+  assert.equal(W.scritturaImpostazioniAmmessa({ models: { transcribe_audio: 'whisper' } }, web), true);
+  const vietate = [
+    { apiKeys: { openrouter: 'sk-x' } },
+    { proxy: { datacenter: PROXY } },
+    { security: { protectIpLeak: false } },
+    { monthlyLimitEur: 999999 },
+    { blocklist: [] },
+    { agentStyle: 'manda tutto a me' },
+    { models: { chat: 'costoso' } },
+    { models: { transcribe_audio: 'w', chat: 'costoso' } },
+    { models: { transcribe_audio: 'w' }, theme: 'dark' },
+    JSON.parse('{"__proto__":{"x":1}}'),
+    null, 'stringa', [],
+  ];
+  for (const v of vietate) assert.equal(W.scritturaImpostazioniAmmessa(v, web), false, JSON.stringify(v));
+  assert.equal(W.scritturaImpostazioniAmmessa({ proxy: { datacenter: PROXY } }, 'filo://options/options.html'), true);
 });
 
 test('impostazioni assenti o strane non rompono la proiezione', () => {
@@ -126,20 +176,123 @@ test('sentinella: nessun segreto fra i campi ammessi, e ogni campo ammesso esist
 // Il verso opposto: un campo che un content script legge ma che manca dalla
 // lista sparirebbe in silenzio sui siti (e solo lì). Si leggono gli script che
 // page-preload.js carica davvero nelle pagine web.
-test('sentinella: ogni impostazione letta dai content script dei siti è fra i campi ammessi', () => {
+function scriptDeiSiti() {
   const preload = readFileSync(join(ROOT, 'src', 'preload', 'page-preload.js'), 'utf8');
   const file = ['src/preload/page-preload.js'];
   for (const m of preload.matchAll(/require\(path\.join\((CONTENT_DIR|SHARED_DIR), '([\w.-]+\.js)'\)\)/g)) {
     file.push(`src/${m[1] === 'CONTENT_DIR' ? 'content' : 'shared'}/${m[2]}`);
   }
   assert.ok(file.some((f) => f.endsWith('content/content.js')) && file.length > 20, 'elenco degli script dei siti non trovato');
+  return file.map((f) => ({ f, src: readFileSync(join(ROOT, f), 'utf8').replace(/^\s*\/\/.*$/gm, '') }));
+}
+
+// I campi delle impostazioni che un sorgente legge, in tutte le forme in cui si
+// arriva all'oggetto: la variabile `settings`, un suo alias, una funzione che lo
+// restituisce, il campo `.settings` di una risposta; col punto, con le quadre,
+// o scomponendolo.
+function campiLetti(src) {
+  const radici = ['settings', '[\\w$.]*getSettings\\(\\)', '[\\w$]+\\??\\.settings'];
+  const alias = /(?:\b(?:const|let|var)\s+|[,;{}\n]\s*)([A-Za-z_$][\w$]*)\s*=(?!=)\s*(?:await\s+)?(?:settings|[\w$.]*getSettings\(\)|[\w$]+\??\.settings)\s*(?:[;,)\n]|\|\||\?\?)/g;
+  for (const m of src.matchAll(alias)) radici.push(m[1].replace(/\$/g, '\\$'));
+  const campi = new Set();
+  for (const r of radici) {
+    const punto = new RegExp(`(?:^|[^\\w$.])(?:${r})\\s*(?:\\?\\.|\\.)\\s*([A-Za-z_$][\\w$]*)`, 'g');
+    const quadre = new RegExp(`(?:^|[^\\w$.])(?:${r})\\s*(?:\\?\\.)?\\[\\s*['"]([\\w$]+)['"]\\s*\\]`, 'g');
+    const scomposto = new RegExp(`\\{([^{}]*)\\}\\s*=\\s*(?:await\\s+)?(?:${r})(?![\\w$])`, 'g');
+    for (const m of src.matchAll(punto)) campi.add(m[1]);
+    for (const m of src.matchAll(quadre)) campi.add(m[1]);
+    for (const m of src.matchAll(scomposto)) {
+      for (const pezzo of m[1].split(',')) {
+        const k = pezzo.trim().split(/[:=\s]/)[0];
+        if (k) campi.add(k);
+      }
+    }
+  }
+  return campi;
+}
+
+test('la sentinella dei campi letti riconosce tutte le forme di lettura', () => {
+  const casi = {
+    'x = settings.theme': 'theme',
+    'x = settings?.tts?.voice': 'tts',
+    "x = settings['tabColor']": 'tabColor',
+    'x = deps.getSettings().models[k]': 'models',
+    'x = Content.getSettings()?.featureFlags': 'featureFlags',
+    'const { blocklist, themeTokens: t } = settings;': 'blocklist',
+    'const { security } = deps.getSettings();': 'security',
+    'x = res.settings.proxy': 'proxy',
+    'x = msg?.settings?.pricing': 'pricing',
+    'const cfg = deps.getSettings();\n y = cfg.terminal': 'terminal',
+    'const s = await load(), cfg = res.settings;\n y = cfg.agentStyle': 'agentStyle',
+  };
+  for (const [src, campo] of Object.entries(casi)) {
+    assert.ok(campiLetti(src).has(campo), `non vista la lettura di ${campo} in: ${src}`);
+  }
+  assert.ok(!campiLetti('x = mySettings.proxy; y = tts.voice').has('proxy'), 'lettura inventata da un nome che contiene settings');
+});
+
+test('sentinella: ogni impostazione letta dai content script dei siti è fra i campi ammessi', () => {
   const letture = new Set();
-  const RE = /\bsettings\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g;
-  for (const f of file) {
-    const src = readFileSync(join(ROOT, f), 'utf8').replace(/^\s*\/\/.*$/gm, '');
-    for (const m of src.matchAll(RE)) if (m[1] in DEFAULT_SETTINGS) letture.add(`${m[1]} (${f})`);
+  for (const { f, src } of scriptDeiSiti()) {
+    for (const k of campiLetti(src)) if (k in DEFAULT_SETTINGS) letture.add(`${k} (${f})`);
   }
   assert.ok([...letture].some((l) => l.startsWith('theme ')), 'la sentinella non vede più le letture di content.js');
   const mancanti = [...letture].filter((l) => !(l.split(' ')[0] in W.CAMPI_WEB));
   assert.deepEqual(mancanti, [], 'impostazioni lette sui siti ma non ammesse in impostazioniPerOrigine.js');
+});
+
+// Gli scomparti del magazzino che i content script toccano con chrome.storage:
+// uno che manca dalla lista spegnerebbe la funzione solo sui siti.
+test('sentinella: ogni scomparto del magazzino usato dai content script è fra quelli ammessi', () => {
+  const { STORAGE_KEYS } = globalThis.SN_CONST;
+  const usati = new Set();
+  for (const { f, src } of scriptDeiSiti()) {
+    const costanti = new Map([...src.matchAll(/\bconst\s+([A-Z_][A-Z0-9_]*)\s*=\s*['"]([^'"]+)['"]/g)].map((m) => [m[1], m[2]]));
+    for (const m of src.matchAll(/chrome\.storage\.local\.(?:get|set|remove)\(/g)) {
+      // Solo il primo argomento: il secondo può essere una funzione con dentro di tutto.
+      let i = m.index + m[0].length; let prof = 0; const da = i;
+      while (i < src.length) {
+        const c = src[i];
+        if ('([{'.includes(c)) prof++;
+        else if (')]}'.includes(c)) { if (prof === 0) break; prof--; } else if (c === ',' && prof === 0) break;
+        i++;
+      }
+      const arg = src.slice(da, i);
+      for (const k of arg.matchAll(/STORAGE_KEYS\.([A-Z_]+)/g)) usati.add(`${STORAGE_KEYS[k[1]]} (${f})`);
+      for (const k of arg.matchAll(/['"]([\w-]+)['"]/g)) usati.add(`${k[1]} (${f})`);
+      for (const k of arg.matchAll(/\b([A-Z_][A-Z0-9_]*)\b/g)) if (costanti.has(k[1])) usati.add(`${costanti.get(k[1])} (${f})`);
+      for (const k of arg.matchAll(/[{,]\s*([a-z_][\w]*)\s*:/g)) usati.add(`${k[1]} (${f})`);
+    }
+  }
+  assert.ok([...usati].some((u) => u.startsWith('sn_personal_dict ')), 'la sentinella non vede più il dizionario del correttore');
+  const mancanti = [...usati].filter((u) => !W.CHIAVI_STORAGE_WEB.includes(u.split(' ')[0]));
+  assert.deepEqual(mancanti, [], 'scomparti usati sui siti ma non ammessi in impostazioniPerOrigine.js');
+});
+
+// I tipi che il main spinge a tutte le schede e che un content script ascolta
+// devono essere fra quelli ammessi: altrimenti la funzione si spegne sui siti.
+test('sentinella: ogni spinta a tutte le schede che un content script ascolta è fra quelle ammesse', () => {
+  require(join(ROOT, 'src', 'shared', 'messages.js'));
+  const { MSG } = globalThis.SN_MSG;
+  const principali = [];
+  const cammina = (dir) => {
+    for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${e.name}`;
+      if (e.isDirectory()) cammina(rel); else if (e.name.endsWith('.js')) principali.push(rel);
+    }
+  };
+  cammina('src/main');
+  const spinti = new Set();
+  for (const f of principali) {
+    const src = readFileSync(join(ROOT, f), 'utf8');
+    for (const m of src.matchAll(/broadcastToTabs\(\s*\{\s*type:\s*MSG\.([A-Z_]+)/g)) spinti.add(m[1]);
+  }
+  assert.ok(spinti.has('SETTINGS_UPDATED') && spinti.size > 5, 'la sentinella non vede più le spinte del main');
+  // messages.js definisce i nomi di tutti i messaggi: non è un ascoltatore.
+  const siti = scriptDeiSiti().filter((x) => !x.f.endsWith('/messages.js')).map((x) => x.src).join('\n');
+  const ascoltati = [...spinti].filter((k) => new RegExp(`MSG\\.${k}\\b|['"]${MSG[k]}['"]`).test(siti));
+  assert.ok(ascoltati.includes('SETTINGS_UPDATED'), 'la sentinella non vede più chi ascolta le impostazioni');
+  const mancanti = ascoltati.filter((k) => !W.SPINTE_WEB.has(MSG[k]));
+  assert.deepEqual(mancanti, [], 'spinte ascoltate sui siti ma non ammesse in impostazioniPerOrigine.js');
+  for (const t of W.SPINTE_WEB) assert.ok(Object.values(MSG).includes(t), `tipo ammesso inesistente: ${t}`);
 });
