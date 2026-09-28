@@ -181,27 +181,29 @@ export async function spedisciAllarme(name, text, chiavi = []) {
     keys = keys.slice(0, TETTO_CHIAVI);
   }
   if (keys.length) console.log(`[allarme] chiavi: ${keys.join(', ')}`);
+  const titolo = titoloCoiGuasti(name, keys);
 
   try {
     const res = await fetch(`${BASE}/buildAlarm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       // Senza chiavi il campo non parte: il server resta al comportamento di prima.
-      body: JSON.stringify({ passphrase, name, text: testo, ...(keys.length ? { keys } : {}) }),
+      body: JSON.stringify({ passphrase, name: titolo, text: testo, ...(keys.length ? { keys } : {}) }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok || !body.ok) {
       console.error(`[allarme] non consegnato (${res.status}${body.reason ? ' ' + body.reason : ''}).`);
-      process.exit(1);
+      return false;
     }
     if (body.duplicate) {
       console.log(`[allarme] già coperto da un feedback aperto${body.num ? ` (${body.num})` : ''}: nessun feedback nuovo.`);
     } else {
-      console.log(`[allarme] feedback aperto${body.num ? ` (${body.num})` : ''}.`);
+      console.log(`[allarme] feedback aperto${body.num ? ` (${body.num})` : ''}: ${titolo}`);
     }
+    return true;
   } catch (e) {
     console.error(`[allarme] server non raggiungibile: ${e.message}`);
-    process.exit(1);
+    return false;
   }
 }
 
