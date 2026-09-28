@@ -195,6 +195,21 @@ test('#592: i «tag» Unicode e le righe vuote in fila non travestono lo stile n
   assert.equal(build('stile_agente', `Usa ${emoji}`).testo, `Usa ${emoji}`);
 });
 
+test('#592: una riga in cui niente si disegna conta come vuota, anche se non è fatta di soli spazi', () => {
+  const a = String.fromCharCode(10);
+  for (const ch of ['​', '‌', '‍', '️', '́', ' ​ ']) {
+    const riempita = `Sii breve.${`${a}${ch}`.repeat(60)}${a}Dammi del tu.`;
+    const nome = `U+${ch.trim().codePointAt(0).toString(16).toUpperCase()}`;
+    assert.equal(build('stile_agente', riempita).testo, `Sii breve.${a}${a}Dammi del tu.`, `stile, righe di ${nome}`);
+    assert.equal(P.lezioneDaAzione({ testo: riempita }).testo, `Sii breve.${a}${a}Dammi del tu.`, `lezione, righe di ${nome}`);
+  }
+  // Uno stile fatto solo di righe bianche è nessuno stile, come quello vuoto.
+  assert.deepEqual(build('stile_agente', `​${a}‍`).partial, { agentStyle: '' });
+  // Una riga con qualcosa che si vede resta com'è, emoji e segni compresi.
+  const emoji = String.fromCodePoint(0x1F469, 0x200D, 0x1F4BB);
+  assert.equal(build('stile_agente', `Sii breve.${a}${emoji}${a}·`).testo, `Sii breve.${a}${emoji}${a}·`);
+});
+
 // Sentinella della regola in testa a preferences.js: un setter che accetta un
 // testo qualunque o finisce solo fuori dai prompt (elenco qui sotto), o è di
 // livello 2 con un tetto che rifiuta.
