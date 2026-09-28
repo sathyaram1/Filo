@@ -14,6 +14,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 require(join(ROOT, 'src', 'shared', 'constants.js'));
 require(join(ROOT, 'src', 'main', 'services', 'providers', 'openrouter.js'));
 require(join(ROOT, 'src', 'main', 'services', 'providers', 'index.js'));
+require(join(ROOT, 'src', 'main', 'services', 'modelGate.js'));
 const auth = require(join(ROOT, 'src', 'main', 'auth', 'google-auth.js'));
 const Defaults = require(join(ROOT, 'src', 'main', 'services', 'defaultsStore.js'));
 
