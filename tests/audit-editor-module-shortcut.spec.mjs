@@ -371,7 +371,9 @@ test('una scorciatoia modulo che l\'Editor usa già viene rifiutata, dicendo cos
     ['Ctrl+-', 'zooma'],
     // Lo stesso tasto scritto per nome: il nome si legge come la pressione.
     ['Ctrl+Minus', 'zooma'],
-    ['Ctrl+Shift+Minus', 'zooma'],
+    // Con Shift il meno diventa un altro simbolo: il nome scritto non è il tasto vero.
+    ['Ctrl+Shift+Minus', 'Con Shift'],
+    ['Ctrl+_', 'zooma'],
     ['Ctrl+Plus', 'zooma'],
     ['Ctrl++', 'zooma'],
     ['Ctrl+B', 'grassetto'],
