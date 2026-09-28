@@ -39,9 +39,11 @@
   //                        predefinito dei router FRITZ!Box (diffusissimi) e
   //                        quello è il caso reale; il prezzo è che un sito
   //                        pubblico .box si aprirebbe in http invece che https.
+  //   • ip               → mai delegato: è dove rispondono i router Speedport
+  //                        di Telekom (speedport.ip).
   const LOCAL_NET_TLDS = new Set([
     'local', 'lan', 'home', 'internal', 'intranet', 'private', 'box',
-    'homenet', 'localdomain', 'corp',
+    'homenet', 'localdomain', 'corp', 'ip',
   ]);
 
   // Vero se l'host è un nome della rete locale (vedi sopra). Un'etichetta sola
