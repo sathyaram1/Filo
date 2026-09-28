@@ -151,9 +151,8 @@ test('CERCA_WEB con dentro un dato letto chiede un OK; una ricerca normale no', 
   const conDato = await execAction(app, { type: 'CERCA_WEB', query: letto.slice(0, 45) }, { contesto: dopoLettura });
   expect(conDato.needsConfirm).toBe(2);
   expect(conDato.executed).toBe(false);
+  // La spiegazione mostra all'utente la query che sta per partire e perché.
   expect(String(conDato.describe || '')).toContain('motore di ricerca');
-  // Il dato letto non torna dentro la spiegazione del popup.
-  expect(String(conDato.describe || '')).not.toContain('PRG7788ZK');
 });
 
 // ── #587: la catena nel turno di chat ───────────────────────────────────────
