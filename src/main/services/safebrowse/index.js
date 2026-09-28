@@ -101,9 +101,8 @@ function pathOf(url) {
   try { return new URL(String(url)).pathname; } catch (_) { return '/'; }
 }
 
-// Il freno sta sul dominio, il verdetto sul sito (#591): sottodomini sempre nuovi con gli stessi indizi non rifanno partire
-// modello e finestra nascosta, ma il verdetto di un sito non passa a un altro (su una piattaforma di hosting un dominio
-// sono migliaia di proprietari). Gli indizi sono quelli che vede il giudice: un sito con indizi diversi ha il suo controllo.
+// Il freno sta sul dominio e sugli indizi che vede il giudice, il verdetto sul sito (#591): sottodomini nuovi con gli stessi
+// indizi non rifanno partire i controlli, e su una piattaforma di hosting il verdetto di un utente non passa agli altri.
 function brakeKey(norm, url, ctx, verdict) {
   if (whitelist.hostedPlatform(norm.host, pathOf(url))) return norm.host + pathOf(url);
   const imp = verdict.imp || null;
