@@ -13,6 +13,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CB = require(join(ROOT, 'src', 'main', 'services', 'cookieBanners.js'));
 const CR = require(join(ROOT, 'src', 'main', 'services', 'consentRules.js'));
 const Cookies = require(join(ROOT, 'src', 'main', 'services', 'cookies.js'));
+// Nell'app il sito registrabile lo dà il normalizzatore del rilevamento siti pericolosi, caricato all'avvio.
+require(join(ROOT, 'src', 'main', 'services', 'safebrowse', 'index.js'));
 
 const LISTA = [
   '! commento',
