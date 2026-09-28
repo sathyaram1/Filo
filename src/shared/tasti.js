@@ -451,6 +451,6 @@
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
     comandoNavigazione, etichettaIndietro, etichettaAvanti,
     tastiRiservati, riservato,
-    tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, combacia, delSistema,
+    tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, combacia, pressioneScritta, delSistema,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
