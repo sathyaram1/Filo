@@ -1,7 +1,7 @@
-// Porte provate nel giro 4 di home-invito: chi ha già fatto l'intervista e scrive prima dei crediti,
-// chi è nuovo e riceve l'invito dal collegamento dopo aver scritto, e l'aspetto della home col benvenuto.
+// Porte provate e chiuse nel giro 4 di home-invito: chi è nuovo e riceve l'invito dal collegamento dopo
+// aver scritto, e la home col benvenuto dopo il riscatto nei due temi (lo screenshot va in tests/.shots).
 import { test, expect } from '../../fixtures/electron.mjs';
-import { usaServerFinto, homePage, prepara, onboardingFatto, riscattaDaCrediti } from './_crediti-finti.mjs';
+import { usaServerFinto, homePage, prepara, riscattaDaCrediti } from './_crediti-finti.mjs';
 
 const stato = usaServerFinto(test);
 const BENVENUTO = /Ciao, sono Filo/;
