@@ -100,13 +100,23 @@ function pathOf(url) {
   try { return new URL(String(url)).pathname; } catch (_) { return '/'; }
 }
 
-// Giudizio del modello e sandbox valgono per il dominio registrabile: per host completo, sottodomini sempre nuovi
-// facevano ripartire entrambi a ogni link (#591). Sulle pagine ospitate resta la pagina, che ha un autore suo.
-function judgeKey(norm, url) {
-  return whitelist.hostedPlatform(norm.host, pathOf(url)) ? norm.host + pathOf(url) : norm.registrable;
+// Il freno sta sul dominio, il verdetto sul sito (#591): sottodomini sempre nuovi con gli stessi indizi non rifanno partire
+// modello e finestra nascosta, ma il verdetto di un sito non passa a un altro (su una piattaforma di hosting un dominio
+// sono migliaia di proprietari). Gli indizi sono quelli che vede il giudice: un sito con indizi diversi ha il suo controllo.
+function brakeKey(norm, url, ctx, verdict) {
+  if (whitelist.hostedPlatform(norm.host, pathOf(url))) return norm.host + pathOf(url);
+  const imp = verdict.imp || null;
+  return [
+    norm.registrable, imp ? imp.brand.display : '', imp ? imp.kind : '', verdict.hosted || '',
+    ctx.linkOrigin || '', ctx.hasPassword ? 'pw' : '', ctx.hasPayment ? 'pay' : '', norm.secure ? 'tls' : '',
+  ].join('|');
 }
 
-// Due analisi dello stesso dominio in volo insieme fanno una chiamata sola.
+// Un controllo che non ha dato verdetto (risposta illeggibile, fornitore in errore) frena per poco, poi si riprova.
+const FAILED_BRAKE_MS = 5 * MIN;
+const deepBrake = new TtlCache(HOUR);
+
+// Due analisi con lo stesso freno in volo insieme fanno una chiamata sola.
 const inflight = new Map();
 function once(key, run) {
   if (inflight.has(key)) return inflight.get(key);
@@ -114,6 +124,23 @@ function once(key, run) {
   inflight.set(key, p);
   return p;
 }
+
+// Parte un controllo profondo se il sito non ha già il suo verdetto e il freno del dominio non è tirato.
+function deepen(stage, bKey, fullTtl, run, store) {
+  const k = stage + ':' + bKey;
+  if (inflight.has(k)) return inflight.get(k).catch(() => {});
+  if (deepBrake.has(k)) return null;
+  deepBrake.set(k, true, FAILED_BRAKE_MS);
+  return once(k, () => Promise.resolve(run()).then((r) => {
+    if (!r) return;
+    store(r);
+    deepBrake.set(k, true, fullTtl);
+  })).catch(() => {});
+}
+
+// La rete di casa (router, NAS, stampanti, localhost) non ha niente da chiedere fuori: nessuno stadio di rete parte.
+const UrlNav = globalThis.SN_URL_NAV || (require('../../../shared/urlNav.js'), globalThis.SN_URL_NAV);
+const isHomeNetwork = (norm) => Boolean(UrlNav && UrlNav.isLocalHost(norm.host));
 
 // Assembla i dati di rete già noti (da cache) per il dominio.
 function assembleCached(norm, url) {
@@ -123,8 +150,8 @@ function assembleCached(norm, url) {
     gsb: gsbCache.get('u:' + pageKey(norm, url)) || gsbCache.get(reg),
     ageDays: ageCache.get(reg),
     cert: certCache.get(reg),
-    sandbox: sandboxCache.get(judgeKey(norm, url)),
-    llm: llmCache.get(judgeKey(norm, url)),
+    sandbox: sandboxCache.get(pageKey(norm, url)),
+    llm: llmCache.get(pageKey(norm, url)),
   };
 }
 
@@ -145,6 +172,8 @@ function analyze(url, ctx = {}, onUpdate) {
   if (first.level === 'pericoloso' && (first.reasons || []).some((r) => /^gsb_|strict/.test(r))) {
     return first;
   }
+
+  if (isHomeNetwork(norm)) return first;
 
   const reg = norm.registrable;
   const tasks = [];
@@ -171,18 +200,17 @@ function analyze(url, ctx = {}, onUpdate) {
   }
   // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist).
   const worthDeepening = first.level === 'sospetto' || first.needsLlm;
-  const jKey = judgeKey(norm, url);
+  const bKey = brakeKey(norm, url, ctx, first);
   if (worthDeepening && providers.llm && need.llm === undefined) {
     const llm = providers.llm;
-    tasks.push(once('llm:' + jKey, () => Promise.resolve(llm(buildLlmMeta(norm, ctx, first))).then((r) => {
-      if (r) llmCache.set(jKey, r);
-    })).catch(() => {}));
+    const meta = buildLlmMeta(norm, ctx, first);
+    const t = deepen('llm', bKey, llmCache.ttl, () => llm(meta), (r) => llmCache.set(key, r));
+    if (t) tasks.push(t);
   }
   if (worthDeepening && providers.sandbox && need.sandbox === undefined) {
     const detonate = providers.sandbox;
-    tasks.push(once('sb:' + jKey, () => Promise.resolve(detonate(url, norm)).then((r) => {
-      if (r) sandboxCache.set(jKey, r);
-    })).catch(() => {}));
+    const t = deepen('sb', bKey, sandboxCache.ttl, () => detonate(url, norm), (r) => sandboxCache.set(key, r));
+    if (t) tasks.push(t);
   }
 
   if (tasks.length && typeof onUpdate === 'function') {
@@ -246,7 +274,7 @@ const API = {
     };
   },
   // cache (per test / invalidazione)
-  _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache },
+  _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache, deepBrake },
   // sotto-moduli (per test)
   normalize: normalizeMod.normalize,
   parseHost: normalizeMod.parseHost,

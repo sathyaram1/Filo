@@ -67,6 +67,8 @@
     if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;         // privato /8
     if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return true;           // privato /16
     if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(h)) return true; // privato /12
+    if (/^169\.254\.\d{1,3}\.\d{1,3}$/.test(h)) return true;           // link-local
+    if (h.includes(':') && /^(f[cd]|fe[89ab])[0-9a-f]*:/.test(h)) return true; // IPv6 privato e link-local
     return false;
   }
 

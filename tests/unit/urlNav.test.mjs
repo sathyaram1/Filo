@@ -116,6 +116,11 @@ test('isLocalHost copre loopback, *.localhost e gli IP privati', () => {
   assert.equal(isLocalHost('192.168.0.1'), true);
   assert.equal(isLocalHost('172.16.0.1'), true);
   assert.equal(isLocalHost('[::1]'), true);
+  assert.equal(isLocalHost('169.254.10.20'), true);
+  assert.equal(isLocalHost('fd00::1'), true);
+  assert.equal(isLocalHost('[fe80::1]'), true);
+  assert.equal(isLocalHost('fda.gov'), false);   // un nome, non un indirizzo IPv6
+  assert.equal(isLocalHost('2001:db8::1'), false);
   assert.equal(isLocalHost('8.8.8.8'), false);  // IP pubblico
   assert.equal(isLocalHost('example.com'), false);
 });
