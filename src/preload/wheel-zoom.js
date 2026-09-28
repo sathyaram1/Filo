@@ -176,6 +176,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
 
   function refreshPercent() {
     if (!inModifica) mostraPercentuale();
+    ricontrollaPosto();
   }
 
   // Il tasto destro chiede e azzera lo zoom da QUI, non con un evento sul
@@ -264,10 +265,8 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     return el;
   }
 
-  // Il riquadro sta nello strato superiore del documento, dove la pagina non lo
-  // copre: sopra i frame di un frameset, un dialogo modale, il tutto schermo.
-  // Col dialogo modale aperto sta DENTRO il dialogo, perché il resto della
-  // pagina diventa intoccabile (#686.1 giro 5).
+  // Il riquadro sta nello strato superiore del documento, sopra frameset, dialoghi e tutto schermo;
+  // col dialogo modale aperto sta DENTRO il dialogo, perché il resto della pagina diventa intoccabile.
   function ospite() {
     let modale = null;
     try { const m = document.querySelectorAll('dialog:modal'); modale = m[m.length - 1] || null; } catch (_) {}
@@ -306,7 +305,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     zoomMode = true;
     try {
       if (!badge) badge = makeBadge();
-      (document.body || document.documentElement).appendChild(badge);
+      mettiInCima();
       inModifica = false;
       mostraPercentuale();
       document.documentElement.style.cursor = 'zoom-in';
@@ -508,6 +507,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     ...gesti,
     ['paste', onPaste, true],
     ['input', onInput, true],
+    ['fullscreenchange', () => { if (zoomMode) mettiInCima(); }, true],
     ['pointerover', vegliaRiquadri(gesti, webFrame), true],
   ], () => {
     // Il documento vecchio se n'è andato col riquadro e i suoi ascoltatori.
