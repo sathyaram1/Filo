@@ -183,3 +183,30 @@ test('il riordino non manda al modello titolo, indirizzo e testo delle pagine de
     await ripristina(app);
   }
 });
+
+// Un nome pubblico che il router intercetta (tplinkwifi.net) è di casa per dove ha risposto: la scheda lo annota dalla
+// risposta vera del frame principale. Qui la pagina risponde dal loopback, e la rete di casa si finge dopo, a mano.
+test('la scheda annota da dove ha risposto la pagina, e un nome che risponde da casa resta in casa', async ({ app, openTab, testServer }) => {
+  await app.evaluate(() => {
+    const N = globalThis.SN_URL_NAV;
+    globalThis.__annotati = [];
+    globalThis.__annotaVero = N.noteHostAddress;
+    N.noteHostAddress = (h, ip) => { globalThis.__annotati.push([h, ip]); return globalThis.__annotaVero(h, ip); };
+  });
+  try {
+    await testServer.openReady(openTab, '<html><body><h1>Pannello</h1></body></html>', { pubblico: true });
+    const annotati = await app.evaluate(() => globalThis.__annotati);
+    expect(annotati).toContainEqual(['sito-pubblico.test', '127.0.0.1']);
+    const esito = await app.evaluate(() => {
+      const N = globalThis.SN_URL_NAV;
+      const prima = N.isHomeNetworkUrl('http://sito-pubblico.test/');
+      N.noteHostAddress('sito-pubblico.test', '192.168.0.1');
+      const dopo = N.isHomeNetworkUrl('http://sito-pubblico.test/');
+      N.noteHostAddress('sito-pubblico.test', '127.0.0.1');
+      return { prima, dopo };
+    });
+    expect(esito).toEqual({ prima: false, dopo: true });
+  } finally {
+    await app.evaluate(() => { globalThis.SN_URL_NAV.noteHostAddress = globalThis.__annotaVero; });
+  }
+});
