@@ -120,6 +120,8 @@ test('#418 javascript:/data:/relativi vengono scartati', () => {
   assert.equal(safeLinkUrl('https://ok.com'), 'https://ok.com');
   assert.equal(safeLinkUrl('http://ok.com'), 'http://ok.com');
   assert.equal(safeLinkUrl('mailto:a@b.com'), 'mailto:a@b.com');
+  // Le parentesi ammesse nell'url di un link markdown non riaprono la porta.
+  assert.doesNotMatch(render('[x](javascript:alert(1)) e [y](filo://manage/(a))'), /<a /);
 });
 
 test('#418 l\'HTML nel testo del modello viene neutralizzato (no XSS)', () => {
