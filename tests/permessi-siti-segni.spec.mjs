@@ -34,13 +34,13 @@ test('la scheda dice cosa il sito usa e cosa si è visto negare; togliere da Sic
   await shell.locator('#perm-bar .perm-si').click();
   await expect.poll(() => esito(page)).toBe('ok');
   const segno = shell.locator('.tab.active .perm-uso');
-  await expect(segno).toHaveAttribute('data-tip', /usa il microfono/);
+  await expect(segno).toHaveAttribute('data-tip', /ha aperto il microfono/);
 
   await avvia(page, 'cam');
   await expect(riga(shell)).toHaveCount(1, { timeout: 10_000 });
   await shell.locator('#perm-bar .perm-no').click();
   await expect.poll(() => esito(page)).toBe('err:NotAllowedError');
-  await expect(segno).toHaveAttribute('data-tip', /usa il microfono, non può usare la fotocamera/);
+  await expect(segno).toHaveAttribute('data-tip', /ha aperto il microfono, non può usare la fotocamera/);
   await shell.screenshot({ path: 'tests/.shots/permessi-segno-scheda.png', clip: { x: 0, y: 0, width: 640, height: 44 } });
 
   const sec = await openTab('filo://security/security.html');

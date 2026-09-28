@@ -292,7 +292,7 @@ test('condividere lo schermo: si chiede ogni volta, «Condividi lo schermo» dà
   await schermo.click();
   await expect.poll(() => esito(page), { timeout: 10_000 }).toBe('ok:1');
   // La scheda lo dice finché la pagina è aperta.
-  await expect(shell.locator('.tab.active .perm-uso')).toHaveAttribute('data-tip', /usa lo schermo/);
+  await expect(shell.locator('.tab.active .perm-uso')).toHaveAttribute('data-tip', /ha aperto lo schermo/);
 
   // Si può mostrare una scheda sola invece di tutto lo schermo.
   await page.click('#schermo');

@@ -1539,7 +1539,7 @@
     // Il segno sulla scheda: cosa il sito ha avuto in questo documento, e cosa si è visto negare.
     function frasiUso(usi) {
       const parti = [];
-      if (usi.inUso && usi.inUso.length) parti.push(`usa ${elenca(usi.inUso)}`);
+      if (usi.inUso && usi.inUso.length) parti.push(`ha aperto ${elenca(usi.inUso)}`);
       const b = Array.isArray(usi.bloccati) ? usi.bloccati : [];
       const negati = b.filter((x) => x.motivo === 'negato').map((x) => x.tipo);
       const smessi = b.filter((x) => x.motivo === 'smesso').map((x) => x.tipo);
