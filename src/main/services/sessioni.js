@@ -7,8 +7,8 @@
 function creaNascita({ app, sessioneDefault } = {}) {
   const protezioni = [];   // { nome, fn }
   const nate = new Set();  // Electron non libera le sessioni: tenerle vive non costa.
-  const esenti = new WeakSet();
-  let esenzioneInCorso = 0;
+  const servizio = new WeakSet();
+  let servizioInCorso = 0;
   let installata = false;
 
   function applica(p, ses) {
@@ -18,8 +18,9 @@ function creaNascita({ app, sessioneDefault } = {}) {
   }
 
   function nasce(ses) {
-    if (!ses || nate.has(ses) || esenti.has(ses)) return;
-    if (esenzioneInCorso > 0) { esenti.add(ses); return; }
+    if (!ses || nate.has(ses)) return;
+    // Il marchio va messo prima delle protezioni: sono loro a leggerlo.
+    if (servizioInCorso > 0) servizio.add(ses);
     nate.add(ses);
     for (const p of protezioni) applica(p, ses);
   }
