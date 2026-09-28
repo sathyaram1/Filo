@@ -106,6 +106,19 @@ async function onboardingFatto(app) {
   });
 }
 
+// `openTab` cerca la scheda per nome dell'host e ridarebbe la home già aperta.
+async function nuovaHome(app, shell) {
+  const prima = new Set(app.windows());
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    const w = app.windows().find((x) => !prima.has(x) && x.url().startsWith('filo://newtab'));
+    if (w) { await w.waitForLoadState('domcontentloaded').catch(() => {}); return w; }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  throw new Error('scheda nuova non trovata');
+}
+
 async function riscattaDaCrediti(openTab) {
   const page = await openTab('filo://credits/credits.html');
   await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 20_000 });
