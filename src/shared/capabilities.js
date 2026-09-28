@@ -472,9 +472,9 @@
     },
     {
       id: 'site-permissions', title: 'Permessi dei siti', category: 'navigation',
-      desc: 'Un sito che vuole il microfono, la fotocamera, quello che hai copiato o la tua posizione lo chiede in una striscia sotto le schede, col suo nome: «Consenti» o «Non consentire». La risposta vale per quel sito finché Filo resta aperto; se non rispondi, dopo qualche secondo vale no e il sito può chiedere di nuovo. Detta e Incolla di Filo sulle pagine non fanno domande.',
-      invoke: 'Compare da sola quando un sito chiede; si risponde coi due pulsanti della striscia.',
-      doesNot: 'Le risposte non restano dopo la chiusura di Filo e non c’è ancora un elenco dei siti a cui hai risposto: riaprendo Filo ogni sito chiede di nuovo. Le notifiche dei siti non passano da qui.',
+      desc: 'Un sito che vuole il microfono, la fotocamera, quello che hai copiato, la tua posizione o mandarti notifiche lo chiede in una striscia sotto le schede, col suo dominio: «Consenti» o «Non consentire». La domanda resta finché rispondi; «Consenti» si accende un attimo dopo, così un clic partito per la pagina non la conferma. Le notifiche si chiedono solo dopo un tuo clic sulla pagina. La risposta vale per quel sito finché Filo resta aperto, e dal menu della scheda «Azzera i permessi del sito» la toglie. Detta e Incolla di Filo sulle pagine non fanno domande.',
+      invoke: 'Compare da sola quando un sito chiede; si risponde coi due pulsanti della striscia. Tasto destro sulla scheda → «Azzera i permessi del sito».',
+      doesNot: 'Le risposte non restano dopo la chiusura di Filo: riaprendo Filo ogni sito chiede di nuovo. Una pagina non apre altri programmi del computer, tranne posta, telefono e SMS dopo un tuo clic, e non ha permessi che espongono il computer (dispositivi MIDI in scrittura, schermi, inattività).',
     },
     {
       id: 'data-export-import', title: 'Esporta e importa i tuoi dati', category: 'settings',

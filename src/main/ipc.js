@@ -369,6 +369,23 @@ function registerIpcHandlers() {
     if (!cornice || !id) return { ok: false };
     return { ok: require('./services/permessiPagine').rispondi(String(id), si === true) };
   });
+  // Le scelte ricordate per il sito di una scheda: il suo menu le mostra e le toglie (#591.1).
+  const paginaDiScheda = (event, id) => {
+    const t = winFor(event)?._filoTabs?.tabs?.find((x) => x.id === id);
+    const wc = t && t.view && t.view.webContents;
+    return wc && !wc.isDestroyed() ? wc : null;
+  };
+  ipcMain.handle('tabs:permessi', (event, { id } = {}) => {
+    const wc = paginaDiScheda(event, id);
+    if (!wc) return { scelte: [] };
+    const Permessi = require('./services/permessiPagine');
+    const { origine, scelte } = Permessi.scelteDi(wc);
+    return { scelte, ...(origine ? Permessi.nomeDaMostrare(origine) : {}) };
+  });
+  ipcMain.handle('tabs:permessi-dimentica', (event, { id } = {}) => {
+    const wc = paginaDiScheda(event, id);
+    return wc ? require('./services/permessiPagine').dimentica(wc) : { tolte: 0, cera: false };
+  });
   ipcMain.handle('tabs:open-blocked-popup', (event, { url } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs || !url) return { ok: false };

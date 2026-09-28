@@ -93,6 +93,7 @@ function installaPermessi(ses) {
       return false;
     },
     schedaDi: schedaPerPermessi,
+    esterno: isOsDelegatedScheme,
   });
 }
 
@@ -719,6 +720,7 @@ class TabManager {
       require('./services/downloads').attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
     } catch (_) {}
     installaPermessi(view.webContents.session);
+    Permessi.seguiGesti(view.webContents);
     require('./services/homeNetwork').attach(view.webContents.session);
     return view;
   }
@@ -2339,6 +2341,8 @@ class TabManager {
   // login Google già presente in Filo.
   _allowAuthPopup(url) {
     const popupPartition = this._partitionFor(url);
+    // Una partizione mai vista da una scheda non ha gestore, ed Electron concederebbe tutto al popup.
+    if (popupPartition) installaPermessi(session.fromPartition(popupPartition));
     return {
       action: 'allow',
       overrideBrowserWindowOptions: {

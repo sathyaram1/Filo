@@ -601,11 +601,26 @@
         entries.push({ label: 'Mostra il banner dei cookie', icon: 'eye', action: 'tab-cookies-show' });
       }
     }
+    // Un sì o un no dato nella domanda dei permessi si toglie da qui, per il sito della scheda.
+    let permessi = null;
+    try { permessi = api.tabs.permessi ? await api.tabs.permessi(t.id) : null; } catch (_) { permessi = null; }
+    if (permessi && Array.isArray(permessi.scelte) && permessi.scelte.length) {
+      entries.push({ label: 'Azzera i permessi del sito', icon: 'lock', action: 'tab-permessi-azzera' });
+    }
     entries.push(
       { type: 'separator' },
       { label: 'Chiudi', icon: 'close', action: 'tab-close' },
     );
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
+  }
+
+  async function azzeraPermessi(id) {
+    let r = null;
+    try { r = await api.tabs.dimenticaPermessi(id); } catch (_) { r = null; }
+    if (!r || !r.tolte) return;
+    showToast(r.cera
+      ? 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo. Ricarica la pagina perché valga anche per quello che sta già usando.'
+      : 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo.');
   }
 
   // Secondo livello di "Apri da un altro paese": la lista delle location
@@ -651,6 +666,7 @@
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
       else if (action === 'tab-cookies-show') api.tabs.cookieBanners(id, true);
       else if (action === 'tab-cookies-auto') api.tabs.cookieBanners(id, false);
+      else if (action === 'tab-permessi-azzera') azzeraPermessi(id);
       else if (action.startsWith('tab-proxy-go:')) proxyTab(id, action.slice('tab-proxy-go:'.length));
     });
   }
@@ -1117,6 +1133,10 @@
   // Esposta per test e per usi programmatici dalla shell stessa.
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
 
+  // Il sì di una domanda che la pagina fa comparire sotto il cursore si arma dopo ARMA_MS (scaricamenti, permessi):
+  // patterns/una-conferma-non-e-un-avviso-sopra-un-fatto-gia-compiuto.md.
+  const ARMA_MS = 1000;
+
   // Lo spazio sopra la pagina lo chiedono in più (scaricamenti, domande dei permessi): la pagina scende della somma.
   const riserveSopra = new Map();
   function riservaSopra(chi, px) {
@@ -1152,7 +1172,6 @@
     // fatta comparire: la riga nasce dove la pagina ha appena mandato il
     // cursore, e un doppio clic risponderebbe senza leggerla. I pulsanti che
     // dicono sì si armano solo quando l'elenco è fermo da ARMA_MS.
-    const ARMA_MS = 1000;
     let elencoFermoDa = 0;
     let firmaElenco = '';
     let timerArma = null;
@@ -1763,9 +1782,12 @@
     let mostrata = null;
     let attiva = null;
 
+    let timerArma = null;
+
     const COSA = (d) => {
       if (d.tipo === 'appunti') return { testo: 'vuole leggere quello che hai copiato', icone: ['clipboard'] };
       if (d.tipo === 'posizione') return { testo: 'vuole sapere dove ti trovi', icone: ['location'] };
+      if (d.tipo === 'notifiche') return { testo: 'vuole mandarti notifiche', icone: ['bell'] };
       const parti = Array.isArray(d.parti) ? d.parti : [];
       const mic = parti.includes('audio');
       const cam = parti.includes('video');
@@ -1797,6 +1819,7 @@
       if (d === mostrata) return;
       mostrata = d;
       const b = ensureBar();
+      clearTimeout(timerArma);
       if (!d) {
         b.hidden = true;
         b.replaceChildren();
@@ -1814,13 +1837,31 @@
       }
       const msg = document.createElement('span');
       msg.className = 'permesso-msg';
+      // Il dominio registrato si legge sempre e la richiesta non si taglia: si accorcia solo la parte davanti.
+      const chi = document.createElement('span');
+      chi.className = 'permesso-chi';
+      const sotto = String(d.sotto || '');
+      if (sotto) {
+        const s = document.createElement('span');
+        s.className = 'permesso-sotto';
+        s.textContent = (sotto.length > 24 ? '…' + sotto.slice(-23) : sotto) + '.';
+        s.title = d.host || '';
+        chi.appendChild(s);
+      }
       const host = document.createElement('strong');
-      host.textContent = d.host || '';
-      msg.append(host, ' ' + cosa.testo);
+      host.textContent = d.dominio || d.host || '';
+      chi.appendChild(host);
+      const testo = document.createElement('span');
+      testo.className = 'permesso-cosa';
+      testo.textContent = cosa.testo;
+      msg.append(chi, ' ', testo);
       const si = document.createElement('button');
       si.type = 'button';
       si.className = 'permesso-btn permesso-si';
       si.textContent = 'Consenti';
+      si.disabled = true;
+      clearTimeout(timerArma);
+      timerArma = setTimeout(() => { if (mostrata === d) si.disabled = false; }, ARMA_MS);
       si.addEventListener('click', () => rispondiA(d, true));
       const no = document.createElement('button');
       no.type = 'button';

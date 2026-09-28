@@ -716,7 +716,10 @@ html[data-feedback-dim="1"] .shell {
 .permesso-bar[hidden] { display: none; }
 .permesso-icone { display: inline-flex; gap: 4px; color: var(--accent); }
 .permesso-icone > span { display: inline-flex; }
-.permesso-msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* La riga va a capo invece di tagliarsi: il dominio e la richiesta si leggono sempre. */
+.permesso-msg { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.permesso-sotto { color: var(--fg-soft); }
+.permesso-cosa { display: inline-block; white-space: nowrap; }
 .permesso-btn {
   padding: 5px 12px;
   border-radius: 8px;
@@ -727,7 +730,8 @@ html[data-feedback-dim="1"] .shell {
   cursor: pointer;
   transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
-.permesso-btn:hover { background: rgba(var(--accent-rgb), 0.12); }
-.permesso-btn:active { transform: scale(0.97); }
+.permesso-btn:hover:not(:disabled) { background: rgba(var(--accent-rgb), 0.12); }
+.permesso-btn:active:not(:disabled) { transform: scale(0.97); }
 .permesso-si { background: var(--accent); border-color: var(--accent); color: #fff; }
-.permesso-si:hover { background: color-mix(in srgb, var(--accent) 85%, #000); }
+.permesso-si:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 85%, #000); }
+.permesso-si:disabled { opacity: 0.5; cursor: default; }

@@ -88,6 +88,8 @@ test('Detta e Incolla di Filo sulla pagina passano col lasciapassare, per pochi 
     assert.equal(Permessi.lasciapassare(wc, 'media'), true);
     assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['audio'] }), [true]);
     assert.deepEqual(chiedi(ses, wc, 'clipboard-read'), [], 'il lasciapassare del microfono non apre gli appunti');
+    assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['video'] }), [], 'né la fotocamera');
+    assert.equal(ses.controllo(wc, 'media', 'https://posta.example', { mediaType: 'video' }), true, 'finché nessuno ha detto no');
     mock.timers.tick(6000);
     assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['audio'] }), [], 'scaduto: si torna a chiedere');
     assert.equal(Permessi.lasciapassare(wc, 'posizione'), false, 'la posizione non ha lasciapassare');
@@ -101,16 +103,18 @@ test('una pagina che non sta in una scheda (nessuno a cui chiedere) riceve no', 
   assert.deepEqual(chiedi(ses, wcFinto('https://accesso.example/'), 'geolocation'), [false]);
 });
 
-test('una domanda senza risposta vale no dopo un po\', non viene ricordata e si ritira dalla cornice', () => {
-  mock.timers.enable({ apis: ['setTimeout'] });
+test('una domanda senza risposta resta finché l\'utente risponde: chi risponde con calma concede ancora', () => {
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1_000_000 });
   try {
     const ses = sessioneFinta();
     const wc = wcFinto('https://mappa.example/');
     const esiti = chiedi(ses, wc, 'geolocation');
-    mock.timers.tick(Permessi.ATTESA_MS + 1);
-    assert.deepEqual(esiti, [false]);
-    assert.ok(ses.avvisi.some((a) => a.evento === 'fine'));
-    assert.deepEqual(chiedi(ses, wc, 'geolocation'), [], 'si può chiedere di nuovo');
+    mock.timers.tick(10 * 60_000);
+    assert.deepEqual(esiti, [], 'nessuna risposta inventata');
+    assert.equal(ses.avvisi.some((a) => a.evento === 'fine'), false, 'la domanda è ancora nella cornice');
+    const domanda = ses.avvisi.find((a) => a.evento === 'chiedi');
+    Permessi.rispondi(domanda.dati.id, true);
+    assert.deepEqual(esiti, [true]);
   } finally {
     mock.timers.reset();
   }
@@ -138,10 +142,68 @@ test('la finestra nascosta del controllo profondo dice no a tutto, anche al cont
   }
 });
 
-test('i permessi fuori dall\'elenco restano come prima, e il gestore dello schermo pieno parla per primo', () => {
-  const ses = { setPermissionCheckHandler() {} };
+test('fuori dall\'elenco una pagina ha solo i permessi innocui, e il gestore dello schermo pieno parla per primo', () => {
+  const ses = { setPermissionCheckHandler(fn) { ses.controllo = fn; } };
   ses.setPermissionRequestHandler = (fn) => { ses.richiesta = fn; };
   Permessi.installa(ses, { prima: (_wc, p, cb) => { if (p === 'fullscreen') { cb(false); return true; } return false; } });
-  assert.deepEqual(chiedi(ses, wcFinto('https://video.example/'), 'fullscreen'), [false]);
-  assert.deepEqual(chiedi(ses, wcFinto('https://video.example/'), 'notifications'), [true]);
+  const wc = wcFinto('https://video.example/');
+  assert.deepEqual(chiedi(ses, wc, 'fullscreen'), [false]);
+  for (const p of ['clipboard-sanitized-write', 'mediaKeySystem', 'pointerLock']) assert.deepEqual(chiedi(ses, wc, p), [true], p);
+  for (const p of ['midiSysex', 'idle-detection', 'window-management', 'display-capture', 'unknown']) {
+    assert.deepEqual(chiedi(ses, wc, p), [false], p);
+    assert.equal(ses.controllo(wc, p, 'https://video.example', {}), false, p);
+  }
+});
+
+test('notifiche: senza un gesto sulla pagina è un no non ricordato; dopo un clic si chiede, e il controllo dice il vero', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://posta.example/');
+  Permessi.seguiGesti(wc);
+  assert.equal(ses.controllo(wc, 'notifications', 'https://posta.example', {}), false, 'non ancora concesse');
+  assert.deepEqual(chiedi(ses, wc, 'notifications'), [false], 'chiesto da solo, al caricamento');
+  assert.equal(ses.avvisi.length, 0, 'nessuna domanda senza gesto');
+  wc.emetti('input-event', {}, { type: 'mouseMove' });
+  assert.deepEqual(chiedi(ses, wc, 'notifications'), [false], 'passare col mouse non è un gesto');
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  const esiti = chiedi(ses, wc, 'notifications');
+  const domanda = ses.avvisi.find((a) => a.evento === 'chiedi');
+  assert.equal(domanda.dati.tipo, 'notifiche');
+  Permessi.rispondi(domanda.dati.id, true);
+  assert.deepEqual(esiti, [true]);
+  assert.equal(ses.controllo(wc, 'notifications', 'https://posta.example', {}), true);
+});
+
+test('un\'altra applicazione si apre solo dalla lista delle schede e solo dopo un gesto sulla pagina', () => {
+  const ses = { setPermissionCheckHandler() {} };
+  ses.setPermissionRequestHandler = (fn) => { ses.richiesta = fn; };
+  Permessi.installa(ses, { esterno: (u) => /^mailto:/.test(String(u)) });
+  const wc = wcFinto('https://negozio.example/');
+  Permessi.seguiGesti(wc);
+  assert.deepEqual(chiedi(ses, wc, 'openExternal', { externalURL: 'mailto:a@b.example' }), [false], 'senza gesto');
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  assert.deepEqual(chiedi(ses, wc, 'openExternal', { externalURL: 'search-ms:query=x' }), [false], 'fuori lista');
+  assert.deepEqual(chiedi(ses, wc, 'openExternal', { externalURL: 'mailto:a@b.example' }), [true]);
+  wc.emetti('did-start-navigation', { isMainFrame: true, isSameDocument: false });
+  assert.deepEqual(chiedi(ses, wc, 'openExternal', { externalURL: 'mailto:a@b.example' }), [false], 'il clic non vale per la pagina dopo');
+});
+
+test('le scelte ricordate per un sito si leggono e si azzerano; dopo si torna a chiedere', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://riunione.example/stanza');
+  wc.session = ses;
+  chiedi(ses, wc, 'media', { mediaTypes: ['audio'] });
+  Permessi.rispondi(ses.avvisi.find((a) => a.evento === 'chiedi').dati.id, false);
+  assert.deepEqual(Permessi.scelteDi(wc).scelte, [{ parte: 'audio', si: false }]);
+  assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['audio'] }), [false]);
+  assert.deepEqual(Permessi.dimentica(wc), { tolte: 1, cera: false });
+  assert.deepEqual(Permessi.scelteDi(wc).scelte, []);
+  assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['audio'] }), [], 'si chiede di nuovo');
+});
+
+test('la domanda nomina il dominio registrato: la parte davanti la sceglie chi ha il sito', () => {
+  assert.deepEqual(Permessi.nomeDaMostrare('https://meet.google.com.verifica-sessione.attacco.example:8443'),
+    { sotto: 'meet.google.com.verifica-sessione', dominio: 'attacco.example:8443' });
+  assert.deepEqual(Permessi.nomeDaMostrare('https://riunione.example'), { sotto: '', dominio: 'riunione.example' });
+  assert.deepEqual(Permessi.nomeDaMostrare('http://127.0.0.1:3000'), { sotto: '', dominio: '127.0.0.1:3000' });
+  assert.equal(Permessi.nomeDaMostrare('https://bbc.co.uk').dominio, 'bbc.co.uk');
 });
