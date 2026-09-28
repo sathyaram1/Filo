@@ -48,6 +48,16 @@ describe('il commit più nuovo di main con la suite verde', () => {
     assert.deepEqual([...corseVerdi(corse).keys()], ['c1']);
   });
 
+  test('si pubblica solo un verde più nuovo dell\'ultima versione', () => {
+    // main: c5 c4 c3 c2 c1, l'ultima versione è su c3.
+    const antenato = (a, b) => MAIN.indexOf(a) >= MAIN.indexOf(b);
+    assert.equal(verdePiuNuovoDelTag('c4', 'c3', antenato), true);
+    assert.equal(verdePiuNuovoDelTag('c3', 'c3', antenato), false, 'il commit già pubblicato non ha niente di nuovo');
+    assert.equal(verdePiuNuovoDelTag('c2', 'c3', antenato), false, 'un verde vecchio (una corsa rifatta) ripubblicherebbe codice vecchio');
+    assert.equal(verdePiuNuovoDelTag('c2', '', antenato), true, 'senza versioni precedenti ogni verde è nuovo');
+    assert.equal(verdePiuNuovoDelTag('', 'c3', antenato), false);
+  });
+
   test('di più corse verdi sullo stesso commit si tiene la prima (la più nuova)', () => {
     const v = corseVerdi([corsa('c4', 'success', { html_url: 'nuova' }), corsa('c4', 'success', { html_url: 'vecchia' })]);
     assert.equal(v.get('c4').html_url, 'nuova');
