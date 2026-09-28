@@ -369,11 +369,17 @@ test('una scorciatoia modulo che l\'Editor usa già viene rifiutata, dicendo cos
     ['Ctrl+0', 'zooma'],
     ['Ctrl+=', 'zooma'],
     ['Ctrl+-', 'zooma'],
+    // Lo stesso tasto scritto per nome: il nome si legge come la pressione.
+    ['Ctrl+Minus', 'zooma'],
+    ['Ctrl+Shift+Minus', 'zooma'],
+    ['Ctrl+Plus', 'zooma'],
+    ['Ctrl++', 'zooma'],
     ['Ctrl+B', 'grassetto'],
     ['Ctrl+C', 'copia'],
   ]) {
     await page.fill('#cfgShortcut', sc);
     await page.click('#cfgSave');
+    await expect(page.locator('#cfgShortcutHint'), sc).toBeHidden();
     await expect(page.locator('#cfgShortcutTaken'), sc).toBeVisible();
     await expect(page.locator('#cfgShortcutTaken'), sc).toContainText(dice);
     await expect(page.locator('#cfgShortcut')).toHaveClass(/ed-field-invalid/);
