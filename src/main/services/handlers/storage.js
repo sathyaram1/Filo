@@ -20,15 +20,9 @@ module.exports = function register(on, ctx) {
   // solo da origine filo://; ciò che i content script fanno davvero (leggere le
   // impostazioni, salvare dizionario/draft/layout) resta consentito.
   const SETTINGS_KEY = SN_CONST.STORAGE_KEYS.SETTINGS; // 'settings' → contiene apiKeys
-  const isFilo = (origin) => String(origin || '').startsWith('filo://');
-  // Le chiavi web non devono MAI vedere i segreti dentro `settings.apiKeys`: il
-  // renderer non ne ha bisogno (le richieste AI allegano la chiave nel main).
-  function redactForWeb(value) {
-    if (!value || typeof value !== 'object' || !value[SETTINGS_KEY]) return value;
-    const s = value[SETTINGS_KEY];
-    if (!s || typeof s !== 'object' || !s.apiKeys) return value;
-    return { ...value, [SETTINGS_KEY]: { ...s, apiKeys: undefined } };
-  }
+  // Verso un'origine web le impostazioni viaggiano ritagliate sui campi che i
+  // content script usano: stessa funzione delle spinte (broadcastToTabs).
+  const { isFilo, impostazioniPerOrigine, storagePerOrigine } = require('../impostazioniPerOrigine');
   // Una richiesta tocca la chiave `settings`? (set: oggetto; remove: lista chiavi)
   const touchesSettings = (keys) =>
     (Array.isArray(keys) ? keys : [keys]).some((k) => k === SETTINGS_KEY);
@@ -36,7 +30,7 @@ module.exports = function register(on, ctx) {
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
   on('_storage:get', async (msg, sender, origin) => {
     const value = await globalThis.chrome.storage.local.get(msg.keys ?? null);
-    return { ok: true, value: isFilo(origin) ? value : redactForWeb(value) };
+    return { ok: true, value: storagePerOrigine(value, origin, SETTINGS_KEY) };
   });
 
   on('_storage:set', async (msg, sender, origin) => {
@@ -73,12 +67,7 @@ module.exports = function register(on, ctx) {
     // un'altra origine quell'indirizzo è illeggibile, e senza questo il menu
     // sarebbe ricomparso proprio nei siti esclusi.
     const pageUrl = String(sender?.tab?.url || '');
-    // Le pagine web (content script) leggono tema/spellcheck/ecc., ma non devono
-    // ricevere le chiavi API: le richieste AI girano nel main, che le allega.
-    if (!isFilo(origin) && settings && settings.apiKeys) {
-      return { ok: true, pageUrl, settings: { ...settings, apiKeys: undefined } };
-    }
-    return { ok: true, pageUrl, settings };
+    return { ok: true, pageUrl, settings: impostazioniPerOrigine(settings, origin) };
   });
 
   on(MSG.UPDATE_SETTINGS, async (msg, sender, origin) => {
@@ -97,10 +86,7 @@ module.exports = function register(on, ctx) {
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato
     // quando Filo cambia una preferenza via chat.
     const merged = await applySettingsUpdate(incoming);
-    if (!isFilo(origin) && merged && merged.apiKeys) {
-      return { ok: true, settings: { ...merged, apiKeys: undefined } };
-    }
-    return { ok: true, settings: merged };
+    return { ok: true, settings: impostazioniPerOrigine(merged, origin) };
   });
 
   on(MSG.RESET_SETTINGS, async (msg, sender, origin) => {

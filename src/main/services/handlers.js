@@ -10,6 +10,7 @@
 
 const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
+const { messaggioPerDestinazione } = require('./impostazioniPerOrigine');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -3901,6 +3902,8 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
   return { ok: true, results };
 }
 
+// Ogni destinatario riceve il messaggio ritagliato sul PROPRIO indirizzo (frame
+// per frame): un sito non riceve dalla spinta più di quanto potrebbe chiedere.
 function broadcastToTabs(message) {
   try {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -3909,7 +3912,7 @@ function broadcastToTabs(message) {
           try { sendToAllFrames(t.view.webContents, message); } catch (_) {}
         }
       }
-      try { win.webContents.send('filo:broadcast', message); } catch (_) {}
+      try { win.webContents.send('filo:broadcast', messaggioPerDestinazione(message, win.webContents.getURL())); } catch (_) {}
     }
   } catch (_) {}
 }
@@ -3955,9 +3958,9 @@ function sendToAllFrames(wc, message) {
   if (!wc || wc.isDestroyed?.()) return;
   let frames = null;
   try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
-  if (!frames || !frames.length) { try { wc.send('filo:broadcast', message); } catch (_) {} return; }
+  if (!frames || !frames.length) { try { wc.send('filo:broadcast', messaggioPerDestinazione(message, wc.getURL())); } catch (_) {} return; }
   for (const f of frames) {
-    try { if (!f.detached) f.send('filo:broadcast', message); } catch (_) {}
+    try { if (!f.detached) f.send('filo:broadcast', messaggioPerDestinazione(message, f.url)); } catch (_) {}
   }
 }
 
