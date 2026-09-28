@@ -547,3 +547,25 @@ test('un simbolo con Shift si rifiuta, il simbolo che esce parte', async ({ open
   await page.keyboard.press('Control+Shift+Backslash');
   await expect(page.locator('#overlay')).toContainText('Statistiche documento');
 });
+
+// L'esempio di un avviso si sceglie con la stessa regola che rifiuta: chi lo
+// segue non se lo vede rifiutare, anche con Ctrl+Shift+1 già su un altro modulo.
+test('l\'esempio proposto da ogni avviso si salva davvero', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await apriDocConModuli(page, [{ ...WC, data: { count: 'words', shortcut: 'Ctrl+Shift+1' } }, COMMENT]);
+
+  await enterSettingsMode(page);
+  for (const sc of ['Alt+F4', 'Ctrl+Pippo+2', 'Ctrl+Spazioo', 'Ctrl+S', 'ctrl+shift+1']) {
+    await page.locator('.ed-module[data-type="comment"]').click();
+    await page.fill('#cfgShortcut', sc);
+    await page.click('#cfgSave');
+    const avviso = await page.locator('#cfgShortcutTaken').innerText();
+    const esempio = (/(?:per esempio|es\.)\s+([^\s)]+?)\)?\.?$/m.exec(avviso) || [])[1];
+    expect(esempio, avviso).toBeTruthy();
+    expect(esempio, avviso).not.toMatch(/Shift\+1$/);
+    await page.fill('#cfgShortcut', esempio);
+    await page.click('#cfgSave');
+    await expect(page.locator('#overlay'), `${sc}: ${esempio} proposto e poi rifiutato`).toBeHidden();
+  }
+});
