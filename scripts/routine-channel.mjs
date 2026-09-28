@@ -803,9 +803,10 @@ export function testoIntentoNonCapito(parola) {
 
 /**
  * Il biglietto passato a mano (`--ticket` o `--biglietto`) vale allo stesso modo in ogni comando che ne
- * usa uno: prende il posto del biglietto davanti, lo conferma se è identico, e se è diverso si rifiuta.
- * Dove non ha senso (probe, ticket: lì serve la parola d'ordine) si rifiuta col motivo, mai ignorato.
- * `domanda` e `risposta` lo leggono da sé. PURA.
+ * usa uno, con una regola sola sulla parola davanti: lo stesso biglietto (spazi intorno compresi) lo
+ * conferma, una parola con la forma lunga di un biglietto vero è un secondo biglietto e si rifiuta, ogni
+ * altra parola resta dopo il biglietto e la nominano i controlli del comando. Probe e ticket lo rifiutano
+ * col motivo; `domanda` e `risposta` lo leggono da sé. PURA.
  * @returns {{ args: string[] } | { errore: string }}
  */
 export function bigliettoAMano(cmd, args, dato) {
@@ -815,18 +816,24 @@ export function bigliettoAMano(cmd, args, dato) {
   if (cmd === 'probe' || cmd === 'ticket') {
     return { errore: `--ticket non vale con «${cmd}»: lì serve la parola d'ordine. Non ho fatto niente.` };
   }
+  if (POSIZIONALI_DOPO_BIGLIETTO[cmd] === undefined) return { args: lista };
+  const davanti = String(lista[0] ?? '').trim();
+  if (davanti === b) return { args: [b, ...lista.slice(1)] };
+  // Un intento, un ruolo o un valore senza il suo campo chiamati «secondo biglietto» facevano togliere il
+  // biglietto giusto, e senza promemoria la risposta dopo era «aggiungi il biglietto»: un giro a vuoto.
+  if (!haFormaDiBigliettoVero(davanti)) return { args: [b, ...lista] };
+  const senzaIntento = cmd === 'deliver' && lista.length < 2;
+  return {
+    errore: `Due biglietti diversi (${davanti.slice(0, 12)}… e --ticket ${b.slice(0, 12)}…)${senzaIntento ? ', e manca l\'intento' : ''}: non ho fatto niente. `
+      + (senzaIntento ? `Passa un biglietto solo, e dopo l'intento (${INTENTI_CONSEGNA.join(', ')}).` : 'Passane uno solo.'),
+  };
+}
+
+/** La parola in più dopo quelle che il comando vuole, se c'è: rilascio e consegna hanno i loro testi. PURA. */
+export function parolaInPiu(cmd, args) {
   const dopo = POSIZIONALI_DOPO_BIGLIETTO[cmd];
-  if (dopo === undefined || lista[0] === b) return { args: lista };
-  if (lista.length <= dopo) {
-    const nonIntento = cmd === 'deliver' && lista.length > 0 && !INTENTI_CONSEGNA.includes(lista[0]);
-    if (!nonIntento) return { args: [b, ...lista] };
-    // Una parola sola davanti a una consegna che non è un intento: storto o secondo biglietto. Dirlo
-    // giusto conta, «due biglietti» manda a cercare un guasto che non c'è: è un biglietto solo se ne ha
-    // la forma lunga («revision_capability» ha quella corta, e resta un intento storto).
-    if (!haFormaDiBigliettoVero(lista[0])) return { errore: testoIntentoNonCapito(lista[0]) };
-    return { errore: `Due biglietti diversi (${String(lista[0]).slice(0, 12)}… e --ticket ${b.slice(0, 12)}…), e manca l'intento: non ho fatto niente. Passa un biglietto solo, e dopo l'intento (${INTENTI_CONSEGNA.join(', ')}).` };
-  }
-  return { errore: `Due biglietti diversi (${String(lista[0]).slice(0, 12)}… e --ticket ${b.slice(0, 12)}…): non ho fatto niente. Passane uno solo.` };
+  if (!['work', 'heartbeat', 'compare'].includes(cmd) || !Array.isArray(args) || args.length <= dopo + 1) return '';
+  return String(args[dopo + 1]);
 }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
