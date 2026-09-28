@@ -29,8 +29,16 @@
 
   let activeMenu = null;
 
-  // Sulle pagine web il menu vive nel documento del sito: un clic finto della pagina non preme i suoi bottoni
-  // (#586: il sito premeva «Incolla» e «Detta» da solo). I gesti che Filo simula per sé passano da `gestoDiFilo`.
+  // Sulle pagine web il menu vive nel documento del sito (#586): ogni suo elemento ubbidisce solo a un gesto vero
+  // dell'utente sul menu com'è stato disegnato. Un bottone spostato, staccato, coperto o reso trasparente dalla pagina
+  // non risponde più. I gesti che Filo simula per sé passano da `gestoDiFilo`.
+  const SUL_WEB = (() => { try { return typeof window !== 'undefined' && location.protocol !== 'filo:'; } catch (_) { return true; } })();
+  const EVENTI_GUARDATI = ['click', 'auxclick', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup',
+    'mouseover', 'mouseenter', 'pointerover', 'pointerenter', 'keydown', 'keyup', 'contextmenu'];
+  // Questi fanno qualcosa: vogliono anche che il browser abbia visto il menu intero, scoperto e opaco. Per questo
+  // sulle pagine web il menu non entra in dissolvenza (`data-sn-sul-web` in menu.css).
+  const VOGLIONO_LA_VISTA = new Set(['click', 'auxclick', 'dblclick', 'mouseenter']);
+  const radici = new WeakMap();
   let gestoInterno = false;
   function gestoDiFilo(fn) {
     gestoInterno = true;
@@ -40,10 +48,79 @@
     if (!activeMenu || !t) return false;
     try { return activeMenu.root.contains(t) || !!(activeMenu.subRoot && activeMenu.subRoot.contains(t)); } catch (_) { return false; }
   }
+  function radiceDi(el) {
+    if (!activeMenu || !el) return null;
+    try {
+      if (activeMenu.root.contains(el)) return activeMenu.root;
+      if (activeMenu.subRoot && activeMenu.subRoot.contains(el)) return activeMenu.subRoot;
+    } catch (_) {}
+    return null;
+  }
+  // Dove Filo ha posato la radice: un menu spostato dalla pagina sotto il cursore non risponde più.
+  function ricordaPosto(radice) {
+    const st = radice && radici.get(radice);
+    if (!st) return;
+    try { const r = radice.getBoundingClientRect(); st.posto = { x: r.left, y: r.top }; } catch (_) {}
+  }
+  // La radice sta dove Filo l'ha messa, e né lei né chi la contiene è stata resa invisibile o trasparente.
+  function integra(radice, st) {
+    try {
+      if (!radice.isConnected || radice.parentNode !== st.padre) return false;
+      if (st.posto) {
+        const r = radice.getBoundingClientRect();
+        if (Math.abs(r.left - st.posto.x) > 3 || Math.abs(r.top - st.posto.y) > 3) return false;
+      }
+      const cs = getComputedStyle(radice);
+      if (cs.visibility !== 'visible' || cs.display === 'none' || Number(cs.opacity) < 0.95 || (cs.filter && cs.filter !== 'none')) return false;
+      let alto = false;
+      try { alto = radice.matches(':popover-open'); } catch (_) {}
+      if (alto) return true;
+      for (let n = radice.parentElement; n && n.nodeType === 1; n = n.parentElement) {
+        const c = getComputedStyle(n);
+        if (Number(c.opacity) < 0.95 || (c.filter && c.filter !== 'none')) return false;
+      }
+      return true;
+    } catch (_) { return false; }
+  }
+  // Il browser dice se la radice si vede davvero: niente sopra, niente trasparenze, niente deformazioni.
+  function osserva(radice) {
+    if (!SUL_WEB || !radice || radici.has(radice)) return;
+    radice.dataset.snSulWeb = '1';
+    // Nello strato più alto della pagina: sopra tutto quello che il sito disegna, e fuori dai filtri che mette a sé.
+    try { if (typeof radice.showPopover === 'function') { radice.popover = 'manual'; radice.showPopover(); } } catch (_) {}
+    const st = { padre: radice.parentNode, visibile: undefined, io: null };
+    radici.set(radice, st);
+    try {
+      st.io = new IntersectionObserver((voci) => {
+        for (const v of voci) st.visibile = v.isVisible === undefined ? v.isIntersecting : !!v.isVisible;
+      }, { trackVisibility: true, delay: 100 });
+      st.io.observe(radice);
+    } catch (_) { st.visibile = true; }
+  }
+  function smetti(radice) {
+    const st = radice && radici.get(radice);
+    try { if (st && st.io) st.io.disconnect(); } catch (_) {}
+  }
+  // Ogni elemento del menu nasce con questa guardia davanti ai suoi gestori: resta sua anche se la pagina lo porta via.
+  function crea(tag) {
+    const el = document.createElement(tag);
+    if (!SUL_WEB) return el;
+    for (const tipo of EVENTI_GUARDATI) {
+      el.addEventListener(tipo, (e) => {
+        if (gestoInterno) return;
+        const radice = radiceDi(el);
+        const st = radice && radici.get(radice);
+        const vede = !VOGLIONO_LA_VISTA.has(tipo) || (st && st.visibile === true);
+        if (e.isTrusted && st && vede && integra(radice, st)) return;
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }, true);
+    }
+    return el;
+  }
   try {
-    if (typeof window !== 'undefined' && location.protocol !== 'filo:') {
-      for (const tipo of ['click', 'auxclick', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup',
-        'mouseover', 'mouseenter', 'pointerover', 'pointerenter', 'keydown', 'keyup']) {
+    if (SUL_WEB) {
+      for (const tipo of EVENTI_GUARDATI) {
         window.addEventListener(tipo, (e) => {
           if (e.isTrusted || gestoInterno || !nelMenu(e.target)) return;
           e.stopImmediatePropagation();
@@ -57,6 +134,8 @@
     try { dismissTooltip?.(); } catch (_) {}
     clearSubCloseTimer();
     if (activeMenu) {
+      smetti(activeMenu.root);
+      smetti(activeMenu.subRoot);
       activeMenu.root.remove();
       try { activeMenu.subRoot?.remove(); } catch (_) {}
       document.removeEventListener('mousedown', activeMenu.onDocClick, true);
@@ -73,6 +152,7 @@
 
   function closeSubmenu() {
     if (!activeMenu?.subRoot) return;
+    smetti(activeMenu.subRoot);
     activeMenu.subRoot.remove();
     activeMenu.subRoot = null;
     activeMenu.subAnchor = null;
@@ -170,6 +250,7 @@
     const mosso = (Number.isFinite(primaTop) && Math.abs(p.top - primaTop) > 0.5)
       || (Number.isFinite(primaLeft) && Math.abs(p.left - primaLeft) > 0.5);
     if (mosso) dismissTooltip();
+    ricordaPosto(root);
     repositionSub();
   }
 
@@ -204,6 +285,7 @@
     });
     sub.style.left = `${p.left}px`;
     sub.style.top = `${p.top}px`;
+    ricordaPosto(sub);
   }
 
   // #500 — un pannello ancorato viene posato una volta e poi il menu si muove
@@ -233,7 +315,7 @@
   // - 'paste': come 'item' ma con freccetta a destra che apre il sotto-menu della cronologia
   function open({ x, y, items, keepOnScroll }) {
     close();
-    const root = document.createElement('div');
+    const root = crea('div');
     root.className = 'sn-menu';
     // UI nostra dentro la pagina del sito: marcata alla nascita, così chi
     // cammina sulla pagina (la traduzione) la salta senza doverla indovinare
@@ -249,7 +331,7 @@
 
     for (const it of items) {
       if (it.type === 'separator') {
-        const sep = document.createElement('div');
+        const sep = crea('div');
         sep.className = 'sn-menu-sep';
         // `hidden` permette al chiamante di nascondere il separatore in tandem
         // con una correction nascosta (vedi gestione 'correction' hidden).
@@ -261,7 +343,7 @@
         continue;
       }
       if (it.type === 'row') {
-        const row = document.createElement('div');
+        const row = crea('div');
         row.className = 'sn-menu-row';
         if (it.dropTarget) row.dataset.snDropTarget = it.dropTarget;
         populateRow(row, it.items, { dropTarget: it.dropTarget });
@@ -270,7 +352,7 @@
         continue;
       }
       if (it.type === 'inline') {
-        const el = document.createElement('div');
+        const el = crea('div');
         el.className = 'sn-menu-inline';
         // Di cosa parla il riquadro (immagine / collegamento / testo). Sulla
         // stessa scheda deve restare lo STESSO da qualunque punto la si clicchi
@@ -297,7 +379,7 @@
         // Bottone composito: la parte sinistra mostra la parola corretta (clic = applica
         // correzione); a destra una freccetta apre un sotto-menu con azioni (aggiungi al
         // dizionario, correggi automaticamente, gestisci correttore).
-        const wrap = document.createElement('div');
+        const wrap = crea('div');
         wrap.className = 'sn-menu-correction';
         keepPageFocus(wrap);
         if (it.disabled) wrap.classList.add('sn-disabled');
@@ -349,26 +431,26 @@
         // Bottone generico: corpo cliccabile a sinistra + freccetta a destra che
         // apre un sotto-menu di varianti/opzioni (subItems). Usato per
         // "Spiega ▸ approfondisci", "Detta ▸ scegli modello", ecc.
-        const wrap = document.createElement('div');
+        const wrap = crea('div');
         wrap.className = 'sn-menu-split';
         if (it.disabled) wrap.classList.add('sn-disabled');
 
-        const main = document.createElement('button');
+        const main = crea('button');
         main.type = 'button';
         main.className = 'sn-menu-split-main';
         main.disabled = !!it.disabled;
         if (it.icon) {
-          const ic = document.createElement('span');
+          const ic = crea('span');
           ic.className = 'sn-menu-split-icon';
           setIconContent(ic, it.icon);
           main.appendChild(ic);
         }
-        const lbl = document.createElement('span');
+        const lbl = crea('span');
         lbl.className = 'sn-menu-label';
         lbl.textContent = it.label;
         main.appendChild(lbl);
         if (it.shortcut) {
-          const sc = document.createElement('span');
+          const sc = crea('span');
           sc.className = 'sn-menu-shortcut';
           sc.textContent = it.shortcut;
           main.appendChild(sc);
@@ -380,7 +462,7 @@
           });
         }
 
-        const arrow = document.createElement('button');
+        const arrow = crea('button');
         arrow.type = 'button';
         arrow.className = 'sn-menu-split-arrow';
         arrow.title = it.arrowTitle || '';
@@ -394,20 +476,20 @@
       }
       if (it.type === 'paste') {
         // Bottone composito: parte sinistra = incolla principale, parte destra = freccetta dropdown
-        const wrap = document.createElement('div');
+        const wrap = crea('div');
         wrap.className = 'sn-menu-paste';
         if (it.disabled) wrap.classList.add('sn-disabled');
 
-        const main = document.createElement('button');
+        const main = crea('button');
         main.type = 'button';
         main.className = 'sn-menu-paste-main';
         main.disabled = !!it.disabled;
-        const lbl = document.createElement('span');
+        const lbl = crea('span');
         lbl.className = 'sn-menu-label';
         lbl.textContent = it.label;
         main.appendChild(lbl);
         if (it.shortcut) {
-          const sc = document.createElement('span');
+          const sc = crea('span');
           sc.className = 'sn-menu-shortcut';
           sc.textContent = it.shortcut;
           main.appendChild(sc);
@@ -419,7 +501,7 @@
           });
         }
 
-        const arrow = document.createElement('button');
+        const arrow = crea('button');
         arrow.type = 'button';
         arrow.className = 'sn-menu-paste-arrow';
         arrow.title = I18n.t('menu_paste_history');
@@ -436,30 +518,30 @@
         continue;
       }
       // item
-      const el = document.createElement('button');
+      const el = crea('button');
       el.type = 'button';
       el.className = 'sn-menu-item';
       if (it.disabled) el.classList.add('sn-disabled');
       // Icona opzionale a sinistra dell'etichetta (stringa SVG dalle icone Filo).
       if (it.icon) {
-        const ic = document.createElement('span');
+        const ic = crea('span');
         ic.className = 'sn-menu-item-icon';
         setIconContent(ic, it.icon);
         el.appendChild(ic);
         el.classList.add('sn-has-icon');
       }
-      const lbl = document.createElement('span');
+      const lbl = crea('span');
       lbl.className = 'sn-menu-label';
       lbl.textContent = it.label;
       el.appendChild(lbl);
       if (it.shortcut) {
-        const sc = document.createElement('span');
+        const sc = crea('span');
         sc.className = 'sn-menu-shortcut';
         sc.textContent = it.shortcut;
         el.appendChild(sc);
       }
       if (it.tag) {
-        const tag = document.createElement('span');
+        const tag = crea('span');
         tag.className = 'sn-menu-tag';
         tag.textContent = it.tag;
         el.appendChild(tag);
@@ -474,6 +556,7 @@
     }
 
     menuHost().appendChild(root);
+    osserva(root);
 
     // #405 — su una pagina con riquadri incorporati il menu può nascere dentro
     // il riquadro o fuori, e i clic non attraversano quel confine: chi ha un
@@ -601,11 +684,11 @@
     wrap.classList.toggle('sn-menu-correction-loading', !!props.loading);
     wrap.classList.toggle('sn-disabled', !!props.disabled);
 
-    const main = document.createElement('button');
+    const main = crea('button');
     main.type = 'button';
     main.className = 'sn-menu-correction-main';
     main.disabled = !!(props.disabled || props.loading);
-    const lbl = document.createElement('span');
+    const lbl = crea('span');
     lbl.className = 'sn-menu-label';
     lbl.textContent = props.label || '';
     main.appendChild(lbl);
@@ -618,7 +701,7 @@
     wrap.appendChild(main);
 
     if (!props.loading) {
-      const arrow = document.createElement('button');
+      const arrow = crea('button');
       arrow.type = 'button';
       arrow.className = 'sn-menu-correction-arrow';
       arrow.textContent = '▸';
@@ -631,43 +714,44 @@
   function openGenericSubmenu(anchorEl, items) {
     if (!activeMenu) return;
     if (activeMenu.subRoot) {
+      smetti(activeMenu.subRoot);
       activeMenu.subRoot.remove();
       activeMenu.subRoot = null;
     }
-    const sub = document.createElement('div');
+    const sub = crea('div');
     sub.className = 'sn-menu sn-menu-sub';
     global.SN_FILO_UI?.mark(sub);
     sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
 
     if (!items || items.length === 0) {
-      const empty = document.createElement('div');
+      const empty = crea('div');
       empty.className = 'sn-menu-empty';
       empty.textContent = '—';
       sub.appendChild(empty);
     } else {
       for (const sit of items) {
         if (sit.type === 'separator') {
-          const sep = document.createElement('div');
+          const sep = crea('div');
           sep.className = 'sn-menu-sep';
           sub.appendChild(sep);
           continue;
         }
         if (sit.type === 'info') {
           // Riga informativa: testo non cliccabile (es. spiegazione di un errore blu).
-          const info = document.createElement('div');
+          const info = crea('div');
           info.className = 'sn-menu-info';
           info.textContent = sit.label || '';
           sub.appendChild(info);
           continue;
         }
-        const b = document.createElement('button');
+        const b = crea('button');
         b.type = 'button';
         b.className = 'sn-menu-item';
         // Come per la riga di correzione: agire da qui non deve togliere il
         // fuoco (e quindi il punto in cui si scriveva) al campo sottostante.
         keepPageFocus(b);
         if (sit.disabled) b.classList.add('sn-disabled');
-        const lbl = document.createElement('span');
+        const lbl = crea('span');
         lbl.className = 'sn-menu-label';
         lbl.textContent = sit.label || '';
         b.appendChild(lbl);
@@ -685,6 +769,7 @@
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
+    osserva(sub);
     activeMenu.subAnchor = anchorEl;
     activeMenu.subMode = 'anchor';
 
@@ -701,16 +786,17 @@
     const onClear = handlers && typeof handlers === 'object' ? handlers.onClear : null;
     if (!activeMenu) return;
     if (activeMenu.subRoot) {
+      smetti(activeMenu.subRoot);
       activeMenu.subRoot.remove();
       activeMenu.subRoot = null;
     }
-    const sub = document.createElement('div');
+    const sub = crea('div');
     sub.className = 'sn-menu sn-menu-sub';
     global.SN_FILO_UI?.mark(sub);
     sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
 
     if (!entries || entries.length === 0) {
-      const empty = document.createElement('div');
+      const empty = crea('div');
       empty.className = 'sn-menu-empty';
       empty.textContent = I18n.t('toast_clipboard_empty');
       sub.appendChild(empty);
@@ -718,7 +804,7 @@
       sub.classList.add('sn-menu-history-sub');
 
       // Lista scorrevole: tutto ciò che è stato incollato, con scroll.
-      const list = document.createElement('div');
+      const list = crea('div');
       list.className = 'sn-menu-history-list';
 
       const searchTextOf = (entry) =>
@@ -728,19 +814,19 @@
       // Messaggi di stato (creati prima così i gestori possono riferirli):
       // - noResults: nessuna corrispondenza nella ricerca;
       // - emptyMsg: l'utente ha rimosso tutte le voci a mano.
-      const noResults = document.createElement('div');
+      const noResults = crea('div');
       noResults.className = 'sn-menu-empty';
       noResults.textContent = I18n.t('menu_paste_no_results');
       noResults.style.display = 'none';
-      const emptyMsg = document.createElement('div');
+      const emptyMsg = crea('div');
       emptyMsg.className = 'sn-menu-empty';
       emptyMsg.textContent = I18n.t('toast_clipboard_empty');
       emptyMsg.style.display = 'none';
 
       // Footer: barra di ricerca + (se supportato) svuota cronologia.
-      const searchWrap = document.createElement('div');
+      const searchWrap = crea('div');
       searchWrap.className = 'sn-menu-history-search';
-      const input = document.createElement('input');
+      const input = crea('input');
       input.type = 'text';
       input.className = 'sn-menu-history-search-input';
       input.placeholder = I18n.t('menu_paste_search');
@@ -790,26 +876,26 @@
       entries.forEach((entry) => {
         // Riga = zona "incolla" (a sinistra) + "×" rimuovi (a destra). Sono due
         // bottoni fratelli, non annidati: il "×" non fa scattare l'incolla.
-        const row = document.createElement('div');
+        const row = crea('div');
         row.className = 'sn-menu-history-item';
         row.dataset.snSearch = searchTextOf(entry).toLowerCase();
 
-        const b = document.createElement('button');
+        const b = crea('button');
         b.type = 'button';
         b.className = 'sn-menu-item sn-menu-history-paste';
         if (entry.type === 'image') {
-          const icon = document.createElement('span');
+          const icon = crea('span');
           icon.className = 'sn-menu-history-icon';
           const img = global.SN_ICONS?.image;
           if (img) icon.innerHTML = img(16);
           else icon.textContent = '🖼';
-          const desc = document.createElement('span');
+          const desc = crea('span');
           desc.className = 'sn-menu-label';
           desc.textContent = entry.description || 'Immagine';
           b.appendChild(icon);
           b.appendChild(desc);
         } else {
-          const lbl = document.createElement('span');
+          const lbl = crea('span');
           lbl.className = 'sn-menu-label';
           const text = (entry.text || '').replace(/\s+/g, ' ').trim();
           lbl.textContent = text.length > 40 ? text.slice(0, 40) + '…' : text;
@@ -822,7 +908,7 @@
         row.appendChild(b);
 
         if (onRemove) {
-          const rm = document.createElement('button');
+          const rm = crea('button');
           rm.type = 'button';
           rm.className = 'sn-menu-history-remove';
           rm.textContent = '×';
@@ -856,12 +942,12 @@
 
       // Svuota cronologia: azione distruttiva → conferma prima di eseguire.
       if (onClear) {
-        clearWrap = document.createElement('div');
+        clearWrap = crea('div');
         clearWrap.className = 'sn-menu-history-clear';
-        const clearBtn = document.createElement('button');
+        const clearBtn = crea('button');
         clearBtn.type = 'button';
         clearBtn.className = 'sn-menu-item sn-menu-history-clear-btn';
-        const cl = document.createElement('span');
+        const cl = crea('span');
         cl.className = 'sn-menu-label';
         cl.textContent = I18n.t('menu_paste_clear');
         clearBtn.appendChild(cl);
@@ -900,6 +986,7 @@
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
+    osserva(sub);
 
     // Posizionamento: la cronologia incolla deve apparire ATTACCATA al box
     // principale (feedback alpha: "il sotto menu compare separato dal box
@@ -921,12 +1008,13 @@
   function openIconGridSubmenu(anchorEl, items, opts = {}) {
     if (!activeMenu) return;
     if (activeMenu.subRoot) {
+      smetti(activeMenu.subRoot);
       activeMenu.subRoot.remove();
       activeMenu.subRoot = null;
       return;
     }
     const cols = opts.cols || 4;
-    const sub = document.createElement('div');
+    const sub = crea('div');
     sub.className = 'sn-menu sn-menu-sub sn-menu-icon-grid';
     global.SN_FILO_UI?.mark(sub);
     sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
@@ -940,6 +1028,7 @@
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
+    osserva(sub);
     activeMenu.subAnchor = anchorEl;
     activeMenu.subMode = 'anchor';
 
@@ -956,7 +1045,7 @@
   let tooltipHideTimer = null;
   function ensureTooltipEl() {
     if (tooltipEl && document.documentElement.contains(tooltipEl)) return tooltipEl;
-    tooltipEl = document.createElement('div');
+    tooltipEl = crea('div');
     tooltipEl.className = 'sn-tooltip';
     global.SN_FILO_UI?.mark(tooltipEl);
     tooltipEl.style.display = 'none';
@@ -1010,7 +1099,7 @@
   // poter rigenerare in-place dopo un drag senza chiudere il menu).
   // ============================================================================
   function makeRowButton(sub, opts = {}) {
-    const b = document.createElement('button');
+    const b = crea('button');
     b.type = 'button';
     b.className = 'sn-menu-row-btn';
     if (sub.kind === 'overflow') b.classList.add('sn-menu-row-overflow');
@@ -1081,7 +1170,7 @@
   }
 
   function makeGridButton(it, opts = {}) {
-    const b = document.createElement('button');
+    const b = crea('button');
     b.type = 'button';
     b.className = 'sn-menu-icon-btn';
     // Vedi makeRowButton: disabilitazione via classe per restare trascinabile.
@@ -1104,7 +1193,7 @@
     sub.innerHTML = '';
     sub.__snGridOpts = opts;
     if (!items || items.length === 0) {
-      const empty = document.createElement('div');
+      const empty = crea('div');
       empty.className = 'sn-menu-empty';
       empty.textContent = '—';
       sub.appendChild(empty);

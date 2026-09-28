@@ -174,8 +174,10 @@ if (!IS_SUBFRAME) try {
 try {
   const loc = String((typeof window !== 'undefined' && window.location && window.location.href) || '');
   if (/^(https?:|about:|data:|blob:|file:)/i.test(loc)) {
-    const { buildPermessiPaginaSource, CANALE } = require('./permessi-pagina.js');
+    const { buildPermessiPaginaSource, CANALE, ANNUNCIO_SCHERMO } = require('./permessi-pagina.js');
     const negati = ipcRenderer.sendSync('filo:permessi-pagina') || [];
+    // Sincrono: l'annuncio deve arrivare al main prima della richiesta dello schermo che lo segue.
+    document.addEventListener(ANNUNCIO_SCHERMO, () => { try { ipcRenderer.sendSync('filo:schermo-annunciato'); } catch (_) {} }, true);
     webFrame.executeJavaScript(buildPermessiPaginaSource(negati), false).catch(() => {});
     ipcRenderer.on('filo:permessi-pagina', (_e, lista) => {
       try { document.dispatchEvent(new CustomEvent(CANALE, { detail: JSON.stringify(Array.isArray(lista) ? lista : []) })); } catch (_) {}

@@ -14,6 +14,9 @@ const TETTO_ATTESE_PER_DOMANDA = 100;
 const CHIUSURE_PER_SMETTERE = 3;
 // Una lettura dei caratteri installati arriva senza richiesta: accende il segno solo appena dopo un gesto vero.
 const GESTO_RECENTE_MS = 3000;
+// getDisplayMedia si annuncia un attimo prima della sua richiesta; un annuncio vecchio non vale più.
+const ANNUNCIO_VALIDO_MS = 5000;
+const TETTO_ANNUNCI = 20;
 const INPUT_VERI = new Set(['mouseDown', 'mouseUp', 'keyDown', 'rawKeyDown', 'char', 'touchStart', 'touchEnd', 'gestureTap']);
 
 let dip = {};
@@ -37,6 +40,7 @@ const stato = {
   cablate: new WeakSet(),
   ascoltatori: new Set(),
   alGestore: null,
+  annunci: new Map(),
 };
 let prossimoId = 1;
 let prossimoAmbito = 1;
@@ -204,8 +208,11 @@ function usiDi(wc, origine) {
   return u;
 }
 
+// Il segno sulla scheda parla del sito della scheda: la scelta di un riquadro di un altro sito non lo tocca.
+function delSitoDellaScheda(wc, origine) { return P.origineDi(urlDi(wc)) === origine; }
+
 function segnaUso(wc, origine, tipi) {
-  if (!vivo(wc) || !schedaDi(wc)) return;
+  if (!vivo(wc) || !schedaDi(wc) || !delSitoDellaScheda(wc, origine)) return;
   const u = usiDi(wc, origine);
   let cambiato = false;
   for (const t of tipi) {
@@ -217,7 +224,7 @@ function segnaUso(wc, origine, tipi) {
 }
 
 function segnaBlocco(wc, origine, tipi, motivo) {
-  if (!vivo(wc) || !schedaDi(wc)) return;
+  if (!vivo(wc) || !schedaDi(wc) || !delSitoDellaScheda(wc, origine)) return;
   const u = usiDi(wc, origine);
   let cambiato = false;
   for (const t of tipi) {
@@ -301,6 +308,7 @@ function annullaPer(wcId) {
     chiudi(v, false);
   }
   stato.schermoScelto.delete(wcId);
+  stato.annunci.delete(wcId);
   const aveva = stato.usi.delete(wcId);
   if (tocca) aggiornaScheda(tocca);
   return aveva;
@@ -447,10 +455,19 @@ function vetoSchermoIntero(wc) {
 }
 
 // L'origine che l'utente vede è quella della scheda: un riquadro può chiedere solo se il sito gliel'ha delegato.
-function urlDiRiferimento(wc, dettagli) {
+// Quello che non si delega (notifiche, aprire app) resta del riquadro di un altro sito che lo chiede.
+function urlDiRiferimento(wc, dettagli, permesso) {
   const d = dettagli || {};
   if (d.isMainFrame !== false && d.requestingUrl) return String(d.requestingUrl);
+  if (P.DEL_RIQUADRO.has(permesso) && riquadroDiAltri(wc, d)) return String(d.requestingUrl);
   return urlDi(wc) || String(d.requestingUrl || '');
+}
+
+function riquadroDiAltri(wc, dettagli) {
+  const d = dettagli || {};
+  if (d.isMainFrame !== false) return false;
+  const o = P.origineDelRiquadro(d.requestingUrl);
+  return !!o && o !== P.origineDi(urlDi(wc));
 }
 
 // Conta chi chiede, non chi ospita: un riquadro web dentro una pagina filo:// resta un sito.
@@ -459,9 +476,9 @@ function daFilo(wc, dettagli) {
   return richiedente ? P.eFilo(richiedente) : P.eFilo(urlDi(wc));
 }
 
-// Lo schermo lo consegna solo il gestore dello schermo, che Chromium chiama DENTRO questo stesso sì: lì si chiede e si
-// sceglie. Una richiesta che non ci passa è la strada vecchia (`chromeMediaSource`), che prenderebbe lo schermo intero
-// e l'audio del computer senza scelta: la pagina muore prima che la cattura le arrivi.
+// Lo schermo lo consegna solo il gestore dello schermo, che Chromium chiama DENTRO questo stesso sì con la scelta
+// dell'utente. Un sì che non ci passa è la strada vecchia (`chromeMediaSource`), che prenderebbe lo schermo intero e
+// l'audio del computer senza scelta: la pagina muore prima che la cattura le arrivi.
 function lasciaAlGestoreDelloSchermo(wc, rispondi) {
   if (!vivo(wc)) return rispondi(false);
   let passato = false;
@@ -469,6 +486,27 @@ function lasciaAlGestoreDelloSchermo(wc, rispondi) {
   try { rispondi(true); } finally { stato.alGestore = null; }
   if (!passato) fermaLaStradaVecchia(wc);
   return undefined;
+}
+
+function annunciFreschi(wc) {
+  const ora = Date.now();
+  return (stato.annunci.get(wc.id) || []).filter((t) => ora - t <= ANNUNCIO_VALIDO_MS);
+}
+
+function annunciaSchermo(wc) {
+  if (!vivo(wc)) return;
+  const l = annunciFreschi(wc);
+  if (l.length < TETTO_ANNUNCI) l.push(Date.now());
+  stato.annunci.set(wc.id, l);
+}
+
+function prendiAnnuncio(wc) {
+  if (!vivo(wc)) return false;
+  const l = annunciFreschi(wc);
+  const annunciato = l.length > 0;
+  l.shift();
+  stato.annunci.set(wc.id, l);
+  return annunciato;
 }
 
 function fermaLaStradaVecchia(wc) {
@@ -490,7 +528,8 @@ function richiesta(ses, wc, permesso, dettagli, callback) {
     if (permesso === 'fullscreen' && vetoSchermoIntero(wc)) return rispondi(false);
     if (daFilo(wc, dettagli)) return rispondi(true);
     const d0 = dettagli || {};
-    const url = urlDiRiferimento(wc, d0);
+    if (P.MAI_DAL_RIQUADRO.has(permesso) && riquadroDiAltri(wc, d0)) return rispondi(false);
+    const url = urlDiRiferimento(wc, d0, permesso);
     const { innocuo, chiuso, tipi, grezzo } = P.tipiRichiesta(permesso, d0);
     if (innocuo) return rispondi(true);
     if (chiuso) return rispondi(false);
@@ -498,17 +537,21 @@ function richiesta(ses, wc, permesso, dettagli, callback) {
     if (!origine) return rispondi(false);
     // Lo schermo lo chiede un documento web: da un riquadro senza indirizzo arriva solo la strada vecchia.
     if (tipi.includes('schermo') && !P.origineDi(d0.requestingUrl || url)) return rispondi(false);
-    if (permesso === 'media' && tipi.length === 1 && tipi[0] === 'schermo') return lasciaAlGestoreDelloSchermo(wc, rispondi);
+    // Il sì allo schermo passa dal gestore dello schermo, o la pagina non lo riceve.
+    const perLoSchermo = permesso === 'media' && tipi.length === 1 && tipi[0] === 'schermo';
+    // Senza l'annuncio di getDisplayMedia è la strada vecchia: no subito, senza domanda.
+    if (perLoSchermo && !prendiAnnuncio(wc)) return rispondi(false);
+    const concedi = perLoSchermo ? (ok) => (ok ? lasciaAlGestoreDelloSchermo(wc, rispondi) : rispondi(false)) : rispondi;
     const decidiOra = () => {
       const d = P.decidi(scelteDi(ses, origine), tipi);
-      if (d.esito === 'consenti') { segnaUso(wc, origine, tipi); return rispondi(true); }
+      if (d.esito === 'consenti') { segnaUso(wc, origine, tipi); return concedi(true); }
       if (d.esito === 'nega') { segnaBlocco(wc, origine, [d.tipo], 'negato'); return rispondi(false); }
       if (haSmesso(ses, origine, d.tipi)) { segnaBlocco(wc, origine, d.tipi, 'smesso'); return rispondi(false); }
       if (!vivo(wc)) return rispondi(false);
-      if (!schedaDi(wc)) return chiediFuoriScheda({ ses, wc, origine, tipi: d.tipi, grezzo, rispondi });
+      if (!schedaDi(wc)) return chiediFuoriScheda({ ses, wc, origine, tipi: d.tipi, grezzo, rispondi: concedi });
       return accoda({
         ses, wc, origine, tipi: d.tipi, grezzo,
-        rispondi: (ok) => { if (ok) segnaUso(wc, origine, tipi); rispondi(ok); },
+        rispondi: (ok) => { if (ok) segnaUso(wc, origine, tipi); concedi(ok); },
       });
     };
     if (stato.caricato) return decidiOra();
@@ -530,7 +573,8 @@ function controllo(ses, wc, permesso, origineRichiesta, dettagli) {
   try {
     const d = dettagli || {};
     if (daFilo(wc, d)) return true;
-    const url = urlDiRiferimento(wc, d) || String(origineRichiesta || '');
+    if (P.MAI_DAL_RIQUADRO.has(permesso) && riquadroDiAltri(wc, d)) return false;
+    const url = urlDiRiferimento(wc, d, permesso) || String(origineRichiesta || '');
     const origine = P.origineDi(url);
     if (!origine) return P.INNOCUI.has(permesso);
     if (!stato.caricato) return P.INNOCUI.has(permesso);
@@ -559,8 +603,8 @@ function schermoDellaScheda(wc, schermi) {
   }
 }
 
-// Qui si chiede, con la striscia o la finestra di sistema, e si consegna quello che l'utente ha scelto; senza, niente.
-function schermo(ses, req, callback) {
+// La scelta di cosa condividere è arrivata con il «Condividi» della barra; senza, lo schermo non esce.
+function schermo(_ses, req, callback) {
   if (stato.alGestore) { const f = stato.alGestore; stato.alGestore = null; f(); }
   let risposto = false;
   const rispondi = (flussi) => {
@@ -570,39 +614,28 @@ function schermo(ses, req, callback) {
   };
   try {
     const wc = webContentsDelFrame(req && req.frame);
-    const origine = vivo(wc) ? P.origineDi(urlDi(wc)) : '';
-    if (!origine) return rispondi({});
+    const scelta = wc ? stato.schermoScelto.get(wc.id) : null;
+    if (!wc || !scelta) return rispondi({});
+    stato.schermoScelto.delete(wc.id);
+    const origine = P.origineDi(urlDi(wc));
     const consegna = (video) => {
-      if (!video || !vivo(wc)) return rispondi({});
+      if (!video) return rispondi({});
       segnaUso(wc, origine, ['schermo']);
       return rispondi({ video });
     };
-    const dopo = (ok) => {
-      const scelta = stato.schermoScelto.get(wc.id);
-      stato.schermoScelto.delete(wc.id);
-      if (!ok || !scelta) return rispondi({});
-      const fonte = String(scelta.fonte || '');
-      if (fonte.startsWith('scheda:')) {
-        const s = schedaPerId(fonte.slice('scheda:'.length));
-        const c = s && s.tab && s.tab.view && s.tab.view.webContents;
-        return consegna(vivo(c) ? c.mainFrame : null);
-      }
-      return Promise.resolve(electron().desktopCapturer.getSources({ types: ['screen', 'window'] }))
-        .then((fonti) => {
-          const lista = Array.isArray(fonti) ? fonti : [];
-          if (fonte) return consegna(lista.find((f) => f.id === fonte) || null);
-          return consegna(schermoDellaScheda(wc, lista.filter((f) => String(f.id).startsWith('screen:'))));
-        })
-        .catch(() => rispondi({}));
-    };
-    const chiedi = () => {
-      if (!vivo(wc)) return rispondi({});
-      if (haSmesso(ses, origine, ['schermo'])) { segnaBlocco(wc, origine, ['schermo'], 'smesso'); return rispondi({}); }
-      if (!schedaDi(wc)) return chiediFuoriScheda({ ses, wc, origine, tipi: ['schermo'], grezzo: '', rispondi: dopo });
-      return accoda({ ses, wc, origine, tipi: ['schermo'], grezzo: '', rispondi: dopo });
-    };
-    if (stato.caricato) return chiedi();
-    return carica().then(chiedi, () => rispondi({}));
+    const fonte = String(scelta.fonte || '');
+    if (fonte.startsWith('scheda:')) {
+      const s = schedaPerId(fonte.slice('scheda:'.length));
+      const c = s && s.tab && s.tab.view && s.tab.view.webContents;
+      return consegna(vivo(c) ? c.mainFrame : null);
+    }
+    return Promise.resolve(electron().desktopCapturer.getSources({ types: ['screen', 'window'] }))
+      .then((fonti) => {
+        const lista = Array.isArray(fonti) ? fonti : [];
+        if (fonte) return consegna(lista.find((f) => f.id === fonte) || null);
+        return consegna(schermoDellaScheda(wc, lista.filter((f) => String(f.id).startsWith('screen:'))));
+      })
+      .catch(() => rispondi({}));
   } catch (_) {
     return rispondi({});
   }
@@ -689,13 +722,17 @@ function segnaIncognito(ses, compagna) {
 // ── quello che la pagina legge dei propri permessi ──────────────────────────
 
 // Per il mondo della pagina: i tipi che l'utente ha davvero negato (o su cui Filo ha smesso di chiedere).
-// Tutto il resto, se Chromium dice «negato», è in realtà «da chiedere».
-function negatiPer(wc) {
+// Tutto il resto, se Chromium dice «negato», è in realtà «da chiedere». `frame`: in un riquadro di un altro sito
+// le notifiche restano negate davvero.
+function negatiPer(wc, frame) {
   if (!vivo(wc)) return [];
   const origine = P.origineDi(urlDi(wc));
   if (!origine) return [];
   const scelte = scelteDi(wc.session, origine) || {};
   const out = Object.keys(P.TIPI).filter((t) => scelte[t] === 'nega' || haSmesso(wc.session, origine, [t]));
+  let url = '';
+  try { url = frame && frame !== wc.mainFrame ? String(frame.url || '') : ''; } catch (_) { url = ''; }
+  if (url && riquadroDiAltri(wc, { isMainFrame: false, requestingUrl: url }) && !out.includes('notifiche')) out.push('notifiche');
   return out;
 }
 
@@ -704,10 +741,9 @@ function avvisaPagine() {
   for (const s of tutteLeSchede()) {
     const wc = s.tab && s.tab.view && s.tab.view.webContents;
     if (!vivo(wc) || !/^https?:/i.test(urlDi(wc))) continue;
-    const lista = negatiPer(wc);
     try {
       const frames = wc.mainFrame && wc.mainFrame.framesInSubtree ? wc.mainFrame.framesInSubtree : [];
-      for (const f of frames) { try { f.send('filo:permessi-pagina', lista); } catch (_) {} }
+      for (const f of frames) { try { f.send('filo:permessi-pagina', negatiPer(wc, f)); } catch (_) {} }
     } catch (_) {}
   }
 }
@@ -799,6 +835,7 @@ function _azzera() {
   stato.cablate = new WeakSet();
   stato.ascoltatori.clear();
   stato.alGestore = null;
+  stato.annunci.clear();
 }
 
 module.exports = {
@@ -813,6 +850,7 @@ module.exports = {
   inAttesaPer,
   usiPer,
   chiudiPrimaDomanda,
+  annunciaSchermo,
   fontiPerDomanda,
   negatiPer,
   gestoVeroRecente,

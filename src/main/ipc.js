@@ -89,10 +89,16 @@ function registerIpcHandlers() {
   // SINCRONO come fp-config: il preload lo installa prima degli script della pagina.
   ipcMain.on('filo:permessi-pagina', (event) => {
     try {
-      event.returnValue = require('./services/permessiSiti').negatiPer(event.sender);
+      event.returnValue = require('./services/permessiSiti').negatiPer(event.sender, event.senderFrame);
     } catch (_) {
       event.returnValue = [];
     }
+  });
+
+  // #586 — getDisplayMedia sta per partire da questa scheda (vedi permessi-pagina.js).
+  ipcMain.on('filo:schermo-annunciato', (event) => {
+    try { require('./services/permessiSiti').annunciaSchermo(event.sender); } catch (_) {}
+    event.returnValue = true;
   });
 
   // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi

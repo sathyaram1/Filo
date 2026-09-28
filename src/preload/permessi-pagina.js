@@ -5,6 +5,8 @@
 const P = require('../shared/permessiSiti.js');
 
 const CANALE = '__filo_permessi_pagina';
+// getDisplayMedia lo annuncia al main prima di partire: un «schermo» che arriva senza annuncio è la strada vecchia.
+const ANNUNCIO_SCHERMO = '__filo_schermo_annunciato';
 
 function buildPermessiPaginaSource(negati) {
   const lista = JSON.stringify(Array.isArray(negati) ? negati.filter((t) => typeof t === 'string') : []);
@@ -29,6 +31,9 @@ function buildPermessiPaginaSource(negati) {
   var ARR = Array.isArray;
   var PROPRIA = Object.prototype.hasOwnProperty;
   var FONTE_VECCHIA = { chromeMediaSource: 1, chromeMediaSourceId: 1 };
+  var MANDA = EventTarget.prototype.dispatchEvent;
+  var EVENTO = Event;
+  var DOC = document;
 
   // Oggetti senza prototipo: quello che Chromium non trova nella copia non lo va a cercare in un prototipo della pagina.
   function copia(v, prof) {
@@ -105,6 +110,13 @@ function buildPermessiPaginaSource(negati) {
         return RA(gum, this, [pulita]);
       }, gum, 'getUserMedia');
     }
+    if (MD && typeof MD.getDisplayMedia === 'function') {
+      var gdm = MD.getDisplayMedia;
+      MD.getDisplayMedia = maschera(function getDisplayMedia() {
+        try { RA(MANDA, DOC, [new EVENTO(${JSON.stringify(ANNUNCIO_SCHERMO)})]); } catch (_) {}
+        return RA(gdm, this, arguments);
+      }, gdm, 'getDisplayMedia');
+    }
     var N = w.Navigator && w.Navigator.prototype;
     ['getUserMedia', 'webkitGetUserMedia'].forEach(function (k) {
       if (!N || typeof N[k] !== 'function') return;
@@ -166,4 +178,4 @@ function buildPermessiPaginaSource(negati) {
 })();`;
 }
 
-module.exports = { buildPermessiPaginaSource, CANALE };
+module.exports = { buildPermessiPaginaSource, CANALE, ANNUNCIO_SCHERMO };

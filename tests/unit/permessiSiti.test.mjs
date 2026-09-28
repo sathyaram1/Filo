@@ -26,7 +26,8 @@ test('le richieste sensibili diventano tipi da approvare; le innocue passano', (
   assert.deepEqual(P.tipiRichiesta('geolocation', {}).tipi, ['posizione']);
   assert.deepEqual(P.tipiRichiesta('clipboard-read', {}).tipi, ['appunti']);
   assert.deepEqual(P.tipiRichiesta('display-capture', {}).tipi, ['schermo']);
-  for (const p of ['clipboard-sanitized-write', 'fullscreen', 'pointerLock', 'keyboardLock', 'mediaKeySystem']) {
+  // Quello che Chrome concede da sé non diventa una domanda: l'inclinazione del computer, lo spazio tenuto da parte.
+  for (const p of ['clipboard-sanitized-write', 'fullscreen', 'pointerLock', 'keyboardLock', 'mediaKeySystem', 'sensors', 'persistent-storage']) {
     assert.equal(P.tipiRichiesta(p, {}).innocuo, true, p);
   }
   assert.equal(P.tipiRichiesta('openExternal', { externalURL: 'mailto:a@b.it' }).innocuo, true);
@@ -363,8 +364,84 @@ test('lo schermo lo chiede solo un documento web: da un riquadro senza indirizzo
   const { wc } = apriScheda('https://video.example/', ses);
   assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: [], requestingUrl: 'about:blank', isMainFrame: false }), [false]);
   assert.equal(Permessi.inAttesaPer(wc).length, 0);
+  Permessi.annunciaSchermo(wc);
   chiedi(ses, wc, 'media', { mediaTypes: [] });
   assert.deepEqual(Permessi.inAttesaPer(wc)[0].tipi, ['schermo']);
+});
+
+// Chromium fa arrivare getDisplayMedia e la strada vecchia (`chromeMediaSource`) identiche; solo getDisplayMedia,
+// DENTRO il sì, passa dal gestore dello schermo, e si annuncia prima dalla pagina.
+function chiediSchermo(ses, wc, { gestore = true } = {}) {
+  const esiti = [];
+  const flussi = [];
+  ses.gestori.richiesta(wc, 'media', (ok) => {
+    esiti.push(ok);
+    if (ok && gestore) ses.gestori.schermo({ frame: { wc } }, (f) => flussi.push(f));
+  }, { requestingUrl: wc.getURL(), isMainFrame: true, mediaTypes: [] });
+  return { esiti, flussi };
+}
+
+test('lo schermo senza annuncio è la strada vecchia: no subito, senza domanda', async () => {
+  const ses = sessioneFinta();
+  Permessi.installa(ses);
+  await Permessi.carica();
+  const { wc } = apriScheda('https://video.example/', ses);
+  assert.deepEqual(chiediSchermo(ses, wc).esiti, [false]);
+  assert.equal(Permessi.inAttesaPer(wc).length, 0);
+});
+
+test('il sì allo schermo che Chromium non passa al gestore dello schermo chiude la pagina prima che la cattura arrivi', async () => {
+  const ses = sessioneFinta();
+  Permessi.installa(ses);
+  const chiuse = [];
+  Permessi._perTest({
+    electron: {
+      webContents: { fromFrame: (f) => f.wc },
+      desktopCapturer: { getSources: async () => [{ id: 'screen:1:0', name: 'Entire screen' }] },
+      screen: { getDisplayMatching: () => ({ id: 1 }) },
+    },
+    fermaPagina: (w) => chiuse.push(w.id),
+  });
+  await Permessi.carica();
+  const { wc } = apriScheda('https://video.example/', ses);
+
+  // getDisplayMedia: annuncio, domanda, «Condividi lo schermo», e il gestore consegna quello che si è scelto.
+  Permessi.annunciaSchermo(wc);
+  const vero = chiediSchermo(ses, wc);
+  assert.deepEqual(vero.esiti, [], 'finché non si risponde la pagina aspetta');
+  Permessi.rispondi(Permessi.inAttesaPer(wc)[0].id, 'consenti', 'screen:1:0');
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepEqual(vero.esiti, [true]);
+  assert.equal(vero.flussi.length, 1);
+  assert.equal(vero.flussi[0].video.id, 'screen:1:0');
+  assert.deepEqual(chiuse, [], 'la strada giusta non chiude niente');
+
+  // La strada vecchia con un annuncio falso: la domanda c'è, ma il sì non passa dal gestore e la pagina si chiude.
+  Permessi.annunciaSchermo(wc);
+  const vecchia = chiediSchermo(ses, wc, { gestore: false });
+  Permessi.rispondi(Permessi.inAttesaPer(wc)[0].id, 'consenti', 'screen:1:0');
+  assert.deepEqual(vecchia.esiti, [true]);
+  assert.deepEqual(chiuse, [wc.id]);
+});
+
+test('le notifiche non le chiede un riquadro di un altro sito, e quello che non si delega resta di chi lo chiede', async () => {
+  const ses = sessioneFinta();
+  Permessi.installa(ses);
+  await Permessi.carica();
+  const { wc } = apriScheda('https://giornale.example/', ses);
+  const riquadro = { isMainFrame: false, requestingUrl: 'https://pubblicita.example/w' };
+  Permessi.imposta(null, 'https://giornale.example', 'notifiche', 'consenti');
+  assert.deepEqual(chiedi(ses, wc, 'notifications', riquadro), [false], 'il sì del giornale non vale per chi incorpora');
+  assert.equal(ses.gestori.controllo(wc, 'notifications', 'https://pubblicita.example', riquadro), false);
+  assert.equal(ses.gestori.controllo(wc, 'notifications', 'https://giornale.example', {}), true);
+  assert.deepEqual(chiedi(ses, wc, 'notifications', { isMainFrame: false, requestingUrl: 'about:blank' }), [true], 'un riquadro vuoto è del giornale');
+  // Aprire un'altra app: la domanda porta il nome del riquadro, e la risposta resta sua.
+  Permessi.imposta(null, 'https://giornale.example', 'app', 'consenti');
+  chiedi(ses, wc, 'openExternal', { ...riquadro, externalURL: 'zoommtg://x' });
+  const d = Permessi.inAttesaPer(wc)[0];
+  assert.equal(d.host, 'pubblicita.example');
+  assert.deepEqual(Permessi.negatiPer(wc, { url: riquadro.requestingUrl }), ['notifiche'], 'e lì dentro le notifiche si leggono negate');
+  assert.deepEqual(Permessi.negatiPer(wc), []);
 });
 
 test('la scheda sa cosa il sito ha avuto e cosa si è visto negare, fino al documento dopo', async () => {
@@ -561,9 +638,15 @@ test('il sorgente per il mondo della pagina: «da chiedere» dove nessuno ha neg
   Object.defineProperty(PermissionStatus.prototype, 'state', { configurable: true, get() { return stati[this.name]; } });
   class Notification {}
   Object.defineProperty(Notification, 'permission', { configurable: true, get() { return permessoNotifiche; } });
-  class MediaDevices { getUserMedia(c) { chiamate.push(c); return Promise.resolve('flusso'); } }
+  const annunci = [];
+  class MediaDevices {
+    getUserMedia(c) { chiamate.push(c); return Promise.resolve('flusso'); }
+    getDisplayMedia() { annunci.push('chiamata'); return Promise.resolve('schermo'); }
+  }
   class DOMException extends Error { constructor(m, n) { super(m); this.name = n; } }
-  const doc = { addEventListener() {} };
+  const { ANNUNCIO_SCHERMO } = require(join(ROOT, 'src', 'preload', 'permessi-pagina.js'));
+  const doc = new EventTarget();
+  doc.addEventListener(ANNUNCIO_SCHERMO, () => annunci.push('annuncio'));
   const w = { PermissionStatus, Notification, MediaDevices, DOMException, Promise, setTimeout, Navigator: class {} };
   new Function('window', 'document', `with (window) { ${src} }`)(w, doc);
   assert.equal(new PermissionStatus('microphone').state, 'prompt', 'nessuno ha negato il microfono');
@@ -574,9 +657,26 @@ test('il sorgente per il mondo della pagina: «da chiedere» dove nessuno ha neg
   permessoNotifiche = 'granted';
   assert.equal(Notification.permission, 'granted');
   const md = new MediaDevices();
+  const nega = (e) => assert.equal(e.name, 'NotAllowedError');
+  // Una richiesta che cambia mentre la si legge: vuota la prima volta, con la fonte vecchia dalla seconda.
+  const cambia = () => { let n = 0; return { get mandatory() { return n++ ? { chromeMediaSource: 'desktop' } : {}; } }; };
+  // Una richiesta coi getter di un framework (Vue 2): lo stesso valore a ogni lettura, passa com'è.
+  const reattiva = {};
+  Object.defineProperty(reattiva, 'deviceId', { enumerable: true, get: () => 'mic-1' });
   return Promise.all([
-    md.getUserMedia({ audio: { mandatory: { chromeMediaSource: 'desktop' } } }).then(() => assert.fail('la strada vecchia è passata'), (e) => assert.equal(e.name, 'NotAllowedError')),
-    md.getUserMedia({ video: { optional: [{ chromeMediaSourceId: 'x' }] } }).then(() => assert.fail(), (e) => assert.equal(e.name, 'NotAllowedError')),
+    md.getUserMedia({ audio: { mandatory: { chromeMediaSource: 'desktop' } } }).then(() => assert.fail('la strada vecchia è passata'), nega),
+    md.getUserMedia({ video: { optional: [{ chromeMediaSourceId: 'x' }] } }).then(() => assert.fail(), nega),
+    md.getUserMedia({ video: cambia() }).then(() => assert.fail('la richiesta che cambia è passata'), nega),
     md.getUserMedia({ audio: true }).then((r) => assert.equal(r, 'flusso')),
-  ]).then(() => assert.equal(chiamate.length, 1, 'al browser arriva solo la richiesta normale'));
+    md.getUserMedia({ audio: reattiva }).then((r) => assert.equal(r, 'flusso')),
+    md.getDisplayMedia({ video: true }).then((r) => assert.equal(r, 'schermo')),
+  ]).then(() => {
+    assert.equal(chiamate.length, 2, 'al browser arrivano solo le richieste normali');
+    // Al browser arriva la copia controllata: senza prototipo, così niente si pesca da un prototipo della pagina.
+    assert.equal(Object.getPrototypeOf(chiamate[0]), null);
+    assert.equal(chiamate[0].audio, true);
+    assert.equal(chiamate[1].audio.deviceId, 'mic-1');
+    assert.equal(Object.getOwnPropertyDescriptor(chiamate[1].audio, 'deviceId').get, undefined, 'la copia non ha getter');
+    assert.deepEqual(annunci, ['annuncio', 'chiamata'], 'getDisplayMedia si annuncia prima di partire');
+  });
 });

@@ -23,6 +23,15 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Sulle pagine web il menu entra senza dissolvenza e senza sfocare il fondo (98% opaco, non si nota): il browser
+   deve poterlo dire «visibile intero», perché i suoi bottoni rispondono solo così (#586, src/content/menu.js). */
+/* Lo strato più alto (popover) porta con sé posizione e margini di serie: il menu li rimette come li vuole. */
+.sn-menu[data-sn-sul-web] { animation-name: sn-scivola-in; backdrop-filter: none; inset: auto; margin: 0; overflow: visible; }
+@keyframes sn-scivola-in {
+  from { transform: translateY(-2px); }
+  to   { transform: translateY(0); }
+}
+
 .sn-menu-item {
   all: unset;
   box-sizing: border-box;

@@ -28,11 +28,20 @@
     altro: { nome: 'Altri permessi', icona: 'lock', verbo: 'usare un permesso che Filo non conosce', ricorda: false },
   };
 
-  // Concessi senza chiedere: nessuno legge o manda fuori qualcosa dell'utente.
-  const INNOCUI = new Set(['clipboard-sanitized-write', 'fullscreen', 'pointerLock', 'keyboardLock', 'mediaKeySystem', 'screen-wake-lock']);
+  // Concessi senza chiedere: nessuno legge o manda fuori qualcosa dell'utente, e nessun browser li chiede (Chrome
+  // concede da sé l'inclinazione del computer e lo spazio che un sito si tiene da parte).
+  const INNOCUI = new Set([
+    'clipboard-sanitized-write', 'fullscreen', 'pointerLock', 'keyboardLock', 'mediaKeySystem', 'screen-wake-lock',
+    'sensors', 'persistent-storage',
+  ]);
 
   // Dispositivi che Filo non consegna ai siti: né domanda né scelta, la porta è chiusa.
   const CHIUSI = new Set(['hid', 'serial', 'usb', 'bluetooth', 'bluetoothScanning']);
+
+  // Quello che il sito non può passare a un riquadro di un altro sito: la scelta resta di chi la chiede.
+  // Le notifiche un riquadro di un altro sito non le chiede proprio, come in Chrome.
+  const DEL_RIQUADRO = new Set(['notifications', 'openExternal']);
+  const MAI_DAL_RIQUADRO = new Set(['notifications']);
 
   // Gli stessi che Filo consegna al sistema da sé per i link (tabs.js, OS_DELEGATED_SCHEMES).
   const SCHEMI_ESTERNI_INNOCUI = new Set(['mailto:', 'tel:', 'sms:']);
@@ -69,6 +78,14 @@
     try { u = new URL(String(url || '')); } catch (_) { return ''; }
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
     return u.origin;
+  }
+
+  // L'origine di un riquadro: '' se eredita quella di chi lo ospita (about:blank, srcdoc), 'null' se non ne ha una.
+  function origineDelRiquadro(url) {
+    const u = String(url || '');
+    if (!u || /^about:(blank|srcdoc)/i.test(u)) return '';
+    if (/^blob:/i.test(u)) return origineDi(u.slice(5)) || 'null';
+    return origineDi(u) || 'null';
   }
 
   function hostDi(origine) {
@@ -213,7 +230,7 @@
   }
 
   const api = {
-    TIPI, INNOCUI, CHIUSI, NOMI_DI_PAGINA, tipoDaParola, sceltaDaParola, eTipo, ricordabile, eFilo, origineDi, hostDi,
+    TIPI, INNOCUI, CHIUSI, NOMI_DI_PAGINA, DEL_RIQUADRO, MAI_DAL_RIQUADRO, origineDelRiquadro, tipoDaParola, sceltaDaParola, eTipo, ricordabile, eFilo, origineDi, hostDi,
     tipiRichiesta, consentitoAlControllo, decidi, verbi, domanda, nomeSchermo, statoLeggibile, normalizza,
   };
   global.SN_PERMESSI_SITI = api;
