@@ -120,6 +120,7 @@
     let cs;
     try { cs = getComputedStyle(el); } catch (_) { return false; }
     if (cs.display === 'none' || cs.visibility === 'hidden' || !coversViewport(el, cs)) return false;
+    if (!(parseInt(cs.zIndex, 10) > 0)) return false;
     if ((el.innerText || '').trim().length > 3) return false;
     if (el.querySelector('iframe,video,canvas,img,svg,input,textarea,select')) return false;
     const bg = cs.backgroundColor || '';
