@@ -4060,6 +4060,7 @@
     }
     const t = tastoEditorDi(sc);
     if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo modulo non partirebbe mai`;
+    if (TASTI.simboloConShift(sc)) return `Con Shift il simbolo cambia, quindi ${nome} non partirebbe mai (scrivi il simbolo che esce, senza Shift)`;
     const e = TASTI.pressioneScritta(sc);
     const altro = e && doc.modules.find((x) => x !== m && AZIONE_SCORCIATOIA[x.type] && x.data && x.data.shortcut && matchShortcut(e, x.data.shortcut));
     if (altro) {
