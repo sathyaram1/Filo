@@ -264,6 +264,36 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     return el;
   }
 
+  // Il riquadro sta nello strato superiore del documento, dove la pagina non lo
+  // copre: sopra i frame di un frameset, un dialogo modale, il tutto schermo.
+  // Col dialogo modale aperto sta DENTRO il dialogo, perché il resto della
+  // pagina diventa intoccabile (#686.1 giro 5).
+  function ospite() {
+    let modale = null;
+    try { const m = document.querySelectorAll('dialog:modal'); modale = m[m.length - 1] || null; } catch (_) {}
+    return modale || document.documentElement;
+  }
+
+  function mettiInCima() {
+    if (!badge) return;
+    const dove = ospite();
+    if (!dove) return;
+    try {
+      if (badge.parentNode !== dove) dove.appendChild(badge);
+      if (typeof badge.showPopover !== 'function') return;
+      if (badge.matches(':popover-open')) badge.hidePopover();
+      badge.showPopover();
+    } catch (_) {}
+  }
+
+  // Un dialogo che si apre o si chiude, o un tutto schermo, a riquadro aperto.
+  function ricontrollaPosto() {
+    if (!zoomMode || !badge) return;
+    let fuori = !badge.isConnected || badge.parentNode !== ospite();
+    try { if (!fuori && badge.showPopover && !badge.matches(':popover-open')) fuori = true; } catch (_) {}
+    if (fuori) mettiInCima();
+  }
+
   // I riquadri incorporati devono sapere se la modalità è aperta, per fermare
   // la rotella e i clic che cadono dentro di loro (src/main/tabs/tabZoom.js).
   function avvisaModalita() {
