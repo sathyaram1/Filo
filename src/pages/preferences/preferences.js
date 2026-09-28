@@ -6,7 +6,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -540,9 +540,10 @@
     tabColorSaveTimer = setTimeout(persistTabColor, 400);
   }
 
-  // Restituisce lo stile testuale corrente dal textarea.
+  // Lo stile come si salva e come arriva al modello: quello che si legge nel
+  // riquadro (#592).
   function currentStyleText() {
-    return $('agentStyleText').value;
+    return testoLeggibile($('agentStyleText').value);
   }
 
   // Il conto compare solo vicino al tetto; oltre, il testo resta nel campo ma
@@ -819,7 +820,7 @@
       case 'theme': return $('theme').value;
       case 'textScale': return parseFloat($('textScale').value) || 1;
       case 'showHomeMessage': return $('showHomeMessage').checked;
-      case 'agentStyle': return currentStyleText().trim();
+      case 'agentStyle': return currentStyleText();
       case 'timerRingtone': return $('timerRingtone').value || 'default';
       case 'terminal.enabled': return $('terminalEnabled').checked;
       case 'terminal.shell': return $('terminalShell').value;
@@ -1204,6 +1205,12 @@
     $('agentStyleText').addEventListener('input', () => {
       syncPresetSelect();
       if (syncStyleNote()) persistDebounced();
+    });
+    // Uscendo dal campo si vede quello che è stato salvato, non un testo con
+    // dentro caratteri invisibili o righe vuote in più.
+    $('agentStyleText').addEventListener('change', () => {
+      const leggibile = currentStyleText();
+      if ($('agentStyleText').value !== leggibile) $('agentStyleText').value = leggibile;
     });
 
     // Token estetici: reset globale ai predefiniti.

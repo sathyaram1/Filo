@@ -2403,11 +2403,11 @@
   // Unicode il modello li legge come lettere) e le righe vuote in fila che
   // spingono il resto oltre il bordo del popup (#592). Restano i giuntori delle
   // emoji e i selettori di variante, che non portano testo.
-  const NON_SI_DISEGNA_RE = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F­͏؜ᅟᅠ឴឵᠋-᠏‎‏‪-‮⁠-⁯ㅤ﻿ﾠ￰-￸\u{1BCA0}-\u{1BCA3}\u{1D173}-\u{1D17A}\u{E0000}-\u{E0FFF}]/gu;
-  const SPAZI_RE = /[ \t   -   ⠀　]+/g;
+  const NON_SI_DISEGNA_RE = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200E\u200F\u202A-\u202E\u2060-\u206F\u3164\uFEFF\uFFA0\uFFF0-\uFFF8\u{1BCA0}-\u{1BCA3}\u{1D173}-\u{1D17A}\u{E0000}-\u{E0FFF}]/gu;
+  const SPAZI_RE = /[ \t\u00A0\u1680\u2000-\u200A\u202F\u205F\u2800\u3000]+/g;
   function testoLeggibile(text) {
     return String(text == null ? '' : text)
-      .replace(/\r\n?|[  ]/g, '\n')
+      .replace(/\r\n?|[\u2028\u2029]/g, '\n')
       .replace(NON_SI_DISEGNA_RE, '')
       .replace(SPAZI_RE, ' ')
       .replace(/ *\n */g, '\n')
@@ -2523,7 +2523,7 @@
   // avrebbe l'ultima parola su di esse (#592). Quelle regole chiudono la parte
   // fissa, quindi il prefisso comune a tutti resta quasi intero (#422).
   function injectAgentStyle(messages, action, styleText) {
-    const style = typeof styleText === 'string' ? styleText.trim() : '';
+    const style = typeof styleText === 'string' ? testoLeggibile(styleText) : '';
     if (!Array.isArray(messages) || !style) return messages;
     if (!STYLE_AWARE_ACTIONS.includes(action)) return messages;
     const blocco = esterno().imbusta({ tipo: 'STILE_UTENTE', testo: style, conIntestazione: true });
@@ -2630,6 +2630,7 @@
     DEFAULT_SETTINGS,
     AGENT_STYLE_MAX,
     agentStyleLength,
+    testoLeggibile,
     LESSON_MAX,
     memoriaImbustata,
     AGENT_STYLE_PRESETS,

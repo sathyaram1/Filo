@@ -225,8 +225,9 @@
   // Di FORMATTAZIONE: marche di direzione del testo, giuntori di parola, il
   // BOM. In una frase non vogliono dire niente e servono solo a spezzare una
   // parola che qualcuno sta cercando, per esempio il nome di una marcatura.
-  // Si tolgono.
-  const FORMATTAZIONE_RE = /[\u200E\u200F\u202A-\u202E\u2060-\u2064\u206A-\u206F\uFEFF]/g;
+  // Con loro i «tag» Unicode e i selettori di variante supplementari: a schermo
+  // non si vedono, il modello li legge come lettere (#592). Si tolgono.
+  const FORMATTAZIONE_RE = /[\u200E\u200F\u202A-\u202E\u2060-\u2064\u206A-\u206F\uFEFF\u{E0000}-\u{E007F}\u{E0100}-\u{E01EF}]/gu;
 
   // ORTOGRAFICI: lo spazio a larghezza zero (thai, khmer), il non-giuntore e
   // il giuntore. In persiano e in hindi separano o uniscono le lettere, cioè

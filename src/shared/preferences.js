@@ -47,12 +47,10 @@
     return `${s.slice(0, 4)}…${s.slice(-4)}`;
   }
 
-  // Un testo libero che finisce in un popup di conferma: via i caratteri che non
-  // si vedono ma cambiano cosa si legge (controllo, direzione del testo), così
-  // quello che l'utente conferma è quello che si salva.
-  const INVISIBILI_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200E\u200F\u202A-\u202E\u2060-\u2064\u206A-\u206F\uFEFF]/g;
+  // Un testo libero che finisce in un popup di conferma, ridotto a quello che si
+  // legge: quello che l'utente conferma è quello che si salva (#592).
   function testoVisibile(v) {
-    return String(v == null ? '' : v).replace(/\r\n?/g, '\n').replace(INVISIBILI_RE, '').trim();
+    return global.SN_CONST.testoLeggibile(v);
   }
   const NESSUNO_STILE = ['nessuno', 'nessuna', 'niente', 'predefinito', 'default', 'togli', 'toglilo', 'rimuovi',
     'cancella', 'azzera', 'reset', 'nessuno stile', 'nessuno (predefinito)'];
