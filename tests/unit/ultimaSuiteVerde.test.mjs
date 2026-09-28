@@ -5,7 +5,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
-  scegliUltimoVerde, corseVerdi, rilascioFermo, testoRilascioFermo, rigaCorsa, SOGLIA_ORE, CHIAVE_FERMO,
+  scegliUltimoVerde, corseVerdi, rilascioFermo, testoRilascioFermo, rigaCorsa, verdePiuNuovoDelTag, SOGLIA_ORE, CHIAVE_FERMO,
 } = await import('../../scripts/ultima-suite-verde.mjs');
 
 // main dal più nuovo: c5 è la punta, c1 il più vecchio.
