@@ -100,14 +100,16 @@ const NEGOZIO = `<title>NEGOZIO</title>
     ${iubenda()}
   </script>`;
 
-test('negozio: la valuta scritta mentre Filo rifiuta resta dopo «Mostra il banner»', async ({ openTab, testServer, shell }) => {
+test('negozio: la valuta scelta dall\'utente resta dopo «Mostra il banner»', async ({ openTab, testServer, shell }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, NEGOZIO);
   await page.waitForFunction(() => document.cookie.includes('_iub_cs-1=rifiutato'), null, { timeout: 10_000 });
   await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
   await sleep(2500);
-  expect(await page.evaluate(() => document.cookie)).toContain('valuta=CHF');
+  // L'utente sceglie la sua valuta.
+  await page.evaluate(() => { document.cookie = 'valuta=EUR; path=/; max-age=86400'; });
   await bannerSiti(shell, true);
   await expect.poll(() => page.evaluate(() => !!document.getElementById('iubenda-cs-banner')).catch(() => false), { timeout: 10_000 }).toBe(true);
-  expect(await page.evaluate(() => document.cookie)).toContain('valuta=CHF');
+  await sleep(1500);
+  expect(await page.evaluate(() => document.cookie)).toContain('valuta=EUR');
 });
