@@ -14,7 +14,7 @@ const SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scr
 
 const {
   scegliUltimoVerde, corseVerdi, rilascioFermo, testoRilascioFermo, rigaCorsa, verdePiuNuovoDelTag, SOGLIA_ORE, CHIAVE_FERMO,
-  oreDalPrimoVerde, testoFermoDopoIlVerde, SOGLIA_VERDE_ORE, CHIAVE_FERMO_DOPO_VERDE,
+  oreDalPrimoVerde, testoFermoDopoIlVerde, SOGLIA_VERDE_ORE, CHIAVE_FERMO_DOPO_VERDE, chiaveDelFermo,
 } = await import('../../scripts/ultima-suite-verde.mjs');
 
 // main dal più nuovo: c5 è la punta, c1 il più vecchio.
