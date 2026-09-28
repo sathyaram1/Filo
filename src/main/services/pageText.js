@@ -289,7 +289,8 @@ function invisibile(nodo) {
   if (/rect\(\s*(?:0|1px)(?:px)?[\s,]+(?:0|1px)/.test(dichiarazione(st, 'clip'))) return true;
   if (/inset\(\s*(?:50|100)%|circle\(\s*0/.test(dichiarazione(st, 'clip-path'))) return true;
   if (/scale[xy]?\(\s*0(?:\.0*)?\s*[,)]/.test(dichiarazione(st, 'transform'))) return true;
-  if (dichiarazione(st, 'color') === 'transparent') return true;
+  // Il titolo sfumato ha il testo trasparente e lo sfondo ritagliato sulle lettere: quello si vede.
+  if (dichiarazione(st, 'color') === 'transparent' && !/background-clip/.test(st)) return true;
   const w = px(dichiarazione(st, 'width'));
   const h = px(dichiarazione(st, 'height'));
   return (w <= 1 || h <= 1) && /hidden|clip/.test(dichiarazione(st, 'overflow'));
