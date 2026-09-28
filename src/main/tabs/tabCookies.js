@@ -114,8 +114,8 @@ const cookieMethods = {
   },
 
   _cookieState(tab) {
-    if (!tab || tab.isInternal || !isWeb(tab.url) || Cookies.currentMode() === Cookies.MODES.MANUAL) return null;
-    const shown = Cookies.isBannerSite(tab.url);
+    if (!tab || tab.isInternal || !isWeb(tab.url) || Cookies.currentMode(this.incognito) === Cookies.MODES.MANUAL) return null;
+    const shown = Cookies.isBannerSite(tab.url, this.incognito);
     const site = Cookies.registrableOf(tab.url);
     const o = tab.cookieOutcome && tab.cookieOutcome.site === site ? tab.cookieOutcome : null;
     const mem = (site && siteMemory(this).get(site)) || null;

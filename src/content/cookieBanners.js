@@ -144,15 +144,22 @@
     return tinted || (cs.backdropFilter && cs.backdropFilter !== 'none');
   }
 
+  // Un sito fatto per non scorrere (un'applicazione che scorre dentro un suo pannello) sta tutto nella finestra:
+  // il suo corpo fermo è disegno, non il blocco di un banner. Il contenuto oltre il bordo è il segno del blocco.
+  function contentOverflows(body) {
+    try { return !!body && body.scrollHeight > window.innerHeight * 1.1; } catch (_) { return false; }
+  }
+
   // Quello che un banner lascia dietro di sé: scorrimento fermo, pagina inchiodata, clic spenti, velo scuro.
   function unlock() {
     const html = document.documentElement;
     const body = document.body;
+    const locked = contentOverflows(body);
     for (const el of [html, body]) {
       if (!el) continue;
       let cs;
       try { cs = getComputedStyle(el); } catch (_) { continue; }
-      if (cs.overflowY === 'hidden' || cs.overflowY === 'clip') el.style.setProperty('overflow-y', 'auto', 'important');
+      if (locked && (cs.overflowY === 'hidden' || cs.overflowY === 'clip')) el.style.setProperty('overflow-y', 'auto', 'important');
       if (cs.pointerEvents === 'none') el.style.setProperty('pointer-events', 'auto', 'important');
       if (el === body && cs.position === 'fixed') {
         const top = parseFloat(cs.top) || 0;

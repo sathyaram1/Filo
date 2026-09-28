@@ -457,6 +457,16 @@
     if (recheck) scheduleScanIn(recheck);
   }
 
+  // Le regole riconoscono un banner dalla forma, e la stessa forma porta anche l'avviso adblock o il limite di
+  // articoli gratuiti: si nasconde solo un messaggio che parla di cookie o di consenso.
+  const CONSENT_TEXT = /cookie|\bconsent\b|consenso|consentement|consentimiento|consentimento|einwilligung|zustimmung|toestemming|samtycke|samtykke|eväste/i;
+
+  function aboutConsent(el) {
+    let t = '';
+    try { t = (el && (el.innerText || el.textContent)) || ''; } catch (_) {}
+    return CONSENT_TEXT.test(t);
+  }
+
   // ─── banner senza «rifiuta» dentro un riquadro: lo nasconde la pagina ───────
   //
   // Il riquadro riconosce il banner (regola a mano o Consent-O-Matic) ma non può nascondersi né sbloccare la
@@ -479,6 +489,7 @@
     if (IS_TOP || reported.has('rejected') || reported.has('frame')) return;
     let showing = false;
     try { showing = (!!com.shownCmp && !com.busy && com.shownCmp.isShowing()) || (handAny && handShowing()); } catch (_) {}
+    if (showing && !aboutConsent(document.body)) showing = false;
     if (!showing) { frameSeenAt = 0; return; }
     const now = Date.now();
     if (!frameSeenAt) frameSeenAt = now;
@@ -551,7 +562,7 @@
     com.shownCmp = null;
     let any = false;
     for (const el of cmp.hideTargets()) {
-      if (el !== document.body && el !== document.documentElement && isVisible(el) && B.hide(el)) any = true;
+      if (el !== document.body && el !== document.documentElement && isVisible(el) && aboutConsent(el) && B.hide(el)) any = true;
     }
     if (any) noteHidden();
   }

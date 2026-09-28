@@ -455,3 +455,95 @@ test('banner «accetta o abbonati» che la lista non nomina ma le regole riconos
   expect(await page.evaluate(() => document.cookie)).not.toContain('tracking');
   await expect.poll(async () => (await tabCookies(shell))?.hidden, { timeout: 8_000 }).toBe(true);
 });
+
+// ── incognito: i comandi sui cookie restano nell'incognito ─────────────────────────────────────────
+
+async function consensoNormale(app) {
+  return app.evaluate(async ({ session }) => (await session.defaultSession.cookies.get({ name: 'OptanonConsent' })).map((c) => c.value));
+}
+
+test('«Mostra il banner dei cookie» in incognito lascia com\'è il profilo normale, anche a incognito chiuso', async ({ app, shell, testServer }) => {
+  test.setTimeout(90_000);
+  const url = testServer.html(RICORDA);
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  await expect.poll(() => consensoNormale(app), { timeout: 10_000 }).toEqual(['rifiutato']);
+  await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
+
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  let incog = null;
+  await expect.poll(() => { incog = app.windows().find((w) => w.url().includes('incognito=1')); return !!incog; }, { timeout: 10_000 }).toBe(true);
+  await incog.waitForFunction(() => document.documentElement.dataset.incognito === '1', null, { timeout: 10_000 });
+  await app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows().find((w) => w._filoIncognito)._filoTabs.openTab(u), url);
+  const statoIncognito = () => incog.evaluate(async () => {
+    const snap = await window.filoShell.tabs.snapshot();
+    const t = snap.tabs.find((x) => x.id === snap.activeId);
+    return t ? { id: t.id, cookies: t.cookies } : null;
+  });
+  await expect.poll(async () => (await statoIncognito())?.cookies?.rejected, { timeout: 10_000 }).toBe(true);
+  const { id } = await statoIncognito();
+  expect((await incog.evaluate((tid) => window.filoShell.tabs.cookieBanners(tid, true), id))?.ok).toBe(true);
+  // Nell'incognito la scelta vale: il menu offre di tornare all'automatico.
+  await expect.poll(async () => (await statoIncognito())?.cookies?.shown, { timeout: 8_000 }).toBe(true);
+  await sleep(1500);
+  expect(await consensoNormale(app)).toEqual(['rifiutato']);
+  expect(await tabCookies(shell)).toEqual({ rejected: true, hidden: false, shown: false });
+
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoIncognito).close());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito)), { timeout: 10_000 }).toBe(false);
+  expect(await tabCookies(shell)).toEqual({ rejected: true, hidden: false, shown: false });
+  expect(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.cookies.bannerSites || [])).toEqual([]);
+});
+
+// ── messaggi dei CMP che non parlano di cookie: non sono banner da nascondere ──────────────────────
+
+function spMessaggio(testServer, testo, bottoni) {
+  return testServer.html(`<title>SP_MSG</title><style>body{margin:0;font:14px sans-serif}</style>
+    <div class="message-container"><div id="notice" class="message type-modal" style="padding:20px">
+      <div class="message-component message-row"><p class="message-component">${testo}</p></div>
+      <div class="message-component message-row">${bottoni.map((b) =>
+        `<button class="message-component message-button no-children focusable sp_choice_type_9" title="${b}">${b}</button>`).join('')}</div>
+    </div></div>`).replace('127.0.0.1', 'blocked.test');
+}
+
+for (const [nome, testo, bottoni] of [
+  ['avviso adblock', 'Sembra che tu stia usando un adblocker. Disattivalo per sostenere il nostro giornalismo.', ['Ho disattivato l\'adblocker', 'Abbonati']],
+  ['articoli gratuiti finiti', 'Hai letto i 5 articoli gratuiti di questo mese. Abbonati per continuare a leggere.', ['Abbonati', 'Accedi']],
+]) {
+  test(`messaggio Sourcepoint che non parla di cookie (${nome}): resta, e il menu non dice «Banner dei cookie nascosto»`, async ({ openTab, testServer, shell }) => {
+    const page = await testServer.openReady(openTab, `<title>SP_ALTRO</title>
+      <style>body{height:4000px;margin:0}</style>
+      <div id="sp_message_container_1" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2147483647;display:flex;align-items:center;justify-content:center">
+        <iframe id="sp_message_iframe_1" src="${spMessaggio(testServer, testo, bottoni)}" style="width:560px;height:300px;border:0;background:#fff"></iframe>
+      </div><h1>Articolo</h1>`);
+    await sleep(9000);
+    expect(await page.evaluate(() => {
+      const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+      return !!el && !!el.closest('#sp_message_container_1');
+    })).toBe(true);
+    expect((await tabCookies(shell))?.hidden).not.toBe(true);
+  });
+}
+
+// ── sblocco: solo il blocco del banner, non il disegno del sito ───────────────────────────────────
+
+test('applicazione col corpo fermo per disegno: nascosto il banner, la rotella non porta via l\'applicazione', async ({ app, openTab, testServer }) => {
+  await app.evaluate(() => globalThis.__filoCookieBanners.setListForTest('###cookie-notice'));
+  const page = await testServer.openReady(openTab, `<!doctype html><title>APP</title>
+    <style>html,body{margin:0;height:100%;overflow:hidden} .shell{display:flex;height:100%} nav{width:200px;background:#eee}
+      main{flex:1;overflow:auto} .tall{height:3000px} .drawer{position:absolute;top:100%;left:0;width:300px;height:600px;background:#ccc}</style>
+    <div class="shell"><nav>menu dell'applicazione</nav><main><div class="tall">contenuto</div></main></div>
+    <div class="drawer">pannello a scomparsa</div>
+    <div id="cookie-notice" style="position:fixed;bottom:0;left:0;right:0;height:80px;background:#fff">Usiamo i cookie. <button>OK</button></div>`);
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('cookie-notice')).display === 'none', null, { timeout: 10_000 });
+  await sleep(4500);
+  await page.mouse.move(100, 100);
+  await page.mouse.wheel(0, 500);
+  await sleep(600);
+  expect(await page.evaluate(() => document.scrollingElement.scrollTop)).toBe(0);
+  // Il pannello dell'applicazione scorre ancora da sé.
+  await page.mouse.move(600, 200);
+  await expect.poll(async () => {
+    await page.mouse.wheel(0, 300);
+    return page.evaluate(() => document.querySelector('main').scrollTop);
+  }, { timeout: 5_000 }).toBeGreaterThan(0);
+});

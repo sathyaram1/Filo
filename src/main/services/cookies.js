@@ -318,28 +318,60 @@ function configureForMode(mode) {
 // wipe senza dover rileggere lo storage in modo asincrono.
 let _cached = { mode: MODES.DEFAULT, trustedSites: [], bannerSites: [] };
 let _configured = false;
+// Impostazioni cambiate da una finestra incognito: valgono solo lì, il profilo normale non le vede (#754).
+// null = l'incognito non ha cambiato niente e vede quelle del profilo normale.
+let _incognito = null;
+
+function inIncognito() {
+  try { return !!require('../shim/storage').inIncognito(); } catch (_) { return false; }
+}
+
+function incognitoSessions() {
+  try {
+    const { BrowserWindow } = require('electron');
+    return BrowserWindow.getAllWindows()
+      .filter((w) => w._filoIncognito && w._filoTabs && w._filoTabs.partition)
+      .map((w) => session.fromPartition(w._filoTabs.partition));
+  } catch (_) { return []; }
+}
+
+// Un sito che entra o esce dall'elenco coi banner dimentica la risposta data: se no il banner non torna
+// (entra) o resta la scelta fatta a mano (esce). Vale per ogni strada: menu della scheda, Sicurezza, import.
+function wipeChanged(prev, next, sessions) {
+  for (const site of new Set([...prev, ...next])) {
+    if (prev.includes(site) === next.includes(site)) continue;
+    for (const ses of sessions) wipeConsentCookies(ses, site).catch(() => {});
+  }
+}
 
 // Ritorna true se cambia qualcosa che le pagine devono sapere (modalità o siti coi banner).
 function configureFromSettings(settings) {
+  if (inIncognito()) {
+    const prev = _incognito || _cached;
+    _incognito = { mode: getMode(settings), bannerSites: getBannerSites(settings) };
+    wipeChanged(prev.bannerSites, _incognito.bannerSites, incognitoSessions());
+    return prev.mode !== _incognito.mode || prev.bannerSites.join('\n') !== _incognito.bannerSites.join('\n');
+  }
   const prev = _cached.bannerSites;
   const prevMode = _cached.mode;
   _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings), bannerSites: getBannerSites(settings) };
   configureForMode(_cached.mode);
   const changed = prevMode !== _cached.mode || prev.join('\n') !== _cached.bannerSites.join('\n');
-  // Un sito che entra o esce dall'elenco coi banner dimentica la risposta data: se no il banner non torna
-  // (entra) o resta la scelta fatta a mano (esce). Vale per ogni strada: menu della scheda, Sicurezza, import.
   if (_configured) {
-    for (const site of new Set([...prev, ..._cached.bannerSites])) {
-      if (prev.includes(site) !== _cached.bannerSites.includes(site)) wipeConsentEverywhere(site).catch(() => {});
-    }
+    wipeChanged(prev, _cached.bannerSites, [session.defaultSession, ...siteSessions.values(), ...(_incognito ? [] : incognitoSessions())]);
   }
   _configured = true;
   return changed;
 }
 
-function currentMode() { return _cached.mode; }
+// Chiusa l'ultima finestra incognito: la prossima riparte dalle impostazioni del profilo normale.
+function resetIncognito() { _incognito = null; }
 
-function isBannerSite(url) { return isBannerSiteIn(_cached.bannerSites, url); }
+function profile(incognito) { return (incognito && _incognito) || _cached; }
+
+function currentMode(incognito) { return profile(incognito).mode; }
+
+function isBannerSite(url, incognito) { return isBannerSiteIn(profile(incognito).bannerSites, url); }
 
 // Wipe usando l'ultima configurazione vista (per before-quit). Ritorna una
 // promessa che si risolve quando i cookie dei tracker sono stati rimossi.
@@ -381,12 +413,6 @@ function isConsentName(name) {
   return CONSENT_NAME.test(String(name || ''));
 }
 
-async function wipeConsentEverywhere(site) {
-  let n = 0;
-  for (const ses of [session.defaultSession, ...siteSessions.values()]) n += await wipeConsentCookies(ses, site);
-  return n;
-}
-
 async function wipeConsentCookies(ses, site) {
   if (!ses || !ses.cookies || !site) return 0;
   let all = [];
@@ -412,7 +438,7 @@ module.exports = {
   currentMode,
   isConsentName,
   wipeConsentCookies,
-  wipeConsentEverywhere,
+  resetIncognito,
   registrableOf,
   isTrackerHost,
   isTrackerUrl,

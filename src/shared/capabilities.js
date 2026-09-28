@@ -467,7 +467,7 @@
       id: 'cookie-banners', title: 'Banner dei cookie rifiutati da soli', category: 'settings',
       desc: 'In modalità Automatico e Privacy Filo rifiuta da solo i banner dei cookie, anche quando stanno in un riquadro dentro la pagina. Quelli che non hanno un «rifiuta» (solo «Accetta», o «accetta o abbonati») li nasconde, senza accettare niente, e se la pagina era rimasta ferma o scurita la sblocca. Dove il sito lo dice, controlla che il rifiuto sia stato registrato davvero.',
       invoke: 'Da solo, a ogni pagina. Il tasto destro sulla scheda dice cosa è successo su quel sito («Cookie non necessari rifiutati» o «Banner dei cookie nascosto»), anche tornandoci dopo in un\'altra scheda o dopo un riavvio, e offre «Mostra il banner dei cookie» per rivederlo; sullo stesso menu «Rifiuta i cookie in automatico qui» torna indietro. I siti coi banner visibili si vedono e si tolgono in Impostazioni → Sicurezza.',
-      doesNot: 'In modalità Manuale non tocca nessun banner. Non avvisa da solo quando rifiuta o nasconde qualcosa.',
+      doesNot: 'In modalità Manuale non tocca nessun banner. Non avvisa da solo quando rifiuta o nasconde qualcosa. Non nasconde i messaggi che non parlano di cookie (avviso sull\'adblocker, limite di articoli gratuiti). Una scelta fatta in una finestra incognito resta lì.',
     },
     {
       id: 'data-export-import', title: 'Esporta e importa i tuoi dati', category: 'settings',
