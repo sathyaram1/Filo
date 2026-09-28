@@ -199,16 +199,43 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     refreshPercent();
   }
 
+  // Col campo aperto le cifre le prende il main prima di qualunque frame (src/main/tabs/tabZoom.js).
+  function avvisaCampo(aperto) {
+    if (!ipc || typeof ipc.send !== 'function') return;
+    try { ipc.send('filo:zoom-campo', aperto); } catch (_) {}
+  }
+
   function iniziaModifica() {
     if (!percentInput) return;
     inModifica = true;
     campo.fresco = true;
+    avvisaCampo(true);
     try { percentInput.focus(); percentInput.select(); } catch (_) {}
   }
 
   function chiudiModifica() {
+    if (inModifica) avvisaCampo(false);
     inModifica = false;
     try { if (percentInput && document.activeElement === percentInput) percentInput.blur(); } catch (_) {}
+  }
+
+  function battiNelCampo(key) {
+    if (!inModifica) return;
+    const r = Z ? Z.tastoCampo(campo, key) : { valore: campo.valore, fresco: false, azione: null };
+    campo.valore = r.valore;
+    campo.fresco = r.fresco;
+    mostraCampo();
+    if (r.azione === 'applica') applicaCampo();
+    else if (r.azione === 'annulla') annullaCampo();
+  }
+
+  function incollaNelCampo(testo) {
+    if (!inModifica) return;
+    const cifre = String(testo || '').replace(/[^\d]/g, '').slice(0, Z ? Z.CIFRE_CAMPO : 6);
+    if (!cifre) return;
+    campo.valore = cifre;
+    campo.fresco = false;
+    mostraCampo();
   }
 
   function applicaCampo() {
@@ -230,12 +257,15 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   const XHTML = 'http://www.w3.org/1999/xhtml';
   const crea = (tag) => document.createElementNS(XHTML, tag);
 
+  // `all: initial` in testa: dentro il dialogo del sito, o sotto la sua radice,
+  // il riquadro non eredita il testo maiuscolo, spaziato o in ombra del sito.
   function makeBadge() {
     const el = crea('div');
     el.id = '__filo-zoom-badge';
     el.setAttribute('role', 'status');
     try { el.setAttribute('popover', 'manual'); } catch (_) {}
     Object.assign(el.style, {
+      all: 'initial', direction: 'ltr', unicodeBidi: 'isolate', whiteSpace: 'nowrap',
       position: 'fixed', inset: 'auto', top: '12px', right: '12px', zIndex: '2147483647',
       margin: '0', border: 'none', overflow: 'visible', width: 'auto', height: 'auto',
       maxWidth: 'none', maxHeight: 'none',
@@ -253,7 +283,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     input.inputMode = 'numeric';
     input.setAttribute('aria-label', 'Percentuale zoom');
     Object.assign(input.style, {
-      width: '3.4em', textAlign: 'right', background: 'transparent',
+      all: 'initial', width: '3.4em', textAlign: 'right', background: 'transparent',
       color: '#fff', border: 'none',
       borderBottom: '1px dashed rgba(255,255,255,0.55)',
       font: 'inherit', padding: '0 1px', margin: '0', outline: 'none',
@@ -285,12 +315,38 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     } catch (_) {}
   }
 
-  // Un dialogo che si apre o si chiude, o un tutto schermo, a riquadro aperto.
+  // Nello strato superiore vince l'ultimo arrivato: una notifica del sito aperta
+  // dopo il riquadro gli sta sopra. Il riquadro deve essere quello che si vede.
+  function coperto() {
+    try {
+      const r = badge.getBoundingClientRect();
+      if (!(r.width > 0 && r.height > 0)) return false;
+      const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
+      const y = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
+      const sopra = document.elementFromPoint(x, y);
+      return !!(sopra && sopra !== badge && !badge.contains(sopra));
+    } catch (_) { return false; }
+  }
+
+  // Un dialogo che si apre o si chiude, un tutto schermo o un livello del sito
+  // arrivato dopo, a riquadro aperto: lo controlla anche la guardia, senza gesti.
   function ricontrollaPosto() {
     if (!zoomMode || !badge) return;
     let fuori = !badge.isConnected || badge.parentNode !== ospite();
     try { if (!fuori && badge.showPopover && !badge.matches(':popover-open')) fuori = true; } catch (_) {}
+    if (!fuori && coperto()) fuori = true;
     if (fuori) mettiInCima();
+  }
+
+  let guardia = null;
+  function avviaGuardia() {
+    if (guardia) return;
+    try { guardia = setInterval(ricontrollaPosto, 250); } catch (_) { guardia = null; }
+  }
+  function fermaGuardia() {
+    if (!guardia) return;
+    try { clearInterval(guardia); } catch (_) {}
+    guardia = null;
   }
 
   // I riquadri incorporati devono sapere se la modalità è aperta, per fermare
@@ -323,6 +379,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       if (!badge) badge = makeBadge();
       togliVelo();
       mettiInCima();
+      avviaGuardia();
       inModifica = false;
       mostraPercentuale();
       document.documentElement.style.cursor = 'zoom-in';
@@ -337,6 +394,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     if (!zoomMode) return;
     applicaCampo();
     zoomMode = false;
+    fermaGuardia();
     try { if (badge && badge.parentNode) badge.parentNode.removeChild(badge); } catch (_) {}
     rimettiVelo();
     try { document.documentElement.style.cursor = ''; } catch (_) {}
@@ -485,12 +543,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'v') return;
       e.preventDefault();
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const r = Z ? Z.tastoCampo(campo, e.key) : { valore: campo.valore, fresco: false, azione: null };
-      campo.valore = r.valore;
-      campo.fresco = r.fresco;
-      mostraCampo();
-      if (r.azione === 'applica') applicaCampo();
-      else if (r.azione === 'annulla') annullaCampo();
+      battiNelCampo(e.key);
       return;
     }
     // In modalità un tasto qualsiasi esce. I tasti dello zoom qui non arrivano
@@ -516,11 +569,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     e.stopPropagation();
     let testo = '';
     try { testo = String(e.clipboardData.getData('text') || ''); } catch (_) {}
-    const cifre = testo.replace(/[^\d]/g, '').slice(0, Z ? Z.CIFRE_CAMPO : 6);
-    if (!cifre) return;
-    campo.valore = cifre;
-    campo.fresco = false;
-    mostraCampo();
+    incollaNelCampo(testo);
   }
 
   // Quello che il campo mostra lo decide Filo: un testo messo dentro da altri
@@ -546,7 +595,9 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     // Il documento vecchio se n'è andato col riquadro e i suoi ascoltatori.
     const eraAperta = zoomMode;
     zoomMode = false;
+    if (inModifica) avvisaCampo(false);
     inModifica = false;
+    fermaGuardia();
     badge = null;
     percentInput = null;
     suppressContextMenu = false;
@@ -593,6 +644,13 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       setTimeout(() => { if (rotellaPresa === prima) eseguiZoom({ verso }); }, 80);
     });
   }
+
+  // Le cifre del campo, prese dal main prima di qualunque frame.
+  ipc.on('filo:zoom-campo-tasto', (_e, t) => {
+    if (!t || typeof t !== 'object') return;
+    if (typeof t.incolla === 'string') incollaNelCampo(t.incolla);
+    else if (typeof t.key === 'string') battiNelCampo(t.key);
+  });
 
   // I gesti fatti dentro un riquadro incorporato, girati qui dal main.
   ipc.on('filo:zoom-gesto', (_e, g) => {

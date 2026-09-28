@@ -2,6 +2,7 @@
 // Non zooma da sé: consegna tutto al preload del frame principale (src/preload/wheel-zoom.js), porta unica dello zoom.
 // Regole: patterns/lo-zoom-lo-tiene-filo-non-la-pagina.md.
 
+const { clipboard } = require('electron');
 require('../../shared/zoomPagina');
 
 function installZoom(wc) {
@@ -10,13 +11,32 @@ function installZoom(wc) {
 
   // Qui il tasto arriva prima del documento e di qualunque riquadro: un sito
   // non lo zittisce riscrivendosi, e un clic dentro un iframe non lo perde.
+  // Col campo della percentuale aperto, anche le cifre: il fuoco non conta.
+  let campo = false;
   wc.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
     const verso = Z.tastoZoom(input);
-    if (!verso) return;
+    if (verso) {
+      event.preventDefault();
+      try { wc.send('filo:zoom-key', verso); } catch (_) {}
+      return;
+    }
+    const perCampo = campo ? Z.tastoPerCampo(input) : null;
+    if (!perCampo) return;
     event.preventDefault();
-    try { wc.send('filo:zoom-key', verso); } catch (_) {}
+    if (perCampo === 'incolla') {
+      let testo = '';
+      try { testo = String(clipboard.readText() || ''); } catch (_) {}
+      try { wc.send('filo:zoom-campo-tasto', { incolla: testo }); } catch (_) {}
+      return;
+    }
+    const key = String(input.key || '');
+    if (key === 'Enter' || key === 'Tab' || key === 'Escape') campo = false;
+    try { wc.send('filo:zoom-campo-tasto', { key }); } catch (_) {}
   });
+  const chiudiCampo = () => { campo = false; };
+  wc.on('did-start-navigation', (_e, _url, inPagina, principale) => { if (principale && !inPagina) chiudiCampo(); });
+  wc.on('render-process-gone', chiudiCampo);
 
   // Ctrl+rotella che nessuno ha preso (un riquadro senza il nostro preload, un
   // ascoltatore spento da un documento riscritto). Chromium lo segnala qui anche
@@ -44,6 +64,10 @@ function installZoom(wc) {
     modalita = on === true;
     for (const f of riquadri()) { try { f.send('filo:zoom-modalita', modalita); } catch (_) {} }
   });
+  // Il campo si apre solo con un clic vero nel frame principale, e lì si chiude.
+  wc.ipc.on('filo:zoom-campo', (e, aperto) => {
+    if (principale(e)) campo = aperto === true;
+  });
   wc.ipc.on('filo:zoom-ciao', (e) => {
     if (principale(e) || !e.senderFrame) return;
     try { e.senderFrame.send('filo:zoom-modalita', modalita); } catch (_) {}
@@ -54,7 +78,7 @@ function installZoom(wc) {
     if (!gesto) return;
     try { wc.send('filo:zoom-gesto', gesto); } catch (_) {}
   });
-  wc.on('did-navigate', () => { modalita = false; });
+  wc.on('did-navigate', () => { modalita = false; campo = false; });
 }
 
 module.exports = { installZoom };
