@@ -1206,6 +1206,7 @@
       if (key !== CUSTOM_KEY) {
         const preset = AGENT_STYLE_PRESETS.find((p) => p.key === key);
         $('agentStyleText').value = preset ? preset.text : '';
+        syncStyleNote();
       } else {
         $('agentStyleText').focus();
       }
