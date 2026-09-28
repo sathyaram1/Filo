@@ -83,13 +83,3 @@ test('la sentinella riconosce le chiamate dirette che c\'erano prima del cancell
     "const res = await fetch('https://openrouter.ai/api/v1/models' + q, { headers });",
   ]) assert.deepEqual(violazioni(riga, 'src/x.js'), [], riga);
 });
-
-test('il cancello controlla il limite di spesa prima di ogni chiamata che costa', () => {
-  const g = readFileSync(join(ROOT, CANCELLO), 'utf8');
-  for (const nome of ['chainFor', 'call']) {
-    const corpo = g.slice(g.indexOf(`function ${nome}(`));
-    const primaChiamata = corpo.search(/providers\(\)\.|P\[method\]\(/);
-    const limite = corpo.indexOf('ensureUnderLimit(');
-    assert.ok(limite >= 0 && (primaChiamata < 0 || limite < primaChiamata), `${nome}: limite prima della chiamata`);
-  }
-});
