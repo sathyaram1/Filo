@@ -67,7 +67,7 @@ function lasciapassareValido(wc, tipo, parti) {
   if (p && p.fino <= Date.now()) { lasciapassari.delete(wc.id); return false; }
   if (!p || p.tipo !== tipo) return false;
   const coperte = PARTI_LASCIAPASSARE[tipo];
-  return Boolean(coperte && parti.every((x) => coperte.has(x === tipo ? 'appunti' : x)));
+  return Boolean(coperte && parti.every((x) => coperte.has(x)));
 }
 
 function lasciapassare(wc, tipo) {
