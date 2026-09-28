@@ -49,9 +49,7 @@ test('con dei casi, un errore che nomina un file prende la sua chiave; il teardo
       { message: 'Worker teardown timeout of 60000ms exceeded.' },
     ],
   };
-  const v = verdetto(json, []);
-  v.nuovi = v.nuovi.map((c) => (c.file ? { ...c, file: fileDellErrore(json.errors[0], RADICE) } : c));
-  assert.deepEqual(chiaviDelVerdetto(v),
+  assert.deepEqual(chiaviDelVerdetto(verdetto(json, [])),
     ['suite:tests/a.spec.mjs', 'suite:tests/fixtures/electron.mjs', 'suite:fuori-dai-casi']);
 });
 
