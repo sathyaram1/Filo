@@ -16,10 +16,10 @@ const CHIAVE_AVVISO_NON_RICORDATO = 'accesso-non-ricordato';
 function testoAccessoNonRicordato() {
   const base = 'Hai fatto l\'accesso, ma Filo non trova un portachiavi di sistema dove custodirlo: '
     + 'quando chiudi Filo dovrai accedere di nuovo.';
-  if (process.platform === 'linux') {
-    return base + ' Per farlo ricordare serve un portachiavi acceso, come GNOME Keyring o KWallet: installalo o avvialo e riapri Filo.';
-  }
-  return base;
+  let backend = '';
+  try { backend = require('electron').safeStorage.getSelectedStorageBackend?.() || ''; } catch (_) {}
+  const consiglio = consiglioPortachiavi({ platform: process.platform, backend });
+  return consiglio ? `${base} ${consiglio}` : base;
 }
 
 // Base delle Cloud Function callable del backend di sicurezza (filo-security):
