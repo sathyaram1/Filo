@@ -176,6 +176,22 @@
     overlay.appendChild(box);
     root.appendChild(overlay);
 
+    // Il popup si apre anche mentre l'utente scrive in chat: quello che batte
+    // finisce nel suo campo, non nel vuoto, e alla chiusura il fuoco torna lì.
+    const prima = doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : null;
+    box.addEventListener('keydown', (e) => {
+      if (e.target !== box || !scrivibile(prima) || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+      const s = prima.selectionStart;
+      const f = prima.selectionEnd;
+      try {
+        if (e.key.length === 1) prima.setRangeText(e.key, s, f, 'end');
+        else if (e.key === 'Backspace' && (s > 0 || f > s)) prima.setRangeText('', s === f ? s - 1 : s, f, 'end');
+        else return;
+      } catch (_) { return; }
+      e.preventDefault();
+      prima.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
     let settled = false;
     function done(result) {
       if (settled) return;
@@ -183,6 +199,7 @@
       doc.removeEventListener('keydown', onKey, true);
       host.remove();
       if (active && active.root === root) active = null;
+      if (prima && prima.isConnected) { try { prima.focus({ preventScroll: true }); } catch (_) {} }
       resolve(result);
     }
     function onKey(e) {
