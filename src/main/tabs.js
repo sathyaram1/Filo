@@ -1914,7 +1914,10 @@ class TabManager {
         console.error(`[tab:${tab.id.slice(0, 6)}] render-process-gone`, details);
       }
       const NE = globalThis.SN_NET_ERROR;
-      const reason = (details && details.reason) || '';
+      // Una pagina chiusa da Filo (#586: lo schermo preso scavalcando la scelta) lo dice con parole sue.
+      const chiusaDaFilo = tab._chiusaDaFilo;
+      tab._chiusaDaFilo = null;
+      const reason = chiusaDaFilo ? `filo-${chiusaDaFilo}` : ((details && details.reason) || '');
       // clean-exit = chiusura ordinata (nostre close/_recreateView): non è un crash.
       if (!NE || reason === 'clean-exit') return;
       const current = tab.url || '';

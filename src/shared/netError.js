@@ -112,6 +112,12 @@
     hint: 'Qualcosa è andato storto mentre la pagina era aperta. Ricaricala per continuare.',
   };
 
+  // #586: la pagina ha provato a prendere lo schermo per la strada che scavalca la scelta, e Filo l'ha chiusa.
+  const CHIUSA_PER_SCHERMO = {
+    title: 'Filo ha chiuso questa pagina',
+    hint: 'Stava per prendersi tutto lo schermo e l’audio del computer senza farti scegliere cosa condividere. Ricaricala solo se ti fidi del sito.',
+  };
+
   const DEFAULT_INFO = {
     title: 'Impossibile caricare la pagina',
     hint: 'Il caricamento non è riuscito. Controlla la connessione e riprova.',
@@ -120,7 +126,7 @@
   // { title, hint, offline } per (code, desc). `desc` (es. ERR_…) resta il
   // dettaglio tecnico che la pagina mostra in piccolo.
   function describe(code, desc) {
-    if (String(code) === CRASH_CODE) return { ...CRASH_INFO, offline: false };
+    if (String(code) === CRASH_CODE) return { ...(desc === 'filo-schermo' ? CHIUSA_PER_SCHERMO : CRASH_INFO), offline: false };
     const known = KNOWN[String(code)];
     if (known) return { title: known.title, hint: known.hint, offline: !!known.offline };
     // Ripiego sulla descrizione simbolica quando il codice non è mappato ma la

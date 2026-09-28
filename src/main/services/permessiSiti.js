@@ -10,7 +10,6 @@ const CHIAVE = globalThis.SN_CONST.STORAGE_KEYS.SITE_PERMISSIONS;
 // Una pagina che chiede a raffica non gonfia la coda: oltre il tetto la risposta è no, subito.
 const TETTO_DOMANDE_PER_SCHEDA = 20;
 const TETTO_ATTESE_PER_DOMANDA = 100;
-const DURATA_SCELTA_SCHERMO_MS = 15000;
 // Chi chiude la domanda tre volte di fila senza rispondere vuol dire «smettila»: Filo smette di chiederla.
 const CHIUSURE_PER_SMETTERE = 3;
 // Una lettura dei caratteri installati arriva senza richiesta: accende il segno solo appena dopo un gesto vero.
@@ -37,6 +36,7 @@ const stato = {
   ultimoInput: new WeakMap(),
   cablate: new WeakSet(),
   ascoltatori: new Set(),
+  alGestore: null,
 };
 let prossimoId = 1;
 let prossimoAmbito = 1;
@@ -430,7 +430,7 @@ function chiediFuoriScheda({ ses, wc, origine, tipi, grezzo, rispondi }) {
       if (scelta === 'ignora') return;
       let scritto = false;
       for (const t of tipi) if (P.ricordabile(t)) scritto = scrivi(ses, origine, t, scelta) || scritto;
-      if (scelta === 'consenti' && schermo) stato.schermoScelto.set(wc.id, { scade: Date.now() + DURATA_SCELTA_SCHERMO_MS, fonte: '' });
+      if (scelta === 'consenti' && schermo) stato.schermoScelto.set(wc.id, { fonte: '' });
       if (scritto) { rivaluta(ses, origine); salva(ses); }
     });
   }
@@ -459,6 +459,26 @@ function daFilo(wc, dettagli) {
   return richiedente ? P.eFilo(richiedente) : P.eFilo(urlDi(wc));
 }
 
+// Lo schermo lo consegna solo il gestore dello schermo, che Chromium chiama DENTRO questo stesso sì: lì si chiede e si
+// sceglie. Una richiesta che non ci passa è la strada vecchia (`chromeMediaSource`), che prenderebbe lo schermo intero
+// e l'audio del computer senza scelta: la pagina muore prima che la cattura le arrivi.
+function lasciaAlGestoreDelloSchermo(wc, rispondi) {
+  if (!vivo(wc)) return rispondi(false);
+  let passato = false;
+  stato.alGestore = () => { passato = true; };
+  try { rispondi(true); } finally { stato.alGestore = null; }
+  if (!passato) fermaLaStradaVecchia(wc);
+  return undefined;
+}
+
+function fermaLaStradaVecchia(wc) {
+  const s = schedaDi(wc);
+  if (s && s.tab) s.tab._chiusaDaFilo = 'schermo';
+  if (dip.fermaPagina) return dip.fermaPagina(wc);
+  try { wc.forcefullyCrashRenderer(); } catch (_) {}
+  return undefined;
+}
+
 function richiesta(ses, wc, permesso, dettagli, callback) {
   let risposto = false;
   const rispondi = (ok) => {
@@ -478,6 +498,7 @@ function richiesta(ses, wc, permesso, dettagli, callback) {
     if (!origine) return rispondi(false);
     // Lo schermo lo chiede un documento web: da un riquadro senza indirizzo arriva solo la strada vecchia.
     if (tipi.includes('schermo') && !P.origineDi(d0.requestingUrl || url)) return rispondi(false);
+    if (permesso === 'media' && tipi.length === 1 && tipi[0] === 'schermo') return lasciaAlGestoreDelloSchermo(wc, rispondi);
     const decidiOra = () => {
       const d = P.decidi(scelteDi(ses, origine), tipi);
       if (d.esito === 'consenti') { segnaUso(wc, origine, tipi); return rispondi(true); }
@@ -538,8 +559,9 @@ function schermoDellaScheda(wc, schermi) {
   }
 }
 
-// La scelta di cosa condividere è arrivata con il «Condividi» della barra; senza, lo schermo non esce.
-function schermo(_ses, req, callback) {
+// Qui si chiede, con la striscia o la finestra di sistema, e si consegna quello che l'utente ha scelto; senza, niente.
+function schermo(ses, req, callback) {
+  if (stato.alGestore) { const f = stato.alGestore; stato.alGestore = null; f(); }
   let risposto = false;
   const rispondi = (flussi) => {
     if (risposto) return;
@@ -548,28 +570,39 @@ function schermo(_ses, req, callback) {
   };
   try {
     const wc = webContentsDelFrame(req && req.frame);
-    const scelta = wc ? stato.schermoScelto.get(wc.id) : null;
-    if (!wc || !scelta || scelta.scade < Date.now()) return rispondi({});
-    stato.schermoScelto.delete(wc.id);
-    const origine = P.origineDi(urlDi(wc));
+    const origine = vivo(wc) ? P.origineDi(urlDi(wc)) : '';
+    if (!origine) return rispondi({});
     const consegna = (video) => {
-      if (!video) return rispondi({});
+      if (!video || !vivo(wc)) return rispondi({});
       segnaUso(wc, origine, ['schermo']);
       return rispondi({ video });
     };
-    const fonte = String(scelta.fonte || '');
-    if (fonte.startsWith('scheda:')) {
-      const s = schedaPerId(fonte.slice('scheda:'.length));
-      const c = s && s.tab && s.tab.view && s.tab.view.webContents;
-      return consegna(vivo(c) ? c.mainFrame : null);
-    }
-    return Promise.resolve(electron().desktopCapturer.getSources({ types: ['screen', 'window'] }))
-      .then((fonti) => {
-        const lista = Array.isArray(fonti) ? fonti : [];
-        if (fonte) return consegna(lista.find((f) => f.id === fonte) || null);
-        return consegna(schermoDellaScheda(wc, lista.filter((f) => String(f.id).startsWith('screen:'))));
-      })
-      .catch(() => rispondi({}));
+    const dopo = (ok) => {
+      const scelta = stato.schermoScelto.get(wc.id);
+      stato.schermoScelto.delete(wc.id);
+      if (!ok || !scelta) return rispondi({});
+      const fonte = String(scelta.fonte || '');
+      if (fonte.startsWith('scheda:')) {
+        const s = schedaPerId(fonte.slice('scheda:'.length));
+        const c = s && s.tab && s.tab.view && s.tab.view.webContents;
+        return consegna(vivo(c) ? c.mainFrame : null);
+      }
+      return Promise.resolve(electron().desktopCapturer.getSources({ types: ['screen', 'window'] }))
+        .then((fonti) => {
+          const lista = Array.isArray(fonti) ? fonti : [];
+          if (fonte) return consegna(lista.find((f) => f.id === fonte) || null);
+          return consegna(schermoDellaScheda(wc, lista.filter((f) => String(f.id).startsWith('screen:'))));
+        })
+        .catch(() => rispondi({}));
+    };
+    const chiedi = () => {
+      if (!vivo(wc)) return rispondi({});
+      if (haSmesso(ses, origine, ['schermo'])) { segnaBlocco(wc, origine, ['schermo'], 'smesso'); return rispondi({}); }
+      if (!schedaDi(wc)) return chiediFuoriScheda({ ses, wc, origine, tipi: ['schermo'], grezzo: '', rispondi: dopo });
+      return accoda({ ses, wc, origine, tipi: ['schermo'], grezzo: '', rispondi: dopo });
+    };
+    if (stato.caricato) return chiedi();
+    return carica().then(chiedi, () => rispondi({}));
   } catch (_) {
     return rispondi({});
   }
@@ -694,7 +727,7 @@ function rispondiDomanda(id, scelta, fonte) {
   else if (scelta === 'nega' && senzaMemoria.length) contaChiusura(v.ses, v.origine, senzaMemoria);
   else azzeraChiusure(v.ses, v.origine, v.tipi);
   if (scelta === 'consenti' && v.tipi.includes('schermo')) {
-    stato.schermoScelto.set(v.wcId, { scade: Date.now() + DURATA_SCELTA_SCHERMO_MS, fonte: valida(fonte) });
+    stato.schermoScelto.set(v.wcId, { fonte: valida(fonte) });
   }
   if (scelta === 'nega') segnaBlocco(v.wc, v.origine, v.tipi.filter((t) => P.ricordabile(t)), 'negato');
   if (scelta !== 'consenti' && haSmesso(v.ses, v.origine, v.tipi)) segnaBlocco(v.wc, v.origine, v.tipi, 'smesso');
@@ -765,6 +798,7 @@ function _azzera() {
   stato.ultimoInput = new WeakMap();
   stato.cablate = new WeakSet();
   stato.ascoltatori.clear();
+  stato.alGestore = null;
 }
 
 module.exports = {

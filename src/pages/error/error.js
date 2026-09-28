@@ -29,7 +29,7 @@
   // Dettaglio tecnico in piccolo (es. "ERR_NAME_NOT_RESOLVED (-105)"): utile a
   // chi cerca aiuto o segnala il problema, invisibile come rumore per gli altri.
   const detailBits = [];
-  if (desc) detailBits.push(desc);
+  if (desc && !/^filo-/.test(desc)) detailBits.push(desc);
   if (code && String(code) !== (NE && NE.CRASH_CODE)) detailBits.push(`(${code})`);
   document.getElementById('err-detail').textContent = detailBits.join(' ');
 
