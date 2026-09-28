@@ -172,6 +172,33 @@ test('livello 3: il bottone resta bloccato finché non si digita "conferma"', as
   expect(await page.evaluate(() => window.__typedResult)).toBe(true);
 });
 
+// #592: col testo più alto del riquadro e la parola scritta, il bottone non
+// resta muto. Invio o clic portano avanti il testo; in fondo eseguono.
+test('livello 3 con un testo lungo: Invio e clic portano avanti il testo, e in fondo eseguono', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await page.evaluate(() => {
+    window.__typedResult = undefined;
+    const righe = Array.from({ length: 60 }, (_, i) => `Riga ${i + 1}.`).join('\n');
+    window.SN_CONFIRM_UI.confirmTyped({ title: 'Eliminazione', text: righe })
+      .then((r) => { window.__typedResult = r; });
+  });
+  const host = page.locator(CONFIRM_HOST);
+  await expect(host).toBeVisible();
+  await fillConfirmInput(page, 'conferma');
+  expect((await confirmState(page)).okDisabled).toBe(true);
+
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await confirmState(page)).textScrollTop).toBeGreaterThan(0);
+  await expect(host).toBeVisible();
+
+  for (let i = 0; i < 10 && await host.count(); i++) {
+    await page.waitForTimeout(400);
+    if (await host.count()) await mouseClickConfirm(page, 'danger');
+  }
+  await expect(host).toHaveCount(0);
+  expect(await page.evaluate(() => window.__typedResult)).toBe(true);
+});
+
 // #479 — scaricare dentro una cartella sensibile passava dalla conferma leggera.
 // `wget -O ~/.ssh/…` chiedeva di digitare "conferma"; `wget -P ~/.ssh …`, e
 // soprattutto un `cd ~/.ssh` (eseguito subito, senza chiedere niente, valido per
