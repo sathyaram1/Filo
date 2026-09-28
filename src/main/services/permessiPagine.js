@@ -52,7 +52,8 @@ function sceltePer(ses) {
 
 function lasciapassareValido(wc, tipo) {
   const p = wc && lasciapassari.get(wc.id);
-  return Boolean(p && p.tipo === tipo && p.fino > Date.now());
+  if (p && p.fino <= Date.now()) { lasciapassari.delete(wc.id); return false; }
+  return Boolean(p && p.tipo === tipo);
 }
 
 function lasciapassare(wc, tipo) {

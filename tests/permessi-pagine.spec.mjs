@@ -32,12 +32,16 @@ const PAGINE = {
 </script>`,
 };
 
+// La finestra nascosta si chiude a caricamento finito: un riquadro lento tiene viva la pagina mentre chiede.
+PAGINE['/media-lenta'] = PAGINE['/media'] + '<iframe src="/lento"></iframe>';
+
 let server;
 let origine;
 test.beforeAll(async () => {
   server = createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
     if (u.pathname === '/esito') { esiti.push(u.searchParams.get('m')); res.end('ok'); return; }
+    if (u.pathname === '/lento') { const t = setTimeout(() => { try { res.end('x'); } catch (_) {} }, 20_000); t.unref?.(); return; }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(PAGINE[u.pathname] || '<p>vuota</p>');
   });
@@ -127,5 +131,12 @@ test('appunti: la pagina non legge quello che hai copiato senza un sì; con Inco
   await pagina.evaluate(() => window.__prova());
   await expect.poll(() => esiti.length, { timeout: 10_000 }).toBe(2);
   expect(esiti[1]).toBe('letto:parola-segreta');
+  await expect(barra()).toBeHidden();
+});
+
+test('la finestra nascosta del controllo profondo nega microfono e fotocamera alla pagina sospetta che riapre', async () => {
+  test.setTimeout(60_000);
+  await app.evaluate(async (_e, u) => globalThis.SN_SAFEBROWSE.sandbox.detonate(u), origine + '/media-lenta');
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['negato:NotAllowedError']);
   await expect(barra()).toBeHidden();
 });
