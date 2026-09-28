@@ -140,6 +140,11 @@
     beginSending: () => { sending = true; sendBtn.disabled = true; },
     runTurnAndContinue: (args) => runTurnAndContinue(args),
     isHomeMessageVisible: () => showHomeMessage,
+    soloRisposteSenzaCrediti: () => {
+      const bolle = [...bubblesEl.children];
+      return bolle.some((b) => b.dataset.senzaCrediti === '1')
+        && bolle.every((b) => b.dataset.senzaCrediti === '1' || b.classList.contains('dash-bubble-user'));
+    },
     setSuggestions: (list) => { suggestions = list; renderSuggestions(); },
     loadDashboard: () => loadDashboard(),
   });
