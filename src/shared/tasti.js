@@ -406,6 +406,12 @@
     return out;
   }
 
+  // Un simbolo (non lettera, cifra, freccia o tasto con nome) con Shift diventa un
+  // altro simbolo, diverso per ogni tastiera: di lui conta il carattere, non Shift.
+  function simbolo(tasto) {
+    return [...tasto].length === 1 && !/^[a-z0-9←-↓]$/.test(tasto);
+  }
+
   // Il tasto premuto è quella scorciatoia? Cmd vale quanto Ctrl.
   function combacia(ev, accel) {
     const f = forma(accel);
@@ -414,7 +420,16 @@
     const a = modificatore(ev, 'alt') ? 'a' : '';
     const s = modificatore(ev, 'shift') ? 's' : '';
     const [mods, tasto] = [f.slice(0, f.indexOf('|')), f.slice(f.indexOf('|') + 1)];
-    return mods === `${c}${a}${s}` && tastiDaEvento(ev).has(tasto);
+    const premuti = simbolo(tasto) ? `${c}${a}${mods.includes('s') ? 's' : ''}` : `${c}${a}${s}`;
+    return mods === premuti && tastiDaEvento(ev).has(tasto);
+  }
+
+  // Il simbolo scritto dopo Shift (o ''): alla pressione arriva quello che Shift ne
+  // fa, quindi la scorciatoia non combacerebbe mai.
+  function simboloConShift(accel) {
+    const f = forma(accel);
+    const tasto = f.slice(f.indexOf('|') + 1);
+    return f && f.slice(0, f.indexOf('|')).includes('s') && simbolo(tasto) ? tasto : '';
   }
 
   // La pressione che una scorciatoia SCRITTA descrive (o null), letta con le

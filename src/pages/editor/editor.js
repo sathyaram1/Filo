@@ -3901,8 +3901,9 @@
     // le pagine si rimpicciolisce lo switch (che avverte pagina per pagina).
     const deletable = !isPinned(m);
     const libera = scorciatoiaLibera(m);
+    const senzaAzione = !AZIONE_SCORCIATOIA[m.type];
     openOverlay(`<h3>${meta.label}</h3>
-      <div class="ed-field"><label>Scorciatoia da tastiera</label>
+      <div class="ed-field"${senzaAzione && !m.data.shortcut ? ' hidden' : ''}><label>Scorciatoia da tastiera</label>
         <input type="text" id="cfgShortcut" placeholder="es. ${escapeHtml(libera)}" value="${escapeHtml(m.data.shortcut || '')}" />
         <div class="ed-field-hint" id="cfgShortcutHint" hidden>Usa almeno un modificatore (${escapeHtml(tasto('Ctrl'))} o Alt), es. ${escapeHtml(libera)} — così non ruba una lettera mentre scrivi.</div>
         <div class="ed-field-hint" id="cfgShortcutTaken" hidden></div></div>
@@ -3927,17 +3928,22 @@
       cfgShortcutHint.hidden = true;
       cfgShortcutTaken.hidden = true;
     });
-    function mostraPresa(motivo) {
+    function mostraAvviso(testo) {
       cfgShortcut.classList.add('ed-field-invalid');
-      cfgShortcutTaken.textContent = `${motivo}: scegline un'altra, per esempio ${libera}.`;
+      cfgShortcutTaken.textContent = testo;
       cfgShortcutTaken.hidden = false;
     }
+    const mostraPresa = (motivo) => mostraAvviso(`${motivo}: scegline un'altra, per esempio ${libera}.`);
+    const AVVISO_SENZA_AZIONE = `«${meta.label}» non ha un'azione unica da far partire con un tasto: svuota il campo e salva.`;
     // Una scorciatoia salvata prima di questi controlli può essere già morta:
     // lo si dice all'apertura, non solo quando la si riscrive.
-    const motivoGiaSalvata = motivoScorciatoiaPresa(String(m.data.shortcut || '').trim(), m);
-    if (motivoGiaSalvata) mostraPresa(motivoGiaSalvata);
+    const giaSalvata = String(m.data.shortcut || '').trim();
+    const motivoGiaSalvata = motivoScorciatoiaPresa(giaSalvata, m);
+    if (giaSalvata && senzaAzione) mostraAvviso(AVVISO_SENZA_AZIONE);
+    else if (motivoGiaSalvata) mostraPresa(motivoGiaSalvata);
     $('cfgSave').addEventListener('click', () => {
       const rawShortcut = cfgShortcut.value.trim();
+      if (rawShortcut && senzaAzione) { mostraAvviso(AVVISO_SENZA_AZIONE); cfgShortcut.focus(); return; }
       const ignoto = rawShortcut ? TASTI.pezzoSconosciuto(rawShortcut) : null;
       if (ignoto && ignoto.modificatore) {
         cfgShortcut.classList.add('ed-field-invalid');
@@ -4055,7 +4061,7 @@
     const t = tastoEditorDi(sc);
     if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo modulo non partirebbe mai`;
     const e = TASTI.pressioneScritta(sc);
-    const altro = e && doc.modules.find((x) => x !== m && x.data && x.data.shortcut && matchShortcut(e, x.data.shortcut));
+    const altro = e && doc.modules.find((x) => x !== m && AZIONE_SCORCIATOIA[x.type] && x.data && x.data.shortcut && matchShortcut(e, x.data.shortcut));
     if (altro) {
       const etich = (MODULE_TYPES[altro.type] && MODULE_TYPES[altro.type].label) || altro.type;
       return `${nome} è già la scorciatoia di «${etich}», e partirebbe solo quello`;
