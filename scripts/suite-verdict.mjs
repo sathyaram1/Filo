@@ -163,6 +163,32 @@ export function primaRiga(e) {
 }
 
 /**
+ * Il file di tests/ che un errore fuori dai casi nomina, relativo alla radice, o ''. Prima la posizione di
+ * Playwright (per un file che non si carica è lo spec, anche se l'errore sta in un aiuto), poi chi importava il
+ * modulo che manca, poi il primo percorso sotto tests/ nel testo. PURA.
+ */
+export function fileDellErrore(e, radice = ROOT) {
+  const base = String(radice || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  const testo = `${e?.message || ''}\n${e?.stack || ''}`.replace(/\[[0-9;]*m/g, '');
+  const candidati = [e?.location?.file, testo.match(/imported from\s+(\S+)/)?.[1],
+    ...[...testo.matchAll(/[^\s'"`()]+\.m?[jt]s\b/g)].map((m) => m[0])];
+  for (const c of candidati) {
+    let f = String(c || '').replace(/^file:\/+/, '/').replace(/\\/g, '/').replace(/^\/([a-z]:)/i, '$1')
+      .replace(/(:\d+){1,2}$/, '');
+    if (!f || f.includes('/node_modules/')) continue;
+    if (base && f.toLowerCase().startsWith(`${base}/`)) f = f.slice(base.length + 1);
+    else if (f.includes('/tests/')) f = f.slice(f.lastIndexOf('/tests/') + 1);
+    if (f.startsWith('tests/')) return f;
+  }
+  return '';
+}
+
+/** La chiave dell'allarme di un file di tests/: quella dei suoi casi se è uno spec. PURA. */
+export function chiaveDelFile(file) {
+  return /\.spec\.m?js$/.test(file) ? `suite:tests/${normalizzaSpec(file)}.spec.mjs` : `suite:${file}`;
+}
+
+/**
  * Gli errori fuori dai casi (un file che non si carica, un fixture rotto, un
  * worker che non chiude) divisi in ROSSI e AVVISI. Playwright li mette in
  * `json.errors`, e i casi del file colpito possono non comparire affatto: per
