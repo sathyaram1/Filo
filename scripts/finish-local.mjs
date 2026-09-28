@@ -449,25 +449,10 @@ export function specDaRilanciare({ checkOnly, ok, sha, tollerato }) {
   };
 }
 
-/**
- * Spezza l'elenco degli spec in lotti che stanno in UNA riga di comando. PURA.
- * Su Windows la riga ha un tetto di ~8.000 caratteri: con tutto `src` toccato
- * gli spec mirati sono stati 245 e il lancio moriva con «riga troppo lunga»
- * prima ancora di partire. Ogni lotto è un `npx playwright test …` a sé.
- */
-export function lottiPerRigaDiComando(specs, maxChars = 6000) {
-  const lotti = [];
-  let corrente = [], lunghezza = 0;
-  for (const s of specs) {
-    const pezzo = s.length + 1;
-    if (corrente.length && lunghezza + pezzo > maxChars) { lotti.push(corrente); corrente = []; lunghezza = 0; }
-    corrente.push(s); lunghezza += pezzo;
-  }
-  if (corrente.length) lotti.push(corrente);
-  return lotti;
-}
+// Con tutto `src` toccato gli spec mirati sono stati 245: in una riga sola `npx` (cmd.exe) moriva prima di partire.
+export { lottiPerRigaDiComando };
 
-/** Lancia gli spec a lotti (vedi lottiPerRigaDiComando); tutti i lotti girano, l'esito è l'AND. */
+/** Tutti i lotti girano, l'esito è l'AND. */
 function runSpecsALotti(specs, label) {
   const lotti = lottiPerRigaDiComando(specs.map((s) => `${s}.spec.mjs`));
   let ok = true;
