@@ -1774,7 +1774,7 @@
       return { testo: 'vuole usare il microfono', icone: ['mic'] };
     };
 
-    function ensureBar() {
+    const ensureBar = () => {
       if (bar) return bar;
       bar = document.createElement('div');
       bar.id = 'permesso-bar';
@@ -1782,16 +1782,17 @@
       bar.hidden = true;
       document.body.appendChild(bar);
       return bar;
-    }
+    };
 
-    function rispondi(d, si) {
+    const rispondiA = (d, si) => {
       const i = domande.indexOf(d);
       if (i >= 0) domande.splice(i, 1);
       api.tabs.rispondiPermesso(d.id, si).catch(() => {});
-      render();
-    }
+      mostraDomanda();
+    };
 
-    function render() {
+    // Funzioni come costanti: una dichiarazione dentro il blocco rimpiazzerebbe il `render` della shell.
+    const mostraDomanda = () => {
       const d = domande.find((x) => x.tabId === attiva) || null;
       if (d === mostrata) return;
       mostrata = d;
@@ -1820,12 +1821,12 @@
       si.type = 'button';
       si.className = 'permesso-btn permesso-si';
       si.textContent = 'Consenti';
-      si.addEventListener('click', () => rispondi(d, true));
+      si.addEventListener('click', () => rispondiA(d, true));
       const no = document.createElement('button');
       no.type = 'button';
       no.className = 'permesso-btn permesso-no';
       no.textContent = 'Non consentire';
-      no.addEventListener('click', () => rispondi(d, false));
+      no.addEventListener('click', () => rispondiA(d, false));
       b.replaceChildren(icone, msg, no, si);
       b.hidden = false;
       requestAnimationFrame(() => {
@@ -1833,7 +1834,7 @@
         document.documentElement.style.setProperty('--sopra-permessi', h + 'px');
         riservaSopra('permessi', h);
       });
-    }
+    };
 
     api.tabs.onPermesso((evento, info) => {
       if (!info || !info.id) return;
@@ -1843,9 +1844,9 @@
         const i = domande.findIndex((x) => x.id === info.id);
         if (i >= 0) domande.splice(i, 1);
       }
-      render();
+      mostraDomanda();
     });
-    try { api.tabs.snapshot().then((snap) => { if (attiva == null && snap) { attiva = snap.activeId || null; render(); } }).catch(() => {}); } catch (_) {}
+    try { api.tabs.snapshot().then((snap) => { if (attiva == null && snap) { attiva = snap.activeId || null; mostraDomanda(); } }).catch(() => {}); } catch (_) {}
     api.tabs.onUpdate((snap) => {
       attiva = (snap && snap.activeId) || null;
       if (snap && Array.isArray(snap.tabs)) {
@@ -1853,7 +1854,7 @@
           if (!snap.tabs.some((t) => t.id === domande[i].tabId)) domande.splice(i, 1);
         }
       }
-      render();
+      mostraDomanda();
     });
   }
 })();

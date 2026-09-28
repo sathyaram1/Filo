@@ -78,7 +78,7 @@ test('microfono e fotocamera: la cornice chiede col nome del sito, Consenti li d
   await expect(barra()).toContainText(new URL(origine).host);
   await expect(barra()).toContainText('microfono e fotocamera');
   expect(esiti, 'la pagina aspetta la risposta').toEqual([]);
-  await barra().getByRole('button', { name: 'Consenti' }).click();
+  await barra().getByRole('button', { name: 'Consenti', exact: true }).click();
   await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['concesso:audio,video']);
   await expect(barra()).toBeHidden();
 
@@ -92,7 +92,7 @@ test('Non consentire: la pagina riceve un no, e per quel sito la domanda non tor
   test.setTimeout(60_000);
   await apri('/media');
   await expect(barra()).toBeVisible({ timeout: 10_000 });
-  await barra().getByRole('button', { name: 'Non consentire' }).click();
+  await barra().getByRole('button', { name: 'Non consentire', exact: true }).click();
   await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['negato:NotAllowedError']);
 
   await apri('/media');
@@ -108,7 +108,7 @@ test('appunti: la pagina non legge quello che hai copiato senza un sì; con Inco
   await expect(barra()).toBeVisible({ timeout: 10_000 });
   await expect(barra()).toContainText('vuole leggere quello che hai copiato');
   expect(esiti).toEqual([]);
-  await barra().getByRole('button', { name: 'Non consentire' }).click();
+  await barra().getByRole('button', { name: 'Non consentire', exact: true }).click();
   await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['negato:NotAllowedError']);
 
   // Incolla di Filo: il content script chiede il lasciapassare per la sua scheda, poi legge.
@@ -118,6 +118,7 @@ test('appunti: la pagina non legge quello che hai copiato senza un sì; con Inco
       const t = w._filoTabs && w._filoTabs.tabs.find((x) => x.view.webContents.getURL().startsWith(base));
       if (!t) continue;
       const wc = t.view.webContents;
+      wc.focus();
       return globalThis.SN_HANDLE_MESSAGE({ type: 'permesso_filo', tipo: 'appunti' }, { tab: { id: t.id, url: wc.getURL() }, url: wc.getURL(), wc, win: w });
     }
     return null;
