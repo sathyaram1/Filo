@@ -21,7 +21,7 @@ const ROOT = join(__dirname, '..', '..');
 const auth = require(join(ROOT, 'src', 'main', 'auth', 'google-auth.js'));
 const Defaults = require(join(ROOT, 'src', 'main', 'services', 'defaultsStore.js'));
 
-// Finge la rete: ogni GET su config/models rende il provider che le si dice,
+// Finge la rete: ogni GET su config/models rende il provider e l'ordinamento che le si dicono,
 // ogni PATCH va a buon fine. Rende l'elenco delle chiamate fatte.
 function conRete(statoRemoto, fn) {
   const origToken = auth.getIdToken;
@@ -83,15 +83,15 @@ test('scaduto il tetto si rilegge', async () => {
 });
 
 test('chi salva la config la vede cambiata subito, non alla scadenza', async () => {
-  const remoto = { provider: 'openrouter' };
+  const remoto = { provider: 'openrouter', providerSort: 'price' };
   await conRete(remoto, async () => {
     await Defaults.refresh();
-    assert.equal(Defaults.get().provider, 'openrouter');
+    assert.equal(Defaults.get().providerSort, 'price');
     // L'owner salva dalla schermata dei modelli predefiniti: da qui in avanti
     // il documento remoto dice un'altra cosa.
-    remoto.provider = 'altro-fornitore';
-    await Defaults.update({ provider: 'altro-fornitore' }, 'finto-id-token');
-    assert.equal(Defaults.get().provider, 'altro-fornitore',
+    remoto.providerSort = 'latency';
+    await Defaults.update({ providerSort: 'latency' }, 'finto-id-token');
+    assert.equal(Defaults.get().providerSort, 'latency',
       'dopo il salvataggio la config in uso è quella nuova, senza aspettare la rilettura periodica');
     // …e la rilettura periodica resta pigra: il salvataggio ha appena
     // rinfrescato, quindi non deve ripartire una lettura.
