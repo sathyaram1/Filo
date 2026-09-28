@@ -2012,17 +2012,7 @@ function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', le
 }
 
 function broadcastLiveUpdate() {
-  const msg = { type: MSG.FILO_LIVE_UPDATED };
-  try {
-    for (const win of BrowserWindow.getAllWindows()) {
-      try { win.webContents.send('filo:broadcast', msg); } catch (_) {}
-      if (win._filoTabs) {
-        for (const t of win._filoTabs.tabs) {
-          try { t.view.webContents.send('filo:broadcast', msg); } catch (_) {}
-        }
-      }
-    }
-  } catch (_) {}
+  broadcastToTabs({ type: MSG.FILO_LIVE_UPDATED });
 }
 
 // Rende leggibile al modello l'output dei comandi eseguiti in un turno: estrae
