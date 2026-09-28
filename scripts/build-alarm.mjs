@@ -154,15 +154,20 @@ export function leggiArgomenti(argv) {
  * credenziale, un solo taglio del testo.
  */
 export async function inviaAllarme(name, text, chiavi = []) {
+  if (!(await spedisciAllarme(name, text, chiavi))) process.exit(1);
+}
+
+/** Come inviaAllarme, ma dice se è arrivato invece di fermare il processo: per chi deve proseguire comunque. */
+export async function spedisciAllarme(name, text, chiavi = []) {
   const passphrase = process.env.FILO_BUILD_PASSPHRASE;
 
   if (!passphrase) {
     console.error('[allarme] FILO_BUILD_PASSPHRASE assente: non posso avvisare nessuno.');
-    process.exit(1);
+    return false;
   }
   if (!name) {
     console.error('[allarme] titolo assente: non spedisco un feedback senza nome.');
-    process.exit(1);
+    return false;
   }
 
   const testo = testoEntroIlTetto(text || '');
