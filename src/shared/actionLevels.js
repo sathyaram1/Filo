@@ -268,6 +268,20 @@
         return `Leggere il documento ${p || ''}`.trim();
       },
     },
+    LEGGI_PAGINA: {
+      // Sola lettura: il testo entra solo nel contesto del modello. Ma scaricare è una richiesta che esce: un indirizzo
+      // che porta fuori dati del contesto sale a 2 come NAVIGA (`_exfil` lo calcola il main, mai l'LLM).
+      level: (a) => (a && a._exfil ? 2 : 1),
+      describe: (a) => {
+        const url = (a && (a.url || a.href || a.link)) || 'una pagina';
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` (${a._exfilReason})` : '';
+          return `Filo sta per leggere una pagina il cui indirizzo${why}:\n${url}\n\n`
+            + 'Potrebbe inviare tuoi dati a un sito esterno. Conferma solo se l\'hai chiesto tu.';
+        }
+        return `Leggere la pagina ${url}`;
+      },
+    },
     LEGGI_TRASPARENZA: {
       // Filo rilegge i propri documenti di trasparenza per rispondere a "perché
       // usi questo modello?", "che fine fanno i miei dati?". Sola lettura di

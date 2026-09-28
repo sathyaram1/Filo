@@ -77,7 +77,7 @@ test('schemi che non sono pagine web e indirizzi senza senso si rifiutano prima 
 });
 
 test('una pagina più lunga del tetto si legge a pezzi: il primo lo dichiara, il seguito riparte da lì', async () => {
-  const riga = (i) => `Riga ${i}: ${'testo di riempimento '.repeat(8)}`;
+  const riga = (i) => `Riga ${i}: ${'testo di riempimento '.repeat(8).trim()}`;
   const righe = Array.from({ length: 900 }, (_, i) => riga(i));
   const url = verso('/lunga', { corpo: `<html><body><main>${righe.map((r) => `<p>${r}</p>`).join('')}<p>ULTIMA_RIGA</p></main></body></html>` });
   await conRete(async () => {

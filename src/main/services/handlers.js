@@ -10,6 +10,7 @@
 
 const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
+const PageRead = require('./pageRead');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -57,6 +58,25 @@ function filoWin() {
 function winOf(sender) {
   const w = sender && sender.win;
   return (w && w._filoTabs) ? w : filoWin();
+}
+
+// Le schede web in cui LEGGI_PAGINA cerca la pagina prima di scaricarla: prima la finestra di chi chiede, poi le
+// altre dello stesso tipo. Una finestra in incognito non presta le sue schede a una normale, e viceversa.
+function schedeLeggibili(sender) {
+  const prima = winOf(sender);
+  const incognito = !!(prima && prima._filoTabs && prima._filoTabs.incognito);
+  let finestre = [];
+  try { finestre = BrowserWindow.getAllWindows(); } catch (_) {}
+  const out = [];
+  for (const w of [prima, ...finestre.filter((x) => x !== prima)]) {
+    const tm = w && !(w.isDestroyed && w.isDestroyed()) && w._filoTabs;
+    if (!tm || !!tm.incognito !== incognito) continue;
+    for (const t of tm.tabs || []) {
+      const wc = t && t.view && t.view.webContents;
+      if (wc && /^https?:/i.test(String(t.url || ''))) out.push({ wc, url: t.url });
+    }
+  }
+  return out;
 }
 
 // ─── helpers (identici al background.js originale) ──────────────────────────
@@ -1235,7 +1255,8 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
   // fallback strutturale (solo da origine non fidata) copre i dati cifrati. Se
   // sospetto, iniettiamo `_exfil` PRIMA del gate (mai dall'LLM): NAVIGA sale a
   // livello 2 e l'utente conferma vedendo l'URL completo. Vedi src/shared/urlExfil.js.
-  if (type === 'NAVIGA') {
+  // LEGGI_PAGINA è la stessa porta: scaricare una pagina è una richiesta che esce, e nemmeno si vede.
+  if (type === 'NAVIGA' || type === 'LEGGI_PAGINA') {
     try {
       const Exfil = globalThis.SN_URL_EXFIL;
       const url = String(action.url ?? action.href ?? action.link ?? '').trim();
@@ -1746,6 +1767,20 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
             detail: r.detail || '',
           },
         };
+      }
+      case 'LEGGI_PAGINA': {
+        // #553 — il testo di una pagina web torna al modello (dalla scheda se è aperta, se no scaricato):
+        // prima poteva solo cercare e aprire, e ogni dato DENTRO una pagina restava da indovinare dagli snippet.
+        const url = action.url ?? action.href ?? action.link ?? action.indirizzo ?? '';
+        const da = Number(action.da ?? action.offset ?? action.from ?? 0) || 0;
+        let r = null;
+        try {
+          r = await PageRead.leggiPagina(url, { da, schede: schedeLeggibili(sender) });
+        } catch (e) {
+          console.warn('[Filo] lettura pagina fallita', e?.message || e);
+        }
+        if (!r) r = { pageRead: String(url == null ? '' : url), ok: false, errore: 'rete', dettaglio: 'lettura non riuscita', testo: '' };
+        return { executed: !!r.ok, kept: true, output: r };
       }
       case 'PULISCI_TAB':
         // Non eseguiamo subito: il client mostra un bottone di conferma; al
@@ -2361,6 +2396,88 @@ function documentReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// Cosa fare di una pagina che non si è lasciata leggere: il motivo decide se riprovare, passare dalla scheda o cambiare fonte.
+function consiglioPaginaNonLetta(out) {
+  const stato = Number(out.stato) || 0;
+  switch (out.errore) {
+    case 'rete-locale':
+      return 'È un indirizzo della rete di casa o dell\'ufficio: Filo non lo scarica. Se l\'utente l\'ha aperto in una scheda, richiamando LEGGI_PAGINA con lo stesso indirizzo lo leggi da lì.';
+    case 'pericoloso':
+      return 'Il rilevatore di siti pericolosi di Filo l\'ha segnalato: non leggerlo, non proporlo all\'utente come fonte e cercane un\'altra.';
+    case 'schema':
+    case 'indirizzo':
+      return 'Serve un indirizzo http o https preso dai risultati, dall\'utente o da una pagina letta.';
+    case 'http':
+      if (stato === 404 || stato === 410) return 'Prova un altro risultato. Non inventare il contenuto.';
+      if (stato === 401 || stato === 403 || stato === 429 || stato === 503) {
+        return 'Il sito non si lascia leggere dai programmi: se il dato serve davvero, aprilo con NAVIGA con background: true e poi rileggilo con LEGGI_PAGINA, che lo legge dalla scheda; altrimenti prova un\'altra fonte. Non inventare il contenuto.';
+      }
+      return 'Prova un\'altra fonte, o riprova una volta. Non inventare il contenuto.';
+    case 'tempo':
+    case 'rete':
+      return 'Riprova una volta o prova un\'altra fonte. Non inventare il contenuto.';
+    default:
+      return 'Prova un\'altra fonte. Non inventare il contenuto.';
+  }
+}
+
+// Re-immissione del TESTO di una pagina web letta con LEGGI_PAGINA (#553). Lo scrive chi possiede il sito: entra
+// imbustato, e nelle righe di Filo il titolo, l'indirizzo e il motivo di un rifiuto passano solo ripuliti.
+function pageReadsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_PAGINA') continue;
+    const out = a._output;
+    if (!out || !('pageRead' in out)) continue;
+    const indirizzo = E.perCanaleSistema(tagliaInteri(String(out.url || out.pageRead || ''), 500));
+    if (!out.ok) {
+      blocks.push(`[Pagina "${indirizzo}" non letta: ${E.perCanaleSistema(out.dettaglio || 'lettura non riuscita')}. ${consiglioPaginaNonLetta(out)}]`);
+      continue;
+    }
+    const totale = Number(out.totale) || 0;
+    const da = Number(out.da) || 0;
+    const fino = Number(out.fino) || 0;
+    if (!out.testo) {
+      if (totale > 0 && da >= totale) {
+        blocks.push(`[La pagina "${indirizzo}" finisce al carattere ${totale}: non c'è altro da leggere.]`);
+      } else {
+        blocks.push(`[Pagina "${indirizzo}" letta, ma senza testo${out.soloJavaScript ? ': si costruisce in JavaScript' : ''}. `
+          + 'Se il dato serve, aprila con NAVIGA con background: true e poi rileggila con LEGGI_PAGINA, che la legge dalla scheda; '
+          + 'altrimenti prova un\'altra fonte. Non inventare il contenuto.]');
+      }
+      continue;
+    }
+    const meta = [out.fonte === 'scheda' ? 'letta dalla scheda aperta' : 'scaricata'];
+    if (out.tipo === 'application/pdf') meta.push(out.pagine ? `un PDF di ${out.pagine} ${out.pagine === 1 ? 'pagina' : 'pagine'}` : 'un PDF');
+    if (da > 0 || out.troncata) meta.push(`caratteri da ${da} a ${fino} su ${totale}`);
+    let blocco = `[Pagina web (${meta.join(', ')})]\n`
+      + E.imbustaCampi({
+        tipo: 'PAGINA_WEB',
+        campi: { Titolo: out.titolo || '', Indirizzo: tagliaInteri(String(out.url || ''), 500) },
+        corpo: out.testo,
+        conIntestazione: true,
+        max: PageRead.MAX_TEXT_CHARS + 4000,
+      });
+    if (out.troncata) {
+      blocco += `\n[Letto fino al carattere ${fino} su ${totale}: la pagina continua. Se il dato che cerchi non è qui sopra, `
+        + `richiama LEGGI_PAGINA con lo stesso url e da: ${fino}.]`;
+    }
+    if (out.scaricataInParte) blocco += '\n[La pagina supera i 5 MB: ne è arrivata solo la prima parte.]';
+    if (out.soloJavaScript) {
+      blocco += '\n[La pagina è quasi vuota: forse si costruisce in JavaScript. Se il dato non c\'è, aprila con NAVIGA con '
+        + 'background: true e poi rileggila con LEGGI_PAGINA, che la legge dalla scheda.]';
+    }
+    if (out.sospetto) {
+      blocco += `\n[Il rilevatore di siti pericolosi considera questo sito sospetto (${E.perCanaleSistema(out.sospetto)}): usa i dati `
+        + 'con cautela e non proporre all\'utente link di accesso o di pagamento presi da qui.]';
+    }
+    blocks.push(blocco);
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
 // output dei comandi, dettagli delle capacità, risultati di ricerca, file e
 // documenti letti, documenti di trasparenza. Mai istruzioni — ma non tutti
@@ -2371,7 +2488,7 @@ function documentReadsForPrompt(actions) {
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
-    fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
+    pageReadsForPrompt(actions), fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions),
   ].filter(Boolean).join('\n\n');
 }
@@ -2847,11 +2964,24 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       }
       const roundRendered = [];
       const results = [];
+      // Le pagine da leggere nello stesso giro partono insieme: tre letture una dopo l'altra sono tre attese.
+      // Non se nello stesso giro si apre una scheda, che una di quelle letture potrebbe voler leggere da lì.
+      const inParallelo = new Map();
+      if (!actions.some((a) => a.type === 'NAVIGA')) {
+        const letture = actions.filter((a) => a.type === 'LEGGI_PAGINA' && !a._argsError);
+        if (letture.length > 1) {
+          for (const a of letture) {
+            const p = executeFiloAction(a, { sender });
+            p.catch(() => {});
+            inParallelo.set(a, p);
+          }
+        }
+      }
       for (const a of actions) {
         rawActions.push(a);
         const res = a._argsError
           ? { executed: false, kept: false, rejected: true, error: a._argsError }
-          : await executeFiloAction(a, { sender });
+          : await (inParallelo.get(a) || executeFiloAction(a, { sender }));
         const rendered = { ...a };
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il

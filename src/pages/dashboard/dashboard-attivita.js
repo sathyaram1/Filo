@@ -241,6 +241,7 @@
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
     CERCA_CHAT: (n) => (n > 1 ? `riletto ${n} conversazioni di prima` : 'riletto una conversazione di prima'),
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
+    LEGGI_PAGINA: (n) => (n > 1 ? `letto ${n} pagine` : 'letto una pagina'),
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
     LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
     CAPACITA_DETTAGLIO: () => 'verificato cosa sa fare',
@@ -365,6 +366,7 @@
       return { icon: '📄', text: nome ? `Leggo il documento: ${nome}` : 'Leggo il documento' };
     },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
+    LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a) }),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
     // del tutto, e l'utente non sapeva dove fosse finito il suo appunto.
     SALVA_APPUNTO: (a) => {
@@ -417,6 +419,7 @@
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto',
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
+    LEGGI_PAGINA: 'Pagina non letta',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
     STILE_PAGINA: 'Aspetto della pagina non cambiato', RIPRISTINA_STILE_PAGINA: 'Aspetto della pagina non ripristinato',
@@ -451,6 +454,18 @@
     // che il silenzio — il diario deve dire tutto quello che Filo ha fatto.
     if (a._traccia) return { icon: '•', text: type.toLowerCase().replace(/_/g, ' ') };
     return null;
+  }
+  // «Leggo la pagina: <titolo>». Il titolo lo scrive il sito: una riga sola e corta, e senza titolo si nomina il sito.
+  function rigaLetturaPagina(a) {
+    const o = (a && a._output) || {};
+    let nome = String(o.titolo || '').replace(/[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!nome) {
+      try { nome = new URL(o.url || a.url || '').hostname.replace(/^www\./, ''); } catch (_) { nome = ''; }
+    }
+    if (nome.length > 80) nome = `${nome.slice(0, 77)}…`;
+    const seguito = Number(o.da || a.da || 0) > 0;
+    const verbo = seguito ? 'Leggo il seguito della pagina' : 'Leggo la pagina';
+    return nome ? `${verbo}: ${nome}` : verbo;
   }
   // La ragione del fallimento, quando il main la conosce.
   function motivoFallimento(a) {
@@ -871,6 +886,10 @@
       // (auto-continue), dove compare la risposta.
       const nome = (a._output && a._output.name) || '';
       return stepTrace(nome ? `📄 Leggo il documento: ${nome}` : '📄 Leggo il documento');
+    }
+    if (type === 'LEGGI_PAGINA') {
+      // Traccia, non bottone: la pagina l'ha letta Filo per sé, e la risposta cita i link che contano.
+      return stepTrace(`🌐 ${rigaLetturaPagina(a)}`);
     }
     if (type === 'LEGGI_TRASPARENZA') {
       // Traccia del passo intermedio: Filo rilegge le scelte dell'owner messe

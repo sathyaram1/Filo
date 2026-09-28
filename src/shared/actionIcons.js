@@ -38,6 +38,7 @@
     CAPACITA_DETTAGLIO: 'clipboard',
     LEGGI_FILE: 'readDocument',
     LEGGI_DOCUMENTO: 'readDocument',
+    LEGGI_PAGINA: 'readPage',
     LEGGI_TRASPARENZA: 'transparency',
     EVENTO_CALENDARIO: 'calendar',
     PULISCI_TAB: 'broom',
@@ -60,7 +61,6 @@
   const PREVISTE = {
     LEGGI_POSTA: 'mailOpen',
     INVIA_POSTA: 'mailSend',
-    LEGGI_PAGINA: 'readPage',
     SCREENSHOT: 'screenshot',
     CLICCA: 'click',
     SCRIVI_NELLA_PAGINA: 'typeText',
