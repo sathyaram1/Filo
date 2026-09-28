@@ -89,7 +89,8 @@ function tabDiWebContents(wc) {
 // cosa: un evento di uscita non può essere il permesso per entrare. Su ogni
 // altro permesso si resta al comportamento di prima (senza gestore, Electron
 // concede), e questo è il motivo del `callback(true)` finale.
-// Si installa dal punto di nascita, come ogni gestore dei permessi (#586 compreso).
+// Nasce con la sessione (punto di nascita). Electron ne tiene UNO per sessione:
+// un altro gestore (#586) estende questo, non ne registra un secondo.
 function installaPermessi(ses) {
   if (!ses) return;
   try {
