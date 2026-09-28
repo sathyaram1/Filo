@@ -212,7 +212,7 @@ function buildGpcSource() {
         var orig = d.get;
         var g = nativo(function () {
           var r = orig.call(this);
-          if (r) { try { installa(prop === 'contentWindow' ? r : r.defaultView); } catch (e) {} }
+          if (r) { try { if (vuoto(this)) installa(prop === 'contentWindow' ? r : r.defaultView); } catch (e) {} }
           return r;
         }, 'get ' + prop);
         Object.defineProperty(CP, prop, { get: g, set: d.set, enumerable: d.enumerable, configurable: true });
