@@ -240,14 +240,23 @@ function scelteDi(wc) {
   return { origine, scelte };
 }
 
+// La pagina già aperta tiene quello che ha ottenuto, e un no alle notifiche lo legge finché non si ricarica.
 function dimentica(wc) {
   const { origine, scelte } = scelteDi(wc);
-  if (!scelte.length) return { tolte: 0, cera: false };
+  if (!scelte.length) return { tolte: 0, ricarica: false };
   for (const s of scelte) wc.session._filoScelte.delete(`${origine}|${s.parte}`);
-  return { tolte: scelte.length, cera: scelte.some((s) => s.si) };
+  return { tolte: scelte.length, ricarica: scelte.some((s) => s.si || s.parte === 'notifiche') };
+}
+
+// Quello che una pagina deve leggere delle notifiche prima di chiedere, come in Chrome: il controllo di Electron sa dire
+// solo sì o no, e il sì mostrerebbe le notifiche senza domanda. La traduzione nella pagina: preload/stato-permessi.js.
+function statoNotifiche(ses, url) {
+  const origine = origineWeb(url);
+  const scelta = origine && ses && ses._filoScelte ? ses._filoScelte.get(`${origine}|notifiche`) : undefined;
+  return scelta === true ? 'granted' : scelta === false ? 'denied' : 'default';
 }
 
 module.exports = {
-  installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare,
+  installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
   TIPI, INNOCUI, GESTO_MS, _inAttesa: inAttesa,
 };
