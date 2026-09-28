@@ -32,8 +32,8 @@ domanda con un no.
 ## Cose che non si vedono finché non ci si sbatte
 
 - **Il controllo silenzioso non ha il «chiedi».** In Electron `setPermissionCheckHandler` risponde sì o no: un sito
-  senza scelta legge `Notification.permission === 'denied'`. Chi guarda prima di chiedere non chiede più; per quei
-  siti la strada è Sicurezza o il tasto destro sulla scheda.
+  senza scelta legge `Notification.permission === 'denied'`. Chi guarda prima di chiedere non chiede più; per questo
+  il tasto destro sulla scheda offre anche i permessi che il sito non ha mai chiesto.
 - **Filo e il sito condividono la sessione.** «Incolla» e «Detta» leggono appunti e microfono dal content script, e
   la richiesta arriva col nome del sito. Prima di chiedere mandano `PERMESSO_FILO`: vale tre secondi, tre usi, e
   solo per quella scheda. Senza, l'utente vedrebbe il sito chiedere una cosa che ha chiesto lui, e un «Consenti»

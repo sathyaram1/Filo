@@ -1601,12 +1601,14 @@
     return { aggiorna, icona, hostCorto };
   })();
 
-  // Tasto destro sulla scheda: le scelte ricordate per quel sito si revocano da qui.
+  // Tasto destro sulla scheda: le scelte per quel sito si danno e si revocano da qui, anche quelle mai chieste.
+  // Senza risposta il sito legge «bloccato» e certi non chiedono più (patterns/un-permesso-lo-da-lutente-fuori-dalla-pagina-che-lo-chiede.md).
+  const PERMESSI_DI_BASE = ['camera', 'microfono', 'posizione', 'notifiche', 'appunti'];
   let ctxPermessiSito = null;
   async function leggiPermessiScheda(tabId) {
     try {
       const r = await api.message({ type: 'site_permissions_of_tab', tabId });
-      return r && r.ok && r.sito && Object.keys(r.sito.scelte || {}).length ? r.sito : null;
+      return r && r.ok && r.sito ? r.sito : null;
     } catch (_) { return null; }
   }
 
@@ -1614,7 +1616,8 @@
     const sito = ctxPermessiSito;
     const P = window.SN_PERMESSI_SITI;
     if (!sito || !P) return;
-    const entries = Object.keys(P.TIPI).filter((t) => sito.scelte[t]).map((t) => ({
+    const tipi = Object.keys(P.TIPI).filter((t) => sito.scelte[t] || PERMESSI_DI_BASE.includes(t));
+    const entries = tipi.map((t) => ({
       label: `${sito.scelte[t] === 'consenti' ? 'Revoca' : 'Consenti'} ${P.TIPI[t].nome.toLowerCase()}`,
       action: `tab-permessi-cambia:${t}`,
     }));

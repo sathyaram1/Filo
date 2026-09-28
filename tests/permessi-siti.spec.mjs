@@ -19,7 +19,12 @@ const PAGINA = `<!doctype html><html><head><title>Permessi</title></head><body>
   window.chiediCamera = () => navigator.mediaDevices.getUserMedia({ video: true, audio: true })
     .then((s) => { const n = s.getTracks().length; s.getTracks().forEach((t) => t.stop()); return 'ok:' + n; },
       (e) => 'err:' + e.name);
-</script></body></html>`;
+  window.chiediSchermo = () => navigator.mediaDevices.getDisplayMedia({ video: true })
+    .then((s) => { const n = s.getVideoTracks().length; s.getTracks().forEach((t) => t.stop()); return 'ok:' + n; },
+      (e) => 'err:' + e.name);
+</script>
+<button id="schermo" onclick="window.__esito = null; chiediSchermo().then((r) => { window.__esito = r; })">Presenta</button>
+</body></html>`;
 
 async function avvia(page, fn) {
   await page.evaluate((f) => {
@@ -64,6 +69,9 @@ test('notifiche: la pagina aspetta, nessun sì senza risposta; «Consenti» dall
 
   mkdirSync(SHOTS, { recursive: true });
   await shell.screenshot({ path: join(SHOTS, 'permessi-striscia.png') });
+  await shell.emulateMedia({ colorScheme: 'dark' });
+  await shell.screenshot({ path: join(SHOTS, 'permessi-striscia-scuro.png') });
+  await shell.emulateMedia({ colorScheme: 'light' });
 
   const si = shell.locator('#perm-bar .perm-si');
   await expect(si).toBeEnabled({ timeout: 5_000 });
@@ -80,6 +88,11 @@ test('notifiche: la pagina aspetta, nessun sì senza risposta; «Consenti» dall
   await expect(voce.locator('.sn-perm-host')).toHaveText(host);
   const notifiche = voce.locator('.sn-perm-riga[data-tipo="notifiche"]');
   await expect(notifiche.locator('button[aria-pressed="true"]')).toHaveText('Consentito');
+  await sec.locator('#sec-permessi').scrollIntoViewIfNeeded();
+  await sec.screenshot({ path: join(SHOTS, 'permessi-sicurezza.png') });
+  await sec.emulateMedia({ colorScheme: 'dark' });
+  await sec.screenshot({ path: join(SHOTS, 'permessi-sicurezza-scuro.png') });
+  await sec.emulateMedia({ colorScheme: 'light' });
 
   // Da lì si blocca: la pagina lo vede subito.
   await notifiche.locator('button[data-valore="nega"]').click();
@@ -102,6 +115,29 @@ test('fotocamera e microfono: «Nega» si ricorda, dal tasto destro sulla scheda
   test.setTimeout(120_000);
   const page = await testServer.openReady(openTab, PAGINA);
   const origine = testServer.origin;
+  const scelte = () => app.evaluate((_e, o) => {
+    const s = globalThis.__filoPermessi.elenco(null).find((x) => x.origine === o);
+    return s ? s.scelte : {};
+  }, origine);
+  const apriPermessi = async () => {
+    if (await testoMenu(app, 'Gestisci permessi')) return;
+    await cliccaFinche(app, {
+      apri: () => tastoDestroScheda(shell),
+      ago: 'Permessi del sito',
+      etichetta: '^Permessi del sito$',
+      finche: async () => !!(await testoMenu(app, 'Gestisci permessi')),
+    });
+  };
+
+  // Un permesso mai chiesto si dà dal tasto destro: chi guarda prima di chiedere legge «denied» e non chiederebbe.
+  expect(await page.evaluate(() => Notification.permission)).toBe('denied');
+  await cliccaFinche(app, {
+    apri: apriPermessi,
+    ago: 'Gestisci permessi',
+    etichetta: '^Consenti notifiche$',
+    finche: async () => (await scelte()).notifiche === 'consenti',
+  });
+  await expect.poll(() => page.evaluate(() => Notification.permission)).toBe('granted');
 
   await avvia(page, 'chiediCamera');
   await expect(riga(shell)).toHaveCount(1, { timeout: 10_000 });
@@ -114,21 +150,8 @@ test('fotocamera e microfono: «Nega» si ricorda, dal tasto destro sulla scheda
   await expect.poll(() => esito(page)).toBe('err:NotAllowedError');
   await expect(riga(shell)).toHaveCount(0);
 
-  const scelte = () => app.evaluate((_e, o) => {
-    const s = globalThis.__filoPermessi.elenco(null).find((x) => x.origine === o);
-    return s ? s.scelte : {};
-  }, origine);
-  expect(await scelte()).toEqual({ camera: 'nega', microfono: 'nega' });
+  expect(await scelte()).toEqual({ notifiche: 'consenti', camera: 'nega', microfono: 'nega' });
 
-  const apriPermessi = async () => {
-    if (await testoMenu(app, 'Gestisci permessi')) return;
-    await cliccaFinche(app, {
-      apri: () => tastoDestroScheda(shell),
-      ago: 'Permessi del sito',
-      etichetta: '^Permessi del sito$',
-      finche: async () => !!(await testoMenu(app, 'Gestisci permessi')),
-    });
-  };
   for (const [voce, tipo] of [['Consenti fotocamera', 'camera'], ['Consenti microfono', 'microfono']]) {
     await cliccaFinche(app, {
       apri: apriPermessi,
@@ -215,4 +238,24 @@ test('Incolla di Filo su un sito legge gli appunti senza chiedere al sito', asyn
   await expect(riga(shell)).toHaveCount(0);
   const elenco = await app.evaluate(() => globalThis.__filoPermessi.elenco(null));
   expect(elenco, 'il sito non si ritrova un permesso sugli appunti').toEqual([]);
+});
+
+test('condividere lo schermo: si chiede ogni volta, «Condividi lo schermo» dà il video alla pagina', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, PAGINA);
+
+  await page.click('#schermo');
+  await expect(riga(shell)).toContainText('vuole vedere il tuo schermo', { timeout: 10_000 });
+  const si = shell.locator('#perm-bar .perm-si');
+  await expect(si).toHaveText('Condividi lo schermo');
+  await expect(si).toBeEnabled();
+  await si.click();
+  await expect.poll(() => esito(page), { timeout: 10_000 }).toBe('ok:1');
+
+  // Non si ricorda: la volta dopo si torna a chiedere, e «Nega» non resta scritto da nessuna parte.
+  await page.click('#schermo');
+  await expect(riga(shell)).toHaveCount(1, { timeout: 10_000 });
+  await shell.locator('#perm-bar .perm-no').click();
+  await expect.poll(() => esito(page)).toBe('err:NotAllowedError');
+  expect(await app.evaluate(() => globalThis.__filoPermessi.elenco(null))).toEqual([]);
 });

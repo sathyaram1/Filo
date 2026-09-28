@@ -1,6 +1,6 @@
 // Custode dei permessi che i siti chiedono: ogni sessione di Electron lo riceve alla nascita (`session-created`).
 // Niente di sensibile passa senza un «Consenti» dato fuori dalla pagina, e il silenzio vale no. Regole pure in
-// src/shared/permessiSiti.js; racconto in patterns/un-permesso-chiesto-da-un-sito-lo-da-l-utente-fuori.md.
+// src/shared/permessiSiti.js; racconto in patterns/un-permesso-lo-da-lutente-fuori-dalla-pagina-che-lo-chiede.md.
 
 const path = require('node:path');
 const P = require(path.join(__dirname, '..', '..', 'shared', 'permessiSiti.js'));

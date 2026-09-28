@@ -548,7 +548,7 @@
       host.className = 'sn-perm-host';
       host.textContent = sito.host;
       host.title = sito.origine;
-      testa.append(host, permButton(I18n.t('security_perm_forget_site'), 'sn-btn-secondary sn-perm-dimentica',
+      testa.append(host, permButton(I18n.t('security_perm_forget_site'), 'sn-btn sn-btn-secondary sn-perm-dimentica',
         () => mandaPermesso({ type: MSG.SITE_PERMISSIONS_FORGET, origine: sito.origine })));
       li.appendChild(testa);
       for (const tipo of Object.keys(PS.TIPI)) {

@@ -458,6 +458,12 @@
       invoke: 'Pagina filo://security/security.html.',
     },
     {
+      id: 'site-permissions', title: 'Permessi dei siti', category: 'settings',
+      desc: 'Quando un sito vuole usare fotocamera, microfono, posizione, notifiche, appunti o lo schermo, Filo te lo chiede in una striscia sotto le schede, con Consenti e Nega. Finché non rispondi il sito non ha niente, e la × vale come un no per quella volta sola. Filo si ricorda la scelta per quel sito, tranne la condivisione dello schermo, che chiede ogni volta. Una scheda in sottofondo che aspetta una risposta ha un’icona che pulsa. Incolla e Detta del menu di Filo non passano da qui, perché gli appunti e il microfono li stai usando tu.',
+      invoke: 'La striscia compare da sola quando un sito chiede. Le scelte ricordate le cambi in Impostazioni → Sicurezza → "Permessi dei siti", oppure col tasto destro sulla scheda → "Permessi del sito".',
+      doesNot: 'Se togli fotocamera o microfono a un sito che li sta già usando, restano accesi finché non ricarichi la pagina. In incognito le scelte restano nella finestra e spariscono quando la chiudi. Le finestre di accesso e le pagine aperte fuori dalle schede non possono chiedere, quindi lì vale il no, a meno che il sito non abbia già un sì. Chiavette e dispositivi USB, seriali o HID restano chiusi ai siti. Un sito a cui non hai ancora risposto vede le notifiche come bloccate, e qualcuno per questo non chiede più. Allora le consenti tu, col tasto destro sulla scheda → "Permessi del sito".',
+    },
+    {
       id: 'data-export-import', title: 'Esporta e importa i tuoi dati', category: 'settings',
       desc: 'Salva tutto quello che Filo sa di te (memorie degli agenti, pagine salvate, cronologia, appunti copiati, costi e impostazioni) in un unico file .zip, e lo ricarica quando vuoi — sullo stesso computer come backup, o su un altro per portarti dietro il tuo Filo. Le immagini copiate finiscono nell\'archivio come file veri, sfogliabili, e al ritorno tornano al loro posto. Prima di scrivere qualsiasi cosa, l\'importazione ti dice cosa contiene il file scelto (di quando è il backup, quante sezioni e quante immagini) e chiede conferma: quello che hai già non viene cancellato, le liste si uniscono senza duplicati e, dove lo stesso dato esiste da entrambe le parti, vince quello del backup. Le impostazioni ripristinate (tema, sicurezza, cookie) diventano attive subito, senza riavviare.',
       invoke: 'Impostazioni → Sicurezza, in fondo: "Esporta dati (.zip)" e "Importa dati (.zip)".',

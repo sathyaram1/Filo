@@ -388,6 +388,8 @@ function menuVoiceLabels() {
       if (f.endsWith('.js')) pages += '\n' + readFileSync(join(d, f), 'utf8');
     }
   }
+  // E il tasto destro sulla scheda, che la barra in alto disegna da sé.
+  pages += '\n' + readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
   const labels = new Set();
   for (const m of i18n.matchAll(/^ {4}(menu_[a-z0-9_]+):\s*'([^']+)'/gm)) {
     if (new RegExp(`'${m[1]}'`).test(content)) labels.add(m[2]);
