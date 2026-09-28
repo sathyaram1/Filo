@@ -550,6 +550,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     badge = null;
     percentInput = null;
     suppressContextMenu = false;
+    rimettiVelo();
     if (eraAperta) avvisaModalita();
   });
 
