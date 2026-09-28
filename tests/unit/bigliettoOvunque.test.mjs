@@ -292,10 +292,14 @@ test('una regola sola per il biglietto a mano: forme, ripetizioni e valori stort
   assert.deepEqual(leggiBigliettoAMano(['release', 'x']), { args: ['release', 'x'], ticket: '' });
 });
 
-test('consegna: una parola che non è un intento è un intento storto, se non ha la forma lunga di un biglietto', () => {
-  const lungo = bigliettoAMano('deliver', ['revision_capability'], VERO).errore || '';
-  assert.match(lungo, /Intento non capito: «revision_capability»/);
-  assert.doesNotMatch(lungo, /biglietti/);
+test('consegna: una parola che non è un intento è un intento storto, se non ha la forma lunga di un biglietto', async () => {
+  await conServer(async ({ ricevuti, env }) => {
+    const r = await esegui('routine-channel.mjs', ['deliver', 'revision_capability', '--notes', 'Report.', '--ticket', VERO], env);
+    assert.equal(r.code, 1, `stderr: ${r.se}`);
+    assert.match(r.se, /Intento non capito: «revision_capability»/);
+    assert.doesNotMatch(r.se, /biglietti/);
+    assert.equal(ricevuti.length, 0);
+  });
   assert.match(bigliettoAMano('deliver', [ALTRO_VERO], VERO).errore || '', /Due biglietti diversi.*manca l'intento/);
 });
 
