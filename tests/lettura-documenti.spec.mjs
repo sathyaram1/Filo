@@ -16,12 +16,27 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { writeFileSync, rmSync } from 'node:fs';
-import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { writeFileSync, rmSync, cpSync, mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { cartellaInCasa } from './helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FIXTURES = join(__dirname, 'fixtures', 'documenti');
 const HOME = 'filo://dashboard/dashboard.html';
+const REPO = join(__dirname, '..');
+
+// I documenti stanno dove li tiene un utente, nella cartella personale: fuori
+// (il repo può stare su un altro disco, la temporanea in AppData) la lettura
+// chiede un OK (#587), e quello ha la sua prova in fondo al file.
+let CASA;
+let FIXTURES;
+test.beforeAll(() => {
+  CASA = cartellaInCasa('filo-documenti-');
+  FIXTURES = join(CASA, 'documenti');
+  cpSync(join(__dirname, 'fixtures', 'documenti'), FIXTURES, { recursive: true });
+  cpSync(join(REPO, 'package.json'), join(CASA, 'package.json'));
+  cpSync(join(REPO, 'assets', 'icons', 'icon.ico'), join(CASA, 'icon.ico'));
+});
+test.afterAll(() => { if (CASA) rmSync(CASA, { recursive: true, force: true }); });
 
 // Manda l'azione dal VERO percorso di runtime e restituisce la risposta del main.
 async function leggiDocumento(page, percorso) {
@@ -60,7 +75,7 @@ test('su un PDF che è una scansione Filo lo dice, invece di inventare', async (
 test('un file di testo si legge senza passare dal terminale', async ({ openTab }) => {
   const page = await openTab(HOME);
   // Un file che esiste di sicuro nel repo e non è un PDF.
-  const r = await leggiDocumento(page, join(__dirname, '..', 'package.json'));
+  const r = await leggiDocumento(page, join(CASA, 'package.json'));
 
   expect(r?.executed).toBe(true);
   expect(r.output.kind).toBe('text');
@@ -84,7 +99,8 @@ test('il file col nome quasi giusto si apre, e Filo sa quale ha aperto', async (
   // vero, insieme al nome vero: il campo `requested` è quello che dice al
   // modello «non era questo il nome», e senza la sua strada fino in fondo il
   // modello continuerebbe a usare il nome che non esiste.
-  const dir = cartellaTemporanea('filo-nome-storpiato-');
+  const dir = join(CASA, 'nome-storpiato');
+  mkdirSync(dir);
   const vero = join(dir, 'SPECIFICHE SEO E METADATI — singolarità.txt');
   writeFileSync(vero, 'meta description: 155 caratteri\n', 'utf8');
   const storpiato = join(dir, 'SPECIFICHE SEO E METADATI - singolarit�.txt');
@@ -103,7 +119,7 @@ test('il file col nome quasi giusto si apre, e Filo sa quale ha aperto', async (
 
 test('un formato che Filo non legge viene rifiutato dicendo cos’è', async ({ openTab }) => {
   const page = await openTab(HOME);
-  const r = await leggiDocumento(page, join(__dirname, '..', 'assets', 'icons', 'icon.ico'));
+  const r = await leggiDocumento(page, join(CASA, 'icon.ico'));
 
   expect(r?.executed).toBe(false);
   expect(r.output.error).toBe('unsupported');
@@ -118,7 +134,8 @@ test('un formato che Filo non legge viene rifiutato dicendo cos’è', async ({ 
 // finire nella risposta al posto del documento chiesto.
 
 test('un nome senza cartella si apre dove Filo sta guardando, non dove sta il programma', async ({ app, openTab }) => {
-  const base = cartellaTemporanea('filo-doc-senza-cartella-');
+  const base = join(CASA, 'senza-cartella');
+  mkdirSync(base);
   try {
     writeFileSync(join(base, 'Relazione — attività.txt'), 'giacenza media 1.234 euro\n', 'utf8');
     const page = await openTab(HOME);
@@ -153,5 +170,38 @@ test('un nome senza cartella si apre dove Filo sta guardando, non dove sta il pr
     ).toBe(false);
   } finally {
     rmSync(base, { recursive: true, force: true });
+  }
+});
+
+// ── Il perimetro di lettura (#587) ──────────────────────────────────────────
+//
+// Una pagina ostile può far leggere al modello un file di configurazione e poi
+// fargli aprire un indirizzo con dentro il contenuto. Fuori dalla cartella
+// personale, o in un file nascosto, la lettura non parte senza un OK; dopo
+// l'OK legge davvero.
+
+test('un documento nascosto non si legge senza un OK, e con l’OK si legge', async ({ openTab }) => {
+  const nascosta = join(homedir(), `.filo-perimetro-${Date.now()}`);
+  mkdirSync(nascosta);
+  const chiave = join(nascosta, 'credenziali.txt');
+  writeFileSync(chiave, 'token=RISERVATO-4242\n', 'utf8');
+  try {
+    const page = await openTab(HOME);
+    const r = await leggiDocumento(page, chiave);
+    expect(r?.executed, 'il file nascosto è stato letto senza chiedere').toBe(false);
+    expect(r?.needsConfirm).toBe(2);
+    expect(String(r?.describe || '')).toContain('Perché te lo chiedo');
+    expect(JSON.stringify(r)).not.toContain('RISERVATO-4242');
+
+    const ok = await page.evaluate((p) => new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        type: window.SN_MSG.MSG.FILO_CONFIRM_ACTION,
+        action: { type: 'LEGGI_DOCUMENTO', percorso: p },
+      }, (x) => resolve(x));
+    }), chiave);
+    expect(ok?.executed, 'dopo l’OK dell’utente il documento si legge').toBe(true);
+    expect(ok.output.text).toContain('RISERVATO-4242');
+  } finally {
+    rmSync(nascosta, { recursive: true, force: true });
   }
 });
