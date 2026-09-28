@@ -799,11 +799,12 @@ html[data-feedback-dim="1"] .shell {
 }
 .perm-chiudi:hover:not(:disabled) { background: var(--border); color: var(--fg); }
 .perm-chiudi svg { display: block; }
-/* «Condividi lo schermo»: le cose fra cui scegliere, in righe che scorrono di lato. */
-.perm-fonti { display: flex; flex-direction: column; gap: 8px; padding-left: 26px; max-height: 280px; overflow-y: auto; }
+/* «Condividi lo schermo»: le cose fra cui scegliere, a gruppi affiancati che usano la larghezza della barra. */
+.perm-fonti { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 22px; padding-left: 26px; max-height: 300px; overflow-y: auto; }
 .perm-fonti-attesa { font: 12px/1.4 system-ui, sans-serif; color: var(--fg-soft); }
 .perm-fonti-titolo { font: 600 11px/1.2 system-ui, sans-serif; color: var(--fg-soft); margin-bottom: 4px; }
-.perm-fonti-riga { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.perm-fonti-gruppo { min-width: 0; }
+.perm-fonti-riga { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 4px; }
 .perm-fonte {
   flex: 0 0 auto;
   display: flex;
