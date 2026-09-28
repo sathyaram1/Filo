@@ -359,9 +359,14 @@
   // Il TCF non ha un comando per rifiutare: serve a sapere se il rifiuto è stato registrato davvero.
   // La pagina lo espone nel suo mondo; da qui si parla col protocollo postMessage del TCF, lo stesso dei riquadri.
 
+  // Il riquadro «__tcfapiLocator» è come lo standard fa trovare il CMP: senza, alla pagina non si scrive niente.
+  function hasTcf() {
+    try { return !!document.querySelector('iframe[name="__tcfapiLocator"]'); } catch (_) { return false; }
+  }
+
   function tcf(command, timeout) {
     return new Promise((resolve) => {
-      if (!IS_TOP) { resolve(null); return; }
+      if (!IS_TOP || !hasTcf()) { resolve(null); return; }
       const callId = 'filo-' + Math.random().toString(36).slice(2);
       let t = null;
       const onMsg = (e) => {
@@ -393,7 +398,7 @@
     if (reported.has('rejected')) return;
     reported.add('rejected');
     const go = () => send({ type: T_OUTCOME, outcome: 'rejected', via: String(via || '').slice(0, 60) });
-    if (!IS_TOP) { go(); return; }
+    if (!IS_TOP || !hasTcf()) { go(); return; }
     tcfConfirmsReject().then((ok) => { if (ok !== false) go(); else reported.delete('rejected'); });
   }
 

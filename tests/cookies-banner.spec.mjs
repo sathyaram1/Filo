@@ -130,6 +130,7 @@ function tcfPage(recordsReject) {
       <button id="onetrust-reject-all-handler" style="width:140px;height:40px"
         onclick="${recordsReject ? 'window.__given=false;' : ''}document.getElementById('onetrust-banner-sdk').remove()">Rifiuta tutto</button>
     </div>
+    <iframe name="__tcfapiLocator" style="display:none"></iframe>
     <script>
       window.__given = true;
       window.__tcfapi = function (cmd, v, cb) {

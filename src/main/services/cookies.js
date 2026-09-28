@@ -319,10 +319,13 @@ function configureForMode(mode) {
 let _cached = { mode: MODES.DEFAULT, trustedSites: [], bannerSites: [] };
 let _configured = false;
 
+// Ritorna true se cambia qualcosa che le pagine devono sapere (modalità o siti coi banner).
 function configureFromSettings(settings) {
   const prev = _cached.bannerSites;
+  const prevMode = _cached.mode;
   _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings), bannerSites: getBannerSites(settings) };
   configureForMode(_cached.mode);
+  const changed = prevMode !== _cached.mode || prev.join('\n') !== _cached.bannerSites.join('\n');
   // Un sito che entra o esce dall'elenco coi banner dimentica la risposta data: se no il banner non torna
   // (entra) o resta la scelta fatta a mano (esce). Vale per ogni strada: menu della scheda, Sicurezza, import.
   if (_configured) {
@@ -331,6 +334,7 @@ function configureFromSettings(settings) {
     }
   }
   _configured = true;
+  return changed;
 }
 
 function currentMode() { return _cached.mode; }
