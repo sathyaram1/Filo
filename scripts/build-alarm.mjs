@@ -86,6 +86,13 @@ export function nomeDelGuasto(chiave) {
   return m ? m[1] : '';
 }
 
+/** Il nome di ogni chiave che ne ha uno, per chiave: il server intitola un feedback coi soli guasti nuovi. PURA. */
+export function nomiDeiGuasti(chiavi) {
+  const nomi = {};
+  for (const k of normalizzaChiavi(chiavi)) if (nomeDelGuasto(k)) nomi[k] = nomeDelGuasto(k);
+  return nomi;
+}
+
 /**
  * Il titolo con i guasti fra parentesi, così due feedback aperti per guasti diversi non si chiamano uguali.
  * Entro il tetto del server: se i nomi non ci stanno tutti, il taglio si dice («e altri N»). PURA.
