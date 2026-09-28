@@ -4055,8 +4055,8 @@
     }
     const t = tastoEditorDi(sc);
     if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo modulo non partirebbe mai`;
-    const e = pressioneDi(sc);
-    const altro = doc.modules.find((x) => x !== m && x.data && x.data.shortcut && matchShortcut(e, x.data.shortcut));
+    const e = TASTI.pressioneScritta(sc);
+    const altro = e && doc.modules.find((x) => x !== m && x.data && x.data.shortcut && matchShortcut(e, x.data.shortcut));
     if (altro) {
       const etich = (MODULE_TYPES[altro.type] && MODULE_TYPES[altro.type].label) || altro.type;
       return `${nome} è già la scorciatoia di «${etich}», e partirebbe solo quello`;
