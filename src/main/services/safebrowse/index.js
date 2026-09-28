@@ -102,11 +102,76 @@ function pathOf(url) {
 }
 
 // Il freno conta le chiamate, il verdetto resta del sito (#591): su una piattaforma di hosting che Filo non conosce un
-// dominio è di migliaia di proprietari, e la risposta di uno non vale per un altro. Il conto è per dominio (per sito sulle
-// piattaforme note): qualche controllo all'ora, oltre i siti nuovi restano col verdetto locale.
+// dominio è di migliaia di proprietari, e la risposta di uno non vale per un altro. Il conto è per proprietario
+// dell'indirizzo, che una pagina non può inventarsi: qualche controllo all'ora, oltre i siti nuovi restano col verdetto locale.
 const DEEP_BUDGET = 5;
-function budgetKey(norm, url) {
-  return whitelist.hostedPlatform(norm.host, pathOf(url)) ? norm.host + pathOf(url) : norm.registrable;
+
+// Una rete: chi ha un server ha di solito un /64 IPv6 (e spesso un /48), cioè miliardi di indirizzi suoi.
+function networkOf(ip) {
+  const a = String(ip || '').toLowerCase().replace(/^\[|\]$/g, '');
+  const v4 = (s) => s.split('.').slice(0, 3).join('.') + '.0/24';
+  if (!a.includes(':')) return v4(a);
+  const dotted = /(\d{1,3}(?:\.\d{1,3}){3})$/.exec(a);
+  let head = a;
+  let tail = [];
+  if (dotted) {
+    const o = dotted[1].split('.').map(Number);
+    head = a.slice(0, -dotted[1].length).replace(/:$/, '');
+    tail = [((o[0] << 8) | o[1]).toString(16), ((o[2] << 8) | o[3]).toString(16)];
+  }
+  const [l, r] = head.split('::');
+  const left = l ? l.split(':') : [];
+  const right = (r !== undefined && r) ? r.split(':') : [];
+  const fill = head.includes('::') ? Array(Math.max(0, 8 - left.length - right.length - tail.length)).fill('0') : [];
+  const h = left.concat(fill, right, tail).map((x) => parseInt(x || '0', 16));
+  // Un IPv4 scritto come IPv6 (::ffff:1.2.3.4) è quell'IPv4.
+  if (h.slice(0, 5).every((x) => x === 0) && h[5] === 0xffff) {
+    return v4([h[6] >> 8, h[6] & 255, h[7] >> 8, h[7] & 255].join('.'));
+  }
+  return h.slice(0, 3).map((x) => x.toString(16)).join(':') + '::/48';
+}
+
+function ownerKey(norm, url) {
+  if (norm.isIp) return networkOf(norm.host);
+  const owner = whitelist.hostedOwner(norm.host, pathOf(url));
+  return owner !== null ? norm.host + owner : norm.registrable;
+}
+
+// Di chi è un indirizzo, per il conto delle chiamate che Filo fa da solo (lo usa anche il blocco geografico).
+function ownerOf(url) {
+  const norm = normalizeMod.normalize(url);
+  return norm && norm.ok ? ownerKey(norm, url) : null;
+}
+
+// Un indirizzo cambiato dalla pagina senza navigare (history.pushState) resta sulla stessa origine ma può scriversi
+// qualunque percorso: il conto va a chi ha servito la pagina davvero, `ctx.budgetUrl`, l'ultimo indirizzo navigato.
+function budgetKey(norm, url, ctx) {
+  const loaded = ctx && ctx.budgetUrl;
+  if (loaded && loaded !== url) {
+    try {
+      if (new URL(String(loaded)).origin === new URL(String(url)).origin) return ownerOf(loaded) || ownerKey(norm, url);
+    } catch (_) {}
+  }
+  return ownerKey(norm, url);
+}
+
+// Qualche chiamata all'ora per chiave; la stessa regola per ogni lavoro automatico che chiama il modello.
+function createOwnerBudget({ perHour = DEEP_BUDGET, max = 5000 } = {}) {
+  const m = new Map();
+  return {
+    m,
+    spend(k) {
+      const now = Date.now();
+      const recent = (m.get(k) || []).filter((t) => now - t < HOUR);
+      m.delete(k);
+      if (recent.length >= perHour) { m.set(k, recent); return false; }
+      recent.push(now);
+      m.set(k, recent);
+      // Tetto largo: una chiave dimenticata riparte col conto pieno, e costa qualche chiamata, non un buco.
+      if (m.size > max) m.delete(m.keys().next().value);
+      return true;
+    },
+  };
 }
 
 // Gli indizi che vede il giudice: lo stesso sito con indizi diversi è un'altra domanda.
