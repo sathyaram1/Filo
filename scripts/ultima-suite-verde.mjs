@@ -198,15 +198,36 @@ async function main() {
   ];
   if (erroreApi) riassunto.push(`- Le corse della suite non si sono lette: ${erroreApi}.`);
 
-  const fermo = rilascioFermo({ oreDallUltima, commitDopoTag, verdeDopoTag });
+  const oreDalVerde = verdeDopoTag ? oreDalPrimoVerde(runs, primoGenitore, tagSha, eAntenato) : NaN;
+  const fermo = rilascioFermo({ oreDallUltima, commitDopoTag, verdeDopoTag, oreDalVerde });
   if (!fermo && tag && commitDopoTag > 0 && !verdeDopoTag && Number.isFinite(oreDallUltima)) {
     riassunto.push(`- Nessun commit verde dopo ${tag} da ${Math.round(oreDallUltima)} ore: sopra le ${SOGLIA_ORE} si apre un feedback.`);
   }
-  if (fermo) riassunto.push('', `**Pubblicazione ferma da più di ${SOGLIA_ORE} ore: si apre un feedback e la corsa resta rossa.**`);
+  if (Number.isFinite(oreDalVerde)) {
+    riassunto.push(`- Il primo verde dopo ${tag || 'nessuna versione'} c'è da ${Math.round(oreDalVerde)} ore: se non esce entro ${SOGLIA_VERDE_ORE}, con l'ultima versione più vecchia di ${SOGLIA_ORE}, si apre un feedback.`);
+  }
+  if (fermo === 'senza-verde') riassunto.push('', `**Pubblicazione ferma da più di ${SOGLIA_ORE} ore: si apre un feedback e la corsa resta rossa.**`);
+  if (fermo === 'dopo-il-verde') riassunto.push('', `**Pubblicazione ferma da più di ${SOGLIA_ORE} ore anche se un verde c'è: si apre un feedback e si prova lo stesso a pubblicare.**`);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${riassunto.join('\n')}\n`);
   console.log(riassunto.join('\n'));
 
-  if (fermo) {
+  // Il guasto sta a valle, e può essere già passato: l'allarme parte, ma la pubblicazione si tenta lo stesso.
+  // Un allarme che non arriva non deve fermarla: la corsa resta rossa solo se la pubblicazione fallisce.
+  if (fermo === 'dopo-il-verde') {
+    let pubblicazioni = [];
+    try {
+      const j = ghApi(`repos/${repo}/actions/workflows/release.yml/runs?branch=main&per_page=8`);
+      pubblicazioni = Array.isArray(j?.workflow_runs) ? j.workflow_runs : [];
+    } catch { /* il testo lo dice: nessuna letta */ }
+    const { titolo, testo } = testoFermoDopoIlVerde({
+      tag, oreDallUltima, commitDopoTag, verde, corsaVerde, oreDalVerde, pubblicazioni, esecuzione, erroreApi,
+    });
+    console.log(`::error::${titolo}`);
+    if (!(await spedisciAllarme(titolo, testo, [CHIAVE_FERMO_DOPO_VERDE]))) {
+      console.log('::error::l\'allarme della pubblicazione ferma non è partito: il guasto resta solo in questa corsa.');
+    }
+  }
+  if (fermo === 'senza-verde') {
     let corse = [];
     try { corse = repo ? leggiCorse(repo, 'per_page=8') : []; } catch { /* il testo lo dice: nessuna letta */ }
     const { titolo, testo } = testoRilascioFermo({ tag, oreDallUltima, commitDopoTag, verde, corsaVerde, corse, esecuzione, erroreApi });
