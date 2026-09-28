@@ -191,20 +191,27 @@ async function signIn() {
   if (net && typeof net.isOnline === 'function' && !net.isOnline()) {
     throw erroreAccesso('rete', 'nessuna connessione');
   }
-  // Un accesso alla volta: chi lo chiede mentre uno aspetta il browser (doppio
-  // clic, «Riapri il browser», il menu account) riapre la STESSA pagina e ne
-  // condivide l'esito, così qualunque scheda del browser completi arriva a Filo.
+  // Un accesso alla volta: chi lo chiede mentre uno aspetta il browser riapre la
+  // STESSA pagina e ne condivide l'esito, così qualunque scheda completi arriva a Filo.
   if (flussoInCorso) {
-    const f = flussoInCorso;
+    const f = await flussoInCorso;
     if (f.aspettaBrowser) {
       f.rinnovaAttesa();
       await apriBrowser(shell, f.url);
     }
     return f.esito;
   }
-  const f = await nuovoFlusso();
-  flussoInCorso = f;
-  f.esito.then(() => {}, () => {}).then(() => { if (flussoInCorso === f) flussoInCorso = null; });
+  const prossimo = nuovoFlusso();
+  flussoInCorso = prossimo;
+  const libera = () => { if (flussoInCorso === prossimo) flussoInCorso = null; };
+  let f;
+  try {
+    f = await prossimo;
+  } catch (e) {
+    libera();
+    throw e;
+  }
+  f.esito.then(libera, libera);
   try {
     await apriBrowser(shell, f.url);
   } catch (e) {
