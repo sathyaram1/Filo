@@ -1186,9 +1186,14 @@ if (isMain) {
       console.error('Il report va in --notes "…", la frase per chi ha mandato il feedback in --frase "…", il testo di un feedback nuovo in --text "…".');
       process.exit(1);
     }
-    // Senza intento una parola storta partiva verso il server COME biglietto: nessuna consegna ha un intento vuoto.
+    // Senza intento una parola storta partiva verso il server COME biglietto, e dopo un biglietto COME
+    // intento: la regola è una, l'intento storto si ferma qui con l'elenco.
     if (!intento) {
-      console.error(testoIntentoNonCapito(looksLikeTicket(biglietto) ? '' : biglietto));
+      console.error(testoIntentoNonCapito(haFormaDiBigliettoVero(biglietto) ? '' : biglietto));
+      process.exit(1);
+    }
+    if (!INTENTI.includes(intento)) {
+      console.error(testoIntentoNonCapito(intento));
       process.exit(1);
     }
     // La versione in cui il fix confluisce la sa solo questa macchina (è quella
