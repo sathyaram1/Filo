@@ -3904,7 +3904,7 @@ function broadcastToTabs(message) {
     for (const win of BrowserWindow.getAllWindows()) {
       if (win._filoTabs) {
         for (const t of win._filoTabs.tabs) {
-          try { spingiAllaScheda(t.view.webContents, message); } catch (_) {}
+          try { spingiAllaScheda(t.view.webContents, message, { inVista: t.id === win._filoTabs.activeId }); } catch (_) {}
         }
       }
       spingiAllaFinestra(win, message);

@@ -5,16 +5,19 @@
 
 const OGNI_VOCE = '*';
 
-// Ciò che i content script leggono davvero. Quello che manca qui non arriva ai
-// siti: un segreto aggiunto domani resta a casa senza che nessuno se ne ricordi.
+// Ciò che i content script leggono davvero, campo per campo anche dentro le sezioni
+// (`true` solo per valori tutti dell'utente): un segreto aggiunto domani resta a casa.
 const CAMPI_WEB = Object.freeze({
   theme: true,
   themeTokens: true,
-  tabColor: true,
+  tabColor: Object.freeze({
+    soglia_saturazione: true, peso_centralita: true, bucket_tinta: true,
+    saturazione_tab: true, luminosita_tab: true, opacita_tab: true,
+  }),
   blocklist: true,
-  featureFlags: true,
-  tts: true,
-  models: true,
+  featureFlags: Object.freeze({ spellcheck: true }),
+  tts: Object.freeze({ voice: true, rate: true, pitch: true }),
+  models: Object.freeze({ transcribe_audio: true }),
   // Voci aperte (le scrive anche l'owner dalla config condivisa): di ognuna
   // passa solo quanto serve al menu della dettatura per scegliere il modello.
   modelRegistry: Object.freeze({
@@ -40,6 +43,10 @@ const SPINTE_WEB = Object.freeze(new Set([
   'tts_stop',
   'fullscreen_changed',
 ]));
+
+// Quelli che si mostrano una volta sola, nella pagina in vista: a un sito vanno
+// solo al frame principale della scheda in primo piano, che è l'unico a mostrarli.
+const SPINTE_WEB_IN_VISTA = Object.freeze(new Set(['show_toast']));
 
 // Gli scomparti del magazzino che i content script usano. `settings` si legge
 // (ritagliato) ma non si scrive mai da un sito.
@@ -146,33 +153,34 @@ function scritturaImpostazioniAmmessa(incoming, origine) {
   return dentroLaRegola(incoming, CAMPI_WEB_SCRITTURA);
 }
 
-// Per le spinte: `null` vuol dire «a questo destinatario non si manda». Verso un
-// sito passano solo i tipi di SPINTE_WEB, e le impostazioni ritagliate.
-// `pagina` è l'indirizzo della scheda quando il destinatario è un suo riquadro.
-function messaggioPerDestinazione(message, url, pagina) {
+// Per le spinte: `null` = «a questo destinatario non si manda». Verso un sito passano i
+// tipi di SPINTE_WEB con le impostazioni ritagliate; `pagina` è la scheda che contiene
+// il riquadro, `dove` dice se la scheda è in primo piano e se chi riceve è un riquadro.
+function messaggioPerDestinazione(message, url, pagina, dove = {}) {
   if (destinazioneFilo(url, pagina) || !message || typeof message !== 'object') return message;
   if (!SPINTE_WEB.has(message.type)) return null;
+  if (SPINTE_WEB_IN_VISTA.has(message.type) && (dove.inVista !== true || dove.riquadro)) return null;
   if (!own(message, 'settings')) return message;
   return { ...message, settings: impostazioniPerWeb(message.settings, [url, pagina]) };
 }
 
-// Una spinta a una scheda, frame per frame (#405: `wc.send` raggiunge solo il frame
-// principale, e i content script girano anche nei riquadri), ognuno col messaggio
-// ritagliato sul proprio indirizzo. Ogni spinta a più schede passa da qui.
-function spingiAllaScheda(wc, message) {
+// Una spinta a una scheda, frame per frame (#405: i content script girano anche nei
+// riquadri), ognuno col messaggio ritagliato sul suo indirizzo e su `inVista` (la
+// scheda in primo piano della finestra). Ogni spinta a più schede passa da qui.
+function spingiAllaScheda(wc, message, { inVista = false } = {}) {
   if (!wc || wc.isDestroyed?.()) return;
   let pagina = '';
   try { pagina = String(wc.getURL() || ''); } catch (_) { pagina = ''; }
   let frames = null;
   try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
   if (!frames || !frames.length) {
-    try { const m = messaggioPerDestinazione(message, pagina); if (m) wc.send('filo:broadcast', m); } catch (_) {}
+    try { const m = messaggioPerDestinazione(message, pagina, undefined, { inVista }); if (m) wc.send('filo:broadcast', m); } catch (_) {}
     return;
   }
   for (const f of frames) {
     try {
       if (f.detached) continue;
-      const m = messaggioPerDestinazione(message, f.url, pagina);
+      const m = messaggioPerDestinazione(message, f.url, pagina, { inVista, riquadro: Boolean(f.parent) });
       if (m) f.send('filo:broadcast', m);
     } catch (_) {}
   }
@@ -184,7 +192,7 @@ function spingiAllaFinestra(win, message) {
   try {
     const wc = win && win.webContents;
     if (!wc || wc.isDestroyed?.()) return;
-    const m = messaggioPerDestinazione(message, wc.getURL());
+    const m = messaggioPerDestinazione(message, wc.getURL(), undefined, { inVista: Boolean(win.isFocused?.()) });
     if (m) wc.send('filo:broadcast', m);
   } catch (_) {}
 }
@@ -223,6 +231,7 @@ module.exports = {
   CAMPI_WEB,
   CAMPI_WEB_SCRITTURA,
   SPINTE_WEB,
+  SPINTE_WEB_IN_VISTA,
   CHIAVI_STORAGE_WEB,
   AZIONI_WEB,
   isFilo,

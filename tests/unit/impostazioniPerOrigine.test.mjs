@@ -61,7 +61,7 @@ test('verso un sito arriva quello che i content script usano, con i valori veri'
   assert.deepEqual(web.themeTokens, { accent: '#c0662f' });
   assert.deepEqual(web.blocklist, ['esempio.it']);
   assert.equal(web.featureFlags.spellcheck, false);
-  assert.deepEqual(web.tts, s.tts);
+  assert.deepEqual(web.tts, { voice: s.tts.voice, rate: s.tts.rate, pitch: s.tts.pitch });
   assert.deepEqual(web.tabColor, s.tabColor);
   assert.equal(web.models.transcribe_audio, 'whisper');
   assert.deepEqual(web.modelRegistry.whisper, {
@@ -145,6 +145,24 @@ test('un campo nuovo non elencato non raggiunge i siti (lista di ammessi, non di
   assert.ok(!testo(web).includes('tok-NUOVO'));
 });
 
+test('dentro una sezione ammessa passa solo il campo dichiarato', () => {
+  const s = impostazioniConSegreti();
+  s.tts = { ...s.tts, rate: 1.3, chiaveServizioVoce: 'tok-VOCE' };
+  s.featureFlags = { ...s.featureFlags, nuovaFunzione: 'tok-FLAG' };
+  s.tabColor = { ...s.tabColor, segreto: 'tok-COLORE' };
+  s.models = { ...s.models, explain: 'claude', segreto: 'tok-MODELLI' };
+  for (const web of [
+    W.impostazioniPerOrigine(s, 'https://sito.example/'),
+    W.messaggioPerDestinazione(messaggio(s), 'https://sito.example/').settings,
+    W.storagePerOrigine({ settings: s }, 'https://sito.example/').settings,
+  ]) {
+    for (const t of ['tok-VOCE', 'tok-FLAG', 'tok-COLORE', 'tok-MODELLI']) assert.ok(!testo(web).includes(t), `${t} arrivato al sito`);
+    assert.equal(web.tts.rate, 1.3);
+    assert.deepEqual(Object.keys(web.models), ['transcribe_audio']);
+  }
+  assert.equal(W.impostazioniPerOrigine(s, 'filo://options/options.html').tts.chiaveServizioVoce, 'tok-VOCE');
+});
+
 test('ogni destinazione che non è filo:// vale come sito, anche vuota o somigliante', () => {
   const s = impostazioniConSegreti();
   for (const url of ['', undefined, null, 'about:blank', 'data:text/html,x', 'file:///C:/x.html', 'https://filo.example/', 'http://x/?u=filo://options']) {
@@ -165,6 +183,32 @@ test('verso un sito la spinta porta solo i tipi che il suo content script ascolt
     }
     assert.equal(W.messaggioPerDestinazione(m, 'filo://dashboard/dashboard.html'), m);
   }
+});
+
+test('un avviso da mostrare arriva a un sito solo nel frame principale della scheda in primo piano', () => {
+  const avviso = { type: 'show_toast', text: 'Feedback inviato, ma non sono riuscito a caricare: estratto-conto.pdf' };
+  assert.equal(W.messaggioPerDestinazione(avviso, 'https://sito.example/', undefined, { inVista: true }), avviso);
+  assert.equal(W.messaggioPerDestinazione(avviso, 'https://sito.example/'), null, 'scheda sullo sfondo');
+  assert.equal(W.messaggioPerDestinazione(avviso, 'https://sito.example/', undefined, { inVista: false }), null);
+  assert.equal(W.messaggioPerDestinazione(avviso, 'https://widget.example/', 'https://sito.example/', { inVista: true, riquadro: true }), null, 'riquadro');
+  assert.equal(W.messaggioPerDestinazione(avviso, 'filo://newtab/'), avviso, 'le pagine di Filo lo ricevono comunque');
+
+  const inviati = [];
+  const scheda = (pagina) => {
+    const principale = { url: pagina, parent: null, detached: false, send: (_c, m) => inviati.push({ url: pagina, m }) };
+    const riquadro = { url: 'https://widget.example/', parent: principale, detached: false, send: (_c, m) => inviati.push({ url: 'riquadro', m }) };
+    return { isDestroyed: () => false, getURL: () => pagina, mainFrame: { framesInSubtree: [principale, riquadro] } };
+  };
+  W.spingiAllaScheda(scheda('https://in-vista.example/'), avviso, { inVista: true });
+  W.spingiAllaScheda(scheda('https://sfondo.example/'), avviso, { inVista: false });
+  W.spingiAllaScheda(scheda('https://senza-dire.example/'), avviso);
+  assert.deepEqual(inviati.map((x) => x.url), ['https://in-vista.example/']);
+
+  const finestre = [];
+  const finestra = (focus) => ({ isFocused: () => focus, webContents: { isDestroyed: () => false, getURL: () => 'https://accounts.example/login', send: (_c, m) => finestre.push({ focus, m }) } });
+  W.spingiAllaFinestra(finestra(true), avviso);
+  W.spingiAllaFinestra(finestra(false), avviso);
+  assert.deepEqual(finestre.map((x) => x.focus), [true]);
 });
 
 test('le letture dello storage grezzo seguono la stessa regola; le altre chiavi restano', () => {
@@ -311,6 +355,43 @@ test('sentinella: ogni impostazione letta dai content script dei siti è fra i c
   assert.deepEqual(mancanti, [], 'impostazioni lette sui siti ma non ammesse in impostazioniPerOrigine.js');
 });
 
+// Dentro le sezioni elencate campo per campo: ogni campo che il codice dei siti
+// legge è ammesso, e ogni campo nuovo di una sezione si decide quando nasce.
+const SEZIONI_A_CAMPI = Object.keys(W.CAMPI_WEB).filter((k) => W.CAMPI_WEB[k] !== true && !('*' in W.CAMPI_WEB[k]));
+
+test('sentinella: ogni campo letto dai siti dentro una sezione elencata campo per campo è ammesso', () => {
+  const { ACTIONS } = globalThis.SN_CONST;
+  const letti = new Set();
+  for (const { f, src } of scriptDeiSiti()) {
+    for (const S of SEZIONI_A_CAMPI) {
+      const punto = new RegExp(`(?<![\\w$'"\`])${S}\\s*(?:\\?\\.|\\.)\\s*([A-Za-z_$][\\w$]*)`, 'g');
+      const quadre = new RegExp(`(?<![\\w$'"\`])${S}\\s*(?:\\?\\.)?\\[\\s*(?:(?:[\\w$]+\\.)*ACTIONS\\.([A-Z_]+)|['"]([\\w$]+)['"])\\s*\\]`, 'g');
+      for (const m of src.matchAll(punto)) letti.add(`${S}.${m[1]} (${f})`);
+      for (const m of src.matchAll(quadre)) letti.add(`${S}.${m[1] ? ACTIONS[m[1]] : m[2]} (${f})`);
+    }
+  }
+  for (const atteso of ['tts.rate', 'featureFlags.spellcheck', 'models.transcribe_audio']) {
+    assert.ok([...letti].some((l) => l.startsWith(`${atteso} `)), `la sentinella non vede più la lettura di ${atteso}`);
+  }
+  const mancanti = [...letti].filter((l) => {
+    const [S, campo] = l.split(' ')[0].split('.');
+    return !(campo in W.CAMPI_WEB[S]);
+  });
+  assert.deepEqual(mancanti, [], 'campi letti sui siti ma non ammessi in impostazioniPerOrigine.js');
+});
+
+// Un campo nuovo in una di queste sezioni non arriva ai siti finché qualcuno non
+// sceglie: nella lista se il codice dei siti lo usa, qui se resta a casa. I modelli
+// per funzione restano fuori: se ne aggiungono spesso e ai siti ne serve uno solo.
+const RESTANO_A_CASA = { tts: ['modelVoice'], featureFlags: ['help', 'categorize'], tabColor: [] };
+test('sentinella: ogni campo delle sezioni elencate campo per campo è stato deciso', () => {
+  for (const S of SEZIONI_A_CAMPI.filter((k) => k !== 'models')) {
+    assert.ok(S in RESTANO_A_CASA, `sezione ${S} elencata campo per campo senza la sua decisione qui`);
+    const indecisi = Object.keys(DEFAULT_SETTINGS[S] || {}).filter((c) => !(c in W.CAMPI_WEB[S]) && !RESTANO_A_CASA[S].includes(c));
+    assert.deepEqual(indecisi, [], `campi nuovi di ${S}: ammetterli in impostazioniPerOrigine.js o dire qui che restano a casa`);
+  }
+});
+
 // Gli scomparti del magazzino che i content script toccano con chrome.storage:
 // uno che manca dalla lista spegnerebbe la funzione solo sui siti.
 test('sentinella: ogni scomparto del magazzino usato dai content script è fra quelli ammessi', () => {
@@ -408,6 +489,22 @@ test('sentinella: ogni spinta a tutte le schede o finestre passa dalla regola de
   cammina('src/main');
   const fuori = principali.flatMap((f) => spinteSenzaRegola(readFileSync(join(ROOT, f), 'utf8'), f));
   assert.deepEqual(fuori, [], 'spinte a tutte le schede che non passano da impostazioniPerOrigine.js');
+});
+
+test('sentinella: ogni spinta a più schede dice quale scheda è in primo piano', () => {
+  const fuori = [];
+  const cammina = (dir) => {
+    for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${e.name}`;
+      if (e.isDirectory()) { cammina(rel); continue; }
+      if (!e.name.endsWith('.js') || rel.endsWith('impostazioniPerOrigine.js')) continue;
+      readFileSync(join(ROOT, rel), 'utf8').split('\n').forEach((r, i) => {
+        if (/\bspingiAllaScheda\(/.test(r) && !/\binVista\b/.test(r) && !/require\(|\{[^}]*spingiAllaScheda[^}]*\}\s*=/.test(r)) fuori.push(`${rel}:${i + 1}`);
+      });
+    }
+  };
+  cammina('src/main');
+  assert.deepEqual(fuori, [], 'senza inVista gli avvisi non arrivano più alla scheda in primo piano di un sito');
 });
 
 test('la spinta frame per frame ritaglia su ogni indirizzo, e una finestra di un sito vale come sito', () => {

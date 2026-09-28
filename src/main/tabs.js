@@ -616,7 +616,7 @@ class TabManager {
   // (e «Esci da schermo intero» a chi ne era già uscito, rimettendocelo con un
   // clic), e il suo Esc chiudeva il menu portandosi via anche la modalità.
   _broadcastToViews(message) {
-    for (const t of this.tabs) spingiAllaScheda(t.view?.webContents, message);
+    for (const t of this.tabs) spingiAllaScheda(t.view?.webContents, message, { inVista: t.id === this.activeId });
   }
 
   // ─── lifecycle ──────────────────────────────────────────────────────────

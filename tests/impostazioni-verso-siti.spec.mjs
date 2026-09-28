@@ -274,3 +274,43 @@ test('l\'avviso dei dati dal vivo arriva alle pagine di Filo e non ai siti', asy
   await expect.poll(() => nelContentScript(app, testServer.origin, 'globalThis.__spia589v.includes("settings_updated")'), { timeout: 8000 }).toBe(true);
   expect(await nelContentScript(app, testServer.origin, 'globalThis.__spia589v'), 'l\'avviso dei dati dal vivo è arrivato al sito').not.toContain('filo_live_updated');
 });
+
+// Anche dentro una sezione ammessa passa solo il campo dichiarato: il prossimo
+// segreto messo nella sezione della voce resta a casa, la velocità di lettura no.
+test('un campo nuovo dentro una sezione ammessa non arriva al sito', async ({ app, shell, openTab, testServer }) => {
+  const sito = await testServer.openReady(openTab, '<!doctype html><html><body><p>Un sito.</p></body></html>');
+  await sito.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await nelContentScript(app, testServer.origin, `
+    globalThis.__spia589c = [];
+    chrome.runtime.onMessage.addListener((m) => { if (m && m.type === 'settings_updated') globalThis.__spia589c.push(m.settings); });
+    true;
+  `);
+  await shell.evaluate(() => window.filoShell.message({
+    type: 'update_settings', settings: { tts: { rate: 1.3, chiaveServizioVoce: 'SEGRETO-DENTRO-LA-VOCE-589' } },
+  }));
+  await expect.poll(() => nelContentScript(app, testServer.origin, 'globalThis.__spia589c.length'), { timeout: 8000 }).toBeGreaterThan(0);
+  const arrivate = await nelContentScript(app, testServer.origin, 'globalThis.__spia589c[globalThis.__spia589c.length - 1]');
+  expect(arrivate.tts?.rate, 'la velocità di lettura deve arrivare al sito').toBe(1.3);
+  expect(JSON.stringify(arrivate), 'un campo mai dichiarato è arrivato al sito').not.toContain('SEGRETO-DENTRO-LA-VOCE-589');
+});
+
+// Un avviso di sistema lo mostra solo la scheda in primo piano: il sito sullo
+// sfondo non ne riceve il testo, quello davanti sì.
+test('un avviso di sistema arriva al sito in primo piano e non a quello sullo sfondo', async ({ app, openTab, testServer }) => {
+  const spia = `
+    globalThis.__spia589t = [];
+    chrome.runtime.onMessage.addListener((m) => { if (m && m.type === 'show_toast') globalThis.__spia589t.push(m.text); });
+    true;
+  `;
+  const sfondo = await testServer.openReady(openTab, '<!doctype html><html><body><p>Sullo sfondo.</p></body></html>');
+  await sfondo.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await nelContentScript(app, testServer.origin, spia);
+  const davanti = testServer.origin.replace('127.0.0.1', 'localhost');
+  const pagina = await openTab(testServer.html('<!doctype html><html><body><p>Davanti.</p></body></html>').replace('127.0.0.1', 'localhost'));
+  await pagina.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await nelContentScript(app, davanti, spia);
+
+  await app.evaluate(() => globalThis.SN_WALLET_MAIN.outOfCreditsNotice({ keySource: 'own' }));
+  await expect.poll(() => nelContentScript(app, davanti, 'globalThis.__spia589t.length'), { timeout: 8000 }).toBe(1);
+  expect(await nelContentScript(app, testServer.origin, 'globalThis.__spia589t'), 'l\'avviso è arrivato al sito sullo sfondo').toEqual([]);
+});

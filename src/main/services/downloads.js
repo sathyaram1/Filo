@@ -379,7 +379,7 @@ function notifyTabs(scope = '') {
     for (const win of windowsOf(scope)) {
       const tm = win._filoTabs;
       if (tm && Array.isArray(tm.tabs)) {
-        for (const t of tm.tabs) spingiAllaScheda(t.view && t.view.webContents, msg);
+        for (const t of tm.tabs) spingiAllaScheda(t.view && t.view.webContents, msg, { inVista: t.id === tm.activeId });
       }
     }
   } catch (_) {}

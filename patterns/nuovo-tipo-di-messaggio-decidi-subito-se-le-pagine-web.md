@@ -101,10 +101,15 @@ ammesso**, in un file solo (`src/main/services/impostazioniPerOrigine.js`):
   quando arriva da una chat aperta lì (#589, giro 6: preferenze, memoria e
   terminale).
 
-Due regole valgono per tutte le liste. Un destinatario è di Filo solo se lo è
-anche la **scheda** che lo contiene: l'indirizzo di un riquadro lo sceglie la
-pagina, e un sito può puntarlo su `filo://`. E di un dato che il sito usa per un
-sì o un no (i siti esclusi) gli arriva solo la parte che lo riguarda.
+Quattro regole valgono per tutte le liste. Un destinatario è di Filo solo se lo
+è anche la **scheda** che lo contiene: l'indirizzo di un riquadro lo sceglie la
+pagina, e un sito può puntarlo su `filo://`. Di un dato che il sito usa per un
+sì o un no (i siti esclusi) gli arriva solo la parte che lo riguarda. La lista
+scende **dentro le sezioni**: di una sezione ammessa passano i campi elencati, e
+un campo nuovo resta a casa finché qualcuno non lo decide (#589, giro 8: un
+segreto messo nella sezione della voce sarebbe arrivato a ogni sito). E ciò che
+si mostra una volta sola, come un avviso, va solo al frame principale della
+scheda **in primo piano**: le altre non lo mostrerebbero mai.
 
 Ogni spinta che gira su più schede o finestre passa da `spingiAllaScheda` /
 `spingiAllaFinestra` di quel file, o si limita da sé alle superfici di Filo: una
