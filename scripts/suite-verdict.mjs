@@ -376,7 +376,7 @@ async function main() {
   if (v.totale === 0) {
     console.error('La suite NON ha eseguito nessun caso: non è un verde.');
     for (const e of Array.isArray(json.errors) ? json.errors : []) console.error(`  errore: ${primaRiga(e)}`);
-    scriviChiavi(opt, [CHIAVE_NON_PARTITA]);
+    scriviChiavi(opt, chiaviSenzaCasi(json.errors));
     process.exit(2);
   }
   // Gli errori fuori dai casi stanno già dentro `v`: fra i nuovi (rossi) o fra
