@@ -113,6 +113,7 @@ test('in una scheda nuova dello stesso sito il menu offre ancora «Mostra il ban
     await sleep(3000);
     // Il sito si ricorda il rifiuto: niente banner. Proprio per questo il menu deve dirlo e offrire di rivederlo.
     expect(await b.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(false);
+    expect(await b.evaluate(() => window.__r)).toBe('');
     expect(await menuDellaScheda(app, shell)).toContain('Mostra il banner dei cookie');
   } finally {
     await chiudiApp(app);
@@ -123,6 +124,7 @@ test('dopo aver riaperto Filo il menu della scheda offre ancora «Mostra il bann
   let { app, shell } = await avvia(userData);
   try {
     await rifiutaSuA(app, shell, srv);
+    await app.evaluate(async ({ session }) => { await session.defaultSession.cookies.flushStore(); });
     await sleep(1500);
   } finally {
     await chiudiApp(app);
@@ -132,6 +134,7 @@ test('dopo aver riaperto Filo il menu della scheda offre ancora «Mostra il bann
     const b = await apri(app, shell, srv.url('/b'), 'ARTICOLO_B');
     await sleep(3000);
     expect(await b.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(false);
+    expect(await b.evaluate(() => window.__r)).toBe('');
     expect(await menuDellaScheda(app, shell)).toContain('Mostra il banner dei cookie');
   } finally {
     await chiudiApp(app);
