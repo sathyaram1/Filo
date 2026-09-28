@@ -154,7 +154,7 @@ for (const [piattaforma, job, nomeFile] of [['Mac', 'release-mac', 'Filo-Mac.dmg
       stato.feedback[0].stato = 'revision_security';
 
       // v0.2.302 è uscita con i file della piattaforma; alla v0.2.303 mancano di nuovo, per un altro motivo.
-      const secondo = lancia('v0.2.303', {
+      const secondo = await lancia('v0.2.303', {
         strumento: { outcome: 'success' }, dipendenze: { outcome: 'success' }, build: { outcome: 'success' },
         controllo: { outcome: 'failure' },
       }, attesi.join(' '));
