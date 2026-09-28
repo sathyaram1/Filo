@@ -98,8 +98,9 @@
   function isHomeNetworkHost(host) {
     const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
     if (!h) return false;
-    if (answeredFrom.has(h) && !/^localhost$|\.localhost$|^127\.|^::1$/.test(h)) return answeredFrom.get(h);
     if (!h.includes('.') && !h.includes(':')) return true; // un nome senza punto su internet non esiste
+    if (/^localhost$|\.localhost$|^127\.|^::1$/.test(h)) return true;
+    if (answeredFrom.has(h)) return answeredFrom.get(h);
     // .box è un dominio pubblico vero: fritz.box è di casa perché risponde da casa, non per come si scrive.
     return isLocalHost(h) && !h.endsWith('.box');
   }
