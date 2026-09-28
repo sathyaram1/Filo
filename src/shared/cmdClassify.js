@@ -954,17 +954,36 @@
     return '';
   }
 
+  // PowerShell lega un parametro col due punti: `-Path:valore` è `-Path valore`.
+  // Il valore di QUALUNQUE `-nome:valore` va misurato come un operando: trattarlo
+  // da percorso può solo far salire il livello (un valore dentro il perimetro
+  // resta 1), mai scenderlo.
+  function valoreDuePunti(t) {
+    const m = /^-[A-Za-z]+:(.+)$/.exec(String(t || ''));
+    return m ? m[1] : null;
+  }
+
   function primoFuori(lista, c) {
     for (const p of lista) {
-      const m = fuoriDa(p, c);
-      if (m) return due(m);
+      // La virgola in PowerShell costruisce un array: `a,b` sono DUE percorsi.
+      // Spezzarla aggiunge solo candidati (mai ne toglie), quindi è sicura anche
+      // dove la virgola è un carattere valido nel nome di un file.
+      for (const q of String(p == null ? '' : p).split(',')) {
+        const m = fuoriDa(q, c);
+        if (m) return due(m);
+      }
     }
     return UNO;
   }
 
   function operandiLettore(prog, testi) {
-    return testi.filter((t) => t && !t.startsWith('-') && !/^\+\d*$/.test(t)
-      && !(prog === 'more' && /^\/[A-Za-z?]\d*$/.test(t)));
+    const out = [];
+    for (const t of testi) {
+      const v = valoreDuePunti(t);
+      if (v) { out.push(v); continue; }
+      if (t && !t.startsWith('-') && !/^\+\d*$/.test(t) && !(prog === 'more' && /^\/[A-Za-z?]\d*$/.test(t))) out.push(t);
+    }
+    return out;
   }
 
   // grep: il primo operando è il modello (salvo `-e`/`-f`), `-f FILE` legge un file.
