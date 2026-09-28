@@ -286,6 +286,45 @@ test('un riquadro che si apre mentre scrivi lascia i tasti al tuo campo: avviso 
   }
 });
 
+// L'Invio che spedisce e i tasti dati a un popup non sono «sta scrivendo»: la
+// conferma da digitare che si apre subito dopo prende «conferma» nel suo campo.
+test('nell’Aiuto, dopo l’invio o dopo un popup confermato da tastiera, «conferma» va nel campo del popup', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await page.evaluate(() => window.SN_SIDEBAR.open());
+  const area = page.locator('.sn-sidebar-input textarea');
+  await expect(area).toBeVisible();
+  const scriviConferma = async () => {
+    await expect.poll(async () => (await confirmState(page))?.hasInput).toBe(true);
+    await page.keyboard.type('conferma', { delay: 30 });
+    const s = await confirmState(page);
+    const chat = await area.inputValue();
+    await page.keyboard.press('Escape');
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+    expect(chat, '«conferma» è finito nel campo dell’Aiuto').toBe('');
+    expect(s.okDisabled, '«conferma» non è arrivato al campo del popup').toBe(false);
+  };
+
+  await area.click();
+  await page.keyboard.type('cancella tutta la memoria', { delay: 20 });
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(500);
+  await page.evaluate(() => { window.SN_CONFIRM_UI.confirmTyped({ title: 'Filo chiede conferma', text: 'Eliminare tutta la memoria.' }); });
+  await scriviConferma();
+
+  await area.fill('');
+  await area.click();
+  await page.evaluate(() => {
+    window.SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Procedo?' })
+      .then(() => window.SN_CONFIRM_UI.confirmTyped({ title: 'Filo chiede conferma', text: 'Eliminare tutta la memoria.' }));
+  });
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  await page.waitForTimeout(600);
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Enter');
+  await scriviConferma();
+});
+
 test('un clic arrivato mentre il riquadro compare non vale come sì; quello dato dopo sì', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
   for (const [apri, bottone] of [
