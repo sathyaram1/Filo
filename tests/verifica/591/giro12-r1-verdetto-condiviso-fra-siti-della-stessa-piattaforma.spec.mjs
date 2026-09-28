@@ -78,7 +78,7 @@ test('caso di riscontro: sottodomini sempre nuovi di un dominio solo fanno un co
   let finestre = 0;
   SB.setProviders({
     gsb: null, rdap: null, ct: null,
-    llm: async () => { giudizi++; return null; },
+    llm: async () => { giudizi++; return { suspicious: false, reason: null }; },
     sandbox: async (u) => { finestre++; return { verdict: 'clean', finalUrl: u, redirects: [] }; },
   });
   for (let i = 0; i < 40; i++) await analizza(`http://x${i}-verifica.dominio-ostile-giro12.com/`, LOGIN);
