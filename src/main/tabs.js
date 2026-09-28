@@ -7,6 +7,7 @@ const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain 
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
+const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
 const ProxyTab = require('./services/proxyTab');
 const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
@@ -615,19 +616,7 @@ class TabManager {
   // (e «Esci da schermo intero» a chi ne era già uscito, rimettendocelo con un
   // clic), e il suo Esc chiudeva il menu portandosi via anche la modalità.
   _broadcastToViews(message) {
-    for (const t of this.tabs) {
-      const wc = t.view?.webContents;
-      if (!wc || wc.isDestroyed?.()) continue;
-      let frames = null;
-      try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
-      if (!frames || !frames.length) {
-        try { wc.send('filo:broadcast', message); } catch (_) {}
-        continue;
-      }
-      for (const f of frames) {
-        try { if (!f.detached) f.send('filo:broadcast', message); } catch (_) {}
-      }
-    }
+    for (const t of this.tabs) spingiAllaScheda(t.view?.webContents, message, { inVista: t.id === this.activeId });
   }
 
   // ─── lifecycle ──────────────────────────────────────────────────────────

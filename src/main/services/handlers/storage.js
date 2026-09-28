@@ -20,39 +20,29 @@ module.exports = function register(on, ctx) {
   // solo da origine filo://; ciò che i content script fanno davvero (leggere le
   // impostazioni, salvare dizionario/draft/layout) resta consentito.
   const SETTINGS_KEY = SN_CONST.STORAGE_KEYS.SETTINGS; // 'settings' → contiene apiKeys
-  const isFilo = (origin) => String(origin || '').startsWith('filo://');
-  // Le chiavi web non devono MAI vedere i segreti dentro `settings.apiKeys`: il
-  // renderer non ne ha bisogno (le richieste AI allegano la chiave nel main).
-  function redactForWeb(value) {
-    if (!value || typeof value !== 'object' || !value[SETTINGS_KEY]) return value;
-    const s = value[SETTINGS_KEY];
-    if (!s || typeof s !== 'object' || !s.apiKeys) return value;
-    return { ...value, [SETTINGS_KEY]: { ...s, apiKeys: undefined } };
-  }
-  // Una richiesta tocca la chiave `settings`? (set: oggetto; remove: lista chiavi)
-  const touchesSettings = (keys) =>
-    (Array.isArray(keys) ? keys : [keys]).some((k) => k === SETTINGS_KEY);
+  // Verso un'origine web passa solo ciò che è nelle liste di impostazioniPerOrigine
+  // (campi letti e scritti, scomparti del magazzino): le stesse delle spinte.
+  const {
+    isFilo, impostazioniPerOrigine, storagePerOrigine, indirizziDelMittente,
+    chiaviStoragePerOrigine, scritturaStorageAmmessa, scritturaImpostazioniAmmessa,
+  } = require('../impostazioniPerOrigine');
+  const vietato = { ok: false, code: 'forbidden', error: 'forbidden' };
 
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
   on('_storage:get', async (msg, sender, origin) => {
-    const value = await globalThis.chrome.storage.local.get(msg.keys ?? null);
-    return { ok: true, value: isFilo(origin) ? value : redactForWeb(value) };
+    const value = await globalThis.chrome.storage.local.get(chiaviStoragePerOrigine(msg.keys ?? null, origin));
+    return { ok: true, value: storagePerOrigine(value, origin, SETTINGS_KEY, indirizziDelMittente(sender)) };
   });
 
   on('_storage:set', async (msg, sender, origin) => {
     const obj = msg.obj || {};
-    // Una pagina web non può scrivere/avvelenare i settings (né iniettare apiKeys).
-    if (!isFilo(origin) && touchesSettings(Object.keys(obj))) {
-      return { ok: false, error: 'forbidden' };
-    }
+    if (!scritturaStorageAmmessa(Object.keys(obj), origin)) return vietato;
     await globalThis.chrome.storage.local.set(obj);
     return { ok: true };
   });
 
   on('_storage:remove', async (msg, sender, origin) => {
-    if (!isFilo(origin) && touchesSettings(msg.keys)) {
-      return { ok: false, error: 'forbidden' };
-    }
+    if (!scritturaStorageAmmessa(msg.keys, origin)) return vietato;
     await globalThis.chrome.storage.local.remove(msg.keys);
     return { ok: true };
   });
@@ -73,34 +63,19 @@ module.exports = function register(on, ctx) {
     // un'altra origine quell'indirizzo è illeggibile, e senza questo il menu
     // sarebbe ricomparso proprio nei siti esclusi.
     const pageUrl = String(sender?.tab?.url || '');
-    // Le pagine web (content script) leggono tema/spellcheck/ecc., ma non devono
-    // ricevere le chiavi API: le richieste AI girano nel main, che le allega.
-    if (!isFilo(origin) && settings && settings.apiKeys) {
-      return { ok: true, pageUrl, settings: { ...settings, apiKeys: undefined } };
-    }
-    return { ok: true, pageUrl, settings };
+    return { ok: true, pageUrl, settings: impostazioniPerOrigine(settings, origin, indirizziDelMittente(sender)) };
   });
 
   on(MSG.UPDATE_SETTINGS, async (msg, sender, origin) => {
-    // I content script delle pagine web aggiornano legittimamente alcune
-    // preferenze (es. il modello di dettatura dal menu tasto destro), quindi
-    // l'update NON è vietato in blocco. Ma da un'origine web NON deve poter
-    // toccare le chiavi API: le strippiamo prima del merge, così una pagina
-    // ostile non può iniettare/sovrascrivere una apiKey (es. dirottare i
-    // prompt su una chiave attaccante). Dalle pagine interne filo:// passa tutto.
-    let incoming = msg.settings;
-    if (!isFilo(origin) && incoming && typeof incoming === 'object' && 'apiKeys' in incoming) {
-      incoming = { ...incoming };
-      delete incoming.apiKeys;
-    }
+    // Da un sito passa solo la voce della dettatura scelta dal menu; qualunque
+    // altro campo (chiavi, proxy, protezioni, spesa, stile) rifiuta la richiesta.
+    const incoming = msg.settings;
+    if (!scritturaImpostazioniAmmessa(incoming, origin)) return vietato;
     // Tutta la propagazione (broadcast, tema nativo, sicurezza, fingerprint,
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato
     // quando Filo cambia una preferenza via chat.
     const merged = await applySettingsUpdate(incoming);
-    if (!isFilo(origin) && merged && merged.apiKeys) {
-      return { ok: true, settings: { ...merged, apiKeys: undefined } };
-    }
-    return { ok: true, settings: merged };
+    return { ok: true, settings: impostazioniPerOrigine(merged, origin, indirizziDelMittente(sender)) };
   });
 
   on(MSG.RESET_SETTINGS, async (msg, sender, origin) => {

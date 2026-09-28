@@ -10,6 +10,7 @@
 
 const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
+const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -1251,6 +1252,11 @@ function perimetroLettura(sender) {
 async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
+  // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
+  // barra d'aiuto, confermate o no. `sender` assente = chiamata interna del main.
+  if (sender && !azioneAmmessaDa(action, sender?.tab?.url || sender?.url || '')) {
+    return { executed: false, kept: false, rejected: true, code: 'forbidden' };
+  }
 
   // IMPOSTA_ESTETICA: il livello (1 normale, 2 se rende il testo illeggibile)
   // dipende dallo stato risultante, che solo il main conosce (ha i token
@@ -2108,17 +2114,7 @@ function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', le
 }
 
 function broadcastLiveUpdate() {
-  const msg = { type: MSG.FILO_LIVE_UPDATED };
-  try {
-    for (const win of BrowserWindow.getAllWindows()) {
-      try { win.webContents.send('filo:broadcast', msg); } catch (_) {}
-      if (win._filoTabs) {
-        for (const t of win._filoTabs.tabs) {
-          try { t.view.webContents.send('filo:broadcast', msg); } catch (_) {}
-        }
-      }
-    }
-  } catch (_) {}
+  broadcastToTabs({ type: MSG.FILO_LIVE_UPDATED });
 }
 
 // Rende leggibile al modello l'output dei comandi eseguiti in un turno: estrae
@@ -4020,64 +4016,44 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
   return { ok: true, results };
 }
 
+// Ogni destinatario riceve il messaggio ritagliato sul PROPRIO indirizzo (frame
+// per frame): a un sito arrivano solo i tipi che il codice di Filo lì ascolta.
 function broadcastToTabs(message) {
   try {
     for (const win of BrowserWindow.getAllWindows()) {
       if (win._filoTabs) {
         for (const t of win._filoTabs.tabs) {
-          try { sendToAllFrames(t.view.webContents, message); } catch (_) {}
+          try { spingiAllaScheda(t.view.webContents, message, { inVista: t.id === win._filoTabs.activeId }); } catch (_) {}
         }
       }
-      try { win.webContents.send('filo:broadcast', message); } catch (_) {}
+      spingiAllaFinestra(win, message);
     }
   } catch (_) {}
 }
 
 // Broadcast alle sole pagine INTERNE (`filo://`) e alla shell.
 //
-// `broadcastToTabs` parla a tutte le schede, e in una scheda esterna il
-// messaggio arriva al content script del sito visitato. Va benissimo per le
-// impostazioni o il tema — sono cose che quel content script deve applicare —
-// ma NON per un messaggio che porta un dato dell'owner: l'elenco delle fusioni
-// in attesa contiene nomi di rami e percorsi di file, cioè su cosa sta
-// lavorando. La regola è la stessa del gate d'origine sugli handler, vista dal
-// verso opposto: se un sito non lo può CHIEDERE, non glielo si può nemmeno
-// mandare da soli.
+// `broadcastToTabs` parla a tutte le schede; ai siti arrivano solo i tipi che il
+// loro content script ascolta (`messaggioPerDestinazione`). Questa strada è per
+// chi vuole dirlo esplicitamente: un dato dell'owner (l'elenco delle fusioni in
+// attesa ha nomi di rami e percorsi di file) non passa mai il confine. Se un
+// sito non lo può CHIEDERE, non glielo si manda nemmeno da soli.
 //
 // Il frame principale basta: qui non ci sono destinatari nei riquadri
-// incorporati (le pagine filo:// non ne ospitano di privilegiati).
+// incorporati (le pagine filo:// non ne ospitano di privilegiati). Anche fra le
+// finestre solo quelle di Filo: un popup di accesso è la pagina di un sito.
 function broadcastToFiloPages(message) {
+  const aFilo = (wc) => {
+    try {
+      if (wc && !wc.isDestroyed?.() && isFilo(wc.getURL())) wc.send('filo:broadcast', message);
+    } catch (_) {}
+  };
   try {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (win._filoTabs) {
-        for (const t of win._filoTabs.tabs) {
-          try {
-            const wc = t.view.webContents;
-            if (!wc || wc.isDestroyed?.()) continue;
-            if (!String(wc.getURL() || '').startsWith('filo://')) continue;
-            wc.send('filo:broadcast', message);
-          } catch (_) {}
-        }
-      }
-      try { win.webContents.send('filo:broadcast', message); } catch (_) {}
+      if (win._filoTabs) for (const t of win._filoTabs.tabs) aFilo(t.view?.webContents);
+      aFilo(win.webContents);
     }
   } catch (_) {}
-}
-
-// #405 — `webContents.send` consegna SOLO al frame principale. Da quando i
-// content script girano anche dentro i riquadri incorporati, un riquadro che
-// non riceve gli aggiornamenti di impostazioni (tema, colori, correttore) o lo
-// stato della lettura ad alta voce resta indietro rispetto alla pagina che lo
-// ospita. Raggiungiamo ogni frame vivo della scheda; se l'enumerazione non è
-// disponibile (frame in navigazione) si ripiega sul comportamento di prima.
-function sendToAllFrames(wc, message) {
-  if (!wc || wc.isDestroyed?.()) return;
-  let frames = null;
-  try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
-  if (!frames || !frames.length) { try { wc.send('filo:broadcast', message); } catch (_) {} return; }
-  for (const f of frames) {
-    try { if (!f.detached) f.send('filo:broadcast', message); } catch (_) {}
-  }
 }
 
 // Configura il rilevatore di siti pericolosi (services/safebrowse) dalle
