@@ -1037,6 +1037,12 @@ class TabManager {
 
   // ─── proxy per-tab ("Apri da un altro paese", vedi proxy-per-tab-spec.md) ──
 
+  // «Apri da un altro paese» esiste solo con un fornitore: ogni porta della
+  // funzione (chat, regole, livello 2 del riconoscimento) chiede qui (#771).
+  async proxyAvailable() {
+    return ProxyTab.isConfigured(await this._readSettings());
+  }
+
   // Instrada la tab attraverso un endpoint nel paese richiesto. La tab viene
   // ricreata nella partition dedicata proxy:<tabId> (cookie jar separato dal
   // resto del browser) con il proxy applicato alla sua session; la scelta vive
@@ -1150,6 +1156,8 @@ class TabManager {
   // lo riduciamo al dominio registrabile — la STESSA chiave usata dal match in
   // navigazione (_ruleForUrl), così la regola scatta davvero alla riapertura.
   async setDomainProxyRule(country, { domain } = {}) {
+    // Una regola che non potrà mai instradare niente è una promessa falsa.
+    if (!(await this.proxyAvailable())) return { ok: false, error: 'not_configured' };
     const code = ProxyTab.normalizeCountry(country);
     if (!code) return { ok: false, error: 'bad_country' };
     const src = String(domain || '');
@@ -1933,7 +1941,7 @@ class TabManager {
       // la pagina d'errore è solo la faccia del fallimento, come negli altri browser.
       tab.url = failed;
       try {
-        if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(failed, code, desc));
+        if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(failed, code, desc, { altroPaese: !!tab.proxy }));
       } catch (_) {}
     });
     // #327 — renderer morto (crash/oom): stessa scheda bianca, stessa cura.

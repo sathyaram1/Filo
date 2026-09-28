@@ -2,6 +2,8 @@
 // Il verdetto safebrowse vive nel TabManager (per tab: bypass/dismiss); qui
 // inoltriamo alla finestra MITTENTE così l'overlay/banner agisce sul tab giusto.
 
+const { soloFilo } = require('./origine');
+
 module.exports = function register(on, ctx) {
   const { MSG, winOf } = ctx;
   const Storage = globalThis.SN_STORAGE;
@@ -45,6 +47,15 @@ module.exports = function register(on, ctx) {
     if (!win || !win._filoTabs || !tabId) return { ok: false };
     return win._filoTabs.geoProposeDismiss(tabId, msg.url || origin);
   });
+
+  // La pagina Sicurezza mostra il riquadro «da un altro paese» solo se la funzione
+  // esiste: la stessa domanda che fanno il tasto destro e la chat (#771).
+  on(MSG.PROXY_STATUS, soloFilo(async () => {
+    const ProxyTab = require('../proxyTab');
+    let settings = null;
+    try { settings = await Storage.getSettings(); } catch (_) {}
+    return { ok: true, configured: ProxyTab.isConfigured(settings), providerHost: ProxyTab.providerHost(settings) };
+  }));
 
   // Il content script di ogni frame chiede cosa fare sulla pagina. Aperto ai siti di proposito (vedi messages.js):
   // la modalità e le regole sono le stesse per tutti, e il sito vale quello della scheda, non quello del riquadro.

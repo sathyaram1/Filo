@@ -606,6 +606,8 @@
     COOKIES_HIDE_FRAME: 'cookies_hide_frame',       // main → pagina { url, origin }
     // Solo pagine filo:// (Sicurezza): cosa Filo ha fatto coi banner, sito per sito, nel profilo della finestra.
     COOKIES_SITES: 'cookies_sites',                 // {} → { ok, sites: [{ site, rejected, hidden, at }] }
+    // Solo pagine filo:// (Sicurezza): «Apri da un altro paese» ha un fornitore? E con quale host.
+    PROXY_STATUS: 'proxy_status',                   // {} → { ok, configured, providerHost }
 
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai

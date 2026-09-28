@@ -39,15 +39,17 @@
   // Costruisce l'URL della pagina d'errore per il fallimento di `targetUrl`.
   // `code` è il codice errore Chromium (negativo) o CRASH_CODE; `desc` la
   // descrizione simbolica (es. "ERR_NAME_NOT_RESOLVED") o il motivo del crash.
-  function buildUrl(targetUrl, code, desc) {
+  // `altroPaese`: la scheda era instradata da un altro paese (cambia il consiglio).
+  function buildUrl(targetUrl, code, desc, { altroPaese } = {}) {
     const params = new URLSearchParams();
     params.set('url', String(targetUrl || ''));
     params.set('code', String(code == null ? '' : code));
     if (desc) params.set('desc', String(desc));
+    if (altroPaese) params.set('via', 'paese');
     return `${ERROR_PAGE_URL}?${params.toString()}`;
   }
 
-  // Estrae { target, code, desc } da un URL di pagina d'errore, o null se
+  // Estrae { target, code, desc, altroPaese } da un URL di pagina d'errore, o null se
   // `url` non è la pagina d'errore. `target` è null se assente o non
   // ri-tentabile (schema non-web): mai restituire bersagli non navigabili.
   function parse(url) {
@@ -59,6 +61,7 @@
       target: isRetriableTarget(rawTarget) ? rawTarget : null,
       code: params.get('code') || '',
       desc: params.get('desc') || '',
+      altroPaese: params.get('via') === 'paese',
     };
   }
 
@@ -100,7 +103,8 @@
     '-118': { title: 'Il sito non risponde', hint: 'Il server ci sta mettendo troppo a rispondere: potrebbe essere sovraccarico, oppure la tua connessione è lenta.' }, // ERR_CONNECTION_TIMED_OUT
     '-7':   { title: 'Il sito non risponde', hint: 'Il caricamento ha superato il tempo massimo. Riprova.' }, // ERR_TIMED_OUT
     '-21':  { title: 'La rete è cambiata', hint: 'La connessione è cambiata durante il caricamento (es. da Wi-Fi a cavo). Riprova.' }, // ERR_NETWORK_CHANGED
-    '-130': { title: 'Il proxy non risponde', hint: 'La scheda passa da un proxy che non è raggiungibile. Riprova, o togli l’instradamento da un altro paese.' }, // ERR_PROXY_CONNECTION_FAILED
+    // Senza instradamento da un altro paese il proxy è quello del sistema (una rete aziendale): lì il consiglio sul paese non c'entra (#771).
+    '-130': { title: 'Il proxy non risponde', hint: 'La connessione passa da un proxy che non è raggiungibile, di solito quello impostato nel computer o nella rete. Riprova, o controlla le impostazioni di rete.', hintAltroPaese: 'La scheda passa da un proxy che non è raggiungibile. Riprova, o togli l’instradamento da un altro paese.' }, // ERR_PROXY_CONNECTION_FAILED
     '-111': { title: 'Impossibile raggiungere il sito', hint: 'La connessione attraverso il proxy non è riuscita: il sito potrebbe non esistere o non essere raggiungibile in questo momento.' }, // ERR_TUNNEL_CONNECTION_FAILED
     '-20':  { title: 'Pagina bloccata', hint: 'Il caricamento è stato bloccato da una protezione attiva (es. blocco contenuti).' }, // ERR_BLOCKED_BY_CLIENT
     '-501': { title: 'Connessione non sicura', hint: 'Il sito ha risposto in modo non sicuro e il caricamento è stato interrotto per proteggerti.' }, // ERR_INSECURE_RESPONSE
@@ -119,10 +123,10 @@
 
   // { title, hint, offline } per (code, desc). `desc` (es. ERR_…) resta il
   // dettaglio tecnico che la pagina mostra in piccolo.
-  function describe(code, desc) {
+  function describe(code, desc, { altroPaese } = {}) {
     if (String(code) === CRASH_CODE) return { ...CRASH_INFO, offline: false };
     const known = KNOWN[String(code)];
-    if (known) return { title: known.title, hint: known.hint, offline: !!known.offline };
+    if (known) return { title: known.title, hint: (altroPaese && known.hintAltroPaese) || known.hint, offline: !!known.offline };
     // Ripiego sulla descrizione simbolica quando il codice non è mappato ma la
     // famiglia è riconoscibile dal nome.
     const d = String(desc || '');

@@ -1052,6 +1052,10 @@ function targetWebTab(sender) {
   return { win, tm, tab: recent[0] || null };
 }
 
+// Esito di PROXY_TAB e REGOLA_PROXY_DOMINIO senza fornitore: toolResultText e
+// la riga del diario lo riconoscono da `proxy`, e nessuno dei due lo dà per fatto.
+const proxyNonDisponibile = () => ({ proxy: 'non_disponibile' });
+
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
 // cambio (la scrittura su storage è condivisa, le cache in-memory no).
 function refreshProxyRulesAllWindows() {
@@ -1918,8 +1922,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         // di follow-up in chat — il testo della risposta è già la conferma, come
         // per IMPOSTA_PREFERENZA. kept:false → non resta un'azione nella bolla.
         const { tm, tab } = targetWebTab(sender);
+        if (tm && !(await tm.proxyAvailable())) return { executed: false, kept: false, output: proxyNonDisponibile() };
         if (!tm || !tab) return { executed: false, kept: false, output: { proxy: 'no_web_tab' } };
         const r = await tm.setTabProxy(tab.id, action.country ?? action.paese ?? action.codicePaese ?? action.location);
+        if (r && r.error === 'not_configured') return { executed: false, kept: false, output: proxyNonDisponibile() };
         return {
           executed: !!(r && r.ok),
           kept: false,
@@ -1946,6 +1952,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         // Dominio esplicito dall'LLM, altrimenti quello della scheda web attiva.
         const domain = action.dominio ?? action.domain ?? action.sito ?? (tab ? tab.url : '');
         const r = await tm.setDomainProxyRule(country, { domain });
+        if (r && r.error === 'not_configured') return { executed: false, kept: false, output: proxyNonDisponibile() };
         if (r && r.ok) refreshProxyRulesAllWindows();
         return {
           executed: !!(r && r.ok),
@@ -2607,6 +2614,10 @@ function toolResultText({ action, res, rendered }) {
     done = String(done || describe()).replace(/\.+\s*$/, '');
     return `Eseguita: ${done}.`;
   }
+  if (res.output && res.output.proxy === 'non_disponibile') {
+    return 'NON fatto: aprire da un altro paese non è ancora disponibile in Filo. Nessuna scheda è stata instradata e nessuna regola salvata. '
+      + 'Dillo all\'utente in una frase, senza darlo per fatto e senza promettere che succederà da solo, e non riprovare.';
+  }
   if (res.output && res.output.rifiuto && res.output.error) {
     const cosa = type === 'SALVA_LEZIONE' ? 'Lezione NON salvata' : 'Impostazione NON applicata';
     return `${cosa}: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
@@ -2625,7 +2636,7 @@ function toolResultText({ action, res, rendered }) {
     return `Azione ${type} non riuscita: non c'è una scheda web attiva su cui agire. Dillo all'utente: deve aprire (o mettere davanti) la pagina.`;
   }
   if (PAGE_ACTIONS.includes(type) && !res.output) {
-    return `Azione ${type} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva (o il proxy non è configurato): dillo all'utente.`;
+    return `Azione ${type} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva: dillo all'utente.`;
   }
   return `Azione ${type} non riuscita: ${describe()}${detail}. Non ripeterla uguale: se manca un dato chiedilo all'utente, altrimenti diglielo.`;
 }
