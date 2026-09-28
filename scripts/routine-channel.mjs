@@ -1104,15 +1104,22 @@ if (isMain) {
     // ricopiarlo a ogni consegna è la scommessa già persa sulla provenienza dei
     // feedback — su decine di ritrovamenti, uno solo risultava firmato giusto.
     const INTENTI = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback'];
+    // `--ticket` (o `--biglietto`) vale quanto il biglietto davanti: il
+    // contratto dei worker dice di ripetere il comando aggiungendolo quando il
+    // promemoria è perso (#587). Non è un dato della consegna.
+    const bigliettoDato = typeof data.biglietto === 'string' ? data.biglietto.trim() : '';
+    delete data.biglietto;
     let biglietto = args[0];
     let intento = args[1] || '';
     if (INTENTI.includes(args[0])) {
       intento = args[0];
       const { readTicket } = await import('./lib/routine-ticket.mjs');
-      biglietto = readTicket(ROOT);
+      biglietto = bigliettoDato || readTicket(ROOT);
       if (!biglietto) {
-        console.error('Nessun biglietto: questa consegna non ha un lavoro a cui riferirsi.');
-        process.exit(3);
+        // Uscita 1, non 3: per il contratto 3 è «canale giù, fermati», e qui il
+        // server non è stato nemmeno chiamato.
+        console.error('NESSUN BIGLIETTO: questa consegna non ha un lavoro a cui riferirsi, e il server non è stato chiamato. Ripeti lo stesso comando aggiungendo --ticket <codice> (il codice è nelle istruzioni con cui sei partito).');
+        process.exit(1);
       }
     }
     // Un posizionale avanzato NON viene ignorato in silenzio. È la trappola in
