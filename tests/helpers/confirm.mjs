@@ -32,6 +32,12 @@ export async function clickConfirm(page, which = 'ok', opts = {}) {
   expect(clicked, `bottone di conferma "${which}" presente e abilitato`).toBe(true);
 }
 
+// Fa scorrere il testo del dialogo fino in fondo: OK si accende solo dopo (#592).
+export async function scrollConfirmToEnd(page) {
+  const done = await page.evaluate(() => window.SN_CONFIRM_UI._test.scrollToEnd());
+  expect(done, 'testo del dialogo presente').toBe(true);
+}
+
 // Scrive nel campo di testo del dialogo livello 3 (digita-la-parola).
 export async function fillConfirmInput(page, value) {
   const filled = await page.evaluate((v) => window.SN_CONFIRM_UI._test.fill(v), value);
