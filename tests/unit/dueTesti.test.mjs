@@ -98,30 +98,16 @@ test('il canale manda DUE testi distinti: il report e la frase', async () => {
     assert.equal(d.frase, undefined,
       'un campo che il server non conosce verrebbe scartato in silenzio: la frase sarebbe persa');
     assert.notEqual(d.notes, d.userNote, 'sono due testi, non lo stesso testo due volte');
-  } finally { srv.close(); }
+  } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
 });
 
 test('la correzione consegna il report E la frase (non solo il report)', async () => {
   const { srv, ricevuti, port } = await fintoServer();
-  const casa = cartellaTemporanea('filo-due-testi-');
+  // `--record-fixed` passa dallo stato locale del giro: gli si dà una cartella
+  // usa-e-getta, così non tocca niente di reale; la guardia sull'identità
+  // rifiuta le consegne fatte da un'altra versione del codice.
+  const casa = depositoSulRamo();
   try {
-    // `--record-fixed` passa dallo stato locale del giro: gli si dà una cartella
-    // usa-e-getta, così non tocca niente di reale. Deve essere un deposito git
-    // POSIZIONATO sul ramo del lavoro: la guardia sull'identità rifiuta le
-    // consegne fatte da un'altra versione del codice, e senza questo il test
-    // fallirebbe per un motivo che non è quello in prova.
-    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: casa });
-    execFileSync('git', ['config', 'user.email', 't@t'], { cwd: casa });
-    execFileSync('git', ['config', 'user.name', 't'], { cwd: casa });
-    writeFileSync(resolve(casa, 'segnaposto.txt'), 'x', 'utf8');
-    // Lo stato del giro sta fuori da git, come nel repo vero
-    // (`.claude/routine-state/` è ignorato): la consegna vale per un commit e
-    // con file non registrati si ferma prima del server — non è ciò che si
-    // prova qui.
-    writeFileSync(resolve(casa, '.gitignore'), 'stato/\n', 'utf8');
-    execFileSync('git', ['add', '-A'], { cwd: casa });
-    execFileSync('git', ['commit', '-qm', 'init'], { cwd: casa });
-    execFileSync('git', ['checkout', '-q', '-b', 'worker/900'], { cwd: casa });
     mkdirSync(resolve(casa, 'stato'), { recursive: true });
     writeFileSync(resolve(casa, 'stato', 'fid-900.json'), JSON.stringify({
       id: 'fid-900', branch: 'worker/900', loopCount: 1, verifierVerdict: 'fail',
