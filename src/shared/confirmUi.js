@@ -378,7 +378,8 @@
       return {
         title: (q('.sn-confirm-title') && q('.sn-confirm-title').textContent) || '',
         text: (textEl && textEl.textContent) || '',
-        okDisabled: !!(okBtn && okBtn.disabled),
+        okDisabled: !!(okBtn && (okBtn.disabled || okBtn.getAttribute('aria-disabled') === 'true')),
+        textScrollTop: textEl ? textEl.scrollTop : 0,
         hasInput: !!q('.sn-confirm-input'),
         textScrolls: !!(textEl && textEl.scrollHeight > textEl.clientHeight + 1),
         selectionBg,
