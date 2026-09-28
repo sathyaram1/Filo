@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
-const { portachiaviDaChiedere } = require('../../src/main/portachiavi.js');
+const { portachiaviDaChiedere, consiglioPortachiavi } = require('../../src/main/portachiavi.js');
 
 test('gestori di finestre e nessun desktop dichiarato: si chiede libsecret', () => {
   for (const d of ['sway', 'i3', 'Hyprland', 'niri', '']) {
@@ -41,6 +41,27 @@ test('scelta esplicita di chi lancia Filo, Windows e Mac: niente', () => {
   assert.equal(portachiaviDaChiedere({ platform: 'linux', env: { XDG_CURRENT_DESKTOP: 'sway' }, haSwitch: true }), null);
   assert.equal(portachiaviDaChiedere({ platform: 'win32', env: {} }), null);
   assert.equal(portachiaviDaChiedere({ platform: 'darwin', env: {} }), null);
+});
+
+// Il consiglio nomina solo il portachiavi che Filo userebbe su quel desktop: su KDE
+// GNOME Keyring non serve, altrove KWallet non basta (#708.1 giro 2).
+test('il consiglio segue il portachiavi scelto: KWallet su KDE, GNOME Keyring altrove', () => {
+  for (const backend of ['kwallet', 'kwallet5', 'kwallet6']) {
+    const c = consiglioPortachiavi({ platform: 'linux', backend });
+    assert.match(c, /KWallet/, backend);
+    assert.doesNotMatch(c, /GNOME Keyring/, backend);
+  }
+  const c = consiglioPortachiavi({ platform: 'linux', backend: 'gnome_libsecret' });
+  assert.match(c, /GNOME Keyring/);
+  assert.doesNotMatch(c, /KWallet/);
+});
+
+test('nessun consiglio dove nessun portachiavi servirebbe: ripiego imposto, Windows, Mac', () => {
+  for (const backend of ['basic_text', 'unknown', '', undefined]) {
+    assert.equal(consiglioPortachiavi({ platform: 'linux', backend }), '', String(backend));
+  }
+  assert.equal(consiglioPortachiavi({ platform: 'win32', backend: 'gnome_libsecret' }), '');
+  assert.equal(consiglioPortachiavi({ platform: 'darwin', backend: 'kwallet5' }), '');
 });
 
 // Gli spec non lo possono provare: Playwright lancia Electron con un portachiavi
