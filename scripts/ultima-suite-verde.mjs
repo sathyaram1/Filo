@@ -240,7 +240,7 @@ async function main() {
     try { corse = repo ? leggiCorse(repo, 'per_page=8') : []; } catch { /* il testo lo dice: nessuna letta */ }
     const { titolo, testo } = testoRilascioFermo({ tag, oreDallUltima, commitDopoTag, verde, corsaVerde, corse, esecuzione, erroreApi });
     console.log(`::error::${titolo}`);
-    await inviaAllarme(titolo, testo, [CHIAVE_FERMO]);
+    await inviaAllarme(titolo, testo, [chiaveDelFermo(CHIAVE_FERMO, tag)]);
     process.exit(1);
   }
   if (erroreApi) {
