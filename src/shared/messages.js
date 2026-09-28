@@ -683,6 +683,16 @@
     // memoria dell'utente.
     // Risposta: { ok, compacted }
     FILO_COMPACT_MEMORY: 'filo_compact_memory',
+    // La memoria come la legge l'utente nelle Preferenze (#592): moduli divisi
+    // in righe e lezioni ancora da riordinare. Solo pagine filo://.
+    // Risposta: { ok, moduli: [{ nome, righe }], lezioni: [{ ts, text }] }
+    FILO_MEMORY_VIEW: 'filo_memory_view',
+    // Toglie UNA riga: { modulo, riga } oppure { lezione: { ts, text } }.
+    // Solo pagine filo://. Risposta: { ok, tolta } (false: non c'era più).
+    FILO_MEMORY_FORGET: 'filo_memory_forget',
+    // Main → sole pagine filo://: la memoria è cambiata. Porta { moduli, lezioni }
+    // come FILO_MEMORY_VIEW, così chi la mostra non la richiede.
+    FILO_MEMORY_CHANGED: 'filo_memory_changed',
     // Stato della micro-intervista di benvenuto (#524). Solo pagine filo://.
     // Risposta: { ok, onboarding: { done, ticked, thread, … }, welcome }
     FILO_GET_ONBOARDING: 'filo_get_onboarding',

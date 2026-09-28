@@ -918,7 +918,11 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
     const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     for (const line of lines) {
       const m = line.match(/^LEZIONE:\s*(.+)$/i);
-      if (m) await FiloMem.appendLesson(m[1]);
+      if (!m) continue;
+      // Il tetto vale anche per le lezioni che Filo si scrive da solo (#592).
+      const l = global.SN_PREF.lezioneDaAzione({ testo: m[1] });
+      if (l.rifiuto) { console.warn('[Filo] lezione automatica scartata:', l.rifiuto); continue; }
+      if (l.testo) await FiloMem.appendLesson(l.testo);
     }
     if (await FiloMem.lessonsBufferShouldCompact()) {
       maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
@@ -1148,7 +1152,7 @@ async function navExfilCorpus() {
 // Le pagine interne filo:// (chat della dashboard) restano fidate per origine e
 // non hanno bisogno del pending. Un CONFIRM forgiato senza il RUN corrispondente
 // non ha un pending e viene rifiutato.
-const pendingConfirms = new Map(); // key → scadenza (ms)
+const pendingConfirms = new Map(); // key → { scade, mostrati }
 const PENDING_CONFIRM_TTL = 5 * 60 * 1000;
 // Firma stabile dell'azione: ignora i campi iniettati dal main (prefissati con
 // `_`, es. `_illegible`/`_exfil`/`_confirm`) così RUN e CONFIRM combaciano.
@@ -1171,15 +1175,30 @@ function pendingConfirmKey(sender, action) {
 function recordPendingConfirm(sender, action) {
   const now = Date.now();
   // Purga opportunistica delle scadute (la mappa resta piccola).
-  for (const [k, exp] of pendingConfirms) if (exp <= now) pendingConfirms.delete(k);
-  pendingConfirms.set(pendingConfirmKey(sender, action), now + PENDING_CONFIRM_TTL);
+  for (const [k, rec] of pendingConfirms) if (rec.scade <= now) pendingConfirms.delete(k);
+  pendingConfirms.set(pendingConfirmKey(sender, action), {
+    scade: now + PENDING_CONFIRM_TTL,
+    mostrati: { righe: action._righe, targetIds: action._targetIds },
+  });
 }
 function consumePendingConfirm(sender, action) {
   const key = pendingConfirmKey(sender, action);
-  const exp = pendingConfirms.get(key);
-  if (!exp) return false;
+  const rec = pendingConfirms.get(key);
+  if (!rec) return false;
   pendingConfirms.delete(key); // one-time
-  return exp > Date.now();
+  return rec.scade > Date.now();
+}
+function daPaginaDiFilo(sender) {
+  return String(sender?.tab?.url || sender?.url || '').startsWith('filo://');
+}
+// All'OK si agisce su quello che il popup ha mostrato, non su ciò che lo stesso
+// riferimento trova adesso: nel frattempo la lista può essere cambiata (#592).
+// Una pagina di Filo rimanda l'azione col popup che ha mostrato; per le altre
+// vale quello registrato alla richiesta di conferma.
+function bersagliMostrati(sender, action) {
+  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds };
+  const rec = pendingConfirms.get(pendingConfirmKey(sender, action));
+  return rec && rec.scade > Date.now() ? rec.mostrati : null;
 }
 
 // Riferimento dell'utente a una sveglia / un timer, normalizzato dai sinonimi
@@ -1293,16 +1312,37 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
   // timer il riferimento dell'utente prende davvero — cosa che solo il main sa,
   // avendo la lista. Risolviamo il riferimento PRIMA del gate e iniettiamo
   // `_targets` (le voci in chiaro, per il popup) e `_targetIds` (su cui agire
-  // dopo la conferma, così la risoluzione non viene rifatta su una lista nel
-  // frattempo cambiata). Mai calcolati dall'LLM.
+  // dopo la conferma: all'OK valgono quelli mostrati, vedi bersagliMostrati).
+  // Mai calcolati dall'LLM.
   if (type === 'CANCELLA_SVEGLIA' || type === 'MODIFICA_SVEGLIA') {
     try {
-      const ref = timerRefOf(action);
       const list = await FiloMem.listTimers();
-      const targets = FiloMem.resolveTimerRefs(list, ref);
+      const visti = confirmed ? bersagliMostrati(sender, action) : null;
+      const targets = visti && Array.isArray(visti.targetIds)
+        ? list.filter((t) => visti.targetIds.includes(t.id))
+        : FiloMem.resolveTimerRefs(list, timerRefOf(action));
       action._targets = targets.map(describeTimerEntry);
       action._targetIds = targets.map((t) => t.id);
     } catch (_) {}
+  }
+
+  // DIMENTICA: le righe che la frase indica le trova il main, prima del gate,
+  // così il popup mostra quelle che se ne andranno (#592).
+  // Il popup riporta righe della memoria: a una pagina visitata non si mostrano.
+  let righeDaDimenticare = [];
+  if (type === 'DIMENTICA') {
+    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+      return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
+    }
+    try {
+      if (confirmed) {
+        const visti = bersagliMostrati(sender, action);
+        righeDaDimenticare = await FiloMem.linesWithText(visti && Array.isArray(visti.righe) ? visti.righe : []);
+      } else {
+        righeDaDimenticare = await FiloMem.findLines(action.testo ?? action.text ?? action.riga ?? '');
+      }
+    } catch (_) {}
+    action._righe = righeDaDimenticare.map((r) => r.testo);
   }
 
   // ── modalità terminale: gate hard, indipendente dal livello (#146.6) ──────
@@ -1368,9 +1408,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
   // sono fidate per origine. Un FILO_CONFIRM_ACTION forgiato "a freddo" da fuori
   // non ha un pending corrispondente → rifiutato (l'azione non si esegue).
   if (level >= 2 && confirmed && !hasBespokeConfirm) {
-    const origin = sender?.tab?.url || sender?.url || '';
-    const trusted = String(origin).startsWith('filo://');
-    if (!trusted && !consumePendingConfirm(sender, action)) {
+    if (!daPaginaDiFilo(sender) && !consumePendingConfirm(sender, action)) {
       console.warn('[Filo] FILO_CONFIRM_ACTION senza conferma legittima: rifiutata', type);
       return { executed: false, kept: false, rejected: true };
     }
@@ -1527,16 +1565,15 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         return { executed: true, kept: false };
       }
       case 'SALVA_LEZIONE': {
-        // Filo fissa una lezione nella PROPRIA memoria su richiesta (o di sua
-        // iniziativa) in chat: la regola entra nel buffer delle lezioni — lo
-        // stesso che l'agente-lezioni riempie da solo — e da subito compare in
-        // LEZIONI RECENTI di ogni conversazione. Visibile e cancellabile
-        // dall'utente fra le memorie, come tutte le lezioni.
-        const lezione = String(action.testo ?? action.text ?? action.lezione ?? '').trim();
+        // Qui ci si arriva solo dopo l'OK dell'utente sul testo esatto (livello
+        // 2, #592). La lezione entra nel buffer e da subito in LEZIONI RECENTI
+        // di ogni conversazione; l'utente la rilegge e la toglie in Preferenze.
+        const l = global.SN_PREF.lezioneDaAzione(action);
+        if (l.rifiuto) return { executed: false, kept: false, output: { error: l.rifiuto, rifiuto: true } };
         let fissata = false;
-        if (lezione) {
+        if (l.testo) {
           try {
-            await FiloMem.appendLesson(lezione);
+            await FiloMem.appendLesson(l.testo);
             fissata = true;
             if (await FiloMem.lessonsBufferShouldCompact()) {
               maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
@@ -1578,6 +1615,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
         const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
         if (!built) return { executed: false, kept: false };
+        // Un rifiuto spiegato resta nel diario col suo perché: non è successo
+        // niente, ma l'utente deve saperlo anche se il modello non lo dice.
+        if (built.rifiuto) return { executed: false, kept: false, output: { error: built.rifiuto, rifiuto: true } };
         await applySettingsUpdate(built.partial);
         return { executed: true, kept: true };
       }
@@ -1826,6 +1866,16 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
           console.warn('[Filo] cancella memoria fallito', e?.message || e);
           return { executed: false, kept: false };
         }
+      }
+      case 'DIMENTICA': {
+        if (!righeDaDimenticare.length) {
+          return { executed: false, kept: false, output: { dimenticate: [] } };
+        }
+        const tolte = [];
+        for (const r of righeDaDimenticare) {
+          if (await FiloMem.forgetLine(r.via)) tolte.push(r.testo);
+        }
+        return { executed: tolte.length > 0, kept: false, output: { dimenticate: tolte } };
       }
       case 'APRI_FILE':
         return { executed: true, kept: true };
@@ -2516,6 +2566,11 @@ function toolResultText({ action, res, rendered }) {
   if (type === 'CANCELLA_SVEGLIA' && res.output && Array.isArray(res.output.removed)) {
     return res.output.removed.length ? `Tolte: ${res.output.removed.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da togliere. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
+  if (type === 'DIMENTICA' && res.output && Array.isArray(res.output.dimenticate)) {
+    return res.output.dimenticate.length
+      ? `Dimenticate: ${res.output.dimenticate.map((r) => `«${r}»`).join(', ')}.`
+      : 'Nella memoria nessuna riga corrispondeva: niente da togliere. Non ripetere uguale: copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.';
+  }
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
     return res.output.updated.length ? `Spostate: ${res.output.updated.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
@@ -2549,6 +2604,11 @@ function toolResultText({ action, res, rendered }) {
     try { done = (Levels && Levels.describeDone && Levels.describeDone(action)) || ''; } catch (_) {}
     done = String(done || describe()).replace(/\.+\s*$/, '');
     return `Eseguita: ${done}.`;
+  }
+  if (res.output && res.output.rifiuto && res.output.error) {
+    const cosa = type === 'SALVA_LEZIONE' ? 'Lezione NON salvata' : 'Impostazione NON applicata';
+    return `${cosa}: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
+      + 'dillo all\'utente e, se vuole, riprova con un testo che stia nel limite.';
   }
   // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
   // pulizia schede, cancellazione archivio) che l'utente aziona da sé.
@@ -4098,6 +4158,15 @@ globalThis.SN_HANDLE_MESSAGE = handleMessage;
 // e qui la cosa da verificare è proprio CHI riceve (una scheda su un sito
 // qualunque non deve vedere passare i rami dell'owner).
 globalThis.SN_BROADCAST_FILO = broadcastToFiloPages;
+// Le Preferenze mostrano la memoria riga per riga (#592): a ogni scrittura il
+// main la rilegge una volta e la manda dentro l'avviso, alle sole pagine di Filo.
+try {
+  FiloMem.setOnMemoryChange(() => {
+    FiloMem.viewForUser()
+      .then((v) => broadcastToFiloPages({ type: MSG.FILO_MEMORY_CHANGED, ...v }))
+      .catch(() => {});
+  });
+} catch (_) {}
 
 module.exports = {
   handleMessage,

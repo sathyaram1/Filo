@@ -97,6 +97,22 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_GET_MEMORY, async () => ({ ok: true, memory: await FiloMem.getMemory() }));
 
+  // Rileggere e togliere una riga di memoria alla volta (#592): è il posto dove
+  // l'utente controlla quello che entra in ogni conversazione. Leggere o
+  // riscrivere la memoria non è roba di una pagina visitata.
+  on(MSG.FILO_MEMORY_VIEW, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    return { ok: true, ...(await FiloMem.viewForUser()) };
+  });
+
+  on(MSG.FILO_MEMORY_FORGET, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    const lezione = msg && msg.lezione && typeof msg.lezione === 'object';
+    const riga = msg && typeof msg.modulo === 'string' && typeof msg.riga === 'string';
+    if (!lezione && !riga) return { ok: false, error: 'bad_request' };
+    return { ok: true, tolta: await FiloMem.forgetLine(msg) };
+  });
+
   // Compattazione FORZATA: porta subito il buffer delle lezioni dentro
   // PROFILO/PREFERENZE senza aspettare la soglia. Prima non esisteva alcun modo
   // di chiederla — la chiusura dell'intervista di benvenuto (#524) ne aveva
