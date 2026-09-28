@@ -381,6 +381,8 @@ function injectStyles() {
 const SHARED_DIR = path.join(__dirname, '..', 'shared');
 const CONTENT_DIR = path.join(__dirname, '..', 'content');
 
+// Stesso elenco di loadContentScripts() in internal-preload.js: le differenze
+// ammesse stanno in tests/unit/contentScriptPreload.test.mjs.
 function loadScripts() {
   // Ordine identico a quello del manifest dell'estensione legacy.
   // `PAGE_ONLY` marca i moduli che descrivono o modificano la SCHEDA nel suo

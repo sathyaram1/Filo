@@ -57,6 +57,17 @@ test('#418 un URL nudo http(s) viene reso cliccabile (autolink)', () => {
   assert.match(html2, /href="https:\/\/foo\.com\/"/);
 });
 
+test('#853 un tag HTML nella risposta si legge com\'è: l\'URL nudo si ferma alle virgolette', () => {
+  const html = render('Codice: <img src="https://x.invalid/a.png"> e <a href=\'https://y.it/?a=1&b=2\'>y</a> fine.');
+  assert.doesNotMatch(html, /<img|<a href=/);
+  // Testo mostrato = testo scritto, senza «;» rimasti da un'entità spezzata.
+  const visibile = html.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  assert.equal(visibile, 'Codice: <img src="https://x.invalid/a.png"> e <a href=\'https://y.it/?a=1&b=2\'>y</a> fine.');
+  assert.match(html, /href="https:\/\/x\.invalid\/a\.png"/);
+  assert.match(html, /href="https:\/\/y\.it\/\?a=1&amp;b=2"/);
+});
+
 // ─── sicurezza: contenuto NON FIDATO, niente link verso l'interno dell'app ───
 
 test('#418 un link filo:// (pagina interna) NON diventa cliccabile', () => {

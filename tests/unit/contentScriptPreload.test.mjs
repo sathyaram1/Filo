@@ -104,6 +104,5 @@ test('i fogli di stile dei content script sono gli stessi nei due preload', () =
   const stiliWeb = elencoStili(pageSrc);
   const stiliInterne = elencoStili(corpoFunzione(internalSrc, 'injectContentScriptStyles'));
   assert.deepEqual(stiliInterne, stiliWeb);
-  for (const f of stiliWeb) assert.ok(existsSync(join(ROOT, 'src', 'style', f)) || existsSync(join(ROOT, 'src', 'styles', f)),
-    `${f} non esiste`);
+  for (const f of stiliWeb) assert.ok(existsSync(join(ROOT, 'src', 'styles', f)), `filo://style/${f} non esiste`);
 });

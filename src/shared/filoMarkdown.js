@@ -74,7 +74,9 @@
     });
 
     // Autolink di URL nudi http(s)://... (mostrano l'URL stesso come testo).
-    t = t.replace(/\bhttps?:\/\/[^\s<]+/gi, (m) => {
+    // Il testo è già escapato: l'URL finisce a un " ' < > (&quot; &#39; &lt;
+    // &gt;), altrimenti `src="https://x">` diventa un link rotto seguito da «;».
+    t = t.replace(/\bhttps?:\/\/(?:&amp;|[^\s&])+/gi, (m) => {
       let url = m;
       let trail = '';
       // La punteggiatura finale (. ) ] , ; : ! ?) non fa parte dell'URL.

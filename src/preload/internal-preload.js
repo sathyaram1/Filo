@@ -277,6 +277,8 @@ function injectContentScriptStyles() {
     document.head.appendChild(link);
   }
 }
+// Stesso elenco di loadScripts() in page-preload.js: le differenze ammesse
+// stanno in tests/unit/contentScriptPreload.test.mjs.
 function loadContentScripts() {
   const SHARED = path.join(__dirname, '..', 'shared');
   const CONTENT = path.join(__dirname, '..', 'content');
@@ -294,10 +296,11 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'tasti.js')); // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   safe(path.join(SHARED, 'campoTesto.js')); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  safe(path.join(SHARED, 'filoMarkdown.js')); // #853 — senza, le risposte del modello entrano come HTML
+  safe(path.join(SHARED, 'linkSospetto.js')); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   safe(path.join(SHARED, 'themeTokens.js'));
   safe(path.join(SHARED, 'confirmUi.js'));
   safe(path.join(SHARED, 'chatErrors.js')); // #360 — errori tecnici → frasi per l'utente
-  safe(path.join(SHARED, 'linkSospetto.js')); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   safe(path.join(SHARED, 'icons.js'));
   safe(path.join(SHARED, 'qr.js'));
   safe(path.join(SHARED, 'calcMarkers.js')); // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
