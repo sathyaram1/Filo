@@ -1878,9 +1878,15 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         let ses = null;
         const scritto = String(action.sito ?? action.site ?? action.dominio ?? '').trim().toLowerCase();
         if (scritto) {
+          // Il sito nominato si cerca fra le schede aperte, poi fra quelli già decisi; se non c'è, è https.
           const host = scritto.replace(/^[a-z]+:\/\//, '').replace(/[/?#].*$/, '');
-          const noto = Permessi.elenco(null).find((x) => x.host === host || x.host === `www.${host}` || `www.${x.host}` === host);
-          origine = noto ? noto.origine : PS.origineDi(`https://${host}`);
+          const stesso = (h) => h === host || h === `www.${host}` || `www.${h}` === host;
+          const win = winOf(sender);
+          const aperta = ((win && win._filoTabs && win._filoTabs.tabs) || [])
+            .map((t) => t.view && t.view.webContents)
+            .find((c) => c && !c.isDestroyed() && PS.origineDi(c.getURL()) && stesso(PS.hostDi(PS.origineDi(c.getURL()))));
+          const noto = Permessi.elenco(null).find((x) => stesso(x.host));
+          if (aperta) { origine = PS.origineDi(aperta.getURL()); ses = aperta.session; } else origine = noto ? noto.origine : PS.origineDi(`https://${host}`);
         } else if (wcTab && !wcTab.isDestroyed()) {
           origine = PS.origineDi(wcTab.getURL());
           ses = wcTab.session;

@@ -3,6 +3,7 @@
 // paese» in incognito non scrive su disco, a schermo intero la domanda si vede, e i caratteri del computer si possono dare.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { testoMenu, cliccaFinche } from './helpers/menuScheda.mjs';
 
 test.use({ argomentiApp: ['--use-fake-device-for-media-stream'] });
 
@@ -154,24 +155,38 @@ test('tenere acceso lo schermo non si chiede; i caratteri del computer si danno 
   const segno = shell.locator('.tab.active .perm-uso.bloccato');
   await expect(segno).toHaveAttribute('data-tip', /vorrebbe vedere i caratteri del computer/);
   // Il segno apre i permessi della scheda, con la voce per dire sì.
-  await segno.click();
-  await expect.poll(async () => {
-    for (const w of app.windows()) {
-      try {
-        const ok = await w.evaluate(() => {
-          const b = [...document.querySelectorAll('button.item')].find((x) => /^Consenti caratteri del computer$/.test(x.textContent.trim()));
-          if (!b) return false;
-          b.click();
-          return true;
-        });
-        if (ok) return true;
-      } catch (_) {}
-    }
-    return false;
-  }, { timeout: 10_000 }).toBe(true);
-  await expect.poll(() => app.evaluate((_e, o) => (globalThis.__filoPermessi.elenco(null).find((x) => x.origine === o) || { scelte: {} }).scelte.caratteri, testServer.origin)).toBe('consenti');
+  const caratteri = () => app.evaluate((_e, o) => (globalThis.__filoPermessi.elenco(null).find((x) => x.origine === o) || { scelte: {} }).scelte.caratteri, testServer.origin);
+  await cliccaFinche(app, {
+    apri: async () => { if (!(await testoMenu(app, 'Gestisci permessi'))) await segno.click(); },
+    ago: 'Gestisci permessi',
+    etichetta: '^Consenti caratteri del computer$',
+    finche: async () => (await caratteri()) === 'consenti',
+  });
   await page.click('#b');
   const n = await page.evaluate(() => window.caratteri());
   expect(typeof n === 'number' && n >= 0, `dopo il sì il sito legge l’elenco (${n})`).toBe(true);
   await expect(shell.locator('.tab.active .perm-uso')).toHaveCount(0);
+});
+
+test('a parole: «blocca la fotocamera a questo sito», «richiedimelo», e per un sito nominato', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, PAGINA);
+  const exec = (action) => app.evaluate(({ BrowserWindow }, a) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
+    return globalThis.SN_EXECUTE_FILO_ACTION(a, { sender: { win, wc: win.webContents } });
+  }, { type: 'PERMESSO_SITO', ...action });
+  const scelte = () => app.evaluate((_e, o) => (globalThis.__filoPermessi.elenco(null).find((x) => x.origine === o) || { scelte: {} }).scelte, testServer.origin);
+
+  const r = await exec({ permesso: 'fotocamera', scelta: 'blocca' });
+  expect(r.executed).toBe(true);
+  expect(await scelte()).toEqual({ camera: 'nega' });
+  await avvia(page, 'cam');
+  await expect.poll(() => esito(page)).toBe('err:NotAllowedError');
+  await exec({ permesso: 'la webcam', scelta: 'chiedi' });
+  expect(await scelte()).toEqual({});
+  await exec({ permesso: 'notifiche', scelta: 'blocca', sito: new URL(testServer.origin).host });
+  expect(await scelte()).toEqual({ notifiche: 'nega' });
+  expect(await page.evaluate(() => Notification.permission), 'la pagina lo vede subito').toBe('denied');
+  // Dare un permesso a parole è un'azione che chiede conferma all'utente.
+  expect(await app.evaluate(() => globalThis.SN_ACTION_LEVELS.levelFor({ type: 'PERMESSO_SITO', permesso: 'microfono', scelta: 'consenti' }))).toBe(2);
 });

@@ -1,7 +1,6 @@
-// Sorgente iniettato nel MAIN WORLD di ogni frame web (#586): la pagina legge «da chiedere» dove Chromium, che da
-// Electron sa dire solo sì o no, risponderebbe «negato» senza che nessuno abbia negato; e la strada vecchia per lo
-// schermo (`chromeMediaSource`) non parte, perché fuori dalla scelta di Filo e perché certe forme uccidono la scheda.
-// Non concede niente: il cancello vero resta nel main. Regole: tests/unit/permessiSiti.test.mjs.
+// Sorgente per il MAIN WORLD di ogni frame web (#586): «da chiedere» dove Chromium direbbe «negato» senza che nessuno
+// abbia negato, e la strada vecchia per lo schermo (`chromeMediaSource`) rifiutata prima del browser. Non concede
+// niente: il cancello vero resta nel main. Regole: tests/unit/permessiSiti.test.mjs e il pattern dei permessi.
 
 const P = require('../shared/permessiSiti.js');
 
