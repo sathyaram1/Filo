@@ -147,6 +147,17 @@ describe('la pubblicazione ferma', () => {
     assert.match(testo, /actions\/runs\/7/);
   });
 
+  test('la chiave di un fermo porta la versione a cui è fermo: un fermo nuovo non è il doppione di uno vecchio', () => {
+    for (const tipo of [CHIAVE_FERMO, CHIAVE_FERMO_DOPO_VERDE]) {
+      assert.equal(chiaveDelFermo(tipo, 'v0.2.300'), chiaveDelFermo(tipo, 'v0.2.300'), 'lo stesso fermo, giro dopo giro: un feedback solo');
+      assert.notEqual(chiaveDelFermo(tipo, 'v0.2.300'), chiaveDelFermo(tipo, 'v0.2.301'), 'dopo una versione uscita è un fermo nuovo');
+      assert.ok(chiaveDelFermo(tipo, 'v0.2.300').startsWith(`${tipo}:`));
+    }
+    assert.notEqual(chiaveDelFermo(CHIAVE_FERMO, 'v1'), chiaveDelFermo(CHIAVE_FERMO_DOPO_VERDE, 'v1'));
+    assert.match(testoRilascioFermo({ tag: 'v0.2.301', oreDallUltima: 100 }).titolo, /alla v0\.2\.301 da 4 giorni/);
+    assert.match(testoFermoDopoIlVerde({ tag: 'v0.2.301', oreDallUltima: 100 }).titolo, /alla v0\.2\.301 da 4 giorni/);
+  });
+
   test('senza un verde, e senza corse lette, lo dice invece di tacere', () => {
     const { testo } = testoRilascioFermo({ tag: 'v1.0.0', oreDallUltima: 72, commitDopoTag: 2, verde: '', corse: [], erroreApi: 'HTTP 403' });
     assert.match(testo, /nessun commit verde/);
