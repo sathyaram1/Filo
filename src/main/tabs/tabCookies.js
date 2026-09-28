@@ -6,7 +6,7 @@ const Cookies = require('../services/cookies');
 
 // Chiavi della memoria della pagina che i CMP usano per ricordarsi la risposta (stessa idea di isConsentName).
 const WIPE_STORAGE_JS = `(() => {
-  const re = /(consent|euconsent|cookielaw|optanon|onetrust|didomi|cookiebot|_sp_|cmp|cmplz|borlabs|iub|usercentrics|uc_|osano|truste|cookieyes|cky|gdpr|tcf|klaro|axeptio|tarteaucitron|cookie)/i;
+  const re = /(consent|cookie|optanon|onetrust|didomi|usercentrics|^uc_|_sp_|^cmp|cmplz|borlabs|^_?iub|iubenda|osano|truste|^cky|gdpr|tcf|klaro|axeptio|tarteaucitron)/i;
   for (const st of [localStorage, sessionStorage]) {
     try { for (const k of Object.keys(st)) if (re.test(k)) st.removeItem(k); } catch (_) {}
   }
