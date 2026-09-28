@@ -116,6 +116,7 @@ test('Ricevuti: aprire la pratica mostra la conversazione intera, il rombo verde
 
   await rombo(page).click();
   await expect(pannello(page)).toContainText('DOMANDA-L3');
+  await expect(pannello(page)).toContainText('27/09/2026');
   await expect(pannello(page)).not.toContainText('non è ancora arrivato');
 
   const richieste = await app.evaluate(() => globalThis.__fs.richieste);
