@@ -54,11 +54,32 @@ export function verdePiuNuovoDelTag(verde, tagSha, eAntenato) {
 }
 
 /**
- * Pubblicazione ferma: l'ultima versione ha più di `soglia` ore, su main c'è
- * codice nuovo dopo di lei e nessun commit più nuovo ha la suite verde. PURA.
+ * Da quante ore c'è su main un commit verde più nuovo dell'ultima versione: conta il PRIMO diventato verde,
+ * perché da allora ogni giro aveva qualcosa da pubblicare. NaN se non ce n'è. PURA (con la domanda iniettata).
  */
-export function rilascioFermo({ oreDallUltima, commitDopoTag, verdeDopoTag, soglia = SOGLIA_ORE } = {}) {
-  return Number.isFinite(oreDallUltima) && oreDallUltima > soglia && commitDopoTag > 0 && !verdeDopoTag;
+export function oreDalPrimoVerde(runs, primoGenitore, tagSha, eAntenato, adesso = Date.now()) {
+  const main = new Set(Array.isArray(primoGenitore) ? primoGenitore : []);
+  let primo = NaN;
+  for (const r of Array.isArray(runs) ? runs : []) {
+    if (!r || !corseVerdi([r]).size || !main.has(r.head_sha)) continue;
+    if (!verdePiuNuovoDelTag(r.head_sha, tagSha, eAntenato)) continue;
+    const quando = Date.parse(r.updated_at || r.created_at || '');
+    if (Number.isFinite(quando) && !(quando >= primo)) primo = quando;
+  }
+  return Number.isFinite(primo) ? (adesso - primo) / 3.6e6 : NaN;
+}
+
+/**
+ * Pubblicazione ferma: l'ultima versione ha più di `soglia` ore e su main c'è codice nuovo dopo di lei.
+ * 'senza-verde' se nessun commit più nuovo ha la suite verde; 'dopo-il-verde' se un verde da pubblicare
+ * c'è da più di `sogliaVerde` ore e non è uscito (cancello unit, numero, costruzione…); altrimenti ''. PURA.
+ */
+export function rilascioFermo({
+  oreDallUltima, commitDopoTag, verdeDopoTag, oreDalVerde, soglia = SOGLIA_ORE, sogliaVerde = SOGLIA_VERDE_ORE,
+} = {}) {
+  if (!(Number.isFinite(oreDallUltima) && oreDallUltima > soglia && commitDopoTag > 0)) return '';
+  if (!verdeDopoTag) return 'senza-verde';
+  return Number.isFinite(oreDalVerde) && oreDalVerde > sogliaVerde ? 'dopo-il-verde' : '';
 }
 
 /** Una corsa in una riga: esito, commit, quando, link. PURA. */
