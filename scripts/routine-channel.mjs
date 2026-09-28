@@ -784,6 +784,45 @@ export function testoImprontaDiversa(quale, dichiarato, punta, motivo = 'altro_c
     + 'Niente è stato consegnato: un esito vale per il contenuto che hai davvero davanti, e l\'impronta la timbra lo strumento. Togli --sha e rilancia, oppure posizionati sul commit che hai esaminato.';
 }
 
+/** Gli intenti che una consegna conosce: decidono se la prima parola di `deliver` è un intento o un biglietto. */
+export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback'];
+
+// Quante parole vogliono questi comandi DOPO il biglietto (che sta sempre davanti).
+const POSIZIONALI_DOPO_BIGLIETTO = { work: 0, heartbeat: 0, release: 0, compare: 2, deliver: 1 };
+
+/** «Manca l'intento, o è scritto storto»: il testo è uno, per chi passa il biglietto a mano e per chi no. PURA. */
+export function testoIntentoNonCapito(parola) {
+  const p = String(parola || '');
+  return `${p ? `Intento non capito: «${p.slice(0, 40)}».` : 'Manca l\'intento della consegna.'} Gli intenti sono: ${INTENTI_CONSEGNA.join(', ')}. Non ho consegnato niente.`;
+}
+
+/**
+ * Il biglietto passato a mano (`--ticket` o `--biglietto`) vale allo stesso modo in ogni comando che ne
+ * usa uno: prende il posto del biglietto davanti, lo conferma se è identico, e se è diverso si rifiuta.
+ * Dove non ha senso (probe, ticket: lì serve la parola d'ordine) si rifiuta col motivo, mai ignorato.
+ * `domanda` e `risposta` lo leggono da sé. PURA.
+ * @returns {{ args: string[] } | { errore: string }}
+ */
+export function bigliettoAMano(cmd, args, dato) {
+  const b = String(dato || '').trim();
+  const lista = Array.isArray(args) ? [...args] : [];
+  if (!b) return { args: lista };
+  if (cmd === 'probe' || cmd === 'ticket') {
+    return { errore: `--ticket non vale con «${cmd}»: lì serve la parola d'ordine. Non ho fatto niente.` };
+  }
+  const dopo = POSIZIONALI_DOPO_BIGLIETTO[cmd];
+  if (dopo === undefined || lista[0] === b) return { args: lista };
+  if (lista.length <= dopo) {
+    // Una parola sola davanti a una consegna: se non è un intento è un intento scritto storto, o un
+    // secondo biglietto. Dirlo giusto conta: «due biglietti» manda a cercare un guasto che non c'è.
+    if (cmd === 'deliver' && lista.length && !INTENTI_CONSEGNA.includes(lista[0]) && !looksLikeTicket(lista[0])) {
+      return { errore: testoIntentoNonCapito(lista[0]) };
+    }
+    if (cmd !== 'deliver' || !lista.length || INTENTI_CONSEGNA.includes(lista[0])) return { args: [b, ...lista] };
+  }
+  return { errore: `Due biglietti diversi (${String(lista[0]).slice(0, 12)}… e --ticket ${b.slice(0, 12)}…): non ho fatto niente. Passane uno solo.` };
+}
+
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
