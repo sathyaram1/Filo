@@ -34,8 +34,9 @@ async function detonate(url, evaluateFinal) {
   if (!el || !el.BrowserWindow || !el.session) return null;
 
   const partition = `filo-detonate-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  // Senza GPC né blocchi: un redirect che passa da un host-tracker va seguito fino in fondo.
-  const ses = require('../sessioni').senzaProtezione(() => el.session.fromPartition(partition, { cache: false }));
+  // Di servizio: GPC e blocchi come ogni sessione, ma le navigazioni della finestra passano, così un
+  // redirect che attraversa un host-tracker si segue fino in fondo.
+  const ses = require('../sessioni').diServizio(() => el.session.fromPartition(partition, { cache: false }));
 
   let downloadStarted = false;
   let downloadName = '';
