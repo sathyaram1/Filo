@@ -74,13 +74,14 @@
     });
 
     // Autolink di URL nudi http(s)://... (mostrano l'URL stesso come testo).
-    // Il testo è già escapato: l'URL finisce a un " ' < > (&quot; &#39; &lt;
-    // &gt;), altrimenti `src="https://x">` diventa un link rotto seguito da «;».
-    t = t.replace(/\bhttps?:\/\/(?:&amp;|[^\s&])+/gi, (m) => {
+    // Il testo è già escapato: l'URL finisce a un " < > (&quot; &lt; &gt;),
+    // altrimenti `src="https://x">` diventa un link rotto seguito da «;».
+    // L'apostrofo resta dentro (wiki/Valle_d'Aosta): fuori solo quello in coda.
+    t = t.replace(/\bhttps?:\/\/(?:&amp;|&#39;|[^\s&])+/gi, (m) => {
       let url = m;
       let trail = '';
-      // La punteggiatura finale (. ) ] , ; : ! ?) non fa parte dell'URL.
-      const tm = /[.,;:!?)\]]+$/.exec(url);
+      // La punteggiatura finale (. ) ] , ; : ! ? ') non fa parte dell'URL.
+      const tm = /(?:[.,;:!?)\]]|&#39;)+$/.exec(url);
       if (tm) { trail = url.slice(url.length - tm[0].length); url = url.slice(0, -tm[0].length); }
       const safe = safeLinkUrl(url);
       return (safe ? stash(anchor(safe, url)) : url) + trail;
