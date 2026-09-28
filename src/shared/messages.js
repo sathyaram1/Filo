@@ -690,7 +690,8 @@
     // Toglie UNA riga: { modulo, riga } oppure { lezione: { ts, text } }.
     // Solo pagine filo://. Risposta: { ok, tolta } (false: non c'era più).
     FILO_MEMORY_FORGET: 'filo_memory_forget',
-    // Main → pagine filo://: la memoria è cambiata, chi la mostra la rilegge.
+    // Main → sole pagine filo://: la memoria è cambiata. Porta { moduli, lezioni }
+    // come FILO_MEMORY_VIEW, così chi la mostra non la richiede.
     FILO_MEMORY_CHANGED: 'filo_memory_changed',
     // Stato della micro-intervista di benvenuto (#524). Solo pagine filo://.
     // Risposta: { ok, onboarding: { done, ticked, thread, … }, welcome }

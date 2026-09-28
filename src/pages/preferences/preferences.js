@@ -1007,20 +1007,16 @@
     return t ? t[0].toUpperCase() + t.slice(1) : 'Altro';
   }
 
-  let memoriaTimer = null;
   async function caricaMemoria() {
     if (!$('memoria')) return;
     let r = null;
     try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_MEMORY_VIEW }); } catch (_) {}
     if (r && r.ok) disegnaMemoria(r);
   }
-  function caricaMemoriaPresto() {
-    clearTimeout(memoriaTimer);
-    memoriaTimer = setTimeout(caricaMemoria, 120);
-  }
 
   function disegnaMemoria({ moduli = [], lezioni = [] }) {
     const box = $('memoria');
+    if (!box) return;
     box.textContent = '';
     const posto = (n) => (n === 'PROFILO' ? 0 : n === 'PREFERENZE' ? 1 : 2);
     const gruppi = [];
@@ -1131,7 +1127,7 @@
     try {
       chrome.runtime.onMessage.addListener((msg) => {
         if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) riallinea(msg.settings);
-        if (msg && msg.type === MSG.FILO_MEMORY_CHANGED) caricaMemoriaPresto();
+        if (msg && msg.type === MSG.FILO_MEMORY_CHANGED && Array.isArray(msg.moduli)) disegnaMemoria(msg);
       });
     } catch (_) {}
     load();

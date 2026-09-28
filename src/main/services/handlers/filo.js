@@ -102,14 +102,7 @@ module.exports = function register(on, ctx) {
   // riscrivere la memoria non è roba di una pagina visitata.
   on(MSG.FILO_MEMORY_VIEW, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
-    const mem = await FiloMem.getMemory();
-    const moduli = Object.entries(mem || {})
-      .filter(([, v]) => typeof v === 'string')
-      .map(([nome, v]) => ({ nome, righe: v.split(/\r?\n/).map((r) => r.trim()).filter(Boolean) }));
-    const lezioni = (await FiloMem.getLessonsBuffer())
-      .filter((l) => l && typeof l.text === 'string' && l.text.trim())
-      .map((l) => ({ ts: l.ts, text: l.text }));
-    return { ok: true, moduli, lezioni };
+    return { ok: true, ...(await FiloMem.viewForUser()) };
   });
 
   on(MSG.FILO_MEMORY_FORGET, async (msg, sender, origin) => {

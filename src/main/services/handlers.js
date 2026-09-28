@@ -4109,9 +4109,15 @@ globalThis.SN_HANDLE_MESSAGE = handleMessage;
 // e qui la cosa da verificare è proprio CHI riceve (una scheda su un sito
 // qualunque non deve vedere passare i rami dell'owner).
 globalThis.SN_BROADCAST_FILO = broadcastToFiloPages;
-// Le Preferenze mostrano la memoria riga per riga (#592): a ogni scrittura la
-// rileggono. Solo le pagine di Filo: un sito non deve sapere quando Filo impara.
-try { FiloMem.setOnMemoryChange(() => broadcastToFiloPages({ type: MSG.FILO_MEMORY_CHANGED })); } catch (_) {}
+// Le Preferenze mostrano la memoria riga per riga (#592): a ogni scrittura il
+// main la rilegge una volta e la manda dentro l'avviso, alle sole pagine di Filo.
+try {
+  FiloMem.setOnMemoryChange(() => {
+    FiloMem.viewForUser()
+      .then((v) => broadcastToFiloPages({ type: MSG.FILO_MEMORY_CHANGED, ...v }))
+      .catch(() => {});
+  });
+} catch (_) {}
 
 module.exports = {
   handleMessage,

@@ -163,6 +163,19 @@
     return true;
   }
 
+  // La memoria come la rilegge l'utente nelle Preferenze (#592): i moduli in
+  // righe, e le lezioni ancora da riordinare.
+  async function viewForUser() {
+    const mem = await getMemory();
+    const moduli = Object.entries(mem || {})
+      .filter(([, v]) => typeof v === 'string')
+      .map(([nome, v]) => ({ nome, righe: v.split(/\r?\n/).map((r) => r.trim()).filter(Boolean) }));
+    const lezioni = (await getLessonsBuffer())
+      .filter((l) => l && typeof l.text === 'string' && l.text.trim())
+      .map((l) => ({ ts: l.ts, text: l.text }));
+    return { moduli, lezioni };
+  }
+
   // Aggiorna alcuni moduli senza toccare gli altri (semantica patch).
   async function patchMemory(patch) {
     const cur = await getMemory();
@@ -856,7 +869,7 @@
     LESSONS_BUFFER_TRIGGER_CHARS,
     // moduli
     getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt, forgetModuleLine,
-    setOnMemoryChange,
+    setOnMemoryChange, viewForUser,
     // onboarding (#524)
     getOnboarding, setOnboarding,
     // timer + sveglie (#322)

@@ -278,3 +278,14 @@ test('#592 — in Preferenze uno stile oltre il tetto non si salva e lo dice', a
   await expect.poll(() => storedStyle(app), { timeout: 4_000 }).toBe(buono);
   await expect(nota).toBeHidden();
 });
+
+test('#592 — dall’Aiuto uno stile troppo lungo è rifiutato, e l’utente legge perché', async ({ app, openTab }) => {
+  const page = await openTab('filo://newtab/');
+  await page.evaluate(() => window.SN_SIDEBAR.open());
+  const max = await app.evaluate(() => globalThis.SN_CONST.AGENT_STYLE_MAX);
+  const lungo = 'Rispondi con calma e con esempi. '.repeat(Math.ceil((max + 50) / 33)).trim();
+  await page.evaluate((v) => window.__filoSidebarTest.runFiloAction({ type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: v }), lungo);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  expect(await storedStyle(app)).toBe('');
+  await expect(page.locator('.sn-sidebar-log').last()).toContainText(`il massimo è ${max}`);
+});

@@ -9,6 +9,10 @@ e accodato in fondo al messaggio di sistema come istruzione «richiesta
 dall'utente», cioè dopo le regole che dicono cosa non è un ordine. Bastava che
 una pagina convincesse il modello a «salvarlo come preferenza».
 
+Le sorelle dello stile sono le lezioni che Filo si fissa (SALVA_LEZIONE) e i
+moduli di memoria in cui finiscono (profilo, preferenze apprese): stessa
+portata, stesse regole.
+
 Valgono insieme quattro cose:
 
 - **Se lo propone il modello, l'utente conferma il testo esatto.** Livello 2, e
@@ -25,9 +29,18 @@ Valgono insieme quattro cose:
   comune resta quasi intero (#422). L'ancora è per azione: nel messaggio di
   sistema dell'editor c'è il documento dell'utente, che può avere un titolo
   qualunque.
-- **Resta visibile e cancellabile** dove l'utente lo cerca.
+- **Resta visibile e cancellabile** dove l'utente lo cerca: lo stile nel suo
+  riquadro, la memoria riga per riga nelle Preferenze («Memoria di Filo»),
+  con canali solo per le pagine di Filo.
 
-Dove: `stile_agente` in `src/shared/preferences.js`, `injectAgentStyle` e
+Le lezioni che Filo si scrive da solo dopo ogni scambio non passano dal popup
+(sarebbe un popup a ogni risposta): per loro valgono il tetto, il recinto e la
+pagina che le mostra. La memoria sta nella parte variabile del prompt, dopo le
+regole anti-inganno, per non rompere il prefisso comune (#422): le regole la
+nominano, e il recinto le toglie l'autorità di un ordine.
+
+Dove: `stile_agente` e `lezioneDaAzione` in `src/shared/preferences.js`,
+`memoriaImbustata` e `MEMORIA_FILO` accanto allo stile, `injectAgentStyle` e
 `INIZIO_ANTI_INGANNO` in `src/shared/constants.js`, `STILE_UTENTE` in
 `src/shared/contenutoEsterno.js`. Sentinelle in
 `tests/unit/preferences.test.mjs` (ogni setter a testo libero è confermato e
