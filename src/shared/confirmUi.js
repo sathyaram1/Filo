@@ -321,15 +321,23 @@
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-danger');
       ok.disabled = true;
 
-      const pronto = () => input.value.trim().toLowerCase() === String(word).toLowerCase() && visto();
-      const aggiorna = () => { ok.disabled = !pronto(); };
-      const visto = tuttoVisto(box, aggiorna);
+      const parola = () => input.value.trim().toLowerCase() === String(word).toLowerCase();
+      const aggiorna = () => {
+        ok.disabled = !parola();
+        inAttesa(ok, parola() && !visto());
+      };
+      const { visto, avanti } = tuttoVisto(box, aggiorna);
+      const premi = () => {
+        if (!parola()) return;
+        if (visto()) done(true);
+        else avanti();
+      };
       input.addEventListener('input', aggiorna);
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && pronto()) { e.preventDefault(); done(true); }
+        if (e.key === 'Enter') { e.preventDefault(); premi(); }
       });
       cancel.addEventListener('click', () => done(false));
-      ok.addEventListener('click', () => { if (pronto()) done(true); });
+      ok.addEventListener('click', premi);
       input.focus();
     });
   }
