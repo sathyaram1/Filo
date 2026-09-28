@@ -340,7 +340,7 @@ function scrivi(nodo, w, ctx) {
       const t = inlineDi(nodo.children, sotto);
       if (!t) return;
       const url = risolviLink(nodo.attrs.href, ctx.base);
-      w.inline(url && url !== t ? ` [${t}](${url}) ` : ` ${t} `);
+      w.inline(url && url !== t ? `[${t}](${url})` : t);
       return;
     }
     default: break;
