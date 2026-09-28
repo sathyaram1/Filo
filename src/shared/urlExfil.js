@@ -192,27 +192,38 @@
     return exposedAlnum(`${sub} ${u.pathname || ''} ${u.search || ''} ${u.hash || ''}`);
   }
 
-  function taintLetto(url, letto) {
+  // `esposto` = testo già ridotto a minuscolo alfanumerico (di un URL o di una
+  // query). Combacia con ciò che è stato letto se ne porta un token misto
+  // lettere+cifre (chiave, codice) o un pezzo di FINESTRA caratteri di fila.
+  function confrontaLetto(esposto, letto) {
     const text = String(letto || '');
-    if (!text) return null;
-    const exposed = carrierAlnum(url);
-    if (exposed.length < TOKEN_MISTO) return null;
+    if (!text || esposto.length < TOKEN_MISTO) return null;
     const reason = 'contiene dati letti dal tuo computer';
     const visti = new Set();
     for (const w of text.toLowerCase().split(/[^a-z0-9]+/)) {
       if (w.length < TOKEN_MISTO || visti.has(w)) continue;
       visti.add(w);
-      if (/[a-z]/.test(w) && /[0-9]/.test(w) && exposed.includes(w)) return { reason };
+      if (/[a-z]/.test(w) && /[0-9]/.test(w) && esposto.includes(w)) return { reason };
     }
-    if (exposed.length >= FINESTRA) {
+    if (esposto.length >= FINESTRA) {
       const grams = new Set();
-      for (let i = 0; i + FINESTRA <= exposed.length; i++) grams.add(exposed.substr(i, FINESTRA));
+      for (let i = 0; i + FINESTRA <= esposto.length; i++) grams.add(esposto.substr(i, FINESTRA));
       const flat = text.toLowerCase().replace(/[^a-z0-9]+/g, '');
       for (let i = 0; i + FINESTRA <= flat.length; i++) {
         if (grams.has(flat.substr(i, FINESTRA))) return { reason };
       }
     }
     return null;
+  }
+
+  function taintLetto(url, letto) {
+    return confrontaLetto(carrierAlnum(url), letto);
+  }
+
+  // Come taintLetto, ma su un TESTO qualsiasi (la query di una ricerca web, che
+  // esce dal computer verso il motore di ricerca esattamente come un URL).
+  function taintTestoLetto(testo, letto) {
+    return confrontaLetto(exposedAlnum(testo), letto);
   }
 
   // Un link come lo si confronta: senza frammento né barra finale, dominio minuscolo.
