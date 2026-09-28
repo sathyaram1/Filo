@@ -814,12 +814,11 @@ export function bigliettoAMano(cmd, args, dato) {
   const dopo = POSIZIONALI_DOPO_BIGLIETTO[cmd];
   if (dopo === undefined || lista[0] === b) return { args: lista };
   if (lista.length <= dopo) {
-    // Una parola sola davanti a una consegna: se non è un intento è un intento scritto storto, o un
-    // secondo biglietto. Dirlo giusto conta: «due biglietti» manda a cercare un guasto che non c'è.
-    if (cmd === 'deliver' && lista.length && !INTENTI_CONSEGNA.includes(lista[0]) && !looksLikeTicket(lista[0])) {
-      return { errore: testoIntentoNonCapito(lista[0]) };
-    }
-    if (cmd !== 'deliver' || !lista.length || INTENTI_CONSEGNA.includes(lista[0])) return { args: [b, ...lista] };
+    const nonIntento = cmd === 'deliver' && lista.length > 0 && !INTENTI_CONSEGNA.includes(lista[0]);
+    if (!nonIntento) return { args: [b, ...lista] };
+    // Una parola sola davanti a una consegna che non è un intento: storto o secondo biglietto. Dirlo
+    // giusto conta, «due biglietti» manda a cercare un guasto che non c'è.
+    if (!looksLikeTicket(lista[0])) return { errore: testoIntentoNonCapito(lista[0]) };
   }
   return { errore: `Due biglietti diversi (${String(lista[0]).slice(0, 12)}… e --ticket ${b.slice(0, 12)}…): non ho fatto niente. Passane uno solo.` };
 }
