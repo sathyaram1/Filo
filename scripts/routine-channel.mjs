@@ -29,8 +29,8 @@
 //
 // USO
 //   Nei comandi che usano un biglietto lo si passa davanti oppure con `--ticket <codice>` (o
-//   `--biglietto`); in tutti e due i posti dev'essere lo stesso. Exit 1 = uso sbagliato o nessun
-//   biglietto: il server non è stato chiamato.
+//   `--biglietto`); in tutti e due i posti dev'essere lo stesso. Senza biglietto l'uscita è 1, non 3:
+//   il server non è stato chiamato.
 //
 //   node scripts/routine-channel.mjs probe <parola-d-ordine>
 //       → c'è lavoro? Non lega niente. Exit 0 = sì, 2 = niente da fare,
