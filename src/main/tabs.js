@@ -2398,9 +2398,9 @@ class TabManager {
         this._notifyPopupBlocked(tab.id, url);
         return { action: 'deny' };
       }
-      // #170.3 — la lista dei siti bloccati la applica openTab; il referrer è
-      // la pagina che ha originato l'apertura, e un «Apri comunque» dato a
-      // questa scheda vale anche per le schede che apre sullo stesso sito.
+      // #170.3 — la lista dei siti bloccati la applica openTab, con provenienza
+      // questa scheda; un «Apri comunque» dato qui vale anche per le schede che
+      // apre sullo stesso sito.
       // #376 — parità con qualsiasi browser: Ctrl+click / click centrale su un
       // link ("aprilo dietro, io continuo a leggere qui") arriva con
       // disposition 'background-tab' e NON deve rubare il primo piano. Prima
