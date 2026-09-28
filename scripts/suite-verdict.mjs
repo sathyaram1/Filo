@@ -337,6 +337,7 @@ async function main() {
     const righe = v.nuovi.map(rigaRosso);
     writeFileSync(resolve(opt.out), righe.length ? `${righe.join('\n')}\n` : '', 'utf8');
   }
+  scriviChiavi(opt, chiaviDelVerdetto(v));
   process.exit(v.nuovi.length ? 1 : 0);
 }
 
