@@ -767,7 +767,9 @@ section:has(#dictList) .sn-spell-add-row {
 .sn-page .sn-cookie-mode-desc { display: block; margin-top: 3px; line-height: 1.5; }
 
 .sn-page .sn-cookie-wl-add > input { flex: 1; }
-.sn-page #cookie-wl-list li {
+.sn-page #cookie-wl-list li,
+.sn-page #cookie-banners-list li,
+.sn-page #cookie-done-list li {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -778,7 +780,9 @@ section:has(#dictList) .sn-spell-add-row {
   margin-bottom: 6px;
   font-size: 13px;
 }
-.sn-page #cookie-wl-list li button {
+.sn-page #cookie-wl-list li button,
+.sn-page #cookie-banners-list li button,
+.sn-page #cookie-done-list li button {
   font-size: 12px;
   padding: 2px 8px;
 }

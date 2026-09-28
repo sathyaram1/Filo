@@ -85,6 +85,23 @@ function registerIpcHandlers() {
     }
   });
 
+  // #754 — la pagina che sta per caricarsi, prima degli script del sito: la risposta al banner dei cookie da
+  // togliere dalla sua memoria, se il sito ha cambiato elenco. SINCRONO per lo stesso motivo di fp-config.
+  ipcMain.on('filo:cookie-wipe', (event, href) => {
+    let out = null;
+    try {
+      const wc = event.sender;
+      const top = event.senderFrame && wc.mainFrame && event.senderFrame.frameTreeNodeId === wc.mainFrame.frameTreeNodeId;
+      if (top) {
+        for (const w of BrowserWindow.getAllWindows()) {
+          const tm = w._filoTabs;
+          if (tm && tm.tabs && tm.tabs.some((t) => t.view && t.view.webContents === wc)) { out = tm.takeCookieWipe(String(href || '')); break; }
+        }
+      }
+    } catch (_) { out = null; }
+    event.returnValue = out;
+  });
+
   // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi
   // riquadri incorporati). Serve alle scorciatoie che lavorano sulla selezione:
   // vanno consegnate a chi ha davvero il testo selezionato. Nessun dato nel
@@ -364,6 +381,15 @@ function registerIpcHandlers() {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
     return win._filoTabs.clearTabProxy(id);
+  });
+  // #754 — dal menu della scheda: rivedere i banner dei cookie su questo sito (show) o ridarli a Filo.
+  // Solo dalla shell: scrive le impostazioni.
+  ipcMain.handle('tabs:cookie-banners', async (event, { id, show } = {}) => {
+    const win = winFor(event);
+    if (!win?._filoTabs || win.webContents !== event.sender) return { ok: false, error: 'forbidden' };
+    // In incognito l'elenco dei siti si scrive nella memoria della sessione, non sul disco.
+    const run = () => win._filoTabs.setCookieBanners(id, !!show);
+    return win._filoIncognito ? DiskStorage.runIncognito(run) : run();
   });
   // Stato per il menu della shell: la voce compare solo se un endpoint è
   // configurato; defaultCountry = ultima location usata, altrimenti il default.

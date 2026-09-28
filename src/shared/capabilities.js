@@ -464,6 +464,12 @@
       invoke: 'Pagina filo://security/security.html.',
     },
     {
+      id: 'cookie-banners', title: 'Banner dei cookie rifiutati da soli', category: 'settings',
+      desc: 'In modalità Automatico e Privacy Filo rifiuta da solo i banner dei cookie, anche quando stanno in un riquadro dentro la pagina. Quelli che non hanno un «rifiuta» (solo «Accetta», o «accetta o abbonati») li nasconde, senza accettare niente, e se la pagina era rimasta ferma o scurita la sblocca. Dove il sito lo dice, controlla che il rifiuto sia stato registrato davvero.',
+      invoke: 'Da solo, a ogni pagina. Il tasto destro sulla scheda dice cosa è successo su quel sito («Cookie non necessari rifiutati» o «Banner dei cookie nascosto»), anche tornandoci dopo in un\'altra scheda o dopo un riavvio, e offre «Mostra il banner dei cookie» per rivederlo; sullo stesso menu «Rifiuta i cookie in automatico qui» torna indietro. In Impostazioni → Sicurezza si vedono tutti e due gli elenchi: i siti coi banner visibili («Rifiuta in automatico») e quelli dove Filo ha rifiutato o nascosto («Mostra il banner»).',
+      doesNot: 'In modalità Manuale non tocca nessun banner. Non avvisa da solo quando rifiuta o nasconde qualcosa. Non nasconde i messaggi che non parlano di cookie (avviso sull\'adblocker, limite di articoli gratuiti). Una scelta fatta in una finestra incognito resta lì. In Privacy non tiene sul disco cosa ha fatto sui siti non fidati. «Mostra il banner» toglie solo la risposta che il clic sul banner ha creato, non l\'accesso o le preferenze del sito.',
+    },
+    {
       id: 'data-export-import', title: 'Esporta e importa i tuoi dati', category: 'settings',
       desc: 'Salva tutto quello che Filo sa di te (memorie degli agenti, pagine salvate, cronologia, appunti copiati, costi e impostazioni) in un unico file .zip, e lo ricarica quando vuoi — sullo stesso computer come backup, o su un altro per portarti dietro il tuo Filo. Le immagini copiate finiscono nell\'archivio come file veri, sfogliabili, e al ritorno tornano al loro posto. Prima di scrivere qualsiasi cosa, l\'importazione ti dice cosa contiene il file scelto (di quando è il backup, quante sezioni e quante immagini) e chiede conferma: quello che hai già non viene cancellato, le liste si uniscono senza duplicati e, dove lo stesso dato esiste da entrambe le parti, vince quello del backup. Le impostazioni ripristinate (tema, sicurezza, cookie) diventano attive subito, senza riavviare.',
       invoke: 'Impostazioni → Sicurezza, in fondo: "Esporta dati (.zip)" e "Importa dati (.zip)".',

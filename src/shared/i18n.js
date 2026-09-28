@@ -520,7 +520,7 @@
     options_cookies_mode_default: 'Automatico (consigliato)',
     options_cookies_mode_default_desc:
       'Filo blocca a monte i tracker noti (Google Analytics, reti pubblicitarie, pixel dei social): lo script non ' +
-      'si carica nemmeno. Rifiuta da solo i banner cookie che riconosce, dice ai siti che non vuoi essere profilato ' +
+      'si carica nemmeno. Rifiuta da solo i banner dei cookie, nasconde quelli che non hanno un «rifiuta», dice ai siti che non vuoi essere profilato ' +
       'e carica i video YouTube senza cookie. I cookie utili a te (login, preferenze, le tue scelte sui siti) ' +
       'restano: non perdi quello che hai impostato.',
     options_cookies_mode_privacy: 'Privacy massima',
@@ -541,6 +541,12 @@
     options_cookies_trusted_note_other:
       'I siti fidati hanno effetto solo in "Privacy massima". In "Automatico" i tuoi login restano comunque salvati, ' +
       'quindi qui non serve aggiungere nulla.',
+    options_cookies_banners_title: 'Qui i banner dei cookie li vedi',
+    options_cookies_banners_remove: 'Rifiuta in automatico',
+    options_cookies_done_title: 'Qui Filo li ha rifiutati o nascosti',
+    options_cookies_done_rejected: 'cookie rifiutati',
+    options_cookies_done_hidden: 'banner nascosto',
+    options_cookies_done_show: 'Mostra il banner',
     // Protezione anti-fingerprinting
     options_fp_title: 'Protezione fingerprinting',
     options_fp_desc:

@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld('filoShell', {
     setProxy: (id, country, tier) => ipcRenderer.invoke('tabs:set-proxy', { id, country, tier }),
     clearProxy: (id) => ipcRenderer.invoke('tabs:clear-proxy', { id }),
     proxyStatus: () => ipcRenderer.invoke('tabs:proxy-status'),
+    // Banner dei cookie del sito della scheda: true = mostrali, false = Filo li gestisce di nuovo.
+    cookieBanners: (id, show) => ipcRenderer.invoke('tabs:cookie-banners', { id, show }),
   },
   // Scaricamenti della navigazione (#410.1): la shell legge la cronologia,
   // comanda i singoli download e riceve gli aggiornamenti di avanzamento dal

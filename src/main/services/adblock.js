@@ -279,10 +279,16 @@ function isEnabled(settings) {
 }
 
 // Avvia un refresh periodico (settimanale) finché il blocco è attivo. Idempotente.
+// Un giro fallito si ritenta a tempo finché il blocco è acceso: vedi retryList.js.
+const refreshInBackground = require('./retryList').makeRetry(
+  () => refresh(),
+  () => enabled && process.env.NODE_ENV !== 'test' && !process.env.FILO_SMOKE,
+);
+
 function ensurePeriodicRefresh() {
   if (refreshTimer) return;
   refreshTimer = setInterval(() => {
-    if (enabled) refresh().catch(() => {});
+    if (enabled) refreshInBackground().catch(() => {});
   }, REFRESH_INTERVAL_MS);
   if (refreshTimer.unref) refreshTimer.unref(); // non tenere vivo il processo
 }
@@ -299,7 +305,7 @@ async function init(settings) {
     ensurePeriodicRefresh();
     // Refresh in background se la cache manca o è stantia. Non attendiamo.
     if (!blockedDomains.size || !lastUpdatedAt || (Date.now() - lastUpdatedAt) >= REFRESH_INTERVAL_MS) {
-      refresh().catch(() => {});
+      refreshInBackground().catch(() => {});
     }
   }
 }
@@ -313,7 +319,7 @@ function configureFromSettings(settings) {
   if (enabled) {
     ensurePeriodicRefresh();
     if (!was && (!blockedDomains.size || (Date.now() - lastUpdatedAt) >= REFRESH_INTERVAL_MS)) {
-      refresh().catch(() => {});
+      refreshInBackground().catch(() => {});
     }
   }
 }
@@ -330,6 +336,7 @@ function status() {
 
 module.exports = {
   DEFAULT_SOURCES,
+  fetchList,
   parseList,
   normalizeDomain,
   isBlockedHost,

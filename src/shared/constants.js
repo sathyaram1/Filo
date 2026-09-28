@@ -68,6 +68,9 @@
     PATHS_OUTBOX: 'pathsOutbox',
     CATEGORIES: 'categories',
     BLOCKLIST: 'blocklist',
+    // #754 — cosa Filo ha fatto col banner dei cookie di ogni sito ({ sito → { rejected, hidden, at } }): il sito
+    // si ricorda il rifiuto e non rimostra il banner, quindi il menu della scheda lo legge da qui. Vedi tabs/tabCookies.js.
+    COOKIE_SITES: 'cookieSites',
     AI_CACHE: 'aiCache',
     CLIPBOARD_HISTORY: 'clipboardHistory',
     PERSONAL_DICT: 'sn_personal_dict',
@@ -2294,9 +2297,12 @@
       // trustedSites: domini (eTLD+1) "fidati" → in 'privacy' ricevono una
       //   partizione isolata ma persistente (resti connesso). Negli altri modi
       //   non hanno effetto.
+      // bannerSites: domini (eTLD+1) dove l'utente ha chiesto di rivedere i
+      //   banner dei cookie (menu della scheda): lì Filo non rifiuta e non nasconde.
       cookies: {
         mode: 'default',
         trustedSites: [],
+        bannerSites: [],
       },
       // Protezione anti-fingerprinting: rumore deterministico per-sito sui
       // segnali continui ad alta entropia (canvas 2D, WebGL, audio). Stessa

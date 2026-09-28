@@ -1010,8 +1010,14 @@ async function applySettingsUpdate(partial) {
   wireSafebrowse(merged).catch(() => {});
   try {
     const Cookies = require('./cookies');
-    Cookies.configureFromSettings(merged);
-    broadcastToTabs({ type: MSG.COOKIES_CONFIG_UPDATE, mode: Cookies.getMode(merged) });
+    const cookiesChanged = Cookies.configureFromSettings(merged);
+    require('./cookieBanners').configureFromSettings(merged);
+    // Ogni frame di ogni scheda rilegge la sua config: solo se la modalità o i siti coi banner sono cambiati.
+    if (cookiesChanged) {
+      broadcastToTabs({ type: MSG.COOKIES_CONFIG_UPDATE, mode: Cookies.getMode(merged) });
+      // Il menu della scheda dice se su quel sito i banner si vedono: la barra deve saperlo subito.
+      for (const w of BrowserWindow.getAllWindows()) { try { w._filoTabs && w._filoTabs._broadcast(); } catch (_) {} }
+    }
   } catch (_) {}
   try { require('./adblock').configureFromSettings(merged); } catch (_) {}
   try { require('./siteBlock').configureFromSettings(merged); } catch (_) {}
@@ -4156,4 +4162,5 @@ module.exports = {
   wireSafebrowse,
   runTabTriageDecision,
   executeFiloAction,
+  applySettingsUpdate,
 };
