@@ -418,8 +418,10 @@ test('git config — legge (1), imposta (2), cancella (3) secondo gli argomenti'
 });
 
 test('git remote — elenca/mostra (1), aggiunge/rinomina (2), rimuove (3)', () => {
-  for (const cmd of ['git remote', 'git remote -v', 'git remote show origin', 'git remote get-url origin']) {
-    assert.equal(lvl(cmd), 1, `"${cmd}" (legge) dovrebbe essere livello 1`);
+  assert.equal(lvl('git remote'), 1, '"git remote" (soli nomi) dovrebbe essere livello 1');
+  // #587: `-v`, `show`, `get-url` stampano gli URL, che possono contenere un token.
+  for (const cmd of ['git remote -v', 'git remote show origin', 'git remote get-url origin']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (stampa un URL col token) dovrebbe essere livello 2`);
   }
   for (const cmd of ['git remote add origin http://x/y.git', 'git remote rename origin upstream', 'git remote set-url origin http://z']) {
     assert.equal(lvl(cmd), 2, `"${cmd}" (modifica) dovrebbe essere livello 2`);
