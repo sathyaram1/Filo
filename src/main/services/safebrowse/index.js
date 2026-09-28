@@ -182,6 +182,14 @@ function analyze(url, ctx = {}, onUpdate) {
     return first;
   }
 
+  const pending = UrlNav && UrlNav.homeNetworkPending(norm.host);
+  if (pending) {
+    pending.then(() => {
+      const next = analyze(url, ctx, onUpdate);
+      if (typeof onUpdate === 'function' && verdictChanged(first, next)) onUpdate(next);
+    });
+    return first;
+  }
   if (isHomeNetwork(norm)) return first;
 
   const reg = norm.registrable;
