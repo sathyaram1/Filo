@@ -84,7 +84,7 @@
     },
     {
       id: 'incognito', title: 'Finestra in incognito', category: 'navigation',
-      desc: 'Apre una nuova finestra privata e isolata: la sessione è effimera e non viene archiviata.',
+      desc: 'Apre una nuova finestra privata e isolata: la sessione è effimera e non viene archiviata. Tracker e pubblicità sono bloccati come nelle altre finestre, e i siti ricevono la richiesta di non tracciarti (secondo la gestione dei cookie scelta in Sicurezza).',
       invoke: 'Menu del tasto destro → "Nuova finestra incognito".',
     },
     {

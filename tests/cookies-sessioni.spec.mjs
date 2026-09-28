@@ -105,7 +105,10 @@ const letturaGpc = (page) => page.evaluate(() => window.__gpc);
 // Header visto dal server per la pagina e per i due riquadri, dopo `da`.
 function headerDopo(srv, da) {
   const r = srv.richieste.slice(da);
-  const di = (path, nome) => r.find((x) => x.path === path && x.nome === nome)?.gpc ?? 'mai arrivata';
+  const di = (path, nome) => {
+    const x = r.find((q) => q.path === path && q.nome === nome);
+    return x ? x.gpc : 'mai arrivata';
+  };
   return { pagina: di('/p', ''), stesso: di('/f', 'stesso'), altro: di('/f', 'altro') };
 }
 
@@ -135,6 +138,22 @@ async function trackerBloccato(app, page, trovaSessione) {
   await expect.poll(() => app.evaluate(() => globalThis.__filoErrTracker), { timeout: 6_000 }).toBe('net::ERR_BLOCKED_BY_CLIENT');
 }
 
+async function modalita(openTab, valore) {
+  const sec = await openTab('filo://security/');
+  await sec.waitForSelector('input[name="cookie-mode"]', { timeout: 8_000 });
+  await sec.locator(`input[name="cookie-mode"][value="${valore}"]`).check();
+  await expect(sec.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+}
+
+async function apriIncognito(app, shell) {
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito && w._filoTabs)), { timeout: 15_000 }).toBe(true);
+}
+
+const apriInIncognito = (app, url) => app.evaluate(({ BrowserWindow }, u) => {
+  BrowserWindow.getAllWindows().find((w) => w._filoIncognito)._filoTabs.openTab(u);
+}, url);
+
 function attesoProtetto(gpc, header) {
   expect(gpc.testa, 'script in <head> della pagina').toBe('true');
   expect(gpc.riquadri.stesso, 'riquadro della stessa origine').toBe('true');
@@ -155,11 +174,8 @@ test('incognito: nasce protetta come la finestra normale, tracker compresi', asy
   test.setTimeout(90_000);
   const srv = await apriServer();
   try {
-    await shell.evaluate(() => window.filoShell.openIncognito());
-    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito && w._filoTabs)), { timeout: 15_000 }).toBe(true);
-    await app.evaluate(({ BrowserWindow }, url) => {
-      BrowserWindow.getAllWindows().find((w) => w._filoIncognito)._filoTabs.openTab(url);
-    }, srv.base + '/p');
+    await apriIncognito(app, shell);
+    await apriInIncognito(app, srv.base + '/p');
     const page = await paginaCon(app, (u) => u.startsWith(srv.base + '/p'));
     const info = await app.evaluate(({ BrowserWindow, session }) => {
       const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
@@ -210,17 +226,38 @@ test('scheda da un altro paese: la sessione proxata nasce protetta, tracker comp
   }
 });
 
-test('manuale: niente GPC né in <head> né nei riquadri, niente header (controprova)', async ({ app, openTab }) => {
-  const sec = await openTab('filo://security/');
-  await sec.waitForSelector('input[name="cookie-mode"]', { timeout: 8_000 });
-  await sec.locator('input[name="cookie-mode"][value="manual"]').check();
-  await expect(sec.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+test('privacy: il jar isolato del sito nasce protetto anche lui', async ({ app, openTab }) => {
+  await modalita(openTab, 'privacy');
   const srv = await apriServer();
   try {
     await openTab(srv.base + '/p');
     const page = await paginaCon(app, (u) => u.startsWith(srv.base + '/p'));
-    const gpc = await letturaGpc(page);
-    expect(gpc).toEqual({ testa: 'undefined', riquadri: { stesso: 'undefined', altro: 'undefined' } });
-    expect(headerDopo(srv, 0)).toEqual({ pagina: null, stesso: null, altro: null });
+    const partizione = await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+      return w._filoTabs.tabs.find((x) => /^https?:/.test(x.url || ''))?.partition || null;
+    });
+    expect(partizione).toMatch(/^filo-priv-/);
+    attesoProtetto(await letturaGpc(page), headerDopo(srv, 0));
+    await trackerBloccato(app, page, {});
+  } finally { await srv.close(); }
+});
+
+// La modalità si sceglie con l'incognito già aperto: anche la sua sessione, nata
+// prima, deve seguirla. In Manuale niente GPC, nemmeno nei riquadri.
+test('manuale: spegne GPC anche nelle sessioni già nate, riquadri compresi (controprova)', async ({ app, openTab, shell }) => {
+  test.setTimeout(90_000);
+  await apriIncognito(app, shell);
+  await modalita(openTab, 'manual');
+  const srv = await apriServer();
+  try {
+    await openTab(srv.base + '/p?finestra=normale');
+    const normale = await paginaCon(app, (u) => u.startsWith(srv.base + '/p?finestra=normale'));
+    await apriInIncognito(app, srv.base + '/p?finestra=incognito');
+    const incognito = await paginaCon(app, (u) => u.startsWith(srv.base + '/p?finestra=incognito'));
+    const spento = { testa: 'undefined', riquadri: { stesso: 'undefined', altro: 'undefined' } };
+    expect(await letturaGpc(normale)).toEqual(spento);
+    expect(await letturaGpc(incognito)).toEqual(spento);
+    expect(srv.richieste.filter((r) => r.gpc !== null)).toEqual([]);
+    expect(srv.richieste.length).toBeGreaterThanOrEqual(6);
   } finally { await srv.close(); }
 });
