@@ -37,7 +37,10 @@
 //
 // USO
 //   node scripts/suite-verdict.mjs <risultato.json> [--out <rossi-nuovi.txt>]
-//                                  [--rossi <rossi-noti.json>]
+//                                  [--rossi <rossi-noti.json>] [--chiavi <file>]
+//
+//   --chiavi scrive le chiavi dell'allarme (scripts/build-alarm.mjs), una per
+//   riga: cosa è rotto, perché il server non apra un doppione per lo stesso guasto.
 //
 //   Come si produce il JSON (Playwright ≥ 1.49):
 //   PLAYWRIGHT_JSON_OUTPUT_NAME=suite.json npx playwright test --reporter=list,json
@@ -217,6 +220,23 @@ export function verdetto(json, noti) {
 export function rigaRosso(c) {
   if (c.spec === FUORI_DAI_CASI) return `errore fuori dai casi: ${c.titolo}`;
   return `tests/${c.spec}.spec.mjs › ${c.titoloCompleto || c.titolo}`;
+}
+
+/** La chiave dell'allarme quando la suite non è partita o non ha lasciato un esito. */
+export const CHIAVE_NON_PARTITA = 'suite:non-partita';
+
+/**
+ * Le chiavi dell'allarme per i rossi nuovi: `suite:tests/<spec>.spec.mjs` per
+ * ogni spec, `suite:fuori-dai-casi` per gli errori senza caso. Una per spec e
+ * non per caso: dieci casi rotti dalla stessa modifica sono un guasto. PURA.
+ */
+export function chiaviDelVerdetto(v) {
+  const chiavi = [];
+  for (const c of Array.isArray(v?.nuovi) ? v.nuovi : []) {
+    const k = c.spec === FUORI_DAI_CASI ? 'suite:fuori-dai-casi' : `suite:tests/${normalizzaSpec(c.spec)}.spec.mjs`;
+    if (!chiavi.includes(k)) chiavi.push(k);
+  }
+  return chiavi;
 }
 
 /** Il riassunto a schermo. Non taglia niente: l'elenco è quello intero. PURA. */
