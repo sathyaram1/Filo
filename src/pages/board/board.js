@@ -101,10 +101,10 @@
   const pending = new Set();    // id feedback con voto in volo (IPC), per disabilitare i pulsanti
   let openReopenAfterLogin = null; // id del fix il cui form "Ancora rotto?" va riaperto dopo un login riuscito
   // #678.2 — un accesso partito dalla bacheca dice sempre com'è andato: mentre
-  // aspetta il browser, e se non riesce il perché, sulla scheda da cui è partito
-  // (in testa se partito da «Accedi»). Vale solo l'ultimo accesso chiesto.
-  let accessoSeq = 0;
-  let accessoInCorso = null;   // { seq, id, dopo, poi } finché il browser non risponde
+  // aspetta il browser, e se non riesce il perché, su ogni scheda che aspettava
+  // (in testa se partito da «Accedi»). Un gesto fatto durante l'attesa si unisce
+  // agli altri: partono tutti appena l'account è dentro, da dovunque ci entri.
+  let attesa = null;           // { gesti: Map(id → { dopo, poi }), testa } finché l'accesso non si chiude
   let accessoFallito = null;   // frase per la testa
   // Form "Ancora rotto?" aperti e testo scritto dentro, per id: renderList()
   // ricostruisce tutte le schede da zero, e un ridisegno che arriva mentre
