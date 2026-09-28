@@ -277,6 +277,35 @@ describe('lo script da riga di comando', () => {
     assert.match(r.stdout, /Rossi NUOVI: 2/);
   });
 
+  const conChiavi = (jsonFile, chiavi) => spawnSync(process.execPath,
+    [CLI, jsonFile, '--out', join(dir, 'n-chiavi.txt'), '--rossi', fileNoti, '--chiavi', chiavi], { encoding: 'utf8' });
+
+  test('--chiavi: un rosso nuovo scrive la chiave del suo spec, un verde un file vuoto', () => {
+    const rosso = join(dir, 'chiavi-rosso.json');
+    const errore = join(dir, 'chiavi-errore.json');
+    const verde = join(dir, 'chiavi-verde.json');
+    writeFileSync(rosso, JSON.stringify(jsonSintetico()), 'utf8');
+    const j = jsonSintetico();
+    j.errors = [{ message: 'Error: Cannot find module x' }];
+    writeFileSync(errore, JSON.stringify(j), 'utf8');
+    writeFileSync(verde, JSON.stringify(jsonSintetico({ conNuovo: false })), 'utf8');
+    assert.equal(conChiavi(rosso, join(dir, 'k1.txt')).status, 1);
+    assert.equal(readFileSync(join(dir, 'k1.txt'), 'utf8'), 'suite:tests/delta.spec.mjs\n');
+    assert.equal(conChiavi(errore, join(dir, 'k2.txt')).status, 1);
+    assert.equal(readFileSync(join(dir, 'k2.txt'), 'utf8'), 'suite:tests/delta.spec.mjs\nsuite:fuori-dai-casi\n');
+    assert.equal(conChiavi(verde, join(dir, 'k3.txt')).status, 0);
+    assert.equal(readFileSync(join(dir, 'k3.txt'), 'utf8'), '');
+  });
+
+  test('--chiavi: una suite che non è partita scrive `suite:non-partita`', () => {
+    assert.equal(conChiavi(join(dir, 'non-esiste.json'), join(dir, 'k4.txt')).status, 2);
+    assert.equal(readFileSync(join(dir, 'k4.txt'), 'utf8'), 'suite:non-partita\n');
+    const vuoto = join(dir, 'chiavi-vuoto.json');
+    writeFileSync(vuoto, JSON.stringify({ suites: [], errors: [] }), 'utf8');
+    assert.equal(conChiavi(vuoto, join(dir, 'k5.txt')).status, 2);
+    assert.equal(readFileSync(join(dir, 'k5.txt'), 'utf8'), 'suite:non-partita\n');
+  });
+
   test.after(() => { try { rmSync(dir, { recursive: true, force: true }); } catch (_) { /* best effort */ } });
 });
 
