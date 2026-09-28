@@ -725,9 +725,77 @@
       : 'Ce ne sono altre ' + n + ', più vecchie, che qui non entrano.';
   }
 
+  // Il segno che il server mette quando l'owner approva col clic una richiesta:
+  // «<email> · approvazione <id>». Non è pieno: copre solo i blocchi già approvati.
+  var RE_SEGNO_DA_APPROVAZIONE = / · approvazione ([0-9a-f]{24})$/;
+
+  /**
+   * Il segno «fondi senza chiedermelo» di una pratica, letto. PURA.
+   * null se non c'è; `tipo` 'pieno' (messo a mano, copre tutto) o
+   * 'approvazione' (nato da un sì a una richiesta: blocchi nuovi = si chiede).
+   */
+  function segnoPreapprovazione(m) {
+    if (!m || typeof m !== 'object') return null;
+    var by = String(m.by || '').trim();
+    if (!by) return null;
+    var at = String(m.at || '').trim();
+    var hit = RE_SEGNO_DA_APPROVAZIONE.exec(by);
+    if (hit) return { tipo: 'approvazione', by: by, at: at, richiesta: hit[1] };
+    return { tipo: 'pieno', by: by, at: at };
+  }
+
+  function quandoSegno(at) {
+    var s = String(at || '').trim();
+    if (!s) return '';
+    return dateTimeText(Date.parse(s)) || s;
+  }
+
+  /** «dal tuo sì alla richiesta del …»: da dove viene un segno nato da un'approvazione. PURA. */
+  function origineSegnoDaApprovazione(segno) {
+    var quando = quandoSegno(segno && segno.at);
+    return quando ? 'dal tuo sì alla richiesta del ' + quando : 'dal tuo sì a una richiesta';
+  }
+
+  /**
+   * Le parole del segno: l'etichetta sulla scheda, il suo hover e la riga del
+   * dettaglio. PURA. Il segno a mano resta com'era; quello da approvazione dice
+   * che vale solo per i blocchi già approvati.
+   */
+  function segnoTesti(segno) {
+    if (!segno) return null;
+    if (segno.tipo === 'approvazione') {
+      var origine = origineSegnoDaApprovazione(segno);
+      return {
+        etichetta: 'blocchi già approvati',
+        titolo: 'Si fonde senza chiedere solo coi blocchi che hai già approvato (' + origine
+          + '); se ne compaiono di nuovi, ti chiede.',
+        riga: 'Si fonde senza chiedere solo coi blocchi che hai già approvato, ' + origine
+          + '. Se ne compaiono di nuovi, ti chiede.',
+      };
+    }
+    var q = quandoSegno(segno.at);
+    return {
+      etichetta: 'senza chiedere',
+      titolo: 'Si fonde senza chiedere: segno messo da ' + segno.by,
+      riga: 'Si fonde senza chiedere: segno messo da ' + segno.by + (q ? ' il ' + q : '') + '.',
+    };
+  }
+
+  /**
+   * Cosa scrive un clic sull'interruttore. PURA. true = metti il segno pieno
+   * (anche sopra quello da approvazione, che non basta a fondere tutto); false =
+   * toglilo (solo il pieno si toglie da qui: è l'unico che l'interruttore mostra acceso).
+   */
+  function segnoAlClic(segno) {
+    return !(segno && segno.tipo === 'pieno');
+  }
+
   /** Chi aveva messo il segno sulla pratica, in una frase. PURA. */
   function preapprovedBy(r) {
-    var by = String((r && r.preapprovedBy) || '').trim().slice(0, 120);
+    var by = String((r && r.preapprovedBy) || '').trim();
+    var segno = segnoPreapprovazione({ by: by, at: r && r.preapprovedAt });
+    if (segno && segno.tipo === 'approvazione') return 'pre-approvata ' + origineSegnoDaApprovazione(segno);
+    by = by.slice(0, 120);
     return by ? 'pre-approvata da ' + by : 'pre-approvata sulla pratica';
   }
 
@@ -840,6 +908,9 @@
     render: render,
     renderRecent: renderRecent,
     preapprovedBy: preapprovedBy,
+    segnoPreapprovazione: segnoPreapprovazione,
+    segnoTesti: segnoTesti,
+    segnoAlClic: segnoAlClic,
     preapprovedWhenText: preapprovedWhenText,
     dateTimeText: dateTimeText,
     mergedWhenText: mergedWhenText,

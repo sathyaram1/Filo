@@ -153,6 +153,7 @@
   // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
   const mgPreapproveBtn = document.getElementById('mgPreapproveBtn');
+  const mgPreapproveRevokeBtn = document.getElementById('mgPreapproveRevokeBtn');
   const mgPreapprovedInfo = document.getElementById('mgPreapprovedInfo');
   const mgPreapproveLine = document.getElementById('mgPreapproveLine');
   const mgStarBtn    = document.getElementById('mgStarBtn');
@@ -1042,6 +1043,8 @@
   const MERGE_APPROVAL_APPROVE = (window.SN_MSG?.MSG?.MERGE_APPROVAL_APPROVE) || 'merge_approval_approve';
   const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
   const MERGE_APPROVALS_CHANGED = (window.SN_MSG?.MSG?.MERGE_APPROVALS_CHANGED) || 'merge_approvals_changed';
+  const TAB_IN_VISTA = (window.SN_MSG?.MSG?.TAB_IN_VISTA) || 'tab_in_vista';
+  const TAB_IN_VISTA_GET = (window.SN_MSG?.MSG?.TAB_IN_VISTA_GET) || 'tab_in_vista_get';
   const LIVELLO4_SALTA = (window.SN_MSG?.MSG?.LIVELLO4_SALTA) || 'livello4_salta';
 
   // Perché una richiesta è stata respinta, detto all'owner e non al codice.
@@ -1130,6 +1133,7 @@
   // avviso e l'altro — una scheda aperta deve poter ridisegnare il suo quadrato
   // senza rileggere niente.
   let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
+  let fusioniLette = false;
   // Una richiesta si manda a fondere per il segno UNA volta per pagina: un
   // rifiuto o un conflitto non si ritentano da soli a ogni rilettura.
   const fusioniTentate = new Set();
@@ -1148,7 +1152,7 @@
     if (!fb) return;
     // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
     // la segnalazione è già lì.
-    if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, { releasedVersion }));
+    if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, { releasedVersion, fusioni }));
     openDetail(fb._id);
   }
 
@@ -1218,7 +1222,9 @@
     const righe = [];
     try {
       for (const fb of allFeedbacks.slice()) {
-        if (!preapprovedOf(fb) || !isOpenPublic(fb)) continue;
+        // Il segno da approvazione non basta: una richiesta ferma lì è nata da
+        // blocchi nuovi, che l'owner deve guardare.
+        if (!preapprovatoPieno(fb) || !isOpenPublic(fb)) continue;
         for (const { req, msg } of await fondiCoperte(fb)) {
           const num = window.SN_MERGE_APPROVALS.feedbackNum(req);
           const dove = num ? ` su #${num}` : '';
@@ -1288,6 +1294,11 @@
       return spegni();
     }
     if (!r || r.ok === false) return spegni();
+    // Una richiesta nuova sposta la pratica nei Ricevuti: quello è un arrivo come un cambio di stato.
+    // Non alla prima lettura, dove niente è «arrivato» mentre la pagina era aperta.
+    const primaDelleFusioni = fusioniLette && LIVE
+      ? new Map(allFeedbacks.map((f) => [String(f._id), sezioneDi(f)]))
+      : null;
     fusioni = {
       pending: r.pending || [],
       failed: r.failed || [],
@@ -1296,6 +1307,8 @@
       // resta finché non si rilegge.
       preapproved: Array.isArray(r.preapproved) ? r.preapproved : (fusioni.preapproved || []),
     };
+    fusioniLette = true;
+    if (primaDelleFusioni && dataLoaded) segnaArrivi(primaDelleFusioni, allFeedbacks);
     // Una richiesta che non c'è più non ha un esito da raccontare.
     const vive = new Set(fusioni.pending.concat(fusioni.failed).map((req) => req.id));
     for (const id of Array.from(esitiTentati.keys())) if (!vive.has(id)) esitiTentati.delete(id);
@@ -1329,7 +1342,7 @@
       // quadrato, dentro c'è una richiesta che potrebbe non esistere più.
       if (livelloAperto) openSidebarLivello(fb, livelloAperto);
     }
-    if (dataLoaded) renderList();
+    if (dataLoaded) ridisegnaListaAlSuoPosto();
   }
 
   async function loadChannelLog() {
@@ -1659,7 +1672,7 @@
     sortMenu = null;
     document.removeEventListener('mousedown', onSortOutside, true);
     document.removeEventListener('keydown', onSortKeydown, true);
-    window.removeEventListener('scroll', closeSortMenu, true);
+    window.removeEventListener('scroll', onSortScroll, true);
     window.removeEventListener('resize', closeSortMenu);
   }
   function onSortOutside(e) {
@@ -1667,6 +1680,13 @@
   }
   function onSortKeydown(e) {
     if (e.key === 'Escape') closeSortMenu();
+  }
+  // Il menu si chiude quando scorre l'owner, non quando la lista si riallinea
+  // da sola sotto di lui.
+  let scrollDelGiroAt = 0;
+  function onSortScroll() {
+    if (Date.now() - scrollDelGiroAt < 300) return;
+    closeSortMenu();
   }
   function chooseSort(mode) {
     closeSortMenu();
@@ -1713,7 +1733,7 @@
     setTimeout(() => {
       document.addEventListener('mousedown', onSortOutside, true);
       document.addEventListener('keydown', onSortKeydown, true);
-      window.addEventListener('scroll', closeSortMenu, true);
+      window.addEventListener('scroll', onSortScroll, true);
       window.addEventListener('resize', closeSortMenu);
     }, 0);
   }
@@ -1826,6 +1846,7 @@
       : `${label} ${countText(n)}`;
     if (n !== null && n !== undefined && loadHitCap()) mgListHead.title = FB.COUNT_CAP_HINT;
     else mgListHead.removeAttribute('title');
+    aggiornaSegnoFerma();
   }
 
   function updateTabCounts() {
@@ -1834,12 +1855,18 @@
     // ricomparire al primo dato leggibile che non passa da renderList.
     if (!sezioniAttendibili()) return;
     const counts = dataLoaded
-      ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly })
+      ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly, fusioni })
       : null;
     const capped = counts ? loadHitCap() : false;
+    // Una sezione che ha ricevuto schede mentre si guardava altro lo dice.
+    const conArrivi = new Set();
+    for (const fb of allFeedbacks) {
+      if (arrivate.has(String(fb._id))) conArrivi.add(sezioneDi(fb));
+    }
     for (const tab of LIST_TABS) {
       const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
       if (!btn) continue;
+      btn.classList.toggle('mg-tab--arrivi', conArrivi.has(tab));
       btn.textContent = counts ? `${TAB_LABELS[tab] || tab} ` : (TAB_LABELS[tab] || tab);
       if (capped) btn.title = FB.COUNT_CAP_HINT;
       else btn.removeAttribute('title');
@@ -1892,18 +1919,17 @@
       // davvero in produzione; i done-ma-non-ancora-spediti restano in "In coda".
       // Macchina a stati: la tab deriva SOLO dallo status (la modalità
       // automatica non è più una lente sulle liste).
-      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion });
+      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion, fusioni });
     }
-
-    // Una fusione ferma È una decisione dell'owner: la sua segnalazione sale
-    // in cima, sopra le altre della stessa scheda. Prima la richiesta viveva in
-    // un riquadro a parte e la scheda non diceva niente — chi scorreva la lista
-    // non aveva modo di sapere che un ramo era fermo lì.
-    currentList = pinFusioniFerme(currentList);
 
     // Override di ordinamento scelto dall'owner dal menu contestuale (tasto
     // destro sull'intestazione). In 'smart' resta l'ordine predefinito sopra.
     currentList = applySortMode(currentList);
+
+    // Una fusione ferma È una decisione dell'owner: sale in cima con QUALSIASI
+    // ordinamento. Fatto prima dell'ordinamento, «per numero» la rimandava a
+    // metà lista e una pratica appena fermata non si vedeva arrivare.
+    currentList = pinFusioniFerme(currentList);
 
     // #495: quante ne contiene ogni scheda, senza doverle aprire. L'ordinamento
     // non cambia il numero, quindi si può contare qui.
@@ -2002,6 +2028,8 @@
       // e stesso peso, così si riconosce scorrendo la lista.
       const ferma = fusioneFerma(fb);
       if (ferma) item.classList.add('mg-item--fusione');
+      const arrivata = arrivate.has(String(fb._id));
+      if (arrivata) item.classList.add('mg-item--arrivata');
       item.style.borderLeftColor = ferma
         ? MR.REASONS.secaudit.color
         : (cl ? cl.color : (aligned ? MR.ALIGNED_COLOR : 'transparent'));
@@ -2022,6 +2050,7 @@
       item.title = (num ? `#${num} · ` : '') + title
         + (norm.statusReason ? ` — ${MR.reasonText(norm.statusReason)}` : '')
         + (ferma ? ' — una fusione aspetta il tuo via libera' : '')
+        + (arrivata ? ' — arrivata qui mentre la pagina era aperta' : '')
         + (ripartenze ? ` · rientrato in coda ${ripartenze} volt${ripartenze === 1 ? 'a' : 'e'}` : '');
       const rowHtml = `
         ${authorIconHtml(fb)}
@@ -2060,10 +2089,18 @@
   // Il segno sulla pratica: `mergePreapproved { by, at }`, in chiaro. Conta
   // solo finché la pratica è aperta (a pratica chiusa il server non lo guarda,
   // e qui non si mostra: sarebbe un'informazione su niente).
+  // Due specie di segno (SN_MERGE_APPROVALS.segnoPreapprovazione): quello a mano
+  // copre tutto, quello nato da un sì a una richiesta solo i blocchi già approvati.
   function preapprovedOf(fb) {
     const m = fb && fb.mergePreapproved;
     if (!m || typeof m !== 'object' || !String(m.by || '').trim()) return null;
-    return { by: String(m.by || ''), at: String(m.at || '') };
+    const UI = window.SN_MERGE_APPROVALS;
+    if (UI && UI.segnoPreapprovazione) return UI.segnoPreapprovazione(m);
+    return { tipo: 'pieno', by: String(m.by || ''), at: String(m.at || '') };
+  }
+  function preapprovatoPieno(fb) {
+    const m = preapprovedOf(fb);
+    return !!(m && m.tipo === 'pieno');
   }
   function isOpenPublic(fb) {
     return String((fb && fb.statusPublic) || 'open') !== 'closed';
@@ -2071,7 +2108,11 @@
   function preapprovedHtml(fb) {
     const m = preapprovedOf(fb);
     if (!m || !isOpenPublic(fb)) return '';
-    return `<span class="mg-preapproved" title="${esc(`Si fonde senza chiedere: segno messo da ${m.by}`)}">senza chiedere</span>`;
+    const UI = window.SN_MERGE_APPROVALS;
+    const t = (UI && UI.segnoTesti) ? UI.segnoTesti(m)
+      : { etichetta: 'senza chiedere', titolo: `Si fonde senza chiedere: segno messo da ${m.by}` };
+    const cls = m.tipo === 'approvazione' ? 'mg-preapproved mg-preapproved--blocchi' : 'mg-preapproved';
+    return `<span class="${cls}" title="${esc(t.titolo)}">${esc(t.etichetta)}</span>`;
   }
 
   // ── Riga di stato della lavorazione (card pinnate + dettaglio) ────────────
@@ -2578,11 +2619,15 @@
     // scelta era di un'altra pratica. Su un ridisegno resta dov'era.
     if (!ridisegno) livelloAperto = null;
     selectedId = id;
+    // Aperta dall'owner: l'arrivo l'ha visto.
+    const eraArrivata = !ridisegno && arrivate.delete(String(id));
 
     // Aggiorna selezione visiva nella lista
     document.querySelectorAll('.mg-item').forEach((el) => {
       el.classList.toggle('mg-item--selected', el.dataset.id === id);
+      if (el.dataset.id === id) el.classList.remove('mg-item--arrivata');
     });
+    if (eraArrivata) updateTabCounts();
 
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb) return;
@@ -2718,7 +2763,10 @@
   // segno. Sulle pratiche chiuse il tasto sparisce: il segno lì non conta.
   function reflectPreapproved(fb) {
     if (!mgPreapproveBtn) return;
-    const m = preapprovedOf(fb);
+    const segno = preapprovedOf(fb);
+    // L'interruttore è acceso solo col segno pieno: quello da approvazione non
+    // fonde i blocchi nuovi, e un clic lo fa diventare pieno.
+    const m = segno && segno.tipo === 'pieno' ? segno : null;
     const aperta = isOpenPublic(fb);
     mgPreapproveBtn.disabled = false;
     mgPreapproveBtn.hidden = !aperta;
@@ -2728,23 +2776,34 @@
     mgPreapproveBtn.title = m
       ? 'Oggi il lavoro delle automazioni su questa pratica si fonde da solo anche se i controlli lo fermano. Toglilo per tornare a ricevere la richiesta da approvare.'
       : 'Se i controlli di sicurezza fermano il lavoro delle automazioni su questa pratica, il server fonde lo stesso, senza aspettare il tuo click. Quello che era stato fermato lo trovi poi in Automazioni.';
+    // Il segno nato da un «Approva» si toglie da qui: con l'interruttore passerebbe prima per il pieno,
+    // che fonde subito la richiesta ferma.
+    if (mgPreapproveRevokeBtn) {
+      mgPreapproveRevokeBtn.disabled = false;
+      mgPreapproveRevokeBtn.hidden = !(aperta && segno && segno.tipo === 'approvazione');
+      mgPreapproveRevokeBtn.title = 'Toglie il sì dato col clic: da ora anche i riallineamenti di questa pratica aspettano il tuo via libera.';
+    }
     if (mgPreapprovedInfo) {
-      mgPreapprovedInfo.hidden = !(m && aperta);
-      mgPreapprovedInfo.textContent = m && aperta
-        ? `Si fonde senza chiedere: segno messo da ${m.by}${m.at ? ` il ${formatDateTime(m.at)}` : ''}.`
-        : '';
+      const UI = window.SN_MERGE_APPROVALS;
+      mgPreapprovedInfo.hidden = !(segno && aperta);
+      mgPreapprovedInfo.textContent = !(segno && aperta) ? ''
+        : m ? `Si fonde senza chiedere: segno messo da ${m.by}${m.at ? ` il ${formatDateTime(m.at)}` : ''}.`
+          : UI.segnoTesti(segno).riga;
     }
   }
 
   // Mette o toglie il segno. Il CHI lo scrive il main dalla sessione: da qui
   // parte solo sì/no.
-  async function togglePreapproved() {
+  async function togglePreapproved(forza) {
     if (!selectedId || !mgPreapproveBtn) return;
     const id = selectedId;
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb) return;
-    const next = !preapprovedOf(fb);
+    const UI = window.SN_MERGE_APPROVALS;
+    const next = typeof forza === 'boolean' ? forza
+      : (UI && UI.segnoAlClic ? UI.segnoAlClic(preapprovedOf(fb)) : !preapprovedOf(fb));
     mgPreapproveBtn.disabled = true;
+    if (mgPreapproveRevokeBtn) mgPreapproveRevokeBtn.disabled = true;
     setManageMsg(next ? 'Segno la pratica…' : 'Tolgo il segno…', '');
     try {
       const r = await sendToMain({ type: 'feedback_update', id, mergePreapproved: next });
@@ -2777,9 +2836,11 @@
       setManageMsg(`Segno non messo${dove}: ${e.message || 'Errore'}`, 'err');
     } finally {
       mgPreapproveBtn.disabled = false;
+      if (mgPreapproveRevokeBtn) mgPreapproveRevokeBtn.disabled = false;
     }
   }
-  if (mgPreapproveBtn) mgPreapproveBtn.addEventListener('click', togglePreapproved);
+  if (mgPreapproveBtn) mgPreapproveBtn.addEventListener('click', () => togglePreapproved());
+  if (mgPreapproveRevokeBtn) mgPreapproveRevokeBtn.addEventListener('click', () => togglePreapproved(false));
 
   // L'etichetta di stato NON si scrive più nel dettaglio (scelta owner
   // 2026-09-13): lo stato lo dicono il colore della scheda in lista e le
@@ -4126,6 +4187,7 @@
     reindexByClient();
     renderList();
     liveLastAt = Date.now();
+    liveOkAt = liveLastAt;
   }
 
   // Indice per mittente (il pannello laterale lo usa). Si rifà a ogni
@@ -4140,17 +4202,14 @@
   }
 
   // ── Aggiornamento continuo ────────────────────────────────────────────────
-  // La dashboard resta al passo da sola: a ogni giro chiede a Firestore le sole
-  // versioni dei feedback (id + ultima scrittura, pochi byte), riscarica i soli
-  // documenti cambiati o nuovi, li decifra e li fonde nella lista. Niente
-  // ricaricamento della pagina, niente riscaricamento dei 5 MB della lista.
-  // Il confronto e la fusione sono logica pura in SN_FEEDBACK_LIVE.
+  // Versioni → soli documenti cambiati → fusione, e solo mentre qualcuno
+  // guarda: patterns/dati-che-cambiano-altrove-cloud-si-chiede-la-versione.md.
   const LIVE = window.SN_FEEDBACK_LIVE;
   // Sorgenti sostituibili dagli spec (che non hanno Firestore).
   const liveSources = {
     listVersions: (o) => FB.listVersions(o),
     // Il giro dal vivo rilegge le RIGHE: stessa proiezione del caricamento.
-    getMany: (ids) => FB.getMany(ids, { fields: FB.CAMPI_LISTA }),
+    getMany: (ids) => FB.getMany(ids, { fields: FB.CAMPI_LISTA, timeoutMs: 20000 }),
     // Il documento intero, per il feedback che l'owner ha aperto. Col tempo
     // massimo: una richiesta appesa terrebbe il pannello su «Caricamento…» e
     // dietro di sé tutti i tasti che scrivono sulla conversazione.
@@ -4158,9 +4217,54 @@
   };
   let liveEnabled = false;
   let liveBlocked = false;  // dati finti iniettati: il giro non parte più, nemmeno se l'avvio finisce dopo
-  let liveTimer   = null;
+  let liveClock   = null;
   let liveTick    = null;   // promessa del giro in corso: uno alla volta
-  let liveLastAt  = 0;      // quando la lista è stata allineata l'ultima volta
+  let liveTickDa  = 0;
+  let liveGen     = 0;      // un giro abbandonato perché appeso non scrive più sulla lista
+  let liveLastAt  = 0;      // ultimo giro tentato
+  let liveOkAt    = 0;      // ultimo giro riuscito
+  let inVista     = true;   // lo dice il main: in una scheda `document.hidden` non cambia mai
+  // Le soglie vengono dal modulo; gli spec le accorciano per non aspettare minuti.
+  const liveTempi = LIVE
+    ? { pollMs: LIVE.POLL_MS, rientroMs: LIVE.RIENTRO_MIN_MS, clockMs: LIVE.CLOCK_MS }
+    : { pollMs: 60000, rientroMs: 15000, clockMs: 5000 };
+  // Arrivate in una sezione mentre la pagina era aperta: con un ordinamento a
+  // scelta possono finire a metà lista, e senza un segno l'arrivo non si vede.
+  const arrivate = new Set();
+
+  function vistaOra() {
+    return inVista && !document.hidden;
+  }
+
+  function conTempo(promessa, ms) {
+    let t = null;
+    return Promise.race([
+      promessa,
+      new Promise((_, rej) => { t = setTimeout(() => rej(new Error('nessuna risposta')), ms); }),
+    ]).finally(() => clearTimeout(t));
+  }
+
+  function sezioneDi(fb) {
+    if (!sezioniAttendibili() || !statoLeggibile(fb)) return null;
+    return MR.manageTabFor(fb, { releasedVersion, fusioni });
+  }
+
+  function segnaArrivi(prima, fresh) {
+    for (const id of LIVE.arrivi(prima, fresh, sezioneDi)) arrivate.add(id);
+  }
+
+  // «Ferma» si dice solo a chi guarda, e solo dopo più giri mancati.
+  function aggiornaSegnoFerma() {
+    if (!mgListHead || !LIVE) return;
+    const ferma = LIVE.listaFerma({ ora: Date.now(), inVista: vistaOra(), ultimoRiuscito: liveOkAt });
+    mgListHead.classList.toggle('mg-list-head--ferma', ferma);
+    if (ferma) {
+      mgListHead.title = `Lista ferma alle ${formatDateTime(new Date(liveOkAt).toISOString())}: `
+        + 'il server non risponde, riprovo da solo.';
+    } else if (mgListHead.title && mgListHead.title.startsWith('Lista ferma')) {
+      mgListHead.removeAttribute('title');
+    }
+  }
 
   // L'owner sta scrivendo nel pannello (commento, risposta, nota)? Allora il
   // pannello non si ridisegna sotto le sue dita: i dati si fondono lo stesso e
@@ -4227,6 +4331,52 @@
     return true;
   }
 
+  let listaMossaAt = 0;
+  let listaPremuta = false;
+  let listaRimandata = null;
+  if (mgList) {
+    mgList.addEventListener('pointermove', () => { listaMossaAt = Date.now(); });
+    mgList.addEventListener('pointerdown', () => { listaPremuta = true; listaMossaAt = Date.now(); });
+    window.addEventListener('pointerup', () => { listaPremuta = false; }, true);
+    mgList.addEventListener('pointerleave', () => { listaMossaAt = 0; listaPremuta = false; riprendiLista(); });
+  }
+  function listaOccupata() {
+    return LIVE.listaInUso({ ora: Date.now(), ultimoMovimento: listaMossaAt, premuto: listaPremuta });
+  }
+  function rimandaLista() {
+    if (listaRimandata) return;
+    listaRimandata = setTimeout(() => { listaRimandata = null; riprendiLista(); }, LIVE.LISTA_IN_USO_MS);
+  }
+  function riprendiLista() {
+    if (!dataLoaded || searchMode) return;
+    if (listaOccupata()) { rimandaLista(); return; }
+    if (listaRimandata) { clearTimeout(listaRimandata); listaRimandata = null; }
+    ridisegnaListaAlSuoPosto();
+  }
+  function listaCheScorre() {
+    return [mgList, mgList && mgList.parentElement]
+      .find((el) => el && el.scrollHeight > el.clientHeight) || null;
+  }
+  function righeLista(scroller) {
+    const base = scroller.getBoundingClientRect().top - scroller.scrollTop;
+    return Array.from(mgList.querySelectorAll('.mg-item')).map((el) => {
+      const r = el.getBoundingClientRect();
+      return { id: el.dataset.id, top: r.top - base, height: r.height };
+    });
+  }
+  // Lo scorrimento si ancora alla prima scheda visibile: se ne esce una più
+  // su, la vista non salta.
+  function ridisegnaListaAlSuoPosto() {
+    if (!LIVE || !mgList) { renderList(); return; }
+    const scroller = listaCheScorre();
+    const prima = scroller ? scroller.scrollTop : 0;
+    const ancora = scroller ? LIVE.ancoraScorrimento(righeLista(scroller), prima) : null;
+    scrollDelGiroAt = Date.now();
+    renderList();
+    const dopo = listaCheScorre();
+    if (dopo) dopo.scrollTop = LIVE.scrollDaAncora(ancora, righeLista(dopo), prima);
+  }
+
   // Ridisegna la lista senza perdere lo scorrimento né la selezione. In
   // ricerca la lista mostra i risultati: quelli restano, i dati sotto sono
   // comunque aggiornati (il dettaglio li legge da lì).
@@ -4236,10 +4386,8 @@
   function rerenderAfterLive(touched) {
     if (!dataLoaded) return false;
     if (!searchMode) {
-      const scrollers = [mgList, mgList && mgList.parentElement].filter(Boolean);
-      const tops = scrollers.map((el) => el.scrollTop);
-      renderList();
-      scrollers.forEach((el, i) => { el.scrollTop = tops[i]; });
+      if (listaOccupata()) rimandaLista();
+      else ridisegnaListaAlSuoPosto();
     }
     if (!selectedId || closeDetailIfGone()) return false;
     if (touched.has(selectedId) && !detailBeingEdited()) {
@@ -4256,8 +4404,11 @@
   // corso viene riusato, non raddoppiato.
   async function refreshFromRemote() {
     if (liveTick) return liveTick;
+    const gen = ++liveGen;
+    liveTickDa = Date.now();
     liveTick = (async () => {
       const remote = await liveSources.listVersions({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
+      if (gen !== liveGen) return { changed: 0 };
       // Una risposta che non è un elenco non è "tutto sparito": è un guasto,
       // e un guasto lascia la lista com'è.
       if (!Array.isArray(remote)) throw new Error('versioni non lette');
@@ -4271,17 +4422,23 @@
         // essere cresciuto lo stesso (un'esplorazione che non trova niente):
         // le statistiche seguono anche questo giro (feedback #496).
         fsSegueLive([], []).catch(() => {});
+        liveOkAt = Date.now();
         return { changed: 0 };
       }
       let fresh = ids.length > 0 ? await liveSources.getMany(ids) : [];
       if (isAdmin && fresh.length > 0) {
         try {
-          const r = await sendToMain({ type: 'feedback_decrypt_fields', list: fresh });
+          const r = await conTempo(sendToMain({ type: 'feedback_decrypt_fields', list: fresh }), 30000);
           if (r && r.ok && Array.isArray(r.list)) fresh = r.list;
         } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
       }
+      if (gen !== liveGen) return { changed: 0 };
+      const primaDelGiro = new Map(allFeedbacks.map((f) => [String(f._id), sezioneDi(f)]));
+      const statiMossi = LIVE.statoCambiato(allFeedbacks, fresh);
       allFeedbacks = LIVE.applyChanges(allFeedbacks, { fresh, removed });
       reindexByClient();
+      segnaArrivi(primaDelGiro, fresh);
+      if (statiMossi && isAdmin) loadMergeApprovals();
       // Il segno «fondi senza chiedermelo» può arrivare da fuori — dallo script
       // dell'owner o da un'altra finestra — e allora la richiesta ferma è la
       // stessa di prima: nessuno avvisa, e senza questo giro il ramo resta fermo
@@ -4291,33 +4448,73 @@
       // Anche le statistiche seguono il giro: quello che la pagina ha appena
       // imparato vale per i numeri quanto per la lista (feedback #496).
       fsSegueLive(fresh, removed).catch(() => {});
+      liveOkAt = Date.now();
       return { changed: ids.length + removed.length };
-    })().finally(() => { liveTick = null; liveLastAt = Date.now(); });
+    })().finally(() => {
+      if (gen === liveGen) { liveTick = null; liveTickDa = 0; }
+      liveLastAt = Date.now();
+      aggiornaSegnoFerma();
+    });
     return liveTick;
   }
 
-  function liveTickIfDue(force) {
-    if (!liveEnabled || document.hidden) return;
-    if (!force && Date.now() - liveLastAt < LIVE.POLL_MS / 2) return;
-    // Il primo caricamento è fallito? Il giro lo ritenta da solo, invece di
-    // lasciare "Errore nel caricamento" finché l'owner non ricarica a mano.
-    if (!dataLoaded) { loadData().catch(() => {}); return; }
-    refreshFromRemote().catch((e) => console.warn('[manage] aggiornamento:', e?.message || e));
+  function orologio(motivo) {
+    if (!liveEnabled || !LIVE) return;
+    const ora = Date.now();
+    if (liveTick && ora - liveTickDa >= LIVE.GIRO_BLOCCATO_MS) {
+      console.warn('[manage] aggiornamento: un giro non ha avuto risposta, ne parte un altro');
+      liveGen += 1;
+      liveTick = null;
+      liveTickDa = 0;
+    }
+    const scelta = LIVE.decidiGiro({
+      ora, motivo, inVista: vistaOra(), dataLoaded,
+      ultimoGiro: liveLastAt, giroDa: liveTick ? liveTickDa : 0,
+      pollMs: liveTempi.pollMs, rientroMs: liveTempi.rientroMs,
+    });
+    aggiornaSegnoFerma();
+    if (scelta === 'carica') {
+      // La prima lista non è arrivata: si ritenta da soli invece di lasciare
+      // «Errore nel caricamento» finché l'owner non ricarica a mano.
+      liveLastAt = ora;
+      loadData().catch(() => {});
+    } else if (scelta === 'giro') {
+      refreshFromRemote().catch((e) => console.warn('[manage] aggiornamento:', e?.message || e));
+    }
   }
 
+  function impostaVista(v) {
+    const eraInVista = vistaOra();
+    inVista = v !== false;
+    if (!eraInVista && vistaOra()) orologio('rientro');
+    else aggiornaSegnoFerma();
+  }
+
+  function armaOrologio() {
+    if (liveClock) clearInterval(liveClock);
+    liveClock = setInterval(() => orologio('battito'), liveTempi.clockMs);
+  }
+
+  let rientroAgganciato = false;
   function startLive() {
     if (!LIVE || liveEnabled || liveBlocked) return;
     liveEnabled = true;
-    liveTimer = setInterval(() => liveTickIfDue(true), LIVE.POLL_MS);
-    // Scheda tornata in vista o finestra tornata in primo piano: se è passato
-    // abbastanza tempo, non aspettare il prossimo battito.
-    document.addEventListener('visibilitychange', () => liveTickIfDue(false));
-    window.addEventListener('focus', () => liveTickIfDue(false));
+    armaOrologio();
+    if (!rientroAgganciato) {
+      rientroAgganciato = true;
+      document.addEventListener('visibilitychange', () => orologio('rientro'));
+      if (window.filo?.onBroadcast) {
+        window.filo.onBroadcast((m) => { if (m && m.type === TAB_IN_VISTA) impostaVista(m.inVista); });
+      }
+    }
+    sendToMain({ type: TAB_IN_VISTA_GET })
+      .then((r) => { if (r && r.ok && typeof r.inVista === 'boolean') impostaVista(r.inVista); })
+      .catch(() => {});
   }
 
   function stopLive() {
     liveEnabled = false;
-    if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+    if (liveClock) { clearInterval(liveClock); liveClock = null; }
   }
 
   // ── Hook di test ────────────────────────────────────────────────────────
@@ -4325,21 +4522,36 @@
   // esercitando il VERO codice di rendering, senza duplicarne la logica nel
   // test (vedi CLAUDE.md → "Test che servono davvero"). Inerte in produzione.
   window.__mgTest = {
-    setData(fbs) {
+    setData(fbs, opts) {
       // Dati finti al posto di quelli veri: l'aggiornamento continuo si ferma,
       // o al primo giro li rimpiazzerebbe con Firestore. Gli spec che vogliono
-      // provarlo sostituiscono le sorgenti (setLiveSources) e chiamano pollNow.
+      // provarlo sostituiscono le sorgenti (setLiveSources) e chiamano pollNow,
+      // oppure passano `{ dalVivo: true }` DOPO averle sostituite: allora
+      // l'orologio vero resta acceso sulle sorgenti finte.
       // Fermo E bloccato: se l'avvio vero finisce DOPO l'iniezione, startLive
       // non deve ripartire e rimpiazzare i dati finti con Firestore.
       stopLive();
-      liveBlocked = true;
+      liveBlocked = !(opts && opts.dalVivo);
       testDataInjected = true;
+      arrivate.clear();
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
       dataLoaded = true;
       loadFailed = false;
       reindexByClient();
       renderList();
+      if (opts && opts.dalVivo) {
+        liveLastAt = Date.now();
+        liveOkAt = liveLastAt;
+        startLive();
+      }
     },
+    // Le soglie dell'orologio, accorciate: un giro vero ogni minuto farebbe
+    // aspettare minuti a ogni spec.
+    setLiveTiming(t) {
+      Object.assign(liveTempi, t || {});
+      if (liveEnabled) armaOrologio();
+    },
+    liveArrivate() { return Array.from(arrivate); },
     // Caricamento FALLITO, su richiesta. Lo spec che verifica "niente numeri
     // inventati quando i dati non sono arrivati" si affidava al fatto che nel
     // sandbox dei test Firestore non è raggiungibile: sulla macchina di chi
