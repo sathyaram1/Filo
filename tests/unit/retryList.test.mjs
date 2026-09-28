@@ -6,8 +6,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -54,7 +53,7 @@ test('lista dei banner: prima apertura senza rete, poi la rete torna e la lista 
   const env = { NODE_ENV: process.env.NODE_ENV, FILO_USER_DATA: process.env.FILO_USER_DATA, FILO_SMOKE: process.env.FILO_SMOKE };
   process.env.NODE_ENV = 'production';
   delete process.env.FILO_SMOKE;
-  process.env.FILO_USER_DATA = mkdtempSync(join(tmpdir(), 'filo-lista-'));
+  process.env.FILO_USER_DATA = cartellaTemporanea('filo-lista-');
   const adPath = require.resolve(join(SERVICES, 'adblock.js'));
   const cbPath = require.resolve(join(SERVICES, 'cookieBanners.js'));
   const prevAd = require.cache[adPath];

@@ -547,3 +547,168 @@ test('applicazione col corpo fermo per disegno: nascosto il banner, la rotella n
     return page.evaluate(() => document.querySelector('main').scrollTop);
   }, { timeout: 5_000 }).toBeGreaterThan(0);
 });
+
+// ── piattaforme che la lista non nomina: il riquadro di Google, OneTrust senza «Rifiuta» ─────────────────
+
+function googleFc(conNonAcconsento) {
+  return `<title>GOOGLE_FC</title>
+  <style>body{margin:0} .page{height:4000px}</style>
+  <div class="page">ricetta lunga</div>
+  <div class="fc-consent-root" dir="ltr" tabindex="0">
+    <div class="fc-dialog-container" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:2147483646">
+      <div class="fc-dialog fc-choice-dialog" role="dialog" aria-modal="true" style="background:#fff;width:500px;padding:20px">
+        <h1 class="fc-dialog-headline">Il sito ricette.example chiede il consenso all'utilizzo dei tuoi dati personali per:</h1>
+        <div class="fc-footer-buttons">
+          ${conNonAcconsento ? `<button class="fc-button fc-cta-do-not-consent" onclick="window.__fc='no';document.body.style.overflow='';document.querySelector('.fc-consent-root').remove()"><p class="fc-button-label">Non acconsento</p></button>` : ''}
+          <button class="fc-button fc-cta-consent" onclick="window.__fc='si';document.cookie='FCCDCF=si; path=/';document.querySelector('.fc-consent-root').remove()"><p class="fc-button-label">Acconsento</p></button>
+          <button class="fc-button fc-cta-manage-options"><p class="fc-button-label">Gestisci opzioni</p></button>
+        </div>
+      </div>
+    </div>
+    <div class="fc-dialog-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2147483645"></div>
+  </div>
+  <script>document.body.style.overflow='hidden'</script>`;
+}
+
+test('riquadro del consenso di Google con «Non acconsento»: Filo lo preme', async ({ app, openTab, testServer, shell }) => {
+  await app.evaluate(() => globalThis.__filoCookieBanners.setListForTest('###cookie-notice'));
+  const page = await testServer.openReady(openTab, googleFc(true));
+  await expect.poll(() => page.evaluate(() => window.__fc || null), { timeout: 12_000 }).toBe('no');
+  expect(await page.evaluate(() => document.cookie)).not.toContain('FCCDCF');
+  await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
+});
+
+test('riquadro del consenso di Google senza «Non acconsento»: nascosto senza accettare, la pagina scorre', async ({ app, openTab, testServer, shell }) => {
+  await app.evaluate(() => globalThis.__filoCookieBanners.setListForTest('###cookie-notice'));
+  const page = await testServer.openReady(openTab, googleFc(false));
+  await expect.poll(() => page.evaluate(() => document.querySelector('.fc-dialog').getBoundingClientRect().height), { timeout: 12_000 }).toBe(0);
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).overflowY), { timeout: 6_000 }).not.toBe('hidden');
+  expect(await page.evaluate(() => [window.__fc || null, document.cookie.includes('FCCDCF')])).toEqual([null, false]);
+  await expect.poll(async () => (await tabCookies(shell))?.hidden, { timeout: 8_000 }).toBe(true);
+});
+
+// Come la lista vera: nomina l'involucro di OneTrust, il banner e il velo, non il pannello delle preferenze.
+const LISTA_ONETRUST = '###onetrust-banner-sdk\n###onetrust-consent-sdk\n##.onetrust-pc-dark-filter';
+
+function oneTrust({ rifiuta }) {
+  return `<title>OT</title>
+  <style>body{margin:0} .page{height:4000px}</style>
+  <div class="page">contenuto</div>
+  <div id="onetrust-consent-sdk">
+    <div class="onetrust-pc-dark-filter" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2147483645"></div>
+    <div id="onetrust-banner-sdk" style="position:fixed;bottom:0;left:0;right:0;height:130px;background:#fff;z-index:2147483646">
+      <p>Usiamo i cookie per migliorare la tua esperienza.</p>
+      <button id="onetrust-pc-btn-handler" onclick="document.getElementById('onetrust-banner-sdk').style.display='none';document.getElementById('onetrust-pc-sdk').style.display='block';document.querySelector('.onetrust-pc-dark-filter').style.display='block'">Impostazioni cookie</button>
+      ${rifiuta ? `<button id="onetrust-reject-all-handler" onclick="window.__rej=1;document.getElementById('onetrust-banner-sdk').style.display='none';document.getElementById('ot-sdk-btn-floating').style.display='block'">Rifiuta tutti</button>` : ''}
+      <button id="onetrust-accept-btn-handler" onclick="window.__acc=1">Accetta tutti</button>
+    </div>
+    <div id="onetrust-pc-sdk" style="display:none;position:fixed;top:10%;left:25%;width:50%;height:60%;background:#fff;z-index:2147483647">
+      <h2>Centro preferenze della privacy</h2>
+      <label>Marketing <input type="checkbox" id="ot-mkt" checked></label>
+      <button class="save-preference-btn-handler" onclick="window.__saved={mkt:document.getElementById('ot-mkt').checked};document.getElementById('onetrust-consent-sdk').remove()">Conferma le mie scelte</button>
+      <button id="accept-recommended-btn-handler" onclick="window.__acc=1">Consenti tutti</button>
+    </div>
+    <div id="ot-sdk-btn-floating" style="display:none;position:fixed;left:10px;bottom:10px;width:45px;height:45px;background:#6aa">
+      <button title="Impostazioni cookie" style="width:45px;height:45px"></button>
+    </div>
+  </div>`;
+}
+
+test('OneTrust senza «Rifiuta» nel banner e nel pannello: Filo non lascia aperto il pannello che ha aperto, e non accetta', async ({ app, openTab, testServer, shell }) => {
+  await app.evaluate((_e, l) => globalThis.__filoCookieBanners.setListForTest(l), LISTA_ONETRUST);
+  const page = await testServer.openReady(openTab, oneTrust({ rifiuta: false }));
+  const aperto = (id) => page.evaluate((i) => { const e = document.getElementById(i); if (!e) return false; const r = e.getBoundingClientRect(); return r.width > 2 && r.height > 2; }, id);
+  await expect.poll(() => aperto('onetrust-pc-sdk'), { timeout: 12_000 }).toBe(false);
+  expect(await aperto('onetrust-banner-sdk')).toBe(false);
+  expect(await page.evaluate(() => window.__acc || null)).toBeNull();
+  await expect.poll(async () => (await tabCookies(shell))?.hidden, { timeout: 8_000 }).toBe(true);
+});
+
+test('OneTrust rifiutato: l\'icona fissa per riaprire le preferenze resta, e il menu non dice «nascosto» (controprova)', async ({ app, openTab, testServer, shell }) => {
+  await app.evaluate((_e, l) => globalThis.__filoCookieBanners.setListForTest(l), LISTA_ONETRUST);
+  const page = await testServer.openReady(openTab, oneTrust({ rifiuta: true }));
+  await expect.poll(() => page.evaluate(() => window.__rej || null), { timeout: 10_000 }).toBe(1);
+  await sleep(6000);
+  expect(await page.evaluate(() => document.getElementById('ot-sdk-btn-floating').getBoundingClientRect().height)).toBeGreaterThan(40);
+  expect(await tabCookies(shell)).toEqual({ rejected: true, hidden: false, shown: false });
+});
+
+// ── «Mostra il banner» e ritorno all'automatico: la risposta del sito va via qualunque nome abbia ────────────
+
+const COOKIEBAR = `<title>COOKIEBAR</title>
+  <div id="cookie-bar" style="position:fixed;bottom:0;left:0;right:0;height:80px;background:#333;color:#fff">
+    <p>Questo sito usa i cookie di terze parti.</p>
+    <a class="cb-enable" href="#" onclick="document.cookie='cookiebar=CookieAllowed; path=/; max-age=86400';document.getElementById('cookie-bar').remove();return false">Accetta</a>
+    <a class="cb-disable" href="#" onclick="document.cookie='cookiebar=CookieDisallowed; path=/; max-age=86400';document.getElementById('cookie-bar').remove();return false">Rifiuta</a>
+  </div>
+  <script>
+    document.cookie = 'sessione=utente; path=/; max-age=86400';
+    if (document.cookie.includes('cookiebar=')) document.getElementById('cookie-bar').remove();
+  </script>`;
+
+const GOVUK = `<title>GOVUK</title>
+  <div class="govuk-cookie-banner" role="region" aria-label="Cookies on GOV.UK" style="position:fixed;top:0;left:0;right:0;height:140px;background:#f3f2f1">
+    <p>We use some essential cookies to make this service work.</p>
+    <button type="button" class="govuk-button" onclick="document.cookie='cookies_policy={&quot;usage&quot;:true}; path=/; max-age=86400';document.cookie='cookies_preferences_set=true; path=/; max-age=86400';document.querySelector('.govuk-cookie-banner').remove()">Accept additional cookies</button>
+    <button type="button" class="govuk-button" onclick="document.cookie='cookies_policy={&quot;usage&quot;:false}; path=/; max-age=86400';document.cookie='cookies_preferences_set=true; path=/; max-age=86400';document.querySelector('.govuk-cookie-banner').remove()">Reject additional cookies</button>
+  </div>
+  <script>
+    document.cookie = 'sessione=utente; path=/; max-age=86400';
+    if (document.cookie.includes('cookies_preferences_set=')) document.querySelector('.govuk-cookie-banner').remove();
+  </script>`;
+
+async function bannerSiti(shell, show) {
+  const { activeId } = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  return shell.evaluate(({ id, s }) => window.filoShell.tabs.cookieBanners(id, s), { id: activeId, s: show });
+}
+
+for (const [nome, html, sel, risposta] of [
+  ['cookie-bar.eu', COOKIEBAR, '#cookie-bar', 'cookiebar='],
+  ['gov.uk', GOVUK, '.govuk-cookie-banner', 'cookies_preferences_set'],
+]) {
+  test(`risposta in un cookie dal nome qualsiasi (${nome}): «Mostra il banner» lo riporta e il login resta`, async ({ openTab, testServer, shell }) => {
+    const page = await testServer.openReady(openTab, html);
+    await page.waitForFunction((r) => document.cookie.includes(r), risposta, { timeout: 10_000 });
+    await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
+    await sleep(2000);
+    await bannerSiti(shell, true);
+    await expect.poll(() => page.evaluate((s) => !!document.querySelector(s), sel).catch(() => false), { timeout: 10_000 }).toBe(true);
+    await sleep(1500);
+    expect(await page.evaluate((s) => !!document.querySelector(s), sel)).toBe(true);
+    expect(await page.evaluate(() => document.cookie)).toContain('sessione=utente');
+  });
+}
+
+test('coi banner mostrati l\'utente accetta, poi «Rifiuta i cookie in automatico qui»: Filo torna a rifiutare anche col nome qualsiasi', async ({ openTab, testServer, shell }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, COOKIEBAR);
+  await page.waitForFunction(() => document.cookie.includes('cookiebar=CookieDisallowed'), null, { timeout: 10_000 });
+  await sleep(2000);
+  await bannerSiti(shell, true);
+  await expect.poll(() => page.evaluate(() => !!document.getElementById('cookie-bar')).catch(() => false), { timeout: 10_000 }).toBe(true);
+  await page.click('#cookie-bar .cb-enable');
+  expect(await page.evaluate(() => document.cookie)).toContain('cookiebar=CookieAllowed');
+  await sleep(2000);
+  await bannerSiti(shell, false);
+  await expect.poll(() => page.evaluate(() => document.cookie).catch(() => ''), { timeout: 12_000 }).toContain('cookiebar=CookieDisallowed');
+  expect(await page.evaluate(() => document.cookie)).toContain('sessione=utente');
+});
+
+// ── sblocco: un altro riquadro del sito aperto tiene il suo velo e il suo blocco ────────────────────
+
+test('nascosto il banner, il riquadro «scegli il paese» del sito tiene il velo e la pagina ferma dietro', async ({ app, openTab, testServer }) => {
+  await app.evaluate(() => globalThis.__filoCookieBanners.setListForTest('###cookie-notice'));
+  const page = await testServer.openReady(openTab, `<title>PAESE</title>
+    <style>body{margin:0;overflow:hidden} .page{height:4000px}</style>
+    <div class="page">negozio</div>
+    <div class="country-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:900"></div>
+    <div class="country-modal" style="position:fixed;top:30%;left:30%;width:40%;background:#fff;z-index:901;padding:20px">
+      <p>Scegli il tuo paese</p><button>Italia</button><button>Svizzera</button></div>
+    <div id="cookie-notice" style="position:fixed;left:0;right:0;bottom:0;height:120px;background:#fff;z-index:1001">
+      <p>Usiamo i cookie.</p><button onclick="window.__accepted=true">Accetta</button></div>`);
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('cookie-notice')).display === 'none', null, { timeout: 10_000 });
+  await sleep(5000);
+  expect(await page.evaluate(() => [getComputedStyle(document.querySelector('.country-overlay')).display, getComputedStyle(document.body).overflowY]))
+    .toEqual(['block', 'hidden']);
+  expect(await page.evaluate(() => window.__accepted)).toBeUndefined();
+});

@@ -16,7 +16,6 @@ function wipeStorageJs(keys) {
   }
 })()`;
 }
-const WIPE_STORAGE_JS = wipeStorageJs([]);
 
 function isWeb(url) { return /^https?:/i.test(String(url || '')); }
 
@@ -216,4 +215,4 @@ function installCookies(TabManager) {
   Object.assign(TabManager.prototype, cookieMethods);
 }
 
-module.exports = { installCookies, loadRemembered, WIPE_STORAGE_JS, wipeStorageJs };
+module.exports = { installCookies, loadRemembered, wipeStorageJs };

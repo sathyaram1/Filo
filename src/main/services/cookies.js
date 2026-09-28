@@ -450,7 +450,6 @@ module.exports = {
   isConsentName,
   wipeConsentCookies,
   setAnswerLookup,
-  answerOf,
   resetIncognito,
   registrableOf,
   isTrackerHost,
