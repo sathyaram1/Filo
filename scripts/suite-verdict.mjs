@@ -236,7 +236,13 @@ export function verdetto(json, noti) {
     }
   }
   const globali = classificaErroriGlobali(json?.errors, v.nuovi.length > 0);
-  for (const riga of globali.rossi) v.nuovi.push({ spec: FUORI_DAI_CASI, titolo: riga, titoloCompleto: riga });
+  const fileDi = new Map();
+  for (const e of Array.isArray(json?.errors) ? json.errors : []) {
+    if (!fileDi.get(primaRiga(e))) fileDi.set(primaRiga(e), fileDellErrore(e));
+  }
+  for (const riga of globali.rossi) {
+    v.nuovi.push({ spec: FUORI_DAI_CASI, titolo: riga, titoloCompleto: riga, file: fileDi.get(riga) || '' });
+  }
   v.avvisi = globali.avvisi;
   return v;
 }
