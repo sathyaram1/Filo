@@ -181,3 +181,12 @@ test('configureFromSettings scarta le voci non valide dalla blacklist salvata', 
   assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, true);
   assert.equal(SB.shouldBlockNavigation('https://ads.test/').block, true);
 });
+
+test('#590: il punto finale del nome non aggira la lista, e un dominio con accenti blocca davvero', () => {
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['evil.example', 'münchen-evil.de'] });
+  assert.equal(SB.shouldBlockNavigation('https://evil.example./x').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://www.evil.example../x').block, true);
+  // L'URL porta il nome in punycode: la voce scritta con l'accento deve combaciare.
+  assert.equal(SB.shouldBlockNavigation('https://münchen-evil.de/').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://xn--mnchen-evil-thb.de/').block, true);
+});

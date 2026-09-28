@@ -59,7 +59,11 @@ function normalizeDomain(raw) {
   s = s.split('?')[0];
   s = s.split('#')[0];
   s = s.split(':')[0]; // porta
-  s = s.replace(/^www\./, '');
+  s = s.replace(/^www\./, '').replace(/\.+$/, '');
+  // Un nome con lettere accentate va confrontato nella forma che ha nell'URL (punycode).
+  if (/[^\x00-\x7f]/.test(s)) {
+    try { s = new URL(`http://${s}`).hostname; } catch (_) {}
+  }
   return s;
 }
 
@@ -129,7 +133,8 @@ function shouldBlockNavigation(targetUrl, { fromUrl = '' } = {}) {
   // Solo navigazioni web top-level: le pagine interne di Filo non si bloccano mai.
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return res;
 
-  const host = u.hostname.toLowerCase();
+  // «sito.it.» è lo stesso host di «sito.it» per il DNS: senza, il punto finale aggira la lista.
+  const host = u.hostname.toLowerCase().replace(/\.+$/, '');
   res.host = host;
 
   if (fromUrl && isSearchEngineHost(hostnameOf(fromUrl))) return res;

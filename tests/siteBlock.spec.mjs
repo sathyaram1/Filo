@@ -280,3 +280,16 @@ test('#590 link in una nuova scheda e redirect verso un sito della lista: blocca
     await r.close();
   }
 });
+
+test('#590 anche l\'assistente sulla pagina: NAVIGA verso un sito della lista non apre e la sua chat lo dice', async ({ app, shell, openTab, testServer }) => {
+  await enableBlock(shell);
+  const target = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1>X</h1>');
+  // Sulle pagine interne i content script sono raggiungibili dal test (come in sidebar-filo-action).
+  const page = await openTab('filo://newtab/');
+  await page.waitForFunction(() => !!window.SN_SIDEBAR && !!window.__filoSidebarTest, null, { timeout: 8000 });
+  await page.evaluate(() => window.SN_SIDEBAR.open());
+  const esito = await page.evaluate((u) => window.__filoSidebarTest.runFiloAction({ type: 'NAVIGA', url: u }), target);
+  expect(esito).toBe(false);
+  await expect(page.locator('.sn-sidebar-log').last()).toContainText(`${BLOCKED_HOST} è fra i siti bloccati`);
+  expect((await tabUrls(app)).filter((u) => u.includes(BLOCKED_HOST))).toEqual([]);
+});
