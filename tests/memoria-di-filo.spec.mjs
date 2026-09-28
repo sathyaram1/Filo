@@ -216,3 +216,78 @@ test('da un sito visitato la memoria non si legge e non si tocca riga per riga',
   expect(out.togli.ok).toBe(false);
   expect(out.dopo).toBe('Si chiama Marta');
 });
+
+const dimentica = (testo) => ({ toolCalls: [{ id: 'd1', name: 'DIMENTICA', arguments: JSON.stringify({ testo }) }] });
+
+test('a voce si dimentica una cosa sola: il popup mostra la riga esatta e l’OK toglie solo quella', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    await M.setMemory({ PROFILO: 'Si chiama Marta\nVive a Lisbona', PREFERENZE: 'Risposte brevi' });
+    await M.appendLesson('L’utente non beve caffè.');
+  });
+  const memoria = () => app.evaluate(async () => ({
+    profilo: (await globalThis.SN_FILO_MEMORY.getMemory()).PROFILO,
+    lezioni: (await globalThis.SN_FILO_MEMORY.getLessonsBuffer()).map((l) => l.text),
+  }));
+
+  await fakeProvider(app, [dimentica('non beve caffè'), { text: 'Te lo faccio confermare.' }]);
+  await page.locator('#input').fill('dimentica che non bevo caffè');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  const popup = (await confirmState(page)).text;
+  expect(popup).toContain('L’utente non beve caffè.');
+  expect(popup).not.toContain('Lisbona');
+  expect((await memoria()).lezioni).toEqual(['L’utente non beve caffè.']);
+  await clickConfirm(page, 'ok');
+  await expect.poll(async () => (await memoria()).lezioni, { timeout: 5_000 }).toEqual([]);
+  expect((await memoria()).profilo).toBe('Si chiama Marta\nVive a Lisbona');
+
+  await fakeProvider(app, [dimentica('Vive a Lisbona'), { text: 'Ok.' }]);
+  await page.locator('#input').fill('non vivo più a Lisbona, dimenticalo');
+  await page.locator('#sendBtn').click();
+  await clickConfirm(page, 'ok', { timeout: 10_000 });
+  await expect.poll(async () => (await memoria()).profilo, { timeout: 5_000 }).toBe('Si chiama Marta');
+  await restore(app);
+});
+
+test('a voce, una cosa che la memoria non ha: nessun popup, e modello e diario lo sanno', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Marta', PREFERENZE: '' }));
+  await fakeProvider(app, [dimentica('ama i pinguini'), { text: 'Non me lo ricordavo.' }]);
+  await page.locator('#input').fill('dimentica che amo i pinguini');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Non me lo ricordavo.' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  const esito = await app.evaluate(() => {
+    const calls = globalThis.__mem_calls;
+    return JSON.stringify(calls[calls.length - 1].filter((m) => m.role === 'tool'));
+  });
+  expect(esito).toContain('nessuna riga corrispondeva');
+  const activity = page.locator('.dash-activity');
+  await activity.locator('.dash-activity-head').click();
+  await expect(activity.locator('.dash-activity-row', { hasText: 'Niente da dimenticare' })).toHaveCount(1);
+  expect(await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getMemory()).PROFILO)).toBe('Si chiama Marta');
+  await restore(app);
+});
+
+test('da un sito visitato «dimentica» non parte e non mostra righe della memoria', async ({ app, shell }) => {
+  void shell;
+  const out = await app.evaluate(async () => {
+    await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Marta', PREFERENZE: '' });
+    const MSG = globalThis.SN_MSG.MSG;
+    const sito = { tab: { id: 1, url: 'https://evil.example/pagina' }, url: 'https://evil.example/pagina' };
+    const r = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.FILO_RUN_ACTION, action: { type: 'DIMENTICA', testo: 'Marta' } }, sito);
+    return { r, dopo: (await globalThis.SN_FILO_MEMORY.getMemory()).PROFILO };
+  });
+  expect(out.r.executed).toBeFalsy();
+  expect(out.r.needsConfirm).toBeFalsy();
+  expect(JSON.stringify(out.r)).not.toContain('Si chiama Marta');
+  expect(out.dopo).toBe('Si chiama Marta');
+});
