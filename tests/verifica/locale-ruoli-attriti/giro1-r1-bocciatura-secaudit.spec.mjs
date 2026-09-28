@@ -20,5 +20,6 @@ test('sulla bocciatura la ricetta non chiede di accodare design a mano', () => {
   expect(out.status, out.stderr).toBe(0);
   const ricetta = out.stdout.replace(/\s+/g, ' ');
   // La frase che oggi manda a cercare il comando: «su fail … accoda `design`».
-  expect(ricetta).not.toMatch(/\*\*fail\*\*[^.]{0,40}accoda `design`/);
+  const trovata = ricetta.match(/\*\*fail\*\*[^.]{0,40}accoda `design`[^)]*/);
+  expect(trovata && trovata[0], 'il server porta già in design su un fail: la ricetta non deve chiedere un\'azione a mano').toBeNull();
 });
