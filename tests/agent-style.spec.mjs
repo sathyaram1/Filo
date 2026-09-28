@@ -429,7 +429,7 @@ test('#592 — scrivere in chat mentre Filo lavora non conferma lo stile; da tas
 // Il popup si conferma solo quando il testo è passato tutto sotto gli occhi:
 // righe innocue o disegnate vuote non tengono sotto il bordo l'istruzione e i
 // rischi (#592). La regola è sul riquadro, non su un carattere.
-const RIGHE_INNOCUE = Array.from({ length: 45 }, (_, i) => `Regola ${i + 1}: rispondi con calma.`).join('\n');
+const RIGHE_INNOCUE = Array.from({ length: 45 }, (_, i) => `Frase ${i + 1}.`).join('\n');
 const NOTA_VUOTA = '\n\u{1D159}'.repeat(45);
 for (const [nome, azione, testo] of [
   ['uno stile di righe innocue', 'IMPOSTA_PREFERENZA', `${RIGHE_INNOCUE}\n${NASCOSTO}`],

@@ -23,6 +23,14 @@ Valgono insieme queste regole:
   in cui niente si disegna, non quella senza caratteri: una riga di soli spazi a
   larghezza zero o giuntori a schermo è bianca. Anche toglierlo passa dal popup:
   si perde il testo dell'utente.
+- **Si conferma quello che si è visto.** La pulizia dei caratteri non basta da
+  sola: tre giri di verifica di fila hanno spinto l'istruzione sotto il bordo
+  con righe vuote, poi di spazi a larghezza zero, poi di righe innocue o di un
+  simbolo che il font disegna vuoto. La regola sta sul riquadro: se il testo non
+  ci sta, OK resta spento finché non lo si fa scorrere fino in fondo; nelle
+  Preferenze il riquadro dello stile cresce col testo. Il popup non si mangia i
+  tasti battuti per la chat: finiscono nel campo, e alla chiusura il fuoco
+  torna lì.
 - **All'OK vale quello che il popup ha mostrato.** Una conferma su un elenco
   (righe da dimenticare, sveglie da togliere) agisce su quelle voci, non su
   quelle che lo stesso riferimento trova al momento dell'OK.
