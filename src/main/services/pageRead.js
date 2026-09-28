@@ -67,9 +67,10 @@ function serializzaVisibile() {
   const MAX_ELEMENTI = 150000;
   const MAX_PROFONDITA = 400;
   const SALTA = {
-    SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEMPLATE: 1, SVG: 1, CANVAS: 1, IFRAME: 1, OBJECT: 1, EMBED: 1, VIDEO: 1,
+    SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEMPLATE: 1, SVG: 1, CANVAS: 1, VIDEO: 1,
     AUDIO: 1, PICTURE: 1, TEXTAREA: 1, LINK: 1, META: 1, DATALIST: 1,
   };
+  const INCORPORATI = { IFRAME: 1, FRAME: 1, OBJECT: 1, EMBED: 1 };
   // Niente `hidden` né stile: se si vede lo ha già deciso lo stile calcolato, e una classe può riaccendere un [hidden].
   const TIENI = ['id', 'class', 'role', 'href', 'open', 'itemprop', 'data-sn-ui', 'aria-hidden'];
   const VUOTI = { BR: 1, HR: 1, WBR: 1 };
@@ -94,6 +95,8 @@ function serializzaVisibile() {
     return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
   };
   const px = (v) => parseFloat(v);
+  // Lo stile si chiede alla finestra del documento dell'elemento: un riquadro incorporato ha la sua.
+  const stile = (el) => (el.ownerDocument && el.ownerDocument.defaultView ? el.ownerDocument.defaultView : window).getComputedStyle(el);
   // Una dissolvenza in attesa (parte quando l'utente scorre fin lì) non è testo nascosto: l'utente lo vedrà.
   const animato = (cs) => (cs.transitionDuration && /[1-9]/.test(cs.transitionDuration))
     || (cs.animationName && cs.animationName !== 'none')
@@ -118,13 +121,13 @@ function serializzaVisibile() {
       if (sfondi.has(x)) { esito = sfondi.get(x); break; }
       visti.push(x);
       let cs = null;
-      try { cs = getComputedStyle(x); } catch (_) { break; }
+      try { cs = stile(x); } catch (_) { break; }
       if (cs.backgroundImage && cs.backgroundImage !== 'none') break;
       // Un'immagine o un video fra i figli può stare sotto il testo: lì il colore di fondo non dice cosa si vede.
       if (x.querySelector && x.querySelector(':scope > img, :scope > video, :scope > picture, :scope > canvas, :scope > svg, :scope > iframe')) break;
       const c = colore(cs.backgroundColor);
       if (c && c.a >= 0.9) { esito = c; break; }
-      if (cs.position !== 'static' && x !== document.body && x !== document.documentElement) break;
+      if (cs.position !== 'static' && x !== x.ownerDocument.body && x !== x.ownerDocument.documentElement) break;
     }
     for (const v of visti) sfondi.set(v, esito);
     return esito;
@@ -158,9 +161,28 @@ function serializzaVisibile() {
     if (SALTA[tag]) return;
     elementi++;
     let cs = null;
-    try { cs = getComputedStyle(nodo); } catch (_) {}
+    try { cs = stile(nodo); } catch (_) {}
     if (cs && (cs.display === 'none' || cs.contentVisibility === 'hidden' || invisibile(cs))) return;
     const nome = tag.toLowerCase();
+    // Quello che la pagina mostra preso da un altro indirizzo: dello stesso sito si legge come il resto, di un altro
+    // resta l'indirizzo, perché il modello sappia che c'è e possa leggerlo. Un pixel di tracciamento non conta.
+    if (INCORPORATI[tag]) {
+      if (cs && (px(cs.width) <= 2 || px(cs.height) <= 2)) return;
+      let doc = null;
+      try { doc = nodo.contentDocument; } catch (_) {}
+      if (doc && doc.body) {
+        out.push('<div>');
+        visita(doc.body, prof + 1, null, null);
+        out.push('</div>');
+        return;
+      }
+      const src = nodo.src || nodo.data || '';
+      if (/^https?:/i.test(src)) out.push(`<iframe src="${escA(src)}" title="${escA(nodo.title || '')}"></iframe>`);
+      return;
+    }
+    // Due pezzi che lo stile mette uno sotto l'altro o affiancati (i figli di una riga flessibile, un blocco) si vedono
+    // staccati anche se nel codice stanno attaccati: uno spazio li separa come li vede l'utente.
+    const stacca = cs && cs.display !== 'contents' && !/^inline/.test(cs.display) ? ' ' : '';
     // Le voci di una tendina, l'etichetta di un bottone di modulo, il testo di un'immagine: niente valori scritti
     // dall'utente nei campi.
     if (tag === 'SELECT') {
@@ -183,10 +205,10 @@ function serializzaVisibile() {
       if (v == null) continue;
       attrs += ` ${a}="${escA(a === 'href' && typeof nodo.href === 'string' ? nodo.href : v)}"`;
     }
-    out.push(`<${nome}${attrs}>`);
+    out.push(`${stacca}<${nome}${attrs}>`);
     if (VUOTI[tag]) return;
     for (const c of Array.from(figli(nodo))) visita(c, prof + 1, cs, nodo);
-    out.push(`</${nome}>`);
+    out.push(`</${nome}>${stacca}`);
   };
   const d = document;
   visita(d.body || d.documentElement, 0, null, null);
@@ -618,8 +640,58 @@ function materialeRiservato(indirizzo) {
   return [...tutti].join('\n');
 }
 
+// Da dove viene un indirizzo che il modello chiede dalla chat: trovato (nei risultati, in una pagina letta, fra le schede,
+// nelle parole dell'utente) o scritto da sé. Uno scritto da sé passa anche dal controllo sulla FORMA, che ferma un blocco
+// di dati comunque travestito: sempre per una lettura, che deve usare indirizzi trovati; per un'apertura da quando nella
+// conversazione è entrato testo di sconosciuti. Prove in tests/unit/pageRead.test.mjs.
+function contestoChat() {
+  return { noti: new Set(), esterno: false };
+}
+
+function annotaLink(ctx, testo) {
+  if (!ctx || !testo) return;
+  const s = String(testo);
+  const trovati = [...s.matchAll(/https?:\/\/[^\s<>"'`\]]+/gi)].map((m) => m[0]);
+  for (const m of s.matchAll(/(?:^|[\s(«"'])(www\.[^\s<>"'`\]]+)/gi)) trovati.push(`https://${m[1]}`);
+  for (const u of trovati) {
+    // Il link di un testo in markdown finisce alla parentesi; uno di Wikipedia la contiene. Valgono tutte e due.
+    for (const v of [u, u.replace(/[).,;:!?»]+$/, ''), u.split(')')[0]]) {
+      const n = normalizzaUrl(v);
+      const k = n.url ? chiaveConfronto(n.url) : '';
+      if (k) ctx.noti.add(k);
+    }
+  }
+}
+
+function annotaAzione(ctx, azione) {
+  if (!ctx || !azione) return;
+  const tipo = String(azione.type || '').toUpperCase();
+  const out = azione._output || {};
+  if (tipo === 'CERCA_WEB' && Array.isArray(out.results) && out.results.length) {
+    ctx.esterno = true;
+    for (const r of out.results) annotaLink(ctx, r && r.url);
+  } else if (tipo === 'LEGGI_PAGINA' && out.ok) {
+    ctx.esterno = true;
+    annotaLink(ctx, out.url);
+    annotaLink(ctx, out.pageRead);
+    annotaLink(ctx, out.testo);
+  }
+}
+
+function formaDaControllare(ctx, tipo, url, schede = []) {
+  if (!ctx || (tipo !== 'LEGGI_PAGINA' && !ctx.esterno)) return false;
+  const n = normalizzaUrl(url);
+  const k = n.url ? chiaveConfronto(n.url) : '';
+  if (!k || ctx.noti.has(k)) return false;
+  return !schede.some((u) => chiaveConfronto(u) === k);
+}
+
 const api = {
   leggiPagina,
+  contestoChat,
+  annotaLink,
+  annotaAzione,
+  formaDaControllare,
   ricordaApertura,
   ricordaLetturaRiservata,
   materialeRiservato,

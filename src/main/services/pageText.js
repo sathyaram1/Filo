@@ -7,9 +7,9 @@
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
 // Il loro contenuto è testo crudo fino alla chiusura: un «<» lì dentro non apre un tag.
 const RAW = new Set(['script', 'style', 'textarea', 'title', 'noscript', 'xmp', 'iframe', 'noembed', 'noframes']);
-// Mai testo da leggere, in nessuna modalità. Immagini, bottoni e tendine hanno una regola loro in `scrivi`.
+// Mai testo da leggere, in nessuna modalità. Immagini, bottoni, tendine e riquadri incorporati hanno una regola loro in `scrivi`.
 const MAI = new Set([
-  'head', 'script', 'style', 'noscript', 'template', 'svg', 'math', 'canvas', 'iframe', 'object', 'embed',
+  'head', 'script', 'style', 'noscript', 'template', 'svg', 'math', 'canvas',
   'video', 'audio', 'picture', 'textarea', 'datalist', 'link', 'meta', 'title', 'noembed', 'noframes', 'xmp', 'map',
 ]);
 // Il NOME di un riquadro decide solo l'ordine (il contorno va in coda), MAI il cestino: gli stessi nomi stanno sul
@@ -293,9 +293,60 @@ function invisibile(nodo) {
   if (/scale[xy]?\(\s*0(?:\.0*)?\s*[,)]/.test(dichiarazione(st, 'transform'))) return true;
   // Il titolo sfumato ha il testo trasparente e lo sfondo ritagliato sulle lettere: quello si vede.
   if (dichiarazione(st, 'color') === 'transparent' && !/background-clip/.test(st)) return true;
+  if (/(?:^|;)\s*(?:color|background)/.test(st) && comeLoSfondo(nodo)) return true;
   const w = px(dichiarazione(st, 'width'));
   const h = px(dichiarazione(st, 'height'));
   return (w <= 1 || h <= 1) && /hidden|clip/.test(dichiarazione(st, 'overflow'));
+}
+
+const NOMI_COLORE = {
+  white: [255, 255, 255], black: [0, 0, 0], silver: [192, 192, 192], gray: [128, 128, 128], grey: [128, 128, 128],
+  whitesmoke: [245, 245, 245], snow: [255, 250, 250], ivory: [255, 255, 240], red: [255, 0, 0], maroon: [128, 0, 0],
+  yellow: [255, 255, 0], olive: [128, 128, 0], lime: [0, 255, 0], green: [0, 128, 0], aqua: [0, 255, 255],
+  cyan: [0, 255, 255], teal: [0, 128, 128], blue: [0, 0, 255], navy: [0, 0, 128], fuchsia: [255, 0, 255],
+  magenta: [255, 0, 255], purple: [128, 0, 128], orange: [255, 165, 0],
+};
+
+// Un colore pieno scritto in una dichiarazione (codice, rgb o nome); null se trasparente o se non si sa.
+function coloreDi(v) {
+  const s = String(v || '').trim().toLowerCase();
+  if (!s || /url\(|gradient|var\(/.test(s)) return null;
+  let m = /#([0-9a-f]{3,8})\b/.exec(s);
+  if (m) {
+    let h = m[1];
+    if (h.length === 3 || h.length === 4) h = h.split('').map((c) => c + c).join('');
+    if (h.length !== 6 && h.length !== 8) return null;
+    if (h.length === 8 && parseInt(h.slice(6, 8), 16) < 230) return null;
+    return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  }
+  m = /rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+)(%?))?/.exec(s);
+  if (m) {
+    const a = m[4] == null ? 1 : parseFloat(m[4]) / (m[5] ? 100 : 1);
+    return a < 0.9 ? null : [m[1], m[2], m[3]].map(Number);
+  }
+  for (const w of s.split(/[\s,]+/)) if (NOMI_COLORE[w]) return NOMI_COLORE[w];
+  return null;
+}
+
+function colorePiuVicino(nodo, props) {
+  for (let x = nodo; x && x.attrs; x = x.parent) {
+    const st = x.attrs.style ? String(x.attrs.style).toLowerCase() : '';
+    if (!st) continue;
+    for (const p of props) {
+      const v = dichiarazione(st, p);
+      if (v) return coloreDi(v);
+    }
+  }
+  return null;
+}
+
+// Testo del colore dello sfondo, dove la pagina li dichiara tutti e due: la stessa regola della scheda aperta. Un figlio
+// che ridichiara il colore del testo si vede, quindi il riquadro non si butta intero.
+function comeLoSfondo(nodo) {
+  const c = colorePiuVicino(nodo, ['color']);
+  const b = c && colorePiuVicino(nodo, ['background-color', 'background']);
+  if (!b || Math.abs(c[0] - b[0]) + Math.abs(c[1] - b[1]) + Math.abs(c[2] - b[2]) >= 24) return false;
+  return !trova(nodo, (x) => /(?:^|;)\s*color\s*:/.test(String(x.attrs.style || '').toLowerCase())).length;
 }
 
 // Testo e testo dentro i link di ogni riquadro, in una passata: la navigazione è ciò che è fatto quasi solo di link.
@@ -335,7 +386,7 @@ function classifica(nodo, ctx) {
   const a = nodo.attrs;
   // La UI che Filo stesso disegna nella pagina (menu, avvisi) non è la pagina: vedi src/shared/filoUi.js.
   if ('data-sn-ui' in a) return CESTINO;
-  if (!ctx.ignoraInvisibile && invisibile(nodo)) return CESTINO;
+  if (invisibile(nodo)) return ctx.invisibiliChiusi ? CHIUSO : CESTINO;
   if (nascosto(nodo)) return CHIUSO;
   if (MAI_SALTARE.has(tag)) return 0;
   const ruolo = a.role ? String(a.role).toLowerCase().trim() : '';
@@ -365,22 +416,30 @@ function risolviLink(href, base) {
   } catch (_) { return ''; }
 }
 
+// Due riquadri affiancati scritti senza spazio fra i tag: a schermo li stacca lo stile, qui li si stacca almeno dove
+// incollarli farebbe un numero che non esiste («7:30» e «19:30», la quantità 2 e il prezzo 1,20).
+const CONFINE_CON_CIFRA = /(?:\p{Nd}[\p{L}\p{N}]|\p{L}\p{Nd})$/u;
+
 class Scrittore {
-  constructor() { this.righe = []; this.cur = ''; this.prefisso = ''; this.spazio = false; }
+  constructor() { this.righe = []; this.cur = ''; this.prefisso = ''; this.spazio = false; this.confine = false; }
   // Lo spazio in fondo si ricorda in un campo: guardarlo sulla riga a ogni pezzo costava il quadrato della riga.
   inline(t) {
     if (!t) return;
     if (!this.cur || this.spazio) t = t.replace(/^\s+/, '');
     if (!t) return;
+    if (this.confine && this.cur && CONFINE_CON_CIFRA.test(this.cur.slice(-1) + t[0])) t = ` ${t}`;
+    this.confine = false;
     this.cur += t;
     this.spazio = /\s$/.test(t);
   }
+  segnaConfine() { this.confine = true; }
   riga() {
     const s = this.cur.replace(/\s+$/, '').replace(/^\s+/, (m) => (this.prefisso ? m : ''));
     if (s.trim() && s.trim() !== this.prefisso.trim()) this.righe.push(s);
     this.cur = '';
     this.prefisso = '';
     this.spazio = false;
+    this.confine = false;
   }
   blocco() {
     this.riga();
@@ -426,6 +485,14 @@ const pulisci = (s, max) => String(s || '').replace(/\s+/g, ' ').trim().slice(0,
 
 function scrivi(nodo, w, ctx) {
   if (typeof nodo === 'string') { w.inline(nodo.replace(/\s+/g, ' ')); return; }
+  // L'apice e il pedice stanno attaccati per davvero: m², 10⁶.
+  const confine = nodo.tag !== 'sup' && nodo.tag !== 'sub';
+  if (confine) w.segnaConfine();
+  scriviElemento(nodo, w, ctx);
+  if (confine) w.segnaConfine();
+}
+
+function scriviElemento(nodo, w, ctx) {
   const tag = nodo.tag;
   if (salta(nodo, ctx)) return;
   const figli = (c) => { for (const x of nodo.children) scrivi(x, w, c || ctx); };
@@ -499,6 +566,18 @@ function scrivi(nodo, w, ctx) {
       return;
     }
     case 'button': w.inline(' '); figli(sotto); w.inline(' '); return;
+    // Quello che la pagina mostra preso da un altro indirizzo (il menù in PDF, un foglio, un calendario): il testo qui
+    // non c'è, e il modello deve sapere che esiste e da dove leggerlo. Un pixel di tracciamento non conta.
+    case 'iframe': case 'frame': case 'embed': case 'object': {
+      const src = risolviLink(nodo.attrs.src || nodo.attrs.data, ctx.base);
+      const pixel = ['width', 'height'].some((k) => /^\s*[0-2](?:px)?\s*$/.test(String(nodo.attrs[k] ?? 'x')));
+      if (!src || pixel) return;
+      const nome = pulisci(nodo.attrs.title || nodo.attrs['aria-label'] || '', 120);
+      w.blocco();
+      w.inline(`[Contenuto incorporato${nome ? `: ${nome.replace(/[[\]]/g, '')}` : ''}](${src})`);
+      w.blocco();
+      return;
+    }
     default: break;
   }
   // Il prezzo disegnato per gli occhi e quello ripetuto per i lettori di schermo stanno attaccati: uno spazio li separa.
@@ -652,11 +731,9 @@ function estrai(html, { url = '' } = {}) {
   const { nodo, corpo } = sceltaRadice(radice);
   const ctx = { modo: 'principale', dentroArticolo: nodo !== corpo, base, lista: 0 };
   let p = componi(nodo, corpo, ctx);
-  // Una pagina tutta sotto un velo trasparente, che i suoi script tolgono a caricamento finito: il velo non è un'esca.
-  if (p.principale.length + p.coda.length < 200) {
-    const senzaVelo = componi(nodo, corpo, { ...ctx, ignoraInvisibile: true });
-    if (senzaVelo.principale.length + senzaVelo.coda.length > 2 * (p.principale.length + p.coda.length)) p = senzaVelo;
-  }
+  // Poco testo visibile: forse un velo trasparente che gli script tolgono a caricamento finito, forse un'esca. Il testo
+  // nascosto arriva, ma fra quello che l'utente potrebbe non vedere, mai mescolato al resto.
+  if (p.principale.length + p.coda.length < 200) p = componi(nodo, corpo, { ...ctx, invisibiliChiusi: true });
   let testo = p.principale;
   if (p.coda) testo += `${testo ? '\n\n' : ''}${TITOLO_CODA}\n${p.coda}`;
   if (p.chiusi) testo += `${testo ? '\n\n' : ''}${TITOLO_CHIUSI}\n${p.chiusi}`;
