@@ -2405,6 +2405,9 @@
   // emoji e i selettori di variante, che non portano testo.
   const NON_SI_DISEGNA_RE = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200E\u200F\u202A-\u202E\u2060-\u206F\u3164\uFEFF\uFFA0\uFFF0-\uFFF8\u{1BCA0}-\u{1BCA3}\u{1D173}-\u{1D17A}\u{E0000}-\u{E0FFF}]/gu;
   const SPAZI_RE = /[ \t\u00A0\u1680\u2000-\u200A\u202F\u205F\u2800\u3000]+/g;
+  // Vuota è la riga in cui niente si disegna, non quella senza caratteri: una
+  // riga di soli giuntori o spazi a larghezza zero a schermo è bianca (#592).
+  const SI_DISEGNA_RE = /[^\s\p{Z}\p{Cc}\p{Cf}\p{M}]/u;
   function testoLeggibile(text) {
     return String(text == null ? '' : text)
       .replace(/\r\n?|[\u2028\u2029]/g, '\n')
