@@ -107,6 +107,7 @@ export function raccogliCasi(json) {
       for (const t of Array.isArray(spec?.tests) ? spec.tests : []) {
         out.push({
           spec: normalizzaSpec(specFile),
+          riga: Number(spec?.line) || 0,
           titolo,
           titoloCompleto: [...corniceQui, titolo].join(' › '),
           stato: statoFinale(t),
