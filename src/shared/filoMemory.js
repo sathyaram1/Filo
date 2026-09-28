@@ -741,6 +741,8 @@
       // #155 — firma degli input con cui è stato generato questo messaggio:
       // serve a capire se la home andrebbe ricalcolata (input cambiati).
       signature: payload?.signature || '',
+      // Scritto senza chiave: manda a riscattare l'invito, e con la chiave non va più servito.
+      senzaChiave: payload?.senzaChiave === true,
     });
   }
 
