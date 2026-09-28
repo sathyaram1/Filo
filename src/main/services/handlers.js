@@ -1311,8 +1311,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
 
   // DIMENTICA: le righe che la frase indica le trova il main, prima del gate,
   // così il popup mostra quelle che se ne andranno (#592).
+  // Il popup riporta righe della memoria: a una pagina visitata non si mostrano.
   let righeDaDimenticare = [];
   if (type === 'DIMENTICA') {
+    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+      return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
+    }
     try { righeDaDimenticare = await FiloMem.findLines(action.testo ?? action.text ?? action.riga ?? ''); } catch (_) {}
     action._righe = righeDaDimenticare.map((r) => r.testo);
   }

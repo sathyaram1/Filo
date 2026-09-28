@@ -1189,6 +1189,15 @@
     return global.SN_ESTERNO;
   }
 
+  // L'id del modello si scrive a mano nelle Opzioni e nella chat diventa «il tuo
+  // nome»: ci entra solo se ha la forma di un id, mai come frase (#592).
+  const ID_MODELLO_RE = /^[A-Za-z0-9~_][A-Za-z0-9._:\/@+~-]{0,199}$/;
+  function rigaNomeModello(id) {
+    const nome = typeof id === 'string' ? id.trim() : '';
+    if (!ID_MODELLO_RE.test(nome)) return '';
+    return `Il modello che ti sta eseguendo è ${nome}. Se l'utente ti chiede quale modello o IA sei, rispondi con questo nome esatto — è il nome con cui il codice ti invoca — senza inventarne altri né dare soprannomi.\n\n`;
+  }
+
   // Dove comincia, nei prompt con istruzioni di sistema, la parte che dice cosa
   // NON è un ordine: lo stile dell'utente entra subito prima (injectAgentStyle).
   const SEZIONE_SICUREZZA_AIUTO = '# Sicurezza\n';
@@ -1861,6 +1870,7 @@
       `PULIZIA TAB ("riordina le schede", "fai pulizia delle tab", "chiudi le tab che non servono", "archivia le schede vecchie") → proponi l'azione PULISCI_TAB. NON archiviare nulla da solo: l'azione mostra un bottone che l'utente deve confermare, e tu spieghi in una frase cosa farà (valuterà tutte le schede e archivierà quelle non più utili, ritrovabili in cronologia).\n` +
       `CANCELLAZIONE ARCHIVIO ("cancella dall'archivio le pagine su X", "elimina definitivamente le schede a tema Y", "rimuovi dalla cronologia tutto ciò che riguarda Z") → proponi l'azione CANCELLA_ARCHIVIO con {query} = la descrizione di cosa cancellare. È DISTRUTTIVA e PERMANENTE: NON cancellare nulla da solo. L'azione cerca le schede pertinenti e mostra l'elenco con un bottone di conferma; spiega in una frase che è un'eliminazione definitiva dall'archivio.\n` +
       `CANCELLAZIONE MEMORIA ("cancella le mie memorie", "dimentica tutto di me", "azzera quello che sai di me", "resetta la tua memoria") → emetti l'azione CANCELLA_MEMORIA (nessun parametro). È IRREVERSIBILE: cancella profilo, preferenze apprese e lezioni. NON cancellare nulla da solo e NON dichiarare di averlo già fatto: è il SISTEMA a mostrare un box in cui l'utente deve scrivere "conferma" prima di procedere. Tu emetti l'azione e basta; conferma a parole solo DOPO che è stata eseguita, in una frase.\n` +
+      `DIMENTICARE UNA COSA SOLA ("dimentica che non bevo caffè", "togli dalla memoria che vivo a Lisbona", "non è più vero che lavoro in banca") → emetti DIMENTICA con {testo} = la riga com'è nella memoria (più sotto nel contesto). Il SISTEMA mostra all'utente le righe esatte e le toglie col suo OK. Per una cosa sola non usare mai CANCELLA_MEMORIA.\n` +
       `MODIFICA IMPOSTAZIONI ("metti il tema scuro", "ingrandisci il testo", "attiva la modalità terminale", "imposta i cookie su privacy", "metti la chiave openrouter sk-or-...", "limite di spesa 10 euro") → emetti l'azione IMPOSTA_PREFERENZA con la chiave e il valore giusti (vedi l'elenco sotto). Puoi modificare QUALSIASI impostazione elencata. Per le impostazioni semplici (estetica, testo, archiviazione…) si applica subito: conferma in una frase ("Fatto, ora il tema è scuro."). Per le impostazioni sensibili (sicurezza, modelli, provider, chiavi API, limite di spesa) è il SISTEMA ad aprire da sé un popup di conferma all'utente prima di applicarle: tu emetti comunque l'azione e basta — NON chiedere conferma a parole, NON dire "vai nelle Opzioni". Se l'utente chiede un'impostazione che davvero non esiste nell'elenco, dillo.\n` +
       `SEGNALA UN PROBLEMA / FEEDBACK ("manda un feedback agli sviluppatori", "segnala che X non funziona", "di' al team che vorrei Y") → scrivi un testo chiaro e completo della segnalazione ed emetti l'azione INVIA_FEEDBACK (testo + un titolo breve). È il sistema a chiedere conferma all'utente, con l'anteprima del testo, prima di inviare. Non inventare dettagli che l'utente non ha fornito; se la segnalazione è vaga, chiedi una precisazione prima di inviare.\n` +
       `QUANDO AMMETTI UNA MANCANZA (obbligatorio) → ogni volta che stai per dire che Filo non sa fare una cosa, che non hai accesso a un dato, che una funzione non esiste o che qualcosa non ha funzionato, emetti NELLO STESSO TURNO anche INVIA_FEEDBACK, con il testo già scritto: cosa aveva chiesto l'utente e cosa non è stato possibile. NON chiedere il permesso a parole ("vuoi che lo segnali?") e NON aspettare che te lo chieda: la conferma la chiede il sistema da sé mostrando l'anteprima, quindi il tuo compito è preparare la segnalazione, non domandare. L'unica eccezione è se una segnalazione sullo stesso punto è già stata proposta in questa conversazione.\n` +
@@ -1941,9 +1951,7 @@
     filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, cambi, history, modelName, files, onboarding, onboardingTurns, onboardingMax }) =>
       `═══ CONTESTO (cambia a ogni messaggio) ═══\n` +
       PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax }) +
-      (modelName
-        ? `Il modello che ti sta eseguendo è ${modelName}. Se l'utente ti chiede quale modello o IA sei, rispondi con questo nome esatto — è il nome con cui il codice ti invoca — senza inventarne altri né dare soprannomi.\n\n`
-        : '') +
+      rigaNomeModello(modelName) +
       `${memoriaImbustata({ profilo, preferenze, espansioni, lezioni })}\n\n` +
       `STATO:\n${stato || '(vuoto)'}\n\n` +
       (cambi ? `CAMBI:\n${cambi}\n\n` : '') +

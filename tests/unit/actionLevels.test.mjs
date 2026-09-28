@@ -51,6 +51,16 @@ test('SALVA_LEZIONE: livello 2 col testo esatto, come lo stile (#592)', () => {
   assert.ok(AL.describe({ type: 'SALVA_LEZIONE', lezione: 'regola Y' }).includes('regola Y'));
 });
 
+test('DIMENTICA: le righe trovate dal main vanno nel popup; oltre tre si digita «conferma» (#592)', () => {
+  assert.equal(AL.levelFor({ type: 'DIMENTICA', testo: 'caffè', _righe: [] }), 1);
+  assert.equal(AL.levelFor({ type: 'DIMENTICA', testo: 'caffè', _righe: ['L’utente non beve caffè.'] }), 2);
+  assert.equal(AL.levelFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1', 'a2', 'a3'] }), 2);
+  assert.equal(AL.levelFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1', 'a2', 'a3', 'a4'] }), 3);
+  const d = AL.describe({ type: 'DIMENTICA', testo: 'caffè', _righe: ['L’utente non beve caffè.'] });
+  assert.ok(d.includes('L’utente non beve caffè.'));
+  assert.ok(d.split('\n')[0].length < 70, 'la prima riga fa da bottone: resta corta');
+});
+
 test('NAVIGA con flag anti-esfiltrazione sale a livello 2 (conferma)', () => {
   // Il flag `_exfil` lo inietta il main (taint-match in urlExfil.js), mai l'LLM:
   // un link che porta fuori dati sensibili deve chiedere conferma, non aprirsi.
