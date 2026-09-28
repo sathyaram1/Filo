@@ -157,13 +157,17 @@
       if (!P || typeof P[method] !== 'function') {
         throw codeError(`Il fornitore ${a.provider || '—'} non sa fare questa chiamata (${method})`, 'PROVIDER_METHOD_MISSING');
       }
-      const r = (await P[method]({
+      const input = {
         ...(args || {}),
         apiKey: a.apiKey,
         model: a.model,
         ...(a.reasoning !== undefined ? { reasoning: a.reasoning } : {}),
         providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s),
-      })) || {};
+      };
+      // Il testo passa dal router, che per complete e streamComplete ha già il suo smistamento per nome.
+      const router = providers();
+      const viaRouter = (method === 'complete' || method === 'streamComplete') && typeof router[method] === 'function';
+      const r = (await (viaRouter ? router[method]({ ...input, provider: a.provider }) : P[method](input))) || {};
       const usage = r.usage;
       const { servedBy, violation } = noteServed(s, action, r);
       const later = !servedBy && Boolean(r.generationId);
