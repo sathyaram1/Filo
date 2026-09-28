@@ -53,6 +53,8 @@ const cookieMethods = {
     const list = Cookies.getBannerSites(settings).filter((d) => d !== site);
     if (show) list.push(site);
     list.sort();
+    // Azzerato PRIMA: col ritorno all'automatico la pagina aperta rifiuta subito, e quell'esito deve restare.
+    tab.cookieOutcome = null;
     const { applySettingsUpdate } = require('../services/handlers');
     await applySettingsUpdate({ security: { cookies: { bannerSites: list } } });
     const wc = tab.view && tab.view.webContents;
@@ -60,7 +62,6 @@ const cookieMethods = {
       try { await Cookies.wipeConsentCookies(wc.session, site); } catch (_) {}
       try { await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: WIPE_STORAGE_JS }]); } catch (_) {}
     }
-    tab.cookieOutcome = null;
     this._broadcast();
     this.reload(tab.id);
     return { ok: true, site, shown: !!show };
