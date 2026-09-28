@@ -100,6 +100,21 @@ function pathOf(url) {
   try { return new URL(String(url)).pathname; } catch (_) { return '/'; }
 }
 
+// Giudizio del modello e sandbox valgono per il dominio registrabile: per host completo, sottodomini sempre nuovi
+// facevano ripartire entrambi a ogni link (#591). Sulle pagine ospitate resta la pagina, che ha un autore suo.
+function judgeKey(norm, url) {
+  return whitelist.hostedPlatform(norm.host, pathOf(url)) ? norm.host + pathOf(url) : norm.registrable;
+}
+
+// Due analisi dello stesso dominio in volo insieme fanno una chiamata sola.
+const inflight = new Map();
+function once(key, run) {
+  if (inflight.has(key)) return inflight.get(key);
+  const p = Promise.resolve().then(run).finally(() => inflight.delete(key));
+  inflight.set(key, p);
+  return p;
+}
+
 // Assembla i dati di rete già noti (da cache) per il dominio.
 function assembleCached(norm, url) {
   if (!norm || !norm.registrable) return {};
@@ -108,8 +123,8 @@ function assembleCached(norm, url) {
     gsb: gsbCache.get('u:' + pageKey(norm, url)) || gsbCache.get(reg),
     ageDays: ageCache.get(reg),
     cert: certCache.get(reg),
-    sandbox: sandboxCache.get(pageKey(norm, url)),
-    llm: llmCache.get(pageKey(norm, url)),
+    sandbox: sandboxCache.get(judgeKey(norm, url)),
+    llm: llmCache.get(judgeKey(norm, url)),
   };
 }
 
@@ -156,15 +171,18 @@ function analyze(url, ctx = {}, onUpdate) {
   }
   // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist).
   const worthDeepening = first.level === 'sospetto' || first.needsLlm;
+  const jKey = judgeKey(norm, url);
   if (worthDeepening && providers.llm && need.llm === undefined) {
-    tasks.push(Promise.resolve(providers.llm(buildLlmMeta(norm, ctx, first))).then((r) => {
-      if (r) llmCache.set(key, r);
-    }).catch(() => {}));
+    const llm = providers.llm;
+    tasks.push(once('llm:' + jKey, () => Promise.resolve(llm(buildLlmMeta(norm, ctx, first))).then((r) => {
+      if (r) llmCache.set(jKey, r);
+    })).catch(() => {}));
   }
   if (worthDeepening && providers.sandbox && need.sandbox === undefined) {
-    tasks.push(Promise.resolve(providers.sandbox(url, norm)).then((r) => {
-      if (r) sandboxCache.set(key, r);
-    }).catch(() => {}));
+    const detonate = providers.sandbox;
+    tasks.push(once('sb:' + jKey, () => Promise.resolve(detonate(url, norm)).then((r) => {
+      if (r) sandboxCache.set(jKey, r);
+    })).catch(() => {}));
   }
 
   if (tasks.length && typeof onUpdate === 'function') {
