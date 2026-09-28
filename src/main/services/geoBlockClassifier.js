@@ -326,7 +326,7 @@ async function classify(input = {}, { complete, cache, now = Date.now, signal } 
     if (!pending) { pending = new Map(); pendingByCache.set(cache, pending); }
     if (pending.has(key)) return { ...(await pending.get(key)) };
   }
-  if (!spendFor(cache, host, url)) {
+  if (!spendFor(cache, host, url, budgetUrl)) {
     return { class: null, route: routeForClass(null), cached: false, skipped: true, reason: 'budget' };
   }
   const run = (async () => {
