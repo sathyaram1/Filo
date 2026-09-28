@@ -206,10 +206,14 @@
     return false;
   }
 
+  // «Rifiuta e abbonati» porta alla pagina dell'abbonamento: non è un rifiuto, è l'altra metà di un banner da nascondere.
+  const NOT_A_REJECT = /(abbona|abbonati|subscri|abonn|suscri|assin|premium|paga|pay|acquista|compra|buy|accedi|login|log in|sign in|registr)/i;
+
   function isRejectText(el) {
-    const txt = (el.textContent || '').trim().toLowerCase();
+    const txt = (el.textContent || '').trim().toLowerCase().replace(/\s+/g, ' ');
     if (!txt || txt.length > 40) return false;
-    return REJECT_PHRASES.some((p) => txt === p || txt.startsWith(p));
+    if (!REJECT_PHRASES.some((p) => txt === p || txt.startsWith(p))) return false;
+    return !NOT_A_REJECT.test(txt);
   }
 
   // Un button/link con testo di rifiuto. Dentro `root` qualsiasi; nel resto della pagina solo se
@@ -218,10 +222,12 @@
     let nodes = [];
     try { nodes = root.querySelectorAll('button, a[role="button"], [role="button"], a, input[type="button"], input[type="submit"]'); } catch (_) {}
     for (const el of nodes) {
-      if (el.__filoCookieClicked || !isVisible(el)) continue;
+      if (el.__filoCookieClicked) continue;
       const probe = el.tagName === 'INPUT' ? { textContent: el.value } : el;
       if (!isRejectText(probe)) continue;
+      if (el.tagName === 'A' && el.target === '_blank') continue;
       if (!inConsentBox && !looksLikeConsent(el)) continue;
+      if (!isVisible(el)) continue;
       return el;
     }
     return null;
@@ -279,9 +285,13 @@
 
   // ─── regole Consent-O-Matic ─────────────────────────────────────────────────
 
+  // Consent-O-Matic smette di cercare dopo pochi secondi senza CMP; qui la finestra è più larga, poi resta la mano.
+  const COM_WINDOW_MS = 20000;
   const com = {
     busy: false,
     lastTick: 0,
+    lastWaiting: false,
+    since: 0,
     tried: new Set(),
     firstSeen: new Map(),
     rules: new Map(),
@@ -306,8 +316,15 @@
     if (!R || !cfg || !Array.isArray(cfg.index) || !cfg.index.length) return false;
     if (com.busy) return true;
     const now = Date.now();
-    if (now - com.lastTick < 350) { scheduleScanIn(360); return false; }
+    if (!com.since) com.since = now;
+    if (now - com.since > COM_WINDOW_MS && !com.firstSeen.size) return false;
+    if (now - com.lastTick < 350) { scheduleScanIn(360); return com.lastWaiting; }
     com.lastTick = now;
+    com.lastWaiting = comScan(R, skip, now);
+    return com.lastWaiting;
+  }
+
+  function comScan(R, skip, now) {
     const names = R.presentInIndex(cfg.index, new Set([...skip, ...com.tried]));
     let waiting = false;
     for (const name of names) {
@@ -471,15 +488,19 @@
     } catch (_) {}
   }
 
+  // Le classi che cambiano servono solo a chiedere le regole della lista; a far ripassare le regole
+  // bastano i nodi nuovi (un banner che compare per classe lo segnala il motore di stile, da cookieBanners.js).
   function onMutations(records) {
     const B = IS_TOP && banners ? global.SN_COOKIE_BANNERS : null;
-    if (B && B.isRunning()) {
-      for (const r of records) {
-        if (r.type === 'attributes') B.survey(r.target);
-        else for (const n of r.addedNodes) if (n.nodeType === 1) B.survey(n);
-      }
+    const surveying = !!(B && B.isRunning());
+    let added = false;
+    for (const r of records) {
+      if (r.type === 'attributes') { if (surveying) B.survey(r.target, false); continue; }
+      if (!r.addedNodes.length) continue;
+      added = true;
+      if (surveying) for (const n of r.addedNodes) if (n.nodeType === 1) B.survey(n, true);
     }
-    scheduleScan();
+    if (added) scheduleScan();
   }
 
   function startObserver() {

@@ -589,12 +589,16 @@
     GEO_PROPOSE_DISMISS: 'geo_propose_dismiss',     // { url } → { ok }
 
     // === Gestione cookie / consenso (src/content/cookies.js) ===
-    // Il content script chiede la modalità corrente per decidere se rifiutare i
-    // banner CMP e riscrivere gli embed YouTube in nocookie. → { mode }
-    COOKIES_CONFIG: 'cookies_config',               // → { mode: 'manual'|'default'|'privacy' }
-    // Broadcast main→content quando la modalità cambia (UPDATE_SETTINGS): il
-    // content (dis)attiva il rifiuto CMP e la riscrittura embed senza reload.
+    // { url, frame: 'top'|'sub' } → { mode, off (su questo sito l'utente vuole i banner), index (rilevatori
+    // Consent-O-Matic), cosmetic (solo 'top': regole EasyList Cookie del sito) }.
+    COOKIES_CONFIG: 'cookies_config',
+    // Broadcast main→content quando la modalità o i siti coi banner cambiano: il content rilegge la config.
     COOKIES_CONFIG_UPDATE: 'cookies_config_update', // → { mode }
+    // Aperti alle pagine web di proposito: li chiede il content script di ogni sito, e non portano dati
+    // dell'utente. La regola Consent-O-Matic è pubblica; l'esito vale solo per la scheda di chi lo manda.
+    COOKIES_RULE: 'cookies_rule',                   // { name } → { ok, rule }
+    COOKIES_OUTCOME: 'cookies_outcome',             // { outcome: 'rejected'|'hidden' } → { ok }
+    COOKIES_BANNER_TOKENS: 'cookies_banner_tokens', // { ids, classes } → { ok, selectors } (quelli della lista)
 
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai

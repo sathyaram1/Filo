@@ -72,12 +72,14 @@
     }
   }
 
-  function survey(root) {
+  function survey(root, deep) {
     if (!running || !root) return;
     collect(root);
-    let nodes = [];
-    try { nodes = root.querySelectorAll ? root.querySelectorAll('[id],[class]') : []; } catch (_) {}
-    for (const n of nodes) collect(n);
+    if (deep !== false) {
+      let nodes = [];
+      try { nodes = root.querySelectorAll ? root.querySelectorAll('[id],[class]') : []; } catch (_) {}
+      for (const n of nodes) collect(n);
+    }
     scheduleFlush();
   }
 

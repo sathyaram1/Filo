@@ -117,6 +117,19 @@ function getTrustedSites(settings) {
   return Array.isArray(list) ? list : [];
 }
 
+// Siti (eTLD+1) dove l'utente ha chiesto di rivedere i banner dei cookie: lì Filo non rifiuta e non nasconde.
+function getBannerSites(settings) {
+  const c = settings && settings.security && settings.security.cookies;
+  const list = (c && c.bannerSites) || [];
+  return Array.isArray(list) ? list.map((d) => String(d || '').toLowerCase()).filter(Boolean) : [];
+}
+
+function isBannerSiteIn(sites, url) {
+  if (!/^https?:/i.test(String(url || ''))) return false;
+  const reg = registrableOf(url);
+  return !!reg && sites.includes(reg);
+}
+
 function trustedSetOf(settings) {
   return new Set(getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
 }
@@ -303,12 +316,16 @@ function configureForMode(mode) {
 
 // Ultima modalità/siti fidati visti, così before-quit (sincrono) può lanciare il
 // wipe senza dover rileggere lo storage in modo asincrono.
-let _cached = { mode: MODES.DEFAULT, trustedSites: [] };
+let _cached = { mode: MODES.DEFAULT, trustedSites: [], bannerSites: [] };
 
 function configureFromSettings(settings) {
-  _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings) };
+  _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings), bannerSites: getBannerSites(settings) };
   configureForMode(_cached.mode);
 }
+
+function currentMode() { return _cached.mode; }
+
+function isBannerSite(url) { return isBannerSiteIn(_cached.bannerSites, url); }
 
 // Wipe usando l'ultima configurazione vista (per before-quit). Ritorna una
 // promessa che si risolve quando i cookie dei tracker sono stati rimossi.
@@ -340,10 +357,41 @@ async function wipeTrackerCookies(settings) {
   return { removed };
 }
 
+// ─── «mostra il banner»: via la risposta che il sito si era segnato ──────────
+//
+// Un banner rifiutato non ricompare da solo: il sito ha scritto la scelta in un cookie. Si tolgono solo i
+// cookie di consenso del sito (nomi dei CMP noti), mai login o carrello; lo stesso per la memoria della pagina.
+const CONSENT_NAME = /(consent|euconsent|cookielaw|optanon|onetrust|didomi|cookiebot|cybot|^_sp_|sp_consent|cmp|cmapi|cmplz|borlabs|_iub_cs|iubenda|notice_(gdpr|pref|behavior)|usprivacy|gdpr|cookieyes|cky-|^uc_|usercentrics|osano|truste|tarteaucitron|klaro|axeptio|cookiefirst|termly|viewed_cookie_policy|cookie_?notice|cookie_?banner|cookies?_?accepted|cookie_?policy)/i;
+
+function isConsentName(name) {
+  return CONSENT_NAME.test(String(name || ''));
+}
+
+async function wipeConsentCookies(ses, site) {
+  if (!ses || !ses.cookies || !site) return 0;
+  let all = [];
+  try { all = await ses.cookies.get({}); } catch (_) { return 0; }
+  let removed = 0;
+  await Promise.all(all.map(async (c) => {
+    const domain = String(c.domain || '').replace(/^\./, '').toLowerCase();
+    if (!(domain === site || domain.endsWith('.' + site))) return;
+    if (!isConsentName(c.name)) return;
+    const url = (c.secure ? 'https://' : 'http://') + domain + (c.path || '/');
+    try { await ses.cookies.remove(url, c.name); removed++; } catch (_) {}
+  }));
+  return removed;
+}
+
 module.exports = {
   MODES,
   getMode,
   getTrustedSites,
+  getBannerSites,
+  isBannerSiteIn,
+  isBannerSite,
+  currentMode,
+  isConsentName,
+  wipeConsentCookies,
   registrableOf,
   isTrackerHost,
   isTrackerUrl,
