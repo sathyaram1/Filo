@@ -15,6 +15,12 @@ import { leggiBigliettoAMano } from '../../scripts/lib/routine-ticket.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BIGLIETTO = 'bigliettodiprova0123';
+// I biglietti veri sono 43 caratteri base64url: uno su 64 comincia con un trattino, uno su 4096 con due.
+// Solo questa forma, davanti, è un secondo biglietto.
+const VERO = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde';
+const VERO_TRATTINO = `-${VERO.slice(1)}`;
+const VERO_DUE_TRATTINI = `--${VERO.slice(2)}`;
+const ALTRO_VERO = `ZZZZ${VERO.slice(4)}`;
 
 function fintoServer() {
   const ricevuti = [];
