@@ -95,6 +95,7 @@ import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } fr
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
 import { scaricaPayload, STAMPA_MAX } from './lib/consegna-file.mjs';
+import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
