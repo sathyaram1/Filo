@@ -23,7 +23,7 @@ const DOC = {
     '--- Filo ha risposto il 27/09/2026, 11:00 ---',
     'TURNO-TRE: serve una scelta, A oppure B?',
   ].join('\n'),
-  livelli: { l3: { ruolo: 'resolver', at: '2026-09-27T11:00:00Z', testo: 'DOMANDA-L3: scegli A oppure B.' } },
+  livelli: { l3: { ruolo: 'resolver', at: '2026-09-27T11:00:00Z', esito: 'segnalato', testo: 'DOMANDA-L3: scegli A oppure B.' } },
 };
 
 // Firestore finto nel main: solo batchGet, con la stessa regola sul nome del vero.
