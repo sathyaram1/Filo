@@ -261,16 +261,31 @@ export const CHIAVE_NON_PARTITA = 'suite:non-partita';
 
 /**
  * Le chiavi dell'allarme per i rossi nuovi: `suite:tests/<spec>.spec.mjs` per
- * ogni spec, `suite:fuori-dai-casi` per gli errori senza caso. Una per spec e
- * non per caso: dieci casi rotti dalla stessa modifica sono un guasto. PURA.
+ * ogni spec, e per un errore senza caso quella del file che nomina, o
+ * `suite:fuori-dai-casi` se non ne nomina nessuno. Una per spec e non per
+ * caso: dieci casi rotti dalla stessa modifica sono un guasto. PURA.
  */
 export function chiaviDelVerdetto(v) {
   const chiavi = [];
   for (const c of Array.isArray(v?.nuovi) ? v.nuovi : []) {
-    const k = c.spec === FUORI_DAI_CASI ? 'suite:fuori-dai-casi' : `suite:tests/${normalizzaSpec(c.spec)}.spec.mjs`;
+    const k = c.spec !== FUORI_DAI_CASI ? `suite:tests/${normalizzaSpec(c.spec)}.spec.mjs`
+      : c.file ? chiaveDelFile(c.file) : 'suite:fuori-dai-casi';
     if (!chiavi.includes(k)) chiavi.push(k);
   }
   return chiavi;
+}
+
+/**
+ * Le chiavi di una suite che non ha eseguito nessun caso: un file che non si carica ferma tutta la suite, ed è un
+ * guasto suo, non quello di un'installazione fallita. Nessun file riconoscibile: la suite non partita. PURA.
+ */
+export function chiaviSenzaCasi(errori, radice = ROOT) {
+  const chiavi = [];
+  for (const e of Array.isArray(errori) ? errori : []) {
+    const f = fileDellErrore(e, radice);
+    if (f && !chiavi.includes(chiaveDelFile(f))) chiavi.push(chiaveDelFile(f));
+  }
+  return chiavi.length ? chiavi : [CHIAVE_NON_PARTITA];
 }
 
 /** Il riassunto a schermo. Non taglia niente: l'elenco è quello intero. PURA. */
