@@ -232,6 +232,8 @@ module.exports = {
   azioneAmmessaDa,
   scritturaImpostazioniAmmessa,
   messaggioPerDestinazione,
+  spingiAllaScheda,
+  spingiAllaFinestra,
   chiaviStoragePerOrigine,
   scritturaStorageAmmessa,
   storagePerOrigine,
