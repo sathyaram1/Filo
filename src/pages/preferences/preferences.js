@@ -558,7 +558,16 @@
     note.textContent = over
       ? `Troppo lungo: ${n} caratteri, il massimo è ${AGENT_STYLE_MAX}. Non lo salvo finché non lo accorci.`
       : `${n} / ${AGENT_STYLE_MAX}`;
+    mostraTuttoLoStile();
     return !over;
+  }
+
+  // Lo stile entra in ogni conversazione: il riquadro cresce col testo, così
+  // niente resta sotto il bordo, nemmeno dopo righe che a schermo sono bianche (#592).
+  function mostraTuttoLoStile() {
+    const el = $('agentStyleText');
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
   }
 
   // Allinea la select dei preset al testo corrente: se combacia con un preset
