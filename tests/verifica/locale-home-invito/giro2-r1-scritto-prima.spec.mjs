@@ -49,7 +49,6 @@ test('scritto nella home senza crediti: dopo il riscatto la scheda nuova apre lâ
   test.setTimeout(150_000);
   await prepara(app, stato.base);
   const home = await scriviSenzaCrediti(app);
-  console.log('INTERVISTA DOPO IL TENTATIVO:', JSON.stringify(await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getOnboarding()).thread)));
   await riscattaDaApriCrediti(app, home);
   const nuova = await nuovaHome(app, shell);
   await expect(nuova.locator('#bubbles .dash-bubble-filo').first()).toContainText(BENVENUTO, { timeout: 30_000 });

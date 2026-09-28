@@ -1,6 +1,7 @@
-// Giro 2 di home-invito: chi è nuovo e riceve il modello con la home aperta vede partire l'intervista lì.
+// Porte del giro 1 di home-invito ri-provate e chiuse nel giro 2: chi è nuovo e riceve il modello con la home aperta
+// vede partire l'intervista lì, da ogni strada.
 import { test, expect } from '../../fixtures/electron.mjs';
-import { usaServerFinto, homePage, nuovaHome, prepara, riscattaDaCrediti, testoHome } from './_crediti-finti.mjs';
+import { usaServerFinto, homePage, prepara, riscattaDaCrediti, testoHome } from './_crediti-finti.mjs';
 
 const stato = usaServerFinto(test);
 const BENVENUTO = /Ciao, sono Filo/;
@@ -51,7 +52,6 @@ test('nuovo: l’invito che aspetta al primo avvio arriva dopo la home, e Filo s
   await expect.poll(() => stato.trattenute.length, { timeout: 30_000 }).toBeGreaterThan(0);
   for (const r of stato.trattenute.splice(0)) r();
   await intervistaNellaHome(home);
-  await home.screenshot({ path: 'tests/.shots/giro2-invito-primo-avvio.png' });
 });
 
 test('nuovo: l’invito che aspetta al primo avvio, senza trattenerlo', async ({ app }) => {
@@ -89,33 +89,4 @@ test('nuovo: chiave OpenRouter messa dalla pagina Crediti, torno alla home e Fil
   await expect(cr.locator('#ownKeyHave')).toBeVisible({ timeout: 10_000 });
   await shell.locator('.tab').first().click();
   await intervistaNellaHome(home);
-});
-
-test('nuovo: scrivo nella home prima dell’invito, poi riscatto da «Apri Crediti» e torno', async ({ app, shell }) => {
-  test.setTimeout(150_000);
-  await prepara(app, stato.base);
-  const home = await homeNuova(app);
-  await home.fill('#input', 'ciao, cosa sai fare?');
-  await home.press('#input', 'Enter');
-  const apri = home.locator('#bubbles button', { hasText: 'Apri Crediti' });
-  await expect(apri).toBeVisible({ timeout: 20_000 });
-  await apri.click();
-  let cr = null;
-  await expect.poll(() => { cr = app.windows().find((w) => w.url().startsWith('filo://credits')); return !!cr; }, { timeout: 15_000 }).toBe(true);
-  await cr.waitForLoadState('domcontentloaded');
-  await expect(cr.locator('#redeemForm')).toBeVisible({ timeout: 20_000 });
-  await cr.fill('#inviteCode', 'ABCD-EFGH');
-  await cr.click('#redeemBtn');
-  await expect(cr.locator('#redeemMsg')).toContainText('riscattato', { timeout: 20_000 });
-  await shell.locator('.tab').first().click();
-  await home.waitForTimeout(5000);
-  console.log('BOLLE DOPO IL RISCATTO:\n' + await home.locator('#bubbles').innerText());
-  await home.screenshot({ path: 'tests/.shots/giro2-scritto-prima.png' });
-  await home.locator('#bubbles button', { hasText: 'Riprova' }).click();
-  await home.waitForTimeout(6000);
-  console.log('BOLLE DOPO RIPROVA:\n' + await home.locator('#bubbles').innerText());
-  console.log('ONBOARDING:', JSON.stringify(await app.evaluate(async () => { const o = await globalThis.SN_FILO_MEMORY.getOnboarding(); return { done: o.done, n: (o.thread || []).length }; })));
-  const nuova = await nuovaHome(app, shell);
-  await nuova.waitForTimeout(6000);
-  console.log('NUOVA SCHEDA:\n' + await nuova.locator('#bubbles').innerText() + '\nHOME MSG: ' + await nuova.locator('#homeMessage').innerText());
 });
