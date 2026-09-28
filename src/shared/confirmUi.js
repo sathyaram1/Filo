@@ -214,8 +214,23 @@
 
     doc.body.appendChild(host);
     active = { host, root };
-    return { overlay, box, done };
+
+    // Un popup si apre anche da solo, sotto un gesto già partito per altro (#592):
+    // per mezzo secondo un clic o un invio veri non valgono come sì. I clic del
+    // codice (gli hook _test) non arrivano da una pagina: lo shadow root è chiuso.
+    const apertoAlle = performance.now();
+    const troppoPresto = (e) => !!(e && e.isTrusted) && performance.now() - apertoAlle < RITARDO_SI_MS;
+    // Chi stava scrivendo continua a scrivere nel suo campo: il fuoco va al
+    // riquadro, che gli gira i tasti, e non al bottone o al campo del popup.
+    const fuoco = (bersaglio) => {
+      const el = scrivibile(prima) ? box : bersaglio;
+      if (el === box) box.tabIndex = -1;
+      el.focus();
+    };
+    return { overlay, box, done, troppoPresto, fuoco };
   }
+
+  const RITARDO_SI_MS = 500;
 
   function header(box, { title, text }) {
     const doc = global.document;
