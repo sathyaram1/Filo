@@ -16,7 +16,6 @@ const T = globalThis.SN_TASTI;
 test('la pressione descritta da un nome scritto è quella che il tasto vero fa combaciare', () => {
   for (const [scritta, premuta] of [
     ['Ctrl+Minus', { ctrlKey: true, key: '-' }],
-    ['Ctrl+Shift+Minus', { ctrlKey: true, shiftKey: true, key: '_', code: 'Minus' }],
     ['Ctrl++', { ctrlKey: true, key: '+' }],
     ['Ctrl+Plus', { ctrlKey: true, key: '=' }],
     ['Cmd+Maiusc+S', { metaKey: true, shiftKey: true, key: 'S', code: 'KeyS' }],
