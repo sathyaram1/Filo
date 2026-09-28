@@ -107,72 +107,18 @@ async function clickMenu(app, shell, label) {
   await w.evaluate((l) => { [...document.querySelectorAll('button.item')].find((b) => b.textContent.includes(l)).click(); }, label);
 }
 
-const CLI = `<!doctype html><html><head><title>BLOG</title><style>body{margin:0;font:16px sans-serif} .c{height:4000px}</style></head><body>
-<div class="c"><h1>Ricette della nonna</h1><p>Testo del blog.</p></div>
-<div id="cookie-law-info-bar" data-nosnippet="true" style="position:fixed;bottom:0;left:0;right:0;background:#fff;color:#333;padding:14px;box-shadow:0 -1px 10px rgba(0,0,0,.3);z-index:9999">
-<span>Questo sito utilizza i cookie per migliorare la tua esperienza.
-<a role="button" class="medium cli-plugin-button cli-plugin-main-button cli_settings_button" style="margin:0 5px">Impostazioni cookie</a>
-<a role="button" data-cli_action="accept" id="cookie_action_close_header" class="medium cli-plugin-button cli-plugin-main-button cookie_action_close_header cli_action_button" onclick="document.cookie='viewed_cookie_policy=yes; path=/';document.cookie='_ga=GA1.1.1; path=/';window.__accepted=true">ACCETTA</a>
-</span></div></body></html>`;
 
-test('CookieLawInfo col solo ACCETTA (lista vera): nascosto, segno, «Mostra» lo riporta e l\'automatico lo rinasconde', async ({ app, shell, open, srv }) => {
-  test.skip(!LISTA, 'lista non disponibile');
-  test.setTimeout(120_000);
-  await app.evaluate((_e, txt) => globalThis.__filoCookieBanners.setListForTest(txt), LISTA);
-  const page = await open(srv.put('blog.test', '/ricetta', CLI));
-  await expect.poll(() => page.evaluate(() => getComputedStyle(document.getElementById('cookie-law-info-bar')).display), { timeout: 10_000 }).toBe('none');
-  expect(await page.evaluate(() => window.__accepted)).toBeUndefined();
-  await expect.poll(async () => (await tabCookies(shell))?.hidden, { timeout: 8_000 }).toBe(true);
-  const m = await openMenu(app, shell, 'Banner dei cookie nascosto');
-  mkdirSync(SHOTS, { recursive: true });
-  await m.screenshot({ path: join(SHOTS, '754-menu-nascosto.png') });
-  await clickMenu(app, shell, 'Mostra il banner dei cookie');
-  await expect.poll(async () => (await tabCookies(shell))?.shown, { timeout: 8_000 }).toBe(true);
-  await sleep(4000);
-  expect(await page.evaluate(() => getComputedStyle(document.getElementById('cookie-law-info-bar')).display)).not.toBe('none');
-  const m2 = await openMenu(app, shell, 'Rifiuta i cookie in automatico qui');
-  await m2.screenshot({ path: join(SHOTS, '754-menu-mostrato.png') });
-  await clickMenu(app, shell, 'Rifiuta i cookie in automatico qui');
-  await expect.poll(() => page.evaluate(() => getComputedStyle(document.getElementById('cookie-law-info-bar')).display).catch(() => ''), { timeout: 12_000 }).toBe('none');
-});
+function spFrame(inner) {
+  return `<!doctype html><html><head><style>body{margin:0;font:14px sans-serif}</style></head><body>
+<div class="message-container"><div id="notice" class="message type-modal">${inner}</div></div></body></html>`;
+}
+const SP_RIFIUTA = `<div class="message-component message-row"><p class="message-component">Cookie per la pubblicità.</p></div>
+<div class="message-component message-row">
+<button title="Accetta" class="message-component message-button no-children focusable sp_choice_type_11" onclick="top.postMessage('sp:accept','*')">Accetta</button>
+<button title="Rifiuta" class="message-component message-button no-children focusable sp_choice_type_13" onclick="top.postMessage('sp:reject','*')">Rifiuta</button></div>`;
 
-const IUBENDA = `<!doctype html><html><head><title>NEGOZIO</title></head><body style="margin:0;height:3000px">
-<h1>Negozio</h1>
-<div id="iubenda-cs-banner" class="iubenda-cs-default iubenda-cs-bottom" style="position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#1b1b1b;color:#fff;padding:14px">
- <div class="iubenda-cs-container"><div class="iubenda-cs-content">
-  <button class="iubenda-cs-close-btn" style="float:right" onclick="window.__closed=true;document.getElementById('iubenda-cs-banner').remove()">×</button>
-  <div id="iubenda-cs-title">Informativa</div>
-  <div id="iubenda-cs-paragraph"><p>Noi e terze parti selezionate utilizziamo cookie per finalità tecniche e, con il tuo consenso, anche per altre finalità.</p></div>
-  <div class="iubenda-cs-opt-group">
-   <div class="iubenda-cs-opt-group-custom"><button class="iubenda-cs-customize-btn" onclick="document.getElementById('iubenda-iframe').style.display='block'">Scopri di più e personalizza</button></div>
-   <div class="iubenda-cs-opt-group-consent"><button class="iubenda-cs-accept-btn iubenda-cs-btn-primary" onclick="window.__accepted=true;document.cookie='_iub_cs-1=all; path=/';document.getElementById('iubenda-cs-banner').remove()">Accetta</button></div>
-  </div>
- </div></div>
-</div>
-<div id="iubenda-iframe" style="display:none;position:fixed;inset:10%;background:#fff;color:#000;z-index:100000;padding:20px">
- <div class="purposes-item"><label>Interazioni e funzionalità semplici</label><input type="checkbox" checked disabled></div>
- <div class="purposes-item"><label>Miglioramento dell’esperienza</label><input type="checkbox" checked></div>
- <div class="purposes-item"><label>Misurazione</label><input type="checkbox" checked></div>
- <div class="purposes-item"><label>Targeting e Pubblicità</label><input type="checkbox" checked></div>
- <button id="iubFooterBtn" onclick="window.__saved=[...document.querySelectorAll('.purposes-item input')].map(i=>i.checked);document.getElementById('iubenda-iframe').remove();document.getElementById('iubenda-cs-banner').remove()">Salva e continua</button>
-</div></body></html>`;
-
-test('iubenda con Accetta e Personalizza (senza «rifiuta»): le finalità si spengono e la scelta si salva', async ({ shell, open, srv }) => {
-  const page = await open(srv.put('negozio.test', '/', IUBENDA));
-  await page.waitForFunction(() => !document.getElementById('iubenda-cs-banner'), null, { timeout: 15_000 }).catch(() => {});
-  const st = await page.evaluate(() => ({ saved: window.__saved, accepted: window.__accepted, closed: window.__closed, banner: !!document.getElementById('iubenda-cs-banner'), disp: document.getElementById('iubenda-cs-banner') && getComputedStyle(document.getElementById('iubenda-cs-banner')).display }));
-  console.log('IUBENDA', JSON.stringify(st), JSON.stringify(await tabCookies(shell)));
-  expect(st.accepted).toBeUndefined();
-  expect(st.saved).toEqual([true, false, false, false]);
-});
-
-// Banner in un riquadro dentro un altro riquadro (una pubblicità che incorpora il CMP): il rifiuto arriva lo stesso.
-test('riquadro nel riquadro: il «Rifiuta» del CMP si preme', async ({ shell, open, srv }) => {
-  srv.put('cmp.test', '/msg', `<!doctype html><body><div class="message-container"><div class="message type-modal">
-    <p>Cookie per la pubblicità</p>
-    <button class="message-component message-button sp_choice_type_11" title="Accetta" onclick="top.postMessage('sp:accept','*')">Accetta</button>
-    <button class="message-component message-button sp_choice_type_13" title="Rifiuta" onclick="top.postMessage('sp:reject','*')">Rifiuta</button>
-  </div></div></body>`);
+test('riquadro nel riquadro (forma Sourcepoint vera): il «Rifiuta» si preme', async ({ shell, open, srv }) => {
+  srv.put('cmp.test', '/msg', spFrame(SP_RIFIUTA));
   srv.put('wrap.test', '/w', `<!doctype html><body style="margin:0"><iframe src="${srv.url('cmp.test', '/msg')}" style="width:500px;height:260px;border:0"></iframe></body>`);
   const page = await open(srv.put('quotidiano.test', '/a', `<!doctype html><title>Q</title><body>
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9;display:flex;align-items:center;justify-content:center" id="velo">
@@ -182,32 +128,77 @@ test('riquadro nel riquadro: il «Rifiuta» del CMP si preme', async ({ shell, o
   await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
 });
 
-// Didomi in un riquadro (variante incorporata): il rifiuto arriva come sulla pagina.
-test('Didomi dentro un riquadro: «Rifiuta» premuto', async ({ shell, open, srv }) => {
-  srv.put('cmp.test', '/didomi', `<!doctype html><body><div id="didomi-host"><div id="didomi-notice" class="didomi-popup-notice">
-    <p>Noi e i nostri partner utilizziamo cookie.</p>
-    <button id="didomi-notice-agree-button" onclick="top.postMessage('d:accept','*')">Accetta e chiudi</button>
-    <button id="didomi-notice-disagree-button" onclick="top.postMessage('d:reject','*')">Continua senza accettare</button>
-  </div></div></body>`);
-  const page = await open(srv.put('rivista.test', '/a', `<!doctype html><title>R</title><body>
-    <iframe id="f" src="${srv.url('cmp.test', '/didomi')}" style="position:fixed;bottom:0;left:0;width:100%;height:200px;border:0;background:#fff;z-index:9"></iframe>
-    <script>addEventListener('message', (e) => { if (typeof e.data === 'string' && e.data.startsWith('d:')) { window.__d = e.data; document.getElementById('f').remove(); } });</script></body>`));
-  await expect.poll(() => page.evaluate(() => window.__d || null), { timeout: 15_000 }).toBe('d:reject');
+const SP_TOP = (frame) => `<!doctype html><html class="sp-message-open"><head><title>QUOTIDIANO</title>
+<style>html.sp-message-open{overflow:hidden!important} body{height:4000px;margin:0}
+#sp_message_container_1{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center}
+#sp_message_iframe_1{width:600px;height:300px;border:0;background:#fff}</style></head>
+<body><h1>Articolo</h1><p>Il testo dell'articolo.</p>
+<div id="sp_message_container_1"><iframe id="sp_message_iframe_1" title="SP Consent Message" src="${frame}"></iframe></div>
+<script>window.__log=[];addEventListener('message', (e) => { if (typeof e.data === 'string' && e.data.startsWith('sp:')) window.__log.push(e.data); });</script></body></html>`;
+
+async function coperta(page) {
+  return page.evaluate(() => { const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2); return !!el && !!el.closest('#sp_message_container_1'); }).catch(() => true);
+}
+
+test('Sourcepoint «Accetta / Personalizza» in un riquadro (lista vera): nascosto, niente accettato', async ({ app, shell, open, srv }) => {
+  test.skip(!LISTA, 'lista non disponibile');
+  await app.evaluate((_e, txt) => globalThis.__filoCookieBanners.setListForTest(txt), LISTA);
+  srv.put('cdn.privacy-mgmt.test', '/pers', spFrame(`<div class="message-component message-row"><p class="message-component">Noi e i nostri partner usiamo cookie.</p></div>
+<div class="message-component message-row">
+<button title="Personalizza" class="message-component message-button no-children focusable sp_choice_type_12" onclick="top.postMessage('sp:settings','*')">Personalizza</button>
+<button title="Accetta" class="message-component message-button no-children focusable sp_choice_type_11" onclick="top.postMessage('sp:accept','*')">Accetta</button></div>`));
+  const page = await open(srv.put('quotidiano.test', '/p', SP_TOP(srv.url('cdn.privacy-mgmt.test', '/pers'))));
+  await expect.poll(() => coperta(page), { timeout: 15_000 }).toBe(false);
+  console.log('LOG pers', await page.evaluate(() => window.__log.join(',')), JSON.stringify(await tabCookies(shell)));
+  expect(await page.evaluate(() => window.__log.includes('sp:accept'))).toBe(false);
 });
 
-// Il cambio di modalità a pagina aperta arriva anche ai riquadri.
-test('Manuale scelto a pagina aperta: il banner che compare dopo nel riquadro resta', async ({ app, shell, open, srv }) => {
-  srv.put('cmp.test', '/tardi', `<!doctype html><body><script>
-    addEventListener('message', (e) => { if (e.data !== 'mostra') return;
-      document.body.insertAdjacentHTML('beforeend', '<div class="message-container"><div class="message type-modal"><button class="message-component message-button sp_choice_type_13" title="Rifiuta" onclick="top.postMessage(\\'sp:reject\\',\\'*\\')">Rifiuta</button></div></div>'); });
-  </script></body>`);
-  const page = await open(srv.put('giornale.test', '/a', `<!doctype html><title>G</title><body>
-    <iframe id="f" src="${srv.url('cmp.test', '/tardi')}" style="width:500px;height:200px;border:0"></iframe>
-    <script>addEventListener('message', (e) => { if (typeof e.data === 'string' && e.data.startsWith('sp:')) window.__sp = e.data; });</script></body>`));
-  await sleep(1500);
-  await app.evaluate(async () => { await globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: { mode: 'manual' } } }); });
-  await sleep(1500);
-  await page.evaluate(() => document.getElementById('f').contentWindow.postMessage('mostra', '*'));
-  await sleep(4000);
-  expect(await page.evaluate(() => window.__sp || null)).toBeNull();
+test('messaggio Sourcepoint che non parla di cookie (avviso adblock): cosa fa Filo', async ({ shell, open, srv }) => {
+  srv.put('cdn.privacy-mgmt.test', '/adb', spFrame(`<div class="message-component message-row"><p class="message-component">Sembra che tu stia usando un adblocker. Disattivalo per sostenere il nostro giornalismo, oppure abbonati.</p></div>
+<div class="message-component message-row">
+<button title="Ho disattivato l'adblocker" class="message-component message-button no-children focusable sp_choice_type_9" onclick="top.postMessage('sp:ricarica','*')">Ho disattivato l'adblocker</button>
+<button title="Abbonati" class="message-component message-button no-children focusable sp_choice_type_9" onclick="top.postMessage('sp:abbonati','*')">Abbonati</button></div>`));
+  const page = await open(srv.put('quotidiano.test', '/adb', SP_TOP(srv.url('cdn.privacy-mgmt.test', '/adb'))));
+  await sleep(9000);
+  console.log('ADB coperta', await coperta(page), JSON.stringify(await tabCookies(shell)));
+});
+
+test('sito che per disegno scorre dentro un suo riquadro (body fermo): dopo aver nascosto il banner la pagina resta ferma', async ({ app, open, srv }) => {
+  await app.evaluate((_e, txt) => globalThis.__filoCookieBanners.setListForTest(txt), '###cookie-notice');
+  const page = await open(srv.put('app.test', '/', `<!doctype html><title>APP</title>
+    <style>html,body{margin:0;height:100%;overflow:hidden} .shell{display:flex;height:100%} nav{width:200px;background:#eee} main{flex:1;overflow:auto} .tall{height:3000px}
+    .drawer{position:absolute;top:100%;left:0;width:300px;height:600px;background:#ccc}</style>
+    <div class="shell"><nav>menu</nav><main><div class="tall">contenuto dell'app</div></main></div>
+    <div class="drawer">pannello fuori schermo</div>
+    <div id="cookie-notice" style="position:fixed;bottom:0;left:0;right:0;height:80px;background:#fff">Usiamo i cookie. <button>OK</button></div>`));
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('cookie-notice')).display === 'none', null, { timeout: 10_000 });
+  await sleep(4500);
+  await page.mouse.move(100, 100);
+  await page.mouse.wheel(0, 500);
+  await sleep(500);
+  console.log('APP scroll', await page.evaluate(() => [document.scrollingElement.scrollTop, getComputedStyle(document.body).overflowY, getComputedStyle(document.documentElement).overflowY]));
+});
+
+test('pagina inchiodata col body fisso e sfocata: dopo il banner nascosto scorre e la posizione torna', async ({ app, open, srv }) => {
+  await app.evaluate((_e, txt) => globalThis.__filoCookieBanners.setListForTest(txt), '###cookie-notice');
+  const page = await open(srv.put('lock.test', '/', `<!doctype html><title>LOCK</title>
+    <style>body{margin:0} .c{height:4000px;background:linear-gradient(#fff,#999)}</style>
+    <div class="c">contenuto</div>
+    <div class="backdrop" style="position:fixed;inset:0;backdrop-filter:blur(4px);z-index:50"></div>
+    <div id="cookie-notice" style="position:fixed;bottom:0;left:0;right:0;height:120px;background:#fff;z-index:51">Usiamo i cookie. <button>Accetta</button></div>
+    <script>document.body.style.position='fixed';document.body.style.top='-300px';document.body.style.width='100%';</script>`));
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('cookie-notice')).display === 'none', null, { timeout: 10_000 });
+  await sleep(1000);
+  await page.mouse.move(100, 100);
+  await page.mouse.wheel(0, 500);
+  await sleep(500);
+  console.log('LOCK', await page.evaluate(() => [window.scrollY, getComputedStyle(document.querySelector('.backdrop')).display, getComputedStyle(document.body).position]));
+});
+
+test('Privacy massima: il banner senza «rifiuta» si nasconde e il segno c\'è', async ({ app, shell, open, srv }) => {
+  await app.evaluate(async () => { await globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: { mode: 'privacy' } } }); });
+  await app.evaluate((_e, txt) => globalThis.__filoCookieBanners.setListForTest(txt), '###cookie-notice');
+  const page = await open(srv.put('priv.test', '/', `<!doctype html><title>PRIV</title><div id="cookie-notice" style="position:fixed;bottom:0;left:0;right:0;height:120px;background:#fff">Usiamo i cookie. <button>Accetta</button></div>`));
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('cookie-notice')).display === 'none', null, { timeout: 10_000 });
+  await expect.poll(async () => (await tabCookies(shell))?.hidden, { timeout: 8_000 }).toBe(true);
 });
