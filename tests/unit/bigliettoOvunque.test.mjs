@@ -64,11 +64,13 @@ const ambiente = (port, casa) => ({
   FILO_NO_BEAT: '1',
 });
 
+const REPORT = 'Report per l’owner: la causa era altrove, il pulsante non veniva mai agganciato alla lista dei modelli.';
+
 test('dispatch: --ticket davanti a un --record-* fa quello che fa messo in coda', async () => {
   const esiti = [];
   for (const argv of [
-    ['--ticket', BIGLIETTO, '--record-fixed', 'fid-900', 'Report: la causa era altrove.'],
-    ['--record-fixed', 'fid-900', 'Report: la causa era altrove.', '--ticket', BIGLIETTO],
+    ['--ticket', BIGLIETTO, '--record-fixed', 'fid-900', REPORT],
+    ['--record-fixed', 'fid-900', REPORT, '--ticket', BIGLIETTO],
   ]) {
     const { srv, ricevuti, port } = await fintoServer();
     const casa = depositoSulRamo();
