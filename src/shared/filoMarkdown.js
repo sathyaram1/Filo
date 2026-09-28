@@ -55,6 +55,27 @@
       + 'rel="noopener noreferrer nofollow">' + text + '</a>';
   }
 
+  const conta = (s, c) => s.split(c).length - 1;
+
+  // Separa da un URL nudo (già escapato) ciò che lo segue nella frase: la
+  // punteggiatura, gli asterischi del grassetto, apostrofi e virgolette di
+  // chiusura, i puntini. Una ) o ] in coda resta solo se chiude una ( o [
+  // dell'URL (wiki/Mercurio_(astronomia)). Regole in tests/unit/filoMarkdown.
+  function separaCoda(m) {
+    let url = m;
+    let trail = '';
+    for (;;) {
+      if (/&amp;$/.test(url)) break;
+      const tm = /(?:&#39;|[.,;:!?*_~…’”»])$/.exec(url);
+      if (tm) { trail = tm[0] + trail; url = url.slice(0, -tm[0].length); continue; }
+      const ultimo = url.slice(-1);
+      const apre = ultimo === ')' ? '(' : ultimo === ']' ? '[' : '';
+      if (apre && conta(url, apre) < conta(url, ultimo)) { trail = ultimo + trail; url = url.slice(0, -1); continue; }
+      return [url, trail];
+    }
+    return [url, trail];
+  }
+
   // Formattazione inline su testo GIA' escapato: codice, link markdown, autolink
   // di URL nudi, grassetto, corsivo. Codice e link vengono "messi da parte" con
   // segnaposto cosi' le trasformazioni successive (autolink, grassetto/corsivo)
