@@ -183,17 +183,8 @@ function cluesOf(norm, ctx, verdict) {
   ].join('|');
 }
 
-const deepBudget = new TtlCache(HOUR);
-function spend(k) {
-  const now = Date.now();
-  const recent = (deepBudget.get(k) || []).filter((t) => now - t < HOUR);
-  if (recent.length >= DEEP_BUDGET) return false;
-  recent.push(now);
-  deepBudget.set(k, recent);
-  // Tetto largo: un dominio dimenticato riparte col conto pieno, e costa qualche chiamata, non un buco.
-  if (deepBudget.m.size > 5000) deepBudget.m.delete(deepBudget.m.keys().next().value);
-  return true;
-}
+const deepBudget = createOwnerBudget();
+const spend = (k) => deepBudget.spend(k);
 
 // Un controllo che non ha dato verdetto (risposta illeggibile, fornitore in errore) non si ripete sullo stesso sito per poco.
 const FAILED_RETRY_MS = 5 * MIN;
