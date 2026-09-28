@@ -112,8 +112,8 @@
       describe: (a) => {
         const url = a.url || a.href || a.link || 'una pagina';
         if (a && a._exfil) {
-          const why = a._exfilReason ? ` (${a._exfilReason})` : '';
-          return `Filo sta per aprire un link che${why}:\n${url}\n\n`
+          const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
+          return `Aprire un link${why}:\n${url}\n\n`
             + 'Potrebbe inviare tuoi dati a un sito esterno. Apri solo se l\'hai chiesto tu.';
         }
         return `Aprire ${url}`;

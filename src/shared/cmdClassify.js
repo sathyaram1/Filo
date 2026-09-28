@@ -794,39 +794,57 @@
   const due = (motivo) => ({ level: 2, motivo });
   const peggiore = (a, b) => (b.level > a.level ? b : a);
 
+  // Variabili che portano percorsi, nomi o valori della shell, non segreti: la
+  // cartella personale, le cartelle di sistema, `$_` delle pipeline PowerShell.
+  const VAR_INNOCUE = new Set([
+    'home', 'userprofile', 'homedrive', 'homepath', 'temp', 'tmp', 'tmpdir', 'appdata', 'localappdata',
+    'public', 'onedrive', 'systemroot', 'windir', 'programfiles', 'programdata', 'username', 'user',
+    'computername', 'hostname', 'pwd', 'oldpwd', 'path', 'shell', 'lang', '_', 'psitem', 'true', 'false', 'null',
+  ]);
+  const DOLLARO_RE = /\$(?:env:)?([A-Za-z_]\w*)/gi;
+  const PERCENTO_RE = /%([A-Za-z_][\w()]*)(?::[^%]*)?%/gi;
+
+  function nomiVariabili(t, { dollaro = true, percento = true } = {}) {
+    const out = [];
+    if (dollaro) for (const m of String(t).matchAll(DOLLARO_RE)) out.push(m[1].toLowerCase());
+    if (percento) for (const m of String(t).matchAll(PERCENTO_RE)) out.push(m[1].toLowerCase());
+    return out;
+  }
+
   // Argomenti come li vede la shell: le virgolette raggruppano (un percorso con
-  // spazi è UNO) e `variabile` segna un'espansione, che fuori da `echo` finisce
-  // comunque stampata nei messaggi d'errore.
+  // spazi è UNO) e `variabile` segna un'espansione che può portare un segreto:
+  // fuori da `echo` finisce comunque stampata nei messaggi d'errore.
   function argomenti(raw) {
     const out = [];
     const s = String(raw);
     let cur = '';
+    let espande = ''; // il testo fuori dagli apici singoli, dove `$` si espande
     let q = '';
     let aperto = false;
-    let variabile = false;
     const chiudi = () => {
-      if (cur || aperto) out.push({ testo: cur, variabile });
-      cur = ''; aperto = false; variabile = false;
+      if (cur || aperto) {
+        // `%NOME%` si espande in cmd anche fra virgolette; `+%H:%M` è il formato di `date`.
+        const nomi = nomiVariabili(espande, { percento: false })
+          .concat(cur.startsWith('+') ? [] : nomiVariabili(cur, { dollaro: false }));
+        out.push({ testo: cur, variabile: nomi.some((n) => !VAR_INNOCUE.has(n)) });
+      }
+      cur = ''; espande = ''; aperto = false;
     };
     for (let i = 0; i < s.length; i++) {
       const ch = s[i];
       if (q) {
         if (ch === q) { q = ''; continue; }
-        if (q === '"' && ch === '$' && /[\w{(]/.test(s[i + 1] || '')) variabile = true;
         cur += ch;
+        if (q === '"') espande += ch;
         continue;
       }
-      if (ch === '"' || ch === '\'') { q = ch; aperto = true; continue; }
+      if (ch === '"' || ch === '\'') { q = ch; aperto = true; espande += ' '; continue; }
       if (ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
       if (/\s/.test(ch)) { chiudi(); continue; }
-      if (ch === '$' && /[\w{(]/.test(s[i + 1] || '')) variabile = true;
       cur += ch;
+      espande += ch;
     }
     chiudi();
-    // `%NOME%` si espande in cmd anche fra virgolette; `+%H:%M` è il formato di `date`.
-    for (const a of out) {
-      if (!a.testo.startsWith('+') && /%[A-Za-z_][\w()]*(:[^%]*)?%/.test(a.testo)) a.variabile = true;
-    }
     return out;
   }
 
@@ -845,9 +863,12 @@
   }
 
   // Dove porta un operando: `{ radice, segs }` assoluto, oppure il motivo per cui non si sa.
-  function dove(p, c) {
-    if (!p) return MOTIVI.ignoto;
-    if (p.includes('$') || /%[A-Za-z_][\w()]*(:[^%]*)?%/.test(p)) return MOTIVI.variabili;
+  function dove(p0, c) {
+    if (!p0) return MOTIVI.ignoto;
+    // La cartella personale scritta con una variabile è la cartella personale.
+    const p = p0.replace(/^(\$env:userprofile|\$env:home|\$home|%userprofile%|%homedrive%%homepath%)(?=$|[\\/])/i, '~');
+    const nomi = nomiVariabili(p);
+    if (nomi.length) return nomi.every((n) => VAR_INNOCUE.has(n)) ? MOTIVI.ignoto : MOTIVI.variabili;
     if (/^[\\/]{2}/.test(p)) return MOTIVI.fuori; // UNC, `\\?\`, `//server`
     if (/^[A-Za-z][A-Za-z0-9]+:/.test(p)) return MOTIVI.sistema; // `env:`, `HKCU:`, `Registry::`
     let r;

@@ -193,7 +193,7 @@
     if (!text) return null;
     const exposed = carrierAlnum(url);
     if (exposed.length < TOKEN_MISTO) return null;
-    const reason = 'contiene dati che Filo ha letto sul tuo computer';
+    const reason = 'contiene dati letti dal tuo computer';
     const visti = new Set();
     for (const w of text.toLowerCase().split(/[^a-z0-9]+/)) {
       if (w.length < TOKEN_MISTO || visti.has(w)) continue;

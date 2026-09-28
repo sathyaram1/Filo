@@ -2890,10 +2890,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         const res = a._argsError
           ? { executed: false, kept: false, rejected: true, error: a._argsError }
           : await executeFiloAction(a, { sender, contesto: azioniViste });
+        // Contiene la home con il nome utente: serve solo al gate, non alla chat.
+        delete a._perimetro;
         const rendered = { ...a };
         delete rendered._argsError;
-        // Contiene la home con il nome utente: serve solo al gate, non alla chat.
-        delete rendered._perimetro;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
         // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
         if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '' };

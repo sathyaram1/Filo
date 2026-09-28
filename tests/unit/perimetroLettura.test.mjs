@@ -28,9 +28,9 @@ const lvl = (cmd, ctx) => C.classify(cmd, ctx);
 
 test('printenv e le variabili d\'ambiente non sono livello 1', () => {
   for (const cmd of [
-    'printenv', 'printenv PATH', 'echo $OPENAI_API_KEY', 'echo "$HOME"', 'echo %USERPROFILE%',
+    'printenv', 'printenv PATH', 'echo $OPENAI_API_KEY', 'echo "$AWS_SECRET_ACCESS_KEY"', 'echo %GITHUB_TOKEN%',
     'Write-Output $env:OPENAI_API_KEY', 'Get-ChildItem env:', 'gci Env:\\', 'Get-Item Env:PATH',
-    'dir env:', 'ls $HOME', 'cat $HOME/nota.txt', 'Set-Location Env: ; Get-ChildItem',
+    'dir env:', 'ls $API_KEY', 'cat $TOKEN/nota.txt', 'cd $SEGRETO', 'Set-Location Env: ; Get-ChildItem',
   ]) {
     for (const ctx of [undefined, LINUX, WIN]) {
       assert.notEqual(lvl(cmd, ctx), 1, `"${cmd}" non deve leggere l'ambiente senza chiedere`);
@@ -42,6 +42,14 @@ test('printenv e le variabili d\'ambiente non sono livello 1', () => {
   assert.equal(lvl("grep '^fine$' note.txt", LINUX), 1);
   assert.equal(lvl("echo '$HOME'", LINUX), 1, 'fra apici singoli `$` non si espande');
   assert.equal(lvl('date +%H:%M', LINUX), 1, 'il formato di date non è una variabile');
+  // La cartella personale scritta con una variabile resta la cartella personale.
+  assert.equal(lvl('cat $HOME/nota.txt', LINUX), 1);
+  assert.equal(lvl('cat "$HOME/.ssh/id_rsa"', LINUX), 2);
+  assert.equal(lvl('Get-ChildItem "$env:USERPROFILE\\Downloads" -Filter *.pdf', WIN), 1);
+  assert.equal(lvl('Get-Content $env:USERPROFILE\\.ssh\\id_rsa', WIN), 2);
+  assert.equal(lvl('type %USERPROFILE%\\Desktop\\nota.txt', WIN), 1);
+  assert.equal(lvl('echo $env:USERNAME', WIN), 1);
+  assert.equal(lvl('Get-ChildItem | Sort-Object { $_.Length }', WIN), 1);
 });
 
 test('ps e l\'elenco dei processi chiedono un OK (righe di comando e ambiente degli altri)', () => {
