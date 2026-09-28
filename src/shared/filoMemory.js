@@ -891,7 +891,7 @@
     LESSONS_BUFFER_TRIGGER_CHARS,
     // moduli
     getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt, forgetModuleLine,
-    setOnMemoryChange, viewForUser,
+    setOnMemoryChange, viewForUser, findLines, forgetLine,
     // onboarding (#524)
     getOnboarding, setOnboarding,
     // timer + sveglie (#322)
