@@ -57,23 +57,27 @@
 
   const conta = (s, c) => s.split(c).length - 1;
 
-  // Separa da un URL nudo (già escapato) ciò che lo segue nella frase: la
-  // punteggiatura, gli asterischi del grassetto, apostrofi e virgolette di
-  // chiusura, i puntini. Una ) o ] in coda resta solo se chiude una ( o [
-  // dell'URL (wiki/Mercurio_(astronomia)). Regole in tests/unit/filoMarkdown.
+  // In coda a un URL nudo si stacca solo ciò che chiude la frase o una
+  // formattazione che questo renderer disegna (gli asterischi): ogni altro
+  // carattere da URL (_ ~ = / # …) resta nel link. Elenco chiuso, sentinella
+  // in tests/unit/filoMarkdown.test.mjs.
+  const STACCATI_IN_CODA = '.,;:!?…’*';
+
+  // Una ) o ] in coda resta solo se chiude una ( o [ dell'URL
+  // (wiki/Mercurio_(astronomia)). Lineare: una coda lunghissima non blocca.
   function separaCoda(m) {
-    let url = m;
-    let trail = '';
-    while (!/&amp;$/.test(url)) {
-      const tm = /(?:&#39;|[.,;:!?*_~…’])$/.exec(url);
-      if (tm) { trail = tm[0] + trail; url = url.slice(0, -tm[0].length); continue; }
-      const ultimo = url.slice(-1);
-      const apre = ultimo === ')' ? '(' : ultimo === ']' ? '[' : '';
-      if (!apre || conta(url, apre) >= conta(url, ultimo)) break;
-      trail = ultimo + trail;
-      url = url.slice(0, -1);
+    const aperte = { ')': conta(m, '('), ']': conta(m, '[') };
+    const chiuse = { ')': conta(m, ')'), ']': conta(m, ']') };
+    let fine = m.length;
+    while (fine > 0 && !m.endsWith('&amp;', fine)) {
+      if (m.endsWith('&#39;', fine)) { fine -= 5; continue; }
+      const c = m[fine - 1];
+      if (STACCATI_IN_CODA.includes(c)) { fine -= 1; continue; }
+      if (!(c in chiuse) || chiuse[c] <= aperte[c]) break;
+      chiuse[c] -= 1;
+      fine -= 1;
     }
-    return [url, trail];
+    return [m.slice(0, fine), m.slice(fine)];
   }
 
   // Formattazione inline su testo GIA' escapato: codice, link markdown, autolink
