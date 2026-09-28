@@ -23,11 +23,16 @@
     app: { nome: 'Aprire altre app', icona: 'lock', verbo: 'aprire un’altra app del computer' },
     file: { nome: 'Modificare file', icona: 'lock', verbo: 'modificare i file che gli apri' },
     cartelle: { nome: 'Leggere cartelle', icona: 'lock', verbo: 'leggere i file di una cartella che scegli' },
-    altro: { nome: 'Altri permessi', icona: 'lock', verbo: 'usare un permesso che Filo non conosce' },
+    caratteri: { nome: 'Caratteri del computer', icona: 'lock', verbo: 'vedere i caratteri installati sul tuo computer' },
+    // Un sì vale per quella richiesta sola: sotto lo stesso nome starebbero cose diverse.
+    altro: { nome: 'Altri permessi', icona: 'lock', verbo: 'usare un permesso che Filo non conosce', ricorda: false },
   };
 
   // Concessi senza chiedere: nessuno legge o manda fuori qualcosa dell'utente.
-  const INNOCUI = new Set(['clipboard-sanitized-write', 'fullscreen', 'pointerLock', 'keyboardLock', 'mediaKeySystem']);
+  const INNOCUI = new Set(['clipboard-sanitized-write', 'fullscreen', 'pointerLock', 'keyboardLock', 'mediaKeySystem', 'screen-wake-lock']);
+
+  // Dispositivi che Filo non consegna ai siti: né domanda né scelta, la porta è chiusa.
+  const CHIUSI = new Set(['hid', 'serial', 'usb', 'bluetooth', 'bluetoothScanning']);
 
   // Gli stessi che Filo consegna al sistema da sé per i link (tabs.js, OS_DELEGATED_SCHEMES).
   const SCHEMI_ESTERNI_INNOCUI = new Set(['mailto:', 'tel:', 'sms:']);
@@ -46,6 +51,7 @@
     'storage-access': 'cookie',
     'top-level-storage-access': 'cookie',
     openExternal: 'app',
+    'local-fonts': 'caratteri',
   };
 
   function eTipo(t) { return Object.prototype.hasOwnProperty.call(TIPI, t); }
@@ -73,6 +79,7 @@
   function tipiRichiesta(permesso, dettagli) {
     const d = dettagli || {};
     if (INNOCUI.has(permesso)) return { innocuo: true, tipi: [] };
+    if (CHIUSI.has(permesso)) return { innocuo: false, chiuso: true, tipi: [] };
     if (permesso === 'media') {
       const m = Array.isArray(d.mediaTypes) ? d.mediaTypes : [];
       const tipi = [];
@@ -89,13 +96,14 @@
       return d.isDirectory ? { innocuo: false, tipi: ['cartelle'] } : { innocuo: true, tipi: [] };
     }
     if (Object.prototype.hasOwnProperty.call(SEMPLICI, permesso)) return { innocuo: false, tipi: [SEMPLICI[permesso]] };
-    return { innocuo: false, tipi: ['altro'] };
+    return { innocuo: false, tipi: ['altro'], grezzo: String(permesso || '').slice(0, 60) };
   }
 
   // Il controllo silenzioso (Notification.permission, permissions.query): vero solo con un sì già dato.
   function consentitoAlControllo(permesso, dettagli, scelte) {
     const d = dettagli || {};
     if (INNOCUI.has(permesso)) return true;
+    if (CHIUSI.has(permesso)) return false;
     const si = (t) => !!scelte && scelte[t] === 'consenti';
     if (permesso === 'media') {
       if (d.mediaType === 'video') return si('camera');
@@ -119,17 +127,30 @@
     return mancanti.length ? { esito: 'chiedi', tipi: mancanti } : { esito: 'consenti' };
   }
 
-  function verbi(tipi) {
+  // `grezzo`: il nome che Chromium dà a un permesso che Filo non conosce, perché chi risponde sappia a cosa.
+  function verbi(tipi, grezzo) {
     const t = (tipi || []).filter(eTipo);
     if (t.length === 2 && t.includes('camera') && t.includes('microfono')) return 'usare la fotocamera e il microfono';
-    const v = t.map((x) => TIPI[x].verbo);
+    const v = t.map((x) => (x === 'altro' && grezzo ? `${TIPI.altro.verbo} («${grezzo}»)` : TIPI[x].verbo));
     if (v.length <= 1) return v[0] || TIPI.altro.verbo;
     return `${v.slice(0, -1).join(', ')} e ${v[v.length - 1]}`;
   }
 
-  function domanda(origine, tipi) {
-    return `${hostDi(origine)} vuole ${verbi(tipi)}`;
+  function domanda(origine, tipi, grezzo) {
+    return `${hostDi(origine)} vuole ${verbi(tipi, grezzo)}`;
   }
+
+  // I nomi che il sistema dà agli schermi arrivano in inglese («Entire screen»): Filo li chiama da sé.
+  function nomeSchermo(indice, quanti) {
+    return quanti > 1 ? `Schermo ${indice + 1}` : 'Schermo intero';
+  }
+
+  // Il nome che un sito usa in permissions.query → il tipo di Filo. Serve a dire «da chiedere» quando nessuno ha scelto.
+  const NOMI_DI_PAGINA = {
+    camera: 'camera', microphone: 'microfono', geolocation: 'posizione', notifications: 'notifiche',
+    'clipboard-read': 'appunti', 'local-fonts': 'caratteri', midi: 'midi', 'window-management': 'schermi',
+    'idle-detection': 'presenza', 'storage-access': 'cookie', 'speaker-selection': 'casse',
+  };
 
   function statoLeggibile(tipo, scelta) {
     const nome = eTipo(tipo) ? TIPI[tipo].nome : tipo;
@@ -156,8 +177,8 @@
   }
 
   const api = {
-    TIPI, INNOCUI, eTipo, ricordabile, eFilo, origineDi, hostDi,
-    tipiRichiesta, consentitoAlControllo, decidi, verbi, domanda, statoLeggibile, normalizza,
+    TIPI, INNOCUI, CHIUSI, NOMI_DI_PAGINA, eTipo, ricordabile, eFilo, origineDi, hostDi,
+    tipiRichiesta, consentitoAlControllo, decidi, verbi, domanda, nomeSchermo, statoLeggibile, normalizza,
   };
   global.SN_PERMESSI_SITI = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

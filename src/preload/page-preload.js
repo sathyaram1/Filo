@@ -14,6 +14,7 @@
 // in Chrome con i content script.
 
 const { ipcRenderer, webFrame } = require('electron');
+try { webFrame.executeJavaScript('window.__segno = String(location.href || "x");'); } catch (_) {} // ESPLORA
 const path = require('node:path');
 
 // ─── #405 — riquadri incorporati (iframe) ───────────────────────────────────
