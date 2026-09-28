@@ -792,6 +792,15 @@ test('i file-ruolo del repo esistono e non sono stub (orchestrator compreso)', (
   }
 });
 
+test('secaudit: sul fail la ricetta non chiede una consegna di design, che il server fa già alla registrazione', () => {
+  // Il server porta in `design` ricevendo il fail, e design→design gli è vietato:
+  // un'azione di chiusura in più manda a cercarsi lo strumento per un rifiuto.
+  const t = readFileSync(fileURLToPath(new URL('../../routines/roles/secaudit.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
+  const fail = t.match(/Su \*\*fail\*\*[^]*?rilascio del biglietto/);
+  assert.ok(fail, 'la ricetta deve dire cosa fare sul fail, fino al rilascio');
+  assert.ok(!/accoda|deliver status/.test(fail[0]), `sul fail niente consegne a mano: «${fail[0]}»`);
+});
+
 // ─── Il biglietto perso non deve più poter succedere (incidente #444) ─────────
 //
 // Il 25 agosto un `--help` battuto a metà lavoro è finito nella porta "giro
