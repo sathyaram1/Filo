@@ -120,13 +120,15 @@ for (const [piattaforma, job, nomeFile] of [['Mac', 'release-mac', 'Filo-Mac.dmg
       : ['Filo-Mac.dmg', 'Filo-Mac.zip', 'latest-mac.yml'];
     const asset = (nomi) => nomi.map((name) => ({ name }));
     const oreFa = (h) => new Date(Date.now() - h * 3.6e6).toISOString();
-    // v0.2.301 senza la piattaforma, v0.2.302 con, v0.2.303 di nuovo senza (la più nuova per prima).
+    // v0.2.300 con la piattaforma, v0.2.301 senza, v0.2.302 con, v0.2.303 di nuovo senza (la più nuova per prima).
     const finto = join(dir, 'github.json');
-    writeFileSync(finto, JSON.stringify([
+    const tutte = [
       { tag_name: 'v0.2.303', draft: false, published_at: oreFa(2), assets: asset([...windows, ...altra]) },
       { tag_name: 'v0.2.302', draft: false, published_at: oreFa(30), assets: asset([...windows, ...altra, ...attesi]) },
       { tag_name: 'v0.2.301', draft: false, published_at: oreFa(60), assets: asset([...windows, ...altra]) },
-    ]));
+      { tag_name: 'v0.2.300', draft: false, published_at: oreFa(90), assets: asset([...windows, ...altra, ...attesi]) },
+    ];
+    const finoA = (tag) => writeFileSync(finto, JSON.stringify(tutte.slice(tutte.findIndex((r) => r.tag_name === tag))));
 
     const { server, stato } = serverAllarmi();
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
