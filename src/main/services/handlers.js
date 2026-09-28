@@ -3928,7 +3928,8 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
   for (const it of items) {
     const usable = Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model;
     if (usable) { scored.push({ score: cosineInt(qv, it.embedding), it }); continue; }
-    if ((it.title || it.summary || it.snippet) && !isHomeNetworkUrl(it.url) && stale.length < SN_CONST.ARCHIVED_EMBED_LIMIT) stale.push(it);
+    const casa = it.casa || isHomeNetworkUrl(it.url);
+    if ((it.title || it.summary || it.snippet) && !casa && stale.length < SN_CONST.ARCHIVED_EMBED_LIMIT) stale.push(it);
   }
   if (stale.length) reindexArchivedEmbeddings(settings, stale).catch(() => {});
   scored.sort((a, b) => b.score - a.score);
