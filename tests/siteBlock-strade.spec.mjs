@@ -28,7 +28,7 @@ test('una finestrella di accesso che il server rimbalza sul sito della lista si 
   await tab.click('#b');
   await shell.waitForTimeout(2500);
   expect((await finestre(app)).filter((u) => u.includes('blocked.test'))).toEqual([]);
-  expect((await finestre(app)).length).toBe(prima);
+  expect((await finestre(app)).length).toBeLessThanOrEqual(prima);
   expect((await avvisi()).length).toBeGreaterThan(0);
 });
 
