@@ -247,6 +247,11 @@
       properties: {},
       required: [],
     },
+    DIMENTICA: {
+      description: 'Fa dimenticare a Filo UNA cosa che ha imparato sull\'utente ("dimentica che non bevo caffè", "togli dalla memoria che vivo a Lisbona"): toglie le righe della memoria (profilo, preferenze, lezioni) che corrispondono a `testo`. Il sistema mostra all\'utente le righe esatte e le toglie solo col suo OK: non chiederlo tu a parole. Se non ne trova nessuna te lo dice. Per cancellare TUTTO c\'è CANCELLA_MEMORIA.',
+      properties: { testo: S('La riga da dimenticare, copiata dalla memoria che vedi nel contesto (basta un pezzo che la identifichi).') },
+      required: ['testo'],
+    },
     IMPOSTA_PREFERENZA: {
       description: ({ sistema }) =>
         'Modifica un\'impostazione dell\'app. Una sola chiave per chiamata (chiama più volte per più impostazioni). Le impostazioni segnate [conferma] sono di livello 2: il sistema chiede conferma all\'utente da sé, tu non chiederla a parole. Chiavi valide e valori ammessi:\n'
