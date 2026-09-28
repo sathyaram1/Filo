@@ -1047,10 +1047,15 @@
       const a = testi[i];
       const low = a.toLowerCase();
       if (!low.startsWith('-') || low.length < 2) { pos.push(a); continue; }
-      const nome = low.slice(1);
-      if (nome === 'path' || (nome.length >= 2 && 'literalpath'.startsWith(nome))) { file.push(testi[i + 1] || ''); i += 1; continue; }
-      if (nome.length >= 4 && 'pattern'.startsWith(nome)) { modello = true; i += 1; continue; }
-      if (/^(context|encoding|include|exclude|culture)$/.test(nome)) { i += 1; continue; }
+      // `-Path:valore` (due punti) o `-Path valore` (token dopo): stesso legame.
+      let nome = low.slice(1);
+      let inline = null;
+      const dp = nome.indexOf(':');
+      if (dp >= 0) { inline = a.slice(1 + dp + 1); nome = nome.slice(0, dp); }
+      const prossimo = () => { if (inline != null) return inline; i += 1; return testi[i] || ''; };
+      if (nome === 'path' || (nome.length >= 2 && 'literalpath'.startsWith(nome))) { file.push(prossimo()); continue; }
+      if (nome.length >= 4 && 'pattern'.startsWith(nome)) { modello = true; prossimo(); continue; }
+      if (/^(context|encoding|include|exclude|culture)$/.test(nome)) { prossimo(); continue; }
     }
     if (!modello) pos.shift();
     return { file: file.concat(pos), ricorsivo: false, ignoto: false };
