@@ -224,6 +224,8 @@ async function clickUntil(app, { open, needle, labelRe, until, timeout = 25_000 
 // La pagina ricorda la risposta in un cookie di consenso, come fanno i CMP veri: il banner torna solo se Filo lo dimentica.
 const RICORDA = `<title>RICORDA</title>
   <div id="onetrust-banner-sdk" style="position:fixed;bottom:0;left:0;right:0;height:120px;background:#222;color:#fff">
+    <button id="onetrust-accept-btn-handler" style="width:140px;height:40px"
+      onclick="document.cookie='OptanonConsent=accettato; path=/; max-age=86400';document.getElementById('onetrust-banner-sdk').remove()">Accetta tutto</button>
     <button id="onetrust-reject-all-handler" style="width:140px;height:40px"
       onclick="document.cookie='OptanonConsent=rifiutato; path=/; max-age=86400';document.getElementById('onetrust-banner-sdk').remove()">Rifiuta tutto</button>
   </div>
@@ -251,9 +253,11 @@ test('menu della scheda: «Cookie non necessari rifiutati», e «Mostra il banne
   expect(await page.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(true);
   expect(await page.evaluate(() => document.cookie)).toContain('sessione=utente');
 
-  // L'elenco dei siti coi banner si vede (e si toglie) in Sicurezza.
   const sites = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.cookies.bannerSites);
   expect(sites).toEqual(['127.0.0.1']);
+  // L'utente, col banner davanti, accetta. Tornando all'automatico Filo deve rifiutare lo stesso.
+  await page.click('#onetrust-accept-btn-handler');
+  expect(await page.evaluate(() => document.cookie)).toContain('OptanonConsent=accettato');
 
   const menu2 = await openAndRead(app, () => rightClickTab(shell), 'Rifiuta i cookie in automatico qui');
   expect(menu2).not.toContain('Cookie non necessari rifiutati');
@@ -262,7 +266,9 @@ test('menu della scheda: «Cookie non necessari rifiutati», e «Mostra il banne
     needle: 'Rifiuta i cookie in automatico qui', labelRe: 'Rifiuta i cookie in automatico qui',
     until: async () => (await tabCookies(shell))?.shown === false,
   });
-  await expect.poll(() => page.evaluate(() => !document.getElementById('onetrust-banner-sdk')).catch(() => false), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => page.evaluate(() => document.cookie).catch(() => ''), { timeout: 10_000 }).toContain('OptanonConsent=rifiutato');
+  expect(await page.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(false);
+  expect(await page.evaluate(() => document.cookie)).toContain('sessione=utente');
   await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
 });
 
