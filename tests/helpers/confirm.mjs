@@ -45,6 +45,21 @@ export async function mouseClickConfirm(page, which = 'ok') {
   await page.mouse.click(p.x, p.y);
 }
 
+// Centro del bottone nell'istante in cui il dialogo compare: è il clic che
+// l'utente aveva già in corso per altro (#592). null se non compare entro 15 s.
+export function pointWhenConfirmAppears(page, which = 'ok') {
+  return page.evaluate((w) => new Promise((resolve) => {
+    const t0 = performance.now();
+    const giro = () => {
+      const p = window.SN_CONFIRM_UI && window.SN_CONFIRM_UI._test.point(w);
+      if (p) return resolve(p);
+      if (performance.now() - t0 > 15_000) return resolve(null);
+      requestAnimationFrame(giro);
+    };
+    giro();
+  }), which);
+}
+
 // Scrive nel campo di testo del dialogo livello 3 (digita-la-parola).
 export async function fillConfirmInput(page, value) {
   const filled = await page.evaluate((v) => window.SN_CONFIRM_UI._test.fill(v), value);

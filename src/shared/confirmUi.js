@@ -298,7 +298,7 @@
   // Livello 2 — popup di conferma con spiegazione + OK/Annulla.
   function confirm({ title = 'Conferma', text = '', okLabel = 'OK', cancelLabel = 'Annulla' } = {}) {
     return new Promise((resolve) => {
-      const { box, done } = buildOverlay(resolve);
+      const { box, done, troppoPresto } = buildOverlay(resolve);
       header(box, { title, text });
       const row = buttonRow(box);
       const cancel = makeBtn(row, cancelLabel, 'sn-confirm-btn-cancel');
@@ -306,10 +306,13 @@
       const aggiorna = () => inAttesa(ok, !visto());
       const { visto, avanti } = tuttoVisto(box, aggiorna);
       cancel.addEventListener('click', () => done(false));
-      ok.addEventListener('click', () => { if (visto()) done(true); else avanti(); });
+      ok.addEventListener('click', (e) => {
+        if (!visto()) avanti();
+        else if (!troppoPresto(e)) done(true);
+      });
       aggiorna();
-      // Il popup si apre anche da solo, mentre l'utente scrive altrove: col
-      // fuoco su OK il primo spazio o invio lo confermerebbe senza leggerlo (#592).
+      // Mai il fuoco su OK, nemmeno se nessuno scriveva: il popup si apre anche
+      // da solo, e il primo spazio o invio lo confermerebbe senza leggerlo (#592).
       box.tabIndex = -1;
       box.focus();
     });
@@ -320,7 +323,7 @@
   function confirmTyped({ title = 'Conferma richiesta', text = '', word = 'conferma', okLabel = 'Esegui', cancelLabel = 'Annulla' } = {}) {
     return new Promise((resolve) => {
       const doc = global.document;
-      const { box, done } = buildOverlay(resolve);
+      const { box, done, troppoPresto, fuoco } = buildOverlay(resolve);
       header(box, { title, text: `${text}\n\nQuesta azione non è reversibile. Scrivi “${word}” per procedere.` });
 
       const input = doc.createElement('input');
@@ -342,18 +345,18 @@
         inAttesa(ok, parola() && !visto());
       };
       const { visto, avanti } = tuttoVisto(box, aggiorna);
-      const premi = () => {
+      const premi = (e) => {
         if (!parola()) return;
-        if (visto()) done(true);
-        else avanti();
+        if (!visto()) avanti();
+        else if (!troppoPresto(e)) done(true);
       };
       input.addEventListener('input', aggiorna);
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); premi(); }
+        if (e.key === 'Enter') { e.preventDefault(); premi(e); }
       });
       cancel.addEventListener('click', () => done(false));
       ok.addEventListener('click', premi);
-      input.focus();
+      fuoco(input);
     });
   }
 
@@ -361,12 +364,12 @@
   // (es. "Hai ricevuto N crediti in regalo 🎁"). Risolve quando l'utente chiude.
   function notify({ title = '', text = '', okLabel = 'OK' } = {}) {
     return new Promise((resolve) => {
-      const { box, done } = buildOverlay(resolve);
+      const { box, done, troppoPresto, fuoco } = buildOverlay(resolve);
       header(box, { title, text });
       const row = buttonRow(box);
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-ok');
-      ok.addEventListener('click', () => done(true));
-      ok.focus();
+      ok.addEventListener('click', (e) => { if (!troppoPresto(e)) done(true); });
+      fuoco(ok);
     });
   }
 
