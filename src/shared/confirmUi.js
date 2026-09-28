@@ -44,6 +44,7 @@
   border-radius: var(--sn-radius, 6px);
   box-shadow: var(--sn-shadow, 0 4px 16px rgba(0,0,0,0.18));
 }
+.sn-confirm-box:focus { outline: none; }
 .sn-confirm-title {
   margin: 0 0 8px;
   font-size: 14px;
