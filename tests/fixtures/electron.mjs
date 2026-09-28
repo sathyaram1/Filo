@@ -50,7 +50,10 @@ export async function chiudiApp(app, { tetto = 5000 } = {}) {
 }
 
 export const test = base.extend({
-  app: async ({}, use) => {
+  // Interruttori di Chromium in più per uno spec che ne ha bisogno (es. la fotocamera finta):
+  // `test.use({ argomentiApp: ['--use-fake-device-for-media-stream'] })`.
+  argomentiApp: [[], { option: true }],
+  app: async ({ argomentiApp }, use) => {
     // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
     // anche FILO_DOWNLOAD_DIR, che gli spec degli scaricamenti confrontano con
     // il percorso che l'app riporta.
@@ -71,6 +74,7 @@ export const test = base.extend({
       args: [
         ...argomentiScala,
         '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9',
+        ...argomentiApp,
         '.',
       ],
       cwd: APP_ROOT,
