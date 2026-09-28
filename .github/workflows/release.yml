@@ -305,10 +305,10 @@ jobs:
             DOPO=$(git rev-list --count --invert-grep --grep='^release: v[0-9]' "${PROVATO}..${MAIN_ORA}" 2>/dev/null || echo "?")
             if [ "$DOPO" != "0" ]; then
               {
-                echo "## main si e' mosso durante la suite: si pubblica comunque il commit provato"
+                echo "## main si e' mosso dopo il commit verde: si pubblica comunque il commit provato"
                 echo ""
                 echo "La suite ha provato \`${PROVATO}\`, pubblicato come ${ATTESA}; main ora e' a \`${MAIN_ORA}\`."
-                echo "Commit entrati dopo, non in questa versione: ${DOPO}. Escono alla prossima corsa, dopo essere passati dalla suite."
+                echo "Commit entrati dopo, non in questa versione: ${DOPO}. Escono a una corsa successiva, quando la loro suite e' verde."
               } >> "$GITHUB_STEP_SUMMARY"
             fi
           fi
