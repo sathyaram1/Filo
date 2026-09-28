@@ -252,7 +252,16 @@
       el.addEventListener('scroll', onCambio, { passive: true });
       if (typeof global.ResizeObserver === 'function') new global.ResizeObserver(onCambio).observe(el);
     }
-    return visto_;
+    // Il clic su OK prima della fine porta avanti il testo di una pagina: un
+    // bottone che non risponde sembra rotto, e il perché stava solo nel title.
+    const avanti = () => el.scrollBy({ top: Math.max(el.clientHeight - 24, 24), behavior: 'smooth' });
+    return { visto: visto_, avanti };
+  }
+
+  function inAttesa(btn, attesa) {
+    if (attesa) btn.setAttribute('aria-disabled', 'true');
+    else btn.removeAttribute('aria-disabled');
+    btn.title = attesa ? 'Scorri fino in fondo per confermare' : '';
   }
 
   function buttonRow(box) {
