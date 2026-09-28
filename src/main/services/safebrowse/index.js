@@ -280,7 +280,7 @@ function analyze(url, ctx = {}, onUpdate) {
   }
   // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist).
   const worthDeepening = first.level === 'sospetto' || first.needsLlm;
-  const bKey = budgetKey(norm, url);
+  const bKey = budgetKey(norm, url, ctx);
   const siteKey = key + '|' + cluesOf(norm, ctx, first);
   const deep = (t) => { if (t) tasks.push(t); };
   if (worthDeepening && providers.llm && need.llm === undefined) {
