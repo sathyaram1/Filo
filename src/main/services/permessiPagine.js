@@ -14,10 +14,12 @@ const TIPI = {
   geolocation: 'posizione',
   notifications: 'notifiche',
 };
-// Fuori da TIPI una pagina ha solo questi, senza domanda; il resto è no (le altre applicazioni hanno la loro regola).
+// Fuori da TIPI passa senza domanda quello che Chrome concede di fabbrica; il resto, che Chrome chiederebbe e Filo non sa
+// ancora chiedere, è no (le altre applicazioni hanno la loro regola). Sentinella: tests/unit/permessiPagine.test.mjs.
 const INNOCUI = new Set([
   'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'keyboardLock', 'mediaKeySystem',
   'speaker-selection', 'storage-access', 'top-level-storage-access', 'fileSystem', 'midi',
+  'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler',
 ]);
 // La lettura sincrona degli appunti non sa chiedere: passa solo con un sì già dato.
 const SOLO_CONTROLLO = new Set(['deprecated-sync-clipboard-read']);
