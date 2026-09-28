@@ -191,12 +191,41 @@ async function signIn() {
   if (net && typeof net.isOnline === 'function' && !net.isOnline()) {
     throw erroreAccesso('rete', 'nessuna connessione');
   }
-  // Un secondo «Accedi» vuol dire che il primo browser è perso: quel flusso si chiude.
-  if (flussoInCorso) flussoInCorso.abort(erroreAccesso('sostituito', 'accesso sostituito da uno nuovo'));
+  // Un accesso alla volta: chi lo chiede mentre uno aspetta il browser (doppio
+  // clic, «Riapri il browser», il menu account) riapre la STESSA pagina e ne
+  // condivide l'esito, così qualunque scheda del browser completi arriva a Filo.
+  if (flussoInCorso) {
+    const f = flussoInCorso;
+    if (f.aspettaBrowser) {
+      f.rinnovaAttesa();
+      await apriBrowser(shell, f.url);
+    }
+    return f.esito;
+  }
+  const f = await nuovoFlusso();
+  flussoInCorso = f;
+  f.esito.then(() => {}, () => {}).then(() => { if (flussoInCorso === f) flussoInCorso = null; });
+  try {
+    await apriBrowser(shell, f.url);
+  } catch (e) {
+    f.loop.abort(e);
+    throw e;
+  }
+  return f.esito;
+}
+
+async function apriBrowser(shell, url) {
+  try {
+    await shell.openExternal(url);
+  } catch (e) {
+    throw erroreAccesso('browser', 'browser non aperto: ' + (e?.message || e));
+  }
+}
+
+async function nuovoFlusso() {
   const { verifier, challenge, method, state } = pkce.createPkce();
   const loop = await startLoopback(state);
   const { redirectUri } = loop;
-  flussoInCorso = loop;
 
   const authUrl = new URL(cfg.authEndpoint);
   authUrl.search = new URLSearchParams({
