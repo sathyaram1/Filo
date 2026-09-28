@@ -66,15 +66,60 @@ describe('il commit più nuovo di main con la suite verde', () => {
 
 describe('la pubblicazione ferma', () => {
   test(`ferma: più di ${SOGLIA_ORE} ore, codice nuovo dopo l'ultima versione, niente di verde dopo di lei`, () => {
-    assert.equal(rilascioFermo({ oreDallUltima: 49, commitDopoTag: 3, verdeDopoTag: false }), true);
+    assert.equal(rilascioFermo({ oreDallUltima: 49, commitDopoTag: 3, verdeDopoTag: false }), 'senza-verde');
   });
 
-  test('non ferma: entro la soglia, senza codice nuovo, o con un verde da pubblicare', () => {
-    assert.equal(rilascioFermo({ oreDallUltima: 47, commitDopoTag: 3, verdeDopoTag: false }), false);
-    assert.equal(rilascioFermo({ oreDallUltima: 400, commitDopoTag: 0, verdeDopoTag: false }), false, 'niente da pubblicare non è un guasto');
-    assert.equal(rilascioFermo({ oreDallUltima: 400, commitDopoTag: 3, verdeDopoTag: true }), false, 'c\'è un verde: la pubblicazione parte');
-    assert.equal(rilascioFermo({ oreDallUltima: NaN, commitDopoTag: 3, verdeDopoTag: false }), false, 'età sconosciuta: non si inventa');
-    assert.equal(rilascioFermo(), false);
+  test(`ferma anche con un verde, se da più di ${SOGLIA_VERDE_ORE} ore non esce: il guasto sta dopo la scelta`, () => {
+    // Il caso che ha fermato i rilasci per tre settimane: cancello unit rosso su Windows, allarme assorbito.
+    assert.equal(rilascioFermo({ oreDallUltima: 100, commitDopoTag: 3, verdeDopoTag: true, oreDalVerde: 68 }), 'dopo-il-verde');
+    assert.equal(rilascioFermo({ oreDallUltima: 400, commitDopoTag: 3, verdeDopoTag: true, oreDalVerde: 13 }), 'dopo-il-verde');
+  });
+
+  test('non ferma: entro la soglia, senza codice nuovo, o con un verde appena arrivato da pubblicare', () => {
+    assert.equal(rilascioFermo({ oreDallUltima: 47, commitDopoTag: 3, verdeDopoTag: false }), '');
+    assert.equal(rilascioFermo({ oreDallUltima: 47, commitDopoTag: 3, verdeDopoTag: true, oreDalVerde: 40 }), '', 'entro le 48 ore niente');
+    assert.equal(rilascioFermo({ oreDallUltima: 400, commitDopoTag: 0, verdeDopoTag: false }), '', 'niente da pubblicare non è un guasto');
+    assert.equal(rilascioFermo({ oreDallUltima: 400, commitDopoTag: 3, verdeDopoTag: true, oreDalVerde: 2 }), '',
+      'un verde di due ore fa: questo giro lo pubblica');
+    assert.equal(rilascioFermo({ oreDallUltima: 400, commitDopoTag: 3, verdeDopoTag: true }), '', 'da quando è verde non si sa: non si inventa');
+    assert.equal(rilascioFermo({ oreDallUltima: NaN, commitDopoTag: 3, verdeDopoTag: false }), '', 'età sconosciuta: non si inventa');
+    assert.equal(rilascioFermo(), '');
+  });
+
+  test('da quando c\'è un verde da pubblicare: il primo diventato verde dopo l\'ultima versione, non il più nuovo', () => {
+    // main: c5 c4 c3 c2 c1, l'ultima versione è su c2. Ogni fusione porta un verde nuovo: conta il primo.
+    const antenato = (a, b) => MAIN.indexOf(a) >= MAIN.indexOf(b);
+    const adesso = Date.parse('2026-09-28T12:00:00Z');
+    const corse = [
+      corsa('c5', 'success', { updated_at: '2026-09-28T11:00:00Z' }),
+      corsa('c4', 'failure', { updated_at: '2026-09-27T12:00:00Z' }),
+      corsa('c3', 'success', { updated_at: '2026-09-26T12:00:00Z' }),
+      corsa('c2', 'success', { updated_at: '2026-09-20T12:00:00Z' }),
+      corsa('ramo', 'success', { updated_at: '2026-09-01T12:00:00Z' }),
+    ];
+    assert.equal(oreDalPrimoVerde(corse, MAIN, 'c2', antenato, adesso), 48, 'c3, verde da due giorni; c2 è la versione stessa');
+    assert.equal(oreDalPrimoVerde(corse, MAIN, 'c3', antenato, adesso), 1);
+    assert.ok(Number.isNaN(oreDalPrimoVerde(corse, MAIN, 'c5', antenato, adesso)), 'niente di verde dopo la versione');
+    assert.ok(Number.isNaN(oreDalPrimoVerde([], MAIN, 'c2', antenato, adesso)));
+    assert.equal(oreDalPrimoVerde([corsa('c3', 'success', { updated_at: undefined })], MAIN, 'c2', antenato, adesso),
+      (adesso - Date.parse('2026-09-28T10:00:00Z')) / 3.6e6, 'senza updated_at vale created_at');
+  });
+
+  test('il feedback del verde che non esce dice da quanto, quale verde, e le ultime corse della pubblicazione', () => {
+    assert.equal(CHIAVE_FERMO_DOPO_VERDE, 'rilascio:fermo-dopo-il-verde');
+    assert.notEqual(CHIAVE_FERMO_DOPO_VERDE, CHIAVE_FERMO, 'due guasti diversi, due chiavi: uno non assorbe l\'altro');
+    const { titolo, testo } = testoFermoDopoIlVerde({
+      tag: 'v0.2.228', oreDallUltima: 100, commitDopoTag: 7, verde: 'abc1234', corsaVerde: corsa('abc1234'), oreDalVerde: 68,
+      pubblicazioni: [corsa('fffffffff1', 'failure')], esecuzione: 'https://github.com/o/r/actions/runs/7',
+    });
+    assert.match(titolo, /4 giorni/);
+    assert.match(titolo, /verde/);
+    assert.match(testo, /v0\.2\.228/);
+    assert.match(testo, /68 ore/);
+    assert.match(testo, /abc1234 \(https:\/\/github\.com\/o\/r\/actions\/runs\/abc1234\)/);
+    assert.match(testo, /failure · fffffffff · /);
+    assert.match(testo, /actions\/runs\/7/);
+    assert.match(testoFermoDopoIlVerde({ tag: 'v1', oreDallUltima: 60, verde: 'x' }).testo, /\(nessuna letta\)/);
   });
 
   test('il feedback dice da quanto, l\'ultimo verde e le ultime corse coi loro link; la chiave è una sola', () => {
