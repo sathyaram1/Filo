@@ -9,7 +9,7 @@ async function serverGpc() {
   const richieste = [];
   const server = createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
-    richieste.push({ host: req.headers.host, path: u.pathname, gpc: req.headers['sec-gpc'] ?? null });
+    richieste.push({ host: req.headers.host, path: u.pathname + u.search, gpc: req.headers['sec-gpc'] ?? null, h: JSON.stringify(req.headers) });
     const tag = u.searchParams.get('t') || '';
     const scrivi = `<script>(function(){var v=String(navigator.globalPrivacyControl);document.documentElement.dataset.gpc=v;
       try{parent!==window&&parent.postMessage({gpc:v,o:location.origin,t:${JSON.stringify(tag)}},'*')}catch(e){}})();</script>`;
@@ -154,6 +154,8 @@ test('scheda normale, incognito e proxata: GPC in head, negli iframe e nell\'hea
     await new Promise((r) => setTimeout(r, 2500));
     esiti.tracker = await app.evaluate(() => globalThis.__trk);
     esiti.header = srv.richieste.map((r) => `${r.host.startsWith('localhost') ? 'L' : 'I'} ${r.path} ${r.gpc}`);
+    console.log('ESITI', JSON.stringify(esiti));
+    for (const r of srv.richieste) if (!r.gpc) console.log('NULLREQ', r.path, r.h);
     esiti.viaProxy = socks.connections.map((c) => `${c.host}:${c.port}`);
     console.log(JSON.stringify(esiti, null, 1));
   } finally {
