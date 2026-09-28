@@ -2469,6 +2469,22 @@
     [ACTIONS.FILO_CHAT]: SEZIONE_ESTERNO_CHAT,
   };
 
+  // Le domande dopo di «Spiega» rimandano i messaggi già composti: la busta del
+  // giro prima si toglie, o lo stile arriva al modello una volta per giro (#592).
+  function senzaStile(content) {
+    const E = esterno();
+    const { inizio, fine } = E.marcature('STILE_UTENTE');
+    const a = content.indexOf(`${E.TIPI.STILE_UTENTE.intestazione}\n${inizio}\n`);
+    if (a < 0) return content;
+    const b = content.indexOf(`\n${fine}`, a);
+    if (b < 0) return content;
+    let prima = content.slice(0, a);
+    let dopo = content.slice(b + fine.length + 1);
+    if (prima.endsWith('\n\n')) prima = prima.slice(0, -2);
+    else if (dopo.startsWith('\n\n')) dopo = dopo.slice(2);
+    return prima + dopo;
+  }
+
   // Lo stile entra imbustato (l'ha salvato l'utente, ma può averglielo proposto
   // un modello che leggeva una pagina) e PRIMA delle regole anti-inganno: dopo,
   // avrebbe l'ultima parola su di esse (#592). Quelle regole chiudono la parte
