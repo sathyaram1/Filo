@@ -218,7 +218,7 @@ async function main() {
     mancanti: process.env.MANCANTI,
     esiti,
   });
-  await inviaAllarme(titolo, testo);
+  await inviaAllarme(titolo, testo, chiaviAllarme(process.env.PIATTAFORMA));
 }
 
 // Il workflow lancia una COPIA di questo file, fuori dalla copia di lavoro: se
