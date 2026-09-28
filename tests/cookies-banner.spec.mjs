@@ -114,6 +114,15 @@ test('banner senza «rifiuta»: nascosto, pagina di nuovo scorrevole, nessun coo
   await expect.poll(async () => (await tabCookies(shell))?.hidden, { timeout: 8_000 }).toBe(true);
 });
 
+test('banner senza «rifiuta» su un sito con CSP stretta sugli stili: si nasconde lo stesso', async ({ app, openTab, testServer }) => {
+  await app.evaluate(() => globalThis.__filoCookieBanners.setListForTest('###cookie-notice'));
+  const page = await testServer.openReady(openTab, `<meta http-equiv="Content-Security-Policy" content="style-src 'self'">
+    <title>CSP</title><p>contenuto</p>
+    <div id="cookie-notice"><p>Usiamo i cookie.</p><button onclick="window.__accepted=true">Accetta</button></div>`);
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('cookie-notice')).display === 'none', null, { timeout: 10_000 });
+  expect(await page.evaluate(() => window.__accepted)).toBeUndefined();
+});
+
 test('banner senza «rifiuta», modalità Manuale: resta visibile (controprova)', async ({ app, openTab, testServer }) => {
   await setMode(openTab, 'manual');
   await app.evaluate(() => globalThis.__filoCookieBanners.setListForTest('###cookie-notice'));
