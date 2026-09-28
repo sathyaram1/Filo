@@ -83,7 +83,7 @@ test('uno stile con una parte invisibile: quello che arriva al modello è quello
   const salvato = await app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.agentStyle || ''));
   // Se il popup mostrava il testo intero, niente di invisibile può essere entrato.
   expect(INVISIBILI.test(salvato), `salvato uno stile con ${Array.from(salvato).length - visibile.length} caratteri che il popup non mostrava`).toBe(false);
-  expect(INVISIBILI.test(popup) && !INVISIBILI.test(salvato)).toBe(false);
+  expect(popup).toContain(visibile);
 
   await page.locator('#input').fill('ciao');
   await page.locator('#sendBtn').click();
