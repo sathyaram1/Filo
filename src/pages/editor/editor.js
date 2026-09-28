@@ -4066,10 +4066,10 @@
     return `${r.motivo}: scegline un'altra${perEsempio}.`;
   }
   // Gli esempi escono coi nomi dei tasti di chi legge; '' se sono tutti presi.
-  const ESEMPI_LIBERI = ['Ctrl+Shift', 'Ctrl+Alt+Shift'].flatMap((mods) => [...'123456789'].map((d) => `${mods}+${d}`));
-  const ESEMPI_CON_NOME = ['Ctrl+Shift+Spazio', 'Ctrl+Alt+Spazio', 'Ctrl+Shift+Invio', 'Ctrl+Alt+Invio'];
+  const ESEMPI_LIBERI = ['Ctrl+Shift', 'Ctrl+Alt+Shift'].flatMap((mods) => [...'123456789'].map((d) => tasto(`${mods}+${d}`)));
+  const ESEMPI_CON_NOME = ['Ctrl+Shift+Spazio', 'Ctrl+Alt+Spazio', 'Ctrl+Shift+Invio', 'Ctrl+Alt+Invio'].map((a) => tasto(a));
   function primaLibera(candidati, m) {
-    return candidati.map(tasto).find((sc) => !rifiuto(sc, m)) || '';
+    return candidati.find((sc) => !rifiuto(sc, m)) || '';
   }
   function scorciatoiaLibera(m) { return primaLibera(ESEMPI_LIBERI, m); }
 
