@@ -1309,6 +1309,14 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
     } catch (_) {}
   }
 
+  // DIMENTICA: le righe che la frase indica le trova il main, prima del gate,
+  // così il popup mostra quelle che se ne andranno (#592).
+  let righeDaDimenticare = [];
+  if (type === 'DIMENTICA') {
+    try { righeDaDimenticare = await FiloMem.findLines(action.testo ?? action.text ?? action.riga ?? ''); } catch (_) {}
+    action._righe = righeDaDimenticare.map((r) => r.testo);
+  }
+
   // ── modalità terminale: gate hard, indipendente dal livello (#146.6) ──────
   // Filo non può eseguire ALCUN comando se l'utente non ha attivato la modalità
   // terminale nelle impostazioni. Controllo PRIMA del gate dei livelli: così un
