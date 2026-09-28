@@ -4,10 +4,11 @@ import { test, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, collegaCartella } from '../../helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const barre = (p) => p.split('\\').join('/');
 
 const esegui = (args, cwd) => new Promise((ok) => {
   const p = spawn(process.execPath, args, { cwd, env: { ...process.env, CI: 'true' } });
@@ -27,14 +28,15 @@ test('con un test.only dimenticato la suite non risulta verde', async () => {
   writeFileSync(join(cartella, 'tests', 'a-fuoco.spec.mjs'),
     "import { test, expect } from '@playwright/test';\ntest.only('messa a fuoco mentre la si provava', () => { expect(1).toBe(1); });\n");
   const risultati = join(cartella, 'suite-risultati.json');
-  writeFileSync(join(cartella, 'pw.config.mjs'), [
-    `import base from ${JSON.stringify(pathToFileURL(join(ROOT, 'playwright.config.js')).href)};`,
-    `export default { ...base, testDir: ${JSON.stringify(join(cartella, 'tests'))}, retries: 0,`,
-    `  reporter: [['json', { outputFile: ${JSON.stringify(risultati)} }]] };`,
+  // .ts: Playwright trasforma lui la configurazione del repo, che è ESM in un pacchetto CommonJS.
+  writeFileSync(join(cartella, 'pw.config.ts'), [
+    `import base from ${JSON.stringify(barre(join(ROOT, 'playwright.config.js')))};`,
+    `export default { ...base, testDir: ${JSON.stringify(barre(join(cartella, 'tests')))}, retries: 0,`,
+    `  reporter: [['json', { outputFile: ${JSON.stringify(barre(risultati))} }]] };`,
   ].join('\n'));
 
-  await esegui([join(ROOT, 'node_modules', '@playwright', 'test', 'cli.js'), 'test', '-c', join(cartella, 'pw.config.mjs')], cartella);
+  const pw = await esegui([join(ROOT, 'node_modules', '@playwright', 'test', 'cli.js'), 'test', '-c', join(cartella, 'pw.config.ts')], cartella);
   const v = await esegui([join(ROOT, 'scripts', 'suite-verdict.mjs'), risultati], ROOT);
   // Uscita 0 = verde = il commit si pubblica, con la prova rotta mai eseguita.
-  expect(v.code, v.out).not.toBe(0);
+  expect(v.code, `${pw.out}\n${v.out}`).not.toBe(0);
 });
