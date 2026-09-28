@@ -74,7 +74,7 @@ test('notifiche da un riquadro di un altro sito', async ({ shell, openTab, testS
   await sleep(2000);
   const n1 = await riga(shell).count();
   console.log('DOMANDA RIQUADRO', n1 ? await riga(shell).first().innerText() : '(nessuna)');
-  if (n1) await shell.locator('#perm-bar .perm-x, #perm-bar .perm-no').first().click().catch(() => {});
+  if (n1) await shell.locator('#perm-bar .perm-chiudi').first().click().catch(() => {});
   await sleep(500);
   // Il giornale ha le notifiche consentite.
   await page.evaluate(() => { window.chiediMia(); });
