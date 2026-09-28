@@ -73,7 +73,8 @@ test('chi è frenato eredita la risposta di chi ha tirato il freno, anche arriva
   }
   assert.equal(giudizi, 1);
   assert.equal(finestre, 1);
-  assert.equal(SB.checkSync('https://sblocco.dominio-gemello.com/', {}).level, 'safe', 'con indizi diversi niente eredità');
+  await analizza('https://pagamenti.dominio-gemello.com/', { hasPayment: true });
+  assert.equal(giudizi, 2, 'con indizi diversi il sito ha il suo controllo, non l\'eredità');
 });
 
 test('un giudizio senza verdetto frena i sottodomini per poco, poi si riprova', async () => {
