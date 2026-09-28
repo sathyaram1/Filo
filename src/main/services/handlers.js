@@ -3039,6 +3039,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           roundRendered.push(rendered);
         }
         push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
+        PageRead.annotaAzione(contesto, rendered);
         results.push({ action: a, res, rendered });
       }
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
