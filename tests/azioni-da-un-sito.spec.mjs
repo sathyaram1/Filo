@@ -1,7 +1,6 @@
-// #589 — dal codice di Filo dentro la pagina di un sito si chiedono solo le azioni
-// della barra d'aiuto (il feedback). Preferenze, memoria e terminale no, nemmeno
-// chiedendo e confermando da sé: la conferma disegnata nella pagina la può dare la pagina.
-// I messaggi partono dal mondo isolato dei content script, dove arrivano davvero.
+// #589 — dalla pagina di un sito si chiedono solo le azioni della barra d'aiuto (il
+// feedback): preferenze, memoria e terminale no, nemmeno confermandole da sé. I messaggi
+// partono dal mondo isolato dei content script. Regola: src/main/services/impostazioniPerOrigine.js.
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';

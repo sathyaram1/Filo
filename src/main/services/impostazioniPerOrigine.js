@@ -54,9 +54,8 @@ const CHIAVI_STORAGE_WEB = Object.freeze([
 ]);
 const CHIAVI_STORAGE_WEB_SCRITTURA = Object.freeze(CHIAVI_STORAGE_WEB.filter((k) => k !== 'settings'));
 
-// Le azioni di Filo che il codice dentro un sito chiede: la barra d'aiuto propone
-// un feedback. Il resto (preferenze, memoria, terminale) solo dalle pagine di Filo,
-// anche confermato: la conferma disegnata dentro un sito la può dare il sito.
+// Le azioni di Filo che il codice dentro un sito chiede (la barra d'aiuto propone un
+// feedback). Il resto no, nemmeno confermato: la conferma nella pagina la dà anche il sito.
 const AZIONI_WEB = Object.freeze(new Set(['INVIA_FEEDBACK']));
 
 const isFilo = (url) => String(url || '').startsWith('filo://');
