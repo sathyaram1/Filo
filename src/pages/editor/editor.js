@@ -3933,57 +3933,23 @@
       cfgShortcutTaken.textContent = testo;
       cfgShortcutTaken.hidden = false;
     }
-    const mostraPresa = (motivo) => mostraAvviso(`${motivo}: scegline un'altra, per esempio ${libera}.`);
+    function mostraRifiuto(r) {
+      if (r.tipo !== 'senzaModificatore') { mostraAvviso(testoRifiuto(r, m)); return; }
+      cfgShortcut.classList.add('ed-field-invalid');
+      cfgShortcutHint.hidden = false;
+    }
     const AVVISO_SENZA_AZIONE = `«${meta.label}» non ha un'azione unica da far partire con un tasto: svuota il campo e salva.`;
     // Una scorciatoia salvata prima di questi controlli può essere già morta:
     // lo si dice all'apertura, non solo quando la si riscrive.
     const giaSalvata = String(m.data.shortcut || '').trim();
-    const motivoGiaSalvata = motivoScorciatoiaPresa(giaSalvata, m);
+    const rifiutoGiaSalvata = rifiuto(giaSalvata, m);
     if (giaSalvata && senzaAzione) mostraAvviso(AVVISO_SENZA_AZIONE);
-    else if (motivoGiaSalvata) mostraPresa(motivoGiaSalvata);
+    else if (rifiutoGiaSalvata) mostraRifiuto(rifiutoGiaSalvata);
     $('cfgSave').addEventListener('click', () => {
       const rawShortcut = cfgShortcut.value.trim();
       if (rawShortcut && senzaAzione) { mostraAvviso(AVVISO_SENZA_AZIONE); cfgShortcut.focus(); return; }
-      const ignoto = rawShortcut ? TASTI.pezzoSconosciuto(rawShortcut) : null;
-      if (ignoto && ignoto.modificatore) {
-        cfgShortcut.classList.add('ed-field-invalid');
-        cfgShortcutTaken.textContent =
-          `Non riconosco «${ignoto.nome}» come tasto da tenere premuto: usa ${tasto('Ctrl')}, Alt o Shift (Maiusc), es. ${tasto('Ctrl+Shift+1')}.`;
-        cfgShortcutTaken.hidden = false;
-        cfgShortcut.focus();
-        return;
-      }
-      // Una scorciatoia senza modificatore (es. la lettera "b") verrebbe premuta
-      // di continuo mentre si scrive: la rifiutiamo e mostriamo come correggerla,
-      // invece di salvarla e rubare quel tasto in tutto l'editor.
-      if (rawShortcut && !isValidShortcut(rawShortcut)) {
-        cfgShortcut.classList.add('ed-field-invalid');
-        cfgShortcutHint.hidden = false;
-        cfgShortcut.focus();
-        return;
-      }
-      // Un tasto finale che non sappiamo riconoscere alla pressione (un nome
-      // sbagliato, "Ctrl+Spazioo") si salverebbe e non partirebbe mai.
-      if (ignoto) {
-        cfgShortcut.classList.add('ed-field-invalid');
-        cfgShortcutTaken.textContent =
-          `Non riconosco il tasto «${ignoto.nome}»: usa una lettera, una cifra o un nome come Spazio, Invio, Esc, Tab, Su, Giù, F1… (es. ${tasto('Ctrl+Shift+Spazio')}).`;
-        cfgShortcutTaken.hidden = false;
-        cfgShortcut.focus();
-        return;
-      }
-      if (rawShortcut && TASTI.delSistema(rawShortcut)) {
-        cfgShortcut.classList.add('ed-field-invalid');
-        cfgShortcutTaken.textContent =
-          `${TASTI.etichetta(rawShortcut)} se la prende il sistema operativo e non arriverebbe mai a questo modulo: scegline un'altra, per esempio ${tasto('Ctrl+Shift+1')}.`;
-        cfgShortcutTaken.hidden = false;
-        cfgShortcut.focus();
-        return;
-      }
-      // Un tasto che qualcun altro serve prima (Filo, l'Editor, un altro modulo)
-      // darebbe una scorciatoia che sembra valida e non parte mai.
-      const motivo = motivoScorciatoiaPresa(rawShortcut, m);
-      if (motivo) { mostraPresa(motivo); cfgShortcut.focus(); return; }
+      const r = rifiuto(rawShortcut, m);
+      if (r) { mostraRifiuto(r); cfgShortcut.focus(); return; }
       m.data.shortcut = rawShortcut;
       if (m.type === 'word-count') m.data.count = $('cfgCount').value;
       if (m.type === 'switch') {
