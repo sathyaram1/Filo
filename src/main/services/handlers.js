@@ -1175,15 +1175,30 @@ function pendingConfirmKey(sender, action) {
 function recordPendingConfirm(sender, action) {
   const now = Date.now();
   // Purga opportunistica delle scadute (la mappa resta piccola).
-  for (const [k, exp] of pendingConfirms) if (exp <= now) pendingConfirms.delete(k);
-  pendingConfirms.set(pendingConfirmKey(sender, action), now + PENDING_CONFIRM_TTL);
+  for (const [k, rec] of pendingConfirms) if (rec.scade <= now) pendingConfirms.delete(k);
+  pendingConfirms.set(pendingConfirmKey(sender, action), {
+    scade: now + PENDING_CONFIRM_TTL,
+    mostrati: { righe: action._righe, targetIds: action._targetIds },
+  });
 }
 function consumePendingConfirm(sender, action) {
   const key = pendingConfirmKey(sender, action);
-  const exp = pendingConfirms.get(key);
-  if (!exp) return false;
+  const rec = pendingConfirms.get(key);
+  if (!rec) return false;
   pendingConfirms.delete(key); // one-time
-  return exp > Date.now();
+  return rec.scade > Date.now();
+}
+function daPaginaDiFilo(sender) {
+  return String(sender?.tab?.url || sender?.url || '').startsWith('filo://');
+}
+// All'OK si agisce su quello che il popup ha mostrato, non su ciò che lo stesso
+// riferimento trova adesso: nel frattempo la lista può essere cambiata (#592).
+// Una pagina di Filo rimanda l'azione col popup che ha mostrato; per le altre
+// vale quello registrato alla richiesta di conferma.
+function bersagliMostrati(sender, action) {
+  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds };
+  const rec = pendingConfirms.get(pendingConfirmKey(sender, action));
+  return rec && rec.scade > Date.now() ? rec.mostrati : null;
 }
 
 // Riferimento dell'utente a una sveglia / un timer, normalizzato dai sinonimi
