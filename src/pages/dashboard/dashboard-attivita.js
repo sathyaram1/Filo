@@ -475,6 +475,7 @@
     if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
     if (o.ok === false && o.detail) return String(o.detail);
+    if (o.ok === false && o.dettaglio) return String(o.dettaglio);
     if (o.error) return String(o.error);
     return '';
   }

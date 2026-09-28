@@ -622,6 +622,7 @@
     // Filo Chat: invio messaggio utente all'agente conversazionale
     // { userMessage, threadHistory: [{role, text, actions?}] }
     // Risposta: { ok, text, actions: [...], model, costEur }
+    // Solo dalle pagine di Filo: la risposta porta quello che Filo ha letto (pagine, documenti, comandi).
     FILO_CHAT: 'filo_chat',
     // Filo State: assembla stato programmatico (tab aperte, tempo, processi).
     // Risposta: { ok, state: {...}, stateText: "..." }
@@ -719,6 +720,7 @@
     // livelli di sicurezza della chat dashboard. Torna { executed, kept,
     // needsConfirm, describe }: se needsConfirm il client mostra il popup di
     // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
+    // Da un sito visitato (con FILO_CONFIRM_ACTION) torna senza `output`: quello che l'azione ha letto resta a Filo.
     FILO_RUN_ACTION: 'filo_run_action',
 
     // #405 — un'azione di PAGINA invocata dal menu aperto dentro un riquadro

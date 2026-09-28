@@ -18,13 +18,22 @@ module.exports = function register(on, ctx) {
   // content script dei siti visitati (vedi
   // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
+  const { soloFilo, daFilo } = require('./origine');
+  // Quello che un'azione ha LETTO (una pagina aperta, un documento, l'uscita di un comando) torna solo a Filo: dal
+  // content script di un sito, Filo non deve diventare il modo di leggere un altro sito o il disco (#553).
+  const perChiChiede = (r, sender, origin) => {
+    if (daFilo(origin, sender) || !r || !('output' in r)) return r;
+    const { output: _letto, ...resto } = r;
+    return resto;
+  };
 
   // #525 — «l'elenco delle chat è cambiato». Lo ascolta la Cronologia aperta.
   const annunciaChat = () => {
     try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
   };
 
-  on(MSG.FILO_CHAT, async (msg, sender, origin) => {
+  // La risposta porta con sé quello che Filo ha letto per darla: la chiede solo una pagina di Filo.
+  on(MSG.FILO_CHAT, soloFilo(async (msg, sender, origin) => {
     try {
       // #525 — `chatId` è la targa della conversazione in corso: il main ci
       // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
@@ -51,16 +60,16 @@ module.exports = function register(on, ctx) {
       const keyRefused = Boolean(W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(e));
       return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions };
     }
-  });
+  }));
 
   // L'utente ha confermato dal client (popup livello 2 / "conferma" digitata
   // livello 3) un'azione rimasta in sospeso: la eseguiamo ora. Il livello
   // viene RICLASSIFICATO qui dentro (executeFiloAction consulta il registro
   // anche con confirmed:true): un client compromesso non può far eseguire
   // un'azione fuori registro.
-  on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
+  on(MSG.FILO_CONFIRM_ACTION, async (msg, sender, origin) => {
     const r = await executeFiloAction(msg.action, { confirmed: true, sender });
-    return { ok: true, ...r };
+    return { ok: true, ...perChiChiede(r, sender, origin) };
   });
 
   // Primo dispatch (non confermato) di una singola azione di Filo richiesta
@@ -70,9 +79,9 @@ module.exports = function register(on, ctx) {
   // viene eseguita finché la sidebar non rimanda la conferma (FILO_CONFIRM_ACTION).
   // Le azioni fuori registro vengono rifiutate dal dispatch, esattamente come
   // per la chat: la sidebar non è un canale privilegiato.
-  on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
+  on(MSG.FILO_RUN_ACTION, async (msg, sender, origin) => {
     const r = await executeFiloAction(msg.action, { sender });
-    return { ok: true, ...r };
+    return { ok: true, ...perChiChiede(r, sender, origin) };
   });
 
   on(MSG.FILO_GET_STATE, async () => {

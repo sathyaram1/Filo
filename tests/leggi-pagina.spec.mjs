@@ -1,7 +1,6 @@
 // LEGGI_PAGINA (#553): Filo apre una pagina trovata e ne LEGGE il testo, invece di arrendersi agli snippet.
-// Il modello è finto ma onesto: la risposta finale la compone da quello che gli è tornato davvero dagli strumenti,
-// quindi il numero compare in chat solo se la pagina è stata letta. Il server di prova sta su 127.0.0.1, che il
-// download vero rifiuta (ed è provato qui sotto): dove serve leggerlo dalla rete, lo scaricatore si sostituisce.
+// Il modello finto risponde con quello che gli è tornato davvero dagli strumenti: il numero compare solo se letto.
+// Il server di prova sta su 127.0.0.1, che il download vero rifiuta (provato qui sotto): dove serve, si sostituisce.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -163,7 +162,7 @@ test('una pagina già aperta si legge dalla scheda, così com\'è resa, anche se
 
   await reteDiProva(app, { vietata: true });
   await stubModello(app, [
-    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url: url.replace('127.0.0.1', '127.0.0.1') + '#orari' } }] },
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url: `${url}#orari` } }] },
     { finale: { cerca: 'apre alle (\\d+:\\d+)', testo: 'RISPOSTA: apre alle $1.' } },
   ]);
   await chiedi(page, 'a che ora apre il museo della pagina che ho aperto?');
@@ -209,4 +208,26 @@ test('un indirizzo che porterebbe fuori dati della memoria chiede conferma prima
   expect(r.needsConfirm).toBe(2);
   expect(String(r.describe || '')).toContain(url);
   expect(await app.evaluate(() => globalThis.__scaricati.length), 'nessuna richiesta prima del sì').toBe(0);
+});
+
+// Il canale dei messaggi arriva anche ai content script dei siti: se quello strato cedesse, un sito non deve poter
+// usare Filo per leggere un'altra pagina (magari una scheda in cui l'utente ha fatto l'accesso).
+test('da un sito visitato Filo non restituisce quello che ha letto, e la chat non risponde', async ({ app, openTab, testServer }) => {
+  await openTab(NEWTAB);
+  const url = testServer.html('<!doctype html><title>Posta</title><main><p>MESSAGGIO_PRIVATO_42</p></main>');
+  await reteDiProva(app);
+  const r = await app.evaluate(async (_e, url) => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const ostile = { tab: { url: 'http://sito-ostile.example/' }, url: 'http://sito-ostile.example/' };
+    const azione = { type: 'LEGGI_PAGINA', url };
+    const daSito = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.FILO_RUN_ACTION, action: azione }, ostile);
+    const confermata = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.FILO_CONFIRM_ACTION, action: azione }, ostile);
+    const daFilo = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.FILO_RUN_ACTION, action: azione }, { url: 'filo://newtab/' });
+    const chat = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.FILO_CHAT, userMessage: `leggi ${url}`, threadHistory: [] }, ostile);
+    return { daSito: JSON.stringify(daSito), confermata: JSON.stringify(confermata), daFilo: JSON.stringify(daFilo), chat };
+  }, url);
+  expect(r.daFilo, 'da una pagina di Filo il testo torna').toContain('MESSAGGIO_PRIVATO_42');
+  expect(r.daSito).not.toContain('MESSAGGIO_PRIVATO_42');
+  expect(r.confermata).not.toContain('MESSAGGIO_PRIVATO_42');
+  expect(r.chat.code).toBe('forbidden');
 });

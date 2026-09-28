@@ -359,14 +359,17 @@ async function leggiPagina(input, { da = 0, schede = [] } = {}) {
 
   let esito = null;
   let fonte = 'rete';
+  // Una scheda che non mostra testo (il visore di un PDF, una pagina ancora bianca) non è l'ultima parola: si prova
+  // anche a scaricarla, e se nemmeno la rete la dà si riferisce la scheda vuota.
+  let schedaVuota = null;
   const scheda = trovaScheda(url, schede);
   if (scheda) {
     try {
       const r = await leggiDallaScheda(scheda.wc);
       if (r) {
         const e = PT.estrai(r.html, { url: r.url || url });
-        esito = { ok: true, url: r.url || url, titolo: e.titolo, testo: e.testo, soloJavaScript: false };
-        fonte = 'scheda';
+        const letto = { ok: true, url: r.url || url, titolo: e.titolo, testo: e.testo, soloJavaScript: false };
+        if (e.testo.trim()) { esito = letto; fonte = 'scheda'; } else schedaVuota = letto;
       }
     } catch (_) { esito = null; }
   }
@@ -376,6 +379,7 @@ async function leggiPagina(input, { da = 0, schede = [] } = {}) {
       esito = await scaricaPagina(url);
       if (esito.ok) inCache(url, esito);
     }
+    if (schedaVuota && (!esito.ok || !String(esito.testo || '').trim())) { esito = schedaVuota; fonte = 'scheda'; }
   }
   if (!esito.ok) return { ...vuoto, ...esito, pageRead: richiesto, url: esito.url || url };
   const dopo = pericolo(esito.url);
