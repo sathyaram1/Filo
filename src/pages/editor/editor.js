@@ -4043,8 +4043,8 @@
     return t.tasti.some((k) => TASTI.combacia(e, ['Ctrl', ...(t.shift ? ['Shift'] : []), k].join('+')));
   }
   function tastoEditorDi(sc) {
-    const e = pressioneDi(sc);
-    return TASTI_EDITOR.find((t) => prendeIlTasto(t, e)) || null;
+    const e = TASTI.pressioneScritta(sc);
+    return (e && TASTI_EDITOR.find((t) => prendeIlTasto(t, e))) || null;
   }
   // Perché una scorciatoia non partirebbe mai su questo modulo ('' = va bene).
   function motivoScorciatoiaPresa(sc, m) {
