@@ -130,10 +130,11 @@ test('deliver: due biglietti diversi si rifiutano, non se ne sceglie uno in sile
   const casa = depositoSulRamo();
   try {
     const r = await esegui('routine-channel.mjs', [
-      'deliver', 'altrobigliettodiprova99', 'status', '--status', 'revision_capability', '--notes', 'Report.',
-      '--ticket', BIGLIETTO,
+      'deliver', ALTRO_VERO, 'status', '--status', 'revision_capability', '--notes', 'Report.',
+      '--ticket', VERO,
     ], ambiente(port, casa));
     assert.equal(r.code, 1, `stderr: ${r.se}`);
+    assert.match(r.se, /Due biglietti diversi/);
     assert.equal(ricevuti.length, 0);
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
 });
