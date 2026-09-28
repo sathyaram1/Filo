@@ -14,7 +14,7 @@ const TIPI = {
   geolocation: 'posizione',
   notifications: 'notifiche',
 };
-// Fuori da TIPI una pagina ha solo questi, senza domanda: gli altri (notifiche escluse, app esterne a parte) sono no.
+// Fuori da TIPI una pagina ha solo questi, senza domanda; il resto è no (le altre applicazioni hanno la loro regola).
 const INNOCUI = new Set([
   'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'keyboardLock', 'mediaKeySystem',
   'speaker-selection', 'storage-access', 'top-level-storage-access', 'fileSystem', 'midi',
