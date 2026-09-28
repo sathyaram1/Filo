@@ -114,8 +114,11 @@
     return tok.length >= STRONG_TOKEN && !STOPWORDS.has(tok);
   }
 
-  // Taint-match: l'URL contiene dati del corpus sensibile?
-  function taint(url, corpus) {
+  // Taint-match: l'URL contiene dati del corpus sensibile? `soloForte` scarta il
+  // segnale debole "≥2 parole comuni in comune": in una query di ricerca le
+  // parole dell'utente coincidono spesso con appunti e profilo, e solo un token
+  // specifico (email, chiave, id lungo) è davvero un segreto che esce.
+  function taint(url, corpus, { soloForte = false } = {}) {
     const exposed = exposedAlnum(url);
     if (!exposed) return null;
     const toks = corpusTokens(corpus);
@@ -132,14 +135,22 @@
     }
     // Un token forte da solo, oppure ≥2 token distinti (dump multi-parola).
     if (strong) return { reason: `contiene un tuo dato ("${sample}…")` };
-    if (hits >= 2) return { reason: 'contiene più dati presi dalla tua memoria/contesto' };
+    if (!soloForte && hits >= 2) return { reason: 'contiene più dati presi dalla tua memoria/contesto' };
     return null;
   }
 
-  // Fallback strutturale: payload corposo / blob opaco in un URL nato da
-  // contenuto NON fidato (es. l'agente sulla pagina). Copre i dati cifrati che
-  // il taint-match non riconosce. Attivo solo con fromUntrusted per non infastidire
-  // sui link legittimi con query lunghe (tracking, OAuth) nati da input diretto.
+  // Fallback strutturale: un blocco di dati OPACO in un URL nato da contenuto NON
+  // fidato (l'agente sulla pagina, l'output di un comando, una ricerca). Copre i
+  // dati cifrati che il taint-match non riconosce. La firma di un carico
+  // codificato è una LUNGA sequenza continua, con dentro cifre o maiuscole
+  // (base64, esadecimale, token, id casuali): un indirizzo leggibile si spezza
+  // su barre, trattini, punti e underscore in parole corte (`wiki`, `storia`,
+  // `ricette`, `bollette`) e non lascia mai un blocco simile. Guardare la sola
+  // LUNGHEZZA del carico invece scambiava ogni percorso un po' lungo per un
+  // payload: è ciò che riportava l'avviso su Wikipedia, una ricetta, un articolo.
+  function struttOpaca(seg) {
+    return seg.length >= STRUCT_BLOB && /[0-9A-Z]/.test(seg) && !/^https?$/i.test(seg);
+  }
   function structural(url) {
     let u;
     try { u = new URL(url); } catch (_) {
@@ -148,20 +159,14 @@
     const search = u.search || '';
     const hash = u.hash || '';
     const path = (u.pathname && u.pathname !== '/') ? u.pathname : '';
-    const carrier = search.length + hash.length + path.length;
-    if (carrier >= STRUCT_CARRIER) {
-      return { reason: 'porta una grande quantità di dati nel link' };
+    for (const seg of (search + hash + path).split(/[^A-Za-z0-9]+/)) {
+      if (struttOpaca(seg)) return { reason: 'contiene un blocco di dati codificato' };
     }
-    // Blob opaco singolo (no separatori umani) in sottodominio o segmenti.
+    // Blob opaco singolo (no separatori umani) come sottodominio.
     const host = u.hostname || '';
     const labels = host.split('.');
     for (const lbl of labels.slice(0, Math.max(0, labels.length - 2))) {
       if (lbl.length >= STRUCT_BLOB) return { reason: 'usa un sottodominio anomalo' };
-    }
-    for (const seg of (search + hash + path).split(/[^A-Za-z0-9+/_=-]+/)) {
-      if (seg.length >= STRUCT_BLOB && !/^https?$/i.test(seg)) {
-        return { reason: 'contiene un blocco di dati codificato' };
-      }
     }
     return null;
   }
