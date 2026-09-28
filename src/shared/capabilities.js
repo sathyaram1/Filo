@@ -437,7 +437,7 @@
     // ───────────────────────────── Impostazioni ──────────────────────────────
     {
       id: 'options-models', title: 'Modelli e chiavi AI', category: 'settings',
-      desc: 'Imposta le chiavi dei servizi AI (OpenRouter, Tavily), scegli il modello di OGNI funzione che ne usa uno — con la possibilità di indicarne più d’uno come ripiego, provati in ordine — e un limite di spesa mensile. Puoi anche affidarti ai modelli predefiniti di Filo.',
+      desc: 'Imposta le chiavi dei servizi AI (OpenRouter, Tavily), scegli il modello di OGNI funzione che ne usa uno — con la possibilità di indicarne più d’uno come ripiego, provati in ordine — e un limite di spesa mensile, che ferma ogni chiamata ai modelli: anche quelle che Filo fa da solo, come il controllo dei siti pericolosi o il riconoscimento dei blocchi geografici, e le prove delle Opzioni. Puoi anche affidarti ai modelli predefiniti di Filo.',
       invoke: 'Menu del tasto destro → "Opzioni Filo", oppure filo://options/options.html.',
       doesNot: 'Le chiavi sono salvate cifrate in locale. Nessuna funzione usa un modello che non hai impostato: se a una funzione manca il modello, o punta a uno che non esiste, quella funzione si ferma e lo segnala quando la usi — non ne sceglie uno per conto suo.',
     },
