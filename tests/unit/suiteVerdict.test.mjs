@@ -150,7 +150,10 @@ describe('le funzioni pure', () => {
   });
 
   test('gli argomenti: file, --out, --rossi; un\'opzione ignota è un errore', () => {
-    assert.deepEqual(leggiArgomenti(['r.json', '--out', 'n.txt', '--rossi', 'k.json']), { file: 'r.json', out: 'n.txt', rossi: 'k.json' });
+    assert.deepEqual(leggiArgomenti(['r.json', '--out', 'n.txt', '--rossi', 'k.json', '--chiavi', 'c.txt']),
+      { file: 'r.json', out: 'n.txt', rossi: 'k.json', chiavi: 'c.txt' });
+    assert.equal(leggiArgomenti(['r.json']).chiavi, '');
+    assert.throws(() => leggiArgomenti(['r.json', '--chiavi']), /vuole un percorso/);
     assert.throws(() => leggiArgomenti(['r.json', '--boh']), /non capita/);
     assert.throws(() => leggiArgomenti(['r.json', '--out']), /vuole un percorso/);
   });
