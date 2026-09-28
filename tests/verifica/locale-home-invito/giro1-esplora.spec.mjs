@@ -28,7 +28,9 @@ test.beforeAll(async () => {
         return json(res, 200, { result: { hasWallet: true, pseudonym: 'abcdef0123456789', balance: { credits: 5000, creditsGranted: 5000, limitUsd: 4.2, usageUsd: 0, remainingUsd: 4.2, eurUsd: 1.2, eurPerCredit: 0.0007 }, stale: false, dailyCredits: 100, invites: [] } });
       }
       if (url === '/walletPendingInvite') {
-        return json(res, 200, { result: stato.pendingCode && !stato.redeemed ? { status: 'ok', code: stato.pendingCode } : { status: 'none' } });
+        const rispondi = () => json(res, 200, { result: stato.pendingCode && !stato.redeemed ? { status: 'ok', code: stato.pendingCode } : { status: 'none' } });
+        if (stato.trattieni) { stato.trattenute.push(rispondi); return undefined; }
+        return rispondi();
       }
       if (url === '/walletRedeem') {
         stato.redeemed = true;
