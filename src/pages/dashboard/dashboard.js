@@ -915,6 +915,7 @@
         credits.addEventListener('click', () => chrome.tabs.create({ url: 'filo://credits/credits.html' }));
         row.appendChild(credits);
       }
+      if (r?.code === 'NO_API_KEY') err.dataset.senzaCrediti = '1';
       // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
       // modello non risponde (rete assente, provider giù, crediti finiti) alla
       // home non ci si arriva più. L'uscita sta qui, accanto, dove l'utente
