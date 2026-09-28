@@ -43,6 +43,7 @@
     PULISCI_TAB: 'broom',
     CANCELLA_ARCHIVIO: 'trash',
     CANCELLA_MEMORIA: 'eraser',
+    DIMENTICA: 'eraser',
     IMPOSTA_PREFERENZA: 'options',
     IMPOSTA_ESTETICA: 'palette',
     ESEGUI_COMANDO: 'terminal',
