@@ -24,9 +24,10 @@ test('la pressione descritta da un nome scritto è quella che il tasto vero fa c
     const p = T.pressioneScritta(scritta);
     assert.ok(p, `${scritta} descrive una pressione`);
     assert.ok(T.combacia(p, scritta), `${scritta}: la pressione descritta combacia col nome`);
-    if (premuta.key !== '_') assert.ok(T.combacia(premuta, scritta), `${scritta}: il tasto vero combacia`);
+    assert.ok(T.combacia(premuta, scritta), `${scritta}: il tasto vero combacia`);
   }
   assert.equal(T.pressioneScritta('Ctrl+Minus').key, '-');
+  assert.equal(T.pressioneScritta('Ctrl+Shift+Minus').shiftKey, true);
   assert.equal(T.pressioneScritta('Ctrl++').key, '+');
   assert.equal(T.pressioneScritta('Ctrl+=').key, '+');
   assert.equal(T.pressioneScritta('b'), null, 'una lettera nuda non è una scorciatoia');
