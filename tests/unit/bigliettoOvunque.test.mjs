@@ -227,7 +227,7 @@ test('rilascio e battito: il biglietto a mano arriva al server, due diversi si r
     assert.equal(ricevuti.find((x) => x.url.includes('routineRelease'))?.body.ticket, BIGLIETTO);
   });
   await conServer(async ({ ricevuti, env }) => {
-    const r = await esegui('routine-channel.mjs', ['release', 'altrobigliettodiprova99', '--ticket', BIGLIETTO, ...RIL], env);
+    const r = await esegui('routine-channel.mjs', ['release', ALTRO_VERO, '--ticket', VERO, ...RIL], env);
     assert.equal(r.code, 1, `stderr: ${r.se}`);
     assert.match(r.se, /Due biglietti diversi/);
     assert.equal(ricevuti.length, 0, 'nessun rilascio in silenzio del biglietto sbagliato');
