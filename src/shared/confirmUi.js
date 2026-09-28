@@ -289,13 +289,15 @@
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-danger');
       ok.disabled = true;
 
-      const matches = () => input.value.trim().toLowerCase() === String(word).toLowerCase();
-      input.addEventListener('input', () => { ok.disabled = !matches(); });
+      const pronto = () => input.value.trim().toLowerCase() === String(word).toLowerCase() && visto();
+      const aggiorna = () => { ok.disabled = !pronto(); };
+      const visto = tuttoVisto(box, aggiorna);
+      input.addEventListener('input', aggiorna);
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && matches()) { e.preventDefault(); done(true); }
+        if (e.key === 'Enter' && pronto()) { e.preventDefault(); done(true); }
       });
       cancel.addEventListener('click', () => done(false));
-      ok.addEventListener('click', () => { if (matches()) done(true); });
+      ok.addEventListener('click', () => { if (pronto()) done(true); });
       input.focus();
     });
   }
