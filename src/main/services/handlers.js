@@ -265,7 +265,9 @@ function withDefaults(settings) {
     const own = settings.apiKeys || {};
     const personal = personalOpenrouterKey();
     const apiKeys = own.openrouter || !personal ? own : { ...own, openrouter: personal };
-    return { ...settings, apiKeys, openWeightsOnly, excludedProviders, providerSort, security };
+    // Un fornitore salvato che Filo non ha più (Gemini) spegnerebbe ogni funzione che cerca la sua chiave.
+    const provider = Defaults.fornitoreUsabile(settings.provider) ? settings.provider : d.provider;
+    return { ...settings, provider, apiKeys, openWeightsOnly, excludedProviders, providerSort, security };
   }
   const userKeys = settings.apiKeys || {};
   const apiKeys = {};
@@ -2644,7 +2646,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // funziona: nessuna chiamata al modello, nessuna rete. Vedi
   // `SN_ONBOARDING.isExitRequest`.
   let onbBefore = Onboarding ? await FiloMem.getOnboarding() : { done: true };
-  const onbActive = !!(Onboarding && !onbBefore.done);
+  // L'intervista comincia col benvenuto di Filo: un messaggio scritto prima (senza crediti) non ne è una risposta, e
+  // metterlo nella conversazione la faceva ripartire da lì, senza che Filo si presentasse mai.
+  const onbActive = !!(Onboarding && !onbBefore.done && onbBefore.thread.length > 0);
 
   // #525 — la chat si scrive su disco ADESSO, non alla chiusura: se l'app
   // muore a metà discussione, la discussione c'è lo stesso. I turni interni
@@ -3157,7 +3161,7 @@ function dashboardScheduler() {
       if (!inputs.hasKey) return;
       const cached = await FiloMem.getDashboardCache();
       // Se nel frattempo gli input sono tornati uguali alla cache, niente AI.
-      if (cached && cached.signature === inputs.signature) return;
+      if (cached && !cached.senzaChiave && cached.signature === inputs.signature) return;
       const result = await generateDashboardFromInputs(inputs);
       // Spinge l'aggiornamento alle home aperte: si aggiornano senza rifare l'LLM.
       broadcastToTabs({
@@ -3181,8 +3185,16 @@ async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } 
   // Senza chiave API: messaggio istantaneo dalle pagine salvate (come prima).
   if (!inputs.hasKey) {
     const payload = buildNoKeyDashboard(inputs.settings, inputs.saved);
-    await FiloMem.setDashboardCache({ ...payload, signature: inputs.signature });
+    await FiloMem.setDashboardCache({ ...payload, signature: inputs.signature, senzaChiave: true });
     return { ...payload, cached: false, ts: new Date().toISOString() };
+  }
+
+  // La chiave è arrivata dopo (#651): la firma non la vede. Il messaggio vero si chiede in background,
+  // ma non a chi deve ancora fare l'intervista, che parte nella home aperta.
+  if (cached && cached.senzaChiave && !force) {
+    const onb = Onboarding ? await FiloMem.getOnboarding() : null;
+    if (!onb || onb.done) dashboardScheduler().request(openTabsCount);
+    return { ...buildNoKeyDashboard(inputs.settings, inputs.saved), cached: false, ts: new Date().toISOString() };
   }
 
   // C'è già una cache e non è un refresh esplicito: la serviamo SUBITO — la

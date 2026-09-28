@@ -140,6 +140,11 @@
     beginSending: () => { sending = true; sendBtn.disabled = true; },
     runTurnAndContinue: (args) => runTurnAndContinue(args),
     isHomeMessageVisible: () => showHomeMessage,
+    soloRisposteSenzaCrediti: () => {
+      const bolle = [...bubblesEl.children];
+      return bolle.some((b) => b.dataset.senzaCrediti === '1')
+        && bolle.every((b) => b.dataset.senzaCrediti === '1' || b.classList.contains('dash-bubble-user'));
+    },
     setSuggestions: (list) => { suggestions = list; renderSuggestions(); },
     loadDashboard: () => loadDashboard(),
   });
@@ -915,6 +920,7 @@
         credits.addEventListener('click', () => chrome.tabs.create({ url: 'filo://credits/credits.html' }));
         row.appendChild(credits);
       }
+      if (r?.code === 'NO_API_KEY') err.dataset.senzaCrediti = '1';
       // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
       // modello non risponde (rete assente, provider giù, crediti finiti) alla
       // home non ci si arriva più. L'uscita sta qui, accanto, dove l'utente
@@ -1242,6 +1248,9 @@
       }
       suggestions = Array.isArray(msg.suggestions) ? msg.suggestions : [];
       renderSuggestions();
+      // La home si rifà da sola anche quando arriva un modello (invito, chiave propria): l'intervista
+      // che lo aspettava parte qui, non alla prossima scheda.
+      Accoglienza.maybeOpenOnboardingLater().catch(() => {});
     } else if (msg?.type === MSG.SETTINGS_UPDATED) {
       applySavedTheme().catch(() => {});
       if (msg.settings && typeof msg.settings.showHomeMessage === 'boolean') {

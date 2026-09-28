@@ -205,6 +205,16 @@ function buildModels() {
   return T ? { registry: T.registry, models: T.models } : { registry: C.DEFAULT_MODEL_REGISTRY || {}, models: C.DEFAULT_MODELS || {} };
 }
 
+// Il fornitore del documento remoto vale solo se Filo lo sa chiamare e la politica lo ammette: il
+// documento è rimasto su 'gemini' dopo l'uscita di Google, e nessuna chiave lo trovava più.
+function fornitoreUsabile(nome, C = globalThis.SN_CONST || {}) {
+  if (typeof nome !== 'string' || !nome) return false;
+  if ((C.PRODUCER_DIRECT_PROVIDERS || []).includes(nome)) return false;
+  if (nome === (C.DEFAULT_PROVIDER || 'openrouter')) return true;
+  const P = globalThis.SN_PROVIDERS;
+  try { return Boolean(P && P.getProvider(nome)); } catch (_) { return false; }
+}
+
 function get() {
   const C = globalThis.SN_CONST || {};
   const out = {
@@ -229,7 +239,7 @@ function get() {
 
   let remoteReasons = [];
   if (remoteModels) {
-    if (typeof remoteModels.provider === 'string' && remoteModels.provider) out.provider = remoteModels.provider;
+    if (fornitoreUsabile(remoteModels.provider, C)) out.provider = remoteModels.provider;
     if (remoteModels.models && typeof remoteModels.models === 'object') {
       out.models = { ...out.models, ...remoteModels.models };
     }
@@ -758,6 +768,7 @@ async function getWorkerLog(idToken) {
 
 module.exports = {
   get,
+  fornitoreUsabile,
   getPublicForAdmin,
   refresh,
   refreshIfStale,
