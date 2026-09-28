@@ -1026,6 +1026,8 @@ class TabManager {
     // cookie non sopravvivono alla chiusura dell'app. setProxy va applicato e
     // ATTESO prima di creare la view, o le prime richieste partirebbero dirette.
     const ses = session.fromPartition(partition);
+    // Da una finestra incognito la scheda resta incognito anche per i permessi: stessa memoria, niente su disco.
+    if (this.incognito && this.partition) Permessi.segnaIncognito(ses, session.fromPartition(this.partition));
     try {
       await ses.setProxy({
         proxyRules: resolved.proxyRules,
@@ -1757,6 +1759,11 @@ class TabManager {
       // perché questo evento arriva PRIMA che il documento veda il tasto, ed è
       // dentro quel giro che la pagina chiede.
       tab._ultimoInputEsc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
+      // La domanda di un permesso sta sopra la pagina: l'Esc la chiude per prima, come la ×.
+      if (input.type === 'keyDown' && input.key === 'Escape' && Permessi.chiudiPrimaDomanda(wc)) {
+        event.preventDefault();
+        return;
+      }
       if (input.type === 'keyDown' && input.key === 'Escape') {
         // Regola unica in tabs.js: handleFullscreenEscape decide (e sa quando
         // l'Esc va invece lasciato alla pagina che ha chiesto il fullscreen).
@@ -2502,6 +2509,8 @@ class TabManager {
         proxy: t.proxy ? { country: t.proxy.country, tier: t.proxy.tier } : null,
         // Le domande di permesso che la pagina aspetta: la barra le mostra sulla scheda attiva.
         permessi: Permessi.inAttesaPer(t.view && t.view.webContents),
+        // Cosa il sito ha avuto o si è visto negare in questo documento: l'indicatore sulla scheda.
+        usiPermessi: Permessi.usiPer(t.view && t.view.webContents),
       })),
     };
   }

@@ -3310,6 +3310,7 @@ require('./handlers/safebrowse')(on, handlerCtx);
 require('./handlers/redteam')(on, handlerCtx);
 require('./handlers/misc')(on, handlerCtx);
 require('./handlers/permessi')(on, handlerCtx);
+require('./handlers/dettatura')(on, handlerCtx);
 
 // ─── handler centrale richiamato dall'IPC ───────────────────────────────────
 
