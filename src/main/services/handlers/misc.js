@@ -191,7 +191,7 @@ function safeImageFilename(name) {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, getEffectiveSettings, modelForAction, buildAttemptChain, broadcastToTabs } = ctx;
+  const { MSG, winOf, modelGate, broadcastToTabs } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
 
   // Titolo breve del feedback, generato da un LLM economico al momento
@@ -203,19 +203,15 @@ module.exports = function register(on, ctx) {
     const t = String(text || '').trim();
     if (!t) return fallback;
     try {
-      const settings = await getEffectiveSettings();
-      const attempts = buildAttemptChain(
-        settings, modelForAction(settings, ACTIONS.FEEDBACK_TITLE), ACTIONS.FEEDBACK_TITLE,
-      );
       const messages = [{
         role: 'user',
         content: 'Genera un titolo brevissimo (2-6 parole, nella stessa lingua del testo) che riassuma questo feedback su un\'app. Rispondi SOLO col titolo, senza virgolette e senza punto finale.\n\nFeedback:\n' + t.slice(0, 1500),
       }];
       const r = await Promise.race([
-        globalThis.SN_PROVIDERS.completeWithFallback({ attempts, messages }),
+        modelGate.text({ action: ACTIONS.FEEDBACK_TITLE, messages }),
         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout titolo (8s)')), 8000)),
       ]);
-      const name = String(r?.text || '').trim()
+      const name = String(r || '').trim()
         .split('\n')[0]
         .replace(/^["'«\s]+|["'»\s.]+$/g, '')
         .slice(0, 120);

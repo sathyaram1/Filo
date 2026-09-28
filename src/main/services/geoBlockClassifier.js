@@ -268,8 +268,8 @@ function createCache({ ttlMs = 6 * 60 * 60 * 1000, now = Date.now, max = 500 } =
 
 // ─── Orchestratore: classifica un caso ambiguo ──────────────────────────────
 // Dependency injection: `complete({ messages, signal })` fa la chiamata al
-// modello (in produzione la passa tabs.js usando un provider economico via
-// SN_PROVIDERS); `cache` è una createCache() condivisa; `now` per i test.
+// modello (in produzione la passa handlers.js, attraverso il cancello dei
+// modelli: limite di spesa e costo); `cache` è una createCache() condivisa.
 //
 // Ritorna { class, route, cached, error? }. Non lancia mai: in caso di errore
 // di rete/modello cade su errore_generico (= nessuna azione), che è il
@@ -295,6 +295,7 @@ async function classify(input = {}, { complete, cache, now = Date.now, signal } 
   }
   let cls = CLASSES.ERRORE_GENERICO;
   let error = null;
+  let code = null;
   try {
     const { messages } = buildPrompt({ title, text, statusCode, host });
     const res = await complete({ messages, signal });
@@ -302,14 +303,16 @@ async function classify(input = {}, { complete, cache, now = Date.now, signal } 
     cls = parseClassification(raw);
   } catch (err) {
     error = (err && err.message) || String(err);
+    code = (err && err.code) || null;
     cls = CLASSES.ERRORE_GENERICO;
   }
 
   // 4) Memorizza (anche errore_generico: evita di ri-bombardare il modello su
   // una pagina che non sa classificare; il TTL lo farà riprovare più tardi).
-  if (cache) { void now; cache.set(key, cls); }
+  // Un rifiuto del limite di spesa no: non ha chiamato nessuno, e alzato il limite la pagina va classificata.
+  if (cache && code !== 'LIMIT_REACHED') { void now; cache.set(key, cls); }
 
-  return { class: cls, route: routeForClass(cls), cached: false, ...(error ? { error } : {}) };
+  return { class: cls, route: routeForClass(cls), cached: false, ...(error ? { error } : {}), ...(code ? { code } : {}) };
 }
 
 const api = {
