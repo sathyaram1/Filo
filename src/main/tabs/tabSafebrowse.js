@@ -81,8 +81,8 @@ const safebrowseMethods = {
   _sbOnNavigate(tab, url) {
     const SB = globalThis.SN_SAFEBROWSE;
     if (!SB || !tab || !url || /^filo:\/\//i.test(url)) return;
-    // L'indirizzo da cui la pagina è arrivata davvero: quello che si scrive dopo non sposta il conto dei lavori automatici,
-    // qui e nel blocco geografico (#591).
+    // L'indirizzo da cui la pagina è arrivata davvero: quello che si scrive dopo non sposta il conto (#591), qui e nel
+    // blocco geografico.
     tab._urlNavigato = url;
     try {
       const verdict = SB.analyze(url, {}, (next) => {
