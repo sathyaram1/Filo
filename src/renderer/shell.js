@@ -1489,6 +1489,8 @@
   const PERMESSI = (() => {
     const P = window.SN_PERMESSI_SITI;
     const ARMA_MS = 1000;
+    // Una pagina che chiede tutto insieme non si prende la finestra: le altre domande salgono man mano.
+    const RIGHE_MAX = 3;
     let bar = null;
     let firma = '';
     let fermoDa = 0;
@@ -1580,7 +1582,7 @@
 
     // Si rifà solo quando cambiano le domande: gli aggiornamenti della scheda (titolo, caricamento) sono continui.
     function aggiorna(tab) {
-      const domande = tab && Array.isArray(tab.permessi) ? tab.permessi : [];
+      const domande = tab && Array.isArray(tab.permessi) ? tab.permessi.slice(0, RIGHE_MAX) : [];
       const nuova = tab ? `${tab.id}|${domande.map((d) => d.id).join(',')}` : '';
       ensureBar();
       if (!domande.length) {
