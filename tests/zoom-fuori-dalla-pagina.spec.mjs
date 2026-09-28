@@ -424,3 +424,63 @@ test('con un dialogo modale aperto il riquadro si tocca, anche se il dialogo si 
   await battiNelCampo(page, '120');
   await expect.poll(async () => percentOf(app, page)).toBe(120);
 });
+
+// Un clic vero dove si vede il numero vale per il numero, anche quando la pagina
+// ha reso intoccabile il riquadro: un dialogo modale dentro un componente, o
+// aperto dopo il riquadro (un banner dei cookie in ritardo). #686.1 giro 6.
+const cifra = (k) => [{ type: 'keyDown', keyCode: k }, { type: 'char', keyCode: k }, { type: 'keyUp', keyCode: k }];
+async function clicSulNumeroE(app, page, numero) {
+  const b = await page.locator('#__filo-zoom-percent').boundingBox();
+  expect(b, 'il riquadro dello zoom non c\'è').not.toBeNull();
+  const z = (await percentOf(app, page)) / 100; // il riquadro misura in pixel della pagina, il clic in quelli della finestra
+  await manda(app, page, clicIn(Math.round((b.x + b.width / 2) * z), Math.round((b.y + b.height / 2) * z)));
+  for (const k of String(numero)) await manda(app, page, cifra(k));
+  await manda(app, page, [{ type: 'keyDown', keyCode: 'Enter' }, { type: 'keyUp', keyCode: 'Enter' }]);
+  await expect.poll(async () => percentOf(app, page)).toBe(numero);
+}
+
+for (const modo of ['open', 'closed']) {
+  test(`dialogo modale dentro un componente ${modo === 'open' ? 'aperto' : 'chiuso'}: il numero battuto nel riquadro vale`, async ({ app, openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, `<!doctype html><html><body style="height:4000px"><h1>sito</h1><div id="h"></div>
+      <script>const r = document.getElementById('h').attachShadow({ mode: '${modo}' });
+      r.innerHTML = '<dialog id="d"><p>Accetti i cookie?</p><button>Accetta</button></dialog>';
+      r.getElementById('d').showModal();</script></body></html>`);
+    await page.waitForTimeout(800);
+    await manda(app, page, clicIn(150, 600, 'middle'));
+    await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+    await clicSulNumeroE(app, page, 130);
+    expect(await modalita(page), 'confermare il numero non chiude la modalità').toBe('1');
+    // Uno scatto di rotella e un altro numero: il riquadro resta suo.
+    await manda(app, page, [rotella]);
+    await expect.poll(async () => percentOf(app, page)).not.toBe(130);
+    await clicSulNumeroE(app, page, 150);
+  });
+}
+
+test('dialogo modale che si apre dopo il riquadro: il numero battuto vale anche senza girare la rotella', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="height:4000px"><h1>sito</h1>
+    <dialog id="d"><p>Accetti i cookie?</p><button>Accetta</button></dialog></body></html>`);
+  await manda(app, page, clicIn(150, 600, 'middle'));
+  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+  await page.evaluate(() => document.getElementById('d').showModal());
+  await page.waitForTimeout(300);
+  await clicSulNumeroE(app, page, 130);
+});
+
+test('il riquadro dello zoom non vela la pagina su un sito che dà uno sfondo ai livelli in primo piano', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head>
+    <style>::backdrop { background: rgba(0,0,0,.6) !important; backdrop-filter: blur(6px) !important; }</style></head>
+    <body style="height:4000px"><h1>un sito qualunque</h1><p>testo da leggere</p></body></html>`);
+  const velo = () => page.evaluate(() => {
+    const s = getComputedStyle(document.getElementById('__filo-zoom-badge'), '::backdrop');
+    return `${s.backgroundColor} ${s.backdropFilter}`;
+  });
+  // Due volte: la regola se ne va all'uscita e torna all'ingresso.
+  for (let i = 0; i < 2; i++) {
+    await manda(app, page, clicIn(150, 600, 'middle'));
+    await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+    expect(await velo(), 'la pagina si scurisce o si sfoca').toBe('rgba(0, 0, 0, 0) none');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#__filo-zoom-badge')).toHaveCount(0);
+  }
+});

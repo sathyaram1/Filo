@@ -46,6 +46,12 @@ dove il sito non arriva, o ci arriva solo per chiedere:
   resto della pagina diventa intoccabile, e a ogni scatto ricontrolla il posto.
   È fatto di elementi HTML anche dove il documento non lo è (un'immagine SVG
   aperta da sola): prima lì la modalità si apriva senza riquadro (#686.1 giro 5).
+  Dove sta non decide se si tocca: un clic vero che cade dove si vede il
+  riquadro vale per il riquadro, qualunque cosa la pagina gli abbia messo
+  sopra o reso intoccabile (un dialogo modale dentro un componente chiuso, uno
+  aperto dopo il riquadro); le cifre le prende comunque la finestra. Lo sfondo
+  che il sito dà a ogni livello in primo piano (`::backdrop`) lo spegne una
+  regola dell'utente con `!important`, che vince su quelle del sito (#686.1 giro 6).
 
 **Il caso.** #686 aveva chiuso tre porte una dopo l'altra (eventi finti, il
 marcatore «mi zoomo da solo» scritto dal sito, ascoltatori zittiti dal sito
@@ -66,4 +72,4 @@ all'utente comunque. Il riquadro con la percentuale sta ancora nel documento:
 un sito che lo cerca apposta può nasconderlo o toglierlo, non cambiare il numero
 che viene applicato.
 
-Prove: `tests/zoom-fuori-dalla-pagina.spec.mjs` (con i riquadri riempiti dalla pagina, il frameset, l'SVG e il dialogo modale), `tests/unit/zoomPagina.test.mjs`.
+Prove: `tests/zoom-fuori-dalla-pagina.spec.mjs` (con i riquadri riempiti dalla pagina, il frameset, l'SVG, il dialogo modale anche dentro un componente e lo sfondo dei livelli in primo piano), `tests/unit/zoomPagina.test.mjs`.
