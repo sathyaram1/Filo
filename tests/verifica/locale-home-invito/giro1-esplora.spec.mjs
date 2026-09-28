@@ -259,7 +259,7 @@ test('config remota col fornitore gemini: con i crediti Filo funziona', async ({
       provider: { stringValue: 'gemini' },
       geminiDirect: { booleanValue: true },
       modelRegistry: { mapValue: { fields: { base: { mapValue: { fields: { provider: { stringValue: 'openrouter' }, model: { stringValue: 'test/base' } } } } } } },
-      models: { mapValue: { fields: { filo_chat: { stringValue: 'base' }, filo_dashboard: { stringValue: 'base' }, filo_lesson: { stringValue: 'base' }, filo_compact: { stringValue: 'base' } } } },
+      models: { mapValue: { fields: { filo_chat: { stringValue: 'base' }, filo_dashboard: { stringValue: 'base' }, filo_lesson: { stringValue: 'base' }, filo_compact: { stringValue: 'base' }, archive_embed: { stringValue: 'embed-004' } } } },
     },
   };
   await prepara(app);
