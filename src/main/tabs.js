@@ -706,6 +706,7 @@ class TabManager {
       require('./services/downloads').attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
     } catch (_) {}
     installaPermessi(view.webContents.session);
+    require('./services/homeNetwork').attach(view.webContents.session);
     return view;
   }
 
