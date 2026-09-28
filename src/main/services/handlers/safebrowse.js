@@ -54,7 +54,9 @@ module.exports = function register(on, ctx) {
     const mode = Cookies.getMode(settings);
     if (mode === Cookies.MODES.MANUAL) return { ok: true, mode };
     const topUrl = String((sender && sender.url) || origin || '');
-    const off = Cookies.isBannerSiteIn(Cookies.getBannerSites(settings), topUrl);
+    const win = winOf(sender);
+    const hold = !!(win && win._filoTabs && sender.tab && win._filoTabs.cookieHold(sender.tab.id));
+    const off = hold || Cookies.isBannerSiteIn(Cookies.getBannerSites(settings), topUrl);
     const res = { ok: true, mode, off, topUrl };
     if (off) return res;
     res.index = require('../consentRules').detectIndex(topUrl);

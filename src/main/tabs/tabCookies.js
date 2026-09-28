@@ -30,6 +30,7 @@ const cookieMethods = {
 
   // Una pagina nuova dello stesso sito tiene l'esito (il sito ricorda il rifiuto e il banner non torna); un altro sito no.
   _cookieOnNavigate(tab, url) {
+    tab._cookieHold = false;
     if (!tab.cookieOutcome) return;
     if (!isWeb(url) || Cookies.registrableOf(url) !== tab.cookieOutcome.site) tab.cookieOutcome = null;
   },
@@ -42,7 +43,15 @@ const cookieMethods = {
     return { rejected: same && !shown && !!o.rejected, hidden: same && !shown && !!o.hidden, shown };
   },
 
-  // show=true: su questo sito i banner tornano (e il sito dimentica la risposta di Filo); false: Filo riprende a gestirli.
+  // La pagina che sta per essere ricaricata non deve rispondere al banner nel frattempo: il suo clic
+  // scriverebbe una risposta che la pagina nuova troverebbe già data.
+  cookieHold(tabId) {
+    const tab = this.tabs.find((t) => t.id === tabId);
+    return !!(tab && tab._cookieHold);
+  },
+
+  // show=true: su questo sito i banner tornano; false: Filo li riprende. In tutti e due i casi il sito
+  // dimentica la risposta che aveva (cookies.js, configureFromSettings) e la pagina si ricarica.
   async setCookieBanners(tabId, show) {
     const tab = this.tabs.find((t) => t.id === tabId);
     if (!tab || tab.isInternal || !isWeb(tab.url)) return { ok: false, error: 'no_site' };
@@ -53,12 +62,13 @@ const cookieMethods = {
     const list = Cookies.getBannerSites(settings).filter((d) => d !== site);
     if (show) list.push(site);
     list.sort();
-    // Azzerato PRIMA: col ritorno all'automatico la pagina aperta rifiuta subito, e quell'esito deve restare.
     tab.cookieOutcome = null;
+    tab._cookieHold = true;
+    setTimeout(() => { tab._cookieHold = false; }, 15000);
     const { applySettingsUpdate } = require('../services/handlers');
     await applySettingsUpdate({ security: { cookies: { bannerSites: list } } });
     const wc = tab.view && tab.view.webContents;
-    if (show && wc && !wc.isDestroyed()) {
+    if (wc && !wc.isDestroyed()) {
       try { await Cookies.wipeConsentCookies(wc.session, site); } catch (_) {}
       try { await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: WIPE_STORAGE_JS }]); } catch (_) {}
     }

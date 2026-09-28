@@ -317,10 +317,20 @@ function configureForMode(mode) {
 // Ultima modalità/siti fidati visti, così before-quit (sincrono) può lanciare il
 // wipe senza dover rileggere lo storage in modo asincrono.
 let _cached = { mode: MODES.DEFAULT, trustedSites: [], bannerSites: [] };
+let _configured = false;
 
 function configureFromSettings(settings) {
+  const prev = _cached.bannerSites;
   _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings), bannerSites: getBannerSites(settings) };
   configureForMode(_cached.mode);
+  // Un sito che entra o esce dall'elenco coi banner dimentica la risposta data: se no il banner non torna
+  // (entra) o resta la scelta fatta a mano (esce). Vale per ogni strada: menu della scheda, Sicurezza, import.
+  if (_configured) {
+    for (const site of new Set([...prev, ..._cached.bannerSites])) {
+      if (prev.includes(site) !== _cached.bannerSites.includes(site)) wipeConsentEverywhere(site).catch(() => {});
+    }
+  }
+  _configured = true;
 }
 
 function currentMode() { return _cached.mode; }
@@ -367,6 +377,12 @@ function isConsentName(name) {
   return CONSENT_NAME.test(String(name || ''));
 }
 
+async function wipeConsentEverywhere(site) {
+  let n = 0;
+  for (const ses of [session.defaultSession, ...siteSessions.values()]) n += await wipeConsentCookies(ses, site);
+  return n;
+}
+
 async function wipeConsentCookies(ses, site) {
   if (!ses || !ses.cookies || !site) return 0;
   let all = [];
@@ -392,6 +408,7 @@ module.exports = {
   currentMode,
   isConsentName,
   wipeConsentCookies,
+  wipeConsentEverywhere,
   registrableOf,
   isTrackerHost,
   isTrackerUrl,
