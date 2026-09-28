@@ -3903,7 +3903,7 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
 }
 
 // Ogni destinatario riceve il messaggio ritagliato sul PROPRIO indirizzo (frame
-// per frame): un sito non riceve dalla spinta più di quanto potrebbe chiedere.
+// per frame): a un sito arrivano solo i tipi che il codice di Filo lì ascolta.
 function broadcastToTabs(message) {
   try {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -3912,7 +3912,10 @@ function broadcastToTabs(message) {
           try { sendToAllFrames(t.view.webContents, message); } catch (_) {}
         }
       }
-      try { win.webContents.send('filo:broadcast', messaggioPerDestinazione(message, win.webContents.getURL())); } catch (_) {}
+      try {
+        const m = messaggioPerDestinazione(message, win.webContents.getURL());
+        if (m) win.webContents.send('filo:broadcast', m);
+      } catch (_) {}
     }
   } catch (_) {}
 }
