@@ -207,7 +207,7 @@ function buildModels() {
 
 // Il fornitore del documento remoto vale solo se Filo lo sa chiamare e la politica lo ammette: il
 // documento è rimasto su 'gemini' dopo l'uscita di Google, e nessuna chiave lo trovava più.
-function fornitoreUsabile(nome, C) {
+function fornitoreUsabile(nome, C = globalThis.SN_CONST || {}) {
   if (typeof nome !== 'string' || !nome) return false;
   if ((C.PRODUCER_DIRECT_PROVIDERS || []).includes(nome)) return false;
   if (nome === (C.DEFAULT_PROVIDER || 'openrouter')) return true;
