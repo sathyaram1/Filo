@@ -106,6 +106,7 @@ test('notifiche: la pagina aspetta, nessun sì senza risposta; «Consenti» dall
   // La scheda in sottofondo lo segnala; la domanda si vede tornandoci.
   await expect(shell.locator('.tab .perm-ind')).toHaveCount(1, { timeout: 10_000 });
   await expect(riga(shell)).toHaveCount(0);
+  await shell.screenshot({ path: join(SHOTS, 'permessi-scheda-in-attesa.png'), clip: { x: 0, y: 0, width: 640, height: 44 } });
   await shell.locator('.tab', { has: shell.locator('.perm-ind') }).click();
   await expect(riga(shell)).toHaveCount(1);
   await expect(shell.locator('.tab .perm-ind')).toHaveCount(0);
