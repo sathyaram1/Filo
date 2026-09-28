@@ -434,11 +434,15 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       return;
     }
     if (!zoomMode) return;
-    if (isInBadge(e.target)) {
-      if (e.target === percentInput && e.button === 0) {
+    ricontrollaPosto();
+    const dentro = isInBadge(e.target);
+    if (dentro || cadeSu(badge, e)) {
+      const sulCampo = e.target === percentInput || cadeSu(percentInput, e);
+      if (sulCampo && e.button === 0) {
         e.preventDefault();
         iniziaModifica();
       }
+      if (!dentro) { e.preventDefault(); e.stopPropagation(); }
       return;
     }
     if (e.button === 2) suppressContextMenu = true; // il destro chiude e basta
