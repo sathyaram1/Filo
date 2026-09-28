@@ -324,6 +324,24 @@
         + 'profilo utente, preferenze apprese e lezioni non ancora salvate. '
         + 'Filo ripartirà senza ricordare nulla di te.',
     },
+    DIMENTICA: {
+      // Toglie dalla memoria le righe indicate a voce: le stesse della × nelle
+      // Preferenze. Il main risolve la frase in `_righe` prima del gate, mai
+      // l'LLM; nessuna riga → 1, il dispatch lo dice. Oltre tre è quasi un
+      // «dimentica tutto», e chiede di digitare «conferma» come CANCELLA_MEMORIA.
+      level: (a) => {
+        const n = Array.isArray(a && a._righe) ? a._righe.length : 0;
+        return n === 0 ? 1 : n > 3 ? 3 : 2;
+      },
+      describe: (a) => {
+        const righe = Array.isArray(a && a._righe) ? a._righe : [];
+        if (!righe.length) return 'Dimenticare una cosa';
+        return `Filo sta per dimenticare ${righe.length === 1 ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`
+          + righe.map((r) => `• ${r}`).join('\n')
+          + '\n\nNon entreranno più nelle conversazioni.';
+      },
+      describeDone: (a) => `Dimenticato: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
+    },
     IMPOSTA_PREFERENZA: {
       // Livello per-preferenza: lo dichiara il setter in preferences.js
       // (default 1). Preferenza sconosciuta/non valida → 2 per prudenza
