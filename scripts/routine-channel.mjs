@@ -893,6 +893,9 @@ if (isMain) {
   // la stessa cosa: due (uno qui e uno lì) è come si perde un testo per strada.
   if (typeof data.frase === 'string') { data.userNote = data.frase; }
   delete data.frase;
+  // `--ticket` è il nome che usano dispatch e il contratto dei worker: qui vale `--biglietto`.
+  if (typeof data.ticket === 'string' && data.biglietto === undefined) data.biglietto = data.ticket;
+  delete data.ticket;
 
   // `--segnala <file.md>`: la segnalazione per l'owner (L3), letta INTERA dal
   // file con gli stessi controlli di dispatch --record-* (assente, vuoto,
