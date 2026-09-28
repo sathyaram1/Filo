@@ -32,6 +32,8 @@ import {
   leggiArgomenti,
   primaRiga,
   classificaErroriGlobali,
+  chiaviDelVerdetto,
+  FUORI_DAI_CASI,
 } from '../../scripts/suite-verdict.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
