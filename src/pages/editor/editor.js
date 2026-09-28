@@ -4012,21 +4012,6 @@
   function matchShortcut(e, sc) {
     return !!sc && TASTI.combacia(e, sc);
   }
-  // La pressione che una scorciatoia scritta descrive: serve a chiedere a chi
-  // ascolta i tasti se la prenderebbe, con le stesse regole del keydown vero.
-  function pressioneDi(sc) {
-    const parts = shortcutParts(sc);
-    const fin = (parts[parts.length - 1] || '').toLowerCase();
-    const mods = parts.slice(0, -1).map((p) => TASTI.tipoModificatore(p));
-    return {
-      ctrlKey: mods.includes('ctrl'), metaKey: false,
-      shiftKey: mods.includes('shift'),
-      altKey: mods.includes('alt'),
-      key: fin === 'plus' ? '+' : fin,
-      code: '',
-    };
-  }
-
   // I tasti che l'Editor serve PRIMA dei moduli: il keydown li legge da qui e il
   // salvataggio di una scorciatoia li rifiuta da qui, così non possono divergere.
   // `suo`: il modulo per cui quel tasto fa già la sua cosa, e può averlo.
