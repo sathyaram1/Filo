@@ -282,22 +282,27 @@ function leggiNoti(percorso) {
   return Array.isArray(specs) ? specs : [];
 }
 
+function scriviChiavi(opt, chiavi) {
+  if (opt.chiavi) writeFileSync(resolve(opt.chiavi), chiavi.length ? `${chiavi.join('\n')}\n` : '', 'utf8');
+}
+
 async function main() {
   let opt;
   try {
     opt = leggiArgomenti(process.argv.slice(2));
   } catch (e) {
     console.error(String(e.message || e));
-    console.error('Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <rossi-nuovi.txt>] [--rossi <rossi-noti.json>]');
+    console.error('Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <rossi-nuovi.txt>] [--rossi <rossi-noti.json>] [--chiavi <file>]');
     process.exit(2);
   }
   if (!opt.file) {
-    console.error('Manca il JSON dei risultati. Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <file>] [--rossi <file>]');
+    console.error('Manca il JSON dei risultati. Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <file>] [--rossi <file>] [--chiavi <file>]');
     process.exit(2);
   }
   const fileJson = resolve(opt.file);
   if (!existsSync(fileJson)) {
     console.error(`La suite NON è partita: il JSON dei risultati non c'è (${fileJson}). Non è un verde.`);
+    scriviChiavi(opt, [CHIAVE_NON_PARTITA]);
     process.exit(2);
   }
   let json;
@@ -305,6 +310,7 @@ async function main() {
     json = JSON.parse(readFileSync(fileJson, 'utf8'));
   } catch (e) {
     console.error(`La suite NON ha lasciato un esito leggibile (${fileJson}): ${String(e.message || e)}. Non è un verde.`);
+    scriviChiavi(opt, [CHIAVE_NON_PARTITA]);
     process.exit(2);
   }
   let noti;
@@ -313,6 +319,7 @@ async function main() {
     noti = leggiNoti(fileNoti);
   } catch (e) {
     console.error(`L'elenco dei rossi noti non si legge (${fileNoti}): ${String(e.message || e)}.`);
+    scriviChiavi(opt, ['suite:rossi-noti']);
     process.exit(2);
   }
 
@@ -320,6 +327,7 @@ async function main() {
   if (v.totale === 0) {
     console.error('La suite NON ha eseguito nessun caso: non è un verde.');
     for (const e of Array.isArray(json.errors) ? json.errors : []) console.error(`  errore: ${primaRiga(e)}`);
+    scriviChiavi(opt, [CHIAVE_NON_PARTITA]);
     process.exit(2);
   }
   // Gli errori fuori dai casi stanno già dentro `v`: fra i nuovi (rossi) o fra
