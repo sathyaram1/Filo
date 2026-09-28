@@ -179,17 +179,28 @@
   // Le righe che una frase detta a voce indica (#592): quelle uguali, se ce ne
   // sono, altrimenti quelle che la contengono. Ognuna porta il `via` di
   // FILO_MEMORY_FORGET, così la voce toglie esattamente quello che toglie la ×.
+  async function tutteLeRighe() {
+    const { moduli, lezioni } = await viewForUser();
+    return [
+      ...moduli.flatMap((m) => m.righe.map((riga) => ({ testo: riga, via: { modulo: m.nome, riga } }))),
+      ...lezioni.map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } } })),
+    ];
+  }
+
   async function findLines(frase) {
     const norma = (s) => String(s == null ? '' : s).replace(/^\s*[-•*]\s+/, '').replace(/\s+/g, ' ').trim().toLowerCase();
     const cerca = norma(frase);
     if (!cerca) return [];
-    const { moduli, lezioni } = await viewForUser();
-    const tutte = [
-      ...moduli.flatMap((m) => m.righe.map((riga) => ({ testo: riga, via: { modulo: m.nome, riga } }))),
-      ...lezioni.map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } } })),
-    ];
+    const tutte = await tutteLeRighe();
     const uguali = tutte.filter((r) => norma(r.testo) === cerca);
     return uguali.length ? uguali : tutte.filter((r) => norma(r.testo).includes(cerca));
+  }
+
+  // Le righe che ci sono ancora fra quelle che un popup ha mostrato, per testo.
+  async function linesWithText(testi) {
+    const visti = new Set((Array.isArray(testi) ? testi : []).filter((t) => typeof t === 'string'));
+    if (!visti.size) return [];
+    return (await tutteLeRighe()).filter((r) => visti.has(r.testo));
   }
 
   async function forgetLine(via) {

@@ -1152,7 +1152,7 @@ async function navExfilCorpus() {
 // Le pagine interne filo:// (chat della dashboard) restano fidate per origine e
 // non hanno bisogno del pending. Un CONFIRM forgiato senza il RUN corrispondente
 // non ha un pending e viene rifiutato.
-const pendingConfirms = new Map(); // key → scadenza (ms)
+const pendingConfirms = new Map(); // key → { scade, mostrati }
 const PENDING_CONFIRM_TTL = 5 * 60 * 1000;
 // Firma stabile dell'azione: ignora i campi iniettati dal main (prefissati con
 // `_`, es. `_illegible`/`_exfil`/`_confirm`) così RUN e CONFIRM combaciano.
@@ -1312,13 +1312,15 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
   // timer il riferimento dell'utente prende davvero — cosa che solo il main sa,
   // avendo la lista. Risolviamo il riferimento PRIMA del gate e iniettiamo
   // `_targets` (le voci in chiaro, per il popup) e `_targetIds` (su cui agire
-  // dopo la conferma, così la risoluzione non viene rifatta su una lista nel
-  // frattempo cambiata). Mai calcolati dall'LLM.
+  // dopo la conferma: all'OK valgono quelli mostrati, vedi bersagliMostrati).
+  // Mai calcolati dall'LLM.
   if (type === 'CANCELLA_SVEGLIA' || type === 'MODIFICA_SVEGLIA') {
     try {
-      const ref = timerRefOf(action);
       const list = await FiloMem.listTimers();
-      const targets = FiloMem.resolveTimerRefs(list, ref);
+      const visti = confirmed ? bersagliMostrati(sender, action) : null;
+      const targets = visti && Array.isArray(visti.targetIds)
+        ? list.filter((t) => visti.targetIds.includes(t.id))
+        : FiloMem.resolveTimerRefs(list, timerRefOf(action));
       action._targets = targets.map(describeTimerEntry);
       action._targetIds = targets.map((t) => t.id);
     } catch (_) {}
@@ -1332,7 +1334,14 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
     if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
       return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
     }
-    try { righeDaDimenticare = await FiloMem.findLines(action.testo ?? action.text ?? action.riga ?? ''); } catch (_) {}
+    try {
+      if (confirmed) {
+        const visti = bersagliMostrati(sender, action);
+        righeDaDimenticare = await FiloMem.linesWithText(visti && Array.isArray(visti.righe) ? visti.righe : []);
+      } else {
+        righeDaDimenticare = await FiloMem.findLines(action.testo ?? action.text ?? action.riga ?? '');
+      }
+    } catch (_) {}
     action._righe = righeDaDimenticare.map((r) => r.testo);
   }
 
@@ -1399,9 +1408,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
   // sono fidate per origine. Un FILO_CONFIRM_ACTION forgiato "a freddo" da fuori
   // non ha un pending corrispondente → rifiutato (l'azione non si esegue).
   if (level >= 2 && confirmed && !hasBespokeConfirm) {
-    const origin = sender?.tab?.url || sender?.url || '';
-    const trusted = String(origin).startsWith('filo://');
-    if (!trusted && !consumePendingConfirm(sender, action)) {
+    if (!daPaginaDiFilo(sender) && !consumePendingConfirm(sender, action)) {
       console.warn('[Filo] FILO_CONFIRM_ACTION senza conferma legittima: rifiutata', type);
       return { executed: false, kept: false, rejected: true };
     }
