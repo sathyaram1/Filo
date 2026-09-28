@@ -10,11 +10,12 @@ test.use({ argomentiApp: ['--use-fake-device-for-media-stream'] });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const riga = (shell) => shell.locator('#perm-bar .perm-row');
 
-// Appena il menu di Filo compare (dopo un tasto destro vero), la pagina fa `window.__modo` al suo bottone.
-const MENU_OSTILE = `<!doctype html><html><head><title>Ostile</title></head><body>
+// Appena il menu di Filo compare (dopo un tasto destro vero), la pagina fa `__MODO__` al suo bottone. Una pagina per
+// prova: le schede del mini server si ritrovano per nome dell'host.
+const MENU_OSTILE = `<!doctype html><html><head><title>Ostile __MODO__</title></head><body>
 <input id="campo" style="width:300px"><div id="via" style="position:fixed;left:400px;top:300px"></div>
 <script>
-  window.__modo = '';
+  window.__modo = '__MODO__';
   window.__fatto = false;
   const trova = (m) => {
     if (window.__modo === 'detta') return [...m.querySelectorAll('.sn-menu-split-main')].find((x) => x.textContent.includes('Detta'));
@@ -36,16 +37,21 @@ const MENU_OSTILE = `<!doctype html><html><head><title>Ostile</title></head><bod
       document.body.appendChild(velo);
       velo.showPopover();
     } else if (window.__modo === 'sposta-menu') {
-      m.style.left = '420px';
-      m.style.top = '320px';
-    } else { document.getElementById('via').appendChild(b); b.click(); }
+      setTimeout(() => { m.style.left = '420px'; m.style.top = '320px'; }, 300);
+    } else if (window.__modo !== 'niente') { document.getElementById('via').appendChild(b); b.click(); }
   }).observe(document.documentElement, { childList: true, subtree: true });
 </script></body></html>`;
 
-async function apriOstile(app, openTab, testServer, modo) {
+async function apriOstile(app, openTab, testServer, modo, { altroHost = false } = {}) {
   await app.evaluate(({ clipboard }) => clipboard.writeText('password-586'));
-  const page = await testServer.openReady(openTab, MENU_OSTILE);
-  await page.evaluate((m) => { window.__modo = m; }, modo);
+  const html = MENU_OSTILE.replaceAll('__MODO__', modo);
+  const page = altroHost
+    ? await (async () => {
+      const p = await openTab(testServer.html(html).replace('127.0.0.1', 'localhost'));
+      await p.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+      return p;
+    })()
+    : await testServer.openReady(openTab, html);
   await page.locator('#campo').click({ button: 'right' });
   await sleep(600);
   return page;
@@ -59,24 +65,35 @@ for (const modo of ['sposta', 'stacca']) {
   });
 }
 
-test('la pagina non fa partire Detta né apre la cronologia premendo i bottoni che ha spostato', async ({ app, openTab, testServer }) => {
+test('la pagina non fa partire Detta premendo il bottone che ha spostato', async ({ app, openTab, testServer }) => {
   const page = await apriOstile(app, openTab, testServer, 'detta');
   await sleep(800);
   await expect(page.locator('.sn-dictate-pill')).toHaveCount(0);
-  const storia = await apriOstile(app, openTab, testServer, 'storia');
-  await sleep(800);
-  expect(await storia.evaluate(() => document.querySelectorAll('.sn-menu-history-item').length)).toBe(0);
 });
 
-test('un clic vero su Incolla non incolla se la pagina copre il menu o lo porta sotto il cursore', async ({ app, openTab, testServer }) => {
-  for (const modo of ['copri', 'sposta-menu']) {
+test('la pagina non apre la cronologia degli appunti premendo la freccia che ha spostato', async ({ app, openTab, testServer }) => {
+  // Un Incolla vero su un altro sito mette il codice nella cronologia di Filo.
+  await app.evaluate(({ clipboard }) => clipboard.writeText('codice-banca-586'));
+  const banca = await testServer.openReady(openTab, '<!doctype html><title>Banca</title><input id="c">');
+  await banca.locator('#c').click({ button: 'right' });
+  await banca.locator('.sn-menu .sn-menu-paste-main').first().click();
+  await expect(banca.locator('#c')).toHaveValue('codice-banca-586');
+  const page = await apriOstile(app, openTab, testServer, 'storia', { altroHost: true });
+  await sleep(800);
+  expect(await page.evaluate(() => document.body.innerText + [...document.querySelectorAll('.sn-menu-history-item')].map((x) => x.textContent).join())).not.toContain('codice-banca-586');
+});
+
+for (const [modo, cosa] of [['copri', 'copre il menu'], ['sposta-menu', 'porta il menu sotto il cursore']]) {
+  test(`un clic vero su Incolla non incolla se la pagina ${cosa}`, async ({ app, openTab, testServer }) => {
     const page = await apriOstile(app, openTab, testServer, modo);
     await page.locator('.sn-menu .sn-menu-paste-main').click({ force: true });
     await sleep(600);
-    expect(await page.locator('#campo').inputValue(), modo).not.toContain('password-586');
-  }
-  // Lo stesso clic sul menu com'è stato disegnato incolla.
-  const page = await apriOstile(app, openTab, testServer, '');
+    expect(await page.locator('#campo').inputValue()).not.toContain('password-586');
+  });
+}
+
+test('lo stesso clic sul menu com’è stato disegnato incolla', async ({ app, openTab, testServer }) => {
+  const page = await apriOstile(app, openTab, testServer, 'niente');
   await page.locator('.sn-menu .sn-menu-paste-main').click();
   await expect(page.locator('#campo')).toHaveValue('password-586');
 });

@@ -56,11 +56,13 @@
     } catch (_) {}
     return null;
   }
-  // Dove Filo ha posato la radice: un menu spostato dalla pagina sotto il cursore non risponde più.
+  // Dove Filo ha posato la radice (subito dopo averlo scritto): un menu che la pagina sposta non risponde più.
   function ricordaPosto(radice) {
     const st = radice && radici.get(radice);
     if (!st) return;
-    try { const r = radice.getBoundingClientRect(); st.posto = { x: r.left, y: r.top }; } catch (_) {}
+    const x = parseFloat(radice.style.left);
+    const y = parseFloat(radice.style.top);
+    st.posto = Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
   }
   // La radice sta dove Filo l'ha messa, e né lei né chi la contiene è stata resa invisibile o trasparente.
   function integra(radice, st) {
@@ -228,8 +230,10 @@
 
     let from = null;
     if (keep) {
-      const l = parseFloat(root.style.left);
-      const t = parseFloat(root.style.top);
+      // Dove l'ha messo Filo, non quello che c'è scritto adesso: la pagina può averlo spostato.
+      const st = radici.get(root);
+      const l = st && st.posto ? st.posto.x : parseFloat(root.style.left);
+      const t = st && st.posto ? st.posto.y : parseFloat(root.style.top);
       if (Number.isFinite(l) && Number.isFinite(t)) from = { left: l, top: t };
     }
     const p = Place.computeOffset({
