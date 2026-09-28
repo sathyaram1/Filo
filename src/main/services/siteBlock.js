@@ -6,48 +6,26 @@ let enabled = true;
 let useAdblockLists = true;
 let userBlacklist = new Set(); // domini extra inseriti dall'utente
 
-// Second-level public suffix usati dai motori multi-TLD (co.uk, com.au,
-// co.jp, com.tr, …): la label del motore può stare subito prima di questi.
-const PUB_SLD = '(?:co|com|net|org|gov|edu|ac|ne|or|go|nom|nic)';
-
-// Ancora il nome di un motore multi-TLD (google/yahoo/yandex) al DOMINIO
-// REGISTRABILE: lo riconosce solo se <name> è la label subito prima del
-// suffisso pubblico (google.com, google.co.uk, search.yahoo.com, yandex.com.tr),
-// NON se è una label iniziale qualsiasi (google.evil.com, yahoo.phishing.io).
-// Il suffisso è un TLD singolo, eventualmente preceduto da un SLD pubblico;
-// nessuno dei due può contenere una label registrabile arbitraria (#230).
-function engineOnPublicSuffix(name) {
-  return new RegExp(`(^|\\.)${name}\\.(?:${PUB_SLD}\\.)?[a-z]{2,}$`);
-}
-
-// Motori di ricerca il cui referrer rende lecita l'apertura di un sito in
-// blacklist. Riconoscimento per pattern sul dominio registrabile, robusto ai
-// molti TLD di Google/Yandex e ai sottodomini (www., search., ecc.).
-const SEARCH_ENGINE_PATTERNS = [
-  engineOnPublicSuffix('google'), // google.com, google.it, google.co.uk, …
-  /(^|\.)bing\.com$/,
-  /(^|\.)duckduckgo\.com$/,
-  /(^|\.)ecosia\.org$/,
-  /(^|\.)startpage\.com$/,
-  /(^|\.)qwant\.com$/,
-  engineOnPublicSuffix('yahoo'), // search.yahoo.com, yahoo.com, yahoo.co.jp, …
-  engineOnPublicSuffix('yandex'), // yandex.com, yandex.ru, yandex.com.tr, …
-  /(^|\.)baidu\.com$/,
-  /(^|\.)brave\.com$/, // search.brave.com
-  /(^|\.)kagi\.com$/,
-  /(^|\.)mojeek\.com$/,
-  /(^|\.)ask\.com$/,
-  // Solo searx.<suffisso pubblico>: searx.qualunque.com lo registra chiunque (#590).
-  engineOnPublicSuffix('searx'),
+// Pagine dei RISULTATI che concedono l'eccezione: nome esatto E percorso del motore, mai la
+// forma del nome, che chiunque si procura (searx.<qualunque>, sites.google.com: #590). path null = host senza pagine di terzi.
+const RISULTATI = [
+  { host: /^(?:www\.)?google\.(?:com|com?\.[a-z]{2}|[a-z]{2})$/, path: /^\/(?:search|url)$/ },
+  { host: /^(?:www\.)?bing\.com$/, path: /^\/(?:search|ck\/a)$/ },
+  { host: /^(?:html\.|lite\.)?duckduckgo\.com$/, path: null },
+  { host: /^(?:www\.)?ecosia\.org$/, path: /^\/search$/ },
+  { host: /^(?:www\.)?startpage\.com$/, path: /^\/(?:sp|do)\// },
+  { host: /^(?:www\.)?qwant\.com$/, path: null },
+  { host: /^(?:[a-z]{2}\.)?search\.yahoo\.com$/, path: /^\/search/ },
+  { host: /^r\.search\.yahoo\.com$/, path: null },
+  { host: /^search\.yahoo\.co\.jp$/, path: /^\/search/ },
+  { host: /^(?:www\.)?yandex\.(?:com|com\.tr|[a-z]{2})$/, path: /^\/(?:search|clck)(?:\/|$)/ },
+  { host: /^ya\.ru$/, path: /^\/search(?:\/|$)/ },
+  { host: /^(?:www|m)\.baidu\.com$/, path: /^\/(?:s|link)$/ },
+  { host: /^search\.brave\.com$/, path: null },
+  { host: /^kagi\.com$/, path: /^\/search$/ },
+  { host: /^(?:www\.)?mojeek\.com$/, path: /^\/search$/ },
+  { host: /^(?:www\.)?ask\.com$/, path: /^\/web$/ },
 ];
-
-function hostnameOf(url) {
-  try {
-    return new URL(url).hostname.toLowerCase();
-  } catch (_) {
-    return '';
-  }
-}
 
 // Normalizza un dominio inserito dall'utente: toglie schema, path, porta, www.
 function normalizeDomain(raw) {
@@ -93,14 +71,13 @@ function matchesSuffix(host, set) {
   return false;
 }
 
-function isSearchEngineHost(host) {
-  if (!host) return false;
-  return SEARCH_ENGINE_PATTERNS.some((re) => re.test(host));
-}
-
-// Il referrer (o la pagina di partenza) è un motore di ricerca?
+// La pagina di partenza è una pagina di risultati di un motore di ricerca?
 function isSearchEngineUrl(url) {
-  return isSearchEngineHost(hostnameOf(url));
+  let u;
+  try { u = new URL(url); } catch (_) { return false; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  const host = u.hostname.toLowerCase().replace(/\.+$/, '');
+  return RISULTATI.some((r) => r.host.test(host) && (!r.path || r.path.test(u.pathname)));
 }
 
 // L'host è in blacklist? (blacklist dedicata dell'utente, oppure — se
@@ -137,7 +114,7 @@ function shouldBlockNavigation(targetUrl, { fromUrl = '' } = {}) {
   const host = u.hostname.toLowerCase().replace(/\.+$/, '');
   res.host = host;
 
-  if (fromUrl && isSearchEngineHost(hostnameOf(fromUrl))) return res;
+  if (fromUrl && isSearchEngineUrl(fromUrl)) return res;
 
   if (!isBlacklistedHost(host)) return res;
 

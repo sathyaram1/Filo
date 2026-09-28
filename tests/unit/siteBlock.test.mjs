@@ -44,14 +44,15 @@ test('caso 3 (#590): un\'apertura di Filo o del modello non ha esenzioni', () =>
   assert.equal(SB.shouldBlockNavigation('https://evil.example/page', { fromUrl: 'filo://newtab/' }).block, true);
 });
 
-test('#590: l\'eccezione SearX vale solo per searx.<suffisso pubblico>, non per un host qualunque', () => {
+test('#590: l\'eccezione la concede solo una pagina di risultati, non la forma del nome', () => {
   reset();
-  for (const ref of ['https://searx.esempio.com/search?q=x', 'https://searx.evil.example/', 'https://searxbad.com/', 'https://a.searx-finto.io/']) {
+  for (const ref of [
+    'https://searx.esempio.com/search?q=x', 'https://searx.xyz/search?q=x', 'https://searx.be/search?q=x', 'https://searxbad.com/',
+    'https://sites.google.com/view/pagina', 'https://docs.google.com/document/d/x', 'https://www.google.com/maps/place/x',
+    'https://baijiahao.baidu.com/s?id=1', 'https://www.bing.com/maps', 'https://www.ecosia.org/blog',
+  ]) {
     assert.equal(SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block, true, `non deve consentire da ${ref}`);
     assert.equal(SB.isSearchEngineUrl(ref), false, ref);
-  }
-  for (const ref of ['https://searx.be/search?q=x', 'https://searx.org/', 'https://www.searx.me/']) {
-    assert.equal(SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block, false, `deve consentire da ${ref}`);
   }
 });
 
@@ -97,7 +98,9 @@ test('#230: i motori multi-TLD legittimi restano riconosciuti', () => {
     'https://www.google.com.au/search?q=x',
     'https://search.yahoo.com/search?p=x',
     'https://es.search.yahoo.com/search?p=x',
-    'https://yahoo.co.jp/',
+    'https://search.yahoo.co.jp/search?p=x',
+    'https://www.bing.com/ck/a?u=x',
+    'https://www.baidu.com/s?wd=x',
     'https://yandex.ru/search/?text=x',
     'https://yandex.com.tr/search/?text=x',
   ]) {

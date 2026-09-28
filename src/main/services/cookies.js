@@ -208,6 +208,11 @@ const blockState = new WeakMap(); // session → { enabled, filtri }
 let hostChiusoFn = null;
 function chiudiHost(fn) { hostChiusoFn = typeof fn === 'function' ? fn : null; }
 
+// Richieste che l'utente ha fatto passare con «Apri comunque» (#590): senza, il sì
+// sulla lista dei siti bloccati si ferma qui e la scheda finisce su una pagina d'errore.
+let permessoFn = null;
+function permettiRichieste(fn) { permessoFn = typeof fn === 'function' ? fn : null; }
+
 // Registra (se manca) l'unico listener onBeforeRequest della sessione. Tracker e
 // ad-blocking restano spenti finché applyTrackerBlocking non accende i filtri.
 function ensureRequestHook(ses) {
@@ -227,7 +232,7 @@ function ensureRequestHook(ses) {
       return;
     }
     const s = blockState.get(ses);
-    if (!s || !s.filtri) {
+    if (!s || !s.filtri || (permessoFn && permessoFn(details))) {
       callback({ cancel: false });
       return;
     }
@@ -485,6 +490,7 @@ module.exports = {
   applyTrackerBlocking,
   ensureRequestHook,
   chiudiHost,
+  permettiRichieste,
   ensureSiteSession,
   configureForMode,
   configureFromSettings,

@@ -1149,14 +1149,14 @@
     if (!info || !info.text) return;
     // Le azioni che arrivano dal main non possono trasportare funzioni: le
     // codifichiamo in modo dichiarativo e le traduciamo qui in onClick.
-    // - openUrl → apri quel sito bypassando il blocco (#170.3 "Apri comunque").
+    // - openUrl → apri quel sito; con apriComunque scavalca la lista dei siti bloccati (#170.3).
     let opts = info.opts;
     if (opts && Array.isArray(opts.actions)) {
       opts = {
         ...opts,
         actions: opts.actions.map((a) => {
           if (a && a.openUrl && !a.onClick) {
-            return { label: a.label, onClick: () => api.tabs.openBlockedPopup(a.openUrl) };
+            return { label: a.label, onClick: () => api.tabs.openBlockedPopup(a.openUrl, a.apriComunque === true) };
           }
           // F4 — undo auto-feedback: azione dichiarativa cancelAutoFeedback.
           if (a && a.cancelAutoFeedback && !a.onClick) {
