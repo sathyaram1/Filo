@@ -325,6 +325,7 @@ async function avvisa(mancanti, righe) {
           ? `Pubblicazione ferma: manca la chiave di default ${nomi}`
           : 'Pubblicazione ferma: nessuna chiave di default',
         text: testo,
+        keys: chiaviAllarmeBake(mancanti),
       }),
     });
     const body = await res.json().catch(() => ({}));
