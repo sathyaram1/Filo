@@ -390,9 +390,17 @@
     click(which) {
       if (!active) return false;
       const btn = active.root.querySelector('.sn-confirm-btn-' + which);
-      if (!btn || btn.disabled) return false;
+      if (!btn || btn.disabled || btn.getAttribute('aria-disabled') === 'true') return false;
       btn.click();
       return true;
+    },
+    // Centro di un bottone, per un clic vero del mouse (anche su OK in attesa).
+    point(which) {
+      if (!active) return null;
+      const btn = active.root.querySelector('.sn-confirm-btn-' + which);
+      if (!btn) return null;
+      const r = btn.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     },
     // Fa scorrere il testo fino in fondo, come chi lo legge tutto.
     scrollToEnd() {
