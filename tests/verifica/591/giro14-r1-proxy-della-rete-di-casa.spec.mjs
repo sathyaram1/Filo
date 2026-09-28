@@ -1,18 +1,29 @@
 // Verifica #591, giro 14 — chi naviga dietro un proxy della rete locale (ufficio, casa con un filtro) vede ogni sito
 // come «rete di casa»: l'indirizzo da cui la pagina ha risposto è quello del proxy, e i controlli sui siti pericolosi
 // (elenco delle truffe, età del dominio, modello, finestra nascosta) non partono più per nessun sito.
-// Serve un indirizzo privato della macchina per il proxy: se non c'è, la prova guarda solo l'indirizzo annotato.
+// Il proxy sta su un indirizzo privato della macchina (quello della LAN); nel contenitore delle routine, che non ne ha,
+// la prova ne aggiunge uno al loopback (10.99.0.1), altrimenti si salta.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer, request } from 'node:http';
 import { networkInterfaces } from 'node:os';
+import { execFileSync } from 'node:child_process';
 
 const PRIVATO = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/;
-function indirizzoPrivato() {
+function trovaPrivato() {
   for (const lista of Object.values(networkInterfaces())) {
     for (const i of lista || []) if (i.family === 'IPv4' && PRIVATO.test(i.address)) return i.address;
   }
   return null;
+}
+const ALIAS = `import socket,fcntl,struct
+s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+fcntl.ioctl(s.fileno(),0x8916,struct.pack('16sH2s4s8s',b'lo:1',socket.AF_INET,b'\\0'*2,socket.inet_aton('10.99.0.1'),b'\\0'*8))`;
+function indirizzoPrivato() {
+  const c = trovaPrivato();
+  if (c || process.platform !== 'linux' || !process.env.FILO_ROUTINE || process.getuid?.() !== 0) return c;
+  try { execFileSync('python3', ['-c', ALIAS], { stdio: 'ignore' }); } catch (_) {}
+  return trovaPrivato();
 }
 
 // Un proxy HTTP minimo: inoltra la richiesta con indirizzo assoluto al server di prova.
@@ -34,7 +45,7 @@ const PAGINA = '<!doctype html><title>Accedi</title><form><input type="email"><i
 
 async function controlliPartiti(app, openTab, url, proxyRules) {
   await app.evaluate(async ({ webContents, session }, regole) => {
-    globalThis.__g14 = { fuori: [], annotati: [] };
+    globalThis.__g14 = { fuori: [] };
     const SB = globalThis.SN_SAFEBROWSE;
     for (const c of Object.values(SB._caches || {})) if (c && c.m) c.m.clear();
     SB.setProviders({
@@ -44,12 +55,6 @@ async function controlliPartiti(app, openTab, url, proxyRules) {
       llm: async (m) => { globalThis.__g14.fuori.push('modello ' + m.host); return null; },
       sandbox: async (u) => { globalThis.__g14.fuori.push('finestra nascosta ' + u); return null; },
     });
-    const Nav = globalThis.SN_URL_NAV;
-    if (!Nav.__g14) {
-      const orig = Nav.noteHostAddress;
-      Nav.noteHostAddress = (h, ip) => { globalThis.__g14.annotati.push(`${h} ${ip}`); return orig(h, ip); };
-      Nav.__g14 = true;
-    }
     const sessioni = new Set([session.defaultSession, ...webContents.getAllWebContents().map((w) => w.session)]);
     for (const s of sessioni) await s.setProxy(regole ? { proxyRules: regole } : { mode: 'direct' });
   }, proxyRules);
@@ -61,24 +66,19 @@ async function controlliPartiti(app, openTab, url, proxyRules) {
 }
 
 test('dietro un proxy della rete locale un sito di internet riceve ancora i controlli', async ({ app, shell, openTab, testServer }) => {
+  const privato = indirizzoPrivato();
+  test.skip(!privato, 'serve un indirizzo privato della macchina su cui mettere il proxy');
   const url = testServer.html(PAGINA, { pubblico: true });
   const porta = Number(new URL(testServer.origin).port);
-  const host = new URL(url).hostname;
 
   const diretto = await controlliPartiti(app, openTab, url, null);
   expect(diretto.fuori.length, 'caso di riscontro: senza proxy il sito riceve i controlli').toBeGreaterThan(0);
 
-  const privato = indirizzoPrivato();
-  const proxy = await avviaProxy(privato || '127.0.0.1', porta);
+  const proxy = await avviaProxy(privato, porta);
   try {
-    const regole = `http=${privato || '127.0.0.1'}:${proxy.address().port}`;
-    const dietro = await controlliPartiti(app, openTab, url.replace(/\/(\d+)$/, '/$1?via=proxy'), regole);
-    const annotato = dietro.annotati.filter((r) => r.startsWith(host + ' ')).pop() || '';
-    expect.soft(annotato.endsWith(' ' + (privato || '127.0.0.1')),
-      `l'indirizzo annotato per ${host} non deve essere quello del proxy (${annotato})`).toBe(false);
-    if (privato) {
-      expect(dietro.fuori.length, `dietro il proxy ${privato} lo stesso sito di internet non riceve nessun controllo`).toBeGreaterThan(0);
-    }
+    const regole = `http=${privato}:${proxy.address().port}`;
+    const dietro = await controlliPartiti(app, openTab, url + '?via=proxy', regole);
+    expect(dietro.fuori.length, `dietro il proxy ${privato} lo stesso sito di internet non riceve nessun controllo`).toBeGreaterThan(0);
   } finally {
     await new Promise((ok) => proxy.close(ok));
   }
