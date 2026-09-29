@@ -905,8 +905,6 @@
       okLabel: 'Svuota',
     });
     if (!ok) return;
-    clearTimeout(chatSaveTimers.get(deck.id));
-    chatSaveTimers.delete(deck.id);
     chatByDeck.set(deck.id, []);
     if (current && current.id === deck.id) renderChat(true);
     await send({ type: MSG.DECKS_CHAT_CLEAR, deckId: deck.id, clientId: chatClientId }).catch(() => {});
