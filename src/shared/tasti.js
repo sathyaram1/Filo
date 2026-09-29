@@ -75,8 +75,20 @@
 
   // "Ctrl+Shift+1" → ["Ctrl", "Shift", "1"]. Il tasto finale può essere un "+"
   // (Ctrl++ non esiste in Filo, ma la spaccatura non deve rovinarlo comunque).
+  // Senza nessun «+» si separa anche col trattino o con lo spazio («Ctrl-S», «Ctrl Shift 2»):
+  // si staccano i modificatori in testa e il resto è il tasto («Ctrl Freccia giù», «Ctrl--»).
   function pezzi(accel) {
-    return String(accel || '').split('+').map((p) => p.trim()).filter(Boolean);
+    const testo = String(accel || '').trim();
+    if (testo.includes('+')) return testo.split('+').map((p) => p.trim()).filter(Boolean);
+    const parti = [];
+    let resto = testo;
+    let m;
+    while ((m = /^([^\s-]+)(\s*-\s*|\s+)/.exec(resto)) && tipoModificatore(m[1])) {
+      parti.push(m[1]);
+      resto = resto.slice(m[0].length);
+    }
+    if (resto.trim()) parti.push(resto.trim());
+    return parti;
   }
 
   // Anche i nomi italiani e i simboli del Mac: un modificatore che non si
