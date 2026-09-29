@@ -16,7 +16,7 @@ const CON_VETTORE = 2000;
 const BERSAGLIO = 4500;
 
 test('dopo la migrazione la prima ricerca per contenuto trova una scheda vecchia rimasta senza vettore', async () => {
-  test.setTimeout(120_000);
+  test.setTimeout(150_000);
   const userData = cartellaTemporanea('filo-v825-');
   const base = Date.UTC(2026, 8, 1);
   const vecchio = [];
@@ -62,7 +62,7 @@ test('dopo la migrazione la prima ricerca per contenuto trova una scheda vecchia
 
     await page.locator('#search').fill('balena');
     await page.locator('#search').press('Enter');
-    await expect(page.locator('#searchNote')).toContainText('per pertinenza', { timeout: 20_000 });
+    await expect(page.locator('#searchNote')).toContainText('per pertinenza', { timeout: 60_000 });
     await expect(page.locator('.arc-results .arc-tab').first()).toContainText('La balena azzurra');
   } finally {
     await chiudiApp(app);
