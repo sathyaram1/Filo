@@ -39,10 +39,19 @@ test('la cancellazione chiesta in chat propone solo le schede pertinenti', async
       const order = [...u.matchAll(/#(\d+) Foto di gatti/g)].map((m) => Number(m[1]));
       return { text: JSON.stringify({ order }), provider: 'openrouter', model: 'stub', usage: {} };
     };
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
-      const text = JSON.stringify({ text: 'Ecco le schede da eliminare.', actions: [{ type: 'CANCELLA_ARCHIVIO', query: 'pagine sui gatti' }] });
-      try { onDelta && onDelta(text); } catch (_) {}
-      return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    let giro = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta, onToolCall }) => {
+      giro += 1;
+      const calls = giro === 1
+        ? [{ id: 'c1', name: 'CANCELLA_ARCHIVIO', arguments: JSON.stringify({ query: 'pagine sui gatti' }) }]
+        : [];
+      for (const c of calls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
+      const text = giro === 1 ? '' : 'Ecco le schede da eliminare: è definitivo.';
+      if (text) { try { onDelta && onDelta(text); } catch (_) {} }
+      return {
+        model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        text, toolCalls: calls, reasoningDetails: [], finishReason: calls.length ? 'tool_calls' : 'stop',
+      };
     };
   });
 
