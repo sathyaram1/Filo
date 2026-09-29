@@ -3409,11 +3409,11 @@ require('./handlers/misc')(on, handlerCtx);
 async function handleMessage(msg, sender = {}) {
   const origin = sender?.tab?.url || sender?.url || '';
   // Da una pagina che non è di Filo passano solo le domande della lista del confine (#589.1).
-  if (daUnSito(origin, sender) && !domandaAmmessaDaUnSito(msg?.type, {
+  if (daUnSito(origin, sender) && !(domandaAmmessaDaUnSito(msg?.type, {
     inVista: inPrimoPiano(sender),
     schedaInVista: schedaInPrimoPiano(sender),
     disegnoSullaBarra: Boolean(sender?.win?._filoDisegnoSullaBarra),
-  }, msg)) {
+  }, msg) && require('./permessiPagine').spendiGesto(sender?.wc, gestiChiesti(msg?.type, msg)))) {
     return { ok: false, code: 'forbidden', error: 'forbidden' };
   }
   const fn = registry.get(msg.type);
