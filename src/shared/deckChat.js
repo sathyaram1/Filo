@@ -156,5 +156,5 @@
     return [...seen];
   }
 
-  global.SN_DECK_CHAT = { MAX_MESSAGES, cleanMessage, cleanChat, fits, historyFor, cardIdsOf };
+  global.SN_DECK_CHAT = { MAX_MESSAGES, cleanMessage, cleanChat, fits, forReading, applyEdit, historyFor, cardIdsOf };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
