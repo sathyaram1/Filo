@@ -52,23 +52,20 @@
   // È logica pura: i chiamanti (pageColor.js) le passano gli RGBA del canvas,
   // così è unit-testabile senza Electron.
 
-  // I sei parametri della spec. Default = tab dal colore vivace e riconoscibile.
-  // I primi cinque governano l'ESTRAZIONE dal favicon (qui sotto); il sesto,
-  // `opacita_tab`, governa il BLEND sullo sfondo della barra
-  // (inactiveTabBackground) e per questo non sta in IDENTITY_PARAMS.
+  // I tre parametri dell'ESTRAZIONE dal favicon. Saturazione e luminosità si
+  // applicano solo a schermo (adaptIdentity): il colore salvato del sito tiene la
+  // tinta anche se l'utente passa da saturazione 0 (#821).
   const IDENTITY_PARAMS = {
     soglia_saturazione: 0.30, // 0–0.5: sotto questa saturazione il pixel è ignorato dal path cromatico
     peso_centralita: 5.0,     // 0–10: forza del bias gaussiano verso il centro del favicon
     bucket_tinta: 2,          // 2–48: divisioni della ruota cromatica per il clustering
-    saturazione_tab: 1.0,     // 0–1: saturazione del colore cromatico adattato
-    luminosita_tab: 0.5,      // 0–1: luminosità del colore cromatico adattato
   };
 
   // Meta dei SEI parametri: è l'unica fonte di verità per i default, i range, le
   // etichette e i commenti mostrati nelle Preferenze avanzate (la "zona codice")
   // e per la validazione quando li si cambia (a voce dalla chat o nelle prefs).
-  // `stage`: 'extract' = usato dall'estrazione del favicon; 'blend' = usato dalla
-  // shell per il mix col fondo del tab bar.
+  // `stage`: 'extract' = estrazione dal favicon; 'adapt' e 'blend' = applicati a
+  // schermo, sul colore salvato del sito.
   const IDENTITY_PARAM_META = [
     { key: 'soglia_saturazione', def: 0.30, min: 0, max: 0.5, step: 0.01, stage: 'extract',
       label: 'Soglia saturazione',
@@ -79,10 +76,10 @@
     { key: 'bucket_tinta', def: 2, min: 2, max: 48, step: 1, stage: 'extract',
       label: 'Bucket tinta',
       comment: 'In quante fasce si divide la ruota dei colori per scegliere la tinta dominante. Pochi bucket = colori raggruppati; molti = distinzione più fine fra tinte simili.' },
-    { key: 'saturazione_tab', def: 1.0, min: 0, max: 1, step: 0.05, stage: 'extract',
+    { key: 'saturazione_tab', def: 1.0, min: 0, max: 1, step: 0.05, stage: 'adapt',
       label: 'Saturazione tab',
       comment: 'Quanto è viva la tinta finale applicata alla tab. 0 = grigia, 1 = piena.' },
-    { key: 'luminosita_tab', def: 0.5, min: 0, max: 1, step: 0.05, stage: 'extract',
+    { key: 'luminosita_tab', def: 0.5, min: 0, max: 1, step: 0.05, stage: 'adapt',
       label: 'Luminosità tab',
       comment: 'Quanto è chiara la tinta finale. 0 = scura, 1 = chiara.' },
     { key: 'opacita_tab', def: 0.6, min: 0, max: 1, step: 0.05, stage: 'blend',
@@ -189,11 +186,10 @@
       let win = buckets[0];
       for (let i = 1; i < bucketCount; i++) if (buckets[i].score > win.score) win = buckets[i];
       if (win.score > 0) {
-        // Media pesata del bucket vincente → tinta brand. Adattamento palette:
-        // mantieni la tinta, sostituisci saturazione e luminosità coi parametri,
-        // così il colore cachato è canonico e vivace (la shell lo mescola solo col fondo).
+        // Media pesata del bucket vincente → tinta brand, salvata piena (s 1, l 0,5):
+        // saturazione_tab e luminosita_tab le applica chi la mostra (adaptIdentity).
         const [h] = rgbToHsl(win.r / win.score, win.g / win.score, win.b / win.score);
-        const [ar, ag, ab] = hslToRgb(h, p.saturazione_tab, p.luminosita_tab);
+        const [ar, ag, ab] = hslToRgb(h, 1, 0.5);
         return `rgb(${ar}, ${ag}, ${ab})`;
       }
     }

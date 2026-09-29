@@ -331,6 +331,31 @@ test.describe('tinta viva delle schede non attive', () => {
     await shell.emulateMedia({ colorScheme: 'light' });
     await expectFormula(0.6, false);
   });
+
+  // #821: la scheda attiva che ripiega sul colore del sito sceglie il testo con la stessa regola.
+  test('scheda attiva col rosso del sito (cima bianca): titolo a 4,5:1 e crocetta a 3:1, nei due temi', async () => {
+    await testServer.openReady(openTab, PAGE_RED.replace('Sito rosso', 'Rosso in primo piano')
+      .replace('margin:0;', 'margin:0;background:#fff;'));
+    const readActive = () => shell.evaluate(() => {
+      const el = document.querySelector('.tab.active[data-tip="Rosso in primo piano"]');
+      if (!el) return null;
+      const nums = (c) => (/rgba?\(([^)]+)\)/.exec(c) || [, ''])[1].split(',').slice(0, 3).map(Number);
+      return {
+        bg: nums(getComputedStyle(el).backgroundColor),
+        title: nums(getComputedStyle(el.querySelector('.title')).color),
+        close: nums(getComputedStyle(el.querySelector('.close')).color),
+      };
+    });
+    for (const scheme of ['light', 'dark']) {
+      await shell.emulateMedia({ colorScheme: scheme });
+      let r = null;
+      await expect.poll(async () => {
+        r = await readActive();
+        return !!r && near(r.bg, [255, 0, 0]) && contrast(r.title, r.bg) >= 4.5;
+      }, { timeout: 9_000 }).toBe(true);
+      expect(contrast(r.close, r.bg), `${scheme}: crocetta ${r.close} su ${r.bg}`).toBeGreaterThanOrEqual(3);
+    }
+  });
 });
 
 // ──────────────────────────── tab-favicon-color ────────────────────────────

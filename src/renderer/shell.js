@@ -490,18 +490,6 @@
     '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/>' +
     '<path d="M12 3a13.5 13.5 0 0 1 0 18"/><path d="M12 3a13.5 13.5 0 0 0 0 18"/></svg>';
 
-  // "Vetro smerigliato" della tab attiva (§1.1): dato il colore campionato dal
-  // sito, scegli un testo leggibile per contrasto (luminanza relativa).
-  function readableOn(rgbStr) {
-    const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-    if (!m) return null;
-    const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-    if (p.length < 3 || p.some((n) => Number.isNaN(n))) return null;
-    const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-    const L = 0.2126 * lin(p[0]) + 0.7152 * lin(p[1]) + 0.0722 * lin(p[2]);
-    return L > 0.45 ? '#1a1918' : '#f8f6f0';
-  }
-
   // Un colore "ha identità" solo se ha croma sufficiente: bianco/nero/grigio
   // (es. l'header bianco di YouTube campionato per il vetro smerigliato §1.1)
   // non rappresentano il sito. Soglia allineata a SN_TAB_COLOR
@@ -646,14 +634,27 @@
     if (drag) return;
     // tabs
     tabsEl.innerHTML = '';
+    // Colori veri del tema, letti una volta per render e solo se servono.
+    let theme;
+    const themeColors = () => {
+      if (theme === undefined) {
+        const bar = TabColor.resolveCssColor(document, 'var(--tab-bg)');
+        const page = TabColor.resolveCssColor(document, 'var(--bg)');
+        const fg = TabColor.resolveCssColor(document, 'var(--fg)');
+        theme = bar && page && fg ? { bar, page, fg } : null;
+      }
+      return theme;
+    };
+    // Il colore salvato del sito ha la tinta piena: saturazione e luminosità dell'utente si applicano qui.
+    const siteColor = (t) => {
+      const c = TabColor && t.identityColor ? TabColor.adaptIdentity(t.identityColor, tabColorParams) : null;
+      return c ? TabColor.rgbCss(c) : null;
+    };
     // opacita_tab 0 = nessun colore: la scheda resta identica a una senza favicon.
     let tabPaint = null;
     if (TabColor && tabColorParams && tabColorParams.opacita_tab > 0
       && state.tabs.some((t) => t.id !== state.activeId && t.identityColor)) {
-      const bar = TabColor.resolveCssColor(document, 'var(--tab-bg)');
-      const page = TabColor.resolveCssColor(document, 'var(--bg)');
-      const fg = TabColor.resolveCssColor(document, 'var(--fg)');
-      if (bar && page && fg) tabPaint = { bar, page, fg };
+      tabPaint = themeColors();
     }
     for (const t of state.tabs) {
       const el = document.createElement('div');
@@ -661,19 +662,19 @@
       el.dataset.id = t.id;
       el.dataset.tip = t.title || t.url;
 
-      // Tab attiva: tingila col colore live del sito (§1.1). Sovrascriviamo la
-      // variabile --tab-active così anche i "piedini" a goccia (::before/::after)
-      // assumono lo stesso colore. Il testo passa a chiaro/scuro per contrasto.
-      // Se il colore campionato dalla cima pagina è neutro (header bianco/grigio:
-      // es. YouTube) non porta identità → ripieghiamo sul colore identità del
-      // sito (theme-color/favicon), così la tab attiva mostra il brand e non il
-      // bianco. Se manca anche quello, si resta sul colore campionato.
+      // Tab attiva: il colore della cima della pagina (§1.1), anche nei "piedini" a
+      // goccia via --tab-active. Una cima neutra (l'header bianco di YouTube) non è
+      // il sito: si ripiega sul suo colore. Inchiostro con la regola delle inattive.
       if (t.id === state.activeId) {
-        const activeColor = hasColorIdentity(t.color) ? t.color : (t.identityColor || t.color);
+        const activeColor = hasColorIdentity(t.color) ? t.color : (siteColor(t) || t.color);
         if (activeColor) {
-          const fg = readableOn(activeColor);
           el.style.setProperty('--tab-active', activeColor);
-          if (fg) el.style.color = fg;
+          const c = TabColor ? themeColors() : null;
+          const ink = c && TabColor.readableInk([activeColor], [c.fg, c.page]);
+          if (ink) {
+            el.classList.add('inked');
+            el.style.setProperty('--tab-ink', TabColor.rgbCss(ink));
+          }
         }
       }
 
@@ -684,7 +685,7 @@
         const bg = TabColor.inactiveTabBackground(t.identityColor, tabPaint.bar, tabColorParams);
         if (bg) {
           const { ink, hover } = TabColor.inkAndHover(bg, tabPaint.fg, tabPaint.page);
-          el.classList.add('tinted');
+          el.classList.add('tinted', 'inked');
           el.style.setProperty('--tab-bg-eff', TabColor.rgbCss(bg));
           el.style.setProperty('--tab-bg-hover', TabColor.rgbCss(hover));
           el.style.setProperty('--tab-ink', TabColor.rgbCss(ink));
@@ -699,8 +700,7 @@
         el.classList.add('audible');
         // Calcola il colore del bagliore: usa il colore identità se disponibile,
         // altrimenti l'accento Filo come fallback. Desaturiamo già via CSS.
-        const glowBase = hasColorIdentity(t.color) ? t.color
-          : (t.identityColor || null);
+        const glowBase = hasColorIdentity(t.color) ? t.color : siteColor(t);
         if (glowBase) {
           el.style.setProperty('--tab-glow-color', glowBase);
         }

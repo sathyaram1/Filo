@@ -29,10 +29,15 @@ ma il suo brand è il rosso del favicon → la tab dev'essere rossa, non bianca.
   `saturazione_tab`, `luminosita_tab`, `opacita_tab`). La **fonte di verità** di
   default/range/etichette/commenti è **una sola**: `IDENTITY_PARAM_META` in
   `src/shared/tabColor.js` (con `defaultParams()`/`clampParams()`). I primi
-  cinque (`stage:'extract'`) sono passati a `extractIdentityFromPixels`; il
-  sesto (`opacita_tab`, `stage:'blend'`) è l'opacità del blend sul fondo della
-  barra. I valori vivono in `settings.tabColor`; `DEFAULT_SETTINGS` in
+  tre (`stage:'extract'`) scelgono la tinta dal favicon; saturazione e
+  luminosità (`stage:'adapt'`) e opacità (`stage:'blend'`) si applicano solo a
+  schermo. I valori vivono in `settings.tabColor`; `DEFAULT_SETTINGS` in
   `constants.js` deve restare allineato ai default del meta.
+- **Il colore salvato è la tinta piena (#821):** estrazione, cache per dominio,
+  Cronologia e sessione tengono la tinta a saturazione 1 e luminosità 0,5; chi
+  la mostra (barra, scheda attiva, bagliore audio, Cronologia) passa da
+  `adaptIdentity`. Salvarla già adattata la perdeva per sempre a saturazione 0.
+  Sentinella in `tests/unit/preferences.test.mjs`.
 - **Tab inattive, nessuna attenuazione in più (#821):** fondo = adattato ×
   `opacita_tab` + neutro della barra (`--tab-bg`) × (1 − `opacita_tab`), e basta:
   con saturazione e opacità a 1 la scheda di YouTube è rosso YouTube, a opacità
@@ -43,7 +48,8 @@ ma il suo brand è il rosso del favicon → la tab dev'essere rossa, non bianca.
   risolti a ogni render con `resolveCssColor`; al cambio di tema la shell
   ridipinge.
 - **Il testo segue il fondo vero:** titolo, crocetta e indicatori di una scheda
-  colorata prendono l'inchiostro di `inkAndHover` (contrasto ≥ 4,5:1, #710, col
+  colorata, attiva compresa (classe `inked`), prendono l'inchiostro di
+  `readableInk`/`inkAndHover` (contrasto ≥ 4,5:1, #710, col
   ripiego su nero o bianco); l'hover va verso il polo del tema lontano
   dall'inchiostro, così non abbassa mai il contrasto. L'accento e il grigio
   morbido sparirebbero su una tinta viva.

@@ -201,19 +201,20 @@ html[data-chrome-compact="1"] .addr {
   animation: tab-glow-pulse 2.4s ease-in-out infinite;
 }
 .tab:hover { background: color-mix(in srgb, var(--tab-bg-eff) 85%, var(--bg)); }
-/* Scheda non attiva col colore del sito: titolo, crocetta e indicatori prendono l'inchiostro che shell.js
+/* Scheda col colore del sito, attiva o no: titolo, crocetta e indicatori prendono l'inchiostro che shell.js
    sceglie per contrasto su quel fondo (l'accento o il grigio morbido sparirebbero su una tinta viva). */
-.tab.tinted { color: var(--tab-ink); }
+.tab.inked,
+.tab.active.inked { color: var(--tab-ink); }
 .tab.tinted:hover { background: var(--tab-bg-hover); }
-.tab.tinted .close,
-.tab.tinted .close:hover,
-.tab.tinted .mute-ind,
-.tab.tinted .favicon.favicon-audible,
-.tab.tinted .proxy-ind { color: inherit; }
-.tab.tinted .close:hover { background: color-mix(in srgb, currentColor 18%, transparent); }
+.tab.inked .close,
+.tab.inked .close:hover,
+.tab.inked .mute-ind,
+.tab.inked .favicon.favicon-audible,
+.tab.inked .proxy-ind { color: inherit; }
+.tab.inked .close:hover { background: color-mix(in srgb, currentColor 18%, transparent); }
 /* Un favicon del colore del suo sito sparirebbe sulla sua scheda a tinta piena: un filo d'inchiostro ne tiene la sagoma. */
-.tab.tinted .favicon:not(.favicon-audible) { filter: drop-shadow(0 0 1px color-mix(in srgb, var(--tab-ink) 60%, transparent)); }
-.tab.tinted .spinner {
+.tab.inked .favicon:not(.favicon-audible) { filter: drop-shadow(0 0 1px color-mix(in srgb, var(--tab-ink) 60%, transparent)); }
+.tab.inked .spinner {
   border-color: color-mix(in srgb, currentColor 30%, transparent);
   border-top-color: currentColor;
 }
