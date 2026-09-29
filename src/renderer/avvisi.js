@@ -1,0 +1,117 @@
+// Disegna sopra la pagina gli avvisi della barra (#588.5). Non decide niente: tetto, tempi,
+// chiavi e azioni restano nella shell, che qui manda lo stato; i clic tornano a lei.
+(() => {
+  'use strict';
+  const api = window.avvisi;
+  if (!api) return;
+  const root = document.documentElement;
+  const vassoio = document.getElementById('vassoio');
+  const pila = document.getElementById('pila');
+  const carte = new Map();
+  const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
+  let ultimaMisura = '';
+
+  function applicaTema(tema) {
+    const vars = tema && typeof tema.vars === 'object' && tema.vars ? tema.vars : {};
+    for (const [k, v] of Object.entries(vars)) {
+      if (!NOME_VAR.test(k)) continue;
+      if (typeof v === 'string' && v.trim()) root.style.setProperty(k, v.trim());
+      else root.style.removeProperty(k);
+    }
+  }
+
+  function normalizza(stato) {
+    const lista = Array.isArray(stato && stato.carte) ? stato.carte : [];
+    return lista.map((c) => ({
+      id: String((c && c.id) || ''),
+      testo: String((c && c.testo) || ''),
+      azioni: Array.isArray(c && c.azioni) ? c.azioni.map((a) => String(a || '')) : [],
+      chiusa: !!(c && c.chiusa),
+    })).filter((c) => c.id);
+  }
+
+  function pulsante(classe, testo, azione) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = classe;
+    b.textContent = testo;
+    b.dataset.azione = azione;
+    return b;
+  }
+
+  function costruisci(c) {
+    const card = document.createElement('div');
+    card.className = 'shell-notif';
+    card.dataset.nid = c.id;
+    const msg = document.createElement('div');
+    msg.className = 'shell-notif-msg';
+    card.appendChild(msg);
+    const chiudi = pulsante('shell-notif-close', '×', 'chiudi');
+    chiudi.setAttribute('aria-label', 'Chiudi notifica');
+    card.appendChild(chiudi);
+    return card;
+  }
+
+  function aggiorna(card, c) {
+    const msg = card.querySelector('.shell-notif-msg');
+    if (msg.textContent !== c.testo) msg.textContent = c.testo;
+    const firma = JSON.stringify(c.azioni);
+    if (card.dataset.firma !== firma) {
+      card.dataset.firma = firma;
+      const vecchia = card.querySelector('.shell-notif-actions');
+      if (vecchia) vecchia.remove();
+      if (c.azioni.length) {
+        const bar = document.createElement('div');
+        bar.className = 'shell-notif-actions';
+        c.azioni.forEach((etichetta, i) => bar.appendChild(pulsante('shell-notif-action', etichetta, String(i))));
+        card.insertBefore(bar, card.querySelector('.shell-notif-close'));
+      }
+    }
+  }
+
+  // Misura sincrona a ogni disegno: la vista nasce nascosta e grande zero, e lì il giro di
+  // rendering (e con lui il ResizeObserver) può non partire mai.
+  function misura() {
+    const w = carte.size ? Math.ceil(pila.offsetWidth) : 0;
+    const h = carte.size ? Math.ceil(pila.offsetHeight) : 0;
+    const chiave = w + 'x' + h;
+    if (chiave === ultimaMisura) return;
+    ultimaMisura = chiave;
+    api.misura(w, h);
+  }
+
+  api.onStato((stato) => {
+    applicaTema(stato && stato.tema);
+    const lista = normalizza(stato);
+    const vivi = new Set(lista.map((c) => c.id));
+    for (const [id, el] of carte) {
+      if (!vivi.has(id)) { el.remove(); carte.delete(id); }
+    }
+    const nuove = [];
+    lista.forEach((c, i) => {
+      let el = carte.get(c.id);
+      if (!el) { el = costruisci(c); carte.set(c.id, el); if (!c.chiusa) nuove.push(el); }
+      if (pila.children[i] !== el) pila.insertBefore(el, pila.children[i] || null);
+      aggiorna(el, c);
+      if (c.chiusa) el.classList.remove('show');
+    });
+    if (nuove.length) {
+      // eslint-disable-next-line no-unused-expressions
+      pila.offsetHeight;
+      for (const el of nuove) el.classList.add('show');
+    }
+    misura();
+    if (nuove.length) vassoio.scrollTop = vassoio.scrollHeight;
+  });
+
+  try { new ResizeObserver(misura).observe(pila); } catch (_) {}
+  // Finestra bassa: la vista è più corta della pila e scorre; in vista resta la più recente.
+  window.addEventListener('resize', () => { vassoio.scrollTop = vassoio.scrollHeight; });
+
+  pila.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-azione]');
+    const card = b && b.closest('.shell-notif');
+    if (!card || card.classList.contains('show') === false) return;
+    api.clic(card.dataset.nid, b.dataset.azione);
+  });
+})();
