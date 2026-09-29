@@ -67,6 +67,16 @@ function isConfigured(settings, env = process.env) {
   return !!configFrom(settings, env).datacenter;
 }
 
+// Host del fornitore (mai le credenziali del template): la pagina Sicurezza lo
+// dichiara a chi apre schede da un altro paese. '' se manca o non si legge.
+function providerHost(settings, env = process.env) {
+  const tmpl = configFrom(settings, env).datacenter;
+  if (!tmpl) return '';
+  const ep = endpointFor(tmpl, 'us');
+  if (!ep) return '';
+  try { return new URL(ep.proxyRules).hostname || ''; } catch (_) { return ''; }
+}
+
 // Sostituisce {country}/{COUNTRY} nel template e separa le credenziali
 // dall'endpoint: Chromium non accetta user:pass dentro proxyRules — per i
 // proxy HTTP le credenziali passano dall'evento `login` (vedi sotto); per
@@ -156,6 +166,7 @@ module.exports = {
   normalizeTier,
   configFrom,
   isConfigured,
+  providerHost,
   endpointFor,
   resolve,
   setPartitionAuth,

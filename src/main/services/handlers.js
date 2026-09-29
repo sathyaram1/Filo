@@ -1052,6 +1052,14 @@ function targetWebTab(sender) {
   return { win, tm, tab: recent[0] || null };
 }
 
+// Esito di PROXY_TAB e REGOLA_PROXY_DOMINIO senza fornitore: proxyUnavailableForPrompt
+// e la riga del diario lo riconoscono da `proxy`, e nessuno dei due lo dà per fatto.
+const proxyNonDisponibile = () => ({ proxy: 'non_disponibile' });
+const esitoNonDisponibile = (a) => !!(a && a._output && a._output.proxy === 'non_disponibile');
+const RISPOSTA_PROXY_NON_DISPONIBILE = 'Aprire un sito da un altro paese in Filo non si può ancora.';
+const SOLLECITO_DOPO_RIFIUTO = '[Il tuo ultimo messaggio è vuoto. Il testo che hai scritto insieme alle azioni l\'utente non l\'ha letto come risposta, '
+  + 'e dava per fatto quello che non è disponibile. Scrivi adesso la risposta completa per l\'utente, tenendo conto degli esiti qui sopra.]';
+
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
 // cambio (la scrittura su storage è condivisa, le cache in-memory no).
 function refreshProxyRulesAllWindows() {
@@ -1918,8 +1926,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         // di follow-up in chat — il testo della risposta è già la conferma, come
         // per IMPOSTA_PREFERENZA. kept:false → non resta un'azione nella bolla.
         const { tm, tab } = targetWebTab(sender);
+        if (tm && !(await tm.proxyAvailable())) return { executed: false, kept: false, output: proxyNonDisponibile() };
         if (!tm || !tab) return { executed: false, kept: false, output: { proxy: 'no_web_tab' } };
         const r = await tm.setTabProxy(tab.id, action.country ?? action.paese ?? action.codicePaese ?? action.location);
+        if (r && r.error === 'not_configured') return { executed: false, kept: false, output: proxyNonDisponibile() };
         return {
           executed: !!(r && r.ok),
           kept: false,
@@ -1946,6 +1956,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         // Dominio esplicito dall'LLM, altrimenti quello della scheda web attiva.
         const domain = action.dominio ?? action.domain ?? action.sito ?? (tab ? tab.url : '');
         const r = await tm.setDomainProxyRule(country, { domain });
+        if (r && r.error === 'not_configured') return { executed: false, kept: false, output: proxyNonDisponibile() };
         if (r && r.ok) refreshProxyRulesAllWindows();
         return {
           executed: !!(r && r.ok),
@@ -2483,8 +2494,16 @@ function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
-    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions),
+    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
   ].filter(Boolean).join('\n\n');
+}
+
+// Da un altro paese senza fornitore (#771): l'esito torna al modello anche nel
+// formato vecchio e nei turni dopo, dove il testo scritto con l'azione lo dava per fatto.
+function proxyUnavailableForPrompt(actions) {
+  if (!Array.isArray(actions) || !actions.some(esitoNonDisponibile)) return '';
+  return '[NON fatto: aprire da un altro paese non è ancora disponibile in Filo. Nessuna scheda è stata instradata e nessuna regola salvata. '
+    + 'Dillo all\'utente in una frase, senza darlo per fatto e senza promettere che succederà da solo, e non riprovare.]';
 }
 
 // Un tentativo interrotto a metà da un guasto (rete, fornitore): queste azioni
@@ -2625,7 +2644,7 @@ function toolResultText({ action, res, rendered }) {
     return `Azione ${type} non riuscita: non c'è una scheda web attiva su cui agire. Dillo all'utente: deve aprire (o mettere davanti) la pagina.`;
   }
   if (PAGE_ACTIONS.includes(type) && !res.output) {
-    return `Azione ${type} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva (o il proxy non è configurato): dillo all'utente.`;
+    return `Azione ${type} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva: dillo all'utente.`;
   }
   return `Azione ${type} non riuscita: ${describe()}${detail}. Non ripeterla uguale: se manca un dato chiedilo all'utente, altrimenti diglielo.`;
 }
@@ -2929,6 +2948,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const rawActions = [];
   const renderedActions = [];
   const notes = [];
+  // Quante note erano già scritte all'ultimo «non disponibile»: quelle lo
+  // davano per fatto, una nota successiva è scritta sapendolo (#771).
+  let noteAlRifiuto = -1;
+  let sollecitato = false;
   let r = null;
   let textReply = '';
   let reasoningDetails = [];
@@ -2972,6 +2995,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       // cronologia del modello e voce, che altrimenti leggerebbero «[[calc: …]]».
       if (Calc) text = Calc.resolveCalcMarkers(text);
       if (!actions.length) {
+        // Muto, e l'ultima frase scritta precede un «non disponibile»: la risposta la riscrive il
+        // modello sapendolo, una volta, perché quella frase poteva rispondere anche ad altro (#771).
+        if (!text.trim() && !sollecitato && round < MAX_ROUNDS && noteAlRifiuto >= 0 && notes.length <= noteAlRifiuto) {
+          sollecitato = true;
+          threadMessages.push({ role: 'user', content: SOLLECITO_DOPO_RIFIUTO });
+          continue;
+        }
         textReply = text;
         reasoningDetails = r.reasoningDetails || [];
         exhausted = false;
@@ -3014,6 +3044,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
       if (text.trim()) notes.push(text.trim());
+      if (roundRendered.some(esitoNonDisponibile)) noteAlRifiuto = notes.length;
       push('filo:action', { kind: 'round', text });
       textReply = text;
       reasoningDetails = r.reasoningDetails || [];
@@ -3049,6 +3080,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const stop = 'Mi sono fermato: troppi passaggi di fila senza arrivare a una risposta. Dimmi se devo continuare.';
     const last = String(textReply || '').trim();
     textReply = last ? `${last}\n\n${stop}` : stop;
+  } else if (!String(textReply || '').trim() && noteAlRifiuto >= 0 && notes.length <= noteAlRifiuto) {
+    // Muto anche sollecitato: prima cosa non si può, poi la frase com'era, dichiarata scritta
+    // prima di saperlo. Toglierla perdeva le risposte ad altro che conteneva (#771).
+    const prima = notes.pop();
+    textReply = prima
+      ? `${RISPOSTA_PROXY_NON_DISPONIBILE}\n\nPrima di saperlo avevo scritto: «${prima}»`
+      : RISPOSTA_PROXY_NON_DISPONIBILE;
   } else if (!String(textReply || '').trim() && notes.length) {
     // Ultimo giro muto dopo un giro con azioni: la frase scritta insieme alle
     // azioni («Ti metto la sveglia alle 7, buonanotte!») era la risposta, non

@@ -11,16 +11,18 @@
 
   function $(id) { return document.getElementById(id); }
 
-  // Estrae l'host del fornitore proxy dal template datacenter configurato
-  // (es. 'socks5://user-{country}:pass@gate.provider.com:7000' → 'gate.provider.com').
-  // Ritorna '' se non configurato o non parsabile. La pagina mostra l'host per
-  // dichiarare onestamente per chi passa il traffico delle tab "da un altro paese".
-  function proxyProviderHost(proxy) {
-    const tmpl = String((proxy && proxy.datacenter) || '').trim();
-    if (!tmpl) return '';
-    const filled = tmpl.replace(/\{country\}/gi, 'us');
-    const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(filled) ? filled : `socks5://${filled}`;
-    try { return new URL(withScheme).hostname || ''; } catch (_) { return ''; }
+  // Il riquadro «da un altro paese» esiste solo col fornitore (#771), e ne
+  // dichiara l'host: per onestà, chi passa il traffico di quelle schede.
+  let lastProxy = '';
+  async function renderProxyBox() {
+    let st = null;
+    try { st = await chrome.runtime.sendMessage({ type: MSG.PROXY_STATUS }); } catch (_) {}
+    const on = !!(st && st.ok && st.configured);
+    $('sec-proxy-box').hidden = !on;
+    const provEl = $('sec-proxy-box-provider');
+    const host = on ? String(st.providerHost || '') : '';
+    provEl.textContent = host ? I18n.t('options_security_proxy_box_provider').replace('%s', host) : '';
+    provEl.hidden = !host;
   }
 
   function fillStaticText() {
@@ -187,18 +189,8 @@
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
     const sec = settings.security || {};
-    // "Apri da un altro paese": se è configurato un fornitore proxy, mostra il
-    // suo host nella riga privacy (onestà: dichiariamo per chi passa il traffico).
-    const provHost = proxyProviderHost(settings.proxy);
-    const provEl = $('sec-proxy-box-provider');
-    if (provEl) {
-      if (provHost) {
-        provEl.textContent = I18n.t('options_security_proxy_box_provider').replace('%s', provHost);
-        provEl.style.display = '';
-      } else {
-        provEl.style.display = 'none';
-      }
-    }
+    lastProxy = JSON.stringify(settings.proxy || {});
+    renderProxyBox();
     // Default-on: il merge con DEFAULT_SETTINGS.security mette già true/true se
     // l'utente non ha mai salvato, quindi qui leggiamo "!== false" per
     // riflettere il default anche in casi limite (es. chiave esistente ma null).
@@ -571,6 +563,10 @@
   // salvataggio da qui non deve riscrivere l'elenco com'era all'apertura.
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) {
+        const p = JSON.stringify(msg.settings.proxy || {});
+        if (p !== lastProxy) { lastProxy = p; renderProxyBox(); }
+      }
       const c = msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings && msg.settings.security && msg.settings.security.cookies;
       if (!c || !Array.isArray(c.bannerSites)) return;
       if (c.bannerSites.join('\n') === cookieBannerSites.join('\n')) return;
