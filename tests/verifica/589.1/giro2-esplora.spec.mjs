@@ -42,23 +42,33 @@ test('porte della segnalazione: da un sito rispondono tutte rifiutato', async ({
 });
 
 test('lasciapassare: una scheda di sfondo si dà il microfono da sola', async ({ app, openTab, testServer }) => {
-  const sito = await testServer.openReady(openTab, '<h1>sfondo</h1>', { pubblico: true });
-  await testServer.openReady(openTab, '<h1>in vista</h1>');
-  const sfondo = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
-  const prima = await sito.evaluate(async () => (await navigator.permissions.query({ name: 'microphone' })).state);
+  const sito = await testServer.openReady(openTab, '<h1>sfondo</h1>');
+  await testServer.openReady(openTab, '<h1>in vista</h1>', { pubblico: true });
+  const sfondo = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
+  const prova = () => sito.evaluate(async () => Promise.race([
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(() => 'concesso', (e) => `rifiuto ${e.name}`),
+    new Promise((r) => setTimeout(() => r('in attesa di una risposta'), 2500)),
+  ]));
+  const senza = await prova();
   const r = await sfondo(chiedi('permesso_filo', { tipo: 'media' }));
-  const dopo = await sito.evaluate(async () => (await navigator.permissions.query({ name: 'microphone' })).state);
-  console.log('microfono', prima, JSON.stringify(r), dopo);
-  expect(dopo, 'una scheda di sfondo si è data il microfono senza che l\'utente lo chiedesse').not.toBe('granted');
+  const con = await prova();
+  console.log('microfono', senza, '|', JSON.stringify(r), '|', con);
+  expect(con, 'dopo la domanda del sito la richiesta del microfono ha avuto un esito diverso').toBe(senza);
 });
 
 test('lasciapassare: il sito in vista legge gli appunti senza gesto', async ({ app, openTab, testServer }) => {
-  const sito = await testServer.openReady(openTab, '<h1>in vista</h1>', { pubblico: true });
+  const sito = await testServer.openReady(openTab, '<h1>in vista</h1>');
   await app.evaluate(({ clipboard }) => clipboard.writeText('password-segreta-123'));
-  const vista = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
-  const senza = await sito.evaluate(async () => { try { return await navigator.clipboard.readText(); } catch (e) { return `ERR ${e.name}`; } });
+  const vista = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
+  await sito.bringToFront().catch(() => {});
+  await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); w.focus(); const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId); t.view.webContents.focus(); });
+  const leggi = () => sito.evaluate(async () => Promise.race([
+    navigator.clipboard.readText().catch((e) => `ERR ${e.name} ${e.message}`),
+    new Promise((r) => setTimeout(() => r('in attesa di una risposta'), 2500)),
+  ]));
+  const senza = await leggi();
   await vista(chiedi('permesso_filo', { tipo: 'appunti' }));
-  const con = await sito.evaluate(async () => { try { return await navigator.clipboard.readText(); } catch (e) { return `ERR ${e.name}`; } });
+  const con = await leggi();
   console.log('appunti', senza, '|', con);
   expect(con, 'il sito ha letto gli appunti dell\'utente senza un suo gesto').not.toBe('password-segreta-123');
 });
@@ -75,7 +85,7 @@ test('pagine salvate: un sito di sfondo le spinge fuori e ne legge una', async (
   const r = await sfondo(`(async () => { let n = 0; for (let i = 0; i < 1000; i++) { const x = await chrome.runtime.sendMessage({ type: 'save_page', page: { url: 'https://spam.example/' + i, title: 'x' + i } }); if (x && x.ok) n++; } return n; })()`);
   console.log('salvate dal sito', JSON.stringify(r));
   const restano = await app.evaluate(async () => (await globalThis.SN_SAVED_PAGES.list()).some((p) => p.url === 'https://banca.example/estratto-conto'));
-  expect(JSON.stringify(sonda.risposta || {}), 'il sito ha letto la miniatura di una pagina salvata').not.toContain('SEGRETO');
+  expect.soft(JSON.stringify(sonda.risposta || {}), 'il sito ha letto la miniatura di una pagina salvata').not.toContain('SEGRETO');
   expect(restano, 'un sito di sfondo ha spinto fuori le pagine salvate dell\'utente').toBe(true);
 });
 
