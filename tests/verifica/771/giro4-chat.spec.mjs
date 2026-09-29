@@ -81,7 +81,8 @@ test('regola «sempre dagli USA»: il giro dopo il rifiuto scrive la risposta, l
   // Il modello ha avuto davanti l'esito «non fatto» prima di rispondere.
   const cap = await app.evaluate(() => globalThis.__captured.map((c) => JSON.stringify(c.messages)));
   expect(cap.length).toBe(3);
-  expect(cap[1]).toContain('non_disponibile');
+  expect(cap[1]).toContain('NON fatto');
+  expect(cap[2]).toContain('ultimo messaggio è vuoto');
   // Il diario lo dice.
   await page.locator('.dash-activity-head').last().click().catch(() => {});
   await expect(page.locator('.dash-activity-row', { hasText: 'Regola non salvata' }).last()).toBeAttached();
@@ -136,4 +137,43 @@ test('col fornitore la regola si salva come prima', async ({ app, shell }) => {
   await expect(lastFilo(page)).toContainText('Fatto: netflix', { timeout: 20_000 });
   const r = await regole(app);
   expect(r['netflix.com'] && r['netflix.com'].country).toBe('us');
+});
+
+test('porta del giro 2: la frase scritta sapendolo, con una pagina aperta, resta la risposta senza sollecito', async ({ app, shell, testServer }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  const url = testServer.html('<title>QUI</title><p>qui</p>');
+  const frase = 'Da un altro paese non si può ancora: ti apro la pagina qui.';
+  await installScript(app, [
+    { text: '', toolCalls: [{ id: 'p1', name: 'PROXY_TAB', arguments: '{"country":"fr"}' }] },
+    { text: frase, toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url }) }] },
+    { text: '' },
+    { text: 'NON DEVE ARRIVARE' },
+  ]);
+  await send(page, 'apri questa scheda dalla Francia');
+  await expect(lastFilo(page)).toContainText(frase, { timeout: 20_000 });
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 5_000 });
+  expect(await app.evaluate(() => globalThis.__captured.length)).toBe(3);
+  expect(await lastFilo(page).innerText()).not.toContain('NON DEVE ARRIVARE');
+});
+
+test('porta del giro 2: pagina aperta e instradamento nello stesso giro, poi muto due volte: nessun «non ho cambiato niente»', async ({ app, shell, testServer }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  const url = testServer.html('<title>NF</title><p>nf</p>');
+  await installScript(app, [
+    { text: 'Ti apro Netflix dagli Stati Uniti.', toolCalls: [
+      { id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url }) },
+      { id: 'p1', name: 'PROXY_TAB', arguments: '{"country":"us"}' },
+    ] },
+    { text: '' },
+    { text: '' },
+  ]);
+  await send(page, 'apri netflix dagli USA');
+  await expect(lastFilo(page)).toContainText('non si può ancora', { timeout: 20_000 });
+  expect(await lastFilo(page).innerText()).not.toContain('non ho cambiato niente');
 });

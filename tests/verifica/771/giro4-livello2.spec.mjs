@@ -35,7 +35,10 @@ async function spia(app) {
     });
     globalThis.__geoCalls = [];
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
-      globalThis.__geoCalls.push(JSON.stringify(messages).slice(0, 400));
+      const m = JSON.stringify(messages);
+      // Altri classificatori (il giudice dei siti sospetti) usano lo stesso fornitore: conta solo il livello 2.
+      if (!m.includes('PERCHÉ una pagina web non mostra')) return { text: '{}', model: attempts[0] && attempts[0].model, usage: {} };
+      globalThis.__geoCalls.push(m.slice(0, 400));
       return { text: '{"class":"errore_generico"}', model: attempts[0] && attempts[0].model, usage: {} };
     };
   });
