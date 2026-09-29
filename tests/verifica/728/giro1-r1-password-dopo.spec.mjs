@@ -45,6 +45,9 @@ test('sosia che chiede la password dopo l\'email, senza ricaricare: blocco', asy
   const continua = page.getByRole('button', { name: 'Continua' });
   await expect(continua).toBeVisible({ timeout: 12_000 });
   await continua.click();
+  // Il tempo di scrivere l'email: una persona non preme «Avanti» nel primo secondo e mezzo.
+  await page.getByPlaceholder('Email').fill('mario@example.com');
+  await page.waitForTimeout(3000);
   await page.click('#avanti');
   await expect(page.getByPlaceholder('Password')).toBeVisible();
   await expect(page.getByPlaceholder('confermo')).toBeVisible({ timeout: 8_000 });
