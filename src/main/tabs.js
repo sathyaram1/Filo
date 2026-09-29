@@ -2760,10 +2760,8 @@ function mapCertError(error) {
 // logica serve anche al campo "nuova scheda" della dashboard, che prima aveva una
 // copia più povera. Sono importati in cima al file da globalThis.SN_URL_NAV.
 
-// Il visore dei PDF è un webContents a sé dentro la scheda, e prende la tastiera
-// appena il documento si apre: i suoi tasti non passano dal before-input-event
-// della scheda, e lì nessun tasto di Filo rispondeva (#838). Si fanno passare
-// dagli stessi ascolti della scheda; al visore arrivano comunque, e non gli servono.
+// Il visore dei PDF è un webContents a sé che prende la tastiera: i suoi tasti non
+// passano dal before-input-event della scheda e vanno portati agli stessi ascolti (#838).
 function inoltraTastiDegliOspiti(app) {
   app.on('web-contents-created', (_e, wc) => {
     if (wc.getType() !== 'remote') return;
