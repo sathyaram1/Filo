@@ -1248,6 +1248,10 @@
       panel.className = 'dl-panel';
       panel.id = 'dl-panel';
       panel.hidden = true;
+      // Un clic che arriva mentre un sì è ancora spento ricomincia l'attesa: una raffica non lo arma (#591, giro 20).
+      panel.addEventListener('pointerdown', () => {
+        if (panel.querySelector('.dl-row-btn:disabled')) elencoFermoDa = Date.now();
+      }, true);
       const head = document.createElement('div');
       head.className = 'dl-panel-head';
       const title = document.createElement('span');
@@ -1788,6 +1792,9 @@
       if (d.tipo === 'appunti') return { testo: 'vuole leggere quello che hai copiato', icone: ['clipboard'] };
       if (d.tipo === 'posizione') return { testo: 'vuole sapere dove ti trovi', icone: ['location'] };
       if (d.tipo === 'notifiche') return { testo: 'vuole mandarti notifiche', icone: ['bell'] };
+      if (d.tipo === 'schermi') return { testo: 'vuole usare tutti i tuoi schermi', icone: ['windowFrame'] };
+      if (d.tipo === 'presenza') return { testo: 'vuole sapere quando sei al computer', icone: ['user'] };
+      if (d.tipo === 'strumenti') return { testo: 'vuole comandare gli strumenti musicali collegati', icone: ['readAloud'] };
       const parti = Array.isArray(d.parti) ? d.parti : [];
       const mic = parti.includes('audio');
       const cam = parti.includes('video');
@@ -1859,9 +1866,14 @@
       si.type = 'button';
       si.className = 'permesso-btn permesso-si';
       si.textContent = 'Consenti';
-      si.disabled = true;
-      clearTimeout(timerArma);
-      timerArma = setTimeout(() => { if (mostrata === d) si.disabled = false; }, ARMA_MS);
+      // Consenti si arma dopo ARMA_MS senza clic sulla striscia: una raffica che continua lo tiene spento (#591, giro 20).
+      const arma = () => {
+        si.disabled = true;
+        clearTimeout(timerArma);
+        timerArma = setTimeout(() => { if (mostrata === d) si.disabled = false; }, ARMA_MS);
+      };
+      arma();
+      b.onpointerdown = () => { if (si.disabled) arma(); };
       si.addEventListener('click', () => rispondiA(d, true));
       const no = document.createElement('button');
       no.type = 'button';

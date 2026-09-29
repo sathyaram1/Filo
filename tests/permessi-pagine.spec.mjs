@@ -79,6 +79,41 @@ PAGINE['/esterno'] = `<!doctype html><meta charset="utf-8"><title>Offerta</title
 const LUNGO = 'videochiamata.sessione-sicura-verifica-account-utente-accesso-autorizzato'
   + '.conferma-identita-riunione-video-chiamata-partecipante.dominio-vero.test';
 
+// Una pagina che si riscrive in un documento blob suo: resta il sito che l'ha creato (#591, giro 20).
+const inBlob = (corpo) => '<!doctype html><meta charset="utf-8"><title>Offerta</title><p>attendi</p><script>'
+  + 'const html = "<!doctype html><title>Offerta</title><p>ok</p><script>"'
+  + ' + "const m=(x)=>fetch(" + JSON.stringify(location.origin) + "+\\"/esito?m=\\"+encodeURIComponent(x));"'
+  + ' + ' + JSON.stringify(corpo) + ' + "<" + "/script>";'
+  + 'location.href = URL.createObjectURL(new Blob([html], { type: "text/html" }));</script>';
+PAGINE['/blob'] = inBlob('m("notifiche:"+Notification.permission);'
+  + 'navigator.mediaDevices.getUserMedia({audio:true,video:true}).then(()=>m("media:concesso"),(e)=>m("media:"+e.name));'
+  + 'setTimeout(()=>navigator.clipboard.readText().then((x)=>m("appunti:"+x),(e)=>m("appunti:"+e.name)),300);'
+  + 'setTimeout(()=>{const f=document.createElement("iframe");f.style.display="none";'
+  + 'f.src="prova-filo-esterno:apri-un-programma";document.body.appendChild(f);},300);');
+// Un gioco a clic col pulsante in alto a destra, dove comparirà Consenti: al primo clic chiede microfono e fotocamera.
+PAGINE['/gioco'] = `<!doctype html><meta charset="utf-8"><title>Gioco</title>
+<style>body{margin:0}#b{position:fixed;top:0;right:0;width:260px;height:60px}</style>
+<button id="b">Clicca più veloce che puoi</button>
+<script>
+  let chiesto = false;
+  document.getElementById('b').addEventListener('click', () => {
+    if (chiesto) return; chiesto = true;
+    navigator.mediaDevices.getUserMedia({ audio: true, video: true }).then(
+      () => fetch('/esito?m=concesso'), (e) => fetch('/esito?m=' + encodeURIComponent('negato:' + e.name)));
+  });
+</script>`;
+// Quello che Chrome chiede o concede dopo un clic: schermi, presenza, font del computer, spazio persistente.
+const dopoUnClic = (azione) => `<!doctype html><meta charset="utf-8"><title>Prova</title>
+<button id="b" style="position:fixed;top:200px;left:200px">Prova</button>
+<script>
+  const m = (x) => fetch('/esito?m=' + encodeURIComponent(x));
+  document.getElementById('b').addEventListener('click', () => { ${azione} });
+</script>`;
+PAGINE['/schermi'] = dopoUnClic("window.getScreenDetails().then(() => m('schermi:letti'), (e) => m('schermi:' + e.name));");
+PAGINE['/presenza'] = dopoUnClic("IdleDetector.requestPermission().then((x) => m('presenza:' + x), (e) => m('presenza:' + e.name));");
+PAGINE['/font'] = dopoUnClic("window.queryLocalFonts().then((f) => m('font:' + (f.length ? 'letti' : 'vuoti')), (e) => m('font:' + e.name));");
+PAGINE['/spazio'] = dopoUnClic("navigator.storage.persist().then((x) => m('spazio:' + x), (e) => m('spazio:' + e.name));");
+
 let server;
 let origine;
 test.beforeAll(async () => {
@@ -110,16 +145,20 @@ test.beforeEach(async () => {
   aperti = join(userData, 'aperti.log');
   writeFileSync(join(bin, 'xdg-open'), `#!/bin/sh\necho "$@" >> "${aperti}"\n`);
   chmodSync(join(bin, 'xdg-open'), 0o755);
+  await avvia();
+});
+
+async function avvia() {
   const porta = new URL(origine).port;
   app = await electron.launch({
     args: [...argomentiScala, '--use-fake-device-for-media-stream', `--host-resolver-rules=MAP ${LUNGO} 127.0.0.1`,
       `--unsafely-treat-insecure-origin-as-secure=http://${LUNGO}:${porta}`, '.'],
     cwd: APP_ROOT,
-    env: { ...process.env, PATH: bin + delimiter + process.env.PATH, FILO_USER_DATA: userData, NODE_ENV: 'test' },
+    env: { ...process.env, PATH: join(userData, 'bin-finto') + delimiter + process.env.PATH, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
   shell = await app.firstWindow();
   await shell.waitForLoadState('domcontentloaded');
-});
+}
 test.afterEach(async () => {
   await chiudiApp(app);
   try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
@@ -342,4 +381,123 @@ test('con un indirizzo lunghissimo la domanda nomina il dominio vero e dice tutt
   await expect(msg).toContainText('vuole usare microfono e fotocamera');
   // Niente di tagliato: tutto il testo sta dentro la riga.
   expect(await msg.evaluate((el) => el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+});
+
+// Filo sono solo le sue pagine: un sito che si riscrive in un documento blob chiede come il sito (#591, giro 20).
+test('una pagina che si riscrive in un documento blob non ottiene niente senza domanda', async () => {
+  test.setTimeout(60_000);
+  await app.evaluate(({ clipboard }) => clipboard.writeText('password-copiata'));
+  await apri('/blob');
+  await expect(barra()).toContainText('microfono e fotocamera', { timeout: 10_000 });
+  await expect(barra().locator('strong')).toHaveText(new URL(origine).host);
+  await new Promise((ok) => setTimeout(ok, 2500));
+  expect(esiti).toContain('notifiche:default');
+  expect(esiti).not.toContain('media:concesso');
+  expect(esiti).not.toContain('appunti:password-copiata');
+  expect(existsSync(aperti) ? readFileSync(aperti, 'utf8').trim() : '').toBe('');
+});
+
+// Consenti vale per un clic dopo una pausa: una raffica che continua lo tiene spento (#591, giro 20).
+test('una raffica di clic sul punto dove compare Consenti non concede; un clic dopo una pausa sì', async () => {
+  test.setTimeout(60_000);
+  await apri('/gioco');
+  let pagina = null;
+  await expect.poll(() => { pagina = paginaDi(origine + '/gioco'); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
+  await pagina.waitForLoadState('domcontentloaded');
+  await pagina.locator('#b').click();
+  const si = barra().locator('.permesso-si');
+  await expect(si).toBeVisible({ timeout: 10_000 });
+  const box = await si.boundingBox();
+  const t0 = Date.now();
+  while (Date.now() - t0 < 2500) {
+    await shell.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await new Promise((ok) => setTimeout(ok, 200));
+  }
+  await new Promise((ok) => setTimeout(ok, 500));
+  expect(esiti, 'concesso da un clic della raffica').toEqual([]);
+  await expect(si).toBeEnabled({ timeout: 5_000 });
+  await si.click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['concesso']);
+});
+
+// Le risposte restano dopo la chiusura, come in Chrome, e la pagina Sicurezza le elenca tutte (#591, giro 20).
+test('le risposte date restano dopo aver riaperto Filo, e dalla pagina Sicurezza si vedono e si tolgono', async () => {
+  test.setTimeout(120_000);
+  await apri('/messaggi');
+  let pagina = null;
+  await expect.poll(() => { pagina = paginaDi(origine + '/messaggi'); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['stato:default/prompt']);
+  await pagina.locator('#attiva').click();
+  const si = barra().getByRole('button', { name: 'Consenti', exact: true });
+  await expect(si).toBeEnabled({ timeout: 10_000 });
+  await si.click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['stato:default/prompt', 'notifiche:granted/granted']);
+  await apri('/microfono');
+  await expect(si).toBeEnabled({ timeout: 10_000 });
+  await si.click();
+  await expect.poll(() => esiti.includes('concesso:audio'), { timeout: 10_000 }).toBe(true);
+  await chiudiApp(app);
+
+  esiti.length = 0;
+  await avvia();
+  await apri('/messaggi');
+  await expect.poll(() => esiti.some((x) => x.startsWith('stato:')), { timeout: 15_000 }).toBe(true);
+  expect(esiti.filter((x) => x.startsWith('stato:')).every((x) => x === 'stato:granted/granted'), JSON.stringify(esiti)).toBe(true);
+  await apri('/microfono');
+  await expect.poll(() => esiti.includes('concesso:audio'), { timeout: 10_000 }).toBe(true);
+  await expect(barra()).toBeHidden();
+
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://security/security.html'));
+  let sicurezza = null;
+  await expect.poll(() => { sicurezza = app.windows().find((w) => w.url().startsWith('filo://security')); return Boolean(sicurezza); }, { timeout: 10_000 }).toBe(true);
+  const righe = sicurezza.locator('#sec-perm-list li');
+  await expect(righe).toHaveCount(2, { timeout: 10_000 });
+  await expect(righe.filter({ hasText: 'Notifiche: consentito' })).toContainText('127.0.0.1');
+  await expect(righe.filter({ hasText: 'Microfono: consentito' })).toHaveCount(1);
+  await righe.filter({ hasText: 'Microfono' }).getByRole('button', { name: 'Togli' }).click();
+  await expect(righe).toHaveCount(1);
+  await apri('/microfono');
+  await expect(barra()).toContainText('vuole usare il microfono', { timeout: 10_000 });
+});
+
+// Quello che Chrome chiede si chiede, quello che concede passa: prima di #591 passava tutto, dopo il giro 19 niente.
+for (const [via, dopo, domanda] of [
+  ['/schermi', 'schermi:letti', 'vuole usare tutti i tuoi schermi'],
+  ['/presenza', 'presenza:granted', 'vuole sapere quando sei al computer'],
+  ['/font', 'font:letti', null],
+  ['/spazio', 'spazio:true', null],
+]) {
+  test(`dopo un clic sulla pagina, ${via.slice(1)}: ${domanda ? 'Filo chiede e col sì la pagina funziona' : 'passa come in Chrome'}`, async () => {
+    test.setTimeout(60_000);
+    await apri(via);
+    let pagina = null;
+    await expect.poll(() => { pagina = paginaDi(origine + via); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
+    await pagina.waitForLoadState('domcontentloaded');
+    await pagina.locator('#b').click();
+    if (domanda) {
+      await expect(barra()).toContainText(domanda, { timeout: 10_000 });
+      expect(esiti).toEqual([]);
+      const si = barra().getByRole('button', { name: 'Consenti', exact: true });
+      await expect(si).toBeEnabled({ timeout: 5_000 });
+      await si.click();
+    }
+    await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual([dopo]);
+    if (!domanda) await expect(barra()).toBeHidden();
+  });
+}
+
+test('le risposte ricordate le legge e le toglie solo una pagina di Filo, non un sito visitato', async () => {
+  const out = await app.evaluate(async () => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const sito = { tab: { id: 1, url: 'https://evil.example/' }, url: 'https://evil.example/' };
+    const filo = { url: 'filo://security/security.html' };
+    return {
+      leggeSito: await globalThis.SN_HANDLE_MESSAGE({ type: MSG.PERMESSI_SITI_GET }, sito),
+      togliSito: await globalThis.SN_HANDLE_MESSAGE({ type: MSG.PERMESSI_SITI_TOGLI, origine: 'https://x.example', parte: 'audio' }, sito),
+      leggeFilo: await globalThis.SN_HANDLE_MESSAGE({ type: MSG.PERMESSI_SITI_GET }, filo),
+    };
+  });
+  expect(out.leggeSito).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
+  expect(out.togliSito).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
+  expect(out.leggeFilo).toEqual({ ok: true, scelte: [] });
 });

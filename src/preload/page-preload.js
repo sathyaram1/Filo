@@ -185,7 +185,8 @@ if (!IS_SUBFRAME) try {
 // Le notifiche si leggono «da chiedere» finché l'utente non ha deciso (#591): regole in preload/stato-permessi.js.
 if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  if (/^https?:/i.test(loc)) {
+  // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
+  if (/^(https?|blob):/i.test(loc)) {
     const { buildStatoPermessiSource } = require('./stato-permessi.js');
     // Senza gesto: con `true` la pagina riceverebbe un clic mai fatto.
     webFrame.executeJavaScript(buildStatoPermessiSource(ipcRenderer.sendSync('filo:permessi-stato', loc)), false).catch(() => {});

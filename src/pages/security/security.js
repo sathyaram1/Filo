@@ -55,6 +55,7 @@
     $('sec-safebrowse-sandbox-desc').textContent = I18n.t('options_security_safebrowse_sandbox_desc');
     $('sec-safebrowse-key-managed').textContent = I18n.t('options_security_safebrowse_key_managed');
     $('sec-cookies-title').textContent = I18n.t('options_cookies_title');
+    $('sec-site-perms-title').textContent = I18n.t('options_site_perms_title');
     $('sec-cookies-desc').textContent = I18n.t('options_cookies_desc');
     $('cookie-mode-manual-label').textContent = I18n.t('options_cookies_mode_manual');
     $('cookie-mode-manual-desc').textContent = I18n.t('options_cookies_mode_manual_desc');
@@ -183,8 +184,48 @@
     }
   }
 
+  // Le risposte date ai siti che restano fra un avvio e l'altro: si vedono tutte qui e si tolgono una per una.
+  async function renderSitePerms() {
+    const list = $('sec-perm-list');
+    let scelte = [];
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.PERMESSI_SITI_GET });
+      scelte = (r && Array.isArray(r.scelte)) ? r.scelte : [];
+    } catch (_) { scelte = []; }
+    list.replaceChildren();
+    if (!scelte.length) {
+      const li = document.createElement('li');
+      li.className = 'sn-muted';
+      li.style.border = 'none';
+      li.textContent = I18n.t('options_site_perms_empty');
+      list.appendChild(li);
+      return;
+    }
+    for (const s of scelte) {
+      const li = document.createElement('li');
+      const testo = document.createElement('span');
+      const sito = document.createElement('strong');
+      sito.textContent = (s.sotto ? s.sotto + '.' : '') + s.dominio;
+      sito.title = s.origine;
+      const cosa = I18n.STRINGS['options_site_perms_part_' + s.parte] || s.parte;
+      testo.append(sito, ' · ', `${cosa}: ${I18n.t(s.si ? 'options_site_perms_yes' : 'options_site_perms_no')}`);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_site_perms_remove');
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try { await chrome.runtime.sendMessage({ type: MSG.PERMESSI_SITI_TOGLI, origine: s.origine, parte: s.parte }); } catch (_) {}
+        renderSitePerms();
+      });
+      li.append(testo, btn);
+      list.appendChild(li);
+    }
+  }
+
   async function load() {
     fillStaticText();
+    renderSitePerms();
     const settings = await Storage.getSettings();
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);

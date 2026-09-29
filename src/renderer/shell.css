@@ -663,7 +663,8 @@ html[data-feedback-dim="1"] .shell {
 }
 .dl-row-btn:hover { background: var(--tab-active); }
 /* #588 — un «sì» appena comparso non risponde ancora: si vede spento finché si arma. */
-.dl-row-btn:disabled { opacity: 0.45; cursor: default; background: var(--tab-bg); }
+/* Spento non prende il clic: lo riceve la riga, che così ricomincia l'attesa. */
+.dl-row-btn:disabled { opacity: 0.45; cursor: default; background: var(--tab-bg); pointer-events: none; }
 /* #588 — marca "è un programma": si legge prima del nome, che è la parte di cui
    il sito decide il testo. Colore d'avviso, non allarme rosso. */
 .dl-row-tag {
@@ -734,4 +735,4 @@ html[data-feedback-dim="1"] .shell {
 .permesso-btn:active:not(:disabled) { transform: scale(0.97); }
 .permesso-si { background: var(--accent); border-color: var(--accent); color: #fff; }
 .permesso-si:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 85%, #000); }
-.permesso-si:disabled { opacity: 0.5; cursor: default; }
+.permesso-si:disabled { opacity: 0.5; cursor: default; pointer-events: none; }

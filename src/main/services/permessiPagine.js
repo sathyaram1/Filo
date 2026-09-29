@@ -1,5 +1,5 @@
-// Permessi delle pagine web (#591.1): microfono, fotocamera, appunti, posizione e notifiche li decide l'utente nella cornice,
-// il resto passa solo se innocuo. Filo stesso (filo://, la shell) resta com'era; Detta e Incolla hanno un lasciapassare breve.
+// Permessi delle pagine web (#591.1): quello che Chrome chiede lo decide l'utente nella cornice, quello che Chrome concede
+// di fabbrica passa. Filo stesso (filo://, la cornice) resta com'era; Detta e Incolla hanno un lasciapassare breve.
 // Senza gestore Electron concede tutto: ogni sessione che mostra pagine web passa da `installa` o da `negaTutto`.
 
 'use strict';
@@ -7,39 +7,64 @@
 const { randomUUID } = require('node:crypto');
 const Psl = require('./safebrowse/psl');
 
+// Ciò che Chrome chiede all'utente: si chiede anche qui. Ogni nome che Electron può mandare sta in uno dei gruppi sotto,
+// e la sentinella in tests/unit/permessiPagine.test.mjs lo confronta con quelli che Electron dichiara.
 const TIPI = {
   media: 'media',
   'clipboard-read': 'appunti',
   'deprecated-sync-clipboard-read': 'appunti',
   geolocation: 'posizione',
   notifications: 'notifiche',
+  'window-management': 'schermi',
+  'idle-detection': 'presenza',
+  midiSysex: 'strumenti',
 };
-// Fuori da TIPI passa senza domanda quello che Chrome concede di fabbrica; il resto, che Chrome chiederebbe e Filo non sa
-// ancora chiedere, è no (le altre applicazioni hanno la loro regola). Sentinella: tests/unit/permessiPagine.test.mjs.
+// Ciò che Chrome concede di fabbrica passa senza domanda.
 const INNOCUI = new Set([
   'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'keyboardLock', 'mediaKeySystem',
   'speaker-selection', 'storage-access', 'top-level-storage-access', 'fileSystem', 'midi',
-  'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler',
+  'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler', 'persistent-storage',
 ]);
-// La lettura sincrona degli appunti non sa chiedere: passa solo con un sì già dato.
+// Ciò che Filo non sa dare è no, senza domanda: condividere lo schermo e i dispositivi collegati vogliono una scelta
+// (quale finestra, quale dispositivo) che Filo non ha.
+const NON_DISPONIBILI = new Set(['display-capture', 'unknown', 'hid', 'serial', 'usb']);
+// Il controllo dice sì solo dopo un sì vero: la lettura sincrona degli appunti non sa chiedere, le notifiche Electron le
+// mostra a chi il controllo dà per concesse, e chi sa che sei al computer lo saprebbe senza domanda.
+const CONTROLLO_SOLO_COL_SI = new Set(['deprecated-sync-clipboard-read', 'notifications', 'idle-detection']);
 const SOLO_CONTROLLO = new Set(['deprecated-sync-clipboard-read']);
-// Notifiche: si chiedono solo subito dopo un gesto dell'utente sulla pagina, e il controllo dice il vero, perché
-// Electron mostra una notifica a chi il controllo dà per concessa.
+// Notifiche: si chiedono solo subito dopo un gesto dell'utente sulla pagina.
 const DOPO_UN_GESTO = new Set(['notifications']);
+// I font del computer Electron non li fa chiedere (arriva solo il controllo): passano subito dopo un gesto sulla pagina,
+// che è anche quello che la pagina deve avere per leggerli.
+const COL_GESTO_SENZA_DOMANDA = new Set(['local-fonts']);
 const GESTO_MS = 5000;
 const GESTI = new Set(['mouseDown', 'mouseUp', 'rawKeyDown', 'keyDown', 'char', 'touchStart', 'touchEnd', 'gestureTap']);
 const LASCIAPASSARE_MS = 5000;
 // Il lasciapassare di Detta copre il microfono e basta: con la fotocamera la pagina avrebbe un sì mai dato (#591, giro 18).
 const PARTI_LASCIAPASSARE = { media: new Set(['audio']), appunti: new Set(['appunti']) };
+// Solo le pagine di Filo sono Filo: ogni altro documento è una pagina web, anche un blob, un data: o un about:.
+const DI_FILO = new Set(['filo:', 'devtools:']);
+// Le risposte date nelle sessioni che restano su disco restano anche loro, come in Chrome; incognito e siti usa-e-getta no.
+const CHIAVE_DISCO = 'sitePermissions';
+const sceltePersistenti = new Map();
+let disco = () => require('../shim/storage');
 
 const lasciapassari = new Map();
 const inAttesa = new Map();
 
+// Chi è un documento: Filo, o una pagina web con la sua origine. Un blob porta l'origine del sito che l'ha creato; una pagina
+// web di cui l'origine non si legge ha origine null, e riceve no (#591, giro 20).
+function classifica(url) {
+  let u;
+  try { u = new URL(String(url || '')); } catch (_) { return { origine: null }; }
+  if (/^https?:$/.test(u.protocol)) return { origine: u.origin };
+  if (u.protocol === 'blob:') return classifica(u.pathname);
+  if (DI_FILO.has(u.protocol)) return { filo: true };
+  return { origine: null };
+}
+
 function origineWeb(url) {
-  try {
-    const u = new URL(String(url || ''));
-    return /^https?:$/.test(u.protocol) ? u.origin : null;
-  } catch (_) { return null; }
+  return classifica(url).origine || null;
 }
 
 function urlDi(wc) {
@@ -48,20 +73,48 @@ function urlDi(wc) {
 
 // Chi chiede è la pagina in cima; un riquadro web dentro una pagina di Filo risponde per sé.
 function origineDi(wc, altro) {
-  return origineWeb(urlDi(wc)) || origineWeb(altro);
+  const cima = urlDi(wc);
+  const c = classifica(cima || altro);
+  if (!c.filo || !cima) return c;
+  const r = classifica(altro);
+  return r.origine ? r : c;
+}
+
+function partiNote(details) {
+  const d = details || {};
+  const tipi = Array.isArray(d.mediaTypes) ? d.mediaTypes : (d.mediaType ? [d.mediaType] : []);
+  return [...new Set(tipi.filter((t) => t === 'audio' || t === 'video'))];
 }
 
 function partiDi(tipo, details) {
   if (tipo !== 'media') return [tipo];
-  const d = details || {};
-  const tipi = Array.isArray(d.mediaTypes) ? d.mediaTypes : (d.mediaType ? [d.mediaType] : []);
-  const noti = tipi.filter((t) => t === 'audio' || t === 'video');
-  return noti.length ? [...new Set(noti)] : ['audio', 'video'];
+  const noti = partiNote(details);
+  return noti.length ? noti : ['audio', 'video'];
+}
+
+function persistente(ses) {
+  try { return Boolean(ses && typeof ses.isPersistent === 'function' && ses.isPersistent()); } catch (_) { return false; }
 }
 
 function sceltePer(ses) {
+  if (persistente(ses)) return sceltePersistenti;
   if (!ses._filoScelte) ses._filoScelte = new Map();
   return ses._filoScelte;
+}
+
+function salva() {
+  try {
+    Promise.resolve(disco().set({ [CHIAVE_DISCO]: Object.fromEntries(sceltePersistenti) })).catch(() => {});
+  } catch (_) {}
+}
+
+// Va letta prima che si apra una scheda: il controllo è sincrono e una pagina ripristinata chiede subito.
+async function carica() {
+  try {
+    const v = ((await disco().get(CHIAVE_DISCO)) || {})[CHIAVE_DISCO];
+    if (!v || typeof v !== 'object') return;
+    for (const [k, si] of Object.entries(v)) if (typeof si === 'boolean' && k.includes('|')) sceltePersistenti.set(k, si);
+  } catch (_) {}
 }
 
 function lasciapassareValido(wc, tipo, parti) {
@@ -124,6 +177,7 @@ function chiudi(id, si, { ricorda }) {
   if (ricorda) {
     const scelte = sceltePer(p.ses);
     for (const parte of p.parti) scelte.set(`${p.origine}|${parte}`, Boolean(si));
+    if (scelte === sceltePersistenti) salva();
   }
   for (const cb of p.callbacks) { try { cb(Boolean(si)); } catch (_) {} }
   try { p.avvisa('fine', { id }); } catch (_) {}
@@ -179,8 +233,10 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
   try {
     ses.setPermissionRequestHandler((wc, permission, callback, details) => {
       if (typeof prima === 'function' && prima(wc, permission, callback, details)) return;
-      const origine = origineDi(wc, details && details.requestingUrl);
-      if (!origine) { callback(true); return; }
+      const chi = origineDi(wc, details && details.requestingUrl);
+      if (chi.filo) { callback(true); return; }
+      const origine = chi.origine;
+      if (!origine) { callback(false); return; }
       if (permission === 'openExternal') {
         const url = details && details.externalURL;
         callback(Boolean(typeof esterno === 'function' && esterno(url) && gestoRecente(wc)));
@@ -188,6 +244,8 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
       }
       const tipo = TIPI[permission];
       if (!tipo) { callback(INNOCUI.has(permission)); return; }
+      // Una richiesta di media senza microfono né fotocamera è la condivisione dello schermo, che Filo non sa dare.
+      if (tipo === 'media' && !partiNote(details).length) { callback(false); return; }
       const parti = partiDi(tipo, details);
       if (lasciapassareValido(wc, tipo, parti)) { callback(true); return; }
       const decise = parti.map((parte) => sceltePer(ses).get(`${origine}|${parte}`));
@@ -200,14 +258,17 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
   try {
     // «Posso?» risponde sì finché l'utente non ha detto no: un «negato» qui farebbe credere al sito che non valga la pena chiedere.
     ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
-      const origine = origineDi(wc, (details && details.requestingUrl) || requestingOrigin);
-      if (!origine) return true;
+      const chi = origineDi(wc, (details && details.requestingUrl) || requestingOrigin);
+      if (chi.filo) return true;
+      const origine = chi.origine;
+      if (!origine) return false;
+      if (COL_GESTO_SENZA_DOMANDA.has(permission)) return gestoRecente(wc);
       const tipo = TIPI[permission];
       if (!tipo) return INNOCUI.has(permission);
       const parti = partiDi(tipo, details);
       if (lasciapassareValido(wc, tipo, parti)) return true;
       const decise = parti.map((parte) => sceltePer(ses).get(`${origine}|${parte}`));
-      if (SOLO_CONTROLLO.has(permission) || DOPO_UN_GESTO.has(permission)) return decise.every((x) => x === true);
+      if (CONTROLLO_SOLO_COL_SI.has(permission)) return decise.every((x) => x === true);
       return !decise.some((x) => x === false);
     });
   } catch (_) {}
@@ -231,9 +292,9 @@ function rispondi(id, si) {
 function scelteDi(wc) {
   const origine = origineWeb(urlDi(wc));
   const ses = wc && wc.session;
-  if (!origine || !ses || !ses._filoScelte) return { origine, scelte: [] };
+  if (!origine || !ses) return { origine, scelte: [] };
   const scelte = [];
-  for (const [chiave, si] of ses._filoScelte) {
+  for (const [chiave, si] of sceltePer(ses)) {
     const i = chiave.lastIndexOf('|');
     if (chiave.slice(0, i) === origine) scelte.push({ parte: chiave.slice(i + 1), si });
   }
@@ -244,19 +305,40 @@ function scelteDi(wc) {
 function dimentica(wc) {
   const { origine, scelte } = scelteDi(wc);
   if (!scelte.length) return { tolte: 0, ricarica: false };
-  for (const s of scelte) wc.session._filoScelte.delete(`${origine}|${s.parte}`);
+  const mappa = sceltePer(wc.session);
+  for (const s of scelte) mappa.delete(`${origine}|${s.parte}`);
+  if (mappa === sceltePersistenti) salva();
   return { tolte: scelte.length, ricarica: scelte.some((s) => s.si || s.parte === 'notifiche') };
+}
+
+// Tutte le risposte che restano, per la pagina Sicurezza: si vedono e si tolgono anche senza aprire il sito.
+function scelteRicordate() {
+  const out = [];
+  for (const [chiave, si] of sceltePersistenti) {
+    const i = chiave.lastIndexOf('|');
+    const origine = chiave.slice(0, i);
+    out.push({ origine, parte: chiave.slice(i + 1), si, ...nomeDaMostrare(origine) });
+  }
+  return out.sort((a, b) => a.dominio.localeCompare(b.dominio) || a.origine.localeCompare(b.origine) || a.parte.localeCompare(b.parte));
+}
+
+function togliScelta(origine, parte) {
+  const ok = sceltePersistenti.delete(`${origine}|${parte}`);
+  if (ok) salva();
+  return ok;
 }
 
 // Quello che una pagina deve leggere delle notifiche prima di chiedere, come in Chrome: il controllo di Electron sa dire
 // solo sì o no, e il sì mostrerebbe le notifiche senza domanda. La traduzione nella pagina: preload/stato-permessi.js.
 function statoNotifiche(ses, url) {
   const origine = origineWeb(url);
-  const scelta = origine && ses && ses._filoScelte ? ses._filoScelte.get(`${origine}|notifiche`) : undefined;
+  const scelta = origine && ses ? sceltePer(ses).get(`${origine}|notifiche`) : undefined;
   return scelta === true ? 'granted' : scelta === false ? 'denied' : 'default';
 }
 
 module.exports = {
   installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
-  TIPI, INNOCUI, GESTO_MS, _inAttesa: inAttesa,
+  carica, scelteRicordate, togliScelta, classifica,
+  TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, _inAttesa: inAttesa,
+  _usaDisco: (d) => { disco = () => d; },
 };

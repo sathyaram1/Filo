@@ -547,6 +547,20 @@
     options_cookies_done_rejected: 'cookie rifiutati',
     options_cookies_done_hidden: 'banner nascosto',
     options_cookies_done_show: 'Mostra il banner',
+    // Risposte date ai permessi dei siti (#591, giro 20)
+    options_site_perms_title: 'Permessi dei siti',
+    options_site_perms_empty: 'Nessuna risposta data a un sito.',
+    options_site_perms_remove: 'Togli',
+    options_site_perms_yes: 'consentito',
+    options_site_perms_no: 'negato',
+    options_site_perms_part_audio: 'Microfono',
+    options_site_perms_part_video: 'Fotocamera',
+    options_site_perms_part_appunti: 'Appunti',
+    options_site_perms_part_posizione: 'Posizione',
+    options_site_perms_part_notifiche: 'Notifiche',
+    options_site_perms_part_schermi: 'Schermi',
+    options_site_perms_part_presenza: 'Presenza al computer',
+    options_site_perms_part_strumenti: 'Strumenti musicali',
     // Protezione anti-fingerprinting
     options_fp_title: 'Protezione fingerprinting',
     options_fp_desc:

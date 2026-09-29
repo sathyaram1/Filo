@@ -4,6 +4,9 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const Permessi = require('../../src/main/services/permessiPagine.js');
@@ -142,20 +145,105 @@ test('la finestra nascosta del controllo profondo dice no a tutto, anche al cont
   }
 });
 
-test('fuori dall\'elenco una pagina ha solo i permessi innocui, e il gestore dello schermo pieno parla per primo', () => {
-  const ses = { setPermissionCheckHandler(fn) { ses.controllo = fn; } };
-  ses.setPermissionRequestHandler = (fn) => { ses.richiesta = fn; };
-  Permessi.installa(ses, { prima: (_wc, p, cb) => { if (p === 'fullscreen') { cb(false); return true; } return false; } });
+test('quello che Chrome concede passa, quello che chiede si chiede, quello che Filo non sa dare è no; lo schermo pieno ha il suo gestore', () => {
+  const ses = sessioneFinta();
   const wc = wcFinto('https://video.example/');
-  assert.deepEqual(chiedi(ses, wc, 'fullscreen'), [false]);
-  for (const p of ['clipboard-sanitized-write', 'mediaKeySystem', 'pointerLock', 'screen-wake-lock']) {
+  const conPrima = { setPermissionCheckHandler() {} };
+  conPrima.setPermissionRequestHandler = (fn) => { conPrima.richiesta = fn; };
+  Permessi.installa(conPrima, { prima: (_wc, p, cb) => { if (p === 'fullscreen') { cb(false); return true; } return false; } });
+  assert.deepEqual(chiedi(conPrima, wc, 'fullscreen'), [false]);
+  for (const p of ['clipboard-sanitized-write', 'mediaKeySystem', 'pointerLock', 'screen-wake-lock', 'persistent-storage']) {
     assert.deepEqual(chiedi(ses, wc, p), [true], p);
     assert.equal(ses.controllo(wc, p, 'https://video.example', {}), true, p);
   }
-  for (const p of ['midiSysex', 'idle-detection', 'window-management', 'display-capture', 'unknown']) {
+  const tipi = { midiSysex: 'strumenti', 'idle-detection': 'presenza', 'window-management': 'schermi' };
+  for (const [p, tipo] of Object.entries(tipi)) {
+    assert.deepEqual(chiedi(ses, wc, p), [], p);
+    assert.equal(ses.avvisi.at(-1).dati.tipo, tipo, p);
+  }
+  assert.equal(ses.controllo(wc, 'idle-detection', 'https://video.example', {}), false, 'chi sa che sei al computer lo sa solo col sì');
+  for (const p of ['display-capture', 'unknown', 'hid', 'serial', 'usb']) {
     assert.deepEqual(chiedi(ses, wc, p), [false], p);
     assert.equal(ses.controllo(wc, p, 'https://video.example', {}), false, p);
   }
+  assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: [] }), [false], 'condividere lo schermo: niente domanda su microfono e fotocamera');
+});
+
+test('i font del computer, che Electron non fa chiedere, passano solo subito dopo un gesto sulla pagina', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://grafica.example/');
+  Permessi.seguiGesti(wc);
+  assert.equal(ses.controllo(wc, 'local-fonts', 'https://grafica.example', {}), false);
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  assert.equal(ses.controllo(wc, 'local-fonts', 'https://grafica.example', {}), true);
+});
+
+// Filo sono solo le sue pagine: un blob porta l'origine del sito che l'ha creato (#591, giro 20).
+test('un documento blob di un sito è quel sito: chiede col suo nome e non ha sì di comodo', () => {
+  const ses = sessioneFinta();
+  const blob = wcFinto('blob:https://offerta.example/6f1c2d3e-0000-4000-8000-000000000000');
+  blob.session = ses;
+  assert.deepEqual(chiedi(ses, blob, 'media', { mediaTypes: ['audio', 'video'] }), []);
+  assert.equal(ses.avvisi.at(-1).dati.host, 'offerta.example');
+  assert.deepEqual(chiedi(ses, blob, 'clipboard-read'), []);
+  assert.equal(ses.controllo(blob, 'notifications', 'https://offerta.example', {}), false);
+  assert.equal(Permessi.statoNotifiche(ses, 'blob:https://offerta.example/x'), 'default');
+  assert.deepEqual(chiedi(ses, blob, 'openExternal', { externalURL: 'search-ms:query=x' }), [false]);
+  for (const url of ['about:blank', 'data:text/html,x', 'blob:null/1234', 'file:///tmp/fattura.html']) {
+    assert.deepEqual(chiedi(ses, wcFinto(url), 'media', { mediaTypes: ['audio'] }), [false], url);
+    assert.equal(ses.controllo(wcFinto(url), 'clipboard-read', '', {}), false, url);
+  }
+  assert.deepEqual(chiedi(ses, wcFinto('blob:filo://editor/abc'), 'clipboard-read'), [true], 'un blob di Filo è Filo');
+  const home = wcFinto('filo://newtab/');
+  assert.deepEqual(chiedi(ses, home, 'geolocation', { requestingUrl: 'https://mappa.example/riquadro' }), []);
+  assert.equal(ses.avvisi.at(-1).dati.host, 'mappa.example', 'un riquadro web in una pagina di Filo chiede per sé');
+});
+
+// Le risposte delle sessioni su disco restano, come in Chrome; incognito e siti usa-e-getta no (#591, giro 20).
+test('nelle sessioni su disco le risposte si condividono, si salvano, si elencano tutte e si tolgono una per una', async () => {
+  const salvate = [];
+  Permessi._usaDisco({ get: async () => ({ sitePermissions: { 'https://riunione.example|audio': true, rotta: 1 } }), set: async (o) => { salvate.push(o); } });
+  await Permessi.carica();
+  const disco = sessioneFinta();
+  disco.isPersistent = () => true;
+  const altra = sessioneFinta();
+  altra.isPersistent = () => true;
+  const incognito = sessioneFinta();
+  incognito.isPersistent = () => false;
+  const wc = wcFinto('https://posta.example/');
+  wc.session = disco;
+  Permessi.seguiGesti(wc);
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  chiedi(disco, wc, 'notifications');
+  Permessi.rispondi(disco.avvisi.at(-1).dati.id, true);
+  assert.equal(Permessi.statoNotifiche(altra, 'https://posta.example/'), 'granted');
+  assert.deepEqual(salvate.at(-1), { sitePermissions: { 'https://riunione.example|audio': true, 'https://posta.example|notifiche': true } });
+  assert.deepEqual(chiedi(disco, wcFinto('https://riunione.example/'), 'media', { mediaTypes: ['audio'] }), [true], 'letto dal disco all\'avvio');
+  assert.equal(Permessi.statoNotifiche(incognito, 'https://posta.example/'), 'default', 'l\'incognito non eredita');
+  assert.ok(Permessi.scelteRicordate().some((x) => x.origine === 'https://posta.example' && x.parte === 'notifiche' && x.si === true
+    && x.dominio === 'posta.example'));
+  assert.equal(Permessi.togliScelta('https://posta.example', 'notifiche'), true);
+  assert.equal(Permessi.statoNotifiche(disco, 'https://posta.example/'), 'default');
+  assert.equal(Permessi.togliScelta('https://posta.example', 'notifiche'), false);
+  assert.deepEqual(salvate.at(-1), { sitePermissions: { 'https://riunione.example|audio': true } });
+  Permessi.togliScelta('https://riunione.example', 'audio');
+});
+
+// Ogni nome che Electron può mandare ai gestori ha una regola: un nome nuovo, qui, è un rosso e non un no silenzioso.
+test('ogni permesso che Electron dichiara è chiesto, concesso o negato per una ragione scritta', () => {
+  const dts = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'node_modules', 'electron', 'electron.d.ts'), 'utf8');
+  const nomi = new Set();
+  for (const firma of ['setPermissionRequestHandler(handler: ((webContents: WebContents, permission: ',
+    'setPermissionCheckHandler(handler: ((webContents: (WebContents) | (null), permission: ']) {
+    const i = dts.indexOf(firma);
+    assert.ok(i >= 0, firma);
+    const union = dts.slice(i + firma.length, dts.indexOf(', ', i + firma.length));
+    for (const m of union.matchAll(/'([^']+)'/g)) nomi.add(m[1]);
+  }
+  assert.ok(nomi.size > 15);
+  const regole = new Set([...Object.keys(Permessi.TIPI), ...Permessi.INNOCUI, ...Permessi.NON_DISPONIBILI,
+    ...Permessi.COL_GESTO_SENZA_DOMANDA, 'openExternal']);
+  assert.deepEqual([...nomi].filter((n) => !regole.has(n)), []);
 });
 
 test('notifiche: senza un gesto sulla pagina è un no non ricordato; dopo un clic si chiede, e il controllo dice il vero', () => {
@@ -214,7 +302,8 @@ test('la domanda nomina il dominio registrato: la parte davanti la sceglie chi h
 // Quello che Chrome concede di fabbrica, senza domanda: una pagina che lo chiede non deve leggere «bloccato» (#591, giro 19).
 test('passa senza domanda tutto quello che Chrome concede di fabbrica', () => {
   const chrome = ['fullscreen', 'pointerLock', 'keyboardLock', 'clipboard-sanitized-write', 'mediaKeySystem', 'midi',
-    'speaker-selection', 'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler'];
+    'speaker-selection', 'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler',
+    'persistent-storage'];
   for (const p of chrome) assert.equal(Permessi.INNOCUI.has(p), true, p);
 });
 
