@@ -654,6 +654,14 @@ function contestoChat() {
   return { noti: new Set(), esterno: false };
 }
 
+// Qui conta tutto quello che l'indirizzo porta fuori: anche il frammento, che la pagina aperta legge, e le credenziali.
+function chiaveForma(indirizzo) {
+  const { u } = analizzaUrl(indirizzo);
+  const k = u ? chiaveConfronto(u.href) : '';
+  if (!k) return '';
+  return `${u.username || u.password ? `${u.username}:${u.password}@` : ''}${k}${u.hash.length > 1 ? u.hash : ''}`;
+}
+
 function annotaLink(ctx, testo) {
   if (!ctx || !testo) return;
   const s = String(testo);
@@ -662,13 +670,13 @@ function annotaLink(ctx, testo) {
   for (const u of trovati) {
     // Il link di un testo in markdown finisce alla parentesi; uno di Wikipedia la contiene. Valgono tutte e due.
     for (const v of [u, u.replace(/[).,;:!?»]+$/, ''), u.replace(/\)[.,;:!?»]*$/, ''), u.split(')')[0]]) {
-      const n = normalizzaUrl(v);
-      const k = n.url ? chiaveConfronto(n.url) : '';
+      const k = chiaveForma(v);
       if (k) ctx.noti.add(k);
     }
   }
 }
 
+// Testo di sconosciuti: i risultati e le pagine, ma anche un documento sul disco (spesso scaricato) e l'uscita di un comando.
 function annotaAzione(ctx, azione) {
   if (!ctx || !azione) return;
   const tipo = String(azione.type || '').toUpperCase();
@@ -681,15 +689,20 @@ function annotaAzione(ctx, azione) {
     annotaLink(ctx, out.url);
     annotaLink(ctx, out.pageRead);
     annotaLink(ctx, out.testo);
+  } else if (tipo === 'LEGGI_DOCUMENTO' && out.ok) {
+    ctx.esterno = true;
+    annotaLink(ctx, out.text);
+  } else if (tipo === 'ESEGUI_COMANDO' && azione._output && !out.blocked) {
+    ctx.esterno = true;
+    annotaLink(ctx, out.stdout);
   }
 }
 
 function formaDaControllare(ctx, tipo, url, schede = []) {
   if (!ctx || (tipo !== 'LEGGI_PAGINA' && !ctx.esterno)) return false;
-  const n = normalizzaUrl(url);
-  const k = n.url ? chiaveConfronto(n.url) : '';
+  const k = chiaveForma(url);
   if (!k || ctx.noti.has(k)) return false;
-  return !schede.some((u) => chiaveConfronto(u) === k);
+  return !schede.some((u) => chiaveForma(u) === k);
 }
 
 const api = {
