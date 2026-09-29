@@ -798,7 +798,7 @@
   // renderizzata dagli ID salvati come DATI (mai markdown). L'ultima bolla
   // mostra la lista con scroll interno; le precedenti collassano a una riga di
   // sintesi riespandibile (§3.3). Stato per-mazzo e SALVATO (#787): cosa di una
-  // bolla si conserva lo decide SN_DECK_CHAT, lo scrive il main (DECKS_CHAT_SAVE).
+  // bolla si conserva lo decide SN_DECK_CHAT, lo scrive il main una modifica alla volta (DECKS_CHAT_EDIT).
 
   const Chat = window.SN_DECK_CHAT;
   const chatByDeck = new Map(); // deckId → [{ who, text, reply, cardIds, query, error, pending, interrupted, expanded, … }]
@@ -990,21 +990,21 @@
     if (m.cardIds && m.cardIds.length) {
       const n = m.cardIds.length;
       const label = m.query ? `per "${m.query}"` : '';
+      // Le righe di una lista chiusa non si disegnano: una chat salvata cresce di sessione in sessione, e
+      // renderChat gira a ogni pezzo di ragionamento.
+      const open = isLast || m.expanded;
       // CMC crescente, il default di ordinamento delle liste (§3.4).
-      const ids = [...m.cardIds].sort((a, b) => {
+      const ids = !open ? [] : [...m.cardIds].sort((a, b) => {
         const ca = Number(cardsById[a] && cardsById[a].cmc) || 0;
         const cb = Number(cardsById[b] && cardsById[b].cmc) || 0;
         return ca - cb;
       });
-      // Le righe di una lista chiusa non si disegnano: una chat salvata cresce di sessione in sessione, e
-      // renderChat gira a ogni pezzo di ragionamento.
-      const open = isLast || m.expanded;
       // Import via chat (§11.2): oltre al toggle per riga, un bottone che
       // aggiunge/aggiorna TUTTE le carte riconosciute in un colpo solo — con
       // 100 carte di una lista incollata, cliccare riga per riga è attrito
       // puro. Resta comunque una conferma esplicita, mai automatica.
-      const importDone = !!m.importQty && !importAllWouldChange(m);
-      const importAllHtml = m.importQty
+      const importDone = open && !!m.importQty && !importAllWouldChange(m);
+      const importAllHtml = open && m.importQty
         ? `<button class="dk-import-all" data-import-all="1" ${importDone ? 'disabled' : ''}>${importDone ? 'Aggiunte ✓' : 'Aggiungi tutte al mazzo'}</button>`
         : '';
       parts.push(`
@@ -1022,10 +1022,15 @@
   // `stickBottom` = "porta comunque la vista in fondo" (nuovo turno dell'utente:
   // vuole vedere il messaggio appena inviato). Negli altri casi si segue il fondo
   // SOLO se l'utente era già in fondo: durante la generazione renderChat gira in
-  // continuazione (i chunk di ragionamento, ~ogni 250ms) e — svuotando e
-  // ricostruendo le bolle — strappava la vista in fondo/in cima a ogni giro,
-  // impedendo di scrollare per leggere mentre Filo genera (#336). Se invece
-  // l'utente ha scrollato su, gli si conserva la posizione.
+  // continuazione (i chunk di ragionamento, ~ogni 250ms) e non deve strappare la
+  // vista mentre l'utente scrolla per leggere (#336).
+  // Ridisegno per differenza: si rifà solo la bolla il cui HTML è cambiato (la risposta in arrivo, la lista
+  // aperta, i + dopo un'aggiunta). La chat salvata cresce di sessione in sessione, e rifarla tutta a ogni pezzo di
+  // ragionamento bloccava la pagina (#787).
+  // Le bolle stanno a gruppi di CHAT_CHUNK: cambiare l'ultima fa ricalcolare la posizione del suo gruppo, non di
+  // migliaia di bolle.
+  const CHAT_CHUNK = 50;
+  let chatDom = []; // [{ html, el }], nell'ordine delle bolle nel log
   function renderChat(stickBottom) {
     if (!current) return;
     const log = $('chatLog');
@@ -1036,17 +1041,66 @@
     msgs.forEach((m, i) => { m._i = i; });
     $('chatEmpty').hidden = msgs.length > 0;
     $('chatClear').hidden = msgs.length === 0;
-    // Il placeholder resta come primo figlio; le bolle si rigenerano dopo.
-    for (const el of [...log.querySelectorAll('.dk-msg')]) el.remove();
-    const cap = Chat.fits(msgs) ? '' : `<p class="dk-msg dk-chat-cap" role="status">Questa chat ha superato i ${Chat.MAX_MESSAGES.toLocaleString('it-IT')} messaggi e da qui in poi Filo non salva i nuovi. Svuotala per ripartire da zero.</p>`;
-    $('chatEmpty').insertAdjacentHTML('afterend',
-      msgs.map((m, i) => chatBubbleHtml(m, i === msgs.length - 1)).join('') + cap);
-    // Lo svuotamento sopra fa collassare scrollHeight → il browser clampa
-    // scrollTop a 0: se non seguiamo il fondo va ripristinata la posizione, o la
-    // vista salterebbe in cima (il sintomo segnalato).
+    const htmls = msgs.map((m, i) => chatBubbleHtml(m, i === msgs.length - 1));
+    if (chatDom.some((d) => !log.contains(d.el))) chatDom = [];
+    if (!chatDom.length) for (const el of log.querySelectorAll('.dk-chat-chunk, .dk-msg')) el.remove();
+    const chunks = [...log.querySelectorAll(':scope > .dk-chat-chunk')];
+    const chunkFor = (i) => {
+      const c = Math.floor(i / CHAT_CHUNK);
+      while (chunks.length <= c) {
+        const div = document.createElement('div');
+        div.className = 'dk-chat-chunk';
+        (chunks[chunks.length - 1] || $('chatEmpty')).after(div);
+        chunks.push(div);
+      }
+      return chunks[c];
+    };
+    const next = htmls.map((html, i) => {
+      const old = chatDom[i];
+      if (old && old.html === html) return old;
+      const t = document.createElement('template');
+      t.innerHTML = html;
+      const el = t.content.firstElementChild;
+      if (old) old.el.replaceWith(el); else chunkFor(i).appendChild(el);
+      return { html, el };
+    });
+    for (const d of chatDom.slice(htmls.length)) d.el.remove();
+    for (const div of chunks.slice(Math.ceil(htmls.length / CHAT_CHUNK))) div.remove();
+    chatDom = next;
+    const capEl = log.querySelector(':scope > .dk-chat-cap');
+    if (Chat.fits(msgs)) { if (capEl) capEl.remove(); } else if (!capEl) {
+      log.insertAdjacentHTML('beforeend', `<p class="dk-msg dk-chat-cap" role="status">Questa chat ha superato i ${Chat.MAX_MESSAGES.toLocaleString('it-IT')} messaggi e da qui in poi Filo non salva i nuovi. Svuotala per ripartire da zero.</p>`);
+    }
     log.scrollTop = follow ? log.scrollHeight : prevTop;
     syncCarouselHighlight();
     preloadVisibleCards();
+  }
+
+  // Mentre il ragionamento scorre cambia solo la bolla che aspetta: si rifà quella, senza ricalcolare le altre.
+  function renderBubble(m) {
+    if (!current || $('screenBuilder').hidden) return;
+    const msgs = chatMsgs();
+    const i = msgs.indexOf(m);
+    const d = chatDom[i];
+    if (i < 0 || !d) return;
+    const html = chatBubbleHtml(m, i === msgs.length - 1);
+    if (html === d.html) return;
+    const log = $('chatLog');
+    const prevTop = log.scrollTop;
+    const follow = log.scrollHeight - prevTop - log.clientHeight < 48;
+    const t = document.createElement('template');
+    t.innerHTML = html;
+    const el = t.content.firstElementChild;
+    d.el.replaceWith(el);
+    d.el = el;
+    d.html = html;
+    log.scrollTop = follow ? log.scrollHeight : prevTop;
+  }
+
+  // Una bolla toccata a mano (un tasto spento in attesa) si rifà al prossimo ridisegno anche se l'HTML torna uguale.
+  function forgetBubble(el) {
+    const d = chatDom.find((x) => x.el === el);
+    if (d) d.html = '';
   }
 
   async function sendChat(text) {
@@ -1081,12 +1135,13 @@
           if (!cotRenderTimer) {
             cotRenderTimer = setTimeout(() => {
               cotRenderTimer = 0;
-              if (bot.pending) renderChat();
+              if (bot.pending) renderBubble(bot);
             }, 250);
           }
         })
       : null;
     let deckChanged = false;
+    let wantsClear = false;
     try {
       const r = await send({ type: MSG.DECKS_CHAT, deckId, text, history, lastResults, reasoningReqId });
       bot.pending = false;
@@ -1114,6 +1169,8 @@
         // La chat può aver modificato il mazzo (es. budget, §9.2): il mazzo
         // aggiornato torna nella risposta → header e statistiche si rinfrescano.
         if (r.deck && current && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
+        // «Svuota la chat» chiesto a parole: stessa conferma della gomma, dopo aver mostrato la risposta.
+        wantsClear = !!r.clearChat;
       }
     } catch (e) {
       bot.pending = false;
@@ -1173,7 +1230,7 @@
     const m = chatMsgs()[Number(bubbleEl.dataset.msgI)];
     if (!m || !m.cardIds || !m.cardIds.length || !importAllWouldChange(m)) return;
     const btn = bubbleEl.querySelector('[data-import-all]');
-    if (btn) btn.disabled = true;
+    if (btn) { btn.disabled = true; forgetBubble(bubbleEl); }
     const { deck: merged, addedCount, updatedCount } = Decks.importCards(current, importEntries(m));
     const saved = merged !== current ? await send({ type: MSG.DECKS_UPDATE, deck: merged }) : { ok: true, deck: current };
     if (saved && saved.ok) current = saved.deck;
@@ -1367,7 +1424,7 @@
       cardsById[r.card.id] = r.card;
       if (m && m.who === 'bot') {
         m.nameIds = { ...(m.nameIds || {}), [key]: r.card.id };
-        saveChatSoon(deckId);
+        saveNamesSoon(deckId, m);
       }
       el.title = `${r.card.name} — ${r.card.typeLine}`;
       // La risoluzione è arrivata DOPO il mouseover: se il puntatore è ancora

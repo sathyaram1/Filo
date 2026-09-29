@@ -157,6 +157,13 @@ module.exports = function register(on, ctx) {
         onReasoning,
       });
       const parsed = Q.parseAgentReply(r.text);
+      // Svuotare la chat è della pagina, con la sua conferma: qui niente ricerche né modifiche al mazzo.
+      if (parsed.clearChat) {
+        return {
+          ok: true, reply: parsed.reply || 'Svuoto la chat di questo mazzo appena confermi.', cardIds: [], cards: {}, query: '',
+          clearChat: true, ...(reasoning ? { reasoning } : {}),
+        };
+      }
 
       let cardIds = [];
       let cards = {};

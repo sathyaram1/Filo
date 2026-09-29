@@ -141,7 +141,7 @@
   function parseAgentReply(text) {
     const none = {
       reply: '', query: '', filter: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
-      import: [], commanderName: '',
+      import: [], commanderName: '', clearChat: false,
     };
     const raw = String(text || '').trim();
     if (!raw) return none;
@@ -196,6 +196,8 @@
               })).filter((it) => it.name)
             : [],
           commanderName: typeof o.commander === 'string' ? o.commander.trim() : '',
+          // Svuotare la chat chiesto a parole: la pagina chiede conferma, qui solo l'intenzione.
+          clearChat: o.clearChat === true,
         };
       } catch (_) { /* prova il prossimo candidato */ }
     }

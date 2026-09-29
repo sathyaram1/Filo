@@ -386,7 +386,7 @@ test('chi supera il tetto di messaggi lo vede scritto', async ({ app, openTab })
     const C = globalThis.SN_DECK_CHAT;
     const messages = [];
     for (let i = 0; i < C.MAX_MESSAGES; i += 2) messages.push({ who: 'user', text: `d${i}` }, { who: 'bot', reply: `r${i}` });
-    await globalThis.SN_DECK_CHATS_SVC.save(id, messages);
+    await globalThis.SN_DECK_CHATS_SVC.edit(id, { op: 'append', messages });
     return C.MAX_MESSAGES;
   }, deckId);
   await reloadBuilder(page);
@@ -450,4 +450,152 @@ test('riavviato Filo, la chat del mazzo è ancora lì e il + funziona', async ()
     await chiudiApp(app);
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   }
+});
+
+async function secondaScheda(app, shell) {
+  const before = new Set(app.windows());
+  await shell.evaluate(async () => {
+    const snap = await window.filoShell.tabs.snapshot();
+    await window.filoShell.tabs.duplicate(snap.activeId);
+  });
+  let other = null;
+  await expect.poll(() => {
+    other = app.windows().find((w) => !before.has(w) && w.url().startsWith('filo://decks/')) || null;
+    return Boolean(other);
+  }).toBe(true);
+  await other.waitForLoadState('domcontentloaded');
+  return other;
+}
+
+// Due schede sullo stesso mazzo: quella che non aspetta vede Filo pensare (non «interrotta»), una chat svuotata lì
+// resta vuota quando la risposta dell'altra arriva, e solo se la scheda che aspetta si ricarica la risposta è interrotta.
+test('due schede sullo stesso mazzo mentre Filo risponde in una: pensa, svuotata resta vuota, ricaricata è interrotta', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await newDeckWithCommander(page);
+  await ask(page, 'prima domanda');
+  const other = await secondaScheda(app, shell);
+  await expect(other.locator('.dk-msg-user')).toHaveText(['prima domanda']);
+
+  await trattieni(app);
+  await page.fill('#chatInput', 'creature con haste');
+  await page.press('#chatInput', 'Enter');
+  await expect(other.locator('.dk-msg-user')).toHaveText(['prima domanda', 'creature con haste']);
+  await expect(other.locator('.dk-msg-bot').last()).toContainText('sta pensando');
+  await expect(other.locator('.dk-retry')).toHaveCount(0);
+  await libera(app);
+  await expect(other.locator('.dk-msg-bot').last().locator('.dk-cardlist .dk-row')).toHaveCount(2);
+  await expect(page.locator('.dk-msg-bot').last().locator('.dk-cardlist .dk-row')).toHaveCount(2);
+
+  await trattieni(app);
+  await page.fill('#chatInput', 'e adesso?');
+  await page.press('#chatInput', 'Enter');
+  await expect(other.locator('.dk-msg-bot').last()).toContainText('sta pensando');
+  await other.click('#chatClear');
+  await clickConfirm(other, 'ok');
+  await expect(other.locator('.dk-msg')).toHaveCount(0);
+  await libera(app);
+  await expect(page.locator('.dk-msg')).toHaveCount(0);
+  await other.waitForTimeout(500);
+  await expect(other.locator('.dk-msg')).toHaveCount(0);
+  expect((await savedChats(app))[deckId]).toBeUndefined();
+
+  await ask(other, 'ripartiamo');
+  await expect(page.locator('.dk-msg-user')).toHaveText(['ripartiamo']);
+  await trattieni(app);
+  await page.fill('#chatInput', 'ancora');
+  await page.press('#chatInput', 'Enter');
+  await expect(other.locator('.dk-msg-bot').last()).toContainText('sta pensando');
+  await page.reload();
+  await expect(other.locator('.dk-msg-bot').last()).toContainText('interrotta');
+  await expect(other.locator('.dk-retry')).toHaveCount(1);
+  await libera(app);
+});
+
+// Una chat salvata cresce di sessione in sessione: mille messaggi, sotto il tetto, e il ragionamento in diretta non
+// deve ridisegnare tutta la conversazione a ogni pezzo.
+test('su una chat salvata lunga il ragionamento in diretta non blocca la pagina', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await app.evaluate(() => {
+    const prev = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (args) => {
+      for (let i = 0; i < 40; i += 1) {
+        await new Promise((r) => setTimeout(r, 75));
+        try { args.onReasoning && args.onReasoning(`pezzo ${i} `); } catch (_) {}
+      }
+      return prev(args);
+    };
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await newDeckWithCommander(page);
+  await app.evaluate(async (_e, id) => {
+    const messages = [];
+    for (let i = 0; i < 500; i += 1) {
+      messages.push({ who: 'user', text: `domanda ${i}` });
+      messages.push({ who: 'bot', reply: `risposta ${i} con [[Lightning Bolt]]`, reasoning: 'r'.repeat(1500), cardIds: ['bolt-1', 'crasher-1'], query: 'o:haste', turn: `t${i}` });
+    }
+    await globalThis.SN_DECK_CHATS_SVC.edit(id, { op: 'append', messages });
+  }, deckId);
+  await reloadBuilder(page);
+  await expect(page.locator('.dk-msg-user')).toHaveCount(500);
+  await page.evaluate(() => {
+    window.__lunghi = [];
+    new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lunghi.push(e.duration); }).observe({ type: 'longtask' });
+  });
+  await page.fill('#chatInput', 'creature con haste');
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('.dk-msg-bot').last().locator('.dk-cot-body')).toContainText('pezzo 10');
+  await expect(page.locator('.dk-msg-bot').last().locator('.dk-cardlist .dk-row')).toHaveCount(2, { timeout: 30_000 });
+  const bloccata = await page.evaluate(() => window.__lunghi.reduce((a, b) => a + b, 0));
+  expect(bloccata).toBeLessThan(300);
+  // Aprire una lista vecchia rifà solo quella bolla.
+  const ms = await page.evaluate(() => {
+    const t = performance.now();
+    document.querySelectorAll('[data-toggle-list]')[3].click();
+    return performance.now() - t;
+  });
+  expect(ms).toBeLessThan(60);
+  await expect(page.locator('.dk-msg-bot').nth(3).locator('.dk-cardlist .dk-row')).toHaveCount(2);
+});
+
+// «Svuota la chat» scritto in chat fa la stessa cosa della gomma: il modello sa che si può, la pagina chiede conferma.
+test('«svuota la chat» scritto in chat chiede conferma e la svuota, anche dopo la ricarica', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await app.evaluate(() => {
+    const prev = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.completeWithFallback = async (args) => {
+      const last = String(args.messages[args.messages.length - 1].content || '');
+      if (!/svuota/i.test(last)) return prev(args);
+      globalThis.__chatCalls.push(args.messages);
+      return { text: '{"clearChat": true}', model: args.attempts[0].model, provider: args.attempts[0].provider, usage: {} };
+    };
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await newDeckWithCommander(page);
+  await ask(page, 'creature con haste');
+
+  await page.fill('#chatInput', 'svuota la chat');
+  await page.press('#chatInput', 'Enter');
+  await clickConfirm(page, 'cancel');
+  await expect(page.locator('.dk-msg-user')).toHaveText(['creature con haste', 'svuota la chat']);
+  await expect(page.locator('.dk-msg-bot').last()).toContainText('appena confermi');
+  const sistema = await app.evaluate(() => String(globalThis.__chatCalls.at(-1)[0].content));
+  expect(sistema).toContain('svuota la chat');
+
+  await page.fill('#chatInput', 'svuota la chat, per favore');
+  await page.press('#chatInput', 'Enter');
+  await clickConfirm(page, 'ok');
+  await expect(page.locator('.dk-msg')).toHaveCount(0);
+  await reloadBuilder(page);
+  await expect(page.locator('.dk-msg')).toHaveCount(0);
+  expect((await savedChats(app))[deckId]).toBeUndefined();
 });

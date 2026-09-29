@@ -87,3 +87,23 @@ test('il tetto è largo e si conta per messaggi', () => {
   assert.equal(C.fits(new Array(C.MAX_MESSAGES).fill({ who: 'user', text: 'a' })), true);
   assert.equal(C.fits(new Array(C.MAX_MESSAGES + 1).fill({ who: 'user', text: 'a' })), false);
 });
+
+test('una risposta in volo col suo turno si rilegge «sta pensando» solo finché qualcuno la aspetta', () => {
+  const saved = C.cleanChat([{ who: 'user', text: 'cerca' }, { who: 'bot', pending: true, turn: 't1', cotOpen: true }]);
+  assert.deepEqual(saved[1], { who: 'bot', turn: 't1', pending: true });
+  assert.deepEqual(C.forReading(saved, (t) => t === 't1')[1], { who: 'bot', turn: 't1', pending: true });
+  assert.deepEqual(C.forReading(saved, () => false)[1], { who: 'bot', turn: 't1', interrupted: true });
+  assert.deepEqual(C.forReading(saved)[1], { who: 'bot', turn: 't1', interrupted: true });
+});
+
+test('ogni scheda applica la sua modifica alla chat salvata, senza riscriverla', () => {
+  const base = [{ who: 'user', text: 'a' }, { who: 'bot', pending: true, turn: 't1' }];
+  // Intanto un'altra scheda ha aggiunto la sua domanda: la risposta attesa entra al suo posto, l'altra resta.
+  const conAltra = C.applyEdit(base, { op: 'append', messages: [{ who: 'user', text: 'b' }, { who: 'bot', pending: true, turn: 't2' }] }).list;
+  const riempita = C.applyEdit(conAltra, { op: 'fill', turn: 't1', message: { who: 'bot', reply: 'A', pending: false, turn: 't1', expanded: true } }).list;
+  assert.deepEqual(riempita.map((m) => m.text || m.reply || (m.pending && 'attesa')), ['a', 'A', 'b', 'attesa']);
+  assert.equal(riempita[1].pending, undefined);
+  // Svuotata nel frattempo: la risposta non ha più dove entrare.
+  assert.deepEqual(C.applyEdit([], { op: 'fill', turn: 't1', message: { reply: 'A' } }), { error: 'gone' });
+  assert.deepEqual(C.applyEdit(base, { op: 'boh' }), { error: 'bad_op' });
+});
