@@ -135,6 +135,25 @@ test('Opus 5.5 ha la sua tariffa: 4/20, lettura della cache 0,20 $/M', async () 
   assert.deepEqual(rep.notes, [], 'un modello conosciuto non porta la nota della tariffa di ripiego');
 });
 
+// Opus 5.5 era passato per Opus 5 senza nota: il prossimo modello di una
+// famiglia nota paga la tariffa di oggi, ma il rapporto lo dice.
+test('una versione che il listino non conosce per nome lascia la nota, col costo di prima', async () => {
+  const letture = { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 1000000, output_tokens: 0 };
+  for (const [model, tariffa, costo] of [
+    ['claude-opus-6', 'Opus 5', 0.5], ['claude-opus-5-6', 'Opus 5', 0.5], ['claude-opus-4-1', 'Opus 5', 0.5],
+    ['claude-sonnet-6', 'Sonnet 5', 0.2], ['claude-haiku-5', 'Haiku 4.5', 0.1], ['claude-fable-6', 'Fable 5.1', 0.25],
+  ]) {
+    const rep = await analizzaRighe([assistant('n', model, letture, [], T('00:00'))]);
+    assert.equal(rep.costUsd, costo, model);
+    assert.ok(rep.notes.some((n) => n.includes(`«${model}»`) && n.includes(tariffa)), `${model}: ${JSON.stringify(rep.notes)}`);
+  }
+  for (const model of [
+    'claude-opus-5-5', 'claude-opus-5-5[1m]', 'us.anthropic.claude-opus-5-5-v1:0', 'claude-opus-5', 'claude-opus-4-8',
+    'claude-opus-4-5-20251101', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-20250514', 'claude-haiku-4-5',
+    'claude-fable-5', 'claude-fable-5-1', 'claude-mythos-5-1',
+  ]) assert.equal(famigliaPrezzo(model).known, true, model);
+});
+
 test('lo slug della cartella dei transcript e le chiavi ammesse da Firestore', () => {
   assert.equal(slugProgetto('C:\\Users\\agenti AI\\Desktop\\Filo\\Filo'), 'C--Users-agenti-AI-Desktop-Filo-Filo');
   assert.equal(slugProgetto('/home/worker/filo'), '-home-worker-filo');
