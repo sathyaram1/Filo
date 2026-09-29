@@ -1062,11 +1062,12 @@
     // mostrata — sono DATI della bolla, si passano come id al main.
     const lastList = [...msgs].reverse().find((m) => m.who === 'bot' && m.cardIds && m.cardIds.length);
     const lastResults = lastList ? [...lastList.cardIds] : [];
-    msgs.push({ who: 'user', text });
-    const bot = { who: 'bot', pending: true };
-    msgs.push(bot);
+    const user = { who: 'user', text };
+    const bot = { who: 'bot', pending: true, turn: newTurnId() };
+    msgs.push(user, bot);
     // Salvata subito: chi chiude la pagina adesso ritrova la domanda, con la risposta segnata come interrotta.
-    saveChat(deckId);
+    // Oltre il tetto il main la rifiuta: la pagina lo dice (renderChat), la conversazione continua qui.
+    editChat(deckId, { op: 'append', messages: [user, bot] });
     renderChat(true); // nuovo turno: porta la vista in fondo per mostrarlo
     // Ragionamento in diretta (#331): mentre il modello pensa, i chunk di CoT
     // arrivano sul canale filo:reasoning e riempiono la bolla "sta pensando"
