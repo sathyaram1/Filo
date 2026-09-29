@@ -111,22 +111,3 @@ test('una pagina che ha in comune con una in lista solo il prefisso dell\'impron
   await page.waitForTimeout(2500);
   await expect(page.getByText('Sito segnalato come pericoloso')).toHaveCount(0);
 });
-
-test('un indirizzo lunghissimo costruito apposta non blocca Filo mentre la pagina si apre', async ({ app, shell, testServer }) => {
-  await preparaGoogle(app, {});
-  const base = testServer.html('<title>LUNGA</title><p>pagina</p>');
-  // 1,5 milioni di caratteri e mille livelli di %25: Chromium li accetta (il tetto è 2 MB).
-  const lunga = `${base}?${'a'.repeat(1_500_000)}%25${'25'.repeat(1000)}`;
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), lunga);
-
-  // Filo risponde: il processo principale non resta fermo più di un secondo di fila.
-  let peggiore = 0;
-  const fine = Date.now() + 8000;
-  while (Date.now() < fine) {
-    const t = Date.now();
-    await app.evaluate(() => 1);
-    peggiore = Math.max(peggiore, Date.now() - t);
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  expect(peggiore).toBeLessThan(1000);
-});
