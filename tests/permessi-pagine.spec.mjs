@@ -46,6 +46,26 @@ PAGINE['/notifiche-subito'] = `<!doctype html><meta charset="utf-8"><title>Offer
 PAGINE['/notifiche-clic'] = `<!doctype html><meta charset="utf-8"><title>Posta</title>
 <button id="attiva" style="position:fixed;top:200px;left:200px">Attiva le notifiche</button>
 <script>${NOTIFICA} document.getElementById('attiva').addEventListener('click', chiedi);</script>`;
+// Come WhatsApp Web e Gmail: il pulsante per attivare le notifiche compare solo se il browser dice che si può chiedere.
+PAGINE['/messaggi'] = `<!doctype html><meta charset="utf-8"><title>Messaggi</title>
+<button id="attiva" hidden style="position:fixed;top:200px;left:200px">Attiva le notifiche</button>
+<script>
+  const manda = (m) => fetch('/esito?m=' + encodeURIComponent(m));
+  navigator.permissions.query({ name: 'notifications' }).then((s) => {
+    manda('stato:' + Notification.permission + '/' + s.state);
+    if (Notification.permission !== 'default') return;
+    const b = document.getElementById('attiva');
+    b.hidden = false;
+    b.addEventListener('click', () => Notification.requestPermission().then((x) => manda('notifiche:' + x + '/' + Notification.permission)));
+  });
+</script>`;
+// Come la «modalità cucina» di un sito di ricette: lo schermo resta acceso dopo un clic, e Chrome non chiede niente.
+PAGINE['/ricetta'] = `<!doctype html><meta charset="utf-8"><title>Ricetta</title>
+<button id="cucina" style="position:fixed;top:200px;left:200px">Modalità cucina</button>
+<script>
+  document.getElementById('cucina').addEventListener('click', () => navigator.wakeLock.request('screen').then(
+    () => fetch('/esito?m=schermo:acceso'), (e) => fetch('/esito?m=' + encodeURIComponent('schermo:' + e.name))));
+</script>`;
 PAGINE['/esterno'] = `<!doctype html><meta charset="utf-8"><title>Offerta</title><p>niente</p><script>
   setTimeout(() => {
     const f = document.createElement('iframe');
