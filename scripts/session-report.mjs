@@ -66,6 +66,7 @@ import { fileURLToPath } from 'node:url';
 // scrive a un'ora, e il costo usciva più basso del 18-39% su ogni sessione.
 export const PREZZI = Object.freeze({
   opus: { input: 5, cacheWrite: 6.25, cacheWrite1h: 10, cacheRead: 0.5, output: 25 },
+  'opus-5-5': { input: 4, cacheWrite: 5, cacheWrite1h: 8, cacheRead: 0.2, output: 20 },
   sonnet: { input: 2, cacheWrite: 2.5, cacheWrite1h: 4, cacheRead: 0.2, output: 10 },
   'sonnet-4': { input: 3, cacheWrite: 3.75, cacheWrite1h: 6, cacheRead: 0.3, output: 15 },
   haiku: { input: 1, cacheWrite: 1.25, cacheWrite1h: 2, cacheRead: 0.1, output: 5 },
