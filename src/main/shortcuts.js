@@ -148,7 +148,9 @@ const salvataggiInCorso = new Set();
 async function saveForLater(win, tab) {
   if (salvataggiInCorso.has(tab.id)) return;
   salvataggiInCorso.add(tab.id);
-  try { await salvaPerDopo(win, tab); } finally { salvataggiInCorso.delete(tab.id); }
+  let entry = null;
+  try { entry = await salvaPerDopo(win, tab); } finally { salvataggiInCorso.delete(tab.id); }
+  if (entry) await confermaSullaSchedaDavanti(win, entry);
 }
 
 // Il ripiego scrive dove scriverebbe la pagina passando dall'IPC: in incognito, nella memoria della sessione e non sul disco.
@@ -164,7 +166,7 @@ async function salvaPerDopo(win, tab) {
   const url = tab.url;
   const title = tab.title;
   const favicon = tab.favicon || '';
-  if (await consegnaConRicevuta(tab, 'save-for-later')) return;
+  if (await consegnaConRicevuta(tab, 'save-for-later')) return null;
   // Pagina che non l'ha presa (ancora in caricamento, bloccata): si salva comunque, prima della miniatura.
   const entry = await comeLaFinestra(win, async () => {
     const res = await handleMessage({ type: MSG.SAVE_PAGE, page: { url, title, favicon } });
@@ -173,7 +175,7 @@ async function salvaPerDopo(win, tab) {
     return res?.entry;
   });
   try { win._filoTabs.closeTab(tab.id); } catch (_) {}
-  await confermaSullaSchedaDavanti(win, entry);
+  return entry;
 }
 
 // La scheda salvata non poteva mostrare la conferma: la mostra quella che l'utente ha davanti adesso, senza chiudersi.

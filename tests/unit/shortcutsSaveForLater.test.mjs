@@ -243,3 +243,34 @@ test('ogni conferma di ripiego porta un\'etichetta sua, uguale in tutti i tentat
   await confermaSullaSchedaDavanti(makeWin(altra), { id: 'E5' }, { tentativoMs: 10, totaleMs: 50 });
   assert.notEqual(altra.ricevuti[0].payload.context.conferma, [...etichette][0], 'un salvataggio nuovo della stessa voce si conferma di nuovo');
 });
+
+test('un secondo Alt+S sulla scheda che aspetta ancora la pagina non avvia un secondo salvataggio', async () => {
+  saved = null; closed = null;
+  let chiusure = 0;
+  const tab = makeTab({ id: 'D1', url: 'https://lenta.example/' }, 'rifiutata');
+  const win = makeWin(tab);
+  win._filoTabs.closeTab = (id) => { closed = id; chiusure++; };
+  dispatch('save-for-later', win);
+  dispatch('save-for-later', win);
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(tab.ricevuti.filter((m) => m.payload.command === 'save-for-later').length, 1, 'un salvataggio per scheda alla volta');
+  assert.equal(chiusure, 1);
+  // Finito quello, la stessa scheda (se è ancora lì) si può salvare di nuovo.
+  dispatch('save-for-later', win);
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(tab.ricevuti.filter((m) => m.payload.command === 'save-for-later').length, 2);
+});
+
+test('una pagina che prende la scorciatoia quando il main ha smesso di aspettare non la esegue: la fa già lui', () => {
+  const consegna = require(join(ROOT, 'src', 'preload', 'scorciatoia.js'));
+  const esegui = (scade) => {
+    const eseguiti = [];
+    const ricevute = [];
+    const ascoltatore = (msg, _s, rispondi) => { eseguiti.push(msg.command); rispondi({ presa: true }); };
+    consegna([ascoltatore], { command: 'save-for-later', ricevuta: 'R', scade }, (m) => { ricevute.push(m.presa); });
+    return { eseguiti, ricevute };
+  };
+  assert.deepEqual(esegui(Date.now() + 3000), { eseguiti: ['save-for-later'], ricevute: [true] });
+  assert.deepEqual(esegui(Date.now() - 1), { eseguiti: [], ricevute: [false] }, 'in ritardo: il main ha già salvato da sé');
+  assert.deepEqual(esegui(undefined), { eseguiti: ['save-for-later'], ricevute: [true] }, 'senza scadenza (vecchio main) si esegue');
+});

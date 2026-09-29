@@ -410,3 +410,21 @@ test('Alt+S su una pagina che non si carica salva l\'indirizzo del sito, non que
   const salvate = await app.evaluate(async () => (await globalThis.SN_SAVED_PAGES.list()).map((p) => ({ url: p.url, favicon: p.favicon })));
   expect(salvate).toEqual([{ url, favicon: '' }]);
 });
+
+// Per tre secondi e mezzo una pagina che non risponde non mostra niente: chi preme di nuovo Alt+S non deve avere due conferme.
+test('un secondo Alt+S su una pagina che non risponde non fa un secondo salvataggio con la sua conferma', async ({ app, openTab, testServer }) => {
+  const davanti = await testServer.openReady(openTab, PAGINA_RICCA('Resto davanti'), { pubblico: true });
+  const url = testServer.html(PAGINA_RICCA('Bloccata due volte'));
+  const page = await openTab(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await page.evaluate(() => { setTimeout(() => { const t = Date.now(); while (Date.now() - t < 12000) { /* occupata */ } }, 50); });
+  await page.waitForTimeout(200);
+  await dispatchAltS(app);
+  await page.waitForTimeout(1500);
+  await dispatchAltS(app);
+
+  await expect(davanti.locator('.sn-save-confirm').first()).toBeVisible({ timeout: 12000 });
+  await davanti.waitForTimeout(2500);
+  expect(await davanti.locator('.sn-save-confirm').count(), 'una conferma per una pagina salvata').toBe(1);
+  expect(await app.evaluate(async (_e, u) => (await globalThis.SN_SAVED_PAGES.list()).filter((p) => p.url === u).length, url)).toBe(1);
+});
