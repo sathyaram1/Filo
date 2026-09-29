@@ -224,3 +224,35 @@ test('le righe entrate nel blocco di una versione dopo che era uscita arrivano c
     assert.deepEqual(righeDi(PN.recap('0.2.229', '0.2.230', foto)), ['fusa durante la suite']);
   });
 });
+
+// Il cancello fonde un ramo com'era alla verifica: se intanto sono uscite una o due versioni, la sua riga finisce sotto
+// una versione che non l'aveva, e nessun test su main se ne accorge. Chi aggiorna la deve vedere lo stesso.
+test('una riga fusa dopo che la sua versione è uscita arriva a chi aggiorna, in qualunque blocco stia', () => {
+  // Il ramo apre il blocco 0.2.230; la 0.2.230 esce senza blocco suo, e il ramo si fonde dopo.
+  const foto230 = conNote([{ version: '0.2.229', features: ['uscita con la 0.2.229'], fixes: [] }],
+    () => PN.fotografia('0.2.230'));
+  conNote([
+    { version: '0.2.232', features: ['in arrivo'], fixes: [] },
+    { version: '0.2.231', features: ['scritta dopo'], fixes: [] },
+    { version: '0.2.230', features: ['fusa dopo l\'uscita della 0.2.230'], fixes: [] },
+    { version: '0.2.229', features: ['uscita con la 0.2.229'], fixes: [] },
+  ], () => {
+    assert.deepEqual(righeDi(PN.recap('0.2.230', '0.2.231', foto230)),
+      ['scritta dopo', 'fusa dopo l\'uscita della 0.2.230']);
+  });
+
+  // Il ramo scrive nel blocco in cima 0.2.229 quando è ancora in arrivo; escono la 0.2.229 e la 0.2.230, poi si fonde.
+  const alla230 = [{ version: '0.2.230', features: ['della 0.2.230'], fixes: [] },
+    { version: '0.2.229', features: ['prima'], fixes: [] }];
+  const foto = conNote(alla230, () => PN.fotografia('0.2.230'));
+  conNote([
+    { version: '0.2.231', features: ['della 0.2.231'], fixes: [] },
+    alla230[0],
+    { version: '0.2.229', features: ['prima'], fixes: ['fusa dopo due uscite'] },
+  ], () => {
+    assert.deepEqual(righeDi(PN.recap('0.2.230', '0.2.231', foto)), ['della 0.2.231', 'fusa dopo due uscite']);
+    // Riavviare la stessa versione, o tornare indietro, non è un aggiornamento.
+    assert.deepEqual(PN.recap('0.2.230', '0.2.230', foto), []);
+    assert.deepEqual(PN.recap('0.2.230', '0.2.229', foto), []);
+  });
+});
