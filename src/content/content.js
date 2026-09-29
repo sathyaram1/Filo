@@ -547,10 +547,12 @@
     // Una ricerca non è una bozza: si riscrive in un attimo, e quella dal vivo ha già
     // dato i risultati senza un invio da riconoscere.
     function diRicerca(el) {
-      if (el.tagName.toUpperCase() !== 'INPUT') return false;
-      if (String(el.type).toLowerCase() === 'search') return true;
+      const tag = el.tagName.toUpperCase();
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA') return false;
       if (/^searchbox$/i.test(el.getAttribute('role') || '') || el.closest('[role="search" i]')) return true;
       if (/^(q|s|k|query|search|search_query|keywords?|field-keywords)$/i.test(el.name || '')) return true;
+      if (tag === 'TEXTAREA') return false;
+      if (String(el.type).toLowerCase() === 'search') return true;
       return /(search|cerca|ricerca|busca|recherche|suche)/i.test(`${el.getAttribute('aria-label') || ''} ${el.placeholder || ''}`);
     }
     const grande = (el) => { try { const r = el.getBoundingClientRect(); return r.width >= 8 && r.height >= 8; } catch (_) { return true; } };
