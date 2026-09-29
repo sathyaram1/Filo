@@ -185,6 +185,9 @@
 
   // ---------- Drag header ----------
 
+  // Anche spostato a mano, il pannello non scende sotto gli avvisi della barra (--filo-avvisi-barra, #588.5).
+  const sopraLaBarra = (px) => `max(${Math.round(px)}px, var(--filo-avvisi-barra, 0px))`;
+
   // Drag dall'header. Mantiene l'ancoraggio al BOTTOM (la barra input resta
   // dov'è quando il pannello si collassa, anche dopo un drag manuale).
   function makeDraggable(handleEl) {
@@ -200,7 +203,7 @@
       startLeft = rect.left;
       startBottom = window.innerHeight - rect.bottom;
       root.style.left = `${rect.left}px`;
-      root.style.bottom = `${startBottom}px`;
+      root.style.bottom = sopraLaBarra(startBottom);
       root.style.right = 'auto';
       root.style.top = 'auto';
       e.preventDefault();
@@ -216,7 +219,7 @@
       // muovendo il mouse in basso (dy > 0) il bottom deve diminuire.
       const newBottom = Math.min(maxBottom, Math.max(0, startBottom - dy));
       root.style.left = `${newLeft}px`;
-      root.style.bottom = `${newBottom}px`;
+      root.style.bottom = sopraLaBarra(newBottom);
     });
     window.addEventListener('mouseup', () => { dragging = false; });
   }
@@ -242,7 +245,7 @@
     // così com'è, altrimenti uso il default 16px.
     const currentBottom = root.style.bottom && root.style.bottom !== 'auto'
       ? root.style.bottom
-      : '16px';
+      : sopraLaBarra(16);
     root.style.left = `${newLeft}px`;
     root.style.right = 'auto';
     root.style.top = 'auto';
