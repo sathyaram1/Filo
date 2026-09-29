@@ -1,37 +1,36 @@
-// esplorazione: aspetto della conferma e della griglia con le miniature piccole, chiaro e scuro.
+// esplorazione: salvata una pagina, l'utente passa subito a un'altra scheda: la scheda salvata si chiude?
 import { test, expect } from '../../fixtures/electron.mjs';
 
-const RICCA = (t) => `<!doctype html><html><head><meta charset="utf-8"><title>${t}</title></head>
-  <body style="margin:0;min-height:100vh;background:linear-gradient(135deg,#f6d365,#fda085 40%,#a1c4fd 70%,#c2e9fb)">
-  <div style="columns:3;padding:24px;font:15px/1.5 Georgia,serif;color:#3a2a1a">${'<p>Filo mette da parte la pagina per dopo con una miniatura.</p>'.repeat(60)}</div></body></html>`;
+const pagina = (t) => `<!doctype html><html><head><meta charset="utf-8"><title>${t}</title></head><body style="background:#fda085"><h1>${t}</h1></body></html>`;
 
-test('aspetto', async ({ app, openTab, testServer }) => {
-  for (const t of ['Prima pagina', 'Seconda pagina']) {
-    const url = testServer.html(RICCA(t));
+const schede = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.map((t) => t.url));
+const attiva = (app, u) => app.evaluate(({ BrowserWindow }, x) => {
+  const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+  const t = tm.tabs.find((y) => y.url === x);
+  if (t) tm.activate(t.id);
+}, u);
+
+for (const strada of ['Alt+S', 'menu']) {
+  test(`${strada}, poi subito un'altra scheda: la salvata si chiude lo stesso`, async ({ app, openTab, testServer }) => {
+    const altra = testServer.html(pagina('Altra scheda'), { pubblico: true });
+    await openTab(altra);
+    const url = testServer.html(pagina('Da salvare'));
     const page = await openTab(url);
     await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
-    await app.evaluate(({ BrowserWindow }) => { globalThis.__filoShortcuts.dispatch('save-for-later', BrowserWindow.getAllWindows().find((w) => w._filoTabs)); });
+    if (strada === 'Alt+S') {
+      await app.evaluate(({ BrowserWindow }) => { globalThis.__filoShortcuts.dispatch('save-for-later', BrowserWindow.getAllWindows().find((w) => w._filoTabs)); });
+    } else {
+      await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
+      await page.locator('.sn-menu [data-sn-icon-id="saveForLater"]').click();
+    }
     await expect(page.locator('.sn-save-confirm')).toBeVisible({ timeout: 5000 });
-    await page.waitForTimeout(400);
-    if (t === 'Prima pagina') await page.screenshot({ path: 'tests/.shots/839-g4-conferma-chiaro.png' });
-    await expect.poll(() => app.evaluate(async (_e, u) => !!(await globalThis.SN_SAVED_PAGES.list()).find((p) => p.url === u && p.thumbnail), url), { timeout: 8000 }).toBe(true);
-  }
-  const home = await openTab('filo://home/home.html');
-  await home.waitForLoadState('domcontentloaded');
-  await home.waitForTimeout(1200);
-  await home.screenshot({ path: 'tests/.shots/839-g4-home-chiaro.png' });
-  await app.evaluate(async () => {
-    const { MSG } = globalThis.SN_MSG;
-    await globalThis.SN_HANDLE_MESSAGE({ type: MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }, { url: 'filo://preferences/preferences.html' });
+    await attiva(app, altra);
+    await new Promise((r) => setTimeout(r, 8000));
+    const dopo8 = await schede(app);
+    console.log(strada, 'DOPO 8s', JSON.stringify(dopo8));
+    await attiva(app, url);
+    await new Promise((r) => setTimeout(r, 1500));
+    console.log(strada, 'TORNATO', JSON.stringify(await schede(app)));
+    expect(dopo8, 'la pagina salvata è rimasta aperta dietro').not.toContain(url);
   });
-  await home.reload();
-  await home.waitForTimeout(1500);
-  await home.screenshot({ path: 'tests/.shots/839-g4-home-scuro.png' });
-  const url = testServer.html(RICCA('Terza pagina'));
-  const page = await openTab(url);
-  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
-  await app.evaluate(({ BrowserWindow }) => { globalThis.__filoShortcuts.dispatch('save-for-later', BrowserWindow.getAllWindows().find((w) => w._filoTabs)); });
-  await expect(page.locator('.sn-save-confirm')).toBeVisible({ timeout: 5000 });
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: 'tests/.shots/839-g4-conferma-scuro.png' });
-});
+}
