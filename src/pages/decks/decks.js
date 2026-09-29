@@ -1121,12 +1121,18 @@
     }
     if (offReasoning) offReasoning();
     if (cotRenderTimer) { clearTimeout(cotRenderTimer); cotRenderTimer = 0; }
+    // La risposta entra al posto del SUO turno nella chat salvata: svuotata nel frattempo (qui o altrove), non
+    // rientra. Solo dopo la scheda è libera, così un avviso arrivato intanto la fa rileggere dal salvato.
+    await editChat(deckId, { op: 'fill', turn: bot.turn, message: bot });
     busyChats.delete(msgs);
-    // Svuotata mentre Filo rispondeva: la risposta non rientra nella chat nuova.
-    if (chatByDeck.get(deckId) === msgs) saveChat(deckId);
+    if (staleChats.has(msgs)) {
+      staleChats.delete(msgs);
+      await rereadChat(deckId, msgs);
+    }
     if (!current || $('screenBuilder').hidden) return;
     if (deckChanged) await renderBuilder();
     else renderChat();
+    if (wantsClear && current.id === deckId && chatByDeck.get(deckId) === msgs) clearChat();
   }
 
   // Toggle aggiungi/rimuovi dalla riga della CardList (§3.4): la carta entra
