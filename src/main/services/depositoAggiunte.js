@@ -17,7 +17,7 @@ const meseCorrente = () => new Date().toISOString().slice(0, 7);
 // L'ordine `s` cresce a ogni aggiunta; chi arriva «in coda» (migrazione, importazione) scende sotto il più vecchio.
 function creaDeposito({ cartella, meseDi }) {
   const record = new Map(); // id → { r, seq, mese }
-  const mesi = new Map();   // mese → { righe }
+  const mesi = new Map();   // mese → { righe, vivi }
   let maxSeq = 0;
   let minSeq = 1;
   let elenco = null;
@@ -38,9 +38,13 @@ function creaDeposito({ cartella, meseDi }) {
       fs.mkdirSync(cartella, { recursive: true });
       fs.appendFileSync(fileDi(mese), testo, 'utf8');
     }
-    const s = mesi.get(mese) || { righe: 0 };
-    s.righe += testo.split('\n').length - 1;
-    mesi.set(mese, s);
+    statoDi(mese).righe += testo.split('\n').length - 1;
+  }
+
+  function statoDi(mese) {
+    let s = mesi.get(mese);
+    if (!s) { s = { righe: 0, vivi: 0 }; mesi.set(mese, s); }
+    return s;
   }
 
   function viviDel(mese) {
@@ -66,7 +70,7 @@ function creaDeposito({ cartella, meseDi }) {
       fs.mkdirSync(cartella, { recursive: true });
       fs.writeFileSync(file + '.tmp', testo, 'utf8');
       fs.renameSync(file + '.tmp', file);
-      mesi.set(mese, { righe: tenuti.length });
+      mesi.set(mese, { righe: tenuti.length, vivi: tenuti.length });
     }
     for (const id of via) record.delete(id);
     for (const [v, r] of tenuti) v.r = r;
@@ -76,18 +80,14 @@ function creaDeposito({ cartella, meseDi }) {
   // Gli aggiornamenti accodano righe: quando un mese ne ha il doppio dei suoi record lo si ricompatta.
   function compattaSeServe(mese) {
     const s = mesi.get(mese);
-    if (!s) return;
-    let vivi = 0;
-    for (const v of record.values()) if (v.mese === mese) vivi++;
-    if (s.righe <= 2 * vivi + 64) return;
+    if (!s || s.righe <= 2 * s.vivi + 64) return;
     try { riscriviMese(mese, (id, v) => v.r); } catch (e) {
       console.warn('[Filo deposito] compattazione fallita:', e.message || e);
     }
   }
 
   function leggiMese(mese, testo) {
-    const s = mesi.get(mese) || { righe: 0 };
-    mesi.set(mese, s);
+    const s = statoDi(mese);
     for (const riga of testo.replace(/^﻿/, '').split('\n')) {
       if (!riga.trim()) continue;
       s.righe++;
@@ -96,7 +96,10 @@ function creaDeposito({ cartella, meseDi }) {
       if (!o || typeof o !== 'object') continue;
       if (o.r && typeof o.r === 'object' && typeof o.r.id === 'string' && o.r.id) {
         const seq = Number.isFinite(o.s) ? o.s : maxSeq + 1;
+        const prima = record.get(o.r.id);
+        if (prima) statoDi(prima.mese).vivi--;
         record.set(o.r.id, { r: o.r, seq, mese });
+        s.vivi++;
         if (seq > maxSeq) maxSeq = seq;
         if (seq < minSeq) minSeq = seq;
       } else if (typeof o.u === 'string' && o.p && typeof o.p === 'object') {
@@ -158,6 +161,7 @@ function creaDeposito({ cartella, meseDi }) {
     for (const [mese, voci] of perMese) {
       accoda(mese, voci.map((x) => JSON.stringify({ s: x.seq, r: x.r })).join('\n') + '\n');
       for (const x of voci) { record.set(x.r.id, { r: x.r, seq: x.seq, mese }); aggiunti.push(x.r); }
+      statoDi(mese).vivi += voci.length;
       elenco = null;
     }
     return aggiunti;
@@ -204,7 +208,12 @@ function creaDeposito({ cartella, meseDi }) {
     let nomi = [];
     try { nomi = fs.readdirSync(cartella); } catch (e) { if (e.code !== 'ENOENT') throw e; }
     for (const nome of nomi) {
-      if (nome.endsWith(EST) || nome.endsWith(EST + '.tmp')) fs.unlinkSync(path.join(cartella, nome));
+      if (!nome.endsWith(EST) && !nome.endsWith(EST + '.tmp')) continue;
+      fs.unlinkSync(path.join(cartella, nome));
+      const mese = nome.slice(0, nome.indexOf(EST));
+      for (const [id, v] of record) if (v.mese === mese) record.delete(id);
+      mesi.delete(mese);
+      elenco = null;
     }
     record.clear();
     mesi.clear();
