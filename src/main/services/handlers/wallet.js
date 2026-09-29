@@ -253,29 +253,38 @@ module.exports = function register(on, ctx) {
   async function saldoPerChat({ fresco = false } = {}) {
     if (!haPortafoglio()) return null;
     let st = ultimaLettura ? ultimaLettura.state : null;
+    let lettaIl = ultimaLettura ? ultimaLettura.at : null;
+    let muto = false; // la lettura di adesso non è arrivata in tempo
     if (fresco && (!ultimaLettura || Date.now() - ultimaLettura.at > CHAT_VALIDO_MS)) {
       const letta = await Promise.race([
         readState().catch(() => null),
         new Promise((r) => setTimeout(() => r(null), CHAT_ATTESA_MS)),
       ]);
-      if (letta) st = letta;
+      if (letta) { st = letta; lettaIl = Date.now(); } else muto = true;
     }
     if (st && st.identity && st.identity.lost) return null;
-    let server = st && st.server;
     if (st && st.server && st.server.hasWallet === false) return null;
-    if (!server || !server.hasWallet) {
+    let server = st && st.server && st.server.hasWallet ? st.server : null;
+    if (!server) {
       const disco = walletStore.lastServer() || lastServer;
-      server = disco && disco.hasWallet ? { ...disco, cached: true } : null;
+      if (!disco || !disco.hasWallet) return { balance: null };
+      server = { ...disco, cached: muto || Boolean(st) };
+      lettaIl = Date.parse(String(disco.readAt || '')) || null;
     }
-    if (!server) return { balance: null };
     const b = server.balance || {};
+    // Perché non è il saldo di adesso: il server dei crediti muto, il servizio
+    // dei modelli che non ha detto il consumo (come la pagina), o una lettura
+    // solo vecchia, che la home usa senza chiederne un'altra.
+    const lastKnown = server.cached || muto ? 'server'
+      : server.stale ? 'models'
+        : !lettaIl || Date.now() - lettaIl > CHAT_VALIDO_MS ? 'old' : '';
+    const readAt = server.cached ? server.readAt
+      : server.stale ? server.usageReadAt
+        : lastKnown && lettaIl ? new Date(lettaIl).toISOString() : null;
     return {
       balance: b.credits != null && Number.isFinite(Number(b.credits)) ? Number(b.credits) : null,
       dailyCredits: server.dailyCredits != null && Number.isFinite(Number(server.dailyCredits)) ? Number(server.dailyCredits) : null,
-      // Perché è l'ultimo saldo noto: il server dei crediti muto, o il
-      // servizio dei modelli che non ha detto il consumo (come la pagina).
-      lastKnown: server.cached ? 'server' : (server.stale ? 'models' : ''),
-      readAt: (server.cached ? server.readAt : server.stale ? server.usageReadAt : null) || null,
+      lastKnown, readAt: readAt || null,
       usingOwnKey: Boolean(st && st.usingOwnKey),
       keyMissing: Boolean(st && st.hasPersonalKey === false),
     };

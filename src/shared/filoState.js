@@ -72,7 +72,10 @@
         const w = await WM.saldoPerChat({ fresco });
         if (w) return { wallet: true, ...w };
       }
-    } catch (_) { /* si ripiega sul conteggio locale */ }
+    } catch (_) {
+      // Col portafoglio il conteggio locale sarebbe una cifra sbagliata: meglio nessuna.
+      try { if (global.SN_WALLET_MAIN?.haPortafoglio?.()) return { wallet: true, balance: null }; } catch (_) {}
+    }
     try {
       const Credits = global.SN_CREDITS;
       if (!Credits || typeof Credits.getPublic !== 'function') return null;
@@ -182,8 +185,12 @@
       if (d && !Number.isNaN(d.getTime())) {
         quando = `, letto il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
       }
-      const perche = c.lastKnown === 'models' ? 'il servizio dei modelli non dice il consumo' : 'il server dei crediti non risponde';
-      out.push(`Saldo: ${fmt(c.balance)} crediti. È l'ultimo saldo noto${quando}: adesso ${perche}, e se dai la cifra va detto.`);
+      if (c.lastKnown === 'old') {
+        out.push(`Saldo: ${fmt(c.balance)} crediti (lo tiene il server${quando ? `; ${quando.slice(2)}` : ''})`);
+      } else {
+        const perche = c.lastKnown === 'models' ? 'il servizio dei modelli non dice il consumo' : 'il server dei crediti non risponde';
+        out.push(`Saldo: ${fmt(c.balance)} crediti. È l'ultimo saldo noto${quando}: adesso ${perche}, e se dai la cifra va detto.`);
+      }
     } else {
       out.push(`Saldo: ${fmt(c.balance)} crediti (lo tiene il server: è il numero della pagina Crediti)`);
     }

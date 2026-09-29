@@ -114,6 +114,7 @@ async function homeDiAvvio(app) {
 }
 
 test('la chat dice il saldo e la quota del portafoglio, e a server muto l\'ultimo saldo noto', async ({ app }) => {
+  await homeDiAvvio(app);
   // Prima del riscatto vale il conteggio locale, com'era.
   const prima = await statoChat(app);
   expect(prima).toMatch(/Saldo: \d+ crediti \(si ricaricano di \d+ ogni giorno a mezzanotte\)/);
@@ -177,7 +178,9 @@ test('invio di una segnalazione col portafoglio: niente +5, il conteggio locale 
 async function semina(app, schede) {
   await app.evaluate(async (_electron, { schede }) => {
     const clientId = 'client-816';
-    await globalThis.chrome.storage.local.set({ sn_feedback_client_id: clientId });
+    // Col portafoglio Filo risponde, e una home nuova aprirebbe l'intervista di
+    // benvenuto, sotto la quale i riquadri non partono: qui è già fatta.
+    await globalThis.chrome.storage.local.set({ sn_feedback_client_id: clientId, filo_onboarding: { done: true } });
     const H = globalThis.SN_FEEDBACK_CLIENT_ID_HASH;
     const mioHash = await H.hashClientId(clientId);
     const cards = [];
@@ -220,6 +223,7 @@ test('riquadro della risoluzione col portafoglio: la cifra del server, l\'archiv
   await expect(archiviato.locator('.dash-thanks-item-body')).toHaveText('L’abbiamo chiuso senza modifiche.');
   await expect(page.locator('.dash-thanks-total')).toContainText('+50 crediti');
   await expect(page.locator('.dash-recap-title')).toHaveText('Grazie! I tuoi feedback sono stati chiusi');
+  await page.waitForTimeout(800); // fine della comparsa, per lo scatto
   await page.screenshot({ path: 'tests/.shots/crediti-veri-riquadro.png' }).catch(() => {});
   expect(await saldoLocale(app)).toBe(prima);
 

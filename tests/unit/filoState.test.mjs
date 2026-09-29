@@ -122,3 +122,12 @@ test('senza portafoglio resta il conteggio locale, com\'era', async () => {
   const { stateText } = await assembleCon({ wallet: null, locale: 842 });
   assert.match(stateText, /Saldo: 842 crediti \(si ricaricano di \d+ ogni giorno a mezzanotte\)/);
 });
+
+test('una lettura solo vecchia (la home non ne chiede un\'altra) si data, senza dire che il server tace', async () => {
+  const { stateText } = await assembleCon({
+    wallet: { balance: 4000, dailyCredits: 100, lastKnown: 'old', readAt: '2026-09-28T08:12:00.000Z' },
+    locale: 777,
+  });
+  assert.match(stateText, /Saldo: 4\.?000 crediti \(lo tiene il server; letto il 28 set alle \d\d:\d\d\)/);
+  assert.doesNotMatch(stateText, /non risponde/);
+});
