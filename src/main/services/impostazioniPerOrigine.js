@@ -1,9 +1,45 @@
-// Cosa passa il confine fra Filo e una pagina che non è filo:// (i content script di un sito):
-// liste di ciò che è AMMESSO, mai di ciò che si toglie: spinte, impostazioni, magazzino, azioni.
+// Cosa passa il confine fra Filo e una pagina che non è filo:// (i content script di un sito): liste di
+// ciò che è AMMESSO, mai di ciò che si toglie: canali, domande, spinte, impostazioni, magazzino, azioni.
 // Regole e sentinelle: tests/unit/impostazioniPerOrigine.test.mjs.
 'use strict';
 
 const OGNI_VOCE = '*';
+
+// I canali su cui parla il preload delle pagine web. Gli altri (schede, finestra,
+// terminale) rispondono solo alla cornice e alle pagine di Filo.
+const CANALI_WEB = Object.freeze(new Set([
+  'filo:message', 'ai-stream:start', 'ai-stream:abort',
+  'filo:fp-config', 'filo:cookie-wipe', 'filo:permessi-stato', 'filo:frame-active',
+]));
+
+// Le domande (tipi di filo:message) che il codice di Filo dentro le pagine fa davvero:
+// da un sito ogni altra si rifiuta. Chi ne aggiunge una in un content script la mette qui.
+const DOMANDE_WEB = Object.freeze(new Set([
+  '_storage:get', '_storage:set', '_storage:remove', 'get_settings', 'update_settings',
+  'ai_request', 'tts_synth', 'tts_reading_state', 'tts_reading_status', 'tts_stop_reading',
+  'auth_status', 'auth_signin', 'redteam_submit', 'submit_feedback', 'credits_award_feedback',
+  'feedback_annotate', 'feedback_clear_draw', 'capture_visible_tab', 'capture_feedback_topbar',
+  'get_clipboard_history', 'push_clipboard_entry', 'remove_clipboard_entry',
+  'clear_clipboard_history', 'update_clipboard_description', 'permesso_filo',
+  'close_tab', 'nav_back', 'nav_forward', 'nav_reload', 'nav_state', 'go_home', 'open_home',
+  'open_new_tab', 'open_incognito', 'open_options', 'open_spellcheck_page', 'open_url',
+  'toggle_fullscreen', 'exit_fullscreen', 'fullscreen_state', 'esc_chiedi_tasto', 'esc_consumato',
+  'run_in_top_frame', 'close_other_menus', 'translate_frames', 'frame_translate_done',
+  'tab_activity', 'tab_dominant_color', 'tab_identity_color', 'replace_misspelling',
+  'save_page', 'save_link', 'set_saved_page_thumb', 'download_image', 'download_media', 'download_link',
+  'fetch_link_meta', 'web_search', 'path_collectable', 'save_path', 'filo_run_action', 'filo_confirm_action',
+  'cookies_config', 'cookies_rule', 'cookies_banner_tokens', 'cookies_frame_banner', 'cookies_outcome',
+  'safebrowse_get', 'safebrowse_proceed', 'safebrowse_dismiss', 'geo_propose_accept', 'geo_propose_dismiss',
+]));
+
+// Le fotografie: da un sito le chiede solo la scheda in primo piano, che inquadra sé stessa;
+// una di sfondo avrebbe la pagina che l'utente sta guardando.
+const DOMANDE_WEB_IN_VISTA = Object.freeze(new Set(['capture_visible_tab', 'capture_feedback_topbar']));
+
+function domandaAmmessaDaUnSito(type, { inVista = false } = {}) {
+  if (typeof type !== 'string' || !DOMANDE_WEB.has(type)) return false;
+  return !DOMANDE_WEB_IN_VISTA.has(type) || inVista === true;
+}
 
 // Ciò che i content script leggono davvero, campo per campo anche dentro le sezioni
 // (`true` solo per valori tutti dell'utente): un segreto aggiunto domani resta a casa.
