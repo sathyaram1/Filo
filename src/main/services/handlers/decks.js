@@ -4,9 +4,10 @@
 // funzioni di modello e manda qui il mazzo intero da persistere (DECKS_UPDATE).
 
 module.exports = function register(on, ctx) {
-  const { MSG, handleAIRequest } = ctx;
+  const { MSG, handleAIRequest, broadcastToFiloPages } = ctx;
   const Store = globalThis.SN_DECK_STORE;
   const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
+  const Chats = globalThis.SN_DECK_CHATS_SVC;
   const Scry = globalThis.SN_SCRYFALL;
 
   on(MSG.DECKS_LIST, async () => {
@@ -37,7 +38,6 @@ module.exports = function register(on, ctx) {
     if (removed) {
       await Opinions.dropDeck(id).catch(() => {});
       await Chats.dropDeck(id).catch(() => {});
-      broadcastToFiloPages({ type: MSG.DECKS_CHAT_CHANGED, deckId: id, clientId: '' });
     }
     return { ok: removed, ...(removed ? {} : { error: 'not_found' }) };
   });

@@ -118,11 +118,16 @@
   // statici non scadono → Infinity). Chi vuole PREZZI freschi passa
   // maxAgeMs = PRICE_TTL_MS. Le mancanti/stantie si scaricano una a una
   // (la coda rate-limited le serializza). Ritorna una mappa id → card
-  // (id introvabili semplicemente assenti).
-  async function cards(ids, { maxAgeMs = Infinity } = {}) {
+  // (id introvabili semplicemente assenti). `cacheOnly`: niente rete, quello che c'è anche se vecchio (la chat
+  // riaperta si disegna subito; le mancanti le chiede dopo).
+  async function cards(ids, { maxAgeMs = Infinity, cacheOnly = false } = {}) {
     const wanted = [...new Set((ids || []).map(String).filter(Boolean))];
     const map = await readCardCache();
     const out = {};
+    if (cacheOnly) {
+      for (const id of wanted) if (map[id] && map[id].card) out[id] = map[id].card;
+      return out;
+    }
     const missing = [];
     for (const id of wanted) {
       const e = map[id];

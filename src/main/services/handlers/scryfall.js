@@ -42,7 +42,7 @@ module.exports = function register(on, ctx) {
   on(MSG.SCRYFALL_CARDS, async (msg) => {
     try {
       const maxAgeMs = msg?.freshPrices ? Scry.PRICE_TTL_MS : Infinity;
-      const cards = await Scry.cards(msg?.ids || [], { maxAgeMs });
+      const cards = await Scry.cards(msg?.ids || [], { maxAgeMs, cacheOnly: !!msg?.cacheOnly });
       return { ok: true, cards };
     } catch (e) {
       return { ok: false, error: e?.message || 'fetch carte fallito' };

@@ -797,14 +797,116 @@
   // avere testo (con [[Nome Carta]] resi span hoverable, §3.5) e/o una CardList
   // renderizzata dagli ID salvati come DATI (mai markdown). L'ultima bolla
   // mostra la lista con scroll interno; le precedenti collassano a una riga di
-  // sintesi riespandibile (§3.3). Stato per-mazzo, vive per la sessione.
+  // sintesi riespandibile (§3.3). Stato per-mazzo e SALVATO (#787): cosa di una
+  // bolla si conserva lo decide SN_DECK_CHAT, lo scrive il main (DECKS_CHAT_SAVE).
 
-  const chatByDeck = new Map(); // deckId → [{ who, text, reply, cardIds, query, error, pending, expanded }]
-  let chatBusy = false;
+  const Chat = window.SN_DECK_CHAT;
+  const chatByDeck = new Map(); // deckId → [{ who, text, reply, cardIds, query, error, pending, interrupted, expanded, … }]
+  const chatLoading = new Map(); // deckId → lettura in corso
+  // Per conversazione, non globale: svuotata la chat mentre Filo risponde, la nuova è subito libera.
+  const busyChats = new WeakSet();
+  const chatSaveTimers = new Map();
+  // Chi ha salvato: la scheda che scrive non si rilegge al proprio avviso (DECKS_CHAT_CHANGED).
+  const chatClientId = `dk${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
   function chatMsgs() {
     if (!chatByDeck.has(current.id)) chatByDeck.set(current.id, []);
     return chatByDeck.get(current.id);
+  }
+
+  function ensureChatLoaded(deckId) {
+    if (chatByDeck.has(deckId)) return Promise.resolve(chatByDeck.get(deckId));
+    if (chatLoading.has(deckId)) return chatLoading.get(deckId);
+    const p = send({ type: MSG.DECKS_CHAT_GET, deckId }).catch(() => null).then((r) => {
+      chatLoading.delete(deckId);
+      if (!chatByDeck.has(deckId)) {
+        const msgs = (r && r.ok && Array.isArray(r.messages)) ? r.messages : [];
+        rememberProseNames(msgs);
+        chatByDeck.set(deckId, msgs);
+      }
+      return chatByDeck.get(deckId);
+    });
+    chatLoading.set(deckId, p);
+    return p;
+  }
+
+  // Oltre il tetto il main rifiuterebbe comunque: non si spedisce, e renderChat lo dice sotto l'ultima bolla.
+  function saveChat(deckId) {
+    clearTimeout(chatSaveTimers.get(deckId));
+    chatSaveTimers.delete(deckId);
+    const msgs = chatByDeck.get(deckId);
+    if (!msgs || !Chat.fits(msgs)) return;
+    send({ type: MSG.DECKS_CHAT_SAVE, deckId, messages: msgs, clientId: chatClientId }).catch(() => {});
+  }
+
+  function saveChatSoon(deckId) {
+    clearTimeout(chatSaveTimers.get(deckId));
+    chatSaveTimers.set(deckId, setTimeout(() => saveChat(deckId), 400));
+  }
+
+  // Le carte della chat riaperta: prima dalla cache (subito), poi dalla rete le poche che mancano, senza far
+  // aspettare la pagina. Una carta già chiesta alla rete non si richiede a ogni ridisegno.
+  const chatCardsAsked = new Set();
+  async function loadChatCards() {
+    if (!current) return;
+    const missing = Chat.cardIdsOf(chatByDeck.get(current.id)).filter((id) => !cardsById[id]);
+    if (!missing.length) return;
+    const r = await send({ type: MSG.SCRYFALL_CARDS, ids: missing, cacheOnly: true }).catch(() => null);
+    Object.assign(cardsById, (r && r.ok && r.cards) || {});
+    const still = missing.filter((id) => !cardsById[id] && !chatCardsAsked.has(id));
+    if (!still.length) return;
+    for (const id of still) chatCardsAsked.add(id);
+    send({ type: MSG.SCRYFALL_CARDS, ids: still }).then((r2) => {
+      if (!(r2 && r2.ok && r2.cards && Object.keys(r2.cards).length)) return;
+      Object.assign(cardsById, r2.cards);
+      if (current && !$('screenBuilder').hidden) renderChat();
+    }).catch(() => {});
+  }
+
+  // Un'altra scheda ha salvato la chat di un mazzo che qui è in memoria: si rilegge, se qui non c'è una risposta
+  // in volo (in quel caso vince chi finisce per ultimo).
+  function onChatChangedElsewhere(msg) {
+    if (!msg || msg.type !== MSG.DECKS_CHAT_CHANGED || msg.clientId === chatClientId) return;
+    const deckId = String(msg.deckId || '');
+    const msgs = chatByDeck.get(deckId);
+    if (!msgs || busyChats.has(msgs)) return;
+    send({ type: MSG.DECKS_CHAT_GET, deckId }).then(async (r) => {
+      if (!(r && r.ok && Array.isArray(r.messages))) return;
+      if (chatByDeck.get(deckId) !== msgs || busyChats.has(msgs)) return;
+      rememberProseNames(r.messages);
+      chatByDeck.set(deckId, r.messages);
+      if (!current || current.id !== deckId || $('screenBuilder').hidden) return;
+      await loadChatCards();
+      renderChat();
+    }).catch(() => {});
+  }
+
+  async function clearChat() {
+    const deck = current;
+    if (!deck || !(chatByDeck.get(deck.id) || []).length) return;
+    const ok = await window.SN_CONFIRM_UI.confirm({
+      title: 'Svuotare la chat?',
+      text: `La conversazione con Filo su "${deck.nome}" verrà cancellata. Il mazzo resta com'è.`,
+      okLabel: 'Svuota',
+    });
+    if (!ok) return;
+    clearTimeout(chatSaveTimers.get(deck.id));
+    chatSaveTimers.delete(deck.id);
+    chatByDeck.set(deck.id, []);
+    if (current && current.id === deck.id) renderChat(true);
+    await send({ type: MSG.DECKS_CHAT_CLEAR, deckId: deck.id, clientId: chatClientId }).catch(() => {});
+  }
+
+  // «Riprova» sull'ultima bolla fallita o interrotta: lo stesso turno rifatto, non una domanda in più.
+  function retryLastTurn() {
+    const msgs = chatMsgs();
+    if (busyChats.has(msgs)) return;
+    const bot = msgs[msgs.length - 1];
+    const user = msgs[msgs.length - 2];
+    if (!bot || bot.who !== 'bot' || !(bot.error || bot.interrupted)) return;
+    if (!user || user.who !== 'user' || !user.text) return;
+    msgs.splice(msgs.length - 2, 2);
+    sendChat(user.text);
   }
 
   function inDeck(cardId) {
