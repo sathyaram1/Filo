@@ -521,6 +521,7 @@ test('una casella di ricerca non protegge la scheda, anche coi risultati dal viv
   for (const [titolo, campo] of [
     ['Musica', '<input id="q" type="search" placeholder="Cosa vuoi ascoltare?">'],
     ['Negozio', '<div role="search"><input id="q" type="text" aria-label="Cerca"></div>'],
+    ['Motore', '<form role="search" onsubmit="event.preventDefault()"><textarea id="q" name="q"></textarea></form>'],
   ]) {
     const page = await apriEsatta(app, shell, conRisultati(titolo, campo));
     await page.locator('#q').click();
@@ -529,9 +530,11 @@ test('una casella di ricerca non protegge la scheda, anche coi risultati dal viv
   }
   await expect.poll(() => moduloDi(shell, 'Musica'), { timeout: 2_000 }).toBe(false);
   expect(await moduloDi(shell, 'Negozio')).toBe(false);
+  expect(await moduloDi(shell, 'Motore')).toBe(false);
 
   await pulisciTutto(app, shell, testServer);
   const aperte = await titoliAperti(shell);
   expect(aperte).not.toContain('Musica');
   expect(aperte).not.toContain('Negozio');
+  expect(aperte).not.toContain('Motore');
 });
