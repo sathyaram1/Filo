@@ -239,7 +239,7 @@ test('la foto della barra un sito la riceve solo mentre l\'utente ci ha disegnat
 });
 
 // Giro 2 di verifica: le domande che il codice di Filo fa solo dopo un gesto dell'utente vogliono il gesto.
-test('senza un gesto dell\'utente un sito non legge gli appunti; dopo un clic una volta sola', async ({ app, openTab, testServer }) => {
+test('senza un gesto dell\'utente un sito non legge gli appunti; subito dopo un clic sì', async ({ app, openTab, testServer }) => {
   const pagina = await testServer.openReady(openTab, '<h1 style="height:60vh">in vista</h1>');
   const sito = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
   await app.evaluate(({ clipboard, BrowserWindow }) => {
@@ -258,10 +258,15 @@ test('senza un gesto dell\'utente un sito non legge gli appunti; dopo un clic un
   expect(senza.risposta, 'senza un gesto il sito si è dato il lasciapassare di Incolla').toMatchObject({ ok: false, code: 'forbidden' });
   expect(await leggi(), 'il sito ha letto gli appunti senza un gesto dell\'utente').not.toBe('PASSWORD-5891');
 
-  // Il clic vero dell'utente sulla pagina è quello che Incolla e Detta hanno sempre: la domanda passa, una volta.
+  // Il clic vero dell'utente sulla pagina è quello che Incolla e Detta hanno sempre: la domanda passa, finché è recente.
   await pagina.click('h1');
   expect((await sito(chiedi('permesso_filo', { tipo: 'appunti' }))).risposta?.ok).toBe(true);
-  expect((await sito(chiedi('permesso_filo', { tipo: 'appunti' }))).risposta?.code).toBe('forbidden');
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const wc = w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents;
+    wc._filoGestoAlle = Date.now() - 60000;
+  });
+  expect((await sito(chiedi('permesso_filo', { tipo: 'appunti' }))).risposta?.code, 'un gesto di un minuto fa vale ancora').toBe('forbidden');
 });
 
 test('un sito non legge né spinge fuori le pagine salvate, e non cancella dizionario e menu', async ({ app, shell, openTab, testServer }) => {
@@ -303,4 +308,20 @@ test('un sito non legge né spinge fuori le pagine salvate, e non cancella dizio
   expect(resta.salvate).toContain(SALVATA);
   expect(resta.magazzino?.sn_icon_layout?.mio).toBe(true);
   expect(resta.magazzino?.sn_personal_dict).toEqual(['Sathya']);
+});
+
+// Un clic dentro un riquadro di un altro sito non arriva al main come gesto: vale il tasto destro che apre il menu.
+test('Salva per dopo dal menu aperto in un riquadro di un altro sito salva ancora', async ({ shell, openTab, testServer }) => {
+  const dentro = testServer.html('<body style="margin:0;background:#cfc"><p id="d" style="height:220px">commenti</p></body>');
+  const pagina = await testServer.openReady(openTab,
+    `<title>Articolo col riquadro</title><h1>articolo</h1><iframe id="f" src="${dentro}" style="width:600px;height:260px;border:0"></iframe>`,
+    { pubblico: true });
+  const url = pagina.url();
+  const riquadro = pagina.frameLocator('#f');
+  await riquadro.locator('#d').click({ button: 'right', position: { x: 200, y: 100 } });
+  const voce = riquadro.locator('.sn-menu [data-sn-icon-id="saveForLater"]');
+  await expect(voce).toBeVisible({ timeout: 8000 });
+  await voce.click();
+  await expect.poll(async () => shell.evaluate(async (u) => (await window.filoShell.message({ type: 'get_saved_pages' })).pages
+    .some((p) => p.url === u), url), { timeout: 8000 }).toBe(true);
 });

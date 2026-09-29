@@ -135,6 +135,22 @@ il premio del feedback dice la cifra, non il saldo; la foto della barra in alto,
 che mostra i titoli delle altre schede, un sito la riceve solo mentre l'utente
 ci ha disegnato sopra per un feedback.
 
+Una domanda che il codice di Filo fa solo **dopo un gesto dell'utente** vuole il
+gesto anche nel main (#589.1, giro 2). Incolla e Detta si danno il permesso
+breve di appunti e microfono, Salva per dopo scrive nella lista, il dizionario,
+le correzioni e la disposizione del menu si scrivono dopo un clic: da un sito
+senza gesto il permesso leggeva la password copiata, mille salvataggi da una
+scheda di sfondo spingevano fuori tutte le pagine salvate, e una richiesta
+cancellava dizionario e menu. Il gesto è quello vero, visto dal main
+(`seguiGesti` in `permessiPagine.js`): un clic o un tasto nella pagina, il
+tasto destro o un tasto anche dentro un riquadro di un altro sito, dove il clic
+sinistro non arriva. Per questo il margine è largo, venti secondi: copre la
+scelta dal menu aperto col tasto destro in un riquadro. I salvataggi sono **uno
+per gesto**: la lista tiene le ultime mille. E la risposta a un sito dice dove
+è finita la pagina, non il titolo o la miniatura della voce che c'era già. Una
+domanda nuova di questo genere entra in `DOMANDE_WEB_COL_GESTO`, uno scomparto
+in `CHIAVI_STORAGE_WEB_COL_GESTO`.
+
 Ogni spinta che gira su più schede o finestre passa da `spingiAllaScheda` /
 `spingiAllaFinestra` di quel file, o si limita da sé alle superfici di Filo: una
 strada parallela (l'avviso dei dati dal vivo, quello degli scaricamenti, lo
