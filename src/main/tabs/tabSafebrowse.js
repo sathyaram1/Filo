@@ -139,6 +139,10 @@ const safebrowseMethods = {
     tab._sbFrameTimer = setTimeout(() => this._sbScanFrames(tab, giro), 1500);
   },
 
+  _sbCampiContano(SB, url) {
+    try { return SB.checkSync(url, { hasPassword: true }).level !== SB.checkSync(url, {}).level; } catch (_) { return false; }
+  },
+
   // L'utente ha scritto "confermo" sull'interstitial "pericoloso": registra il
   // bypass per (tab, dominio) e ridisegna (l'overlay sparisce).
   safebrowseProceed(tabId, url) {
