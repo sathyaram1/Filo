@@ -1495,7 +1495,20 @@ class TabManager {
       t.view.setVisible?.(t.id === id);
     }
     this.layout();
+    this._tastieraAllaSchedaAttiva();
     this._broadcast();
+  }
+
+  // La scheda davanti prende la tastiera se questa era su una scheda che non si
+  // vede più, o su niente perché la view chiusa se l'è portata via: senza, dopo
+  // Ctrl+W, Alt+cifra o Alt+S i tasti non arrivano a nessuno finché non si
+  // clicca (#838). La barra che ha la tastiera la tiene; Filo dietro non la ruba.
+  _tastieraAllaSchedaAttiva() {
+    const tab = this.tabs.find((t) => t.id === this.activeId);
+    if (!tab || this.win.isDestroyed() || !this.win.isFocused()) return;
+    const col = require('electron').webContents.getFocusedWebContents();
+    if (col === this.win.webContents || col === tab.view.webContents) return;
+    try { tab.view.webContents.focus(); } catch (_) {}
   }
 
   // §2.1 — segnali di attività riportati dal content script (input, scroll,
