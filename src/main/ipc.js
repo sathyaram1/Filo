@@ -408,7 +408,8 @@ function registerIpcHandlers() {
   ipcMain.handle('tabs:open-blocked-popup', (event, { url, apriComunque } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs || !url) return { ok: false };
-    win._filoTabs.openBlockedPopup(url, { apriComunque: apriComunque === true });
+    // Scavalcare la lista lo chiede solo la shell, dove sta la notifica «Sito bloccato» (#590).
+    win._filoTabs.openBlockedPopup(url, { apriComunque: apriComunque === true && event.sender === win.webContents });
     return { ok: true };
   });
   // Proxy per-tab ("Apri da un altro paese"): instrada/de-instrada una singola
