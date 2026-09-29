@@ -399,3 +399,58 @@ test('parola comune vicina a un marchio: avviso richiudibile, non il blocco a pa
   await expect(continua).toHaveCount(0, { timeout: 6_000 });
   await expect(page.getByRole('heading', { name: 'Team' })).toBeVisible();
 });
+
+// #728 — un sosia di un marchio corto blocca solo se chiede la password: il campo va visto anche quando arriva dopo
+// il caricamento o sta in un riquadro. Niente rete: conta solo il nome, come con un dominio vecchio.
+async function serviSenzaRete(app, pagine) {
+  await servi(app, pagine);
+  await app.evaluate(() => globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null }));
+}
+
+test('sosia di un marchio corto: il modulo d\'accesso montato dopo l\'apertura porta al blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com': '<h1>PayPal</h1><div id="app">Caricamento…</div><script>'
+      + `setTimeout(() => { document.getElementById('app').innerHTML = ${JSON.stringify(ACCESSO)}; }, 2500);</script>`,
+  });
+  const page = await openTab('https://paypak.com/');
+  await expect(page.getByRole('button', { name: 'Continua' })).toBeVisible({ timeout: 12_000 });
+  await expect(page.getByPlaceholder('confermo')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/ti sta chiedendo la password/)).toBeVisible();
+});
+
+test('sosia di un marchio corto: la password chiesta dopo l\'email, senza ricaricare, porta al blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com': '<h1>PayPal</h1><div id="f"><input name="email" placeholder="Email">'
+      + '<button id="avanti" onclick="document.getElementById(\'f\').innerHTML = '
+      + '\'<input type=password placeholder=Password><button>Accedi</button>\'">Avanti</button></div>',
+  });
+  const page = await openTab('https://paypak.com/');
+  const continua = page.getByRole('button', { name: 'Continua' });
+  await expect(continua).toBeVisible({ timeout: 12_000 });
+  await continua.click();
+  await page.getByPlaceholder('Email').fill('mario@example.com');
+  await page.waitForTimeout(3000);
+  await page.click('#avanti');
+  await expect(page.getByPlaceholder('confermo')).toBeVisible({ timeout: 10_000 });
+});
+
+test('sosia di un marchio corto col modulo d\'accesso in un riquadro della pagina: blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com/accesso': `<!doctype html><body>${ACCESSO}</body>`,
+    'paypak.com': '<h1>PayPal</h1><iframe src="/accesso" width="400" height="200"></iframe>',
+  });
+  const page = await openTab('https://paypak.com/');
+  await expect(page.frameLocator('iframe').getByPlaceholder('Email')).toBeVisible({ timeout: 12_000 });
+  await expect(page.getByPlaceholder('confermo')).toBeVisible({ timeout: 10_000 });
+});
+
+test('il blocco già a schermo non si ridisegna quando un\'altra analisi lo rimanda: il «confermo» a metà resta (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, { 'paypak.com': `<h1>PayPal</h1>${ACCESSO}` });
+  const page = await openTab('https://paypak.com/');
+  const campo = page.getByPlaceholder('confermo');
+  await expect(campo).toBeVisible({ timeout: 12_000 });
+  await campo.fill('conf');
+  // Il giro sui campi della pagina parte dopo il caricamento e rimanda lo stesso verdetto.
+  await page.waitForTimeout(3000);
+  await expect(campo).toHaveValue('conf');
+});

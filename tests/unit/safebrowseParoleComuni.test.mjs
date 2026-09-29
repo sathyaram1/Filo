@@ -79,3 +79,36 @@ test('i marchi veri e i domini senza somiglianza restano puliti', () => {
     'https://wikipedia.org/', 'https://enciclopedia.it/',
   ]) assert.equal(evaluate(url, {}, VECCHIO).level, 'safe', url);
 });
+
+// Sui marchi lunghi il nome può distare due lettere, e a due lettere stanno le parole comuni.
+const DUE_LETTERE = [
+  ['https://www.telegraph.co.uk/', 'Telegram'],
+  ['https://telegramma.it/', 'Telegram'],
+  ['https://www.telegrafo.it/', 'Telegram'],
+  ['https://linked.com/', 'LinkedIn'],
+  ['https://codebase.com/', 'Coinbase'],
+  ['https://whatsup.com/', 'WhatsApp'],
+  ['https://macbook.com/', 'Facebook'],
+];
+
+test('una parola comune a due lettere da un marchio lungo avvisa, non blocca', () => {
+  for (const [url, marchio] of DUE_LETTERE) {
+    const v = evaluate(url, {}, VECCHIO);
+    assert.equal(v.level, 'sospetto', url);
+    assert.ok(v.message.body.includes(marchio), url);
+    assert.doesNotMatch(v.message.title, /^Attenzione: questo non è/, url);
+  }
+});
+
+test('a due lettere da un marchio lungo il blocco torna col secondo segnale', () => {
+  for (const [url] of DUE_LETTERE) {
+    for (const [ctx, asyncData] of [[{}, GIOVANE], [{}, CERT_ROTTO], [{ hasPassword: true }, VECCHIO]]) {
+      assert.equal(evaluate(url, ctx, asyncData).level, 'pericoloso', url + ' ' + JSON.stringify(asyncData));
+    }
+  }
+});
+
+test('«rn» per «m» e «vv» per «w» contano una lettera sola: il sosia di un marchio lungo resta bloccato', () => {
+  for (const url of ['https://rnicrosoft.com/', 'https://rnetamask.com/', 'https://vvhatsapp.com/', 'https://instagrarn.com/'])
+    assert.equal(evaluate(url, {}, VECCHIO).level, 'pericoloso', url);
+});
