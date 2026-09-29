@@ -71,7 +71,7 @@
         visti.add(id);
         voci.push(id === t.id ? t : { ...t, id });
       }
-      d.aggiungiMolti(voci, { inCoda: true });
+      entrate(d.aggiungiMolti(voci, { inCoda: true }));
     }
     await chrome.storage.local.remove(CHIAVE_VECCHIA);
   }
