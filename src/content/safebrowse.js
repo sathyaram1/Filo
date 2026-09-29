@@ -242,8 +242,13 @@
     try { proceed.focus(); } catch (_) {}
   }
 
+  let currentKey = '';
   function render(level, message, url) {
     const u = url || location.href;
+    // Lo stesso avviso rimandato da un'altra analisi non si ridisegna: cancellerebbe il «confermo» scritto a metà.
+    const key = level + '\n' + (message ? `${message.title}\n${message.body}` : '');
+    if (level !== 'safe' && level === currentLevel && key === currentKey && host && document.documentElement.contains(host)) return;
+    currentKey = key;
     if (level === 'pericoloso') { currentLevel = level; renderDanger(u, message); }
     else if (level === 'sospetto') { currentLevel = level; renderSuspect(u, message); }
     else clear();
