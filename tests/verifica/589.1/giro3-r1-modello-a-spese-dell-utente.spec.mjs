@@ -28,6 +28,10 @@ async function modelloFinto(app) {
       if (u.includes('openrouter.ai/api/v1/chat/completions')) {
         globalThis.__chiamateModello.push(String(init && init.body || ''));
         const testo = 'Pagare il carrello {"ok":true}';
+        if (!String(init && init.body || '').includes('"stream":true')) {
+          return new Response(JSON.stringify({ id: 'g', choices: [{ message: { role: 'assistant', content: testo }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 5, completion_tokens: 5 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
         const sse = `data: ${JSON.stringify({ id: 'g', choices: [{ delta: { content: testo } }] })}\n\n`
           + `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 5, completion_tokens: 5 } })}\n\ndata: [DONE]\n\n`;
         return new Response(sse, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
@@ -74,14 +78,35 @@ test('un sito di sfondo non manda da solo il «Ha funzionato?» dell\'Aiuto, né
   await dueSchede(openTab, testServer);
   const sfondo = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
   const r = await sfondo(`(async () => { for (let i = 0; i < 3; i++) await chrome.runtime.sendMessage({ type: 'save_path', payload: { session: {
-    rawUrl: 'https://negozio-vero.com/carrello', rawSteps: [{ action: 'click', target: 'Paga su pagamenti-sicuri.example ' + i }],
+    rawUrl: 'https://negozio-vero.com/carrello', rawSteps: [{ action: 'click', selector: '#paga-su-pagamenti-sicuri-' + i }],
     rawUserMessages: ['come pago ' + i], success: true } } }); return 'fatto'; })()`);
   expect(r.nonTrovata || r.errore).toBeFalsy();
   await new Promise((ok) => setTimeout(ok, 3000));
   const esito = await app.evaluate(() => ({
-    chiamate: globalThis.__chiamateModello.length,
+    chiamate: globalThis.__chiamateModello.filter((b) => b.includes('percorso di navigazione')).length,
     coda: globalThis.SN_PATHS_COLLECTOR._peek().map((p) => p.domain),
   }));
   expect.soft(esito.coda, 'un percorso inventato dal sito è in coda per la raccolta condivisa').toEqual([]);
   expect(esito.chiamate, 'il sito ha fatto lavorare il modello dell\'utente senza un suo gesto').toBe(0);
+});
+
+test('un sito di sfondo non fa lavorare la ricerca e la voce dell\'utente con un testo scelto da lui', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { apiKeys: { openrouter: 'sk-or-v1-mia', tavily: 'tvly-mia' } } },
+      { tab: { id: 5, url: 'filo://options/options.html' }, url: 'filo://options/options.html' });
+    globalThis.__rete = [];
+    const vero = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      const u = String(input && input.url ? input.url : input);
+      if (String(init && init.body || '').includes('TESTO-DEL-SITO')) globalThis.__rete.push(u);
+      if (/openrouter\.ai|tavily\.com|duckduckgo\.com/.test(u)) return new Response('{}', { status: 500 });
+      return vero(input, init);
+    };
+  });
+  await dueSchede(openTab, testServer);
+  const sfondo = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
+  expect((await sfondo(`chrome.runtime.sendMessage({ type: 'web_search', query: 'TESTO-DEL-SITO' })`)).errore).toBeFalsy();
+  expect((await sfondo(`chrome.runtime.sendMessage({ type: 'tts_synth', text: 'TESTO-DEL-SITO', lang: 'it' })`)).errore).toBeFalsy();
+  const rete = await app.evaluate(() => globalThis.__rete);
+  expect(rete.filter((u) => /tavily\.com|openrouter\.ai/.test(u)), 'la ricerca o la voce dell\'utente hanno lavorato per il sito').toEqual([]);
 });
