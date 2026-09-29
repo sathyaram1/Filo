@@ -614,16 +614,23 @@ module.exports = function register(on, ctx) {
     // ma marca la versione corrente come "vista" così il prossimo update parte
     // pulito. Niente note ritornate → niente popup.
     if (!lastSeen) {
-      try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, current); } catch (_) {}
+      await markUpdateSeen(current);
       return { ok: true, current, lastSeen: null, notes: [] };
     }
-    const notes = PN.since(lastSeen, current);
+    const foto = await globalThis.SN_STORAGE.getRaw(KEYS.LAST_SEEN_NOTES, null);
+    const notes = PN.recap(lastSeen, current, foto);
     return { ok: true, current, lastSeen, notes };
   });
 
-  on(MSG.MARK_UPDATE_SEEN, async () => {
+  // Versione e fotografia si scrivono insieme: recap() usa la fotografia solo se è della versione vista.
+  async function markUpdateSeen(version) {
     const KEYS = globalThis.SN_CONST.STORAGE_KEYS;
-    try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, appVersion()); } catch (_) {}
+    try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_NOTES, globalThis.SN_PATCH_NOTES.fotografia(version)); } catch (_) {}
+    try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, version); } catch (_) {}
+  }
+
+  on(MSG.MARK_UPDATE_SEEN, async () => {
+    await markUpdateSeen(appVersion());
     return { ok: true };
   });
 

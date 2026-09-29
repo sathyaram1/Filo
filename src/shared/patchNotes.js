@@ -1,22 +1,15 @@
-// SINGOLA SORGENTE del recap aggiornamento (popup all'avvio) e del calcolo
-// "quante patch sei indietro". Vedi CLAUDE.md → "Patch notes".
-//
-// Ogni volta che chiudi un fix o aggiungi una feature VISIBILE all'utente,
-// aggiungi una riga al blocco della versione corrente (features/fixes), in
-// italiano e NON tecnica. Le voci interne (refactor/test/infra) NON vanno qui.
-//
-// Formato (lista ordinata dalla versione PIÙ RECENTE alla più vecchia):
-//   { version: '0.2.50', date: '2026-06-18',
-//     features: ['Testo per l’utente…'],
-//     fixes: ['Testo per l’utente…'] }
+// Novità mostrate a chi aggiorna Filo (recap all'avvio): solo ciò che un utente qualunque vede, in italiano semplice.
+// Una riga non va mai sotto una versione già uscita: chi la leggerebbe ha già quella versione.
+// Regole e guardia: tests/unit/patchNotes.test.mjs.
 
 (function (global) {
   'use strict';
 
   const NOTES = [
-    // ↓ Nuove versioni in cima.
+    // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
+    // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
-      version: '0.2.228', date: '2026-09-11',
+      version: '0.2.229', date: '2026-09-11',
       features: [
         'Filo rifiuta i banner dei cookie anche quando il sito li mette in un riquadro dentro la pagina, e ne riconosce molti di più. Quelli che offrono solo «Accetta», o «accetta o abbonati», li nasconde senza accettare niente, e la pagina torna a scorrere. Col tasto destro sulla scheda, o in Sicurezza, vedi cosa ha fatto su ogni sito e rimetti il banner se ti serve.',
         'Un programma scaricato da un sito (.exe, .msi, .bat, .dmg, .iso, .pkg, .sh, .jar\u2026) non arriva pi\u00f9 nei Download in silenzio. Filo si ferma, ti dice che \u00e8 un programma e da quale sito arriva, e lo scarica solo se rispondi di s\u00ec. Nell\u2019elenco degli scaricamenti i programmi si riconoscono a colpo d\u2019occhio, e aprirne uno chiede una seconda conferma, perch\u00e9 aprirlo vuol dire eseguirlo. Gli altri file scendono come sempre. Se preferisci, in Sicurezza spegni la domanda o elenchi i siti di cui ti fidi.',
@@ -88,6 +81,7 @@
         'Quando segnali dalla bacheca che un fix è ancora rotto e l\'invio non riesce, puoi riprovare subito: quello che hai scritto resta nel riquadro. Prima Filo rispondeva che l\'avevi già segnalato, e la tua spiegazione non arrivava a nessuno.',
         'Se chiedi a Filo conto di una scelta che non ha ancora messo per iscritto, come i soldi con cui sta in piedi, ti dice che quel documento non c\'è ancora invece di cercarlo a vuoto. Quello sui modelli lo legge per intero, fonti comprese. Nella pagina Trasparenza le sezioni non ancora scritte si leggono bene e si aprono, col link a quello che c\'è. Prima cliccarle non faceva niente. Nell\'elenco delle fonti virgolette e apostrofi si vedono di nuovo come tali, non come codici.',
         'Se chiedi a Filo di aprire un sito da un altro paese, ti dice che per ora non si può, invece di salvare una regola che non avrebbe fatto niente. E finché la funzione non c\'è, Filo non spende i tuoi crediti per capire se una pagina è bloccata nel tuo paese.',
+        'Dopo un aggiornamento il riepilogo mostra le novità che la nuova versione porta. Prima, a chi aggiornava appena usciva una versione, spesso non compariva proprio.',
       ],
     },
     {
@@ -1091,5 +1085,38 @@
     return NOTES.length ? NOTES[0].version : '0.0.0';
   }
 
-  global.SN_PATCH_NOTES = { NOTES, cmpVersion, since, countBehind, latestVersion };
+  // FNV-1a: riconosce una riga già mostrata senza doverne salvare il testo.
+  function impronta(riga) {
+    const s = String(riga);
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+    return h.toString(16).padStart(8, '0');
+  }
+
+  // Tutte le righe che la versione `versione` conteneva, come impronte: si salva quando l'utente chiude il recap.
+  // Una riga può finire sotto una versione già uscita senza di lei (fusa dopo il commit da cui è nata la build, o da un
+  // ramo rimasto indietro di qualche uscita): il numero del blocco non lo dice, solo questa fotografia sì.
+  function fotografia(versione) {
+    return {
+      versione: String(versione),
+      righe: NOTES.filter((n) => cmpVersion(n.version, versione) <= 0)
+        .flatMap((n) => [...(n.features || []), ...(n.fixes || [])]).map(impronta),
+    };
+  }
+
+  // Con la fotografia di `lastSeen`: ogni riga fino a `current` che quella versione non aveva, in qualunque blocco stia.
+  // Senza (salvata da una versione di prima): since().
+  function recap(lastSeen, current, foto) {
+    if (!lastSeen || !foto || foto.versione !== String(lastSeen) || !Array.isArray(foto.righe)) return since(lastSeen, current);
+    if (cmpVersion(current, lastSeen) <= 0) return [];
+    const viste = new Set(foto.righe);
+    const nuove = (righe) => (righe || []).filter((r) => !viste.has(impronta(r)));
+    return NOTES
+      .filter((n) => cmpVersion(n.version, current) <= 0)
+      .sort((x, y) => cmpVersion(y.version, x.version))
+      .map((n) => ({ version: n.version, date: n.date, features: nuove(n.features), fixes: nuove(n.fixes) }))
+      .filter((n) => n.features.length || n.fixes.length);
+  }
+
+  global.SN_PATCH_NOTES = { NOTES, cmpVersion, since, countBehind, latestVersion, impronta, fotografia, recap };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
