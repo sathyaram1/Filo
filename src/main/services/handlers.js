@@ -119,33 +119,6 @@ async function noteProvenienzaImmagini(dataUrls, marchi) {
   return blocchi.join('\n\n');
 }
 
-// #711 — lo stesso esito, per le immagini che l'utente ha davanti quando chiede
-// all'Aiuto della pagina. Il payload può scriverlo chiunque parli al canale: dei
-// numeri si tengono solo i numeri, e le frasi viaggiano imbustate.
-function notaOrigineAiuto(o) {
-  const E = globalThis.SN_ESTERNO;
-  if (!E || !o || typeof o !== 'object') return '';
-  const intero = (v) => Math.max(0, Math.min(10000, Math.floor(Number(v) || 0)));
-  const visibili = intero(o.visibili);
-  const controllate = Math.min(intero(o.controllate), visibili);
-  if (!visibili) return '';
-  const quali = controllate === visibili
-    ? `delle ${visibili} immagini visibili nella pagina`
-    : `di ${controllate} delle ${visibili} immagini visibili nella pagina, le più grandi`;
-  const esiti = (Array.isArray(o.esiti) ? o.esiti : []).slice(0, 50)
-    .filter((e) => e && typeof e.frase === 'string' && e.frase.trim());
-  const nonProva = 'l’assenza di etichette NON prova che un’immagine sia autentica: uno screenshot, una ricompressione o il caricamento su un social le cancellano, e molti generatori non le scrivono affatto';
-  if (!esiti.length) {
-    return `(Sistema: ${E.perCanaleSistema(`ho letto in locale le etichette di origine ${quali}: nessuna ne porta. ${nonProva}. Se l’utente chiede se un’immagine è fatta con l’AI, dillo così, senza giudicare l’origine dai pixel`)}.)`;
-  }
-  const righe = esiti.map((e) => {
-    const alt = e.alt ? `, testo alternativo «${e.alt}»` : '';
-    return `immagine ${intero(e.n)} (${intero(e.larghezza)}×${intero(e.altezza)} px${alt}): ${e.frase}`;
-  });
-  const testa = `(Sistema: ${E.perCanaleSistema(`ho letto in locale le etichette di origine ${quali}; quelle che ne portano sono nel blocco qui sotto, numerate dalla più grande, e le altre non ne hanno. Filo legge solo ciò che i file dichiarano e non giudica mai i pixel: riporta quegli esiti senza aggiungerci un verdetto tuo, e per le altre ricorda che ${nonProva}`)}.)`;
-  return `${testa}\n${E.imbusta({ tipo: 'ETICHETTA_FILE', testo: righe.join('\n'), conIntestazione: true })}`;
-}
-
 function testoDelTurnoAutomatico(payload) {
   return PROMPTS.turnoAutomaticoAiuto({
     nota: payload.userAction || '',
@@ -191,7 +164,7 @@ async function buildMessages(action, payload) {
     const parts = [];
     const userText = payload.userMessage || testoDelTurnoAutomatico(payload);
     if (userText) parts.push({ type: 'text', text: userText });
-    const origine = notaOrigineAiuto(payload.origineImmagini);
+    const origine = PROMPTS.origineImmaginiAiuto(payload.origineImmagini);
     if (origine) parts.push({ type: 'text', text: origine });
     if (payload.screenshot) parts.push({ type: 'image_url', image_url: { url: payload.screenshot } });
     const userMsg = parts.length === 1 && parts[0].type === 'text'

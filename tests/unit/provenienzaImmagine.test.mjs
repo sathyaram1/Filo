@@ -5,6 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   pngFirmato, pngSpoglio, pngConTesto, pngConXmp, certificato, elencoPem,
 } from '../helpers/immagineFirmata.mjs';
@@ -249,4 +251,47 @@ test('nessuna frase di Filo dichiara un’immagine autentica o priva di AI', () 
     const nota = P.notaPerModello(P.analizza(...c));
     assert.doesNotMatch((nota.sistema + ' ' + nota.etichetta).replace(/NON prova che l’immagine sia autentica/, ''), /autentic|immagine reale|nessun segno di AI/i);
   }
+});
+
+// ── File scritti dall'SDK di riferimento del C2PA (c2pa-rs 0.91, certificato di prova) ──
+// Le immagini qui sopra le fabbrica un aiutante scritto da noi: se sbagliasse come il
+// lettore, passerebbero insieme. Queste le ha scritte chi fa lo standard (#711, giro 1).
+const FIXTURE = join(process.cwd(), 'tests', 'fixtures', 'provenienza');
+const ufficiale = (nome) => readFileSync(join(FIXTURE, nome));
+
+test('credenziali scritte dall’SDK ufficiale: generata, modificata, scattata', () => {
+  assert.equal(P.frase(P.analizza(ufficiale('c2pa-ufficiale-ai.jpg'))),
+    'Generata con l’AI secondo credenziali firmate da C2PA Test Signing Cert. Firma valida, firmatario non verificato.');
+  assert.match(P.frase(P.analizza(ufficiale('c2pa-ufficiale-ai.png'))), /^Generata con l’AI secondo credenziali firmate/);
+  assert.match(P.frase(P.analizza(ufficiale('c2pa-ufficiale-modificata.jpg'))), /^Modificata con l’AI secondo credenziali firmate/);
+  assert.match(P.frase(P.analizza(ufficiale('c2pa-ufficiale-fotocamera.jpg'))), /^Scattata con una fotocamera secondo credenziali firmate/);
+  // Il certificato di prova non è nell'elenco ufficiale, e scaricato l'elenco lo si dice.
+  assert.match(frase(ufficiale('c2pa-ufficiale-ai.jpg')), /non è nell’elenco ufficiale/);
+});
+
+test('un file dell’SDK ufficiale cambiato dopo la firma lo dice', () => {
+  for (const nome of ['c2pa-ufficiale-ai.jpg', 'c2pa-ufficiale-ai.png']) {
+    const b = Buffer.from(ufficiale(nome));
+    b[b.length - 30] ^= 0x5a;
+    const f = P.frase(P.analizza(b));
+    assert.match(f, /cambiato dopo la firma/, nome);
+    assert.doesNotMatch(f, /Generata/, nome);
+  }
+});
+
+test('generata con l’AI e poi ritagliata: l’origine si trova nel manifesto del passo prima', () => {
+  const r = P.analizza(ufficiale('c2pa-ufficiale-ritagliata.jpg'));
+  assert.equal(r.origine, 'ai');
+  assert.equal(r.prova, 'firmata');
+});
+
+test('un ingrediente la cui impronta non è quella firmata non racconta la storia', () => {
+  // Si guasta un byte nel manifesto del passo prima (il primo della raccolta, cioè
+  // quello dell'immagine generata): la firma del passo dopo copre ancora sé stessa.
+  const b = Buffer.from(ufficiale('c2pa-ufficiale-ritagliata.jpg'));
+  const i = b.indexOf(Buffer.from('trainedAlgorithmicMedia'));
+  assert.ok(i > 0);
+  b[i] ^= 0x01;
+  const r = P.analizza(b);
+  assert.notEqual(r.origine, 'ai');
 });

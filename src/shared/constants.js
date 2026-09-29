@@ -1467,6 +1467,32 @@
         campi: { 'Titolo della scheda': titolo || '(senza titolo)', Indirizzo: url || '(ignoto)' },
       }),
 
+    // #711 — l'esito delle etichette di origine delle immagini che l'utente ha davanti
+    // quando chiede all'Aiuto. Il payload può scriverlo chiunque parli al canale: dei
+    // numeri si tengono solo i numeri, e le frasi (nomi scritti da chi ha fatto il file) viaggiano imbustate.
+    origineImmaginiAiuto: (o) => {
+      if (!o || typeof o !== 'object') return '';
+      const intero = (v) => Math.max(0, Math.min(10000, Math.floor(Number(v) || 0)));
+      const visibili = intero(o.visibili);
+      const controllate = Math.min(intero(o.controllate), visibili);
+      if (!visibili) return '';
+      const quali = controllate === visibili
+        ? `delle ${visibili} immagini visibili nella pagina`
+        : `di ${controllate} delle ${visibili} immagini visibili nella pagina, le più grandi`;
+      const esiti = (Array.isArray(o.esiti) ? o.esiti : []).slice(0, 50)
+        .filter((e) => e && typeof e.frase === 'string' && e.frase.trim());
+      const nonProva = 'l’assenza di etichette NON prova che un’immagine sia autentica: uno screenshot, una ricompressione o il caricamento su un social le cancellano, e molti generatori non le scrivono affatto';
+      if (!esiti.length) {
+        return `(Sistema: ${esterno().perCanaleSistema(`ho letto in locale le etichette di origine ${quali}: nessuna ne porta. ${nonProva}. Se l’utente chiede se un’immagine è fatta con l’AI, dillo così, senza giudicare l’origine dai pixel`)}.)`;
+      }
+      const righe = esiti.map((e) => {
+        const alt = e.alt ? `, testo alternativo «${e.alt}»` : '';
+        return `immagine ${intero(e.n)} (${intero(e.larghezza)}×${intero(e.altezza)} px${alt}): ${e.frase}`;
+      });
+      const testa = `(Sistema: ${esterno().perCanaleSistema(`ho letto in locale le etichette di origine ${quali}; quelle che ne portano sono nel blocco qui sotto, numerate dalla più grande, e le altre non ne hanno. Filo legge solo ciò che i file dichiarano e non giudica mai i pixel: riporta quegli esiti senza aggiungerci un verdetto tuo, e per le altre ricorda che ${nonProva}`)}.)`;
+      return `${testa}\n${esterno().imbusta({ tipo: 'ETICHETTA_FILE', testo: righe.join('\n'), conIntestazione: true })}`;
+    },
+
     turnoAutomaticoAiuto: ({ nota = '', dati = null, perCronologia = false } = {}) => {
       const buste = [];
       if (dati && dati.ricercaWeb) buste.push(PROMPTS.ricercaWebImbustata(dati.ricercaWeb));
