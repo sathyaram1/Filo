@@ -243,3 +243,112 @@ test('col fuoco sulla barra, cambiare scheda non le toglie la tastiera', async (
     return webContents.getFocusedWebContents() === w.webContents;
   })).toBe(true);
 });
+
+// Un PDF si apre nel visore, che è un webContents a sé e prende la tastiera
+// appena il documento compare: da lì i tasti di Filo devono valere come dalla pagina.
+function pdfMinimo(testo) {
+  const ogg = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    null,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  const flusso = `BT /F1 24 Tf 72 700 Td (${testo}) Tj ET`;
+  ogg[3] = `<< /Length ${flusso.length} >>\nstream\n${flusso}\nendstream`;
+  let out = '%PDF-1.4\n';
+  const off = [];
+  ogg.forEach((o, i) => { off.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const xref = out.length;
+  out += `xref\n0 ${ogg.length + 1}\n0000000000 65535 f \n` + off.map((o) => String(o).padStart(10, '0') + ' 00000 n \n').join('');
+  out += `trailer\n<< /Size ${ogg.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}
+
+const testPdf = test.extend({
+  pdfUrl: async ({}, use) => {
+    const pdf = pdfMinimo('Manuale di prova');
+    const srv = createServer((_req, res) => { res.writeHead(200, { 'Content-Type': 'application/pdf' }); res.end(pdf); });
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+    await use(`http://127.0.0.1:${srv.address().port}/manuale.pdf`);
+    try { srv.closeAllConnections?.(); } catch (_) {}
+    await new Promise((r) => srv.close(r));
+  },
+});
+
+// Apre il PDF davanti a una pagina qualunque e aspetta che il visore abbia la tastiera.
+async function pdfColTastieraNelVisore(app, shell, openTab, testServer, pdfUrl) {
+  await testServer.openReady(openTab, TESTO);
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w.show(); w.focus();
+  });
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), pdfUrl);
+  await expect.poll(() => app.evaluate(({ webContents }) => {
+    const f = webContents.getFocusedWebContents();
+    return !!f && f.getType() === 'remote' && !f.isLoading();
+  }), { timeout: 15_000 }).toBe(true);
+  return (await schede(app)).activeId;
+}
+
+function premiNelVisore(app, keyCode, modifiers) {
+  return app.evaluate(({ webContents }, o) => {
+    const visore = webContents.getFocusedWebContents();
+    visore.sendInputEvent({ type: 'keyDown', keyCode: o.keyCode, modifiers: o.modifiers });
+    visore.sendInputEvent({ type: 'keyUp', keyCode: o.keyCode, modifiers: o.modifiers });
+  }, { keyCode, modifiers });
+}
+
+testPdf('dal visore di un PDF Alt+S salva il documento e chiude la scheda una volta sola, anche tenendolo premuto', async ({ app, shell, openTab, testServer, pdfUrl }) => {
+  const id = await pdfColTastieraNelVisore(app, shell, openTab, testServer, pdfUrl);
+  const n = (await schede(app)).ids.length;
+  await app.evaluate(({ webContents }) => {
+    const visore = webContents.getFocusedWebContents();
+    visore.sendInputEvent({ type: 'keyDown', keyCode: 'S', modifiers: ['alt'] });
+    visore.sendInputEvent({ type: 'keyDown', keyCode: 'S', modifiers: ['alt', 'isAutoRepeat'] });
+    visore.sendInputEvent({ type: 'keyDown', keyCode: 'S', modifiers: ['alt', 'isAutoRepeat'] });
+    visore.sendInputEvent({ type: 'keyUp', keyCode: 'S', modifiers: ['alt'] });
+  });
+  await expect.poll(() => app.evaluate(async (_e, u) => (await globalThis.SN_STORAGE.getRaw('savedPages', []))
+    .some((p) => p.url === u), pdfUrl), { timeout: 10_000 }).toBe(true);
+  await expect.poll(async () => (await schede(app)).ids.includes(id), { timeout: 10_000 }).toBe(false);
+  await new Promise((r) => setTimeout(r, 800));
+  expect((await schede(app)).ids.length).toBe(n - 1);
+});
+
+testPdf('dal visore di un PDF Alt+H apre l\'Aiuto sopra il documento', async ({ app, shell, openTab, testServer, pdfUrl }) => {
+  await pdfColTastieraNelVisore(app, shell, openTab, testServer, pdfUrl);
+  await premiNelVisore(app, 'H', ['alt']);
+  await expect.poll(() => aiutoSullaAttiva(app), { timeout: 10_000 }).toBe(true);
+});
+
+testPdf('dal visore di un PDF valgono anche Ctrl+T, Alt+cifra e Ctrl+W, ciascuno una volta', async ({ app, shell, openTab, testServer, pdfUrl }) => {
+  const id = await pdfColTastieraNelVisore(app, shell, openTab, testServer, pdfUrl);
+  const n = (await schede(app)).ids.length;
+
+  await premiNelVisore(app, 'T', ['control']);
+  await expect.poll(async () => (await schede(app)).ids.length).toBe(n + 1);
+  await app.evaluate(({ BrowserWindow }, tid) => {
+    const t = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+    t.closeTab(t.activeId);
+    t.activate(tid);
+  }, id);
+  await expect.poll(() => app.evaluate(({ webContents }) => {
+    const f = webContents.getFocusedWebContents();
+    return !!f && f.getType() === 'remote';
+  }), { timeout: 10_000 }).toBe(true);
+
+  await premiNelVisore(app, '1', ['alt']);
+  await expect.poll(async () => (await schede(app)).activeId).not.toBe(id);
+  await app.evaluate(({ BrowserWindow }, tid) => {
+    BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.activate(tid);
+  }, id);
+  await expect.poll(() => app.evaluate(({ webContents }) => {
+    const f = webContents.getFocusedWebContents();
+    return !!f && f.getType() === 'remote';
+  }), { timeout: 10_000 }).toBe(true);
+
+  await premiNelVisore(app, 'W', ['control']);
+  await expect.poll(async () => (await schede(app)).ids.includes(id)).toBe(false);
+  expect((await schede(app)).ids.length).toBe(n - 1);
+});

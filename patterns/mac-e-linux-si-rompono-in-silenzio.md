@@ -25,6 +25,8 @@ aggiunge lì.
   Alt+lettera apre menu e schede negli altri programmi (Alt+H è la Home di Word): le
   scorciatoie di Filo si ascoltano sui suoi webContents (`before-input-event`), così valgono
   solo con Filo davanti (#838, sentinella `tests/unit/scorciatoieSoloInFilo.test.mjs`).
+  Il visore dei PDF è un webContents a sé che non passa da quell'evento: i suoi tasti li
+  porta agli ascolti della scheda `inoltraTastiDegliOspiti` (`src/main/tabs.js`).
 - **Il nome di una scorciatoia non si scrive a mano: si chiede.** Le funzioni
   rispondevano già a Cmd: a mentire erano le SCRITTE, una alla volta.
   `src/shared/tasti.js` è la porta unica: `SN_TASTI.etichetta('Ctrl+B')` dà `Ctrl+B` su
