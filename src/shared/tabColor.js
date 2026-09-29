@@ -54,10 +54,8 @@
 
   // I sei parametri della spec. Default = tab dal colore vivace e riconoscibile.
   // I primi cinque governano l'ESTRAZIONE dal favicon (qui sotto); il sesto,
-  // `opacita_tab`, governa il BLEND del colore sullo sfondo della barra delle
-  // schede ed è applicato dalla shell (src/renderer/shell.js): non entra
-  // nell'estrazione, quindi non sta in IDENTITY_PARAMS (i soli parametri letti
-  // da extractIdentityFromPixels) ma è descritto nel meta più sotto.
+  // `opacita_tab`, governa il BLEND sullo sfondo della barra
+  // (inactiveTabBackground) e per questo non sta in IDENTITY_PARAMS.
   const IDENTITY_PARAMS = {
     soglia_saturazione: 0.30, // 0–0.5: sotto questa saturazione il pixel è ignorato dal path cromatico
     peso_centralita: 5.0,     // 0–10: forza del bias gaussiano verso il centro del favicon
@@ -193,7 +191,7 @@
       if (win.score > 0) {
         // Media pesata del bucket vincente → tinta brand. Adattamento palette:
         // mantieni la tinta, sostituisci saturazione e luminosità coi parametri,
-        // così il colore cachato è canonico e vivace (la shell poi lo attenua).
+        // così il colore cachato è canonico e vivace (la shell lo mescola solo col fondo).
         const [h] = rgbToHsl(win.r / win.score, win.g / win.score, win.b / win.score);
         const [ar, ag, ab] = hslToRgb(h, p.saturazione_tab, p.luminosita_tab);
         return `rgb(${ar}, ${ag}, ${ab})`;
@@ -206,9 +204,120 @@
     return `rgb(${v}, ${v}, ${v})`;
   }
 
+  // ------------------------------------------------------------
+  // Fondo di una scheda non attiva (spec, Pipeline 3-4) e suo inchiostro
+  // ------------------------------------------------------------
+  // Unica regola per la barra e per la Cronologia: nessuna attenuazione oltre
+  // ai parametri, così saturazione_tab e opacita_tab pesano per intero.
+
+  function toRgb(c) {
+    return Array.isArray(c) ? (c.length >= 3 ? [c[0], c[1], c[2]] : null) : parseRgb(c);
+  }
+
+  // Pipeline 3: la tinta resta quella del sito, saturazione e luminosità le
+  // decidono i parametri; un acromatico passa com'è. Riapplicarla a un colore
+  // già adattato non lo cambia, e adatta anche i ripieghi theme-color/manifest.
+  function adaptIdentity(color, params) {
+    const c = toRgb(color);
+    if (!c) return null;
+    if (Math.max(c[0], c[1], c[2]) - Math.min(c[0], c[1], c[2]) < IDENTITY_CHROMA_MIN) {
+      return c.map((v) => Math.round(v));
+    }
+    const p = clampParams(params);
+    const [h] = rgbToHsl(c[0], c[1], c[2]);
+    return hslToRgb(h, p.saturazione_tab, p.luminosita_tab);
+  }
+
+  // Pipeline 4: finale = sopra × alpha + sotto × (1 − alpha), per canale.
+  function blendRgb(top, bottom, alpha) {
+    const a = Math.max(0, Math.min(1, Number(alpha) || 0));
+    return [0, 1, 2].map((i) => Math.round(top[i] * a + bottom[i] * (1 - a)));
+  }
+
+  // null = la scheda resta sul neutro della barra (nessuna identità o colore spento).
+  function inactiveTabBackground(identity, bar, params) {
+    const adapted = adaptIdentity(identity, params);
+    const b = toRgb(bar);
+    if (!adapted || !b) return null;
+    return blendRgb(adapted, b, clampParams(params).opacita_tab);
+  }
+
+  function relativeLuminance(color) {
+    const c = toRgb(color);
+    if (!c) return 0;
+    const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+  }
+
+  function contrastRatio(a, b) {
+    const la = relativeLuminance(a), lb = relativeLuminance(b);
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  }
+
+  // Il titolo deve reggere `min` (4,5:1, #710) su ogni fondo dato: vince
+  // l'inchiostro col contrasto più alto; se nessuno ci arriva, nero o bianco
+  // (su un fondo solo uno dei due supera sempre 4,58:1).
+  function readableInk(backgrounds, inks, min) {
+    const need = typeof min === 'number' ? min : 4.5;
+    const bgs = (backgrounds || []).map(toRgb).filter(Boolean);
+    if (!bgs.length) return null;
+    const worst = (ink) => Math.min(...bgs.map((bg) => contrastRatio(ink, bg)));
+    let best = null, bestScore = -1;
+    const pick = (list) => {
+      for (const raw of list) {
+        const ink = toRgb(raw);
+        if (!ink) continue;
+        const sc = worst(ink);
+        if (sc > bestScore) { best = ink; bestScore = sc; }
+      }
+    };
+    pick(inks || []);
+    if (bestScore < need) pick([[0, 0, 0], [255, 255, 255]]);
+    return best.map((v) => Math.round(v));
+  }
+
+  // Inchiostro della scheda e suo fondo di hover: l'hover va verso il polo del
+  // tema lontano dall'inchiostro, così passarci sopra non abbassa mai il contrasto.
+  function inkAndHover(bg, fg, page) {
+    const ink = readableInk([bg], [fg, page]);
+    const far = toRgb(contrastRatio(ink, page) >= contrastRatio(ink, fg) ? page : fg);
+    return { ink, hover: blendRgb(bg, far, 0.85) };
+  }
+
+  function rgbCss(c) {
+    return `rgb(${Math.round(c[0])}, ${Math.round(c[1])}, ${Math.round(c[2])})`;
+  }
+
+  // L'unica funzione col DOM: risolve un'espressione CSS (anche var(--x), un
+  // color-mix o un token dell'utente) nel colore mostrato, via canvas.
+  let probeCanvas = null;
+  function resolveCssColor(doc, expr) {
+    try {
+      const probe = doc.createElement('span');
+      probe.style.display = 'none';
+      probe.style.color = expr;
+      (doc.body || doc.documentElement).appendChild(probe);
+      const value = doc.defaultView.getComputedStyle(probe).color;
+      probe.remove();
+      if (!probeCanvas || probeCanvas.ownerDocument !== doc) {
+        probeCanvas = doc.createElement('canvas');
+        probeCanvas.width = probeCanvas.height = 1;
+      }
+      const ctx = probeCanvas.getContext('2d', { willReadFrequently: true });
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = '#000';
+      ctx.fillStyle = value;
+      ctx.fillRect(0, 0, 1, 1);
+      const d = ctx.getImageData(0, 0, 1, 1).data;
+      return [d[0], d[1], d[2]];
+    } catch (_) { return null; }
+  }
+
   global.SN_TAB_COLOR = {
     IDENTITY_CHROMA_MIN, parseRgb, chroma, hasIdentity,
     IDENTITY_PARAMS, IDENTITY_PARAM_META, defaultParams, clampParams,
     rgbToHsl, hslToRgb, extractIdentityFromPixels,
+    adaptIdentity, blendRgb, inactiveTabBackground,
+    relativeLuminance, contrastRatio, readableInk, inkAndHover, rgbCss, resolveCssColor,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

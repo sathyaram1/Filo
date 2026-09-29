@@ -166,7 +166,7 @@ test.describe('colore identità tab inattiva', () => {
   const PAGE_B = `<!doctype html><html><head><title>Sito B</title></head>
 <body style="margin:0"><div style="height:1200px;background:#fff"></div></body></html>`;
 
-  test('la tab inattiva prende il colore identità del sito attenuato', async () => {
+  test('la tab inattiva prende il colore identità del sito', async () => {
     await testServer.openReady(openTab, PAGE_A);
 
     // Il colore identità (dal theme-color) arriva fino allo snapshot del main.
@@ -188,8 +188,8 @@ test.describe('colore identità tab inattiva', () => {
       return a ? a.id : null;
     }), { timeout: 8_000 }).not.toBeNull();
 
-    // La shell tinge quella tab INATTIVA con la tinta attenuata: la variabile
-    // --tab-bg-eff è impostata inline e mescola un colore col neutro del tab bar.
+    // La shell tinge quella tab INATTIVA: --tab-bg-eff inline col colore già
+    // mescolato al neutro del tab bar (la formula la prova il describe #821).
     const id = await shell.evaluate(async () => {
       const snap = await window.filoShell.tabs.snapshot();
       const a = snap.tabs.find(
@@ -209,9 +209,127 @@ test.describe('colore identità tab inattiva', () => {
     }, id);
 
     expect(bgEff).not.toBeNull();
-    // È una tab inattiva e ha la tinta identità (color-mix col neutro del tab bar).
     expect(bgEff.isActive).toBe(false);
-    expect(bgEff.bgEff).toContain('color-mix');
+    expect(bgEff.bgEff).toMatch(/^rgb\(/);
+  });
+});
+
+// ───────────────────── tinta viva delle schede non attive (#821) ─────────────────────
+test.describe('tinta viva delle schede non attive', () => {
+  const favSvg = encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">' +
+    '<rect width="16" height="16" fill="rgb(220,20,20)"/></svg>',
+  );
+  const PAGE_RED = '<!doctype html><html><head>' +
+    `<link rel="icon" href="data:image/svg+xml,${favSvg}">` +
+    '<title>Sito rosso</title></head><body style="margin:0;height:1200px">rosso</body></html>';
+  const PAGE_OTHER = '<!doctype html><html><head><title>Altro sito</title></head>' +
+    '<body style="margin:0;height:1200px">altro</body></html>';
+
+  const setSettings = (settings) => shell.evaluate(
+    (st) => window.filoShell.message({ type: 'update_settings', settings: st }), settings);
+
+  // Fondo, barra e titolo della scheda rossa come li mostra lo schermo.
+  const readRedTab = () => shell.evaluate(() => {
+    const el = document.querySelector('.tab[data-tip="Sito rosso"]');
+    if (!el || el.classList.contains('active')) return null;
+    const probe = document.createElement('div');
+    probe.style.background = 'var(--tab-bg)';
+    document.body.appendChild(probe);
+    const bar = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const nums = (c) => (/rgba?\(([^)]+)\)/.exec(c) || [, ''])[1].split(',').slice(0, 3).map(Number);
+    return {
+      bg: nums(getComputedStyle(el).backgroundColor),
+      bar: nums(bar),
+      title: nums(getComputedStyle(el.querySelector('.title')).color),
+      close: nums(getComputedStyle(el.querySelector('.close')).color),
+      tinted: el.classList.contains('tinted'),
+      dark: matchMedia('(prefers-color-scheme: dark)').matches,
+    };
+  });
+
+  const lum = ([r, g, b]) => {
+    const l = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * l(r) + 0.7152 * l(g) + 0.0722 * l(b);
+  };
+  const contrast = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  const formula = (bar, op) => [255, 0, 0].map((v, i) => v * op + bar[i] * (1 - op));
+  const near = (got, want) => got.every((v, i) => Math.abs(v - want[i]) <= 2);
+
+  async function openRedInactive() {
+    await testServer.openReady(openTab, PAGE_RED);
+    await expect.poll(async () => shell.evaluate(async () => {
+      const snap = await window.filoShell.tabs.snapshot();
+      const a = snap.tabs.find((t) => t.id === snap.activeId);
+      return (a && a.identityColor) || null;
+    }), { timeout: 9_000 }).toBe('rgb(255, 0, 0)');
+    await testServer.openReady(openTab, PAGE_OTHER);
+  }
+
+  // La scheda rossa ha il fondo della formula della spec, e il titolo si legge.
+  async function expectFormula(op, dark) {
+    let last = null;
+    await expect.poll(async () => {
+      last = await readRedTab();
+      return !!last && last.dark === dark && near(last.bg, formula(last.bar, op));
+    }, { timeout: 8_000 }).toBe(true);
+    expect(contrast(last.title, last.bg), `titolo ${last.title} su ${last.bg}`).toBeGreaterThanOrEqual(4.5);
+    expect(last.close).toEqual(last.title);
+    return last;
+  }
+
+  test.afterEach(async () => {
+    await shell.emulateMedia({ colorScheme: 'light' });
+    const TC = await app.evaluate(() => globalThis.SN_TAB_COLOR.defaultParams());
+    await setSettings({ tabColor: TC, theme: 'system' });
+  });
+
+  test('coi predefiniti la scheda di un favicon rosso è rossa viva, e opacita_tab la governa', async () => {
+    await setSettings({ theme: 'light' });
+    await openRedInactive();
+
+    const def = await expectFormula(0.6, false);
+    expect(def.tinted).toBe(true);
+    // Vivace: il canale rosso domina, non il grigiastro della vecchia saturazione al 18%.
+    expect(def.bg[0] - Math.max(def.bg[1], def.bg[2])).toBeGreaterThan(120);
+
+    // Saturazione e opacità al massimo: rosso YouTube pieno.
+    await setSettings({ tabColor: { saturazione_tab: 1, opacita_tab: 1 } });
+    const full = await expectFormula(1, false);
+    expect(full.bg).toEqual([255, 0, 0]);
+
+    // Il preset di «colori più vivaci nelle tab» si vede rispetto ai predefiniti.
+    await setSettings({ tabColor: { saturazione_tab: 1, opacita_tab: 0.9 } });
+    const vivid = await expectFormula(0.9, false);
+    expect(Math.hypot(...vivid.bg.map((v, i) => v - def.bg[i]))).toBeGreaterThan(60);
+
+    // Opacità 0: nessun colore, il fondo è quello della barra.
+    await setSettings({ tabColor: { opacita_tab: 0 } });
+    await expect.poll(async () => {
+      const r = await readRedTab();
+      return !!r && !r.tinted && near(r.bg, r.bar);
+    }, { timeout: 8_000 }).toBe(true);
+  });
+
+  test('tema scuro: stessa formula sul fondo scuro della barra, titolo leggibile anche in hover', async () => {
+    await openRedInactive();
+    await expectFormula(0.6, false);
+
+    // Il cambio di tema da solo ridipinge la scheda (Playwright tiene la shell in chiaro: si emula).
+    await shell.emulateMedia({ colorScheme: 'dark' });
+    const dark = await expectFormula(0.6, true);
+    expect(lum(dark.bar)).toBeLessThan(0.05);
+
+    await shell.hover('.tab[data-tip="Sito rosso"] .title');
+    await expect.poll(async () => {
+      const r = await readRedTab();
+      return !!r && !near(r.bg, dark.bg) && contrast(r.title, r.bg) >= 4.5;
+    }, { timeout: 5_000 }).toBe(true);
+    await shell.mouse.move(0, 200);
+
+    await shell.emulateMedia({ colorScheme: 'light' });
+    await expectFormula(0.6, false);
   });
 });
 

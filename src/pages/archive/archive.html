@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="filo://style/theme.css" />
   <link rel="stylesheet" href="filo://style/pages.css" />
   <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/tabColor.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
@@ -37,15 +38,14 @@
       flex: 1 1 0; min-width: 132px;
       padding: 7px 12px; border-radius: var(--sn-radius);
       border: 1px solid color-mix(in srgb, var(--arc-color, var(--sn-border)) 40%, var(--sn-border));
-      /* Sfondo: tinta identità del sito, attenuata e mescolata al neutro come le tab in alto. Le schede senza
-         colore ricadono sul solo neutro. */
-      background: color-mix(in srgb, var(--arc-tint, var(--sn-hover)) 55%, var(--sn-hover));
-      color: var(--sn-fg);
+      /* Sfondo e inchiostro li calcola archive.js con la regola delle tab in alto; senza colore, il neutro. */
+      background: var(--arc-bg, var(--sn-hover));
+      color: var(--arc-ink, var(--sn-fg));
       cursor: pointer;
       transition: background 0.1s ease;
     }
     .arc-tab:hover, .arc-tab:focus-visible {
-      background: color-mix(in srgb, var(--arc-tint, var(--sn-hover)) 55%, var(--sn-bg));
+      background: var(--arc-bg-hover, color-mix(in srgb, var(--sn-hover) 55%, var(--sn-bg)));
     }
     .arc-tab:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
     /* I risultati della ricerca sono una lista piatta per pertinenza: chip compatte che vanno a capo, non una
@@ -58,12 +58,13 @@
       background-color: var(--arc-color, var(--sn-border));
     }
     .arc-title {
-      font-size: 13px; color: var(--sn-fg);
+      font-size: 13px; color: inherit;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .arc-score {
       font-size: 10px; color: var(--sn-muted); flex: 0 0 auto;
     }
+    .arc-tab.tinted .arc-score { color: inherit; }
     /* Senza questa riga la sezione resta a schermo anche quando la pagina la nasconde:
        patterns/una-classe-che-scrive-display-deve-lasciarsi-nascondere.md */
     .arc-section[hidden] { display: none; }
