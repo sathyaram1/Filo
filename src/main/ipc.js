@@ -105,7 +105,8 @@ function registerIpcHandlers() {
   // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
   ipcMain.on('filo:permessi-stato', (event, href) => {
     try {
-      event.returnValue = { notifiche: require('./services/permessiPagine').statoNotifiche(event.sender.session, href) };
+      const Permessi = require('./services/permessiPagine');
+      event.returnValue = { notifiche: Permessi.statoNotifiche(event.sender.session, href), gestoMs: Permessi.GESTO_MS };
     } catch (_) {
       event.returnValue = { notifiche: 'default' };
     }
