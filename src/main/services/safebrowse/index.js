@@ -241,8 +241,16 @@ function analyze(url, ctx = {}, onUpdate) {
   if (!norm || !norm.ok) return engine.evaluate(url, ctx, {});
   const first = engine.evaluate(url, ctx, assembleCached(norm, url));
 
-  // Se è già pericoloso da blacklist/strict, non serve altro.
+  // Se è già pericoloso da blacklist/strict, non serve altro. Un verdetto Safe Browsing dato da una parte dell'indirizzo
+  // si completa in sottofondo: la pagina può essere in lista con una categoria più grave di quella del sito.
   if (first.level === 'pericoloso' && (first.reasons || []).some((r) => /^gsb_|strict/.test(r))) {
+    if (first.gsb && first.gsb.partial && providers.gsb && typeof onUpdate === 'function') {
+      Promise.resolve(providers.gsb(url, norm)).then((r) => {
+        if (!r || r.partial) return;
+        const next = engine.evaluate(url, ctx, { ...assembleCached(norm, url), gsb: r });
+        if (verdictChanged(first, next)) onUpdate(next);
+      }).catch(() => {});
+    }
     return first;
   }
 

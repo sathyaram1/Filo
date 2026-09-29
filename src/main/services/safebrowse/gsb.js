@@ -216,7 +216,7 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
   }
 
   // Un'impronta in lista basta per «pericoloso» anche se altre non hanno risposta (sito già noto, Google giù o lento);
-  // «pulito» le vuole tutte. undefined quando non si sa.
+  // «pulito» le vuole tutte. undefined quando non si sa; `partial`: il resto dell'indirizzo può dare una categoria più grave.
   function decide(hs, known) {
     const found = [];
     let unknown = false;
@@ -228,7 +228,8 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
     }
     if (!found.length) return unknown ? undefined : { listed: false };
     found.sort((a, b) => SEVERITY.indexOf(a.category) - SEVERITY.indexOf(b.category));
-    return { listed: true, category: found[0].category, threatType: found[0].threatType };
+    const v = { listed: true, category: found[0].category, threatType: found[0].threatType };
+    return unknown ? { ...v, partial: true } : v;
   }
 
   // Verdetto dalla sola cache, senza rete.

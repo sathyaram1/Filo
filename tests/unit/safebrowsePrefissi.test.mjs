@@ -241,7 +241,7 @@ test('un sito già riconosciuto in lista resta segnalato sulle sue altre pagine:
     const subito = SB.analyze(url, {}, () => {});
     assert.equal(subito.level, 'pericoloso', String(guasto));
     assert.equal(subito.gsb.category, 'phishing', String(guasto));
-    assert.deepEqual(await SB._gsbLookup.check(url), { listed: true, category: 'phishing', threatType: 'SOCIAL_ENGINEERING' }, String(guasto));
+    assert.deepEqual(await SB._gsbLookup.check(url), { listed: true, category: 'phishing', threatType: 'SOCIAL_ENGINEERING', partial: true }, String(guasto));
   }
 
   SB.configure({ gsbKey: () => '', enableNetwork: false, enableSandbox: false });
@@ -302,6 +302,19 @@ test('rifiuti ripetuti del servizio: si aspetta prima di riprovare, e nel fratte
   assert.equal(chiamate.length, 3);
 });
 
+test('una pagina di un sito già noto come phishing, in lista lei stessa come malware: l\'avviso parte subito e poi dice malware', async () => {
+  const richieste = servizioFinto({ elenco: { 'doppia-813.it/': 'SOCIAL_ENGINEERING', 'doppia-813.it/scarica.exe': 'MALWARE' } });
+  accendi();
+  assert.equal((await verdettoDopoRete('https://doppia-813.it/accedi', richieste)).gsb.category, 'phishing');
+  let aggiornato = null;
+  const subito = SB.analyze('https://doppia-813.it/scarica.exe', {}, (v) => { aggiornato = v; });
+  assert.equal(subito.level, 'pericoloso');
+  assert.equal(subito.gsb.category, 'phishing');
+  assert.ok(await finoA(() => aggiornato));
+  assert.equal(aggiornato.level, 'pericoloso');
+  assert.equal(aggiornato.gsb.category, 'malware');
+});
+
 test('richieste in pausa: un\'impronta in lista già in memoria decide senza rete; senza, il verdetto resta sconosciuto', async () => {
   const full = sha('pausa-sito-813.it/');
   let giu = false;
@@ -315,8 +328,9 @@ test('richieste in pausa: un\'impronta in lista già in memoria decide senza ret
   await L.check('https://altro-813.it/1');
   await L.check('https://altro-813.it/2');
   const n = chiamate.length;
-  assert.deepEqual(await L.check('https://pausa-sito-813.it/b'), { listed: true, category: 'malware', threatType: 'MALWARE' });
-  assert.deepEqual(L.peek('https://pausa-sito-813.it/c'), { listed: true, category: 'malware', threatType: 'MALWARE' });
+  const noto = { listed: true, category: 'malware', threatType: 'MALWARE', partial: true };
+  assert.deepEqual(await L.check('https://pausa-sito-813.it/b'), noto);
+  assert.deepEqual(L.peek('https://pausa-sito-813.it/c'), noto);
   assert.equal(chiamate.length, n);
   assert.equal(await L.check('https://pulito-813.it/x'), null);
   assert.equal(L.peek('https://pulito-813.it/x'), undefined);
