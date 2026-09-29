@@ -114,7 +114,7 @@ test('modello sconosciuto: tariffa opus e una nota', async () => {
   const righe = [assistant('z', 'claude-nuovo-9', { input_tokens: 1000000, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 }, [], T('00:00'))];
   const rep = await analizzaRighe(righe);
   assert.equal(rep.costUsd, PREZZI.opus.input);
-  assert.match(rep.notes[0], /claude-nuovo-9.*opus/);
+  assert.match(rep.notes[0], /claude-nuovo-9.*Opus 5/);
   assert.equal(famigliaPrezzo('claude-fable-5').key, 'fable-5');
   assert.equal(famigliaPrezzo('claude-fable-5-1').key, 'fable');
   assert.equal(famigliaPrezzo('claude-sonnet-4-6').key, 'sonnet-4');
