@@ -4,9 +4,9 @@
 // #277: su una pagina interna di Filo (filo://) Alt+S non salva e non chiude.
 // #839: su una pagina web Alt+S passa alla pagina, che fa la stessa cosa della
 // voce del menu (miniatura piccola, conferma cliccabile, chiusura). Il main
-// salva e chiude da solo SOLO se la pagina non la prende (Filo spento sul
-// sito, pagina ancora in caricamento, nessuna risposta), coi dati fotografati
-// al momento del tasto (#334).
+// salva e chiude da solo SOLO se la pagina non la prende (ancora in
+// caricamento, nessuna risposta), coi dati fotografati al momento del tasto
+// (#334), e la conferma la mostra la scheda rimasta davanti.
 //
 // Electron e ./services/handlers sono stubati via Module._load, così il test
 // gira in ms senza aprire nessuna finestra.
@@ -74,7 +74,7 @@ function makeWin(tab) {
 
 // Una tab con una webContents fittizia. `risposta` simula la pagina: 'presa'
 // (content script di Filo che fa il salvataggio), 'rifiutata' (nessun
-// ascoltatore: Filo spento sul sito) o null (nessuna risposta).
+// ascoltatore: Filo non ancora montato) o null (nessuna risposta).
 function makeTab(over = {}, risposta = 'rifiutata') {
   const tab = {
     id: 'T1',
@@ -148,6 +148,20 @@ test('Alt+S su pagina web senza Filo: il main salva, allega la miniatura e chiud
   assert.equal(thumb && thumb.id, 'E1', 'la miniatura va alla voce appena salvata');
   assert.match(thumb.thumbnail, /^data:image\/jpeg;base64,/, 'e ci va già compressa');
   assert.equal(closed, 'T1', 'la tab web va chiusa dopo il salvataggio');
+});
+
+test('Alt+S su una pagina che non risponde: la conferma la mostra la scheda rimasta davanti, senza chiudersi', async () => {
+  saved = null; thumb = null; closed = null;
+  const salvata = makeTab({ id: 'T1', url: 'https://news.example.com/articolo', title: 'Articolo' }, 'rifiutata');
+  const davanti = makeTab({ id: 'T2', url: 'https://altro.example.com/', title: 'Altro' }, null);
+  const win = makeWin(salvata);
+  win._filoTabs.tabs.push(davanti);
+  win._filoTabs.closeTab = (id) => { closed = id; win._filoTabs.activeId = 'T2'; };
+  dispatch('save-for-later', win);
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(closed, 'T1');
+  assert.deepEqual(davanti.ricevuti.map((m) => [m.canale, m.payload.command, m.payload.context && m.payload.context.entry && m.payload.context.entry.id]),
+    [['shortcut:triggered', 'save-for-later-confirm', 'E1']], 'la scheda davanti riceve la conferma della voce appena salvata');
 });
 
 test('senza risposta dalla pagina la consegna si arrende, e una ricevuta da un\'altra scheda non vale', async () => {

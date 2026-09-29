@@ -892,7 +892,8 @@
   // appena messa da parte evidenziata; ignorandolo, la scheda si chiude da sola
   // come prima. È l'unico modo per far scoprire la lista proprio nel momento in
   // cui serve, senza aggiungere voci di menu.
-  function showSaveConfirm(entry) {
+  // `chiudiScheda: false` quando la mostra la scheda davanti per un salvataggio che la scheda salvata non poteva confermare (#839).
+  function showSaveConfirm(entry, { chiudiScheda = true } = {}) {
     const AUTO_CLOSE_MS = 4000;
     let done = false;
     let timer = null;
@@ -917,7 +918,7 @@
     const finish = (openList) => {
       if (done) return;
       done = true;
-      salvataggioInCorso = false;
+      if (chiudiScheda) salvataggioInCorso = false;
       if (timer) { clearTimeout(timer); timer = null; }
       pill.dataset.snClosing = '1';
       pill.classList.remove('sn-save-confirm-visible');
@@ -925,7 +926,7 @@
       if (openList && entry && entry.id) {
         chrome.runtime.sendMessage({ type: MSG.OPEN_HOME, highlight: entry.id }).catch(() => {});
       }
-      chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }).catch(() => {});
+      if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }).catch(() => {});
     };
 
     pill.addEventListener('click', () => finish(true));

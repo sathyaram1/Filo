@@ -126,18 +126,50 @@ test('Alt+S fa quello che fa il menu: conferma cliccabile, miniatura piccola, li
   await chiusa;
 });
 
-test('Alt+S su un sito dove Filo è spento: salva con la miniatura piccola e chiude subito', async ({ app, shell, openTab, testServer }) => {
+test('Alt+S su un sito dove Filo è spento: stessa conferma cliccabile, miniatura piccola, scheda chiusa', async ({ app, shell, openTab, testServer }) => {
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { blocklist: ['127.0.0.1'] } }));
   const url = testServer.html(PAGINA_RICCA('Sito escluso'));
   const page = await openTab(url);
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
   await page.waitForTimeout(500);
 
-  // Nessuno in pagina prende la scorciatoia: la risposta arriva subito, non dopo l'attesa di tre secondi e mezzo.
-  const chiusa = page.waitForEvent('close', { timeout: 2500 });
   await dispatchAltS(app);
+  const pill = page.locator('.sn-save-confirm');
+  await expect(pill, 'Alt+S su un sito escluso chiudeva la scheda senza conferma').toBeVisible({ timeout: 5000 });
+  const m = await attendiMiniatura(app, url);
+  controllaPiccola(m, 'Alt+S su sito escluso');
+
+  const chiusa = page.waitForEvent('close', { timeout: 8000 });
+  await pill.click();
+  const home = await attendiHome(app);
+  expect(home.url()).toContain(`highlight=${m.id}`);
   await chiusa;
-  controllaPiccola(await attendiMiniatura(app, url), 'Alt+S su sito escluso');
+});
+
+test('Alt+S su una pagina che non risponde: salva, chiude, e la conferma compare sulla scheda che resta davanti', async ({ app, openTab, testServer }) => {
+  const davanti = await testServer.openReady(openTab, PAGINA_RICCA('Resto davanti'), { pubblico: true });
+  const url = testServer.html(PAGINA_RICCA('Bloccata'));
+  const page = await openTab(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+
+  // Il filo della pagina resta occupato: né la pagina né Filo dentro di lei possono rispondere.
+  await page.evaluate(() => { setTimeout(() => { const t = Date.now(); while (Date.now() - t < 12000) { /* occupata */ } }, 50); });
+  await page.waitForTimeout(200);
+  await dispatchAltS(app);
+
+  const pill = davanti.locator('.sn-save-confirm');
+  await expect(pill, 'la conferma non è comparsa da nessuna parte').toBeVisible({ timeout: 12000 });
+  const salvata = await app.evaluate(async (_e, u) => (await globalThis.SN_SAVED_PAGES.list()).find((p) => p.url === u) || null, url);
+  expect(salvata, 'la pagina bloccata non è stata salvata').toBeTruthy();
+  const aperta = (u) => app.evaluate(({ BrowserWindow }, x) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.some((t) => t.url === x), u);
+  expect(await aperta(url), 'la scheda salvata doveva chiudersi').toBe(false);
+
+  await pill.click();
+  const home = await attendiHome(app);
+  expect(home.url()).toContain(`highlight=${salvata.id}`);
+  // La scheda che ha solo mostrato la conferma resta aperta.
+  await davanti.waitForTimeout(500);
+  expect(await aperta(davanti.url()), 'la conferma ha chiuso la scheda che la mostrava').toBe(true);
 });
 
 // PNG vero scritto a mano (niente Electron prima dell'avvio): rumore colorato, che in PNG pesa MB.

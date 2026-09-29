@@ -414,7 +414,14 @@
       chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
     }, { capture: true });
 
-    if (isBlocked()) { self.__snFiloSpento = true; return; }
+    if (isBlocked()) {
+      self.__snFiloSpento = true;
+      // Alt+S è un gesto rivolto a Filo: anche qui salva con la miniatura e la conferma della voce del menu (#839).
+      chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+        if (msg?.type === MSG.SHORTCUT_TRIGGERED && COMANDI_SALVA.has(msg.command)) suSalvaPerDopo(msg, sendResponse);
+      });
+      return;
+    }
 
     SpellCheck.init(settings);
 
@@ -2135,17 +2142,25 @@
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
-      // #839 — Alt+S è la voce «Salva per dopo» del menu: stessa funzione, stessa miniatura, stessa conferma.
-      if (msg.command === 'save-for-later') {
-        if (IS_SUBFRAME) return;
-        sendResponse({ presa: true });
-        try { Menu.close(); } catch (_) {}
-        Actions.savePage();
-        return;
-      }
+      if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
       handleShortcut(msg.command, msg.context);
       sendResponse({ ok: true });
     }
+  }
+
+  // #839 — Alt+S è la voce «Salva per dopo» del menu: stessa funzione, stessa miniatura, stessa conferma.
+  // La conferma arriva qui anche per un salvataggio che la scheda salvata non poteva mostrare: questa è quella davanti.
+  const COMANDI_SALVA = new Set(['save-for-later', 'save-for-later-confirm']);
+
+  function suSalvaPerDopo(msg, sendResponse) {
+    if (IS_SUBFRAME) return;
+    if (msg.command === 'save-for-later') {
+      sendResponse({ presa: true });
+      try { Menu.close(); } catch (_) {}
+      Actions.savePage();
+      return;
+    }
+    Actions.showSaveConfirm(msg.context && msg.context.entry, { chiudiScheda: false });
   }
 
   function selectionAnchor() {

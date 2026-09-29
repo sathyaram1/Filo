@@ -103,7 +103,7 @@ function dispatch(command, window) {
 }
 
 // #839 — Alt+S e il menu sono la stessa azione: la fa la pagina (savePage nel content script), con la sua
-// miniatura, la conferma cliccabile e la chiusura. Il main salva da solo solo se la pagina non la prende.
+// miniatura, la conferma cliccabile e la chiusura, anche dove Filo è spento. Il main salva da solo solo se la pagina non risponde.
 const ATTESA_RICEVUTA_MS = 3500;
 const ricevuteInAttesa = new Map();
 
@@ -138,11 +138,22 @@ async function saveForLater(win, tab) {
   const title = tab.title;
   const favicon = tab.favicon || '';
   if (await consegnaConRicevuta(tab, 'save-for-later')) return;
-  // Pagina senza Filo dentro (sito escluso, ancora in caricamento, bloccata): si salva comunque, prima della miniatura.
+  // Pagina che non l'ha presa (ancora in caricamento, bloccata): si salva comunque, prima della miniatura.
   const res = await handleMessage({ type: MSG.SAVE_PAGE, page: { url, title, favicon } });
   const thumbnail = await dallaScheda(tab.view.webContents);
   if (thumbnail && res?.entry?.id) await globalThis.SN_SAVED_PAGES.setThumbnail(res.entry.id, thumbnail);
   try { win._filoTabs.closeTab(tab.id); } catch (_) {}
+  confermaSullaSchedaDavanti(win, res?.entry);
+}
+
+// La scheda salvata non poteva mostrare la conferma: la mostra quella che l'utente ha davanti adesso, senza chiudersi.
+// Gli avvisi della cornice finiscono sotto la pagina, per questo non passa di lì.
+function confermaSullaSchedaDavanti(win, entry) {
+  if (!entry?.id) return;
+  const tm = win && win._filoTabs;
+  const davanti = tm?.tabs?.find((t) => t.id === tm.activeId);
+  const context = { entry: { id: entry.id, category: entry.category || null } };
+  try { davanti.view.webContents.send('shortcut:triggered', { command: 'save-for-later-confirm', context }); } catch (_) {}
 }
 
 module.exports = { collegaScorciatoie, comandoDaTasto, dispatch, saveForLater, consegnaConRicevuta, riceviRicevuta, isInternalTab, acceleratorePerPiattaforma, COMMANDS };
