@@ -873,14 +873,19 @@
     }).catch(() => {});
   }
 
-  // Un'altra scheda ha salvato la chat di un mazzo che qui è in memoria: si rilegge, se qui non c'è una risposta
-  // in volo (in quel caso vince chi finisce per ultimo).
+  // Un'altra scheda ha cambiato la chat di un mazzo che qui è in memoria: si rilegge. Se qui c'è una risposta in
+  // volo si aspetta che sia scritta (la bolla che la aspetta vive in questa memoria), poi si rilegge.
   function onChatChangedElsewhere(msg) {
     if (!msg || msg.type !== MSG.DECKS_CHAT_CHANGED || msg.clientId === chatClientId) return;
     const deckId = String(msg.deckId || '');
     const msgs = chatByDeck.get(deckId);
-    if (!msgs || busyChats.has(msgs)) return;
-    send({ type: MSG.DECKS_CHAT_GET, deckId }).then(async (r) => {
+    if (!msgs) return;
+    if (busyChats.has(msgs)) { staleChats.add(msgs); return; }
+    rereadChat(deckId, msgs);
+  }
+
+  function rereadChat(deckId, msgs) {
+    return send({ type: MSG.DECKS_CHAT_GET, deckId }).then(async (r) => {
       if (!(r && r.ok && Array.isArray(r.messages))) return;
       if (chatByDeck.get(deckId) !== msgs || busyChats.has(msgs)) return;
       rememberProseNames(r.messages);
