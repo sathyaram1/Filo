@@ -830,18 +830,27 @@
     return p;
   }
 
-  // Oltre il tetto il main rifiuterebbe comunque: non si spedisce, e renderChat lo dice sotto l'ultima bolla.
-  function saveChat(deckId) {
-    clearTimeout(chatSaveTimers.get(deckId));
-    chatSaveTimers.delete(deckId);
-    const msgs = chatByDeck.get(deckId);
-    if (!msgs || !Chat.fits(msgs)) return;
-    send({ type: MSG.DECKS_CHAT_SAVE, deckId, messages: msgs, clientId: chatClientId }).catch(() => {});
+  // Una modifica alla volta sulla chat salvata (SN_DECK_CHAT.applyEdit), mai la chat intera dalla memoria di questa
+  // scheda. Oltre il tetto il main rifiuta, e renderChat lo dice sotto l'ultima bolla.
+  function editChat(deckId, change) {
+    return send({ type: MSG.DECKS_CHAT_EDIT, deckId, clientId: chatClientId, ...change }).catch(() => null);
   }
 
-  function saveChatSoon(deckId) {
-    clearTimeout(chatSaveTimers.get(deckId));
-    chatSaveTimers.set(deckId, setTimeout(() => saveChat(deckId), 400));
+  // I nomi in prosa risolti, raccolti per bolla e scritti insieme: passare il mouse su dieci nomi è una scrittura.
+  const namesToSave = new Map(); // bolla → mazzo
+  let namesTimer = 0;
+  function saveNamesSoon(deckId, m) {
+    if (!m.turn) return;
+    namesToSave.set(m, deckId);
+    clearTimeout(namesTimer);
+    namesTimer = setTimeout(() => {
+      for (const [bubble, id] of namesToSave) editChat(id, { op: 'names', turn: bubble.turn, nameIds: bubble.nameIds });
+      namesToSave.clear();
+    }, 400);
+  }
+
+  function newTurnId() {
+    return `${chatClientId}.${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   }
 
   // Le carte della chat riaperta: prima dalla cache (subito), poi dalla rete le poche che mancano, senza far
