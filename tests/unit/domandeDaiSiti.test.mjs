@@ -86,13 +86,41 @@ test('da un sito passano le domande dei content script, le altre no', () => {
 });
 
 test('le fotografie da un sito le chiede solo la scheda in primo piano', () => {
+  const tutto = { inVista: true, schedaInVista: true, disegnoSullaBarra: true };
   for (const t of W.DOMANDE_WEB_IN_VISTA) {
     assert.ok(W.DOMANDE_WEB.has(t), `${t} deve essere prima di tutto una domanda ammessa`);
-    assert.equal(W.domandaAmmessaDaUnSito(t, { inVista: true }), true, t);
-    assert.equal(W.domandaAmmessaDaUnSito(t, { inVista: false }), false, t);
+    assert.equal(W.domandaAmmessaDaUnSito(t, tutto), true, t);
+    assert.equal(W.domandaAmmessaDaUnSito(t, { ...tutto, inVista: false }), false, t);
     assert.equal(W.domandaAmmessaDaUnSito(t), false, t);
   }
   assert.ok(W.DOMANDE_WEB_IN_VISTA.has(MSG.CAPTURE_VISIBLE_TAB) && W.DOMANDE_WEB_IN_VISTA.has(MSG.CAPTURE_FEEDBACK_TOPBAR));
+});
+
+// #589.1 giro 1 — una domanda ammessa non arriva oltre la scheda che la fa.
+test('ciò che cambia la vista dell\'utente lo chiede solo la scheda in primo piano, da ogni suo riquadro', () => {
+  for (const t of [MSG.SHELL_ACTION, MSG.TOGGLE_FULLSCREEN, MSG.EXIT_FULLSCREEN, MSG.OPEN_URL, MSG.OPEN_NEW_TAB,
+    MSG.OPEN_HOME, MSG.OPEN_OPTIONS, MSG.OPEN_INCOGNITO, MSG.FILO_RUN_ACTION, MSG.FILO_CONFIRM_ACTION, MSG.AUTH_SIGNIN]) {
+    assert.ok(W.DOMANDE_WEB_SCHEDA_IN_VISTA.has(t), t);
+  }
+  for (const t of W.DOMANDE_WEB_SCHEDA_IN_VISTA) {
+    assert.ok(W.DOMANDE_WEB.has(t), `${t} deve essere prima di tutto una domanda ammessa`);
+    const msg = { type: t, on: true };
+    assert.equal(W.domandaAmmessaDaUnSito(t, { schedaInVista: true }, msg), true, `${t} da un riquadro della scheda in vista`);
+    assert.equal(W.domandaAmmessaDaUnSito(t, { inVista: true }, msg), true, `${t} dalla pagina in vista`);
+    assert.equal(W.domandaAmmessaDaUnSito(t, { schedaInVista: false }, msg), false, `${t} da una scheda di sfondo`);
+    assert.equal(W.domandaAmmessaDaUnSito(t, undefined, msg), false, t);
+  }
+  assert.equal(W.domandaAmmessaDaUnSito(MSG.FEEDBACK_ANNOTATE, {}, { type: MSG.FEEDBACK_ANNOTATE, on: false }), true,
+    'spegnere l\'ombra del feedback lo chiede anche una pagina che si chiude in secondo piano');
+  assert.equal(W.domandaAmmessaDaUnSito(MSG.FEEDBACK_ANNOTATE, {}, { type: MSG.FEEDBACK_ANNOTATE, on: true }), false);
+  assert.equal(W.domandaAmmessaDaUnSito(MSG.CLOSE_TAB, {}), true, 'chiudere sé stessa resta a ogni scheda');
+});
+
+test('la foto della barra a un sito solo mentre l\'utente ci ha disegnato sopra', () => {
+  assert.equal(W.domandaAmmessaDaUnSito(MSG.CAPTURE_FEEDBACK_TOPBAR, { inVista: true }), false);
+  assert.equal(W.domandaAmmessaDaUnSito(MSG.CAPTURE_FEEDBACK_TOPBAR, { inVista: true, disegnoSullaBarra: true }), true);
+  assert.equal(W.domandaAmmessaDaUnSito(MSG.CAPTURE_FEEDBACK_TOPBAR, { inVista: false, disegnoSullaBarra: true }), false);
+  assert.equal(W.domandaAmmessaDaUnSito(MSG.CAPTURE_VISIBLE_TAB, { inVista: true }), true);
 });
 
 test('chi è un sito: la scheda e la pagina che parla devono essere entrambe di Filo', () => {
@@ -109,6 +137,15 @@ test('chi è un sito: la scheda e la pagina che parla devono essere entrambe di 
     ['', { wc: {} }],
     [' filo://home/', {}],
   ]) assert.equal(O.daUnSito(origine, mittente), true, `${origine} / ${JSON.stringify(mittente)}`);
+});
+
+test('la scheda in primo piano vale da ogni suo riquadro, non dalle altre schede né dai popup', () => {
+  const win = { _filoTabs: { activeId: 7 } };
+  assert.equal(O.schedaInPrimoPiano({ win, tab: { id: 7 }, frame: { frameTreeNodeId: 2 } }), true);
+  assert.equal(O.schedaInPrimoPiano({ win, tab: { id: 8 } }), false, 'scheda di sfondo');
+  assert.equal(O.schedaInPrimoPiano({ win: {}, tab: { id: 7 } }), false, 'finestra senza schede (popup)');
+  assert.equal(O.schedaInPrimoPiano({ win, tab: null }), false);
+  assert.equal(O.schedaInPrimoPiano(undefined), false);
 });
 
 test('in primo piano vale solo il frame principale della scheda attiva', () => {

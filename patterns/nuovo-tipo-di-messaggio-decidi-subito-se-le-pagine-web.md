@@ -125,6 +125,16 @@ foto che un sito chiede: le ottiene solo il frame principale della scheda in
 vista, che inquadra sé stessa; una scheda di sfondo avrebbe quella che l'utente
 sta guardando.
 
+Una domanda ammessa non arriva **oltre la scheda che la fa** (#589.1, giro 1).
+Ciò che cambia quello che l'utente guarda (i tasti della barra, lo schermo
+intero, una scheda o una finestra portata davanti, l'ombra del feedback, la
+lettura ferma altrove) lo chiede solo la scheda in primo piano, da qualunque
+suo riquadro: da una scheda di sfondo il tasto Home portava via la pagina che
+l'utente stava scrivendo. E una risposta porta solo ciò che serve a chi chiede:
+il premio del feedback dice la cifra, non il saldo; la foto della barra in alto,
+che mostra i titoli delle altre schede, un sito la riceve solo mentre l'utente
+ci ha disegnato sopra per un feedback.
+
 Ogni spinta che gira su più schede o finestre passa da `spingiAllaScheda` /
 `spingiAllaFinestra` di quel file, o si limita da sé alle superfici di Filo: una
 strada parallela (l'avviso dei dati dal vivo, quello degli scaricamenti, lo

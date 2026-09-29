@@ -158,3 +158,82 @@ test('la finestra di accesso aperta da un sito vale come sito, non come la corni
     expect(JSON.stringify(r.risposta)).not.toContain('MILANO-5891');
   }
 });
+
+// Giro 1 di verifica: una domanda ammessa non arriva oltre la scheda che la fa.
+test('una scheda di sfondo non cambia ciò che l\'utente guarda; quella in vista apre ancora le sue schede', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, '<h1>sfondo</h1>');
+  const inVista = await testServer.openReady(openTab, '<h1>posta</h1><textarea id="bozza"></textarea>', { pubblico: true });
+  await inVista.fill('#bozza', 'bozza che l\'utente sta scrivendo');
+  const sfondo = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
+  const prima = await schede(app);
+  const guardata = prima.tutte.find((t) => t.id === prima.attiva);
+  expect(guardata.url).toMatch(/^http:\/\/sito-pubblico\.test/);
+
+  for (const [tipo, extra] of [
+    ['shell_action', { command: 'home' }], ['toggle_fullscreen', {}], ['open_url', { url: `${testServer.origin}/non-cercata` }],
+    ['open_options', {}], ['open_new_tab', {}], ['filo_run_action', { action: { type: 'NAVIGA', url: `${testServer.origin}/navigata` } }],
+    ['feedback_annotate', { on: true }],
+  ]) {
+    const r = await sfondo(chiedi(tipo, extra));
+    expect(r.nonTrovata || r.errore).toBeFalsy();
+    expect(r.risposta, `${tipo}: una scheda di sfondo ha agito su ciò che l'utente guarda`).toMatchObject({ ok: false, code: 'forbidden' });
+  }
+  await new Promise((r) => setTimeout(r, 800));
+  const dopo = await schede(app);
+  expect(dopo.attiva).toBe(guardata.id);
+  expect(dopo.tutte.find((t) => t.id === guardata.id)?.url).toBe(guardata.url);
+  expect(dopo.tutte).toHaveLength(prima.tutte.length);
+  expect(await app.evaluate(({ BrowserWindow }) => Boolean(BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.contentFullscreen))).toBe(false);
+  await expect(inVista.locator('#bozza')).toHaveValue('bozza che l\'utente sta scrivendo');
+
+  // La scheda in vista apre ancora il link dal menu, anche da un suo riquadro.
+  const vista = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
+  expect((await vista(chiedi('open_url', { url: `${testServer.origin}/voluta` }))).risposta?.ok).toBe(true);
+  await expect.poll(async () => (await schede(app)).tutte.some((t) => t.url.endsWith('/voluta'))).toBe(true);
+});
+
+test('il premio del feedback dice a un sito la cifra, non il saldo', async ({ app, shell, openTab, testServer }) => {
+  await testServer.openReady(openTab, '<h1>sito</h1>');
+  const sito = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
+  const r = await sito(chiedi('credits_award_feedback'));
+  expect(r.risposta?.ok).toBe(true);
+  expect(r.risposta?.credits).toBeGreaterThan(0);
+  expect(Object.prototype.hasOwnProperty.call(r.risposta, 'balance'), JSON.stringify(r.risposta)).toBe(false);
+  const saldo = await shell.evaluate(async () => (await window.filoShell.message({ type: 'get_credits' }))?.credits?.balance);
+  expect(typeof saldo).toBe('number');
+  expect(JSON.stringify(r.risposta)).not.toContain(String(saldo));
+});
+
+test('la foto della barra un sito la riceve solo mentre l\'utente ci ha disegnato sopra', async ({ app, shell, openTab, testServer }) => {
+  const altra = await testServer.openReady(openTab, '<title>AAAAAAAAAAAAAAAAAAAAAAAA</title><h1>altra</h1>');
+  await testServer.openReady(openTab, '<title>sito</title><h1>in vista</h1>', { pubblico: true });
+  const sito = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
+  await expect.poll(async () => {
+    const { attiva, tutte } = await schede(app);
+    return tutte.find((t) => t.id === attiva)?.url || '';
+  }).toMatch(/^http:\/\/sito-pubblico\.test/);
+
+  const senza = await sito(chiedi('capture_feedback_topbar'));
+  expect(senza.risposta, 'senza un disegno dell\'utente il sito ha avuto la foto della barra coi titoli delle altre schede').toMatchObject({ ok: false, code: 'forbidden' });
+  await altra.evaluate(() => { document.title = 'WWWWWWWWWWWWWWWWWWWWWWWW'; });
+
+  // Il riquadro del feedback aperto e un tratto dell'utente sulla barra: la foto arriva.
+  await sito('SN_FEEDBACK_UI.open()');
+  await expect(shell.locator('#feedback-draw')).toBeVisible({ timeout: 4000 });
+  const box = await shell.locator('#feedback-draw').boundingBox();
+  const y = Math.min(15, (box?.height || 40) / 2);
+  await shell.mouse.move(160, y);
+  await shell.mouse.down();
+  await shell.mouse.move(280, y + 2, { steps: 6 });
+  await shell.mouse.up();
+  let foto = null;
+  await expect.poll(async () => {
+    foto = await sito(chiedi('capture_feedback_topbar'));
+    return (foto.risposta?.dataUrl || '').length;
+  }, { timeout: 5000 }).toBeGreaterThan(500);
+
+  // Chiuso il riquadro il disegno se ne va, e con lui la foto.
+  await sito('SN_FEEDBACK_UI.close()');
+  await expect(shell.locator('#feedback-draw')).toBeHidden({ timeout: 4000 });
+  await expect.poll(async () => (await sito(chiedi('capture_feedback_topbar'))).risposta?.code).toBe('forbidden');
+});
