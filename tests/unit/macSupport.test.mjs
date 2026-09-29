@@ -732,8 +732,21 @@ test('la lista dei tasti già presi non si stacca dalla barra dei menu', () => {
   require(join(ROOT, 'src', 'shared', 'tasti.js'));
   const T = globalThis.SN_TASTI;
 
+  // Un role senza acceleratore scritto si porta quello di Electron (menu-item-roles), e su Mac
+  // il menu Aiuto si apre con Cmd+?: senza questa tabella quei tasti erano invisibili (#545).
+  const TASTO_DEL_ROLE_SU_MAC = {
+    cut: 'Ctrl+X', copy: 'Ctrl+C', paste: 'Ctrl+V', pasteandmatchstyle: 'Ctrl+Alt+Shift+V',
+    selectall: 'Ctrl+A', undo: 'Ctrl+Z', redo: 'Ctrl+Shift+Z', minimize: 'Ctrl+M', close: 'Ctrl+W',
+    quit: 'Ctrl+Q', hide: 'Ctrl+H', hideothers: 'Ctrl+Alt+H', help: 'Ctrl+?',
+    about: '', services: '', unhide: '', zoom: '', front: '', window: '',
+  };
+  const ignoti = vociDellaBarra('darwin')
+    .filter((v) => v.role && !v.accelerator && !(String(v.role).toLowerCase() in TASTO_DEL_ROLE_SU_MAC))
+    .map((v) => v.role);
+  assert.deepEqual(ignoti, [], 'role nuovo nella barra: scrivi qui sopra il tasto che Electron gli dà su Mac');
+
   const scoperti = vociDellaBarra('darwin')
-    .map((v) => v.accelerator)
+    .map((v) => v.accelerator || (v.role && TASTO_DEL_ROLE_SU_MAC[String(v.role).toLowerCase()]))
     .filter(Boolean)
     // "CommandOrControl" è come lo scrive Electron; la regola parla in Ctrl.
     .map((a) => a.replace(/CommandOrControl/g, 'Ctrl'))

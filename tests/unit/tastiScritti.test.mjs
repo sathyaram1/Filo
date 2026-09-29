@@ -67,3 +67,32 @@ test('un simbolo con un modificatore che lo cambia si riconosce prima di salvarl
   assert.equal(T.modificatoreCheCambiaSimbolo('Alt+.', 'darwin'), 'Alt');
   assert.equal(T.modificatoreCheCambiaSimbolo('Alt+.', 'win32'), '');
 });
+
+test('senza «+» il trattino e lo spazio separano i pezzi, e i soli modificatori si riconoscono', () => {
+  const premi = (o) => ({ ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...o });
+  const doppio = premi({ ctrlKey: true, shiftKey: true, key: '@', code: 'Digit2' });
+  for (const scritto of ['Ctrl-Shift-2', 'Ctrl Shift 2', 'ctrl - shift - 2', 'Control Maiusc 2']) {
+    assert.ok(T.combacia(doppio, scritto), scritto);
+    assert.equal(T.pezzoSconosciuto(scritto), null, scritto);
+  }
+  assert.ok(T.combacia(premi({ ctrlKey: true, key: 's', code: 'KeyS' }), 'Ctrl-S'));
+  assert.ok(T.combacia(premi({ ctrlKey: true, key: '-', code: 'Minus' }), 'Ctrl--'));
+  assert.ok(T.combacia(premi({ ctrlKey: true, key: 'ArrowDown', code: 'ArrowDown' }), 'Ctrl Freccia giù'));
+  assert.ok(T.combacia(premi({ ctrlKey: true, key: 'ArrowDown', code: 'ArrowDown' }), 'Ctrl+Freccia giù'));
+  assert.equal(T.pressioneScritta('b'), null);
+  for (const solo of ['Ctrl', 'Ctrl+', 'Ctrl-', 'Ctrl+Shift', 'Cmd Shift', 'Shift']) assert.equal(T.soloModificatori(solo), true, solo);
+  for (const no of ['Ctrl++', 'Ctrl--', 'Ctrl-S', 'Ctrl+Shift+1', 'b', '']) assert.equal(T.soloModificatori(no), false, no);
+  assert.equal(T.etichetta('Ctrl-Shift-2', 'darwin'), 'Cmd+Shift+2');
+});
+
+test('su Mac i tasti presi prima della pagina sono quelli del Mac', () => {
+  // «Incolla senza formato» del Mac è Cmd+Alt+Shift+V; Cmd+Shift+V lì non è di nessuno.
+  assert.equal(T.riservato('Cmd+Alt+Shift+V', 'darwin'), true);
+  assert.equal(T.riservato('Cmd+Shift+V', 'darwin'), false);
+  assert.equal(T.riservato('Cmd+?', 'darwin'), true, 'Cmd+? apre il menu Aiuto');
+  for (const accel of ['Cmd+Tab', 'Cmd+Shift+Tab', 'Cmd+Alt+Esc', 'Cmd+Shift+Q']) {
+    assert.equal(T.delSistema(accel, 'darwin'), true, accel);
+  }
+  assert.equal(T.delSistema('Ctrl+Tab', 'win32'), false);
+  for (const p of ['win32', 'linux']) assert.equal(T.delSistema('Ctrl+Alt+Canc', p), true, p);
+});
