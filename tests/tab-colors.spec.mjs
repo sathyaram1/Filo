@@ -149,9 +149,18 @@ test.describe('colore live tab attiva', () => {
       expect.objectContaining({ tint: expect.stringContaining('rgb(20, 40, 200)') }),
     );
 
-    const fg = await shell.evaluate(() => document.querySelector('.tab.active').style.color);
-    // Testo chiaro su fondo scuro (qualunque forma rgb/hex → deve essere "chiaro").
-    expect(fg).toBeTruthy();
+    // Il titolo si legge sul blu scuro: 4,5:1, la regola di tutte le schede colorate (#821).
+    const ratio = await shell.evaluate(() => {
+      const el = document.querySelector('.tab.active');
+      const nums = (c) => (/rgba?\(([^)]+)\)/.exec(c) || [, ''])[1].split(',').slice(0, 3).map(Number);
+      const lum = ([r, g, b]) => {
+        const l = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+        return 0.2126 * l(r) + 0.7152 * l(g) + 0.0722 * l(b);
+      };
+      const a = lum(nums(getComputedStyle(el.querySelector('.title')).color)), b = lum([20, 40, 200]);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    });
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
   });
 });
 
