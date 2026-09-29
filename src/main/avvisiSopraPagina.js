@@ -124,7 +124,8 @@ class AvvisiSopraPagina {
     // Se la vista muore, il prossimo avviso ne fa nascere un'altra.
     wc.on('render-process-gone', () => this._butta());
     this.win.contentView.addChildView(vista);
-    wc.loadFile(path.join(__dirname, '..', 'renderer', 'avvisi.html'));
+    // Da filo://shell come la shell: un file:// farebbe scattare chi controlla che nessuna vista apra file locali.
+    wc.loadURL('filo://shell/avvisi.html');
     return vista;
   }
 

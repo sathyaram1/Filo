@@ -110,7 +110,7 @@ export const test = base.extend({
     await use(async () => {
       const scadenza = Date.now() + 10_000;
       while (Date.now() < scadenza) {
-        const p = app.windows().find((w) => { try { return /\/renderer\/avvisi\.html$/.test(w.url()); } catch (_) { return false; } });
+        const p = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/avvisi.html'); } catch (_) { return false; } });
         if (p) return p;
         await new Promise((r) => setTimeout(r, 100));
       }
