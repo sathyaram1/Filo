@@ -108,7 +108,8 @@
     // Broadcast main→renderer quando il saldo crediti cambia (consumo, refill,
     // ricompensa): la shell aggiorna l'icona/animazione, la pagina il grafico.
     CREDITS_CHANGED: 'credits_changed',
-    // Ricompensa crediti per un feedback inviato (+5 subito). { } → { ok, credits, balance }
+    // Ricompensa crediti per un feedback inviato (+5 subito). { } → { ok, credits, balance }.
+    // Con un portafoglio (#816) non accredita: { ok, wallet: true, credits: 0, inArrivo }.
     CREDITS_AWARD_FEEDBACK: 'credits_award_feedback',
     // Recap aggiornamento (popup all'avvio): confronta la versione vista
     // l'ultima volta con app.getVersion() e ritorna le note delle versioni
@@ -122,8 +123,9 @@
     // cerca su Firestore i feedback inviati da questo client, accredita la
     // ricompensa per priorità (50/100/200/300) una volta sola per feedback, e
     // ritorna l'elenco da ringraziare. { } → { ok, rewards:[{num,name,explanation,
-    // credits,priority}], totalCredits }. La home mostra un popup di
-    // ringraziamento e anima i crediti verso il profilo.
+    // status:'done'|'closed',credits}], totalCredits }. Con un portafoglio (#816)
+    // la cifra è il movimento del server (0 = chiusa senza premio) e il conteggio
+    // locale non si muove. La home mostra un popup e anima i crediti ricevuti.
     GET_FEEDBACK_REWARDS: 'get_feedback_rewards',
     // === Bacheca utente — voto funziona/non-funziona (DC2) ===================
     // BOARD_CAST_VOTE: l'utente loggato esprime/cambia il proprio voto su un

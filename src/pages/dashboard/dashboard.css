@@ -1089,8 +1089,9 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to { opacity: 1; transform: none; }
 }
+/* A destra il posto della X di chiusura (assoluta, 14 + 30px): titolo e totale non ci finiscono sotto. */
 .dash-recap-header {
-  padding: 22px 24px 14px;
+  padding: 22px 56px 14px 24px;
   border-bottom: 1px solid var(--dash-line);
 }
 .dash-recap-title {

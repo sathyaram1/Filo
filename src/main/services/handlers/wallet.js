@@ -176,7 +176,15 @@ module.exports = function register(on, ctx) {
   // ── Stato per la pagina Crediti ───────────────────────────────────────────
   // { ok, identity:{ ok, error? }, hasPersonalKey, pseudonym, usingOwnKey,
   //   server: <walletState> | null, error? }
+  // L'ultima lettura resta a chi deve DIRE il saldo fuori da quella pagina
+  // (la chat, #816): lo stesso numero, senza un giro dal server a ogni turno.
+  let ultimaLettura = null; // { at, state }
   async function readState() {
+    const state = await leggiStato();
+    ultimaLettura = { at: Date.now(), state };
+    return state;
+  }
+  async function leggiStato() {
     const own = await ownKey();
     const out = {
       ok: true, identity: { ok: false }, hasPersonalKey: Boolean(walletStore.personalKey()), pseudonym: walletStore.pseudonym(),
@@ -228,6 +236,60 @@ module.exports = function register(on, ctx) {
     return out;
   }
 
+  // Questa installazione ha un portafoglio (#816): i crediti veri li tiene il
+  // server, e il conteggio locale non riceve premi né si racconta in chat.
+  function haPortafoglio() {
+    try {
+      return Boolean(walletStore.personalKey() || walletStore.pseudonym() || (lastServer && lastServer.hasWallet));
+    } catch (_) { return false; }
+  }
+
+  // Il saldo che la chat dice (#816): quello della pagina Crediti. `null` =
+  // nessun portafoglio, e vale il conteggio locale. `fresco`: la domanda viene
+  // da un turno di chat, e una lettura più vecchia di un minuto si rifà
+  // (aspettandola al più poco: poi vale l'ultima nota, dichiarata tale).
+  const CHAT_VALIDO_MS = 60 * 1000;
+  const CHAT_ATTESA_MS = 2500;
+  async function saldoPerChat({ fresco = false } = {}) {
+    if (!haPortafoglio()) return null;
+    let st = ultimaLettura ? ultimaLettura.state : null;
+    let lettaIl = ultimaLettura ? ultimaLettura.at : null;
+    let muto = false; // la lettura di adesso non è arrivata in tempo
+    if (fresco && (!ultimaLettura || Date.now() - ultimaLettura.at > CHAT_VALIDO_MS)) {
+      const letta = await Promise.race([
+        readState().catch(() => null),
+        new Promise((r) => setTimeout(() => r(null), CHAT_ATTESA_MS)),
+      ]);
+      if (letta) { st = letta; lettaIl = Date.now(); } else muto = true;
+    }
+    if (st && st.identity && st.identity.lost) return null;
+    if (st && st.server && st.server.hasWallet === false) return null;
+    let server = st && st.server && st.server.hasWallet ? st.server : null;
+    if (!server) {
+      const disco = walletStore.lastServer() || lastServer;
+      if (!disco || !disco.hasWallet) return { balance: null };
+      server = { ...disco, cached: muto || Boolean(st) };
+      lettaIl = Date.parse(String(disco.readAt || '')) || null;
+    }
+    const b = server.balance || {};
+    // Perché non è il saldo di adesso: il server dei crediti muto, il servizio
+    // dei modelli che non ha detto il consumo (come la pagina), o una lettura
+    // solo vecchia, che la home usa senza chiederne un'altra.
+    const lastKnown = server.cached || muto ? 'server'
+      : server.stale ? 'models'
+        : !lettaIl || Date.now() - lettaIl > CHAT_VALIDO_MS ? 'old' : '';
+    const readAt = server.cached ? server.readAt
+      : server.stale ? server.usageReadAt
+        : lastKnown && lettaIl ? new Date(lettaIl).toISOString() : null;
+    return {
+      balance: b.credits != null && Number.isFinite(Number(b.credits)) ? Number(b.credits) : null,
+      dailyCredits: server.dailyCredits != null && Number.isFinite(Number(server.dailyCredits)) ? Number(server.dailyCredits) : null,
+      lastKnown, readAt: readAt || null,
+      usingOwnKey: Boolean(st && st.usingOwnKey),
+      keyMissing: Boolean(st && st.hasPersonalKey === false),
+    };
+  }
+
   // Cancello sull'origine (pattern «nuovo tipo di messaggio»): saldo, codici
   // d'invito, riscatto e nuova chiave leggono e muovono dati dell'utente.
   // Solo le pagine filo:// e la shell; una pagina web riceve `forbidden`.
@@ -261,6 +323,7 @@ module.exports = function register(on, ctx) {
     identity.resetIdentity();
     walletStore.clear();
     lastServer = null;
+    ultimaLettura = null;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
     return { ok: true, state: await readState() };
@@ -463,7 +526,10 @@ module.exports = function register(on, ctx) {
     const result = await callable('walletGrant', { pseudonym: msg.pseudonym, credits: msg.credits, why: msg.why || 'owner' }, { asOwner: true });
     // Se il regalo è alla propria installazione, la pagina Crediti aperta
     // accanto deve muoversi: si avvisano le pagine, come a ogni cambio di saldo.
-    if (result && result.ok) { try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {} }
+    if (result && result.ok) {
+      ultimaLettura = null;
+      try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    }
     return { result };
   }));
   on(MSG.WALLET_OWNER_INVITES, ownerOnly(async (msg) => ({
@@ -486,7 +552,8 @@ module.exports = function register(on, ctx) {
     if (!idToken) throw new Error('Sessione scaduta: rifai l’accesso.');
     const knobs = await Defaults.setCreditsKnobs((msg && msg.patch) || {}, idToken);
     // Le manopole cambiano quota e premi: chi guarda i crediti in un'altra
-    // pagina deve rileggere.
+    // pagina deve rileggere, e la chat anche.
+    ultimaLettura = null;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     return { knobs };
   }));
@@ -662,6 +729,10 @@ module.exports = function register(on, ctx) {
 
   globalThis.SN_WALLET_MAIN = {
     recordUsage, outOfCreditsNotice, flush, readState, keySource,
+    // Le cifre dette fuori dalla pagina Crediti (#816): chat, premi delle
+    // segnalazioni. `redeemedAt`: da quando le segnalazioni portano lo pseudonimo.
+    haPortafoglio, saldoPerChat,
+    redeemedAt: () => { try { return (walletStore.load() || {}).redeemedAt || null; } catch (_) { return null; } },
     // Lo pseudonimo di questa installazione, letto dal deposito locale (niente
     // rete): lo scrive chi manda un feedback, così il server sa a chi
     // accreditare il premio (#652). Vuoto se non c'è un portafoglio.

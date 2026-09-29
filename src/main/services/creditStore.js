@@ -150,6 +150,14 @@
     return { state: s, credits: amount };
   }
 
+  // Segna una segnalazione chiusa come già annunciata, SENZA accreditare: con un
+  // portafoglio il premio lo dà il server (#816), e il riquadro non va ripetuto.
+  function applyAnnounced(state, ref) {
+    const s = ensure(state);
+    if (ref) s.rewardedFeedback[ref] = true;
+    return { state: s };
+  }
+
   // PURA (DC2): true se quel feedback ha già ricevuto il premio voto per questo
   // utente (la cache crediti è già per-account). Usata per decidere SENZA I/O se
   // accreditare — il chiamante async (awardVoteOnce) la usa per restare idempotente
@@ -249,6 +257,13 @@
     return { credits: amount, balance: Math.round(state.balance) };
   }
 
+  async function markFeedbackAnnounced(ref) {
+    const state = await load();
+    applyAnnounced(state, ref);
+    await writeState(state);
+    emitChange(state, 'announce');
+  }
+
   // True se quel feedback ha già ricevuto la ricompensa di risoluzione (C5).
   async function wasFeedbackRewarded(id) {
     const state = await load();
@@ -319,10 +334,10 @@
   global.SN_CREDITS = {
     // pure (per i test e la logica)
     freshState, ensure, applyRefill, costEurToCredits, rewardForPriority,
-    applyConsumption, applyAward, isVoteRewardPending, applyConsumptionIfAffordable,
+    applyConsumption, applyAward, applyAnnounced, isVoteRewardPending, applyConsumptionIfAffordable,
     publicView, dateKey, daysBetween,
     // async (runtime)
-    load, getPublic, recordConsumption, award, wasFeedbackRewarded,
+    load, getPublic, recordConsumption, award, markFeedbackAnnounced, wasFeedbackRewarded,
     wasVoteRewarded, awardVoteOnce, spendIfAffordable,
     readState, writeState, adopt, setOwner, onChange,
   };

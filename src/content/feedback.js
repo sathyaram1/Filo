@@ -768,22 +768,28 @@
         const originRect = modal.getBoundingClientRect();
         close();
         // Ricompensa C3: +5 crediti subito all'invio. Best-effort, non blocca;
-        // l'importo effettivo lo decide il main (CREDIT.FEEDBACK_SEND).
+        // l'importo effettivo lo decide il main (CREDIT.FEEDBACK_SEND). Con un
+        // portafoglio (#816) il premio lo dà il server dopo i controlli: qui
+        // niente cifra e niente monete, perché adesso non arriva niente.
         let awarded = 5;
+        let premio = null;
         try {
           const ar = await chrome.runtime.sendMessage({ type: MSG.CREDITS_AWARD_FEEDBACK });
-          if (ar?.ok && Number(ar.credits) > 0) awarded = Number(ar.credits);
+          if (ar?.ok && ar.wallet) premio = { inArrivo: !!ar.inArrivo };
+          else if (ar?.ok && Number(ar.credits) > 0) awarded = Number(ar.credits);
         } catch (_) {}
-        flyCredits(originRect, awarded);
+        if (!premio) flyCredits(originRect, awarded);
         // Se qualche allegato non è riuscito a caricarsi, il feedback parte
         // comunque (testo + allegati ok) ma avvisiamo l'utente di QUALI file
         // sono andati persi, così non resta convinto che siano stati inviati.
         const failed = Array.isArray(res.failed) ? res.failed : [];
+        const dopo = premio?.inArrivo ? ' Il premio arriva sul tuo saldo dopo i controlli.' : '';
         if (failed.length) {
           const names = failed.map((f) => f?.name || 'allegato').join(', ');
-          Popup?.showToast?.(`Feedback inviato (+${awarded} crediti), ma non sono riuscito a caricare: ${names}`, { duration: 6000 });
+          const inviato = premio ? 'Feedback inviato' : `Feedback inviato (+${awarded} crediti)`;
+          Popup?.showToast?.(`${inviato}, ma non sono riuscito a caricare: ${names}${dopo ? `.${dopo}` : ''}`, { duration: 6000 });
         } else {
-          Popup?.showToast?.(`Grazie! Feedback inviato. +${awarded} crediti.`, { duration: 2800 });
+          Popup?.showToast?.(premio ? `Grazie! Feedback inviato.${dopo}` : `Grazie! Feedback inviato. +${awarded} crediti.`, { duration: premio ? 4000 : 2800 });
         }
       } catch (e) {
         console.error('[SN feedback] submit', e);
