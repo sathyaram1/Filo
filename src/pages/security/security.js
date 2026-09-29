@@ -326,7 +326,9 @@
   // www. e porta, lascia il bare host minuscolo. "https://www.Gmail.com/x" →
   // "gmail.com". Ritorna '' se non estraibile.
   function cleanDomain(raw) {
-    let s = String(raw || '').trim().toLowerCase();
+    // Come la lista nel main: «*.sito.it», «.sito.it» e «sito.it.» valgono «sito.it». Prima di
+    // leggere l'indirizzo, perché il browser scrive la stella come «%2A».
+    let s = String(raw || '').trim().toLowerCase().replace(/^([a-z]+:\/\/)?\*?\.+/, '$1');
     if (!s) return '';
     try {
       if (s.includes('://')) s = new URL(s).hostname;
@@ -334,8 +336,7 @@
     } catch (_) {
       s = s.split('/')[0].split('?')[0];
     }
-    // Come la lista nel main: «*.sito.it», «.sito.it» e «sito.it.» valgono «sito.it».
-    s = s.replace(/^\*?\.+/, '').replace(/\.+$/, '').replace(/^www\./, '');
+    s = s.replace(/^\.+|\.+$/g, '').replace(/^www\./, '');
     return window.SN_NOMI_SITO.valido(s) ? s : '';
   }
 
