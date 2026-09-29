@@ -4278,6 +4278,51 @@ function reindexArchivedEmbeddings(settings, items) {
   return reindexInCorso;
 }
 
+const conVettoreDi = (it, modello) => Array.isArray(it.embedding) && it.embedding.length && it.embedModel === modello;
+
+// Una pagina della rete di casa non va al modello (#591): vale solo per testo.
+function daIndicizzare(items, modello) {
+  return items.filter((it) => !conVettoreDi(it, modello) && (it.title || it.summary || it.snippet)
+    && !(it.casa || isHomeNetworkUrl(it.url)));
+}
+
+// Le schede senza un vettore del modello in uso (migrate, chiuse senza rete, di un modello vecchio) si indicizzano in
+// sottofondo all'avvio e a ogni cambio di modello: la prima ricerca trova l'indice già fatto invece di aspettarlo (#825).
+let indiceTimer = null;
+let indiceModello = null;
+function programmaIndiceArchivio(ritardo) {
+  if (Disco.inIncognito()) return;
+  clearTimeout(indiceTimer);
+  indiceTimer = setTimeout(() => { indiceTimer = null; indicizzaArchivio().catch(() => {}); }, ritardo);
+  indiceTimer.unref?.();
+}
+
+async function indicizzaArchivio() {
+  // Una corsa già in giro può essere del modello di prima: finita quella, si guarda una volta ancora.
+  for (let giro = 0; giro < 2; giro++) {
+    const settings = await getEffectiveSettings();
+    const a = embedAttempt(settings);
+    indiceModello = a ? a.model : null;
+    if (!a) return;
+    const stale = daIndicizzare(await ArchivedTabs.list(), a.model);
+    if (!stale.length) return;
+    const unaNuova = !reindexInCorso;
+    await reindexArchivedEmbeddings(settings, stale);
+    if (unaNuova) return;
+  }
+}
+
+try {
+  chrome.storage.onChanged.addListener((changes) => {
+    if (!changes || !changes.settings) return;
+    getEffectiveSettings().then((s) => {
+      const a = embedAttempt(s);
+      if (a && a.model !== indiceModello) programmaIndiceArchivio(2000);
+    }).catch(() => {});
+  });
+  programmaIndiceArchivio(10_000);
+} catch (_) {}
+
 // Testo senza accenti e minuscolo, per confrontare una ricerca con le schede che un vettore non ce l'hanno ancora.
 function testoPiano(testo) {
   return String(testo || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
