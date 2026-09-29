@@ -52,10 +52,21 @@ const vuoleLaScheda = (type, msg) => DOMANDE_WEB_SCHEDA_IN_VISTA.has(type)
 // l'utente ci ha disegnato sopra, l'unico motivo per cui il riquadro del feedback la chiede.
 const DOMANDE_WEB_COL_DISEGNO = Object.freeze(new Set(['capture_feedback_topbar']));
 
-function domandaAmmessaDaUnSito(type, { inVista = false, schedaInVista = false, disegnoSullaBarra = false } = {}, msg = null) {
+// Il «Ha funzionato?» dell'Aiuto pubblica i passi per chi userà Filo su quel sito: da un sito vale solo per
+// l'indirizzo della pagina che lo chiede, o un sito scriverebbe i percorsi di un altro (#589.1, giro 3).
+const INDIRIZZO_DELLA_DOMANDA = new Map([['save_path', (msg) => msg && msg.payload && msg.payload.session && msg.payload.session.rawUrl]]);
+function sulSitoDelMittente(type, msg, indirizzi) {
+  const leggi = INDIRIZZO_DELLA_DOMANDA.get(type);
+  if (!leggi) return true;
+  const host = hostDi(leggi(msg));
+  return Boolean(host) && (indirizzi || []).some((u) => hostDi(u) === host);
+}
+
+function domandaAmmessaDaUnSito(type, { inVista = false, schedaInVista = false, disegnoSullaBarra = false, indirizzi = [] } = {}, msg = null) {
   if (typeof type !== 'string' || !DOMANDE_WEB.has(type)) return false;
   if (DOMANDE_WEB_IN_VISTA.has(type) && inVista !== true) return false;
   if (vuoleLaScheda(type, msg) && inVista !== true && schedaInVista !== true) return false;
+  if (!sulSitoDelMittente(type, msg, indirizzi)) return false;
   return !DOMANDE_WEB_COL_DISEGNO.has(type) || disegnoSullaBarra === true;
 }
 
