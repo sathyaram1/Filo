@@ -84,7 +84,8 @@ html[data-chrome-compact="1"] .addr {
 }
 .tabs::-webkit-scrollbar { height: 0; width: 0; display: none; }
 
-/* Le notifiche si impilano in basso a destra. Quelle infinite restano finché non si preme la X. */
+/* Le notifiche si impilano in basso a destra. Quelle infinite restano finché non si preme la X.
+   Questa pila è il modello: a schermo la disegna la vista sopra la pagina, le carte stanno in avvisi.css. */
 .shell-notifs {
   position: fixed;
   right: 16px;
@@ -110,54 +111,6 @@ html[data-chrome-compact="1"] .addr {
   background: var(--border);
   border-radius: 3px;
 }
-.shell-notif {
-  position: relative;
-  max-width: min(360px, 80vw);
-  padding: 10px 30px 10px 14px;
-  background: var(--tab-active);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-  font-size: 13px;
-  opacity: 0;
-  transform: translateX(12px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  pointer-events: auto;
-}
-.shell-notif.show { opacity: 1; transform: translateX(0); }
-.shell-notif-msg { line-height: 1.4; word-break: break-word; }
-.shell-notif-close {
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--muted, #888);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  border-radius: 4px;
-}
-.shell-notif-close:hover { background: var(--border); color: var(--fg); }
-.shell-notif-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-.shell-notif-action {
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg, transparent);
-  color: var(--fg);
-  font-size: 12px;
-  cursor: pointer;
-}
-.shell-notif-action:hover { background: var(--border); }
 /* Il bagliore "sfuma perdendo di intensità": parte percepibile e scende quasi a zero, poi torna,
    con una transizione morbida. */
 @keyframes tab-glow-pulse {
