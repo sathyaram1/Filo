@@ -1055,6 +1055,8 @@ function targetWebTab(sender) {
 // Esito di PROXY_TAB e REGOLA_PROXY_DOMINIO senza fornitore: proxyUnavailableForPrompt
 // e la riga del diario lo riconoscono da `proxy`, e nessuno dei due lo dà per fatto.
 const proxyNonDisponibile = () => ({ proxy: 'non_disponibile' });
+const esitoNonDisponibile = (a) => !!(a && a._output && a._output.proxy === 'non_disponibile');
+const RISPOSTA_PROXY_NON_DISPONIBILE = 'Aprire un sito da un altro paese in Filo non si può ancora: non ho cambiato niente.';
 
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
 // cambio (la scrittura su storage è condivisa, le cache in-memory no).
