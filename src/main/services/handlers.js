@@ -4351,6 +4351,9 @@ async function rerankResults(query, items) {
 // Ricerca semantica: embeddizza la query, ordina le tab per similarità coseno.
 // Ritorna { results } (metadati senza embedding) oppure { results:null } se non
 // è possibile (niente chiave) così la pagina ripiega sul filtro per sottostringa.
+// Ogni scheda conta già alla prima ricerca: quelle senza un vettore del modello in uso (migrate, chiuse senza rete, di un
+// modello vecchio) si indicizzano adesso, e chi non arriva entro l'attesa, o non va al modello (rete di casa), vale per testo.
+const ATTESA_INDICE_MS = 15_000;
 async function searchArchivedTabs(query, { topK = 40 } = {}) {
   const q = String(query == null ? '' : query).trim();
   if (!q) return { ok: true, results: null };
@@ -4359,24 +4362,36 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
   try { emb = await embedTexts([q], settings); } catch (_) { emb = null; }
   if (!emb || !emb.vectors[0] || !emb.vectors[0].length) return { ok: true, results: null, noEmbed: true };
   const qv = quantizeEmbedding(emb.vectors[0]);
-  const items = await ArchivedTabs.list();
-  const scored = [];
-  // Si confrontano solo i vettori fatti dal modello in uso: quelli di un altro
-  // modello (o le schede senza vettore) si rifanno in background, e dalla
-  // ricerca successiva contano anche loro.
-  const stale = [];
-  for (const it of items) {
-    const usable = Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model;
-    if (usable) { scored.push({ score: cosineInt(qv, it.embedding), it }); continue; }
-    const casa = it.casa || isHomeNetworkUrl(it.url);
-    if ((it.title || it.summary || it.snippet) && !casa) stale.push(it);
+  // Si confrontano solo i vettori fatti dal modello in uso: vettori di modelli diversi non sono confrontabili.
+  const usabile = (it) => Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model;
+  let items = await ArchivedTabs.list();
+  const stale = items.filter((it) => !usabile(it) && (it.title || it.summary || it.snippet)
+    && !(it.casa || isHomeNetworkUrl(it.url)));
+  if (stale.length) {
+    let timer = null;
+    await Promise.race([
+      reindexArchivedEmbeddings(settings, stale).catch(() => {}),
+      new Promise((ok) => { timer = setTimeout(ok, ATTESA_INDICE_MS); }),
+    ]);
+    clearTimeout(timer);
+    items = await ArchivedTabs.list();
   }
-  if (stale.length) reindexArchivedEmbeddings(settings, stale).catch(() => {});
+  const parole = paroleDellaRicerca(q);
+  const scored = [];
+  const perTesto = [];
+  for (const it of items) {
+    if (usabile(it)) { scored.push({ score: cosineInt(qv, it.embedding), it }); continue; }
+    if (!parole.length) continue;
+    const testo = new Set(paroleDellaRicerca(`${it.title || ''} ${it.summary || ''} ${it.snippet || ''} ${it.url || ''}`));
+    if (parole.every((p) => testo.has(p))) perTesto.push(it);
+  }
   scored.sort((a, b) => b.score - a.score);
-  let results = scored.slice(0, topK).map(({ score, it }) => {
-    const { embedding, ...meta } = it;
-    return { ...meta, score };
-  });
+  const senzaVettore = ({ embedding, ...meta }) => meta;
+  // Chi vale per testo contiene tutte le parole cercate: va davanti, senza un punteggio che non ha.
+  let results = [
+    ...perTesto.slice(0, topK).map(senzaVettore),
+    ...scored.slice(0, topK).map(({ score, it }) => ({ ...senzaVettore(it), score })),
+  ].slice(0, topK);
 
   // §3.2 step 4 — re-rank LLM dei primi risultati (best-effort): legge i riassunti
   // e li riordina per pertinenza alla query. Se non disponibile, resta l'ordine
