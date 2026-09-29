@@ -26,6 +26,7 @@ require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei downl
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
 const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
+const { collegaScorciatoie } = require('./shortcuts');
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
@@ -1814,6 +1815,7 @@ class TabManager {
       this.pageFullscreenTabId = null;
       this.setContentFullscreen(false);
     });
+    collegaScorciatoie(wc, () => this.win);
     wc.on('before-input-event', (event, input) => {
       // #514 — l'ultimo tasto era l'Esc? Serve a `enter-html-full-screen`, che
       // da un Esc non fa passare nessuna richiesta di schermo pieno. Qui,

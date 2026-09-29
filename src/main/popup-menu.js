@@ -5,6 +5,7 @@
 const { BrowserWindow, nativeTheme } = require('electron');
 const path = require('node:path');
 const { hideForTests } = require('./test-window-mode');
+const { collegaScorciatoie } = require('./shortcuts');
 
 let activePopup = null;
 
@@ -227,6 +228,8 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   });
 
   activePopup = popup;
+  // Il menu prende il fuoco: senza, le scorciatoie di Filo lì dentro morirebbero.
+  collegaScorciatoie(popup.webContents, parentWin);
 
   const html = buildHTML(entries, isDark, MARGIN);
   popup.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
