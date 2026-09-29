@@ -61,19 +61,21 @@ function domandaAmmessaDaUnSito(type, { inVista = false, schedaInVista = false, 
 
 // Quelle che il codice di Filo nelle pagine fa solo dopo un gesto dell'utente (Incolla, Detta, Salva per dopo,
 // la voce della dettatura) e gli scomparti che scrive solo così (dizionario, correzioni, disposizione del menu):
-// da un sito passano con un gesto vero e recente su quella scheda, uno per voce.
+// da un sito vogliono un gesto vero e recente su quella scheda.
 const DOMANDE_WEB_COL_GESTO = Object.freeze(new Set([
   'permesso_filo', 'save_page', 'save_link', 'set_saved_page_thumb', 'update_settings',
 ]));
 const CHIAVI_STORAGE_WEB_COL_GESTO = Object.freeze(['sn_personal_dict', 'sn_autocorrect', 'sn_icon_layout']);
+// Un gesto, un salvataggio: la lista tiene le ultime mille, e mille salvataggi dopo un clic sono del sito.
+const DOMANDE_WEB_UNA_PER_GESTO = Object.freeze(new Set(['save_page', 'save_link']));
 
-/** Le voci di gesto che la domanda di un sito spende: [] se non ne vuole. PURA. */
-function gestiChiesti(type, msg = null) {
-  if (DOMANDE_WEB_COL_GESTO.has(type)) return [type];
+/** La domanda di un sito vuole un gesto dell'utente? PURA. */
+function vuoleUnGesto(type, msg = null) {
+  if (DOMANDE_WEB_COL_GESTO.has(type)) return true;
   let chiavi = [];
   if (type === '_storage:set') chiavi = msg && msg.obj && typeof msg.obj === 'object' ? Object.keys(msg.obj) : [];
   else if (type === '_storage:remove') chiavi = msg ? [].concat(msg.keys) : [];
-  return chiavi.filter((k) => CHIAVI_STORAGE_WEB_COL_GESTO.includes(k)).map((k) => `storage:${k}`);
+  return chiavi.some((k) => CHIAVI_STORAGE_WEB_COL_GESTO.includes(k));
 }
 
 // Ciò che i content script leggono davvero, campo per campo anche dentro le sezioni
@@ -306,8 +308,9 @@ module.exports = {
   DOMANDE_WEB_COL_DISEGNO,
   DOMANDE_WEB_COL_GESTO,
   CHIAVI_STORAGE_WEB_COL_GESTO,
+  DOMANDE_WEB_UNA_PER_GESTO,
   domandaAmmessaDaUnSito,
-  gestiChiesti,
+  vuoleUnGesto,
   CAMPI_WEB,
   CAMPI_WEB_SCRITTURA,
   SPINTE_WEB,

@@ -10,7 +10,7 @@
 
 const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
-const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra, domandaAmmessaDaUnSito, gestiChiesti } = require('./impostazioniPerOrigine');
+const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra, domandaAmmessaDaUnSito, vuoleUnGesto, DOMANDE_WEB_UNA_PER_GESTO } = require('./impostazioniPerOrigine');
 const { daUnSito, inPrimoPiano, schedaInPrimoPiano } = require('./handlers/origine');
 
 const { SN_CONST, SN_MSG } = globalThis;
@@ -3406,14 +3406,21 @@ require('./handlers/misc')(on, handlerCtx);
 
 // ─── handler centrale richiamato dall'IPC ───────────────────────────────────
 
-async function handleMessage(msg, sender = {}) {
-  const origin = sender?.tab?.url || sender?.url || '';
-  // Da una pagina che non è di Filo passano solo le domande della lista del confine, e quelle di un gesto col gesto (#589.1).
-  if (daUnSito(origin, sender) && !(domandaAmmessaDaUnSito(msg?.type, {
+// Da una pagina che non è di Filo passano solo le domande della lista del confine, e quelle di un gesto col gesto (#589.1).
+function ammessaDaUnSito(msg, sender) {
+  const type = msg?.type;
+  const ammessa = domandaAmmessaDaUnSito(type, {
     inVista: inPrimoPiano(sender),
     schedaInVista: schedaInPrimoPiano(sender),
     disegnoSullaBarra: Boolean(sender?.win?._filoDisegnoSullaBarra),
-  }, msg) && require('./permessiPagine').spendiGesto(sender?.wc, gestiChiesti(msg?.type, msg)))) {
+  }, msg);
+  if (!ammessa || !vuoleUnGesto(type, msg)) return ammessa;
+  return require('./permessiPagine').gestoPerFilo(sender?.wc, DOMANDE_WEB_UNA_PER_GESTO.has(type) ? type : null);
+}
+
+async function handleMessage(msg, sender = {}) {
+  const origin = sender?.tab?.url || sender?.url || '';
+  if (daUnSito(origin, sender) && !ammessaDaUnSito(msg, sender)) {
     return { ok: false, code: 'forbidden', error: 'forbidden' };
   }
   const fn = registry.get(msg.type);

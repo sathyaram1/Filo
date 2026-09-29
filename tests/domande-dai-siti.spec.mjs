@@ -237,3 +237,70 @@ test('la foto della barra un sito la riceve solo mentre l\'utente ci ha disegnat
   await expect(shell.locator('#feedback-draw')).toBeHidden({ timeout: 4000 });
   await expect.poll(async () => (await sito(chiedi('capture_feedback_topbar'))).risposta?.code).toBe('forbidden');
 });
+
+// Giro 2 di verifica: le domande che il codice di Filo fa solo dopo un gesto dell'utente vogliono il gesto.
+test('senza un gesto dell\'utente un sito non legge gli appunti; dopo un clic una volta sola', async ({ app, openTab, testServer }) => {
+  const pagina = await testServer.openReady(openTab, '<h1 style="height:60vh">in vista</h1>');
+  const sito = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
+  await app.evaluate(({ clipboard, BrowserWindow }) => {
+    clipboard.writeText('PASSWORD-5891');
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w.focus();
+    w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents.focus();
+  });
+  const leggi = () => pagina.evaluate(() => Promise.race([
+    navigator.clipboard.readText().catch((e) => `rifiuto ${e.name}`),
+    new Promise((r) => setTimeout(() => r('in attesa'), 2000)),
+  ]));
+
+  const senza = await sito(chiedi('permesso_filo', { tipo: 'appunti' }));
+  expect(senza.nonTrovata || senza.errore).toBeFalsy();
+  expect(senza.risposta, 'senza un gesto il sito si è dato il lasciapassare di Incolla').toMatchObject({ ok: false, code: 'forbidden' });
+  expect(await leggi(), 'il sito ha letto gli appunti senza un gesto dell\'utente').not.toBe('PASSWORD-5891');
+
+  // Il clic vero dell'utente sulla pagina è quello che Incolla e Detta hanno sempre: la domanda passa, una volta.
+  await pagina.click('h1');
+  expect((await sito(chiedi('permesso_filo', { tipo: 'appunti' }))).risposta?.ok).toBe(true);
+  expect((await sito(chiedi('permesso_filo', { tipo: 'appunti' }))).risposta?.code).toBe('forbidden');
+});
+
+test('un sito non legge né spinge fuori le pagine salvate, e non cancella dizionario e menu', async ({ app, shell, openTab, testServer }) => {
+  await datiPersonali(shell);
+  await shell.evaluate(async () => {
+    await window.filoShell.message({ type: '_storage:set', obj: { sn_icon_layout: { primary: ['copy'], secondary: [], mio: true }, sn_personal_dict: ['Sathya'] } });
+  });
+  const pagina = await testServer.openReady(openTab, '<h1 style="height:60vh">in vista</h1>');
+  await testServer.openReady(openTab, '<h1>sfondo</h1>', { pubblico: true });
+  await pagina.bringToFront();
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const t = w._filoTabs.tabs.find((x) => String(x.url).startsWith('http://127.0.0.1'));
+    w._filoTabs.activate(t.id);
+  });
+  const sfondo = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
+  const vista = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
+
+  const sonda = await sfondo(chiedi('save_page', { page: { url: 'https://banca.example/conto' } }));
+  expect(sonda.nonTrovata || sonda.errore).toBeFalsy();
+  expect(sonda.risposta).toMatchObject({ ok: false, code: 'forbidden' });
+  const riusciti = await sfondo(`(async () => { let n = 0; for (let i = 0; i < 1000; i++) { const r = await chrome.runtime.sendMessage({ type: 'save_page', page: { url: 'https://spam.example/' + i } }); if (r && r.ok) n++; } return n; })()`);
+  expect(riusciti.risposta, 'un sito di sfondo ha salvato pagine senza un gesto dell\'utente').toBe(0);
+  const tolti = await sfondo(`chrome.runtime.sendMessage({ type: '_storage:remove', keys: ['sn_icon_layout', 'sn_personal_dict'] })`);
+  expect(tolti.risposta).toMatchObject({ ok: false, code: 'forbidden' });
+
+  // Dopo un clic sulla pagina in vista: un salvataggio solo, e la risposta dice dove è finita, non cosa c'era.
+  await pagina.click('h1');
+  const dopo = await vista(chiedi('save_page', { page: { url: 'https://banca.example/conto' } }));
+  expect(dopo.risposta?.ok).toBe(true);
+  expect(dopo.risposta?.entry?.id).toBeTruthy();
+  expect(JSON.stringify(dopo.risposta), 'la risposta al sito porta il titolo di una pagina salvata dall\'utente').not.toContain(SALVATA);
+  expect((await vista(chiedi('save_page', { page: { url: 'https://spam.example/x' } }))).risposta?.code, 'un clic, un salvataggio').toBe('forbidden');
+
+  const resta = await shell.evaluate(async () => ({
+    salvate: (await window.filoShell.message({ type: 'get_saved_pages' })).pages.map((p) => p.title),
+    magazzino: (await window.filoShell.message({ type: '_storage:get', keys: ['sn_icon_layout', 'sn_personal_dict'] })).value,
+  }));
+  expect(resta.salvate).toContain(SALVATA);
+  expect(resta.magazzino?.sn_icon_layout?.mio).toBe(true);
+  expect(resta.magazzino?.sn_personal_dict).toEqual(['Sathya']);
+});

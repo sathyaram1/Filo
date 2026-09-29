@@ -123,36 +123,35 @@ test('la foto della barra a un sito solo mentre l\'utente ci ha disegnato sopra'
   assert.equal(W.domandaAmmessaDaUnSito(MSG.CAPTURE_VISIBLE_TAB, { inVista: true }), true);
 });
 
-test('le domande di un gesto dell\'utente: quali voci spendono', () => {
+test('le domande di un gesto dell\'utente: quali lo vogliono, e quali lo spendono', () => {
   for (const t of [MSG.PERMESSO_FILO, MSG.SAVE_PAGE, MSG.SAVE_LINK, MSG.SET_SAVED_PAGE_THUMB, MSG.UPDATE_SETTINGS]) {
-    assert.deepEqual(W.gestiChiesti(t, { type: t }), [t], t);
+    assert.equal(W.vuoleUnGesto(t, { type: t }), true, t);
   }
   for (const t of W.DOMANDE_WEB_COL_GESTO) assert.ok(W.DOMANDE_WEB.has(t), `${t} deve essere prima di tutto una domanda ammessa`);
+  for (const t of W.DOMANDE_WEB_UNA_PER_GESTO) assert.ok(W.DOMANDE_WEB_COL_GESTO.has(t), t);
   for (const k of W.CHIAVI_STORAGE_WEB_COL_GESTO) assert.ok(W.CHIAVI_STORAGE_WEB.includes(k), k);
-  assert.deepEqual(W.gestiChiesti('_storage:remove', { keys: ['sn_icon_layout', 'sn_personal_dict'] }),
-    ['storage:sn_icon_layout', 'storage:sn_personal_dict']);
-  assert.deepEqual(W.gestiChiesti('_storage:remove', { keys: 'sn_autocorrect' }), ['storage:sn_autocorrect']);
-  assert.deepEqual(W.gestiChiesti('_storage:set', { obj: { sn_icon_layout: {}, sn_qr_in_primary_migrated: true } }), ['storage:sn_icon_layout']);
-  assert.deepEqual(W.gestiChiesti('_storage:set', { obj: { sn_feedback_draft_text: 'bozza' } }), [], 'le bozze si scrivono a ogni tasto');
-  assert.deepEqual(W.gestiChiesti('_storage:remove', {}), []);
-  assert.deepEqual(W.gestiChiesti(MSG.GET_SETTINGS, {}), []);
-  assert.deepEqual(W.gestiChiesti(MSG.CLOSE_TAB, null), []);
+  assert.equal(W.vuoleUnGesto('_storage:remove', { keys: ['sn_icon_layout', 'sn_personal_dict'] }), true);
+  assert.equal(W.vuoleUnGesto('_storage:remove', { keys: 'sn_autocorrect' }), true);
+  assert.equal(W.vuoleUnGesto('_storage:set', { obj: { sn_icon_layout: {}, sn_qr_in_primary_migrated: true } }), true);
+  assert.equal(W.vuoleUnGesto('_storage:set', { obj: { sn_feedback_draft_text: 'bozza' } }), false, 'le bozze si scrivono a ogni tasto');
+  assert.equal(W.vuoleUnGesto('_storage:remove', {}), false);
+  assert.equal(W.vuoleUnGesto(MSG.GET_SETTINGS, {}), false);
+  assert.equal(W.vuoleUnGesto(MSG.CLOSE_TAB, null), false);
 });
 
-test('un gesto vero e recente vale una volta per voce', () => {
+test('un gesto vero e recente; i salvataggi uno per gesto', () => {
   const P = require(join(ROOT, 'src', 'main', 'services', 'permessiPagine.js'));
-  assert.equal(P.spendiGesto({}, []), true, 'chi non chiede un gesto passa');
-  assert.equal(P.spendiGesto({}, ['save_page']), false, 'senza gesto no');
-  assert.equal(P.spendiGesto(null, ['save_page']), false);
-  assert.equal(P.spendiGesto({ _filoGestoAlle: Date.now() - P.GESTO_MS - 1 }, ['save_page']), false, 'un gesto vecchio no');
+  assert.equal(P.gestoPerFilo({}), false, 'senza gesto no');
+  assert.equal(P.gestoPerFilo(null, 'save_page'), false);
+  assert.equal(P.gestoPerFilo({ _filoGestoAlle: Date.now() - P.GESTO_FILO_MS - 1 }), false, 'un gesto vecchio no');
   const wc = { _filoGestoAlle: Date.now() };
-  assert.equal(P.spendiGesto(wc, ['save_page']), true);
-  assert.equal(P.spendiGesto(wc, ['save_page']), false, 'un clic, un salvataggio');
-  assert.equal(P.spendiGesto(wc, ['set_saved_page_thumb']), true, 'la miniatura dello stesso salvataggio passa');
-  assert.equal(P.spendiGesto(wc, ['storage:sn_icon_layout', 'save_page']), false, 'una voce già spesa ferma la domanda intera');
-  assert.equal(P.spendiGesto(wc, ['storage:sn_icon_layout']), true, 'e non spende le altre');
+  assert.equal(P.gestoPerFilo(wc), true);
+  assert.equal(P.gestoPerFilo(wc), true, 'dizionario e menu si scrivono più volte dopo lo stesso tasto destro');
+  assert.equal(P.gestoPerFilo(wc, 'save_page'), true);
+  assert.equal(P.gestoPerFilo(wc, 'save_page'), false, 'un clic, un salvataggio');
+  assert.equal(P.gestoPerFilo(wc, 'save_link'), true, 'ogni voce ha il suo conto');
   wc._filoGestoAlle += 1;
-  assert.equal(P.spendiGesto(wc, ['save_page']), true, 'un gesto nuovo, un salvataggio nuovo');
+  assert.equal(P.gestoPerFilo(wc, 'save_page'), true, 'un gesto nuovo, un salvataggio nuovo');
 });
 
 test('chi è un sito: la scheda e la pagina che parla devono essere entrambe di Filo', () => {

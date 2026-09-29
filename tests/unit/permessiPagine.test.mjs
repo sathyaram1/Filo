@@ -178,6 +178,21 @@ test('i font del computer, che Electron non fa chiedere, passano solo subito dop
   assert.equal(ses.controllo(wc, 'local-fonts', 'https://grafica.example', {}), true);
 });
 
+// Un riquadro di un altro sito non passa da `input-event`: il tasto destro e i tasti sì (#589.1).
+test('il gesto arriva anche dal tasto destro e dai tasti dentro un riquadro', () => {
+  const tasto = wcFinto('https://blog.example/');
+  Permessi.seguiGesti(tasto);
+  tasto.emetti('before-input-event', {}, { type: 'keyUp', key: 'a' });
+  tasto.emetti('before-input-event', {}, { type: 'keyDown', key: 'Escape' });
+  assert.equal(Permessi.gestoPerFilo(tasto), false, 'un tasto lasciato o Esc non sono un gesto');
+  tasto.emetti('before-input-event', {}, { type: 'keyDown', key: 'a' });
+  assert.equal(Permessi.gestoPerFilo(tasto), true);
+  const destro = wcFinto('https://blog.example/');
+  Permessi.seguiGesti(destro);
+  destro.emetti('context-menu', {}, {});
+  assert.equal(Permessi.gestoPerFilo(destro), true);
+});
+
 // Filo sono solo le sue pagine: un blob porta l'origine del sito che l'ha creato (#591, giro 20).
 test('un documento blob di un sito è quel sito: chiede col suo nome e non ha sì di comodo', () => {
   const ses = sessioneFinta();

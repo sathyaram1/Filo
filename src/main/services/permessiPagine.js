@@ -141,6 +141,11 @@ function seguiGesti(wc) {
       if (!GESTI.has(type) || String(input.key || '') === 'Escape') return;
       wc._filoGestoAlle = Date.now();
     });
+    // Un riquadro di un altro sito non passa da `input-event`: lì il tasto destro e i tasti premuti arrivano da qui.
+    wc.on('context-menu', () => { wc._filoGestoAlle = Date.now(); });
+    wc.on('before-input-event', (_e, input) => {
+      if (input && input.type === 'keyDown' && String(input.key || '') !== 'Escape') wc._filoGestoAlle = Date.now();
+    });
     wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
       const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
       const stessa = e && typeof e.isSameDocument === 'boolean' ? e.isSameDocument : isInPlace;
@@ -154,13 +159,16 @@ function gestoRecente(wc) {
   return Boolean(t && Date.now() - t < GESTO_MS);
 }
 
-// Un gesto vero e recente vale una volta per voce: dopo un clic mille salvataggi sono del sito, non dell'utente (#589.1).
-function spendiGesto(wc, voci) {
-  if (!Array.isArray(voci) || !voci.length) return true;
-  if (!gestoRecente(wc)) return false;
+// Le domande di Filo dentro un sito (Incolla, Detta, Salva per dopo…) vogliono un gesto vero su quella scheda. Il margine
+// copre la scelta dal menu aperto in un riquadro, dove conta solo il tasto destro; `unaVolta`: un gesto, una risposta (#589.1).
+const GESTO_FILO_MS = 20000;
+function gestoPerFilo(wc, unaVolta = null) {
+  const t = wc && wc._filoGestoAlle;
+  if (!t || Date.now() - t >= GESTO_FILO_MS) return false;
+  if (!unaVolta) return true;
   const speso = wc._filoGestoSpeso || (wc._filoGestoSpeso = new Map());
-  if (voci.some((v) => speso.get(v) === wc._filoGestoAlle)) return false;
-  for (const v of voci) speso.set(v, wc._filoGestoAlle);
+  if (speso.get(unaVolta) === t) return false;
+  speso.set(unaVolta, t);
   return true;
 }
 
@@ -347,8 +355,8 @@ function statoNotifiche(ses, url) {
 }
 
 module.exports = {
-  installa, negaTutto, rispondi, lasciapassare, seguiGesti, spendiGesto, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
+  installa, negaTutto, rispondi, lasciapassare, seguiGesti, gestoPerFilo, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
   carica, scelteRicordate, togliScelta, classifica,
-  TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, _inAttesa: inAttesa,
+  TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, GESTO_FILO_MS, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
 };
