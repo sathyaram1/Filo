@@ -343,11 +343,12 @@
     'Alt+\u2190', 'Alt+\u2192',
   ];
   const PRESI_SU_MAC = [
-    // Le voci della barra dei menu (src/main/menu.js).
+    // Le voci della barra dei menu (src/main/menu.js), anche col tasto che un role di Electron
+    // si porta da sé: su Mac «Incolla senza formato» è Cmd+Alt+Shift+V, il menu Aiuto Cmd+?.
     'Ctrl+Z', 'Ctrl+Shift+Z',
     'Ctrl+Plus', 'Ctrl+=', 'Ctrl+-', 'Ctrl+0',
-    'Ctrl+X', 'Ctrl+C', 'Ctrl+V', 'Ctrl+Shift+V', 'Ctrl+A',
-    'Ctrl+Q', 'Ctrl+M', 'Ctrl+H', 'Ctrl+Alt+H',
+    'Ctrl+X', 'Ctrl+C', 'Ctrl+V', 'Ctrl+Alt+Shift+V', 'Ctrl+A',
+    'Ctrl+Q', 'Ctrl+M', 'Ctrl+H', 'Ctrl+Alt+H', 'Ctrl+?',
   ];
   // Spiega, Traduci, Salva, Aiuto (src/main/shortcuts.js): con Filo davanti se
   // li prende lui prima della pagina.
@@ -392,6 +393,12 @@
   function tipoModificatore(nome) {
     const n = String(nome || '').trim().toLowerCase();
     return CTRL.test(n) ? 'ctrl' : ALT.test(n) ? 'alt' : SHIFT.test(n) ? 'shift' : '';
+  }
+
+  // Solo modificatori, senza il tasto da premere con loro («Ctrl», «Ctrl+», «Ctrl-», «Ctrl+Shift»).
+  function soloModificatori(accel) {
+    const parti = pezzi(String(accel || '').trim().replace(/\+\s*\+$/, '+Plus'));
+    return parti.length > 0 && parti.every((p) => tipoModificatore(p));
   }
 
   // Il primo pezzo scritto che alla pressione non si riconoscerebbe, o null:
@@ -463,12 +470,14 @@
     };
   }
 
-  // Combinazioni che il sistema operativo intercetta prima di Filo: il menu
-  // Start, il cambio finestra, Spotlight e le istantanee dello schermo su Mac.
+  // Combinazioni che il sistema operativo intercetta prima di Filo: il menu Start, il cambio
+  // finestra o app, Spotlight, le istantanee dello schermo, l'uscita forzata, la sessione.
   const PRESI_DAL_SISTEMA = {
-    win32: ['Ctrl+Escape', 'Ctrl+Shift+Escape', 'Alt+Tab', 'Alt+Shift+Tab', 'Alt+Escape', 'Alt+F4'],
-    darwin: ['Ctrl+Space', 'Ctrl+Alt+Space', 'Ctrl+Shift+3', 'Ctrl+Shift+4', 'Ctrl+Shift+5'],
-    linux: ['Alt+Tab', 'Alt+Shift+Tab', 'Alt+F4'],
+    win32: ['Ctrl+Escape', 'Ctrl+Shift+Escape', 'Alt+Tab', 'Alt+Shift+Tab', 'Alt+Escape', 'Alt+F4',
+      'Ctrl+Alt+Delete'],
+    darwin: ['Ctrl+Space', 'Ctrl+Alt+Space', 'Ctrl+Shift+3', 'Ctrl+Shift+4', 'Ctrl+Shift+5',
+      'Ctrl+Tab', 'Ctrl+Shift+Tab', 'Ctrl+Alt+Escape', 'Ctrl+Shift+Q'],
+    linux: ['Alt+Tab', 'Alt+Shift+Tab', 'Alt+F4', 'Ctrl+Alt+Delete'],
   };
   function delSistema(accel, esplicita) {
     const f = forma(accel);
@@ -484,7 +493,7 @@
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
     comandoNavigazione, etichettaIndietro, etichettaAvanti,
     tastiRiservati, riservato,
-    tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, combacia, pressioneScritta, delSistema,
+    tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, delSistema,
     modificatoreCheCambiaSimbolo,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
