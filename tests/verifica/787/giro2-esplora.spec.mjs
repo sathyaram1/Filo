@@ -118,3 +118,38 @@ test('chat lunga: apertura e ridisegno', async ({ app, openTab }) => {
     console.log(`CHAT ${n}: apertura ${open} ms, ridisegno ${redraw.toFixed(0)} ms`);
   }
 });
+
+test('chat lunga: ragionamento in diretta', async ({ app, openTab }) => {
+  test.setTimeout(180_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await app.evaluate(() => {
+    const prev = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (args) => {
+      for (let i = 0; i < 40; i += 1) {
+        await new Promise((r) => setTimeout(r, 75));
+        try { args.onReasoning && args.onReasoning(`pezzo ${i} del ragionamento `); } catch (_) {}
+      }
+      return prev({ ...args, onReasoning: null });
+    };
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await newDeck(page);
+  for (const n of [200, 1000, 2000]) {
+    await seedChat(app, deckId, n, { reasoning: 1500, ids: 20 });
+    await reloadBuilder(page);
+    await expect(page.locator('.dk-msg-user')).toHaveCount(n / 2);
+    await page.evaluate(() => {
+      window.__lt = [];
+      new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lt.push(e.duration); }).observe({ type: 'longtask', buffered: false });
+    });
+    await page.fill('#chatInput', 'creature con haste');
+    await page.press('#chatInput', 'Enter');
+    await expect(page.locator('.dk-msg-user')).toHaveCount(n / 2 + 1);
+    await expect(page.locator('.dk-msg-bot').last().locator('.dk-msg-pending', { hasText: 'sta pensando' })).toHaveCount(0, { timeout: 60_000 });
+    const lt = await page.evaluate(() => window.__lt);
+    const tot = lt.reduce((a, b) => a + b, 0);
+    console.log(`STREAM ${n}: ${lt.length} compiti lunghi, ${tot.toFixed(0)} ms bloccati su ~3000 ms, max ${Math.max(0, ...lt).toFixed(0)} ms`);
+  }
+});
