@@ -167,6 +167,20 @@ const MIN = 60 * 1000;
 function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {}) {
   const cache = new Map();
   const pending = new Map();
+  // Una pagina passa da qui più volte per apertura (verdetto subito, richiesta, verdetto finale): l'impronta si fa una volta.
+  const recenti = new Map();
+
+  function hashesFor(url) {
+    const k = String(url);
+    let hs = recenti.get(k);
+    if (!hs) {
+      hs = hashesOf(k);
+      if (recenti.size >= 16) recenti.delete(recenti.keys().next().value);
+    }
+    recenti.delete(k);
+    recenti.set(k, hs);
+    return hs;
+  }
   let failures = 0;
   let pausedUntil = 0;
 
