@@ -378,9 +378,10 @@ test('Google Sites: un modulo montato secondi dopo il caricamento del riquadro f
 
 // Safe Browsing a prefissi (#813): la chiamata a Google è intercettata nel main. Una pagina del mini server in lista
 // mostra l'avviso di oggi anche dopo una pagina pulita dello stesso sito, e verso Google escono solo prefissi di 4 byte.
+// Il nome è da internet: la rete di casa non chiede niente fuori (#591).
 test('Safe Browsing: una pagina in lista mostra l\'avviso, e a Google arrivano solo prefissi dell\'impronta', async ({ app, openTab, testServer }) => {
-  const pulita = testServer.html('<title>SB813_PULITA</title><p>pagina pulita</p>');
-  const trappola = testServer.html('<title>SB813_TRAPPOLA</title><p>pagina in lista</p>');
+  const pulita = testServer.html('<title>SB813_PULITA</title><p>pagina pulita</p>', { pubblico: true });
+  const trappola = testServer.html('<title>SB813_TRAPPOLA</title><p>pagina in lista</p>', { pubblico: true });
   const { hostname, port, pathname } = new URL(trappola);
   await app.evaluate(async (_e, listata) => {
     const crypto = process.getBuiltinModule('crypto');
