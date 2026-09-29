@@ -362,3 +362,71 @@ testSenzaFixture('un archivio pieno in storage.json si migra intero, riassunti e
     rmSync(userData, { recursive: true, force: true });
   }
 });
+
+// #825 giro 2: l'indicizzazione partiva solo alla ricerca, e con un archivio grande la prima ricerca aspettava e sbagliava.
+testSenzaFixture('dopo la migrazione le schede senza vettore si indicizzano da sole, e la prima ricerca le trova subito', async () => {
+  testSenzaFixture.setTimeout(120_000);
+  const userData = cartellaTemporanea('filo-indice-archivio-');
+  const vecchio = [];
+  for (let i = 0; i < 3000; i++) {
+    vecchio.push({
+      id: `m${i}`, url: `https://migrata-${i}.test/`, title: i === 2500 ? 'Il Gattopardo' : `Pagina ${i}`,
+      closedAt: new Date(Date.UTC(2026, 8, 1) - i * 3600e3).toISOString(), reason: 'manual', coOpenUrls: [],
+      summary: i === 2500 ? 'Romanzo di Tomasi di Lampedusa: la nobiltà siciliana davanti all\'Unità.' : `Riassunto ${i}`,
+      // Come le lasciava il tetto di prima: vettore solo sulle più recenti.
+      ...(i < 1000 ? { embedding: [0, 127], embedModel: 'qwen/qwen3-embedding-8b' } : {}),
+    });
+  }
+  writeFileSync(join(userData, 'storage.json'), JSON.stringify({ archivedTabs: vecchio }), 'utf8');
+  const app = await electron.launch({
+    args: [...argomentiScala, '.'],
+    cwd: APP_ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
+  });
+  try {
+    const shell = await app.firstWindow();
+    await shell.waitForLoadState('domcontentloaded');
+    // Chiave e modelli arrivano ad app aperta, perché il fornitore finto si installa solo da qui.
+    await preparaModelli(app);
+    await app.evaluate(() => {
+      const finto = globalThis.SN_PROVIDER_OPENROUTER.embed;
+      globalThis.SN_PROVIDER_OPENROUTER.embed = async (a) => finto({ texts: a.texts.map((t) => t.replace(/nobilt/i, 'gattopardo')) });
+    });
+    // Nessuna ricerca: l'indice si fa da sé.
+    await expect.poll(() => app.evaluate(async () =>
+      (await globalThis.SN_ARCHIVED_TABS.list()).filter((t) => !t.embedding).length), { timeout: 60_000 }).toBe(0);
+
+    await app.evaluate(() => { globalThis.__embedCalls = []; });
+    await shell.evaluate(() => window.filoShell.tabs.open('filo://archive/archive.html'));
+    let page = null;
+    await expect.poll(() => { page = app.windows().find((w) => w.url().startsWith('filo://archive')); return !!page; }).toBe(true);
+    await expect(page.locator('.arc-tab').first()).toBeVisible({ timeout: 30_000 });
+    await page.locator('#search').fill('libro sulla nobiltà in Sicilia');
+    await page.locator('#search').press('Enter');
+    await expect(page.locator('#searchNote')).toContainText('per pertinenza', { timeout: 10_000 });
+    await expect(page.locator('.arc-results .arc-tab').first()).toContainText('Il Gattopardo');
+    expect(await app.evaluate(() => globalThis.__embedCalls.map((t) => t.length))).toEqual([1]);
+  } finally {
+    await chiudiApp(app);
+    rmSync(userData, { recursive: true, force: true });
+  }
+});
+
+test('cambiato il modello di indicizzazione, l\'archivio si rifà da solo senza aspettare una ricerca', async ({ app }) => {
+  await preparaModelli(app);
+  await app.evaluate(async () => {
+    const EM = globalThis.SN_TEST_MODELS.registry['qwen-embed'].model;
+    const voci = [];
+    for (let i = 0; i < 300; i++) {
+      voci.push({ id: `c${i}`, url: `https://cambio-${i}.test/`, title: `Cambio ${i}`, embedding: [0, 127], embedModel: EM });
+    }
+    await globalThis.SN_ARCHIVED_TABS.importa(voci);
+    const reg = globalThis.SN_TEST_MODELS.registry;
+    await globalThis.SN_STORAGE.updateSettings({
+      modelRegistry: { ...reg, 'qwen-embed': { ...reg['qwen-embed'], model: 'qwen/altro-embed' } },
+    });
+  });
+  await expect.poll(() => app.evaluate(async () =>
+    (await globalThis.SN_ARCHIVED_TABS.list()).filter((t) => t.embedModel === 'qwen/altro-embed').length),
+  { timeout: 20_000 }).toBe(300);
+});

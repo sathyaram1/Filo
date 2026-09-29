@@ -28,8 +28,11 @@ vettori appena tolti (#825).
   manda (CLAUDE.md § Limiti).
 - **Un dato derivato che costa** (riassunto, vettore) si salva con la voce e dura
   quanto lei. Se lo si pota per risparmiare spazio, la lettura dopo lo ripaga.
-  La ricerca calcola solo quello che manca, tutto nella stessa corsa e senza un
-  tetto per ricerca.
+  Quello che manca (dopo una migrazione, un cambio di modello, una chiusura
+  senza rete) si calcola in sottofondo all'avvio e al cambio di modello, non
+  alla prima lettura: chi cerca trova l'indice fatto invece di aspettarlo
+  (#825 giro 2). La ricerca aspetta solo una corsa già partita, con un tetto
+  breve, e senza un tetto sul numero di voci.
 - **L'incognito va rifatto a mano.** `storage.json` lo garantisce con
   l'allowlist fail-closed; un file proprio no. Ogni funzione pubblica chiede
   `inIncognito()` allo shim (`src/main/shim/storage.js`): se la chiamata arriva
