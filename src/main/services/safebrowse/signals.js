@@ -6,9 +6,9 @@
 // `ctx` e non sono mai l'unica base di un avviso ad alta gravità.
 //
 // Tipi di impersonazione (vedi spec):
-//   strict    — confusable (omoglifi UTS-39) o typo su un brand lungo.
+//   strict    — confusable (omoglifi UTS-39) o typo di una lettera su un brand lungo.
 //               Da solo basta per "Pericoloso".
-//   weak_typo — typo su un brand corto: da solo vale "Sospetto".
+//   weak_typo — typo su un brand corto, o di due lettere su uno lungo: da solo vale "Sospetto".
 //   broad     — combosquat (brand + altre parole), nome esatto su suffisso non
 //               ufficiale, o brand come sottodominio con eTLD+1 altro. → "Sospetto".
 
