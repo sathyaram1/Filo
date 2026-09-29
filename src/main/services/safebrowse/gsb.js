@@ -103,6 +103,21 @@ function cleanPath(p) {
   return r !== '/' && p.endsWith('/') ? r + '/' : r;
 }
 
+// Nome utente e password non sono il sito: si tolgono prima di decodificare, come fa Chrome. Decodificati prima,
+// un %2F o un %3F nel nome utente spostava il sito su di lui (verifica di #813).
+function dropUserinfo(s) {
+  const m = /^[a-zA-Z][a-zA-Z0-9+.\-]*:\/\//.exec(s);
+  if (!m) return s;
+  const start = m[0].length;
+  let end = s.length;
+  for (let i = start; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c === 0x2f || c === 0x3f || c === 0x5c) { end = i; break; }
+  }
+  const at = s.lastIndexOf('@', end - 1);
+  return at >= start ? s.slice(0, start) + s.slice(at + 1) : s;
+}
+
 // Forma canonica del protocollo Safe Browsing. Accetta anche un Buffer, per gli esempi ufficiali scritti a byte.
 function canonicalize(input) {
   if (input == null) return null;
@@ -110,7 +125,7 @@ function canonicalize(input) {
   let s = trimControls(bytes.toString('latin1')).replace(/[\t\r\n]/g, '');
   const hash = s.indexOf('#');
   if (hash >= 0) s = s.slice(0, hash);
-  s = escapeBytes(unescapeAll(s));
+  s = escapeBytes(unescapeAll(dropUserinfo(s)));
   let [scheme, rest] = schemeOf(s);
   const q = rest.indexOf('?');
   const hasQuery = q >= 0;
