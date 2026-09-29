@@ -61,7 +61,8 @@ function ipNumber(s) {
 }
 
 function canonicalIp(host) {
-  if (!/^(?:0x[0-9a-f]+|[0-9.])+$/i.test(host)) return '';
+  // Filtro senza quantificatori annidati: la forma alternata tornava indietro col quadrato della lunghezza (#813).
+  if (!/^[0-9a-fx.]+$/i.test(host)) return '';
   const parts = host.split('.');
   if (parts.length > 4) return '';
   const out = [];
