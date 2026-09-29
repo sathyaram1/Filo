@@ -54,10 +54,15 @@ module.exports = function register(on, ctx) {
     return { ok: true, messages: await Chats.get(String(msg?.deckId || '')) };
   });
 
-  on(MSG.DECKS_CHAT_SAVE, async (msg, _sender, origin) => {
+  on(MSG.DECKS_CHAT_EDIT, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     const deckId = String(msg?.deckId || '');
-    const r = await Chats.save(deckId, msg?.messages);
+    const change = {
+      op: String(msg?.op || ''), messages: msg?.messages, turn: msg?.turn, message: msg?.message,
+      userText: msg?.userText, nameIds: msg?.nameIds,
+    };
+    // Pagina ricaricata o chiusa col turno ancora atteso: le altre schede rileggono e lo trovano interrotto.
+    const r = await Chats.edit(deckId, change, { wc: sender && sender.wc, onAbandon: () => changed(deckId, '') });
     if (r.ok) changed(deckId, msg?.clientId);
     return r;
   });
