@@ -460,3 +460,26 @@ test('nessuna capacità descrive come voce da cliccare una spiegazione che arriv
       `la capacità "${id}" deve dire che la spiegazione arriva da sola, senza niente da cliccare`);
   }
 });
+
+// #545: la chat deve sapere quali moduli dell'Editor prendono una scorciatoia;
+// l'elenco vero è la tabella delle azioni dell'Editor, il manifesto la segue.
+test('il manifesto nomina ogni modulo dell\'Editor che prende una scorciatoia, e solo quelli', () => {
+  const src = readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8');
+  const blocco = /const AZIONE_SCORCIATOIA = \{([\s\S]*?)\n  \};/.exec(src);
+  assert.ok(blocco, 'tabella delle azioni delle scorciatoie non trovata nell\'Editor');
+  const tipi = [...blocco[1].matchAll(/^\s+'?([a-z-]+)'?:/gm)].map((m) => m[1]);
+  const etichetta = (tipo) => {
+    const m = new RegExp(`^\\s+'?${tipo}'?:\\s*\\{\\s*label: '([^']+)'`, 'm').exec(src);
+    assert.ok(m, `etichetta del modulo ${tipo} non trovata`);
+    return m[1];
+  };
+  const frase = /[^.]*prendono una scorciatoia[^.]*\./.exec(CAP.get('editor').desc);
+  assert.ok(frase, 'la voce «editor» non dice quali moduli prendono una scorciatoia');
+  for (const tipo of tipi) {
+    assert.ok(frase[0].includes(etichetta(tipo)), `il manifesto non dice che «${etichetta(tipo)}» prende una scorciatoia`);
+  }
+  const tutti = [...src.matchAll(/^\s+'?([a-z-]+)'?:\s*\{\s*label: '([^']+)'/gm)].map((m) => m[2]);
+  for (const altro of tutti.filter((l) => !tipi.map(etichetta).includes(l))) {
+    assert.ok(!frase[0].includes(altro), `il manifesto promette una scorciatoia a «${altro}», che non la prende`);
+  }
+});

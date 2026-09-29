@@ -4331,10 +4331,10 @@
       if (!prendeIlTasto(t, e)) continue;
       if (t.attivo && !t.attivo()) continue;
       if (t.nelFoglio && !docEl.contains(e.target)) continue;
-      // Il browser annulla e ripete solo dentro un campo di testo: fuori, il tasto
-      // fa l'azione del modulo a cui appartiene, come il suo clic.
-      const fa = t.fa || (t.suo && !isEditableTarget(e.target) && AZIONE_SCORCIATOIA[t.suo]);
-      if (fa) { e.preventDefault(); fa(); }
+      if (t.fa) { e.preventDefault(); t.fa(e); return; }
+      // Il browser annulla e ripete solo in un campo di testo: fuori, il tasto va
+      // al modulo che l'ha salvato, come il suo clic.
+      if (t.suo && !isEditableTarget(e.target)) break;
       return;
     }
     // scorciatoie personalizzate dei moduli

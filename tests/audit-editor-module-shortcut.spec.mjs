@@ -569,3 +569,74 @@ test('l\'esempio proposto da ogni avviso si salva davvero', async ({ openTab }) 
     await expect(page.locator('#overlay'), `${sc}: ${esempio} proposto e poi rifiutato`).toBeHidden();
   }
 });
+
+// Ctrl+Z sul modulo Indietro si accetta perché il tasto fa già la sua cosa: deve
+// farla anche col cursore fuori dal testo, dove il browser non annulla (#545).
+test('Ctrl+Z annulla anche dopo un clic su un modulo, come il clic su Indietro', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await apriDocConModuli(page, [WC, { id: 'u-t', type: 'undo', cells: [{ x: 5, y: 0 }], data: {} }]);
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="undo"]').click();
+  await page.fill('#cfgShortcut', 'Ctrl+Z');
+  await page.click('#cfgSave');
+  await expect(page.locator('#overlay')).toBeHidden();
+  await exitSettingsMode(page);
+
+  await page.click('#doc');
+  await page.keyboard.press('End');
+  await page.keyboard.type(' ABC');
+  await page.waitForTimeout(300);
+  const scritto = await page.locator('#doc').innerText();
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await expect(page.locator('#overlay')).toBeVisible();
+  await page.locator('#overlay').click({ position: { x: 5, y: 5 } });
+  await expect(page.locator('#overlay')).toBeHidden();
+  expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).not.toBe('doc');
+
+  await page.keyboard.press('Control+KeyZ');
+  await expect.poll(() => page.locator('#doc').innerText(), { timeout: 2000 }).not.toBe(scritto);
+  // Dentro un campo di testo Ctrl+Z resta di quel campo.
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await page.locator('#overlay').click({ position: { x: 5, y: 5 } });
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await page.fill('#cfgShortcut', 'Ctrl+Shift+7');
+  const doc = await page.locator('#doc').innerText();
+  await page.keyboard.press('Control+KeyZ');
+  await page.waitForTimeout(200);
+  expect(await page.locator('#doc').innerText()).toBe(doc);
+});
+
+// A pannello aperto la tastiera è del pannello: Esc lo chiude, e una combinazione
+// premuta nel campo della scorciatoia non agisce sul foglio o sui moduli dietro (#545).
+test('a pannello aperto Esc chiude e i tasti non agiscono dietro', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await apriDocConModuli(page, [{ ...WC, data: { count: 'words', shortcut: 'Ctrl+Shift+1' } }, COMMENT]);
+
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await expect(page.locator('#overlay')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#overlay')).toBeHidden();
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="comment"]').click();
+  await page.click('#cfgShortcut');
+  const barra = await page.locator('#root').getAttribute('class');
+  await page.keyboard.press('Control+Backslash');
+  await page.keyboard.press('Control+Shift+Digit1');
+  await page.waitForTimeout(250);
+  await expect(page.locator('#cfgShortcut')).toHaveCount(1);
+  await expect(page.locator('#overlay h3', { hasText: 'Statistiche' })).toHaveCount(0);
+  expect(await page.locator('#root').getAttribute('class')).toBe(barra);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#overlay')).toBeHidden();
+
+  // Chiuso il pannello, i tasti tornano al foglio e ai moduli.
+  await exitSettingsMode(page);
+  await page.click('#doc');
+  await page.keyboard.press('Control+Shift+Digit1');
+  await expect(page.locator('#overlay h3', { hasText: 'Statistiche' })).toBeVisible();
+});
