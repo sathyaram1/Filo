@@ -392,15 +392,16 @@ test('dalla chat, un indirizzo che il modello si scrive da sé coi dati travesti
   expect(await app.evaluate(() => globalThis.__scaricati.length), 'nessuna richiesta senza il sì dell\'utente').toBe(0);
 });
 
-test('dalla scheda aperta arriva quello che l\'utente vede: i pezzi affiancati staccati, i riquadri incorporati letti o indicati', async ({ app, openTab, testServer }) => {
+test('dalla scheda aperta arriva quello che l\'utente vede: i pezzi affiancati staccati, i riquadri incorporati letti o indicati, le parti alte quanto la finestra', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   await openTab(NEWTAB);
   const orari = testServer.html('<!doctype html><html><body><p>Anagrafe: dal lunedì al venerdì, 8:30-12:30</p></body></html>');
   // Stesso server, altro nome: per la pagina è un altro sito, e il suo contenuto non si legge da qui.
   const altroSito = testServer.html('<!doctype html><html><body><p>Calendario eventi</p></body></html>').replace('127.0.0.1', 'localhost');
   const mappa = testServer.html('<!doctype html><html><body><p>Mappa</p></body></html>').replace('127.0.0.1', 'localhost');
-  // Largo quanto la pagina: nella scheda in secondo piano, grande 0×0, misura zero anche se l'utente lo vedrà.
+  // Largo quanto la pagina o alto quanto la finestra: nella scheda in secondo piano, grande 0×0, misura zero.
   const url = testServer.html(`<!doctype html><html><head><title>Comune</title></head><body><main><h1>Comune di Rovigo</h1>
+<section style="height:100vh;overflow:hidden"><p>Sportello aperto il sabato dalle 9:00</p></section>
 <div style="display:flex;gap:12px"><span>Lunedì</span><span>7:30</span><span>19:30</span></div>
 <iframe src="${orari}" width="600" height="200"></iframe><iframe src="${altroSito}" title="Eventi" width="600" height="200"></iframe>
 <iframe src="${mappa}" title="Dove siamo" style="width:100%;height:300px;border:0"></iframe>
@@ -414,4 +415,8 @@ test('dalla scheda aperta arriva quello che l\'utente vede: i pezzi affiancati s
   expect(t).toContain('8:30-12:30');
   expect(t).toContain(`[Contenuto incorporato: Eventi](${altroSito})`);
   expect(t).toContain(`[Contenuto incorporato: Dove siamo](${mappa})`);
+  expect(t).toContain('Sportello aperto il sabato dalle 9:00');
+  // Finita la lettura la scheda torna com'era.
+  expect(await app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows().flatMap((w) => (w._filoTabs ? w._filoTabs.tabs : []))
+    .find((x) => x.view.webContents.getURL() === u).view.webContents.executeJavaScript('innerWidth'), url)).toBe(0);
 });
