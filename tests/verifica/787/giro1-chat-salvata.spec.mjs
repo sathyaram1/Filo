@@ -328,6 +328,8 @@ test('riavvio di Filo: stessa chat, + che aggiunge, ogni mazzo la sua', async ()
     await expect(page.locator('.dk-msg-user')).toHaveText(['che ne pensi del mazzo?']);
     await ask(page, 'e poi?', 2);
     const hist = await app.evaluate(() => globalThis.__chatCalls[0].map((m) => String(m.content || '')));
+    console.log('DEBUG', JSON.stringify(await app.evaluate(() => globalThis.__chatCalls.map((ms) => ms.map((m) => [m.role, String(m.content).slice(0, 80)])))));
+    console.log('DEBUG2', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('.dk-msg')].map((e) => e.textContent.trim().slice(0, 60)))));
     expect(hist.some((c) => c.includes('che ne pensi del mazzo?'))).toBe(true);
     expect(hist.some((c) => c.includes('creature con haste'))).toBe(false);
   } finally {
