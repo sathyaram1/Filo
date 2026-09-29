@@ -142,6 +142,21 @@ test('le domande di un gesto dell\'utente: quali lo vogliono, e quali lo spendon
   assert.equal(W.vuoleUnGesto(MSG.CLOSE_TAB, null), false);
 });
 
+// #589.1 giro 3 — il «Ha funzionato?» pubblica i passi per gli altri utenti di quel sito.
+test('da un sito il «Ha funzionato?» vale solo per l\'indirizzo della pagina che lo chiede', () => {
+  const chiedi = (rawUrl) => ({ type: MSG.SAVE_PATH, payload: { session: { rawUrl } } });
+  const pagina = { indirizzi: ['https://negozio.example/carrello?x=1', 'https://negozio.example/carrello?x=1'] };
+  assert.equal(W.domandaAmmessaDaUnSito(MSG.SAVE_PATH, pagina, chiedi('https://negozio.example/carrello')), true);
+  const riquadro = { indirizzi: ['https://widget.example/chat', 'https://negozio.example/'] };
+  assert.equal(W.domandaAmmessaDaUnSito(MSG.SAVE_PATH, riquadro, chiedi('https://widget.example/chat')), true, 'il riquadro dove si è aperto l\'Aiuto');
+  for (const altro of ['https://banca.example/', 'https://negozio.example.attacco.example/', '', 'non un indirizzo', undefined]) {
+    assert.equal(W.domandaAmmessaDaUnSito(MSG.SAVE_PATH, pagina, chiedi(altro)), false, String(altro));
+  }
+  assert.equal(W.domandaAmmessaDaUnSito(MSG.SAVE_PATH, {}, chiedi('https://negozio.example/')), false, 'senza mittente noto no');
+  assert.equal(W.domandaAmmessaDaUnSito(MSG.SAVE_PATH, pagina, null), false);
+  assert.equal(W.domandaAmmessaDaUnSito(MSG.GET_SETTINGS, {}, { type: MSG.GET_SETTINGS }), true, 'le altre domande non portano un indirizzo');
+});
+
 test('un gesto vero e recente; i salvataggi uno per gesto', () => {
   const P = require(join(ROOT, 'src', 'main', 'services', 'permessiPagine.js'));
   assert.equal(P.gestoPerFilo({}), false, 'senza gesto no');
