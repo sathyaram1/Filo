@@ -26,6 +26,8 @@ base('la prima ricerca dopo la migrazione trova la scheda vecchia per contenuto,
       reason: 'manual', coOpenUrls: [], scrollPosition: null, proxy: null,
       summary: i === 4500 ? 'Romanzo di Tomasi di Lampedusa: la nobiltà siciliana davanti all\'Unità.' : `Riassunto qualunque ${i}`,
       snippet: '',
+      // Le più recenti 2000 col vettore del modello in uso, come le lasciava il tetto di prima.
+      ...(i < 2000 ? { embedding: [0, 127, 40], embedModel: 'qwen/qwen3-embedding-8b' } : {}),
     });
   }
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ archivedTabs: vecchio }), 'utf8');
@@ -37,6 +39,7 @@ base('la prima ricerca dopo la migrazione trova la scheda vecchia per contenuto,
   try {
     const shell = await app.firstWindow();
     await shell.waitForLoadState('domcontentloaded');
+    // Il fornitore finto si installa solo ad app aperta: chiave e modelli arrivano qui, prima che l'archivio si apra.
     await app.evaluate(async () => {
       await globalThis.SN_STORAGE.updateSettings({
         useDefaultModels: false,
@@ -50,15 +53,6 @@ base('la prima ricerca dopo la migrazione trova la scheda vecchia per contenuto,
       };
       globalThis.SN_PROVIDERS.completeWithFallback = async () => ({ text: '', provider: 'openrouter', model: 'stub', usage: {} });
     });
-    // Le più recenti 2000 hanno il vettore del modello in uso, come le lasciava il tetto di prima.
-    await app.evaluate(async () => {
-      const EM = globalThis.SN_TEST_MODELS.registry['qwen-embed'].model;
-      const s = await chrome.storage.local.get('archivedTabs');
-      const a = s.archivedTabs;
-      for (let i = 0; i < 2000; i++) { a[i].embedding = [0, 127, 40]; a[i].embedModel = EM; }
-      await chrome.storage.local.set({ archivedTabs: a });
-    });
-
     await shell.evaluate(() => window.filoShell.tabs.open('filo://archive/archive.html'));
     let page = null;
     await expect.poll(() => { page = app.windows().find((w) => w.url().startsWith('filo://archive')); return !!page; }).toBe(true);
