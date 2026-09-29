@@ -562,11 +562,16 @@
     }
     // Gli editor di codice ricevono i tasti in una casella minuscola e mostrano il testo
     // altrove: l'area è il contenitore visibile, o quello su cui si è cliccato per scrivere.
+    const areaDelCampo = new WeakMap();
     function areaDi(campo) {
-      if (campo.isContentEditable || grande(campo)) return campo;
+      if (campo.isContentEditable) return campo;
+      let area = areaDelCampo.get(campo);
+      if (area && area.isConnected) return area;
       const body = campo.ownerDocument.body;
       const tocco = ultimoTocco && ultimoTocco.ownerDocument === campo.ownerDocument ? ultimoTocco : null;
-      return primoGrande(campo.parentElement, body) || (tocco && primoGrande(tocco, body)) || campo;
+      area = grande(campo) ? campo : (primoGrande(campo.parentElement, body) || (tocco && primoGrande(tocco, body)) || campo);
+      areaDelCampo.set(campo, area);
+      return area;
     }
     function testo(area) {
       const tag = area.tagName.toUpperCase();
