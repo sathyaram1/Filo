@@ -72,8 +72,9 @@
     DECKS_SET_COMMANDER: 'decks_set_commander', // { id, scryfallId }
     // Chat unificata del Builder (§3-§4): NL → query Scryfall / carte
     // cross-mazzo via LLM. { deckId, text, history?, lastResults? } →
-    // { ok, reply, cardIds, cards, query, deck? }. `lastResults` sono gli id
-    // dell'ultima CardList mostrata (per "valuta questi risultati", §6.1).
+    // { ok, reply, cardIds, cards, query, deck?, clearChat? }. `lastResults` sono gli id
+    // dell'ultima CardList mostrata (per "valuta questi risultati", §6.1); `clearChat`: l'utente ha
+    // chiesto a parole di svuotare la chat, la pagina chiede conferma.
     DECKS_CHAT: 'decks_chat',
     // La chat salvata di un mazzo (§3.2), solo dalle pagine filo://. EDIT applica UNA modifica alla chat salvata
     // (SN_DECK_CHAT.applyEdit: op 'append' | 'fill' | 'drop' | 'names') e rifiuta un mazzo che non esiste più, una
