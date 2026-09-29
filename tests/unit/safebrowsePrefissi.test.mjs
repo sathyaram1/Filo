@@ -390,3 +390,24 @@ test('un nome utente o un sito lunghissimi costruiti apposta non fermano il calc
     assert.ok(performance.now() - t < 1000, `${u.slice(0, 20)}…: ${Math.round(performance.now() - t)} ms`);
   }
 });
+
+// Verifica di #813, giro 4: la memoria delle ultime pagine teneva anche le espressioni, 250 MB per otto indirizzi ostili.
+test('otto indirizzi lunghissimi controllati di fila non restano in memoria', async () => {
+  const v8 = await import('node:v8');
+  const vm = await import('node:vm');
+  v8.setFlagsFromString('--expose-gc');
+  const gc = vm.runInNewContext('gc');
+  const { L } = lookupFinto(() => ({ ok: true, cacheMs: 60_000, matches: [] }));
+  const indirizzi = [];
+  gc();
+  const prima = process.memoryUsage().heapUsed;
+  for (let k = 0; k < 8; k++) {
+    const seg = String.fromCharCode(97 + k).repeat(450_000);
+    indirizzi.push(`http://a.b.c.d.e.f.g.it/${seg}/${seg}/${seg}/q?${'y'.repeat(400_000)}`);
+    L.peek(indirizzi[k]);
+  }
+  gc();
+  const occupati = process.memoryUsage().heapUsed - prima;
+  // Gli otto indirizzi (circa 15 MB) li tiene la prova stessa: oltre quelli, niente di paragonabile.
+  assert.ok(occupati < 60e6, `occupati ${Math.round(occupati / 1e6)} MB`);
+});

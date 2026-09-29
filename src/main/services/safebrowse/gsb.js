@@ -184,14 +184,15 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
   const cache = new Map();
   const pending = new Map();
   // Una pagina passa da qui più volte per apertura (verdetto subito, richiesta, verdetto finale): l'impronta si fa una volta.
-  // Si tengono solo impronta e prefisso: le espressioni di otto indirizzi lunghissimi occupavano 250 MB (verifica di #813).
+  // Né l'indirizzo né le sue espressioni restano qui, solo impronte: otto indirizzi lunghissimi tenevano 250 MB (verifica di #813).
   const recenti = new Map();
 
   function hashesFor(url) {
-    const k = String(url);
+    const u = String(url);
+    const k = crypto.createHash('sha256').update(u).digest('base64');
     let hs = recenti.get(k);
     if (!hs) {
-      hs = hashesOf(k).map(({ full, prefix }) => ({ full, prefix }));
+      hs = hashesOf(u).map(({ full, prefix }) => ({ full, prefix }));
       if (recenti.size >= 8) recenti.delete(recenti.keys().next().value);
     }
     recenti.delete(k);
