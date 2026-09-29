@@ -111,7 +111,7 @@
   pila.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-azione]');
     const card = b && b.closest('.shell-notif');
-    if (!card || card.classList.contains('show') === false) return;
+    if (!card || !card.classList.contains('show')) return;
     api.clic(card.dataset.nid, b.dataset.azione);
   });
 })();
