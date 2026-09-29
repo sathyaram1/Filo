@@ -17,9 +17,12 @@
 // Chi aggiunge una porta con potere passa di qui. `tests/feedback-canali-origine.spec.mjs`
 // bussa a tutte da un sito visitato e diventa rossa se una risponde altro.
 
-/** La richiesta arriva da una superficie di Filo? PURA. */
+const isFilo = (u) => String(u || '').startsWith('filo://');
+
+/** La richiesta arriva da una superficie di Filo? Vale se lo sono la scheda e la pagina che parla. PURA. */
 function daFilo(origin, sender) {
-  return String(origin || '').startsWith('filo://') || !!(sender && sender.isShell);
+  if (sender && sender.isShell) return true;
+  return isFilo(origin) && (!(sender && sender.url) || isFilo(sender.url));
 }
 
 /** Avvolge un handler: da un sito visitato risponde «rifiutato per provenienza». */

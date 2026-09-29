@@ -17,6 +17,8 @@ const { createSession, defaultCwd, commandExists } = require('./services/shell')
 const { resolveShell } = require('./services/terminal');
 const { hostResolves } = require('./services/hostResolve');
 const DiskStorage = require('./shim/storage');
+const { CANALI_WEB } = require('./services/impostazioniPerOrigine');
+const { daFilo } = require('./services/handlers/origine');
 
 const inFlightStreams = new Map(); // requestId → AbortController
 // Una shell PERSISTENTE per scheda, chiavata sull'id del WebContents che la
@@ -45,7 +47,8 @@ function senderInfo(event) {
   return {
     tab: tab ? { id: tab.id, url: tab.url, title: tab.title } : null,
     url: wc.getURL(),
-    isShell: win ? win.webContents === wc : false,
+    // La cornice è la finestra che tiene le schede: una finestra aperta da un sito (popup di accesso) è un sito.
+    isShell: Boolean(win && win._filoTabs && win.webContents === wc),
     // Riferimento alla finestra proprietaria (in-process: l'handler è chiamato
     // direttamente, non oltre il confine IPC) + flag incognito, così i servizi
     // aprono i tab nella finestra giusta e l'IPC instrada lo storage in RAM.
@@ -64,6 +67,19 @@ function senderInfo(event) {
   };
 }
 
+// Un canale fuori da CANALI_WEB risponde solo alla cornice e alle pagine di Filo (#589.1).
+const RIFIUTO = Object.freeze({ ok: false, code: 'forbidden', error: 'forbidden' });
+function canaleAmmesso(canale, event) {
+  if (CANALI_WEB.has(canale)) return true;
+  const info = senderInfo(event);
+  return daFilo(info.tab?.url || info.url, info);
+}
+const handle = (canale, fn) => ipcMain.handle(canale, (event, ...args) => (canaleAmmesso(canale, event) ? fn(event, ...args) : RIFIUTO));
+const ascolta = (canale, fn) => ipcMain.on(canale, (event, ...args) => {
+  if (canaleAmmesso(canale, event)) return fn(event, ...args);
+  event.returnValue = null;
+});
+
 function registerIpcHandlers() {
   // Alla chiusura di Filo non lasciamo shell orfane: nessuna persistenza dopo
   // l'uscita (alla riapertura si parte da una shell pulita).
@@ -77,7 +93,7 @@ function registerIpcHandlers() {
   // può aspettare una Promise. Ritorna { level, seed }: il seed è derivato in
   // main dal master secret (che NON attraversa mai questo confine). Vedi
   // services/fingerprint.js e preload/fingerprint-guard.js.
-  ipcMain.on('filo:fp-config', (event, href) => {
+  ascolta('filo:fp-config', (event, href) => {
     try {
       event.returnValue = require('./services/fingerprint').configForHref(href);
     } catch (_) {
@@ -87,7 +103,7 @@ function registerIpcHandlers() {
 
   // #754 — la pagina che sta per caricarsi, prima degli script del sito: la risposta al banner dei cookie da
   // togliere dalla sua memoria, se il sito ha cambiato elenco. SINCRONO per lo stesso motivo di fp-config.
-  ipcMain.on('filo:cookie-wipe', (event, href) => {
+  ascolta('filo:cookie-wipe', (event, href) => {
     let out = null;
     try {
       const wc = event.sender;
@@ -103,7 +119,7 @@ function registerIpcHandlers() {
   });
 
   // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
-  ipcMain.on('filo:permessi-stato', (event, href) => {
+  ascolta('filo:permessi-stato', (event, href) => {
     try {
       const Permessi = require('./services/permessiPagine');
       event.returnValue = { notifiche: Permessi.statoNotifiche(event.sender.session, href), gestoMs: Permessi.GESTO_MS };
@@ -116,11 +132,11 @@ function registerIpcHandlers() {
   // riquadri incorporati). Serve alle scorciatoie che lavorano sulla selezione:
   // vanno consegnate a chi ha davvero il testo selezionato. Nessun dato nel
   // messaggio: conta solo il mittente.
-  ipcMain.on('filo:frame-active', (event) => {
+  ascolta('filo:frame-active', (event) => {
     try { event.sender._filoActiveFrame = event.senderFrame || null; } catch (_) {}
   });
 
-  ipcMain.handle('filo:message', async (event, msg) => {
+  handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
     // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura
     // dello storage che ne discende (anche dopo await) finisce nell'overlay in
@@ -135,7 +151,7 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('ai-stream:start', async (event, { requestId, action, payload }) => {
+  handle('ai-stream:start', async (event, { requestId, action, payload }) => {
     const incognito = !!BrowserWindow.fromWebContents(event.sender)?._filoIncognito
       || senderInfo(event).isIncognito;
     const ac = new AbortController();
@@ -178,7 +194,7 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
-  ipcMain.on('ai-stream:abort', (_event, { requestId }) => {
+  ascolta('ai-stream:abort', (_event, { requestId }) => {
     const ac = inFlightStreams.get(requestId);
     if (ac) {
       try { ac.abort(); } catch (_) {}
@@ -187,12 +203,9 @@ function registerIpcHandlers() {
   });
 
   // ─── shell (modalità terminale della dashboard) ──────────────────────────
-  // Esegue un comando in streaming su una shell PERSISTENTE per scheda. SOLO
-  // per le pagine interne fidate (filo://): le pagine web esterne NON devono
-  // poter avviare una shell.
-  ipcMain.handle('shell:start', (event, { execId, command, cwd, shell } = {}) => {
-    const url = event.sender.getURL() || '';
-    if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
+  // Esegue un comando in streaming su una shell PERSISTENTE per scheda. Come
+  // ogni canale fuori da CANALI_WEB, un sito non ci arriva.
+  handle('shell:start', (event, { execId, command, cwd, shell } = {}) => {
     if (!execId || typeof command !== 'string') return { ok: false, error: 'bad-args' };
     const send = (suffix, data) => {
       try { event.sender.send(`shell:${execId}:${suffix}`, data); } catch (_) {}
@@ -228,10 +241,8 @@ function registerIpcHandlers() {
 
   // Esiste questo comando nella shell? Usato dall'evidenziazione live della
   // dashboard (modalità terminale) per colorare di rosso i "/comando" che non
-  // verrebbero riconosciuti. Solo pagine interne filo:// (come shell:start).
-  ipcMain.handle('shell:which', async (event, { command, shell, cwd } = {}) => {
-    const url = event.sender.getURL() || '';
-    if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
+  // verrebbero riconosciuti.
+  handle('shell:which', async (event, { command, shell, cwd } = {}) => {
     try {
       const exists = await commandExists({ shell, cwd, command });
       return { ok: true, exists };
@@ -242,12 +253,9 @@ function registerIpcHandlers() {
 
   // Questo "/dominio.tld" esiste davvero? Usato dalla barra comando della
   // dashboard per (a) colorare di rosso un sito inesistente mentre si scrive e
-  // (b) non navigare a vuoto verso una pagina bianca quando lo si invia. Solo
-  // pagine interne filo:// (come shell:which). In caso di dubbio torna
-  // resolves:true così non blocca mai una navigazione legittima.
-  ipcMain.handle('net:resolves', async (event, { host } = {}) => {
-    const url = event.sender.getURL() || '';
-    if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
+  // (b) non navigare a vuoto verso una pagina bianca quando lo si invia. In
+  // caso di dubbio torna resolves:true così non blocca mai una navigazione legittima.
+  handle('net:resolves', async (event, { host } = {}) => {
     try {
       const resolves = await hostResolves(host);
       return { ok: true, resolves };
@@ -257,12 +265,12 @@ function registerIpcHandlers() {
   });
 
   // Directory iniziale da mostrare nella riga grigia quando si attiva il terminale.
-  ipcMain.handle('shell:home', () => {
+  handle('shell:home', () => {
     try { return { ok: true, cwd: defaultCwd() }; } catch (_) { return { ok: false }; }
   });
 
   // Testo grezzo verso lo stdin del comando interattivo in corso (casella stdin).
-  ipcMain.on('shell:input', (event, { text } = {}) => {
+  ascolta('shell:input', (event, { text } = {}) => {
     const s = shellSessions.get(event.sender.id);
     if (s) s.write(String(text == null ? '' : text));
   });
@@ -271,7 +279,7 @@ function registerIpcHandlers() {
   // comando successivo ne ricrea una pulita; la cwd è preservata dalla
   // dashboard (che la ripassa). Le variabili impostate prima dello Stop vanno
   // perse: è il compromesso per un'interruzione affidabile su Windows.
-  ipcMain.on('shell:abort', (event) => {
+  ascolta('shell:abort', (event) => {
     const s = shellSessions.get(event.sender.id);
     if (s) { try { s.kill(); } catch (_) {} shellSessions.delete(event.sender.id); }
   });
@@ -285,63 +293,63 @@ function registerIpcHandlers() {
     }
     return BrowserWindow.fromWebContents(wc) || BrowserWindow.getAllWindows()[0];
   };
-  ipcMain.handle('tabs:open', (event, { url } = {}) => {
+  handle('tabs:open', (event, { url } = {}) => {
     const win = winFor(event);
     if (!win || !win._filoTabs) return { ok: false };
     const id = win._filoTabs.openTab(url || 'filo://newtab/');
     return { ok: true, id };
   });
-  ipcMain.handle('tabs:close', (event, { id }) => {
+  handle('tabs:close', (event, { id }) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.closeTab(id);
     return { ok: true };
   });
-  ipcMain.handle('tabs:activate', (event, { id }) => {
+  handle('tabs:activate', (event, { id }) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.activate(id);
     return { ok: true };
   });
-  ipcMain.handle('tabs:navigate', (event, { id, url }) => {
+  handle('tabs:navigate', (event, { id, url }) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.navigate(id, url);
     return { ok: true };
   });
   // Drag & drop nella barra: sposta una tab a una nuova posizione (toIndex).
-  ipcMain.handle('tabs:move', (event, { id, toIndex } = {}) => {
+  handle('tabs:move', (event, { id, toIndex } = {}) => {
     const win = winFor(event);
     const moved = win?._filoTabs ? win._filoTabs.moveTab(id, toIndex) : false;
     return { ok: true, moved };
   });
-  ipcMain.handle('tabs:reserve-top', (event, { px }) => {
+  handle('tabs:reserve-top', (event, { px }) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.setTopInset(px);
     return { ok: true };
   });
   // Chrome compatto: la shell nasconde la barra indirizzi fuori dalla home, e
   // chiede al main di far risalire la WebContentsView a coprire quello spazio.
-  ipcMain.handle('tabs:set-chrome-compact', (event, { on } = {}) => {
+  handle('tabs:set-chrome-compact', (event, { on } = {}) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.setChromeCompact(!!on);
     return { ok: true };
   });
-  ipcMain.handle('tabs:back', (event, { id }) => {
+  handle('tabs:back', (event, { id }) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.goBack(id);
     return { ok: true };
   });
-  ipcMain.handle('tabs:forward', (event, { id }) => {
+  handle('tabs:forward', (event, { id }) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.goForward(id);
     return { ok: true };
   });
-  ipcMain.handle('tabs:reload', (event, { id }) => {
+  handle('tabs:reload', (event, { id }) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.reload(id);
     return { ok: true };
   });
   // Menu tasto destro su tab: silenzia/riattiva l'audio. Se `muted` non è
   // passato (undefined) facciamo un toggle.
-  ipcMain.handle('tabs:set-muted', (event, { id, muted } = {}) => {
+  handle('tabs:set-muted', (event, { id, muted } = {}) => {
     const win = winFor(event);
     if (win?._filoTabs) {
       if (muted === undefined) win._filoTabs.toggleMute(id);
@@ -350,7 +358,7 @@ function registerIpcHandlers() {
     return { ok: true };
   });
   // Menu tasto destro su tab: apre una copia della tab (stesso URL).
-  ipcMain.handle('tabs:duplicate', async (event, { id } = {}) => {
+  handle('tabs:duplicate', async (event, { id } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false };
     const newId = await win._filoTabs.duplicateTab(id);
@@ -358,23 +366,23 @@ function registerIpcHandlers() {
   });
   // Menu tasto destro su tab: "Aiuto" → apre la sidebar Aiuto su quella scheda
   // col contesto della tab.
-  ipcMain.handle('tabs:help', (event, { id } = {}) => {
+  handle('tabs:help', (event, { id } = {}) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.openHelp(id);
     return { ok: true };
   });
-  ipcMain.handle('tabs:set-active-visible', (event, { visible } = {}) => {
+  handle('tabs:set-active-visible', (event, { visible } = {}) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.setActiveVisible(visible !== false);
     return { ok: true };
   });
-  ipcMain.handle('tabs:snapshot', (event) => {
+  handle('tabs:snapshot', (event) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { activeId: null, tabs: [] };
     return win._filoTabs.snapshot();
   });
   // Solo la cornice risponde a una domanda di permesso: è l'unico posto dove l'ha vista l'utente (#591.1).
-  ipcMain.handle('tabs:permesso-risposta', (event, { id, si } = {}) => {
+  handle('tabs:permesso-risposta', (event, { id, si } = {}) => {
     const cornice = BrowserWindow.getAllWindows().some((w) => w._filoTabs && (w.webContents === event.sender || w._filoShell?.webContents === event.sender));
     if (!cornice || !id) return { ok: false };
     return { ok: require('./services/permessiPagine').rispondi(String(id), si === true) };
@@ -385,18 +393,18 @@ function registerIpcHandlers() {
     const wc = t && t.view && t.view.webContents;
     return wc && !wc.isDestroyed() ? wc : null;
   };
-  ipcMain.handle('tabs:permessi', (event, { id } = {}) => {
+  handle('tabs:permessi', (event, { id } = {}) => {
     const wc = paginaDiScheda(event, id);
     if (!wc) return { scelte: [] };
     const Permessi = require('./services/permessiPagine');
     const { origine, scelte } = Permessi.scelteDi(wc);
     return { scelte, ...(origine ? Permessi.nomeDaMostrare(origine) : {}) };
   });
-  ipcMain.handle('tabs:permessi-dimentica', (event, { id } = {}) => {
+  handle('tabs:permessi-dimentica', (event, { id } = {}) => {
     const wc = paginaDiScheda(event, id);
     return wc ? require('./services/permessiPagine').dimentica(wc) : { tolte: 0, cera: false };
   });
-  ipcMain.handle('tabs:open-blocked-popup', (event, { url } = {}) => {
+  handle('tabs:open-blocked-popup', (event, { url } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs || !url) return { ok: false };
     win._filoTabs.openBlockedPopup(url);
@@ -405,19 +413,19 @@ function registerIpcHandlers() {
   // Proxy per-tab ("Apri da un altro paese"): instrada/de-instrada una singola
   // tab attraverso un endpoint in un altro paese. La lista location curate
   // serve al menu tasto destro sulla tab (feedback UI separato).
-  ipcMain.handle('tabs:set-proxy', async (event, { id, country, tier } = {}) => {
+  handle('tabs:set-proxy', async (event, { id, country, tier } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
     return win._filoTabs.setTabProxy(id, country, { tier });
   });
-  ipcMain.handle('tabs:clear-proxy', (event, { id } = {}) => {
+  handle('tabs:clear-proxy', (event, { id } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
     return win._filoTabs.clearTabProxy(id);
   });
   // #754 — dal menu della scheda: rivedere i banner dei cookie su questo sito (show) o ridarli a Filo.
   // Solo dalla shell: scrive le impostazioni.
-  ipcMain.handle('tabs:cookie-banners', async (event, { id, show } = {}) => {
+  handle('tabs:cookie-banners', async (event, { id, show } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs || win.webContents !== event.sender) return { ok: false, error: 'forbidden' };
     // In incognito l'elenco dei siti si scrive nella memoria della sessione, non sul disco.
@@ -426,7 +434,7 @@ function registerIpcHandlers() {
   });
   // Stato per il menu della shell: la voce compare solo se un endpoint è
   // configurato; defaultCountry = ultima location usata, altrimenti il default.
-  ipcMain.handle('tabs:proxy-status', async () => {
+  handle('tabs:proxy-status', async () => {
     const ProxyTab = require('./services/proxyTab');
     let settings = null;
     try { settings = await globalThis.SN_STORAGE?.getSettings?.(); } catch (_) {}
@@ -440,7 +448,7 @@ function registerIpcHandlers() {
   });
 
   // ─── popup menu custom (sopra le WebContentsView) ────────────────────────
-  ipcMain.handle('shell:popup-menu', (event, { entries, x, y }) => {
+  handle('shell:popup-menu', (event, { entries, x, y }) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false };
     showPopupMenu(win, entries, x, y, (value) => {
@@ -456,18 +464,18 @@ function registerIpcHandlers() {
   });
 
   // ─── tooltip custom (sopra le WebContentsView) ───────────────────────────
-  ipcMain.on('shell:tooltip-show', (event, { text, x, y }) => {
+  ascolta('shell:tooltip-show', (event, { text, x, y }) => {
     const win = winFor(event);
     if (!win) return;
     showTooltip(win, String(text || ''), Number(x) || 0, Number(y) || 0);
   });
-  ipcMain.on('shell:tooltip-hide', () => hideTooltip());
+  ascolta('shell:tooltip-hide', () => hideTooltip());
 
   // ─── disegno annotazione sulla barra in alto (shell) ─────────────────────
   // La shell ci dice se c'è un disegno sulla sua barra: lo rilanciamo ai content
   // script (box feedback) così "Cancella disegno" compare anche quando si è
   // disegnato SOLO sulla barra e l'invio allega lo screenshot annotato.
-  ipcMain.on('shell:feedback-draw-state', (_event, { has } = {}) => {
+  ascolta('shell:feedback-draw-state', (_event, { has } = {}) => {
     try {
       const { MSG } = globalThis.SN_MSG;
       broadcastToTabs({ type: MSG.FEEDBACK_DRAW_STATE, topbar: !!has });
@@ -475,25 +483,25 @@ function registerIpcHandlers() {
   });
 
   // ─── controlli finestra (min / max / close) ──────────────────────────────
-  ipcMain.handle('window:minimize', (event) => {
+  handle('window:minimize', (event) => {
     const win = winFor(event); if (win) win.minimize();
     return { ok: true };
   });
-  ipcMain.handle('window:toggle-maximize', (event) => {
+  handle('window:toggle-maximize', (event) => {
     const win = winFor(event);
     if (win) {
       if (win.isMaximized()) win.unmaximize(); else win.maximize();
     }
     return { ok: true };
   });
-  ipcMain.handle('window:close', (event) => {
+  handle('window:close', (event) => {
     const win = winFor(event); if (win) win.close();
     return { ok: true };
   });
 
   // ─── apertura finestra incognito ─────────────────────────────────────────
   // Lazy require di window.js per evitare un ciclo di import al boot.
-  ipcMain.handle('window:open-incognito', () => {
+  handle('window:open-incognito', () => {
     try {
       const { createIncognitoWindow } = require('./window');
       createIncognitoWindow();

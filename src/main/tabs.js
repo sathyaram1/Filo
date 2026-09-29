@@ -1800,6 +1800,7 @@ class TabManager {
     // (#686). Il canale è quello della singola scheda: muore con lei.
     try {
       wc.ipc.on('filo:zoom-proprio', (_e, perc) => {
+        if (!String(wc.getURL() || '').startsWith('filo://')) return;
         const n = Math.round(Number(perc));
         tab.zoomProprio = Number.isFinite(n) && n > 0 ? n : null;
       });

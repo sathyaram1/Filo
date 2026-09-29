@@ -10,7 +10,8 @@
 
 const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
-const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
+const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra, domandaAmmessaDaUnSito } = require('./impostazioniPerOrigine');
+const { daUnSito, inPrimoPiano } = require('./handlers/origine');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -3407,6 +3408,10 @@ require('./handlers/misc')(on, handlerCtx);
 
 async function handleMessage(msg, sender = {}) {
   const origin = sender?.tab?.url || sender?.url || '';
+  // Da una pagina che non è di Filo passano solo le domande della lista del confine (#589.1).
+  if (daUnSito(origin, sender) && !domandaAmmessaDaUnSito(msg?.type, { inVista: inPrimoPiano(sender) })) {
+    return { ok: false, code: 'forbidden', error: 'forbidden' };
+  }
   const fn = registry.get(msg.type);
   if (fn) return fn(msg, sender, origin);
   return { ok: false, error: `Tipo messaggio sconosciuto: ${msg.type}` };
