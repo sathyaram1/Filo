@@ -95,7 +95,7 @@ export function scrittureCache(u) {
 export function famigliaPrezzo(model) {
   const m = String(model || '').toLowerCase();
   if (/fable|mythos/.test(m)) return { key: /(fable|mythos)-5(?![-\d])/.test(m) ? 'fable-5' : 'fable', known: true };
-  if (m.includes('opus')) return { key: 'opus', known: true };
+  if (m.includes('opus')) return { key: /opus-5-5(?!\d)/.test(m) ? 'opus-5-5' : 'opus', known: true };
   if (m.includes('sonnet')) return { key: /sonnet-4/.test(m) ? 'sonnet-4' : 'sonnet', known: true };
   if (m.includes('haiku')) return { key: 'haiku', known: true };
   return { key: 'opus', known: false };
