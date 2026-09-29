@@ -1015,10 +1015,12 @@
     const msgs = chatMsgs();
     msgs.forEach((m, i) => { m._i = i; });
     $('chatEmpty').hidden = msgs.length > 0;
+    $('chatClear').hidden = msgs.length === 0;
     // Il placeholder resta come primo figlio; le bolle si rigenerano dopo.
     for (const el of [...log.querySelectorAll('.dk-msg')]) el.remove();
+    const cap = Chat.fits(msgs) ? '' : `<p class="dk-msg dk-chat-cap" role="status">Questa chat ha superato i ${Chat.MAX_MESSAGES.toLocaleString('it-IT')} messaggi: quelli nuovi non vengono più salvati. Svuotala per ripartire da zero.</p>`;
     $('chatEmpty').insertAdjacentHTML('afterend',
-      msgs.map((m, i) => chatBubbleHtml(m, i === msgs.length - 1)).join(''));
+      msgs.map((m, i) => chatBubbleHtml(m, i === msgs.length - 1)).join('') + cap);
     // Lo svuotamento sopra fa collassare scrollHeight → il browser clampa
     // scrollTop a 0: se non seguiamo il fondo va ripristinata la posizione, o la
     // vista salterebbe in cima (il sintomo segnalato).
