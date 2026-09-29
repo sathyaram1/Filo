@@ -1058,6 +1058,9 @@
           btn.className = 'shell-notif-action';
           btn.textContent = a.label;
           btn.addEventListener('click', () => {
+            // Il bottone resta sotto il puntatore mentre la notifica sparisce: un doppio clic
+            // ripeterebbe l'azione (due schede da «Apri comunque»).
+            if (card.dataset.closing === '1') return;
             try { a.onClick && a.onClick(); } catch (_) {}
             dismiss(card);
           });

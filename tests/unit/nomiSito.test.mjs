@@ -13,7 +13,7 @@ test('valido: un nome con estensione, anche non latina; niente IP né nomi senza
   for (const d of ['facebook.com', 'bbc.co.uk', 'xn--mnchen-3ya.de', domainToASCII('сайт.рф'), domainToASCII('例え.テスト')]) {
     assert.equal(N.valido(d), true, d);
   }
-  for (const d of ['facebook', '1.2.3.4', '', 'a.xn--', 'sito.c']) assert.equal(N.valido(d), false, d);
+  for (const d of ['facebook', '1.2.3.4', '', 'a.xn--', 'sito.c', '.sito.it', 'sito..it', '*.sito.it']) assert.equal(N.valido(d), false, d);
 });
 
 test('leggibile: il nome torna come l\'utente l\'ha scritto, uguale alla decodifica di Node', () => {

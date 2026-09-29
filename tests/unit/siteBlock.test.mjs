@@ -122,3 +122,11 @@ test('#590: un sito con l\'estensione in caratteri non latini entra in lista e b
   assert.equal(SB.shouldBlockNavigation('https://例え.テスト/').block, true);
   assert.equal(SB.shouldBlockNavigation('https://münchen.de/').host, 'münchen.de');
 });
+
+test('#590: «.sito.it» e «*.sito.it», la forma «il sito e i sottodomini» di filtri e cookie, bloccano il sito', () => {
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['.evil.example', '*.ads.test'] });
+  assert.equal(SB.status().blacklistSize, 2);
+  for (const u of ['https://evil.example/', 'https://m.evil.example/x', 'https://ads.test/', 'https://cdn.ads.test/']) {
+    assert.equal(SB.shouldBlockNavigation(u).block, true, u);
+  }
+});
