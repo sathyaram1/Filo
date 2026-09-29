@@ -1,6 +1,6 @@
 // Verifica #821, giro 1: schede non attive con la tinta viva del sito, cinque siti, due temi.
 import { test, expect } from '../../fixtures/electron.mjs';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 
 const svg = (inner) => 'data:image/svg+xml,' + encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">${inner}</svg>`);
@@ -107,13 +107,12 @@ test('cinque siti noti: tinta viva, formula, titolo leggibile, chiaro e scuro', 
       const ht = h.tabs.find((x) => x.tip === t.tip);
       report.push({ tag: scheme + '-hover', tip: t.tip, bg: nums(ht.bg), contrTitolo: +contrast(nums(ht.title), nums(ht.bg)).toFixed(2) });
     }
-    await shell.hover('.tab[data-tip="Tubo rosso"] .close');
-    await shell.screenshot({ path: `tests/.shots/v821-hover-close-${scheme}.png`, clip: { x: 0, y: 0, width: 700, height: 44 } });
     await shell.mouse.move(5, 300);
   }
-  writeFileSync('tests/.shots/v821-report.json', JSON.stringify(report));
   for (const r of report) {
     expect(r.contrTitolo, `${r.tag} ${r.tip}`).toBeGreaterThanOrEqual(4.5);
     if ('ok' in r) expect(r.ok, `${r.tag} ${r.tip} ${r.bg} vs ${r.atteso}`).toBe(true);
+    // Vivace: i quattro siti colorati restano ben saturi anche mescolati col fondo.
+    if ('ok' in r && /rosso|gialla|blu|verde/.test(r.tip)) expect(r.sat, `${r.tag} ${r.tip}`).toBeGreaterThan(0.6);
   }
 });
