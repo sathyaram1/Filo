@@ -344,4 +344,4 @@ function installaMenuApplicazione() {
   }
 }
 
-module.exports = { installaMenuApplicazione, template, annulla, ripeti, staScrivendo };
+module.exports = { installaMenuApplicazione, template, tastoDellaBarra, annulla, ripeti, staScrivendo };
