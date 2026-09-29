@@ -1,31 +1,10 @@
 // Blocco apertura siti in blacklist (#170.3): decide se una navigazione top-level va bloccata.
-// Non notifica e non conosce le schede: lo chiama solo _maybeBlockNavigation di tabs.js,
-// l'unico passaggio di ogni cambio d'indirizzo (#590). Eccezioni: vedi shouldBlockNavigation.
+// Non notifica e non conosce le schede: lo chiama solo _decisioneBlocco di tabs.js,
+// l'unico passaggio di ogni cambio d'indirizzo (#590). Regole: tests/unit/siteBlock.test.mjs.
 
 let enabled = true;
 let useAdblockLists = true;
 let userBlacklist = new Set(); // domini extra inseriti dall'utente
-
-// Pagine dei RISULTATI che concedono l'eccezione: nome esatto E percorso del motore, mai la
-// forma del nome, che chiunque si procura (searx.<qualunque>, sites.google.com: #590). path null = host senza pagine di terzi.
-const RISULTATI = [
-  { host: /^(?:www\.)?google\.(?:com|com?\.[a-z]{2}|[a-z]{2})$/, path: /^\/(?:search|url)$/ },
-  { host: /^(?:www\.)?bing\.com$/, path: /^\/(?:search|ck\/a)$/ },
-  { host: /^(?:html\.|lite\.)?duckduckgo\.com$/, path: null },
-  { host: /^(?:www\.)?ecosia\.org$/, path: /^\/search$/ },
-  { host: /^(?:www\.)?startpage\.com$/, path: /^\/(?:sp|do)\// },
-  { host: /^(?:www\.)?qwant\.com$/, path: null },
-  { host: /^(?:[a-z]{2}\.)?search\.yahoo\.com$/, path: /^\/search/ },
-  { host: /^r\.search\.yahoo\.com$/, path: null },
-  { host: /^search\.yahoo\.co\.jp$/, path: /^\/search/ },
-  { host: /^(?:www\.)?yandex\.(?:com|com\.tr|[a-z]{2})$/, path: /^\/(?:search|clck)(?:\/|$)/ },
-  { host: /^ya\.ru$/, path: /^\/search(?:\/|$)/ },
-  { host: /^(?:www|m)\.baidu\.com$/, path: /^\/(?:s|link)$/ },
-  { host: /^search\.brave\.com$/, path: null },
-  { host: /^kagi\.com$/, path: /^\/search$/ },
-  { host: /^(?:www\.)?mojeek\.com$/, path: /^\/search$/ },
-  { host: /^(?:www\.)?ask\.com$/, path: /^\/web$/ },
-];
 
 // Normalizza un dominio inserito dall'utente: toglie schema, path, porta, www.
 function normalizeDomain(raw) {
@@ -71,15 +50,6 @@ function matchesSuffix(host, set) {
   return false;
 }
 
-// La pagina di partenza è una pagina di risultati di un motore di ricerca?
-function isSearchEngineUrl(url) {
-  let u;
-  try { u = new URL(url); } catch (_) { return false; }
-  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
-  const host = u.hostname.toLowerCase().replace(/\.+$/, '');
-  return RISULTATI.some((r) => r.host.test(host) && (!r.path || r.path.test(u.pathname)));
-}
-
 // L'host è in blacklist? (blacklist dedicata dell'utente, oppure — se
 // abilitato — le liste pubbliche dell'ad-blocker.)
 function isBlacklistedHost(host) {
@@ -94,10 +64,9 @@ function isBlacklistedHost(host) {
   return false;
 }
 
-// Decisione centrale. Ritorna { block, host, reason }. L'unica eccezione è il
-// referrer di un motore di ricerca (l'utente l'ha cercato apposta): un'apertura
-// di Filo o del modello NON è esente (#590), a scavalcare è solo «Apri comunque».
-function shouldBlockNavigation(targetUrl, { fromUrl = '' } = {}) {
+// Decisione centrale. Ritorna { block, host, reason }. Nessuna eccezione per
+// provenienza, nemmeno una ricerca (#590, scelta dell'owner): scavalca solo «Apri comunque».
+function shouldBlockNavigation(targetUrl) {
   const res = { block: false, host: '', reason: '' };
   if (!enabled) return res;
 
@@ -113,8 +82,6 @@ function shouldBlockNavigation(targetUrl, { fromUrl = '' } = {}) {
   // «sito.it.» è lo stesso host di «sito.it» per il DNS: senza, il punto finale aggira la lista.
   const host = u.hostname.toLowerCase().replace(/\.+$/, '');
   res.host = host;
-
-  if (fromUrl && isSearchEngineUrl(fromUrl)) return res;
 
   if (!isBlacklistedHost(host)) return res;
 
@@ -151,7 +118,6 @@ function status() {
 module.exports = {
   configureFromSettings,
   shouldBlockNavigation,
-  isSearchEngineUrl,
   isBlacklistedHost,
   normalizeDomain,
   setForTest,

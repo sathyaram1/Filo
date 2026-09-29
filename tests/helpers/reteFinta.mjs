@@ -1,5 +1,5 @@
 // Rete finta con nomi veri per gli spec della lista dei siti bloccati (#590): un server
-// locale risponde per nome e percorso agli host mappati qui (sites.google.com, www.bing.com…).
+// locale risponde per nome e percorso agli host mappati qui (www.bing.com, blocked.test…).
 // Non parla con la rete vera; ogni host nuovo va aggiunto a HOSTS.
 
 import { createServer } from 'node:http';
@@ -16,7 +16,7 @@ const APP_ROOT = resolve(__dirname, '..', '..');
 
 export const HOSTS = [
   'blocked.test', 'www.blocked.test', 'sito.test', 'accorcia.test', 'tracker.test', 'articolo.test',
-  'libero.test', 'searx.xyz', 'sites.google.com', 'baijiahao.baidu.com', 'www.bing.com',
+  'libero.test', 'www.bing.com',
 ];
 
 export const test = filoTest.extend({
@@ -43,17 +43,25 @@ export const test = filoTest.extend({
   },
   app: async ({ rete }, use) => {
     const userData = cartellaTemporanea('filo-test-');
-    const rules = HOSTS.map((h) => `MAP ${h} 127.0.0.1:${rete.port}`).join(', ');
-    const app = await electron.launch({
-      args: [...argomentiScala, `--host-resolver-rules=${rules}`, '.'],
-      cwd: APP_ROOT,
-      env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
-    });
+    const app = await avviaFilo(rete, userData);
     await use(app);
     await chiudiApp(app);
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   },
 });
+
+// Filo sulla rete finta con una cartella dati scelta da chi chiama: due avvii sulla stessa
+// cartella sono una riapertura di Filo.
+export function avviaFilo(rete, userData) {
+  const rules = HOSTS.map((h) => `MAP ${h} 127.0.0.1:${rete.port}`).join(', ');
+  return electron.launch({
+    args: [...argomentiScala, `--host-resolver-rules=${rules}`, '.'],
+    cwd: APP_ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
+  });
+}
+
+export { chiudiApp, cartellaTemporanea };
 
 export { expect };
 
@@ -97,3 +105,10 @@ export async function contaAvvisi(app) {
   });
   return () => app.evaluate(() => globalThis.__avvisi590.slice());
 }
+
+// La scheda (indirizzo per l'utente e indirizzo caricato) che sta sul sito `host`, anche dalla pagina «Sito bloccato».
+export const schedaSu = (app, host) => app.evaluate(({ BrowserWindow }, h) => {
+  const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+  const t = w && w._filoTabs.tabs.find((x) => String(x.url || '').includes(h));
+  return t ? { id: t.id, url: t.url, caricata: t.view.webContents.getURL() } : null;
+}, host);

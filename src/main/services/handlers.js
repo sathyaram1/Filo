@@ -943,6 +943,10 @@ async function applySettingsUpdate(partial) {
   } catch (_) {}
   try { require('./adblock').configureFromSettings(merged); } catch (_) {}
   try { require('./siteBlock').configureFromSettings(merged); } catch (_) {}
+  // Una scheda già aperta su un sito appena messo in lista si porta via subito (#590).
+  try {
+    for (const w of BrowserWindow.getAllWindows()) w._filoTabs?.riapplicaListaBloccati?.();
+  } catch (_) {}
   try { require('./downloads').configureFromSettings(merged); } catch (_) {}
   return merged;
 }

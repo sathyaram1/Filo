@@ -1,9 +1,13 @@
 // Lista dei siti bloccati (#590): le strade che passano per nomi veri (motori, contatori,
-// finestrelle di accesso) e per la storia della scheda. Rete finta: tests/helpers/reteFinta.mjs.
+// finestrelle di accesso), la storia della scheda e le schede già aperte. Rete finta: tests/helpers/reteFinta.mjs.
 
-import { test, expect, lista, schede, finestre, apri, idAttiva, contaAvvisi } from './helpers/reteFinta.mjs';
+import { rmSync } from 'node:fs';
+import { test, expect, lista, schede, finestre, apri, idAttiva, contaAvvisi, schedaSu, avviaFilo, chiudiApp, cartellaTemporanea } from './helpers/reteFinta.mjs';
 
 const aperteSu = async (app, host) => (await schede(app)).filter((u) => u.includes(host));
+const PAGINA_BLOCCATA = /^filo:\/\/error\/error\.html\?.*code=blocked/;
+const caricataSu = async (app, host) => ((await schedaSu(app, host)) || {}).caricata || '';
+const paginaBloccata = (app) => app.windows().find((w) => PAGINA_BLOCCATA.test(w.url()));
 
 test('una finestrella di accesso aperta dalla pagina verso il sito della lista non nasce, e lo si dice', async ({ app, shell, rete }) => {
   await lista(shell, ['blocked.test']);
@@ -32,21 +36,6 @@ test('una finestrella di accesso che il server rimbalza sul sito della lista si 
   expect((await avvisi()).length).toBeGreaterThan(0);
 });
 
-for (const [nome, host, path] of [
-  ['un nome «searx» su un\'estensione qualunque', 'searx.xyz', '/search'],
-  ['una pagina di Google Sites', 'sites.google.com', '/view/pagina'],
-  ['un articolo sul sottodominio degli autori di Baidu', 'baijiahao.baidu.com', '/s'],
-]) {
-  test(`l'eccezione della ricerca non la prende ${nome}`, async ({ app, shell, rete }) => {
-    await lista(shell, ['blocked.test']);
-    const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO DELLA LISTA</h1>');
-    const partenza = rete.pagina(host, path, `<h1>pagina</h1><script>setTimeout(() => { location.href = ${JSON.stringify(bersaglio)}; }, 500)</script>`);
-    await apri(app, shell, partenza);
-    await shell.waitForTimeout(2500);
-    expect(await aperteSu(app, 'blocked.test')).toEqual([]);
-  });
-}
-
 test('«Apri» sulla chip dei popup non scavalca la lista dei siti bloccati', async ({ app, shell, rete }) => {
   await lista(shell, ['blocked.test']);
   const avvisi = await contaAvvisi(app);
@@ -63,15 +52,21 @@ test('«Apri» sulla chip dei popup non scavalca la lista dei siti bloccati', as
   expect((await avvisi()).length).toBeGreaterThan(0);
 });
 
-test('un risultato di ricerca che rimbalza arriva anche aperto in una scheda nuova', async ({ app, shell, rete }) => {
+test('dai risultati di una ricerca il sito della lista si ferma, cliccato o aperto in una scheda nuova', async ({ app, shell, rete }) => {
   await lista(shell, ['blocked.test']);
+  const avvisi = await contaAvvisi(app);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO CERCATO</h1>');
   const r = rete.rimbalzo('accorcia.test', '/r', bersaglio);
-  const risultati = rete.pagina('www.bing.com', '/search', `<a id="nuova" target="_blank" href="${r}">risultato</a>`);
+  const risultati = rete.pagina('www.bing.com', '/search', `<a id="diretto" href="${bersaglio}">risultato</a> <a id="nuova" target="_blank" href="${r}">risultato</a>`);
   await apri(app, shell, risultati);
   const tab = app.windows().find((w) => w.url().includes('www.bing.com'));
   await tab.evaluate(() => document.getElementById('nuova').click());
-  await expect.poll(async () => (await aperteSu(app, 'blocked.test')).length, { timeout: 6000 }).toBe(1);
+  await shell.waitForTimeout(1500);
+  await tab.evaluate(() => document.getElementById('diretto').click());
+  await shell.waitForTimeout(1500);
+  expect(await aperteSu(app, 'blocked.test')).toEqual([]);
+  expect(tab.url()).toContain('www.bing.com/search');
+  expect((await avvisi()).length).toBeGreaterThan(0);
 });
 
 test('indietro verso un sito messo in lista nel frattempo: fermato e detto', async ({ app, shell, rete }) => {
@@ -90,24 +85,100 @@ test('indietro verso un sito messo in lista nel frattempo: fermato e detto', asy
   expect((await avvisi()).length).toBeGreaterThan(0);
 });
 
-test('ricaricare un sito messo in lista mentre lo si guarda lo dice; uno aperto con «Apri comunque» si ricarica', async ({ app, shell, rete }) => {
+test('un sito messo in lista mentre lo si guarda passa subito alla pagina «Sito bloccato», e «Apri comunque» lì lo riapre', async ({ app, shell, rete }) => {
   await lista(shell, []);
   const sito = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
   await apri(app, shell, sito);
-  const id = await idAttiva(app);
   await lista(shell, ['blocked.test']);
+  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toMatch(PAGINA_BLOCCATA);
+  expect((await schedaSu(app, 'blocked.test')).url).toBe(sito);
+  const pagina = paginaBloccata(app);
+  await expect(pagina.locator('h1')).toHaveText('Sito bloccato');
+  await expect(pagina.locator('#err-host')).toHaveText('blocked.test');
+  await pagina.screenshot({ path: 'tests/.shots/590-sito-bloccato.png' });
+
+  // La copia di quella scheda è ancora la pagina «Sito bloccato», non il sito.
+  const { id } = await schedaSu(app, 'blocked.test');
+  await shell.evaluate((i) => window.filoShell.tabs.duplicate(i), id);
+  await shell.waitForTimeout(1500);
+  expect(await aperteSu(app, 'http://blocked.test')).toEqual([]);
+
   const avvisi = await contaAvvisi(app);
+  await pagina.locator('button', { hasText: 'Apri comunque' }).click();
+  await expect.poll(async () => (await aperteSu(app, 'http://blocked.test')).length, { timeout: 6000 }).toBe(1);
+  const riaperta = (await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.tabs
+    .filter((t) => t.view.webContents.getURL().startsWith('http://blocked.test')).map((t) => t.id)))[0];
+  expect(riaperta).toBe(id);
   await shell.evaluate((i) => window.filoShell.tabs.reload(i), id);
   await shell.waitForTimeout(1500);
-  expect((await avvisi()).length).toBe(1);
+  expect(await caricataSu(app, 'blocked.test')).toBe(sito);
+  expect(await avvisi()).toEqual([]);
+});
 
-  await shell.evaluate((u) => window.filoShell.tabs.openBlockedPopup(u, true), sito);
-  await expect.poll(async () => (await aperteSu(app, 'blocked.test')).length, { timeout: 6000 }).toBe(2);
-  const id2 = await idAttiva(app);
-  await shell.waitForTimeout(4200); // oltre la finestra in cui lo stesso sito non si ri-notifica
-  await shell.evaluate((i) => window.filoShell.tabs.reload(i), id2);
-  await shell.waitForTimeout(1500);
-  expect((await avvisi()).length).toBe(1);
+test('indietro dalla pagina «Sito bloccato» torna alla pagina di prima; tolto dalla lista, il sito torna', async ({ app, shell, rete }) => {
+  await lista(shell, []);
+  const prima = rete.pagina('sito.test', '/', '<h1>PRIMA</h1>');
+  const sito = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+  await apri(app, shell, prima);
+  const id = await idAttiva(app);
+  await shell.evaluate(([i, u]) => window.filoShell.tabs.navigate(i, u), [id, sito]);
+  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toBe(sito);
+  await lista(shell, ['blocked.test']);
+  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toMatch(PAGINA_BLOCCATA);
+  await shell.waitForTimeout(500);
+  await shell.evaluate((i) => window.filoShell.tabs.back(i), id);
+  await expect.poll(() => caricataSu(app, 'sito.test'), { timeout: 6000 }).toBe(prima);
+
+  await shell.evaluate((i) => window.filoShell.tabs.forward(i), id);
+  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toMatch(PAGINA_BLOCCATA);
+  await lista(shell, []);
+  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toBe(sito);
+});
+
+test('alla riapertura di Filo una scheda su un sito della lista torna sulla pagina «Sito bloccato»', async ({ rete }) => {
+  const userData = cartellaTemporanea('filo-test-');
+  const avvia = async () => {
+    const app = await avviaFilo(rete, userData);
+    const shell = await app.firstWindow();
+    await shell.waitForLoadState('domcontentloaded');
+    return { app, shell };
+  };
+  let app = null;
+  try {
+    const sito = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+    let shell;
+    ({ app, shell } = await avvia());
+    await apri(app, shell, sito);
+    await lista(shell, ['blocked.test']);
+    await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toMatch(PAGINA_BLOCCATA);
+    await shell.waitForTimeout(1500); // la sessione si salva con un attimo di ritardo
+    await chiudiApp(app);
+
+    ({ app, shell } = await avvia());
+    await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 10000 }).toMatch(PAGINA_BLOCCATA);
+    await shell.waitForTimeout(1000);
+    expect(await aperteSu(app, 'http://blocked.test')).toEqual([]);
+    const { id } = await schedaSu(app, 'blocked.test');
+    await shell.evaluate((i) => window.filoShell.tabs.activate(i), id);
+    await expect.poll(() => !!paginaBloccata(app), { timeout: 6000 }).toBe(true);
+    await paginaBloccata(app).locator('button', { hasText: 'Apri comunque' }).click();
+    await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toBe(sito);
+  } finally {
+    if (app) await chiudiApp(app);
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  }
+});
+
+test('liste pubbliche: «Apri comunque» della pagina «Sito bloccato» apre davvero il sito, non una pagina d\'errore', async ({ app, shell, rete }) => {
+  await lista(shell, [], { useAdblockLists: false });
+  const tracker = rete.pagina('tracker.test', '/', '<h1>TRACKER</h1>');
+  await apri(app, shell, tracker);
+  await app.evaluate(() => { globalThis.__filoAdblock.setDomainsForTest(['tracker.test']); });
+  await lista(shell, [], { useAdblockLists: true });
+  await expect.poll(() => caricataSu(app, 'tracker.test'), { timeout: 6000 }).toMatch(PAGINA_BLOCCATA);
+  await paginaBloccata(app).locator('button', { hasText: 'Apri comunque' }).click();
+  await expect.poll(() => caricataSu(app, 'tracker.test'), { timeout: 6000 }).toBe(tracker);
+  await expect(app.windows().find((w) => w.url() === tracker).locator('h1')).toHaveText('TRACKER');
 });
 
 test('liste pubbliche: «Apri comunque» su un contatore di clic porta all\'articolo, non a una pagina d\'errore', async ({ app, shell, rete }) => {

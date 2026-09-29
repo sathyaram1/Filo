@@ -1,7 +1,7 @@
 // Blocco apertura siti in blacklist (#170.3) — e2e.
 //
 // Assertiamo il COMPORTAMENTO, non un messaggio:
-//   1) cliccare un link verso un sito in blacklist (referrer NON di ricerca)
+//   1) cliccare un link verso un sito in blacklist
 //      → la navigazione è bloccata (la tab NON cambia URL) e compare la
 //        notifica "Sito bloccato" con l'azione "Apri comunque";
 //   2) "Apri comunque" apre davvero il sito, e vale per quel sito in quella scheda;
@@ -9,8 +9,7 @@
 //      barra della home, NAVIGA del modello (e la chat lo dice), link in nuova
 //      scheda, redirect.
 //
-// L'eccezione "referrer di motore di ricerca" (caso 2 della spec) è coperta in
-// modo esaustivo dallo unit test tests/unit/siteBlock.test.mjs.
+// Nessuna provenienza è esente, nemmeno una ricerca: tests/siteBlock-strade.spec.mjs.
 //
 // Per rendere il blocco deterministico usiamo un DOMINIO REALE finto,
 // "blocked.test" (estensione valida → entra davvero in blacklist, a differenza

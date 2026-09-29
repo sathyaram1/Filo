@@ -31,13 +31,16 @@
   const detailBits = [];
   if (desc) detailBits.push(desc);
   if (code && String(code) !== (NE && NE.CRASH_CODE)) detailBits.push(`(${code})`);
-  document.getElementById('err-detail').textContent = detailBits.join(' ');
+  document.getElementById('err-detail').textContent = msg.blocked ? '' : detailBits.join(' ');
+  if (msg.blocked) document.getElementById('page').classList.add('err-blocked');
 
   // Il titolo del documento diventa il titolo della scheda (via
   // page-title-updated): il sito fallito, non più "Nuova scheda".
   document.title = host || msg.title;
 
   const retryBtn = document.getElementById('err-retry');
+  // Sul sito bloccato il bottone è «Apri comunque»: il main riconosce il salto da qui al bersaglio.
+  if (msg.blocked) retryBtn.textContent = 'Apri comunque';
   function retry() {
     if (!target) return;
     // replace(): il tentativo non aggiunge un'ulteriore voce di cronologia

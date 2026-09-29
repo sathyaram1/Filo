@@ -10,7 +10,7 @@ module.exports = function register(on, ctx) {
   on('_tabs:create', async (msg, sender) => {
     const win = winOf(sender);
     if (!win || !win._filoTabs) return { ok: false };
-    const id = win._filoTabs.openTab(msg.url || 'filo://newtab/', { fromUrl: sender?.tab?.url || '' });
+    const id = win._filoTabs.openTab(msg.url || 'filo://newtab/');
     return { ok: true, id };
   });
 
