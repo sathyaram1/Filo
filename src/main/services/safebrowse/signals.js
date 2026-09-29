@@ -48,10 +48,16 @@ function typoThreshold(tokenLen) {
   return 1;
 }
 
-// #728 — sotto questa lunghezza una distanza di una lettera è quasi sempre una
-// parola comune (team/steam, email/gmail, apply/apple), non un sosia: il typo
-// da solo avvisa, e blocca solo con un secondo segnale.
+// #728 — il typo da solo blocca solo a una lettera da un brand lungo: sotto, o a due
+// lettere, è quasi sempre una parola comune (team/steam, email/gmail, telegraph/telegram)
+// e avvisa, bloccando solo con un secondo segnale.
 const TYPO_BLOCCO_MIN_LEN = 8;
+
+// «rn» e «vv» a occhio sono «m» e «w»: sono una lettera sola anche per il blocco (instagrarn, rnicrosoft).
+function typoBloccante(sld, token, dist) {
+  if (token.length < TYPO_BLOCCO_MIN_LEN) return false;
+  return dist === 1 || osaDistance(sld.replace(/rn/g, 'm').replace(/vv/g, 'w'), token) <= 1;
+}
 
 // Cerca la migliore corrispondenza di impersonazione fra i brand noti.
 // Ritorna { strict, weak, broad } dove ciascuno è null o { brand, reason, ... }.
