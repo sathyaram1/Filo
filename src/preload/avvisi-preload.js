@@ -1,6 +1,6 @@
 // Preload della vista degli avvisi sopra la pagina (src/renderer/avvisi.html): riceve lo stato, dice
-// quanto è grande, riporta clic e tasto destro, chiede il suggerimento della X e rigira alla scheda i
-// gesti caduti nel vuoto. Nient'altro deve poter chiedere al main.
+// quanto è grande, riporta clic, tasto destro e puntatore sopra le carte, chiede il suggerimento della X e
+// rigira alla scheda i gesti caduti nel vuoto. Nient'altro deve poter chiedere al main.
 
 const { contextBridge, ipcRenderer } = require('electron');
 
@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('avvisi', {
   // Testo vuoto lo nasconde.
   suggerimento: (testo, x, y) => ipcRenderer.send('avvisi:suggerimento', { testo: testo || '', x, y }),
   menu: (id, x, y) => ipcRenderer.send('avvisi:menu', { id, x, y }),
+  sopra: (on) => ipcRenderer.send('avvisi:sopra', { sopra: !!on }),
   inoltra: (gesto) => ipcRenderer.send('avvisi:inoltra', gesto),
   onCursore: (fn) => {
     ipcRenderer.on('avvisi:cursore', (_event, forma) => { try { fn(forma); } catch (_) {} });

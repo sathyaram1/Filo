@@ -23,7 +23,7 @@ function fogli(dir) {
 }
 
 // Regole fisse ancorate in basso e a destra, senza un alto: un riquadro nell'angolo, non un velo a tutta pagina.
-export function ancorateAllAngolo(css) {
+function ancorateAllAngolo(css) {
   const pulito = css.replace(/\/\*[\s\S]*?\*\//g, '');
   const trovate = [];
   const re = /([^{}]+)\{([^{}]*)\}/g;

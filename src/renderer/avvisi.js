@@ -120,6 +120,8 @@
     misura();
     if (nuove.length) inFondo();
     if (tipSu && (!tipSu.isConnected || !tipSu.closest('.shell-notif.show'))) nascondiTip();
+    // La carta sotto il puntatore se n'è andata (o la pila si è svuotata, e la vista sparisce senza un mouseout).
+    if (!pila.querySelector('.shell-notif.show:hover')) segnaSopra(false);
   });
 
   // Il suggerimento di Filo sulle icone, come nella barra (shell.js, data-tip): lo disegna il main.
@@ -170,6 +172,19 @@
   // ci cadono tornano alla scheda. Un gesto partito dal vuoto resta della pagina fino al rilascio (trascinare
   // la barra di scorrimento, selezionare del testo), anche se passa sopra una carta.
   const cartaSotto = (e) => e.target && e.target.closest && e.target.closest('.shell-notif.show');
+  // Col puntatore sopra una carta i tempi della pila aspettano: li tiene la shell, qui si dice solo entra/esce.
+  let sopra = false;
+  function segnaSopra(ora) {
+    if (ora === sopra || !api.sopra) return;
+    sopra = ora;
+    api.sopra(ora);
+  }
+  pila.addEventListener('mouseover', (e) => { if (cartaSotto(e)) segnaSopra(true); });
+  document.addEventListener('mouseout', (e) => {
+    const r = e.relatedTarget;
+    if (!(r && r.closest && r.closest('.shell-notif.show'))) segnaSopra(false);
+  }, true);
+  root.addEventListener('mouseleave', () => segnaSopra(false));
   let gestoDellaPagina = false;
   let sopraIlVuoto = false;
   const TASTO = ['left', 'middle', 'right'];

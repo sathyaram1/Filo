@@ -183,6 +183,12 @@ class AvvisiSopraPagina {
     });
   }
 
+  // Il puntatore sopra le carte ferma i loro tempi: li tiene la shell.
+  _sopra(on) {
+    if (!this.win || this.win.isDestroyed()) return;
+    try { this.win.webContents.send('avvisi:sopra', { sopra: on }); } catch (_) {}
+  }
+
   _mostraSuggerimento(dati) {
     const t = testo(dati && dati.testo);
     const vista = this.vista;
@@ -254,6 +260,8 @@ class AvvisiSopraPagina {
         this._inoltra(dati);
       } else if (canale === 'avvisi:menu') {
         this._menu(dati);
+      } else if (canale === 'avvisi:sopra') {
+        this._sopra(!!(dati && dati.sopra));
       }
     });
     wc.once('did-finish-load', () => { this.pronta = true; this._invia(); });
@@ -271,6 +279,7 @@ class AvvisiSopraPagina {
     this.pronta = false;
     if (!vista) return;
     this._nascondiSuggerimento();
+    this._sopra(false);
     this.altezza = 0;
     try { this._riserva(0); } catch (_) {}
     try { if (this.win && !this.win.isDestroyed()) this.win.contentView.removeChildView(vista); } catch (_) {}

@@ -933,6 +933,9 @@
     // Con un tetto teniamo solo le più recenti (le più rilevanti); le eccedenti
     // vengono rimosse subito, senza attendere il timeout.
     const MAX_STACK = 5;
+    // Col puntatore sopra la pila i tempi aspettano; uscito, a chi era agli sgoccioli restano almeno questi ms.
+    const RIPRESA_MS = 2000;
+    let fermi = false;
     let seq = 0;
     function hostEl() {
       if (!host) {
@@ -967,6 +970,7 @@
       try { api.avvisi.stato({ carte, tema: { vars } }); } catch (_) {}
     }
     if (api.avvisi) {
+      if (api.avvisi.onSopra) api.avvisi.onSopra((dati) => ferma(!!(dati && dati.sopra)));
       api.avvisi.onAzione((dati) => {
         if (!host || !dati) return;
         const card = Array.from(host.children).find((c) => c.dataset.nid === String(dati.id));
@@ -990,11 +994,35 @@
         try { c.remove(); } catch (_) {}
       }
     }
+    function avviaTempo(card, ms) {
+      card._restano = ms;
+      if (fermi) return;
+      card._scade = Date.now() + ms;
+      card._timer = setTimeout(() => dismiss(card), ms);
+    }
+    function ferma(sopra) {
+      if (sopra === fermi) return;
+      fermi = sopra;
+      for (const c of hostEl().children) {
+        if (c.dataset.closing === '1' || c._restano == null) continue;
+        if (sopra) {
+          if (!c._timer) continue;
+          clearTimeout(c._timer);
+          c._timer = null;
+          c._restano = Math.max(0, c._scade - Date.now());
+        } else if (!c._timer) {
+          avviaTempo(c, Math.max(c._restano, RIPRESA_MS));
+        }
+      }
+    }
     function dismiss(card) {
       if (!card || card.dataset.closing === '1') return;
       card.dataset.closing = '1';
       if (card._timer) clearTimeout(card._timer);
+      card._timer = null;
       card.classList.remove('show');
+      // Pila vuota: nessuno ha più il puntatore sopra, anche se la vista sparendo non l'ha potuto dire.
+      if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) fermi = false;
       // attende la transizione prima di rimuovere dal DOM
       setTimeout(() => { try { card.remove(); } catch (_) {} }, 220);
     }
@@ -1064,9 +1092,7 @@
         try { window.SN_SOUNDS.play(typeof wantSound === 'string' ? wantSound : notifConfig.sound); } catch (_) {}
       }
 
-      if (!infinite) {
-        card._timer = setTimeout(() => dismiss(card), durationSec * 1000);
-      }
+      if (!infinite) avviaTempo(card, durationSec * 1000);
       return card;
     }
     // Un avviso con chiave dice uno stato: quando lo stato cambia se ne va.

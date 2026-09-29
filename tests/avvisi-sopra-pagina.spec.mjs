@@ -398,3 +398,73 @@ test('la X di un avviso dice «Chiudi» col suggerimento di Filo, che se ne va c
   await shell.evaluate(() => document.querySelector('.shell-notif-close').click());
   await expect.poll(suggerimento, { timeout: 4000 }).not.toMatch(/Chiudi/);
 });
+
+test('col riquadro Aiuto aperto gli avvisi della barra non coprono la sua riga per scrivere, e quando se ne vanno il riquadro torna giù', async ({ app, shell, avvisi }) => {
+  let page = null;
+  await expect.poll(() => {
+    page = app.windows().find((w) => { try { return w.url().startsWith('filo://newtab'); } catch (_) { return false; } });
+    return !!page;
+  }, { timeout: 10_000 }).toBe(true);
+  await page.waitForFunction(() => typeof window.SN_SIDEBAR?.open === 'function', null, { timeout: 8000 });
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs).setContentSize(1280, 800));
+  await page.evaluate(() => window.SN_SIDEBAR.open());
+  await page.waitForSelector('.sn-sidebar-input', { timeout: 8000 });
+  const fondoRiga = () => page.evaluate(() => Math.round(innerHeight - document.querySelector('.sn-sidebar-input').getBoundingClientRect().bottom));
+  const prima = await fondoRiga();
+
+  await shell.evaluate(() => window.filoNotify('Scaricato: report.pdf', {
+    durationSec: 0,
+    actions: [{ label: 'Apri file', onClick: () => {} }, { label: 'Apri cartella', onClick: () => {} }],
+  }));
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
+  const coperto = async () => {
+    const g = await app.evaluate(({ BrowserWindow }) => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+      return { v: tm.avvisi.vista.getBounds(), t: tm.tabs.find((t) => t.id === tm.activeId).view.getBounds() };
+    });
+    const riga = await page.evaluate(() => {
+      const r = document.querySelector('.sn-sidebar-input').getBoundingClientRect();
+      return { x: r.left, y: r.top, right: r.right, bottom: r.bottom, alto: document.querySelector('.sn-sidebar').getBoundingClientRect().top };
+    });
+    const c = await vista.evaluate(() => {
+      const r = document.querySelector('.shell-notif').getBoundingClientRect();
+      return { x: r.left, y: r.top, right: r.right, bottom: r.bottom };
+    });
+    const dx = g.v.x - g.t.x;
+    const dy = g.v.y - g.t.y;
+    // Salendo non esce dall'alto della pagina: si accorcia.
+    if (riga.alto < 0) return 'fuori';
+    return riga.x < c.right + dx && c.x + dx < riga.right && riga.y < c.bottom + dy && c.y + dy < riga.bottom;
+  };
+  await expect.poll(coperto, { timeout: 5000 }).toBe(false);
+
+  // Ridotto alla sola riga per scrivere resta sopra lo stesso.
+  await page.evaluate(() => document.querySelector('.sn-sidebar').classList.add('sn-sidebar-collapsed'));
+  await expect.poll(coperto, { timeout: 5000 }).toBe(false);
+  await page.evaluate(() => document.querySelector('.sn-sidebar').classList.remove('sn-sidebar-collapsed'));
+
+  await vista.locator('.shell-notif-close').click();
+  await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
+  await expect.poll(fondoRiga).toBe(prima);
+});
+
+test('un avviso a tempo resta finché il puntatore ci sta sopra, e se ne va da solo quando esce', async ({ shell, avvisi }) => {
+  await shell.evaluate(() => window.filoNotify('Scaricato: report.pdf', {
+    durationSec: 2,
+    actions: [{ label: 'Apri file', onClick: () => {} }, { label: 'Apri cartella', onClick: () => {} }],
+  }));
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
+  await vista.locator('.shell-notif-msg').hover();
+  await expect.poll(() => vista.evaluate(() => document.querySelector('.shell-notif:hover') !== null)).toBe(true);
+
+  // Il doppio della sua durata col puntatore sopra: c'è ancora, e i pulsanti si raggiungono.
+  await shell.waitForTimeout(4000);
+  await expect(shell.locator('.shell-notif:not([data-closing="1"])')).toHaveCount(1);
+  await expect(vista.locator('.shell-notif.show .shell-notif-action', { hasText: 'Apri file' })).toBeVisible();
+
+  // Il puntatore esce nel vuoto attorno alla carta: il tempo riparte, e l'avviso se ne va da solo.
+  await vista.mouse.move(2, 2);
+  await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 8000 });
+});

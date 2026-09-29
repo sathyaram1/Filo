@@ -109,6 +109,11 @@ contextBridge.exposeInMainWorld('filoShell', {
       ipcRenderer.on('avvisi:azione', wrapped);
       return () => ipcRenderer.removeListener('avvisi:azione', wrapped);
     },
+    onSopra: (fn) => {
+      const wrapped = (_event, dati) => { try { fn(dati); } catch (_) {} };
+      ipcRenderer.on('avvisi:sopra', wrapped);
+      return () => ipcRenderer.removeListener('avvisi:sopra', wrapped);
+    },
   },
   // Modalità annotazione del box feedback: la shell mette/toglie un velo
   // d'ombra sopra la propria barra in alto così tutto Filo va in penombra.
