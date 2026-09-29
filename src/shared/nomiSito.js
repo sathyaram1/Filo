@@ -71,7 +71,7 @@
     if (!/(^|\.)xn--/i.test(s)) return s;
     const etichette = s.split('.').map((e) => {
       if (!/^xn--/i.test(e)) return e;
-      try { return decodifica(e.slice(4).toLowerCase()); } catch (_) { return e; }
+      try { return decodifica(e.slice(4).toLowerCase()) || e; } catch (_) { return e; }
     });
     const estensione = etichette[etichette.length - 1] || '';
     if (/^[\x00-\x7f]*$/.test(estensione) && etichette.some((e) => IMITATORI.test(e))) return s;
