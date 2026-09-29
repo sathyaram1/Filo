@@ -75,7 +75,7 @@ async function pixelAccesi(nome) {
 test('la pagina sospetta riaperta di nascosto non suona e non lascia la sua finestra di dialogo sullo schermo', async () => {
   test.setTimeout(90_000);
   expect(await pixelAccesi('591-giro21-r1-prima.png'), 'lo schermo non è vuoto già prima della prova').toBeLessThan(50);
-  const fatto = app.evaluate(async (_e, u) => globalThis.SN_SAFEBROWSE.sandbox.detonate(u), origine + '/allarme');
+  const fatto = app.evaluate(async (_e, u) => globalThis.SN_SAFEBROWSE.sandbox.detonate(u), origine + '/allarme').catch(() => null);
   await expect.poll(() => esiti.includes('audio:running'), { timeout: 10_000 }).toBe(true);
   const copie = await app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows()
     .filter((w) => !w.isDestroyed() && w.webContents.getURL().startsWith(u))
