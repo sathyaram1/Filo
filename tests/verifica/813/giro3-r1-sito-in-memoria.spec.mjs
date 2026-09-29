@@ -36,22 +36,27 @@ async function primaPagina(openTab, testServer) {
   return page;
 }
 
+// La scheda passa alla pagina dopo del sito, come dopo l'invio di un modulo.
+async function paginaDopo(page, url, titolo) {
+  await page.evaluate((u) => location.assign(u), url);
+  await page.waitForFunction((t) => document.title === t && document.documentElement.dataset.filoReady === '1', titolo, { timeout: 8000 });
+}
+
 test('con Google irraggiungibile, un\'altra pagina di un sito appena riconosciuto in lista mostra ancora l\'avviso', async ({ app, openTab, testServer }) => {
   await preparaGoogle(app);
-  await primaPagina(openTab, testServer);
+  const page = await primaPagina(openTab, testServer);
 
   await modo(app, 'giu');
-  const seconda = await openTab(testServer.html('<title>CONFERMA</title><form><input placeholder="numero della carta"></form>'));
-  await seconda.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+  await paginaDopo(page, testServer.html('<title>CONFERMA</title><form><input placeholder="numero della carta"></form>'), 'CONFERMA');
   await expect.poll(() => app.evaluate(() => globalThis.__g813r1.richieste), { timeout: 5000 }).toBeGreaterThan(1);
-  await expect(seconda.getByText('Sito segnalato come pericoloso')).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText('Sito segnalato come pericoloso')).toBeVisible({ timeout: 5000 });
 });
 
 test('con Google lento, un\'altra pagina di un sito appena riconosciuto in lista mostra l\'avviso senza aspettarlo', async ({ app, openTab, testServer }) => {
   await preparaGoogle(app);
-  await primaPagina(openTab, testServer);
+  const page = await primaPagina(openTab, testServer);
 
   await modo(app, 4000);
-  const seconda = await openTab(testServer.html('<title>CONFERMA2</title><form><input type="password"></form>'));
-  await expect(seconda.getByText('Sito segnalato come pericoloso')).toBeVisible({ timeout: 2000 });
+  await paginaDopo(page, testServer.html('<title>CONFERMA2</title><form><input type="password"></form>'), 'CONFERMA2');
+  await expect(page.getByText('Sito segnalato come pericoloso')).toBeVisible({ timeout: 1500 });
 });
