@@ -363,7 +363,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   const strumentiVisti = new Set();
   const inCorso = new Map();
   const modelli = new Set();
-  const sconosciuti = new Set();
+  const sconosciuti = new Map();
   // `since`: solo quello che è successo da quel momento (il biglietto di
   // questo giro): quando l'orchestratore rilascia il biglietto di un worker
   // morto, il suo transcript è quello scelto, e senza finestra ci finirebbero
