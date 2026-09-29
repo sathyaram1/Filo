@@ -108,7 +108,9 @@
         ? { country: String(meta.proxy.country), tier: meta.proxy.tier || null }
         : null,
     };
-    return d.aggiungi(entry);
+    const r = d.aggiungi(entry);
+    if (r) entrate([r]);
+    return r;
   }
 
   // Come list() ma SENZA gli embedding: è ciò che mandiamo al renderer, per non
