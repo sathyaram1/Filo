@@ -136,8 +136,8 @@ test('§5 — cancellazione multipla dall’archivio (DELETE_ARCHIVED_TABS)', as
 test('cambiando modello di indicizzazione, i vettori vecchi si rifanno da soli e la ricerca riparte', async ({ app, openTab }) => {
   // Le schede archiviate prima del cambio (o con l'API di Google, che non c'è
   // più) hanno vettori di un'altra "lingua": non si confrontano con quelli
-  // nuovi. La ricerca deve ignorarli — e reindicizzarli in background, così
-  // dalla ricerca dopo ci sono anche loro. Senza il fix: o si confrontano
+  // nuovi. La ricerca deve ignorarli e reindicizzarli col modello in uso, così
+  // la scheda conta già in quella ricerca. Senza il fix: o si confrontano
   // vettori incompatibili (risultati a caso) o le schede vecchie spariscono
   // dalla ricerca per sempre.
   await app.evaluate(async () => {
