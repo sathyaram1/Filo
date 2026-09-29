@@ -4,6 +4,8 @@
   'use strict';
 
   const { STORAGE_KEYS, SAVED_PAGES_LIMIT } = global.SN_CONST;
+  // Ogni miniatura entra rimpicciolita, da qualunque strada arrivi (#839).
+  const { perLista } = require('./miniature');
 
   function uuid() {
     if (crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -20,6 +22,7 @@
   }
 
   async function save(page) {
+    const thumbnail = perLista(page.thumbnail);
     const pages = await list();
 
     // Dedupe per URL: salvare di nuovo una pagina già in "Aperti per dopo"
@@ -31,7 +34,7 @@
       const existing = pages[idx];
       existing.title = page.title || existing.title || page.url;
       if (page.favicon) existing.favicon = page.favicon;
-      if (page.thumbnail) existing.thumbnail = page.thumbnail;
+      if (thumbnail) existing.thumbnail = thumbnail;
       existing.savedAt = new Date().toISOString();
       pages.splice(idx, 1);
       pages.unshift(existing);
@@ -44,7 +47,7 @@
       url: page.url,
       title: page.title || page.url,
       favicon: page.favicon || '',
-      thumbnail: page.thumbnail || '',
+      thumbnail,
       savedAt: new Date().toISOString(),
       category: page.category || null,
       categoryConfidence: page.categoryConfidence || null,
@@ -61,6 +64,7 @@
   // esiste più (rimossa nel frattempo) l'update è un no-op.
   async function setThumbnail(id, thumbnail) {
     if (!id || !thumbnail) return null;
+    thumbnail = perLista(thumbnail);
     const pages = await list();
     const entry = pages.find((p) => p.id === id);
     if (!entry) return null;
@@ -81,5 +85,5 @@
     return remove(id);
   }
 
-  global.SN_SAVED_PAGES = { list, save, setThumbnail, remove, consume };
+  global.SN_SAVED_PAGES = { list, save, setThumbnail, remove, consume, rimpicciolisciMiniature: require('./miniature').rimpicciolisciSalvate };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

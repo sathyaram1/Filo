@@ -218,6 +218,8 @@ module.exports = function register(on, ctx) {
       }
       if (Object.keys(rest).length) await DiskStorage.set(rest);
       if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
+      // Un backup di una versione vecchia porta le miniature a piena risoluzione (#839).
+      globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {});
 
       return { ok: true, added: stats.added, updated: stats.updated, unchanged: stats.unchanged };
     } catch (e) {
