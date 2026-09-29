@@ -298,13 +298,9 @@ test.describe('segnali di attività per-tab', () => {
       return t ? t.scrollPct : 0;
     }, activeId), { timeout: 8_000 }).toBeGreaterThan(0);
 
-    // Scrivere in un campo → formDirty true.
-    await page.evaluate(() => {
-      const el = document.getElementById('f');
-      el.focus();
-      el.value = 'ciao';
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-    });
+    // Scrivere in un campo → formDirty true. Scritto davvero: un valore messo da uno script
+    // della pagina non è testo dell'utente (#824).
+    await page.locator('#f').fill('ciao');
     await expect.poll(async () => shell.evaluate(async (id) => {
       const snap = await window.filoShell.tabs.snapshot();
       const t = snap.tabs.find((x) => x.id === id);
