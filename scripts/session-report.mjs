@@ -57,7 +57,8 @@ import { fileURLToPath } from 'node:url';
 // 0,25 $/M) e Fable 5 (1 $/M). Sonnet 4.x costa 3/15, Sonnet 5 costa 2/10.
 // Opus 5.5 costa 4/20 (lettura 0,20 $/M): a tariffa opus le routine
 // risultavano care più del doppio, perché la lettura della cache è quasi tutto.
-// Un modello sconosciuto paga la tariffa opus, con una nota nel rapporto.
+// Un modello che il listino non conosce per nome paga la tariffa della sua
+// famiglia (opus se non ne ha una), con una nota nel rapporto.
 //
 // Le due durate si distinguono nel transcript (`usage.cache_creation.
 // ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`; la somma è
