@@ -2627,7 +2627,7 @@ class TabManager {
   }
 
   // #590 — L'UNICO punto che applica la lista dei siti bloccati: ci passano
-  // openTab, navigate, will-navigate, will-redirect, la storia e le viste ricreate.
+  // openTab, navigate, will-navigate, will-redirect, la storia, le viste ricreate e il commit.
   // Ritorna la decisione ({ host, reason, target }) se la lista ferma `url`, altrimenti
   // null; non avvisa. `tab` è la scheda di partenza, che può avere un «Apri comunque».
   _decisioneBlocco(tab, url) {
