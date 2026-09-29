@@ -29,7 +29,7 @@ Quello che la **shell** deve mostrare nell'area della pagina e che deve restarci
   mostrerebbe la pagina. La sua pagina manda le misure in modo sincrono a
   ogni disegno: nata nascosta e grande zero, il ResizeObserver può non partire
   mai. Ogni `addChildView` di una scheda finisce sopra di lei, quindi il layout la
-  riporta in cima. Preload minimo (lo stato entra; misure, clic, tasto destro e gesti del vuoto escono), e il
+  riporta in cima. Preload minimo (lo stato entra; misure, clic, tasto destro, puntatore sopra le carte e gesti del vuoto escono), e il
   canale dello stato si accetta solo dalla shell della sua finestra.
 - **La tastiera non è sua.** Una WebContentsView che carica la sua pagina
   DENTRO la finestra si prende il fuoco: chi stava scrivendo nella scheda perde i
@@ -37,17 +37,24 @@ Quello che la **shell** deve mostrare nell'area della pagina e che deve restarci
   entra nella finestra alla prima posa; e se un clic le dà la tastiera la
   restituisce subito alla scheda, al giro dopo l'evento `focus` (durante l'evento
   il fuoco risulta ancora a chi l'aveva, e restituirlo non farebbe niente).
-- **L'angolo si divide.** Le pile di Filo dentro la pagina (content script,
-  editor) stanno nello stesso angolo: la vista scrive la sua altezza nella scheda
-  attiva (`--filo-avvisi-barra`, foglio d'autore: uno di origine `user` non si
-  toglie più) e quelle pile ci salgono sopra. Il valore è in px CSS della scheda,
+- **L'angolo si divide.** Quello che Filo ancora in basso a destra dentro la
+  pagina (le pile di avvisi del content script e dell'editor, il riquadro Aiuto,
+  anche spostato a mano finché resta nell'angolo) sta nello stesso angolo: la vista scrive la sua altezza
+  nella scheda attiva (`--filo-avvisi-barra`, foglio d'autore: uno di origine
+  `user` non si toglie più) e tutto ci sale sopra. Un riquadro nuovo in
+  quell'angolo usa la stessa variabile nel suo `bottom`: lo controlla
+  `tests/unit/angoloAvvisiBarra.test.mjs` sui fogli di `src/styles` e `src/pages`
+  (una posizione scritta da JS la sentinella non la vede). Il valore è in px CSS della scheda,
   quindi dipende dal suo zoom: il preload della pagina segnala ogni cambio di zoom,
   da qualunque parte arrivi (`filo:zoom-cambiato`), e il main lo riscrive.
 - **Il tasto destro** su una carta apre il menu di Filo con le sue azioni e
   «Chiudi»; la scelta passa dallo stesso canale del clic. In fondo alla finestra
   il menu si apre sopra il punto.
 - **Il modello resta dov'era.** La vista disegna e riporta i clic; tetto, tempi,
-  chiavi e azioni restano nella shell. Il DOM della shell diventa un modello
+  chiavi e azioni restano nella shell. Col puntatore sopra una carta i tempi
+  aspettano (la vista dice solo quando entra ed esce, la shell ferma e riparte, e
+  a chi era agli sgoccioli lascia due secondi); la pila che si svuota scioglie la
+  pausa, perché la vista che sparisce non riceve l'uscita del puntatore. Il DOM della shell diventa un modello
   **nascosto** (`visibility: hidden`): un test che ne chiede la visibilità o ci
   clicca sopra fallisce, invece di dire verde su una cosa che nessuno vede.
 - **Il tema** della shell (token dell'utente, incognito) la vista non ce l'ha: la

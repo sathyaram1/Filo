@@ -43,8 +43,9 @@ irraggiungibili.
   l'utente che fa due cose di fila: è **un'azione sola** che mostra prima
   «sto lavorando» e poi l'esito. Quando due pile non possono essere una (quella
   della barra sta in una vista sopra la pagina, quelle della pagina nel suo
-  DOM), una cede il posto all'altra: le pile della pagina salgono dell'altezza
-  di quella della barra (#588.5).
+  DOM), una cede il posto all'altra: le pile della pagina, e ogni riquadro di
+  Filo in quell'angolo, salgono dell'altezza di quella della barra (#588.5,
+  sentinella `tests/unit/angoloAvvisiBarra.test.mjs`).
 - **Non tutti gli avvisi sono sfrattabili.** Il tetto butta via i più vecchi, ma
   un avviso che porta **l'unico comando** per una cosa in corso (fermare una
   registrazione, raggiungere la lista dove è appena finita una pagina) va marcato
