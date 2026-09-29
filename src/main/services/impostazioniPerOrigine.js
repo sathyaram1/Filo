@@ -71,16 +71,17 @@ function domandaAmmessaDaUnSito(type, { inVista = false, schedaInVista = false, 
 }
 
 // Quelle che il codice di Filo nelle pagine fa solo dopo un gesto dell'utente (Incolla, Detta, Salva per dopo, la voce
-// della dettatura, l'invio di un feedback, gli scaricamenti, un altro paese) e gli scomparti che scrive solo così
-// (dizionario, correzioni, disposizione del menu): da un sito vogliono un gesto vero e recente su quella scheda.
+// della dettatura, l'invio di un feedback, gli scaricamenti, un altro paese, il «Ha funzionato?» dell'Aiuto) e gli
+// scomparti che scrive solo così (dizionario, correzioni, disposizione del menu): da un sito vogliono un gesto vero e
+// recente su quella scheda.
 const DOMANDE_WEB_COL_GESTO = Object.freeze(new Set([
   'permesso_filo', 'save_page', 'save_link', 'set_saved_page_thumb', 'update_settings',
   'submit_feedback', 'credits_award_feedback', 'redteam_submit',
-  'download_image', 'download_media', 'download_link', 'geo_propose_accept',
+  'download_image', 'download_media', 'download_link', 'geo_propose_accept', 'save_path',
 ]));
 const CHIAVI_STORAGE_WEB_COL_GESTO = Object.freeze(['sn_personal_dict', 'sn_autocorrect', 'sn_icon_layout']);
-// Un gesto, un salvataggio: la lista tiene le ultime mille, e mille salvataggi dopo un clic sono del sito.
-const DOMANDE_WEB_UNA_PER_GESTO = Object.freeze(new Set(['save_page', 'save_link']));
+// Un gesto, una scrittura: la lista tiene le ultime mille, e un «Ha funzionato?» costa due chiamate al modello.
+const DOMANDE_WEB_UNA_PER_GESTO = Object.freeze(new Set(['save_page', 'save_link', 'save_path']));
 
 /** La domanda di un sito vuole un gesto dell'utente? PURA. */
 function vuoleUnGesto(type, msg = null) {
