@@ -64,7 +64,7 @@ test('migrazione di 6000 schede da storage.json, riavvio, tempi', async () => {
       const t0 = Date.now();
       const l = await globalThis.SN_ARCHIVED_TABS.list();
       const t1 = Date.now();
-      await require('node:timers/promises').setTimeout(300);
+      await globalThis.__filoStorage.whenSettled();
       return { l, ms: t1 - t0 };
     });
     console.log('apertura+migrazione ms', r.ms);
@@ -129,13 +129,6 @@ test('ricerca con 6000 schede: trova una delle prime, la seconda non indicizza, 
       }
       await A.importa(voci);
     }, 6000);
-    const cerca = (a) => a.evaluate(async () => {
-      const prima = globalThis.__chiamate.length;
-      const w = globalThis.SN_WINDOW || null;
-      const { BrowserWindow } = require('electron');
-      return { prima };
-    });
-    await cerca(app);
     const shell = await app.firstWindow();
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
@@ -184,7 +177,7 @@ test('cancellare una scheda la toglie dai file della cartella dati (una, alcune,
   await page.waitForLoadState('domcontentloaded');
   await page.evaluate(async () => chrome.runtime.sendMessage({ type: 'remove_archived_tab', id: 'x1' }));
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
-  await app.evaluate(async () => { await require(require('node:path').join(process.cwd(), 'src/main/shim/storage.js')).whenSettled?.(); });
+  await app.evaluate(async () => { await globalThis.__filoStorage.whenSettled(); });
   const dove = tuttiIFile(userData).filter((p) => { try { return readFileSync(p).includes(S); } catch (_) { return false; } });
   expect(dove).toEqual([]);
   const resto = await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((t) => [t.id, t.coOpenUrls]));
@@ -233,7 +226,6 @@ test('esporta e reimporta: l’archivio torna uguale', async () => {
 test('incognito: chiudere una scheda non la archivia, e dall’incognito non si svuota l’archivio', async ({ app, testServer }) => {
   await app.evaluate(async () => { await globalThis.SN_ARCHIVED_TABS.archive({ url: 'https://tenuta.test/', title: 'Tenuta' }); });
   const url = testServer.html('<title>Segreta</title>segreta');
-  await app.evaluate(async () => { require('electron').ipcMain.emit; });
   const shell = await app.firstWindow();
   await shell.evaluate(() => window.filoShell.openIncognito());
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito && w._filoTabs))).toBe(true);
