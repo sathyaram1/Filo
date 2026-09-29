@@ -82,10 +82,13 @@ test('le notifiche e il microfono concessi a un sito restano concessi dopo aver 
   esiti.length = 0;
   ({ app, shell } = await avvia());
   try {
+    // Le schede della volta prima possono tornare da sole: conta che ogni lettura dica concesso.
     await shell.evaluate((u) => window.filoShell.tabs.open(u), origine + '/posta');
-    await expect.poll(() => esiti.slice(), { timeout: 15_000 }).toEqual(['stato:granted']);
+    await expect.poll(() => esiti.some((x) => x.startsWith('stato:')), { timeout: 15_000 }).toBe(true);
+    expect(esiti.filter((x) => x.startsWith('stato:')).every((x) => x === 'stato:granted'), JSON.stringify(esiti)).toBe(true);
     await shell.evaluate((u) => window.filoShell.tabs.open(u), origine + '/riunione');
-    await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['stato:granted', 'microfono:concesso']);
+    await expect.poll(() => esiti.includes('microfono:concesso'), { timeout: 10_000 }).toBe(true);
+    await expect(shell.locator('#permesso-bar')).toBeHidden();
   } finally {
     await chiudiApp(app);
   }
