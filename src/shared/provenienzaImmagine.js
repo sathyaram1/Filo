@@ -413,7 +413,9 @@
       if (c && !origine) origine = c;
     }
     const chi = /(?:xmp:CreatorTool|photoshop:Credit|dc:creator|tiff:Make)\s*(?:=\s*"([^"]*)"|>\s*([^<]*)<)/i.exec(t);
-    return { origine, dichiarante: chi ? String(chi[1] || chi[2] || '').trim() : '' };
+    // «Adobe Photoshop 25.0 (Windows)»: il sistema su cui girava non dice chi dichiara.
+    const nome = chi ? String(chi[1] || chi[2] || '').trim() : '';
+    return { origine, dichiarante: nome.replace(/\s*\((?:windows|macintosh|mac ?os[^)]*|linux|android|ios)\)$/i, '') };
   }
 
   // ─────────────────────────────── C2PA ────────────────────────────────────
@@ -801,8 +803,8 @@
     if (res.prova === 'firmata') {
       if (res.firmatario === 'non_verificato') {
         return chi
-          ? `${cosa} secondo credenziali firmate da ${chi}: firma valida, firmatario non verificato.`
-          : `${cosa} secondo credenziali firmate: firma valida, firmatario non verificato.`;
+          ? `${cosa} secondo credenziali firmate da ${chi}. Firma valida, firmatario non verificato.`
+          : `${cosa} secondo credenziali firmate. Firma valida, firmatario non verificato.`;
       }
       if (res.firmatario !== 'riconosciuto') {
         return chi

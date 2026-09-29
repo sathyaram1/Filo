@@ -63,7 +63,7 @@ test('prima di aver mai scaricato l’elenco: firma valida, firmatario non verif
 
   const riga = menu.locator(RIGA);
   await expect(riga).toHaveText(
-    'Generata con l’AI secondo credenziali firmate da OpenAI: firma valida, firmatario non verificato.',
+    'Generata con l’AI secondo credenziali firmate da OpenAI. Firma valida, firmatario non verificato.',
     { timeout: 10000 },
   );
   await expect(riga).toHaveClass(/sn-menu-origine-debole/);
@@ -205,7 +205,7 @@ test('in chat, un’immagine con credenziali firmate porta al modello lo stesso 
 test('in chat, senza elenco la risposta dice lo stesso «non verificato» del menu', async ({ app }) => {
   await configuraModello(app);
   const prompt = await promptConImmagine(app, 'questa foto è fatta con l’AI?', dataUrl(pngFirmato(firmatario())));
-  expect(prompt).toContain('Generata con l’AI secondo credenziali firmate da OpenAI: firma valida, firmatario non verificato.');
+  expect(prompt).toContain('Generata con l’AI secondo credenziali firmate da OpenAI. Firma valida, firmatario non verificato.');
 });
 
 test('in chat, un’immagine senza etichette dice che non ce ne sono e che questo non prova niente', async ({ app }) => {

@@ -48,7 +48,7 @@ test('mai scaricato: la firma è valida ma il firmatario resta non verificato', 
   F._dimentica();
   const r = await F.analizzaImmagine(IMMAGINE);
   assert.equal(r.firmatario, 'non_verificato');
-  assert.match(P.frase(r), /firma valida, firmatario non verificato/);
+  assert.match(P.frase(r), /Firma valida, firmatario non verificato/);
   assert.equal(F.stato().scaricato, false);
 });
 

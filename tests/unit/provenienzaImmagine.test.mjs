@@ -39,7 +39,7 @@ test('finché l’elenco non è mai stato scaricato: firma valida, firmatario no
   const r = P.analizza(pngFirmato(firmatario()));
   assert.equal(r.prova, 'firmata');
   assert.equal(r.firmatario, 'non_verificato', 'senza elenco non si decide niente su chi ha firmato');
-  assert.equal(P.frase(r), 'Generata con l’AI secondo credenziali firmate da OpenAI: firma valida, firmatario non verificato.');
+  assert.equal(P.frase(r), 'Generata con l’AI secondo credenziali firmate da OpenAI. Firma valida, firmatario non verificato.');
   assert.equal(P.analizza(pngFirmato(firmatario()), { ancore: null }).firmatario, 'non_verificato');
 });
 
@@ -167,6 +167,13 @@ test('l’etichetta IPTC/XMP senza firma si presenta come dichiarazione del file
   assert.equal(r.origine, 'ai');
   assert.equal(r.prova, 'dichiarata');
   assert.equal(P.frase(r), 'Generata con l’AI secondo il file stesso (Adobe), senza firma che lo confermi.');
+});
+
+test('nell’etichetta XMP il programma si nomina senza il sistema su cui girava', () => {
+  const xmp = '<rdf:Description xmp:CreatorTool="Adobe Photoshop 25.0 (Windows)" '
+    + 'Iptc4xmpExt:DigitalSourceType="http://cv.iptc.org/newscodes/digitalsourcetype/compositeWithTrainedAlgorithmicMedia"/>';
+  assert.equal(P.frase(P.analizza(pngConXmp(pngSpoglio(), xmp))),
+    'Modificata con l’AI secondo il file stesso (Adobe Photoshop 25.0), senza firma che lo confermi.');
 });
 
 test('compositeWithTrainedAlgorithmicMedia in XMP resta «modificata»', () => {
