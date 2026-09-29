@@ -53,3 +53,14 @@ test('sosia che chiede la password dopo l\'email, senza ricaricare: blocco', asy
   await expect(page.getByPlaceholder('Password')).toBeVisible();
   await expect(page.getByPlaceholder('confermo')).toBeVisible({ timeout: 8_000 });
 });
+
+test('sosia col modulo d\'accesso in un riquadro incorporato della pagina: blocco', async ({ app, openTab }) => {
+  await servi(app, {
+    'paypak.com/accesso': `<!doctype html><body>${ACCESSO}</body>`,
+    'paypak.com': '<h1>PayPal</h1><iframe src="/accesso" width="400" height="200"></iframe>',
+  });
+  const page = await openTab('https://paypak.com/');
+  const riquadro = page.frameLocator('iframe');
+  await expect(riquadro.getByPlaceholder('Email')).toBeVisible({ timeout: 12_000 });
+  await expect(page.getByPlaceholder('confermo')).toBeVisible({ timeout: 8_000 });
+});
