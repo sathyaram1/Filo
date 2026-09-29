@@ -91,14 +91,36 @@ export function scrittureCache(u) {
   return { cw5m: cw5m + resto, cw1h };
 }
 
-/** La famiglia di prezzo di un modello. PURA. `known` è falso se si ripiega su opus. */
+/** Le versioni che il listino conosce per nome, con la tariffa che devono avere. */
+const VERSIONI = Object.freeze({
+  opus: { '5-5': 'opus-5-5', 5: 'opus', '4-8': 'opus', '4-7': 'opus', '4-6': 'opus', '4-5': 'opus' },
+  sonnet: { 5: 'sonnet', '4-6': 'sonnet-4', '4-5': 'sonnet-4', 4: 'sonnet-4' },
+  haiku: { '4-5': 'haiku' },
+  fable: { '5-1': 'fable', 5: 'fable-5' },
+  mythos: { '5-1': 'fable', 5: 'fable-5' },
+});
+
+/** Il nome di ogni tariffa, per la nota del rapporto. */
+export const NOMI_TARIFFA = Object.freeze({
+  opus: 'Opus 5', 'opus-5-5': 'Opus 5.5', sonnet: 'Sonnet 5', 'sonnet-4': 'Sonnet 4.6',
+  haiku: 'Haiku 4.5', fable: 'Fable 5.1', 'fable-5': 'Fable 5',
+});
+
+/**
+ * La tariffa di un modello. PURA. `known` è falso se il listino non conosce
+ * quella versione per nome: Opus 5.5 passò in silenzio per Opus 5, il
+ * prossimo modello di una famiglia nota deve almeno lasciare la nota.
+ */
 export function famigliaPrezzo(model) {
   const m = String(model || '').toLowerCase();
-  if (/fable|mythos/.test(m)) return { key: /(fable|mythos)-5(?![-\d])/.test(m) ? 'fable-5' : 'fable', known: true };
-  if (m.includes('opus')) return { key: /opus-5-5(?!\d)/.test(m) ? 'opus-5-5' : 'opus', known: true };
-  if (m.includes('sonnet')) return { key: /sonnet-4/.test(m) ? 'sonnet-4' : 'sonnet', known: true };
-  if (m.includes('haiku')) return { key: 'haiku', known: true };
-  return { key: 'opus', known: false };
+  let key = 'opus';
+  if (/fable|mythos/.test(m)) key = /(fable|mythos)-5(?![-\d])/.test(m) ? 'fable-5' : 'fable';
+  else if (m.includes('opus')) key = /opus-5-5(?!\d)/.test(m) ? 'opus-5-5' : 'opus';
+  else if (m.includes('sonnet')) key = /sonnet-4/.test(m) ? 'sonnet-4' : 'sonnet';
+  else if (m.includes('haiku')) key = 'haiku';
+  // La minore ha una o due cifre: un suffisso di data (otto) non è una versione.
+  const v = /(fable|mythos|opus|sonnet|haiku)-(\d+)(?:-(\d{1,2})(?!\d))?/.exec(m);
+  return { key, known: !!v && VERSIONI[v[1]][v[3] ? `${v[2]}-${v[3]}` : v[2]] === key };
 }
 
 /** Il nome della cartella dei transcript per una cartella di lavoro. PURA. */
