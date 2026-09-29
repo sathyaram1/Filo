@@ -42,7 +42,7 @@ module.exports = function register(on, ctx) {
   on(MSG.SCRYFALL_CARDS, async (msg) => {
     try {
       const maxAgeMs = msg?.freshPrices ? Scry.PRICE_TTL_MS : Infinity;
-      const cards = await Scry.cards(msg?.ids || [], { maxAgeMs });
+      const cards = await Scry.cards(msg?.ids || [], { maxAgeMs, cacheOnly: !!msg?.cacheOnly });
       return { ok: true, cards };
     } catch (e) {
       return { ok: false, error: e?.message || 'fetch carte fallito' };
@@ -157,6 +157,15 @@ module.exports = function register(on, ctx) {
         onReasoning,
       });
       const parsed = Q.parseAgentReply(r.text);
+      // Svuotare la chat è della pagina, con la sua conferma: qui niente ricerche né modifiche al mazzo. Il testo è
+      // di Filo, non del modello: resta vero anche se la conferma non arriva (Annulla, mazzo lasciato) o se il
+      // modello scrive di averla già svuotata.
+      if (parsed.clearChat) {
+        return {
+          ok: true, reply: 'Svuoto la chat di questo mazzo? Il mazzo resta com\'è.', cardIds: [], cards: {}, query: '',
+          clearChat: true, ...(reasoning ? { reasoning } : {}),
+        };
+      }
 
       let cardIds = [];
       let cards = {};

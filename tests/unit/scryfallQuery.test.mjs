@@ -172,7 +172,7 @@ test('isFresh: dentro il TTL sì, oltre no, timestamp rotto no', () => {
 
 const NONE = {
   reply: '', query: '', filter: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
-  import: [], commanderName: '',
+  import: [], commanderName: '', clearChat: false,
 };
 
 test('parseAgentReply: JSON pulito → campi normalizzati', () => {
@@ -274,4 +274,10 @@ test('proseSegments: testo senza marcatori / vuoto / marcatore vuoto', () => {
     { type: 'text', text: '[[ ]]' },
     { type: 'text', text: ' b' },
   ]);
+});
+
+test('parseAgentReply: «svuota la chat» chiesto a parole arriva come intenzione, solo se è proprio true', () => {
+  assert.equal(Q.parseAgentReply('{"clearChat":true}').clearChat, true);
+  assert.equal(Q.parseAgentReply('{"clearChat":"true","reply":"ok"}').clearChat, false);
+  assert.equal(Q.parseAgentReply('{"reply":"ciao"}').clearChat, false);
 });

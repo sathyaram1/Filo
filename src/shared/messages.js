@@ -72,9 +72,18 @@
     DECKS_SET_COMMANDER: 'decks_set_commander', // { id, scryfallId }
     // Chat unificata del Builder (§3-§4): NL → query Scryfall / carte
     // cross-mazzo via LLM. { deckId, text, history?, lastResults? } →
-    // { ok, reply, cardIds, cards, query, deck? }. `lastResults` sono gli id
-    // dell'ultima CardList mostrata (per "valuta questi risultati", §6.1).
+    // { ok, reply, cardIds, cards, query, deck?, clearChat? }. `lastResults` sono gli id
+    // dell'ultima CardList mostrata (per "valuta questi risultati", §6.1); `clearChat`: l'utente ha
+    // chiesto a parole di svuotare la chat, la pagina chiede conferma.
     DECKS_CHAT: 'decks_chat',
+    // La chat salvata di un mazzo (§3.2), solo dalle pagine filo://. EDIT applica UNA modifica alla chat salvata
+    // (SN_DECK_CHAT.applyEdit: op 'append' | 'fill' | 'drop' | 'names') e rifiuta un mazzo che non esiste più, una
+    // chat oltre il tetto (error 'too_many', max) o un turno che non c'è più (error 'gone').
+    DECKS_CHAT_GET: 'decks_chat_get',     // { deckId } → { ok, messages }
+    DECKS_CHAT_EDIT: 'decks_chat_edit',   // { deckId, op, messages?|turn+message?|turn+userText?|turn+nameIds?, clientId } → { ok } | { ok:false, error, max? }
+    DECKS_CHAT_CLEAR: 'decks_chat_clear', // { deckId, clientId } → { ok }
+    // Broadcast alle pagine filo:// dopo EDIT/CLEAR: le altre schede sullo stesso mazzo si rileggono la chat.
+    DECKS_CHAT_CHANGED: 'decks_chat_changed', // { deckId, clientId }
     // Parere LLM carta-vs-mazzo (§6). { deckId, cardIds, compute?, refresh? } →
     // { ok, opinions: { cardId → { text, versione, stale } } }.
     // compute=false: solo cache (mai LLM). refresh=true: ricalcola anche i freschi.
@@ -89,7 +98,7 @@
     // Client Scryfall (§13.2), tutto nel main (rate limit + cache condivisi).
     SCRYFALL_SEARCH: 'scryfall_search',   // { query, deckId? } → identity auto dal commander
     SCRYFALL_NAMED: 'scryfall_named',     // { name } (risoluzione fuzzy)
-    SCRYFALL_CARDS: 'scryfall_cards',     // { ids, freshPrices? } → mappa id → carta
+    SCRYFALL_CARDS: 'scryfall_cards',     // { ids, freshPrices?, cacheOnly? } → mappa id → carta
     SCRYFALL_SYMBOLS: 'scryfall_symbols', // {} → mappa '{U}' → svg_uri
     SCRYFALL_PRINTS: 'scryfall_prints',   // { name } → { ok, prints } (n. stampe, cache permanente)
     GET_COSTS: 'get_costs',
