@@ -678,3 +678,76 @@ test('con cronologia dietro, Ctrl+Z salvato su Indietro annulla e non porta via 
   await page.keyboard.press('Control+KeyZ');
   await page.waitForURL((u) => u.href.startsWith('filo://newtab'), { timeout: 8_000 });
 });
+
+// Su Mac il browser non ripete con Cmd+Y (lì i tasti di modifica passano dalla barra dei menu):
+// l'Editor non deve contarlo fra i suoi, o Avanti con Cmd+Y tace mentre si scrive (#545).
+// Qui il Mac si simula: l'Editor chiede il sistema a SN_TASTI, che si tiene da quando si carica.
+test('su Mac Cmd+Y dato ad Avanti ripete anche mentre si scrive, e non si rifiuta altrove', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await page.addInitScript(() => {
+    let tasti;
+    Object.defineProperty(window, 'SN_TASTI', {
+      configurable: true,
+      get: () => tasti,
+      set: (v) => { tasti = v; if (v) v.suMac = () => true; },
+    });
+  });
+  await apriDocConModuli(page, [WC, { id: 'r-t', type: 'redo', cells: [{ x: 5, y: 0 }], data: {} }]);
+  expect(await page.evaluate(() => window.SN_TASTI.suMac())).toBe(true);
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await page.fill('#cfgShortcut', 'Cmd+Y');
+  await page.click('#cfgSave');
+  await expect(page.locator('#overlay')).toBeHidden();
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await page.fill('#cfgShortcut', '');
+  await page.click('#cfgSave');
+  await page.locator('.ed-module[data-type="redo"]').click();
+  await page.fill('#cfgShortcut', 'Cmd+Y');
+  await page.click('#cfgSave');
+  await expect(page.locator('#overlay')).toBeHidden();
+  await exitSettingsMode(page);
+
+  await page.click('#doc');
+  await page.keyboard.press('End');
+  await page.keyboard.type(' ABC');
+  await page.waitForTimeout(300);
+  await page.keyboard.press('Control+KeyZ');
+  await expect.poll(() => page.locator('#doc').innerText(), { timeout: 2000 }).not.toContain('ABC');
+  await page.keyboard.press('Meta+KeyY');
+  await expect.poll(() => page.locator('#doc').innerText(), { timeout: 2000 }).toContain('ABC');
+});
+
+// Scritta col trattino o con gli spazi una scorciatoia si legge come col più; senza il tasto
+// finale l'avviso dice che manca il tasto, non il modificatore che c'è (#545).
+test('«Ctrl Shift 2» parte come Ctrl+Shift+2, e «Ctrl+» dice che manca il tasto', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await apriDocConModuli(page, [WC]);
+  await enterSettingsMode(page);
+
+  for (const [scritto, atteso] of [['Ctrl+', /Manca il tasto/], ['Ctrl-Shift', /Manca il tasto/], ['Ctrl-S', /salva il documento/]]) {
+    await page.locator('.ed-module[data-type="word-count"]').click();
+    await page.fill('#cfgShortcut', scritto);
+    await page.click('#cfgSave');
+    await expect(page.locator('#cfgShortcutTaken'), scritto).toHaveText(atteso);
+    await expect(page.locator('#cfgShortcutHint'), scritto).toBeHidden();
+    await page.click('#cfgCancel');
+  }
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await page.fill('#cfgShortcut', 'Ctrl+');
+  await page.click('#cfgSave');
+  await page.screenshot({ path: 'tests/.shots/audit-editor-manca-il-tasto.png' });
+  await page.click('#cfgCancel');
+
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await page.fill('#cfgShortcut', 'Ctrl Shift 2');
+  await page.click('#cfgSave');
+  await expect(page.locator('#overlay')).toBeHidden();
+  await exitSettingsMode(page);
+  await page.click('#doc');
+  await page.keyboard.press('Control+Shift+Digit2');
+  await expect(page.locator('#overlay h3', { hasText: 'Statistiche' })).toBeVisible();
+});
