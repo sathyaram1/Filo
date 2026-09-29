@@ -247,11 +247,12 @@ test('«Azzera i permessi del sito» nel menu della scheda toglie un no: la pagi
   await expect(barra()).toContainText('vuole usare il microfono');
 });
 
-test('notifiche: chieste da sole al caricamento sono un no senza domanda; dopo un clic sulla pagina si chiedono', async () => {
+test('notifiche: chieste da sole al caricamento non fanno domande e non valgono un no; dopo un clic sulla pagina si chiedono', async () => {
   test.setTimeout(60_000);
   await apri('/notifiche-subito');
-  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['notifiche:denied']);
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['notifiche:default']);
   await expect(barra()).toBeHidden();
+  expect(await paginaDi(origine + '/notifiche-subito').evaluate(() => Notification.permission)).toBe('default');
 
   await apri('/notifiche-clic');
   let pagina = null;
