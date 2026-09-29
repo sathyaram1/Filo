@@ -4396,8 +4396,8 @@ async function rerankResults(query, items) {
 // Ricerca semantica: embeddizza la query, ordina le tab per similarità coseno.
 // Ritorna { results } (metadati senza embedding) oppure { results:null } se non
 // è possibile (niente chiave) così la pagina ripiega sul filtro per sottostringa.
-// Ogni scheda conta già alla prima ricerca: quelle senza un vettore del modello in uso (migrate, chiuse senza rete, di un
-// modello vecchio) si indicizzano adesso, e chi non arriva entro l'attesa, o non va al modello (rete di casa), vale per testo.
+// Se l'indice in sottofondo non ha ancora finito, la ricerca lo aspetta un poco; chi non arriva entro l'attesa, o non va
+// al modello (rete di casa), vale per testo.
 const ATTESA_INDICE_MS = 15_000;
 async function searchArchivedTabs(query, { topK = 40 } = {}) {
   const q = String(query == null ? '' : query).trim();
