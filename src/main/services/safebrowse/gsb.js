@@ -7,21 +7,36 @@
 const crypto = require('node:crypto');
 const { domainToASCII } = require('node:url');
 
-const MAX_UNESCAPE = 1024;
-
 function unescapeOnce(s) {
   return s.replace(/%([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
 }
 
-function escapeBytes(s) {
-  let out = '';
+const isHex = (c) => (c >= 48 && c <= 57) || (c >= 65 && c <= 70) || (c >= 97 && c <= 102);
+
+// Lo stesso punto fisso di «togli gli escape finché ne restano», in una passata: un indirizzo ostile con mille
+// livelli di %25 costava mille passate sull'intero indirizzo e fermava Filo per secondi (verifica di #813).
+function unescapeAll(s) {
+  const out = new Uint8Array(s.length);
+  let n = 0;
   for (let i = 0; i < s.length; i++) {
-    const c = s.charCodeAt(i);
-    out += (c <= 0x20 || c >= 0x7f || c === 0x23 || c === 0x25)
-      ? '%' + c.toString(16).toUpperCase().padStart(2, '0')
-      : s[i];
+    out[n++] = s.charCodeAt(i) & 0xff;
+    while (n >= 3 && out[n - 3] === 0x25 && isHex(out[n - 2]) && isHex(out[n - 1])) {
+      out[n - 3] = parseInt(String.fromCharCode(out[n - 2], out[n - 1]), 16);
+      n -= 2;
+    }
   }
-  return out;
+  return Buffer.from(out.buffer, 0, n).toString('latin1');
+}
+
+function escapeBytes(s) {
+  return s.replace(/[\x00-\x20\x7f-\xff#%]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+}
+
+function trimControls(s) {
+  let a = 0, b = s.length;
+  while (a < b && s.charCodeAt(a) <= 0x20) a++;
+  while (b > a && s.charCodeAt(b - 1) <= 0x20) b--;
+  return s.slice(a, b);
 }
 
 function schemeOf(s) {
