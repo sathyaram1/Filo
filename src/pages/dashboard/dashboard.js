@@ -1754,8 +1754,8 @@
     const doneBtn = document.createElement('button');
     doneBtn.type = 'button';
     doneBtn.className = 'dash-recap-btn dash-recap-done';
-    // Nessuna risolta (archiviate, doppioni): il congedo non festeggia.
-    doneBtn.textContent = rewards.some((r) => r.status !== 'closed') ? 'Fantastico!' : 'Va bene';
+    // Archiviate e doppioni soltanto: il congedo non festeggia.
+    doneBtn.textContent = nessunaRisolta ? 'Va bene' : 'Fantastico!';
     doneBtn.addEventListener('click', close);
     footer.append(doneBtn);
     box.appendChild(footer);
