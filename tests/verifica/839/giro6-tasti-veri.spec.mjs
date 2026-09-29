@@ -45,11 +45,19 @@ async function miniaturaPiccola(app, url) {
   return s;
 }
 
+// openTab trova la pagina per nome del sito: con due pagine dello stesso server serve l'indirizzo intero.
+async function apriEsatta(app, openTab, url) {
+  await openTab(url);
+  let page = null;
+  await expect.poll(() => { page = app.windows().find((p) => { try { return p.url() === url; } catch (_) { return false; } }); return !!page; }, { timeout: 10_000 }).toBe(true);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  return page;
+}
+
 test('Alt+S premuto sulla pagina: conferma cliccabile, miniatura piccola, e la conferma porta alla voce', async ({ app, openTab, testServer }) => {
   await testServer.openReady(openTab, PAGINA('Prima'));
   const url = testServer.html(PAGINA('Da salvare'));
-  const page = await openTab(url);
-  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  const page = await apriEsatta(app, openTab, url);
   await premiSu(app);
   const pill = page.locator('.sn-save-confirm');
   await expect(pill).toBeVisible({ timeout: 5000 });
@@ -68,8 +76,7 @@ test('Alt+S premuto sulla pagina: conferma cliccabile, miniatura piccola, e la c
 test('Alt+S col fuoco sulla barra di Filo: stessa conferma sulla pagina attiva', async ({ app, openTab, testServer }) => {
   await testServer.openReady(openTab, PAGINA('Prima'));
   const url = testServer.html(PAGINA('Dalla barra'));
-  const page = await openTab(url);
-  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  const page = await apriEsatta(app, openTab, url);
   const id = (await schede(app)).activeId;
   await premiSu(app, { dove: 'barra' });
   await expect(page.locator('.sn-save-confirm')).toBeVisible({ timeout: 5000 });
@@ -80,8 +87,7 @@ test('Alt+S col fuoco sulla barra di Filo: stessa conferma sulla pagina attiva',
 test('Alt+S col menu della linguetta aperto salva la pagina attiva con la sua conferma', async ({ app, shell, openTab, testServer }) => {
   await testServer.openReady(openTab, PAGINA('Prima'));
   const url = testServer.html(PAGINA('Dal menu linguetta'));
-  const page = await openTab(url);
-  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  const page = await apriEsatta(app, openTab, url);
   await shell.evaluate(() => {
     const el = document.querySelector('.tab.active') || document.querySelector('.tab');
     const r = el.getBoundingClientRect();
@@ -111,8 +117,7 @@ test('con l\'incognito aperto dietro, Alt+S nella finestra normale davanti salva
   const inc = await schede(app, true);
 
   const url = testServer.html(PAGINA('Normale davanti'));
-  const page = await openTab(url);
-  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  const page = await apriEsatta(app, openTab, url);
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     w.show(); w.focus();
