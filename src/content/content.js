@@ -522,15 +522,25 @@
     setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
   }
 
-  // Testo scritto dall'utente e non ancora inviato: finché ce n'è la pulizia non
-  // chiude la scheda (#824). Conta l'area in cui si è scritto com'è quando la pulizia
-  // chiede (MSG.FORM_RECHECK), non il campo che ha ricevuto i tasti. Porte: tests/tab-auto-archive.spec.mjs.
+  // Testo scritto dall'utente e non ancora inviato: finché ce n'è la pulizia non chiude la
+  // scheda (#824). Conta solo il testo nato da un gesto dell'utente (o scritto da Filo per lui),
+  // e lo segue per contenuto quando la pagina lo sposta. Porte: tests/tab-auto-archive.spec.mjs.
   function startFormTracker() {
     if (/^filo:\/\/(options|preferences)\//i.test(location.href)) return;
+    const PAGINA_DI_FILO = /^filo:/i.test(location.href);
     // Area in cui l'utente ha scritto → testo che mostrava prima che ci scrivesse.
     const aree = new Map();
     const basi = new WeakMap();
+    // Caselle a più righe ed editor: il solo testo che si segue fuori dal suo campo.
+    const lunghe = new WeakSet();
+    // Componenti chiusi in cui è arrivata una scrittura: il testo lì dentro non si legge.
+    const opachi = new Set();
+    // Testo lungo di un'area tolta dalla pagina: se ricompare in un altro campo è ancora dell'utente.
+    const orfani = [];
+    // Impronte dei testi lunghi mandati al server: la risposta può rimetterli in un campo.
+    const partiti = new Set();
     let ultimoMandato = null;
+    let ultimeImpronte = '';
     let ultimoTocco = null;
     let rilettura = null;
     const TIPI_DI_TESTO = /^(text|search|email|url|tel|password|number)$/;
@@ -584,15 +594,64 @@
     // Un riquadro tolto dalla pagina lascia i suoi nodi «connessi» a un documento morto.
     const viva = (a) => a.isConnected && !!(a.ownerDocument && a.ownerDocument.defaultView);
 
+    // Quello che Filo scrive per l'utente (Incolla, dettatura, sostituzioni, l'agente) arriva con
+    // eventi sintetici dal suo mondo isolato e conta come un gesto; quelli della pagina no.
+    let daFilo = 0;
+    const segnate = new WeakSet();
+    function segnaScrittureDiFilo(win) {
+      if (PAGINA_DI_FILO) return;
+      try {
+        const proto = win.EventTarget.prototype;
+        if (segnate.has(proto)) return;
+        segnate.add(proto);
+        const originale = proto.dispatchEvent;
+        proto.dispatchEvent = function (ev) { daFilo++; try { return originale.call(this, ev); } finally { daFilo--; } };
+      } catch (_) {}
+    }
+    const gesto = (e) => e.isTrusted || daFilo > 0 || PAGINA_DI_FILO;
+
     // Un'area vuota resta in elenco: l'editor può rimetterci il testo dopo l'evento.
     function stato() {
       let daInviare = false;
       for (const [area, base] of aree) {
-        if (!viva(area)) { aree.delete(area); continue; }
+        if (!viva(area)) { lascia(area, base); continue; }
         const ora = pulito(testo(area));
         if (ora && ora !== pulito(base)) daInviare = true;
       }
+      for (const h of opachi) if (viva(h)) daInviare = true; else opachi.delete(h);
       return daInviare;
+    }
+    function lascia(area, base) {
+      aree.delete(area);
+      if (!lunghe.has(area)) return;
+      const t = pulito(testo(area));
+      if (!t || t === pulito(base)) return;
+      orfani.push(t);
+      if (orfani.length > 20) orfani.shift();
+    }
+    function impronta(s) {
+      let h1 = 0xdeadbeef;
+      let h2 = 0x41c6ce57;
+      for (let i = 0; i < s.length; i++) {
+        const c = s.charCodeAt(i);
+        h1 = Math.imul(h1 ^ c, 2654435761);
+        h2 = Math.imul(h2 ^ c, 1597334677);
+      }
+      h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+      h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+      return (h2 >>> 0).toString(36) + (h1 >>> 0).toString(36);
+    }
+    function impronte() {
+      const out = new Set(partiti);
+      for (const [area, base] of aree) {
+        if (!lunghe.has(area) || !viva(area)) continue;
+        const t = pulito(testo(area));
+        if (t && t !== pulito(base)) out.add(impronta(t));
+      }
+      return [...out].slice(-50);
+    }
+    function invia(payload) {
+      try { Promise.resolve(chrome.runtime.sendMessage(payload)).catch(() => {}); } catch (_) {}
     }
     // Solo la digitazione vera è un'interazione: una risposta al ricontrollo non
     // deve far sembrare la scheda appena usata al modello.
@@ -600,39 +659,68 @@
       ultimoMandato = ora;
       const payload = { type: MSG.TAB_ACTIVITY, formDirty: ora };
       if (daUtente) payload.lastInteractionAt = Date.now();
-      try { Promise.resolve(chrome.runtime.sendMessage(payload)).catch(() => {}); } catch (_) {}
+      invia(payload);
+    }
+    // Le impronte partono a riposo (dopo la rilettura, all'invio, al ricontrollo), mai a ogni tasto.
+    function mandaImpronte() {
+      const imp = impronte();
+      const k = imp.join(',');
+      if (k === ultimeImpronte) return;
+      ultimeImpronte = k;
+      invia({ type: MSG.TAB_ACTIVITY, impronte: imp });
     }
     function aggiorna(daUtente) {
       const ora = stato();
       if (ora !== ultimoMandato) manda(ora, daUtente);
     }
 
+    const bersaglio = (e) => (e.composedPath && e.composedPath()[0]) || e.target;
     function campoDa(e) {
-      // composedPath: un campo dentro uno shadow root arriva qui come il suo host.
-      const el = campoDiTesto((e.composedPath && e.composedPath()[0]) || e.target);
+      const el = campoDiTesto(bersaglio(e));
       return el && !diRicerca(el) ? el : null;
+    }
+    // Da dentro un componente chiuso la scrittura arriva al suo host, che non è un campo.
+    function opaco(e) {
+      if (typeof e.inputType !== 'string') return null;
+      const t = bersaglio(e);
+      if (!t || t.nodeType !== 1 || t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName)) return null;
+      return t;
+    }
+    function aRiposo() {
+      clearTimeout(rilettura);
+      rilettura = setTimeout(() => { aggiorna(false); mandaImpronte(); }, 400);
     }
     function scritto(area, base) {
       if (!aree.has(area)) aree.set(area, base);
+      if (area.tagName.toUpperCase() === 'TEXTAREA' || area.isContentEditable) lunghe.add(area);
       aggiorna(true);
-      clearTimeout(rilettura);
-      rilettura = setTimeout(() => aggiorna(false), 400);
+      aRiposo();
     }
-    function onTocco(e) { ultimoTocco = (e.composedPath && e.composedPath()[0]) || e.target; }
+    function scrittoInOpaco(e) {
+      const h = opaco(e);
+      if (!h || opachi.has(h)) return;
+      opachi.add(h);
+      aggiorna(true);
+    }
+    const iniziale = (a) => (/^(input|textarea)$/i.test(a.tagName) ? a.defaultValue || '' : '');
+    function onTocco(e) { ultimoTocco = bersaglio(e); }
     function onPrima(e) {
+      if (!gesto(e)) return;
       const campo = campoDa(e);
-      if (!campo) return;
+      if (!campo) { scrittoInOpaco(e); return; }
       const area = areaDi(campo);
       if (!aree.has(area)) basi.set(area, testo(area));
     }
     function onFormInput(e) {
+      if (!gesto(e)) return;
       const campo = campoDa(e);
-      if (!campo) return;
+      if (!campo) { scrittoInOpaco(e); return; }
       const area = areaDi(campo);
-      scritto(area, basi.has(area) ? basi.get(area) : '');
+      scritto(area, basi.has(area) ? basi.get(area) : iniziale(area));
     }
     // Molti editor ricchi incollano e ricevono il trascinamento da soli, senza «input».
     function onIncolla(e) {
+      if (!gesto(e)) return;
       const campo = campoDa(e);
       if (!campo) return;
       const area = areaDi(campo);
@@ -652,12 +740,55 @@
     function onSubmit(e) {
       const form = e.target;
       if (!form || !aree.size) return;
+      mandaImpronte();
       setTimeout(() => {
         if (!e.defaultPrevented || soloUnaRiga(form)) {
-          for (const a of [...aree.keys()]) if (a.form === form || (form.contains && form.contains(a))) aree.delete(a);
+          for (const [a, base] of [...aree]) {
+            if (a.form !== form && !(form.contains && form.contains(a))) continue;
+            const t = !e.defaultPrevented && lunghe.has(a) ? pulito(testo(a)) : '';
+            if (t && t !== pulito(base)) partiti.add(impronta(t));
+            aree.delete(a);
+          }
         }
         aggiorna(false);
+        mandaImpronte();
       }, 0);
+    }
+
+    // Il documento e le radici aperte dei componenti che contiene. Costa un giro di tutta la
+    // pagina: solo al ricontrollo, mai al caricamento.
+    function radici(doc) {
+      const out = [doc];
+      for (let i = 0; i < out.length; i++) for (const el of out[i].querySelectorAll('*')) if (el.shadowRoot) out.push(el.shadowRoot);
+      return out;
+    }
+    function* documenti(doc, n = 0) {
+      yield doc;
+      if (n >= 4) return;
+      for (const r of radici(doc)) for (const f of r.querySelectorAll('iframe, frame')) {
+        let d = null;
+        try { d = f.contentDocument; } catch (_) {}
+        if (d) yield* documenti(d, n + 1);
+      }
+    }
+    // Il testo dell'utente si segue per contenuto: un campo che mostra il testo di un'area tolta
+    // (cambio di editor) o rimandato dal server (anteprima, invio respinto, passo dopo) è ancora suo.
+    function adotta(daServer) {
+      const cercate = new Set(Array.isArray(daServer) ? daServer.map(String) : []);
+      if (!cercate.size && !orfani.length) return;
+      for (const doc of documenti(document)) for (const r of radici(doc)) {
+        for (const el of r.querySelectorAll('textarea, [contenteditable], input[type="hidden" i]')) {
+          const area = el.tagName.toUpperCase() === 'INPUT' ? el : campoDiTesto(el);
+          if (!area || aree.has(area) || area.readOnly || area.disabled || diRicerca(area)) continue;
+          const t = pulito(testo(area));
+          if (!t) continue;
+          const o = orfani.findIndex((x) => x === t || (x.length >= 20 && t.includes(x)));
+          if (o < 0 && !cercate.has(impronta(t))) continue;
+          if (o >= 0) orfani.splice(o, 1);
+          aree.set(area, '');
+          lunghe.add(area);
+        }
+      }
     }
 
     // I riquadri senza indirizzo proprio (gli editor classici scritti dalla pagina)
@@ -665,6 +796,7 @@
     // ascoltatori non li duplica, e dopo un document.open() li rimette.
     function osserva(win) {
       const o = { passive: true, capture: true };
+      segnaScrittureDiFilo(win);
       try {
         win.addEventListener('pointerdown', onTocco, o);
         win.addEventListener('beforeinput', onPrima, o);
@@ -688,7 +820,11 @@
     function onUscita(e) {
       const w = e.target;
       setTimeout(() => {
-        try { const a = w.document.activeElement; if (eRiquadro(a)) riquadro(a); } catch (_) {}
+        try {
+          let a = w.document.activeElement;
+          while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
+          if (eRiquadro(a)) riquadro(a);
+        } catch (_) {}
       }, 0);
     }
 
@@ -699,7 +835,9 @@
       try { nav = performance.getEntriesByType('navigation')[0]; } catch (_) {}
       if (!nav || nav.type !== 'back_forward') return;
       for (const el of document.querySelectorAll('input, textarea')) {
-        if (campoDiTesto(el) && !diRicerca(el) && grande(el) && el.value !== el.defaultValue) aree.set(el, el.defaultValue);
+        if (!campoDiTesto(el) || diRicerca(el) || !grande(el) || el.value === el.defaultValue) continue;
+        aree.set(el, el.defaultValue);
+        if (el.tagName.toUpperCase() === 'TEXTAREA') lunghe.add(el);
       }
     }
     adottaRipristinati();
@@ -709,14 +847,25 @@
     if (attivo && !diRicerca(attivo) && areaDi(attivo) === attivo
       && (attivo.isContentEditable || attivo.value !== attivo.defaultValue)) {
       aree.set(attivo, attivo.isContentEditable ? '' : attivo.defaultValue);
+      if (attivo.isContentEditable || attivo.tagName.toUpperCase() === 'TEXTAREA') lunghe.add(attivo);
     }
-    if (aree.size) aggiorna(false);
+    if (aree.size) { aggiorna(false); mandaImpronte(); }
 
     osserva(window);
     // Pagina tornata dalla cache di navigazione: per il main è un documento nuovo.
-    window.addEventListener('pageshow', (e) => { if (e.persisted) manda(stato(), false); });
+    window.addEventListener('pageshow', (e) => {
+      if (!e.persisted) return;
+      manda(stato(), false);
+      ultimeImpronte = '';
+      mandaImpronte();
+    });
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.type === MSG.FORM_RECHECK) { osserva(window); manda(stato(), false); }
+      if (!msg || msg.type !== MSG.FORM_RECHECK) return;
+      osserva(window);
+      stato();
+      try { adotta(msg.impronte); } catch (_) {}
+      manda(stato(), false);
+      mandaImpronte();
     });
   }
 

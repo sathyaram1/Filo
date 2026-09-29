@@ -1246,8 +1246,11 @@ class TabManager {
       if (!frames.length) continue;
       const vivi = new Set(frames.map(chiaveFrame));
       for (const k of [...(tab._moduli || [])]) if (!vivi.has(k)) tab._moduli.delete(k);
+      for (const k of [...(tab._impronte ? tab._impronte.keys() : [])]) if (!vivi.has(k)) tab._impronte.delete(k);
       tab.formDirty = !!(tab._moduli && tab._moduli.size);
-      spingiAllaScheda(tab.view.webContents, { type }, { inVista: tab.id === this.activeId });
+      // Le impronte del documento di prima: la pagina nuova può mostrare il testo mandato al server.
+      const impronte = tab._improntePrima || [];
+      spingiAllaScheda(tab.view.webContents, { type, impronte }, { inVista: tab.id === this.activeId });
       chiesto = true;
     }
     if (chiesto) await new Promise((r) => setTimeout(r, 400));
@@ -1548,6 +1551,11 @@ class TabManager {
       if (activity.formDirty) tab._moduli.add(k); else tab._moduli.delete(k);
       const ora = tab._moduli.size > 0;
       if (ora !== tab.formDirty) { tab.formDirty = ora; changed = true; }
+    }
+    if (Array.isArray(activity.impronte)) {
+      if (!tab._impronte) tab._impronte = new Map();
+      const imp = activity.impronte.filter((x) => typeof x === 'string' && x.length <= 32).slice(0, 50);
+      tab._impronte.set(frame ? chiaveFrame(frame) : '', imp);
     }
     if (changed) this._broadcast();
   }
@@ -2157,6 +2165,8 @@ class TabManager {
       // che il content script lo ricalcoli per il nuovo sito.
       const cachedIdentity = this._identityColorCache.get(hostOf(url)) || null;
       tab._moduli = null;
+      tab._improntePrima = [...(tab._impronte ? tab._impronte.values() : [])].flat().slice(-50);
+      tab._impronte = null;
       update({
         url: userUrl(url),
         color: null,
@@ -2191,7 +2201,11 @@ class TabManager {
     });
     // Un riquadro che cambia documento si porta via il testo che c'era (#824).
     wc.on('did-frame-navigate', (_e, _url, _code, _text, isMainFrame, pid, rid) => {
-      if (isMainFrame || !tab._moduli || !tab._moduli.delete(`${pid}:${rid}`)) return;
+      if (isMainFrame) return;
+      const k = `${pid}:${rid}`;
+      const imp = tab._impronte && tab._impronte.get(k);
+      if (imp) { tab._improntePrima = [...(tab._improntePrima || []), ...imp].slice(-50); tab._impronte.delete(k); }
+      if (!tab._moduli || !tab._moduli.delete(k)) return;
       if (!tab._moduli.size && tab.formDirty) update({ formDirty: false });
     });
     wc.on('did-navigate-in-page', (_e, url) => update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));

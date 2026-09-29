@@ -105,6 +105,7 @@ module.exports = function register(on, ctx) {
         lastInteractionAt: msg.lastInteractionAt,
         scrollPct: msg.scrollPct,
         formDirty: msg.formDirty,
+        impronte: msg.impronte,
       }, sender.frame);
     }
     return { ok: true };

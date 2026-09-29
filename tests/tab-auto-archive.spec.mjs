@@ -538,3 +538,119 @@ test('una casella di ricerca non protegge la scheda, anche coi risultati dal viv
   expect(aperte).not.toContain('Negozio');
   expect(aperte).not.toContain('Motore');
 });
+
+// Il testo dell'utente si segue per contenuto: quando la pagina lo sposta in un altro campo, o
+// il server lo rimette nella pagina che risponde, è ancora da proteggere; pubblicato no.
+
+test('il testo spostato dalla pagina in un altro campo, o rimandato dal server, tiene aperta la scheda (#824)', async ({ app, shell, testServer }) => {
+  const TESTO = 'Il mio post lungo sul viaggio in Islanda, scritto con calma';
+  const post = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Post</title></head><body>
+    <div id="box"><div id="ed" contenteditable="true" style="min-height:80px;border:1px solid"></div></div><button id="md">Markdown</button>
+    <script>md.onclick = () => { const t = document.createElement('textarea'); t.id = 'ta'; t.value = ed.innerText; box.replaceChildren(t); };</script>
+    </body></html>`));
+  await post.locator('#ed').click();
+  await post.keyboard.type(TESTO);
+  await post.locator('#md').click();
+  await expect(post.locator('#ta')).toHaveValue(TESTO);
+
+  // Anteprima, invio respinto dal server, passo dopo di un modulo a pagine: il testo torna nella risposta.
+  const risposte = {
+    Anteprima: `<p>Manca l'oggetto</p><form method="post"><textarea name="m" id="m">${TESTO}</textarea><button>Salva</button></form>`,
+    Passo: `<form method="post"><input type="hidden" name="m" value="${TESTO}"><input name="tel"><button>Invia</button></form>`,
+  };
+  for (const [titolo, corpo] of Object.entries(risposte)) {
+    const dopo = testServer.html(`<!doctype html><html><head><title>${titolo}</title></head><body>${corpo}</body></html>`);
+    const page = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Prima ${titolo}</title></head><body>
+      <form method="post" action="${dopo}"><textarea name="m" id="m"></textarea><button id="via">Avanti</button></form></body></html>`));
+    await page.locator('#m').click();
+    await page.keyboard.type(TESTO);
+    await page.locator('#via').click();
+    await page.waitForFunction((t) => document.title === t && document.documentElement.dataset.filoReady === '1', titolo);
+  }
+
+  // Pubblicato: il riquadro sparisce col testo dentro, e il testo compare come commento.
+  const social = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Commenti</title></head><body>
+    <div id="box"><div id="ed" contenteditable="true" style="min-height:60px;border:1px solid"></div><button id="pub">Rispondi</button></div><ul id="lista"></ul>
+    <script>pub.onclick = () => { const li = document.createElement('li'); li.textContent = ed.textContent; lista.append(li); box.remove(); };</script>
+    </body></html>`));
+  await social.locator('#ed').click();
+  await social.keyboard.type(TESTO);
+  await social.locator('#pub').click();
+  await expect(social.locator('#lista li')).toHaveText(TESTO);
+
+  // Una ricerca rimandata nella casella della pagina dei risultati non è una bozza.
+  const risultati = testServer.html('<!doctype html><html><head><title>Risultati</title></head><body><form method="post"><input name="dove" id="dove" value="Reykjavik"><button>Cerca</button></form><p>12 alberghi</p></body></html>');
+  const cerca = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Alberghi</title></head><body>
+    <form method="post" action="${risultati}"><input name="dove" id="dove" placeholder="Dove vuoi andare?"><button>Cerca</button></form></body></html>`));
+  await cerca.locator('#dove').click();
+  await cerca.keyboard.type('Reykjavik');
+  await cerca.locator('button').click();
+  await cerca.waitForFunction(() => document.title === 'Risultati' && document.documentElement.dataset.filoReady === '1');
+
+  await pulisciTutto(app, shell, testServer);
+  const aperte = await titoliAperti(shell);
+  expect(aperte).toContain('Post');
+  expect(aperte).toContain('Anteprima');
+  expect(aperte).toContain('Passo');
+  expect(aperte).not.toContain('Commenti');
+  expect(aperte).not.toContain('Risultati');
+});
+
+test('il testo scritto in un campo dentro un componente della pagina tiene aperta la scheda (#824)', async ({ app, shell, testServer }) => {
+  const chiuso = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Chiuso</title></head><body>
+    <x-campo style="display:block"></x-campo>
+    <script>customElements.define('x-campo', class extends HTMLElement { constructor() { super();
+      const r = this.attachShadow({ mode: 'closed' }); r.innerHTML = '<textarea style="width:300px;height:80px"></textarea>'; window.__ta = r.querySelector('textarea'); } });</script>
+    </body></html>`));
+  await chiuso.mouse.click(60, 40);
+  await chiuso.keyboard.type('Testo nel componente chiuso');
+  expect(await chiuso.evaluate(() => window.__ta.value)).toBe('Testo nel componente chiuso');
+
+  const ombra = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Ombra</title></head><body>
+    <x-ed style="display:block"></x-ed>
+    <script>customElements.define('x-ed', class extends HTMLElement { connectedCallback() {
+      const r = this.attachShadow({ mode: 'open' }); const f = document.createElement('iframe');
+      f.style.cssText = 'width:500px;height:200px'; r.append(f);
+      const d = f.contentDocument; d.open(); d.write('<!doctype html><html><body contenteditable="true" style="min-height:150px"></body></html>'); d.close(); } });</script>
+    </body></html>`));
+  const corpo = ombra.frameLocator('x-ed iframe').locator('body');
+  await corpo.click();
+  await ombra.keyboard.type('Articolo nell’editor del componente');
+  await expect(corpo).toHaveText('Articolo nell’editor del componente');
+
+  await pulisciTutto(app, shell, testServer);
+  const aperte = await titoliAperti(shell);
+  expect(aperte).toContain('Chiuso');
+  expect(aperte).toContain('Ombra');
+});
+
+test('un numero o una data messi dai pulsanti della pagina non proteggono la scheda, «Incolla» di Filo sì (#824)', async ({ app, shell, testServer }) => {
+  const negozio = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Negozio</title></head><body>
+    <input id="qta" type="number" value="1" min="1"><button id="piu">+</button>
+    <input id="arrivo" type="text" placeholder="Arrivo" readonly><button id="giorno">12</button>
+    <script>piu.onclick = () => { qta.stepUp(); qta.dispatchEvent(new Event('change', { bubbles: true })); };
+      giorno.onclick = () => { arrivo.value = '12/10/2026'; arrivo.dispatchEvent(new Event('input', { bubbles: true })); arrivo.dispatchEvent(new Event('change', { bubbles: true })); };</script>
+    </body></html>`));
+  await negozio.locator('#piu').click();
+  await negozio.locator('#piu').click();
+  await negozio.locator('#giorno').click();
+  await expect(negozio.locator('#qta')).toHaveValue('3');
+  await expect(negozio.locator('#arrivo')).toHaveValue('12/10/2026');
+  await negozio.waitForTimeout(800);
+  expect(await moduloDi(shell, 'Negozio')).toBe(false);
+
+  const TESTO = 'Risposta preparata altrove e incollata con Filo';
+  await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), TESTO);
+  const nota = await apriEsatta(app, shell, testServer.html('<!doctype html><html><head><title>Nota</title></head><body><textarea id="t" style="width:300px;height:80px"></textarea></body></html>'));
+  await nota.locator('#t').click();
+  await nota.locator('#t').click({ button: 'right' });
+  await expect(nota.locator('.sn-menu')).toBeVisible();
+  await nota.locator('.sn-menu').getByText('Incolla', { exact: true }).first().click();
+  await expect(nota.locator('#t')).toHaveValue(TESTO);
+  await expect.poll(() => moduloDi(shell, 'Nota'), { timeout: 8_000 }).toBe(true);
+
+  await pulisciTutto(app, shell, testServer);
+  const aperte = await titoliAperti(shell);
+  expect(aperte).not.toContain('Negozio');
+  expect(aperte).toContain('Nota');
+});
