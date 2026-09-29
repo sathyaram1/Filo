@@ -129,3 +129,41 @@ test('incognito window: seconda finestra, TabManager effimero, badge visibile', 
   expect(badge.hasSvg).toBe(true);
   expect(badge.text).toContain('Incognito');
 });
+
+// #839 — le scorciatoie vanno alla finestra che l'utente ha davanti: con l'incognito davanti, Alt+S salva e chiude
+// la pagina dell'incognito, non quella della finestra normale che sta dietro (prima andavano sempre alla principale).
+test('Alt+S con la finestra in incognito davanti salva e chiude la pagina di quella finestra', async ({ app, shell, openTab, testServer }) => {
+  const pagina = (t) => `<!doctype html><html><head><meta charset="utf-8"><title>${t}</title></head><body><h1>${t}</h1></body></html>`;
+  await testServer.openReady(openTab, pagina('Finestra normale'));
+  await app.evaluate(({ BrowserWindow }) => { globalThis.__finestraNormale = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito); });
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  const incognito = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+    return w ? w._filoTabs.tabs.map((t) => t.title) : null;
+  });
+  // La nuova scheda dell'incognito nasce quando la sua barra ha finito di caricarsi: la pagina si apre dopo.
+  await expect.poll(async () => ((await incognito()) || []).length, { timeout: 15000 }).toBe(1);
+  const url = testServer.html(pagina('In incognito'));
+  await app.evaluate(({ BrowserWindow }, u) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+    w._filoTabs.openTab(u);
+    w.show(); w.focus();
+  }, url);
+  await expect.poll(async () => {
+    const p = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } });
+    return p ? p.evaluate(() => document.documentElement.dataset.filoContentReady === '1').catch(() => false) : false;
+  }, { timeout: 10000 }).toBe(true);
+
+  // Il tasto registrato per tutto il sistema passa la finestra con cui è stato registrato: la normale.
+  await app.evaluate(() => { globalThis.__filoShortcuts.dispatch('save-for-later', globalThis.__finestraNormale); });
+
+  await expect.poll(async () => (await incognito()).includes('In incognito'), { timeout: 10000, message: 'la pagina in incognito davanti doveva chiudersi' }).toBe(false);
+  const normale = await app.evaluate(() => globalThis.__finestraNormale._filoTabs.tabs.map((t) => t.title));
+  expect(normale, 'la pagina della finestra normale, dietro, non va toccata').toContain('Finestra normale');
+  // Salvata come fa l'incognito: nella memoria della sessione, non sul disco.
+  const salvate = await app.evaluate(async () => ({
+    disco: (await globalThis.SN_SAVED_PAGES.list()).map((p) => p.url),
+    sessione: await globalThis.__filoStorage.runIncognito(async () => (await globalThis.SN_SAVED_PAGES.list()).map((p) => p.url)),
+  }));
+  expect(salvate).toEqual({ disco: [], sessione: [url] });
+});

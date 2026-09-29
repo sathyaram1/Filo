@@ -2161,7 +2161,8 @@
       Actions.savePage();
       return;
     }
-    Actions.showSaveConfirm(msg.context && msg.context.entry, { chiudiScheda: false });
+    const ctx = msg.context || {};
+    Actions.showSaveConfirm(ctx.entry, { chiudiScheda: false, conferma: ctx.conferma });
   }
 
   function selectionAnchor() {

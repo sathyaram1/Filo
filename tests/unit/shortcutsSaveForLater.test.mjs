@@ -35,9 +35,11 @@ let closed; // id della tab chiusa, o null
 // (require-ato in cima a shortcuts.js). Intercettiamo Module._load.
 const HANDLERS_ID = join(ROOT, 'src', 'main', 'services', 'handlers.js');
 const origLoad = Module._load;
+// Condiviso: shortcuts.js lo destruttura al require, i test gli danno la finestra a fuoco.
+const BrowserWindowStub = {};
 Module._load = function patched(request, parent, isMain) {
   if (request === 'electron') {
-    return { BrowserWindow: {} };
+    return { BrowserWindow: BrowserWindowStub };
   }
   if (request === './services/handlers') {
     return {
@@ -207,4 +209,37 @@ test('la conferma di ripiego segue la scheda che l\'utente ha davanti, e si arre
   const muta = makeTab({ id: 'M' }, null);
   assert.equal(await confermaSullaSchedaDavanti(makeWin(muta), { id: 'E8' }, { tentativoMs: 10, totaleMs: 500 }), false);
   assert.ok(muta.ricevuti.length >= 2, 'nel frattempo ha riprovato');
+});
+
+test('le scorciatoie vanno alla finestra di Filo a fuoco (anche l\'incognito), non a quella con cui sono state registrate', async () => {
+  saved = null; closed = null;
+  const dietro = makeTab({ id: 'N', url: 'https://normale.example/' }, 'presa');
+  const davanti = makeTab({ id: 'I', url: 'https://incognito.example/' }, 'presa');
+  const principale = makeWin(dietro);
+  const incognito = makeWin(davanti);
+  BrowserWindowStub.getFocusedWindow = () => incognito;
+  try {
+    dispatch('save-for-later', principale);
+    dispatch('explain-selection', principale);
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(dietro.ricevuti.length, 0, 'alla finestra dietro non arriva niente');
+    assert.deepEqual(davanti.ricevuti.map((m) => m.payload.command), ['save-for-later', 'explain-selection']);
+    // Una finestra senza schede a fuoco (un menu a comparsa) non conta: resta la finestra di Filo di prima.
+    BrowserWindowStub.getFocusedWindow = () => ({ isDestroyed: () => false });
+    dispatch('explain-selection', principale);
+    await new Promise((r) => setTimeout(r, 5));
+    assert.equal(dietro.ricevuti.length, 1);
+  } finally {
+    delete BrowserWindowStub.getFocusedWindow;
+  }
+});
+
+test('ogni conferma di ripiego porta un\'etichetta sua, uguale in tutti i tentativi', async () => {
+  const muta = makeTab({ id: 'M2' }, null);
+  await confermaSullaSchedaDavanti(makeWin(muta), { id: 'E5' }, { tentativoMs: 10, totaleMs: 200 });
+  const etichette = new Set(muta.ricevuti.map((m) => m.payload.context.conferma));
+  assert.equal(etichette.size, 1, 'la pagina riconosce i tentativi dello stesso salvataggio');
+  const altra = makeTab({ id: 'M3' }, null);
+  await confermaSullaSchedaDavanti(makeWin(altra), { id: 'E5' }, { tentativoMs: 10, totaleMs: 50 });
+  assert.notEqual(altra.ricevuti[0].payload.context.conferma, [...etichette][0], 'un salvataggio nuovo della stessa voce si conferma di nuovo');
 });

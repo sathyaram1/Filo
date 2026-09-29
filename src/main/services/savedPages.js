@@ -22,6 +22,9 @@
   }
 
   async function save(page) {
+    // Dalla pagina d'errore di Filo si mette da parte il sito che non si è caricato, non la pagina interna (#839).
+    const sito = global.SN_NET_ERROR?.targetOf?.(page.url);
+    if (sito) page = { ...page, url: sito, favicon: '' };
     const thumbnail = accettabile(page.thumbnail);
     const pages = await list();
 

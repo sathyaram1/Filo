@@ -64,11 +64,22 @@ function isInternalTab(tab) {
   return !!tab.isInternal || String(tab.url || '').startsWith('filo://');
 }
 
+// Le scorciatoie vanno alla finestra di Filo che l'utente ha davanti (anche l'incognito):
+// `ripiego` vale solo se a fuoco non c'è una finestra con schede (un menu a comparsa).
+function finestraDiFilo(ripiego) {
+  const viva = (w) => !!(w && w._filoTabs && !(typeof w.isDestroyed === 'function' && w.isDestroyed()));
+  let aFuoco = null;
+  try { aFuoco = BrowserWindow.getFocusedWindow?.() || null; } catch (_) {}
+  if (viva(aFuoco)) return aFuoco;
+  if (viva(ripiego)) return ripiego;
+  try { return (BrowserWindow.getAllWindows?.() || []).find(viva) || null; } catch (_) { return null; }
+}
+
 function dispatch(command, window) {
   // Manda al webContents della tab attiva. Se è una pagina interna senza
   // content script, nessuno raccoglie: ok, è il comportamento atteso.
-  const win = window || BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
-  if (!win || !win._filoTabs) return;
+  const win = finestraDiFilo(window);
+  if (!win) return;
   const active = win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId);
   if (!active) return;
 
@@ -151,7 +162,7 @@ async function saveForLater(win, tab) {
 // Gli avvisi della cornice finiscono sotto la pagina, per questo non passa di lì.
 async function confermaSullaSchedaDavanti(win, entry, { tentativoMs = 800, totaleMs = 10000 } = {}) {
   if (!entry?.id) return false;
-  const context = { entry: { id: entry.id, category: entry.category || null } };
+  const context = { entry: { id: entry.id, category: entry.category || null }, conferma: crypto.randomUUID() };
   const fine = Date.now() + totaleMs;
   while (Date.now() < fine) {
     const tm = win && !(win.isDestroyed && win.isDestroyed()) ? win._filoTabs : null;

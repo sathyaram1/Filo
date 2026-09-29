@@ -351,3 +351,62 @@ test('le miniature grandi già salvate si rimpiccioliscono una volta, senza perd
     rmSync(profilo, { recursive: true, force: true });
   }
 });
+
+// Le conferme che nascono in una pagina durante `ms`, compresa quella già presente.
+function contaComparse(pagina, ms) {
+  return pagina.evaluate(async (durata) => {
+    const viste = new Set();
+    const guarda = () => { for (const p of document.querySelectorAll('.sn-save-confirm')) viste.add(p); };
+    guarda();
+    const mo = new MutationObserver(guarda);
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+    await new Promise((r) => setTimeout(r, durata));
+    mo.disconnect();
+    return viste.size;
+  }, ms);
+}
+const occupa = (page) => page.evaluate(() => { setTimeout(() => { const t = Date.now(); while (Date.now() - t < 10000) { /* occupata */ } }, 50); });
+
+// Una pagina di Filo davanti mostra la conferma di ripiego e lo dice al main come una pagina web: una volta sola, non tre.
+test('con una pagina di Filo davanti la conferma di ripiego compare una volta sola', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60000);
+  const lista = await openTab('filo://home/home.html');
+  await lista.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 }).catch(() => {});
+  const url = testServer.html(PAGINA_RICCA('Bloccata, lista davanti'));
+  const page = await openTab(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await occupa(page);
+  await page.waitForTimeout(200);
+  await dispatchAltS(app);
+  await expect.poll(() => schedeAperte(app).then((s) => s.includes(url)), { timeout: 12000 }).toBe(false);
+  await lista.waitForSelector('.sn-save-confirm', { timeout: 12000 });
+  expect(await contaComparse(lista, 11000), 'la conferma ricompariva sulla pagina di Filo finché il main smetteva di riprovare').toBe(1);
+});
+
+test('unica scheda bloccata: nella nuova scheda la conferma compare una volta sola', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60000);
+  const url = testServer.html(PAGINA_RICCA('Unica, conferma una volta'));
+  const page = await openTab(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await chiudiNuoveSchede(app);
+  await occupa(page);
+  await page.waitForTimeout(200);
+  await dispatchAltS(app);
+  let nuova = null;
+  await expect.poll(() => { nuova = app.windows().find((w) => { try { return w.url().startsWith('filo://newtab/'); } catch (_) { return false; } }); return !!nuova; }, { timeout: 12000 }).toBe(true);
+  await nuova.waitForSelector('.sn-save-confirm', { timeout: 12000 });
+  expect(await contaComparse(nuova, 11000)).toBe(1);
+});
+
+// Dalla pagina d'errore di Filo si mette da parte il sito che non si è caricato, dal menu come da Alt+S.
+test('Alt+S su una pagina che non si carica salva l\'indirizzo del sito, non quello della pagina d\'errore', async ({ app, shell }) => {
+  const url = 'http://127.0.0.1:9/sito-giu';
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  let errore = null;
+  await expect.poll(() => { errore = app.windows().find((w) => { try { return w.url().startsWith('filo://error/'); } catch (_) { return false; } }); return !!errore; }, { timeout: 10000 }).toBe(true);
+  await errore.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await dispatchAltS(app);
+  await expect(errore.locator('.sn-save-confirm')).toBeVisible({ timeout: 5000 });
+  const salvate = await app.evaluate(async () => (await globalThis.SN_SAVED_PAGES.list()).map((p) => ({ url: p.url, favicon: p.favicon })));
+  expect(salvate).toEqual([{ url, favicon: '' }]);
+});

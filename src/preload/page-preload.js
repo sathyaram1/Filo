@@ -357,24 +357,11 @@ try {
 // La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content
 // script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.
 // Adattatore: ascolto shortcut:triggered e ribroadcast come filo:broadcast.
-ipcRenderer.on('shortcut:triggered', (_event, { command, context, ricevuta } = {}) => {
-  // Il payload deve usare il type MSG.SHORTCUT_TRIGGERED del catalogo messaggi.
-  // Lo prendiamo dai constants caricati sopra (SN_MSG popolato da messages.js).
-  // `context` è opzionale: lo usa la voce "Aiuto" del menu tasto destro su una
-  // tab per dire all'agente da dove è stato invocato (url + titolo della scheda).
-  const t = globalThis.SN_MSG?.MSG?.SHORTCUT_TRIGGERED || 'shortcut_triggered';
-  const deliver = () => {
-    let presa = false;
-    const rispondi = (r) => { if (r && r.presa) presa = true; };
-    for (const fn of broadcastListeners) {
-      try { fn({ type: t, command, context }, { id: 'filo-desktop' }, rispondi); } catch (_) {}
-    }
-    // #839 — il main aspetta di sapere se la pagina ha preso la scorciatoia: se no, la fa lui.
-    if (ricevuta) {
-      const r = globalThis.SN_MSG?.MSG?.SHORTCUT_RECEIPT || 'shortcut_receipt';
-      filoMessage({ type: r, ricevuta, presa }).catch(() => {});
-    }
-  };
+// `context` è opzionale: lo usa la voce "Aiuto" del menu tasto destro su una
+// tab per dire all'agente da dove è stato invocato (url + titolo della scheda).
+const consegnaScorciatoia = require('./scorciatoia.js');
+ipcRenderer.on('shortcut:triggered', (_event, payload = {}) => {
+  const deliver = () => consegnaScorciatoia(broadcastListeners, payload, filoMessage);
   // #405 — una scorciatoia indirizzata a un riquadro (Alt+E su testo
   // selezionato dentro un video incorporato) può arrivare prima che il
   // riquadro abbia montato Filo: montalo e consegna appena è pronto.

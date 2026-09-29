@@ -840,6 +840,7 @@
 
   // Un secondo Alt+S (o clic) mentre il salvataggio è in corso non apre una seconda conferma: la scheda sta già per chiudersi.
   let salvataggioInCorso = false;
+  const confermeMostrate = new Set();
 
   async function savePage() {
     if (salvataggioInCorso) return;
@@ -893,17 +894,18 @@
   // come prima. È l'unico modo per far scoprire la lista proprio nel momento in
   // cui serve, senza aggiungere voci di menu.
   // `chiudiScheda: false` quando la mostra la scheda davanti per un salvataggio che la scheda salvata non poteva confermare (#839).
-  function showSaveConfirm(entry, { chiudiScheda = true } = {}) {
+  // `conferma` è l'etichetta di quel salvataggio: il main la riprova finché una pagina risponde, e ogni salvataggio si conferma una volta sola.
+  function showSaveConfirm(entry, { chiudiScheda = true, conferma = '' } = {}) {
     const AUTO_CLOSE_MS = 4000;
     let done = false;
     let timer = null;
-    // Una conferma riprovata dal main arriva più volte alla pagina che si stava caricando: se ne mostra una.
-    const id = entry && entry.id ? String(entry.id) : '';
-    if (id && [...document.querySelectorAll('.sn-save-confirm:not([data-sn-closing])')].some((p) => p.dataset.entryId === id)) return;
+    if (conferma) {
+      if (confermeMostrate.has(conferma)) return;
+      confermeMostrate.add(conferma);
+    }
 
     const pill = document.createElement('div');
     pill.className = 'sn-save-confirm';
-    if (id) pill.dataset.entryId = id;
     pill.setAttribute('role', 'button');
     pill.tabIndex = 0;
     const text = document.createElement('span');
