@@ -178,7 +178,7 @@
     for (const lbl of labels.slice(0, Math.max(0, labels.length - 2))) {
       if (lbl.length >= STRUCT_BLOB) return { reason: 'usa un sottodominio anomalo' };
     }
-    for (const seg of (search + hash + path).split(/[^A-Za-z0-9+/_=-]+/)) {
+    for (const seg of `${cred} ${search}${hash}${path}`.split(/[^A-Za-z0-9+/_=-]+/)) {
       if (seg.length >= STRUCT_BLOB && !/^https?$/i.test(seg)) {
         return { reason: 'contiene un blocco di dati codificato' };
       }
