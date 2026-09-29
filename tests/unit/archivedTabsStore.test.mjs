@@ -61,6 +61,9 @@ const Disco = require(join(ROOT, 'src', 'main', 'shim', 'storage.js'));
 require(join(ROOT, 'src', 'main', 'shim', 'chrome-api.js'));
 require(join(ROOT, 'src', 'main', 'services', 'archivedTabs.js'));
 const A = globalThis.SN_ARCHIVED_TABS;
+// L'indice per contenuto sa delle schede nuove da qui: ogni strada d'ingresso deve passarci.
+const entrate = [];
+A.suEntrate((voci) => entrate.push(...voci.map((t) => t.id)));
 
 function fileDellaCartellaDati(dir = userData) {
   const out = [];
@@ -85,6 +88,17 @@ test('la migrazione porta tutte le schede fuori da storage.json, con riassunti e
   const suDisco = JSON.parse(readFileSync(join(userData, 'storage.json'), 'utf8'));
   assert.equal(suDisco.archivedTabs, undefined);
   assert.equal(suDisco.settings.theme, 'light');
+  assert.deepEqual([...entrate].sort(), archivioVecchio.map((t) => t.id).sort(), 'le migrate si annunciano all\'indice');
+});
+
+test('ogni scheda che entra in archivio si annuncia all\'indice: chiusa, importata, migrata', async () => {
+  entrate.length = 0;
+  const chiusa = await A.archive({ url: 'https://chiusa-825.test/', title: 'Chiusa' });
+  assert.equal(await A.importa([{ id: 'imp-1', url: 'https://importata-825.test/', title: 'Importata' }, { id: chiusa.id, url: 'x' }]), 1);
+  assert.deepEqual(entrate, [chiusa.id, 'imp-1'], 'una già presente non si riannuncia');
+  await Disco.runIncognito(() => A.archive({ url: 'https://incognito-entrata.test/', title: 'Privata' }));
+  assert.deepEqual(entrate, [chiusa.id, 'imp-1']);
+  await A.removeMany([chiusa.id, 'imp-1']);
 });
 
 test('oltre le 5000 non sparisce niente, e chiudere una scheda resta rapido', async () => {
