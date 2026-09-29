@@ -166,7 +166,9 @@
     const search = u.search || '';
     const hash = u.hash || '';
     const path = (u.pathname && u.pathname !== '/') ? u.pathname : '';
-    const carrier = search.length + hash.length + path.length;
+    // Le credenziali nell'indirizzo arrivano al server come qualunque altro pezzo.
+    const cred = `${u.username || ''} ${u.password || ''}`.trim();
+    const carrier = search.length + hash.length + path.length + cred.length;
     if (carrier >= STRUCT_CARRIER) {
       return { reason: 'porta una grande quantità di dati nel link' };
     }
