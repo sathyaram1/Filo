@@ -4322,6 +4322,7 @@ try {
       if (a && a.model !== indiceModello) programmaIndiceArchivio(2000);
     }).catch(() => {});
   });
+  ArchivedTabs.suEntrate(() => programmaIndiceArchivio(2000));
   programmaIndiceArchivio(10_000);
 } catch (_) {}
 
