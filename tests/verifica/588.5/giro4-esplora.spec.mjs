@@ -12,7 +12,7 @@ const PDF = Buffer.from('%PDF-1.4\n% finto\n' + 'x'.repeat(4096));
 
 function scatta(nome) {
   const p = join(SHOTS, `588.5-g4-${nome}.png`);
-  try { execFileSync('scrot', ['-o', p]); } catch (e) { console.log('scrot', e.message); }
+  try { execFileSync('scrot', ['-p', '-o', p]); } catch (e) { console.log('scrot', e.message); }
   return p;
 }
 const xdo = (...a) => execFileSync('xdotool', a.map(String));
@@ -58,13 +58,14 @@ function serverFile(handler) {
 
 test('pdf cliccato: l’avviso si VEDE sullo schermo e «Apri cartella» risponde al mouse vero', async ({ app, shell, openTab, testServer, avvisi }) => {
   const srv = await serverFile((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': PDF.length });
+    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': PDF.length, 'Content-Disposition': 'attachment; filename="manuale.pdf"' });
     res.end(PDF);
   });
   const url = `http://127.0.0.1:${srv.address().port}/manuale.pdf`;
   try {
     const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;background:#00ff00;height:100vh">
-      <a id="dl" href="${url}" style="display:block;padding:40px;font-size:30px">manuale.pdf</a></body></html>`);
+      <a id="dl" href="${url}" style="display:block;padding:40px;font-size:30px">manuale.pdf</a>
+      <button id="angolo" style="position:fixed;right:4px;bottom:4px;width:10px;height:10px;padding:0" onclick="window.__angolo=(window.__angolo||0)+1"></button></body></html>`);
     await app.evaluate(({ shell: sh }) => { globalThis.__cartelle = []; sh.showItemInFolder = (p) => { globalThis.__cartelle.push(p); }; });
     await page.locator('#dl').click();
     const vista = await vistaAvvisi(app, 20000);
@@ -80,6 +81,17 @@ test('pdf cliccato: l’avviso si VEDE sullo schermo e «Apri cartella» rispond
     console.log('colore carta', JSON.stringify(col));
     expect(col.g > 200 && col.r < 60 && col.b < 60).toBe(false);
 
+    // Mouse vero sopra la carta per 10 s: l'avviso (8 s) resta.
+    xdo('mousemove', '--sync', Math.round(zona.x + 20), Math.round(zona.y + 5));
+    await page.waitForTimeout(10000);
+    expect(await vista.locator('.shell-notif.show').count()).toBe(1);
+    // Clic vero nel margine in basso a destra: arriva al pulsante della pagina.
+    const tb = await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId); return t.view.getBounds(); });
+    const an = await page.locator('#angolo').boundingBox();
+    xdo('mousemove', '--sync', Math.round(k.c.x + tb.x + an.x + 5), Math.round(k.c.y + tb.y + an.y + 5));
+    await page.waitForTimeout(300);
+    xdo('click', 1);
+    await expect.poll(() => page.evaluate(() => window.__angolo || 0), { timeout: 3000 }).toBe(1);
     // Mouse vero sopra «Apri cartella» (dopo l'armatura): clic.
     await page.waitForTimeout(1100);
     const bt = await vista.evaluate(() => { const b = [...document.querySelectorAll('.shell-notif-action')].find((x) => /Apri cartella/.test(x.textContent)); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
@@ -263,4 +275,58 @@ test('tasto destro nella pagina accanto a un avviso: il riquadro di Filo', async
   await page.waitForTimeout(1200);
   console.log('destro', JSON.stringify(k), JSON.stringify(r));
   scatta('destro-pagina');
+});
+
+test('puntatore vero: dal testo della pagina al vuoto accanto alla carta, sopra altro testo', async ({ app, shell, openTab, testServer, avvisi }) => {
+  const riga = 'testo della pagina '.repeat(12);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;height:100vh;font-size:16px"><div style="position:fixed;left:0;right:0;bottom:0;height:140px;line-height:20px">${(riga + '<br>').repeat(7)}</div></body></html>`);
+  await shell.evaluate(() => window.filoNotify('Corto', { durationSec: 0 }));
+  await shell.evaluate(() => window.filoNotify('Un avviso molto più largo di quello sopra, per lasciare vuoto', { durationSec: 0 }));
+  const vista = await avvisi();
+  await page.waitForTimeout(800);
+  const k = await contenuto(app);
+  const tb = await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId); return t.view.getBounds(); });
+  // punto vuoto: a sinistra della carta stretta
+  const vuoto = await vista.evaluate(() => { const c = document.querySelector('.shell-notif'); const r = c.getBoundingClientRect(); return { x: r.left - 30, y: r.top + r.height / 2 }; });
+  const sx = Math.round(k.c.x + k.vista.x + vuoto.x);
+  const sy = Math.round(k.c.y + k.vista.y + vuoto.y);
+  const esiti = [];
+  for (let i = 0; i < 4; i++) {
+    // parte dal testo della pagina fuori dalla vista, alla stessa altezza
+    xdo('mousemove', '--sync', Math.round(k.c.x + k.vista.x - 60), sy);
+    await page.waitForTimeout(300);
+    for (let x = k.c.x + k.vista.x - 60; x <= sx; x += 10) { xdo('mousemove', Math.round(x), sy); await page.waitForTimeout(20); }
+    xdo('mousemove', '--sync', sx, sy);
+    await page.waitForTimeout(600);
+    esiti.push(await vista.evaluate(() => document.documentElement.style.cursor));
+    // passa sopra una carta e torna nel vuoto
+    const c = await vista.evaluate(() => { const r = document.querySelectorAll('.shell-notif')[1].getBoundingClientRect(); return { x: r.left + 20, y: r.top + 10 }; });
+    xdo('mousemove', '--sync', Math.round(k.c.x + k.vista.x + c.x), Math.round(k.c.y + k.vista.y + c.y));
+    await page.waitForTimeout(300);
+    xdo('mousemove', '--sync', sx, sy);
+    await page.waitForTimeout(600);
+    esiti.push(await vista.evaluate(() => document.documentElement.style.cursor));
+  }
+  console.log('cursori', JSON.stringify(esiti), JSON.stringify(tb));
+});
+
+test('puntatore vero: nel vuoto sopra un collegamento e sopra lo sfondo', async ({ app, shell, openTab, testServer, avvisi }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;height:100vh;background:#fff">
+    <a id="lnk" href="#x" style="position:fixed;right:0;bottom:0;display:block;width:600px;height:8px;background:#fdd"></a></body></html>`);
+  await shell.evaluate(() => window.filoNotify('Avviso qualunque', { durationSec: 0 }));
+  const vista = await avvisi();
+  await page.waitForTimeout(800);
+  const k = await contenuto(app);
+  const esiti = {};
+  for (const [nome, dy] of [['sfondo', 12], ['link', 4], ['sfondo2', 12], ['link2', 4]]) {
+    const x = Math.round(k.c.x + k.vista.x + k.vista.width - 100);
+    const y = Math.round(k.c.y + k.vista.y + k.vista.height - dy);
+    xdo('mousemove', '--sync', x - 30, y);
+    await page.waitForTimeout(150);
+    for (let i = 1; i <= 6; i++) { xdo('mousemove', x - 30 + i * 5, y); await page.waitForTimeout(40); }
+    await page.waitForTimeout(500);
+    esiti[nome] = await vista.evaluate(() => document.documentElement.style.cursor);
+    scatta(`cursore-${nome}`);
+  }
+  console.log('cursori2', JSON.stringify(esiti));
 });
