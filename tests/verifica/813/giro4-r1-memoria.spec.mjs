@@ -36,6 +36,9 @@ test('otto indirizzi lunghissimi aperti di fila non lasciano centinaia di MB occ
     await page.waitForTimeout(1500);
     const occupati = (await heap()) - base;
     console.log(`MB rimasti nel processo principale: ${(occupati / 1e6).toFixed(1)}`);
+    for (let k = 0; k < 8; k++) await page.goto(`http://127.0.0.1:${porta}/corta${k}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    console.log(`MB dopo otto pagine corte: ${(((await heap()) - base) / 1e6).toFixed(1)}`);
     expect(occupati).toBeLessThan(100e6);
   } finally {
     srv.close();

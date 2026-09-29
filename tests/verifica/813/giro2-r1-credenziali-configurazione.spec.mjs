@@ -1,6 +1,5 @@
-// Verifica di #813, secondo giro, rilievo 1, con la rete finta limitata a Safe Browsing. La prova gemella del giro
-// resta rossa nel secondo caso per un difetto suo: il suo Google finto risponde anche alla richiesta dei modelli che
-// Filo fa all'avvio, e quella risposta rifà la configurazione del controllo a metà prova (verdetto sconosciuto, null).
+// Verifica di #813, secondo giro, rilievo 1, con la rete finta limitata a Safe Browsing e la configurazione rimessa prima
+// di ogni verifica: il collegamento delle impostazioni all'avvio di Filo può rifarla a metà prova, senza chiave.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 test('un collegamento con un nome utente lunghissimo costruito apposta non blocca Filo per secondi', async ({ app, openTab, testServer }) => {
