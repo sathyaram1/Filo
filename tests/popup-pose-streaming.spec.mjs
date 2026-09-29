@@ -322,7 +322,7 @@ test('Alt+E su una parola in basso in una pagina vera: la riga per scrivere rest
     .poll(() => page.evaluate(() => String(window.getSelection())), { timeout: 5000 })
     .toContain('supercalifragilistico');
 
-  // La scorciatoia globale, la stessa strada di Alt+E.
+  // Quello che fa Alt+E dopo aver riconosciuto il tasto.
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
