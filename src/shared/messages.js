@@ -362,7 +362,7 @@
 
     // §1.2 — colore IDENTITÀ del sito (theme-color → manifest → favicon →
     // fallback), calcolato una volta dal content script e cachato per dominio dal
-    // main; la shell lo applica attenuato alle tab INATTIVE.
+    // main; la shell lo mescola col fondo della barra nelle tab INATTIVE.
     TAB_IDENTITY_COLOR: 'tab_identity_color',        // { color: 'rgb(r,g,b)' | null }
 
     // La scheda è sotto gli occhi di qualcuno (attiva, finestra né nascosta né

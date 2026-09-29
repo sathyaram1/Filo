@@ -86,7 +86,7 @@
   // ------------------------------------------------------------
   // Si calcola UNA VOLTA per pagina (con qualche retry per i siti che settano
   // theme-color/favicon dopo il paint) e si manda al main, che lo cacha per
-  // dominio. La shell lo applica attenuato alle tab inattive.
+  // dominio. La shell lo mescola col fondo della barra nelle tab inattive.
   // getParams (opzionale): funzione che ritorna i parametri di estrazione
   // correnti (settings.tabColor). Vengono passati a extractIdentityFromPixels,
   // così cambiarli (a voce o nelle Preferenze) cambia il colore estratto. Se

@@ -3,7 +3,7 @@
 [← Tutti i pattern](../PATTERNS.md)
 
 Il colore con cui si tingono le tab (attiva = "vetro smerigliato" §1.1; inattive
-= tinta identità attenuata §1.2) deve rappresentare il **brand del sito**, non la
+= tinta del sito mescolata col fondo della barra) deve rappresentare il **brand del sito**, non la
 sua chrome neutra. Un `theme-color`/sfondo bianco, nero o grigio **non è
 un'identità** e non va usato come tinta: in quel caso si ripiega sul **favicon**
 (il segnale di brand più affidabile). Es: YouTube dichiara `theme-color` bianco
@@ -22,16 +22,34 @@ ma il suo brand è il rosso del favicon → la tab dev'essere rossa, non bianca.
   sbagliata). I favicon same-origin (come YouTube) funzionano.
 - **Dove:** campionamento in `src/content/pageColor.js` (catena `compute()`);
   applicazione/ripiego nella shell in `src/renderer/shell.js` (`render`,
-  `hasColorIdentity`).
+  `hasColorIdentity`). Prove: `tests/unit/tabColor.test.mjs`,
+  `tests/tab-colors.spec.mjs`, `tests/tab-archive.spec.mjs`.
 - **Parametri regolabili (6):** l'estrazione e il blend sono governati da sei
   parametri (`soglia_saturazione`, `peso_centralita`, `bucket_tinta`,
   `saturazione_tab`, `luminosita_tab`, `opacita_tab`). La **fonte di verità** di
   default/range/etichette/commenti è **una sola**: `IDENTITY_PARAM_META` in
   `src/shared/tabColor.js` (con `defaultParams()`/`clampParams()`). I primi
   cinque (`stage:'extract'`) sono passati a `extractIdentityFromPixels`; il
-  sesto (`opacita_tab`, `stage:'blend'`) è la frazione di tinta nel `color-mix`
-  della shell. I valori vivono in `settings.tabColor`; `DEFAULT_SETTINGS` in
+  sesto (`opacita_tab`, `stage:'blend'`) è l'opacità del blend sul fondo della
+  barra. I valori vivono in `settings.tabColor`; `DEFAULT_SETTINGS` in
   `constants.js` deve restare allineato ai default del meta.
+- **Tab inattive, nessuna attenuazione in più (#821):** fondo = adattato ×
+  `opacita_tab` + neutro della barra (`--tab-bg`) × (1 − `opacita_tab`), e basta:
+  con saturazione e opacità a 1 la scheda di YouTube è rosso YouTube, a opacità
+  0 è identica a una scheda senza colore. La vecchia regola «saturazione al
+  15-20%» è superata dalla spec «Colore identità delle tab»: non va rimessa, né
+  qui né altrove. Il calcolo sta in `inactiveTabBackground` (JS, non
+  `color-mix`: serve il colore vero per scegliere il testo), sui colori del tema
+  risolti a ogni render con `resolveCssColor`; al cambio di tema la shell
+  ridipinge.
+- **Il testo segue il fondo vero:** titolo, crocetta e indicatori di una scheda
+  colorata prendono l'inchiostro di `inkAndHover` (contrasto ≥ 4,5:1, #710, col
+  ripiego su nero o bianco); l'hover va verso il polo del tema lontano
+  dall'inchiostro, così non abbassa mai il contrasto. L'accento e il grigio
+  morbido sparirebbero su una tinta viva.
+- **Una regola, due posti:** la Cronologia (`src/pages/archive/archive.js`)
+  colora le chip con le stesse funzioni, sul neutro della chip; niente copie
+  locali della formula.
 - **Due strade per cambiarli (parità di cammini):** (1) **a voce in chat** — il
   setter `colore_tab` in `src/shared/preferences.js` mappa richieste verbali
   ("più vivaci"/"più neutre"/"nessuno"/"più preciso"/"predefinito") su preset
@@ -40,7 +58,9 @@ ma il suo brand è il rosso del favicon → la tab dev'essere rossa, non bianca.
   estetici) in `src/pages/preferences/`. Entrambe scrivono via `UPDATE_SETTINGS`,
   che fa **deepMerge** su `tabColor` (un preset parziale lascia intatti gli altri
   parametri) e ribroadcast `SETTINGS_UPDATED`: il content **ri-estrae** il colore
-  del favicon coi nuovi parametri e la shell **ri-renderizza** il blend, live.
+  del favicon coi nuovi parametri e shell e Cronologia **ridipingono**, live
+  (l'adattamento si riapplica anche lì, quindi vale subito anche per i colori già
+  in cache e per i ripieghi theme-color/manifest).
 - **Quando aggiungi/cambi un parametro:** toccalo SOLO in `IDENTITY_PARAM_META`
   (più il default speculare in `constants.js`); UI prefs, validazione e mapping a
   voce lo ereditano. Niente slider per questi: sono valori numerici espliciti.
