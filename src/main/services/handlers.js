@@ -10,7 +10,7 @@
 
 const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
-const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra, domandaAmmessaDaUnSito } = require('./impostazioniPerOrigine');
+const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra, domandaAmmessaDaUnSito, gestiChiesti } = require('./impostazioniPerOrigine');
 const { daUnSito, inPrimoPiano, schedaInPrimoPiano } = require('./handlers/origine');
 
 const { SN_CONST, SN_MSG } = globalThis;
