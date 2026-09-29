@@ -1,4 +1,4 @@
-// VERIFICA #728 giro 1, rilievo 3 — una parola comune a due lettere da un marchio
+// VERIFICA #728 giro 2, rilievo 2 (era il 3 del giro 1) — una parola comune a due lettere da un marchio
 // lungo (telegraph/Telegram, linked/LinkedIn, codebase/Coinbase) non deve aprire
 // da sola il blocco a tutta pagina; il sosia a una lettera sì.
 
