@@ -4321,11 +4321,20 @@
   if (ICONS.apps) sidebarToggle.innerHTML = ICONS.apps(16);
 
   window.addEventListener('keydown', (e) => {
+    // A pannello aperto la tastiera è del pannello: Esc lo chiude, e nessun tasto
+    // agisce sul foglio o sui moduli che stanno dietro (#545).
+    if (!overlay.hidden) {
+      if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); closeOverlay(); }
+      return;
+    }
     for (const t of TASTI_EDITOR) {
       if (!prendeIlTasto(t, e)) continue;
       if (t.attivo && !t.attivo()) continue;
       if (t.nelFoglio && !docEl.contains(e.target)) continue;
-      if (t.fa) { e.preventDefault(); t.fa(e); }
+      // Il browser annulla e ripete solo dentro un campo di testo: fuori, il tasto
+      // fa l'azione del modulo a cui appartiene, come il suo clic.
+      const fa = t.fa || (t.suo && !isEditableTarget(e.target) && AZIONE_SCORCIATOIA[t.suo]);
+      if (fa) { e.preventDefault(); fa(); }
       return;
     }
     // scorciatoie personalizzate dei moduli
