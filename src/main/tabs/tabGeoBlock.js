@@ -206,9 +206,11 @@ const geoBlockMethods = {
     const classify = globalThis.SN_GEO_CLASSIFY;
     if (typeof classify !== 'function') return;
     if (tab.geoBlock) return; // già rilevato (livello 1)
+    // In incognito il testo della pagina non parte da solo verso il modello (#591): resta il livello 1, che è locale.
+    if (this.incognito) return;
     let host = '';
     try { host = new URL(url).hostname; } catch (_) { return; }
-    const input = { title: tab.title || '', text, statusCode: tab._lastStatus || 0, host, url };
+    const input = { title: tab.title || '', text, statusCode: tab._lastStatus || 0, host, url, budgetUrl: tab._urlNavigato };
     this.proxyAvailable()
       .then((ok) => (ok ? classify(input) : null))
       .then((res) => {
@@ -231,4 +233,4 @@ function installGeoBlock(TabManager) {
   Object.assign(TabManager.prototype, geoBlockMethods);
 }
 
-module.exports = { installGeoBlock };
+module.exports = { installGeoBlock, geoBlockMethods };

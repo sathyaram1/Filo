@@ -33,8 +33,10 @@ async function setupStubs(app, { summary } = {}) {
 test('chiudere una scheda la indicizza: riassunto LLM + embedding + snippet', async ({ app, shell, openTab, testServer }) => {
   await setupStubs(app, { summary: 'Riassunto di prova: pagina sui gatti e i felini domestici.' });
 
+  // Un sito con un nome da internet: le pagine della rete di casa non vanno a riassunto e indice (#591).
   await testServer.openReady(openTab,
-    '<!doctype html><html><head><title>Gatti</title></head><body style="margin:0">gatti felini animali domestici coccole</body></html>');
+    '<!doctype html><html><head><title>Gatti</title></head><body style="margin:0">gatti felini animali domestici coccole</body></html>',
+    { pubblico: true });
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate(async (i) => window.filoShell.tabs.close(i), id);
 

@@ -224,6 +224,8 @@ app.whenReady().then(async () => {
     // #588 — conferma prima di scaricare/aprire un programma: la config va
     // letta PRIMA del primo will-download, che è sincrono e non può attenderla.
     try { require('./services/downloads').configureFromSettings(s); } catch (_) {}
+    // Le risposte date ai siti vanno lette prima della prima scheda: il controllo dei permessi è sincrono.
+    try { await require('./services/permessiPagine').carica(); } catch (_) {}
     // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
     // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
     try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}

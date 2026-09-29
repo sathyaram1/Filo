@@ -102,6 +102,16 @@ function registerIpcHandlers() {
     event.returnValue = out;
   });
 
+  // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
+  ipcMain.on('filo:permessi-stato', (event, href) => {
+    try {
+      const Permessi = require('./services/permessiPagine');
+      event.returnValue = { notifiche: Permessi.statoNotifiche(event.sender.session, href), gestoMs: Permessi.GESTO_MS };
+    } catch (_) {
+      event.returnValue = { notifiche: 'default' };
+    }
+  });
+
   // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi
   // riquadri incorporati). Serve alle scorciatoie che lavorano sulla selezione:
   // vanno consegnate a chi ha davvero il testo selezionato. Nessun dato nel
@@ -362,6 +372,29 @@ function registerIpcHandlers() {
     const win = winFor(event);
     if (!win?._filoTabs) return { activeId: null, tabs: [] };
     return win._filoTabs.snapshot();
+  });
+  // Solo la cornice risponde a una domanda di permesso: è l'unico posto dove l'ha vista l'utente (#591.1).
+  ipcMain.handle('tabs:permesso-risposta', (event, { id, si } = {}) => {
+    const cornice = BrowserWindow.getAllWindows().some((w) => w._filoTabs && (w.webContents === event.sender || w._filoShell?.webContents === event.sender));
+    if (!cornice || !id) return { ok: false };
+    return { ok: require('./services/permessiPagine').rispondi(String(id), si === true) };
+  });
+  // Le scelte ricordate per il sito di una scheda: il suo menu le mostra e le toglie (#591.1).
+  const paginaDiScheda = (event, id) => {
+    const t = winFor(event)?._filoTabs?.tabs?.find((x) => x.id === id);
+    const wc = t && t.view && t.view.webContents;
+    return wc && !wc.isDestroyed() ? wc : null;
+  };
+  ipcMain.handle('tabs:permessi', (event, { id } = {}) => {
+    const wc = paginaDiScheda(event, id);
+    if (!wc) return { scelte: [] };
+    const Permessi = require('./services/permessiPagine');
+    const { origine, scelte } = Permessi.scelteDi(wc);
+    return { scelte, ...(origine ? Permessi.nomeDaMostrare(origine) : {}) };
+  });
+  ipcMain.handle('tabs:permessi-dimentica', (event, { id } = {}) => {
+    const wc = paginaDiScheda(event, id);
+    return wc ? require('./services/permessiPagine').dimentica(wc) : { tolte: 0, cera: false };
   });
   ipcMain.handle('tabs:open-blocked-popup', (event, { url } = {}) => {
     const win = winFor(event);

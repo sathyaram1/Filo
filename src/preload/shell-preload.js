@@ -38,6 +38,16 @@ contextBridge.exposeInMainWorld('filoShell', {
       return () => ipcRenderer.removeListener('tabs:popup-blocked', wrapped);
     },
     openBlockedPopup: (url) => ipcRenderer.invoke('tabs:open-blocked-popup', { url }),
+    onPermesso: (fn) => {
+      const chiedi = (_event, info) => { try { fn('chiedi', info); } catch (_) {} };
+      const fine = (_event, info) => { try { fn('fine', info); } catch (_) {} };
+      ipcRenderer.on('tabs:permesso', chiedi);
+      ipcRenderer.on('tabs:permesso-fine', fine);
+      return () => { ipcRenderer.removeListener('tabs:permesso', chiedi); ipcRenderer.removeListener('tabs:permesso-fine', fine); };
+    },
+    rispondiPermesso: (id, si) => ipcRenderer.invoke('tabs:permesso-risposta', { id, si }),
+    permessi: (id) => ipcRenderer.invoke('tabs:permessi', { id }),
+    dimenticaPermessi: (id) => ipcRenderer.invoke('tabs:permessi-dimentica', { id }),
     // Proxy per-tab ("Apri da un altro paese") + stato (configurato, location).
     setProxy: (id, country, tier) => ipcRenderer.invoke('tabs:set-proxy', { id, country, tier }),
     clearProxy: (id) => ipcRenderer.invoke('tabs:clear-proxy', { id }),

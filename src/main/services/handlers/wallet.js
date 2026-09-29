@@ -618,10 +618,10 @@ module.exports = function register(on, ctx) {
   on(MSG.WALLET_OWN_KEY_INFO, filoOnly(async () => {
     const key = await ownKey();
     if (!key) return { ok: false, status: 'no_own_key' };
-    const P = globalThis.SN_PROVIDER_OPENROUTER;
-    if (!P || typeof P.keyInfo !== 'function') return { ok: false, status: 'internal' };
+    const Gate = globalThis.SN_MODEL_GATE;
+    if (!Gate || !Gate.supports('openrouter', 'keyInfo')) return { ok: false, status: 'internal' };
     try {
-      const info = await P.keyInfo({ apiKey: key });
+      const info = await Gate.keyInfo({ provider: 'openrouter', apiKey: key });
       return { ok: true, ...info, line: W.ownKeyBalanceLine(info) };
     } catch (e) {
       const st = Number(e && e.status) || 0;

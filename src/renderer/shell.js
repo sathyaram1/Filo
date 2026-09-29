@@ -601,11 +601,26 @@
         entries.push({ label: 'Mostra il banner dei cookie', icon: 'eye', action: 'tab-cookies-show' });
       }
     }
+    // Un sì o un no dato nella domanda dei permessi si toglie da qui, per il sito della scheda.
+    let permessi = null;
+    try { permessi = api.tabs.permessi ? await api.tabs.permessi(t.id) : null; } catch (_) { permessi = null; }
+    if (permessi && Array.isArray(permessi.scelte) && permessi.scelte.length) {
+      entries.push({ label: 'Azzera i permessi del sito', icon: 'lock', action: 'tab-permessi-azzera' });
+    }
     entries.push(
       { type: 'separator' },
       { label: 'Chiudi', icon: 'close', action: 'tab-close' },
     );
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
+  }
+
+  async function azzeraPermessi(id) {
+    let r = null;
+    try { r = await api.tabs.dimenticaPermessi(id); } catch (_) { r = null; }
+    if (!r || !r.tolte) return;
+    showToast(r.ricarica
+      ? 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo. Ricarica la pagina perché valga anche per quello che sta già usando.'
+      : 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo.');
   }
 
   // Secondo livello di "Apri da un altro paese": la lista delle location
@@ -651,6 +666,7 @@
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
       else if (action === 'tab-cookies-show') api.tabs.cookieBanners(id, true);
       else if (action === 'tab-cookies-auto') api.tabs.cookieBanners(id, false);
+      else if (action === 'tab-permessi-azzera') azzeraPermessi(id);
       else if (action.startsWith('tab-proxy-go:')) proxyTab(id, action.slice('tab-proxy-go:'.length));
     });
   }
@@ -1117,6 +1133,19 @@
   // Esposta per test e per usi programmatici dalla shell stessa.
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
 
+  // Il sì di una domanda che la pagina fa comparire sotto il cursore si arma dopo ARMA_MS (scaricamenti, permessi):
+  // patterns/una-conferma-non-e-un-avviso-sopra-un-fatto-gia-compiuto.md.
+  const ARMA_MS = 1000;
+
+  // Lo spazio sopra la pagina lo chiedono in più (scaricamenti, domande dei permessi): la pagina scende della somma.
+  const riserveSopra = new Map();
+  function riservaSopra(chi, px) {
+    if (px > 0) riserveSopra.set(chi, px); else riserveSopra.delete(chi);
+    let tot = 0;
+    for (const v of riserveSopra.values()) tot += v;
+    try { api.tabs.reserveTop && api.tabs.reserveTop(tot); } catch (_) {}
+  }
+
   // ─── Scaricamenti della navigazione (#410.1) ───────────────────────────
   // Indicatore nella fila di tab (sempre visibile, non coperto dalla view
   // nativa della pagina) + pannello espandibile con i singoli download. Il
@@ -1143,7 +1172,6 @@
     // fatta comparire: la riga nasce dove la pagina ha appena mandato il
     // cursore, e un doppio clic risponderebbe senza leggerla. I pulsanti che
     // dicono sì si armano solo quando l'elenco è fermo da ARMA_MS.
-    const ARMA_MS = 1000;
     let elencoFermoDa = 0;
     let firmaElenco = '';
     let timerArma = null;
@@ -1220,6 +1248,10 @@
       panel.className = 'dl-panel';
       panel.id = 'dl-panel';
       panel.hidden = true;
+      // Un clic che arriva mentre un sì è ancora spento ricomincia l'attesa: una raffica non lo arma (#591, giro 20).
+      panel.addEventListener('pointerdown', () => {
+        if (panel.querySelector('.dl-row-btn:disabled')) elencoFermoDa = Date.now();
+      }, true);
       const head = document.createElement('div');
       head.className = 'dl-panel-head';
       const title = document.createElement('span');
@@ -1406,7 +1438,7 @@
       if (!panelOpen || !panel) return;
       requestAnimationFrame(() => {
         const h = Math.ceil(panel.getBoundingClientRect().height);
-        try { api.tabs.reserveTop && api.tabs.reserveTop(h + 6); } catch (_) {}
+        riservaSopra('scaricamenti', h + 6);
       });
     }
     function openPanel() {
@@ -1430,7 +1462,7 @@
       firmaElenco = '';
       if (panel) panel.hidden = true;
       dlBtn.classList.remove('open');
-      try { api.tabs.reserveTop && api.tabs.reserveTop(0); } catch (_) {}
+      riservaSopra('scaricamenti', 0);
     }
     function togglePanel() { panelOpen ? closePanel() : openPanel(); }
 
@@ -1742,6 +1774,140 @@
         if (timer) { clearTimeout(timer); timer = null; }
         try { chip.remove(); } catch (_) {}
       }
+    });
+  }
+
+  // ─── Domande dei permessi (#591.1) ──────────────────────────────────────
+  // Microfono, fotocamera, appunti, posizione: la pagina chiede, risponde l'utente qui, nella cornice, dove la pagina
+  // non la copre e non la può imitare. Si vede solo la domanda della scheda in primo piano; le altre aspettano il loro turno.
+  if (api.tabs.onPermesso && api.tabs.rispondiPermesso) {
+    const domande = [];
+    let bar = null;
+    let mostrata = null;
+    let attiva = null;
+
+    let timerArma = null;
+
+    const COSA = (d) => {
+      if (d.tipo === 'appunti') return { testo: 'vuole leggere quello che hai copiato', icone: ['clipboard'] };
+      if (d.tipo === 'posizione') return { testo: 'vuole sapere dove ti trovi', icone: ['location'] };
+      if (d.tipo === 'notifiche') return { testo: 'vuole mandarti notifiche', icone: ['bell'] };
+      if (d.tipo === 'schermi') return { testo: 'vuole usare tutti i tuoi schermi', icone: ['windowFrame'] };
+      if (d.tipo === 'presenza') return { testo: 'vuole sapere quando sei al computer', icone: ['user'] };
+      if (d.tipo === 'strumenti') return { testo: 'vuole comandare gli strumenti musicali collegati', icone: ['readAloud'] };
+      const parti = Array.isArray(d.parti) ? d.parti : [];
+      const mic = parti.includes('audio');
+      const cam = parti.includes('video');
+      if (mic && cam) return { testo: 'vuole usare microfono e fotocamera', icone: ['mic', 'camera'] };
+      if (cam) return { testo: 'vuole usare la fotocamera', icone: ['camera'] };
+      return { testo: 'vuole usare il microfono', icone: ['mic'] };
+    };
+
+    const ensureBar = () => {
+      if (bar) return bar;
+      bar = document.createElement('div');
+      bar.id = 'permesso-bar';
+      bar.className = 'permesso-bar';
+      bar.hidden = true;
+      document.body.appendChild(bar);
+      return bar;
+    };
+
+    const rispondiA = (d, si) => {
+      const i = domande.indexOf(d);
+      if (i >= 0) domande.splice(i, 1);
+      api.tabs.rispondiPermesso(d.id, si).catch(() => {});
+      mostraDomanda();
+    };
+
+    // Funzioni come costanti: una dichiarazione dentro il blocco rimpiazzerebbe il `render` della shell.
+    const mostraDomanda = () => {
+      const d = domande.find((x) => x.tabId === attiva) || null;
+      if (d === mostrata) return;
+      mostrata = d;
+      const b = ensureBar();
+      clearTimeout(timerArma);
+      if (!d) {
+        b.hidden = true;
+        b.replaceChildren();
+        document.documentElement.style.removeProperty('--sopra-permessi');
+        riservaSopra('permessi', 0);
+        return;
+      }
+      const cosa = COSA(d);
+      const icone = document.createElement('span');
+      icone.className = 'permesso-icone';
+      for (const n of cosa.icone) {
+        const i = document.createElement('span');
+        setIcon(i, n, 16);
+        icone.appendChild(i);
+      }
+      const msg = document.createElement('span');
+      msg.className = 'permesso-msg';
+      // Il dominio registrato si legge sempre e la richiesta non si taglia: si accorcia solo la parte davanti.
+      const chi = document.createElement('span');
+      chi.className = 'permesso-chi';
+      const sotto = String(d.sotto || '');
+      if (sotto) {
+        const s = document.createElement('span');
+        s.className = 'permesso-sotto';
+        s.textContent = (sotto.length > 24 ? '…' + sotto.slice(-23) : sotto) + '.';
+        s.title = d.host || '';
+        chi.appendChild(s);
+      }
+      const host = document.createElement('strong');
+      host.textContent = d.dominio || d.host || '';
+      chi.appendChild(host);
+      const testo = document.createElement('span');
+      testo.className = 'permesso-cosa';
+      testo.textContent = cosa.testo;
+      msg.append(chi, ' ', testo);
+      const si = document.createElement('button');
+      si.type = 'button';
+      si.className = 'permesso-btn permesso-si';
+      si.textContent = 'Consenti';
+      // Consenti si arma dopo ARMA_MS senza clic sulla striscia: una raffica che continua lo tiene spento (#591, giro 20).
+      const arma = () => {
+        si.disabled = true;
+        clearTimeout(timerArma);
+        timerArma = setTimeout(() => { if (mostrata === d) si.disabled = false; }, ARMA_MS);
+      };
+      arma();
+      b.onpointerdown = () => { if (si.disabled) arma(); };
+      si.addEventListener('click', () => rispondiA(d, true));
+      const no = document.createElement('button');
+      no.type = 'button';
+      no.className = 'permesso-btn permesso-no';
+      no.textContent = 'Non consentire';
+      no.addEventListener('click', () => rispondiA(d, false));
+      b.replaceChildren(icone, msg, no, si);
+      b.hidden = false;
+      requestAnimationFrame(() => {
+        const h = Math.ceil(b.getBoundingClientRect().height);
+        document.documentElement.style.setProperty('--sopra-permessi', h + 'px');
+        riservaSopra('permessi', h);
+      });
+    };
+
+    api.tabs.onPermesso((evento, info) => {
+      if (!info || !info.id) return;
+      if (evento === 'chiedi') {
+        if (!domande.some((x) => x.id === info.id)) domande.push(info);
+      } else {
+        const i = domande.findIndex((x) => x.id === info.id);
+        if (i >= 0) domande.splice(i, 1);
+      }
+      mostraDomanda();
+    });
+    try { api.tabs.snapshot().then((snap) => { if (attiva == null && snap) { attiva = snap.activeId || null; mostraDomanda(); } }).catch(() => {}); } catch (_) {}
+    api.tabs.onUpdate((snap) => {
+      attiva = (snap && snap.activeId) || null;
+      if (snap && Array.isArray(snap.tabs)) {
+        for (let i = domande.length - 1; i >= 0; i--) {
+          if (!snap.tabs.some((t) => t.id === domande[i].tabId)) domande.splice(i, 1);
+        }
+      }
+      mostraDomanda();
     });
   }
 })();

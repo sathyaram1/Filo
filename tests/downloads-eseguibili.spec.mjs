@@ -684,3 +684,30 @@ test('un’immagine disco scaricata prima che fosse in lista chiede conferma dop
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   }
 });
+
+// Una raffica di clic nel punto dove compare «Scarica» lo tiene spento: vale un clic dopo una pausa (#591, giro 20).
+test('una raffica di clic dove compare «Scarica» non risponde; un clic dopo una pausa sì', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServer();
+  try {
+    const dir = await cartellaDownload(app);
+    const page = await apriPagina(srv.base, { openTab, testServer });
+    await page.locator('#exe').click();
+    const riga = domanda(shell, 'setup.exe');
+    const si = risposta(riga, /^Scarica$/);
+    await expect(si).toBeVisible({ timeout: 10000 });
+    const b = await si.boundingBox();
+    const t0 = Date.now();
+    while (Date.now() - t0 < 2500) {
+      await clicNellaFinestra(app, b.x + b.width / 2, b.y + b.height / 2);
+      await shell.waitForTimeout(200);
+    }
+    expect(await statoDi(shell, 'setup.exe')).toBe('pending');
+    expect(contenuto(dir)).not.toContain('setup.exe');
+    await expect(si).toBeEnabled({ timeout: 5000 });
+    await si.click();
+    await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 20000 }).toBe('completed');
+  } finally {
+    await srv.close();
+  }
+});

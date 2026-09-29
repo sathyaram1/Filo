@@ -86,6 +86,7 @@
       id: 'incognito', title: 'Finestra in incognito', category: 'navigation',
       desc: 'Apre una nuova finestra privata e isolata: la sessione è effimera e non viene archiviata.',
       invoke: 'Menu del tasto destro → "Nuova finestra incognito".',
+      doesNot: 'Non sospende il limite di spesa del mese: quello che si spende lì conta come fuori e resta nel conto. Il testo delle pagine non va al modello per riconoscere i blocchi geografici.',
     },
     {
       id: 'fullscreen', title: 'Schermo intero', category: 'navigation',
@@ -109,7 +110,7 @@
       id: 'auto-archive', title: 'Archiviazione automatica delle schede', category: 'navigation',
       desc: 'Le schede lasciate inattive a lungo vengono archiviate da sole; il riordino collassa anche le schede «Nuova scheda»/home aperte più volte in una sola e chiude le pagine di impostazioni che non stai più usando (restano sempre raggiungibili), per tenere pulita la barra.',
       invoke: 'Automatico (soglia e attivazione in Preferenze); a richiesta con il comando /pulisci o il pulsante «Riordina e archivia le schede» nella home.',
-      doesNot: 'Non tocca le finestre in incognito, la scheda attiva, le schede con audio in riproduzione o con un modulo compilato non inviato, né le pagine di lavoro interne di Filo (Editor, Bacheca, Mazzi, Cronologia).',
+      doesNot: 'Non tocca le finestre in incognito, la scheda attiva, le schede con audio in riproduzione o con un modulo compilato non inviato, né le pagine di lavoro interne di Filo (Editor, Bacheca, Mazzi, Cronologia). Delle pagine della rete di casa (router, NAS, stampanti) al modello non arrivano titolo, indirizzo e testo.',
     },
     {
       id: 'reorder-tabs', title: 'Riordina le schede per colore', category: 'navigation',
@@ -437,7 +438,7 @@
     // ───────────────────────────── Impostazioni ──────────────────────────────
     {
       id: 'options-models', title: 'Modelli e chiavi AI', category: 'settings',
-      desc: 'Imposta le chiavi dei servizi AI (OpenRouter, Tavily), scegli il modello di OGNI funzione che ne usa uno — con la possibilità di indicarne più d’uno come ripiego, provati in ordine — e un limite di spesa mensile. Puoi anche affidarti ai modelli predefiniti di Filo.',
+      desc: 'Imposta le chiavi dei servizi AI (OpenRouter, Tavily), scegli il modello di OGNI funzione che ne usa uno — con la possibilità di indicarne più d’uno come ripiego, provati in ordine — e un limite di spesa mensile, che ferma ogni chiamata ai modelli: anche quelle che Filo fa da solo, come il controllo dei siti pericolosi o il riconoscimento dei blocchi geografici, e le prove delle Opzioni. Puoi anche affidarti ai modelli predefiniti di Filo.',
       invoke: 'Menu del tasto destro → "Opzioni Filo", oppure filo://options/options.html.',
       doesNot: 'Le chiavi sono salvate cifrate in locale. Nessuna funzione usa un modello che non hai impostato: se a una funzione manca il modello, o punta a uno che non esiste, quella funzione si ferma e lo segnala quando la usi — non ne sceglie uno per conto suo.',
     },
@@ -468,6 +469,12 @@
       desc: 'In modalità Automatico e Privacy Filo rifiuta da solo i banner dei cookie, anche quando stanno in un riquadro dentro la pagina. Quelli che non hanno un «rifiuta» (solo «Accetta», o «accetta o abbonati») li nasconde, senza accettare niente, e se la pagina era rimasta ferma o scurita la sblocca. Dove il sito lo dice, controlla che il rifiuto sia stato registrato davvero.',
       invoke: 'Da solo, a ogni pagina. Il tasto destro sulla scheda dice cosa è successo su quel sito («Cookie non necessari rifiutati» o «Banner dei cookie nascosto»), anche tornandoci dopo in un\'altra scheda o dopo un riavvio, e offre «Mostra il banner dei cookie» per rivederlo; sullo stesso menu «Rifiuta i cookie in automatico qui» torna indietro. In Impostazioni → Sicurezza si vedono tutti e due gli elenchi: i siti coi banner visibili («Rifiuta in automatico») e quelli dove Filo ha rifiutato o nascosto («Mostra il banner»).',
       doesNot: 'In modalità Manuale non tocca nessun banner. Non avvisa da solo quando rifiuta o nasconde qualcosa. Non nasconde i messaggi che non parlano di cookie (avviso sull\'adblocker, limite di articoli gratuiti). Una scelta fatta in una finestra incognito resta lì. In Privacy non tiene sul disco cosa ha fatto sui siti non fidati. «Mostra il banner» toglie solo la risposta che il clic sul banner ha creato, non l\'accesso o le preferenze del sito.',
+    },
+    {
+      id: 'site-permissions', title: 'Permessi dei siti', category: 'navigation',
+      desc: 'Un sito che vuole il microfono, la fotocamera, quello che hai copiato, la tua posizione, mandarti notifiche, usare tutti i tuoi schermi, sapere quando sei al computer o comandare gli strumenti musicali collegati lo chiede in una striscia sotto le schede, col suo dominio: «Consenti» o «Non consentire». Vale anche per le pagine che un sito si costruisce da sé. La domanda resta finché rispondi; «Consenti» si accende quando smetti di cliccare sulla striscia, così un clic partito per la pagina, o una raffica, non la conferma. Le notifiche si chiedono solo dopo un tuo clic sulla pagina, e finché non rispondi il sito le vede «da chiedere», così un’app di messaggi mostra il suo pulsante per attivarle. Tenere lo schermo acceso, lo schermo pieno e lo spazio per lavorare senza rete passano senza domande, come in Chrome; i font del computer passano subito dopo un tuo clic sulla pagina. La risposta resta anche dopo aver chiuso Filo, tranne in incognito e nei siti usa-e-getta della Privacy massima; la pagina Sicurezza le elenca tutte e le toglie una per una, e dal menu della scheda «Azzera i permessi del sito» toglie quelle del sito aperto. Detta e Incolla di Filo sulle pagine non fanno domande.',
+      invoke: 'Compare da sola quando un sito chiede; si risponde coi due pulsanti della striscia. Impostazioni → Sicurezza → «Permessi dei siti». Tasto destro sulla scheda → «Azzera i permessi del sito».',
+      doesNot: 'Una pagina non apre altri programmi del computer, tranne posta, telefono e SMS dopo un tuo clic. Non condivide lo schermo e non si collega a dispositivi USB, seriali o HID: Filo non ha ancora la scelta della finestra o del dispositivo.',
     },
     {
       id: 'data-export-import', title: 'Esporta e importa i tuoi dati', category: 'settings',

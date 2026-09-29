@@ -25,7 +25,8 @@ async function startServer() {
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   return {
-    origin: `http://127.0.0.1:${server.address().port}`,
+    // Un nome da internet (la fixture lo porta al loopback): una pagina della rete di casa non va al classificatore (#591).
+    origin: `http://sito-pubblico.test:${server.address().port}`,
     async close() {
       try { server.closeAllConnections?.(); } catch (_) {}
       await new Promise((r) => server.close(r));

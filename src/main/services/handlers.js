@@ -16,8 +16,15 @@ const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
 const { MSG } = SN_MSG;
 const Storage = globalThis.SN_STORAGE;
-const Providers = globalThis.SN_PROVIDERS;
 const Costs = globalThis.SN_COSTS;
+const Gate = globalThis.SN_MODEL_GATE.create({
+  getSettings: () => getEffectiveSettings(),
+  buildChain: (s, ref, action) => buildAttemptChain(s, ref, action),
+  modelFor: (s, action) => modelForAction(s, action),
+  routing: (s) => providerRouting(s),
+  noteServed: (s, action, r) => noteServedProvider(s, action, r),
+  costs: Costs,
+});
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
 const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
@@ -375,21 +382,6 @@ function openWeightsConfigError(settings, action, droppedRefs) {
   return e;
 }
 
-async function ensureUnderLimit(settings) {
-  if (await Costs.isOverLimit(settings.monthlyLimitEur)) {
-    const e = new Error(I18n.t('err_limit_reached'));
-    e.code = 'LIMIT_REACHED';
-    throw e;
-  }
-}
-
-// Oltre il limite di spesa nessun tentativo parte: non esiste più un fornitore
-// "gratuito" su cui ripiegare (era l'API diretta di Google, oggi fuori da Filo).
-async function applyLimitToChain(settings, attempts) {
-  await ensureUnderLimit(settings);
-  return attempts;
-}
-
 // Catena di tentativi per servire una richiesta. L'UNICA sorgente dei modelli è
 // la configurazione effettiva (condivisa o personale): il registry scritto nel
 // codice NON viene più rifuso qui sotto. Rifonderlo significava che un modello
@@ -532,44 +524,6 @@ function noteServedProvider(settings, action, result) {
   return { servedBy, violation };
 }
 
-// ─── Chi ha servito, a posteriori (voce e dettatura) ─────────────────────────
-// Per le chiamate audio il router non mette il fornitore nella risposta; lo si
-// chiede dopo con l'id della generazione, che diventa leggibile qualche secondo
-// più tardi. Best-effort e FUORI dal cammino della risposta: la politica va
-// verificata, ma chi detta non deve aspettare la verifica. Se risulta un
-// escluso: log, toast a interruttore acceso, e la voce di cronologia (se c'è)
-// viene marchiata. Con `recordCost` registra anche il costo che il router
-// riporta lì (la lettura ad alta voce non lo dice nella risposta).
-function auditServedByLater({ settings, action, provider, model, apiKey, generationId, historyId, recordCost, keySource = '' }) {
-  if (!generationId) return;
-  const P = Providers.getProvider(provider);
-  if (!P || typeof P.lookupServedBy !== 'function') return;
-  const delays = [4000, 10000, 25000];
-  let i = 0;
-  const schedule = () => {
-    if (i >= delays.length) return;
-    const t = setTimeout(tick, delays[i++]);
-    if (t && typeof t.unref === 'function') t.unref();
-  };
-  const tick = async () => {
-    let r = null;
-    try { r = await P.lookupServedBy({ apiKey, generationId }); } catch (_) { r = null; }
-    if (!r || !r.servedBy) { schedule(); return; }
-    const { servedBy, violation } = noteServedProvider(settings, action, { servedBy: r.servedBy });
-    if (historyId) {
-      try { await History.patch(historyId, { servedBy, policyViolation: violation }); } catch (_) {}
-    }
-    if (recordCost && Number.isFinite(r.costUsd) && r.costUsd > 0) {
-      try {
-        await Costs.record({
-          action, provider, model, usage: { costUsd: r.costUsd, keySource }, pricing: null, usdToEur: settings.usdToEur,
-        });
-      } catch (_) {}
-    }
-  };
-  schedule();
-}
-
 // ─── Dettatura ───────────────────────────────────────────────────────────────
 // Non è una chat: l'audio va all'endpoint di trascrizione, che risponde col
 // testo. Stessa catena di modelli, stesso limite di spesa, stesso riscontro su
@@ -578,9 +532,8 @@ function auditServedByLater({ settings, action, provider, model, apiKey, generat
 async function handleTranscription({ settings, payload, origin, signal }) {
   const p = payload || {};
   const model = modelForAction(settings, ACTIONS.TRANSCRIBE_AUDIO);
-  const attempts = await applyLimitToChain(
-    settings, buildAttemptChain(settings, model, ACTIONS.TRANSCRIBE_AUDIO),
-  );
+  const attempts = buildAttemptChain(settings, model, ACTIONS.TRANSCRIBE_AUDIO);
+  await Gate.ensureUnderLimit(settings);
   let audioBase64 = typeof p.audioBase64 === 'string' ? p.audioBase64 : '';
   let format = typeof p.format === 'string' && p.format ? p.format : 'wav';
   if (!audioBase64 && typeof p.dataUrl === 'string') {
@@ -598,29 +551,23 @@ async function handleTranscription({ settings, payload, origin, signal }) {
   }
   const Voices = globalThis.SN_TTS_VOICES;
   const language = Voices ? Voices.langOf(p.lang) : '';
-  const routing = providerRouting(settings);
   let lastErr = null;
   for (const a of attempts) {
-    const P = Providers.getProvider(a.provider);
-    if (!P || typeof P.transcribe !== 'function' || !a.model) continue;
+    if (!Gate.supports(a.provider, 'transcribe') || !a.model) continue;
     try {
-      const r = await P.transcribe({
-        apiKey: a.apiKey, model: a.model, audioBase64, format,
-        language: language || undefined, providerRouting: routing, signal,
+      // Chi ha servito può arrivare dopo la voce di cronologia: la si marchia allora.
+      let historyId = null;
+      const r = await Gate.call({
+        action: ACTIONS.TRANSCRIBE_AUDIO, settings, attempt: a, method: 'transcribe',
+        args: { audioBase64, format, language: language || undefined, signal },
+        onLateServedBy: ({ servedBy, violation }) => (historyId
+          ? History.patch(historyId, { servedBy, policyViolation: violation }) : null),
       });
       const text = String(r.text || '').trim();
-      const { servedBy, violation } = noteServedProvider(settings, ACTIONS.TRANSCRIBE_AUDIO, r);
-      let costEur = 0;
-      try {
-        costEur = await Costs.record({
-          action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model,
-          usage: r.usage, pricing: null, usdToEur: settings.usdToEur,
-        });
-      } catch (_) {}
+      const { servedBy, violation, costEur } = r;
       // Le trascrizioni PROVVISORIE della dettatura in diretta non vanno in
       // cronologia: ne arriverebbe una al secondo, tutte sostituite dalla
       // definitiva. Il costo però si registra sempre.
-      let historyId = null;
       if (!p.interim) {
         try {
           const h = await History.append({
@@ -632,16 +579,9 @@ async function handleTranscription({ settings, payload, origin, signal }) {
           historyId = h && h.id;
         } catch (_) {}
       }
-      if (!servedBy) {
-        // La generazione si rilegge con la chiave che l'ha fatta: dopo un
-        // ripiego (#629) non è più quella con cui si era partiti.
-        auditServedByLater({
-          settings, action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model,
-          apiKey: r.keyUsed || a.apiKey, generationId: r.generationId, historyId,
-        });
-      }
       return { text, model: a.model, provider: a.provider, costEur, usage: r.usage };
     } catch (e) {
+      if (e && e.code === 'LIMIT_REACHED') throw e;
       lastErr = e;
       console.warn(`[SN] dettatura ${a.provider}/${a.model} fallita:`, e.message || e);
     }
@@ -740,8 +680,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     return { text: cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
 
-  const attemptsRaw = buildAttemptChain(settings, model, action);
-  const attempts = await applyLimitToChain(settings, attemptsRaw);
+  const attempts = buildAttemptChain(settings, model, action);
 
   // Se il caller vuole il RAGIONAMENTO in diretta (es. la chat della home, #priorità1)
   // o la RISPOSTA in diretta (#420) usiamo il cammino in streaming, che espone i
@@ -762,8 +701,8 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   const result = (onReasoning || onText || onToolCall)
     ? await (async () => {
         let acc = '';
-        const r = await Providers.streamCompleteWithFallback({
-          attempts, messages, tools, toolChoice, signal,
+        const r = await Gate.stream({
+          action, settings, attempts, messages, tools, toolChoice, signal,
           onDelta: (d) => {
             acc += d;
             mark('firstTextMs');
@@ -783,18 +722,11 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
         if (textStreamer) textStreamer.flush();
         return { ...r, text: r.text != null ? r.text : acc };
       })()
-    : await Providers.completeWithFallback({ attempts, messages, tools, toolChoice, signal });
+    : await Gate.complete({ action, settings, attempts, messages, tools, toolChoice, signal });
   timing.totalMs = Date.now() - t0;
   const toolCalls = Array.isArray(result.toolCalls) ? result.toolCalls : [];
   const reasoningDetails = Array.isArray(result.reasoningDetails) ? result.reasoningDetails : [];
-  const usedProvider = result.provider || attempts[0].provider;
-  const concreteModel = result.model || attempts[0].model;
-  const { servedBy, violation } = noteServedProvider(settings, action, result);
-  const pricing = settings.pricing?.[concreteModel];
-  const costEur = await Costs.record({
-    action, provider: usedProvider, model: concreteModel,
-    usage: result.usage, pricing, usdToEur: settings.usdToEur,
-  });
+  const { provider: usedProvider, model: concreteModel, servedBy, violation, costEur } = result;
 
   if (
     action !== ACTIONS.TRANSLATE_PAGE && action !== ACTIONS.CATEGORIZE
@@ -849,24 +781,14 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
     return { costEur: 0, usage: cached.usage || {}, cached: true, provider: settings.provider, model };
   }
 
-  await ensureUnderLimit(settings);
-  const attempts = buildAttemptChain(settings, model, action);
-
-  const result = await Providers.streamCompleteWithFallback({
-    attempts, messages, signal,
+  const result = await Gate.stream({
+    action, settings, messages, signal,
     onDelta: (delta) => { if (onDelta) onDelta(delta); },
     // Il provider è caduto DOPO aver già streamato dei delta: avvisa il
     // renderer di buttare il testo parziale prima che arrivi il fallback (#273).
     onReset: (info) => { if (onReset) onReset(info); },
   });
-  const usedProvider = result.provider || attempts[0].provider;
-  const concreteModel = result.model || attempts[0].model;
-  const { servedBy, violation } = noteServedProvider(settings, action, result);
-  const pricing = settings.pricing?.[concreteModel];
-  const costEur = await Costs.record({
-    action, provider: usedProvider, model: concreteModel,
-    usage: result.usage, pricing, usdToEur: settings.usdToEur,
-  });
+  const { provider: usedProvider, model: concreteModel, servedBy, violation, costEur } = result;
 
   await History.append({
     action, provider: usedProvider, model: concreteModel, servedBy,
@@ -3443,10 +3365,8 @@ const handlerCtx = {
   buildAttemptChain,
   providerRouting,
   openWeightsBlockReason,
-  applyLimitToChain,
+  modelGate: Gate,
   handleAIRequest,
-  noteServedProvider,
-  auditServedByLater,
   maybeCategorizeAsync,
   searchArchivedTabs,
   handleFiloChat,
@@ -3492,6 +3412,16 @@ async function handleMessage(msg, sender = {}) {
   return { ok: false, error: `Tipo messaggio sconosciuto: ${msg.type}` };
 }
 
+// Una pagina della rete di casa (router, NAS, localhost) non va ai lavori automatici col modello (#591).
+const isHomeNetworkUrl = (url) => Boolean(url && globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.isHomeNetworkUrl(url));
+async function isHomeNetworkUrlSettled(url) {
+  let host = '';
+  try { host = new URL(String(url)).hostname; } catch (_) {}
+  const pending = host && globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.homeNetworkPending(host);
+  if (pending) await pending;
+  return isHomeNetworkUrl(url);
+}
+
 // §2.1 — decisione LLM di triage tab. Riceve i metadati/segnali di TUTTE le tab
 // candidate + (opz.) un estratto del contenuto e la memoria a lungo termine, e
 // torna per ciascuna una decisione keep/archive con motivazione. Batch unico.
@@ -3499,11 +3429,6 @@ async function handleMessage(msg, sender = {}) {
 // lancia se manca la chiave / supera il limite di costo.
 async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' } = {}) {
   if (!Array.isArray(tabs) || !tabs.length) return { decisions: [] };
-  const settings = await getEffectiveSettings();
-  const model = modelForAction(settings, ACTIONS.FILO_TAB_TRIAGE);
-  const attemptsRaw = buildAttemptChain(settings, model, ACTIONS.FILO_TAB_TRIAGE);
-  const attempts = await applyLimitToChain(settings, attemptsRaw);
-
   const system = [
     'Sei il gestore delle schede del browser dell\'utente. Decidi quali schede',
     'TENERE aperte e quali ARCHIVIARE. Archiviare NON è perdere: la scheda viene',
@@ -3545,7 +3470,11 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
   const E = globalThis.SN_ESTERNO;
   const campo = (v) => E.neutralizza(v, { unaRiga: true });
   const lines = tabs.map((t, i) => {
-    const parts = [`#${i}`, t.title ? `"${campo(String(t.title).slice(0, 120))}"` : '', campo(t.url || '')];
+    // Di una pagina della rete di casa al modello arrivano solo i segnali di Filo: titolo, indirizzo e testo restano qui (#591).
+    const casa = isHomeNetworkUrl(t.url);
+    const parts = casa
+      ? [`#${i}`, '[pagina della rete di casa]']
+      : [`#${i}`, t.title ? `"${campo(String(t.title).slice(0, 120))}"` : '', campo(t.url || '')];
     const sig = [];
     if (typeof t.idleMin === 'number') sig.push(`inattiva da ${t.idleMin}min`);
     if (typeof t.ageMin === 'number') sig.push(`aperta da ${t.ageMin}min`);
@@ -3554,7 +3483,7 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
     if (t.audible) sig.push('audio in riproduzione');
     if (Array.isArray(t.coOpenUrls) && t.coOpenUrls.length) sig.push(`co-aperte: ${t.coOpenUrls.length}`);
     let s = parts.filter(Boolean).join(' ') + (sig.length ? ` [${sig.join(', ')}]` : '');
-    if (t.contentExtract) s += `\n   estratto: ${campo(String(t.contentExtract).slice(0, 500).replace(/\s+/g, ' '))}`;
+    if (t.contentExtract && !casa) s += `\n   estratto: ${campo(String(t.contentExtract).slice(0, 500).replace(/\s+/g, ' '))}`;
     return s;
   }).join('\n');
 
@@ -3572,16 +3501,8 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
     { role: 'user', content: userParts.join('\n') },
   ];
 
-  const result = await Providers.completeWithFallback({ attempts, messages });
-  const usedProvider = result.provider || attempts[0].provider;
-  const concreteModel = result.model || attempts[0].model;
-  try {
-    const pricing = settings.pricing?.[concreteModel];
-    await Costs.record({
-      action: ACTIONS.FILO_TAB_TRIAGE, provider: usedProvider, model: concreteModel,
-      usage: result.usage, pricing, usdToEur: settings.usdToEur,
-    });
-  } catch (_) {}
+  const result = await Gate.complete({ action: ACTIONS.FILO_TAB_TRIAGE, messages });
+  const { provider: usedProvider, model: concreteModel } = result;
 
   const parsed = extractJson(result.text) || {};
   const decisions = Array.isArray(parsed.decisions) ? parsed.decisions : [];
@@ -3609,20 +3530,7 @@ function cosineInt(a, b) {
 // Completamento LLM one-shot per un'azione (risolve modello/chiave/limite e
 // registra il costo). Ritorna il testo. Usato da riassunto, triage, re-rank.
 async function runOneShot(action, messages) {
-  const settings = await getEffectiveSettings();
-  const model = modelForAction(settings, action);
-  const attempts = await applyLimitToChain(settings, buildAttemptChain(settings, model, action));
-  const result = await Providers.completeWithFallback({ attempts, messages });
-  const usedProvider = result.provider || attempts[0].provider;
-  const concreteModel = result.model || attempts[0].model;
-  try {
-    const pricing = settings.pricing?.[concreteModel];
-    await Costs.record({
-      action, provider: usedProvider, model: concreteModel,
-      usage: result.usage, pricing, usdToEur: settings.usdToEur,
-    });
-  } catch (_) {}
-  return result.text || '';
+  return Gate.text({ action, messages });
 }
 
 // §3.1 — riassunto breve di una pagina (per l'archivio + base dell'embedding).
@@ -3895,10 +3803,7 @@ function embedAttempt(settings) {
     const attempts = buildAttemptChain(
       settings, modelForAction(settings, ACTIONS.ARCHIVE_EMBED), ACTIONS.ARCHIVE_EMBED,
     );
-    return attempts.find((a) => {
-      const P = Providers.getProvider(a.provider);
-      return P && typeof P.embed === 'function' && a.model;
-    }) || null;
+    return attempts.find((a) => Gate.supports(a.provider, 'embed') && a.model) || null;
   } catch (_) { return null; /* nessun modello configurato → niente indicizzazione */ }
 }
 
@@ -3906,21 +3811,11 @@ async function embedTexts(texts, settingsIn) {
   const settings = settingsIn || await getEffectiveSettings();
   const a = embedAttempt(settings);
   if (!a) return null;
-  // Stesso limite di spesa delle altre funzioni: oltre il limite niente
-  // indicizzazione (la ricerca per parole continua a funzionare).
-  await ensureUnderLimit(settings);
-  const P = Providers.getProvider(a.provider);
-  const r = await P.embed({
-    apiKey: a.apiKey, model: a.model, texts, dim: SN_CONST.EMBED_DIM,
-    providerRouting: providerRouting(settings),
+  // Oltre il limite di spesa il cancello rifiuta: la ricerca per parole continua a funzionare.
+  const r = await Gate.call({
+    action: ACTIONS.ARCHIVE_EMBED, settings, attempt: a, method: 'embed',
+    args: { texts, dim: SN_CONST.EMBED_DIM },
   });
-  noteServedProvider(settings, ACTIONS.ARCHIVE_EMBED, r);
-  try {
-    await Costs.record({
-      action: ACTIONS.ARCHIVE_EMBED, provider: a.provider, model: a.model,
-      usage: r.usage, pricing: settings.pricing?.[a.model], usdToEur: settings.usdToEur,
-    });
-  } catch (_) {}
   return { vectors: r.vectors || [], model: a.model };
 }
 
@@ -3963,6 +3858,12 @@ async function reindexArchivedEmbeddings(settings, items) {
 async function enrichArchivedTab(id, payload) {
   try {
     if (!id) return;
+    // Riassunto e indice passano dal modello: una pagina della rete di casa resta in casa (#591). Il segno resta sulla
+    // voce, perché dopo un riavvio Filo non sa più da dove aveva risposto un nome come tplinkwifi.net.
+    if (payload && typeof payload === 'object' && await isHomeNetworkUrlSettled(payload.url)) {
+      await ArchivedTabs.update(id, { casa: true });
+      return;
+    }
     const title = (payload && typeof payload === 'object') ? (payload.title || '') : '';
     const content = (payload && typeof payload === 'object')
       ? (payload.content || '')
@@ -4034,7 +3935,8 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
   for (const it of items) {
     const usable = Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model;
     if (usable) { scored.push({ score: cosineInt(qv, it.embedding), it }); continue; }
-    if ((it.title || it.summary || it.snippet) && stale.length < SN_CONST.ARCHIVED_EMBED_LIMIT) stale.push(it);
+    const casa = it.casa || isHomeNetworkUrl(it.url);
+    if ((it.title || it.summary || it.snippet) && !casa && stale.length < SN_CONST.ARCHIVED_EMBED_LIMIT) stale.push(it);
   }
   if (stale.length) reindexArchivedEmbeddings(settings, stale).catch(() => {});
   scored.sort((a, b) => b.score - a.score);
@@ -4121,12 +4023,8 @@ async function wireSafebrowse(settingsArg) {
   // Giudice LLM: riusa la catena di fallback dei provider con il modello
   // configurato per questa funzione (slot proprio, visibile nell'editor dei
   // modelli). Solo METADATI (mai contenuto pagina) passano da llm.judge.
-  const runLlm = sb.llmJudge === false ? null : async (messages) => {
-    const s = await getEffectiveSettings();
-    const attempts = buildAttemptChain(s, modelForAction(s, ACTIONS.SAFEBROWSE_JUDGE), ACTIONS.SAFEBROWSE_JUDGE);
-    const r = await Providers.completeWithFallback({ attempts, messages });
-    return r.text;
-  };
+  const runLlm = sb.llmJudge === false ? null
+    : (messages) => Gate.text({ action: ACTIONS.SAFEBROWSE_JUDGE, messages });
   SB.configure({
     gsbKey: () => safeBrowsingKeyFor(settings),
     runLlm,
@@ -4151,12 +4049,7 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
   const Classifier = globalThis.SN_GEOBLOCK_CLASSIFIER;
   if (!Classifier) return { class: null, route: { proxy: false }, skipped: true };
   if (!geoClassifierCache) geoClassifierCache = Classifier.createCache();
-  const complete = async ({ messages, signal }) => {
-    const s = await getEffectiveSettings();
-    const attempts = buildAttemptChain(s, modelForAction(s, ACTIONS.GEOBLOCK_CLASSIFY), ACTIONS.GEOBLOCK_CLASSIFY);
-    const r = await Providers.completeWithFallback({ attempts, messages, signal });
-    return r.text;
-  };
+  const complete = ({ messages, signal }) => Gate.text({ action: ACTIONS.GEOBLOCK_CLASSIFY, messages, signal });
   return Classifier.classify(input, { complete, cache: geoClassifierCache });
 };
 
