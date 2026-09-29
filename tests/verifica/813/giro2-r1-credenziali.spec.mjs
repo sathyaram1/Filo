@@ -42,9 +42,13 @@ test('all\'arrivo, un indirizzo con barra o punto di domanda in codice nel nome 
       return { ok: true, status: 200, async json() { return { fullHashes: hit ? [{ fullHash: full.toString('base64'), fullHashDetails: [{ threatType: 'SOCIAL_ENGINEERING' }] }] : [], cacheDuration: '300s' }; } };
     };
     const SB = globalThis.SN_SAFEBROWSE;
-    SB.configure({ gsbKey: () => 'chiave-di-prova', enableSandbox: false, enableNetwork: false });
     const out = [];
-    for (const x of indirizzi) { SB._gsbLookup.clear(); out.push(await SB._gsbLookup.check(x)); }
+    // Il collegamento delle impostazioni all'avvio può rifare la configurazione a metà: la si rimette prima di ogni verifica.
+    for (const x of indirizzi) {
+      SB.configure({ gsbKey: () => 'chiave-di-prova', enableSandbox: false, enableNetwork: false });
+      SB._gsbLookup.clear();
+      out.push(await SB._gsbLookup.check(x));
+    }
     return out;
   }, {
     expr: u.hostname + u.pathname,
