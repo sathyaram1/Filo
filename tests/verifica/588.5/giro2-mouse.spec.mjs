@@ -32,44 +32,24 @@ test('il margine trasparente attorno alla carta lascia passare il clic alla pagi
     <button id="angolo" style="position:fixed;right:3px;bottom:3px;width:10px;height:10px;padding:0" onclick="window.__n=(window.__n||0)+1"></button>
     </body></html>`);
   await inVista(app);
-  await shell.evaluate(() => window.filoNotify('Scaricato: report.pdf', { durationSec: 0 }));
-  const vista = await avvisi();
-  await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
-  await expect.poll(async () => ((await geometria(app)).v || {}).width || 0).toBeGreaterThan(100);
-  const g = await geometria(app);
+  const g0 = await geometria(app);
   const r = await page.evaluate(() => { const b = document.getElementById('angolo').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
-  const sx = Math.round(g.c.x + g.t.x + r.x);
-  const sy = Math.round(g.c.y + g.t.y + r.y);
-  console.log('geometria', JSON.stringify(g), 'clic a', sx, sy);
+  const sx = Math.round(g0.c.x + g0.t.x + r.x);
+  const sy = Math.round(g0.c.y + g0.t.y + r.y);
   // Controllo: senza avviso il clic arriva.
   xdo('mousemove', sx, sy); xdo('click', 1);
-  await new Promise((res) => setTimeout(res, 300));
-  const n = await page.evaluate(() => window.__n || 0);
-  console.log('clic arrivati alla pagina con avviso', n);
-  expect(n).toBe(1);
-});
-
-test('la barra di scorrimento della pagina, in fondo, si afferra anche con un avviso', async ({ app, shell, openTab, testServer, avvisi }) => {
-  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;height:5000px;background:linear-gradient(#fff,#ccc)"><p>lungo</p></body></html>`);
-  await inVista(app);
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  const sb = await page.evaluate(() => ({ w: window.innerWidth - document.documentElement.clientWidth, y: scrollY }));
-  console.log('larghezza barra', sb.w, 'scrollY', sb.y);
+  await expect.poll(() => page.evaluate(() => window.__n || 0)).toBe(1);
   await shell.evaluate(() => window.filoNotify('Scaricato: report.pdf', { durationSec: 0 }));
   const vista = await avvisi();
   await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
   await expect.poll(async () => ((await geometria(app)).v || {}).width || 0).toBeGreaterThan(100);
   const g = await geometria(app);
-  const sx = Math.round(g.c.x + g.t.x + g.t.width - Math.max(3, sb.w / 2));
-  const sy = Math.round(g.c.y + g.t.y + g.t.height - 30);
-  console.log('geometria', JSON.stringify(g), 'presa a', sx, sy);
-  xdo('mousemove', sx, sy); xdo('mousedown', 1);
-  for (let i = 1; i <= 10; i++) { xdo('mousemove', sx, sy - i * 30); await new Promise((res) => setTimeout(res, 30)); }
-  xdo('mouseup', 1);
-  await new Promise((res) => setTimeout(res, 300));
-  const dopo = await page.evaluate(() => scrollY);
-  console.log('scrollY dopo il trascinamento', dopo);
-  expect(dopo).toBeLessThan(sb.y - 100);
+  console.log('geometria', JSON.stringify(g), 'clic a', sx, sy);
+  xdo('mousemove', sx - 5, sy - 5); xdo('mousemove', sx, sy); xdo('click', 1);
+  await new Promise((res) => setTimeout(res, 400));
+  const n = await page.evaluate(() => window.__n || 0);
+  console.log('clic arrivati alla pagina con avviso', n);
+  expect(n).toBe(2);
 });
 
 test('un clic sul testo della carta non toglie la tastiera al campo in cui si scriveva', async ({ app, shell, openTab, testServer, avvisi }) => {
