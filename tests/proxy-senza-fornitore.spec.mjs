@@ -220,6 +220,70 @@ test('chat senza fornitore con l\'ultimo giro muto: la frase «fatto» non resta
   await page.screenshot({ path: 'tests/.shots/771-chat-giro-muto.png' }).catch(() => {});
 });
 
+// Copione del modello a giri, in formato strumenti: ogni voce è un giro.
+async function copioneGiri(app, turni) {
+  await app.evaluate(async (_e, turni) => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    let i = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts }) => {
+      const t = turni[Math.min(i++, turni.length - 1)];
+      return {
+        text: t.text, toolCalls: t.toolCalls || [], reasoningDetails: [],
+        model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        finishReason: t.toolCalls ? 'tool_calls' : 'stop',
+      };
+    };
+  }, turni);
+}
+
+// La risposta fissa copre solo la frase scritta PRIMA del rifiuto, e non nega
+// quello che il turno ha fatto davvero (una pagina aperta).
+test('giro finale muto con altre azioni: la risposta dice solo cosa non si può, e una frase scritta dopo il rifiuto resta la risposta', async ({ app, shell, testServer }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+
+  // Pagina aperta e instradamento chiesti nello stesso giro, poi muto.
+  const netflix = testServer.html('<title>Netflix finto</title><p>catalogo</p>');
+  await copioneGiri(app, [
+    {
+      text: 'PROMESSA_USA: apro Netflix dagli Stati Uniti.',
+      toolCalls: [
+        { id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: netflix, etichetta: 'Netflix' }) },
+        { id: 'p1', name: 'PROXY_TAB', arguments: '{"country":"us"}' },
+      ],
+    },
+    { text: '' },
+  ]);
+  await page.locator('#input').fill('apri netflix dagli USA');
+  await page.locator('#sendBtn').click();
+  await expect(shell.locator('.tab')).toHaveCount(2, { timeout: 15_000 });
+  const fissa = page.locator('.dash-bubble-filo', { hasText: 'da un altro paese in Filo non si può ancora' });
+  await expect(fissa).toHaveCount(1, { timeout: 15_000 });
+  await expect(fissa).toContainText('Netflix');
+  await expect(fissa).not.toContainText(/non ho cambiato|PROMESSA_USA/);
+
+  // Rifiuto al primo giro, pagina aperta con una frase scritta sapendolo, poi muto.
+  const guida = testServer.html('<title>Guida</title><p>guida</p>');
+  await copioneGiri(app, [
+    { text: '', toolCalls: [{ id: 'p2', name: 'PROXY_TAB', arguments: '{"country":"fr"}' }] },
+    { text: 'FRASE_INFORMATA: dalla Francia non si può ancora, ti apro la guida.', toolCalls: [{ id: 'n2', name: 'NAVIGA', arguments: JSON.stringify({ url: guida, etichetta: 'Guida' }) }] },
+    { text: '' },
+  ]);
+  await page.locator('#input').fill('apri questa scheda dalla Francia');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'FRASE_INFORMATA' })).toHaveCount(1, { timeout: 15_000 });
+  await expect(fissa).toHaveCount(1);
+  await page.screenshot({ path: 'tests/.shots/771-chat-muto-con-altre-azioni.png' }).catch(() => {});
+});
+
 // Formato vecchio (JSON nel testo): la frase scritta insieme all'azione la dava
 // per fatta, e senza un esito da leggere il turno finiva lì.
 test('chat nel formato vecchio: l\'esito «non disponibile» torna al modello e la sua frase non resta la risposta', async ({ app, shell }) => {
