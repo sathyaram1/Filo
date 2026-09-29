@@ -20,10 +20,10 @@ const PAGINE = {
     m('audio:' + c.state);
     alert('Il tuo computer è infetto: chiama subito il numero 800 000 000');
     m('dopo-alert');
-  </script><p>avviso</p>`,
+  </script><p>avviso</p><iframe src="/lento"></iframe>`,
   '/stampa': `<!doctype html><meta charset="utf-8"><title>Avviso</title><script>${M}
-    m('prima'); window.print(); m('dopo-stampa');
-  </script><iframe src="/lento"></iframe>`,
+    m('prima'); addEventListener('load', () => { window.print(); m('dopo-stampa'); });
+  </script><p>avviso</p>`,
   '/microfono': `<!doctype html><meta charset="utf-8"><title>Riunione</title><script>${M}
     navigator.mediaDevices.getUserMedia({ audio: true }).then(
       (s) => m('concesso:' + s.getTracks().map((t) => t.kind).join(',')), (e) => m('negato:' + e.name));
@@ -110,14 +110,14 @@ test('la pagina riaperta di nascosto non apre la finestra di stampa del sistema'
   expect(await schermo('giro21-prima-stampa.png')).toBeLessThan(50);
   const fatto = app.evaluate(async (_e, u) => globalThis.SN_SAFEBROWSE.sandbox.detonate(u), origine + '/stampa');
   await expect.poll(() => esiti.includes('prima'), { timeout: 10_000 }).toBe(true);
+  await fatto;
   await new Promise((ok) => setTimeout(ok, 2500));
   const durante = await schermo('giro21-stampa-durante.png');
-  await fatto;
   console.log('esiti:', JSON.stringify(esiti), 'pixel accesi durante:', durante);
   expect(durante, 'la finestra di stampa della pagina sospetta compare sullo schermo').toBeLessThan(50);
 });
 
-test('una risposta tolta dalla pagina Sicurezza aperta in incognito resta tolta dopo aver riaperto Filo', async () => {
+for (const dove of ['normale', 'incognito']) test(`una risposta tolta dalla pagina Sicurezza aperta nella finestra ${dove} resta tolta dopo aver riaperto Filo`, async () => {
   test.setTimeout(150_000);
   const barra = () => shell.locator('#permesso-bar');
   await shell.evaluate((u) => window.filoShell.tabs.open(u), origine + '/microfono');
@@ -126,11 +126,15 @@ test('una risposta tolta dalla pagina Sicurezza aperta in incognito resta tolta 
   await si.click();
   await expect.poll(() => esiti.includes('concesso:audio'), { timeout: 10_000 }).toBe(true);
 
-  await shell.evaluate(() => window.filoShell.openIncognito());
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito && w._filoTabs)), { timeout: 15_000 }).toBe(true);
-  await app.evaluate(({ BrowserWindow }) => {
-    BrowserWindow.getAllWindows().find((w) => w._filoIncognito)._filoTabs.openTab('filo://security/security.html');
-  });
+  if (dove === 'incognito') {
+    await shell.evaluate(() => window.filoShell.openIncognito());
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito && w._filoTabs)), { timeout: 15_000 }).toBe(true);
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows().find((w) => w._filoIncognito)._filoTabs.openTab('filo://security/security.html');
+    });
+  } else {
+    await shell.evaluate(() => window.filoShell.tabs.open('filo://security/security.html'));
+  }
   let sicurezza = null;
   await expect.poll(() => { sicurezza = app.windows().find((w) => w.url().startsWith('filo://security')); return Boolean(sicurezza); }, { timeout: 15_000 }).toBe(true);
   const righe = sicurezza.locator('#sec-perm-list li');
@@ -157,7 +161,9 @@ test('aspetto: striscia della domanda e pagina Sicurezza in chiaro e in scuro', 
       const MSG = globalThis.SN_MSG.MSG;
       await globalThis.SN_HANDLE_MESSAGE({ type: MSG.UPDATE_SETTINGS, settings: { theme: t } }, { url: 'filo://options/options.html' });
     }, tema);
-    await shell.evaluate((u) => window.filoShell.tabs.open(u), origine + '/microfono?' + tema);
+    await app.evaluate(({ nativeTheme }, t) => { nativeTheme.themeSource = t; }, tema);
+    const o = tema === 'light' ? origine : origine.replace('127.0.0.1', 'localhost');
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), o + '/microfono');
     await expect(barra()).toBeVisible({ timeout: 10_000 });
     await new Promise((ok) => setTimeout(ok, 1200));
     await shell.screenshot({ path: join(SHOTS, `giro21-barra-${tema}.png`) });
