@@ -175,6 +175,51 @@ test('chat senza fornitore: niente regola salvata né scheda instradata, e il mo
   await page.screenshot({ path: 'tests/.shots/771-chat-non-disponibile.png' }).catch(() => {});
 });
 
+// Il modello scrive «fatto» insieme alla chiamata e dopo il rifiuto resta muto:
+// la sua frase non diventa la risposta, Filo dice che non si può.
+test('chat senza fornitore con l\'ultimo giro muto: la frase «fatto» non resta la risposta', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const turni = [
+      { text: 'PROMESSA_REGOLA: da ora netflix si apre sempre dagli Stati Uniti.', toolCalls: [{ id: 'r1', name: 'REGOLA_PROXY_DOMINIO', arguments: '{"country":"us","dominio":"netflix.com"}' }] },
+      { text: '' },
+      { text: 'PROMESSA_SCHEDA: fatto, la scheda ora arriva dalla Francia.', toolCalls: [{ id: 'p1', name: 'PROXY_TAB', arguments: '{"country":"fr"}' }] },
+      { text: '' },
+    ];
+    let i = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts }) => {
+      const t = turni[Math.min(i++, turni.length - 1)];
+      return {
+        text: t.text, toolCalls: t.toolCalls || [], reasoningDetails: [],
+        model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        finishReason: t.toolCalls ? 'tool_calls' : 'stop',
+      };
+    };
+  });
+
+  const risposte = page.locator('.dash-bubble-filo', { hasText: 'da un altro paese in Filo non si può ancora' });
+  await page.locator('#input').fill('apri sempre netflix dagli USA');
+  await page.locator('#sendBtn').click();
+  await expect(risposte).toHaveCount(1, { timeout: 15_000 });
+  await page.locator('#input').fill('apri questa scheda dalla Francia');
+  await page.locator('#sendBtn').click();
+  await expect(risposte).toHaveCount(2, { timeout: 15_000 });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'PROMESSA_' })).toHaveCount(0);
+  const regole = await app.evaluate(async () => globalThis.SN_FILO_MEMORY.listProxyRules());
+  expect(Object.keys(regole || {})).toEqual([]);
+  await page.screenshot({ path: 'tests/.shots/771-chat-giro-muto.png' }).catch(() => {});
+});
+
 // Formato vecchio (JSON nel testo): la frase scritta insieme all'azione la dava
 // per fatta, e senza un esito da leggere il turno finiva lì.
 test('chat nel formato vecchio: l\'esito «non disponibile» torna al modello e la sua frase non resta la risposta', async ({ app, shell }) => {
