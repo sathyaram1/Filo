@@ -53,7 +53,7 @@ test('pagina che non risponde con davanti solo la nuova scheda di Filo: la confe
   expect(dove.length, 'nessuna conferma: la pagina è stata salvata e chiusa in silenzio').toBeGreaterThan(0);
 });
 
-test('pagina ancora in caricamento: Alt+S salva, chiude, conferma sulla scheda davanti', async ({ app, openTab, testServer }) => {
+test('pagina ancora in caricamento: Alt+S salva, chiude, conferma sulla scheda davanti', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);
   const davanti = await testServer.openReady(openTab, PAGINA('Davanti', '#fda085'), { pubblico: true });
   let rilascia;
@@ -65,7 +65,6 @@ test('pagina ancora in caricamento: Alt+S salva, chiude, conferma sulla scheda d
   await new Promise((r) => lento.listen(0, '127.0.0.1', r));
   const url = `http://localhost:${lento.address().port}/pagina`;
   try {
-    const shell = app.windows().find((w) => w.url().startsWith('filo://shell') || w.url().includes('renderer')) || (await app.firstWindow());
     await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
     let page = null;
     await expect.poll(() => { page = app.windows().find((w) => { try { return new URL(w.url()).hostname === 'localhost'; } catch (_) { return false; } }); return !!page; }, { timeout: 8000 }).toBe(true);
@@ -115,4 +114,77 @@ test('la griglia di «Aperti per dopo» con le miniature nuove, tema chiaro e sc
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
   await home.waitForTimeout(800);
   await home.screenshot({ path: 'tests/.shots/839-g2-griglia-scuro.png' });
+});
+
+async function bloccaEPremi(app, page) {
+  await page.evaluate(() => { setTimeout(() => { const t = Date.now(); while (Date.now() - t < 10000) { /* occupata */ } }, 50); });
+  await page.waitForTimeout(200);
+  await altS(app);
+}
+
+const chiudiScheda = (app, u) => app.evaluate(({ BrowserWindow }, x) => {
+  const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+  const t = tm.tabs.find((y) => y.url.startsWith(x));
+  if (t) tm.closeTab(t.id);
+}, u);
+
+for (const interna of ['filo://home/home.html', 'filo://options/options.html', 'filo://history/history.html']) {
+  test(`pagina che non risponde con davanti ${interna}: la conferma compare`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    await chiudiScheda(app, 'filo://newtab/');
+    const pi = await openTab(interna);
+    await pi.waitForLoadState('domcontentloaded');
+    await pi.waitForTimeout(800);
+    const url = testServer.html(PAGINA('Bloccata ' + interna));
+    const page = await openTab(url);
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+    await bloccaEPremi(app, page);
+    await expect.poll(() => salvata(app, url).then((s) => !!s), { timeout: 12000 }).toBe(true);
+    const dove = await attendiConferma(app, 6000);
+    console.log(interna, 'schede dopo', await schede(app), 'conferma in', dove);
+    expect(dove.length, 'nessuna conferma').toBeGreaterThan(0);
+  });
+}
+
+test('pagina che non risponde ed è l\'unica scheda: la conferma compare nella nuova scheda', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const url = testServer.html(PAGINA('Unica'));
+  const page = await openTab(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await chiudiScheda(app, 'filo://newtab/');
+  console.log('schede prima', await schede(app));
+  await bloccaEPremi(app, page);
+  await expect.poll(() => salvata(app, url).then((s) => !!s), { timeout: 12000 }).toBe(true);
+  const dove = await attendiConferma(app, 6000);
+  console.log('schede dopo', await schede(app), 'conferma in', dove);
+  expect(dove.length, 'nessuna conferma').toBeGreaterThan(0);
+});
+
+test('Alt+S due volte su una pagina in caricamento: una voce sola, una conferma che porta alla voce', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const davanti = await testServer.openReady(openTab, PAGINA('Davanti2', '#fda085'), { pubblico: true });
+  const lento = createServer((req, res) => {
+    if (req.url.startsWith('/lento.js')) return; // mai
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<!doctype html><html><head><title>Lenta</title></head><body><h1>Si carica</h1><script src="/lento.js"></script></body></html>');
+  });
+  await new Promise((r) => lento.listen(0, '127.0.0.1', r));
+  const url = `http://localhost:${lento.address().port}/p`;
+  try {
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    await expect.poll(() => app.windows().some((w) => { try { return new URL(w.url()).hostname === 'localhost'; } catch (_) { return false; } }), { timeout: 8000 }).toBe(true);
+    await new Promise((r) => setTimeout(r, 800));
+    await altS(app);
+    await new Promise((r) => setTimeout(r, 1500));
+    await altS(app);
+    await expect.poll(() => salvata(app, url).then((s) => !!s), { timeout: 10000 }).toBe(true);
+    await new Promise((r) => setTimeout(r, 4000));
+    const voci = await app.evaluate(async (_e, x) => (await globalThis.SN_SAVED_PAGES.list()).filter((p) => p.url === x), url);
+    const conferme = await davanti.evaluate(() => [...document.querySelectorAll('.sn-save-confirm')].length);
+    console.log('voci', voci.length, voci.map((v) => v.id), 'conferme', conferme, 'schede', await schede(app));
+    expect(voci.length).toBe(1);
+  } finally {
+    lento.closeAllConnections?.();
+    await new Promise((r) => lento.close(r));
+  }
 });
