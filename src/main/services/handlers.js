@@ -3064,6 +3064,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const stop = 'Mi sono fermato: troppi passaggi di fila senza arrivare a una risposta. Dimmi se devo continuare.';
     const last = String(textReply || '').trim();
     textReply = last ? `${last}\n\n${stop}` : stop;
+  } else if (!String(textReply || '').trim() && renderedActions.some(esitoNonDisponibile)) {
+    // Muto dopo un «non disponibile»: la frase scritta con l'azione la dava per fatta (#771).
+    textReply = RISPOSTA_PROXY_NON_DISPONIBILE;
   } else if (!String(textReply || '').trim() && notes.length) {
     // Ultimo giro muto dopo un giro con azioni: la frase scritta insieme alle
     // azioni («Ti metto la sveglia alle 7, buonanotte!») era la risposta, non
