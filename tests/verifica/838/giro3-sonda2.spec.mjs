@@ -1,4 +1,4 @@
-// Sonda 2 del giro 3 di #838: pagina interna con selezione, PDF, seconda finestra.
+// Sonda 2 del giro 3 di #838: pagina interna con selezione, PDF.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
@@ -46,23 +46,21 @@ function premiDoveHaLaTastiera(app, keyCode, modifiers) {
   }, { keyCode, modifiers });
 }
 
-function schede(app, i = 0) {
-  return app.evaluate(({ BrowserWindow }, i) => {
-    const ws = BrowserWindow.getAllWindows().filter((x) => x._filoTabs && !x._filoIncognito).sort((a, b) => a.id - b.id);
-    const w = ws[i];
+function schede(app) {
+  return app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     return { ids: w._filoTabs.tabs.map((x) => x.id), activeId: w._filoTabs.activeId, urls: w._filoTabs.tabs.map((x) => x.url) };
-  }, i);
+  });
 }
 
-test('sonda: Alt+E e Alt+T su pagina interna con selezione', async ({ app, openTab }) => {
-  for (const [lettera, titolo] of [['E', 'Approfondimento'], ['T', 'Traduzione']]) {
-    const page = await openTab('filo://options/options.html');
+for (const [lettera, titolo, url] of [['E', 'Approfondimento', 'filo://options/options.html'], ['T', 'Traduzione', 'filo://history/history.html']]) {
+  test(`sonda: Alt+${lettera} su pagina interna con selezione`, async ({ app, openTab }) => {
+    const page = await openTab(url);
     await page.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8000 });
     await page.waitForTimeout(800);
     const sel = await page.evaluate(() => {
-      const el = [...document.querySelectorAll('h1,h2,h3,p,label,span,div')].find((e) => e.children.length === 0 && (e.textContent || '').trim().length > 12 && e.offsetParent);
+      const el = [...document.querySelectorAll('h1,h2,h3,p,label,span,div,button')].find((e) => e.children.length === 0 && (e.textContent || '').trim().length > 5 && e.offsetParent);
       if (!el) return '';
-      el.click?.();
       const r = document.createRange(); r.selectNodeContents(el);
       const s = getSelection(); s.removeAllRanges(); s.addRange(r);
       return s.toString();
@@ -76,44 +74,70 @@ test('sonda: Alt+E e Alt+T su pagina interna con selezione', async ({ app, openT
     await premiDoveHaLaTastiera(app, lettera, ['alt']);
     const ok = await page.locator('.sn-popup .sn-popup-title').first().textContent({ timeout: 6000 }).catch(() => 'NIENTE');
     console.log(`INTERNA Alt+${lettera}:`, ok, '(atteso', titolo + ')');
-  }
-});
+  });
+}
 
-test('sonda: PDF', async ({ app, openTab, shell }) => {
+async function apriPdf(app, shell) {
   const pdf = pdfMinimo('Documento di prova per Filo');
   const srv = createServer((req, res) => { res.writeHead(200, { 'Content-Type': 'application/pdf' }); res.end(pdf); });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   const url = `http://127.0.0.1:${srv.address().port}/doc.pdf`;
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  await expect.poll(() => app.evaluate(({ webContents }) => webContents.getAllWebContents().some((w) => w.getType() === 'remote')), { timeout: 10000 }).toBe(true);
+  await shell.waitForTimeout(1500);
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w.show(); w.focus();
+    const wc = w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents;
+    wc.focus();
+    wc.sendInputEvent({ type: 'mouseDown', x: 300, y: 300, button: 'left', clickCount: 1 });
+    wc.sendInputEvent({ type: 'mouseUp', x: 300, y: 300, button: 'left', clickCount: 1 });
+  });
+  await shell.waitForTimeout(800);
+  return srv;
+}
+
+for (const [nome, tasto, mod] of [['Alt+S', 'S', ['alt']], ['Ctrl+W', 'W', ['control']], ['Alt+H', 'H', ['alt']]]) {
+  test(`sonda: PDF ${nome} dal visore`, async ({ app, shell }) => {
+    const srv = await apriPdf(app, shell);
+    try {
+      console.log('fuoco:', await dove(app));
+      const prima = await schede(app);
+      await premiDoveHaLaTastiera(app, tasto, mod);
+      await shell.waitForTimeout(3000);
+      const dopo = await schede(app);
+      const aiuto = await app.evaluate(({ BrowserWindow }) => {
+        const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+        const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+        return t.view.webContents.executeJavaScript('!!document.querySelector(".sn-sidebar")').catch(() => 'err');
+      });
+      console.log(`PDF ${nome} dal visore: scheda PDF chiusa=`, !dopo.ids.includes(prima.activeId), 'aiuto=', aiuto);
+    } finally { srv.close(); }
+  });
+}
+
+test('sonda: PDF, la stessa azione chiesta direttamente (come faceva la scorciatoia di sistema)', async ({ app, shell }) => {
+  const srv = await apriPdf(app, shell);
   try {
-    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-    await shell.waitForTimeout(4000);
-    const s = await schede(app);
-    console.log('schede', JSON.stringify(s.urls));
-    const tuttiWc = await app.evaluate(({ webContents }) => webContents.getAllWebContents().map((w) => w.getType() + ' ' + w.getURL().slice(0, 70)));
-    console.log('webContents:', JSON.stringify(tuttiWc, null, 1));
-    // clic dentro il PDF con un vero evento di mouse sulla scheda
+    const prima = await schede(app);
     await app.evaluate(({ BrowserWindow }) => {
       const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-      w.show(); w.focus();
-      const wc = w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents;
-      wc.focus();
-      wc.sendInputEvent({ type: 'mouseDown', x: 300, y: 300, button: 'left', clickCount: 1 });
-      wc.sendInputEvent({ type: 'mouseUp', x: 300, y: 300, button: 'left', clickCount: 1 });
+      globalThis.__filoShortcuts.dispatch('open-help-sidebar', w);
     });
-    await shell.waitForTimeout(1000);
-    console.log('fuoco dopo clic nel PDF:', await dove(app));
-    const prima = await schede(app);
-    await premiDoveHaLaTastiera(app, 'S', ['alt']);
-    await shell.waitForTimeout(4000);
+    await shell.waitForTimeout(2500);
+    const aiuto = await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+      const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+      return t.view.webContents.executeJavaScript('!!document.querySelector(".sn-sidebar")').catch(() => 'err');
+    });
+    console.log('PDF dispatch Aiuto diretto: aiuto=', aiuto);
+    await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+      globalThis.__filoShortcuts.dispatch('save-for-later', w);
+    });
+    await shell.waitForTimeout(3000);
     const dopo = await schede(app);
-    console.log('PDF Alt+S: schede prima', prima.ids.length, 'dopo', dopo.ids.length, 'attiva chiusa:', !dopo.ids.includes(prima.activeId));
+    const salvata = await app.evaluate(async () => (await globalThis.SN_STORAGE.getRaw('savedPages', [])).map((p) => p.url));
+    console.log('PDF dispatch Salva diretto: chiusa=', !dopo.ids.includes(prima.activeId), 'salvate=', JSON.stringify(salvata));
   } finally { srv.close(); }
-});
-
-test('sonda: seconda finestra', async ({ app, openTab, testServer, shell }) => {
-  await testServer.openReady(openTab, '<p>uno</p>');
-  await app.evaluate(() => require('./src/main/window').createMainWindow?.());
-  await shell.waitForTimeout(3000);
-  const n = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((x) => x._filoTabs).length);
-  console.log('finestre', n);
 });
