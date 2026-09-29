@@ -919,6 +919,7 @@
     if (!bot || bot.who !== 'bot' || !(bot.error || bot.interrupted)) return;
     if (!user || user.who !== 'user' || !user.text) return;
     msgs.splice(msgs.length - 2, 2);
+    editChat(current.id, { op: 'drop', turn: bot.turn || '', userText: user.text });
     sendChat(user.text);
   }
 
