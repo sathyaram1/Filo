@@ -40,7 +40,8 @@
 //     20 → conflitto di merge: serve risoluzione manuale. Nessuna fusione.
 //     1  → errore tecnico (argomenti, biglietto assente, server/GitHub giù) o
 //          richiesta RIFIUTATA dal server (verdetti non registrati, ramo che
-//          non combacia col biglietto): il server l'ha già messa a registro.
+//          non combacia col biglietto, via libera che non copre la punta): il
+//          server l'ha già messa a registro.
 
 import { execFileSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
@@ -138,6 +139,24 @@ export function testoEsitiDecaduti(decaduti, punta, ramo = '', id = '') {
     + 'Poi registra di nuovo il verdetto, che parte timbrato col contenuto nuovo (nella nota scrivi anche cosa hai letto in più):\n'
     + `  node scripts/dispatch.mjs --record-secaudit ${i} <pass|fail> --nota <file.md>\n`
     + 'e, se è pass, rilancia questo comando. La verifica funzionale non la rifai tu: se il pezzo nuovo non è fatto solo di prove del giro tolte, il server la rimette in giro da sé quando chiedi la fusione.';
+}
+
+/**
+ * Cosa fare dopo un rifiuto con cui il server ha GIÀ rimesso in giro la
+ * pratica (#773). PURA. '' per ogni altro motivo, che si stampa com'è.
+ */
+export function testoRifiutoServer(reason) {
+  const coda = 'Niente fusione. Il server ha azzerato il tuo via libera di sicurezza e rimanda da sé un nuovo controllo sulla punta: '
+    + 'non registrare altro, rilascia il biglietto.';
+  if (reason === 'secaudit_stale') {
+    return '[merge-gate] RIFIUTATO (secaudit_stale): il via libera di sicurezza registrato sul server non parla della punta del ramo '
+      + `(è stato dato su un altro commit, o registrato senza). ${coda}`;
+  }
+  if (reason === 'stale') {
+    return '[merge-gate] RIFIUTATO (stale): sul server la punta del ramo non è il commit per cui hai chiesto la fusione, quindi il ramo '
+      + `si è mosso nel frattempo. ${coda}`;
+  }
+  return '';
 }
 
 /**
@@ -436,7 +455,7 @@ async function main() {
     if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner nella dashboard di gestione');
   }
   else if (code === 20) console.error(`[merge-gate] CONFLICT: ${reply.reason || 'serve risoluzione manuale'}`);
-  else console.error(`[merge-gate] ERROR: ${reply.reason || 'guasto'}`);
+  else console.error(testoRifiutoServer(reply.reason) || `[merge-gate] ERROR: ${reply.reason || 'guasto'}`);
   process.exit(code);
 }
 
