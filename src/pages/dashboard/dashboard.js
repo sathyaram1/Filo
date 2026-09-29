@@ -1753,7 +1753,8 @@
     const doneBtn = document.createElement('button');
     doneBtn.type = 'button';
     doneBtn.className = 'dash-recap-btn dash-recap-done';
-    doneBtn.textContent = 'Fantastico!';
+    // Nessuna risolta (archiviate, doppioni): il congedo non festeggia.
+    doneBtn.textContent = rewards.some((r) => r.status !== 'closed') ? 'Fantastico!' : 'Va bene';
     doneBtn.addEventListener('click', close);
     footer.append(doneBtn);
     box.appendChild(footer);
