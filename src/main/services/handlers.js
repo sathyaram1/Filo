@@ -4366,7 +4366,9 @@ async function enrichArchivedTab(id, payload) {
       patch.embedModel = emb.model;
     }
     if (Object.keys(patch).length) await ArchivedTabs.update(id, patch);
-  } catch (_) { /* l'arricchimento non deve mai disturbare */ }
+  } catch (_) { /* l'arricchimento non deve mai disturbare */ } finally {
+    inArricchimento.delete(id);
+  }
 }
 globalThis.SN_TAB_ENRICH = enrichArchivedTab;
 
