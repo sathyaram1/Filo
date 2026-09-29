@@ -199,8 +199,8 @@
 
   // ───────────────────────────────── JUMBF ─────────────────────────────────
 
-  // Un box: { tipo, etichetta, dati, figli, raw }. `raw` è il box intero con la
-  // sua intestazione, perché è su quello che il claim calcola le impronte.
+  // Un box: { tipo, etichetta, dati, figli, raw }. Le impronte del claim (asserzioni,
+  // manifesti degli ingredienti) lo standard le calcola su `dati`, senza intestazione.
   function jumbfBoxes(b, da, a) {
     const out = [];
     let i = da;
@@ -566,6 +566,7 @@
 
   // Ciò che il claim afferma, ma solo per le asserzioni la cui impronta combacia
   // con quella firmata: un'asserzione non coperta dalla firma non è firmata.
+  const RELAZIONI = new Set(['parentOf', 'componentOf']);
   function leggiManifesto(manifesto, claim) {
     const attese = new Map();
     const liste = [claim && claim.assertions, claim && claim.created_assertions, claim && claim.gathered_assertions];
@@ -578,13 +579,13 @@
       }
     }
     const store = perEtichetta(manifesto.figli, 'c2pa.assertions');
-    const out = { origine: null, generatore: '', coperte: 0, scoperte: 0, hashDati: null };
+    const out = { origine: null, generatore: '', coperte: 0, scoperte: 0, hashDati: null, ingredienti: [] };
     if (!store) return out;
     for (const box of store.figli) {
       if (box.tipo !== 'jumb' || !box.etichetta) continue;
       const atteso = attese.get(box.etichetta);
       if (atteso && atteso.hash && atteso.hash.length) {
-        const vero = sha(atteso.alg, box.raw);
+        const vero = sha(atteso.alg, box.dati);
         if (!vero || !ugualiByte(vero, atteso.hash)) { out.scoperte++; continue; }
       } else if (attese.size) { out.scoperte++; continue; }
       out.coperte++;
@@ -592,7 +593,13 @@
       if (!dati) continue;
       const etichetta = box.etichetta.replace(/__\d+$/, '');
       if (etichetta === 'c2pa.hash.data') out.hashDati = cborTesta(dati);
-      else if (etichetta === 'c2pa.actions' || etichetta === 'c2pa.actions.v2') {
+      else if (/^c2pa\.ingredient(\.v\d+)?$/.test(etichetta)) {
+        const ing = cborTesta(dati);
+        const rif = ing && (ing.activeManifest || ing.c2pa_manifest);
+        if (rif && typeof rif.url === 'string' && RELAZIONI.has(String(ing.relationship))) {
+          out.ingredienti.push({ relazione: String(ing.relationship), url: rif.url, hash: u8(rif.hash), alg: rif.alg || claim.alg || 'sha256' });
+        }
+      } else if (etichetta === 'c2pa.actions' || etichetta === 'c2pa.actions.v2') {
         const az = cborTesta(dati);
         const elenco = az && Array.isArray(az.actions) ? az.actions : [];
         for (const a of elenco) {
@@ -614,6 +621,7 @@
     }
     const gen = claim && (claim.claim_generator_info || claim.claim_generator);
     if (Array.isArray(gen) && gen[0] && gen[0].name) out.generatore = String(gen[0].name);
+    else if (gen && typeof gen === 'object' && typeof gen.name === 'string') out.generatore = gen.name;
     else if (typeof gen === 'string') out.generatore = gen.split('(')[0].trim();
     return out;
   }
@@ -679,6 +687,51 @@
     return vuoto;
   }
 
+  function firmaDelManifesto(manifesto) {
+    const claimBox = perEtichetta([manifesto], 'c2pa.claim') || perEtichetta([manifesto], 'c2pa.claim.v2');
+    const firmaBox = perEtichetta([manifesto], 'c2pa.signature');
+    const claimBytes = contenuto(claimBox);
+    const coseBytes = contenuto(firmaBox);
+    if (!claimBytes || !coseBytes) return null;
+    const claim = cborTesta(claimBytes);
+    if (!claim || typeof claim !== 'object') return null;
+    return { claim, firma: verificaCose(coseBytes, claimBytes) };
+  }
+
+  // Quanto conta un'origine quando la dicono più passi della storia del file.
+  const PESO_ORIGINE = { 'ai': 3, 'ai-modificata': 2, 'fotocamera': 1 };
+
+  // Un'immagine generata e poi solo ritagliata porta l'origine nel manifesto del
+  // passo prima: vale se la sua impronta è quella che il passo dopo ha firmato e
+  // se la sua firma regge. Torna { origine, firma } o null.
+  function daIngredienti(store, ingredienti, profondita, visti) {
+    if (profondita > 16) return null;
+    let meglio = null;
+    for (const ing of ingredienti) {
+      const etichetta = ing.url.split('/c2pa/').pop().split('/')[0];
+      if (!etichetta || visti.has(etichetta)) continue;
+      const box = store.figli.find((f) => f.tipo === 'jumb' && f.etichetta === etichetta);
+      if (!box || !ing.hash.length) continue;
+      const vero = sha(ing.alg, box.dati);
+      if (!vero || !ugualiByte(vero, ing.hash)) continue;
+      const letto = firmaDelManifesto(box);
+      if (!letto || !letto.firma.valida) continue;
+      visti.add(etichetta);
+      const dentro = leggiManifesto(box, letto.claim);
+      let esito = dentro.origine ? { origine: dentro.origine, firma: letto.firma, generatore: dentro.generatore } : null;
+      const sotto = daIngredienti(store, dentro.ingredienti, profondita + 1, visti);
+      if (sotto && (!esito || PESO_ORIGINE[sotto.origine] > PESO_ORIGINE[esito.origine])) esito = sotto;
+      if (!esito) continue;
+      // Un pezzo incollato dentro l'immagine non la rende scattata né generata: la rende modificata.
+      if (ing.relazione === 'componentOf') {
+        if (esito.origine === 'fotocamera') continue;
+        esito = { ...esito, origine: 'ai-modificata' };
+      }
+      if (!meglio || PESO_ORIGINE[esito.origine] > PESO_ORIGINE[meglio.origine]) meglio = esito;
+    }
+    return meglio;
+  }
+
   function daC2pa(boxes, byteFile, ancore) {
     const store = boxes.find((x) => x.tipo === 'jumb') || boxes[0];
     if (!store || !store.figli) return null;
@@ -688,15 +741,9 @@
     const manifesto = manifesti.length ? manifesti[manifesti.length - 1] : null;
     if (!manifesto) return null;
 
-    const claimBox = perEtichetta([manifesto], 'c2pa.claim') || perEtichetta([manifesto], 'c2pa.claim.v2');
-    const firmaBox = perEtichetta([manifesto], 'c2pa.signature');
-    const claimBytes = contenuto(claimBox);
-    const coseBytes = contenuto(firmaBox);
-    if (!claimBytes || !coseBytes) return null;
-    const claim = cborTesta(claimBytes);
-    if (!claim || typeof claim !== 'object') return null;
-
-    const firma = verificaCose(coseBytes, claimBytes);
+    const attivo = firmaDelManifesto(manifesto);
+    if (!attivo) return null;
+    const { claim, firma } = attivo;
     const avvisi = [];
     if (!firma.valida) {
       // Credenziali che non reggono la verifica: si dice che ci sono e che non
@@ -712,18 +759,30 @@
     if (intatto === false) avvisi.push('file_cambiato');
     if (intatto === null) avvisi.push('legame_assente');
     if (letto.scoperte) avvisi.push('asserzioni_scoperte');
-    if (firma.scaduto) avvisi.push('certificato_scaduto');
-    if (firma.catenaIntegra === false) avvisi.push('catena_rotta');
 
-    const firmatario = statoFirmatario(firma.certificati, ancore);
-    const dichiarante = nomeLeggibile(firma.soggetto) || letto.generatore || '';
+    // Chi DICHIARA l'origine è chi ha firmato il manifesto che la contiene: per
+    // un'immagine generata e poi ritagliata, il generatore e non il programma del ritaglio.
+    let origine = letto.origine;
+    let chi = { firma, generatore: letto.generatore };
+    const storia = daIngredienti(store, letto.ingredienti, 0, new Set([manifesto.etichetta]));
+    if (storia && (!origine || PESO_ORIGINE[storia.origine] > PESO_ORIGINE[origine])) {
+      origine = storia.origine;
+      chi = { firma: storia.firma, generatore: storia.generatore };
+    }
+    if (chi.firma.scaduto) avvisi.push('certificato_scaduto');
+    if (chi.firma.catenaIntegra === false) avvisi.push('catena_rotta');
+
+    // Un file cambiato dopo la firma chiama in causa chi ha firmato QUEI byte, cioè l'ultimo passo.
+    if (avvisi.includes('file_cambiato')) chi = { firma, generatore: letto.generatore };
+    const firmatario = statoFirmatario(chi.firma.certificati, ancore);
+    const dichiarante = nomeLeggibile(chi.firma.soggetto) || chi.generatore || '';
     // Un manifesto valido che non dice niente sull'origine non è una notizia:
     // si tace e si lascia parlare le altre etichette del file.
-    const dicibile = letto.origine || avvisi.includes('file_cambiato');
+    const dicibile = origine || avvisi.includes('file_cambiato');
     if (!dicibile) return null;
     return {
       trovato: true,
-      origine: letto.origine,
+      origine,
       prova: 'firmata',
       dichiarante,
       firmatario,
@@ -761,6 +820,15 @@
       if (re.test(t)) return p.ente;
     }
     return '';
+  }
+
+  // L'esito del marchio invisibile lo calcola chi ha già i pixel (SN_MARCHIO): qui
+  // vale solo un ente che quel lettore sa riconoscere, mai un nome scritto da chi chiama.
+  function daMarchio(marchio) {
+    const M = global.SN_MARCHIO;
+    const ente = marchio && typeof marchio.ente === 'string' ? marchio.ente : '';
+    if (!ente || !M || !M.ENTI.includes(ente)) return null;
+    return { trovato: true, origine: 'ai', prova: 'marchio', dichiarante: ente, firmatario: '', avvisi: [], fonte: 'marchio' };
   }
 
   // ──────────────────────────────── la frase ───────────────────────────────
@@ -818,6 +886,9 @@
       if (res.origine === 'ai-modificata') return `Modificata con l’AI, credenziali di ${chi}.`;
       return `Generata con l’AI, lo dichiara ${chi} nelle credenziali firmate.`;
     }
+    if (res.prova === 'marchio') {
+      return `${cosa} secondo il marchio invisibile di ${chi || 'un generatore'}, senza firma che lo confermi.`;
+    }
     return chi
       ? `${cosa} secondo il file stesso (${chi}), senza firma che lo confermi.`
       : `${cosa} secondo il file stesso, senza firma che lo confermi.`;
@@ -838,7 +909,7 @@
     }
     return {
       sistema: 'ho letto in locale le etichette di origine dell’immagine: il file non ne porta nessuna — '
-        + 'né credenziali firmate, né etichetta IPTC/XMP, né parametri di generazione. Questo NON prova che l’immagine sia '
+        + 'né credenziali firmate, né etichetta IPTC/XMP, né parametri di generazione, né il marchio invisibile di Stable Diffusion. Questo NON prova che l’immagine sia '
         + 'autentica: uno screenshot, una ricompressione o il caricamento su un social le cancellano, e molti generatori non '
         + 'le scrivono affatto. Dillo così, senza sbilanciarti sull’origine',
       etichetta: '',
@@ -846,7 +917,7 @@
   }
 
   global.SN_PROVENIENZA = {
-    analizza, frase, notaPerModello, ancoreDaPem,
+    analizza, frase, notaPerModello, ancoreDaPem, daMarchio,
     _interni: { pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, statoFirmatario },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

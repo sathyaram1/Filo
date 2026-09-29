@@ -236,7 +236,8 @@ export function pngFirmato({
     const boxAzioni = asserzione('c2pa.actions', azioni);
     const boxLegame = asserzione('c2pa.hash.data', legame);
     const store = superbox('asserzioni', 'c2pa.assertions', boxAzioni, boxLegame);
-    const sha = (b) => crypto.createHash('sha256').update(b).digest();
+    // Come lo standard (e l'SDK di riferimento): l'impronta è sul contenuto del superbox, senza intestazione.
+    const sha = (b) => crypto.createHash('sha256').update(b.subarray(8)).digest();
     const claim = cbor({
       'dc:title': 'prova.png',
       'dc:format': 'image/png',
