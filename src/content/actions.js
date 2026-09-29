@@ -658,6 +658,14 @@
     };
   }
 
+  // #711 — le etichette di origine di un'immagine già scaricata: il main legge i byte,
+  // il marchio invisibile si legge qui, dove il browser sa già decodificarla. Il menu
+  // e l'Aiuto passano entrambi da qui.
+  async function leggiOrigine(blob, dataUrl) {
+    const marchio = await (global.SN_MARCHIO ? global.SN_MARCHIO.daBlob(blob) : Promise.resolve(null));
+    return chrome.runtime.sendMessage({ type: MSG.IMAGE_PROVENANCE, dataUrl, marchio });
+  }
+
   // Sezione inline "Spiega immagine": stessa filosofia di buildInlineExplain ma con dataUrl.
   // I byte si scaricano UNA volta: la descrizione del modello e il controllo
   // locale delle etichette di origine (#711) partono insieme da quegli stessi byte.
@@ -687,9 +695,10 @@
         let cancelled = false;
         (async () => {
           let dataUrl;
+          let blob;
           try {
             const r = await fetch(src);
-            const blob = await r.blob();
+            blob = await r.blob();
             dataUrl = await blobToDataUrl(blob);
           } catch (_) {
             if (cancelled) return;
@@ -702,7 +711,7 @@
 
           // Locale e senza crediti: arriva molto prima della descrizione, e si
           // mostra appena c'è invece di aspettarla.
-          chrome.runtime.sendMessage({ type: MSG.IMAGE_PROVENANCE, dataUrl }).then((p) => {
+          leggiOrigine(blob, dataUrl).then((p) => {
             if (cancelled || !p || !p.ok || !p.frase) return;
             origine.textContent = p.frase;
             origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified' : 'menu_origin_hint');
@@ -1924,6 +1933,7 @@
     schedulePrefetchExplain,
     buildInlineExplain,
     buildInlineExplainImage,
+    leggiOrigine,
     buildInlineExplainLink,
     analyzeLinkSuspicious,
     // salva / condividi / cerca / immagini

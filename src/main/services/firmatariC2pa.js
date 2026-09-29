@@ -142,11 +142,13 @@ async function init() {
 
 const attesa = (ms) => new Promise((r) => { const t = setTimeout(r, ms); if (t.unref) t.unref(); });
 
-// La lettura che usano il menu e la chat: una sola, così le due strade dicono la stessa cosa.
-async function analizzaImmagine(byte) {
+// La lettura che usano il menu, la chat e l'Aiuto: una sola, così le strade dicono la stessa cosa.
+// `opzioni.marchio`: l'esito del marchio invisibile, letto da chi ha già i pixel; conta solo se il file tace.
+async function analizzaImmagine(byte, opzioni) {
   const P = provenienza();
   if (!P) throw new Error('controllo non disponibile');
   let res = P.analizza(byte, { ancore });
+  if (!res.trovato) return P.daMarchio(opzioni && opzioni.marchio) || res;
   if (res.firmatario !== 'non_verificato') return res;
   const giro = inCorso || (automatico() && serveAggiornare() ? aggiorna() : null);
   if (!giro) return res;

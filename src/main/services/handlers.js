@@ -98,7 +98,7 @@ function formatKnownPathsForPrompt(rawPaths) {
 // #711 — l'esito del controllo locale delle etichette di origine delle immagini
 // allegate. La nota è voce di Filo, la frase del file viaggia imbustata: i nomi
 // dentro li scrive chi ha prodotto l'immagine.
-async function noteProvenienzaImmagini(dataUrls) {
+async function noteProvenienzaImmagini(dataUrls, marchi) {
   const P = globalThis.SN_PROVENIENZA;
   const E = globalThis.SN_ESTERNO;
   if (!P || !E || !Array.isArray(dataUrls) || !dataUrls.length) return '';
@@ -108,7 +108,8 @@ async function noteProvenienzaImmagini(dataUrls) {
     const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrls[i] || ''));
     if (!m) continue;
     let nota;
-    try { nota = P.notaPerModello(await analizzaImmagine(Buffer.from(m[1], 'base64'))); } catch (_) { continue; }
+    const marchio = Array.isArray(marchi) ? marchi[i] : null;
+    try { nota = P.notaPerModello(await analizzaImmagine(Buffer.from(m[1], 'base64'), { marchio })); } catch (_) { continue; }
     const quale = dataUrls.length > 1 ? ` (immagine ${i + 1})` : '';
     const testa = `(Sistema${quale}: ${E.perCanaleSistema(nota.sistema)}.)`;
     blocchi.push(nota.etichetta
@@ -116,6 +117,33 @@ async function noteProvenienzaImmagini(dataUrls) {
       : testa);
   }
   return blocchi.join('\n\n');
+}
+
+// #711 — lo stesso esito, per le immagini che l'utente ha davanti quando chiede
+// all'Aiuto della pagina. Il payload può scriverlo chiunque parli al canale: dei
+// numeri si tengono solo i numeri, e le frasi viaggiano imbustate.
+function notaOrigineAiuto(o) {
+  const E = globalThis.SN_ESTERNO;
+  if (!E || !o || typeof o !== 'object') return '';
+  const intero = (v) => Math.max(0, Math.min(10000, Math.floor(Number(v) || 0)));
+  const visibili = intero(o.visibili);
+  const controllate = Math.min(intero(o.controllate), visibili);
+  if (!visibili) return '';
+  const quali = controllate === visibili
+    ? `delle ${visibili} immagini visibili nella pagina`
+    : `di ${controllate} delle ${visibili} immagini visibili nella pagina, le più grandi`;
+  const esiti = (Array.isArray(o.esiti) ? o.esiti : []).slice(0, 50)
+    .filter((e) => e && typeof e.frase === 'string' && e.frase.trim());
+  const nonProva = 'l’assenza di etichette NON prova che un’immagine sia autentica: uno screenshot, una ricompressione o il caricamento su un social le cancellano, e molti generatori non le scrivono affatto';
+  if (!esiti.length) {
+    return `(Sistema: ${E.perCanaleSistema(`ho letto in locale le etichette di origine ${quali}: nessuna ne porta. ${nonProva}. Se l’utente chiede se un’immagine è fatta con l’AI, dillo così, senza giudicare l’origine dai pixel`)}.)`;
+  }
+  const righe = esiti.map((e) => {
+    const alt = e.alt ? `, testo alternativo «${e.alt}»` : '';
+    return `immagine ${intero(e.n)} (${intero(e.larghezza)}×${intero(e.altezza)} px${alt}): ${e.frase}`;
+  });
+  const testa = `(Sistema: ${E.perCanaleSistema(`ho letto in locale le etichette di origine ${quali}; quelle che ne portano sono nel blocco qui sotto, numerate dalla più grande, e le altre non ne hanno. Filo legge solo ciò che i file dichiarano e non giudica mai i pixel: riporta quegli esiti senza aggiungerci un verdetto tuo, e per le altre ricorda che ${nonProva}`)}.)`;
+  return `${testa}\n${E.imbusta({ tipo: 'ETICHETTA_FILE', testo: righe.join('\n'), conIntestazione: true })}`;
 }
 
 function testoDelTurnoAutomatico(payload) {
@@ -163,6 +191,8 @@ async function buildMessages(action, payload) {
     const parts = [];
     const userText = payload.userMessage || testoDelTurnoAutomatico(payload);
     if (userText) parts.push({ type: 'text', text: userText });
+    const origine = notaOrigineAiuto(payload.origineImmagini);
+    if (origine) parts.push({ type: 'text', text: origine });
     if (payload.screenshot) parts.push({ type: 'image_url', image_url: { url: payload.screenshot } });
     const userMsg = parts.length === 1 && parts[0].type === 'text'
       ? { role: 'user', content: parts[0].text }
@@ -2600,7 +2630,7 @@ async function editorFileSummaries() {
   } catch (_) { return ''; }
 }
 
-async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, chatId = null, sender = null }) {
+async function handleFiloChat({ userMessage, threadHistory, image, images, marchi = null, reasoningReqId = null, internal = false, chatId = null, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
@@ -2712,7 +2742,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // #711 — «questa foto è fatta con l'AI?» deve avere in chat la stessa
     // risposta del tasto destro, quindi il controllo si fa SEMPRE: capire
     // dall'intento quando serve sarebbe una promessa affidata al modello.
-    const origine = await noteProvenienzaImmagini(imageList);
+    const origine = await noteProvenienzaImmagini(imageList, marchi);
     if (origine) parts.push({ type: 'text', text: origine });
     threadMessages.push({ role: 'user', content: parts });
   } else {

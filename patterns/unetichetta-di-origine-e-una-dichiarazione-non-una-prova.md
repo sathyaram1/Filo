@@ -33,7 +33,20 @@ La regola, in tre pezzi:
   asserzioni con la loro impronta: si legge solo quello che combacia, e il
   legame duro sui byte del file decide se le credenziali parlano ancora di
   *questa* immagine. Un'asserzione fuori dall'elenco è testo che chiunque ha
-  potuto infilare nel file dopo.
+  potuto infilare nel file dopo. Le impronte si calcolano come le calcola lo
+  standard (sul contenuto del box, senza intestazione), e **le prove usano anche
+  file scritti dall'SDK di riferimento** (`tests/fixtures/provenienza/`): un
+  lettore e un generatore di prova scritti dalla stessa mano sbagliano insieme e
+  passano insieme, ed è così che al primo giro #711 taceva su ogni file vero.
+- **La storia del file conta.** Un'immagine generata e poi ritagliata in un
+  programma che tiene le credenziali dice «generata» nel manifesto del passo
+  prima: si segue l'ingrediente, se la sua impronta è quella firmata dal passo
+  dopo e se la sua firma regge, e a dichiarare è chi ha firmato quel manifesto.
+- **Dai pixel si legge solo un messaggio noto**, mai una stima: il marchio aperto
+  dei programmi di Stable Diffusion. E si legge dove l'immagine è già decodificata
+  per mostrarla (la pagina, la chat), mai nel processo principale: un decoder
+  d'immagini lì è una porta aperta a chiunque mandi un file. Il main accetta
+  l'esito solo come nome di un ente che il lettore conosce.
 
 **I nomi dentro l'etichetta li scrive chi ha fatto il file.** Il soggetto di un
 certificato e il generatore dichiarato sono contenuto esterno a tutti gli
@@ -46,15 +59,17 @@ Filo, i nomi no.
 riquadro «Spiega immagine» compare su quattro rami del menu del tasto destro
 (immagine cliccata, immagine dentro un link, sotto un velo, sotto un velo dentro
 un link): il controllo sta dentro il riquadro, non dentro i rami, e gira sugli
-stessi byte che la descrizione ha già scaricato — mai un secondo download. In
+stessi byte che la descrizione ha già scaricato — mai un secondo download. Nell'Aiuto della pagina si leggono le immagini che l'utente ha davanti, dalle
+più grandi, a ogni sua domanda. In
 chat lo stesso controllo si fa su **ogni** immagine allegata, senza provare a
 indovinare se l'utente stava chiedendo proprio quello: capirlo dall'intento
 sarebbe [una promessa affidata al
 modello](una-promessa-fatta-allutente-non-puo-dipendere-dal-modello.md).
 
 Il codice: `src/shared/provenienzaImmagine.js` (lettura dei contenitori, JUMBF,
-COSE, catena fino all'elenco, verdetto e frase), `src/main/services/firmatariC2pa.js`
-(l'elenco: scaricarlo, tenerlo, e l'unica lettura che usano menu e chat),
+COSE, catena fino all'elenco, ingredienti, verdetto e frase),
+`src/shared/marchioInvisibile.js` (il marchio nei pixel), `src/main/services/firmatariC2pa.js`
+(l'elenco: scaricarlo, tenerlo, e l'unica lettura che usano menu, chat e Aiuto),
 `tests/helpers/immagineFirmata.mjs` (immagini di prova firmate davvero: autorità,
 certificato, firma e legame duro, così la prova diventa rossa se il lettore
 smette di verificare).

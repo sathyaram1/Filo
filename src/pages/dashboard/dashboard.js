@@ -773,6 +773,23 @@
     return h;
   }
 
+  // #711 — il marchio invisibile si legge qui, dove l'immagine è già decodificata per
+  // l'anteprima; il main ne tiene conto solo se il file non porta etichette.
+  async function marchiDelleImmagini(images) {
+    const M = window.SN_MARCHIO;
+    if (!M) return [];
+    return Promise.all(images.map(async (u) => {
+      try {
+        const m = /^data:([^;,]*)[^,]*;base64,(.*)$/s.exec(String(u || ''));
+        if (!m) return null;
+        const bin = atob(m[2]);
+        const byte = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) byte[i] = bin.charCodeAt(i);
+        return await M.daBlob(new Blob([byte], { type: m[1] || 'image/png' }));
+      } catch (_) { return null; }
+    }));
+  }
+
   async function runFiloTurn({ userMessage, images = [], internal = false, activity = null }) {
     // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
     // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
@@ -865,6 +882,7 @@
     if (images.length) {
       msg.image = images[0]; // retrocompatibilità (provider mono-immagine)
       msg.images = images;
+      msg.marchi = await marchiDelleImmagini(images);
     }
     const r = await send(msg);
 

@@ -431,6 +431,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'dictationSegmenter.js')); } catch (e) { console.error('[Filo CS] dictationSegmenter', e); }
   try { require(path.join(CONTENT_DIR, 'tts.js')); } catch (e) { console.error('[Filo CS] tts', e); }
   try { require(path.join(CONTENT_DIR, 'editBox.js')); } catch (e) { console.error('[Filo CS] editBox', e); }
+  try { require(path.join(SHARED_DIR, 'marchioInvisibile.js')); } catch (e) { console.error('[Filo CS] marchioInvisibile', e); } // #711 — il marchio si legge dove l'immagine è già decodificata: PRIMA di actions.js
   try { require(path.join(CONTENT_DIR, 'actions.js')); } catch (e) { console.error('[Filo CS] actions', e); }
   try { require(path.join(CONTENT_DIR, 'menuIcons.js')); } catch (e) { console.error('[Filo CS] menuIcons', e); }
   try { require(path.join(CONTENT_DIR, 'content.js')); } catch (e) { console.error('[Filo CS] content', e); }

@@ -319,6 +319,7 @@ function loadContentScripts() {
   if (process.env.NODE_ENV === 'test') safe(path.join(SHARED, '..', '..', 'tests', 'fixtures', 'testModels.js'));
   safe(path.join(CONTENT, 'tts.js'));
   safe(path.join(CONTENT, 'editBox.js'));
+  safe(path.join(SHARED, 'marchioInvisibile.js')); // #711 — il marchio si legge dove l'immagine è già decodificata: PRIMA di actions.js
   safe(path.join(CONTENT, 'actions.js'));
   safe(path.join(CONTENT, 'menuIcons.js'));
   safe(path.join(CONTENT, 'content.js'));

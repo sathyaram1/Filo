@@ -80,6 +80,7 @@ require(path.join(SHARED, 'campoNumero.js'));
 require(path.join(SHARED, 'routineSessioni.js'));
 // #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.
 // Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).
+require(path.join(SHARED, 'marchioInvisibile.js')); // l'elenco degli enti che il marchio sa dire: PRIMA di provenienzaImmagine.js
 require(path.join(SHARED, 'provenienzaImmagine.js'));
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
 require(path.join(SHARED, 'actionLevels.js'));
