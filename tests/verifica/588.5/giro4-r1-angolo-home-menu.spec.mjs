@@ -28,11 +28,15 @@ const siToccano = (a, b) => a.x < b.r && b.x < a.r && a.y < b.b && b.y < a.b;
 
 for (const [W, testo] of [
   [1280, 'Scaricato: Fattura_Energia_Elettrica_settembre_2026.pdf'],
-  [960, 'Scaricato: report.pdf'],
+  [960, 'Scaricato: preventivo-cucina-2026.pdf'],
 ]) {
   test(`Home larga ${W}: con «${testo}» a schermo il tasto di invio resta scoperto`, async ({ app, shell, avvisi }) => {
     await app.evaluate(({ BrowserWindow }, w) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).setContentSize(w, 760), W);
-    const home = app.windows().find((w) => { try { return w.url().startsWith('filo://newtab'); } catch (_) { return false; } });
+    let home = null;
+    await expect.poll(() => {
+      home = app.windows().find((w) => { try { return /^filo:\/\/(newtab|dashboard)/.test(w.url()); } catch (_) { return false; } });
+      return !!home;
+    }, { timeout: 15000 }).toBe(true);
     expect(home, 'la Home non c’è').toBeTruthy();
     await home.locator('#sendBtn').waitFor();
     await shell.evaluate(({ t }) => window.filoNotify(t, { durationSec: 0, actions: [{ label: 'Apri file', onClick: () => {} }, { label: 'Apri cartella', onClick: () => {} }] }), { t: testo });

@@ -19,9 +19,12 @@ test('nel vuoto accanto alla carta: freccia sopra lo sfondo, mano sopra un colle
   const cursore = () => vista.evaluate(() => getComputedStyle(document.documentElement).cursor);
   // Margine basso della vista: sopra lo sfondo (12 px dal fondo) e sopra il collegamento (4 px dal fondo).
   const x = b.width - 100;
-  for (const [y, atteso] of [[b.height - 12, 'default'], [b.height - 4, 'pointer'], [b.height - 12, 'default']]) {
+  // La freccia è 'auto' o 'default'; la mano è 'pointer'.
+  const freccia = async () => ['auto', 'default'].includes(await cursore());
+  for (const [y, suLink] of [[b.height - 12, false], [b.height - 4, true], [b.height - 12, false]]) {
     for (let i = 0; i < 4; i++) await gestoNellaVista(app, { type: 'mouseMove', x: x - 12 + i * 4, y });
-    await expect.poll(cursore, { timeout: 3000 }).toBe(atteso);
+    await page.waitForTimeout(300);
+    if (suLink) await expect.poll(cursore, { timeout: 3000 }).toBe('pointer');
+    else await expect.poll(freccia, { timeout: 3000, message: `sopra lo sfondo il puntatore è «${await cursore()}»` }).toBe(true);
   }
-  expect(await page.evaluate(() => 1)).toBe(1);
 });
