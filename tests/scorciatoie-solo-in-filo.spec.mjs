@@ -137,6 +137,7 @@ test('Alt+S in una finestra in incognito salva solo nella memoria di quella fine
     return t.activeId;
   });
 
+  const normale = await schede(app);
   await premi(app, 'S', { incognito: true });
 
   await expect.poll(() => app.evaluate(({ BrowserWindow }, id) => {
@@ -151,6 +152,5 @@ test('Alt+S in una finestra in incognito salva solo nella memoria di quella fine
     return { suDisco, inMemoria };
   }, url);
   expect(dove).toEqual({ suDisco: false, inMemoria: true });
-  // La finestra normale non è stata toccata.
-  expect((await schede(app)).ids.length).toBeGreaterThan(0);
+  expect((await schede(app)).ids).toEqual(normale.ids);
 });
