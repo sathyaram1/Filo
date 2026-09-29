@@ -455,6 +455,14 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
+  // ─── avvisi della barra (sopra le WebContentsView, #588.5) ────────────────
+  // Solo la shell della finestra manda la sua pila: una scheda non deve poter disegnare lì.
+  ipcMain.on('avvisi:stato', (event, stato) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed() || win.webContents !== event.sender) return;
+    if (win._filoTabs?.avvisi) win._filoTabs.avvisi.aggiorna(stato);
+  });
+
   // ─── tooltip custom (sopra le WebContentsView) ───────────────────────────
   ipcMain.on('shell:tooltip-show', (event, { text, x, y }) => {
     const win = winFor(event);

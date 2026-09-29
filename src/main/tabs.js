@@ -27,6 +27,7 @@ const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
 const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
+const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
@@ -265,6 +266,10 @@ class TabManager {
     this.partition = partition || null;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
+    this.avvisi = new AvvisiSopraPagina(window, {
+      alto: () => this._altezzaCornice(),
+      restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
+    });
     // §1.2 — cache del colore identità per dominio (host → 'rgb(r,g,b)'). Così
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
     // aspettare che il content script ricalcoli.
@@ -1692,17 +1697,19 @@ class TabManager {
 
   // ─── layout ─────────────────────────────────────────────────────────────
 
+  // Altezza di chrome riservata in alto: 0 a tutto schermo, solo la fila di tab
+  // se in chrome compatto (barra indirizzi nascosta), altrimenti l'intera shell.
+  // A questo si somma l'eventuale topInset dei dropdown.
+  _altezzaCornice() {
+    if (this.contentFullscreen) return 0;
+    return (this.chromeCompact ? this.tabRowHeight : this.shellHeight) + this.topInset;
+  }
+
   layout() {
     const [w, h] = this.win.getContentSize();
     for (const tab of this.tabs) {
       if (tab.id === this.activeId) {
-        // Altezza di chrome riservata in alto: 0 a tutto schermo, solo la fila
-        // di tab se in chrome compatto (barra indirizzi nascosta), altrimenti
-        // l'intera shell. A questo si somma l'eventuale topInset dei dropdown.
-        const chrome = this.contentFullscreen
-          ? 0
-          : ((this.chromeCompact ? this.tabRowHeight : this.shellHeight) + this.topInset);
-        const top = chrome;
+        const top = this._altezzaCornice();
         const b = { x: 0, y: top, width: w, height: Math.max(0, h - top) };
         tab.view.setBounds(b);
         if (process.env.FILO_SMOKE) {
@@ -1712,6 +1719,7 @@ class TabManager {
         tab.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       }
     }
+    this.avvisi.posa();
   }
 
   // ─── zoom da tastiera quando il focus è sulla barra di Filo ────────────

@@ -101,6 +101,15 @@ contextBridge.exposeInMainWorld('filoShell', {
     ipcRenderer.on('shell:toast', wrapped);
     return () => ipcRenderer.removeListener('shell:toast', wrapped);
   },
+  // #588.5 — la pila degli avvisi va a schermo in una vista sopra la pagina; i suoi clic tornano qui.
+  avvisi: {
+    stato: (stato) => ipcRenderer.send('avvisi:stato', stato),
+    onAzione: (fn) => {
+      const wrapped = (_event, dati) => { try { fn(dati); } catch (_) {} };
+      ipcRenderer.on('avvisi:azione', wrapped);
+      return () => ipcRenderer.removeListener('avvisi:azione', wrapped);
+    },
+  },
   // Modalità annotazione del box feedback: la shell mette/toglie un velo
   // d'ombra sopra la propria barra in alto così tutto Filo va in penombra.
   onFeedbackDim: (fn) => {

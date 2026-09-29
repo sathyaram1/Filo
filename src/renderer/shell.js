@@ -80,6 +80,7 @@
       applyTabColorParams(r?.settings?.tabColor);
       applyNotifConfig(r?.settings?.notifications);
       try { render(); } catch (_) {}
+      try { NOTIFS.rispecchia(); } catch (_) {}
     })
     .catch(() => {});
   if (typeof api.onBroadcast === 'function') {
@@ -89,6 +90,7 @@
         applyTabColorParams(m.settings?.tabColor);
         applyNotifConfig(m.settings?.notifications);
         try { render(); } catch (_) {}
+        try { NOTIFS.rispecchia(); } catch (_) {}
       }
     });
   }
@@ -931,6 +933,7 @@
     // Con un tetto teniamo solo le più recenti (le più rilevanti); le eccedenti
     // vengono rimosse subito, senza attendere il timeout.
     const MAX_STACK = 5;
+    let seq = 0;
     function hostEl() {
       if (!host) {
         host = document.getElementById('shell-notifs');
@@ -940,8 +943,40 @@
           host.className = 'shell-notifs';
           document.body.appendChild(host);
         }
+        new MutationObserver(rispecchia).observe(host, {
+          childList: true, subtree: true, characterData: true,
+          attributes: true, attributeFilter: ['class', 'data-closing'],
+        });
       }
       return host;
+    }
+    // Questa pila qui sotto la copre la scheda: a schermo la disegna la vista sopra la pagina
+    // (#588.5), che riceve a ogni cambio lo stato intero, tema compreso.
+    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius'];
+    function rispecchia() {
+      if (!host || !api.avvisi) return;
+      const carte = Array.from(host.querySelectorAll(':scope > .shell-notif')).map((c) => ({
+        id: c.dataset.nid || '',
+        testo: c.querySelector('.shell-notif-msg')?.textContent || '',
+        azioni: Array.from(c.querySelectorAll('.shell-notif-action')).map((b) => b.textContent || ''),
+        chiusa: c.dataset.closing === '1',
+      }));
+      const cs = getComputedStyle(document.documentElement);
+      const vars = {};
+      for (const k of VAR_TEMA) vars[k] = cs.getPropertyValue(k).trim();
+      try { api.avvisi.stato({ carte, tema: { vars } }); } catch (_) {}
+    }
+    if (api.avvisi) {
+      api.avvisi.onAzione((dati) => {
+        if (!host || !dati) return;
+        const card = Array.from(host.children).find((c) => c.dataset.nid === String(dati.id));
+        if (!card || card.dataset.closing === '1') return;
+        const btn = dati.azione === 'chiudi'
+          ? card.querySelector('.shell-notif-close')
+          : card.querySelectorAll('.shell-notif-action')[Number(dati.azione)];
+        if (btn) btn.click();
+      });
+      try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rispecchia); } catch (_) {}
     }
     // Rimuove immediatamente (senza animazione) le card più vecchie oltre il
     // tetto, così lo stack non supera mai MAX_STACK elementi vivi.
@@ -980,6 +1015,7 @@
       if (opts.key) dismissKey(opts.key);
       const card = document.createElement('div');
       card.className = 'shell-notif';
+      card.dataset.nid = String(++seq);
       if (opts.key) card.dataset.key = String(opts.key);
 
       const msg = document.createElement('div');
@@ -1050,7 +1086,7 @@
         if (c.dataset.key === String(key)) dismiss(c);
       }
     }
-    return { show, dismiss, dismissKey };
+    return { show, dismiss, dismissKey, rispecchia };
   })();
 
   // Compat: il vecchio toast informativo (es. "Tab riordinate e salvate") ora
