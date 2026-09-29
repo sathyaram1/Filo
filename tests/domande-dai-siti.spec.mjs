@@ -127,9 +127,7 @@ test('un sito non chiude le altre schede, né per messaggio né dal canale delle
     for (const [canale, args] of [['tabs:close', { id }], ['tabs:navigate', { id, url: 'https://altrove.example/' }], ['tabs:snapshot', undefined]]) {
       const h = ipcMain._invokeHandlers && ipcMain._invokeHandlers.get(canale);
       if (!h) { esiti[canale] = 'handler introvabile'; continue; }
-      esiti[canale] = await new Promise((resolve) => {
-        h({ sender: wc, senderFrame: wc.mainFrame, _reply: resolve, _throw: (e) => resolve({ eccezione: String(e) }) }, args);
-      });
+      try { esiti[canale] = await h({ sender: wc, senderFrame: wc.mainFrame }, args); } catch (e) { esiti[canale] = { eccezione: String(e) }; }
     }
     return esiti;
   }, { id: altra.id, daChi: sitoId });
