@@ -1052,8 +1052,8 @@ function targetWebTab(sender) {
   return { win, tm, tab: recent[0] || null };
 }
 
-// Esito di PROXY_TAB e REGOLA_PROXY_DOMINIO senza fornitore: toolResultText e
-// la riga del diario lo riconoscono da `proxy`, e nessuno dei due lo dà per fatto.
+// Esito di PROXY_TAB e REGOLA_PROXY_DOMINIO senza fornitore: proxyUnavailableForPrompt
+// e la riga del diario lo riconoscono da `proxy`, e nessuno dei due lo dà per fatto.
 const proxyNonDisponibile = () => ({ proxy: 'non_disponibile' });
 
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
@@ -2490,8 +2490,16 @@ function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
-    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions),
+    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
   ].filter(Boolean).join('\n\n');
+}
+
+// Da un altro paese senza fornitore (#771): l'esito torna al modello anche nel
+// formato vecchio e nei turni dopo, dove il testo scritto con l'azione lo dava per fatto.
+function proxyUnavailableForPrompt(actions) {
+  if (!Array.isArray(actions) || !actions.some((a) => a && a._output && a._output.proxy === 'non_disponibile')) return '';
+  return '[NON fatto: aprire da un altro paese non è ancora disponibile in Filo. Nessuna scheda è stata instradata e nessuna regola salvata. '
+    + 'Dillo all\'utente in una frase, senza darlo per fatto e senza promettere che succederà da solo, e non riprovare.]';
 }
 
 // Un tentativo interrotto a metà da un guasto (rete, fornitore): queste azioni
@@ -2613,10 +2621,6 @@ function toolResultText({ action, res, rendered }) {
     try { done = (Levels && Levels.describeDone && Levels.describeDone(action)) || ''; } catch (_) {}
     done = String(done || describe()).replace(/\.+\s*$/, '');
     return `Eseguita: ${done}.`;
-  }
-  if (res.output && res.output.proxy === 'non_disponibile') {
-    return 'NON fatto: aprire da un altro paese non è ancora disponibile in Filo. Nessuna scheda è stata instradata e nessuna regola salvata. '
-      + 'Dillo all\'utente in una frase, senza darlo per fatto e senza promettere che succederà da solo, e non riprovare.';
   }
   if (res.output && res.output.rifiuto && res.output.error) {
     const cosa = type === 'SALVA_LEZIONE' ? 'Lezione NON salvata' : 'Impostazione NON applicata';

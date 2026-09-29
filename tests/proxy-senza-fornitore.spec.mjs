@@ -58,8 +58,17 @@ test('livello 2: senza fornitore 403 e pagina quasi vuota non chiamano il modell
   test.setTimeout(120_000);
   const srv = await startServer();
   try {
+    // Un modello configurato per il classificatore: senza, la catena dei
+    // tentativi si ferma prima del fornitore e la spia non vedrebbe niente comunque.
     // Spia sul fornitore di modelli: conta solo le chiamate del classificatore.
-    await app.evaluate(() => {
+    await app.evaluate(async () => {
+      const C = globalThis.SN_CONST;
+      await globalThis.SN_STORAGE.updateSettings({
+        useDefaultModels: false,
+        apiKeys: { openrouter: 'k-test' },
+        models: { [C.ACTIONS.GEOBLOCK_CLASSIFY]: 'deepseek-flash' },
+        modelRegistry: globalThis.SN_TEST_MODELS.registry,
+      });
       const P = globalThis.SN_PROVIDERS;
       const orig = P.completeWithFallback;
       globalThis.__geoLlm = 0;
@@ -166,7 +175,44 @@ test('chat senza fornitore: niente regola salvata né scheda instradata, e il mo
   await page.screenshot({ path: 'tests/.shots/771-chat-non-disponibile.png' }).catch(() => {});
 });
 
-test('Sicurezza: il riquadro «da un altro paese» c\'è solo col fornitore, col suo host', async ({ openTab }) => {
+// Formato vecchio (JSON nel testo): la frase scritta insieme all'azione la dava
+// per fatta, e senza un esito da leggere il turno finiva lì.
+test('chat nel formato vecchio: l\'esito «non disponibile» torna al modello e la sua frase non resta la risposta', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const turni = [
+      { text: 'FRASE_PROMESSA: netflix si aprirà sempre dagli USA.', actions: [{ type: 'REGOLA_PROXY_DOMINIO', country: 'us', dominio: 'netflix.com' }] },
+      { text: 'RISPOSTA_LEGACY', actions: [] },
+    ];
+    globalThis.__legacy = [];
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages }) => {
+      const n = globalThis.__legacy.push(JSON.stringify(messages || []));
+      return { text: JSON.stringify(turni[Math.min(n - 1, 1)]), model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+  });
+
+  await page.locator('#input').fill('apri sempre netflix dagli USA');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA_LEGACY' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'FRASE_PROMESSA' })).toHaveCount(0);
+  const giri = await app.evaluate(() => globalThis.__legacy);
+  expect(giri.length).toBe(2);
+  expect(giri[1]).toContain('aprire da un altro paese non è ancora disponibile');
+  const regole = await app.evaluate(async () => globalThis.SN_FILO_MEMORY.listProxyRules());
+  expect(Object.keys(regole || {})).toEqual([]);
+});
+
+test('Sicurezza: il riquadro «da un altro paese» c\'è solo col fornitore, col suo host', async ({ app, openTab }) => {
   const sec = await openTab('filo://security/security.html');
   await sec.waitForLoadState('domcontentloaded');
   await expect(sec.locator('#sec-proxy-box-title')).not.toBeEmpty();
@@ -184,6 +230,12 @@ test('Sicurezza: il riquadro «da un altro paese» c\'è solo col fornitore, col
   await expect(sec.locator('#sec-proxy-box-provider')).toContainText('gate.testprovider.net');
   await expect(sec.locator('#sec-proxy-box-provider')).not.toContainText('pw');
   await sec.locator('#sec-proxy-box').screenshot({ path: 'tests/.shots/771-sicurezza-con.png' }).catch(() => {});
+
+  // Lo stato del fornitore lo chiede solo una pagina di Filo, non un sito visitato.
+  const daSito = await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE(
+    { type: globalThis.SN_MSG.MSG.PROXY_STATUS }, { tab: { id: 1, url: 'https://sito-qualunque.example/' } }));
+  expect(daSito).toMatchObject({ ok: false, code: 'forbidden' });
+  expect(daSito.providerHost).toBeUndefined();
 
   await imposta('');
   await expect(sec.locator('#sec-proxy-box')).toBeHidden({ timeout: 8_000 });
@@ -221,6 +273,7 @@ test('-130: la scheda normale dietro un proxy di sistema non parla di altri paes
   const diretta = await hintErrore(app, id);
   expect(diretta).toMatch(/proxy/i);
   expect(diretta).not.toMatch(/paese/i);
+  await page.screenshot({ path: 'tests/.shots/771-errore-130-diretta.png' }).catch(() => {});
   await app.evaluate(async ({ BrowserWindow }, tabId) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const t = w._filoTabs.tabs.find((x) => x.id === tabId);

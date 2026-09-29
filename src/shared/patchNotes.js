@@ -80,6 +80,7 @@
         'Se una segnalazione rimasta in attesa non riesce a partire, l\'avviso ti aspetta nella finestra finché non lo chiudi. Prima passava mentre guardavi altrove, e quella segnalazione spariva senza che nessuno lo sapesse.',
         'Quando segnali dalla bacheca che un fix è ancora rotto e l\'invio non riesce, puoi riprovare subito: quello che hai scritto resta nel riquadro. Prima Filo rispondeva che l\'avevi già segnalato, e la tua spiegazione non arrivava a nessuno.',
         'Se chiedi a Filo conto di una scelta che non ha ancora messo per iscritto, come i soldi con cui sta in piedi, ti dice che quel documento non c\'è ancora invece di cercarlo a vuoto. Quello sui modelli lo legge per intero, fonti comprese. Nella pagina Trasparenza le sezioni non ancora scritte si leggono bene e si aprono, col link a quello che c\'è. Prima cliccarle non faceva niente. Nell\'elenco delle fonti virgolette e apostrofi si vedono di nuovo come tali, non come codici.',
+        'Se chiedi a Filo di aprire un sito da un altro paese, ti dice che per ora non si può, invece di salvare una regola che non avrebbe fatto niente. E finché la funzione non c\'è, Filo non spende i tuoi crediti per capire se una pagina è bloccata nel tuo paese.',
       ],
     },
     {

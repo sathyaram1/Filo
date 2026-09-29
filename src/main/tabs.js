@@ -9,6 +9,7 @@ const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
 const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
 const ProxyTab = require('./services/proxyTab');
+const { registerFiloProtocolForSession } = require('./protocol');
 const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
 const { installSafebrowse } = require('./tabs/tabSafebrowse');
@@ -1068,6 +1069,8 @@ class TabManager {
     // cookie non sopravvivono alla chiusura dell'app. setProxy va applicato e
     // ATTESO prima di creare la view, o le prime richieste partirebbero dirette.
     const ses = session.fromPartition(partition);
+    // Senza filo:// qui la pagina d'errore non si carica e un proxy muto lascia la scheda vuota.
+    if (!ses.protocol.isProtocolHandled('filo')) registerFiloProtocolForSession(ses);
     try {
       await ses.setProxy({
         proxyRules: resolved.proxyRules,
