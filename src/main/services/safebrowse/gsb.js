@@ -112,7 +112,7 @@ function dropUserinfo(s) {
   let end = s.length;
   for (let i = start; i < s.length; i++) {
     const c = s.charCodeAt(i);
-    if (c === 0x2f || c === 0x3f || c === 0x5c) { end = i; break; }
+    if (c === 0x2f || c === 0x3f) { end = i; break; }
   }
   const at = s.lastIndexOf('@', end - 1);
   return at >= start ? s.slice(0, start) + s.slice(at + 1) : s;

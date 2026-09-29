@@ -302,3 +302,37 @@ test('un indirizzo lunghissimo costruito apposta: la pagina in lista resta segna
   assert.equal(esito.category, 'phishing');
   assert.equal(gsb.canonicalize(`http://h/%25${'25'.repeat(5000)}`).url, 'http://h/%25');
 });
+
+// Verifica di #813, giro 2: la scheda riporta l'indirizzo col nome utente, e un %2F o %3F lì dentro spostava il sito.
+test('nome utente e password nell\'indirizzo non sono il sito: la pagina in lista resta riconosciuta', async () => {
+  for (const [dato, atteso] of [
+    ['http://www.banca.it%2Faccedi@esca-813.it/entra.html', 'http://esca-813.it/entra.html'],
+    ['http://accesso%3Fsicuro@esca-813.it/entra.html', 'http://esca-813.it/entra.html'],
+    ['https://utente:pa%2Fss%40word@esca-813.it:8443/entra.html?x=1', 'https://esca-813.it/entra.html?x=1'],
+    ['http://esca-813.it/a@b?c@d', 'http://esca-813.it/a@b?c@d'],
+  ]) assert.equal(gsb.canonicalize(dato).url, atteso, dato);
+  assert.ok(gsb.expressions('http://www.banca.it%2Faccedi@esca-813.it/entra.html').every((e) => e.startsWith('esca-813.it/')));
+
+  const lista = sha('esca-813.it/entra.html');
+  const { L } = lookupFinto((prefissi) => ({
+    ok: true,
+    cacheMs: 60_000,
+    matches: prefissi.includes(lista.subarray(0, 4).toString('base64'))
+      ? [{ hash: lista.toString('base64'), threatType: 'SOCIAL_ENGINEERING', category: 'phishing' }]
+      : [],
+  }));
+  const esito = await L.check('http://www.banca.it%2Faccedi@esca-813.it/entra.html');
+  assert.deepEqual([esito.listed, esito.category], [true, 'phishing']);
+});
+
+test('un nome utente o un sito lunghissimi costruiti apposta non fermano il calcolo', () => {
+  for (const u of [
+    `http://0x${'1'.repeat(1_500_000)}z%2F@esca-813.it/entra.html`,
+    `http://0x${'1'.repeat(1_500_000)}z/`,
+    `http://${'1.'.repeat(700_000)}x/`,
+  ]) {
+    const t = performance.now();
+    gsb.hashesOf(u);
+    assert.ok(performance.now() - t < 1000, `${u.slice(0, 20)}…: ${Math.round(performance.now() - t)} ms`);
+  }
+});
