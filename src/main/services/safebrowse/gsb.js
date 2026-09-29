@@ -209,7 +209,8 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
     failures = 0;
     const ttl = Math.max(0, Number(res.cacheMs) || 0);
     const got = new Map(prefixes.map((p) => [p, { exp: now() + ttl, full: new Map() }]));
-    for (const m of res.matches || []) {
+    for (const m of Array.isArray(res.matches) ? res.matches : []) {
+      if (!m || typeof m.hash !== 'string') continue;
       const e = got.get(Buffer.from(m.hash, 'base64').subarray(0, 4).toString('base64'));
       if (!e) continue;
       const list = e.full.get(m.hash) || [];
@@ -236,7 +237,7 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
     }
     if (missing.length) {
       if (now() < pausedUntil) return null;
-      const req = request(missing);
+      const req = request(missing).catch(() => null);
       for (const p of missing) {
         const one = req.then((m) => (m && m.get(p)) || null);
         pending.set(p, one);
