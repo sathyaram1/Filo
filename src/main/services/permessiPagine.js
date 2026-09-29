@@ -154,6 +154,16 @@ function gestoRecente(wc) {
   return Boolean(t && Date.now() - t < GESTO_MS);
 }
 
+// Un gesto vero e recente vale una volta per voce: dopo un clic mille salvataggi sono del sito, non dell'utente (#589.1).
+function spendiGesto(wc, voci) {
+  if (!Array.isArray(voci) || !voci.length) return true;
+  if (!gestoRecente(wc)) return false;
+  const speso = wc._filoGestoSpeso || (wc._filoGestoSpeso = new Map());
+  if (voci.some((v) => speso.get(v) === wc._filoGestoAlle)) return false;
+  for (const v of voci) speso.set(v, wc._filoGestoAlle);
+  return true;
+}
+
 // Il dominio registrato va sempre letto: con un indirizzo lungo la parte che sceglie chi attacca è quella davanti.
 function nomeDaMostrare(origine) {
   let u;
