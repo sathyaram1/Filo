@@ -26,6 +26,7 @@ require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei downl
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
 const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
+const { collegaScorciatoie } = require('./shortcuts');
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
@@ -845,6 +846,7 @@ class TabManager {
     if (activate) {
       // Riaffermo la visibilità su tutti i tab dopo loadURL.
       for (const t of this.tabs) t.view.setVisible?.(t.id === id);
+      this._tastieraAllaSchedaAttiva();
     }
     // #152 — born proxied: se il dominio ha una regola persistente, la scheda
     // nasce instradata da quel paese (ricrea la view nella partition proxata).
@@ -1494,7 +1496,20 @@ class TabManager {
       t.view.setVisible?.(t.id === id);
     }
     this.layout();
+    this._tastieraAllaSchedaAttiva();
     this._broadcast();
+  }
+
+  // La scheda davanti prende la tastiera se questa era su una scheda che non si
+  // vede più, o su niente perché la view chiusa se l'è portata via: senza, dopo
+  // Ctrl+W, Alt+cifra o Alt+S i tasti non arrivano a nessuno finché non si
+  // clicca (#838). La barra che ha la tastiera la tiene; Filo dietro non la ruba.
+  _tastieraAllaSchedaAttiva() {
+    const tab = this.tabs.find((t) => t.id === this.activeId);
+    if (!tab || this.win.isDestroyed() || !this.win.isFocused()) return;
+    const col = require('electron').webContents.getFocusedWebContents();
+    if (col === this.win.webContents || col === tab.view.webContents) return;
+    try { tab.view.webContents.focus(); } catch (_) {}
   }
 
   // §2.1 — segnali di attività riportati dal content script (input, scroll,
@@ -1614,6 +1629,7 @@ class TabManager {
     // Visibilità coerente con lo stato attivo: solo la scheda attiva è visibile,
     // le altre (inclusa la view appena ricreata se non attiva) restano nascoste.
     for (const t of this.tabs) t.view.setVisible?.(t.id === this.activeId);
+    if (wasActive) this._tastieraAllaSchedaAttiva();
     this._broadcast();
   }
 
@@ -1814,6 +1830,7 @@ class TabManager {
       this.pageFullscreenTabId = null;
       this.setContentFullscreen(false);
     });
+    collegaScorciatoie(wc, () => this.win);
     wc.on('before-input-event', (event, input) => {
       // #514 — l'ultimo tasto era l'Esc? Serve a `enter-html-full-screen`, che
       // da un Esc non fa passare nessuna richiesta di schermo pieno. Qui,
@@ -2743,4 +2760,24 @@ function mapCertError(error) {
 // logica serve anche al campo "nuova scheda" della dashboard, che prima aveva una
 // copia più povera. Sono importati in cima al file da globalThis.SN_URL_NAV.
 
-module.exports = { TabManager, normalizeUrl, isWebUnsafeNav };
+// Il visore dei PDF è un webContents a sé che prende la tastiera: i suoi tasti non
+// passano dal before-input-event della scheda e vanno portati agli stessi ascolti (#838).
+function inoltraTastiDegliOspiti(app) {
+  app.on('web-contents-created', (_e, wc) => {
+    if (wc.getType() !== 'remote') return;
+    wc.on('input-event', (_ev, input) => {
+      const tipo = input && { rawKeyDown: 'keyDown', keyDown: 'keyDown', keyUp: 'keyUp' }[input.type];
+      if (!tipo) return;
+      // Un tasto della barra dei menu (su Mac Cmd+W, Cmd+T…) lo esegue già lei.
+      if (tipo === 'keyDown' && require('./menu').tastoDellaBarra(input)) return;
+      // Chi ha la tastiera sta nella finestra davanti, nella scheda attiva.
+      const win = BrowserWindow.getFocusedWindow();
+      const tabs = win && win._filoTabs;
+      const tab = tabs && tabs.tabs.find((t) => t.id === tabs.activeId);
+      if (!tab || tab.view.webContents === wc || tab.view.webContents.isDestroyed()) return;
+      tab.view.webContents.emit('before-input-event', { preventDefault() {} }, { ...input, type: tipo });
+    });
+  });
+}
+
+module.exports = { TabManager, normalizeUrl, isWebUnsafeNav, inoltraTastiDegliOspiti };
