@@ -982,6 +982,8 @@
         const cb = Number(cardsById[b] && cardsById[b].cmc) || 0;
         return ca - cb;
       });
+      // Le righe di una lista chiusa non si disegnano: una chat salvata cresce di sessione in sessione, e
+      // renderChat gira a ogni pezzo di ragionamento.
       const open = isLast || m.expanded;
       // Import via chat (§11.2): oltre al toggle per riga, un bottone che
       // aggiunge/aggiorna TUTTE le carte riconosciute in un colpo solo — con
@@ -995,7 +997,7 @@
           <span>${open ? '▾' : '▸'}</span>
           <span>${n} risultat${n === 1 ? 'o' : 'i'} ${esc(label)}</span>
         </button>
-        <div class="dk-cardlist" ${open ? '' : 'hidden'}>${importAllHtml}${ids.map((id) => chatRowHtml(id, m.importQty && m.importQty[id])).join('')}</div>`);
+        <div class="dk-cardlist" ${open ? '' : 'hidden'}>${open ? importAllHtml + ids.map((id) => chatRowHtml(id, m.importQty && m.importQty[id])).join('') : ''}</div>`);
     } else if (!m.reply) {
       parts.push(`<p class="dk-msg-text dk-msg-pending">Nessun risultato${m.query ? ` per "${esc(m.query)}"` : ''}.</p>`);
     }
