@@ -172,7 +172,7 @@ test('senza portafoglio la pagina chiede l\'invito; col codice giusto mostra il 
     return out;
   });
   for (const type of ['wallet_state', 'wallet_redeem', 'wallet_reissue', 'wallet_owner_overview']) {
-    expect(gate[type], type).toEqual({ ok: false, error: 'forbidden' });
+    expect(gate[type], type).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
   }
   expect(gate.filoState.ok).toBe(true);
   expect(gate.filoState.server.hasWallet).toBe(true);

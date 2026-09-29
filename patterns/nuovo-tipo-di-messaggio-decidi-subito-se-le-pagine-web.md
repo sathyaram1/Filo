@@ -89,6 +89,14 @@ l'intervista di benvenuto, che un sito non poteva chiedere, arrivava da sola).
 Tutto quello che attraversa il confine con un sito sta in **liste di ciò che è
 ammesso**, in un file solo (`src/main/services/impostazioniPerOrigine.js`):
 
+- i **canali** su cui parla il preload delle pagine web; gli altri (schede,
+  finestra, terminale) passano da `handle`/`ascolta` di `ipc.js` e rispondono
+  solo alla cornice e alle pagine di Filo;
+- le **domande** (tipi di `filo:message`) che il codice di Filo dentro le pagine
+  fa davvero: da un sito ogni altra si rifiuta in `handleMessage`, prima di
+  arrivare all'handler, anche se l'handler non ha un gate suo (#589.1: memoria,
+  pagine salvate, stato della home, archivio, categorie, chiusura di altre
+  schede rispondevano a qualunque sito);
 - i **tipi di messaggio** spinti che raggiungono un frame non `filo://` (quelli
   che un content script ascolta); un tipo nuovo resta nelle pagine di Filo;
 - i **campi delle impostazioni** che un sito riceve (risposte, letture dello
@@ -103,13 +111,19 @@ ammesso**, in un file solo (`src/main/services/impostazioniPerOrigine.js`):
 
 Quattro regole valgono per tutte le liste. Un destinatario è di Filo solo se lo
 è anche la **scheda** che lo contiene: l'indirizzo di un riquadro lo sceglie la
-pagina, e un sito può puntarlo su `filo://`. Di un dato che il sito usa per un
+pagina, e un sito può puntarlo su `filo://`. Nell'altro verso un mittente è di
+Filo solo se lo sono la scheda e la pagina che parla, e la **cornice** è la
+finestra che tiene le schede: un popup di accesso aperto da un sito ha la sua
+finestra tutta per sé, ma resta un sito (#589.1). Di un dato che il sito usa per un
 sì o un no (i siti esclusi) gli arriva solo la parte che lo riguarda. La lista
 scende **dentro le sezioni**: di una sezione ammessa passano i campi elencati, e
 un campo nuovo resta a casa finché qualcuno non lo decide (#589, giro 8: un
 segreto messo nella sezione della voce sarebbe arrivato a ogni sito). E ciò che
 si mostra una volta sola, come un avviso, va solo al frame principale della
-scheda **in primo piano**: le altre non lo mostrerebbero mai.
+scheda **in primo piano**: le altre non lo mostrerebbero mai. Lo stesso per le
+foto che un sito chiede: le ottiene solo il frame principale della scheda in
+vista, che inquadra sé stessa; una scheda di sfondo avrebbe quella che l'utente
+sta guardando.
 
 Ogni spinta che gira su più schede o finestre passa da `spingiAllaScheda` /
 `spingiAllaFinestra` di quel file, o si limita da sé alle superfici di Filo: una
@@ -117,9 +131,11 @@ strada parallela (l'avviso dei dati dal vivo, quello degli scaricamenti, lo
 schermo intero) scavalcava la lista, e un popup di accesso è una finestra che
 contiene un sito (#589, giro 7).
 
-Un content script che comincia ad ascoltare una spinta, leggere un campo o
-usare uno scomparto nuovo lo aggiunge lì: le sentinelle di
-`tests/unit/impostazioniPerOrigine.test.mjs` diventano rosse finché non lo fa,
-invece di lasciarlo spegnere in silenzio solo sui siti. Un dato che un sito non
+Un content script che comincia ad ascoltare una spinta, fare una domanda,
+leggere un campo o usare uno scomparto nuovo lo aggiunge lì: le sentinelle di
+`tests/unit/impostazioniPerOrigine.test.mjs` e `tests/unit/domandeDaiSiti.test.mjs`
+diventano rosse finché non lo fa, invece di lasciarlo spegnere in silenzio solo
+sui siti; e una domanda che nessuno fa più va tolta. La prova dal vero parla dal
+mondo isolato del preload di un sito (`tests/domande-dai-siti.spec.mjs`). Un dato che un sito non
 deve vedere affatto può andare anche con `broadcastToFiloPages`, che lo dice
 esplicitamente.

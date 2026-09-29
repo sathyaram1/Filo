@@ -1,4 +1,5 @@
 // Protocollo messaggi tra content script, background e pagine.
+// Un tipo che un content script chiede dentro i siti va anche in DOMANDE_WEB (services/impostazioniPerOrigine.js).
 
 (function (global) {
   'use strict';

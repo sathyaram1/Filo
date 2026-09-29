@@ -63,10 +63,10 @@ test('#246/#256 i canali riservati (AI/costi) sono negati da origine web; la cro
   }, SENDERS);
 
   // Difesa: i canali riservati sono negati da origine web.
-  expect(out.webGetHist).toEqual({ ok: false, error: 'forbidden' });
-  expect(out.webAppendHist).toEqual({ ok: false, error: 'forbidden' });
-  expect(out.webClearHist).toEqual({ ok: false, error: 'forbidden' });
-  expect(out.webCosts).toEqual({ ok: false, error: 'forbidden' });
+  expect(out.webGetHist).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
+  expect(out.webAppendHist).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
+  expect(out.webClearHist).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
+  expect(out.webCosts).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
 
   // Feature #256: rimozione singola da origine web funziona e persiste.
   expect(out.webRemoveEntry.ok).toBe(true);
