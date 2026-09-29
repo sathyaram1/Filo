@@ -37,9 +37,26 @@ const DOMANDE_WEB = Object.freeze(new Set([
 // una di sfondo avrebbe la pagina che l'utente sta guardando.
 const DOMANDE_WEB_IN_VISTA = Object.freeze(new Set(['capture_visible_tab', 'capture_feedback_topbar']));
 
-function domandaAmmessaDaUnSito(type, { inVista = false } = {}) {
+// Quelle che cambiano ciò che l'utente guarda (barra, schermo intero, schede e finestre davanti,
+// l'ombra del feedback, la lettura altrove): da un sito solo la scheda in primo piano, da ogni suo riquadro.
+const DOMANDE_WEB_SCHEDA_IN_VISTA = Object.freeze(new Set([
+  'shell_action', 'toggle_fullscreen', 'exit_fullscreen', 'open_url', 'open_new_tab', 'open_home',
+  'open_options', 'open_incognito', 'open_spellcheck_page', 'auth_signin', 'filo_run_action',
+  'filo_confirm_action', 'feedback_annotate', 'feedback_clear_draw', 'tts_stop_reading',
+]));
+// Spegnere l'ombra resta libero: lo chiede anche una pagina che si chiude in secondo piano.
+const vuoleLaScheda = (type, msg) => DOMANDE_WEB_SCHEDA_IN_VISTA.has(type)
+  && !(type === 'feedback_annotate' && !(msg && msg.on));
+
+// La barra in alto porta i titoli delle altre schede: a un sito la si fotografa solo mentre
+// l'utente ci ha disegnato sopra, l'unico motivo per cui il riquadro del feedback la chiede.
+const DOMANDE_WEB_COL_DISEGNO = Object.freeze(new Set(['capture_feedback_topbar']));
+
+function domandaAmmessaDaUnSito(type, { inVista = false, schedaInVista = false, disegnoSullaBarra = false } = {}, msg = null) {
   if (typeof type !== 'string' || !DOMANDE_WEB.has(type)) return false;
-  return !DOMANDE_WEB_IN_VISTA.has(type) || inVista === true;
+  if (DOMANDE_WEB_IN_VISTA.has(type) && inVista !== true) return false;
+  if (vuoleLaScheda(type, msg) && inVista !== true && schedaInVista !== true) return false;
+  return !DOMANDE_WEB_COL_DISEGNO.has(type) || disegnoSullaBarra === true;
 }
 
 // Ciò che i content script leggono davvero, campo per campo anche dentro le sezioni
