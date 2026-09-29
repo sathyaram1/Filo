@@ -284,6 +284,66 @@ test('#590 NAVIGA verso un accorciatore che rimbalza sul sito della lista: la ch
   }
 });
 
+for (const [forma, corpo] of [
+  ['un rinvio scritto nella pagina', (b) => `<meta http-equiv="refresh" content="0;url=${b}"><p>ti porto di là</p>`],
+  ['uno script', (b) => `<p>ti porto di là</p><script>location.replace(${JSON.stringify(b)})</script>`],
+]) {
+  test(`#590 NAVIGA verso una pagina che rimanda da sé (${forma}) al sito della lista: la chat e il modello sanno che non si è aperto`, async ({ app, shell, testServer }) => {
+    test.setTimeout(60_000);
+    await enableBlock(shell);
+    const passaggio = testServer.html(`<!doctype html><meta charset="utf-8">${corpo(blockedUrl(testServer, '<!doctype html><h1>X</h1>'))}`);
+    const page = await newtabPage(app);
+    await expect(page.locator('#input')).toBeVisible({ timeout: 8000 });
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: passaggio, etichetta: 'corto' }) }] },
+      { text: 'RISPOSTA-FINTA' },
+    ]);
+    try {
+      await page.locator('#input').fill('apri quel link');
+      await page.locator('#sendBtn').click();
+      await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA-FINTA' })).toBeVisible({ timeout: 15_000 });
+      expect((await tabUrls(app)).filter((u) => u.includes(BLOCKED_HOST))).toEqual([]);
+      const activity = page.locator('.dash-activity');
+      await activity.locator('.dash-activity-head').click();
+      await expect(activity.locator('.dash-activity-row', { hasText: 'Link non aperto' })).toContainText(`${BLOCKED_HOST} è fra i siti bloccati`);
+      const risposte = ((await app.evaluate(() => globalThis.__fake590_calls))[1] || []).filter((m) => m && m.role === 'tool');
+      expect(JSON.stringify(risposte)).toContain('NON aperta');
+    } finally {
+      await app.evaluate(() => { try { globalThis.__fake590_restore?.(); } catch (_) {} });
+    }
+  });
+}
+
+test('#590 NAVIGA verso un sito delle liste pubbliche: né il modello né la notifica lo chiamano un divieto dell\'utente', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(() => { globalThis.__filoAdblock.setDomainsForTest(['tracker.test']); });
+  await shell.evaluate(() => window.filoShell.message({
+    type: 'update_settings',
+    settings: { security: { siteBlock: { enabled: true, useAdblockLists: true, blacklist: [] } } },
+  }));
+  await shell.evaluate(() => new Promise((r) => setTimeout(r, 300)));
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8000 });
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: 'http://tracker.test/x', etichetta: 'pagina' }) }] },
+    { text: 'RISPOSTA-FINTA' },
+  ]);
+  try {
+    await page.locator('#input').fill('apri quella pagina');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA-FINTA' })).toBeVisible({ timeout: 10_000 });
+    const risposte = JSON.stringify(((await app.evaluate(() => globalThis.__fake590_calls))[1] || []).filter((m) => m && m.role === 'tool'));
+    expect(risposte).toContain('pubblicità e tracciamento');
+    expect(risposte).not.toContain('è nella lista dei siti bloccati dell');
+    await expect(shell.locator('.shell-notif', { hasText: 'tracker.test' }).first()).toContainText('pubblicità e tracciamento');
+    const activity = page.locator('.dash-activity');
+    await activity.locator('.dash-activity-head').click();
+    await expect(activity.locator('.dash-activity-row', { hasText: 'Link non aperto' })).toContainText('tracker.test è fra i siti di pubblicità e tracciamento');
+  } finally {
+    await app.evaluate(() => { try { globalThis.__fake590_restore?.(); } catch (_) {} });
+  }
+});
+
 test('#590 link in una nuova scheda e redirect verso un sito della lista: bloccati', async ({ app, shell, openTab, testServer }) => {
   await enableBlock(shell);
   const target = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="t">ARRIVATO</h1>');

@@ -212,14 +212,57 @@ test('liste pubbliche: «Apri comunque» su un contatore di clic porta all\'arti
   expect((await schede(app)).filter((u) => u.startsWith('filo://error'))).toEqual([]);
 });
 
+// Le notifiche «Sito bloccato» nate nella shell (non i messaggi mandati: la shell tiene una sola notifica per sito a schermo).
+async function contaCarte(shell) {
+  await shell.evaluate(() => {
+    window.__carte590 = 0;
+    new MutationObserver((m) => {
+      for (const r of m) for (const n of r.addedNodes) {
+        if (n.classList && n.classList.contains('shell-notif') && /Sito bloccato/.test(n.textContent)) window.__carte590 += 1;
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  return () => shell.evaluate(() => window.__carte590);
+}
+
 test('una pagina che riprova in continuazione non riempie l\'angolo di notifiche', async ({ app, shell, rete }) => {
   await lista(shell, ['blocked.test']);
-  const avvisi = await contaAvvisi(app);
+  const carte = await contaCarte(shell);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>X</h1>');
   const pagina = rete.pagina('sito.test', '/', `<h1>insiste</h1><script>setInterval(() => { location.href = ${JSON.stringify(bersaglio)}; }, 150)</script>`);
   await apri(app, shell, pagina);
   await shell.waitForTimeout(5000);
-  expect((await avvisi()).length).toBeLessThanOrEqual(2);
+  expect(await carte()).toBeLessThanOrEqual(2);
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' })).toHaveCount(1);
+});
+
+test('chiusa la notifica «Sito bloccato», il secondo tentativo lo dice di nuovo', async ({ app, shell, rete }) => {
+  await lista(shell, ['blocked.test']);
+  const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+  const pagina = rete.pagina('sito.test', '/', `<a id="go" href="${bersaglio}">vai</a>`);
+  await apri(app, shell, pagina);
+  const tab = app.windows().find((w) => w.url().includes('sito.test'));
+  await tab.waitForSelector('#go');
+  const avvisi = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
+  await tab.evaluate(() => document.getElementById('go').click());
+  await expect(avvisi.first()).toBeVisible({ timeout: 6000 });
+  await avvisi.first().locator('.shell-notif-close').click();
+  await expect(avvisi).toHaveCount(0, { timeout: 3000 });
+  await tab.evaluate(() => document.getElementById('go').click());
+  await expect(avvisi.first()).toBeVisible({ timeout: 3000 });
+  expect(tab.url()).toBe(pagina);
+});
+
+test('«Apri comunque» premuto due volte apre una scheda sola', async ({ app, shell, rete }) => {
+  await lista(shell, ['blocked.test']);
+  const sito = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), sito);
+  const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first();
+  await expect(card).toBeVisible({ timeout: 6000 });
+  await card.locator('.shell-notif-action', { hasText: 'Apri comunque' }).dblclick();
+  await expect.poll(async () => (await aperteSu(app, 'blocked.test')).length, { timeout: 6000 }).toBeGreaterThan(0);
+  await shell.waitForTimeout(1500);
+  expect(await aperteSu(app, 'blocked.test')).toHaveLength(1);
 });
 
 test('un indirizzo senza schema (come a volte lo manda il modello) porta la scheda a quell\'indirizzo', async ({ app, shell }) => {
@@ -268,6 +311,42 @@ test('Preferenze: la descrizione non promette eccezioni, e un sito con estension
   await pref.reload();
   await pref.waitForLoadState('domcontentloaded');
   await expect(pref.locator('#sec-siteblock-blacklist')).toHaveValue('сайт.рф\nmünchen.de', { timeout: 6000 });
+});
+
+test('Preferenze: «.sito.it» e «*.sito.it» valgono «sito.it» e bloccano', async ({ app, shell, rete }) => {
+  const sito = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+  const altro = rete.pagina('www.blocked.test', '/', '<h1>WWW</h1>');
+  const pref = await paginaSicurezza(app, shell);
+  for (const voce of ['.blocked.test', '*.blocked.test']) {
+    await scriviLista(pref, voce);
+    await expect(pref.locator('#sec-siteblock-blacklist-error')).toBeHidden();
+    const avvisi = await contaAvvisi(app);
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), sito);
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), altro);
+    await expect.poll(async () => (await avvisi()).length, { timeout: 6000 }).toBeGreaterThan(0);
+    await shell.waitForTimeout(800);
+    expect(await aperteSu(app, 'blocked.test/'), voce).toEqual([]);
+  }
+});
+
+test('Preferenze: una seconda pagina Sicurezza aperta da prima non riscrive la lista cambiata nell\'altra', async ({ app, shell }) => {
+  const listaSalvata = () => app.evaluate(async () => ((await globalThis.SN_STORAGE.getSettings()).security?.siteBlock || {}).blacklist || []);
+  await paginaSicurezza(app, shell);
+  await shell.evaluate((i) => window.filoShell.tabs.duplicate(i), await idAttiva(app));
+  await expect.poll(() => app.windows().filter((w) => w.url().startsWith('filo://security')).length, { timeout: 8000 }).toBe(2);
+  const [prima, seconda] = app.windows().filter((w) => w.url().startsWith('filo://security'));
+  await prima.waitForSelector('#sec-siteblock-blacklist');
+  await seconda.waitForSelector('#sec-block-popups');
+  await seconda.waitForTimeout(800);
+  await scriviLista(prima, 'blocked.test');
+  await expect.poll(listaSalvata, { timeout: 4000 }).toEqual(['blocked.test']);
+  await seconda.evaluate(() => {
+    const c = document.getElementById('sec-block-popups');
+    c.checked = !c.checked;
+    c.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await seconda.waitForTimeout(1200);
+  expect(await listaSalvata()).toEqual(['blocked.test']);
 });
 
 test('un nome con lettere accentate si legge come è scritto nella pagina «Sito bloccato» e nel titolo della scheda', async ({ app, shell, rete }) => {

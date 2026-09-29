@@ -279,6 +279,7 @@
 
     // F4 — Default ON quando il setting non è ancora stato scritto (undefined → true).
     $('sec-auto-feedback').checked = sec.autoFeedback === undefined ? true : !!sec.autoFeedback;
+    mostrata = leggiSicurezza();
   }
 
   // ─── protezione fingerprinting ─────────────────────────────────────────────
@@ -569,37 +570,61 @@
     return { valid, invalid };
   }
 
-  async function save() {
-    const { valid: dlTrusted, invalid: dlInvalid } = parseBlacklist($('sec-dl-trusted').value);
-    setTrustedError(dlInvalid);
-    const { valid: blacklist, invalid } = parseBlacklist($('sec-siteblock-blacklist').value);
-    setBlacklistError(invalid);
-    const partial = {
-      security: {
-        protectIpLeak: !!$('sec-protect-ip').checked,
-        blockPopups: !!$('sec-block-popups').checked,
-        adblock: { enabled: !!$('sec-adblock').checked },
-        siteBlock: {
-          enabled: !!$('sec-siteblock').checked,
-          useAdblockLists: !!$('sec-siteblock-lists').checked,
-          blacklist,
-        },
-        safeBrowse: {
-          enabled: !!$('sec-safebrowse').checked,
-          networkSignals: !!$('sec-safebrowse-network').checked,
-          llmJudge: !!$('sec-safebrowse-llm').checked,
-          sandbox: !!$('sec-safebrowse-sandbox').checked,
-        },
-        // #588 — conferma sui programmi scaricati, e i siti che ne sono esenti.
-        downloads: {
-          confirmExecutables: !!$('sec-dl-exe').checked,
-          trustedSites: dlTrusted,
-        },
-        // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
-        autoFeedback: !!$('sec-auto-feedback').checked,
+  // La sezione Sicurezza come la mostra la pagina adesso.
+  function leggiSicurezza() {
+    return {
+      protectIpLeak: !!$('sec-protect-ip').checked,
+      blockPopups: !!$('sec-block-popups').checked,
+      adblock: { enabled: !!$('sec-adblock').checked },
+      siteBlock: {
+        enabled: !!$('sec-siteblock').checked,
+        useAdblockLists: !!$('sec-siteblock-lists').checked,
+        blacklist: parseBlacklist($('sec-siteblock-blacklist').value).valid,
       },
+      safeBrowse: {
+        enabled: !!$('sec-safebrowse').checked,
+        networkSignals: !!$('sec-safebrowse-network').checked,
+        llmJudge: !!$('sec-safebrowse-llm').checked,
+        sandbox: !!$('sec-safebrowse-sandbox').checked,
+      },
+      // #588 — conferma sui programmi scaricati, e i siti che ne sono esenti.
+      downloads: {
+        confirmExecutables: !!$('sec-dl-exe').checked,
+        trustedSites: parseBlacklist($('sec-dl-trusted').value).valid,
+      },
+      // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
+      autoFeedback: !!$('sec-auto-feedback').checked,
     };
-    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+  }
+
+  // Quello che la pagina ha letto o scritto l'ultima volta. Si salva solo ciò che l'utente ha
+  // cambiato qui: una pagina rimasta aperta da prima non riscrive la lista cambiata altrove (#590).
+  let mostrata = null;
+
+  function soloCambiati(ora, prima) {
+    const out = {};
+    for (const k of Object.keys(ora)) {
+      const n = ora[k];
+      const v = prima ? prima[k] : undefined;
+      if (n && typeof n === 'object' && !Array.isArray(n)) {
+        const d = soloCambiati(n, v && typeof v === 'object' ? v : null);
+        if (Object.keys(d).length) out[k] = d;
+      } else if (JSON.stringify(n) !== JSON.stringify(v)) {
+        out[k] = n;
+      }
+    }
+    return out;
+  }
+
+  async function save() {
+    setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+    setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
+    const ora = leggiSicurezza();
+    const cambi = soloCambiati(ora, mostrata);
+    mostrata = ora;
+    if (Object.keys(cambi).length) {
+      await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security: cambi } });
+    }
     const hint = $('savedHint');
     hint.classList.add('sn-show');
     clearTimeout(save._t);
@@ -627,6 +652,13 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // Tornando su questa scheda si rilegge, a meno che l'utente non abbia qui modifiche non salvate:
+    // un'altra pagina Sicurezza può aver cambiato le liste nel frattempo.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || !mostrata) return;
+      if (Object.keys(soloCambiati(leggiSicurezza(), mostrata)).length) return;
+      load();
+    });
     // Niente pulsante "Salva": ogni toggle viene applicato e persistito subito.
     $('sec-protect-ip').addEventListener('change', save);
     $('sec-block-popups').addEventListener('change', save);

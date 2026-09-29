@@ -464,7 +464,10 @@
     const o = a && a._output;
     if (!o) return '';
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
-    if (o.blocked === 'site') return o.host ? `${o.host} è fra i siti bloccati` : 'sito fra quelli bloccati';
+    if (o.blocked === 'site') {
+      const quali = o.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati';
+      return `${o.host || 'il sito'} è fra i siti ${quali}`;
+    }
     if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
     if (o.proxy === 'non_disponibile') return 'non ancora disponibile';
     if (o.proxy === 'no_web_tab') return 'nessuna pagina web aperta';

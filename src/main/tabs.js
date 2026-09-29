@@ -138,6 +138,10 @@ function filoSingletonKey(url) {
 }
 
 const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
+// Esito di una scheda aperta da NAVIGA (#590): quanto si aspetta, dopo l'arrivo della prima pagina,
+// che la pagina si sposti da sé su un sito della lista. Tetto e margine dopo il caricamento.
+const ASSESTAMENTO_MS = 1500;
+const DOPO_CARICAMENTO_MS = 300;
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
 
 // SICUREZZA — schemi consentiti per le navigazioni ORIGINATE da contenuto web
@@ -178,9 +182,6 @@ function openExternalScheme(rawUrl) {
   try { shell.openExternal(String(rawUrl)); } catch (_) {}
   return true;
 }
-
-// Finestra in cui lo stesso sito bloccato si notifica una volta sola (#590).
-const AVVISO_BLOCCO_MS = 4000;
 
 // webContents → sito di un «Apri comunque»: il sì vale anche per il blocco delle richieste.
 const permessiApriComunque = new Map();
@@ -807,7 +808,7 @@ class TabManager {
     }
     const bloccata = apriComunque ? null : this._decisioneBlocco(null, url);
     if (bloccata && !bloccoInPagina) {
-      this._notifyBlocked(bloccata.host, bloccata.target);
+      this._notifyBlocked(bloccata);
       return null;
     }
     const id = randomUUID();
@@ -2003,8 +2004,11 @@ class TabManager {
       // «Apri comunque» della pagina «Sito bloccato» che il main ha messo in questa scheda (#590).
       if (this._apriComunqueDallaPagina(tab, url, event)) this._concediApriComunque(tab, url);
       // #170.3 — link o window.location verso un sito della lista: fermato.
-      if (this._maybeBlockNavigation(tab, url)) {
+      const fermata = this._maybeBlockNavigation(tab, url);
+      if (fermata) {
         event.preventDefault();
+        // Una scheda aperta da NAVIGA che la pagina rimanda da sé sul sito della lista: la chat lo deve sapere.
+        this._esitoApertura(tab, fermata);
         return;
       }
       if (this._needsRecreate(tab, url)) {
@@ -2212,8 +2216,12 @@ class TabManager {
       this._sostituisciVoceBloccata(wc, url);
       // #590 — una navigazione già partita quando il suo sito è entrato in lista arriva lo stesso: si ferma qui.
       const bloccata = /^https?:\/\//i.test(url) && this._decisioneBlocco(tab, url);
-      this._esitoApertura(tab, bloccata || null);
-      if (bloccata) { this._mostraPaginaBloccata(tab, url, bloccata); return; }
+      if (bloccata) {
+        this._esitoApertura(tab, bloccata);
+        this._mostraPaginaBloccata(tab, url, bloccata);
+        return;
+      }
+      this._assestaEsito(tab);
       // Documento nuovo: lo zoom che la pagina vecchia dichiarava di sé non
       // vale più (#686).
       tab.zoomProprio = null;
@@ -2669,8 +2677,9 @@ class TabManager {
   }
 
   // Come è finita la prima apertura di una scheda appena nata (#590): `bloccata` è la decisione
-  // della lista se l'ha fermata un rimbalzo, null se la pagina è arrivata o dopo `tetto` ms.
-  // Serve a chi l'ha aperta per conto dell'utente (NAVIGA) per non dire «aperta» a vuoto.
+  // della lista se l'ha fermata un rimbalzo del server o della pagina (rinvio, script), null se la
+  // pagina è arrivata e ci è rimasta o dopo `tetto` ms. Serve a chi l'ha aperta per conto
+  // dell'utente (NAVIGA) per non dire «aperta» a vuoto.
   esitoApertura(id, { tetto = 5000 } = {}) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab || tab._everNavigated) return Promise.resolve({ bloccata: null });
@@ -2685,13 +2694,30 @@ class TabManager {
     const attese = tab._attesaEsito;
     if (!attese) return;
     tab._attesaEsito = null;
+    clearTimeout(tab._assestamento);
+    tab._assestamento = null;
     for (const a of attese) a(bloccata);
+  }
+
+  // Arrivata la prima pagina, l'esito aspetta che finisca di caricare e un attimo dopo: un rinvio
+  // scritto nella pagina parte a caricamento finito. Al massimo ASSESTAMENTO_MS dopo l'arrivo.
+  _assestaEsito(tab) {
+    if (!tab._attesaEsito || tab._assestamento) return;
+    const arrivata = () => this._esitoApertura(tab, null);
+    tab._assestamento = setTimeout(arrivata, ASSESTAMENTO_MS);
+    try {
+      tab.view.webContents.once('did-stop-loading', () => {
+        if (!tab._attesaEsito) return;
+        clearTimeout(tab._assestamento);
+        tab._assestamento = setTimeout(arrivata, DOPO_CARICAMENTO_MS);
+      });
+    } catch (_) {}
   }
 
   // Come _decisioneBlocco, e se blocca lo dice con la notifica «Sito bloccato».
   _maybeBlockNavigation(tab, url) {
     const decision = this._decisioneBlocco(tab, url);
-    if (decision) this._notifyBlocked(decision.host, decision.target);
+    if (decision) this._notifyBlocked(decision);
     return decision;
   }
 
@@ -2781,20 +2807,16 @@ class TabManager {
     return !!(tab && tab.siteBlockAllowed && siteBlockSiteOf(url) === tab.siteBlockAllowed);
   }
 
-  // Notifica in basso a destra (#170.1): sito bloccato + azione "Apri comunque".
-  // L'azione riusa il percorso openBlockedPopup (apertura programmatica, che
-  // bypassa il blocco).
-  _notifyBlocked(host, url) {
+  // Notifica in basso a destra (#170.1): sito bloccato + azione "Apri comunque", che riusa
+  // openBlockedPopup. `decision` viene da _decisioneBlocco: il motivo distingue le liste pubbliche.
+  _notifyBlocked({ host, target, reason }) {
     try {
-      const label = host || globalThis.SN_NOMI_SITO.sitoDi(url) || url;
-      // Una pagina che riprova in continuazione non deve prendersi l'angolo delle notifiche.
-      const ora = Date.now();
-      if (!this._avvisiBlocco) this._avvisiBlocco = new Map();
-      if (ora - (this._avvisiBlocco.get(label) || 0) < AVVISO_BLOCCO_MS) return;
-      this._avvisiBlocco.set(label, ora);
+      const label = host || globalThis.SN_NOMI_SITO.sitoDi(target) || target;
+      const perche = reason === 'lists' ? ' · pubblicità e tracciamento' : '';
       this.win.webContents.send('shell:toast', {
-        text: `Sito bloccato: ${label}`,
-        opts: { actions: [{ label: 'Apri comunque', openUrl: url, apriComunque: true }] },
+        text: `Sito bloccato: ${label}${perche}`,
+        // Una pagina che riprova in continuazione non impila notifiche: finché questa è a schermo resta una.
+        opts: { unica: `sito-bloccato:${label}`, actions: [{ label: 'Apri comunque', openUrl: target, apriComunque: true }] },
       });
     } catch (_) {}
   }

@@ -1402,14 +1402,14 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
             // Gli schemi non web sono esclusi qui sopra: una scheda che non
             // nasce è la lista dei siti bloccati (#590), e la chat lo deve dire.
             if (!tabId) {
-              let host = '';
-              try { host = globalThis.SN_NOMI_SITO.leggibile(new URL(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`).hostname); } catch (_) {}
-              return { executed: false, kept: true, output: { blocked: 'site', host } };
+              let d = null;
+              try { d = require('./siteBlock').shouldBlockNavigation(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`); } catch (_) {}
+              return { executed: false, kept: true, output: { blocked: 'site', host: (d && d.host) || '', reason: (d && d.reason) || '' } };
             }
-            // La scheda nata può fermarla dopo un rimbalzo verso la lista (un link accorciato).
+            // La scheda nata può fermarla dopo un rimbalzo verso la lista (un link accorciato, un rinvio della pagina).
             const esito = typeof tm.esitoApertura === 'function' ? await tm.esitoApertura(tabId) : null;
             if (esito && esito.bloccata) {
-              return { executed: false, kept: true, output: { blocked: 'site', host: esito.bloccata.host } };
+              return { executed: false, kept: true, output: { blocked: 'site', host: esito.bloccata.host, reason: esito.bloccata.reason || '' } };
             }
             opened = true;
           }
@@ -2556,7 +2556,11 @@ function toolResultText({ action, res, rendered }) {
   if (obs) return obs;
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'site') {
     const sito = res.output.host || 'quel sito';
-    return `Pagina NON aperta: ${sito} è nella lista dei siti bloccati dell'utente. Diglielo in una riga: se vuole aprirla lo stesso c'è «Apri comunque» nella notifica appena comparsa. Non riprovare e non cercare un altro indirizzo per arrivarci.`;
+    // Le liste pubbliche non sono la lista dell'utente: se il modello dice «la tua lista», lui lo cerca in Preferenze e non lo trova.
+    const chi = res.output.reason === 'lists'
+      ? 'è fra i siti di pubblicità e tracciamento che Filo blocca da sé (non è nella lista dell\'utente)'
+      : 'è nella lista dei siti bloccati dell\'utente';
+    return `Pagina NON aperta: ${sito} ${chi}. Diglielo in una riga: se vuole aprirla lo stesso c'è «Apri comunque» nella notifica appena comparsa. Non riprovare e non cercare un altro indirizzo per arrivarci.`;
   }
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'scheme') {
     return 'Pagina NON aperta: l\'indirizzo non è una pagina web (ammessi solo http e https). Non riprovare con lo stesso indirizzo.';

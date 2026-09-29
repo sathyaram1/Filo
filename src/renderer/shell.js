@@ -1026,48 +1026,66 @@
       // attende la transizione prima di rimuovere dal DOM
       setTimeout(() => { try { card.remove(); } catch (_) {} }, 220);
     }
+    // Azioni opzionali (es. "Apri comunque" per i blocchi #170.3). Stanno prima della X.
+    function azioni(card, actions) {
+      const vecchia = card.querySelector('.shell-notif-actions');
+      if (vecchia) vecchia.remove();
+      if (!Array.isArray(actions) || !actions.length) return;
+      const bar = document.createElement('div');
+      bar.className = 'shell-notif-actions';
+      for (const a of actions) {
+        if (!a || !a.label) continue;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'shell-notif-action';
+        btn.textContent = a.label;
+        btn.addEventListener('click', () => {
+          // Il bottone resta sotto il puntatore mentre la notifica sparisce: un doppio clic
+          // ripeterebbe l'azione (due schede da «Apri comunque»).
+          if (card.dataset.closing === '1') return;
+          try { a.onClick && a.onClick(); } catch (_) {}
+          dismiss(card);
+        });
+        bar.appendChild(btn);
+      }
+      card.insertBefore(bar, card.querySelector('.shell-notif-close'));
+    }
     // showNotification(text, opts?) — opts: { durationSec, sound (toneId|false),
-    // actions: [{ label, onClick }] }. Senza opts usa la config delle Preferenze.
+    // actions: [{ label, onClick }], unica }. Senza opts usa la config delle Preferenze.
+    // `unica`: finché una notifica con la stessa chiave è a schermo non ne nasce un'altra;
+    // quella riparte da capo con le azioni nuove. Chiusa, la prossima ricompare subito.
     function show(text, opts) {
       if (!text) return null;
       opts = opts || {};
       if (opts.key) dismissKey(opts.key);
+      const durationSec = opts.durationSec != null
+        ? Number(opts.durationSec)
+        : notifConfig.durationSec;
+      const durata = Number.isFinite(durationSec) && durationSec > 0 ? durationSec : 0;
+
+      const chiave = opts.unica ? String(opts.unica) : '';
+      const gemella = chiave && Array.from(hostEl().children)
+        .find((c) => c.dataset.unica === chiave && c.dataset.closing !== '1');
+      if (gemella) {
+        gemella.querySelector('.shell-notif-msg').textContent = text;
+        azioni(gemella, opts.actions);
+        if (gemella._timer) clearTimeout(gemella._timer);
+        gemella._timer = null;
+        gemella._restano = null;
+        if (durata) avviaTempo(gemella, durata * 1000);
+        return gemella;
+      }
+
       const card = document.createElement('div');
       card.className = 'shell-notif';
       card.dataset.nid = String(++seq);
       if (opts.key) card.dataset.key = String(opts.key);
+      if (chiave) card.dataset.unica = chiave;
 
       const msg = document.createElement('div');
       msg.className = 'shell-notif-msg';
       msg.textContent = text;
       card.appendChild(msg);
-
-      const durationSec = opts.durationSec != null
-        ? Number(opts.durationSec)
-        : notifConfig.durationSec;
-      const infinite = !(Number.isFinite(durationSec) && durationSec > 0);
-
-      // Azioni opzionali (es. "Apri comunque" per i blocchi #170.3).
-      if (Array.isArray(opts.actions) && opts.actions.length) {
-        const bar = document.createElement('div');
-        bar.className = 'shell-notif-actions';
-        for (const a of opts.actions) {
-          if (!a || !a.label) continue;
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'shell-notif-action';
-          btn.textContent = a.label;
-          btn.addEventListener('click', () => {
-            // Il bottone resta sotto il puntatore mentre la notifica sparisce: un doppio clic
-            // ripeterebbe l'azione (due schede da «Apri comunque»).
-            if (card.dataset.closing === '1') return;
-            try { a.onClick && a.onClick(); } catch (_) {}
-            dismiss(card);
-          });
-          bar.appendChild(btn);
-        }
-        card.appendChild(bar);
-      }
 
       // La X compare sempre per le notifiche infinite; per quelle a tempo è
       // comunque utile poterle chiudere subito, quindi la mostriamo sempre.
@@ -1078,6 +1096,7 @@
       close.textContent = '×';
       close.addEventListener('click', () => dismiss(card));
       card.appendChild(close);
+      azioni(card, opts.actions);
 
       hostEl().appendChild(card);
       // Applica subito il tetto: se questa card sfora, la più vecchia sparisce.
@@ -1095,7 +1114,7 @@
         try { window.SN_SOUNDS.play(typeof wantSound === 'string' ? wantSound : notifConfig.sound); } catch (_) {}
       }
 
-      if (!infinite) avviaTempo(card, durationSec * 1000);
+      if (durata) avviaTempo(card, durata * 1000);
       return card;
     }
     // Un avviso con chiave dice uno stato: quando lo stato cambia se ne va.
