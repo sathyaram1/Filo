@@ -85,6 +85,11 @@ test('6000 schede: la pagina le riceve tutte e la ricerca per contenuto trova un
   expect(r.results[0].title).toBe('Recensione del Gattopardo');
   // Tutte le schede hanno già il loro vettore: l'unica chiamata è quella della domanda.
   expect(await app.evaluate(() => globalThis.__embedCalls)).toEqual([['gattopardo']]);
+
+  // La Cronologia, senza modifiche ai suoi file, le mostra tutte: anche la più vecchia.
+  const cronologia = await openTab('filo://archive/archive.html');
+  await expect(cronologia.locator('.arc-tab')).toHaveCount(6000, { timeout: 30_000 });
+  await expect(cronologia.locator('.arc-tab', { hasText: 'Pagina qualunque 0' })).toHaveCount(1);
 });
 
 test('due ricerche di fila: la prima indicizza le schede senza vettore, la seconda non ripaga niente', async ({ app, openTab }) => {
@@ -99,7 +104,7 @@ test('due ricerche di fila: la prima indicizza le schede senza vettore, la secon
   const page = await openTab('filo://newtab/');
   await cerca(page, 'gattopardo');
   const EM = await app.evaluate(() => globalThis.SN_TEST_MODELS.registry['qwen-embed'].model);
-  await expect.poll(() => app.evaluate(async (em) =>
+  await expect.poll(() => app.evaluate(async (_e, em) =>
     (await globalThis.SN_ARCHIVED_TABS.list()).filter((t) => t.embedModel === em).length, EM),
   { timeout: 15_000 }).toBe(300);
 
@@ -140,7 +145,7 @@ test('chiudere una scheda con 6000 già in archivio resta rapido, e storage.json
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate(async (i) => window.filoShell.tabs.close(i), id);
 
-  await expect.poll(() => app.evaluate(async (u) =>
+  await expect.poll(() => app.evaluate(async (_e, u) =>
     (await globalThis.SN_ARCHIVED_TABS.list()).some((t) => t.url === u), url), { timeout: 8_000 }).toBe(true);
   const tempi = await app.evaluate(() => globalThis.__tempiArchivio);
   console.log(`[misura #825] archiviare una scheda chiusa con 6000 in archivio: ${tempi.map((t) => t.toFixed(2)).join(', ')} ms`);
@@ -157,7 +162,7 @@ test('chiudere una scheda con 6000 già in archivio resta rapido, e storage.json
 
 test('cancellata dalla Cronologia, una scheda non si trova più in nessun file della cartella dati', async ({ app, openTab }) => {
   const url = 'https://da-cancellare-825.test/pagina-privata';
-  await app.evaluate(async (u) => {
+  await app.evaluate(async (_e, u) => {
     const A = globalThis.SN_ARCHIVED_TABS;
     const t = await A.archive({ url: u, title: 'Da cancellare' });
     await A.update(t.id, { summary: 'riassunto-privato-825', embedding: [1, 2, 3], embedModel: 'm' });
@@ -201,7 +206,7 @@ test('esporta e reimporta: l\'archivio torna uguale, e reimportare due volte non
         coOpenUrls: ['https://insieme.test/'],
         proxy: i === 1 ? { country: 'DE', tier: 'residential' } : null,
       });
-      await A.update(t.id, { summary: `riassunto ${i}`, embedding: [i, -i, 7], embedModel: 'm' });
+      await A.update(t.id, { summary: `riassunto ${i}`, embedding: [i, 100 - i, 7], embedModel: 'm' });
     }
     return A.list();
   }, { zip, png: PNG });
@@ -251,7 +256,7 @@ test('una scheda chiusa in una finestra incognito non entra in archivio', async 
   await apriEChiudi(true, privata);
   await apriEChiudi(false, normale);
   // La scheda normale, chiusa dopo, c'è: a quel punto quella incognito avrebbe già avuto il tempo di arrivare.
-  await expect.poll(() => app.evaluate(async (u) =>
+  await expect.poll(() => app.evaluate(async (_e, u) =>
     (await globalThis.SN_ARCHIVED_TABS.list()).some((t) => t.url === u), normale), { timeout: 8_000 }).toBe(true);
   const urls = await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((t) => t.url));
   expect(urls).not.toContain(privata);

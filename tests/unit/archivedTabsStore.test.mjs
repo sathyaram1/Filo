@@ -12,7 +12,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import Module from 'node:module';
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
@@ -54,7 +55,7 @@ writeFileSync(join(userData, 'storage.json'), JSON.stringify({
   archivedTabs: archivioVecchio,
 }), 'utf8');
 
-const ROOT = join(import.meta.dirname, '..', '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 require(join(ROOT, 'src', 'shared', 'constants.js'));
 const Disco = require(join(ROOT, 'src', 'main', 'shim', 'storage.js'));
 require(join(ROOT, 'src', 'main', 'shim', 'chrome-api.js'));
