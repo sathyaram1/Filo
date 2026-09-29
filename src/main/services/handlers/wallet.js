@@ -176,7 +176,15 @@ module.exports = function register(on, ctx) {
   // ── Stato per la pagina Crediti ───────────────────────────────────────────
   // { ok, identity:{ ok, error? }, hasPersonalKey, pseudonym, usingOwnKey,
   //   server: <walletState> | null, error? }
+  // L'ultima lettura resta a chi deve DIRE il saldo fuori da quella pagina
+  // (la chat, #816): lo stesso numero, senza un giro dal server a ogni turno.
+  let ultimaLettura = null; // { at, state }
   async function readState() {
+    const state = await leggiStato();
+    ultimaLettura = { at: Date.now(), state };
+    return state;
+  }
+  async function leggiStato() {
     const own = await ownKey();
     const out = {
       ok: true, identity: { ok: false }, hasPersonalKey: Boolean(walletStore.personalKey()), pseudonym: walletStore.pseudonym(),
@@ -226,6 +234,49 @@ module.exports = function register(on, ctx) {
       }
     }
     return out;
+  }
+
+  // Questa installazione ha un portafoglio (#816): i crediti veri li tiene il
+  // server, e il conteggio locale non riceve premi né si racconta in chat.
+  function haPortafoglio() {
+    try {
+      return Boolean(walletStore.personalKey() || walletStore.pseudonym() || (lastServer && lastServer.hasWallet));
+    } catch (_) { return false; }
+  }
+
+  // Il saldo che la chat dice (#816): quello della pagina Crediti. `null` =
+  // nessun portafoglio, e vale il conteggio locale. `fresco`: la domanda viene
+  // da un turno di chat, e una lettura più vecchia di un minuto si rifà
+  // (aspettandola al più poco: poi vale l'ultima nota, dichiarata tale).
+  const CHAT_VALIDO_MS = 60 * 1000;
+  const CHAT_ATTESA_MS = 2500;
+  async function saldoPerChat({ fresco = false } = {}) {
+    if (!haPortafoglio()) return null;
+    let st = ultimaLettura ? ultimaLettura.state : null;
+    if (fresco && (!ultimaLettura || Date.now() - ultimaLettura.at > CHAT_VALIDO_MS)) {
+      const letta = await Promise.race([
+        readState().catch(() => null),
+        new Promise((r) => setTimeout(() => r(null), CHAT_ATTESA_MS)),
+      ]);
+      if (letta) st = letta;
+    }
+    if (st && st.identity && st.identity.lost) return null;
+    let server = st && st.server;
+    if (st && st.server && st.server.hasWallet === false) return null;
+    if (!server || !server.hasWallet) {
+      const disco = walletStore.lastServer() || lastServer;
+      server = disco && disco.hasWallet ? { ...disco, cached: true } : null;
+    }
+    if (!server) return { balance: null };
+    const b = server.balance || {};
+    return {
+      balance: b.credits != null && Number.isFinite(Number(b.credits)) ? Number(b.credits) : null,
+      dailyCredits: server.dailyCredits != null && Number.isFinite(Number(server.dailyCredits)) ? Number(server.dailyCredits) : null,
+      lastKnown: Boolean(server.cached || server.stale),
+      readAt: server.cached ? (server.readAt || null) : null,
+      usingOwnKey: Boolean(st && st.usingOwnKey),
+      keyMissing: Boolean(st && st.hasPersonalKey === false),
+    };
   }
 
   // Cancello sull'origine (pattern «nuovo tipo di messaggio»): saldo, codici
