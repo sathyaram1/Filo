@@ -2,6 +2,7 @@
 // sistema, e dentro Filo fanno quello che facevano. I tasti arrivano come quelli
 // veri, iniettati sul webContents che ha il fuoco (scheda, riquadro, barra).
 
+import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 
 const TESTO = `<!doctype html><html><body style="margin:0;padding:16px;font:16px sans-serif">
