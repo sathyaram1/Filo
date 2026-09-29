@@ -59,7 +59,9 @@ for (const [forma, corpo] of [
     await page.locator('#sendBtn').click();
     await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA-G16' })).toBeVisible({ timeout: 15_000 });
 
-    const alModello = JSON.stringify((await app.evaluate(() => globalThis.__g16_calls))[1] || []);
+    // Solo le risposte agli strumenti: il resto del contesto (istruzioni di sistema) non conta.
+    const alModello = JSON.stringify(((await app.evaluate(() => globalThis.__g16_calls))[1] || [])
+      .filter((m) => m && m.role === 'tool').map((m) => m.content));
     expect(alModello, 'al modello non deve tornare «Eseguita» per una pagina che non si è aperta').toContain('NON aperta');
     const diario = page.locator('.dash-activity');
     await diario.locator('.dash-activity-head').click();
