@@ -153,7 +153,7 @@
   async function route() {
     const r = parseRoute();
     if (r.screen === 'builder') {
-      const res = await send({ type: MSG.DECKS_GET, id: r.id });
+      const [res] = await Promise.all([send({ type: MSG.DECKS_GET, id: r.id }), ensureChatLoaded(r.id)]);
       if (!res || !res.ok) { location.hash = '#/'; return; }
       const prevId = current && current.id;
       current = res.deck;
@@ -298,7 +298,7 @@
     // Cache-first: l'elenco compare SUBITO coi campi statici già in cache (le
     // carte del mazzo sono state risolte quando sono entrate). I prezzi freschi
     // arrivano dopo, in background, senza far aspettare le carte (feedback #380).
-    await Promise.all([ensureSymbols(), loadDeckCards()]);
+    await Promise.all([ensureSymbols(), loadDeckCards(), loadChatCards()]);
     refreshOpinionStaleness();
     renderDeckList();
     renderChat(stickChat);
@@ -348,9 +348,9 @@
     if (!ids.length) return;
     const r = await send({ type: MSG.SCRYFALL_CARDS, ids, freshPrices });
     // MERGE, mai sostituzione: la cache di pagina contiene anche le carte dei
-    // risultati chat (sendChat) e dei nomi in prosa risolti (resolveProseCard).
-    // Le bolle chat vivono per tutta la pagina (chatByDeck): dopo un edit del
-    // mazzo l'hover su quei risultati deve continuare ad aprire la preview.
+    // risultati chat (sendChat, loadChatCards) e dei nomi in prosa risolti
+    // (resolveProseCard): dopo un edit del mazzo l'hover su quei risultati deve
+    // continuare ad aprire la preview.
     Object.assign(cardsById, (r && r.ok && r.cards) || {});
   }
 
@@ -942,7 +942,9 @@
     return window.SN_SCRYFALL_Q.proseSegments(text).map((seg) => {
       if (seg.type !== 'card') return esc(seg.text);
       const known = proseIdByName.get(String(seg.name).toLowerCase());
-      return `<span class="dk-prose-card" data-card-name="${esc(seg.name)}"${known ? ` data-card-id="${esc(known)}"` : ''}>${esc(seg.name)}</span>`;
+      const card = known && cardsById[known];
+      const title = card ? ` title="${esc(`${card.name} — ${card.typeLine}`)}"` : '';
+      return `<span class="dk-prose-card" data-card-name="${esc(seg.name)}"${known ? ` data-card-id="${esc(known)}"` : ''}${title}>${esc(seg.name)}</span>`;
     }).join('');
   }
 
@@ -1008,6 +1010,7 @@
   // impedendo di scrollare per leggere mentre Filo genera (#336). Se invece
   // l'utente ha scrollato su, gli si conserva la posizione.
   function renderChat(stickBottom) {
+    if (!current) return;
     const log = $('chatLog');
     const prevTop = log.scrollTop;
     // "vicino al fondo" con tolleranza: seguire anche se manca qualche px.
@@ -1030,17 +1033,14 @@
   }
 
   async function sendChat(text) {
-    if (chatBusy) return;
-    chatBusy = true;
+    const deckId = current.id;
     const msgs = chatMsgs();
+    if (busyChats.has(msgs)) return;
+    busyChats.add(msgs);
     // Le bolle precedenti tornano collassate quando arriva un nuovo scambio (§3.3).
     for (const m of msgs) m.expanded = false;
     // La cronologia per l'agente si costruisce PRIMA di accodare il nuovo turno.
-    const history = msgs
-      .filter((m) => (m.who === 'user' && m.text) || (m.who === 'bot' && m.reply))
-      .map((m) => (m.who === 'user'
-        ? { role: 'user', content: m.text }
-        : { role: 'assistant', content: m.reply }));
+    const history = Chat.historyFor(msgs);
     // "Valuta questi risultati" (§6.1): l'insieme indicato è l'ultima CardList
     // mostrata — sono DATI della bolla, si passano come id al main.
     const lastList = [...msgs].reverse().find((m) => m.who === 'bot' && m.cardIds && m.cardIds.length);
@@ -1048,6 +1048,8 @@
     msgs.push({ who: 'user', text });
     const bot = { who: 'bot', pending: true };
     msgs.push(bot);
+    // Salvata subito: chi chiude la pagina adesso ritrova la domanda, con la risposta segnata come interrotta.
+    saveChat(deckId);
     renderChat(true); // nuovo turno: porta la vista in fondo per mostrarlo
     // Ragionamento in diretta (#331): mentre il modello pensa, i chunk di CoT
     // arrivano sul canale filo:reasoning e riempiono la bolla "sta pensando"
@@ -1068,7 +1070,7 @@
       : null;
     let deckChanged = false;
     try {
-      const r = await send({ type: MSG.DECKS_CHAT, deckId: current.id, text, history, lastResults, reasoningReqId });
+      const r = await send({ type: MSG.DECKS_CHAT, deckId, text, history, lastResults, reasoningReqId });
       bot.pending = false;
       // Il testo completo del ragionamento torna con la risposta (anche in
       // caso d'errore): è la versione autoritativa rispetto ai chunk live.
@@ -1093,7 +1095,7 @@
         opinionsByCard.clear();
         // La chat può aver modificato il mazzo (es. budget, §9.2): il mazzo
         // aggiornato torna nella risposta → header e statistiche si rinfrescano.
-        if (r.deck && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
+        if (r.deck && current && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
       }
     } catch (e) {
       bot.pending = false;
@@ -1101,7 +1103,10 @@
     }
     if (offReasoning) offReasoning();
     if (cotRenderTimer) { clearTimeout(cotRenderTimer); cotRenderTimer = 0; }
-    chatBusy = false;
+    busyChats.delete(msgs);
+    // Svuotata mentre Filo rispondeva: la risposta non rientra nella chat nuova.
+    if (chatByDeck.get(deckId) === msgs) saveChat(deckId);
+    if (!current || $('screenBuilder').hidden) return;
     if (deckChanged) await renderBuilder();
     else renderChat();
   }
@@ -1128,6 +1133,7 @@
   // il commander candidato, MA SOLO se il mazzo non ne ha già uno (mai
   // sovrascrivere una scelta esistente senza un'azione dedicata, §8.4).
   async function importAllFromBubble(bubbleEl) {
+    const deckId = current.id;
     const m = chatMsgs()[Number(bubbleEl.dataset.msgI)];
     if (!m || m.imported || !m.cardIds || !m.cardIds.length) return;
     const entries = m.cardIds
@@ -1142,6 +1148,7 @@
       if (r && r.ok) { current = r.deck; commanderSet = true; }
     }
     m.imported = true;
+    saveChat(deckId);
     await renderBuilder();
     const total = addedCount + updatedCount + (commanderSet ? 1 : 0);
     showToast(total ? `Aggiunte ${total} cart${total === 1 ? 'a' : 'e'} al mazzo.` : 'Nessuna carta nuova da aggiungere.');
@@ -1297,6 +1304,13 @@
   const proseIdByName = new Map();    // nome (lowercase) → scryfall id
   const proseResolving = new WeakMap(); // span → Promise in corso
 
+  // I nomi risolti stanno anche nella bolla (nameIds): riaperta la chat, passarci sopra non chiede più la rete.
+  function rememberProseNames(msgs) {
+    for (const m of msgs || []) {
+      if (m && m.nameIds) for (const [name, id] of Object.entries(m.nameIds)) proseIdByName.set(name, id);
+    }
+  }
+
   function resolveProseCard(el) {
     if (el.dataset.cardId) return Promise.resolve(el.dataset.cardId);
     const key = String(el.dataset.cardName || '').toLowerCase();
@@ -1308,6 +1322,9 @@
       return Promise.resolve(id);
     }
     if (proseResolving.has(el)) return proseResolving.get(el);
+    const bubble = el.closest('[data-msg-i]');
+    const deckId = current && current.id;
+    const m = bubble && deckId ? chatMsgs()[Number(bubble.dataset.msgI)] : null;
     const p = (async () => {
       const r = await send({ type: MSG.SCRYFALL_NAMED, name: el.dataset.cardName });
       proseResolving.delete(el);
@@ -1315,6 +1332,10 @@
       el.dataset.cardId = r.card.id;
       proseIdByName.set(key, r.card.id);
       cardsById[r.card.id] = r.card;
+      if (m && m.who === 'bot') {
+        m.nameIds = { ...(m.nameIds || {}), [key]: r.card.id };
+        saveChatSoon(deckId);
+      }
       el.title = `${r.card.name} — ${r.card.typeLine}`;
       // La risoluzione è arrivata DOPO il mouseover: se il puntatore è ancora
       // sul nome non ci sarà un nuovo evento — la preview parte da qui.
@@ -1853,6 +1874,7 @@
     // Solo se c'è un commander da togliere (feedback #302): l'inverso di
     // "Imposta come commander", altrimenti non c'è modo di annullarlo.
     if (current.commander) add('Rimuovi commander', () => removeCommander());
+    if ((chatByDeck.get(current.id) || []).length) add('Svuota la chat…', () => clearChat());
     add('Elimina…', async () => {
       const ok = await window.SN_CONFIRM_UI.confirm({
         title: 'Eliminare il mazzo?',
@@ -1931,6 +1953,18 @@
     });
 
     $('deckName').addEventListener('click', (e) => { e.stopPropagation(); openSwitcher(); });
+    // Svuota la chat del mazzo: icona nell'intestazione della chat, tasto destro sulla stessa intestazione e voce
+    // del menu del mazzo fanno la stessa cosa (clearChat, con conferma).
+    $('chatClear').innerHTML = (window.SN_ICONS && window.SN_ICONS.eraser && window.SN_ICONS.eraser(15)) || '⌫';
+    $('chatClear').addEventListener('click', () => clearChat());
+    $('chatHead').addEventListener('contextmenu', (e) => {
+      if (!current || !(chatByDeck.get(current.id) || []).length) return;
+      e.preventDefault();
+      openCtx(e.clientX, e.clientY, [{ label: 'Svuota la chat…', run: () => clearChat() }]);
+    });
+    if (chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
+      chrome.runtime.onMessage.addListener(onChatChangedElsewhere);
+    }
     // Tasto destro sulla riga del commander (§ "il tasto destro è centrale"):
     // quando un commander è impostato, offre di rimuoverlo direttamente da lì
     // (feedback #302). Senza commander il menu non ha nulla da offrire.
@@ -1950,7 +1984,7 @@
       e.preventDefault();
       const input = $('chatInput');
       const text = input.value.trim();
-      if (!text || chatBusy) return;
+      if (!text || busyChats.has(chatMsgs())) return;
       input.value = '';
       sendChat(text);
     });
@@ -1967,6 +2001,7 @@
     };
     log.addEventListener('click', (e) => {
       if (toggleCot(e.target)) return;
+      if (e.target.closest('[data-retry]')) { retryLastTurn(); return; }
       const impAll = e.target.closest('[data-import-all]');
       if (impAll) { importAllFromBubble(impAll.closest('[data-msg-i]')); return; }
       const add = e.target.closest('[data-add]');
