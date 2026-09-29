@@ -78,7 +78,15 @@
     return etichette.join('.');
   }
 
-  const api = { valido, leggibile };
+  // Il sito di un indirizzo come lo legge l'utente, porta compresa; '' se non è un indirizzo.
+  function sitoDi(url) {
+    try {
+      const u = new URL(String(url));
+      return u.hostname ? leggibile(u.hostname) + (u.port ? `:${u.port}` : '') : '';
+    } catch (_) { return ''; }
+  }
+
+  const api = { valido, leggibile, sitoDi };
   global.SN_NOMI_SITO = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

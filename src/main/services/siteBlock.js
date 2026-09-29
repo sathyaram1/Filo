@@ -2,6 +2,8 @@
 // Non notifica e non conosce le schede: lo chiama solo _decisioneBlocco di tabs.js,
 // l'unico passaggio di ogni cambio d'indirizzo (#590). Regole: tests/unit/siteBlock.test.mjs.
 
+const NomiSito = require('../../shared/nomiSito.js');
+
 let enabled = true;
 let useAdblockLists = true;
 let userBlacklist = new Set(); // domini extra inseriti dall'utente
@@ -24,12 +26,9 @@ function normalizeDomain(raw) {
   return s;
 }
 
-// Un dominio è valido come voce di blacklist solo se ha un'estensione (almeno
-// un punto + TLD alfabetico). Allineato al campo "siti fidati": una voce come
-// "facebook" o un IP non è mai un host reale, quindi non deve entrare nel Set
-// (matcherebbe "facebook.com/com", non "facebook") dando falsa sicurezza.
+// Una voce come "facebook" o un IP non è mai un host reale: non entra nel Set dando falsa sicurezza.
 function isValidDomain(host) {
-  return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host);
+  return NomiSito.valido(host);
 }
 
 // Da lista grezza (settings) → Set di domini normalizzati E validi.
@@ -81,7 +80,8 @@ function shouldBlockNavigation(targetUrl) {
 
   // «sito.it.» è lo stesso host di «sito.it» per il DNS: senza, il punto finale aggira la lista.
   const host = u.hostname.toLowerCase().replace(/\.+$/, '');
-  res.host = host;
+  // Il nome come lo legge l'utente (münchen.de, non xn--mnchen-3ya.de): va in notifica e in chat.
+  res.host = NomiSito.leggibile(host);
 
   if (!isBlacklistedHost(host)) return res;
 
