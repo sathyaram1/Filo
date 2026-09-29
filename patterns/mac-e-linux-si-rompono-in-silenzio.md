@@ -16,11 +16,17 @@ aggiunge lì.
 - **Cmd vale quanto Ctrl.** Una scorciatoia si legge `e.ctrlKey || e.metaKey`, mai
   `ctrlKey` da solo. Gli acceleratori di Electron si dichiarano `CommandOrControl+X`.
 - **Alt su Mac scrive.** Opzione+E compone `é`, Opzione+cifra fa `¡™£¢`. Una scorciatoia
-  GLOBALE con Alt+lettera se lo prende in tutto il sistema; una con Alt+cifra impedisce di
-  digitare quei simboli in qualunque pagina. Su Mac Alt+lettera prende un Ctrl davanti
+  con Alt+lettera toglie l'accento a chi scrive in una pagina; una con Alt+cifra impedisce di
+  digitare quei simboli. Su Mac Alt+lettera prende un Ctrl davanti
   (`src/main/shortcuts.js`) e Alt+cifra diventa Cmd+cifra (i salti fra schede, come in
   ogni browser su Mac), tranne lo zero, che su Mac è già lo zoom al 100%: lì la scheda in
   fondo si raggiunge con Cmd+9, «l'ultima».
+- **Niente scorciatoie di sistema con Alt+lettera, su nessun sistema.** Su Windows e Linux
+  Alt+lettera apre menu e schede negli altri programmi (Alt+H è la Home di Word): le
+  scorciatoie di Filo si ascoltano sui suoi webContents (`before-input-event`), così valgono
+  solo con Filo davanti (#838, sentinella `tests/unit/scorciatoieSoloInFilo.test.mjs`).
+  Il visore dei PDF è un webContents a sé che non passa da quell'evento: i suoi tasti li
+  porta agli ascolti della scheda `inoltraTastiDegliOspiti` (`src/main/tabs.js`).
 - **Il nome di una scorciatoia non si scrive a mano: si chiede.** Le funzioni
   rispondevano già a Cmd: a mentire erano le SCRITTE, una alla volta.
   `src/shared/tasti.js` è la porta unica: `SN_TASTI.etichetta('Ctrl+B')` dà `Ctrl+B` su

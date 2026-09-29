@@ -15,10 +15,10 @@
 // LE REGOLE, E PERCHÉ SONO QUESTE
 //   · Ctrl → Cmd. Su Mac il tasto delle scorciatoie è Cmd, e Filo lo accetta
 //     ovunque accetti Ctrl.
-//   · Alt+lettera → Ctrl+Alt+lettera. Sono le scorciatoie GLOBALI (Alt+E, T, S,
-//     H): su Mac Alt è il tasto Opzione, quello che compone gli accenti, e
-//     prendersi Opzione+E toglierebbe la "é" a chi scrive in italiano in
-//     qualunque programma. `src/main/shortcuts.js` registra infatti Ctrl+Alt.
+//   · Alt+lettera → Ctrl+Alt+lettera. Sono Spiega, Traduci, Salva e Aiuto
+//     (Alt+E, T, S, H): su Mac Alt è il tasto Opzione, quello che compone gli
+//     accenti, e prendersi Opzione+E toglierebbe la "é" a chi scrive in una
+//     pagina. `src/main/shortcuts.js` ascolta infatti Ctrl+Alt.
 //   · Alt+cifra → Cmd+cifra. Sono i salti da una scheda all'altra. Su Mac
 //     Opzione+cifra SCRIVE (¡™£¢…), quindi Filo non può prendersela mentre
 //     l'utente digita; Cmd+cifra è la forma che usa ogni browser su Mac e non
@@ -117,8 +117,8 @@
       return `Cmd+${tastoFinale === '0' ? '9' : tastoFinale}`;
     }
 
-    // Alt+lettera: scorciatoia GLOBALE. Su Mac prende un Control davanti (e qui
-    // "Ctrl" è davvero il tasto Control del Mac, non Cmd): vedi shortcuts.js.
+    // Alt+lettera: Spiega, Traduci, Salva, Aiuto. Su Mac prende un Control davanti
+    // (e qui "Ctrl" è davvero il tasto Control del Mac, non Cmd): vedi shortcuts.js.
     if (haAlt && !haCtrl) return ['Ctrl', 'Alt', ...altri, tastoFinale].join('+');
 
     // Tutto il resto passa da Ctrl, e su Mac Ctrl si preme Cmd.
@@ -337,9 +337,9 @@
     'Ctrl+X', 'Ctrl+C', 'Ctrl+V', 'Ctrl+Shift+V', 'Ctrl+A',
     'Ctrl+Q', 'Ctrl+M', 'Ctrl+H', 'Ctrl+Alt+H',
   ];
-  // Le scorciatoie globali (src/main/shortcuts.js): registrate a livello di
-  // sistema, non arrivano a nessuna pagina.
-  const GLOBALI = ['Alt+E', 'Alt+T', 'Alt+S', 'Alt+H'];
+  // Spiega, Traduci, Salva, Aiuto (src/main/shortcuts.js): con Filo davanti se
+  // li prende lui prima della pagina.
+  const DI_FILO = ['Alt+E', 'Alt+T', 'Alt+S', 'Alt+H'];
 
   // Tutte le combinazioni che su questo sistema non raggiungono una pagina,
   // nella forma con cui l'utente le vedrebbe scritte.
@@ -348,7 +348,7 @@
     const lista = [
       ...PRESI_OVUNQUE,
       ...(mac ? PRESI_SU_MAC : []),
-      ...GLOBALI.map((g) => etichetta(g, esplicita)),
+      ...DI_FILO.map((g) => etichetta(g, esplicita)),
       // Il salto di scheda: Alt+cifra qui, Cmd+cifra su Mac.
       ...'0123456789'.split('').map((d) => etichetta(`Alt+${d}`, esplicita)),
     ];

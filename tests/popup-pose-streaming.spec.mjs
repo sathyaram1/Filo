@@ -300,7 +300,7 @@ test('selezione a metà finestra: il riquadro si accorcia invece di sbordare, e 
 // I due test sopra aprono il riquadro chiamando l'app dall'interno. Questo fa
 // esattamente quello che fa chi ha segnalato: pagina web vera, parola
 // selezionata col mouse a tre quarti dell'altezza, Alt+E, e si aspetta la
-// risposta. È la strada che passa per la scorciatoia globale e per l'ancora
+// risposta. È la strada che passa per la scorciatoia di Filo e per l'ancora
 // ricavata dalla selezione — se il rimedio non arrivasse fin qui, qui si vede.
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <style>
@@ -322,7 +322,7 @@ test('Alt+E su una parola in basso in una pagina vera: la riga per scrivere rest
     .poll(() => page.evaluate(() => String(window.getSelection())), { timeout: 5000 })
     .toContain('supercalifragilistico');
 
-  // La scorciatoia globale, la stessa strada di Alt+E.
+  // Quello che fa Alt+E dopo aver riconosciuto il tasto.
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);

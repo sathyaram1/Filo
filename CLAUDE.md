@@ -102,7 +102,7 @@ regole valgono mentre scrivi.
   (`src/shared/tasti.js`), mai scritto a mano; nell'HTML non ci va. Un tasto
   nuovo si controlla con `SN_TASTI.riservato()`: su Mac la barra dei menu
   (`src/main/menu.js`) vede i tasti per prima. Su Mac Alt scrive: una
-  scorciatoia globale Alt+lettera lì prende un Ctrl davanti
+  scorciatoia Alt+lettera lì prende un Ctrl davanti
   (`src/main/shortcuts.js`), Alt+cifra diventa Cmd+cifra.
 - **Niente percorsi di Windows scritti a mano**, nemmeno nei prompt: `app.getPath`,
   `os.homedir()`, `path.join`.

@@ -6,6 +6,7 @@ const { BrowserWindow, session } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { TabManager } = require('./tabs');
+const { collegaScorciatoie } = require('./shortcuts');
 const { registerFiloProtocolForSession } = require('./protocol');
 
 const SHELL_HEIGHT = 88;
@@ -75,6 +76,8 @@ function wireWindowCommon(win, tabs) {
     if (input.type !== 'keyDown' || input.key !== 'Escape') return;
     if (tabs.handleFullscreenEscape(null)) event.preventDefault();
   });
+  // Spiega, Traduci, Salva per dopo e Aiuto anche col fuoco sulla barra.
+  collegaScorciatoie(win.webContents, win);
 
   // Indietro e avanti senza tastiera (#685). Le due strade non si sovrappongono
   // mai — Electron manda gli app-command su Windows e Linux, lo swipe su Mac —

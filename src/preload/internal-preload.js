@@ -242,7 +242,7 @@ const chromeShim = {
 };
 
 // ─── shortcut hook ─────────────────────────────────────────────────────────
-// Gemello dell'adattatore in page-preload.js. Lo shortcut globale (Alt+E/Alt+T/
+// Gemello dell'adattatore in page-preload.js. La scorciatoia (Alt+E/Alt+T/
 // Alt+H in shortcuts.js) e la voce "Aiuto" del menu tasto destro sulla linguetta
 // (TabManager.openHelp in tabs.js) fanno webContents.send('shortcut:triggered')
 // sul tab attivo. Il content script (content.js) ascolta MSG.SHORTCUT_TRIGGERED

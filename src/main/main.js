@@ -4,7 +4,6 @@
 //   - finestra principale con shell (tab bar + indirizzo)
 //   - manager dei tab basato su WebContentsView
 //   - servizi (storage, providers AI, saved pages, ecc.)
-//   - shortcut globali
 
 const { app, BrowserWindow, nativeTheme, session } = require('electron');
 const path = require('node:path');
@@ -81,7 +80,6 @@ try { require('./test-servizi-chiusi').chiudiServiziNeiTest(); } catch (_) {}
 const { createMainWindow, revealWindow } = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
-const { registerShortcuts } = require('./shortcuts');
 const { installaMenuApplicazione } = require('./menu');
 const { initAutoUpdater } = require('./updater');
 
@@ -194,6 +192,7 @@ app.whenReady().then(async () => {
   // è in cima allo schermo e vince sui tasti che le pagine ascoltano, quindi va
   // messa PRIMA che si apra qualsiasi finestra (vedi src/main/menu.js).
   installaMenuApplicazione();
+  require('./tabs').inoltraTastiDegliOspiti(app);
 
   const Storage = globalThis.SN_STORAGE;
   try {
@@ -253,7 +252,6 @@ app.whenReady().then(async () => {
   try { require('./services/downloads').init().catch(() => {}); } catch (_) {}
 
   mainWindow = createMainWindow();
-  registerShortcuts(mainWindow);
 
   // Il collegamento d'invito (#651): la dichiarazione al sistema, l'indirizzo
   // dell'avvio a freddo (Windows e Linux lo mettono fra gli argomenti) e

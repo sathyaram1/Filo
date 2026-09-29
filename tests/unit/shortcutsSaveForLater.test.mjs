@@ -1,4 +1,4 @@
-// Unit test per la scorciatoia globale "Salva per dopo" (Alt+S) in
+// Unit test per la scorciatoia "Salva per dopo" (Alt+S) in
 // src/main/shortcuts.js.
 //
 // BUG (feedback #277): premendo Alt+S mentre la tab attiva è una pagina interna
@@ -42,7 +42,7 @@ const HANDLERS_ID = join(ROOT, 'src', 'main', 'services', 'handlers.js');
 const origLoad = Module._load;
 Module._load = function patched(request, parent, isMain) {
   if (request === 'electron') {
-    return { globalShortcut: { register: () => true }, BrowserWindow: {} };
+    return { BrowserWindow: {} };
   }
   if (request === './services/handlers') {
     return {

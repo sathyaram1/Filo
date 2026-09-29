@@ -29,7 +29,7 @@ const path = require('node:path');
 // di pubblicità e widget, per frame che l'utente non tocca mai. Quindi:
 //   - nel frame principale tutto resta com'era (caricamento al DOMContentLoaded);
 //   - in un riquadro non si carica NIENTE finché l'utente non lo tocca davvero
-//     (tasto destro, clic, tasto premuto, o una scorciatoia globale diretta a
+//     (tasto destro, clic, tasto premuto, o una scorciatoia di Filo diretta a
 //     quel frame). Alla prima interazione il riquadro monta l'intero Filo.
 // Le funzioni di PAGINA (colore della scheda, segnali di attività, avviso del
 // sito pericoloso, traduzione della pagina) restano appannaggio del frame
@@ -334,7 +334,7 @@ globalThis.self = globalThis; // i moduli IIFE controllano `self` come fallback
 
 // ─── #405 — quale frame sta usando l'utente ────────────────────────────────
 //
-// Le scorciatoie globali (Alt+E Spiegazione, Alt+T Traduci) lavorano sul testo
+// Le scorciatoie Alt+E (Spiegazione) e Alt+T (Traduci) lavorano sul testo
 // selezionato. Con i riquadri incorporati il testo selezionato può stare dentro
 // il riquadro, ma `webContents.send` consegna SOLO al frame principale: la
 // scorciatoia arrivava a chi non aveva nessuna selezione e non succedeva nulla.
@@ -354,7 +354,7 @@ try {
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
 // ─── shortcut hook ─────────────────────────────────────────────────────────
-// Lo shortcut globale fa un webContents.send('shortcut:triggered'); il content
+// La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content
 // script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.
 // Adattatore: ascolto shortcut:triggered e ribroadcast come filo:broadcast.
 ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
