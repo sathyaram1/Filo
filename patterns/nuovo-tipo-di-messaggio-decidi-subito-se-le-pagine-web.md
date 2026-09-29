@@ -148,7 +148,10 @@ tasto destro o un tasto anche dentro un riquadro di un altro sito, dove il clic
 sinistro non arriva. Per questo il margine è largo, venti secondi: copre la
 scelta dal menu aperto col tasto destro in un riquadro. I salvataggi sono **uno
 per gesto**: la lista tiene le ultime mille. E la risposta a un sito dice dove
-è finita la pagina, non il titolo o la miniatura della voce che c'era già. Una
+è finita la pagina, non il titolo o la miniatura della voce che c'era già. Il
+«Ha funzionato?» dell'Aiuto costa due chiamate al modello e pubblica i passi per
+chi userà Filo su quel sito: vuole il gesto, uno per risposta, e da un sito vale
+solo per l'indirizzo della pagina che lo chiede (#589.1, giro 3). Una
 domanda nuova di questo genere entra in `DOMANDE_WEB_COL_GESTO`, uno scomparto
 in `CHIAVI_STORAGE_WEB_COL_GESTO`.
 
