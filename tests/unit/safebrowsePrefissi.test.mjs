@@ -229,6 +229,26 @@ test('offline o con un errore del servizio: il resto lavora, e l\'errore non res
   }
 });
 
+// Verifica di #813, giro 3: il verdetto del sito aspettava la risposta per il resto dell'indirizzo, e senza Google non arrivava.
+test('un sito già riconosciuto in lista resta segnalato sulle sue altre pagine: subito, con Google giù, senza chiave', async () => {
+  let richieste = servizioFinto({ elenco: { 'esca-intera-813.it/': 'SOCIAL_ENGINEERING' } });
+  accendi();
+  assert.equal((await verdettoDopoRete('https://esca-intera-813.it/accedi', richieste)).level, 'pericoloso');
+
+  for (const guasto of ['offline', 503]) {
+    richieste = servizioFinto({ guasto });
+    const url = `https://esca-intera-813.it/conferma-${guasto}`;
+    const subito = SB.analyze(url, {}, () => {});
+    assert.equal(subito.level, 'pericoloso', String(guasto));
+    assert.equal(subito.gsb.category, 'phishing', String(guasto));
+    assert.deepEqual(await SB._gsbLookup.check(url), { listed: true, category: 'phishing', threatType: 'SOCIAL_ENGINEERING' }, String(guasto));
+  }
+
+  SB.configure({ gsbKey: () => '', enableNetwork: false, enableSandbox: false });
+  assert.equal(SB.analyze('https://esca-intera-813.it/carta', {}, () => {}).level, 'pericoloso');
+  assert.equal(SB.checkSync('https://esca-intera-813.it/fine').level, 'pericoloso');
+});
+
 // Il lookup da solo, con un orologio finto: i tempi sono quelli che dice Google.
 function lookupFinto(risposte) {
   let t = 1_000_000;

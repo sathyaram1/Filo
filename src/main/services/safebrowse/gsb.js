@@ -215,28 +215,32 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
     for (const k of cache.keys()) { if (cache.size <= maxEntries) break; cache.delete(k); }
   }
 
-  function decide(hs, entryOf) {
+  // Un'impronta in lista basta per «pericoloso» anche se altre non hanno risposta (sito già noto, Google giù o lento);
+  // «pulito» le vuole tutte. undefined quando non si sa.
+  function decide(hs, known) {
     const found = [];
+    let unknown = false;
     for (const h of hs) {
-      const threats = entryOf(h.prefix).full.get(h.full);
+      const e = known.get(h.prefix);
+      if (!e) { unknown = true; continue; }
+      const threats = e.full.get(h.full);
       if (threats) found.push(...threats);
     }
-    if (!found.length) return { listed: false };
+    if (!found.length) return unknown ? undefined : { listed: false };
     found.sort((a, b) => SEVERITY.indexOf(a.category) - SEVERITY.indexOf(b.category));
     return { listed: true, category: found[0].category, threatType: found[0].threatType };
   }
 
-  // Verdetto dalla sola cache: undefined se anche un prefisso non ha una risposta valida.
+  // Verdetto dalla sola cache, senza rete.
   function peek(url) {
     const hs = hashesFor(url);
     if (!hs.length) return undefined;
     const got = new Map();
     for (const h of hs) {
       const e = fresh(h.prefix);
-      if (!e) return undefined;
-      got.set(h.prefix, e);
+      if (e) got.set(h.prefix, e);
     }
-    return decide(hs, (p) => got.get(p));
+    return decide(hs, got);
   }
 
   async function request(prefixes) {
@@ -280,8 +284,7 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
       else if (pending.has(p)) waits.push(pending.get(p).then((e2) => { if (e2) found.set(p, e2); }));
       else missing.push(p);
     }
-    if (missing.length) {
-      if (now() < pausedUntil) return null;
+    if (missing.length && now() >= pausedUntil) {
       const req = request(missing).catch(() => null);
       for (const p of missing) {
         const one = req.then((m) => (m && m.get(p)) || null);
@@ -291,8 +294,7 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
       waits.push(req.then((m) => { if (m) for (const [p, e] of m) found.set(p, e); }));
     }
     await Promise.all(waits);
-    if (prefixes.some((p) => !found.has(p))) return null;
-    return decide(hs, (p) => found.get(p));
+    return decide(hs, found) || null;
   }
 
   function clear() {
