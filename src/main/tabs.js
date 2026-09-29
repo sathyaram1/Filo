@@ -1233,14 +1233,13 @@ class TabManager {
     return tab.id === this.activeId || !!tab.audible || !!tab.formDirty;
   }
 
-  // La pulizia decide da cosa c'è nei campi adesso, non da cosa c'era: le schede
-  // col testo da inviare lo riconfermano frame per frame (una pagina può aver
-  // svuotato il campo dopo l'invio, un riquadro può essere sparito).
+  // La pulizia decide da cosa c'è nei campi adesso, non da cosa c'era: ogni scheda
+  // lo riconferma frame per frame (un campo svuotato dopo l'invio, un riquadro
+  // sparito, un editor che ha messo il testo dopo l'ultimo segnale).
   async _ricontrollaModuli() {
-    const sporche = this.tabs.filter((t) => t.formDirty);
-    if (!sporche.length) return;
     const type = globalThis.SN_MSG?.MSG?.FORM_RECHECK || 'form_recheck';
-    for (const tab of sporche) {
+    let chiesto = false;
+    for (const tab of this.tabs) {
       let frames = [];
       try { frames = tab.view.webContents.mainFrame.framesInSubtree || []; } catch (_) {}
       // Senza l'elenco dei frame non si toglie niente: nel dubbio la scheda resta protetta.
@@ -1248,9 +1247,10 @@ class TabManager {
       const vivi = new Set(frames.map(chiaveFrame));
       for (const k of [...(tab._moduli || [])]) if (!vivi.has(k)) tab._moduli.delete(k);
       tab.formDirty = !!(tab._moduli && tab._moduli.size);
-      for (const f of frames) { try { f.send('filo:broadcast', { type }); } catch (_) {} }
+      spingiAllaScheda(tab.view.webContents, { type }, { inVista: tab.id === this.activeId });
+      chiesto = true;
     }
-    await new Promise((r) => setTimeout(r, 400));
+    if (chiesto) await new Promise((r) => setTimeout(r, 400));
   }
 
   // Candidati archiviabili: schede web + pagine interne EFFIMERE (home/nuova

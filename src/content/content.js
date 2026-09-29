@@ -522,29 +522,70 @@
     setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
   }
 
-  // Testo scritto dall'utente e non ancora inviato, in questo frame: finché ce
-  // n'è la pulizia non chiude la scheda (#824). Conta cosa c'è nei campi quando
-  // la pulizia chiede (MSG.FORM_RECHECK), non solo i tasti premuti. Spunte e
-  // tendine non sono testo; le impostazioni di Filo salvano ogni campo da sole.
+  // Testo scritto dall'utente e non ancora inviato: finché ce n'è la pulizia non
+  // chiude la scheda (#824). Conta l'area in cui si è scritto com'è quando la pulizia
+  // chiede (MSG.FORM_RECHECK), non il campo che ha ricevuto i tasti. Porte: tests/tab-auto-archive.spec.mjs.
   function startFormTracker() {
     if (/^filo:\/\/(options|preferences)\//i.test(location.href)) return;
-    const scritti = new Set();
+    // Area in cui l'utente ha scritto → testo che mostrava prima che ci scrivesse.
+    const aree = new Map();
+    const basi = new WeakMap();
     let ultimoMandato = null;
+    let ultimoTocco = null;
+    let rilettura = null;
     const TIPI_DI_TESTO = /^(text|search|email|url|tel|password|number)$/;
     function campoDiTesto(t) {
+      if (t && t.nodeType === 3) t = t.parentElement;
       if (!t || !t.tagName) return null;
       const tag = t.tagName.toUpperCase();
       if (tag === 'TEXTAREA') return t;
       if (tag === 'INPUT') return TIPI_DI_TESTO.test(String(t.type || 'text').toLowerCase()) ? t : null;
-      return t.isContentEditable ? t : null;
+      if (!t.isContentEditable) return null;
+      while (t.parentElement && t.parentElement.isContentEditable) t = t.parentElement;
+      return t;
+    }
+    // Una ricerca non è una bozza: si riscrive in un attimo, e quella dal vivo ha già
+    // dato i risultati senza un invio da riconoscere.
+    function diRicerca(el) {
+      if (el.tagName.toUpperCase() !== 'INPUT') return false;
+      if (String(el.type).toLowerCase() === 'search') return true;
+      if (/^searchbox$/i.test(el.getAttribute('role') || '') || el.closest('[role="search" i]')) return true;
+      if (/^(q|s|k|query|search|search_query|keywords?|field-keywords)$/i.test(el.name || '')) return true;
+      return /(search|cerca|ricerca|busca|recherche|suche)/i.test(`${el.getAttribute('aria-label') || ''} ${el.placeholder || ''}`);
+    }
+    const grande = (el) => { try { const r = el.getBoundingClientRect(); return r.width >= 8 && r.height >= 8; } catch (_) { return true; } };
+    function primoGrande(da, body) {
+      for (let p = da, n = 0; p && p !== body && n < 8; p = p.parentElement, n++) if (grande(p)) return p;
+      return null;
+    }
+    // Gli editor di codice ricevono i tasti in una casella minuscola e mostrano il testo
+    // altrove: l'area è il contenitore visibile, o quello su cui si è cliccato per scrivere.
+    function areaDi(campo) {
+      if (campo.isContentEditable || grande(campo)) return campo;
+      const body = campo.ownerDocument.body;
+      const tocco = ultimoTocco && ultimoTocco.ownerDocument === campo.ownerDocument ? ultimoTocco : null;
+      return primoGrande(campo.parentElement, body) || (tocco && primoGrande(tocco, body)) || campo;
+    }
+    function testo(area) {
+      const tag = area.tagName.toUpperCase();
+      if (tag === 'TEXTAREA' || tag === 'INPUT') return area.value || '';
+      if (area.isContentEditable) return area.textContent || '';
+      return area.innerText || area.textContent || '';
     }
     // Gli editor ricchi lasciano spazi a larghezza zero anche quando sono vuoti.
-    const haTesto = (el) => /[^\s\u200B-\u200D\u2060\uFEFF]/.test(
-      el.isContentEditable ? (el.textContent || '') : (el.value || ''));
+    const pulito = (s) => String(s).replace(/[\s​-‍⁠﻿]+/g, '');
+    // Un riquadro tolto dalla pagina lascia i suoi nodi «connessi» a un documento morto.
+    const viva = (a) => a.isConnected && !!(a.ownerDocument && a.ownerDocument.defaultView);
 
+    // Un'area vuota resta in elenco: l'editor può rimetterci il testo dopo l'evento.
     function stato() {
-      for (const el of scritti) if (!el.isConnected || !haTesto(el)) scritti.delete(el);
-      return scritti.size > 0;
+      let daInviare = false;
+      for (const [area, base] of aree) {
+        if (!viva(area)) { aree.delete(area); continue; }
+        const ora = pulito(testo(area));
+        if (ora && ora !== pulito(base)) daInviare = true;
+      }
+      return daInviare;
     }
     // Solo la digitazione vera è un'interazione: una risposta al ricontrollo non
     // deve far sembrare la scheda appena usata al modello.
@@ -559,18 +600,43 @@
       if (ora !== ultimoMandato) manda(ora, daUtente);
     }
 
-    function onFormInput(e) {
+    function campoDa(e) {
       // composedPath: un campo dentro uno shadow root arriva qui come il suo host.
       const el = campoDiTesto((e.composedPath && e.composedPath()[0]) || e.target);
-      if (!el) return;
-      scritti.add(el);
+      return el && !diRicerca(el) ? el : null;
+    }
+    function scritto(area, base) {
+      if (!aree.has(area)) aree.set(area, base);
       aggiorna(true);
+      clearTimeout(rilettura);
+      rilettura = setTimeout(() => aggiorna(false), 400);
+    }
+    function onTocco(e) { ultimoTocco = (e.composedPath && e.composedPath()[0]) || e.target; }
+    function onPrima(e) {
+      const campo = campoDa(e);
+      if (!campo) return;
+      const area = areaDi(campo);
+      if (!aree.has(area)) basi.set(area, testo(area));
+    }
+    function onFormInput(e) {
+      const campo = campoDa(e);
+      if (!campo) return;
+      const area = areaDi(campo);
+      scritto(area, basi.has(area) ? basi.get(area) : '');
+    }
+    // Molti editor ricchi incollano e ricevono il trascinamento da soli, senza «input».
+    function onIncolla(e) {
+      const campo = campoDa(e);
+      if (!campo) return;
+      const area = areaDi(campo);
+      scritto(area, testo(area));
+      setTimeout(() => aggiorna(true), 0);
     }
 
     // Chi invia davvero lascia la pagina. Se la pagina trattiene l'invio, un
-    // rifiuto (campo mancante) e un invio via script si somigliano: una ricerca
-    // di una riga conta come inviata, un modulo più lungo resta da proteggere
-    // finché la pagina non ne svuota o toglie i campi.
+    // rifiuto (campo mancante) e un invio via script si somigliano: un modulo di
+    // una riga conta come inviato, uno più lungo resta da proteggere finché la
+    // pagina non ne svuota o toglie i campi.
     function soloUnaRiga(form) {
       const campi = [...(form.elements || [])].filter((el) => campoDiTesto(el));
       return campi.length <= 1 && !campi.some((el) => el.tagName.toUpperCase() === 'TEXTAREA')
@@ -578,12 +644,44 @@
     }
     function onSubmit(e) {
       const form = e.target;
-      if (!form || !scritti.size) return;
+      if (!form || !aree.size) return;
       setTimeout(() => {
         if (!e.defaultPrevented || soloUnaRiga(form)) {
-          for (const el of scritti) if (el.form === form || (form.contains && form.contains(el))) scritti.delete(el);
+          for (const a of [...aree.keys()]) if (a.form === form || (form.contains && form.contains(a))) aree.delete(a);
         }
         aggiorna(false);
+      }, 0);
+    }
+
+    // I riquadri senza indirizzo proprio (gli editor classici scritti dalla pagina)
+    // non caricano Filo: li segue il documento che li contiene. Riaggiungere gli
+    // ascoltatori non li duplica, e dopo un document.open() li rimette.
+    function osserva(win) {
+      const o = { passive: true, capture: true };
+      try {
+        win.addEventListener('pointerdown', onTocco, o);
+        win.addEventListener('beforeinput', onPrima, o);
+        win.addEventListener('input', onFormInput, o);
+        win.addEventListener('change', onFormInput, o);
+        win.addEventListener('paste', onIncolla, o);
+        win.addEventListener('drop', onIncolla, o);
+        win.addEventListener('submit', onSubmit, o);
+        win.addEventListener('blur', onUscita);
+        win.document.addEventListener('load', onCaricato, o);
+        for (const f of win.document.querySelectorAll('iframe, frame')) riquadro(f);
+      } catch (_) {}
+    }
+    function riquadro(f) {
+      let w = null;
+      try { w = f.contentWindow; if (!w || !w.document) return; } catch (_) { return; }
+      osserva(w);
+    }
+    const eRiquadro = (t) => !!(t && t.tagName && /^i?frame$/i.test(t.tagName));
+    function onCaricato(e) { if (eRiquadro(e.target)) riquadro(e.target); }
+    function onUscita(e) {
+      const w = e.target;
+      setTimeout(() => {
+        try { const a = w.document.activeElement; if (eRiquadro(a)) riquadro(a); } catch (_) {}
       }, 0);
     }
 
@@ -594,23 +692,24 @@
       try { nav = performance.getEntriesByType('navigation')[0]; } catch (_) {}
       if (!nav || nav.type !== 'back_forward') return;
       for (const el of document.querySelectorAll('input, textarea')) {
-        if (campoDiTesto(el) && el.value !== el.defaultValue && haTesto(el)) scritti.add(el);
+        if (campoDiTesto(el) && !diRicerca(el) && grande(el) && el.value !== el.defaultValue) aree.set(el, el.defaultValue);
       }
     }
     adottaRipristinati();
     // In un riquadro Filo si monta al primo tocco: quel che si è scritto prima
     // dell'arrivo di questo script sta nel campo col fuoco.
     const attivo = IS_SUBFRAME && campoDiTesto(document.activeElement);
-    if (attivo && haTesto(attivo) && (attivo.isContentEditable || attivo.value !== attivo.defaultValue)) scritti.add(attivo);
-    if (scritti.size) aggiorna(false);
+    if (attivo && !diRicerca(attivo) && areaDi(attivo) === attivo
+      && (attivo.isContentEditable || attivo.value !== attivo.defaultValue)) {
+      aree.set(attivo, attivo.isContentEditable ? '' : attivo.defaultValue);
+    }
+    if (aree.size) aggiorna(false);
 
-    window.addEventListener('input', onFormInput, { passive: true, capture: true });
-    window.addEventListener('change', onFormInput, { passive: true, capture: true });
-    window.addEventListener('submit', onSubmit, { passive: true, capture: true });
+    osserva(window);
     // Pagina tornata dalla cache di navigazione: per il main è un documento nuovo.
     window.addEventListener('pageshow', (e) => { if (e.persisted) manda(stato(), false); });
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.type === MSG.FORM_RECHECK) manda(stato(), false);
+      if (msg && msg.type === MSG.FORM_RECHECK) { osserva(window); manda(stato(), false); }
     });
   }
 

@@ -266,7 +266,7 @@ test('conta solo il testo ancora da inviare: spunte, invio e cambio pagina non p
     <label><input type="checkbox" id="spunta"> ricordami</label>
     <select id="scelta"><option>uno</option><option>due</option></select>
     <textarea id="nota"></textarea>
-    <form id="ricerca" onsubmit="event.preventDefault()"><input id="q" type="search"><button>Cerca</button></form>
+    <form id="attivita" onsubmit="event.preventDefault()"><input id="q" type="text"><button>Aggiungi</button></form>
     <a id="via" href="${dopo}">avanti</a>
   </body></html>`));
   const attesa = () => page.waitForTimeout(800);
@@ -279,8 +279,8 @@ test('conta solo il testo ancora da inviare: spunte, invio e cambio pagina non p
   await page.locator('#nota').fill('appunto a metà');
   await expect.poll(() => moduloDi(shell, 'Campi'), { timeout: 8_000 }).toBe(true);
 
-  // Inviare la ricerca non cancella l'appunto scritto fuori dal modulo.
-  await page.locator('#q').fill('meteo');
+  // Inviare un modulo di una riga non cancella l'appunto scritto fuori da lui.
+  await page.locator('#q').fill('comprare il latte');
   await page.locator('#q').press('Enter');
   await attesa();
   expect(await moduloDi(shell, 'Campi')).toBe(true);
@@ -289,7 +289,7 @@ test('conta solo il testo ancora da inviare: spunte, invio e cambio pagina non p
   await page.locator('#nota').fill('');
   await expect.poll(() => moduloDi(shell, 'Campi'), { timeout: 8_000 }).toBe(false);
 
-  await page.locator('#q').fill('treni per Roma');
+  await page.locator('#q').fill('chiamare il medico');
   await expect.poll(() => moduloDi(shell, 'Campi'), { timeout: 8_000 }).toBe(true);
   await page.locator('#q').press('Enter');
   await expect.poll(() => moduloDi(shell, 'Campi'), { timeout: 8_000 }).toBe(false);
@@ -428,4 +428,110 @@ test('un commento pubblicato o un messaggio mandato, col campo svuotato dalla pa
   expect(aperte).not.toContain('Social');
   expect(aperte).not.toContain('Chat');
   expect(aperte).toContain('Bozza');
+});
+
+// Conta il testo che l'area mostra, anche se non è arrivato con la digitazione
+// normale in un campo dove Filo era già caricato.
+
+// Come ProseMirror, Tiptap, Slate, Lexical, Draft, CKEditor 5: l'incolla lo fa l'editor.
+const EDITOR_RICCO = `<div id="ed" contenteditable="true" style="min-height:80px;border:1px solid"></div>
+  <script>ed.addEventListener('paste', (e) => { e.preventDefault(); const p = document.createElement('p'); p.textContent = e.clipboardData.getData('text/plain'); ed.appendChild(p); });</script>`;
+
+test('un editor classico in un riquadro scritto dalla pagina tiene aperta la scheda, e svuotato non più (#824)', async ({ app, shell, testServer }) => {
+  const page = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Blog</title></head><body>
+    <iframe id="f" style="width:500px;height:200px"></iframe>
+    <script>const d = document.getElementById('f').contentDocument; d.open(); d.write('<!doctype html><html><body contenteditable="true" style="min-height:150px"></body></html>'); d.close();</script>
+    </body></html>`));
+  const corpo = page.frameLocator('#f').locator('body');
+  const TESTO = 'Articolo scritto nell’editor del blog';
+  await corpo.click();
+  await page.keyboard.type(TESTO);
+  await expect.poll(() => moduloDi(shell, 'Blog'), { timeout: 8_000 }).toBe(true);
+
+  await pulisciTutto(app, shell, testServer);
+  expect(await titoliAperti(shell)).toContain('Blog');
+  expect(await corpo.textContent()).toBe(TESTO);
+
+  await corpo.click();
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.press('Backspace');
+  await expect.poll(() => moduloDi(shell, 'Blog'), { timeout: 8_000 }).toBe(false);
+});
+
+test('una bozza incollata in un editor ricco, con Ctrl+V o con «Incolla» di Filo, tiene aperta la scheda (#824)', async ({ app, shell, testServer }) => {
+  const tastiera = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Ricco</title></head><body>${EDITOR_RICCO}</body></html>`));
+  const TESTO = 'Bozza lunga preparata altrove e incollata qui';
+  await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), TESTO);
+  await tastiera.locator('#ed').click();
+  await tastiera.keyboard.press('ControlOrMeta+V');
+  await expect(tastiera.locator('#ed')).toHaveText(TESTO);
+  await expect.poll(() => moduloDi(shell, 'Ricco'), { timeout: 8_000 }).toBe(true);
+
+  const menu = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Menu</title></head><body>${EDITOR_RICCO}</body></html>`));
+  await menu.locator('#ed').click();
+  await menu.locator('#ed').click({ button: 'right' });
+  await expect(menu.locator('.sn-menu')).toBeVisible();
+  await menu.locator('.sn-menu').getByText('Incolla', { exact: true }).first().click();
+  await expect(menu.locator('#ed')).toHaveText(TESTO);
+  await expect.poll(() => moduloDi(shell, 'Menu'), { timeout: 8_000 }).toBe(true);
+
+  await pulisciTutto(app, shell, testServer);
+  const aperte = await titoliAperti(shell);
+  expect(aperte).toContain('Ricco');
+  expect(aperte).toContain('Menu');
+});
+
+test('il codice scritto in un editor che riceve i tasti in una casella nascosta tiene aperta la scheda (#824)', async ({ app, shell, testServer }) => {
+  // Com'è fatto CodeMirror 5: la casella che riceve i tasti sta dentro l'editor e si svuota subito.
+  const page = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Codice</title></head><body>
+    <div id="cm" style="border:1px solid;font-family:monospace;min-height:60px">
+      <div style="overflow:hidden;position:relative;width:3px;height:0"><textarea id="hid" style="position:absolute;bottom:-1em;padding:0;width:1px;height:1em;outline:none"></textarea></div>
+      <div id="righe"><span>1</span> <span id="codice"></span></div>
+    </div>
+    <button id="svuota">Esegui</button>
+    <script>
+      cm.addEventListener('mousedown', (e) => { e.preventDefault(); hid.focus(); });
+      hid.addEventListener('input', () => { setTimeout(() => { codice.textContent += hid.value; hid.value = ''; }, 20); });
+      svuota.onclick = () => { codice.textContent = ''; };
+    </script></body></html>`));
+  const TESTO = 'function ciao() {}';
+  await page.locator('#cm').click();
+  await page.keyboard.type(TESTO);
+  await expect(page.locator('#codice')).toHaveText(TESTO);
+  await expect.poll(() => moduloDi(shell, 'Codice'), { timeout: 8_000 }).toBe(true);
+
+  await pulisciTutto(app, shell, testServer);
+  expect(await titoliAperti(shell)).toContain('Codice');
+  expect(await page.locator('#codice').textContent()).toBe(TESTO);
+
+  // L'editor tornato com'era prima di scriverci non ha più niente da perdere.
+  await page.locator('#svuota').click();
+  await expect(page.locator('#codice')).toHaveText('');
+  await pulisciTutto(app, shell, testServer);
+  expect(await titoliAperti(shell)).not.toContain('Codice');
+});
+
+test('una casella di ricerca non protegge la scheda, anche coi risultati dal vivo e prima di Invio (#824)', async ({ app, shell, testServer }) => {
+  const BRANI = ['Yesterday', 'Let It Be', 'Hey Jude', 'Imagine'];
+  const conRisultati = (titolo, campo) => testServer.html(`<!doctype html><html><head><title>${titolo}</title></head><body>
+    ${campo}<ul id="ris"></ul>
+    <script>const B = ${JSON.stringify(BRANI)};
+      q.addEventListener('input', () => { ris.innerHTML = ''; for (const b of B.filter((x) => x.toLowerCase().includes(q.value.toLowerCase()))) { const li = document.createElement('li'); li.textContent = b; ris.append(li); } });</script>
+    </body></html>`);
+  for (const [titolo, campo] of [
+    ['Musica', '<input id="q" type="search" placeholder="Cosa vuoi ascoltare?">'],
+    ['Negozio', '<div role="search"><input id="q" type="text" aria-label="Cerca"></div>'],
+  ]) {
+    const page = await apriEsatta(app, shell, conRisultati(titolo, campo));
+    await page.locator('#q').click();
+    await page.keyboard.type('hey');
+    await expect(page.locator('#ris li')).toHaveText(['Hey Jude']);
+  }
+  await expect.poll(() => moduloDi(shell, 'Musica'), { timeout: 2_000 }).toBe(false);
+  expect(await moduloDi(shell, 'Negozio')).toBe(false);
+
+  await pulisciTutto(app, shell, testServer);
+  const aperte = await titoliAperti(shell);
+  expect(aperte).not.toContain('Musica');
+  expect(aperte).not.toContain('Negozio');
 });

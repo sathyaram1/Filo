@@ -42,6 +42,7 @@ const SPINTE_WEB = Object.freeze(new Set([
   'tts_global_reading',
   'tts_stop',
   'fullscreen_changed',
+  'form_recheck',
 ]));
 
 // Quelli che si mostrano una volta sola, nella pagina in vista: a un sito vanno
