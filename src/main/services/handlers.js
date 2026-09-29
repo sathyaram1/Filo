@@ -2499,7 +2499,7 @@ function observationsForPrompt(actions) {
 // Da un altro paese senza fornitore (#771): l'esito torna al modello anche nel
 // formato vecchio e nei turni dopo, dove il testo scritto con l'azione lo dava per fatto.
 function proxyUnavailableForPrompt(actions) {
-  if (!Array.isArray(actions) || !actions.some((a) => a && a._output && a._output.proxy === 'non_disponibile')) return '';
+  if (!Array.isArray(actions) || !actions.some(esitoNonDisponibile)) return '';
   return '[NON fatto: aprire da un altro paese non è ancora disponibile in Filo. Nessuna scheda è stata instradata e nessuna regola salvata. '
     + 'Dillo all\'utente in una frase, senza darlo per fatto e senza promettere che succederà da solo, e non riprovare.]';
 }
