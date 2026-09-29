@@ -1,0 +1,159 @@
+// #589.1 — cosa ottiene un sito che parla col main dal mondo del preload (isolamento dei contesti
+// rotto): solo le domande e i canali del codice di Filo dentro le pagine (impostazioniPerOrigine.js).
+// Senza il fix è ROSSO: memoria, pagine salvate, stato, foto della scheda in vista, chiusura di altre schede.
+
+import { test, expect } from './fixtures/electron.mjs';
+
+const MEMORIA = 'Anna, vive a MILANO-5891, lavora in ospedale';
+const SALVATA = 'CONTO-CORRENTE-5891';
+
+// Il codice gira nel mondo isolato del preload della pagina riconosciuta da `quale`: lì
+// vivono i content script e lo shim chrome.*, come per un sito che ne ha rotto il confine.
+function dalPreload(app, quale) {
+  return (codice) => app.evaluate(async ({ BrowserWindow }, { src, codice: c }) => {
+    // eslint-disable-next-line no-new-func
+    const scegli = new Function('u', `return (${src})(u);`);
+    const wcs = BrowserWindow.getAllWindows().flatMap((w) => [
+      ...(w._filoTabs?.tabs || []).map((t) => t.view.webContents),
+      ...(w._filoTabs ? [] : [w.webContents]),
+    ]);
+    const wc = wcs.find((x) => { try { return scegli(x.getURL()); } catch (_) { return false; } });
+    if (!wc) return { nonTrovata: true };
+    try {
+      return { risposta: await wc.executeJavaScriptInIsolatedWorld(999, [{ code: c }]) };
+    } catch (e) { return { errore: String(e) }; }
+  }, { src: quale.toString(), codice });
+}
+
+const chiedi = (tipo, extra = {}) => `chrome.runtime.sendMessage(${JSON.stringify({ type: tipo, ...extra })})`;
+
+async function datiPersonali(shell) {
+  await shell.evaluate(async ({ memoria, salvata }) => {
+    const m = (x) => window.filoShell.message(x);
+    await m({ type: '_storage:set', obj: { filo_memory: { PROFILO: memoria } } });
+    await m({ type: 'save_page', page: { url: 'https://banca.example/conto', title: salvata, text: 'saldo' } });
+  }, { memoria: MEMORIA, salvata: SALVATA });
+}
+
+async function schede(app) {
+  return app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    return { attiva: w._filoTabs.activeId, tutte: w._filoTabs.tabs.map((t) => ({ id: t.id, url: String(t.url || '') })) };
+  });
+}
+
+test('un sito non si fa dare memoria, pagine salvate, stato, archivio e categorie; le sue domande rispondono', async ({ app, shell, openTab, testServer }) => {
+  await datiPersonali(shell);
+  const web = await testServer.openReady(openTab, '<h1>sito qualunque</h1>');
+  const sito = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
+
+  const domande = ['filo_get_memory', 'get_saved_pages', 'filo_get_state', 'get_archived_tabs', 'get_categories', 'get_credits', 'auth_signout'];
+  for (const tipo of domande) {
+    const r = await sito(chiedi(tipo));
+    expect(r.nonTrovata || r.errore, `${tipo}: il preload del sito non è stato raggiunto`).toBeFalsy();
+    expect(r.risposta, `${tipo}: un sito ha avuto risposta a una domanda che il codice dentro le pagine non fa`).toMatchObject({ ok: false, code: 'forbidden' });
+    const testo = JSON.stringify(r.risposta);
+    expect(testo).not.toContain('MILANO-5891');
+    expect(testo).not.toContain(SALVATA);
+  }
+
+  // Le domande del codice di Filo dentro la pagina restano: impostazioni (ritagliate) e navigazione.
+  const impostazioni = await sito(chiedi('get_settings'));
+  expect(impostazioni.risposta?.ok).toBe(true);
+  expect(impostazioni.risposta?.settings?.theme).toBeTruthy();
+  const nav = await sito(chiedi('nav_state'));
+  expect(nav.risposta?.ok).toBe(true);
+
+  // Dalla cornice di Filo gli stessi dati ci sono: il rifiuto è per provenienza, non per assenza.
+  const daFilo = await shell.evaluate(async () => ({
+    memoria: await window.filoShell.message({ type: 'filo_get_memory' }),
+    salvate: await window.filoShell.message({ type: 'get_saved_pages' }),
+  }));
+  expect(JSON.stringify(daFilo.memoria)).toContain('MILANO-5891');
+  expect(JSON.stringify(daFilo.salvate)).toContain(SALVATA);
+  void web;
+});
+
+test('la foto la chiede solo la scheda in vista, e inquadra sé stessa', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, '<style>html,body{background:#0000ff;height:100%;margin:0}</style><h1>sfondo</h1>');
+  await testServer.openReady(openTab, '<style>html,body{background:#ff0000;height:100%;margin:0}</style><h1>in vista</h1>', { pubblico: true });
+  const sfondo = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
+  const inVista = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
+  await expect.poll(async () => (await schede(app)).tutte.find((t) => t.id === (0, 0))?.url ?? (await schede(app)).attiva).toBeTruthy();
+
+  for (const tipo of ['capture_visible_tab', 'capture_feedback_topbar']) {
+    const r = await sfondo(chiedi(tipo));
+    expect(r.nonTrovata || r.errore).toBeFalsy();
+    expect(r.risposta, `${tipo}: una scheda di sfondo ha avuto la foto`).toMatchObject({ ok: false, code: 'forbidden' });
+    expect(r.risposta?.dataUrl).toBeFalsy();
+  }
+
+  // La scheda in vista la ottiene (salva per dopo, feedback, barra d'aiuto), ed è la sua pagina.
+  let scatto = null;
+  await expect.poll(async () => {
+    scatto = await inVista(chiedi('capture_visible_tab'));
+    return (scatto.risposta?.dataUrl || '').length;
+  }, { timeout: 15000 }).toBeGreaterThan(1000);
+  const colore = await app.evaluate(({ nativeImage }, u) => {
+    const img = nativeImage.createFromDataURL(u);
+    const { width, height } = img.getSize();
+    const bmp = img.toBitmap();
+    const i = ((Math.floor(height / 2) * width) + Math.floor(width / 2)) * 4;
+    return { r: bmp[i + 2], g: bmp[i + 1], b: bmp[i] };
+  }, scatto.risposta.dataUrl);
+  expect(colore.r > 200 && colore.b < 60, `la foto non è della scheda in vista: ${JSON.stringify(colore)}`).toBe(true);
+});
+
+test('un sito non chiude le altre schede, né per messaggio né dal canale delle schede', async ({ app, shell, openTab, testServer }) => {
+  await testServer.openReady(openTab, '<h1>sito</h1>');
+  await testServer.openReady(openTab, '<h1>altra scheda</h1>', { pubblico: true });
+  const { tutte } = await schede(app);
+  const altra = tutte.find((t) => t.url.startsWith('http://sito-pubblico.test'));
+  const sitoId = tutte.find((t) => t.url.startsWith('http://127.0.0.1')).id;
+  expect(altra).toBeTruthy();
+  const sito = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
+
+  const perMessaggio = await sito(chiedi('_tabs:remove', { id: altra.id }));
+  expect(perMessaggio.risposta).toMatchObject({ ok: false, code: 'forbidden' });
+
+  // I canali delle schede li usa la cornice: bussiamo come farebbe il sito, col suo mittente.
+  const dalCanale = await app.evaluate(async ({ BrowserWindow, ipcMain }, { id, daChi }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const wc = w._filoTabs.tabs.find((t) => t.id === daChi).view.webContents;
+    const esiti = {};
+    for (const [canale, args] of [['tabs:close', { id }], ['tabs:navigate', { id, url: 'https://altrove.example/' }], ['tabs:snapshot', undefined]]) {
+      const h = ipcMain._invokeHandlers && ipcMain._invokeHandlers.get(canale);
+      if (!h) { esiti[canale] = 'handler introvabile'; continue; }
+      esiti[canale] = await new Promise((resolve) => {
+        h({ sender: wc, senderFrame: wc.mainFrame, _reply: resolve, _throw: (e) => resolve({ eccezione: String(e) }) }, args);
+      });
+    }
+    return esiti;
+  }, { id: altra.id, daChi: sitoId });
+  for (const [canale, esito] of Object.entries(dalCanale)) {
+    expect(esito, `${canale}: un sito ha usato un canale della cornice`).toMatchObject({ ok: false, code: 'forbidden' });
+  }
+  await new Promise((r) => setTimeout(r, 500));
+  expect((await schede(app)).tutte.find((t) => t.id === altra.id)?.url, 'la scheda dell\'utente è stata chiusa o spostata da un sito').toBe(altra.url);
+
+  // La cornice la chiude.
+  await shell.evaluate((id) => window.filoShell.tabs.close(id), altra.id);
+  await expect.poll(async () => (await schede(app)).tutte.some((t) => t.id === altra.id)).toBe(false);
+});
+
+test('la finestra di accesso aperta da un sito vale come sito, non come la cornice', async ({ app, shell, openTab, testServer }) => {
+  await datiPersonali(shell);
+  const accesso = testServer.html('<h1>accedi</h1>');
+  const web = await testServer.openReady(openTab, `<button id="apri" onclick="window.open('${accesso}?client_id=a&redirect_uri=b', 'accesso', 'width=400,height=400')">accedi</button>`);
+  await web.click('#apri');
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .some((w) => !w._filoTabs && String(w.webContents.getURL()).includes('client_id=a'))), { timeout: 10000 }).toBe(true);
+  const finestra = dalPreload(app, (u) => u.includes('client_id=a'));
+  await expect.poll(async () => (await finestra('typeof chrome')).risposta, { timeout: 10000 }).toBe('object');
+
+  for (const tipo of ['filo_get_memory', 'get_saved_pages', 'auth_signout', 'capture_visible_tab']) {
+    const r = await finestra(chiedi(tipo));
+    expect(r.risposta, `${tipo}: la finestra aperta dal sito è stata trattata come la cornice di Filo`).toMatchObject({ ok: false, code: 'forbidden' });
+    expect(JSON.stringify(r.risposta)).not.toContain('MILANO-5891');
+  }
+});

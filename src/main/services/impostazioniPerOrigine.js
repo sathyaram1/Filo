@@ -27,7 +27,7 @@ const DOMANDE_WEB = Object.freeze(new Set([
   'run_in_top_frame', 'close_other_menus', 'translate_frames', 'frame_translate_done',
   'tab_activity', 'tab_dominant_color', 'tab_identity_color', 'replace_misspelling',
   'save_page', 'save_link', 'set_saved_page_thumb', 'download_image', 'download_media', 'download_link',
-  'fetch_link_meta', 'web_search', 'path_collectable', 'save_path', 'filo_run_action', 'filo_confirm_action',
+  'fetch_link_meta', 'web_search', 'path_collectable', 'save_path', 'filo_run_action', 'filo_confirm_action', 'shell_action',
   'cookies_config', 'cookies_rule', 'cookies_banner_tokens', 'cookies_frame_banner', 'cookies_outcome',
   'safebrowse_get', 'safebrowse_proceed', 'safebrowse_dismiss', 'geo_propose_accept', 'geo_propose_dismiss',
 ]));
