@@ -2098,6 +2098,7 @@
     log.addEventListener('click', (e) => {
       if (toggleCot(e.target)) return;
       if (e.target.closest('[data-retry]')) { retryLastTurn(); return; }
+      if (e.target.closest('[data-clear-chat]')) { clearChat(); return; }
       const impAll = e.target.closest('[data-import-all]');
       if (impAll) { importAllFromBubble(impAll.closest('[data-msg-i]')); return; }
       const add = e.target.closest('[data-add]');
