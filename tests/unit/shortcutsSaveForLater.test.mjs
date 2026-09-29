@@ -44,7 +44,6 @@ Module._load = function patched(request, parent, isMain) {
       handleMessage: async (msg) => {
         const { MSG } = globalThis.SN_MSG;
         if (msg && msg.type === MSG.SAVE_PAGE) { saved = msg.page; return { ok: true, entry: { id: 'E1' } }; }
-        if (msg && msg.type === MSG.SET_SAVED_PAGE_THUMB) { thumb = msg; return { ok: true }; }
         return { ok: false };
       },
     };
@@ -57,6 +56,8 @@ Module._load = function patched(request, parent, isMain) {
 // quindi non possiamo ripristinare Module._load subito. Lo ripristiniamo alla
 // chiusura del processo. Intercetta solo 'electron' e './services/handlers'.
 process.on('exit', () => { Module._load = origLoad; });
+
+globalThis.SN_SAVED_PAGES = { setThumbnail: async (id, thumbnail) => { thumb = { id, thumbnail }; return { id }; } };
 
 const { dispatch, consegnaConRicevuta, riceviRicevuta } = require(join(ROOT, 'src', 'main', 'shortcuts.js'));
 
@@ -91,7 +92,14 @@ function makeTab(over = {}, risposta = 'rifiutata') {
         if (tab.primaDiRispondere) tab.primaDiRispondere();
         if (risposta) setTimeout(() => riceviRicevuta(payload.ricevuta, tab.id, risposta === 'presa'), 1);
       },
-      capturePage: async () => ({ toDataURL: () => 'data:image/png;base64,AAAA' }),
+      // Una cattura come la dà Electron: una bitmap già in mano al main, niente da decodificare.
+      capturePage: async () => ({
+        isEmpty: () => false,
+        getSize: () => ({ width: 1280, height: 800 }),
+        crop() { return this; },
+        resize() { return this; },
+        toJPEG: () => Buffer.from('jpeg'),
+      }),
     },
   };
   return tab;
@@ -138,6 +146,7 @@ test('Alt+S su pagina web senza Filo: il main salva, allega la miniatura e chiud
   assert.equal(saved.url, 'https://news.example.com/articolo');
   assert.equal(saved.title, 'Articolo');
   assert.equal(thumb && thumb.id, 'E1', 'la miniatura va alla voce appena salvata');
+  assert.match(thumb.thumbnail, /^data:image\/jpeg;base64,/, 'e ci va già compressa');
   assert.equal(closed, 'T1', 'la tab web va chiusa dopo il salvataggio');
 });
 

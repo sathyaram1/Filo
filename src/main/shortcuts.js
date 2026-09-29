@@ -129,14 +129,9 @@ function riceviRicevuta(ricevuta, tabId, presa) {
   return true;
 }
 
-function entro(promessa, ms) {
-  let timer;
-  const scadenza = new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('timeout')), ms); });
-  return Promise.race([promessa, scadenza]).finally(() => clearTimeout(timer));
-}
-
 async function saveForLater(win, tab) {
   const { handleMessage } = require('./services/handlers');
+  const { dallaScheda } = require('./services/miniature');
   const { MSG } = globalThis.SN_MSG;
   // I dati della scheda si fotografano prima di ogni attesa: un redirect intanto farebbe salvare la pagina sbagliata (#334).
   const url = tab.url;
@@ -145,11 +140,8 @@ async function saveForLater(win, tab) {
   if (await consegnaConRicevuta(tab, 'save-for-later')) return;
   // Pagina senza Filo dentro (sito escluso, ancora in caricamento, bloccata): si salva comunque, prima della miniatura.
   const res = await handleMessage({ type: MSG.SAVE_PAGE, page: { url, title, favicon } });
-  try {
-    const img = await entro(tab.view.webContents.capturePage(), 3000);
-    const thumbnail = img.toDataURL();
-    if (thumbnail && res?.entry?.id) await handleMessage({ type: MSG.SET_SAVED_PAGE_THUMB, id: res.entry.id, thumbnail });
-  } catch (_) {}
+  const thumbnail = await dallaScheda(tab.view.webContents);
+  if (thumbnail && res?.entry?.id) await globalThis.SN_SAVED_PAGES.setThumbnail(res.entry.id, thumbnail);
   try { win._filoTabs.closeTab(tab.id); } catch (_) {}
 }
 

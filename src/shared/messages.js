@@ -44,7 +44,7 @@
     GET_SAVED_PAGES: 'get_saved_pages',
     REMOVE_SAVED_PAGE: 'remove_saved_page',       // { id }
     CONSUME_SAVED_PAGE: 'consume_saved_page',     // { id }
-    SET_SAVED_PAGE_THUMB: 'set_saved_page_thumb', // { id, thumbnail } — miniatura best-effort dopo il salvataggio
+    SET_SAVED_PAGE_THUMB: 'set_saved_page_thumb', // { id } — il main fotografa la scheda di chi chiede e ne fa la miniatura
 
     // §3.1/§3.3 — archivio tab chiuse (metadati). La scrittura avviene nel main
     // alla chiusura di una tab; queste servono alla pagina archivio per leggere/

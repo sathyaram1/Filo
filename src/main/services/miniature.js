@@ -62,6 +62,11 @@ function entro(promessa, ms) {
   return Promise.race([promessa, scadenza]).finally(() => clearTimeout(timer));
 }
 
+// Una scheda che non risponde (pagina bloccata) non deve tenere fermo il salvataggio.
+async function dallaScheda(webContents) {
+  try { return daCattura(await entro(webContents.capturePage(), 3000)); } catch (_) { return ''; }
+}
+
 async function conPaginaIsolata(lavoro) {
   const { BrowserWindow } = require('electron');
   const win = new BrowserWindow({
@@ -116,4 +121,4 @@ async function rimpicciolisciSalvate() {
   return fatte;
 }
 
-module.exports = { daCattura, accettabile, grande, rimpicciolisciSalvate, LARGHEZZA, MAX_BYTE };
+module.exports = { daCattura, dallaScheda, accettabile, grande, rimpicciolisciSalvate, LARGHEZZA, MAX_BYTE };

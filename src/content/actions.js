@@ -816,10 +816,14 @@
   // incorpora la rimozione, il secondo gira quando quel frame è stato
   // committato; il piccolo timeout copre la presentazione fuori processo del
   // compositor prima che il main scatti la foto.
-  async function captureVisibleTab() {
-    await new Promise((resolve) => {
+  function attendiCompositor() {
+    return new Promise((resolve) => {
       requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 50)));
     });
+  }
+
+  async function captureVisibleTab() {
+    await attendiCompositor();
     return chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
   }
 
@@ -841,7 +845,7 @@
     if (salvataggioInCorso) return;
     salvataggioInCorso = true;
     // Committa il salvataggio SUBITO, prima di qualsiasi attesa. La cattura
-    // della miniatura (captureVisibleTab) attende ~120ms che il menu sparisca
+    // della miniatura attende ~120ms che il menu sparisca
     // dal compositor: se in quella finestra la pagina fa un redirect o si
     // ricarica, il contesto del content script viene distrutto e il messaggio
     // di salvataggio non partirebbe mai — l'utente crederebbe di aver salvato
@@ -867,24 +871,15 @@
       return;
     }
 
-    // Miniatura best-effort: catturala dopo che il menu è sparito dal
-    // compositor. La cattura DEVE precedere il toast di conferma, altrimenti il
-    // toast finisce dentro la miniatura (#325). Se la pagina è già cambiata la
-    // cattura può fallire: il salvataggio resta comunque valido, solo senza
-    // anteprima.
-    let thumbnail = '';
+    // Miniatura best-effort: la scatta il main (piccola, #839) dopo che il menu
+    // è sparito dal compositor. La cattura DEVE precedere il toast di conferma,
+    // altrimenti il toast finisce dentro la miniatura (#325): si aspetta la
+    // risposta. Se la pagina è già cambiata la cattura può fallire: il
+    // salvataggio resta comunque valido, solo senza anteprima.
     try {
-      const cap = await captureVisibleTab();
-      thumbnail = cap?.dataUrl || '';
+      await attendiCompositor();
+      if (entry?.id) await chrome.runtime.sendMessage({ type: MSG.SET_SAVED_PAGE_THUMB, id: entry.id });
     } catch (_) { /* miniatura opzionale */ }
-
-    if (thumbnail && entry?.id) {
-      chrome.runtime.sendMessage({
-        type: MSG.SET_SAVED_PAGE_THUMB,
-        id: entry.id,
-        thumbnail,
-      }).catch(() => {});
-    }
 
     // Conferma CLICCABILE che porta alla lista (#252): rimpiazza il vecchio
     // toast muto + chiusura a 600ms (troppo rapida per farci qualcosa).

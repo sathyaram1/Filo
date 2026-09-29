@@ -4,8 +4,8 @@
   'use strict';
 
   const { STORAGE_KEYS, SAVED_PAGES_LIMIT } = global.SN_CONST;
-  // Ogni miniatura entra rimpicciolita, da qualunque strada arrivi (#839).
-  const { perLista } = require('./miniature');
+  // Nel file dei dati entra solo un'anteprima già piccola, da qualunque strada arrivi (#839).
+  const { accettabile } = require('./miniature');
 
   function uuid() {
     if (crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -22,7 +22,7 @@
   }
 
   async function save(page) {
-    const thumbnail = perLista(page.thumbnail);
+    const thumbnail = accettabile(page.thumbnail);
     const pages = await list();
 
     // Dedupe per URL: salvare di nuovo una pagina già in "Aperti per dopo"
@@ -63,8 +63,8 @@
   // la miniatura arriva dopo (cattura ~120ms) ed è opzionale. Se la scheda non
   // esiste più (rimossa nel frattempo) l'update è un no-op.
   async function setThumbnail(id, thumbnail) {
+    thumbnail = accettabile(thumbnail);
     if (!id || !thumbnail) return null;
-    thumbnail = perLista(thumbnail);
     const pages = await list();
     const entry = pages.find((p) => p.id === id);
     if (!entry) return null;

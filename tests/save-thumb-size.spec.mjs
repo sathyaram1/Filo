@@ -44,7 +44,9 @@ async function attendiMiniatura(app, url) {
 
 function controllaPiccola(m, strada) {
   expect(m.mime, `${strada}: la miniatura dev'essere compressa`).toBe('image/jpeg');
-  expect(m.width, `${strada}: larghezza della miniatura`).toBe(320);
+  // Circa 320 px: con lo schermo scalato (125% sulla macchina dell'owner) la bitmap può uscire un poco più larga.
+  expect(m.width, `${strada}: larghezza della miniatura`).toBeGreaterThanOrEqual(300);
+  expect(m.width, `${strada}: larghezza della miniatura`).toBeLessThanOrEqual(420);
   expect(m.bytes, `${strada}: peso della miniatura (${m.bytes} byte)`).toBeLessThan(SOGLIA);
 }
 
