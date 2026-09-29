@@ -93,7 +93,7 @@ function matchBrands(norm) {
         const dist = osaDistance(sld, token);
         if (dist > 0 && dist <= th) {
           const hit = { brand, reason: 'typo', sld, distance: dist };
-          if (token.length >= TYPO_BLOCCO_MIN_LEN) strict = hit;
+          if (typoBloccante(sld, token, dist)) strict = hit;
           else if (!weak) weak = hit;
           continue;
         }
