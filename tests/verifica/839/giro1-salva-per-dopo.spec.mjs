@@ -1,4 +1,4 @@
-// Verifica #839, giro 1 — «Salva per dopo» dal menu e da Alt+S: stessa miniatura piccola, stessa conferma, scheda chiusa.
+// Verifica #839, giro 1 — porte ri-provate e chiuse: miniatura piccola da menu e Alt+S, conferma di Alt+S, passata sulle vecchie.
 // Si parte dai passi dell'utente; le misure si leggono dallo storage vero del processo principale.
 
 import { test, expect, argomentiScala, chiudiApp } from '../../fixtures/electron.mjs';
@@ -26,14 +26,6 @@ const PAGINA_PESANTE = (titolo) => `<!doctype html><html><head><title>${titolo}<
   }
   const d = x.getImageData(0, 0, c.width, c.height);
   for (let i = 0; i < d.data.length; i += 4) { const n = (Math.random() - 0.5) * 40; d.data[i] += n; d.data[i+1] += n; d.data[i+2] += n; }
-  x.putImageData(d, 0, 0);
-</script></body></html>`;
-
-const PAGINA_RUMORE = `<!doctype html><html><head><title>Rumore</title></head><body style="margin:0">
-<canvas id="c" style="display:block"></canvas><script>
-  const c = document.getElementById('c'); c.width = innerWidth; c.height = innerHeight;
-  const x = c.getContext('2d'); const d = x.createImageData(c.width, c.height);
-  for (let i = 0; i < d.data.length; i++) d.data[i] = (i % 4 === 3) ? 255 : Math.random() * 255;
   x.putImageData(d, 0, 0);
 </script></body></html>`;
 
@@ -127,7 +119,6 @@ test('Alt+S: stessa conferma del menu, visibile, che apre la lista con la voce e
   expect(m.width).toBeGreaterThanOrEqual(300);
   expect(m.width).toBeLessThanOrEqual(340);
   expect(m.byte).toBeLessThan(60 * 1024);
-  // La miniatura non contiene la conferma: è stata scattata prima.
   await pill.click();
   const home = await attendiHome(app);
   expect(home, 'la conferma di Alt+S non apre la lista').toBeTruthy();
@@ -137,8 +128,9 @@ test('Alt+S: stessa conferma del menu, visibile, che apre la lista con la voce e
   await expect.poll(() => schedaAperta(app, url), { timeout: 8000 }).toBe(false);
 });
 
-test('Alt+S ripetuto in fretta, poi il menu: una voce sola, una conferma sola, una scheda chiusa', async ({ app, openTab, testServer }) => {
-  const altra = await pronta(openTab, testServer, PAGINA_PESANTE('Altra scheda'));
+test('Alt+S ripetuto in fretta: una voce sola, una conferma sola, chiusa solo la sua scheda', async ({ app, openTab, testServer }) => {
+  // Nome diverso: openTab cerca la scheda per nome dell'host.
+  const altra = await testServer.openReady(openTab, PAGINA_PESANTE('Altra scheda'), { pubblico: true });
   const altraUrl = altra.url();
   const page = await pronta(openTab, testServer, PAGINA_PESANTE('Doppio'));
   const url = page.url();
@@ -166,28 +158,6 @@ test('Alt+S col menu del tasto destro aperto: il menu sparisce e la miniatura re
   expect(v?.thumbnail).toBeTruthy();
   const m = await misura(app, v.thumbnail);
   expect(m.byte).toBeLessThan(60 * 1024);
-});
-
-test('esplora: pagina fitta di dettagli (rumore) — c\'è comunque una miniatura?', async ({ app, openTab, testServer }) => {
-  const page = await pronta(openTab, testServer, PAGINA_RUMORE);
-  const url = page.url();
-  await premiAltS(app);
-  await expect(page.locator('.sn-save-confirm')).toBeVisible({ timeout: 5000 });
-  const v = await attendiMiniatura(app, url, 6000);
-  console.log('rumore', v?.thumbnail ? await misura(app, v.thumbnail) : 'NESSUNA MINIATURA');
-});
-
-test('esplora: Alt+S su una pagina ancora in caricamento', async ({ app, openTab, testServer, shell }) => {
-  // Pagina che non finisce di caricare: un'immagine che non risponde mai.
-  const url = testServer.html(`<!doctype html><html><head><title>Lenta</title></head><body><h1>Lenta</h1>
-    <script>document.write('<img src="http://127.0.0.1:9/mai.png">')</script></body></html>`);
-  const page = await openTab(url);
-  const t0 = Date.now();
-  await premiAltS(app);
-  let visto = false;
-  try { await page.locator('.sn-save-confirm').waitFor({ state: 'visible', timeout: 5000 }); visto = true; } catch (_) {}
-  await expect.poll(() => schedaAperta(app, url), { timeout: 10000 }).toBe(false);
-  console.log('lenta: conferma vista =', visto, 'chiusa dopo ms', Date.now() - t0, 'salvata =', (await salvate(app)).some((p) => p.url === url));
 });
 
 // Le miniature grandi di prima: si prepara lo storage di un utente vero e si riapre Filo.
