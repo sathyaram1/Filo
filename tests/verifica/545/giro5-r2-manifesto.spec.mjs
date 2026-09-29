@@ -7,5 +7,5 @@ const require = createRequire(import.meta.url);
 test('il manifesto nomina le scorciatoie dei moduli dell\'Editor', () => {
   require('../../../src/shared/capabilities.js');
   const voce = JSON.stringify(globalThis.SN_CAPABILITIES.get('editor'));
-  expect(voce).toMatch(/(scorciatoi[^.]*modul|modul[^.]*scorciatoi)/i);
+  expect(/(scorciatoi[^.]*modul|modul[^.]*scorciatoi)/i.test(voce), 'la voce «editor» non dice che un modulo prende una scorciatoia').toBe(true);
 });
