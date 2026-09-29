@@ -13,8 +13,8 @@
     // un link a un file). Sopravvive al riavvio: la pagina elenco (#410.3) la
     // legge da qui. Schema per voce: vedi src/main/services/downloads.js.
     DOWNLOADS: 'downloads',
-    // §3.1 — tab archiviate (chiuse = salvate). Metadati per tab: vedi
-    // services/archivedTabs.js. Mostrate in filo://archive raggruppate per giorno.
+    // §3.1 — dove stavano le tab archiviate prima di avere file propri: serve
+    // solo alla migrazione in services/archivedTabs.js.
     ARCHIVED_TABS: 'archivedTabs',
     // Deck builder Commander (DECK-BUILDER-SPEC.md §13.1): lista dei mazzi,
     // storage interamente locale. Vedi src/main/services/deckStore.js.
@@ -2560,19 +2560,11 @@
   // Lasciamo abbondante margine per gli altri consumer.
   const HISTORY_LIMIT_BYTES = 4 * 1024 * 1024; // 4MB
   const SAVED_PAGES_LIMIT = 1000;
-  // §3.1 — cap tab archiviate. ~1-2 KB/tab di metadati → 10k tab ≈ 20 MB, ma
-  // chrome.storage.local è ~10 MB condiviso: teniamo un cap prudente e ruotiamo
-  // le più vecchie. (Riassunto/embedding §3.2 sono rimandati: per ora solo metadati.)
-  const ARCHIVED_TABS_LIMIT = 5000;
   // §3.2 ricerca semantica: dimensione del vettore di indicizzazione
-  // (Matryoshka: 256 dim = buon compromesso qualità/peso). I vettori si
-  // quantizzano a int8 e si tengono solo sulle ultime ARCHIVED_EMBED_LIMIT tab
-  // (le più recenti) per non sforare la quota di chrome.storage.
-  // QUALE modello indicizza NON si decide qui: è la funzione ARCHIVE_EMBED,
-  // impostabile come tutte le altre (prima era un nome scritto in questo file,
-  // quindi nessuno poteva vederlo né cambiarlo).
+  // (Matryoshka: 256 dim = buon compromesso qualità/peso), quantizzato a int8.
+  // L'archivio delle schede non ha tetti (patterns/un-archivio-che-cresce-sta-in-file-suoi-a-sole-aggiunte.md).
+  // QUALE modello indicizza NON si decide qui: è la funzione ARCHIVE_EMBED.
   const EMBED_DIM = 256;
-  const ARCHIVED_EMBED_LIMIT = 2000;
   // #525 — quanta parte della trascrizione di una chat viene mandata al
   // modello che le assegna titolo e tipo. Non è un tetto su ciò che si
   // CONSERVA (una chat si salva sempre intera): è solo quanto basta a
@@ -2661,9 +2653,7 @@
     HISTORY_ITEMS_HARD_CAP,
     FILO_CHAT_TRIAGE_CHARS,
     SAVED_PAGES_LIMIT,
-    ARCHIVED_TABS_LIMIT,
     EMBED_DIM,
-    ARCHIVED_EMBED_LIMIT,
     AI_CACHE_MAX_ENTRIES,
     CLIPBOARD_HISTORY_MAX,
     PAGES_WITHOUT_MENU_PREFIXES,

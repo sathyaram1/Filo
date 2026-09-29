@@ -11,11 +11,12 @@
 //    quando la si chiude è una chat persa ogni volta che l'app muore a metà
 //    discussione — cioè proprio nel caso in cui il salvataggio serviva. Ogni
 //    messaggio (dell'utente e di Filo) finisce su disco appena esiste.
-//  • **Passa da chrome.storage.local**, come l'archivio delle schede. Non è
+//  • **Passa da chrome.storage.local.** Non è
 //    un dettaglio di comodità: è lì che vive la garanzia dell'incognito (vedi
 //    src/main/shim/storage.js, allowlist fail-closed). Scrivendo file per
 //    conto nostro, una chat fatta in una finestra incognito resterebbe su
-//    disco.
+//    disco, a meno di rifare la garanzia a mano come l'archivio delle schede
+//    (patterns/un-archivio-che-cresce-sta-in-file-suoi-a-sole-aggiunte.md).
 //
 // Niente cap sul numero di chat: il cap È la cancellazione automatica che il
 // feedback esclude. Una chat pesa qualche KB; la pulizia in blocco, se mai
