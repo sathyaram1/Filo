@@ -4241,33 +4241,46 @@ async function embedTexts(texts, settingsIn) {
   return { vectors: r.vectors || [], model: a.model };
 }
 
-// Reindicizza in background le schede i cui vettori vengono da un altro modello
-// (o mancano): tutte, a blocchi, le più recenti prima, una sola corsa alla volta.
-// Un vettore salvato resta finché resta la scheda, quindi ogni scheda si paga una
-// volta per modello (poche decine di parole: costo irrisorio).
-let reindexRunning = false;
-async function reindexArchivedEmbeddings(settings, items) {
-  if (reindexRunning || !items.length) return;
-  reindexRunning = true;
-  try {
-    for (let i = 0; i < items.length; i += 50) {
-      const batch = items.slice(i, i + 50);
-      const texts = batch.map((it) =>
-        `${it.title || ''}\n${it.summary || it.snippet || ''}`.replace(/\s+/g, ' ').trim().slice(0, 4000));
-      const emb = await embedTexts(texts, settings);
-      if (!emb) return;
-      for (let k = 0; k < batch.length; k++) {
-        const v = emb.vectors[k];
-        if (v && v.length) {
-          await ArchivedTabs.update(batch[k].id, { embedding: quantizeEmbedding(v), embedModel: emb.model });
+// Indicizza le schede senza un vettore del modello in uso: tutte, a blocchi, più blocchi insieme, una corsa alla volta
+// (chi arriva mentre gira aspetta la stessa). Un vettore salvato resta finché resta la scheda: si paga una volta per modello.
+const REINDEX_BLOCCO = 50;
+const REINDEX_IN_PARALLELO = 4;
+let reindexInCorso = null;
+function reindexArchivedEmbeddings(settings, items) {
+  if (reindexInCorso) return reindexInCorso;
+  if (!items.length) return Promise.resolve();
+  reindexInCorso = (async () => {
+    const blocchi = [];
+    for (let i = 0; i < items.length; i += REINDEX_BLOCCO) blocchi.push(items.slice(i, i + REINDEX_BLOCCO));
+    let prossimo = 0;
+    let fermo = false;
+    const lavora = async () => {
+      while (!fermo && prossimo < blocchi.length) {
+        const batch = blocchi[prossimo++];
+        const texts = batch.map((it) =>
+          `${it.title || ''}\n${it.summary || it.snippet || ''}`.replace(/\s+/g, ' ').trim().slice(0, 4000));
+        let emb = null;
+        try { emb = await embedTexts(texts, settings); } catch (e) {
+          console.warn('[SN] reindicizzazione archivio fallita:', e.message || e);
+        }
+        if (!emb) { fermo = true; return; }
+        for (let k = 0; k < batch.length; k++) {
+          const v = emb.vectors[k];
+          if (v && v.length) {
+            await ArchivedTabs.update(batch[k].id, { embedding: quantizeEmbedding(v), embedModel: emb.model });
+          }
         }
       }
-    }
-  } catch (e) {
-    console.warn('[SN] reindicizzazione archivio fallita:', e.message || e);
-  } finally {
-    reindexRunning = false;
-  }
+    };
+    await Promise.all(Array.from({ length: Math.min(REINDEX_IN_PARALLELO, blocchi.length) }, lavora));
+  })().finally(() => { reindexInCorso = null; });
+  return reindexInCorso;
+}
+
+// Le parole di una ricerca, per confrontarle col testo delle schede che un vettore non ce l'hanno ancora.
+function paroleDellaRicerca(testo) {
+  return String(testo || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u).filter((p) => p.length > 1);
 }
 
 // §3.1/§3.2 — arricchisce una tab archiviata: genera un riassunto LLM, lo
