@@ -246,6 +246,53 @@ function attendiCaricamento(wc, ms) {
   });
 }
 
+function misuraFinestra(wc) {
+  try {
+    const { BrowserWindow } = require('electron');
+    const w = (BrowserWindow.fromWebContents && BrowserWindow.fromWebContents(wc))
+      || BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+    const [width, height] = w.getContentSize();
+    if (width > 200 && height > 200) return { width, height };
+  } catch (_) {}
+  return { width: 1280, height: 800 };
+}
+
+// La scheda in secondo piano è grande 0×0: un riquadro alto «100vh», l'app a tutta pagina, il riquadro incorporato
+// largo «100%» misurano zero e sembrano invisibili. Per la lettura la pagina si impagina come in una finestra vera.
+const impaginate = new Map();
+async function conMisuraVera(wc, leggi) {
+  let st = impaginate.get(wc);
+  if (!st) {
+    let dim = null;
+    try {
+      dim = await conScadenza(wc.executeJavaScriptInIsolatedWorld(MONDO_ISOLATO, [{ code: '[innerWidth, innerHeight]' }]), 2000);
+    } catch (_) {}
+    if (!Array.isArray(dim) || (dim[0] > 2 && dim[1] > 2) || typeof wc.enableDeviceEmulation !== 'function') return leggi();
+    st = impaginate.get(wc);
+    if (!st) {
+      const viewSize = misuraFinestra(wc);
+      st = { n: 0, pronta: null };
+      impaginate.set(wc, st);
+      try {
+        wc.enableDeviceEmulation({
+          screenPosition: 'desktop', screenSize: viewSize, viewSize, viewPosition: { x: 0, y: 0 }, deviceScaleFactor: 0, scale: 1,
+        });
+      } catch (_) {}
+      st.pronta = new Promise((r) => setTimeout(r, 150));
+    }
+  }
+  st.n++;
+  try {
+    await st.pronta;
+    return await leggi();
+  } finally {
+    if (--st.n === 0) {
+      impaginate.delete(wc);
+      try { if (!wc.isDestroyed()) wc.disableDeviceEmulation(); } catch (_) {}
+    }
+  }
+}
+
 async function leggiDallaScheda(wc) {
   if (!wc || (typeof wc.isDestroyed === 'function' && wc.isDestroyed())) return null;
   if (typeof wc.isLoading === 'function' && wc.isLoading()) {
@@ -255,7 +302,7 @@ async function leggiDallaScheda(wc) {
   }
   if (typeof wc.isDestroyed === 'function' && wc.isDestroyed()) return null;
   const codice = `(${serializzaVisibile.toString()})()`;
-  const r = await conScadenza(wc.executeJavaScriptInIsolatedWorld(MONDO_ISOLATO, [{ code: codice }]), 8000);
+  const r = await conMisuraVera(wc, () => conScadenza(wc.executeJavaScriptInIsolatedWorld(MONDO_ISOLATO, [{ code: codice }]), 8000));
   return r && typeof r.html === 'string' ? r : null;
 }
 
