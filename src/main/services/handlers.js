@@ -3413,6 +3413,7 @@ function ammessaDaUnSito(msg, sender) {
     inVista: inPrimoPiano(sender),
     schedaInVista: schedaInPrimoPiano(sender),
     disegnoSullaBarra: Boolean(sender?.win?._filoDisegnoSullaBarra),
+    indirizzi: indirizziDelMittente(sender),
   }, msg);
   if (!ammessa || !vuoleUnGesto(type, msg)) return ammessa;
   return require('./permessiPagine').gestoPerFilo(sender?.wc, DOMANDE_WEB_UNA_PER_GESTO.has(type) ? type : null);
