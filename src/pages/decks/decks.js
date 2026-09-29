@@ -886,7 +886,7 @@
     if (!deck || !(chatByDeck.get(deck.id) || []).length) return;
     const ok = await window.SN_CONFIRM_UI.confirm({
       title: 'Svuotare la chat?',
-      text: `La conversazione con Filo su "${deck.nome}" verrà cancellata. Il mazzo resta com'è.`,
+      text: `La conversazione su "${deck.nome}" sparisce per sempre. Il mazzo resta com'è.`,
       okLabel: 'Svuota',
     });
     if (!ok) return;
@@ -969,7 +969,7 @@
     if (m.pending) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Filo sta pensando…</div></div>`;
     // Solo l'ultima bolla si riprova: rifarne una in mezzo metterebbe la risposta fuori posto.
     const retry = isLast ? '<button class="dk-retry" data-retry="1" title="Rimanda la stessa domanda">↻ Riprova</button>' : '';
-    if (m.interrupted) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta interrotta: la pagina si è chiusa prima che Filo finisse.</div>${retry}</div>`;
+    if (m.interrupted) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta interrotta. La pagina si è chiusa prima che Filo finisse.</div>${retry}</div>`;
     if (m.error) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>${retry}</div>`;
     const parts = [cotHtml(m)];
     if (m.reply) parts.push(`<p class="dk-msg-text">${proseHtml(m.reply)}</p>`);
@@ -1023,7 +1023,7 @@
     $('chatClear').hidden = msgs.length === 0;
     // Il placeholder resta come primo figlio; le bolle si rigenerano dopo.
     for (const el of [...log.querySelectorAll('.dk-msg')]) el.remove();
-    const cap = Chat.fits(msgs) ? '' : `<p class="dk-msg dk-chat-cap" role="status">Questa chat ha superato i ${Chat.MAX_MESSAGES.toLocaleString('it-IT')} messaggi: quelli nuovi non vengono più salvati. Svuotala per ripartire da zero.</p>`;
+    const cap = Chat.fits(msgs) ? '' : `<p class="dk-msg dk-chat-cap" role="status">Questa chat ha superato i ${Chat.MAX_MESSAGES.toLocaleString('it-IT')} messaggi e da qui in poi Filo non salva i nuovi. Svuotala per ripartire da zero.</p>`;
     $('chatEmpty').insertAdjacentHTML('afterend',
       msgs.map((m, i) => chatBubbleHtml(m, i === msgs.length - 1)).join('') + cap);
     // Lo svuotamento sopra fa collassare scrollHeight → il browser clampa

@@ -1,5 +1,5 @@
 // La chat del banco di lavoro di un mazzo resta dopo una ricarica e dopo un riavvio di Filo, mazzo per mazzo (#787).
-// Provider e Scryfall sono finti nel main, i messaggi viaggiano sul cammino IPC vero della pagina. Si asserisce quello
+// Provider e Scryfall sono finti nel main; i messaggi viaggiano sul cammino IPC vero della pagina. Si asserisce quello
 // che vede l'utente: bolle e liste di nuovo lì, il + che mette la carta nel mazzo, lo storico che arriva al modello.
 
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
@@ -307,20 +307,27 @@ test('chiusa la pagina mentre Filo risponde: alla riapertura la risposta è «in
   await expect(page.locator('.dk-msg-user')).toHaveCount(1);
 });
 
-test('un\'altra scheda sullo stesso mazzo vede la conversazione aggiornarsi da sola', async ({ app, openTab }) => {
+test('un\'altra scheda sullo stesso mazzo vede la conversazione aggiornarsi da sola', async ({ app, shell, openTab }) => {
   test.setTimeout(60_000);
   await mockScryfall(app);
   await mockProvider(app);
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
-  const deckId = await newDeckWithCommander(page);
+  await newDeckWithCommander(page);
   await ask(page, 'prima domanda');
 
-  const shell = app.windows().find((w) => { try { return new URL(w.url()).hostname === 'shell'; } catch (_) { return false; } });
-  const url = `filo://decks/decks.html#/deck/${encodeURIComponent(deckId)}`;
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-  await expect.poll(() => app.windows().filter((w) => w.url() === url || w.url().startsWith('filo://decks/')).length).toBeGreaterThan(1);
-  const other = app.windows().filter((w) => w.url().startsWith('filo://decks/')).find((w) => w !== page);
+  // La pagina dei mazzi è una scheda sola: la seconda si ottiene con «Duplica scheda».
+  const before = new Set(app.windows());
+  await shell.evaluate(async () => {
+    const snap = await window.filoShell.tabs.snapshot();
+    await window.filoShell.tabs.duplicate(snap.activeId);
+  });
+  let other = null;
+  await expect.poll(() => {
+    other = app.windows().find((w) => !before.has(w) && w.url().startsWith('filo://decks/')) || null;
+    return Boolean(other);
+  }).toBe(true);
+  await other.waitForLoadState('domcontentloaded');
   await expect(other.locator('.dk-msg-user')).toHaveText(['prima domanda']);
 
   await ask(page, 'seconda domanda');
@@ -349,7 +356,8 @@ test('chi supera il tetto di messaggi lo vede scritto', async ({ app, openTab })
   await expect(page.locator('.dk-chat-cap')).toHaveCount(0);
   await ask(page, 'una di troppo');
   await expect(page.locator('.dk-chat-cap')).toBeVisible();
-  await expect(page.locator('.dk-chat-cap')).toContainText(max.toLocaleString('it-IT'));
+  const scritto = await page.evaluate((n) => n.toLocaleString('it-IT'), max);
+  await expect(page.locator('.dk-chat-cap')).toContainText(scritto);
 });
 
 test('riavviato Filo, la chat del mazzo è ancora lì e il + funziona', async () => {

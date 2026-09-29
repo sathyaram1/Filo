@@ -278,6 +278,7 @@ Rispettare i rate limit di cortesia (~10 req/s); tutte le risorse statiche cache
 | Prezzi | scryfall_id | TTL (ore) |
 | Tag context-free | (carta, tag) | Permanente, cross-mazzo |
 | Pareri | (carta, versione mazzo) | Fino a refresh; stantio marcato dopo edit |
+| Chat del banco (bolle come dati, §3.2) | mazzo | Fino a «Svuota la chat» o all'eliminazione del mazzo |
 
 ---
 
