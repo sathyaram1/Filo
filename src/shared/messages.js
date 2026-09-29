@@ -117,7 +117,7 @@
     // Se non c'è una versione vista (primissimo avvio) la marca come vista e
     // non ritorna note (niente popup a sorpresa). Vedi src/shared/patchNotes.js.
     GET_UPDATE_RECAP: 'get_update_recap',
-    // L'utente ha chiuso il recap: salva app.getVersion() come ultima vista.
+    // L'utente ha chiuso il recap: salva app.getVersion() come ultima vista, con la fotografia delle sue novità.
     MARK_UPDATE_SEEN: 'mark_update_seen',
     // Feedback dell'utente passati a `done` da quando non guardava (C5): il main
     // cerca su Firestore i feedback inviati da questo client, accredita la

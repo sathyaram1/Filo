@@ -207,15 +207,19 @@ riscrive. Sono TRE testi distinti:
    stanno solo nel report. Se non cambia niente di visibile, non si scrive.
 3. **Riga di changelog** in `src/shared/patchNotes.js`: solo se un utente
    qualunque può usare la cosa (superfici owner e parti interne no); una
-   riga, orientata al beneficio.
+   riga, orientata al beneficio, nel blocco in cima (vedi § Fonti di verità
+   singole).
 
 Prima di consegnare un testo destinato a un umano applica
 **`.claude/skills/unslop/SKILL.md`**.
 
 ## Fonti di verità singole (aggiornale nello stesso commit)
 
-- **`src/shared/patchNotes.js`**: changelog per l'utente comune, allineato a
-  `package.json`.
+- **`src/shared/patchNotes.js`**: changelog per l'utente comune. Il blocco in
+  cima porta il numero della prossima versione (`package.json` + 1 patch); se
+  quel numero è già uscito se ne apre uno nuovo, perché una riga sotto una
+  versione uscita non la vede chi aggiorna. Sentinella:
+  `tests/unit/patchNotes.test.mjs`.
 - **`src/shared/capabilities.js`**: manifesto di cosa sa fare Filo. Capacità
   nuova, cambiata o rimossa = voce aggiornata; una sentinella la confronta col
   codice.
