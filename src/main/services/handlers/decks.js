@@ -32,10 +32,42 @@ module.exports = function register(on, ctx) {
   on(MSG.DECKS_DELETE, async (msg) => {
     const id = String(msg?.id || '');
     const removed = await Store.remove(id);
-    // Mazzo eliminato → via anche i suoi pareri cacheati (la cache tag resta:
+    // Mazzo eliminato → via anche i suoi pareri cacheati e la sua chat (la cache tag resta:
     // è per carta, cross-mazzo). Best-effort: il delete non deve fallire per questo.
-    if (removed) await Opinions.dropDeck(id).catch(() => {});
+    if (removed) {
+      await Opinions.dropDeck(id).catch(() => {});
+      await Chats.dropDeck(id).catch(() => {});
+      broadcastToFiloPages({ type: MSG.DECKS_CHAT_CHANGED, deckId: id, clientId: '' });
+    }
     return { ok: removed, ...(removed ? {} : { error: 'not_found' }) };
+  });
+
+  // ── Chat per mazzo (§3.2) ─────────────────────────────────────────────────
+  // Solo le pagine filo:// (la chat la scrive la pagina dei mazzi); un sito non ha niente da leggere né da scrivere qui.
+  const isFilo = (origin) => String(origin || '').startsWith('filo://');
+  const changed = (deckId, clientId) => broadcastToFiloPages({
+    type: MSG.DECKS_CHAT_CHANGED, deckId, clientId: String(clientId || ''),
+  });
+
+  on(MSG.DECKS_CHAT_GET, async (msg, _sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    return { ok: true, messages: await Chats.get(String(msg?.deckId || '')) };
+  });
+
+  on(MSG.DECKS_CHAT_SAVE, async (msg, _sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    const deckId = String(msg?.deckId || '');
+    const r = await Chats.save(deckId, msg?.messages);
+    if (r.ok) changed(deckId, msg?.clientId);
+    return r;
+  });
+
+  on(MSG.DECKS_CHAT_CLEAR, async (msg, _sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    const deckId = String(msg?.deckId || '');
+    await Chats.dropDeck(deckId);
+    changed(deckId, msg?.clientId);
+    return { ok: true };
   });
 
   on(MSG.DECKS_DUPLICATE, async (msg) => {
