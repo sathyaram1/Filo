@@ -503,5 +503,7 @@
     inviteView, inviteStateLine, entryNoticeText,
     // Manopole e movimenti della pagina dell'owner (#652)
     OWNER_KNOBS, OWNER_KNOB_KEYS, knobOf, GRANT_LABELS, grantLabel,
+    // Le cifre dette fuori dalla pagina Crediti (#816)
+    formatCredits, PREMIO_ATTESA_MS, resolutionReward,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
