@@ -84,8 +84,25 @@
         const b = tryBase64(tok);
         if (b) pieces.push(b);
       }
+      const h = tryHex(tok);
+      if (h) pieces.push(h);
     }
-    return pieces.join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const alnum = pieces.join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    // Scritti al contrario: pezzi sotto le soglie della forma, che il controllo strutturale non vede (#553).
+    return `${alnum} ${[...alnum].reverse().join('')}`;
+  }
+
+  // Esadecimale che decodifica in testo stampabile: «4d6172696f» è «Mario».
+  function tryHex(tok) {
+    if (!/^(?:[0-9a-f]{2}){5,}$/i.test(tok)) return '';
+    let bin = '';
+    for (let i = 0; i < tok.length; i += 2) bin += String.fromCharCode(parseInt(tok.slice(i, i + 2), 16));
+    let printable = 0;
+    for (let i = 0; i < bin.length; i++) {
+      const c = bin.charCodeAt(i);
+      if (c >= 32 && c < 127) printable++;
+    }
+    return printable / bin.length > 0.85 ? bin : '';
   }
 
   // Token sensibili del corpus: parole alfanumeriche (≥ MIN_TOKEN) + indirizzi
