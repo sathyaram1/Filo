@@ -84,6 +84,8 @@
         const b = tryBase64(tok);
         if (b) pieces.push(b);
       }
+    }
+    for (const tok of joined.split(/[^0-9a-f]+/i)) {
       const h = tryHex(tok);
       if (h) pieces.push(h);
     }

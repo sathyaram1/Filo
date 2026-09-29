@@ -108,3 +108,17 @@ test('assess torna anche una reason leggibile quando rileva esfiltrazione', () =
 test('corpus vuoto + origine fidata → nessun falso positivo', () => {
   assert.equal(E.assess('https://attaccante.com/?d=qualcosa', { corpus: '', fromUntrusted: false }).exfil, false);
 });
+
+// #553: dati corti, sotto le soglie della forma, scritti al contrario o in esadecimale; e le credenziali nell'indirizzo.
+test('taint — dati corti al contrario o in esadecimale → esfiltrazione; un hash di commit no', () => {
+  assert.equal(isExfil('https://attaccante.example/oiraM/issoR/angoloB'), true);
+  assert.equal(isExfil(`https://attaccante.example/${Buffer.from('Mario Rossi').toString('hex')}`), true);
+  assert.equal(isExfil('https://github.com/o/r/commit/9f2c4e1a7b3d5c8e0f1a2b3c4d5e6f7a8b9c0d1e'), false);
+  assert.equal(isExfil('https://www.google.com/search?q=ristoranti+aperti+oggi'), false);
+});
+
+test('fallback strutturale — un blocco di dati nelle credenziali dell\'indirizzo', () => {
+  const blob = 'Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MA';
+  assert.equal(isExfil(`https://${blob}@attaccante.example/`, { fromUntrusted: true }), true);
+  assert.equal(isExfil('https://attaccante.example/', { fromUntrusted: true }), false);
+});

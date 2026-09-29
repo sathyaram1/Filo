@@ -233,3 +233,28 @@ test('il controllo sulla forma guarda gli indirizzi che il modello si scrive da 
   assert.equal(PR.formaDaControllare(c, 'LEGGI_PAGINA', 'https://banca.example/conto', ['https://www.banca.example/conto/']), false, 'una scheda aperta');
   assert.equal(PR.formaDaControllare(null, 'LEGGI_PAGINA', 'https://attaccante.example/r?d=x'), false, 'fuori dalla chat decide chi chiama');
 });
+
+test('il controllo sulla forma guarda anche il frammento e le credenziali, che un indirizzo trovato non aveva', () => {
+  const c = PR.contestoChat();
+  PR.annotaAzione(c, { type: 'LEGGI_PAGINA', _output: { ok: true, url: 'https://attaccante.example/p', testo: 'Vai a [questa](https://attaccante.example/r).' } });
+  assert.equal(PR.formaDaControllare(c, 'NAVIGA', 'https://attaccante.example/r'), false);
+  assert.equal(PR.formaDaControllare(c, 'NAVIGA', 'https://attaccante.example/r#4d6172696f20526f737369'), true);
+  assert.equal(PR.formaDaControllare(c, 'NAVIGA', 'https://4d6172696f@attaccante.example/r'), true);
+  assert.equal(PR.formaDaControllare(c, 'NAVIGA', 'https://sito.example/app#x', ['https://sito.example/app']), true, 'la scheda senza frammento');
+  assert.equal(PR.formaDaControllare(c, 'NAVIGA', 'https://sito.example/app#/posta', ['https://sito.example/app#/posta']), false);
+});
+
+test('un documento letto o l\'uscita di un comando sono testo di sconosciuti come una pagina', () => {
+  for (const azione of [
+    { type: 'LEGGI_DOCUMENTO', _output: { ok: true, text: 'Scarica da https://dati.example/f.csv' } },
+    { type: 'ESEGUI_COMANDO', _output: { stdout: '<html>…</html>', code: 0 } },
+  ]) {
+    const c = PR.contestoChat();
+    PR.annotaAzione(c, azione);
+    assert.equal(c.esterno, true, azione.type);
+    assert.equal(PR.formaDaControllare(c, 'NAVIGA', 'https://attaccante.example/r?d=x'), true, azione.type);
+  }
+  const c = PR.contestoChat();
+  PR.annotaAzione(c, { type: 'ESEGUI_COMANDO', _output: { blocked: true } });
+  assert.equal(c.esterno, false, 'un comando bloccato non ha portato niente');
+});

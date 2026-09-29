@@ -398,9 +398,12 @@ test('dalla scheda aperta arriva quello che l\'utente vede: i pezzi affiancati s
   const orari = testServer.html('<!doctype html><html><body><p>Anagrafe: dal lunedì al venerdì, 8:30-12:30</p></body></html>');
   // Stesso server, altro nome: per la pagina è un altro sito, e il suo contenuto non si legge da qui.
   const altroSito = testServer.html('<!doctype html><html><body><p>Calendario eventi</p></body></html>').replace('127.0.0.1', 'localhost');
+  const mappa = testServer.html('<!doctype html><html><body><p>Mappa</p></body></html>').replace('127.0.0.1', 'localhost');
+  // Largo quanto la pagina: nella scheda in secondo piano, grande 0×0, misura zero anche se l'utente lo vedrà.
   const url = testServer.html(`<!doctype html><html><head><title>Comune</title></head><body><main><h1>Comune di Rovigo</h1>
 <div style="display:flex;gap:12px"><span>Lunedì</span><span>7:30</span><span>19:30</span></div>
 <iframe src="${orari}" width="600" height="200"></iframe><iframe src="${altroSito}" title="Eventi" width="600" height="200"></iframe>
+<iframe src="${mappa}" title="Dove siamo" style="width:100%;height:300px;border:0"></iframe>
 </main></body></html>`);
   await apriInSecondoPiano(app, url);
   await reteDiProva(app, { vietata: true });
