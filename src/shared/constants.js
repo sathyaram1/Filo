@@ -130,6 +130,8 @@
     // all'avvio). All'avvio si confronta con app.getVersion(): se è più vecchia
     // e ci sono note (src/shared/patchNotes.js), mostra il recap. Vedi C4.
     LAST_SEEN_VERSION: 'filo_last_seen_version',
+    // Le righe del blocco più recente di quella versione, come impronte (patchNotes.fotografia).
+    LAST_SEEN_NOTES: 'filo_last_seen_notes',
     // Regole proxy persistenti per dominio (#152): "questo sito sempre da
     // <paese>". Oggetto { <dominio registrabile>: { country, tier?, ts } }.
     // Alla navigazione verso il dominio la tab nasce già instradata da quel
