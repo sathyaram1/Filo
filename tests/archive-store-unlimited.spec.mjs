@@ -15,8 +15,10 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { createRequire } from 'node:module';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const { buildExportZip } = createRequire(import.meta.url)('../src/main/services/exportData.js');
 
 // Modelli locali, chiave finta, indicizzazione finta che riconosce «gattopardo»; ogni chiamata si registra.
 async function preparaModelli(app) {
@@ -429,4 +431,63 @@ test('cambiato il modello di indicizzazione, l\'archivio si rifà da solo senza 
   await expect.poll(() => app.evaluate(async () =>
     (await globalThis.SN_ARCHIVED_TABS.list()).filter((t) => t.embedModel === 'qwen/altro-embed').length),
   { timeout: 20_000 }).toBe(300);
+});
+
+// #825 giro 3: un backup importato a Filo acceso portava schede senza vettore, e l'indice aspettava la prima ricerca.
+test('un backup importato a Filo acceso si indicizza da solo, e la prima ricerca lo trova subito', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await preparaModelli(app);
+  const EM = await app.evaluate(() => globalThis.SN_TEST_MODELS.registry['qwen-embed'].model);
+  const vecchio = [];
+  for (let i = 0; i < 1500; i++) {
+    vecchio.push({
+      id: `b${i}`, url: `https://dal-backup-${i}.test/`, title: i === 1400 ? 'Il Gattopardo, riassunto' : `Dal backup ${i}`,
+      closedAt: new Date(Date.UTC(2026, 8, 1) - i * 3600e3).toISOString(), reason: 'manual', coOpenUrls: [],
+      // Un backup della versione di prima: vettore solo sulle più recenti.
+      ...(i < 500 ? { embedding: [0, 127], embedModel: EM } : {}),
+    });
+  }
+  const dati = await cartellaDati(app);
+  const zip = join(dati, 'backup-vecchio-825.zip');
+  writeFileSync(zip, buildExportZip({ archivedTabs: vecchio }));
+  await app.evaluate(({ dialog }, z) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [z] }); }, zip);
+
+  const page = await openTab('filo://newtab/');
+  const anteprima = await page.evaluate(async () => chrome.runtime.sendMessage({ type: 'import_data_preview' }));
+  expect(anteprima.ok).toBe(true);
+  const esito = await page.evaluate(async (t) => chrome.runtime.sendMessage({ type: 'import_data_apply', token: t }), anteprima.token);
+  expect(esito.ok).toBe(true);
+
+  // Nessuna ricerca: l'indice delle schede importate si fa da sé.
+  await expect.poll(() => app.evaluate(async (_e, em) =>
+    (await globalThis.SN_ARCHIVED_TABS.list()).filter((t) => t.embedModel !== em).length, EM), { timeout: 30_000 }).toBe(0);
+  await app.evaluate(() => { globalThis.__embedCalls = []; });
+  const r = await cerca(page, 'gattopardo');
+  expect(r.results[0].title).toBe('Il Gattopardo, riassunto');
+  expect(await app.evaluate(() => globalThis.__embedCalls)).toEqual([['gattopardo']]);
+});
+
+test('una scheda chiusa si indicizza una volta sola, anche se il suo riassunto tarda', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await preparaModelli(app);
+  await app.evaluate(() => {
+    globalThis.SN_PROVIDERS.completeWithFallback = async () => {
+      await new Promise((ok) => setTimeout(ok, 4000));
+      return { text: 'Riassunto lento della pagina 825.', provider: 'openrouter', model: 'stub', usage: {} };
+    };
+  });
+  const url = testServer.html('<!doctype html><title>Chiusa una volta 825</title><body>contenuto</body>', { pubblico: true });
+  await openTab(url);
+  await testServer.openReady(openTab, '<!doctype html><title>Altra</title><body>altra</body>', { pubblico: true });
+  const snap = await shell.evaluate(async () => window.filoShell.tabs.snapshot());
+  const t = snap.tabs.find((x) => x.url === url);
+  await shell.evaluate(async (i) => window.filoShell.tabs.close(i), t.id);
+  await expect.poll(() => app.evaluate(async (_e, u) => {
+    const e = (await globalThis.SN_ARCHIVED_TABS.list()).find((x) => x.url === u);
+    return !!(e && e.embedding && e.summary);
+  }, url), { timeout: 15_000 }).toBe(true);
+  // Oltre l'indice programmato all'ingresso della scheda: nessuna chiamata in più per lei.
+  await new Promise((ok) => setTimeout(ok, 3000));
+  const perLei = await app.evaluate(() => globalThis.__embedCalls.filter((c) => c.some((x) => /825/.test(x))).length);
+  expect(perLei).toBe(1);
 });

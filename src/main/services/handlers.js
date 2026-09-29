@@ -3900,8 +3900,8 @@ try {
       if (a && a.model !== indiceModello) programmaIndiceArchivio(2000);
     }).catch(() => {});
   });
-  ArchivedTabs.suEntrate(() => programmaIndiceArchivio(2000));
   programmaIndiceArchivio(10_000);
+  ArchivedTabs.suEntrate(() => programmaIndiceArchivio(2000));
 } catch (_) {}
 
 // Testo senza accenti e minuscolo, per confrontare una ricerca con le schede che un vettore non ce l'hanno ancora.
