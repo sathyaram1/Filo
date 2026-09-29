@@ -110,7 +110,7 @@
       id: 'auto-archive', title: 'Archiviazione automatica delle schede', category: 'navigation',
       desc: 'Le schede lasciate inattive a lungo vengono archiviate da sole; il riordino collassa anche le schede «Nuova scheda»/home aperte più volte in una sola e chiude le pagine di impostazioni che non stai più usando (restano sempre raggiungibili), per tenere pulita la barra.',
       invoke: 'Automatico (soglia e attivazione in Preferenze); a richiesta con il comando /pulisci o il pulsante «Riordina e archivia le schede» nella home.',
-      doesNot: 'Non tocca le finestre in incognito, la scheda attiva, le schede con audio in riproduzione o con un modulo compilato non inviato, né le pagine di lavoro interne di Filo (Editor, Bacheca, Mazzi, Cronologia). Delle pagine della rete di casa (router, NAS, stampanti) al modello non arrivano titolo, indirizzo e testo.',
+      doesNot: 'Non tocca le finestre in incognito, la scheda attiva, le schede con audio in riproduzione o con del testo scritto in un modulo e non ancora inviato, né le pagine di lavoro interne di Filo (Editor, Bacheca, Mazzi, Cronologia). Delle pagine della rete di casa (router, NAS, stampanti) al modello non arrivano titolo, indirizzo e testo.',
     },
     {
       id: 'reorder-tabs', title: 'Riordina le schede per colore', category: 'navigation',

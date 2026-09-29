@@ -181,3 +181,139 @@ test('l’agente può lanciare la pulizia su richiesta (RUN_TAB_TRIAGE)', async 
   expect(state.titles).not.toContain('Due');
   expect(/filo:\/\/options/.test(state.activeUrl || '')).toBe(true);
 });
+
+// #824 — il testo scritto in un modulo e non inviato non si perde mai per la
+// pulizia, qualunque cosa decida il modello: la scheda resta aperta.
+
+async function apriEsatta(app, shell, url) {
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  let page = null;
+  await expect.poll(() => {
+    page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } });
+    return !!page;
+  }, { timeout: 10_000 }).toBe(true);
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+  return page;
+}
+
+const moduloDi = (shell, title) => shell.evaluate(async (t) => {
+  const s = await window.filoShell.tabs.snapshot();
+  const tab = s.tabs.find((x) => x.title === t);
+  return tab ? tab.formDirty : null;
+}, title);
+
+const PAGINA_MODULO = `<!doctype html><html><head><title>Modulo</title></head><body>
+  <form onsubmit="event.preventDefault()"><textarea id="messaggio"></textarea><button>Invia</button></form>
+</body></html>`;
+
+test('/pulisci e il bottone della home non chiudono la scheda con un modulo scritto e non inviato (#824)', async ({ app, shell, testServer, openTab }) => {
+  await apriEsatta(app, shell, testServer.html(mk('Alpha', 'rgb(200,40,40)')));
+  const modulo = await apriEsatta(app, shell, testServer.html(PAGINA_MODULO));
+  const TESTO = 'Gentile assistenza, vi scrivo perché il mio ordine 🚚 <b>non</b> è arrivato';
+  await modulo.locator('#messaggio').fill(TESTO);
+  await expect.poll(() => moduloDi(shell, 'Modulo'), { timeout: 8_000 }).toBe(true);
+  await apriEsatta(app, shell, testServer.html(mk('Bravo', 'rgb(40,80,200)')));
+  // La richiesta parte da una pagina di Filo, come /pulisci e il bottone della home.
+  const dash = await openTab('filo://options/options.html');
+
+  // Il modello decide di archiviare TUTTO, anche la scheda col modulo.
+  await app.evaluate(async () => {
+    globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({
+      decisions: tabs.map((t, i) => ({ i, action: 'archive', reason: 'pulizia' })),
+    });
+  });
+  const res = await dash.evaluate(async () => await chrome.runtime.sendMessage({ type: 'run_tab_triage' }));
+  expect(res.ok).toBe(true);
+  expect(res.archived).toBeGreaterThanOrEqual(2);
+
+  const titoli = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.title));
+  expect(titoli).toContain('Modulo');
+  expect(titoli).not.toContain('Alpha');
+  expect(titoli).not.toContain('Bravo');
+  // Il testo è ancora lì, nella scheda rimasta aperta.
+  expect(await modulo.locator('#messaggio').inputValue()).toBe(TESTO);
+  await expect.poll(async () => app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).length), { timeout: 5_000 }).toBeGreaterThan(0);
+  const archiviate = await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((x) => x.title));
+  expect(archiviate).not.toContain('Modulo');
+});
+
+test('se l’utente scrive mentre il modello sta decidendo, quella scheda resta aperta (#824)', async ({ app, shell, testServer }) => {
+  await apriEsatta(app, shell, testServer.html(mk('Uno', 'rgb(200,40,40)')));
+  await apriEsatta(app, shell, testServer.html(mk('Due', 'rgb(40,80,200)')));
+  await apriEsatta(app, shell, testServer.html(mk('Tre', '')));
+
+  const res = await app.evaluate(async ({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => {
+      // A decisione in corso l'utente scrive in "Due": il segnale arriva adesso.
+      const due = win._filoTabs.tabs.find((t) => t.title === 'Due');
+      win._filoTabs.setTabActivity(due.id, { formDirty: true });
+      return { decisions: tabs.map((t, i) => ({ i, action: 'archive', reason: 'test' })) };
+    };
+    return win._filoTabs.runAutoTriage({ trigger: 'idle' });
+  });
+  expect(res.archived).toBeGreaterThanOrEqual(1);
+
+  const titoli = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.title));
+  expect(titoli).toContain('Due');
+  expect(titoli).toContain('Tre');
+  expect(titoli).not.toContain('Uno');
+});
+
+test('conta solo il testo ancora da inviare: spunte, invio e cambio pagina non proteggono la scheda (#824)', async ({ app, shell, testServer }) => {
+  const dopo = testServer.html(mk('Dopo', ''));
+  const page = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Campi</title></head><body>
+    <label><input type="checkbox" id="spunta"> ricordami</label>
+    <select id="scelta"><option>uno</option><option>due</option></select>
+    <textarea id="nota"></textarea>
+    <form id="ricerca" onsubmit="event.preventDefault()"><input id="q" type="search"><button>Cerca</button></form>
+    <a id="via" href="${dopo}">avanti</a>
+  </body></html>`));
+  const attesa = () => page.waitForTimeout(800);
+
+  await page.locator('#spunta').check();
+  await page.locator('#scelta').selectOption('due');
+  await attesa();
+  expect(await moduloDi(shell, 'Campi')).toBe(false);
+
+  await page.locator('#nota').fill('appunto a metà');
+  await expect.poll(() => moduloDi(shell, 'Campi'), { timeout: 8_000 }).toBe(true);
+
+  // Inviare la ricerca non cancella l'appunto scritto fuori dal modulo.
+  await page.locator('#q').fill('meteo');
+  await page.locator('#q').press('Enter');
+  await attesa();
+  expect(await moduloDi(shell, 'Campi')).toBe(true);
+
+  // Svuotato l'appunto non resta niente da perdere.
+  await page.locator('#nota').fill('');
+  await expect.poll(() => moduloDi(shell, 'Campi'), { timeout: 8_000 }).toBe(false);
+
+  await page.locator('#q').fill('treni per Roma');
+  await expect.poll(() => moduloDi(shell, 'Campi'), { timeout: 8_000 }).toBe(true);
+  await page.locator('#q').press('Enter');
+  await expect.poll(() => moduloDi(shell, 'Campi'), { timeout: 8_000 }).toBe(false);
+
+  // Una pagina nuova non eredita il testo di quella di prima.
+  await page.locator('#nota').fill('bozza');
+  await expect.poll(() => moduloDi(shell, 'Campi'), { timeout: 8_000 }).toBe(true);
+  await page.locator('#via').click();
+  await expect.poll(() => moduloDi(shell, 'Dopo'), { timeout: 8_000 }).toBe(false);
+});
+
+test('le impostazioni di Filo salvano da sole: scriverci non le protegge dalla pulizia (#824)', async ({ shell, openTab }) => {
+  const opzioni = await openTab('filo://options/options.html');
+  await opzioni.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+  await opzioni.evaluate(() => {
+    const el = document.querySelector('input[type="text"], input:not([type]), textarea');
+    el.value = 'prova';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await opzioni.waitForTimeout(800);
+  const sporca = await shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    const t = s.tabs.find((x) => /filo:\/\/options/.test(x.url || ''));
+    return t ? t.formDirty : null;
+  });
+  expect(sporca).toBe(false);
+});

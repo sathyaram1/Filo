@@ -513,16 +513,44 @@
       }, 500);
     }
 
-    // Form "sporco": primo input/change su un campo editabile. Si manda una volta.
+    // Campi con testo scritto e non ancora inviato: finché ce n'è uno la pulizia
+    // automatica non chiude la scheda (#824). Spunte e tendine non sono testo, e
+    // le impostazioni di Filo salvano ogni campo da sole.
+    const scritti = new Set();
+    const SI_SALVA_DA_SOLA = /^filo:\/\/(options|preferences)\//i.test(location.href);
+    const TIPI_DI_TESTO = /^(text|search|email|url|tel|password|number)$/;
+    function campoDiTesto(t) {
+      if (!t || !t.tagName) return null;
+      const tag = t.tagName.toUpperCase();
+      if (tag === 'TEXTAREA') return t;
+      if (tag === 'INPUT') return TIPI_DI_TESTO.test(String(t.type || 'text').toLowerCase()) ? t : null;
+      return t.isContentEditable ? t : null;
+    }
+    const senzaTesto = (el) => !el.isConnected || (!el.isContentEditable && !/\S/.test(el.value || ''));
+
+    function aggiornaModulo() {
+      for (const el of scritti) if (senzaTesto(el)) scritti.delete(el);
+      const ora = scritti.size > 0;
+      if (ora === formDirty) return;
+      formDirty = ora;
+      send({ formDirty: ora, scrollPct: Math.round(scrollPct()) });
+    }
+
     function onFormInput(e) {
-      if (formDirty) return;
-      const t = e.target;
-      if (!t) return;
-      const tag = (t.tagName || '').toUpperCase();
-      const editable = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable;
-      if (!editable) return;
-      formDirty = true;
-      send({ formDirty: true, scrollPct: Math.round(scrollPct()) });
+      if (SI_SALVA_DA_SOLA) return;
+      // composedPath: un campo dentro uno shadow root arriva qui come il suo host.
+      const el = campoDiTesto((e.composedPath && e.composedPath()[0]) || e.target);
+      if (!el) return;
+      scritti.add(el);
+      aggiornaModulo();
+    }
+
+    // Il modulo inviato non ha più niente da perdere; i campi scritti fuori sì.
+    function onSubmit(e) {
+      const form = e.target;
+      if (!form || !scritti.size) return;
+      for (const el of scritti) if (el.form === form || (form.contains && form.contains(el))) scritti.delete(el);
+      aggiornaModulo();
     }
 
     window.addEventListener('pointerdown', onInteract, { passive: true, capture: true });
@@ -530,6 +558,7 @@
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('input', onFormInput, { passive: true, capture: true });
     window.addEventListener('change', onFormInput, { passive: true, capture: true });
+    window.addEventListener('submit', onSubmit, { passive: true, capture: true });
 
     // Primo campione dello scroll iniziale (alcune pagine aprono già scrollate).
     setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);

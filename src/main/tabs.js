@@ -1227,15 +1227,20 @@ class TabManager {
     this._lastAppInteractionAt = Date.now();
   }
 
+  // Mai chiuse dalla pulizia, qualunque cosa decida il modello: l'attiva, quella
+  // con audio, quella con testo scritto e non inviato (#824, spec §2.1).
+  _intoccabileDalTriage(tab) {
+    return tab.id === this.activeId || !!tab.audible || !!tab.formDirty;
+  }
+
   // Candidati archiviabili: schede web + pagine interne EFFIMERE (home/nuova
-  // scheda, impostazioni), non attiva, non in riproduzione audio. Prima erano
-  // esclusi TUTTI i filo:// interni, quindi il riordino poteva chiudere un sito
-  // (es. YouTube) ma mai le impostazioni aperte o le home duplicate. (Incognito
-  // è escluso a monte: niente timer in incognito.)
+  // scheda, impostazioni). Prima erano esclusi TUTTI i filo:// interni, quindi
+  // il riordino poteva chiudere un sito (es. YouTube) ma mai le impostazioni
+  // aperte o le home duplicate. (Incognito è escluso a monte.)
   _triageCandidates() {
     const T = globalThis.SN_TAB_TRIAGE;
     return this.tabs.filter((t) => {
-      if (t.id === this.activeId || t.audible) return false;
+      if (this._intoccabileDalTriage(t)) return false;
       if (T) return T.isTriageableUrl(t.url);
       return !t.isInternal && /^https?:\/\//i.test(t.url || '');
     });
@@ -1320,9 +1325,9 @@ class TabManager {
     }
   }
 
-  // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive' (mai la
-  // attiva o con audio — salvaguardia), poi riordina cromaticamente i superstiti
-  // (§1.3) e mostra il toast (§2.3). `cands` è l'elenco indicizzato passato all'LLM.
+  // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive', poi
+  // riordina cromaticamente i superstiti (§1.3) e mostra il toast (§2.3).
+  // `cands` è l'elenco indicizzato passato all'LLM.
   applyTriageDecisions(cands, decisions) {
     const byIndex = new Map();
     for (const d of (decisions || [])) {
@@ -1332,7 +1337,8 @@ class TabManager {
     cands.forEach((tab, i) => {
       const d = byIndex.get(i);
       if (!d || d.action !== 'archive') return;
-      if (tab.id === this.activeId || tab.audible) return; // salvaguardia dura
+      // Ricontrollata qui: mentre il modello rispondeva l'utente può aver scritto.
+      if (this._intoccabileDalTriage(tab)) return;
       toArchive.push({ tab, reason: d.reason || 'auto' });
     });
 
@@ -2128,6 +2134,9 @@ class TabManager {
         url: userUrl(url),
         color: null,
         identityColor: cachedIdentity,
+        // Il testo scritto nel documento vecchio è stato inviato o è già perso:
+        // senza, una ricerca fatta una volta proteggerebbe la scheda per sempre (#824).
+        formDirty: false,
         canBack: canGoBack(wc),
         canFwd: canGoFwd(wc),
       });
