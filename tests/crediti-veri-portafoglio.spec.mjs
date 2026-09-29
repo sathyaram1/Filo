@@ -245,3 +245,22 @@ test('riquadro della risoluzione col portafoglio: la cifra del server, l\'archiv
   await expect(primo).toContainText('+50', { timeout: 15_000 });
   await expect(primo).toContainText('Segnalazione risolta');
 });
+
+test('riquadro con sole segnalazioni chiuse senza modifiche: il congedo non festeggia', async ({ app }) => {
+  const page = await homeDiAvvio(app);
+  await page.waitForTimeout(500);
+  await riscatta(app);
+  const adesso = new Date().toISOString();
+  await semina(app, [
+    { _id: 'fbDoppione', status: 'archived', statusPublic: 'closed', name: 'Un doppione', seq: 804, subSeq: 0, userNote: '', reward: 50, createdAt: adesso, resolvedAt: adesso },
+  ]);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('#thanksOverlay')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.dash-recap-title')).toHaveText('Grazie! Il tuo feedback è stato chiuso');
+  await expect(page.locator('.dash-thanks-total')).toHaveCount(0);
+  await expect(page.locator('.dash-recap-done')).toHaveText('Va bene');
+  await page.locator('.dash-recap-done').click();
+  await expect(page.locator('#thanksOverlay')).toHaveCount(0);
+});
