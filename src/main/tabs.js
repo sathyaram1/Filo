@@ -1233,6 +1233,26 @@ class TabManager {
     return tab.id === this.activeId || !!tab.audible || !!tab.formDirty;
   }
 
+  // La pulizia decide da cosa c'è nei campi adesso, non da cosa c'era: le schede
+  // col testo da inviare lo riconfermano frame per frame (una pagina può aver
+  // svuotato il campo dopo l'invio, un riquadro può essere sparito).
+  async _ricontrollaModuli() {
+    const sporche = this.tabs.filter((t) => t.formDirty);
+    if (!sporche.length) return;
+    const type = globalThis.SN_MSG?.MSG?.FORM_RECHECK || 'form_recheck';
+    for (const tab of sporche) {
+      let frames = [];
+      try { frames = tab.view.webContents.mainFrame.framesInSubtree || []; } catch (_) {}
+      // Senza l'elenco dei frame non si toglie niente: nel dubbio la scheda resta protetta.
+      if (!frames.length) continue;
+      const vivi = new Set(frames.map(chiaveFrame));
+      for (const k of [...(tab._moduli || [])]) if (!vivi.has(k)) tab._moduli.delete(k);
+      tab.formDirty = !!(tab._moduli && tab._moduli.size);
+      for (const f of frames) { try { f.send('filo:broadcast', { type }); } catch (_) {} }
+    }
+    await new Promise((r) => setTimeout(r, 400));
+  }
+
   // Candidati archiviabili: schede web + pagine interne EFFIMERE (home/nuova
   // scheda, impostazioni). Prima erano esclusi TUTTI i filo:// interni, quindi
   // il riordino poteva chiudere un sito (es. YouTube) ma mai le impostazioni
@@ -1281,10 +1301,11 @@ class TabManager {
   // Se l'LLM manca o fallisce, i duplicati vengono comunque collassati.
   async runAutoTriage({ trigger = 'idle' } = {}) {
     if (this.incognito || this._triageRunning) return { archived: 0 };
-    const cands = this._triageCandidates();
-    if (!cands.length) return { archived: 0 };
     this._triageRunning = true;
     try {
+      await this._ricontrollaModuli();
+      const cands = this._triageCandidates();
+      if (!cands.length) return { archived: 0 };
       // 1) Duplicati esatti: decisione deterministica e affidabile.
       const T = globalThis.SN_TAB_TRIAGE;
       let dupIdx = new Set();
@@ -1506,14 +1527,14 @@ class TabManager {
   // §2.1 — segnali di attività riportati dal content script (input, scroll,
   // form sporco). Merge parziale sullo snapshot. Best-effort: throttled lato
   // pagina, qui non rimbalziamo se nulla cambia in modo significativo.
-  setTabActivity(id, activity) {
+  setTabActivity(id, activity, frame = null) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab || !activity || typeof activity !== 'object') return;
-    // Qualsiasi attività in una tab conta come "Filo è in uso": resetta il
-    // contatore di inattività dell'app (§2.1).
-    this._lastAppInteractionAt = Date.now();
     let changed = false;
     if (typeof activity.lastInteractionAt === 'number') {
+      // Qualsiasi interazione in una tab conta come "Filo è in uso": resetta il
+      // contatore di inattività dell'app (§2.1).
+      this._lastAppInteractionAt = Date.now();
       tab.lastInteractionAt = activity.lastInteractionAt; changed = true;
     }
     if (typeof activity.scrollPct === 'number') {
@@ -1521,7 +1542,12 @@ class TabManager {
       if (v !== tab.scrollPct) { tab.scrollPct = v; changed = true; }
     }
     if (typeof activity.formDirty === 'boolean') {
-      if (activity.formDirty !== tab.formDirty) { tab.formDirty = activity.formDirty; changed = true; }
+      // Una voce per frame: il «niente» della pagina non cancella il testo di un riquadro.
+      if (!tab._moduli) tab._moduli = new Set();
+      const k = frame ? chiaveFrame(frame) : '';
+      if (activity.formDirty) tab._moduli.add(k); else tab._moduli.delete(k);
+      const ora = tab._moduli.size > 0;
+      if (ora !== tab.formDirty) { tab.formDirty = ora; changed = true; }
     }
     if (changed) this._broadcast();
   }
@@ -2130,6 +2156,7 @@ class TabManager {
       // host già in cache lo applichiamo subito, altrimenti azzeriamo e aspettiamo
       // che il content script lo ricalcoli per il nuovo sito.
       const cachedIdentity = this._identityColorCache.get(hostOf(url)) || null;
+      tab._moduli = null;
       update({
         url: userUrl(url),
         color: null,
@@ -2161,6 +2188,11 @@ class TabManager {
           this._geoBlockDetected(tab, url, GeoBlock.SOURCES.REDIRECT, redirectHit.detail);
         }
       }
+    });
+    // Un riquadro che cambia documento si porta via il testo che c'era (#824).
+    wc.on('did-frame-navigate', (_e, _url, _code, _text, isMainFrame, pid, rid) => {
+      if (isMainFrame || !tab._moduli || !tab._moduli.delete(`${pid}:${rid}`)) return;
+      if (!tab._moduli.size && tab.formDirty) update({ formDirty: false });
     });
     wc.on('did-navigate-in-page', (_e, url) => update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
     // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
@@ -2696,6 +2728,10 @@ class TabManager {
 installSafebrowse(TabManager);
 installGeoBlock(TabManager);
 installCookies(TabManager);
+
+function chiaveFrame(f) {
+  try { return `${f.processId}:${f.routingId}`; } catch (_) { return ''; }
+}
 
 // Host di un URL (chiave della cache colore identità §1.2). Solo schemi web:
 // le pagine filo:// interne non hanno identità di sito da tinteggiare.

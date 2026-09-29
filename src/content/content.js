@@ -470,11 +470,9 @@
   // ------------------------------------------------------------
   // Segnali di attività della tab (spec §2.1)
   // ------------------------------------------------------------
-  // Riporta al main: quando l'utente ha interagito l'ultima volta, quanto ha
-  // scrollato (0-100%) e se ha "sporcato" un form (input non ancora inviato).
-  // Throttled per non inondare l'IPC.
+  // Riporta al main: quando l'utente ha interagito l'ultima volta e quanto ha
+  // scrollato (0-100%). Throttled per non inondare l'IPC.
   function startTabActivityReporter() {
-    let formDirty = false;
     let lastSentScroll = -1;
     let pending = false;
     let lastSend = 0;
@@ -516,11 +514,22 @@
       }, 500);
     }
 
-    // Campi con testo scritto e non ancora inviato: finché ce n'è uno la pulizia
-    // automatica non chiude la scheda (#824). Spunte e tendine non sono testo, e
-    // le impostazioni di Filo salvano ogni campo da sole.
+    window.addEventListener('pointerdown', onInteract, { passive: true, capture: true });
+    window.addEventListener('keydown', onInteract, { passive: true, capture: true });
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    // Primo campione dello scroll iniziale (alcune pagine aprono già scrollate).
+    setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
+  }
+
+  // Testo scritto dall'utente e non ancora inviato, in questo frame: finché ce
+  // n'è la pulizia non chiude la scheda (#824). Conta cosa c'è nei campi quando
+  // la pulizia chiede (MSG.FORM_RECHECK), non solo i tasti premuti. Spunte e
+  // tendine non sono testo; le impostazioni di Filo salvano ogni campo da sole.
+  function startFormTracker() {
+    if (/^filo:\/\/(options|preferences)\//i.test(location.href)) return;
     const scritti = new Set();
-    const SI_SALVA_DA_SOLA = /^filo:\/\/(options|preferences)\//i.test(location.href);
+    let ultimoMandato = null;
     const TIPI_DI_TESTO = /^(text|search|email|url|tel|password|number)$/;
     function campoDiTesto(t) {
       if (!t || !t.tagName) return null;
@@ -529,42 +538,80 @@
       if (tag === 'INPUT') return TIPI_DI_TESTO.test(String(t.type || 'text').toLowerCase()) ? t : null;
       return t.isContentEditable ? t : null;
     }
-    const senzaTesto = (el) => !el.isConnected || (!el.isContentEditable && !/\S/.test(el.value || ''));
+    // Gli editor ricchi lasciano spazi a larghezza zero anche quando sono vuoti.
+    const haTesto = (el) => /[^\s\u200B-\u200D\u2060\uFEFF]/.test(
+      el.isContentEditable ? (el.textContent || '') : (el.value || ''));
 
-    function aggiornaModulo() {
-      for (const el of scritti) if (senzaTesto(el)) scritti.delete(el);
-      const ora = scritti.size > 0;
-      if (ora === formDirty) return;
-      formDirty = ora;
-      send({ formDirty: ora, scrollPct: Math.round(scrollPct()) });
+    function stato() {
+      for (const el of scritti) if (!el.isConnected || !haTesto(el)) scritti.delete(el);
+      return scritti.size > 0;
+    }
+    // Solo la digitazione vera è un'interazione: una risposta al ricontrollo non
+    // deve far sembrare la scheda appena usata al modello.
+    function manda(ora, daUtente) {
+      ultimoMandato = ora;
+      const payload = { type: MSG.TAB_ACTIVITY, formDirty: ora };
+      if (daUtente) payload.lastInteractionAt = Date.now();
+      try { Promise.resolve(chrome.runtime.sendMessage(payload)).catch(() => {}); } catch (_) {}
+    }
+    function aggiorna(daUtente) {
+      const ora = stato();
+      if (ora !== ultimoMandato) manda(ora, daUtente);
     }
 
     function onFormInput(e) {
-      if (SI_SALVA_DA_SOLA) return;
       // composedPath: un campo dentro uno shadow root arriva qui come il suo host.
       const el = campoDiTesto((e.composedPath && e.composedPath()[0]) || e.target);
       if (!el) return;
       scritti.add(el);
-      aggiornaModulo();
+      aggiorna(true);
     }
 
-    // Il modulo inviato non ha più niente da perdere; i campi scritti fuori sì.
+    // Chi invia davvero lascia la pagina. Se la pagina trattiene l'invio, un
+    // rifiuto (campo mancante) e un invio via script si somigliano: una ricerca
+    // di una riga conta come inviata, un modulo più lungo resta da proteggere
+    // finché la pagina non ne svuota o toglie i campi.
+    function soloUnaRiga(form) {
+      const campi = [...(form.elements || [])].filter((el) => campoDiTesto(el));
+      return campi.length <= 1 && !campi.some((el) => el.tagName.toUpperCase() === 'TEXTAREA')
+        && !(form.querySelector && form.querySelector('[contenteditable=""], [contenteditable="true"]'));
+    }
     function onSubmit(e) {
       const form = e.target;
       if (!form || !scritti.size) return;
-      for (const el of scritti) if (el.form === form || (form.contains && form.contains(el))) scritti.delete(el);
-      aggiornaModulo();
+      setTimeout(() => {
+        if (!e.defaultPrevented || soloUnaRiga(form)) {
+          for (const el of scritti) if (el.form === form || (form.contains && form.contains(el))) scritti.delete(el);
+        }
+        aggiorna(false);
+      }, 0);
     }
 
-    window.addEventListener('pointerdown', onInteract, { passive: true, capture: true });
-    window.addEventListener('keydown', onInteract, { passive: true, capture: true });
-    window.addEventListener('scroll', onScroll, { passive: true });
+    // Tornando Indietro il browser rimette nei campi il testo di prima, senza
+    // eventi: è ancora testo dell'utente.
+    function adottaRipristinati() {
+      let nav = null;
+      try { nav = performance.getEntriesByType('navigation')[0]; } catch (_) {}
+      if (!nav || nav.type !== 'back_forward') return;
+      for (const el of document.querySelectorAll('input, textarea')) {
+        if (campoDiTesto(el) && el.value !== el.defaultValue && haTesto(el)) scritti.add(el);
+      }
+    }
+    adottaRipristinati();
+    // In un riquadro Filo si monta al primo tocco: quel che si è scritto prima
+    // dell'arrivo di questo script sta nel campo col fuoco.
+    const attivo = IS_SUBFRAME && campoDiTesto(document.activeElement);
+    if (attivo && haTesto(attivo) && (attivo.isContentEditable || attivo.value !== attivo.defaultValue)) scritti.add(attivo);
+    if (scritti.size) aggiorna(false);
+
     window.addEventListener('input', onFormInput, { passive: true, capture: true });
     window.addEventListener('change', onFormInput, { passive: true, capture: true });
     window.addEventListener('submit', onSubmit, { passive: true, capture: true });
-
-    // Primo campione dello scroll iniziale (alcune pagine aprono già scrollate).
-    setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
+    // Pagina tornata dalla cache di navigazione: per il main è un documento nuovo.
+    window.addEventListener('pageshow', (e) => { if (e.persisted) manda(stato(), false); });
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.FORM_RECHECK) manda(stato(), false);
+    });
   }
 
   function isBlocked() {

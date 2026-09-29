@@ -105,7 +105,7 @@ module.exports = function register(on, ctx) {
         lastInteractionAt: msg.lastInteractionAt,
         scrollPct: msg.scrollPct,
         formDirty: msg.formDirty,
-      });
+      }, sender.frame);
     }
     return { ok: true };
   });

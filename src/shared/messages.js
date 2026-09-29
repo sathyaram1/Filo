@@ -381,6 +381,9 @@
     // §2.1 — segnali di attività della tab riportati dal content script, per la
     // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty? }
     TAB_ACTIVITY: 'tab_activity',
+    // Main → ogni frame: «rimanda adesso se hai testo da inviare» (la pulizia sta
+    // per decidere, #824). Risposta: TAB_ACTIVITY con il solo formDirty.
+    FORM_RECHECK: 'form_recheck',
 
     // §2.1 — pulizia/riordino su richiesta esplicita dell'utente (lo invoca
     // l'agente Filo dopo conferma). Esegue il triage su tutte le tab della finestra.

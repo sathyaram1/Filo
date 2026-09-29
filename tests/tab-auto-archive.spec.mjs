@@ -317,3 +317,115 @@ test('le impostazioni di Filo salvano da sole: scriverci non le protegge dalla p
   });
   expect(sporca).toBe(false);
 });
+
+// La pulizia guarda cosa c'è nei campi quando decide: il testo ancora da inviare
+// tiene aperta la scheda anche in un riquadro, dopo Indietro o dopo un invio
+// respinto; un campo che la pagina ha svuotato dopo l'invio non protegge più.
+
+const titoliAperti = (shell) => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.title));
+
+async function pulisciTutto(app, shell, testServer) {
+  await apriEsatta(app, shell, testServer.html('<!doctype html><title>Altra</title><p>altra pagina'));
+  return app.evaluate(async ({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({
+      decisions: tabs.map((t, i) => ({ i, action: 'archive', reason: 'pulizia' })),
+    });
+    return win._filoTabs.runAutoTriage({ trigger: 'manual' });
+  });
+}
+
+test('il testo scritto in un riquadro di un altro sito tiene aperta la scheda (#824)', async ({ app, shell, testServer }) => {
+  const dentro = testServer.html('<!doctype html><html><body><textarea id="t" style="width:300px;height:100px"></textarea></body></html>', { pubblico: true });
+  const page = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Riquadro</title></head><body>
+    <iframe id="f" src="${dentro}" style="width:400px;height:200px"></iframe></body></html>`));
+  const TESTO = 'Commento lungo scritto nel riquadro dei commenti';
+  await page.frameLocator('#f').locator('#t').click();
+  await page.keyboard.type(TESTO);
+  await expect.poll(() => moduloDi(shell, 'Riquadro'), { timeout: 8_000 }).toBe(true);
+
+  await pulisciTutto(app, shell, testServer);
+  expect(await titoliAperti(shell)).toContain('Riquadro');
+  expect(await page.frameLocator('#f').locator('#t').inputValue()).toBe(TESTO);
+
+  // Svuotato il riquadro la pagina non ha più niente da perdere.
+  await page.frameLocator('#f').locator('#t').fill('');
+  await expect.poll(() => moduloDi(shell, 'Riquadro'), { timeout: 8_000 }).toBe(false);
+});
+
+test('la bozza che il browser rimette nel campo tornando Indietro tiene aperta la scheda (#824)', async ({ app, shell, testServer }) => {
+  const b = testServer.html('<!doctype html><title>Dopo</title><p>pagina dopo');
+  const page = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Lettera</title></head><body>
+    <form action="/x" method="post"><textarea name="m" id="m"></textarea><button>Invia</button></form><a id="via" href="${b}">vai</a></body></html>`));
+  const TESTO = 'Bozza della lettera al padrone di casa';
+  await page.locator('#m').click();
+  await page.keyboard.type(TESTO);
+  await expect.poll(() => moduloDi(shell, 'Lettera'), { timeout: 8_000 }).toBe(true);
+  await page.locator('#via').click();
+  await expect.poll(() => moduloDi(shell, 'Dopo'), { timeout: 8_000 }).toBe(false);
+  await page.goBack();
+  await page.waitForFunction(() => document.title === 'Lettera');
+  await expect(page.locator('#m')).toHaveValue(TESTO);
+  await expect.poll(() => moduloDi(shell, 'Lettera'), { timeout: 8_000 }).toBe(true);
+
+  await pulisciTutto(app, shell, testServer);
+  expect(await titoliAperti(shell)).toContain('Lettera');
+  expect(await page.locator('#m').inputValue()).toBe(TESTO);
+});
+
+test('un «Invia» respinto dalla pagina non conta come inviato (#824)', async ({ app, shell, testServer }) => {
+  const page = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Candidatura</title></head><body>
+    <form id="f"><textarea id="m"></textarea><input id="mail" type="email"><button>Invia</button></form><p id="err"></p>
+    <script>document.getElementById('f').addEventListener('submit', (e) => { e.preventDefault(); if (!document.getElementById('mail').value) document.getElementById('err').textContent = 'Manca la mail'; });</script>
+    </body></html>`));
+  const TESTO = 'Lettera di presentazione lunga e scritta con cura';
+  await page.locator('#m').click();
+  await page.keyboard.type(TESTO);
+  await expect.poll(() => moduloDi(shell, 'Candidatura'), { timeout: 8_000 }).toBe(true);
+  await page.locator('button').click();
+  await expect(page.locator('#err')).toHaveText('Manca la mail');
+  await page.waitForTimeout(500);
+  expect(await moduloDi(shell, 'Candidatura')).toBe(true);
+
+  await pulisciTutto(app, shell, testServer);
+  expect(await titoliAperti(shell)).toContain('Candidatura');
+  expect(await page.locator('#m').inputValue()).toBe(TESTO);
+});
+
+test('un commento pubblicato o un messaggio mandato, col campo svuotato dalla pagina, non proteggono più la scheda (#824)', async ({ app, shell, testServer }) => {
+  const social = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Social</title></head><body>
+    <div id="ed" contenteditable="true" style="min-height:60px;border:1px solid"></div><button id="pub">Pubblica</button><ul id="lista"></ul>
+    <script>pub.onclick = () => { const li = document.createElement('li'); li.textContent = ed.textContent; lista.append(li); ed.innerHTML = ''; };</script>
+    </body></html>`));
+  // Cancellare a mano tutto il testo di un editor ricco toglie la protezione.
+  await social.locator('#ed').click();
+  await social.keyboard.type('prima prova');
+  await expect.poll(() => moduloDi(shell, 'Social'), { timeout: 8_000 }).toBe(true);
+  await social.keyboard.press('ControlOrMeta+A');
+  await social.keyboard.press('Backspace');
+  await expect.poll(() => moduloDi(shell, 'Social'), { timeout: 8_000 }).toBe(false);
+  await social.keyboard.type('Bel post!');
+  await expect.poll(() => moduloDi(shell, 'Social'), { timeout: 8_000 }).toBe(true);
+  await social.locator('#pub').click();
+  await expect(social.locator('#lista li')).toHaveText('Bel post!');
+
+  const chat = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Chat</title></head><body>
+    <textarea id="chat"></textarea><button id="manda">Manda</button><ul id="lista"></ul>
+    <script>manda.onclick = () => { const li = document.createElement('li'); li.textContent = chat.value; lista.append(li); chat.value = ''; };</script>
+    </body></html>`));
+  await chat.locator('#chat').click();
+  await chat.keyboard.type('Ciao, arrivo alle 8');
+  await expect.poll(() => moduloDi(shell, 'Chat'), { timeout: 8_000 }).toBe(true);
+  await chat.locator('#manda').click();
+  await expect(chat.locator('#lista li')).toHaveText('Ciao, arrivo alle 8');
+
+  const bozza = await apriEsatta(app, shell, testServer.html(PAGINA_MODULO.replace('Modulo', 'Bozza')));
+  await bozza.locator('#messaggio').fill('ancora da mandare');
+  await expect.poll(() => moduloDi(shell, 'Bozza'), { timeout: 8_000 }).toBe(true);
+
+  await pulisciTutto(app, shell, testServer);
+  const aperte = await titoliAperti(shell);
+  expect(aperte).not.toContain('Social');
+  expect(aperte).not.toContain('Chat');
+  expect(aperte).toContain('Bozza');
+});
