@@ -18,7 +18,8 @@ function normalizeDomain(raw) {
   s = s.split('?')[0];
   s = s.split('#')[0];
   s = s.split(':')[0]; // porta
-  s = s.replace(/^www\./, '').replace(/\.+$/, '');
+  // «*.sito.it» e «.sito.it», la forma di filtri e cookie per «il sito e i sottodomini», valgono «sito.it».
+  s = s.replace(/^\*?\.+/, '').replace(/\.+$/, '').replace(/^www\./, '');
   // Un nome con lettere accentate va confrontato nella forma che ha nell'URL (punycode).
   if (/[^\x00-\x7f]/.test(s)) {
     try { s = new URL(`http://${s}`).hostname; } catch (_) {}
