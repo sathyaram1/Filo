@@ -805,7 +805,8 @@
   const chatLoading = new Map(); // deckId → lettura in corso
   // Per conversazione, non globale: svuotata la chat mentre Filo risponde, la nuova è subito libera.
   const busyChats = new WeakSet();
-  const chatSaveTimers = new Map();
+  // Cambiata altrove mentre qui si aspettava Filo: si rilegge appena la risposta è scritta.
+  const staleChats = new WeakSet();
   // Chi ha salvato: la scheda che scrive non si rilegge al proprio avviso (DECKS_CHAT_CHANGED).
   const chatClientId = `dk${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
