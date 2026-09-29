@@ -333,7 +333,8 @@
     } catch (_) {
       s = s.split('/')[0].split('?')[0];
     }
-    s = s.replace(/^www\./, '');
+    // Come la lista nel main: «*.sito.it», «.sito.it» e «sito.it.» valgono «sito.it».
+    s = s.replace(/^\*?\.+/, '').replace(/\.+$/, '').replace(/^www\./, '');
     return window.SN_NOMI_SITO.valido(s) ? s : '';
   }
 
