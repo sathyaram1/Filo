@@ -580,7 +580,7 @@
       return area.innerText || area.textContent || '';
     }
     // Gli editor ricchi lasciano spazi a larghezza zero anche quando sono vuoti.
-    const pulito = (s) => String(s).replace(/[\s​-‍⁠﻿]+/g, '');
+    const pulito = (s) => String(s).replace(/[\s\u200B-\u200D\u2060\uFEFF]+/g, '');
     // Un riquadro tolto dalla pagina lascia i suoi nodi «connessi» a un documento morto.
     const viva = (a) => a.isConnected && !!(a.ownerDocument && a.ownerDocument.defaultView);
 
