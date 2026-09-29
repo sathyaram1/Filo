@@ -468,7 +468,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   if (Number.isFinite(ultimoMs)) rep.endedAt = new Date(ultimoMs).toISOString();
   if (Number.isFinite(primoMs) && Number.isFinite(ultimoMs)) rep.durationS = Math.round((ultimoMs - primoMs) / 1000);
   rep.costUsd = Math.round(costo * 10000) / 10000;
-  for (const m of sconosciuti) rep.notes.push(`modello sconosciuto «${m}»: costo calcolato a tariffa opus`);
+  for (const [m, key] of sconosciuti) rep.notes.push(`modello sconosciuto «${m}»: costo calcolato a tariffa ${NOMI_TARIFFA[key]}`);
   if (illeggibili) rep.notes.push(`${illeggibili} righe del transcript non erano JSON e sono state saltate`);
   return rep;
 }
