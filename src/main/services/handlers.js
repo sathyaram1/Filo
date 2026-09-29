@@ -4242,18 +4242,16 @@ async function embedTexts(texts, settingsIn) {
 }
 
 // Reindicizza in background le schede i cui vettori vengono da un altro modello
-// (o mancano): a blocchi, le più recenti prima, una sola corsa alla volta. Il
-// costo è irrisorio (poche decine di parole a scheda) e senza questo, dopo un
-// cambio di modello di indicizzazione, la ricerca semantica troverebbe solo le
-// schede chiuse da quel momento in poi.
+// (o mancano): tutte, a blocchi, le più recenti prima, una sola corsa alla volta.
+// Un vettore salvato resta finché resta la scheda, quindi ogni scheda si paga una
+// volta per modello (poche decine di parole: costo irrisorio).
 let reindexRunning = false;
 async function reindexArchivedEmbeddings(settings, items) {
   if (reindexRunning || !items.length) return;
   reindexRunning = true;
   try {
-    const todo = items.slice(0, 200);
-    for (let i = 0; i < todo.length; i += 50) {
-      const batch = todo.slice(i, i + 50);
+    for (let i = 0; i < items.length; i += 50) {
+      const batch = items.slice(i, i + 50);
       const texts = batch.map((it) =>
         `${it.title || ''}\n${it.summary || it.snippet || ''}`.replace(/\s+/g, ' ').trim().slice(0, 4000));
       const emb = await embedTexts(texts, settings);
@@ -4358,7 +4356,7 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
     const usable = Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model;
     if (usable) { scored.push({ score: cosineInt(qv, it.embedding), it }); continue; }
     const casa = it.casa || isHomeNetworkUrl(it.url);
-    if ((it.title || it.summary || it.snippet) && !casa && stale.length < SN_CONST.ARCHIVED_EMBED_LIMIT) stale.push(it);
+    if ((it.title || it.summary || it.snippet) && !casa) stale.push(it);
   }
   if (stale.length) reindexArchivedEmbeddings(settings, stale).catch(() => {});
   scored.sort((a, b) => b.score - a.score);
