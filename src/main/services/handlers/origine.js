@@ -55,4 +55,4 @@ function inPrimoPiano(sender) {
   return Boolean(f && principale && (f === principale || f.frameTreeNodeId === principale.frameTreeNodeId));
 }
 
-module.exports = { daFilo, soloFilo, daUnSito, inPrimoPiano };
+module.exports = { daFilo, soloFilo, daUnSito, inPrimoPiano, schedaInPrimoPiano };
