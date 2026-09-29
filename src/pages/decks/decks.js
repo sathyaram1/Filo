@@ -1169,8 +1169,10 @@
         // La chat può aver modificato il mazzo (es. budget, §9.2): il mazzo
         // aggiornato torna nella risposta → header e statistiche si rinfrescano.
         if (r.deck && current && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
-        // «Svuota la chat» chiesto a parole: stessa conferma della gomma, dopo aver mostrato la risposta.
+        // «Svuota la chat» chiesto a parole: stessa conferma della gomma, dopo aver mostrato la risposta. La bolla
+        // tiene il tasto: se la conferma non arriva adesso (Annulla, mazzo lasciato), la richiesta resta lì.
         wantsClear = !!r.clearChat;
+        if (wantsClear) bot.clearChat = true;
       }
     } catch (e) {
       bot.pending = false;
