@@ -897,9 +897,13 @@
     const AUTO_CLOSE_MS = 4000;
     let done = false;
     let timer = null;
+    // Una conferma riprovata dal main arriva più volte alla pagina che si stava caricando: se ne mostra una.
+    const id = entry && entry.id ? String(entry.id) : '';
+    if (id && [...document.querySelectorAll('.sn-save-confirm:not([data-sn-closing])')].some((p) => p.dataset.entryId === id)) return;
 
     const pill = document.createElement('div');
     pill.className = 'sn-save-confirm';
+    if (id) pill.dataset.entryId = id;
     pill.setAttribute('role', 'button');
     pill.tabIndex = 0;
     const text = document.createElement('span');

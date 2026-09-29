@@ -59,7 +59,7 @@ process.on('exit', () => { Module._load = origLoad; });
 
 globalThis.SN_SAVED_PAGES = { setThumbnail: async (id, thumbnail) => { thumb = { id, thumbnail }; return { id }; } };
 
-const { dispatch, consegnaConRicevuta, riceviRicevuta } = require(join(ROOT, 'src', 'main', 'shortcuts.js'));
+const { dispatch, consegnaConRicevuta, riceviRicevuta, confermaSullaSchedaDavanti } = require(join(ROOT, 'src', 'main', 'shortcuts.js'));
 
 // Costruisce una finta finestra con una sola tab attiva.
 function makeWin(tab) {
@@ -140,7 +140,10 @@ test('Alt+S su pagina web senza Filo: il main salva, allega la miniatura e chiud
   const tab = makeTab({ url: 'https://news.example.com/articolo', title: 'Articolo' }, 'rifiutata');
   // Intanto la pagina naviga altrove: si salva quella su cui era stato premuto il tasto (#334).
   tab.primaDiRispondere = () => { tab.url = 'https://altrove.example.com/'; tab.title = 'Altrove'; };
-  dispatch('save-for-later', makeWin(tab));
+  const win = makeWin(tab);
+  win._filoTabs.tabs.push(makeTab({ id: 'T2' }, 'presa'));
+  win._filoTabs.closeTab = (id) => { closed = id; win._filoTabs.activeId = 'T2'; };
+  dispatch('save-for-later', win);
   await new Promise((r) => setTimeout(r, 30));
   assert.ok(saved, 'una pagina web DEVE essere salvata in "Aperti per dopo"');
   assert.equal(saved.url, 'https://news.example.com/articolo');
@@ -153,7 +156,7 @@ test('Alt+S su pagina web senza Filo: il main salva, allega la miniatura e chiud
 test('Alt+S su una pagina che non risponde: la conferma la mostra la scheda rimasta davanti, senza chiudersi', async () => {
   saved = null; thumb = null; closed = null;
   const salvata = makeTab({ id: 'T1', url: 'https://news.example.com/articolo', title: 'Articolo' }, 'rifiutata');
-  const davanti = makeTab({ id: 'T2', url: 'https://altro.example.com/', title: 'Altro' }, null);
+  const davanti = makeTab({ id: 'T2', url: 'https://altro.example.com/', title: 'Altro' }, 'presa');
   const win = makeWin(salvata);
   win._filoTabs.tabs.push(davanti);
   win._filoTabs.closeTab = (id) => { closed = id; win._filoTabs.activeId = 'T2'; };
@@ -175,4 +178,33 @@ test('senza risposta dalla pagina la consegna si arrende, e una ricevuta da un\'
   assert.equal(riceviRicevuta(ricevuta, tab.id, true), true);
   assert.equal(await esito, true);
   assert.equal(riceviRicevuta(ricevuta, tab.id, true), false, 'una ricevuta vale una volta');
+});
+
+test('la conferma di ripiego si riprova finché una pagina la prende: la scheda nata al posto dell\'ultima all\'inizio la perde', async () => {
+  const nuova = makeTab({ id: 'N1', url: 'filo://newtab/', isInternal: true }, null);
+  // Prima consegna persa (documento non ancora pronto), dalla seconda la pagina risponde.
+  const send = nuova.view.webContents.send;
+  nuova.view.webContents.send = (canale, payload) => {
+    send(canale, payload);
+    if (nuova.ricevuti.length > 1) setTimeout(() => riceviRicevuta(payload.ricevuta, nuova.id, true), 1);
+  };
+  const win = makeWin(nuova);
+  const esito = await confermaSullaSchedaDavanti(win, { id: 'E9', category: null }, { tentativoMs: 20, totaleMs: 2000 });
+  assert.equal(esito, true);
+  assert.equal(nuova.ricevuti.length, 2, 'riprovata una volta, poi basta');
+  assert.deepEqual(nuova.ricevuti.map((m) => [m.payload.command, m.payload.context.entry.id]), [['save-for-later-confirm', 'E9'], ['save-for-later-confirm', 'E9']]);
+});
+
+test('la conferma di ripiego segue la scheda che l\'utente ha davanti, e si arrende a tempo scaduto', async () => {
+  const prima = makeTab({ id: 'A', url: 'https://a.example/' }, null);
+  const dopo = makeTab({ id: 'B', url: 'https://b.example/' }, 'presa');
+  const win = makeWin(prima);
+  win._filoTabs.tabs.push(dopo);
+  setTimeout(() => { win._filoTabs.activeId = 'B'; }, 30);
+  assert.equal(await confermaSullaSchedaDavanti(win, { id: 'E7' }, { tentativoMs: 20, totaleMs: 2000 }), true);
+  assert.equal(dopo.ricevuti.length, 1);
+
+  const muta = makeTab({ id: 'M' }, null);
+  assert.equal(await confermaSullaSchedaDavanti(makeWin(muta), { id: 'E8' }, { tentativoMs: 10, totaleMs: 500 }), false);
+  assert.ok(muta.ricevuti.length >= 2, 'nel frattempo ha riprovato');
 });

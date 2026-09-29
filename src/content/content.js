@@ -2154,8 +2154,9 @@
 
   function suSalvaPerDopo(msg, sendResponse) {
     if (IS_SUBFRAME) return;
+    // Anche la conferma torna con la ricevuta: finché nessuna pagina la prende il main la riprova sulla scheda davanti.
+    sendResponse({ presa: true });
     if (msg.command === 'save-for-later') {
-      sendResponse({ presa: true });
       try { Menu.close(); } catch (_) {}
       Actions.savePage();
       return;

@@ -107,7 +107,7 @@ function dispatch(command, window) {
 const ATTESA_RICEVUTA_MS = 3500;
 const ricevuteInAttesa = new Map();
 
-function consegnaConRicevuta(tab, command, attesaMs = ATTESA_RICEVUTA_MS) {
+function consegnaConRicevuta(tab, command, attesaMs = ATTESA_RICEVUTA_MS, context) {
   return new Promise((resolve) => {
     const ricevuta = crypto.randomUUID();
     const chiudi = (presa) => {
@@ -117,7 +117,7 @@ function consegnaConRicevuta(tab, command, attesaMs = ATTESA_RICEVUTA_MS) {
     };
     const timer = setTimeout(() => chiudi(false), attesaMs);
     ricevuteInAttesa.set(ricevuta, { tabId: tab.id, chiudi });
-    try { tab.view.webContents.send('shortcut:triggered', { command, ricevuta }); } catch (_) { chiudi(false); }
+    try { tab.view.webContents.send('shortcut:triggered', { command, ricevuta, context }); } catch (_) { chiudi(false); }
   });
 }
 
@@ -143,17 +143,24 @@ async function saveForLater(win, tab) {
   const thumbnail = await dallaScheda(tab.view.webContents);
   if (thumbnail && res?.entry?.id) await globalThis.SN_SAVED_PAGES.setThumbnail(res.entry.id, thumbnail);
   try { win._filoTabs.closeTab(tab.id); } catch (_) {}
-  confermaSullaSchedaDavanti(win, res?.entry);
+  await confermaSullaSchedaDavanti(win, res?.entry);
 }
 
 // La scheda salvata non poteva mostrare la conferma: la mostra quella che l'utente ha davanti adesso, senza chiudersi.
+// Vale solo quando una pagina l'ha presa: la scheda nata al posto dell'ultima, o una che sta navigando, la prima la perde.
 // Gli avvisi della cornice finiscono sotto la pagina, per questo non passa di lì.
-function confermaSullaSchedaDavanti(win, entry) {
-  if (!entry?.id) return;
-  const tm = win && win._filoTabs;
-  const davanti = tm?.tabs?.find((t) => t.id === tm.activeId);
+async function confermaSullaSchedaDavanti(win, entry, { tentativoMs = 800, totaleMs = 10000 } = {}) {
+  if (!entry?.id) return false;
   const context = { entry: { id: entry.id, category: entry.category || null } };
-  try { davanti.view.webContents.send('shortcut:triggered', { command: 'save-for-later-confirm', context }); } catch (_) {}
+  const fine = Date.now() + totaleMs;
+  while (Date.now() < fine) {
+    const tm = win && !(win.isDestroyed && win.isDestroyed()) ? win._filoTabs : null;
+    if (!tm) return false;
+    const davanti = tm.tabs.find((t) => t.id === tm.activeId);
+    if (davanti && await consegnaConRicevuta(davanti, 'save-for-later-confirm', tentativoMs, context)) return true;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  return false;
 }
 
-module.exports = { collegaScorciatoie, comandoDaTasto, dispatch, saveForLater, consegnaConRicevuta, riceviRicevuta, isInternalTab, acceleratorePerPiattaforma, COMMANDS };
+module.exports = { collegaScorciatoie, comandoDaTasto, dispatch, saveForLater, consegnaConRicevuta, riceviRicevuta, confermaSullaSchedaDavanti, isInternalTab, acceleratorePerPiattaforma, COMMANDS };

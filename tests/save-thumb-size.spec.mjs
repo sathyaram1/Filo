@@ -10,6 +10,7 @@
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { writeFileSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { deflateSync } from 'node:zlib';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -170,6 +171,97 @@ test('Alt+S su una pagina che non risponde: salva, chiude, e la conferma compare
   // La scheda che ha solo mostrato la conferma resta aperta.
   await davanti.waitForTimeout(500);
   expect(await aperta(davanti.url()), 'la conferma ha chiuso la scheda che la mostrava').toBe(true);
+});
+
+// La conferma di ripiego vale solo quando una pagina l'ha presa: la scheda nata al posto dell'ultima all'inizio non è pronta.
+const schedeAperte = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.map((t) => t.url));
+const chiudiNuoveSchede = (app) => app.evaluate(({ BrowserWindow }) => {
+  const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+  for (const t of tm.tabs.filter((y) => y.url.startsWith('filo://newtab/'))) tm.closeTab(t.id);
+});
+async function conferme(app) {
+  const dove = [];
+  for (const w of app.windows()) {
+    try { const n = await w.evaluate(() => document.querySelectorAll('.sn-save-confirm').length); for (let i = 0; i < n; i++) dove.push(w); } catch (_) {}
+  }
+  return dove;
+}
+// Pagina che resta in caricamento finché il test non la libera: uno script che non arriva.
+async function serverLento(titolo) {
+  const attese = [];
+  const server = createServer((req, res) => {
+    if (req.url.startsWith('/lento.js')) { attese.push(res); return; }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`<!doctype html><html><head><title>${titolo}</title></head><body style="background:#c2e9fb"><h1>${titolo}</h1><script src="/lento.js"></script></body></html>`);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  return {
+    url: `http://localhost:${server.address().port}/p`,
+    libera: () => { for (const res of attese.splice(0)) { res.writeHead(200, { 'Content-Type': 'text/javascript' }); res.end(''); } },
+    chiudi: async () => { server.closeAllConnections?.(); await new Promise((r) => server.close(r)); },
+  };
+}
+
+test('Alt+S sull\'unica scheda, bloccata: la conferma compare nella nuova scheda che prende il suo posto e porta alla voce', async ({ app, openTab, testServer }) => {
+  const url = testServer.html(PAGINA_RICCA('Unica bloccata'));
+  const page = await openTab(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await chiudiNuoveSchede(app);
+  expect(await schedeAperte(app)).toEqual([url]);
+  await page.evaluate(() => { setTimeout(() => { const t = Date.now(); while (Date.now() - t < 10000) { /* occupata */ } }, 50); });
+  await page.waitForTimeout(200);
+  await dispatchAltS(app);
+
+  await expect.poll(async () => (await conferme(app)).length, { timeout: 12000, message: 'salvata e chiusa senza nessuna conferma' }).toBe(1);
+  const [dove] = await conferme(app);
+  expect(dove.url()).toMatch(/^filo:\/\/newtab\//);
+  const salvata = await app.evaluate(async (_e, u) => (await globalThis.SN_SAVED_PAGES.list()).find((p) => p.url === u) || null, url);
+  expect(salvata).toBeTruthy();
+  await dove.locator('.sn-save-confirm').click();
+  const home = await attendiHome(app);
+  expect(home.url()).toContain(`highlight=${salvata.id}`);
+});
+
+test('Alt+S sull\'unica scheda, ancora in caricamento: salva, chiude, e la conferma compare', async ({ app, shell }) => {
+  const lenta = await serverLento('Unica lenta');
+  try {
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), lenta.url);
+    await expect.poll(() => schedeAperte(app).then((s) => s.includes(lenta.url)), { timeout: 8000 }).toBe(true);
+    await chiudiNuoveSchede(app);
+    await new Promise((r) => setTimeout(r, 800));
+    expect(await schedeAperte(app)).toEqual([lenta.url]);
+    await dispatchAltS(app);
+    await expect.poll(async () => (await conferme(app)).length, { timeout: 12000, message: 'salvata e chiusa senza nessuna conferma' }).toBe(1);
+    expect(await app.evaluate(async (_e, u) => (await globalThis.SN_SAVED_PAGES.list()).some((p) => p.url === u), lenta.url)).toBe(true);
+    expect(await schedeAperte(app)).not.toContain(lenta.url);
+  } finally {
+    await lenta.chiudi();
+  }
+});
+
+test('la conferma di ripiego riprovata su una scheda che finisce di caricarsi dopo compare una volta sola', async ({ app, shell, openTab, testServer }) => {
+  const lenta = await serverLento('Davanti lenta');
+  try {
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), lenta.url);
+    await expect.poll(() => schedeAperte(app).then((s) => s.includes(lenta.url)), { timeout: 8000 }).toBe(true);
+    const url = testServer.html(PAGINA_RICCA('Bloccata dietro'));
+    const page = await openTab(url);
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+    await page.evaluate(() => { setTimeout(() => { const t = Date.now(); while (Date.now() - t < 10000) { /* occupata */ } }, 50); });
+    await page.waitForTimeout(200);
+    await dispatchAltS(app);
+    // La scheda davanti dopo la chiusura è quella lenta: le conferme riprovate le restano in coda finché non si carica.
+    await expect.poll(() => schedeAperte(app).then((s) => s.includes(url)), { timeout: 12000 }).toBe(false);
+    await new Promise((r) => setTimeout(r, 2500));
+    lenta.libera();
+    await expect.poll(async () => (await conferme(app)).length, { timeout: 8000 }).toBeGreaterThan(0);
+    await new Promise((r) => setTimeout(r, 800));
+    const tutte = await conferme(app);
+    expect(tutte.length, 'una conferma per salvataggio').toBe(1);
+    expect(new URL(tutte[0].url()).hostname).toBe('localhost');
+  } finally {
+    await lenta.chiudi();
+  }
 });
 
 // PNG vero scritto a mano (niente Electron prima dell'avvio): rumore colorato, che in PNG pesa MB.
