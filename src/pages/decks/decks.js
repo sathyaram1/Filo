@@ -987,7 +987,9 @@
     if (m.error) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>${retry}</div>`;
     const parts = [cotHtml(m)];
     if (m.reply) parts.push(`<p class="dk-msg-text">${proseHtml(m.reply)}</p>`);
-    if (m.cardIds && m.cardIds.length) {
+    if (m.clearChat) {
+      parts.push('<button class="dk-retry" data-clear-chat="1" title="Chiede conferma, poi svuota la chat di questo mazzo">Svuota la chat…</button>');
+    } else if (m.cardIds && m.cardIds.length) {
       const n = m.cardIds.length;
       const label = m.query ? `per "${m.query}"` : '';
       // Le righe di una lista chiusa non si disegnano: una chat salvata cresce di sessione in sessione, e
