@@ -107,3 +107,12 @@ test('ogni scheda applica la sua modifica alla chat salvata, senza riscriverla',
   assert.deepEqual(C.applyEdit([], { op: 'fill', turn: 't1', message: { reply: 'A' } }), { error: 'gone' });
   assert.deepEqual(C.applyEdit(base, { op: 'boh' }), { error: 'bad_op' });
 });
+
+test('la richiesta di svuotare a parole resta nella bolla, anche dopo la risposta scritta al suo turno', () => {
+  const [bot] = C.cleanChat([{ who: 'bot', turn: 't1', reply: 'Svuoto la chat di questo mazzo?', clearChat: true }]);
+  assert.equal(bot.clearChat, true);
+  const r = C.applyEdit([{ who: 'user', text: 'svuota la chat' }, { who: 'bot', turn: 't1', pending: true }],
+    { op: 'fill', turn: 't1', message: { who: 'bot', reply: 'Svuoto la chat di questo mazzo?', clearChat: true } });
+  assert.equal(r.list[1].clearChat, true);
+  assert.equal(C.cleanChat([{ who: 'bot', reply: 'x', clearChat: 'true' }])[0].clearChat, undefined);
+});
