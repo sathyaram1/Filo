@@ -26,7 +26,9 @@ Quello che la **shell** deve mostrare nell'area della pagina e che deve restarci
   spazio accanto a una carta più stretta) è **della pagina**: la vista le rigira i
   gesti che ci cadono (clic, doppio clic, tasto destro, rotella, e un trascinamento
   fino al rilascio, anche se passa sopra una carta) e mostra il puntatore che
-  mostrerebbe la pagina. La sua pagina manda le misure in modo sincrono a
+  mostrerebbe la pagina (Electron chiama `pointer` la freccia e `hand` la mano;
+  l'ultimo detto dalla scheda vale anche rientrando nel vuoto, dove la pagina non
+  lo ridice). La sua pagina manda le misure in modo sincrono a
   ogni disegno: nata nascosta e grande zero, il ResizeObserver può non partire
   mai. Ogni `addChildView` di una scheda finisce sopra di lei, quindi il layout la
   riporta in cima. Preload minimo (lo stato entra; misure, clic, tasto destro, puntatore sopra le carte e gesti del vuoto escono), e il
@@ -41,7 +43,10 @@ Quello che la **shell** deve mostrare nell'area della pagina e che deve restarci
   pagina (le pile di avvisi del content script e dell'editor, il riquadro Aiuto,
   anche spostato a mano finché resta nell'angolo) sta nello stesso angolo: la vista scrive la sua altezza
   nella scheda attiva (`--filo-avvisi-barra`, foglio d'autore: uno di origine
-  `user` non si toglie più) e tutto ci sale sopra. Un riquadro nuovo in
+  `user` non si toglie più) e tutto ci sale sopra. Il valore nuovo si inserisce
+  SOPRA il vecchio e solo dopo si toglie il precedente: un foglio inserito mentre
+  la scheda carica può finire nel documento nuovo senza che se ne tenga la
+  chiave, e con «togli e rimetti» restava lì col suo valore. Un riquadro nuovo in
   quell'angolo usa la stessa variabile nel suo `bottom`: lo controlla
   `tests/unit/angoloAvvisiBarra.test.mjs` sui fogli di `src/styles` e `src/pages`
   (una posizione scritta da JS la sentinella non la vede). Il valore è in px CSS della scheda,

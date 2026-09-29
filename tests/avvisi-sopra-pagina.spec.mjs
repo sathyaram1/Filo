@@ -468,3 +468,71 @@ test('un avviso a tempo resta finché il puntatore ci sta sopra, e se ne va da s
   await vista.mouse.move(2, 2);
   await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 8000 });
 });
+
+test('una scheda aperta con un avviso a schermo: chiuso l’avviso, gli avvisi di Filo nella pagina tornano in fondo', async ({ app, shell, testServer, avvisi }) => {
+  await shell.evaluate(() => window.filoNotify('Scaricato: report.pdf', { durationSec: 0, actions: [{ label: 'Apri file', onClick: () => {} }] }));
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
+
+  // La scheda nasce e carica mentre l'avviso copre l'angolo: il valore dell'angolo le arriva a metà caricamento.
+  const url = testServer.html(`<!doctype html><html><body style="margin:0;padding:24px">
+    <a id="link" href="https://example.com/articolo">Un collegamento di prova</a></body></html>`);
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  let page = null;
+  await expect.poll(() => {
+    page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } });
+    return !!page;
+  }, { timeout: 15_000 }).toBe(true);
+  await page.waitForLoadState('load');
+  const riserva = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--filo-avvisi-barra').trim());
+  await expect.poll(riserva).not.toBe('');
+
+  await vista.locator('.shell-notif-close').click();
+  await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
+
+  const menu = page.locator('.sn-menu');
+  let fatto = false;
+  for (let i = 0; i < 6 && !fatto; i++) {
+    await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });
+    const voce = menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' });
+    try {
+      await voce.first().waitFor({ state: 'visible', timeout: 1500 });
+      await voce.first().click();
+      fatto = true;
+    } catch (_) { await page.waitForTimeout(200); }
+  }
+  expect(fatto, 'voce «Copia URL» non raggiungibile').toBe(true);
+  await expect(page.locator('.sn-toast')).toHaveCount(1, { timeout: 5000 });
+  const fondo = () => page.evaluate(() => Math.round(innerHeight - document.querySelector('.sn-toasts').getBoundingClientRect().bottom));
+  await expect.poll(fondo, { timeout: 3000 }).toBeLessThanOrEqual(24);
+});
+
+test('nel vuoto attorno agli avvisi il puntatore è quello della pagina: freccia sullo sfondo, mano sui collegamenti, barra sul testo', async ({ app, shell, openTab, testServer, avvisi }) => {
+  await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;height:100vh;background:#fff">
+    <a href="#x" style="position:fixed;right:0;bottom:0;display:block;width:600px;height:8px"></a>
+    <p style="position:fixed;right:0;bottom:8px;margin:0;width:600px;height:6px;overflow:hidden;font:40px/6px sans-serif;text-align:right;white-space:nowrap">testo testo testo testo testo</p></body></html>`);
+  await shell.evaluate(() => window.filoNotify('Avviso qualunque', { durationSec: 0 }));
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
+  const b = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.avvisi.vista.getBounds());
+  expect(b.width).toBeGreaterThan(100);
+  const cursore = () => vista.evaluate(() => getComputedStyle(document.documentElement).cursor);
+  const x = b.width - 100;
+  const muovi = async (y) => { for (let i = 0; i < 4; i++) await gestoNellaVista(app, { type: 'mouseMove', x: x - 12 + i * 4, y }); };
+  const freccia = async () => ['auto', 'default'].includes(await cursore());
+
+  // Margine alto della vista: sopra lo sfondo della pagina. Poi in fondo: il collegamento (ultimi 8 px) e il testo sopra.
+  await muovi(4);
+  await expect.poll(freccia, { timeout: 3000 }).toBe(true);
+  await muovi(b.height - 4);
+  await expect.poll(cursore, { timeout: 3000 }).toBe('pointer');
+  await muovi(b.height - 11);
+  await expect.poll(cursore, { timeout: 3000 }).toBe('text');
+
+  // Sopra la carta e di nuovo nel vuoto sullo stesso testo: la pagina non lo ridice, la vista se lo ricorda.
+  const c = await vista.evaluate(() => { const r = document.querySelector('.shell-notif-msg').getBoundingClientRect(); return { x: Math.round(r.left + 5), y: Math.round(r.top + 5) }; });
+  await gestoNellaVista(app, { type: 'mouseMove', x: c.x, y: c.y });
+  await expect.poll(cursore).not.toBe('text');
+  await muovi(b.height - 11);
+  await expect.poll(cursore, { timeout: 3000 }).toBe('text');
+});

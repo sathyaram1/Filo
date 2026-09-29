@@ -225,6 +225,7 @@
   }, true);
   document.addEventListener('mousemove', (e) => {
     if (gestoDellaPagina || !cartaSotto(e)) {
+      if (!sopraIlVuoto) root.style.cursor = formaPagina;
       sopraIlVuoto = true;
       inoltra('mouseMove', e);
     } else {
@@ -248,10 +249,21 @@
     'copy', 'alias', 'none', 'not-allowed', 'no-drop', 'grab', 'grabbing', 'zoom-in', 'zoom-out', 'context-menu',
     'vertical-text', 'col-resize', 'row-resize', 'all-scroll', 'e-resize', 'n-resize', 'ne-resize', 'nw-resize',
     's-resize', 'se-resize', 'sw-resize', 'w-resize', 'ns-resize', 'ew-resize', 'nesw-resize', 'nwse-resize']);
+  // Electron chiama 'pointer' la freccia e 'hand' la mano: in CSS la mano è 'pointer'.
+  const DA_ELECTRON = { pointer: 'default', hand: 'pointer', nodrop: 'no-drop', 'drag-drop-none': 'no-drop',
+    'drag-drop-move': 'move', 'drag-drop-copy': 'copy', 'drag-drop-link': 'alias' };
+  function formaCss(forma) {
+    const f = String(forma || '');
+    if (Object.prototype.hasOwnProperty.call(DA_ELECTRON, f)) return DA_ELECTRON[f];
+    if (/panning/.test(f)) return 'all-scroll';
+    return FORME.has(f) ? f : '';
+  }
+  // L'ultimo puntatore della pagina vale anche se è arrivato mentre si era sopra una carta: entrando nel vuoto si usa.
+  let formaPagina = '';
   if (api.onCursore) {
     api.onCursore((forma) => {
-      const f = forma === 'nodrop' ? 'no-drop' : String(forma || '');
-      if (sopraIlVuoto) root.style.cursor = FORME.has(f) ? f : '';
+      formaPagina = formaCss(forma);
+      if (sopraIlVuoto) root.style.cursor = formaPagina;
     });
   }
 

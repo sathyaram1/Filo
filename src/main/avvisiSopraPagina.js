@@ -52,6 +52,7 @@ class AvvisiSopraPagina {
     this.suggerimento = false;
     this.inoltroSu = null;
     this.cursori = new WeakSet();
+    this.forme = new WeakMap();
     if (win && typeof win.once === 'function') win.once('closed', () => this._butta());
   }
 
@@ -85,6 +86,8 @@ class AvvisiSopraPagina {
     vista.setVisible(true);
     this.altezza = h;
     this._riserva(h);
+    const wc = this._wcAttiva();
+    if (wc) this._seguiPuntatore(wc);
   }
 
   // L'angolo in basso a destra è uno: gli avvisi di Filo dentro la scheda attiva salgono sopra la
@@ -153,17 +156,29 @@ class AvvisiSopraPagina {
     } else if (tipo === 'mouseWheel') {
       Object.assign(ev, { deltaX: passo(d.dx), deltaY: passo(d.dy), canScroll: true, hasPreciseScrollingDeltas: true });
     }
+    const prima = this.inoltroSu;
     this.inoltroSu = tipo === 'mouseLeave' ? null : wc;
-    if (!this.cursori.has(wc)) {
-      this.cursori.add(wc);
-      // Sopra il vuoto della vista il puntatore è quello che mostrerebbe la pagina (mano su un link, barra sul testo).
-      wc.on('cursor-changed', (_e, forma) => {
-        if (this.inoltroSu !== wc || !this.vista || this.vista.webContents.isDestroyed()) return;
-        try { this.vista.webContents.send('avvisi:cursore', testo(forma)); } catch (_) {}
-      });
-    }
+    this._seguiPuntatore(wc);
+    // Rientrando nel vuoto la pagina non ridice un puntatore che per lei non è cambiato: lo si ridà da qui.
+    if (this.inoltroSu && prima !== wc) this._puntatore(this.forme.get(wc) || '');
     if (tipo === 'mouseDown') this.restituisciTastiera();
     try { wc.sendInputEvent(ev); } catch (_) {}
+  }
+
+  // Sopra il vuoto della vista il puntatore è quello che mostrerebbe la pagina (mano su un link, barra sul testo).
+  // Si ascolta da quando la vista copre la scheda, così si sa anche quello che la pagina ha detto prima.
+  _seguiPuntatore(wc) {
+    if (this.cursori.has(wc)) return;
+    this.cursori.add(wc);
+    wc.on('cursor-changed', (_e, forma) => {
+      this.forme.set(wc, testo(forma));
+      if (this.inoltroSu === wc) this._puntatore(forma);
+    });
+  }
+
+  _puntatore(forma) {
+    if (!this.vista || this.vista.webContents.isDestroyed()) return;
+    try { this.vista.webContents.send('avvisi:cursore', testo(forma)); } catch (_) {}
   }
 
   // Tasto destro su una carta: le sue azioni e la chiusura, nel menu di Filo; la scelta fa quello che fa il pulsante.
