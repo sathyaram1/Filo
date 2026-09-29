@@ -4,6 +4,7 @@ module.exports = function register(on, ctx) {
   const { MSG, maybeCategorizeAsync } = ctx;
   const SavedPages = globalThis.SN_SAVED_PAGES;
   const Categorizer = globalThis.SN_CATEGORIZER;
+  const { dallaScheda } = require('../miniature');
 
   on(MSG.SAVE_PAGE, async (msg) => {
     const entry = await SavedPages.save(msg.page);
@@ -45,5 +46,16 @@ module.exports = function register(on, ctx) {
 
   on(MSG.CONSUME_SAVED_PAGE, async (msg) => ({ ok: true, pages: await SavedPages.consume(msg.id) }));
 
-  on(MSG.SET_SAVED_PAGE_THUMB, async (msg) => ({ ok: true, entry: await SavedPages.setThumbnail(msg.id, msg.thumbnail) }));
+  // La miniatura la scatta il main dalla scheda di chi la chiede: un'immagine mandata dalla pagina qui non si decodifica (#839).
+  on(MSG.SET_SAVED_PAGE_THUMB, async (msg, sender) => {
+    const tab = sender?.win?._filoTabs?.tabs?.find((t) => t.id === sender?.tab?.id);
+    if (!tab || !msg?.id) return { ok: false };
+    const thumbnail = await dallaScheda(tab.view.webContents);
+    const entry = thumbnail ? await SavedPages.setThumbnail(msg.id, thumbnail) : null;
+    return { ok: !!entry, entry };
+  });
+
+  on(MSG.SHORTCUT_RECEIPT, async (msg, sender) => ({
+    ok: require('../../shortcuts').riceviRicevuta(msg.ricevuta, sender?.tab?.id, msg.presa),
+  }));
 };

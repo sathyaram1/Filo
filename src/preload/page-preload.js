@@ -357,17 +357,11 @@ try {
 // La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content
 // script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.
 // Adattatore: ascolto shortcut:triggered e ribroadcast come filo:broadcast.
-ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
-  // Il payload deve usare il type MSG.SHORTCUT_TRIGGERED del catalogo messaggi.
-  // Lo prendiamo dai constants caricati sopra (SN_MSG popolato da messages.js).
-  // `context` è opzionale: lo usa la voce "Aiuto" del menu tasto destro su una
-  // tab per dire all'agente da dove è stato invocato (url + titolo della scheda).
-  const t = globalThis.SN_MSG?.MSG?.SHORTCUT_TRIGGERED || 'shortcut_triggered';
-  const deliver = () => {
-    for (const fn of broadcastListeners) {
-      try { fn({ type: t, command, context }, { id: 'filo-desktop' }, () => {}); } catch (_) {}
-    }
-  };
+// `context` è opzionale: lo usa la voce "Aiuto" del menu tasto destro su una
+// tab per dire all'agente da dove è stato invocato (url + titolo della scheda).
+const consegnaScorciatoia = require('./scorciatoia.js');
+ipcRenderer.on('shortcut:triggered', (_event, payload = {}) => {
+  const deliver = () => consegnaScorciatoia(broadcastListeners, payload, filoMessage);
   // #405 — una scorciatoia indirizzata a un riquadro (Alt+E su testo
   // selezionato dentro un video incorporato) può arrivare prima che il
   // riquadro abbia montato Filo: montalo e consegna appena è pronto.
@@ -376,6 +370,8 @@ ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
     waitForContentScripts(deliver);
     return;
   }
+  // Premuta a pagina ancora in caricamento, aspetta che Filo ci sia invece di perdersi.
+  if (!contenutiPronti()) { waitForContentScripts(deliver); return; }
   deliver();
 });
 
@@ -510,12 +506,17 @@ function ensureContentScripts() {
 
 // Chiama `fn` quando i content script del riquadro hanno finito di installare i
 // propri listener (content.js marca `filoContentReady` a fine init).
+// Su una pagina dove Filo è spento (sito escluso, pagina di sistema) content.js
+// non mette ascoltatori: lo dichiara, e chi aspetta non resta appeso tre secondi.
+function contenutiPronti() {
+  try { if (document.documentElement.dataset.filoContentReady === '1') return true; } catch (_) {}
+  return globalThis.__snFiloSpento === true;
+}
+
 function waitForContentScripts(fn) {
   const deadline = Date.now() + 3000;
   const tick = () => {
-    let ready = false;
-    try { ready = document.documentElement.dataset.filoContentReady === '1'; } catch (_) {}
-    if (ready || Date.now() > deadline) { try { fn(); } catch (_) {} return; }
+    if (contenutiPronti() || Date.now() > deadline) { try { fn(); } catch (_) {} return; }
     setTimeout(tick, 16);
   };
   tick();
@@ -541,15 +542,3 @@ if (!IS_SUBFRAME) {
   }
 }
 
-// Helper usato dal main per il save-for-later shortcut: estrae metadata
-// senza dipendere dal content script di estensione (che potrebbe non aver
-// finito di caricarsi).
-window.__sn_collectSavePayload = () => {
-  try {
-    const desc = document.querySelector('meta[name="description"]')?.content
-      || document.querySelector('meta[property="og:description"]')?.content || '';
-    const favicon = document.querySelector('link[rel*="icon"]')?.href || '';
-    const excerpt = (document.body?.innerText || '').slice(0, 600);
-    return { description: desc, favicon, excerpt };
-  } catch (_) { return {}; }
-};

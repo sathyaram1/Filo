@@ -193,7 +193,8 @@ function createIncognitoWindow() {
   wireWindowCommon(win, tabs);
 
   win.webContents.once('did-finish-load', async () => {
-    tabs.openTab('filo://newtab/'); // niente restore in incognito
+    // Niente restore in incognito. Una scheda aperta qui prima che la barra finisse di caricarsi resta davanti.
+    if (!tabs.tabs.length) tabs.openTab('filo://newtab/');
     revealWindow(win);
   });
 

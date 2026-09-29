@@ -64,11 +64,22 @@ function isInternalTab(tab) {
   return !!tab.isInternal || String(tab.url || '').startsWith('filo://');
 }
 
+// Le scorciatoie vanno alla finestra di Filo che l'utente ha davanti (anche l'incognito):
+// `ripiego` vale solo se a fuoco non c'è una finestra con schede (un menu a comparsa).
+function finestraDiFilo(ripiego) {
+  const viva = (w) => !!(w && w._filoTabs && !(typeof w.isDestroyed === 'function' && w.isDestroyed()));
+  let aFuoco = null;
+  try { aFuoco = BrowserWindow.getFocusedWindow?.() || null; } catch (_) {}
+  if (viva(aFuoco)) return aFuoco;
+  if (viva(ripiego)) return ripiego;
+  try { return (BrowserWindow.getAllWindows?.() || []).find(viva) || null; } catch (_) { return null; }
+}
+
 function dispatch(command, window) {
   // Manda al webContents della tab attiva. Se è una pagina interna senza
   // content script, nessuno raccoglie: ok, è il comportamento atteso.
-  const win = window || BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
-  if (!win || !win._filoTabs) return;
+  const win = finestraDiFilo(window);
+  if (!win) return;
   const active = win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId);
   if (!active) return;
 
@@ -102,43 +113,86 @@ function dispatch(command, window) {
   }
 }
 
+// #839 — Alt+S e il menu sono la stessa azione: la fa la pagina (savePage nel content script), con la sua
+// miniatura, la conferma cliccabile e la chiusura, anche dove Filo è spento. Il main salva da solo solo se la pagina non risponde.
+const ATTESA_RICEVUTA_MS = 3500;
+const ricevuteInAttesa = new Map();
+
+function consegnaConRicevuta(tab, command, attesaMs = ATTESA_RICEVUTA_MS, context) {
+  return new Promise((resolve) => {
+    const ricevuta = crypto.randomUUID();
+    const chiudi = (presa) => {
+      clearTimeout(timer);
+      ricevuteInAttesa.delete(ricevuta);
+      resolve(presa);
+    };
+    const timer = setTimeout(() => chiudi(false), attesaMs);
+    ricevuteInAttesa.set(ricevuta, { tabId: tab.id, chiudi });
+    // `scade`: una pagina che la prende quando il main ha smesso di aspettare non la esegue, se no si salva due volte.
+    const scade = Date.now() + attesaMs;
+    try { tab.view.webContents.send('shortcut:triggered', { command, ricevuta, context, scade }); } catch (_) { chiudi(false); }
+  });
+}
+
+// La ricevuta vale solo dalla scheda a cui era stata consegnata.
+function riceviRicevuta(ricevuta, tabId, presa) {
+  const attesa = ricevuteInAttesa.get(ricevuta);
+  if (!attesa || attesa.tabId !== tabId) return false;
+  attesa.chiudi(!!presa);
+  return true;
+}
+
+// Un secondo Alt+S sulla scheda che aspetta ancora la pagina o il ripiego non avvia un altro salvataggio con la sua conferma.
+const salvataggiInCorso = new Set();
+
 async function saveForLater(win, tab) {
+  if (salvataggiInCorso.has(tab.id)) return;
+  salvataggiInCorso.add(tab.id);
+  let entry = null;
+  try { entry = await salvaPerDopo(win, tab); } finally { salvataggiInCorso.delete(tab.id); }
+  if (entry) await confermaSullaSchedaDavanti(win, entry);
+}
+
+// Il ripiego scrive dove scriverebbe la pagina passando dall'IPC: in incognito, nella memoria della sessione e non sul disco.
+function comeLaFinestra(win, lavoro) {
+  return win && win._filoIncognito ? require('./shim/storage').runIncognito(lavoro) : lavoro();
+}
+
+async function salvaPerDopo(win, tab) {
   const { handleMessage } = require('./services/handlers');
-  // Fotografiamo SUBITO i dati identificativi della scheda, prima di qualsiasi
-  // attesa: se la pagina naviga/redirect mentre raccogliamo metadata e
-  // miniatura, tab.url/tab.title potrebbero già puntare alla nuova pagina e
-  // finiremmo per salvare quella sbagliata (#334, cammino da scorciatoia).
+  const { dallaScheda } = require('./services/miniature');
+  const { MSG } = globalThis.SN_MSG;
+  // I dati della scheda si fotografano prima di ogni attesa: un redirect intanto farebbe salvare la pagina sbagliata (#334).
   const url = tab.url;
   const title = tab.title;
   const favicon = tab.favicon || '';
-  // Chiediamo metadata al content script (best-effort), poi catturiamo thumbnail.
-  let extra = {};
-  try {
-    extra = await tab.view.webContents.executeJavaScript(
-      '(window.__sn_collectSavePayload && window.__sn_collectSavePayload()) || {}',
-      true,
-    );
-  } catch (_) { /* tab senza content script */ }
-  let thumbnail = '';
-  try {
-    const img = await tab.view.webContents.capturePage();
-    thumbnail = img.resize({ width: 320 }).toDataURL();
-  } catch (_) {}
-  const salva = () => handleMessage({
-    type: globalThis.SN_MSG.MSG.SAVE_PAGE,
-    page: {
-      url, title,
-      favicon: favicon || extra.favicon,
-      thumbnail,
-      description: extra.description,
-      excerpt: extra.excerpt,
-    },
+  if (await consegnaConRicevuta(tab, 'save-for-later')) return null;
+  // Pagina che non l'ha presa (ancora in caricamento, bloccata): si salva comunque, prima della miniatura.
+  const entry = await comeLaFinestra(win, async () => {
+    const res = await handleMessage({ type: MSG.SAVE_PAGE, page: { url, title, favicon } });
+    const thumbnail = await dallaScheda(tab.view.webContents);
+    if (thumbnail && res?.entry?.id) await globalThis.SN_SAVED_PAGES.setThumbnail(res.entry.id, thumbnail);
+    return res?.entry;
   });
-  // Da una finestra in incognito il salvataggio resta in memoria, come quello
-  // del tasto destro (che passa dall'IPC): sul disco non deve arrivare niente.
-  if (win._filoIncognito) await require('./shim/storage').runIncognito(salva);
-  else await salva();
   try { win._filoTabs.closeTab(tab.id); } catch (_) {}
+  return entry;
 }
 
-module.exports = { collegaScorciatoie, comandoDaTasto, dispatch, saveForLater, isInternalTab, acceleratorePerPiattaforma, COMMANDS };
+// La scheda salvata non poteva mostrare la conferma: la mostra quella che l'utente ha davanti adesso, senza chiudersi.
+// Vale solo quando una pagina l'ha presa: la scheda nata al posto dell'ultima, o una che sta navigando, la prima la perde.
+// Gli avvisi della cornice finiscono sotto la pagina, per questo non passa di lì.
+async function confermaSullaSchedaDavanti(win, entry, { tentativoMs = 800, totaleMs = 10000 } = {}) {
+  if (!entry?.id) return false;
+  const context = { entry: { id: entry.id, category: entry.category || null }, conferma: crypto.randomUUID() };
+  const fine = Date.now() + totaleMs;
+  while (Date.now() < fine) {
+    const tm = win && !(win.isDestroyed && win.isDestroyed()) ? win._filoTabs : null;
+    if (!tm) return false;
+    const davanti = tm.tabs.find((t) => t.id === tm.activeId);
+    if (davanti && await consegnaConRicevuta(davanti, 'save-for-later-confirm', tentativoMs, context)) return true;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  return false;
+}
+
+module.exports = { collegaScorciatoie, comandoDaTasto, dispatch, saveForLater, consegnaConRicevuta, riceviRicevuta, confermaSullaSchedaDavanti, isInternalTab, acceleratorePerPiattaforma, COMMANDS };

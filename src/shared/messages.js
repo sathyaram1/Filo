@@ -44,7 +44,7 @@
     GET_SAVED_PAGES: 'get_saved_pages',
     REMOVE_SAVED_PAGE: 'remove_saved_page',       // { id }
     CONSUME_SAVED_PAGE: 'consume_saved_page',     // { id }
-    SET_SAVED_PAGE_THUMB: 'set_saved_page_thumb', // { id, thumbnail } — miniatura best-effort dopo il salvataggio
+    SET_SAVED_PAGE_THUMB: 'set_saved_page_thumb', // { id } — il main fotografa la scheda di chi chiede e ne fa la miniatura
 
     // §3.1/§3.3 — archivio tab chiuse (metadati). La scrittura avviene nel main
     // alla chiusura di una tab; queste servono alla pagina archivio per leggere/
@@ -801,6 +801,8 @@
     // Da background -> content (broadcast)
     SETTINGS_UPDATED: 'settings_updated',
     SHORTCUT_TRIGGERED: 'shortcut_triggered',     // { command }
+    // Risposta della pagina a una scorciatoia consegnata con ricevuta: se non l'ha presa, la fa il main (#839). { ricevuta, presa }
+    SHORTCUT_RECEIPT: 'shortcut_receipt',
     // Contropartita di RUN_IN_TOP_FRAME: arriva SOLO al frame principale della
     // scheda e gli fa eseguire l'azione di pagina chiesta da un riquadro. { iconId }
     TOP_FRAME_COMMAND: 'top_frame_command',

@@ -253,11 +253,9 @@ const chromeShim = {
 // la voce "Aiuto" per dire all'agente da dove è stato invocato). Solo su origine
 // filo://, dove lo shim e i content script sono davvero installati.
 if (IS_FILO_ORIGIN) {
-  ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
-    const t = globalThis.SN_MSG?.MSG?.SHORTCUT_TRIGGERED || 'shortcut_triggered';
-    for (const fn of chromeShim.runtime.onMessage._listeners) {
-      try { fn({ type: t, command, context }, { id: 'filo-desktop' }, () => {}); } catch (_) {}
-    }
+  const consegnaScorciatoia = require('./scorciatoia.js');
+  ipcRenderer.on('shortcut:triggered', (_event, payload = {}) => {
+    consegnaScorciatoia(chromeShim.runtime.onMessage._listeners, payload, filoApi.message);
   });
 }
 
