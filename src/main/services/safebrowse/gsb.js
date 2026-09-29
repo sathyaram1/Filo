@@ -190,8 +190,14 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
   // Verdetto dalla sola cache: undefined se anche un prefisso non ha una risposta valida.
   function peek(url) {
     const hs = hashesOf(url);
-    if (!hs.length || hs.some((h) => !fresh(h.prefix))) return undefined;
-    return decide(hs, fresh);
+    if (!hs.length) return undefined;
+    const got = new Map();
+    for (const h of hs) {
+      const e = fresh(h.prefix);
+      if (!e) return undefined;
+      got.set(h.prefix, e);
+    }
+    return decide(hs, (p) => got.get(p));
   }
 
   async function request(prefixes) {

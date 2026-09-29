@@ -20,7 +20,9 @@ afterEach(() => {
 const sha = (s) => crypto.createHash('sha256').update(s).digest();
 
 // Servizio finto: risponde come hashes.search v5 e annota ogni richiesta così com'è partita.
+// `elenco`: espressione → tipo, oppure coppie [impronta completa, tipo].
 function servizioFinto({ elenco = {}, cacheDuration = '300s', guasto = null, dettagli = null } = {}) {
+  const voci = Array.isArray(elenco) ? elenco : Object.entries(elenco).map(([expr, tipo]) => [sha(expr), tipo]);
   const richieste = [];
   globalThis.fetch = async (url, opts) => {
     richieste.push({ url: String(url), opts: JSON.stringify(opts || {}) });
@@ -28,8 +30,7 @@ function servizioFinto({ elenco = {}, cacheDuration = '300s', guasto = null, det
     if (typeof guasto === 'number') return { ok: false, status: guasto, json: async () => ({}) };
     const chiesti = new URL(String(url)).searchParams.getAll('hashPrefixes');
     const fullHashes = [];
-    for (const [expr, threatType] of Object.entries(elenco)) {
-      const full = Buffer.isBuffer(expr) ? expr : sha(expr);
+    for (const [full, threatType] of voci) {
       if (!chiesti.includes(full.subarray(0, 4).toString('base64'))) continue;
       fullHashes.push({ fullHash: full.toString('base64'), fullHashDetails: dettagli || [{ threatType }] });
     }
@@ -153,18 +154,9 @@ test('l\'impronta completa di un indirizzo in lista dà «pericoloso» con la ca
   assert.match(v.message.body, /phishing/);
 
   SB._gsbLookup.clear();
-  richieste = servizioFinto({ elenco: { [quasi.toString('latin1')]: 'MALWARE' } });
-  globalThis.fetch = (() => {
-    const f = globalThis.fetch;
-    return async (url, opts) => {
-      const r = await f(url, opts);
-      const corpo = await r.json();
-      const chiesti = new URL(String(url)).searchParams.getAll('hashPrefixes');
-      if (chiesti.includes(quasi.subarray(0, 4).toString('base64'))) corpo.fullHashes = [{ fullHash: quasi.toString('base64'), fullHashDetails: [{ threatType: 'MALWARE' }] }];
-      return { ok: true, status: 200, json: async () => corpo };
-    };
-  })();
+  richieste = servizioFinto({ elenco: [[quasi, 'MALWARE']] });
   const w = await verdettoDopoRete(listato, richieste);
+  assert.equal(richieste.length, 1);
   assert.equal(w.level, 'safe');
   assert.deepEqual(SB._gsbLookup.peek(listato), { listed: false });
 });
