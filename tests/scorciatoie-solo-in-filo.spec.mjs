@@ -154,3 +154,91 @@ test('Alt+S in una finestra in incognito salva solo nella memoria di quella fine
   expect(dove).toEqual({ suDisco: false, inMemoria: true });
   expect((await schede(app)).ids).toEqual(normale.ids);
 });
+
+// Da qui il tasto va a chi ha davvero la tastiera, come uno vero: se nessuno ce
+// l'ha si perde. Dopo una scheda chiusa o cambiata la tastiera restava a nessuno.
+function premiDoveHaLaTastiera(app, keyCode, modifiers) {
+  return app.evaluate(({ webContents }, o) => {
+    const f = webContents.getFocusedWebContents();
+    if (!f) return false;
+    f.sendInputEvent({ type: 'keyDown', keyCode: o.keyCode, modifiers: o.modifiers });
+    f.sendInputEvent({ type: 'keyUp', keyCode: o.keyCode, modifiers: o.modifiers });
+    return true;
+  }, { keyCode, modifiers });
+}
+
+async function quattroPagineColFuocoSullUltima(app, openTab, testServer) {
+  for (let i = 1; i <= 4; i++) await testServer.openReady(openTab, TESTO.replace('<p id="testo">', `<p id="testo">Pagina ${i}. `));
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w.show(); w.focus();
+    w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents.focus();
+  });
+}
+
+function tastieraSullaAttiva(app) {
+  return app.evaluate(({ BrowserWindow, webContents }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    return webContents.getFocusedWebContents() === t.view.webContents;
+  });
+}
+
+function aiutoSullaAttiva(app) {
+  return app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    return t.view.webContents.executeJavaScript('!!document.querySelector(".sn-sidebar")');
+  });
+}
+
+test('Alt+S premuto due volte di fila salva e chiude due schede', async ({ app, openTab, testServer }) => {
+  await quattroPagineColFuocoSullUltima(app, openTab, testServer);
+  const n = (await schede(app)).ids.length;
+  expect(await premiDoveHaLaTastiera(app, 'S', ['alt'])).toBe(true);
+  await expect.poll(async () => (await schede(app)).ids.length, { timeout: 10_000 }).toBe(n - 1);
+  await expect.poll(() => tastieraSullaAttiva(app)).toBe(true);
+  await premiDoveHaLaTastiera(app, 'S', ['alt']);
+  await expect.poll(async () => (await schede(app)).ids.length, { timeout: 10_000 }).toBe(n - 2);
+});
+
+test('Ctrl+W premuto due volte di fila chiude due schede', async ({ app, openTab, testServer }) => {
+  await quattroPagineColFuocoSullUltima(app, openTab, testServer);
+  const n = (await schede(app)).ids.length;
+  expect(await premiDoveHaLaTastiera(app, 'W', ['control'])).toBe(true);
+  await expect.poll(async () => (await schede(app)).ids.length).toBe(n - 1);
+  await expect.poll(() => tastieraSullaAttiva(app)).toBe(true);
+  await premiDoveHaLaTastiera(app, 'W', ['control']);
+  await expect.poll(async () => (await schede(app)).ids.length).toBe(n - 2);
+});
+
+for (const [nome, keyCode, modifiers] of [
+  ['Ctrl+W', 'W', ['control']],
+  ['il salto di scheda con Alt+2', '2', ['alt']],
+]) {
+  test(`dopo ${nome}, Alt+H apre l'Aiuto sulla scheda che resta davanti`, async ({ app, openTab, testServer }) => {
+    await quattroPagineColFuocoSullUltima(app, openTab, testServer);
+    const prima = (await schede(app)).activeId;
+    expect(await premiDoveHaLaTastiera(app, keyCode, modifiers)).toBe(true);
+    await expect.poll(async () => (await schede(app)).activeId).not.toBe(prima);
+    await expect.poll(() => tastieraSullaAttiva(app)).toBe(true);
+    // Una pagina appena tornata davanti perde un messaggio nei primi decimi di
+    // secondo, anche mandato a mano: si aspetta che risponda, come un dito vero.
+    await aiutoSullaAttiva(app);
+    await premiDoveHaLaTastiera(app, 'H', ['alt']);
+    await expect.poll(() => aiutoSullaAttiva(app), { timeout: 8000 }).toBe(true);
+  });
+}
+
+test('col fuoco sulla barra, cambiare scheda non le toglie la tastiera', async ({ app, openTab, testServer }) => {
+  await quattroPagineColFuocoSullUltima(app, openTab, testServer);
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w.webContents.focus();
+    w._filoTabs.activate(w._filoTabs.tabs[1].id);
+  });
+  expect(await app.evaluate(({ BrowserWindow, webContents }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    return webContents.getFocusedWebContents() === w.webContents;
+  })).toBe(true);
+});
