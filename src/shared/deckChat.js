@@ -75,6 +75,63 @@
     return (Array.isArray(list) ? list.length : 0) <= MAX_MESSAGES;
   }
 
+  // Una risposta resta «sta pensando» solo finché la pagina che l'ha chiesta è ancora lì ad aspettarla (`isLive`,
+  // lo sa il main); altrimenti si rilegge interrotta, col suo turno per «Riprova».
+  function forReading(list, isLive) {
+    return cleanChat(list).map((m) => {
+      if (!m.pending || (typeof isLive === 'function' && isLive(m.turn))) return m;
+      const { pending, ...rest } = m;
+      return { ...rest, interrupted: true };
+    });
+  }
+
+  function turnIndex(list, turn) {
+    return turn ? list.findIndex((m) => m.who === 'bot' && m.turn === turn) : -1;
+  }
+
+  // Le schede non riscrivono mai la chat intera: ognuna manda la SUA modifica, applicata sulla chat salvata di
+  // adesso. Così una scheda rimasta indietro (un'altra ha svuotato, o ha scritto nel frattempo) non riporta in
+  // vita niente e non cancella il lavoro dell'altra. Risultato: { list } oppure { error }.
+  function applyEdit(list, change) {
+    const cur = cleanChat(list);
+    const c = change && typeof change === 'object' ? change : {};
+    if (c.op === 'append') {
+      const next = cur.concat(cleanChat(c.messages));
+      return fits(next) ? { list: next } : { error: 'too_many' };
+    }
+    if (c.op === 'fill') {
+      const i = turnIndex(cur, str(c.turn));
+      const m = cleanMessage({ ...(c.message || {}), who: 'bot', turn: str(c.turn), pending: false, interrupted: false });
+      if (i < 0 || !m) return { error: 'gone' };
+      if (!m.nameIds && cur[i].nameIds) m.nameIds = cur[i].nameIds;
+      cur[i] = m;
+      return { list: cur };
+    }
+    if (c.op === 'drop') {
+      // Riprova: via la risposta fallita e la domanda che l'ha chiesta. Una bolla senza turno (salvata prima dei
+      // turni) si riconosce dall'essere l'ultima, fallita, dopo la stessa domanda.
+      const text = str(c.userText);
+      let i = turnIndex(cur, str(c.turn));
+      if (i < 0 && !c.turn) {
+        const last = cur.length - 1;
+        const m = cur[last];
+        if (m && m.who === 'bot' && (m.error || m.interrupted || m.pending)) i = last;
+      }
+      if (i < 0) return { error: 'gone' };
+      const from = i > 0 && cur[i - 1].who === 'user' && (!text || cur[i - 1].text === text) ? i - 1 : i;
+      cur.splice(from, i - from + 1);
+      return { list: cur };
+    }
+    if (c.op === 'names') {
+      const i = turnIndex(cur, str(c.turn));
+      if (i < 0) return { error: 'gone' };
+      const names = nameMap({ ...(cur[i].nameIds || {}), ...(nameMap(c.nameIds) || {}) });
+      if (names) cur[i] = { ...cur[i], nameIds: names };
+      return { list: cur };
+    }
+    return { error: 'bad_op' };
+  }
+
   // Lo storico per il modello: domande e risposte scritte, niente bolle d'errore o interrotte.
   function historyFor(msgs) {
     return (msgs || [])
