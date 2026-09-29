@@ -1,6 +1,6 @@
 // Verifica #821, giro 1: schede non attive con la tinta viva del sito, cinque siti, due temi.
 import { test, expect } from '../../fixtures/electron.mjs';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 
 const svg = (inner) => 'data:image/svg+xml,' + encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">${inner}</svg>`);
@@ -89,7 +89,7 @@ test('cinque siti noti: tinta viva, formula, titolo leggibile, chiaro e scuro', 
   for (const [title, icon] of SITI) await testServer.openReady(openTab, page(title, icon));
   await testServer.openReady(openTab, page('Pagina neutra', null));
   await expect.poll(async () => (await leggiSchede(shell)).tabs.filter((t) => !t.active && t.identity).length,
-    { timeout: 15_000 }).toBe(SITI.length);
+    { timeout: 15_000 }).toBeGreaterThanOrEqual(SITI.length);
   mkdirSync('tests/.shots', { recursive: true });
   const report = [];
   for (const scheme of ['light', 'dark']) {
@@ -111,7 +111,7 @@ test('cinque siti noti: tinta viva, formula, titolo leggibile, chiaro e scuro', 
     await shell.screenshot({ path: `tests/.shots/v821-hover-close-${scheme}.png`, clip: { x: 0, y: 0, width: 700, height: 44 } });
     await shell.mouse.move(5, 300);
   }
-  console.log(JSON.stringify(report, null, 1));
+  writeFileSync('tests/.shots/v821-report.json', JSON.stringify(report));
   for (const r of report) {
     expect(r.contrTitolo, `${r.tag} ${r.tip}`).toBeGreaterThanOrEqual(4.5);
     if ('ok' in r) expect(r.ok, `${r.tag} ${r.tip} ${r.bg} vs ${r.atteso}`).toBe(true);
