@@ -135,6 +135,21 @@ test('indietro dalla pagina «Sito bloccato» torna alla pagina di prima; tolto 
   await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toBe(sito);
 });
 
+test('un sito messo in lista mentre una scheda ci sta ancora arrivando: la scheda finisce sulla pagina «Sito bloccato»', async ({ app, shell, rete }) => {
+  await lista(shell, []);
+  const lento = rete.pagina('blocked.test', '/lento', '<h1>SITO</h1>', { ritardoMs: 2500 });
+  const partenza = rete.pagina('sito.test', '/', '<h1>PARTENZA</h1>');
+  await apri(app, shell, partenza);
+  const tab = app.windows().find((w) => w.url().includes('sito.test'));
+  await tab.evaluate((u) => { location.href = u; }, lento);
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), lento);
+  await shell.waitForTimeout(500);
+  await lista(shell, ['blocked.test']);
+  const suQuelSito = async () => (await schede(app)).filter((u) => u.includes('blocked.test'));
+  await expect.poll(async () => (await suQuelSito()).filter((u) => PAGINA_BLOCCATA.test(u)).length, { timeout: 8000 }).toBe(2);
+  expect(await aperteSu(app, 'http://blocked.test')).toEqual([]);
+});
+
 test('alla riapertura di Filo una scheda su un sito della lista torna sulla pagina «Sito bloccato»', async ({ rete }) => {
   const userData = cartellaTemporanea('filo-test-');
   const avvia = async () => {

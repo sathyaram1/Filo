@@ -28,14 +28,17 @@ export const test = filoTest.extend({
       const r = pagine.get(`${host}${path}`);
       if (!r) { res.writeHead(404); res.end('no'); return; }
       if (r.to) { res.writeHead(302, { Location: r.to }); res.end(); return; }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(r.html);
+      setTimeout(() => {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(r.html);
+      }, r.ritardoMs || 0);
     });
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const port = server.address().port;
     await use({
       port,
-      pagina(host, path, html) { pagine.set(`${host}${path}`, { html: `<!doctype html><meta charset="utf-8">${html}` }); return `http://${host}${path}`; },
+      // `ritardoMs`: la risposta arriva dopo, per le prove su una navigazione ancora in corso.
+      pagina(host, path, html, { ritardoMs = 0 } = {}) { pagine.set(`${host}${path}`, { html: `<!doctype html><meta charset="utf-8">${html}`, ritardoMs }); return `http://${host}${path}`; },
       rimbalzo(host, path, to) { pagine.set(`${host}${path}`, { to }); return `http://${host}${path}`; },
     });
     try { server.closeAllConnections?.(); } catch (_) {}
