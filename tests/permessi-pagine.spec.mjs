@@ -207,8 +207,9 @@ test('appunti: la pagina non legge quello che hai copiato senza un sì; con Inco
   await barra().getByRole('button', { name: 'Non consentire', exact: true }).click();
   await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['negato:NotAllowedError']);
 
-  // Incolla di Filo: il content script chiede il lasciapassare per la sua scheda, poi legge.
+  // Incolla di Filo: dopo il clic dell'utente il content script chiede il lasciapassare per la sua scheda, poi legge.
   const pagina = app.windows().find((w) => w.url().startsWith(origine));
+  await pagina.click('input');
   const ok = await app.evaluate(async ({ BrowserWindow }, base) => {
     for (const w of BrowserWindow.getAllWindows()) {
       const t = w._filoTabs && w._filoTabs.tabs.find((x) => x.view.webContents.getURL().startsWith(base));
@@ -356,6 +357,7 @@ test('il lasciapassare di Detta vale per il microfono, non per la fotocamera a c
   await expect(barra()).toBeVisible({ timeout: 10_000 });
   await barra().getByRole('button', { name: 'Non consentire', exact: true }).click();
   await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['negato:NotAllowedError']);
+  await paginaDi(origine).click('textarea');
   const ok = await app.evaluate(async ({ BrowserWindow }, base) => {
     for (const w of BrowserWindow.getAllWindows()) {
       const t = w._filoTabs && w._filoTabs.tabs.find((x) => x.view.webContents.getURL().startsWith(base));

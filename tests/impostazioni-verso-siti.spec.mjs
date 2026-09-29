@@ -136,7 +136,12 @@ test('a un sito non arriva l\'intervista di benvenuto, e da un sito non si riscr
   expect(alSito, 'l\'intervista di benvenuto è arrivata dentro la pagina di un sito').not.toContain('INTERVISTA-589');
   expect(alSito).not.toContain('filo_onboarding_updated');
 
-  // Dal content script del sito: le scritture che il suo codice non fa sono rifiutate…
+  // Dal content script del sito, dopo un clic dell'utente sulla pagina: le scritture che il suo codice non fa sono rifiutate…
+  await app.evaluate(({ BrowserWindow }, base) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w._filoTabs.activate([...w._filoTabs.tabs].reverse().find((t) => String(t.url).startsWith(base)).id);
+  }, testServer.origin);
+  await sito.click('p');
   const esiti = JSON.parse(await nelContentScript(app, testServer.origin, `
     (async () => {
       const MSG = SN_MSG.MSG;
