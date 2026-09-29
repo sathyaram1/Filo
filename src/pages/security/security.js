@@ -241,7 +241,7 @@
     const sblk = sec.siteBlock || {};
     $('sec-siteblock').checked = sblk.enabled !== false;
     $('sec-siteblock-lists').checked = sblk.useAdblockLists !== false;
-    $('sec-siteblock-blacklist').value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : []).join('\n');
+    $('sec-siteblock-blacklist').value = righeLeggibili(sblk.blacklist);
     // Se ci sono voci salvate da prima del controllo (o non valide), avvisa
     // subito che non bloccheranno nulla invece di lasciarle passare mute.
     setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
@@ -250,7 +250,7 @@
     // chiave assente vale "chiedi", come nel main.
     const dl = sec.downloads || {};
     $('sec-dl-exe').checked = dl.confirmExecutables !== false;
-    $('sec-dl-trusted').value = (Array.isArray(dl.trustedSites) ? dl.trustedSites : []).join('\n');
+    $('sec-dl-trusted').value = righeLeggibili(dl.trustedSites);
     setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
     syncDownloadsEnabled();
     const sb = sec.safeBrowse || {};
@@ -334,7 +334,12 @@
       s = s.split('/')[0].split('?')[0];
     }
     s = s.replace(/^www\./, '');
-    return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s) ? s : '';
+    return window.SN_NOMI_SITO.valido(s) ? s : '';
+  }
+
+  // Si salva la forma «xn--…», si mostra il nome come l'utente l'ha scritto (münchen.de).
+  function righeLeggibili(lista) {
+    return (Array.isArray(lista) ? lista : []).map((d) => window.SN_NOMI_SITO.leggibile(d)).join('\n');
   }
 
   function renderWhitelist() {
@@ -351,7 +356,7 @@
     for (const domain of cookieWhitelist) {
       const li = document.createElement('li');
       const span = document.createElement('span');
-      span.textContent = domain;
+      span.textContent = window.SN_NOMI_SITO.leggibile(domain);
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'sn-btn-secondary';

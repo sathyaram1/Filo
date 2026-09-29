@@ -19,8 +19,7 @@
 
   // Host del bersaglio, per titolo scheda + riga sotto al titolo. textContent
   // ovunque: l'URL arriva dalla query string, mai iniettarlo come HTML.
-  let host = '';
-  try { host = target ? (new URL(target).host || target) : ''; } catch (_) { host = target || ''; }
+  const host = target ? ((window.SN_NOMI_SITO && window.SN_NOMI_SITO.sitoDi(target)) || target) : '';
 
   document.getElementById('err-title').textContent = msg.title;
   document.getElementById('err-host').textContent = host ? host : '';

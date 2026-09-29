@@ -2033,10 +2033,14 @@ class TabManager {
       // #590 — un redirect è un cambio d'indirizzo come gli altri: senza, un
       // accorciatore o un redirect aperto porta a un sito della lista.
       if (event.isMainFrame === false) return;
-      if (this._maybeBlockNavigation(tab, url)) {
+      const fermata = this._maybeBlockNavigation(tab, url);
+      if (fermata) {
         event.preventDefault();
         // Una scheda nata per quell'indirizzo resterebbe bianca e senza storia.
-        if (!tab._everNavigated && !tab.isInternal) setImmediate(() => this._dropTab(tab));
+        if (!tab._everNavigated && !tab.isInternal) {
+          this._esitoApertura(tab, fermata);
+          setImmediate(() => this._dropTab(tab));
+        }
       }
     });
     // Debug helper: in dev relay i log della pagina al main.
@@ -2208,6 +2212,7 @@ class TabManager {
       this._sostituisciVoceBloccata(wc, url);
       // #590 — una navigazione già partita quando il suo sito è entrato in lista arriva lo stesso: si ferma qui.
       const bloccata = /^https?:\/\//i.test(url) && this._decisioneBlocco(tab, url);
+      this._esitoApertura(tab, bloccata || null);
       if (bloccata) { this._mostraPaginaBloccata(tab, url, bloccata); return; }
       // Documento nuovo: lo zoom che la pagina vecchia dichiarava di sé non
       // vale più (#686).
@@ -2432,7 +2437,7 @@ class TabManager {
     // hook resterebbe senza le difese che ogni scheda ha. Qui arrivano SOLO i
     // popup di login (ogni altro percorso del handler qui sopra ritorna 'deny').
     wc.on('did-create-window', (child) => {
-      this._hardenAuthPopup(child);
+      this._hardenAuthPopup(child, tab);
     });
   }
 
@@ -2481,7 +2486,8 @@ class TabManager {
   //     di login concatenato (es. scelta account → verifica) resta una vera
   //     finestra (ricorsivamente hardened), tutto il resto torna dentro Filo
   //     come scheda normale — mai finestre libere non gestite.
-  _hardenAuthPopup(win) {
+  // `origine`: la scheda da cui nasce il popup. Il suo «Apri comunque» vale anche qui (#590).
+  _hardenAuthPopup(win, origine = null) {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
     installaPermessi(pwc.session);
@@ -2490,15 +2496,25 @@ class TabManager {
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
       );
     } catch (_) { /* policy non supportata in qualche build */ }
+    if (origine && origine.siteBlockAllowed && origine._permessoRichieste) {
+      const wcId = pwc.id;
+      permessiApriComunque.set(wcId, origine.siteBlockAllowed);
+      pwc.once('destroyed', () => permessiApriComunque.delete(wcId));
+    }
     let mostrata = false;
     pwc.on('did-navigate', () => { mostrata = true; });
+    // Una finestrella fermata prima di mostrare qualcosa resterebbe vuota a schermo.
+    const ferma = (event) => {
+      event.preventDefault();
+      if (!mostrata) setImmediate(() => { try { win.close(); } catch (_) {} });
+    };
     pwc.on('will-navigate', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
         openExternalScheme(url);
         return;
       }
-      if (this._maybeBlockNavigation(null, url)) event.preventDefault();
+      if (this._maybeBlockNavigation(origine, url)) ferma(event);
     });
     // SICUREZZA (#309) — come per le tab: will-navigate non copre i redirect
     // lato server, e un IdP compromesso/ostile potrebbe rimbalzare il popup
@@ -2510,11 +2526,7 @@ class TabManager {
         return;
       }
       if (event.isMainFrame === false) return;
-      if (this._maybeBlockNavigation(null, url)) {
-        event.preventDefault();
-        // Una finestrella che non ha mostrato niente resterebbe vuota a schermo.
-        if (!mostrata) setImmediate(() => { try { win.close(); } catch (_) {} });
-      }
+      if (this._maybeBlockNavigation(origine, url)) ferma(event);
     });
     pwc.setWindowOpenHandler(({ url }) => {
       if (isWebUnsafeNav(url)) {
@@ -2522,21 +2534,24 @@ class TabManager {
         return { action: 'deny' };
       }
       if (isAuthPopup(url)) {
-        if (this._maybeBlockNavigation(null, url)) return { action: 'deny' };
+        if (this._maybeBlockNavigation(origine, url)) return { action: 'deny' };
         return this._allowAuthPopup(url);
       }
-      this.openTab(url, { activate: true });
+      this.openTab(url, {
+        activate: true,
+        apriComunque: this._siteAllowedIn(origine, url),
+        permessoRichieste: this._siteAllowedIn(origine, url) && !!(origine && origine._permessoRichieste),
+      });
       return { action: 'deny' };
     });
-    pwc.on('did-create-window', (child) => this._hardenAuthPopup(child));
+    pwc.on('did-create-window', (child) => this._hardenAuthPopup(child, origine));
   }
 
   // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell
   // mostra l'avviso "Bloccato popup da <host>" con «Apri» per aprirlo.
   _notifyPopupBlocked(tabId, url) {
     try {
-      let host = '';
-      try { host = new URL(url).host; } catch (_) { host = url; }
+      const host = globalThis.SN_NOMI_SITO.sitoDi(url) || url;
       this.win.webContents.send('tabs:popup-blocked', { tabId, url, host });
     } catch (_) {}
   }
@@ -2545,8 +2560,15 @@ class TabManager {
   // legittimo (es. share dialog, OAuth) e va aperto bypassando il blocco dei
   // popup, NON la lista dei siti bloccati: quella la scavalca solo `apriComunque`,
   // l'«Apri comunque» della notifica di sito bloccato.
-  openBlockedPopup(url, { apriComunque = false } = {}) {
-    this.openTab(url, { activate: true, apriComunque: !!apriComunque, permessoRichieste: !!apriComunque });
+  // `daScheda`: la scheda che aveva chiesto il popup, il cui «Apri comunque» vale anche per lui.
+  openBlockedPopup(url, { apriComunque = false, daScheda = null } = {}) {
+    const origine = daScheda ? this.tabs.find((t) => t.id === daScheda) : null;
+    const eredita = this._siteAllowedIn(origine, url);
+    this.openTab(url, {
+      activate: true,
+      apriComunque: !!apriComunque || eredita,
+      permessoRichieste: !!apriComunque || (eredita && !!origine._permessoRichieste),
+    });
   }
 
   // #412 — un link "Scarica" con target=_blank (o window.open) apre una nuova
@@ -2594,6 +2616,7 @@ class TabManager {
   _dropTab(tab) {
     const idx = this.tabs.findIndex((t) => t.id === tab.id);
     if (idx < 0) return false;
+    this._esitoApertura(tab, null);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
@@ -2643,6 +2666,26 @@ class TabManager {
     }
     if (!decision || !decision.block) return null;
     return { ...decision, target };
+  }
+
+  // Come è finita la prima apertura di una scheda appena nata (#590): `bloccata` è la decisione
+  // della lista se l'ha fermata un rimbalzo, null se la pagina è arrivata o dopo `tetto` ms.
+  // Serve a chi l'ha aperta per conto dell'utente (NAVIGA) per non dire «aperta» a vuoto.
+  esitoApertura(id, { tetto = 5000 } = {}) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab || tab._everNavigated) return Promise.resolve({ bloccata: null });
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => this._esitoApertura(tab, null), tetto);
+      if (!tab._attesaEsito) tab._attesaEsito = [];
+      tab._attesaEsito.push((bloccata) => { clearTimeout(timer); resolve({ bloccata }); });
+    });
+  }
+
+  _esitoApertura(tab, bloccata) {
+    const attese = tab._attesaEsito;
+    if (!attese) return;
+    tab._attesaEsito = null;
+    for (const a of attese) a(bloccata);
   }
 
   // Come _decisioneBlocco, e se blocca lo dice con la notifica «Sito bloccato».
@@ -2743,7 +2786,7 @@ class TabManager {
   // bypassa il blocco).
   _notifyBlocked(host, url) {
     try {
-      const label = host || (() => { try { return new URL(url).host; } catch (_) { return url; } })();
+      const label = host || globalThis.SN_NOMI_SITO.sitoDi(url) || url;
       // Una pagina che riprova in continuazione non deve prendersi l'angolo delle notifiche.
       const ora = Date.now();
       if (!this._avvisiBlocco) this._avvisiBlocco = new Map();

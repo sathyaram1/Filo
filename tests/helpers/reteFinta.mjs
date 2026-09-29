@@ -17,6 +17,8 @@ const APP_ROOT = resolve(__dirname, '..', '..');
 export const HOSTS = [
   'blocked.test', 'www.blocked.test', 'sito.test', 'accorcia.test', 'tracker.test', 'articolo.test',
   'libero.test', 'www.bing.com',
+  // Nomi internazionali nella forma che arriva alla rete: münchen.de e сайт.рф.
+  'xn--mnchen-3ya.de', 'xn--80aswg.xn--p1ai',
 ];
 
 export const test = filoTest.extend({

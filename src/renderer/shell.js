@@ -1748,10 +1748,10 @@
   if (api.tabs.onPopupBlocked) {
     api.tabs.onPopupBlocked((info) => {
       if (!info || !info.url) return;
-      const url = info.url;
+      const { url, tabId } = info;
       NOTIFS.show(`Bloccato popup da ${info.host || '?'}`, {
         durationSec: 8,
-        actions: [{ label: 'Apri', onClick: () => { try { api.tabs.openBlockedPopup(url); } catch (_) {} } }],
+        actions: [{ label: 'Apri', onClick: () => { try { api.tabs.openBlockedPopup(url, false, tabId); } catch (_) {} } }],
       });
     });
   }

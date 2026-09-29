@@ -38,7 +38,8 @@ contextBridge.exposeInMainWorld('filoShell', {
       return () => ipcRenderer.removeListener('tabs:popup-blocked', wrapped);
     },
     // `apriComunque`: solo l'«Apri comunque» della notifica di sito bloccato scavalca la lista.
-    openBlockedPopup: (url, apriComunque) => ipcRenderer.invoke('tabs:open-blocked-popup', { url, apriComunque: apriComunque === true }),
+    // `daScheda`: la scheda del popup fermato, il cui «Apri comunque» vale anche per il popup.
+    openBlockedPopup: (url, apriComunque, daScheda) => ipcRenderer.invoke('tabs:open-blocked-popup', { url, apriComunque: apriComunque === true, daScheda }),
     onPermesso: (fn) => {
       const chiedi = (_event, info) => { try { fn('chiedi', info); } catch (_) {} };
       const fine = (_event, info) => { try { fn('fine', info); } catch (_) {} };

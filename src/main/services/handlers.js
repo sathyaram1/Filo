@@ -1402,9 +1402,13 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
             // Gli schemi non web sono esclusi qui sopra: una scheda che non
             // nasce è la lista dei siti bloccati (#590), e la chat lo deve dire.
             if (!tabId) {
-              let host = '';
-              try { host = new URL(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`).hostname; } catch (_) {}
+              const host = globalThis.SN_NOMI_SITO.sitoDi(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`);
               return { executed: false, kept: true, output: { blocked: 'site', host } };
+            }
+            // La scheda nata può fermarla dopo un rimbalzo verso la lista (un link accorciato).
+            const esito = typeof tm.esitoApertura === 'function' ? await tm.esitoApertura(tabId) : null;
+            if (esito && esito.bloccata) {
+              return { executed: false, kept: true, output: { blocked: 'site', host: esito.bloccata.host } };
             }
             opened = true;
           }

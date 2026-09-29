@@ -112,3 +112,13 @@ test('#590: il punto finale del nome non aggira la lista, e un dominio con accen
   assert.equal(SB.shouldBlockNavigation('https://münchen-evil.de/').block, true);
   assert.equal(SB.shouldBlockNavigation('https://xn--mnchen-evil-thb.de/').block, true);
 });
+
+test('#590: un sito con l\'estensione in caratteri non latini entra in lista e blocca; il nome si legge com\'è scritto', () => {
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['сайт.рф', 'xn--r8jz45g.xn--zckzah', 'münchen.de'] });
+  assert.equal(SB.status().blacklistSize, 3);
+  const d = SB.shouldBlockNavigation('https://сайт.рф/pagina');
+  assert.equal(d.block, true);
+  assert.equal(d.host, 'сайт.рф');
+  assert.equal(SB.shouldBlockNavigation('https://例え.テスト/').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://münchen.de/').host, 'münchen.de');
+});

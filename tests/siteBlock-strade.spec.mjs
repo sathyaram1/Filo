@@ -233,3 +233,89 @@ test('un indirizzo senza schema (come a volte lo manda il modello) porta la sche
   });
   expect(decodeURIComponent(out || '')).toContain('libero.test/pagina');
 });
+
+async function paginaSicurezza(app, shell) {
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://security/security.html'));
+  await expect.poll(() => !!app.windows().find((w) => w.url().startsWith('filo://security')), { timeout: 8000 }).toBe(true);
+  const p = app.windows().find((w) => w.url().startsWith('filo://security'));
+  await p.waitForLoadState('domcontentloaded');
+  return p;
+}
+
+async function scriviLista(pagina, testo) {
+  const campo = pagina.locator('#sec-siteblock-blacklist');
+  await campo.scrollIntoViewIfNeeded();
+  await campo.fill(testo);
+  await campo.dispatchEvent('change');
+  await pagina.waitForTimeout(600);
+}
+
+test('Preferenze: la descrizione non promette eccezioni, e un sito con estensione non latina entra in lista e blocca', async ({ app, shell, rete }) => {
+  const RF = 'xn--80aswg.xn--p1ai';
+  rete.pagina(RF, '/', '<h1>SITO RF</h1>');
+  const pref = await paginaSicurezza(app, shell);
+  await expect(pref.locator('#sec-siteblock-desc')).not.toContainText('motore di ricerca');
+  await expect(pref.locator('#sec-siteblock-desc')).not.toContainText('lo apre Filo per te');
+  await scriviLista(pref, 'сайт.рф\nmünchen.de');
+  await expect(pref.locator('#sec-siteblock-blacklist-error')).toBeHidden();
+
+  const avvisi = await contaAvvisi(app);
+  await shell.evaluate(() => window.filoShell.tabs.open('http://сайт.рф/'));
+  await expect.poll(async () => (await avvisi()).join(' '), { timeout: 6000 }).toContain('Sito bloccato: сайт.рф');
+  expect(await aperteSu(app, RF)).toEqual([]);
+
+  // Si salva nella forma «xn--», si rilegge come l'utente l'ha scritto.
+  await pref.reload();
+  await pref.waitForLoadState('domcontentloaded');
+  await expect(pref.locator('#sec-siteblock-blacklist')).toHaveValue('сайт.рф\nmünchen.de', { timeout: 6000 });
+});
+
+test('un nome con lettere accentate si legge come è scritto nella pagina «Sito bloccato» e nel titolo della scheda', async ({ app, shell, rete }) => {
+  const MUENCHEN = 'xn--mnchen-3ya.de';
+  await lista(shell, []);
+  const sito = rete.pagina(MUENCHEN, '/', '<h1>MUENCHEN</h1>');
+  await apri(app, shell, sito);
+  await lista(shell, ['münchen.de']);
+  await expect.poll(() => caricataSu(app, MUENCHEN), { timeout: 6000 }).toMatch(PAGINA_BLOCCATA);
+  const pagina = paginaBloccata(app);
+  await expect(pagina.locator('#err-host')).toHaveText('münchen.de');
+  await expect(pagina).toHaveTitle('münchen.de');
+});
+
+const finestrelle = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+  .filter((w) => !w._filoTabs && w.isVisible()).map((w) => w.webContents.getURL()));
+
+async function apertoComunque(app, shell, url) {
+  await shell.evaluate((u) => window.filoShell.tabs.openBlockedPopup(u, true), url);
+  await expect.poll(() => app.windows().some((w) => w.url() === url), { timeout: 8000 }).toBe(true);
+  return app.windows().find((w) => w.url() === url);
+}
+
+test('dentro un sito aperto con «Apri comunque» le sue finestrelle di accesso si aprono, dritte o dopo un rimbalzo', async ({ app, shell, rete }) => {
+  await lista(shell, ['blocked.test']);
+  const accesso = rete.pagina('blocked.test', '/oauth/authorize', '<h1>ACCESSO DEL SITO</h1>') + '?client_id=a&response_type=code';
+  const login = rete.rimbalzo('blocked.test', '/login', accesso);
+  const sito = rete.pagina('blocked.test', '/', `<h1>SITO</h1>
+    <button id="diretta" onclick="window.open('${accesso}', 'a1', 'width=500,height=400')">accedi</button>
+    <button id="rimbalzo" onclick="window.open('${login}', 'a2', 'width=500,height=400')">accedi</button>`);
+  const tab = await apertoComunque(app, shell, sito);
+  await tab.click('#diretta');
+  await expect.poll(() => finestrelle(app), { timeout: 6000 }).toEqual([accesso]);
+  await tab.click('#rimbalzo');
+  await expect.poll(() => finestrelle(app), { timeout: 6000 }).toEqual([accesso, accesso]);
+});
+
+test('dentro un sito aperto con «Apri comunque», «Apri» sulla chip dei popup apre il popup di quel sito', async ({ app, shell, rete }) => {
+  await lista(shell, ['blocked.test']);
+  const pop = rete.pagina('blocked.test', '/pop', '<h1>POPUP DEL SITO</h1>');
+  const sito = rete.pagina('blocked.test', '/', `<h1>SITO</h1><button id="b" onclick="window.open('${pop}', 'p', 'width=400,height=300')">pop</button>`);
+  const tab = await apertoComunque(app, shell, sito);
+  const avvisi = await contaAvvisi(app);
+  await tab.click('#b');
+  const chip = shell.locator('.popup-chip').first();
+  await expect(chip).toBeVisible({ timeout: 6000 });
+  await chip.locator('button', { hasText: 'Apri' }).click();
+  await expect.poll(async () => (await schede(app)).includes(pop), { timeout: 6000 }).toBe(true);
+  expect(await avvisi()).toEqual([]);
+});
+

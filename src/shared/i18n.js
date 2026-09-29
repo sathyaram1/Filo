@@ -436,10 +436,10 @@
       'che usi davvero (Google, YouTube, banche…) non vengono mai bloccati.',
     options_security_siteblock: 'Blocca l’apertura dei siti in blacklist',
     options_security_siteblock_desc:
-      'Impedisce di APRIRE i siti in blacklist (non solo le loro pubblicità). Se provi ' +
-      'ad aprire un sito bloccato compare una notifica con “Apri comunque”. ' +
-      'Eccezioni: se arrivi da un motore di ricerca o lo apre Filo per te, l’apertura ' +
-      'è permessa. Puoi aggiungere domini tuoi qui sotto (uno per riga).',
+      'Impedisce di APRIRE i siti in blacklist (non solo le loro pubblicità), anche dai ' +
+      'risultati di una ricerca e quando è Filo ad aprirli. Se provi ad aprire un sito ' +
+      'bloccato compare una notifica con “Apri comunque”. Puoi aggiungere domini tuoi ' +
+      'qui sotto (uno per riga).',
     options_security_siteblock_lists: 'Usa anche le liste pubbliche (pubblicità/tracker) come blacklist',
     options_security_siteblock_blacklist_label: 'Domini in blacklist (uno per riga)',
     options_security_siteblock_blacklist_invalid:

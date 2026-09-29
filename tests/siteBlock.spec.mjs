@@ -146,6 +146,38 @@ async function newtabPage(app) {
   throw new Error('newtab non trovata');
 }
 
+// La chat della home risponde coi giri scritti qui (tool call e testo), senza rete.
+async function modelloFinto(app, giri) {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+  });
+  await app.evaluate(async (_electron, g) => {
+    const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.__fake590_restore = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
+    globalThis.__fake590_calls = [];
+    let n = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
+      globalThis.__fake590_calls.push(JSON.parse(JSON.stringify(messages)));
+      const giro = g[Math.min(n, g.length - 1)];
+      n += 1;
+      const calls = giro.toolCalls || [];
+      for (const c of calls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
+      if (giro.text) { try { onDelta && onDelta(giro.text); } catch (_) {} }
+      return {
+        model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        text: giro.text || '', toolCalls: calls, reasoningDetails: [],
+        finishReason: calls.length ? 'tool_calls' : 'stop',
+      };
+    };
+  }, giri);
+}
+
 // Un server che risponde 302 verso `to`: un accorciatore o un redirect aperto.
 async function redirector(to) {
   const server = createServer((_req, res) => { res.writeHead(302, { Location: to }); res.end(); });
@@ -180,15 +212,6 @@ test('#590 NAVIGA del modello verso un sito della lista: nessuna scheda, e la ch
   await enableBlock(shell);
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible({ timeout: 8000 });
-  await app.evaluate(async () => {
-    const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.updateSettings({
-      useDefaultModels: false,
-      apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
-      modelRegistry: globalThis.SN_TEST_MODELS.registry,
-    });
-  });
 
   const target = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1>DAL MODELLO</h1>');
   // Il modello simulato apre l'indirizzo intero e, come a volte fa, uno nudo.
@@ -199,25 +222,7 @@ test('#590 NAVIGA del modello verso un sito della lista: nessuna scheda, e la ch
     ] },
     { text: 'Non l’ho aperta: è fra i siti che hai bloccato.' },
   ];
-  await app.evaluate(async (_electron, g) => {
-    const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
-    globalThis.__fake590_restore = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
-    globalThis.__fake590_calls = [];
-    let n = 0;
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
-      globalThis.__fake590_calls.push(JSON.parse(JSON.stringify(messages)));
-      const giro = g[Math.min(n, g.length - 1)];
-      n += 1;
-      const calls = giro.toolCalls || [];
-      for (const c of calls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
-      if (giro.text) { try { onDelta && onDelta(giro.text); } catch (_) {} }
-      return {
-        model: attempts[0].model, provider: attempts[0].provider, usage: {},
-        text: giro.text || '', toolCalls: calls, reasoningDetails: [],
-        finishReason: calls.length ? 'tool_calls' : 'stop',
-      };
-    };
-  }, giri);
+  await modelloFinto(app, giri);
 
   try {
     await page.locator('#input').fill('apri quella pagina');
@@ -244,6 +249,38 @@ test('#590 NAVIGA del modello verso un sito della lista: nessuna scheda, e la ch
     expect(secondo).not.toContain('Proposta all');
   } finally {
     await app.evaluate(() => { try { globalThis.__fake590_restore?.(); } catch (_) {} });
+  }
+});
+
+test('#590 NAVIGA verso un accorciatore che rimbalza sul sito della lista: la chat e l\'assistente sulla pagina dicono il blocco', async ({ app, shell, testServer }) => {
+  test.setTimeout(60_000);
+  await enableBlock(shell);
+  const r = await redirector(blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1>X</h1>'));
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8000 });
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: r.url, etichetta: 'corto' }) }] },
+    { text: 'RISPOSTA-FINTA' },
+  ]);
+  try {
+    await page.locator('#input').fill('apri quel link');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA-FINTA' })).toBeVisible({ timeout: 10_000 });
+    expect((await tabUrls(app)).filter((u) => u.includes(BLOCKED_HOST))).toEqual([]);
+    const activity = page.locator('.dash-activity');
+    await activity.locator('.dash-activity-head').click();
+    await expect(activity.locator('.dash-activity-row', { hasText: 'Link non aperto' })).toContainText(`${BLOCKED_HOST} è fra i siti bloccati`);
+    const secondo = JSON.stringify((await app.evaluate(() => globalThis.__fake590_calls))[1] || []);
+    expect(secondo).toContain('lista dei siti bloccati');
+
+    await page.waitForFunction(() => !!window.SN_SIDEBAR && !!window.__filoSidebarTest, null, { timeout: 8000 });
+    await page.evaluate(() => window.SN_SIDEBAR.open());
+    const esito = await page.evaluate((u) => window.__filoSidebarTest.runFiloAction({ type: 'NAVIGA', url: u }), r.url);
+    expect(esito).toBe(false);
+    await expect(page.locator('.sn-sidebar-log').last()).toContainText(`${BLOCKED_HOST} è fra i siti bloccati`);
+  } finally {
+    await app.evaluate(() => { try { globalThis.__fake590_restore?.(); } catch (_) {} });
+    await r.close();
   }
 });
 
