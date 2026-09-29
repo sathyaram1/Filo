@@ -2946,6 +2946,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const rawActions = [];
   const renderedActions = [];
   const notes = [];
+  // Quante note erano già scritte all'ultimo «non disponibile»: quelle lo
+  // davano per fatto, una nota successiva è scritta sapendolo (#771).
+  let noteAlRifiuto = -1;
   let r = null;
   let textReply = '';
   let reasoningDetails = [];
