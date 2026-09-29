@@ -27,7 +27,6 @@
     return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 7);
   }
 
-  let deposito = null;
   let apertura = null;
 
   // L'incognito non vede l'archivio e non ci scrive (la stessa garanzia che storage.json dà alle sue chiavi di navigazione).
@@ -38,7 +37,6 @@
         const d = creaDeposito({ cartella: cartella(), meseDi });
         await d.carica();
         await migra(d);
-        deposito = d;
         return d;
       })();
       apertura.catch(() => { apertura = null; });
