@@ -1,4 +1,4 @@
-// Verifica #711, giro 1, rilievo 4: un'immagine generata con l'AI e poi ritagliata in un
+// Verifica #711, giro 1, rilievo 1 (una delle sue porte): un'immagine generata con l'AI e poi ritagliata in un
 // programma che tiene le credenziali. Il manifesto dell'ultimo passo dice solo «aperta,
 // ritagliata»; che fosse generata lo dice quello del passo prima, che il file si porta dietro.
 import { test, expect } from '../../fixtures/electron.mjs';
