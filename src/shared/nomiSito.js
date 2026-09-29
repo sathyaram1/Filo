@@ -5,8 +5,9 @@
 (function (global) {
   'use strict';
 
-  // L'estensione è di lettere, oppure la forma «xn--…» di un'estensione non latina (.рф, .中国).
-  const VALIDO = /^[a-z0-9.-]+\.(?:[a-z]{2,}|xn--[a-z0-9-]+)$/i;
+  // Etichette non vuote («.sito.it» non è un host, e accettarlo non bloccherebbe niente); l'estensione
+  // è di lettere, oppure la forma «xn--…» di un'estensione non latina (.рф, .中国).
+  const VALIDO = /^(?:[a-z0-9-]+\.)+(?:[a-z]{2,}|xn--[a-z0-9-]+)$/i;
 
   function valido(host) {
     return VALIDO.test(String(host || ''));
