@@ -347,7 +347,7 @@ function statoNotifiche(ses, url) {
 }
 
 module.exports = {
-  installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
+  installa, negaTutto, rispondi, lasciapassare, seguiGesti, spendiGesto, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
   carica, scelteRicordate, togliScelta, classifica,
   TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
