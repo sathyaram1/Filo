@@ -56,6 +56,8 @@
     if (m.error) { out.error = str(m.error) || 'nessuna risposta'; return out; }
     const reply = str(m.reply);
     if (reply) out.reply = reply;
+    // «Svuota la chat» chiesto a parole: la bolla tiene il suo tasto, così la richiesta sopravvive ad Annulla e ai cambi di mazzo.
+    if (m.clearChat === true) out.clearChat = true;
     const cardIds = idList(m.cardIds);
     if (cardIds.length) out.cardIds = cardIds;
     const query = str(m.query);
