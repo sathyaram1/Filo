@@ -182,6 +182,44 @@ test('i tasti + e ✓ seguono il mazzo di adesso, non quello del momento della r
   await expect(bolt).toHaveText('+');
 });
 
+// Come il + delle righe, anche «Aggiungi tutte» di una lista incollata segue il mazzo di adesso: tolte le carte e
+// riaperta la chat torna usabile e le rimette nel mazzo.
+test('«Aggiungi tutte» di una lista incollata segue il mazzo di adesso, anche dopo la ricarica', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await app.evaluate(() => {
+    const prev = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.completeWithFallback = async (args) => {
+      const last = String(args.messages[args.messages.length - 1].content || '');
+      if (!/importa/i.test(last)) return prev(args);
+      const text = JSON.stringify({ reply: 'Ecco la lista.', import: [{ name: 'Lightning Bolt', qty: 1 }] });
+      return { text, model: args.attempts[0].model, provider: args.attempts[0].provider, usage: {} };
+    };
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await newDeckWithCommander(page);
+  await ask(page, 'importa questa lista: 1 Lightning Bolt');
+  const all = page.locator('.dk-import-all');
+  await all.click();
+  await expect(page.locator('#deckCount')).toHaveText('1/100 carte');
+  await expect(all).toBeDisabled();
+  await expect(all).toHaveText('Aggiunte ✓');
+
+  // Tolta la carta, il tasto torna acceso subito, e resta acceso dopo la ricarica.
+  await page.locator('.dk-msg-bot [data-add="bolt-1"]').click();
+  await expect(page.locator('#deckCount')).toHaveText('0/100 carte');
+  await expect(all).toBeEnabled();
+  await reloadBuilder(page);
+  await expect(page.locator('.dk-msg-bot [data-add="bolt-1"]')).toHaveAttribute('data-in', '0');
+  await expect(all).toBeEnabled();
+  await expect(all).toHaveText('Aggiungi tutte al mazzo');
+  await all.click();
+  await expect(page.locator('#deckCount')).toHaveText('1/100 carte');
+  await expect(all).toBeDisabled();
+});
+
 test('due mazzi, due conversazioni', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await mockScryfall(app);

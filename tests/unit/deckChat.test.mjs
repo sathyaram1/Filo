@@ -27,7 +27,8 @@ test('si conserva il contenuto, non lo stato di vista', () => {
     who: 'bot', reasoning: 'cerco draghi', nameIds: { 'shivan dragon': 'b' },
     reply: 'Eccone due, guarda [[Shivan Dragon]].', cardIds: ['a', 'b'], query: 't:dragon c:r',
   });
-  assert.deepEqual(saved[3], { who: 'bot', cardIds: ['f'], importQty: { f: 37 }, imported: true });
+  // «Già aggiunte» si ricava dal mazzo di adesso: un vecchio segno salvato non si porta dietro.
+  assert.deepEqual(saved[3], { who: 'bot', cardIds: ['f'], importQty: { f: 37 } });
   assert.deepEqual(saved[5], { who: 'bot', reasoning: 'boh', error: 'il servizio non risponde. Riprova.' });
 });
 

@@ -989,8 +989,9 @@
       // aggiunge/aggiorna TUTTE le carte riconosciute in un colpo solo — con
       // 100 carte di una lista incollata, cliccare riga per riga è attrito
       // puro. Resta comunque una conferma esplicita, mai automatica.
+      const importDone = !!m.importQty && !importAllWouldChange(m);
       const importAllHtml = m.importQty
-        ? `<button class="dk-import-all" data-import-all="1" ${m.imported ? 'disabled' : ''}>${m.imported ? 'Aggiunte ✓' : 'Aggiungi tutte al mazzo'}</button>`
+        ? `<button class="dk-import-all" data-import-all="1" ${importDone ? 'disabled' : ''}>${importDone ? 'Aggiunte ✓' : 'Aggiungi tutte al mazzo'}</button>`
         : '';
       parts.push(`
         <button class="dk-list-summary" data-toggle-list="1" aria-expanded="${open ? 'true' : 'false'}">
@@ -1134,14 +1135,25 @@
   // carte riconosciute dall'import via chat (rispettando la qty per riga) +
   // il commander candidato, MA SOLO se il mazzo non ne ha già uno (mai
   // sovrascrivere una scelta esistente senza un'azione dedicata, §8.4).
-  async function importAllFromBubble(bubbleEl) {
-    const deckId = current.id;
-    const m = chatMsgs()[Number(bubbleEl.dataset.msgI)];
-    if (!m || m.imported || !m.cardIds || !m.cardIds.length) return;
-    const entries = m.cardIds
+  function importEntries(m) {
+    return (m.cardIds || [])
       .filter((id) => id !== m.importCommanderId)
       .map((id) => ({ scryfall_id: id, qty: (m.importQty && m.importQty[id]) || 1 }));
-    const { deck: merged, addedCount, updatedCount } = Decks.importCards(current, entries);
+  }
+
+  // Lo stato del tasto si ricava dal mazzo di adesso, come il + delle righe (#787): acceso finché il clic
+  // cambierebbe qualcosa, anche dopo una ricarica o dopo aver tolto le carte.
+  function importAllWouldChange(m) {
+    const { addedCount, updatedCount } = Decks.importCards(current, importEntries(m));
+    return addedCount + updatedCount > 0 || !!(m.importCommanderId && !current.commander);
+  }
+
+  async function importAllFromBubble(bubbleEl) {
+    const m = chatMsgs()[Number(bubbleEl.dataset.msgI)];
+    if (!m || !m.cardIds || !m.cardIds.length || !importAllWouldChange(m)) return;
+    const btn = bubbleEl.querySelector('[data-import-all]');
+    if (btn) btn.disabled = true;
+    const { deck: merged, addedCount, updatedCount } = Decks.importCards(current, importEntries(m));
     const saved = merged !== current ? await send({ type: MSG.DECKS_UPDATE, deck: merged }) : { ok: true, deck: current };
     if (saved && saved.ok) current = saved.deck;
     let commanderSet = false;
@@ -1149,8 +1161,6 @@
       const r = await send({ type: MSG.DECKS_SET_COMMANDER, id: current.id, scryfallId: m.importCommanderId });
       if (r && r.ok) { current = r.deck; commanderSet = true; }
     }
-    m.imported = true;
-    saveChat(deckId);
     await renderBuilder();
     const total = addedCount + updatedCount + (commanderSet ? 1 : 0);
     showToast(total ? `Aggiunte ${total} cart${total === 1 ? 'a' : 'e'} al mazzo.` : 'Nessuna carta nuova da aggiungere.');

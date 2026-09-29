@@ -33,9 +33,9 @@
     return Object.keys(out).length ? out : null;
   }
 
-  // Solo DATI: lo stato di vista (lista aperta, ragionamento aperto) non si conserva, così alla riapertura le
-  // liste vecchie sono chiuse e l'ultima aperta (§3.3). Una risposta ancora in volo si rilegge come interrotta:
-  // chi la aspettava non c'è più.
+  // Solo DATI: lo stato di vista (lista aperta, ragionamento aperto, «già aggiunte» che si ricava dal mazzo di
+  // adesso) non si conserva, così alla riapertura le liste vecchie sono chiuse e l'ultima aperta (§3.3). Una
+  // risposta ancora in volo si rilegge come interrotta: chi la aspettava non c'è più.
   function cleanMessage(m) {
     if (!m || typeof m !== 'object') return null;
     if (m.who === 'user') {
@@ -60,7 +60,6 @@
     if (qty) out.importQty = qty;
     const cmd = str(m.importCommanderId);
     if (cmd) out.importCommanderId = cmd;
-    if (m.imported === true) out.imported = true;
     return out;
   }
 
