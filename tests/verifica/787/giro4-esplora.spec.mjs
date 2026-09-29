@@ -57,7 +57,8 @@ test('due schede sullo stesso mazzo chiedono insieme: tutte e due le risposte re
   await expect(b.locator('.dk-msg-bot').last()).toContainText('sta pensando');
   await b.fill('#chatInput', 'seconda domanda');
   await b.press('#chatInput', 'Enter');
-  await expect(a.locator('.dk-msg-user')).toHaveText(['prima', 'creature con haste', 'seconda domanda']);
+  await expect(b.locator('.dk-msg-user')).toHaveText(['prima', 'creature con haste', 'seconda domanda']);
+  await expect.poll(() => app.evaluate(() => globalThis.__releases.length)).toBe(2);
   await app.evaluate(() => { globalThis.__hold = false; globalThis.__releases.splice(0).forEach((r) => r()); });
 
   for (const p of [a, b]) {
