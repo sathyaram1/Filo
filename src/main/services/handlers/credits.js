@@ -377,9 +377,10 @@ module.exports = function register(on, ctx) {
     if (WM && WM.haPortafoglio && WM.haPortafoglio()) {
       return { ok: true, wallet: true, credits: 0, inArrivo: Boolean(WM.pseudonym && WM.pseudonym()) };
     }
-    // L'importo non lo sceglie chi chiede: la domanda arriva anche dal box dentro i siti (#589.1).
+    // L'importo non lo sceglie chi chiede, e il saldo non torna indietro: la domanda arriva
+    // anche dal box dentro i siti, a cui basta la cifra del premio (#589.1).
     const r = await Credits.award({ kind: 'feedback_sent', credits: globalThis.SN_CONST.CREDIT.FEEDBACK_SEND, ref: null });
-    return { ok: true, ...r };
+    return { ok: true, credits: r.credits };
   });
 
   // ── Ricompensa alla risoluzione di un feedback (C5) ─────────────────────────
