@@ -19,8 +19,16 @@ La regola, in tre pezzi:
   OpenAI nelle credenziali firmate») e un'etichetta scritta nel file senza firma
   («lo dichiara il file stesso») non sono la stessa frase e non hanno lo stesso
   peso a schermo. In mezzo ci sono i casi che vanno detti per nome: firma che non
-  torna, ente che non si riconosce, file cambiato dopo la firma. Quando una firma
-  non regge non si riferisce nemmeno cosa affermava: ripeterlo è darle voce.
+  torna, firmatario fuori dall'elenco, file cambiato dopo la firma. Quando una
+  firma non regge non si riferisce nemmeno cosa affermava: ripeterlo è darle voce.
+- **Chi ha firmato si riconosce da una cosa sola: l'elenco ufficiale.** La catena
+  del certificato deve arrivare a un'autorità dell'elenco dei firmatari che
+  pubblica chi gestisce lo standard, e il certificato deve essere fatto per
+  firmare credenziali. Il nome scritto nel certificato non conta: un certificato
+  «OpenAI» se lo fa chiunque in un minuto. L'elenco Filo lo scarica da sé e lo
+  tiene su disco; **finché non l'ha mai avuto dice «firma valida, firmatario non
+  verificato»**, che non è «sconosciuto»: sono due stati diversi e hanno due frasi
+  diverse. Un elenco scaricato male non prende il posto di quello buono.
 - **Quello che la firma non copre non è firmato.** In C2PA il claim elenca le
   asserzioni con la loro impronta: si legge solo quello che combacia, e il
   legame duro sui byte del file decide se le credenziali parlano ancora di
@@ -45,6 +53,8 @@ sarebbe [una promessa affidata al
 modello](una-promessa-fatta-allutente-non-puo-dipendere-dal-modello.md).
 
 Il codice: `src/shared/provenienzaImmagine.js` (lettura dei contenitori, JUMBF,
-COSE, verdetto e frase), `tests/helpers/immagineFirmata.mjs` (immagini di prova
-firmate davvero: certificato, firma e legame duro, così la prova diventa rossa
-se il lettore smette di verificare).
+COSE, catena fino all'elenco, verdetto e frase), `src/main/services/firmatariC2pa.js`
+(l'elenco: scaricarlo, tenerlo, e l'unica lettura che usano menu e chat),
+`tests/helpers/immagineFirmata.mjs` (immagini di prova firmate davvero: autorità,
+certificato, firma e legame duro, così la prova diventa rossa se il lettore
+smette di verificare).

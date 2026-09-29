@@ -705,8 +705,8 @@
           chrome.runtime.sendMessage({ type: MSG.IMAGE_PROVENANCE, dataUrl }).then((p) => {
             if (cancelled || !p || !p.ok || !p.frase) return;
             origine.textContent = p.frase;
-            origine.title = I18n.t('menu_origin_hint');
-            origine.classList.toggle('sn-menu-origine-debole', p.prova !== 'firmata');
+            origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified' : 'menu_origin_hint');
+            origine.classList.toggle('sn-menu-origine-debole', !p.forte);
             origine.hidden = false;
           }).catch(() => {});
 

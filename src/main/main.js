@@ -55,6 +55,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoDefaults = require('./services/defaultsStore');
     globalThis.__filoCookies = require('./services/cookies');
     globalThis.__filoAdblock = require('./services/adblock');
+    globalThis.__filoFirmatariC2pa = require('./services/firmatariC2pa');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
     globalThis.__filoShortcuts = require('./shortcuts');
@@ -197,6 +198,9 @@ app.whenReady().then(async () => {
     // blocco alla sessione di default, carica la cache e — se attivo e stantia —
     // avvia un refresh in background. Non blocca l'avvio.
     try { await require('./services/adblock').init(s); } catch (_) {}
+    // #711 — l'elenco ufficiale dei firmatari C2PA: rilegge la copia su disco e
+    // la rinfresca in sottofondo quando è vecchia. Non blocca l'avvio.
+    try { await require('./services/firmatariC2pa').init(); } catch (_) {}
     // Blocco apertura siti in blacklist (#170.3): legge la config dalle
     // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}

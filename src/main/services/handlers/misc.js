@@ -413,8 +413,9 @@ module.exports = function register(on, ctx) {
     const P = globalThis.SN_PROVENIENZA;
     if (!P) return { ok: false, error: 'controllo non disponibile' };
     try {
-      const res = P.analizza(byte);
-      return { ok: true, frase: P.frase(res), ...res };
+      const res = await require('../firmatariC2pa').analizzaImmagine(byte);
+      const forte = res.prova === 'firmata' && res.firmatario === 'riconosciuto';
+      return { ok: true, frase: P.frase(res), forte, ...res };
     } catch (e) {
       return { ok: false, error: e?.message || 'controllo fallito' };
     }
