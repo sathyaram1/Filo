@@ -148,7 +148,10 @@ test('fuori dall\'elenco una pagina ha solo i permessi innocui, e il gestore del
   Permessi.installa(ses, { prima: (_wc, p, cb) => { if (p === 'fullscreen') { cb(false); return true; } return false; } });
   const wc = wcFinto('https://video.example/');
   assert.deepEqual(chiedi(ses, wc, 'fullscreen'), [false]);
-  for (const p of ['clipboard-sanitized-write', 'mediaKeySystem', 'pointerLock']) assert.deepEqual(chiedi(ses, wc, p), [true], p);
+  for (const p of ['clipboard-sanitized-write', 'mediaKeySystem', 'pointerLock', 'screen-wake-lock']) {
+    assert.deepEqual(chiedi(ses, wc, p), [true], p);
+    assert.equal(ses.controllo(wc, p, 'https://video.example', {}), true, p);
+  }
   for (const p of ['midiSysex', 'idle-detection', 'window-management', 'display-capture', 'unknown']) {
     assert.deepEqual(chiedi(ses, wc, p), [false], p);
     assert.equal(ses.controllo(wc, p, 'https://video.example', {}), false, p);
@@ -195,7 +198,7 @@ test('le scelte ricordate per un sito si leggono e si azzerano; dopo si torna a 
   Permessi.rispondi(ses.avvisi.find((a) => a.evento === 'chiedi').dati.id, false);
   assert.deepEqual(Permessi.scelteDi(wc).scelte, [{ parte: 'audio', si: false }]);
   assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['audio'] }), [false]);
-  assert.deepEqual(Permessi.dimentica(wc), { tolte: 1, cera: false });
+  assert.deepEqual(Permessi.dimentica(wc), { tolte: 1, ricarica: false });
   assert.deepEqual(Permessi.scelteDi(wc).scelte, []);
   assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['audio'] }), [], 'si chiede di nuovo');
 });
@@ -206,4 +209,27 @@ test('la domanda nomina il dominio registrato: la parte davanti la sceglie chi h
   assert.deepEqual(Permessi.nomeDaMostrare('https://riunione.example'), { sotto: '', dominio: 'riunione.example' });
   assert.deepEqual(Permessi.nomeDaMostrare('http://127.0.0.1:3000'), { sotto: '', dominio: '127.0.0.1:3000' });
   assert.equal(Permessi.nomeDaMostrare('https://bbc.co.uk').dominio, 'bbc.co.uk');
+});
+
+// Quello che Chrome concede di fabbrica, senza domanda: una pagina che lo chiede non deve leggere «bloccato» (#591, giro 19).
+test('passa senza domanda tutto quello che Chrome concede di fabbrica', () => {
+  const chrome = ['fullscreen', 'pointerLock', 'keyboardLock', 'clipboard-sanitized-write', 'mediaKeySystem', 'midi',
+    'speaker-selection', 'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler'];
+  for (const p of chrome) assert.equal(Permessi.INNOCUI.has(p), true, p);
+});
+
+test('le notifiche si leggono «da chiedere» finché l\'utente non decide; il no e l\'azzeramento si vedono', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://posta.example/in-arrivo');
+  wc.session = ses;
+  Permessi.seguiGesti(wc);
+  assert.equal(Permessi.statoNotifiche(ses, 'https://posta.example/in-arrivo'), 'default');
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  chiedi(ses, wc, 'notifications');
+  Permessi.rispondi(ses.avvisi.find((a) => a.evento === 'chiedi').dati.id, false);
+  assert.equal(Permessi.statoNotifiche(ses, 'https://posta.example/altra'), 'denied');
+  assert.equal(Permessi.statoNotifiche(ses, 'https://altro.example/'), 'default', 'un altro sito non eredita il no');
+  assert.deepEqual(Permessi.dimentica(wc), { tolte: 1, ricarica: true }, 'la pagina aperta legge il no finché non si ricarica');
+  assert.equal(Permessi.statoNotifiche(ses, 'https://posta.example/'), 'default');
+  assert.equal(Permessi.statoNotifiche(ses, 'filo://options/'), 'default');
 });
