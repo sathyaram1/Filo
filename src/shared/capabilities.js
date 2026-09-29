@@ -300,7 +300,7 @@
     },
     {
       id: 'archive', title: 'Cronologia delle schede', category: 'save',
-      desc: 'La cronologia principale: le schede chiuse raggruppate per giorno, una riga per giorno, colorate come le tab in alto; puoi cercarle anche per contenuto e riaprirle. Restano tutte finché non le cancelli tu, e una scheda cancellata sparisce anche dal disco.',
+      desc: 'La cronologia principale: le schede chiuse raggruppate per giorno, una riga per giorno, colorate come le tab in alto; puoi cercarle anche per contenuto e riaprirle. Restano tutte finché non le cancelli tu. Una scheda cancellata esce dall\'archivio sul disco; la copia della pagina nella cache di navigazione resta finché il motore non la scarta.',
       invoke: 'Icona «Cronologia» in alto a destra nella home (o dalla home → "Cronologia"), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu: «Riapri» o «Elimina».',
     },
     {
