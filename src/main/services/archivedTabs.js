@@ -1,33 +1,82 @@
-// Persistenza tab archiviate (§3.1). "Chiudere una tab non è perdere — è
-// salvare": quando una scheda web viene chiusa, i suoi metadati finiscono qui e
-// restano consultabili (e riapribili) dalla pagina archivio (filo://archive).
-//
-// Per ora salviamo SOLO i metadati (~1-2 KB/tab). Il riassunto LLM e l'embedding
-// per la ricerca semantica (§3.2) sono rimandati: questo store è la base su cui
-// si appoggeranno.
+// Archivio delle schede chiuse (§3.1): metadati, riassunto e vettore di ogni scheda, in file propri (userData/archivio-schede).
+// Nessun tetto e nessuna scadenza: una scheda esce solo quando l'utente la cancella, e allora sparisce dal disco.
+// Regole: patterns/un-archivio-che-cresce-sta-in-file-suoi-a-sole-aggiunte.md; prove: tests/archive-store-unlimited.spec.mjs.
 
 (function (global) {
   'use strict';
 
-  const { STORAGE_KEYS, ARCHIVED_TABS_LIMIT, ARCHIVED_EMBED_LIMIT } = global.SN_CONST;
+  const path = require('node:path');
+  const { creaDeposito } = require('./depositoAggiunte');
+  const Disco = require('../shim/storage');
+
+  // La chiave dove l'archivio stava in storage.json: serve solo a migrarlo.
+  const CHIAVE_VECCHIA = global.SN_CONST.STORAGE_KEYS.ARCHIVED_TABS;
 
   function uuid() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
     return Date.now().toString(36) + Math.random().toString(36).slice(2);
   }
 
+  function cartella() {
+    const root = process.env.FILO_USER_DATA || require('electron').app.getPath('userData');
+    return path.join(root, 'archivio-schede');
+  }
+
+  function meseDi(t) {
+    const d = new Date(t && t.closedAt);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 7);
+  }
+
+  let deposito = null;
+  let apertura = null;
+
+  // L'incognito non vede l'archivio e non ci scrive (la stessa garanzia che storage.json dà alle sue chiavi di navigazione).
+  // Per questo si apre solo da fuori: la migrazione deve leggere storage.json vero, non la vista vuota dell'incognito.
+  function apri() {
+    if (!apertura) {
+      apertura = (async () => {
+        const d = creaDeposito({ cartella: cartella(), meseDi });
+        await d.carica();
+        await migra(d);
+        deposito = d;
+        return d;
+      })();
+      apertura.catch(() => { apertura = null; });
+    }
+    return apertura;
+  }
+
+  // Si toglie la chiave vecchia solo dopo che le schede sono su disco nei file nuovi:
+  // un arresto a metà rifà la migrazione, e gli id già presenti non si duplicano.
+  async function migra(d) {
+    const res = await chrome.storage.local.get(CHIAVE_VECCHIA);
+    const vecchio = res && res[CHIAVE_VECCHIA];
+    if (vecchio === undefined) return;
+    if (Array.isArray(vecchio) && vecchio.length) {
+      const visti = new Set();
+      const voci = [];
+      for (const t of vecchio) {
+        if (!t || typeof t !== 'object' || Array.isArray(t)) continue;
+        const id = typeof t.id === 'string' && t.id && !visti.has(t.id) ? t.id : uuid();
+        visti.add(id);
+        voci.push(id === t.id ? t : { ...t, id });
+      }
+      d.aggiungiMolti(voci, { inCoda: true });
+    }
+    await chrome.storage.local.remove(CHIAVE_VECCHIA);
+  }
+
   async function list() {
-    const res = await chrome.storage.local.get(STORAGE_KEYS.ARCHIVED_TABS);
-    const arr = res[STORAGE_KEYS.ARCHIVED_TABS];
-    return Array.isArray(arr) ? arr : [];
+    if (Disco.inIncognito()) return [];
+    return (await apri()).tutti();
   }
 
   // Archivia una tab chiusa. `meta` contiene i campi catturati al momento della
   // chiusura (vedi tabs.js _archiveClosedTab). Ritorna l'entry creata, o null se
-  // la tab non è archiviabile (manca l'URL).
+  // la tab non è archiviabile (manca l'URL, o la chiamata arriva dall'incognito).
   async function archive(meta) {
-    if (!meta || !meta.url) return null;
-    const items = await list();
+    if (!meta || !meta.url || Disco.inIncognito()) return null;
+    const d = await apri();
     const entry = {
       id: uuid(),
       url: meta.url,
@@ -37,12 +86,10 @@
       identityColor: meta.identityColor || null,
       openedAt: meta.openedAt || null,
       closedAt: meta.closedAt || new Date().toISOString(),
-      // Perché è stata chiusa: per ora sempre 'manual' (chiusura dell'utente).
-      // L'auto-archiviazione (§2.1) userà altri valori (es. 'inactive').
+      // 'manual' per la chiusura dell'utente, altri valori dall'auto-archiviazione (§2.1).
       reason: meta.reason || 'manual',
       // URL delle altre tab aperte nello stesso momento (contesto di lavoro).
       coOpenUrls: Array.isArray(meta.coOpenUrls) ? meta.coOpenUrls.slice(0, 30) : [],
-      // Posizione di scroll: rimandata (la consuma §2.1). Campo riservato.
       scrollPosition: typeof meta.scrollPosition === 'number' ? meta.scrollPosition : null,
       // Location proxy ("Apri da un altro paese"): { country, tier } se la tab
       // era proxata alla chiusura, null altrimenti. Riaprendo dalla cronologia
@@ -51,63 +98,68 @@
         ? { country: String(meta.proxy.country), tier: meta.proxy.tier || null }
         : null,
     };
-    items.unshift(entry);
-    if (items.length > ARCHIVED_TABS_LIMIT) items.length = ARCHIVED_TABS_LIMIT;
-    await chrome.storage.local.set({ [STORAGE_KEYS.ARCHIVED_TABS]: items });
-    return entry;
+    return d.aggiungi(entry);
   }
 
-  // Come list() ma SENZA gli embedding: è ciò che mandiamo al renderer (la pagina
-  // archivio), per non spedire MB di vettori via IPP ad ogni apertura.
+  // Come list() ma SENZA gli embedding: è ciò che mandiamo al renderer, per non
+  // spedire MB di vettori via IPC ad ogni apertura della pagina.
   async function listMeta() {
-    const items = await list();
-    return items.map(({ embedding, ...rest }) => rest);
+    return (await list()).map(({ embedding, ...rest }) => rest);
   }
 
-  // Tiene gli embedding solo sulle ultime ARCHIVED_EMBED_LIMIT tab (le più
-  // recenti, che stanno in testa all'array): azzera i più vecchi per non sforare
-  // la quota. Muta l'array in place e ritorna true se ha cambiato qualcosa.
-  function capEmbeddings(items) {
-    let changed = false;
-    for (let i = ARCHIVED_EMBED_LIMIT; i < items.length; i++) {
-      if (items[i] && items[i].embedding) { items[i].embedding = null; changed = true; }
-    }
-    return changed;
-  }
-
-  // Aggiorna un'entry (es. aggiunta di embedding/snippet dopo l'arricchimento).
+  // Aggiorna un'entry (riassunto, snippet, vettore dopo l'arricchimento). Il vettore resta finché resta la scheda.
   async function update(id, patch) {
-    if (!id || !patch) return null;
-    const items = await list();
-    const idx = items.findIndex((t) => t.id === id);
-    if (idx < 0) return null;
-    items[idx] = { ...items[idx], ...patch };
-    capEmbeddings(items);
-    await chrome.storage.local.set({ [STORAGE_KEYS.ARCHIVED_TABS]: items });
-    return items[idx];
+    if (!id || !patch || Disco.inIncognito()) return null;
+    return (await apri()).aggiorna(id, patch);
+  }
+
+  // Un indirizzo cancellato non deve restare nemmeno fra le «schede aperte insieme» delle altre,
+  // a meno che un'altra scheda archiviata abbia quello stesso indirizzo.
+  function togli(d, ids) {
+    const via = new Set(ids);
+    const urlVia = new Set();
+    for (const id of via) { const t = d.prendi(id); if (t && t.url) urlVia.add(t.url); }
+    for (const t of d.tutti()) if (!via.has(t.id) && urlVia.has(t.url)) urlVia.delete(t.url);
+    return d.togli([...via], (t) => {
+      if (!urlVia.size || !Array.isArray(t.coOpenUrls) || !t.coOpenUrls.some((u) => urlVia.has(u))) return t;
+      return { ...t, coOpenUrls: t.coOpenUrls.filter((u) => !urlVia.has(u)) };
+    });
   }
 
   async function remove(id) {
-    const items = await list();
-    const filtered = items.filter((t) => t.id !== id);
-    await chrome.storage.local.set({ [STORAGE_KEYS.ARCHIVED_TABS]: filtered });
-    return filtered;
+    if (Disco.inIncognito()) return [];
+    const d = await apri();
+    togli(d, [id]);
+    return d.tutti();
   }
 
   // Cancellazione multipla (§5 pulizia retroattiva). Ritorna { removed, remaining }.
   async function removeMany(ids) {
-    const set = new Set(Array.isArray(ids) ? ids : []);
-    if (!set.size) return { removed: 0, remaining: (await list()).length };
-    const items = await list();
-    const filtered = items.filter((t) => !set.has(t.id));
-    await chrome.storage.local.set({ [STORAGE_KEYS.ARCHIVED_TABS]: filtered });
-    return { removed: items.length - filtered.length, remaining: filtered.length };
+    if (Disco.inIncognito()) return { removed: 0, remaining: 0 };
+    const d = await apri();
+    const removed = togli(d, Array.isArray(ids) ? ids : []);
+    return { removed, remaining: d.numero() };
   }
 
   async function clear() {
-    await chrome.storage.local.set({ [STORAGE_KEYS.ARCHIVED_TABS]: [] });
+    if (Disco.inIncognito()) return [];
+    (await apri()).svuota();
     return [];
   }
 
-  global.SN_ARCHIVED_TABS = { list, listMeta, archive, update, remove, removeMany, clear };
+  // Importazione di un backup: si aggiungono le schede che mancano, dietro alle
+  // presenti (come l'unione delle liste in exportData). Ritorna quante ne sono entrate.
+  async function importa(voci) {
+    if (Disco.inIncognito() || !Array.isArray(voci)) return 0;
+    const d = await apri();
+    const pronte = voci
+      .filter((t) => t && typeof t === 'object' && !Array.isArray(t))
+      .map((t) => (typeof t.id === 'string' && t.id ? t : { ...t, id: uuid() }));
+    return d.aggiungiMolti(pronte, { inCoda: true }).length;
+  }
+
+  global.SN_ARCHIVED_TABS = {
+    list, listMeta, archive, update, remove, removeMany, clear, importa,
+    cartella,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
