@@ -565,19 +565,25 @@ test('su una chat salvata lunga il ragionamento in diretta non blocca la pagina'
 });
 
 // «Svuota la chat» scritto in chat fa la stessa cosa della gomma: il modello sa che si può, la pagina chiede conferma.
-test('«svuota la chat» scritto in chat chiede conferma e la svuota, anche dopo la ricarica', async ({ app, openTab }) => {
-  test.setTimeout(60_000);
-  await mockScryfall(app);
-  await mockProvider(app);
-  await app.evaluate(() => {
+async function modelloCheSvuota(app, attesaMs = 0) {
+  await app.evaluate((_e, attesaMs) => {
     const prev = globalThis.SN_PROVIDERS.completeWithFallback;
     globalThis.SN_PROVIDERS.completeWithFallback = async (args) => {
       const last = String(args.messages[args.messages.length - 1].content || '');
       if (!/svuota/i.test(last)) return prev(args);
       globalThis.__chatCalls.push(args.messages);
-      return { text: '{"clearChat": true}', model: args.attempts[0].model, provider: args.attempts[0].provider, usage: {} };
+      if (attesaMs) await new Promise((r) => setTimeout(r, attesaMs));
+      // Il modello dice di averla già svuotata: la bolla non deve crederci.
+      return { text: '{"clearChat": true, "reply": "Fatto, chat svuotata!"}', model: args.attempts[0].model, provider: args.attempts[0].provider, usage: {} };
     };
-  });
+  }, attesaMs);
+}
+
+test('«svuota la chat» scritto in chat chiede conferma e la svuota, anche dopo la ricarica', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await modelloCheSvuota(app);
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
   const deckId = await newDeckWithCommander(page);
@@ -587,10 +593,20 @@ test('«svuota la chat» scritto in chat chiede conferma e la svuota, anche dopo
   await page.press('#chatInput', 'Enter');
   await clickConfirm(page, 'cancel');
   await expect(page.locator('.dk-msg-user')).toHaveText(['creature con haste', 'svuota la chat']);
-  await expect(page.locator('.dk-msg-bot').last()).toContainText('appena confermi');
   const sistema = await app.evaluate(() => String(globalThis.__chatCalls.at(-1)[0].content));
   expect(sistema).toContain('svuota la chat');
+  // Annullato: la bolla chiede, non promette né dice di aver fatto; il suo tasto resta, anche dopo la ricarica.
+  const bolla = page.locator('.dk-msg-bot').last();
+  await expect(bolla).toContainText('Svuoto la chat di questo mazzo?');
+  await expect(bolla).not.toContainText('svuotata');
+  await reloadBuilder(page);
+  await expect(page.locator('.dk-msg-bot').last().locator('[data-clear-chat]')).toBeVisible();
+  await page.locator('.dk-msg-bot').last().locator('[data-clear-chat]').click();
+  await clickConfirm(page, 'ok');
+  await expect(page.locator('.dk-msg')).toHaveCount(0);
 
+  // Chiesto di nuovo e confermato subito: la conferma si apre da sola.
+  await ask(page, 'creature con haste');
   await page.fill('#chatInput', 'svuota la chat, per favore');
   await page.press('#chatInput', 'Enter');
   await clickConfirm(page, 'ok');
@@ -598,4 +614,34 @@ test('«svuota la chat» scritto in chat chiede conferma e la svuota, anche dopo
   await reloadBuilder(page);
   await expect(page.locator('.dk-msg')).toHaveCount(0);
   expect((await savedChats(app))[deckId]).toBeUndefined();
+});
+
+test('«svuota la chat» chiesto e poi lasciato il mazzo mentre Filo risponde: al ritorno la richiesta è ancora lì', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await modelloCheSvuota(app, 1500);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await newDeckWithCommander(page);
+  await ask(page, 'creature con haste');
+  await page.fill('#chatInput', 'svuota la chat');
+  await page.press('#chatInput', 'Enter');
+  await page.click('#backToLibrary');
+  await expect(page.locator('#screenLibrary')).toBeVisible();
+  await expect.poll(async () => {
+    const m = ((await savedChats(app))[deckId] || { messages: [] }).messages.at(-1);
+    return !!(m && m.clearChat && !m.pending);
+  }, { timeout: 10_000 }).toBe(true);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+
+  await page.evaluate((id) => { location.hash = `#/deck/${encodeURIComponent(id)}`; }, deckId);
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  const bolla = page.locator('.dk-msg-bot').last();
+  await expect(bolla).toContainText('Svuoto la chat di questo mazzo?');
+  await bolla.locator('[data-clear-chat]').click();
+  await clickConfirm(page, 'ok');
+  await expect(page.locator('.dk-msg')).toHaveCount(0);
+  await reloadBuilder(page);
+  await expect(page.locator('.dk-msg')).toHaveCount(0);
 });
