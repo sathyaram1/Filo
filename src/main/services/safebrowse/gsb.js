@@ -106,16 +106,10 @@ function cleanPath(p) {
 function canonicalize(input) {
   if (input == null) return null;
   const bytes = Buffer.isBuffer(input) ? input : Buffer.from(String(input), 'utf8');
-  let s = bytes.toString('latin1').replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[\t\r\n]/g, '');
+  let s = trimControls(bytes.toString('latin1')).replace(/[\t\r\n]/g, '');
   const hash = s.indexOf('#');
   if (hash >= 0) s = s.slice(0, hash);
-  for (let i = 0; ; i++) {
-    if (i >= MAX_UNESCAPE) return null;
-    const t = unescapeOnce(s);
-    if (t === s) break;
-    s = t;
-  }
-  s = escapeBytes(s);
+  s = escapeBytes(unescapeAll(s));
   let [scheme, rest] = schemeOf(s);
   const q = rest.indexOf('?');
   const hasQuery = q >= 0;
