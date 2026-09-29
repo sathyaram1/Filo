@@ -23,9 +23,14 @@ function buildStatoPermessiSource(stato) {
   try { Object.defineProperty(N, 'permission', { get: Object.getOwnPropertyDescriptor(g, 'permission').get, enumerable: d.enumerable, configurable: true }); } catch (e) { return; }
   var chiedi = N.requestPermission;
   if (typeof chiedi === 'function') {
-    // Senza un gesto Filo non fa la domanda: la risposta è «nessuno ha deciso», non un no.
+    // Senza un gesto Filo non fa la domanda: la risposta è «nessuno ha deciso», non un no. Il gesto si conta come lo
+    // conta Filo (input vero negli ultimi 5 s): l'attivazione della pagina può venire da uno script iniettato con gesto.
+    var ultimoGesto = 0;
+    ['pointerdown', 'mousedown', 'mouseup', 'keydown', 'touchstart', 'touchend'].forEach(function (t) {
+      window.addEventListener(t, function (e) { if (e.isTrusted && e.key !== 'Escape') ultimoGesto = Date.now(); }, true);
+    });
     var r = { requestPermission: function (cb) {
-      var gesto = !navigator.userActivation || navigator.userActivation.isActive;
+      var gesto = Date.now() - ultimoGesto < 5000;
       return chiedi.call(N).then(function (x) {
         if (x === 'denied' && gesto) deciso = 'denied';
         var s = leggi();
