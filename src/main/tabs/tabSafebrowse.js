@@ -139,8 +139,11 @@ const safebrowseMethods = {
     tab._sbFrameTimer = setTimeout(() => this._sbScanFrames(tab, giro), 1500);
   },
 
+  // Solo dove il campo porterebbe al blocco: un http con la password resta l'avviso che vede già il content script.
   _sbCampiContano(SB, url) {
-    try { return SB.checkSync(url, { hasPassword: true }).level !== SB.checkSync(url, {}).level; } catch (_) { return false; }
+    try {
+      return SB.checkSync(url, { hasPassword: true }).level === 'pericoloso' && SB.checkSync(url, {}).level !== 'pericoloso';
+    } catch (_) { return false; }
   },
 
   // L'utente ha scritto "confermo" sull'interstitial "pericoloso": registra il
