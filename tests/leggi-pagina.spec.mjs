@@ -413,4 +413,5 @@ test('dalla scheda aperta arriva quello che l\'utente vede: i pezzi affiancati s
   expect(t).toContain('Lunedì 7:30 19:30');
   expect(t).toContain('8:30-12:30');
   expect(t).toContain(`[Contenuto incorporato: Eventi](${altroSito})`);
+  expect(t).toContain(`[Contenuto incorporato: Dove siamo](${mappa})`);
 });
