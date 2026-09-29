@@ -128,7 +128,9 @@ function consegnaConRicevuta(tab, command, attesaMs = ATTESA_RICEVUTA_MS, contex
     };
     const timer = setTimeout(() => chiudi(false), attesaMs);
     ricevuteInAttesa.set(ricevuta, { tabId: tab.id, chiudi });
-    try { tab.view.webContents.send('shortcut:triggered', { command, ricevuta, context }); } catch (_) { chiudi(false); }
+    // `scade`: una pagina che la prende quando il main ha smesso di aspettare non la esegue, se no si salva due volte.
+    const scade = Date.now() + attesaMs;
+    try { tab.view.webContents.send('shortcut:triggered', { command, ricevuta, context, scade }); } catch (_) { chiudi(false); }
   });
 }
 
