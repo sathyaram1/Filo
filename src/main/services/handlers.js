@@ -1057,6 +1057,8 @@ function targetWebTab(sender) {
 const proxyNonDisponibile = () => ({ proxy: 'non_disponibile' });
 const esitoNonDisponibile = (a) => !!(a && a._output && a._output.proxy === 'non_disponibile');
 const RISPOSTA_PROXY_NON_DISPONIBILE = 'Aprire un sito da un altro paese in Filo non si può ancora.';
+const SOLLECITO_DOPO_RIFIUTO = '[Il tuo ultimo messaggio è vuoto. Il testo che hai scritto insieme alle azioni l\'utente non l\'ha letto come risposta, '
+  + 'e dava per fatto quello che non è disponibile. Scrivi adesso la risposta completa per l\'utente, tenendo conto degli esiti qui sopra.]';
 
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
 // cambio (la scrittura su storage è condivisa, le cache in-memory no).
