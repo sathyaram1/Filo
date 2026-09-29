@@ -30,4 +30,21 @@ function soloFilo(handler) {
   };
 }
 
-module.exports = { daFilo, soloFilo };
+/** Chi chiede è una pagina che non è di Filo? Una chiamata interna al main non porta né indirizzo né pagina. PURA. */
+function daUnSito(origin, sender) {
+  const pagina = Boolean(origin) || Boolean(sender && (sender.wc || sender.tab || sender.frame));
+  return pagina && !daFilo(origin, sender);
+}
+
+/** Chi chiede è il frame principale della scheda in primo piano della sua finestra? */
+function inPrimoPiano(sender) {
+  const tm = sender && sender.win && sender.win._filoTabs;
+  const id = sender && sender.tab && sender.tab.id;
+  if (!tm || id == null || tm.activeId !== id) return false;
+  let principale = null;
+  try { principale = sender.wc && !sender.wc.isDestroyed() ? sender.wc.mainFrame : null; } catch (_) { principale = null; }
+  const f = sender.frame;
+  return Boolean(f && principale && (f === principale || f.frameTreeNodeId === principale.frameTreeNodeId));
+}
+
+module.exports = { daFilo, soloFilo, daUnSito, inPrimoPiano };
