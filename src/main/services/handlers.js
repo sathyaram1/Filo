@@ -4337,8 +4337,9 @@ function testoPiano(testo) {
 // { title, content } oppure una stringa (trattata come contenuto). Best-effort:
 // se manca la chiave o il testo, fa il possibile (anche solo snippet) e non rompe.
 async function enrichArchivedTab(id, payload) {
+  if (!id) return;
+  inArricchimento.add(id);
   try {
-    if (!id) return;
     // Riassunto e indice passano dal modello: una pagina della rete di casa resta in casa (#591). Il segno resta sulla
     // voce, perché dopo un riavvio Filo non sa più da dove aveva risposto un nome come tplinkwifi.net.
     if (payload && typeof payload === 'object' && await isHomeNetworkUrlSettled(payload.url)) {
