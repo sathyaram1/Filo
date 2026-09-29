@@ -39,11 +39,16 @@ function daUnSito(origin, sender) {
   return pagina && !daFilo(origin, sender);
 }
 
-/** Chi chiede è il frame principale della scheda in primo piano della sua finestra? */
-function inPrimoPiano(sender) {
+/** Chi chiede sta nella scheda in primo piano della sua finestra, pagina o riquadro che sia? */
+function schedaInPrimoPiano(sender) {
   const tm = sender && sender.win && sender.win._filoTabs;
   const id = sender && sender.tab && sender.tab.id;
-  if (!tm || id == null || tm.activeId !== id) return false;
+  return Boolean(tm && id != null && tm.activeId === id);
+}
+
+/** Chi chiede è il frame principale della scheda in primo piano della sua finestra? */
+function inPrimoPiano(sender) {
+  if (!schedaInPrimoPiano(sender)) return false;
   let principale = null;
   try { principale = sender.wc && !sender.wc.isDestroyed() ? sender.wc.mainFrame : null; } catch (_) { principale = null; }
   const f = sender.frame;
