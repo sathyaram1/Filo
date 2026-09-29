@@ -175,7 +175,7 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
     let hs = recenti.get(k);
     if (!hs) {
       hs = hashesOf(k);
-      if (recenti.size >= 16) recenti.delete(recenti.keys().next().value);
+      if (recenti.size >= 8) recenti.delete(recenti.keys().next().value);
     }
     recenti.delete(k);
     recenti.set(k, hs);
@@ -212,7 +212,7 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
 
   // Verdetto dalla sola cache: undefined se anche un prefisso non ha una risposta valida.
   function peek(url) {
-    const hs = hashesOf(url);
+    const hs = hashesFor(url);
     if (!hs.length) return undefined;
     const got = new Map();
     for (const h of hs) {
@@ -252,7 +252,7 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
 
   // null quando il verdetto non si conosce (senza chiave, offline, errore del servizio): mai «pulito» per ripiego.
   async function check(url) {
-    const hs = hashesOf(url);
+    const hs = hashesFor(url);
     if (!hs.length) return null;
     const prefixes = [...new Set(hs.map((h) => h.prefix))];
     const found = new Map();

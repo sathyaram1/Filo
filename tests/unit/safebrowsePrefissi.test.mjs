@@ -281,3 +281,24 @@ test('rifiuti ripetuti del servizio: si aspetta prima di riprovare, e nel fratte
   await L.check('https://pausa-813.it/4');
   assert.equal(chiamate.length, 3);
 });
+
+// Verifica di #813, giro 1: mille livelli di %25 costavano mille passate sull'indirizzo intero, Filo fermo per secondi.
+test('un indirizzo lunghissimo costruito apposta: la pagina in lista resta segnalata e il calcolo resta rapido', async () => {
+  const lista = sha('lunga-813.it/esca.html');
+  const { L } = lookupFinto((prefissi) => ({
+    ok: true,
+    cacheMs: 60_000,
+    matches: prefissi.includes(lista.subarray(0, 4).toString('base64'))
+      ? [{ hash: lista.toString('base64'), threatType: 'SOCIAL_ENGINEERING', category: 'phishing' }]
+      : [],
+  }));
+  const ostile = `https://lunga-813.it/esca.html?${'a'.repeat(1_500_000)}%25${'25'.repeat(5000)}`;
+  const t = performance.now();
+  L.peek(ostile);
+  const esito = await L.check(ostile);
+  L.peek(ostile);
+  assert.ok(performance.now() - t < 1000, `verifica di una pagina: ${Math.round(performance.now() - t)} ms`);
+  assert.equal(esito.listed, true);
+  assert.equal(esito.category, 'phishing');
+  assert.equal(gsb.canonicalize(`http://h/%25${'25'.repeat(5000)}`).url, 'http://h/%25');
+});
