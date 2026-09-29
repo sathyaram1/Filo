@@ -193,8 +193,10 @@ test('una scheda di sfondo non cambia ciò che l\'utente guarda; quella in vista
 });
 
 test('il premio del feedback dice a un sito la cifra, non il saldo', async ({ app, shell, openTab, testServer }) => {
-  await testServer.openReady(openTab, '<h1>sito</h1>');
+  const pagina = await testServer.openReady(openTab, '<h1>sito</h1>');
   const sito = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
+  expect((await sito(chiedi('credits_award_feedback'))).risposta?.code, 'il premio senza l\'invio dell\'utente').toBe('forbidden');
+  await pagina.click('h1');
   const r = await sito(chiedi('credits_award_feedback'));
   expect(r.risposta?.ok).toBe(true);
   expect(r.risposta?.credits).toBeGreaterThan(0);

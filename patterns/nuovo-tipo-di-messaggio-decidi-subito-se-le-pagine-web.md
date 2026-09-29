@@ -138,7 +138,8 @@ ci ha disegnato sopra per un feedback.
 Una domanda che il codice di Filo fa solo **dopo un gesto dell'utente** vuole il
 gesto anche nel main (#589.1, giro 2). Incolla e Detta si danno il permesso
 breve di appunti e microfono, Salva per dopo scrive nella lista, il dizionario,
-le correzioni e la disposizione del menu si scrivono dopo un clic: da un sito
+le correzioni e la disposizione del menu si scrivono dopo un clic, e da un clic
+partono l'invio di un feedback, gli scaricamenti e un altro paese: da un sito
 senza gesto il permesso leggeva la password copiata, mille salvataggi da una
 scheda di sfondo spingevano fuori tutte le pagine salvate, e una richiesta
 cancellava dizionario e menu. Il gesto è quello vero, visto dal main

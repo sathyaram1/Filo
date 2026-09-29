@@ -59,11 +59,13 @@ function domandaAmmessaDaUnSito(type, { inVista = false, schedaInVista = false, 
   return !DOMANDE_WEB_COL_DISEGNO.has(type) || disegnoSullaBarra === true;
 }
 
-// Quelle che il codice di Filo nelle pagine fa solo dopo un gesto dell'utente (Incolla, Detta, Salva per dopo,
-// la voce della dettatura) e gli scomparti che scrive solo così (dizionario, correzioni, disposizione del menu):
-// da un sito vogliono un gesto vero e recente su quella scheda.
+// Quelle che il codice di Filo nelle pagine fa solo dopo un gesto dell'utente (Incolla, Detta, Salva per dopo, la voce
+// della dettatura, l'invio di un feedback, gli scaricamenti, un altro paese) e gli scomparti che scrive solo così
+// (dizionario, correzioni, disposizione del menu): da un sito vogliono un gesto vero e recente su quella scheda.
 const DOMANDE_WEB_COL_GESTO = Object.freeze(new Set([
   'permesso_filo', 'save_page', 'save_link', 'set_saved_page_thumb', 'update_settings',
+  'submit_feedback', 'credits_award_feedback', 'redteam_submit',
+  'download_image', 'download_media', 'download_link', 'geo_propose_accept',
 ]));
 const CHIAVI_STORAGE_WEB_COL_GESTO = Object.freeze(['sn_personal_dict', 'sn_autocorrect', 'sn_icon_layout']);
 // Un gesto, un salvataggio: la lista tiene le ultime mille, e mille salvataggi dopo un clic sono del sito.

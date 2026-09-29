@@ -124,7 +124,9 @@ test('la foto della barra a un sito solo mentre l\'utente ci ha disegnato sopra'
 });
 
 test('le domande di un gesto dell\'utente: quali lo vogliono, e quali lo spendono', () => {
-  for (const t of [MSG.PERMESSO_FILO, MSG.SAVE_PAGE, MSG.SAVE_LINK, MSG.SET_SAVED_PAGE_THUMB, MSG.UPDATE_SETTINGS]) {
+  for (const t of [MSG.PERMESSO_FILO, MSG.SAVE_PAGE, MSG.SAVE_LINK, MSG.SET_SAVED_PAGE_THUMB, MSG.UPDATE_SETTINGS,
+    MSG.SUBMIT_FEEDBACK, MSG.CREDITS_AWARD_FEEDBACK, MSG.REDTEAM_SUBMIT, MSG.DOWNLOAD_IMAGE, MSG.DOWNLOAD_MEDIA,
+    MSG.DOWNLOAD_LINK, MSG.GEO_PROPOSE_ACCEPT]) {
     assert.equal(W.vuoleUnGesto(t, { type: t }), true, t);
   }
   for (const t of W.DOMANDE_WEB_COL_GESTO) assert.ok(W.DOMANDE_WEB.has(t), `${t} deve essere prima di tutto una domanda ammessa`);
