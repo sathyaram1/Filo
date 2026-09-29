@@ -1,6 +1,7 @@
-// VERIFICA #728 giro 1, rilievo 1 — un sosia di un marchio corto che chiede la
-// password deve arrivare al blocco anche quando il modulo compare un attimo dopo
-// l'apertura (pagina montata dal codice, o password chiesta dopo l'email).
+// VERIFICA #728 giro 2, rilievo 1 (era l'1 del giro 1) — un sosia di un marchio corto
+// che chiede la password deve arrivare al blocco anche quando il modulo compare un
+// attimo dopo l'apertura (pagina montata dal codice, password chiesta dopo l'email)
+// o sta in un riquadro incorporato della pagina stessa.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
