@@ -4009,18 +4009,20 @@
     { tasti: ['b'], cosa: 'mette il grassetto', suo: 'bold', nelFoglio: true, fa: () => exec('bold') },
     { tasti: ['i'], cosa: 'mette il corsivo', suo: 'italic', nelFoglio: true, fa: () => exec('italic') },
     { tasti: ['u'], cosa: 'sottolinea', suo: 'underline', nelFoglio: true, fa: () => exec('underline') },
-    // Li serve il browser (fa: null): un modulo li toglierebbe al foglio.
-    { tasti: ['z'], cosa: 'annulla l\'ultima modifica', suo: 'undo', fa: null },
-    { tasti: ['y'], cosa: 'ripete la modifica annullata', suo: 'redo', fa: null },
-    { tasti: ['z'], shift: true, cosa: 'ripete la modifica annullata', suo: 'redo', fa: null },
-    { tasti: ['x'], cosa: 'taglia', fa: null },
-    { tasti: ['c'], cosa: 'copia', fa: null },
-    { tasti: ['v'], cosa: 'incolla', fa: null },
-    { tasti: ['v'], shift: true, cosa: 'incolla senza formattazione', fa: null },
-    { tasti: ['a'], cosa: 'seleziona tutto', fa: null },
+    // Li serve il browser (fa: null): un modulo li toglierebbe al foglio. Su Mac il browser non
+    // li fa: quelli che esistono sono della barra dei menu (già riservati), Cmd+Y non fa niente.
+    { tasti: ['z'], cosa: 'annulla l\'ultima modifica', suo: 'undo', delBrowser: true, fa: null },
+    { tasti: ['y'], cosa: 'ripete la modifica annullata', suo: 'redo', delBrowser: true, fa: null },
+    { tasti: ['z'], shift: true, cosa: 'ripete la modifica annullata', suo: 'redo', delBrowser: true, fa: null },
+    { tasti: ['x'], cosa: 'taglia', delBrowser: true, fa: null },
+    { tasti: ['c'], cosa: 'copia', delBrowser: true, fa: null },
+    { tasti: ['v'], cosa: 'incolla', delBrowser: true, fa: null },
+    { tasti: ['v'], shift: true, cosa: 'incolla senza formattazione', delBrowser: true, fa: null },
+    { tasti: ['a'], cosa: 'seleziona tutto', delBrowser: true, fa: null },
   ];
   function prendeIlTasto(t, e) {
     if (!(e.ctrlKey || e.metaKey)) return false;
+    if (t.delBrowser && TASTI.suMac()) return false;
     if (t.prende) return t.prende(e);
     return t.tasti.some((k) => TASTI.combacia(e, ['Ctrl', ...(t.shift ? ['Shift'] : []), k].join('+')));
   }
@@ -4056,6 +4058,8 @@
     if (!sc) return null;
     const ignoto = TASTI.pezzoSconosciuto(sc);
     if (ignoto && ignoto.modificatore) return { tipo: 'modificatore', nome: ignoto.nome };
+    const conReale = sc.split(/[+\s-]+/).some((p) => ['ctrl', 'alt'].includes(TASTI.tipoModificatore(p)));
+    if (conReale && TASTI.soloModificatori(sc)) return { tipo: 'senzaTasto', nome: TASTI.etichetta(sc.replace(/[+\s-]+$/, '')) };
     // Senza Ctrl/Cmd/Alt la lettera scatterebbe mentre si scrive.
     if (!isValidShortcut(sc)) return { tipo: 'senzaModificatore' };
     if (ignoto) return { tipo: 'tasto', nome: ignoto.nome };
@@ -4069,6 +4073,7 @@
     if (r.tipo === 'modificatore') {
       return `Non riconosco «${r.nome}» come tasto da tenere premuto: usa ${tasto('Ctrl')}, Alt o Shift (Maiusc)${libera ? `, es. ${libera}` : ''}.`;
     }
+    if (r.tipo === 'senzaTasto') return `Manca il tasto da premere insieme a ${r.nome}: aggiungi una lettera o una cifra${libera ? `, es. ${libera}` : ''}.`;
     if (r.tipo === 'tasto') {
       const conNome = primaLibera(ESEMPI_CON_NOME, m);
       return `Non riconosco il tasto «${r.nome}»: usa una lettera, una cifra o un nome come Spazio, Invio, Esc, Tab, Su, Giù, F1…${conNome ? ` (es. ${conNome})` : ''}.`;
