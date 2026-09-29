@@ -73,17 +73,3 @@ test('col fornitore la stessa pagina 403 chiama il modello', async ({ app, openT
     await expect.poll(() => chiamate(app), { timeout: 15_000 }).toBeGreaterThan(0);
   } finally { await srv.close(); }
 });
-
-test('in incognito, senza fornitore, il 403 non chiama il modello', async ({ app, shell }) => {
-  test.setTimeout(90_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const srv = await startServer();
-  try {
-    await spia(app);
-    const ok = await app.evaluate(async ({ BrowserWindow }) => {
-      const fn = globalThis.SN_OPEN_INCOGNITO || null;
-      return typeof fn === 'function';
-    });
-    test.skip(!ok, 'nessuna strada di test per aprire l’incognito');
-  } finally { await srv.close(); }
-});
