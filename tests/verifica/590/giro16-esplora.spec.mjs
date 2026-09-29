@@ -158,7 +158,7 @@ test('E7 voci della lista scritte in altre forme', async ({ app, shell, rete }) 
     const errore = await pref.locator('#sec-siteblock-blacklist-error').isVisible() ? await pref.locator('#sec-siteblock-blacklist-error').innerText() : '(nessun avviso)';
     const salvata = await pref.evaluate(async () => ((await window.SN_STORAGE.getSettings()).security?.siteBlock || {}).blacklist);
     const esito = await app.evaluate(({ BrowserWindow }) => {
-      const sb = require('/home/user/Filo/src/main/services/siteBlock.js');
+      const sb = process.mainModule.require('/home/user/Filo/src/main/services/siteBlock.js');
       return ['http://blocked.test/', 'http://sito.test/'].map((u) => sb.shouldBlockNavigation(u).block);
     }).catch((e) => String(e));
     console.log(`E7 «${testo}» → avviso: ${errore} | salvata: ${JSON.stringify(salvata)} | blocca [blocked, sito]: ${JSON.stringify(esito)}`);
