@@ -8,6 +8,8 @@ const haXdotool = process.platform === 'linux' && !!process.env.DISPLAY
 test.skip(!haXdotool, 'serve xdotool su uno schermo X (contenitore delle routine)');
 
 const xdo = (...a) => execFileSync('xdotool', a.map(String));
+// xdotool conta in pixel fisici, Electron in pixel logici (FILO_TEST_SCALE).
+const vai = (g, x, y) => xdo('mousemove', Math.round(x * g.s), Math.round(y * g.s));
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function aSchermo(app) {
@@ -23,20 +25,20 @@ async function aSchermo(app) {
 }
 
 function geometria(app) {
-  return app.evaluate(({ BrowserWindow }) => {
+  return app.evaluate(({ BrowserWindow, screen }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const tm = w._filoTabs;
     const tab = tm.tabs.find((t) => t.id === tm.activeId);
-    return { c: w.getContentBounds(), t: tab.view.getBounds(), v: tm.avvisi.vista ? tm.avvisi.vista.getBounds() : null };
+    return { s: screen.getPrimaryDisplay().scaleFactor, c: w.getContentBounds(), t: tab.view.getBounds(), v: tm.avvisi.vista ? tm.avvisi.vista.getBounds() : null };
   });
 }
 
 async function clicSulla(app, page, sel) {
   const g = await geometria(app);
   const r = await page.evaluate((s) => { const b = document.querySelector(s).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; }, sel);
-  const sx = Math.round(g.c.x + g.t.x + r.x);
-  const sy = Math.round(g.c.y + g.t.y + r.y);
-  xdo('mousemove', sx - 5, sy - 5); xdo('mousemove', sx, sy); xdo('click', 1);
+  const sx = g.c.x + g.t.x + r.x;
+  const sy = g.c.y + g.t.y + r.y;
+  vai(g, sx - 5, sy - 5); vai(g, sx, sy); xdo('click', 1);
   await pausa(400);
 }
 
