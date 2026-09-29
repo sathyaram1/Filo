@@ -79,7 +79,10 @@ test('la foto la chiede solo la scheda in vista, e inquadra sé stessa', async (
   await testServer.openReady(openTab, '<style>html,body{background:#ff0000;height:100%;margin:0}</style><h1>in vista</h1>', { pubblico: true });
   const sfondo = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
   const inVista = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
-  await expect.poll(async () => (await schede(app)).tutte.find((t) => t.id === (0, 0))?.url ?? (await schede(app)).attiva).toBeTruthy();
+  await expect.poll(async () => {
+    const { attiva, tutte } = await schede(app);
+    return tutte.find((t) => t.id === attiva)?.url || '';
+  }).toMatch(/^http:\/\/sito-pubblico\.test/);
 
   for (const tipo of ['capture_visible_tab', 'capture_feedback_topbar']) {
     const r = await sfondo(chiedi(tipo));
