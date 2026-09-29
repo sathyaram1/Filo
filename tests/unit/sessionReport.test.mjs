@@ -122,6 +122,19 @@ test('modello sconosciuto: tariffa opus e una nota', async () => {
   assert.equal(famigliaPrezzo('claude-haiku-4-5').key, 'haiku');
 });
 
+test('Opus 5.5 ha la sua tariffa: 4/20, lettura della cache 0,20 $/M', async () => {
+  assert.equal(famigliaPrezzo('claude-opus-5-5').key, 'opus-5-5');
+  assert.equal(famigliaPrezzo('claude-opus-5').key, 'opus');
+  assert.equal(famigliaPrezzo('claude-opus-4-8').key, 'opus');
+  const righe = [assistant('o', 'claude-opus-5-5', {
+    input_tokens: 100, cache_creation_input_tokens: 1000, cache_read_input_tokens: 1000000, output_tokens: 1000,
+  }, [], T('00:00'))];
+  const rep = await analizzaRighe(righe);
+  // 100·4 + 1000·5 + 1.000.000·0,2 + 1000·20 = 225.400 / 1e6
+  assert.equal(rep.costUsd, 0.2254);
+  assert.deepEqual(rep.notes, [], 'un modello conosciuto non porta la nota della tariffa di ripiego');
+});
+
 test('lo slug della cartella dei transcript e le chiavi ammesse da Firestore', () => {
   assert.equal(slugProgetto('C:\\Users\\agenti AI\\Desktop\\Filo\\Filo'), 'C--Users-agenti-AI-Desktop-Filo-Filo');
   assert.equal(slugProgetto('/home/worker/filo'), '-home-worker-filo');
