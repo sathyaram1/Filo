@@ -3034,6 +3034,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
       if (text.trim()) notes.push(text.trim());
+      if (roundRendered.some(esitoNonDisponibile)) noteAlRifiuto = notes.length;
       push('filo:action', { kind: 'round', text });
       textReply = text;
       reasoningDetails = r.reasoningDetails || [];
