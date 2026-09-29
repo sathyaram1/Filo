@@ -38,7 +38,7 @@ function apriBlocco(dir, v, riga) {
 function aggiungiInCima(dir, riga) {
   const f = join(dir, 'src', 'shared', 'patchNotes.js');
   const s = readFileSync(f, 'utf8');
-  const i = s.indexOf('features: [', s.indexOf('const NOTES = [')) + 'features: ['.length;
+  const i = s.indexOf('features: [', s.indexOf("version: '", s.indexOf('const NOTES = ['))) + 'features: ['.length;
   writeFileSync(f, s.slice(0, i) + `\n        ${JSON.stringify(riga)},` + s.slice(i));
   git(dir, 'commit', '--quiet', '-am', 'riga nel blocco in cima');
 }
