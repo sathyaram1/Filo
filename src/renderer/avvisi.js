@@ -10,6 +10,11 @@
   const carte = new Map();
   const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
   let ultimaMisura = '';
+  // Le azioni di un avviso che la pagina fa comparire (e spostare) sotto il cursore si armano quando
+  // la pila è ferma da ARMA_MS; la X resta sempre viva. patterns/una-conferma-non-e-un-avviso-sopra-un-fatto-gia-compiuto.md
+  const ARMA_MS = 1000;
+  let firmaPila = '';
+  let timerArma = null;
 
   function applicaTema(tema) {
     const vars = tema && typeof tema.vars === 'object' && tema.vars ? tema.vars : {};
@@ -80,6 +85,16 @@
     api.misura(w, h);
   }
 
+  function arma(firma) {
+    if (firma === firmaPila) return;
+    firmaPila = firma;
+    for (const b of pila.querySelectorAll('.shell-notif-action')) b.disabled = true;
+    clearTimeout(timerArma);
+    timerArma = setTimeout(() => {
+      for (const b of pila.querySelectorAll('.shell-notif-action')) b.disabled = false;
+    }, ARMA_MS);
+  }
+
   api.onStato((stato) => {
     applicaTema(stato && stato.tema);
     const lista = normalizza(stato);
@@ -100,18 +115,23 @@
       pila.offsetHeight;
       for (const el of nuove) el.classList.add('show');
     }
+    arma(JSON.stringify(lista));
     misura();
-    if (nuove.length) vassoio.scrollTop = vassoio.scrollHeight;
+    if (nuove.length) inFondo();
   });
 
-  try { new ResizeObserver(misura).observe(pila); } catch (_) {}
   // Finestra bassa: la vista è più corta della pila e scorre; in vista resta la più recente.
-  window.addEventListener('resize', () => { vassoio.scrollTop = vassoio.scrollHeight; });
+  function inFondo() {
+    const fondo = vassoio.scrollHeight - vassoio.clientHeight;
+    if (fondo > 0 && vassoio.scrollTop !== fondo) vassoio.scrollTop = fondo;
+  }
+  try { new ResizeObserver(misura).observe(pila); } catch (_) {}
+  window.addEventListener('resize', inFondo);
 
   pila.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-azione]');
     const card = b && b.closest('.shell-notif');
-    if (!card || !card.classList.contains('show')) return;
+    if (!card || b.disabled || !card.classList.contains('show')) return;
     api.clic(card.dataset.nid, b.dataset.azione);
   });
 })();

@@ -2435,7 +2435,7 @@ class TabManager {
   }
 
   // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell
-  // mostra una chip "Bloccato popup da <host> — Apri" cliccabile per aprirlo.
+  // mostra l'avviso "Bloccato popup da <host>" con «Apri» per aprirlo.
   _notifyPopupBlocked(tabId, url) {
     try {
       let host = '';
@@ -2444,7 +2444,7 @@ class TabManager {
     } catch (_) {}
   }
 
-  // Chiamato da IPC quando l'utente clicca "Apri" sulla chip — il popup era
+  // Chiamato da IPC quando l'utente clicca "Apri" sull'avviso — il popup era
   // legittimo (es. share dialog, OAuth) e va aperto bypassando il blocco.
   openBlockedPopup(url) {
     this.openTab(url, { activate: true });

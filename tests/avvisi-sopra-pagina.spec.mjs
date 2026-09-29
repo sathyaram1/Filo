@@ -106,3 +106,50 @@ test('un avviso resta sopra anche alla scheda aperta dopo, segue il tema e la X 
   await expect(vista.locator('.shell-notif')).toHaveCount(0);
   await expect.poll(async () => (await posa(app)).vista.width).toBe(0);
 });
+
+test('il clic che arriva insieme all’avviso non ne aziona i pulsanti; la X sì, sempre', async ({ shell, avvisi }) => {
+  // La pagina decide quando e sotto quale punto nasce un avviso (uno scaricamento che finisce, un
+  // popup bloccato): il clic già partito verso di lei non deve diventare «Apri file».
+  await shell.evaluate(() => {
+    window.__fatto = 0;
+    window.filoNotify('Con un’azione', { durationSec: 0, actions: [{ label: 'Fai', onClick: () => { window.__fatto++; } }] });
+  });
+  const vista = await avvisi();
+  const azione = vista.locator('.shell-notif-action', { hasText: 'Fai' });
+  await azione.waitFor();
+  await azione.click({ force: true });
+  await expect(azione).toBeDisabled();
+  expect(await shell.evaluate(() => window.__fatto)).toBe(0);
+
+  // Ferma la pila, l'azione si arma e risponde.
+  await expect(azione).toBeEnabled({ timeout: 3000 });
+  await azione.click();
+  await expect.poll(() => shell.evaluate(() => window.__fatto)).toBe(1);
+  await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
+
+  // La X di un avviso appena nato risponde subito: un no per sbaglio non costa niente.
+  await shell.evaluate(() => window.filoNotify('Da chiudere', { durationSec: 0, actions: [{ label: 'Fai', onClick: () => {} }] }));
+  await vista.locator('.shell-notif.show', { hasText: 'Da chiudere' }).locator('.shell-notif-close').click();
+  await expect(shell.locator('.shell-notif', { hasText: 'Da chiudere' })).toHaveCount(0, { timeout: 4000 });
+});
+
+test('un popup bloccato si annuncia sopra la pagina e «Apri» lo apre in una scheda', async ({ app, shell, openTab, testServer, avvisi }) => {
+  const target = testServer.html('<!doctype html><html><body><p id="t">POPUP APERTO</p></body></html>');
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body><p>pagina</p></body></html>');
+  const prima = (await posa(app)).schede;
+  await page.evaluate((u) => { window.open(u, '_blank', 'width=400,height=300'); }, target);
+
+  await expect(shell.locator('.shell-notif', { hasText: 'Bloccato popup da' })).toHaveCount(1, { timeout: 8000 });
+  const vista = await avvisi();
+  const carta = vista.locator('.shell-notif.show', { hasText: 'Bloccato popup da 127.0.0.1' });
+  await expect(carta).toBeVisible();
+  expect((await posa(app)).schede).toBe(prima);
+
+  await carta.locator('.shell-notif-action', { hasText: 'Apri' }).click();
+  await expect.poll(async () => (await posa(app)).schede).toBe(prima + 1);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }, u) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const attiva = tm.tabs.find((t) => t.id === tm.activeId);
+    return !!attiva && attiva.url === u;
+  }, target)).toBe(true);
+});

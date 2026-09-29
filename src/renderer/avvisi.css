@@ -45,10 +45,13 @@
   border-radius: 6px;
   background: var(--bg, transparent);
   color: var(--fg);
+  font-family: inherit;
   font-size: 12px;
   cursor: pointer;
 }
 .shell-notif-action:hover { background: var(--border); }
+/* Appena comparsa, l'azione non risponde ancora (avvisi.js, ARMA_MS): si vede spenta finché si arma. */
+.shell-notif-action:disabled { opacity: 0.45; cursor: default; pointer-events: none; }
 
 /* ── Vista sopra la pagina ── la finestra è grande quanto la pila: niente fondo, niente 80vw
    (la larghezza della vista dipende dalle carte, e le carte dalla vista, si stringerebbero a vuoto). */

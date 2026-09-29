@@ -56,9 +56,12 @@ irraggiungibili.
   `window` (il menu del tasto destro: `src/content/menu.js`) lo legge come "la
   pagina si è mossa" e **si chiude da solo**. Confronta con una tolleranza pari
   allo sposto d'ingresso e scrivi `scrollTop` solo se cambia davvero.
-- **Dove:** `NOTIFS` (`enforceCap`/`syncOverflow`) in `src/renderer/shell.js`;
-  `.shell-notifs` in `src/renderer/shell.css`. Test
-  `tests/notifications.spec.mjs` (la raffica non straripa e resta chiudibile).
+- **Dove:** il modello è `NOTIFS` (`enforceCap`) in `src/renderer/shell.js`; a
+  schermo la pila la disegna la vista sopra la pagina
+  (`src/main/avvisiSopraPagina.js`, `src/renderer/avvisi.{html,js,css}`), alta al
+  massimo quanto l'area della pagina, e dentro si scorre
+  ([la shell non disegna sopra la pagina](la-shell-non-disegna-sopra-la-pagina.md)).
+  Test `tests/notifications.spec.mjs` (la raffica non straripa e resta chiudibile).
   Stesso pattern nell'editor: `showEditorToast`/`.ed-toasts` in
   `src/pages/editor/editor.{js,css}`, test `tests/editor-trash.spec.mjs`.
   Lato **pagina visitata** (content script): `mountToast`/`unmountToast` +
