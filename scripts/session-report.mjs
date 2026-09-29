@@ -55,6 +55,8 @@ import { fileURLToPath } from 'node:url';
 // scrittura in cache a 5 minuti = 1,25× l'input, a UN'ORA = 2× l'input
 // (`cacheWrite1h`), lettura = 0,1× l'input, tranne Fable 5.1 (lettura
 // 0,25 $/M) e Fable 5 (1 $/M). Sonnet 4.x costa 3/15, Sonnet 5 costa 2/10.
+// Opus 5.5 costa 4/20 (lettura 0,20 $/M): a tariffa opus le routine
+// risultavano care più del doppio, perché la lettura della cache è quasi tutto.
 // Un modello sconosciuto paga la tariffa opus, con una nota nel rapporto.
 //
 // Le due durate si distinguono nel transcript (`usage.cache_creation.
