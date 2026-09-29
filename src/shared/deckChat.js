@@ -34,8 +34,9 @@
   }
 
   // Solo DATI: lo stato di vista (lista aperta, ragionamento aperto, «già aggiunte» che si ricava dal mazzo di
-  // adesso) non si conserva, così alla riapertura le liste vecchie sono chiuse e l'ultima aperta (§3.3). Una
-  // risposta ancora in volo si rilegge come interrotta: chi la aspettava non c'è più.
+  // adesso) non si conserva, così alla riapertura le liste vecchie sono chiuse e l'ultima aperta (§3.3). Il turno
+  // (`turn`) è l'identità di una risposta: chi la completa, la riprova o ne salva i nomi la ritrova da lì. Una
+  // risposta in volo senza turno non ha nessuno che la aspetti: è interrotta.
   function cleanMessage(m) {
     if (!m || typeof m !== 'object') return null;
     if (m.who === 'user') {
@@ -44,10 +45,13 @@
     }
     if (m.who !== 'bot') return null;
     const out = { who: 'bot' };
+    const turn = str(m.turn);
+    if (turn) out.turn = turn;
     const reasoning = str(m.reasoning);
     if (reasoning) out.reasoning = reasoning;
     const names = nameMap(m.nameIds);
     if (names) out.nameIds = names;
+    if (m.pending && turn) { out.pending = true; return out; }
     if (m.pending || m.interrupted) { out.interrupted = true; return out; }
     if (m.error) { out.error = str(m.error) || 'nessuna risposta'; return out; }
     const reply = str(m.reply);
