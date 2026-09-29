@@ -9,6 +9,7 @@
 // I moduli SN_* sono stati caricati dal loader.js — qui assumiamo siano su global.
 
 const { BrowserWindow } = require('electron');
+const Disco = require('../shim/storage');
 const Defaults = require('./defaultsStore');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 
