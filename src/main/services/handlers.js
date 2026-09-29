@@ -2992,6 +2992,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       // cronologia del modello e voce, che altrimenti leggerebbero «[[calc: …]]».
       if (Calc) text = Calc.resolveCalcMarkers(text);
       if (!actions.length) {
+        // Muto, e l'ultima frase scritta precede un «non disponibile»: la risposta la riscrive il
+        // modello sapendolo, una volta, perché quella frase poteva rispondere anche ad altro (#771).
+        if (!text.trim() && !sollecitato && round < MAX_ROUNDS && noteAlRifiuto >= 0 && notes.length <= noteAlRifiuto) {
+          sollecitato = true;
+          threadMessages.push({ role: 'user', content: SOLLECITO_DOPO_RIFIUTO });
+          continue;
+        }
         textReply = text;
         reasoningDetails = r.reasoningDetails || [];
         exhausted = false;
