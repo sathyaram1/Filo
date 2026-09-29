@@ -1,24 +1,20 @@
-// SINGOLA SORGENTE del recap aggiornamento (popup all'avvio) e del calcolo
-// "quante patch sei indietro". Vedi CLAUDE.md → "Patch notes".
-//
-// Ogni volta che chiudi un fix o aggiungi una feature VISIBILE all'utente,
-// aggiungi una riga al blocco della versione corrente (features/fixes), in
-// italiano e NON tecnica. Le voci interne (refactor/test/infra) NON vanno qui.
-//
-// Formato (lista ordinata dalla versione PIÙ RECENTE alla più vecchia):
-//   { version: '0.2.50', date: '2026-06-18',
-//     features: ['Testo per l’utente…'],
-//     fixes: ['Testo per l’utente…'] }
+// Novità mostrate a chi aggiorna Filo (recap all'avvio): solo ciò che un utente qualunque vede, in italiano semplice.
+// Una riga non va mai sotto una versione già uscita: chi la leggerebbe ha già quella versione.
+// Regole e guardia: tests/unit/patchNotes.test.mjs.
 
 (function (global) {
   'use strict';
 
   const NOTES = [
-    // ↓ Nuove versioni in cima.
+    // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
+    // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
-      version: '0.2.228', date: '2026-09-11',
+      version: '0.2.229', date: '2026-09-11',
       features: [
+        'Filo rifiuta i banner dei cookie anche quando il sito li mette in un riquadro dentro la pagina, e ne riconosce molti di più. Quelli che offrono solo «Accetta», o «accetta o abbonati», li nasconde senza accettare niente, e la pagina torna a scorrere. Col tasto destro sulla scheda, o in Sicurezza, vedi cosa ha fatto su ogni sito e rimetti il banner se ti serve.',
+        'Un programma scaricato da un sito (.exe, .msi, .bat, .dmg, .iso, .pkg, .sh, .jar\u2026) non arriva pi\u00f9 nei Download in silenzio. Filo si ferma, ti dice che \u00e8 un programma e da quale sito arriva, e lo scarica solo se rispondi di s\u00ec. Nell\u2019elenco degli scaricamenti i programmi si riconoscono a colpo d\u2019occhio, e aprirne uno chiede una seconda conferma, perch\u00e9 aprirlo vuol dire eseguirlo. Gli altri file scendono come sempre. Se preferisci, in Sicurezza spegni la domanda o elenchi i siti di cui ti fidi.',
         'Indietro e avanti adesso si fanno come in qualsiasi browser: Alt+\u2190 e Alt+\u2192 (su Mac Cmd+[ e Cmd+]) e i due tasti laterali del mouse, su qualunque pagina e anche mentre stai scrivendo in un campo. Su Mac funziona anche lo scorrimento orizzontale a due dita.',
+        'Lo zoom della pagina lo puoi chiedere a parole: «ingrandisci un po\'», «zoom al 150%», «torna alla dimensione normale». Filo sa a quanto sta adesso e te lo dice, e quando la pagina non è al 100% il menu del tasto destro mostra il livello e la riporta alla dimensione reale con un clic. Coi tasti e con la rotella si arriva fino al 500% e si scende al 25%, come in un browser qualsiasi.',
         'Le chat con Filo nella nuova scheda non spariscono più quando torni alla home: restano tutte sul tuo computer, per intero, compresa l\'intervista del primo avvio e i comandi che hai scritto nel terminale, con il loro esito. Le ritrovi in Cronologia, sopra le schede chiuse. Le discussioni sono in vista, i comandi che avevi dato stanno sotto un interruttore. Cerca una parola e trovi la chat che ne parlava, anche se l\'hai detta a metà conversazione; cliccala per riaprirla e continuare a scrivere da dove eravate. Il titolo lo scrive Filo: se non ti va bene lo riscrivi col tasto destro, e da lì sposti anche una chat finita fra i comandi per sbaglio. Puoi anche chiedere a Filo "riprendi la discussione di ieri su…": la ritrova lui.',
         'La tua chiave OpenRouter si mette e si toglie dalla pagina Crediti, dove vedi quanto ha speso e quanto le resta. Se OpenRouter la rifiuta, Filo risponde lo stesso coi tuoi crediti e te lo scrive sotto la risposta. La pagina Crediti ricorda l’ultimo rifiuto finché la chiave non torna a funzionare.',
         'Un invito adesso è un link. Chi lo apre scarica Filo e al primo avvio si ritrova i crediti già dentro, senza ricopiare il codice. Ogni tuo link vale per tre persone, e nella pagina Crediti vedi quanti sono entrati e quanti posti restano.',
@@ -27,11 +23,29 @@
       ],
       fixes: [
         'Un sito dal nome comune non passa pi\u00f9 per l\'imitazione di un marchio. team.com, email.com, apply.com e le altre parole che distano una lettera da Steam, Gmail o Apple aprivano il blocco a tutta pagina, quello che si toglie solo scrivendo \u00abconfermo\u00bb. Adesso trovi un avviso che chiudi con un clic. Il blocco resta sui sosia scritti con lettere che si somigliano, come paypa1 o g00gle, e su ogni sito che oltre al nome somigliante \u00e8 stato registrato da poco, ha il certificato rotto o ti chiede la password.',
+        'Con Filo aperto dietro un altro programma, Alt+E, Alt+T, Alt+S e Alt+H (su Mac con Ctrl davanti) tornano a quel programma. In Word ed Excel Alt+H apre di nuovo la scheda Home, e un Alt+S premuto altrove non ti chiude più una scheda di Filo. Dentro Filo le quattro scorciatoie funzionano come prima. E dopo aver chiuso o cambiato scheda da tastiera, i tasti arrivano subito alla scheda che hai davanti: Ctrl+W premuto due volte chiude due schede, senza bisogno di un clic in mezzo. Con un PDF aperto le scorciatoie di Filo adesso rispondono tutte: Alt+S lo salva per dopo, Alt+H apre l\'Aiuto, e Ctrl+W, Ctrl+T e Alt+cifra funzionano come sulle altre pagine.',
+        'I menu che si aprono col tasto destro su una scheda o dalle icone in alto a destra si chiudono con Esc. Con le frecce accendi una voce e con Invio la scegli, senza toccare il mouse.',
+        'Alt+S adesso fa quello che fa «Salva per dopo» nel menu. Compare la conferma, e se la clicchi si apre la lista con la pagina appena salvata in evidenza. Le anteprime delle pagine salvate pesano molto meno, anche quelle che avevi già, così Filo non riscrive più megabyte di immagini a ogni modifica. Se salvi una pagina che non si è caricata, nella lista finisce il sito, pronto da riaprire quando torna. E con una finestra in incognito davanti, Alt+S e le altre scorciatoie di Filo lavorano su quella, non sulla finestra che sta dietro.',
+        'Se chiedi a Filo quanti crediti ti restano, ti risponde col saldo della pagina Crediti e con la quota che arriva ogni giorno. Quando mandi una segnalazione non ti promette più 5 crediti, perché il premio arriva sul saldo dopo i controlli. E quando la segnalazione viene risolta, il riquadro in home dice i crediti che hai ricevuto davvero.',
+        'Nel deck builder la chat con Filo non si svuota più quando ricarichi la pagina o riavvii Filo. Ogni mazzo ritrova la sua conversazione, con le carte trovate e il + per metterle nel mazzo, e puoi continuare da dove eri. Per ripartire da zero la svuoti con la gomma in cima alla chat, o chiedendolo a Filo.',
+        'Sulle pagine di Filo, come l\'Editor, la Cronologia o le Preferenze, la spiegazione del tasto destro e le risposte di Spiega e Traduci mostrano grassetto, elenchi e link cliccabili, come sulle pagine web. Se una risposta cita del codice HTML, lo leggi scritto com\'è. E la spiegazione nel menu non lascia più righe vuote fra un paragrafo e un elenco. Ovunque Filo ti risponda, un indirizzo in grassetto, fra virgolette o con le parentesi, come molte voci di Wikipedia, porta alla pagina giusta.',
+        'Se Filo vuole cambiare lo stile con cui ti scrive, o ricordarsi una cosa su di te, prima ti mostra la frase esatta e aspetta il tuo OK. Stile e cose da ricordare arrivano fino a 800 caratteri, e oltre Filo te lo dice invece di tagliare. Nelle Preferenze, sotto «Memoria di Filo», rileggi tutto quello che ha imparato e togli una riga alla volta, oppure chiedi a Filo di dimenticare una cosa sola («dimentica che non bevo caffè»). Se una richiesta di conferma compare mentre stai scrivendo o cliccando altrove, un tasto o un clic partiti per altro non la confermano più: OK lo premi tu, e quello che scrivi resta nel campo. Se il testo da confermare non sta nel riquadro, OK si accende quando l\'hai fatto scorrere fino in fondo. E le Preferenze lasciate aperte in una scheda seguono quello che cambi chiedendolo a Filo, senza rimettere i valori di prima al primo clic.',
+        'Il limite di spesa del mese adesso ferma tutto quello che Filo chiede ai modelli, anche il lavoro che fa da solo e anche nelle finestre in incognito: il controllo dei siti pericolosi, il riconoscimento dei blocchi geografici, il titolo delle segnalazioni e i pulsanti «Prova» delle Opzioni. Prima quei lavori andavano avanti oltre il limite, e quello che costavano non entrava nel conteggio del mese.',
+        'Le pagine della rete di casa, come il pannello del router, il NAS o la stampante, restano in casa anche quando le apri per nome, come tplinkwifi.net, fritz.box o homeassistant. Il controllo dei siti pericolosi, il riconoscimento dei blocchi geografici, il riordino delle schede e il riassunto delle schede chiuse non le mandano più fuori.',
+        'Un sito che vuole microfono, fotocamera, quello che hai copiato, la tua posizione o mandarti notifiche adesso te lo chiede, in alto sotto le schede, e decidi tu con calma. Filo ricorda la risposta anche dopo averlo chiuso; in Impostazioni → Sicurezza le trovi tutte e le togli quando vuoi. Detta e Incolla di Filo continuano a funzionare senza domande.',
+        'Prima di aprire un link — o di cercare sul web un testo — che contiene qualcosa appena letto dal tuo computer, Filo te lo mostra e aspetta il tuo OK. Chiede un OK anche prima di leggere un file nascosto o di configurazione, un file fuori dalla tua cartella personale o le variabili di sistema. Le letture di tutti i giorni, come i tuoi file di testo anche indicati con un jolly (i .txt, i .csv), restano immediate.',
+        'Nell\'Editor la scorciatoia di un modulo parte anche con un tasto speciale, come Ctrl+Spazio o Ctrl+Freccia su (Cmd su Mac), e anche se scrivi Control al posto di Ctrl o Maiusc al posto di Shift. Se scrivi un tasto che Filo non conosce, o una combinazione che il sistema tiene per sé come Ctrl+Esc su Windows, te lo dice prima di salvare.',
+        'Anche in una finestra in incognito un programma scaricato si ferma e ti chiede se tenerlo, dicendoti da quale sito arriva. I file scaricati lì compaiono nell\u2019elenco di quella finestra, che si svuota quando la chiudi.',
+        'Se clicchi col tasto destro su un\u2019immagine che apre un link, per esempio il banner o il logo di una scheda, il menu ti avvisa se quel link \u00e8 sospetto, per esempio se imita un sito noto, come gi\u00e0 fa col link scritto.',
+        'Su Linux con sway, i3, Hyprland e simili Filo usa il portachiavi di sistema e si ricorda l\'accesso anche dopo la chiusura. Se il portachiavi non c\'è, te lo dice appena accedi: chiuso Filo dovrai rifare l\'accesso, e ti spiega cosa installare. Prima lo scoprivi solo riaprendolo.',
         'Quando chiedi a Filo di cambiare l\'aspetto, ogni pulsante sotto la risposta dice quale impostazione regola e mostra il campione del colore appena messo. Prima erano tutti «Scegli il colore esatto» e con cinque colori cambiati insieme non si capiva quale fosse quale.',
         'Selezioni «3000 rupie» e la spiegazione ti dice quanto fanno in euro col cambio di oggi. Adesso vale per tutte le valute che pubblica la Banca centrale europea, non più per dieci soltanto, e l\'importo si legge come un prezzo, «27,45 €», invece che con dodici cifre dopo la virgola. Lo stesso vale per la spiegazione estesa, che prima i cambi non li riceveva affatto.',
+        'Se chiedi a Filo in chat «quanto fanno 3000 rupie in euro», risponde col cambio di oggi e il conto lo fa Filo, invece di andare a memoria. Lo stesso per le altre valute e per miglia, libbre e Fahrenheit.',
         'Un link che imita l\'indirizzo di un sito noto te lo dice con una frase, appena apri il menu del tasto destro. Prima usciva un codice interno, e compariva solo insieme alla spiegazione del link; se la spiegazione non arrivava, l\'avviso non lo vedevi affatto. L\'avviso non scatta pi\u00f9 sui link di tutti i giorni: un video che parte da un certo minuto, l\'indirizzo di GitLab, i link corti di X, Google e Amazon, i siti di un altro Paese come amazon.de.',
         'Se chiedi a Filo come farsi spiegare un link o una parola, non ti manda più a cercare una voce di menu che non esiste: la spiegazione arriva da sola quando apri il menu del tasto destro.',
         'La bacheca si apre subito, con i miglioramenti più recenti in cima, e gli altri arrivano mentre scorri. Prima ogni apertura scaricava tutti i miglioramenti usciti finora.',
+        'In bacheca ogni voto e ogni «Ancora rotto?» ti dice com\'è andata. Se il voto non passa, sulla scheda leggi il perché: manca la rete, va rifatto l\'accesso o il miglioramento è tornato in lavorazione. Quando la segnalazione parte, la scheda resta lì con la conferma e i crediti che hai speso.',
+        'In bacheca, se voti o premi «Ancora rotto?» senza aver fatto l\'accesso, la scheda ti ricorda di completarlo nel browser, e il voto parte appena sei dentro, anche se accedi dal menu account. Se l\'accesso non riesce leggi il perché: manca la rete, l\'hai annullato, il browser non si apre o il servizio non risponde. Se hai chiuso il browser, «Riapri il browser» lo riapre e «Lascia stare» chiude l\'attesa.',
         'I siti personali pubblicati su GitHub Pages, GitLab Pages e piattaforme simili non fanno più scattare «GitHub? Controlla l\'indirizzo». Filo guarda l\'indirizzo del sito, non quello della piattaforma che lo ospita. Vale anche al contrario: una pagina che si spaccia per PayPal o per la tua banca su Vercel, Netlify, Amazon, SharePoint, WordPress o Medium prima passava per fidata insieme alla piattaforma, adesso viene segnalata. Lo stesso per le pagine che chiunque pubblica su Google Sites, Moduli Google, Apps Script, Microsoft Forms, Notion, Canva, archive.org e nei file pubblici di Amazon S3 e Google Cloud: se ti chiedono una password o i dati della carta, anche in un riquadro incorporato, in un normale campo di testo o in una domanda che compare dopo, Filo le controlla invece di fidarsi del nome di Google, Microsoft o Amazon.',
         'Niente più «Controlla l\'indirizzo» sui siti veri che Filo non riconosceva: l\'accesso a Microsoft 365, github.dev, gli Amazon, eBay, Google e PayPal di altri paesi, i negozi su Shopify, i file su Dropbox.',
         'Su Windows Filo si accorge quando un comando del terminale fallisce, per esempio perché il file non c\'è o la cartella è sbagliata. Prima il comando gli risultava riuscito, e Filo ti rispondeva come se avesse letto o fatto quello che voleva. Nel terminale che usi tu, un comando fallito adesso mostra il suo codice d\'uscita. E adesso girano anche i comandi che finiscono con un commento. Prima non partivano affatto.',
@@ -45,6 +59,7 @@
         'Un documento rovinato in un punto solo si legge lo stesso, e per intero. Capita a un estratto conto che mescola righe vecchie e nuove, o al registro di un programma: prima bastava un carattere rotto perché Filo leggesse tutto il resto con l\'alfabeto sbagliato e ti rispondesse su «cittÃ » invece che su «città». Adesso perde quel carattere e basta, e ti dice che l\'ha perso.',
         'Se la cartella in cui Filo sta guardando sparisce, perché l\'hai rinominata o cancellata o era su una chiavetta che hai staccato, Filo riparte dalla tua cartella personale e te lo dice. Prima in quella scheda non eseguiva più nessun comando, nemmeno quello per andarsene, e dava la colpa a un programma mancante.',
         'Appena l\'invito è riscattato la home lo sa. Prima continuava a dire che per attivare Filo serve un codice, e il suo primo suggerimento portava a riscattare un invito già riscattato: il messaggio giusto arrivava solo aprendo una scheda nuova.',
+        'L\'intervista del primo avvio parte appena hai i crediti, la nuova scheda ti scrive un messaggio pensato per te invece del solito saluto, e Filo impara da come lo usi. Prima, con i modelli predefiniti, Filo credeva di non avere una chiave e le teneva spente.',
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
         'Quando l\'Aiuto cerca sul web, legge quello che trova come informazione, non come un ordine. Prima un sito che si piazzava fra i primi risultati poteva scrivere lì dentro istruzioni per l\'assistente e farsi obbedire. Vale per tutto il testo che Filo legge da una pagina: quando spiega o traduce quello che hai selezionato, quando traduce la pagina intera, quando controlla o modifica quello che scrivi in un campo, e quando ti dice dove porta un link. Vale anche per i nomi dei pulsanti che l\'Aiuto legge sulla pagina: un sito non può più farsi passare per Filo scrivendoli in un certo modo.',
         'Lo stesso vale per l\'assistente della nuova scheda: quando cerca sul web, legge quello che trova come informazione. Prima un sito piazzato fra i primi risultati poteva dargli ordini, ed è l\'assistente che apre siti, cambia impostazioni e lancia comandi. Vale anche per i titoli delle pagine che hai salvato per dopo e delle schede aperte, per i documenti che gli fai leggere e per quello che un comando gli stampa: un PDF o una pagina scaricata non possono più dettargli cosa fare. E quando fa pulizia fra le schede, decide lui quali chiudere: prima una pagina poteva scriversi addosso che doveva restare aperta.',
@@ -67,6 +82,8 @@
         'Se una segnalazione rimasta in attesa non riesce a partire, l\'avviso ti aspetta nella finestra finché non lo chiudi. Prima passava mentre guardavi altrove, e quella segnalazione spariva senza che nessuno lo sapesse.',
         'Quando segnali dalla bacheca che un fix è ancora rotto e l\'invio non riesce, puoi riprovare subito: quello che hai scritto resta nel riquadro. Prima Filo rispondeva che l\'avevi già segnalato, e la tua spiegazione non arrivava a nessuno.',
         'Se chiedi a Filo conto di una scelta che non ha ancora messo per iscritto, come i soldi con cui sta in piedi, ti dice che quel documento non c\'è ancora invece di cercarlo a vuoto. Quello sui modelli lo legge per intero, fonti comprese. Nella pagina Trasparenza le sezioni non ancora scritte si leggono bene e si aprono, col link a quello che c\'è. Prima cliccarle non faceva niente. Nell\'elenco delle fonti virgolette e apostrofi si vedono di nuovo come tali, non come codici.',
+        'Se chiedi a Filo di aprire un sito da un altro paese, ti dice che per ora non si può, invece di salvare una regola che non avrebbe fatto niente. E finché la funzione non c\'è, Filo non spende i tuoi crediti per capire se una pagina è bloccata nel tuo paese.',
+        'Dopo un aggiornamento il riepilogo mostra le novità che la nuova versione porta. Prima, a chi aggiornava appena usciva una versione, spesso non compariva proprio.',
       ],
     },
     {
@@ -1070,5 +1087,38 @@
     return NOTES.length ? NOTES[0].version : '0.0.0';
   }
 
-  global.SN_PATCH_NOTES = { NOTES, cmpVersion, since, countBehind, latestVersion };
+  // FNV-1a: riconosce una riga già mostrata senza doverne salvare il testo.
+  function impronta(riga) {
+    const s = String(riga);
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+    return h.toString(16).padStart(8, '0');
+  }
+
+  // Tutte le righe che la versione `versione` conteneva, come impronte: si salva quando l'utente chiude il recap.
+  // Una riga può finire sotto una versione già uscita senza di lei (fusa dopo il commit da cui è nata la build, o da un
+  // ramo rimasto indietro di qualche uscita): il numero del blocco non lo dice, solo questa fotografia sì.
+  function fotografia(versione) {
+    return {
+      versione: String(versione),
+      righe: NOTES.filter((n) => cmpVersion(n.version, versione) <= 0)
+        .flatMap((n) => [...(n.features || []), ...(n.fixes || [])]).map(impronta),
+    };
+  }
+
+  // Con la fotografia di `lastSeen`: ogni riga fino a `current` che quella versione non aveva, in qualunque blocco stia.
+  // Senza (salvata da una versione di prima): since().
+  function recap(lastSeen, current, foto) {
+    if (!lastSeen || !foto || foto.versione !== String(lastSeen) || !Array.isArray(foto.righe)) return since(lastSeen, current);
+    if (cmpVersion(current, lastSeen) <= 0) return [];
+    const viste = new Set(foto.righe);
+    const nuove = (righe) => (righe || []).filter((r) => !viste.has(impronta(r)));
+    return NOTES
+      .filter((n) => cmpVersion(n.version, current) <= 0)
+      .sort((x, y) => cmpVersion(y.version, x.version))
+      .map((n) => ({ version: n.version, date: n.date, features: nuove(n.features), fixes: nuove(n.fixes) }))
+      .filter((n) => n.features.length || n.fixes.length);
+  }
+
+  global.SN_PATCH_NOTES = { NOTES, cmpVersion, since, countBehind, latestVersion, impronta, fotografia, recap };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

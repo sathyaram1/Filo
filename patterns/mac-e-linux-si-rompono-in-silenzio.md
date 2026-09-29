@@ -16,11 +16,17 @@ aggiunge lì.
 - **Cmd vale quanto Ctrl.** Una scorciatoia si legge `e.ctrlKey || e.metaKey`, mai
   `ctrlKey` da solo. Gli acceleratori di Electron si dichiarano `CommandOrControl+X`.
 - **Alt su Mac scrive.** Opzione+E compone `é`, Opzione+cifra fa `¡™£¢`. Una scorciatoia
-  GLOBALE con Alt+lettera se lo prende in tutto il sistema; una con Alt+cifra impedisce di
-  digitare quei simboli in qualunque pagina. Su Mac Alt+lettera prende un Ctrl davanti
+  con Alt+lettera toglie l'accento a chi scrive in una pagina; una con Alt+cifra impedisce di
+  digitare quei simboli. Su Mac Alt+lettera prende un Ctrl davanti
   (`src/main/shortcuts.js`) e Alt+cifra diventa Cmd+cifra (i salti fra schede, come in
   ogni browser su Mac), tranne lo zero, che su Mac è già lo zoom al 100%: lì la scheda in
   fondo si raggiunge con Cmd+9, «l'ultima».
+- **Niente scorciatoie di sistema con Alt+lettera, su nessun sistema.** Su Windows e Linux
+  Alt+lettera apre menu e schede negli altri programmi (Alt+H è la Home di Word): le
+  scorciatoie di Filo si ascoltano sui suoi webContents (`before-input-event`), così valgono
+  solo con Filo davanti (#838, sentinella `tests/unit/scorciatoieSoloInFilo.test.mjs`).
+  Il visore dei PDF è un webContents a sé che non passa da quell'evento: i suoi tasti li
+  porta agli ascolti della scheda `inoltraTastiDegliOspiti` (`src/main/tabs.js`).
 - **Il nome di una scorciatoia non si scrive a mano: si chiede.** Le funzioni
   rispondevano già a Cmd: a mentire erano le SCRITTE, una alla volta.
   `src/shared/tasti.js` è la porta unica: `SN_TASTI.etichetta('Ctrl+B')` dà `Ctrl+B` su
@@ -103,3 +109,51 @@ aggiunge lì.
   `APPDIR=$PWD/squashfs-root ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a ./squashfs-root/AppRun --no-sandbox`
 - Nessuna di queste prove dice che l'app si apra e funzioni su un Mac o su un Linux
   desktop vero, con la sua sessione grafica e le sue notifiche. Nel report si dichiara.
+
+## Se la mezza release di una piattaforma fallisce, apre un feedback
+
+`release-mac` e `release-linux` sono `continue-on-error`, e deve restare così: un guasto
+su Linux non deve togliere l'aggiornamento a chi sta su Windows. Il prezzo è che la corsa
+resta verde e il lavoro diventa rosso in una pagina che nessuno apre — Filo per Linux è
+mancato da OGNI release per sei giorni senza che nessuno lo sapesse (#733).
+
+Quindi ogni lavoro di piattaforma finisce con un passo `if: failure()` che chiama
+`scripts/release-platform-alarm.mjs`: il guasto diventa un feedback in coda, con
+piattaforma, versione, passo fallito e link all'esecuzione, e la release Windows non si
+tocca. Ogni passo prima di lui ha un `id`, perché è da quelli che si capisce quale si è
+fermato. I file che devono stare nella release (`PIATTAFORME` nello script) vivono lì e
+basta: il controllo finale del lavoro li chiede con `--attesi <piattaforma>`.
+
+Un lavoro nuovo marcato `continue-on-error` senza l'allarme non nasce:
+`tests/unit/releaseSuite.test.mjs` lo ferma.
+
+**Una versione già pubblicata non si ripubblica rilanciando il lavoro**: decide se
+pubblicare contando i commit dopo l'ultimo tag, quindi senza commit nuovi non rifà nulla.
+Per rimettere i file su quella stessa release si avvia `release.yml` a mano con
+`ripubblica_mac` o `ripubblica_linux` e il numero in `ripubblica_versione`: il lavoro
+costruisce il codice di QUEL tag e gli riattacca i suoi file, senza far girare la suite e
+senza pubblicare una versione nuova. Il feedback dell'allarme manda proprio lì, e il nome
+della casella vive in `casella()` dello script, così i due non divergono.
+
+Un guasto lo si racconta **per quello che è**: ogni file atteso sa da quale passo arriva
+(`attaccaDa`), quindi quando cade il caricamento del foglietto il feedback non dichiara
+rotto anche il download. Dare per perso tutto manda chi lo prende a cercare un guasto più
+grosso di quello vero (#733, primo giro di verifica).
+
+**L'allarme deve poter parlare prima di tutto il resto.** Lo strumento che apre il
+feedback vive nel repo, e la copia di lavoro del lavoro di piattaforma diventa quella del
+tag a cui ci si attacca: un tag vecchio non ce l'ha, e se il prelievo fallisce non c'è
+niente. Quindi il primo passo preleva il codice di QUESTA corsa e il secondo ne copia
+`release-platform-alarm.mjs` e `build-alarm.mjs` sotto `runner.temp`; da lì in poi
+l'allarme e il controllo finale usano quella copia, non `scripts/`.
+
+**E se l'allarme non parte, la corsa non resta verde.** Il passo riprova tre volte, poi
+scrive `esito=muto` fra gli output del lavoro, lo dice nel riepilogo della corsa ed esce
+rosso; il lavoro `avviso-mancato` legge quell'output e fa fallire la corsa. È l'ultimo
+segnale rimasto: senza, un feedback non consegnato riportava esattamente il silenzio da
+cui è nato il #733 (secondo giro di verifica). Un `|| echo` su quel passo è il bug.
+
+**Il titolo dice solo quello che si è guardato.** Se nessuno ha letto la pagina della
+versione non si annuncia un elenco di file mancanti, e se il lavoro si è fermato prima di
+sapere a quale versione attaccarsi non si dichiara rotto nessun download: le sentinelle
+in `tests/unit/releasePlatformAlarm.test.mjs` lo tengono fermo.

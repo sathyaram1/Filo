@@ -51,8 +51,8 @@ Un worker alla volta, scelto dal ruolo che il biglietto porta (`role` nel
 JSON di `ticket … --json`; vuoto = server vecchio, usa il worker generico):
 `subagent_type: routine-secaudit` se il ruolo è
 `secaudit`, altrimenti `subagent_type: routine-worker` (definiti in
-`.claude/agents/`: Opus a sforzo `high`, il controllo di sicurezza a
-`medium` perché è una lettura di diff — decisione owner 2026-09-03). Mai
+`.claude/agents/`: Opus a sforzo `xhigh`, tutti e due, compreso il controllo
+di sicurezza — decisione owner 2026-09-27). Mai
 Fable, consuma crediti a parte; mai degradare: se lo spawn fallisce, chiudi.
 Se quei tipi di agente non risultano disponibili (cartella caricata solo al
 riavvio della sessione), ripiega su `general-purpose` con `model: "opus"`.

@@ -32,6 +32,16 @@ export function sembraOpzione(arg) {
   return !/^[-‐-—−]?\d/.test(s.slice(1));
 }
 
+/**
+ * Come `sembraOpzione`, per il report di una correzione: lì un trattino seguito da uno spazio apre un
+ * elenco puntato, non un'opzione. La critica resta sulla regola stretta (cosa accetta il verificatore non
+ * cambia). PURA.
+ */
+export function sembraOpzioneNelReport(arg) {
+  const s = String(arg ?? '');
+  return sembraOpzione(s) && !/\s/.test(s[1]);
+}
+
 /** La forma normale di un'opzione: due trattini veri, minuscola. PURA. */
 export function normalizza(arg) {
   let s = String(arg ?? '');

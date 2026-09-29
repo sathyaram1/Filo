@@ -37,6 +37,16 @@
     return { shellPref: '"powershell" | "cmd" | "bash" | "zsh"', esempioPercorso: '~/Documenti/bolletta.pdf' };
   }
 
+  function tettoLezione() {
+    const C = global.SN_CONST;
+    return C && C.LESSON_MAX ? `${C.LESSON_MAX} caratteri` : 'qualche centinaio di caratteri';
+  }
+
+  function tettoStile() {
+    const C = global.SN_CONST;
+    return C && C.AGENT_STYLE_MAX ? `al massimo ${C.AGENT_STYLE_MAX} caratteri` : 'con un tetto di lunghezza';
+  }
+
   // I documenti di trasparenza che ESISTONO davvero. L'elenco non si scrive a
   // mano: lo dà SN_TRANSPARENCY, generato dai markdown in transparency/.
   // Scritto a mano prometteva quattro documenti quando ne esisteva uno solo
@@ -134,7 +144,7 @@
       required: ['testo', 'contesto'],
     },
     SALVA_LEZIONE: {
-      description: 'Fissa una LEZIONE nella memoria di Filo (la sezione LEZIONI RECENTI): una regola breve, in terza persona, che vale da subito in TUTTE le conversazioni. L\'utente la vede e può cancellarla fra le memorie. Non usarla per i contenuti dell\'utente (per quelli c\'è SALVA_APPUNTO): è per come TU devi comportarti d\'ora in poi.',
+      description: () => 'Fissa una LEZIONE nella memoria di Filo (la sezione LEZIONI RECENTI): una regola breve, in terza persona, che vale da subito in TUTTE le conversazioni. Il sistema la mostra all\'utente col testo esatto e la salva solo col suo OK: non chiederlo tu a parole. Al massimo ' + tettoLezione() + '. L\'utente la rilegge e la toglie nelle Preferenze, sotto «Memoria di Filo». Non usarla per i contenuti dell\'utente (per quelli c\'è SALVA_APPUNTO): è per come TU devi comportarti d\'ora in poi.',
       properties: { testo: S('La regola, breve e in terza persona ("L\'utente non beve caffè").') },
       required: ['testo'],
     },
@@ -237,13 +247,18 @@
       properties: {},
       required: [],
     },
+    DIMENTICA: {
+      description: 'Fa dimenticare a Filo UNA cosa che ha imparato sull\'utente ("dimentica che non bevo caffè", "togli dalla memoria che vivo a Lisbona"): toglie le righe della memoria (profilo, preferenze, lezioni) che corrispondono a `testo`. Il sistema mostra all\'utente le righe esatte e le toglie solo col suo OK: non chiederlo tu a parole. Se non ne trova nessuna te lo dice. Per cancellare TUTTO c\'è CANCELLA_MEMORIA.',
+      properties: { testo: S('La riga da dimenticare, copiata dalla memoria che vedi nel contesto (basta un pezzo che la identifichi).') },
+      required: ['testo'],
+    },
     IMPOSTA_PREFERENZA: {
       description: ({ sistema }) =>
         'Modifica un\'impostazione dell\'app. Una sola chiave per chiamata (chiama più volte per più impostazioni). Le impostazioni segnate [conferma] sono di livello 2: il sistema chiede conferma all\'utente da sé, tu non chiederla a parole. Chiavi valide e valori ammessi:\n'
         + '• tema: "sistema" | "chiaro" | "scuro"\n'
         + '• dimensione_testo: "piccolo" | "normale" | "grande" | "molto grande" | "enorme"\n'
         + '• commento_home: true | false (commento di Filo al centro della home)\n'
-        + '• stile_agente: testo libero (come deve scrivere Filo)\n'
+        + `• stile_agente: testo libero, ${tettoStile()} (come deve scrivere Filo; "nessuno" lo toglie) [conferma]\n`
         + '• correttore: true | false (correttore ortografico AI)\n'
         + '• sidebar_aiuto: true | false ; categorizzazione: true | false\n'
         + '• archiviazione_automatica: true | false ; archivia_alla_riapertura: true | false ; archivia_se_inattivo: true | false\n'
@@ -333,6 +348,14 @@
     RIPRISTINA_STILE_PAGINA: {
       description: 'Toglie le modifiche di stile che hai applicato alla pagina con STILE_PAGINA ("rimetti com\'era", "togli le modifiche").',
       properties: {},
+      required: [],
+    },
+    ZOOM_PAGINA: {
+      description: 'INGRANDISCE o RIMPICCIOLISCE tutta la pagina che l\'utente sta guardando — testo E immagini insieme, come Ctrl +/-/0. Per "ingrandisci la pagina", "zoom al 150%", "è troppo piccolo", "rimpicciolisci", "torna alla dimensione normale". NON confonderlo con la dimensione del testo nelle impostazioni (IMPOSTA_PREFERENZA, che cambia l\'interfaccia di Filo) né con STILE_PAGINA (che cambia il carattere di un pezzo di pagina): qui si scala la pagina intera. Passa `percentuale` quando l\'utente dice un numero, altrimenti `verso`. Il livello attuale è nello STATO: usalo per capire "un po\' più grande". Lo zoom resta sul sito finché Filo è aperto; chiudendo e riaprendo Filo si riparte dal 100%, quindi non promettere che duri oltre.',
+      properties: {
+        percentuale: I('Livello esatto in percentuale (100 = dimensione reale). Da 25 a 500: oltre, il sistema si ferma al limite e te lo dice.'),
+        verso: S('Un passo per volta, come i tasti: "in" più grande, "out" più piccolo, "reset" torna al 100%.', { enum: ['in', 'out', 'reset'] }),
+      },
       required: [],
     },
     COMANDO_FINESTRA: {

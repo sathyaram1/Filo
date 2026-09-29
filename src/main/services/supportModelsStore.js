@@ -110,7 +110,10 @@ function fsDocToObject(doc) {
 // Filo; «non ho potuto chiedere» no. Senza questa distinzione il permesso
 // negato, che è la risposta normale per chiunque non gestisca Filo, passava
 // per un guasto di passaggio e faceva ripartire le letture ogni mezzo minuto.
-async function leggiDoc(docPath, idToken) {
+// `tokenMancato`: chi usa Filo è dentro ma la sessione non ha dato il token.
+// Il server risponde allora a un anonimo, e il suo «non ti riguarda» non parla
+// di questo account: tenerlo spegneva la configurazione dell'owner (#679.2).
+async function leggiDoc(docPath, idToken, { tokenMancato = false } = {}) {
   const url = `${FIRESTORE_BASE}/${docPath}?key=${API_KEY}`;
   const headers = {};
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
@@ -121,7 +124,7 @@ async function leggiDoc(docPath, idToken) {
     return { risposto: false, doc: null };
   }
   if (res.status === 404) return { risposto: true, doc: {} };
-  if (res.status === 401 || res.status === 403) return { risposto: true, doc: null };
+  if (res.status === 401 || res.status === 403) return { risposto: !tokenMancato, doc: null };
   if (!res.ok) return { risposto: false, doc: null };
   try {
     const json = await res.json();
@@ -153,7 +156,7 @@ async function patchDoc(docPath, fields, mask, idToken) {
 //
 // `get()` legge DUE documenti, e chi risolve uno slot di supporto la chiama a
 // ogni chiamata di modello: erano due letture di Firestore per ogni giudizio
-// (#679). La copia dura cinque minuti e la butta il salvataggio.
+// (#679). La copia dura cinque minuti e il salvataggio la fa scadere.
 //
 // Si mette via SOLO una risposta intera. Quella arrivata a metà si serve e
 // basta: se la si archiviasse, sopravviverebbe al ritorno della rete, e per
@@ -166,6 +169,10 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 // Solo risposte intere: { identita, ts, valore }.
 let cache = null;
 let adesso = () => Date.now();
+
+function sessioneAperta() {
+  try { return Boolean(auth.getProfile && auth.getProfile()); } catch (_) { return false; }
+}
 
 // La risposta dipende da CHI sta usando Filo: i segreti dei giudici li legge
 // solo l'owner. Senza questa firma, un logout lascerebbe in circolo per cinque
@@ -197,11 +204,15 @@ async function get() {
   const ultimaBuona = cache && cache.identita === chi ? cache : null;
   if (ultimaBuona && adesso() - ultimaBuona.ts < CACHE_TTL_MS) return clona(ultimaBuona.valore);
 
+  // Letta PRIMA del token: un rinnovo che fallisce chiude la sessione, e dopo
+  // sembrerebbe che nessuno fosse dentro.
+  const dentro = sessioneAperta();
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
+  const opz = { tokenMancato: dentro && !idToken };
   const [doc, secrets] = await Promise.all([
-    leggiDoc(SUPPORT_MODELS_DOC, idToken),
-    leggiDoc(JUDGE_SECRETS_DOC, idToken),
+    leggiDoc(SUPPORT_MODELS_DOC, idToken, opz),
+    leggiDoc(JUDGE_SECRETS_DOC, idToken, opz),
   ]);
 
   // Quello che non è arrivato vale l'ultima risposta buona, anche scaduta, mai
@@ -264,8 +275,18 @@ async function update(partial, idToken) {
       idToken
     );
   }
-  // Chi ha appena salvato deve vedere il salvato, non la copia di prima.
-  invalidaCache();
+  // Chi ha appena salvato deve vedere il salvato. La copia di prima non si
+  // butta: si scade e prende quello che il server ha accettato, così se la
+  // rilettura non arriva la schermata mostra il salvato, non un vuoto.
+  const chi = identita();
+  if (cache && cache.identita === chi) {
+    const v = clona(cache.valore);
+    for (const k of mask) v[k] = fromFsValue(fields[k]);
+    if (typeof partial.openrouterKey === 'string' && partial.openrouterKey.trim()) v.openrouterKeyPresent = true;
+    cache = { identita: chi, ts: -Infinity, valore: v };
+  } else {
+    invalidaCache();
+  }
   return get();
 }
 

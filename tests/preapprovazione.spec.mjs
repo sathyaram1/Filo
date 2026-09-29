@@ -36,9 +36,10 @@ function pratica(over = {}) {
 }
 
 /** Il canale verso il main: proprietario, e le scritture registrate. */
-async function stubMain(page, { preapproved = [] } = {}) {
+async function stubMain(page, { preapproved = [], pending = [] } = {}) {
   await page.evaluate((cfg) => {
     window.__updates = [];
+    window.__fusioni = [];
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
       const t = msg && msg.type;
@@ -48,11 +49,12 @@ async function stubMain(page, { preapproved = [] } = {}) {
         return msg.mergePreapproved ? { ok: true, by: 'owner@esempio' } : { ok: true };
       }
       if (t === 'merge_approvals_get') {
-        return { ok: true, pending: [], failed: [], recent: [], preapproved: cfg.preapproved, ttlMs: 7 * 24 * 60 * 60 * 1000 };
+        return { ok: true, pending: cfg.pending, failed: [], recent: [], preapproved: cfg.preapproved, ttlMs: 7 * 24 * 60 * 60 * 1000 };
       }
+      if (t === 'merge_approval_approve') { window.__fusioni.push(msg.id); return { ok: true, result: 'merged', sha: 'deadbeefcafe' }; }
       return orig(msg);
     };
-  }, { preapproved });
+  }, { preapproved, pending });
 }
 
 async function apri(page, fbs, opts) {
@@ -213,4 +215,78 @@ test('senza fusioni pre-approvate l’elenco non compare', async ({ openTab }) =
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
   await page.locator('.mg-tab[data-tab="automation"]').click();
   await expect(page.locator('#mgMergeApprovalsPreapproved')).toBeHidden();
+});
+
+test('il segno nato da un sì a una richiesta si legge per quello che è, e un clic lo fa pieno', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({
+    mergePreapproved: { by: 'owner@esempio · approvazione ab12cd34ef56ab12cd34ef56', at: '2026-09-26T10:26:00Z' },
+  });
+  await apri(page, [fb]);
+  const badge = page.locator(`.mg-item[data-id="${fb._id}"] .mg-preapproved`);
+  await expect(badge).toHaveText('blocchi già approvati');
+  await expect(badge).toHaveAttribute('title', /solo coi blocchi che hai già approvato \(dal tuo sì alla richiesta del 26\/09\/2026/);
+
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+  const btn = page.locator('#mgPreapproveBtn');
+  // Non è il segno pieno: l'interruttore è spento e lo si può accendere.
+  await expect(btn).toHaveAttribute('aria-pressed', 'false');
+  await expect(btn).toHaveText('Fondi senza chiedermelo');
+  await expect(page.locator('#mgPreapprovedInfo')).toContainText('dal tuo sì alla richiesta del 26/09/2026');
+  await expect(page.locator('#mgPreapprovedInfo')).not.toContainText('ab12cd34');
+
+  await btn.click();
+  await expect.poll(() => page.evaluate(() => window.__updates.map((u) => u.mergePreapproved))).toEqual([true]);
+  await expect(btn).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#mgPreapprovedInfo')).toContainText('segno messo da owner@esempio');
+  await expect(badge).toHaveText('senza chiedere');
+
+  // Il pieno si toglie come sempre.
+  await btn.click();
+  await expect.poll(() => page.evaluate(() => window.__updates.map((u) => u.mergePreapproved))).toEqual([true, false]);
+  await expect(btn).toHaveAttribute('aria-pressed', 'false');
+  await expect(badge).toHaveCount(0);
+});
+
+test('il segno nato da un sì si toglie da solo, senza fondere la richiesta ferma che la pratica ha davanti', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({
+    status: 'design', statusReason: 'l5',
+    mergePreapproved: { by: 'owner@esempio · approvazione ab12cd34ef56ab12cd34ef56', at: '2026-09-26T10:26:00Z' },
+  });
+  // La richiesta aperta dopo il riallineamento, per i soli blocchi nuovi.
+  const nuova = {
+    id: 'cd34ef56ab12cd34ef56ab12', supersedes: 'ab12cd34ef56ab12cd34ef56', branch: 'claude/regole', sha: SHA,
+    who: 'secaudit', num: '#581', feedbackId: fb._id, origin: 'routine',
+    blocks: [{ gate: 'guard_the_guards', label: 'Tocca aree protette', items: ['firestore.rules'], more: 0 }],
+    createdAtMs: Date.now() - 60000, expiresAtMs: Date.now() + 86400000, expired: false, used: false, discarded: false,
+  };
+  await apri(page, [fb], { pending: [nuova], tab: 'inbox' });
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  const togli = page.locator('#mgPreapproveRevokeBtn');
+  await expect(togli).toBeVisible();
+  await expect(togli).toHaveText('Chiedimi prima di fondere');
+  await togli.click();
+  await expect.poll(() => page.evaluate(() => window.__updates.map((u) => u.mergePreapproved))).toEqual([false]);
+  await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => window.__fusioni)).toEqual([]);
+  await expect(page.locator(`.mg-item[data-id="${fb._id}"] .mg-preapproved`)).toHaveCount(0);
+  await expect(page.locator('#mgPreapprovedInfo')).toBeHidden();
+  await expect(togli).toBeHidden();
+  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Fondi senza chiedermelo');
+});
+
+test('col segno pieno o senza segno il tasto per togliere quello da un sì non c’è', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const piena = pratica({ mergePreapproved: { by: 'owner@esempio', at: '2026-09-26T10:26:00Z' } });
+  const senza = pratica({ _id: 'fb-preapprova-2', seq: 582 });
+  await apri(page, [piena, senza]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), piena._id);
+  await expect(page.locator('#mgPreapproveBtn')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#mgPreapproveRevokeBtn')).toBeHidden();
+  await page.evaluate((id) => window.__mgTest.openDetail(id), senza._id);
+  await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
+  await expect(page.locator('#mgPreapproveRevokeBtn')).toBeHidden();
 });

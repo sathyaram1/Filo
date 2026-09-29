@@ -202,6 +202,8 @@
   // main (handler DEFAULTS_*) e nelle regole Firestore: qui decidiamo solo se
   // mostrare la voce di menu.
   let isAdmin = false;
+  // Falso quando manca il portachiavi di sistema: l'accesso vale fino alla chiusura.
+  let authRemembered = true;
 
   function shortName(p) {
     if (!p) return '';
@@ -246,6 +248,7 @@
       const r = await api.auth.status();
       authProfile = (r && r.ok && r.signedIn) ? r.profile : null;
       isAdmin = !!(r && r.ok && r.signedIn && r.isAdmin);
+      authRemembered = !(r && r.remembered === false);
     } catch (_) {
       authProfile = null;
       isAdmin = false;
@@ -258,10 +261,10 @@
     authBusy = true; renderAccount();
     try {
       const r = await api.auth.signIn();
-      if (r && r.ok) { authProfile = r.profile; isAdmin = !!r.isAdmin; }
-      else if (r && r.error) alert('Accesso non riuscito: ' + r.error);
-    } catch (e) {
-      alert('Accesso non riuscito: ' + (e?.message || e));
+      if (r && r.ok) { authProfile = r.profile; isAdmin = !!r.isAdmin; authRemembered = r.remembered !== false; }
+      else showToast((r && r.error) || 'Accesso non riuscito: riprova.');
+    } catch (_) {
+      showToast('Accesso non riuscito: riprova.');
     } finally {
       authBusy = false; renderAccount();
     }
@@ -283,6 +286,7 @@
         const label = shortName(authProfile);
         showNativeMenu(accountBtn, [
           { label: authProfile.email || label, disabled: true },
+          ...(authRemembered ? [] : [{ label: 'Accesso valido fino alla chiusura di Filo', disabled: true }]),
           { type: 'separator' },
           { label: 'Crediti', icon: 'credits', url: 'filo://credits/credits.html' },
           { label: 'Nuova finestra incognito', icon: 'incognito', action: 'open-incognito' },
@@ -306,7 +310,12 @@
     }
     // Aggiorna l'icona quando il main segnala un cambio sessione.
     if (api.auth && api.auth.onChanged) {
-      api.auth.onChanged((m) => { authProfile = m.profile || null; isAdmin = !!(m && m.isAdmin); renderAccount(); });
+      api.auth.onChanged((m) => {
+        authProfile = m.profile || null; isAdmin = !!(m && m.isAdmin);
+        authRemembered = m.remembered !== false;
+        if (!authProfile || authRemembered) NOTIFS.dismissKey('accesso-non-ricordato');
+        renderAccount();
+      });
     }
     refreshAuth();
   }
@@ -580,11 +589,38 @@
         });
       }
     }
+    // #754 — cosa ha fatto Filo col banner dei cookie di questo sito, e la strada per rivederlo.
+    const ck = t.cookies;
+    if (ck && (ck.shown || ck.rejected || ck.hidden)) {
+      entries.push({ type: 'separator' });
+      if (ck.shown) {
+        entries.push({ label: 'Rifiuta i cookie in automatico qui', icon: 'cookie', action: 'tab-cookies-auto' });
+      } else {
+        if (ck.rejected) entries.push({ label: 'Cookie non necessari rifiutati', icon: 'cookie', disabled: true });
+        if (ck.hidden) entries.push({ label: 'Banner dei cookie nascosto', icon: 'cookie', disabled: true });
+        entries.push({ label: 'Mostra il banner dei cookie', icon: 'eye', action: 'tab-cookies-show' });
+      }
+    }
+    // Un sì o un no dato nella domanda dei permessi si toglie da qui, per il sito della scheda.
+    let permessi = null;
+    try { permessi = api.tabs.permessi ? await api.tabs.permessi(t.id) : null; } catch (_) { permessi = null; }
+    if (permessi && Array.isArray(permessi.scelte) && permessi.scelte.length) {
+      entries.push({ label: 'Azzera i permessi del sito', icon: 'lock', action: 'tab-permessi-azzera' });
+    }
     entries.push(
       { type: 'separator' },
       { label: 'Chiudi', icon: 'close', action: 'tab-close' },
     );
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
+  }
+
+  async function azzeraPermessi(id) {
+    let r = null;
+    try { r = await api.tabs.dimenticaPermessi(id); } catch (_) { r = null; }
+    if (!r || !r.tolte) return;
+    showToast(r.ricarica
+      ? 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo. Ricarica la pagina perché valga anche per quello che sta già usando.'
+      : 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo.');
   }
 
   // Secondo livello di "Apri da un altro paese": la lista delle location
@@ -628,6 +664,9 @@
       else if (action === 'tab-proxy-default') proxyTab(id);
       else if (action === 'tab-proxy-clear') api.tabs.clearProxy(id);
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
+      else if (action === 'tab-cookies-show') api.tabs.cookieBanners(id, true);
+      else if (action === 'tab-cookies-auto') api.tabs.cookieBanners(id, false);
+      else if (action === 'tab-permessi-azzera') azzeraPermessi(id);
       else if (action.startsWith('tab-proxy-go:')) proxyTab(id, action.slice('tab-proxy-go:'.length));
     });
   }
@@ -938,8 +977,10 @@
     function show(text, opts) {
       if (!text) return null;
       opts = opts || {};
+      if (opts.key) dismissKey(opts.key);
       const card = document.createElement('div');
       card.className = 'shell-notif';
+      if (opts.key) card.dataset.key = String(opts.key);
 
       const msg = document.createElement('div');
       msg.className = 'shell-notif-msg';
@@ -1003,7 +1044,13 @@
       }
       return card;
     }
-    return { show, dismiss };
+    // Un avviso con chiave dice uno stato: quando lo stato cambia se ne va.
+    function dismissKey(key) {
+      for (const c of hostEl().querySelectorAll('.shell-notif')) {
+        if (c.dataset.key === String(key)) dismiss(c);
+      }
+    }
+    return { show, dismiss, dismissKey };
   })();
 
   // Compat: il vecchio toast informativo (es. "Tab riordinate e salvate") ora
@@ -1016,10 +1063,16 @@
   // risposta veniva buttata via e il clic non produceva nulla: il silenzio è
   // indistinguibile da un'app bloccata. Ora l'esito diventa un avviso, con la
   // cartella come via d'uscita (il file potrebbe essere lì rinominato).
-  function openDownloadFile(id) {
+  function openDownloadFile(id, confirmed) {
     if (!api.downloads) return Promise.resolve();
-    return api.downloads.openFile(id).then((res) => {
+    return api.downloads.openFile(id, confirmed).then((res) => {
       if (!res || res.ok !== false) return;
+      // #588 — è un programma: aprirlo lo esegue. Il main non lo tocca finché
+      // non torna un "sì" esplicito; la via di mezzo (guardare dov'è finito
+      // senza eseguirlo) resta a un clic.
+      // La domanda sta nella riga del pannello: un avviso in basso finirebbe
+      // sotto la pagina, e il clic sembrerebbe non fare niente.
+      if (res.needsConfirm && chiediApertura) { chiediApertura(id, res.text); return; }
       const opts = res.missing
         ? { actions: [{ label: 'Apri cartella', onClick: () => openDownloadFolder(id) }] }
         : undefined;
@@ -1036,6 +1089,10 @@
       if (res.missing) NOTIFS.show('Il file non c’è più: ho aperto la cartella dov’era');
     }).catch(() => {});
   }
+
+  // #588 — impostata dal pannello scaricamenti: porta lì la domanda «aprire un
+  // programma?», dove la pagina non la copre.
+  let chiediApertura = null;
 
   if (api.onToast) api.onToast((info) => {
     if (!info || !info.text) return;
@@ -1076,6 +1133,19 @@
   // Esposta per test e per usi programmatici dalla shell stessa.
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
 
+  // Il sì di una domanda che la pagina fa comparire sotto il cursore si arma dopo ARMA_MS (scaricamenti, permessi):
+  // patterns/una-conferma-non-e-un-avviso-sopra-un-fatto-gia-compiuto.md.
+  const ARMA_MS = 1000;
+
+  // Lo spazio sopra la pagina lo chiedono in più (scaricamenti, domande dei permessi): la pagina scende della somma.
+  const riserveSopra = new Map();
+  function riservaSopra(chi, px) {
+    if (px > 0) riserveSopra.set(chi, px); else riserveSopra.delete(chi);
+    let tot = 0;
+    for (const v of riserveSopra.values()) tot += v;
+    try { api.tabs.reserveTop && api.tabs.reserveTop(tot); } catch (_) {}
+  }
+
   // ─── Scaricamenti della navigazione (#410.1) ───────────────────────────
   // Indicatore nella fila di tab (sempre visibile, non coperto dalla view
   // nativa della pagina) + pannello espandibile con i singoli download. Il
@@ -1092,6 +1162,19 @@
     const dls = new Map();
     let panelOpen = false;
     let panel = null;
+    // #588 — le domande sui programmi sono righe del pannello, che si apre sopra
+    // la pagina: la riga in attesa È «scaricarlo?», e qui stanno le «aprirlo?»
+    // (id → testo) finché non si risponde. Gli esiti andati storti restano
+    // nella riga che li ha chiesti (id → testo).
+    const domandeApri = new Map();
+    const avvisiRiga = new Map();
+    // #588 — il «sì» di una domanda sui programmi non si dà col clic che l'ha
+    // fatta comparire: la riga nasce dove la pagina ha appena mandato il
+    // cursore, e un doppio clic risponderebbe senza leggerla. I pulsanti che
+    // dicono sì si armano solo quando l'elenco è fermo da ARMA_MS.
+    let elencoFermoDa = 0;
+    let firmaElenco = '';
+    let timerArma = null;
 
     const ACTIVE = new Set(['progressing', 'paused']);
     const isActive = (r) => r && ACTIVE.has(r.state);
@@ -1113,6 +1196,7 @@
         case 'cancelled': return 'Annullato';
         case 'interrupted': return 'Interrotto';
         case 'paused': return 'In pausa';
+        case 'pending': return 'In attesa di conferma';
         default: return 'In corso';
       }
     }
@@ -1122,21 +1206,34 @@
       if (!all.length) { dlBtn.hidden = true; if (panelOpen) closePanel(); return; }
       dlBtn.hidden = false;
       const active = all.filter(isActive);
-      if (active.length) {
+      // #588 — un programma che aspetta una risposta conta quanto uno in corso:
+      // l'avviso si può chiudere con la ×, e se l'indicatore tacesse l'unico
+      // segno che la domanda è ancora lì sparirebbe con lui.
+      const attesa = all.filter((r) => r && r.state === 'pending');
+      dlBtn.classList.toggle('attesa', attesa.length > 0);
+      dlBtn.dataset.tip = attesa.length
+        ? (attesa.length === 1 ? 'Un programma aspetta la tua risposta' : `${attesa.length} programmi aspettano la tua risposta`)
+        : 'Scaricamenti';
+      if (active.length || attesa.length) {
         dlCount.hidden = false;
-        dlCount.textContent = String(active.length);
+        dlCount.textContent = String(active.length + attesa.length);
         // Avanzamento aggregato: byte ricevuti / totali sui download con totale
         // noto. Se nessuno ha un totale, barra indeterminata (animata via CSS).
         let recv = 0; let total = 0; let known = 0;
         for (const r of active) { if (r.totalBytes > 0) { recv += r.receivedBytes; total += r.totalBytes; known++; } }
-        if (known && total > 0) {
+        if (!active.length) {
+          // Solo attese: niente barra, che direbbe «sto scaricando» a un file
+          // che aspetta l'utente e non si muove.
+          dlBtn.classList.remove('indeterminate', 'active');
+          dlFill.style.width = '0%';
+        } else if (known && total > 0) {
           dlBtn.classList.remove('indeterminate');
           dlFill.style.width = `${Math.min(100, Math.round((recv / total) * 100))}%`;
+          dlBtn.classList.add('active');
         } else {
-          dlBtn.classList.add('indeterminate');
+          dlBtn.classList.add('indeterminate', 'active');
           dlFill.style.width = '40%';
         }
-        dlBtn.classList.add('active');
       } else {
         dlBtn.classList.remove('active', 'indeterminate');
         dlCount.hidden = true;
@@ -1151,6 +1248,10 @@
       panel.className = 'dl-panel';
       panel.id = 'dl-panel';
       panel.hidden = true;
+      // Un clic che arriva mentre un sì è ancora spento ricomincia l'attesa: una raffica non lo arma (#591, giro 20).
+      panel.addEventListener('pointerdown', () => {
+        if (panel.querySelector('.dl-row-btn:disabled')) elencoFermoDa = Date.now();
+      }, true);
       const head = document.createElement('div');
       head.className = 'dl-panel-head';
       const title = document.createElement('span');
@@ -1189,20 +1290,28 @@
     function renderPanel() {
       ensurePanel();
       const list = panel.querySelector('#dl-panel-list');
-      list.textContent = '';
       const all = Array.from(dls.values()).sort((a, b) => {
-        // Attivi in cima, poi per data d'inizio decrescente.
-        const aa = isActive(a) ? 0 : 1; const bb = isActive(b) ? 0 : 1;
-        if (aa !== bb) return aa - bb;
+        // Le domande in cima, poi gli attivi, poi per data d'inizio decrescente.
+        const rank = (r) => ((r.state === 'pending' || domandeApri.has(r.id)) ? 0 : (isActive(r) ? 1 : 2));
+        if (rank(a) !== rank(b)) return rank(a) - rank(b);
         return String(b.startedAt || '').localeCompare(String(a.startedAt || ''));
       });
+      const firma = all.map((r) => `${r.id}:${r.state === 'pending' ? 'p' : ''}${domandeApri.has(r.id) ? 'a' : ''}`).join('|');
+      if (firma !== firmaElenco) { firmaElenco = firma; elencoFermoDa = Date.now(); }
       if (!all.length) {
         const empty = document.createElement('div');
         empty.className = 'dl-empty';
         empty.textContent = 'Nessuno scaricamento';
-        list.appendChild(empty);
+        list.replaceChildren(empty);
+      } else if (window.SN_RIGHE_VIVE) {
+        window.SN_RIGHE_VIVE.riconcilia(list, all.map(renderRow), ':scope > .dl-row-actions');
+      } else {
+        list.replaceChildren(...all.map(renderRow));
       }
-      for (const r of all) list.appendChild(renderRow(r));
+      const manca = elencoFermoDa + ARMA_MS - Date.now();
+      if (manca > 0 && !timerArma) {
+        timerArma = setTimeout(() => { timerArma = null; if (panelOpen) renderPanel(); }, manca + 20);
+      }
       // Il pannello ha cambiato altezza: aggiorna lo spazio riservato.
       if (panelOpen) reserveForPanel();
     }
@@ -1211,13 +1320,22 @@
       const row = document.createElement('div');
       row.className = 'dl-row';
       row.dataset.state = r.state;
+      row.dataset.id = r.id;
       // Il file non è più al suo posto: la riga lo dice PRIMA del clic (testo
       // attenuato) e non offre "Apri file", che non avrebbe niente da aprire.
       if (r.missing) row.dataset.missing = '1';
 
       const name = document.createElement('div');
       name.className = 'dl-row-name';
-      name.textContent = r.filename || 'download';
+      // #588 — un programma si riconosce PRIMA di cliccare: la marca sta
+      // accanto al nome, non dentro un'estensione che l'occhio non legge.
+      if (r.exe) {
+        const tag = document.createElement('span');
+        tag.className = 'dl-row-tag';
+        tag.textContent = 'Programma';
+        name.appendChild(tag);
+      }
+      name.appendChild(document.createTextNode(r.filename || 'download'));
       name.title = r.filename || '';
       row.appendChild(name);
 
@@ -1242,22 +1360,55 @@
           : `${fmtBytes(r.receivedBytes)} scaricati`;
       } else if (r.missing) {
         meta.textContent = `Non più sul disco · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
+      } else if (r.state === 'pending') {
+        // Da quale sito arriva è la cosa che fa decidere: sta nella riga, non
+        // solo nell'avviso che l'utente può aver già chiuso.
+        const da = provenienza(r);
+        meta.textContent = da ? `${stateLabel(r)} · ${da}` : stateLabel(r);
       } else {
         meta.textContent = `${stateLabel(r)} · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       }
       row.appendChild(meta);
 
+      const apri = r.state === 'completed' && !r.missing ? domandeApri.get(r.id) : '';
+      const domanda = r.state === 'pending' ? testoScarica(r) : apri;
+      if (domanda) {
+        row.dataset.chiede = '1';
+        const ask = document.createElement('div');
+        ask.className = 'dl-row-ask';
+        ask.textContent = domanda;
+        row.appendChild(ask);
+      }
+      if (avvisiRiga.has(r.id)) {
+        const nota = document.createElement('div');
+        nota.className = 'dl-row-note';
+        nota.setAttribute('role', 'status');
+        nota.textContent = avvisiRiga.get(r.id);
+        row.appendChild(nota);
+      }
+
       const actions = document.createElement('div');
       actions.className = 'dl-row-actions';
-      const addBtn = (label, fn) => {
+      const addBtn = (label, fn, dice) => {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'dl-row-btn';
         b.textContent = label;
+        if (dice === 'si' && Date.now() - elencoFermoDa < ARMA_MS) b.disabled = true;
         b.addEventListener('click', fn);
         actions.appendChild(b);
       };
-      if (isActive(r)) {
+      if (r.state === 'pending') {
+        // Le stesse due risposte dell'avviso: chiuderlo non deve togliere la
+        // possibilità di rispondere (#588).
+        const rispondi = (allow) => api.downloads.confirm(r.id, allow).then((res) => {
+          if (res && res.ok === false) avvisiRiga.set(r.id, res.error || 'Risposta non registrata');
+          if (res && res.items) syncFromList(res.items);
+          else if (panelOpen) renderPanel();
+        }).catch(() => {});
+        addBtn('Scarica', () => rispondi(true), 'si');
+        addBtn('Non scaricare', () => rispondi(false));
+      } else if (isActive(r)) {
         // Gli scaricamenti "a mano" (Salva immagine/video come…) non si mettono
         // in pausa: meglio nessun pulsante che uno che non fa niente.
         if (r.canPause !== false) {
@@ -1265,6 +1416,11 @@
           else addBtn('Pausa', () => api.downloads.pause(r.id).catch(() => {}));
         }
         addBtn('Annulla', () => api.downloads.cancel(r.id).catch(() => {}));
+      } else if (apri) {
+        const rispondi = (fn) => { domandeApri.delete(r.id); if (fn) fn(); renderPanel(); };
+        addBtn('Apri comunque', () => rispondi(() => openDownloadFile(r.id, true)), 'si');
+        addBtn('Apri cartella', () => rispondi(() => openDownloadFolder(r.id)));
+        addBtn('Annulla', () => rispondi(null));
       } else if (r.state === 'completed') {
         if (!r.missing) addBtn('Apri file', () => openDownloadFile(r.id));
         addBtn('Apri cartella', () => openDownloadFolder(r.id));
@@ -1282,7 +1438,7 @@
       if (!panelOpen || !panel) return;
       requestAnimationFrame(() => {
         const h = Math.ceil(panel.getBoundingClientRect().height);
-        try { api.tabs.reserveTop && api.tabs.reserveTop(h + 6); } catch (_) {}
+        riservaSopra('scaricamenti', h + 6);
       });
     }
     function openPanel() {
@@ -1299,9 +1455,14 @@
     }
     function closePanel() {
       panelOpen = false;
+      // Chiudere il pannello è non rispondere: «aprirlo?» si ritira, mentre
+      // un programma in attesa resta in attesa (l'indicatore lo conta).
+      domandeApri.clear();
+      avvisiRiga.clear();
+      firmaElenco = '';
       if (panel) panel.hidden = true;
       dlBtn.classList.remove('open');
-      try { api.tabs.reserveTop && api.tabs.reserveTop(0); } catch (_) {}
+      riservaSopra('scaricamenti', 0);
     }
     function togglePanel() { panelOpen ? closePanel() : openPanel(); }
 
@@ -1312,17 +1473,48 @@
     function syncFromList(items) {
       dls.clear();
       if (Array.isArray(items)) for (const r of items) dls.set(r.id, r);
+      for (const id of Array.from(domandeApri.keys())) {
+        if (dls.get(id)?.state !== 'completed') domandeApri.delete(id);
+      }
       renderIndicator();
       if (panelOpen) renderPanel();
     }
 
-    // Aggiornamenti live dal main (start/progress/done/error).
+    // Aggiornamenti live dal main (start/progress/done/error/removed).
     api.downloads.onEvent((info) => {
       if (!info || !info.item) return;
-      dls.set(info.item.id, info.item);
+      if (info.kind === 'removed') dls.delete(info.item.id);
+      else dls.set(info.item.id, info.item);
+      if (info.item.state !== 'completed' || info.kind === 'removed') domandeApri.delete(info.item.id);
       renderIndicator();
-      if (panelOpen) renderPanel();
+      // Il main manda 'ask' solo alla finestra da cui parte lo scaricamento.
+      if (info.kind === 'ask') mostraRiga(info.item.id);
+      else if (panelOpen) renderPanel();
     });
+
+    function provenienza(r) {
+      try { return window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain); } catch (_) {}
+      return r.site ? `da ${r.site}` : '';
+    }
+
+    function testoScarica(r) {
+      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site, r.siteUncertain); } catch (_) {}
+      return `«${r.filename}» è un programma. Scaricarlo?`;
+    }
+
+    // Apre il pannello (che fa spazio sopra la pagina) e porta in vista la riga.
+    function mostraRiga(id) {
+      if (panelOpen) renderPanel(); else openPanel();
+      requestAnimationFrame(() => {
+        const row = panel && Array.from(panel.querySelectorAll('.dl-row')).find((x) => x.dataset.id === id);
+        try { row && row.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+      });
+    }
+
+    chiediApertura = (id, testo) => {
+      domandeApri.set(id, testo || 'È un programma: aprirlo vuol dire eseguirlo.');
+      mostraRiga(id);
+    };
 
     // Cronologia iniziale (sopravvive al riavvio).
     api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
@@ -1582,6 +1774,140 @@
         if (timer) { clearTimeout(timer); timer = null; }
         try { chip.remove(); } catch (_) {}
       }
+    });
+  }
+
+  // ─── Domande dei permessi (#591.1) ──────────────────────────────────────
+  // Microfono, fotocamera, appunti, posizione: la pagina chiede, risponde l'utente qui, nella cornice, dove la pagina
+  // non la copre e non la può imitare. Si vede solo la domanda della scheda in primo piano; le altre aspettano il loro turno.
+  if (api.tabs.onPermesso && api.tabs.rispondiPermesso) {
+    const domande = [];
+    let bar = null;
+    let mostrata = null;
+    let attiva = null;
+
+    let timerArma = null;
+
+    const COSA = (d) => {
+      if (d.tipo === 'appunti') return { testo: 'vuole leggere quello che hai copiato', icone: ['clipboard'] };
+      if (d.tipo === 'posizione') return { testo: 'vuole sapere dove ti trovi', icone: ['location'] };
+      if (d.tipo === 'notifiche') return { testo: 'vuole mandarti notifiche', icone: ['bell'] };
+      if (d.tipo === 'schermi') return { testo: 'vuole usare tutti i tuoi schermi', icone: ['windowFrame'] };
+      if (d.tipo === 'presenza') return { testo: 'vuole sapere quando sei al computer', icone: ['user'] };
+      if (d.tipo === 'strumenti') return { testo: 'vuole comandare gli strumenti musicali collegati', icone: ['readAloud'] };
+      const parti = Array.isArray(d.parti) ? d.parti : [];
+      const mic = parti.includes('audio');
+      const cam = parti.includes('video');
+      if (mic && cam) return { testo: 'vuole usare microfono e fotocamera', icone: ['mic', 'camera'] };
+      if (cam) return { testo: 'vuole usare la fotocamera', icone: ['camera'] };
+      return { testo: 'vuole usare il microfono', icone: ['mic'] };
+    };
+
+    const ensureBar = () => {
+      if (bar) return bar;
+      bar = document.createElement('div');
+      bar.id = 'permesso-bar';
+      bar.className = 'permesso-bar';
+      bar.hidden = true;
+      document.body.appendChild(bar);
+      return bar;
+    };
+
+    const rispondiA = (d, si) => {
+      const i = domande.indexOf(d);
+      if (i >= 0) domande.splice(i, 1);
+      api.tabs.rispondiPermesso(d.id, si).catch(() => {});
+      mostraDomanda();
+    };
+
+    // Funzioni come costanti: una dichiarazione dentro il blocco rimpiazzerebbe il `render` della shell.
+    const mostraDomanda = () => {
+      const d = domande.find((x) => x.tabId === attiva) || null;
+      if (d === mostrata) return;
+      mostrata = d;
+      const b = ensureBar();
+      clearTimeout(timerArma);
+      if (!d) {
+        b.hidden = true;
+        b.replaceChildren();
+        document.documentElement.style.removeProperty('--sopra-permessi');
+        riservaSopra('permessi', 0);
+        return;
+      }
+      const cosa = COSA(d);
+      const icone = document.createElement('span');
+      icone.className = 'permesso-icone';
+      for (const n of cosa.icone) {
+        const i = document.createElement('span');
+        setIcon(i, n, 16);
+        icone.appendChild(i);
+      }
+      const msg = document.createElement('span');
+      msg.className = 'permesso-msg';
+      // Il dominio registrato si legge sempre e la richiesta non si taglia: si accorcia solo la parte davanti.
+      const chi = document.createElement('span');
+      chi.className = 'permesso-chi';
+      const sotto = String(d.sotto || '');
+      if (sotto) {
+        const s = document.createElement('span');
+        s.className = 'permesso-sotto';
+        s.textContent = (sotto.length > 24 ? '…' + sotto.slice(-23) : sotto) + '.';
+        s.title = d.host || '';
+        chi.appendChild(s);
+      }
+      const host = document.createElement('strong');
+      host.textContent = d.dominio || d.host || '';
+      chi.appendChild(host);
+      const testo = document.createElement('span');
+      testo.className = 'permesso-cosa';
+      testo.textContent = cosa.testo;
+      msg.append(chi, ' ', testo);
+      const si = document.createElement('button');
+      si.type = 'button';
+      si.className = 'permesso-btn permesso-si';
+      si.textContent = 'Consenti';
+      // Consenti si arma dopo ARMA_MS senza clic sulla striscia: una raffica che continua lo tiene spento (#591, giro 20).
+      const arma = () => {
+        si.disabled = true;
+        clearTimeout(timerArma);
+        timerArma = setTimeout(() => { if (mostrata === d) si.disabled = false; }, ARMA_MS);
+      };
+      arma();
+      b.onpointerdown = () => { if (si.disabled) arma(); };
+      si.addEventListener('click', () => rispondiA(d, true));
+      const no = document.createElement('button');
+      no.type = 'button';
+      no.className = 'permesso-btn permesso-no';
+      no.textContent = 'Non consentire';
+      no.addEventListener('click', () => rispondiA(d, false));
+      b.replaceChildren(icone, msg, no, si);
+      b.hidden = false;
+      requestAnimationFrame(() => {
+        const h = Math.ceil(b.getBoundingClientRect().height);
+        document.documentElement.style.setProperty('--sopra-permessi', h + 'px');
+        riservaSopra('permessi', h);
+      });
+    };
+
+    api.tabs.onPermesso((evento, info) => {
+      if (!info || !info.id) return;
+      if (evento === 'chiedi') {
+        if (!domande.some((x) => x.id === info.id)) domande.push(info);
+      } else {
+        const i = domande.findIndex((x) => x.id === info.id);
+        if (i >= 0) domande.splice(i, 1);
+      }
+      mostraDomanda();
+    });
+    try { api.tabs.snapshot().then((snap) => { if (attiva == null && snap) { attiva = snap.activeId || null; mostraDomanda(); } }).catch(() => {}); } catch (_) {}
+    api.tabs.onUpdate((snap) => {
+      attiva = (snap && snap.activeId) || null;
+      if (snap && Array.isArray(snap.tabs)) {
+        for (let i = domande.length - 1; i >= 0; i--) {
+          if (!snap.tabs.some((t) => t.id === domande[i].tabId)) domande.splice(i, 1);
+        }
+      }
+      mostraDomanda();
     });
   }
 })();

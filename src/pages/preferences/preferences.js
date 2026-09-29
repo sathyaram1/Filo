@@ -6,7 +6,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -130,6 +130,7 @@
           row.classList.add('sn-token-invalid');
           return;
         }
+        if (!tokenDaSalvare.has(name)) tokenInCorso.delete(name);
         renderTokenRow(name); // canonicalizza al valore effettivo
       });
       row.appendChild(input);
@@ -158,12 +159,56 @@
     Bootstrap.applyThemeTokens(currentOverrides);
   }
 
-  function persistTokens() {
-    chrome.runtime.sendMessage({
-      type: MSG.UPDATE_SETTINGS,
-      settings: { themeTokens: currentOverrides },
-    });
+  // La mappa dei token si salva intera: si parte da quella in memoria adesso e
+  // ci si applicano solo i token toccati qui, o un colore chiesto a Filo con la
+  // pagina aperta sparirebbe al primo ritocco (#592).
+  const tokenDaSalvare = new Set();
+  const tokenInCorso = new Set();
+  let tokenAzzeraTutti = false;
+
+  async function persistTokens() {
+    const nomi = [...tokenDaSalvare];
+    const tutti = tokenAzzeraTutti;
+    tokenDaSalvare.clear();
+    tokenAzzeraTutti = false;
+    for (const name of nomi) {
+      const input = $(`tok-${name}`);
+      const v = input ? input.value.trim() : '';
+      if (v === '' || !Tokens || Tokens.validate(name, v)) tokenInCorso.delete(name);
+    }
+    let next = {};
+    if (!tutti) {
+      const fresh = await Storage.getSettings().catch(() => null);
+      next = { ...((fresh && fresh.themeTokens) || {}) };
+      for (const name of nomi) {
+        if (Object.prototype.hasOwnProperty.call(currentOverrides, name)) next[name] = currentOverrides[name];
+        else delete next[name];
+      }
+    }
+    currentOverrides = { ...next };
+    for (const name of tokenInCorso) {
+      const input = $(`tok-${name}`);
+      const v = input ? input.value.trim() : '';
+      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = v;
+    }
+    chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: next } });
     flashSaved('tokenSavedHint');
+  }
+
+  // Un aggiornamento arrivato da altrove: si ridisegnano i token che l'utente
+  // non sta scrivendo qui, gli altri restano come li ha lasciati.
+  function riallineaToken(mappa) {
+    if (!Tokens) return;
+    const salvati = mappa || {};
+    const nomi = new Set([...Object.keys(currentOverrides), ...Object.keys(salvati)]);
+    for (const name of nomi) {
+      if (tokenInCorso.has(name) || tokenDaSalvare.has(name)) continue;
+      if (Object.prototype.hasOwnProperty.call(salvati, name)) currentOverrides[name] = salvati[name];
+      else delete currentOverrides[name];
+    }
+    for (const name of Tokens.names()) {
+      if (!tokenInCorso.has(name) && !tokenDaSalvare.has(name)) renderTokenRow(name);
+    }
   }
 
   function persistTokensDebounced() {
@@ -176,7 +221,7 @@
   // ereditano (es. link.color da accent) mostrano subito il valore ereditato.
   function renderOtherTokenRows(exceptName) {
     if (!Tokens) return;
-    for (const name of Tokens.names()) if (name !== exceptName) renderTokenRow(name);
+    for (const name of Tokens.names()) if (name !== exceptName && !tokenInCorso.has(name)) renderTokenRow(name);
   }
 
   function onTokenInput(name) {
@@ -184,6 +229,7 @@
     const row = input.closest('.sn-token-row');
     const err = row.querySelector('.sn-token-error');
     const v = input.value.trim();
+    tokenInCorso.add(name);
 
     // Mentre si digita NON mostriamo l'errore (eviterebbe di lampeggiare "non
     // valido" a ogni carattere di un colore scritto a mano): l'errore puntuale
@@ -204,6 +250,7 @@
       const sw = row.querySelector('.sn-token-swatch');
       if (sw) sw.style.background = Tokens.effectiveValue(name, currentOverrides, resolvedTheme()) || '';
     }
+    tokenDaSalvare.add(name);
     renderOtherTokenRows(name);
     applyTokensLive();
     persistTokensDebounced();
@@ -211,6 +258,8 @@
 
   function resetToken(name) {
     delete currentOverrides[name];
+    tokenInCorso.delete(name);
+    tokenDaSalvare.add(name);
     renderTokenRow(name);
     renderOtherTokenRows(name); // se era una categoria, aggiorna chi ereditava
     applyTokensLive();
@@ -219,6 +268,8 @@
 
   function resetAllTokens() {
     currentOverrides = {};
+    tokenInCorso.clear();
+    tokenAzzeraTutti = true;
     if (Tokens) for (const name of Tokens.names()) renderTokenRow(name);
     applyTokensLive();
     persistTokens();
@@ -369,7 +420,10 @@
       input.autocomplete = 'off';
       input.setAttribute('aria-label', `${m.label} (${m.min}–${m.max})`);
       input.addEventListener('input', () => onTabColorInput(m.key));
-      input.addEventListener('blur', () => renderTabColorRow(m.key));
+      input.addEventListener('blur', () => {
+        if (!tabColDaSalvare.has(m.key)) tabColInCorso.delete(m.key);
+        renderTabColorRow(m.key);
+      });
       row.appendChild(input);
 
       const reset = document.createElement('button');
@@ -410,15 +464,22 @@
     if (row) row.classList.toggle('sn-token-modified', val !== m.def);
   }
 
+  // Come per i token: si mandano solo i parametri toccati qui, e quelli che
+  // l'utente sta scrivendo non si riscrivono da sotto (#592).
+  const tabColDaSalvare = new Set();
+  const tabColInCorso = new Set();
+
   function onTabColorInput(key) {
     const input = $(`tabcol-${key}`);
     const m = tabColorMeta(key);
     if (!input || !m) return;
+    tabColInCorso.add(key);
     let n = parseFloat(String(input.value).replace(',', '.'));
     if (!Number.isFinite(n)) return; // campo intermedio (vuoto/"-"): non salvare ora
     n = Math.max(m.min, Math.min(m.max, n));
     if (m.step >= 1) n = Math.round(n);
     currentTabColor[key] = n;
+    tabColDaSalvare.add(key);
     const row = input.closest('.sn-token-row');
     if (row) row.classList.toggle('sn-token-modified', n !== m.def);
     persistTabColorDebounced();
@@ -428,14 +489,20 @@
     const m = tabColorMeta(key);
     if (!m) return;
     currentTabColor[key] = m.def;
+    tabColInCorso.delete(key);
+    tabColDaSalvare.add(key);
     renderTabColorRow(key);
     persistTabColor();
   }
 
   function resetAllTabColor() {
     currentTabColor = TabColor ? TabColor.defaultParams() : {};
+    tabColInCorso.clear();
     if (TabColor && Array.isArray(TabColor.IDENTITY_PARAM_META)) {
-      for (const m of TabColor.IDENTITY_PARAM_META) renderTabColorRow(m.key);
+      for (const m of TabColor.IDENTITY_PARAM_META) {
+        tabColDaSalvare.add(m.key);
+        renderTabColorRow(m.key);
+      }
     }
     persistTabColor();
   }
@@ -443,11 +510,29 @@
   function persistTabColor() {
     const clamped = TabColor ? TabColor.clampParams(currentTabColor) : currentTabColor;
     currentTabColor = clamped;
+    const parte = {};
+    for (const key of tabColDaSalvare) {
+      if (Object.prototype.hasOwnProperty.call(clamped, key)) parte[key] = clamped[key];
+      const n = parseFloat(String(($(`tabcol-${key}`) || {}).value || '').replace(',', '.'));
+      if (Number.isFinite(n)) tabColInCorso.delete(key);
+    }
+    tabColDaSalvare.clear();
+    if (!Object.keys(parte).length) return;
     chrome.runtime.sendMessage({
       type: MSG.UPDATE_SETTINGS,
-      settings: { tabColor: clamped },
+      settings: { tabColor: parte },
     });
     flashSaved('tabColorSavedHint');
+  }
+
+  function riallineaTabColor(salvati) {
+    if (!TabColor || !Array.isArray(TabColor.IDENTITY_PARAM_META)) return;
+    const fresh = TabColor.clampParams(salvati || {});
+    for (const m of TabColor.IDENTITY_PARAM_META) {
+      if (tabColInCorso.has(m.key) || tabColDaSalvare.has(m.key)) continue;
+      currentTabColor[m.key] = fresh[m.key];
+      renderTabColorRow(m.key);
+    }
   }
 
   function persistTabColorDebounced() {
@@ -455,9 +540,34 @@
     tabColorSaveTimer = setTimeout(persistTabColor, 400);
   }
 
-  // Restituisce lo stile testuale corrente dal textarea.
+  // Lo stile come si salva e come arriva al modello: quello che si legge nel
+  // riquadro (#592).
   function currentStyleText() {
-    return $('agentStyleText').value;
+    return testoLeggibile($('agentStyleText').value);
+  }
+
+  // Il conto compare solo vicino al tetto; oltre, il testo resta nel campo ma
+  // non si salva finché non lo si accorcia. Torna se il testo è salvabile.
+  function syncStyleNote() {
+    const n = agentStyleLength(currentStyleText());
+    const over = n > AGENT_STYLE_MAX;
+    const note = $('agentStyleNote');
+    note.hidden = !over && n < AGENT_STYLE_MAX * 0.8;
+    note.classList.toggle('agent-style-over', over);
+    $('agentStyleText').classList.toggle('agent-style-over', over);
+    note.textContent = over
+      ? `Troppo lungo: ${n} caratteri, il massimo è ${AGENT_STYLE_MAX}. Non lo salvo finché non lo accorci.`
+      : `${n} / ${AGENT_STYLE_MAX}`;
+    mostraTuttoLoStile();
+    return !over;
+  }
+
+  // Lo stile entra in ogni conversazione: il riquadro cresce col testo, così
+  // niente resta sotto il bordo, nemmeno dopo righe che a schermo sono bianche (#592).
+  function mostraTuttoLoStile() {
+    const el = $('agentStyleText');
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
   }
 
   // Allinea la select dei preset al testo corrente: se combacia con un preset
@@ -698,42 +808,93 @@
     input.value = String(clampNotifDurationSec(parseInt(input.value, 10)));
   }
 
+  // Campi toccati qui e non ancora partiti: persist() manda solo questi, e un
+  // cambio arrivato da altrove (la chat, un'altra scheda) non li riscrive. Il
+  // resto della pagina segue la memoria (#592).
+  const toccati = new Set();
+  const CAMPO_DI = {
+    theme: 'theme', textScale: 'textScale', showHomeMessage: 'showHomeMessage',
+    agentStylePreset: 'agentStyle', agentStyleText: 'agentStyle', timerRingtone: 'timerRingtone',
+    terminalEnabled: 'terminal.enabled', terminalShell: 'terminal.shell',
+    ttsVoice: 'tts.voice', ttsRate: 'tts.rate', ttsPitch: 'tts.pitch',
+    ttsModelVoice: 'tts.modelVoice', ttsModelVoiceCustom: 'tts.modelVoice',
+    autoArchiveEnabled: 'autoArchive.enabled', autoArchiveIdleHours: 'autoArchive.idleHours',
+    autoArchiveOnClose: 'autoArchive.onClose',
+    notifDuration: 'notifications.durationSec', notifSoundEnabled: 'notifications.soundEnabled',
+    notifSound: 'notifications.sound',
+  };
+
+  function valoreDelCampo(k) {
+    switch (k) {
+      case 'theme': return $('theme').value;
+      case 'textScale': return parseFloat($('textScale').value) || 1;
+      case 'showHomeMessage': return $('showHomeMessage').checked;
+      case 'agentStyle': return currentStyleText();
+      case 'timerRingtone': return $('timerRingtone').value || 'default';
+      case 'terminal.enabled': return $('terminalEnabled').checked;
+      case 'terminal.shell': return $('terminalShell').value;
+      case 'tts.voice': return $('ttsVoice').value || '';
+      case 'tts.rate': return parseFloat($('ttsRate').value) || 1;
+      case 'tts.pitch': return parseFloat($('ttsPitch').value) || 1;
+      case 'tts.modelVoice': return currentModelVoice();
+      case 'autoArchive.enabled': return $('autoArchiveEnabled').checked;
+      case 'autoArchive.idleHours': return clampIdleHours(parseInt($('autoArchiveIdleHours').value, 10));
+      case 'autoArchive.onClose': return $('autoArchiveOnClose').checked;
+      case 'notifications.durationSec': return clampNotifDurationSec(parseInt($('notifDuration').value, 10));
+      case 'notifications.soundEnabled': return $('notifSoundEnabled').checked;
+      case 'notifications.sound': return $('notifSound').value || 'default';
+      default: return undefined;
+    }
+  }
+
+  // Lo stesso valore letto dalla memoria, con le stesse regole di riempi().
+  function valoreSalvato(s, k) {
+    const aa = s.autoArchive || {};
+    const tts = s.tts || {};
+    const notif = s.notifications || {};
+    const dur = Number(notif.durationSec);
+    switch (k) {
+      case 'theme': return s.theme || 'system';
+      case 'textScale': return Number(s.textScale ?? 1);
+      case 'showHomeMessage': return s.showHomeMessage !== false;
+      case 'agentStyle': return String(s.agentStyle || '').trim();
+      case 'timerRingtone': return s.timerRingtone || 'default';
+      case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
+      case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
+      case 'tts.voice': return tts.voice || '';
+      case 'tts.rate': return Number(tts.rate) || 1;
+      case 'tts.pitch': return Number(tts.pitch) || 1;
+      case 'tts.modelVoice': return tts.modelVoice || '';
+      case 'autoArchive.enabled': return aa.enabled !== false;
+      case 'autoArchive.idleHours': return clampIdleHours(Number(aa.idleHours) > 0 ? Number(aa.idleHours) : 6);
+      case 'autoArchive.onClose': return aa.onClose !== false;
+      case 'notifications.durationSec': return clampNotifDurationSec(Number.isFinite(dur) && dur >= 0 ? dur : 5);
+      case 'notifications.soundEnabled': return notif.soundEnabled === true;
+      case 'notifications.sound': return notif.sound || 'default';
+      default: return undefined;
+    }
+  }
+
   async function persist() {
+    const styleOk = syncStyleNote();
+    const settings = {};
+    const partiti = [];
+    for (const k of toccati) {
+      // Oltre il tetto lo stile resta nel campo e in sospeso: non parte.
+      if (k === 'agentStyle' && !styleOk) continue;
+      const [a, b] = k.split('.');
+      if (b) settings[a] = { ...(settings[a] || {}), [b]: valoreDelCampo(k) };
+      else settings[a] = valoreDelCampo(k);
+      partiti.push(k);
+    }
+    for (const k of partiti) toccati.delete(k);
+
     const theme = $('theme').value;
-    const textScale = parseFloat($('textScale').value) || 1;
-    const showHomeMessage = $('showHomeMessage').checked;
-    const agentStyle = currentStyleText().trim();
-    const timerRingtone = $('timerRingtone').value || 'default';
-    const terminal = {
-      enabled: $('terminalEnabled').checked,
-      shell: $('terminalShell').value,
-    };
-    const tts = {
-      voice: $('ttsVoice').value || '',
-      rate: parseFloat($('ttsRate').value) || 1,
-      pitch: parseFloat($('ttsPitch').value) || 1,
-      modelVoice: currentModelVoice(),
-    };
-    const autoArchive = {
-      enabled: $('autoArchiveEnabled').checked,
-      onIdle: true,
-      idleHours: clampIdleHours(parseInt($('autoArchiveIdleHours').value, 10)),
-      onClose: $('autoArchiveOnClose').checked,
-    };
-    const notifications = {
-      durationSec: clampNotifDurationSec(parseInt($('notifDuration').value, 10)),
-      soundEnabled: $('notifSoundEnabled').checked,
-      sound: $('notifSound').value || 'default',
-    };
-
-    await chrome.runtime.sendMessage({
-      type: MSG.UPDATE_SETTINGS,
-      settings: { theme, textScale, showHomeMessage, agentStyle, timerRingtone, terminal, tts, autoArchive, notifications },
-    });
-
     window.SN_PAGE_THEME = theme;
     Bootstrap.applyTheme(theme);
-    Bootstrap.applyTextScale(textScale);
+    Bootstrap.applyTextScale(parseFloat($('textScale').value) || 1);
+    if (!partiti.length) return;
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings });
     flashSaved();
   }
 
@@ -757,71 +918,179 @@
     sel.appendChild(custom);
   }
 
-  async function load() {
-    const settings = await Storage.getSettings();
-    $('theme').value = settings.theme || 'system';
-    const scale = String(settings.textScale ?? 1);
-    const opt = [...$('textScale').options].find((o) => o.value === scale);
-    $('textScale').value = opt ? scale : '1';
-    $('showHomeMessage').checked = settings.showHomeMessage !== false;
+  // Scrive nei campi i valori di `settings`; `vuole(k)` dice quali campi
+  // toccare (al caricamento tutti, a un cambio arrivato da altrove solo quelli
+  // che l'utente non sta cambiando qui).
+  function riempi(settings, vuole = () => true) {
+    if (vuole('theme')) $('theme').value = settings.theme || 'system';
+    if (vuole('textScale')) {
+      const scale = String(settings.textScale ?? 1);
+      const opt = [...$('textScale').options].find((o) => o.value === scale);
+      $('textScale').value = opt ? scale : '1';
+    }
+    if (vuole('showHomeMessage')) $('showHomeMessage').checked = settings.showHomeMessage !== false;
 
-    buildPresetOptions();
-    $('agentStyleText').value = settings.agentStyle || '';
-    syncPresetSelect();
+    if (vuole('agentStyle')) {
+      $('agentStyleText').value = settings.agentStyle || '';
+      syncPresetSelect();
+      syncStyleNote();
+    }
 
     const aa = settings.autoArchive || {};
-    $('autoArchiveEnabled').checked = aa.enabled !== false;
-    $('autoArchiveOnClose').checked = aa.onClose !== false;
-    $('autoArchiveIdleHours').value = String(Number(aa.idleHours) > 0 ? Number(aa.idleHours) : 6);
+    if (vuole('autoArchive.enabled')) $('autoArchiveEnabled').checked = aa.enabled !== false;
+    if (vuole('autoArchive.onClose')) $('autoArchiveOnClose').checked = aa.onClose !== false;
+    if (vuole('autoArchive.idleHours')) $('autoArchiveIdleHours').value = String(Number(aa.idleHours) > 0 ? Number(aa.idleHours) : 6);
 
     const terminal = settings.terminal || {};
-    $('terminalEnabled').checked = terminal.enabled === true;
-    // PowerShell e cmd esistono solo su Windows. Fuori da lì il comando parte
-    // comunque (il main ricade su /bin/sh — vedi src/main/services/terminal.js),
-    // ma offrire tre shell di Windows a chi sta su un Mac è un menu che mente:
-    // qui si mostrano quelle vere. Il valore salvato di una macchina Windows
-    // (es. "powershell") si legge come "la shell di sistema".
-    const suWindows = (() => { try { return (window.filo?.sistema || 'win32') === 'win32'; } catch (_) { return true; } })();
-    const sel = $('terminalShell');
-    if (!suWindows) {
-      sel.innerHTML = '';
-      for (const [value, label] of [['sh', 'Shell di sistema (sh)'], ['bash', 'Bash']]) {
-        const o = document.createElement('option');
-        o.value = value; o.textContent = label;
-        sel.appendChild(o);
-      }
+    if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
+    if (vuole('terminal.shell')) {
+      const sel = $('terminalShell');
+      const suWindows = shellDiWindows();
+      const salvata = terminal.shell || (suWindows ? 'powershell' : 'sh');
+      const predefinita = suWindows ? 'powershell' : 'sh';
+      const shellOpt = [...sel.options].find((o) => o.value === salvata);
+      sel.value = shellOpt ? salvata : predefinita;
     }
-    const salvata = terminal.shell || (suWindows ? 'powershell' : 'sh');
-    const predefinita = suWindows ? 'powershell' : 'sh';
-    const shellOpt = [...sel.options].find((o) => o.value === salvata);
-    sel.value = shellOpt ? salvata : predefinita;
 
-    // Notifiche (durata + suono)
-    populateNotifSounds();
     const notif = settings.notifications || {};
-    const dur = Number(notif.durationSec);
-    $('notifDuration').value = String(Number.isFinite(dur) && dur >= 0 ? dur : 5);
-    $('notifSoundEnabled').checked = notif.soundEnabled === true;
-    const notifSound = notif.sound || 'default';
-    const nsOpt = [...$('notifSound').options].find((o) => o.value === notifSound);
-    $('notifSound').value = nsOpt ? notifSound : 'default';
+    if (vuole('notifications.durationSec')) {
+      const dur = Number(notif.durationSec);
+      $('notifDuration').value = String(Number.isFinite(dur) && dur >= 0 ? dur : 5);
+    }
+    if (vuole('notifications.soundEnabled')) $('notifSoundEnabled').checked = notif.soundEnabled === true;
+    if (vuole('notifications.sound')) {
+      const notifSound = notif.sound || 'default';
+      const nsOpt = [...$('notifSound').options].find((o) => o.value === notifSound);
+      $('notifSound').value = nsOpt ? notifSound : 'default';
+    }
 
-    // Suoneria timer
-    const ringtone = settings.timerRingtone || 'default';
-    const ringOpt = [...$('timerRingtone').options].find((o) => o.value === ringtone);
-    $('timerRingtone').value = ringOpt ? ringtone : 'default';
+    if (vuole('timerRingtone')) {
+      const ringtone = settings.timerRingtone || 'default';
+      const ringOpt = [...$('timerRingtone').options].find((o) => o.value === ringtone);
+      $('timerRingtone').value = ringOpt ? ringtone : 'default';
+    }
 
     const tts = settings.tts || {};
-    populateModelVoices(tts.modelVoice || '');
+    if (vuole('tts.modelVoice')) populateModelVoices(tts.modelVoice || '');
     if (ttsSupported()) {
-      const rate = Number(tts.rate) || 1;
-      const pitch = Number(tts.pitch) || 1;
-      $('ttsRate').value = String(rate);
-      $('ttsRateVal').textContent = rate.toFixed(1) + '×';
-      $('ttsPitch').value = String(pitch);
-      $('ttsPitchVal').textContent = pitch.toFixed(1);
-      populateVoices(tts.voice || '');
-    } else {
+      if (vuole('tts.rate')) {
+        const rate = Number(tts.rate) || 1;
+        $('ttsRate').value = String(rate);
+        $('ttsRateVal').textContent = rate.toFixed(1) + '×';
+      }
+      if (vuole('tts.pitch')) {
+        const pitch = Number(tts.pitch) || 1;
+        $('ttsPitch').value = String(pitch);
+        $('ttsPitchVal').textContent = pitch.toFixed(1);
+      }
+      if (vuole('tts.voice')) populateVoices(tts.voice || '');
+    }
+  }
+
+  function shellDiWindows() {
+    try { return (window.filo?.sistema || 'win32') === 'win32'; } catch (_) { return true; }
+  }
+
+  // PowerShell e cmd esistono solo su Windows. Fuori da lì il comando parte
+  // comunque (il main ricade su /bin/sh — vedi src/main/services/terminal.js),
+  // ma offrire tre shell di Windows a chi sta su un Mac è un menu che mente:
+  // qui si mostrano quelle vere. Il valore salvato di una macchina Windows
+  // (es. "powershell") si legge come "la shell di sistema".
+  function preparaShell() {
+    if (shellDiWindows()) return;
+    const sel = $('terminalShell');
+    sel.innerHTML = '';
+    for (const [value, label] of [['sh', 'Shell di sistema (sh)'], ['bash', 'Bash']]) {
+      const o = document.createElement('option');
+      o.value = value; o.textContent = label;
+      sel.appendChild(o);
+    }
+  }
+
+  // ── Memoria di Filo (#592) ───────────────────────────────────────────────
+  // Profilo, preferenze apprese e lezioni entrano in ogni conversazione: qui
+  // l'utente le rilegge e ne toglie una riga alla volta.
+  const NOMI_GRUPPO = { PROFILO: 'Chi sei', PREFERENZE: 'Cosa preferisci' };
+  function nomeGruppo(nome) {
+    if (NOMI_GRUPPO[nome]) return NOMI_GRUPPO[nome];
+    const t = String(nome || '').replace(/_+/g, ' ').trim().toLowerCase();
+    return t ? t[0].toUpperCase() + t.slice(1) : 'Altro';
+  }
+
+  async function caricaMemoria() {
+    if (!$('memoria')) return;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_MEMORY_VIEW }); } catch (_) {}
+    if (r && r.ok) disegnaMemoria(r);
+  }
+
+  function disegnaMemoria({ moduli = [], lezioni = [] }) {
+    const box = $('memoria');
+    if (!box) return;
+    box.textContent = '';
+    const posto = (n) => (n === 'PROFILO' ? 0 : n === 'PREFERENZE' ? 1 : 2);
+    const gruppi = [];
+    for (const m of [...moduli].sort((a, b) => posto(a.nome) - posto(b.nome))) {
+      if (!Array.isArray(m.righe) || !m.righe.length) continue;
+      gruppi.push({ titolo: nomeGruppo(m.nome), righe: m.righe.map((riga) => ({ testo: riga, via: { modulo: m.nome, riga } })) });
+    }
+    if (lezioni.length) {
+      gruppi.push({ titolo: 'Imparato da poco', righe: lezioni.map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } } })) });
+    }
+    if (!gruppi.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = 'Filo non ha ancora imparato niente su di te.';
+      box.appendChild(p);
+      return;
+    }
+    for (const g of gruppi) {
+      const h = document.createElement('h3');
+      h.className = 'mem-gruppo';
+      h.textContent = g.titolo;
+      box.appendChild(h);
+      for (const r of g.righe) box.appendChild(rigaMemoria(r));
+    }
+  }
+
+  function rigaMemoria({ testo, via }) {
+    const row = document.createElement('div');
+    row.className = 'mem-riga';
+    const t = document.createElement('span');
+    t.className = 'mem-testo';
+    t.textContent = testo;
+    row.appendChild(t);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mem-via';
+    b.textContent = '×';
+    b.title = 'Dimentica';
+    b.setAttribute('aria-label', `Dimentica: ${testo.slice(0, 80)}`);
+    b.addEventListener('click', () => dimentica(b, via));
+    row.appendChild(b);
+    return row;
+  }
+
+  // Si dice «Dimenticato» solo se il main l'ha tolta davvero: con la pagina
+  // rimasta indietro la riga può non esserci più.
+  async function dimentica(b, via) {
+    b.disabled = true;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_MEMORY_FORGET, ...via }); } catch (_) {}
+    const hint = $('memoriaHint');
+    if (hint) hint.textContent = r && r.ok && r.tolta ? 'Dimenticato' : 'Non c\'era più: ecco com\'è adesso';
+    flashSaved('memoriaHint');
+    caricaMemoria();
+  }
+
+  let caricato = false;
+
+  async function load() {
+    const settings = await Storage.getSettings();
+    buildPresetOptions();
+    preparaShell();
+    populateNotifSounds();
+    if (!ttsSupported()) {
       const u = $('ttsUnsupported');
       if (u) u.hidden = false;
       ['ttsVoice', 'ttsRate', 'ttsPitch', 'ttsPreview'].forEach((id) => {
@@ -829,6 +1098,7 @@
         if (el) el.disabled = true;
       });
     }
+    riempi(settings);
 
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
@@ -844,10 +1114,34 @@
       ? TabColor.clampParams(settings.tabColor || {})
       : { ...(settings.tabColor || {}) };
     buildTabColorSection();
+    caricato = true;
+  }
+
+  // Un cambio arrivato da altrove: si riscrive solo quello che è davvero
+  // cambiato e che l'utente non sta toccando qui, così il cursore non salta.
+  function riallinea(settings) {
+    if (!caricato || !settings) return;
+    riempi(settings, (k) => !toccati.has(k) && valoreDelCampo(k) !== valoreSalvato(settings, k));
+    riallineaToken(settings.themeTokens);
+    riallineaTabColor(settings.tabColor);
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    // Prima di ogni altro ascoltatore: quando parte persist() il campo è già segnato.
+    for (const [id, k] of Object.entries(CAMPO_DI)) {
+      const el = $(id);
+      if (!el) continue;
+      el.addEventListener('input', () => toccati.add(k));
+      el.addEventListener('change', () => toccati.add(k));
+    }
+    try {
+      chrome.runtime.onMessage.addListener((msg) => {
+        if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) riallinea(msg.settings);
+        if (msg && msg.type === MSG.FILO_MEMORY_CHANGED && Array.isArray(msg.moduli)) disegnaMemoria(msg);
+      });
+    } catch (_) {}
     load();
+    caricaMemoria();
 
     // Tema e dimensione testo: anteprima immediata + salvataggio.
     $('theme').addEventListener('change', () => {
@@ -912,12 +1206,24 @@
       if (key !== CUSTOM_KEY) {
         const preset = AGENT_STYLE_PRESETS.find((p) => p.key === key);
         $('agentStyleText').value = preset ? preset.text : '';
+        syncStyleNote();
       } else {
         $('agentStyleText').focus();
       }
       persist();
     });
-    $('agentStyleText').addEventListener('input', () => { syncPresetSelect(); persistDebounced(); });
+    $('agentStyleText').addEventListener('input', () => {
+      syncPresetSelect();
+      if (syncStyleNote()) persistDebounced();
+    });
+    // Uscendo dal campo si vede quello che è stato salvato, non un testo con
+    // dentro caratteri invisibili o righe vuote in più (gli spazi ai bordi no).
+    $('agentStyleText').addEventListener('change', () => {
+      const leggibile = currentStyleText();
+      if ($('agentStyleText').value.trim() !== leggibile) $('agentStyleText').value = leggibile;
+      mostraTuttoLoStile();
+    });
+    window.addEventListener('resize', mostraTuttoLoStile);
 
     // Token estetici: reset globale ai predefiniti.
     $('resetAllTokens').addEventListener('click', resetAllTokens);

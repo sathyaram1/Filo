@@ -86,7 +86,8 @@ test('la copia della configurazione è UNA, condivisa dai due script che la legg
   // seconda copia sarebbe una seconda verità con una scadenza sua.
   const { readFileSync: leggi } = await import('node:fs');
   const { join: unisci } = await import('node:path');
-  const radice = new URL('../../', import.meta.url).pathname;
+  const { fileURLToPath } = await import('node:url');
+  const radice = fileURLToPath(new URL('../../', import.meta.url));
   for (const nome of ['dispatch.mjs', 'verify-local.mjs']) {
     assert.match(leggi(unisci(radice, 'scripts', nome), 'utf8'), /config-routine-copia/,
       `${nome} non passa dalla copia condivisa di config/routines`);

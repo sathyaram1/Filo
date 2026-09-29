@@ -97,14 +97,14 @@ function fsDocToObject(doc) {
   return out;
 }
 
-// Legge un documento Firestore. Ritorna l'oggetto, {} se 404 (non esiste
-// ancora), oppure null se la lettura non è consentita/è fallita (403/altro).
 // Legge un documento DICENDO com'è andata, non solo cosa ha portato (#679).
 // «Non esiste» e «non ti riguarda» sono risposte definitive del server; «non
 // ho potuto chiedere» no, e chi tiene una copia in memoria deve distinguerle:
 // contare un tentativo fallito come una lettura fatta lascia Filo con la
 // configurazione che non ha fino alla scadenza lunga.
-async function leggiDoc(docPath, idToken) {
+// `tokenMancato`: chi usa Filo è dentro ma la sessione non ha dato il token, e
+// il «non ti riguarda» detto a un anonimo non parla di lui (#679.2).
+async function leggiDoc(docPath, idToken, { tokenMancato = false } = {}) {
   const url = `${FIRESTORE_BASE}/${docPath}?key=${API_KEY}`;
   const headers = {};
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
@@ -115,7 +115,7 @@ async function leggiDoc(docPath, idToken) {
     return { risposto: false, doc: null }; // offline o rete giù → usa i fallback
   }
   if (res.status === 404) return { risposto: true, doc: {} };
-  if (res.status === 401 || res.status === 403) return { risposto: true, doc: null };
+  if (res.status === 401 || res.status === 403) return { risposto: !tokenMancato, doc: null };
   if (!res.ok) return { risposto: false, doc: null };
   try {
     const json = await res.json();
@@ -143,22 +143,32 @@ function isAdminUser() {
 // `config/secrets` si legge SOLO da admin (#581): per tutti gli altri le chiavi
 // sono quelle incastonate dal build, e questo documento non si tocca affatto.
 async function refresh() {
+  // Letto PRIMA del token: un rinnovo che fallisce chiude la sessione, e dopo
+  // l'owner sembrerebbe uno qualunque.
+  const admin = isAdminUser();
+  let dentro = false;
+  try { dentro = Boolean(auth.isSignedIn()); } catch (_) {}
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
+  const tokenMancato = (admin || dentro) && !idToken;
 
-  const models = await leggiDoc(MODELS_DOC, idToken);
+  const models = await leggiDoc(MODELS_DOC, idToken, { tokenMancato });
   if (models.doc) remoteModels = models.doc;
   let risposto = models.risposto;
 
-  if (idToken && isAdminUser()) {
+  if (admin && !idToken) {
+    // Owner senza token: le sue chiavi non si sono potute chiedere. Si tiene
+    // l'ultima copia (la serve `get()` solo se admin c'è) e si riprova presto:
+    // spegnerla faceva pagare la chiave del build per mezz'ora (#679.2).
+    risposto = false;
+  } else if (admin) {
     const secrets = await leggiDoc(SECRETS_DOC, idToken);
-    if (secrets.doc) remoteSecrets = secrets.doc;
+    // Il «non ti riguarda» detto a un token vero è definitivo, e spegne la copia.
+    if (secrets.risposto) remoteSecrets = secrets.doc;
     risposto = risposto && secrets.risposto;
   } else {
-    // Chi non è admin non ha override: azzerare invece di lasciare la cache
-    // com'era tiene onesta la precedenza anche dopo un logout dell'owner sulla
-    // stessa installazione (altrimenti le chiavi lette da admin resterebbero in
-    // uso per un account che non può più leggerle).
+    // Chi non è admin non ha override; il cancello che conta sta in `get()`,
+    // qui si libera solo la copia in memoria.
     remoteSecrets = null;
   }
   // Solo una lettura a cui il server HA risposto rimanda la prossima (#679).
@@ -195,6 +205,16 @@ function buildModels() {
   return T ? { registry: T.registry, models: T.models } : { registry: C.DEFAULT_MODEL_REGISTRY || {}, models: C.DEFAULT_MODELS || {} };
 }
 
+// Il fornitore del documento remoto vale solo se Filo lo sa chiamare e la politica lo ammette: il
+// documento è rimasto su 'gemini' dopo l'uscita di Google, e nessuna chiave lo trovava più.
+function fornitoreUsabile(nome, C = globalThis.SN_CONST || {}) {
+  if (typeof nome !== 'string' || !nome) return false;
+  if ((C.PRODUCER_DIRECT_PROVIDERS || []).includes(nome)) return false;
+  if (nome === (C.DEFAULT_PROVIDER || 'openrouter')) return true;
+  const Gate = globalThis.SN_MODEL_GATE;
+  return Boolean(Gate && Gate.hasProvider(nome));
+}
+
 function get() {
   const C = globalThis.SN_CONST || {};
   const out = {
@@ -217,8 +237,9 @@ function get() {
     safeBrowsingKey: getBuildSafeBrowsingKey(),
   };
 
+  let remoteReasons = [];
   if (remoteModels) {
-    if (typeof remoteModels.provider === 'string' && remoteModels.provider) out.provider = remoteModels.provider;
+    if (fornitoreUsabile(remoteModels.provider, C)) out.provider = remoteModels.provider;
     if (remoteModels.models && typeof remoteModels.models === 'object') {
       out.models = { ...out.models, ...remoteModels.models };
     }
@@ -248,6 +269,9 @@ function get() {
         .filter((x) => typeof x === 'string' && x.trim())
         .map((x) => x.trim());
     }
+    if (Array.isArray(remoteModels.excludedProviderReasons)) {
+      remoteReasons = remoteModels.excludedProviderReasons;
+    }
     if (typeof remoteModels.providerSort === 'string') {
       out.providerSort = remoteModels.providerSort.trim();
     }
@@ -260,7 +284,16 @@ function get() {
     }
   }
 
-  if (remoteSecrets) {
+  // Il perché di ogni esclusione: sta in un campo a parte, così i client che
+  // leggono solo `excludedProviders` (array di nomi) restano compatibili.
+  out.excludedProviderReasons = typeof C.excludedProviderReasons === 'function'
+    ? C.excludedProviderReasons(out.excludedProviders, remoteReasons, C.DEFAULT_EXCLUDED_PROVIDER_REASONS)
+    : [];
+
+  // Le chiavi lette da admin valgono solo finché admin c'è ADESSO, non fino alla
+  // prossima rilettura: un logout non rilegge niente, e la copia restava in uso
+  // a chi usava il computer dopo, fino a mezz'ora (#679.1).
+  if (remoteSecrets && isAdminUser()) {
     if (remoteSecrets.apiKeys && typeof remoteSecrets.apiKeys === 'object') {
       // Solo i valori non vuoti sovrascrivono le chiavi di build.
       for (const k of ['openrouter', 'tavily']) {
@@ -285,6 +318,7 @@ function getPublicForAdmin() {
     models: eff.models,
     modelRegistry: eff.modelRegistry,
     excludedProviders: eff.excludedProviders,
+    excludedProviderReasons: eff.excludedProviderReasons,
     providerSort: eff.providerSort,
     apiKeysPresent: {
       openrouter: Boolean(eff.apiKeys.openrouter),
@@ -349,11 +383,30 @@ async function update(partial, idToken) {
     modelFields.excludedProviders = toFsValue(clean);
     modelMask.push('excludedProviders');
   }
+  if (Array.isArray(partial.excludedProviderReasons)) {
+    const C = globalThis.SN_CONST || {};
+    const kinds = C.EXCLUDED_PROVIDER_KINDS || [];
+    const clean = partial.excludedProviderReasons
+      .filter((r) => r && typeof r.name === 'string' && r.name.trim())
+      .map((r) => ({
+        name: r.name.trim(),
+        kind: kinds.includes(r.kind) ? r.kind : '',
+        note: typeof r.note === 'string' ? r.note.trim() : '',
+      }));
+    modelFields.excludedProviderReasons = toFsValue(clean);
+    modelMask.push('excludedProviderReasons');
+  }
   if (typeof partial.providerSort === 'string') {
     modelFields.providerSort = toFsValue(partial.providerSort.trim());
     modelMask.push('providerSort');
   }
-  if (modelMask.length) await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
+  if (modelMask.length) {
+    await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
+    // Il salvato entra subito nella copia: se la rilettura qui sotto non arriva,
+    // la schermata non deve tornare ai valori di prima (#679.2).
+    remoteModels = { ...(remoteModels || {}) };
+    for (const k of modelMask) remoteModels[k] = fromFsValue(modelFields[k]);
+  }
 
   // Doc segreti (chiavi). Scriviamo solo i campi presenti come stringa.
   //
@@ -383,7 +436,12 @@ async function update(partial, idToken) {
     secretFields.safeBrowsingKey = toFsValue(partial.safeBrowsingKey.trim());
     secretMask.push('safeBrowsingKey');
   }
-  if (secretMask.length) await patchDoc(SECRETS_DOC, secretFields, secretMask, idToken);
+  if (secretMask.length) {
+    await patchDoc(SECRETS_DOC, secretFields, secretMask, idToken);
+    const prima = remoteSecrets || {};
+    remoteSecrets = { ...prima, apiKeys: { ...(prima.apiKeys || {}), ...fromFsValue(secretFields.apiKeys || { mapValue: {} }) } };
+    if ('safeBrowsingKey' in secretFields) remoteSecrets.safeBrowsingKey = fromFsValue(secretFields.safeBrowsingKey);
+  }
 
   // La rilettura qui NON è un lusso: è ciò che rende immediata la modifica
   // sulla macchina di chi salva. La rilettura periodica è lenta apposta
@@ -710,6 +768,7 @@ async function getWorkerLog(idToken) {
 
 module.exports = {
   get,
+  fornitoreUsabile,
   getPublicForAdmin,
   refresh,
   refreshIfStale,

@@ -1,6 +1,6 @@
 // Il bilancio del livello 3 separato da quello del 2 (decisione dell'owner
 // del 2026-09-23): un 3 interno a bilancio finito ferma il lavoro, un 2 interno
-// a bilancio finito NON ferma — esce come feedback a priorità 2 — e i quattro
+// a bilancio finito NON ferma — esce nel feedback dei rimasti — e i quattro
 // nomi dei bilanci sono gli stessi nella regola, nelle tabelle e in dashboard.
 
 import { test } from 'node:test';
@@ -65,10 +65,12 @@ test('un 2 interno paga il bilancio dei 2; a bilancio finito NON ferma: va da pa
 
   const nota = R.roundNote({ summary: 'il resto regge', findings: [f(2, 'i', 'non salva'), f(2, 'i', 'nemmeno la scorciatoia')], decision: finito });
   assert.match(nota, /Nessun rilievo interno da correggere adesso/);
-  assert.match(nota, /Il bilancio delle correzioni di livello 2 è finito: i 2 rilievi interni di livello 2 rimasti escono come feedback a parte, a priorità 2\./);
+  assert.match(nota, /Il bilancio delle correzioni di livello 2 è finito: i 2 rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano nel feedback dei rimasti\./);
+  assert.match(nota, /I 2 rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità 2/);
   assert.doesNotMatch(nota, /Il lavoro si ferma/);
   const uno = R.roundNote({ summary: '', findings: [f(2, 'i', 'non salva')], decision: zero });
-  assert.match(uno, /il rilievo interno di livello 2 rimasto esce come feedback a parte, a priorità 2\./);
+  assert.match(uno, /il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra nel feedback dei rimasti\./);
+  assert.match(uno, /Il rilievo non corretto in questo giro esce in un feedback derivato, a priorità 2: \[2i\] non salva/);
 });
 
 test('un 2 interno col segno ? ferma ancora: la decisione dell\'owner non dipende dal bilancio', () => {
@@ -145,17 +147,20 @@ test('sentinella: i nomi dei bilanci sono gli stessi nella regola, nelle tabelle
   assert.ok(blocco, 'CAP_FIELDS in manage.js');
   const chiavi = [...blocco[1].matchAll(/^\s*(cap\d):/gm)].map((m) => m[1]);
   assert.deepEqual(chiavi, R.CAP_KEYS, 'i campi guidati da CAP_FIELDS, nello stesso ordine');
-  // Due liste scritte a mano fuori da CAP_FIELDS: il blocco da non-owner (un
-  // campo che ci manca resta scrivibile a chiunque) e la spenta a routine
-  // spente (un blocco che ci manca resta acceso mentre gli altri si spengono).
+  // Il blocco da non-owner è una lista scritta a mano fuori da CAP_FIELDS: un
+  // campo che ci manca resta scrivibile a chiunque.
   const gate = /function applyAutoModeGate\(\) \{([\s\S]*?)\n  \}/.exec(js);
   assert.ok(gate, 'applyAutoModeGate in manage.js');
   for (const k of R.CAP_KEYS) {
     const K = k.replace('cap', 'Cap');
     assert.match(gate[1], new RegExp(`\\bmg${K}\\b`), `mg${K} manca dal blocco da non-owner`);
     assert.match(gate[1], new RegExp(`\\bmg${K}Save\\b`), `mg${K}Save manca dal blocco da non-owner`);
-    assert.match(js, new RegExp(`'mg${K}Block'`), `mg${K}Block manca dalla lista dei blocchi spenti a routine spente`);
   }
+  // Richiesta owner: le impostazioni della tab si modificano sempre, anche a
+  // routine o automatica spente. Solo l'essere owner accende o spegne un controllo.
+  const condizioni = [...gate[1].matchAll(/\.disabled\s*=\s*([^;]+);/g)].map((m) => m[1].trim());
+  assert.ok(condizioni.length > 0, 'applyAutoModeGate non spegne più niente');
+  for (const c of condizioni) assert.equal(c, '!isAdmin', `un controllo dipende da altro che l'essere owner: ${c}`);
 });
 
 test('le stampe del giro locale e delle routine dicono i quattro bilanci e i 2 messi da parte', async () => {
@@ -164,7 +169,7 @@ test('le stampe del giro locale e delle routine dicono i quattro bilanci e i 2 m
   const finito = decide([f(2, 'i', 'non salva')], { count2: 4 });
   assert.equal(VL.bilanciResiduiText(finito.budgets), 'cap3: 5 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 1 giri residui su 1 · cap0: 0 giri residui su 0');
   assert.equal(VL.bilanciResiduiText(null), '');
-  assert.match(VL.dueDaParteText(finito.derived), /^Bilancio delle correzioni di livello 2 finito: il rilievo interno di livello 2 rimasto esce come feedback a parte, a priorità 2\. Il lavoro non si ferma\.$/);
+  assert.match(VL.dueDaParteText(finito.derived), /^Bilancio delle correzioni di livello 2 finito: il rilievo interno di livello 2 rimasto entra nel feedback dei rimasti\. Il lavoro non si ferma\.$/);
   assert.equal(VL.dueDaParteText([f(1, 'i', 'x'), f(2, 'e', 'y')]), '', 'un 1 messo da parte o un 2 esterno non sono il caso');
   // La coda della fase 2 in locale: quattro bilanci, e la riga sui 2 quando ci sono.
   const fix = decide([f(3, 'i', 'perde i dati'), f(2, 'i', 'a')], { count2: 4 });
@@ -172,8 +177,8 @@ test('le stampe del giro locale e delle routine dicono i quattro bilanci e i 2 m
   assert.match(coda, /Bilanci: cap3: 4 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 1 giri residui su 1 · cap0: 0 giri residui su 0/);
   // La risposta del server stampata dalle routine: pass coi 2 usciti a priorità 2, e i quattro bilanci.
   const pass = verifierReplyText({ outcome: 'pass', derived: [{ level: 2, sede: 'i', text: 'non salva', priority: 2, num: '#7.1' }], budgets: finito.budgets });
-  assert.match(pass, /#7\.1, priorità 2, interno messo da parte/);
-  assert.match(pass, /Bilancio delle correzioni di livello 2 finito: il rilievo interno di livello 2 rimasto è uscito come feedback a parte, a priorità 2/);
+  assert.match(pass, /#7\.1, priorità 2, rimasti del giro: 1 rilievo \(\[2i\]\)/);
+  assert.match(pass, /Bilancio delle correzioni di livello 2 finito: il rilievo interno di livello 2 rimasto è entrato nel feedback dei rimasti/);
   assert.match(pass, /Bilanci: cap3: 5 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 1 giri residui su 1 · cap0: 0 giri residui su 0/);
   const stop = verifierReplyText({ outcome: 'stop', motivo: 'loop', blocking: [f(3, 'i', 'perde i dati')], sospesi: [], derived: [], budgets: decide([f(3, 'i', 'x')], { count3: 5 }).budgets });
   assert.match(stop, /un 3 a bilancio esaurito, o un 3\/2 che chiede una decisione/);

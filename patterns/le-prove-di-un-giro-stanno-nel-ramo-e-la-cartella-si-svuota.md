@@ -29,6 +29,19 @@ la cartella.
 - Restano le prove dei rilievi che hanno fermato il lavoro: le tratta chi riprende.
 - Una prova che copre anche un caso ancora aperto non si cancella: le si toglie il caso
   che se ne va.
+- La consegna della correzione (`verify-local.mjs corretto`, `dispatch.mjs --record-fixed`)
+  rilancia una volta le prove cancellate o cambiate, com'erano, sul codice nuovo: una ancora
+  rossa la respinge (#679, una prova rossa cancellata insieme alla correzione; togliere il
+  solo caso rosso e tenere il file è la stessa porta). Dopo un riallineamento contano solo
+  le prove che ha toccato il ramo: quelle che main ha cambiato nel frattempo sono di altri
+  lavori e non si rilanciano. Le prove dei rilievi messi da parte escono PRIMA di ogni
+  correzione, in un commit che toglie solo quelle registrato da chi ha scritto la critica
+  (`verify-local.mjs pulizia`, `dispatch.mjs --record-pulizia`): il confronto parte da lì,
+  e una prova tolta ancora rossa ferma la consegna sempre (`scripts/lib/prove-tolte.mjs`).
+  La pulizia riconosce le prove dal nome, che porta il numero del rilievo riprodotto
+  (`giro<k>-r<n>-<cosa>.spec.mjs`, il posto del rilievo nella critica): contare quante ne
+  escono non bastava, perché un rilievo messo da parte senza prova sua lasciava uscire la
+  prova rossa di uno da correggere.
 
 ## Il rosso atteso
 

@@ -632,9 +632,24 @@ section:has(#dictList) .sn-spell-add-row {
   white-space: nowrap;
 }
 
-.sn-excluded-row {
-  grid-template-columns: 1fr auto;
+.sn-excluded-row,
+.sn-excluded-head {
+  grid-template-columns: minmax(0, 1fr) 140px minmax(0, 1.4fr) auto;
 }
+/* Intestazione da sola = lista vuota: sparisce, resta il bottone per aggiungere. */
+.sn-excluded-head:last-child { display: none; }
+/* Correzione suggerita di un nome che non copre nessun fornitore: un link nel messaggio, non un
+   altro bottone pieno nella riga. */
+.sn-excluded-guess {
+  background: none;
+  border: none;
+  padding: 0 0 0 6px;
+  font: inherit;
+  color: var(--sn-link);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sn-excluded-guess:hover { color: var(--sn-fg); }
 
 /* Censimento in sola lettura degli altri punti in cui Filo usa un modello: senza cornice, perché è
    un elenco e non una tabella di controlli. */
@@ -752,7 +767,10 @@ section:has(#dictList) .sn-spell-add-row {
 .sn-page .sn-cookie-mode-desc { display: block; margin-top: 3px; line-height: 1.5; }
 
 .sn-page .sn-cookie-wl-add > input { flex: 1; }
-.sn-page #cookie-wl-list li {
+.sn-page #cookie-wl-list li,
+.sn-page #cookie-banners-list li,
+.sn-page #cookie-done-list li,
+.sn-page #sec-perm-list li {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -763,7 +781,10 @@ section:has(#dictList) .sn-spell-add-row {
   margin-bottom: 6px;
   font-size: 13px;
 }
-.sn-page #cookie-wl-list li button {
+.sn-page #cookie-wl-list li button,
+.sn-page #cookie-banners-list li button,
+.sn-page #cookie-done-list li button,
+.sn-page #sec-perm-list li button {
   font-size: 12px;
   padding: 2px 8px;
 }

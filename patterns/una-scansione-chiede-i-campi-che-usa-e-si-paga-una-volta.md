@@ -89,17 +89,32 @@ minuto, condivisa fra dispatch e verify-local),
 `scripts/lib/firestore-conta.mjs` (il conteggio),
 `scripts/lib/letture.mjs` (la riga del costo).
 
-Le sentinelle: `tests/unit/letturePerCampi.test.mjs` diventa rossa su una
-scansione in `scripts/` che non dice quali campi le servono — per chiamata, non
-per file, così uno script che altrove passa i campi non assolve la scansione che
-li ha dimenticati. Tre cose l'hanno già aggirata, e sono tre cose da non
-rimettere: i nomi dei metodi si chiedono al modulo (`Object.keys`), o `listAll` e
-`listAllPublicPaged` ripassano davanti; il RICEVITORE è qualunque, o basta tenere
-il modulo in una variabile che non si chiama `FB`; e si guarda tutta la cartella,
-`lib/` compresa, che è dove stanno gli attrezzi comuni e dove finirà la prossima
-scansione. Un conteggio (`:runAggregationQuery`) non porta via documenti e non ha
-niente da proiettare: la forma della `structuredQuery` vale solo dove c'è anche
-`:runQuery`.
+## Il freno guarda la richiesta, non il comando
+
+Un freno che legge il TESTO degli script riconosce delle grafie, e ogni giro ne
+trova una nuova che gli passa davanti: l'elenco dei metodi scritto a mano, il
+modulo in una variabile che non si chiama `FB`, la sottocartella `lib/`, poi in
+un colpo solo `FB?.list…`, il metodo preso dal modulo e chiamato da solo, la
+query scritta dentro la richiesta, la chiave prima di `pageSize`, l'indirizzo
+messo insieme con un più (#680.1). Tutte producono la STESSA richiesta.
+
+Quindi il freno sta sulla `fetch` (`scripts/lib/freno-letture.mjs`) e ferma,
+prima che parta, una scansione senza proiezione: una lista REST di una
+collezione senza `mask.fieldPaths`, una `:runQuery` senza `select`. Non è una
+scansione una query che porta via al massimo dieci documenti senza cursore (il
+massimo di `seq`); lo è qualunque pagina con un cursore (`pageToken`,
+`startAt`), anche piccola, perché è un pezzo di un giro intero. Un conteggio,
+un `batchGet`, una lettura per nome e le scritture passano. Chi sbatte contro il
+freno lo scopre alla prima prova a secco, e senza aver pagato niente.
+
+Il freno si installa da sé con `lib/firestore-auth.mjs`, l'unica strada per le
+credenziali che la collezione privata vuole. Le schede pubbliche si leggono
+senza: chi carica il modulo dei feedback importa il freno in testa, e la
+sentinella lo controlla.
+
+Le sentinelle: `tests/unit/letturePerCampi.test.mjs` fa girare davvero uno
+strumento in ogni grafia trovata finora sotto il freno, e guarda che si fermi
+prima della rete e che la stessa scansione coi campi passi.
 `tests/unit/archiviazioneLetture.test.mjs` tiene il conto del passo che scrive.
 `tests/unit/copiaSuFile.test.mjs` tiene le regole della copia: fresca risponde,
 scaduta o illeggibile no, dopo un'applicazione si butta, e quello che qualcun

@@ -268,17 +268,44 @@ function createCache({ ttlMs = 6 * 60 * 60 * 1000, now = Date.now, max = 500 } =
 
 // ─── Orchestratore: classifica un caso ambiguo ──────────────────────────────
 // Dependency injection: `complete({ messages, signal })` fa la chiamata al
-// modello (in produzione la passa tabs.js usando un provider economico via
-// SN_PROVIDERS); `cache` è una createCache() condivisa; `now` per i test.
+// modello (in produzione la passa handlers.js, attraverso il cancello dei
+// modelli: limite di spesa e costo); `cache` è una createCache() condivisa.
 //
 // Ritorna { class, route, cached, error? }. Non lancia mai: in caso di errore
 // di rete/modello cade su errore_generico (= nessuna azione), che è il
 // comportamento prudente per una feature opzionale.
+// Chi arriva mentre la stessa pagina è già dal modello aspetta quella risposta: la scheda campiona due volte (#591).
+const pendingByCache = new WeakMap();
+
+// Una pagina della rete di casa non è mai bloccata per paese, e il suo testo non esce di casa (#591).
+async function isHomeNetwork(host) {
+  const U = globalThis.SN_URL_NAV || (require('../../shared/urlNav.js'), globalThis.SN_URL_NAV);
+  if (!U) return false;
+  const pending = U.homeNetworkPending && U.homeNetworkPending(host);
+  if (pending) await pending;
+  return U.isHomeNetworkHost(host);
+}
+
+// Il conto per proprietario dell'indirizzo, lo stesso del controllo dei siti pericolosi (#591): percorsi e sottodomini
+// nuovi di uno stesso sito non fanno ripartire il modello oltre qualche volta all'ora. Uno per cache, come la cache.
+const budgetByCache = new WeakMap();
+function sb() {
+  return globalThis.SN_SAFEBROWSE || require('./safebrowse');
+}
+// `budgetUrl` è l'indirizzo navigato dalla scheda: quello che la pagina si riscrive dopo non sposta il conto.
+function spendFor(cache, host, url, budgetUrl) {
+  if (!cache) return true;
+  const SB = sb();
+  let budget = budgetByCache.get(cache);
+  if (!budget) { budget = SB.createOwnerBudget(); budgetByCache.set(cache, budget); }
+  return budget.spend(SB.ownerOf(url || `https://${host}/`, budgetUrl) || String(host || '').toLowerCase());
+}
+
 async function classify(input = {}, { complete, cache, now = Date.now, signal } = {}) {
-  const { title, text, statusCode, host, url } = input;
+  const { title, text, statusCode, host, url, budgetUrl } = input;
 
   // 1) Gate: se non è un caso ambiguo, non chiamare il modello.
-  if (!shouldClassify({ statusCode, text, deterministicHit: input.deterministicHit })) {
+  if (!shouldClassify({ statusCode, text, deterministicHit: input.deterministicHit }) || await isHomeNetwork(host)) {
     return { class: null, route: routeForClass(null), cached: false, skipped: true };
   }
 
@@ -293,23 +320,40 @@ async function classify(input = {}, { complete, cache, now = Date.now, signal } 
   if (typeof complete !== 'function') {
     return { class: CLASSES.ERRORE_GENERICO, route: routeForClass(CLASSES.ERRORE_GENERICO), cached: false, error: 'no_model' };
   }
-  let cls = CLASSES.ERRORE_GENERICO;
-  let error = null;
-  try {
-    const { messages } = buildPrompt({ title, text, statusCode, host });
-    const res = await complete({ messages, signal });
-    const raw = typeof res === 'string' ? res : (res && (res.text || res.content)) || '';
-    cls = parseClassification(raw);
-  } catch (err) {
-    error = (err && err.message) || String(err);
-    cls = CLASSES.ERRORE_GENERICO;
+  let pending = null;
+  if (cache) {
+    pending = pendingByCache.get(cache);
+    if (!pending) { pending = new Map(); pendingByCache.set(cache, pending); }
+    if (pending.has(key)) return { ...(await pending.get(key)) };
   }
+  if (!spendFor(cache, host, url, budgetUrl)) {
+    return { class: null, route: routeForClass(null), cached: false, skipped: true, reason: 'budget' };
+  }
+  const run = (async () => {
+    let cls = CLASSES.ERRORE_GENERICO;
+    let error = null;
+    let code = null;
+    try {
+      const { messages } = buildPrompt({ title, text, statusCode, host });
+      const res = await complete({ messages, signal });
+      const raw = typeof res === 'string' ? res : (res && (res.text || res.content)) || '';
+      cls = parseClassification(raw);
+    } catch (err) {
+      error = (err && err.message) || String(err);
+      code = (err && err.code) || null;
+      cls = CLASSES.ERRORE_GENERICO;
+    }
 
-  // 4) Memorizza (anche errore_generico: evita di ri-bombardare il modello su
-  // una pagina che non sa classificare; il TTL lo farà riprovare più tardi).
-  if (cache) { void now; cache.set(key, cls); }
+    // 4) Memorizza (anche errore_generico: evita di ri-bombardare il modello su
+    // una pagina che non sa classificare; il TTL lo farà riprovare più tardi).
+    // Un rifiuto del limite di spesa no: non ha chiamato nessuno, e alzato il limite la pagina va classificata.
+    if (cache && code !== 'LIMIT_REACHED') { void now; cache.set(key, cls); }
 
-  return { class: cls, route: routeForClass(cls), cached: false, ...(error ? { error } : {}) };
+    return { class: cls, route: routeForClass(cls), cached: false, ...(error ? { error } : {}), ...(code ? { code } : {}) };
+  })();
+  if (!pending) return run;
+  pending.set(key, run);
+  try { return { ...(await run) }; } finally { pending.delete(key); }
 }
 
 const api = {

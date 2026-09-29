@@ -344,6 +344,15 @@
     `<circle cx="11" cy="11" r="6"/>` +
     `<path d="M20 20l-4.3-4.3"/>`;
 
+  // --- Zoom della pagina: la lente col più dentro. Distinta da `zoom`, che
+  // sono le quattro frecce dello schermo intero: due cose diverse non possono
+  // avere lo stesso disegno.
+  const zoomPagina =
+    `<circle cx="11" cy="11" r="6"/>` +
+    `<path d="M20 20l-4.3-4.3"/>` +
+    `<path d="M8.4 11h5.2"/>` +
+    `<path d="M11 8.4v5.2"/>`;
+
   // ======================================================================
   // Icone delle AZIONI dell'agente Filo (righe del blocco di attività in
   // chat, #521). La corrispondenza azione → icona sta in
@@ -695,6 +704,7 @@
     decks:        (size) => wrap(decks, { size }),
     note:         (size) => wrap(note, { size }),
     search:       (size) => wrap(search, { size }),
+    zoomPagina:   (size) => wrap(zoomPagina, { size }),
     // --- Azioni dell'agente (la tabella azione → icona è in actionIcons.js)
     openTab:      (size) => wrap(openTab, { size }),
     folder:       (size) => wrap(folder, { size }),

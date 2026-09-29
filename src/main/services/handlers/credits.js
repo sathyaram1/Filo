@@ -102,10 +102,27 @@ module.exports = function register(on, ctx) {
   // documenti saltati li avesse letti.
   const SOLO_CON_EMAIL = { unaryFilter: { field: { fieldPath: 'email' }, op: 'IS_NOT_NULL' } };
 
-  function corpoElencoUtenti(after) {
+  // Chi cerca una persona scrive l'inizio del suo indirizzo: le email stanno
+  // salvate in minuscolo, e `\uf8ff` chiude l'intervallo dopo ogni carattere
+  // che può seguire quell'inizio (#679.3).
+  function filtroUtenti(cerca) {
+    if (!cerca) return SOLO_CON_EMAIL;
+    const campo = { fieldPath: 'email' };
+    return {
+      compositeFilter: {
+        op: 'AND',
+        filters: [
+          { fieldFilter: { field: campo, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: cerca } } },
+          { fieldFilter: { field: campo, op: 'LESS_THAN', value: { stringValue: `${cerca}\uf8ff` } } },
+        ],
+      },
+    };
+  }
+
+  function corpoElencoUtenti(after, cerca = '') {
     const q = {
       from: [{ collectionId: 'credits' }],
-      where: SOLO_CON_EMAIL,
+      where: filtroUtenti(cerca),
       orderBy: [{ field: { fieldPath: 'email' }, direction: 'ASCENDING' }],
       select: { fields: CAMPI_RIGA_UTENTE.map((f) => ({ fieldPath: f })) },
       limit: USERS_PAGE_SIZE,
@@ -118,11 +135,11 @@ module.exports = function register(on, ctx) {
 
   // Quanti sono in tutto. Un conteggio non è un errore che valga la pena
   // mostrare: se non arriva, l'elenco si mostra lo stesso senza il totale.
-  async function adminCountUsers(idToken) {
+  async function adminCountUsers(idToken, cerca = '') {
     const endpoint = `${FB.rest.FIRESTORE_BASE}:runAggregationQuery?key=${FB.rest.API_KEY}`;
     const body = {
       structuredAggregationQuery: {
-        structuredQuery: { from: [{ collectionId: 'credits' }], where: SOLO_CON_EMAIL },
+        structuredQuery: { from: [{ collectionId: 'credits' }], where: filtroUtenti(cerca) },
         aggregations: [{ alias: 'totale', count: {} }],
       },
     };
@@ -142,7 +159,7 @@ module.exports = function register(on, ctx) {
     return null;
   }
 
-  async function adminListUsers({ after = '' } = {}) {
+  async function adminListUsers({ after = '', cerca = '' } = {}) {
     if (!FB?.rest) return { users: [], total: null, next: '' };
     const idToken = await auth.getIdToken();
     if (!idToken) throw new Error('Sessione scaduta: rifai l\'accesso.');
@@ -151,9 +168,9 @@ module.exports = function register(on, ctx) {
       fetch(endpoint, {
         method: 'POST',
         headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(corpoElencoUtenti(after)),
+        body: JSON.stringify(corpoElencoUtenti(after, cerca)),
       }),
-      adminCountUsers(idToken).catch(() => null),
+      adminCountUsers(idToken, cerca).catch(() => null),
     ]);
     if (!res.ok) throw new Error(`users ${res.status}`);
     const rows = await res.json();
@@ -327,8 +344,9 @@ module.exports = function register(on, ctx) {
     try {
       // Il segnalibro è un'email: più lungo del massimo che un'email può essere
       // non è un segnalibro, è solo corpo della richiesta in più.
-      const { users, total, next } = await adminListUsers({ after: String(msg?.after || '').slice(0, 320) });
-      return { ok: true, users, total, next };
+      const cerca = String(msg?.cerca || '').trim().toLowerCase().slice(0, 320);
+      const { users, total, next } = await adminListUsers({ after: String(msg?.after || '').slice(0, 320), cerca });
+      return { ok: true, users, total, next, cerca };
     }
     catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }));
@@ -351,7 +369,14 @@ module.exports = function register(on, ctx) {
 
   // +5 crediti subito all'invio di un feedback (C3). Idempotenza per-invio è del
   // chiamante: ogni invio è un evento distinto, quindi premiamo ogni volta.
+  // Con un portafoglio il premio lo dà il server dopo i controlli (#816): il
+  // conteggio locale non si muove. `inArrivo`: la segnalazione porta lo
+  // pseudonimo, senza il quale il server non sa a chi darlo.
   on(MSG.CREDITS_AWARD_FEEDBACK, async (msg) => {
+    const WM = globalThis.SN_WALLET_MAIN;
+    if (WM && WM.haPortafoglio && WM.haPortafoglio()) {
+      return { ok: true, wallet: true, credits: 0, inArrivo: Boolean(WM.pseudonym && WM.pseudonym()) };
+    }
     const { SN_CONST } = globalThis;
     const amount = (msg && Number(msg.credits)) || SN_CONST.CREDIT.FEEDBACK_SEND;
     const r = await Credits.award({ kind: 'feedback_sent', credits: amount, ref: msg?.ref || null });
@@ -463,6 +488,23 @@ module.exports = function register(on, ctx) {
         if (H && H.hashClientId) localIdHash = await H.hashClientId(id);
       } catch (_) {}
 
+      // #816 — con un portafoglio la cifra è quella che il server ha
+      // accreditato per QUELLA segnalazione; i movimenti si chiedono una volta
+      // sola, e solo se c'è davvero qualcosa da annunciare.
+      const WM = globalThis.SN_WALLET_MAIN;
+      const W = globalThis.SN_WALLET;
+      const conPortafoglio = Boolean(WM && WM.haPortafoglio && WM.haPortafoglio() && W && W.resolutionReward);
+      let movimenti;
+      async function movimentiDelServer() {
+        if (movimenti) return movimenti;
+        movimenti = { grants: null, fresh: false };
+        try {
+          const srv = (await WM.readState())?.server;
+          if (srv && srv.hasWallet && Array.isArray(srv.grants)) movimenti = { grants: srv.grants, fresh: !srv.cached };
+        } catch (_) {}
+        return movimenti;
+      }
+
       const rewards = [];
       for (const f of all) {
         // S1.F2.1: la macchina UTENTE non ha la chiave privata → non può leggere
@@ -501,17 +543,29 @@ module.exports = function register(on, ctx) {
         // ricompensa scenderebbe in silenzio alla fascia più bassa. Le schede
         // pubblicate prima che il campo esistesse non ce l'hanno: per quelle
         // resta la fascia minima, che è quello che davano comunque.
-        const credits = Number.isFinite(Number(f.reward)) && Number(f.reward) > 0
-          ? Math.round(Number(f.reward))
-          : Credits.rewardForPriority(0);
-        // Accredita e marca questo feedback come premiato (state.rewardedFeedback),
-        // così alla prossima apertura non ricompare.
-        await Credits.award({ kind: 'feedback_resolved', credits, ref: fid });
+        let credits;
+        if (conPortafoglio) {
+          const { grants, fresh } = await movimentiDelServer();
+          const esito = W.resolutionReward({ card: f, grants, grantsFresh: fresh, redeemedAt: WM.redeemedAt(), now: adesso });
+          // Movimento non ancora arrivato: si riguarda al controllo dopo.
+          if (!esito.announce) continue;
+          credits = esito.credits;
+          await Credits.markFeedbackAnnounced(fid);
+        } else {
+          credits = Number.isFinite(Number(f.reward)) && Number(f.reward) > 0
+            ? Math.round(Number(f.reward))
+            : Credits.rewardForPriority(0);
+          // Accredita e marca questo feedback come premiato (state.rewardedFeedback),
+          // così alla prossima apertura non ricompare.
+          await Credits.award({ kind: 'feedback_resolved', credits, ref: fid });
+        }
         rewards.push({
           id: fid,
           num: FB.formatNum ? FB.formatNum(f.seq, f.subSeq) : '',
           name: String(f.name || '').slice(0, 200),
           explanation: resolutionExplanation(f),
+          // Risolta o chiusa senza modifiche: il riquadro non le racconta uguali.
+          status: f.status === 'done' || !f.status ? 'done' : 'closed',
           credits,
         });
       }

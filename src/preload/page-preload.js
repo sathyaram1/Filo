@@ -29,11 +29,12 @@ const path = require('node:path');
 // di pubblicità e widget, per frame che l'utente non tocca mai. Quindi:
 //   - nel frame principale tutto resta com'era (caricamento al DOMContentLoaded);
 //   - in un riquadro non si carica NIENTE finché l'utente non lo tocca davvero
-//     (tasto destro, clic, tasto premuto, o una scorciatoia globale diretta a
+//     (tasto destro, clic, tasto premuto, o una scorciatoia di Filo diretta a
 //     quel frame). Alla prima interazione il riquadro monta l'intero Filo.
-// Le funzioni di PAGINA (colore della scheda, segnali di attività, banner
-// cookie/sito pericoloso, traduzione della pagina) restano appannaggio del
-// frame principale: dentro un riquadro descriverebbero il rettangolo sbagliato.
+// Le funzioni di PAGINA (colore della scheda, segnali di attività, avviso del
+// sito pericoloso, traduzione della pagina) restano appannaggio del frame
+// principale: dentro un riquadro descriverebbero il rettangolo sbagliato.
+// Il modulo cookie è l'eccezione (#754): vedi startCookiesInFrame più sotto.
 const IS_SUBFRAME = (() => {
   try { return window.top !== window.self; } catch (_) { return true; }
 })();
@@ -164,6 +165,33 @@ if (!IS_SUBFRAME) try {
     }
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
+
+// Il sito è entrato o uscito dall'elenco coi banner dei cookie: la sua risposta va via prima che i suoi script
+// la leggano (regola e chiavi le decide il main, tabs/tabCookies.js). Solo nel frame principale.
+if (!IS_SUBFRAME) try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) {
+    const w = ipcRenderer.sendSync('filo:cookie-wipe', loc);
+    if (w && typeof w.pattern === 'string') {
+      const re = new RegExp(w.pattern, 'i');
+      const extra = new Set(Array.isArray(w.keys) ? w.keys : []);
+      for (const st of [window.localStorage, window.sessionStorage]) {
+        try { for (const k of Object.keys(st)) if (re.test(k) || extra.has(k)) st.removeItem(k); } catch (_) {}
+      }
+    }
+  }
+} catch (e) { /* come sopra: mai bloccare il caricamento */ }
+
+// Le notifiche si leggono «da chiedere» finché l'utente non ha deciso (#591): regole in preload/stato-permessi.js.
+if (!IS_SUBFRAME) try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
+  if (/^(https?|blob):/i.test(loc)) {
+    const { buildStatoPermessiSource } = require('./stato-permessi.js');
+    // Senza gesto: con `true` la pagina riceverebbe un clic mai fatto.
+    webFrame.executeJavaScript(buildStatoPermessiSource(ipcRenderer.sendSync('filo:permessi-stato', loc)), false).catch(() => {});
+  }
+} catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
 // ─── chrome.* shim per i content script ────────────────────────────────────
 //
@@ -306,7 +334,7 @@ globalThis.self = globalThis; // i moduli IIFE controllano `self` come fallback
 
 // ─── #405 — quale frame sta usando l'utente ────────────────────────────────
 //
-// Le scorciatoie globali (Alt+E Spiegazione, Alt+T Traduci) lavorano sul testo
+// Le scorciatoie Alt+E (Spiegazione) e Alt+T (Traduci) lavorano sul testo
 // selezionato. Con i riquadri incorporati il testo selezionato può stare dentro
 // il riquadro, ma `webContents.send` consegna SOLO al frame principale: la
 // scorciatoia arrivava a chi non aveva nessuna selezione e non succedeva nulla.
@@ -326,20 +354,14 @@ try {
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
 // ─── shortcut hook ─────────────────────────────────────────────────────────
-// Lo shortcut globale fa un webContents.send('shortcut:triggered'); il content
+// La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content
 // script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.
 // Adattatore: ascolto shortcut:triggered e ribroadcast come filo:broadcast.
-ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
-  // Il payload deve usare il type MSG.SHORTCUT_TRIGGERED del catalogo messaggi.
-  // Lo prendiamo dai constants caricati sopra (SN_MSG popolato da messages.js).
-  // `context` è opzionale: lo usa la voce "Aiuto" del menu tasto destro su una
-  // tab per dire all'agente da dove è stato invocato (url + titolo della scheda).
-  const t = globalThis.SN_MSG?.MSG?.SHORTCUT_TRIGGERED || 'shortcut_triggered';
-  const deliver = () => {
-    for (const fn of broadcastListeners) {
-      try { fn({ type: t, command, context }, { id: 'filo-desktop' }, () => {}); } catch (_) {}
-    }
-  };
+// `context` è opzionale: lo usa la voce "Aiuto" del menu tasto destro su una
+// tab per dire all'agente da dove è stato invocato (url + titolo della scheda).
+const consegnaScorciatoia = require('./scorciatoia.js');
+ipcRenderer.on('shortcut:triggered', (_event, payload = {}) => {
+  const deliver = () => consegnaScorciatoia(broadcastListeners, payload, filoMessage);
   // #405 — una scorciatoia indirizzata a un riquadro (Alt+E su testo
   // selezionato dentro un video incorporato) può arrivare prima che il
   // riquadro abbia montato Filo: montalo e consegna appena è pronto.
@@ -348,6 +370,8 @@ ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
     waitForContentScripts(deliver);
     return;
   }
+  // Premuta a pagina ancora in caricamento, aspetta che Filo ci sia invece di perdersi.
+  if (!contenutiPronti()) { waitForContentScripts(deliver); return; }
   deliver();
 });
 
@@ -381,6 +405,8 @@ function injectStyles() {
 const SHARED_DIR = path.join(__dirname, '..', 'shared');
 const CONTENT_DIR = path.join(__dirname, '..', 'content');
 
+// Stesso elenco di loadContentScripts() in internal-preload.js: le differenze
+// ammesse stanno in tests/unit/contentScriptPreload.test.mjs.
 function loadScripts() {
   // Ordine identico a quello del manifest dell'estensione legacy.
   // `PAGE_ONLY` marca i moduli che descrivono o modificano la SCHEDA nel suo
@@ -418,6 +444,8 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'spellcheck.js')); } catch (e) { console.error('[Filo CS] spellcheck', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
+  if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookieRules.js')); } catch (e) { console.error('[Filo CS] cookieRules', e); }
+  if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookieBanners.js')); } catch (e) { console.error('[Filo CS] cookieBanners', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
   try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); } // S1.F2.2
@@ -453,6 +481,20 @@ function start() {
   } catch (_) {}
 }
 
+// #754 — molti banner dei cookie vivono in un riquadro (Sourcepoint, TrustArc, varianti di Didomi e
+// Quantcast): lì il modulo cookie parte da solo, senza il resto di Filo, e solo sulle pagine web.
+function startCookiesInFrame() {
+  let href = '';
+  try { href = window.location.href || ''; } catch (_) {}
+  if (!/^https?:/i.test(href)) return;
+  const go = () => {
+    try { require(path.join(CONTENT_DIR, 'cookieRules.js')); } catch (e) { console.error('[Filo CS] cookieRules (riquadro)', e); }
+    try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies (riquadro)', e); }
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go, { once: true });
+  else go();
+}
+
 // #405 — montaggio dei content script in un riquadro incorporato: una volta
 // sola, alla prima interazione dell'utente con quel riquadro.
 let contentScriptsStarted = false;
@@ -464,12 +506,17 @@ function ensureContentScripts() {
 
 // Chiama `fn` quando i content script del riquadro hanno finito di installare i
 // propri listener (content.js marca `filoContentReady` a fine init).
+// Su una pagina dove Filo è spento (sito escluso, pagina di sistema) content.js
+// non mette ascoltatori: lo dichiara, e chi aspetta non resta appeso tre secondi.
+function contenutiPronti() {
+  try { if (document.documentElement.dataset.filoContentReady === '1') return true; } catch (_) {}
+  return globalThis.__snFiloSpento === true;
+}
+
 function waitForContentScripts(fn) {
   const deadline = Date.now() + 3000;
   const tick = () => {
-    let ready = false;
-    try { ready = document.documentElement.dataset.filoContentReady === '1'; } catch (_) {}
-    if (ready || Date.now() > deadline) { try { fn(); } catch (_) {} return; }
+    if (contenutiPronti() || Date.now() > deadline) { try { fn(); } catch (_) {} return; }
     setTimeout(tick, 16);
   };
   tick();
@@ -483,6 +530,7 @@ if (!IS_SUBFRAME) {
     start();
   }
 } else {
+  startCookiesInFrame();
   // Un clic, un tasto premuto o il fuoco su un campo dentro il riquadro dicono
   // "sto usando questa cosa": da lì in poi il riquadro deve rispondere come il
   // resto della pagina. Il tasto destro ha il suo cammino (il bridge qui sopra),
@@ -494,15 +542,3 @@ if (!IS_SUBFRAME) {
   }
 }
 
-// Helper usato dal main per il save-for-later shortcut: estrae metadata
-// senza dipendere dal content script di estensione (che potrebbe non aver
-// finito di caricarsi).
-window.__sn_collectSavePayload = () => {
-  try {
-    const desc = document.querySelector('meta[name="description"]')?.content
-      || document.querySelector('meta[property="og:description"]')?.content || '';
-    const favicon = document.querySelector('link[rel*="icon"]')?.href || '';
-    const excerpt = (document.body?.innerText || '').slice(0, 600);
-    return { description: desc, favicon, excerpt };
-  } catch (_) { return {}; }
-};

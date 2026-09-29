@@ -51,7 +51,7 @@
           "un numero storto non arriva al server, e lo dice con parole di Filo",
           "il tetto dei crediti elargibili ferma OGNI strada: ingresso, quota, regalo e premi"
         ],
-        "perche": "stesso motivo di tests/wallet-owner-page: le prove del giro di verifica sulla pagina dell'owner dei crediti fingono di essere l'owner salvando una sessione su disco, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema. Nel contenitore delle routine quel portachiavi non c'è, l'owner non viene riconosciuto e la pagina mostra «questa pagina è del proprietario». Succede sempre, su qualunque ramo. Queste prove la suite le raccoglie solo con FILO_TEST_VERIFICA=1.",
+        "perche": "le prove del giro di verifica sulla pagina dell'owner dei crediti fingono di essere l'owner salvando una sessione, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema, che nel contenitore non c'è. Il #708 ha tolto la causa (la sessione resta per l'avvio in corso) e tests/wallet-owner-page, che aveva lo stesso motivo, nel contenitore e in GitHub è verde e non è più in questo elenco (#647). Queste invece restano finché un giro con filo-security accanto al repo non le rilancia: la suite le raccoglie solo con FILO_TEST_VERIFICA=1.",
         "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
       },
       {

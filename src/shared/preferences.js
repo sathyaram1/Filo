@@ -5,12 +5,13 @@
 // QUALI preferenze sono modificabili e COME interpretarne i valori è la stessa
 // esposta dalla pagina Preferenze, e deve restare testabile senza Electron.
 //
-// Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS }.
-// `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk }
-// oppure null se chiave/valore non sono validi. Solo le preferenze qui elencate
-// sono scrivibili. Dal #146.5 l'elenco copre TUTTE le impostazioni della pagina
-// Opzioni (modelli, provider, chiavi API, sicurezza/privacy, limite di spesa,
-// funzionalità) oltre a quelle estetiche/comportamentali: ognuna dichiara il
+// Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS, lezioneDaAzione }.
+// `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk },
+// { rifiuto } col perché, oppure null se chiave/valore non sono validi. Solo le
+// preferenze qui elencate sono scrivibili. Dal #146.5 l'elenco copre TUTTE le
+// impostazioni della pagina Opzioni (modelli, provider, chiavi API,
+// sicurezza/privacy, limite di spesa, funzionalità) oltre a quelle
+// estetiche/comportamentali: ognuna dichiara il
 // proprio `level` (1 = applica subito, 2 = popup di conferma). Le impostazioni
 // sensibili (sicurezza, modelli, chiavi, provider, costi) sono di livello 2.
 //
@@ -19,6 +20,10 @@
 // eventuali rischi. È il testo che il popup di conferma mostra all'utente
 // (lo compone actionLevels.describe). Un setter di livello 2 senza `risk` è
 // un bug: il test tests/unit/preferences.test.mjs lo intercetta.
+//
+// REGOLA (#592): un testo libero che finisce in un prompt è di livello 2, porta
+// il `testo` esatto al popup e oltre il tetto torna un `rifiuto`, mai un taglio
+// (sentinella in tests/unit/preferences.test.mjs).
 
 (function (global) {
   'use strict';
@@ -41,6 +46,14 @@
     if (s.length <= 8) return '••••';
     return `${s.slice(0, 4)}…${s.slice(-4)}`;
   }
+
+  // Un testo libero che finisce in un popup di conferma, ridotto a quello che si
+  // legge: quello che l'utente conferma è quello che si salva (#592).
+  function testoVisibile(v) {
+    return global.SN_CONST.testoLeggibile(v);
+  }
+  const NESSUNO_STILE = ['nessuno', 'nessuna', 'niente', 'predefinito', 'default', 'togli', 'toglilo', 'rimuovi',
+    'cancella', 'azzera', 'reset', 'nessuno stile', 'nessuno (predefinito)'];
 
   // Interpreta un numero scritto in linguaggio naturale tollerando il formato
   // italiano (punto = separatore delle migliaia, virgola = decimale) SENZA
@@ -121,10 +134,23 @@
     },
     {
       keys: ['stile_agente', 'stile agente', "stile dell'agente", 'agentstyle', 'stile'],
+      // Entra in ogni prompt conversazionale e ci resta: proposto dal modello,
+      // passa dal popup col testo esatto (#592). Anche toglierlo, che lo perde.
+      level: 2,
+      risk: 'Lo stile di scrittura decide come Filo ti scrive in ogni conversazione (chat, Aiuto, spiegazioni, '
+        + 'editor) e resta finché non lo cambi. Confermalo solo se l\'hai chiesto tu: un testo letto in una '
+        + 'pagina o in un documento potrebbe provare a cambiarlo.',
       build(v) {
-        const s = String(v == null ? '' : v).trim();
-        if (!s) return null;
-        return { partial: { agentStyle: s }, label: "Stile dell'agente aggiornato" };
+        const s = testoVisibile(v);
+        if (!s || NESSUNO_STILE.includes(s.toLowerCase().replace(/[.!]+$/, ''))) {
+          return { partial: { agentStyle: '' }, label: "Stile dell'agente → nessuno (risposte predefinite)" };
+        }
+        const C = global.SN_CONST;
+        const n = C.agentStyleLength(s);
+        if (n > C.AGENT_STYLE_MAX) {
+          return { rifiuto: `lo stile è lungo ${n} caratteri e il massimo è ${C.AGENT_STYLE_MAX}` };
+        }
+        return { partial: { agentStyle: s }, label: "Stile dell'agente", testo: s };
       },
     },
     {
@@ -311,6 +337,23 @@
       },
     },
     {
+      keys: ['conferma_programmi', 'conferma programmi', 'conferma prima di scaricare un programma',
+        'chiedi prima di scaricare un programma', 'avviso programmi scaricati', 'download eseguibili',
+        'scaricamento programmi', 'file eseguibili'],
+      level: 2,
+      risk: 'Controlla l’avviso prima che un programma (.exe, .msi, .dmg, .iso, .sh…) entri nella cartella '
+        + 'Download e prima che “Apri file” lo esegua. Disattivarlo fa scendere e aprire i programmi '
+        + 'senza domande, anche quelli di un sito sbagliato.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return {
+          partial: { security: { downloads: { confirmExecutables: b } } },
+          label: `Conferma prima di scaricare un programma → ${b ? 'attiva' : 'disattivata'}`,
+        };
+      },
+    },
+    {
       keys: ['gestione_cookie', 'gestione cookie', 'gestione dei cookie', 'cookie', 'banner cookie', 'banner dei cookie'],
       level: 2,
       risk: 'Decide come Filo gestisce i cookie dei siti. Le modalità più permissive aumentano '
@@ -481,12 +524,14 @@
   ];
 
   // Trova il setter giusto per una chiave (match esatto, poi fuzzy) e costruisce
-  // il partial. Ritorna { partial, label } o null se chiave/valore non validi.
+  // il partial. Ritorna { partial, label, level, risk, testo? }, { rifiuto } se il
+  // valore va rifiutato spiegando perché, o null se chiave/valore non validi.
   function buildPreferencePartial(rawKey, rawVal) {
     const key = String(rawKey == null ? '' : rawKey).trim().toLowerCase();
     if (!key) return null;
     const withLevel = (setter) => {
       const r = setter.build(rawVal);
+      if (r && r.rifiuto) return { rifiuto: r.rifiuto };
       return r ? { ...r, level: setter.level || 1, risk: setter.risk || '' } : null;
     };
     for (const setter of PREF_SETTERS) {
@@ -498,5 +543,16 @@
     return null;
   }
 
-  global.SN_PREF = { buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS };
+  // Una lezione è la sorella dello stile (#592): il popup mostra il testo che si
+  // salva, e oltre il tetto torna un rifiuto col perché, mai un taglio.
+  function lezioneDaAzione(a) {
+    const testo = testoVisibile(a && (a.testo ?? a.text ?? a.lezione));
+    if (!testo) return { testo: '' };
+    const C = global.SN_CONST;
+    const n = C.agentStyleLength(testo);
+    if (n > C.LESSON_MAX) return { testo, rifiuto: `la lezione è lunga ${n} caratteri e il massimo è ${C.LESSON_MAX}` };
+    return { testo };
+  }
+
+  global.SN_PREF = { buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -44,7 +44,7 @@
     GET_SAVED_PAGES: 'get_saved_pages',
     REMOVE_SAVED_PAGE: 'remove_saved_page',       // { id }
     CONSUME_SAVED_PAGE: 'consume_saved_page',     // { id }
-    SET_SAVED_PAGE_THUMB: 'set_saved_page_thumb', // { id, thumbnail } — miniatura best-effort dopo il salvataggio
+    SET_SAVED_PAGE_THUMB: 'set_saved_page_thumb', // { id } — il main fotografa la scheda di chi chiede e ne fa la miniatura
 
     // §3.1/§3.3 — archivio tab chiuse (metadati). La scrittura avviene nel main
     // alla chiusura di una tab; queste servono alla pagina archivio per leggere/
@@ -72,9 +72,18 @@
     DECKS_SET_COMMANDER: 'decks_set_commander', // { id, scryfallId }
     // Chat unificata del Builder (§3-§4): NL → query Scryfall / carte
     // cross-mazzo via LLM. { deckId, text, history?, lastResults? } →
-    // { ok, reply, cardIds, cards, query, deck? }. `lastResults` sono gli id
-    // dell'ultima CardList mostrata (per "valuta questi risultati", §6.1).
+    // { ok, reply, cardIds, cards, query, deck?, clearChat? }. `lastResults` sono gli id
+    // dell'ultima CardList mostrata (per "valuta questi risultati", §6.1); `clearChat`: l'utente ha
+    // chiesto a parole di svuotare la chat, la pagina chiede conferma.
     DECKS_CHAT: 'decks_chat',
+    // La chat salvata di un mazzo (§3.2), solo dalle pagine filo://. EDIT applica UNA modifica alla chat salvata
+    // (SN_DECK_CHAT.applyEdit: op 'append' | 'fill' | 'drop' | 'names') e rifiuta un mazzo che non esiste più, una
+    // chat oltre il tetto (error 'too_many', max) o un turno che non c'è più (error 'gone').
+    DECKS_CHAT_GET: 'decks_chat_get',     // { deckId } → { ok, messages }
+    DECKS_CHAT_EDIT: 'decks_chat_edit',   // { deckId, op, messages?|turn+message?|turn+userText?|turn+nameIds?, clientId } → { ok } | { ok:false, error, max? }
+    DECKS_CHAT_CLEAR: 'decks_chat_clear', // { deckId, clientId } → { ok }
+    // Broadcast alle pagine filo:// dopo EDIT/CLEAR: le altre schede sullo stesso mazzo si rileggono la chat.
+    DECKS_CHAT_CHANGED: 'decks_chat_changed', // { deckId, clientId }
     // Parere LLM carta-vs-mazzo (§6). { deckId, cardIds, compute?, refresh? } →
     // { ok, opinions: { cardId → { text, versione, stale } } }.
     // compute=false: solo cache (mai LLM). refresh=true: ricalcola anche i freschi.
@@ -89,7 +98,7 @@
     // Client Scryfall (§13.2), tutto nel main (rate limit + cache condivisi).
     SCRYFALL_SEARCH: 'scryfall_search',   // { query, deckId? } → identity auto dal commander
     SCRYFALL_NAMED: 'scryfall_named',     // { name } (risoluzione fuzzy)
-    SCRYFALL_CARDS: 'scryfall_cards',     // { ids, freshPrices? } → mappa id → carta
+    SCRYFALL_CARDS: 'scryfall_cards',     // { ids, freshPrices?, cacheOnly? } → mappa id → carta
     SCRYFALL_SYMBOLS: 'scryfall_symbols', // {} → mappa '{U}' → svg_uri
     SCRYFALL_PRINTS: 'scryfall_prints',   // { name } → { ok, prints } (n. stampe, cache permanente)
     GET_COSTS: 'get_costs',
@@ -99,7 +108,8 @@
     // Broadcast main→renderer quando il saldo crediti cambia (consumo, refill,
     // ricompensa): la shell aggiorna l'icona/animazione, la pagina il grafico.
     CREDITS_CHANGED: 'credits_changed',
-    // Ricompensa crediti per un feedback inviato (+5 subito). { } → { ok, credits, balance }
+    // Ricompensa crediti per un feedback inviato (+5 subito). { } → { ok, credits, balance }.
+    // Con un portafoglio (#816) non accredita: { ok, wallet: true, credits: 0, inArrivo }.
     CREDITS_AWARD_FEEDBACK: 'credits_award_feedback',
     // Recap aggiornamento (popup all'avvio): confronta la versione vista
     // l'ultima volta con app.getVersion() e ritorna le note delle versioni
@@ -107,14 +117,15 @@
     // Se non c'è una versione vista (primissimo avvio) la marca come vista e
     // non ritorna note (niente popup a sorpresa). Vedi src/shared/patchNotes.js.
     GET_UPDATE_RECAP: 'get_update_recap',
-    // L'utente ha chiuso il recap: salva app.getVersion() come ultima vista.
+    // L'utente ha chiuso il recap: salva app.getVersion() come ultima vista, con la fotografia delle sue novità.
     MARK_UPDATE_SEEN: 'mark_update_seen',
     // Feedback dell'utente passati a `done` da quando non guardava (C5): il main
     // cerca su Firestore i feedback inviati da questo client, accredita la
     // ricompensa per priorità (50/100/200/300) una volta sola per feedback, e
     // ritorna l'elenco da ringraziare. { } → { ok, rewards:[{num,name,explanation,
-    // credits,priority}], totalCredits }. La home mostra un popup di
-    // ringraziamento e anima i crediti verso il profilo.
+    // status:'done'|'closed',credits}], totalCredits }. Con un portafoglio (#816)
+    // la cifra è il movimento del server (0 = chiusa senza premio) e il conteggio
+    // locale non si muove. La home mostra un popup e anima i crediti ricevuti.
     GET_FEEDBACK_REWARDS: 'get_feedback_rewards',
     // === Bacheca utente — voto funziona/non-funziona (DC2) ===================
     // BOARD_CAST_VOTE: l'utente loggato esprime/cambia il proprio voto su un
@@ -150,8 +161,9 @@
     // OWNER_LIST_USERS: una PAGINA dell'elenco degli utenti registrati (campo
     //   `email` sui doc credits/<uid>), ordinata per email. `after` è l'ultima
     //   email già ricevuta; `next` la riporta se c'è un'altra pagina, `total`
-    //   è il conteggio di tutti (null se non è arrivato).
-    //   { after? } → { ok, users:[{email,name,balance}], total, next } | { ok:false, error }.
+    //   è il conteggio di tutti (null se non è arrivato). `cerca` restringe a
+    //   chi ha un'email che comincia così, e `total` conta solo loro.
+    //   { after?, cerca? } → { ok, users:[{email,name,balance}], total, next, cerca } | { ok:false, error }.
     OWNER_LIST_USERS: 'owner_list_users',
     // OWNER_GIFT_CREDITS: regala `amount` crediti all'utente con `email`.
     //   { amount, email } → { ok, email, amount, balance } | { ok:false, error }.
@@ -259,8 +271,14 @@
     DOWNLOADS_CLEAR: 'downloads_clear',
     // Rimuove UNA voce dalla cronologia. { id } → { ok, items }
     DOWNLOAD_REMOVE: 'download_remove',
-    // Apre il file scaricato col programma di sistema. { id } → { ok } | { ok:false, error }
+    // Apre il file scaricato col programma di sistema. Su un PROGRAMMA (#588)
+    // risponde { ok:false, needsConfirm:true, text } finché non arriva
+    // { id, confirmed:true }: aprirlo lo esegue, e chi lo fa deve saperlo.
+    // { id, confirmed? } → { ok } | { ok:false, error }
     DOWNLOAD_OPEN_FILE: 'download_open_file',
+    // #588 — risposta alla conferma di uno scaricamento in attesa (un programma
+    // fermo fuori dalla cartella Download). { id, allow } → { ok, items }
+    DOWNLOAD_CONFIRM: 'download_confirm',
     // Mostra il file nella cartella (evidenziato). { id } → { ok } | { ok:false, error }
     DOWNLOAD_OPEN_FOLDER: 'download_open_folder',
     // Comandi sul download in corso. { id } → { ok }
@@ -285,6 +303,8 @@
     // Catalogo modelli di un provider recuperato dal main con le chiavi
     // predefinite (solo admin). { provider } → { ok, items: [{ id, label }] }
     DEFAULT_MODELS_LIST: 'default_models_list',
+    // Fornitori dello smistatore (solo admin): → { ok, items: [{ name, slug }] }
+    DEFAULT_PROVIDERS_LIST: 'default_providers_list',
 
     OPEN_HOME: 'open_home',
     GO_HOME: 'go_home',                             // naviga la scheda corrente alla home (filo://newtab/)
@@ -346,6 +366,19 @@
     // fallback), calcolato una volta dal content script e cachato per dominio dal
     // main; la shell lo applica attenuato alle tab INATTIVE.
     TAB_IDENTITY_COLOR: 'tab_identity_color',        // { color: 'rgb(r,g,b)' | null }
+
+    // La scheda è sotto gli occhi di qualcuno (attiva, finestra né nascosta né
+    // ridotta a icona)? In una WebContentsView `document.hidden` resta falso
+    // anche in secondo piano, quindi chi legge dalla rete a intervalli lo
+    // chiede qui. Il main lo spinge anche da sé, a ogni cambio, come broadcast
+    // TAB_IN_VISTA (solo alle pagine filo://).
+    TAB_IN_VISTA_GET: 'tab_in_vista_get',            // {} → { ok, inVista }
+    TAB_IN_VISTA: 'tab_in_vista',                    // broadcast { inVista }
+    // Detta e Incolla di Filo su una pagina web: microfono o appunti per pochi secondi, senza domanda al sito (#591.1).
+    PERMESSO_FILO: 'permesso_filo',                  // { tipo: 'media'|'appunti' } → { ok }
+    // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
+    PERMESSI_SITI_GET: 'permessi_siti_get',          // {} → { ok, scelte: [{ origine, parte, si, sotto, dominio }] }
+    PERMESSI_SITI_TOGLI: 'permessi_siti_togli',      // { origine, parte } → { ok }
 
     // §2.1 — segnali di attività della tab riportati dal content script, per la
     // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty? }
@@ -572,17 +605,30 @@
     GEO_PROPOSE_DISMISS: 'geo_propose_dismiss',     // { url } → { ok }
 
     // === Gestione cookie / consenso (src/content/cookies.js) ===
-    // Il content script chiede la modalità corrente per decidere se rifiutare i
-    // banner CMP e riscrivere gli embed YouTube in nocookie. → { mode }
-    COOKIES_CONFIG: 'cookies_config',               // → { mode: 'manual'|'default'|'privacy' }
-    // Broadcast main→content quando la modalità cambia (UPDATE_SETTINGS): il
-    // content (dis)attiva il rifiuto CMP e la riscrittura embed senza reload.
+    // { url, frame: 'top'|'sub' } → { mode, off (su questo sito l'utente vuole i banner), index (rilevatori
+    // Consent-O-Matic), cosmetic (solo 'top': regole EasyList Cookie del sito), seen ('hidden' se sul sito
+    // Filo ha già nascosto un banner senza «rifiuta») }.
+    COOKIES_CONFIG: 'cookies_config',
+    // Broadcast main→content quando la modalità o i siti coi banner cambiano: il content rilegge la config.
     COOKIES_CONFIG_UPDATE: 'cookies_config_update', // → { mode }
+    // Aperti alle pagine web di proposito: li chiede il content script di ogni sito, e non portano dati
+    // dell'utente. La regola Consent-O-Matic è pubblica; l'esito vale solo per la scheda di chi lo manda.
+    COOKIES_RULE: 'cookies_rule',                   // { name } → { ok, rule }
+    COOKIES_OUTCOME: 'cookies_outcome',             // { outcome: 'rejected'|'hidden'|'unconfirmed'|'answer', cookies?, storage? } → { ok }
+    COOKIES_BANNER_TOKENS: 'cookies_banner_tokens', // { ids, classes } → { ok, selectors } (quelli della lista)
+    // Un riquadro con un banner che non ha «rifiuta» lo dice al main, che passa alla pagina l'indirizzo del riquadro
+    // suo figlio da nascondere: fra frame si passa dal main, una postMessage la saprebbe scrivere anche il sito.
+    COOKIES_FRAME_BANNER: 'cookies_frame_banner',   // (riquadro) {} → { ok }
+    COOKIES_HIDE_FRAME: 'cookies_hide_frame',       // main → pagina { url, origin }
+    // Solo pagine filo:// (Sicurezza): cosa Filo ha fatto coi banner, sito per sito, nel profilo della finestra.
+    COOKIES_SITES: 'cookies_sites',                 // {} → { ok, sites: [{ site, rejected, hidden, at }] }
+    // Solo pagine filo:// (Sicurezza): «Apri da un altro paese» ha un fornitore? E con quale host.
+    PROXY_STATUS: 'proxy_status',                   // {} → { ok, configured, providerHost }
 
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai
     // esposti alle pagine. La risposta porta solo il profilo pubblico.
-    AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile: {email,name,picture} | null }
+    AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile } | { ok: false, code, error: frase per l'utente }
     AUTH_SIGNOUT: 'auth_signout',                  // → { ok }
     AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, profile|null }
     AUTH_CHANGED: 'auth_changed',                  // broadcast → { signedIn, profile|null }
@@ -666,6 +712,16 @@
     // memoria dell'utente.
     // Risposta: { ok, compacted }
     FILO_COMPACT_MEMORY: 'filo_compact_memory',
+    // La memoria come la legge l'utente nelle Preferenze (#592): moduli divisi
+    // in righe e lezioni ancora da riordinare. Solo pagine filo://.
+    // Risposta: { ok, moduli: [{ nome, righe }], lezioni: [{ ts, text }] }
+    FILO_MEMORY_VIEW: 'filo_memory_view',
+    // Toglie UNA riga: { modulo, riga } oppure { lezione: { ts, text } }.
+    // Solo pagine filo://. Risposta: { ok, tolta } (false: non c'era più).
+    FILO_MEMORY_FORGET: 'filo_memory_forget',
+    // Main → sole pagine filo://: la memoria è cambiata. Porta { moduli, lezioni }
+    // come FILO_MEMORY_VIEW, così chi la mostra non la richiede.
+    FILO_MEMORY_CHANGED: 'filo_memory_changed',
     // Stato della micro-intervista di benvenuto (#524). Solo pagine filo://.
     // Risposta: { ok, onboarding: { done, ticked, thread, … }, welcome }
     FILO_GET_ONBOARDING: 'filo_get_onboarding',
@@ -745,6 +801,8 @@
     // Da background -> content (broadcast)
     SETTINGS_UPDATED: 'settings_updated',
     SHORTCUT_TRIGGERED: 'shortcut_triggered',     // { command }
+    // Risposta della pagina a una scorciatoia consegnata con ricevuta: se non l'ha presa, la fa il main (#839). { ricevuta, presa }
+    SHORTCUT_RECEIPT: 'shortcut_receipt',
     // Contropartita di RUN_IN_TOP_FRAME: arriva SOLO al frame principale della
     // scheda e gli fa eseguire l'azione di pagina chiesta da un riquadro. { iconId }
     TOP_FRAME_COMMAND: 'top_frame_command',

@@ -37,7 +37,7 @@ serve, e costa.
 Accertati che ogni rilievo sia reale: se hai un dubbio, verificalo prima di
 scriverlo. Se sei in dubbio sul livello, scegli il più basso.
 
-### La sede: interno o esterno
+### La sede: interno, vicino o esterno
 
 **Interno** (`i`) se una delle due:
 
@@ -49,20 +49,27 @@ scriverlo. Se sei in dubbio sul livello, scegli il più basso.
   Prima di scrivere `i` per questo motivo lo controlli sul codice, non a
   intuito: `git diff origin/main...HEAD -- <file>` sul punto che hai davanti.
 
+**Vicino** (`v`): il difetto NON è di questo lavoro (per il resto sarebbe
+esterno), ma sta in un file che il ramo modifica già. Lo controlli sul codice:
+il file è nell'elenco di `git diff --name-only origin/main...HEAD`. Se c'è, è
+`v`; se non c'è, è `e`.
+
 **Esterno** (`e`) tutto il resto: un difetto che c'era già su `main` fuori
-dallo scenario; un'altra porta della stessa classe che la segnalazione non
-nominava; un difetto in qualcosa che il ramo ha aggiunto oltre il chiesto
-(l'aggiunta resta, il suo difetto va in un feedback suo: non si disfa il
-lavoro fatto).
+dallo scenario, in un file che il ramo non tocca; un'altra porta della stessa
+classe che la segnalazione non nominava; un difetto in qualcosa che il ramo ha
+aggiunto oltre il chiesto (l'aggiunta resta, il suo difetto va in un feedback
+suo: non si disfa il lavoro fatto).
 
-La sede non cambia il livello: un 3 esterno resta un 3. Il giro continua solo
-per i rilievi interni; ogni esterno esce subito in un feedback suo, con la
-priorità uguale al livello, e non ferma questo lavoro — nemmeno col `?`: la
-domanda viaggia nel suo feedback.
+La sede non cambia il livello che scrivi: un 3 esterno resta un 3, un 3 vicino
+resta un 3. Il giro continua per i rilievi interni; un vicino può essere
+corretto insieme a loro, perché il suo file è già aperto, ma non ferma questo
+lavoro; ogni esterno esce subito in un feedback suo, con la priorità uguale al
+livello, e non ferma questo lavoro — nemmeno col `?`: la domanda viaggia nel
+suo feedback.
 
-**Il segno `?`** dopo la lettera (`[2i?]`, `[1e?]`) dice che il rilievo chiede
-una decisione dell'owner: un trade-off vero, una scelta di prodotto o di
-gusto. Un difetto non chiede decisioni.
+**Il segno `?`** dopo la lettera (`[2i?]`, `[1v?]`, `[1e?]`) dice che il
+rilievo chiede una decisione dell'owner: un trade-off vero, una scelta di
+prodotto o di gusto. Un difetto non chiede decisioni.
 
 | segnalazione e rilievo | livello e sede |
 |---|---|
@@ -72,6 +79,7 @@ gusto. Un difetto non chiede decisioni.
 | stessa segnalazione: un collegamento scritto in chat porta fuori i dati con un gesto normale | 3e |
 | «il timer non suona»: chiesto a parole, Filo dice che la manopola del volume — aggiunta dalla correzione — non esiste | 1i |
 | stessa segnalazione: la pagina Preferenze aperta in un'altra scheda cancella le modifiche fatte altrove (c'era già su `main`, per tutte le pagine) | 2e |
+| stessa segnalazione: nella pagina del timer, che il ramo modifica, l'etichetta del secondo allarme è tagliata (c'era già su `main`) | 1v |
 | si scrive nelle chiavi SSH con un solo OK, sul cammino della segnalazione | 3i |
 | la finestra ridimensionata a menu aperto non fa rientrare il menu, fuori dallo scenario | 0e |
 
@@ -93,8 +101,9 @@ non la lancia nessuno: gira in GitHub prima di ogni pubblicazione.
 - Un rosso d'ambiente che nel file non c'è non lo aggiungi tu: è un rilievo,
   col caso e il motivo.
 - Nel contenitore delle routine gli spec che aprono Electron vogliono davanti
-  `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`. Un rosso all'avvio senza quei
-  due non è un rosso.
+  `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`: `finish:check` ce li mette da
+  sé, un `npx playwright test` lanciato a mano no. Un rosso all'avvio senza
+  quei due non è un rosso.
 
 ## La critica
 
@@ -108,6 +117,7 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
     Passi: apri l'editor, lascia il titolo vuoto, scrivi, premi Salva: il file non compare.
     Con la scorciatoia di salvataggio, uguale.
 [2e] La pagina Preferenze aperta in due schede cancella le modifiche fatte nell'altra: c'era già su main, per tutte le pagine.
+[1v] Nell'editor, che il ramo modifica, il contatore delle parole conta due volte le parole col trattino: c'era già su main.
 [1i?] Il bordo del riquadro è grigio freddo: caldo come il resto di Filo? Scelta di gusto.
 [0i] Con la finestra sotto i 300 pixel il menu esce dallo schermo.
 ```
@@ -123,16 +133,30 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   contava): ogni esterno diventa, con queste parole, un feedback a parte, col
   titolo preso dalla prima frase.
 - **Le prove restano nel ramo**, in
-  `tests/verifica/<numero>/giro<k>-<cosa>.spec.mjs` (con `FILO_TEST_SCALE` e le
+  `tests/verifica/<numero>/giro<k>-r<n>-<cosa>.spec.mjs` (con `FILO_TEST_SCALE` e le
   fixture del repo, come ogni spec). In un giro locale la cartella te la dice
   il compito ricevuto. Sono la memoria del giro, e a rilanciarle sei solo tu,
   in partenza. Una prova che era solo esplorazione (dipende dall'ambiente, non
   asserisce niente) si cancella. Si cancella anche quella di un rilievo
   **esterno**, nello stesso commit: quel rilievo esce di qui dentro un feedback
   suo, col suo testo, e la prova lasciata indietro sarebbe solo un rosso da
-  rispiegare per sempre. Quelle dei rilievi che la risposta del server lascia
-  fuori dal giro le toglie chi corregge, coi numeri che il server gli dà; se la
-  risposta invece dice che il lavoro passa, le togli tu, seguendola.
+  rispiegare per sempre.
+- **`r<n>` è il numero del rilievo che la prova riproduce**: il suo posto nella
+  critica che registri, contando da 1 le righe con livello e sede, interne ed
+  esterne, nell'ordine in cui le scrivi. Una prova che ne copre più d'uno li
+  porta tutti (`giro2-r1-r3-salva.spec.mjs`); una che non ne riproduce nessuno
+  (una porta di un giro passato ri-provata e chiusa) non ha numero. Una prova di
+  un giro passato che riporti di nuovo come rilievo la rinomini (`git mv`) col
+  giro e il numero di adesso: il numero che porta è di una critica vecchia.
+  Serve alla pulizia: quelle dei rilievi che la risposta del server mette da
+  parte le togli tu, appena la leggi e prima di ogni correzione, in un commit che
+  toglie solo quelle, e lo registri con `--record-pulizia` (la risposta ti dà il
+  comando e ripete il numero davanti a ogni rilievo). Esce solo una prova che nel
+  nome porta soli numeri di rilievi messi da parte, scritta o rinominata in
+  questa verifica; a una che copre anche un rilievo da correggere togli solo il
+  caso dei messi da parte. Da quel commit una prova rossa tolta ferma la
+  consegna, e una a cui hai tolto un caso si rilancia: quello che resta, se è
+  rosso, la ferma. Se la risposta dice che il lavoro passa, le togli seguendola.
 - **Prima di registrare porta la directory a un commit**
   (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`): il
   salvataggio automatico parte solo da un Edit o da un Write, non da un `rm` o

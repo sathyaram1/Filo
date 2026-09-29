@@ -112,6 +112,9 @@ test('la firma NON tocca le due copie intermedie della build universale', () => 
 // ── La pubblicazione automatica ─────────────────────────────────────────────
 
 const WORKFLOW = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
+// I file che devono stare nella release vivono in un posto solo dal #733:
+// il controllo del workflow li chiede a questo script invece di nominarli.
+const { PIATTAFORME } = await import('../../scripts/release-platform-alarm.mjs');
 
 test('la pubblicazione automatica costruisce anche la versione per Mac', () => {
   assert.match(WORKFLOW, /^\s{2}release-mac:/m, 'il lavoro che costruisce la versione Mac è sparito dalla pubblicazione automatica');
@@ -140,15 +143,27 @@ test('il pacchetto Mac viene allegato alla release, non solo costruito', () => {
   const macJob = WORKFLOW.slice(WORKFLOW.search(/^\s{2}release-mac:/m));
   assert.match(macJob, /gh release view/,
     'manca il controllo finale: senza, un mancato allegato passa inosservato');
+  // Dal #733 i nomi non stanno più nel workflow: il controllo li chiede allo
+  // script dell'allarme, così il feedback che si apre nomina gli stessi file.
+  assert.match(macJob, /release-platform-alarm\.mjs"? --attesi Mac/,
+    'il controllo finale non chiede l\'elenco dei file attesi: senza elenco non guarda niente e resta verde');
   for (const file of ['Filo-Mac.dmg', 'Filo-Mac.zip', 'latest-mac.yml']) {
-    assert.ok(macJob.includes(file), `il controllo finale non cerca ${file}`);
+    assert.ok(PIATTAFORME.Mac.attesi.includes(file), `il controllo finale non cerca ${file}`);
   }
 });
 
 test('la versione Mac si costruisce dallo stesso codice di quella Windows', () => {
   const macJob = WORKFLOW.slice(WORKFLOW.search(/^\s{2}release-mac:/m));
-  assert.match(macJob, /ref:\s*\$\{\{\s*needs\.release\.outputs\.sha\s*\}\}/,
+  // Dal #733 il codice da costruire lo sceglie un passo, perché ci si arriva
+  // anche a mano per riattaccare i file a una versione già uscita. Sulla strada
+  // automatica deve restare il COMMIT costruito per Windows: il tag nasce alla
+  // pubblicazione e punta a dove sta main in quel momento.
+  assert.match(macJob, /ref:\s*\$\{\{\s*steps\.bersaglio\.outputs\.codice\s*\}\}/,
+    'il lavoro Mac non prende più il codice dal passo che lo sceglie');
+  assert.match(macJob, /COMMIT_APPENA_USCITO:\s*\$\{\{\s*needs\.release\.outputs\.sha\s*\}\}/,
     'il lavoro Mac non parte dal commit costruito per Windows: due file con lo stesso numero di versione e dentro codice diverso');
+  assert.match(macJob, /CODICE="\$CHIESTA"/,
+    'riattaccando a mano si deve costruire il codice DI QUELLA versione, non main');
 });
 
 // ── Sentinella sul codice: le scorciatoie devono valere anche su Mac ────────
@@ -203,21 +218,20 @@ test('nessuna scorciatoia guarda solo il tasto di Windows', () => {
     'queste righe reagiscono a Ctrl ma non a Cmd: su Mac la scorciatoia non risponde.\n' + colpevoli.join('\n'));
 });
 
-test('le scorciatoie globali non rubano il tasto degli accenti su Mac', () => {
-  // Alt+E/T/S/H sono scorciatoie di SISTEMA: valgono ovunque, non solo dentro
-  // Filo. Su Mac Alt è il tasto Opzione, che serve a comporre gli accenti
-  // (Opzione+E → é): registrarlo così toglierebbe l'accento acuto a chi scrive
-  // in italiano, in qualunque programma, finché Filo è acceso.
+test('le scorciatoie di Filo non rubano il tasto degli accenti su Mac', () => {
+  // Alt+E/T/S/H valgono con Filo davanti (#838). Su Mac Alt è il tasto Opzione,
+  // che compone gli accenti (Opzione+E → é) anche dentro le pagine di Filo:
+  // prenderselo toglierebbe l'accento acuto a chi scrive in italiano.
   const src = stripComments(readFileSync(join(ROOT, 'src', 'main', 'shortcuts.js'), 'utf8'));
   assert.match(src, /darwin/,
-    'shortcuts.js non distingue più il Mac: le scorciatoie globali tornerebbero a essere Opzione+lettera');
+    'shortcuts.js non distingue più il Mac: le scorciatoie tornerebbero a essere Opzione+lettera');
   const { acceleratorePerPiattaforma, COMMANDS } = require(join(ROOT, 'src', 'main', 'shortcuts.js'));
   const vero = process.platform;
   try {
     Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
     for (const accel of Object.keys(COMMANDS)) {
       assert.notEqual(acceleratorePerPiattaforma(accel), accel,
-        `su Mac ${accel} resta Opzione+lettera: mangia gli accenti in tutto il sistema`);
+        `su Mac ${accel} resta Opzione+lettera: mangia gli accenti a chi scrive in Filo`);
     }
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
     for (const accel of Object.keys(COMMANDS)) {
@@ -340,8 +354,8 @@ test('la regola dà il nome giusto su ogni sistema', () => {
   assert.equal(T.etichetta('Ctrl+\\', 'darwin'), 'Cmd+\\');
   assert.equal(T.etichetta('Ctrl+Shift+1', 'darwin'), 'Cmd+Shift+1');
   assert.equal(T.etichetta('Ctrl', 'darwin'), 'Cmd');
-  // …le scorciatoie globali prendono il Control del Mac davanti (Opzione da
-  // sola è il tasto degli accenti: vedi shortcuts.js)…
+  // …Spiega, Traduci, Salva e Aiuto prendono il Control del Mac davanti
+  // (Opzione da sola è il tasto degli accenti: vedi shortcuts.js)…
   assert.equal(T.etichetta('Alt+E', 'darwin'), 'Ctrl+Alt+E');
   assert.equal(T.etichetta('Alt+H', 'darwin'), 'Ctrl+Alt+H');
   // …e il salto di scheda passa a Cmd, perché Opzione+cifra su Mac SCRIVE.
@@ -746,7 +760,7 @@ test('nessuno può assegnarsi un tasto che Filo si prende prima', () => {
   assert.equal(T.riservato('Cmd+Shift+Z', 'darwin'), true);
   // Su Windows lo zoom NON passa dalla barra: quel tasto arriva alla pagina.
   assert.equal(T.riservato('Ctrl+0', 'win32'), false);
-  // Le scorciatoie globali sono registrate a livello di sistema.
+  // Spiega, Traduci, Salva e Aiuto: Filo se li prende prima della pagina.
   assert.equal(T.riservato('Alt+E', 'win32'), true);
   assert.equal(T.riservato('Ctrl+Alt+E', 'darwin'), true);
   // E una combinazione libera resta libera, altrimenti non se ne può usare più

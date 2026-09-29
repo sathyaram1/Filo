@@ -17,8 +17,10 @@ un **livello**.
   richiesta, con le parole del feedback come specifica. Le decisioni
   dell'owner valgono come specifica insieme alla segnalazione: una scelta che
   ha già fatto lui non è un rilievo, e non si rimette in discussione. L'unica occhiata al
-  diff è puntuale e viene DOPO aver trovato un difetto: serve a dire se l'ha
-  creato questo ramo (la sede del rilievo, più sotto), su quel file soltanto.
+  diff è puntuale e viene DOPO aver trovato un difetto: serve a dire la sede
+  del rilievo (più sotto) — se l'ha creato questo ramo, su quel file soltanto,
+  o se quel file è fra quelli che il ramo modifica già
+  (`git diff --name-only origin/main...HEAD`).
 
 <!-- includi: _cornice-feedback.md -->
 Se è l'ultimo caso, dillo nella critica.

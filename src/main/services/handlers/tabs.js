@@ -1,6 +1,8 @@
 // Handler di dominio: ciclo di vita dei tab via shim chrome.tabs, segnali
 // colore/attività dal content script, triage manuale e schede archiviate.
 
+const { soloFilo } = require('./origine');
+
 module.exports = function register(on, ctx) {
   const { MSG, winOf, searchArchivedTabs } = ctx;
   const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
@@ -25,6 +27,25 @@ module.exports = function register(on, ctx) {
       win._filoTabs.setTabColor(sender.tab.id, msg.color || null);
     }
     return { ok: true };
+  });
+
+  // Arriva dai content script di Filo, che la pagina non può chiamare: vale solo per la scheda che l'ha mandato.
+  on(MSG.PERMESSO_FILO, async (msg, sender) => {
+    if (!sender || !sender.tab || !sender.wc) return { ok: false };
+    return { ok: require('../permessiPagine').lasciapassare(sender.wc, msg && msg.tipo) };
+  });
+
+  // Le scelte ricordate stanno solo nelle pagine di Filo: un sito non le legge e non le cambia.
+  on(MSG.PERMESSI_SITI_GET, soloFilo(async () => ({ ok: true, scelte: require('../permessiPagine').scelteRicordate() })));
+  on(MSG.PERMESSI_SITI_TOGLI, soloFilo(async (msg) => ({
+    ok: require('../permessiPagine').togliScelta(String((msg && msg.origine) || ''), String((msg && msg.parte) || '')),
+  })));
+
+  on(MSG.TAB_IN_VISTA_GET, async (msg, sender) => {
+    const win = winOf(sender);
+    const tabs = win && win._filoTabs;
+    if (!tabs || !sender?.tab?.id) return { ok: true, inVista: true };
+    return { ok: true, inVista: tabs.inVista(sender.tab.id) };
   });
 
   on(MSG.TAB_IDENTITY_COLOR, async (msg, sender) => {

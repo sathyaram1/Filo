@@ -112,13 +112,24 @@ async function pronta(page) {
 
 const conta = (page) => page.evaluate(() => window.__conta);
 
-test('la bacheca mostra le prime schede, in ordine, senza scaricarle tutte', async ({ openTab }) => {
+// La prima apertura parte PRIMA della rete finta: il servizio vero nelle prove è
+// chiuso ovunque (#735.1), quindi non lascia schede su disco e al ricaricamento
+// vince la rete finta.
+async function apri(openTab, docs) {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await pronta(page);
-  await reteFinta(page, schede(QUANTE));
+  await reteFinta(page, docs);
   await page.reload();
   await pronta(page);
+  // Se la chiave della copia cambiasse, qui si vedrebbe: la prima scheda è della rete finta.
+  const piuRecente = docs.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+  await expect(page.locator('.bd-card-title').first()).toHaveText(piuRecente.name);
+  return page;
+}
+
+test('la bacheca mostra le prime schede, in ordine, senza scaricarle tutte', async ({ openTab }) => {
+  const page = await apri(openTab, schede(QUANTE));
 
   await expect(page.locator('.bd-card')).toHaveCount(PAGINA);
   // Dal più recente: l'ordine lo fa la query, non la pagina.
@@ -135,12 +146,7 @@ test('la bacheca mostra le prime schede, in ordine, senza scaricarle tutte', asy
 });
 
 test('scorrendo arrivano le successive, una pagina per volta', async ({ openTab }) => {
-  const page = await openTab(URL);
-  await page.waitForLoadState('domcontentloaded');
-  await pronta(page);
-  await reteFinta(page, schede(QUANTE));
-  await page.reload();
-  await pronta(page);
+  const page = await apri(openTab, schede(QUANTE));
   await expect(page.locator('.bd-card')).toHaveCount(PAGINA);
 
   await page.evaluate(() => document.getElementById('bdMore')?.scrollIntoView());
@@ -154,12 +160,7 @@ test('scorrendo arrivano le successive, una pagina per volta', async ({ openTab 
 });
 
 test('riaprendo, la bacheca compare subito e non si rilegge niente', async ({ openTab }) => {
-  const page = await openTab(URL);
-  await page.waitForLoadState('domcontentloaded');
-  await pronta(page);
-  await reteFinta(page, schede(QUANTE));
-  await page.reload();
-  await pronta(page);
+  const page = await apri(openTab, schede(QUANTE));
   await expect(page.locator('.bd-card')).toHaveCount(PAGINA);
 
   // Seconda apertura: la copia su disco disegna la pagina, e al server si
@@ -175,12 +176,7 @@ test('riaprendo, la bacheca compare subito e non si rilegge niente', async ({ op
 });
 
 test('un fix uscito dopo l\'ultima visita compare senza rileggere la bacheca', async ({ openTab }) => {
-  const page = await openTab(URL);
-  await page.waitForLoadState('domcontentloaded');
-  await pronta(page);
-  await reteFinta(page, schede(QUANTE));
-  await page.reload();
-  await pronta(page);
+  const page = await apri(openTab, schede(QUANTE));
   await expect(page.locator('.bd-card')).toHaveCount(PAGINA);
 
   // Una scheda nuova, pubblicata mentre non guardavamo.
@@ -206,12 +202,7 @@ test('un fix uscito dopo l\'ultima visita compare senza rileggere la bacheca', a
 });
 
 test('il proprio voto si vede subito e resta anche riaprendo la pagina', async ({ openTab }) => {
-  const page = await openTab(URL);
-  await page.waitForLoadState('domcontentloaded');
-  await pronta(page);
-  await reteFinta(page, schede(20));
-  await page.reload();
-  await pronta(page);
+  const page = await apri(openTab, schede(20));
 
   // Il canale col main risponde come a un utente loggato che vota: qui si
   // prova la BACHECA, il contratto IPC vero sta in board-vote.spec.mjs.

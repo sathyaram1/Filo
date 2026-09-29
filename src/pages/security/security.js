@@ -11,16 +11,18 @@
 
   function $(id) { return document.getElementById(id); }
 
-  // Estrae l'host del fornitore proxy dal template datacenter configurato
-  // (es. 'socks5://user-{country}:pass@gate.provider.com:7000' → 'gate.provider.com').
-  // Ritorna '' se non configurato o non parsabile. La pagina mostra l'host per
-  // dichiarare onestamente per chi passa il traffico delle tab "da un altro paese".
-  function proxyProviderHost(proxy) {
-    const tmpl = String((proxy && proxy.datacenter) || '').trim();
-    if (!tmpl) return '';
-    const filled = tmpl.replace(/\{country\}/gi, 'us');
-    const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(filled) ? filled : `socks5://${filled}`;
-    try { return new URL(withScheme).hostname || ''; } catch (_) { return ''; }
+  // Il riquadro «da un altro paese» esiste solo col fornitore (#771), e ne
+  // dichiara l'host: per onestà, chi passa il traffico di quelle schede.
+  let lastProxy = '';
+  async function renderProxyBox() {
+    let st = null;
+    try { st = await chrome.runtime.sendMessage({ type: MSG.PROXY_STATUS }); } catch (_) {}
+    const on = !!(st && st.ok && st.configured);
+    $('sec-proxy-box').hidden = !on;
+    const provEl = $('sec-proxy-box-provider');
+    const host = on ? String(st.providerHost || '') : '';
+    provEl.textContent = host ? I18n.t('options_security_proxy_box_provider').replace('%s', host) : '';
+    provEl.hidden = !host;
   }
 
   function fillStaticText() {
@@ -36,6 +38,9 @@
     $('sec-siteblock-desc').textContent = I18n.t('options_security_siteblock_desc');
     $('sec-siteblock-lists-label').textContent = I18n.t('options_security_siteblock_lists');
     $('sec-siteblock-blacklist-label').textContent = I18n.t('options_security_siteblock_blacklist_label');
+    $('sec-dl-exe-label').textContent = I18n.t('options_security_downloads');
+    $('sec-dl-exe-desc').textContent = I18n.t('options_security_downloads_desc');
+    $('sec-dl-trusted-label').textContent = I18n.t('options_security_downloads_trusted_label');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
     $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
     $('sec-proxy-box-title').textContent = I18n.t('options_security_proxy_box_title');
@@ -50,6 +55,7 @@
     $('sec-safebrowse-sandbox-desc').textContent = I18n.t('options_security_safebrowse_sandbox_desc');
     $('sec-safebrowse-key-managed').textContent = I18n.t('options_security_safebrowse_key_managed');
     $('sec-cookies-title').textContent = I18n.t('options_cookies_title');
+    $('sec-site-perms-title').textContent = I18n.t('options_site_perms_title');
     $('sec-cookies-desc').textContent = I18n.t('options_cookies_desc');
     $('cookie-mode-manual-label').textContent = I18n.t('options_cookies_mode_manual');
     $('cookie-mode-manual-desc').textContent = I18n.t('options_cookies_mode_manual_desc');
@@ -62,6 +68,8 @@
     $('sec-cookies-trusted-note').textContent = I18n.t('options_cookies_trusted_note_other');
     $('cookie-wl-input').placeholder = I18n.t('options_cookies_whitelist_placeholder');
     $('cookie-wl-add-btn').textContent = I18n.t('options_cookies_whitelist_add');
+    $('sec-cookies-banners-title').textContent = I18n.t('options_cookies_banners_title');
+    $('sec-cookies-done-title').textContent = I18n.t('options_cookies_done_title');
     $('sec-fp-title').textContent = I18n.t('options_fp_title');
     $('sec-fp-desc').textContent = I18n.t('options_fp_desc');
     $('fp-mode-off-label').textContent = I18n.t('options_fp_mode_off');
@@ -176,24 +184,54 @@
     }
   }
 
+  // Le risposte date ai siti che restano fra un avvio e l'altro: si vedono tutte qui e si tolgono una per una.
+  async function renderSitePerms() {
+    const list = $('sec-perm-list');
+    let scelte = [];
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.PERMESSI_SITI_GET });
+      scelte = (r && Array.isArray(r.scelte)) ? r.scelte : [];
+    } catch (_) { scelte = []; }
+    list.replaceChildren();
+    if (!scelte.length) {
+      const li = document.createElement('li');
+      li.className = 'sn-muted';
+      li.style.border = 'none';
+      li.textContent = I18n.t('options_site_perms_empty');
+      list.appendChild(li);
+      return;
+    }
+    for (const s of scelte) {
+      const li = document.createElement('li');
+      const testo = document.createElement('span');
+      const sito = document.createElement('strong');
+      sito.textContent = (s.sotto ? s.sotto + '.' : '') + s.dominio;
+      sito.title = s.origine;
+      const cosa = I18n.STRINGS['options_site_perms_part_' + s.parte] || s.parte;
+      testo.append(sito, ' · ', `${cosa}: ${I18n.t(s.si ? 'options_site_perms_yes' : 'options_site_perms_no')}`);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_site_perms_remove');
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try { await chrome.runtime.sendMessage({ type: MSG.PERMESSI_SITI_TOGLI, origine: s.origine, parte: s.parte }); } catch (_) {}
+        renderSitePerms();
+      });
+      li.append(testo, btn);
+      list.appendChild(li);
+    }
+  }
+
   async function load() {
     fillStaticText();
+    renderSitePerms();
     const settings = await Storage.getSettings();
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
     const sec = settings.security || {};
-    // "Apri da un altro paese": se è configurato un fornitore proxy, mostra il
-    // suo host nella riga privacy (onestà: dichiariamo per chi passa il traffico).
-    const provHost = proxyProviderHost(settings.proxy);
-    const provEl = $('sec-proxy-box-provider');
-    if (provEl) {
-      if (provHost) {
-        provEl.textContent = I18n.t('options_security_proxy_box_provider').replace('%s', provHost);
-        provEl.style.display = '';
-      } else {
-        provEl.style.display = 'none';
-      }
-    }
+    lastProxy = JSON.stringify(settings.proxy || {});
+    renderProxyBox();
     // Default-on: il merge con DEFAULT_SETTINGS.security mette già true/true se
     // l'utente non ha mai salvato, quindi qui leggiamo "!== false" per
     // riflettere il default anche in casi limite (es. chiave esistente ma null).
@@ -208,6 +246,13 @@
     // subito che non bloccheranno nulla invece di lasciarle passare mute.
     setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
     syncSiteBlockEnabled();
+    // #588 — conferma prima di scaricare/aprire un programma. Default ON: la
+    // chiave assente vale "chiedi", come nel main.
+    const dl = sec.downloads || {};
+    $('sec-dl-exe').checked = dl.confirmExecutables !== false;
+    $('sec-dl-trusted').value = (Array.isArray(dl.trustedSites) ? dl.trustedSites : []).join('\n');
+    setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+    syncDownloadsEnabled();
     const sb = sec.safeBrowse || {};
     $('sec-safebrowse').checked = sb.enabled !== false;
     $('sec-safebrowse-network').checked = sb.networkSignals !== false;
@@ -221,7 +266,10 @@
     if (radio) radio.checked = true;
     const trusted = cookies.trustedSites || cookies.loginWhitelist;
     cookieWhitelist = Array.isArray(trusted) ? trusted.slice() : [];
+    cookieBannerSites = Array.isArray(cookies.bannerSites) ? cookies.bannerSites.slice() : [];
     renderWhitelist();
+    renderBannerSites();
+    loadCookieDone();
     syncCookieMode();
 
     const fp = sec.fingerprint || {};
@@ -252,6 +300,8 @@
   // ─── gestione cookie ──────────────────────────────────────────────────────
 
   let cookieWhitelist = [];
+  // #754 — siti dove l'utente ha chiesto di rivedere i banner (dal menu della scheda): qui si vedono e si tolgono.
+  let cookieBannerSites = [];
 
   function currentMode() {
     const checked = document.querySelector('input[name="cookie-mode"]:checked');
@@ -317,6 +367,79 @@
     }
   }
 
+  function renderBannerSites() {
+    const box = $('sec-cookies-banners');
+    const list = $('cookie-banners-list');
+    list.innerHTML = '';
+    box.hidden = !cookieBannerSites.length;
+    for (const domain of cookieBannerSites) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = domain;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_cookies_banners_remove');
+      btn.addEventListener('click', () => {
+        cookieBannerSites = cookieBannerSites.filter((d) => d !== domain);
+        renderBannerSites();
+        saveCookies();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
+  // Cosa Filo ha fatto coi banner, sito per sito: la stessa memoria che il menu della scheda legge, tutta.
+  // «Mostra il banner» qui fa quello che fa dal menu: il sito passa all'elenco sopra e dimentica la risposta.
+  let cookieDoneSites = [];
+  let cookieDoneSig = '';
+
+  async function loadCookieDone() {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.COOKIES_SITES }); } catch (_) {}
+    const sites = (r && r.ok && Array.isArray(r.sites) ? r.sites : []).filter((x) => x && !cookieBannerSites.includes(x.site));
+    const sig = sites.map((x) => x.site + (x.rejected ? 'r' : '') + (x.hidden ? 'h' : '')).join('\n');
+    if (sig === cookieDoneSig) return;
+    cookieDoneSig = sig;
+    cookieDoneSites = sites;
+    renderCookieDone();
+  }
+
+  function renderCookieDone() {
+    const box = $('sec-cookies-done');
+    const list = $('cookie-done-list');
+    list.innerHTML = '';
+    box.hidden = !cookieDoneSites.length;
+    for (const it of cookieDoneSites) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = it.site;
+      const what = document.createElement('span');
+      what.className = 'sn-muted';
+      what.style.marginLeft = '8px';
+      what.textContent = I18n.t(it.rejected ? 'options_cookies_done_rejected' : 'options_cookies_done_hidden');
+      span.appendChild(what);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_cookies_done_show');
+      btn.addEventListener('click', () => {
+        if (!cookieBannerSites.includes(it.site)) cookieBannerSites.push(it.site);
+        cookieBannerSites.sort();
+        cookieDoneSites = cookieDoneSites.filter((x) => x.site !== it.site);
+        cookieDoneSig = '';
+        renderBannerSites();
+        renderCookieDone();
+        saveCookies();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
   // Mostra (o nasconde, con msg vuoto) un avviso inline sotto il campo "siti
   // fidati". Senza questo, un input rifiutato spariva senza spiegazione.
   function setWhitelistError(msg) {
@@ -354,7 +477,7 @@
   async function saveCookies() {
     const partial = {
       security: {
-        cookies: { mode: currentMode(), trustedSites: cookieWhitelist.slice() },
+        cookies: { mode: currentMode(), trustedSites: cookieWhitelist.slice(), bannerSites: cookieBannerSites.slice() },
       },
     };
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
@@ -382,6 +505,27 @@
     if (sub) sub.style.opacity = on ? '1' : '0.45';
     $('sec-siteblock-lists').disabled = !on;
     $('sec-siteblock-blacklist').disabled = !on;
+  }
+
+  function syncDownloadsEnabled() {
+    const on = !!$('sec-dl-exe').checked;
+    const sub = $('sec-dl-exe-sub');
+    if (sub) sub.style.opacity = on ? '1' : '0.45';
+    $('sec-dl-trusted').disabled = !on;
+  }
+
+  // Le righe scartate si dicono, come per la blacklist: un dominio scritto male
+  // qui non allenta nessuna difesa, ma chi l'ha scritto crede di sì.
+  function setTrustedError(invalidRows) {
+    const el = $('sec-dl-trusted-error');
+    if (!el) return;
+    if (invalidRows && invalidRows.length) {
+      el.textContent = I18n.t('options_security_downloads_trusted_invalid', invalidRows.join(', '));
+      el.style.display = 'block';
+    } else {
+      el.textContent = '';
+      el.style.display = 'none';
+    }
   }
 
   // Mostra (o nasconde, con lista vuota) un avviso inline sotto la blacklist
@@ -420,6 +564,8 @@
   }
 
   async function save() {
+    const { valid: dlTrusted, invalid: dlInvalid } = parseBlacklist($('sec-dl-trusted').value);
+    setTrustedError(dlInvalid);
     const { valid: blacklist, invalid } = parseBlacklist($('sec-siteblock-blacklist').value);
     setBlacklistError(invalid);
     const partial = {
@@ -438,6 +584,11 @@
           llmJudge: !!$('sec-safebrowse-llm').checked,
           sandbox: !!$('sec-safebrowse-sandbox').checked,
         },
+        // #588 — conferma sui programmi scaricati, e i siti che ne sono esenti.
+        downloads: {
+          confirmExecutables: !!$('sec-dl-exe').checked,
+          trustedSites: dlTrusted,
+        },
         // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
         autoFeedback: !!$('sec-auto-feedback').checked,
       },
@@ -448,6 +599,25 @@
     clearTimeout(save._t);
     save._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
+
+  // Un sito aggiunto dal menu della scheda mentre questa pagina è aperta deve comparire qui, e un
+  // salvataggio da qui non deve riscrivere l'elenco com'era all'apertura.
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) {
+        const p = JSON.stringify(msg.settings.proxy || {});
+        if (p !== lastProxy) { lastProxy = p; renderProxyBox(); }
+      }
+      const c = msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings && msg.settings.security && msg.settings.security.cookies;
+      if (!c || !Array.isArray(c.bannerSites)) return;
+      if (c.bannerSites.join('\n') === cookieBannerSites.join('\n')) return;
+      cookieBannerSites = c.bannerSites.slice();
+      renderBannerSites();
+      loadCookieDone();
+    });
+  }
+  // Filo rifiuta e nasconde mentre si naviga nelle altre schede: tornando qui l'elenco è quello di adesso.
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') loadCookieDone(); });
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
@@ -461,6 +631,9 @@
     // Mentre l'utente corregge le righe, togli l'avviso precedente (rivalutato
     // al prossimo salvataggio su blur).
     $('sec-siteblock-blacklist').addEventListener('input', () => setBlacklistError([]));
+    $('sec-dl-exe').addEventListener('change', () => { syncDownloadsEnabled(); save(); });
+    $('sec-dl-trusted').addEventListener('change', save);
+    $('sec-dl-trusted').addEventListener('input', () => setTrustedError([]));
     $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
     $('sec-safebrowse-network').addEventListener('change', save);
     $('sec-safebrowse-llm').addEventListener('change', save);

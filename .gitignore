@@ -23,6 +23,9 @@ tests/_audit*.spec.mjs
 # solo per il nome vecchio — le farebbe
 # sparire in silenzio: non finirebbero in nessun commit e non comparirebbero
 # nemmeno nel controllo dei file non salvati, che i file esclusi non li vede.
+# Eccezione: le copie che la consegna rimette per un attimo per rilanciare le prove tolte
+# (scripts/lib/prove-tolte.mjs) non sono prove di nessuno.
+tests/verifica/_tolte-*/
 tests/.fb/*.png
 tests/agent/.env
 tests/agent/.out/

@@ -397,6 +397,13 @@
     admin_defaults_excluded_name: 'Nome del fornitore',
     admin_defaults_excluded_add: 'Aggiungi fornitore',
     admin_defaults_excluded_remove: 'Rimuovi',
+    admin_defaults_excluded_kind: 'Motivo',
+    admin_defaults_excluded_kind_none: 'Non scritto',
+    admin_defaults_excluded_kind_producer: 'Produce i modelli',
+    admin_defaults_excluded_kind_unreliable: 'Serve male',
+    admin_defaults_excluded_note: 'Nota (quando, cosa è successo)',
+    admin_defaults_excluded_unknown: 'Nessun fornitore di OpenRouter si chiama così: questa voce non esclude nessuno.',
+    admin_defaults_excluded_guess: 'Forse «%s»?',
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
     admin_defaults_excluded_drift: 'Questa lista sostituisce quella scritta nel codice, e queste esclusioni non ci sono: %s. Finché mancano, quei fornitori possono servire le richieste.',
     admin_defaults_excluded_drift_fix: 'Rimettili nella lista',
@@ -438,6 +445,17 @@
     options_security_siteblock_blacklist_invalid:
       'Queste righe non sono domini validi e non bloccheranno nulla (usa un dominio ' +
       'con estensione, es. facebook.com — niente IP o nomi senza punto): %s',
+    options_security_downloads: 'Chiedi prima di scaricare un programma',
+    options_security_downloads_desc:
+      'I file che il computer ESEGUE (.exe, .msi, .bat, .dmg, .iso, .pkg, .sh, .jar…) ' +
+      'non entrano nella cartella Download senza il tuo sì. Filo ti dice da quale ' +
+      'sito arrivano e aspetta. Anche “Apri file” su un programma chiede conferma, ' +
+      'perché aprirlo vuol dire eseguirlo. Tutti gli altri file scendono come sempre.',
+    options_security_downloads_trusted_label:
+      'Siti di cui ti fidi, uno per riga. Da questi i programmi scendono senza chiedere',
+    options_security_downloads_trusted_invalid:
+      'Queste righe non sono domini validi e verranno ignorate (usa un dominio ' +
+      'con estensione, es. mozilla.org): %s',
     options_security_p2p_box_title: 'Cosa succede ai servizi P2P se attivi la protezione IP',
     options_security_p2p_box_body:
       'Servizi tipo Snapdrop, ToffeeShare, alcuni giochi browser e alcune feature di scoperta dispositivi ' +
@@ -502,7 +520,7 @@
     options_cookies_mode_default: 'Automatico (consigliato)',
     options_cookies_mode_default_desc:
       'Filo blocca a monte i tracker noti (Google Analytics, reti pubblicitarie, pixel dei social): lo script non ' +
-      'si carica nemmeno. Rifiuta da solo i banner cookie che riconosce, dice ai siti che non vuoi essere profilato ' +
+      'si carica nemmeno. Rifiuta da solo i banner dei cookie, nasconde quelli che non hanno un «rifiuta», dice ai siti che non vuoi essere profilato ' +
       'e carica i video YouTube senza cookie. I cookie utili a te (login, preferenze, le tue scelte sui siti) ' +
       'restano: non perdi quello che hai impostato.',
     options_cookies_mode_privacy: 'Privacy massima',
@@ -523,6 +541,26 @@
     options_cookies_trusted_note_other:
       'I siti fidati hanno effetto solo in "Privacy massima". In "Automatico" i tuoi login restano comunque salvati, ' +
       'quindi qui non serve aggiungere nulla.',
+    options_cookies_banners_title: 'Qui i banner dei cookie li vedi',
+    options_cookies_banners_remove: 'Rifiuta in automatico',
+    options_cookies_done_title: 'Qui Filo li ha rifiutati o nascosti',
+    options_cookies_done_rejected: 'cookie rifiutati',
+    options_cookies_done_hidden: 'banner nascosto',
+    options_cookies_done_show: 'Mostra il banner',
+    // Risposte date ai permessi dei siti (#591, giro 20)
+    options_site_perms_title: 'Permessi dei siti',
+    options_site_perms_empty: 'Nessuna risposta data a un sito.',
+    options_site_perms_remove: 'Togli',
+    options_site_perms_yes: 'consentito',
+    options_site_perms_no: 'negato',
+    options_site_perms_part_audio: 'Microfono',
+    options_site_perms_part_video: 'Fotocamera',
+    options_site_perms_part_appunti: 'Appunti',
+    options_site_perms_part_posizione: 'Posizione',
+    options_site_perms_part_notifiche: 'Notifiche',
+    options_site_perms_part_schermi: 'Schermi',
+    options_site_perms_part_presenza: 'Presenza al computer',
+    options_site_perms_part_strumenti: 'Strumenti musicali',
     // Protezione anti-fingerprinting
     options_fp_title: 'Protezione fingerprinting',
     options_fp_desc:

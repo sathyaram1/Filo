@@ -142,9 +142,12 @@
   gap: 6px;
   padding-right: 4px;
 }
+/* Il corpo è HTML di SN_MARKDOWN (a capo già in <br> e <p>): con pre-wrap
+   gli a capo fra un blocco e l'altro diventerebbero righe vuote. */
 .sn-menu-inline-body {
   flex: 1;
   min-width: 0;
+  white-space: normal;
 }
 .sn-menu-inline-arrow {
   all: unset;

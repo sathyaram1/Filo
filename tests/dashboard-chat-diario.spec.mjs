@@ -96,14 +96,19 @@ test('A — appunto e lezione hanno la loro riga nel diario, e il riassunto le c
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Segnato.' })).toBeVisible({ timeout: 10_000 });
 
+  // La lezione entra in ogni conversazione: passa dal popup col testo (#592).
+  const host = page.locator(CONFIRM_HOST);
+  await expect(host).toBeVisible({ timeout: 5_000 });
+  await clickConfirm(page, 'ok');
+  await expect(host).toHaveCount(0, { timeout: 5_000 });
+
   // Il blocco c'è (prima: nessun blocco, nessuna traccia) e il riassunto dice
-  // entrambe le cose.
+  // l'appunto.
   const activity = page.locator('.dash-activity');
   await expect(activity).toHaveCount(1);
   await expect(activity).toHaveAttribute('data-phase', 'done');
   const label = activity.locator('.dash-activity-label');
   await expect(label).toContainText('salvato un appunto');
-  await expect(label).toContainText('memorizzato una cosa');
 
   await activity.locator('.dash-activity-head').click();
   const body = activity.locator('.dash-activity-body');

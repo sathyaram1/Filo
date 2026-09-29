@@ -117,6 +117,19 @@ function getTrustedSites(settings) {
   return Array.isArray(list) ? list : [];
 }
 
+// Siti (eTLD+1) dove l'utente ha chiesto di rivedere i banner dei cookie: lì Filo non rifiuta e non nasconde.
+function getBannerSites(settings) {
+  const c = settings && settings.security && settings.security.cookies;
+  const list = (c && c.bannerSites) || [];
+  return Array.isArray(list) ? list.map((d) => String(d || '').toLowerCase()).filter(Boolean) : [];
+}
+
+function isBannerSiteIn(sites, url) {
+  if (!/^https?:/i.test(String(url || ''))) return false;
+  const reg = registrableOf(url);
+  return !!reg && sites.includes(reg);
+}
+
 function trustedSetOf(settings) {
   return new Set(getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
 }
@@ -188,36 +201,56 @@ function applyGpc(ses, enabled) {
 // attivo, ogni richiesta verso un host-tracker viene annullata: lo script non
 // si carica, il cookie non viene creato, nessun dato parte.
 
-const blockState = new WeakMap(); // session → { enabled }
+const blockState = new WeakMap(); // session → { enabled, filtri }
+
+// Host chiusi a prescindere dalla modalità: li accende solo la modalità test
+// (src/main/test-servizi-chiusi.js), che per questo passa dallo stesso listener.
+let hostChiusoFn = null;
+function chiudiHost(fn) { hostChiusoFn = typeof fn === 'function' ? fn : null; }
+
+// Registra (se manca) l'unico listener onBeforeRequest della sessione. Tracker e
+// ad-blocking restano spenti finché applyTrackerBlocking non accende i filtri.
+function ensureRequestHook(ses) {
+  if (!ses || !ses.webRequest) return null;
+  let state = blockState.get(ses);
+  if (state) return state;
+  state = { enabled: false, filtri: false };
+  blockState.set(ses, state);
+  // UNICO choke point onBeforeRequest per sessione: Electron consente un solo
+  // listener per evento per sessione (una seconda registrazione SOSTITUISCE la
+  // prima), quindi il blocco tracker (curato) e il motore ad-blocking (liste)
+  // devono convivere qui dentro. I due hanno gate indipendenti: il tracker è
+  // legato alla modalità cookie (s.enabled), l'ad-blocking ha il suo toggle.
+  ses.webRequest.onBeforeRequest((details, callback) => {
+    if (hostChiusoFn && hostChiusoFn(details.url)) {
+      callback({ cancel: true });
+      return;
+    }
+    const s = blockState.get(ses);
+    if (!s || !s.filtri) {
+      callback({ cancel: false });
+      return;
+    }
+    if (s.enabled && isTrackerUrl(details.url)) {
+      callback({ cancel: true });
+      return;
+    }
+    let ad = null;
+    try { ad = require('./adblock'); } catch (_) {}
+    if (ad && ad.shouldBlock && ad.shouldBlock(details.url)) {
+      callback({ cancel: true });
+      return;
+    }
+    callback({ cancel: false });
+  });
+  return state;
+}
 
 function applyTrackerBlocking(ses, enabled) {
-  if (!ses || !ses.webRequest) return;
-  let state = blockState.get(ses);
-  if (!state) {
-    state = { enabled: !!enabled };
-    blockState.set(ses, state);
-    // UNICO choke point onBeforeRequest per sessione: Electron consente un solo
-    // listener per evento per sessione (una seconda registrazione SOSTITUISCE la
-    // prima), quindi il blocco tracker (curato) e il motore ad-blocking (liste)
-    // devono convivere qui dentro. I due hanno gate indipendenti: il tracker è
-    // legato alla modalità cookie (s.enabled), l'ad-blocking ha il suo toggle.
-    ses.webRequest.onBeforeRequest((details, callback) => {
-      const s = blockState.get(ses);
-      if (s && s.enabled && isTrackerUrl(details.url)) {
-        callback({ cancel: true });
-        return;
-      }
-      let ad = null;
-      try { ad = require('./adblock'); } catch (_) {}
-      if (ad && ad.shouldBlock && ad.shouldBlock(details.url)) {
-        callback({ cancel: true });
-        return;
-      }
-      callback({ cancel: false });
-    });
-  } else {
-    state.enabled = !!enabled;
-  }
+  const state = ensureRequestHook(ses);
+  if (!state) return;
+  state.filtri = true;
+  state.enabled = !!enabled;
 }
 
 // ─── sessioni per-sito (modalità privacy) ─────────────────────────────────
@@ -283,12 +316,92 @@ function configureForMode(mode) {
 
 // Ultima modalità/siti fidati visti, così before-quit (sincrono) può lanciare il
 // wipe senza dover rileggere lo storage in modo asincrono.
-let _cached = { mode: MODES.DEFAULT, trustedSites: [] };
+let _cached = { mode: MODES.DEFAULT, trustedSites: [], bannerSites: [] };
+let _configured = false;
+// Impostazioni cambiate da una finestra incognito: valgono solo lì, il profilo normale non le vede (#754).
+// null = l'incognito non ha cambiato niente e vede quelle del profilo normale.
+let _incognito = null;
 
-function configureFromSettings(settings) {
-  _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings) };
-  configureForMode(_cached.mode);
+function inIncognito() {
+  try { return !!require('../shim/storage').inIncognito(); } catch (_) { return false; }
 }
+
+function incognitoSessions() {
+  try {
+    const { BrowserWindow } = require('electron');
+    return BrowserWindow.getAllWindows()
+      .filter((w) => w._filoIncognito && w._filoTabs && w._filoTabs.partition)
+      .map((w) => session.fromPartition(w._filoTabs.partition));
+  } catch (_) { return []; }
+}
+
+// Un sito che entra o esce dall'elenco coi banner dimentica la risposta data: se no il banner non torna
+// (entra) o resta la scelta fatta a mano (esce). Vale per ogni strada: menu della scheda, Sicurezza, import.
+// I cookie si tolgono qui; la memoria della pagina e cosa Filo sapeva del sito li toglie `listChange`.
+function wipeChanged(prev, next, sessions, scope) {
+  for (const site of new Set([...prev, ...next])) {
+    if (prev.includes(site) === next.includes(site)) continue;
+    const answer = answerOf(site);
+    for (const ses of sessions) wipeConsentCookies(ses, site, answer.cookies).catch(() => {});
+    try { if (listChange) listChange(site, answer, scope); } catch (_) {}
+  }
+}
+
+let listChange = null;
+function setListChangeHandler(fn) { listChange = typeof fn === 'function' ? fn : null; }
+
+// Modalità o elenchi cambiati: chi tiene dati per sito li riguarda (tabs/tabCookies.js, cosa resta sul disco).
+let configChange = null;
+function setConfigChangeHandler(fn) { configChange = typeof fn === 'function' ? fn : null; }
+
+// In Privacy un sito non fidato non tiene niente oltre la sessione, nemmeno quello che Filo sa di lui.
+function keepsSiteData(site) {
+  if (_cached.mode !== MODES.PRIVACY) return true;
+  const s = String(site || '').toLowerCase();
+  return _cached.trustedSites.some((d) => String(d || '').toLowerCase() === s);
+}
+
+// I nomi che il sito ha dato alla sua risposta, visti dopo il clic sul banner: li tiene tabs/tabCookies.js.
+let answerLookup = null;
+function setAnswerLookup(fn) { answerLookup = typeof fn === 'function' ? fn : null; }
+function answerOf(site) {
+  try { const a = answerLookup && answerLookup(site); if (a) return { cookies: a.cookies || [], storage: a.storage || [] }; } catch (_) {}
+  return { cookies: [], storage: [] };
+}
+
+// Ritorna true se cambia qualcosa che le pagine devono sapere (modalità o siti coi banner).
+function configureFromSettings(settings) {
+  if (inIncognito()) {
+    const prev = _incognito || _cached;
+    _incognito = { mode: getMode(settings), bannerSites: getBannerSites(settings) };
+    wipeChanged(prev.bannerSites, _incognito.bannerSites, incognitoSessions(), { normal: false, incognito: true });
+    return prev.mode !== _incognito.mode || prev.bannerSites.join('\n') !== _incognito.bannerSites.join('\n');
+  }
+  const prev = _cached.bannerSites;
+  const prevMode = _cached.mode;
+  const prevTrusted = _cached.trustedSites.join('\n');
+  _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings), bannerSites: getBannerSites(settings) };
+  configureForMode(_cached.mode);
+  const changed = prevMode !== _cached.mode || prev.join('\n') !== _cached.bannerSites.join('\n');
+  if (_configured) {
+    wipeChanged(prev, _cached.bannerSites, [session.defaultSession, ...siteSessions.values(), ...(_incognito ? [] : incognitoSessions())],
+      { normal: true, incognito: !_incognito });
+  }
+  _configured = true;
+  if (prevMode !== _cached.mode || prevTrusted !== _cached.trustedSites.join('\n')) {
+    try { if (configChange) configChange(); } catch (_) {}
+  }
+  return changed;
+}
+
+// Chiusa l'ultima finestra incognito: la prossima riparte dalle impostazioni del profilo normale.
+function resetIncognito() { _incognito = null; }
+
+function profile(incognito) { return (incognito && _incognito) || _cached; }
+
+function currentMode(incognito) { return profile(incognito).mode; }
+
+function isBannerSite(url, incognito) { return isBannerSiteIn(profile(incognito).bannerSites, url); }
 
 // Wipe usando l'ultima configurazione vista (per before-quit). Ritorna una
 // promessa che si risolve quando i cookie dei tracker sono stati rimossi.
@@ -320,10 +433,48 @@ async function wipeTrackerCookies(settings) {
   return { removed };
 }
 
+// ─── «mostra il banner»: via la risposta che il sito si era segnato ──────────
+//
+// Un banner rifiutato non ricompare da solo: il sito ha scritto la scelta in un cookie. Si tolgono solo i
+// cookie di consenso del sito (nomi dei CMP noti), mai login o carrello; lo stesso per la memoria della pagina.
+const CONSENT_NAME = /(consent|euconsent|cookielaw|optanon|onetrust|didomi|cookiebot|cybot|^_sp_|sp_consent|cmp|cmapi|cmplz|borlabs|_iub_cs|iubenda|notice_(gdpr|pref|behavior)|usprivacy|gdpr|cookieyes|cky-|^uc_|usercentrics|osano|truste|tarteaucitron|klaro|axeptio|cookiefirst|termly|viewed_cookie_policy|cookie_?notice|cookie_?banner|cookies?_?accepted|cookie_?policy)/i;
+
+function isConsentName(name) {
+  return CONSENT_NAME.test(String(name || ''));
+}
+
+// `names`: i cookie che il sito ha scritto come risposta dopo il clic, qualunque nome abbiano.
+async function wipeConsentCookies(ses, site, names) {
+  if (!ses || !ses.cookies || !site) return 0;
+  const extra = new Set(Array.isArray(names) ? names : []);
+  let all = [];
+  try { all = await ses.cookies.get({}); } catch (_) { return 0; }
+  let removed = 0;
+  await Promise.all(all.map(async (c) => {
+    const domain = String(c.domain || '').replace(/^\./, '').toLowerCase();
+    if (!(domain === site || domain.endsWith('.' + site))) return;
+    if (!isConsentName(c.name) && !extra.has(c.name)) return;
+    const url = (c.secure ? 'https://' : 'http://') + domain + (c.path || '/');
+    try { await ses.cookies.remove(url, c.name); removed++; } catch (_) {}
+  }));
+  return removed;
+}
+
 module.exports = {
   MODES,
   getMode,
   getTrustedSites,
+  getBannerSites,
+  isBannerSiteIn,
+  isBannerSite,
+  currentMode,
+  isConsentName,
+  wipeConsentCookies,
+  setListChangeHandler,
+  setConfigChangeHandler,
+  keepsSiteData,
+  setAnswerLookup,
+  resetIncognito,
   registrableOf,
   isTrackerHost,
   isTrackerUrl,
@@ -332,6 +483,8 @@ module.exports = {
   ensureHeaderHook,
   applyGpc,
   applyTrackerBlocking,
+  ensureRequestHook,
+  chiudiHost,
   ensureSiteSession,
   configureForMode,
   configureFromSettings,

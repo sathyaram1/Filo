@@ -43,6 +43,7 @@
     PULISCI_TAB: 'broom',
     CANCELLA_ARCHIVIO: 'trash',
     CANCELLA_MEMORIA: 'eraser',
+    DIMENTICA: 'eraser',
     IMPOSTA_PREFERENZA: 'options',
     IMPOSTA_ESTETICA: 'palette',
     ESEGUI_COMANDO: 'terminal',
@@ -52,6 +53,7 @@
     REGOLA_PROXY_DOMINIO: 'globePinned',
     RIMUOVI_REGOLA_PROXY: 'globeOff',
     COMANDO_FINESTRA: 'windowFrame',
+    ZOOM_PAGINA: 'zoomPagina',
     STILE_PAGINA: 'brush',
     RIPRISTINA_STILE_PAGINA: 'undo',
   };

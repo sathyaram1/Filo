@@ -414,7 +414,14 @@
       chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
     }, { capture: true });
 
-    if (isBlocked()) return;
+    if (isBlocked()) {
+      self.__snFiloSpento = true;
+      // Alt+S è un gesto rivolto a Filo: anche qui salva con la miniatura e la conferma della voce del menu (#839).
+      chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+        if (msg?.type === MSG.SHORTCUT_TRIGGERED && COMANDI_SALVA.has(msg.command)) suSalvaPerDopo(msg, sendResponse);
+      });
+      return;
+    }
 
     SpellCheck.init(settings);
 
@@ -1704,6 +1711,14 @@
       items.push(TranslatePage.buildRestoreOriginalItem());
     }
 
+    // 2d. Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
+    // lo stato meno visibile che il tasto destro può raccontare: una pagina
+    // rimasta zoomata da un'altra visita spiega da sé perché è così, e la voce
+    // è anche la via d'uscita. Il livello lo sa il preload: glielo si chiede
+    // con un evento, la risposta arriva nel dataset nello stesso dispatch.
+    const zoomItem = buildZoomItem();
+    if (zoomItem) items.push(zoomItem);
+
     // 3. Zona contestuale — assente se non c'è contesto utile.
     const contextItems = buildContextualItems({
       selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
@@ -1733,6 +1748,36 @@
       icon: ricon,
       label: 'Invia attacco (Red-team)',
       onClick: () => openSurface('redteam', () => self.SN_REDTEAM_ATTACK_UI?.open()),
+    };
+  }
+
+  // Livello di zoom della pagina, o null se è alla dimensione reale. Il numero
+  // lo tiene il preload, che gira nello stesso mondo isolato di questo file:
+  // passare dal documento lo metterebbe a portata del sito, che lo userebbe per
+  // rimettersi lo zoom come vuole lui (#686, primo giro di verifica).
+  function zoomPagina() {
+    return (typeof self !== 'undefined' && self.SN_ZOOM_PAGINA) || null;
+  }
+
+  function zoomCorrente() {
+    const Z = zoomPagina();
+    if (!Z) return null;
+    try {
+      const p = Z.percentuale();
+      return Number.isFinite(p) && p !== 100 ? p : null;
+    } catch (_) { return null; }
+  }
+
+  function buildZoomItem() {
+    const p = zoomCorrente();
+    if (p == null) return null;
+    return {
+      type: 'item',
+      // Stesso nome della voce nella barra dei menu: due strade per la stessa
+      // cosa non si chiamano in due modi.
+      label: `Dimensione reale (ora ${p}%)`,
+      shortcut: Tasti.etichetta('Ctrl+0'),
+      onClick: () => { try { zoomPagina()?.azzera(); } catch (_) {} },
     };
   }
 
@@ -1890,7 +1935,7 @@
       items.push({ type: 'separator' });
       // Una sola sezione "Spiega" (quella dell'immagine, l'elemento cliccato):
       // aggiungerne una seconda firerebbe una seconda chiamata AI a ogni apertura.
-      items.push(Actions.buildInlineExplainImage(imgEl));
+      items.push(Actions.buildInlineExplainImage(imgEl, linkOfImg));
       return items;
     }
 
@@ -1929,7 +1974,7 @@
       // Sul filmato resta il collegamento: una spiegazione del filmato non
       // esiste, ed è già la stessa in tutti e tre i modi di cliccare la scheda.
       items.push(imgInLink
-        ? Actions.buildInlineExplainImage(imgInLink)
+        ? Actions.buildInlineExplainImage(imgInLink, linkEl)
         : Actions.buildInlineExplainLink(linkEl));
       return items;
     }
@@ -1965,12 +2010,13 @@
     // completo mentre il filmatino suonava, menu vuoto un istante dopo (#444).
     if (imgUnder) {
       for (const it of buildImageActionItems(imgUnder)) items.push(it);
-      if (belongsTo(imgUnder, linkUnder, layers)) {
+      const linkOfCover = belongsTo(imgUnder, linkUnder, layers) ? linkUnder : null;
+      if (linkOfCover) {
         items.push({ type: 'separator' });
-        for (const it of buildLinkActionItems(linkUnder)) items.push(it);
+        for (const it of buildLinkActionItems(linkOfCover)) items.push(it);
       }
       items.push({ type: 'separator' });
-      items.push(Actions.buildInlineExplainImage(imgUnder));
+      items.push(Actions.buildInlineExplainImage(imgUnder, linkOfCover));
       return items;
     }
 
@@ -2096,15 +2142,27 @@
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
-      // Shortcut save-for-later: il SW chiede al content il payload.
-      if (msg.command === 'save-for-later') {
-        if (isBlocked()) { sendResponse({ savePayload: null }); return; }
-        sendResponse({ savePayload: Actions.buildSavePayload() });
-        return;
-      }
+      if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
       handleShortcut(msg.command, msg.context);
       sendResponse({ ok: true });
     }
+  }
+
+  // #839 — Alt+S è la voce «Salva per dopo» del menu: stessa funzione, stessa miniatura, stessa conferma.
+  // La conferma arriva qui anche per un salvataggio che la scheda salvata non poteva mostrare: questa è quella davanti.
+  const COMANDI_SALVA = new Set(['save-for-later', 'save-for-later-confirm']);
+
+  function suSalvaPerDopo(msg, sendResponse) {
+    if (IS_SUBFRAME) return;
+    // Anche la conferma torna con la ricevuta: finché nessuna pagina la prende il main la riprova sulla scheda davanti.
+    sendResponse({ presa: true });
+    if (msg.command === 'save-for-later') {
+      try { Menu.close(); } catch (_) {}
+      Actions.savePage();
+      return;
+    }
+    const ctx = msg.context || {};
+    Actions.showSaveConfirm(ctx.entry, { chiudiScheda: false, conferma: ctx.conferma });
   }
 
   function selectionAnchor() {
@@ -2134,7 +2192,6 @@
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
     }
-    // save-for-later è gestito direttamente nel background
   }
 
   // La lettura ad alta voce e la dettatura (tutto l'audio del content script)

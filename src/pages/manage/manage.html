@@ -112,10 +112,6 @@
     .mg-auto-sub-title {
       margin: 0; font-size: 12px; font-weight: 600; color: var(--sn-muted);
     }
-    /* Automatica spenta: i figli non decidono niente, e si vede. */
-    .mg-auto-sub--off { opacity: 0.45; }
-    /* Con le routine spente le impostazioni che valgono solo per loro sono inerti, come i sotto-interruttori qui sopra. */
-    .mg-auto-block--off { opacity: 0.45; }
 
     /* Scelta fra poche alternative: pillole affiancate, una sola accesa. */
     .mg-auto-choice { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
@@ -609,6 +605,22 @@
     .mg-item:not(.mg-item--staged) { flex-wrap: wrap; }
     .mg-item:hover { background: var(--sn-hover); }
     .mg-item--selected { background: var(--sn-hover); }
+    /* Arrivata a pagina aperta: un punto caldo in testa finché non la si apre (con un ordinamento a scelta può
+       cadere a metà lista). In coda sta nella riga del titolo: da figlio della colonna avrebbe una riga sua. */
+    .mg-item--arrivata:not(.mg-item--staged)::before,
+    .mg-item--staged.mg-item--arrivata > .mg-item-row:first-child::before {
+      content: ''; flex: 0 0 auto; align-self: center;
+      width: var(--mg-arrivo-size, 7px); height: var(--mg-arrivo-size, 7px); border-radius: 50%;
+      background: var(--mg-arrivo-color, var(--sn-accent));
+    }
+    .mg-tab--arrivi::after {
+      content: ''; display: inline-block; vertical-align: super;
+      width: 5px; height: 5px; margin-left: 3px; border-radius: 50%;
+      background: var(--mg-arrivo-color, var(--sn-accent));
+    }
+    /* Lista che non riesce più ad allinearsi: il titolo si spegne, l'hover dice da quando. */
+    #mgListHead.mg-list-head--ferma { opacity: var(--mg-ferma-opacity, 0.55); }
+    #mgListHead.mg-list-head--ferma::after { content: ' · ferma'; font-weight: 400; }
     /* "Non filtrato": il colore del bordo è bianco. Per renderlo leggibile su
        qualunque tema affianchiamo al bordo bianco una sottile linea grigia. */
     .mg-item--unfiltered {
@@ -649,10 +661,11 @@
     /* Icona d'autore (chi ha scritto il feedback): owner/utente/Claude/Filo. */
     .mg-item-author { flex: 0 0 auto; font-size: 13px; line-height: 1; align-self: center; }
     .mg-item-num { font-size: 11px; color: var(--sn-muted); font-weight: 600; flex: 0 0 auto; }
-    /* Base zero: col titolo che non chiede spazio suo, a mandare a capo sono le etichette, non lui. */
+    /* Base zero: col titolo che non chiede spazio suo, a mandare a capo sono le etichette, non lui. Il minimo
+       lo tiene leggibile: sotto, sono le etichette ad andare a capo invece di ridurlo a una lettera. */
     .mg-item-title {
       font-size: 13px; line-height: 1.4;
-      flex: 1 1 0; min-width: 0;
+      flex: 1 1 0; min-width: min(var(--mg-title-min, 8em), 100%);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     /* Aperta/Chiusa è l'unica cosa che si sa di una segnalazione il cui stato fine è cifrato: stesse parole e
@@ -1350,6 +1363,8 @@
               <div class="mg-preapprove-line" id="mgPreapproveLine" hidden>
                 <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveBtn"
                   aria-pressed="false" hidden>Fondi senza chiedermelo</button>
+                <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveRevokeBtn"
+                  hidden>Chiedimi prima di fondere</button>
                 <span class="mg-preapproved-info" id="mgPreapprovedInfo" hidden></span>
               </div>
 
@@ -1648,7 +1663,7 @@
             <span class="mg-action-msg" id="mgAutoMsg" role="status"></span>
           </p>
 
-          <!-- Chi può entrare in coda da solo, per categoria di mittente. Con l'automatica spenta sono inerti, e si vede. -->
+          <!-- Chi può entrare in coda da solo, per categoria di mittente: conta solo con l'automatica accesa. -->
           <div class="mg-auto-sub" id="mgAutoApproveBlock">
             <p class="mg-auto-sub-title">Entrano in coda da soli</p>
             <label class="mg-switch mg-switch--sm" title="I feedback che scrivi tu">
@@ -1699,7 +1714,7 @@
           </div>
         </section>
 
-        <!-- Esplorazione automatica a coda vuota: riguarda solo le routine, e col master spento è inerte. -->
+        <!-- Esplorazione automatica a coda vuota: riguarda solo le routine. -->
         <section class="mg-auto-block" id="mgProberIdleBlock">
           <label class="mg-switch" title="Ferma l'esplorazione automatica quando non ci sono più feedback da lavorare">
             <span class="mg-switch-text">Esplora quando la coda è vuota</span>

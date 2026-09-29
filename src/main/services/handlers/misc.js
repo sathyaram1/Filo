@@ -2,6 +2,7 @@
 // feedback (annotazione/invio) e fetch dei metadati Open Graph di un link.
 
 const { safeFetch } = require('../safe-fetch');
+const { avvisoNellaFinestra } = require('../avvisoFinestra');
 const auth = require('../../auth/google-auth');
 // L'identità da allegare a un invio che il server limita per identità: la
 // chiede la coda dei percorsi condivisi, al momento in cui spedisce.
@@ -190,7 +191,7 @@ function safeImageFilename(name) {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, getEffectiveSettings, modelForAction, buildAttemptChain, broadcastToTabs } = ctx;
+  const { MSG, winOf, modelGate, broadcastToTabs } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
 
   // Titolo breve del feedback, generato da un LLM economico al momento
@@ -202,19 +203,15 @@ module.exports = function register(on, ctx) {
     const t = String(text || '').trim();
     if (!t) return fallback;
     try {
-      const settings = await getEffectiveSettings();
-      const attempts = buildAttemptChain(
-        settings, modelForAction(settings, ACTIONS.FEEDBACK_TITLE), ACTIONS.FEEDBACK_TITLE,
-      );
       const messages = [{
         role: 'user',
         content: 'Genera un titolo brevissimo (2-6 parole, nella stessa lingua del testo) che riassuma questo feedback su un\'app. Rispondi SOLO col titolo, senza virgolette e senza punto finale.\n\nFeedback:\n' + t.slice(0, 1500),
       }];
       const r = await Promise.race([
-        globalThis.SN_PROVIDERS.completeWithFallback({ attempts, messages }),
+        modelGate.text({ action: ACTIONS.FEEDBACK_TITLE, messages }),
         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout titolo (8s)')), 8000)),
       ]);
-      const name = String(r?.text || '').trim()
+      const name = String(r || '').trim()
         .split('\n')[0]
         .replace(/^["'«\s]+|["'»\s.]+$/g, '')
         .slice(0, 120);
@@ -333,7 +330,7 @@ module.exports = function register(on, ctx) {
           const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
           // La voce nella barra in alto: percentuale, peso e "Annulla", gli
           // stessi di un download partito da un link.
-          entry = downloads.beginManual({ url, filename: name, totalBytes });
+          entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win) });
           // Il nome da proporre lo sa solo il server (Content-Disposition):
           // per questo la destinazione si chiede da qui in poi, mai prima.
           askDest = () => pickDestination(name).then((d) => {
@@ -436,14 +433,20 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     return fn(msg, sender, origin);
   };
-  on(MSG.DOWNLOADS_LIST, internalOnly(async () => ({ ok: true, items: DL().list() })));
-  on(MSG.DOWNLOADS_CLEAR, internalOnly(async () => ({ ok: true, items: DL().clearCompleted() })));
-  on(MSG.DOWNLOAD_REMOVE, internalOnly(async (msg) => ({ ok: true, items: DL().remove(msg.id) })));
-  on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg) => DL().openFile(msg.id)));
-  on(MSG.DOWNLOAD_OPEN_FOLDER, internalOnly(async (msg) => DL().openFolder(msg.id)));
-  on(MSG.DOWNLOAD_CANCEL, internalOnly(async (msg) => DL().cancel(msg.id)));
-  on(MSG.DOWNLOAD_PAUSE, internalOnly(async (msg) => DL().pause(msg.id)));
-  on(MSG.DOWNLOAD_RESUME, internalOnly(async (msg) => DL().resume(msg.id)));
+  // #588.2 — ogni finestra vede e comanda solo le voci del suo ambito: una
+  // finestra incognito le sue, quella normale la cronologia.
+  const ambito = (sender) => DL().scopeOfWindow(sender && sender.win);
+  on(MSG.DOWNLOADS_LIST, internalOnly(async (_m, s) => ({ ok: true, items: DL().list(ambito(s)) })));
+  on(MSG.DOWNLOADS_CLEAR, internalOnly(async (_m, s) => ({ ok: true, items: DL().clearCompleted(ambito(s)) })));
+  on(MSG.DOWNLOAD_REMOVE, internalOnly(async (msg, s) => ({ ok: true, items: DL().remove(msg.id, ambito(s)) })));
+  // #588 — `confirmed` viaggia dalla superficie che ha MOSTRATO la conferma:
+  // senza, il main risponde needsConfirm e non tocca shell.openPath.
+  on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg, s) => DL().openFile(msg.id, { confirmed: !!msg.confirmed }, ambito(s))));
+  on(MSG.DOWNLOAD_CONFIRM, internalOnly(async (msg, s) => DL().confirmDownload(msg.id, !!msg.allow, ambito(s))));
+  on(MSG.DOWNLOAD_OPEN_FOLDER, internalOnly(async (msg, s) => DL().openFolder(msg.id, ambito(s))));
+  on(MSG.DOWNLOAD_CANCEL, internalOnly(async (msg, s) => DL().cancel(msg.id, ambito(s))));
+  on(MSG.DOWNLOAD_PAUSE, internalOnly(async (msg, s) => DL().pause(msg.id, ambito(s))));
+  on(MSG.DOWNLOAD_RESUME, internalOnly(async (msg, s) => DL().resume(msg.id, ambito(s))));
 
   on(MSG.FEEDBACK_ANNOTATE, async (msg, sender) => {
     // Il box feedback è appena entrato/uscito dalla modalità annotazione.
@@ -479,32 +482,6 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: e?.message || String(e) };
     }
   });
-
-  // #602 — un avviso che DEVE essere visto: va nella cornice della finestra
-  // (la stessa striscia di notifiche che annuncia la fine di uno scaricamento),
-  // non nella pagina davanti. Resta lì finché non lo si chiude, perché dice che
-  // una segnalazione non è mai partita e va rimandata.
-  //
-  // Ritorna `false` se non c'era nessuna finestra pronta a mostrarlo: chi
-  // chiama tiene allora da parte l'avviso e riprova più tardi, invece di
-  // parlare al vuoto. Una finestra che sta ancora caricando non conta: la sua
-  // cornice non ascolta ancora.
-  function avvisoNellaFinestra(testo) {
-    let dette = 0;
-    try {
-      const { BrowserWindow } = require('electron');
-      for (const win of BrowserWindow.getAllWindows()) {
-        if (!win || win.isDestroyed?.() || !win._filoTabs) continue;
-        const wc = win.webContents;
-        if (!wc || wc.isDestroyed?.() || wc.isLoading?.()) continue;
-        try {
-          wc.send('shell:toast', { text: testo, opts: { durationSec: 0 } });
-          dette++;
-        } catch (_) {}
-      }
-    } catch (_) {}
-    return dette > 0;
-  }
 
   // Coda d'invio del feedback (#341): "Invia" NON aspetta più la rete. Il box
   // sparisce subito e il main si fa carico di consegnare il feedback in
@@ -637,16 +614,23 @@ module.exports = function register(on, ctx) {
     // ma marca la versione corrente come "vista" così il prossimo update parte
     // pulito. Niente note ritornate → niente popup.
     if (!lastSeen) {
-      try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, current); } catch (_) {}
+      await markUpdateSeen(current);
       return { ok: true, current, lastSeen: null, notes: [] };
     }
-    const notes = PN.since(lastSeen, current);
+    const foto = await globalThis.SN_STORAGE.getRaw(KEYS.LAST_SEEN_NOTES, null);
+    const notes = PN.recap(lastSeen, current, foto);
     return { ok: true, current, lastSeen, notes };
   });
 
-  on(MSG.MARK_UPDATE_SEEN, async () => {
+  // Versione e fotografia si scrivono insieme: recap() usa la fotografia solo se è della versione vista.
+  async function markUpdateSeen(version) {
     const KEYS = globalThis.SN_CONST.STORAGE_KEYS;
-    try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, appVersion()); } catch (_) {}
+    try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_NOTES, globalThis.SN_PATCH_NOTES.fotografia(version)); } catch (_) {}
+    try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, version); } catch (_) {}
+  }
+
+  on(MSG.MARK_UPDATE_SEEN, async () => {
+    await markUpdateSeen(appVersion());
     return { ok: true };
   });
 

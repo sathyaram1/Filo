@@ -70,6 +70,21 @@ function documento(u) {
 
 let richieste = [];
 
+// I filtri sull'email come li applica Firestore (confronto per codice).
+function passa(where) {
+  const filtri = where?.compositeFilter ? where.compositeFilter.filters : [where];
+  return (x) => filtri.every((f) => {
+    if (f.unaryFilter) return f.unaryFilter.op === 'IS_NOT_NULL' && x.email != null;
+    const v = f.fieldFilter.value.stringValue;
+    switch (f.fieldFilter.op) {
+      case 'GREATER_THAN_OR_EQUAL': return x.email >= v;
+      case 'LESS_THAN': return x.email < v;
+      case 'EQUAL': return x.email === v;
+      default: throw new Error(`filtro non previsto: ${f.fieldFilter.op}`);
+    }
+  });
+}
+
 // Firestore finto: risponde alla query di elenco rispettando limit e
 // segnalibro, e alla query di conteggio col totale vero.
 function reteFinta() {
@@ -79,15 +94,16 @@ function reteFinta() {
     const body = JSON.parse(opts.body);
     richieste.push({ url: u, body });
     if (u.includes(':runAggregationQuery')) {
+      const quanti = TUTTI.filter(passa(body.structuredAggregationQuery.structuredQuery.where)).length;
       return {
         ok: true, status: 200,
-        json: async () => [{ result: { aggregateFields: { totale: { integerValue: String(TUTTI.length) } } } }],
+        json: async () => [{ result: { aggregateFields: { totale: { integerValue: String(quanti) } } } }],
         text: async () => '',
       };
     }
     const q = body.structuredQuery;
     const dopo = q.startAt ? q.startAt.values[0].stringValue : '';
-    const pagina = TUTTI.filter((x) => !dopo || x.email > dopo).slice(0, q.limit);
+    const pagina = TUTTI.filter(passa(q.where)).filter((x) => !dopo || x.email > dopo).slice(0, q.limit);
     return { ok: true, status: 200, json: async () => pagina.map(documento), text: async () => '' };
   };
 }
@@ -167,4 +183,40 @@ test('un sito visitato non può chiedere l’elenco di chi usa Filo', async () =
   const r = await elencoUtenti({}, { isShell: false }, 'https://sito-qualsiasi.example');
   assert.equal(r.ok, false);
   assert.equal(r.code, 'forbidden');
+});
+
+// #679.3 — con più di cinquanta iscritti una persona sola la si trova
+// dall'indirizzo, senza sfogliare le pagine e senza passare da /gift.
+test('cercando l’indirizzo arriva quella persona, non la prima pagina di tutti', async () => {
+  const r = await daFilo({ cerca: 'utente099@esempio.it' });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.users.map((x) => x.email), ['utente099@esempio.it']);
+  assert.equal(r.users[0].balance, 199);
+  assert.equal(r.total, 1, 'il totale conta chi corrisponde alla ricerca, non tutti gli iscritti');
+  assert.equal(r.next, '');
+});
+
+test('basta l’inizio dell’indirizzo, in qualunque maiuscola, e la ricerca si sfoglia', async () => {
+  const r = await daFilo({ cerca: '  UTENTE1 ' });
+  assert.equal(r.total, 20);
+  assert.equal(r.users.length, 20);
+  assert.ok(r.users.every((x) => x.email.startsWith('utente1')));
+  const larga = await daFilo({ cerca: 'utente' });
+  assert.equal(larga.users.length, 50);
+  const dopo = await daFilo({ cerca: 'utente', after: larga.next });
+  assert.equal(dopo.users[0].email, TUTTI[50].email, 'la pagina dopo resta dentro la ricerca');
+});
+
+test('una ricerca che non trova nessuno torna vuota, non con tutti', async () => {
+  const r = await daFilo({ cerca: 'nessuno@altrove.it' });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.users, []);
+  assert.equal(r.total, 0);
+});
+
+test('la ricerca legge solo le righe che mostra, come l’elenco', async () => {
+  await daFilo({ cerca: 'utente0' });
+  const q = richieste.find((x) => x.url.includes(':runQuery')).body.structuredQuery;
+  assert.deepEqual(q.select.fields.map((f) => f.fieldPath).sort(), ['balance', 'email', 'name']);
+  assert.ok(!('offset' in q));
 });

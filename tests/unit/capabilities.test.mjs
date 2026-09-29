@@ -1,7 +1,7 @@
 // Unit test per src/shared/capabilities.js — il manifesto delle capacità di
 // Filo (F1). Verifica due cose:
 //   1. integrità strutturale del manifesto e della sua API;
-//   2. anti-stale: incrocia alcune voci col CODICE REALE (shortcut globali,
+//   2. anti-stale: incrocia alcune voci col CODICE REALE (scorciatoie,
 //      icone del menu, pagine filo://) così che, se una capacità sparisce o
 //      cambia invocazione senza aggiornare il manifesto, il test diventi rosso.
 // Pura logica → niente Electron, gira in millisecondi.
@@ -64,11 +64,11 @@ test('index() è compatto, get()/byCategory()/all() coerenti', () => {
 
 // ── Anti-stale: incrocio col codice reale ────────────────────────────────────
 
-test('ogni comando degli shortcut globali è coperto dal manifesto', () => {
-  // shortcuts.js definisce i 4 comandi OS; ognuno deve esistere come capacità.
+test('ogni comando delle scorciatoie di Filo è coperto dal manifesto', () => {
+  // shortcuts.js definisce i 4 comandi; ognuno deve esistere come capacità.
   const src = readFileSync(join(ROOT, 'src', 'main', 'shortcuts.js'), 'utf8');
   const commands = [...src.matchAll(/'(Alt\+[A-Z])':\s*'([a-z-]+)'/g)].map((m) => ({ accel: m[1], cmd: m[2] }));
-  assert.ok(commands.length >= 4, 'mi aspetto almeno 4 shortcut globali');
+  assert.ok(commands.length >= 4, 'mi aspetto almeno 4 scorciatoie');
   // Mappa comando-shortcut → id capacità che lo descrive.
   const cmdToCap = {
     'explain-selection': 'explain-selection',
@@ -115,6 +115,9 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_RUN_ACTION: 'agent-actions',
     FILO_CONFIRM_ACTION: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',
+    // #592 — la memoria riga per riga nelle Preferenze: rileggerla e toglierne una.
+    FILO_MEMORY_VIEW: 'filo-memory',
+    FILO_MEMORY_FORGET: 'filo-memory',
     // #525 — l'archivio delle chat: lo consulta la pagina Cronologia
     // (capacità "chat-archive"). La ricerca che fa FILO stesso passa dalle
     // azioni (FILO_RUN_ACTION → CERCA_CHAT) ed è la capacità gemella
@@ -388,6 +391,8 @@ function menuVoiceLabels() {
       if (f.endsWith('.js')) pages += '\n' + readFileSync(join(d, f), 'utf8');
     }
   }
+  // E il menu del tasto destro sulle schede, che sta nella cornice.
+  pages += '\n' + readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
   const labels = new Set();
   for (const m of i18n.matchAll(/^ {4}(menu_[a-z0-9_]+):\s*'([^']+)'/gm)) {
     if (new RegExp(`'${m[1]}'`).test(content)) labels.add(m[2]);

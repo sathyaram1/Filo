@@ -113,6 +113,8 @@
   // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
   async function pasteFromClipboard() {
     deps.restorePasteContext();
+    // Gli appunti li legge Filo per l'utente che ha scelto Incolla, non il sito: vale pochi secondi, solo qui.
+    try { await chrome.runtime.sendMessage({ type: MSG.PERMESSO_FILO, tipo: 'appunti' }); } catch (_) {}
     // Tenta lettura strutturata (testo + immagini)
     try {
       if (navigator.clipboard.read) {
@@ -660,17 +662,36 @@
     };
   }
 
+  // L'avviso sull'indirizzo lo calcola Filo, non il modello: si mostra SUBITO e
+  // resta anche se la spiegazione non arriva mai (#725).
+  function mostraAvvisoLink(el, url) {
+    const avviso = LinkSospetto.avviso(LinkSospetto.analizza(url));
+    if (!avviso) return;
+    const w = document.createElement('div');
+    w.className = 'sn-menu-link-warn';
+    w.textContent = avviso;
+    el.appendChild(w);
+  }
+
   // Sezione inline "Spiega immagine": stessa filosofia di buildInlineExplain ma con dataUrl.
-  function buildInlineExplainImage(imgEl) {
+  // `linkEl` è il collegamento che l'immagine apre: l'unica sezione del menu parla
+  // dell'immagine, ma l'avviso sull'indirizzo non si perde (#725.1).
+  function buildInlineExplainImage(imgEl, linkEl) {
     return {
       type: 'inline',
       subject: 'image',
       content: I18n.t('menu_explain_loading'),
       onMount: (el) => {
         el.classList.add('sn-menu-inline-loading');
+        el.textContent = '';
+        if (linkEl && linkEl.href) mostraAvvisoLink(el, linkEl.href);
+        const body = document.createElement('div');
+        body.className = 'sn-menu-link-body';
+        body.textContent = I18n.t('menu_explain_loading');
+        el.appendChild(body);
         const src = imgEl.currentSrc || imgEl.src;
         if (!src) {
-          el.textContent = I18n.t('err_provider_failed');
+          body.textContent = I18n.t('err_provider_failed');
           el.classList.remove('sn-menu-inline-loading');
           el.classList.add('sn-menu-inline-error');
           return () => {};
@@ -691,15 +712,15 @@
             el.classList.remove('sn-menu-inline-loading');
             if (!res?.ok || !res.text) {
               el.classList.add('sn-menu-inline-error');
-              el.textContent = res?.error || I18n.t('err_provider_failed');
+              body.textContent = res?.error || I18n.t('err_provider_failed');
               return;
             }
-            el.textContent = res.text;
+            body.textContent = res.text;
           } catch (e) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
             el.classList.add('sn-menu-inline-error');
-            el.textContent = I18n.t('err_provider_failed');
+            body.textContent = I18n.t('err_provider_failed');
           }
         })();
         return () => { cancelled = true; };
@@ -720,19 +741,8 @@
           const url = linkEl.href;
           const anchorText = (linkEl.textContent || '').trim().slice(0, 200);
           const flags = LinkSospetto.analizza(url);
-
-          // L'avviso sull'indirizzo lo calcola Filo, non il modello: si mostra
-          // SUBITO e resta anche se la spiegazione non arriva mai. Prima
-          // compariva col primo pezzo della risposta, e su un provider caduto
-          // il link sospetto passava senza che nessuno lo dicesse (#725).
-          const avvisoSospetto = LinkSospetto.avviso(flags);
           el.textContent = '';
-          if (avvisoSospetto) {
-            const w = document.createElement('div');
-            w.className = 'sn-menu-link-warn';
-            w.textContent = avvisoSospetto;
-            el.appendChild(w);
-          }
+          mostraAvvisoLink(el, url);
           const body = document.createElement('div');
           body.className = 'sn-menu-link-body';
           body.textContent = I18n.t('menu_link_loading');
@@ -806,10 +816,14 @@
   // incorpora la rimozione, il secondo gira quando quel frame è stato
   // committato; il piccolo timeout copre la presentazione fuori processo del
   // compositor prima che il main scatti la foto.
-  async function captureVisibleTab() {
-    await new Promise((resolve) => {
+  function attendiCompositor() {
+    return new Promise((resolve) => {
       requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 50)));
     });
+  }
+
+  async function captureVisibleTab() {
+    await attendiCompositor();
     return chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
   }
 
@@ -824,9 +838,15 @@
     };
   }
 
+  // Un secondo Alt+S (o clic) mentre il salvataggio è in corso non apre una seconda conferma: la scheda sta già per chiudersi.
+  let salvataggioInCorso = false;
+  const confermeMostrate = new Set();
+
   async function savePage() {
+    if (salvataggioInCorso) return;
+    salvataggioInCorso = true;
     // Committa il salvataggio SUBITO, prima di qualsiasi attesa. La cattura
-    // della miniatura (captureVisibleTab) attende ~120ms che il menu sparisca
+    // della miniatura attende ~120ms che il menu sparisca
     // dal compositor: se in quella finestra la pagina fa un redirect o si
     // ricarica, il contesto del content script viene distrutto e il messaggio
     // di salvataggio non partirebbe mai — l'utente crederebbe di aver salvato
@@ -838,6 +858,7 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.SAVE_PAGE, page: base });
       if (!res?.ok) {
+        salvataggioInCorso = false;
         Popup.showToast(I18n.t('toast_save_failed'));
         return;
       }
@@ -845,29 +866,21 @@
     } catch (e) {
       // Contesto distrutto da un redirect immediato o errore IPC: avvisa
       // invece di fallire in silenzio.
+      salvataggioInCorso = false;
       console.error('[SN] savePage', e);
       Popup.showToast(I18n.t('toast_save_failed'));
       return;
     }
 
-    // Miniatura best-effort: catturala dopo che il menu è sparito dal
-    // compositor. La cattura DEVE precedere il toast di conferma, altrimenti il
-    // toast finisce dentro la miniatura (#325). Se la pagina è già cambiata la
-    // cattura può fallire: il salvataggio resta comunque valido, solo senza
-    // anteprima.
-    let thumbnail = '';
+    // Miniatura best-effort: la scatta il main (piccola, #839) dopo che il menu
+    // è sparito dal compositor. La cattura DEVE precedere il toast di conferma,
+    // altrimenti il toast finisce dentro la miniatura (#325): si aspetta la
+    // risposta. Se la pagina è già cambiata la cattura può fallire: il
+    // salvataggio resta comunque valido, solo senza anteprima.
     try {
-      const cap = await captureVisibleTab();
-      thumbnail = cap?.dataUrl || '';
+      await attendiCompositor();
+      if (entry?.id) await chrome.runtime.sendMessage({ type: MSG.SET_SAVED_PAGE_THUMB, id: entry.id });
     } catch (_) { /* miniatura opzionale */ }
-
-    if (thumbnail && entry?.id) {
-      chrome.runtime.sendMessage({
-        type: MSG.SET_SAVED_PAGE_THUMB,
-        id: entry.id,
-        thumbnail,
-      }).catch(() => {});
-    }
 
     // Conferma CLICCABILE che porta alla lista (#252): rimpiazza il vecchio
     // toast muto + chiusura a 600ms (troppo rapida per farci qualcosa).
@@ -880,10 +893,16 @@
   // appena messa da parte evidenziata; ignorandolo, la scheda si chiude da sola
   // come prima. È l'unico modo per far scoprire la lista proprio nel momento in
   // cui serve, senza aggiungere voci di menu.
-  function showSaveConfirm(entry) {
+  // `chiudiScheda: false` quando la mostra la scheda davanti per un salvataggio che la scheda salvata non poteva confermare (#839).
+  // `conferma` è l'etichetta di quel salvataggio: il main la riprova finché una pagina risponde, e ogni salvataggio si conferma una volta sola.
+  function showSaveConfirm(entry, { chiudiScheda = true, conferma = '' } = {}) {
     const AUTO_CLOSE_MS = 4000;
     let done = false;
     let timer = null;
+    if (conferma) {
+      if (confermeMostrate.has(conferma)) return;
+      confermeMostrate.add(conferma);
+    }
 
     const pill = document.createElement('div');
     pill.className = 'sn-save-confirm';
@@ -905,6 +924,7 @@
     const finish = (openList) => {
       if (done) return;
       done = true;
+      if (chiudiScheda) salvataggioInCorso = false;
       if (timer) { clearTimeout(timer); timer = null; }
       pill.dataset.snClosing = '1';
       pill.classList.remove('sn-save-confirm-visible');
@@ -912,7 +932,7 @@
       if (openList && entry && entry.id) {
         chrome.runtime.sendMessage({ type: MSG.OPEN_HOME, highlight: entry.id }).catch(() => {});
       }
-      chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }).catch(() => {});
+      if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }).catch(() => {});
     };
 
     pill.addEventListener('click', () => finish(true));

@@ -350,7 +350,8 @@ test('una config salvata prima dello sdoppiamento non riaccende le istanze spent
   await expect(page.locator('#mgAutoApproveUser')).toBeChecked();
 });
 
-test('#446 — con l\'automatica spenta gli interruttori per mittente non decidono niente', async ({ openTab }) => {
+test('#446 — con l\'automatica spenta gli interruttori per mittente restano modificabili e salvano', async ({ openTab }) => {
+  // L'owner prepara chi entra in coda da solo PRIMA di accendere l'automatica.
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
@@ -359,23 +360,18 @@ test('#446 — con l\'automatica spenta gli interruttori per mittente non decido
   await stubAutomation(page, { enabled: false });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadAutoMode());
+  await expect(page.locator('#mgAutoState')).toHaveText('Off');
 
   for (const id of ['mgAutoApproveOwner', 'mgAutoApproveUser', 'mgAutoApproveLocal',
     'mgAutoApproveWorker', 'mgAutoApproveVerifier', 'mgAutoApproveResiduo',
     'mgAutoApproveProber', 'mgAutoApproveClaude', 'mgAutoApproveFilo']) {
-    await expect(page.locator('#' + id)).toBeDisabled();
+    await expect(page.locator('#' + id)).toBeEnabled();
   }
-  await expect(page.locator('#mgAutoApproveBlock')).toHaveClass(/mg-auto-sub--off/);
 
-  // Accendendo il master tornano azionabili, senza ricaricare la pagina.
-  await page.evaluate(() => {
-    const el = document.getElementById('mgAutoToggle');
-    el.disabled = false;
-    el.checked = true;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  await expect(page.locator('#mgAutoApproveUser')).toBeEnabled();
-  await expect(page.locator('#mgAutoApproveBlock')).not.toHaveClass(/mg-auto-sub--off/);
+  await page.locator('#mgAutoApproveUser + .mg-switch-track').click();
+  await expect.poll(() => page.evaluate(() => window.__automation.autoApprove.user)).toBe(false);
+  await expect(page.locator('#mgAutoApproveUser')).not.toBeChecked();
+  expect(await page.evaluate(() => window.__automation.enabled)).toBe(false);
 });
 
 test('#448 — spegnere l\'esplorazione a coda vuota arriva alla config delle routine', async ({ openTab }) => {
@@ -409,7 +405,7 @@ test('#448 — spegnere l\'esplorazione a coda vuota arriva alla config delle ro
   });
 });
 
-test('l\'interruttore master spegne le routine e rende inerti le impostazioni che valgono solo per loro', async ({ openTab }) => {
+test('l\'interruttore master spegne le routine e le impostazioni che valgono per loro restano modificabili', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
@@ -434,30 +430,51 @@ test('l\'interruttore master spegne le routine e rende inerti le impostazioni ch
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
 
-  // 1. La decisione LASCIA il client: è ciò che le routine andranno a leggere.
+  // La decisione LASCIA il client: è ciò che le routine andranno a leggere.
   await expect.poll(() => page.evaluate(() => window.__automationSets)).toContainEqual({ routinesEnabled: false });
   await expect.poll(() => page.evaluate(() => window.__automation.routinesEnabled)).toBe(false);
   await expect(page.locator('#mgRoutinesState')).toHaveText('Off');
 
-  // 2. Le impostazioni che senza routine non decidono niente diventano
-  //    inerti — e si vede, invece di restare lì a promettere un effetto.
-  await expect(page.locator('#mgProberIdle')).toBeDisabled();
-  for (const id of ['#mgCap3', '#mgCap2', '#mgCap1', '#mgCap0', '#mgFixInstructions']) await expect(page.locator(id)).toBeDisabled();
-  for (const id of ['#mgProberIdleBlock', '#mgCap3Block', '#mgCap2Block', '#mgCap1Block', '#mgCap0Block', '#mgFixInstructionsBlock']) {
-    await expect(page.locator(id)).toHaveClass(/mg-auto-block--off/);
-  }
-  // Il timeout dei giudici NON dipende dalle routine: resta usabile.
-  await expect(page.locator('#mgJudgeTimeout')).toBeEnabled();
-
-  // 3. Riacceso, tutto torna manovrabile.
-  await page.evaluate(() => {
-    const el = document.getElementById('mgRoutinesToggle');
-    el.checked = true;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  // Spente le routine, bilanci, istruzioni ed esplorazione si preparano per la riaccensione.
   await expect(page.locator('#mgProberIdle')).toBeEnabled();
-  await expect(page.locator('#mgCap2')).toBeEnabled();
-  await expect(page.locator('#mgFixInstructions')).toBeEnabled();
+  for (const id of ['#mgCap3', '#mgCap2', '#mgCap1', '#mgCap0', '#mgFixInstructions',
+    '#mgCap3Save', '#mgCap2Save', '#mgCap1Save', '#mgCap0Save', '#mgFixInstructionsSave']) {
+    await expect(page.locator(id)).toBeEnabled();
+  }
+  await expect(page.locator('#mgJudgeTimeout')).toBeEnabled();
+});
+
+test('a routine spente un bilancio e le istruzioni si modificano e restano salvati', async ({ openTab }) => {
+  // Il caso dell'owner: apre Gestione con le routine GIÀ spente e vuole cambiare i numeri.
+  const page = await apriAutomazioni(openTab);
+  await stubAutomation(page, { routinesEnabled: false });
+  await stubCaps(page, { cap3: 2, cap2: 5, cap1: 1, cap0: 0, fixInstructions: 'VECCHIO' });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(page.locator('#mgRoutinesState')).toHaveText('Off');
+
+  await page.locator('#mgCap3').fill('6');
+  await page.locator('#mgCap3Save').click();
+  await expect(page.locator('#mgCap3Msg')).toHaveText('Salvato.');
+  await page.locator('#mgFixInstructions').fill('Correggi prima i livelli 3.');
+  await page.locator('#mgFixInstructionsSave').click();
+  await expect(page.locator('#mgFixInstructionsMsg')).toHaveText('Salvato.');
+  await page.locator('#mgProberIdle + .mg-switch-track').click();
+
+  await expect.poll(() => page.evaluate(() => window.__capsSets))
+    .toEqual([{ cap3: 6 }, { fixInstructions: 'Correggi prima i livelli 3.' }]);
+  await expect.poll(() => page.evaluate(() => window.__automation.proberWhenIdle)).toBe(false);
+
+  // Riletti dalla config, i valori nuovi sono quelli che la pagina mostra.
+  await page.evaluate(() => {
+    document.getElementById('mgCap3').value = '';
+    document.getElementById('mgFixInstructions').value = '';
+  });
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(page.locator('#mgCap3')).toHaveValue('6');
+  await expect(page.locator('#mgFixInstructions')).toHaveValue('Correggi prima i livelli 3.');
+  expect(await page.evaluate(() => window.__automation.routinesEnabled)).toBe(false);
 });
 
 test('se il salvataggio dell\'interruttore fallisce, le routine NON risultano spente', async ({ openTab }) => {
@@ -662,8 +679,7 @@ test('se il salvataggio delle sessioni fallisce, la pagina NON mostra la scelta 
 });
 
 test('le scelte sulle sessioni restano manovrabili anche a routine spente', async ({ openTab }) => {
-  // Escludere un account è una cosa che si decide PRIMA di riaccendere: se
-  // fossero inerti come i bilanci, si potrebbe solo riaccendere e sperare.
+  // Escludere un account è una cosa che si decide PRIMA di riaccendere.
   const page = await apriAutomazioni(openTab);
   await stubAutomation(page);
   await stubSessions(page);
@@ -676,7 +692,7 @@ test('le scelte sulle sessioni restano manovrabili anche a routine spente', asyn
     el.checked = false;
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  await expect(page.locator('#mgCap2')).toBeDisabled();  // i bilanci sì, inerti
+  await expect(page.locator('#mgCap2')).toBeEnabled();
 
   for (const id of ['#mgMaxSessions', '#mgMaxSessionsSave', '#mgAccountA', '#mgAccountB']) {
     await expect(page.locator(id)).toBeEnabled();

@@ -396,11 +396,12 @@ test('una chat vuota non lascia un guscio senza titolo in Cronologia', async ({ 
 });
 
 test('l’intervista di benvenuto resta una conversazione anche se il modello dice "comando"', async ({ app, openTab }) => {
-  // Niente `configura`: su un profilo nuovo l'intervista è APERTA, e la prima
-  // chat È l'intervista. Il classificatore qui risponde sempre "comando":
-  // deve perdere.
+  // Niente `configura`: l'intervista è aperta col benvenuto, come la trova chi apre Filo la prima volta, e la prima
+  // chat È l'intervista. Il classificatore qui risponde sempre "comando": deve perdere.
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    const O = globalThis.SN_ONBOARDING;
+    await globalThis.SN_FILO_MEMORY.setOnboarding(O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE }));
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -1054,7 +1055,8 @@ test('l’esito di un comando lento resta nella chat in cui il comando è stato 
   await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 30_000 });
 
   // Un comando che ci mette qualche secondo, e l'utente se ne va prima.
-  await dash.locator('#input').fill('/sleep 4; echo "ESIT""O-TARDIVO"');
+  // La parola spezzata vale in sh e in PowerShell ("ESIT""O" in PowerShell stampa ESIT"O).
+  await dash.locator('#input').fill("/sleep 4; echo ESIT''O-TARDIVO");
   await dash.locator('#input').press('Enter');
   await dash.waitForTimeout(700);
   await dash.locator('#input').fill('/home');

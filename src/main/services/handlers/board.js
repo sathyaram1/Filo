@@ -27,21 +27,82 @@ module.exports = function register(on, ctx) {
   const FB = globalThis.SN_FEEDBACK;
   const { SN_CONST } = globalThis;
 
+  // #678.1 — un gesto non riuscito si DICE, con la frase giusta: chi vota o
+  // riapre deve sapere se manca la rete, la sessione o il fix stesso. Il
+  // messaggio grezzo resta nei log. `code` serve alla pagina per reagire.
+  const SESSIONE_SCADUTA = { ok: false, code: 'auth', error: 'Sessione scaduta: rifai l\'accesso.' };
+  const VOTO_NON_REGISTRATO = 'Il voto non è stato registrato: riprova.';
+  const RIAPERTURA_NON_PARTITA = 'La segnalazione non è partita: riprova.';
+  const TORNATO_IN_LAVORAZIONE = {
+    ok: false, code: 'gone',
+    error: 'Questo miglioramento è tornato in lavorazione: per ora non si può più votare né segnalare.',
+  };
+
+  function statoHttp(e) {
+    const s = Number(e && e.status);
+    if (s > 0) return s;
+    const m = /\((\d{3})\)/.exec(String((e && e.message) || ''));
+    return m ? Number(m[1]) : 0;
+  }
+
+  // Il token si chiede fuori da getUid(), che inghiotte ogni errore: senza
+  // rete il rinnovo fallisce e «sessione scaduta» manderebbe a rifare un
+  // accesso che non serve.
+  async function credenziali() {
+    let idToken = null;
+    try { idToken = await auth.getIdToken(); } catch (e) { return { fallito: e }; }
+    if (!idToken) return { esito: SESSIONE_SCADUTA };
+    const uid = await auth.getUid();
+    if (!uid) return { esito: SESSIONE_SCADUTA };
+    return { uid, idToken };
+  }
+
+  async function esitoFallito(e, id, generico) {
+    console.warn('[board] gesto non riuscito:', e?.message || e);
+    const CE = globalThis.SN_CHAT_ERRORS;
+    if (CE?.isTransientNetwork?.(e)) {
+      return { ok: false, code: 'offline', error: 'Non riesco a raggiungere il server: controlla la connessione e riprova.' };
+    }
+    // Un rinnovo rifiutato chiude la sessione (signOut in google-auth).
+    const st = statoHttp(e);
+    if (!auth.isSignedIn() || st === 401) return SESSIONE_SCADUTA;
+    // Una scheda che non c'è più non si può scrivere: le regole rifiutano la
+    // creazione, e la risposta è un 403 che da solo non dice perché.
+    if (id && (st === 403 || st === 404)) {
+      try {
+        const card = await FB.getPublic(id);
+        if (!inBacheca(card)) return TORNATO_IN_LAVORAZIONE;
+      } catch (_) { /* la verifica non è riuscita: resta la frase generica */ }
+    }
+    return { ok: false, error: generico };
+  }
+
+  function versioneRilasciata() {
+    try { return require('electron').app.getVersion(); } catch (_) { return ''; }
+  }
+
+  function inBacheca(card) {
+    if (!card) return false;
+    const MR = globalThis.SN_MANAGE_REVIEW;
+    if (!MR?.listBoardTab) return true;
+    return MR.listBoardTab([card], { releasedVersion: versioneRilasciata() }).length > 0;
+  }
+
   on(MSG.BOARD_CAST_VOTE, soloFilo(async (msg) => {
+    const id = String(msg?.id || '').trim();
     try {
       if (!auth.isSignedIn()) {
-        return { ok: false, error: 'Accedi per votare i miglioramenti.' };
+        return { ok: false, code: 'auth', error: 'Accedi per votare i miglioramenti.' };
       }
-      const id = String(msg?.id || '').trim();
       const vote = msg?.vote;
       if (!id) return { ok: false, error: 'Feedback non valido.' };
       if (vote !== 'works' && vote !== 'broken') {
         return { ok: false, error: "Voto non valido: usa 'works' o 'broken'." };
       }
-      const uid = await auth.getUid();
-      if (!uid) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      const idToken = await auth.getIdToken();
-      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const cr = await credenziali();
+      if (cr.esito) return cr.esito;
+      if (cr.fallito) return esitoFallito(cr.fallito, id, VOTO_NON_REGISTRATO);
+      const { uid, idToken } = cr;
       if (!FB?.castVote) throw new Error('SN_FEEDBACK non caricato nel main process');
 
       await FB.castVote(id, { uid, vote, credibilitySnapshot: 1 }, { idToken });
@@ -67,7 +128,7 @@ module.exports = function register(on, ctx) {
         balance: reward.balance,
       };
     } catch (e) {
-      return { ok: false, error: e?.message || String(e) };
+      return esitoFallito(e, id, VOTO_NON_REGISTRATO);
     }
   }));
 
@@ -95,21 +156,21 @@ module.exports = function register(on, ctx) {
   // utente, mai duplicati. In entrambi i rami di fallimento dopo aver scalato,
   // restituiamo i crediti (compensazione best-effort).
   on(MSG.BOARD_REOPEN, soloFilo(async (msg) => {
+    const id = String(msg?.id || '').trim();
     try {
       if (!auth.isSignedIn()) {
-        return { ok: false, error: 'Accedi per segnalare che un fix è ancora rotto.' };
+        return { ok: false, code: 'auth', error: 'Accedi per segnalare che un fix è ancora rotto.' };
       }
-      const id = String(msg?.id || '').trim();
       const text = String(msg?.text || '').trim();
       if (!id) return { ok: false, error: 'Feedback non valido.' };
       if (!text) return { ok: false, error: 'Descrivi cosa non funziona ancora.' };
       if (text.length > 10000) return { ok: false, error: 'Testo troppo lungo.' };
 
-      const uid = await auth.getUid();
-      if (!uid) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      const idToken = await auth.getIdToken();
-      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      if (!FB?.castReopenRequest || !FB?.submit) throw new Error('SN_FEEDBACK non caricato nel main process');
+      const cr = await credenziali();
+      if (cr.esito) return cr.esito;
+      if (cr.fallito) return esitoFallito(cr.fallito, id, RIAPERTURA_NON_PARTITA);
+      const { uid, idToken } = cr;
+      if (!FB?.castReopenRequest || !FB?.submit || !FB?.getPublic) throw new Error('SN_FEEDBACK non caricato nel main process');
 
       const MR = globalThis.SN_MANAGE_REVIEW;
       if (!MR?.canReopen) throw new Error('SN_MANAGE_REVIEW non caricato nel main process');
@@ -117,14 +178,13 @@ module.exports = function register(on, ctx) {
       // Idoneità: rilegge il documento originale (non fidarsi dello stato che
       // il renderer aveva in cache) e applica lo stesso gate "Risolti, niente
       // red-team" della board + il guard anti-doppia-riapertura.
-      const original = await fetchFeedback(id);
-      if (!original) return { ok: false, error: 'Feedback non trovato.' };
-      let releasedVersion = '';
-      try { releasedVersion = require('electron').app.getVersion(); } catch (_) { /* test env */ }
-      if (!MR.canReopen(original, { releasedVersion })) {
+      // Un guasto di rete qui non è «fix non trovato»: sale a esitoFallito.
+      const original = await FB.getPublic(id);
+      if (!original) return TORNATO_IN_LAVORAZIONE;
+      if (!MR.canReopen(original, { releasedVersion: versioneRilasciata() })) {
         return MR.hasReopenRequest(original)
-          ? { ok: false, error: 'Questo fix è già stato segnalato come ancora rotto.' }
-          : { ok: false, error: 'Questo fix non è (più) riapribile dalla bacheca.' };
+          ? { ok: false, code: 'gone', error: 'Qualcuno ha già segnalato che questo miglioramento non funziona ancora: è tornato in lavorazione.' }
+          : TORNATO_IN_LAVORAZIONE;
       }
 
       // Anti-spam: scala i crediti SOLO se il saldo basta (nessun saldo
@@ -184,21 +244,21 @@ module.exports = function register(on, ctx) {
 
       return { ok: true, feedbackId: created.id, balance: spend.balance };
     } catch (e) {
-      return { ok: false, error: e?.message || String(e) };
+      return esitoFallito(e, id, RIAPERTURA_NON_PARTITA);
     }
   }));
 
   on(MSG.BOARD_CLEAR_VOTE, soloFilo(async (msg) => {
+    const id = String(msg?.id || '').trim();
     try {
       if (!auth.isSignedIn()) {
-        return { ok: false, error: 'Accedi per votare i miglioramenti.' };
+        return { ok: false, code: 'auth', error: 'Accedi per votare i miglioramenti.' };
       }
-      const id = String(msg?.id || '').trim();
       if (!id) return { ok: false, error: 'Feedback non valido.' };
-      const uid = await auth.getUid();
-      if (!uid) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      const idToken = await auth.getIdToken();
-      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const cr = await credenziali();
+      if (cr.esito) return cr.esito;
+      if (cr.fallito) return esitoFallito(cr.fallito, id, VOTO_NON_REGISTRATO);
+      const { uid, idToken } = cr;
       if (!FB?.clearVote) throw new Error('SN_FEEDBACK non caricato nel main process');
 
       await FB.clearVote(id, uid, { idToken });
@@ -207,42 +267,25 @@ module.exports = function register(on, ctx) {
       const votes = await fetchVotes(id);
       return { ok: true, uid, votes };
     } catch (e) {
-      return { ok: false, error: e?.message || String(e) };
+      return esitoFallito(e, id, VOTO_NON_REGISTRATO);
     }
   }));
 
-  // Legge la SCHEDA PUBBLICA del fix (`feedback-public/{id}`, #583): serve a
-  // BOARD_REOPEN per verificare l'idoneità con i dati FRESCHI dal server
-  // (status/resolvedInVersion/reopenRequests), non con quanto il renderer ha in
-  // cache. È la scheda e non il documento perché il documento, da quando la
-  // collezione non è più pubblica, questa macchina non lo può aprire — e non
-  // deve: il testo e l'URL di quel feedback sono di chi l'ha mandato.
-  // Ritorna null se non trovato o in caso d'errore di rete.
-  async function fetchFeedback(id) {
-    if (!FB?.getPublic) return null;
-    try {
-      return await FB.getPublic(id);
-    } catch (_) {
-      return null;
-    }
-  }
-
   // Legge SOLO il campo `votes` della scheda pubblica (GET singolo, proiezione
-  // mask) — più leggero di una lista intera per un solo documento. Ritorna {}
-  // se la scheda non ha ancora voti o in caso d'errore (best-effort: il
-  // chiamante ha comunque appena scritto il proprio voto).
+  // mask). {} = la scheda non ha voti; null = rilettura non riuscita, e la
+  // pagina tiene il conteggio che ha: un {} lì azzererebbe un voto già scritto.
   async function fetchVotes(id) {
-    if (!FB?.rest) return {};
+    if (!FB?.rest) return null;
     try {
       const url = `${FB.rest.FIRESTORE_BASE}/${FB.rest.VIEW_COLLECTION}/${encodeURIComponent(id)}` +
         `?mask.fieldPaths=votes&key=${FB.rest.API_KEY}`;
       const res = await fetch(url);
-      if (!res.ok) return {};
+      if (!res.ok) return null;
       const doc = await res.json();
       const obj = FB.fsDocToObject(doc);
       return (obj && typeof obj.votes === 'object' && obj.votes) || {};
     } catch (_) {
-      return {};
+      return null;
     }
   }
 };

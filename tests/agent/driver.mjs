@@ -36,8 +36,9 @@ export async function launchFilo({ userDataPrefix = 'filo-agent-', extraEnv = {}
   // Cartella canonica e con uno spazio nel nome, come per ogni altra partenza:
   // tests/helpers/percorsi.mjs.
   const userData = cartellaTemporanea(userDataPrefix);
-  const env = { ...process.env, FILO_USER_DATA: userData, ...extraEnv };
-  delete env.NODE_ENV; // produzione-like (relay log resta attivo)
+  // Produzione-like (relay log resta attivo), ma il servizio vero delle schede resta chiuso come in ogni prova.
+  const env = { ...process.env, FILO_USER_DATA: userData, FILO_SERVIZI_CHIUSI: '1', ...extraEnv };
+  delete env.NODE_ENV;
   // `argomentiScala` porta qui FILO_TEST_SCALE. Senza, il comando con cui si
   // GUARDA una modifica visiva girava sempre al 100% anche con la manopola
   // accesa, e non lo diceva: chi la usava per rivedere un rosso da 125% vedeva

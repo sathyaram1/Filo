@@ -15,7 +15,7 @@
   const code = (info && info.code) || '';
   const desc = (info && info.desc) || '';
 
-  const msg = NE ? NE.describe(code, desc) : { title: 'Impossibile caricare la pagina', hint: '', offline: false };
+  const msg = NE ? NE.describe(code, desc, { altroPaese: !!(info && info.altroPaese) }) : { title: 'Impossibile caricare la pagina', hint: '', offline: false };
 
   // Host del bersaglio, per titolo scheda + riga sotto al titolo. textContent
   // ovunque: l'URL arriva dalla query string, mai iniettarlo come HTML.

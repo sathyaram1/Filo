@@ -7,6 +7,21 @@ const Defaults = require('../defaultsStore');
 const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
 const { daFilo, soloFilo } = require('./origine');
+const { spiegaErroreAccesso } = require('../../auth/esitoAccesso');
+const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { consiglioPortachiavi } = require('../../portachiavi');
+
+// Chi accede su un computer senza portachiavi di sistema scopriva solo alla
+// riapertura di essere di nuovo fuori, e pensava a un guasto (#708.1).
+const CHIAVE_AVVISO_NON_RICORDATO = 'accesso-non-ricordato';
+function testoAccessoNonRicordato() {
+  const base = 'Hai fatto l\'accesso, ma Filo non trova un portachiavi di sistema dove custodirlo: '
+    + 'quando chiudi Filo dovrai accedere di nuovo.';
+  let backend = '';
+  try { backend = require('electron').safeStorage.getSelectedStorageBackend?.() || ''; } catch (_) {}
+  const consiglio = consiglioPortachiavi({ platform: process.platform, backend });
+  return consiglio ? `${base} ${consiglio}` : base;
+}
 
 // Base delle Cloud Function callable del backend di sicurezza (filo-security):
 // stessa region/progetto del deploy. Override per i test via env.
@@ -246,13 +261,19 @@ module.exports = function register(on, ctx) {
     const isAdmin = auth.isAdmin();
     if (!daFilo(origin, sender)) return { ok: true, signedIn, isAdmin };
     const uid = signedIn ? await auth.getUid() : null;
-    return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid };
+    return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid, remembered: auth.isRemembered() };
   });
 
   on(MSG.AUTH_SIGNIN, async () => {
     try {
       const profile = await auth.signIn();
-      avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
+      const remembered = auth.isRemembered();
+      avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile, remembered });
+      // Nel main e non nelle pagine: all'accesso si arriva da molte porte
+      // (menu account, bacheca, posta, red-team, siti), e l'avviso vale per tutte.
+      if (auth.isSignedIn() && !remembered) {
+        avvisoNellaFinestra(testoAccessoNonRicordato(), { chiave: CHIAVE_AVVISO_NON_RICORDATO });
+      }
       // Rinfresca la config condivisa in background. Le chiavi ruotate
       // dall'admin NON si leggono più qui (#581: config/secrets è admin-only e
       // le chiavi arrivano col build); resta utile per config/models.
@@ -260,9 +281,9 @@ module.exports = function register(on, ctx) {
       // Appena l'owner è dentro, la vista pubblica dei feedback si rimette in
       // pari da sola (#583): è il momento in cui il main ha di nuovo il token.
       if (auth.isAdmin()) scheduleViewSync({ delayMs: 4000, force: true });
-      return { ok: true, profile, isAdmin: auth.isAdmin() };
+      return { ok: true, profile, isAdmin: auth.isAdmin(), remembered };
     } catch (e) {
-      return { ok: false, error: e?.message || String(e) };
+      return { ok: false, ...spiegaErroreAccesso(e) };
     }
   });
 
@@ -794,12 +815,21 @@ module.exports = function register(on, ctx) {
     return rows;
   }
 
-  async function mergeCardFields(rows) {
+  // Per pochi feedback si chiedono le loro sole schede: il giro della Gestione
+  // rileggeva tutte le schede (centinaia di letture) per riunirne due o tre.
+  const SCHEDE_MIRATE_MAX = 100;
+
+  async function mergeCardFields(rows, { mirate = false } = {}) {
     const V = PUBLIC_VIEW();
     if (!V || !Array.isArray(rows) || rows.length === 0) return rows;
     let cards;
-    try { cards = await publicCards(); }
-    catch (e) {
+    const FB = FEEDBACK();
+    const ids = rows.map((r) => r && r._id).filter(Boolean);
+    try {
+      cards = (mirate && FB && FB.getManyPublic && ids.length <= SCHEDE_MIRATE_MAX)
+        ? await FB.getManyPublic(ids, { timeoutMs: 20000 })
+        : await publicCards();
+    } catch (e) {
       console.warn('[feedback] schede pubbliche non lette:', e?.message || e);
       return rows; // meglio i voti storici che nessun feedback
     }
@@ -818,7 +848,7 @@ module.exports = function register(on, ctx) {
       const ids = Array.isArray(msg.ids) ? msg.ids : [];
       const soloCampi = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
       const rows = await FB.getMany(ids, { timeoutMs, idToken, fields: soloCampi });
-      return { ok: true, rows: await mergeCardFields(rows) };
+      return { ok: true, rows: await mergeCardFields(rows, { mirate: true }) };
     }
     // La lettura COMPLETA (#496): la chiede la scheda delle statistiche, che
     // fa domande sull'INSIEME («quanti ne sono arrivati in tutto»), e a una

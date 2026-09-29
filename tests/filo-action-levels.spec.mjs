@@ -6,7 +6,7 @@
 // dispatch (anche se arrivano già "confermate" dal client).
 
 import { test, expect } from './fixtures/electron.mjs';
-import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, fillConfirmInput } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, fillConfirmInput, mouseClickConfirm, pointWhenConfirmAppears } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -172,6 +172,33 @@ test('livello 3: il bottone resta bloccato finché non si digita "conferma"', as
   expect(await page.evaluate(() => window.__typedResult)).toBe(true);
 });
 
+// #592: col testo più alto del riquadro e la parola scritta, il bottone non
+// resta muto. Invio o clic portano avanti il testo; in fondo eseguono.
+test('livello 3 con un testo lungo: Invio e clic portano avanti il testo, e in fondo eseguono', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await page.evaluate(() => {
+    window.__typedResult = undefined;
+    const righe = Array.from({ length: 60 }, (_, i) => `Riga ${i + 1}.`).join('\n');
+    window.SN_CONFIRM_UI.confirmTyped({ title: 'Eliminazione', text: righe })
+      .then((r) => { window.__typedResult = r; });
+  });
+  const host = page.locator(CONFIRM_HOST);
+  await expect(host).toBeVisible();
+  await fillConfirmInput(page, 'conferma');
+  expect((await confirmState(page)).okDisabled).toBe(true);
+
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await confirmState(page)).textScrollTop).toBeGreaterThan(0);
+  await expect(host).toBeVisible();
+
+  for (let i = 0; i < 10 && await host.count(); i++) {
+    await page.waitForTimeout(400);
+    if (await host.count()) await mouseClickConfirm(page, 'danger');
+  }
+  await expect(host).toHaveCount(0);
+  expect(await page.evaluate(() => window.__typedResult)).toBe(true);
+});
+
 // #479 — scaricare dentro una cartella sensibile passava dalla conferma leggera.
 // `wget -O ~/.ssh/…` chiedeva di digitare "conferma"; `wget -P ~/.ssh …`, e
 // soprattutto un `cd ~/.ssh` (eseguito subito, senza chiedere niente, valido per
@@ -233,6 +260,90 @@ test('#479: scaricare dopo essersi spostati in una cartella sensibile chiede "co
   // alla conferma leggera (nessuna frizione aggiunta dove non serve).
   const stampa = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'curl http://esempio.test/x' });
   expect(stampa.needsConfirm).toBe(2);
+});
+
+// #592 — un riquadro che si apre da solo non prende come risposta un gesto
+// partito per altro: chi scriveva continua a scrivere nel suo campo, e un clic
+// arrivato mentre compare non vale come sì. Le tre forme del riquadro, una regola.
+test('un riquadro che si apre mentre scrivi lascia i tasti al tuo campo: avviso e conferma da digitare', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  const campo = page.locator('#input');
+  for (const apri of [
+    () => { window.__esito = undefined; window.SN_CONFIRM_UI.notify({ title: 'Crediti in regalo', text: 'Ti sono stati regalati 50 crediti!', okLabel: 'Evviva!' }).then((r) => { window.__esito = r; }); },
+    () => { window.__esito = undefined; window.SN_CONFIRM_UI.confirmTyped({ title: 'Eliminazione', text: 'Eliminare tutto.' }).then((r) => { window.__esito = r; }); },
+  ]) {
+    await campo.fill('');
+    await campo.click();
+    await page.keyboard.type('che tempo', { delay: 20 });
+    await page.evaluate(apri);
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+    await page.keyboard.type(' fa domani', { delay: 20 });
+    await expect(page.locator(CONFIRM_HOST), 'il riquadro si è chiuso col tasto battuto per la chat').toBeVisible();
+    expect(await page.evaluate(() => window.__esito)).toBeUndefined();
+    await clickConfirm(page, (await confirmState(page)).hasInput ? 'cancel' : 'ok');
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+    await expect(campo).toHaveValue('che tempo fa domani');
+  }
+});
+
+// L'Invio che spedisce e i tasti dati a un popup non sono «sta scrivendo»: la
+// conferma da digitare che si apre subito dopo prende «conferma» nel suo campo.
+test('nell’Aiuto, dopo l’invio o dopo un popup confermato da tastiera, «conferma» va nel campo del popup', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await page.evaluate(() => window.SN_SIDEBAR.open());
+  const area = page.locator('.sn-sidebar-input textarea');
+  await expect(area).toBeVisible();
+  const scriviConferma = async (caso) => {
+    await expect.poll(async () => (await confirmState(page))?.hasInput).toBe(true);
+    await page.keyboard.type('conferma', { delay: 30 });
+    const s = await confirmState(page);
+    const chat = await area.inputValue();
+    await page.keyboard.press('Escape');
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+    expect(chat, `${caso}: «conferma» è finito nel campo dell’Aiuto`).toBe('');
+    expect(s.okDisabled, `${caso}: «conferma» non è arrivato al campo del popup`).toBe(false);
+  };
+
+  await area.click();
+  await page.keyboard.type('cancella tutta la memoria', { delay: 20 });
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(500);
+  await page.evaluate(() => { window.SN_CONFIRM_UI.confirmTyped({ title: 'Filo chiede conferma', text: 'Eliminare tutta la memoria.' }); });
+  await scriviConferma('dopo l’invio');
+
+  await area.evaluate((el) => { el.value = ''; });
+  await area.click();
+  await page.evaluate(() => {
+    window.SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Procedo?' })
+      .then(() => window.SN_CONFIRM_UI.confirmTyped({ title: 'Filo chiede conferma', text: 'Eliminare tutta la memoria.' }));
+  });
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  await page.waitForTimeout(600);
+  for (const tasto of ['Tab', 'Tab', 'Enter']) {
+    await page.keyboard.press(tasto);
+    await page.waitForTimeout(100);
+  }
+  await scriviConferma('dopo un popup confermato da tastiera');
+});
+
+test('un clic arrivato mentre il riquadro compare non vale come sì; quello dato dopo sì', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  for (const [apri, bottone] of [
+    [() => { window.__esito = undefined; window.SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Procedo?' }).then((r) => { window.__esito = r; }); }, 'ok'],
+    [() => { window.__esito = undefined; window.SN_CONFIRM_UI.notify({ title: 'Crediti in regalo', text: 'Ti sono stati regalati 50 crediti!' }).then((r) => { window.__esito = r; }); }, 'ok'],
+  ]) {
+    const punto = pointWhenConfirmAppears(page, bottone);
+    await page.evaluate(apri);
+    const p = await punto;
+    expect(p, 'il riquadro non è comparso').toBeTruthy();
+    await page.mouse.click(p.x, p.y);
+    await page.waitForTimeout(200);
+    await expect(page.locator(CONFIRM_HOST), 'un clic arrivato mentre il riquadro compariva l’ha chiuso').toBeVisible();
+    await page.waitForTimeout(500);
+    await mouseClickConfirm(page, bottone);
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+    expect(await page.evaluate(() => window.__esito)).toBe(true);
+  }
 });
 
 test('Esc annulla il popup di conferma', async ({ openTab }) => {

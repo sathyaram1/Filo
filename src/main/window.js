@@ -6,6 +6,7 @@ const { BrowserWindow, session } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { TabManager } = require('./tabs');
+const { collegaScorciatoie } = require('./shortcuts');
 const { registerFiloProtocolForSession } = require('./protocol');
 
 const SHELL_HEIGHT = 88;
@@ -75,6 +76,8 @@ function wireWindowCommon(win, tabs) {
     if (input.type !== 'keyDown' || input.key !== 'Escape') return;
     if (tabs.handleFullscreenEscape(null)) event.preventDefault();
   });
+  // Spiega, Traduci, Salva per dopo e Aiuto anche col fuoco sulla barra.
+  collegaScorciatoie(win.webContents, win);
 
   // Indietro e avanti senza tastiera (#685). Le due strade non si sovrappongono
   // mai — Electron manda gli app-command su Windows e Linux, lo swipe su Mac —
@@ -190,16 +193,19 @@ function createIncognitoWindow() {
   wireWindowCommon(win, tabs);
 
   win.webContents.once('did-finish-load', async () => {
-    tabs.openTab('filo://newtab/'); // niente restore in incognito
+    // Niente restore in incognito. Una scheda aperta qui prima che la barra finisse di caricarsi resta davanti.
+    if (!tabs.tabs.length) tabs.openTab('filo://newtab/');
     revealWindow(win);
   });
 
   // Alla chiusura dell'ULTIMA finestra incognito, azzera l'overlay in RAM: nulla
   // di ciò che è stato scritto durante la sessione sopravvive.
   win.on('closed', () => {
+    try { require('./services/downloads').forgetScope(partition); } catch (_) {}
     const stillOpen = BrowserWindow.getAllWindows().some((w) => w !== win && w._filoIncognito);
     if (!stillOpen) {
       try { require('./shim/storage').resetIncognito(); } catch (_) {}
+      try { require('./services/cookies').resetIncognito(); } catch (_) {}
     }
   });
 

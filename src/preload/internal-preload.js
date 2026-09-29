@@ -7,12 +7,6 @@
 
 const { ipcRenderer, webFrame } = require('electron');
 
-// Modalità zoom con la rotella attivata dal click centrale (sostituisce
-// l'autoscroll nativo) + zoom con Ctrl/Cmd (rotella, pinch del trackpad,
-// Ctrl +/-/0): sulle pagine interne funziona come su quelle web. Le pagine che
-// zoomano da sé si tirano fuori con `dataset.filoOwnZoom`. Vedi wheel-zoom.js.
-try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
-
 // ─── SICUREZZA: gate d'origine ─────────────────────────────────────────────
 // Questo preload è PRIVILEGIATO: espone window.filo (IPC, shell, AI stream) e
 // uno shim chrome.* con accesso a storage (chiavi API + TUTTI i dati utente) e
@@ -27,6 +21,15 @@ try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer }); } c
 const IS_FILO_ORIGIN = (() => {
   try { return location.protocol === 'filo:'; } catch (_) { return false; }
 })();
+
+// Modalità zoom con la rotella attivata dal click centrale (sostituisce
+// l'autoscroll nativo) + zoom con Ctrl/Cmd (rotella, pinch del trackpad,
+// Ctrl +/-/0): sulle pagine interne funziona come su quelle web. Le pagine che
+// zoomano da sé si tirano fuori con `dataset.filoOwnZoom`. Vedi wheel-zoom.js.
+// Quel marcatore vale solo se il documento è davvero filo://: se un documento
+// non nostro finisse a girare qui (il caso che teme il gate qui sopra) se lo
+// scriverebbe da sé per rendersi impossibile da ingrandire (#686).
+try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer, interna: IS_FILO_ORIGIN }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
 
 let streamCounter = 0;
 
@@ -239,7 +242,7 @@ const chromeShim = {
 };
 
 // ─── shortcut hook ─────────────────────────────────────────────────────────
-// Gemello dell'adattatore in page-preload.js. Lo shortcut globale (Alt+E/Alt+T/
+// Gemello dell'adattatore in page-preload.js. La scorciatoia (Alt+E/Alt+T/
 // Alt+H in shortcuts.js) e la voce "Aiuto" del menu tasto destro sulla linguetta
 // (TabManager.openHelp in tabs.js) fanno webContents.send('shortcut:triggered')
 // sul tab attivo. Il content script (content.js) ascolta MSG.SHORTCUT_TRIGGERED
@@ -250,11 +253,9 @@ const chromeShim = {
 // la voce "Aiuto" per dire all'agente da dove è stato invocato). Solo su origine
 // filo://, dove lo shim e i content script sono davvero installati.
 if (IS_FILO_ORIGIN) {
-  ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
-    const t = globalThis.SN_MSG?.MSG?.SHORTCUT_TRIGGERED || 'shortcut_triggered';
-    for (const fn of chromeShim.runtime.onMessage._listeners) {
-      try { fn({ type: t, command, context }, { id: 'filo-desktop' }, () => {}); } catch (_) {}
-    }
+  const consegnaScorciatoia = require('./scorciatoia.js');
+  ipcRenderer.on('shortcut:triggered', (_event, payload = {}) => {
+    consegnaScorciatoia(chromeShim.runtime.onMessage._listeners, payload, filoApi.message);
   });
 }
 
@@ -274,6 +275,8 @@ function injectContentScriptStyles() {
     document.head.appendChild(link);
   }
 }
+// Stesso elenco di loadScripts() in page-preload.js: le differenze ammesse
+// stanno in tests/unit/contentScriptPreload.test.mjs.
 function loadContentScripts() {
   const SHARED = path.join(__dirname, '..', 'shared');
   const CONTENT = path.join(__dirname, '..', 'content');
@@ -291,10 +294,11 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'tasti.js')); // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   safe(path.join(SHARED, 'campoTesto.js')); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  safe(path.join(SHARED, 'filoMarkdown.js')); // #853 — senza, le risposte del modello entrano come HTML
+  safe(path.join(SHARED, 'linkSospetto.js')); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   safe(path.join(SHARED, 'themeTokens.js'));
   safe(path.join(SHARED, 'confirmUi.js'));
   safe(path.join(SHARED, 'chatErrors.js')); // #360 — errori tecnici → frasi per l'utente
-  safe(path.join(SHARED, 'linkSospetto.js')); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   safe(path.join(SHARED, 'icons.js'));
   safe(path.join(SHARED, 'qr.js'));
   safe(path.join(SHARED, 'calcMarkers.js')); // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js

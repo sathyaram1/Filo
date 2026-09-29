@@ -19,8 +19,8 @@
 // riporta il nome lungo. Fuori da Windows fa il suo lavoro di sempre (risolve
 // `/tmp` → `/private/tmp` su macOS), quindi si usa ovunque.
 
-import { mkdtempSync, realpathSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, realpathSync, symlinkSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // Forma canonica di un percorso ESISTENTE. Se il percorso non c'è (o il sistema
@@ -56,4 +56,17 @@ export const SPAZIO = 'con spazio-';
 // vecchia. Il prefisso resta in testa, così la cartella si riconosce a occhio.
 export function cartellaTemporanea(prefisso) {
   return percorsoCanonico(mkdtempSync(join(tmpdir(), `${prefisso}${SPAZIO}`)));
+}
+
+// Una cartella nuova DENTRO la cartella personale: è lì che il perimetro di
+// lettura (#587) lascia leggere senza chiedere. La temporanea di sistema sta
+// fuori (`/tmp`) o in AppData, dove ogni lettura chiede un OK.
+export function cartellaInCasa(prefisso) {
+  return percorsoCanonico(mkdtempSync(join(homedir(), `${prefisso}${SPAZIO}`)));
+}
+
+// Su Windows un symlink vuole l'amministratore o la modalità sviluppatore (EPERM, #742):
+// una junction no, e Node la risolve allo stesso modo. Altrove resta un symlink.
+export function collegaCartella(verso, collegamento) {
+  symlinkSync(verso, collegamento, process.platform === 'win32' ? 'junction' : 'dir');
 }

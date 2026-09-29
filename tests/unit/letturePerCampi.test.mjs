@@ -2,21 +2,23 @@
 //
 // Perché conta. Un feedback pesa qualche KB — testo cifrato, note, allegati — e
 // gli script di manutenzione ne guardano tre o quattro campi. Lanciati qualche
-// volta nello stesso pomeriggio (prova a secco, applicazione, controllo) su una
-// collezione intera fanno una raffica: a settembre 2026 un solo giorno ha fatto
-// il 40% del conto mensile di Firestore (#680).
+// volta nello stesso pomeriggio su una collezione intera fanno una raffica: a
+// settembre 2026 un solo giorno ha fatto il 40% del conto mensile (#680).
 //
-// La proiezione non si può rendere obbligatoria nella porta comune senza
-// spezzare le pagine dell'app, che la lettura intera la vogliono davvero.
-// Quindi la regola vive qui: chi scrive il prossimo script di manutenzione se ne
-// accorge in millisecondi invece che in fattura.
+// Il freno guarda la RICHIESTA che parte (scripts/lib/freno-letture.mjs), non
+// come è scritto il comando: ogni grafia nuova produce la stessa richiesta, e un
+// freno sul testo ne lasciava passare cinque (#680.1). Qui si prova quello.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync, readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
+import {
+  scansioneSenzaCampi, conFreno, ScansioneSenzaCampi, DOCUMENTI_SENZA_CAMPI_MAX,
+} from '../../scripts/lib/freno-letture.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -29,61 +31,112 @@ require(join(ROOT, 'src', 'shared', 'feedbackPublicView.js'));
 
 const FB = globalThis.SN_FEEDBACK;
 const BA = globalThis.SN_BOARD_ARCHIVE;
+const BASE = 'https://firestore.googleapis.com/v1/projects/p/databases/(default)/documents';
 
-// I nomi VERI dei metodi di lettura del modulo, chiesti al modulo: un elenco
-// scritto a mano invecchia, e con l'elenco `listAll` e `listAllPublicPaged`
-// passavano davanti al freno senza una parola (#680, primo giro).
-const METODI_LISTA = Object.keys(FB).filter((k) => /^list/.test(k) && typeof FB[k] === 'function');
-
-// Le tre forme con cui uno script chiede una collezione, e come si dice «solo
-// questi campi» in ognuna.
-const FORME = [
-  {
-    nome: 'le liste dei feedback (SN_FEEDBACK)',
-    // Il RICEVITORE è qualunque: il modulo lo si tiene in una variabile, e
-    // chiamarla `segnalazioni` invece di `FB` non deve spegnere il freno
-    // (#680, secondo giro). Sono i NOMI dei metodi a essere esatti, così
-    // `server.listen(` e simili non finiscono nel mucchio.
-    chiamata: new RegExp(`\\b[A-Za-z_$][\\w$]*\\s*\\.\\s*(?:${METODI_LISTA.join('|')})\\s*\\(`),
-    campi: /fields\s*:/,
-    perChiamata: true,
-    rimedio: 'passa `fields: [...]` (es. SN_BOARD_ARCHIVE.CAMPI_DECISIONE)',
-  },
-  {
-    nome: 'una structuredQuery scritta a mano',
-    chiamata: /structuredQuery\s*[=.]/,
-    // Solo dove la query porta via DOCUMENTI: un conteggio
-    // (`:runAggregationQuery`) non ne consegna nessuno e non ha niente da
-    // proiettare.
-    soloSe: /:runQuery\b/,
-    campi: /\.select\s*=|select\s*:/,
-    rimedio: 'aggiungi `select: { fields: [...] }` alla structuredQuery',
-  },
-  {
-    nome: 'la lista REST dei documenti',
-    chiamata: /\/feedback\?pageSize|\/feedback\?\$\{/,
-    campi: /mask\.fieldPaths/,
-    rimedio: 'aggiungi `mask.fieldPaths=<campo>` alla query string',
-  },
-];
-
-// Gli argomenti di UNA chiamata, dalla parentesi aperta alla sua: la regola è
-// per chiamata, non per file. Un file che altrove passa i campi non assolve la
-// scansione che li ha dimenticati.
-function argomentiDellaChiamata(testo, da) {
-  let profondita = 0;
-  for (let i = da; i < testo.length; i += 1) {
-    const c = testo[i];
-    if (c === '(') profondita += 1;
-    else if (c === ')') { profondita -= 1; if (profondita === 0) return testo.slice(da, i + 1); }
-  }
-  return testo.slice(da);
+// La rete finta sotto il freno: registra quello che le arriva davvero.
+async function sottoIlFreno(fn) {
+  const arrivate = [];
+  const vera = globalThis.fetch;
+  globalThis.fetch = conFreno(async (input, init) => {
+    arrivate.push({ url: String(input), init });
+    return { ok: true, status: 200, json: async () => [], text: async () => '' };
+  });
+  try {
+    let errore = null;
+    try { await fn(); } catch (e) { errore = e; }
+    return { arrivate, errore };
+  } finally { globalThis.fetch = vera; }
 }
 
+async function modulo(codice) {
+  return import(`data:text/javascript,${encodeURIComponent(codice)}`);
+}
+
+// Lo strumento che il prossimo scriverà senza sapere del freno, in ogni grafia
+// trovata finora. Ognuna scarica la collezione intera; accanto, la stessa
+// scansione che dice i campi, che deve passare.
+const GRAFIE = {
+  'la grafia degli script di oggi': [
+    'const FB = globalThis.SN_FEEDBACK; export const tutti = () => FB.listAllPaged({ idToken: "t" });',
+    'const FB = globalThis.SN_FEEDBACK; export const tutti = () => FB.listAllPaged({ idToken: "t", fields: ["seq"] });',
+  ],
+  'col punto di domanda (FB?.listAllPaged)': [
+    'const FB = globalThis.SN_FEEDBACK; export const tutti = () => FB?.listAllPaged({ idToken: "t" });',
+    'const FB = globalThis.SN_FEEDBACK; export const tutti = () => FB?.listAllPaged({ idToken: "t", fields: ["seq"] });',
+  ],
+  'il metodo preso dal modulo e chiamato da solo': [
+    'const { listAll } = globalThis.SN_FEEDBACK; export const tutti = () => listAll({ idToken: "t" });',
+    'const { listAll } = globalThis.SN_FEEDBACK; export const tutti = () => listAll({ idToken: "t", fields: ["seq"] });',
+  ],
+  'la domanda al database scritta dentro la richiesta': [
+    `export const tutti = () => fetch("${BASE}:runQuery?key=k", { method: "POST",
+      body: JSON.stringify({ structuredQuery: { from: [{ collectionId: "feedback" }], limit: 500 } }) });`,
+    `export const tutti = () => fetch("${BASE}:runQuery?key=k", { method: "POST",
+      body: JSON.stringify({ structuredQuery: { from: [{ collectionId: "feedback" }], limit: 500, select: { fields: [{ fieldPath: "seq" }] } } }) });`,
+  ],
+  'la chiave davanti al numero di pagina': [
+    `export const tutti = () => fetch(\`${BASE}/feedback?key=k&pageSize=300\`);`,
+    `export const tutti = () => fetch(\`${BASE}/feedback?key=k&pageSize=300&mask.fieldPaths=seq\`);`,
+  ],
+  'l\'indirizzo messo insieme con un più': [
+    `const qs = "pageSize=300"; export const tutti = () => fetch("${BASE}" + "/feedback?" + qs);`,
+    `const qs = "pageSize=300&mask.fieldPaths=seq"; export const tutti = () => fetch("${BASE}" + "/feedback?" + qs);`,
+  ],
+  'le schede pubbliche, senza credenziali': [
+    'export const tutti = () => globalThis.SN_FEEDBACK.listAllPublicPaged({});',
+    'export const tutti = () => globalThis.SN_FEEDBACK.listAllPublicPaged({ fields: ["votes"] });',
+  ],
+};
+
+for (const [come, [nudo, proiettato]] of Object.entries(GRAFIE)) {
+  test(`il freno ferma la scansione senza campi prima della rete: ${come}`, async () => {
+    const senza = await sottoIlFreno(async () => (await modulo(nudo)).tutti());
+    assert.ok(senza.errore instanceof ScansioneSenzaCampi,
+      `«${come}» doveva fermarsi, invece: ${senza.errore ? senza.errore.message : 'nessun errore'}`);
+    assert.equal(senza.arrivate.length, 0, 'la richiesta è arrivata alla rete: il documento intero è già pagato');
+    const con = await sottoIlFreno(async () => (await modulo(proiettato)).tutti());
+    assert.equal(con.errore, null, `«${come}» dice i campi e il freno lo ferma lo stesso: ${con.errore && con.errore.message}`);
+    assert.ok(con.arrivate.length >= 1, 'la scansione con i campi non è partita');
+  });
+}
+
+test('il freno lascia passare quello che non è una scansione di documenti interi', () => {
+  const passa = [
+    [`${BASE}/feedback/abc`, {}],
+    [`${BASE}/config/routines?key=k`, {}],
+    [`${BASE}/feedback/abc?updateMask.fieldPaths=status`, { method: 'PATCH', body: '{}' }],
+    [`${BASE}:runAggregationQuery?key=k`, { method: 'POST', body: JSON.stringify({ structuredAggregationQuery: { structuredQuery: { from: [{ collectionId: 'feedback' }] } } }) }],
+    [`${BASE}:batchGet?key=k`, { method: 'POST', body: JSON.stringify({ documents: [`${BASE}/feedback/a`] }) }],
+    // Il massimo di `seq`: un documento, niente cursore.
+    [`${BASE}:runQuery?key=k`, { method: 'POST', body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'feedback' }], limit: 1 } }) }],
+    [`${BASE}/feedback?pageSize=${DOCUMENTI_SENZA_CAMPI_MAX}`, {}],
+    ['https://securetoken.googleapis.com/v1/token?key=k', { method: 'POST', body: 'grant_type=refresh_token' }],
+    ['https://example.com/feedback?pageSize=300', {}],
+  ];
+  for (const [url, init] of passa) assert.equal(scansioneSenzaCampi(url, init), null, `fermata a torto: ${url}`);
+});
+
+test('una scansione a pagine piccole si ferma alla seconda pagina: il cursore dice che è un giro intero', () => {
+  assert.match(String(scansioneSenzaCampi(`${BASE}/feedback?pageSize=5&pageToken=abc`, {})), /feedback/);
+  const pagina = { structuredQuery: { from: [{ collectionId: 'credits' }], limit: 5, startAt: { values: [] } } };
+  assert.match(String(scansioneSenzaCampi(`${BASE}:runQuery`, { method: 'POST', body: JSON.stringify(pagina) })), /credits/);
+  // Nessun limite è il limite del server: una collezione intera.
+  const tutta = { structuredQuery: { from: [{ collectionId: 'feedback-public' }] } };
+  assert.match(String(scansioneSenzaCampi(`${BASE}:runQuery`, { method: 'POST', body: JSON.stringify(tutta) })), /feedback-public/);
+  assert.match(String(scansioneSenzaCampi(new URL(`${BASE}/feedback`), undefined)), /feedback/);
+});
+
+test('chi prende le credenziali di Firestore prende anche il freno', () => {
+  // In un processo a parte: qui il freno è già caricato dall'import in testa.
+  const auth = pathToFileURL(join(SCRIPTS, 'lib', 'firestore-auth.mjs')).href;
+  const esito = execFileSync(process.execPath, ['--input-type=module', '-e',
+    `await import(${JSON.stringify(auth)}); process.stdout.write(String(Boolean(globalThis.fetch[Symbol.for('filo.frenoLetture')])));`,
+  ], { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(esito, 'true', 'firestore-auth non installa il freno: le scansioni degli script partono senza');
+});
+
 // Tutta la cartella degli strumenti, sottocartelle comprese: gli attrezzi
-// condivisi (la copia, il conteggio, la lettura riusata) stanno in una
-// sottocartella, ed è il primo posto dove finirà la prossima scansione
-// (#680, secondo giro).
+// condivisi stanno in `lib/`, ed è lì che finirà la prossima scansione.
 function scriptDiManutenzione(dir = SCRIPTS, prefisso = '') {
   const out = [];
   for (const voce of readdirSync(dir, { withFileTypes: true })) {
@@ -95,65 +148,17 @@ function scriptDiManutenzione(dir = SCRIPTS, prefisso = '') {
   return out;
 }
 
-function colpevoliIn(nome, testo) {
-  const colpevoli = [];
-  for (const forma of FORME) {
-    if (forma.perChiamata) {
-      for (const m of testo.matchAll(new RegExp(forma.chiamata, 'g'))) {
-        const args = argomentiDellaChiamata(testo, m.index + m[0].length - 1);
-        if (forma.campi.test(args)) continue;
-        colpevoli.push(`scripts/${nome} — ${m[0].trim()} ${forma.nome}: ${forma.rimedio}`);
-      }
-      continue;
-    }
-    if (forma.soloSe && !forma.soloSe.test(testo)) continue;
-    if (!forma.chiamata.test(testo)) continue;
-    if (forma.campi.test(testo)) continue;
-    colpevoli.push(`scripts/${nome} — ${forma.nome}: ${forma.rimedio}`);
-  }
-  return colpevoli;
-}
-
-// Un freno che non si sa fermare non frena: qui si guida contro il muro apposta.
-test('il freno riconosce OGNI modo di chiedere l\'elenco, non solo quelli che gli script usano oggi', () => {
-  const scansioni = [
-    'FB.listAllPaged({ idToken: t })',
-    'FB.listAll({ idToken: t })',
-    'FB.listAllPublic({})',
-    'FB.listAllPublicPaged({})',
-    'FB.listPublic({ pageSize: 500 })',
-    'FB.list({ pageSize: 500 })',
-    'FB.listResolved({ sinceIso: s })',
-    'SN_FEEDBACK.listAll({})',
-    // Il modulo tenuto in una variabile con un altro nome: è come lo scriverà
-    // il prossimo, e prima passava (#680, secondo giro).
-    'segnalazioni.listAll({ idToken: t })',
-    'elenco.listAllPaged({ idToken: t })',
-  ];
-  for (const riga of scansioni) {
-    assert.equal(colpevoliIn('finto.mjs', `export const x = ${riga};`).length, 1,
-      `«${riga}» scarica la collezione intera e il freno non se ne accorge`);
-    assert.deepEqual(colpevoliIn('finto.mjs', `export const x = ${riga.replace(/\(\{/, '({ fields: CAMPI,')};`), [],
-      `«${riga}» dice quali campi gli servono e il freno lo ferma lo stesso`);
-  }
-  // Un metodo che si chiama quasi come una lista ma non è del modulo non deve
-  // finire nel mucchio: il freno che grida a vuoto lo si spegne.
-  assert.deepEqual(colpevoliIn('finto.mjs', 'server.listen(0, "127.0.0.1", ok);'), []);
-});
-
-test('il freno guarda in TUTTA la cartella degli strumenti, sottocartelle comprese', () => {
-  // Gli attrezzi condivisi di questo lavoro stanno in una sottocartella: una
-  // scansione messa lì passava senza una parola (#680, secondo giro).
-  const visti = scriptDiManutenzione().map((f) => f.nome);
-  assert.ok(visti.some((n) => n.includes('/')), `nessuna sottocartella guardata: ${visti.length} file`);
-  assert.ok(visti.includes('lib/scansione-secco.mjs'), `gli attrezzi comuni non sono guardati: ${visti.join(', ')}`);
-});
-
-test('nessuno script scansiona la collezione dei feedback senza dire quali campi gli servono', () => {
-  const colpevoli = [];
-  for (const { nome, testo } of scriptDiManutenzione()) colpevoli.push(...colpevoliIn(nome, testo));
-  assert.deepEqual(colpevoli, [],
-    `questi script scaricano documenti interi per guardarne qualche campo:\n  ${colpevoli.join('\n  ')}`);
+test('ogni script che può leggere le segnalazioni carica il freno prima di farlo', () => {
+  // La collezione privata si legge solo con le credenziali di firestore-auth,
+  // che il freno lo porta con sé. Le schede pubbliche no: chi carica il modulo
+  // dei feedback le può scansionare senza credenziali, quindi importa il freno
+  // da sé, in testa e non dentro un ramo.
+  const importaFreno = /^\s*import\s+(?:[^;]*?\sfrom\s+)?['"][^'"]*(?:freno-letture|firestore-auth)\.mjs['"]/m;
+  const parlaConFirestore = /['"/]feedback\.js['"]|firestore\.googleapis/;
+  const visti = scriptDiManutenzione();
+  assert.ok(visti.some((f) => f.nome === 'lib/firestore-auth.mjs'), `lib/ non guardata: ${visti.map((f) => f.nome).join(', ')}`);
+  const scoperti = visti.filter((f) => parlaConFirestore.test(f.testo) && !importaFreno.test(f.testo)).map((f) => f.nome);
+  assert.deepEqual(scoperti, [], `questi script leggono Firestore senza il freno sulle scansioni: ${scoperti.join(', ')}`);
 });
 
 test('ogni script di manutenzione stampa quanti documenti ha letto', () => {

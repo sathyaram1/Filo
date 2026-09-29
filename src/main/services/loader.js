@@ -44,6 +44,7 @@ require(path.join(SHARED, 'themeTokens.js'));
 require(path.join(SHARED, 'tabColor.js'));
 require(path.join(SHARED, 'tabTriage.js')); // §2.1 — candidati/dedup riordino schede (logica pura)
 require(path.join(SHARED, 'downloadTabs.js')); // #412/#441 — schede usa e getta dei download (logica pura)
+require(path.join(SHARED, 'eseguibili.js')); // #588 — quali file il sistema ESEGUE (logica pura)
 // #585 — pulizia e incapsulamento dei percorsi condivisi. Va PRIMA di paths.js
 // (che la usa in scrittura) e di handlers.js (che la usa in lettura).
 require(path.join(SHARED, 'pathsSafety.js'));
@@ -78,10 +79,12 @@ require(path.join(SHARED, 'wallet.js'));      // #598 — crediti sul server: ri
 require(path.join(SHARED, 'campoNumero.js'));
 // Come partono le sessioni delle routine: stesse regole in pagina e nel main.
 require(path.join(SHARED, 'routineSessioni.js'));
+require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei marker [[calc:]]: la chat li risolve nel main
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
 require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SHARED, 'actionTools.js'));  // le azioni come strumenti del modello (tool calling nativo)
 require(path.join(SHARED, 'pageRestyle.js'));
+require(path.join(SHARED, 'zoomPagina.js'));  // zoom della pagina: passo, limiti, livello↔percentuale (una regola sola per tasti e chat)
 require(path.join(SHARED, 'ttsChunk.js'));
 require(path.join(SHARED, 'ttsCache.js'));
 require(path.join(SHARED, 'ttsVoices.js'));          // voci del modello di lettura (Kokoro)
@@ -108,12 +111,14 @@ require(path.join(SHARED, 'deckStats.js'));    // dipende da SN_DECKS (tipoOf)
 require(path.join(SHARED, 'scryfallQuery.js'));
 require(path.join(SHARED, 'deckOpinions.js')); // pareri/auto-tag §6-§7 (logica pura)
 require(path.join(SHARED, 'deckImportExport.js')); // parser rigido testo↔carte §11 (logica pura)
+require(path.join(SHARED, 'deckChat.js'));     // chat per mazzo §3.2: cosa si conserva (logica pura)
 require(path.join(SHARED, 'editorStore.js'));   // collezione file editor (logica pura)
 require(path.join(SHARED, 'editorVersions.js')); // storico/punti di ripristino (logica pura)
 require(path.join(SHARED, 'editorNotes.js'));   // appunti di Filo dentro i file editor (dipende dai due sopra)
 require(path.join(SHARED, 'editorSummary.js')); // riassunto per file + estrazione testo (logica pura, #379.5)
 require(path.join(SVC, 'providers', 'openrouter.js'));
 require(path.join(SVC, 'providers', 'index.js'));
+require(path.join(SVC, 'modelGate.js')); // l'unica strada verso i fornitori: limite, costo, chi ha servito (#591)
 require(path.join(SVC, 'feedbackOutbox.js')); // #341 — coda invio feedback offline (dipende da SN_FEEDBACK + SN_STORAGE)
 require(path.join(SVC, 'creditStore.js'));
 require(path.join(SVC, 'costTracker.js'));
@@ -124,6 +129,7 @@ require(path.join(SVC, 'filoChats.js'));  // #525 — dipende da SN_CHAT_ARCHIVE
 require(path.join(SVC, 'deckStore.js'));   // dipende da SN_DECKS (shared/decks.js)
 require(path.join(SVC, 'scryfall.js'));    // dipende da SN_SCRYFALL_Q (shared/scryfallQuery.js)
 require(path.join(SVC, 'deckOpinions.js')); // dipende da SN_DECK_OPINIONS + SN_SCRYFALL_Q
+require(path.join(SVC, 'deckChats.js'));   // dipende da SN_DECK_CHAT + SN_DECK_STORE
 require(path.join(SVC, 'aiCache.js'));
 require(path.join(SVC, 'categorizer.js'));
 require(path.join(SVC, 'pathsCollector.js'));
@@ -141,7 +147,6 @@ module.exports = {
   get SN_CONST() { return globalThis.SN_CONST; },
   get SN_MSG() { return globalThis.SN_MSG; },
   get SN_STORAGE() { return globalThis.SN_STORAGE; },
-  get SN_PROVIDERS() { return globalThis.SN_PROVIDERS; },
   get SN_COSTS() { return globalThis.SN_COSTS; },
   get SN_CREDITS() { return globalThis.SN_CREDITS; },
   get SN_SAVED_PAGES() { return globalThis.SN_SAVED_PAGES; },

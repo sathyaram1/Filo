@@ -283,6 +283,7 @@
     /* Il `display: flex` qui sopra vince sull'attributo `hidden` (la regola UA è meno specifica di una d'autore):
        senza questa riga il banner "sola lettura" restava visibile anche agli admin, che i feedback li gestiscono. */
     .fb-admin-banner[hidden] { display: none; }
+    .fb-admin-banner .fb-admin-ko { color: var(--sn-error); }
     /* Stesso contorno morbido del banner admin, così il box si legge come "zona proprietario". */
     .fb-automation {
       margin-bottom: 16px; padding: 4px 14px 12px;

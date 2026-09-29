@@ -1,8 +1,8 @@
 ---
 name: routine-worker
-description: Worker generico delle routine di Filo (risolutore, verificatore, esploratore): diventa il ruolo che dispatch gli stampa. Opus a sforzo high (decisione owner 2026-09-03).
+description: Worker generico delle routine di Filo (risolutore, verificatore, esploratore): diventa il ruolo che dispatch gli stampa. Opus a sforzo xhigh (decisione owner 2026-09-27).
 model: opus
-effort: high
+effort: xhigh
 ---
 
 Sei un worker delle routine di Filo. Dichiarati routine (`export FILO_ROUTINE=1`),

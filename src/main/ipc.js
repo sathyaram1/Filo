@@ -85,6 +85,33 @@ function registerIpcHandlers() {
     }
   });
 
+  // #754 — la pagina che sta per caricarsi, prima degli script del sito: la risposta al banner dei cookie da
+  // togliere dalla sua memoria, se il sito ha cambiato elenco. SINCRONO per lo stesso motivo di fp-config.
+  ipcMain.on('filo:cookie-wipe', (event, href) => {
+    let out = null;
+    try {
+      const wc = event.sender;
+      const top = event.senderFrame && wc.mainFrame && event.senderFrame.frameTreeNodeId === wc.mainFrame.frameTreeNodeId;
+      if (top) {
+        for (const w of BrowserWindow.getAllWindows()) {
+          const tm = w._filoTabs;
+          if (tm && tm.tabs && tm.tabs.some((t) => t.view && t.view.webContents === wc)) { out = tm.takeCookieWipe(String(href || '')); break; }
+        }
+      }
+    } catch (_) { out = null; }
+    event.returnValue = out;
+  });
+
+  // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
+  ipcMain.on('filo:permessi-stato', (event, href) => {
+    try {
+      const Permessi = require('./services/permessiPagine');
+      event.returnValue = { notifiche: Permessi.statoNotifiche(event.sender.session, href), gestoMs: Permessi.GESTO_MS };
+    } catch (_) {
+      event.returnValue = { notifiche: 'default' };
+    }
+  });
+
   // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi
   // riquadri incorporati). Serve alle scorciatoie che lavorano sulla selezione:
   // vanno consegnate a chi ha davvero il testo selezionato. Nessun dato nel
@@ -346,6 +373,29 @@ function registerIpcHandlers() {
     if (!win?._filoTabs) return { activeId: null, tabs: [] };
     return win._filoTabs.snapshot();
   });
+  // Solo la cornice risponde a una domanda di permesso: è l'unico posto dove l'ha vista l'utente (#591.1).
+  ipcMain.handle('tabs:permesso-risposta', (event, { id, si } = {}) => {
+    const cornice = BrowserWindow.getAllWindows().some((w) => w._filoTabs && (w.webContents === event.sender || w._filoShell?.webContents === event.sender));
+    if (!cornice || !id) return { ok: false };
+    return { ok: require('./services/permessiPagine').rispondi(String(id), si === true) };
+  });
+  // Le scelte ricordate per il sito di una scheda: il suo menu le mostra e le toglie (#591.1).
+  const paginaDiScheda = (event, id) => {
+    const t = winFor(event)?._filoTabs?.tabs?.find((x) => x.id === id);
+    const wc = t && t.view && t.view.webContents;
+    return wc && !wc.isDestroyed() ? wc : null;
+  };
+  ipcMain.handle('tabs:permessi', (event, { id } = {}) => {
+    const wc = paginaDiScheda(event, id);
+    if (!wc) return { scelte: [] };
+    const Permessi = require('./services/permessiPagine');
+    const { origine, scelte } = Permessi.scelteDi(wc);
+    return { scelte, ...(origine ? Permessi.nomeDaMostrare(origine) : {}) };
+  });
+  ipcMain.handle('tabs:permessi-dimentica', (event, { id } = {}) => {
+    const wc = paginaDiScheda(event, id);
+    return wc ? require('./services/permessiPagine').dimentica(wc) : { tolte: 0, cera: false };
+  });
   ipcMain.handle('tabs:open-blocked-popup', (event, { url } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs || !url) return { ok: false };
@@ -364,6 +414,15 @@ function registerIpcHandlers() {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
     return win._filoTabs.clearTabProxy(id);
+  });
+  // #754 — dal menu della scheda: rivedere i banner dei cookie su questo sito (show) o ridarli a Filo.
+  // Solo dalla shell: scrive le impostazioni.
+  ipcMain.handle('tabs:cookie-banners', async (event, { id, show } = {}) => {
+    const win = winFor(event);
+    if (!win?._filoTabs || win.webContents !== event.sender) return { ok: false, error: 'forbidden' };
+    // In incognito l'elenco dei siti si scrive nella memoria della sessione, non sul disco.
+    const run = () => win._filoTabs.setCookieBanners(id, !!show);
+    return win._filoIncognito ? DiskStorage.runIncognito(run) : run();
   });
   // Stato per il menu della shell: la voce compare solo se un endpoint è
   // configurato; defaultCountry = ultima location usata, altrimenti il default.

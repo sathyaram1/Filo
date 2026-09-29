@@ -4,7 +4,6 @@
 //   - finestra principale con shell (tab bar + indirizzo)
 //   - manager dei tab basato su WebContentsView
 //   - servizi (storage, providers AI, saved pages, ecc.)
-//   - shortcut globali
 
 const { app, BrowserWindow, nativeTheme, session } = require('electron');
 const path = require('node:path');
@@ -33,6 +32,18 @@ try {
   if (cleaned) app.userAgentFallback = cleaned;
 } catch (_) { /* best-effort: in peggio resta la UA di default */ }
 
+// Il portachiavi si sceglie solo prima di `ready`: senza, su sway/i3 l'accesso
+// non sopravvive alla chiusura nemmeno col portachiavi acceso (#708.1).
+try {
+  const { portachiaviDaChiedere } = require('./portachiavi');
+  const scelto = portachiaviDaChiedere({
+    platform: process.platform,
+    env: process.env,
+    haSwitch: app.commandLine.hasSwitch('password-store'),
+  });
+  if (scelto) app.commandLine.appendSwitch('password-store', scelto);
+} catch (_) {}
+
 // Carica i moduli "shared/background" portati dall'estensione. Si registrano
 // tutti su `globalThis` (pattern IIFE preservato dal codice extension), così
 // gli altri moduli del main process li trovano via global.
@@ -55,16 +66,20 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoDefaults = require('./services/defaultsStore');
     globalThis.__filoCookies = require('./services/cookies');
     globalThis.__filoAdblock = require('./services/adblock');
+    globalThis.__filoCookieBanners = require('./services/cookieBanners');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
     globalThis.__filoShortcuts = require('./shortcuts');
   } catch (_) {}
 }
 
+// Nelle prove il servizio vero delle schede non si raggiunge da nessuna porta, anche da quelle
+// che aprono Filo fuori dalla modalità test (vedi test-servizi-chiusi.js). No-op altrimenti.
+try { require('./test-servizi-chiusi').chiudiServiziNeiTest(); } catch (_) {}
+
 const { createMainWindow, revealWindow } = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
-const { registerShortcuts } = require('./shortcuts');
 const { installaMenuApplicazione } = require('./menu');
 const { initAutoUpdater } = require('./updater');
 
@@ -177,6 +192,7 @@ app.whenReady().then(async () => {
   // è in cima allo schermo e vince sui tasti che le pagine ascoltano, quindi va
   // messa PRIMA che si apra qualsiasi finestra (vedi src/main/menu.js).
   installaMenuApplicazione();
+  require('./tabs').inoltraTastiDegliOspiti(app);
 
   const Storage = globalThis.SN_STORAGE;
   try {
@@ -197,12 +213,23 @@ app.whenReady().then(async () => {
     // blocco alla sessione di default, carica la cache e — se attivo e stantia —
     // avvia un refresh in background. Non blocca l'avvio.
     try { await require('./services/adblock').init(s); } catch (_) {}
+    // EasyList Cookie (banner da nascondere): cache su disco e aggiornamento settimanale in sottofondo.
+    require('./services/cookieBanners').init(s).catch(() => {});
+    // Cosa Filo ha fatto coi banner dei singoli siti: il menu della scheda lo mostra anche alla visita dopo.
+    try { await require('./tabs/tabCookies').loadRemembered(); } catch (_) {}
     // Blocco apertura siti in blacklist (#170.3): legge la config dalle
     // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}
+    // #588 — conferma prima di scaricare/aprire un programma: la config va
+    // letta PRIMA del primo will-download, che è sincrono e non può attenderla.
+    try { require('./services/downloads').configureFromSettings(s); } catch (_) {}
+    // Le risposte date ai siti vanno lette prima della prima scheda: il controllo dei permessi è sincrono.
+    try { await require('./services/permessiPagine').carica(); } catch (_) {}
     // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
     // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
     try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}
+    // Le miniature grandi di «Aperti per dopo» (#839), qualche secondo dopo: l’avvio non le aspetta.
+    setTimeout(() => { globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {}); }, 3000);
   } catch (_) {}
 
   // Ripristina la sessione "Accedi con Google" persistita (non fa rete: l'ID
@@ -227,7 +254,6 @@ app.whenReady().then(async () => {
   try { require('./services/downloads').init().catch(() => {}); } catch (_) {}
 
   mainWindow = createMainWindow();
-  registerShortcuts(mainWindow);
 
   // Il collegamento d'invito (#651): la dichiarazione al sistema, l'indirizzo
   // dell'avvio a freddo (Windows e Linux lo mettono fra gli argomenti) e

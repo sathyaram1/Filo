@@ -1161,6 +1161,13 @@
     return out.slice(-12);
   }
 
+  // La memoria arriva al modello recintata come nella chat: la scrive Filo da
+  // conversazioni che possono aver letto una pagina ostile (#592).
+  function memoriaImbustata(testo) {
+    const E = window.SN_ESTERNO;
+    return E ? E.imbusta({ tipo: 'MEMORIA_FILO', testo, conIntestazione: true }) : '';
+  }
+
   // Estratto della memoria di Filo (profilo + preferenze) come contesto.
   async function filoMemoryText() {
     try {
@@ -1217,7 +1224,7 @@
       parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
         + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
     }
-    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memory);
+    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
     const messages = [
       { role: 'system', content: TITLE_SYSTEM_PROMPT },
       { role: 'user', content: parts.join('\n\n') },
@@ -1314,7 +1321,7 @@
       parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
         + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
     }
-    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memory);
+    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
     const messages = [
       { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
       { role: 'user', content: parts.join('\n\n') },
@@ -2398,7 +2405,7 @@
   // Pinch sul trackpad e Ctrl+rotella generano wheel events con ctrlKey=true;
   // da tastiera Ctrl+= / Ctrl+- / Ctrl+0. Lo zoom scala l'intero documento
   // (testo e immagini) via la proprietà CSS `zoom`, senza toccare il modello
-  // salvato. (Vedi handleZoomKey() nel keydown globale per le scorciatoie.)
+  // salvato.
   const ZOOM_MIN = 0.5, ZOOM_MAX = 3;
   let zoomLevel = 1;
   // L'editor zooma il foglio, non la finestra: il preload deve stare fuori
@@ -2407,6 +2414,13 @@
   function applyZoom() {
     zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(zoomLevel * 100) / 100));
     docEl.style.zoom = zoomLevel === 1 ? '' : String(zoomLevel);
+    // Chi zooma da sé deve DIRE a quanto sta: il livello della finestra qui
+    // resta fermo al 100%, e senza questo Filo risponderebbe 100% mentre il
+    // foglio è ingrandito (#686, secondo giro di verifica).
+    try {
+      document.documentElement.dataset.filoOwnZoomPercent = String(Math.round(zoomLevel * 100));
+      document.dispatchEvent(new Event('filo:zoom-proprio'));
+    } catch (_) {}
   }
   function zoomVerso(dir) {
     if (dir === 'in') zoomLevel += 0.1;
@@ -2415,22 +2429,21 @@
     else return;
     applyZoom();
   }
-  function handleZoomKey(e) {
-    const k = e.key;
-    if (k === '+' || k === '=') { e.preventDefault(); zoomVerso('in'); return true; }
-    if (k === '-' || k === '_') { e.preventDefault(); zoomVerso('out'); return true; }
-    if (k === '0') { e.preventDefault(); zoomVerso('reset'); return true; }
-    return false;
-  }
-  // Su Mac il tasto dello zoom non arriva mai a questa pagina: se lo prende la
-  // barra dei menu in cima allo schermo, che lo gira alla scheda attiva. Il
-  // preload lo consegna qui perché l'editor scala il FOGLIO, non la finestra —
-  // senza questa strada, su Mac lo zoom dell'editor non succedeva affatto.
-  // (Su Windows e Linux il tasto arriva al keydown qui sopra e questa strada
-  // non viene mai percorsa: nessun doppio zoom.)
+  // Il tasto dello zoom non lo legge questa pagina: lo prende Filo prima di
+  // tutti (src/preload/wheel-zoom.js) e lo consegna qui come evento, perché
+  // l'editor scala il FOGLIO e non la finestra. Una strada sola su tutti i
+  // sistemi: su Mac il tasto se lo prende comunque la barra dei menu.
   for (const [evento, dir] of [['filo:zoom-in', 'in'], ['filo:zoom-out', 'out'], ['filo:zoom-reset', 'reset']]) {
     document.addEventListener(evento, () => zoomVerso(dir));
   }
+  // #686 — «zoom al 150%» chiesto in chat. La percentuale arriva nel dataset e
+  // non in `detail`: fra il mondo del preload e questo un `detail` non passa.
+  document.addEventListener('filo:zoom-set', () => {
+    const grezzo = parseFloat(document.documentElement.dataset.filoZoomTarget || '');
+    if (!Number.isFinite(grezzo) || grezzo <= 0) return;
+    zoomLevel = grezzo / 100;
+    applyZoom();
+  });
   docWrap.addEventListener('wheel', (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
     // deltaY<0 (pinch-out / scroll su) → ingrandisci. Passo proporzionale al
@@ -3923,6 +3936,15 @@
     });
     $('cfgSave').addEventListener('click', () => {
       const rawShortcut = cfgShortcut.value.trim();
+      const ignoto = rawShortcut ? TASTI.pezzoSconosciuto(rawShortcut) : null;
+      if (ignoto && ignoto.modificatore) {
+        cfgShortcut.classList.add('ed-field-invalid');
+        cfgShortcutTaken.textContent =
+          `Non riconosco «${ignoto.nome}» come tasto da tenere premuto: usa ${tasto('Ctrl')}, Alt o Shift (Maiusc), es. ${tasto('Ctrl+Shift+1')}.`;
+        cfgShortcutTaken.hidden = false;
+        cfgShortcut.focus();
+        return;
+      }
       // Una scorciatoia senza modificatore (es. la lettera "b") verrebbe premuta
       // di continuo mentre si scrive: la rifiutiamo e mostriamo come correggerla,
       // invece di salvarla e rubare quel tasto in tutto l'editor.
@@ -3937,7 +3959,25 @@
       // quelle della barra dei menu in cima allo schermo. Salvarle significava
       // dare all'utente una scorciatoia che sembra valida e non parte mai: qui
       // gliela rifiutiamo dicendogli chi si prende quel tasto.
-      if (rawShortcut && TASTI && TASTI.riservato(rawShortcut)) {
+      // Un tasto finale che non sappiamo riconoscere alla pressione (un nome
+      // sbagliato, "Ctrl+Spazioo") si salverebbe e non partirebbe mai.
+      if (ignoto) {
+        cfgShortcut.classList.add('ed-field-invalid');
+        cfgShortcutTaken.textContent =
+          `Non riconosco il tasto «${ignoto.nome}»: usa una lettera, una cifra o un nome come Spazio, Invio, Esc, Tab, Su, Giù, F1… (es. ${tasto('Ctrl+Shift+Spazio')}).`;
+        cfgShortcutTaken.hidden = false;
+        cfgShortcut.focus();
+        return;
+      }
+      if (rawShortcut && TASTI.delSistema(rawShortcut)) {
+        cfgShortcut.classList.add('ed-field-invalid');
+        cfgShortcutTaken.textContent =
+          `${TASTI.etichetta(rawShortcut)} se la prende il sistema operativo e non arriverebbe mai a questo modulo: scegline un'altra, per esempio ${tasto('Ctrl+Shift+1')}.`;
+        cfgShortcutTaken.hidden = false;
+        cfgShortcut.focus();
+        return;
+      }
+      if (rawShortcut && TASTI.riservato(rawShortcut)) {
         cfgShortcut.classList.add('ed-field-invalid');
         cfgShortcutTaken.textContent =
           `${TASTI.etichetta(rawShortcut)} è già di Filo (schede, zoom, annulla…) e non arriverebbe mai a questo modulo: scegline un'altra, per esempio ${tasto('Ctrl+Shift+1')}.`;
@@ -3956,23 +3996,20 @@
   }
 
   // ── Scorciatoie modulo personalizzate ──────────────────────────────────
-  const SHORTCUT_MODIFIERS = ['ctrl', 'control', 'cmd', 'command', 'meta', 'alt', 'option', 'shift'];
+  // Nome scritto e tasto premuto si leggono con le stesse regole: SN_TASTI.
   function shortcutParts(sc) {
-    return String(sc || '').toLowerCase().split('+').map((s) => s.trim()).filter(Boolean);
+    return String(sc || '').split('+').map((s) => s.trim()).filter(Boolean);
   }
   // Un modificatore "reale" cambia il carattere prodotto: Ctrl/Cmd/Alt. Shift da
   // solo NON basta (Shift+b digita comunque "B"), quindi non conta come reale.
   function shortcutHasRealModifier(sc) {
-    const parts = shortcutParts(sc);
-    return SHORTCUT_MODIFIERS.some((m) => m !== 'shift' && parts.includes(m));
+    return shortcutParts(sc).slice(0, -1).some((m) => ['ctrl', 'alt'].includes(TASTI.tipoModificatore(m)));
   }
-  // Una scorciatoia è valida solo se ha un modificatore reale + un tasto finale:
-  // così non può coincidere con la normale digitazione di una lettera.
+  // Valida: un modificatore reale e un tasto finale, così non coincide con la
+  // digitazione di una lettera.
   function isValidShortcut(sc) {
     const parts = shortcutParts(sc);
-    if (parts.length < 2) return false;
-    const key = parts[parts.length - 1];
-    if (SHORTCUT_MODIFIERS.includes(key)) return false; // manca il tasto finale
+    if (parts.length < 2 || TASTI.tipoModificatore(parts[parts.length - 1])) return false;
     return shortcutHasRealModifier(sc);
   }
   function isEditableTarget(t) {
@@ -3981,35 +4018,8 @@
     const tag = t.tagName;
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
   }
-  // Il tasto finale premuto può presentarsi in più forme: `e.key` è il carattere
-  // PRODOTTO (con Shift+1 diventa "!", non "1"), mentre `e.code` è il tasto FISICO
-  // (Digit1, KeyB) indipendente da Shift e dal layout. Confrontiamo la scorciatoia
-  // contro entrambe le forme, così "Ctrl+Shift+1" combacia anche se il layout
-  // trasforma Shift+1 in un simbolo. Fallback su `e.key` per i tasti non
-  // alfanumerici (frecce, ecc.).
-  function eventKeyCandidates(e) {
-    const out = new Set();
-    if (e.key) out.add(e.key.toLowerCase());
-    const code = e.code || '';
-    let m;
-    if ((m = /^Digit(\d)$/.exec(code))) out.add(m[1]);
-    else if ((m = /^Numpad(\d)$/.exec(code))) out.add(m[1]);
-    else if ((m = /^Key([A-Z])$/.exec(code))) out.add(m[1].toLowerCase());
-    return out;
-  }
   function matchShortcut(e, sc) {
-    if (!sc) return false;
-    const parts = sc.toLowerCase().split('+').map((s) => s.trim());
-    // Cmd vale quanto Ctrl: su Mac l'utente scrive la scorciatoia con il tasto
-    // che ha davvero sotto le dita, e il campo gli propone "Cmd+…". Senza
-    // questa riga la scorciatoia si salva, sembra valida e poi non parte mai.
-    const need = {
-      ctrl: parts.includes('ctrl') || parts.includes('cmd') || parts.includes('command') || parts.includes('meta'),
-      shift: parts.includes('shift'),
-      alt: parts.includes('alt') || parts.includes('option'),
-    };
-    const key = parts[parts.length - 1];
-    return (e.ctrlKey || e.metaKey) === need.ctrl && e.shiftKey === need.shift && e.altKey === need.alt && eventKeyCandidates(e).has(key);
+    return !!sc && TASTI.combacia(e, sc);
   }
   function triggerModuleShortcut(m) {
     setActivePage(m.z);
@@ -4251,7 +4261,6 @@
   window.addEventListener('keydown', (e) => {
     const meta = e.ctrlKey || e.metaKey;
     if (meta && e.key.toLowerCase() === 's') { e.preventDefault(); save(true); return; }
-    if (meta && handleZoomKey(e)) return;
     if (meta && e.key === '\\') { e.preventDefault(); toggleSidebar(); return; }
     if (meta && e.key.toLowerCase() === 'f') {
       const sr = doc.modules.find((m) => m.type === 'search-replace');

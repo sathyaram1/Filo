@@ -38,10 +38,22 @@ contextBridge.exposeInMainWorld('filoShell', {
       return () => ipcRenderer.removeListener('tabs:popup-blocked', wrapped);
     },
     openBlockedPopup: (url) => ipcRenderer.invoke('tabs:open-blocked-popup', { url }),
+    onPermesso: (fn) => {
+      const chiedi = (_event, info) => { try { fn('chiedi', info); } catch (_) {} };
+      const fine = (_event, info) => { try { fn('fine', info); } catch (_) {} };
+      ipcRenderer.on('tabs:permesso', chiedi);
+      ipcRenderer.on('tabs:permesso-fine', fine);
+      return () => { ipcRenderer.removeListener('tabs:permesso', chiedi); ipcRenderer.removeListener('tabs:permesso-fine', fine); };
+    },
+    rispondiPermesso: (id, si) => ipcRenderer.invoke('tabs:permesso-risposta', { id, si }),
+    permessi: (id) => ipcRenderer.invoke('tabs:permessi', { id }),
+    dimenticaPermessi: (id) => ipcRenderer.invoke('tabs:permessi-dimentica', { id }),
     // Proxy per-tab ("Apri da un altro paese") + stato (configurato, location).
     setProxy: (id, country, tier) => ipcRenderer.invoke('tabs:set-proxy', { id, country, tier }),
     clearProxy: (id) => ipcRenderer.invoke('tabs:clear-proxy', { id }),
     proxyStatus: () => ipcRenderer.invoke('tabs:proxy-status'),
+    // Banner dei cookie del sito della scheda: true = mostrali, false = Filo li gestisce di nuovo.
+    cookieBanners: (id, show) => ipcRenderer.invoke('tabs:cookie-banners', { id, show }),
   },
   // Scaricamenti della navigazione (#410.1): la shell legge la cronologia,
   // comanda i singoli download e riceve gli aggiornamenti di avanzamento dal
@@ -51,12 +63,16 @@ contextBridge.exposeInMainWorld('filoShell', {
     list: () => ipcRenderer.invoke('filo:message', { type: 'downloads_list' }),
     clear: () => ipcRenderer.invoke('filo:message', { type: 'downloads_clear' }),
     remove: (id) => ipcRenderer.invoke('filo:message', { type: 'download_remove', id }),
-    openFile: (id) => ipcRenderer.invoke('filo:message', { type: 'download_open_file', id }),
+    // `confirmed` = la shell ha già mostrato la seconda conferma su un
+    // programma (#588); senza, il main risponde needsConfirm e non apre niente.
+    openFile: (id, confirmed) => ipcRenderer.invoke('filo:message', { type: 'download_open_file', id, confirmed: !!confirmed }),
+    // Risposta all'avviso "questo è un programma: scaricarlo?".
+    confirm: (id, allow) => ipcRenderer.invoke('filo:message', { type: 'download_confirm', id, allow: !!allow }),
     openFolder: (id) => ipcRenderer.invoke('filo:message', { type: 'download_open_folder', id }),
     cancel: (id) => ipcRenderer.invoke('filo:message', { type: 'download_cancel', id }),
     pause: (id) => ipcRenderer.invoke('filo:message', { type: 'download_pause', id }),
     resume: (id) => ipcRenderer.invoke('filo:message', { type: 'download_resume', id }),
-    // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error', item }
+    // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error'|'missing'|'removed'|'ask', item }
     onEvent: (fn) => {
       const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
       ipcRenderer.on('shell:download', wrapped);

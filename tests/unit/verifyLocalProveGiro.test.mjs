@@ -129,3 +129,36 @@ test('ovunque si dica di rilanciare le prove del giro, si dice anche come va scr
     }
   }
 });
+
+// La pulizia (le prove dei rilievi messi da parte, tolte prima di correggere) sposta la partenza della
+// correzione: da lì si misura se c'è un commit nuovo, e da lì guarda la verifica dopo.
+test('la pulizia si registra solo a correzione aperta e con rilievi messi da parte, e diventa la partenza', async () => {
+  const { withPulizia } = await import('../../scripts/verify-local.mjs');
+  const PULIZIA = 'c'.repeat(40);
+  const buona = { ok: true, sha: PULIZIA, files: ['tests/verifica/locale-r/giro1-r2-a.spec.mjs'], cancellate: ['tests/verifica/locale-r/giro1-r2-a.spec.mjs'] };
+  const critica = (derived) => {
+    const s = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', {
+      critique: 'provato tutto.\n[2i] rotto\n[1i] x', sha: SHA, caps: { cap3: 5, cap2: 5, cap1: 2, cap0: 0 },
+    }).state;
+    s.r.pending.derived = derived;
+    return s;
+  };
+  assert.match(withPulizia(critica([]), 'r', { controllo: buona }).reason, /non ha messo da parte nessun rilievo/);
+  assert.match(withPulizia({}, 'r', { controllo: buona }).reason, /nessun giro di correzione aperto/);
+  assert.match(withPulizia(critica([{ level: 1, text: 'x' }]), 'r', { controllo: { ok: false, motivo: 'c\'è codice' } }).reason, /c'è codice/);
+  assert.match(withPulizia(critica([{ level: 1, text: 'x' }]), 'r', { controllo: buona, dirtyFiles: ['a.txt'] }).reason, /pulizia non registrata[\s\S]*a\.txt/);
+  // La prova del rilievo 1, da correggere, non esce con quella del 2 messo da parte: il numero sta nel nome.
+  const larga = { ...buona, cancellate: [...buona.cancellate, 'tests/verifica/locale-r/giro1-r1-c.spec.mjs'] };
+  assert.match(withPulizia(critica([{ level: 1, text: 'x' }]), 'r', { controllo: larga }).reason, /giro1-r1-c\.spec\.mjs: r1 non è fra/);
+  const p = withPulizia(critica([{ level: 1, text: 'x' }]), 'r', { controllo: buona });
+  assert.equal(p.ok, true);
+  assert.equal(p.state.r.pending.shaPulizia, PULIZIA);
+  // Nessun commit dopo la pulizia = niente corretto, come senza pulizia.
+  assert.equal(withFixed(p.state, 'r', { report: 'niente', sha: PULIZIA }).outcome, 'stop');
+  const f = withFixed(p.state, 'r', { report: 'corretto', sha: ALTRO });
+  assert.equal(f.outcome, 'fixed');
+  assert.equal(f.state.r.chiusura.shaPrima, PULIZIA);
+  // La risposta persa si ristampa anche dal commit della pulizia.
+  const rimandata = withCritique(p.state, 'r', { critique: 'provato tutto.\n[2i] rotto\n[1i] x', sha: PULIZIA, caps: { cap3: 5, cap2: 5, cap1: 2, cap0: 0 } });
+  assert.equal(rimandata.replayed, true);
+});

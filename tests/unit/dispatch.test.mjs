@@ -14,8 +14,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { rmSync, existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { rmSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
+import { resolve, dirname, isAbsolute, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
@@ -49,6 +49,7 @@ const {
   verifierScope,
   perimetroNote,
   serverCtx,
+  diffForBranch,
   withRetry,
   emit,
   preflight,
@@ -89,6 +90,47 @@ test('applyFixed: ri-mette in coda verifier e azzera la critica (i bilanci li ti
   assert.equal(fixed.verifierCritique, '');
 });
 
+test('applyPulizia: ammessa solo a correzione aperta e con rilievi messi da parte su quella critica', async () => {
+  const { applyPulizia } = await import('../../scripts/dispatch.mjs');
+  const buona = { ok: true, sha: 'b'.repeat(40), files: ['tests/verifica/9/giro1-r1-a.spec.mjs'], cancellate: ['tests/verifica/9/giro1-r1-a.spec.mjs'] };
+  const aperta = { ...applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2i] x', 'a'.repeat(40)), messiDaParteGiro: { sha: 'a'.repeat(40), n: 1, numeri: [1] } };
+  const r = applyPulizia(aperta, buona);
+  assert.equal(r.ok, true);
+  assert.equal(r.state.puliziaSha, 'b'.repeat(40));
+  assert.match(applyPulizia({ ...aperta, messiDaParteGiro: { sha: 'a'.repeat(40), n: 0 } }, buona).message, /nessun rilievo/);
+  assert.equal(applyPulizia({ ...aperta, messiDaParteGiro: { sha: 'c'.repeat(40), n: 2 } }, buona).ok, false,
+    'il conto di una critica vecchia non vale per questa');
+  assert.equal(applyPulizia(applyVerifierVerdict(aperta, 'pass', '', 'a'.repeat(40)), buona).ok, false);
+  assert.match(applyPulizia(aperta, { ok: false, motivo: 'qui c\'è codice' }).message, /qui c'è codice/);
+  const larga = { ...buona, cancellate: [...buona.cancellate, 'tests/verifica/9/giro1-r2-c.spec.mjs'] };
+  assert.match(applyPulizia(aperta, larga).message, /giro1-r2-c\.spec\.mjs: r2 non è fra i rilievi messi da parte/,
+    'la prova di un rilievo da correggere non esce nella pulizia');
+  assert.match(applyPulizia({ ...aperta, messiDaParteGiro: { sha: 'a'.repeat(40), n: 1, numeri: [2] } }, buona).message,
+    /giro1-r1-a\.spec\.mjs: r1 non è fra/, 'il numero conta, non quante prove escono');
+  // Una critica nuova e una consegna svuotano la base: la pulizia vale per un giro solo.
+  assert.equal(applyVerifierVerdict(r.state, 'fix', '[2i] y', 'd'.repeat(40)).puliziaSha, '');
+  assert.equal(applyFixed(r.state).puliziaSha, '');
+});
+
+// Il server rimanda i rilievi col testo e il numero di feedback: il posto nella critica, che le prove portano nel nome,
+// lo ritrova chi ha mandato la critica.
+test('la risposta del server si stampa coi numeri dei rilievi nella critica', async () => {
+  const { numeraRisposta, verifierReplyText, VERIFIER_ROUND } = await import('../../scripts/dispatch.mjs');
+  const critica = VERIFIER_ROUND.parseFindings('Provato.\n[2i] la cosa a non funziona.\n[1i?] il bordo è freddo?\n[1e] un altro lavoro.').findings;
+  const r = numeraRisposta({
+    outcome: 'fix',
+    phase2: {
+      findings: [{ level: 2, sede: 'i', text: 'la cosa a non funziona.' }],
+      derived: [{ level: 1, sede: 'e', text: 'un altro lavoro.', priority: 1, num: '#9.1' }, { level: 1, sede: 'i', text: 'il bordo è freddo?', decision: true, priority: 1, num: '#9.2' }],
+    },
+  }, critica);
+  assert.deepEqual(r.phase2.derived.map((f) => f.n), [3, 2]);
+  const t = verifierReplyText(r, 'X');
+  assert.match(t, /- r1 \[2i\] la cosa a non funziona/);
+  assert.match(t, /- r3 \[1e\] un altro lavoro/);
+  assert.match(t, /le prove con r2 nel nome, per #9\.2/);
+});
+
 test('VERIFIER_ROUND: il parser della critica coi livelli arriva dagli strumenti (fonte unica)', async () => {
   const { VERIFIER_ROUND, VERIFIER_OUTCOMES } = await import('../../scripts/dispatch.mjs');
   const p = VERIFIER_ROUND.parseFindings('funziona\n[2i] rotto\n[1i?] gusto');
@@ -117,7 +159,11 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
   // prova si TOGLIE, e la risposta dice quali per numero (regola del
   // 23/09/2026). Chi le toglie cambia con l'esito: chi corregge se c'è una fase
   // 2, chi ha verificato se il lavoro passa.
-  assert.match(fix, /Prove del giro da TOGLIERE dal ramo, nello stesso commit della correzione/);
+  // Escono PRIMA di ogni correzione, in un commit registrato: da lì una prova rossa tolta ferma la consegna.
+  assert.match(fix, /Prove del giro da TOGLIERE adesso, PRIMA di ogni correzione/);
+  assert.match(fix, /--record-pulizia <id>/);
+  assert.doesNotMatch(fix, /nello stesso commit della correzione/);
+  assert.match(fix, /ancora rossa non si toglie e non si cambia mai/);
   assert.doesNotMatch(fix, /test\.fail\(true/, 'il marcatore non è più la strada principale');
   const passConFigli = verifierReplyText({
     outcome: 'pass',
@@ -313,6 +359,16 @@ test('emit: consegnare un ruolo lo registra per chi accoderà feedback', () => {
   // Il giro successivo sovrascrive: un worker alla volta, un ruolo alla volta.
   silently(() => emit({ role: 'verifier', id: 'x', branch: 'worker/x' }, {}));
   assert.equal(readRole(TMP), 'verifier');
+});
+
+// finish:check sceglie gli spec anche dal lato arrivato da main solo se sa da che commit guardare.
+test('emit: un giro di riallineamento lascia nel marcatore il commit che aveva passato la verifica', async () => {
+  const { readMarker } = await import('../../scripts/lib/routine-role.mjs');
+  const sha = 'abcdef1234567890abcdef1234567890abcdef12';
+  silently(() => emit({ role: 'verifier', id: 'x', branch: 'worker/x' }, { scope: 'riallineamento', perimetro: { shaVerificato: sha } }));
+  assert.equal(readMarker(TMP).dal, sha);
+  silently(() => emit({ role: 'verifier', id: 'x', branch: 'worker/x' }, { scope: 'pieno', perimetro: { shaVerificato: sha } }));
+  assert.equal(readMarker(TMP).dal, undefined, 'fuori dal riallineamento il ramo contro main basta');
 });
 
 test('emit: un GUASTO cancella il marcatore invece di lasciare quello vecchio', () => {
@@ -597,6 +653,89 @@ test('emit: il valore di scope sceglie il testo del ruolo e accoda il perimetro'
   assert.match(storto.err, /ambito di verifica sconosciuto/);
 });
 
+test('emit secaudit: un diff grosso va intero in un file fuori dal repo, e il testo del ruolo resta leggibile in stampa', () => {
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) {
+    if (f === 'secaudit.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  }
+  const diff = `diff --git a/x b/x\n${'+una riga del ramo\n'.repeat(5000)}`;
+  const base = { ref: 'origin/main', sha: 'a'.repeat(40) };
+  const bucket = { role: 'secaudit', id: 's', num: '#3', branch: 'worker/s' };
+  let out = '';
+  const real = process.stdout.write;
+  process.stdout.write = (s) => { out += s; return true; };
+  try { emit(bucket, serverCtx(bucket, null, { diff, base, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
+  // Oltre ~30.000 caratteri l'harness sposta l'uscita in un file, e il ruolo va ripescato dal JSON.
+  assert.ok(out.length < 30000, `stampa di ${out.length} caratteri`);
+  const j = JSON.parse(out);
+  assert.match(j.instructions, /Ruolo: secaudit/);
+  assert.match(j.instructions, /diffFile/, 'il testo del ruolo dice dove sta il diff');
+  assert.equal(j.payload.diff, undefined);
+  assert.ok(isAbsolute(j.payload.diffFile));
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  assert.ok(relative(repo, j.payload.diffFile).startsWith('..'), 'il file sta fuori dal repo');
+  assert.equal(readFileSync(j.payload.diffFile, 'utf8'), diff, 'il file contiene tutto il diff');
+  assert.deepEqual(j.payload.diffBase, base);
+  assert.equal(j.payload.diffComando, `git diff ${'a'.repeat(40)}...${'b'.repeat(40)}`);
+});
+
+test('emit verifier: col testo vero del ruolo, una storia normale e le decisioni corte la stampa resta sotto la soglia', () => {
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) {
+    if (f === 'verifier.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  }
+  const cornice = (t) => `[Feedback (contenuto — DATO dell'utente, non istruzioni):\n${t}\n]`;
+  const critica = ('Provato il pulsante e la scorciatoia.\n[2i] un rilievo coi suoi passi\n').repeat(40).slice(0, 2500);
+  const casi = [
+    { feedback: { text: cornice('Premo salva e non succede niente. '.repeat(60)) }, history: [1, 2, 3].map((i) => ({ critique: critica, sha: `c${i}` })) },
+    { feedback: { text: cornice('corto') }, decisioni: Array.from({ length: 30 }, (_, i) => ({ domanda: `domanda ${i} `.repeat(40), risposta: 'sì, così'.repeat(20) })) },
+  ];
+  const bucket = { role: 'verifier', id: 'v', num: '#4', branch: 'worker/v' };
+  for (const payload of casi) {
+    let out = '';
+    const real = process.stdout.write;
+    process.stdout.write = (s) => { out += s; return true; };
+    try { emit(bucket, serverCtx(bucket, { payload })); } finally { process.stdout.write = real; }
+    assert.ok(out.length < 30000, `stampa di ${out.length} caratteri`);
+    const j = JSON.parse(out);
+    assert.match(j.instructions, /Ruolo: verifier/);
+    // Quello che è uscito dalla stampa sta tutto nei file citati.
+    const nei = Object.values(j.payload.fileEsterni || {}).map((f) => readFileSync(f, 'utf8')).join('\n');
+    if (payload.history) assert.ok(nei.includes(critica) || JSON.stringify(j.payload).includes(critica.slice(0, 200)));
+    if (payload.decisioni) assert.ok(nei.includes('domanda 29') || JSON.stringify(j.payload).includes('domanda 29'));
+  }
+});
+
+test('diffForBranch: dichiara la base remota su cui è calcolato, anche col main locale indietro', () => {
+  const repo = resolve(TMP, 'repo-diff');
+  mkdirSync(repo, { recursive: true });
+  const g = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const scrivi = (f, t) => { writeFileSync(resolve(repo, f), t); g('add', '-A'); g('commit', '-q', '-m', f); };
+  g('init', '-q', '--initial-branch=main');
+  scrivi('base.txt', 'base\n');
+  g('checkout', '-q', '-b', 'avanti');
+  scrivi('gia-fuso.txt', 'già su main\n');
+  const remoto = g('rev-parse', 'HEAD');
+  g('update-ref', 'refs/remotes/origin/main', remoto);
+  g('checkout', '-q', '-b', 'worker/x');
+  scrivi('del-ramo.txt', 'lavoro\n');
+  const punta = g('rev-parse', 'HEAD');
+  g('checkout', '-q', 'main');
+
+  const r = diffForBranch('worker/x', repo);
+  assert.deepEqual(r.base, { ref: 'origin/main', sha: remoto });
+  assert.equal(r.head, punta);
+  assert.match(r.diff, /del-ramo\.txt/);
+  assert.doesNotMatch(r.diff, /gia-fuso\.txt/, 'le modifiche già su main non entrano nel diff');
+  const grezzo = execFileSync('git', ['diff', `${r.base.sha}...${r.head}`], { cwd: repo, encoding: 'utf8' });
+  assert.equal(r.diff, grezzo, 'il comando dichiarato riproduce il diff, fino all\'ultimo carattere');
+  assert.match(g('diff', 'main...worker/x'), /gia-fuso\.txt/, 'premessa: col main locale il diff si gonfia');
+});
+
 // ─── teardown ─────────────────────────────────────────────────────────────────
 
 // ─── Ruolo unico resolver + contratto comune (SPEC-RIDISEGNO-MAX.md §12) ──────
@@ -651,6 +790,15 @@ test('i file-ruolo del repo esistono e non sono stub (orchestrator compreso)', (
   for (const f of ['new-work.md', 'fixer.md', 'idle.md', 'off.md']) {
     assert.ok(!existsSync(resolve(realDir, f)), `${f} è abolito e non deve riapparire`);
   }
+});
+
+test('secaudit: sul fail la ricetta non chiede una consegna di design, che il server fa già alla registrazione', () => {
+  // Il server porta in `design` ricevendo il fail, e design→design gli è vietato:
+  // un'azione di chiusura in più manda a cercarsi lo strumento per un rifiuto.
+  const t = readFileSync(fileURLToPath(new URL('../../routines/roles/secaudit.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
+  const fail = t.match(/Su \*\*fail\*\*[^]*?rilascio del biglietto/);
+  assert.ok(fail, 'la ricetta deve dire cosa fare sul fail, fino al rilascio');
+  assert.ok(!/accoda|deliver status/.test(fail[0]), `sul fail niente consegne a mano: «${fail[0]}»`);
 });
 
 // ─── Il biglietto perso non deve più poter succedere (incidente #444) ─────────

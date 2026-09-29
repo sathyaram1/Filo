@@ -102,7 +102,7 @@ regole valgono mentre scrivi.
   (`src/shared/tasti.js`), mai scritto a mano; nell'HTML non ci va. Un tasto
   nuovo si controlla con `SN_TASTI.riservato()`: su Mac la barra dei menu
   (`src/main/menu.js`) vede i tasti per prima. Su Mac Alt scrive: una
-  scorciatoia globale Alt+lettera lì prende un Ctrl davanti
+  scorciatoia Alt+lettera lì prende un Ctrl davanti
   (`src/main/shortcuts.js`), Alt+cifra diventa Cmd+cifra.
 - **Niente percorsi di Windows scritti a mano**, nemmeno nei prompt: `app.getPath`,
   `os.homedir()`, `path.join`.
@@ -207,15 +207,19 @@ riscrive. Sono TRE testi distinti:
    stanno solo nel report. Se non cambia niente di visibile, non si scrive.
 3. **Riga di changelog** in `src/shared/patchNotes.js`: solo se un utente
    qualunque può usare la cosa (superfici owner e parti interne no); una
-   riga, orientata al beneficio.
+   riga, orientata al beneficio, nel blocco in cima (vedi § Fonti di verità
+   singole).
 
 Prima di consegnare un testo destinato a un umano applica
 **`.claude/skills/unslop/SKILL.md`**.
 
 ## Fonti di verità singole (aggiornale nello stesso commit)
 
-- **`src/shared/patchNotes.js`**: changelog per l'utente comune, allineato a
-  `package.json`.
+- **`src/shared/patchNotes.js`**: changelog per l'utente comune. Il blocco in
+  cima porta il numero della prossima versione (`package.json` + 1 patch); se
+  quel numero è già uscito se ne apre uno nuovo, perché una riga sotto una
+  versione uscita non la vede chi aggiorna. Sentinella:
+  `tests/unit/patchNotes.test.mjs`.
 - **`src/shared/capabilities.js`**: manifesto di cosa sa fare Filo. Capacità
   nuova, cambiata o rimossa = voce aggiornata; una sentinella la confronta col
   codice.
@@ -232,7 +236,7 @@ npm install                # se manca il binario Electron: node node_modules/ele
 npm start
 npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
-npm test                   # SUITE COMPLETA (~350 spec, ~1.450 casi): NON si lancia a mano (vedi § Verifica)
+npm test                   # SUITE COMPLETA (~370 spec, ~1.450 casi): NON si lancia a mano (vedi § Verifica)
 npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo
 npm run test:shoot         # cattura visiva della finestra reale
 ```
@@ -244,7 +248,7 @@ npm run test:shoot         # cattura visiva della finestra reale
   in `patterns/un-test-chiede-al-sistema-non-presume-quello-su-cui-e-nato.md`.
 - **I rossi d'ambiente noti** stanno in `tests/rossi-noti.json`: un rosso che
   non è lì dentro è una regressione.
-- **Nel contenitore delle routine** gli spec che aprono Electron vogliono davanti `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`; senza, il rosso non è del codice.
+- **Nel contenitore delle routine** gli spec che aprono Electron vogliono davanti `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a` (`finish:check` li mette da sé, `scripts/lib/schermo-virtuale.mjs`); senza, il rosso non è del codice.
 - Modelli per `test:explore`: open via OpenRouter, chiave in
   `tests/agent/.env`, MAI chiavi del produttore dei pesi (politica modelli).
 

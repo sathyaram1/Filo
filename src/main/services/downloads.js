@@ -3,8 +3,8 @@
 // Cosa intercetta: i download che partono cliccando un link a un file (PDF,
 // ZIP, allegato) o quando un server risponde con Content-Disposition:attachment.
 // Electron emette `will-download` sulla sessione che ha originato la richiesta:
-// qui ascoltiamo la sessione di navigazione predefinita (e, opportunisticamente,
-// le sessioni per-scheda di privacy/proxy/incognito) e SEGUIAMO ogni download —
+// qui ascoltiamo la sessione di navigazione predefinita e quelle per-scheda
+// (privacy, proxy, incognito) e SEGUIAMO ogni download —
 // nome, dimensione, byte ricevuti, stato — così la barra in alto di Filo può
 // mostrarne l'avanzamento fedele invece di lasciarlo "al buio".
 //
@@ -27,9 +27,14 @@
 //   { id, filename, url, mime, totalBytes, receivedBytes, state, savePath,
 //     startedAt, endedAt, paused, canResume, canPause }
 //   state ∈ 'progressing' | 'paused' | 'completed' | 'interrupted' | 'cancelled'
+//
+// Incognito (#588.2): stesso controllo, ma la voce ha l'ambito della sua
+// finestra (`_scope`): non va su disco, la vede solo quella finestra e sparisce
+// quando si chiude. Il file scaricato resta nella cartella, come in ogni browser.
 
 const path = require('node:path');
 const fs = require('node:fs');
+const { spingiAllaScheda } = require('./impostazioniPerOrigine');
 
 // Tetto della cronologia persistita: teniamo le voci più recenti. 200 è ampio
 // per l'uso reale e non gonfia storage.json (poche centinaia di byte a voce).
@@ -38,7 +43,58 @@ const HISTORY_LIMIT = 200;
 // Stati non terminali: se li ritroviamo all'avvio (record salvato mentre un
 // download era in corso, poi l'app si è chiusa) il DownloadItem non esiste più,
 // quindi la voce va normalizzata a 'interrupted'.
-const NON_TERMINAL = new Set(['progressing', 'paused']);
+const NON_TERMINAL = new Set(['progressing', 'paused', 'pending']);
+
+// #588 — un file che il sistema ESEGUE non entra nella cartella Download senza
+// una risposta: scende in una cartella riservata (`quarantena` dentro i dati
+// dell'app), e da lì si sposta solo se l'utente dice di sì. Stato 'pending'.
+// La lista delle estensioni e le frasi stanno in src/shared/eseguibili.js.
+function ESE() { return globalThis.SN_ESEGUIBILI; }
+
+// Config letta dalle impostazioni (security.downloads). Il default CHIEDE:
+// finché le impostazioni non sono arrivate, un programma si ferma comunque.
+let chiediEseguibili = true;
+let sitiFidati = [];
+
+function configureFromSettings(settings) {
+  const d = (settings && settings.security && settings.security.downloads) || {};
+  chiediEseguibili = d.confirmExecutables !== false;
+  sitiFidati = Array.isArray(d.trustedSites) ? d.trustedSites.slice() : [];
+}
+
+// Un programma da un sito che l'utente ha dichiarato fidato scende come un PDF.
+// La fiducia vale solo per un sito CERTO: un file che può venire da un
+// riquadro di altri non prende quella della pagina che lo ospita (#588).
+function chiedeConferma(sito, incerto) {
+  if (!chiediEseguibili) return false;
+  if (incerto) return true;
+  try { return !ESE().fidato(sito, sitiFidati); } catch (_) { return true; }
+}
+
+// Da quale sito arriva il programma, deciso qui una volta per tutte le
+// superfici. Regola unica: vale solo un'origine che il browser garantisce.
+// L'indirizzo del file la porta quasi sempre; un `data:` o un `blob:null` no,
+// e allora vale la pagina solo se TUTTI i suoi riquadri sono di quel sito: con
+// un riquadro di altri (una pubblicità) il file può venire da lui, e il sito
+// resta nominato ma incerto (#588).
+function sitoDi(url, webContents) {
+  const leggi = (x) => { try { return ESE().sito(x); } catch (_) { return ''; } };
+  const dalFile = leggi(url);
+  if (dalFile) return { sito: dalFile, incerto: false };
+  let pagina = '';
+  let incerto = true;
+  try {
+    if (webContents && !webContents.isDestroyed?.()) {
+      pagina = leggi(webContents.getURL() || '');
+      const riquadri = webContents.mainFrame ? webContents.mainFrame.framesInSubtree : [];
+      incerto = !pagina || riquadri.some((f) => {
+        const h = leggi(f.origin);
+        return !(h && (h === pagina || h.endsWith('.' + pagina)));
+      });
+    }
+  } catch (_) { incerto = true; }
+  return { sito: pagina, incerto };
+}
 
 // Record vivi (id → dati). Include gli scaricamenti in corso E la cronologia
 // caricata da storage. La mappa è la fonte di verità in memoria.
@@ -50,9 +106,25 @@ const liveItems = new Map();
 // perché i byte li muove handlers/misc.js. Vedi beginManual().
 const liveManual = new Map();
 // Sessioni già agganciate (evita doppioni se una session torna più volte).
-// Le sessioni incognito NON vengono mai agganciate (vedi tabs.js _makeView):
-// "nessuna traccia" vale anche per i download.
 const attached = new WeakSet();
+
+// Ambito di chi guarda: '' per le finestre normali, la partizione per una
+// finestra incognito. Una voce si vede e si comanda solo dal suo ambito.
+function scopeOfWindow(win) {
+  if (!win || !win._filoIncognito) return '';
+  return String((win._filoTabs && win._filoTabs.partition) || 'incognito');
+}
+const scopeOf = (rec) => (rec && rec._scope) || '';
+function recordIn(id, scope) {
+  const rec = records.get(id);
+  return rec && scopeOf(rec) === String(scope || '') ? rec : null;
+}
+function windowsOf(scope) {
+  try {
+    return electron().BrowserWindow.getAllWindows()
+      .filter((w) => w && !w.isDestroyed?.() && scopeOfWindow(w) === String(scope || ''));
+  } catch (_) { return []; }
+}
 
 let loaded = false;
 
@@ -75,7 +147,12 @@ function storageKey() {
 // `_`, e `../../pwned` si presenta come `_.._.._pwned`. Ogni fila di due o più
 // punti si comprime a uno, ovunque sia; i punti singoli (`a.b.txt`) restano.
 function safeName(name) {
-  let s = String(name || '').trim().replace(/[\x00-\x1f]/g, '');
+  // I caratteri di direzione (U+202E & co.) non cambiano l'estensione vera ma
+  // capovolgono come si LEGGE il nome: «fattura<RLO>txt.exe» si mostra come
+  // «fatturaexe.txt». Il file su disco non deve poterlo fare (#588).
+  let s = String(name || '');
+  try { s = ESE().nomeVisibile(s); } catch (_) {}
+  s = s.trim().replace(/[\x00-\x1f]/g, '');
   s = s.split(/[\\/]/).pop() || '';
   s = s.replace(/[<>:"|?*]/g, '_').replace(/\.{2,}/g, '.').replace(/^\.+/, '').trim();
   if (!s || s === '.' || s === '..') s = 'download';
@@ -117,6 +194,37 @@ function uniquePath(dir, filename) {
     n++;
   }
   return candidate;
+}
+
+// Cartella di quarantena: dentro i dati dell'app, MAI dentro Download. Un
+// programma in attesa di risposta sta qui, dove nessun gestore file lo mostra e
+// nessun doppio clic lo trova.
+function quarantineDir() {
+  let base = '';
+  try { base = electron().app.getPath('userData'); } catch (_) { base = downloadsDir(); }
+  const dir = path.join(base, 'quarantena');
+  try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+  return dir;
+}
+
+// Sposta il file approvato dalla quarantena alla cartella Download. La rinomina
+// fallisce fra volumi diversi (userData e Download possono stare su dischi
+// diversi): in quel caso si copia e si cancella. Ritorna false se non ce l'ha
+// fatta — chi chiama lo DICE, non finge che il file sia arrivato.
+function spostaFile(src, dst) {
+  try { fs.renameSync(src, dst); return true; } catch (_) {}
+  try { fs.copyFileSync(src, dst); } catch (_) { return false; }
+  try { fs.unlinkSync(src); } catch (_) { /* copiato: il doppione in quarantena non è un guasto */ }
+  return true;
+}
+
+// Il file in quarantena non serve più (rifiutato, rimosso, o app riavviata).
+function rimuoviQuarantena(rec) {
+  const p = rec && rec._quarantena && rec.savePath;
+  if (!p) return;
+  try { fs.unlinkSync(p); } catch (_) {}
+  forgetExists(p);
+  rec._quarantena = false;
 }
 
 // ─── il file può sparire DOPO lo scaricamento ───────────────────────────
@@ -168,7 +276,9 @@ function publicRecord(r) {
     totalBytes: r.totalBytes || 0,
     receivedBytes: r.receivedBytes || 0,
     state: r.state,
-    savePath: r.savePath || '',
+    // Finché il file è in quarantena il percorso NON esce: è una cartella
+    // interna di Filo, e mostrarla (o lasciarla copiare) inviterebbe ad andarci.
+    savePath: r.state === 'pending' ? '' : (r.savePath || ''),
     startedAt: r.startedAt || null,
     endedAt: r.endedAt || null,
     paused: !!r.paused,
@@ -180,13 +290,20 @@ function publicRecord(r) {
     // Il file scaricato non è più al suo posto (spostato, rinominato,
     // cestinato): le superfici lo mostrano attenuato e senza "Apri file".
     missing: isMissing(r),
+    // #588 — è un file che il sistema ESEGUE: le superfici lo marcano a vista e
+    // "Apri file" chiede conferma. `site` è il sito da cui arriva, che è la
+    // cosa da guardare prima di decidere.
+    exe: !!r.exe,
+    site: r.site || '',
+    siteUncertain: !!r.siteUncertain,
   };
 }
 
 // Ordina per inizio decrescente (più recente prima) — così la shell e la
 // cronologia mostrano subito l'ultimo scaricamento.
-function listRecords() {
+function listRecords(scope = '') {
   return Array.from(records.values())
+    .filter((r) => scopeOf(r) === String(scope || ''))
     .map(publicRecord)
     .sort((a, b) => String(b.startedAt || '').localeCompare(String(a.startedAt || '')));
 }
@@ -202,9 +319,25 @@ async function loadHistory() {
       for (const raw of arr) {
         if (!raw || !raw.id) continue;
         const rec = { ...raw };
-        // Un download che risultava "in corso" alla chiusura non può più
-        // proseguire: il suo DownloadItem è morto. Lo marchiamo interrotto.
-        if (NON_TERMINAL.has(rec.state)) { rec.state = 'interrupted'; rec.paused = false; rec.canResume = false; }
+        // Una conferma non sopravvive al riavvio: chi l'avrebbe data non è più
+        // davanti a quell'avviso. Il programma resta fuori dalla cartella e la
+        // voce dice che non è stato scaricato (#588).
+        // La marca si ricalcola a ogni avvio perché l'elenco dei tipi cresce:
+        // un .iso scaricato prima che ci entrasse si aprirebbe senza conferma
+        // (#588.1). Solo in aggiunta: una marca già data non si toglie.
+        if (rec.exe !== true) {
+          try { rec.exe = ESE().eEseguibile(rec.filename); } catch (_) { rec.exe = false; }
+          if (!rec.site) { try { rec.site = ESE().sito(rec.url); } catch (_) {} }
+        }
+        if (rec.state === 'pending') {
+          rec._quarantena = true;
+          rimuoviQuarantena(rec);
+          rec.state = 'cancelled'; rec.savePath = ''; rec.paused = false; rec.canResume = false;
+        } else if (NON_TERMINAL.has(rec.state)) {
+          // Un download che risultava "in corso" alla chiusura non può più
+          // proseguire: il suo DownloadItem è morto. Lo marchiamo interrotto.
+          rec.state = 'interrupted'; rec.paused = false; rec.canResume = false;
+        }
         records.set(rec.id, rec);
       }
     }
@@ -213,53 +346,49 @@ async function loadHistory() {
 
 function persist() {
   try {
-    const arr = listRecords().slice(0, HISTORY_LIMIT);
+    // Le voci incognito non toccano mai il disco.
+    const arr = listRecords('').slice(0, HISTORY_LIMIT);
     chrome.storage.local.set({ [storageKey()]: arr });
   } catch (_) { /* best-effort */ }
 }
 
 // ─── broadcast verso la shell ───────────────────────────────────────────
 function broadcast(kind, rec) {
+  // Una voce tolta dall'elenco non torna nella barra con l'esito tardivo del
+  // suo annullamento.
+  if (kind !== 'removed' && rec && !records.has(rec.id)) { notifyTabs(); return; }
+  const scope = scopeOf(rec);
   try {
-    const { BrowserWindow } = electron();
     const payload = { kind, item: publicRecord(rec) };
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win || win.isDestroyed?.()) continue;
-      // La barra in alto (shell): riceve il record completo per l'indicatore
-      // e il pannello, come da #410.1.
+    // Solo le finestre di Filo: un popup di accesso è la pagina di un sito, e il
+    // record porta il percorso su disco.
+    for (const win of windowsOf(scope)) {
+      if (!win._filoTabs) continue;
       try { win.webContents.send('shell:download', payload); } catch (_) {}
     }
   } catch (_) {}
-  notifyTabs();
+  notifyTabs(scope);
 }
 
-// Segnale CONTENTLESS alle pagine (schede) — serve alla pagina filo://downloads
-// per sapere quando ri-leggere la lista. NON portiamo qui il record: questo
-// canale (`filo:broadcast`) raggiunge ANCHE le schede di siti esterni, e il
-// record contiene il percorso ASSOLUTO su disco (con lo username). La pagina
-// legge i dati veri dal canale DOWNLOADS_LIST, riservato alle superfici interne.
-function notifyTabs() {
+// Segnale senza contenuto alla pagina filo://downloads, che rilegge la lista dal
+// canale DOWNLOADS_LIST. Ai siti non arriva: passa dalla lista delle spinte.
+function notifyTabs(scope = '') {
   try {
-    const { BrowserWindow } = electron();
     const type = (globalThis.SN_MSG && globalThis.SN_MSG.MSG.DOWNLOADS_UPDATED) || 'downloads_updated';
     const msg = { type };
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win || win.isDestroyed?.()) continue;
+    for (const win of windowsOf(scope)) {
       const tm = win._filoTabs;
       if (tm && Array.isArray(tm.tabs)) {
-        for (const t of tm.tabs) {
-          try { t.view.webContents.send('filo:broadcast', msg); } catch (_) {}
-        }
+        for (const t of tm.tabs) spingiAllaScheda(t.view && t.view.webContents, msg, { inVista: t.id === tm.activeId });
       }
     }
   } catch (_) {}
 }
 
-function shellToast(text, opts) {
+function shellToast(text, opts, scope = '') {
   try {
-    const { BrowserWindow } = electron();
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win || win.isDestroyed?.() || !win._filoTabs) continue;
+    for (const win of windowsOf(scope)) {
+      if (!win._filoTabs) continue;
       try { win.webContents.send('shell:toast', { text, opts }); } catch (_) {}
     }
   } catch (_) {}
@@ -284,41 +413,109 @@ function notifyDownloadStarted(webContents) {
   } catch (_) {}
 }
 
+// #588 — la domanda «scaricarlo?» è la riga in attesa del pannello scaricamenti,
+// che la barra apre sopra la pagina: un avviso della barra nell'area pagina
+// resterebbe sotto la vista nativa, invisibile. Solo la finestra da cui parte.
+function chiediNellaFinestra(webContents, rec) {
+  try {
+    const finestre = windowsOf(scopeOf(rec)).filter((w) => w._filoTabs);
+    const tiene = (w) => (w._filoTabs.tabs || []).some((t) => {
+      try { return t.view.webContents === webContents; } catch (_) { return false; }
+    });
+    const win = finestre.find(tiene) || finestre.find((w) => w.isFocused?.()) || finestre[0];
+    if (win && !win.isDestroyed?.()) win.webContents.send('shell:download', { kind: 'ask', item: publicRecord(rec) });
+  } catch (_) {}
+}
+
+// Chiude uno scaricamento arrivato in fondo: se veniva dalla quarantena (#588)
+// il file entra ORA nella cartella Download, e solo se ci entra davvero la voce
+// dice "completato".
+function completa(rec) {
+  if (rec._quarantena) {
+    const dest = uniquePath(downloadsDir(), rec.filename);
+    if (spostaFile(rec.savePath, dest)) {
+      forgetExists(rec.savePath);
+      rec.savePath = dest;
+      rec.filename = path.basename(dest);
+      rec._quarantena = false;
+    } else {
+      // Il file non è arrivato dove l'utente lo cercherà: dirlo è l'unica
+      // risposta onesta (e la quarantena si svuota, così non resta un programma
+      // in un posto che nessuno guarda).
+      rimuoviQuarantena(rec);
+      rec.state = 'interrupted';
+      rec.savePath = '';
+      persist();
+      broadcast('error', rec);
+      shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8 }, scopeOf(rec));
+      return;
+    }
+  }
+  rec.state = 'completed';
+  if (!rec.endedAt) rec.endedAt = new Date().toISOString();
+  persist();
+  broadcast('done', rec);
+  // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
+  // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
+  shellToast(`Scaricato: ${shortName(rec.filename)}`, {
+    durationSec: 8,
+    actions: [
+      { label: 'Apri file', openDownloadId: rec.id },
+      { label: 'Apri cartella', revealDownloadId: rec.id },
+    ],
+  }, scopeOf(rec));
+}
+
 // ─── intercettazione ────────────────────────────────────────────────────
-function onWillDownload(item, webContents) {
+function onWillDownload(item, webContents, scope = '') {
   const id = uuid();
   const filename = safeName(item.getFilename() || (function () {
     try { return decodeURIComponent(new URL(item.getURL()).pathname.split('/').pop() || ''); }
     catch (_) { return ''; }
   })() || 'download');
 
+  const url = item.getURL();
+  const { sito, incerto } = sitoDi(url, webContents);
+  let exe = false;
+  try { exe = ESE().eEseguibile(filename); } catch (_) {}
+  // Un programma si ferma PRIMA della cartella Download: i byte scendono in
+  // quarantena e ci restano finché l'utente non risponde (#588). Il resto dei
+  // file non cambia di una virgola: l'attrito va solo dove serve.
+  const attesa = exe && chiedeConferma(sito, incerto);
+
   // Salvataggio diretto nella cartella Download (niente dialogo "Salva come":
   // vedi nota di filosofia in testa al file). setSavePath disattiva il dialogo
   // nativo — indispensabile anche per i test headless.
   let savePath = '';
   try {
-    savePath = uniquePath(downloadsDir(), filename);
+    savePath = uniquePath(attesa ? quarantineDir() : downloadsDir(), filename);
     item.setSavePath(savePath);
   } catch (_) { /* se fallisce, Electron mostrerà comunque il suo dialogo */ }
 
   const rec = {
     id,
     filename: path.basename(savePath || filename),
-    url: item.getURL(),
+    url,
     mime: item.getMimeType() || '',
     totalBytes: item.getTotalBytes() || 0,
     receivedBytes: item.getReceivedBytes() || 0,
-    state: 'progressing',
+    state: attesa ? 'pending' : 'progressing',
     savePath,
     startedAt: new Date().toISOString(),
     endedAt: null,
     paused: false,
     canResume: false,
+    exe,
+    site: sito,
+    siteUncertain: incerto,
+    _quarantena: attesa,
+    _scope: scope || '',
   };
   records.set(id, rec);
   liveItems.set(id, item);
   persist();
   broadcast('start', rec);
+  if (attesa) chiediNellaFinestra(webContents, rec);
   // #412 — chiudi la scheda "vuota" aperta apposta da un link Scarica
   // target=_blank. Deferito così il ciclo di vita del download (già preso in
   // carico qui sopra) è completamente cablato prima di toccare l'albero delle view.
@@ -411,26 +608,22 @@ function onWillDownload(item, webContents) {
     rec.filename = rec.savePath ? path.basename(rec.savePath) : rec.filename;
 
     if (state === 'completed') {
-      rec.state = 'completed';
-      persist();
-      broadcast('done', rec);
-      // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
-      // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
-      shellToast(`Scaricato: ${shortName(rec.filename)}`, {
-        durationSec: 8,
-        actions: [
-          { label: 'Apri file', openDownloadId: rec.id },
-          { label: 'Apri cartella', revealDownloadId: rec.id },
-        ],
-      });
+      // I byte sono arrivati ma il programma aspetta ancora una risposta: resta
+      // in quarantena, e nessun avviso dice "scaricato" per un file che non è
+      // nella cartella Download (#588). Ci pensa confirm(), quando l'utente
+      // risponde.
+      if (rec.state === 'pending') { rec._arrivato = true; persist(); broadcast('progress', rec); return; }
+      completa(rec);
     } else {
+      // Rifiutato, caduto o annullato: il pezzo in quarantena non deve restare.
+      rimuoviQuarantena(rec);
       // 'cancelled' (annullato dall'utente) o 'interrupted' (rete caduta, 4xx/5xx,
       // spazio finito): niente silenzio.
       rec.state = state === 'cancelled' ? 'cancelled' : 'interrupted';
       persist();
       broadcast('error', rec);
       if (rec.state !== 'cancelled') {
-        shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8 });
+        shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8 }, scopeOf(rec));
       }
     }
   }
@@ -449,7 +642,13 @@ function onWillDownload(item, webContents) {
     // "perdona" le cadute precedenti (è il caso della rete ballerina).
     if (recv > maxRecv) { maxRecv = recv; clearInterruptGrace(); armWatchdog(); }
 
-    if (rec.paused) {
+    // In attesa di risposta (#588): i byte scendono in quarantena, ma la voce
+    // NON diventa "in corso" — non lo è, finché non c'è un sì. Gli argini
+    // contro il silenzio restano attivi: un trasferimento morto va dichiarato
+    // anche mentre l'avviso è a schermo.
+    const inAttesa = rec.state === 'pending';
+
+    if (rec.paused && !inAttesa) {
       // Pausa volontaria dell'utente: non è un guasto, sospendi ogni timer.
       rec.state = 'paused';
       clearInterruptGrace();
@@ -458,10 +657,10 @@ function onWillDownload(item, webContents) {
       // Chromium dichiara caduto il trasferimento: gli concediamo la finestra di
       // grazia per riprendersi da solo. Per l'utente resta "in corso" — se
       // riparte davvero non deve vedere allarmi inutili.
-      rec.state = 'progressing';
+      if (!inAttesa) rec.state = 'progressing';
       armInterruptGrace();
     } else {
-      rec.state = 'progressing';
+      if (!inAttesa) rec.state = 'progressing';
       if (!rec._stallTimer) armWatchdog();   // ripreso dopo una pausa
     }
     broadcast('progress', rec);
@@ -493,7 +692,13 @@ function finalizeManual(rec, state, savePath) {
   rec.endedAt = new Date().toISOString();
   rec.paused = false;
   rec.canResume = false;
-  if (savePath) { rec.savePath = savePath; rec.filename = path.basename(savePath); }
+  if (savePath) {
+    rec.savePath = savePath;
+    rec.filename = path.basename(savePath);
+    // Il nome definitivo lo sceglie l'utente nel dialogo di salvataggio: la
+    // marca "è un programma" si rifà su QUELLO, non sul nome proposto.
+    try { rec.exe = ESE().eEseguibile(rec.filename); } catch (_) {}
+  }
   rec.state = state;
   persist();
   broadcast(state === 'completed' ? 'done' : 'error', rec);
@@ -501,12 +706,19 @@ function finalizeManual(rec, state, savePath) {
   // già la sua conferma nella pagina (un secondo avviso sarebbe un doppione).
 }
 
-function beginManual({ url, filename, totalBytes } = {}) {
+function beginManual({ url, filename, totalBytes, scope } = {}) {
   const id = uuid();
+  const nome = safeName(filename || 'download');
+  const indirizzo = String(url || '');
+  const marca = (fn, ripiego) => { try { return fn(); } catch (_) { return ripiego; } };
   const rec = {
     id,
-    filename: safeName(filename || 'download'),
-    url: String(url || ''),
+    filename: nome,
+    url: indirizzo,
+    // Anche "Salva immagine/video come…" può depositare un programma: la voce
+    // lo dichiara e "Apri file" chiede conferma come per ogni altro (#588).
+    exe: marca(() => ESE().eEseguibile(nome), false),
+    site: marca(() => ESE().sito(indirizzo), ''),
     mime: '',
     totalBytes: Number(totalBytes) > 0 ? Number(totalBytes) : 0,
     receivedBytes: 0,
@@ -517,6 +729,7 @@ function beginManual({ url, filename, totalBytes } = {}) {
     paused: false,
     canResume: false,
     canPause: false,
+    _scope: scope || '',
   };
   records.set(id, rec);
   const requestCancel = () => { rec._cancelled = true; finalizeManual(rec, 'cancelled'); };
@@ -554,41 +767,73 @@ function beginManual({ url, filename, totalBytes } = {}) {
   };
 }
 
-// Aggancia will-download a una sessione (idempotente).
-function attachSession(ses) {
+// Aggancia will-download a una sessione (idempotente). `scope` è la partizione
+// di una finestra incognito, '' per il resto (vedi scopeOfWindow).
+function attachSession(ses, { scope = '' } = {}) {
   if (!ses || attached.has(ses)) return;
   attached.add(ses);
   try {
-    ses.on('will-download', (_e, item, webContents) => { onWillDownload(item, webContents); });
+    ses.on('will-download', (_e, item, webContents) => { onWillDownload(item, webContents, scope); });
   } catch (_) {}
+}
+
+// Una finestra incognito si è chiusa: le sue voci spariscono con lei. Un
+// programma ancora in attesa non ha più nessuno che risponda, e la quarantena
+// si svuota; uno scaricamento in corso arriva in fondo senza più una riga.
+function forgetScope(scope) {
+  if (!scope) return;
+  for (const [id, rec] of Array.from(records)) {
+    if (scopeOf(rec) !== scope) continue;
+    if (rec.state === 'pending') confirmDownload(id, false, scope);
+    records.delete(id);
+    liveManual.delete(id);
+  }
 }
 
 async function init() {
   await loadHistory();
+  // Nessuna attesa sopravvive a un riavvio (loadHistory le chiude): quello che
+  // resta in quarantena è orfano, e un programma orfano non deve restare su
+  // disco. Si svuota all'avvio, quando non può esserci niente di vivo dentro.
+  try {
+    const dir = quarantineDir();
+    for (const nome of fs.readdirSync(dir)) {
+      try { fs.rmSync(path.join(dir, nome), { recursive: true, force: true }); } catch (_) {}
+    }
+  } catch (_) {}
   try { attachSession(electron().session.defaultSession); } catch (_) {}
 }
 
 // ─── API per gli handler IPC (comandi dalla shell) ─────────────────────────
-function list() { return listRecords(); }
+function list(scope = '') { return listRecords(scope); }
 
-function clearCompleted() {
+function clearCompleted(scope = '') {
   for (const [id, rec] of records) {
-    if (!NON_TERMINAL.has(rec.state)) records.delete(id);
+    if (scopeOf(rec) === scope && !NON_TERMINAL.has(rec.state)) records.delete(id);
   }
   persist();
-  return listRecords();
+  return listRecords(scope);
 }
 
-function remove(id) {
+function remove(id, scope = '') {
+  if (!recordIn(id, scope)) return listRecords(scope);
   // Un download in corso non si "rimuove" dalla lista: prima lo si annulla.
   // Vale per entrambi i cammini, nativo e "a mano".
   if (liveItems.has(id)) { try { liveItems.get(id).cancel(); } catch (_) {} }
   if (liveManual.has(id)) { try { liveManual.get(id).cancel(); } catch (_) {} }
+  // Togliere dall'elenco una voce in attesa È una risposta: il programma in
+  // quarantena se ne va con lei, invece di restare su disco senza più nessuno
+  // che possa deciderne la sorte (#588).
+  const rec = records.get(id);
+  if (rec) rimuoviQuarantena(rec);
   records.delete(id);
   liveItems.delete(id);
   liveManual.delete(id);
   persist();
-  return listRecords();
+  // La barra in alto deve saperlo: una domanda «scaricarlo?» ancora a schermo
+  // per questa voce si ritira (#588).
+  if (rec) broadcast('removed', rec);
+  return listRecords(scope);
 }
 
 // Messaggio unico per "il file non c'è più": lo dicono sia la barra in alto sia
@@ -596,9 +841,46 @@ function remove(id) {
 const MISSING_TEXT = 'Il file non c’è più: forse è stato spostato o cancellato';
 const MISSING_FOLDER_TEXT = 'La cartella non c’è più: forse è stata spostata o cancellata';
 
-function openFile(id) {
-  const rec = records.get(id);
+// #588 — risposta alla domanda "questo programma lo scarico?". `allow` viene da
+// un clic dell'utente: un no cancella il file dalla quarantena, un sì lo fa
+// proseguire (o lo sposta subito, se i byte sono già tutti arrivati).
+function confirmDownload(id, allow, scope = '') {
+  const rec = recordIn(id, scope);
+  if (!rec || rec.state !== 'pending') {
+    return { ok: false, error: 'Questo scaricamento non aspetta più una risposta', items: listRecords(scope) };
+  }
+  if (!allow) {
+    const item = liveItems.get(id);
+    rec._final = true;   // il 'done' che segue cancel() non deve riscrivere l'esito
+    if (rec._stallTimer) { clearTimeout(rec._stallTimer); rec._stallTimer = null; }
+    if (rec._resumeTimer) { clearTimeout(rec._resumeTimer); rec._resumeTimer = null; }
+    if (item) { try { item.cancel(); } catch (_) {} }
+    liveItems.delete(id);
+    rimuoviQuarantena(rec);
+    rec.state = 'cancelled';
+    rec.savePath = '';
+    rec.paused = false;
+    rec.canResume = false;
+    rec.endedAt = new Date().toISOString();
+    persist();
+    broadcast('error', rec);
+    return { ok: true, items: listRecords(scope) };
+  }
+  if (rec._arrivato) { completa(rec); return { ok: true, items: listRecords(scope) }; }
+  // Ancora in corso: prosegue come un download qualsiasi, e il file esce dalla
+  // quarantena quando arriva in fondo (completa()).
+  rec.state = 'progressing';
+  persist();
+  broadcast('progress', rec);
+  return { ok: true, items: listRecords(scope) };
+}
+
+function openFile(id, opts, scope = '') {
+  const rec = recordIn(id, scope);
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
+  if (rec.state === 'pending') {
+    return { ok: false, error: 'Questo programma non è ancora sul computer. Rispondi prima all’avviso' };
+  }
   // Guarda il disco PRIMA di tentare (vedi nota su fileExists): l'esito
   // dell'apertura non è affidabile su tutte le piattaforme.
   forgetExists(rec.savePath);
@@ -607,6 +889,16 @@ function openFile(id) {
     // superfici aperte così la vedono attenuata senza dover ricaricare.
     broadcast('missing', rec);
     return { ok: false, missing: true, error: MISSING_TEXT };
+  }
+  // #588 — l'UNICA porta verso shell.openPath: aprire un programma è eseguirlo,
+  // e qui non si passa senza una seconda risposta. Il gate sta nel main perché
+  // le superfici che offrono "Apri file" sono tre (avviso, barra, pagina) e una
+  // regola per porta sarebbe una porta dimenticata.
+  if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.site, rec.siteUncertain)) {
+    let text = `«${rec.filename}» è un programma: aprirlo vuol dire eseguirlo.`;
+    let title = 'Aprire un programma?';
+    try { text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain); title = ESE().titoloApri(rec.filename); } catch (_) {}
+    return { ok: false, needsConfirm: true, exe: true, title, text };
   }
   try {
     const r = electron().shell.openPath(rec.savePath);
@@ -618,8 +910,8 @@ function openFile(id) {
   } catch (e) { return { ok: false, error: e?.message || 'apertura fallita' }; }
 }
 
-function openFolder(id) {
-  const rec = records.get(id);
+function openFolder(id, scope = '') {
+  const rec = recordIn(id, scope);
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
   if (!rec.savePath) return { ok: false, missing: true, error: MISSING_TEXT };
   forgetExists(rec.savePath);
@@ -647,19 +939,22 @@ function openFolder(id) {
   } catch (e) { return { ok: false, error: e?.message || 'apertura cartella fallita' }; }
 }
 
-function cancel(id) {
+function cancel(id, scope = '') {
+  if (!recordIn(id, scope)) return { ok: true };
   const item = liveItems.get(id);
   if (item) { try { item.cancel(); } catch (_) {} }
   const manual = liveManual.get(id);
   if (manual) { try { manual.cancel(); } catch (_) {} }
   return { ok: true };
 }
-function pause(id) {
+function pause(id, scope = '') {
+  if (!recordIn(id, scope)) return { ok: true };
   const item = liveItems.get(id);
   if (item && !item.isPaused()) { try { item.pause(); } catch (_) {} }
   return { ok: true };
 }
-function resume(id) {
+function resume(id, scope = '') {
+  if (!recordIn(id, scope)) return { ok: true };
   const item = liveItems.get(id);
   if (item && item.canResume()) { try { item.resume(); } catch (_) {} }
   return { ok: true };
@@ -668,6 +963,8 @@ function resume(id) {
 module.exports = {
   init,
   attachSession,
+  forgetScope,
+  scopeOfWindow,
   beginManual,
   // Serve a chi scarica i byte da sé (#436) per piazzare il file parziale nella
   // stessa cartella in cui atterrerebbe un download nativo: così la rinomina
@@ -677,6 +974,8 @@ module.exports = {
   list,
   clearCompleted,
   remove,
+  confirmDownload,
+  configureFromSettings,
   openFile,
   openFolder,
   cancel,

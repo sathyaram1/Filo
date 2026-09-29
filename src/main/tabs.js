@@ -3,15 +3,19 @@
 // La shell parla con il main via IPC (tabs:* canali); il main risponde con
 // broadcast tabs:updated alla shell perché ridisegni la barra.
 
-const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow } = require('electron');
+const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
+const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
 const ProxyTab = require('./services/proxyTab');
+const { registerFiloProtocolForSession } = require('./protocol');
 const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
 const { installSafebrowse } = require('./tabs/tabSafebrowse');
 const { installGeoBlock } = require('./tabs/tabGeoBlock');
+const { installCookies } = require('./tabs/tabCookies');
+const Permessi = require('./services/permessiPagine');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -22,6 +26,7 @@ require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei downl
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
 const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
+const { collegaScorciatoie } = require('./shortcuts');
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
@@ -77,29 +82,42 @@ function tabDiWebContents(wc) {
   return null;
 }
 
-// #514 — l'Esc NON è un gesto con cui una pagina può prendersi lo schermo.
-// Da quando il tasto arriva al documento (serve: è quello che chiude i riquadri
-// aperti sopra la pagina, e prendercelo prima li scavalcava), il browser lo
-// conta come gesto dell'utente. Una pagina che chiede lo schermo pieno dentro
-// il proprio gestore dell'Esc lo otteneva senza che nessuno avesse cliccato
-// niente: da lì il tasto di questa segnalazione diventava un testa o croce —
-// un Esc esce, il successivo rientra — perché la modalità tornava "della
-// pagina" e l'Esc dopo era suo. Si rifiuta qui, prima che succeda qualsiasi
-// cosa: un evento di uscita non può essere il permesso per entrare. Su ogni
-// altro permesso si resta al comportamento di prima (senza gestore, Electron
-// concede), e questo è il motivo del `callback(true)` finale.
+// #514 — l'Esc NON è un gesto con cui una pagina può prendersi lo schermo: chi chiede lo schermo pieno dentro il
+// proprio gestore dell'Esc lo otteneva senza un clic, e un evento di uscita non può essere il permesso per entrare.
+// Microfono, fotocamera, appunti e posizione li decide l'utente (#591.1): regole in services/permessiPagine.js.
 function installaPermessi(ses) {
-  if (!ses || ses._filoPermessi) return;
-  ses._filoPermessi = true;
+  Permessi.installa(ses, {
+    prima: (wc, permission, callback) => {
+      if (permission !== 'fullscreen') return false;
+      const t = tabDiWebContents(wc);
+      if (t && t._ultimoInputEsc) { callback(false); return true; }
+      return false;
+    },
+    schedaDi: schedaPerPermessi,
+    esterno: isOsDelegatedScheme,
+  });
+}
+
+// La domanda va alla cornice della finestra che mostra la pagina: lì la pagina non la copre e non la imita.
+function schedaPerPermessi(wc) {
   try {
-    ses.setPermissionRequestHandler((wc, permission, callback) => {
-      if (permission === 'fullscreen') {
-        const t = tabDiWebContents(wc);
-        if (t && t._ultimoInputEsc) { callback(false); return; }
-      }
-      callback(true);
-    });
+    for (const w of BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      const t = tm && Array.isArray(tm.tabs) && tm.tabs.find((x) => {
+        const c = x && x.view && x.view.webContents;
+        return c && !c.isDestroyed() && c.id === wc.id;
+      });
+      if (!t) continue;
+      return {
+        tabId: t.id,
+        avvisa: (evento, dati) => {
+          if (w.isDestroyed() || w.webContents.isDestroyed()) return;
+          w.webContents.send(evento === 'chiedi' ? 'tabs:permesso' : 'tabs:permesso-fine', dati);
+        },
+      };
+    }
   } catch (_) {}
+  return null;
 }
 
 // #252 — pagina interna filo:// "singleton": ne ha senso UNA sola scheda alla
@@ -322,6 +340,35 @@ class TabManager {
     this.loadProxyRules().catch(() => {});
     // Ctrl +/-/0 premuti mentre il focus è sulla barra (vedi _wireShellZoomKeys).
     this._wireShellZoomKeys();
+    for (const ev of ['minimize', 'restore', 'hide', 'show']) {
+      try { this.win.on?.(ev, () => this._annunciaVista()); } catch (_) {}
+    }
+  }
+
+  // Chi guarda: la scheda attiva di una finestra né nascosta né ridotta a
+  // icona. `document.hidden` in una WebContentsView non lo dice (resta falso).
+  inVista(tabId) {
+    if (!tabId || tabId !== this.activeId) return false;
+    try {
+      if (this.win.isDestroyed?.() || this.win.isMinimized?.()) return false;
+      if (this.win.isVisible && !this.win.isVisible()) return false;
+    } catch (_) { return false; }
+    return true;
+  }
+
+  // Alle pagine filo:// che hanno cambiato stato, e solo a loro: chi legge a
+  // intervalli (la Gestione) smette da nascosta e si riallinea al rientro.
+  _annunciaVista() {
+    for (const t of this.tabs) {
+      const ora = this.inVista(t.id);
+      if (t._inVista === ora) continue;
+      t._inVista = ora;
+      const wc = t.view?.webContents;
+      try {
+        if (!wc || wc.isDestroyed?.() || !String(wc.getURL() || '').startsWith('filo://')) continue;
+        wc.send('filo:broadcast', { type: 'tab_in_vista', inVista: ora });
+      } catch (_) {}
+    }
   }
 
   // Aggiorna le impostazioni di sicurezza e le riapplica a tutti i tab esistenti.
@@ -586,19 +633,7 @@ class TabManager {
   // (e «Esci da schermo intero» a chi ne era già uscito, rimettendocelo con un
   // clic), e il suo Esc chiudeva il menu portandosi via anche la modalità.
   _broadcastToViews(message) {
-    for (const t of this.tabs) {
-      const wc = t.view?.webContents;
-      if (!wc || wc.isDestroyed?.()) continue;
-      let frames = null;
-      try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
-      if (!frames || !frames.length) {
-        try { wc.send('filo:broadcast', message); } catch (_) {}
-        continue;
-      }
-      for (const f of frames) {
-        try { if (!f.detached) f.send('filo:broadcast', message); } catch (_) {}
-      }
-    }
+    for (const t of this.tabs) spingiAllaScheda(t.view?.webContents, message, { inVista: t.id === this.activeId });
   }
 
   // ─── lifecycle ──────────────────────────────────────────────────────────
@@ -679,15 +714,15 @@ class TabManager {
     }
     const view = new WebContentsView({ webPreferences });
     // #410.1 — segui gli scaricamenti anche sulle sessioni NON predefinite
-    // (privacy per-sito, proxy "apri da un altro paese"): senza questo, un
-    // download partito da una scheda proxata/privacy resterebbe "al buio".
-    // Le finestre incognito sono ESCLUSE di proposito: "nessuna traccia" vale
-    // anche per i download, che quindi non entrano nella cronologia condivisa
-    // (in incognito il browser usa comunque il suo salvataggio nativo).
-    if (!this.incognito) {
-      try { require('./services/downloads').attachSession(view.webContents.session); } catch (_) {}
-    }
+    // (privacy, proxy, incognito): una sessione non agganciata scarica col
+    // dialogo nativo, senza barra e senza il controllo sui programmi (#588.2).
+    // L'incognito ha il suo ambito: le sue voci non vanno su disco.
+    try {
+      require('./services/downloads').attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
+    } catch (_) {}
     installaPermessi(view.webContents.session);
+    Permessi.seguiGesti(view.webContents);
+    require('./services/homeNetwork').attach(view.webContents.session);
     return view;
   }
 
@@ -770,6 +805,8 @@ class TabManager {
       // Proxy per-tab ("Apri da un altro paese"): { country, tier } finché la
       // tab è instradata da un altro paese, null altrimenti. Vedi setTabProxy.
       proxy: null,
+      // #754 — banner dei cookie di questo sito: { site, rejected, hidden } (vedi tabs/tabCookies.js).
+      cookieOutcome: null,
       // #145 — tab nata da un ripristino di sessione: l'autoplay resta bloccato
       // (vedi _makeView). Memorizzato sulla tab così sopravvive a _recreateView
       // (es. se la tab viene proxata alla nascita per una regola di dominio).
@@ -809,6 +846,7 @@ class TabManager {
     if (activate) {
       // Riaffermo la visibilità su tutti i tab dopo loadURL.
       for (const t of this.tabs) t.view.setVisible?.(t.id === id);
+      this._tastieraAllaSchedaAttiva();
     }
     // #152 — born proxied: se il dominio ha una regola persistente, la scheda
     // nasce instradata da quel paese (ricrea la view nella partition proxata).
@@ -971,7 +1009,7 @@ class TabManager {
       const coOpenUrls = this.tabs
         .filter((t) => t.id !== tab.id && t.url && /^https?:\/\//i.test(t.url))
         .map((t) => t.url);
-      const enrichPayload = { title: tab.title || '', content: tab.contentExtract || '' };
+      const enrichPayload = { title: tab.title || '', content: tab.contentExtract || '', url };
       Promise.resolve(
         Archive.archive({
           url,
@@ -1018,6 +1056,12 @@ class TabManager {
 
   // ─── proxy per-tab ("Apri da un altro paese", vedi proxy-per-tab-spec.md) ──
 
+  // «Apri da un altro paese» esiste solo con un fornitore: ogni porta della
+  // funzione (chat, regole, livello 2 del riconoscimento) chiede qui (#771).
+  async proxyAvailable() {
+    return ProxyTab.isConfigured(await this._readSettings());
+  }
+
   // Instrada la tab attraverso un endpoint nel paese richiesto. La tab viene
   // ricreata nella partition dedicata proxy:<tabId> (cookie jar separato dal
   // resto del browser) con il proxy applicato alla sua session; la scelta vive
@@ -1043,6 +1087,8 @@ class TabManager {
     // cookie non sopravvivono alla chiusura dell'app. setProxy va applicato e
     // ATTESO prima di creare la view, o le prime richieste partirebbero dirette.
     const ses = session.fromPartition(partition);
+    // Senza filo:// qui la pagina d'errore non si carica e un proxy muto lascia la scheda vuota.
+    if (!ses.protocol.isProtocolHandled('filo')) registerFiloProtocolForSession(ses);
     try {
       await ses.setProxy({
         proxyRules: resolved.proxyRules,
@@ -1131,6 +1177,8 @@ class TabManager {
   // lo riduciamo al dominio registrabile — la STESSA chiave usata dal match in
   // navigazione (_ruleForUrl), così la regola scatta davvero alla riapertura.
   async setDomainProxyRule(country, { domain } = {}) {
+    // Una regola che non potrà mai instradare niente è una promessa falsa.
+    if (!(await this.proxyAvailable())) return { ok: false, error: 'not_configured' };
     const code = ProxyTab.normalizeCountry(country);
     if (!code) return { ok: false, error: 'bad_country' };
     const src = String(domain || '');
@@ -1448,7 +1496,20 @@ class TabManager {
       t.view.setVisible?.(t.id === id);
     }
     this.layout();
+    this._tastieraAllaSchedaAttiva();
     this._broadcast();
+  }
+
+  // La scheda davanti prende la tastiera se questa era su una scheda che non si
+  // vede più, o su niente perché la view chiusa se l'è portata via: senza, dopo
+  // Ctrl+W, Alt+cifra o Alt+S i tasti non arrivano a nessuno finché non si
+  // clicca (#838). La barra che ha la tastiera la tiene; Filo dietro non la ruba.
+  _tastieraAllaSchedaAttiva() {
+    const tab = this.tabs.find((t) => t.id === this.activeId);
+    if (!tab || this.win.isDestroyed() || !this.win.isFocused()) return;
+    const col = require('electron').webContents.getFocusedWebContents();
+    if (col === this.win.webContents || col === tab.view.webContents) return;
+    try { tab.view.webContents.focus(); } catch (_) {}
   }
 
   // §2.1 — segnali di attività riportati dal content script (input, scroll,
@@ -1568,6 +1629,7 @@ class TabManager {
     // Visibilità coerente con lo stato attivo: solo la scheda attiva è visibile,
     // le altre (inclusa la view appena ricreata se non attiva) restano nascoste.
     for (const t of this.tabs) t.view.setVisible?.(t.id === this.activeId);
+    if (wasActive) this._tastieraAllaSchedaAttiva();
     this._broadcast();
   }
 
@@ -1689,6 +1751,41 @@ class TabManager {
     });
   }
 
+  // Zoom della scheda attiva chiesto da fuori la tastiera (oggi: la chat).
+  // Passa dalla STESSA porta dei tasti, così la memoria per sito e l'opt-out
+  // delle pagine che zoomano da sé restano di chi già li tiene. Il preload
+  // risponde con la percentuale che ha davvero applicato: chi chiede un valore
+  // fuori scala deve poterlo dire all'utente invece di tacere il taglio.
+  applicaZoom(spec) {
+    const active = this.tabs.find((t) => t.id === this.activeId);
+    if (!active || !active.view) return Promise.resolve(null);
+    const wc = active.view.webContents;
+    const rid = `zoom-${randomUUID()}`;
+    return new Promise((resolve) => {
+      let chiuso = false;
+      const fine = (v) => {
+        if (chiuso) return;
+        chiuso = true;
+        clearTimeout(scadenza);
+        try { ipcMain.removeListener('filo:zoom-applicato', onEco); } catch (_) {}
+        resolve(v);
+      };
+      // Solo la scheda a cui l'abbiamo chiesto può rispondere: un'altra pagina
+      // non deve poter mettere un numero in bocca a Filo.
+      const onEco = (e, msg) => {
+        if (!msg || String(msg.rid || '') !== rid) return;
+        if (e.sender !== wc) return;
+        fine(msg);
+      };
+      // Nessuna risposta: la pagina non ha il nostro preload (un visualizzatore
+      // interno, una pagina d'errore) o non è ancora in piedi. È diverso da
+      // «non c'è nessuna scheda», e chi riferisce all'utente deve poterlo dire.
+      const scadenza = setTimeout(() => fine({ muto: true }), 2000);
+      ipcMain.on('filo:zoom-applicato', onEco);
+      try { wc.send('filo:zoom-key', { ...spec, rid }); } catch (_) { fine({ muto: true }); }
+    });
+  }
+
   // ─── eventi della WebContents → aggiorna stato + broadcast ─────────────
 
   _wireEvents(tab) {
@@ -1697,6 +1794,16 @@ class TabManager {
       Object.assign(tab, patch);
       this._broadcast();
     };
+    // Una pagina di Filo che scala il proprio contenuto (l'editor scala il
+    // foglio) dichiara qui a quanto sta: il livello della finestra per lei
+    // resta 100%, e senza questo Filo riferirebbe in chat il numero sbagliato
+    // (#686). Il canale è quello della singola scheda: muore con lei.
+    try {
+      wc.ipc.on('filo:zoom-proprio', (_e, perc) => {
+        const n = Math.round(Number(perc));
+        tab.zoomProprio = Number.isFinite(n) && n > 0 ? n : null;
+      });
+    } catch (_) {}
     // In modalità "contenuto a tutto schermo" la pagina copre la barra, quindi
     // Esc deve riportare la shell. Intercettiamo il tasto prima che la pagina lo
     // gestisca (vale anche per i siti esterni, senza dipendere dai content script).
@@ -1723,6 +1830,7 @@ class TabManager {
       this.pageFullscreenTabId = null;
       this.setContentFullscreen(false);
     });
+    collegaScorciatoie(wc, () => this.win);
     wc.on('before-input-event', (event, input) => {
       // #514 — l'ultimo tasto era l'Esc? Serve a `enter-html-full-screen`, che
       // da un Esc non fa passare nessuna richiesta di schermo pieno. Qui,
@@ -1869,7 +1977,7 @@ class TabManager {
       // la pagina d'errore è solo la faccia del fallimento, come negli altri browser.
       tab.url = failed;
       try {
-        if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(failed, code, desc));
+        if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(failed, code, desc, { altroPaese: !!tab.proxy }));
       } catch (_) {}
     });
     // #327 — renderer morto (crash/oom): stessa scheda bianca, stessa cura.
@@ -2009,6 +2117,9 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // Documento nuovo: lo zoom che la pagina vecchia dichiarava di sé non
+      // vale più (#686).
+      tab.zoomProprio = null;
       // Documento nuovo: chi rispondeva era quello vecchio. Il nuovo si
       // ripresenterà da solo appena montato (MSG.FULLSCREEN_STATE); fino ad
       // allora vale l'attesa corta, quella di chi non risponde.
@@ -2041,6 +2152,7 @@ class TabManager {
       // appena il main-frame si è committato, prima che la pagina sia
       // interattiva. Best-effort, non blocca mai (vedi _sbOnNavigate).
       this._sbOnNavigate(tab, url);
+      this._cookieOnNavigate(tab, url);
       // Geo-block livello 1 (deterministico): nuova navigazione → il segnale
       // precedente decade; HTTP 451 è conclusivo, altrimenti vale l'eventuale
       // redirect "di blocco" memorizzato durante questa navigazione.
@@ -2138,7 +2250,7 @@ class TabManager {
       try {
         const SB = globalThis.SN_SAFEBROWSE;
         const norm = SB && SB.normalize(url);
-        if (norm && norm.registrable) SB.recordCert(norm.registrable, mapCertError(error));
+        if (norm && norm.host) SB.recordCert(norm.host, mapCertError(error));
       } catch (_) {}
       try { callback(false); } catch (_) {}
     });
@@ -2246,6 +2358,8 @@ class TabManager {
   // login Google già presente in Filo.
   _allowAuthPopup(url) {
     const popupPartition = this._partitionFor(url);
+    // Una partizione mai vista da una scheda non ha gestore, ed Electron concederebbe tutto al popup.
+    if (popupPartition) installaPermessi(session.fromPartition(popupPartition));
     return {
       action: 'allow',
       overrideBrowserWindowOptions: {
@@ -2277,6 +2391,7 @@ class TabManager {
   _hardenAuthPopup(win) {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
+    installaPermessi(pwc.session);
     try {
       pwc.setWebRTCIPHandlingPolicy(
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
@@ -2469,6 +2584,8 @@ class TabManager {
         // Proxy per-tab ("Apri da un altro paese"): { country, tier } o null.
         // La shell lo userà per l'indicatore sulla tab (feedback UI separato).
         proxy: t.proxy ? { country: t.proxy.country, tier: t.proxy.tier } : null,
+        // Banner dei cookie del sito, per il menu della scheda: null se Filo non li gestisce qui.
+        cookies: this._cookieState(t),
       })),
     };
   }
@@ -2478,6 +2595,7 @@ class TabManager {
     try {
       this.win.webContents.send('tabs:updated', this.snapshot());
     } catch (_) { /* shell non ancora caricata */ }
+    this._annunciaVista();
     this._persistSession();
   }
 
@@ -2585,6 +2703,7 @@ class TabManager {
 // d'istanza identici a prima del refactor.
 installSafebrowse(TabManager);
 installGeoBlock(TabManager);
+installCookies(TabManager);
 
 // Host di un URL (chiave della cache colore identità §1.2). Solo schemi web:
 // le pagine filo:// interne non hanno identità di sito da tinteggiare.
@@ -2641,4 +2760,24 @@ function mapCertError(error) {
 // logica serve anche al campo "nuova scheda" della dashboard, che prima aveva una
 // copia più povera. Sono importati in cima al file da globalThis.SN_URL_NAV.
 
-module.exports = { TabManager, normalizeUrl, isWebUnsafeNav };
+// Il visore dei PDF è un webContents a sé che prende la tastiera: i suoi tasti non
+// passano dal before-input-event della scheda e vanno portati agli stessi ascolti (#838).
+function inoltraTastiDegliOspiti(app) {
+  app.on('web-contents-created', (_e, wc) => {
+    if (wc.getType() !== 'remote') return;
+    wc.on('input-event', (_ev, input) => {
+      const tipo = input && { rawKeyDown: 'keyDown', keyDown: 'keyDown', keyUp: 'keyUp' }[input.type];
+      if (!tipo) return;
+      // Un tasto della barra dei menu (su Mac Cmd+W, Cmd+T…) lo esegue già lei.
+      if (tipo === 'keyDown' && require('./menu').tastoDellaBarra(input)) return;
+      // Chi ha la tastiera sta nella finestra davanti, nella scheda attiva.
+      const win = BrowserWindow.getFocusedWindow();
+      const tabs = win && win._filoTabs;
+      const tab = tabs && tabs.tabs.find((t) => t.id === tabs.activeId);
+      if (!tab || tab.view.webContents === wc || tab.view.webContents.isDestroyed()) return;
+      tab.view.webContents.emit('before-input-event', { preventDefault() {} }, { ...input, type: tipo });
+    });
+  });
+}
+
+module.exports = { TabManager, normalizeUrl, isWebUnsafeNav, inoltraTastiDegliOspiti };

@@ -32,6 +32,8 @@ test('dashboard: ricerca senza risultati dice "Nessun risultato", non "Nessun fe
   const inboxTab = page.locator('[data-tab="inbox"]');
   await expect(inboxTab).toHaveText(/Ricevuti \(2\)/);
   await expect(page.locator('.fb-card')).toHaveCount(2);
+  const count = page.locator('#count');
+  await expect(count).toHaveText('2 feedback');
 
   const empty = page.locator('#empty');
 
@@ -47,15 +49,26 @@ test('dashboard: ricerca senza risultati dice "Nessun risultato", non "Nessun fe
   await expect(empty).not.toContainText('Nessun feedback in arrivo');
   // Il tab NON perde il suo conteggio reale: continua a dire "Ricevuti (2)".
   await expect(inboxTab).toHaveText(/Ricevuti \(2\)/);
+  // #511: il contatore accanto alla ricerca dice lo zero, non sparisce.
+  await expect(count).toBeVisible();
+  await expect(count).toHaveText('0 feedback');
   await page.screenshot({ path: 'tests/.shots/feedback-search-empty.png' }).catch(() => {});
 
   // Controprova: svuotando la ricerca tornano le 2 card e sparisce il messaggio.
   await page.fill('#search', '');
   await expect(page.locator('.fb-card')).toHaveCount(2);
   await expect(empty).toBeHidden();
+  await expect(count).toHaveText('2 feedback');
 
   // E una ricerca CHE matcha filtra correttamente (una sola card).
   await page.fill('#search', 'finestra');
   await expect(page.locator('.fb-card')).toHaveCount(1);
   await expect(empty).toBeHidden();
+  await expect(count).toHaveText('1 feedback');
+
+  // Stessa causa, altra porta: il filtro «Solo automatici» senza ritrovamenti.
+  await page.fill('#search', '');
+  await page.check('#agentOnly');
+  await expect(page.locator('.fb-card')).toHaveCount(0);
+  await expect(count).toHaveText('0 feedback');
 });
