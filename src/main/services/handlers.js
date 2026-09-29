@@ -4286,10 +4286,12 @@ function daIndicizzare(items, modello) {
     && !(it.casa || isHomeNetworkUrl(it.url)));
 }
 
-// Le schede senza un vettore del modello in uso (migrate, chiuse senza rete, di un modello vecchio) si indicizzano in
-// sottofondo all'avvio e a ogni cambio di modello: la prima ricerca trova l'indice già fatto invece di aspettarlo (#825).
+// Le schede senza un vettore del modello in uso si indicizzano in sottofondo quando entrano in archivio (da qualunque
+// strada), all'avvio e a ogni cambio di modello: la prima ricerca trova l'indice già fatto invece di aspettarlo (#825).
+// Una scheda appena chiusa il vettore lo riceve dal suo arricchimento: finché è in corso l'indice non la paga due volte.
 let indiceTimer = null;
 let indiceModello = null;
+const inArricchimento = new Set();
 function programmaIndiceArchivio(ritardo) {
   if (Disco.inIncognito()) return;
   clearTimeout(indiceTimer);
