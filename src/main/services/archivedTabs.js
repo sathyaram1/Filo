@@ -167,11 +167,11 @@
     const pronte = voci
       .filter((t) => t && typeof t === 'object' && !Array.isArray(t))
       .map((t) => (typeof t.id === 'string' && t.id ? t : { ...t, id: uuid() }));
-    return d.aggiungiMolti(pronte, { inCoda: true }).length;
+    return entrate(d.aggiungiMolti(pronte, { inCoda: true })).length;
   }
 
   global.SN_ARCHIVED_TABS = {
     list, listMeta, archive, update, remove, removeMany, clear, importa,
-    cartella,
+    suEntrate, cartella,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
