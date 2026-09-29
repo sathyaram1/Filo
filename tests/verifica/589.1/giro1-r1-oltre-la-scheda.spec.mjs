@@ -1,6 +1,6 @@
 // #589.1 giro 1, rilievo 1 — le domande che la lista lascia passare non devono arrivare oltre la
-// scheda che le fa: comandi della barra e schermo intero da una scheda di sfondo, il saldo dei
-// crediti nella risposta del premio, i titoli delle altre schede nella foto della barra.
+// scheda che le fa: barra, schermo intero e schede in primo piano da una scheda di sfondo, il saldo
+// dei crediti nella risposta del premio, i titoli delle altre schede nella foto della barra.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -44,13 +44,15 @@ test('una scheda di sfondo non preme i tasti della barra né manda a schermo int
 
   const home = await sfondo(chiedi('shell_action', { command: 'home' }));
   expect(home.nonTrovata || home.errore).toBeFalsy();
-  const schermo = await sfondo(chiedi('toggle_fullscreen'));
+  await sfondo(chiedi('toggle_fullscreen'));
+  await sfondo(chiedi('open_url', { url: `${testServer.origin}/non-cercata` }));
+  await sfondo(chiedi('open_options'));
   await new Promise((r) => setTimeout(r, 1500));
 
   const dopo = await schede(app);
   expect(dopo.tutte.find((t) => t.id === guardata.id)?.url, 'una scheda di sfondo ha portato via la pagina che l\'utente stava guardando').toBe(guardata.url);
   expect(dopo.schermoIntero, 'una scheda di sfondo ha messo a schermo intero la scheda che l\'utente guarda').toBe(false);
-  void schermo;
+  expect(dopo.attiva, 'una scheda di sfondo ha portato in primo piano schede che l\'utente non ha chiesto').toBe(guardata.id);
 });
 
 test('la risposta al premio del feedback non dice a un sito il saldo dei crediti', async ({ app, shell, openTab, testServer }) => {
