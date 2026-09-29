@@ -261,7 +261,45 @@ test('notifiche: chieste da sole al caricamento non fanno domande e non valgono 
   await expect(barra()).toBeVisible({ timeout: 10_000 });
   await expect(barra()).toContainText('vuole mandarti notifiche');
   await barra().getByRole('button', { name: 'Consenti', exact: true }).click();
-  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['notifiche:denied', 'notifiche:granted']);
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['notifiche:default', 'notifiche:granted']);
+});
+
+test('un\'app di messaggi legge le notifiche «da chiedere», offre il suo pulsante e col sì le riceve', async () => {
+  test.setTimeout(60_000);
+  await apri('/messaggi');
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['stato:default/prompt']);
+  let pagina = null;
+  await expect.poll(() => { pagina = paginaDi(origine + '/messaggi'); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
+  await pagina.locator('#attiva').click();
+  await expect(barra()).toContainText('vuole mandarti notifiche', { timeout: 10_000 });
+  const si = barra().getByRole('button', { name: 'Consenti', exact: true });
+  await expect(si).toBeEnabled({ timeout: 5_000 });
+  await si.click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['stato:default/prompt', 'notifiche:granted/granted']);
+});
+
+test('col no dell\'utente l\'app di messaggi legge le notifiche bloccate, anche dopo aver ricaricato', async () => {
+  test.setTimeout(60_000);
+  await apri('/messaggi');
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['stato:default/prompt']);
+  let pagina = null;
+  await expect.poll(() => { pagina = paginaDi(origine + '/messaggi'); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
+  await pagina.locator('#attiva').click();
+  await barra().getByRole('button', { name: 'Non consentire', exact: true }).click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['stato:default/prompt', 'notifiche:denied/denied']);
+  await pagina.reload();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['stato:default/prompt', 'notifiche:denied/denied', 'stato:denied/denied']);
+});
+
+test('lo schermo acceso, come la modalità cucina di un sito di ricette, passa dopo un clic senza domande', async () => {
+  test.setTimeout(60_000);
+  await apri('/ricetta');
+  let pagina = null;
+  await expect.poll(() => { pagina = paginaDi(origine + '/ricetta'); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
+  await pagina.waitForLoadState('domcontentloaded');
+  await pagina.locator('#cucina').click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['schermo:acceso']);
+  await expect(barra()).toBeHidden();
 });
 
 test('una pagina non apre un\'altra applicazione da un riquadro invisibile, senza un clic', async () => {
