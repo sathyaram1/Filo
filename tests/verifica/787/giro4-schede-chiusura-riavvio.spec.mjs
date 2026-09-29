@@ -1,5 +1,5 @@
-// #787 — quarto giro: porte nuove sulla chat salvata (due schede che chiedono insieme, scheda chiusa, riavvio a
-// metà, apertura di una chat lunga, errore salvato, aspetto della bolla «svuota»).
+// #787 — quarto giro: porte ri-provate e chiuse sulla chat salvata (due schede che chiedono insieme, scheda chiusa,
+// riavvio a metà risposta, chat lunga riaperta, errore salvato, aspetto della bolla «svuota» in due temi).
 
 import { test, expect, argomentiScala, chiudiApp } from '../../fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
