@@ -116,6 +116,60 @@ test('due ricerche di fila: la prima indicizza le schede senza vettore, la secon
   expect(await app.evaluate(() => globalThis.__embedCalls)).toEqual([['gattopardo'], ['gattopardo']]);
 });
 
+// #825 giro 1: dopo la migrazione le schede vecchie non avevano vettore, e la prima ricerca in Cronologia non le trovava.
+test('la prima ricerca in Cronologia trova già una scheda vecchia rimasta senza vettore', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await preparaModelli(app);
+  await app.evaluate(async () => {
+    const EM = globalThis.SN_TEST_MODELS.registry['qwen-embed'].model;
+    const voci = [];
+    for (let i = 0; i < 1500; i++) {
+      voci.push({
+        id: `m${i}`, url: `https://migrata-${i}.test/`, title: i === 1400 ? 'Il Gattopardo, riassunto' : `Migrata ${i}`,
+        closedAt: new Date(Date.UTC(2026, 8, 1) - i * 3600e3).toISOString(), coOpenUrls: [],
+        // Come le lasciava il tetto di prima: vettore solo sulle più recenti.
+        ...(i < 500 ? { embedding: [0, 127], embedModel: EM } : {}),
+      });
+    }
+    await globalThis.SN_ARCHIVED_TABS.importa(voci);
+    const veloce = globalThis.SN_PROVIDER_OPENROUTER.embed;
+    globalThis.SN_PROVIDER_OPENROUTER.embed = async (a) => {
+      await new Promise((ok) => setTimeout(ok, 200));
+      return veloce(a);
+    };
+  });
+  const page = await openTab('filo://archive/archive.html');
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('.arc-tab').first()).toBeVisible({ timeout: 20_000 });
+  await page.locator('#search').fill('gattopardo');
+  await page.locator('#search').press('Enter');
+  await expect(page.locator('#searchNote')).toContainText('per pertinenza', { timeout: 30_000 });
+  await expect(page.locator('.arc-results .arc-tab').first()).toContainText('Il Gattopardo, riassunto');
+});
+
+test('una scheda che il modello non indicizza si trova lo stesso per testo', async ({ app, openTab }) => {
+  await preparaModelli(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_ARCHIVED_TABS.importa([
+      { id: 'g', url: 'https://libri.test/', title: 'Il Gattopardo, riassunto', closedAt: '2025-01-10T10:00:00.000Z' },
+      { id: 'r', url: 'http://192.168.1.1/', title: 'Pannello del router', casa: true, closedAt: '2025-01-11T10:00:00.000Z' },
+      { id: 'a', url: 'https://altro.test/', title: 'Tutt’altro', closedAt: '2025-01-12T10:00:00.000Z' },
+    ]);
+    // Il fornitore risponde alla domanda ma fallisce sulle schede: niente vettori per nessuna.
+    const vero = globalThis.SN_PROVIDER_OPENROUTER.embed;
+    globalThis.SN_PROVIDER_OPENROUTER.embed = async (a) => {
+      if (a.texts.length > 1 || /riassunto|Tutt/.test(a.texts[0])) throw new Error('fornitore giù');
+      return vero(a);
+    };
+  });
+  const page = await openTab('filo://newtab/');
+  const libro = await cerca(page, 'gattopàrdo');
+  expect(libro.results.map((r) => r.title)).toEqual(['Il Gattopardo, riassunto']);
+  expect(libro.results[0].score).toBeUndefined();
+  const router = await cerca(page, 'router');
+  expect(router.results.map((r) => r.title)).toEqual(['Pannello del router']);
+});
+
 test('chiudere una scheda con 6000 già in archivio resta rapido, e storage.json non contiene l\'archivio', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   await app.evaluate(async () => {

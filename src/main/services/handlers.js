@@ -4277,10 +4277,9 @@ function reindexArchivedEmbeddings(settings, items) {
   return reindexInCorso;
 }
 
-// Le parole di una ricerca, per confrontarle col testo delle schede che un vettore non ce l'hanno ancora.
-function paroleDellaRicerca(testo) {
-  return String(testo || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u).filter((p) => p.length > 1);
+// Testo senza accenti e minuscolo, per confrontare una ricerca con le schede che un vettore non ce l'hanno ancora.
+function testoPiano(testo) {
+  return String(testo || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 }
 
 // §3.1/§3.2 — arricchisce una tab archiviata: genera un riassunto LLM, lo
@@ -4376,14 +4375,14 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
     clearTimeout(timer);
     items = await ArchivedTabs.list();
   }
-  const parole = paroleDellaRicerca(q);
+  const parole = testoPiano(q).split(/[^\p{L}\p{N}]+/u).filter((p) => p.length > 1);
   const scored = [];
   const perTesto = [];
   for (const it of items) {
     if (usabile(it)) { scored.push({ score: cosineInt(qv, it.embedding), it }); continue; }
     if (!parole.length) continue;
-    const testo = new Set(paroleDellaRicerca(`${it.title || ''} ${it.summary || ''} ${it.snippet || ''} ${it.url || ''}`));
-    if (parole.every((p) => testo.has(p))) perTesto.push(it);
+    const testo = testoPiano(`${it.title || ''} ${it.summary || ''} ${it.snippet || ''} ${it.url || ''}`);
+    if (parole.every((p) => testo.includes(p))) perTesto.push(it);
   }
   scored.sort((a, b) => b.score - a.score);
   const senzaVettore = ({ embedding, ...meta }) => meta;
