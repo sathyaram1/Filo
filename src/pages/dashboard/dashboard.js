@@ -1692,9 +1692,11 @@
     header.className = 'dash-recap-header dash-thanks-header';
     const title = document.createElement('div');
     title.className = 'dash-recap-title';
+    // Una segnalazione archiviata o doppia è chiusa, non risolta (#816).
+    const tuttiRisolti = rewards.every((r) => r.status !== 'closed');
     title.textContent = rewards.length > 1
-      ? 'Grazie! I tuoi feedback sono stati risolti'
-      : 'Grazie! Il tuo feedback è stato risolto';
+      ? (tuttiRisolti ? 'Grazie! I tuoi feedback sono stati risolti' : 'Grazie! I tuoi feedback sono stati chiusi')
+      : (tuttiRisolti ? 'Grazie! Il tuo feedback è stato risolto' : 'Grazie! Il tuo feedback è stato chiuso');
     header.appendChild(title);
     if (totalCredits > 0) {
       const badge = document.createElement('div');
@@ -1740,7 +1742,7 @@
       const expl = document.createElement('div');
       expl.className = 'dash-thanks-item-body';
       expl.textContent = (r.explanation && String(r.explanation).trim())
-        || 'È stato sistemato: provalo e dicci com’è andata.';
+        || (r.status === 'closed' ? 'L’abbiamo chiuso senza modifiche.' : 'È stato sistemato: provalo e dicci com’è andata.');
       item.appendChild(expl);
 
       bodyEl.appendChild(item);
@@ -1759,7 +1761,8 @@
     document.body.appendChild(overlay);
     doneBtn.focus();
     // Anima i crediti verso il profilo dopo un attimo (il box è già su schermo).
-    setTimeout(() => flyCreditsToAccount(totalCredits), 250);
+    // Senza una cifra non vola niente: nessun credito è arrivato.
+    if (totalCredits > 0) setTimeout(() => flyCreditsToAccount(totalCredits), 250);
   }
 
   // #525 — la scheda sta per sparire (chiusura della scheda o dell'app): è una

@@ -314,6 +314,7 @@ module.exports = function register(on, ctx) {
     identity.resetIdentity();
     walletStore.clear();
     lastServer = null;
+    ultimaLettura = null;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
     return { ok: true, state: await readState() };
@@ -516,7 +517,10 @@ module.exports = function register(on, ctx) {
     const result = await callable('walletGrant', { pseudonym: msg.pseudonym, credits: msg.credits, why: msg.why || 'owner' }, { asOwner: true });
     // Se il regalo è alla propria installazione, la pagina Crediti aperta
     // accanto deve muoversi: si avvisano le pagine, come a ogni cambio di saldo.
-    if (result && result.ok) { try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {} }
+    if (result && result.ok) {
+      ultimaLettura = null;
+      try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    }
     return { result };
   }));
   on(MSG.WALLET_OWNER_INVITES, ownerOnly(async (msg) => ({
@@ -539,7 +543,8 @@ module.exports = function register(on, ctx) {
     if (!idToken) throw new Error('Sessione scaduta: rifai l’accesso.');
     const knobs = await Defaults.setCreditsKnobs((msg && msg.patch) || {}, idToken);
     // Le manopole cambiano quota e premi: chi guarda i crediti in un'altra
-    // pagina deve rileggere.
+    // pagina deve rileggere, e la chat anche.
+    ultimaLettura = null;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     return { knobs };
   }));
@@ -715,6 +720,10 @@ module.exports = function register(on, ctx) {
 
   globalThis.SN_WALLET_MAIN = {
     recordUsage, outOfCreditsNotice, flush, readState, keySource,
+    // Le cifre dette fuori dalla pagina Crediti (#816): chat, premi delle
+    // segnalazioni. `redeemedAt`: da quando le segnalazioni portano lo pseudonimo.
+    haPortafoglio, saldoPerChat,
+    redeemedAt: () => { try { return (walletStore.load() || {}).redeemedAt || null; } catch (_) { return null; } },
     // Lo pseudonimo di questa installazione, letto dal deposito locale (niente
     // rete): lo scrive chi manda un feedback, così il server sa a chi
     // accreditare il premio (#652). Vuoto se non c'è un portafoglio.
