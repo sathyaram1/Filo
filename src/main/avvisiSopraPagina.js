@@ -91,35 +91,37 @@ class AvvisiSopraPagina {
   // pila della barra (--filo-avvisi-barra, letta dalle loro pile in popup.css ed editor.css).
   _riserva(px) {
     const wc = this._wcAttiva();
-    if (!wc) return;
+    if (wc) this._scriviRiserva(wc, px);
+  }
+
+  // Un foglio inserito mentre la scheda carica può finire nel documento nuovo senza che se ne tenga la chiave, e
+  // restare lì col vecchio valore: quindi il valore nuovo si mette SOPRA (stessa origine e peso, vince il più
+  // recente) e solo dopo si toglie il precedente. Foglio d'autore: uno di origine 'user' non si toglie più.
+  _scriviRiserva(wc, px) {
     let r = this.riserve.get(wc);
     if (!r) {
-      r = { px: 0, chiave: null, coda: Promise.resolve() };
+      r = { px: 0, chiave: null, gen: 0, coda: Promise.resolve() };
       this.riserve.set(wc, r);
-      // Un documento nuovo non ha il foglio inserito nel vecchio: si rimette.
-      wc.on('dom-ready', () => {
-        r.px = 0;
-        r.chiave = null;
-        if (this._wcAttiva() === wc) this._riserva(this.altezza);
-      });
+      // Documento nuovo: la chiave del vecchio non vale più, e lì dentro può esserci un foglio di cui non si sa.
+      wc.on('did-navigate', () => { r.gen++; r.chiave = null; r.px = null; });
+      wc.on('dom-ready', () => { r.px = null; this._scriviRiserva(wc, this._wcAttiva() === wc ? this.altezza : 0); });
       // Il valore è in px CSS della scheda: cambiato lo zoom (da qualunque parte), va riscritto.
-      try { wc.ipc.on('filo:zoom-cambiato', () => { if (this._wcAttiva() === wc) this._riserva(this.altezza); }); } catch (_) {}
+      try { wc.ipc.on('filo:zoom-cambiato', () => { if (this._wcAttiva() === wc) this._scriviRiserva(wc, this.altezza); }); } catch (_) {}
     }
     let zoom = 1;
     try { zoom = wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
     const css = px > 0 ? Math.ceil(px / zoom) : 0;
     if (css === r.px) return;
     r.px = css;
+    const gen = r.gen;
     r.coda = r.coda.then(async () => {
-      if (r.chiave) {
-        const k = r.chiave;
-        r.chiave = null;
-        try { await wc.removeInsertedCSS(k); } catch (_) {}
-      }
-      // Foglio d'autore: uno di origine 'user' removeInsertedCSS non lo toglie, e il valore resterebbe.
-      if (css > 0 && !wc.isDestroyed()) {
-        try { r.chiave = await wc.insertCSS(`:root:root{--filo-avvisi-barra:${css}px!important}`); } catch (_) {}
-      }
+      if (wc.isDestroyed()) return;
+      let k = null;
+      try { k = await wc.insertCSS(`:root:root{--filo-avvisi-barra:${css}px!important}`); } catch (_) { return; }
+      if (gen !== r.gen) return;
+      const prima = r.chiave;
+      r.chiave = k;
+      if (prima) { try { await wc.removeInsertedCSS(prima); } catch (_) {} }
     });
   }
 
