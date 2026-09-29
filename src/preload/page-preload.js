@@ -187,7 +187,8 @@ if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (/^https?:/i.test(loc)) {
     const { buildStatoPermessiSource } = require('./stato-permessi.js');
-    webFrame.executeJavaScript(buildStatoPermessiSource(ipcRenderer.sendSync('filo:permessi-stato', loc)), true).catch(() => {});
+    // Senza gesto: con `true` la pagina riceverebbe un clic mai fatto.
+    webFrame.executeJavaScript(buildStatoPermessiSource(ipcRenderer.sendSync('filo:permessi-stato', loc)), false).catch(() => {});
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
