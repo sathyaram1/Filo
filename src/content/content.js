@@ -409,6 +409,9 @@
       // activeElement nel caso il keydown arrivi sul body con un campo a fuoco.
       const target = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
       if (isEditable(target) || isEditable(document.activeElement)) return;
+      // Una pagina di Filo in cui l'utente ha dato Ctrl+Z a un suo comando (un
+      // modulo dell'Editor) se lo tiene: vince la scelta esplicita (#545).
+      if (PAGINA_DI_FILO && document.documentElement.dataset.filoCtrlZ === 'pagina') return;
       e.preventDefault();
       e.stopPropagation();
       chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
