@@ -29,7 +29,8 @@ test('tema scuro dalle Preferenze: la carta segue la barra; clic vero su «Apri 
     const MSG = globalThis.SN_MSG.MSG;
     await globalThis.SN_HANDLE_MESSAGE({ type: MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }, { url: 'filo://preferences/preferences.html' });
   });
-  await expect.poll(() => shell.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches), { timeout: 8000 }).toBe(true);
+  // Nel contenitore il tema del sistema non arriva alle pagine: lo si emula sulla barra, che lo passa alla vista.
+  await shell.emulateMedia({ colorScheme: 'dark' });
   await app.evaluate(({ shell: sh }) => { globalThis.__cartelle = []; sh.showItemInFolder = (p) => { globalThis.__cartelle.push(p); }; });
   await shell.evaluate(() => window.filoNotify('Scaricato: Fattura_settembre_2026.pdf', { durationSec: 0, actions: [{ label: 'Apri file', onClick: () => {} }, { label: 'Apri cartella', onClick: () => { window.__apri = (window.__apri || 0) + 1; } }] }));
   const vista = await avvisi();
@@ -55,7 +56,7 @@ test('tema scuro dalle Preferenze: la carta segue la barra; clic vero su «Apri 
     const MSG = globalThis.SN_MSG.MSG;
     await globalThis.SN_HANDLE_MESSAGE({ type: MSG.UPDATE_SETTINGS, settings: { theme: 'light' } }, { url: 'filo://preferences/preferences.html' });
   });
-  await expect.poll(() => shell.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches), { timeout: 8000 }).toBe(false);
+  await shell.emulateMedia({ colorScheme: 'light' });
   await page.waitForTimeout(800);
   const chiaro = await vista.evaluate(() => getComputedStyle(document.querySelector('.shell-notif.show')).backgroundColor);
   console.log('tornato chiaro', chiaro);

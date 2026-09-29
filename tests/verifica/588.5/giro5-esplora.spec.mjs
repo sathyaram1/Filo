@@ -88,6 +88,14 @@ test('rotella vera nel vuoto e sopra la carta; clic centrale su un collegamento 
   await page.waitForTimeout(600);
   const k = await contenuto(app);
   const c = await cartaRect(vista);
+  // Controllo: tre scatti nella pagina, lontano dalla carta.
+  xdo('mousemove', '--sync', ...pagina(k, 200, 200));
+  await page.waitForTimeout(200);
+  xdo('click', '--repeat', 3, '--delay', 60, 5);
+  await page.waitForTimeout(800);
+  console.log('rotella: controllo nella pagina', await page.evaluate(() => scrollY));
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.waitForTimeout(300);
   xdo('mousemove', '--sync', ...schermo(k, Math.max(2, c.x - 6), c.y + c.h / 2));
   await page.waitForTimeout(200);
   xdo('click', '--repeat', 3, '--delay', 60, 5);
@@ -161,4 +169,94 @@ test('puntatore fermo nell’angolo quando arriva un avviso a tempo: se ne va da
   xdo('mousemove', '--sync', ...pagina(k0, 100, 100));
   await page.waitForTimeout(4000);
   console.log('dopo 4 s col puntatore altrove: avvisi vivi', await shell.evaluate(() => document.querySelectorAll('.shell-notif:not([data-closing="1"])').length));
+});
+
+test('due avvisi: chiuso il più vecchio, il pulsante del più recente risponde subito', async ({ app, shell, openTab, testServer, avvisi }) => {
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body style="margin:0;height:100vh;background:#eee"><p>due avvisi</p></body></html>');
+  await shell.evaluate(() => {
+    window.__b = 0;
+    window.filoNotify('Scaricato: primo.pdf', { durationSec: 0, actions: [{ label: 'Apri file', onClick: () => {} }] });
+  });
+  const vista = await avvisi();
+  await page.waitForTimeout(400);
+  await shell.evaluate(() => window.filoNotify('Scaricato: secondo.pdf', { durationSec: 0, actions: [{ label: 'Apri file', onClick: () => { window.__b++; } }] }));
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(2);
+  await page.waitForTimeout(1600);
+  const k = await contenuto(app);
+  const pos = await vista.evaluate(() => {
+    const [a, b] = document.querySelectorAll('.shell-notif.show');
+    const x = a.querySelector('.shell-notif-close').getBoundingClientRect();
+    const p = b.querySelector('.shell-notif-action').getBoundingClientRect();
+    return { x: { x: x.left + x.width / 2, y: x.top + x.height / 2 }, p: { x: p.left + p.width / 2, y: p.top + p.height / 2 } };
+  });
+  xdo('mousemove', '--sync', ...schermo(k, pos.x.x, pos.x.y));
+  await page.waitForTimeout(150);
+  xdo('click', 1);
+  // Il pulsante del secondo avviso non si è mosso: lo si clicca.
+  xdo('mousemove', '--sync', ...schermo(k, pos.p.x, pos.p.y));
+  await page.waitForTimeout(400);
+  const spento = await vista.evaluate(() => { const b = document.querySelectorAll('.shell-notif.show .shell-notif-action'); return [...b].map((x) => x.disabled); });
+  const k2 = await contenuto(app);
+  const pos2 = await vista.evaluate(() => { const p = document.querySelector('.shell-notif.show .shell-notif-action').getBoundingClientRect(); return { x: p.left + p.width / 2, y: p.top + p.height / 2 }; });
+  console.log('dopo la chiusura: spenti', JSON.stringify(spento), 'vista prima', JSON.stringify(k.vista), 'dopo', JSON.stringify(k2.vista), 'pulsante prima', JSON.stringify(schermo(k, pos.p.x, pos.p.y)), 'dopo', JSON.stringify(schermo(k2, pos2.x, pos2.y)));
+  scatta('due-avvisi');
+  xdo('click', 1);
+  await page.waitForTimeout(500);
+  console.log('clic sul pulsante del secondo, 550 ms dopo la chiusura del primo: azioni', await shell.evaluate(() => window.__b));
+  expect(await shell.evaluate(() => window.__b)).toBe(1);
+});
+
+test('tasto indietro del mouse: nella pagina e nel vuoto accanto alla carta', async ({ app, shell, openTab, testServer, avvisi }) => {
+  const a = testServer.html('<!doctype html><html><body style="margin:0;height:100vh;background:#cfc"><p>pagina A</p></body></html>');
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;height:100vh;background:#eee"><a id="l" href="${a}">vai ad A</a></body></html>`);
+  const inizio = page.url();
+  await page.locator('#l').click();
+  await expect.poll(() => page.url()).toBe(a);
+  await page.waitForTimeout(500);
+  const k0 = await contenuto(app);
+  xdo('mousemove', '--sync', ...pagina(k0, 300, 300));
+  await page.waitForTimeout(200);
+  xdo('click', 8);
+  await page.waitForTimeout(1200);
+  console.log('tasto indietro nella pagina: url', page.url() === inizio ? 'tornata indietro' : page.url());
+  await page.locator('#l').click();
+  await expect.poll(() => page.url()).toBe(a);
+  await shell.evaluate(() => window.filoNotify('Scaricato: prova.pdf', { durationSec: 0 }));
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
+  await page.waitForTimeout(600);
+  const k = await contenuto(app);
+  const c = await cartaRect(vista);
+  xdo('mousemove', '--sync', ...schermo(k, Math.max(2, c.x - 6), c.y + c.h / 2));
+  await page.waitForTimeout(300);
+  xdo('click', 8);
+  await page.waitForTimeout(1200);
+  console.log('tasto indietro nel vuoto: url', page.url() === inizio ? 'tornata indietro' : page.url());
+});
+
+test('chiuso con la X l’avviso di sopra, il puntatore resta sulla pagina: quello di sotto riprende il suo tempo?', async ({ app, shell, openTab, testServer, avvisi }) => {
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body style="margin:0;height:100vh;background:#eee"><p>tempo</p></body></html>');
+  await shell.evaluate(() => window.filoNotify('Avviso di sopra, da chiudere con la X', { durationSec: 0 }));
+  const vista = await avvisi();
+  await page.waitForTimeout(300);
+  await shell.evaluate(() => window.filoNotify('Avviso di sotto, a tempo', { durationSec: 3 }));
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(2);
+  await page.waitForTimeout(700);
+  const k = await contenuto(app);
+  const x = await vista.evaluate(() => { const r = document.querySelector('.shell-notif.show .shell-notif-close').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  const [sx, sy] = schermo(k, x.x, x.y);
+  xdo('mousemove', '--sync', sx - 30, sy);
+  await page.waitForTimeout(200);
+  xdo('mousemove', '--sync', sx, sy);
+  await page.waitForTimeout(400);
+  xdo('click', 1);
+  await page.waitForTimeout(500);
+  // Il puntatore ora è sopra la pagina (la vista si è accorciata dall'alto): lo si muove un po' lì.
+  for (let i = 1; i <= 5; i++) { xdo('mousemove', '--sync', sx - 20 * i, sy - 10 * i); await page.waitForTimeout(80); }
+  const k2 = await contenuto(app);
+  console.log('vista dopo la X', JSON.stringify(k2.vista), 'puntatore', sx - 100, sy - 50);
+  await page.waitForTimeout(6000);
+  const vivi = await shell.evaluate(() => document.querySelectorAll('.shell-notif:not([data-closing="1"])').length);
+  console.log('6 s dopo, col puntatore sulla pagina: avvisi vivi', vivi);
+  expect(vivi).toBe(0);
 });
