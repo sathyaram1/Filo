@@ -38,9 +38,35 @@ function utcTime(d) {
 const OID_ECDSA_SHA256 = '2a8648ce3d040302';
 const OID_O = '55040a';
 const OID_CN = '550403';
+const OID_VINCOLI = '551d13';
+const OID_USO_CHIAVE = '551d0f';
+const OID_USI_ESTESI = '551d25';
 
-/** Certificato autofirmato P-256 valido da ieri a fra un anno. */
-export function certificato({ organizzazione = 'OpenAI, Inc.', nomeComune = 'Filo test signer' } = {}) {
+/** L'uso con cui le autorità del C2PA emettono i certificati per firmare i manifesti. */
+export const USO_FIRMA_C2PA = '1.3.6.1.4.1.62558.2.1';
+
+function oidPunti(testo) {
+  const n = testo.split('.').map(Number);
+  const out = [n[0] * 40 + n[1]];
+  for (const v of n.slice(2)) {
+    const b = [v & 0x7f];
+    let x = v >>> 7;
+    while (x > 0) { b.unshift(0x80 | (x & 0x7f)); x >>>= 7; }
+    out.push(...b);
+  }
+  return der(0x06, Buffer.from(out));
+}
+const estensione = (id, critica, valore) => seq(oid(id), ...(critica ? [der(0x01, Buffer.from([0xff]))] : []), der(0x04, valore));
+
+/**
+ * Certificato P-256 valido da ieri a fra un anno. Senza `emittente` è
+ * autofirmato; con `ca` è un'autorità che può emetterne altri. `usi` sono gli
+ * usi estesi del certificato di chi firma (vuoto = estensione assente).
+ */
+export function certificato({
+  organizzazione = 'OpenAI, Inc.', nomeComune = 'Filo test signer',
+  emittente = null, ca = false, usi = ca ? [] : [USO_FIRMA_C2PA],
+} = {}) {
   const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const spki = publicKey.export({ type: 'spki', format: 'der' });
   const nome = seq(
@@ -50,18 +76,32 @@ export function certificato({ organizzazione = 'OpenAI, Inc.', nomeComune = 'Fil
   const ieri = new Date(Date.now() - 86400000);
   const fraUnAnno = new Date(Date.now() + 365 * 86400000);
   const algFirma = seq(oid(OID_ECDSA_SHA256));
+  const estensioni = [
+    estensione(OID_VINCOLI, true, ca ? seq(der(0x01, Buffer.from([0xff]))) : seq()),
+    estensione(OID_USO_CHIAVE, true, ca ? Buffer.from([0x03, 0x02, 0x01, 0x06]) : Buffer.from([0x03, 0x02, 0x07, 0x80])),
+  ];
+  if (usi.length) estensioni.push(estensione(OID_USI_ESTESI, false, seq(...usi.map(oidPunti))));
   const tbs = seq(
     der(0xa0, intero(2)),
     intero(Math.floor(Math.random() * 0xffffff) + 1),
     algFirma,
-    nome,
+    emittente ? emittente.nome : nome,
     seq(utcTime(ieri), utcTime(fraUnAnno)),
     nome,
     spki,
+    der(0xa3, seq(...estensioni)),
   );
-  const firma = crypto.sign('sha256', tbs, privateKey);
+  const firma = crypto.sign('sha256', tbs, emittente ? emittente.privateKey : privateKey);
   const cert = seq(tbs, algFirma, der(0x03, Buffer.concat([Buffer.from([0]), firma])));
-  return { der: cert, privateKey, organizzazione };
+  return { der: cert, privateKey, organizzazione, nome };
+}
+
+/** L'elenco dei firmatari riconosciuti nella forma in cui lo pubblica il C2PA. */
+export function elencoPem(...autorita) {
+  return autorita.map((c) => {
+    const righe = c.der.toString('base64').match(/.{1,64}/g).join('\n');
+    return `Subject\tCN=${c.organizzazione}\n-----BEGIN CERTIFICATE-----\n${righe}\n-----END CERTIFICATE-----\n`;
+  }).join('\n');
 }
 
 // ──────────────────────────────── CBOR ──────────────────────────────────────
@@ -171,11 +211,13 @@ const SORGENTE = 'http://cv.iptc.org/newscodes/digitalsourcetype/';
 
 /**
  * PNG con manifesto C2PA firmato davvero. `sorgente` è il vocabolo IPTC
- * (`trainedAlgorithmicMedia`, `digitalCapture`, …).
+ * (`trainedAlgorithmicMedia`, `digitalCapture`, …); `catena` sono i certificati
+ * intermedi che il manifesto si porta dietro dopo quello di chi firma.
  */
 export function pngFirmato({
   base = pngSpoglio(),
   cert = certificato(),
+  catena = [],
   sorgente = 'trainedAlgorithmicMedia',
   azione = 'c2pa.created',
   generatore = 'Filo test/1.0',
@@ -208,7 +250,7 @@ export function pngFirmato({
       signature: 'self#jumbf=c2pa.signature',
       alg: 'sha256',
     });
-    const protetto = cbor({ '1': -7, '33': cert.der });
+    const protetto = cbor({ '1': -7, '33': catena.length ? [cert.der, ...catena.map((c) => c.der)] : cert.der });
     const daFirmare = Buffer.concat([
       Buffer.from([0x84]), cbor('Signature1'), cbor(protetto), cbor(Buffer.alloc(0)), cbor(claim),
     ]);

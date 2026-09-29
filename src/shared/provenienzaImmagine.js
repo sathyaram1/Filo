@@ -11,33 +11,16 @@
     try { return (typeof require === 'function') ? require(nome) : null; } catch (_) { return null; }
   }
 
-  // Chi Filo riconosce come dichiarante. `nomi` sono le forme con cui l'ente si
-  // firma nel certificato o si nomina nei metadati; `radici` (impronta SHA-256
-  // della chiave pubblica del certificato radice) è la prova forte, quando c'è.
-  const ENTI = [
-    { ente: 'OpenAI', nomi: ['openai'], radici: [] },
-    { ente: 'Adobe', nomi: ['adobe'], radici: [] },
-    { ente: 'Google', nomi: ['google', 'google llc', 'alphabet'], radici: [] },
-    { ente: 'Microsoft', nomi: ['microsoft'], radici: [] },
-    { ente: 'Meta', nomi: ['meta platforms', 'meta ai'], radici: [] },
-    { ente: 'Amazon', nomi: ['amazon', 'aws'], radici: [] },
-    { ente: 'Leica', nomi: ['leica'], radici: [] },
-    { ente: 'Sony', nomi: ['sony'], radici: [] },
-    { ente: 'Canon', nomi: ['canon'], radici: [] },
-    { ente: 'Nikon', nomi: ['nikon'], radici: [] },
-    { ente: 'Fujifilm', nomi: ['fujifilm', 'fuji photo'], radici: [] },
-    { ente: 'Qualcomm', nomi: ['qualcomm'], radici: [] },
-    { ente: 'Samsung', nomi: ['samsung'], radici: [] },
-    { ente: 'Truepic', nomi: ['truepic'], radici: [] },
-    { ente: 'Digimarc', nomi: ['digimarc'], radici: [] },
-    { ente: 'Getty Images', nomi: ['getty images'], radici: [] },
-    { ente: 'Shutterstock', nomi: ['shutterstock'], radici: [] },
-    { ente: 'BBC', nomi: ['bbc', 'british broadcasting'], radici: [] },
-    { ente: 'Nvidia', nomi: ['nvidia'], radici: [] },
-    { ente: 'Stability AI', nomi: ['stability ai', 'stability.ai'], radici: [] },
-    { ente: 'Black Forest Labs', nomi: ['black forest labs'], radici: [] },
-    { ente: 'Midjourney', nomi: ['midjourney'], radici: [] },
-  ];
+  // Gli usi che il C2PA ammette sul certificato di chi firma un manifesto: gli
+  // stessi del lettore di riferimento, così un firmatario valido là vale anche qui.
+  const USI_FIRMA = new Set([
+    '1.3.6.1.5.5.7.3.4',
+    '1.3.6.1.5.5.7.3.36',
+    '1.3.6.1.5.5.7.3.8',
+    '1.3.6.1.5.5.7.3.9',
+    '1.3.6.1.4.1.311.76.59.1.9',
+    '1.3.6.1.4.1.62558.2.1',
+  ]);
 
   // I codici IPTC: sono URI, e la coda dopo l'ultima barra è il vocabolo.
   const SORGENTI = {
@@ -53,7 +36,7 @@
     minorhumanedits: null,
     compositecapture: null,
     composite: null,
-softwareImage: null,
+    softwareimage: null,
   };
 
   // Chiavi di testo che i generatori scrivono nei PNG: la chiave da sola basta a
@@ -513,10 +496,9 @@ softwareImage: null,
       valida: true,
       motivo: '',
       soggetto: campoCert(certs[0].subject, 'O') || campoCert(certs[0].subject, 'CN') || '',
-      emittente: campoCert(certs[0].issuer, 'O') || campoCert(certs[0].issuer, 'CN') || '',
       catenaIntegra,
-      radice: impronteChiavi(crypto, certs),
       scaduto: scaduto(certs[0]),
+      certificati: certs,
     };
   }
 
@@ -524,31 +506,60 @@ softwareImage: null,
     const m = new RegExp('(?:^|\\n)' + nome + '=([^\\n]*)').exec(String(testo || ''));
     return m ? m[1].trim() : '';
   }
+  // «OpenAI, L.L.C.» e «Google LLC» a schermo sono OpenAI e Google: la forma
+  // societaria non aiuta a capire chi ha firmato.
+  const FORMA_SOCIETARIA = /[\s,]+(?:inc|incorporated|llc|l\.l\.c|ltd|limited|co|corp|corporation|company|gmbh|ag|s\.?p\.?a|s\.?r\.?l|s\.?a|b\.?v|n\.?v|plc|pty|k\.?k|oy|ab|a\/s|se)\.?$/i;
+  function nomeLeggibile(nome) {
+    let s = String(nome || '').trim();
+    for (let i = 0; i < 4; i++) {
+      const t = s.replace(FORMA_SOCIETARIA, '').replace(/[\s,]+$/, '');
+      if (!t || t === s) break;
+      s = t;
+    }
+    return s;
+  }
   function scaduto(cert) {
     const a = Date.parse(cert.validTo);
     return Number.isFinite(a) ? Date.now() > a : false;
   }
-  function impronteChiavi(crypto, certs) {
+  // Riconosciuto vuol dire una cosa sola: la catena di chi ha firmato arriva a un
+  // certificato dell'elenco ufficiale. Il nome sul certificato lo scrive chiunque.
+  // `ancore` assente = elenco mai scaricato, che non è la stessa cosa di «sconosciuto».
+  function statoFirmatario(certs, ancore) {
+    if (!Array.isArray(ancore)) return 'non_verificato';
+    const foglia = certs && certs[0];
+    if (!foglia || foglia.ca) return 'sconosciuto';
+    const usi = foglia.extKeyUsage || foglia.keyUsage;
+    if (!Array.isArray(usi) || !usi.some((u) => USI_FIRMA.has(u))) return 'sconosciuto';
+    const elenco = new Set(ancore.map((a) => a && a.fingerprint256).filter(Boolean));
+    for (let i = 0; i < certs.length; i++) {
+      if (i > 0 && elenco.has(certs[i].fingerprint256)) return 'riconosciuto';
+      const padre = certs[i + 1];
+      if (padre) {
+        if (!emessoDa(certs[i], padre)) return 'sconosciuto';
+      } else if (ancore.some((a) => emessoDa(certs[i], a))) return 'riconosciuto';
+    }
+    return 'sconosciuto';
+  }
+  function emessoDa(figlio, padre) {
+    try { return !!padre.ca && !!figlio.checkIssued(padre) && figlio.verify(padre.publicKey); } catch (_) { return false; }
+  }
+
+  // L'elenco scaricato è un PEM con righe di commento in mezzo: vale ogni
+  // certificato che si legge, gli altri blocchi si saltano.
+  function ancoreDaPem(testo) {
+    const crypto = nodeMod('node:crypto');
+    if (!crypto || !crypto.X509Certificate) return [];
     const out = [];
-    for (const c of certs) {
+    const re = /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g;
+    let m;
+    while ((m = re.exec(String(testo || '')))) {
       try {
-        const der = c.publicKey.export({ type: 'spki', format: 'der' });
-        out.push(crypto.createHash('sha256').update(der).digest('hex'));
+        const c = new crypto.X509Certificate(m[0]);
+        if (c.ca) out.push(c);
       } catch (_) {}
     }
     return out;
-  }
-
-  function enteRiconosciuto(nome, impronte) {
-    const n = String(nome || '').toLowerCase();
-    for (const e of ENTI) {
-      if ((impronte || []).some((i) => e.radici.includes(i))) return { ente: e.ente, forte: true };
-    }
-    if (!n) return null;
-    for (const e of ENTI) {
-      if (e.nomi.some((x) => n.includes(x))) return { ente: e.ente, forte: false };
-    }
-    return null;
   }
 
   // Ciò che il claim afferma, ma solo per le asserzioni la cui impronta combacia
@@ -629,9 +640,12 @@ softwareImage: null,
 
   // ──────────────────────────────── analisi ────────────────────────────────
 
-  function analizza(byte) {
+  // `opzioni.ancore`: i certificati dell'elenco ufficiale dei firmatari
+  // (`ancoreDaPem`); assente se Filo non l'ha mai scaricato.
+  function analizza(byte, opzioni) {
+    const ancore = opzioni && Array.isArray(opzioni.ancore) ? opzioni.ancore : null;
     const b = u8(byte);
-    const vuoto = { trovato: false, origine: null, prova: '', dichiarante: '', riconosciuto: false, avvisi: [], fonte: '' };
+    const vuoto = { trovato: false, origine: null, prova: '', dichiarante: '', firmatario: '', avvisi: [], fonte: '' };
     if (b.length < 12) return vuoto;
 
     let cont;
@@ -639,7 +653,7 @@ softwareImage: null,
 
     // 1. Credenziali firmate: l'unica cosa che può valere come attribuzione.
     if (cont.c2pa && cont.c2pa.length) {
-      const esito = daC2pa(cont.c2pa, b);
+      const esito = daC2pa(cont.c2pa, b, ancore);
       if (esito) return esito;
     }
 
@@ -647,10 +661,9 @@ softwareImage: null,
     for (const testo of cont.xmp) {
       const x = leggiXmp(testo);
       if (x.origine) {
-        const ric = enteRiconosciuto(x.dichiarante, []);
         return {
           trovato: true, origine: x.origine, prova: 'dichiarata',
-          dichiarante: ric ? ric.ente : x.dichiarante, riconosciuto: !!ric,
+          dichiarante: enteDaTesto(x.dichiarante) || x.dichiarante, firmatario: '',
           avvisi: [], fonte: 'xmp',
         };
       }
@@ -664,7 +677,7 @@ softwareImage: null,
     return vuoto;
   }
 
-  function daC2pa(boxes, byteFile) {
+  function daC2pa(boxes, byteFile, ancore) {
     const store = boxes.find((x) => x.tipo === 'jumb') || boxes[0];
     if (!store || !store.figli) return null;
     // L'ultimo manifesto è quello attivo: i precedenti sono la storia del file.
@@ -688,7 +701,7 @@ softwareImage: null,
       // valgono, mai cosa affermano — sarebbe ripetere il testo di chi le ha messe.
       return {
         trovato: true, origine: null, prova: 'firma-rotta', dichiarante: '',
-        riconosciuto: false, avvisi: [firma.motivo || 'firma_non_valida'], fonte: 'c2pa',
+        firmatario: '', avvisi: [firma.motivo || 'firma_non_valida'], fonte: 'c2pa',
       };
     }
 
@@ -700,8 +713,8 @@ softwareImage: null,
     if (firma.scaduto) avvisi.push('certificato_scaduto');
     if (firma.catenaIntegra === false) avvisi.push('catena_rotta');
 
-    const ric = enteRiconosciuto(firma.soggetto, firma.radice) || enteRiconosciuto(letto.generatore, []);
-    const dichiarante = ric ? ric.ente : (firma.soggetto || letto.generatore || '');
+    const firmatario = statoFirmatario(firma.certificati, ancore);
+    const dichiarante = nomeLeggibile(firma.soggetto) || letto.generatore || '';
     // Un manifesto valido che non dice niente sull'origine non è una notizia:
     // si tace e si lascia parlare le altre etichette del file.
     const dicibile = letto.origine || avvisi.includes('file_cambiato');
@@ -711,7 +724,7 @@ softwareImage: null,
       origine: letto.origine,
       prova: 'firmata',
       dichiarante,
-      riconosciuto: !!ric,
+      firmatario,
       avvisi,
       fonte: 'c2pa',
     };
@@ -723,7 +736,7 @@ softwareImage: null,
       if (typeof valore === 'string' && valore.trim()) {
         return {
           trovato: true, origine: 'ai', prova: 'dichiarata',
-          dichiarante: v.ente, riconosciuto: false, avvisi: [], fonte: 'png',
+          dichiarante: v.ente, firmatario: '', avvisi: [], fonte: 'png',
         };
       }
     }
@@ -733,7 +746,7 @@ softwareImage: null,
       const valore = testi[chiave];
       const ente = typeof valore === 'string' ? enteDaTesto(valore) : '';
       if (ente) {
-        return { trovato: true, origine: 'ai', prova: 'dichiarata', dichiarante: ente, riconosciuto: false, avvisi: [], fonte: 'png' };
+        return { trovato: true, origine: 'ai', prova: 'dichiarata', dichiarante: ente, firmatario: '', avvisi: [], fonte: 'png' };
       }
     }
     return null;
@@ -786,12 +799,17 @@ softwareImage: null,
     if (!cosa) return '';
 
     if (res.prova === 'firmata') {
-      const debole = (res.avvisi || []).some((a) => a === 'legame_assente' || a === 'asserzioni_scoperte' || a === 'catena_rotta' || a === 'certificato_scaduto');
-      if (!res.riconosciuto) {
+      if (res.firmatario === 'non_verificato') {
         return chi
-          ? `${cosa} secondo credenziali firmate da ${chi}, un ente che Filo non riconosce.`
-          : `${cosa} secondo credenziali firmate, ma Filo non riconosce chi le ha firmate.`;
+          ? `${cosa} secondo credenziali firmate da ${chi}: firma valida, firmatario non verificato.`
+          : `${cosa} secondo credenziali firmate: firma valida, firmatario non verificato.`;
       }
+      if (res.firmatario !== 'riconosciuto') {
+        return chi
+          ? `${cosa} secondo credenziali firmate da ${chi}, che non è nell’elenco ufficiale dei firmatari riconosciuti.`
+          : `${cosa} secondo credenziali firmate da qualcuno che non è nell’elenco ufficiale dei firmatari riconosciuti.`;
+      }
+      const debole = (res.avvisi || []).some((a) => a === 'legame_assente' || a === 'asserzioni_scoperte' || a === 'catena_rotta' || a === 'certificato_scaduto');
       if (debole) return `${cosa} secondo ${chi}, ma le sue credenziali sono incomplete.`;
       if (res.origine === 'fotocamera') return `Scattata con una fotocamera, firmata da ${chi}.`;
       if (res.origine === 'ai-modificata') return `Modificata con l’AI, credenziali di ${chi}.`;
@@ -825,7 +843,7 @@ softwareImage: null,
   }
 
   global.SN_PROVENIENZA = {
-    analizza, frase, notaPerModello, ENTI,
-    _interni: { pulisci, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, enteRiconosciuto },
+    analizza, frase, notaPerModello, ancoreDaPem,
+    _interni: { pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, statoFirmatario },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
