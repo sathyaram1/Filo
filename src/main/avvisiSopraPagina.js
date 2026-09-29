@@ -32,14 +32,18 @@ function pulisci(stato) {
 }
 
 class AvvisiSopraPagina {
-  constructor(win, { alto = () => 0, restituisciTastiera = () => {} } = {}) {
+  constructor(win, { alto = () => 0, restituisciTastiera = () => {}, schedaAttiva = () => null } = {}) {
     this.win = win;
     this.alto = alto;
     this.restituisciTastiera = restituisciTastiera;
+    this.schedaAttiva = schedaAttiva;
     this.vista = null;
     this.pronta = false;
     this.stato = { carte: [], tema: { vars: {} } };
     this.misura = { w: 0, h: 0 };
+    this.altezza = 0;
+    this.riserve = new WeakMap();
+    this.suggerimento = false;
     if (win && typeof win.once === 'function') win.once('closed', () => this._butta());
   }
 
@@ -63,11 +67,68 @@ class AvvisiSopraPagina {
     if (!this.stato.carte.length || !w || !h) {
       vista.setVisible(false);
       vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+      this._nascondiSuggerimento();
+      this.altezza = 0;
+      this._riserva(0);
+      // Chi ha cliccato una carta ha dato la tastiera alla vista: sparita la vista, torna alla pagina.
+      const col = require('electron').webContents.getFocusedWebContents();
+      if (!col || col === vista.webContents) this.restituisciTastiera();
       return;
     }
     vista.setBounds({ x: W - w, y: H - h, width: w, height: h });
     this._inCima();
     vista.setVisible(true);
+    this.altezza = h;
+    this._riserva(h);
+  }
+
+  // L'angolo in basso a destra è uno: gli avvisi di Filo dentro la scheda attiva salgono sopra la
+  // pila della barra (--filo-avvisi-barra, letta dalle loro pile in popup.css ed editor.css).
+  _riserva(px) {
+    let wc = null;
+    try { wc = this.schedaAttiva(); } catch (_) { wc = null; }
+    if (!wc || wc.isDestroyed()) return;
+    let r = this.riserve.get(wc);
+    if (!r) {
+      r = { px: 0, chiave: null, coda: Promise.resolve() };
+      this.riserve.set(wc, r);
+      // Un documento nuovo non ha il foglio inserito nel vecchio: si rimette.
+      wc.on('dom-ready', () => {
+        r.px = 0;
+        r.chiave = null;
+        if (this.schedaAttiva() === wc) this._riserva(this.altezza);
+      });
+    }
+    let zoom = 1;
+    try { zoom = wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
+    const css = px > 0 ? Math.ceil(px / zoom) : 0;
+    if (css === r.px) return;
+    r.px = css;
+    r.coda = r.coda.then(async () => {
+      if (r.chiave) {
+        const k = r.chiave;
+        r.chiave = null;
+        try { await wc.removeInsertedCSS(k); } catch (_) {}
+      }
+      if (css > 0 && !wc.isDestroyed()) {
+        try { r.chiave = await wc.insertCSS(`:root{--filo-avvisi-barra:${css}px!important}`, { cssOrigin: 'user' }); } catch (_) {}
+      }
+    });
+  }
+
+  _mostraSuggerimento(dati) {
+    const t = testo(dati && dati.testo);
+    const vista = this.vista;
+    if (!t || !vista || !this.win || this.win.isDestroyed()) { this._nascondiSuggerimento(); return; }
+    const b = vista.getBounds();
+    this.suggerimento = true;
+    try { require('./popup-tooltip').showTooltip(this.win, t, b.x + (Number(dati.x) || 0), b.y + (Number(dati.y) || 0)); } catch (_) {}
+  }
+
+  _nascondiSuggerimento() {
+    if (!this.suggerimento) return;
+    this.suggerimento = false;
+    try { require('./popup-tooltip').hideTooltip(); } catch (_) {}
   }
 
   // Ogni scheda nuova entra in cima alle viste della finestra: gli avvisi devono tornarle sopra.
@@ -118,6 +179,8 @@ class AvvisiSopraPagina {
         if (!id || !AZIONE.test(azione)) return;
         try { this.win.webContents.send('avvisi:azione', { id, azione }); } catch (_) {}
         this.restituisciTastiera();
+      } else if (canale === 'avvisi:suggerimento') {
+        this._mostraSuggerimento(dati);
       }
     });
     wc.once('did-finish-load', () => { this.pronta = true; this._invia(); });
@@ -135,6 +198,9 @@ class AvvisiSopraPagina {
     this.vista = null;
     this.pronta = false;
     if (!vista) return;
+    this._nascondiSuggerimento();
+    this.altezza = 0;
+    try { this._riserva(0); } catch (_) {}
     try { if (this.win && !this.win.isDestroyed()) this.win.contentView.removeChildView(vista); } catch (_) {}
     try { if (!vista.webContents.isDestroyed()) vista.webContents.close(); } catch (_) {}
   }
