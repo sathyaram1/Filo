@@ -317,10 +317,10 @@ test('in incognito la scheda non chiede al modello del blocco geografico', async
   globalThis.SN_GEO_CLASSIFY = async () => { chiesto++; return { skipped: true }; };
   try {
     const tab = { title: 'Forbidden', _lastStatus: 403, view: null };
-    geoBlockMethods._geoLevel2Check.call({ incognito: true }, tab, 'https://video.esempio.it/v/1', 'Access denied');
+    geoBlockMethods._geoLevel2Check.call({ incognito: true, proxyAvailable: async () => true }, tab, 'https://video.esempio.it/v/1', 'Access denied');
     await new Promise((r) => setTimeout(r, 10));
     assert.equal(chiesto, 0);
-    geoBlockMethods._geoLevel2Check.call({ incognito: false }, tab, 'https://video.esempio.it/v/1', 'Access denied');
+    geoBlockMethods._geoLevel2Check.call({ incognito: false, proxyAvailable: async () => true }, tab, 'https://video.esempio.it/v/1', 'Access denied');
     await new Promise((r) => setTimeout(r, 10));
     assert.equal(chiesto, 1, 'caso di riscontro: fuori dall\'incognito il livello 2 parte');
   } finally { globalThis.SN_GEO_CLASSIFY = prima; }
@@ -372,6 +372,7 @@ test('nella scheda: una pagina vuota su un secchio che si riscrive l\'indirizzo 
   installSafebrowse(Schede);
   installGeoBlock(Schede);
   const schede = new Schede();
+  schede.proxyAvailable = async () => true; // il livello 2 parte solo con un fornitore (#771)
   const prima = globalThis.SN_GEO_CLASSIFY;
   const cache = C.createCache();
   let chiamate = 0;
