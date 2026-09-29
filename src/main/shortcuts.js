@@ -140,7 +140,21 @@ function riceviRicevuta(ricevuta, tabId, presa) {
   return true;
 }
 
+// Un secondo Alt+S sulla scheda che aspetta ancora la pagina o il ripiego non avvia un altro salvataggio con la sua conferma.
+const salvataggiInCorso = new Set();
+
 async function saveForLater(win, tab) {
+  if (salvataggiInCorso.has(tab.id)) return;
+  salvataggiInCorso.add(tab.id);
+  try { await salvaPerDopo(win, tab); } finally { salvataggiInCorso.delete(tab.id); }
+}
+
+// Il ripiego scrive dove scriverebbe la pagina passando dall'IPC: in incognito, nella memoria della sessione e non sul disco.
+function comeLaFinestra(win, lavoro) {
+  return win && win._filoIncognito ? require('./shim/storage').runIncognito(lavoro) : lavoro();
+}
+
+async function salvaPerDopo(win, tab) {
   const { handleMessage } = require('./services/handlers');
   const { dallaScheda } = require('./services/miniature');
   const { MSG } = globalThis.SN_MSG;
@@ -150,11 +164,14 @@ async function saveForLater(win, tab) {
   const favicon = tab.favicon || '';
   if (await consegnaConRicevuta(tab, 'save-for-later')) return;
   // Pagina che non l'ha presa (ancora in caricamento, bloccata): si salva comunque, prima della miniatura.
-  const res = await handleMessage({ type: MSG.SAVE_PAGE, page: { url, title, favicon } });
-  const thumbnail = await dallaScheda(tab.view.webContents);
-  if (thumbnail && res?.entry?.id) await globalThis.SN_SAVED_PAGES.setThumbnail(res.entry.id, thumbnail);
+  const entry = await comeLaFinestra(win, async () => {
+    const res = await handleMessage({ type: MSG.SAVE_PAGE, page: { url, title, favicon } });
+    const thumbnail = await dallaScheda(tab.view.webContents);
+    if (thumbnail && res?.entry?.id) await globalThis.SN_SAVED_PAGES.setThumbnail(res.entry.id, thumbnail);
+    return res?.entry;
+  });
   try { win._filoTabs.closeTab(tab.id); } catch (_) {}
-  await confermaSullaSchedaDavanti(win, res?.entry);
+  await confermaSullaSchedaDavanti(win, entry);
 }
 
 // La scheda salvata non poteva mostrare la conferma: la mostra quella che l'utente ha davanti adesso, senza chiudersi.
