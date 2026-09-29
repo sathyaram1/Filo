@@ -1,22 +1,15 @@
-// SINGOLA SORGENTE del recap aggiornamento (popup all'avvio) e del calcolo
-// "quante patch sei indietro". Vedi CLAUDE.md → "Patch notes".
-//
-// Ogni volta che chiudi un fix o aggiungi una feature VISIBILE all'utente,
-// aggiungi una riga al blocco della versione corrente (features/fixes), in
-// italiano e NON tecnica. Le voci interne (refactor/test/infra) NON vanno qui.
-//
-// Formato (lista ordinata dalla versione PIÙ RECENTE alla più vecchia):
-//   { version: '0.2.50', date: '2026-06-18',
-//     features: ['Testo per l’utente…'],
-//     fixes: ['Testo per l’utente…'] }
+// Novità mostrate a chi aggiorna Filo (recap all'avvio): solo ciò che un utente qualunque vede, in italiano semplice.
+// Una riga non va mai sotto una versione già uscita: chi la leggerebbe ha già quella versione.
+// Regole e guardia: tests/unit/patchNotes.test.mjs.
 
 (function (global) {
   'use strict';
 
   const NOTES = [
-    // ↓ Nuove versioni in cima.
+    // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
+    // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
-      version: '0.2.228', date: '2026-09-11',
+      version: '0.2.229', date: '2026-09-11',
       features: [
         'Filo rifiuta i banner dei cookie anche quando il sito li mette in un riquadro dentro la pagina, e ne riconosce molti di più. Quelli che offrono solo «Accetta», o «accetta o abbonati», li nasconde senza accettare niente, e la pagina torna a scorrere. Col tasto destro sulla scheda, o in Sicurezza, vedi cosa ha fatto su ogni sito e rimetti il banner se ti serve.',
         'Un programma scaricato da un sito (.exe, .msi, .bat, .dmg, .iso, .pkg, .sh, .jar\u2026) non arriva pi\u00f9 nei Download in silenzio. Filo si ferma, ti dice che \u00e8 un programma e da quale sito arriva, e lo scarica solo se rispondi di s\u00ec. Nell\u2019elenco degli scaricamenti i programmi si riconoscono a colpo d\u2019occhio, e aprirne uno chiede una seconda conferma, perch\u00e9 aprirlo vuol dire eseguirlo. Gli altri file scendono come sempre. Se preferisci, in Sicurezza spegni la domanda o elenchi i siti di cui ti fidi.',
@@ -1089,5 +1082,45 @@
     return NOTES.length ? NOTES[0].version : '0.0.0';
   }
 
-  global.SN_PATCH_NOTES = { NOTES, cmpVersion, since, countBehind, latestVersion };
+  // FNV-1a: riconosce una riga già mostrata senza doverne salvare il testo.
+  function impronta(riga) {
+    const s = String(riga);
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+    return h.toString(16).padStart(8, '0');
+  }
+
+  function bloccoDi(versione) {
+    return NOTES
+      .filter((n) => cmpVersion(n.version, versione) <= 0)
+      .sort((x, y) => cmpVersion(y.version, x.version))[0] || null;
+  }
+
+  // Cosa conteneva il blocco più recente della versione `versione`, da salvare quando l'utente
+  // chiude il recap. Una versione nasce dal commit provato dalla suite: le righe fuse nel frattempo
+  // finiscono nel suo blocco ma arrivano con la versione dopo, e solo questa fotografia le distingue.
+  function fotografia(versione) {
+    const b = bloccoDi(versione);
+    return {
+      versione: String(versione),
+      blocco: b ? b.version : null,
+      righe: b ? [...(b.features || []), ...(b.fixes || [])].map(impronta) : [],
+    };
+  }
+
+  // since() più le righe entrate dopo nel blocco che `lastSeen` aveva già (vedi fotografia).
+  function recap(lastSeen, current, foto) {
+    const notes = since(lastSeen, current);
+    if (!lastSeen || !foto || foto.versione !== String(lastSeen) || !Array.isArray(foto.righe)) return notes;
+    const b = NOTES.find((n) => n.version === foto.blocco);
+    if (!b || cmpVersion(b.version, lastSeen) > 0 || cmpVersion(b.version, current) > 0) return notes;
+    const viste = new Set(foto.righe);
+    const nuove = (righe) => (righe || []).filter((r) => !viste.has(impronta(r)));
+    const features = nuove(b.features);
+    const fixes = nuove(b.fixes);
+    if (!features.length && !fixes.length) return notes;
+    return [...notes, { version: b.version, date: b.date, features, fixes }];
+  }
+
+  global.SN_PATCH_NOTES = { NOTES, cmpVersion, since, countBehind, latestVersion, impronta, fotografia, recap };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
