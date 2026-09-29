@@ -3079,8 +3079,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const last = String(textReply || '').trim();
     textReply = last ? `${last}\n\n${stop}` : stop;
   } else if (!String(textReply || '').trim() && noteAlRifiuto >= 0 && notes.length <= noteAlRifiuto) {
-    // Muto, e l'ultima nota era scritta prima del «non disponibile»: lo dava per fatto (#771).
-    textReply = RISPOSTA_PROXY_NON_DISPONIBILE;
+    // Muto anche sollecitato: prima cosa non si può, poi la frase com'era, dichiarata scritta
+    // prima di saperlo. Toglierla perdeva le risposte ad altro che conteneva (#771).
+    const prima = notes.pop();
+    textReply = prima
+      ? `${RISPOSTA_PROXY_NON_DISPONIBILE}\n\nPrima di saperlo avevo scritto: «${prima}»`
+      : RISPOSTA_PROXY_NON_DISPONIBILE;
   } else if (!String(textReply || '').trim() && notes.length) {
     // Ultimo giro muto dopo un giro con azioni: la frase scritta insieme alle
     // azioni («Ti metto la sveglia alle 7, buonanotte!») era la risposta, non
