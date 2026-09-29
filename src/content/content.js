@@ -199,10 +199,13 @@
       // e lo applica attenuato alle tab inattive.
       try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
 
-      // Segnali di attività (§2.1): ultima interazione, % di scroll, form sporco.
+      // Segnali di attività (§2.1): ultima interazione, % di scroll.
       // Servono all'LLM per decidere cosa archiviare.
       try { startTabActivityReporter(); } catch (_) {}
     }
+    // Il testo da inviare invece si guarda in ogni frame: editor, commenti e
+    // moduli di contatto stanno spesso in un riquadro (#824).
+    try { startFormTracker(); } catch (_) {}
 
     // Siamo nati mentre lo schermo intero era già acceso? Lo CHIEDIAMO, non
     // aspettiamo l'annuncio: l'annuncio parte quando la modalità cambia, e una
