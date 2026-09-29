@@ -41,7 +41,10 @@ irraggiungibili.
   un toast, una pill interattiva e una conferma cliccabile che condividono
   l'angolo devono condividere anche la pila. Il caso più frequente non è nemmeno
   l'utente che fa due cose di fila: è **un'azione sola** che mostra prima
-  «sto lavorando» e poi l'esito.
+  «sto lavorando» e poi l'esito. Quando due pile non possono essere una (quella
+  della barra sta in una vista sopra la pagina, quelle della pagina nel suo
+  DOM), una cede il posto all'altra: le pile della pagina salgono dell'altezza
+  di quella della barra (#588.5).
 - **Non tutti gli avvisi sono sfrattabili.** Il tetto butta via i più vecchi, ma
   un avviso che porta **l'unico comando** per una cosa in corso (fermare una
   registrazione, raggiungere la lista dove è appena finita una pagina) va marcato

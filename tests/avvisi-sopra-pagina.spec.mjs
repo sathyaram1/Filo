@@ -153,3 +153,114 @@ test('un popup bloccato si annuncia sopra la pagina e «Apri» lo apre in una sc
     return !!attiva && attiva.url === u;
   }, target)).toBe(true);
 });
+
+// Il fuoco lo chiede la prova: il clic di Playwright non sposta la tastiera fra le viste come uno vero.
+function tastieraAllaScheda(app) {
+  return app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const tm = win._filoTabs;
+    win.focus();
+    tm.tabs.find((t) => t.id === tm.activeId).view.webContents.focus();
+  });
+}
+function inFuoco(app) {
+  return app.evaluate(({ webContents }) => {
+    const f = webContents.getFocusedWebContents();
+    return f ? f.getURL() : '';
+  });
+}
+
+test('il primo avviso della finestra lascia la tastiera a chi scrive nella pagina, anche quando se ne va', async ({ app, shell, openTab, testServer, avvisi }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+    <input id="campo" style="margin:40px"></body></html>`);
+  await tastieraAllaScheda(app);
+  await page.locator('#campo').click();
+  await expect.poll(() => inFuoco(app)).toContain(testServer.origin);
+
+  // Il primo avviso fa nascere la vista: caricandosi dentro la finestra si prendeva la tastiera.
+  await shell.evaluate(() => window.filoNotify('Scaricato: report.pdf', { durationSec: 1 }));
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
+  expect(await inFuoco(app)).toContain(testServer.origin);
+
+  // Chi clicca la carta le dà la tastiera: sparito l'avviso, torna alla pagina.
+  await shell.evaluate(() => window.filoNotify('secondo', { durationSec: 1 }));
+  await expect(vista.locator('.shell-notif.show .shell-notif-msg', { hasText: 'secondo' })).toHaveCount(1);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.avvisi.vista.webContents.focus());
+  await expect.poll(() => inFuoco(app)).toContain('avvisi.html');
+  await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 5000 });
+  await expect.poll(() => inFuoco(app)).toContain(testServer.origin);
+});
+
+test('gli avvisi di Filo nella pagina salgono sopra quelli della barra, e tornano giù quando la barra si svuota', async ({ app, shell, openTab, testServer, avvisi }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px">
+    <a id="link" href="https://example.com/articolo">Un collegamento di prova</a></body></html>`);
+  await shell.evaluate(() => window.filoNotify('Scaricato: report.pdf', {
+    durationSec: 0,
+    actions: [{ label: 'Apri file', onClick: () => {} }, { label: 'Apri cartella', onClick: () => {} }],
+  }));
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
+
+  // Un'azione di Filo sulla pagina, dal tasto destro, che risponde col suo avviso.
+  const menu = page.locator('.sn-menu');
+  let fatto = false;
+  for (let i = 0; i < 6 && !fatto; i++) {
+    await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });
+    const voce = menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' });
+    try {
+      await voce.first().waitFor({ state: 'visible', timeout: 1500 });
+      await voce.first().click();
+      fatto = true;
+    } catch (_) { await page.waitForTimeout(200); }
+  }
+  expect(fatto, 'voce «Copia URL» non raggiungibile').toBe(true);
+  await expect(page.locator('.sn-toast')).toHaveCount(1, { timeout: 5000 });
+
+  const coperti = async () => {
+    const g = await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+      const tm = win._filoTabs;
+      const tab = tm.tabs.find((t) => t.id === tm.activeId);
+      return { v: tm.avvisi.vista.getBounds(), t: tab.view.getBounds() };
+    });
+    const toast = await page.evaluate(() => {
+      const r = document.querySelector('.sn-toast').getBoundingClientRect();
+      return { x: r.left, y: r.top, right: r.right, bottom: r.bottom };
+    });
+    const carta = await vista.evaluate(() => {
+      const r = document.querySelector('.shell-notif').getBoundingClientRect();
+      return { x: r.left, y: r.top, right: r.right, bottom: r.bottom };
+    });
+    const dx = g.v.x - g.t.x;
+    const dy = g.v.y - g.t.y;
+    return toast.x < carta.right + dx && carta.x + dx < toast.right && toast.y < carta.bottom + dy && carta.y + dy < toast.bottom;
+  };
+  await expect.poll(coperti).toBe(false);
+
+  const fondo = () => page.evaluate(() => {
+    const r = document.querySelector('.sn-toasts').getBoundingClientRect();
+    return Math.round(innerHeight - r.bottom);
+  });
+  await vista.locator('.shell-notif-close').click();
+  await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
+  await expect.poll(fondo).toBeLessThanOrEqual(24);
+});
+
+test('la X di un avviso dice «Chiudi» col suggerimento di Filo, che se ne va con l’avviso', async ({ app, shell, avvisi }) => {
+  await shell.evaluate(() => window.filoNotify('Scaricato: report.pdf', { durationSec: 0 }));
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
+  const suggerimento = () => app.evaluate(async ({ BrowserWindow }) => {
+    const testi = [];
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w._filoTabs || !w.isVisible()) continue;
+      try { testi.push(await w.webContents.executeJavaScript('document.body ? document.body.innerText : ""')); } catch (_) {}
+    }
+    return testi.join(' | ');
+  });
+  await vista.locator('.shell-notif-close').hover();
+  await expect.poll(suggerimento, { timeout: 4000 }).toMatch(/Chiudi/);
+  await shell.evaluate(() => document.querySelector('.shell-notif-close').click());
+  await expect.poll(suggerimento, { timeout: 4000 }).not.toMatch(/Chiudi/);
+});

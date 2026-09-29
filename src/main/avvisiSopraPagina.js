@@ -65,14 +65,14 @@ class AvvisiSopraPagina {
     const w = Math.min(this.misura.w, W);
     const h = Math.min(this.misura.h, Math.max(0, H - this.alto()));
     if (!this.stato.carte.length || !w || !h) {
+      // Chi ha cliccato una carta ha dato la tastiera alla vista: sparita la vista, torna alla pagina.
+      const conTastiera = require('electron').webContents.getFocusedWebContents() === vista.webContents;
       vista.setVisible(false);
       vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       this._nascondiSuggerimento();
       this.altezza = 0;
       this._riserva(0);
-      // Chi ha cliccato una carta ha dato la tastiera alla vista: sparita la vista, torna alla pagina.
-      const col = require('electron').webContents.getFocusedWebContents();
-      if (!col || col === vista.webContents) this.restituisciTastiera();
+      if (conTastiera) this.restituisciTastiera();
       return;
     }
     vista.setBounds({ x: W - w, y: H - h, width: w, height: h });
@@ -110,8 +110,9 @@ class AvvisiSopraPagina {
         r.chiave = null;
         try { await wc.removeInsertedCSS(k); } catch (_) {}
       }
+      // Foglio d'autore: uno di origine 'user' removeInsertedCSS non lo toglie, e il valore resterebbe.
       if (css > 0 && !wc.isDestroyed()) {
-        try { r.chiave = await wc.insertCSS(`:root{--filo-avvisi-barra:${css}px!important}`, { cssOrigin: 'user' }); } catch (_) {}
+        try { r.chiave = await wc.insertCSS(`:root:root{--filo-avvisi-barra:${css}px!important}`); } catch (_) {}
       }
     });
   }
@@ -186,8 +187,7 @@ class AvvisiSopraPagina {
     wc.once('did-finish-load', () => { this.pronta = true; this._invia(); });
     // Se la vista muore, il prossimo avviso ne fa nascere un'altra.
     wc.on('render-process-gone', () => this._butta());
-    // Carica fuori dalla finestra e ci entra alla prima posa: una vista che carica dentro si prende
-    // la tastiera, e chi stava scrivendo nella pagina perde i tasti (#588.5).
+    // Carica FUORI dalla finestra (ci entra alla prima posa): dentro si prenderebbe la tastiera di chi scrive.
     // Da filo://shell come la shell: un file:// farebbe scattare chi controlla che nessuna vista apra file locali.
     wc.loadURL('filo://shell/avvisi.html');
     return vista;

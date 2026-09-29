@@ -269,6 +269,10 @@ class TabManager {
     this.avvisi = new AvvisiSopraPagina(window, {
       alto: () => this._altezzaCornice(),
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
+      schedaAttiva: () => {
+        const t = this.tabs.find((x) => x.id === this.activeId);
+        return t && t.view ? t.view.webContents : null;
+      },
     });
     // §1.2 — cache del colore identità per dominio (host → 'rgb(r,g,b)'). Così
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza

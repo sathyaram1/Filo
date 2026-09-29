@@ -27,6 +27,15 @@ Quello che la **shell** deve mostrare nell'area della pagina e che deve restarci
   mai. Ogni `addChildView` di una scheda finisce sopra di lei, quindi il layout la
   riporta in cima. Preload minimo (lo stato entra, misure e clic escono), e il
   canale dello stato si accetta solo dalla shell della sua finestra.
+- **La tastiera non è sua.** Una WebContentsView che carica la sua pagina
+  DENTRO la finestra si prende il fuoco: chi stava scrivendo nella scheda perde i
+  tasti, e il cursore continua a lampeggiare nel campo. Quindi carica fuori ed
+  entra nella finestra alla prima posa; e se l'utente cliccandola le ha dato la
+  tastiera, quando sparisce la restituisce alla scheda.
+- **L'angolo si divide.** Le pile di Filo dentro la pagina (content script,
+  editor) stanno nello stesso angolo: la vista scrive la sua altezza nella scheda
+  attiva (`--filo-avvisi-barra`, foglio d'autore: uno di origine `user` non si
+  toglie più) e quelle pile ci salgono sopra.
 - **Il modello resta dov'era.** La vista disegna e riporta i clic; tetto, tempi,
   chiavi e azioni restano nella shell. Il DOM della shell diventa un modello
   **nascosto** (`visibility: hidden`): un test che ne chiede la visibilità o ci

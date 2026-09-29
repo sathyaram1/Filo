@@ -53,6 +53,7 @@
     card.appendChild(msg);
     const chiudi = pulsante('shell-notif-close', '×', 'chiudi');
     chiudi.setAttribute('aria-label', 'Chiudi notifica');
+    chiudi.dataset.tip = 'Chiudi';
     card.appendChild(chiudi);
     return card;
   }
@@ -118,7 +119,37 @@
     arma(JSON.stringify(lista));
     misura();
     if (nuove.length) inFondo();
+    if (tipSu && (!tipSu.isConnected || !tipSu.closest('.shell-notif.show'))) nascondiTip();
   });
+
+  // Il suggerimento di Filo sulle icone, come nella barra (shell.js, data-tip): lo disegna il main.
+  let tipSu = null;
+  let tipTimer = null;
+  function nascondiTip() {
+    clearTimeout(tipTimer);
+    tipTimer = null;
+    if (!tipSu) return;
+    tipSu = null;
+    api.suggerimento('');
+  }
+  pila.addEventListener('mouseover', (e) => {
+    const t = e.target.closest('[data-tip]');
+    if (!t || t === tipSu) return;
+    nascondiTip();
+    tipSu = t;
+    tipTimer = setTimeout(() => {
+      const r = t.getBoundingClientRect();
+      // Sopra l'icona e allineato alla sua destra: sotto c'è il testo della carta, a destra il bordo della finestra.
+      api.suggerimento(t.dataset.tip, Math.round(r.right - 58), Math.round(r.top - 28));
+    }, 350);
+  });
+  pila.addEventListener('mouseout', (e) => {
+    const t = e.target.closest('[data-tip]');
+    if (t && t === tipSu && !(e.relatedTarget && t.contains(e.relatedTarget))) nascondiTip();
+  });
+  document.addEventListener('mousedown', nascondiTip, true);
+  document.documentElement.addEventListener('mouseleave', nascondiTip);
+  window.addEventListener('blur', nascondiTip);
 
   // Finestra bassa: la vista è più corta della pila e scorre; in vista resta la più recente.
   function inFondo() {
