@@ -61,7 +61,7 @@ test('trenta miniature grandi, una illeggibile, un salvataggio mentre la passata
     const stato = await app.evaluate(async () => {
       const pages = await globalThis.SN_STORAGE.getRaw('savedPages', []);
       const cats = await globalThis.SN_STORAGE.getRaw('categories', []);
-      return { ids: pages.map((p) => p.id), meta: pages.map((p) => [p.id, p.url, p.savedAt, p.category, p.categoryId, p.categoryConfidence]), cat: cats[0].thumbnailUrl.slice(0, 20), maxByte: Math.max(...pages.filter((p) => p.id !== 'rotta' && p.thumbnail).map((p) => p.thumbnail.length * 3 / 4)) };
+      return { ids: pages.map((p) => p.id), meta: pages.map((p) => [p.id, p.url, p.savedAt, p.category, p.categoryId, p.categoryConfidence]), cat: cats[0].thumbnailUrl.slice(0, 19), maxByte: Math.max(...pages.filter((p) => p.id !== 'rotta' && p.thumbnail).map((p) => p.thumbnail.length * 3 / 4)) };
     });
     expect(stato.ids[0], 'la pagina salvata durante la passata').not.toMatch(/^p\d/);
     expect(stato.ids).not.toContain('p5');

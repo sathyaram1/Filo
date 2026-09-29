@@ -188,3 +188,39 @@ test('Alt+S due volte su una pagina in caricamento: una voce sola, una conferma 
     await new Promise((r) => lento.close(r));
   }
 });
+
+test('aspetto: conferma di ripiego su «Aperti per dopo» e sulla nuova scheda, tema scuro', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
+  for (const [interna, nome] of [['filo://home/home.html', 'home'], ['filo://newtab/', 'newtab']]) {
+    if (interna !== 'filo://newtab/') await chiudiScheda(app, 'filo://newtab/');
+    const pi = interna === 'filo://newtab/' ? null : await openTab(interna);
+    if (pi) { await pi.waitForLoadState('domcontentloaded'); await pi.waitForTimeout(600); }
+    const url = testServer.html(PAGINA('Per aspetto ' + nome));
+    const page = await openTab(url);
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+    await bloccaEPremi(app, page);
+    await expect.poll(async () => (await confermaOvunque(app)).length, { timeout: 12000 }).toBeGreaterThan(0);
+    const w = app.windows().find((x) => x.url().startsWith(interna));
+    await w.waitForTimeout(300);
+    await w.screenshot({ path: `tests/.shots/839-g2-ripiego-${nome}-scuro.png` });
+    await page.waitForTimeout(10);
+  }
+});
+
+test('lista «Aperti per dopo» già aperta: dopo un salvataggio dal menu, tornandoci, la pagina c\'è', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const lista = await openTab('filo://home/home.html');
+  await lista.waitForLoadState('domcontentloaded');
+  await lista.waitForTimeout(600);
+  const url = testServer.html(PAGINA('Da ritrovare'));
+  const page = await openTab(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
+  await page.locator('.sn-menu [data-sn-icon-id="saveForLater"]').click();
+  await page.waitForEvent('close', { timeout: 10000 });
+  console.log('schede', await schede(app));
+  await lista.waitForTimeout(1500);
+  await lista.screenshot({ path: 'tests/.shots/839-g2-lista-aperta.png' });
+  await expect(lista.locator('.sn-card')).toHaveCount(1, { timeout: 3000 });
+});
