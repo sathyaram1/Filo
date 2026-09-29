@@ -84,8 +84,8 @@ html[data-chrome-compact="1"] .addr {
 }
 .tabs::-webkit-scrollbar { height: 0; width: 0; display: none; }
 
-/* Le notifiche si impilano in basso a destra. Quelle infinite restano finché non si preme la X.
-   Questa pila è il modello: a schermo la disegna la vista sopra la pagina, le carte stanno in avvisi.css. */
+/* La pila degli avvisi in basso a destra è il modello, e non si disegna: qui la coprirebbe la scheda
+   aperta. A schermo la disegna la vista sopra la pagina (avvisi.html, #588.5); le carte in avvisi.css. */
 .shell-notifs {
   position: fixed;
   right: 16px;
@@ -94,22 +94,8 @@ html[data-chrome-compact="1"] .addr {
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
-  z-index: 9999;
+  visibility: hidden;
   pointer-events: none;
-  /* Mai più alto della finestra: su finestre basse lo stack scorre invece di spingere le card vecchie
-     fuori schermo, dove la loro X sparirebbe con loro. */
-  max-height: calc(100vh - 32px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
-}
-/* Acceso solo quando c'è davvero overflow (syncOverflow), per poter afferrare la scrollbar: senza,
-   il contenitore resta trasparente ai click e le aree vuote lasciano passare al contenuto sotto. */
-.shell-notifs.scrolling { pointer-events: auto; padding-right: 4px; }
-.shell-notifs::-webkit-scrollbar { width: 6px; }
-.shell-notifs::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
 }
 /* Il bagliore "sfuma perdendo di intensità": parte percepibile e scende quasi a zero, poi torna,
    con una transizione morbida. */

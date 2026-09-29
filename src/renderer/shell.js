@@ -950,8 +950,8 @@
       }
       return host;
     }
-    // Questa pila qui sotto la copre la scheda: a schermo la disegna la vista sopra la pagina
-    // (#588.5), che riceve a ogni cambio lo stato intero, tema compreso.
+    // Questa pila è il modello e non si disegna (la coprirebbe la scheda): a schermo la disegna la
+    // vista sopra la pagina (#588.5), che riceve a ogni cambio lo stato intero, tema compreso.
     const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius'];
     function rispecchia() {
       if (!host || !api.avvisi) return;
@@ -990,22 +990,13 @@
         try { c.remove(); } catch (_) {}
       }
     }
-    // Se anche col tetto lo stack eccede l'altezza della finestra (finestra
-    // molto bassa), il contenitore diventa scrollabile: attiviamo i pointer
-    // events per poter afferrare la scrollbar e teniamo in vista la più recente.
-    function syncOverflow() {
-      const h = hostEl();
-      const scrollable = h.scrollHeight > h.clientHeight + 1;
-      h.classList.toggle('scrolling', scrollable);
-      if (scrollable) h.scrollTop = h.scrollHeight;
-    }
     function dismiss(card) {
       if (!card || card.dataset.closing === '1') return;
       card.dataset.closing = '1';
       if (card._timer) clearTimeout(card._timer);
       card.classList.remove('show');
       // attende la transizione prima di rimuovere dal DOM
-      setTimeout(() => { try { card.remove(); } catch (_) {} syncOverflow(); }, 220);
+      setTimeout(() => { try { card.remove(); } catch (_) {} }, 220);
     }
     // showNotification(text, opts?) — opts: { durationSec, sound (toneId|false),
     // actions: [{ label, onClick }] }. Senza opts usa la config delle Preferenze.
@@ -1064,8 +1055,6 @@
       // eslint-disable-next-line no-unused-expressions
       card.offsetHeight;
       card.classList.add('show');
-      // Finestra molto bassa: rendi scrollabile e mostra la più recente.
-      syncOverflow();
 
       // Suono opzionale alla comparsa.
       const wantSound = opts.sound !== undefined

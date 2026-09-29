@@ -7,16 +7,6 @@ import { createServer } from 'node:http';
 
 const FILE = Buffer.from('%PDF-1.4\n% finto pdf di prova\n' + 'x'.repeat(2048));
 
-async function vistaAvvisi(app) {
-  const scadenza = Date.now() + 10_000;
-  while (Date.now() < scadenza) {
-    const p = app.windows().find((w) => { try { return /\/renderer\/avvisi\.html$/.test(w.url()); } catch (_) { return false; } });
-    if (p) return p;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('nessuna vista degli avvisi');
-}
-
 // Dov'è la vista rispetto alla scheda attiva, e se è l'ultima delle viste (quindi disegnata sopra).
 function posa(app) {
   return app.evaluate(({ BrowserWindow }) => {
@@ -37,7 +27,7 @@ function posa(app) {
   });
 }
 
-test('l’avviso di fine scaricamento compare sopra la pagina e «Apri cartella» risponde', async ({ app, shell, openTab, testServer }) => {
+test('l’avviso di fine scaricamento compare sopra la pagina e «Apri cartella» risponde', async ({ app, shell, openTab, testServer, avvisi }) => {
   const fileServer = createServer((req, res) => {
     res.writeHead(200, {
       'Content-Type': 'application/pdf',
@@ -58,7 +48,7 @@ test('l’avviso di fine scaricamento compare sopra la pagina e «Apri cartella�
 
     await page.locator('#dl').click();
 
-    const vista = await vistaAvvisi(app);
+    const vista = await avvisi();
     await expect(vista.locator('.shell-notif.show .shell-notif-msg')).toHaveText('Scaricato: report.pdf', { timeout: 15_000 });
     await expect(vista.locator('.shell-notif-action', { hasText: 'Apri file' })).toBeVisible();
     await expect(vista.locator('.shell-notif-action', { hasText: 'Apri cartella' })).toBeVisible();
@@ -88,10 +78,10 @@ test('l’avviso di fine scaricamento compare sopra la pagina e «Apri cartella�
   }
 });
 
-test('un avviso resta sopra anche alla scheda aperta dopo, segue il tema e la X lo chiude', async ({ app, shell, openTab, testServer }) => {
+test('un avviso resta sopra anche alla scheda aperta dopo, segue il tema e la X lo chiude', async ({ app, shell, openTab, testServer, avvisi }) => {
   await testServer.openReady(openTab, '<!doctype html><html><body><p>prima</p></body></html>');
   await shell.evaluate(() => window.filoNotify('Avviso che resta', { durationSec: 0 }));
-  const vista = await vistaAvvisi(app);
+  const vista = await avvisi();
   await expect(vista.locator('.shell-notif.show .shell-notif-msg')).toHaveText('Avviso che resta');
 
   const prima = (await posa(app)).schede;
@@ -100,13 +90,16 @@ test('un avviso resta sopra anche alla scheda aperta dopo, segue il tema e la X 
   await expect.poll(async () => (await posa(app)).inCima).toBe(true);
   expect((await posa(app)).vista.width).toBeGreaterThan(100);
 
-  // Stessi colori della shell, in chiaro e in scuro.
+  // Stessi colori della shell, in chiaro e in scuro: la vista li prende dalla shell, non dal sistema.
   const sfondo = (p) => p.evaluate(() => getComputedStyle(document.querySelector('.shell-notif')).backgroundColor);
-  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'light'; });
+  await shell.emulateMedia({ colorScheme: 'light' });
   await expect.poll(async () => (await sfondo(vista)) === (await sfondo(shell))).toBe(true);
   const chiaro = await sfondo(vista);
-  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
-  await expect.poll(async () => (await sfondo(vista)) !== chiaro && (await sfondo(vista)) === (await sfondo(shell))).toBe(true);
+  await shell.emulateMedia({ colorScheme: 'dark' });
+  await expect.poll(async () => {
+    const [v, s] = [await sfondo(vista), await sfondo(shell)];
+    return v !== chiaro && v === s;
+  }).toBe(true);
 
   await vista.locator('.shell-notif-close').click();
   await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });

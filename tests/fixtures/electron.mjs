@@ -104,6 +104,20 @@ export const test = base.extend({
     await use(win);
   },
 
+  // La vista che disegna sopra la pagina gli avvisi della barra (#588.5); nasce al primo avviso.
+  // La pila nella shell è solo il modello, nascosto: quello che l'utente vede e clicca sta qui.
+  avvisi: async ({ app }, use) => {
+    await use(async () => {
+      const scadenza = Date.now() + 10_000;
+      while (Date.now() < scadenza) {
+        const p = app.windows().find((w) => { try { return /\/renderer\/avvisi\.html$/.test(w.url()); } catch (_) { return false; } });
+        if (p) return p;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      throw new Error('avvisi: la vista degli avvisi non è nata');
+    });
+  },
+
   // Apre un URL come tab e ritorna la Page corrispondente al WebContentsView.
   // Polling sull'URL: app.waitForEvent('window') può risolvere con la
   // newtab (già pendente al boot), non con il tab appena aperto. Per evitare
