@@ -448,6 +448,42 @@
     return GRANT_LABELS[capo] || GRANT_LABELS[raw] || 'Crediti ricevuti';
   }
 
+  // Un saldo come lo scrive la pagina Crediti: al più un decimale, alla
+  // italiana. La chat lo scrive uguale, così i due numeri non divergono.
+  function formatCredits(n) {
+    const v = Math.round((Number(n) || 0) * 10) / 10;
+    return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);
+  }
+
+  // ── Il premio di una segnalazione chiusa, con un portafoglio (#816) ───────
+  // Il premio vero lo accredita il server, e solo a una segnalazione RISOLTA
+  // (`done`) mandata col portafoglio. Il riquadro annuncia la cifra del
+  // movimento `feedback_closed:<id>`; senza movimento non inventa una cifra:
+  // aspetta, finché il movimento può ancora arrivare.
+  const PREMIO_ATTESA_MS = 24 * 60 * 60 * 1000;
+
+  // { card, grants, grantsFresh, redeemedAt, now } → { announce, credits }.
+  // `grantsFresh` falso = movimenti da una lettura vecchia (server muto): ciò
+  // che c'è vale, ciò che manca può essere solo non ancora letto.
+  function resolutionReward({ card, grants, grantsFresh = false, redeemedAt = null, now = Date.now() } = {}) {
+    const c = card || {};
+    const why = `feedback_closed:${String(c._id || '')}`;
+    const g = (Array.isArray(grants) ? grants : []).find((x) => x && x.why === why && Number(x.credits) > 0);
+    if (g) return { announce: true, credits: Number(g.credits) };
+    // Archiviata, doppione: il server non la premia.
+    if (c.status && c.status !== 'done') return { announce: true, credits: 0 };
+    // Mandata prima del riscatto: sul documento non c'è lo pseudonimo, e il
+    // server non sa a chi darlo.
+    const created = Date.parse(String(c.createdAt || ''));
+    const redeemed = Date.parse(String(redeemedAt || ''));
+    if (Number.isFinite(created) && Number.isFinite(redeemed) && created < redeemed) return { announce: true, credits: 0 };
+    if (!grantsFresh) return { announce: false, credits: 0 };
+    // Manopola a zero, tetto dei regali pieno: il movimento non arriverà più.
+    const closed = Date.parse(String(c.resolvedAt || c.publishedAt || ''));
+    if (!Number.isFinite(closed) || Number(now) - closed > PREMIO_ATTESA_MS) return { announce: true, credits: 0 };
+    return { announce: false, credits: 0 };
+  }
+
   // Si è appena entrati con un invito: la frase che lo dice, in home e nella
   // pagina Crediti. Chi ha invitato non si può nominare — il server non manda
   // il suo pseudonimo con lo stato del portafoglio.
