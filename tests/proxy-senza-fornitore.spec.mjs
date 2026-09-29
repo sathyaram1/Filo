@@ -175,8 +175,9 @@ test('chat senza fornitore: niente regola salvata né scheda instradata, e il mo
   await page.screenshot({ path: 'tests/.shots/771-chat-non-disponibile.png' }).catch(() => {});
 });
 
-// Il modello scrive «fatto» insieme alla chiamata e dopo il rifiuto resta muto:
-// la sua frase non diventa la risposta, Filo dice che non si può.
+// Il modello scrive «fatto» insieme alla chiamata e dopo il rifiuto resta muto: la
+// risposta la riscrive lui, sollecitato una volta. Se tace ancora, Filo dice che non
+// si può e la frase resta, dichiarata come scritta prima di saperlo.
 test('chat senza fornitore con l\'ultimo giro muto: la frase «fatto» non resta la risposta', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
@@ -193,12 +194,15 @@ test('chat senza fornitore con l\'ultimo giro muto: la frase «fatto» non resta
     const turni = [
       { text: 'PROMESSA_REGOLA: da ora netflix si apre sempre dagli Stati Uniti.', toolCalls: [{ id: 'r1', name: 'REGOLA_PROXY_DOMINIO', arguments: '{"country":"us","dominio":"netflix.com"}' }] },
       { text: '' },
+      { text: 'RISPOSTA_SOLLECITATA: salvare una regola sul paese non si può ancora.' },
       { text: 'PROMESSA_SCHEDA: fatto, la scheda ora arriva dalla Francia.', toolCalls: [{ id: 'p1', name: 'PROXY_TAB', arguments: '{"country":"fr"}' }] },
       { text: '' },
+      { text: '' },
     ];
-    let i = 0;
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts }) => {
-      const t = turni[Math.min(i++, turni.length - 1)];
+    globalThis.__giri = [];
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages }) => {
+      const n = globalThis.__giri.push(JSON.parse(JSON.stringify(messages || [])));
+      const t = turni[Math.min(n - 1, turni.length - 1)];
       return {
         text: t.text, toolCalls: t.toolCalls || [], reasoningDetails: [],
         model: attempts[0].model, provider: attempts[0].provider, usage: {},
@@ -206,15 +210,25 @@ test('chat senza fornitore con l\'ultimo giro muto: la frase «fatto» non resta
       };
     };
   });
+  const giri = () => app.evaluate(() => globalThis.__giri);
 
-  const risposte = page.locator('.dash-bubble-filo', { hasText: 'da un altro paese in Filo non si può ancora' });
   await page.locator('#input').fill('apri sempre netflix dagli USA');
   await page.locator('#sendBtn').click();
-  await expect(risposte).toHaveCount(1, { timeout: 15_000 });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA_SOLLECITATA' })).toHaveCount(1, { timeout: 15_000 });
+  const primi = await giri();
+  expect(primi.length).toBe(3);
+  const sollecito = primi[2][primi[2].length - 1];
+  expect(sollecito.role).toBe('user');
+  expect(String(sollecito.content)).toMatch(/non l'ha letto come risposta/);
+
+  // Muto anche sollecitato: un sollecito solo, poi la risposta fissa.
   await page.locator('#input').fill('apri questa scheda dalla Francia');
   await page.locator('#sendBtn').click();
-  await expect(risposte).toHaveCount(2, { timeout: 15_000 });
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'PROMESSA_' })).toHaveCount(0);
+  const fissa = page.locator('.dash-bubble-filo', { hasText: 'da un altro paese in Filo non si può ancora' });
+  await expect(fissa).toHaveCount(1, { timeout: 15_000 });
+  await expect(fissa).toContainText('Prima di saperlo avevo scritto: «PROMESSA_SCHEDA');
+  expect((await giri()).length).toBe(6);
+  await expect(page.locator('.dash-bubble-filo', { hasText: /^\s*PROMESSA_/ })).toHaveCount(0);
   const regole = await app.evaluate(async () => globalThis.SN_FILO_MEMORY.listProxyRules());
   expect(Object.keys(regole || {})).toEqual([]);
   await page.screenshot({ path: 'tests/.shots/771-chat-giro-muto.png' }).catch(() => {});
@@ -242,9 +256,9 @@ async function copioneGiri(app, turni) {
   }, turni);
 }
 
-// La risposta fissa copre solo la frase scritta PRIMA del rifiuto, e non nega
+// La risposta fissa scatta solo sulla frase scritta PRIMA del rifiuto, e non nega
 // quello che il turno ha fatto davvero (una pagina aperta).
-test('giro finale muto con altre azioni: la risposta dice solo cosa non si può, e una frase scritta dopo il rifiuto resta la risposta', async ({ app, shell, testServer }) => {
+test('giro finale muto con altre azioni: la risposta dice cosa non si può senza negare il resto, e una frase scritta dopo il rifiuto resta la risposta', async ({ app, shell, testServer }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -268,7 +282,8 @@ test('giro finale muto con altre azioni: la risposta dice solo cosa non si può,
   const fissa = page.locator('.dash-bubble-filo', { hasText: 'da un altro paese in Filo non si può ancora' });
   await expect(fissa).toHaveCount(1, { timeout: 15_000 });
   await expect(fissa).toContainText('Netflix');
-  await expect(fissa).not.toContainText(/non ho cambiato|PROMESSA_USA/);
+  await expect(fissa).not.toContainText(/non ho cambiato/);
+  await expect(fissa).toContainText('Prima di saperlo avevo scritto: «PROMESSA_USA');
 
   // Rifiuto al primo giro, pagina aperta con una frase scritta sapendolo, poi muto.
   const guida = testServer.html('<title>Guida</title><p>guida</p>');
@@ -282,6 +297,39 @@ test('giro finale muto con altre azioni: la risposta dice solo cosa non si può,
   await expect(page.locator('.dash-bubble-filo', { hasText: 'FRASE_INFORMATA' })).toHaveCount(1, { timeout: 15_000 });
   await expect(fissa).toHaveCount(1);
   await page.screenshot({ path: 'tests/.shots/771-chat-muto-con-altre-azioni.png' }).catch(() => {});
+});
+
+// Una domanda doppia col giro finale muto, anche sollecitato: la risposta all'altra
+// metà, scritta prima del rifiuto, resta nella bolla accanto al «non si può».
+test('domanda doppia, giro finale muto: la risposta all\'altra metà non sparisce dalla bolla', async ({ app, shell, testServer }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  const fissa = page.locator('.dash-bubble-filo', { hasText: 'da un altro paese in Filo non si può ancora' });
+
+  // Risposta e instradamento nello stesso giro.
+  await copioneGiri(app, [
+    { text: 'SOLE_A_ROMA: a Roma oggi c\'è il sole, 24 gradi. Ti apro Netflix dagli Stati Uniti.', toolCalls: [{ id: 'p1', name: 'PROXY_TAB', arguments: '{"country":"us"}' }] },
+    { text: '' },
+  ]);
+  await page.locator('#input').fill('che tempo fa a Roma? e apri netflix dagli USA');
+  await page.locator('#sendBtn').click();
+  await expect(fissa).toHaveCount(1, { timeout: 15_000 });
+  await expect(fissa).toContainText('SOLE_A_ROMA');
+
+  // Risposta in un giro prima, instradamento in un giro senza testo.
+  const meteo = testServer.html('<title>Meteo</title><p>pioggia</p>');
+  await copioneGiri(app, [
+    { text: 'PIOGGIA_A_PARIGI: a Parigi piove, 14 gradi.', toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: meteo, etichetta: 'Meteo' }) }] },
+    { text: '', toolCalls: [{ id: 'p2', name: 'PROXY_TAB', arguments: '{"country":"fr"}' }] },
+    { text: '' },
+  ]);
+  await page.locator('#input').fill('che tempo fa a Parigi? poi apri la scheda dalla Francia');
+  await page.locator('#sendBtn').click();
+  await expect(fissa).toHaveCount(2, { timeout: 15_000 });
+  await expect(fissa.last()).toContainText('PIOGGIA_A_PARIGI');
+  await page.screenshot({ path: 'tests/.shots/771-chat-domanda-doppia.png' }).catch(() => {});
 });
 
 // Formato vecchio (JSON nel testo): la frase scritta insieme all'azione la dava
