@@ -1093,36 +1093,29 @@
     return h.toString(16).padStart(8, '0');
   }
 
-  function bloccoDi(versione) {
-    return NOTES
-      .filter((n) => cmpVersion(n.version, versione) <= 0)
-      .sort((x, y) => cmpVersion(y.version, x.version))[0] || null;
-  }
-
-  // Cosa conteneva il blocco più recente della versione `versione`, da salvare quando l'utente
-  // chiude il recap. Una versione nasce dal commit provato dalla suite: le righe fuse nel frattempo
-  // finiscono nel suo blocco ma arrivano con la versione dopo, e solo questa fotografia le distingue.
+  // Tutte le righe che la versione `versione` conteneva, come impronte: si salva quando l'utente chiude il recap.
+  // Una riga può finire sotto una versione già uscita senza di lei (fusa dopo il commit da cui è nata la build, o da un
+  // ramo rimasto indietro di qualche uscita): il numero del blocco non lo dice, solo questa fotografia sì.
   function fotografia(versione) {
-    const b = bloccoDi(versione);
     return {
       versione: String(versione),
-      blocco: b ? b.version : null,
-      righe: b ? [...(b.features || []), ...(b.fixes || [])].map(impronta) : [],
+      righe: NOTES.filter((n) => cmpVersion(n.version, versione) <= 0)
+        .flatMap((n) => [...(n.features || []), ...(n.fixes || [])]).map(impronta),
     };
   }
 
-  // since() più le righe entrate dopo nel blocco che `lastSeen` aveva già (vedi fotografia).
+  // Con la fotografia di `lastSeen`: ogni riga fino a `current` che quella versione non aveva, in qualunque blocco stia.
+  // Senza (salvata da una versione di prima): since().
   function recap(lastSeen, current, foto) {
-    const notes = since(lastSeen, current);
-    if (!lastSeen || !foto || foto.versione !== String(lastSeen) || !Array.isArray(foto.righe)) return notes;
-    const b = NOTES.find((n) => n.version === foto.blocco);
-    if (!b || cmpVersion(b.version, lastSeen) > 0 || cmpVersion(b.version, current) > 0) return notes;
+    if (!lastSeen || !foto || foto.versione !== String(lastSeen) || !Array.isArray(foto.righe)) return since(lastSeen, current);
+    if (cmpVersion(current, lastSeen) <= 0) return [];
     const viste = new Set(foto.righe);
     const nuove = (righe) => (righe || []).filter((r) => !viste.has(impronta(r)));
-    const features = nuove(b.features);
-    const fixes = nuove(b.fixes);
-    if (!features.length && !fixes.length) return notes;
-    return [...notes, { version: b.version, date: b.date, features, fixes }];
+    return NOTES
+      .filter((n) => cmpVersion(n.version, current) <= 0)
+      .sort((x, y) => cmpVersion(y.version, x.version))
+      .map((n) => ({ version: n.version, date: n.date, features: nuove(n.features), fixes: nuove(n.fixes) }))
+      .filter((n) => n.features.length || n.fixes.length);
   }
 
   global.SN_PATCH_NOTES = { NOTES, cmpVersion, since, countBehind, latestVersion, impronta, fotografia, recap };
