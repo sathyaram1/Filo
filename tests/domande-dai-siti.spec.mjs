@@ -312,6 +312,33 @@ test('un sito non legge né spinge fuori le pagine salvate, e non cancella dizio
   expect(resta.magazzino?.sn_personal_dict).toEqual(['Sathya']);
 });
 
+// Giro 3: il «Ha funzionato?» dell'Aiuto costa due chiamate al modello e pubblica i passi per gli altri utenti del sito.
+test('un sito non manda da solo il «Ha funzionato?» dell\'Aiuto, né per un altro sito', async ({ app, openTab, testServer }) => {
+  const pagina = await testServer.openReady(openTab, '<h1 style="height:60vh">in vista</h1>');
+  await testServer.openReady(openTab, '<h1>sfondo</h1>', { pubblico: true });
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w._filoTabs.activate(w._filoTabs.tabs.find((x) => String(x.url).startsWith('http://127.0.0.1')).id);
+  });
+  const sfondo = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
+  const vista = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
+  const percorso = (rawUrl) => ({ payload: { session: { rawUrl, rawSteps: [{ action: 'click', selector: '#paga' }], rawUserMessages: ['come pago'], success: true } } });
+  const indirizzoSfondo = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs)
+    ._filoTabs.tabs.find((t) => String(t.url).startsWith('http://sito-pubblico.test')).url);
+
+  for (const rawUrl of [indirizzoSfondo, 'https://negozio-vero.com/carrello']) {
+    const r = await sfondo(chiedi('save_path', percorso(rawUrl)));
+    expect(r.nonTrovata || r.errore).toBeFalsy();
+    expect(r.risposta, `senza un gesto un sito di sfondo ha mandato il «Ha funzionato?» per ${rawUrl}`).toMatchObject({ ok: false, code: 'forbidden' });
+  }
+
+  await pagina.click('h1');
+  expect((await vista(chiedi('save_path', percorso('https://negozio-vero.com/carrello')))).risposta?.code,
+    'un sito ha mandato il «Ha funzionato?» per un altro sito').toBe('forbidden');
+  expect((await vista(chiedi('save_path', percorso(pagina.url())))).risposta?.ok, 'dopo il clic su Sì il percorso della pagina passa').toBe(true);
+  expect((await vista(chiedi('save_path', percorso(pagina.url())))).risposta?.code, 'un clic, un «Ha funzionato?»').toBe('forbidden');
+});
+
 // Un clic dentro un riquadro di un altro sito non arriva al main come gesto: vale il tasto destro che apre il menu.
 test('Salva per dopo dal menu aperto in un riquadro di un altro sito salva ancora', async ({ shell, openTab, testServer }) => {
   const dentro = testServer.html('<body style="margin:0;background:#cfc"><p id="d" style="height:220px">commenti</p></body>');
