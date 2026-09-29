@@ -123,6 +123,38 @@ test('la foto della barra a un sito solo mentre l\'utente ci ha disegnato sopra'
   assert.equal(W.domandaAmmessaDaUnSito(MSG.CAPTURE_VISIBLE_TAB, { inVista: true }), true);
 });
 
+test('le domande di un gesto dell\'utente: quali voci spendono', () => {
+  for (const t of [MSG.PERMESSO_FILO, MSG.SAVE_PAGE, MSG.SAVE_LINK, MSG.SET_SAVED_PAGE_THUMB, MSG.UPDATE_SETTINGS]) {
+    assert.deepEqual(W.gestiChiesti(t, { type: t }), [t], t);
+  }
+  for (const t of W.DOMANDE_WEB_COL_GESTO) assert.ok(W.DOMANDE_WEB.has(t), `${t} deve essere prima di tutto una domanda ammessa`);
+  for (const k of W.CHIAVI_STORAGE_WEB_COL_GESTO) assert.ok(W.CHIAVI_STORAGE_WEB.includes(k), k);
+  assert.deepEqual(W.gestiChiesti('_storage:remove', { keys: ['sn_icon_layout', 'sn_personal_dict'] }),
+    ['storage:sn_icon_layout', 'storage:sn_personal_dict']);
+  assert.deepEqual(W.gestiChiesti('_storage:remove', { keys: 'sn_autocorrect' }), ['storage:sn_autocorrect']);
+  assert.deepEqual(W.gestiChiesti('_storage:set', { obj: { sn_icon_layout: {}, sn_qr_in_primary_migrated: true } }), ['storage:sn_icon_layout']);
+  assert.deepEqual(W.gestiChiesti('_storage:set', { obj: { sn_feedback_draft_text: 'bozza' } }), [], 'le bozze si scrivono a ogni tasto');
+  assert.deepEqual(W.gestiChiesti('_storage:remove', {}), []);
+  assert.deepEqual(W.gestiChiesti(MSG.GET_SETTINGS, {}), []);
+  assert.deepEqual(W.gestiChiesti(MSG.CLOSE_TAB, null), []);
+});
+
+test('un gesto vero e recente vale una volta per voce', () => {
+  const P = require(join(ROOT, 'src', 'main', 'services', 'permessiPagine.js'));
+  assert.equal(P.spendiGesto({}, []), true, 'chi non chiede un gesto passa');
+  assert.equal(P.spendiGesto({}, ['save_page']), false, 'senza gesto no');
+  assert.equal(P.spendiGesto(null, ['save_page']), false);
+  assert.equal(P.spendiGesto({ _filoGestoAlle: Date.now() - P.GESTO_MS - 1 }, ['save_page']), false, 'un gesto vecchio no');
+  const wc = { _filoGestoAlle: Date.now() };
+  assert.equal(P.spendiGesto(wc, ['save_page']), true);
+  assert.equal(P.spendiGesto(wc, ['save_page']), false, 'un clic, un salvataggio');
+  assert.equal(P.spendiGesto(wc, ['set_saved_page_thumb']), true, 'la miniatura dello stesso salvataggio passa');
+  assert.equal(P.spendiGesto(wc, ['storage:sn_icon_layout', 'save_page']), false, 'una voce già spesa ferma la domanda intera');
+  assert.equal(P.spendiGesto(wc, ['storage:sn_icon_layout']), true, 'e non spende le altre');
+  wc._filoGestoAlle += 1;
+  assert.equal(P.spendiGesto(wc, ['save_page']), true, 'un gesto nuovo, un salvataggio nuovo');
+});
+
 test('chi è un sito: la scheda e la pagina che parla devono essere entrambe di Filo', () => {
   assert.equal(O.daUnSito('', {}), false, 'una chiamata interna al main non ha mittente');
   assert.equal(O.daUnSito('', undefined), false);
