@@ -264,6 +264,10 @@ function storagePerOrigine(valore, origine, chiave = 'settings', indirizzi = [or
 }
 
 module.exports = {
+  CANALI_WEB,
+  DOMANDE_WEB,
+  DOMANDE_WEB_IN_VISTA,
+  domandaAmmessaDaUnSito,
   CAMPI_WEB,
   CAMPI_WEB_SCRITTURA,
   SPINTE_WEB,
