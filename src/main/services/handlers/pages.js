@@ -46,4 +46,8 @@ module.exports = function register(on, ctx) {
   on(MSG.CONSUME_SAVED_PAGE, async (msg) => ({ ok: true, pages: await SavedPages.consume(msg.id) }));
 
   on(MSG.SET_SAVED_PAGE_THUMB, async (msg) => ({ ok: true, entry: await SavedPages.setThumbnail(msg.id, msg.thumbnail) }));
+
+  on(MSG.SHORTCUT_RECEIPT, async (msg, sender) => ({
+    ok: require('../../shortcuts').riceviRicevuta(msg.ricevuta, sender?.tab?.id, msg.presa),
+  }));
 };

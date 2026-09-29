@@ -834,7 +834,12 @@
     };
   }
 
+  // Un secondo Alt+S (o clic) mentre il salvataggio è in corso non apre una seconda conferma: la scheda sta già per chiudersi.
+  let salvataggioInCorso = false;
+
   async function savePage() {
+    if (salvataggioInCorso) return;
+    salvataggioInCorso = true;
     // Committa il salvataggio SUBITO, prima di qualsiasi attesa. La cattura
     // della miniatura (captureVisibleTab) attende ~120ms che il menu sparisca
     // dal compositor: se in quella finestra la pagina fa un redirect o si
@@ -848,6 +853,7 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.SAVE_PAGE, page: base });
       if (!res?.ok) {
+        salvataggioInCorso = false;
         Popup.showToast(I18n.t('toast_save_failed'));
         return;
       }
@@ -855,6 +861,7 @@
     } catch (e) {
       // Contesto distrutto da un redirect immediato o errore IPC: avvisa
       // invece di fallire in silenzio.
+      salvataggioInCorso = false;
       console.error('[SN] savePage', e);
       Popup.showToast(I18n.t('toast_save_failed'));
       return;
@@ -915,6 +922,7 @@
     const finish = (openList) => {
       if (done) return;
       done = true;
+      salvataggioInCorso = false;
       if (timer) { clearTimeout(timer); timer = null; }
       pill.dataset.snClosing = '1';
       pill.classList.remove('sn-save-confirm-visible');

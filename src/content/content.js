@@ -414,7 +414,7 @@
       chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
     }, { capture: true });
 
-    if (isBlocked()) return;
+    if (isBlocked()) { self.__snFiloSpento = true; return; }
 
     SpellCheck.init(settings);
 
@@ -2135,10 +2135,12 @@
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
-      // Shortcut save-for-later: il SW chiede al content il payload.
+      // #839 — Alt+S è la voce «Salva per dopo» del menu: stessa funzione, stessa miniatura, stessa conferma.
       if (msg.command === 'save-for-later') {
-        if (isBlocked()) { sendResponse({ savePayload: null }); return; }
-        sendResponse({ savePayload: Actions.buildSavePayload() });
+        if (IS_SUBFRAME) return;
+        sendResponse({ presa: true });
+        try { Menu.close(); } catch (_) {}
+        Actions.savePage();
         return;
       }
       handleShortcut(msg.command, msg.context);
@@ -2173,7 +2175,6 @@
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
     }
-    // save-for-later è gestito direttamente nel background
   }
 
   // La lettura ad alta voce e la dettatura (tutto l'audio del content script)

@@ -801,6 +801,8 @@
     // Da background -> content (broadcast)
     SETTINGS_UPDATED: 'settings_updated',
     SHORTCUT_TRIGGERED: 'shortcut_triggered',     // { command }
+    // Risposta della pagina a una scorciatoia consegnata con ricevuta: se non l'ha presa, la fa il main (#839). { ricevuta, presa }
+    SHORTCUT_RECEIPT: 'shortcut_receipt',
     // Contropartita di RUN_IN_TOP_FRAME: arriva SOLO al frame principale della
     // scheda e gli fa eseguire l'azione di pagina chiesta da un riquadro. { iconId }
     TOP_FRAME_COMMAND: 'top_frame_command',

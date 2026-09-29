@@ -228,7 +228,7 @@ app.whenReady().then(async () => {
     // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
     // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
     try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}
-    // Le miniature grandi di «Aperti per dopo» (#839), a finestra già aperta: non rallenta l'avvio.
+    // Le miniature grandi di «Aperti per dopo» (#839), qualche secondo dopo: l’avvio non le aspetta.
     setTimeout(() => { globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {}); }, 3000);
   } catch (_) {}
 

@@ -102,43 +102,55 @@ function dispatch(command, window) {
   }
 }
 
+// #839 — Alt+S e il menu sono la stessa azione: la fa la pagina (savePage nel content script), con la sua
+// miniatura, la conferma cliccabile e la chiusura. Il main salva da solo solo se la pagina non la prende.
+const ATTESA_RICEVUTA_MS = 3500;
+const ricevuteInAttesa = new Map();
+
+function consegnaConRicevuta(tab, command, attesaMs = ATTESA_RICEVUTA_MS) {
+  return new Promise((resolve) => {
+    const ricevuta = crypto.randomUUID();
+    const chiudi = (presa) => {
+      clearTimeout(timer);
+      ricevuteInAttesa.delete(ricevuta);
+      resolve(presa);
+    };
+    const timer = setTimeout(() => chiudi(false), attesaMs);
+    ricevuteInAttesa.set(ricevuta, { tabId: tab.id, chiudi });
+    try { tab.view.webContents.send('shortcut:triggered', { command, ricevuta }); } catch (_) { chiudi(false); }
+  });
+}
+
+// La ricevuta vale solo dalla scheda a cui era stata consegnata.
+function riceviRicevuta(ricevuta, tabId, presa) {
+  const attesa = ricevuteInAttesa.get(ricevuta);
+  if (!attesa || attesa.tabId !== tabId) return false;
+  attesa.chiudi(!!presa);
+  return true;
+}
+
+function entro(promessa, ms) {
+  let timer;
+  const scadenza = new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('timeout')), ms); });
+  return Promise.race([promessa, scadenza]).finally(() => clearTimeout(timer));
+}
+
 async function saveForLater(win, tab) {
   const { handleMessage } = require('./services/handlers');
-  // Fotografiamo SUBITO i dati identificativi della scheda, prima di qualsiasi
-  // attesa: se la pagina naviga/redirect mentre raccogliamo metadata e
-  // miniatura, tab.url/tab.title potrebbero già puntare alla nuova pagina e
-  // finiremmo per salvare quella sbagliata (#334, cammino da scorciatoia).
+  const { MSG } = globalThis.SN_MSG;
+  // I dati della scheda si fotografano prima di ogni attesa: un redirect intanto farebbe salvare la pagina sbagliata (#334).
   const url = tab.url;
   const title = tab.title;
   const favicon = tab.favicon || '';
-  // Chiediamo metadata al content script (best-effort), poi catturiamo thumbnail.
-  let extra = {};
+  if (await consegnaConRicevuta(tab, 'save-for-later')) return;
+  // Pagina senza Filo dentro (sito escluso, ancora in caricamento, bloccata): si salva comunque, prima della miniatura.
+  const res = await handleMessage({ type: MSG.SAVE_PAGE, page: { url, title, favicon } });
   try {
-    extra = await tab.view.webContents.executeJavaScript(
-      '(window.__sn_collectSavePayload && window.__sn_collectSavePayload()) || {}',
-      true,
-    );
-  } catch (_) { /* tab senza content script */ }
-  let thumbnail = '';
-  try {
-    const img = await tab.view.webContents.capturePage();
-    thumbnail = img.resize({ width: 320 }).toDataURL();
+    const img = await entro(tab.view.webContents.capturePage(), 3000);
+    const thumbnail = img.toDataURL();
+    if (thumbnail && res?.entry?.id) await handleMessage({ type: MSG.SET_SAVED_PAGE_THUMB, id: res.entry.id, thumbnail });
   } catch (_) {}
-  const salva = () => handleMessage({
-    type: globalThis.SN_MSG.MSG.SAVE_PAGE,
-    page: {
-      url, title,
-      favicon: favicon || extra.favicon,
-      thumbnail,
-      description: extra.description,
-      excerpt: extra.excerpt,
-    },
-  });
-  // Da una finestra in incognito il salvataggio resta in memoria, come quello
-  // del tasto destro (che passa dall'IPC): sul disco non deve arrivare niente.
-  if (win._filoIncognito) await require('./shim/storage').runIncognito(salva);
-  else await salva();
   try { win._filoTabs.closeTab(tab.id); } catch (_) {}
 }
 
-module.exports = { collegaScorciatoie, comandoDaTasto, dispatch, saveForLater, isInternalTab, acceleratorePerPiattaforma, COMMANDS };
+module.exports = { collegaScorciatoie, comandoDaTasto, dispatch, saveForLater, consegnaConRicevuta, riceviRicevuta, isInternalTab, acceleratorePerPiattaforma, COMMANDS };
