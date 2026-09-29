@@ -195,7 +195,7 @@ test('le righe entrate nel blocco di una versione dopo che era uscita arrivano c
     { version: '0.2.225', date: '2026-09-10', features: ['vecchia'], fixes: [] },
   ];
   const foto = conNote(uscita, () => PN.fotografia('0.2.229'));
-  assert.equal(foto.blocco, '0.2.229');
+  assert.equal(foto.righe.length, 3, 'la fotografia tiene tutte le righe della versione, non solo il blocco in cima');
   assert.ok(!JSON.stringify(foto).includes('prima novità'), 'la fotografia salva impronte, non il testo');
 
   const dopo = [
