@@ -272,8 +272,10 @@ module.exports = function register(on, ctx) {
     return {
       balance: b.credits != null && Number.isFinite(Number(b.credits)) ? Number(b.credits) : null,
       dailyCredits: server.dailyCredits != null && Number.isFinite(Number(server.dailyCredits)) ? Number(server.dailyCredits) : null,
-      lastKnown: Boolean(server.cached || server.stale),
-      readAt: server.cached ? (server.readAt || null) : null,
+      // Perché è l'ultimo saldo noto: il server dei crediti muto, o il
+      // servizio dei modelli che non ha detto il consumo (come la pagina).
+      lastKnown: server.cached ? 'server' : (server.stale ? 'models' : ''),
+      readAt: (server.cached ? server.readAt : server.stale ? server.usageReadAt : null) || null,
       usingOwnKey: Boolean(st && st.usingOwnKey),
       keyMissing: Boolean(st && st.hasPersonalKey === false),
     };
