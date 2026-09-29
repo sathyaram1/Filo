@@ -307,7 +307,6 @@ const chromeShim = {
       },
       async set(obj) { await filoMessage({ type: '_storage:set', obj }); },
       async remove(keys) { await filoMessage({ type: '_storage:remove', keys }); },
-      async clear() { await filoMessage({ type: '_storage:clear' }); },
     },
     onChanged: {
       addListener(fn) {
@@ -318,14 +317,6 @@ const chromeShim = {
         });
       },
     },
-  },
-  tabs: {
-    async create({ url } = {}) {
-      const r = await filoMessage({ type: '_tabs:create', url });
-      return { id: r.id };
-    },
-    async query() { return []; },
-    async remove(id) { await filoMessage({ type: '_tabs:remove', id }); },
   },
 };
 

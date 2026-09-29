@@ -372,14 +372,13 @@ module.exports = function register(on, ctx) {
   // Con un portafoglio il premio lo dà il server dopo i controlli (#816): il
   // conteggio locale non si muove. `inArrivo`: la segnalazione porta lo
   // pseudonimo, senza il quale il server non sa a chi darlo.
-  on(MSG.CREDITS_AWARD_FEEDBACK, async (msg) => {
+  on(MSG.CREDITS_AWARD_FEEDBACK, async () => {
     const WM = globalThis.SN_WALLET_MAIN;
     if (WM && WM.haPortafoglio && WM.haPortafoglio()) {
       return { ok: true, wallet: true, credits: 0, inArrivo: Boolean(WM.pseudonym && WM.pseudonym()) };
     }
-    const { SN_CONST } = globalThis;
-    const amount = (msg && Number(msg.credits)) || SN_CONST.CREDIT.FEEDBACK_SEND;
-    const r = await Credits.award({ kind: 'feedback_sent', credits: amount, ref: msg?.ref || null });
+    // L'importo non lo sceglie chi chiede: la domanda arriva anche dal box dentro i siti (#589.1).
+    const r = await Credits.award({ kind: 'feedback_sent', credits: globalThis.SN_CONST.CREDIT.FEEDBACK_SEND, ref: null });
     return { ok: true, ...r };
   });
 

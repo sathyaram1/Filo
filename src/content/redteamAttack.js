@@ -8,8 +8,8 @@
 //   2. Descrizione — spiega cosa fa l'attacco; va al giudice di validità, NON
 //      ai 4 giudici del panel.
 // Più un bottone d'invio che mostra il costo (50 crediti). Se l'utente non è
-// loggato → invito ad accedere; se i crediti non bastano → bottone disabilitato
-// con messaggio.
+// loggato → invito ad accedere; se i crediti non bastano lo dice la risposta
+// dell'invio (il saldo non si chiede: dentro un sito non passa, #589.1).
 //
 // Il backend NON è ancora deployato: MSG.REDTEAM_SUBMIT torna { status:'error' }
 // dal vivo → il pannello mostra un messaggio amichevole e NON crasha mai.
@@ -111,7 +111,6 @@
     const cancelBtn = root.querySelector('.sn-rt-cancel');
 
     let signedIn = false;
-    let balance = null; // null = sconosciuto (non blocchiamo finché non lo sappiamo)
 
     function sendLabel() {
       // Mostra SEMPRE il costo (spec §8.1, punto 3).
@@ -125,16 +124,10 @@
       statusEl.classList.toggle('sn-rt-status--ok', kind === 'ok');
     }
 
-    // Abilita/disabilita il bottone d'invio in base a stato login, saldo e testo.
+    // Abilita/disabilita il bottone d'invio in base a stato login e testo.
     function refreshSendState() {
       sendBtn.textContent = sendLabel();
       const hasText = !!attackEl.value.trim();
-      // Crediti insufficienti noti → disabilita con messaggio (spec §8.1 punto 4).
-      if (signedIn && balance != null && balance < COST) {
-        sendBtn.disabled = true;
-        setStatus(`Crediti insufficienti: hai ${balance}, ne servono ${COST}.`, 'err');
-        return;
-      }
       // Non loggato: il bottone resta cliccabile ma porta al login.
       if (!signedIn) {
         sendBtn.disabled = false;
@@ -173,18 +166,12 @@
       }).catch(() => {});
     } catch (_) {}
 
-    // ---- stato auth + saldo crediti ----
-    (async function loadAuthAndBalance() {
+    // ---- stato auth ----
+    (async function loadAuth() {
       try {
         const a = await chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS });
         signedIn = !!(a && a.signedIn);
       } catch (_) { signedIn = false; }
-      if (signedIn) {
-        try {
-          const c = await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS });
-          if (c && Number.isFinite(Number(c.credits))) balance = Number(c.credits);
-        } catch (_) {}
-      }
       if (activeRoot === root) refreshSendState();
     })();
 
