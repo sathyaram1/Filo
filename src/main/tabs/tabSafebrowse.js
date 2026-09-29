@@ -104,7 +104,8 @@ const safebrowseMethods = {
   },
 
   // I campi compaiono quando vuole il codice dell'utente: dopo un «Avanti» che non ricarica, dopo un avvio lento.
-  // Finché la pagina ospitata resta aperta la si riguarda, fino al primo campo sensibile.
+  // Finché la pagina resta aperta la si riguarda, fino al primo campo sensibile: sulle pagine ospitate, e dove un
+  // campo sensibile cambierebbe il verdetto (un sosia di un brand corto blocca solo se chiede la password, #728).
   async _sbScanFrames(tab, giro) {
     const SB = globalThis.SN_SAFEBROWSE;
     const wc = tab.view && tab.view.webContents;
@@ -112,7 +113,7 @@ const safebrowseMethods = {
     const url = wc.getURL();
     let ospitata = null;
     try { const u = new URL(url); ospitata = SB.whitelist.hostedPlatform(u.hostname, u.pathname); } catch (_) {}
-    if (!ospitata || tab._sbCampiUrl === url) return;
+    if (tab._sbCampiUrl === url || !(ospitata || this._sbCampiContano(SB, url))) return;
     const hints = { hasPassword: false, hasPayment: false, budgetUrl: tab._urlNavigato };
     const codice = `(${pageHints.toString()})(document)`;
     let frames = [];
