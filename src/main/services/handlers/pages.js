@@ -1,20 +1,26 @@
 // Handler di dominio: pagine salvate ("salva per dopo") e categorie.
 
+const { daUnSito } = require('./origine');
+
+// A un sito basta sapere dove è finita la pagina (conferma e miniatura): titolo e miniatura di una voce che
+// c'era già sono dell'utente (#589.1).
+const vocePer = (entry, sender, origin) => (entry && daUnSito(origin, sender) ? { id: entry.id, category: entry.category } : entry);
+
 module.exports = function register(on, ctx) {
   const { MSG, maybeCategorizeAsync } = ctx;
   const SavedPages = globalThis.SN_SAVED_PAGES;
   const Categorizer = globalThis.SN_CATEGORIZER;
 
-  on(MSG.SAVE_PAGE, async (msg) => {
+  on(MSG.SAVE_PAGE, async (msg, sender, origin) => {
     const entry = await SavedPages.save(msg.page);
     maybeCategorizeAsync(entry, msg.page).catch((e) => console.warn('[Filo] categorize failed', e));
-    return { ok: true, entry };
+    return { ok: true, entry: vocePer(entry, sender, origin) };
   });
 
-  on(MSG.SAVE_LINK, async (msg) => {
+  on(MSG.SAVE_LINK, async (msg, sender, origin) => {
     const entry = await SavedPages.save({ url: msg.url, title: msg.title });
     maybeCategorizeAsync(entry, { url: msg.url, title: msg.title }).catch((e) => console.warn('[Filo] categorize failed', e));
-    return { ok: true, entry };
+    return { ok: true, entry: vocePer(entry, sender, origin) };
   });
 
   on(MSG.GET_CATEGORIES, async () => ({ ok: true, categories: await Categorizer.listCategories() }));
@@ -45,5 +51,7 @@ module.exports = function register(on, ctx) {
 
   on(MSG.CONSUME_SAVED_PAGE, async (msg) => ({ ok: true, pages: await SavedPages.consume(msg.id) }));
 
-  on(MSG.SET_SAVED_PAGE_THUMB, async (msg) => ({ ok: true, entry: await SavedPages.setThumbnail(msg.id, msg.thumbnail) }));
+  on(MSG.SET_SAVED_PAGE_THUMB, async (msg, sender, origin) => ({
+    ok: true, entry: vocePer(await SavedPages.setThumbnail(msg.id, msg.thumbnail), sender, origin),
+  }));
 };

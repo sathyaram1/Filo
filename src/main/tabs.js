@@ -2393,6 +2393,7 @@ class TabManager {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
     installaPermessi(pwc.session);
+    Permessi.seguiGesti(pwc);
     try {
       pwc.setWebRTCIPHandlingPolicy(
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
