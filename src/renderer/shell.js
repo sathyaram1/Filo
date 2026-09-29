@@ -80,6 +80,7 @@
       applyTabColorParams(r?.settings?.tabColor);
       applyNotifConfig(r?.settings?.notifications);
       try { render(); } catch (_) {}
+      try { NOTIFS.rispecchia(); } catch (_) {}
     })
     .catch(() => {});
   if (typeof api.onBroadcast === 'function') {
@@ -89,6 +90,7 @@
         applyTabColorParams(m.settings?.tabColor);
         applyNotifConfig(m.settings?.notifications);
         try { render(); } catch (_) {}
+        try { NOTIFS.rispecchia(); } catch (_) {}
       }
     });
   }
@@ -931,6 +933,10 @@
     // Con un tetto teniamo solo le più recenti (le più rilevanti); le eccedenti
     // vengono rimosse subito, senza attendere il timeout.
     const MAX_STACK = 5;
+    // Col puntatore sopra la pila i tempi aspettano; uscito, a chi era agli sgoccioli restano almeno questi ms.
+    const RIPRESA_MS = 2000;
+    let fermi = false;
+    let seq = 0;
     function hostEl() {
       if (!host) {
         host = document.getElementById('shell-notifs');
@@ -940,8 +946,41 @@
           host.className = 'shell-notifs';
           document.body.appendChild(host);
         }
+        new MutationObserver(rispecchia).observe(host, {
+          childList: true, subtree: true, characterData: true,
+          attributes: true, attributeFilter: ['class', 'data-closing'],
+        });
       }
       return host;
+    }
+    // Questa pila è il modello e non si disegna (la coprirebbe la scheda): a schermo la disegna la
+    // vista sopra la pagina (#588.5), che riceve a ogni cambio lo stato intero, tema compreso.
+    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius'];
+    function rispecchia() {
+      if (!host || !api.avvisi) return;
+      const carte = Array.from(host.querySelectorAll(':scope > .shell-notif')).map((c) => ({
+        id: c.dataset.nid || '',
+        testo: c.querySelector('.shell-notif-msg')?.textContent || '',
+        azioni: Array.from(c.querySelectorAll('.shell-notif-action')).map((b) => b.textContent || ''),
+        chiusa: c.dataset.closing === '1',
+      }));
+      const cs = getComputedStyle(document.documentElement);
+      const vars = {};
+      for (const k of VAR_TEMA) vars[k] = cs.getPropertyValue(k).trim();
+      try { api.avvisi.stato({ carte, tema: { vars } }); } catch (_) {}
+    }
+    if (api.avvisi) {
+      if (api.avvisi.onSopra) api.avvisi.onSopra((dati) => ferma(!!(dati && dati.sopra)));
+      api.avvisi.onAzione((dati) => {
+        if (!host || !dati) return;
+        const card = Array.from(host.children).find((c) => c.dataset.nid === String(dati.id));
+        if (!card || card.dataset.closing === '1') return;
+        const btn = dati.azione === 'chiudi'
+          ? card.querySelector('.shell-notif-close')
+          : card.querySelectorAll('.shell-notif-action')[Number(dati.azione)];
+        if (btn) btn.click();
+      });
+      try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rispecchia); } catch (_) {}
     }
     // Rimuove immediatamente (senza animazione) le card più vecchie oltre il
     // tetto, così lo stack non supera mai MAX_STACK elementi vivi.
@@ -955,22 +994,37 @@
         try { c.remove(); } catch (_) {}
       }
     }
-    // Se anche col tetto lo stack eccede l'altezza della finestra (finestra
-    // molto bassa), il contenitore diventa scrollabile: attiviamo i pointer
-    // events per poter afferrare la scrollbar e teniamo in vista la più recente.
-    function syncOverflow() {
-      const h = hostEl();
-      const scrollable = h.scrollHeight > h.clientHeight + 1;
-      h.classList.toggle('scrolling', scrollable);
-      if (scrollable) h.scrollTop = h.scrollHeight;
+    function avviaTempo(card, ms) {
+      card._restano = ms;
+      if (fermi) return;
+      card._scade = Date.now() + ms;
+      card._timer = setTimeout(() => dismiss(card), ms);
+    }
+    function ferma(sopra) {
+      if (sopra === fermi) return;
+      fermi = sopra;
+      for (const c of hostEl().children) {
+        if (c.dataset.closing === '1' || c._restano == null) continue;
+        if (sopra) {
+          if (!c._timer) continue;
+          clearTimeout(c._timer);
+          c._timer = null;
+          c._restano = Math.max(0, c._scade - Date.now());
+        } else if (!c._timer) {
+          avviaTempo(c, Math.max(c._restano, RIPRESA_MS));
+        }
+      }
     }
     function dismiss(card) {
       if (!card || card.dataset.closing === '1') return;
       card.dataset.closing = '1';
       if (card._timer) clearTimeout(card._timer);
+      card._timer = null;
       card.classList.remove('show');
+      // Pila vuota: nessuno ha più il puntatore sopra, anche se la vista sparendo non l'ha potuto dire.
+      if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) fermi = false;
       // attende la transizione prima di rimuovere dal DOM
-      setTimeout(() => { try { card.remove(); } catch (_) {} syncOverflow(); }, 220);
+      setTimeout(() => { try { card.remove(); } catch (_) {} }, 220);
     }
     // showNotification(text, opts?) — opts: { durationSec, sound (toneId|false),
     // actions: [{ label, onClick }] }. Senza opts usa la config delle Preferenze.
@@ -980,6 +1034,7 @@
       if (opts.key) dismissKey(opts.key);
       const card = document.createElement('div');
       card.className = 'shell-notif';
+      card.dataset.nid = String(++seq);
       if (opts.key) card.dataset.key = String(opts.key);
 
       const msg = document.createElement('div');
@@ -1028,8 +1083,6 @@
       // eslint-disable-next-line no-unused-expressions
       card.offsetHeight;
       card.classList.add('show');
-      // Finestra molto bassa: rendi scrollabile e mostra la più recente.
-      syncOverflow();
 
       // Suono opzionale alla comparsa.
       const wantSound = opts.sound !== undefined
@@ -1039,9 +1092,7 @@
         try { window.SN_SOUNDS.play(typeof wantSound === 'string' ? wantSound : notifConfig.sound); } catch (_) {}
       }
 
-      if (!infinite) {
-        card._timer = setTimeout(() => dismiss(card), durationSec * 1000);
-      }
+      if (!infinite) avviaTempo(card, durationSec * 1000);
       return card;
     }
     // Un avviso con chiave dice uno stato: quando lo stato cambia se ne va.
@@ -1050,7 +1101,7 @@
         if (c.dataset.key === String(key)) dismiss(c);
       }
     }
-    return { show, dismiss, dismissKey };
+    return { show, dismiss, dismissKey, rispecchia };
   })();
 
   // Compat: il vecchio toast informativo (es. "Tab riordinate e salvate") ora
@@ -1691,89 +1742,17 @@
     });
   }
 
-  // ─── Chip "popup bloccato" ─────────────────────────────────────────────
-  // Quando il main blocca un window.open() non richiesto invia
-  // 'tabs:popup-blocked' con { tabId, url, host }. Mostriamo una chip ancorata
-  // sotto la barra indirizzi: "Bloccato popup da <host>  [Apri] [×]".
-  // - Click "Apri": apre il popup come nuovo tab (bypass blocco).
-  // - Click "×" o auto-dismiss dopo 8s: chip svanisce.
-  // Riusiamo `reserveTop` (lo stesso meccanismo che già si usa per i menu
-  // dropdown) per evitare che la chip finisca sopra l'area WebContentsView
-  // di un'altra tab: la posizioniamo dentro la shell (DOM HTML), quindi non
-  // serve riservare spazio extra — è già sopra l'area pagina.
+  // ─── Popup bloccato ────────────────────────────────────────────────────
+  // Il main blocca un window.open() non richiesto e manda { tabId, url, host }: è un avviso della
+  // pila in basso a destra, con «Apri» per aprirlo comunque (la chip sotto la barra la copriva la scheda).
   if (api.tabs.onPopupBlocked) {
-    const chipHost = document.createElement('div');
-    chipHost.id = 'popup-chips';
-    chipHost.style.position = 'fixed';
-    chipHost.style.top = '52px';
-    chipHost.style.right = '12px';
-    chipHost.style.zIndex = '1000';
-    chipHost.style.display = 'flex';
-    chipHost.style.flexDirection = 'column';
-    chipHost.style.gap = '6px';
-    chipHost.style.pointerEvents = 'auto';
-    document.body.appendChild(chipHost);
-
     api.tabs.onPopupBlocked((info) => {
-      if (!info) return;
-      const { url, host } = info;
-      const chip = document.createElement('div');
-      chip.className = 'popup-chip';
-      chip.style.background = 'var(--sn-surface, #fff)';
-      chip.style.color = 'var(--sn-text, #222)';
-      chip.style.border = '1px solid var(--sn-border, #d0d0d0)';
-      chip.style.borderRadius = '999px';
-      chip.style.padding = '6px 10px';
-      chip.style.font = '12px system-ui, sans-serif';
-      chip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-      chip.style.display = 'inline-flex';
-      chip.style.alignItems = 'center';
-      chip.style.gap = '8px';
-      chip.style.maxWidth = '360px';
-
-      const label = document.createElement('span');
-      label.textContent = `Bloccato popup da ${host || '?'}`;
-      label.style.whiteSpace = 'nowrap';
-      label.style.overflow = 'hidden';
-      label.style.textOverflow = 'ellipsis';
-      chip.appendChild(label);
-
-      const open = document.createElement('button');
-      open.type = 'button';
-      open.textContent = 'Apri';
-      open.style.cursor = 'pointer';
-      open.style.background = 'transparent';
-      open.style.border = '1px solid currentColor';
-      open.style.borderRadius = '999px';
-      open.style.padding = '2px 8px';
-      open.style.font = 'inherit';
-      open.style.color = 'inherit';
-      open.addEventListener('click', () => {
-        try { api.tabs.openBlockedPopup(url); } catch (_) {}
-        dismiss();
+      if (!info || !info.url) return;
+      const url = info.url;
+      NOTIFS.show(`Bloccato popup da ${info.host || '?'}`, {
+        durationSec: 8,
+        actions: [{ label: 'Apri', onClick: () => { try { api.tabs.openBlockedPopup(url); } catch (_) {} } }],
       });
-      chip.appendChild(open);
-
-      const x = document.createElement('button');
-      x.type = 'button';
-      x.textContent = '×';
-      x.setAttribute('aria-label', 'Chiudi');
-      x.style.cursor = 'pointer';
-      x.style.background = 'transparent';
-      x.style.border = 'none';
-      x.style.font = '16px system-ui';
-      x.style.lineHeight = '1';
-      x.style.padding = '0 4px';
-      x.style.color = 'inherit';
-      x.addEventListener('click', () => dismiss());
-      chip.appendChild(x);
-
-      chipHost.appendChild(chip);
-      let timer = setTimeout(dismiss, 8000);
-      function dismiss() {
-        if (timer) { clearTimeout(timer); timer = null; }
-        try { chip.remove(); } catch (_) {}
-      }
     });
   }
 

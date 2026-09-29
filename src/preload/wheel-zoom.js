@@ -69,6 +69,20 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   // impossibile da ingrandire (#686, primo giro di verifica).
   const interna = !!(opts && opts.interna);
 
+  // Lo zoom cambia anche da fuori (main, un'altra scheda dello stesso sito): il main tiene valori in px CSS
+  // della scheda (l'altezza degli avvisi della barra, #588.5) e va avvisato a ogni cambio, da qualunque parte.
+  if (ipc && typeof ipc.send === 'function' && typeof matchMedia === 'function') {
+    const osservaZoom = () => {
+      try {
+        matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener('change', () => {
+          try { ipc.send('filo:zoom-cambiato'); } catch (_) {}
+          osservaZoom();
+        }, { once: true });
+      } catch (_) {}
+    };
+    osservaZoom();
+  }
+
   // Passo e limiti stanno in un posto solo (src/shared/zoomPagina.js): tasti,
   // rotella, badge e chat devono zoomare della stessa quantità e fermarsi dove
   // si ferma Chrome, altrimenti due strade sullo stesso zoom divergono.

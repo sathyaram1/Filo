@@ -19,7 +19,7 @@ import { test, expect } from './fixtures/electron.mjs';
 const MOTIVO = 'Non ho mandato niente: manca la chiave con cui si cifra. '
   + 'Senza cifratura quel contenuto lo può leggere chiunque.';
 
-test('la segnalazione che non può partire lo dice nella finestra, e ci resta', async ({ app, shell }) => {
+test('la segnalazione che non può partire lo dice nella finestra, e ci resta', async ({ app, shell, avvisi }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 10_000 });
 
   // La copia di Filo che non riesce più a cifrare, con una segnalazione già in
@@ -47,8 +47,9 @@ test('la segnalazione che non può partire lo dice nella finestra, e ci resta', 
   // Non se ne va da solo: è una cosa da rimandare, non un messaggio di passaggio.
   await shell.waitForTimeout(1500);
   await expect(avviso).toHaveCount(1);
-  // E si chiude quando lo decide chi legge.
-  await avviso.locator('.shell-notif-close').click();
+  // E si chiude quando lo decide chi legge, dalla X che vede sopra la pagina.
+  const vista = await avvisi();
+  await vista.locator('.shell-notif', { hasText: /non ho mandato niente/i }).locator('.shell-notif-close').click();
   await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 5_000 });
 
   // Detta la cosa, la voce esce dalla coda: non resta lì a ritentare per niente.

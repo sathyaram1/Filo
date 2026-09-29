@@ -1,13 +1,13 @@
 /* Sidebar Aiuto (Fase 2) — overlay laterale destro full-height. */
 
 .sn-sidebar {
-  /* Ancorata al bottom: la barra di input resta fissa e la chat cresce verso l'alto. Al collasso sparisce
-     solo la parte superiore, l'input non si sposta. */
+  /* Ancorata al bottom (al collasso l'input non si sposta), sopra gli avvisi della barra quando ci sono:
+     --filo-avvisi-barra, tests/unit/angoloAvvisiBarra.test.mjs. */
   position: fixed;
-  bottom: 16px;
+  bottom: max(16px, var(--filo-avvisi-barra, 0px));
   right: 16px;
   width: 360px;
-  height: calc(100vh - 32px);
+  height: calc(100vh - 16px - max(16px, var(--filo-avvisi-barra, 0px)));
   /* z-index gestito inline da sidebar.js via Popup.registerStack — partecipa
      allo stacking condiviso con popup AI e modale feedback. */
   z-index: 2147483600;

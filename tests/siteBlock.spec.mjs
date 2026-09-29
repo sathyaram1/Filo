@@ -39,7 +39,7 @@ function blockedUrl(testServer, body) {
   return testServer.html(body).replace('127.0.0.1', BLOCKED_HOST);
 }
 
-test('blocco diretto: click su link verso sito in blacklist → bloccato + notifica', async ({ shell, openTab, testServer }) => {
+test('blocco diretto: click su link verso sito in blacklist → bloccato + notifica', async ({ shell, openTab, testServer, avvisi }) => {
   await enableBlock(shell);
 
   const targetUrl = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="t">TARGET BLOCCATO</h1>');
@@ -54,8 +54,9 @@ test('blocco diretto: click su link verso sito in blacklist → bloccato + notif
   // Click sul link: è una navigazione top-level con referrer NON di ricerca.
   await page.evaluate(() => document.getElementById('go').click());
 
-  // La notifica di blocco compare nella shell, con l'azione "Apri comunque".
-  const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
+  // La notifica di blocco compare sopra la pagina, con l'azione "Apri comunque".
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' })).toHaveCount(1, { timeout: 6000 });
+  const card = (await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato' });
   await expect(card).toBeVisible({ timeout: 6000 });
   await expect(card.locator('.shell-notif-action', { hasText: 'Apri comunque' })).toBeVisible();
 
@@ -65,7 +66,7 @@ test('blocco diretto: click su link verso sito in blacklist → bloccato + notif
   expect(page.url()).toBe(fromUrl);
 });
 
-test('"Apri comunque" apre il sito bypassando il blocco', async ({ app, shell, openTab, testServer }) => {
+test('"Apri comunque" apre il sito bypassando il blocco', async ({ app, shell, openTab, testServer, avvisi }) => {
   await enableBlock(shell);
 
   const targetUrl = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="t">APERTO COMUNQUE</h1>');
@@ -77,7 +78,8 @@ test('"Apri comunque" apre il sito bypassando il blocco', async ({ app, shell, o
   await page.waitForSelector('#go', { timeout: 8000 });
   await page.evaluate(() => document.getElementById('go').click());
 
-  const action = shell.locator('.shell-notif-action', { hasText: 'Apri comunque' });
+  await expect(shell.locator('.shell-notif-action', { hasText: 'Apri comunque' })).toHaveCount(1, { timeout: 6000 });
+  const action = (await avvisi()).locator('.shell-notif-action', { hasText: 'Apri comunque' });
   await expect(action).toBeVisible({ timeout: 6000 });
   await action.click();
 

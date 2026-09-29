@@ -185,6 +185,13 @@
 
   // ---------- Drag header ----------
 
+  // Anche spostato, nell'angolo degli avvisi della barra (carte larghe al più 392px) il pannello sta sopra di
+  // loro (--filo-avvisi-barra, #588.5); altrove resta dove l'hanno messo.
+  const ANGOLO_PX = 400;
+  const bassoPer = (px, left, w) => (left + w > window.innerWidth - ANGOLO_PX
+    ? `max(${Math.round(px)}px, var(--filo-avvisi-barra, 0px))`
+    : `${Math.round(px)}px`);
+
   // Drag dall'header. Mantiene l'ancoraggio al BOTTOM (la barra input resta
   // dov'è quando il pannello si collassa, anche dopo un drag manuale).
   function makeDraggable(handleEl) {
@@ -200,7 +207,7 @@
       startLeft = rect.left;
       startBottom = window.innerHeight - rect.bottom;
       root.style.left = `${rect.left}px`;
-      root.style.bottom = `${startBottom}px`;
+      root.style.bottom = bassoPer(startBottom, rect.left, rect.width);
       root.style.right = 'auto';
       root.style.top = 'auto';
       e.preventDefault();
@@ -216,7 +223,7 @@
       // muovendo il mouse in basso (dy > 0) il bottom deve diminuire.
       const newBottom = Math.min(maxBottom, Math.max(0, startBottom - dy));
       root.style.left = `${newLeft}px`;
-      root.style.bottom = `${newBottom}px`;
+      root.style.bottom = bassoPer(newBottom, newLeft, w);
     });
     window.addEventListener('mouseup', () => { dragging = false; });
   }
@@ -238,15 +245,14 @@
       ? margin
       : Math.max(0, window.innerWidth - w - margin);
 
-    // Mantieni l'ancoraggio bottom: se è già fissato in stile inline lo lascio
-    // così com'è, altrimenti uso il default 16px.
-    const currentBottom = root.style.bottom && root.style.bottom !== 'auto'
-      ? root.style.bottom
-      : '16px';
+    // Mantieni l'ancoraggio bottom: se è già fissato in stile inline tengo quella
+    // distanza, altrimenti uso il default 16px.
+    const fissato = /^(?:max\()?(-?\d+(?:\.\d+)?)px/.exec(root.style.bottom || '');
+    const currentBottom = fissato ? Number(fissato[1]) : 16;
     root.style.left = `${newLeft}px`;
     root.style.right = 'auto';
     root.style.top = 'auto';
-    root.style.bottom = currentBottom;
+    root.style.bottom = bassoPer(currentBottom, newLeft, w);
   }
 
   // ---------- Rendering conv ----------
