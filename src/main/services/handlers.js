@@ -4408,10 +4408,9 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
   if (!emb || !emb.vectors[0] || !emb.vectors[0].length) return { ok: true, results: null, noEmbed: true };
   const qv = quantizeEmbedding(emb.vectors[0]);
   // Si confrontano solo i vettori fatti dal modello in uso: vettori di modelli diversi non sono confrontabili.
-  const usabile = (it) => Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model;
+  const usabile = (it) => conVettoreDi(it, emb.model);
   let items = await ArchivedTabs.list();
-  const stale = items.filter((it) => !usabile(it) && (it.title || it.summary || it.snippet)
-    && !(it.casa || isHomeNetworkUrl(it.url)));
+  const stale = daIndicizzare(items, emb.model);
   if (stale.length) {
     let timer = null;
     await Promise.race([
