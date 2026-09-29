@@ -1,15 +1,20 @@
-// Vista che mostra gli avvisi della barra sopra le schede (#588.5): il DOM della shell nell'area
-// pagina resta sotto la WebContentsView attiva. Una per finestra, nasce al primo avviso.
-// Il modello (tetto, tempi, azioni) resta in shell.js: qui solo posa, ordine delle viste e clic.
+// Vista che mostra gli avvisi della barra sopra le schede (#588.5), una per finestra, nata al primo avviso.
+// Il modello (tetto, tempi, azioni) resta in shell.js: qui posa, clic, tasto destro e gesti del vuoto
+// rigirati alla scheda. Regole: patterns/la-shell-non-disegna-sopra-la-pagina.md
 
 const path = require('node:path');
 const { collegaScorciatoie } = require('./shortcuts');
 
 const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
 const AZIONE = /^(chiudi|\d{1,2})$/;
+const GESTI = new Set(['mouseDown', 'mouseUp', 'mouseMove', 'mouseLeave', 'mouseWheel']);
+const TASTI = new Set(['left', 'middle', 'right']);
+const MODIFICATORI = new Set(['shift', 'control', 'alt', 'meta', 'leftButtonDown', 'middleButtonDown', 'rightButtonDown']);
 
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
 const lato = (v) => Math.max(0, Math.min(10000, Math.round(Number(v) || 0)));
+const coord = (v) => Math.max(-10000, Math.min(10000, Math.round(Number(v) || 0)));
+const passo = (v) => Math.max(-5000, Math.min(5000, Number(v) || 0));
 
 // Lo stato arriva dalla shell: se ne tengono solo le forme attese, senza tagliare i testi.
 function pulisci(stato) {
@@ -32,6 +37,7 @@ function pulisci(stato) {
 }
 
 class AvvisiSopraPagina {
+  // schedaAttiva: la WebContentsView della scheda in primo piano (o null).
   constructor(win, { alto = () => 0, restituisciTastiera = () => {}, schedaAttiva = () => null } = {}) {
     this.win = win;
     this.alto = alto;
@@ -44,6 +50,8 @@ class AvvisiSopraPagina {
     this.altezza = 0;
     this.riserve = new WeakMap();
     this.suggerimento = false;
+    this.inoltroSu = null;
+    this.cursori = new WeakSet();
     if (win && typeof win.once === 'function') win.once('closed', () => this._butta());
   }
 
@@ -65,14 +73,11 @@ class AvvisiSopraPagina {
     const w = Math.min(this.misura.w, W);
     const h = Math.min(this.misura.h, Math.max(0, H - this.alto()));
     if (!this.stato.carte.length || !w || !h) {
-      // Chi ha cliccato una carta ha dato la tastiera alla vista: sparita la vista, torna alla pagina.
-      const conTastiera = require('electron').webContents.getFocusedWebContents() === vista.webContents;
       vista.setVisible(false);
       vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       this._nascondiSuggerimento();
       this.altezza = 0;
       this._riserva(0);
-      if (conTastiera) this.restituisciTastiera();
       return;
     }
     vista.setBounds({ x: W - w, y: H - h, width: w, height: h });
@@ -85,9 +90,8 @@ class AvvisiSopraPagina {
   // L'angolo in basso a destra è uno: gli avvisi di Filo dentro la scheda attiva salgono sopra la
   // pila della barra (--filo-avvisi-barra, letta dalle loro pile in popup.css ed editor.css).
   _riserva(px) {
-    let wc = null;
-    try { wc = this.schedaAttiva(); } catch (_) { wc = null; }
-    if (!wc || wc.isDestroyed()) return;
+    const wc = this._wcAttiva();
+    if (!wc) return;
     let r = this.riserve.get(wc);
     if (!r) {
       r = { px: 0, chiave: null, coda: Promise.resolve() };
@@ -96,8 +100,10 @@ class AvvisiSopraPagina {
       wc.on('dom-ready', () => {
         r.px = 0;
         r.chiave = null;
-        if (this.schedaAttiva() === wc) this._riserva(this.altezza);
+        if (this._wcAttiva() === wc) this._riserva(this.altezza);
       });
+      // Il valore è in px CSS della scheda: cambiato lo zoom (da qualunque parte), va riscritto.
+      try { wc.ipc.on('filo:zoom-cambiato', () => { if (this._wcAttiva() === wc) this._riserva(this.altezza); }); } catch (_) {}
     }
     let zoom = 1;
     try { zoom = wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
@@ -114,6 +120,66 @@ class AvvisiSopraPagina {
       if (css > 0 && !wc.isDestroyed()) {
         try { r.chiave = await wc.insertCSS(`:root:root{--filo-avvisi-barra:${css}px!important}`); } catch (_) {}
       }
+    });
+  }
+
+  _schedaViva() {
+    let v = null;
+    try { v = this.schedaAttiva(); } catch (_) { v = null; }
+    return v && v.webContents && !v.webContents.isDestroyed() ? v : null;
+  }
+
+  _wcAttiva() {
+    const v = this._schedaViva();
+    return v ? v.webContents : null;
+  }
+
+  // Dove la vista è vuota (margine, accanto a una carta più stretta) il gesto è della pagina sotto:
+  // la vista lo rigira alla scheda, come le pile della pagina che dove sono vuote lasciano passare il clic.
+  _inoltra(d) {
+    const tipo = testo(d && d.tipo);
+    const v = this._schedaViva();
+    if (!GESTI.has(tipo) || !this.vista || !v) return;
+    const wc = v.webContents;
+    const b = this.vista.getBounds();
+    const s = v.getBounds();
+    const ev = { type: tipo, x: coord(b.x + coord(d.x) - s.x), y: coord(b.y + coord(d.y) - s.y) };
+    ev.modifiers = (Array.isArray(d.mod) ? d.mod : []).map(testo).filter((m) => MODIFICATORI.has(m));
+    if (tipo === 'mouseDown' || tipo === 'mouseUp') {
+      ev.button = TASTI.has(d.tasto) ? d.tasto : 'left';
+      ev.clickCount = Math.max(1, Math.min(3, Math.round(Number(d.clic) || 1)));
+    } else if (tipo === 'mouseWheel') {
+      Object.assign(ev, { deltaX: passo(d.dx), deltaY: passo(d.dy), canScroll: true, hasPreciseScrollingDeltas: true });
+    }
+    this.inoltroSu = tipo === 'mouseLeave' ? null : wc;
+    if (!this.cursori.has(wc)) {
+      this.cursori.add(wc);
+      // Sopra il vuoto della vista il puntatore è quello che mostrerebbe la pagina (mano su un link, barra sul testo).
+      wc.on('cursor-changed', (_e, forma) => {
+        if (this.inoltroSu !== wc || !this.vista || this.vista.webContents.isDestroyed()) return;
+        try { this.vista.webContents.send('avvisi:cursore', testo(forma)); } catch (_) {}
+      });
+    }
+    if (tipo === 'mouseDown') this.restituisciTastiera();
+    try { wc.sendInputEvent(ev); } catch (_) {}
+  }
+
+  // Tasto destro su una carta: le sue azioni e la chiusura, nel menu di Filo; la scelta fa quello che fa il pulsante.
+  _menu(d) {
+    const id = testo(d && d.id);
+    const carta = this.stato.carte.find((c) => c.id === id && !c.chiusa);
+    if (!carta || !this.vista || !this.win || this.win.isDestroyed()) return;
+    this._nascondiSuggerimento();
+    const voci = carta.azioni.map((label, i) => ({ label, action: `avviso:${i}` })).filter((v) => v.label);
+    if (voci.length) voci.push({ type: 'separator' });
+    voci.push({ label: 'Chiudi', icon: 'close', action: 'avviso:chiudi' });
+    const b = this.vista.getBounds();
+    const { showPopupMenu } = require('./popup-menu');
+    showPopupMenu(this.win, voci, b.x + coord(d.x), b.y + coord(d.y), (scelta) => {
+      const m = /^@action:avviso:(chiudi|\d{1,2})$/.exec(testo(scelta));
+      if (!m || this.win.isDestroyed()) return;
+      try { this.win.webContents.send('avvisi:azione', { id, azione: m[1] }); } catch (_) {}
+      this.restituisciTastiera();
     });
   }
 
@@ -168,7 +234,9 @@ class AvvisiSopraPagina {
     const wc = vista.webContents;
     wc.setWindowOpenHandler(() => ({ action: 'deny' }));
     wc.on('will-navigate', (e) => e.preventDefault());
-    // Un clic sulla carta le dà la tastiera: le scorciatoie di Filo devono restare vive anche lì.
+    // La tastiera non è sua: un clic su una carta gliela dà, e torna subito a chi scriveva. Al giro dopo:
+    // durante l'evento il fuoco risulta ancora a chi l'aveva, e restituirlo sarebbe un no-op.
+    wc.on('focus', () => setTimeout(() => this.restituisciTastiera(), 0));
     collegaScorciatoie(wc, this.win);
     wc.on('ipc-message', (_e, canale, dati) => {
       if (canale === 'avvisi:misura') {
@@ -182,6 +250,10 @@ class AvvisiSopraPagina {
         this.restituisciTastiera();
       } else if (canale === 'avvisi:suggerimento') {
         this._mostraSuggerimento(dati);
+      } else if (canale === 'avvisi:inoltra') {
+        this._inoltra(dati);
+      } else if (canale === 'avvisi:menu') {
+        this._menu(dati);
       }
     });
     wc.once('did-finish-load', () => { this.pronta = true; this._invia(); });

@@ -204,6 +204,10 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   if (popX + WIN_W > cb.x + cb.width) {
     popX = cb.x + cb.width - WIN_W;
   }
+  // Sotto non c'è posto (un tasto destro in fondo alla finestra, sugli avvisi): si apre sopra il punto.
+  if (popY + WIN_H - MARGIN > cb.y + cb.height) {
+    popY = Math.max(cb.y - MARGIN, cb.y + y - 6 - contentH - MARGIN);
+  }
 
   const popup = new BrowserWindow({
     parent: parentWin,

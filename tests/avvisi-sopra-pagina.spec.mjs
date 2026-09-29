@@ -170,7 +170,7 @@ function inFuoco(app) {
   });
 }
 
-test('il primo avviso della finestra lascia la tastiera a chi scrive nella pagina, anche quando se ne va', async ({ app, shell, openTab, testServer, avvisi }) => {
+test('il primo avviso della finestra lascia la tastiera a chi scrive nella pagina, e un clic sulla carta gliela restituisce subito', async ({ app, shell, openTab, testServer, avvisi }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
     <input id="campo" style="margin:40px"></body></html>`);
   await tastieraAllaScheda(app);
@@ -183,13 +183,147 @@ test('il primo avviso della finestra lascia la tastiera a chi scrive nella pagin
   await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
   expect(await inFuoco(app)).toContain(testServer.origin);
 
-  // Chi clicca la carta le dà la tastiera: sparito l'avviso, torna alla pagina.
-  await shell.evaluate(() => window.filoNotify('secondo', { durationSec: 1 }));
+  // Chi clicca la carta le dà la tastiera: torna alla pagina subito, con l'avviso ancora lì (#588.5 giro 2).
+  await shell.evaluate(() => window.filoNotify('secondo', { durationSec: 0 }));
   await expect(vista.locator('.shell-notif.show .shell-notif-msg', { hasText: 'secondo' })).toHaveCount(1);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.avvisi.vista.webContents.focus());
-  await expect.poll(() => inFuoco(app)).toContain('avvisi.html');
-  await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 5000 });
   await expect.poll(() => inFuoco(app)).toContain(testServer.origin);
+  await expect(shell.locator('.shell-notif', { hasText: 'secondo' })).toHaveCount(1);
+});
+
+// Un gesto vero dentro la vista: sendInputEvent passa dal suo renderer come un clic dell'utente, senza la
+// scelta fra le viste che fa il sistema (la vista copre quel punto per costruzione).
+function gestoNellaVista(app, ev) {
+  return app.evaluate(({ BrowserWindow }, e) => {
+    BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.avvisi.vista.webContents.sendInputEvent(e);
+  }, ev);
+}
+// Il punto della pagina, in coordinate della vista.
+async function nellaVista(app, page, sel) {
+  const g = await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    return { v: tm.avvisi.vista.getBounds(), t: tm.tabs.find((t) => t.id === tm.activeId).view.getBounds() };
+  });
+  const r = await page.evaluate((s) => { const b = document.querySelector(s).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; }, sel);
+  return { x: Math.round(g.t.x + r.x - g.v.x), y: Math.round(g.t.y + r.y - g.v.y) };
+}
+
+test('nel vuoto attorno agli avvisi la pagina risponde: clic, doppio clic, tasto destro e rotella', async ({ app, shell, openTab, testServer, avvisi }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;height:4000px">
+    <button id="angolo" style="position:fixed;right:3px;bottom:3px;width:10px;height:10px;padding:0"></button>
+    <p id="parola" style="position:fixed;right:250px;bottom:110px;margin:0;font:14px sans-serif">parola</p>
+    <script>
+      window.__clic = 0;
+      document.getElementById('angolo').addEventListener('click', () => { window.__clic++; });
+    </script></body></html>`);
+  await shell.evaluate(() => {
+    window.filoNotify('Bloccato popup', { durationSec: 0, actions: [{ label: 'Apri', onClick: () => {} }] });
+    window.filoNotify('Scaricato: Relazione trimestrale definitiva (versione corretta) 2026.pdf', { durationSec: 0, actions: [{ label: 'Apri file', onClick: () => {} }, { label: 'Apri cartella', onClick: () => {} }] });
+  });
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(2);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.avvisi.vista.getBounds().height)).toBeGreaterThan(150);
+
+  // Il margine all'angolo della finestra: dentro la vista, fuori dalle carte.
+  const a = await nellaVista(app, page, '#angolo');
+  expect(await vista.evaluate(({ x, y }) => x < innerWidth && y < innerHeight && !document.elementFromPoint(x, y)?.closest('.shell-notif'), a)).toBe(true);
+  await gestoNellaVista(app, { type: 'mouseDown', x: a.x, y: a.y, button: 'left', clickCount: 1 });
+  await gestoNellaVista(app, { type: 'mouseUp', x: a.x, y: a.y, button: 'left', clickCount: 1 });
+  await expect.poll(() => page.evaluate(() => window.__clic)).toBe(1);
+  await gestoNellaVista(app, { type: 'mouseDown', x: a.x, y: a.y, button: 'right', clickCount: 1 });
+  await gestoNellaVista(app, { type: 'mouseUp', x: a.x, y: a.y, button: 'right', clickCount: 1 });
+  // Il tasto destro nel vuoto è quello della pagina: si apre il menu di Filo sulla pagina.
+  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 5000 });
+  await page.keyboard.press('Escape');
+
+  // Accanto alla carta più stretta: il doppio clic seleziona la parola della pagina.
+  const p = await nellaVista(app, page, '#parola');
+  expect(await vista.evaluate(({ x, y }) => !document.elementFromPoint(x, y)?.closest('.shell-notif'), p)).toBe(true);
+  for (const n of [1, 2]) {
+    await gestoNellaVista(app, { type: 'mouseDown', x: p.x, y: p.y, button: 'left', clickCount: n });
+    await gestoNellaVista(app, { type: 'mouseUp', x: p.x, y: p.y, button: 'left', clickCount: n });
+  }
+  await expect.poll(() => page.evaluate(() => String(getSelection()).trim())).toBe('parola');
+  // Sopra il testo della pagina il puntatore è quello del testo, come fuori dalla vista.
+  await gestoNellaVista(app, { type: 'mouseMove', x: p.x + 1, y: p.y });
+  await expect.poll(() => vista.evaluate(() => document.documentElement.style.cursor)).toBe('text');
+
+  // La rotella sopra una carta scorre la pagina, nello stesso verso che avrebbe sulla pagina.
+  const c = await vista.evaluate(() => { const r = document.querySelector('.shell-notif-msg').getBoundingClientRect(); return { x: Math.round(r.left + 5), y: Math.round(r.top + 5) }; });
+  await gestoNellaVista(app, { type: 'mouseWheel', x: c.x, y: c.y, deltaX: 0, deltaY: -120, canScroll: true });
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(50);
+});
+
+test('tasto destro su un avviso: il menu ha le sue azioni e «Chiudi», e la scelta fa quello che fa il pulsante', async ({ app, shell, avvisi }) => {
+  await shell.evaluate(() => {
+    window.__cartella = 0;
+    window.filoNotify('Scaricato: report.pdf', {
+      durationSec: 0,
+      actions: [{ label: 'Apri file', onClick: () => {} }, { label: 'Apri cartella', onClick: () => { window.__cartella++; } }],
+    });
+  });
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
+  const trovaMenu = async () => {
+    let menu = null;
+    await expect.poll(async () => {
+      for (const w of app.windows()) {
+        try { if (await w.evaluate(() => [...document.querySelectorAll('button.item')].some((b) => /Chiudi/.test(b.textContent)))) { menu = w; return true; } } catch (_) {}
+      }
+      return false;
+    }, { timeout: 8_000 }).toBe(true);
+    return menu;
+  };
+
+  await vista.locator('.shell-notif-msg').click({ button: 'right' });
+  let menu = await trovaMenu();
+  expect(await menu.evaluate(() => [...document.querySelectorAll('button.item')].map((b) => b.textContent.trim()))).toEqual(['Apri file', 'Apri cartella', 'Chiudi']);
+  // Il menu, aperto in fondo alla finestra, ci sta dentro: sale sopra il punto invece di uscire sotto.
+  const dentro = await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const m = BrowserWindow.getAllWindows().find((w) => w !== win && w.getParentWindow() === win && w.isVisible() && w.getBounds().height > 60);
+    const cb = win.getContentBounds();
+    const b = m.getBounds();
+    return b.y + b.height - 26 <= cb.y + cb.height + 1;
+  });
+  expect(dentro).toBe(true);
+  await menu.evaluate(() => [...document.querySelectorAll('button.item')].find((b) => /Apri cartella/.test(b.textContent)).click());
+  await expect.poll(() => shell.evaluate(() => window.__cartella)).toBe(1);
+  await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
+
+  // «Chiudi» dal menu chiude l'avviso.
+  await shell.evaluate(() => window.filoNotify('Da chiudere', { durationSec: 0 }));
+  await vista.locator('.shell-notif.show .shell-notif-msg', { hasText: 'Da chiudere' }).click({ button: 'right' });
+  menu = await trovaMenu();
+  await menu.evaluate(() => [...document.querySelectorAll('button.item')].find((b) => /Chiudi/.test(b.textContent)).click());
+  await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
+});
+
+test('cambiando lo zoom della pagina con un avviso aperto, gli avvisi di Filo nella pagina restano sopra', async ({ app, shell, openTab, testServer, avvisi }) => {
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body style="margin:0"><p>pagina</p></body></html>');
+  await shell.evaluate(() => window.filoNotify('Scaricato: report.pdf', { durationSec: 0, actions: [{ label: 'Apri file', onClick: () => {} }] }));
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
+  // La pila della pagina (quella dei suoi avvisi), misurata in pixel dello schermo contro l'altezza della vista.
+  const scarto = async () => {
+    const barra = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.avvisi.vista.getBounds().height);
+    const m = await page.evaluate(() => {
+      let h = document.querySelector('.sn-toasts');
+      if (!h) { h = document.createElement('div'); h.className = 'sn-toasts'; h.innerHTML = '<div style="height:40px;width:200px">avviso</div>'; document.documentElement.appendChild(h); }
+      return { fondo: innerHeight - h.getBoundingClientRect().bottom, zoom: window.devicePixelRatio };
+    });
+    const scala = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().scaleFactor);
+    return Math.round(m.fondo * (m.zoom / scala)) - barra;
+  };
+  await expect.poll(scarto).toBeGreaterThanOrEqual(-1);
+  for (const z of [0.5, 1.5]) {
+    await app.evaluate(({ BrowserWindow }, f) => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+      tm.tabs.find((t) => t.id === tm.activeId).view.webContents.setZoomFactor(f);
+    }, z);
+    await expect.poll(scarto).toBeGreaterThanOrEqual(-1);
+    await expect.poll(scarto).toBeLessThanOrEqual(2);
+  }
 });
 
 test('gli avvisi di Filo nella pagina salgono sopra quelli della barra, e tornano giù quando la barra si svuota', async ({ app, shell, openTab, testServer, avvisi }) => {

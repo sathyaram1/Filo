@@ -271,7 +271,7 @@ class TabManager {
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
       schedaAttiva: () => {
         const t = this.tabs.find((x) => x.id === this.activeId);
-        return t && t.view ? t.view.webContents : null;
+        return (t && t.view) || null;
       },
     });
     // §1.2 — cache del colore identità per dominio (host → 'rgb(r,g,b)'). Così

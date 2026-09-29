@@ -165,4 +165,87 @@
     if (!card || b.disabled || !card.classList.contains('show')) return;
     api.clic(card.dataset.nid, b.dataset.azione);
   });
+
+  // Il vuoto della vista (margine, spazio accanto a una carta più stretta) è della pagina sotto: i gesti che
+  // ci cadono tornano alla scheda. Un gesto partito dal vuoto resta della pagina fino al rilascio (trascinare
+  // la barra di scorrimento, selezionare del testo), anche se passa sopra una carta.
+  const cartaSotto = (e) => e.target && e.target.closest && e.target.closest('.shell-notif.show');
+  let gestoDellaPagina = false;
+  let sopraIlVuoto = false;
+  const TASTO = ['left', 'middle', 'right'];
+  // I tasti premuti passano tali e quali: Ctrl e Cmd li legge la pagina, non la vista.
+  const TASTI_MOD = [['shiftKey', 'shift'], ['ctrlKey', 'control'], ['altKey', 'alt'], ['metaKey', 'meta']];
+  function modificatori(e) {
+    const m = TASTI_MOD.filter(([k]) => e[k]).map(([, nome]) => nome);
+    if (e.buttons & 1) m.push('leftButtonDown');
+    if (e.buttons & 4) m.push('middleButtonDown');
+    if (e.buttons & 2) m.push('rightButtonDown');
+    return m;
+  }
+  function inoltra(tipo, e, extra) {
+    api.inoltra(Object.assign({ tipo, x: e.clientX, y: e.clientY, mod: modificatori(e) }, extra || {}));
+  }
+  function lasciaIlVuoto(e, versoLaPagina) {
+    if (!sopraIlVuoto) return;
+    sopraIlVuoto = false;
+    root.style.cursor = '';
+    if (!versoLaPagina) inoltra('mouseLeave', e);
+  }
+  const BIT = [1, 4, 2];
+  // La barra con cui scorre la pila stessa (finestra bassa) resta sua.
+  const suBarraDellaPila = (e) => e.target === vassoio && e.offsetX >= vassoio.clientWidth;
+  document.addEventListener('mousedown', (e) => {
+    // Nessun altro tasto premuto: è un gesto nuovo, anche se il rilascio del precedente si è perso.
+    if (e.buttons === BIT[e.button]) gestoDellaPagina = false;
+    if (!gestoDellaPagina && (cartaSotto(e) || suBarraDellaPila(e))) return;
+    gestoDellaPagina = true;
+    e.preventDefault();
+    inoltra('mouseDown', e, { tasto: TASTO[e.button] || 'left', clic: e.detail });
+  }, true);
+  document.addEventListener('mouseup', (e) => {
+    if (!gestoDellaPagina) return;
+    if (!e.buttons) gestoDellaPagina = false;
+    e.preventDefault();
+    inoltra('mouseUp', e, { tasto: TASTO[e.button] || 'left', clic: e.detail });
+  }, true);
+  document.addEventListener('mousemove', (e) => {
+    if (gestoDellaPagina || !cartaSotto(e)) {
+      sopraIlVuoto = true;
+      inoltra('mouseMove', e);
+    } else {
+      lasciaIlVuoto(e);
+    }
+  }, true);
+  // La vista tocca i bordi destro e basso della finestra: uscendo di lì il puntatore lascia anche la pagina.
+  // Uscendo in alto o a sinistra entra nella pagina, che da lì riceve i gesti veri.
+  root.addEventListener('mouseleave', (e) => {
+    if (gestoDellaPagina) return;
+    lasciaIlVuoto(e, e.clientX < innerWidth - 1 && e.clientY < innerHeight - 1);
+  });
+  // La rotella scorre la pagina anche sopra le carte (come sopra le pile della pagina), finché la pila non scorre da sé.
+  document.addEventListener('wheel', (e) => {
+    if (cartaSotto(e) && vassoio.scrollHeight > vassoio.clientHeight) return;
+    e.preventDefault();
+    const riga = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? innerHeight : 1;
+    inoltra('mouseWheel', e, { dx: -e.deltaX * riga, dy: -e.deltaY * riga });
+  }, { capture: true, passive: false });
+  const FORME = new Set(['default', 'pointer', 'text', 'crosshair', 'wait', 'help', 'move', 'progress', 'cell',
+    'copy', 'alias', 'none', 'not-allowed', 'no-drop', 'grab', 'grabbing', 'zoom-in', 'zoom-out', 'context-menu',
+    'vertical-text', 'col-resize', 'row-resize', 'all-scroll', 'e-resize', 'n-resize', 'ne-resize', 'nw-resize',
+    's-resize', 'se-resize', 'sw-resize', 'w-resize', 'ns-resize', 'ew-resize', 'nesw-resize', 'nwse-resize']);
+  if (api.onCursore) {
+    api.onCursore((forma) => {
+      const f = forma === 'nodrop' ? 'no-drop' : String(forma || '');
+      if (sopraIlVuoto) root.style.cursor = FORME.has(f) ? f : '';
+    });
+  }
+
+  // Tasto destro su una carta: il menu di Filo con le sue azioni; nel vuoto è della pagina (già rigirato).
+  document.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const card = cartaSotto(e);
+    if (!card || gestoDellaPagina) return;
+    nascondiTip();
+    api.menu(card.dataset.nid, e.clientX, e.clientY);
+  }, true);
 })();

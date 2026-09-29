@@ -22,20 +22,30 @@ Quello che la **shell** deve mostrare nell'area della pagina e che deve restarci
 - **La vista:** nasce al primo bisogno (una finestra che non ne ha non paga un
   processo in più), ha sfondo trasparente ed è grande **quanto il contenuto**:
   una vista trasparente prende i clic su tutta la sua area, e ogni pixel in più è
-  una zona morta sopra la pagina. La sua pagina manda le misure in modo sincrono a
+  una zona morta sopra la pagina. Il vuoto che resta (il margine dell'ombra, lo
+  spazio accanto a una carta più stretta) è **della pagina**: la vista le rigira i
+  gesti che ci cadono (clic, doppio clic, tasto destro, rotella, e un trascinamento
+  fino al rilascio, anche se passa sopra una carta) e mostra il puntatore che
+  mostrerebbe la pagina. La sua pagina manda le misure in modo sincrono a
   ogni disegno: nata nascosta e grande zero, il ResizeObserver può non partire
   mai. Ogni `addChildView` di una scheda finisce sopra di lei, quindi il layout la
-  riporta in cima. Preload minimo (lo stato entra, misure e clic escono), e il
+  riporta in cima. Preload minimo (lo stato entra; misure, clic, tasto destro e gesti del vuoto escono), e il
   canale dello stato si accetta solo dalla shell della sua finestra.
 - **La tastiera non è sua.** Una WebContentsView che carica la sua pagina
   DENTRO la finestra si prende il fuoco: chi stava scrivendo nella scheda perde i
   tasti, e il cursore continua a lampeggiare nel campo. Quindi carica fuori ed
-  entra nella finestra alla prima posa; e se l'utente cliccandola le ha dato la
-  tastiera, quando sparisce la restituisce alla scheda.
+  entra nella finestra alla prima posa; e se un clic le dà la tastiera la
+  restituisce subito alla scheda, al giro dopo l'evento `focus` (durante l'evento
+  il fuoco risulta ancora a chi l'aveva, e restituirlo non farebbe niente).
 - **L'angolo si divide.** Le pile di Filo dentro la pagina (content script,
   editor) stanno nello stesso angolo: la vista scrive la sua altezza nella scheda
   attiva (`--filo-avvisi-barra`, foglio d'autore: uno di origine `user` non si
-  toglie più) e quelle pile ci salgono sopra.
+  toglie più) e quelle pile ci salgono sopra. Il valore è in px CSS della scheda,
+  quindi dipende dal suo zoom: il preload della pagina segnala ogni cambio di zoom,
+  da qualunque parte arrivi (`filo:zoom-cambiato`), e il main lo riscrive.
+- **Il tasto destro** su una carta apre il menu di Filo con le sue azioni e
+  «Chiudi»; la scelta passa dallo stesso canale del clic. In fondo alla finestra
+  il menu si apre sopra il punto.
 - **Il modello resta dov'era.** La vista disegna e riporta i clic; tetto, tempi,
   chiavi e azioni restano nella shell. Il DOM della shell diventa un modello
   **nascosto** (`visibility: hidden`): un test che ne chiede la visibilità o ci
@@ -45,4 +55,7 @@ Quello che la **shell** deve mostrare nell'area della pagina e che deve restarci
   lo rimanda quando cambia.
 - **Test:** si guarda la vista (fixture `avvisi` in `tests/fixtures/electron.mjs`),
   si controlla che sia l'ultima fra le viste della finestra e dentro l'area della
-  pagina, e si clicca lì. `tests/avvisi-sopra-pagina.spec.mjs`.
+  pagina, e si clicca lì. Il vuoto si prova con `sendInputEvent` dentro la vista:
+  passa dal suo renderer come un gesto vero, ma salta la scelta fra le viste che
+  fa il sistema, che si vede solo col mouse vero (xdotool sullo schermo virtuale).
+  `tests/avvisi-sopra-pagina.spec.mjs`.
