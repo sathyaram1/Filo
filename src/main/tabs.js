@@ -2768,6 +2768,8 @@ function inoltraTastiDegliOspiti(app) {
     wc.on('input-event', (_ev, input) => {
       const tipo = input && { rawKeyDown: 'keyDown', keyDown: 'keyDown', keyUp: 'keyUp' }[input.type];
       if (!tipo) return;
+      // Un tasto della barra dei menu (su Mac Cmd+W, Cmd+T…) lo esegue già lei.
+      if (tipo === 'keyDown' && require('./menu').tastoDellaBarra(input)) return;
       // Chi ha la tastiera sta nella finestra davanti, nella scheda attiva.
       const win = BrowserWindow.getFocusedWindow();
       const tabs = win && win._filoTabs;
