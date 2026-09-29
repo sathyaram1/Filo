@@ -111,6 +111,7 @@ require(path.join(SHARED, 'deckStats.js'));    // dipende da SN_DECKS (tipoOf)
 require(path.join(SHARED, 'scryfallQuery.js'));
 require(path.join(SHARED, 'deckOpinions.js')); // pareri/auto-tag §6-§7 (logica pura)
 require(path.join(SHARED, 'deckImportExport.js')); // parser rigido testo↔carte §11 (logica pura)
+require(path.join(SHARED, 'deckChat.js'));     // chat per mazzo §3.2: cosa si conserva (logica pura)
 require(path.join(SHARED, 'editorStore.js'));   // collezione file editor (logica pura)
 require(path.join(SHARED, 'editorVersions.js')); // storico/punti di ripristino (logica pura)
 require(path.join(SHARED, 'editorNotes.js'));   // appunti di Filo dentro i file editor (dipende dai due sopra)
@@ -127,6 +128,7 @@ require(path.join(SVC, 'filoChats.js'));  // #525 — dipende da SN_CHAT_ARCHIVE
 require(path.join(SVC, 'deckStore.js'));   // dipende da SN_DECKS (shared/decks.js)
 require(path.join(SVC, 'scryfall.js'));    // dipende da SN_SCRYFALL_Q (shared/scryfallQuery.js)
 require(path.join(SVC, 'deckOpinions.js')); // dipende da SN_DECK_OPINIONS + SN_SCRYFALL_Q
+require(path.join(SVC, 'deckChats.js'));   // dipende da SN_DECK_CHAT + SN_DECK_STORE
 require(path.join(SVC, 'aiCache.js'));
 require(path.join(SVC, 'categorizer.js'));
 require(path.join(SVC, 'pathsCollector.js'));

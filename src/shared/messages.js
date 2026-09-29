@@ -75,6 +75,13 @@
     // { ok, reply, cardIds, cards, query, deck? }. `lastResults` sono gli id
     // dell'ultima CardList mostrata (per "valuta questi risultati", §6.1).
     DECKS_CHAT: 'decks_chat',
+    // La chat salvata di un mazzo (§3.2), solo dalle pagine filo://. SAVE riscrive tutte le bolle del mazzo e
+    // rifiuta un mazzo che non esiste più o una chat oltre il tetto (error 'too_many', max).
+    DECKS_CHAT_GET: 'decks_chat_get',     // { deckId } → { ok, messages }
+    DECKS_CHAT_SAVE: 'decks_chat_save',   // { deckId, messages, clientId } → { ok } | { ok:false, error, max? }
+    DECKS_CHAT_CLEAR: 'decks_chat_clear', // { deckId, clientId } → { ok }
+    // Broadcast alle pagine filo:// dopo SAVE/CLEAR: le altre schede sullo stesso mazzo si rileggono la chat.
+    DECKS_CHAT_CHANGED: 'decks_chat_changed', // { deckId, clientId }
     // Parere LLM carta-vs-mazzo (§6). { deckId, cardIds, compute?, refresh? } →
     // { ok, opinions: { cardId → { text, versione, stale } } }.
     // compute=false: solo cache (mai LLM). refresh=true: ricalcola anche i freschi.

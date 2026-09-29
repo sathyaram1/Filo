@@ -44,6 +44,9 @@
     // "questa carta rispetta il criterio di ricerca" dipende solo da carta +
     // criterio → permanente e cross-ricerca. Vedi src/main/services/deckOpinions.js.
     DECK_SEARCH_CACHE: 'deckSearchCache',
+    // Chat del banco di lavoro (§3.2): { deckId → { messages, updatedAt } }, bolle come DATI (SN_DECK_CHAT).
+    // Se ne va col mazzo. Vedi src/main/services/deckChats.js.
+    DECK_CHATS: 'deckChats',
     COSTS: 'costs',
     // Crediti (gamification): saldo, refill giornaliero, consumo aggregato per
     // tipo d'uso e log ricompense. Cache locale del doc Firestore `credits/<uid>`.
