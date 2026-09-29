@@ -2206,6 +2206,9 @@ class TabManager {
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
       this._sostituisciVoceBloccata(wc, url);
+      // #590 — una navigazione già partita quando il suo sito è entrato in lista arriva lo stesso: si ferma qui.
+      const bloccata = /^https?:\/\//i.test(url) && this._decisioneBlocco(tab, url);
+      if (bloccata) { this._mostraPaginaBloccata(tab, url, bloccata); return; }
       // Documento nuovo: lo zoom che la pagina vecchia dichiarava di sé non
       // vale più (#686).
       tab.zoomProprio = null;
