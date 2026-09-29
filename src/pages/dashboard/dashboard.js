@@ -1671,7 +1671,8 @@
     box.className = 'dash-recap-box dash-thanks-box';
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
-    box.setAttribute('aria-label', 'Feedback risolto');
+    const nessunaRisolta = rewards.every((r) => r.status === 'closed');
+    box.setAttribute('aria-label', nessunaRisolta ? 'Feedback chiuso' : 'Feedback risolto');
     overlay.appendChild(box);
 
     let settled = false;
