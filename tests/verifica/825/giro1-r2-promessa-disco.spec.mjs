@@ -1,6 +1,14 @@
+// Verifica #825 giro 1, rilievo 2: novità e descrizione della Cronologia promettono che una scheda cancellata «sparisce anche
+// dal disco». Se la promessa c'è, dopo il flusso vero (apro la pagina, chiudo, cancello dalla Cronologia) nessun file della
+// cartella dati deve contenere il suo indirizzo. Oggi resta nella cache di navigazione.
+
 import { test, expect } from '../../fixtures/electron.mjs';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const PROMESSA = /sparisce anche dal disco/i;
 
 function tuttiIFile(dir) {
   const out = [];
@@ -14,7 +22,11 @@ function tuttiIFile(dir) {
   return out;
 }
 
-test('flusso vero: chiudo una scheda, la cancello dalla Cronologia, dove resta il suo indirizzo', async ({ app, shell, openTab, testServer }) => {
+test('la promessa «sparisce anche dal disco» è vera nel flusso vero di chiusura e cancellazione', async ({ app, shell, openTab, testServer }) => {
+  const testi = ['src/shared/patchNotes.js', 'src/shared/capabilities.js']
+    .map((f) => readFileSync(join(APP_ROOT, f), 'utf8'));
+  if (!testi.some((t) => PROMESSA.test(t))) return;
+
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
@@ -25,10 +37,9 @@ test('flusso vero: chiudo una scheda, la cancello dalla Cronologia, dove resta i
     globalThis.SN_PROVIDER_OPENROUTER.embed = async ({ texts }) => ({ vectors: texts.map(() => [0.5, 0.2, 0.9, 0.1]) });
     globalThis.SN_PROVIDERS.completeWithFallback = async () => ({ text: 'Riassunto finto della pagina.', provider: 'openrouter', model: 'stub', usage: {} });
   });
-  const url = testServer.html('<!doctype html><title>Pagina riservata</title><body>contenuto riservato molto privato</body>', { pubblico: true });
+  const url = testServer.html('<!doctype html><title>Pagina riservata</title><body>contenuto riservato</body>', { pubblico: true });
   const marca = new URL(url).pathname;
-  const page = await openTab(url);
-  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 }).catch(() => {});
+  await openTab(url);
   await testServer.openReady(openTab, '<!doctype html><title>Altra</title><body>altra</body>', { pubblico: true });
   const snap = await shell.evaluate(async () => window.filoShell.tabs.snapshot());
   const t = snap.tabs.find((x) => (x.url || '').endsWith(marca));
@@ -38,17 +49,14 @@ test('flusso vero: chiudo una scheda, la cancello dalla Cronologia, dove resta i
     return !!(e && e.embedding);
   }, marca), { timeout: 10_000 }).toBe(true);
   const id = await app.evaluate(async (_e, m) => (await globalThis.SN_ARCHIVED_TABS.list()).find((x) => x.url.endsWith(m)).id, marca);
+
   const arc = await openTab('filo://archive/archive.html');
   await arc.waitForLoadState('domcontentloaded');
   await arc.evaluate(async (i) => chrome.runtime.sendMessage({ type: 'remove_archived_tab', id: i }), id);
-  await new Promise((r) => setTimeout(r, 1500));
   await app.evaluate(async () => { await globalThis.__filoStorage.whenSettled(); });
+
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
-  const dove = tuttiIFile(userData).filter((p) => { try { return readFileSync(p).includes(marca); } catch (_) { return false; } });
-  console.log('FILE CON L’INDIRIZZO:', JSON.stringify(dove.map((p) => p.slice(userData.length)), null, 1));
-  const chiavi = await app.evaluate(async (_e, m) => {
-    const all = await globalThis.chrome.storage.local.get(null);
-    return Object.keys(all).filter((k) => JSON.stringify(all[k]).includes(m));
-  }, marca);
-  console.log('CHIAVI DI storage.json CON L’INDIRIZZO:', JSON.stringify(chiavi));
+  await expect.poll(() => tuttiIFile(userData)
+    .filter((p) => { try { return readFileSync(p).includes(marca); } catch (_) { return false; } })
+    .map((p) => p.slice(userData.length)), { timeout: 5_000 }).toEqual([]);
 });
