@@ -152,7 +152,7 @@ function pngRumore(w, h) {
   const raw = Buffer.alloc(riga * h);
   let s = 12345;
   for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w * 3; x++) { s = (s * 1103515245 + 12345) >>> 0; raw[y * riga + 1 + x] = s >>> 24; }
+    for (let x = 0; x < w * 3; x++) { s = (Math.imul(s, 1103515245) + 12345) >>> 0; raw[y * riga + 1 + x] = s >>> 24; }
   }
   const chunk = (tipo, dati) => {
     const len = Buffer.alloc(4); len.writeUInt32BE(dati.length);
