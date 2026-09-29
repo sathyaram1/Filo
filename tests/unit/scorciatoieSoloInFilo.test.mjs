@@ -99,6 +99,7 @@ test('le quattro scorciatoie scattano col tasto giusto su ogni sistema', () => {
   // Tastiera non latina o tasto morto: conta il tasto fisico.
   assert.equal(comandoDaTasto(tasto('у', { alt: true }, { code: 'KeyE' }), 'linux'), 'explain-selection');
   assert.equal(comandoDaTasto(tasto('Dead', { alt: true, control: true }, { code: 'KeyE' }), 'darwin'), 'explain-selection');
+  assert.equal(comandoDaTasto(tasto('\u0005', { alt: true, control: true }, { code: 'KeyE' }), 'darwin'), 'explain-selection');
   // Layout diverso (Dvorak): il tasto fisico E scrive un punto, e Alt+. non è Spiega.
   assert.equal(comandoDaTasto(tasto('.', { alt: true }, { code: 'KeyE' }), 'win32'), null);
   assert.equal(comandoDaTasto(null, 'win32'), null);

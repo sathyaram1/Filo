@@ -19,15 +19,16 @@ function acceleratorePerPiattaforma(accel, piattaforma = process.platform) {
 }
 
 // Modificatori esatti: AltGr su Windows è Ctrl+Alt e con E scrive €, Alt+Shift
-// è un'altra combinazione. Un carattere ASCII dice il tasto nel layout
-// dell'utente; fuori da lì (é, €, cirillico, tasto morto) conta il tasto fisico.
+// è un'altra combinazione. Un carattere ASCII stampabile dice il tasto nel layout
+// dell'utente; fuori da lì (é, €, cirillico, tasto morto, carattere di controllo)
+// conta il tasto fisico.
 function tastoCombacia(input, accel) {
   const parti = accel.split('+');
   const lettera = parti.pop().toLowerCase();
   if (!!input.control !== parti.includes('Control') || !!input.alt !== parti.includes('Alt')) return false;
   if (input.meta || input.shift) return false;
   const key = String(input.key || '');
-  if (key.length === 1 && key.charCodeAt(0) < 128) return key.toLowerCase() === lettera;
+  if (key.length === 1 && key > ' ' && key < '\u007f') return key.toLowerCase() === lettera;
   return String(input.code || '') === `Key${lettera.toUpperCase()}`;
 }
 
@@ -40,8 +41,8 @@ function comandoDaTasto(input, piattaforma = process.platform) {
 }
 
 // Da chiamare su ogni webContents di Filo che può avere il fuoco (scheda, barra,
-// menu a comparsa): il tasto arriva lì solo se Filo è davanti. `finestra` è la
-// finestra (o una funzione che la dà) su cui agire.
+// menu a comparsa): il tasto arriva lì solo se Filo è davanti. `finestra` è
+// quella su cui agire (o una funzione che la dà), mai un'altra finestra di Filo.
 function collegaScorciatoie(wc, finestra) {
   if (!wc || typeof wc.on !== 'function') return;
   wc.on('before-input-event', (event, input) => {
