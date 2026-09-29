@@ -31,7 +31,7 @@ const dip = { scarica: safeFetch };
 const cache = new Map();
 const schedeLette = new Map();
 
-function normalizzaUrl(input) {
+function analizzaUrl(input) {
   let s = String(input == null ? '' : input).trim().replace(/^[<"'«]+|[>"'»]+$/g, '').trim();
   if (!s) return { errore: 'indirizzo' };
   if (/^\/\//.test(s)) s = `https:${s}`;
@@ -43,6 +43,12 @@ function normalizzaUrl(input) {
   let u;
   try { u = new URL(s); } catch (_) { return { errore: 'indirizzo' }; }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return { errore: 'schema' };
+  return { u };
+}
+
+function normalizzaUrl(input) {
+  const { u, errore } = analizzaUrl(input);
+  if (!u) return { errore };
   u.username = '';
   u.password = '';
   u.hash = '';
