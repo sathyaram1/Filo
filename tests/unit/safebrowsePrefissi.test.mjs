@@ -302,6 +302,26 @@ test('rifiuti ripetuti del servizio: si aspetta prima di riprovare, e nel fratte
   assert.equal(chiamate.length, 3);
 });
 
+test('richieste in pausa: un\'impronta in lista già in memoria decide senza rete; senza, il verdetto resta sconosciuto', async () => {
+  const full = sha('pausa-sito-813.it/');
+  let giu = false;
+  const { L, chiamate } = lookupFinto((prefissi) => {
+    if (giu) return { ok: false, status: 429 };
+    const hit = prefissi.includes(full.subarray(0, 4).toString('base64'));
+    return { ok: true, matches: hit ? [{ hash: full.toString('base64'), threatType: 'MALWARE', category: 'malware' }] : [], cacheMs: 600_000 };
+  });
+  assert.equal((await L.check('https://pausa-sito-813.it/a')).listed, true);
+  giu = true;
+  await L.check('https://altro-813.it/1');
+  await L.check('https://altro-813.it/2');
+  const n = chiamate.length;
+  assert.deepEqual(await L.check('https://pausa-sito-813.it/b'), { listed: true, category: 'malware', threatType: 'MALWARE' });
+  assert.deepEqual(L.peek('https://pausa-sito-813.it/c'), { listed: true, category: 'malware', threatType: 'MALWARE' });
+  assert.equal(chiamate.length, n);
+  assert.equal(await L.check('https://pulito-813.it/x'), null);
+  assert.equal(L.peek('https://pulito-813.it/x'), undefined);
+});
+
 // Verifica di #813, giro 1: mille livelli di %25 costavano mille passate sull'indirizzo intero, Filo fermo per secondi.
 test('un indirizzo lunghissimo costruito apposta: la pagina in lista resta segnalata e il calcolo resta rapido', async () => {
   const lista = sha('lunga-813.it/esca.html');
