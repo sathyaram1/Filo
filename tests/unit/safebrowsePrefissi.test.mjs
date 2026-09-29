@@ -398,16 +398,13 @@ test('otto indirizzi lunghissimi controllati di fila non restano in memoria', as
   v8.setFlagsFromString('--expose-gc');
   const gc = vm.runInNewContext('gc');
   const { L } = lookupFinto(() => ({ ok: true, cacheMs: 60_000, matches: [] }));
-  const indirizzi = [];
   gc();
   const prima = process.memoryUsage().heapUsed;
   for (let k = 0; k < 8; k++) {
     const seg = String.fromCharCode(97 + k).repeat(450_000);
-    indirizzi.push(`http://a.b.c.d.e.f.g.it/${seg}/${seg}/${seg}/q?${'y'.repeat(400_000)}`);
-    L.peek(indirizzi[k]);
+    L.peek(`http://a.b.c.d.e.f.g.it/${seg}/${seg}/${seg}/q?${'y'.repeat(400_000)}`);
   }
   gc();
   const occupati = process.memoryUsage().heapUsed - prima;
-  // Gli otto indirizzi (circa 15 MB) li tiene la prova stessa: oltre quelli, niente di paragonabile.
-  assert.ok(occupati < 60e6, `occupati ${Math.round(occupati / 1e6)} MB`);
+  assert.ok(occupati < 20e6, `occupati ${Math.round(occupati / 1e6)} MB`);
 });
