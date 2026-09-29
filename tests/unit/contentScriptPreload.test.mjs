@@ -22,6 +22,8 @@ const DIFFERENZE = {
     'src/content/safebrowse.js': 'avviso di sito pericoloso: le pagine interne sono di Filo',
     'src/content/geoProposal.js': 'proposta per i siti bloccati nel tuo Paese: riguarda solo siti esterni',
     'src/content/cookies.js': 'banner dei cookie: le pagine interne non ne hanno',
+    'src/content/cookieRules.js': 'regole dei banner dei cookie: le pagine interne non ne hanno',
+    'src/content/cookieBanners.js': 'banner dei cookie da nascondere: le pagine interne non ne hanno',
   },
   soloPagineInterne: {
     'tests/fixtures/testModels.js': 'modelli di prova, caricati solo con NODE_ENV=test',
