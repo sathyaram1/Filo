@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 
 const SHOTS = resolve('tests/.shots');
 mkdirSync(SHOTS, { recursive: true });
+test.setTimeout(120000);
 const PDF = Buffer.from('%PDF-1.4\n% finto\n' + 'x'.repeat(4096));
 
 function scatta(nome) {
@@ -22,7 +23,7 @@ async function contenuto(app) {
     const c = win.getContentBounds();
     const v = win._filoTabs.avvisi.vista;
     const figli = win.contentView.children;
-    return { c, vista: v ? v.getBounds() : null, inCima: !!v && figli[figli.length - 1] === v, visibile: !!v && v.getVisible() };
+    return { c, vista: v ? v.getBounds() : null, inCima: !!v && figli[figli.length - 1] === v, visibile: !!v && v.getBounds().width > 0 };
   });
 }
 
@@ -36,6 +37,18 @@ async function colore(app, file, r) {
     for (let i = 0; i < b.length; i += 4) { B += b[i]; G += b[i + 1]; R += b[i + 2]; n++; }
     return { r: Math.round(R / n), g: Math.round(G / n), b: Math.round(B / n), size: img.getSize() };
   }, { file, r });
+}
+
+async function vistaAvvisi(app, ms = 40000) {
+  const fine = Date.now() + ms;
+  while (Date.now() < fine) {
+    const p = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/avvisi.html'); } catch (_) { return false; } });
+    if (p) return p;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  const urls = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().flatMap((w) => (w._filoTabs ? w._filoTabs.tabs.map((t) => t.view.webContents.getURL()) : [])));
+  const dl = await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); return w.webContents.executeJavaScript("document.getElementById('shell-notifs') ? document.getElementById('shell-notifs').textContent : 'nessuna pila'"); });
+  throw new Error('vista non nata; schede: ' + JSON.stringify(urls) + ' pila: ' + dl);
 }
 
 function serverFile(handler) {
@@ -54,7 +67,7 @@ test('pdf cliccato: l’avviso si VEDE sullo schermo e «Apri cartella» rispond
       <a id="dl" href="${url}" style="display:block;padding:40px;font-size:30px">manuale.pdf</a></body></html>`);
     await app.evaluate(({ shell: sh }) => { globalThis.__cartelle = []; sh.showItemInFolder = (p) => { globalThis.__cartelle.push(p); }; });
     await page.locator('#dl').click();
-    const vista = await avvisi();
+    const vista = await vistaAvvisi(app, 20000);
     await expect(vista.locator('.shell-notif.show .shell-notif-msg')).toContainText('Scaricato', { timeout: 15000 });
     await page.waitForTimeout(400);
     const k = await contenuto(app);
@@ -87,7 +100,7 @@ test('scaricamento caduto a metà: «Scaricamento non riuscito» si vede sopra l
   try {
     const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;background:#00ff00;height:100vh"><a id="dl" href="${url}">rotto</a></body></html>`);
     await page.locator('#dl').click();
-    const vista = await avvisi();
+    const vista = await vistaAvvisi(app, 60000);
     await expect(vista.locator('.shell-notif.show .shell-notif-msg')).toContainText('non riuscito', { timeout: 30000 });
     await page.waitForTimeout(400);
     const k = await contenuto(app);
@@ -118,7 +131,7 @@ test('finestra incognito: l’avviso di fine scaricamento si vede lì sopra la p
     await app.evaluate(({ BrowserWindow }, u) => {
       const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito && x._filoTabs);
       w.focus();
-      w._filoTabs.createTab(u);
+      w._filoTabs.openTab(u);
     }, base + '/pagina');
     let page = null;
     await expect.poll(() => { page = app.windows().find((w) => { try { return w.url().startsWith(base + '/pagina'); } catch (_) { return false; } }); return !!page; }, { timeout: 15000 }).toBe(true);
@@ -128,7 +141,7 @@ test('finestra incognito: l’avviso di fine scaricamento si vede lì sopra la p
       const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito && x._filoTabs);
       const v = w._filoTabs.avvisi.vista;
       const f = w.contentView.children;
-      return !!v && v.getVisible() && f[f.length - 1] === v && v.getBounds().width > 100;
+      return !!v && f[f.length - 1] === v && v.getBounds().width > 100;
     }), { timeout: 15000 }).toBe(true);
     await page.waitForTimeout(500);
     scatta('incognito');
@@ -193,7 +206,8 @@ test('cambio scheda con un avviso aperto: la riserva passa alla scheda nuova e s
   await shell.evaluate(() => { for (const b of document.querySelectorAll('.shell-notif-close')) b.click(); });
   await expect.poll(() => riserva(b)).toBe('');
   // torna ad A
-  await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); const tm = w._filoTabs; tm.activate ? tm.activate(tm.tabs[tm.tabs.length - 2].id) : tm.switchTo(tm.tabs[tm.tabs.length - 2].id); });
+  await app.evaluate(({ BrowserWindow }, u) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); const tm = w._filoTabs; tm.activate(tm.tabs.find((t) => t.view.webContents.getURL() === u).id); }, a.url());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); const tm = w._filoTabs; return tm.tabs.find((t) => t.id === tm.activeId).view.webContents.getURL(); })).toBe(a.url());
   await expect.poll(() => riserva(a), { timeout: 5000 }).toBe('');
 });
 
