@@ -1478,7 +1478,7 @@
       if (!visibili) return '';
       const quali = controllate === visibili
         ? `delle ${visibili} immagini visibili nella pagina`
-        : `di ${controllate} delle ${visibili} immagini visibili nella pagina, le più grandi`;
+        : `di ${controllate} delle ${visibili} immagini visibili nella pagina (le altre non le ho potute leggere, o stavano oltre le più grandi)`;
       const esiti = (Array.isArray(o.esiti) ? o.esiti : []).slice(0, 50)
         .filter((e) => e && typeof e.frase === 'string' && e.frase.trim());
       const nonProva = 'l’assenza di etichette NON prova che un’immagine sia autentica: uno screenshot, una ricompressione o il caricamento su un social le cancellano, e molti generatori non le scrivono affatto';
