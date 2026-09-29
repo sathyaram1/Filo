@@ -607,6 +607,12 @@ test('Ctrl+Z annulla anche dopo un clic su un modulo, come il clic su Indietro',
   await page.keyboard.press('Control+KeyZ');
   await page.waitForTimeout(200);
   expect(await page.locator('#doc').innerText()).toBe(doc);
+  // Tolta la scorciatoia, Ctrl+Z fuori dal testo torna alla regola di Filo.
+  await page.click('#cfgCancel');
+  await page.locator('.ed-module[data-type="undo"]').click();
+  await page.fill('#cfgShortcut', '');
+  await page.click('#cfgSave');
+  expect(await page.evaluate(() => document.documentElement.dataset.filoCtrlZ)).toBeUndefined();
 });
 
 // A pannello aperto la tastiera è del pannello: Esc lo chiude, e una combinazione
@@ -639,4 +645,36 @@ test('a pannello aperto Esc chiude e i tasti non agiscono dietro', async ({ open
   await page.click('#doc');
   await page.keyboard.press('Control+Shift+Digit1');
   await expect(page.locator('#overlay h3', { hasText: 'Statistiche' })).toBeVisible();
+});
+
+// Fuori dal testo Ctrl+Z torna alla pagina precedente (#267): se Indietro l'ha
+// salvato, nell'Editor vince il modulo; tolto, la regola di Filo torna (#545).
+test('con cronologia dietro, Ctrl+Z salvato su Indietro annulla e non porta via dall\'Editor', async ({ openTab }) => {
+  const page = await openTab('filo://newtab/');
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+  await page.evaluate((u) => { window.location.href = u; }, EDITOR);
+  await page.waitForURL((u) => u.href.startsWith(EDITOR), { timeout: 10_000 });
+  await apriDocConModuli(page, [WC, { id: 'u-t', type: 'undo', cells: [{ x: 5, y: 0 }], data: { shortcut: 'Ctrl+Z' } }]);
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+
+  await page.click('#doc');
+  await page.keyboard.press('End');
+  await page.keyboard.type(' ABC');
+  await page.waitForTimeout(300);
+  const scritto = await page.locator('#doc').innerText();
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await page.locator('#overlay').click({ position: { x: 5, y: 5 } });
+  await expect(page.locator('#overlay')).toBeHidden();
+  await page.keyboard.press('Control+KeyZ');
+  await expect.poll(() => page.locator('#doc').innerText(), { timeout: 2000 }).not.toBe(scritto);
+  await page.waitForTimeout(500);
+  expect(page.url()).toContain('editor');
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="undo"]').click();
+  await page.fill('#cfgShortcut', '');
+  await page.click('#cfgSave');
+  await exitSettingsMode(page);
+  await page.keyboard.press('Control+KeyZ');
+  await page.waitForURL((u) => u.href.startsWith('filo://newtab'), { timeout: 8_000 });
 });

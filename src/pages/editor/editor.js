@@ -2553,8 +2553,9 @@
   // Fuori dai campi di testo Filo usa Ctrl+Z per tornare alla pagina precedente
   // (src/content/content.js): se un modulo l'ha salvato, qui vince il modulo (#545).
   function dichiaraCtrlZ() {
-    const z = { ctrlKey: true, key: 'z', code: 'KeyZ' };
-    const preso = doc.modules.some((m) => AZIONE_SCORCIATOIA[m.type] && m.data && m.data.shortcut && matchShortcut(z, m.data.shortcut));
+    const annulla = TASTI_EDITOR.find((t) => t.suo === 'undo');
+    const preso = doc.modules.some((m) => AZIONE_SCORCIATOIA[m.type] && m.data && m.data.shortcut
+      && prendeIlTasto(annulla, TASTI.pressioneScritta(m.data.shortcut) || {}));
     if (preso) document.documentElement.dataset.filoCtrlZ = 'pagina';
     else delete document.documentElement.dataset.filoCtrlZ;
   }
