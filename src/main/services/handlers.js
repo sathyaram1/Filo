@@ -4306,7 +4306,7 @@ async function indicizzaArchivio() {
     const a = embedAttempt(settings);
     indiceModello = a ? a.model : null;
     if (!a) return;
-    const stale = daIndicizzare(await ArchivedTabs.list(), a.model);
+    const stale = daIndicizzare(await ArchivedTabs.list(), a.model).filter((it) => !inArricchimento.has(it.id));
     if (!stale.length) return;
     const unaNuova = !reindexInCorso;
     await reindexArchivedEmbeddings(settings, stale);
