@@ -29,6 +29,18 @@
 
   let apertura = null;
 
+  // Ogni scheda che entra in archivio (chiusura, migrazione, importazione) passa di qui: chi indicizza lo sa
+  // da una strada sola, così una strada d'ingresso nuova non resta senza indice (#825).
+  const ascoltatori = new Set();
+  function entrate(voci) {
+    if (voci.length) for (const fn of ascoltatori) { try { fn(voci); } catch (_) {} }
+    return voci;
+  }
+  function suEntrate(fn) {
+    ascoltatori.add(fn);
+    return () => ascoltatori.delete(fn);
+  }
+
   // L'incognito non vede l'archivio e non ci scrive (la stessa garanzia che storage.json dà alle sue chiavi di navigazione).
   // Per questo si apre solo da fuori: la migrazione deve leggere storage.json vero, non la vista vuota dell'incognito.
   function apri() {
