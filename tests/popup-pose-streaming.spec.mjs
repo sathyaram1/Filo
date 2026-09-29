@@ -300,7 +300,7 @@ test('selezione a metà finestra: il riquadro si accorcia invece di sbordare, e 
 // I due test sopra aprono il riquadro chiamando l'app dall'interno. Questo fa
 // esattamente quello che fa chi ha segnalato: pagina web vera, parola
 // selezionata col mouse a tre quarti dell'altezza, Alt+E, e si aspetta la
-// risposta. È la strada che passa per la scorciatoia globale e per l'ancora
+// risposta. È la strada che passa per la scorciatoia di Filo e per l'ancora
 // ricavata dalla selezione — se il rimedio non arrivasse fin qui, qui si vede.
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <style>
