@@ -123,7 +123,8 @@ class AvvisiSopraPagina {
     wc.once('did-finish-load', () => { this.pronta = true; this._invia(); });
     // Se la vista muore, il prossimo avviso ne fa nascere un'altra.
     wc.on('render-process-gone', () => this._butta());
-    this.win.contentView.addChildView(vista);
+    // Carica fuori dalla finestra e ci entra alla prima posa: una vista che carica dentro si prende
+    // la tastiera, e chi stava scrivendo nella pagina perde i tasti (#588.5).
     // Da filo://shell come la shell: un file:// farebbe scattare chi controlla che nessuna vista apra file locali.
     wc.loadURL('filo://shell/avvisi.html');
     return vista;
