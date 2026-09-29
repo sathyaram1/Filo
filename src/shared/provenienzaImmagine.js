@@ -810,6 +810,7 @@
           : `${cosa} secondo credenziali firmate da qualcuno che non è nell’elenco ufficiale dei firmatari riconosciuti.`;
       }
       const debole = (res.avvisi || []).some((a) => a === 'legame_assente' || a === 'asserzioni_scoperte' || a === 'catena_rotta' || a === 'certificato_scaduto');
+      if (!chi) return `${cosa} secondo credenziali firmate da un firmatario riconosciuto${debole ? ', ma incomplete' : ''}.`;
       if (debole) return `${cosa} secondo ${chi}, ma le sue credenziali sono incomplete.`;
       if (res.origine === 'fotocamera') return `Scattata con una fotocamera, firmata da ${chi}.`;
       if (res.origine === 'ai-modificata') return `Modificata con l’AI, credenziali di ${chi}.`;

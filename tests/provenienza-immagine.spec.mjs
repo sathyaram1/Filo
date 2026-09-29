@@ -3,13 +3,29 @@
 // propria origine — e TACE quando il file non dichiara niente.
 //
 // Le immagini di prova sono firmate davvero (tests/helpers/immagineFirmata.mjs):
-// certificato, COSE e legame duro sui byte. Se il lettore smettesse di
+// autorità, certificato, COSE e legame duro sui byte. Se il lettore smettesse di
 // verificare, o se la riga comparisse su un file spoglio, questi test sono rossi.
+// L'elenco ufficiale dei firmatari Filo lo scarica davvero, da un server di prova.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { pngFirmato, pngSpoglio, pngConTesto, certificato } from './helpers/immagineFirmata.mjs';
+import { pngFirmato, pngSpoglio, pngConTesto, certificato, elencoPem } from './helpers/immagineFirmata.mjs';
 
 const RIGA = '.sn-menu-origine';
+
+const RADICE = certificato({ organizzazione: 'Autorità di prova', nomeComune: 'Radice di prova', ca: true });
+const INTERMEDIA = certificato({ organizzazione: 'Autorità di prova', nomeComune: 'Intermedia', ca: true, emittente: RADICE });
+const firmatario = (organizzazione = 'OpenAI, Inc.') => ({
+  cert: certificato({ organizzazione, emittente: INTERMEDIA }),
+  catena: [INTERMEDIA],
+});
+
+// Filo scarica l'elenco dei firmatari riconosciuti come fa da solo ogni giorno,
+// solo che l'indirizzo è quello del server di prova.
+async function scaricaElenco(app, testServer, ...autorita) {
+  const url = testServer.asset(elencoPem(...autorita), 'text/plain');
+  const esito = await app.evaluate((_e, u) => globalThis.__filoFirmatariC2pa.aggiorna({ forza: true, url: u }), url);
+  expect(esito.ok).toBe(true);
+}
 
 function pagina(src, { dentroUnLink = false } = {}) {
   const img = `<img id="foto" src="${src}" width="160" height="160" style="background:#e07b39">`;
@@ -27,15 +43,46 @@ async function apriMenuSullaFoto(page) {
   return menu;
 }
 
-test('un’immagine con credenziali firmate fa comparire la riga che dice chi lo dichiara', async ({ openTab, testServer }) => {
-  const src = testServer.asset(pngFirmato(), 'image/png');
+test('un’immagine con credenziali firmate fa comparire la riga che dice chi lo dichiara', async ({ app, openTab, testServer }) => {
+  await scaricaElenco(app, testServer, RADICE);
+  const src = testServer.asset(pngFirmato(firmatario()), 'image/png');
   const page = await testServer.openReady(openTab, pagina(src));
   const menu = await apriMenuSullaFoto(page);
 
   const riga = menu.locator(RIGA);
   await expect(riga).toBeVisible({ timeout: 10000 });
   await expect(riga).toHaveText('Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.');
+  await expect(riga).not.toHaveClass(/sn-menu-origine-debole/);
   await page.screenshot({ path: 'tests/.shots/provenienza-immagine-firmata.png' }).catch(() => {});
+});
+
+test('prima di aver mai scaricato l’elenco: firma valida, firmatario non verificato', async ({ openTab, testServer }) => {
+  const src = testServer.asset(pngFirmato(firmatario()), 'image/png');
+  const page = await testServer.openReady(openTab, pagina(src));
+  const menu = await apriMenuSullaFoto(page);
+
+  const riga = menu.locator(RIGA);
+  await expect(riga).toHaveText(
+    'Generata con l’AI secondo credenziali firmate da OpenAI: firma valida, firmatario non verificato.',
+    { timeout: 10000 },
+  );
+  await expect(riga).toHaveClass(/sn-menu-origine-debole/);
+  await expect(riga).toHaveAttribute('title', /non ha ancora scaricato l’elenco ufficiale/);
+  await page.screenshot({ path: 'tests/.shots/provenienza-immagine-non-verificata.png' }).catch(() => {});
+});
+
+test('un certificato che si chiama «OpenAI» ma non arriva all’elenco non viene preso per OpenAI', async ({ app, openTab, testServer }) => {
+  await scaricaElenco(app, testServer, RADICE);
+  const src = testServer.asset(pngFirmato({ cert: certificato({ organizzazione: 'OpenAI, Inc.' }) }), 'image/png');
+  const page = await testServer.openReady(openTab, pagina(src));
+  const menu = await apriMenuSullaFoto(page);
+
+  const riga = menu.locator(RIGA);
+  await expect(riga).toHaveText(
+    'Generata con l’AI secondo credenziali firmate da OpenAI, che non è nell’elenco ufficiale dei firmatari riconosciuti.',
+    { timeout: 10000 },
+  );
+  await expect(riga).toHaveClass(/sn-menu-origine-debole/);
 });
 
 test('la stessa immagine ricompressa, senza metadati, non fa comparire nessuna frase sull’autenticità', async ({ openTab, testServer }) => {
@@ -55,21 +102,35 @@ test('la stessa immagine ricompressa, senza metadati, non fa comparire nessuna f
   await page.screenshot({ path: 'tests/.shots/provenienza-immagine-spoglia.png' }).catch(() => {});
 });
 
-test('la riga compare anche quando l’immagine è dentro un collegamento', async ({ openTab, testServer }) => {
-  const src = testServer.asset(pngFirmato({
-    cert: certificato({ organizzazione: 'Leica Camera AG' }),
-    sorgente: 'digitalCapture',
-  }), 'image/png');
+test('la riga compare anche quando l’immagine è dentro un collegamento', async ({ app, openTab, testServer }) => {
+  await scaricaElenco(app, testServer, RADICE);
+  const src = testServer.asset(pngFirmato({ ...firmatario('Leica Camera AG'), sorgente: 'digitalCapture' }), 'image/png');
   const page = await testServer.openReady(openTab, pagina(src, { dentroUnLink: true }));
   const menu = await apriMenuSullaFoto(page);
 
-  await expect(menu.locator(RIGA)).toHaveText('Scattata con una fotocamera, firmata da Leica.', { timeout: 10000 });
+  await expect(menu.locator(RIGA)).toHaveText('Scattata con una fotocamera, firmata da Leica Camera.', { timeout: 10000 });
   // Il ramo del link resta quello di sempre: la riga si aggiunge, non sostituisce.
   await expect(menu.getByText('Apri in nuova tab', { exact: false }).first()).toBeVisible();
 });
 
-test('un file cambiato dopo la firma lo dice, e non ripete quello che le credenziali affermavano', async ({ openTab, testServer }) => {
-  const manomessa = Buffer.from(pngFirmato());
+test('la riga compare anche quando l’immagine sta sotto un velo trasparente', async ({ app, openTab, testServer }) => {
+  await scaricaElenco(app, testServer, RADICE);
+  const src = testServer.asset(pngFirmato(firmatario()), 'image/png');
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px">
+    <div style="position:relative;width:160px;height:160px">
+      <img src="${src}" width="160" height="160" style="display:block">
+      <div id="velo" style="position:absolute;inset:0;background:transparent"></div>
+    </div>
+  </body></html>`);
+  await page.locator('#velo').click({ button: 'right', position: { x: 20, y: 20 } });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible();
+  await expect(menu.locator(RIGA)).toHaveText('Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.', { timeout: 10000 });
+});
+
+test('un file cambiato dopo la firma lo dice, e non ripete quello che le credenziali affermavano', async ({ app, openTab, testServer }) => {
+  await scaricaElenco(app, testServer, RADICE);
+  const manomessa = Buffer.from(pngFirmato(firmatario()));
   manomessa[manomessa.length - 30] ^= 0x5a;
   const src = testServer.asset(manomessa, 'image/png');
   const page = await testServer.openReady(openTab, pagina(src));
@@ -130,14 +191,21 @@ function promptConImmagine(app, userMessage, immagine) {
   }, { userMessage, immagine });
 }
 
-test('in chat, un’immagine con credenziali firmate porta al modello lo stesso esito del menu', async ({ app }) => {
+test('in chat, un’immagine con credenziali firmate porta al modello lo stesso esito del menu', async ({ app, testServer }) => {
   await configuraModello(app);
-  const prompt = await promptConImmagine(app, 'questa foto è fatta con l’AI?', dataUrl(pngFirmato()));
+  await scaricaElenco(app, testServer, RADICE);
+  const prompt = await promptConImmagine(app, 'questa foto è fatta con l’AI?', dataUrl(pngFirmato(firmatario())));
 
   expect(prompt).toContain('Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.');
   // Dentro la recinzione: il nome lo scrive il file, non Filo.
   const dentro = prompt.split('<<<ETICHETTA_FILE>>>')[1] || '';
   expect(dentro.split('<<<FINE_ETICHETTA_FILE>>>')[0]).toContain('OpenAI');
+});
+
+test('in chat, senza elenco la risposta dice lo stesso «non verificato» del menu', async ({ app }) => {
+  await configuraModello(app);
+  const prompt = await promptConImmagine(app, 'questa foto è fatta con l’AI?', dataUrl(pngFirmato(firmatario())));
+  expect(prompt).toContain('Generata con l’AI secondo credenziali firmate da OpenAI: firma valida, firmatario non verificato.');
 });
 
 test('in chat, un’immagine senza etichette dice che non ce ne sono e che questo non prova niente', async ({ app }) => {
