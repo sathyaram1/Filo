@@ -75,7 +75,7 @@
   // chiusura (vedi tabs.js _archiveClosedTab). Ritorna l'entry creata, o null se
   // la tab non è archiviabile (manca l'URL, o la chiamata arriva dall'incognito).
   async function archive(meta) {
-    if (!meta || !meta.url || Disco.inIncognito()) return null;
+    if (!meta || typeof meta.url !== 'string' || !meta.url || Disco.inIncognito()) return null;
     const d = await apri();
     const entry = {
       id: uuid(),

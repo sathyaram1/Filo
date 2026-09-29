@@ -88,7 +88,7 @@ function creaDeposito({ cartella, meseDi }) {
 
   function leggiMese(mese, testo) {
     const s = statoDi(mese);
-    for (const riga of testo.replace(/^﻿/, '').split('\n')) {
+    for (const riga of testo.replace(/^\uFEFF/, '').split('\n')) {
       if (!riga.trim()) continue;
       s.righe++;
       let o;
@@ -152,7 +152,6 @@ function creaDeposito({ cartella, meseDi }) {
       if (record.has(r.id) || visti.has(r.id)) continue;
       visti.add(r.id);
       const seq = inCoda ? --minSeq : ++maxSeq;
-      if (seq > maxSeq) maxSeq = seq;
       const mese = meseDelRecord(r);
       if (!perMese.has(mese)) perMese.set(mese, []);
       perMese.get(mese).push({ r, seq });
