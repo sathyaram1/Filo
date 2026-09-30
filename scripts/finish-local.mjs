@@ -571,6 +571,8 @@ async function main() {
   const checkOnly = argv.includes('--check');
   // Un numero sbagliato si scopre adesso, non dopo i controlli.
   const pratica = checkOnly ? null : await praticaDelLavoro(opzFeedback.valore);
+  const senza = senzaPraticaStop({ checkOnly, pratica });
+  if (senza) { console.error(senza); process.exit(1); }
 
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   if (!branch || branch === 'HEAD') { console.error('Stato del repo non chiaro: nessun ramo corrente.'); process.exit(1); }
