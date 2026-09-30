@@ -874,10 +874,10 @@
   // `opts`: { releasedVersion, starredOnly, confirmedOnly }. PURA.
   function manageTabCounts(feedbacks, opts) {
     const list = feedbacks || [];
-    const counts = { inbox: 0, queue: 0, resolved: 0, archived: 0 };
+    const counts = { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 };
     for (const f of list) {
       const tab = manageTabFor(f, opts);
-      if (tab === 'inbox' || tab === 'queue' || tab === 'resolved') counts[tab]++;
+      if (tab === 'inbox' || tab === 'queue' || tab === 'local' || tab === 'resolved') counts[tab]++;
     }
     counts.archived = listArchiveTab(list, opts).length;
     return counts;
