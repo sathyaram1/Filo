@@ -192,7 +192,7 @@
     root.appendChild(style);
 
     const overlay = doc.createElement('div');
-    overlay.className = 'sn-confirm-overlay';
+    overlay.className = copre ? 'sn-confirm-overlay sn-confirm-copre' : 'sn-confirm-overlay';
     const box = doc.createElement('div');
     box.className = 'sn-confirm-box';
     overlay.appendChild(box);
