@@ -17,6 +17,8 @@ const CHIUSURA_MS = 220;
 const BORDO = 5;
 const VICINO = 24;
 const SONDA_MS = 50;
+// Col puntatore fuori dalla pagina (fila delle schede, fuori dalla finestra) si guarda più di rado.
+const SONDA_LONTANO_MS = 150;
 // Dopo un ridimensionamento o uno spostamento della finestra il bordo non spinge: era il sistema al lavoro.
 const QUIETE_MS = 600;
 // Dopo un trascinamento dal menu la barra resta un attimo, per vedere dove è finita l'icona.
