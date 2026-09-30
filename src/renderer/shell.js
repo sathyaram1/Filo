@@ -915,6 +915,7 @@
       });
       tabsEl.appendChild(el);
     }
+    misuraLarghezzeNaturali();
 
     tabsEl.style.flex = larghezzeFerme && strisciaFerma ? `0 0 ${strisciaFerma}px` : '';
 

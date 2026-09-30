@@ -105,7 +105,6 @@ test('scheda stretta: l\'avviso audio resta sempre, la favicon cede solo quando 
   await expect(shell.locator(`.tab[data-id="${attiva}"]`)).toHaveClass(/active/);
   await expect(shell.locator('.tab .proxy-ind')).toHaveCount(2, { timeout: 10_000 });
 
-  await shell.addStyleTag({ content: '#larghezze-431{}' });
   const larghezze = async (w, a) => {
     await shell.evaluate(({ w, a }) => {
       let st = document.getElementById('larghezze-431');
