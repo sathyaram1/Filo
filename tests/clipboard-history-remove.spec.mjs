@@ -3,7 +3,7 @@ import { _electron as electron } from '@playwright/test';
 import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CONFIRM_HOST } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confermaSopraPagina, confirmText } from './helpers/confirm.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 // Feedback #256: nella cronologia degli appunti (freccia accanto a "Incolla")
@@ -109,8 +109,11 @@ test('paste history: rimuovi una singola voce e svuota tutta la cronologia', asy
     const clearBtn = sub.locator('.sn-menu-history-clear-btn');
     await expect(clearBtn).toBeVisible();
     await clearBtn.click();
-    // Compare il dialogo di conferma di Filo (host visibile nel DOM del documento).
-    await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+    // Compare il dialogo di conferma di Filo: sopra la scheda, fuori dal documento del sito (#592.6).
+    const sopra = await confermaSopraPagina(app);
+    await expect(sopra.locator(CONFIRM_HOST)).toBeVisible();
+    expect(await confirmText(sopra)).toContain('Svuota');
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 
     await page.screenshot({ path: 'tests/.shots/clipboard-history-remove.png' });
   } finally {

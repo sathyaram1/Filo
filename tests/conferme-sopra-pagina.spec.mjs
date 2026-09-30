@@ -61,7 +61,8 @@ function geometria(app) {
     const vista = tm.conferme.vista;
     return {
       inCima: !!vista && ultima === vista,
-      visibile: !!vista && (typeof vista.getVisible === 'function' ? vista.getVisible() : true),
+      // Nascosta, la vista ha anche misure zero: Electron non dice se una vista è visibile.
+      visibile: !!vista && vista.getBounds().width > 0,
       vista: vista ? vista.getBounds() : null,
       scheda: scheda.view.getBounds(),
       url: vista ? vista.webContents.getURL() : '',
