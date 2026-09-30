@@ -23,8 +23,8 @@ test('menu aperto vicino al bordo sinistro: trascinando un\'icona dentro il menu
   await pausa(500);
   const r = await riga.boundingBox();
   const s = await statoBarra(app);
-  const zoom = await page.evaluate(() => window.devicePixelRatio / (window.outerWidth ? 1 : 1));
+  // Il pannello è largo quanto la vista meno il margine dell'ombra, che è della pagina.
   const coperto = s.aperta ? Math.max(0, (s.bounds.width - 16) - r.x) : 0;
   await page.mouse.up();
-  expect(coperto, `la barra aperta copre i primi ${coperto}px della riga del menu (zoom ${zoom})`).toBe(0);
+  expect(coperto, `la barra aperta copre i primi ${coperto}px della riga del menu`).toBe(0);
 });
