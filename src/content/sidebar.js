@@ -25,6 +25,7 @@
   // da fuori (risultati di ricerca, etichette della pagina) entra in
   // cronologia gia imbustato.
   const Esterno = global.SN_ESTERNO;
+  const gestoVero = (e) => !!global.SN_FILO_UI?.gestoVero(e);
 
   let root = null;
   let stackEntry = null;
