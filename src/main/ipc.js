@@ -474,6 +474,7 @@ function registerIpcHandlers() {
 
   // ─── conferme di Filo chieste da un sito (sopra la sua scheda, #592.6) ───────
   ipcMain.handle('filo:conferma', (event, richiesta) => chiediConferma(event, richiesta));
+  ipcMain.on('filo:conferma-ritira', (event, d) => ritiraConferma(event, d));
 
   // ─── tooltip custom (sopra le WebContentsView) ───────────────────────────
   ipcMain.on('shell:tooltip-show', (event, { text, x, y }) => {
