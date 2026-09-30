@@ -275,7 +275,7 @@
       const CA = global.SN_CHAT_ARCHIVE;
       const corpo = `${testoEsito}${label ? `\n${label}` : ''}`.replace(/\s+$/, '');
       const daScrivere = corpo.trim() ? corpo : '(nessun esito)';
-      archiviaRiga(CA ? CA.clampOutput(daScrivere) : daScrivere, 'filo', chatDelComando);
+      archiviaRiga(CA ? CA.clampOutput(daScrivere) : daScrivere, 'filo', chatDelComando, 'comando');
     };
 
     const handle = window.filo.shellExec({

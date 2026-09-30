@@ -413,6 +413,29 @@ describe('ciò che l\'agente ha letto prima conta anche se la pagina è cambiata
   });
 });
 
+describe('una frase di Filo porta con sé solo ciò che veniva da fuori', () => {
+  require(join(ROOT, 'src', 'shared', 'chatArchive.js'));
+  const CA = globalThis.SN_CHAT_ARCHIVE;
+  const LETTO = [{ valore: '482913', regola: 'codice', fonte: "dall'output di un comando" }];
+
+  test('il codice letto che la risposta ripete resta con la frase, anche senza le parole del codice', () => {
+    assert.deepEqual(X.lettiNelTesto('La banca ti ha mandato 482913.', LETTO), LETTO);
+    const m = CA.toStoredMessage({ role: 'filo', text: 'La banca ti ha mandato 482913.', letti: LETTO });
+    assert.deepEqual(m.letti, LETTO);
+  });
+
+  test('una password proposta da Filo non è letta da fuori', () => {
+    assert.deepEqual(X.lettiNelTesto('Ti propongo questa password: Tr7#kq29Lm.', LETTO), []);
+    assert.equal('letti' in CA.toStoredMessage({ role: 'filo', text: 'Ti propongo questa password: Tr7#kq29Lm.' }), false);
+  });
+
+  test('l’esito di un comando lanciato a mano resta testo di fuori; una frase dell’utente non porta fonti', () => {
+    assert.equal(CA.toStoredMessage({ role: 'filo', text: 'x', esterno: "dall'output di un comando" }).esterno, "dall'output di un comando");
+    const u = CA.toStoredMessage({ role: 'user', text: 'x', letti: LETTO, esterno: 'y' });
+    assert.equal('letti' in u || 'esterno' in u, false);
+  });
+});
+
 describe('un testo lungo non tiene fermo il processo principale', () => {
   const frasi = [
     'La 2FA richiede un secondo fattore, spesso un OTP generato da un\'app, secondo la RFC 6238 del 2011.',

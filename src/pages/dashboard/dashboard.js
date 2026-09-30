@@ -85,12 +85,12 @@
   // quella aperta quando è pronta: chi la produce prende la targa (`chatDellaRiga`)
   // al momento del comando e la passa qui. Un comando lento più un ritorno alla
   // home la mettevano nella chat sbagliata, o in una chat nuova mai fatta.
-  const archiviaRiga = (text, role, chat) => {
+  const archiviaRiga = (text, role, chat, esterno) => {
     // L'intervista di benvenuto ha una conversazione sua e un modo suo di
     // finire: le sue righe le archivia lei.
     if (Accoglienza.isActive()) return null;
     const id = chat || ensureChatId();
-    try { send({ type: MSG.FILO_CHAT_NOTE, id, text, role }); } catch (_) {}
+    try { send({ type: MSG.FILO_CHAT_NOTE, id, text, role, ...(esterno ? { esterno } : {}) }); } catch (_) {}
     return id;
   };
   const chatDellaRiga = () => (Accoglienza.isActive() ? null : ensureChatId());
@@ -375,9 +375,14 @@
         note.textContent = Att.summarizeActivity(types, false);
         bubblesEl.appendChild(note);
       }
+      // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.
+      const fuori = isUser ? {} : {
+        ...(Array.isArray(m.letti) && m.letti.length ? { letti: m.letti } : {}),
+        ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
+      };
       threadHistory.push(isUser
         ? { role: 'user', text }
-        : { role: 'filo', text, actions: types.map((t) => ({ type: t })) });
+        : { role: 'filo', text, actions: types.map((t) => ({ type: t })), ...fuori });
     }
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     inputEl.focus();
@@ -994,6 +999,7 @@
       if (turn.text) { entry.reasoning = turn.text; entry.reasoningMs = turn.ms; }
       if (Array.isArray(r.reasoningDetails) && r.reasoningDetails.length) entry.reasoningDetails = r.reasoningDetails;
       if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
+      if (Array.isArray(r.letti) && r.letti.length) entry.letti = r.letti;
       threadHistory.push(entry);
       Term.applyCommandCwd(r.actions);
       // Chi guida la sequenza deve poter assorbire questa bolla nel blocco se

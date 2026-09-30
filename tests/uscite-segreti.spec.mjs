@@ -415,10 +415,10 @@ test('riaperta dopo un riavvio, la chat non porta fuori il codice che Filo aveva
   await page.locator('#input').fill('leggi la notifica della banca');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'La banca ti ha mandato' })).toBeVisible({ timeout: 20_000 });
-  // Il registro dei segreti letti vive quanto la sessione: dopo un riavvio restano solo le frasi della chat.
+  // Il registro dei segreti letti vive quanto la sessione: dopo un riavvio resta la fonte salvata con la frase.
   await app.evaluate(() => globalThis.SN_SEGRETI_LETTI.svuota());
   expect(await riapriEPortaFuori(app, openTab, page, {
-    testo: 'La banca ti ha mandato', frase: `il codice monouso ${CODICE}`, fonte: 'prima, in questa conversazione',
+    testo: 'La banca ti ha mandato', frase: `il codice monouso ${CODICE}`, fonte: "dall'output di un comando",
   })).toBe('fermato');
 });
 
@@ -439,6 +439,8 @@ test('riaperta dalla Cronologia, la chat non porta fuori il codice uscito da un 
     await page.locator('#input').fill('ok, ci penso dopo');
     await page.locator('#sendBtn').click();
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Va bene.' })).toBeVisible({ timeout: 20_000 });
+    // Anche dopo un riavvio: l'esito del comando resta segnato come testo di fuori nell'archivio.
+    await app.evaluate(() => globalThis.SN_SEGRETI_LETTI.svuota());
     expect(await riapriEPortaFuori(app, openTab, page, {
       testo: 'ci penso dopo', frase: `Il tuo codice monouso è ${CODICE}`, fonte: "dall'output di un comando",
     })).toBe('fermato');
@@ -484,4 +486,49 @@ test('un codice letto in una chat non esce da un’altra conversazione che non l
     .toContainText("conteneva un codice letto dall'output di un comando");
   await altra.waitForTimeout(500);
   expect(apertoVerso(app, RACCOLTA)).toBe(false);
+});
+
+test('la password che Filo propone si usa al messaggio dopo: non l’ha letta da fuori', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await preparaModelli(app);
+  await senzaAccoglienza(app, page);
+  await modelloFinto(app, { giri: [{ text: 'Ti propongo questa password: Tr7#kq29Lm. Salvala in un posto sicuro.' }] });
+  await page.locator('#input').fill('generami una password sicura per il nuovo account');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ti propongo' })).toBeVisible({ timeout: 20_000 });
+  const comando = { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'echo Tr7#kq29Lm' }) }] };
+  await modelloFinto(app, { giri: [comando, { text: 'Eccola nel terminale.' }] });
+  await page.locator('#input').fill('ok, scrivila nel terminale così la copio');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Eccola nel terminale.' })).toBeVisible({ timeout: 20_000 });
+  const visti = JSON.stringify(await app.evaluate(() => globalThis.__visti));
+  expect(visti).toContain('Tr7#kq29Lm');
+  expect(visti).not.toContain('nessuna conferma e nessun livello lo sblocca');
+  await expect(page.locator('.dash-activity').last()).not.toContainText('fermato');
+
+  // Riaperta dopo un riavvio, resta sua.
+  await app.evaluate(() => globalThis.SN_SEGRETI_LETTI.svuota());
+  let id = null;
+  await expect.poll(async () => {
+    id = await page.evaluate(async () => {
+      const r = await chrome.runtime.sendMessage({ type: 'filo_chats_list' });
+      for (const c of (r && r.chats) || []) {
+        const g = await chrome.runtime.sendMessage({ type: 'filo_chat_get', id: c.id });
+        if (JSON.stringify((g && g.chat) || {}).includes('Ti propongo')) return c.id;
+      }
+      return null;
+    });
+    return id;
+  }, { timeout: 10_000 }).toBeTruthy();
+  await openTab(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(id)}`);
+  const riaperta = await newtab(app, 'filo://dashboard/dashboard.html?chat=');
+  await expect(riaperta.locator('#input')).toBeVisible();
+  await modelloFinto(app, { giri: [comando, { text: 'Di nuovo nel terminale.' }] });
+  await riaperta.locator('#input').fill('scrivila ancora');
+  await riaperta.locator('#sendBtn').click();
+  await expect(riaperta.locator('.dash-bubble-filo', { hasText: 'Di nuovo nel terminale.' })).toBeVisible({ timeout: 20_000 });
+  expect(JSON.stringify(await app.evaluate(() => globalThis.__visti))).not.toContain('nessuna conferma e nessun livello lo sblocca');
 });
