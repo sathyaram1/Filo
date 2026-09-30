@@ -1,5 +1,5 @@
 // La fila di schede in cima alla pagina dei feedback (Ricevuti, In coda,
-// Risolti, Archiviati — le stesse della dashboard di gestione, #509) deve
+// Lavori locali, Risolti, Archiviati — le stesse della dashboard di gestione, #509) deve
 // adattarsi alla larghezza della finestra: su finestre strette va a capo invece
 // di sforare il bordo destro e trascinare TUTTA la pagina in uno scorrimento
 // orizzontale. E ogni scheda resta di un pezzo solo: il numero non si stacca
