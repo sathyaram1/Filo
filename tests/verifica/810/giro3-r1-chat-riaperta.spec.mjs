@@ -29,12 +29,15 @@ async function riapriEUsaIlCodice(app, openTab, page) {
   await riaperta.locator('#input').fill('completa tu l’accesso sul sito');
   await riaperta.locator('#sendBtn').click();
   const deadline = Date.now() + 20_000;
-  while (Date.now() < deadline) {
-    if (apertoVerso(app, RACCOLTA)) return 'aperto';
-    if (await riaperta.locator('.dash-activity-row', { hasText: 'Non ho aperto' }).count()) return 'fermato';
-    await new Promise((r) => setTimeout(r, 200));
+  let esito = 'niente';
+  while (Date.now() < deadline && esito === 'niente') {
+    if (apertoVerso(app, RACCOLTA)) esito = 'aperto';
+    else if (await riaperta.locator('.dash-activity-row', { hasText: 'Non ho aperto' }).count()) esito = 'fermato';
+    else await new Promise((r) => setTimeout(r, 200));
   }
-  return 'niente';
+  // Il modello della chat riaperta ha davvero davanti il codice: non è un indirizzo inventato.
+  expect(JSON.stringify(await app.evaluate(() => globalThis.__visti))).toContain(CODICE);
+  return esito;
 }
 
 test('riaperta dalla Cronologia, la chat non porta fuori il codice che aveva letto dall’output di un comando', async ({ app, shell, openTab }) => {
@@ -66,9 +69,15 @@ test('riaperta dalla Cronologia, la chat non porta fuori il codice uscito da un 
     const page = await newtab(app);
     await expect(page.locator('#input')).toBeVisible();
     await preparaModelli(app);
+    await page.reload();
+    await expect(page.locator('#input')).toBeVisible();
     await page.locator('#input').fill(`/cat "${file}"`);
     await page.locator('#input').press('Enter');
     await expect(page.getByText(`Il tuo codice monouso è ${CODICE}`).first()).toBeVisible({ timeout: 15_000 });
+    await modelloFinto(app, { giri: [{ text: 'Va bene.' }] });
+    await page.locator('#input').fill('ok, ci penso dopo');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Va bene.' })).toBeVisible({ timeout: 20_000 });
 
     expect(await riapriEUsaIlCodice(app, openTab, page)).toBe('fermato');
   } finally {
