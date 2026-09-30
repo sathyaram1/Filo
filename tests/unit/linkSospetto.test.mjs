@@ -260,6 +260,11 @@ const SITI_VERI = [
   'https://www.email.it/', 'https://www.stream.it/', 'https://www.revolution.it/', 'https://www.pineapple.com/',
   'https://www.otherwise.com/', 'https://www.connexion.fr/', 'https://www.arubanetworks.com/', 'https://bnl.gov/',
   'https://www.google.com/url?q=https://www.poste.it/',
+  // Giro 2: le pagine d'accesso dei gestori SPID accreditati e altri indirizzi ufficiali dei marchi.
+  'https://spid.register.it/login/selfcare/login', 'https://spid.intesigroup.com/', 'https://loginspid.infocamere.it/',
+  'https://spid.intesa.it/', 'https://www.intesa.it/', 'https://github.blog/changelog/', 'https://discordstatus.com/',
+  'https://discord.gift/abc', 'https://www.dhlparcel.nl/nl', 'https://gls-us.com/', 'https://gls-spain.es/',
+  'https://urldefense.com/v3/__https://www.poste.it/__;!!AbC!x$', 'https://www.poste.it@www.poste.it/', 'https://mario.rossi@example.com/',
 ];
 
 test('i siti veri con un nome vicino a un marchio non si prendono l’avviso, né nel menu né all’apertura', () => {
