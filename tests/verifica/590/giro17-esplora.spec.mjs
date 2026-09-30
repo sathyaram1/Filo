@@ -118,3 +118,56 @@ test('E3 NAVIGA bloccata: dopo che la notifica se ne va, cosa resta in chat', as
   await page.screenshot({ path: 'tests/.shots/590-g17-chat-aperta.png' });
   await app.evaluate(() => { try { globalThis.__fake_restore?.(); } catch (_) {} });
 });
+
+test('E7 tre NAVIGA in un giro: quando nasce ogni scheda', async ({ app, shell, rete }) => {
+  test.setTimeout(60_000);
+  await lista(shell, ['blocked.test']);
+  const urls = ['/a', '/b', '/c'].map((p) => rete.pagina('libero.test', p, `<h1>${p}</h1><img src="/lenta.png">`, { ritardoMs: 800 }));
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8000 });
+  await modelloFinto(app, [
+    { toolCalls: urls.map((u, i) => ({ id: `n${i}`, name: 'NAVIGA', arguments: JSON.stringify({ url: u, etichetta: `p${i}`, background: true }) })) },
+    { text: 'Aperte.' },
+  ]);
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    globalThis.__nascite = [];
+    const orig = w._filoTabs.openTab.bind(w._filoTabs);
+    w._filoTabs.openTab = (u, o) => { globalThis.__nascite.push([Date.now(), String(u)]); return orig(u, o); };
+  });
+  const t0 = await app.evaluate(() => Date.now());
+  await page.locator('#input').fill('apri le tre pagine');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Aperte' })).toBeVisible({ timeout: 30_000 });
+  const t1 = await app.evaluate(() => Date.now());
+  const nascite = await app.evaluate(() => globalThis.__nascite);
+  console.log('E7 nascite (ms da invio)', JSON.stringify(nascite.map(([t, u]) => [t - t0, u.replace(/^http:\/\/[^/]+/, '')])), 'risposta a', t1 - t0);
+  await app.evaluate(() => { try { globalThis.__fake_restore?.(); } catch (_) {} });
+});
+
+for (const attesa of [1, 3]) {
+  test(`E8 NAVIGA verso una pagina che rimanda al sito della lista dopo ${attesa} s`, async ({ app, shell, rete }) => {
+    test.setTimeout(60_000);
+    await lista(shell, ['blocked.test']);
+    const avvisi = await contaAvvisi(app);
+    const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+    const ponte = rete.pagina('accorcia.test', '/p', `<meta http-equiv="refresh" content="${attesa};url=${bersaglio}"><h1>Stai lasciando il sito…</h1>`);
+    const page = await newtabPage(app);
+    await expect(page.locator('#input')).toBeVisible({ timeout: 8000 });
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: ponte, etichetta: 'pagina' }) }] },
+      { text: 'Fatto.' },
+    ]);
+    await page.locator('#input').fill('apri quel link');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto' })).toBeVisible({ timeout: 20_000 });
+    await page.waitForTimeout((attesa + 2) * 1000);
+    const calls = await app.evaluate(() => globalThis.__fake_calls);
+    const secondo = JSON.stringify(calls[1] || []);
+    console.log(`E8 ${attesa}s avvisi`, JSON.stringify(await avvisi()), 'schede', JSON.stringify(await schede(app)));
+    console.log(`E8 ${attesa}s al modello:`, (secondo.match(/(Pagina NON aperta[^"]{0,80}|Eseguit[^"]{0,60})/) || ['?'])[0]);
+    const act = page.locator('.dash-activity').first();
+    if (await act.count()) { await act.locator('.dash-activity-head').click().catch(() => {}); await page.waitForTimeout(300); console.log(`E8 ${attesa}s diario:`, (await act.innerText()).replace(/\n/g, ' | ')); }
+    await app.evaluate(() => { try { globalThis.__fake_restore?.(); } catch (_) {} });
+  });
+}
