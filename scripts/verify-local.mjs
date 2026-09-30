@@ -300,7 +300,7 @@ const senzaNumero = (l) => l.map(({ n: _n, ...f }) => f);
  * I bilanci consumati e i rilievi messi da parte nei giri precedenti dello
  * stesso lavoro sopravvivono: sono del lavoro, non della singola verifica.
  */
-export function withRequest(state, branch, { request, sha, at }) {
+export function withRequest(state, branch, { request, sha, at, feedbackId, feedbackNum }) {
   const s = (state && typeof state === 'object') ? { ...state } : {};
   const prev = s[branch] || {};
   s[branch] = {
@@ -311,6 +311,13 @@ export function withRequest(state, branch, { request, sha, at }) {
     derived: Array.isArray(prev.derived) ? prev.derived : [],
     rounds: Array.isArray(prev.rounds) ? prev.rounds : [],
   };
+  // La pratica del lavoro (#908) la legge npm run finish: resta finché non se ne indica un'altra.
+  const id = String(feedbackId || prev.feedbackId || '');
+  if (id) {
+    s[branch].feedbackId = id;
+    const num = feedbackId ? feedbackNum : prev.feedbackNum;
+    if (num) s[branch].feedbackNum = Number(num) || String(num);
+  }
   // Il perimetro della chiusura vale per la verifica subito dopo una
   // correzione (anche rilanciata), e per nessun'altra.
   if (prev.chiusura && (prev.verdict === 'fixed' || !prev.verdict)) s[branch].chiusura = prev.chiusura;
