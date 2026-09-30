@@ -54,11 +54,8 @@
   // Stati "chiusi": non vanno (più) giudicati, restano nei loro flussi.
   const CLOSED_STATUSES = ['done', 'verified', 'archived', 'ignored'];
 
-  // Mittenti FIDATI = automazione dell'owner: prefisso riservato E la prova del
-  // mittente (#595), che solo admin e Admin SDK possono scrivere. Il prefisso da
-  // solo lo scrive chiunque: senza prova è un anonimo. Se risultano bloccati a
-  // livello di identità è un errore e vanno ri-giudicati, non mostrati come
-  // "attacco". Speculare a isTrustedIdentity nel backend (filo-security).
+  // Fidato = prefisso riservato E prova del mittente (#595): il prefisso da solo lo scrive chiunque.
+  // Speculare a isTrustedIdentity nel backend (filo-security).
   const SENDER_PROOFS = ['admin', 'server'];
   function isTrustedClient(clientId, senderProof) {
     return /^(owner|routine|agent|local):/i.test(String(clientId || ''))
