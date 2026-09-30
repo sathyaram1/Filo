@@ -2776,6 +2776,60 @@
     mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
     mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
     reflectPreapproved(fb);
+    reflectLocal(fb);
+  }
+
+  // ── «Solo in locale» (#908) ───────────────────────────────────────────────
+  // Il tasto c'è dove il segno si può mettere (owner o sessione con la prova, pratica
+  // aperta) o togliere; sui feedback degli utenti no: in locale non si lavorano.
+  function localToggleOffered(fb) {
+    return MR.isLocalOnly(fb) || MR.localSignCheck(fb, true).ok || (MR.isProvenLocalSender(fb) && isOpenPublic(fb));
+  }
+  function reflectLocal(fb) {
+    if (!mgLocalBtn) return;
+    const on = MR.isLocalOnly(fb);
+    mgLocalBtn.hidden = !isAdmin || !localToggleOffered(fb);
+    mgLocalBtn.disabled = false;
+    mgLocalBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    mgLocalBtn.textContent = on ? '💻 Solo locale' : '💻 Locale';
+    const perche = on ? null : MR.localSignCheck(fb, true);
+    mgLocalBtn.title = on
+      ? `${localSignText(fb)} Clic: la rimetti anche alle routine.`
+      : (perche.ok
+        ? 'La lavora solo una sessione locale: nessuna routine la prende e compare nei Lavori locali.'
+        : `Adesso non si può: ${perche.motivo}.`);
+  }
+
+  async function setLocalSign(id, valore) {
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb) return;
+    const check = MR.localSignCheck(fb, valore);
+    const num = FB.formatNum(fb.seq, fb.subSeq);
+    const chi = num ? ` (#${num})` : '';
+    if (!check.ok) { setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${check.motivo}.`, 'err'); return; }
+    if (selectedId === id && mgLocalBtn) mgLocalBtn.disabled = true;
+    setManageMsg(valore ? 'Segno la pratica come lavoro locale…' : 'La rimetto anche alle routine…', '');
+    try {
+      const r = await sendToMain({ type: 'feedback_update', id, localOnly: valore });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      fb.localOnly = valore ? { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() } : undefined;
+      if (selectedId === id) reflectLocal(fb);
+      renderList();
+      const dove = MR.manageTabFor(fb, { releasedVersion, fusioni });
+      setManageMsg(valore
+        ? `Da ora${chi} la lavora solo una sessione locale${dove === 'local' ? ': la trovi nei Lavori locali' : ''}.`
+        : `Da ora${chi} la possono prendere anche le routine.`, 'ok');
+    } catch (e) {
+      setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${e.message || 'Errore'}`, 'err');
+    } finally {
+      if (mgLocalBtn) mgLocalBtn.disabled = false;
+    }
+  }
+  if (mgLocalBtn) {
+    mgLocalBtn.addEventListener('click', () => {
+      const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+      if (fb) setLocalSign(fb._id, !MR.isLocalOnly(fb));
+    });
   }
 
   // Il tasto «Fondi senza chiedermelo» e la riga che dice chi ha messo il
