@@ -8,6 +8,8 @@ const VERI = [
   'https://supplier.ariba.com/',
   'https://www.isbank.com.tr/', // Türkiye İş Bankası
   'https://www.bancobpi.pt/', // Banco BPI
+  // Le immagini condivise dalla comunità di Steam: il nome attaccato ad altre parole in un sottodominio della rete di Akamai.
+  'https://steamuserimages-a.akamaihd.net/ugc/1234567890/ABCDEF0123456789/',
 ];
 
 test('nel menu un sito vero a una lettera da un marchio non si prende l’avviso', async ({ openTab, testServer }) => {
