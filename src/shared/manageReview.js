@@ -486,7 +486,8 @@
       if (panelComplete(fb)) {
         const worst = worstVerdictBlock(fb);
         if (worst) {
-          return { text: `Mittente fidato segnalato come ${worst.label.toLowerCase()}: decidi tu.`, color: worst.color };
+          const chi = isTrustedClient(fb.clientId, fb.senderProof) ? 'Mittente fidato segnalato' : 'Segnalato';
+          return { text: `${chi} come ${worst.label.toLowerCase()}: decidi tu.`, color: worst.color };
         }
         return null;
       }
