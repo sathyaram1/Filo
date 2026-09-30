@@ -160,7 +160,7 @@
         const list = targetList(a);
         if (list.length) {
           return [`Filo sta per togliere ${list.length === 1 ? 'questa voce' : `queste ${list.length} voci`}:\n`,
-            elenco(list), '\n\nUna volta tolte non suoneranno più.'];
+            elenco(list), list.length === 1 ? '\n\nUna volta tolta non suonerà più.' : '\n\nUna volta tolte non suoneranno più.'];
         }
         const what = timerRefLabel(a);
         return `Togliere ${what}`;
