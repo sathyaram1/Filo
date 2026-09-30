@@ -194,11 +194,11 @@ async function praticaInChiaro(doc) {
     senderProof: f.senderProof?.stringValue || '',
     statusPublic: f.statusPublic?.stringValue || 'open',
     localOnly: lo ? { by: lo.by?.stringValue || '', at: Number(lo.at?.integerValue || 0) } : undefined,
-    claimedBy: f.claimedBy?.stringValue || '',
-    claimExpiresAt: f.claimExpiresAt?.stringValue || '',
+    beatAt: f.beatAt?.stringValue || f.beatAt?.timestampValue || '',
+    workingSince: f.workingSince?.stringValue || f.workingSince?.timestampValue || '',
   };
 }
-const CAMPI_PRATICA = ['clientId', 'senderProof', 'status', 'statusPublic', 'localOnly', 'claimedBy', 'claimExpiresAt'];
+const CAMPI_PRATICA = ['clientId', 'senderProof', 'status', 'statusPublic', 'localOnly', 'beatAt', 'workingSince'];
 
 /**
  * Il segno «solo in locale» (#908): `valore` true lo mette ({ by, at } in ms), false lo toglie.
@@ -243,6 +243,32 @@ export async function serveLocale(id, nota = '', opts = {}) {
   if (fb.status === 'design') return { ok: false, motivo: 'è già nei Ricevuti, in attesa di una scelta dell’owner' };
   const testo = `Richiede lavoro locale.${String(nota || '').trim() ? ` ${String(nota).trim()}` : ''}`;
   return scrivi(id, 'design', testo, { ...opts, bearer, attore: 'routine', reason: 'locale' });
+}
+
+/**
+ * Una sessione locale può legare il suo lavoro a questa pratica (verify-local start --feedback, finish
+ * --feedback)? Solo se è dell'owner o di una sessione con la prova: in locale i feedback degli utenti non si lavorano.
+ * @returns {Promise<{ ok: true, avviso: string } | { ok: false, motivo: string, utente: boolean }>}
+ */
+export async function praticaPerLaSessione(id, opts = {}) {
+  const bearer = opts.bearer || await acquireBearer();
+  const doc = await getDoc(id, bearer, CAMPI_PRATICA);
+  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente`, utente: false };
+  const fb = await praticaInChiaro(doc);
+  if (!fb) return { ok: false, motivo: 'mittente o stato non decifrabili: non so di chi è la pratica', utente: false };
+  const chi = MR.localSenderCheck(fb);
+  if (!chi.ok) return { ok: false, motivo: chi.motivo, utente: !!chi.utente };
+  return { ok: true, avviso: avvisoDaCampi(doc.fields) };
+}
+
+/** Il rifiuto di una pratica come lo legge la sessione, con la strada per i Ricevuti se è di un utente. PURA. */
+export function rifiutoPratica(id, r) {
+  const righe = [`RIFIUTATO: ${String((r && r.motivo) || 'pratica non lavorabile in locale').replace(/\.$/, '')}.`];
+  if (r && r.utente) {
+    righe.push('In locale i feedback degli utenti non si lavorano. Se questo richiede lavoro locale, riportalo');
+    righe.push(`nei Ricevuti e decide l'owner: node scripts/owner-feedback.mjs ${id} --serve-locale "perché"`);
+  }
+  return righe.join('\n');
 }
 
 /** La versione in costruzione: è quella in cui un fix confluisce. */
