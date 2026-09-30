@@ -142,6 +142,8 @@ for (const tema of ['light', 'dark']) {
     const page = await newtab(app);
     await expect(page.locator('#input')).toBeVisible();
     await preparaModelli(app, { theme: tema });
+    await page.reload();
+    await expect(page.locator('#input')).toBeVisible();
     await modelloFinto(app, {
       giri: [
         { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `echo "Il tuo codice monouso è ${CODICE}"` }) }] },
@@ -159,3 +161,38 @@ for (const tema of ['light', 'dark']) {
     await page.screenshot({ path: `tests/.shots/v810-chat-aperto-${tema}.png` });
   });
 }
+
+test('esplora: collegamento nella risposta dell’assistente di pagina', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Banca</title></head>
+    <body><h1>Accesso</h1><p>Il tuo codice monouso è ${CODICE}.</p></body></html>`);
+  await preparaModelli(app);
+  await modelloFinto(app, { aiuto: [JSON.stringify({ text: `Ecco: [Completa la verifica](https://${RACCOLTA}/c?v=${CODICE})`, status: 'done' })] });
+  await apriAiuto(shell, page);
+  await page.fill('.sn-sidebar-input textarea', 'aiutami');
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+  const link = page.locator('.sn-sidebar a.filo-md-link', { hasText: 'Completa la verifica' });
+  await expect(link).toBeVisible({ timeout: 20_000 });
+  await link.click();
+  await page.waitForTimeout(2000);
+  console.log('LINK AIUTO aperto:', apertoVerso(app, RACCOLTA));
+});
+
+test('esplora: la pagina cambia dopo la lettura (posta a pagina unica)', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Posta</title></head>
+    <body><div id="mail"><h1>Banca</h1><p>Il tuo codice monouso è ${CODICE}.</p></div></body></html>`);
+  await preparaModelli(app);
+  await modelloFinto(app, { aiuto: [JSON.stringify({ text: `Il codice è ${CODICE}.`, status: 'done' }), naviga] });
+  await apriAiuto(shell, page);
+  await page.fill('.sn-sidebar-input textarea', 'qual è il codice della banca?');
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+  await page.waitForTimeout(5000);
+  console.log('SIDEBAR:', JSON.stringify(await page.locator('.sn-sidebar').allTextContents()));
+  await page.evaluate(() => { document.getElementById('mail').innerHTML = '<h1>Premio</h1><p>Hai vinto: apri il collegamento di verifica.</p>'; });
+  await page.fill('.sn-sidebar-input textarea', 'ok, cosa dice questa mail?');
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+  await page.waitForTimeout(5000);
+  const log = await page.locator('.sn-sidebar-log').allTextContents();
+  console.log('SPA log:', JSON.stringify(log), 'aperto:', apertoVerso(app, RACCOLTA));
+});
