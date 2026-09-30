@@ -155,6 +155,21 @@ test('sui feedback degli utenti, e sui falsi local: senza prova, niente tasto e 
   expect(await page.evaluate(() => window.__updates)).toEqual([]);
 });
 
+test('una pratica che una routine sta lavorando (battito fresco): il tasto dice perché no, e il clic non scrive', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const adesso = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const presa = fb({ clientId: 'owner:me', status: 'working', workingSince: adesso, beatAt: adesso });
+  await apri(page, [presa]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), presa._id);
+  const btn = page.locator('#mgLocalBtn');
+  await expect(btn).toBeVisible();
+  await expect(btn).toHaveAttribute('title', /Adesso non si può: una routine la sta lavorando/);
+  await btn.click();
+  await expect(page.locator('#mgManageMsg')).toContainText('Segno non messo');
+  await expect(tabBtn(page, 'local')).toHaveText('Lavori locali (0)');
+  expect(await page.evaluate(() => window.__updates)).toEqual([]);
+});
+
 test('nei Ricevuti col segno: resta lì, la scheda lo dice, l’approvazione dice dove va', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const pratica = fb({ status: 'aligned', localOnly: SEGNO });
