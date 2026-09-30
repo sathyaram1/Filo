@@ -525,6 +525,7 @@
           bordo: primo.borderLeftColor,
           bordoSinistro: primo.borderLeftWidth,
           bgBox: box ? global.getComputedStyle(box).backgroundColor : '',
+          font: box ? global.getComputedStyle(box).fontFamily : '',
         } : null,
         okDisabled: !!(okBtn && (okBtn.disabled || okBtn.getAttribute('aria-disabled') === 'true')),
         textScrollTop: textEl ? textEl.scrollTop : 0,

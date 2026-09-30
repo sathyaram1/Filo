@@ -120,23 +120,44 @@ test('nel popup la selezione del testo è nella palette Filo, non nel blu di sis
 });
 
 // Sui siti il popup vive nel mondo isolato della pagina: i suoi hook si raggiungono dal main.
-function nelMondoIsolato(app, porta, codice) {
-  return app.evaluate(async ({ webContents }, { porta, codice }) => {
-    const wc = webContents.getAllWebContents().find((w) => w.getURL().includes(`:${porta}/`));
+function nelMondoIsolato(app, url, codice) {
+  return app.evaluate(async ({ webContents }, { url, codice }) => {
+    const wc = webContents.getAllWebContents().find((w) => w.getURL() === url);
     return wc ? wc.executeJavaScriptInIsolatedWorld(999, [{ code: codice }]) : null;
-  }, { porta, codice });
+  }, { url, codice });
 }
 
-test('#592.7 — nell’Aiuto su un sito, il foglio di stile della pagina non spegne il filo del riquadro', async ({ app, openTab, testServer }) => {
-  test.setTimeout(60_000);
-  const page = await testServer.openReady(openTab, '<!doctype html><html><head><style>body{--sn-accent:transparent}</style></head><body><h1>Ricette</h1></body></html>');
-  const porta = new URL(page.url()).port;
-  await expect.poll(() => nelMondoIsolato(app, porta, 'typeof window.__filoSidebarTest?.runFiloAction'), { timeout: 8000 }).toBe('function');
-  await nelMondoIsolato(app, porta, `window.SN_SIDEBAR.open(); window.__filoSidebarTest.runFiloAction(${JSON.stringify({ type: 'INVIA_FEEDBACK', testo: TESTO })}); 1`);
+// Il foglio della pagina riscrive le variabili di Filo: un accento trasparente, uno
+// che non è un colore, o testo, sfondo e accento scelti insieme. Il popup resta
+// quello che si vede su una pagina qualsiasi, riquadro compreso.
+const FOGLI = {
+  'un accento trasparente': 'body{--sn-accent:transparent}',
+  'un accento che non è un colore': 'body{--sn-accent:nessuno}',
+  'testo, sfondo e accento scelti insieme': '.sn-confirm-host{--sn-fg:#000;--sn-overlay-bg:#808080;--sn-accent:#fff;--sn-font:monospace}',
+};
+
+// Lo stesso sito prima e dopo aver aggiunto il suo foglio: un secondo sito nello
+// stesso test non si può aprire, le schede si scelgono per nome del sito.
+async function riquadro(app, page) {
+  const url = page.url();
+  await expect.poll(() => nelMondoIsolato(app, url, 'typeof window.__filoSidebarTest?.runFiloAction'), { timeout: 8000 }).toBe('function');
+  await nelMondoIsolato(app, url, `window.SN_SIDEBAR.open(); window.__filoSidebarTest.runFiloAction(${JSON.stringify({ type: 'INVIA_FEEDBACK', testo: TESTO })}); 1`);
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(1, { timeout: 8000 });
-  const s = JSON.parse(await nelMondoIsolato(app, porta, 'JSON.stringify(window.SN_CONFIRM_UI._test.state())'));
-  expect(s.citazioni).toEqual([TESTO]);
-  expect(staccoDelFilo(s), `filo ${s.riquadro.bordo} su ${s.riquadro.bgBox}`).toBeGreaterThanOrEqual(60);
-  await nelMondoIsolato(app, porta, "window.SN_CONFIRM_UI._test.click('cancel')");
+  const s = JSON.parse(await nelMondoIsolato(app, url, 'JSON.stringify(window.SN_CONFIRM_UI._test.state())'));
+  await nelMondoIsolato(app, url, "window.SN_CONFIRM_UI._test.click('cancel')");
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
-});
+  return s;
+}
+
+for (const [nome, css] of Object.entries(FOGLI)) {
+  test(`#592.7 — nell’Aiuto su un sito, ${nome} nel foglio della pagina non cambia il popup né spegne il riquadro`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    const page = await testServer.openReady(openTab, '<!doctype html><html><body><h1>Ricette</h1></body></html>');
+    const pulito = await riquadro(app, page);
+    await page.addStyleTag({ content: css });
+    const s = await riquadro(app, page);
+    expect(s.citazioni).toEqual([TESTO]);
+    expect(s.riquadro, 'il foglio della pagina ha cambiato il popup').toEqual(pulito.riquadro);
+    expect(staccoDelFilo(s), `filo ${s.riquadro.bordo} su ${s.riquadro.bgBox}`).toBeGreaterThanOrEqual(60);
+  });
+}

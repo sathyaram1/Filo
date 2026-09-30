@@ -587,6 +587,7 @@
       resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     document.documentElement.dataset.snTheme = resolved;
+    self.SN_CONFIRM_UI?.tema?.({ theme: resolved });
   }
 
   // Override dei token estetici (#146.1): le superfici Filo iniettate nella
@@ -597,6 +598,7 @@
   function applyThemeTokens(tokens) {
     const reg = self.SN_THEME_TOKENS;
     if (reg) reg.applyToDocument(document, tokens || {});
+    self.SN_CONFIRM_UI?.tema?.({ tokens: tokens || {} });
   }
 
   // Il vero elemento cliccato. Il listener contextmenu vive su window (via il
