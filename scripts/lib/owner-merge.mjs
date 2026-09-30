@@ -146,8 +146,7 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
         // Il codice è su main ma la pratica resta aperta: una routine potrebbe rilavorarla.
         righe.push(`  Pratica ${pratica} non chiusa: ${r.localDetail || r.localReason}. Se il lavoro la conclude, chiudila a mano: ${chiudi}`);
       }
-      return righe.join('
-');
+      return righe.join('\n');
     }
     case 'blocked':
       // Il lavoro locale tocca le aree protette quasi sempre: il messaggio dice
