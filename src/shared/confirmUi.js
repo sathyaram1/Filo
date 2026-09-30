@@ -221,11 +221,14 @@
       if (prima && prima.isConnected) { try { prima.focus({ preventScroll: true }); } catch (_) {} }
       resolve(result);
     }
+    // Sulla pagina stessa entrambe le risposte fanno qualcosa (resta o esce): le danno solo i bottoni.
     function onKey(e) {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+      if (e.key === 'Escape' && !copre) { e.preventDefault(); e.stopPropagation(); done(false); }
     }
     doc.addEventListener('keydown', onKey, true);
-    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) done(false); });
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay && !copre) done(false); });
+    const segnale = opzioni && opzioni.segnale;
+    if (segnale && typeof segnale.addEventListener === 'function') segnale.addEventListener('abort', () => done(false), { once: true });
 
     doc.body.appendChild(host);
     active = { host, root, done };
