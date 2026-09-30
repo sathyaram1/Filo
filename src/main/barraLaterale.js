@@ -140,6 +140,10 @@ class BarraLaterale {
     this._ferma('stringi');
     this.timer.stringi = setTimeout(() => { this.timer.stringi = null; if (!this.aperta) this.posa(); }, CHIUSURA_MS);
     if (avevaFuoco) this._restituisciTastiera();
+    // Chiusa col puntatore fermo sul bordo (scorciatoia, Esc): si riapre solo se il puntatore si muove.
+    this.puntoFermo = this._punto();
+    this._ferma('sonda');
+    this._guarda();
   }
 
   commuta(motivo = 'clic') {
