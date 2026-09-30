@@ -40,7 +40,13 @@ function manager(tabs, activeId) {
     tabs, activeId, _attivaNascosta: false, layouts: 0,
     win: {
       isDestroyed: () => false, isVisible: () => true, isMinimized: () => false,
-      contentView: { addChildView: (v, i) => { figli.splice(figli.indexOf(v) >>> 0, figli.includes(v) ? 1 : 0); figli.splice(i ?? figli.length, 0, v); } },
+      contentView: {
+        addChildView: (v, i) => {
+          const k = figli.indexOf(v);
+          if (k >= 0) figli.splice(k, 1);
+          figli.splice(i ?? figli.length, 0, v);
+        },
+      },
     },
     figli,
     layout() {

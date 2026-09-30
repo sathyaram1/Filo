@@ -1,30 +1,43 @@
 // #430 — passando il puntatore su una scheda compare la carta con l'anteprima di cosa contiene, e la foto è già
 // lì quando la carta compare: la scheda lasciata dietro, quella aperta in secondo piano e quella nascosta prima di
-// finire di caricare. Si guarda la carta vera (la finestra figlia), coi suoi pixel.
+// finire di caricare. Si guarda la carta vera (la finestra figlia), coi suoi pixel. Le schede si aprono e si
+// cambiano dalle strade dell'utente: il main si interroga soltanto.
 
+import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 
-const pagina = (colore, titolo) => `<!doctype html><title>${titolo}</title>
-<style>html,body{margin:0;height:100%;background:${colore}}</style><h1 style="margin:0;padding:40px;font:40px sans-serif">${titolo}</h1>`;
+const pagina = (colore, titolo, corpo = '') => `<!doctype html><title>${titolo}</title>
+<style>html,body{margin:0;height:100%;background:${colore}}a{display:block;font:30px sans-serif;padding:20px}</style>
+<h1 style="margin:0;padding:40px;font:40px sans-serif">${titolo}</h1>${corpo}`;
 
-async function apri(app, url, activate = true) {
-  return app.evaluate(({ BrowserWindow }, { url, activate }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    return w._filoTabs.openTab(url, { activate });
-  }, { url, activate });
+async function schede(app) {
+  return app.evaluate(({ BrowserWindow }) => {
+    const t = BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs;
+    return { attiva: t.activeId, tutte: t.tabs.map((x) => ({ id: x.id, url: x.url, loading: x.loading, foto: !!t.anteprime.get(x.id) })) };
+  });
 }
 
-async function attiva(app, id) {
-  await app.evaluate(({ BrowserWindow }, id) => {
-    BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.activate(id);
-  }, id);
+// Id della scheda su quell'indirizzo, appena ha finito di caricare.
+async function caricata(app, url) {
+  let id = null;
+  await expect.poll(async () => {
+    const s = await schede(app);
+    const t = s.tutte.find((x) => x.url === url);
+    id = t && !t.loading ? t.id : null;
+    return !!id;
+  }, { timeout: 15_000 }).toBe(true);
+  return id;
 }
 
-async function caricata(app, id) {
-  await expect.poll(() => app.evaluate(({ BrowserWindow }, id) => {
-    const t = BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.tabs.find((x) => x.id === id);
-    return !!t && !t.loading && /^http/.test(t.url);
-  }, id), { timeout: 15_000 }).toBe(true);
+async function apri(app, shell, url) {
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  const id = await caricata(app, url);
+  await expect.poll(async () => (await schede(app)).attiva, { timeout: 5000 }).toBe(id);
+  return id;
+}
+
+async function haFoto(app, id) {
+  await expect.poll(async () => (await schede(app)).tutte.find((x) => x.id === id)?.foto, { timeout: 10_000 }).toBe(true);
 }
 
 // Stato della carta: visibile, cosa dice, e il colore al centro della sua foto (null se la foto non c'è).
@@ -38,6 +51,7 @@ async function carta(app) {
       const r = img ? img.getBoundingClientRect() : null;
       return {
         mostrata: !carta.hidden,
+        larghezza: carta.getBoundingClientRect().width,
         titolo: document.getElementById('titolo').textContent,
         indirizzo: document.getElementById('indirizzo').textContent,
         pronta: !!img && img.complete && img.naturalWidth > 0,
@@ -70,13 +84,14 @@ const tinta = (c) => {
   return `altro ${c.join(',')}`;
 };
 
+// Il tempo che una pagina si disegni davvero prima di lasciarla, come per chi l'ha guardata.
+const guardata = () => new Promise((r) => setTimeout(r, 400));
+
 test('la scheda lasciata dietro mostra la sua anteprima appena ci passi sopra', async ({ app, shell, testServer }) => {
-  const rossa = await apri(app, testServer.html(pagina('#e01010', 'Pagina rossa')));
-  await caricata(app, rossa);
-  // Il tempo che la pagina si disegni davvero prima di cambiare scheda, come per chi l'ha guardata.
-  await new Promise((r) => setTimeout(r, 400));
-  const blu = await apri(app, testServer.html(pagina('#1030e0', 'Pagina blu')));
-  await caricata(app, blu);
+  const rossa = await apri(app, shell, testServer.html(pagina('#e01010', 'Pagina rossa')));
+  await guardata();
+  const blu = await apri(app, shell, testServer.html(pagina('#1030e0', 'Pagina blu')));
+  await haFoto(app, rossa);
 
   await shell.locator(`.tab[data-id="${rossa}"]`).hover();
   await expect.poll(async () => (await carta(app)).visibile, { timeout: 3000 }).toBe(true);
@@ -93,58 +108,71 @@ test('la scheda lasciata dietro mostra la sua anteprima appena ci passi sopra', 
   expect((await carta(app)).foto).toBeNull();
 
   // Lasciata la barra, la carta se ne va.
-  await shell.mouse.move(600, 20);
   await shell.locator('#tab-new').hover();
   await expect.poll(async () => (await carta(app)).visibile, { timeout: 3000 }).toBe(false);
 
-  // Ci si torna: la carta cambia foto con la scheda, e quella che era davanti ha ora la sua.
-  await attiva(app, rossa);
-  await caricata(app, rossa);
-  await new Promise((r) => setTimeout(r, 300));
+  // Un clic sulla rossa la porta davanti: da lì la carta della blu ha la sua foto.
+  await guardata();
+  await shell.locator(`.tab[data-id="${rossa}"]`).click();
+  await expect.poll(async () => (await schede(app)).attiva, { timeout: 5000 }).toBe(rossa);
+  await haFoto(app, blu);
   await shell.locator(`.tab[data-id="${blu}"]`).hover();
   await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 3000 }).toBe('blu');
 });
 
-test('una scheda aperta in secondo piano ha l\'anteprima senza essere mai stata aperta', async ({ app, shell, testServer }) => {
-  const davanti = await apri(app, testServer.html(pagina('#e01010', 'Davanti')));
-  await caricata(app, davanti);
-  const dietro = await apri(app, testServer.html(pagina('#10a020', 'Dietro')), false);
-  await caricata(app, dietro);
-  // Ancora non aperta, e intanto la pagina davanti è rimasta quella.
-  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.activeId)).toBe(davanti);
+test('una scheda aperta in secondo piano con Ctrl+clic ha l\'anteprima senza essere mai stata aperta', async ({ app, shell, testServer }) => {
+  const url = testServer.html(pagina('#10a020', 'Dietro'));
+  const davantiUrl = testServer.html(pagina('#e01010', 'Davanti', `<a id="vai" href="${url}">link</a>`));
+  const davanti = await apri(app, shell, davantiUrl);
+  const page = app.windows().find((w) => w.url() === davantiUrl);
+  await page.click('#vai', { modifiers: ['Control'] });
+  const dietro = await caricata(app, url);
+  // Aperta dietro: la pagina davanti è rimasta quella.
+  expect((await schede(app)).attiva).toBe(davanti);
 
-  await expect.poll(() => app.evaluate(({ BrowserWindow }, id) =>
-    !!BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.anteprime.get(id), dietro), { timeout: 10_000 }).toBe(true);
+  await haFoto(app, dietro);
   await shell.locator(`.tab[data-id="${dietro}"]`).hover();
   await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 3000 }).toBe('verde');
   expect((await carta(app)).titolo).toBe('Dietro');
 });
 
 test('una scheda nascosta prima di finire di caricare ha comunque la sua anteprima', async ({ app, shell, testServer }) => {
-  const prima = await apri(app, testServer.html(pagina('#e01010', 'Prima')));
-  await caricata(app, prima);
-  // Come al ripristino della sessione: si aprono dietro e subito dopo se ne porta davanti un'altra.
-  const ids = await app.evaluate(({ BrowserWindow }, urls) => {
-    const tabs = BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs;
-    const a = tabs.openTab(urls[0], { activate: false });
-    const b = tabs.openTab(urls[1], { activate: false });
-    tabs.activate(b);
-    return [a, b];
-  }, [testServer.html(pagina('#10a020', 'Verde nascosta')), testServer.html(pagina('#1030e0', 'Blu davanti'))]);
-  await caricata(app, ids[0]);
-  await caricata(app, ids[1]);
-  await expect.poll(() => app.evaluate(({ BrowserWindow }, id) =>
-    !!BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.anteprime.get(id), ids[0]), { timeout: 10_000 }).toBe(true);
-  await shell.locator(`.tab[data-id="${ids[0]}"]`).hover();
-  await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 3000 }).toBe('verde');
+  // Una pagina lenta, come al ripristino della sessione: finisce di caricare quando davanti c'è già un'altra scheda.
+  const lento = createServer((_req, res) => {
+    setTimeout(() => {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(pagina('#10a020', 'Verde lenta'));
+    }, 2500);
+  });
+  await new Promise((r) => lento.listen(0, '127.0.0.1', r));
+  try {
+    const url = `http://127.0.0.1:${lento.address().port}/lenta`;
+    const primaUrl = testServer.html(pagina('#e01010', 'Prima', `<a id="vai" href="${url}">link</a>`));
+    const prima = await apri(app, shell, primaUrl);
+    const page = app.windows().find((w) => w.url() === primaUrl);
+    await page.click('#vai', { modifiers: ['Control'] });
+    await expect.poll(async () => (await schede(app)).tutte.some((x) => x.url === url), { timeout: 5000 }).toBe(true);
+    const verde = (await schede(app)).tutte.find((x) => x.url === url).id;
+    // Cambio di scheda mentre quella dietro sta ancora caricando.
+    const altra = await apri(app, shell, testServer.html(pagina('#1030e0', 'Blu davanti')));
+    expect((await schede(app)).tutte.find((x) => x.id === verde).loading).toBe(true);
+    expect(altra).not.toBe(prima);
+
+    await caricata(app, url);
+    await haFoto(app, verde);
+    await shell.locator(`.tab[data-id="${verde}"]`).hover();
+    await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 3000 }).toBe('verde');
+  } finally {
+    lento.closeAllConnections?.();
+    await new Promise((r) => lento.close(r));
+  }
 });
 
 test('dalle Preferenze l\'anteprima si spegne e torna il suggerimento col titolo', async ({ app, shell, testServer }) => {
-  const a = await apri(app, testServer.html(pagina('#e01010', 'Uno')));
-  await caricata(app, a);
-  await new Promise((r) => setTimeout(r, 300));
-  const b = await apri(app, testServer.html(pagina('#1030e0', 'Due')));
-  await caricata(app, b);
+  const a = await apri(app, shell, testServer.html(pagina('#e01010', 'Uno')));
+  await guardata();
+  await apri(app, shell, testServer.html(pagina('#1030e0', 'Due')));
+  await haFoto(app, a);
 
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { tabPreview: { enabled: false } } }));
   await expect(shell.locator(`.tab[data-id="${a}"]`)).toHaveAttribute('data-tip', 'Uno', { timeout: 5000 });
@@ -156,12 +184,9 @@ test('dalle Preferenze l\'anteprima si spegne e torna il suggerimento col titolo
   // Riaccesa, e più grande.
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { tabPreview: { enabled: true, size: 'grande' } } }));
   await expect(shell.locator(`.tab[data-id="${a}"]`)).toHaveAttribute('data-anteprima', a, { timeout: 5000 });
-  await shell.mouse.move(5, 5);
+  await shell.locator('#tab-new').hover();
   await shell.locator(`.tab[data-id="${a}"]`).hover();
   await expect.poll(async () => (await carta(app)).visibile, { timeout: 3000 }).toBe(true);
-  const larga = await app.evaluate(({ BrowserWindow }) => {
-    const c = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL() === 'filo://shell/anteprima.html');
-    return c.webContents.executeJavaScript('document.getElementById("carta").getBoundingClientRect().width');
-  });
-  expect(Math.round(larga)).toBe(360);
+  expect(Math.round((await carta(app)).larghezza)).toBe(360);
+  expect(tinta((await carta(app)).colore)).toBe('rosso');
 });

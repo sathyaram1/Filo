@@ -10,6 +10,7 @@
   const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
   const immagini = new Map();
   let temaMesso = [];
+  let ultima = null;
 
   api.onImmagine((d) => {
     if (!d || typeof d.id !== 'string' || typeof d.src !== 'string' || !d.src.startsWith('data:image/')) return;
@@ -17,8 +18,9 @@
     img.alt = '';
     img.draggable = false;
     img.src = d.src;
-    img.decode().catch(() => {});
-    immagini.set(d.id, { img, w: Number(d.w) || 16, h: Number(d.h) || 10 });
+    const f = { img, w: Number(d.w) || 16, h: Number(d.h) || 10, pronta: false };
+    f.decodifica = img.decode().catch(() => {}).then(() => { f.pronta = true; });
+    immagini.set(d.id, f);
   });
 
   api.onDimentica((ids) => {
@@ -37,8 +39,21 @@
     }
   }
 
+  // Una foto arrivata un istante fa si aspetta decodificata: la carta non compare mai con un buco al suo posto.
   api.onMostra((d) => {
     if (!d) return;
+    ultima = d.n;
+    const f = d.immagine ? immagini.get(d.id) : null;
+    if (f && !f.pronta) {
+      // Col tetto: una decodifica che non torna non deve tenere la carta chiusa.
+      Promise.race([f.decodifica, new Promise((r) => setTimeout(r, 150))])
+        .then(() => { if (ultima === d.n) disegna(d, f); });
+      return;
+    }
+    disegna(d, f);
+  });
+
+  function disegna(d, f) {
     tema(d);
     const m = d.margine || { su: 0, lati: 0, giu: 0 };
     document.body.style.padding = `${m.su}px ${m.lati}px ${m.giu}px`;
@@ -47,7 +62,6 @@
     titolo.textContent = String(d.titolo || '');
     indirizzo.textContent = String(d.indirizzo || '');
     foto.replaceChildren();
-    const f = d.immagine ? immagini.get(d.id) : null;
     if (f) {
       const interna = larghezza - 2;
       // L'altezza segue la pagina, ma una pagina stretta e alta non diventa un poster.
@@ -58,11 +72,16 @@
     carta.hidden = false;
     const r = carta.getBoundingClientRect();
     api.misura(d.n, Math.ceil(r.width), Math.ceil(r.height));
-  });
+  }
 
   api.onNascondi(() => {
+    ultima = null;
     carta.hidden = true;
     foto.replaceChildren();
-    requestAnimationFrame(() => requestAnimationFrame(() => api.vuota()));
+    // Due fotogrammi perché il vuoto arrivi a schermo; il tetto per quando la finestra non disegna (coperta, fuori schermo).
+    let detto = false;
+    const vuota = () => { if (!detto) { detto = true; api.vuota(); } };
+    requestAnimationFrame(() => requestAnimationFrame(vuota));
+    setTimeout(vuota, 100);
   });
 })();

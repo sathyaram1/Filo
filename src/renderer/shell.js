@@ -406,6 +406,7 @@
     const CALDA = 600;
     const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--font', '--radius'];
     let timer = null;
+    let vaVia = null;
     let aperta = null;
     let spentaAlle = 0;
 
@@ -434,12 +435,14 @@
     }
     function nascondi() {
       if (timer) { clearTimeout(timer); timer = null; }
+      if (vaVia) { clearTimeout(vaVia); vaVia = null; }
       if (!aperta) return;
       aperta = null;
       spentaAlle = Date.now();
       try { api.anteprima && api.anteprima.nascondi(); } catch (_) {}
     }
     function sopra(id) {
+      if (vaVia) { clearTimeout(vaVia); vaVia = null; }
       if (!anteprimaSchede.enabled || drag) return;
       if (id === aperta) return;
       if (timer) { clearTimeout(timer); timer = null; }
@@ -459,7 +462,8 @@
     tabsEl.addEventListener('mouseover', (e) => {
       const el = e.target.closest('.tab[data-anteprima]');
       if (el) sopra(el.dataset.anteprima);
-      else nascondi();
+      // Il bordo fra due schede non spegne la carta: passando alla vicina cambierebbe con un lampo.
+      else if (!vaVia) vaVia = setTimeout(nascondi, 120);
     });
     tabsEl.addEventListener('mouseenter', () => {
       if (anteprimaSchede.enabled) try { api.anteprima && api.anteprima.prepara(); } catch (_) {}
