@@ -210,3 +210,64 @@ describe('la chiamata al server', () => {
     }
   });
 });
+
+describe('la pratica del lavoro locale (#908)', () => {
+  test('fuso saltando L5: l’esito porta i blocchi registrati e la chiusura della pratica', () => {
+    const trips = [{ gate: 'guard_the_guards', detail: 'firestore.rules' }];
+    const r = classifyOwnerMerge(200, risposta({ ok: true, result: 'merged', sha: 'abc', skippedL5: true, trips, closed: true }));
+    assert.deepEqual(r, { outcome: 'merged', sha: 'abc', skippedL5: true, trips, closed: true });
+    const msg = messageForOwnerMerge(r, 'claude/x', { feedbackId: 'ID', feedbackNum: 908 });
+    assert.match(msg, /^✓/);
+    assert.match(msg, /L5 saltato.*#908/);
+    assert.match(msg, /Blocchi registrati \(1\)/);
+    assert.match(msg, /guard_the_guards: firestore\.rules/);
+    assert.match(msg, /Pratica #908 chiusa/);
+    assert.equal(exitCodeForOwnerMerge(r), 0);
+  });
+
+  test('fuso ma la pratica non si è chiusa: si dice, con cosa fare', () => {
+    const r = classifyOwnerMerge(200, risposta({ ok: true, result: 'merged', sha: 'abc', skippedL5: true, trips: [], closed: false, closeError: 'scrittura rifiutata' }));
+    const msg = messageForOwnerMerge(r, 'claude/x', { feedbackNum: 908 });
+    assert.match(msg, /Nessun blocco registrato/);
+    assert.match(msg, /NON si è chiusa: scrittura rifiutata.*a mano/);
+  });
+
+  test('bloccato con la pratica: dice perché L5 non è stato saltato, e aspetta il sì senza parlare di muri', () => {
+    for (const corpo of [
+      { localReason: 'mittente_non_provato', localDetail: 'il feedback non porta la prova del mittente (senderProof admin)' },
+      { local: { eligible: false, reason: 'mittente_non_provato', detail: 'il feedback non porta la prova del mittente (senderProof admin)' } },
+    ]) {
+      const r = classifyOwnerMerge(200, risposta({ ok: true, result: 'blocked', reason: 'x', requestId: 'ab12', ...corpo }));
+      assert.equal(r.localReason, 'mittente_non_provato');
+      const msg = messageForOwnerMerge(r, 'claude/x', { feedbackId: 'ID' });
+      assert.match(msg, /L5 non è stato saltato: il feedback non porta la prova/);
+      assert.match(msg, /aspetta il tuo sì/);
+      assert.doesNotMatch(msg, /non si aggirano|da qui non|unica strada/);
+    }
+  });
+
+  test('bloccato senza pratica: ricorda come legarla', () => {
+    const msg = messageForOwnerMerge({ outcome: 'blocked', reason: 'x', requestId: 'ab12' }, 'claude/x');
+    assert.match(msg, /--feedback/);
+  });
+
+  test('la domanda porta feedbackId solo quando c’è', async () => {
+    process.env.FILO_ADMIN_REFRESH_TOKEN = 'refresh-finto';
+    const corpi = [];
+    const vero = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ id_token: 'id-finto' }), text: async () => '' });
+    const fetchImpl = async (_u, opts) => {
+      corpi.push(JSON.parse(opts.body));
+      return { status: 200, text: async () => JSON.stringify({ result: { ok: true, result: 'merged', sha: 'd' } }) };
+    };
+    try {
+      await askServerMerge({ branch: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'xEedWgj3AnlLh3lTZ5z5', fetchImpl, url: 'https://esempio/ownerMerge' });
+      await askServerMerge({ branch: 'claude/x', sha: 'a'.repeat(40), fetchImpl, url: 'https://esempio/ownerMerge' });
+    } finally {
+      globalThis.fetch = vero;
+      delete process.env.FILO_ADMIN_REFRESH_TOKEN;
+    }
+    assert.deepEqual(corpi[0], { data: { branch: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'xEedWgj3AnlLh3lTZ5z5' } });
+    assert.deepEqual(corpi[1], { data: { branch: 'claude/x', sha: 'a'.repeat(40) } });
+  });
+});
