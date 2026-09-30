@@ -176,18 +176,39 @@
     if (carrier >= STRUCT_CARRIER) {
       return { reason: 'porta una grande quantità di dati nel link' };
     }
-    // Blob opaco singolo (no separatori umani) in sottodominio o segmenti.
-    const host = u.hostname || '';
-    const labels = host.split('.');
-    for (const lbl of labels.slice(0, Math.max(0, labels.length - 2))) {
-      if (lbl.length >= STRUCT_BLOB) return { reason: 'usa un sottodominio anomalo' };
+    const labels = (u.hostname || '').split('.');
+    if (opaco(labels.slice(0, Math.max(0, labels.length - 2)).join('.')) >= STRUCT_BLOB) {
+      return { reason: 'usa un sottodominio anomalo' };
     }
-    for (const seg of `${cred} ${search}${hash}${path}`.split(/[^A-Za-z0-9+/_=-]+/)) {
-      if (seg.length >= STRUCT_BLOB && !/^https?$/i.test(seg)) {
-        return { reason: 'contiene un blocco di dati codificato' };
+    let resto = `${cred} ${search} ${hash} ${path}`;
+    try { resto = decodeURIComponent(resto); } catch (_) {}
+    if (opaco(resto) >= STRUCT_BLOB) return { reason: 'contiene un blocco di dati codificato' };
+    return null;
+  }
+
+  // Quanti caratteri di un pezzo d'indirizzo sono codice e non parole: parole, date e numeri corti non contano;
+  // cifre mescolate a lettere, numeri lunghi, maiuscole sparse e file di numeri corti sì, comunque siano spezzati.
+  function opaco(testo) {
+    let massa = 0;
+    let numeri = 0;
+    let cifre = 0;
+    for (const tok of String(testo || '').split(/[^\p{L}\p{N}]+/u)) {
+      if (!tok) continue;
+      if (/^\p{N}+$/u.test(tok)) {
+        if (tok.length > 4) massa += tok.length;
+        else { numeri++; cifre += tok.length; }
+      } else if (/\p{N}/u.test(tok) || casuale(tok)) {
+        massa += tok.length;
       }
     }
-    return null;
+    // Tre o quattro numeri corti sono una data o una versione; una fila lunga sono codici di caratteri.
+    if (numeri > 6) massa += cifre;
+    return massa;
+  }
+
+  function casuale(parola) {
+    if ((parola.match(/\p{Ll}\p{Lu}/gu) || []).length >= 3) return true;
+    return /^[a-z]{6,}$/i.test(parola) && !/[aeiouy]/i.test(parola);
   }
 
   // Verdetto: { exfil, reason }. corpus = materiale sensibile che era nel
