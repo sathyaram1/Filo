@@ -2783,7 +2783,7 @@
   // Il tasto c'è dove il segno si può mettere (owner o sessione con la prova, pratica
   // aperta) o togliere; sui feedback degli utenti no: in locale non si lavorano.
   function localToggleOffered(fb) {
-    return MR.isLocalOnly(fb) || MR.localSignCheck(fb, true).ok || (MR.isProvenLocalSender(fb) && isOpenPublic(fb));
+    return MR.isLocalOnly(fb) || (MR.isProvenLocalSender(fb) && isOpenPublic(fb));
   }
   function reflectLocal(fb) {
     if (!mgLocalBtn) return;
