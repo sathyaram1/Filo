@@ -466,8 +466,8 @@
 
   // ── Larghezze ferme dopo una chiusura (#428) ──────────────────────────────
   // Chiusa una scheda col puntatore sulla fila in alto, le altre tengono la
-  // larghezza che avevano finché il puntatore non lascia la fila: la X della
-  // scheda che scorre al posto di quella chiusa resta sotto il puntatore.
+  // larghezza che avevano finché il puntatore non lascia la fila: fra schede
+  // larghe uguali la X di quella che scorre al posto della chiusa resta sotto il puntatore.
   const tabRowEl = tabsEl.closest('.tab-row') || tabsEl;
   let larghezzeFerme = null; // Map id → px
   let strisciaFerma = 0; // px della striscia, solo se se n'è andata l'ultima scheda
