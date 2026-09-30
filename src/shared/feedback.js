@@ -700,6 +700,9 @@
   // token rifiutato (401/403) → si riparte anonimi e il risultato lo dice (`authRefused`).
   async function submit({ text, url, title, userAgent, clientId, clientIdHash, images, files, name, parentId, capabilityGapId, submissionId }, opts = {}) {
     const idToken = (opts && typeof opts.idToken === 'string') ? opts.idToken : '';
+    // #908: un lavoro locale nasce solo con la prova; da anonimo diventerebbe un feedback d'utente.
+    const localOnly = (opts && opts.localOnly && typeof opts.localOnly === 'object') ? opts.localOnly : null;
+    if (localOnly && !idToken) throw new Error('feedback solo locale senza token admin (401): non parte da anonimo');
     // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
     // qualunque caricamento e prima di creare il documento: così «non è partito
     // niente» è vero alla lettera, e non «è partito tutto tranne il testo».
