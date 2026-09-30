@@ -242,18 +242,15 @@ const perPopup = new WeakMap();
 
 // La domanda di una pagina web va sopra la sua scheda; da un popup di accesso, che è una finestra vera
 // con dentro un sito (#589.3), sopra la finestra. Da chiunque altro non si apre niente.
-function chiediConferma(event, richiesta) {
-  const wc = event && event.sender;
-  if (!wc) return Promise.resolve(false);
-  const frame = event.senderFrame || null;
+function confermeDi(wc, { crea = false } = {}) {
   for (const w of BrowserWindow.getAllWindows()) {
     const tm = w._filoTabs;
-    if (tm && tm.conferme && tm.tabs.some((t) => t.view && t.view.webContents === wc)) return tm.conferme.chiedi(wc, frame, richiesta);
+    if (tm && tm.conferme && tm.tabs.some((t) => t.view && t.view.webContents === wc)) return tm.conferme;
   }
   const win = BrowserWindow.fromWebContents(wc);
-  if (!win || win.isDestroyed() || win._filoTabs || win.webContents !== wc) return Promise.resolve(false);
+  if (!win || win.isDestroyed() || win._filoTabs || win.webContents !== wc) return null;
   let c = perPopup.get(win);
-  if (!c) {
+  if (!c && crea) {
     c = new ConfermeSopraPagina(win, {
       sotto: () => (win.isDestroyed() ? null : win.webContents),
       area: () => {
