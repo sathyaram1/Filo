@@ -83,9 +83,13 @@ class BarraLaterale {
     });
     if (win && typeof win.once === 'function') win.once('closed', () => this._butta());
     if (win && typeof win.on === 'function') {
-      const quiete = () => { this.quieteFino = Date.now() + QUIETE_MS; this._ferma('sonda'); this._segnaBordo(false); };
+      const quiete = () => { this.quieteFino = Date.now() + QUIETE_MS; this._segnaBordo(false); };
       for (const ev of ['will-resize', 'resize', 'move']) win.on(ev, quiete);
+      for (const ev of ['focus', 'show', 'restore']) win.on(ev, () => this._guarda());
     }
+    // La fila delle schede: chi trascina una scheda fino al bordo tiene premuto un tasto lì, non nella pagina.
+    const shell = win && win.webContents;
+    if (shell && typeof shell.on === 'function') shell.on('input-event', (_e, input) => this._inputDellaShell(input));
     Layout.leggi({ incognito: this._incognito() }).then((l) => this.disposizione(l)).catch(() => {});
     try {
       const letta = globalThis.SN_STORAGE?.getSettings?.();
