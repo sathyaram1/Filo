@@ -702,7 +702,9 @@
     const idToken = (opts && typeof opts.idToken === 'string') ? opts.idToken : '';
     // #908: un lavoro locale nasce solo con la prova; da anonimo diventerebbe un feedback d'utente.
     const localOnly = (opts && opts.localOnly && typeof opts.localOnly === 'object') ? opts.localOnly : null;
-    if (localOnly && !idToken) throw new Error('feedback solo locale senza token admin (401): non parte da anonimo');
+    // `soloAdmin`: chi chiama vuole la prova o niente (lo script delle sessioni locali).
+    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly);
+    if (soloAdmin && !idToken) throw new Error('create senza token admin (401): questo feedback non parte da anonimo');
     // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
     // qualunque caricamento e prima di creare il documento: così «non è partito
     // niente» è vero alla lettera, e non «è partito tutto tranne il testo».
@@ -867,8 +869,8 @@
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify(doc),
       });
-      if (localOnly && (res.status === 401 || res.status === 403)) {
-        throw new Error(`firestore create fallito (${res.status}): token admin rifiutato, e un feedback solo locale non parte da anonimo`);
+      if (soloAdmin && (res.status === 401 || res.status === 403)) {
+        throw new Error(`firestore create fallito (${res.status}): token admin rifiutato, e questo feedback non parte da anonimo`);
       }
       if (res.status === 401 || res.status === 403) {
         authRefused = res.status;
