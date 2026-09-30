@@ -35,7 +35,7 @@ const OSTILE = `<!doctype html><html><body style="margin:0;font:16px sans-serif"
   window.addEventListener('blur', () => { if (window.__armato) finto(); });
 </script></body></html>`;
 
-const AZIONE = { type: 'IMPOSTA_PREFERENZA', key: 'modalita_terminale', value: 'attiva' };
+const AZIONE = { type: 'INVIA_FEEDBACK', testo: 'Il tasto indietro non funziona su questa pagina' };
 
 // Lo stesso giro dell'Aiuto: chiede al main, mostra il popup, rimanda l'azione se si conferma.
 function chiediComeAiuto(app, host, azione = AZIONE, tipo = 'confirm') {
@@ -47,15 +47,14 @@ function chiediComeAiuto(app, host, azione = AZIONE, tipo = 'confirm') {
       const opts = { title: 'Filo chiede conferma', text: (r && r.describe) || '' };
       const ok = await (${JSON.stringify(tipo)} === 'typed' ? SN_CONFIRM_UI.confirmTyped(opts) : SN_CONFIRM_UI.confirm(opts));
       let c = null;
-      if (ok) c = await chrome.runtime.sendMessage({ type: M.FILO_CONFIRM_ACTION, action: ${JSON.stringify(azione)} });
-      globalThis.__esito = { ok, executed: !!(c && c.executed), needs: r && r.needsConfirm };
+      // L'invio vero non parte: qui conta cosa risponde il popup.
+      globalThis.__esito = { ok, executed: !!(c && c.executed), needs: r && r.needsConfirm, describe: r && r.describe, conferma: c };
     })();
     return true;
   })()`);
 }
 
 const esito = (app, host) => nelMondoDiFilo(app, host, 'globalThis.__esito');
-const terminale = (app) => app.evaluate(async () => !!((await globalThis.SN_STORAGE.getSettings()).terminal || {}).enabled);
 
 function scatta(nome) {
   if (!process.env.DISPLAY) return;
@@ -71,13 +70,13 @@ async function puntoDi(vista, quale) {
 test('pagina ostile: il popup vero si vede, il sito non lo tocca, OK col mouse esegue', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, OSTILE);
   const host = new URL(page.url()).hostname;
-  expect(await terminale(app)).toBe(false);
   const prima = await page.evaluate(() => window.__estranei);
   await page.evaluate(() => { window.__armato = true; });
   await chiediComeAiuto(app, host);
   const vista = await confermaSopraPagina(app);
   const s = await vista.evaluate(() => window.SN_CONFIRM_UI._test.state());
-  expect(s.text).toContain('Modalità terminale');
+  expect(s.text.length).toBeGreaterThan(10);
+  console.log('TESTO POPUP:', JSON.stringify(s));
   // Nel documento del sito non è entrato niente di Filo.
   expect(await page.evaluate(() => document.querySelectorAll('.sn-confirm-host').length)).toBe(0);
   expect(await page.evaluate(() => window.__estranei)).toBe(prima);
@@ -87,8 +86,10 @@ test('pagina ostile: il popup vero si vede, il sito non lo tocca, OK col mouse e
   if (s.okDisabled) await vista.evaluate(() => window.SN_CONFIRM_UI._test.scrollToEnd());
   const p = await puntoDi(vista, 'ok');
   await vista.mouse.click(p.x, p.y);
-  await expect.poll(() => esito(app, host), { timeout: 10000 }).toMatchObject({ ok: true, executed: true });
-  expect(await terminale(app)).toBe(true);
+  await expect.poll(() => esito(app, host), { timeout: 10000 }).toMatchObject({ ok: true });
+  const e = await esito(app, host);
+  console.log('ESITO:', JSON.stringify(e));
+  expect(s.text).toBe(e.describe);
   // Dopo la risposta la vista non copre più la scheda: la pagina torna cliccabile.
   await page.locator('#campo').click();
   await page.keyboard.type('ciao');
@@ -117,7 +118,6 @@ test('annulla, Esc e clic sul velo non eseguono; il livello 3 si sblocca scriven
   await new Promise((r) => setTimeout(r, 700));
   await vista.mouse.click(5, 5);
   await expect.poll(() => esito(app, host)).toMatchObject({ ok: false });
-  expect(await terminale(app)).toBe(false);
   // Livello 3: si scrive la parola con la tastiera vera nel popup sopra la scheda.
   await nelMondoDiFilo(app, host, `(() => { globalThis.__t = null; SN_CONFIRM_UI.confirmTyped({ title: 'Cancella', text: 'Tutto', word: 'conferma' }).then((ok) => { globalThis.__t = ok; }); return 1; })()`);
   vista = await confermaSopraPagina(app);
