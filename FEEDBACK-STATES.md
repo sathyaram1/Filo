@@ -158,8 +158,36 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 `tabFor(status)` = lookup pura, senza `pipeline`, senza `isApproved`, senza `autoMode`:
 - Ricevuti: `unlabeled | suspicious_file | attack | spam | design | aligned`
 - In coda: `todo | working | revision_capability | revision_security | done(non rilasciato)`
+- Lavori locali (#908): quello che starebbe «In coda» ma porta il segno `localOnly`.
 - Risolti: `done(rilasciato)` — Archiviati: `archived` (+ filtro ⭐; + filtro "Bloccati
   confermati" per `*_confirmed`, decisione presa: restano ispezionabili come log lì).
+
+### 4b. I lavori delle sessioni locali (#908)
+
+`localOnly: { by, at }` (in chiaro, `at` in millisecondi, scrive solo l'admin) dice
+che la pratica la lavora solo una sessione locale: la coda delle routine, il recupero
+degli arenati e il pacemaker la saltano, e le superfici la mostrano nei Lavori locali
+invece che «In coda». Negli stati dei Ricevuti resta nei Ricevuti (aspetta comunque
+l'owner), con l'approvazione che dice `→ Lavori locali`.
+
+- Il segno si mette solo su feedback dell'owner o di una sessione (`owner:`/`local:`)
+  **con la prova** `senderProof: 'admin'`, a pratica aperta, non segnalata come
+  attacco/spam e non in mano a una routine (`localSignCheck`). Mai su un utente: un
+  feedback d'utente che richiederebbe lavoro locale torna nei Ricevuti (`design`,
+  motivo `locale`, nota «Richiede lavoro locale») con `owner-feedback.mjs --serve-locale`.
+- Si mette e si toglie in Gestione (tasto «Locale» nel dettaglio, tasto destro sulla
+  scheda), con `owner-feedback.mjs --solo-locale | --non-locale`, e nasce già messo sui
+  feedback aperti da `claude-feedback.mjs` (`--non-locale` per aprirne uno per le routine).
+- Le sessioni locali hanno le credenziali dell'owner. Per REGOLA (non per un blocco
+  tecnico) non spostano feedback dai Ricevuti né dalle conferme `*_confirmed`, non
+  lavorano feedback di utenti e non stampano testo di attacchi: `owner-feedback.mjs`
+  rifiuta prima di scrivere.
+- Alla nascita un lavoro locale provato salta i giudici (`pipeline.skipped:
+  'local_proven'`, status `todo`). Alla fusione `npm run finish` manda `feedbackId`
+  (da `--feedback <N>` o da `verify-local.mjs start --feedback <N>`): se il documento
+  è un lavoro locale provato il server esegue L5 solo per registrare i blocchi
+  (`skippedL5: true`), fonde senza chiedere e chiude la pratica. Manca una condizione →
+  la richiesta aspetta il sì dell'owner in Gestione, col motivo.
 
 ### 4a. Le AZIONI dell'owner per sezione (`ownerActions`)
 
