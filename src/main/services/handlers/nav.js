@@ -78,14 +78,20 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  // «Apri comunque» della chat (#590): scavalca la lista come quello della notifica. Lo chiede una
-  // pagina di Filo, o l'assistente su una pagina web ma solo per un'apertura sua che la lista ha fermato.
+  // «Apri comunque» della chat (#590): da una pagina di Filo scavalca la lista come quello della notifica.
+  // L'assistente sta nel DOM della pagina web, che può guidargli clic e tasti: il suo bottone riporta la
+  // notifica «Sito bloccato», fuori dalla pagina, e il sì si dà lì. Solo per un'apertura sua fermata.
   on(MSG.APRI_COMUNQUE, async (msg, sender, origin) => {
     const win = winOf(sender);
     const url = String((msg && msg.url) || '');
     if (!win?._filoTabs || !/^https?:\/\//i.test(url)) return { ok: false };
-    if (!isFilo(origin) && !win._filoTabs.apribileDallAssistente(sender && sender.wc, url)) return { ok: false, error: 'forbidden' };
-    win._filoTabs.openBlockedPopup(url, { apriComunque: true });
+    if (isFilo(origin)) {
+      win._filoTabs.openBlockedPopup(url, { apriComunque: true });
+      return { ok: true };
+    }
+    if (!win._filoTabs.apribileDallAssistente(sender && sender.wc, url)) return { ok: false, error: 'forbidden' };
+    // Ancora in lista: la notifica. Uscito dalla lista nel frattempo: si apre e basta.
+    win._filoTabs.openTab(url);
     return { ok: true };
   });
 
