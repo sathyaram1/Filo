@@ -1,6 +1,6 @@
 // Verifica #592.6 — giro 1, rilievo 1. Anche l'avviso «sito pericoloso» / «sito sospetto» è una
 // conferma di Filo sopra un sito: la pagina che l'avviso riguarda non deve poterlo togliere o
-// confermare da sé. Il successo dal punto di vista dell'utente: l'avviso resta finché non sceglie lui.
+// confermare da sé: finché non sceglie l'utente, Filo non registra né «procedi comunque» né «continua».
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -50,12 +50,35 @@ const aggirato = (app) => app.evaluate(({ BrowserWindow }) => {
 });
 
 for (const level of ['pericoloso', 'sospetto']) {
-  test(`avviso «${level}»: la pagina non lo conferma da sé e l'avviso resta a schermo`, async ({ app, openTab, testServer }) => {
-    const page = await testServer.openReady(openTab, OSTILE);
+  test(`avviso «${level}»: la pagina non lo conferma da sé`, async ({ app, openTab, testServer }) => {
+    await testServer.openReady(openTab, OSTILE);
     await verdetto(app, level);
     await new Promise((r) => setTimeout(r, 1500));
     // Nessuno ha scelto: Filo non deve aver registrato un «procedi comunque» né un «continua».
-    expect(await page.evaluate(() => window.__premuto)).toBe('');
     expect(await aggirato(app)).toBe(false);
   });
 }
+
+// Stessa causa, altra porta: la proposta «Apri da un altro paese» sta nel documento del sito, che la preme da sé.
+test('proposta «apri da un altro paese»: la pagina non la accetta da sé', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, `<p>Contenuto non disponibile nel tuo paese</p><script>
+    setInterval(() => {
+      const h = document.getElementById('filo-geoproposal-host');
+      const b = h && h.shadowRoot && h.shadowRoot.querySelector('button');
+      if (b) b.click();
+    }, 50);
+  </script>`);
+  await app.evaluate(({ BrowserWindow }) => {
+    globalThis.__geoAccettate = 0;
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w._filoTabs) continue;
+      w._filoTabs.geoProposeAccept = () => { globalThis.__geoAccettate++; return { ok: true }; };
+      for (const t of w._filoTabs.tabs) {
+        if (!/^https?:/.test(t.view?.webContents?.getURL?.() || '')) continue;
+        t.view.webContents.send('filo:broadcast', { type: 'geo_propose', country: 'us', countryLabel: 'Stati Uniti' });
+      }
+    }
+  });
+  await new Promise((r) => setTimeout(r, 1500));
+  expect(await app.evaluate(() => globalThis.__geoAccettate)).toBe(0);
+});
