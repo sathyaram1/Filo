@@ -3,7 +3,7 @@
 // finto confermava quello vero. Qui il sito ci prova, e l'utente legge e conferma la domanda vera.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { confermaSopraPagina, nelMondoDiFilo, confirmState, clickConfirm, pointWhenConfirmAppears, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { confermaSopraPagina, nelMondoDiFilo, confirmState, clickConfirm, pointWhenConfirmAppears, mouseClickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
 
 test.setTimeout(60_000);
 
@@ -208,4 +208,34 @@ test('la conferma da scrivere e il semplice avviso passano dalla stessa vista; d
   await clickConfirm(sopra, 'ok');
   await expect.poll(esiti).toEqual([['typed', true], ['prima', false], ['seconda', true]]);
   await expect.poll(async () => (await geometria(app)).visibile).toBe(false);
+});
+
+// Anche la proposta «Apri da un altro paese» è una domanda di Filo su un sito: sta sopra la scheda,
+// la pagina che vorrebbe accettarla da sé non la trova, e l'utente sì.
+test('proposta «Apri da un altro paese»: la pagina non la accetta da sé, l’utente sì', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<p>Contenuto non disponibile nel tuo paese</p><script>
+    window.__premuti = 0;
+    setInterval(() => {
+      for (const h of document.querySelectorAll('body > *, html > *')) {
+        const r = h.shadowRoot;
+        if (!r) continue;
+        for (const b of r.querySelectorAll('button')) { b.click(); window.__premuti++; }
+      }
+    }, 50);
+  </script>`);
+  await app.evaluate(({ BrowserWindow }) => {
+    globalThis.__geo = [];
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs;
+    tm.geoProposeAccept = (tabId, country) => { globalThis.__geo.push(['apri', country]); return { ok: true }; };
+    tm.geoProposeDismiss = () => { globalThis.__geo.push(['no']); return { ok: true }; };
+    const t = tm.tabs.find((x) => x.id === tm.activeId);
+    t.view.webContents.send('filo:broadcast', { type: 'geo_propose', country: 'us', countryLabel: 'Stati Uniti' });
+  });
+  const sopra = await confermaSopraPagina(app);
+  expect(await confirmState(sopra)).toMatchObject({ title: 'Questo contenuto è bloccato in Italia', okLabel: 'Apri da Stati Uniti', cancelLabel: 'No' });
+  await sopra.waitForTimeout(1200);
+  expect(await page.evaluate(() => window.__premuti)).toBe(0);
+  expect(await app.evaluate(() => globalThis.__geo)).toEqual([]);
+  await mouseClickConfirm(sopra, 'ok');
+  await expect.poll(() => app.evaluate(() => globalThis.__geo)).toEqual([['apri', 'us']]);
 });
