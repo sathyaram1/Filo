@@ -250,7 +250,7 @@
     const troppoPresto = (e) => !!(e && e.isTrusted) && !(performance.now() - visibileDa >= RITARDO_SI_MS);
     // Chi stava scrivendo continua a scrivere nel suo campo: il fuoco va al
     // riquadro, che gli gira i tasti, e non al bottone o al campo del popup.
-    const scriveva = ospite ? !!ospite.scriveva : staScrivendo(prima);
+    const scriveva = !copre && (ospite ? !!ospite.scriveva : staScrivendo(prima));
     const fuoco = (bersaglio) => {
       const el = scriveva ? box : bersaglio;
       if (el === box) box.tabIndex = -1;
