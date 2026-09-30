@@ -194,7 +194,7 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       // i giudici guardano (le vedono direttamente). Il resto sono documenti.
       images: (Array.isArray(allegati) ? allegati : []).filter((a) => a.type.startsWith('image/')),
       files: (Array.isArray(allegati) ? allegati : []).filter((a) => !a.type.startsWith('image/')),
-    });
+    }, idToken ? { idToken } : undefined);
   } catch (e) {
     return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
   }
@@ -202,8 +202,29 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
   // ma senza il documento per cui magari è stato aperto. Si riporta.
   const falliti = Array.isArray(res && res.failed) ? res.failed : [];
   const caricati = ((res && res.files) || []).length + ((res && res.images) || []).length;
-  return { ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti };
+  return {
+    ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti,
+    senderProof: (res && res.senderProof) || '',
+    ...(res && res.authRefused ? { authRefused: res.authRefused } : {}),
+  };
 }
+
+/**
+ * Il token admin dell'owner: { idToken } oppure { idToken: '', motivo }.
+ * Oggetto e non funzione perché i test lo sostituiscono: il vero va in rete.
+ */
+export const credenziale = {
+  async ottieni() {
+    const { findAdminRefreshToken, mintIdToken } = await import('./lib/firestore-auth.mjs');
+    const rt = findAdminRefreshToken();
+    if (!rt) return { idToken: '', motivo: 'nessuna credenziale admin su questa macchina' };
+    try {
+      return { idToken: await mintIdToken(rt) };
+    } catch (e) {
+      return { idToken: '', motivo: String((e && e.message) || e) };
+    }
+  },
+};
 
 /**
  * Priorità: le regole non la concedono a un mittente anonimo (vedi il ramo
