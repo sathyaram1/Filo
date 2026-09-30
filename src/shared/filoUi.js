@@ -104,5 +104,11 @@
     } catch (_) { return false; }
   }
 
-  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside, aperti, onMark };
+  // Un clic o un tasto dell'utente, non del codice del sito: i nostri pezzi nel suo documento li preme
+  // anche lui. Chi fa avanzare qualcosa di Filo da lì passa di qui (#592.6).
+  function gestoVero(e) {
+    return !!(e && e.isTrusted === true);
+  }
+
+  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside, aperti, onMark, gestoVero };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
