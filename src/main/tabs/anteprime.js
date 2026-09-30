@@ -51,6 +51,11 @@ class AnteprimeSchede {
     tab._anteprimaAttesa = TENTATIVI;
   }
 
+  // Si è vista davanti: la sua foto la prende congeda() quando torna dietro.
+  mostrata(tab) {
+    this._fineAttesa(tab);
+  }
+
   tieneSveglia(tab) {
     return !!(tab && tab._anteprimaAttesa > 0);
   }
@@ -63,7 +68,7 @@ class AnteprimeSchede {
   // La scheda davanti sta per andare dietro: l'ultima cosa che l'utente ci ha visto è la sua anteprima.
   congeda(tab) {
     if (!vivo(tab) || this.spento) return;
-    this._sveglia(tab, false);
+    this._fineAttesa(tab);
     const n = ++this.seq;
     tab._anteprimaSeq = n;
     let p;
@@ -106,12 +111,11 @@ class AnteprimeSchede {
     this.sotto = null;
   }
 
-  _sveglia(tab, resta) {
-    if (!tab || !tab._anteprimaAttesa) return;
+  // La visibilità la rimette in riga il prossimo cambio di scheda, come per ogni scheda aperta dietro.
+  _fineAttesa(tab) {
+    if (!tab) return;
     tab._anteprimaAttesa = 0;
-    if (!resta && tab.id !== this.m.activeId) {
-      try { tab.view.setVisible?.(false); } catch (_) {}
-    }
+    this.coda = this.coda.filter((id) => id !== tab.id);
   }
 
   _salva(tab, dato) {
@@ -153,7 +157,7 @@ class AnteprimeSchede {
   _piuTardi(tab) {
     if (!this.tieneSveglia(tab) || tab.loading) return;
     tab._anteprimaAttesa -= 1;
-    if (!this.tieneSveglia(tab)) { this._sveglia({ ...tab, _anteprimaAttesa: 1, view: tab.view, id: tab.id }, false); return; }
+    if (!this.tieneSveglia(tab)) return;
     const t = setTimeout(() => this.caricata(tab), RITENTA);
     t.unref?.();
   }
@@ -176,7 +180,7 @@ class AnteprimeSchede {
           this._salva(tab, dato);
           this.sotto = null;
           m.layout();
-          this._sveglia(tab, false);
+          this._fineAttesa(tab);
           return true;
         }
         if (Date.now() > fine) return false;
