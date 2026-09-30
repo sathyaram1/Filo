@@ -896,7 +896,9 @@
         const a = document.createElement('span');
         a.className = 'tab-alert ' + (t.muted ? 'mute-ind' : 'audio-ind');
         a.setAttribute('role', 'button');
-        a.title = t.muted ? 'Riattiva audio' : 'Silenzia';
+        // Ogni controllo dentro la scheda porta il suo data-tip (mai `title`): senza, il suggerimento
+        // di Filo risale a quello della scheda e dice il titolo della pagina (#431).
+        a.dataset.tip = t.muted ? 'Riattiva audio' : 'Silenzia';
         a.setAttribute('aria-label', t.muted
           ? 'Audio mutato — clicca per riattivare'
           : 'Audio in riproduzione — clicca per silenziare');
