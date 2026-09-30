@@ -378,7 +378,8 @@
   // l'ha già scritta nel prompt (i percorsi condivisi).
   function imbusta({ tipo, testo, conIntestazione = false, unaRiga = false, max } = {}) {
     const { inizio, fine } = marcature(tipo);
-    const corpo = tagliaDichiarando(neutralizza(testo, { unaRiga }), max);
+    const tetto = max === undefined && TIPI[tipo].senzaTetto ? Infinity : max;
+    const corpo = tagliaDichiarando(neutralizza(testo, { unaRiga }), tetto);
     const busta = `${inizio}\n${corpo}\n${fine}`;
     if (!conIntestazione) return busta;
     const testa = TIPI[tipo].intestazione;
