@@ -257,7 +257,7 @@ service cloud.firestore {
       // scripts/claude-feedback.mjs col token admin per scrivere `senderProof`
       // (#595), la prova del mittente che il create anonimo sotto NON ammette:
       // la sentinella tests/unit/firestoreRulesSenderProof.test.mjs lo tiene vero.
-      allow create: if isAdmin();
+      allow create: if isAdmin() && localOnlyValido(request.resource.data);
 
       // `name` = titolo breve generato da un LLM all'invio; `seq`/`subSeq` =
       // numero progressivo leggibile (#22, #22.1) calcolato dal client.
