@@ -699,6 +699,11 @@
     });
   } catch (_) {}
 
+  function logFermata(frase) {
+    const el = appendActionLog(frase);
+    if (el) el.classList.add('sn-sidebar-log-fermata');
+  }
+
   // Quello che l'utente ha scritto qui: il main lascia uscire un codice scritto da lui (#810).
   function paroleUtente() {
     return history.filter((h) => h && h.kind === 'real').map((h) => String(h.content || ''));
@@ -716,7 +721,7 @@
     if (!res || !res.ok) { appendActionLog(`${label}: non riuscita`); return false; }
     // Un segreto che sarebbe uscito: la riga dice cosa è stato fermato e da dove veniva.
     if (res.output && res.output.blocked === 'segreto') {
-      appendActionLog(res.output.frase || `${label}: fermata`);
+      logFermata(res.output.frase || `${label}: fermata`);
       return false;
     }
 
@@ -738,7 +743,7 @@
         c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, parole: paroleUtente() });
       } catch (_) {}
       if (c && c.output && c.output.blocked === 'segreto') {
-        appendActionLog(c.output.frase || `${label}: fermata`);
+        logFermata(c.output.frase || `${label}: fermata`);
         return false;
       }
       return scriviEsito(label, action, c);
@@ -1065,7 +1070,7 @@
           // #810 — la domanda avrebbe portato fuori un segreto: la ricerca non parte, e né la
           // riga né la nota ripetono la domanda.
           if (r && r.blocked === 'segreto') {
-            appendActionLog(r.frase || 'non ho fatto la ricerca');
+            logFermata(r.frase || 'non ho fatto la ricerca');
             esitoVuoto = 'la ricerca web che avevi chiesto NON è partita: la domanda conteneva un codice, una password, una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire a nessun livello. Non riprovarla in altra forma; dillo all\'utente in una riga (se vuole la fa lui a mano)';
           } else {
             appendActionLog(`ricerca web: "${parsed.query}"`);

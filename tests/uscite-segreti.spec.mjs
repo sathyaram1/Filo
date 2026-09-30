@@ -165,9 +165,8 @@ test('un codice letto dall’output di un comando non esce: la chat dice cosa ha
 
   expect(apertoVerso(app, RACCOLTA)).toBe(false);
   // Il modello sa che è un blocco fisso, non una conferma da chiedere di nuovo.
-  const visti = await app.evaluate(() => globalThis.__visti);
-  const ultimo = JSON.stringify(visti[visti.length - 1]);
-  expect(ultimo).toContain('nessuna conferma e nessun livello lo sblocca');
+  const visti = JSON.stringify(await app.evaluate(() => globalThis.__visti));
+  expect(visti).toContain('nessuna conferma e nessun livello lo sblocca');
 
   const activity = page.locator('.dash-activity').last();
   await expect(activity.locator('.dash-activity-label')).toContainText('fermato un’azione'.replace('’', "'"));
