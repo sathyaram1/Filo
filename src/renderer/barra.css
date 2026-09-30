@@ -38,22 +38,32 @@ html, body {
   user-select: none;
 }
 
-/* L'indizio per chi non sa che la barra c'è: sottile, caldo, mai invadente. */
+/* L'indizio per chi non sa che la barra c'è: sottile, caldo, mai invadente. La zona viva (larga quanto la
+   vista chiusa) può essere più larga della linea: la fascia del bordo, a finestra non massimizzata, è del sistema. */
 .striscia {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
+  width: 4px;
   cursor: pointer;
+}
+.striscia::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
   background: linear-gradient(rgba(var(--accent-rgb), 0.5), var(--accent));
   opacity: 0.45;
   transition: opacity var(--dur), width var(--dur);
 }
-.striscia:hover, .striscia.spinge, .striscia.bordo { opacity: 1; width: 4px; }
-/* Nascosta da Preferenze: il bordo resta vivo, e la striscia si accende solo mentre la si spinge. */
-html.senza-striscia .striscia:not(.spinge):not(.bordo) { opacity: 0; }
-html.aperta .striscia { opacity: 0; pointer-events: none; }
+.striscia:hover::before, .striscia.spinge::before, .striscia.bordo::before { opacity: 1; width: 4px; }
+/* Nascosta da Preferenze: il bordo resta vivo, e la striscia si accende solo mentre la si spinge o la si tocca. */
+html.senza-striscia .striscia:not(.spinge):not(.bordo):not(:hover)::before { opacity: 0; }
+html.aperta .striscia { pointer-events: none; }
+html.aperta .striscia::before { opacity: 0; }
 
 .pannello {
   position: absolute;
