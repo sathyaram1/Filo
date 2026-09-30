@@ -288,9 +288,10 @@
       else { for (const id of batches[i]) unverified.add(id); error = error || r.error; }
     });
     if (Object.keys(judged).length) {
+      const judgedSeen = Object.fromEntries(Object.entries(judged).map(([id, v]) => [judgedAs(cards[id]), v]));
       // Riletta prima di scrivere: due ricerche in parallelo non si cancellano i giudizi a vicenda.
       await chrome.storage.local.set({
-        [STORAGE_KEYS.DECK_SEARCH_CACHE]: P.updateSearchCache(await readSearchCache(), key, judged, {
+        [STORAGE_KEYS.DECK_SEARCH_CACHE]: P.updateSearchCache(await readSearchCache(), key, judgedSeen, {
           keepPrefix: `${fp}|`, maxPairs: SEARCH_CACHE_MAX_PAIRS, maxPerCard: SEARCH_CACHE_PER_CARD,
         }),
       });
