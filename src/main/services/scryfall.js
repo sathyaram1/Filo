@@ -76,24 +76,41 @@
     });
   }
 
+  // Un guasto passeggero (rete, 429, 5xx) si riprova prima di arrendersi; una query rifiutata (4xx) tornerebbe uguale.
+  const PAGE_RETRY_MS = [700, 2000];
+  async function searchPage(path) {
+    for (let i = 0; ; i += 1) {
+      try {
+        return await apiGet(path);
+      } catch (e) {
+        const status = Number(e && e.status);
+        if (i >= PAGE_RETRY_MS.length || (status && status !== 429 && status < 500)) throw e;
+        await new Promise((r) => setTimeout(r, PAGE_RETRY_MS[i]));
+      }
+    }
+  }
+
   // ── Ricerca (§4): il vincolo di identity lo aggiunge il chiamante via
   //    buildSearchQuery; qui si esegue e si semplifica. ─────────────────────
   //    `maxCards` oltre la pagina (175) segue le pagine successive; `hasMore` + `total` dicono a chi mostra quante
-  //    ne restano fuori (mai un taglio muto, #382). Una pagina successiva che fallisce chiude lì, con `hasMore`.
+  //    ne restano fuori (mai un taglio muto, #382). Una pagina successiva che non risponde nemmeno riprovata chiude
+  //    lì con `broken`: le altre non le ha tagliate un tetto, e chi mostra lo dice.
   //    `remember: false`: chi filtra i risultati mette in cache solo quelli che tiene (`remember()`).
   async function search(userQuery, { identity, maxCards = 0, remember = true, onPage = null } = {}) {
     const q = Q.buildSearchQuery(userQuery, identity);
-    if (!q) return { cards: [], hasMore: false, total: 0, query: q };
+    if (!q) return { cards: [], hasMore: false, total: 0, query: q, broken: false };
     const cards = [];
     let hasMore = false;
+    let broken = false;
     let total = 0;
     for (let page = 1; ; page += 1) {
       let data;
       try {
-        data = await apiGet(`/cards/search?q=${encodeURIComponent(q)}&order=cmc${page > 1 ? `&page=${page}` : ''}`);
+        data = await searchPage(`/cards/search?q=${encodeURIComponent(q)}&order=cmc${page > 1 ? `&page=${page}` : ''}`);
       } catch (e) {
         if (page === 1) throw e;
         hasMore = true;
+        broken = true;
         break;
       }
       if (!data) break;
