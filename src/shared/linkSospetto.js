@@ -54,7 +54,17 @@
     if (!MOTORE) return null;
     let n = null;
     try { n = MOTORE.normalize(rawUrl); } catch (_) { return null; }
-    if (!n || !n.ok || n.isIp || n.single || n.suffixOnly || !n.sld) return null;
+    if (!n || !n.ok) return null;
+    // https://paypal.com@altro.net si legge paypal.com, ma il sito è altro.net:
+    // quello che sta prima della chiocciola vale come un sottodominio.
+    const chi = utente(rawUrl);
+    // Un indirizzo numerico o di un nome solo non ha nome né sottodomini: conta
+    // solo quello che sta prima della chiocciola (http://paypal.com@203.0.113.7).
+    if (n.isIp || n.single) {
+      if (!chi.length) return null;
+      return { registrabile: n.host, registrabileU: n.host, nome: '', nomeU: '', sotto: chi, primo: '', piattaforma: '', certificato: false };
+    }
+    if (n.suffixOnly || !n.sld) return null;
     // «paypal.com.» è paypal.com: il punto finale non è un'etichetta.
     const ascii = n.host.replace(/\.$/, '').split('.');
     const uni = (n.hostUnicode || n.host).replace(/\.$/, '').split('.');
@@ -64,17 +74,17 @@
     if (!n.ospitato && !n.publicSuffix.includes('.') && n.publicSuffix.length === 2
       && SUFFISSI_2L.has(n.sld) && ascii.length > quante) quante += 1;
     const i = ascii.length - quante;
-    const sotto = uni.slice(0, i);
-    if (sotto[0] === 'www') sotto.shift();
-    // https://paypal.com@altro.net si legge paypal.com, ma il sito è altro.net:
-    // quello che sta prima della chiocciola vale come un sottodominio.
-    sotto.unshift(...utente(rawUrl));
+    const sottoHost = uni.slice(0, i);
+    if (sottoHost[0] === 'www') sottoHost.shift();
     const registrabile = ascii.slice(i).join('.');
     return {
       registrabile,
+      // Il sito si nomina come lo vede chi legge, non col punycode «xn--».
+      registrabileU: uni.slice(i).join('.'),
       nome: ascii[i],
       nomeU: uni[i],
-      sotto,
+      sotto: [...chi, ...sottoHost],
+      primo: sottoHost[0] || '',
       piattaforma,
       certificato: MOTORE.isWhitelisted(registrabile),
     };
