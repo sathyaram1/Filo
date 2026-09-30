@@ -409,6 +409,8 @@
     let vaVia = null;
     let aperta = null;
     let spentaAlle = 0;
+    // La scheda appena cliccata non riapre la carta finché il puntatore non passa su un'altra.
+    let zittita = null;
 
     function elDi(id) {
       return tabsEl.querySelector(`.tab[data-anteprima="${CSS.escape(id)}"]`);
@@ -444,6 +446,8 @@
     function sopra(id) {
       if (vaVia) { clearTimeout(vaVia); vaVia = null; }
       if (!anteprimaSchede.enabled || drag) return;
+      if (id === zittita) return;
+      zittita = null;
       if (id === aperta) return;
       if (timer) { clearTimeout(timer); timer = null; }
       if (aperta || Date.now() - spentaAlle < CALDA) { invia(id); return; }
@@ -468,8 +472,17 @@
     tabsEl.addEventListener('mouseenter', () => {
       if (anteprimaSchede.enabled) try { api.anteprima && api.anteprima.prepara(); } catch (_) {}
     });
-    tabsEl.addEventListener('mouseleave', nascondi);
-    tabsEl.addEventListener('mousedown', nascondi, true);
+    tabsEl.addEventListener('mouseleave', () => { zittita = null; nascondi(); });
+    // Se la barra si ridisegna mentre il puntatore esce, l'uscita può perdersi: basta essere altrove.
+    document.addEventListener('mouseover', (e) => {
+      if (aperta && !tabsEl.contains(e.target)) { zittita = null; nascondi(); }
+    });
+    document.documentElement.addEventListener('mouseleave', nascondi);
+    tabsEl.addEventListener('mousedown', (e) => {
+      const el = e.target.closest('.tab[data-anteprima]');
+      zittita = el ? el.dataset.anteprima : null;
+      nascondi();
+    }, true);
     tabsEl.addEventListener('wheel', nascondi, { passive: true });
     tabsEl.addEventListener('contextmenu', nascondi, true);
     window.addEventListener('blur', nascondi);

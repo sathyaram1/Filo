@@ -1,5 +1,5 @@
 // La carta che mostra cosa c'è in una scheda quando il puntatore le passa sopra (#430): finestra figlia,
-// perché la shell non disegna sopra la pagina. Le foto arrivano PRIMA dell'hover, già decodificate nella carta.
+// perché la shell non disegna sopra la pagina. Le foto arrivano PRIMA dell'hover e la carta le tiene decodificate.
 // Non fotografa niente (tabs/anteprime.js) e non decide quando comparire (shell.js). Regole: patterns/l-anteprima-di-una-scheda-si-scatta-prima-che-serva.md
 
 const path = require('node:path');
@@ -32,7 +32,7 @@ function temaPulito(vars) {
 function statoDi(parent) {
   let s = stati.get(parent);
   if (!s) {
-    s = { win: null, pronta: false, voluta: null, posa: null, attese: [] };
+    s = { win: null, pronta: false, voluta: null, giri: 0, attese: [] };
     stati.set(parent, s);
   }
   return s;
@@ -149,7 +149,8 @@ function mostra(parent, dati) {
   if (!tab) { nascondi(parent); return false; }
   const s = finestra(parent);
   if (!s) return false;
-  const n = (s.voluta ? s.voluta.n : 0) + 1;
+  // Il numero non riparte mai: una misura in ritardo non deve combaciare con una carta nuova.
+  const n = ++s.giri;
   s.voluta = { n, id, x: Math.round(Number(dati.x) || 0), y: Math.round(Number(dati.y) || 0) };
   const davanti = id === tabs.activeId;
   invia(s, 'anteprima:mostra', {
@@ -181,9 +182,4 @@ function indirizzoDi(url) {
   try { return new URL(u).hostname.replace(/^www\./i, ''); } catch (_) { return ''; }
 }
 
-function finestraDi(parent) {
-  const s = parent ? stati.get(parent) : null;
-  return s && s.win && !s.win.isDestroyed() ? s.win : null;
-}
-
-module.exports = { precarica, prepara, dimentica, mostra, nascondi, finestraDi, larghezzaDi, indirizzoDi, LARGHEZZE };
+module.exports = { precarica, prepara, dimentica, mostra, nascondi };
