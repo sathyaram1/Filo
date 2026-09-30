@@ -6,17 +6,20 @@
 const MAX_LETTI = 50000;
 const letti = new Map();
 
+function aggiungi(x, fonte) {
+  if (!x || typeof x.valore !== 'string' || !x.valore) return;
+  const k = `${x.regola}:${x.valore.toLowerCase()}`;
+  // La prima fonte è quella vera: una frase di Filo che lo ripete dopo non la cambia.
+  const prima = letti.get(k);
+  letti.delete(k);
+  letti.set(k, prima || { valore: x.valore, regola: x.regola, fonte: fonte || x.fonte || 'da fuori' });
+  if (letti.size > MAX_LETTI) letti.delete(letti.keys().next().value);
+}
+
 function ricorda(testo, fonte) {
   const G = globalThis.SN_GUARDIANO_STATICO;
   if (!G || typeof testo !== 'string' || !testo.trim()) return;
-  for (const x of G.segretiNelTesto(testo)) {
-    const k = `${x.regola}:${x.valore.toLowerCase()}`;
-    // La prima fonte è quella vera: una frase di Filo che lo ripete dopo non la cambia.
-    const prima = letti.get(k);
-    letti.delete(k);
-    letti.set(k, prima || { ...x, fonte });
-    if (letti.size > MAX_LETTI) letti.delete(letti.keys().next().value);
-  }
+  for (const x of G.segretiNelTesto(testo)) aggiungi(x, fonte);
 }
 
 function tutti() {
@@ -27,4 +30,4 @@ function svuota() {
   letti.clear();
 }
 
-module.exports = { ricorda, tutti, svuota };
+module.exports = { ricorda, aggiungi, tutti, svuota };
