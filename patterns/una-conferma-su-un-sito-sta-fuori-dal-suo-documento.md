@@ -19,7 +19,10 @@ nella pagina, in uno Shadow DOM chiuso.
   disegnarla: nessun chiamante sceglie la strada, quindi nessuno la sbaglia. Un content script nuovo
   che ha bisogno di un sì usa `SN_CONFIRM_UI`, mai un riquadro suo nella pagina: è per questo che
   l'avviso di sito pericoloso o sospetto e la proposta «Apri da un altro paese», che stavano in uno
-  Shadow DOM aperto, la pagina li premeva da sé (#592.6, giro 1).
+  Shadow DOM aperto, la pagina li premeva da sé (#592.6, giro 1). Vale anche dentro un pannello di Filo
+  che sta nella pagina: il sì di «Ha funzionato?» dell'Aiuto, che pubblica i passi, si dà nel popup, e i
+  bottoni del riquadro stanno in uno Shadow DOM chiuso perché la pagina non faccia comparire da sé la
+  domanda (#592.6, giro 2).
 - **L'avviso sulla pagina stessa** (`coprePagina`): copre la pagina quasi del tutto, rispondono solo i
   bottoni (Esc e il velo non scelgono, perché anche «Torna indietro» fa qualcosa), e i tasti non
   tornano al campo di chi scriveva, che potrebbe essere la password chiesta dal sito dell'avviso.

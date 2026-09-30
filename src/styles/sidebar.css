@@ -311,43 +311,7 @@
   align-items: center;
 }
 
-.sn-sidebar-feedback-btn {
-  all: unset;
-  cursor: pointer;
-  padding: 5px 12px;
-  background: var(--sn-bg);
-  color: var(--sn-fg);
-  border: 1px solid var(--sn-border);
-  border-radius: 999px;
-  font-size: 12px;
-  transition: background 120ms ease, border-color 120ms ease;
-}
-.sn-sidebar-feedback-btn:hover {
-  background: var(--sn-accent);
-  color: #fff;
-  border-color: var(--sn-accent);
-}
-.sn-sidebar-feedback-btn:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-.sn-sidebar-feedback-btn:disabled:hover {
-  background: var(--sn-bg);
-  color: var(--sn-fg);
-  border-color: var(--sn-border);
-}
-
-.sn-sidebar-feedback-skip {
-  all: unset;
-  cursor: pointer;
-  margin-left: auto;
-  padding: 0 6px;
-  color: var(--sn-muted);
-  font-size: 14px;
-  line-height: 1;
-}
-.sn-sidebar-feedback-skip:hover { color: var(--sn-fg); }
-.sn-sidebar-feedback-skip:disabled { opacity: 0.5; cursor: default; }
+/* I bottoni della risposta stanno in uno Shadow DOM chiuso, col loro stile: src/content/sidebar.js (#592.6). */
 
 .sn-sidebar-feedback-thanks {
   font-size: 11px;

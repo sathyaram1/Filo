@@ -415,11 +415,17 @@
     // modello guarda il resto e blocca tutto il percorso se ci riconosce una
     // persona. Prometteva «senza il tuo nome» quando quel modello, di fatto,
     // non vedeva niente di quello che stava per uscire (#584, terzo giro).
-    const promessa = 'Rispondendo condividi i passi di questo percorso con chi userà Filo su questo sito. Filo toglie prima i dati personali e l’ora; se resta qualcosa che dice chi sei, non lo pubblica.';
-    nota.textContent = promessa;
+    const tutela = 'Filo toglie prima i dati personali e l’ora; se resta qualcosa che dice chi sei, non lo pubblica.';
+    nota.textContent = `Rispondendo condividi i passi di questo percorso con chi userà Filo su questo sito. ${tutela}`;
     wrap.appendChild(nota);
+    // Il riquadro sta nel documento del sito: i bottoni in uno Shadow DOM chiuso, che la pagina non trova né preme,
+    // e il sì alla condivisione nel popup di Filo, che su un sito sta fuori dalla sua portata (#592.6).
     const row = document.createElement('div');
     row.className = 'sn-sidebar-feedback-row';
+    const bottoni = row.attachShadow({ mode: 'closed' });
+    const stile = document.createElement('style');
+    stile.textContent = CSS_RISPOSTA;
+    bottoni.appendChild(stile);
 
     const up = document.createElement('button');
     up.type = 'button';
@@ -445,14 +451,18 @@
       wrap.appendChild(t);
     }
 
-    // Questo riquadro sta nel documento del sito, che può riscriverlo e premerne i bottoni: il sì alla
-    // condivisione lo si dà nel popup di Filo, che lì sta fuori dalla sua portata (#592.6). Un no chiude la domanda.
+    // Un no nel popup chiude la domanda: niente parte, e non si ripropone.
     async function rispondi(riuscito) {
       disableAll();
       let ok = false;
       try {
         const Ui = global.SN_CONFIRM_UI;
-        ok = !!Ui && await Ui.confirm({ title: 'Condividi questo percorso?', text: promessa, okLabel: 'Condividi', cancelLabel: 'Non condividere' });
+        ok = !!Ui && await Ui.confirm({
+          title: 'Condividi questo percorso?',
+          text: `Filo condivide i passi di questo percorso con chi lo userà su questo sito. ${tutela}`,
+          okLabel: 'Condividi',
+          cancelLabel: 'Non condividere',
+        });
       } catch (_) { ok = false; }
       if (!ok) { wrap.classList.add('sn-sidebar-feedback-dismissed'); return; }
       saveCurrentPath(riuscito).catch(() => {});
@@ -466,12 +476,58 @@
       wrap.classList.add('sn-sidebar-feedback-dismissed');
     });
 
-    row.appendChild(up);
-    row.appendChild(down);
-    row.appendChild(skip);
+    bottoni.appendChild(up);
+    bottoni.appendChild(down);
+    bottoni.appendChild(skip);
     wrap.appendChild(row);
     conv.appendChild(wrap);
     conv.scrollTop = conv.scrollHeight;
+    rispostaAperta = { up, down, skip };
+  }
+
+  let rispostaAperta = null;
+  const CSS_RISPOSTA = `
+.sn-sidebar-feedback-btn {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 12px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: 999px;
+  font-size: 12px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.sn-sidebar-feedback-btn:hover {
+  background: var(--sn-accent);
+  color: #fff;
+  border-color: var(--sn-accent);
+}
+.sn-sidebar-feedback-btn:disabled { cursor: default; opacity: 0.5; }
+.sn-sidebar-feedback-btn:disabled:hover {
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border-color: var(--sn-border);
+}
+.sn-sidebar-feedback-skip {
+  all: unset;
+  cursor: pointer;
+  margin-left: auto;
+  padding: 0 6px;
+  color: var(--sn-muted);
+  font-size: 14px;
+  line-height: 1;
+}
+.sn-sidebar-feedback-skip:hover { color: var(--sn-fg); }
+.sn-sidebar-feedback-skip:disabled { opacity: 0.5; cursor: default; }
+`;
+
+  // Per gli spec: i bottoni stanno in un root chiuso, i locator non ci arrivano. Centro per un clic vero del mouse.
+  function puntoRisposta(quale) {
+    const b = rispostaAperta && rispostaAperta[quale];
+    if (!b || !b.isConnected) return null;
+    const r = b.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2, disabled: b.disabled, label: b.textContent };
   }
 
   // Da questa pagina un percorso condiviso partirebbe? Lo sa solo il processo
@@ -1284,6 +1340,6 @@
     // che legge chiunque, quindi quello che c'è scritto è una promessa (#584).
     // `renderFeedbackPrompt` lo disegna e basta; chi decide se chiedere è
     // `percorsoRaccoglibile`, ed è quella la porta che vale.
-    renderFeedbackPrompt, percorsoRaccoglibile,
+    renderFeedbackPrompt, percorsoRaccoglibile, puntoRisposta,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

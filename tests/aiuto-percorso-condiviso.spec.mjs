@@ -9,8 +9,11 @@
 // quando si risponde.
 //
 // Senza il fix il primo test è rosso: sotto la domanda non c'era niente.
+// Il riquadro sta nel documento del sito: i bottoni sono in un root chiuso e il sì
+// alla condivisione si dà nel popup di Filo, che la pagina non tocca (#592.6).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { clickConfirm, confirmState, confermaSopraPagina, nelMondoDiFilo } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -24,6 +27,13 @@ async function apriRiquadro(page) {
     window.__filoSidebarTest.renderFeedbackPrompt();
   });
   await page.waitForSelector('.sn-sidebar-feedback', { timeout: 8000 });
+}
+
+// I bottoni della risposta stanno in un root chiuso: un clic vero del mouse sul loro centro.
+async function premi(page, quale) {
+  const p = await page.evaluate((q) => window.__filoSidebarTest.puntoRisposta(q), quale);
+  expect(p, `bottone «${quale}» presente`).toBeTruthy();
+  await page.mouse.click(p.x, p.y);
 }
 
 test('sotto «Ha funzionato?» c’è scritto che rispondendo si condivide il percorso', async ({ openTab }) => {
@@ -78,15 +88,17 @@ async function ascolta(page) {
   });
 }
 
-test('il pollice in su pubblica davvero, una volta sola, e senza dire chi \u00e8 stato', async ({ openTab }) => {
+test('il pollice in su chiede il sì nel popup, poi pubblica davvero, una volta sola, e senza dire chi \u00e8 stato', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
   await apriRiquadro(page);
   await ascolta(page);
 
-  const su = page.locator('.sn-sidebar-feedback').last().locator('.sn-sidebar-feedback-btn').first();
-  await su.click();
-  await su.click({ force: true }).catch(() => {});
-  await su.click({ force: true }).catch(() => {});
+  await premi(page, 'up');
+  await expect.poll(() => confirmState(page).then((s) => s && s.text)).toContain('dati personali');
+  expect(await page.evaluate(() => window.__inviati.length)).toBe(0);
+  await clickConfirm(page, 'ok');
+  await premi(page, 'up');
+  await premi(page, 'up');
   await page.waitForTimeout(150);
 
   const inviati = await page.evaluate(() => window.__inviati);
@@ -107,7 +119,8 @@ test('il pollice in gi\u00f9 pubblica anche lui, con l\u2019esito negativo', asy
   await apriRiquadro(page);
   await ascolta(page);
 
-  await page.locator('.sn-sidebar-feedback').last().locator('.sn-sidebar-feedback-btn').nth(1).click();
+  await premi(page, 'down');
+  await clickConfirm(page, 'ok');
   await page.waitForTimeout(150);
 
   const inviati = await page.evaluate(() => window.__inviati);
@@ -120,13 +133,65 @@ test('il pollice in gi\u00f9 pubblica anche lui, con l\u2019esito negativo', asy
   expect(nota.toLowerCase()).toContain('rispondendo');
 });
 
+test('«Non condividere» nel popup non pubblica niente e chiude la domanda', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await apriRiquadro(page);
+  await ascolta(page);
+
+  await premi(page, 'up');
+  await clickConfirm(page, 'cancel');
+  await page.waitForTimeout(150);
+
+  expect(await page.evaluate(() => window.__inviati.length)).toBe(0);
+  expect(await page.evaluate(() => window.__filoSidebarTest.puntoRisposta('up').disabled)).toBe(true);
+});
+
 test('la X non pubblica niente: chiudere il riquadro \u00e8 la via d\u2019uscita', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
   await apriRiquadro(page);
   await ascolta(page);
 
-  await page.locator('.sn-sidebar-feedback').last().locator('.sn-sidebar-feedback-skip').click();
+  await premi(page, 'skip');
   await page.waitForTimeout(150);
 
   expect(await page.evaluate(() => window.__inviati.length)).toBe(0);
+});
+
+// La pagina ostile: appena compare la domanda ne riscrive la riga e cerca un bottone da premere.
+const OSTILE = `<!doctype html><html><body><h1>Negozio</h1><script>
+  window.__premuto = null;
+  setInterval(() => {
+    const nota = document.querySelector('.sn-sidebar-feedback-nota');
+    if (nota && !nota.dataset.mio) { nota.dataset.mio = '1'; nota.textContent = 'Solo un parere privato per Filo.'; }
+    const b = document.querySelector('.sn-sidebar-feedback button, .sn-sidebar-feedback-btn');
+    if (b && !b.disabled && !window.__premuto) { window.__premuto = b.textContent; b.click(); }
+  }, 50);
+</script></body></html>`;
+
+test('su un sito la pagina non risponde da s\u00e9, e chi risponde legge nel popup quello che succede davvero', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, OSTILE);
+  const host = new URL(page.url()).hostname;
+  await nelMondoDiFilo(app, host, `(() => {
+    globalThis.__inviati = 0;
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (m, ...r) => { if (m && m.type === 'save_path') { globalThis.__inviati++; return Promise.resolve({ ok: true }); } return orig(m, ...r); };
+    SN_SIDEBAR.open();
+    __filoSidebarTest.renderFeedbackPrompt();
+    return 1;
+  })()`);
+  await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => window.__premuto)).toBe(null);
+  expect(await nelMondoDiFilo(app, host, 'globalThis.__inviati')).toBe(0);
+
+  const p = await nelMondoDiFilo(app, host, "__filoSidebarTest.puntoRisposta('up')");
+  await page.mouse.click(p.x, p.y);
+  const vista = await confermaSopraPagina(app);
+  const s = await vista.evaluate(() => window.SN_CONFIRM_UI._test.state());
+  expect(s.text).toContain('dati personali');
+  expect(s.text).not.toContain('parere privato');
+  expect(await nelMondoDiFilo(app, host, 'globalThis.__inviati')).toBe(0);
+  await page.waitForTimeout(700);
+  const ok = await vista.evaluate(() => window.SN_CONFIRM_UI._test.point('ok'));
+  await vista.mouse.click(ok.x, ok.y);
+  await expect.poll(() => nelMondoDiFilo(app, host, 'globalThis.__inviati')).toBe(1);
 });
