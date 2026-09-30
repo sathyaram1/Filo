@@ -856,11 +856,20 @@
     let authRefused = 0;
     if (idToken) {
       doc.fields.senderProof = toFsValue('admin');
+      if (localOnly) {
+        doc.fields.localOnly = toFsValue({
+          by: String(localOnly.by || '').slice(0, 120),
+          at: Math.round(Number(localOnly.at) || Date.now()),
+        });
+      }
       res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify(doc),
       });
+      if (localOnly && (res.status === 401 || res.status === 403)) {
+        throw new Error(`firestore create fallito (${res.status}): token admin rifiutato, e un feedback solo locale non parte da anonimo`);
+      }
       if (res.status === 401 || res.status === 403) {
         authRefused = res.status;
         delete doc.fields.senderProof;
