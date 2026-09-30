@@ -100,7 +100,7 @@ class BarraLaterale {
   // Preferenze → Avanzate, la chat e il tasto destro sulla striscia: tutte le scritture passano da applySettingsUpdate.
   impostazioni(v) {
     this.opzioni = opzioniDi(v);
-    if (!this.opzioni.spinta) { this._ferma('sonda'); this._segnaBordo(false); }
+    if (!this.opzioni.spinta) { this._ferma('sonda'); this._segnaBordo(false); } else this._guarda();
     this._invia();
   }
 
