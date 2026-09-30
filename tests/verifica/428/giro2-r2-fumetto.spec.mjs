@@ -3,13 +3,14 @@
 // Serve il puntatore vero del sistema (xdotool, X11) e la finestra a schermo: altrove si salta.
 
 import { execFileSync } from 'node:child_process';
+import { test, expect } from '../../fixtures/electron.mjs';
 
 let xdotool = false;
 try { execFileSync('xdotool', ['version'], { stdio: 'ignore' }); xdotool = process.platform === 'linux' && !!process.env.DISPLAY; } catch (_) {}
-// La finestra nascosta dei test non riceve il puntatore vero.
+// La finestra nascosta dei test non riceve il puntatore vero; l'avvio legge l'ambiente al lancio.
+const nascosta = process.env.FILO_HIDE_WINDOW;
 if (xdotool) delete process.env.FILO_HIDE_WINDOW;
-
-const { test, expect } = await import('../../fixtures/electron.mjs');
+test.afterAll(() => { if (nascosta !== undefined) process.env.FILO_HIDE_WINDOW = nascosta; });
 
 const xdo = (...a) => execFileSync('xdotool', a.map(String));
 
@@ -17,7 +18,7 @@ async function larghezze(shell) {
   return shell.evaluate(() => [...document.querySelectorAll('#tabs .tab:not(.active)')].map((el) => el.getBoundingClientRect().width));
 }
 
-async function striscaFerma(shell) {
+async function strisciaQuieta(shell) {
   for (let i = 0; i < 40; i++) {
     const n = await shell.evaluate(() => new Promise((res) => {
       let c = 0;
@@ -35,7 +36,7 @@ test('fermo sul fumetto sotto la fila, dopo una chiusura le schede si adattano',
     await shell.evaluate((u) => window.filoShell.tabs.open(u), testServer.html(`<title>Ricetta della pasta al forno numero ${i} - Cucina di casa</title><p>${i}</p>`));
   }
   await expect(shell.locator('#tabs .tab')).toHaveCount(14, { timeout: 15_000 });
-  await striscaFerma(shell);
+  await strisciaQuieta(shell);
   const b = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x.getBounds().width > 1000);
     w.focus();
@@ -47,7 +48,7 @@ test('fermo sul fumetto sotto la fila, dopo una chiusura le schede si adattano',
   const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
   xdo('mousemove', ...schermo(cx - 20, cy)); await shell.waitForTimeout(100);
   xdo('mousemove', ...schermo(cx, cy)); await shell.waitForTimeout(300);
-  const prima = await larghezze(shell);
+  const prima = Math.max(...await larghezze(shell));
   xdo('click', 1);
   // Il fumetto della scheda scivolata sotto il puntatore compare dopo 350 ms.
   await shell.waitForTimeout(900);
@@ -61,6 +62,6 @@ test('fermo sul fumetto sotto la fila, dopo una chiusura le schede si adattano',
   expect((await shell.evaluate(() => window.filoShell.puntatore())).y, 'il puntatore è sotto la fila').toBeGreaterThan(40);
   await expect.poll(async () => {
     const ora = await larghezze(shell);
-    return ora.every((w, i) => w > prima[i] + 0.5) ? 'adattate' : 'ferme';
+    return ora.every((w) => w > prima + 0.5) ? 'adattate' : `ferme a ${prima}`;
   }, { timeout: 3_000 }).toBe('adattate');
 });
