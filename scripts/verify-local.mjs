@@ -1141,7 +1141,7 @@ if (isMain) {
     console.error('Ambito della verifica: ' + (scope === 'chiusura' ? 'chiusura (giro stretto acceso, e il giro prima è stato corretto)' : 'pieno'));
     console.error(state[b].feedbackId
       ? `Pratica del lavoro: ${state[b].feedbackNum ? '#' + state[b].feedbackNum : state[b].feedbackId} (la porta npm run finish).`
-      : 'Nessuna pratica collegata: npm run finish chiederà la fusione senza (start --feedback <N> per legarla).');
+      : 'Nessuna pratica collegata. Ogni lavoro locale ha il suo feedback, e senza npm run finish non chiede la fusione: aprilo (npm run feedback:apri) e rilancia start --feedback <N>.');
     if (pratica && pratica.avviso) console.error(pratica.avviso);
     process.exit(0);
   }
