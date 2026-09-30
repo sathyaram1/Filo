@@ -230,7 +230,7 @@ describe('la pratica del lavoro locale (#908)', () => {
     const msg = messageForOwnerMerge(r, 'claude/x', { feedbackId: 'fid908' });
     assert.match(msg, /^✓/);
     assert.match(msg, /L5 saltato.*#908/, 'il numero arriva dal server anche senza quello del finish');
-    assert.match(msg, /Blocchi registrati \(1\)[^\n]*\n\s+· guard_the_guards/);
+    assert.match(msg, /Blocchi registrati \(1\)[^\n]*\n\s+· Tocca aree protette .*: firestore\.rules/);
     assert.match(msg, /Pratica #908 chiusa/);
     assert.doesNotMatch(msg, /NON si è registrata/);
     assert.equal(exitCodeForOwnerMerge(r), 0);
