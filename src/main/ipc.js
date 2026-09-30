@@ -55,7 +55,7 @@ function senderInfo(event) {
   return {
     tab: tab ? { id: tab.id, url: tab.url, title: tab.title } : null,
     url: wc.getURL(),
-    isShell: win ? win.webContents === wc : false,
+    isShell: Boolean(finestraDellaBarra(wc)),
     // Riferimento alla finestra proprietaria (in-process: l'handler è chiamato
     // direttamente, non oltre il confine IPC) + flag incognito, così i servizi
     // aprono i tab nella finestra giusta e l'IPC instrada lo storage in RAM.
