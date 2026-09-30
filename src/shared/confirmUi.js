@@ -376,7 +376,7 @@
     if (daFuori(ospite)) return fuori('confirm', opts);
     const { title = 'Conferma', text = '', okLabel = 'OK', cancelLabel = 'Annulla' } = opts || {};
     return new Promise((resolve) => {
-      const { box, done, troppoPresto } = buildOverlay(resolve, ospite);
+      const { box, done, troppoPresto } = buildOverlay(resolve, ospite, opts);
       header(box, { title, text });
       const row = buttonRow(box);
       const cancel = makeBtn(row, cancelLabel, 'sn-confirm-btn-cancel');
@@ -403,8 +403,9 @@
     const { title = 'Conferma richiesta', text = '', word = 'conferma', okLabel = 'Esegui', cancelLabel = 'Annulla' } = opts || {};
     return new Promise((resolve) => {
       const doc = global.document;
-      const { box, done, troppoPresto, fuoco } = buildOverlay(resolve, ospite);
-      header(box, { title, text: `${text}\n\nQuesta azione non è reversibile. Scrivi “${word}” per procedere.` });
+      const { box, done, troppoPresto, fuoco } = buildOverlay(resolve, ospite, opts);
+      const avviso = opts && opts.reversibile ? '' : 'Questa azione non è reversibile. ';
+      header(box, { title, text: `${text}\n\n${avviso}Scrivi “${word}” per procedere.` });
 
       const input = doc.createElement('input');
       input.type = 'text';
@@ -446,7 +447,7 @@
     if (daFuori(ospite)) return fuori('notify', opts);
     const { title = '', text = '', okLabel = 'OK' } = opts || {};
     return new Promise((resolve) => {
-      const { box, done, troppoPresto, fuoco } = buildOverlay(resolve, ospite);
+      const { box, done, troppoPresto, fuoco } = buildOverlay(resolve, ospite, opts);
       header(box, { title, text });
       const row = buttonRow(box);
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-ok');
@@ -480,6 +481,7 @@
         okDisabled: !!(okBtn && (okBtn.disabled || okBtn.getAttribute('aria-disabled') === 'true')),
         textScrollTop: textEl ? textEl.scrollTop : 0,
         hasInput: !!q('.sn-confirm-input'),
+        copre: !!q('.sn-confirm-copre'),
         textScrolls: !!(textEl && textEl.scrollHeight > textEl.clientHeight + 1),
         selectionBg,
       };
