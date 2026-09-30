@@ -2432,19 +2432,41 @@ function proxyUnavailableForPrompt(actions) {
     + 'Dillo all\'utente in una frase, senza darlo per fatto e senza promettere che succederà da solo, e non riprovare.]';
 }
 
-// Le voci colpite da un'azione (`_targets`) sono nomi salvati (#592.4): nella
-// frase di Filo diventano «voce N», e i nomi veri stanno nel recinto sotto.
+// I campi che portano un testo salvato da Filo, oltre alle voci colpite
+// (`_targets`, per ogni azione): un'azione nuova che ripete un nome salvato va qui.
+const CAMPI_SALVATI = {
+  TIMER: ['label', 'etichetta'],
+  SVEGLIA: ['label', 'etichetta'],
+  SALVA_LEZIONE: ['testo', 'text', 'lezione'],
+  DIMENTICA: ['_righe'],
+};
+
+// I testi salvati che una descrizione ripete (#592.4): nella frase di Filo
+// diventano «voce N», e i testi veri stanno nel recinto sotto, ripuliti.
 function descriviPerModello(action, { fatto = false } = {}) {
   const Levels = globalThis.SN_ACTION_LEVELS;
   if (!Levels) return '';
   const descrivi = fatto && Levels.describeDone ? Levels.describeDone : Levels.describe;
-  const voci = Array.isArray(action && action._targets) ? action._targets : [];
-  if (!voci.length) return descrivi(action) || '';
+  const tipo = String((action && action.type) || '').toUpperCase();
+  const voci = [];
+  const voce = (v) => {
+    const s = String(v);
+    if (!voci.includes(s)) voci.push(s);
+    return `voce ${voci.indexOf(s) + 1}`;
+  };
+  const copia = { ...action };
+  for (const campo of ['_targets', ...(CAMPI_SALVATI[tipo] || [])]) {
+    const v = action && action[campo];
+    if (Array.isArray(v)) copia[campo] = v.map(voce);
+    else if (typeof v === 'string' && v.trim()) copia[campo] = voce(v);
+  }
+  const frase = descrivi(copia) || '';
+  const usate = voci.map((v, i) => ({ v, n: i + 1 })).filter(({ n }) => new RegExp(`\\bvoce ${n}\\b`).test(frase));
+  if (!usate.length) return frase;
   const E = globalThis.SN_ESTERNO;
-  const frase = descrivi({ ...action, _targets: voci.map((_, i) => `voce ${i + 1}`) }) || '';
   return `${frase}\n${E.imbusta({
     tipo: 'TESTO_SALVATO',
-    testo: voci.map((v, i) => `voce ${i + 1}: ${E.neutralizza(v, { unaRiga: true })}`).join('\n'),
+    testo: usate.map(({ v, n }) => `voce ${n}: ${E.neutralizza(v, { unaRiga: true })}`).join('\n'),
   })}`;
 }
 
