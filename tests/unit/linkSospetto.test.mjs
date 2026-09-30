@@ -294,3 +294,55 @@ test('un link che imita un altro sito non si contatta nemmeno per leggerne il ti
   assert.equal(LS.grave(null), false);
   assert.equal(LS.grave([42, {}]), false);
 });
+
+test('le porte del giro 5: chiocciola e numero, lettere fuori tabella, nome incollato, esche', () => {
+  // #725.2 — ogni forma qui si legge come il sito vero e non lo è.
+  const casi = {
+    'http://paypal.com@203.0.113.7/login': ['brand_in_subdomain:paypal.com', '203.0.113.7'],
+    'http://www.paypal.com@192.168.1.1/': ['brand_in_subdomain:paypal.com', '192.168.1.1'],
+    'https://login-microsoftonline.com/common/oauth2': ['combosquatting:microsoft.com', 'login-microsoftonline.com'],
+    'https://microsoftonline-login.com/': ['combosquatting:microsoft.com', 'microsoftonline-login.com'],
+    'https://microsoft365-login.com/': ['combosquatting:microsoft.com', 'microsoft365-login.com'],
+    'https://amazonprime-rinnovo.com/': ['combosquatting:amazon.com', 'amazonprime-rinnovo.com'],
+    'https://instagram-copyright.com/appeal': ['combosquatting:instagram.com', 'instagram-copyright.com'],
+    'https://www-paypal.com/signin': ['combosquatting:paypal.com', 'www-paypal.com'],
+    'https://secure-раураl.com/': ['combosquatting:paypal.com', 'secure-раураl.com'],
+    'https://paypal.com.аccesso-sicuro.net/': ['brand_in_subdomain:paypal.com', 'аccesso-sicuro.net'],
+  };
+  for (const [u, [codice, sito]] of Object.entries(casi)) {
+    assert.deepEqual(LS.analizza(u), [codice], `nessun avviso giusto su ${u}`);
+    const avviso = LS.avviso(LS.analizza(u), u);
+    assert.ok(avviso.includes(`il sito è ${sito}:`), `l’avviso non nomina il sito come si legge su ${u}: ${avviso}`);
+    assert.ok(!/xn--/.test(avviso), `l’avviso mostra il codice interno su ${u}: ${avviso}`);
+  }
+  // Una lettera sosia che la tabella non conosce non spegne il confronto.
+  const sosia = {
+    'https://mıcrosoft.com/login': 'microsoft.com',
+    'https://lınkedın.com/': 'linkedin.com',
+    'https://ɑmazon.com/': 'amazon.com',
+    'https://ɑpple.com/': 'apple.com',
+    'https://ԍithub.com/login': 'github.com',
+    'https://paypaǀ.com/': 'paypal.com',
+  };
+  for (const [u, imitato] of Object.entries(sosia)) {
+    assert.deepEqual(LS.analizza(u), ['homograph:' + imitato], `nessun avviso su ${u}`);
+  }
+  assert.deepEqual(LS.analizza('https://ԍithub.com.evil.net/'), ['brand_in_subdomain:github.com']);
+});
+
+test('le pagine che appartengono davvero all’azienda nominata non sono imitazioni', () => {
+  // #725.2 — servizi riservati alle aziende col nome del cliente in testa, e
+  // domini tecnici del marchio: un avviso qui grida al lupo.
+  for (const u of [
+    'https://paypal.wd1.myworkdayjobs.com/jobs',
+    'https://google.qualtrics.com/jfe/form/SV_prova',
+    'https://youtube.googleapis.com/v/dQw4w9WgXcQ',
+    'https://github.githubassets.com/assets/app.js',
+    'https://youtube-eng.googleblog.com/',
+  ]) {
+    assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
+  }
+  // Sugli stessi servizi il nome con un'esca, o dietro un'altra azienda, resta sospetto.
+  assert.deepEqual(LS.analizza('https://paypal-login.qualtrics.com/'), ['brand_in_subdomain:paypal.com']);
+  assert.deepEqual(LS.analizza('https://paypal.com@evil.qualtrics.com/'), ['brand_in_subdomain:paypal.com']);
+});

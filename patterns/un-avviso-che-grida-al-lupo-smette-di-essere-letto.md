@@ -46,8 +46,10 @@ nome dentro un altro indirizzo però è anche `github-readme-stats` o
 `apple.stackexchange.com`. Il segnale preciso: nei sottodomini (e prima della
 chiocciola) il nome da solo basta, accanto al nome registrato serve una parola
 d'esca (`secure`, `login`, `com`, `rimborsi`); i domini certificati e le pagine
-per azienda (`microsoft.github.io`) restano fuori. Il dominio registrabile e gli
-omoglifi li decide lo stesso motore dei siti aperti, non una seconda copia.
+per azienda (`microsoft.github.io`, `paypal.wd1.myworkdayjobs.com`) restano
+fuori. Il dominio registrabile e gli omoglifi li decide lo stesso motore dei
+siti aperti, non una seconda copia. Una lettera sosia che la tabella non
+conosce resta com'è e conta nella distanza: scartarla spegneva il confronto.
 
 **Ogni frase ipotizza, nessuna afferma.** Il controllo guarda l'indirizzo, non
 il sito: «potrebbe essere un'imitazione» si può dire, «chi lo riceve entra al

@@ -25,7 +25,7 @@ const EXTRA = [
   'google.es', 'android.com', 'chromium.org', 'gstatic.com',
   'googleusercontent.com', 'googleapis.com', 'googletagmanager.com',
   'google-analytics.com', 'ggpht.com', 'doubleclick.net', 'withgoogle.com',
-  'goo.gl', 'recaptcha.net',
+  'goo.gl', 'recaptcha.net', 'googleblog.com',
   // CDN/infra di altri brand (contengono il token del brand ma sono ufficiali)
   'fbcdn.net', 'cdninstagram.com', 'licdn.com', 'twimg.com',
   'paypalobjects.com', 'icloud-content.com',

@@ -70,7 +70,7 @@ const BRANDS = [
   { token: 'shopify', display: 'Shopify', domains: ['shopify.com', 'myshopify.com'] },
 
   // Dev / lavoro
-  { token: 'github', display: 'GitHub', domains: ['github.com', 'github.io', 'github.dev'] },
+  { token: 'github', display: 'GitHub', domains: ['github.com', 'github.io', 'github.dev', 'githubassets.com'] },
   { token: 'gitlab', display: 'GitLab', domains: ['gitlab.com', 'gitlab.io'] },
 ];
 
