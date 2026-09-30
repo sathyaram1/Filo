@@ -291,7 +291,7 @@
     if (forma === 'brand_in_subdomain' || forma === 'combosquatting') {
       const sito = url ? sitoCheComanda(url) : null;
       const dove = !sito ? 'porta a un altro sito'
-        : sito.piattaforma ? `la pagina sta su ${sito.piattaforma}` : `il sito è ${sito.registrabile}`;
+        : sito.piattaforma ? `la pagina sta su ${sito.piattaforma}` : `il sito è ${sito.registrabileU}`;
       return `L’indirizzo usa il nome di ${dominio}, ma ${dove}: potrebbe essere un’imitazione.`;
     }
     return '';
