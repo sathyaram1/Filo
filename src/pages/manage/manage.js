@@ -2896,8 +2896,9 @@
     // fonde i blocchi nuovi, e un clic lo fa diventare pieno.
     const m = segno && segno.tipo === 'pieno' ? segno : null;
     const aperta = isOpenPublic(fb);
+    const locale = MR.isProvenLocalWork(fb);
     mgPreapproveBtn.disabled = false;
-    mgPreapproveBtn.hidden = !aperta;
+    mgPreapproveBtn.hidden = !aperta || locale;
     if (mgPreapproveLine) mgPreapproveLine.hidden = !aperta;
     mgPreapproveBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
     mgPreapproveBtn.textContent = m ? 'Chiedimi prima di fondere' : 'Fondi senza chiedermelo';
