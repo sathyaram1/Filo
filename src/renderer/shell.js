@@ -880,6 +880,7 @@
         const p = document.createElement('span');
         p.className = 'proxy-ind';
         p.setAttribute('aria-label', 'Aperta da un altro paese');
+        p.dataset.tip = 'Aperta da un altro paese';
         p.innerHTML = PROXY_IND_SVG + '<span class="cc">' + t.proxy.country.toUpperCase() + '</span>';
         el.appendChild(p);
       }
