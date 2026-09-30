@@ -351,3 +351,24 @@ test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza 
   expect(provRes.ok).toBe(false);
   expect(String(provRes.error || '')).toMatch(/amministrator/i);
 });
+
+// #465: la ricerca fra i feedback si imposta in Gestione, ma finché lì non la si salva la
+// sua catena vive qui. Salvare la griglia non deve cancellare le funzioni che non mostra.
+test('salvare i modelli predefiniti tiene la catena delle funzioni spostate in Gestione', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, {
+    models: { manage_search: 'esistente', explain: 'esistente' },
+  });
+  await expect(page.locator('#modelsGrid label', { hasText: /ricerca fra i feedback/i })).toHaveCount(0);
+
+  await page.click('#saveBtn');
+  await expect.poll(() => page.evaluate(() => window.__sent.some((m) => m.type === 'defaults_update'))).toBe(true);
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd.config.models.manage_search).toBe('esistente');
+  expect(upd.config.models.explain).toBe('esistente');
+
+  // Anche al secondo salvataggio, dopo che la pagina ha riletto la risposta.
+  await page.click('#saveBtn');
+  await expect.poll(() => page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').length)).toBe(2);
+  const upd2 = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd2.config.models.manage_search).toBe('esistente');
+});

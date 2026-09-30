@@ -11,7 +11,9 @@ const MODELS = {
   judgeRedTeam: '', judgePriority: '',
   manageSearch: 'deepseek-flash',
   judgeRegistry: { 'giudice-veloce': { provider: 'openrouter', model: 'deepseek/deepseek-v4-pro' } },
-  sharedNicknames: [{ nick: 'deepseek-flash', label: 'DeepSeek Flash' }],
+  sharedNicknames: [{ nick: 'deepseek-flash', label: 'DeepSeek Flash' }, { nick: 'solo-condiviso', label: '' }],
+  // Il registro con cui l'app risolve la ricerca: con i modelli propri non coincide coi condivisi.
+  appRegistry: { 'deepseek-flash': { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash', label: 'DeepSeek Flash' } },
   openrouterKeyPresent: true,
 };
 
@@ -61,6 +63,35 @@ test('la ricerca fra i feedback ha il suo modello in Gestione → Modelli, e il 
   const inviato = await page.evaluate(() => window.__inviati[0]);
   expect(inviato.models.manageSearch).toBe('giudice-veloce');
   await expect(page.locator('#mgSmStatus')).toHaveText('Salvato.');
+});
+
+test('il campo della ricerca conosce i modelli che la ricerca può usare: segnala quelli che non esistono e propone gli altri', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriModelli(page);
+
+  const input = page.locator('.mg-sm-slot[data-slot="manageSearch"] .sn-chain-input').first();
+  const segnalato = () => input.evaluate((e) => Boolean(e.title) && Boolean(e.style.color));
+  await expect(input).toHaveValue('deepseek-flash');
+  expect(await segnalato()).toBe(false);
+
+  await input.fill('flsh');
+  await input.press('Tab');
+  await expect.poll(segnalato).toBe(true);
+
+  // Un nickname dei giudici vale anche qui: la ricerca risolve col loro registro sopra al suo.
+  await input.fill('giudice-veloce');
+  await input.press('Tab');
+  await expect.poll(segnalato).toBe(false);
+
+  // Il Tab chiude la tendina con un ritardo: si riapre dopo, non durante.
+  await page.waitForTimeout(250);
+  await input.fill('');
+  await input.pressSequentially('e');
+  const tendina = page.locator('.mg-sm-slot[data-slot="manageSearch"] .sn-select-pop');
+  await expect(tendina).toBeVisible();
+  const proposti = await tendina.locator('.sn-select-option').evaluateAll((els) => els.map((e) => e.dataset.value));
+  expect(proposti).toEqual(expect.arrayContaining(['giudice-veloce', 'deepseek-flash']));
+  expect(proposti).not.toContain('solo-condiviso');
 });
 
 test('scrivendo nel campo «Modello OpenRouter» del registro compaiono i modelli del catalogo', async ({ openTab }) => {
