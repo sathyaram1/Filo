@@ -932,18 +932,20 @@
   // detail all'hover, ma è già precaricata (preloadVisibleCards) così è istantanea.
   // `qty` arriva dall'import (§11.2, es. "37 Forest"): il toggle la userà
   // come quantità reale invece del default 1 delle ricerche normali.
-  function chatRowHtml(id, qty) {
+  // `unchecked`: il giudice non l'ha potuta guardare (§4.1), la riga lo dice.
+  function chatRowHtml(id, qty, unchecked) {
     const card = cardsById[id];
     const name = card ? card.name : id;
     const mana = card ? manaHtml(card.manaCost) : '';
     const added = inDeck(id);
     const q = Number(qty) > 1 ? Number(qty) : 0;
+    const flag = unchecked ? '<span class="dk-row-flag" title="Non controllata: potrebbe non c\'entrare">?</span>' : '';
     return `
-      <div class="dk-row" data-card-id="${esc(id)}">
+      <div class="dk-row${unchecked ? ' dk-row-unchecked' : ''}" data-card-id="${esc(id)}">
         <button class="dk-add" data-add="${esc(id)}" data-qty="${q || 1}" data-in="${added ? 1 : 0}"
                 title="${added ? 'Rimuovi dal mazzo' : 'Aggiungi al mazzo'}"
                 aria-label="${added ? `Rimuovi ${esc(name)} dal mazzo` : `Aggiungi ${esc(name)} al mazzo`}">${added ? '✓' : '+'}</button>
-        <span class="dk-row-name">${q ? `<span class="dk-row-qty">${q}×</span> ` : ''}${esc(name)}</span>
+        <span class="dk-row-name">${q ? `<span class="dk-row-qty">${q}×</span> ` : ''}${esc(name)}</span>${flag}
         <span class="dk-row-mana">${mana}</span>
       </div>`;
   }
@@ -978,9 +980,25 @@
       </div>`;
   }
 
+  // Bolla in attesa: la frase del modello appena c'è, e la fase della ricerca con quante carte su quante (#382).
+  function progressHtml(p) {
+    if (!p || !(p.total > 0)) return '<div class="dk-msg-pending">Filo sta pensando…</div>';
+    const n = (x) => Number(x).toLocaleString('it-IT');
+    const done = Math.min(Number(p.done) || 0, p.total);
+    const label = p.fase === 'controllo'
+      ? `Controllo una per una le ${n(p.total)} carte trovate…`
+      : 'Cerco le carte su Scryfall…';
+    const pct = Math.round((done / p.total) * 100);
+    return `${p.reply ? `<p class="dk-msg-text">${proseHtml(p.reply)}</p>` : ''}
+      <div class="dk-msg-pending dk-progress" role="status">
+        <span>${esc(label)}</span><span class="dk-progress-n">${n(done)} di ${n(p.total)}</span>
+        <span class="dk-progress-bar" aria-hidden="true"><span style="width:${pct}%"></span></span>
+      </div>`;
+  }
+
   function chatBubbleHtml(m, isLast) {
     if (m.who === 'user') return `<div class="dk-msg dk-msg-user">${esc(m.text)}</div>`;
-    if (m.pending) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Filo sta pensando…</div></div>`;
+    if (m.pending) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}${progressHtml(m.progress)}</div>`;
     // Solo l'ultima bolla si riprova: rifarne una in mezzo metterebbe la risposta fuori posto.
     const retry = isLast ? '<button class="dk-retry" data-retry="1" title="Rimanda la stessa domanda">↻ Riprova</button>' : '';
     if (m.interrupted) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta interrotta. La pagina si è chiusa prima che Filo finisse.</div>${retry}</div>`;
@@ -1005,6 +1023,7 @@
       // aggiunge/aggiorna TUTTE le carte riconosciute in un colpo solo — con
       // 100 carte di una lista incollata, cliccare riga per riga è attrito
       // puro. Resta comunque una conferma esplicita, mai automatica.
+      const unchecked = new Set(open && Array.isArray(m.uncheckedIds) ? m.uncheckedIds : []);
       const importDone = open && !!m.importQty && !importAllWouldChange(m);
       const importAllHtml = open && m.importQty
         ? `<button class="dk-import-all" data-import-all="1" ${importDone ? 'disabled' : ''}>${importDone ? 'Aggiunte ✓' : 'Aggiungi tutte al mazzo'}</button>`
@@ -1014,7 +1033,7 @@
           <span>${open ? '▾' : '▸'}</span>
           <span>${n} risultat${n === 1 ? 'o' : 'i'} ${esc(label)}</span>
         </button>
-        <div class="dk-cardlist" ${open ? '' : 'hidden'}>${open ? importAllHtml + ids.map((id) => chatRowHtml(id, m.importQty && m.importQty[id])).join('') : ''}</div>`);
+        <div class="dk-cardlist" ${open ? '' : 'hidden'}>${open ? importAllHtml + ids.map((id) => chatRowHtml(id, m.importQty && m.importQty[id], unchecked.has(id))).join('') : ''}</div>`);
     } else if (!m.reply) {
       parts.push(`<p class="dk-msg-text dk-msg-pending">Nessun risultato${m.query ? ` per "${esc(m.query)}"` : ''}.</p>`);
     }
@@ -1132,8 +1151,10 @@
     let cotRenderTimer = 0;
     const offReasoning = (window.filo && window.filo.onReasoning)
       ? window.filo.onReasoning((data) => {
-          if (!data || data.reqId !== reasoningReqId || !data.text || !bot.pending) return;
-          bot.reasoning = (bot.reasoning || '') + data.text;
+          if (!data || data.reqId !== reasoningReqId || !bot.pending) return;
+          if (data.progress) bot.progress = data.progress;
+          else if (data.text) bot.reasoning = (bot.reasoning || '') + data.text;
+          else return;
           if (!cotRenderTimer) {
             cotRenderTimer = setTimeout(() => {
               cotRenderTimer = 0;
@@ -1156,6 +1177,7 @@
         bot.reply = r.reply || '';
         bot.cardIds = r.cardIds || [];
         bot.query = r.query || '';
+        if (Array.isArray(r.uncheckedIds) && r.uncheckedIds.length) bot.uncheckedIds = r.uncheckedIds;
         // Import via chat (§11.2): quantità reali per riga (basics tipo
         // "37 Forest") + eventuale commander candidato, per il bottone
         // "Aggiungi tutte" e per il toggle per riga.

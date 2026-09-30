@@ -60,6 +60,9 @@
     if (m.clearChat === true) out.clearChat = true;
     const cardIds = idList(m.cardIds);
     if (cardIds.length) out.cardIds = cardIds;
+    // Le righe che il giudice non ha potuto guardare restano segnate anche riaprendo la chat (#382).
+    const unchecked = idList(m.uncheckedIds).filter((id) => cardIds.includes(id));
+    if (unchecked.length) out.uncheckedIds = unchecked;
     const query = str(m.query);
     if (query) out.query = query;
     const qty = qtyMap(m.importQty);
