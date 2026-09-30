@@ -336,7 +336,17 @@ export async function main(argvIn) {
   try { allegati = percorsiAllegati.map(leggiAllegato); }
   catch (e) { console.error(`USO: ${e.message}`); return EXIT.USO; }
 
-  const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun });
+  // La credenziale si chiede solo quando c'è davvero qualcosa da depositare:
+  // un errore d'uso o una prova a vuoto non toccano la rete.
+  const vuoto = !String(titolo || '').trim() || !String(testo || '').trim();
+  const cred = (dryRun || vuoto) ? { idToken: '' } : await credenziale.ottieni();
+  if (!dryRun && !vuoto && !cred.idToken) {
+    console.error(`ATTENZIONE: ${cred.motivo || 'nessun token admin'}. Il feedback parte come anonimo e passa dai giudici.`);
+  }
+  const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun, idToken: cred.idToken });
+  if (r.ok && r.authRefused) {
+    console.error(`ATTENZIONE: il token admin è stato rifiutato (${r.authRefused}). Il feedback è partito come anonimo e passa dai giudici.`);
+  }
   if (!r.ok) {
     console.error(`${r.uso ? 'USO' : 'RIFIUTATO'}: ${r.motivo}`);
     if (r.uso) uso();
