@@ -67,13 +67,15 @@
 .sn-confirm-filo { margin: 0; }
 /* Il testo che non è di Filo (proposto dal modello, o salvato) sta su un
    foglietto tinto d'accento con un filo a sinistra: le parole di Filo non ce
-   l'hanno, e nessun carattere del testo ne esce. */
+   l'hanno, e nessun carattere del testo ne esce. Il filo è per metà il colore
+   del testo: l'accento lo cambia il modello senza chiedere e su un sito lo
+   ridefinisce la pagina, e spegnere il filo deve voler dire spegnere le parole. */
 .sn-confirm-quote {
   margin: 6px 0 10px;
   padding: 8px 10px;
   background: color-mix(in srgb, var(--sn-accent, #c45a3b) 9%, transparent);
   border: 1px solid color-mix(in srgb, var(--sn-accent, #c45a3b) 30%, transparent);
-  border-left: 3px solid var(--sn-accent, #c45a3b);
+  border-left: 3px solid color-mix(in srgb, var(--sn-accent, #c45a3b) 50%, currentColor);
   border-radius: var(--sn-radius, 6px);
 }
 .sn-confirm-quote:last-child { margin-bottom: 0; }
