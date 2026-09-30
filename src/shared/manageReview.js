@@ -561,7 +561,49 @@
     // Una richiesta di fusione che aspetta l'owner è una sua decisione: Ricevuti anche se lo stato
     // non è arrivato al cancello. Solo `pending`: una fallita per conflitto la riallinea la routine.
     if (tab && tab !== 'archived' && richiestaInAttesa(fb, opts)) return 'inbox';
+    // Col segno locale la coda delle routine non la vede: mostrarla «In coda» direbbe il falso.
+    // Negli stati dei Ricevuti resta lì, perché aspetta comunque una decisione dell'owner.
+    if (tab === 'queue' && isLocalOnly(fb)) return 'local';
     return tab;
+  }
+
+  // Gli stati in cui una pratica aspetta l'owner: le sessioni locali non la spostano da lì (#908).
+  function isRicevutiStatus(status) {
+    const info = FS().STATUSES[String(status || '')];
+    return !!info && info.tab === 'inbox';
+  }
+
+  /**
+   * Il segno «solo in locale» si può mettere (`valore` true) o togliere su questa pratica? PURA.
+   * Ritorna { ok: true } o { ok: false, motivo, utente } — `utente` vuol dire che il feedback
+   * è di un utente: in locale non si lavora, e se servisse lavoro locale torna nei Ricevuti.
+   * `opts.now` iniettabile nei test.
+   */
+  function localSignCheck(fb, valore, opts) {
+    if (!fb) return { ok: false, motivo: 'feedback non trovato' };
+    if (!valore) return isLocalOnly(fb) ? { ok: true } : { ok: false, motivo: 'il segno «solo in locale» non c’è' };
+    if (isLocalOnly(fb)) return { ok: false, motivo: 'il segno «solo in locale» c’è già' };
+    if (!isProvenLocalSender(fb)) {
+      const cid = String(fb.clientId || '');
+      if (LOCAL_SENDER_RE.test(cid)) {
+        return { ok: false, utente: true, motivo: 'il mittente non porta la prova (#595): vale come un feedback di un utente, e in locale i feedback degli utenti non si lavorano' };
+      }
+      if (RESERVED_CLIENT_RE.test(cid) && SENDER_PROOFS.includes(fb.senderProof)) {
+        return { ok: false, motivo: 'l’ha aperto una routine: in locale si lavorano solo i feedback dell’owner o di una sessione locale' };
+      }
+      return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale non si lavora' };
+    }
+    if (statusUnreadable(fb)) return { ok: false, motivo: 'lo stato non si legge: non so se la pratica è aperta' };
+    const tab = manageTabFor(fb, opts);
+    if (tab === 'resolved' || tab === 'archived' || String(fb.statusPublic || 'open') === 'closed') {
+      return { ok: false, motivo: 'la pratica è chiusa' };
+    }
+    const now = (opts && opts.now) != null ? opts.now : Date.now();
+    const scade = new Date(fb.claimExpiresAt || 0).getTime() || 0;
+    if (String(fb.claimedBy || '').trim() && scade > now) {
+      return { ok: false, motivo: 'una routine la sta lavorando adesso: il segno si mette quando il suo biglietto è revocato' };
+    }
+    return { ok: true };
   }
 
   function richiestaInAttesa(fb, opts) {
