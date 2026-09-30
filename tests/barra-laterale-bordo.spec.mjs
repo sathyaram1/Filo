@@ -10,7 +10,7 @@ import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
-import { barraPage, statoBarra, premi } from './helpers/barra.mjs';
+import { barraPage, statoBarra, premi, comandaBarra, menuAperto, vociDelMenu, scegliNelMenu } from './helpers/barra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -26,6 +26,8 @@ for s in sys.argv[1].split(';'):
     elif p[0] == 'wait': time.sleep(int(p[1]) / 1000)
     elif p[0] == 'down': xt.XTestFakeButtonEvent(d, 1, 1, 0)
     elif p[0] == 'up': xt.XTestFakeButtonEvent(d, 1, 0, 0)
+    elif p[0] == 'rdown': xt.XTestFakeButtonEvent(d, 3, 1, 0)
+    elif p[0] == 'rup': xt.XTestFakeButtonEvent(d, 3, 0, 0)
     x11.XFlush(d)
 x11.XCloseDisplay(d)
 `;
@@ -52,7 +54,7 @@ async function avvia({ xFinestra = 80 } = {}) {
   await shell.waitForLoadState('domcontentloaded');
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
   await expect.poll(() => app.windows().some((w) => { try { return w.url() === url; } catch (_) { return false; } }), { timeout: 10_000 }).toBe(true);
-  await expect.poll(async () => (await statoBarra(app))?.bounds?.width ?? 0, { timeout: 10_000 }).toBe(4);
+  await expect.poll(async () => (await statoBarra(app))?.bounds?.width ?? 0, { timeout: 10_000 }).toBeGreaterThan(0);
   // Staccata dal bordo dello schermo, così il puntatore può anche uscirne a sinistra.
   await app.evaluate(({ BrowserWindow }, x) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito).setBounds({ x, y: 40, width: 1100, height: 800 }), xFinestra);
   await pausa(900);
@@ -178,6 +180,41 @@ test('una scheda trascinata o una selezione portate sul bordo non la aprono, nem
     await expect.poll(() => aperta(app), { timeout: 2000 }).toBe(false);
     await pausa(900);
     expect(await aperta(app), 'chiusa col tasto, puntatore fermo sul bordo').toBe(false);
+  } finally {
+    await chiudi();
+  }
+});
+
+test('la striscia si tocca oltre la fascia del sistema: il clic la apre anche a spinta spenta, il tasto destro dà il suo menu, fermarsi lì non la apre', async () => {
+  test.skip(!xtestDisponibile(), 'serve uno schermo X con XTest (contenitore Linux sotto xvfb-run)');
+  test.setTimeout(90_000);
+  const { app, max, x0, y, px, chiudi } = await avvia();
+  try {
+    expect(max, 'Filo si apre non massimizzato: è il caso da provare').toBe(false);
+    const s = await statoBarra(app);
+    expect(s.bounds.width, 'la striscia chiusa va oltre i 5 px del sistema').toBe(9);
+    const oltre = x0 + 7;
+
+    // Fermo sulla parte che si clicca, a due passi dal bordo: è già pagina, non si apre da sola.
+    puntatore(`move:${x0 + px(300)}:${y};wait:150;move:${oltre}:${y};wait:40;move:${oltre}:${y + 2};wait:900`);
+    expect(await aperta(app), 'fermo oltre la fascia').toBe(false);
+
+    // Il tasto destro apre il menu della striscia.
+    puntatore(`move:${oltre}:${y + 30};wait:60;rdown;wait:40;rup;wait:500`);
+    const menu = await menuAperto(app, { tetto: 3000 });
+    expect(menu, 'il menu della striscia non si è aperto').toBeTruthy();
+    expect(await vociDelMenu(menu)).toContain('Apri la barra laterale');
+    await scegliNelMenu(menu, 'Apri la barra laterale');
+    await expect.poll(() => aperta(app), { timeout: 2000 }).toBe(true);
+    await comandaBarra(app, 'chiudi');
+    puntatore(`move:${x0 + px(400)}:${y};wait:400`);
+    await expect.poll(() => aperta(app), { timeout: 2000 }).toBe(false);
+
+    // Con l'apertura dal bordo spenta il clic la apre lo stesso.
+    await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { barraLaterale: { spinta: false } } }, { url: 'filo://preferences/preferences.html' }));
+    await expect.poll(async () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.barra.opzioni.spinta)).toBe(false);
+    puntatore(`move:${oltre}:${y};wait:100;down;wait:50;up;wait:600`);
+    await expect.poll(() => aperta(app), { timeout: 2000 }).toBe(true);
   } finally {
     await chiudi();
   }

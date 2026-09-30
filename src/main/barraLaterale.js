@@ -13,7 +13,8 @@ const OMBRA = 16;
 // Il tempo dell'animazione di chiusura (barra.css): prima la vista resta larga, o il pannello sparisce di colpo.
 const CHIUSURA_MS = 220;
 // A finestra non massimizzata i primi pixel dentro il bordo li prende il sistema per ridimensionare una finestra
-// senza cornice (Electron, FramelessView): lì la striscia non riceve il puntatore, e il main lo guarda da sé.
+// senza cornice (Electron, FramelessView): lì la vista non riceve niente. La sosta la guarda il main, e la parte
+// viva della striscia (clic, tasto destro) comincia dopo la fascia.
 const BORDO = 5;
 const VICINO = 24;
 const SONDA_MS = 50;
@@ -74,6 +75,7 @@ class BarraLaterale {
     this.ultimaSonda = 0;
     this.etichettePagina = null;
     this.ultimaPagina = '';
+    this.strisciaPx = STRISCIA;
     this.vuoto = new VuotoDellaVista({
       vista: () => (this.vista && !this.vista.webContents.isDestroyed() ? this.vista : null),
       scheda: () => { const t = this._attiva(); return t ? t.view : null; },
@@ -86,6 +88,7 @@ class BarraLaterale {
       const quiete = () => { this.quieteFino = Date.now() + QUIETE_MS; this.puntoFermo = this._punto(); this._segnaBordo(false); this._guarda(); };
       for (const ev of ['will-resize', 'resize', 'move']) win.on(ev, quiete);
       for (const ev of ['focus', 'show', 'restore']) win.on(ev, () => this._guarda());
+      for (const ev of ['maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen', 'restore']) win.on(ev, () => this.posa());
     }
     // La fila delle schede: chi trascina una scheda fino al bordo tiene premuto un tasto lì, non nella pagina.
     const shell = win && win.webContents;
@@ -339,14 +342,23 @@ class BarraLaterale {
     const [, H] = this.win.getContentSize();
     const y = Math.max(0, Math.round(this.alto()));
     const largo = this.aperta || this.timer.stringi;
-    const w = largo ? PANNELLO + OMBRA : STRISCIA;
+    const chiusa = this._larghezzaChiusa();
+    const w = largo ? PANNELLO + OMBRA : chiusa;
     vista.setBounds({ x: 0, y, width: w, height: Math.max(0, H - y) });
     this._inCima();
     vista.setVisible(true);
     const t = this._attiva();
     if (t && this.aperta) this.vuoto.segui(t.view.webContents);
+    if (chiusa !== this.strisciaPx) { this.strisciaPx = chiusa; this._invia(); }
     // Il layout cambia anche per lo schermo intero: la voce che lo dice va ridetta.
     this.aggiornaNav();
+  }
+
+  // Dove il sistema si prende la fascia del bordo, la striscia chiusa è larga anche oltre: lì si clicca.
+  _larghezzaChiusa() {
+    let fascia = false;
+    try { fascia = !this.tabs.contentFullscreen && !this.win.isMaximized() && !this.win.isFullScreen(); } catch (_) {}
+    return fascia ? BORDO + STRISCIA : STRISCIA;
   }
 
   // Ogni scheda nuova entra in cima alle viste della finestra: la barra deve tornarle sopra, ma sotto
@@ -493,6 +505,7 @@ class BarraLaterale {
       trascinamento: !!this.trascinamento,
       tasto: T ? T.etichettaBarra() : 'Ctrl+Shift+B',
       bordo: this.bordo,
+      strisciaPx: this.strisciaPx || STRISCIA,
       opzioni: { spinta: this.opzioni.spinta, attesaMs: this.opzioni.attesaMs, striscia: this.opzioni.striscia },
     };
   }

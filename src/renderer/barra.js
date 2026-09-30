@@ -43,9 +43,12 @@
     if (spinta) { clearTimeout(spinta); spinta = null; }
     striscia.classList.remove('spinge');
   }
-  // Il bordo va SPINTO, non sfiorato: il puntatore resta sulla striscia per l'attesa scelta in Preferenze.
+  // Il bordo va SPINTO, non sfiorato: il puntatore resta sulla linea per l'attesa scelta in Preferenze. Oltre la
+  // linea la striscia si clicca soltanto: lì è già pagina, e fermarsi non è spingere.
+  const LINEA = 4;
   striscia.addEventListener('pointermove', (e) => {
     if (!e.isTrusted || stato.aperta || opzioni().spinta === false) return;
+    if (e.clientX >= LINEA) { annullaSpinta(); return; }
     // Chi trascina una scheda o seleziona del testo passa di qui con un tasto premuto: non spinge.
     if (e.buttons) { annullaSpinta(); return; }
     if (spinta) return;
@@ -73,7 +76,9 @@
   window.SN_VUOTO.collega({
     inoltra: (gesto) => api.inoltra(gesto),
     onCursore: api.onCursore,
-    proprio: (e) => !!trascina || !!(e.target && e.target.closest && e.target.closest('#pannello, #striscia')),
+    // La rotella sulla striscia scorre la pagina: la striscia si clicca, non si scorre.
+    proprio: (e, tipo) => !!trascina || !!(e.target && e.target.closest
+      && (e.target.closest('#pannello') || (tipo !== 'rotella' && e.target.closest('#striscia')))),
     // La vista tocca i bordi sinistro e basso della finestra, e in alto la fila delle schede: solo a destra c'è la pagina.
     versoLaPagina: (e) => e.clientX >= innerWidth - 1,
   });
@@ -368,6 +373,7 @@
     if (stato.aperta) annullaSpinta();
     else nascondiSuggerimento();
     striscia.setAttribute('aria-label', `Barra laterale (${stato.tasto || ''})`);
+    striscia.style.width = `${Number(stato.strisciaPx) || LINEA}px`;
     disegnaIcone(Array.isArray(stato.icone) ? stato.icone : [], eraAperta);
     disegnaAccount(stato.account || null);
     disegnaMira(stato.mira, stato.trascinamento);

@@ -1665,6 +1665,30 @@ class TabManager {
     else this.goBack(target);
   }
 
+  // Le pagine dietro (o davanti) nella cronologia della scheda, dalla più vicina: il tasto destro su
+  // Indietro e Avanti della barra laterale le elenca, e sceglierne una ci torna con vaiAllaVoce.
+  vociCronologia(verso, id) {
+    const tab = this.tabs.find((t) => t.id === (id || this.activeId));
+    const h = tab && tab.view.webContents.navigationHistory;
+    if (!h || typeof h.getEntryAtIndex !== 'function') return [];
+    const attiva = h.getActiveIndex();
+    const passo = verso === 'avanti' ? 1 : -1;
+    const out = [];
+    for (let i = attiva + passo; i >= 0 && i < h.length(); i += passo) {
+      const e = h.getEntryAtIndex(i);
+      if (e) out.push({ indice: i, titolo: String(e.title || ''), url: String(e.url || '') });
+    }
+    return out;
+  }
+
+  vaiAllaVoce(id, indice) {
+    const tab = this.tabs.find((t) => t.id === id);
+    const h = tab && tab.view.webContents.navigationHistory;
+    const i = Math.round(Number(indice));
+    if (!h || !Number.isFinite(i) || i < 0 || i >= h.length() || i === h.getActiveIndex()) return;
+    h.goToIndex(i);
+  }
+
   goForward(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;

@@ -30,6 +30,7 @@ export function statoBarra(app) {
       primary: b.layout ? [...b.layout.primary] : null,
       secondary: b.layout ? [...b.layout.secondary] : null,
       schermoIntero: !!w._filoTabs.contentFullscreen,
+      chiusa: b._larghezzaChiusa(),
       alto: w._filoTabs._altezzaCornice(),
     };
   });

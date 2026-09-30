@@ -24,7 +24,9 @@ test('a barra chiusa si vede la striscia; spingere sul bordo la apre, passarci d
   const barra = await barraPage(app);
   const s0 = await statoBarra(app);
   expect(s0.aperta).toBe(false);
-  expect(s0.bounds.width).toBe(4);
+  // Striscia sola: 4 px, e 5 in più dove il sistema si prende la fascia del bordo (finestra non massimizzata).
+  expect(s0.bounds.width).toBe(s0.chiusa);
+  expect([4, 9]).toContain(s0.chiusa);
   expect(s0.bounds.x).toBe(0);
   expect(s0.bounds.y).toBe(s0.alto);
   await expect(barra.locator('#striscia')).toBeVisible();
@@ -221,6 +223,7 @@ test('a schermo intero la barra resta raggiungibile, e il primo Esc chiude lei, 
   await barra.locator('#nav .ico[data-id="fullscreen"]').click();
   await expect.poll(async () => (await statoBarra(app)).schermoIntero).toBe(true);
   await comandaBarra(app, 'chiudi');
+  // A schermo intero la fascia del sistema non c'è: resta la striscia sola.
   await expect.poll(async () => (await statoBarra(app)).bounds.width).toBe(4);
   const s = await statoBarra(app);
   expect(s.bounds.y).toBe(0);
@@ -413,7 +416,7 @@ test('aperta col mouse, il puntatore che torna sulla pagina la chiude', async ({
   await page.mouse.move(520, 310);
   await expect.poll(() => aperta(app), { timeout: 3000 }).toBe(false);
   // E il pannello si ritira: la vista torna larga quanto la striscia.
-  await expect.poll(async () => (await statoBarra(app)).bounds.width).toBe(4);
+  await expect.poll(async () => { const s = await statoBarra(app); return s.bounds.width === s.chiusa; }).toBe(true);
 });
 
 test('un trascinamento dal menu interrotto da una pagina che ricarica non lascia la barra appesa', async ({ app, openTab, testServer }) => {
@@ -450,11 +453,11 @@ test('Nuova finestra incognito dalla barra: anche lei ha la sua barra, con le st
   await privata.waitForFunction(() => document.querySelectorAll('#nav .ico').length > 0, null, { timeout: 5000 });
   const ids = await privata.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id));
   expect(ids).toEqual(['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
-  const larga = await app.evaluate(({ BrowserWindow }) => {
+  const { larga, chiusa } = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && x._filoIncognito);
-    return w._filoTabs.barra.vista.getBounds().width;
+    return { larga: w._filoTabs.barra.vista.getBounds().width, chiusa: w._filoTabs.barra._larghezzaChiusa() };
   });
-  expect(larga).toBe(4);
+  expect(larga).toBe(chiusa);
 });
 
 test('dentro la barra le icone si riordinano trascinandole, e l\'ordine resta', async ({ app, openTab, testServer }) => {
