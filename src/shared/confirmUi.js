@@ -200,8 +200,9 @@
 
     // Il popup si apre anche mentre l'utente scrive in chat: quello che batte
     // finisce nel suo campo, non nel vuoto, e alla chiusura il fuoco torna lì.
+    // Non se la domanda è sulla pagina: la password che si batteva non deve finire nel sito dell'avviso.
     const prima = ospite ? null : campoAttivo(doc);
-    const inoltra = ospite ? (ospite.campo && ospite.tasto) || null : (scrivibile(prima) ? (t) => applicaTasto(prima, t) : null);
+    const inoltra = copre ? null : ospite ? (ospite.campo && ospite.tasto) || null : (scrivibile(prima) ? (t) => applicaTasto(prima, t) : null);
     box.addEventListener('keydown', (e) => {
       if (e.target !== box || !inoltra || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
       if (e.key.length !== 1 && e.key !== 'Backspace') return;
