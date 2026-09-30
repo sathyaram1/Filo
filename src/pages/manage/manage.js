@@ -238,8 +238,11 @@
     // altre girano da sole, questa nasce da una conversazione.
     local:    { icon: '💻', label: 'Claude (sessione locale)' },
     claude:   { icon: '🤖', label: 'Claude (ruolo non indicato)' },
+    // #595: si firma col prefisso dell'owner o di una sua istanza ma senza prova; per la pipeline è un utente.
+    unproven: { icon: '❔', label: 'Utente, prefisso riservato senza prova' },
   };
   function authorKindOf(fb) {
+    if (MR && MR.isUnprovenSender && MR.isUnprovenSender(fb)) return 'unproven';
     return (TH && TH.authorKind) ? TH.authorKind(fb && fb.clientId) : 'user';
   }
   function authorMetaOf(fb) {
@@ -255,7 +258,7 @@
   function senderLabel(fb) {
     const kind = authorKindOf(fb);
     const m = AUTHOR_META[kind] || AUTHOR_META.user;
-    if (kind !== 'user') return `${m.icon} ${m.label}`;
+    if (kind !== 'user' && kind !== 'unproven') return `${m.icon} ${m.label}`;
     const id = String((fb && fb.clientId) || '').trim();
     const short = id.slice(0, 8);
     return short ? `${m.icon} ${m.label} · ${short}…` : `${m.icon} ${m.label}`;
