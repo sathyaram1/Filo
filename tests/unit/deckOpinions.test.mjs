@@ -226,6 +226,25 @@ test('updateSearchCache con keepPrefix: i giudizi di un giudice con altre istruz
   assert.deepEqual(after, { a: { 'fp1|x': true }, c: { 'fp1|z': true } });
 });
 
+test('updateSearchCache con tetti: escono i giudizi più vecchi, mai quelli appena dati (#382)', () => {
+  // Per carta: il criterio rigiudicato torna in fondo, e oltre il tetto esce il più vecchio.
+  const perCard = O.updateSearchCache({ a: { k1: true, k2: false, k3: true } }, 'k1', { a: false }, { maxPerCard: 3 });
+  assert.deepEqual(Object.keys(perCard.a), ['k2', 'k3', 'k1']);
+  const trimmed = O.updateSearchCache(perCard, 'k4', { a: true }, { maxPerCard: 3 });
+  assert.deepEqual(trimmed.a, { k3: true, k1: false, k4: true });
+
+  // In tutto: escono le carte giudicate da più tempo, le fresche restano tutte.
+  let cache = {};
+  for (const [i, id] of ['c1', 'c2', 'c3', 'c4'].entries()) cache = O.updateSearchCache(cache, `k${i}`, { [id]: true }, { maxPairs: 3 });
+  assert.deepEqual(Object.keys(cache), ['c2', 'c3', 'c4']);
+  const fresh = O.updateSearchCache(cache, 'nuovo', { x: true, y: false, z: true }, { maxPairs: 3 });
+  assert.deepEqual(fresh, { x: { nuovo: true }, y: { nuovo: false }, z: { nuovo: true } });
+  // Una carta rigiudicata diventa la più giovane e non esce.
+  const touched = O.updateSearchCache(cache, 'altro', { c2: false }, { maxPairs: 3 });
+  assert.deepEqual(Object.keys(touched), ['c4', 'c2']);
+  assert.deepEqual(touched.c2, { k1: true, altro: false });
+});
+
 test('searchFilterNote: scartate mai mostrate in silenzio, non controllate sempre dichiarate (#382)', () => {
   assert.equal(O.searchFilterNote({ found: 10, kept: 4, unverified: 0, criterion: 'x' }), '', 'filtro riuscito: niente da dire');
   const none = O.searchFilterNote({ found: 12, kept: 0, unverified: 0, criterion: ' dà haste ad altre creature ' });

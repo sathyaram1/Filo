@@ -94,9 +94,9 @@ module.exports = function register(on, ctx) {
     } catch (_) { return ''; }
   }
 
-  // Quello che la richiesta dà per scontato e il giudice non vede altrove (#382): il commander del mazzo, e le
-  // richieste di prima quando il modello non ha scritto un criterio che le riprenda.
-  async function judgeContext(deck, previousAsks) {
+  // Quello che la richiesta dà per scontato e il giudice non vede altrove (#382): il commander del mazzo, le carte
+  // del mazzo se il criterio lo richiama, e le richieste di prima quando il modello non ha scritto un criterio.
+  async function judgeContext({ deck, criterion, previousAsks, deckNames }) {
     const out = [];
     const meta = deck && deck.commanderMeta;
     if (deck && deck.commander) {
@@ -106,6 +106,11 @@ module.exports = function register(on, ctx) {
           .filter(Boolean).join(' · ')
         : String((meta && meta.name) || '');
       if (body) out.push(`Il commander del mazzo è ${body}`);
+    }
+    // Stesso metro dei tag contestuali (§7): la lista entra solo se serve, perché ogni carta aggiunta la cambia.
+    const asks = [criterion, ...previousAsks].join(' ');
+    if (deckNames.length && !globalThis.SN_DECK_OPINIONS.isContextFreeTag(asks)) {
+      out.push(`Carte già nel mazzo: ${deckNames.join(', ')}`);
     }
     if (previousAsks.length) {
       out.push(`Richieste precedenti dell'utente in questa chat, dalla più vecchia:\n${previousAsks.map((t) => `- «${t}»`).join('\n')}`);
@@ -337,7 +342,10 @@ module.exports = function register(on, ctx) {
                 .map((m) => (m.content.length > 300 ? `${m.content.slice(0, 299)}…` : m.content));
               fr = await globalThis.SN_DECK_OPINIONS_SVC.filterSearch({
                 criterion: crit, cardIds, cards, handleAIRequest,
-                context: await judgeContext(deckOut || deck, previousAsks),
+                context: await judgeContext({
+                  deck: deckOut || deck, criterion: crit, previousAsks,
+                  deckNames: (deckOut || deck).carte.map((c) => known[c.scryfall_id] && known[c.scryfall_id].name).filter(Boolean),
+                }),
                 judgeModel: await judgeModelNow(),
                 onProgress: ({ done, total }) => onProgress({ fase: 'controllo', done, total }),
               });
