@@ -1,4 +1,4 @@
-// I segreti che Filo custodisce (#810): chiavi dei servizi AI, accesso, identità della copia,
+// I segreti che Filo custodisce (#810): chiavi dei servizi, accesso, identità della copia,
 // portafoglio. Servono solo a fermare un'uscita che li contiene e a oscurarli nei messaggi verso
 // i modelli: mai a un prompt. Regole: src/shared/urlExfil.js (valutaUscita).
 
@@ -23,6 +23,7 @@ function custoditi({ impostazioni = [] } = {}) {
   for (const s of impostazioni) {
     const chiavi = s && s.apiKeys && typeof s.apiKeys === 'object' ? s.apiKeys : {};
     for (const v of Object.values(chiavi)) metti(v, 'chiave');
+    metti(s && s.security && s.security.safeBrowse && s.security.safeBrowse.safeBrowsingKey, 'chiave');
   }
   return out;
 }

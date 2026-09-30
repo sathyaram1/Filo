@@ -51,7 +51,7 @@ describe('un segreto custodito da Filo non esce da nessuna uscita, a nessun live
       const v = X.valutaUscita(a, { segreti: SEGRETI });
       assert.equal(v.blocca, true);
       assert.match(v.frase, /^non ho /);
-      assert.match(v.frase, /chiave dei servizi AI che custodisco/);
+      assert.match(v.frase, /una chiave di un servizio che custodisco/);
       assert.ok(!v.frase.includes(CHIAVE.slice(10, 30)), 'la riga non ripete il segreto');
     });
   }
@@ -62,6 +62,18 @@ describe('un segreto custodito da Filo non esce da nessuna uscita, a nessun live
       assert.equal(v.blocca, true);
       assert.ok(v.frase.includes(parola), v.frase);
     }
+  });
+
+  test('i segreti custoditi: chiavi salvate e di servizio, senza doppioni né valori corti', () => {
+    const S = require(join(ROOT, 'src', 'main', 'services', 'segretiCustoditi.js'));
+    const trovati = S.custoditi({
+      impostazioni: [
+        { apiKeys: { openrouter: CHIAVE, tavily: 'corta' }, security: { safeBrowse: { safeBrowsingKey: 'FINTA-navigazione-sicura-99' } } },
+        { apiKeys: { openrouter: CHIAVE } },
+      ],
+    });
+    assert.deepEqual(trovati.map((x) => x.valore), [CHIAVE, 'FINTA-navigazione-sicura-99']);
+    assert.ok(trovati.every((x) => x.tipo === 'chiave'));
   });
 
   test('un\'azione che non esce non passa di qui', () => {

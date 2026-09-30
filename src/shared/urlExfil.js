@@ -338,7 +338,7 @@
 
   // Cosa conteneva, per la riga che legge l'utente: mai il segreto stesso.
   const CUSTODITI = Object.freeze({
-    chiave: 'una chiave dei servizi AI che custodisco',
+    chiave: 'una chiave di un servizio che custodisco',
     accesso: 'un token del tuo accesso a Filo',
     identita: "l'identità di questa copia di Filo",
     portafoglio: 'la chiave del tuo portafoglio',
