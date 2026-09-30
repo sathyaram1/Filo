@@ -53,7 +53,9 @@ async function avvia() {
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
   await expect.poll(() => app.windows().some((w) => { try { return w.url() === url; } catch (_) { return false; } }), { timeout: 10_000 }).toBe(true);
   await expect.poll(async () => (await statoBarra(app))?.bounds?.width ?? 0, { timeout: 10_000 }).toBe(4);
-  await pausa(600);
+  // Staccata dal bordo dello schermo, così il puntatore può anche uscirne a sinistra.
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito).setBounds({ x: 80, y: 40, width: 1100, height: 800 }));
+  await pausa(900);
   const { cb, scala, max } = await app.evaluate(({ BrowserWindow, screen }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     return { cb: w.getContentBounds(), scala: screen.getPrimaryDisplay().scaleFactor, max: w.isMaximized() };
@@ -93,7 +95,7 @@ test('fermo sul bordo sinistro la barra si apre anche dove il sistema ridimensio
     expect((await statoBarra(app)).motivo).toBe('spinta');
 
     // Il puntatore esce dalla finestra a sinistra senza passare dal pannello: la barra si chiude.
-    puntatore(`move:${Math.max(0, x0 - px(30))}:${y};wait:1200`);
+    puntatore(`move:${x0 - px(40)}:${y};wait:1200`);
     await expect.poll(() => aperta(app), { timeout: 3000 }).toBe(false);
 
     // Il clic sulla striscia (che sta nella stessa fascia) la apre.
@@ -109,16 +111,15 @@ test('con l\'apertura dal bordo spenta, fermo sul bordo non si apre; la maniglia
   test.setTimeout(90_000);
   const { app, x0, y, px, chiudi } = await avvia();
   try {
-    await app.evaluate(async () => {
-      const { applySettingsUpdate } = require('./src/main/services/handlers');
-      await applySettingsUpdate({ barraLaterale: { spinta: false } });
-    }).catch(async () => {
-      await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { barraLaterale: { spinta: false } } }, { url: 'filo://preferences/preferences.html' }));
-    });
+    await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { barraLaterale: { spinta: false } } }, { url: 'filo://preferences/preferences.html' }));
     await expect.poll(async () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.barra.opzioni.spinta)).toBe(false);
     puntatore(`move:${x0 + px(400)}:${y};wait:150;move:${x0 + 1}:${y};wait:40;move:${x0}:${y + 2};wait:900`);
     expect(await aperta(app)).toBe(false);
-    puntatore(`move:${x0 + px(400)}:${y};wait:200`);
+    const shell = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/shell.html'); } catch (_) { return false; } });
+    const m = await shell.locator('#barra-maniglia').boundingBox();
+    const yFinestra = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito).getContentBounds().y);
+    puntatore(`move:${x0 + px(m.x + m.width / 2)}:${px(yFinestra + m.y + m.height / 2)};wait:100;down;wait:40;up;wait:500`);
+    await expect.poll(() => aperta(app), { timeout: 2000 }).toBe(true);
   } finally {
     await chiudi();
   }
