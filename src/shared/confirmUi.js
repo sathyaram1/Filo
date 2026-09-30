@@ -9,6 +9,9 @@
 //     finché l'utente non digita espressamente la parola ("conferma").
 //
 // Esc o click fuori dal box = annulla. Una sola conferma alla volta.
+// `coprePagina`: la domanda è sulla pagina stessa (sito pericoloso) — la
+// copre, rispondono solo i bottoni, e i tasti non tornano alla pagina.
+// `segnale` (AbortSignal) ritira la domanda: risolve false.
 //
 // SICUREZZA: su una pagina web il popup NON sta nel documento del sito, che
 // potrebbe nasconderlo e disegnarci sopra un testo diverso (#592.6): lo
