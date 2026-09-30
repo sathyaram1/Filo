@@ -65,11 +65,9 @@
   overflow-y: auto;
 }
 .sn-confirm-filo { margin: 0; }
-/* Il testo che non è di Filo (proposto dal modello, o salvato) sta su un
-   foglietto tinto d'accento con un filo a sinistra: le parole di Filo non ce
-   l'hanno, e nessun carattere del testo ne esce. Il filo è per metà il colore
-   del testo: l'accento lo cambia il modello senza chiedere e su un sito lo
-   ridefinisce la pagina, e spegnere il filo deve voler dire spegnere le parole. */
+/* Il testo che non è di Filo sta su un foglietto tinto d'accento, con un filo a
+   sinistra che le parole di Filo non hanno. Il filo è per metà colore del testo:
+   l'accento lo cambiano il modello e le pagine, e chi spegne il filo spegne le parole. */
 .sn-confirm-quote {
   margin: 6px 0 10px;
   padding: 8px 10px;
