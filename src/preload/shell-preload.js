@@ -99,6 +99,11 @@ contextBridge.exposeInMainWorld('filoShell', {
   },
   tooltipShow: (text, x, y) => ipcRenderer.send('shell:tooltip-show', { text, x, y }),
   tooltipHide: () => ipcRenderer.send('shell:tooltip-hide'),
+  // #430 — la carta con l'anteprima della scheda sotto il puntatore.
+  anteprima: {
+    mostra: (dati) => ipcRenderer.send('anteprima:mostra', dati),
+    nascondi: () => ipcRenderer.send('anteprima:nascondi'),
+  },
   // §2.3 — toast informativo (es. "Tab riordinate e salvate in cronologia").
   onToast: (fn) => {
     const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };

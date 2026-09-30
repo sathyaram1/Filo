@@ -74,11 +74,22 @@
       sound: typeof notifications.sound === 'string' ? notifications.sound : 'default',
     };
   }
+  // #430 — carta con l'anteprima della scheda al passaggio del puntatore: accesa e misura dalle Preferenze.
+  let anteprimaSchede = { enabled: true, size: 'media' };
+  function applyTabPreview(tp) {
+    if (!tp || typeof tp !== 'object') return;
+    anteprimaSchede = {
+      enabled: tp.enabled !== false,
+      size: ['piccola', 'media', 'grande'].includes(tp.size) ? tp.size : 'media',
+    };
+    if (!anteprimaSchede.enabled) try { ANTEPRIMA.nascondi(); } catch (_) {}
+  }
   api.message({ type: 'get_settings' })
     .then((r) => {
       applyShellTokens(r?.settings?.themeTokens);
       applyTabColorParams(r?.settings?.tabColor);
       applyNotifConfig(r?.settings?.notifications);
+      applyTabPreview(r?.settings?.tabPreview);
       try { render(); } catch (_) {}
       try { NOTIFS.rispecchia(); } catch (_) {}
     })
@@ -89,6 +100,7 @@
         applyShellTokens(m.settings?.themeTokens);
         applyTabColorParams(m.settings?.tabColor);
         applyNotifConfig(m.settings?.notifications);
+        applyTabPreview(m.settings?.tabPreview);
         try { render(); } catch (_) {}
         try { NOTIFS.rispecchia(); } catch (_) {}
       }
@@ -386,6 +398,77 @@
   })();
 
   let state = { activeId: null, tabs: [] };
+
+  // #430 — la carta di anteprima. La prima compare dopo un attimo (attraversare la barra non deve accendere
+  // niente); da lì, finché si resta sulle schede, passa dall'una all'altra subito. Le foto sono già nella carta.
+  const ANTEPRIMA = (() => {
+    const RITARDO = 200;
+    const CALDA = 600;
+    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--font', '--radius'];
+    let timer = null;
+    let aperta = null;
+    let spentaAlle = 0;
+
+    function elDi(id) {
+      return tabsEl.querySelector(`.tab[data-anteprima="${CSS.escape(id)}"]`);
+    }
+    function tema() {
+      const cs = getComputedStyle(document.documentElement);
+      const vars = {};
+      for (const k of VAR_TEMA) {
+        const v = cs.getPropertyValue(k).trim();
+        if (v) vars[k] = v;
+      }
+      return vars;
+    }
+    function invia(id) {
+      const el = elDi(id);
+      const t = state.tabs.find((x) => x.id === id);
+      if (!el || !t || !api.anteprima) { nascondi(); return; }
+      const r = el.getBoundingClientRect();
+      aperta = id;
+      api.anteprima.mostra({
+        id, titolo: tabLabel(t), x: Math.round(r.left), y: Math.round(r.bottom + 4),
+        misura: anteprimaSchede.size, tema: tema(),
+      });
+    }
+    function nascondi() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (!aperta) return;
+      aperta = null;
+      spentaAlle = Date.now();
+      try { api.anteprima && api.anteprima.nascondi(); } catch (_) {}
+    }
+    function sopra(id) {
+      if (!anteprimaSchede.enabled || drag) return;
+      if (id === aperta) return;
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (aperta || Date.now() - spentaAlle < CALDA) { invia(id); return; }
+      timer = setTimeout(() => {
+        timer = null;
+        const el = elDi(id);
+        if (el && el.matches(':hover')) invia(id);
+      }, RITARDO);
+    }
+    // La barra si ridisegna a ogni titolo o icona che cambia: la carta segue la sua scheda, o sparisce con lei.
+    function ridisegnata() {
+      if (!aperta) return;
+      if (!anteprimaSchede.enabled || !elDi(aperta)) { nascondi(); return; }
+      invia(aperta);
+    }
+    tabsEl.addEventListener('mouseover', (e) => {
+      const el = e.target.closest('.tab[data-anteprima]');
+      if (el) sopra(el.dataset.anteprima);
+      else nascondi();
+    });
+    tabsEl.addEventListener('mouseleave', nascondi);
+    tabsEl.addEventListener('mousedown', nascondi, true);
+    tabsEl.addEventListener('wheel', nascondi, { passive: true });
+    tabsEl.addEventListener('contextmenu', nascondi, true);
+    window.addEventListener('blur', nascondi);
+    window.addEventListener('resize', nascondi);
+    return { nascondi, ridisegnata, aperta: () => aperta };
+  })();
 
   function activeTab() {
     return state.tabs.find((t) => t.id === state.activeId) || null;
@@ -793,7 +876,9 @@
       const el = document.createElement('div');
       el.className = 'tab' + (t.id === state.activeId ? ' active' : '');
       el.dataset.id = t.id;
-      el.dataset.tip = t.title || t.url;
+      // Con l'anteprima accesa la carta dice già il titolo: il suggerimento di testo sarebbe un doppione.
+      if (anteprimaSchede.enabled) el.dataset.anteprima = t.id;
+      else el.dataset.tip = t.title || t.url;
       const ferma = larghezzeFerme && larghezzeFerme.get(String(t.id));
       if (ferma) {
         el.style.flex = `0 0 ${ferma}px`;
@@ -928,6 +1013,7 @@
     }
 
     tabsEl.style.flex = larghezzeFerme && strisciaFerma ? `0 0 ${strisciaFerma}px` : '';
+    try { ANTEPRIMA.ridisegnata(); } catch (_) {}
 
     // §6 — con la striscia scrollabile, assicuriamoci che la scheda attiva sia
     // sempre visibile (può finire fuori vista dopo che ne apri molte).
