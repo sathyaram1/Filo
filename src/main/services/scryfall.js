@@ -121,7 +121,7 @@
       if (!hasMore || cards.length >= maxCards) break;
     }
     if (remember) cacheCards(cards).catch(() => {});
-    return { cards, hasMore, total: Math.max(total, cards.length), query: q };
+    return { cards, hasMore, total: Math.max(total, cards.length), query: q, broken };
   }
 
   // Risoluzione nome fuzzy (§3.5): null se Scryfall non riconosce il nome.
