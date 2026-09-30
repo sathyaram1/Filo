@@ -119,20 +119,36 @@ function bloccoInRiga(t) {
  * Cosa legge l'owner. PURA. Una riga di esito e, quando serve, la riga che
  * dice cosa fare adesso — mai un motivo tecnico lasciato lì da interpretare.
  */
-export function messageForOwnerMerge(reply, branch = 'il ramo') {
+export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
   const r = reply || {};
+  const pratica = ctx.feedbackNum ? `#${String(ctx.feedbackNum).replace(/^#+/, '')}` : 'la pratica';
   switch (r.outcome) {
-    case 'merged':
-      return `✓ '${branch}' fuso su main dal server${r.sha ? ` (${String(r.sha).slice(0, 8)})` : ''}.`;
+    case 'merged': {
+      const righe = [`✓ '${branch}' fuso su main dal server${r.sha ? ` (${String(r.sha).slice(0, 8)})` : ''}.`];
+      if (r.skippedL5) {
+        const trips = Array.isArray(r.trips) ? r.trips : [];
+        righe.push(`  L5 saltato: lavoro locale di ${pratica}, mittente provato.`);
+        righe.push(trips.length
+          ? `  Blocchi registrati (${trips.length}), li rileggi in Gestione → Automazioni, «Fuse senza chiedere»:\n${trips.map((t) => `    · ${bloccoInRiga(t)}`).join('\n')}`
+          : '  Nessun blocco registrato: i controlli non avrebbero fermato niente.');
+      }
+      if (r.closed === true) righe.push(`  Pratica ${pratica} chiusa.`);
+      else if (r.closeError || r.closed === false) {
+        righe.push(`  La pratica ${pratica} NON si è chiusa${r.closeError ? `: ${r.closeError}` : ''}. Chiudila a mano.`);
+      }
+      return righe.join('\n');
+    }
     case 'blocked':
-      // Il blocco NON è più un vicolo cieco. Il lavoro locale tocca le aree
-      // protette quasi sempre (in locale si lavora proprio sulle guardie): un
-      // messaggio che si ferma a "decidi tu cosa farne" lascia chi legge senza
-      // nessuna mossa possibile — e su main, da qui, non scrive più nessuno.
-      // La mossa c'è, ed è una sola: approvarla in Filo, dove serve una persona.
+      // Il lavoro locale tocca le aree protette quasi sempre: il messaggio dice
+      // perché L5 non è stato saltato e dove si dà il sì. Aspettare il sì è una
+      // regola del server, non un muro di questa macchina.
       return `✗ Fusione BLOCCATA dai controlli di sicurezza del server: ${r.reason || 'motivo non riportato'}\n`
         + '  Sono controlli automatici sul contenuto delle modifiche (aree protette,\n'
-        + '  dipendenze nuove, segreti), e da qui non si aggirano.\n'
+        + '  dipendenze nuove, segreti): la fusione aspetta il tuo sì.\n'
+        + (r.localDetail || r.localReason
+          ? `  L5 non è stato saltato: ${r.localDetail || r.localReason}.\n`
+          : (ctx.feedbackId ? '' : '  Nessuna pratica collegata: con npm run finish -- --feedback <N> il lavoro locale\n'
+            + '  di un feedback tuo o di una sessione, con la prova del mittente, non aspetta.\n'))
         + (r.requestId
           ? '\n  L\'ho messa IN ATTESA: approvala da Filo, nella dashboard di gestione\n'
             + '  (l\'avviso in cima ai Ricevuti). Da lì puoi anche scartarla.\n'
