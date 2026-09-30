@@ -214,7 +214,7 @@ test('le imitazioni di Poste, banche e WhatsApp si fanno riconoscere dal menu de
 
 test('un’imitazione somiglia al sito vero dello stesso Paese', () => {
   assert.deepEqual(LS.analizza('https://arnazon.it/'), ['typosquatting:amazon.it']);
-  assert.deepEqual(LS.analizza('https://poster.it/'), ['typosquatting:poste.it']);
+  assert.deepEqual(LS.analizza('https://p0ste.it/'), ['typosquatting:poste.it']);
   assert.match(LS.avviso(LS.analizza('https://arnazon.it/')), /somiglia ad amazon\.it/);
 });
 

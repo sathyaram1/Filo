@@ -13,8 +13,13 @@
 
 'use strict';
 
-const { BRANDS } = require('./brands');
+const { BRANDS, PAROLE, isLegitBrandDomain } = require('./brands');
 const { skeleton, skeletonCoppie } = require('./confusables');
+
+const PAROLE_VERE = new Set(PAROLE);
+const PAROLE_SKEL = PAROLE.map(skeleton);
+// Sotto questa lunghezza un nome sta dentro troppe parole: conta solo in testa o in coda a un pezzo fra trattini.
+const TOKEN_CORTO = 5;
 
 // Distanza di Damerau-Levenshtein (OSA): conta sostituzione/inserzione/
 // cancellazione = 1 e la trasposizione di due adiacenti = 1 (così "amzaon" dista
@@ -47,6 +52,43 @@ function typoThreshold(tokenLen) {
   return 1;
 }
 
+// La label usa il nome del marchio fuori da una parola vera (infoposte sì, imposte no). Una parola vera non scavalca
+// un trattino (poste-rimborso non è poster), il nome sì (p-a-y-p-a-l).
+function usaIlMarchio(label, token) {
+  const t = skeleton(token);
+  if (!t) return false;
+  const pezzi = label.split(/[^\p{L}\p{N}]+/u).map(skeleton).filter(Boolean);
+  if (token.length < TOKEN_CORTO) {
+    return pezzi.some((p) => p === t
+      || (p.startsWith(t) && !dentroUnaParola(p, 0, t.length))
+      || (p.endsWith(t) && !dentroUnaParola(p, p.length - t.length, t.length)));
+  }
+  const s = pezzi.join('');
+  for (let i = s.indexOf(t); i !== -1; i = s.indexOf(t, i + 1)) {
+    let inizio = 0;
+    const pezzo = pezzi.find((p) => { const dentro = i >= inizio && i + t.length <= inizio + p.length; if (!dentro) inizio += p.length; return dentro; });
+    if (!pezzo || !dentroUnaParola(pezzo, i - inizio, t.length)) return true;
+  }
+  return false;
+}
+
+function dentroUnaParola(s, i, n) {
+  return PAROLE_SKEL.some((w) => {
+    for (let j = s.indexOf(w); j !== -1 && j <= i; j = s.indexOf(w, j + 1)) {
+      if (j + w.length >= i + n) return true;
+    }
+    return false;
+  });
+}
+
+// Un indirizzo ufficiale intero davanti a un dominio altrui: posteitaliane.it.accesso.net, login-office-com.x.net.
+function ufficialeNelSottodominio(subLabels, brand) {
+  const punti = '.' + subLabels.join('.') + '.';
+  const trattini = punti.replace(/-/g, '.');
+  return brand.domains.some((d) => punti.includes('.' + d + '.')
+    || (d.split('.')[0].length >= 4 && trattini.includes('.' + d + '.')));
+}
+
 // Cerca la migliore corrispondenza di impersonazione fra i brand noti.
 // Ritorna { strict, broad } dove ciascuno è null o { brand, reason, ... }.
 function matchBrands(norm) {
@@ -58,13 +100,13 @@ function matchBrands(norm) {
   const uLabels = (norm.hostUnicode || norm.host || '').split('.');
   const regLabelCount = norm.registrable ? norm.registrable.split('.').length : 1;
   const subLabels = uLabels.slice(0, Math.max(0, uLabels.length - regLabelCount));
+  // Il sito vero di un marchio non imita nessun altro marchio (paypal.poste.it non esiste, ma nemmeno il suo avviso).
+  if (isLegitBrandDomain(norm.registrable)) return { strict: null, broad: null };
 
   let strict = null;
   let broad = null;
 
   for (const brand of BRANDS) {
-    // Non flaggare mai i domini legittimi del brand stesso.
-    if (brand.domains.includes(norm.registrable)) return { strict: null, broad: null };
     const token = brand.token;
     const tokenSkel = skeleton(token);
 
@@ -74,8 +116,8 @@ function matchBrands(norm) {
       continue;
     }
     // ── STRICT: typo puro (bassa distanza di edit sulla label) ──────────
-    // Non sul nome di un sito ospitato: lì è una parola scelta dall'utente (email.github.io, team.netlify.app).
-    if (!strict && sld !== token && !norm.ospitato) {
+    // Non sul nome di un sito ospitato (email.github.io) né su una parola vera (cloud.it, mail.com, post.ch).
+    if (!strict && sld !== token && !norm.ospitato && !PAROLE_VERE.has(sld)) {
       const th = typoThreshold(token.length);
       if (th > 0 && Math.abs(sld.length - token.length) <= th) {
         const dist = osaDistance(sld, token);
@@ -84,17 +126,18 @@ function matchBrands(norm) {
     }
 
     // ── BROAD: nome esatto su suffisso non ufficiale ────────────────────
-    if (!broad && sld === token) { broad = { brand, reason: 'exact_other_tld', sld }; continue; }
+    // Una sigla di tre lettere è il nome di troppe cose (bnl.gov è un laboratorio).
+    if (!broad && sld === token && token.length > 3) { broad = { brand, reason: 'exact_other_tld', sld }; continue; }
     // ── BROAD: combosquat (token come sottostringa insieme ad altro) ────
-    if (!broad && sld.length > token.length && (sld.includes(token) || sldSkel.includes(tokenSkel))) {
+    if (!broad && sld.length > token.length && usaIlMarchio(sld, token)) {
       broad = { brand, reason: 'combosquat', sld }; continue;
     }
-    // ── BROAD: brand come sottodominio mentre l'eTLD+1 è altro ───────────
-    // Anche come parola della label: whatsapp-web.com.accesso.net (#725.8).
+    // ── BROAD: brand nel sottodominio mentre l'eTLD+1 è altro ────────────
+    // Da solo, fra trattini, attaccato ad altre parole o come indirizzo ufficiale intero (#725.8).
     if (!broad && subLabels.length) {
-      for (const lbl of subLabels) {
-        if ([lbl, ...lbl.split('-')].some((p) => p === token || skeleton(p) === tokenSkel)) { broad = { brand, reason: 'subdomain', sld: lbl }; break; }
-      }
+      const lbl = subLabels.find((l) => usaIlMarchio(l, token));
+      if (lbl) { broad = { brand, reason: 'subdomain', sld: lbl }; continue; }
+      if (ufficialeNelSottodominio(subLabels, brand)) { broad = { brand, reason: 'subdomain', sld: subLabels.join('.') }; continue; }
     }
   }
   // Strict prevale: se c'è strict, ignoriamo il broad dello stesso giro.
