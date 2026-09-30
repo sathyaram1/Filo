@@ -1,9 +1,9 @@
-// Verifica #428, giro 2, rilievo 2: chiusa una scheda, il puntatore scende e si ferma sul fumetto
-// col titolo della scheda (è una finestra a sé): la barra non se ne accorge e le larghezze restano ferme.
-// Serve il puntatore vero del sistema (xdotool, X11) e la finestra a schermo: altrove si salta.
+// Il fumetto col titolo di una scheda è una finestra a sé, sotto il puntatore: non deve prendersi il
+// mouse, o la barra non sa che il puntatore l'ha lasciata e dopo una chiusura le schede restano strette (#428).
+// Serve il puntatore vero del sistema (xdotool su X11) e la finestra a schermo: altrove si salta.
 
 import { execFileSync } from 'node:child_process';
-import { test, expect } from '../../fixtures/electron.mjs';
+import { test, expect } from './fixtures/electron.mjs';
 
 let xdotool = false;
 try { execFileSync('xdotool', ['version'], { stdio: 'ignore' }); xdotool = process.platform === 'linux' && !!process.env.DISPLAY; } catch (_) {}
