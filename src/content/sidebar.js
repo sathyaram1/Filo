@@ -138,17 +138,22 @@
     makeDraggable(root.querySelector('.sn-sidebar-header'));
     const form = root.querySelector('.sn-sidebar-input');
     const ta = form.querySelector('textarea');
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
+    // Parte solo da un tasto o un clic veri: l'invio del modulo lo fa anche il codice del sito (#592.6).
+    const invia = () => {
       const text = ta.value.trim();
       if (!text) return;
       ta.value = '';
       submit({ userMessage: text });
+    };
+    form.addEventListener('submit', (e) => e.preventDefault());
+    form.querySelector('button[type="submit"]').addEventListener('click', (e) => {
+      e.preventDefault();
+      if (gestoVero(e)) invia();
     });
     ta.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        form.requestSubmit();
+        if (gestoVero(e)) invia();
       }
     });
     // Focus o tasto sull'input → riapri la chat
