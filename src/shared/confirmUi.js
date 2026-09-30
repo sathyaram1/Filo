@@ -34,6 +34,8 @@
   background: rgba(0, 0, 0, 0.35);
   font-family: var(--sn-font);
 }
+/* Avviso sulla pagina stessa: finché non si sceglie, la pagina non si vede. */
+.sn-confirm-overlay.sn-confirm-copre { background: rgba(28, 14, 8, 0.92); }
 .sn-confirm-box {
   width: min(440px, calc(100vw - 48px));
   padding: 20px;
