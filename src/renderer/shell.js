@@ -772,6 +772,21 @@
     });
   }
 
+  // La scheda è un contenitore (le icone cedono il posto per priorità, shell.css) e così non darebbe
+  // più alla striscia la larghezza del suo contenuto: la si misura con tutto in vista e la si restituisce.
+  function misuraLarghezzeNaturali() {
+    const schede = [...tabsEl.children];
+    if (!schede.length) return;
+    schede.forEach((el) => el.classList.add('misura'));
+    const pad = getComputedStyle(schede[0]);
+    const bordi = parseFloat(pad.paddingLeft) + parseFloat(pad.paddingRight);
+    const larghe = schede.map((el) => el.getBoundingClientRect().width);
+    schede.forEach((el, i) => {
+      el.style.setProperty('--tab-naturale', `${Math.max(0, Math.ceil(larghe[i] - bordi))}px`);
+      el.classList.remove('misura');
+    });
+  }
+
   function render() {
     // Durante una trascinata non ridisegnare: cancellare i nodi farebbe perdere
     // il riferimento alla tab trascinata e interromperebbe il drag. Il riordino
