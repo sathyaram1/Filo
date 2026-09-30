@@ -339,7 +339,11 @@ module.exports = function register(on, ctx) {
           // Senza criterio del modello vale la richiesta stessa.
           const crit = critOf(criterion);
           const found = cardIds.length;
-          if (crit && found) {
+          // Una pagina che non ha risposto non è un tetto: la bolla tiene Riprova, e la nota lo dice.
+          if (sr.broken) retryable = true;
+          if (!found) {
+            reply = [reply, globalThis.SN_DECK_OPINIONS.searchEmptyNote({ identity: !!identityColors })].filter(Boolean).join('\n');
+          } else if (crit) {
             onProgress({ fase: 'controllo', done: 0, total: found });
             let fr;
             try {

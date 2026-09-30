@@ -270,9 +270,10 @@
 
   // Riga della risposta in chat dopo il giudice (§4.1): una scartata non si mostra mai, una non controllata si dichiara
   // (la lista la segna con ?), e le carte trovate oltre quelle arrivate al giudice (`total` > `found`) pure (#382).
-  function searchFilterNote({ found, kept, unverified, criterion, why, total = 0 }) {
+  // `broken`: le pagine dopo `found` non sono arrivate per un guasto, non per un tetto; si riprova, non si restringe.
+  function searchFilterNote({ found, kept, unverified, criterion, why, total = 0, broken = false }) {
     const motivo = why ? ` Motivo: ${why}` : '';
-    const cap = searchCapNote({ seen: found, total, judged: unverified < found });
+    const cap = searchCapNote({ seen: found, total, judged: unverified < found, broken });
     const withCap = (s) => [s, cap].filter(Boolean).join(' ');
     if (found > 0 && unverified >= found) {
       return withCap(`Non sono riuscito a controllare una per una le carte trovate. Qui sotto c'è la ricerca senza filtro, quindi può contenere carte che non c'entrano.${motivo}`);
@@ -287,7 +288,9 @@
       const c = String(criterion || '').trim().replace(/\s+/g, ' ');
       const crit = `«${c.length > 160 ? `${c.slice(0, 159).trimEnd()}…` : c}»`;
       if (total > found) {
-        return `Ho controllato una per una le prime ${num(found)} delle ${num(total)} carte trovate, in ordine di costo, e nessuna corrisponde a ${crit}. Per arrivare alle altre aggiungi un vincolo, per esempio un costo massimo o un tipo, o chiedilo con altre parole.`;
+        return broken
+          ? `Ho controllato una per una le prime ${num(found)} delle ${num(total)} carte trovate, in ordine di costo, e nessuna corrisponde a ${crit}. Poi Scryfall ha smesso di rispondere. Riprova per controllare anche le altre.`
+          : `Ho controllato una per una le prime ${num(found)} delle ${num(total)} carte trovate, in ordine di costo, e nessuna corrisponde a ${crit}. Per arrivare alle altre aggiungi un vincolo, per esempio un costo massimo o un tipo, o chiedilo con altre parole.`;
       }
       return found === 1
         ? `Ho controllato la carta trovata, ma non corrisponde a ${crit}. Prova a chiederlo con altre parole.`
@@ -297,11 +300,19 @@
   }
 
   // Scryfall ne ha trovate più di quante ne sono arrivate in chat: la frase che lo dice, '' se sono tutte lì.
-  function searchCapNote({ seen, total, judged }) {
+  function searchCapNote({ seen, total, judged, broken = false }) {
     if (!(total > seen) || !(seen > 0)) return '';
+    if (broken) {
+      return `Scryfall ne ha trovate ${num(total)} ma ha smesso di rispondere dopo le prime ${num(seen)}, quindi ${judged ? 'ho controllato solo quelle' : 'qui sotto ci sono solo quelle'}. Riprova per avere anche le altre.`;
+    }
     return judged
       ? `Scryfall ne ha trovate ${num(total)} e ho controllato le prime ${num(seen)}, in ordine di costo. Per arrivare alle altre aggiungi un vincolo, per esempio un costo massimo o un tipo.`
       : `Scryfall ne ha trovate ${num(total)} e qui sotto ci sono le prime ${num(seen)}, in ordine di costo. Per arrivare alle altre aggiungi un vincolo, per esempio un costo massimo o un tipo.`;
+  }
+
+  // Ricerca che Scryfall non trova: la dice come quella che il giudice scarta tutta, mai una bolla muta.
+  function searchEmptyNote({ identity = false } = {}) {
+    return `Nessun risultato su Scryfall per questa ricerca${identity ? ', fra le carte nei colori del commander' : ''}. Prova a chiederlo con altre parole.`;
   }
 
   // Punto delle migliaia scritto qui: il separatore di toLocaleString cambia fra Node ed Electron.
@@ -322,5 +333,6 @@
     updateSearchCache,
     searchFilterNote,
     searchCapNote,
+    searchEmptyNote,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
