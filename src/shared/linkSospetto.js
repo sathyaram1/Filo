@@ -11,7 +11,9 @@
     'twitter.com', 'x.com', 'linkedin.com', 'github.com',
   ];
 
-  // Codici: 'url_invalido' | 'side_effect' | 'token_in_url' | 'typosquatting:<dominio>'.
+  const FORME = ['typosquatting', 'homograph', 'brand_in_subdomain', 'combosquatting'];
+
+  // Codici: 'url_invalido' | 'side_effect' | 'token_in_url' | '<forma>:<dominio imitato>'.
   function analizza(rawUrl) {
     const flags = [];
     let u;
@@ -23,35 +25,159 @@
     if (AZIONI.test(u.pathname) || AZIONI.test(query)) flags.push('side_effect');
     if (haCredenziale(query)) flags.push('token_in_url');
 
-    const host = u.hostname.toLowerCase().replace(/^www\./, '');
-    const nome = nomeSito(host);
-    const sosia = normalizzaSosia(nome);
-    for (const p of POPULAR) {
-      if (host === p) break;
-      if (host.endsWith('.' + p)) break;
-      const suo = nomeSito(p);
-      // Stesso nome, altro dominio di primo livello (amazon.de, google.co):
-      // è il sito, non chi lo imita.
-      if (nome === suo) break;
-      if (sosia === suo || levenshteinSmall(nome, suo, tolleranza(suo))) {
-        flags.push('typosquatting:' + p);
-        break;
-      }
-    }
+    const imit = imitazione(sitoCheComanda(rawUrl));
+    if (imit) flags.push(imit.forma + ':' + imit.dominio);
     return flags;
   }
 
-  // Suffissi di secondo livello: in 'amazon.co.uk' il nome del sito è 'amazon'.
+  // Chi comanda un indirizzo lo decide lo stesso motore dei siti aperti
+  // (safebrowse): dominio registrabile, piattaforme ospitanti, whitelist, omoglifi.
+  const MOTORE = (function () {
+    if (typeof require !== 'function') return null;
+    try {
+      return {
+        normalize: require('../main/services/safebrowse/normalize.js').normalize,
+        isWhitelisted: require('../main/services/safebrowse/whitelist.js').isWhitelisted,
+        skeleton: require('../main/services/safebrowse/confusables.js').skeleton,
+      };
+    } catch (e) {
+      console.error('[Filo] linkSospetto: senza il motore dei siti non riconosce le imitazioni', e);
+      return null;
+    }
+  })();
+
+  // Suffissi di secondo livello sotto un dominio di Paese: in 'google.com.eg' il
+  // nome del sito è 'google' anche dove la lista dei suffissi non arriva.
   const SUFFISSI_2L = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac']);
 
-  // #725 — si confronta il nome, non l'indirizzo intero: col primo livello
-  // dentro, ogni cambio di Paese era un'imitazione (amazon.de contro amazon.it).
-  function nomeSito(host) {
-    const parti = host.split('.').filter(Boolean);
-    if (parti.length < 2) return host;
-    parti.pop();
-    if (parti.length >= 2 && SUFFISSI_2L.has(parti[parti.length - 1])) parti.pop();
-    return parti[parti.length - 1] || host;
+  function sitoCheComanda(rawUrl) {
+    if (!MOTORE) return null;
+    let n = null;
+    try { n = MOTORE.normalize(rawUrl); } catch (_) { return null; }
+    if (!n || !n.ok || n.isIp || n.single || n.suffixOnly || !n.sld) return null;
+    // «paypal.com.» è paypal.com: il punto finale non è un'etichetta.
+    const ascii = n.host.replace(/\.$/, '').split('.');
+    const uni = (n.hostUnicode || n.host).replace(/\.$/, '').split('.');
+    if (uni.length !== ascii.length) return null;
+    let quante = n.registrable.split('.').length;
+    let piattaforma = n.ospitato ? n.publicSuffix : '';
+    if (!n.ospitato && !n.publicSuffix.includes('.') && n.publicSuffix.length === 2
+      && SUFFISSI_2L.has(n.sld) && ascii.length > quante) quante += 1;
+    const i = ascii.length - quante;
+    const sotto = uni.slice(0, i);
+    if (sotto[0] === 'www') sotto.shift();
+    // https://paypal.com@altro.net si legge paypal.com, ma il sito è altro.net:
+    // quello che sta prima della chiocciola vale come un sottodominio.
+    sotto.unshift(...utente(rawUrl));
+    const registrabile = ascii.slice(i).join('.');
+    return {
+      registrabile,
+      nome: ascii[i],
+      nomeU: uni[i],
+      sotto,
+      piattaforma,
+      certificato: MOTORE.isWhitelisted(registrabile),
+    };
+  }
+
+  function utente(rawUrl) {
+    let u;
+    try { u = new URL(rawUrl); } catch (_) { return []; }
+    const chi = [u.username, u.password].filter(Boolean).join('.');
+    if (!chi) return [];
+    let testo = chi;
+    try { testo = decodeURIComponent(chi); } catch (_) {}
+    return testo.toLowerCase().split(/[.:@/]+/).filter(Boolean);
+  }
+
+  // Piattaforme dove il sottodominio è l'account di chi pubblica, e le aziende
+  // si tengono il proprio nome: microsoft.github.io è Microsoft.
+  const PIATTAFORME_ACCOUNT = new Set(['github.io', 'gitlab.io']);
+
+  // Parole che accompagnano un nome famoso nei domini di phishing
+  // (secure-paypal, paypal-com, amazon-rimborsi). Senza una di queste accanto,
+  // «github-readme-stats» è uno strumento, non un'imitazione (#725.2).
+  const ESCA = new Set([
+    'com', 'it', 'net', 'org', 'co', 'eu', 'info', 'uk', 'de', 'fr', 'es', 'us',
+    'login', 'signin', 'logon', 'accesso', 'accedi', 'entra', 'auth', 'id', 'account', 'accounts', 'conto', 'profilo', 'profile',
+    'secure', 'security', 'sicuro', 'sicura', 'sicurezza', 'protezione', 'protect', 'verify', 'verifica', 'verification', 'verified',
+    'conferma', 'confirm', 'convalida', 'validate', 'unlock', 'sblocco', 'sblocca', 'recovery', 'recupero', 'reset', 'password',
+    'support', 'supporto', 'assistenza', 'help', 'aiuto', 'service', 'services', 'servizio', 'servizi', 'customer', 'clienti', 'cliente', 'care', 'center', 'centro',
+    'billing', 'pagamento', 'pagamenti', 'payment', 'payments', 'pay', 'fattura', 'invoice', 'refund', 'rimborso', 'rimborsi', 'rinnovo', 'renew',
+    'abbonamento', 'subscription', 'carta', 'card', 'wallet', 'bonus', 'premio', 'premi', 'gift', 'regalo', 'promo', 'offerta', 'offer', 'rewards', 'prize',
+    'alert', 'alerts', 'avviso', 'notifica', 'notification', 'update', 'aggiorna', 'aggiornamento', 'attivazione', 'activate',
+    'blocco', 'blocked', 'sospeso', 'suspended', 'limited', 'limitato', 'official', 'ufficiale', 'italia', 'italy', 'team', 'mail', 'email', 'web', 'online',
+  ]);
+  // Incollate al nome (securepaypal, paypalcom) solo le più nette: googlemail e
+  // amazonpay sono domini veri dei due marchi.
+  const ESCA_INCOLLATA = new Set([
+    'com', 'it', 'net', 'login', 'signin', 'logon', 'secure', 'security', 'sicuro', 'sicurezza', 'verify', 'verifica',
+    'account', 'accesso', 'id', 'support', 'assistenza', 'help', 'update', 'conferma', 'confirm', 'rimborso', 'refund',
+  ]);
+  // Sotto questa lunghezza un nome famoso dentro un altro è un caso, non un indizio.
+  const MIN_NOME_DENTRO = 5;
+
+  function scheletro(s) {
+    return normalizzaSosia(MOTORE.skeleton(s));
+  }
+
+  // Il nome famoso `suo` sta in `parte` (un'etichetta dell'indirizzo) come
+  // parola intera o incollato a un'esca. `bastaLui`: da solo vale già.
+  function usaNome(parte, suo, bastaLui) {
+    if (suo.length < MIN_NOME_DENTRO) return false;
+    const parole = parte.split('-').filter(Boolean).map(scheletro);
+    if (bastaLui && parole.length === 1 && parole[0] === suo) return true;
+    for (let k = 0; k < parole.length; k++) {
+      const w = parole[k];
+      if (w === suo) {
+        if (bastaLui || parole.some((a, j) => j !== k && ESCA.has(a))) return true;
+      } else if (w.length > suo.length) {
+        if (w.startsWith(suo) && ESCA_INCOLLATA.has(w.slice(suo.length))) return true;
+        if (w.endsWith(suo) && ESCA_INCOLLATA.has(w.slice(0, -suo.length))) return true;
+      }
+    }
+    return false;
+  }
+
+  function imitazione(sito) {
+    if (!sito || sito.certificato) return null;
+    const famosi = POPULAR.map((dominio) => ({ dominio, suo: nomeSito(dominio) }));
+    for (const f of famosi) {
+      if (sito.registrabile === f.dominio) return null;
+      // Stesso nome, altro dominio di primo livello (amazon.de, google.co): è
+      // il sito. Su una piattaforma ospitante il nome lo sceglie chi pubblica.
+      if (sito.nome === f.suo && (!sito.piattaforma || PIATTAFORME_ACCOUNT.has(sito.piattaforma))) return null;
+    }
+    // Lettere di un altro alfabeto (раураl.com): si confronta quello che si
+    // legge a schermo, non il punycode che il browser ha nell'indirizzo. Solo se
+    // ogni lettera si legge come una latina: una parola russa non imita nessuno.
+    const straniero = /[^\u0000-\u007f]/.test(sito.nomeU)
+      && MOTORE.skeleton(sito.nomeU).length === sito.nomeU.replace(/-/g, '').length
+      ? scheletro(sito.nomeU) : '';
+    for (const f of famosi) {
+      if (straniero) {
+        if (straniero === f.suo || (!sito.piattaforma && levenshteinSmall(straniero, f.suo, tolleranza(f.suo)))) {
+          return { forma: 'homograph', dominio: f.dominio };
+        }
+      } else if (sito.nome !== f.suo) {
+        if (normalizzaSosia(sito.nome) === f.suo) return { forma: 'typosquatting', dominio: f.dominio };
+        // Sul nome di una pagina ospitata la distanza non dice niente: è una
+        // parola scelta da chi pubblica (team.netlify.app).
+        if (!sito.piattaforma && levenshteinSmall(sito.nome, f.suo, tolleranza(f.suo))) return { forma: 'typosquatting', dominio: f.dominio };
+      }
+    }
+    for (const f of famosi) {
+      // Arriva qui solo su una piattaforma ospitante: paypal.netlify.app.
+      if (sito.nome === f.suo) return { forma: 'brand_in_subdomain', dominio: f.dominio };
+      if (sito.sotto.some((l) => usaNome(l, f.suo, true))) return { forma: 'brand_in_subdomain', dominio: f.dominio };
+      if (usaNome(sito.nomeU, f.suo, false)) return { forma: 'combosquatting', dominio: f.dominio };
+    }
+    return null;
+  }
+
+  // Il nome di un dominio famoso scritto per intero: 'amazon' da 'amazon.it'.
+  function nomeSito(dominio) {
+    return dominio.split('.')[0];
   }
 
   // #725 — una soglia fissa grida al lupo: due lettere su un nome corto sono
@@ -116,32 +242,49 @@
     token_in_url: 'Nell’indirizzo c’è un codice che può valere come una chiave d’accesso. Chi lo riceve potrebbe entrare al posto tuo.',
   };
 
-  function frasePerCodice(codice) {
+  // `url`, se c'è, fa dire quale sito comanda davvero: chi legge
+  // paypal.com.accesso-sicuro.net deve sapere che il sito è accesso-sicuro.net.
+  function frasePerCodice(codice, url) {
     if (FRASI[codice]) return FRASI[codice];
-    if (codice.startsWith('typosquatting:')) {
-      const dominio = codice.slice('typosquatting:'.length).trim();
-      if (dominio) return `L’indirizzo somiglia a ${dominio} ma non è quello: potrebbe essere un’imitazione.`;
+    const due = codice.indexOf(':');
+    if (due < 0) return '';
+    const forma = codice.slice(0, due);
+    const dominio = codice.slice(due + 1).trim();
+    if (!dominio) return '';
+    if (forma === 'typosquatting') return `L’indirizzo somiglia a ${dominio} ma non è quello: potrebbe essere un’imitazione.`;
+    if (forma === 'homograph') return `L’indirizzo sembra ${dominio}, ma alcune lettere sono solo simili a quelle vere: potrebbe essere un’imitazione.`;
+    if (forma === 'brand_in_subdomain' || forma === 'combosquatting') {
+      const sito = url ? sitoCheComanda(url) : null;
+      const dove = sito ? ` (${sito.piattaforma || sito.registrabile})` : '';
+      return `L’indirizzo usa il nome di ${dominio}, ma porta a un altro sito${dove}: potrebbe essere un’imitazione.`;
     }
     return '';
   }
 
   // Codici → frasi, senza doppioni e senza vuoti. Un codice che non conosciamo
   // si tace: meglio nessun avviso che un avviso incomprensibile.
-  function frasi(codici) {
+  function frasi(codici, url) {
     const out = [];
     for (const c of (Array.isArray(codici) ? codici : [])) {
       if (typeof c !== 'string') continue;
-      const f = frasePerCodice(c);
+      const f = frasePerCodice(c, typeof url === 'string' ? url : '');
       if (f && !out.includes(f)) out.push(f);
     }
     return out;
   }
 
   // L'avviso intero, pronto da mostrare (stringa vuota se non c'è niente da dire).
-  function avviso(codici) {
-    const f = frasi(codici);
+  function avviso(codici, url) {
+    const f = frasi(codici, url);
     return f.length ? '⚠️ ' + f.join(' ') : '';
   }
 
-  global.SN_LINK_SOSPETTO = { analizza, frasi, avviso, POPULAR };
+  // Un link da non contattare nemmeno per leggerne il titolo: esegue
+  // un'azione, o imita un altro sito.
+  function grave(codici) {
+    return (Array.isArray(codici) ? codici : []).some((c) => typeof c === 'string'
+      && (c === 'side_effect' || FORME.includes(c.split(':')[0])));
+  }
+
+  global.SN_LINK_SOSPETTO = { analizza, frasi, avviso, grave, POPULAR };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

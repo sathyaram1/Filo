@@ -59,7 +59,14 @@ test('ogni codice prodotto dall’euristica ha la sua frase', () => {
     assert.equal(f.length, 1, `il codice "${c}" non ha una frase per l’utente`);
     assert.ok(f[0].length > 20 && /\.$/.test(f[0]), `la frase di "${c}" non è una frase: ${f[0]}`);
   }
-  assert.equal(LS.frasi(['typosquatting:paypal.com']).length, 1);
+  // Le imitazioni portano la forma davanti al dominio imitato: ognuna ha la sua frase.
+  const forme = [...new Set([...src.matchAll(/forma: '([a-z_]+)'/g)].map((m) => m[1]))];
+  assert.ok(forme.length >= 4, `mi aspetto ≥4 forme di imitazione, trovate ${forme.join(', ')}`);
+  for (const forma of forme) {
+    const f = LS.frasi([forma + ':paypal.com'], 'https://paypal.com.accesso-sicuro.net/');
+    assert.equal(f.length, 1, `la forma "${forma}" non ha una frase per l’utente`);
+    assert.ok(f[0].includes('paypal.com') && /\.$/.test(f[0]), `la frase di "${forma}" non nomina il sito imitato: ${f[0]}`);
+  }
 });
 
 test('più avvisi insieme restano leggibili, e i casi vuoti non mostrano niente', () => {
@@ -119,7 +126,8 @@ test('l’avviso non afferma più di quello che il controllo sa', () => {
   // Il controllo guarda l'indirizzo, non il sito: nessuna delle frasi può
   // dichiarare un fatto. Una che afferma trasforma ogni falso allarme in
   // un'accusa, e chi legge smette di crederci (#725).
-  for (const c of ['side_effect', 'token_in_url', 'typosquatting:paypal.com']) {
+  for (const c of ['side_effect', 'token_in_url', 'typosquatting:paypal.com', 'homograph:paypal.com',
+    'brand_in_subdomain:paypal.com', 'combosquatting:paypal.com']) {
     const f = LS.frasi([c])[0];
     assert.match(f, /potrebbe|può|sembra/i, `la frase di "${c}" afferma invece di ipotizzare: ${f}`);
   }
@@ -181,4 +189,107 @@ test('le imitazioni vere continuano a farsi riconoscere', () => {
   for (const [u, atteso] of Object.entries(sosia)) {
     assert.deepEqual(LS.analizza(u), ['typosquatting:' + atteso], `nessun avviso su ${u}`);
   }
+});
+
+test('un nome famoso dentro un indirizzo di tutti i giorni non fa scattare l’avviso', () => {
+  // #725.2 — il falso allarme prima del vero positivo: il nome di un marchio
+  // compare in domini suoi, in strumenti che parlano di lui, in parole comuni e
+  // nei sottodomini dei siti che ospitano una pagina per azienda.
+  const innocenti = [
+    'https://microsoft.github.io/vscode-docs/',
+    'https://google.github.io/styleguide/',
+    'https://apple.stackexchange.com/questions/1',
+    'https://microsoft.sharepoint.com/teams/x',
+    'https://github-readme-stats.vercel.app/api?username=x',
+    'https://google-webfonts-helper.herokuapp.com/fonts',
+    'https://google-analytics.com/collect',
+    'https://googlemail.com/',
+    'https://facebookmail.com/',
+    'https://paypal-community.com/t5/',
+    'https://www.youtube-nocookie.com/embed/abc',
+    'https://amazon-adsystem.com/x',
+    'https://paypalobjects.com/logo.png',
+    'https://raw.githubusercontent.com/a/b/main/README.md',
+    'https://login.microsoftonline.com/',
+    'https://pineapple.com/',
+    'https://apple-pie-recipes.com/',
+    'https://amazon-watch.org/',
+    'https://google.com.eg/',
+    'https://amazon.co.jp/',
+    'https://paypal.co.uk/',
+    'https://paypal.com./it',
+    'https://müller.de/',
+    'https://реклама.рф/',
+    'https://utente:segreta@esempio.it/',
+    'mailto:paypal@esempio.it',
+    'https://192.168.1.1/',
+  ];
+  for (const u of innocenti) {
+    assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
+  }
+});
+
+test('le imitazioni in cui il nome vero c’è tutto ma non comanda si fanno riconoscere', () => {
+  // #725.2 — le forme delle mail di phishing: il sito vero davanti a un altro
+  // dominio, il nome vero incollato a una parola d'esca, il nome prima della
+  // chiocciola. Il successo per chi legge: sa quale sito imita e quale sito c'è
+  // davvero dietro.
+  const casi = {
+    'https://paypal.com.accesso-sicuro.net/login': ['brand_in_subdomain:paypal.com', 'accesso-sicuro.net'],
+    'https://www.paypal.it.verifica-conto.com/': ['brand_in_subdomain:paypal.com', 'verifica-conto.com'],
+    'https://paypal.accesso-sicuro.net/': ['brand_in_subdomain:paypal.com', 'accesso-sicuro.net'],
+    'https://www.paypal.com.net/': ['brand_in_subdomain:paypal.com', 'com.net'],
+    'https://paypal.com@accesso-sicuro.net/': ['brand_in_subdomain:paypal.com', 'accesso-sicuro.net'],
+    'https://paypal.netlify.app/': ['brand_in_subdomain:paypal.com', 'netlify.app'],
+    'https://secure-paypal.com/': ['combosquatting:paypal.com', 'secure-paypal.com'],
+    'https://paypal-com.net/': ['combosquatting:paypal.com', 'paypal-com.net'],
+    'https://securepaypal.com/': ['combosquatting:paypal.com', 'securepaypal.com'],
+    'https://amazon-rimborsi.it/': ['combosquatting:amazon.com', 'amazon-rimborsi.it'],
+    'https://apple-id-verifica.com/': ['combosquatting:apple.com', 'apple-id-verifica.com'],
+    'https://secure-paypal.netlify.app/': ['combosquatting:paypal.com', 'netlify.app'],
+  };
+  for (const [u, [codice, sito]] of Object.entries(casi)) {
+    assert.deepEqual(LS.analizza(u), [codice], `nessun avviso giusto su ${u}`);
+    const avviso = LS.avviso(LS.analizza(u), u);
+    const imitato = codice.split(':')[1];
+    assert.ok(avviso.includes(imitato), `l’avviso non nomina il sito imitato su ${u}: ${avviso}`);
+    assert.ok(avviso.includes(`(${sito})`), `l’avviso non dice quale sito c’è davvero su ${u}: ${avviso}`);
+    assert.match(avviso, /imitazione/i);
+  }
+  // Senza l'indirizzo la frase resta intera, solo senza il nome del sito.
+  assert.match(LS.frasi(['combosquatting:paypal.com'])[0], /^L’indirizzo usa il nome di paypal\.com, ma porta a un altro sito: .*\.$/);
+});
+
+test('un nome scritto con le lettere di un altro alfabeto si riconosce', () => {
+  // #725.2 — a schermo si legge come quello vero, nell'indirizzo il browser ha
+  // il punycode: si confronta quello che vede chi legge.
+  const casi = {
+    'https://раураl.com/login': 'paypal.com',
+    'https://xn--l-7sba6dbr.com/login': 'paypal.com',
+    'https://аррӏе.com/': 'apple.com',
+    'https://gооgle.com/': 'google.com',
+    'https://päypal.com/': 'paypal.com',
+  };
+  for (const [u, imitato] of Object.entries(casi)) {
+    assert.deepEqual(LS.analizza(u), ['homograph:' + imitato], `nessun avviso su ${u}`);
+    const avviso = LS.avviso(LS.analizza(u), u);
+    assert.ok(avviso.includes(imitato) && /lettere/.test(avviso), `l’avviso non spiega l’inganno su ${u}: ${avviso}`);
+  }
+  // Nei sottodomini e accanto a un'esca vale lo stesso.
+  assert.deepEqual(LS.analizza('https://раураl.com.accesso-sicuro.net/'), ['brand_in_subdomain:paypal.com']);
+  assert.deepEqual(LS.analizza('https://secure-раураl.com/'), ['combosquatting:paypal.com']);
+});
+
+test('un link che imita un altro sito non si contatta nemmeno per leggerne il titolo', () => {
+  // #725.2 — il titolo della pagina lo scrive chi imita («PayPal – Accedi»), e
+  // l'indirizzo può portare il segno di chi ha aperto la mail.
+  for (const u of ['https://paypal.com.accesso-sicuro.net/', 'https://раураl.com/', 'https://paypa1.com/',
+    'https://secure-paypal.com/', 'https://esempio.it/unsubscribe']) {
+    assert.ok(LS.grave(LS.analizza(u)), `si contatterebbe ${u}`);
+  }
+  for (const u of ['https://gitlab.com/', 'https://esempio.it/a?token=9f2ba71c4de80a13', 'https://microsoft.github.io/']) {
+    assert.ok(!LS.grave(LS.analizza(u)), `non si leggerebbe il titolo di ${u}`);
+  }
+  assert.equal(LS.grave(null), false);
+  assert.equal(LS.grave([42, {}]), false);
 });

@@ -89,6 +89,46 @@ test('la spiegazione arriva da sola: nel menu non c’è niente da cliccare', as
   await expect(menu.getByText(/^Spiegazione$/)).toHaveCount(0);
 });
 
+// #725.2 — le imitazioni in cui il nome vero c'è tutto ma non comanda: il
+// sito vero davanti a un altro dominio, e le lettere di un altro alfabeto.
+const IMITAZIONI = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
+  <p><a id="davanti" href="https://paypal.com.accesso-sicuro.net/login">paypal.com – accedi al tuo conto</a></p>
+  <p><a id="alfabeto" href="https://раураl.com/login">paypal.com</a></p>
+  <p><a id="esca" href="https://secure-paypal.com/">Verifica il tuo conto</a></p>
+</body></html>`;
+
+test('il sito vero davanti a un altro dominio: l’avviso dice quale sito c’è davvero', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, IMITAZIONI);
+  await page.locator('#davanti').click({ button: 'right' });
+  const avviso = page.locator('.sn-menu .sn-menu-link-warn');
+  await expect(avviso).toBeVisible({ timeout: 3000 });
+  const testo = ((await avviso.textContent()) || '').trim();
+  // Il successo per chi legge: sa che imita paypal.com e che il sito è un altro.
+  expect(testo).toContain('paypal.com');
+  expect(testo).toContain('accesso-sicuro.net');
+  expect(testo).toMatch(/imitazione/i);
+  await page.screenshot({ path: 'tests/.shots/725-2-sito-davanti.png' });
+  await page.keyboard.press('Escape');
+
+  await page.locator('#esca').click({ button: 'right' });
+  const esca = page.locator('.sn-menu .sn-menu-link-warn');
+  await expect(esca).toBeVisible({ timeout: 3000 });
+  expect(((await esca.textContent()) || '')).toContain('secure-paypal.com');
+});
+
+test('un nome scritto con le lettere di un altro alfabeto si prende l’avviso', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, IMITAZIONI);
+  await page.locator('#alfabeto').click({ button: 'right' });
+  const avviso = page.locator('.sn-menu .sn-menu-link-warn');
+  await expect(avviso).toBeVisible({ timeout: 3000 });
+  const testo = ((await avviso.textContent()) || '').trim();
+  expect(testo).toContain('paypal.com');
+  expect(testo).toMatch(/lettere/);
+  expect(testo).toMatch(/imitazione/i);
+  expect(testo).not.toMatch(/homograph|xn--/);
+  await page.screenshot({ path: 'tests/.shots/725-2-altro-alfabeto.png' });
+});
+
 // #725.1 — quando il punto cliccato è un'immagine che apre un collegamento
 // (locandina, banner, logo di una scheda) la sezione del menu parla
 // dell'immagine: l'avviso sull'indirizzo deve esserci lo stesso, in tutte le

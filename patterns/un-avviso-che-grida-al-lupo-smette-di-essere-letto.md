@@ -38,6 +38,17 @@ nuovo: le lettere che a occhio ne valgono un'altra (`paypa1`, `micros0ft`,
 `arnazon`) si riconoscono normalizzandole, e lì la prova è l'uguaglianza, non
 una distanza.
 
+**Chi comanda lo dice il dominio registrabile, non la lettura da sinistra**
+(#725.2). Le imitazioni più comuni hanno il nome vero tutto intero:
+`paypal.com.accesso-sicuro.net`, `secure-paypal.com`, `раураl.com` in lettere
+cirilliche. Il confronto lettera per lettera sul nome le lasciava passare; il
+nome dentro un altro indirizzo però è anche `github-readme-stats` o
+`apple.stackexchange.com`. Il segnale preciso: nei sottodomini (e prima della
+chiocciola) il nome da solo basta, accanto al nome registrato serve una parola
+d'esca (`secure`, `login`, `com`, `rimborsi`); i domini certificati e le pagine
+per azienda (`microsoft.github.io`) restano fuori. Il dominio registrabile e gli
+omoglifi li decide lo stesso motore dei siti aperti, non una seconda copia.
+
 **Ogni frase ipotizza, nessuna afferma.** Il controllo guarda l'indirizzo, non
 il sito: «potrebbe essere un'imitazione» si può dire, «chi lo riceve entra al
 posto tuo» no.

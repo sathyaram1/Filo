@@ -665,7 +665,7 @@
   // L'avviso sull'indirizzo lo calcola Filo, non il modello: si mostra SUBITO e
   // resta anche se la spiegazione non arriva mai (#725).
   function mostraAvvisoLink(el, url) {
-    const avviso = LinkSospetto.avviso(LinkSospetto.analizza(url));
+    const avviso = LinkSospetto.avviso(LinkSospetto.analizza(url), url);
     if (!avviso) return;
     const w = document.createElement('div');
     w.className = 'sn-menu-link-warn';
@@ -748,9 +748,10 @@
           body.textContent = I18n.t('menu_link_loading');
           el.appendChild(body);
 
-          // Fetch leggero dei metadati OG via background (CORS-safe). Saltato se url sospetto in modo grave.
+          // Fetch leggero dei metadati OG via background (CORS-safe). Saltato se url sospetto in modo grave:
+          // un'imitazione non si contatta, il suo og:title direbbe «PayPal» al modello (#725.2).
           let ogTitle = '', ogDescription = '';
-          if (!flags.includes('side_effect')) {
+          if (!LinkSospetto.grave(flags)) {
             try {
               const r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url });
               if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
