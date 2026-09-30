@@ -915,6 +915,7 @@
 
       const close = document.createElement('span');
       close.className = 'close';
+      close.dataset.tip = `Chiudi scheda (${tasto('Ctrl+W')})`;
       if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
       else close.textContent = '×';
       close.addEventListener('click', (e) => {
