@@ -29,6 +29,14 @@ test('a barra chiusa si vede la striscia; spingere sul bordo la apre, passarci d
   expect(s0.bounds.y).toBe(s0.alto);
   await expect(barra.locator('#striscia')).toBeVisible();
   await expect(barra.locator('#pannello')).toBeHidden();
+  // La scheda aperta per ultima entra in cima alle viste: la barra le torna sopra.
+  const sopra = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const figli = w.contentView.children;
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    return figli.indexOf(w._filoTabs.barra.vista) > figli.indexOf(t.view);
+  });
+  expect(sopra).toBe(true);
 
   // Di corsa: entra e se ne va prima dell'attesa.
   await barra.mouse.move(1, 300);
@@ -115,6 +123,8 @@ test('indietro, avanti, ricarica e home funzionano da un sito, spenti quando non
   const fwd = barra.locator('#nav .ico[data-id="forward"]');
   await expect(back).toHaveAttribute('aria-disabled', 'true');
   await expect(fwd).toHaveAttribute('aria-disabled', 'true');
+  // Spento si vede: sbiadito come nel menu.
+  expect(await back.evaluate((el) => parseFloat(getComputedStyle(el).opacity))).toBeLessThan(1);
   // Spento vuol dire che non fa niente.
   await back.click({ force: true });
   await pausa(300);
@@ -354,13 +364,22 @@ test('col tasto destro un\'icona della barra torna nel menu', async ({ app, open
   await barra.locator('#nav .ico[data-id="incognito"]').click({ button: 'right' });
   let popup = null;
   const fine = Date.now() + 5000;
+  // Anche il suggerimento è una finestra data:: il menu è quella con le voci.
   while (!popup && Date.now() < fine) {
-    popup = app.windows().find((w) => { try { return w.url().startsWith('data:text/html'); } catch (_) { return false; } });
+    for (const w of app.windows()) {
+      let url = '';
+      try { url = w.url(); } catch (_) { continue; }
+      if (url.startsWith('data:text/html') && await w.$('.menu').catch(() => null)) { popup = w; break; }
+    }
     if (!popup) await pausa(100);
   }
   expect(popup, 'il menu della voce non si è aperto').toBeTruthy();
-  await popup.waitForSelector('.menu');
-  await popup.locator('button.item', { hasText: 'Rimetti nel menu del tasto destro' }).click();
+  await expect(popup.locator('button.item', { hasText: 'Rimetti nel menu del tasto destro' })).toBeVisible();
+  // La scelta chiude il menu: il clic non aspetta una pagina che non c'è più.
+  await popup.evaluate(() => {
+    const b = [...document.querySelectorAll('button.item')].find((x) => x.textContent.includes('Rimetti nel menu'));
+    b.click();
+  }).catch(() => {});
   await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('incognito');
   expect((await statoBarra(app)).secondary).toContain('incognito');
   await expect(barra.locator('#nav .ico[data-id="incognito"]')).toHaveCount(0);
@@ -395,4 +414,67 @@ test('aperta col mouse, il puntatore che torna sulla pagina la chiude', async ({
   await expect.poll(() => aperta(app), { timeout: 3000 }).toBe(false);
   // E il pannello si ritira: la vista torna larga quanto la striscia.
   await expect.poll(async () => (await statoBarra(app)).bounds.width).toBe(4);
+});
+
+test('un trascinamento dal menu interrotto da una pagina che ricarica non lascia la barra appesa', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO);
+  await barraPage(app);
+  await page.locator('#p').click({ button: 'right' });
+  const icona = page.locator('.sn-menu [data-sn-icon-id="share"]').first();
+  await expect(icona).toBeVisible();
+  const box = await icona.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 14, box.y + 14, { steps: 3 });
+  await expect.poll(() => aperta(app)).toBe(true);
+  await page.evaluate(() => location.reload());
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+  await page.mouse.up();
+  await expect.poll(() => aperta(app), { timeout: 4000 }).toBe(false);
+  expect((await statoBarra(app)).bar).not.toContain('share');
+});
+
+test('Nuova finestra incognito dalla barra: anche lei ha la sua barra, con le stesse icone', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, SITO);
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await barra.locator('#nav .ico[data-id="incognito"]').click();
+  let privata = null;
+  const fine = Date.now() + 10_000;
+  while (!privata && Date.now() < fine) {
+    privata = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/barra.html?incognito=1'); } catch (_) { return false; } });
+    if (!privata) await pausa(100);
+  }
+  expect(privata, 'la finestra incognito non ha la barra').toBeTruthy();
+  await privata.waitForFunction(() => document.querySelectorAll('#nav .ico').length > 0, null, { timeout: 5000 });
+  const ids = await privata.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id));
+  expect(ids).toEqual(['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
+  const larga = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && x._filoIncognito);
+    return w._filoTabs.barra.vista.getBounds().width;
+  });
+  expect(larga).toBe(4);
+});
+
+test('dentro la barra le icone si riordinano trascinandole, e l\'ordine resta', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, SITO);
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  const home = await barra.locator('#nav .ico[data-id="home"]').boundingBox();
+  const back = await barra.locator('#nav .ico[data-id="back"]').boundingBox();
+  await barra.mouse.move(home.x + home.width / 2, home.y + home.height / 2);
+  await barra.mouse.down();
+  await barra.mouse.move(home.x + home.width / 2 + 2, home.y - 10, { steps: 3 });
+  await barra.mouse.move(back.x + back.width / 2, back.y + 4, { steps: 6 });
+  await expect(barra.locator('#nav .segno')).toHaveCount(1);
+  await barra.mouse.up();
+  await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 2)).toEqual(['home', 'back']);
+  await expect.poll(() => barra.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id).slice(0, 2))).toEqual(['home', 'back']);
+  // Il clic che chiude il trascinamento non preme l'icona: la scheda resta dov'era.
+  expect(await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    return w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId).url;
+  })).not.toMatch(/^filo:\/\/newtab/);
 });

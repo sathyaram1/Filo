@@ -44,7 +44,7 @@ class BarraLaterale {
     this.mira = null;
     this.trascinamento = null;
     this.suggerimento = false;
-    this.timer = { uscita: null, stringi: null, fine: null };
+    this.timer = { uscita: null, stringi: null, fine: null, trascina: null };
     this.ultimoNav = '';
     if (win && typeof win.once === 'function') win.once('closed', () => this._butta());
     Layout.leggi({ incognito: this._incognito() }).then((l) => this.disposizione(l)).catch(() => {});
@@ -106,7 +106,17 @@ class BarraLaterale {
 
   // Input vero arrivato alla scheda o alla fila delle schede, cioè fuori dalla barra.
   inputAltrove(input) {
-    if (!this.aperta || this.trascinamento || !input) return;
+    if (!input) return;
+    // Il rilascio di un trascinamento dal menu arriva sempre qui: se la pagina non dice più
+    // «fine» (ha navigato, è caduta), la barra non resta ferma ad aspettarla.
+    if (this.trascinamento) {
+      if (input.type === 'mouseUp') {
+        this._ferma('trascina');
+        this.timer.trascina = setTimeout(() => { this.timer.trascina = null; this._fineTrascinamento(); }, 500);
+      }
+      return;
+    }
+    if (!this.aperta) return;
     if (input.type === 'mouseDown' && (input.button || 'left') === 'left') { this.chiudi(); return; }
     if (input.type !== 'mouseMove') return;
     // La pagina riceve il puntatore solo dove la barra non c'è: vale più di un'uscita persa per strada.
@@ -152,11 +162,19 @@ class BarraLaterale {
     this.aggiornaNav();
   }
 
-  // Ogni scheda nuova entra in cima alle viste della finestra: la barra deve tornarle sopra.
+  // Ogni scheda nuova entra in cima alle viste della finestra: la barra deve tornarle sopra, ma sotto
+  // gli avvisi, che restano l'ultima vista (tests/avvisi-sopra-pagina.spec.mjs).
   _inCima() {
     const cv = this.win.contentView;
-    const figli = cv.children || [];
-    if (figli[figli.length - 1] !== this.vista) cv.addChildView(this.vista);
+    const figli = () => cv.children || [];
+    const schede = new Set(this.tabs.tabs.map((t) => t.view));
+    const mia = figli().indexOf(this.vista);
+    if (mia >= 0 && !figli().slice(mia + 1).some((v) => schede.has(v))) return;
+    if (mia >= 0) cv.removeChildView(this.vista);
+    const avvisi = this.tabs.avvisi && this.tabs.avvisi.vista;
+    const sotto = avvisi ? figli().indexOf(avvisi) : -1;
+    if (sotto >= 0) cv.addChildView(this.vista, sotto);
+    else cv.addChildView(this.vista);
   }
 
   disposizione(layout) {
@@ -374,16 +392,23 @@ class BarraLaterale {
       return { ok: true };
     }
     if (fase === 'fine') {
-      const posata = !!this.trascinamento.posata;
-      this.trascinamento = null;
-      this.mira = null;
-      this._invia();
-      if (this.motivo === 'trascina' && !this.dentro) {
-        this.timer.fine = setTimeout(() => { this.timer.fine = null; if (!this.dentro) this.chiudi(); }, posata ? DOPO_POSA_MS : 0);
-      }
+      this._fineTrascinamento();
       return { ok: true };
     }
     return { ok: false };
+  }
+
+  _fineTrascinamento() {
+    this._ferma('trascina');
+    if (!this.trascinamento) return;
+    const posata = !!this.trascinamento.posata;
+    this.trascinamento = null;
+    this.mira = null;
+    this._invia();
+    if (this.motivo === 'trascina' && !this.dentro) {
+      this._ferma('fine');
+      this.timer.fine = setTimeout(() => { this.timer.fine = null; if (!this.dentro) this.chiudi(); }, posata ? DOPO_POSA_MS : 0);
+    }
   }
 
   // L'icona davanti alla quale posare, dalle misure che la barra ha mandato (px della vista).
