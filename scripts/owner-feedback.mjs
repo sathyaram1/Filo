@@ -180,7 +180,7 @@ async function lavoroVietato(doc, to) {
   const fb = await praticaInChiaro(doc);
   if (!fb) return { motivo: 'mittente o stato non decifrabili: non so di chi è la pratica', utente: false };
   const chi = MR.localSenderCheck(fb);
-  return chi.ok ? null : { motivo: chi.motivo, utente: !!chi.utente };
+  return chi.ok ? null : { motivo: chi.motivo, utente: !!chi.utente, senzaProva: !!chi.senzaProva };
 }
 
 /**
@@ -226,7 +226,7 @@ export async function segnaLocale(id, valore, opts = {}) {
   const fb = await praticaInChiaro(doc);
   if (!fb) return { ok: false, motivo: 'mittente o stato non decifrabili: non so di chi è la pratica' };
   const check = MR.localSignCheck(fb, valore);
-  if (!check.ok) return { ok: false, motivo: check.motivo, utente: !!check.utente };
+  if (!check.ok) return { ok: false, motivo: check.motivo, utente: !!check.utente, senzaProva: !!check.senzaProva };
   const segno = valore ? { by: chiScrive(bearer), at: Date.now() } : null;
   if (opts.dryRun) return { ok: true, dryRun: true, segno };
   const fields = segno ? { localOnly: toFsValue(segno) } : {};
@@ -270,7 +270,7 @@ export async function praticaPerLaSessione(id, opts = {}) {
   const fb = await praticaInChiaro(doc);
   if (!fb) return { ok: false, motivo: 'mittente o stato non decifrabili: non so di chi è la pratica', utente: false };
   const chi = MR.localSenderCheck(fb);
-  if (!chi.ok) return { ok: false, motivo: chi.motivo, utente: !!chi.utente };
+  if (!chi.ok) return { ok: false, motivo: chi.motivo, utente: !!chi.utente, senzaProva: !!chi.senzaProva };
   return { ok: true, avviso: avvisoDaCampi(doc.fields) };
 }
 
@@ -388,7 +388,7 @@ export async function scrivi(id, to, nota, opts = {}) {
   const vietata = partenzaVietata(from);
   if (vietata) return { ok: false, motivo: vietata, from };
   const lavoro = from === to ? null : await lavoroVietato(doc, to);
-  if (lavoro) return { ok: false, motivo: lavoro.motivo, utente: lavoro.utente, from };
+  if (lavoro) return { ok: false, motivo: lavoro.motivo, utente: lavoro.utente, senzaProva: lavoro.senzaProva, from };
   const check = transizioneAmmessa(from, to, opts.attore || 'owner');
   if (!check.ok) return { ok: false, motivo: check.motivo, from };
 
