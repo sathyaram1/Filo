@@ -11,6 +11,35 @@ const RITENTA = 4000;
 const TENTATIVI = 3;
 // Feed, posta, video: il contenuto arriva dopo il caricamento, e alla prima foto la pagina è ancora vuota.
 const RIPRESA = 3000;
+// Una pagina dietro mai vista si rifotografa quando cambia, non a orari fissi: una spia nel suo mondo isolato conta
+// i cambi del DOM e le immagini arrivate. Fra due foto per cambio l'attesa raddoppia, così un ticker costa poco.
+const SEGUI = 90_000;
+const GIRO = 1500;
+const QUIETE = 600;
+const PASSO = 3000;
+const SENZA_QUIETE = 4000;
+const MONDO = 1430;
+const SPIA = `(() => {
+  let s = window.__filoAnteprima;
+  if (!s) {
+    s = window.__filoAnteprima = { n: 0, t: performance.now() };
+    const tocca = () => { s.n++; s.t = performance.now(); };
+    try {
+      s.o = new MutationObserver(tocca);
+      s.o.observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+    } catch (_) {}
+    s.f = tocca;
+    try { document.addEventListener('load', tocca, true); } catch (_) {}
+  }
+  return { n: s.n, quiete: performance.now() - s.t };
+})()`;
+const SPEGNI = `(() => {
+  const s = window.__filoAnteprima;
+  if (!s) return;
+  try { s.o && s.o.disconnect(); } catch (_) {}
+  try { document.removeEventListener('load', s.f, true); } catch (_) {}
+  window.__filoAnteprima = null;
+})()`;
 
 const pausa = (ms) => new Promise((r) => { const t = setTimeout(r, ms); t.unref?.(); });
 
