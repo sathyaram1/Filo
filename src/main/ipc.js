@@ -427,8 +427,8 @@ function registerIpcHandlers() {
   // #754 — dal menu della scheda: rivedere i banner dei cookie su questo sito (show) o ridarli a Filo.
   // Solo dalla shell: scrive le impostazioni.
   ipcMain.handle('tabs:cookie-banners', async (event, { id, show } = {}) => {
-    const win = winFor(event);
-    if (!win?._filoTabs || win.webContents !== event.sender) return { ok: false, error: 'forbidden' };
+    const win = finestraDellaBarra(event.sender);
+    if (!win) return { ok: false, error: 'forbidden' };
     // In incognito l'elenco dei siti si scrive nella memoria della sessione, non sul disco.
     const run = () => win._filoTabs.setCookieBanners(id, !!show);
     return win._filoIncognito ? DiskStorage.runIncognito(run) : run();
