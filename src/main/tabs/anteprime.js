@@ -9,6 +9,8 @@ const ATTESA_DISEGNO = 350;
 const TETTO_DISEGNO = 2500;
 const RITENTA = 4000;
 const TENTATIVI = 3;
+// Feed, posta, video: il contenuto arriva dopo il caricamento, e alla prima foto la pagina è ancora vuota.
+const RIPRESA = 3000;
 
 const pausa = (ms) => new Promise((r) => { const t = setTimeout(r, ms); t.unref?.(); });
 
@@ -32,10 +34,11 @@ function daCattura(img) {
 
 class AnteprimeSchede {
   // manager: il TabManager della finestra. suNuova(id, dato): un'anteprima pronta, da portare alla carta.
-  constructor(manager, { suNuova = () => {}, suTolte = () => {} } = {}) {
+  constructor(manager, { suNuova = () => {}, suTolte = () => {}, ripresa = RIPRESA } = {}) {
     this.m = manager;
     this.suNuova = suNuova;
     this.suTolte = suTolte;
+    this.ripresa = ripresa;
     this.foto = new Map();
     this.seq = 0;
     this.coda = [];
@@ -49,6 +52,15 @@ class AnteprimeSchede {
   // Nata in secondo piano: resta «visibile» a 0×0 finché non ha la sua foto (nascosta non si disegna più).
   nataDietro(tab) {
     tab._anteprimaAttesa = TENTATIVI;
+    tab._anteprimaRipresa = false;
+  }
+
+  // Una scheda di dietro che passa da sola a un'altra pagina (un rimando, un aggiornamento): la foto di prima
+  // non è più sua. Torna sveglia come una nata dietro, e al caricamento si rifotografa.
+  navigata(tab) {
+    if (this.spento || !vivo(tab) || tab.id === this.m.activeId) return;
+    this.nataDietro(tab);
+    try { tab.view.setVisible?.(true); } catch (_) {}
   }
 
   // Si è vista davanti: la sua foto la prende congeda() quando torna dietro.
@@ -115,6 +127,7 @@ class AnteprimeSchede {
   _fineAttesa(tab) {
     if (!tab) return;
     tab._anteprimaAttesa = 0;
+    tab._anteprimaRipresa = false;
     this.coda = this.coda.filter((id) => id !== tab.id);
   }
 
@@ -154,6 +167,14 @@ class AnteprimeSchede {
     }
   }
 
+  // La prima foto di una scheda di dietro ne chiama una seconda poco dopo; alla seconda la scheda si riaddormenta.
+  _dopoFoto(tab) {
+    if (tab._anteprimaRipresa) { this._fineAttesa(tab); return; }
+    tab._anteprimaRipresa = true;
+    const t = setTimeout(() => this.caricata(tab), this.ripresa);
+    t.unref?.();
+  }
+
   _piuTardi(tab) {
     if (!this.tieneSveglia(tab) || tab.loading) return;
     tab._anteprimaAttesa -= 1;
@@ -177,10 +198,12 @@ class AnteprimeSchede {
         const dato = daCattura(img);
         if (dato) {
           if (!this.tieneSveglia(tab)) return true;
+          // Una foto di congeda() ancora in volo è più vecchia di questa.
+          tab._anteprimaSeq = ++this.seq;
           this._salva(tab, dato);
           this.sotto = null;
           m.layout();
-          this._fineAttesa(tab);
+          this._dopoFoto(tab);
           return true;
         }
         if (Date.now() > fine) return false;

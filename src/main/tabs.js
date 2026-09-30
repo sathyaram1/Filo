@@ -2256,6 +2256,7 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      if (tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab);
       if (tab._vistaNuova && tab._vistaNuova.wc === wc) tab._vistaNuova = null;
       this._sostituisciVoceBloccata(wc, url);
       // #590 — una navigazione già partita quando il suo sito è entrato in lista arriva lo stesso: si ferma qui.
