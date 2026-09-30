@@ -188,7 +188,7 @@ async function assistenteSu(app, shell, pagina, host) {
   return { tab, naviga, esegui };
 }
 
-test('assistente sulla pagina: NAVIGA fermata, sotto c\'è «Apri comunque» col sito, che la pagina non può premere', async ({ app, shell, rete }) => {
+test('assistente sulla pagina: NAVIGA fermata, sotto c\'è «Apri comunque» col sito, che riporta la notifica di Filo: il sì si dà lì', async ({ app, shell, rete }) => {
   test.setTimeout(60_000);
   await lista(shell, ['blocked.test']);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
@@ -200,25 +200,54 @@ test('assistente sulla pagina: NAVIGA fermata, sotto c\'è «Apri comunque» col
   const bottone = tab.locator('.sn-sidebar button', { hasText: 'Apri comunque blocked.test' });
   await expect(bottone).toBeVisible();
   await tab.screenshot({ path: 'tests/.shots/590-assistente-apri-comunque.png' });
-  // Un clic finto della pagina, e una richiesta per un indirizzo che l'assistente non si è visto fermare: niente.
-  await tab.evaluate(() => [...document.querySelectorAll('.sn-sidebar button')].find((b) => /Apri comunque/.test(b.textContent)).click());
-  await shell.waitForTimeout(1000);
-  expect(await suBloccato(app)).toEqual([]);
+  // Andata via la notifica dell'apertura fermata, il bottone la riporta; il sito si apre solo da lì.
+  const notifica = shell.locator('.shell-notif', { hasText: 'Sito bloccato: blocked.test' });
+  await expect(notifica).toHaveCount(0, { timeout: 10_000 });
   await bottone.click();
+  await expect(notifica).toBeVisible({ timeout: 6000 });
+  await tab.waitForTimeout(500);
+  expect(await suBloccato(app)).toEqual([]);
+  await notifica.locator('.shell-notif-action', { hasText: 'Apri comunque' }).click();
   await expect.poll(() => suBloccato(app), { timeout: 8000 }).toEqual([bersaglio]);
-  // La pagina lo chiude in un'etichetta grande quanto mezzo schermo: il clic dell'utente lì sopra non apre niente.
-  await tab.waitForTimeout(2200);
-  await tab.evaluate(() => {
-    const b = [...document.querySelectorAll('.sn-sidebar button')].find((x) => /Apri comunque/.test(x.textContent));
-    const l = document.createElement('label');
-    l.id = 'trappola';
-    l.style.cssText = 'position:fixed;left:0;top:120px;width:600px;height:400px;display:block;background:#eee;z-index:1';
-    document.body.append(l);
-    l.append(b);
+});
+
+// Il bottone sta nel DOM della pagina: quello che la pagina gli fa (mondo principale) non deve aprire il sito.
+const bottoneDellaPagina = () => [...document.querySelectorAll('.sn-sidebar button')].find((x) => /Apri comunque|Chiudi questo avviso/.test(x.textContent));
+
+test('assistente sulla pagina: la pagina che dà il fuoco a «Apri comunque», lo traveste o lo stende su tutto lo schermo non apre il sito della lista', async ({ app, shell, rete }) => {
+  test.setTimeout(60_000);
+  await lista(shell, ['blocked.test']);
+  const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+  const { tab, naviga: apri } = await assistenteSu(app, shell, rete.pagina('sito.test', '/', '<h1>PAGINA</h1><p style="height:3000px">testo lungo</p>'), 'sito.test');
+  expect(await apri(bersaglio)).toBe(false);
+  await expect(tab.locator('.sn-sidebar button', { hasText: 'Apri comunque blocked.test' })).toBeVisible();
+  const notifica = shell.locator('.shell-notif', { hasText: 'Sito bloccato: blocked.test' });
+  const pagina = (codice) => tab.evaluate(([trova, c]) => { const b = new Function(`return (${trova})()`)(); new Function('b', c)(b); }, [bottoneDellaPagina.toString(), codice]);
+  // Ogni gesto arriva al bottone (ricompare la notifica), e il sito resta chiuso.
+  const gesto = async (fai) => {
+    await expect(notifica.first()).toBeVisible({ timeout: 6000 });
+    await notifica.first().locator('.shell-notif-close').click();
+    await expect(notifica).toHaveCount(0, { timeout: 3000 });
+    await fai();
+    await expect(notifica.first()).toBeVisible({ timeout: 6000 });
+    await tab.waitForTimeout(800);
+    expect(await suBloccato(app)).toEqual([]);
+  };
+  // Invisibile e col fuoco: lo spazio per scorrere la pagina.
+  await gesto(async () => {
+    await pagina("b.style.opacity = '0'; b.focus();");
+    await tab.keyboard.press('Space');
   });
-  await tab.mouse.click(300, 450);
-  await tab.waitForTimeout(1200);
-  expect(await suBloccato(app)).toEqual([bersaglio]);
+  // Travestito da «Chiudi questo avviso».
+  await gesto(async () => {
+    await pagina("b.style.opacity = ''; b.textContent = 'Chiudi questo avviso';");
+    await tab.locator('.sn-sidebar button', { hasText: 'Chiudi questo avviso' }).click();
+  });
+  // Trasparente e grande quanto lo schermo: un clic sul testo della pagina.
+  await gesto(async () => {
+    await pagina("document.body.append(b); b.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;opacity:0;z-index:2147483647;margin:0;padding:0;border:0';");
+    await tab.mouse.click(200, 300);
+  });
 });
 
 test('assistente sulla pagina: la pagina aperta che dopo qualche secondo si sposta da sé sul sito della lista cambia il diario', async ({ app, shell, rete }) => {
