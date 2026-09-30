@@ -221,6 +221,44 @@ test('la pagina gemella dei feedback ha la stessa sezione, con lo stesso numero'
   await expect(page.locator('#tabs [data-tab="queue"]')).toHaveText('In coda (1)');
 });
 
+test('lavoro locale: niente «Fondi senza chiedermelo», una riga dice che si fonde senza chiedere', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const giaSegnata = fb({ _id: 'loc-2', seq: 909, localOnly: SEGNO, mergePreapproved: { by: 'owner@esempio', at: '2026-09-29T10:00:00Z' } });
+  const daSegnare = fb({ _id: 'own-1', seq: 910, clientId: 'owner:me' });
+  await apri(page, [fb({ localOnly: SEGNO }), giaSegnata, daSegnare], { tab: 'local' });
+  const tasto = page.locator('#mgPreapproveBtn');
+  const riga = page.locator('#mgPreapprovedInfo');
+
+  await page.evaluate(() => window.__mgTest.openDetail('loc-1'));
+  await expect(page.locator('#mgLocalBtn')).toBeVisible();
+  await expect(tasto).toBeHidden();
+  await expect(page.locator('#mgPreapproveRevokeBtn')).toBeHidden();
+  await expect(riga).toBeVisible();
+  await expect(riga).toHaveText(/^Lavoro locale: alla chiusura si fonde senza chiedere/);
+
+  // Col segno di pre-approvazione già sulla pratica: né tasto né etichetta, e il dato non si tocca.
+  await expect(page.locator('.mg-item[data-id="loc-2"] .mg-preapproved')).toHaveCount(0);
+  await page.evaluate(() => window.__mgTest.openDetail('loc-2'));
+  await expect(tasto).toBeHidden();
+  await expect(riga).toHaveText(/^Lavoro locale/);
+  await expect(riga).not.toContainText('segno messo da');
+
+  // Il segno locale messo dal dettaglio fa sparire il tasto subito; tolto, il tasto torna.
+  await tabBtn(page, 'queue').click();
+  await page.evaluate(() => window.__mgTest.openDetail('own-1'));
+  await expect(tasto).toBeVisible();
+  await expect(tasto).toHaveText('Fondi senza chiedermelo');
+  await page.locator('#mgLocalBtn').click();
+  await expect(page.locator('#mgLocalBtn')).toHaveAttribute('aria-pressed', 'true');
+  await expect(tasto).toBeHidden();
+  await expect(riga).toHaveText(/^Lavoro locale/);
+  await page.locator('#mgLocalBtn').click();
+  await expect(page.locator('#mgLocalBtn')).toHaveAttribute('aria-pressed', 'false');
+  await expect(tasto).toBeVisible();
+  await expect(riga).toBeHidden();
+  expect((await page.evaluate(() => window.__updates)).filter((u) => 'mergePreapproved' in u)).toEqual([]);
+});
+
 test('il segno messo da una sessione dice chi l’ha messo come la testata, non col mittente grezzo', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [fb({ localOnly: { by: 'local:claude', at: SEGNO.at } })], { tab: 'local' });
