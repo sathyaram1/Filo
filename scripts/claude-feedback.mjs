@@ -338,9 +338,9 @@ export async function main(argvIn) {
 
   // La credenziale si chiede solo quando c'è davvero qualcosa da depositare:
   // un errore d'uso o una prova a vuoto non toccano la rete.
-  const vuoto = !String(titolo || '').trim() || !String(testo || '').trim();
-  const cred = (dryRun || vuoto) ? { idToken: '' } : await credenziale.ottieni();
-  if (!dryRun && !vuoto && !cred.idToken) {
+  const deposita = !dryRun && Boolean(String(titolo || '').trim() && String(testo || '').trim());
+  const cred = deposita ? await credenziale.ottieni() : { idToken: '' };
+  if (deposita && !cred.idToken) {
     console.error(`ATTENZIONE: ${cred.motivo || 'nessun token admin'}. Il feedback parte come anonimo e passa dai giudici.`);
   }
   const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun, idToken: cred.idToken });
