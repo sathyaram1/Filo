@@ -787,9 +787,8 @@
    * non è in lavorazione. PURA (opts.now iniettabile nei test). Ritorna:
    *   { status, steps: [{key,label,state:'done'|'current'|'pending'}],
    *     current: <step corrente>, active: bool, by: string }
-   * `active` = un'istanza ci sta lavorando in questo momento: claim vivo
-   * (claimExpiresAt nel futuro) in qualunque fase, oppure — solo per `working`,
-   * l'unica fase con un lock a TTL suo — un workingSince fresco.
+   * `active` = un'istanza ci sta lavorando in questo momento: battito (`beatAt`)
+   * o presa in carico (`workingSince`) freschi, FS.isBeating.
    */
   function workProgress(fb, opts) {
     const { status } = normalizeStatus(fb);
@@ -1489,7 +1488,7 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient, isUnprovenSender, effectiveClientId,
-    isLocalOnly, isProvenLocalSender, isRicevutiStatus, localSignCheck,
+    isLocalOnly, isProvenLocalSender, isRicevutiStatus, localSignCheck, localSenderCheck,
     panelComplete, judgesNote, reasonText,
     statusUnreadable, valueUnreadable, sectionsReliable, publicStateLabel, PUBLIC_STATE_HINT,
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
