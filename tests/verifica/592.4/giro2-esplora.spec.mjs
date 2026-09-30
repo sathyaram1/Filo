@@ -121,7 +121,7 @@ test('marcature forgiate nei testi salvati: nessuna richiesta al modello le lasc
   });
   console.log(JSON.stringify(report, null, 1));
   const sys = chat[4][0].content;
-  console.log('STATO>>>', sys.slice(sys.indexOf('PROCESSI ATTIVI'), sys.indexOf('PROCESSI ATTIVI') + 2500));
+  console.log('STATO>>>', sys.slice(sys.indexOf('═══ FILO STATE'), sys.indexOf('═══ FILO STATE') + 3000));
   console.log('FILE>>>', sys.slice(sys.indexOf('FILE DELL\'EDITOR'), sys.indexOf('FILE DELL\'EDITOR') + 1200));
   const storia = chat[4].filter((m) => m.role !== 'system').map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n---\n');
   console.log('STORIA>>>', storia);
