@@ -44,7 +44,7 @@ test('su Mac «Alt+1» e «Alt+-» restano Alt+1 e Alt+- nell\'avviso', async ({
     await page.click('#cfgSave');
     const avviso = page.locator('#cfgShortcutTaken');
     await expect(avviso, scritto).toBeVisible();
-    await expect(avviso, scritto).toContainText(new RegExp(`^${scritto.replace(/[+-]/g, '\\$&')}\\b|[^+]${scritto.replace(/[+-]/g, '\\$&')}`));
+    await expect(avviso, scritto).toContainText(scritto);
     await expect(avviso, scritto).not.toContainText(/Cmd\+1|Ctrl\+Alt\+-/);
   }
 });

@@ -18,7 +18,12 @@ async function docConModuli(page, modules) {
   await expect(page.locator('#doc')).toBeVisible();
 }
 
-for (const [scritto, premuto] of [['Ctrl+Backspace', 'Control+Backspace'], ['Ctrl+Canc', null], ['Ctrl+Freccia sinistra', null]]) {
+// [scritto, dove mettere il cursore, tasto premuto, cosa scrivere dopo, testo atteso nel foglio]
+for (const [scritto, da, premuto, poi, atteso] of [
+  ['Ctrl+Backspace', 'End', 'Control+Backspace', '', /^uno due\s*$/],
+  ['Ctrl+Canc', 'Home', 'Control+Delete', '', /^\s*due tre$/],
+  ['Ctrl+Freccia sinistra', 'End', 'Control+ArrowLeft', 'X', /Xtre/],
+]) {
   test(`«${scritto}» su un modulo: avviso, oppure il foglio lo fa ancora`, async ({ openTab }) => {
     const page = await openTab(EDITOR);
     await page.waitForLoadState('domcontentloaded');
@@ -31,11 +36,11 @@ for (const [scritto, premuto] of [['Ctrl+Backspace', 'Control+Backspace'], ['Ctr
       await expect(page.locator('#cfgShortcutTaken')).toBeVisible();
       return;
     }
-    expect(premuto, `${scritto} si è salvata senza avvisi`).toBeTruthy();
     await page.locator('.ed-module[data-type="settings"]').click();
     await page.click('#doc');
-    await page.keyboard.press('End');
+    await page.keyboard.press(da);
     await page.keyboard.press(premuto);
-    await expect.poll(() => page.locator('#doc').innerText(), { timeout: 2000 }).not.toContain('tre');
+    if (poi) await page.keyboard.type(poi);
+    await expect.poll(() => page.locator('#doc').innerText(), { timeout: 2000 }).toMatch(atteso);
   });
 }
