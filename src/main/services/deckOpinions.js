@@ -271,8 +271,8 @@
     };
   }
 
-  // Un lotto al giudice. Una risposta illeggibile si richiede una volta senza cache (quella rotta è appena stata
-  // salvata); un errore di configurazione (niente modello, chiave, tetto) non migliora riprovando.
+  // Un lotto al giudice. Una risposta illeggibile si richiede una volta (le risposte del giudice non passano dalla
+  // cache delle risposte); un errore di configurazione (niente modello, chiave, tetto) non migliora riprovando.
   async function judgeBatch({ criterion, context, ids, cards, handleAIRequest }) {
     const sys = PROMPTS.decksSearchFilter({
       criterion,
@@ -286,7 +286,6 @@
           action: ACTIONS.DECKS_SEARCH_FILTER,
           payload: { messages: [{ role: 'user', content: sys }] },
           origin: 'filo://decks',
-          noCache: attempt > 0,
         });
         const keep = P.parseSearchKeep(r && r.text, ids);
         if (keep) return { keep };

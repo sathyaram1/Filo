@@ -611,7 +611,7 @@ test('#382: scelto un altro modello per il filtro, la stessa ricerca la giudica 
   await expect(again.locator('.dk-row-name')).toHaveText(['Hammer of Purphoros']);
 });
 
-test('#382: una sessione di ricerche larghe non svuota la cronologia AI del resto di Filo', async ({ app, openTab }) => {
+test('#382: una sessione di ricerche larghe non svuota la cronologia AI né le risposte già pronte del resto di Filo', async ({ app, openTab }) => {
   test.setTimeout(180_000);
   await mockScryfall(app);
   await mockProvider(app);
