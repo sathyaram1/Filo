@@ -277,6 +277,11 @@ export async function praticaPerLaSessione(id, opts = {}) {
 /** Il rifiuto di una pratica come lo legge la sessione, con la strada per i Ricevuti se è di un utente. PURA. */
 export function rifiutoPratica(id, r) {
   const righe = [`RIFIUTATO: ${String((r && r.motivo) || 'pratica non lavorabile in locale').replace(/\.$/, '')}.`];
+  if (r && r.senzaProva) {
+    righe.push('Se l’hanno aperto l’owner o una sessione prima che la prova esistesse, il ripasso gliela dà (a vuoto con --dry-run):');
+    righe.push('  npm run feedback:ripasso');
+    righe.push('Altrimenti vale come un utente.');
+  }
   if (r && r.utente) {
     righe.push('Se richiede lavoro locale, riportalo nei Ricevuti e decide l’owner:');
     righe.push(`  node scripts/owner-feedback.mjs ${id} --serve-locale "perché"`);
