@@ -113,11 +113,13 @@ function campiLocali(r) {
   return out;
 }
 
-/** Un blocco registrato, in una riga. PURA. */
+/** Un blocco registrato, in una riga: il server manda l'elenco intero, e un taglio si dichiara. PURA. */
 function bloccoInRiga(t) {
   if (!t || typeof t !== 'object') return String(t || '');
   const nome = String(t.label || t.gate || 'controllo');
-  return t.detail ? `${nome}: ${String(t.detail).slice(0, 160)}` : nome;
+  const det = String(t.detail || '');
+  if (!det) return nome;
+  return det.length > 2000 ? `${nome}: ${det.slice(0, 2000)}… (elenco intero nella nota della pratica)` : `${nome}: ${det}`;
 }
 
 /**
