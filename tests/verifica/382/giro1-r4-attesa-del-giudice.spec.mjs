@@ -1,7 +1,9 @@
-// Mock condivisi delle prove di verifica #382: Scryfall e provider LLM finti nel main, cammino IPC reale.
-import { expect } from '../../fixtures/electron.mjs';
+// #382 verifica giro 1: mentre il giudice guarda le carte la bolla deve dire cosa sta succedendo
+// (L'ATTESA È ATTRITO: un progresso mostrabile si mostra), non restare su «Filo sta pensando…».
+import { test, expect } from '../../fixtures/electron.mjs';
 
-export async function mockScryfall(app) {
+
+async function mockScryfall(app) {
   await app.evaluate(() => {
     const card = (id, name, cmc, type, oracle, ci = ['R']) => ({
       id, name, mana_cost: `{${cmc}}`, cmc, type_line: type, oracle_text: oracle,
@@ -30,7 +32,7 @@ export async function mockScryfall(app) {
   });
 }
 
-export async function mockProvider(app) {
+async function mockProvider(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
@@ -59,7 +61,7 @@ export async function mockProvider(app) {
   });
 }
 
-export async function deckWithCommander(page) {
+async function deckWithCommander(page) {
   await page.click('#newDeck');
   await expect(page.locator('#screenBuilder')).toBeVisible();
   const deckId = decodeURIComponent((await page.evaluate(() => location.hash)).replace('#/deck/', ''));
@@ -68,7 +70,7 @@ export async function deckWithCommander(page) {
   return deckId;
 }
 
-export async function send(page, text) {
+async function send(page, text) {
   const bots = page.locator('.dk-msg-bot');
   const before = await bots.count();
   await page.fill('#chatInput', text);
@@ -78,3 +80,43 @@ export async function send(page, text) {
   await expect(bubble.locator('.dk-msg-pending')).toHaveCount(0, { timeout: 20_000 });
   return bubble;
 }
+
+test('durante il controllo delle carte la bolla lo dice', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await app.evaluate(() => {
+    const card = globalThis.__card;
+    const p = [];
+    for (let i = 1; i <= 120; i++) p.push(card(`c-${i}`, `Carta ${String(i).padStart(3, '0')}`, 1, 'Instant', 'Draw a card.'));
+    globalThis.__pages = [p];
+    globalThis.__chat = () => JSON.stringify({ reply: 'Cerco carte che pescano.', query: 'o:draw', filter: 'fa pescare carte' });
+    globalThis.__lascia = null;
+    globalThis.__inGiudice = 0;
+    const gate = new Promise((r) => { globalThis.__lascia = r; });
+    const judge = () => JSON.stringify({ keep: [1] });
+    // Il giudice resta in attesa finché la prova non lo lascia andare.
+    const orig = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.completeWithFallback = async (args) => {
+      const last = String(args.messages[args.messages.length - 1].content || '');
+      if (/CARTE CANDIDATE/.test(last)) { globalThis.__inGiudice = (globalThis.__inGiudice || 0) + 1; await gate; }
+      return orig(args);
+    };
+    globalThis.__judge = judge;
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  await page.fill('#chatInput', 'carte che pescano');
+  await page.press('#chatInput', 'Enter');
+  const bubble = page.locator('.dk-msg-bot').last();
+  await expect.poll(() => app.evaluate(() => globalThis.__inGiudice || 0), { timeout: 15_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: 'tests/.shots/verifica-382-attesa.png' });
+  // SUCCESSO: la bolla in attesa dice che Filo sta controllando le carte trovate (e quante).
+  await expect(bubble).toContainText(/controll/i);
+  await expect(bubble).toContainText(/120/);
+  await app.evaluate(() => globalThis.__lascia());
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(3);
+});
