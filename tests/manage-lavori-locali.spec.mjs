@@ -12,6 +12,9 @@
 //      l'approvazione dice dove va.
 //   5. Automazioni: una fusione locale che ha saltato L5 si legge come tale.
 //   6. La pagina gemella dei feedback ha la stessa sezione con lo stesso numero.
+//   7. Su un lavoro locale provato «Fondi senza chiedermelo» non c'è (il server la
+//      fonde comunque senza chiedere): al suo posto una riga che lo dice. Un segno di
+//      pre-approvazione già messo resta nel dato, e torna quando il segno locale si toglie.
 
 import { test, expect } from './fixtures/electron.mjs';
 
