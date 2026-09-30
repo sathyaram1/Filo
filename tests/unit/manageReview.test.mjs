@@ -756,7 +756,8 @@ test('localSignCheck: pratica chiusa, segnalata o in mano a una routine → no',
 test('localSenderCheck: la pratica da legare a un lavoro locale, segno o no', () => {
   assert.equal(MR.localSenderCheck(locale({ localOnly: SEGNO })).ok, true);
   assert.equal(MR.localSenderCheck(locale({ clientId: 'owner:me' })).ok, true);
-  assert.deepEqual(Object.values(MR.localSenderCheck(locale({ clientId: 'abc123', senderProof: undefined }))).slice(0, 2), [false, true]);
+  const utente = MR.localSenderCheck(locale({ clientId: 'abc123', senderProof: undefined }));
+  assert.deepEqual([utente.ok, utente.utente], [false, true]);
   assert.equal(MR.localSenderCheck(locale({ senderProof: undefined })).utente, true);
   assert.equal(MR.localSenderCheck(locale({ clientId: 'routine:worker', senderProof: 'server' })).ok, false);
 });
