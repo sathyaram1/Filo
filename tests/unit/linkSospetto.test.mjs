@@ -358,6 +358,10 @@ test('un indirizzo ufficiale prima della chiocciola non fa passare per vero il s
     'https://login:www.paypal.com@evil.net/': 'PayPal',
     'https://www.paypal.com%2Flogin@evil.net/': 'PayPal',
     'https://paypa1.com@verifica-conto.net/': 'paypal.com',
+    // Giro 3: una seconda chiocciola in codice dopo il nome non lo sposta.
+    'https://www.poste.it%40verifica-conto.net@accesso-sicuro.net/': 'Poste Italiane',
+    'https://www.paypal.com%40conto.net@accesso-sicuro.net/login': 'PayPal',
+    'https://www.poste.it%2540conto.net@accesso-sicuro.net/': 'Poste Italiane',
   };
   for (const [u, marchio] of Object.entries(casi)) {
     assert.ok(LS.avviso(LS.analizza(u)).includes(marchio), `nessun avviso che nomini ${marchio} su ${u}`);
