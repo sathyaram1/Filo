@@ -1048,6 +1048,17 @@
     return r;
   }
 
+  // Una lettura confermata a turno finito (#553): l'esito è già nello storico, e il modello risponde senza che
+  // l'utente riscriva. Se intanto è partito un altro turno, quello lo porta con sé.
+  const NOTA_LETTURA_CONFERMATA = '(Sistema: l\'utente ha confermato la lettura della pagina; l\'esito è qui sopra. '
+    + 'Rispondi alla sua ultima domanda usando quel testo.)';
+  function riprendiDopoConferma() {
+    if (sending) return;
+    sending = true;
+    sendBtn.disabled = true;
+    runTurnAndContinue({ userMessage: NOTA_LETTURA_CONFERMATA, internal: true }).catch(() => {});
+  }
+
   // #360 — "Riprova" dalla bolla d'errore: rimanda lo stesso messaggio senza
   // farlo riscrivere. La bolla d'errore sparisce (il tentativo è ricominciato) e
   // lo storico è già a posto: un turno fallito non ci ha lasciato niente dentro.
