@@ -74,6 +74,9 @@ function ensureWin(parentWin) {
       sandbox: false,
     },
   });
+  // Il fumetto compare sotto il puntatore: se prendesse lui il mouse, la barra non saprebbe che il
+  // puntatore l'ha lasciata (resterebbero aperti il fumetto e le larghezze ferme dopo una chiusura, #428).
+  tipWin.setIgnoreMouseEvents(true);
   tipReady = false;
   tipWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(buildHTML()));
   tipWin.webContents.once('did-finish-load', () => {
