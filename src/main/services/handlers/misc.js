@@ -575,9 +575,13 @@ module.exports = function register(on, ctx) {
       // "owner:" così la dashboard lo distingue (verde) dai feedback dei tester
       // esterni (arancione). L'identità owner è nota solo qui nel main (auth
       // singleton): il content script che genera il clientId non sa di esserlo.
+      // `dallOwner` lo decide il main, non il payload: la coda spedirà col token
+      // admin e la prova del mittente (#595).
+      let dallOwner = false;
       try {
         if (auth.isAdmin() && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
           payload.clientId = globalThis.SN_FEEDBACK_THREAD.ownerize(payload.clientId);
+          dallOwner = String(payload.clientId || '').startsWith('owner:');
         }
       } catch (_) {}
       console.log('[Filo feedback] submit start', {
