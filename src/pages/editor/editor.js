@@ -3969,6 +3969,12 @@
       }
       closeOverlay(); renderGrid(); markDirty();
     });
+    // Invio in un campo conferma come «Salva», come Esc annulla (#545).
+    overlayBox.querySelectorAll('input[type="text"]').forEach((inp) => inp.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      e.preventDefault();
+      $('cfgSave').click();
+    }));
   }
 
   // ── Scorciatoie modulo personalizzate ──────────────────────────────────
