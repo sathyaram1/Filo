@@ -183,13 +183,12 @@
       // Stesso nome, altro dominio di primo livello (amazon.de, google.co): è
       // il sito. Su una piattaforma ospitante il nome lo sceglie chi pubblica.
       if (sito.nome === f.suo && (!sito.piattaforma || PIATTAFORME_ACCOUNT.has(sito.piattaforma))) return null;
+      if (sito.primo === f.suo && SERVIZI_PER_AZIENDA.has(sito.registrabile)) return null;
     }
     // Lettere di un altro alfabeto (раураl.com): si confronta quello che si
-    // legge a schermo, non il punycode che il browser ha nell'indirizzo. Solo se
-    // ogni lettera si legge come una latina: una parola russa non imita nessuno.
-    const straniero = /[^\u0000-\u007f]/.test(sito.nomeU)
-      && MOTORE.skeleton(sito.nomeU).length === sito.nomeU.replace(/-/g, '').length
-      ? scheletro(sito.nomeU) : '';
+    // legge a schermo, non il punycode che il browser ha nell'indirizzo. Una
+    // parola russa resta lontana da ogni marchio anche così.
+    const straniero = NON_ASCII.test(sito.nomeU) ? scheletro(sito.nomeU) : '';
     for (const f of famosi) {
       if (straniero) {
         if (straniero === f.suo || (!sito.piattaforma && levenshteinSmall(straniero, f.suo, tolleranza(f.suo)))) {
