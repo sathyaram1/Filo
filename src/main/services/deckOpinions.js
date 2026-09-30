@@ -29,6 +29,10 @@
   const FILTER_BATCH = 50;
   const FILTER_PARALLEL = 8;
   const CONFIG_ERRORS = new Set(['NO_MODEL_FOR_ACTION', 'NO_API_KEY', 'LIMIT_REACHED']);
+  // Un «troppe richieste» o un servizio sovraccarico si aspetta, con meno lotti insieme. Quando un lotto finisce
+  // queste attese (15 s in tutto) il servizio è giù davvero, e gli altri non aspettano più.
+  const BUSY_WAITS_MS = [1000, 2000, 4000, 8000];
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // Giudizi salvati: circa venti ricerche larghe. Oltre si perdono i più vecchi, e rifarne uno costa una chiamata
   // economica; senza tetto ogni ricerca lasciava decine di KB nel file di Filo, per sempre.
