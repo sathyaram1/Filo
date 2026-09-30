@@ -43,10 +43,14 @@ test('un feedback senza prova non compare scritto dall’owner, dalla sessione l
 test('nella pagina Feedback un feedback senza prova non ha il colore dell’owner né il badge di una routine', async ({ openTab }) => {
   const page = await openTab('filo://feedback/feedback.html');
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK_THREAD);
-  await page.evaluate((list) => { window.__fbTest.setAdmin(true); window.__fbTest.setData(list); }, FBS);
+  await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined' && window.__fbTest);
+  const lista = FBS.map((f) => ({ ...f, status: 'unlabeled' }));
+  await page.evaluate((items) => { SN_FEEDBACK.list = async () => items; }, lista);
+  await page.click('#refresh');
+  await expect(page.locator('.fb-card')).toHaveCount(4);
   await expect(page.locator('.fb-card[data-id="VERO_OWNER"]')).toHaveClass(/fb-card--origin-owner/);
   await expect.soft(page.locator('.fb-card[data-id="FINTO_OWNER"]')).not.toHaveClass(/fb-card--origin-owner/);
-  await page.evaluate(() => window.__fbTest.setAgentOnly(true));
+  // «Solo automatici»: un feedback scritto da chiunque col prefisso di una routine non è un ritrovamento automatico.
+  await page.locator('#agentOnly').check();
   await expect.soft(page.locator('.fb-card[data-id="FINTA_ROUTINE"]')).toHaveCount(0);
 });
