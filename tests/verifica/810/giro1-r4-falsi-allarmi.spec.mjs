@@ -53,3 +53,11 @@ test('l’identificativo di un servizio che si chiama «otp» non ferma il coman
   await activity.locator('.dash-activity-head').click();
   await expect(activity.locator('.dash-activity-row', { hasText: 'Non ho eseguito il comando' })).toHaveCount(0);
 });
+
+test('in una pagina che spiega il 2FA, il numero di una norma citata vicino a «OTP» non ferma il collegamento', async ({ app }) => {
+  const r = await app.evaluate(() => globalThis.SN_URL_EXFIL.valutaUscita(
+    { type: 'NAVIGA', url: 'https://www.rfc-editor.org/rfc/rfc6238' },
+    { pagina: { testo: 'La 2FA richiede un secondo fattore, spesso un OTP generato da un\'app, secondo la RFC 6238 del 2011.', host: 'it.wikipedia.org' } },
+  ));
+  expect(r.blocca, r.frase).toBe(false);
+});
