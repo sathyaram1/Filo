@@ -161,3 +161,28 @@ for (const [nome, css] of Object.entries(FOGLI)) {
     expect(staccoDelFilo(s), `filo ${s.riquadro.bordo} su ${s.riquadro.bgBox}`).toBeGreaterThanOrEqual(60);
   });
 }
+
+// Fissare le variabili non deve costare la personalizzazione: sui siti il popup
+// segue il tema e i colori scelti dall'utente, anche se cambiano a popup aperto.
+test('#592.7 — sui siti il popup segue tema e accento dell’utente, anche a popup aperto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const imposta = (settings) => app.evaluate(async (_e, s) => {
+    await globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: s }, { url: 'filo://preferences/preferences.html' });
+  }, settings);
+  await imposta({ theme: 'dark', themeTokens: { accent: '#2e7d32' } });
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body><h1>Ricette</h1></body></html>');
+  const url = page.url();
+  await expect.poll(() => nelMondoIsolato(app, url, 'typeof window.__filoSidebarTest?.runFiloAction'), { timeout: 8000 }).toBe('function');
+  await nelMondoIsolato(app, url, `window.SN_SIDEBAR.open(); window.__filoSidebarTest.runFiloAction(${JSON.stringify({ type: 'INVIA_FEEDBACK', testo: TESTO })}); 1`);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(1, { timeout: 8000 });
+  const stato = async () => JSON.parse(await nelMondoIsolato(app, url, 'JSON.stringify(window.SN_CONFIRM_UI._test.state())'));
+  const scuro = await stato();
+  expect(scuro.riquadro.bgBox).toBe('rgba(30, 29, 27, 0.98)');
+  expect(scuro.riquadro.bg).toContain('0.180392 0.490196 0.196078');
+  await page.screenshot({ path: 'tests/.shots/conferma-sito-scuro-verde.png' });
+  await imposta({ theme: 'light', themeTokens: {} });
+  await expect.poll(async () => (await stato()).riquadro.bgBox, { timeout: 5000 }).toBe('rgba(248, 246, 240, 0.98)');
+  expect((await stato()).riquadro.bg).toContain('0.768627 0.352941 0.231373');
+  await nelMondoIsolato(app, url, "window.SN_CONFIRM_UI._test.click('cancel')");
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+});
