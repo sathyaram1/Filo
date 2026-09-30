@@ -171,6 +171,18 @@ export function partenzaVietata(from) {
   return '';
 }
 
+// Gli stati del lavoro: una sessione ci porta solo pratiche sue o dell'owner, la stessa regola di start/finish --feedback (#908).
+export const STATI_DEL_LAVORO = Object.freeze(['working', 'revision_capability', 'revision_security', 'done']);
+
+/** Il passaggio porta la pratica nel lavoro, e non è dell'owner né di una sessione? null = si può. */
+async function lavoroVietato(doc, to) {
+  if (!STATI_DEL_LAVORO.includes(to)) return null;
+  const fb = await praticaInChiaro(doc);
+  if (!fb) return { motivo: 'mittente o stato non decifrabili: non so di chi è la pratica', utente: false };
+  const chi = MR.localSenderCheck(fb);
+  return chi.ok ? null : { motivo: chi.motivo, utente: !!chi.utente };
+}
+
 /**
  * I campi che servono a decidere sul segno, decifrati. null se mittente o stato
  * non si leggono: senza sapere di chi è la pratica non si segna niente.
