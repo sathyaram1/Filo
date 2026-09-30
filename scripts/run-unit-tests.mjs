@@ -117,7 +117,7 @@ function main() {
     return;
   }
 
-  const r = spawnSync(process.execPath, ['--test', ...flags, ...files], {
+  const r = spawnSync(process.execPath, ['--test', ...flags, ...fileArgs(files)], {
     stdio: 'inherit',
     // I test si aspettano la root del repo come cartella corrente, come quando
     // li lanciava npm. Così `npm run test:unit` e un lancio da fuori danno lo
