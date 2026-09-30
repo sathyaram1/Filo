@@ -65,3 +65,31 @@ export async function fillConfirmInput(page, value) {
   const filled = await page.evaluate((v) => window.SN_CONFIRM_UI._test.fill(v), value);
   expect(filled, 'campo di testo del dialogo presente').toBe(true);
 }
+
+// Su una pagina web il popup non sta nel documento del sito ma in una vista di Filo sopra la
+// scheda (#592.6): la sua pagina è filo://shell/conferma.html, e lì valgono gli helper qui sopra.
+// Ritorna quella pagina quando il popup ci è a schermo.
+export async function confermaSopraPagina(app, { timeout = 10_000 } = {}) {
+  const scadenza = Date.now() + timeout;
+  while (Date.now() < scadenza) {
+    const p = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/conferma.html'); } catch (_) { return false; } });
+    if (p && await p.evaluate(() => !!(window.SN_CONFIRM_UI && window.SN_CONFIRM_UI._test.state())).catch(() => false)) return p;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error('confermaSopraPagina: il popup sopra la scheda non è comparso');
+}
+
+// Codice nel mondo isolato del preload di una scheda web, dove vivono i content script di Filo:
+// page.evaluate gira nel mondo della pagina e non ci arriva. `host` è l'hostname della scheda.
+export function nelMondoDiFilo(app, host, code) {
+  return app.evaluate(async ({ BrowserWindow }, { host, code }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const t = (w._filoTabs?.tabs || []).find((x) => {
+        try { return new URL(x.view.webContents.getURL()).hostname === host; } catch (_) { return false; }
+      });
+      // 999 è il mondo isolato dei preload di Electron.
+      if (t) return t.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code }]);
+    }
+    throw new Error(`nelMondoDiFilo: nessuna scheda su ${host}`);
+  }, { host, code });
+}
