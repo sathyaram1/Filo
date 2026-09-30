@@ -736,6 +736,9 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     // richiesta dell'utente: come quando prendeva in prestito «Categorizza»,
     // resta fuori dalla cronologia.
     && action !== ACTIONS.MANAGE_SEARCH
+    // Il giudice delle carte è il passaggio interno di una ricerca nel deck builder, fino a venti chiamate a ricerca
+    // col prompt intero: in cronologia buttava fuori tutto il resto in una dozzina di ricerche (#382).
+    && action !== ACTIONS.DECKS_SEARCH_FILTER
   ) {
     // Le azioni chiamate in questo giro stanno nell'output della voce: un giro
     // fatto solo di chiamate non è una risposta vuota.
