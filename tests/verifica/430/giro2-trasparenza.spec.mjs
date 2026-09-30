@@ -60,3 +60,22 @@ test('la carta vera sullo schermo, sotto la scheda puntata', async ({ app, shell
   await shell.waitForTimeout(700);
   execFileSync('scrot', ['-o', 'tests/.shots/430-g2-carta-vera.png']);
 });
+
+test('la scheda fotografata sotto quella davanti, aperta con un clic, si vede', async ({ app, shell, openTab, testServer }) => {
+  test.skip(process.env.FILO_TEST_VISIBLE !== '1', 'solo a finestra vera');
+  mkdirSync('tests/.shots', { recursive: true });
+  const dietro = testServer.html(pagina('#d01010', 'Rossa'));
+  const uA = testServer.html(pagina('#f4f4f4', 'Davanti', `<a id="vai" href="${dietro}">vai</a>`));
+  const pA = await openTab(uA);
+  await idDi(app, (t) => t.url === uA);
+  await pA.click('#vai', { modifiers: ['Control'] });
+  const d = await idDi(app, (t) => t.url === dietro);
+  await expect.poll(async () => (await schede(app)).tutte.find((x) => x.id === d).foto, { timeout: 10_000 }).toBe(true);
+  await shell.waitForTimeout(4000);
+  await shell.locator(`.tab[data-id="${d}"]`).click();
+  await shell.waitForTimeout(800);
+  const b = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).getContentBounds());
+  const [r, g, bl] = await pixel(app, 'tests/.shots/430-g2-aperta.png', b.x + Math.round(b.width / 2), b.y + Math.round(b.height * 0.7));
+  console.log('APERTA', r, g, bl);
+  expect(r > 180 && g < 90 && bl < 90).toBe(true);
+});
