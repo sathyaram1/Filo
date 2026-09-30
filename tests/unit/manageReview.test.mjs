@@ -37,11 +37,25 @@ test('classifyBlock: nessuna pipeline → bianco se aperto (mai giudicato), null
 
 test('classifyBlock: mittente fidato (routine/owner) bloccato a L1 → unfiltered, non attacco', () => {
   // Identità dell'owner flaggata per errore: va RI-GIUDICATA, non mostrata come attacco.
-  const r = MR.classifyBlock({ clientId: 'routine:routine', pipeline: { action: 'human_review', l1Category: 'dangerous', verdicts: [] } });
+  const r = MR.classifyBlock({ clientId: 'routine:routine', senderProof: 'server', pipeline: { action: 'human_review', l1Category: 'dangerous', verdicts: [] } });
   assert.equal(r.reason, 'unfiltered');
   // Un mittente ESTERNO con lo stesso pipeline resta un attacco (rosso).
   const ext = MR.classifyBlock({ clientId: 'caf22093', pipeline: { action: 'human_review', l1Category: 'dangerous', verdicts: [] } });
   assert.equal(ext.reason, 'attack');
+});
+
+test('#595 — il prefisso riservato senza prova del mittente è un anonimo', () => {
+  const pipeline = { action: 'human_review', l1Category: 'dangerous', verdicts: [] };
+  // Chiunque può scrivere `owner:` davanti al proprio clientId: senza la prova
+  // che solo admin e server possono mettere, il suo attacco resta rosso.
+  for (const clientId of ['owner:abc', 'routine:x', 'agent:m', 'local:claude']) {
+    assert.equal(MR.classifyBlock({ clientId, pipeline }).reason, 'attack', `${clientId} senza prova`);
+    assert.equal(MR.classifyBlock({ clientId, senderProof: 'utente', pipeline }).reason, 'attack', `${clientId} con prova inventata`);
+    assert.equal(MR.classifyBlock({ clientId, senderProof: 'admin', pipeline }).reason, 'unfiltered', `${clientId} con prova admin`);
+  }
+  assert.equal(MR.isTrustedClient('local:claude', 'server'), true);
+  assert.equal(MR.isTrustedClient('auto:gap', 'admin'), false, 'auto: non è un prefisso riservato');
+  assert.equal(MR.isTrustedClient('owner:abc'), false);
 });
 
 test('classifyBlock: mittente fidato CON verdetti completi → classificato normalmente', () => {
