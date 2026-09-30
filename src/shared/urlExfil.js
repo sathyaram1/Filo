@@ -27,8 +27,10 @@
   // nell'URL", li mette in chiaro o base64; non in forme cifrate sofisticate).
   const MIN_TOKEN = 5;      // lunghezza minima di un token del corpus per contare
   const STRONG_TOKEN = 12;  // un solo token così lungo che combacia → già sospetto
-  const STRUCT_CARRIER = 80; // payload (query+fragment+path) per il fallback strutturale
-  const STRUCT_BLOB = 24;   // singolo token opaco (sottodominio/segmento) → sospetto
+  // Un percorso fatto di parole può essere lungo (la documentazione, un articolo): la soglia sul totale sta sopra
+  // quelli che un modello scrive da sé; il codice opaco invece conta a sé, anche spezzato da barre e trattini (#553).
+  const STRUCT_CARRIER = 120; // payload (query+fragment+path) per il fallback strutturale
+  const STRUCT_BLOB = 20;   // caratteri di codice opaco (sottodominio o resto dell'indirizzo) → sospetto
 
   // Parole comuni (it/en) abbastanza lunghe da superare STRONG_TOKEN ma innocue:
   // evitano che un URL legittimo che le contiene scateni il match a token singolo.
