@@ -2121,6 +2121,19 @@
     return `<span class="${cls}" title="${esc(t.titolo)}">${esc(t.etichetta)}</span>`;
   }
 
+  // Nei Lavori locali il segno lo dice la sezione; altrove (una pratica che aspetta
+  // l'owner nei Ricevuti, una chiusa) la scheda lo porta, o sembrerebbe una delle routine.
+  function localBadgeHtml(fb) {
+    if (!MR.isLocalOnly(fb) || currentTab === 'local') return '';
+    return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">locale</span>`;
+  }
+  function localSignText(fb) {
+    const m = fb && fb.localOnly;
+    if (!m) return '';
+    const quando = Number(m.at) > 0 ? ` il ${formatDateTime(new Date(Number(m.at)).toISOString())}` : '';
+    return `Solo lavoro locale: nessuna routine la prende. Segno messo da ${m.by}${quando}.`;
+  }
+
   // ── Riga di stato della lavorazione (card pinnate + dettaglio) ────────────
   // Traduce l'avanzamento (MR.workProgress) in una riga leggibile: i tre
   // passaggi dell'iter come spunte (✓ fatto · ● in corso · ○ da fare) e se
