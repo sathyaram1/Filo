@@ -120,6 +120,12 @@
       doesNot: 'Non chiude né archivia nessuna scheda: le riordina soltanto (per chiudere quelle non più utili c’è /pulisci).',
     },
     {
+      id: 'tab-preview', title: 'Anteprima di una scheda al passaggio del mouse', category: 'navigation',
+      desc: 'Passando il mouse su una scheda della barra compare una carta con il suo titolo, il sito e un’immagine della pagina com’era l’ultima volta che l’hai vista. Le schede aperte in secondo piano hanno la loro immagine appena finiscono di caricare, anche se non le hai mai aperte. Sulla scheda che hai davanti la carta mostra solo il titolo.',
+      invoke: 'Passa il mouse su una scheda. In Preferenze → «Anteprima delle schede» la spegni o scegli la dimensione (piccola, media, grande); lo stesso chiedendolo a Filo ("spegni l\'anteprima delle schede", "anteprima delle schede più grande").',
+      doesNot: 'L’immagine è quella dell’ultima volta che la pagina si è vista: se la scheda cambia da sola mentre è dietro, l’anteprima non si aggiorna finché non ci torni. Le immagini restano in memoria e non vengono salvate sul computer.',
+    },
+    {
       id: 'open-in-background', title: 'Apri una scheda in secondo piano', category: 'navigation',
       desc: 'Filo può aprire una pagina senza portartici davanti: tu resti dove sei e quello che hai chiesto — un brano, una radio, un podcast — parte lo stesso nella scheda dietro.',
       invoke: 'Chiedilo a parole all’assistente ("mettimi questa canzone", "apri senza cambiare scheda"): quando ciò che apre serve solo da ascoltare, la scheda nasce in secondo piano. Il riferimento che resta nella conversazione ti porta a quella scheda quando vuoi.',

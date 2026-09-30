@@ -515,6 +515,10 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (win) CartaAnteprima.mostra(win, dati);
   });
+  ipcMain.on('anteprima:prepara', (event) => {
+    const win = finestraDellaBarra(event.sender);
+    if (win) CartaAnteprima.prepara(win);
+  });
   ipcMain.on('anteprima:nascondi', (event) => {
     const win = finestraDellaBarra(event.sender);
     if (win) CartaAnteprima.nascondi(win);

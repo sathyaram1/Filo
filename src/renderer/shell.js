@@ -461,6 +461,9 @@
       if (el) sopra(el.dataset.anteprima);
       else nascondi();
     });
+    tabsEl.addEventListener('mouseenter', () => {
+      if (anteprimaSchede.enabled) try { api.anteprima && api.anteprima.prepara(); } catch (_) {}
+    });
     tabsEl.addEventListener('mouseleave', nascondi);
     tabsEl.addEventListener('mousedown', nascondi, true);
     tabsEl.addEventListener('wheel', nascondi, { passive: true });

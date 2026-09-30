@@ -146,7 +146,7 @@ test('dalle Preferenze l\'anteprima si spegne e torna il suggerimento col titolo
   const b = await apri(app, testServer.html(pagina('#1030e0', 'Due')));
   await caricata(app, b);
 
-  await shell.evaluate(() => window.filoShell.message({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { tabPreview: { enabled: false } } }));
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { tabPreview: { enabled: false } } }));
   await expect(shell.locator(`.tab[data-id="${a}"]`)).toHaveAttribute('data-tip', 'Uno', { timeout: 5000 });
   await expect(shell.locator(`.tab[data-id="${a}"]`)).not.toHaveAttribute('data-anteprima', /.+/);
   await shell.locator(`.tab[data-id="${a}"]`).hover();
@@ -154,7 +154,7 @@ test('dalle Preferenze l\'anteprima si spegne e torna il suggerimento col titolo
   expect((await carta(app)).visibile).toBe(false);
 
   // Riaccesa, e più grande.
-  await shell.evaluate(() => window.filoShell.message({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { tabPreview: { enabled: true, size: 'grande' } } }));
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { tabPreview: { enabled: true, size: 'grande' } } }));
   await expect(shell.locator(`.tab[data-id="${a}"]`)).toHaveAttribute('data-anteprima', a, { timeout: 5000 });
   await shell.mouse.move(5, 5);
   await shell.locator(`.tab[data-id="${a}"]`).hover();

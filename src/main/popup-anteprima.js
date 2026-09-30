@@ -121,10 +121,16 @@ function posa(parent, s, dati) {
   if (!s.win.isVisible()) s.win.showInactive();
 }
 
+// Senza carta ancora aperta la foto resta nel main: gliele porta tutte la carta quando nasce.
 function precarica(parent, id, dato) {
-  const s = finestra(parent);
-  if (!s || !dato) return;
+  const s = parent && !parent.isDestroyed() ? stati.get(parent) : null;
+  if (!s || !s.win || s.win.isDestroyed() || !dato) return;
   invia(s, 'anteprima:immagine', { id: testo(id), src: dato.src, w: dato.w, h: dato.h });
+}
+
+// Il puntatore è entrato nella barra: la carta nasce adesso, così alla prima comparsa è già carica.
+function prepara(parent) {
+  finestra(parent);
 }
 
 function dimentica(parent, ids) {
@@ -180,4 +186,4 @@ function finestraDi(parent) {
   return s && s.win && !s.win.isDestroyed() ? s.win : null;
 }
 
-module.exports = { precarica, dimentica, mostra, nascondi, finestraDi, larghezzaDi, indirizzoDi, LARGHEZZE };
+module.exports = { precarica, prepara, dimentica, mostra, nascondi, finestraDi, larghezzaDi, indirizzoDi, LARGHEZZE };

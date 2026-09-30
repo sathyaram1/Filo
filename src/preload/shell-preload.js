@@ -101,6 +101,7 @@ contextBridge.exposeInMainWorld('filoShell', {
   tooltipHide: () => ipcRenderer.send('shell:tooltip-hide'),
   // #430 — la carta con l'anteprima della scheda sotto il puntatore.
   anteprima: {
+    prepara: () => ipcRenderer.send('anteprima:prepara'),
     mostra: (dati) => ipcRenderer.send('anteprima:mostra', dati),
     nascondi: () => ipcRenderer.send('anteprima:nascondi'),
   },
