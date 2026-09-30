@@ -1358,8 +1358,6 @@ module.exports = function register(on, ctx) {
     return { ok: true, result: 'discarded' };
   }));
 
-  // Config "modelli di supporto" (doc config/supportModels). Owner-only.
-  // GET legge i 4 slot; UPDATE scrive solo i campi passati (per-campo PATCH).
   // All'editor servono anche la catena in uso negli slot spostati mai salvati e
   // i nickname del registro condiviso, che il server dei giudici unisce al loro.
   async function perEditor(models) {
@@ -1370,6 +1368,9 @@ module.exports = function register(on, ctx) {
     models.sharedNicknames = Object.keys(shared).map((nick) => ({ nick, label: String((shared[nick] || {}).label || '') }));
     return models;
   }
+
+  // Config "modelli di supporto" (doc config/supportModels). Owner-only.
+  // GET legge gli slot; UPDATE scrive solo i campi passati (per-campo PATCH).
   on(MSG.SUPPORT_MODELS_GET, ownerOnly(async () => {
     try {
       const models = await perEditor(await SupportModels.get());

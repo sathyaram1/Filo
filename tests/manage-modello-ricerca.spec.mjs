@@ -142,3 +142,45 @@ test('una ricerca fra i feedback parte col modello scelto in Gestione, risolto s
   expect(esito.errore).toBeNull();
   expect(esito.catena).toEqual(['vendor/modello-ricerca']);
 });
+
+test('slot svuotato in Gestione: la ricerca non parte su un modello e l\'errore dice dove impostarlo', async ({ app }) => {
+  const esito = await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.MANAGE_SEARCH]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const veraFetch = globalThis.fetch;
+    globalThis.fetch = async (url, opts) => {
+      const u = String(url);
+      if (u.includes('/documents/config/supportModels')) {
+        return new Response(JSON.stringify({ fields: { manageSearch: { stringValue: '' } } }), { status: 200 });
+      }
+      if (u.includes('/documents/config/judgeSecrets')) return new Response('{}', { status: 404 });
+      return veraFetch(url, opts);
+    };
+    const P = globalThis.SN_PROVIDERS;
+    const veroC = P.completeWithFallback;
+    let chiamato = false;
+    P.completeWithFallback = async () => { chiamato = true; return { text: '[]', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} }; };
+    let errore = null;
+    try {
+      await globalThis.__filoHandlers.handleAIRequest({
+        action: C.ACTIONS.MANAGE_SEARCH,
+        payload: { messages: [{ role: 'user', content: 'x' }] },
+        origin: 'test',
+        noCache: true,
+      });
+    } catch (e) {
+      errore = String((e && e.message) || e);
+    } finally {
+      P.completeWithFallback = veroC;
+      globalThis.fetch = veraFetch;
+    }
+    return { errore, chiamato };
+  });
+  expect(esito.chiamato).toBe(false);
+  expect(esito.errore).toContain('Gestione → Modelli di supporto');
+});

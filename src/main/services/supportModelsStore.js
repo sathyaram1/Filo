@@ -51,9 +51,8 @@ const JUDGE_SECRETS_DOC = 'config/judgeSecrets';
 // non letto da nessuno, è stato rimosso.
 const SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority', 'manageSearch'];
 
-// Slot di funzioni spostate qui dalle Opzioni (#465): finché il campo non esiste
-// nel doc vale null, e la funzione usa ancora la scelta fatta prima dello
-// spostamento; una stringa vuota invece è una scelta (nessun modello).
+// Slot spostati qui dalle Opzioni (#465): campo assente nel doc = null, e vale ancora la scelta di
+// prima; una stringa vuota invece è una scelta (nessun modello).
 const SLOTS_SPOSTATI = ['manageSearch'];
 
 // Timeout per giudice, salvato in MILLISECONDI nel campo `judgeTimeoutMs` dello

@@ -74,15 +74,13 @@ async function resolveSupportModel(slot, hardcoded, getConfig) {
   return fallback;
 }
 
-// Le funzioni dell'app che usa solo chi gestisce Filo (censimento: `owner` con
-// `action`) prendono la catena dal loro slot, e i nickname si risolvono sul
-// registro dei giudici sopra a quello effettivo, come fa il server dei giudici.
-// Slot null = mai impostato: resta la scelta fatta prima dello spostamento (#465).
 function ownerSlotFor(action) {
   const Usage = globalThis.SN_MODEL_USAGE;
   return Usage && typeof Usage.ownerSlotForAction === 'function' ? Usage.ownerSlotForAction(action) : '';
 }
 
+// Funzioni che usa solo l'owner (#465): catena dal loro slot, registro dei giudici sopra a quello
+// effettivo come sul server; slot null = mai impostato, resta la scelta di prima dello spostamento.
 async function settingsForOwnerAction(settings, action, getConfig) {
   const slot = ownerSlotFor(action);
   if (!slot) return settings;

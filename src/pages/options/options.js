@@ -79,7 +79,8 @@
     if (!Usage || typeof Usage.byArea !== 'function') return;
 
     for (const group of Usage.byArea()) {
-      const rows = group.entries.filter((e) => e.from !== 'user');
+      // Una funzione che usa solo chi gestisce Filo (`action`) qui è rumore (#465).
+      const rows = group.entries.filter((e) => e.from !== 'user' && !e.action);
       if (!rows.length) continue;
 
       const head = document.createElement('div');
@@ -139,7 +140,10 @@
 
   function effectiveModelConfig() {
     if ($('useDefaultModels').checked) {
-      return defaultModelsPublic || { models: {}, modelRegistry: {} };
+      const cfg = defaultModelsPublic || { models: {}, modelRegistry: {} };
+      // La config condivisa può portare ancora funzioni che qui non ci sono più (#465).
+      const qui = new Set((ModelChain.actionLabels() || []).map(([a]) => a));
+      return { ...cfg, models: Object.fromEntries(Object.entries(cfg.models || {}).filter(([a]) => qui.has(a))) };
     }
     return {
       models: ModelChain.collect(modelChains || {}),

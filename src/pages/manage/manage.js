@@ -5181,9 +5181,8 @@
     for (const nick of Object.keys(shared)) addNick(nick, (shared[nick] || {}).label);
   }
 
-  // Catalogo OpenRouter per il campo «Modello OpenRouter» del registro, chiesto
-  // al main come in Modelli predefiniti (#465). Finché non arriva, la tendina
-  // propone i modelli già scritti nel registro; se non arriva, il campo resta libero.
+  // Catalogo OpenRouter del campo «Modello OpenRouter», dal main come in Modelli predefiniti (#465):
+  // finché non arriva la tendina propone i modelli già scritti; se non arriva, il campo resta libero.
   let smCatalog = null;
   let smCatalogPending = null;
   function ensureSmCatalog() {
