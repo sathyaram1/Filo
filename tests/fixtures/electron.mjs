@@ -129,7 +129,9 @@ export const test = base.extend({
       const deadline = Date.now() + 10_000;
       let page = null;
       while (Date.now() < deadline) {
-        page = app.windows().find((w) => {
+        // La nuova scheda c'è già all'avvio: col solo nome si guiderebbe quella rimasta dietro, che l'anteprima
+        // delle schede (#430) allarga e fotografa sotto quella davanti. Qui serve la scheda che l'utente ha davanti.
+        page = target === 'newtab' ? await paginaDavanti(app, shell) : app.windows().find((w) => {
           try { return new URL(w.url()).hostname === target; }
           catch (_) { return false; }
         });
