@@ -41,6 +41,12 @@ nella pagina, in uno Shadow DOM chiuso.
   barra la tiene), e finché la domanda è a schermo la pagina sotto non se la riprende. Chi stava
   scrivendo nella pagina continua a scrivere nel suo campo: la vista gli rimanda i tasti
   (`conferma:tasto` → il frame che ha chiesto), e alla risposta il fuoco torna a lui.
+- **Quello che resta nella pagina va avanti solo col gesto.** I passi dell'Aiuto («✓ Accetta», il clic
+  sull'elemento evidenziato), le sue scelte e la sua casella stanno nel documento del sito, che li premeva
+  e li inviava da codice: ogni passo era una chiamata al modello pagata dall'utente, in un giro senza fine
+  (#592.6, giro 3). Chi fa avanzare qualcosa di Filo da un pezzo che sta nella pagina chiede
+  `SN_FILO_UI.gestoVero(e)`. L'evento `submit` non basta: quello di `requestSubmit()` chiamato dal sito
+  arriva come vero, conta il tasto o il clic che lo fa partire. `tests/aiuto-solo-gesti-veri.spec.mjs`.
 - **Test:** la domanda si fa partire dal mondo isolato del preload (`nelMondoDiFilo` in
   `tests/helpers/confirm.mjs`: `page.evaluate` gira nel mondo della pagina e non ci arriva), e il popup
   si guarda nella sua vista (`confermaSopraPagina`), dove valgono gli hook `_test` di sempre.
