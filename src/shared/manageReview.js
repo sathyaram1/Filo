@@ -811,8 +811,9 @@
     // In coda: priorità DESC come criterio primario tra i non-in-lavorazione.
     // `sort` è stabile, quindi a parità di priorità si conserva l'ordine di
     // sortReview (severità poi recenza), e il pinning finale conserva a sua
-    // volta l'ordine per priorità dentro ogni gruppo.
-    if (tab === 'queue') {
+    // volta l'ordine per priorità dentro ogni gruppo. I Lavori locali sono la
+    // stessa coda, lavorata da un'altra parte.
+    if (tab === 'queue' || tab === 'local') {
       const now = (opts && opts.now) != null ? opts.now : Date.now();
       // Rango di pinning: istanza attiva ora > fase più avanzata > non in
       // lavorazione (-1). Il +10 separa nettamente gli attivi dagli inattivi.
