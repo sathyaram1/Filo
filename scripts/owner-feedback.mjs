@@ -524,11 +524,7 @@ if (isMain) {
     const valore = locali[0] === '--solo-locale';
     const r = await segnaLocale(id, valore, { dryRun });
     if (!r.ok) {
-      console.error(`RIFIUTATO: ${r.motivo}.`);
-      if (r.utente) {
-        console.error('In locale i feedback degli utenti non si lavorano. Se questo richiede lavoro locale, riportalo');
-        console.error(`nei Ricevuti e decide l'owner: node scripts/owner-feedback.mjs ${id} --serve-locale "perché"`);
-      }
+      console.error(rifiutoPratica(id, r));
       process.exit(3);
     }
     console.log(r.dryRun
