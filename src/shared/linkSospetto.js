@@ -134,23 +134,42 @@
   // Sotto questa lunghezza un nome famoso dentro un altro è un caso, non un indizio.
   const MIN_NOME_DENTRO = 5;
 
+  const NON_ASCII = /[^\u0000-\u007f]/;
+
+  // Quello che si legge a schermo: le lettere sosia diventano latine, quelle che
+  // la tabella non conosce restano come sono, così la distanza le conta invece
+  // di perderle (ԍithub dista una lettera da github, non tre).
   function scheletro(s) {
-    return normalizzaSosia(MOTORE.skeleton(s));
+    let out = '';
+    for (const ch of s.normalize('NFC').toLowerCase()) {
+      const m = MOTORE.skeleton(ch);
+      if (m) out += m;
+      else if (NON_ASCII.test(ch)) out += ch;
+    }
+    return normalizzaSosia(out);
   }
 
-  // Il nome famoso `suo` sta in `parte` (un'etichetta dell'indirizzo) come
-  // parola intera o incollato a un'esca. `bastaLui`: da solo vale già.
+  // Una parola scritta con lettere d'altri alfabeti vale il nome famoso anche a
+  // qualche lettera di distanza: un nome di sito vero non è così vicino a un marchio.
+  function valeNome(p, suo) {
+    return p.w === suo || (p.estera && levenshteinSmall(p.w, suo, tolleranza(suo)));
+  }
+
+  // Il nome famoso `suo` sta in `parte` (un'etichetta dell'indirizzo), da solo o
+  // incollato a un'altra parola, con un'esca accanto o incollata. `bastaLui`: da
+  // solo vale già.
   function usaNome(parte, suo, bastaLui) {
     if (suo.length < MIN_NOME_DENTRO) return false;
-    const parole = parte.split('-').filter(Boolean).map(scheletro);
-    if (bastaLui && parole.length === 1 && parole[0] === suo) return true;
+    const parole = parte.split('-').filter(Boolean).map((p) => ({ w: scheletro(p), estera: NON_ASCII.test(p) }));
+    const escaAccanto = (k) => parole.some((a, j) => j !== k && ESCA.has(a.w));
+    if (bastaLui && parole.length === 1 && valeNome(parole[0], suo)) return true;
     for (let k = 0; k < parole.length; k++) {
-      const w = parole[k];
-      if (w === suo) {
-        if (bastaLui || parole.some((a, j) => j !== k && ESCA.has(a))) return true;
+      const w = parole[k].w;
+      if (valeNome(parole[k], suo)) {
+        if (bastaLui || escaAccanto(k)) return true;
       } else if (w.length > suo.length) {
-        if (w.startsWith(suo) && ESCA_INCOLLATA.has(w.slice(suo.length))) return true;
-        if (w.endsWith(suo) && ESCA_INCOLLATA.has(w.slice(0, -suo.length))) return true;
+        if (w.startsWith(suo) && (ESCA_INCOLLATA.has(w.slice(suo.length)) || escaAccanto(k))) return true;
+        if (w.endsWith(suo) && (ESCA_INCOLLATA.has(w.slice(0, -suo.length)) || escaAccanto(k))) return true;
       }
     }
     return false;
