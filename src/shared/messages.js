@@ -547,11 +547,10 @@
     // può leggere: si passa dalla callable owner-only del backend di sicurezza.
     ROUTINE_LOG_GET: 'routine_log_get',            // → { ok, rejections:[…], comparisons:[…] } | { ok:false, error }
     // Fusioni bloccate dai controlli di sicurezza del server, in attesa
-    // dell'owner (SPEC-RIDISEGNO-MAX.md §10). Il server non le respinge e
-    // basta: apre una richiesta, e l'owner la approva DENTRO Filo — su una
-    // superficie diversa dal terminale, dove serve una persona davanti allo
-    // schermo. Vivono in una collezione che nessun client può leggere: si passa
-    // dalla callable owner-only del backend di sicurezza.
+    // dell'owner (SPEC-RIDISEGNO-MAX.md §10): il server apre una richiesta che
+    // aspetta il suo sì in Gestione (un lavoro locale provato non la apre: #908).
+    // Vivono in una collezione che nessun client può leggere: si passa dalla
+    // callable owner-only del backend di sicurezza.
     //
     // ORIGINE: solo pagine `filo://`. Un sito visitato non deve poter né sapere
     // che c'è una fusione in attesa (dice cosa sta facendo l'owner) né tentare

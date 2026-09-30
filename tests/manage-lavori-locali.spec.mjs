@@ -60,7 +60,7 @@ const tabBtn = (page, tab) => page.locator(`.mg-tab[data-tab="${tab}"]`);
 
 test('la sezione «Lavori locali» tiene i feedback col segno, fuori dalla coda', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  const locale = fb({ localOnly: SEGNO });
+  const locale = fb({ localOnly: SEGNO, pipeline: { skipped: 'local_proven' } });
   const inCoda = fb({ _id: 'q-1', seq: 700, name: 'Una cosa per le routine', clientId: 'utente-x', senderProof: undefined });
   await apri(page, [locale, inCoda]);
 
@@ -79,6 +79,8 @@ test('la sezione «Lavori locali» tiene i feedback col segno, fuori dalla coda'
   // Le azioni sono quelle della coda.
   await page.locator('.mg-item').click();
   await expect(page.locator('#mgActionsRow')).toContainText('Risolto');
+  // Nato come lavoro locale provato, i giudici li ha saltati: la conversazione lo dice.
+  await expect(page.locator('#mgThread')).toContainText('i giudici non servono');
 });
 
 test('dal dettaglio: il tasto «Locale» mette il segno, la pratica passa nei Lavori locali, e si toglie', async ({ openTab }) => {
@@ -158,6 +160,7 @@ test('nei Ricevuti col segno: resta lì, la scheda lo dice, l’approvazione dic
   const pratica = fb({ status: 'aligned', localOnly: SEGNO });
   await apri(page, [pratica], { tab: 'inbox' });
   await expect(tabBtn(page, 'inbox')).toHaveText('Ricevuti (1)');
+  await expect(page.locator('#mgAlignedBtn')).toHaveText('Approva tutti gli allineati (1) → Lavori locali');
   const badge = page.locator('.mg-item .mg-local-badge');
   await expect(badge).toHaveText('locale');
   await expect(badge).toHaveAttribute('title', /nessuna routine.*owner@esempio/);

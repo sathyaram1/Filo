@@ -7,11 +7,9 @@
 //   automazioni — codice scritto da un'IA a partire da testo di sconosciuti.
 //
 //   Il lavoro LOCALE dell'owner però ci cade dentro quasi sempre, perché in
-//   locale si lavora proprio su quelle cose. Da oggi il blocco non è un rifiuto
-//   secco: il server apre una richiesta in attesa, e l'owner la approva QUI —
-//   davanti allo schermo, su una superficie diversa dal terminale. È questo che
-//   rende l'eccezione accettabile: una sessione catturata ha le credenziali
-//   della macchina, non le mani dell'owner sulla finestra di Filo.
+//   locale si lavora proprio su quelle cose. Il blocco non è un rifiuto secco:
+//   il server apre una richiesta che aspetta il sì dell'owner, QUI. Da #908 il
+//   lavoro locale di una pratica provata non la apre: fonde e registra i blocchi.
 //
 // DOVE VIVE (scelta dell'owner, 2026-08-26)
 //   SOLO nella dashboard di gestione, in cima ai Ricevuti: i Ricevuti sono le
@@ -657,7 +655,7 @@
       box.appendChild(title);
 
       var intro = el('p', 'sn-mac-intro',
-        'I controlli di sicurezza del server le hanno fermate perché toccano parti protette: aspettano il tuo sì.');
+        'I controlli di sicurezza del server le hanno fermate perché toccano parti protette. Aspettano il tuo sì.');
       box.appendChild(intro);
 
       for (var i = 0; i < list.length; i++) box.appendChild(buildCard(list[i], o));
@@ -841,8 +839,8 @@
     if (!list.length) return 0;
     host.appendChild(el('p', 'sn-mac-recent-title', 'Fuse senza chiedere'));
     var intro = el('p', 'sn-mac-preapproved-intro',
-      'Lavori fermati dai controlli e fusi lo stesso: delle automazioni, dove sulla pratica avevi detto «fondi senza chiedermelo», '
-      + 'e locali, dove la pratica era tua con la prova del mittente. Qui c’è tutto quello che era stato segnalato.');
+      'Lavori fermati dai controlli e fusi lo stesso. Quelli delle automazioni avevano sulla pratica il tuo «fondi senza chiedermelo»; '
+      + 'quelli locali venivano da una pratica tua, con la prova del mittente. Qui c’è tutto quello che era stato segnalato.');
     host.appendChild(intro);
     var ul = el('ul', 'sn-mac-preapproved');
     for (var i = 0; i < list.length; i++) {
@@ -863,7 +861,7 @@
       sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '');
       head.appendChild(sha);
       var who = el('span', 'sn-mac-recent-who', isSkippedL5(r) ? 'lavoro locale: L5 saltato' : preapprovedBy(r));
-      if (isSkippedL5(r)) who.title = 'Pratica aperta da te o da una sessione locale, con la prova del mittente: i controlli hanno solo registrato cosa avrebbero fermato.';
+      if (isSkippedL5(r)) who.title = 'Pratica aperta da te o da una sessione locale, con la prova del mittente. I controlli hanno solo registrato cosa avrebbero fermato.';
       else if (r.preapprovedAt) who.title = preapprovedWhenText(r.preapprovedAt);
       head.appendChild(who);
       head.appendChild(el('span', 'sn-mac-recent-when', mergedWhenText(r.decidedAtMs || r.createdAtMs, now)));

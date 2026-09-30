@@ -1767,7 +1767,7 @@
     } else if (isAdmin && MR.localSignCheck(fb, true).ok) {
       voci.push({
         testo: '💻 Solo lavoro locale',
-        titolo: 'Nessuna routine la prende: la lavora una sessione locale, e compare nei Lavori locali.',
+        titolo: 'Nessuna routine la prende. La lavora una sessione locale, e passa nei Lavori locali.',
         azione: () => segnoDalMenu(fb, true),
       });
     }
@@ -2837,9 +2837,9 @@
     mgLocalBtn.textContent = on ? '💻 Solo locale' : '💻 Locale';
     const perche = on ? null : MR.localSignCheck(fb, true);
     mgLocalBtn.title = on
-      ? `${localSignText(fb)} Clic: la rimetti anche alle routine.`
+      ? `${localSignText(fb)} Un clic la rimette anche alle routine.`
       : (perche.ok
-        ? 'La lavora solo una sessione locale: nessuna routine la prende e compare nei Lavori locali.'
+        ? 'La lavora solo una sessione locale. Nessuna routine la prende, e passa nei Lavori locali.'
         : `Adesso non si può: ${perche.motivo}.`);
   }
 
@@ -3778,7 +3778,7 @@
       else if (summary) opinionHtml = esc(summary);          // troncato ma è l'unica cosa che c'è
       // #908: un lavoro locale col mittente provato i giudici li salta di proposito.
       else if (fb.pipeline && fb.pipeline.skipped === 'local_proven') {
-        opinionHtml = '<em>Lavoro locale, aperto da te o da una sessione con la prova del mittente: i giudici non servono.</em>';
+        opinionHtml = '<em>Lavoro locale aperto da te o da una sessione, con la prova del mittente. I giudici non servono.</em>';
       }
       // "non ha ANCORA un parere" si legge come "sta arrivando": vero solo
       // finché la segnalazione aspetta una decisione. Su una già decisa (un

@@ -144,7 +144,7 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
       // regola del server, non un muro di questa macchina.
       return `✗ Fusione BLOCCATA dai controlli di sicurezza del server: ${r.reason || 'motivo non riportato'}\n`
         + '  Sono controlli automatici sul contenuto delle modifiche (aree protette,\n'
-        + '  dipendenze nuove, segreti): la fusione aspetta il tuo sì.\n'
+        + '  dipendenze nuove, segreti). La fusione aspetta il tuo sì.\n'
         + (r.localDetail || r.localReason
           ? `  L5 non è stato saltato: ${r.localDetail || r.localReason}.\n`
           : (ctx.feedbackId ? '' : '  Nessuna pratica collegata: con npm run finish -- --feedback <N> il lavoro locale\n'
