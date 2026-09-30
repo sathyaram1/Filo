@@ -185,7 +185,8 @@ test('i siti veri con un nome vicino a un marchio non si prendono l’avviso', a
   // #725.8 giro 1 — col giudizio dell'apertura il menu ne ereditava i falsi allarmi: indirizzi ufficiali che
   // l'elenco non conosceva (revolut.me, apple.co) e parole vere (telegraph, cloud, imposte).
   const veri = ['https://www.telegraph.co.uk/news/', 'https://www.cloud.it/', 'https://revolut.me/mario', 'https://apple.co/3abcdEf',
-    'https://cdn.discordapp.com/attachments/1/2/foto.png', 'https://www.imposte.it/'];
+    'https://cdn.discordapp.com/attachments/1/2/foto.png', 'https://www.imposte.it/', 'https://spid.register.it/login/selfcare/login',
+    'https://github.blog/changelog/'];
   const link = veri.map((u, i) => `<p><a id="v${i}" href="${u}">Link ${i}</a></p>`).join('');
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px;font:16px sans-serif">${link}</body></html>`);
   const conAvviso = [];
