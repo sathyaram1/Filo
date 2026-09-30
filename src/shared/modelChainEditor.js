@@ -183,11 +183,11 @@
   // registry); qui passiamo solo la sorgente delle opzioni (i nickname), il
   // validatore di compatibilità e le classi/posizionamento del segmento.
   // Ritorna una funzione per chiudere il popup.
-  function attachDropdown(seg, inp, onPick, validate) {
+  function attachDropdown(seg, inp, onPick, validate, readOptions) {
     const Combo = global.SN_COMBOBOX;
     if (!Combo) return () => {};
     return Combo.attach(seg, inp, {
-      readOptions: readNicknameOptions,
+      readOptions: readOptions || readNicknameOptions,
       onPick,
       validate,
       popClass: 'sn-chain-pop',
@@ -283,7 +283,7 @@
         attachDropdown(seg, inp, (value) => {
           const v = validate ? validate(value) : { ok: true };
           if (v.ok) accept(value); else reject(v.reason);
-        }, validate);
+        }, validate, ctx && ctx.readOptions);
 
         // Il pulsante di rimozione c'è solo se ci sono più segmenti: l'ultimo
         // rimasto non si può rimuovere (resterebbe l'azione senza modello).
@@ -362,5 +362,5 @@
     for (const action of Object.keys(chains || {})) chains[action].conferma();
   }
 
-  global.SN_MODEL_CHAIN = { buildChain, renderGrid, collect, conferma, actionLabels };
+  global.SN_MODEL_CHAIN = { buildChain, renderGrid, collect, conferma, actionLabels, makeValidator, makeKnownCheck };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

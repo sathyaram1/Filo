@@ -1366,6 +1366,8 @@ module.exports = function register(on, ctx) {
     if (typeof ctx.fillMovedSlots === 'function') ctx.fillMovedSlots(models, settings);
     const shared = (Defaults.get() || {}).modelRegistry || {};
     models.sharedNicknames = Object.keys(shared).map((nick) => ({ nick, label: String((shared[nick] || {}).label || '') }));
+    // Gli slot spostati girano nell'app: i loro nickname si risolvono sul registro in uso qui (#465).
+    models.appRegistry = (settings && settings.modelRegistry && typeof settings.modelRegistry === 'object') ? settings.modelRegistry : {};
     return models;
   }
 
