@@ -240,7 +240,7 @@ test('D — un\'azione eseguita senza bottone in chat torna al modello come eseg
   expect(m[m.length - 1].tool_call_id).toBe(ids[1]);
   expect(m[m.length - 2].content).toMatch(/^Eseguita/);
   expect(m[m.length - 2].content).not.toMatch(/NON eseguita/);
-  expect(m[m.length - 1].content).toMatch(/^Tolte: .*Uovo/);
+  expect(m[m.length - 1].content).toMatch(/^Tolte:\n<<<TESTO_SALVATO>>>\n.*Uovo/);
 
   // La riga della sveglia tolta c'è, una volta sola; il timer non c'è più.
   const activity = page.locator('.dash-activity');

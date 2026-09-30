@@ -226,17 +226,16 @@
       lines.push(`Saldo: ${state.credits.balance} crediti (si ricaricano di ${refill} ogni giorno a mezzanotte)`);
       lines.push('');
     }
-    // TAB APERTE
     // TAB APERTE — il titolo di una scheda lo scrive il SITO, non Filo e non
     // l'utente: è contenuto esterno come i risultati di una ricerca, e va
     // dichiarato tale e recintato prima di entrare in un prompt (#593). Filo
     // scrive la riga intorno (numero, fuoco, ultima attività); dentro la busta
     // ci va il titolo, ripulito come un campo, così non può aprire una riga
     // per conto suo.
+    const E = esterno();
     lines.push('TAB APERTE');
     if (!state.tabs.length) lines.push('(nessuna)');
     else {
-      const E = esterno();
       const top = state.tabs.slice(0, 12);
       const righe = [];
       top.forEach((t, i) => {
@@ -260,11 +259,17 @@
       lines.push(`Scheda davanti: ${davanti.zoomPercent}% (100% = dimensione reale; si cambia con ZOOM_PAGINA)`);
       lines.push('');
     }
-    // PROCESSI
+    // Da qui in giù i testi salvati: nomi, notifiche, frasi della chat e della
+    // home. Li può aver scritti un modello che leggeva una pagina (#592.4).
+    const salvati = (righe) => E.imbusta({
+      tipo: 'TESTO_SALVATO',
+      conIntestazione: true,
+      testo: righe.map((r) => E.neutralizza(r, { unaRiga: true })).join('\n'),
+    });
     lines.push('PROCESSI ATTIVI');
     if (!state.timers.length) lines.push('(nessuno)');
     else {
-      state.timers.forEach((t) => {
+      lines.push(salvati(state.timers.map((t) => {
         if (t.kind === 'alarm') {
           // #322 — le sveglie si descrivono con l'orario assoluto, non col
           // countdown (che per una sveglia a ore di distanza confonderebbe).
@@ -274,38 +279,34 @@
           // così l'agente e l'utente leggono la stessa cosa.
           const M = global.SN_FILO_MEMORY;
           const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
-          lines.push(`- Sveglia${t.label ? ` "${t.label}"` : ''}${rep ? ` ricorrente ${rep}` : ''}: suona alle ${hhmm}`);
-        } else {
-          const rem = t.paused ? '(in pausa)' : `${Math.floor(t.remainingSec / 60)}m ${t.remainingSec % 60}s rimanenti`;
-          lines.push(`- Timer "${t.label}": ${rem}`);
+          return `- Sveglia${t.label ? ` "${t.label}"` : ''}${rep ? ` ricorrente ${rep}` : ''}: suona alle ${hhmm}`;
         }
-      });
+        const rem = t.paused ? '(in pausa)' : `${Math.floor(t.remainingSec / 60)}m ${t.remainingSec % 60}s rimanenti`;
+        return `- Timer "${t.label}": ${rem}`;
+      })));
     }
     lines.push('');
-    // NOTIFICHE
     lines.push('NOTIFICHE NON GESTITE');
     if (!state.notifications.length) lines.push('(nessuna)');
-    else state.notifications.forEach((n) => lines.push(`- [${n.ageRel}] ${n.kind}: ${n.text}`));
+    else lines.push(salvati(state.notifications.map((n) => `- [${n.ageRel}] ${n.kind}: ${n.text}`)));
     lines.push('');
-    // AZIONI RECENTI
     lines.push('AZIONI RECENTI (ultime 24h)');
     if (!state.recentActions.length) lines.push('(nessuna)');
     else {
-      state.recentActions.slice(0, 30).forEach((a) => {
-        lines.push(`- [${formatRelativeTime(a.ts)}] ${a.type}: ${a.summary}`);
-      });
+      lines.push(salvati(state.recentActions.slice(0, 30)
+        .map((a) => `- [${formatRelativeTime(a.ts)}] ${a.type}: ${a.summary}`)));
     }
     lines.push('');
-    // DASHBOARD CORRENTE
     lines.push('DASHBOARD ATTUALE');
     if (state.dashboard) {
-      lines.push(`Messaggio: "${(state.dashboard.message || '').slice(0, 200)}"`);
+      const righe = [`Messaggio: "${String(state.dashboard.message || '').slice(0, 200)}"`];
       if (state.dashboard.suggestions?.length) {
-        lines.push('Suggerimenti:');
+        righe.push('Suggerimenti:');
         state.dashboard.suggestions.slice(0, 8).forEach((s, i) => {
-          lines.push(`${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`);
+          righe.push(`${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`);
         });
       }
+      lines.push(salvati(righe));
     } else {
       lines.push('(non ancora generata)');
     }

@@ -2301,23 +2301,29 @@ function chatSearchesForPrompt(actions) {
 }
 
 // Re-immissione del CONTENUTO di un file letto con LEGGI_FILE in un turno
-// precedente (#379.5): l'agente vede il testo completo del file che ha chiesto e
-// risponde con quello davanti (prima vedeva solo il riassunto). Sono DATI di
-// sistema affidabili, non istruzioni dell'utente.
+// precedente (#379.5): l'agente risponde col testo completo davanti. Sono dati,
+// non istruzioni, e arrivano recintati come testo salvato (#592.4).
 function fileReadsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
   const blocks = [];
   for (const a of actions) {
     if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_FILE') continue;
     const out = a._output;
     if (!out || !('fileRead' in out)) continue;
     if (!out.found) {
-      blocks.push(`[File "${out.fileRead}" non trovato: non esiste (più) nell'editor]`);
+      blocks.push(`[File "${E.perCanaleSistema(out.fileRead)}" non trovato: non esiste (più) nell'editor]`);
       continue;
     }
-    let body = String(out.text || '');
-    if (body.length > 8000) body = `${tagliaInteri(body, 8000)}\n…(contenuto troncato)`;
-    blocks.push(`[Contenuto completo del file "${out.title || out.fileRead}"]\n${body || '(vuoto)'}`);
+    const body = String(out.text || '');
+    const taglio = body.length > 8000;
+    blocks.push(`[Contenuto completo del file ${E.perCanaleSistema(out.fileRead)}]\n`
+      + E.imbustaCampi({
+        tipo: 'TESTO_SALVATO',
+        campi: { Titolo: out.title || '(senza titolo)' },
+        corpo: (taglio ? tagliaInteri(body, 8000) : body) || '(vuoto)',
+      })
+      + (taglio ? '\n…(contenuto troncato: qui sopra ci sono i primi 8000 caratteri)' : ''));
   }
   return blocks.join('\n\n').trim();
 }
@@ -2407,11 +2413,9 @@ function documentReadsForPrompt(actions) {
 
 // Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
 // output dei comandi, dettagli delle capacità, risultati di ricerca, file e
-// documenti letti, documenti di trasparenza. Mai istruzioni — ma non tutti
-// nello stesso modo: le capacità e i documenti di trasparenza li scrive Filo,
-// i file dell'editor li scrive l'utente, mentre i risultati di una ricerca, il
-// testo di un documento e quello che un comando ha stampato li scrive qualcun
-// altro e arrivano imbustati come ogni altro contenuto esterno (#593).
+// documenti letti, documenti di trasparenza. Mai istruzioni: fuori dalla busta
+// resta solo ciò che scrive Filo (capacità, trasparenza); il resto, file
+// dell'editor compresi, arriva imbustato (#593, #592.4).
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
@@ -2428,18 +2432,55 @@ function proxyUnavailableForPrompt(actions) {
     + 'Dillo all\'utente in una frase, senza darlo per fatto e senza promettere che succederà da solo, e non riprovare.]';
 }
 
+// I campi che portano un testo salvato da Filo, oltre alle voci colpite
+// (`_targets`, per ogni azione): un'azione nuova che ripete un nome salvato va qui.
+const CAMPI_SALVATI = {
+  TIMER: ['label', 'etichetta'],
+  SVEGLIA: ['label', 'etichetta'],
+  SALVA_LEZIONE: ['testo', 'text', 'lezione'],
+  DIMENTICA: ['_righe'],
+};
+
+// I testi salvati che una descrizione ripete (#592.4): nella frase di Filo
+// diventano «voce N», e i testi veri stanno nel recinto sotto, ripuliti.
+function descriviPerModello(action, { fatto = false } = {}) {
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  if (!Levels) return '';
+  const descrivi = fatto && Levels.describeDone ? Levels.describeDone : Levels.describe;
+  const tipo = String((action && action.type) || '').toUpperCase();
+  const voci = [];
+  const voce = (v) => {
+    const s = String(v);
+    if (!voci.includes(s)) voci.push(s);
+    return `voce ${voci.indexOf(s) + 1}`;
+  };
+  const copia = { ...action };
+  for (const campo of ['_targets', ...(CAMPI_SALVATI[tipo] || [])]) {
+    const v = action && action[campo];
+    if (Array.isArray(v)) copia[campo] = v.map(voce);
+    else if (typeof v === 'string' && v.trim()) copia[campo] = voce(v);
+  }
+  const frase = descrivi(copia) || '';
+  const usate = voci.map((v, i) => ({ v, n: i + 1 })).filter(({ n }) => new RegExp(`\\bvoce ${n}\\b`).test(frase));
+  if (!usate.length) return frase;
+  const E = globalThis.SN_ESTERNO;
+  return `${frase}\n${E.imbusta({
+    tipo: 'TESTO_SALVATO',
+    testo: usate.map(({ v, n }) => `voce ${n}: ${E.neutralizza(v, { unaRiga: true })}`).join('\n'),
+  })}`;
+}
+
 // Un tentativo interrotto a metà da un guasto (rete, fornitore): queste azioni
 // sono state eseguite PRIMA che tutto si fermasse, e ripeterle vuol dire un
 // secondo timer, un secondo appunto. Dato di sistema, non istruzione.
 function interruptedActionsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
-  const Levels = globalThis.SN_ACTION_LEVELS;
   const righe = [];
   for (const a of actions) {
     if (!a || a._executed === false || a._confirm) continue;
     let cosa = String(a.type || '').toUpperCase();
     try {
-      const d = (Levels && (Levels.describeDone ? Levels.describeDone(a) : Levels.describe(a))) || '';
+      const d = descriviPerModello(a, { fatto: true });
       if (d) cosa = d.replace(/\.+\s*$/, '');
     } catch (_) {}
     righe.push(`- ${cosa}`);
@@ -2456,13 +2497,12 @@ function interruptedActionsForPrompt(actions) {
 // tirare a indovinare. Dato di sistema, non istruzione.
 function confirmedActionsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
-  const Levels = globalThis.SN_ACTION_LEVELS;
   const righe = [];
   for (const a of actions) {
     if (!a || !a._confirmed) continue;
     let cosa = String(a.type || '').toUpperCase();
     try {
-      const d = (Levels && (Levels.describeDone ? Levels.describeDone(a) : Levels.describe(a))) || '';
+      const d = descriviPerModello(a, { fatto: true });
       if (d) cosa = d.replace(/\.+\s*$/, '');
     } catch (_) {}
     righe.push(`- ${cosa}`);
@@ -2486,9 +2526,8 @@ const LEGACY_CONTINUE_NUDGE =
 // esplicitamente di NON richiamare l'azione: il popup è già davanti all'utente,
 // e un modello che la ritenta lo farebbe comparire due volte.
 function toolResultText({ action, res, rendered }) {
-  const Levels = globalThis.SN_ACTION_LEVELS;
   const type = String(action.type || '').toUpperCase();
-  const describe = () => { try { return (Levels && Levels.describe(action)) || type; } catch (_) { return type; } };
+  const describe = () => { try { return descriviPerModello(action) || type; } catch (_) { return type; } };
   // `rejected` è il solo «non è un'azione» (fuori registro, argomenti rotti,
   // conferma forgiata). `kept: false` NON vuol dire fallita: vuol dire che in
   // chat non c'è niente da mostrare (un appunto scritto, una lezione fissata,
@@ -2506,16 +2545,22 @@ function toolResultText({ action, res, rendered }) {
     return `In attesa della conferma dell'utente: il sistema gli sta mostrando cosa stai per fare («${describe()}»). `
       + 'NON richiamare questa azione: la conferma è già in corso. Se hai altro da fare prosegui; altrimenti rispondi in una riga, senza dire di aver già fatto.';
   }
+  // Nomi di sveglie e timer e righe della memoria tornano recintati: li può aver
+  // scritti un modello mentre leggeva una pagina (#592.4).
+  const nomiSalvati = (nomi) => globalThis.SN_ESTERNO.imbusta({
+    tipo: 'TESTO_SALVATO',
+    testo: nomi.map((n) => `- ${globalThis.SN_ESTERNO.neutralizza(n, { unaRiga: true })}`).join('\n'),
+  });
   if (type === 'CANCELLA_SVEGLIA' && res.output && Array.isArray(res.output.removed)) {
-    return res.output.removed.length ? `Tolte: ${res.output.removed.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da togliere. Non ripetere uguale: chiedi all\'utente quale intende.';
+    return res.output.removed.length ? `Tolte:\n${nomiSalvati(res.output.removed)}` : 'Nessuna sveglia o timer corrispondeva: niente da togliere. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
   if (type === 'DIMENTICA' && res.output && Array.isArray(res.output.dimenticate)) {
     return res.output.dimenticate.length
-      ? `Dimenticate: ${res.output.dimenticate.map((r) => `«${r}»`).join(', ')}.`
+      ? `Dimenticate:\n${nomiSalvati(res.output.dimenticate)}`
       : 'Nella memoria nessuna riga corrispondeva: niente da togliere. Non ripetere uguale: copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.';
   }
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
-    return res.output.updated.length ? `Spostate: ${res.output.updated.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
+    return res.output.updated.length ? `Spostate:\n${nomiSalvati(res.output.updated)}` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
   // #686 — lo zoom lo riferisce il numero VERO, non quello chiesto: un «al
   // 900%» finisce al massimo, e l'utente deve sentirselo dire.
@@ -2544,7 +2589,7 @@ function toolResultText({ action, res, rendered }) {
     // impostare…»): un «vuole» dopo «Eseguita» faceva dire al modello che era
     // ancora da fare. Senza il punto finale: lo mette la riga.
     let done = '';
-    try { done = (Levels && Levels.describeDone && Levels.describeDone(action)) || ''; } catch (_) {}
+    try { done = descriviPerModello(action, { fatto: true }); } catch (_) {}
     done = String(done || describe()).replace(/\.+\s*$/, '');
     return `Eseguita: ${done}.`;
   }
@@ -3144,10 +3189,16 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
 
   const payload = {
     profilo, preferenze, espansioni, lezioni, stato: stateText,
-    notifiche: notiList.length ? notiList.map((n) => `- [${n.ts}] ${n.kind}: ${n.text}`).join('\n') : '(nessuna)',
-    appunti: filesList.length
-      ? filesList.map((f) => `- [${f.id}] ${f.title}: ${f.summary}`).join('\n')
-      : '(nessuno)',
+    // Notifiche e file li può aver scritti un modello che leggeva una pagina: e
+    // da qui escono messaggio e bottoni della home (#592.4).
+    notifiche: notiList.length
+      ? globalThis.SN_ESTERNO.imbusta({
+        tipo: 'TESTO_SALVATO',
+        conIntestazione: true,
+        testo: notiList.map((n) => globalThis.SN_ESTERNO.neutralizza(`- [${n.ts}] ${n.kind}: ${n.text}`, { unaRiga: true })).join('\n'),
+      })
+      : '(nessuna)',
+    appunti: globalThis.SN_EDITOR_SUMMARY.renderForPrompt(filesList) || '(nessuno)',
     // #593 (secondo giro di verifica) — il titolo di una pagina salvata lo
     // scrive il sito, non l'utente e non Filo: da qui escono il messaggio al
     // centro della nuova scheda e dei bottoni che aprono un indirizzo, quindi
