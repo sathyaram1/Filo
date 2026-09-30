@@ -903,7 +903,7 @@
     // 409 ALREADY_EXISTS con documentId → il feedback è già stato scritto da un
     // tentativo precedente (identico submissionId). Non è un errore: successo
     // idempotente, nessun duplicato creato.
-    const prova = idToken ? { senderProof, ...(authRefused ? { authRefused } : {}) } : {};
+    const prova = idToken ? { senderProof, ...(authRefused ? { authRefused } : {}), ...(localOnly ? { localOnly: true } : {}) } : {};
     if (docId && res.status === 409) {
       return { id: docId, seq: null, images: uploaded, files: uploadedFiles, failed, deduped: true, ...prova };
     }
