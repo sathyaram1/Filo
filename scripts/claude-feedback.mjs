@@ -236,12 +236,14 @@ export const credenziale = {
  * server la sovrascrive appena passa: una priorità che sparisce da sola è
  * peggio di una non impostata.
  */
-export async function applicaPriorita(id, valore) {
-  const { findAdminRefreshToken, mintIdToken } = await import('./lib/firestore-auth.mjs');
-  const rt = findAdminRefreshToken();
-  if (!rt) return { ok: false, motivo: 'nessuna credenziale admin su questa macchina' };
+export async function applicaPriorita(id, valore, idTokenGiaPreso = '') {
+  let idToken = idTokenGiaPreso;
+  if (!idToken) {
+    const c = await credenziale.ottieni();
+    if (!c.idToken) return { ok: false, motivo: c.motivo };
+    idToken = c.idToken;
+  }
   try {
-    const idToken = await mintIdToken(rt);
     await FB.updateStatus(id, { priority: valore, priorityManual: true }, { idToken });
     return { ok: true };
   } catch (e) {
