@@ -88,6 +88,7 @@
         'Se chiedi a Filo di aprire un sito da un altro paese, ti dice che per ora non si può, invece di salvare una regola che non avrebbe fatto niente. E finché la funzione non c\'è, Filo non spende i tuoi crediti per capire se una pagina è bloccata nel tuo paese.',
         'Dopo un aggiornamento il riepilogo mostra le novità che la nuova versione porta. Prima, a chi aggiornava appena usciva una versione, spesso non compariva proprio.',
         'Quando chiudi una scheda col mouse, le altre non cambiano larghezza finché il puntatore resta sulla fila delle schede, e non ti si ridimensionano sotto la mano. Si risistemano quando porti via il puntatore.',
+        'Un clic sulla X di una scheda, o col tasto centrale, la chiude anche mentre un\'altra scheda sta caricando o cambia titolo. Prima a volte non succedeva niente e toccava cliccare di nuovo.',
       ],
     },
     {
