@@ -478,3 +478,55 @@ test('dentro la barra le icone si riordinano trascinandole, e l\'ordine resta', 
     return w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId).url;
   })).not.toMatch(/^filo:\/\/newtab/);
 });
+
+test('finestra bassa e barra piena: il gruppo sfuma dove ci sono altre icone, e quella appena portata si vede', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, SITO);
+  const barra = await barraPage(app);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito).setSize(900, 540));
+  await pausa(400);
+  for (const id of ['translate', 'screenshot', 'screenshotCrop', 'transcribe', 'share', 'saveForLater', 'qrCode', 'colorPicker', 'newTab']) {
+    await app.evaluate(async (_, i) => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: i, target: 'bar' }, {}), id);
+  }
+  await comandaBarra(app, 'tasto');
+  await pannelloFermo(barra);
+  // Non ci stanno tutte: sotto c'è altro, e il gruppo lo dice.
+  await expect(barra.locator('#nav')).toHaveClass(/altre-sotto/);
+  // L'ultima arriva in fondo, come la posa un trascinamento che cade sotto le icone visibili.
+  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'editorApp', target: 'bar' }, {}));
+  await expect(barra.locator('#nav .ico[data-id="editorApp"]')).toHaveCount(1);
+  await pausa(500);
+  const dove = await barra.evaluate(() => {
+    const n = document.getElementById('nav').getBoundingClientRect();
+    const b = document.querySelector('#nav .ico[data-id="editorApp"]').getBoundingClientRect();
+    return { dentro: b.top >= n.top - 1 && b.bottom <= n.bottom + 1 };
+  });
+  expect(dove.dentro, 'l\'icona appena portata sta nella parte visibile del gruppo').toBe(true);
+  await expect(barra.locator('#nav')).toHaveClass(/altre-sopra/);
+});
+
+test('menu aperto vicino al bordo: riordinandolo la barra non gli va sopra; al bordo si apre e riceve l\'icona', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:12px 16px;font:16px sans-serif;height:1400px">
+    <p id="p">Un paragrafo che comincia vicino al bordo sinistro.</p></body></html>`);
+  const barra = await barraPage(app);
+  await page.mouse.click(20, 24, { button: 'right' });
+  const icona = page.locator('.sn-menu [data-sn-icon-id="share"]').first();
+  await expect(icona).toBeVisible();
+  const box = await icona.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2 + 2, { steps: 4 });
+  await pausa(400);
+  expect(await aperta(app), 'sopra il menu la barra resta chiusa').toBe(false);
+  // Al bordo, a sinistra del menu, la barra si apre e mira.
+  await page.mouse.move(6, 200, { steps: 8 });
+  await expect.poll(() => aperta(app)).toBe(true);
+  await pannelloFermo(barra);
+  await expect(barra.locator('#nav')).toHaveClass(/mira/);
+  // Tornando sopra il menu si richiude, e di nuovo al bordo si riapre.
+  await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2, { steps: 6 });
+  await expect.poll(() => aperta(app)).toBe(false);
+  await page.mouse.move(6, 200, { steps: 6 });
+  await expect.poll(() => aperta(app)).toBe(true);
+  await page.mouse.up();
+  await expect.poll(async () => (await statoBarra(app)).bar).toContain('share');
+});

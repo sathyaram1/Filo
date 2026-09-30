@@ -30,12 +30,21 @@ ogni voce globale lo allungava e seppelliva le voci dell'elemento.
   (non Ctrl+B, che è il grassetto di ogni editor).
 - **Il bordo che la vista non vede.** A finestra non massimizzata i primi 5
   pixel dentro il bordo sono del sistema, che lì ridimensiona una finestra
-  senza cornice: né la striscia né la pagina ricevono il puntatore. Quando la
-  pagina lo vede andare verso il bordo (o uscire), il main lo guarda da sé
-  (`screen.getCursorScreenPoint`) finché resta lì, e dopo l'attesa apre;
-  mentre la finestra si ridimensiona o si sposta, no. Il mouse di Playwright
-  entra dritto in una vista e salta questa scelta: la prova è col puntatore
-  vero (`tests/barra-laterale-bordo.spec.mjs`, XTest sotto xvfb).
+  senza cornice: né la striscia né la pagina ricevono il puntatore. Il main lo
+  guarda da sé (`screen.getCursorScreenPoint`) finché non è dentro la pagina
+  lontano dal bordo: chi ci arriva con un lancio, rientra da fuori della
+  finestra o scende dalla fila delle schede nella pagina non lascia traccia
+  (giro 2 di #871, la seconda volta di questa famiglia). Il tasto premuto si
+  legge sia dalla pagina sia dalla fila delle schede; dopo un rilascio, una
+  chiusura o un ridimensionamento il bordo conta solo quando il puntatore si
+  muove. Il mouse di Playwright entra dritto in una vista e salta questa
+  scelta: la prova è col puntatore vero (`tests/barra-laterale-bordo.spec.mjs`,
+  XTest sotto xvfb).
+- **Il menu aperto dove si apre la barra** non si copre: trascinando un'icona
+  da un menu che comincia nella fascia del pannello, la barra si apre solo al
+  bordo, a sinistra del menu, e si richiude se il puntatore torna sul menu.
+- **Il gruppo che scorre lo dice**: senza barra di scorrimento, sfuma dal lato
+  dove ci sono altre icone, e l'icona appena arrivata si porta in vista.
 - **Tutto si regola** (Preferenze → Avanzate, a parole, tasto destro sulla
   striscia o sulla linguetta): apertura dal bordo, attesa, chiusura dopo
   l'uscita, striscia visibile. I limiti stanno in `opzioniBarraLaterale`
