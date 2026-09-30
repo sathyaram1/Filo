@@ -257,26 +257,43 @@
 
   // Riga della risposta in chat dopo il giudice (§4.1): una carta scartata non si mostra mai, e quando il giudice
   // non ha potuto guardarle lo si dice, perché la lista che resta non è filtrata (#382). '' = tutto a posto.
-  function searchFilterNote({ found, kept, unverified, criterion, why }) {
+  // `total` sono le carte che Scryfall ha trovato, `found` quelle arrivate al giudice: se sono di più lo si dice.
+  // Le non controllate, se sono solo una parte, la lista le segna col punto interrogativo.
+  function searchFilterNote({ found, kept, unverified, criterion, why, total = 0 }) {
     const motivo = why ? ` Motivo: ${why}` : '';
+    const cap = searchCapNote({ seen: found, total, judged: true });
+    const withCap = (s) => [s, cap].filter(Boolean).join(' ');
     if (found > 0 && unverified >= found) {
-      return `Non sono riuscito a controllare una per una le carte trovate. Qui sotto c'è la ricerca senza filtro, quindi può contenere carte che non c'entrano.${motivo}`;
+      return withCap(`Non sono riuscito a controllare una per una le carte trovate. Qui sotto c'è la ricerca senza filtro, quindi può contenere carte che non c'entrano.${motivo}`);
     }
     if (unverified > 0) {
-      return unverified === 1
-        ? `Una delle carte qui sotto non l'ho potuta controllare, quindi potrebbe non c'entrare.${motivo}`
-        : `${unverified} delle carte qui sotto non le ho potute controllare, quindi potrebbero non c'entrare.${motivo}`;
+      return withCap(unverified === 1
+        ? `Una delle carte qui sotto, segnata con ?, non l'ho potuta controllare, quindi potrebbe non c'entrare.${motivo}`
+        : `${unverified} delle carte qui sotto, segnate con ?, non le ho potute controllare, quindi potrebbero non c'entrare.${motivo}`);
     }
     if (found > 0 && kept === 0) {
       // Il criterio può essere il messaggio intero dell'utente: in chat se ne cita l'inizio, dichiarando il taglio.
       const c = String(criterion || '').trim().replace(/\s+/g, ' ');
       const crit = `«${c.length > 160 ? `${c.slice(0, 159).trimEnd()}…` : c}»`;
+      if (total > found) {
+        return `Ho controllato una per una le prime ${num(found)} delle ${num(total)} carte trovate, in ordine di costo, ma nessuna corrisponde a ${crit}. Aggiungi un vincolo, per esempio un costo massimo o un tipo, per arrivare alle altre, o chiedilo con altre parole.`;
+      }
       return found === 1
         ? `Ho controllato la carta trovata, ma non corrisponde a ${crit}. Prova a chiederlo con altre parole.`
-        : `Ho controllato una per una le ${found} carte trovate, ma nessuna corrisponde a ${crit}. Prova a chiederlo con altre parole.`;
+        : `Ho controllato una per una le ${num(found)} carte trovate, ma nessuna corrisponde a ${crit}. Prova a chiederlo con altre parole.`;
     }
-    return '';
+    return cap;
   }
+
+  // Scryfall ne ha trovate più di quante ne sono arrivate in chat: la frase che lo dice, '' se sono tutte lì.
+  function searchCapNote({ seen, total, judged }) {
+    if (!(total > seen) || !(seen > 0)) return '';
+    return judged
+      ? `Le carte trovate sono ${num(total)}: ho controllato le prime ${num(seen)}, in ordine di costo. Aggiungi un vincolo, per esempio un costo massimo o un tipo, per arrivare alle altre.`
+      : `Le carte trovate sono ${num(total)}: qui sotto ci sono le prime ${num(seen)}, in ordine di costo. Aggiungi un vincolo, per esempio un costo massimo o un tipo, per arrivare alle altre.`;
+  }
+
+  function num(n) { return Number(n).toLocaleString('it-IT'); }
 
   global.SN_DECK_OPINIONS = {
     normTag,
