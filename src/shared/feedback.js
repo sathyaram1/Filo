@@ -1873,6 +1873,16 @@
       }
       mask.push('mergePreapproved');
     }
+    // Il segno «solo in locale» (#908): stessa forma di scrittura, `at` in millisecondi.
+    if (localOnly !== undefined) {
+      if (localOnly && typeof localOnly === 'object') {
+        fields.localOnly = toFsValue({
+          by: String(localOnly.by || '').slice(0, 120),
+          at: Math.round(Number(localOnly.at) || Date.now()),
+        });
+      }
+      mask.push('localOnly');
+    }
     if (priority !== undefined) {
       // Priorità 1-3 (0 = nessuna). Clamp PRIMA di cifrare.
       const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
