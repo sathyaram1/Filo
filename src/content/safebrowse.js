@@ -13,7 +13,6 @@
 
   let currentLevel = 'safe';
   let aperta = null; // { level, chiave, ritiro }
-  let uscendo = false;
 
   const chrome = global.chrome;
   function send(msg, cb) {
@@ -31,11 +30,6 @@
   function sameHost(a, b) {
     try { return new URL(a).host === new URL(b).host; } catch (_) { return true; }
   }
-
-  try {
-    global.addEventListener('beforeunload', () => { uscendo = true; }, true);
-    global.addEventListener('pageshow', () => { uscendo = false; }, true);
-  } catch (_) {}
 
   function ritira() {
     const a = aperta;
@@ -64,15 +58,15 @@
 
   // «Torna indietro» non conferma MAI il sito (#288): senza una pagina prima si esce e basta.
   function tornaIndietro(level, url, message) {
+    // Un «indietro» che resta in questo documento (voci aggiunte dalla pagina, uscita trattenuta) non la lascia scoperta.
+    const ancora = () => { if (!aperta && currentLevel === level) chiedi(level, url, message); };
+    try { global.addEventListener('popstate', ancora, { once: true }); } catch (_) {}
+    setTimeout(ancora, 3000);
     try {
       if (history.length > 1) history.back();
       else if (level === 'sospetto') send({ type: T_DISMISS, url }, () => location.replace('about:blank'));
       else location.replace('about:blank');
     } catch (_) {}
-    // Un «indietro» che resta in questo documento (voci aggiunte dalla pagina) non la lascia scoperta.
-    setTimeout(() => {
-      if (!uscendo && !aperta && currentLevel === level) chiedi(level, url, message);
-    }, 1000);
   }
 
   function chiedi(level, url, message) {
