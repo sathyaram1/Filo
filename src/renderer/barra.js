@@ -1,0 +1,350 @@
+// La barra laterale disegnata (#871): lo stato lo tiene il main, qui si disegna e si riportano i
+// gesti. Solo gesti veri (isTrusted): la vista è sua, ma la regola non costa niente.
+// Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
+
+(function () {
+  'use strict';
+
+  const api = window.barra;
+  const ICONS = window.SN_ICONS || {};
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const striscia = $('striscia');
+  const pannello = $('pannello');
+  const nav = $('nav');
+  const fisse = $('fisse');
+  const ora = $('ora');
+
+  // Il bordo va SPINTO, non sfiorato: il puntatore resta sulla striscia per questo tempo.
+  const SPINTA_MS = 250;
+  const SUGGERIMENTO_MS = 350;
+  const SOGLIA_TRASCINA = 4;
+
+  const svg = (nome, px) => (typeof ICONS[nome] === 'function' ? ICONS[nome](px) : '');
+
+  let stato = { aperta: false, icone: [] };
+  let firma = null;
+  let eraAperta = false;
+
+  // ── tema ─────────────────────────────────────────────────────────────────
+  let varsScritte = [];
+  function applicaTema(vars) {
+    for (const k of varsScritte) root.style.removeProperty(k);
+    varsScritte = [];
+    for (const [k, v] of Object.entries(vars || {})) {
+      if (!/^--[a-z][a-z0-9-]*$/.test(k) || typeof v !== 'string' || !v) continue;
+      root.style.setProperty(k, v);
+      varsScritte.push(k);
+    }
+  }
+
+  // ── la spinta sul bordo ──────────────────────────────────────────────────
+  let spinta = null;
+  function annullaSpinta() {
+    if (spinta) { clearTimeout(spinta); spinta = null; }
+    striscia.classList.remove('spinge');
+  }
+  striscia.addEventListener('pointermove', (e) => {
+    if (!e.isTrusted || stato.aperta) return;
+    // Chi trascina una scheda o seleziona del testo passa di qui con un tasto premuto: non spinge.
+    if (e.buttons) { annullaSpinta(); return; }
+    if (spinta) return;
+    striscia.classList.add('spinge');
+    spinta = setTimeout(() => { spinta = null; api.spinta(); }, SPINTA_MS);
+  });
+  striscia.addEventListener('pointerleave', annullaSpinta);
+  striscia.addEventListener('pointerdown', annullaSpinta);
+  striscia.addEventListener('click', (e) => {
+    if (!e.isTrusted) return;
+    annullaSpinta();
+    api.apri();
+  });
+
+  // ── puntatore dentro e fuori ─────────────────────────────────────────────
+  let trascina = null;
+  pannello.addEventListener('pointerenter', (e) => { if (e.isTrusted) api.dentro(); });
+  pannello.addEventListener('pointerleave', (e) => {
+    if (!e.isTrusted || trascina) return;
+    nascondiSuggerimento();
+    api.fuori();
+  });
+  // Il margine trasparente dell'ombra è della pagina, a vista: un clic lì chiude.
+  document.addEventListener('pointerdown', (e) => {
+    if (!e.isTrusted || !stato.aperta) return;
+    if (e.target === document.documentElement || e.target === document.body) api.chiudi();
+  });
+
+  // ── suggerimenti ─────────────────────────────────────────────────────────
+  let suggTimer = null;
+  function programmaSuggerimento(el) {
+    nascondiSuggerimento();
+    suggTimer = setTimeout(() => {
+      suggTimer = null;
+      if (!el.isConnected || trascina) return;
+      const r = el.getBoundingClientRect();
+      const p = pannello.getBoundingClientRect();
+      api.suggerimento({ testo: el.dataset.sugg || el.getAttribute('aria-label') || '', x: Math.round(p.right + 8), y: Math.round(r.top + r.height / 2 - 11) });
+    }, SUGGERIMENTO_MS);
+  }
+  function nascondiSuggerimento() {
+    if (suggTimer) { clearTimeout(suggTimer); suggTimer = null; }
+    api.suggerimento({ testo: '' });
+  }
+
+  // ── le icone del primo gruppo ────────────────────────────────────────────
+  function bottone(classe) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = classe;
+    b.addEventListener('pointerenter', (e) => { if (e.isTrusted) programmaSuggerimento(b); });
+    b.addEventListener('pointerleave', () => { if (suggTimer) { clearTimeout(suggTimer); suggTimer = null; } });
+    return b;
+  }
+
+  function aggiornaIcona(b, it) {
+    b.dataset.id = it.id;
+    b.setAttribute('aria-label', it.etichetta);
+    b.setAttribute('aria-disabled', it.spenta ? 'true' : 'false');
+    b.classList.toggle('accesa', !!it.accesa);
+    if (b.dataset.icona !== it.icona) {
+      b.dataset.icona = it.icona;
+      b.innerHTML = svg(it.icona, 18);
+    }
+  }
+
+  function disegnaIcone(icone, animaNuove) {
+    const ids = icone.map((i) => i.id).join('|');
+    if (ids === firma) {
+      // Stessi pulsanti: si aggiornano al loro posto, così un clic a metà non si perde.
+      icone.forEach((it) => { const b = nav.querySelector(`[data-id="${it.id}"]`); if (b) aggiornaIcona(b, it); });
+      return;
+    }
+    const prima = new Set([...nav.querySelectorAll('.ico')].map((b) => b.dataset.id));
+    firma = ids;
+    nav.replaceChildren();
+    for (const it of icone) {
+      const b = bottone('ico');
+      aggiornaIcona(b, it);
+      if (animaNuove && !prima.has(it.id)) b.classList.add('nuova');
+      b.addEventListener('click', (e) => {
+        if (!e.isTrusted || b.getAttribute('aria-disabled') === 'true') return;
+        api.azione({ id: it.id });
+      });
+      b.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (!e.isTrusted) return;
+        api.menu({ id: it.id, x: e.clientX, y: e.clientY });
+      });
+      b.addEventListener('pointerdown', (e) => iniziaTrascina(e, b));
+      nav.appendChild(b);
+    }
+    misura();
+  }
+
+  function misura() {
+    const icone = [...nav.querySelectorAll('.ico')].map((b) => {
+      const r = b.getBoundingClientRect();
+      return { id: b.dataset.id, alto: Math.round(r.top), basso: Math.round(r.bottom) };
+    });
+    api.misure({ icone });
+  }
+  window.addEventListener('resize', misura);
+  nav.addEventListener('scroll', misura, { passive: true });
+
+  // ── il sistema: ora e voci fisse ─────────────────────────────────────────
+  const FISSE = [
+    { comando: 'history', icona: 'history', etichetta: 'Cronologia' },
+    { comando: 'apps', icona: 'apps', etichetta: 'App' },
+    { comando: 'redteam', icona: 'redteam', etichetta: 'Red-team' },
+    { comando: 'account', icona: 'user', etichetta: 'Profilo' },
+    { comando: 'settings', icona: 'options', etichetta: 'Impostazioni' },
+  ];
+  const fissi = {};
+  for (const f of FISSE) {
+    const b = bottone('ico piccola');
+    b.dataset.comando = f.comando;
+    b.setAttribute('aria-label', f.etichetta);
+    b.innerHTML = svg(f.icona, 16);
+    b.addEventListener('click', (e) => {
+      if (!e.isTrusted) return;
+      const r = b.getBoundingClientRect();
+      api.sistema({ comando: f.comando, y: Math.round(r.top) });
+    });
+    fisse.appendChild(b);
+    fissi[f.comando] = b;
+  }
+
+  let firmaAccount = '';
+  function disegnaAccount(a) {
+    const b = fissi.account;
+    const f = a ? `${a.dentro}|${a.foto}|${a.etichetta}` : '';
+    if (f === firmaAccount) return;
+    firmaAccount = f;
+    const nome = a && a.dentro ? (a.etichetta || 'Profilo') : 'Accedi';
+    b.setAttribute('aria-label', a && a.dentro ? `Profilo: ${nome}` : nome);
+    b.dataset.sugg = nome;
+    if (a && a.dentro && /^https:\/\//.test(a.foto || '')) {
+      const img = document.createElement('img');
+      img.className = 'avatar';
+      img.alt = '';
+      img.referrerPolicy = 'no-referrer';
+      img.onerror = () => { b.innerHTML = svg('user', 16); };
+      img.src = a.foto;
+      b.replaceChildren(img);
+    } else {
+      b.innerHTML = svg('user', 16);
+    }
+  }
+
+  function scriviOra() {
+    const d = new Date();
+    ora.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    ora.dataset.sugg = d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+    setTimeout(scriviOra, 60000 - (Date.now() % 60000) + 50);
+  }
+  ora.addEventListener('pointerenter', (e) => { if (e.isTrusted) programmaSuggerimento(ora); });
+  ora.addEventListener('pointerleave', () => { if (suggTimer) { clearTimeout(suggTimer); suggTimer = null; } nascondiSuggerimento(); });
+  scriviOra();
+
+  // ── tastiera ─────────────────────────────────────────────────────────────
+  const tuttiIBottoni = () => [...pannello.querySelectorAll('.ico')];
+  pannello.addEventListener('keydown', (e) => {
+    const lista = tuttiIBottoni();
+    const i = lista.indexOf(document.activeElement);
+    let j = -1;
+    if (e.key === 'ArrowDown') j = i < 0 ? 0 : Math.min(lista.length - 1, i + 1);
+    else if (e.key === 'ArrowUp') j = i < 0 ? 0 : Math.max(0, i - 1);
+    else if (e.key === 'Home') j = 0;
+    else if (e.key === 'End') j = lista.length - 1;
+    if (j < 0) return;
+    e.preventDefault();
+    lista[j].focus();
+  });
+
+  // ── trascinare: dentro la barra si riordina, fuori si posa nel menu aperto ──
+  function iniziaTrascina(e, b) {
+    if (!e.isTrusted || e.button !== 0) return;
+    const partenza = { x: e.clientX, y: e.clientY };
+    const id = b.dataset.id;
+    let fantasma = null;
+    let segno = null;
+    let fuori = false;
+    let raf = 0;
+    let ultimo = null;
+    try { b.setPointerCapture(e.pointerId); } catch (_) {}
+
+    const dentroPannello = (x) => x <= pannello.getBoundingClientRect().right;
+    const primaDi = (y) => {
+      for (const altro of nav.querySelectorAll('.ico')) {
+        if (altro === b) continue;
+        const r = altro.getBoundingClientRect();
+        if (y < r.top + r.height / 2) return altro;
+      }
+      return null;
+    };
+    const mostraSegno = (y) => {
+      if (!segno) { segno = document.createElement('div'); segno.className = 'segno'; }
+      const prima = primaDi(y);
+      if (prima) nav.insertBefore(segno, prima);
+      else nav.appendChild(segno);
+    };
+    const togliSegno = () => { if (segno) { segno.remove(); segno = null; } };
+
+    const muovi = (ev) => {
+      if (!ev.isTrusted) return;
+      if (!trascina) {
+        if (Math.hypot(ev.clientX - partenza.x, ev.clientY - partenza.y) < SOGLIA_TRASCINA) return;
+        trascina = { id };
+        nascondiSuggerimento();
+        b.classList.add('trascinata');
+        fantasma = b.cloneNode(true);
+        fantasma.classList.remove('trascinata');
+        fantasma.classList.add('fantasma');
+        document.body.appendChild(fantasma);
+      }
+      ev.preventDefault();
+      const r = b.getBoundingClientRect();
+      fantasma.style.left = `${ev.clientX - r.width / 2}px`;
+      fantasma.style.top = `${ev.clientY - r.height / 2}px`;
+      const ora = !dentroPannello(ev.clientX);
+      fantasma.hidden = ora;
+      if (ora) togliSegno(); else mostraSegno(ev.clientY);
+      if (ora || fuori) {
+        ultimo = { fase: ora ? 'muovi' : 'annulla', id, x: Math.round(ev.clientX), y: Math.round(ev.clientY) };
+        if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (ultimo) api.trascinaFuori(ultimo); ultimo = null; });
+      }
+      fuori = ora;
+    };
+
+    const fine = (ev, annullato) => {
+      b.removeEventListener('pointermove', muovi);
+      b.removeEventListener('pointerup', su);
+      b.removeEventListener('pointercancel', annulla);
+      try { b.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      if (!trascina) return;
+      const prima = segno ? segno.nextElementSibling : null;
+      togliSegno();
+      if (fantasma) { fantasma.remove(); fantasma = null; }
+      b.classList.remove('trascinata');
+      trascina = null;
+      const x = Math.round(ev.clientX);
+      const y = Math.round(ev.clientY);
+      if (annullato) {
+        if (fuori) api.trascinaFuori({ fase: 'annulla', id, x, y });
+      } else if (!dentroPannello(ev.clientX)) {
+        api.trascinaFuori({ fase: 'rilascia', id, x, y });
+      } else {
+        const beforeId = prima && prima.classList.contains('ico') ? prima.dataset.id : null;
+        if (beforeId !== id) api.posa({ id, beforeId });
+      }
+      // Il clic che segue il rilascio non è un clic sull'icona.
+      const ingoia = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
+      window.addEventListener('click', ingoia, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener('click', ingoia, true), 50);
+      if (!pannello.matches(':hover')) api.fuori();
+    };
+    const su = (ev) => { if (ev.isTrusted) fine(ev, false); };
+    const annulla = (ev) => fine(ev, true);
+    b.addEventListener('pointermove', muovi);
+    b.addEventListener('pointerup', su);
+    b.addEventListener('pointercancel', annulla);
+  }
+
+  // Un'icona trascinata dal menu del tasto destro: dove cadrebbe.
+  let segnoMira = null;
+  function disegnaMira(mira, attivo) {
+    nav.classList.toggle('mira', !!attivo);
+    if (!attivo || !mira) { if (segnoMira) { segnoMira.remove(); segnoMira = null; } return; }
+    if (!segnoMira) { segnoMira = document.createElement('div'); segnoMira.className = 'segno'; }
+    let prima = null;
+    for (const b of nav.querySelectorAll('.ico')) {
+      const r = b.getBoundingClientRect();
+      if (mira.y < r.top + r.height / 2) { prima = b; break; }
+    }
+    if (prima) nav.insertBefore(segnoMira, prima);
+    else nav.appendChild(segnoMira);
+  }
+
+  // ── lo stato dal main ────────────────────────────────────────────────────
+  api.onStato((s) => {
+    stato = s || { aperta: false, icone: [] };
+    applicaTema(stato.tema);
+    root.classList.toggle('aperta', !!stato.aperta);
+    if (stato.aperta) annullaSpinta();
+    else nascondiSuggerimento();
+    const tasto = stato.tasto || '';
+    striscia.title = '';
+    striscia.setAttribute('aria-label', `Barra laterale (${tasto})`);
+    disegnaIcone(Array.isArray(stato.icone) ? stato.icone : [], eraAperta);
+    disegnaAccount(stato.account || null);
+    disegnaMira(stato.mira, stato.trascinamento);
+    if (stato.fuoco) {
+      const primo = tuttiIBottoni().find((b) => b.getAttribute('aria-disabled') !== 'true');
+      if (primo) primo.focus();
+    }
+    if (stato.aperta && !eraAperta) requestAnimationFrame(misura);
+    eraAperta = !!stato.aperta;
+  });
+  api.pronta();
+})();
