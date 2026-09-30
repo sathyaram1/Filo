@@ -3237,8 +3237,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   }
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.
   // Se in questo turno abbiamo già proposto la segnalazione all'utente (#360),
-  // quella anonima non parte: una sola segnalazione per lo stesso buco.
-  maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal }).catch(() => {});
+  // quella anonima non parte: una sola segnalazione per lo stesso buco. Nemmeno dopo
+  // un'azione fermata perché portava fuori un segreto (#810): il «non ho potuto» è voluto.
+  const fermata = renderedActions.some((x) => x && x._output && x._output.blocked === 'segreto');
+  if (!fermata) maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal }).catch(() => {});
   return {
     text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur,
     // Le note scritte a metà lavoro e il ragionamento strutturato dell'ultimo
