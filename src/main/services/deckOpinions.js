@@ -307,7 +307,8 @@
   }
 
   // Un lotto al giudice. Una risposta illeggibile si richiede una volta (le risposte del giudice non passano dalla
-  // cache delle risposte); un errore di configurazione (niente modello, chiave, tetto) non migliora riprovando.
+  // cache delle risposte); un errore di configurazione (niente modello, chiave, tetto) non migliora riprovando, e un
+  // servizio occupato torna `busy` a chi sa aspettare.
   async function judgeBatch({ criterion, context, ids, cards, handleAIRequest }) {
     const sys = PROMPTS.decksSearchFilter({
       criterion,
