@@ -110,6 +110,7 @@ test('indietro, avanti, ricarica e home funzionano da un sito, spenti quando non
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
   const barra = await barraPage(app);
   await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
   const back = barra.locator('#nav .ico[data-id="back"]');
   const fwd = barra.locator('#nav .ico[data-id="forward"]');
   await expect(back).toHaveAttribute('aria-disabled', 'true');
@@ -146,6 +147,7 @@ test('indietro e avanti funzionano anche fra le pagine di Filo', async ({ app, o
   await page.waitForLoadState('domcontentloaded');
   const barra = await barraPage(app);
   await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
   const back = barra.locator('#nav .ico[data-id="back"]');
   await expect(back).toHaveAttribute('aria-disabled', 'true');
   await page.evaluate(() => { location.href = 'filo://preferences/preferences.html'; });
@@ -205,6 +207,7 @@ test('a schermo intero la barra resta raggiungibile, e il primo Esc chiude lei, 
   const page = await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
   await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
   await barra.locator('#nav .ico[data-id="fullscreen"]').click();
   await expect.poll(async () => (await statoBarra(app)).schermoIntero).toBe(true);
   await comandaBarra(app, 'chiudi');
@@ -230,6 +233,7 @@ test('le voci che stavano in alto nella home sono in fondo alla barra, e la home
   await expect(home.locator('#dashControls')).toHaveCount(0);
   const barra = await barraPage(app);
   await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
   const fisse = await barra.$$eval('#fisse .ico', (els) => els.map((e) => e.dataset.comando));
   expect(fisse).toEqual(['history', 'apps', 'redteam', 'account', 'settings']);
   await expect(barra.locator('#ora')).toHaveText(/^\d{2}:\d{2}$/);
@@ -237,11 +241,13 @@ test('le voci che stavano in alto nella home sono in fondo alla barra, e la home
   await barra.locator('#fisse [data-comando="history"]').click();
   await expect.poll(() => app.windows().some((w) => { try { return w.url().startsWith('filo://archive/'); } catch (_) { return false; } })).toBe(true);
   await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
   await barra.locator('#fisse [data-comando="redteam"]').click();
   await expect.poll(() => app.windows().some((w) => { try { return w.url().startsWith('filo://redteam/'); } catch (_) { return false; } })).toBe(true);
 
   // App apre il menu delle app accanto alla barra, non in alto a destra.
   await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
   const vistaPrima = app.windows().length;
   await barra.locator('#fisse [data-comando="apps"]').click();
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
@@ -344,6 +350,7 @@ test('col tasto destro un\'icona della barra torna nel menu', async ({ app, open
   await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
   await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
   await barra.locator('#nav .ico[data-id="incognito"]').click({ button: 'right' });
   let popup = null;
   const fine = Date.now() + 5000;
@@ -357,4 +364,35 @@ test('col tasto destro un\'icona della barra torna nel menu', async ({ app, open
   await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('incognito');
   expect((await statoBarra(app)).secondary).toContain('incognito');
   await expect(barra.locator('#nav .ico[data-id="incognito"]')).toHaveCount(0);
+});
+
+test('chiesta a Filo in chat la barra si apre e resta aperta mentre il mouse gira sulla pagina', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO);
+  const barra = await barraPage(app);
+  const r = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), { type: 'COMANDO_FINESTRA', comando: 'sidebar' });
+  expect(r.executed).toBe(true);
+  await expect.poll(() => aperta(app)).toBe(true);
+  await expect(barra.locator('#pannello')).toBeVisible();
+  await page.mouse.move(400, 300);
+  await page.mouse.move(420, 320);
+  await pausa(700);
+  expect(await aperta(app)).toBe(true);
+  // Un clic sulla pagina la chiude.
+  await page.mouse.click(420, 320);
+  await expect.poll(() => aperta(app)).toBe(false);
+});
+
+test('aperta col mouse, il puntatore che torna sulla pagina la chiude', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO);
+  const barra = await barraPage(app);
+  await barra.mouse.move(0, 300);
+  await expect.poll(() => aperta(app)).toBe(true);
+  await pannelloFermo(barra);
+  await barra.mouse.move(30, 300);
+  await pausa(100);
+  await page.mouse.move(500, 300);
+  await page.mouse.move(520, 310);
+  await expect.poll(() => aperta(app), { timeout: 3000 }).toBe(false);
+  // E il pannello si ritira: la vista torna larga quanto la striscia.
+  await expect.poll(async () => (await statoBarra(app)).bounds.width).toBe(4);
 });

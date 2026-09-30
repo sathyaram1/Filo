@@ -72,6 +72,10 @@ html.aperta .striscia { opacity: 0; pointer-events: none; }
   visibility: hidden;
   transition: transform var(--dur) cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear var(--dur);
 }
+/* Al buio il pannello sale di un tono sulla pagina, come una carta sopra il tavolo. */
+@media (prefers-color-scheme: dark) {
+  .pannello { background: var(--tab-bg, var(--tab-active)); }
+}
 html.aperta .pannello {
   transform: none;
   visibility: visible;

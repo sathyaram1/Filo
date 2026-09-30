@@ -45,7 +45,7 @@
   // ===== Le parti della home =====
   //
   // Qui restano chat e turni, la home (messaggio centrale e suggerimenti), la
-  // colonna live, i controlli in alto a destra, il recap e i premi. Il resto
+  // colonna live, il recap e i premi. Il resto
   // vive accanto, in quattro moduli che si registrano su globalThis e ricevono
   // da qui le loro dipendenze:
   //

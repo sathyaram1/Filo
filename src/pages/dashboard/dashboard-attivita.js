@@ -409,6 +409,7 @@
       const labels = {
         fullscreen: 'Schermo intero', minimize: 'Finestra ridotta a icona', home: 'Home aperta',
         settings: 'Impostazioni aperte', apps: 'Menu App aperto', account: 'Menu Account aperto',
+        sidebar: 'Barra laterale aperta',
       };
       const cmd = String(a.comando || a.command || a.cmd || '').toLowerCase();
       return { icon: '🪟', text: labels[cmd] || 'Comando della finestra' };

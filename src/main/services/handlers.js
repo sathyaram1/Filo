@@ -1955,7 +1955,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
         // intero, riduci a icona, menu Impostazioni/App/Account, home): prima poteva
         // solo spiegare a parole come cliccarli. "close" è escluso di proposito.
-        const allowed = ['home', 'settings', 'apps', 'account', 'minimize', 'fullscreen'];
+        const allowed = ['home', 'settings', 'apps', 'account', 'minimize', 'fullscreen', 'sidebar'];
         const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim().toLowerCase();
         if (!allowed.includes(cmd)) {
           return { executed: false, kept: false, output: { window: 'invalid', command: cmd } };
@@ -1976,6 +1976,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
             win.setFullScreen(!win.isFullScreen());
           }
           return { executed: true, kept: false, output: { window: 'fullscreen' } };
+        }
+        // #871 — la barra laterale chiesta in chat resta aperta finché la si chiude, come da tastiera.
+        if (cmd === 'sidebar') {
+          if (!win._filoTabs?.barra) return { executed: false, kept: false };
+          win._filoTabs.barra.apri('chat');
+          return { executed: true, kept: false, output: { window: 'sidebar' } };
         }
         // home / minimize / settings / apps / account: clicca il bottone REALE
         // della shell, riusando il canale dei comandi rapidi della barra (stessa

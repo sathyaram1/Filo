@@ -42,6 +42,7 @@
       ],
       [T ? T.etichettaIndietro() : 'Alt+\u2190', 'Torna alla pagina precedente'],
       [T ? T.etichettaAvanti() : 'Alt+\u2192', 'Vai alla pagina successiva'],
+      [T ? T.etichettaBarra() : 'Ctrl+Shift+B', 'Apri e chiudi la barra laterale'],
     ].forEach(([k, v]) => {
       const li = document.createElement('li');
       li.textContent = `${k} — ${v}`;

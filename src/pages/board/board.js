@@ -647,9 +647,9 @@
   }
 
   // ── Animazione ricompensa crediti ───────────────────────────────────────
-  // Variante locale alla bacheca (pagina senza icona account in vista): vola
-  // dal pulsante di voto verso l'angolo in alto a destra. Stesso spirito di
-  // flyCredits (content/feedback.js) e flyCreditsToAccount (dashboard.js).
+  // Variante locale alla bacheca: vola dal pulsante di voto verso il profilo, in
+  // fondo alla barra laterale (#871). Stesso spirito di flyCredits
+  // (content/feedback.js) e flyCreditsToAccount (dashboard.js).
   // Decorativa, best-effort, rispetta prefers-reduced-motion.
   function flyCreditsFromButton(originRect, amount) {
     try {
@@ -662,8 +662,8 @@
         : { left: window.innerWidth / 2 - 20, top: window.innerHeight - 80, width: 40, height: 40 };
       const ox = r.left + r.width / 2;
       const oy = r.top + r.height / 2;
-      const tx = Math.max(24, window.innerWidth - 26);
-      const ty = 26;
+      const tx = 24;
+      const ty = Math.max(26, window.innerHeight - 64);
       const GOLD = '#e0a93f';
 
       const layer = document.createElement('div');

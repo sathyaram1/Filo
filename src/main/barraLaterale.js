@@ -54,7 +54,7 @@ class BarraLaterale {
 
   // ── apertura e chiusura ──────────────────────────────────────────────────
 
-  // motivo: 'spinta' | 'clic' | 'tasto' | 'trascina'. Da tastiera la barra prende il fuoco.
+  // motivo: 'spinta' | 'clic' | 'tasto' | 'chat' | 'trascina'. Da tastiera la barra prende il fuoco.
   apri(motivo = 'clic') {
     this._ferma('stringi');
     this._ferma('uscita');
@@ -108,7 +108,11 @@ class BarraLaterale {
   inputAltrove(input) {
     if (!this.aperta || this.trascinamento || !input) return;
     if (input.type === 'mouseDown' && (input.button || 'left') === 'left') { this.chiudi(); return; }
-    if (input.type === 'mouseMove' && this.motivo !== 'tasto') this._programmaUscita();
+    if (input.type !== 'mouseMove') return;
+    // La pagina riceve il puntatore solo dove la barra non c'è: vale più di un'uscita persa per strada.
+    this.dentro = false;
+    // Aperta da tastiera o dalla chat, il mouse che si muove sulla pagina non la chiude.
+    if (this.motivo !== 'tasto' && this.motivo !== 'chat') this._programmaUscita();
   }
 
   _programmaUscita() {
@@ -144,6 +148,8 @@ class BarraLaterale {
     vista.setBounds({ x: 0, y, width: w, height: Math.max(0, H - y) });
     this._inCima();
     vista.setVisible(true);
+    // Il layout cambia anche per lo schermo intero: la voce che lo dice va ridetta.
+    this.aggiornaNav();
   }
 
   // Ogni scheda nuova entra in cima alle viste della finestra: la barra deve tornarle sopra.

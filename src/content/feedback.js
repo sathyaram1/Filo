@@ -117,8 +117,8 @@
   }
 
   // Animazione ricompensa (C3): alla chiusura del box, alcune "monete credito"
-  // volano dalla posizione del box verso l'angolo in alto a destra — la
-  // direzione dell'icona profilo/account — con una piccola etichetta "+N".
+  // volano dalla posizione del box verso l'angolo in basso a sinistra — il
+  // profilo, in fondo alla barra laterale — con una piccola etichetta "+N".
   // Vive nel content overlay (la barra in alto della shell è coperta dalla
   // WebContentsView nativa, quindi un'animazione disegnata dalla shell sarebbe
   // occlusa). Puramente decorativa: best-effort, non blocca, si auto-rimuove.
@@ -144,9 +144,9 @@
         : { left: window.innerWidth / 2 - 20, top: window.innerHeight - 80, width: 40, height: 40 };
       const ox = r.left + r.width / 2;
       const oy = r.top + r.height / 2;
-      // Bersaglio: angolo in alto a destra, dove vive l'icona profilo/account.
-      const tx = Math.max(24, window.innerWidth - 26);
-      const ty = 26;
+      // Bersaglio: il profilo, in fondo alla barra laterale sul bordo sinistro (#871).
+      const tx = 24;
+      const ty = Math.max(26, window.innerHeight - 64);
       const GOLD = '#e0a93f';
 
       // Etichetta "+N" che sale e svanisce sopra l'origine.

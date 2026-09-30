@@ -97,7 +97,7 @@
     {
       id: 'sidebar', title: 'Barra laterale', category: 'navigation',
       desc: 'Una barra che si apre dal bordo sinistro su ogni pagina, siti e pagine di Filo, con quello che riguarda la finestra e non l\'elemento sotto il mouse: in cima Indietro, Avanti, Ricarica, Home, Nuova finestra incognito, Schermo intero e Chiudi pagina (Indietro e Avanti spenti quando non c\'è dove andare); in fondo l\'ora, Cronologia, App, Red-team, il profilo e le Impostazioni. Le icone del menu del tasto destro si trascinano nella barra laterale e da lì nel menu aperto, e restano dove le metti anche dopo un riavvio; col tasto destro su un\'icona della barra la rimetti nel menu.',
-      invoke: 'Spingi il mouse contro il bordo sinistro della finestra per un attimo, oppure clicca la striscia sottile sul bordo sinistro o la linguetta a sinistra delle schede, oppure Ctrl+Shift+B (Cmd+Shift+B su Mac), che la apre e la chiude. Si chiude uscendo col mouse, con Esc o cliccando sulla pagina.',
+      invoke: 'Spingi il mouse contro il bordo sinistro della finestra per un attimo, oppure clicca la striscia sottile sul bordo sinistro o la linguetta a sinistra delle schede, oppure Ctrl+Shift+B (Cmd+Shift+B su Mac), che la apre e la chiude, oppure chiedilo all’assistente («apri la barra laterale»). Si chiude uscendo col mouse, con Esc o cliccando sulla pagina.',
       doesNot: 'Passarci sopra di corsa o trascinare una scheda non la apre. Un sito non può aprirla né premerne i pulsanti.',
     },
     {
