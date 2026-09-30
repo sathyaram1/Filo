@@ -60,8 +60,8 @@ html, body {
   transition: opacity var(--dur), width var(--dur);
 }
 .striscia:hover::before, .striscia.spinge::before, .striscia.bordo::before { opacity: 1; width: 4px; }
-/* Nascosta da Preferenze: il bordo resta vivo, e la striscia si accende solo mentre la si spinge o la si tocca. */
-html.senza-striscia .striscia:not(.spinge):not(.bordo):not(:hover)::before { opacity: 0; }
+/* Nascosta da Preferenze: il bordo resta vivo, e la striscia si accende solo mentre la si spinge. */
+html.senza-striscia .striscia:not(.spinge):not(.bordo)::before { opacity: 0; }
 html.aperta .striscia { pointer-events: none; }
 html.aperta .striscia::before { opacity: 0; }
 

@@ -63,7 +63,7 @@ test('tasto destro sulla striscia e sulla linguetta: nascondere la striscia e sp
   await scegliNelMenu(menu, 'Nascondi la striscia sul bordo');
   await expect.poll(async () => (await opzioni(app)).striscia).toBe(false);
   await expect(barra.locator('html.senza-striscia')).toHaveCount(1);
-  await expect.poll(() => barra.evaluate(() => getComputedStyle(document.getElementById('striscia')).opacity)).toBe('0');
+  await expect.poll(() => barra.evaluate(() => getComputedStyle(document.getElementById('striscia'), '::before').opacity)).toBe('0');
   // Resta salvata: la pagina Preferenze la legge uguale.
   expect((await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).barraLaterale)).striscia).toBe(false);
 
