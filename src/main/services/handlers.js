@@ -2301,9 +2301,8 @@ function chatSearchesForPrompt(actions) {
 }
 
 // Re-immissione del CONTENUTO di un file letto con LEGGI_FILE in un turno
-// precedente (#379.5): l'agente vede il testo completo del file che ha chiesto e
-// risponde con quello davanti (prima vedeva solo il riassunto). Sono DATI di
-// sistema affidabili, non istruzioni dell'utente.
+// precedente (#379.5): l'agente risponde col testo completo davanti. Sono dati,
+// non istruzioni, e arrivano recintati come testo salvato (#592.4).
 function fileReadsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   const E = globalThis.SN_ESTERNO;
@@ -2318,8 +2317,6 @@ function fileReadsForPrompt(actions) {
     }
     const body = String(out.text || '');
     const taglio = body.length > 8000;
-    // Titolo e testo di un file dell'editor li può aver scritti il modello
-    // stesso mentre leggeva una pagina (#592.4): fuori dalla riga di Filo.
     blocks.push(`[Contenuto completo del file ${E.perCanaleSistema(out.fileRead)}]\n`
       + E.imbustaCampi({
         tipo: 'TESTO_SALVATO',
@@ -2416,11 +2413,9 @@ function documentReadsForPrompt(actions) {
 
 // Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
 // output dei comandi, dettagli delle capacità, risultati di ricerca, file e
-// documenti letti, documenti di trasparenza. Mai istruzioni — ma non tutti
-// nello stesso modo: le capacità e i documenti di trasparenza li scrive Filo,
-// i file dell'editor li scrive l'utente, mentre i risultati di una ricerca, il
-// testo di un documento e quello che un comando ha stampato li scrive qualcun
-// altro e arrivano imbustati come ogni altro contenuto esterno (#593).
+// documenti letti, documenti di trasparenza. Mai istruzioni: fuori dalla busta
+// resta solo ciò che scrive Filo (capacità, trasparenza); il resto, file
+// dell'editor compresi, arriva imbustato (#593, #592.4).
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
@@ -2437,18 +2432,33 @@ function proxyUnavailableForPrompt(actions) {
     + 'Dillo all\'utente in una frase, senza darlo per fatto e senza promettere che succederà da solo, e non riprovare.]';
 }
 
+// Le voci colpite da un'azione (`_targets`) sono nomi salvati (#592.4): nella
+// frase di Filo diventano «voce N», e i nomi veri stanno nel recinto sotto.
+function descriviPerModello(action, { fatto = false } = {}) {
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  if (!Levels) return '';
+  const descrivi = fatto && Levels.describeDone ? Levels.describeDone : Levels.describe;
+  const voci = Array.isArray(action && action._targets) ? action._targets : [];
+  if (!voci.length) return descrivi(action) || '';
+  const E = globalThis.SN_ESTERNO;
+  const frase = descrivi({ ...action, _targets: voci.map((_, i) => `voce ${i + 1}`) }) || '';
+  return `${frase}\n${E.imbusta({
+    tipo: 'TESTO_SALVATO',
+    testo: voci.map((v, i) => `voce ${i + 1}: ${E.neutralizza(v, { unaRiga: true })}`).join('\n'),
+  })}`;
+}
+
 // Un tentativo interrotto a metà da un guasto (rete, fornitore): queste azioni
 // sono state eseguite PRIMA che tutto si fermasse, e ripeterle vuol dire un
 // secondo timer, un secondo appunto. Dato di sistema, non istruzione.
 function interruptedActionsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
-  const Levels = globalThis.SN_ACTION_LEVELS;
   const righe = [];
   for (const a of actions) {
     if (!a || a._executed === false || a._confirm) continue;
     let cosa = String(a.type || '').toUpperCase();
     try {
-      const d = (Levels && (Levels.describeDone ? Levels.describeDone(a) : Levels.describe(a))) || '';
+      const d = descriviPerModello(a, { fatto: true });
       if (d) cosa = d.replace(/\.+\s*$/, '');
     } catch (_) {}
     righe.push(`- ${cosa}`);
@@ -2465,13 +2475,12 @@ function interruptedActionsForPrompt(actions) {
 // tirare a indovinare. Dato di sistema, non istruzione.
 function confirmedActionsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
-  const Levels = globalThis.SN_ACTION_LEVELS;
   const righe = [];
   for (const a of actions) {
     if (!a || !a._confirmed) continue;
     let cosa = String(a.type || '').toUpperCase();
     try {
-      const d = (Levels && (Levels.describeDone ? Levels.describeDone(a) : Levels.describe(a))) || '';
+      const d = descriviPerModello(a, { fatto: true });
       if (d) cosa = d.replace(/\.+\s*$/, '');
     } catch (_) {}
     righe.push(`- ${cosa}`);
@@ -2495,9 +2504,8 @@ const LEGACY_CONTINUE_NUDGE =
 // esplicitamente di NON richiamare l'azione: il popup è già davanti all'utente,
 // e un modello che la ritenta lo farebbe comparire due volte.
 function toolResultText({ action, res, rendered }) {
-  const Levels = globalThis.SN_ACTION_LEVELS;
   const type = String(action.type || '').toUpperCase();
-  const describe = () => { try { return (Levels && Levels.describe(action)) || type; } catch (_) { return type; } };
+  const describe = () => { try { return descriviPerModello(action) || type; } catch (_) { return type; } };
   // `rejected` è il solo «non è un'azione» (fuori registro, argomenti rotti,
   // conferma forgiata). `kept: false` NON vuol dire fallita: vuol dire che in
   // chat non c'è niente da mostrare (un appunto scritto, una lezione fissata,
@@ -2515,8 +2523,8 @@ function toolResultText({ action, res, rendered }) {
     return `In attesa della conferma dell'utente: il sistema gli sta mostrando cosa stai per fare («${describe()}»). `
       + 'NON richiamare questa azione: la conferma è già in corso. Se hai altro da fare prosegui; altrimenti rispondi in una riga, senza dire di aver già fatto.';
   }
-  // I nomi di sveglie e timer tornano recintati: li può aver scelti un modello
-  // mentre leggeva una pagina (#592.4).
+  // Nomi di sveglie e timer e righe della memoria tornano recintati: li può aver
+  // scritti un modello mentre leggeva una pagina (#592.4).
   const nomiSalvati = (nomi) => globalThis.SN_ESTERNO.imbusta({
     tipo: 'TESTO_SALVATO',
     testo: nomi.map((n) => `- ${globalThis.SN_ESTERNO.neutralizza(n, { unaRiga: true })}`).join('\n'),
@@ -2526,7 +2534,7 @@ function toolResultText({ action, res, rendered }) {
   }
   if (type === 'DIMENTICA' && res.output && Array.isArray(res.output.dimenticate)) {
     return res.output.dimenticate.length
-      ? `Dimenticate: ${res.output.dimenticate.map((r) => `«${r}»`).join(', ')}.`
+      ? `Dimenticate:\n${nomiSalvati(res.output.dimenticate)}`
       : 'Nella memoria nessuna riga corrispondeva: niente da togliere. Non ripetere uguale: copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.';
   }
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
@@ -2559,7 +2567,7 @@ function toolResultText({ action, res, rendered }) {
     // impostare…»): un «vuole» dopo «Eseguita» faceva dire al modello che era
     // ancora da fare. Senza il punto finale: lo mette la riga.
     let done = '';
-    try { done = (Levels && Levels.describeDone && Levels.describeDone(action)) || ''; } catch (_) {}
+    try { done = descriviPerModello(action, { fatto: true }); } catch (_) {}
     done = String(done || describe()).replace(/\.+\s*$/, '');
     return `Eseguita: ${done}.`;
   }
