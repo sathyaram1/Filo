@@ -43,6 +43,27 @@ export function comandaBarra(app, cosa) {
   }, cosa);
 }
 
+// Il pannello scivola dentro: le misure valgono a scivolata finita.
+export async function pannelloFermo(barra) {
+  await barra.waitForFunction(() => {
+    const p = document.getElementById('pannello');
+    return document.documentElement.classList.contains('aperta') && getComputedStyle(p).transform === 'none'
+      && p.getBoundingClientRect().left >= 0;
+  }, null, { timeout: 5000 });
+  await new Promise((r) => setTimeout(r, 250));
+}
+
+// Un tasto vero, come arriva dalla tastiera: passa da before-input-event (i tasti di Playwright no).
+export function premi(app, dove, keyCode, modifiers = []) {
+  return app.evaluate(({ BrowserWindow }, arg) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    const wc = arg.dove === 'shell' ? w.webContents : arg.dove === 'barra' ? w._filoTabs.barra.vista.webContents : t.view.webContents;
+    wc.sendInputEvent({ type: 'keyDown', keyCode: arg.keyCode, modifiers: arg.modifiers });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: arg.keyCode, modifiers: arg.modifiers });
+  }, { dove, keyCode, modifiers });
+}
+
 // Sposta le icone nel menu del tasto destro come farebbe l'utente trascinandole.
 export async function mettiNelMenu(app, ids, zona = 'secondary') {
   for (const id of ids) {

@@ -71,7 +71,8 @@ class BarraLaterale {
     this._ferma('uscita');
     this._ferma('fine');
     if (!this.aperta) return;
-    const avevaFuoco = this._haFuoco();
+    // Da tastiera il fuoco l'ha preso lei: torna alla scheda anche se il sistema non lo dice ancora.
+    const avevaFuoco = this._haFuoco() || this.motivo === 'tasto';
     this.aperta = false;
     this.motivo = null;
     this.dentro = false;

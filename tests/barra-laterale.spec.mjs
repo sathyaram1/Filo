@@ -5,10 +5,11 @@
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { rmSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
-import { barraPage, statoBarra, comandaBarra } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi } from './helpers/barra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -73,27 +74,33 @@ test('la striscia e la maniglia la aprono, la scorciatoia la apre e la chiude, E
 
   // Dalla pagina, con un campo a fuoco: il tasto è di Filo.
   await page.evaluate(() => { const i = document.createElement('input'); i.id = 'campo'; document.body.appendChild(i); i.focus(); });
-  await page.keyboard.press('Control+Shift+B');
+  await premi(app, 'scheda', 'B', ['control', 'shift']);
   await expect.poll(() => aperta(app)).toBe(true);
   expect((await statoBarra(app)).motivo).toBe('tasto');
-  // Aperta da tastiera prende il fuoco: le frecce scorrono le icone.
-  await expect.poll(() => barra.evaluate(() => document.activeElement && document.activeElement.dataset.id)).toBeTruthy();
-  await barra.keyboard.press('Escape');
+  // Aperta da tastiera prende il fuoco sulla prima icona che fa qualcosa.
+  await expect.poll(() => barra.evaluate(() => document.activeElement && document.activeElement.dataset.id)).toBe('reload');
+  await premi(app, 'barra', 'Escape');
   await expect.poll(() => aperta(app)).toBe(false);
-  // …e la tastiera torna a chi scriveva.
-  await page.keyboard.type('ok');
-  await expect.poll(() => page.evaluate(() => document.getElementById('campo').value)).toBe('ok');
+  // …e la tastiera torna alla pagina.
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    return w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId).view.webContents.isFocused();
+  })).toBe(true);
 
-  await page.keyboard.press('Control+Shift+B');
+  await premi(app, 'scheda', 'B', ['control', 'shift']);
   await expect.poll(() => aperta(app)).toBe(true);
-  await barra.keyboard.press('Control+Shift+B');
+  await premi(app, 'barra', 'B', ['control', 'shift']);
   await expect.poll(() => aperta(app)).toBe(false);
 
-  // Dalla fila delle schede.
-  await shell.keyboard.press('Control+Shift+B');
+  // Dalla fila delle schede, e con Cmd come su Mac.
+  await premi(app, 'shell', 'B', ['meta', 'shift']);
   await expect.poll(() => aperta(app)).toBe(true);
-  await shell.keyboard.press('Escape');
+  await premi(app, 'shell', 'Escape');
   await expect.poll(() => aperta(app)).toBe(false);
+  // Ctrl+B resta alla pagina (è il grassetto).
+  await premi(app, 'scheda', 'B', ['control']);
+  await pausa(300);
+  expect(await aperta(app)).toBe(false);
 });
 
 test('indietro, avanti, ricarica e home funzionano da un sito, spenti quando non c\'è dove andare', async ({ app, openTab, testServer }) => {
@@ -108,7 +115,7 @@ test('indietro, avanti, ricarica e home funzionano da un sito, spenti quando non
   await expect(back).toHaveAttribute('aria-disabled', 'true');
   await expect(fwd).toHaveAttribute('aria-disabled', 'true');
   // Spento vuol dire che non fa niente.
-  await back.click();
+  await back.click({ force: true });
   await pausa(300);
   expect(page.url()).toBe(a);
 
@@ -210,10 +217,10 @@ test('a schermo intero la barra resta raggiungibile, e il primo Esc chiude lei, 
   await expect.poll(() => aperta(app)).toBe(true);
   await expect(barra.locator('#nav .ico[data-id="fullscreen"]')).toHaveAttribute('aria-label', 'Esci da schermo intero');
 
-  await page.keyboard.press('Escape');
+  await premi(app, 'scheda', 'Escape');
   await expect.poll(() => aperta(app)).toBe(false);
   expect((await statoBarra(app)).schermoIntero).toBe(true);
-  await page.keyboard.press('Escape');
+  await premi(app, 'scheda', 'Escape');
   await expect.poll(async () => (await statoBarra(app)).schermoIntero).toBe(false);
 });
 
@@ -258,13 +265,17 @@ test('trascino «Screenshot» dal tasto destro alla barra: resta dopo il riavvio
     await shell.waitForLoadState('domcontentloaded');
     return { app, shell };
   };
-  const apriSito = async (app, shell) => {
-    const url = 'data:text/html,' + encodeURIComponent(SITO);
+  const server = createServer((_req, res) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(SITO); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const indirizzo = `http://127.0.0.1:${server.address().port}/sito`;
+  // Un indirizzo per giro: al riavvio torna anche la scheda di prima, con il suo.
+  const apriSito = async (app, shell, giro) => {
+    const url = `${indirizzo}?giro=${giro}`;
     await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
     let page = null;
     const fine = Date.now() + 10_000;
     while (!page && Date.now() < fine) {
-      page = app.windows().find((w) => { try { return w.url().startsWith('data:text/html'); } catch (_) { return false; } });
+      page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } });
       if (!page) await pausa(100);
     }
     await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
@@ -272,7 +283,7 @@ test('trascino «Screenshot» dal tasto destro alla barra: resta dopo il riavvio
   };
   try {
     let { app, shell } = await avvia();
-    let page = await apriSito(app, shell);
+    let page = await apriSito(app, shell, 1);
     const barra = await barraPage(app);
     await page.locator('#p').click({ button: 'right' });
     const icona = page.locator('.sn-menu [data-sn-icon-id="screenshot"]').first();
@@ -283,7 +294,7 @@ test('trascino «Screenshot» dal tasto destro alla barra: resta dopo il riavvio
     await page.mouse.move(box.x + 12, box.y + 12, { steps: 3 });
     // Il trascinamento apre la barra.
     await expect.poll(() => aperta(app)).toBe(true);
-    await expect(barra.locator('#pannello')).toBeVisible();
+    await pannelloFermo(barra);
     const home = await barra.locator('#nav .ico[data-id="home"]').boundingBox();
     await page.mouse.move(30, home.y + 4, { steps: 8 });
     await expect(barra.locator('#nav')).toHaveClass(/mira/);
@@ -295,7 +306,7 @@ test('trascino «Screenshot» dal tasto destro alla barra: resta dopo il riavvio
     await chiudiApp(app);
 
     ({ app, shell } = await avvia());
-    page = await apriSito(app, shell);
+    page = await apriSito(app, shell, 2);
     const barra2 = await barraPage(app);
     await expect.poll(async () => (await statoBarra(app)).bar).toContain('screenshot');
     await expect(barra2.locator('#nav .ico[data-id="screenshot"]')).toHaveCount(1);
@@ -305,6 +316,7 @@ test('trascino «Screenshot» dal tasto destro alla barra: resta dopo il riavvio
     const riga = page.locator('.sn-menu .sn-menu-row[data-sn-drop-target="primary"]').first();
     await expect(riga).toBeVisible();
     await comandaBarra(app, 'clic');
+    await pannelloFermo(barra2);
     const src = await barra2.locator('#nav .ico[data-id="screenshot"]').boundingBox();
     const dst = await riga.boundingBox();
     const s = await statoBarra(app);
@@ -323,6 +335,7 @@ test('trascino «Screenshot» dal tasto destro alla barra: resta dopo il riavvio
     await expect(page.locator('.sn-drag-preview')).toHaveCount(0);
     await chiudiApp(app);
   } finally {
+    try { server.close(); } catch (_) {}
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   }
 });
@@ -331,18 +344,17 @@ test('col tasto destro un\'icona della barra torna nel menu', async ({ app, open
   await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
   await comandaBarra(app, 'clic');
-  // Il menu a comparsa è una finestra a sé: si sceglie la voce come farebbe il clic.
-  await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    const b = w._filoTabs.barra;
-    const pm = process.mainModule.require('./src/main/popup-menu');
-    const vero = pm.showPopupMenu;
-    pm.showPopupMenu = (_w, voci, _x, _y, scegli) => { pm.showPopupMenu = vero; globalThis.__vociBarra = voci; scegli('@action:barra:al-menu'); };
-    b._menu({ id: 'incognito', x: 20, y: 100 });
-  });
+  await barra.locator('#nav .ico[data-id="incognito"]').click({ button: 'right' });
+  let popup = null;
+  const fine = Date.now() + 5000;
+  while (!popup && Date.now() < fine) {
+    popup = app.windows().find((w) => { try { return w.url().startsWith('data:text/html'); } catch (_) { return false; } });
+    if (!popup) await pausa(100);
+  }
+  expect(popup, 'il menu della voce non si è aperto').toBeTruthy();
+  await popup.waitForSelector('.menu');
+  await popup.locator('button.item', { hasText: 'Rimetti nel menu del tasto destro' }).click();
   await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('incognito');
   expect((await statoBarra(app)).secondary).toContain('incognito');
-  const voci = await app.evaluate(() => globalThis.__vociBarra.map((v) => v.label));
-  expect(voci).toContain('Rimetti nel menu del tasto destro');
   await expect(barra.locator('#nav .ico[data-id="incognito"]')).toHaveCount(0);
 });
