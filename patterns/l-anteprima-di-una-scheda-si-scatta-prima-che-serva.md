@@ -22,6 +22,14 @@ chiede.
   davanti che la copre tutta; il layout lo sa e non la rimpicciolisce a metà.
   Una alla volta, e mai mentre la scheda davanti è nascosta (menu della shell
   sopra la pagina) o la finestra non si vede: lì la si vedrebbe, o non verrebbe.
+- **Due foto, non una.** Feed, posta e video riempiono la pagina dopo il
+  caricamento: alla prima foto sono bianchi. La scheda nata dietro resta sveglia
+  per una seconda foto qualche secondo dopo, poi si riaddormenta.
+- **Una scheda dietro che cambia pagina da sola** (un rimando «Apertura in
+  corso…», un aggiornamento) torna sveglia come una nata dietro e si rifotografa
+  al caricamento: la carta non deve mai avere il titolo di una pagina e la foto
+  di un'altra. Una foto chiesta lasciando la scheda e ancora in volo non copre
+  quella scattata dopo.
 - **La carta** è una finestra figlia (`src/main/popup-anteprima.js`, strada 2 di
   [la shell non disegna sopra la pagina](la-shell-non-disegna-sopra-la-pagina.md)):
   non prende il puntatore né la tastiera, nasce quando il puntatore entra nella
@@ -30,9 +38,14 @@ chiede.
   scheda di prima.
 - **La prima compare dopo un attimo**, per non accendersi attraversando la
   barra; da lì, finché si resta sulle schede, passa dall'una all'altra subito.
+  La barra si ridisegna a ogni titolo o icona che cambia: l'attesa della stessa
+  scheda non riparte al ridisegno, e se la scheda è sotto il puntatore lo dice
+  la posizione del puntatore, perché una scheda appena rifatta non ha ancora
+  `:hover`.
   Sulla scheda davanti non c'è foto: la pagina si vede già.
 - **Le foto stanno in memoria**, mai su disco (anche in incognito), e se ne
   vanno con la scheda.
 - **Test:** `tests/tab-preview.spec.mjs` guarda la carta vera e il colore dei
-  suoi pixel, per la scheda lasciata dietro, per quella nata dietro e per quella
-  nascosta prima di finire di caricare.
+  suoi pixel, per la scheda lasciata dietro, per quella nata dietro, per quella
+  nascosta prima di finire di caricare, per quella che si riempie dopo, per
+  quella che cambia pagina da sola e con la barra che si ridisegna di continuo.

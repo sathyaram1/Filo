@@ -406,6 +406,8 @@
     const CALDA = 600;
     const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--font', '--radius'];
     let timer = null;
+    let attesaDi = null;
+    let puntatore = null;
     let vaVia = null;
     let aperta = null;
     let spentaAlle = 0;
@@ -436,7 +438,7 @@
       });
     }
     function nascondi() {
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
       if (vaVia) { clearTimeout(vaVia); vaVia = null; }
       if (!aperta) return;
       aperta = null;
@@ -449,13 +451,26 @@
       if (id === zittita) return;
       zittita = null;
       if (id === aperta) return;
-      if (timer) { clearTimeout(timer); timer = null; }
+      // La barra si ridisegna a ogni titolo o icona che cambia e il puntatore «rientra» nella scheda rifatta:
+      // l'attesa della stessa scheda non riparte, o con un titolo che cambia spesso la carta non arriverebbe mai.
+      if (timer && attesaDi === id) return;
+      if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
       if (aperta || Date.now() - spentaAlle < CALDA) { invia(id); return; }
+      attesaDi = id;
       timer = setTimeout(() => {
         timer = null;
-        const el = elDi(id);
-        if (el && el.matches(':hover')) invia(id);
+        attesaDi = null;
+        if (sottoIlPuntatore(id)) invia(id);
       }, RITARDO);
+    }
+    // Una scheda appena rifatta non ha ancora :hover col puntatore fermo sopra: conta dove sta il puntatore.
+    function sottoIlPuntatore(id) {
+      const el = elDi(id);
+      if (!el) return false;
+      if (el.matches(':hover')) return true;
+      if (!puntatore) return false;
+      const sotto = document.elementFromPoint(puntatore.x, puntatore.y);
+      return !!sotto && sotto.closest('.tab[data-anteprima]') === el;
     }
     // La barra si ridisegna a ogni titolo o icona che cambia: la carta segue la sua scheda, o sparisce con lei.
     function ridisegnata() {
@@ -463,7 +478,9 @@
       if (!anteprimaSchede.enabled || !elDi(aperta)) { nascondi(); return; }
       invia(aperta);
     }
+    tabsEl.addEventListener('mousemove', (e) => { puntatore = { x: e.clientX, y: e.clientY }; }, { passive: true });
     tabsEl.addEventListener('mouseover', (e) => {
+      puntatore = { x: e.clientX, y: e.clientY };
       const el = e.target.closest('.tab[data-anteprima]');
       if (el) sopra(el.dataset.anteprima);
       // Il bordo fra due schede non spegne la carta: passando alla vicina cambierebbe con un lampo.
@@ -472,7 +489,7 @@
     tabsEl.addEventListener('mouseenter', () => {
       if (anteprimaSchede.enabled) try { api.anteprima && api.anteprima.prepara(); } catch (_) {}
     });
-    tabsEl.addEventListener('mouseleave', () => { zittita = null; nascondi(); });
+    tabsEl.addEventListener('mouseleave', () => { zittita = null; puntatore = null; nascondi(); });
     // Se la barra si ridisegna mentre il puntatore esce, l'uscita può perdersi: basta essere altrove.
     document.addEventListener('mouseover', (e) => {
       if (aperta && !tabsEl.contains(e.target)) { zittita = null; nascondi(); }

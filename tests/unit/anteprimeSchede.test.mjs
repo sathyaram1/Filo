@@ -29,6 +29,7 @@ function scheda(id, { disegnata = true } = {}) {
     id, loading: false, bounds: null,
     view: {
       setBounds(b) { this.bounds = b; },
+      setVisible(v) { this.visibile = v; },
       webContents: { isDestroyed: () => false, capturePage: async () => immagine(!disegnata) },
     },
   };
@@ -78,7 +79,8 @@ test('la scheda nata dietro si fotografa sotto quella davanti e torna a zero', a
   const davanti = scheda('d');
   const dietro = scheda('b');
   const m = manager([davanti, dietro], 'd');
-  m.anteprime = new AnteprimeSchede(m);
+  const arrivate = [];
+  m.anteprime = new AnteprimeSchede(m, { ripresa: 40, suNuova: (id) => arrivate.push(id) });
   m.anteprime.nataDietro(dietro);
   assert.equal(m.anteprime.tieneSveglia(dietro), true);
   m.anteprime.caricata(dietro);
@@ -87,7 +89,51 @@ test('la scheda nata dietro si fotografa sotto quella davanti e torna a zero', a
   assert.equal(dietro.view.bounds, 'piena');
   await aspetta(() => m.anteprime.get('b'));
   assert.equal(dietro.view.bounds, 'zero');
+  // Il contenuto di feed e posta arriva dopo il caricamento: resta sveglia per una seconda foto, poi si riaddormenta.
+  assert.equal(m.anteprime.tieneSveglia(dietro), true);
+  await aspetta(() => arrivate.length === 2);
+  await aspetta(() => !m.anteprime.tieneSveglia(dietro));
+  assert.equal(dietro.view.bounds, 'zero');
+});
+
+test('una scheda di dietro che cambia pagina da sola torna sveglia e si rifotografa; quella davanti no', async () => {
+  const davanti = scheda('d');
+  const dietro = scheda('b');
+  const m = manager([davanti, dietro], 'd');
+  const arrivate = [];
+  m.anteprime = new AnteprimeSchede(m, { ripresa: 40, suNuova: (id) => arrivate.push(id) });
+  m.anteprime.congeda(dietro);
+  await aspetta(() => arrivate.length === 1);
+  dietro.view.visibile = false;
   assert.equal(m.anteprime.tieneSveglia(dietro), false);
+  m.anteprime.navigata(dietro);
+  assert.equal(m.anteprime.tieneSveglia(dietro), true);
+  assert.equal(dietro.view.visibile, true, 'nascosta non si disegnerebbe');
+  m.anteprime.caricata(dietro);
+  await aspetta(() => arrivate.length >= 2);
+  m.anteprime.navigata(davanti);
+  assert.equal(m.anteprime.tieneSveglia(davanti), false);
+  m.anteprime.chiudi();
+});
+
+test('una foto della scheda lasciata ancora in volo non copre quella scattata dopo', async () => {
+  let rilascia;
+  const vecchia = { ...immagine(), getSize: () => ({ width: 1000, height: 700 }) };
+  const dietro = scheda('b');
+  const davanti = scheda('d');
+  const m = manager([davanti, dietro], 'd');
+  m.anteprime = new AnteprimeSchede(m, { ripresa: 10_000 });
+  dietro.view.webContents.capturePage = () => new Promise((r) => { rilascia = () => r(vecchia); });
+  m.anteprime.congeda(dietro);
+  dietro.view.webContents.capturePage = async () => immagine();
+  m.anteprime.navigata(dietro);
+  m.anteprime.caricata(dietro);
+  await aspetta(() => m.anteprime.get('b'));
+  assert.equal(m.anteprime.get('b').w, 1280);
+  rilascia();
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(m.anteprime.get('b').w, 1280);
+  m.anteprime.chiudi();
 });
 
 test('se la scheda davanti si nasconde a metà, quella di dietro non resta allargata', async () => {

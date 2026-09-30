@@ -1,7 +1,6 @@
-// #430 — passando il puntatore su una scheda compare la carta con l'anteprima di cosa contiene, e la foto è già
-// lì quando la carta compare: la scheda lasciata dietro, quella aperta in secondo piano e quella nascosta prima di
-// finire di caricare. Si guarda la carta vera (la finestra figlia), coi suoi pixel. Le schede si aprono e si
-// cambiano dalle strade dell'utente: il main si interroga soltanto.
+// #430 — passando il puntatore su una scheda compare la carta con l'anteprima di cosa contiene, con la foto già lì.
+// Si guarda la carta vera (la finestra figlia), coi suoi pixel; le schede si aprono e si cambiano dalle strade
+// dell'utente, il main si interroga soltanto. I casi coperti li elenca patterns/l-anteprima-di-una-scheda-si-scatta-prima-che-serva.md.
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
@@ -188,5 +187,66 @@ test('dalle Preferenze l\'anteprima si spegne e torna il suggerimento col titolo
   await shell.locator(`.tab[data-id="${a}"]`).hover();
   await expect.poll(async () => (await carta(app)).visibile, { timeout: 3000 }).toBe(true);
   expect(Math.round((await carta(app)).larghezza)).toBe(360);
+  expect(tinta((await carta(app)).colore)).toBe('rosso');
+});
+
+// Feed, posta, video: il contenuto arriva dopo il caricamento. La prima foto è ancora vuota, la seconda no.
+test('una scheda aperta dietro che si riempie dopo il caricamento mostra il contenuto arrivato', async ({ app, shell, testServer }) => {
+  const url = testServer.html(`<!doctype html><title>Tarda</title><style>html,body{margin:0;height:100%;background:#fff}</style>
+<script>addEventListener('load',()=>setTimeout(()=>{document.documentElement.style.background=document.body.style.background='#10a020'},1200))</script><body></body>`);
+  const davantiUrl = testServer.html(pagina('#e01010', 'Davanti', `<a id="vai" href="${url}">link</a>`));
+  await apri(app, shell, davantiUrl);
+  const page = app.windows().find((w) => w.url() === davantiUrl);
+  await page.click('#vai', { modifiers: ['Control'] });
+  const dietro = await caricata(app, url);
+  await haFoto(app, dietro);
+  await new Promise((r) => setTimeout(r, 4000));
+  await shell.locator(`.tab[data-id="${dietro}"]`).hover();
+  await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 3000 }).toBe('verde');
+});
+
+// Un rimando («Apertura in corso…») o un aggiornamento della pagina mentre la scheda sta dietro: la foto segue.
+test('una scheda dietro che passa da sola a un\'altra pagina ha la foto della pagina nuova, come il titolo', async ({ app, shell, testServer }) => {
+  const finale = testServer.html(pagina('#10a020', 'Articolo'));
+  const ponte = (dopo) => testServer.html(`<!doctype html><title>Apertura…</title><style>html,body{margin:0;height:100%;background:#fff}</style>
+<p id="vai">Apertura in corso…</p><script>addEventListener('load',()=>setTimeout(()=>location.replace(${JSON.stringify(finale)}),${dopo}))</script>`);
+
+  // Nata dietro con Ctrl+clic.
+  const primo = ponte(900);
+  const davantiUrl = testServer.html(pagina('#e01010', 'Davanti', `<a id="vai" href="${primo}">link</a>`));
+  const davanti = await apri(app, shell, davantiUrl);
+  const page = app.windows().find((w) => w.url() === davantiUrl);
+  await page.click('#vai', { modifiers: ['Control'] });
+  const nata = await caricata(app, finale);
+  await new Promise((r) => setTimeout(r, 1500));
+  await shell.locator(`.tab[data-id="${nata}"]`).hover();
+  await expect.poll(async () => (await carta(app)).titolo, { timeout: 3000 }).toBe('Articolo');
+  await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 3000 }).toBe('verde');
+  await shell.locator('#tab-new').hover();
+  await expect.poll(async () => (await carta(app)).visibile, { timeout: 3000 }).toBe(false);
+
+  // Guardata e lasciata prima che cambi pagina.
+  const secondo = ponte(2500);
+  const vista = await apri(app, shell, secondo);
+  await guardata();
+  await shell.locator(`.tab[data-id="${davanti}"]`).click();
+  await expect.poll(async () => (await schede(app)).attiva, { timeout: 5000 }).toBe(davanti);
+  await expect.poll(async () => (await schede(app)).tutte.find((x) => x.id === vista)?.url, { timeout: 10_000 }).toBe(finale);
+  await new Promise((r) => setTimeout(r, 1500));
+  await shell.locator(`.tab[data-id="${vista}"]`).hover();
+  await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 3000 }).toBe('verde');
+});
+
+// La barra si ridisegna a ogni titolo che cambia: l'attesa della prima carta non deve ripartire a ogni ridisegno.
+test('con una scheda che cambia titolo più volte al secondo la carta compare lo stesso', async ({ app, shell, testServer }) => {
+  await apri(app, shell, testServer.html(pagina('#e0e010', 'Caricamento', `<script>let n=0;setInterval(()=>{document.title='Caricamento '+(++n)+'%'},150)</script>`)));
+  const rossa = await apri(app, shell, testServer.html(pagina('#e01010', 'Rossa')));
+  await guardata();
+  await apri(app, shell, testServer.html(pagina('#1030e0', 'Blu')));
+  await haFoto(app, rossa);
+  await shell.mouse.move(600, 500);
+  await new Promise((r) => setTimeout(r, 900));
+  await shell.locator(`.tab[data-id="${rossa}"]`).hover();
+  await expect.poll(async () => { const c = await carta(app); return c.visibile && c.titolo === 'Rossa'; }, { timeout: 2000 }).toBe(true);
   expect(tinta((await carta(app)).colore)).toBe('rosso');
 });
