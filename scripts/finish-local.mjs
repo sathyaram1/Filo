@@ -56,9 +56,9 @@
 //   il lavoro locale ci cade quasi sempre. Con la pratica (`--feedback`, o il
 //   feedbackId che `verify-local.mjs start --feedback` scrive nel ramo) il server
 //   rilegge il feedback: un lavoro locale col mittente provato si fonde senza
-//   chiedere, i blocchi restano registrati e la pratica si chiude. Senza, il
-//   server apre una richiesta che aspetta il sì dell'owner in Gestione: è la
-//   regola del server. Qui si dice bene (messageForOwnerMerge) e si suona il
+//   chiedere, i blocchi restano registrati e la pratica si chiude. Senza pratica
+//   qui non si parte (senzaPraticaStop); con una non ammessa il server apre una
+//   richiesta che aspetta il sì dell'owner in Gestione. Qui si dice bene (messageForOwnerMerge) e si suona il
 //   campanello per la pagina già aperta (src/main/services/mergeApprovalSignal.js).
 
 import { execFileSync, spawnSync } from 'node:child_process';
