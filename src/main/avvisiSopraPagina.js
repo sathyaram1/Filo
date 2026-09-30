@@ -38,8 +38,10 @@ function pulisci(stato) {
 
 class AvvisiSopraPagina {
   // schedaAttiva: la WebContentsView della scheda in primo piano (o null).
-  constructor(win, { alto = () => 0, restituisciTastiera = () => {}, schedaAttiva = () => null } = {}) {
+  // dopoInCima: chi deve restare sopra anche agli avvisi (la conferma aperta) ci torna.
+  constructor(win, { alto = () => 0, restituisciTastiera = () => {}, schedaAttiva = () => null, dopoInCima = () => {} } = {}) {
     this.win = win;
+    this.dopoInCima = dopoInCima;
     this.alto = alto;
     this.restituisciTastiera = restituisciTastiera;
     this.schedaAttiva = schedaAttiva;
@@ -226,6 +228,7 @@ class AvvisiSopraPagina {
     const cv = this.win.contentView;
     const figli = cv.children || [];
     if (figli[figli.length - 1] !== this.vista) cv.addChildView(this.vista);
+    try { this.dopoInCima(); } catch (_) {}
   }
 
   _invia() {

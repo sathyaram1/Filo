@@ -28,6 +28,7 @@ require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il si
 const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
+const { ConfermeSopraPagina } = require('./confermeSopraPagina');
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
@@ -266,7 +267,13 @@ class TabManager {
     this.partition = partition || null;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
+    const schedaDavanti = () => this.tabs.find((x) => x.id === this.activeId) || null;
+    this.conferme = new ConfermeSopraPagina(window, {
+      sotto: () => { const t = schedaDavanti(); return (t && t.view && t.view.webContents) || null; },
+      area: () => { const t = schedaDavanti(); return t && t.view ? t.view.getBounds() : null; },
+    });
     this.avvisi = new AvvisiSopraPagina(window, {
+      dopoInCima: () => this.conferme.inCima(),
       alto: () => this._altezzaCornice(),
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
       schedaAttiva: () => {
@@ -1724,6 +1731,7 @@ class TabManager {
       }
     }
     this.avvisi.posa();
+    this.conferme.posa();
   }
 
   // ─── zoom da tastiera quando il focus è sulla barra di Filo ────────────
