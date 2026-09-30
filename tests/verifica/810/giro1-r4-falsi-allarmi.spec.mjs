@@ -41,7 +41,7 @@ test('l’identificativo di un servizio che si chiama «otp» non ferma il coman
   const page = await chat(app, shell);
   await modelloFinto(app, {
     giri: [
-      { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'echo "CONTAINER ID   NAME\n3f2a1b9c8d7e   otp-service"' }) }] },
+      { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'echo "3f2a1b9c8d7e   otp-service   Up 2 hours"' }) }] },
       { toolCalls: [{ id: 'c2', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'echo 3f2a1b9c8d7e' }) }] },
       { text: 'Fatto.' },
     ],
