@@ -47,7 +47,10 @@ const BRANDS = [
   { token: 'inps', display: 'INPS', domains: ['inps.it'] },
   { token: 'agenziaentrate', display: 'Agenzia delle Entrate', domains: ['agenziaentrate.gov.it', 'agenziaentrateriscossione.gov.it'] },
   { token: 'agenziadelleentrate', display: 'Agenzia delle Entrate', domains: ['agenziaentrate.gov.it', 'agenziaentrateriscossione.gov.it'] },
-  { token: 'spid', display: 'SPID', domains: ['spid.gov.it'] },
+  // Le pagine d'accesso SPID stanno sui domini dei gestori (spid.register.it, loginspid.infocamere.it): #725.8.
+  { token: 'spid', display: 'SPID', domains: ['spid.gov.it'],
+    gestori: ['aruba.it', 'infocert.it', 'intesa.it', 'lepida.it', 'namirialtsp.com', 'poste.it', 'register.it', 'sieltecloud.it',
+      'tim.it', 'intesigroup.com', 'teamsystem.com', 'eht.eu', 'infocamere.it'] },
   { token: 'aruba', display: 'Aruba', domains: ['aruba.it', 'arubapec.it', 'arubacloud.com', 'cloud.it'] },
   { token: 'telepass', display: 'Telepass', domains: ['telepass.com'] },
   { token: 'brt', display: 'BRT', domains: ['brt.it'] },
