@@ -107,7 +107,7 @@
   // tetto: chi trabocca scende in cima ad «Altro…».
   function applicaPosa(layout, { id, target, beforeId = null } = {}) {
     if (!noto(id) || !ZONE.includes(target)) return null;
-    const out = copia(valida(layout) ? { bar: [], ...layout } : DEFAULT);
+    const out = copia(valida(layout) ? { ...layout, bar: Array.isArray(layout.bar) ? layout.bar : [] } : DEFAULT);
     for (const z of ZONE) out[z] = out[z].filter((x) => x !== id);
     const zona = out[target];
     const i = beforeId ? zona.indexOf(beforeId) : -1;
