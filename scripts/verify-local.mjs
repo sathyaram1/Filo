@@ -1056,18 +1056,26 @@ if (isMain) {
   // I bilanci veri, o ci si ferma qui: un errore evidente, nessun ripiego.
   // La pratica, o ci si ferma: legare il lavoro al feedback sbagliato è peggio che non legarlo.
   const praticaOStop = async (rif) => {
-    const { risolviFeedback, avvisoPratica } = await import('./lib/pratica-locale.mjs');
+    const { risolviFeedback } = await import('./lib/pratica-locale.mjs');
     const { acquireBearer, FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
+    let r;
+    let lavorabile;
     try {
       const bearer = await acquireBearer();
-      const r = await risolviFeedback(rif, { bearer, base: FIRESTORE_BASE });
+      r = await risolviFeedback(rif, { bearer, base: FIRESTORE_BASE });
       if (!r.ok) throw new Error(r.motivo);
-      return { ...r, avviso: await avvisoPratica(r.id, { bearer, base: FIRESTORE_BASE }) };
+      const { praticaPerLaSessione } = await import('./owner-feedback.mjs');
+      lavorabile = await praticaPerLaSessione(r.id, { bearer });
     } catch (e) {
       console.error(`PRATICA NON TROVATA — mi fermo, non ho toccato niente. ${String((e && e.message) || e)}`);
       process.exit(1);
     }
-    return null;
+    if (!lavorabile.ok) {
+      const { rifiutoPratica } = await import('./owner-feedback.mjs');
+      console.error(`${rifiutoPratica(r.id, lavorabile)}\nNon ho legato il lavoro a questa pratica e non ho toccato niente.`);
+      process.exit(1);
+    }
+    return { ...r, avviso: lavorabile.avviso };
   };
 
   const bilanciOStop = async () => {
