@@ -13,6 +13,13 @@
 //   autenticato, dove il server le valida. Questo strumento presuppone le
 //   credenziali dell'owner, che le routine non hanno.
 //
+// LE SESSIONI LOCALI (#908): UNA REGOLA, NON UN MURO
+//   Lo usano soprattutto le sessioni locali, che hanno le credenziali dell'owner
+//   e quindi tutti i suoi poteri. Per regola però non spostano feedback DAI
+//   Ricevuti (aspettano una decisione dell'owner, in Gestione) né dalle sue
+//   conferme, non lavorano feedback di utenti e non stampano testo dei feedback:
+//   qui si rifiuta prima di scrivere. Firestore lo permetterebbe; è una scelta.
+//
 // PERCHÉ IL CONTROLLO QUI FUNZIONA DAVVERO
 //   La validazione dei passaggi di stato ha bisogno di leggere lo stato attuale,
 //   che è cifrato. L'automatismo su GitHub la chiave non ce l'aveva, quindi non
@@ -29,6 +36,16 @@
 //                                                         [--dry-run]
 //   node scripts/owner-feedback.mjs <id> --preapprova     (solo il segno, stato invariato)
 //   node scripts/owner-feedback.mjs <id> --chiedi-prima
+//   node scripts/owner-feedback.mjs <id> --solo-locale    (segno «solo in locale»)
+//   node scripts/owner-feedback.mjs <id> --non-locale
+//   node scripts/owner-feedback.mjs <id> --serve-locale ["perché"]
+//
+//   `--solo-locale`: la pratica la lavora solo una sessione locale, nessuna
+//   routine la prende, e in Gestione sta nei Lavori locali. Solo sui feedback
+//   dell'owner o di una sessione con la prova del mittente (#595).
+//   `--non-locale` lo toglie. Su un feedback di un utente il segno si rifiuta:
+//   se richiede lavoro locale, `--serve-locale` lo riporta nei Ricevuti
+//   (stato design, nota «Richiede lavoro locale») e decide l'owner.
 //
 //   `--preapprova`: «fondi senza chiedermelo» su QUESTA pratica. Se i controlli
 //   del server fermano il lavoro di una routine, il server fonde lo stesso e
@@ -64,10 +81,12 @@ import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedback.js';
 import '../src/shared/feedbackStatus.js';
+import '../src/shared/manageReview.js';
 
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
 const FS = globalThis.SN_FB_STATUS;
 const CRYPTO = globalThis.SN_FEEDBACK_CRYPTO;
+const MR = globalThis.SN_MANAGE_REVIEW;
 const statusToPublic = globalThis.SN_FEEDBACK?.statusToPublic;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -136,6 +155,94 @@ export async function segnaPreapprovazione(id, valore, opts = {}) {
   });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   return { ok: true, segno };
+}
+
+/**
+ * Da qui una sessione non sposta niente (#908). PURA. '' = si può partire.
+ * I Ricevuti aspettano una decisione dell'owner; i confermati SONO una sua decisione.
+ */
+export function partenzaVietata(from) {
+  const s = String(from || '');
+  if (MR.isRicevutiStatus(s)) {
+    return `«${s}» è uno stato dei Ricevuti: aspetta una decisione dell'owner, in Gestione. Per regola una sessione non sposta feedback da lì`;
+  }
+  if (/_confirmed$/.test(s)) return `«${s}» è una conferma dell'owner: la cambia lui, in Gestione`;
+  return '';
+}
+
+/**
+ * I campi che servono a decidere sul segno, decifrati. null se mittente o stato
+ * non si leggono: senza sapere di chi è la pratica non si segna niente.
+ */
+async function praticaInChiaro(doc) {
+  const f = doc?.fields || {};
+  const grezzi = { _id: doc.name, clientId: f.clientId?.stringValue || '', status: f.status?.stringValue || '' };
+  let dec = grezzi;
+  if (CRYPTO?.isEncrypted?.(grezzi.clientId) || CRYPTO?.isEncrypted?.(grezzi.status)) {
+    try {
+      const { decryptFeedbackFields, PLACEHOLDER } = await import('./lib/decrypt-feedback-fields.mjs');
+      dec = await decryptFeedbackFields(grezzi);
+      if ([dec.clientId, dec.status].some((v) => v === PLACEHOLDER || CRYPTO.isEncrypted(v))) return null;
+    } catch (_) { return null; }
+  }
+  const status = String(dec.status || '').trim();
+  if (!FS.isCanonical(status)) return null;
+  const lo = f.localOnly?.mapValue?.fields;
+  return {
+    clientId: String(dec.clientId || ''),
+    status,
+    senderProof: f.senderProof?.stringValue || '',
+    statusPublic: f.statusPublic?.stringValue || 'open',
+    localOnly: lo ? { by: lo.by?.stringValue || '', at: Number(lo.at?.integerValue || 0) } : undefined,
+    claimedBy: f.claimedBy?.stringValue || '',
+    claimExpiresAt: f.claimExpiresAt?.stringValue || '',
+  };
+}
+const CAMPI_PRATICA = ['clientId', 'senderProof', 'status', 'statusPublic', 'localOnly', 'claimedBy', 'claimExpiresAt'];
+
+/**
+ * Il segno «solo in locale» (#908): `valore` true lo mette ({ by, at } in ms), false lo toglie.
+ * La regola sta in SN_MANAGE_REVIEW.localSignCheck, la stessa del tasto in Gestione.
+ * Ritorna { ok, segno } o { ok:false, motivo, utente } (utente = feedback di un utente).
+ */
+export async function segnaLocale(id, valore, opts = {}) {
+  const bearer = opts.bearer || await acquireBearer();
+  const doc = await getDoc(id, bearer, CAMPI_PRATICA);
+  if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
+  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
+  const fb = await praticaInChiaro(doc);
+  if (!fb) return { ok: false, motivo: 'mittente o stato non decifrabili: non so di chi è la pratica' };
+  const check = MR.localSignCheck(fb, valore);
+  if (!check.ok) return { ok: false, motivo: check.motivo, utente: !!check.utente };
+  const segno = valore ? { by: chiScrive(bearer), at: Date.now() } : null;
+  if (opts.dryRun) return { ok: true, dryRun: true, segno };
+  const fields = segno ? { localOnly: toFsValue(segno) } : {};
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=localOnly`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
+  return { ok: true, segno };
+}
+
+/**
+ * Un feedback di un utente che richiederebbe lavoro locale torna nei Ricevuti:
+ * stato design, motivo 'locale', nota «Richiede lavoro locale». Decide l'owner.
+ * È il passaggio che una routine fa quando ha domande, e si dichiara come tale.
+ */
+export async function serveLocale(id, nota = '', opts = {}) {
+  const bearer = opts.bearer || await acquireBearer();
+  const doc = await getDoc(id, bearer, CAMPI_PRATICA);
+  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
+  const fb = await praticaInChiaro(doc);
+  if (!fb) return { ok: false, motivo: 'mittente o stato non decifrabili: non so di chi è la pratica' };
+  if (MR.isProvenLocalSender(fb)) {
+    return { ok: false, motivo: 'la pratica è dell’owner o di una sessione: per lavorarla in locale usa --solo-locale' };
+  }
+  if (fb.status === 'design') return { ok: false, motivo: 'è già nei Ricevuti, in attesa di una scelta dell’owner' };
+  const testo = `Richiede lavoro locale.${String(nota || '').trim() ? ` ${String(nota).trim()}` : ''}`;
+  return scrivi(id, 'design', testo, { ...opts, bearer, attore: 'routine', reason: 'locale' });
 }
 
 /** La versione in costruzione: è quella in cui un fix confluisce. */
@@ -225,7 +332,7 @@ export async function scrivi(id, to, nota, opts = {}) {
   if (opts.preapprova === true && statusToPublic && statusToPublic(to) === 'closed') {
     return { ok: false, motivo: `lo stato «${to}» chiude la pratica: il segno «fondi senza chiedermelo» non conterebbe. Ometti --preapprova (o usa --chiedi-prima).` };
   }
-  const bearer = await acquireBearer();
+  const bearer = opts.bearer || await acquireBearer();
   // Di questo documento si guardano lo stato (per sapere se il passaggio è
   // legale) e le note (per fondere il report): basta chiedere quei due, e la
   // lettura va nel conto di chi ci ha mandato qui (#680).
@@ -239,6 +346,8 @@ export async function scrivi(id, to, nota, opts = {}) {
     // esattamente ciò che il vecchio automatismo faceva "per prudenza".
     return { ok: false, motivo: 'stato attuale non decifrabile: non posso sapere se il passaggio è legale' };
   }
+  const vietata = partenzaVietata(from);
+  if (vietata) return { ok: false, motivo: vietata, from };
   const check = transizioneAmmessa(from, to, opts.attore || 'owner');
   if (!check.ok) return { ok: false, motivo: check.motivo, from };
 
@@ -318,12 +427,15 @@ if (isMain) {
   const uso = () => {
     console.error('Uso: node scripts/owner-feedback.mjs <id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--preapprova|--chiedi-prima] [--come-routine] [--dry-run]');
     console.error('     node scripts/owner-feedback.mjs <id> --preapprova | --chiedi-prima   (solo il segno, stato invariato)');
+    console.error('     node scripts/owner-feedback.mjs <id> --solo-locale | --non-locale    (segno «solo in locale», stato invariato)');
+    console.error('     node scripts/owner-feedback.mjs <id> --serve-locale ["perché"]       (feedback di un utente → Ricevuti, «richiede lavoro locale»)');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
-    opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar', '--preapprova', '--chiedi-prima'],
+    opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar', '--preapprova', '--chiedi-prima',
+      '--solo-locale', '--non-locale', '--serve-locale'],
     conValore: ['--branch', '--reason', '--frase'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
@@ -368,6 +480,36 @@ if (isMain) {
     posizionali.push(a);
   }
   const [id, status, ...nota] = posizionali;
+
+  // Il segno «solo in locale» e il ritorno nei Ricevuti: da soli, senza stato.
+  const locali = ['--solo-locale', '--non-locale', '--serve-locale'].filter((o) => argv.includes(o));
+  if (locali.length > 1) { console.error(`RIFIUTATO: ${locali.join(' e ')} insieme — non ho toccato niente.`); process.exit(1); }
+  if (locali.length === 1) {
+    if (!id) { uso(); process.exit(1); }
+    if (locali[0] === '--serve-locale') {
+      const r = await serveLocale(id, [status, ...nota].filter(Boolean).join(' '), { dryRun });
+      if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo}`); process.exit(3); }
+      console.log(r.dryRun
+        ? `(prova a vuoto) ${r.from} → design, «richiede lavoro locale»; campi: ${r.campi.join(', ')}`
+        : `OK: ${id} torna nei Ricevuti (design, «richiede lavoro locale»): decide l'owner.`);
+      process.exit(0);
+    }
+    if (status) { console.error(`RIFIUTATO: ${locali[0]} va da solo, senza stato né nota — non ho toccato niente.`); process.exit(1); }
+    const valore = locali[0] === '--solo-locale';
+    const r = await segnaLocale(id, valore, { dryRun });
+    if (!r.ok) {
+      console.error(`RIFIUTATO: ${r.motivo}.`);
+      if (r.utente) {
+        console.error('In locale i feedback degli utenti non si lavorano. Se questo richiede lavoro locale, riportalo');
+        console.error(`nei Ricevuti e decide l'owner: node scripts/owner-feedback.mjs ${id} --serve-locale "perché"`);
+      }
+      process.exit(3);
+    }
+    console.log(r.dryRun
+      ? `[dry-run] ${id}: ${valore ? 'metterei' : 'toglierei'} il segno «solo in locale»`
+      : `${id}: ${valore ? `da ora la lavora solo una sessione locale (segno di ${r.segno.by})` : 'da ora la possono prendere anche le routine'}`);
+    process.exit(0);
+  }
 
   // Solo il segno, stato invariato: `<id> --preapprova` / `<id> --chiedi-prima`.
   if (id && !status && typeof preapprova === 'boolean') {

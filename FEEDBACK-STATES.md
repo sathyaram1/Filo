@@ -147,7 +147,7 @@ possibilità di crearne di nuovi.
 
 ## 4. Tab dashboard (deriva SOLO da `status`)
 
-Le tab sono QUATTRO e valgono per OGNI superficie che elenca feedback — la
+Le tab sono CINQUE e valgono per OGNI superficie che elenca feedback — la
 dashboard di gestione (`filo://manage`) e la pagina dei feedback
 (`filo://feedback`), che fino al #509 aveva una tassonomia sua (la vecchia
 new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
