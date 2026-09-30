@@ -40,10 +40,22 @@
   const SEARCH_CACHE_PER_CARD = 30;
 
   const digest = (s) => crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 16);
-  // I giudizi salvati valgono per le istruzioni E il modello che li hanno prodotti: cambiato uno dei due, la cache
-  // scade da sé (patterns/una-cache-scade-con-la-richiesta-non-solo-con-l-orologio.md).
+  // I giudizi salvati valgono per le istruzioni, la forma della riga carta e il modello che li hanno prodotti:
+  // cambiato uno dei tre, la cache scade da sé (patterns/una-cache-scade-con-la-richiesta-non-solo-con-l-orologio.md).
+  const JUDGE_SAMPLE = { name: 'n', manaCost: '{1}', typeLine: 't', power: '1', toughness: '1', priceEur: 1, oracleText: 'o' };
   function judgeFingerprint(model) {
-    return digest(`${PROMPTS.decksSearchFilter({ criterion: '', cards: '' })}\n${model || ''}`).slice(0, 10);
+    return digest(`${PROMPTS.decksSearchFilter({ criterion: '', cards: '' })}\n${judgeCardBody(JUDGE_SAMPLE)}\n${model || ''}`).slice(0, 10);
+  }
+  // Il giudizio salvato è per la carta COM'ERA quando il giudice l'ha vista: cambiato il prezzo o il testo, si rifà.
+  function judgedAs(card) {
+    return `${card.id}@${digest(judgeCardBody(card)).slice(0, 8)}`;
+  }
+  function isBusy(e) {
+    const m = /^(?:OpenRouter|Gemini)(?:\s+\S+)?\s+(\d{3})\b/.exec(String((e && e.message) || ''));
+    const status = Number(e && e.status) || (m ? Number(m[1]) : 0);
+    if (status === 429 || status >= 500) return true;
+    const CE = global.SN_CHAT_ERRORS;
+    return !!(CE && CE.isTransientNetwork(e));
   }
 
   async function readOpinions() {
