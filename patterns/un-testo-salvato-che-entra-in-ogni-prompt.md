@@ -30,7 +30,11 @@ Valgono insieme queste regole:
   `{ citazione }` / `{ elenco }` per il testo del modello o salvato, che il
   popup disegna su un foglietto tinto d'accento. Vale per ogni popup che mostra
   un testo non di Filo (feedback a suo nome, righe da dimenticare, comando,
-  link, ricerca, sveglie, documento).
+  link, ricerca, sveglie, documento). Il segno del riquadro non può dipendere
+  da un colore che cambia chi scrive il testo: l'accento il modello lo cambia
+  senza chiedere nello stesso turno, e su un sito la pagina ridefinisce le
+  variabili del tema. Per questo il filo a sinistra è per metà colore del
+  testo: chi lo spegne spegne anche le parole.
 - **Si conferma quello che si è visto.** La pulizia dei caratteri non basta da
   sola: tre giri di verifica di fila hanno spinto l'istruzione sotto il bordo
   con righe vuote, poi di spazi a larghezza zero, poi di righe innocue o di un

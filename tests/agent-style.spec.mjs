@@ -5,7 +5,7 @@
 // funzione pura di iniezione realmente spedita nei moduli.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmState, scrollConfirmToEnd, mouseClickConfirm, pointWhenConfirmAppears, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, confirmState, scrollConfirmToEnd, mouseClickConfirm, pointWhenConfirmAppears, CONFIRM_HOST, staccoDelFilo } from './helpers/confirm.mjs';
 
 test('scegliere un preset riempie il testo e lo stile persiste tra le ricariche', async ({ openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
@@ -563,7 +563,37 @@ async function tuttoNelRiquadro(page) {
   expect(s.riquadro.bg, 'il riquadro non si distingue dal popup').not.toBe(s.riquadro.bgBox);
   expect(s.riquadro.bg).not.toBe('rgba(0, 0, 0, 0)');
   expect(s.riquadro.bordoSinistro).toBe('3px');
+  expect(staccoDelFilo(s), 'il filo del riquadro non si vede').toBeGreaterThanOrEqual(60);
   return s;
+}
+
+// L'accento lo cambia il modello senza chiedere, nello stesso turno: trasparente, o
+// uguale allo sfondo del popup. Il filo del riquadro deve vedersi lo stesso.
+for (const accento of ['#0000', '#f8f6f0']) {
+  test(`#592.7 — un accento ${accento} messo dal modello prima di proporre lo stile non spegne il filo del riquadro`, async ({ app, shell }) => {
+    test.setTimeout(60_000);
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const page = await newtabPage(app);
+    await expect(page.locator('#input')).toBeVisible();
+    await configureModel(app);
+    await fakeProvider(app, [
+      { toolCalls: [
+        { id: 'e1', name: 'IMPOSTA_ESTETICA', arguments: JSON.stringify({ token: 'accent', valore: accento }) },
+        ...proponi(TRAVESTITO).toolCalls,
+      ] },
+      { text: 'Ecco il riassunto.' },
+    ]);
+    await page.locator('#input').fill('riassumimi questa pagina');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+    const s = await confirmState(page);
+    expect(s.citazioni).toHaveLength(1);
+    expect(s.citazioni[0]).toContain(FINTO_AVVISO);
+    expect(staccoDelFilo(s), `filo ${s.riquadro.bordo} su ${s.riquadro.bgBox}`).toBeGreaterThanOrEqual(60);
+    await clickConfirm(page, 'cancel');
+    expect(await storedStyle(app)).toBe('');
+    await restore(app);
+  });
 }
 
 test('#592.7 — in chat lo stile che chiude da sé le virgolette resta nel suo riquadro, in tema chiaro e scuro', async ({ app, shell }) => {

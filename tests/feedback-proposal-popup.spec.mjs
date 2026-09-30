@@ -9,7 +9,7 @@
 //   3. la selezione del testo usa la palette di Filo, non il blu di sistema.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { CONFIRM_HOST, confirmState, confirmText, clickConfirm } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, staccoDelFilo } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -117,4 +117,26 @@ test('nel popup la selezione del testo è nella palette Filo, non nel blu di sis
   expect(state.textScrolls).toBe(true);
 
   await clickConfirm(page, 'cancel');
+});
+
+// Sui siti il popup vive nel mondo isolato della pagina: i suoi hook si raggiungono dal main.
+function nelMondoIsolato(app, porta, codice) {
+  return app.evaluate(async ({ webContents }, { porta, codice }) => {
+    const wc = webContents.getAllWebContents().find((w) => w.getURL().includes(`:${porta}/`));
+    return wc ? wc.executeJavaScriptInIsolatedWorld(999, [{ code: codice }]) : null;
+  }, { porta, codice });
+}
+
+test('#592.7 — nell’Aiuto su un sito, il foglio di stile della pagina non spegne il filo del riquadro', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, '<!doctype html><html><head><style>body{--sn-accent:transparent}</style></head><body><h1>Ricette</h1></body></html>');
+  const porta = new URL(page.url()).port;
+  await expect.poll(() => nelMondoIsolato(app, porta, 'typeof window.__filoSidebarTest?.runFiloAction'), { timeout: 8000 }).toBe('function');
+  await nelMondoIsolato(app, porta, `window.SN_SIDEBAR.open(); window.__filoSidebarTest.runFiloAction(${JSON.stringify({ type: 'INVIA_FEEDBACK', testo: TESTO })}); 1`);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(1, { timeout: 8000 });
+  const s = JSON.parse(await nelMondoIsolato(app, porta, 'JSON.stringify(window.SN_CONFIRM_UI._test.state())'));
+  expect(s.citazioni).toEqual([TESTO]);
+  expect(staccoDelFilo(s), `filo ${s.riquadro.bordo} su ${s.riquadro.bgBox}`).toBeGreaterThanOrEqual(60);
+  await nelMondoIsolato(app, porta, "window.SN_CONFIRM_UI._test.click('cancel')");
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 });
