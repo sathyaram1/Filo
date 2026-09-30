@@ -45,8 +45,8 @@ nella pagina, in uno Shadow DOM chiuso.
   sull'elemento evidenziato), le sue scelte e la sua casella stanno nel documento del sito, che li premeva
   e li inviava da codice: ogni passo era una chiamata al modello pagata dall'utente, in un giro senza fine
   (#592.6, giro 3). Chi fa avanzare qualcosa di Filo da un pezzo che sta nella pagina chiede
-  `SN_FILO_UI.gestoVero(e)`. L'evento `submit` non basta: quello di `requestSubmit()` chiamato dal sito
-  arriva come vero, conta il tasto o il clic che lo fa partire. `tests/aiuto-solo-gesti-veri.spec.mjs`.
+  `SN_FILO_UI.gestoVero(e)`. L'evento `submit` non basta: quello partito da `requestSubmit()` o da un clic
+  di codice sul bottone arriva come vero, quindi conta il tasto o il clic che lo fa partire. `tests/aiuto-solo-gesti-veri.spec.mjs`.
 - **Test:** la domanda si fa partire dal mondo isolato del preload (`nelMondoDiFilo` in
   `tests/helpers/confirm.mjs`: `page.evaluate` gira nel mondo della pagina e non ci arriva), e il popup
   si guarda nella sua vista (`confermaSopraPagina`), dove valgono gli hook `_test` di sempre.
