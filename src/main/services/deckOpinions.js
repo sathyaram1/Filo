@@ -82,6 +82,19 @@
       card.oracleText ? `— ${card.oracleText.replace(/\n/g, ' ')}` : '',
     ].filter(Boolean).join(' · ');
   }
+  // La carta come la vede il giudice della ricerca (§4.1): anche i dati che un criterio può citare, forza e prezzo.
+  function judgeCardBody(card) {
+    const pt = card.power || card.toughness ? `forza/costituzione ${card.power || '?'}/${card.toughness || '?'}` : '';
+    const price = Number.isFinite(card.priceEur) ? `prezzo ${card.priceEur.toFixed(2).replace('.', ',')} €` : 'prezzo sconosciuto';
+    return [
+      card.name,
+      card.manaCost ? `costo ${card.manaCost}` : '',
+      card.typeLine,
+      pt,
+      price,
+      card.oracleText ? `— ${card.oracleText.replace(/\n/g, ' ')}` : '',
+    ].filter(Boolean).join(' · ');
+  }
   function cardPromptLine(card) {
     return `- [id: ${card.id}] ${cardPromptBody(card)}`;
   }
