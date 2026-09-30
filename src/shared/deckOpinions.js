@@ -192,19 +192,22 @@
     return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
-  // Risposta del batch filtro (§4.1): { "keep": ["id", ...] } oppure un array
-  // nudo di id. Ritorna un Set degli id "keep" RISTRETTO a quelli davvero
-  // giudicati (mai id inventati dal modello). Gli id giudicati e non presenti in
-  // "keep" sono "scartati" (bool false), informazione cacheabile dal chiamante.
+  // Risposta del batch filtro (§4.1): { "keep": [...] } o un array nudo, con i NUMERI della lista (1 = primo di
+  // judgeIds) o gli id esatti; mai id inventati. `null` = risposta illeggibile: non è «nessuna tiene», e un
+  // chiamante che la salvasse come tutte scartate avvelenerebbe la cache per sempre (#382).
   function parseSearchKeep(text, judgeIds) {
-    const allow = new Set((judgeIds || []).map(String));
+    const ids = (judgeIds || []).map(String);
+    const allow = new Set(ids);
     const o = firstJson(text);
+    if (!o) return null;
+    const list = Array.isArray(o) ? o : (Array.isArray(o.keep) ? o.keep : null);
+    if (!list) return null;
     const out = new Set();
-    if (!o) return out;
-    const list = Array.isArray(o) ? o : (Array.isArray(o.keep) ? o.keep : []);
     for (const it of list) {
-      const id = String(it || '').trim();
-      if (id && allow.has(id)) out.add(id);
+      const s = String(it == null ? '' : it).trim();
+      if (allow.has(s)) { out.add(s); continue; }
+      const n = /^\d+$/.test(s) ? Number(s) : NaN;
+      if (n >= 1 && n <= ids.length) out.add(ids[n - 1]);
     }
     return out;
   }
@@ -232,18 +235,41 @@
 
   // Aggiorna la cache coi giudizi freschi (id → bool) per un criterio. Ritorna
   // una NUOVA mappa (mai mutare l'input). Solo gli id davvero giudicati.
-  function updateSearchCache(searchCache, criterion, judged) {
+  // `keepPrefix`: le chiavi che non cominciano così vengono da un giudice con altre istruzioni e si buttano.
+  function updateSearchCache(searchCache, criterion, judged, { keepPrefix = '' } = {}) {
     const key = normCriterion(criterion);
     if (!key) return searchCache && typeof searchCache === 'object' ? searchCache : {};
     const next = {};
     for (const [id, e] of Object.entries(searchCache && typeof searchCache === 'object' ? searchCache : {})) {
-      next[id] = { ...e };
+      const kept = {};
+      for (const [k, v] of Object.entries(e && typeof e === 'object' ? e : {})) {
+        if (!keepPrefix || k.startsWith(keepPrefix)) kept[k] = v;
+      }
+      if (Object.keys(kept).length) next[id] = kept;
     }
     for (const [id, matched] of Object.entries(judged || {})) {
       if (!next[id]) next[id] = {};
       next[id][key] = !!matched;
     }
     return next;
+  }
+
+  // Riga della risposta in chat dopo il giudice (§4.1): una carta scartata non si mostra mai, e quando il giudice
+  // non ha potuto guardarle lo si dice, perché la lista che resta non è filtrata (#382). '' = tutto a posto.
+  function searchFilterNote({ found, kept, unverified, criterion, why }) {
+    const motivo = why ? ` Motivo: ${why}` : '';
+    if (found > 0 && unverified >= found) {
+      return `Non sono riuscito a controllare una per una le carte trovate: qui sotto c'è la ricerca senza filtro, e può contenere carte che non c'entrano.${motivo}`;
+    }
+    if (unverified > 0) {
+      return unverified === 1
+        ? `Una delle carte qui sotto non l'ho potuta controllare, quindi potrebbe non c'entrare.${motivo}`
+        : `${unverified} delle carte qui sotto non le ho potute controllare, quindi potrebbero non c'entrare.${motivo}`;
+    }
+    if (found > 0 && kept === 0) {
+      return `Ho controllato una per una le ${found === 1 ? 'carta trovata' : `${found} carte trovate`}, ma nessuna corrisponde a «${String(criterion || '').trim()}». Prova a chiederlo con altre parole.`;
+    }
+    return '';
   }
 
   global.SN_DECK_OPINIONS = {
@@ -259,5 +285,6 @@
     parseSearchKeep,
     planSearchFilter,
     updateSearchCache,
+    searchFilterNote,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
