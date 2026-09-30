@@ -74,4 +74,41 @@ async function resolveSupportModel(slot, hardcoded, getConfig) {
   return fallback;
 }
 
-module.exports = { resolveSupportModel, SLOT_DEFAULTS };
+// Le funzioni dell'app che usa solo chi gestisce Filo (censimento: `owner` con
+// `action`) prendono la catena dal loro slot, e i nickname si risolvono sul
+// registro dei giudici sopra a quello effettivo, come fa il server dei giudici.
+// Slot null = mai impostato: resta la scelta fatta prima dello spostamento (#465).
+function ownerSlotFor(action) {
+  const Usage = globalThis.SN_MODEL_USAGE;
+  return Usage && typeof Usage.ownerSlotForAction === 'function' ? Usage.ownerSlotForAction(action) : '';
+}
+
+async function settingsForOwnerAction(settings, action, getConfig) {
+  const slot = ownerSlotFor(action);
+  if (!slot) return settings;
+  const getter = typeof getConfig === 'function' ? getConfig : SupportModels.get;
+  let config = null;
+  try { config = await getter(); } catch (_) { config = null; }
+  const chain = config ? config[slot] : null;
+  if (typeof chain !== 'string') return settings;
+  const judgeRegistry = (config.judgeRegistry && typeof config.judgeRegistry === 'object') ? config.judgeRegistry : {};
+  return {
+    ...settings,
+    models: { ...(settings.models || {}), [action]: chain.trim() },
+    modelRegistry: { ...(settings.modelRegistry || {}), ...judgeRegistry },
+  };
+}
+
+// Per l'editor di Gestione: uno slot spostato e mai impostato mostra la catena
+// che la funzione usa davvero, così salvando la si porta nello slot.
+function fillMovedSlots(models, settings) {
+  const Usage = globalThis.SN_MODEL_USAGE;
+  const pairs = Usage && typeof Usage.ownerActions === 'function' ? Usage.ownerActions() : [];
+  const inUse = (settings && settings.models) || {};
+  for (const { action, slot } of pairs) {
+    if (models[slot] == null) models[slot] = typeof inUse[action] === 'string' ? inUse[action] : '';
+  }
+  return models;
+}
+
+module.exports = { resolveSupportModel, SLOT_DEFAULTS, ownerSlotFor, settingsForOwnerAction, fillMovedSlots };

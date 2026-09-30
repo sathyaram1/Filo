@@ -5122,7 +5122,7 @@
   // ── Sezione "Modelli di supporto" (DD1) ──────────────────────────────────
   // Slot → editor a segmenti (buildChain del modelChainEditor).
   // Caricato pigro: viene inizializzato la prima volta che l'utente clicca la tab.
-  const SM_SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority'];
+  const SM_SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority', 'manageSearch'];
   // Etichette amichevoli per slot (i giudici del panel L2 sono "Giudice 1/2/3"
   // + "Giudice dinamico"; l'id grezzo non va mai mostrato all'utente). L'HTML
   // ha già le <label> statiche; questa mappa è la sorgente di verità se in
@@ -5135,8 +5135,12 @@
     judgeDynamic:  'Giudice dinamico',
     judgeRedTeam:  'Giudice red-team',
     judgePriority: 'Giudice priorità',
+    manageSearch:  'Ricerca fra i feedback',
   };
   let smChains = {};        // slot → { getValue }
+  // Nickname del registro condiviso (Modelli predefiniti): il server dei giudici
+  // lo unisce al loro, quindi valgono anche qui. Arrivano col GET.
+  let smSharedNicknames = [];
   let smLoaded  = false;    // true dopo il primo caricamento riuscito
   let smLoading = false;    // guard anti-doppio-caricamento
 
@@ -5171,9 +5175,40 @@
     // 1. Registro dedicato ai giudici (priorità: compaiono per primi).
     const judgeReg = collectJudgeRegistry();
     for (const nick of Object.keys(judgeReg)) addNick(nick, judgeReg[nick].label);
-    // 2. Registro condiviso predefinito (fallback comodo: flash, haiku, …).
+    // 2. Registro condiviso (Modelli predefiniti).
+    for (const n of smSharedNicknames) addNick(n && n.nick, n && n.label);
     const shared = (window.SN_CONST && window.SN_CONST.DEFAULT_MODEL_REGISTRY) || {};
     for (const nick of Object.keys(shared)) addNick(nick, (shared[nick] || {}).label);
+  }
+
+  // Catalogo OpenRouter per il campo «Modello OpenRouter» del registro, chiesto
+  // al main come in Modelli predefiniti (#465). Finché non arriva, la tendina
+  // propone i modelli già scritti nel registro; se non arriva, il campo resta libero.
+  let smCatalog = null;
+  let smCatalogPending = null;
+  function ensureSmCatalog() {
+    if (smCatalog || smCatalogPending) return smCatalogPending;
+    const type = (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.DEFAULT_MODELS_LIST) || 'default_models_list';
+    smCatalogPending = Promise.resolve()
+      .then(() => sendToMain({ type, provider: 'openrouter' }))
+      .then((r) => { if (r && r.ok && Array.isArray(r.items) && r.items.length) smCatalog = r.items; })
+      .catch(() => {})
+      .finally(() => { smCatalogPending = null; });
+    return smCatalogPending;
+  }
+
+  function readSmModelOptions() {
+    const out = [];
+    const seen = new Set();
+    const add = (id, label) => {
+      const v = String(id || '').trim();
+      if (!v || seen.has(v)) return;
+      seen.add(v);
+      out.push({ value: v, label: label && label !== v ? String(label) : '' });
+    };
+    if (smCatalog) for (const it of smCatalog) add(it && it.id, it && it.label);
+    else if (mgSmRegistryList) for (const el of mgSmRegistryList.querySelectorAll('.sn-model-id')) add(el.value, '');
+    return out;
   }
 
   // ── Registro modelli dei giudici (nickname → modello OpenRouter) ───────────
@@ -5197,6 +5232,16 @@
     modelIn.setAttribute('autocomplete', 'off');
     modelIn.placeholder = 'modello OpenRouter (es. deepseek/deepseek-v4-pro)';
     modelIn.value = e.model || '';
+    const modelWrap = document.createElement('div');
+    modelWrap.className = 'sn-model-id-wrap';
+    modelWrap.appendChild(modelIn);
+    modelIn.addEventListener('focus', () => { ensureSmCatalog(); });
+    if (window.SN_COMBOBOX) {
+      window.SN_COMBOBOX.attach(modelWrap, modelIn, {
+        readOptions: readSmModelOptions,
+        onPick: () => populateSmNicknames(),
+      });
+    }
 
     const del = document.createElement('button');
     del.type = 'button';
@@ -5210,7 +5255,7 @@
     modelIn.addEventListener('input', () => populateSmNicknames());
 
     row.appendChild(nickIn);
-    row.appendChild(modelIn);
+    row.appendChild(modelWrap);
     row.appendChild(del);
     return row;
   }
@@ -5314,6 +5359,8 @@
   // Render dell'editor (chiave + registro giudici + nickname + slot) e reveal.
   // Estratta da loadSupportModels così i test possono esercitarla senza il canale.
   function renderSupportModelsEditor(models) {
+    if (models && Array.isArray(models.sharedNicknames)) smSharedNicknames = models.sharedNicknames;
+    ensureSmCatalog();
     applyJudgeKeyState(models || {});
     renderJudgeRegistry((models || {}).judgeRegistry || {});
     populateSmNicknames();
@@ -5339,6 +5386,7 @@
       // Ricarica i valori salvati (confirma round-trip Firestore).
       if (mgSmKeyInput) mgSmKeyInput.value = ''; // non riteniamo la chiave in pagina
       applyJudgeKeyState(r.models || {});
+      if (r.models && Array.isArray(r.models.sharedNicknames)) smSharedNicknames = r.models.sharedNicknames;
       renderJudgeRegistry((r.models || {}).judgeRegistry || judgeRegistry);
       populateSmNicknames();
       renderSmSlots(r.models || models);
