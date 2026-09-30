@@ -1748,6 +1748,12 @@
       window.addEventListener('resize', closeSortMenu);
     }, 0);
   }
+  // L'esito si legge nel dettaglio: dal menu la pratica si apre, così il messaggio ha dove stare.
+  function segnoDalMenu(fb, valore) {
+    if (selectedId !== fb._id) openDetail(fb._id);
+    setLocalSign(fb._id, valore);
+  }
+
   // Tasto destro su una scheda: quello che si fa su una pratica senza aprirla (#908).
   mgList.addEventListener('contextmenu', (e) => {
     const item = e.target.closest('.mg-item[data-id]');
@@ -1757,12 +1763,12 @@
     const num = FB.formatNum(fb.seq, fb.subSeq);
     const voci = [{ testo: 'Apri', azione: () => openDetail(fb._id) }];
     if (isAdmin && MR.isLocalOnly(fb)) {
-      voci.push({ testo: '💻 Rimetti anche alle routine', titolo: localSignText(fb), azione: () => setLocalSign(fb._id, false) });
+      voci.push({ testo: '💻 Rimetti anche alle routine', titolo: localSignText(fb), azione: () => segnoDalMenu(fb, false) });
     } else if (isAdmin && MR.localSignCheck(fb, true).ok) {
       voci.push({
         testo: '💻 Solo lavoro locale',
         titolo: 'Nessuna routine la prende: la lavora una sessione locale, e compare nei Lavori locali.',
-        azione: () => setLocalSign(fb._id, true),
+        azione: () => segnoDalMenu(fb, true),
       });
     }
     if (num) {
