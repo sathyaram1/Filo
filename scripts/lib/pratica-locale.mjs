@@ -55,6 +55,27 @@ export function estraiOpzioneFeedback(argv) {
 }
 
 /**
+ * Cosa manca alla pratica perché la fusione salti L5, detto prima del lavoro. PURA.
+ * Guarda i soli campi in chiaro: il mittente (cifrato) e lo stato fine li rilegge il server.
+ */
+export function avvisoDaCampi(fields) {
+  const f = fields || {};
+  const mancano = [];
+  if (f.senderProof?.stringValue !== 'admin') mancano.push('la prova del mittente (senderProof admin)');
+  if (!f.localOnly?.mapValue) mancano.push('il segno «solo in locale»');
+  if (f.statusPublic?.stringValue === 'closed') mancano.push('una pratica aperta (è chiusa)');
+  if (!mancano.length) return '';
+  return `Attenzione: a questa pratica manca ${mancano.join(', ')}. Alla fusione L5 non si salta e, se i controlli fermano, si aspetta il tuo sì.`;
+}
+
+export async function avvisoPratica(id, { bearer, base, fetchImpl = fetch } = {}) {
+  const campi = ['senderProof', 'localOnly', 'statusPublic'].map((c) => `mask.fieldPaths=${c}`).join('&');
+  const res = await fetchImpl(`${base}/feedback/${encodeURIComponent(id)}?${campi}`, { headers: { Authorization: `Bearer ${bearer}` } });
+  if (!res.ok) return `Non ho potuto leggere la pratica (${res.status}): se manca qualcosa lo dirà il server alla fusione.`;
+  return avvisoDaCampi((await res.json()).fields);
+}
+
+/**
  * Il riferimento risolto all'id Firestore, in rete. Un numero con più documenti
  * (i vecchi #N.k) prende quello col subSeq chiesto, 0 se non detto.
  * @returns {Promise<{ ok: true, id: string, seq: number|null } | { ok: false, motivo: string }>}
