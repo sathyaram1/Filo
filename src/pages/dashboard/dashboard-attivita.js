@@ -519,10 +519,12 @@
     btn.className = 'dash-action-btn';
     btn.textContent = 'Apri comunque';
     btn.title = `Apri ${o.host || o.url} anche se è fra i siti bloccati`;
+    // Un doppio clic apre una scheda sola; chiusa quella, il bottone riapre.
     btn.addEventListener('click', async () => {
       if (btn.disabled) return;
       btn.disabled = true;
       await send({ type: MSG.APRI_COMUNQUE, url: o.url });
+      setTimeout(() => { btn.disabled = false; }, 2000);
     });
     return btn;
   }
