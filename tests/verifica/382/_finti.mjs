@@ -1,9 +1,9 @@
-// #382 giro 3: prove avversariali sul giudice delle ricerche a parole del deck builder.
-// Scryfall e provider finti nel main, come in tests/decks-search-filter.spec.mjs.
+// #382 giro 3: Scryfall e provider finti nel main per le prove del giudice delle ricerche a parole.
+// Non è uno spec: lo importano i giro3-*.spec.mjs di questa cartella.
 
-import { test, expect } from '../../fixtures/electron.mjs';
+import { expect } from '../../fixtures/electron.mjs';
 
-async function mockScryfall(app) {
+export async function mockScryfall(app) {
   await app.evaluate(() => {
     const COMMANDER = {
       id: 'niv-1', name: 'Niv-Mizzet, Parun', mana_cost: '{U}{U}{U}{R}{R}{R}', cmc: 6,
@@ -30,7 +30,7 @@ async function mockScryfall(app) {
   });
 }
 
-async function mockProvider(app) {
+export async function mockProvider(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
@@ -71,7 +71,7 @@ async function mockProvider(app) {
   });
 }
 
-async function manyCards(app, { pages, relevant = [] }) {
+export async function manyCards(app, { pages, relevant = [] }) {
   await app.evaluate((_electron, { pages, relevant }) => {
     const card = (id, name, cmc, oracle) => ({
       id, name, mana_cost: `{${cmc}}`, cmc, type_line: 'Artifact', oracle_text: oracle,
@@ -91,7 +91,7 @@ async function manyCards(app, { pages, relevant = [] }) {
   }, { pages, relevant });
 }
 
-async function deckWithCommander(page) {
+export async function deckWithCommander(page) {
   await page.click('#newDeck');
   await expect(page.locator('#screenBuilder')).toBeVisible();
   const deckId = decodeURIComponent((await page.evaluate(() => location.hash)).replace('#/deck/', ''));
@@ -100,86 +100,13 @@ async function deckWithCommander(page) {
   return deckId;
 }
 
-async function send(page, text) {
+export async function send(page, text, timeout = 30_000) {
   const bots = page.locator('.dk-msg-bot');
   const before = await bots.count();
   await page.fill('#chatInput', text);
   await page.press('#chatInput', 'Enter');
   await expect(bots).toHaveCount(before + 1);
   const bubble = bots.nth(before);
-  await expect(bubble.locator('.dk-msg-pending')).toHaveCount(0, { timeout: 30_000 });
+  await expect(bubble.locator('.dk-msg-pending')).toHaveCount(0, { timeout });
   return bubble;
 }
-
-test('un fornitore che risponde «troppe richieste» ai controlli in parallelo non lascia carte non controllate', async ({ app, openTab }) => {
-  test.setTimeout(120_000);
-  await mockScryfall(app);
-  await mockProvider(app);
-  // Tre pagine di Scryfall, 525 carte, 11 gruppi al giudice; la carta giusta è in ogni gruppo.
-  const relevant = Array.from({ length: 11 }, (_, i) => i * 50 + 7);
-  await manyCards(app, { pages: [175, 175, 175], relevant });
-  await app.evaluate(() => { globalThis.__maxConcurrent = 4; globalThis.__judgeMs = 300; });
-  const page = await openTab('filo://decks/decks.html');
-  await page.waitForLoadState('domcontentloaded');
-  await deckWithCommander(page);
-
-  const bubble = await send(page, 'carte che danno haste');
-  const rejected = await app.evaluate(() => globalThis.__rejected);
-  console.log('rifiuti 429:', rejected, 'chiamate servite:', await app.evaluate(() => globalThis.__filterCalls.length));
-  await page.screenshot({ path: 'tests/.shots/verifica-382-giro3-429.png' });
-  // SUCCESSO per l'utente: tutte le carte controllate, solo le 11 giuste in lista, nessuna segnata «non controllata».
-  await expect(bubble).not.toContainText('non le ho potute controllare');
-  await expect(bubble.locator('.dk-row-unchecked')).toHaveCount(0);
-  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(11);
-});
-
-test('esplora: bolla in attesa e righe non controllate, tema chiaro e scuro', async ({ app, openTab }) => {
-  test.setTimeout(120_000);
-  await mockScryfall(app);
-  await mockProvider(app);
-  await manyCards(app, { pages: [175, 60], relevant: [7, 180] });
-  await app.evaluate(() => { globalThis.__judgeGate = new Promise((r) => { globalThis.__openGate = r; }); });
-  const page = await openTab('filo://decks/decks.html');
-  await page.waitForLoadState('domcontentloaded');
-  await deckWithCommander(page);
-  await page.fill('#chatInput', 'carte che danno haste');
-  await page.press('#chatInput', 'Enter');
-  const bubble = page.locator('.dk-msg-bot').last();
-  await expect(bubble.locator('.dk-progress')).toContainText('Controllo una per una le 235 carte trovate');
-  for (const tema of ['light', 'dark']) {
-    await page.emulateMedia({ colorScheme: tema });
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: `tests/.shots/verifica-382-giro3-attesa-${tema}.png` });
-  }
-  // Il secondo gruppo risponde in un formato illeggibile: le sue carte restano segnate.
-  await app.evaluate(() => {
-    const good = globalThis.__judge;
-    globalThis.__judge = (prompt) => (/Giusta 180/.test(prompt) || /Carta 200 /.test(prompt) ? 'boh' : good(prompt));
-    globalThis.__openGate();
-  });
-  await expect(bubble.locator('.dk-msg-pending')).toHaveCount(0, { timeout: 30_000 });
-  for (const tema of ['light', 'dark']) {
-    await page.emulateMedia({ colorScheme: tema });
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: `tests/.shots/verifica-382-giro3-dopo-${tema}.png` });
-  }
-  console.log('testo bolla:', await bubble.innerText());
-});
-
-test('esplora: markup nella richiesta finisce come testo nella risposta', async ({ app, openTab }) => {
-  test.setTimeout(60_000);
-  await mockScryfall(app);
-  await mockProvider(app);
-  await manyCards(app, { pages: [3] });
-  await app.evaluate(() => {
-    globalThis.__chat = () => JSON.stringify({ query: 'o:haste' });
-    globalThis.__judge = () => JSON.stringify({ keep: [] });
-  });
-  const page = await openTab('filo://decks/decks.html');
-  await page.waitForLoadState('domcontentloaded');
-  await deckWithCommander(page);
-  const bubble = await send(page, '<img src=x id=inj onerror="window.__pwn=1"> carte che danno haste');
-  await expect(bubble).toContainText('<img src=x');
-  await expect(page.locator('#inj')).toHaveCount(0);
-  expect(await page.evaluate(() => window.__pwn || 0)).toBe(0);
-});
