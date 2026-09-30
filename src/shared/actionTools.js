@@ -364,6 +364,21 @@
       properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (menu Account), sidebar (apri la barra laterale).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account', 'sidebar'] }) },
       required: ['comando'],
     },
+    SPOSTA_ICONA: {
+      description: 'Sposta un\'icona fra la barra laterale (bordo sinistro), la riga di icone del menu del tasto destro e «Altro…» dello stesso menu: la stessa cosa che l\'utente fa trascinandola, e resta anche dopo un riavvio. Per "metti Screenshot nella barra laterale", "togli Chiudi scheda dalla barra", "rimetti Indietro nel tasto destro". Togliere dalla barra senza dire dove = "altro". Esegue subito.',
+      properties: () => {
+        const D = global.SN_DISPOSIZIONE_ICONE;
+        const ids = D ? Object.keys(D.ICONE) : [];
+        const elenco = ids.map((id) => `${id} (${D.nome(id)})`).join(', ');
+        const icona = ids.length ? { enum: ids } : {};
+        return {
+          icona: S(`L'icona, per id${elenco ? `: ${elenco}` : ''}.`, icona),
+          dove: S('"barra" = la barra laterale; "menu" = la riga di icone in cima al menu del tasto destro (al massimo 6: chi trabocca scende in «Altro…»); "altro" = dentro «Altro…» del tasto destro.', { enum: ['barra', 'menu', 'altro'] }),
+          prima_di: S('Facoltativo: l\'id dell\'icona davanti alla quale metterla; senza, va in fondo.', icona),
+        };
+      },
+      required: ['icona', 'dove'],
+    },
     // Disponibile solo durante l'intervista di benvenuto (#524): la aggiunge
     // `definitions({ onboarding: true })`.
     ONBOARDING: {

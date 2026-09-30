@@ -133,3 +133,48 @@ test('«Traduci» nella barra: a pagina tradotta si chiama «Mostra originale»,
   await pannelloFermo(barra);
   await expect(icona).toHaveAttribute('aria-label', 'Traduci', { timeout: 5000 });
 });
+
+test('tasto destro su Indietro e Avanti: le pagine della scheda dalla più vicina, e la scelta ci porta', async ({ app, openTab, testServer }) => {
+  const a = testServer.html('<!doctype html><title>Pagina Alfa</title><body><h1>A</h1></body>');
+  const b = testServer.html('<!doctype html><title>Pagina Beta</title><body><h1>B</h1></body>');
+  const c = testServer.html('<!doctype html><title>Pagina Gamma</title><body><h1>C</h1></body>');
+  const page = await openTab(a);
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
+  for (const u of [b, c]) {
+    await page.evaluate((x) => { location.href = x; }, u);
+    await page.waitForURL(u);
+  }
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+
+  await barra.locator('#nav .ico[data-id="back"]').click({ button: 'right' });
+  let menu = await menuAperto(app);
+  expect(menu, 'il menu di Indietro non si è aperto').toBeTruthy();
+  expect(await vociDelMenu(menu)).toEqual(['Pagina Beta', 'Pagina Alfa', 'Rimetti nel menu del tasto destro']);
+  await scegliNelMenu(menu, 'Pagina Alfa');
+  await page.waitForURL(a);
+
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await barra.locator('#nav .ico[data-id="forward"]').click({ button: 'right' });
+  menu = await menuAperto(app);
+  expect(await vociDelMenu(menu)).toEqual(['Pagina Beta', 'Pagina Gamma', 'Rimetti nel menu del tasto destro']);
+  await scegliNelMenu(menu, 'Pagina Gamma');
+  await page.waitForURL(c);
+});
+
+test('tasto destro su Indietro con una cronologia lunga: le prime quindici, e quante altre ce ne sono', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO);
+  for (let i = 1; i <= 17; i++) await page.evaluate((n) => { location.hash = `#p${n}`; }, i);
+  await expect.poll(() => page.evaluate(() => history.length)).toBeGreaterThanOrEqual(18);
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await barra.locator('#nav .ico[data-id="back"]').click({ button: 'right' });
+  const menu = await menuAperto(app);
+  expect(menu, 'il menu di Indietro non si è aperto').toBeTruthy();
+  const voci = await vociDelMenu(menu);
+  expect(voci.filter((v) => v.includes('#p') || v.includes('/')).length).toBeGreaterThanOrEqual(15);
+  expect(voci).toContain('…e altre 2 pagine più indietro');
+});

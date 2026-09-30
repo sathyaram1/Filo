@@ -1952,6 +1952,24 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
           },
         };
       }
+      case 'SPOSTA_ICONA': {
+        // #871 — la disposizione delle icone (barra laterale, riga e «Altro…» del tasto destro) a parole: stessa
+        // porta del trascinamento, così menu aperti e barre di tutte le finestre la ricevono uguale.
+        const D = globalThis.SN_DISPOSIZIONE_ICONE;
+        const id = String(action.icona ?? action.id ?? '').trim();
+        const dove = String(action.dove ?? '').trim().toLowerCase();
+        const prima = String(action.prima_di ?? '').trim();
+        if (!D || !D.noto(id) || !Object.prototype.hasOwnProperty.call(D.DOVE, dove)) {
+          return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
+        }
+        const incognito = !!winOf(sender)?._filoIncognito;
+        const layout = await require('./layoutIcone').posa(
+          { id, target: D.DOVE[dove], beforeId: D.noto(prima) && prima !== id ? prima : null }, { incognito });
+        if (!layout) return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
+        // La riga del tasto destro ha sei posti: chi ci entra per ultimo può spingerne fuori un'altra.
+        const finita = ['bar', 'primary', 'secondary'].find((z) => layout[z].includes(id));
+        return { executed: true, kept: false, output: { icona: id, dove, finita, layout } };
+      }
       case 'COMANDO_FINESTRA': {
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
         // intero, riduci a icona, menu Impostazioni/App/Account, home): prima poteva

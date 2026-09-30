@@ -58,6 +58,17 @@
   const uguali = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i]);
   const noto = (id) => typeof id === 'string' && Object.prototype.hasOwnProperty.call(ICONE, id);
 
+  // Le zone come le dice chi parla con Filo (SPOSTA_ICONA): la barra, la riga del tasto destro, «Altro…».
+  const DOVE = Object.freeze({ barra: 'bar', menu: 'primary', altro: 'secondary' });
+
+  // Il nome che l'utente legge nel menu, per la chat.
+  function nome(id) {
+    if (!noto(id)) return String(id || '');
+    const I = global.SN_I18N;
+    const t = I && typeof I.t === 'function' ? I.t(ICONE[id].etichetta) : '';
+    return t && t !== ICONE[id].etichetta ? t : id;
+  }
+
   function valida(v) {
     return !!(v && typeof v === 'object' && Array.isArray(v.primary) && Array.isArray(v.secondary));
   }
@@ -121,7 +132,7 @@
   }
 
   global.SN_DISPOSIZIONE_ICONE = {
-    ZONE, GLOBALI, ICONE, DEFAULT, MAX_PRIMARY, RITIRATE, AGGIUNTE,
-    noto, valida, migra, applicaPosa,
+    ZONE, GLOBALI, ICONE, DEFAULT, MAX_PRIMARY, RITIRATE, AGGIUNTE, DOVE,
+    noto, nome, valida, migra, applicaPosa,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

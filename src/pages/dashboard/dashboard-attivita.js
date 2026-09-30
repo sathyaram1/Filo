@@ -265,6 +265,7 @@
     STILE_PAGINA: () => 'cambiato l\'aspetto della pagina',
     RIPRISTINA_STILE_PAGINA: () => 'rimesso la pagina com\'era',
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
+    SPOSTA_ICONA: () => 'spostato un\'icona',
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
   };
   // `hasReasoning`: il modello ha davvero ragionato. Senza, un blocco che
@@ -414,6 +415,13 @@
       const cmd = String(a.comando || a.command || a.cmd || '').toLowerCase();
       return { icon: '🪟', text: labels[cmd] || 'Comando della finestra' };
     },
+    SPOSTA_ICONA: (a) => {
+      const D = window.SN_DISPOSIZIONE_ICONE;
+      const id = String(a.icona || a.id || '');
+      const nome = D && D.noto && D.noto(id) ? D.nome(id) : id;
+      const dove = { barra: 'nella barra laterale', menu: 'nel tasto destro', altro: 'in «Altro…»' }[String(a.dove || '').toLowerCase()] || '';
+      return { icon: '📌', text: `Icona spostata · ${nome}${dove ? ` ${dove}` : ''}` };
+    },
   };
   // Che cosa NON è andato a buon fine, detto come lo direbbe l'utente: la riga
   // del diario resta (è successo qualcosa), ma non promette il contrario.
@@ -430,7 +438,7 @@
     STILE_PAGINA: 'Aspetto della pagina non cambiato', RIPRISTINA_STILE_PAGINA: 'Aspetto della pagina non ripristinato',
     PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
     RIMUOVI_PROXY_TUTTE: 'Proxy non tolti', REGOLA_PROXY_DOMINIO: 'Regola non salvata',
-    RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito',
+    RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito', SPOSTA_ICONA: 'Icona non spostata',
     EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
   };
   function activityRowFor(a) {

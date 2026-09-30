@@ -53,6 +53,7 @@
     REGOLA_PROXY_DOMINIO: 'globePinned',
     RIMUOVI_REGOLA_PROXY: 'globeOff',
     COMANDO_FINESTRA: 'windowFrame',
+    SPOSTA_ICONA: 'pin',
     ZOOM_PAGINA: 'zoomPagina',
     STILE_PAGINA: 'brush',
     RIPRISTINA_STILE_PAGINA: 'undo',

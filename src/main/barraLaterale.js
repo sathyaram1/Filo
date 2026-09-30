@@ -24,6 +24,8 @@ const SONDA_LONTANO_MS = 150;
 const QUIETE_MS = 600;
 // Dopo un trascinamento dal menu la barra resta un attimo, per vedere dove è finita l'icona.
 const DOPO_POSA_MS = 900;
+// Le pagine elencate dal tasto destro su Indietro e Avanti; le altre si contano in fondo, non spariscono.
+const PAGINE_NEL_MENU = 15;
 
 const FISSE = new Set(['history', 'apps', 'redteam', 'settings', 'account']);
 const MENU_DELLA_SHELL = new Set(['apps', 'settings', 'account']);
