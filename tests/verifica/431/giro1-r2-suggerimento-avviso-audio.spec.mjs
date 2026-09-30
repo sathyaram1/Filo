@@ -8,6 +8,18 @@ test('sull\'altoparlante il suggerimento di Filo dice Silenzia, sul muto Riattiv
   });
   await openTab(testServer.html('<title>Musica di sottofondo</title>'));
   await openTab(testServer.html('<title>Podcast</title>'));
+  // Giro 2: la barra si ridimensiona mentre arrivano i titoli; si passa col puntatore solo a barra ferma.
+  await expect(shell.locator('.tab .title')).toHaveText(['Home', 'Musica di sottofondo', 'Podcast'], { timeout: 10_000 });
+  await expect(shell.locator('.tab .spinner')).toHaveCount(0, { timeout: 10_000 });
+  const ferma = async (loc) => {
+    let prima = null;
+    await expect.poll(async () => {
+      const ora = JSON.stringify(await loc.boundingBox());
+      const uguale = ora === prima;
+      prima = ora;
+      return uguale;
+    }, { timeout: 5000, intervals: [200] }).toBe(true);
+  };
   const [suona, muta] = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const web = w._filoTabs.tabs.filter((x) => /^https?:/.test(x.url || ''));
