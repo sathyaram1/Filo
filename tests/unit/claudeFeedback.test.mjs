@@ -30,7 +30,6 @@ const FB = globalThis.SN_FEEDBACK;
 
 // La credenziale vera va in rete col token dell'owner: nei test non c'è mai,
 // salvo dove un test la mette apposta.
-const credenzialeVera = SCRIPT.credenziale.ottieni;
 SCRIPT.credenziale.ottieni = async () => ({ idToken: '', motivo: 'nessuna credenziale (test)' });
 
 /** Sostituisce submit per la durata di `fn`, raccogliendo cosa gli è arrivato. */
@@ -102,7 +101,6 @@ test('#595 prova a vuoto ed errore d’uso non chiedono la credenziale', async (
   } finally {
     SCRIPT.credenziale.ottieni = async () => ({ idToken: '', motivo: 'nessuna credenziale (test)' });
   }
-  assert.equal(typeof credenzialeVera, 'function');
 });
 
 test('il feedback parte firmato come sessione locale, non come utente anonimo', async () => {
