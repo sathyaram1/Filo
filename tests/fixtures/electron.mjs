@@ -49,6 +49,29 @@ export async function chiudiApp(app, { tetto = 5000 } = {}) {
   if (pid) { try { process.kill(pid, 'SIGKILL'); } catch (_) {} }
 }
 
+// La Page della scheda davanti nella finestra della shell: la si riconosce da un segno messo dal main.
+async function paginaDavanti(app, shell) {
+  const segno = `s${Date.now()}${Math.random().toString(36).slice(2)}`;
+  let messo = false;
+  try {
+    const bw = await app.browserWindow(shell);
+    messo = await bw.evaluate(async (w, s) => {
+      const t = w._filoTabs && w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+      if (!t || !/^filo:\/\/newtab\//.test(t.view.webContents.getURL())) return false;
+      await t.view.webContents.executeJavaScript(`window.__filoSchedaDavanti = ${JSON.stringify(s)}`);
+      return true;
+    }, segno);
+  } catch (_) { return null; }
+  if (!messo) return null;
+  for (const w of app.windows()) {
+    try {
+      if (new URL(w.url()).hostname !== 'newtab') continue;
+      if (await w.evaluate(() => window.__filoSchedaDavanti) === segno) return w;
+    } catch (_) { /* una pagina che sta cambiando: al giro dopo */ }
+  }
+  return null;
+}
+
 export const test = base.extend({
   app: async ({}, use) => {
     // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
