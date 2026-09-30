@@ -10,11 +10,12 @@
 //   - la chiave condivisa, quando presente, raggiunge DAVVERO il motore per tutti
 //     gli account (asserisce che lo stadio GSB si accende), senza mai trapelare
 //     il valore al renderer admin (solo un booleano "configurata").
-//   - l'interstitial "pericoloso" copre DAVVERO la pagina e si toglie solo dopo
-//     aver scritto "confermo" → Procedi (asserisce che l'overlay sparisce, cioè
-//     che il flusso di bypass funziona, non che un testo sia cambiato).
+//   - l'avviso "pericoloso" copre DAVVERO la pagina, sta sopra la scheda dove il
+//     sito non arriva (#592.6), e si toglie solo dopo aver scritto "confermo" →
+//     Procedi (asserisce il bypass registrato, non che un testo sia cambiato).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { confermaSopraPagina, confirmState, mouseClickConfirm } from './helpers/confirm.mjs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -126,41 +127,66 @@ test('chiave GSB condivisa: quando è impostata raggiunge il motore per TUTTI (s
   expect(active.on).toBe(true);
 });
 
-test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo" → Procedi', async ({ app, openTab, testServer }) => {
-  // Pagina esterna reale (127.0.0.1) con i content script montati. Di per sé è
-  // "safe"; iniettiamo il verdetto pericoloso come fa il main dopo l'analisi.
-  const page = await testServer.openReady(openTab, '<title>SB_VICTIM</title><p>contenuto pagina</p>');
-
-  // Broadcast del verdetto al tab esterno (senza url → il content lo applica
-  // alla pagina corrente). Replica esattamente ciò che fa _sbBroadcast.
-  await app.evaluate(({ BrowserWindow }) => {
+// L'avviso è il popup di Filo sopra la scheda, fuori dal documento del sito (#592.6): la pagina di cui parla
+// non lo vede, non lo toglie e non risponde al posto dell'utente.
+function verdetto(app, level, message) {
+  return app.evaluate(({ BrowserWindow }, { level, message }) => {
     for (const w of BrowserWindow.getAllWindows()) {
       if (!w._filoTabs) continue;
       for (const t of w._filoTabs.tabs) {
         const u = t.view?.webContents?.getURL?.() || '';
         if (!/^https?:/.test(u)) continue;
-        t.view.webContents.send('filo:broadcast', {
-          type: 'safebrowse_update',
-          level: 'pericoloso',
-          message: { title: 'Sito pericoloso', body: 'Questo non è PayPal. Il dominio è paypa1.com, ti sta chiedendo la password.' },
-        });
+        t.view.webContents.send('filo:broadcast', { type: 'safebrowse_update', level, message });
       }
     }
+  }, { level, message });
+}
+
+function scelteRegistrate(app) {
+  return app.evaluate(({ BrowserWindow }) => {
+    const out = { bypass: [], dismissed: [] };
+    for (const w of BrowserWindow.getAllWindows()) {
+      for (const t of (w._filoTabs?.tabs || [])) {
+        if (t.sbBypass) out.bypass.push(...t.sbBypass);
+        if (t.sbDismissed) out.dismissed.push(...t.sbDismissed);
+      }
+    }
+    return out;
   });
+}
 
-  // L'overlay vive in uno Shadow DOM aperto: Playwright lo attraversa.
-  await expect(page.getByText('Sito pericoloso')).toBeVisible({ timeout: 6_000 });
-  await expect(page.getByText(/Questo non è PayPal/)).toBeVisible();
+const domandeInCoda = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.conferme.coda.length);
 
-  // Il pulsante "Procedi comunque" è inerte finché non si scrive "confermo".
-  const proceed = page.getByRole('button', { name: 'Procedi comunque' });
-  await expect(proceed).toBeVisible();
+const PAYPAL = { title: 'Sito pericoloso', body: 'Questo non è PayPal. Il dominio è paypa1.com, ti sta chiedendo la password.' };
 
-  await page.getByPlaceholder('confermo').fill('confermo');
-  await proceed.click();
+test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo" → Procedi', async ({ app, openTab, testServer }) => {
+  // Pagina esterna reale (127.0.0.1) con i content script montati. Di per sé è
+  // "safe"; iniettiamo il verdetto pericoloso come fa il main dopo l'analisi.
+  const page = await testServer.openReady(openTab, '<title>SB_VICTIM</title><p>contenuto pagina</p>');
+  await verdetto(app, 'pericoloso', PAYPAL);
 
-  // Dopo la conferma l'overlay sparisce (bypass registrato per il dominio).
-  await expect(page.getByText('Sito pericoloso')).toHaveCount(0, { timeout: 6_000 });
+  const vista = await confermaSopraPagina(app);
+  const s = await confirmState(vista);
+  expect(s.title).toBe('Sito pericoloso');
+  expect(s.text).toMatch(/Questo non è PayPal/);
+  expect(s.text).toMatch(/Scrivi “confermo”/);
+  expect(s.text).not.toMatch(/non è reversibile/);
+  expect(s).toMatchObject({ copre: true, hasInput: true, okLabel: 'Procedi comunque', cancelLabel: 'Torna indietro' });
+  await expect(page.locator('#filo-safebrowse-host')).toHaveCount(0);
+
+  // Esc e un clic fuori dal riquadro non scelgono niente; "Procedi comunque" è inerte finché non si scrive "confermo".
+  await vista.waitForTimeout(600);
+  await vista.keyboard.press('Escape');
+  await vista.mouse.click(5, 5);
+  expect(await confirmState(vista)).toMatchObject({ okDisabled: true });
+  await vista.keyboard.type('confermo');
+  expect(await confirmState(vista)).toMatchObject({ okDisabled: false });
+  await mouseClickConfirm(vista, 'danger');
+
+  // Dopo la conferma l'avviso sparisce e il bypass è registrato per il dominio.
+  await expect.poll(() => confirmState(vista)).toBeNull();
+  await expect.poll(async () => (await scelteRegistrate(app)).bypass.length).toBe(1);
+  expect(await domandeInCoda(app)).toBe(0);
 });
 
 test('interstitial "pericoloso": "Torna indietro" su scheda NUOVA esce SENZA confermare il sito (#288)', async ({ app, openTab, testServer }) => {
@@ -168,81 +194,127 @@ test('interstitial "pericoloso": "Torna indietro" su scheda NUOVA esce SENZA con
   // caso del bug. "Torna indietro" deve solo uscire (about:blank), MAI registrare
   // il bypass del dominio come farebbe "Procedi comunque".
   const page = await testServer.openReady(openTab, '<title>SB_BACK</title><p>contenuto pagina</p>');
-
-  // Sanity: la scheda è davvero senza cronologia (altrimenti il ramo del bug non
-  // verrebbe esercitato e il test sarebbe inutile).
   expect(await page.evaluate(() => history.length)).toBe(1);
+  await verdetto(app, 'pericoloso', { title: 'Sito pericoloso', body: 'Questo non è PayPal. Ti sta chiedendo la password.' });
 
-  await app.evaluate(({ BrowserWindow }) => {
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (!w._filoTabs) continue;
-      for (const t of w._filoTabs.tabs) {
-        const u = t.view?.webContents?.getURL?.() || '';
-        if (!/^https?:/.test(u)) continue;
-        t.view.webContents.send('filo:broadcast', {
-          type: 'safebrowse_update',
-          level: 'pericoloso',
-          message: { title: 'Sito pericoloso', body: 'Questo non è PayPal. Ti sta chiedendo la password.' },
-        });
-      }
-    }
-  });
-
-  await expect(page.getByText('Sito pericoloso')).toBeVisible({ timeout: 6_000 });
-
-  // Clic su "Torna indietro": la pagina esce verso about:blank.
-  await page.getByRole('button', { name: 'Torna indietro' }).click();
+  const vista = await confermaSopraPagina(app);
+  await vista.waitForTimeout(600);
+  await mouseClickConfirm(vista, 'cancel');
   await page.waitForFunction(() => location.href === 'about:blank', null, { timeout: 6_000 });
-
-  // COMPORTAMENTO ATTESO: nessun dominio è stato confermato in ALCUN tab. Col
-  // bug, "Torna indietro" inviava T_PROCEED → safebrowseProceed aggiungeva il
-  // registrable a tab.sbBypass (size 1): il sito restava "confermato" per la
-  // scheda. Dopo il fix nessun bypass viene mai registrato.
-  const bypassed = await app.evaluate(({ BrowserWindow }) => {
-    const all = [];
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (!w._filoTabs) continue;
-      for (const t of w._filoTabs.tabs) {
-        if (t.sbBypass && t.sbBypass.size) all.push(...t.sbBypass);
-      }
-    }
-    return all;
-  });
-  expect(bypassed).toEqual([]);
+  expect((await scelteRegistrate(app)).bypass).toEqual([]);
+  await expect.poll(() => domandeInCoda(app)).toBe(0);
 });
 
 test('popup "sospetto": è un popup di conferma e si chiude solo con "Continua" (#176)', async ({ app, openTab, testServer }) => {
   // Pagina esterna reale: di per sé "safe". Iniettiamo il verdetto "sospetto"
   // come fa il main dopo l'analisi (es. il sito casinò del feedback #176).
-  const page = await testServer.openReady(openTab, '<title>SB_SUSPECT</title><p>contenuto pagina</p>');
+  await testServer.openReady(openTab, '<title>SB_SUSPECT</title><p>contenuto pagina</p>');
+  await verdetto(app, 'sospetto', { title: 'Sito potenzialmente sospetto', body: 'Chiede credenziali o dati personali su un dominio non ufficiale.' });
 
-  await app.evaluate(({ BrowserWindow }) => {
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (!w._filoTabs) continue;
-      for (const t of w._filoTabs.tabs) {
-        const u = t.view?.webContents?.getURL?.() || '';
-        if (!/^https?:/.test(u)) continue;
-        t.view.webContents.send('filo:broadcast', {
-          type: 'safebrowse_update',
-          level: 'sospetto',
-          message: { title: 'Sito potenzialmente sospetto', body: 'Chiede credenziali o dati personali su un dominio non ufficiale.' },
-        });
-      }
-    }
-  });
+  const vista = await confermaSopraPagina(app);
+  const s = await confirmState(vista);
+  expect(s).toMatchObject({ title: 'Sito potenzialmente sospetto', copre: true, okLabel: 'Continua', cancelLabel: 'Torna indietro' });
+  expect(s.text).toMatch(/credenziali o dati personali/);
 
-  // L'avviso compare come popup di conferma (non più la striscia "Ho capito"):
-  // titolo + corpo visibili, e i due pulsanti di scelta esplicita.
-  await expect(page.getByText('Sito potenzialmente sospetto')).toBeVisible({ timeout: 6_000 });
-  await expect(page.getByText(/credenziali o dati personali/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Ho capito' })).toHaveCount(0);
-  const proceed = page.getByRole('button', { name: 'Continua' });
-  await expect(proceed).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Torna indietro' })).toBeVisible();
+  // Esc e il clic fuori dal riquadro non lo chiudono: si sceglie.
+  await vista.waitForTimeout(600);
+  await vista.keyboard.press('Escape');
+  await vista.mouse.click(5, 5);
+  expect(await confirmState(vista)).not.toBeNull();
 
   // Solo dopo la conferma esplicita ("Continua") il popup sparisce.
-  await proceed.click();
-  await expect(page.getByText('Sito potenzialmente sospetto')).toHaveCount(0, { timeout: 6_000 });
+  await mouseClickConfirm(vista, 'ok');
+  await expect.poll(() => confirmState(vista)).toBeNull();
+  await expect.poll(async () => (await scelteRegistrate(app)).dismissed.length).toBe(1);
+});
+
+test('la pagina di cui parla l\'avviso non lo trova, non lo copre e non lo conferma da sé', async ({ app, openTab, testServer }) => {
+  // Appena Filo le mette sopra qualcosa, la pagina ostile scrive «confermo», preme i bottoni, lo nasconde
+  // e apre un suo dialogo.
+  const page = await testServer.openReady(openTab, `<title>Accedi a PayPal</title><input type="password" id="pw"><script>
+    window.__trovato = 0;
+    const prova = () => {
+      for (const h of document.querySelectorAll('body > *, html > *')) {
+        if (h.id === 'pw' || h.tagName === 'SCRIPT' || h.tagName === 'DIALOG' || h === document.body || h === document.head) continue;
+        window.__trovato++;
+        h.style.setProperty('display', 'none', 'important');
+        const r = h.shadowRoot;
+        if (!r) continue;
+        const i = r.querySelector('input');
+        if (i) { i.value = 'confermo'; i.dispatchEvent(new Event('input', { bubbles: true })); }
+        for (const b of r.querySelectorAll('button')) b.click();
+      }
+      if (!document.querySelector('dialog')) {
+        const d = document.createElement('dialog');
+        d.textContent = 'Tutto a posto, continua pure';
+        document.body.appendChild(d);
+        try { d.showModal(); } catch (_) {}
+      }
+    };
+    setInterval(prova, 50);
+  </script>`);
+  const prima = await page.evaluate(() => window.__trovato);
+  await verdetto(app, 'pericoloso', PAYPAL);
+  const vista = await confermaSopraPagina(app);
+  await vista.waitForTimeout(1500);
+  expect(await page.evaluate(() => window.__trovato)).toBe(prima);
+  expect(await confirmState(vista)).toMatchObject({ title: 'Sito pericoloso', copre: true });
+  expect(await scelteRegistrate(app)).toEqual({ bypass: [], dismissed: [] });
+  // La vista è in cima alla finestra, grande quanto la scheda: il dialogo della pagina resta sotto.
+  const g = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const tm = w._filoTabs;
+    const figli = w.contentView.children;
+    return { inCima: figli[figli.length - 1] === tm.conferme.vista, vista: tm.conferme.vista.getBounds(), scheda: tm.tabs.find((t) => t.id === tm.activeId).view.getBounds() };
+  });
+  expect(g.inCima).toBe(true);
+  expect(g.vista).toEqual(g.scheda);
+});
+
+test('la password che si stava battendo non finisce nel sito quando compare l\'avviso', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, '<title>Accedi</title><input type="password" id="pw">');
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w.show(); w.focus();
+    const tm = w._filoTabs;
+    tm.tabs.find((x) => x.id === tm.activeId).view.webContents.focus();
+  });
+  await page.locator('#pw').click();
+  await page.keyboard.type('segr');
+  await verdetto(app, 'pericoloso', PAYPAL);
+  const vista = await confermaSopraPagina(app);
+  // Chi batteva il resto della password lo batte nel riquadro dell'avviso, non nella pagina.
+  await vista.keyboard.type('eto');
+  await expect(page.locator('#pw')).toHaveValue('segr');
+  expect(await confirmState(vista)).toMatchObject({ okDisabled: true });
+});
+
+test('«Torna indietro» su una pagina che trattiene l\'indietro nel suo documento: l\'avviso torna', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, '<title>Trappola</title><p>contenuto</p>');
+  await page.evaluate(() => { history.pushState({}, '', '#a'); history.pushState({}, '', '#b'); });
+  await verdetto(app, 'pericoloso', PAYPAL);
+  let vista = await confermaSopraPagina(app);
+  await vista.waitForTimeout(600);
+  await mouseClickConfirm(vista, 'cancel');
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe('#a');
+  // Stesso documento, stessa pagina pericolosa: l'avviso ricompare, e niente è stato confermato.
+  vista = await confermaSopraPagina(app);
+  expect(await confirmState(vista)).toMatchObject({ title: 'Sito pericoloso', copre: true });
+  expect((await scelteRegistrate(app)).bypass).toEqual([]);
+});
+
+test('il verdetto cambia mentre l\'avviso è a schermo: «sospetto» lascia il posto a «pericoloso», e «sicuro» lo ritira', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, '<title>SB_CAMBIA</title><p>contenuto</p>');
+  await verdetto(app, 'sospetto', { title: 'Sito potenzialmente sospetto', body: 'Primo indizio.' });
+  const vista = await confermaSopraPagina(app);
+  expect((await confirmState(vista)).title).toBe('Sito potenzialmente sospetto');
+  await verdetto(app, 'pericoloso', PAYPAL);
+  await expect.poll(async () => (await confirmState(vista))?.title).toBe('Sito pericoloso');
+  expect(await domandeInCoda(app)).toBe(1);
+  await verdetto(app, 'safe', null);
+  await expect.poll(() => confirmState(vista)).toBeNull();
+  await expect.poll(() => domandeInCoda(app)).toBe(0);
+  expect(await scelteRegistrate(app)).toEqual({ bypass: [], dismissed: [] });
 });
 
 test('pagina pubblicata da un utente: chiudere l\'avviso su un modulo non silenzia gli altri moduli nella scheda', async ({ app, openTab, testServer }) => {

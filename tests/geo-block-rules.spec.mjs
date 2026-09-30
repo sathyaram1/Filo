@@ -4,9 +4,9 @@
 //
 //   (a) retry silenzioso con toast: sito non flaggato + nessun cookie di login
 //       → la tab viene riaperta proxata DA SOLA e la shell mostra "Aperto da …";
-//   (b) proposta inline con login attivo: cookie di sessione presenti → MAI retry
-//       silenzioso, compare la striscia che propone l'apertura da un altro paese;
-//       accettando, la tab viene proxata.
+//   (b) proposta con login attivo: cookie di sessione presenti → MAI retry
+//       silenzioso, il popup di Filo sopra la scheda propone l'apertura da un
+//       altro paese; accettando, la tab viene proxata.
 //
 // Più la guardia di sicurezza (c): sito flaggato pericoloso → nessuna azione.
 //
@@ -14,9 +14,10 @@
 // d'ingresso che il rilevamento, già testato in tests/unit/geoBlock.test.mjs,
 // usa internamente): così il test è deterministico e mirato al LIVELLO
 // DECISIONALE, con input reali (proxy SOCKS5 di test, cookie reali nella session,
-// toast reale nella shell, banner reale nel content script).
+// toast reale nella shell, popup reale sopra la scheda).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { confermaSopraPagina, confirmState, mouseClickConfirm } from './helpers/confirm.mjs';
 import { createServer as createNetServer, connect as netConnect } from 'node:net';
 
 // Mini SOCKS5 (no-auth) che registra le CONNECT e rimappa ogni hostname su
@@ -136,17 +137,20 @@ test('(b) login attivo → niente retry silenzioso, proposta inline; accettando 
     const before = await webTab(app);
     await fireGeoBlock(app, before.id);
 
-    // Compare la proposta inline (banner del content script, Shadow DOM aperto).
-    const openBtn = page.getByText('Apri da Stati Uniti', { exact: true });
-    await expect(openBtn).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('In questa tab non sarai loggato.', { exact: false })).toBeVisible();
+    // Compare la proposta: il popup di Filo sopra la scheda, dove la pagina non arriva (#592.6).
+    const vista = await confermaSopraPagina(app, { timeout: 10_000 });
+    const s = await confirmState(vista);
+    expect(s).toMatchObject({ okLabel: 'Apri da Stati Uniti', cancelLabel: 'No' });
+    expect(s.text).toContain('In questa tab non sarai loggato.');
+    await expect(page.locator('#filo-geoproposal-host')).toHaveCount(0);
 
     // Invariante forte (b): a sessione attiva NON si riprova mai in silenzio.
     expect((await webTab(app)).proxy).toBeNull();
     expect(socks.connections.length).toBe(0);
 
     // Accettando la proposta, la tab viene instradata dall'altro paese.
-    await openBtn.click();
+    await vista.waitForTimeout(600);
+    await mouseClickConfirm(vista, 'ok');
     await expect.poll(async () => (await webTab(app)).proxy, { timeout: 30_000 })
       .toEqual({ country: 'us', tier: 'datacenter' });
     await expect.poll(() => socks.connections.length, { timeout: 15_000 }).toBeGreaterThan(0);
@@ -178,7 +182,8 @@ test('(c) sito flaggato pericoloso → nessuna azione (il proxy non aggira la si
     await page.waitForTimeout(1500);
     expect((await webTab(app)).proxy).toBeNull();
     expect(socks.connections.length).toBe(0);
-    // Nessun banner di proposta nel content script.
+    // Nessuna proposta: né in coda sopra la scheda né nella pagina.
+    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.conferme.coda.length)).toBe(0);
     expect(await page.locator('#filo-geoproposal-host').count()).toBe(0);
   } finally {
     await socks.close();
