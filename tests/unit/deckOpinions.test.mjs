@@ -178,7 +178,7 @@ test('applyTagMembership: carte non giudicate e giudizi identici non toccano il 
 // se rispetta il criterio, con cache (carta, criterio) permanente cross-ricerca.
 
 test('search filter: API registrata su globalThis', () => {
-  for (const fn of ['normCriterion', 'parseSearchKeep', 'planSearchFilter', 'updateSearchCache', 'searchFilterNote', 'searchCapNote']) {
+  for (const fn of ['normCriterion', 'parseSearchKeep', 'planSearchFilter', 'updateSearchCache', 'searchFilterNote', 'searchCapNote', 'searchEmptyNote']) {
     assert.equal(typeof O[fn], 'function', `manca ${fn}`);
   }
 });
@@ -273,6 +273,23 @@ test('searchFilterNote: le carte trovate oltre quelle arrivate al giudice si dic
   assert.equal(O.searchFilterNote({ found: 10, kept: 4, unverified: 0, criterion: 'x', total: 10 }), '');
   assert.equal(O.searchCapNote({ seen: 175, total: 175, judged: false }), '');
   assert.match(O.searchCapNote({ seen: 175, total: 900, judged: false }), /^Scryfall ne ha trovate 900 e qui sotto ci sono le prime 175/);
+});
+
+test('searchFilterNote: le pagine perse per un guasto chiedono di riprovare, non un vincolo in più (#382)', () => {
+  const some = O.searchFilterNote({ found: 175, kept: 3, unverified: 0, criterion: 'x', total: 525, broken: true });
+  assert.match(some, /Scryfall ne ha trovate 525 ma ha smesso di rispondere dopo le prime 175, quindi ho controllato solo quelle\. Riprova/);
+  assert.doesNotMatch(some, /vincolo/);
+  const none = O.searchFilterNote({ found: 175, kept: 0, unverified: 0, criterion: 'dà haste', total: 525, broken: true });
+  assert.match(none, /le prime 175 delle 525 carte trovate/);
+  assert.match(none, /smesso di rispondere\. Riprova/);
+  assert.doesNotMatch(none, /vincolo/);
+  const raw = O.searchCapNote({ seen: 175, total: 525, judged: false, broken: true });
+  assert.match(raw, /qui sotto ci sono solo quelle\. Riprova/);
+});
+
+test('searchEmptyNote: una ricerca senza risultati lo dice, come quella che il giudice scarta tutta (#382)', () => {
+  assert.match(O.searchEmptyNote(), /^Nessun risultato su Scryfall per questa ricerca\. Prova a chiederlo con altre parole\.$/);
+  assert.match(O.searchEmptyNote({ identity: true }), /fra le carte nei colori del commander/);
 });
 
 test('planSearchFilter: separa cache-hit da giudicare, preserva ordine, keepFromCache solo i true', () => {

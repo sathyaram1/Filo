@@ -367,14 +367,14 @@ module.exports = function register(on, ctx) {
             if (fr.unverifiedIds.length) retryable = true;
             const note = globalThis.SN_DECK_OPINIONS.searchFilterNote({
               found, kept: fr.keepIds.length, unverified: fr.unverifiedIds.length, criterion: crit, total: sr.total,
-              why: fr.error ? (fr.error.userText || friendlyChatError(fr.error)) : '',
+              broken: !!sr.broken, why: fr.error ? (fr.error.userText || friendlyChatError(fr.error)) : '',
             });
             if (note) reply = [reply, note].filter(Boolean).join('\n');
             // In cache vanno le carte che si mostrano, non le centinaia della rete larga.
             Scry.remember(cardIds.map((id) => cards[id]).filter(Boolean)).catch(() => {});
             cards = Object.fromEntries(cardIds.filter((id) => cards[id]).map((id) => [id, cards[id]]));
-          } else if (found) {
-            const cap = globalThis.SN_DECK_OPINIONS.searchCapNote({ seen: found, total: sr.total, judged: false });
+          } else {
+            const cap = globalThis.SN_DECK_OPINIONS.searchCapNote({ seen: found, total: sr.total, judged: false, broken: !!sr.broken });
             if (cap) reply = [reply, cap].filter(Boolean).join('\n');
           }
         }

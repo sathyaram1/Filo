@@ -42,6 +42,12 @@ async function mockScryfall(app) {
         // `__pages`: risultati su più pagine, come Scryfall oltre le 175 carte.
         const pages = globalThis.__pages || [globalThis.__searchCards || [CRASHER, BOLT]];
         const n = Number(u.searchParams.get('page') || '1');
+        // `__failPages`: { pagina → quante volte ancora risponde 503 } (Infinity = finché la prova non cambia idea).
+        const fails = globalThis.__failPages && globalThis.__failPages[n];
+        if (fails > 0) {
+          globalThis.__failPages[n] = fails - 1;
+          return { ok: false, status: 503, json: async () => ({}) };
+        }
         body = { data: pages[n - 1] || [], has_more: n < pages.length, total_cards: pages.reduce((t, p) => t + p.length, 0) };
       }
       else if (BY_ID[u.pathname.replace('/cards/', '')]) body = BY_ID[u.pathname.replace('/cards/', '')];
@@ -381,6 +387,64 @@ test('#382: oltre il tetto di pagine la chat dice quante erano, e il giudice lav
   expect(pagesAsked).toEqual(['1', '2', '3', '4', '5', '6']);
   expect(await app.evaluate(() => globalThis.__filterCalls.length)).toBe(21);
   expect(await app.evaluate(() => globalThis.__maxInFlight)).toBeLessThanOrEqual(8);
+});
+
+test('#382: una pagina di Scryfall che non risponde una volta si riprova, e le carte giuste delle pagine dopo arrivano', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await manyCards(app, { pages: [175, 175, 175], relevant: [7, 207, 407] });
+  await app.evaluate(() => { globalThis.__failPages = { 2: 1 }; });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'carte che danno haste');
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(3);
+  await expect(bubble.locator('.dk-cardlist')).toContainText('Giusta 407');
+  await expect(bubble).not.toContainText('Scryfall ne ha trovate');
+  await expect(bubble.locator('[data-retry]')).toHaveCount(0);
+});
+
+test('#382: se una pagina dopo la prima non risponde nemmeno riprovata, la chat lo dice e Riprova porta le altre carte', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await manyCards(app, { pages: [175, 175, 175], relevant: [7, 207, 407] });
+  await app.evaluate(() => { globalThis.__failPages = { 2: Infinity }; });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'carte che danno haste');
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(1);
+  await expect(bubble).toContainText('Scryfall ne ha trovate 525 ma ha smesso di rispondere dopo le prime 175');
+  await expect(bubble).not.toContainText('vincolo');
+
+  await app.evaluate(() => { globalThis.__failPages = {}; });
+  await bubble.locator('[data-retry]').click();
+  const again = page.locator('.dk-msg-bot').last();
+  await expect(again.locator('.dk-msg-pending')).toHaveCount(0, { timeout: 60_000 });
+  await expect(again.locator('.dk-cardlist .dk-row')).toHaveCount(3);
+  await expect(again).not.toContainText('smesso di rispondere');
+});
+
+test('#382: una ricerca a parole che Scryfall non trova lo dice, anche dopo la frase del modello', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await app.evaluate(() => {
+    globalThis.__pages = [[]];
+    globalThis.__chat = () => JSON.stringify({ reply: 'Cerco carte che danno haste.', query: 'o:"gives haste"', filter: 'fa guadagnare haste ad altre creature' });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'carte che danno haste');
+  await expect(bubble).toContainText('Cerco carte che danno haste.');
+  await expect(bubble).toContainText('Nessun risultato su Scryfall per questa ricerca, fra le carte nei colori del commander.');
+  expect(await app.evaluate(() => globalThis.__filterCalls.length)).toBe(0);
 });
 
 test('#382: una ricerca tutta in sintassi con più di una pagina lo dice, senza giudice', async ({ app, openTab }) => {
