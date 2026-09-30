@@ -104,7 +104,7 @@
     // non in attesa dei giudici).
     const judgeable = !CLOSED_STATUSES.includes(status) && status !== 'clarify';
 
-    // Mittente FIDATO (automazione dell'owner: owner:/routine:/agent:) SENZA
+    // Mittente FIDATO (isTrustedClient: prefisso riservato e prova) SENZA
     // verdetti = i giudici non sono (ancora) girati su un feedback del proprietario
     // — spesso perché l'identità era stata flaggata per errore. NON è un blocco:
     // è "da ri-giudicare" (bianco). Va prima dei controlli di blocco identità.
