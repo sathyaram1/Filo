@@ -457,6 +457,24 @@
     if (toIndex >= 0) api.tabs.move(d.id, toIndex);
   }
 
+  // Un clic arriva solo se pressione e rilascio cadono sullo stesso nodo: se un aggiornamento ricrea la
+  // striscia in mezzo, la X e il tasto centrale non chiudono niente. Col tasto giù si ridisegna al rilascio.
+  let premutoSullaStriscia = false;
+  let ridisegnoRimandato = false;
+
+  function rilascioStriscia() {
+    if (!premutoSullaStriscia) return;
+    premutoSullaStriscia = false;
+    // Dopo il click, che il browser consegna subito dopo il mouseup.
+    setTimeout(() => {
+      if (!ridisegnoRimandato || premutoSullaStriscia || drag) return;
+      render();
+    }, 0);
+  }
+  tabsEl.addEventListener('mousedown', () => { premutoSullaStriscia = true; }, true);
+  window.addEventListener('mouseup', rilascioStriscia, true);
+  window.addEventListener('blur', rilascioStriscia);
+
   function startTabDrag(e, t, el) {
     if (e.button !== 0) return;
     // Non iniziare un drag dai controlli interni (chiudi, indicatori audio…).
