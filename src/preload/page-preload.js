@@ -202,6 +202,21 @@ let streamCounter = 0;
 
 const filoMessage = (msg) => ipcRenderer.invoke('filo:message', msg);
 
+// Le conferme di Filo su un sito le disegna il main sopra la scheda, fuori dal documento
+// che il sito può ridisegnare (#592.6): SN_CONFIRM_UI manda qui la domanda. Ai tasti che
+// l'utente batte sul popup mentre scriveva risponde il suo campo, in questo frame.
+const tastiConferme = new Map();
+let seqConferme = 0;
+ipcRenderer.on('filo:conferma-tasto', (_event, d) => {
+  const suTasto = d && tastiConferme.get(d.id);
+  if (suTasto) suTasto(d.tasto);
+});
+globalThis.SN_CONFERMA_FUORI = (richiesta, suTasto) => {
+  const id = ++seqConferme;
+  tastiConferme.set(id, suTasto);
+  return ipcRenderer.invoke('filo:conferma', { ...richiesta, id }).finally(() => tastiConferme.delete(id));
+};
+
 const broadcastListeners = new Set();
 // #407 — messaggi che devono SVEGLIARE un riquadro incorporato. Dentro un
 // riquadro i content script si montano solo quando l'utente lo tocca; ma
