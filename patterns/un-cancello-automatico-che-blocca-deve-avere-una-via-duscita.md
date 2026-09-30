@@ -52,9 +52,12 @@ chiede, ma **far decidere l'owner su ciò che non viene da lui**:
 - **Un'eccezione lascia traccia** dove l'owner la può guardare (chi, cosa,
   quando, quali blocchi scavalcati), non solo nei log del server.
 - **Dove:** decisione pura + I/O in `filo-security/functions/src/routine/
-  mergeApprovals.js`; avviso condiviso in `src/shared/mergeApprovals.js` +
+  mergeApprovals.js`; lavoro locale in `functions/src/routine/ownerMerge.js` e
+  `functions/src/localWork.js`, lato sessione `scripts/lib/owner-merge.mjs`;
+  avviso condiviso in `src/shared/mergeApprovals.js` +
   `src/styles/mergeApprovals.css`; campanello in
   `src/main/services/mergeApprovalSignal.js`. Test:
   `functions/test/routine-merge-approvals.test.js`,
+  `functions/test/lavori-locali-908.test.js`, `tests/unit/ownerMerge.test.mjs`,
   `tests/unit/mergeApprovals.test.mjs`,
   `tests/unit/mergeApprovalSignal.test.mjs`, `tests/merge-approvals.spec.mjs`.
