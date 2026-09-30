@@ -363,6 +363,7 @@ module.exports = function register(on, ctx) {
       scheduleViewSync({ delayMs: 1500, force: true });
       // La pagina mostra subito chi ha messo il segno «fondi senza chiedermelo»:
       // glielo dice il main, che è l'unico a saperlo.
+      if (localOnly) return { ok: true, by: localOnly.by, at: localOnly.at };
       return mergePreapproved ? { ok: true, by: mergePreapproved.by } : { ok: true };
     } catch (e) {
       const raw = e?.message || String(e);
