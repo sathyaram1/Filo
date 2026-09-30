@@ -45,10 +45,13 @@
     return imp.stretta ? 'typosquatting:' + dominioImitato(imp) : 'marchio_imitato:' + imp.brand.display;
   }
 
-  // https://www.paypal.com@altro.net si legge come il sito vero, ma porta a quello dopo la chiocciola.
+  // https://www.paypal.com@altro.net si legge come il sito vero, ma porta a quello dopo la chiocciola. Conta il nome con
+  // cui il pezzo comincia: una seconda chiocciola in codice (www.poste.it%40x.net@altro.net) non deve spostarlo.
   function nomePrimaDellaChiocciola(prima, href) {
     if (!prima || !sitoNominato) return '';
-    const come = 'https://' + prima.replace(/^[a-z]+:\/\//i, '');
+    const nome = prima.replace(/^[a-z]+:\/\//i, '').match(/^[^@:/?#\\\s%]+/);
+    if (!nome) return '';
+    const come = 'https://' + nome[0];
     const nominato = sitoNominato(come);
     const arrivo = sitoNominato(href);
     if (!nominato || (arrivo && arrivo.registrable === nominato.registrable)) return '';
