@@ -261,7 +261,19 @@ function confermeDi(wc, { crea = false } = {}) {
     perPopup.set(win, c);
     win.on('resize', () => c.posa());
   }
-  return c.chiedi(wc, frame, richiesta);
+  return c || null;
 }
 
-module.exports = { ConfermeSopraPagina, chiediConferma, pulisci };
+function chiediConferma(event, richiesta) {
+  const wc = event && event.sender;
+  const c = wc ? confermeDi(wc, { crea: true }) : null;
+  return c ? c.chiedi(wc, event.senderFrame || null, richiesta) : Promise.resolve(false);
+}
+
+function ritiraConferma(event, d) {
+  const wc = event && event.sender;
+  const c = wc ? confermeDi(wc) : null;
+  if (c) c.ritira(wc, event.senderFrame || null, Number(d && d.id));
+}
+
+module.exports = { ConfermeSopraPagina, chiediConferma, ritiraConferma, pulisci };
