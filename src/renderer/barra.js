@@ -73,7 +73,7 @@
   window.SN_VUOTO.collega({
     inoltra: (gesto) => api.inoltra(gesto),
     onCursore: api.onCursore,
-    proprio: (e) => !stato.aperta || !!trascina || !!(e.target && e.target.closest && e.target.closest('#pannello')),
+    proprio: (e) => !!trascina || !!(e.target && e.target.closest && e.target.closest('#pannello, #striscia')),
     // La vista tocca i bordi sinistro e basso della finestra, e in alto la fila delle schede: solo a destra c'è la pagina.
     versoLaPagina: (e) => e.clientX >= innerWidth - 1,
   });

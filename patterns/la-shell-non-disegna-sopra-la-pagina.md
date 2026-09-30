@@ -18,7 +18,10 @@ Quello che la **shell** deve mostrare nell'area della pagina e che deve restarci
   2. è di passaggio e ancorata a un pulsante della barra → finestra figlia
      (`src/main/popup-menu.js`, `src/main/popup-tooltip.js`);
   3. resta sopra la pagina e segue la finestra → vista in cima, come
-     `src/main/avvisiSopraPagina.js`.
+     `src/main/avvisiSopraPagina.js` e `src/main/barraLaterale.js`. I gesti del
+     vuoto e il puntatore della pagina li fanno `src/main/vuotoDellaVista.js` e
+     `src/renderer/vuoto.js`, uguali per tutte le viste: una vista nuova dice
+     solo cosa è suo e da che lato c'è la pagina.
 - **La vista:** nasce al primo bisogno (una finestra che non ne ha non paga un
   processo in più), ha sfondo trasparente ed è grande **quanto il contenuto**:
   una vista trasparente prende i clic su tutta la sua area, e ogni pixel in più è

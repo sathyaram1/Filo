@@ -117,3 +117,39 @@ test('il tasto della barra è di Filo: riservato, con Cmd su Mac, e mai Ctrl+B',
   assert.equal(T.comandoBarra({ control: true, shift: true, alt: true, key: 'B', code: 'KeyB' }), false);
   assert.equal(T.comandoBarra({ shift: true, key: 'B', code: 'KeyB' }), false);
 });
+
+// ── le regolazioni della barra (Preferenze → Avanzate, IMPOSTA_PREFERENZA, tasto destro sulla striscia) ──
+require(join(ROOT, 'src', 'shared', 'constants.js'));
+require(join(ROOT, 'src', 'shared', 'preferences.js'));
+const C = globalThis.SN_CONST;
+const P = globalThis.SN_PREF;
+
+test('le regolazioni della barra: un valore fuori dai limiti torna dentro, uno mancante prende il predefinito', () => {
+  assert.deepEqual(C.opzioniBarraLaterale(undefined), { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true });
+  assert.deepEqual(C.DEFAULT_SETTINGS.barraLaterale, { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true });
+  const o = C.opzioniBarraLaterale({ spinta: false, attesaMs: 5, uscitaMs: '99999', striscia: false });
+  assert.deepEqual(o, { spinta: false, attesaMs: 100, uscitaMs: 5000, striscia: false });
+  assert.equal(C.opzioniBarraLaterale({ attesaMs: 'boh' }).attesaMs, 250);
+});
+
+test('a parole: le regolazioni della barra si scrivono, e un tempo fuori dai limiti è un rifiuto col numero', () => {
+  assert.deepEqual(P.buildPreferencePartial('barra_spinta', 'no').partial, { barraLaterale: { spinta: false } });
+  assert.deepEqual(P.buildPreferencePartial('barra_striscia', 'nascondi').partial, { barraLaterale: { striscia: false } });
+  assert.deepEqual(P.buildPreferencePartial('barra_attesa', '0,5 secondi').partial, { barraLaterale: { attesaMs: 500 } });
+  assert.deepEqual(P.buildPreferencePartial('barra_uscita', '800 ms').partial, { barraLaterale: { uscitaMs: 800 } });
+  assert.match(P.buildPreferencePartial('barra_attesa', '10 secondi').rifiuto, /10000 ms.*100 a 3000/);
+  assert.match(P.buildPreferencePartial('barra_uscita', '20').rifiuto, /20 ms/);
+  // L'elenco che legge il modello le nomina tutte.
+  const strumenti = readFileSync(join(ROOT, 'src', 'shared', 'actionTools.js'), 'utf8');
+  for (const k of ['barra_spinta', 'barra_striscia', 'barra_attesa', 'barra_uscita']) assert.ok(strumenti.includes(k), k);
+});
+
+test('il manifesto non manda più l\'utente dove le voci della barra non ci sono più', () => {
+  require(join(ROOT, 'src', 'shared', 'capabilities.js'));
+  const M = globalThis.SN_CAPABILITIES;
+  const home = `${M.get('home-page').desc} ${M.get('home-page').invoke}`;
+  assert.doesNotMatch(home, /in alto a destra ci sono le icone/i, 'la home non ha più la fila di icone in alto');
+  assert.match(home, /barra laterale/);
+  const errore = `${M.get('network-error-page').desc} ${M.get('network-error-page').invoke}`;
+  assert.doesNotMatch(errore, /Ricarica"? dal menu/i, '«Ricarica» non sta più nel menu del tasto destro');
+});

@@ -28,6 +28,18 @@ ogni voce globale lo allungava e seppelliva le voci dell'elemento.
   selezionare del testo non la aprono. Per chi il bordo non lo raggiunge ci sono
   il clic sulla striscia, la linguetta nella fila delle schede e Ctrl+Shift+B
   (non Ctrl+B, che è il grassetto di ogni editor).
+- **Il bordo che la vista non vede.** A finestra non massimizzata i primi 5
+  pixel dentro il bordo sono del sistema, che lì ridimensiona una finestra
+  senza cornice: né la striscia né la pagina ricevono il puntatore. Quando la
+  pagina lo vede andare verso il bordo (o uscire), il main lo guarda da sé
+  (`screen.getCursorScreenPoint`) finché resta lì, e dopo l'attesa apre;
+  mentre la finestra si ridimensiona o si sposta, no. Il mouse di Playwright
+  entra dritto in una vista e salta questa scelta: la prova è col puntatore
+  vero (`tests/barra-laterale-bordo.spec.mjs`, XTest sotto xvfb).
+- **Tutto si regola** (Preferenze → Avanzate, a parole, tasto destro sulla
+  striscia o sulla linguetta): apertura dal bordo, attesa, chiusura dopo
+  l'uscita, striscia visibile. I limiti stanno in `opzioniBarraLaterale`
+  (`src/shared/constants.js`).
 - **Solo gesti veri.** Un sito non arriva alla vista della barra; nella pagina
   il trascinamento dal menu parte solo da eventi `isTrusted`, perché un
   trascinamento finto aprirebbe la barra a comando del sito.
