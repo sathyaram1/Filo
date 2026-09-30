@@ -53,6 +53,13 @@ class ConfermeSopraPagina {
     });
   }
 
+  // Chi ha chiesto non la vuole più (il verdetto sul sito è cambiato): vale un Annulla, anche se è a schermo.
+  ritira(wc, frame, idPagina) {
+    if (!Number.isSafeInteger(idPagina) || idPagina <= 0) return;
+    this._togli((v) => v.wc === wc && v.idPagina === idPagina
+      && (!frame || !v.frame || stessoFrame(v.frame, frame.processId, frame.routingId)));
+  }
+
   // Chiamata dal layout delle schede: cambio di scheda, ridimensionamenti, schermo intero.
   // Una domanda si vede solo sopra la sua scheda, quando è davanti; le altre aspettano il loro turno.
   posa() {
