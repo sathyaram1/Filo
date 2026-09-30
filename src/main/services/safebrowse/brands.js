@@ -85,7 +85,7 @@ const BRANDS = [
   { token: 'linkedin', display: 'LinkedIn', domains: ['linkedin.com', 'lnkd.in', 'licdn.com'] },
   { token: 'tiktok', display: 'TikTok', domains: ['tiktok.com', 'tiktokcdn.com', 'tiktokv.com'] },
   { token: 'telegram', display: 'Telegram', domains: ['telegram.org', 't.me', 'telegram.me', 'telegra.ph', 'telegram.dog'] },
-  { token: 'discord', display: 'Discord', domains: ['discord.com', 'discord.gg', 'discordapp.com', 'discordapp.net', 'discord.media'] },
+  { token: 'discord', display: 'Discord', domains: ['discord.com', 'discord.gg', 'discordapp.com', 'discordapp.net', 'discord.media', 'discordstatus.com', 'discord.new', 'discord.gift'] },
   { token: 'netflix', display: 'Netflix', domains: ['netflix.com', 'netflix.net', 'netflixtechblog.com'] },
   { token: 'youtube', display: 'YouTube', domains: ['youtube.com', 'youtu.be', 'youtube-nocookie.com', 'youtubekids.com', 'youtube.it', 'youtube.de', 'youtube.fr', 'youtube.es', 'youtube.co.uk', 'youtube.ch', 'youtube.at', 'youtube.nl', 'youtube.be', 'youtube.pl', 'youtube.pt', 'youtube.ca', 'youtube.com.br', 'youtube.co.jp', 'youtube.com.au'] },
   { token: 'steam', display: 'Steam', domains: ['steampowered.com', 'steamcommunity.com', 'steamstatic.com', 'steamgames.com', 'steamdeck.com', 'steamusercontent.com'] },
