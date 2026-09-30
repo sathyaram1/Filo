@@ -103,6 +103,13 @@ html.aperta .pannello {
   transition: background var(--dur), box-shadow var(--dur);
 }
 .nav::-webkit-scrollbar { display: none; }
+/* Senza barra di scorrimento, le icone che non stanno si annunciano sfumando dal loro lato. */
+.nav.altre-sotto { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent); }
+.nav.altre-sopra { -webkit-mask-image: linear-gradient(to top, #000 calc(100% - 26px), transparent); mask-image: linear-gradient(to top, #000 calc(100% - 26px), transparent); }
+.nav.altre-sopra.altre-sotto {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 26px, #000 calc(100% - 26px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 26px, #000 calc(100% - 26px), transparent);
+}
 .nav.mira {
   background: rgba(var(--accent-rgb), 0.08);
   box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.55);

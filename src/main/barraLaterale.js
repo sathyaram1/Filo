@@ -705,13 +705,23 @@ class BarraLaterale {
       const id = testo(msg.id);
       if (!D || !D.noto(id)) return { ok: false };
       this._ferma('fine');
-      this.trascinamento = { id, tabId };
-      if (!this.aperta) this.apri('trascina');
+      const piena = Math.ceil((PANNELLO + 8) / zoom);
+      const sinistra = msg.menuSinistra == null ? NaN : Number(msg.menuSinistra);
+      // Il menu sta dove si aprirebbe la barra: aperta subito coprirebbe i posti in cui si riordina. Si apre
+      // quando il puntatore va al bordo, a sinistra del menu, e si richiude se ci torna sopra.
+      const rimandata = !this.aperta && Number.isFinite(sinistra) && sinistra < piena;
+      this.trascinamento = { id, tabId, rimandata };
+      if (!rimandata && !this.aperta) this.apri('trascina');
       else this._invia();
-      return { ok: true, larghezza: Math.ceil((PANNELLO + 8) / zoom) };
+      const stretta = Math.max(Math.ceil(12 / zoom), Math.floor(sinistra) - 4);
+      return { ok: true, larghezza: rimandata ? Math.min(piena, stretta) : piena };
     }
     if (!this.trascinamento || this.trascinamento.tabId !== tabId) return { ok: false };
     if (fase === 'sopra') {
+      if (this.trascinamento.rimandata) {
+        if (msg.y != null && !this.aperta) this.apri('trascina');
+        else if (msg.y == null && this.aperta && this.motivo === 'trascina') this.chiudi();
+      }
       this.mira = msg.y == null ? null : { y: yLocale(msg.y) };
       this._invia();
       return { ok: true };

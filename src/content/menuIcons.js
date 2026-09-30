@@ -257,10 +257,10 @@
   };
   if (!IS_SUBFRAME) {
     Menu.setPonteBarra?.({
-      inizio(id) {
+      inizio(id, menuSinistra) {
         barraAperta = null;
         miraInviata = null;
-        trascina({ fase: 'inizio', id }).then((r) => { if (r && r.ok) barraAperta = { larghezza: Number(r.larghezza) || 0 }; });
+        trascina({ fase: 'inizio', id, menuSinistra }).then((r) => { if (r && r.ok) barraAperta = { larghezza: Number(r.larghezza) || 0 }; });
       },
       sopra(x, y) {
         const dentro = !!barraAperta && x <= barraAperta.larghezza;

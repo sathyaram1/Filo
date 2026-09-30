@@ -157,7 +157,13 @@
     }
     // L'icona appena arrivata si fa vedere anche se il gruppo scorre: senza, sembra che il trascinamento non abbia fatto niente.
     const arrivata = prima.size ? [...nav.querySelectorAll('.ico')].find((b) => !prima.has(b.dataset.id)) : null;
-    if (arrivata) arrivata.scrollIntoView({ block: 'nearest' });
+    if (arrivata) {
+      // Misure di impaginazione, non del riquadro: l'icona nuova entra rimpicciolita dall'animazione.
+      const su = arrivata.offsetTop - nav.offsetTop;
+      const giu = su + arrivata.offsetHeight;
+      if (giu > nav.scrollTop + nav.clientHeight) nav.scrollTop = giu - nav.clientHeight + 4;
+      else if (su < nav.scrollTop) nav.scrollTop = su - 4;
+    }
     misura();
   }
 

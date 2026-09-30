@@ -1121,6 +1121,11 @@
   // pagina per tutto il gesto, anche sopra la barra, quindi è da qui che si dice dove cade.
   let ponteBarra = null;
   function setPonteBarra(p) { ponteBarra = p || null; }
+  // Dove comincia il menu aperto: se sta dove si apre la barra, lei aspetta che il puntatore vada al bordo.
+  function sinistraDelMenu() {
+    const els = [activeMenu?.root, activeMenu?.subRoot].filter((e) => e && e.isConnected);
+    return els.length ? Math.min(...els.map((e) => e.getBoundingClientRect().left)) : null;
+  }
 
   function attachDrag(el, { id, source }) {
     el.dataset.snDraggable = '1';
@@ -1163,7 +1168,7 @@
         preview.style.height = r.height + 'px';
         menuHost().appendChild(preview);
         updatePreview(x, y);
-        try { ponteBarra?.inizio(id); } catch (_) {}
+        try { ponteBarra?.inizio(id, sinistraDelMenu()); } catch (_) {}
       };
 
       const checkHoverOpen = (x, y) => {
