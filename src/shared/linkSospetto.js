@@ -8,11 +8,13 @@
   // #725.8 — chi imita un marchio lo decide il controllo che gira all'apertura della pagina: un elenco solo
   // di marchi e domini ufficiali, e un link non è pulito qui e sospetto quando lo apri.
   let imitazione = null;
+  let sitoNominato = null;
   try {
-    if (typeof require === 'function') imitazione = require('../main/services/safebrowse/engine.js').imitazione;
+    if (typeof require === 'function') ({ imitazione, sitoNominato } = require('../main/services/safebrowse/engine.js'));
   } catch (e) { console.error('[linkSospetto] controllo dei marchi non caricato', e); }
 
-  // Codici: 'url_invalido' | 'side_effect' | 'token_in_url' | 'typosquatting:<dominio>' | 'marchio_imitato:<marchio>'.
+  // Codici: 'url_invalido' | 'side_effect' | 'token_in_url' | 'typosquatting:<dominio>' | 'marchio_imitato:<marchio>'
+  // | 'nome_prima_chiocciola'.
   function analizza(rawUrl, rinvii = 0) {
     const flags = [];
     let u;
