@@ -910,13 +910,13 @@
     await send({ type: MSG.DECKS_CHAT_CLEAR, deckId: deck.id, clientId: chatClientId }).catch(() => {});
   }
 
-  // «Riprova» sull'ultima bolla fallita o interrotta: lo stesso turno rifatto, non una domanda in più.
+  // «Riprova» sull'ultima bolla fallita, interrotta o riuscita solo in parte: lo stesso turno rifatto, non una domanda in più.
   function retryLastTurn() {
     const msgs = chatMsgs();
     if (busyChats.has(msgs)) return;
     const bot = msgs[msgs.length - 1];
     const user = msgs[msgs.length - 2];
-    if (!bot || bot.who !== 'bot' || !(bot.error || bot.interrupted)) return;
+    if (!bot || bot.who !== 'bot' || !(bot.error || bot.interrupted || bot.retryable)) return;
     if (!user || user.who !== 'user' || !user.text) return;
     msgs.splice(msgs.length - 2, 2);
     editChat(current.id, { op: 'drop', turn: bot.turn || '', userText: user.text });
@@ -1005,6 +1005,8 @@
     if (m.error) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>${retry}</div>`;
     const parts = [cotHtml(m)];
     if (m.reply) parts.push(`<p class="dk-msg-text">${proseHtml(m.reply)}</p>`);
+    // Sopra la lista: con decine di righe, sotto non lo vedrebbe nessuno.
+    if (m.retryable) parts.push(retry);
     if (m.clearChat) {
       parts.push('<button class="dk-retry" data-clear-chat="1" title="Chiede conferma, poi svuota la chat di questo mazzo">Svuota la chat…</button>');
     } else if (m.cardIds && m.cardIds.length) {
@@ -1178,6 +1180,7 @@
         bot.cardIds = r.cardIds || [];
         bot.query = r.query || '';
         if (Array.isArray(r.uncheckedIds) && r.uncheckedIds.length) bot.uncheckedIds = r.uncheckedIds;
+        if (r.retryable) bot.retryable = true;
         // Import via chat (§11.2): quantità reali per riga (basics tipo
         // "37 Forest") + eventuale commander candidato, per il bottone
         // "Aggiungi tutte" e per il toggle per riga.

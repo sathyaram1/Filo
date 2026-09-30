@@ -214,6 +214,9 @@ module.exports = function register(on, ctx) {
       let cards = {};
       let query = '';
       let uncheckedIds = [];
+      // Il turno è andato solo in parte (ricerca non partita, carte non controllate) e la risposta dice di riprovare:
+      // la bolla allora tiene il tasto Riprova, come una risposta in errore.
+      let retryable = false;
       // Budget/reply/deck di uscita dichiarati qui (prima dell'import, sotto)
       // perché sia la ricerca sia l'import possono accodare testo alla reply.
       let reply = parsed.reply;
@@ -260,8 +263,9 @@ module.exports = function register(on, ctx) {
         // (Scryfall risponde 400): non buttare l'intero turno (#331) — si
         // riprova UNA volta facendo correggere la query al modello stesso, e
         // se non ne esce si spiega il problema in chiaro nella reply.
-        // Solo un messaggio tutto in sintassi è già la richiesta esatta; ogni altra ricerca passa dal giudice (§4.1).
-        const critOf = (c) => c || (Q.isPureSyntax(text) ? '' : text);
+        // Solo un messaggio tutto in sintassi è già la richiesta esatta, anche se il modello gli aggiunge un criterio;
+        // ogni altra ricerca passa dal giudice (§4.1).
+        const critOf = (c) => (Q.isPureSyntax(text) ? '' : (c || text));
         // Chi passa dal giudice segue le pagine di Scryfall fino al tetto: la query larga le riempie in fretta, e
         // fermarsi alla prima vedeva solo le 175 più economiche (#382). Oltre il tetto la chat lo dice.
         const runSearch = (q, c) => (critOf(c)
@@ -321,6 +325,7 @@ module.exports = function register(on, ctx) {
             } catch (_) { sr = null; }
           }
           if (!sr && !explained) {
+            retryable = true;
             reply = [reply,
               `Ho provato a cercare su Scryfall ma la ricerca non è andata a buon fine (la query «${parsed.query}» non è stata accettata${Number.isFinite(status) && (status >= 500 || status === 429) ? ' perché il servizio al momento non risponde' : ''}). Prova a riformulare la richiesta con parole diverse, o riprova tra poco.`,
             ].filter(Boolean).join('\n');
@@ -355,6 +360,7 @@ module.exports = function register(on, ctx) {
             cardIds = fr.keepIds;
             // Segnate in lista solo se sono una parte: se non l'ha controllata nessuna, lo dice già la nota.
             if (fr.unverifiedIds.length < found) uncheckedIds = fr.unverifiedIds;
+            if (fr.unverifiedIds.length) retryable = true;
             const note = globalThis.SN_DECK_OPINIONS.searchFilterNote({
               found, kept: fr.keepIds.length, unverified: fr.unverifiedIds.length, criterion: crit, total: sr.total,
               why: fr.error ? (fr.error.userText || friendlyChatError(fr.error)) : '',
@@ -516,6 +522,7 @@ module.exports = function register(on, ctx) {
       return {
         ok: true, reply, cardIds, cards, query,
         ...(unchecked.length ? { uncheckedIds: unchecked } : {}),
+        ...(retryable ? { retryable: true } : {}),
         ...(reasoning ? { reasoning } : {}),
         ...(deckOut ? { deck: deckOut } : {}),
         ...(importPending ? { importPending } : {}),

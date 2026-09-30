@@ -79,12 +79,17 @@ async function mockProvider(app) {
       const last = String(messages[messages.length - 1].content || '');
       let text;
       if (/CARTE CANDIDATE/.test(last)) {
+        // `__maxConcurrent`: un fornitore che oltre quel numero di richieste insieme risponde «troppe richieste».
+        if (globalThis.__maxConcurrent && (globalThis.__inFlight || 0) >= globalThis.__maxConcurrent) {
+          globalThis.__rejected = (globalThis.__rejected || 0) + 1;
+          throw Object.assign(new Error('OpenRouter 429: Rate limit exceeded, retry shortly'), { status: 429 });
+        }
         // Chiamata al giudice del filtro: registra e tieni solo Lightning Bolt (o fai quello che chiede la prova).
         globalThis.__filterCalls.push(last);
         globalThis.__inFlight = (globalThis.__inFlight || 0) + 1;
         globalThis.__maxInFlight = Math.max(globalThis.__maxInFlight || 0, globalThis.__inFlight);
         if (globalThis.__judgeGate) await globalThis.__judgeGate;
-        await new Promise((r) => setTimeout(r, 5));
+        await new Promise((r) => setTimeout(r, globalThis.__judgeMs || 5));
         globalThis.__inFlight -= 1;
         text = globalThis.__judge ? globalThis.__judge(last, attempts[0].model) : JSON.stringify({ keep: ['bolt-1'] });
       } else if (globalThis.__chat) {
