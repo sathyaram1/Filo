@@ -609,7 +609,7 @@ test('listArchiveTab: filtro "Bloccati confermati" tiene solo attacchi/spam conf
   assert.equal(MR.listArchiveTab(items).length, 3);
 });
 
-test('manageTabCounts: conta le quattro schede-lista, e solo quelle', () => {
+test('manageTabCounts: conta le cinque schede-lista, e solo quelle', () => {
   const items = [
     { _id: 'i1', status: 'unlabeled', createdAt: '2026-01-01' },
     { _id: 'i2', status: 'attack', createdAt: '2026-01-02' },
@@ -620,17 +620,17 @@ test('manageTabCounts: conta le quattro schede-lista, e solo quelle', () => {
     { _id: 'z1', status: 'archived', createdAt: '2026-04-01' },
   ];
   assert.deepEqual(MR.manageTabCounts(items), {
-    inbox: 3, queue: 2, resolved: 1, archived: 1,
+    inbox: 3, queue: 2, local: 0, resolved: 1, archived: 1,
   });
   // Nessuna chiave in più: le schede senza lista (statistiche, modelli,
   // automazioni, log) non hanno un numero da mostrare.
   assert.deepEqual(Object.keys(MR.manageTabCounts(items)).sort(),
-    ['archived', 'inbox', 'queue', 'resolved']);
+    ['archived', 'inbox', 'local', 'queue', 'resolved']);
 });
 
-test('manageTabCounts: liste vuote → quattro zeri (una scheda vuota lo dice)', () => {
-  assert.deepEqual(MR.manageTabCounts([]), { inbox: 0, queue: 0, resolved: 0, archived: 0 });
-  assert.deepEqual(MR.manageTabCounts(null), { inbox: 0, queue: 0, resolved: 0, archived: 0 });
+test('manageTabCounts: liste vuote → cinque zeri (una scheda vuota lo dice)', () => {
+  assert.deepEqual(MR.manageTabCounts([]), { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(null), { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 });
 });
 
 test('manageTabCounts: ogni numero è la LUNGHEZZA della lista che la scheda mostra', () => {
@@ -672,9 +672,99 @@ test('manageTabCounts: gli Archiviati seguono i filtri della colonna (⭐, confe
 
 test('manageTabCounts: spostare un feedback sposta due numeri (approvazione)', () => {
   const items = [{ _id: 'a', status: 'unlabeled', createdAt: '2026-01-01' }];
-  assert.deepEqual(MR.manageTabCounts(items), { inbox: 1, queue: 0, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 1, queue: 0, local: 0, resolved: 0, archived: 0 });
   items[0].status = 'todo';   // l'owner approva: Ricevuti → In coda
-  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, local: 0, resolved: 0, archived: 0 });
+});
+
+// ── Lavori locali (#908) ────────────────────────────────────────────────────
+
+const SEGNO = { by: 'owner@x', at: 1790000000000 };
+const locale = (extra) => ({
+  _id: 'l1', status: 'todo', clientId: 'local:claude', senderProof: 'admin', createdAt: '2026-09-01', ...extra,
+});
+
+test('Lavori locali: col segno la pratica esce da «In coda» e ha la sua sezione', () => {
+  const items = [locale({ localOnly: SEGNO }), { _id: 'q1', status: 'todo', createdAt: '2026-09-02' }];
+  assert.equal(MR.manageTabFor(items[0]), 'local');
+  assert.deepEqual(MR.listForManageTab(items, 'local').map((f) => f._id), ['l1']);
+  assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), ['q1']);
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, local: 1, resolved: 0, archived: 0 });
+  // Il numero è la lunghezza della lista che la sezione mostra.
+  assert.equal(MR.manageTabCounts(items).local, MR.listForManageTab(items, 'local').length);
+});
+
+test('Lavori locali: tutto l’iter di lavorazione ci sta, i Ricevuti e i chiusi no', () => {
+  for (const status of ['todo', 'working', 'revision_capability', 'revision_security']) {
+    assert.equal(MR.manageTabFor(locale({ status, localOnly: SEGNO })), 'local', status);
+  }
+  // Aspetta ancora l'owner: resta nei Ricevuti, e l'approvazione dice dove va.
+  const allineato = locale({ status: 'aligned', localOnly: SEGNO });
+  assert.equal(MR.manageTabFor(allineato), 'inbox');
+  assert.equal(MR.ownerActionFor(allineato, 'accept').label, '→ Lavori locali');
+  assert.equal(MR.ownerActionFor(locale({ status: 'aligned' }), 'accept').label, '→ In coda');
+  assert.equal(MR.manageTabFor(locale({ status: 'archived', localOnly: SEGNO })), 'archived');
+  assert.equal(MR.manageTabFor(locale({ status: 'done', localOnly: SEGNO, resolvedInVersion: '1.0.0' }), { releasedVersion: '2.0.0' }), 'resolved');
+});
+
+test('Lavori locali: le azioni sono quelle della coda', () => {
+  const fb = locale({ localOnly: SEGNO });
+  assert.deepEqual(MR.ownerActions(fb).map((a) => a.key), ['resolve', 'archive']);
+});
+
+test('Lavori locali: una fusione che aspetta l’owner lo porta nei Ricevuti anche col segno', () => {
+  const fb = locale({ localOnly: SEGNO, seq: 12 });
+  const fusioni = { pending: [{ id: 'r1', feedbackId: 'l1', num: '12', branch: 'claude/x' }] };
+  assert.equal(MR.manageTabFor(fb, { fusioni }), 'inbox');
+});
+
+test('localSignCheck: il segno si mette solo su owner o sessione CON la prova', () => {
+  assert.equal(MR.localSignCheck(locale(), true).ok, true);
+  assert.equal(MR.localSignCheck(locale({ clientId: 'owner:me' }), true).ok, true);
+  // Il solo prefisso non basta: senza prova vale come un utente.
+  const senzaProva = MR.localSignCheck(locale({ senderProof: undefined }), true);
+  assert.equal(senzaProva.ok, false);
+  assert.equal(senzaProva.utente, true);
+  assert.match(senzaProva.motivo, /prova/);
+  // Un utente: rifiutato, e la risposta lo dice (lo script propone i Ricevuti).
+  const utente = MR.localSignCheck(locale({ clientId: 'abc123', senderProof: undefined }), true);
+  assert.deepEqual([utente.ok, utente.utente], [false, true]);
+  // Una routine con la prova: non è un utente, ma non è nemmeno lavoro locale.
+  const routine = MR.localSignCheck(locale({ clientId: 'routine:worker', senderProof: 'server' }), true);
+  assert.deepEqual([routine.ok, !!routine.utente], [false, false]);
+});
+
+test('localSignCheck: pratica chiusa, segnalata o in mano a una routine → no', () => {
+  const now = Date.parse('2026-09-30T10:00:00Z');
+  assert.equal(MR.localSignCheck(locale({ status: 'archived', statusPublic: 'closed' }), true, { now }).ok, false);
+  assert.equal(MR.localSignCheck(locale({ status: 'attack' }), true, { now }).ok, false);
+  const presa = locale({ status: 'working', claimedBy: 'routine:worker', claimExpiresAt: '2026-09-30T11:00:00Z' });
+  const r = MR.localSignCheck(presa, true, { now });
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /biglietto/);
+  // Biglietto scaduto: la pratica è di nuovo libera.
+  assert.equal(MR.localSignCheck({ ...presa, claimExpiresAt: '2026-09-30T09:00:00Z' }, true, { now }).ok, true);
+  // Stato cifrato: non si sa se è aperta, non si segna.
+  assert.equal(MR.localSignCheck(locale({ status: 'FENC1:abc' }), true, { now }).ok, false);
+});
+
+test('localSignCheck: togliere il segno si può sempre, se c’è', () => {
+  assert.equal(MR.localSignCheck(locale({ clientId: 'abc', senderProof: undefined, localOnly: SEGNO }), false).ok, true);
+  assert.equal(MR.localSignCheck(locale(), false).ok, false);
+  assert.equal(MR.localSignCheck(locale({ localOnly: SEGNO }), true).ok, false);
+});
+
+test('isRicevutiStatus: i sei stati che aspettano l’owner, e solo quelli', () => {
+  const ric = ['unlabeled', 'suspicious_file', 'attack', 'spam', 'design', 'aligned'];
+  for (const s of ric) assert.equal(MR.isRicevutiStatus(s), true, s);
+  for (const s of ['todo', 'working', 'done', 'archived', 'attack_confirmed', '']) assert.equal(MR.isRicevutiStatus(s), false, s);
+});
+
+test('isLocalOnly: serve una mappa con chi l’ha messo', () => {
+  assert.equal(MR.isLocalOnly({ localOnly: SEGNO }), true);
+  assert.equal(MR.isLocalOnly({ localOnly: {} }), false);
+  assert.equal(MR.isLocalOnly({ localOnly: true }), false);
+  assert.equal(MR.isLocalOnly({}), false);
 });
 
 // ── Riapertura a pagamento dalla board (DC4) ────────────────────────────────
