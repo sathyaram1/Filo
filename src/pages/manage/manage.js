@@ -303,8 +303,8 @@
       arr.sort((a, b) => MR.priorityOf(b) - MR.priorityOf(a));
     } else if (sortMode === 'creator') {
       arr.sort((a, b) => {
-        const ra = AUTHOR_RANK[authorKindOf(a)] ?? 9;
-        const rb = AUTHOR_RANK[authorKindOf(b)] ?? 9;
+        const ra = AUTHOR_RANK[authorKindOf(a)] ?? 99;
+        const rb = AUTHOR_RANK[authorKindOf(b)] ?? 99;
         if (ra !== rb) return ra - rb;
         return String(a.clientId || '').localeCompare(String(b.clientId || ''));
       });
