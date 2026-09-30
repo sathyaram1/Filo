@@ -90,6 +90,7 @@
             prepared: !!x.prepared,
             queuedAt: Number(x.queuedAt) || Date.now(),
             attempts: Number(x.attempts) || 0,
+            dallOwner: !!x.dallOwner,
             rinuncia: !!x.rinuncia,
             motivoRinuncia: x.motivoRinuncia || '',
           }));
