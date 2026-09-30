@@ -19,6 +19,8 @@ Quello che la **shell** deve mostrare nell'area della pagina e che deve restarci
      (`src/main/popup-menu.js`, `src/main/popup-tooltip.js`);
   3. resta sopra la pagina e segue la finestra → vista in cima, come
      `src/main/avvisiSopraPagina.js`.
+  Una domanda modale chiesta da un sito (le conferme di `SN_CONFIRM_UI`) è una vista in cima anche
+  lei, ma grande quanto la scheda: `patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md`.
 - **La vista:** nasce al primo bisogno (una finestra che non ne ha non paga un
   processo in più), ha sfondo trasparente ed è grande **quanto il contenuto**:
   una vista trasparente prende i clic su tutta la sua area, e ogni pixel in più è

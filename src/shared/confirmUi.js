@@ -442,10 +442,9 @@
 
   // ── Hook di TEST (tests/helpers/confirm.mjs) ─────────────────────────────
   // Il root chiuso rende il dialogo invisibile ai locator Playwright: gli spec
-  // sulle pagine filo:// (contextIsolation:false) passano da qui via
-  // page.evaluate. Sulle pagine web esterne SN_CONFIRM_UI vive nel mondo
-  // isolato del preload: la pagina NON può chiamare questi hook, quindi non
-  // riaprono la falla del feedback #249.
+  // passano da qui via page.evaluate, sulle pagine filo:// e nella vista sopra
+  // la scheda. Nessun sito li raggiunge: sulle pagine web il modulo vive nel
+  // mondo isolato del preload, e il dialogo non è nel loro documento.
   const _test = {
     // Stato del dialogo aperto, o null se non ce n'è uno.
     state() {

@@ -1,6 +1,6 @@
 // Su un sito il popup di conferma di Filo non sta nel documento della pagina (#592.6): lì il codice del sito
 // poteva renderlo invisibile e disegnare al suo posto un popup finto con un altro testo, e il clic su OK del
-// finto confermava quello vero. Qui il sito prova a farlo, e l'utente legge e conferma la domanda vera.
+// finto confermava quello vero. Qui il sito ci prova, e l'utente legge e conferma la domanda vera.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { confermaSopraPagina, nelMondoDiFilo, confirmState, clickConfirm, pointWhenConfirmAppears, CONFIRM_HOST } from './helpers/confirm.mjs';
@@ -173,4 +173,39 @@ test('la domanda sta sopra la sua scheda: dietro aspetta, davanti torna; una pag
   await page.evaluate(() => { location.reload(); });
   await expect.poll(async () => (await geometria(app)).visibile).toBe(false);
   expect(await app.evaluate(() => globalThis.__fbCalls.length)).toBe(0);
+});
+
+test('la conferma da scrivere e il semplice avviso passano dalla stessa vista; due domande insieme arrivano una alla volta', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, OSTILE);
+  const host = new URL(page.url()).hostname;
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  const esiti = () => nelMondoDiFilo(app, host, 'window.__esiti');
+
+  // Livello 3: Esegui resta spento finché non si scrive la parola, poi conferma.
+  await nelMondoDiFilo(app, host, `
+    window.__esiti = [];
+    SN_CONFIRM_UI.confirmTyped({ title: 'Elimina tutto', text: 'Cancella <b>ogni</b> cosa' }).then((v) => window.__esiti.push(['typed', v]));
+    true;`);
+  let sopra = await confermaSopraPagina(app);
+  let s = await confirmState(sopra);
+  expect(s.hasInput).toBe(true);
+  expect(s.okDisabled).toBe(true);
+  expect(s.text).toContain('Cancella <b>ogni</b> cosa');
+  await sopra.keyboard.type('conferma');
+  await expect.poll(async () => (await confirmState(sopra)).okDisabled).toBe(false);
+  await clickConfirm(sopra, 'danger');
+  await expect.poll(esiti).toEqual([['typed', true]]);
+
+  // Due domande di fila: la seconda aspetta che si risponda alla prima.
+  await nelMondoDiFilo(app, host, `
+    SN_CONFIRM_UI.confirm({ title: 'Prima', text: 'uno' }).then((v) => window.__esiti.push(['prima', v]));
+    SN_CONFIRM_UI.notify({ title: 'Seconda', text: 'due' }).then((v) => window.__esiti.push(['seconda', v]));
+    true;`);
+  sopra = await confermaSopraPagina(app);
+  expect((await confirmState(sopra)).title).toBe('Prima');
+  await clickConfirm(sopra, 'cancel');
+  await expect.poll(async () => (await confirmState(sopra))?.title).toBe('Seconda');
+  await clickConfirm(sopra, 'ok');
+  await expect.poll(esiti).toEqual([['typed', true], ['prima', false], ['seconda', true]]);
+  await expect.poll(async () => (await geometria(app)).visibile).toBe(false);
 });
