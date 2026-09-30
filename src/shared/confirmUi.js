@@ -174,8 +174,9 @@
   // dove done(result) smonta tutto e risolve la Promise una sola volta.
   // `ospite` c'è solo nella vista sopra la scheda: il campo di chi scriveva sta
   // nella pagina sotto, e i tasti gli arrivano da `ospite.tasto`.
-  function buildOverlay(resolve, ospite) {
+  function buildOverlay(resolve, ospite, opzioni = {}) {
     const doc = global.document;
+    const copre = !!(opzioni && opzioni.coprePagina);
 
     // L'host è l'UNICO nodo visibile dal documento: nessun contenuto, solo il
     // posizionamento a tutto viewport (inline, così non serve CSS nel documento).
