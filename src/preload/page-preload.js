@@ -211,10 +211,16 @@ ipcRenderer.on('filo:conferma-tasto', (_event, d) => {
   const suTasto = d && tastiConferme.get(d.id);
   if (suTasto) suTasto(d.tasto);
 });
-globalThis.SN_CONFERMA_FUORI = (richiesta, suTasto) => {
+globalThis.SN_CONFERMA_FUORI = (richiesta, suTasto, segnale) => {
   const id = ++seqConferme;
   tastiConferme.set(id, suTasto);
-  return ipcRenderer.invoke('filo:conferma', { ...richiesta, id }).finally(() => tastiConferme.delete(id));
+  const ritira = () => ipcRenderer.send('filo:conferma-ritira', { id });
+  const ascolta = segnale && typeof segnale.addEventListener === 'function';
+  if (ascolta) segnale.addEventListener('abort', ritira, { once: true });
+  return ipcRenderer.invoke('filo:conferma', { ...richiesta, id }).finally(() => {
+    tastiConferme.delete(id);
+    if (ascolta) segnale.removeEventListener('abort', ritira);
+  });
 };
 
 const broadcastListeners = new Set();
