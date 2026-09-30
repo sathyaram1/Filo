@@ -18,6 +18,9 @@ function pulisci(r) {
     campo: !!(r && r.campo === true),
   };
   for (const k of CAMPI) if (r && typeof r[k] === 'string') out[k] = r[k];
+  for (const k of BANDIERE) if (r && r[k] === true) out[k] = true;
+  // Un avviso sulla pagina non rimanda tasti alla pagina, qualunque cosa dica chi chiede.
+  if (out.coprePagina) { out.scriveva = false; out.campo = false; }
   return out;
 }
 
