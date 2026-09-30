@@ -300,8 +300,8 @@ class BarraLaterale {
     if (!icona || !this.vista || !this.win || this.win.isDestroyed()) return;
     this._nascondiSuggerimento();
     const voci = [];
-    if (!icona.spenta) voci.push({ label: icona.etichetta, icon: icona.icona, action: 'barra:esegui' });
-    voci.push({ label: 'Rimetti nel menu del tasto destro', icon: 'moveOut', action: 'barra:al-menu' });
+    if (!icona.spenta) voci.push({ label: icona.etichetta, action: 'barra:esegui' });
+    voci.push({ label: 'Rimetti nel menu del tasto destro', action: 'barra:al-menu' });
     const b = this.vista.getBounds();
     const { showPopupMenu } = require('./popup-menu');
     this._ferma('uscita');
