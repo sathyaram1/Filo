@@ -24,6 +24,16 @@ const inFlightStreams = new Map(); // requestId → AbortController
 // processo (variabili, $env, cwd persistono). Muore alla chiusura della scheda.
 const shellSessions = new Map(); // webContents.id → sessione shell persistente
 
+// La finestra di Filo di cui `wc` è la barra, o null. Essere il frame principale di una
+// finestra non basta: un popup di accesso è una finestra vera con dentro un sito (#589.3).
+function finestraDellaBarra(wc) {
+  if (!wc) return null;
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (w._filoTabs && (w.webContents === wc || w._filoShell?.webContents === wc)) return w;
+  }
+  return null;
+}
+
 function senderInfo(event) {
   const wc = event.sender;
   // BrowserWindow.fromWebContents() può ritornare null per le WebContentsView
