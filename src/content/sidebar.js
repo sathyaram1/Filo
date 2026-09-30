@@ -445,16 +445,21 @@
       wrap.appendChild(t);
     }
 
-    up.addEventListener('click', () => {
+    // Questo riquadro sta nel documento del sito, che può riscriverlo e premerne i bottoni: il sì alla
+    // condivisione lo si dà nel popup di Filo, che lì sta fuori dalla sua portata (#592.6). Un no chiude la domanda.
+    async function rispondi(riuscito) {
       disableAll();
-      saveCurrentPath(true).catch(() => {});
+      let ok = false;
+      try {
+        const Ui = global.SN_CONFIRM_UI;
+        ok = !!Ui && await Ui.confirm({ title: 'Condividi questo percorso?', text: promessa, okLabel: 'Condividi', cancelLabel: 'Non condividere' });
+      } catch (_) { ok = false; }
+      if (!ok) { wrap.classList.add('sn-sidebar-feedback-dismissed'); return; }
+      saveCurrentPath(riuscito).catch(() => {});
       thanks();
-    });
-    down.addEventListener('click', () => {
-      disableAll();
-      saveCurrentPath(false).catch(() => {});
-      thanks();
-    });
+    }
+    up.addEventListener('click', () => rispondi(true));
+    down.addEventListener('click', () => rispondi(false));
     skip.addEventListener('click', () => {
       // Niente save, solo dismiss visivo.
       disableAll();
