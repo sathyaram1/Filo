@@ -52,38 +52,48 @@ export function testoDaStampare(fb, segno) {
   return righe.join('\n');
 }
 
+/**
+ * Legge `id` e decide: lo stato si decifra da solo, e il resto solo se lo stato lo permette.
+ * `decifra` riceve i campi grezzi e li rende in chiaro (lib/decrypt-feedback-fields.mjs).
+ * @returns {Promise<{ codice: number, errore?: string, testo?: string }>}
+ */
+export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fetch, decifra, seq = null, segno } = {}) {
+  const maschera = CAMPI.map((c) => `mask.fieldPaths=${c}`).join('&');
+  const res = await fetchImpl(`${base}/feedback/${encodeURIComponent(id)}?${maschera}`, { headers: { Authorization: `Bearer ${bearer}` } });
+  if (!res.ok) return { codice: res.status >= 500 ? 4 : 3, errore: `lettura fallita (${res.status})` };
+  const doc = await res.json();
+  const f = doc.fields || {};
+  const stato = await decifra({ _id: doc.name, status: f.status?.stringValue || '' }).catch(() => ({}));
+  const vietato = vietatoLeggere(stato.status);
+  if (vietato) return { codice: 3, errore: `${vietato}. Non ho decifrato il testo` };
+  const pieno = await decifra({
+    _id: doc.name, clientId: f.clientId?.stringValue || '', name: f.name?.stringValue || '',
+    text: f.text?.stringValue || '', notes: f.notes?.stringValue || '', url: f.url?.stringValue || '',
+  });
+  return {
+    codice: 0,
+    testo: testoDaStampare({
+      ...pieno, _id: id, status: String(stato.status).trim(), senderProof: f.senderProof?.stringValue || '',
+      seq: Number(f.seq?.integerValue) || seq || null, subSeq: Number(f.subSeq?.integerValue) || 0,
+    }, segno || randomBytes(6).toString('hex')),
+  };
+}
+
 async function main(argv) {
-  const rif = argv.filter((a) => !a.startsWith('--'));
-  if (rif.length !== 1 || argv.length !== 1) { console.error('USO: npm run feedback:leggi -- <numero|id>'); return 1; }
-  let bearer;
-  let r;
-  let doc;
+  if (argv.length !== 1 || argv[0].startsWith('--')) { console.error('USO: npm run feedback:leggi -- <numero|id>'); return 1; }
   try {
-    bearer = await acquireBearer();
-    r = await risolviFeedback(rif[0], { bearer, base: FIRESTORE_BASE });
+    const bearer = await acquireBearer();
+    const r = await risolviFeedback(argv[0], { bearer, base: FIRESTORE_BASE });
     if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo}`); return 3; }
-    const maschera = CAMPI.map((f) => `mask.fieldPaths=${f}`).join('&');
-    const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(r.id)}?${maschera}`, { headers: { Authorization: `Bearer ${bearer}` } });
-    if (!res.ok) { console.error(`RIFIUTATO: lettura fallita (${res.status})`); return res.status >= 500 ? 4 : 3; }
-    doc = await res.json();
+    const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
+    const esito = await leggi(r.id, { bearer, decifra: decryptFeedbackFields, seq: r.seq });
+    if (esito.codice) { console.error(`RIFIUTATO: ${esito.errore}.`); return esito.codice; }
+    console.log(esito.testo);
+    return 0;
   } catch (e) {
     console.error(`Server non raggiungibile: ${String((e && e.message) || e).slice(0, 200)}`);
     return 4;
   }
-  const f = doc.fields || {};
-  const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
-  const stato = await decryptFeedbackFields({ _id: doc.name, status: f.status?.stringValue || '' }).catch(() => ({}));
-  const vietato = vietatoLeggere(stato.status);
-  if (vietato) { console.error(`RIFIUTATO: ${vietato}. Non ho decifrato il testo.`); return 3; }
-  const pieno = await decryptFeedbackFields({
-    _id: doc.name, clientId: f.clientId?.stringValue || '', name: f.name?.stringValue || '',
-    text: f.text?.stringValue || '', notes: f.notes?.stringValue || '', url: f.url?.stringValue || '',
-  });
-  console.log(testoDaStampare({
-    ...pieno, _id: r.id, status: String(stato.status).trim(), senderProof: f.senderProof?.stringValue || '',
-    seq: Number(f.seq?.integerValue) || r.seq || null, subSeq: Number(f.subSeq?.integerValue) || 0,
-  }, randomBytes(6).toString('hex')));
-  return 0;
 }
 
 if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) {
