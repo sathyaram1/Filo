@@ -29,6 +29,7 @@
     corrente = id;
     const opts = {};
     for (const k of ['title', 'text', 'okLabel', 'cancelLabel', 'word']) if (typeof r[k] === 'string') opts[k] = r[k];
+    for (const k of ['coprePagina', 'reversibile']) if (r[k] === true) opts[k] = true;
     const ospite = { scriveva: r.scriveva === true, campo: r.campo === true, tasto: (t) => api.tasto(id, t) };
     const apri = r.tipo === 'typed' ? Ui.confirmTyped : r.tipo === 'notify' ? Ui.notify : Ui.confirm;
     apri(opts, ospite).then((ok) => {
