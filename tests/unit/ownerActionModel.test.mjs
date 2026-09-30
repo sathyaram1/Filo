@@ -71,12 +71,34 @@ test('le funzioni di tutti non leggono gli slot di supporto', async () => {
 });
 
 test('l\'editor mostra la catena in uso negli slot spostati mai salvati, e non tocca quelli salvati', () => {
-  const vuoto = SupportModels.__test ? null : null; // lo store non si interroga: basta la forma di get()
-  void vuoto;
   const mai = fillMovedSlots({ sanitizer: '', manageSearch: null }, EFFECTIVE);
   assert.equal(mai.manageSearch, 'vecchio');
   assert.equal(mai.sanitizer, '');
   assert.equal(fillMovedSlots({ manageSearch: '' }, EFFECTIVE).manageSearch, '');
   assert.equal(fillMovedSlots({ manageSearch: 'nuovo' }, EFFECTIVE).manageSearch, 'nuovo');
   assert.equal(fillMovedSlots({ manageSearch: null }, null).manageSearch, '');
+});
+
+test('lo store distingue lo slot mai scritto (null) da quello svuotato (\'\')', async () => {
+  const auth = require(join(ROOT, 'src', 'main', 'auth', 'google-auth.js'));
+  const orig = { token: auth.getIdToken, admin: auth.isAdmin, profilo: auth.getProfile, fetch: global.fetch };
+  let campi = {};
+  auth.getIdToken = async () => 'finto-id-token';
+  auth.isAdmin = () => true;
+  auth.getProfile = () => ({ email: 'owner@esempio' });
+  global.fetch = async () => ({ ok: true, status: 200, async json() { return { fields: campi }; }, async text() { return ''; } });
+  try {
+    SupportModels.invalidaCache();
+    campi = { sanitizer: { stringValue: 'kimi' } };
+    assert.equal((await SupportModels.get()).manageSearch, null);
+    SupportModels.invalidaCache();
+    campi = { manageSearch: { stringValue: '' } };
+    assert.equal((await SupportModels.get()).manageSearch, '');
+    SupportModels.invalidaCache();
+    campi = { manageSearch: { stringValue: 'cerca' } };
+    assert.equal((await SupportModels.get()).manageSearch, 'cerca');
+  } finally {
+    auth.getIdToken = orig.token; auth.isAdmin = orig.admin; auth.getProfile = orig.profilo; global.fetch = orig.fetch;
+    SupportModels.invalidaCache();
+  }
 });
