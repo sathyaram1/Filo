@@ -192,9 +192,17 @@
             it.prepared = true;
           }
           const payload = it.name ? Object.assign({}, it.payload, { name: it.name }) : it.payload;
-          const result = await fb.submit(payload);
+          let idToken = '';
+          if (it.dallOwner) {
+            try { idToken = (tokenOwnerFn && await tokenOwnerFn()) || ''; } catch (_) { idToken = ''; }
+            if (!idToken) logFn('voce dell\'owner senza accesso valido: parte anonima e passa dai giudici', it.id);
+          }
+          const result = idToken ? await fb.submit(payload, { idToken }) : await fb.submit(payload);
           remove(it.id);
           logFn('inviato:', it.id);
+          if (idToken && result && result.senderProof !== 'admin') {
+            logFn('token dell\'owner rifiutato' + (result.authRefused ? ` (${result.authRefused})` : '') + ': partita anonima', it.id);
+          }
           try { onDoneFn && onDoneFn(it, result); } catch (_) {}
           backoff = backoffMin; // successo → azzera il backoff
         } catch (e) {
