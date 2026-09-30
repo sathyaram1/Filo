@@ -178,7 +178,7 @@ test('applyTagMembership: carte non giudicate e giudizi identici non toccano il 
 // se rispetta il criterio, con cache (carta, criterio) permanente cross-ricerca.
 
 test('search filter: API registrata su globalThis', () => {
-  for (const fn of ['normCriterion', 'parseSearchKeep', 'planSearchFilter', 'updateSearchCache']) {
+  for (const fn of ['normCriterion', 'parseSearchKeep', 'planSearchFilter', 'updateSearchCache', 'searchFilterNote']) {
     assert.equal(typeof O[fn], 'function', `manca ${fn}`);
   }
 });
@@ -196,8 +196,41 @@ test('parseSearchKeep: tiene solo gli id keep davvero giudicati, tollera fence e
   // Array nudo di id.
   const r2 = O.parseSearchKeep('["b"]', judge);
   assert.deepEqual([...r2], ['b']);
-  // Risposta non-JSON → nessun keep (non si inventa nulla).
-  assert.equal(O.parseSearchKeep('boh', judge).size, 0);
+  // Risposta non-JSON o senza lista keep → null, non «nessuna tiene» (#382: salvata così avvelenava la cache).
+  assert.equal(O.parseSearchKeep('boh', judge), null);
+  assert.equal(O.parseSearchKeep('{"reply":"Ok."}', judge), null);
+  // Lista vuota letta davvero: nessuna tiene.
+  assert.equal(O.parseSearchKeep('{"keep":[]}', judge).size, 0);
+});
+
+test('parseSearchKeep: i numeri della lista valgono come le carte in quella posizione (#382)', () => {
+  const judge = ['uuid-a', 'uuid-b', 'uuid-c'];
+  assert.deepEqual([...O.parseSearchKeep('{"keep":[1,3]}', judge)].sort(), ['uuid-a', 'uuid-c']);
+  assert.deepEqual([...O.parseSearchKeep('{"keep":["2"]}', judge)], ['uuid-b']);
+  // Fuori lista (0, 4, negativi, decimali) non inventa carte.
+  assert.equal(O.parseSearchKeep('{"keep":[0,4,-1,1.5]}', judge).size, 0);
+});
+
+test('updateSearchCache con keepPrefix: i giudizi di un giudice con altre istruzioni se ne vanno (#382)', () => {
+  const before = { a: { 'vecchio criterio': false, 'fp1|x': true }, b: { 'fp0|y': false } };
+  const after = O.updateSearchCache(before, 'fp1|z', { c: true }, { keepPrefix: 'fp1|' });
+  assert.deepEqual(after, { a: { 'fp1|x': true }, c: { 'fp1|z': true } });
+});
+
+test('searchFilterNote: scartate mai mostrate in silenzio, non controllate sempre dichiarate (#382)', () => {
+  assert.equal(O.searchFilterNote({ found: 10, kept: 4, unverified: 0, criterion: 'x' }), '', 'filtro riuscito: niente da dire');
+  const none = O.searchFilterNote({ found: 12, kept: 0, unverified: 0, criterion: ' dà haste ad altre creature ' });
+  assert.match(none, /12 carte trovate/);
+  assert.match(none, /nessuna corrisponde a «dà haste ad altre creature»/);
+  assert.match(O.searchFilterNote({ found: 1, kept: 0, unverified: 0, criterion: 'x' }), /^Ho controllato la carta trovata, ma non corrisponde a «x»/);
+  const long = O.searchFilterNote({ found: 3, kept: 0, unverified: 0, criterion: 'parola '.repeat(2000) });
+  assert.ok(long.length < 400, 'un criterio lunghissimo non riempie la chat');
+  assert.match(long, /…»/, 'il taglio si vede');
+  const all = O.searchFilterNote({ found: 5, kept: 5, unverified: 5, criterion: 'x', why: 'problema di rete.' });
+  assert.match(all, /senza filtro/);
+  assert.match(all, /Motivo: problema di rete\./);
+  assert.match(O.searchFilterNote({ found: 5, kept: 3, unverified: 1, criterion: 'x' }), /^Una delle carte/);
+  assert.match(O.searchFilterNote({ found: 90, kept: 60, unverified: 40, criterion: 'x' }), /^40 delle carte/);
 });
 
 test('planSearchFilter: separa cache-hit da giudicare, preserva ordine, keepFromCache solo i true', () => {

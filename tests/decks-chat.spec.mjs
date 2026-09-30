@@ -89,6 +89,12 @@ async function mockProvider(app) {
     });
     globalThis.__chatCalls = [];
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      // Il giudice dei risultati (#382) le tiene tutte: qui si prova la chat, non il filtro.
+      const prompt = String(messages[messages.length - 1].content || '');
+      if (/CARTE CANDIDATE/.test(prompt)) {
+        const keep = (prompt.match(/^\d+(?=\. )/gm) || []).map(Number);
+        return { text: JSON.stringify({ keep }), model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      }
       globalThis.__chatCalls.push(messages);
       const last = String(messages[messages.length - 1].content || '');
       const text = /haste/i.test(last)

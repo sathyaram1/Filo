@@ -38,7 +38,7 @@ async function mockScryfall(app) {
       globalThis.__scryRequests.push(String(url));
       const u = new URL(String(url));
       let body = null;
-      if (u.pathname === '/cards/search') body = { data: [CRASHER, BOLT], has_more: false };
+      if (u.pathname === '/cards/search') body = { data: globalThis.__searchCards || [CRASHER, BOLT], has_more: false };
       else if (BY_ID[u.pathname.replace('/cards/', '')]) body = BY_ID[u.pathname.replace('/cards/', '')];
       else if (u.pathname === '/symbology') {
         body = { data: [
@@ -74,9 +74,11 @@ async function mockProvider(app) {
       const last = String(messages[messages.length - 1].content || '');
       let text;
       if (/CARTE CANDIDATE/.test(last)) {
-        // Chiamata al giudice del filtro: registra e tieni solo Lightning Bolt.
+        // Chiamata al giudice del filtro: registra e tieni solo Lightning Bolt (o fai quello che chiede la prova).
         globalThis.__filterCalls.push(last);
-        text = JSON.stringify({ keep: ['bolt-1'] });
+        text = globalThis.__judge ? globalThis.__judge(last) : JSON.stringify({ keep: ['bolt-1'] });
+      } else if (globalThis.__chat) {
+        text = globalThis.__chat(last);
       } else if (/danni/i.test(last)) {
         // Ricerca "a parole": query VOLUTAMENTE LARGA + criterio da filtrare.
         text = JSON.stringify({
@@ -151,4 +153,158 @@ test('ricerca larga + filtro semantico: 2 candidate → 1 tenuta; la ripetizione
   await expect(bubble2.locator('.dk-row-name').first()).toHaveText('Lightning Bolt');
   // Il contatore del giudice NON è avanzato: la cache ha coperto tutto.
   expect(await app.evaluate(() => globalThis.__filterCalls.length)).toBe(1);
+});
+
+// #382 — la ricerca a parole passa SEMPRE dal giudice, e ciò che il giudice scarta non si vede mai.
+// Le carte della segnalazione: una creatura che HA haste (da scartare) e un equipaggiamento che la DÀ.
+async function hasteCards(app) {
+  await app.evaluate(() => {
+    const card = (id, name, cmc, type, oracle) => ({
+      id, name, mana_cost: `{${cmc}}`, cmc, type_line: type, oracle_text: oracle,
+      colors: ['R'], color_identity: ['R'], image_uris: { normal: `https://cards.test/${id}.jpg` },
+      prices: { eur: '0.50' }, legalities: { commander: 'legal' }, scryfall_uri: `https://scryfall.com/card/${id}`,
+    });
+    globalThis.__searchCards = [
+      card('guide-1', 'Goblin Guide', 1, 'Creature — Goblin Scout', 'Haste'),
+      card('hammer-1', 'Hammer of Purphoros', 3, 'Legendary Enchantment Artifact', 'Creatures you control have haste.'),
+    ];
+  });
+}
+
+// La bolla di QUESTO turno, a risposta arrivata.
+async function send(page, text) {
+  const bots = page.locator('.dk-msg-bot');
+  const before = await bots.count();
+  await page.fill('#chatInput', text);
+  await page.press('#chatInput', 'Enter');
+  await expect(bots).toHaveCount(before + 1);
+  const bubble = bots.nth(before);
+  await expect(bubble.locator('.dk-msg-pending')).toHaveCount(0, { timeout: 15_000 });
+  return bubble;
+}
+
+test('#382: senza "filter" dal modello la ricerca a parole passa comunque dal giudice, con la richiesta come criterio', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await hasteCards(app);
+  await app.evaluate(() => {
+    // Il modello scrive la query larga coi sinonimi ma dimentica "filter": è la porta da cui passavano le carte sbagliate.
+    globalThis.__chat = () => JSON.stringify({ reply: 'Cerco carte che danno haste.', query: '(o:"gains haste" or o:"have haste" or o:haste)' });
+    globalThis.__judge = (prompt) => JSON.stringify({ keep: [prompt.split('\n').find((l) => /Hammer of Purphoros/.test(l)).split('.')[0]] });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'carte che danno haste');
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(1);
+  await expect(bubble.locator('.dk-row-name').first()).toHaveText('Hammer of Purphoros');
+  await expect(bubble.locator('.dk-cardlist')).not.toContainText('Goblin Guide');
+  const calls = await app.evaluate(() => globalThis.__filterCalls);
+  expect(calls).toHaveLength(1);
+  expect(calls[0]).toContain('"carte che danno haste"');
+  // I candidati arrivano numerati: il giudice risponde coi numeri, non ricopiando gli id.
+  expect(calls[0]).toMatch(/^1\. Goblin Guide/m);
+  await page.screenshot({ path: 'tests/.shots/decks-search-filter-382.png' });
+});
+
+test('#382: un messaggio tutto in sintassi Scryfall non passa dal giudice', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await hasteCards(app);
+  await app.evaluate(() => {
+    globalThis.__chat = () => JSON.stringify({ query: 'o:haste t:creature' });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'o:haste t:creature');
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(2);
+  expect(await app.evaluate(() => globalThis.__filterCalls.length)).toBe(0);
+});
+
+test('#382: se il giudice le scarta tutte non si mostrano, e la risposta lo dice', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await hasteCards(app);
+  await app.evaluate(() => {
+    globalThis.__chat = () => JSON.stringify({ query: '(o:haste or o:rush)', filter: 'dà haste alle creature attaccanti al turno 1' });
+    globalThis.__judge = () => JSON.stringify({ keep: [] });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'haste al primo turno');
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(0);
+  await expect(bubble).toContainText('Ho controllato una per una le 2 carte trovate, ma nessuna corrisponde a «dà haste alle creature attaccanti al turno 1»');
+  await expect(bubble).not.toContainText('Goblin Guide');
+  await page.screenshot({ path: 'tests/.shots/decks-search-filter-382-nessuna.png' });
+});
+
+test('#382: un giudice che risponde male si richiede, poi le carte restano ma la risposta avvisa; e il guasto non finisce in cache', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await hasteCards(app);
+  await app.evaluate(() => {
+    globalThis.__chat = () => JSON.stringify({ query: '(o:haste)', filter: 'fa guadagnare haste ad altre creature' });
+    globalThis.__judge = () => 'Non saprei.';
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'carte che danno haste');
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(2);
+  await expect(bubble).toContainText('Non sono riuscito a controllare una per una le carte trovate');
+  await expect(bubble).toContainText('formato che non so leggere');
+  await page.screenshot({ path: 'tests/.shots/decks-search-filter-382-guasto.png' });
+  // Una richiesta ripetuta senza cache, non di più.
+  expect(await app.evaluate(() => globalThis.__filterCalls.length)).toBe(2);
+
+  // Il giudice torna a funzionare: la stessa ricerca lo richiama (niente «tutte scartate» salvato) e filtra davvero.
+  await app.evaluate(() => {
+    globalThis.__judge = (prompt) => JSON.stringify({ keep: [prompt.split('\n').find((l) => /Hammer of Purphoros/.test(l)).split('.')[0]] });
+  });
+  const again = await send(page, 'carte che danno haste');
+  await expect(again.locator('.dk-cardlist .dk-row')).toHaveCount(1);
+  await expect(again.locator('.dk-row-name').first()).toHaveText('Hammer of Purphoros');
+  await expect(again).not.toContainText('Non sono riuscito');
+  expect(await app.evaluate(() => globalThis.__filterCalls.length)).toBe(3);
+});
+
+test('#382: oltre un lotto il giudice le guarda tutte, in più chiamate, senza lasciarne fuori nessuna', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await app.evaluate(() => {
+    const cards = [];
+    for (let i = 1; i <= 130; i++) {
+      cards.push({
+        id: `c-${i}`, name: `Carta ${String(i).padStart(3, '0')}${i % 2 ? '' : ' Pari'}`, mana_cost: '{R}', cmc: 1, type_line: 'Instant',
+        oracle_text: 'Draw a card.', colors: ['R'], color_identity: ['R'], image_uris: { normal: `https://cards.test/c${i}.jpg` },
+        prices: { eur: '0.10' }, legalities: { commander: 'legal' }, scryfall_uri: `https://scryfall.com/card/c${i}`,
+      });
+    }
+    globalThis.__searchCards = cards;
+    globalThis.__chat = () => JSON.stringify({ query: 'o:draw', filter: 'carte pari' });
+    // Tiene le «Pari» di ogni lotto, coi numeri del SUO lotto.
+    globalThis.__judge = (prompt) => JSON.stringify({
+      keep: prompt.split('\n').filter((l) => /^\d+\. .* Pari ·/.test(l)).map((l) => Number(l.split('.')[0])),
+    });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'pescate pari');
+  await expect(bubble.locator('.dk-list-summary')).toContainText('65 risultati');
+  await expect(bubble.locator('.dk-cardlist')).toContainText('Carta 130 Pari');
+  await expect(bubble.locator('.dk-cardlist')).not.toContainText('Carta 129');
+  expect(await app.evaluate(() => globalThis.__filterCalls.length)).toBe(3);
 });

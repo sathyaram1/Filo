@@ -16,6 +16,8 @@
 (function (global) {
   'use strict';
 
+  const crypto = require('node:crypto');
+
   const { STORAGE_KEYS, ACTIONS, PROMPTS } = global.SN_CONST;
   const P = global.SN_DECK_OPINIONS;
   const Q = global.SN_SCRYFALL_Q;
@@ -23,6 +25,18 @@
   // Tetto di carte per batch: un mazzo Commander è ≤100; oltre è un errore del
   // chiamante, non un caso d'uso.
   const MAX_BATCH = 120;
+  // Candidati per chiamata del giudice: i lotti partono insieme, e uno corto risponde prima e sbaglia meno.
+  const FILTER_BATCH = 50;
+  const CONFIG_ERRORS = new Set(['NO_MODEL_FOR_ACTION', 'NO_API_KEY', 'LIMIT_REACHED']);
+
+  const digest = (s) => crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 16);
+  // I giudizi salvati valgono per le istruzioni che li hanno prodotti: cambiate quelle, la cache scade da sé
+  // (patterns/una-cache-scade-con-la-richiesta-non-solo-con-l-orologio.md).
+  let judgeFp = '';
+  function judgeFingerprint() {
+    if (!judgeFp) judgeFp = digest(PROMPTS.decksSearchFilter({ criterion: '', cards: '' })).slice(0, 10);
+    return judgeFp;
+  }
 
   async function readOpinions() {
     const r = await chrome.storage.local.get(STORAGE_KEYS.DECK_OPINIONS);
@@ -56,14 +70,16 @@
   }
 
   // Riga di contesto per il prompt: la carta come la vede l'LLM.
-  function cardPromptLine(card) {
-    const parts = [
-      `- [id: ${card.id}] ${card.name}`,
+  function cardPromptBody(card) {
+    return [
+      card.name,
       card.manaCost ? `costo ${card.manaCost}` : '',
       card.typeLine,
       card.oracleText ? `— ${card.oracleText.replace(/\n/g, ' ')}` : '',
-    ].filter(Boolean);
-    return parts.join(' · ');
+    ].filter(Boolean).join(' · ');
+  }
+  function cardPromptLine(card) {
+    return `- [id: ${card.id}] ${cardPromptBody(card)}`;
   }
 
   function deckListForPrompt(deck, cards) {
@@ -181,50 +197,72 @@
     };
   }
 
-  // Filtro semantico dei risultati di ricerca (§4.1): dato l'ordine dei
-  // candidati (già filtrati per colore da Scryfall) e un criterio in
-  // linguaggio naturale, tiene solo le carte che lo rispettano. UNA sola
-  // chiamata LLM per i soli id NON ancora in cache per quel criterio; il
-  // giudizio (carta, criterio) → bool è cacheato permanentemente cross-ricerca.
-  // `cards` è la mappa id → card (per il testo Oracle nel prompt).
-  // Ritorna { keepIds, judgedCount, fromCacheCount }: keepIds preserva l'ordine
-  // dei candidati. Se il criterio è vuoto, non filtra (tiene tutto).
+  // Filtro semantico dei risultati (§4.1): OGNI candidato passa dal giudice, a lotti in parallelo, mai un taglio
+  // silenzioso; chi non ha potuto guardare torna in `unverifiedIds`, visibile, con `error` per dire perché.
   async function filterSearch({ criterion, cardIds, cards, handleAIRequest }) {
-    const ids = (cardIds || []).map(String).filter((id) => cards && cards[id]);
+    const ids = [...new Set((cardIds || []).map(String))].filter((id) => cards && cards[id]);
     const crit = P.normCriterion(criterion);
-    if (!crit || !ids.length) return { keepIds: ids, judgedCount: 0, fromCacheCount: 0 };
+    if (!crit || !ids.length) return { keepIds: ids, unverifiedIds: [], judgedCount: 0, error: null };
 
+    const fp = judgeFingerprint();
+    const key = `${fp}|${digest(crit)}`;
     const cache = await readSearchCache();
-    const plan = P.planSearchFilter({ cardIds: ids, criterion: crit, searchCache: cache });
+    const plan = P.planSearchFilter({ cardIds: ids, criterion: key, searchCache: cache });
 
-    let judged = {};
-    let keptFresh = new Set();
-    if (plan.judgeIds.length) {
-      const toJudge = plan.judgeIds.slice(0, MAX_BATCH);
-      const sys = PROMPTS.decksSearchFilter({
-        criterion,
-        cards: toJudge.map((id) => cardPromptLine(cards[id])).join('\n'),
-      });
-      const r = await handleAIRequest({
-        action: ACTIONS.DECKS_SEARCH_FILTER,
-        payload: { messages: [{ role: 'user', content: sys }] },
-        origin: 'filo://decks',
-      });
-      keptFresh = P.parseSearchKeep(r.text, toJudge);
-      for (const id of toJudge) judged[id] = keptFresh.has(id);
+    const batches = [];
+    for (let i = 0; i < plan.judgeIds.length; i += FILTER_BATCH) batches.push(plan.judgeIds.slice(i, i + FILTER_BATCH));
+    const results = await Promise.all(batches.map((b) => judgeBatch({ criterion, ids: b, cards, handleAIRequest })));
+
+    const judged = {};
+    const unverified = new Set();
+    let error = null;
+    results.forEach((r, i) => {
+      if (r.keep) for (const id of batches[i]) judged[id] = r.keep.has(id);
+      else { for (const id of batches[i]) unverified.add(id); error = error || r.error; }
+    });
+    if (Object.keys(judged).length) {
+      // Riletta prima di scrivere: due ricerche in parallelo non si cancellano i giudizi a vicenda.
       await chrome.storage.local.set({
-        [STORAGE_KEYS.DECK_SEARCH_CACHE]: P.updateSearchCache(cache, crit, judged),
+        [STORAGE_KEYS.DECK_SEARCH_CACHE]: P.updateSearchCache(await readSearchCache(), key, judged, { keepPrefix: `${fp}|` }),
       });
     }
 
-    const keepSet = new Set([...plan.keepFromCache, ...Object.keys(judged).filter((id) => judged[id])]);
-    // Preserva l'ordine originale dei candidati.
-    const keepIds = ids.filter((id) => keepSet.has(id));
+    const keepSet = new Set([...plan.keepFromCache, ...Object.keys(judged).filter((id) => judged[id]), ...unverified]);
     return {
-      keepIds,
-      judgedCount: plan.judgeIds.length,
-      fromCacheCount: plan.keepFromCache.length + (ids.length - plan.judgeIds.length - plan.keepFromCache.length),
+      keepIds: ids.filter((id) => keepSet.has(id)),
+      unverifiedIds: ids.filter((id) => unverified.has(id)),
+      judgedCount: Object.keys(judged).length,
+      error,
     };
+  }
+
+  // Un lotto al giudice. Una risposta illeggibile si richiede una volta senza cache (quella rotta è appena stata
+  // salvata); un errore di configurazione (niente modello, chiave, tetto) non migliora riprovando.
+  async function judgeBatch({ criterion, ids, cards, handleAIRequest }) {
+    const sys = PROMPTS.decksSearchFilter({
+      criterion,
+      cards: ids.map((id, i) => `${i + 1}. ${cardPromptBody(cards[id])}`).join('\n'),
+    });
+    let error = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const r = await handleAIRequest({
+          action: ACTIONS.DECKS_SEARCH_FILTER,
+          payload: { messages: [{ role: 'user', content: sys }] },
+          origin: 'filo://decks',
+          noCache: attempt > 0,
+        });
+        const keep = P.parseSearchKeep(r && r.text, ids);
+        if (keep) return { keep };
+        error = Object.assign(new Error('risposta del filtro illeggibile'), {
+          userText: 'il modello del filtro ha risposto in un formato che non so leggere. Riprova, o scegli un altro modello per «Mazzi — filtro dei risultati di ricerca» in Modelli predefiniti.',
+        });
+      } catch (e) {
+        error = e;
+        if (e && CONFIG_ERRORS.has(e.code)) break;
+      }
+    }
+    return { error };
   }
 
   global.SN_DECK_OPINIONS_SVC = { getOpinions, computeOpinions, autoTag, dropDeck, filterSearch };

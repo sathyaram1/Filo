@@ -192,9 +192,8 @@
     return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
-  // Risposta del batch filtro (§4.1): { "keep": [...] } o un array nudo, con i NUMERI della lista (1 = primo di
-  // judgeIds) o gli id esatti; mai id inventati. `null` = risposta illeggibile: non è «nessuna tiene», e un
-  // chiamante che la salvasse come tutte scartate avvelenerebbe la cache per sempre (#382).
+  // { "keep": [...] } o array nudo, coi NUMERI della lista (1 = judgeIds[0]) o gli id esatti. `null` = illeggibile:
+  // non è «nessuna tiene», e salvata come tutte scartate avvelenerebbe la cache per sempre (#382).
   function parseSearchKeep(text, judgeIds) {
     const ids = (judgeIds || []).map(String);
     const allow = new Set(ids);
@@ -259,7 +258,7 @@
   function searchFilterNote({ found, kept, unverified, criterion, why }) {
     const motivo = why ? ` Motivo: ${why}` : '';
     if (found > 0 && unverified >= found) {
-      return `Non sono riuscito a controllare una per una le carte trovate: qui sotto c'è la ricerca senza filtro, e può contenere carte che non c'entrano.${motivo}`;
+      return `Non sono riuscito a controllare una per una le carte trovate. Qui sotto c'è la ricerca senza filtro, quindi può contenere carte che non c'entrano.${motivo}`;
     }
     if (unverified > 0) {
       return unverified === 1
@@ -267,7 +266,12 @@
         : `${unverified} delle carte qui sotto non le ho potute controllare, quindi potrebbero non c'entrare.${motivo}`;
     }
     if (found > 0 && kept === 0) {
-      return `Ho controllato una per una le ${found === 1 ? 'carta trovata' : `${found} carte trovate`}, ma nessuna corrisponde a «${String(criterion || '').trim()}». Prova a chiederlo con altre parole.`;
+      // Il criterio può essere il messaggio intero dell'utente: in chat se ne cita l'inizio, dichiarando il taglio.
+      const c = String(criterion || '').trim().replace(/\s+/g, ' ');
+      const crit = `«${c.length > 160 ? `${c.slice(0, 159).trimEnd()}…` : c}»`;
+      return found === 1
+        ? `Ho controllato la carta trovata, ma non corrisponde a ${crit}. Prova a chiederlo con altre parole.`
+        : `Ho controllato una per una le ${found} carte trovate, ma nessuna corrisponde a ${crit}. Prova a chiederlo con altre parole.`;
     }
     return '';
   }

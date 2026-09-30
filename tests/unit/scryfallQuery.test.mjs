@@ -23,6 +23,15 @@ test('identityCode: ordina in WUBRG, scarta ignoti, incolore → C', () => {
   assert.equal(Q.identityCode(['X', 'u']), 'U');
 });
 
+test('isPureSyntax: solo un messaggio tutto in sintassi Scryfall salta il giudice dei risultati (#382)', () => {
+  for (const q of ['t:dragon cmc<=3', 'o:haste', '(o:"gains haste" or o:"have haste") -t:creature', 'is:commander id:UR', 'kw:flying and pow>=4']) {
+    assert.equal(Q.isPureSyntax(q), true, q);
+  }
+  for (const q of ['carte che danno haste', 'o:haste a 2 mana', 'draghi', 'Lightning Bolt', '', '   ', 'or and', '(( ))']) {
+    assert.equal(Q.isPureSyntax(q), false, q);
+  }
+});
+
 test('buildSearchQuery: aggiunge id<= con l\'identity del commander (§4)', () => {
   assert.equal(Q.buildSearchQuery('haste', ['U', 'R']), 'haste id<=UR');
   assert.equal(Q.buildSearchQuery('t:artifact cmc<3', []), 't:artifact cmc<3 id<=C');

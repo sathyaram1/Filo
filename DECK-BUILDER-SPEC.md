@@ -73,6 +73,7 @@ L'agente è istruito a marcare **sempre** i nomi carta con la sintassi `[[Nome C
 - **Filtro color identity automatico**: ogni ricerca è vincolata all'identità del commander (`id<=WUBRG-subset`). "Modi per dare haste" in un mazzo Izzet non deve mai proporre carte verdi.
 - **Query cross-mazzo** ("il ramp di mazzo X"): non è una feature di layout, è scope della query. L'agente risolve il riferimento leggendo l'altro mazzo (carte + tag) e produce una `CardList` normale, aggiungibile al mazzo corrente.
 - Query ibride (semantica + sintassi Scryfall esplicita) passano invariate dove l'utente usa sintassi nativa.
+- **Filtro semantico (§4.1)**: una ricerca a parole usa una query larga apposta (sinonimi in OR), e ogni carta che torna passa da un giudice LLM economico, a lotti in parallelo, con cache per carta, criterio e istruzioni del giudice. Si mostra solo quello che il giudice tiene. Salta il giudice solo un messaggio scritto tutto in sintassi Scryfall. Se le scarta tutte, la chat lo dice; se non riesce a giudicare, mostra la ricerca grezza e lo dice. Mai un ripiego silenzioso sui risultati larghi (#382).
 
 ---
 

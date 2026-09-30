@@ -208,6 +208,8 @@ module.exports = function register(on, ctx) {
         }
       }
       if (parsed.query) {
+        // Il criterio del giudice segue la query che è partita davvero: quella corretta al secondo tentativo porta il suo.
+        let criterion = parsed.filter;
         // Filtro identity AUTOMATICO (§4): lo aggiunge search/buildSearchQuery;
         // se l'utente/LLM ha già un vincolo id esplicito, quello vince.
         // La query la scrive il MODELLO e può essere sintatticamente invalida
@@ -257,6 +259,7 @@ module.exports = function register(on, ctx) {
               if (p2.query) {
                 // Il modello ha riprovato: se anche questa fallisce si passa
                 // alla spiegazione generica qui sotto.
+                criterion = p2.filter || criterion;
                 sr = await Scry.search(p2.query, { identity: identityColors });
               } else if (p2.reply) {
                 // Niente query: il modello ha SPIEGATO il problema — è la
@@ -275,22 +278,25 @@ module.exports = function register(on, ctx) {
           cardIds = sr.cards.map((c) => c.id);
           for (const c of sr.cards) cards[c.id] = c;
           query = sr.query;
-          // Filtro semantico (§4.1): la query era LARGA apposta (sinonimi, per
-          // non perdere carte). Se il modello ha dato un "filter", un LLM
-          // economico giudica carta-per-carta se rispetta l'intento, in batch,
-          // con cache (carta, criterio). Best-effort: un errore o un filtro che
-          // svuota TUTTO non deve lasciare l'utente a mani vuote → si ricade
-          // sui risultati larghi.
-          if (parsed.filter && cardIds.length) {
+          // Filtro semantico (§4.1): la query è LARGA apposta, e ogni carta che torna passa dal giudice (#382).
+          // Senza criterio del modello vale la richiesta stessa; solo un messaggio tutto in sintassi è già esatto.
+          const crit = criterion || (Q.isPureSyntax(text) ? '' : text);
+          if (crit && cardIds.length) {
+            const found = cardIds.length;
+            let fr;
             try {
-              const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
-              const fr = await Opinions.filterSearch({
-                criterion: parsed.filter, cardIds, cards, handleAIRequest,
+              fr = await globalThis.SN_DECK_OPINIONS_SVC.filterSearch({
+                criterion: crit, cardIds, cards, handleAIRequest,
               });
-              if (fr && Array.isArray(fr.keepIds) && fr.keepIds.length) {
-                cardIds = fr.keepIds;
-              }
-            } catch (_) { /* filtro fallito: si tengono i risultati larghi */ }
+            } catch (e) {
+              fr = { keepIds: cardIds, unverifiedIds: cardIds, error: e };
+            }
+            cardIds = fr.keepIds;
+            const note = globalThis.SN_DECK_OPINIONS.searchFilterNote({
+              found, kept: fr.keepIds.length, unverified: fr.unverifiedIds.length, criterion: crit,
+              why: fr.error ? (fr.error.userText || friendlyChatError(fr.error)) : '',
+            });
+            if (note) reply = [reply, note].filter(Boolean).join('\n');
           }
         }
       } else if (parsed.cards.length) {

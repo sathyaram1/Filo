@@ -2068,7 +2068,8 @@
       `{"reply": "<testo breve in italiano, opzionale>", "query": "<query Scryfall, opzionale>", "filter": "<criterio in italiano, opzionale>", "cards": ["<scryfall_id>", ...] (opzionale), "budget": <numero | null> (opzionale), "prob": {"turn": <N>, "needs": {"<categoria>": <quante>}} (opzionale), "evaluate": "deck" | "results" (opzionale), "tagWith": ["<tag>", ...] (opzionale), "import": [{"name": "<nome carta>", "qty": <N>}, ...] (opzionale), "commander": "<nome carta>" (opzionale), "clearChat": true (opzionale)}\n\n` +
       `Regole:\n` +
       `- RICERCA (query secca o frase che chiede carte): produci "query" in sintassi Scryfall (termini in inglese: o:, t:, cmc, kw:, ecc.). NON aggiungere vincoli di color identity (id/id<=): li aggiunge il sistema automaticamente. "reply" può restare vuota o contenere UNA frase di contesto. La ricerca la ESEGUE IL SISTEMA con la tua query: hai quindi pieno accesso al database delle carte — non dire mai il contrario. Anche cercare un commander da zero ("un commander izzet che costa 4 e crea elementali") è una RICERCA: query con is:commander e i vincoli richiesti (per i colori del commander cercato usa id:, es. is:commander id:UR).\n` +
-      `- QUERY LARGA + FILTRO: quando la richiesta è concettuale/fuzzy (un EFFETTO, un TEMA, un RUOLO descritti a parole — es. "carte che fanno tornare creature dal cimitero", "pedine che si moltiplicano", "protezione per il commander"), NON restringere troppo la query: scrivi una query VOLUTAMENTE LARGA e generosa, includendo SINONIMI e formulazioni alternative del testo Oracle in OR (usa la sintassi "(o:parola1 or o:parola2 or o:parola3)"), così non perdi carte scritte con parole diverse. In quei casi aggiungi ANCHE "filter": una frase in italiano che descrive CON PRECISIONE cosa deve fare la carta per andare bene. Un secondo modello userà "filter" per tenere solo le carte davvero pertinenti. Se invece la ricerca è già MECCANICA ed esatta (tipo/costo/keyword precisi, es. "t:dragon cmc<=3", "creature volanti a 2 mana"), NON serve "filter": ometterlo.\n` +
+      `- QUERY LARGA: quando la richiesta è concettuale/fuzzy (un EFFETTO, un TEMA, un RUOLO descritti a parole — es. "carte che fanno tornare creature dal cimitero", "pedine che si moltiplicano", "protezione per il commander"), NON restringere troppo la query: scrivi una query VOLUTAMENTE LARGA e generosa, includendo SINONIMI e formulazioni alternative del testo Oracle in OR (usa la sintassi "(o:parola1 or o:parola2 or o:parola3)"), così non perdi carte scritte con parole diverse.\n` +
+      `- FILTRO: ogni RICERCA chiesta a parole ha SEMPRE anche "filter", una frase in italiano che descrive CON PRECISIONE cosa deve essere o fare la carta per andare bene, con tutti i vincoli della richiesta (anche quelli dei messaggi precedenti che la richiesta riprende). Un secondo modello giudica i risultati carta per carta con "filter" e mostra solo quelli che lo rispettano. Descrivi la FUNZIONE, non la parola: "carte che danno haste" è "fa guadagnare haste ad altre creature", non "ha haste". Ometti "filter" SOLO quando il messaggio è scritto tutto in sintassi Scryfall (es. "t:dragon cmc<=3"): lì la query è già la richiesta esatta.\n` +
       `- SINTASSI ESPLICITA: se il messaggio contiene già sintassi Scryfall (es. "o:haste cmc<=2", "t:dragon"), quelle parti passano INVARIATE nella query; traduci solo l'eventuale parte in linguaggio naturale attorno.\n` +
       `- CROSS-MAZZO ("il ramp di mazzo X", "le terre del mio mazzo Y"): NON fare una query. Seleziona dalla lista dell'altro mazzo le carte pertinenti (usa nomi e tag) e metti i loro scryfall_id in "cards", nell'ordine della lista. In "reply" una frase breve su cosa hai selezionato.\n` +
       `- BUDGET ("budget 40 euro", "metti un tetto di 25€", "togli il budget"): metti in "budget" il numero in euro, oppure null per rimuovere il tetto. Il sistema lo applica e conferma da solo: "reply" può restare vuota.\n` +
@@ -2137,17 +2138,18 @@
     // Filtro semantico dei risultati di ricerca (§4.1): decide, carta per
     // carta, se rispetta l'intento dell'utente. La query Scryfall era larga
     // apposta (per non perdere sinonimi), qui si tiene solo il pertinente.
-    // Output JSON tipizzato: la LISTA degli id che superano il filtro.
+    // Risponde coi NUMERI della lista, non con gli id: un modello economico sbaglia a ricopiare un id lungo.
     decksSearchFilter: ({ criterion, cards }) =>
       `Sei un esperto di Magic: The Gathering. L'utente ha cercato carte con questo criterio, in italiano:\n"${criterion}"\n\n` +
-      `Qui sotto una lista di carte candidate (già filtrate per colore). Per OGNI carta decidi se rispetta DAVVERO il criterio, guardando cosa fa la carta (testo Oracle, tipo, costo) — non basta che contenga una parola simile.\n\n` +
+      `Qui sotto le CARTE CANDIDATE, numerate (già filtrate per colore). Per OGNI carta decidi se rispetta DAVVERO il criterio, guardando cosa fa la carta (testo Oracle, tipo, costo) — non basta che contenga una parola simile.\n\n` +
       `CARTE CANDIDATE:\n${cards}\n\n` +
-      `Rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`): la lista degli id delle carte che rispettano il criterio:\n` +
-      `{"keep": ["<scryfall_id>", ...]}\n\n` +
+      `Rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`): i numeri delle carte che rispettano il criterio:\n` +
+      `{"keep": [<numero>, ...]}\n\n` +
       `Regole:\n` +
       `- Metti in "keep" SOLO le carte che rispettano il criterio; ometti le altre.\n` +
-      `- Sii generoso ma onesto: se una carta è chiaramente pertinente all'intento (anche se descritta con parole diverse), tienila; se non c'entra, scartala.\n` +
-      `- Usa gli id ESATTAMENTE come scritti; mai inventarne.\n` +
+      `- Guarda la FUNZIONE che il criterio chiede: se chiede di DARE qualcosa ad altre carte (haste, protezione, pedine, una capacità), una carta che ce l'ha solo per sé non va bene.\n` +
+      `- Se una carta fa davvero ciò che il criterio chiede, anche con parole diverse, tienila; se non c'entra, scartala.\n` +
+      `- Usa SOLO i numeri della lista.\n` +
       `- Se NESSUNA carta è pertinente, rispondi {"keep": []}.`,
   };
 
