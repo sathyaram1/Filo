@@ -65,13 +65,22 @@
   // forma alfanumerica minuscola, così "Mario_Rossi", "mario.rossi" e
   // "MarioRossi" collassano sulla stessa chiave e i separatori non aiutano a
   // evadere il match.
+  // Ogni sequenza «%xx» si decodifica per conto suo: un solo «%» spaiato non deve spegnere la
+  // decodifica dell'intero indirizzo (#810).
+  function decodificaPercento(s) {
+    return s.replace(/(?:%[0-9A-Fa-f]{2})+/g, (pezzo) => {
+      try { return decodeURIComponent(pezzo); } catch (_) {
+        return pezzo.replace(/%([0-9A-Fa-f]{2})/g, (m, h) => (parseInt(h, 16) < 128 ? String.fromCharCode(parseInt(h, 16)) : m));
+      }
+    });
+  }
+
   function varianti(url) {
     const raw = String(url || '');
     const pieces = [raw];
     let cur = raw;
     for (let i = 0; i < 3; i++) {
-      let dec = cur;
-      try { dec = decodeURIComponent(cur.replace(/\+/g, ' ')); } catch (_) { dec = cur; }
+      const dec = decodificaPercento(cur.replace(/\+/g, ' '));
       if (dec === cur) break;
       pieces.push(dec);
       cur = dec;

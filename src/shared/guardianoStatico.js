@@ -86,6 +86,21 @@
     return somma % 10 === 0;
   }
 
+  // Una carta ha la forma del suo circuito: prefisso e lunghezza, oltre alla cifra di controllo. Quella da
+  // sola la passa un numero lungo su dieci: un video, un ordine, un istante nei log.
+  function cartaValida(raw) {
+    const s = String(raw || '').replace(/[\s-]/g, '');
+    if (!luhn(s)) return false;
+    const n = s.length;
+    const p = (k) => Number(s.slice(0, k));
+    if (s[0] === '4') return n === 13 || n === 16 || n === 19;
+    if ((p(2) >= 51 && p(2) <= 55) || (p(4) >= 2221 && p(4) <= 2720)) return n === 16;
+    if (p(2) === 34 || p(2) === 37) return n === 15;
+    if (p(2) === 36 || p(2) === 38 || p(2) === 39 || (p(3) >= 300 && p(3) <= 305)) return n >= 14;
+    if ((p(4) >= 3528 && p(4) <= 3589) || p(4) === 6011 || p(2) === 62 || p(2) === 65 || (p(3) >= 644 && p(3) <= 649)) return n >= 16;
+    return (p(2) === 50 || (p(2) >= 56 && p(2) <= 69)) && n >= 12;
+  }
+
   // L'host che una scritta NOMINA, se ne nomina uno: un indirizzo intero o un
   // nome di dominio scritto in chiaro.
   function hostNominato(etichetta) {
@@ -159,7 +174,7 @@
       }
     }
     for (const m of s.match(CARTA_RE) || []) {
-      if (luhn(m)) {
+      if (cartaValida(m)) {
         return { blocca: true, regola: 'carta', motivo: 'conteneva quello che sembra il numero di una carta' };
       }
     }
@@ -239,13 +254,15 @@
 
   // Il codice è quello che la parola annuncia: un attacco («è», «:», un «=» da solo) e al più parole che
   // lo precisano, mai dentro un indirizzo né dopo una virgola che apre altro. Dopo quelle parole i due
-  // punti annunciano la parola che li precede: lì «1500» o «BENVENUTO10» sono altro. `stretto`: solo l'attacco.
+  // punti annunciano la parola che li precede: lì «1500» o «BENVENUTO10» sono altro. `stretto`: solo l'attacco,
+  // e che ci sia: «Password dimenticata?» non annuncia niente.
   const ATTACCO = /(?:^|[:=]|(?:^|[\s(])(?:è|e'|is|are|was|sono|ecco|here|vale|risulta|seguente|seguenti|following))$/i;
   const SOLO_ATTACCO = /^\s*(?:[:=]|è|e'|is|are|was|sono|ecco|here|vale|risulta)?\s*$/i;
   const ALTRA_FRASE = /[.!?]\s+[A-ZÀ-Ý]/;
   function annunciato(fra, valore = '', { stretto = false } = {}) {
     if (ALTRA_FRASE.test(fra) || /\/|\bwww\./i.test(fra)) return false;
     const g = fra.replace(/(?:\s*(?:\d{1,3}[.)]|[•·*"'«»“”(-]))*\s*$/, '');
+    if (stretto && !g.trim()) return false;
     if (!ATTACCO.test(g)) return false;
     if (/=\s*$/.test(g) && !/^\s*=\s*$/.test(g)) return false;
     if (/[,;]\s/.test(g) && !SOLO_ATTACCO.test(g.split(/[,;]\s/).pop())) return false;
@@ -264,22 +281,26 @@
   function dentroUnNome(s, i, j) {
     return /[a-z0-9][-_.]$/.test(s.slice(Math.max(0, i - 2), i)) || /^[-_.][a-z]/.test(s.slice(j, j + 2));
   }
-  // «one-time» da solo è un acquisto o un pagamento: annuncia un codice solo se lo nomina.
-  const ONE_TIME_CODICE = /^[\s-]+(?:use[\s-]+)?(?:[a-z]+[\s-]+)?(?:password|pass\s?code|code|pin)s?\b/i;
 
   // «Password: …», «la tua nuova password è …»: la parola da sola annuncia una password solo se la
   // segue subito l'attacco. Solo qui e non in `controlla`: un avviso che nomina la password e una
   // data non ha niente da fermare.
   const MARCHIO_PASSWORD = /\b(?:password|passcode|passphrase)\b/i;
-  // Una parola sola, con una lettera e una cifra o un simbolo: «Tr7#kq29Lm».
+  // Una parola sola, con una lettera e una cifra o un simbolo DENTRO: «Tr7#kq29Lm», «Kx82mPq!». Il segno ai
+  // bordi («dimenticata?», «(obbligatoria)», «manager:») è punteggiatura; un indirizzo o una mail non sono password.
   const FORMA_PASSWORD = /^(?=.*[A-Za-z])(?=.*[^A-Za-z])(?=(?:[^A-Za-z0-9]*[A-Za-z0-9]){6})[^\s"'«»“”<>]{6,64}$/;
+  function sembraPassword(v) {
+    if (!FORMA_PASSWORD.test(v) || /:\/\/|^www\./i.test(v) || /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(v)) return false;
+    const nucleo = v.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '');
+    return /\d/.test(nucleo) || /[^A-Za-z0-9]/.test(nucleo);
+  }
   function passwordAnnunciata(s, fine, stretto, out) {
     const finestra = s.slice(fine, fine + RAGGIO + 64);
     const re = /\S+/g;
     let t;
     while ((t = re.exec(finestra)) && t.index <= RAGGIO) {
       const v = t[0].replace(/[.,;)»”"']+$/, '');
-      if (!FORMA_PASSWORD.test(v)) continue;
+      if (!sembraPassword(v)) continue;
       if (annunciato(finestra.slice(0, t.index), v, { stretto })) out.push({ valore: v, regola: 'password' });
       return;
     }
@@ -300,13 +321,8 @@
     let parola;
     while ((parola = cerca.exec(s)) && out.length < MAX_ESTRATTI) {
       const inizio = parola.index;
-      let fine = inizio + parola[0].length;
+      const fine = inizio + parola[0].length;
       if (dentroUnNome(s, inizio, fine)) continue;
-      if (/^one[\s-]?time$/i.test(parola[0])) {
-        const coda = ONE_TIME_CODICE.exec(s.slice(fine, fine + 40));
-        if (!coda) continue;
-        fine += coda[0].length;
-      }
       if (!tutti) tutti = candidatiDi(s);
       const regola = /pass/i.test(s.slice(inizio, fine)) ? 'password' : 'codice';
       const presi = [];
@@ -348,7 +364,7 @@
       if (ibanValido(m)) out.push({ valore: m.replace(/\s/g, ''), regola: 'iban' });
     }
     for (const m of s.match(CARTA_RE) || []) {
-      if (luhn(m)) out.push({ valore: m.replace(/[\s-]/g, ''), regola: 'carta' });
+      if (cartaValida(m)) out.push({ valore: m.replace(/[\s-]/g, ''), regola: 'carta' });
     }
     const visti = new Set();
     return out.filter((x) => {
@@ -384,7 +400,7 @@
   }
 
   global.SN_GUARDIANO_STATICO = {
-    controlla, ibanValido, luhn, hostNominato, hostDi, stessoSito, linkNelTesto,
+    controlla, ibanValido, luhn, cartaValida, hostNominato, hostDi, stessoSito, linkNelTesto,
     segretiNelTesto, oscuraSegreti, SEGRETO_MIN, OSCURATO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
