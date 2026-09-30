@@ -92,7 +92,7 @@ test('dal dettaglio: il tasto «Locale» mette il segno, la pratica passa nei La
   const btn = page.locator('#mgLocalBtn');
   await expect(btn).toBeVisible();
   await expect(btn).toHaveAttribute('aria-pressed', 'false');
-  await expect(btn).toHaveAttribute('title', /nessuna routine/);
+  await expect(btn).toHaveAttribute('title', /nessuna routine/i);
   await btn.click();
   await expect(btn).toHaveAttribute('aria-pressed', 'true');
   await expect(btn).toHaveText(/Solo locale/);
