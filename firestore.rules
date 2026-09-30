@@ -198,6 +198,22 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // config/redteam (#896) → `openToAll`: il Red Team è aperto a chi non è
+    // admin? Spento, assente o illeggibile = in pausa; le callable del server lo
+    // leggono con l'Admin SDK. Lettura pubblica: dentro c'è un interruttore e
+    // basta, e la pagina del Red Team deve poter dire «in pausa» a chiunque.
+    match /config/redteam {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['openToAll', 'updatedAt'])
+        && request.resource.data.get('openToAll', false) is bool
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt is timestamp
+            || (request.resource.data.updatedAt is string
+                && request.resource.data.updatedAt.size() <= 40));
+      allow delete: if isAdmin();
+    }
+
     // config/supportModels → modelli per gli slot di supporto (sanitizer,
     // judge1, judge2, judge3, judgeDynamic, judgeRedTeam, judgePriority). Ogni
     // campo è una stringa catena di nickname ("flash, flash-or"), stesso
