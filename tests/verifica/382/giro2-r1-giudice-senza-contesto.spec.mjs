@@ -24,9 +24,9 @@ test('una richiesta che parla del commander: il giudice sa chi è', async ({ app
       card('ogre-1', 'Hulking Ogre', 3, 'Creature — Ogre', "Hulking Ogre can't block creatures with power 2 or less."),
     ]];
     globalThis.__chat = () => JSON.stringify({ reply: 'Cerco carte per il tuo commander.', query: '(t:instant or t:sorcery or t:creature)', filter: 'carte che sinergizzano con il commander del mazzo' });
-    // Sa giudicare la sinergia solo se il prompt dice chi è il commander e cosa fa.
+    // Sa giudicare la sinergia solo se il prompt dice chi è il commander.
     globalThis.__judge = (prompt) => {
-      if (!/Niv-Mizzet/.test(prompt) || !/instant or sorcery/i.test(head(prompt))) return JSON.stringify({ keep: [] });
+      if (!/Niv-Mizzet/.test(head(prompt))) return JSON.stringify({ keep: [] });
       return JSON.stringify({ keep: lines(prompt).filter((l) => /Instant|Sorcery/.test(l)).map((l) => Number(l.split('.')[0])) });
     };
   });
