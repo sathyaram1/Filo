@@ -753,6 +753,14 @@ test('localSignCheck: pratica chiusa, segnalata o in mano a una routine → no',
   assert.equal(MR.localSignCheck(locale({ status: 'FENC1:abc' }), true, { now }).ok, false);
 });
 
+test('localSenderCheck: la pratica da legare a un lavoro locale, segno o no', () => {
+  assert.equal(MR.localSenderCheck(locale({ localOnly: SEGNO })).ok, true);
+  assert.equal(MR.localSenderCheck(locale({ clientId: 'owner:me' })).ok, true);
+  assert.deepEqual(Object.values(MR.localSenderCheck(locale({ clientId: 'abc123', senderProof: undefined }))).slice(0, 2), [false, true]);
+  assert.equal(MR.localSenderCheck(locale({ senderProof: undefined })).utente, true);
+  assert.equal(MR.localSenderCheck(locale({ clientId: 'routine:worker', senderProof: 'server' })).ok, false);
+});
+
 test('localSignCheck: togliere il segno si può sempre, se c’è', () => {
   assert.equal(MR.localSignCheck(locale({ clientId: 'abc', senderProof: undefined, localOnly: SEGNO }), false).ok, true);
   assert.equal(MR.localSignCheck(locale(), false).ok, false);
