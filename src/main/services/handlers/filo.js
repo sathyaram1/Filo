@@ -188,7 +188,9 @@ module.exports = function register(on, ctx) {
     // la chat è finita — come per un turno normale.
     if (sender && sender.wc) ctx.affidaChat(id, sender.wc);
     const role = msg.role === 'user' ? 'user' : 'filo';
-    await FiloChats.append(id, { role, text });
+    // L'esito di un comando lanciato a mano l'ha scritto il comando: riaperta, la chat lo tratta da letto (#810).
+    const esterno = role === 'filo' && msg.esterno === 'comando' ? "dall'output di un comando" : '';
+    await FiloChats.append(id, { role, text, ...(esterno ? { esterno } : {}) });
     return { ok: true };
   });
 
