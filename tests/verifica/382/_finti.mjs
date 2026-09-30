@@ -1,5 +1,5 @@
-// #382 giro 3: Scryfall e provider finti nel main per le prove del giudice delle ricerche a parole.
-// Non è uno spec: lo importano i giro3-*.spec.mjs di questa cartella.
+// #382: Scryfall e provider finti nel main per le prove del giudice delle ricerche a parole.
+// Non è uno spec: lo importano gli spec di questa cartella.
 
 import { expect } from '../../fixtures/electron.mjs';
 
