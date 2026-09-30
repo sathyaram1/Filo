@@ -653,9 +653,9 @@
     return riga;
   }
 
-  // Come la chat della home: la notifica se ne va in pochi secondi, il bottone resta. Conta solo il
-  // clic vero dell'utente, perché il bottone sta nel DOM della pagina; il main accetta solo gli
-  // indirizzi che la lista ha fermato a un'apertura di questo assistente.
+  // Come la chat della home: la notifica se ne va in pochi secondi, il bottone resta. Sta nel DOM della
+  // pagina, che può spostarlo, travestirlo e dargli il fuoco: per questo non apre niente, riporta la
+  // notifica «Sito bloccato» di Filo, e il sì si dà lì. La pagina può farla comparire anche da sé.
   function bottoneApriComunque(dopo, { host, url } = {}) {
     if (!dopo || !/^https?:\/\//i.test(String(url || ''))) return;
     const wrap = document.createElement('div');
@@ -664,17 +664,9 @@
     btn.type = 'button';
     btn.className = 'sn-sidebar-choice';
     btn.textContent = `Apri comunque ${host || url}`;
-    btn.title = `Apri ${host || url} anche se è fra i siti bloccati`;
-    let tastoAt = 0;
-    btn.addEventListener('keydown', (e) => { if (e.isTrusted && (e.key === 'Enter' || e.key === ' ')) tastoAt = Date.now(); });
-    btn.addEventListener('click', (e) => {
-      // Un clic della pagina (finto, o girato da un'etichetta che la pagina ci ha messo intorno) non vale:
-      // col mouse il punto cliccato è il bottone, da tastiera il tasto è stato premuto sul bottone.
-      const sulBottone = e.detail === 0 ? Date.now() - tastoAt < 1000 : document.elementFromPoint(e.clientX, e.clientY) === btn;
-      if (!e.isTrusted || !sulBottone || btn.disabled) return;
-      btn.disabled = true;
+    btn.title = `Filo ti chiede conferma nella notifica «Sito bloccato»`;
+    btn.addEventListener('click', () => {
       Promise.resolve().then(() => chrome.runtime.sendMessage({ type: MSG.APRI_COMUNQUE, url })).catch(() => {});
-      setTimeout(() => { btn.disabled = false; }, 2000);
     });
     wrap.appendChild(btn);
     dopo.insertAdjacentElement('afterend', wrap);
