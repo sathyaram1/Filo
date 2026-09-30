@@ -174,6 +174,35 @@
   // questo modulo. `active` serve a done() e agli hook di test qui sotto.
   let active = null; // { host, root }
 
+  // Su una pagina che non è di Filo il popup non eredita nessuna variabile dal
+  // documento, che la pagina riscrive (#592.7): le fissa sul suo overlay, dentro
+  // il root chiuso, dal tema e dai token che gli passa content.js.
+  const tema = { theme: null, tokens: {} };
+  function variabili(tokens, theme) {
+    const T = global.SN_THEME_TOKENS;
+    const val = (n) => (T && T.get(n) ? T.effectiveValue(n, tokens || {}, theme) : null);
+    const out = {};
+    for (const [, nome] of CSS.matchAll(/var\((--sn-[\w-]+)/g)) {
+      const tok = T ? T.names().find((n) => T.get(n).css === nome) : null;
+      out[nome] = (tok && val(tok)) || 'initial';
+    }
+    const sel = val('selection.color');
+    const op = Number(val('selection.opacity'));
+    if (sel && op >= 0) out['--sn-selection-bg'] = `color-mix(in srgb, ${sel} ${op * 100}%, transparent)`;
+    return out;
+  }
+  function fissaVariabili(overlay) {
+    if (!global.location || global.location.protocol === 'filo:') return;
+    const scuro = tema.theme ? tema.theme === 'dark' : !!(global.matchMedia && global.matchMedia('(prefers-color-scheme: dark)').matches);
+    overlay.style.cssText = Object.entries(variabili(tema.tokens, scuro ? 'dark' : 'light')).map(([k, v]) => `${k}:${v}`).join(';');
+  }
+  function impostaTema({ theme, tokens } = {}) {
+    if (theme === 'light' || theme === 'dark') tema.theme = theme;
+    if (tokens && typeof tokens === 'object') tema.tokens = tokens;
+    const o = active && active.root.querySelector('.sn-confirm-overlay');
+    if (o) fissaVariabili(o);
+  }
+
   // Chi batteva un carattere in un campo un attimo fa sta scrivendo: un popup che
   // si apre in quel momento gli lascia i tasti nel suo campo (#592). L'Invio che
   // spedisce e i tasti dati a un popup no: dopo, l'utente aspetta Filo.
