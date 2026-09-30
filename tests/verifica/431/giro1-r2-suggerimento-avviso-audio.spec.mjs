@@ -32,6 +32,7 @@ test('sull\'altoparlante il suggerimento di Filo dice Silenzia, sul muto Riattiv
 
   const altoparlante = shell.locator(`.tab[data-id="${suona}"] .audio-ind`);
   await expect(altoparlante).toHaveCount(1, { timeout: 10_000 });
+  await ferma(altoparlante);
   await shell.mouse.move(5, 200);
   await altoparlante.hover();
   await expect.poll(ultimo, { timeout: 3000 }).toMatch(/silenzia/i);
