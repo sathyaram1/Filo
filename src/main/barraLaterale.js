@@ -169,10 +169,13 @@ class BarraLaterale {
   // Input vero arrivato alla scheda o alla fila delle schede, cioè fuori dalla barra.
   inputAltrove(input) {
     if (!input) return;
-    // Chi trascina o seleziona del testo arriva sul bordo con un tasto premuto: non spinge.
-    if (input.type === 'mouseDown') this.tastoGiu = true;
-    else if (input.type === 'mouseUp') this.tastoGiu = false;
-    if (!this.aperta && (input.type === 'mouseMove' || input.type === 'mouseLeave')) this._forseBordo();
+    this._tasti('scheda', input);
+    if (!this.aperta) {
+      // Uscendo dalla pagina il puntatore può andare dove la pagina non lo vede più (la fascia del sistema,
+      // fuori dalla finestra): da lì lo guarda il main, anche arrivando di corsa.
+      if (input.type === 'mouseLeave') this._guarda();
+      else if (input.type === 'mouseMove') this._forseBordo();
+    }
     // Il rilascio di un trascinamento dal menu arriva sempre qui: se la pagina non dice più
     // «fine» (ha navigato, è caduta), la barra non resta ferma ad aspettarla.
     if (this.trascinamento) {
