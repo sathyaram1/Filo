@@ -217,3 +217,13 @@ test('la pagina gemella dei feedback ha la stessa sezione, con lo stesso numero'
   await expect(page.locator('#tabs [data-tab="local"]')).toHaveText('Lavori locali (1)');
   await expect(page.locator('#tabs [data-tab="queue"]')).toHaveText('In coda (1)');
 });
+
+test('il segno messo da una sessione dice chi l’ha messo come la testata, non col mittente grezzo', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [fb({ localOnly: { by: 'local:claude', at: SEGNO.at } })], { tab: 'local' });
+  await page.evaluate(() => window.__mgTest.openDetail('loc-1'));
+  const tasto = page.locator('#mgLocalBtn');
+  await expect(tasto).toBeVisible();
+  await expect(tasto).toHaveAttribute('title', /Segno messo da Claude \(sessione locale\)/);
+  await expect(tasto).not.toHaveAttribute('title', /local:claude/);
+});

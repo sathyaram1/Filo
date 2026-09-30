@@ -363,7 +363,7 @@ export async function scrivi(id, to, nota, opts = {}) {
   // Di questo documento si guardano lo stato (per sapere se il passaggio è
   // legale) e le note (per fondere il report): basta chiedere quei due, e la
   // lettura va nel conto di chi ci ha mandato qui (#680).
-  const doc = await getDoc(id, bearer, ['status', 'notes']);
+  const doc = await getDoc(id, bearer, ['status', 'notes', 'clientId', 'senderProof']);
   if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
 
@@ -375,6 +375,8 @@ export async function scrivi(id, to, nota, opts = {}) {
   }
   const vietata = partenzaVietata(from);
   if (vietata) return { ok: false, motivo: vietata, from };
+  const lavoro = from === to ? null : await lavoroVietato(doc, to);
+  if (lavoro) return { ok: false, motivo: lavoro.motivo, utente: lavoro.utente, from };
   const check = transizioneAmmessa(from, to, opts.attore || 'owner');
   if (!check.ok) return { ok: false, motivo: check.motivo, from };
 
