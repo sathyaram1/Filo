@@ -238,6 +238,7 @@
 
     const overlay = doc.createElement('div');
     overlay.className = 'sn-confirm-overlay';
+    fissaVariabili(overlay);
     const box = doc.createElement('div');
     box.className = 'sn-confirm-box';
     overlay.appendChild(box);
