@@ -715,7 +715,7 @@
       async function runConfirm() {
         if (btn.disabled) return;
         const Ui = window.SN_CONFIRM_UI;
-        const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '' };
+        const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '', parti: a._confirm.parti };
         const ok = Ui
           ? await (a._confirm.level >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : window.confirm(opts.text); // fallback se il modulo non è caricato

@@ -650,7 +650,7 @@
     // l'azione (riclassificata di nuovo nel main) via FILO_CONFIRM_ACTION.
     if (res.needsConfirm) {
       const Ui = global.SN_CONFIRM_UI;
-      const opts = { title: 'Filo chiede conferma', text: res.describe || '' };
+      const opts = { title: 'Filo chiede conferma', text: res.describe || '', parti: res.parti };
       let ok = false;
       try {
         ok = Ui
@@ -798,14 +798,17 @@
     // Conferma per le azioni che escono verso l'esterno (stesso popup di Filo).
     if (spec.confirm) {
       const Ui = global.SN_CONFIRM_UI;
+      // Il testo intero e nel suo riquadro: si conferma quello che si legge, e il
+      // testo non può chiudere le virgolette e parlare come Filo (#592.7).
       let detail = '';
-      if (spec.target === 'text') detail = text.length > 80 ? `${text.slice(0, 80)}…` : text;
+      if (spec.target === 'text') detail = text;
       else if (imgEl) detail = imgEl.currentSrc || imgEl.src || '';
       else if (linkEl) detail = linkEl.href || '';
       const describe = `${label}${detail ? `:\n“${detail}”` : ''}`;
+      const parti = detail ? [`${label}:`, { citazione: detail, nuda: spec.target !== 'text' }] : [label];
       let ok = false;
       try {
-        ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: describe }) : global.confirm(describe);
+        ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: describe, parti }) : global.confirm(describe);
       } catch (_) { ok = false; }
       if (!ok) { appendActionLog(`${label}: annullata`); return false; }
     }

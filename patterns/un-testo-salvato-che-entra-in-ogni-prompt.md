@@ -23,6 +23,14 @@ Valgono insieme queste regole:
   in cui niente si disegna, non quella senza caratteri: una riga di soli spazi a
   larghezza zero o giuntori a schermo è bianca. Anche toglierlo passa dal popup:
   si perde il testo dell'utente.
+- **Il testo proposto sta in un riquadro suo, non fra virgolette.** Fra
+  virgolette il modello le chiudeva da sé e continuava con un finto avviso di
+  Filo (#592.7); cambiarle non basta, perché restano quelle che si somigliano.
+  La descrizione del popup è a pezzi: stringhe per le parole di Filo e
+  `{ citazione }` / `{ elenco }` per il testo del modello o salvato, che il
+  popup disegna su un foglietto tinto d'accento. Vale per ogni popup che mostra
+  un testo non di Filo (feedback a suo nome, righe da dimenticare, comando,
+  link, ricerca, sveglie, documento).
 - **Si conferma quello che si è visto.** La pulizia dei caratteri non basta da
   sola: tre giri di verifica di fila hanno spinto l'istruzione sotto il bordo
   con righe vuote, poi di spazi a larghezza zero, poi di righe innocue o di un
@@ -63,7 +71,8 @@ pagina che le mostra. La memoria sta nella parte variabile del prompt, dopo le
 regole anti-inganno, per non rompere il prefisso comune (#422): le regole la
 nominano, e il recinto le toglie l'autorità di un ordine.
 
-Dove: `stile_agente` e `lezioneDaAzione` in `src/shared/preferences.js`,
+Dove: `describeParts` in `src/shared/actionLevels.js` e i riquadri in
+`src/shared/confirmUi.js`, `stile_agente` e `lezioneDaAzione` in `src/shared/preferences.js`,
 `memoriaImbustata` e `MEMORIA_FILO` accanto allo stile, `testoLeggibile`,
 `injectAgentStyle` e `INIZIO_ANTI_INGANNO` in `src/shared/constants.js`,
 `STILE_UTENTE` in `src/shared/contenutoEsterno.js`, `bersagliMostrati` in
@@ -71,4 +80,5 @@ Dove: `stile_agente` e `lezioneDaAzione` in `src/shared/preferences.js`,
 `tests/unit/preferences.test.mjs` (ogni setter a testo libero è confermato e
 con tetto, o dichiara di non finire in un prompt) e
 `tests/unit/stileAgentePrompt.test.mjs` (nessuna frase anti-inganno prima dello
-stile, in nessun prompt che lo riceve).
+stile, in nessun prompt che lo riceve) e `tests/unit/actionLevels.test.mjs`
+(in nessun popup il testo del modello sta fra le parole di Filo).

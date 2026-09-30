@@ -1342,6 +1342,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
       kept: true,
       needsConfirm: level,
       describe: Levels ? Levels.describe(action) : '',
+      parti: Levels ? Levels.describeParts(action) : [],
     };
   }
   // #250 — Un'azione che RICHIEDE conferma non può arrivare `confirmed` da una
@@ -2987,7 +2988,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
         // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
-        if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '' };
+        if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '', parti: res.parti };
         // Output di un comando eseguito subito (livello 1) o esito bloccato
         // (terminale spento): il client lo mostra in chat (#146.6).
         if (res.output) rendered._output = res.output;
@@ -3072,7 +3073,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const res = await executeFiloAction(proposal, { sender });
     if (res.kept) {
       const rendered = res.needsConfirm
-        ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '' } }
+        ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '', parti: res.parti } }
         : { ...proposal };
       if (res.output) rendered._output = res.output;
       renderedActions.push(rendered);

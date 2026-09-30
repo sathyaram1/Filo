@@ -1,8 +1,10 @@
 // Componenti di conferma riusabili per i livelli di sicurezza delle azioni
 // di Filo (#146.2). Stile minimale, costruito sui token del tema (--sn-*).
 //
-//   SN_CONFIRM_UI.confirm({ title, text, okLabel, cancelLabel }) → Promise<bool>
+//   SN_CONFIRM_UI.confirm({ title, text, parti, okLabel, cancelLabel }) → Promise<bool>
 //     Livello 2: popup che SPIEGA in chiaro la modifica, con OK e Annulla.
+//     `parti` (facoltativo, vince su `text`): stringhe di Filo e riquadri
+//     { citazione } / { elenco } col testo che non è suo (#592.7).
 //
 //   SN_CONFIRM_UI.confirmTyped({ title, text, word }) → Promise<bool>
 //     Livello 3: box con attrito maggiore — il bottone resta disabilitato
@@ -61,6 +63,24 @@
      sotto gli occhi (tuttoVisto). Il tetto lascia posto a titolo e bottoni. */
   max-height: min(640px, calc(100vh - 160px));
   overflow-y: auto;
+}
+.sn-confirm-filo { margin: 0; }
+/* Il testo che non è di Filo (proposto dal modello, o salvato) sta su un
+   foglietto tinto d'accento con un filo a sinistra: le parole di Filo non ce
+   l'hanno, e nessun carattere del testo ne esce. */
+.sn-confirm-quote {
+  margin: 6px 0 10px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--sn-accent, #c45a3b) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sn-accent, #c45a3b) 30%, transparent);
+  border-left: 3px solid var(--sn-accent, #c45a3b);
+  border-radius: var(--sn-radius, 6px);
+}
+.sn-confirm-quote:last-child { margin-bottom: 0; }
+.sn-confirm-quote-voce + .sn-confirm-quote-voce {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--sn-accent, #c45a3b) 22%, transparent);
 }
 .sn-confirm-input {
   display: block;
@@ -256,7 +276,7 @@
     return { overlay, box, done, troppoPresto, fuoco };
   }
 
-  function header(box, { title, text }) {
+  function header(box, { title, parti }) {
     const doc = global.document;
     if (title) {
       const h = doc.createElement('div');
@@ -266,8 +286,49 @@
     }
     const p = doc.createElement('div');
     p.className = 'sn-confirm-text';
-    p.textContent = text || '';
+    if (parti.some(riquadro)) riempi(p, parti);
+    else p.textContent = parti.join('');
     box.appendChild(p);
+  }
+
+  const riquadro = (x) => !!x && typeof x === 'object' && (Array.isArray(x.elenco) || x.citazione != null);
+  function partiDi(text, parti) {
+    const buone = Array.isArray(parti) ? parti.filter((x) => typeof x === 'string' || riquadro(x)) : [];
+    return buone.length ? buone : [String(text ?? '')];
+  }
+
+  // Il testo che non è di Filo va in un elemento suo, riempito con textContent:
+  // il bordo lo chiude il DOM, non un carattere (#592.7). Gli a capo accanto a un
+  // riquadro li fa il riquadro stesso.
+  function riempi(el, parti) {
+    const doc = global.document;
+    const fuse = [];
+    for (const x of parti) {
+      if (typeof x === 'string' && typeof fuse[fuse.length - 1] === 'string') fuse[fuse.length - 1] += x;
+      else fuse.push(x);
+    }
+    fuse.forEach((x, i) => {
+      if (typeof x === 'string') {
+        let s = x;
+        if (riquadro(fuse[i - 1])) s = s.replace(/^\s+/, '');
+        if (riquadro(fuse[i + 1])) s = s.replace(/\s+$/, '');
+        if (!s) return;
+        const t = doc.createElement('div');
+        t.className = 'sn-confirm-filo';
+        t.textContent = s;
+        el.appendChild(t);
+        return;
+      }
+      const q = doc.createElement('div');
+      q.className = 'sn-confirm-quote';
+      for (const v of Array.isArray(x.elenco) ? x.elenco : [x.citazione]) {
+        const r = doc.createElement('div');
+        r.className = 'sn-confirm-quote-voce';
+        r.textContent = String(v ?? '');
+        q.appendChild(r);
+      }
+      el.appendChild(q);
+    });
   }
 
   function scrivibile(el) {
@@ -320,10 +381,10 @@
   }
 
   // Livello 2 — popup di conferma con spiegazione + OK/Annulla.
-  function confirm({ title = 'Conferma', text = '', okLabel = 'OK', cancelLabel = 'Annulla' } = {}) {
+  function confirm({ title = 'Conferma', text = '', parti = null, okLabel = 'OK', cancelLabel = 'Annulla' } = {}) {
     return new Promise((resolve) => {
       const { box, done, troppoPresto } = buildOverlay(resolve);
-      header(box, { title, text });
+      header(box, { title, parti: partiDi(text, parti) });
       const row = buttonRow(box);
       const cancel = makeBtn(row, cancelLabel, 'sn-confirm-btn-cancel');
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-ok');
@@ -344,11 +405,11 @@
 
   // Livello 3 — l'utente deve digitare la parola (default "conferma") per
   // sbloccare il bottone. Per azioni irreversibili.
-  function confirmTyped({ title = 'Conferma richiesta', text = '', word = 'conferma', okLabel = 'Esegui', cancelLabel = 'Annulla' } = {}) {
+  function confirmTyped({ title = 'Conferma richiesta', text = '', parti = null, word = 'conferma', okLabel = 'Esegui', cancelLabel = 'Annulla' } = {}) {
     return new Promise((resolve) => {
       const doc = global.document;
       const { box, done, troppoPresto, fuoco } = buildOverlay(resolve);
-      header(box, { title, text: `${text}\n\nQuesta azione non è reversibile. Scrivi “${word}” per procedere.` });
+      header(box, { title, parti: [...partiDi(text, parti), `\n\nQuesta azione non è reversibile. Scrivi “${word}” per procedere.`] });
 
       const input = doc.createElement('input');
       input.type = 'text';
@@ -386,10 +447,10 @@
 
   // Avviso a un solo bottone — comunica qualcosa senza chiedere una scelta
   // (es. "Hai ricevuto N crediti in regalo 🎁"). Risolve quando l'utente chiude.
-  function notify({ title = '', text = '', okLabel = 'OK' } = {}) {
+  function notify({ title = '', text = '', parti = null, okLabel = 'OK' } = {}) {
     return new Promise((resolve) => {
       const { box, done, troppoPresto, fuoco } = buildOverlay(resolve);
-      header(box, { title, text });
+      header(box, { title, parti: partiDi(text, parti) });
       const row = buttonRow(box);
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-ok');
       ok.addEventListener('click', (e) => { if (!troppoPresto(e)) done(true); });
@@ -417,9 +478,24 @@
       try {
         if (textEl) selectionBg = global.getComputedStyle(textEl, '::selection').backgroundColor || '';
       } catch (_) {}
+      // Cosa sta nei riquadri e cosa fuori: le parole di Filo non devono
+      // contenere il testo del modello, e il riquadro deve vedersi (#592.7).
+      const quote = Array.from(active.root.querySelectorAll('.sn-confirm-quote'));
+      const voci = (el) => Array.from(el.children).map((c) => c.textContent).join('\n');
+      const pezzi = textEl ? Array.from(textEl.childNodes) : [];
+      const primo = quote[0] ? global.getComputedStyle(quote[0]) : null;
+      const box = q('.sn-confirm-box');
       return {
         title: (q('.sn-confirm-title') && q('.sn-confirm-title').textContent) || '',
-        text: (textEl && textEl.textContent) || '',
+        text: pezzi.map((n) => (n.nodeType === 1 && n.classList.contains('sn-confirm-quote') ? voci(n) : n.textContent)).join('\n'),
+        citazioni: quote.map(voci),
+        fuori: pezzi.filter((n) => !(n.nodeType === 1 && n.classList.contains('sn-confirm-quote'))).map((n) => n.textContent).join('\n'),
+        riquadro: primo ? {
+          bg: primo.backgroundColor,
+          bordo: primo.borderLeftColor,
+          bordoSinistro: primo.borderLeftWidth,
+          bgBox: box ? global.getComputedStyle(box).backgroundColor : '',
+        } : null,
         okDisabled: !!(okBtn && (okBtn.disabled || okBtn.getAttribute('aria-disabled') === 'true')),
         textScrollTop: textEl ? textEl.scrollTop : 0,
         hasInput: !!q('.sn-confirm-input'),

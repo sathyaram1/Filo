@@ -39,7 +39,7 @@ test('la segnalazione proposta apre il popup da sola e mostra il testo per inter
   expect(r.describe).toContain(CODA);
   expect(r.describe).not.toContain('…');
 
-  const action = { type: 'INVIA_FEEDBACK', testo: TESTO, titolo: 'chiudere le altre schede', _confirm: { level: 2, text: r.describe } };
+  const action = { type: 'INVIA_FEEDBACK', testo: TESTO, titolo: 'chiudere le altre schede', _confirm: { level: 2, text: r.describe, parti: r.parti } };
 
   // Risposta FRESCA della chat: nessun click: il popup deve comparire da sé.
   await page.evaluate((a) => {
@@ -58,6 +58,8 @@ test('la segnalazione proposta apre il popup da sola e mostra il testo per inter
   expect(shown).toContain('L\'utente ha richiesto di chiudere');
   expect(shown).toContain(CODA);
   expect(shown).not.toContain('…');
+  // Il testo che parte a nome dell'utente sta nel suo riquadro (#592.7).
+  expect((await confirmState(page)).citazioni).toEqual([TESTO]);
 
   // Il chip in chat NON è stato cliccato da nessuno: è rimasto lì come ripiego.
   const btnText = await page.locator('#test-proposal .dash-action-btn').textContent();

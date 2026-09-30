@@ -29,6 +29,11 @@
     if (P && P.lezioneDaAzione) return P.lezioneDaAzione(a);
     return { testo: String((a && (a.testo ?? a.text ?? a.lezione)) ?? '').trim() };
   }
+  // Un testo che non è di Filo (scritto dal modello, o salvato e ripetuto) va in
+  // un pezzo suo: il popup lo chiude in un riquadro, e nessun carattere del testo
+  // può chiuderlo prima (#592.7). Sentinella in tests/unit/actionLevels.test.mjs.
+  const cit = (testo, nuda) => (nuda ? { citazione: String(testo), nuda: true } : { citazione: String(testo) });
+  const elenco = (voci) => ({ elenco: voci.map(String) });
   const RISCHIO_LEZIONE = 'Da adesso vale in ogni conversazione, e resta finché non la togli dalle Preferenze, '
     + 'sotto «Memoria di Filo». Confermala solo se l\'hai detta tu: un testo letto in una pagina o in un '
     + 'documento potrebbe provare a fargliela ricordare.';
@@ -122,8 +127,8 @@
         const url = a.url || a.href || a.link || 'una pagina';
         if (a && a._exfil) {
           const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
-          return `Aprire un link${why}:\n${url}\n\n`
-            + 'Potrebbe inviare tuoi dati a un sito esterno. Apri solo se l\'hai chiesto tu.';
+          return [`Aprire un link${why}:\n`, cit(url, true),
+            '\n\nPotrebbe inviare tuoi dati a un sito esterno. Apri solo se l\'hai chiesto tu.'];
         }
         return `Aprire ${url}`;
       },
@@ -154,9 +159,8 @@
       describe: (a) => {
         const list = targetList(a);
         if (list.length) {
-          return `Filo sta per togliere ${list.length === 1 ? 'questa voce' : `queste ${list.length} voci`}:\n`
-            + list.map((t) => `• ${t}`).join('\n')
-            + '\n\nUna volta tolte non suoneranno più.';
+          return [`Filo sta per togliere ${list.length === 1 ? 'questa voce' : `queste ${list.length} voci`}:\n`,
+            elenco(list), '\n\nUna volta tolte non suoneranno più.'];
         }
         const what = timerRefLabel(a);
         return `Togliere ${what}`;
@@ -175,8 +179,10 @@
         const dove = when ? ` alle ${when}` : '';
         const quando = rip ? ` (${rip})` : '';
         if (list.length > 1) {
-          return `Filo sta per spostare${dove}${quando} queste ${list.length} voci:\n`
-            + list.map((t) => `• ${t}`).join('\n');
+          // Un orario che non è solo cifre è testo del modello: nel popup va nel riquadro.
+          const cifre = !when || /^\d{1,2}(?:[:.]\d{2})?$/.test(when);
+          return [`Filo sta per spostare${cifre ? dove : ''}${quando} queste ${list.length} voci:\n`, elenco(list),
+            ...(cifre ? [] : ['\n\nNuovo orario:\n', cit(when, true)])];
         }
         return `Spostare ${timerRefLabel(a)}${dove}${quando}`;
       },
@@ -193,7 +199,7 @@
       describe: (a) => {
         const l = lezione(a);
         if (!l.testo || l.rifiuto) return 'Ricordare una cosa';
-        return `Filo vuole ricordare una cosa.\n\nTesto esatto:\n«${l.testo}»\n\n${RISCHIO_LEZIONE}`;
+        return ['Filo vuole ricordare una cosa.\n\nTesto esatto:\n', cit(l.testo), `\n\n${RISCHIO_LEZIONE}`];
       },
       describeDone: (a) => `Ricordato: «${lezione(a).testo}»`,
     },
@@ -208,7 +214,7 @@
         // può leggere per intero non è un consenso. Se è lungo, è il popup a
         // scorrere (src/shared/confirmUi.js), non il testo ad accorciarsi.
         const testo = String(a.testo ?? a.text ?? a.messaggio ?? '').trim();
-        return `Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n“${testo || '(vuoto)'}”`;
+        return ['Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n', testo ? cit(testo) : '(vuoto)'];
       },
     },
     CERCA_WEB: {
@@ -221,8 +227,8 @@
         const q = a.query || a.q || a.testo || a.text || '';
         if (a && a._exfil) {
           const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
-          return `Cercare sul web un testo${why}:\n"${q}"\n\n`
-            + 'Potrebbe inviare tuoi dati a un motore di ricerca. Cerca solo se l\'hai chiesto tu.';
+          return [`Cercare sul web un testo${why}:\n`, cit(q),
+            '\n\nPotrebbe inviare tuoi dati a un motore di ricerca. Cerca solo se l\'hai chiesto tu.'];
         }
         return `Cercare sul web "${q}"`;
       },
@@ -291,6 +297,7 @@
       describe: (a) => {
         const p = a && (a.percorso ?? a.path ?? a.file ?? a.documento);
         const perche = documentoFuori(a);
+        if (perche && p) return ['Leggere il documento ', cit(p, true), `\nPerché te lo chiedo: ${perche}`];
         return `Leggere il documento ${p || ''}`.trim() + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
       },
     },
@@ -312,8 +319,7 @@
     },
     CANCELLA_ARCHIVIO: {
       level: 3,
-      describe: (a) => `Eliminare DEFINITIVAMENTE dall'archivio le schede pertinenti a `
-        + `“${a.query || a.testo || ''}”.`,
+      describe: (a) => [`Eliminare DEFINITIVAMENTE dall'archivio le schede pertinenti a `, cit(a.query || a.testo || ''), '.'],
     },
     CANCELLA_MEMORIA: {
       // Cancella tutti i moduli di memoria di Filo (PROFILO, PREFERENZE, espansioni)
@@ -336,9 +342,8 @@
       describe: (a) => {
         const righe = Array.isArray(a && a._righe) ? a._righe : [];
         if (!righe.length) return 'Dimenticare una cosa';
-        return `Filo sta per dimenticare ${righe.length === 1 ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`
-          + righe.map((r) => `• ${r}`).join('\n')
-          + '\n\nNon entreranno più nelle conversazioni.';
+        return [`Filo sta per dimenticare ${righe.length === 1 ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`,
+          elenco(righe), '\n\nNon entreranno più nelle conversazioni.'];
       },
       describeDone: (a) => `Dimenticato: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
     },
@@ -360,8 +365,8 @@
         // Un testo libero si mostra per intero: si conferma quello (#592). La
         // prima riga resta corta perché fa anche da bottone.
         const base = `Filo vuole impostare: ${built.label}.`;
-        const testo = built.testo ? `\n\nTesto esatto:\n«${built.testo}»` : '';
-        return built.risk ? `${base}${testo}\n\n${built.risk}` : `${base}${testo}`;
+        const testo = built.testo ? ['\n\nTesto esatto:\n', cit(built.testo)] : [];
+        return [base, ...testo, ...(built.risk ? [`\n\n${built.risk}`] : [])];
       },
       // A cosa fatta (esito allo strumento): niente «vuole», niente rischi.
       describeDone: (a) => {
@@ -383,7 +388,10 @@
         const label = (t && t.label) || estTok(a) || 'un elemento';
         const val = estVal(a);
         if (a && a._illegible) {
-          return `Cambiare “${label}” a ${val || 'questo valore'} renderebbe il testo `
+          // Nel popup solo parole di Filo: un token del registro e un valore valido.
+          const nome = (t && t.label) || 'un elemento';
+          const valido = T && T.validate && T.validate(estTok(a), val) ? val : 'questo valore';
+          return `Cambiare “${nome}” a ${valido} renderebbe il testo `
             + `quasi illeggibile (colore troppo vicino allo sfondo). Applico comunque?`;
         }
         return `Cambiare “${label}”${val ? ` a ${val}` : ''}`;
@@ -416,9 +424,8 @@
         const C = global.SN_CMD_CLASSIFY;
         let perche = '';
         try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
-        return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`
-          + (cwd ? `\nCartella di lavoro: ${cwd}` : '')
-          + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
+        return ['Eseguire nel terminale:\n', cmd ? cit(cmd, true) : '(comando vuoto)',
+          (cwd ? `\nCartella di lavoro: ${cwd}` : '') + (perche ? `\nPerché te lo chiedo: ${perche}` : '')];
       },
     },
     // ── proxy per-tab via linguaggio naturale (#152) ──────────────────────────
@@ -516,12 +523,32 @@
     return lvl === 1 || lvl === 2 || lvl === 3 ? lvl : null;
   }
 
-  // Spiegazione in chiaro di cosa Filo sta tentando, per il popup di conferma.
-  function describe(action) {
-    if (!action || typeof action !== 'object') return '';
+  const riquadro = (p) => !!p && typeof p === 'object' && (Array.isArray(p.elenco) || p.citazione != null);
+
+  // La spiegazione per il popup di conferma a pezzi: stringhe (parole di Filo) e
+  // riquadri ({ citazione } o { elenco }) col testo che non è suo.
+  function describeParts(action) {
+    if (!action || typeof action !== 'object') return [];
     const entry = REGISTRY[String(action.type || '').toUpperCase()];
-    if (!entry) return '';
-    try { return entry.describe(action) || ''; } catch (_) { return ''; }
+    if (!entry) return [];
+    let d;
+    try { d = entry.describe(action); } catch (_) { return []; }
+    if (!Array.isArray(d)) return d ? [String(d)] : [];
+    return d.filter((p) => (typeof p === 'string' ? p : riquadro(p)));
+  }
+
+  // La stessa spiegazione in una riga di testo: il bottone, il diario, il
+  // modello. I riquadri tornano fra virgolette, gli elenchi a punti.
+  function piatto(parti) {
+    return parti.map((p) => {
+      if (typeof p === 'string') return p;
+      if (Array.isArray(p.elenco)) return p.elenco.map((v) => `• ${v}`).join('\n');
+      return p.nuda ? p.citazione : `«${p.citazione}»`;
+    }).join('');
+  }
+
+  function describe(action) {
+    return piatto(describeParts(action));
   }
 
   // La stessa cosa a fatto compiuto, per l'esito che torna al modello: dove
@@ -530,8 +557,9 @@
     if (!action || typeof action !== 'object') return '';
     const entry = REGISTRY[String(action.type || '').toUpperCase()];
     if (!entry) return '';
-    try { return (entry.describeDone ? entry.describeDone(action) : entry.describe(action)) || ''; } catch (_) { return ''; }
+    if (!entry.describeDone) return describe(action);
+    try { return entry.describeDone(action) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone };
+  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeParts, describeDone };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
