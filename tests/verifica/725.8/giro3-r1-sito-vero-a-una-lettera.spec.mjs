@@ -1,5 +1,5 @@
-// Verifica #725.8 giro 3, rilievo 1: un sito vero e noto il cui nome dista una lettera da un marchio entrato
-// con questo lavoro (Aruba, Banco BPM, Isybank) viene preso per un falso: avviso nel menu e blocco all'apertura.
+// Verifica #725.8 giro 3, rilievo 1: siti veri presi per imitazioni dai marchi e dalle regole entrati con questo
+// lavoro: un nome a una lettera da Aruba, Banco BPM o Isybank, le immagini di Steam sulla rete di Akamai.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
