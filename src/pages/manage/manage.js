@@ -1713,20 +1713,26 @@
       : 'Riordina i feedback — clic o tasto destro';
   }
   function openSortMenu(x, y) {
+    apriMenu(x, y, ['num', 'priority', 'creator', 'smart'].map((mode) => ({
+      testo: SORT_MODES[mode], acceso: mode === sortMode, radio: true, azione: () => chooseSort(mode),
+    })));
+  }
+  // Un menu di voci nello stile dei select (PATTERNS.md); uno solo aperto per volta.
+  function apriMenu(x, y, voci) {
     closeSortMenu();
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop mg-ctxmenu';
     menu.setAttribute('role', 'menu');
-    for (const mode of ['num', 'priority', 'creator', 'smart']) {
+    for (const v of voci) {
       const opt = document.createElement('div');
       opt.className = 'sn-select-option';
-      opt.setAttribute('role', 'menuitemradio');
-      const on = mode === sortMode;
-      opt.setAttribute('aria-checked', on ? 'true' : 'false');
-      if (on) opt.classList.add('sn-selected');
-      // ✓ sull'ordinamento attivo; spazio allineato sugli altri.
-      opt.textContent = `${on ? '✓ ' : ' '}${SORT_MODES[mode]}`;
-      opt.addEventListener('click', () => chooseSort(mode));
+      opt.setAttribute('role', v.radio ? 'menuitemradio' : 'menuitem');
+      if (v.radio) opt.setAttribute('aria-checked', v.acceso ? 'true' : 'false');
+      if (v.acceso) opt.classList.add('sn-selected');
+      if (v.titolo) opt.title = v.titolo;
+      // ✓ sulla voce attiva; spazio allineato sulle altre.
+      opt.textContent = v.radio ? `${v.acceso ? '✓ ' : ' '}${v.testo}` : v.testo;
+      opt.addEventListener('click', () => { closeSortMenu(); v.azione(); });
       menu.appendChild(opt);
     }
     document.body.appendChild(menu);
@@ -1742,6 +1748,33 @@
       window.addEventListener('resize', closeSortMenu);
     }, 0);
   }
+  // Tasto destro su una scheda: quello che si fa su una pratica senza aprirla (#908).
+  mgList.addEventListener('contextmenu', (e) => {
+    const item = e.target.closest('.mg-item[data-id]');
+    const fb = item && allFeedbacks.find((f) => f._id === item.dataset.id);
+    if (!fb) return;
+    e.preventDefault();
+    const num = FB.formatNum(fb.seq, fb.subSeq);
+    const voci = [{ testo: 'Apri', azione: () => openDetail(fb._id) }];
+    if (isAdmin && MR.isLocalOnly(fb)) {
+      voci.push({ testo: '💻 Rimetti anche alle routine', titolo: localSignText(fb), azione: () => setLocalSign(fb._id, false) });
+    } else if (isAdmin && MR.localSignCheck(fb, true).ok) {
+      voci.push({
+        testo: '💻 Solo lavoro locale',
+        titolo: 'Nessuna routine la prende: la lavora una sessione locale, e compare nei Lavori locali.',
+        azione: () => setLocalSign(fb._id, true),
+      });
+    }
+    if (num) {
+      voci.push({
+        testo: `Copia #${num}`,
+        titolo: 'Il numero con cui parlarne, anche a npm run finish -- --feedback',
+        azione: () => { navigator.clipboard.writeText(`#${num}`).then(() => setManageMsg(`#${num} copiato.`, 'ok'), () => {}); },
+      });
+    }
+    apriMenu(e.clientX, e.clientY, voci);
+  });
+
   // Tasto destro ovunque sull'intestazione della lista → menu di ordinamento.
   if (mgListHeadRow) {
     mgListHeadRow.addEventListener('contextmenu', (e) => {
