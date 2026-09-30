@@ -19,8 +19,8 @@
   const MARCHI_MONOUSO = new RegExp(
     '(?:\\botp\\b|\\bmfa\\b|\\b2fa\\b|one[\\s-]?time'
     + '|(?:codic|chiav|password|passphrase)\\w*\\s+(?:di\\s+|da\\s+)?'
-    + '(?:recupero|ripristino|temporane\\w+|monouso|usa\\s+e\\s+getta)'
-    + '|(?:recovery|backup|one[\\s-]?time)\\s+code)',
+    + '(?:recupero|ripristino|backup|temporane\\w+|monouso|usa\\s+e\\s+getta)'
+    + '|(?:recovery|backup|one[\\s-]?time)\\s+codes?)',
     'i',
   );
 
