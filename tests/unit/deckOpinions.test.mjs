@@ -178,7 +178,7 @@ test('applyTagMembership: carte non giudicate e giudizi identici non toccano il 
 // se rispetta il criterio, con cache (carta, criterio) permanente cross-ricerca.
 
 test('search filter: API registrata su globalThis', () => {
-  for (const fn of ['normCriterion', 'parseSearchKeep', 'planSearchFilter', 'updateSearchCache', 'searchFilterNote']) {
+  for (const fn of ['normCriterion', 'parseSearchKeep', 'planSearchFilter', 'updateSearchCache', 'searchFilterNote', 'searchCapNote']) {
     assert.equal(typeof O[fn], 'function', `manca ${fn}`);
   }
 });
@@ -190,8 +190,8 @@ test('normCriterion: minuscolo, trim e spazi normalizzati (chiavi di cache stabi
 
 test('parseSearchKeep: tiene solo gli id keep davvero giudicati, tollera fence e array nudo', () => {
   const judge = ['a', 'b', 'c'];
-  // Oggetto { keep: [...] } dentro un fence, con un id inventato ('z') scartato.
-  const r1 = O.parseSearchKeep('```json\n{"keep":["a","c","z"]}\n```', judge);
+  // Oggetto { keep: [...] } dentro un fence.
+  const r1 = O.parseSearchKeep('```json\n{"keep":["a","c"]}\n```', judge);
   assert.deepEqual([...r1].sort(), ['a', 'c']);
   // Array nudo di id.
   const r2 = O.parseSearchKeep('["b"]', judge);
@@ -207,8 +207,17 @@ test('parseSearchKeep: i numeri della lista valgono come le carte in quella posi
   const judge = ['uuid-a', 'uuid-b', 'uuid-c'];
   assert.deepEqual([...O.parseSearchKeep('{"keep":[1,3]}', judge)].sort(), ['uuid-a', 'uuid-c']);
   assert.deepEqual([...O.parseSearchKeep('{"keep":["2"]}', judge)], ['uuid-b']);
-  // Fuori lista (0, 4, negativi, decimali) non inventa carte.
-  assert.equal(O.parseSearchKeep('{"keep":[0,4,-1,1.5]}', judge).size, 0);
+});
+
+test('parseSearchKeep: una voce che non indica una carta della lista rende illeggibile la risposta, non «nessuna tiene» (#382)', () => {
+  const judge = ['uuid-a', 'uuid-b', 'uuid-c'];
+  // Coi nomi al posto dei numeri il giudice non ha scartato niente: salvarla come tutte scartate bloccava la ricerca.
+  assert.equal(O.parseSearchKeep('{"keep":["Hammer of Purphoros"]}', judge), null);
+  assert.equal(O.parseSearchKeep('{"keep":[{"n":2}]}', judge), null);
+  // Fuori lista (0, 4, negativi, decimali) o un id inventato: la numerazione del giudice non è quella della lista.
+  for (const k of ['[0]', '[4]', '[-1]', '[1.5]', '[1, 4]', '["uuid-a", "uuid-z"]', '["2."]']) {
+    assert.equal(O.parseSearchKeep(`{"keep":${k}}`, judge), null, k);
+  }
 });
 
 test('updateSearchCache con keepPrefix: i giudizi di un giudice con altre istruzioni se ne vanno (#382)', () => {
@@ -229,8 +238,22 @@ test('searchFilterNote: scartate mai mostrate in silenzio, non controllate sempr
   const all = O.searchFilterNote({ found: 5, kept: 5, unverified: 5, criterion: 'x', why: 'problema di rete.' });
   assert.match(all, /senza filtro/);
   assert.match(all, /Motivo: problema di rete\./);
-  assert.match(O.searchFilterNote({ found: 5, kept: 3, unverified: 1, criterion: 'x' }), /^Una delle carte/);
-  assert.match(O.searchFilterNote({ found: 90, kept: 60, unverified: 40, criterion: 'x' }), /^40 delle carte/);
+  assert.match(O.searchFilterNote({ found: 5, kept: 3, unverified: 1, criterion: 'x' }), /^Una delle carte qui sotto, segnata con \?/);
+  assert.match(O.searchFilterNote({ found: 90, kept: 60, unverified: 40, criterion: 'x' }), /^40 delle carte qui sotto, segnate con \?/);
+});
+
+test('searchFilterNote: le carte trovate oltre quelle arrivate al giudice si dichiarano col numero (#382)', () => {
+  const some = O.searchFilterNote({ found: 1050, kept: 12, unverified: 0, criterion: 'x', total: 12340 });
+  assert.match(some, /Scryfall ne ha trovate 12\.340 e ho controllato le prime 1\.050, in ordine di costo/);
+  assert.match(some, /aggiungi un vincolo/);
+  const none = O.searchFilterNote({ found: 1050, kept: 0, unverified: 0, criterion: 'dà haste', total: 2340 });
+  assert.match(none, /le prime 1\.050 delle 2\.340 carte trovate/);
+  assert.doesNotMatch(none, /Ho controllato una per una le 1\.050 carte trovate/, 'non dice di averle viste tutte');
+  const raw = O.searchFilterNote({ found: 1050, kept: 1050, unverified: 1050, criterion: 'x', total: 2340 });
+  assert.match(raw, /qui sotto ci sono le prime 1\.050/, 'senza giudice non dice «ho controllato»');
+  assert.equal(O.searchFilterNote({ found: 10, kept: 4, unverified: 0, criterion: 'x', total: 10 }), '');
+  assert.equal(O.searchCapNote({ seen: 175, total: 175, judged: false }), '');
+  assert.match(O.searchCapNote({ seen: 175, total: 900, judged: false }), /^Scryfall ne ha trovate 900 e qui sotto ci sono le prime 175/);
 });
 
 test('planSearchFilter: separa cache-hit da giudicare, preserva ordine, keepFromCache solo i true', () => {

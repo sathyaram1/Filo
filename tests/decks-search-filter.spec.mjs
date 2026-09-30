@@ -38,7 +38,12 @@ async function mockScryfall(app) {
       globalThis.__scryRequests.push(String(url));
       const u = new URL(String(url));
       let body = null;
-      if (u.pathname === '/cards/search') body = { data: globalThis.__searchCards || [CRASHER, BOLT], has_more: false };
+      if (u.pathname === '/cards/search') {
+        // `__pages`: risultati su più pagine, come Scryfall oltre le 175 carte.
+        const pages = globalThis.__pages || [globalThis.__searchCards || [CRASHER, BOLT]];
+        const n = Number(u.searchParams.get('page') || '1');
+        body = { data: pages[n - 1] || [], has_more: n < pages.length, total_cards: pages.reduce((t, p) => t + p.length, 0) };
+      }
       else if (BY_ID[u.pathname.replace('/cards/', '')]) body = BY_ID[u.pathname.replace('/cards/', '')];
       else if (u.pathname === '/symbology') {
         body = { data: [
@@ -76,6 +81,11 @@ async function mockProvider(app) {
       if (/CARTE CANDIDATE/.test(last)) {
         // Chiamata al giudice del filtro: registra e tieni solo Lightning Bolt (o fai quello che chiede la prova).
         globalThis.__filterCalls.push(last);
+        globalThis.__inFlight = (globalThis.__inFlight || 0) + 1;
+        globalThis.__maxInFlight = Math.max(globalThis.__maxInFlight || 0, globalThis.__inFlight);
+        if (globalThis.__judgeGate) await globalThis.__judgeGate;
+        await new Promise((r) => setTimeout(r, 5));
+        globalThis.__inFlight -= 1;
         text = globalThis.__judge ? globalThis.__judge(last) : JSON.stringify({ keep: ['bolt-1'] });
       } else if (globalThis.__chat) {
         text = globalThis.__chat(last);
@@ -307,4 +317,161 @@ test('#382: oltre un lotto il giudice le guarda tutte, in più chiamate, senza l
   await expect(bubble.locator('.dk-cardlist')).toContainText('Carta 130 Pari');
   await expect(bubble.locator('.dk-cardlist')).not.toContainText('Carta 129');
   expect(await app.evaluate(() => globalThis.__filterCalls.length)).toBe(3);
+});
+
+// Carte finte per le prove su più pagine: tutte rosse, dentro l'identità del commander.
+async function manyCards(app, { pages, relevant = [] }) {
+  await app.evaluate((_electron, { pages, relevant }) => {
+    const card = (id, name, cmc, oracle) => ({
+      id, name, mana_cost: `{${cmc}}`, cmc, type_line: 'Artifact', oracle_text: oracle,
+      colors: ['R'], color_identity: ['R'], image_uris: { normal: `https://cards.test/${id}.jpg` },
+      prices: { eur: '0.10' }, legalities: { commander: 'legal' }, scryfall_uri: `https://scryfall.com/card/${id}`,
+    });
+    let k = 0;
+    globalThis.__pages = pages.map((size, p) => Array.from({ length: size }, () => {
+      k += 1;
+      const hit = relevant.includes(k);
+      return card(`c-${k}`, hit ? `Giusta ${k}` : `Carta ${k}`, p + 1, hit ? 'Creatures you control have haste.' : 'Haste');
+    }));
+    globalThis.__chat = () => JSON.stringify({ reply: 'Cerco carte che danno haste.', query: '(o:"have haste" or o:haste)', filter: 'fa guadagnare haste ad altre creature' });
+    // Tiene le «Giusta» di ogni lotto, coi numeri del SUO lotto.
+    globalThis.__judge = (prompt) => JSON.stringify({
+      keep: prompt.split('\n').filter((l) => /^\d+\. Giusta /.test(l)).map((l) => Number(l.split('.')[0])),
+    });
+  }, { pages, relevant });
+}
+
+test('#382: la rete larga oltre la prima pagina arriva al giudice, e la carta giusta a pagina 2 si vede', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  // 175 carte a pagina 1, nessuna giusta; a pagina 2 la giusta.
+  await manyCards(app, { pages: [175, 20], relevant: [180] });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'carte che danno haste');
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(1);
+  await expect(bubble.locator('.dk-row-name').first()).toHaveText('Giusta 180');
+  await expect(bubble).not.toContainText('nessuna corrisponde');
+  await expect(bubble).not.toContainText('Scryfall ne ha trovate');
+});
+
+test('#382: oltre il tetto di pagine la chat dice quante erano, e il giudice lavora a gruppi', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await manyCards(app, { pages: [175, 175, 175, 175, 175, 175, 175], relevant: [3, 1100] });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'carte che danno haste');
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(1);
+  await expect(bubble.locator('.dk-row-name').first()).toHaveText('Giusta 3');
+  await expect(bubble).toContainText('Scryfall ne ha trovate 1.225 e ho controllato le prime 1.050, in ordine di costo');
+  const pagesAsked = await app.evaluate(() => globalThis.__scryRequests
+    .filter((u) => u.includes('/cards/search')).map((u) => new URL(u).searchParams.get('page') || '1'));
+  expect(pagesAsked).toEqual(['1', '2', '3', '4', '5', '6']);
+  expect(await app.evaluate(() => globalThis.__filterCalls.length)).toBe(21);
+  expect(await app.evaluate(() => globalThis.__maxInFlight)).toBeLessThanOrEqual(8);
+});
+
+test('#382: una ricerca tutta in sintassi con più di una pagina lo dice, senza giudice', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await manyCards(app, { pages: [175, 40] });
+  await app.evaluate(() => { globalThis.__chat = () => JSON.stringify({ query: 'o:haste t:artifact' }); });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'o:haste t:artifact');
+  await expect(bubble.locator('.dk-list-summary')).toContainText('175 risultati');
+  await expect(bubble).toContainText('Scryfall ne ha trovate 215 e qui sotto ci sono le prime 175, in ordine di costo');
+  expect(await app.evaluate(() => globalThis.__filterCalls.length)).toBe(0);
+});
+
+test('#382: un giudice che risponde coi nomi non diventa «nessuna corrisponde», e la ricerca ripetuta torna a filtrare', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await hasteCards(app);
+  await app.evaluate(() => {
+    globalThis.__chat = () => JSON.stringify({ query: '(o:haste)', filter: 'fa guadagnare haste ad altre creature' });
+    globalThis.__judge = () => JSON.stringify({ keep: ['Hammer of Purphoros'] });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const first = await send(page, 'carte che danno haste');
+  await expect(first).not.toContainText('nessuna corrisponde');
+  await expect(first).toContainText('Non sono riuscito a controllare una per una le carte trovate');
+  await expect(first.locator('.dk-cardlist .dk-row')).toHaveCount(2);
+
+  await app.evaluate(() => {
+    globalThis.__judge = (prompt) => JSON.stringify({ keep: [prompt.split('\n').find((l) => /Hammer of Purphoros/.test(l)).split('.')[0]] });
+  });
+  const again = await send(page, 'carte che danno haste');
+  await expect(again.locator('.dk-cardlist .dk-row')).toHaveCount(1);
+  await expect(again.locator('.dk-row-name').first()).toHaveText('Hammer of Purphoros');
+});
+
+test('#382: se un gruppo del giudice non risponde, le sue carte sono segnate nella lista, anche riaprendo la chat', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await manyCards(app, { pages: [120], relevant: [1, 51, 101] });
+  await app.evaluate(() => {
+    const judge = globalThis.__judge;
+    // Il secondo gruppo (51-100) risponde sempre male.
+    globalThis.__judge = (prompt) => (/Giusta 51 /.test(prompt) ? 'boh' : judge(prompt));
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'carte che danno haste');
+  await expect(bubble).toContainText('50 delle carte qui sotto, segnate con ?, non le ho potute controllare');
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(52);
+  await expect(bubble.locator('.dk-row-unchecked')).toHaveCount(50);
+  await expect(bubble.locator('.dk-row', { hasText: 'Giusta 1' }).first()).not.toHaveClass(/dk-row-unchecked/);
+  const flag = bubble.locator('.dk-row', { hasText: 'Carta 52' }).locator('.dk-row-flag');
+  await expect(flag).toHaveText('?');
+  await expect(flag).toHaveAttribute('title', /Non controllata/);
+  await page.screenshot({ path: 'tests/.shots/decks-search-filter-382-non-controllate.png' });
+
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  const riaperta = page.locator('.dk-msg-bot').last();
+  await expect(riaperta.locator('.dk-row-unchecked')).toHaveCount(50);
+});
+
+test('#382: mentre il giudice lavora la bolla dice cosa fa, con la frase di Filo e il conteggio', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await manyCards(app, { pages: [120], relevant: [7] });
+  await app.evaluate(() => {
+    globalThis.__judgeGate = new Promise((r) => { globalThis.__openGate = r; });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  await page.fill('#chatInput', 'carte che danno haste');
+  await page.press('#chatInput', 'Enter');
+  const bubble = page.locator('.dk-msg-bot').last();
+  await expect.poll(() => app.evaluate(() => globalThis.__inFlight || 0), { timeout: 15_000 }).toBeGreaterThan(0);
+  const status = bubble.locator('.dk-progress');
+  await expect(status).toContainText('Controllo una per una le 120 carte trovate');
+  await expect(status).toContainText('0 di 120');
+  await expect(bubble).toContainText('Cerco carte che danno haste.');
+  await page.screenshot({ path: 'tests/.shots/decks-search-filter-382-attesa.png' });
+  await app.evaluate(() => globalThis.__openGate());
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(1);
+  await expect(bubble.locator('.dk-progress')).toHaveCount(0);
 });

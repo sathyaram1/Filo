@@ -291,7 +291,8 @@
       : `Scryfall ne ha trovate ${num(total)} e qui sotto ci sono le prime ${num(seen)}, in ordine di costo. Per arrivare alle altre aggiungi un vincolo, per esempio un costo massimo o un tipo.`;
   }
 
-  function num(n) { return Number(n).toLocaleString('it-IT'); }
+  // Punto delle migliaia scritto qui: il separatore di toLocaleString cambia fra Node ed Electron.
+  function num(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 
   global.SN_DECK_OPINIONS = {
     normTag,

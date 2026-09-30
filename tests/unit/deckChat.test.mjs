@@ -116,3 +116,10 @@ test('la richiesta di svuotare a parole resta nella bolla, anche dopo la rispost
   assert.equal(r.list[1].clearChat, true);
   assert.equal(C.cleanChat([{ who: 'bot', reply: 'x', clearChat: 'true' }])[0].clearChat, undefined);
 });
+
+test('le carte che il giudice non ha potuto guardare restano segnate, solo fra quelle della lista (#382)', () => {
+  const [bot] = C.cleanChat([{ who: 'bot', reply: 'x', cardIds: ['a', 'b', 'c'], uncheckedIds: ['b', 'z', '', 3] }]);
+  assert.deepEqual(bot.uncheckedIds, ['b']);
+  const [senza] = C.cleanChat([{ who: 'bot', reply: 'x', cardIds: ['a'], uncheckedIds: ['z'] }]);
+  assert.equal('uncheckedIds' in senza, false);
+});
