@@ -696,7 +696,13 @@
   // storico): il collegato nasce come un feedback normale (numero
   // proprio), `parentId` serve solo a far comparire "collegato a #N" in
   // dashboard e a far risalire chi triagia all'originale.
-  async function submit({ text, url, title, userAgent, clientId, clientIdHash, images, files, name, parentId, capabilityGapId, submissionId }) {
+  //
+  // `opts.idToken` (#595): SOLO il token admin dell'owner. La create parte
+  // autenticata e porta `senderProof: 'admin'`, la prova del mittente che le
+  // regole non concedono a un anonimo. Token rifiutato (401/403) = si riparte
+  // anonimi, e il risultato lo dice (`senderProof: ''`, `authRefused`).
+  async function submit({ text, url, title, userAgent, clientId, clientIdHash, images, files, name, parentId, capabilityGapId, submissionId }, opts = {}) {
+    const idToken = (opts && typeof opts.idToken === 'string') ? opts.idToken : '';
     // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
     // qualunque caricamento e prima di creare il documento: così «non è partito
     // niente» è vero alla lettera, e non «è partito tutto tranne il testo».
