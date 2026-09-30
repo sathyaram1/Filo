@@ -259,7 +259,7 @@
     // ─────────────────────────────── Link ────────────────────────────────────
     {
       id: 'explain-link', title: 'Spiega un link', category: 'links',
-      desc: 'Spiega dove porta un link senza aprirlo, e segnala se sembra sospetto (phishing).',
+      desc: 'Spiega dove porta un link senza aprirlo, e segnala se sembra sospetto (phishing): per esempio se imita un marchio noto (banche, Poste, social, negozi) su un sito che non è suo. I marchi e i loro siti ufficiali sono gli stessi dell’avviso che Filo mostra quando apri una pagina.',
       invoke: 'Clic destro su un link: la spiegazione arriva da sola dentro il menu, non c’è una voce da cliccare. Se l’indirizzo ha qualcosa che non torna, sopra la spiegazione compare un avviso che dice cosa.',
       doesNot: 'Non apre il link; l’analisi di sicurezza è basata su indizi nell’indirizzo, non su un database in tempo reale.',
     },

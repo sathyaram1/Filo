@@ -211,4 +211,13 @@ function checkSync(url, ctx = {}) {
   return evaluate(url, ctx, {});
 }
 
-module.exports = { evaluate, checkSync, buildMessage, agePhrase, YOUNG_DOMAIN_DAYS, VERY_YOUNG_DOMAIN_DAYS };
+// Il marchio che l'indirizzo imita, dal solo indirizzo: è il giudizio dell'avviso all'apertura, e lo chiede
+// anche il menu dei link (#725.8), così la stessa pagina non è sospetta per uno e pulita per l'altro.
+function imitazione(url) {
+  const v = evaluate(url);
+  if (!v.imp) return null;
+  const n = v.norm;
+  return { stretta: v.imp.kind === 'strict_impersonation', brand: v.imp.brand, reason: v.imp.reason, publicSuffix: n.publicSuffix };
+}
+
+module.exports = { evaluate, checkSync, imitazione, buildMessage, agePhrase, YOUNG_DOMAIN_DAYS, VERY_YOUNG_DOMAIN_DAYS };

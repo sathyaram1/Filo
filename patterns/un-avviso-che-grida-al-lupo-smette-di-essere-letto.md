@@ -29,8 +29,16 @@ lunghezza di ciò che si confronta, e sotto una certa lunghezza non si indovina
 affatto.
 
 **Si confronta la cosa, non il contorno.** Il nome del sito, non l'indirizzo
-intero: dentro l'indirizzo ci sono il dominio di primo livello e i
-sottodomini, che cambiano da un Paese all'altro senza cambiare sito.
+intero. Che `amazon.de` sia Amazon e `amazon.shop` no non lo dice il nome: lo
+dice l'elenco dei domini ufficiali di ciascun marchio (#725.8). Prendere per
+vero ogni nome famoso su qualunque dominio di primo livello lasciava passare
+`paypal.support`.
+
+**Due avvisi sulla stessa cosa danno lo stesso giudizio.** L'avviso sul link
+del tasto destro e quello all'apertura della pagina chiedono al motore lo
+stesso verdetto sul marchio, con un elenco solo di marchi e domini ufficiali.
+Con due elenchi, un link è pulito nel menu e sospetto quando lo apri, e chi
+legge smette di credere a tutti e due.
 
 **Stringere la soglia non deve spegnere il controllo.** Quello che la soglia
 più stretta perde si recupera con un segnale più preciso, non allargandola di
@@ -45,7 +53,9 @@ posto tuo» no.
 ## Dove
 
 `src/shared/linkSospetto.js` (euristica e frasi), mostrato da
-`src/content/actions.js` nella sezione inline del link. Le soglie e i casi
+`src/content/actions.js` nella sezione inline del link. Il giudizio sul marchio
+lo dà `imitazione()` in `src/main/services/safebrowse/engine.js`, coi marchi di
+`brands.js`. Le soglie e i casi
 — quelli che devono scattare e quelli che non devono — stanno in
 `tests/unit/linkSospetto.test.mjs`: un controllo nuovo aggiunge la sua coppia
 di elenchi lì, il falso allarme prima del vero positivo.

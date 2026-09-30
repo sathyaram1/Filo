@@ -60,6 +60,7 @@ test('ogni codice prodotto dall’euristica ha la sua frase', () => {
     assert.ok(f[0].length > 20 && /\.$/.test(f[0]), `la frase di "${c}" non è una frase: ${f[0]}`);
   }
   assert.equal(LS.frasi(['typosquatting:paypal.com']).length, 1);
+  assert.equal(LS.frasi(['marchio_imitato:Poste Italiane']).length, 1);
 });
 
 test('più avvisi insieme restano leggibili, e i casi vuoti non mostrano niente', () => {
@@ -119,7 +120,7 @@ test('l’avviso non afferma più di quello che il controllo sa', () => {
   // Il controllo guarda l'indirizzo, non il sito: nessuna delle frasi può
   // dichiarare un fatto. Una che afferma trasforma ogni falso allarme in
   // un'accusa, e chi legge smette di crederci (#725).
-  for (const c of ['side_effect', 'token_in_url', 'typosquatting:paypal.com']) {
+  for (const c of ['side_effect', 'token_in_url', 'typosquatting:paypal.com', 'marchio_imitato:PayPal']) {
     const f = LS.frasi([c])[0];
     assert.match(f, /potrebbe|può|sembra/i, `la frase di "${c}" afferma invece di ipotizzare: ${f}`);
   }
@@ -180,5 +181,71 @@ test('le imitazioni vere continuano a farsi riconoscere', () => {
   };
   for (const [u, atteso] of Object.entries(sosia)) {
     assert.deepEqual(LS.analizza(u), ['typosquatting:' + atteso], `nessun avviso su ${u}`);
+  }
+});
+
+// #725.8 — il menu conosceva quattordici nomi famosi e prendeva per vero un nome
+// famoso su qualunque dominio di primo livello; il controllo all'apertura della
+// pagina ne conosceva una quarantina, coi loro domini ufficiali. Adesso il
+// giudizio sul marchio è uno solo, quello del controllo all'apertura.
+const Pagina = require(join(ROOT, 'src', 'main', 'services', 'safebrowse', 'engine.js'));
+const { BRANDS } = require(join(ROOT, 'src', 'main', 'services', 'safebrowse', 'brands.js'));
+
+const IMITAZIONI_ITALIANE = {
+  'https://poste.it.accesso-sicuro.net/login': 'Poste Italiane',
+  'https://intesasanpaolo.com.accesso.net/': 'Intesa Sanpaolo',
+  'https://unicredit-sicurezza.com/': 'UniCredit',
+  'https://whatsapp-web.com.accesso.net/': 'WhatsApp',
+  'https://bancoposta-online.com/': 'Poste Italiane',
+  'https://paypal.support/': 'PayPal',
+  'https://netflix.top/': 'Netflix',
+  'https://amazon.shop/': 'Amazon',
+};
+
+test('le imitazioni di Poste, banche e WhatsApp si fanno riconoscere dal menu del link', () => {
+  // Il successo per chi legge: l'avviso c'è e nomina il marchio che il link
+  // usa, così capisce di chi diffidare.
+  for (const [u, marchio] of Object.entries(IMITAZIONI_ITALIANE)) {
+    const avviso = LS.avviso(LS.analizza(u));
+    assert.ok(avviso.includes(marchio), `nessun avviso che nomini ${marchio} su ${u}: «${avviso}»`);
+    assert.match(avviso, /imitazione/i, `l’avviso su ${u} non dice che può essere un’imitazione`);
+  }
+});
+
+test('un’imitazione somiglia al sito vero dello stesso Paese', () => {
+  assert.deepEqual(LS.analizza('https://arnazon.it/'), ['typosquatting:amazon.it']);
+  assert.deepEqual(LS.analizza('https://poster.it/'), ['typosquatting:poste.it']);
+  assert.match(LS.avviso(LS.analizza('https://arnazon.it/')), /somiglia ad amazon\.it/);
+});
+
+test('il menu del link e l’avviso all’apertura della pagina danno lo stesso giudizio', () => {
+  // La stessa pagina non può essere sospetta per uno e pulita per l'altro.
+  const ufficiali = BRANDS.flatMap((b) => b.domains.map((d) => `https://${d}/`));
+  const corpus = [
+    ...Object.keys(IMITAZIONI_ITALIANE),
+    ...ufficiali,
+    'https://paypa1.com/login', 'https://gooogle.com/', 'https://arnazon.com/', 'https://youtub3.com/',
+    'https://xn--80ak6aa92e.com/', 'https://tvvitter.com/', 'https://paypal-login.github.io/',
+    'https://gitlab.com/gitlab-org/gitlab', 'https://utente.github.io/blog/', 'https://google.co/search?q=filo',
+    'https://amazon.de/dp/B00ABCDEF', 'https://wa.me/393331234567', 'https://bancoposta.poste.it/',
+    'https://esempio-tranquillo.test/articolo', 'http://127.0.0.1:8080/', 'https://it.wikipedia.org/wiki/PayPal',
+  ];
+  for (const u of corpus) {
+    const menu = LS.analizza(u).some((c) => /^(typosquatting|marchio_imitato):/.test(c));
+    const pagina = !!Pagina.evaluate(u).imp;
+    assert.equal(menu, pagina, `${u}: menu ${menu ? 'sospetto' : 'pulito'}, apertura ${pagina ? 'sospetta' : 'pulita'}`);
+  }
+  for (const u of ufficiali) assert.deepEqual(LS.analizza(u), [], `avviso sul sito vero ${u}`);
+});
+
+test('l’elenco dei marchi è uno solo: il menu non ne tiene uno suo', () => {
+  const src = readFileSync(join(ROOT, 'src', 'shared', 'linkSospetto.js'), 'utf8');
+  assert.ok(!/POPULAR|'paypal\.com'|'amazon\.it'/.test(src),
+    'linkSospetto.js ha di nuovo un suo elenco di siti famosi: i due controlli divergeranno');
+});
+
+test('l’avviso all’apertura della pagina riconosce le stesse imitazioni', () => {
+  for (const u of Object.keys(IMITAZIONI_ITALIANE)) {
+    assert.notEqual(Pagina.evaluate(u).level, 'safe', `nessun avviso all’apertura di ${u}`);
   }
 });

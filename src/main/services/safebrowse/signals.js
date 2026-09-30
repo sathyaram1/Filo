@@ -14,7 +14,7 @@
 'use strict';
 
 const { BRANDS } = require('./brands');
-const { skeleton } = require('./confusables');
+const { skeleton, skeletonCoppie } = require('./confusables');
 
 // Distanza di Damerau-Levenshtein (OSA): conta sostituzione/inserzione/
 // cancellazione = 1 e la trasposizione di due adiacenti = 1 (così "amzaon" dista
@@ -54,6 +54,7 @@ function matchBrands(norm) {
   // punycode, es. xn--80ak6aa92e, va confrontato per ciò che mostra: "аррӏе").
   const sld = (norm.sldUnicode || norm.sld || '').toLowerCase();
   const sldSkel = skeleton(sld);
+  const sldCoppie = skeletonCoppie(sld);
   const uLabels = (norm.hostUnicode || norm.host || '').split('.');
   const regLabelCount = norm.registrable ? norm.registrable.split('.').length : 1;
   const subLabels = uLabels.slice(0, Math.max(0, uLabels.length - regLabelCount));
@@ -68,7 +69,7 @@ function matchBrands(norm) {
     const tokenSkel = skeleton(token);
 
     // ── STRICT: confusable (stesso scheletro, stringa diversa) ──────────
-    if (!strict && sld !== token && sldSkel && sldSkel === tokenSkel) {
+    if (!strict && sld !== token && sldSkel && (sldSkel === tokenSkel || sldCoppie === tokenSkel)) {
       strict = { brand, reason: 'confusable', sld };
       continue;
     }

@@ -138,3 +138,40 @@ test('un’immagine dentro un link normale non si prende l’avviso', async ({ o
   await page.waitForTimeout(800);
   await expect(page.locator('.sn-menu .sn-menu-link-warn')).toHaveCount(0);
 });
+
+// #725.8 — il menu conosceva solo quattordici nomi famosi internazionali: le
+// imitazioni di Poste, banche e WhatsApp passavano senza avviso, e un nome
+// famoso su un dominio qualsiasi (paypal.support) era preso per il sito vero.
+const IMITAZIONI = {
+  'https://poste.it.accesso-sicuro.net/login': 'Poste Italiane',
+  'https://intesasanpaolo.com.accesso.net/': 'Intesa Sanpaolo',
+  'https://unicredit-sicurezza.com/': 'UniCredit',
+  'https://whatsapp-web.com.accesso.net/': 'WhatsApp',
+  'https://bancoposta-online.com/': 'Poste Italiane',
+  'https://paypal.support/': 'PayPal',
+  'https://netflix.top/': 'Netflix',
+  'https://amazon.shop/': 'Amazon',
+};
+
+test('le imitazioni di Poste, banche, WhatsApp e i nomi famosi su un altro dominio hanno l’avviso', async ({ openTab, testServer }) => {
+  const link = Object.keys(IMITAZIONI).map((u, i) => `<p><a id="l${i}" href="${u}">Link ${i}</a></p>`).join('');
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px;font:16px sans-serif">${link}
+    <p><a id="vero" href="https://www.poste.it/">Poste vero</a></p></body></html>`);
+  const avviso = page.locator('.sn-menu .sn-menu-link-warn');
+  let i = 0;
+  for (const [u, marchio] of Object.entries(IMITAZIONI)) {
+    await page.locator('#l' + i++).click({ button: 'right' });
+    await expect(avviso, `nessun avviso su ${u}`).toBeVisible({ timeout: 3000 });
+    const testo = ((await avviso.textContent()) || '').trim();
+    expect(testo, u).toContain(marchio);
+    expect(testo, u).toMatch(/imitazione/i);
+    if (u.includes('poste.it.accesso')) await page.screenshot({ path: 'tests/.shots/725-8-imitazione-poste.png' });
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.sn-menu')).toHaveCount(0);
+  }
+  // Il sito vero resta pulito.
+  await page.locator('#vero').click({ button: 'right' });
+  await expect(page.locator('.sn-menu .sn-menu-inline[data-subject="link"]')).toBeVisible();
+  await page.waitForTimeout(800);
+  await expect(avviso).toHaveCount(0);
+});

@@ -5,13 +5,14 @@
 (function (global) {
   'use strict';
 
-  const POPULAR = [
-    'google.com', 'amazon.com', 'amazon.it', 'apple.com', 'microsoft.com',
-    'facebook.com', 'youtube.com', 'paypal.com', 'netflix.com', 'instagram.com',
-    'twitter.com', 'x.com', 'linkedin.com', 'github.com',
-  ];
+  // #725.8 — chi imita un marchio lo decide il controllo che gira all'apertura della pagina: un elenco solo
+  // di marchi e domini ufficiali, e un link non è pulito qui e sospetto quando lo apri.
+  let imitazione = null;
+  try {
+    if (typeof require === 'function') imitazione = require('../main/services/safebrowse/engine.js').imitazione;
+  } catch (e) { console.error('[linkSospetto] controllo dei marchi non caricato', e); }
 
-  // Codici: 'url_invalido' | 'side_effect' | 'token_in_url' | 'typosquatting:<dominio>'.
+  // Codici: 'url_invalido' | 'side_effect' | 'token_in_url' | 'typosquatting:<dominio>' | 'marchio_imitato:<marchio>'.
   function analizza(rawUrl) {
     const flags = [];
     let u;
@@ -23,51 +24,17 @@
     if (AZIONI.test(u.pathname) || AZIONI.test(query)) flags.push('side_effect');
     if (haCredenziale(query)) flags.push('token_in_url');
 
-    const host = u.hostname.toLowerCase().replace(/^www\./, '');
-    const nome = nomeSito(host);
-    const sosia = normalizzaSosia(nome);
-    for (const p of POPULAR) {
-      if (host === p) break;
-      if (host.endsWith('.' + p)) break;
-      const suo = nomeSito(p);
-      // Stesso nome, altro dominio di primo livello (amazon.de, google.co):
-      // è il sito, non chi lo imita.
-      if (nome === suo) break;
-      if (sosia === suo || levenshteinSmall(nome, suo, tolleranza(suo))) {
-        flags.push('typosquatting:' + p);
-        break;
-      }
-    }
+    const imp = imitazione ? imitazione(u.href) : null;
+    if (imp && imp.stretta) flags.push('typosquatting:' + dominioImitato(imp));
+    else if (imp) flags.push('marchio_imitato:' + imp.brand.display);
     return flags;
   }
 
-  // Suffissi di secondo livello: in 'amazon.co.uk' il nome del sito è 'amazon'.
-  const SUFFISSI_2L = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac']);
-
-  // #725 — si confronta il nome, non l'indirizzo intero: col primo livello
-  // dentro, ogni cambio di Paese era un'imitazione (amazon.de contro amazon.it).
-  function nomeSito(host) {
-    const parti = host.split('.').filter(Boolean);
-    if (parti.length < 2) return host;
-    parti.pop();
-    if (parti.length >= 2 && SUFFISSI_2L.has(parti[parti.length - 1])) parti.pop();
-    return parti[parti.length - 1] || host;
-  }
-
-  // #725 — una soglia fissa grida al lupo: due lettere su un nome corto sono
-  // un altro sito (gitlab non imita github), e su un nome di una non si indovina.
-  function tolleranza(nome) {
-    if (nome.length <= 4) return 0;
-    return nome.length <= 7 ? 1 : 2;
-  }
-
-  // Le lettere che a occhio ne valgono un'altra: recuperano i sosia (paypa1,
-  // micros0ft, arnazon) che la tolleranza più stretta lascerebbe passare.
-  function normalizzaSosia(nome) {
-    return nome
-      .replace(/rn/g, 'm').replace(/vv/g, 'w')
-      .replace(/0/g, 'o').replace(/1/g, 'l')
-      .replace(/3/g, 'e').replace(/5/g, 's');
+  // Il dominio vero da nominare: quello dello stesso Paese, se il marchio ce l'ha (arnazon.it somiglia ad amazon.it).
+  function dominioImitato(imp) {
+    const domini = imp.brand.domains;
+    return domini.find((d) => imp.publicSuffix && d.endsWith('.' + imp.publicSuffix) && !d.slice(0, -imp.publicSuffix.length - 1).includes('.'))
+      || domini[0];
   }
 
   // #725 — il nome del parametro da solo non basta: chiamarsi «t» o «hash» è
@@ -83,30 +50,6 @@
     return false;
   }
 
-  // Levenshtein limitata a `max` (early-exit). True se distance ≤ max e ≥ 1.
-  function levenshteinSmall(a, b, max) {
-    if (a === b) return false;
-    if (Math.abs(a.length - b.length) > max) return false;
-    const m = a.length, n = b.length;
-    if (m === 0 || n === 0) return false;
-    const prev = new Array(n + 1);
-    const cur = new Array(n + 1);
-    for (let j = 0; j <= n; j++) prev[j] = j;
-    for (let i = 1; i <= m; i++) {
-      cur[0] = i;
-      let rowMin = cur[0];
-      for (let j = 1; j <= n; j++) {
-        const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
-        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
-        if (cur[j] < rowMin) rowMin = cur[j];
-      }
-      if (rowMin > max) return false;
-      for (let j = 0; j <= n; j++) prev[j] = cur[j];
-    }
-    const d = prev[n];
-    return d >= 1 && d <= max;
-  }
-
   // #725 — il codice interno («typosquatting:paypal.com») finiva davanti
   // all'utente così com'era. Chi legge un avviso di sicurezza deve capire, in
   // una frase, cosa c'è che non va e cosa rischia.
@@ -120,7 +63,12 @@
     if (FRASI[codice]) return FRASI[codice];
     if (codice.startsWith('typosquatting:')) {
       const dominio = codice.slice('typosquatting:'.length).trim();
-      if (dominio) return `L’indirizzo somiglia a ${dominio} ma non è quello: potrebbe essere un’imitazione.`;
+      if (dominio) return `L’indirizzo somiglia ${/^a/i.test(dominio) ? 'ad' : 'a'} ${dominio} ma non è quello: potrebbe essere un’imitazione.`;
+    }
+    // Il nome del sito vero non ci va: lo sceglie chi ha scritto il link, e il modello legge questi codici come parole di Filo.
+    if (codice.startsWith('marchio_imitato:')) {
+      const marchio = codice.slice('marchio_imitato:'.length).trim();
+      if (marchio) return `L’indirizzo usa il nome di ${marchio} ma non porta a un suo sito: potrebbe essere un’imitazione.`;
     }
     return '';
   }
@@ -143,5 +91,5 @@
     return f.length ? '⚠️ ' + f.join(' ') : '';
   }
 
-  global.SN_LINK_SOSPETTO = { analizza, frasi, avviso, POPULAR };
+  global.SN_LINK_SOSPETTO = { analizza, frasi, avviso };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

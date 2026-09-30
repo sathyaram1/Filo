@@ -63,7 +63,7 @@ const BRANDS = [
   { token: 'telegram', display: 'Telegram', domains: ['telegram.org', 't.me'] },
   { token: 'discord', display: 'Discord', domains: ['discord.com', 'discord.gg'] },
   { token: 'netflix', display: 'Netflix', domains: ['netflix.com'] },
-  { token: 'youtube', display: 'YouTube', domains: ['youtube.com', 'youtu.be', 'youtube-nocookie.com', 'youtubekids.com'] },
+  { token: 'youtube', display: 'YouTube', domains: ['youtube.com', 'youtu.be', 'youtube-nocookie.com', 'youtubekids.com', 'youtube.it', 'youtube.de', 'youtube.fr', 'youtube.es', 'youtube.co.uk', 'youtube.ch', 'youtube.at', 'youtube.nl', 'youtube.be', 'youtube.pl', 'youtube.pt', 'youtube.ca', 'youtube.com.br', 'youtube.co.jp', 'youtube.com.au'] },
   { token: 'steam', display: 'Steam', domains: ['steampowered.com', 'steamcommunity.com'] },
 
   // Shopping

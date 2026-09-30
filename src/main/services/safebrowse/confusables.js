@@ -50,8 +50,7 @@ const MAP = new Map(Object.entries({
 // inserire trattini/punti per spezzare la parola: "p-a-y-p-a-l").
 function skeleton(s) {
   if (!s || typeof s !== 'string') return '';
-  // Coppie che a occhio fanno una lettera sola (arnazon, tvvitter): prima dei singoli caratteri.
-  const norm = s.normalize('NFC').toLowerCase().replace(/rn/g, 'm').replace(/vv/g, 'w');
+  const norm = s.normalize('NFC').toLowerCase();
   let out = '';
   for (const ch of norm) {
     const mapped = MAP.get(ch);
@@ -60,6 +59,13 @@ function skeleton(s) {
     if (/[a-z0-9]/.test(ch)) out += ch;
   }
   return out;
+}
+
+// Lo scheletro con le coppie che a occhio fanno una lettera sola (arnazon, tvvitter). Solo per l'uguaglianza:
+// dentro una parola più lunga la coppia è quasi sempre vera (stearns non contiene steam).
+function skeletonCoppie(s) {
+  if (!s || typeof s !== 'string') return '';
+  return skeleton(s.normalize('NFC').toLowerCase().replace(/rn/g, 'm').replace(/vv/g, 'w'));
 }
 
 // Vero se `a` e `b` hanno lo stesso scheletro (e non sono già identiche): cioè
@@ -71,4 +77,4 @@ function looksLike(a, b) {
   return sa.length > 0 && sa === sb;
 }
 
-module.exports = { skeleton, looksLike, MAP };
+module.exports = { skeleton, skeletonCoppie, looksLike, MAP };
