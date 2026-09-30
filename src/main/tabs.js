@@ -2320,7 +2320,10 @@ class TabManager {
         }
       }
     });
-    wc.on('did-navigate-in-page', (_e, url) => update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
+    wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
+      update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) });
+      if (isMainFrame === true && tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab, { inPagina: true });
+    });
     // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
     // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva
     // dal main (non dal content script, che manda un campione di attività anche

@@ -397,4 +397,10 @@ html,body{background:transparent;overflow:hidden;height:100%}
 </style></head><body><div class="menu">${items}</div><script>${TASTIERA_MENU}</script></body></html>`;
 }
 
-module.exports = { showPopupMenu, buildHTML, computeMenuWidth };
+// Il menu aperto sopra questa finestra, se c'è: la carta di anteprima delle schede non gli si apre sotto.
+function menuAperto(parentWin) {
+  if (!activePopup || activePopup.isDestroyed()) return null;
+  try { return activePopup.getParentWindow() === parentWin ? activePopup : null; } catch (_) { return null; }
+}
+
+module.exports = { showPopupMenu, buildHTML, computeMenuWidth, menuAperto };

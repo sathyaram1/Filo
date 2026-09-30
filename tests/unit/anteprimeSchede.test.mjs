@@ -151,6 +151,58 @@ test('se la scheda davanti si nasconde a metà, quella di dietro non resta allar
   m.anteprime.chiudi();
 });
 
+// Una spia finta: conta i cambi come quella vera, e si sa quando l'hanno spenta.
+function conSpia(tab) {
+  const spia = { n: 0, spenta: 0 };
+  tab.view.webContents.executeJavaScriptInIsolatedWorld = async (_mondo, [{ code }]) => {
+    if (/disconnect/.test(code)) { spia.spenta++; return undefined; }
+    return { n: spia.n, quiete: 10_000 };
+  };
+  return spia;
+}
+
+test('una pagina dietro mai vista si rifotografa quando cambia, e non quando resta ferma', async () => {
+  const davanti = scheda('d');
+  const dietro = scheda('b');
+  const spia = conSpia(dietro);
+  const m = manager([davanti, dietro], 'd');
+  const arrivate = [];
+  m.anteprime = new AnteprimeSchede(m, { ripresa: 60_000, giro: 20, passo: 30, suNuova: (id) => arrivate.push(id) });
+  m.anteprime.nataDietro(dietro);
+  m.anteprime.caricata(dietro);
+  await aspetta(() => arrivate.length === 1);
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(arrivate.length, 1, 'ferma: nessuna foto in più');
+  spia.n = 7;
+  await aspetta(() => arrivate.length === 2);
+  assert.equal(dietro.view.bounds, 'zero');
+  m.anteprime.chiudi();
+});
+
+test('una scheda vista che cambia pagina senza ricaricarsi si rifotografa; tornata davanti non la si segue più', async () => {
+  const davanti = scheda('d');
+  const dietro = scheda('b');
+  const spia = conSpia(dietro);
+  const m = manager([davanti, dietro], 'd');
+  const arrivate = [];
+  m.anteprime = new AnteprimeSchede(m, { ripresa: 60_000, giro: 20, passo: 30, suNuova: (id) => arrivate.push(id) });
+  m.anteprime.congeda(dietro);
+  await aspetta(() => arrivate.length === 1);
+  dietro.view.visibile = false;
+  m.anteprime.navigata(dietro, { inPagina: true });
+  await aspetta(() => arrivate.length === 2);
+  assert.equal(dietro.view.visibile, true, 'nascosta non si disegnerebbe');
+  m.activeId = 'b';
+  m.anteprime.mostrata(dietro);
+  await aspetta(() => spia.spenta === 1);
+  spia.n = 99;
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(arrivate.length, 2);
+  m.anteprime.navigata(dietro, { inPagina: true });
+  assert.equal(dietro._anteprimaSegui, null, 'quella davanti non si segue');
+  m.anteprime.chiudi();
+});
+
 test('una scheda chiusa porta via la sua foto', async () => {
   const a = scheda('a');
   const m = manager([a], 'a');

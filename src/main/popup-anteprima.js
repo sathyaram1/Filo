@@ -5,6 +5,7 @@
 const path = require('node:path');
 const { BrowserWindow, nativeTheme } = require('electron');
 const { hideForTests } = require('./test-window-mode');
+const { menuAperto } = require('./popup-menu');
 
 // Il margine trasparente tiene l'ombra; sopra è sottile perché la carta sfiora la barra delle schede.
 const MARGINE = { su: 2, lati: 10, giu: 14 };
@@ -126,6 +127,8 @@ function precarica(parent, id, dato) {
   const s = parent && !parent.isDestroyed() ? stati.get(parent) : null;
   if (!s || !s.win || s.win.isDestroyed() || !dato) return;
   invia(s, 'anteprima:immagine', { id: testo(id), src: dato.src, w: dato.w, h: dato.h });
+  // La carta aperta su questa scheda passa alla foto nuova: chi la guarda non deve uscire e rientrare.
+  if (s.voluta && s.voluta.id === testo(id) && s.voluta.dati) mostra(parent, s.voluta.dati);
 }
 
 // Il puntatore è entrato nella barra: la carta nasce adesso, così alla prima comparsa è già carica.
@@ -151,7 +154,14 @@ function mostra(parent, dati) {
   if (!s) return false;
   // Il numero non riparte mai: una misura in ritardo non deve combaciare con una carta nuova.
   const n = ++s.giri;
-  s.voluta = { n, id, x: Math.round(Number(dati.x) || 0), y: Math.round(Number(dati.y) || 0) };
+  s.voluta = { n, id, x: Math.round(Number(dati.x) || 0), y: Math.round(Number(dati.y) || 0), dati };
+  // Col menu del tasto destro aperto la carta aspetta che si chiuda: gli finirebbe sotto, mezza coperta.
+  const menu = menuAperto(parent);
+  if (menu) {
+    if (s.win.isVisible()) { invia(s, 'anteprima:nascondi', {}); s.win.hide(); }
+    dopoIlMenu(parent, s, menu);
+    return true;
+  }
   const davanti = id === tabs.activeId;
   invia(s, 'anteprima:mostra', {
     n,
@@ -166,6 +176,15 @@ function mostra(parent, dati) {
     scuro: nativeTheme.shouldUseDarkColors,
   });
   return true;
+}
+
+function dopoIlMenu(parent, s, menu) {
+  if (s.menu === menu) return;
+  s.menu = menu;
+  menu.once('closed', () => {
+    if (s.menu === menu) s.menu = null;
+    if (s.voluta && s.voluta.dati && !parent.isDestroyed()) mostra(parent, s.voluta.dati);
+  });
 }
 
 function nascondi(parent) {

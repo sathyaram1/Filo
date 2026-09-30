@@ -250,3 +250,103 @@ test('con una scheda che cambia titolo più volte al secondo la carta compare lo
   await expect.poll(async () => { const c = await carta(app); return c.visibile && c.titolo === 'Rossa'; }, { timeout: 2000 }).toBe(true);
   expect(tinta((await carta(app)).colore)).toBe('rosso');
 });
+
+// Una posta o un'app pesante su una rete lenta: il contenuto arriva ben dopo la seconda foto. La foto segue il cambio.
+test('una scheda aperta dietro che si riempie cinque secondi dopo il caricamento mostra il contenuto', async ({ app, shell, testServer }) => {
+  const url = testServer.html(`<!doctype html><title>Posta</title><style>html,body{margin:0;height:100%;background:#fff}</style>
+<p>Caricamento…</p><script>addEventListener('load',()=>setTimeout(()=>{document.documentElement.style.background=document.body.style.background='#10a020'},5000))</script>`);
+  const davantiUrl = testServer.html(pagina('#e01010', 'Davanti', `<a id="vai" href="${url}">link</a>`));
+  await apri(app, shell, davantiUrl);
+  const page = app.windows().find((w) => w.url() === davantiUrl);
+  await page.click('#vai', { modifiers: ['Control'] });
+  const dietro = await caricata(app, url);
+  await new Promise((r) => setTimeout(r, 9000));
+  await shell.mouse.move(600, 500);
+  await new Promise((r) => setTimeout(r, 900));
+  await shell.locator(`.tab[data-id="${dietro}"]`).hover();
+  await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 3000 }).toBe('verde');
+});
+
+// Un sito a pagina unica (il video dopo, il messaggio dopo) cambia pagina senza ricaricare: niente caricamento da aspettare.
+test('una scheda dietro che cambia pagina senza ricaricarsi ha la foto nuova, come il titolo', async ({ app, shell, testServer }) => {
+  const url = testServer.html(`<!doctype html><title>Video 1</title><style>html,body{margin:0;height:100%;background:#e01010}</style>
+<h1>Video 1</h1><script>addEventListener('load',()=>setTimeout(()=>{history.pushState({},'','?v=2');document.title='Video 2';document.documentElement.style.background=document.body.style.background='#10a020';document.querySelector('h1').textContent='Video 2'},6000))</script>`);
+  const davantiUrl = testServer.html(pagina('#1030e0', 'Davanti', `<a id="vai" href="${url}">link</a>`));
+  await apri(app, shell, davantiUrl);
+  const page = app.windows().find((w) => w.url() === davantiUrl);
+  await page.click('#vai', { modifiers: ['Control'] });
+  const dietro = await caricata(app, url);
+  await expect.poll(async () => (await schede(app)).tutte.find((x) => x.id === dietro)?.url, { timeout: 15_000 }).toMatch(/\?v=2$/);
+  await new Promise((r) => setTimeout(r, 4500));
+  await shell.mouse.move(600, 500);
+  await new Promise((r) => setTimeout(r, 900));
+  await shell.locator(`.tab[data-id="${dietro}"]`).hover();
+  await expect.poll(async () => (await carta(app)).titolo, { timeout: 3000 }).toBe('Video 2');
+  await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 3000 }).toBe('verde');
+});
+
+// Chi apre un link dietro e punta subito la scheda nuova per sbirciarla: la foto arriva nella carta già aperta.
+test('la carta aperta su una scheda che finisce di caricare, o che riceve la seconda foto, passa alla foto nuova', async ({ app, shell, testServer }) => {
+  const lento = createServer((_req, res) => {
+    setTimeout(() => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(pagina('#10a020', 'Lenta')); }, 2500);
+  });
+  await new Promise((r) => lento.listen(0, '127.0.0.1', r));
+  const lenta = `http://localhost:${lento.address().port}/lenta`;
+  try {
+    const davantiUrl = testServer.html(pagina('#1030e0', 'Davanti', `<a id="vai" href="${lenta}">link</a>`));
+    await apri(app, shell, davantiUrl);
+    const page = app.windows().find((w) => w.url() === davantiUrl);
+    await page.click('#vai', { modifiers: ['Control'] });
+    let dietro = null;
+    await expect.poll(async () => { dietro = (await schede(app)).tutte.find((t) => t.url === lenta)?.id; return !!dietro; }, { timeout: 5000 }).toBe(true);
+    await shell.mouse.move(600, 500);
+    await new Promise((r) => setTimeout(r, 900));
+    // Sul bordo sinistro: a caricamento finito il titolo si accorcia e la scheda si stringe.
+    await shell.locator(`.tab[data-id="${dietro}"]`).hover({ position: { x: 12, y: 12 } });
+    await expect.poll(async () => (await carta(app)).visibile, { timeout: 3000 }).toBe(true);
+    expect((await carta(app)).foto).toBeNull();
+    await haFoto(app, dietro);
+    await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 3000 }).toBe('verde');
+  } finally {
+    lento.closeAllConnections?.();
+    await new Promise((r) => lento.close(r));
+  }
+
+  const tarda = testServer.html(`<!doctype html><title>Feed</title><style>html,body{margin:0;height:100%;background:#fff}</style>
+<p>Caricamento…</p><script>addEventListener('load',()=>setTimeout(()=>{document.documentElement.style.background=document.body.style.background='#10a020'},1200))</script>`);
+  const davanti2 = testServer.html(pagina('#1030e0', 'Ancora davanti', `<a id="vai" href="${tarda}">link</a>`));
+  await apri(app, shell, davanti2);
+  const page2 = app.windows().find((w) => w.url() === davanti2);
+  await shell.mouse.move(600, 500);
+  await page2.click('#vai', { modifiers: ['Control'] });
+  const feed = await caricata(app, tarda);
+  await haFoto(app, feed);
+  await shell.locator(`.tab[data-id="${feed}"]`).hover({ position: { x: 12, y: 12 } });
+  await expect.poll(async () => (await carta(app)).visibile, { timeout: 3000 }).toBe(true);
+  await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 8000 }).toBe('verde');
+});
+
+// Col menu del tasto destro di una scheda aperto, la carta di un'altra scheda gli finirebbe sotto, mezza coperta.
+test('col menu di una scheda aperto la carta aspetta che il menu si chiuda', async ({ app, shell, testServer }) => {
+  const menuAperti = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .filter((w) => !w.isDestroyed() && w.isVisible() && /^data:text\/html/.test(w.webContents.getURL())).length);
+  const rossa = await apri(app, shell, testServer.html(pagina('#e01010', 'Rossa')));
+  await guardata();
+  const verde = await apri(app, shell, testServer.html(pagina('#10a020', 'Verde')));
+  await guardata();
+  await apri(app, shell, testServer.html(pagina('#1030e0', 'Blu')));
+  await haFoto(app, rossa);
+  await shell.mouse.move(600, 500);
+  await new Promise((r) => setTimeout(r, 900));
+  await shell.locator(`.tab[data-id="${verde}"]`).click({ button: 'right' });
+  await expect.poll(menuAperti, { timeout: 3000 }).toBeGreaterThan(0);
+  await shell.locator(`.tab[data-id="${rossa}"]`).hover();
+  await new Promise((r) => setTimeout(r, 800));
+  expect(await menuAperti()).toBeGreaterThan(0);
+  expect((await carta(app)).visibile).toBe(false);
+  // Chiuso il menu col puntatore ancora sulla scheda, la carta arriva.
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed() && /^data:text\/html/.test(w.webContents.getURL())) w.close();
+  });
+  await expect.poll(async () => { const c = await carta(app); return c.visibile && c.titolo === 'Rossa'; }, { timeout: 3000 }).toBe(true);
+});

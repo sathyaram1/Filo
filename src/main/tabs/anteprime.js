@@ -164,7 +164,7 @@ class AnteprimeSchede {
     if (this.spento) return;
     let s = tab._anteprimaSegui;
     if (!s || nuova) {
-      s = { n: null, ultima: Date.now(), passo: this.tempi.passo, dal: 0, sporca: false, inVolo: false };
+      s = { n: null, ultima: 0, passo: this.tempi.passo, dal: 0, sporca: false, inVolo: false };
       tab._anteprimaSegui = s;
     }
     s.fino = Date.now() + this.tempi.segui;

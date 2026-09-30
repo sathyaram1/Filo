@@ -22,20 +22,31 @@ chiede.
   davanti che la copre tutta; il layout lo sa e non la rimpicciolisce a metà.
   Una alla volta, e mai mentre la scheda davanti è nascosta (menu della shell
   sopra la pagina) o la finestra non si vede: lì la si vedrebbe, o non verrebbe.
-- **Due foto, non una.** Feed, posta e video riempiono la pagina dopo il
-  caricamento: alla prima foto sono bianchi. La scheda nata dietro resta sveglia
-  per una seconda foto qualche secondo dopo, poi si riaddormenta.
+- **La foto segue la pagina quando cambia, non a orari fissi.** Feed, posta e
+  video riempiono la pagina dopo il caricamento, quando vogliono: alla prima
+  foto sono bianchi, e un secondo scatto a tre secondi (che resta, per ciò che
+  cambia senza toccare il DOM) non basta a una posta lenta. Una pagina dietro
+  che l'utente non ha ancora visto ha una spia nel suo mondo isolato che conta i
+  cambi del DOM e le immagini arrivate; il main la interroga a giri brevi e,
+  quando la pagina è cambiata e si è fermata (o cambia da troppo), la
+  rifotografa. Fra due foto per cambio l'attesa raddoppia, così una pagina che
+  cambia sempre (un ticker, un video) costa poche foto; la spia si spegne quando
+  la scheda viene davanti o un minuto e mezzo dopo l'ultimo cambio di pagina.
 - **Una scheda dietro che cambia pagina da sola** (un rimando «Apertura in
-  corso…», un aggiornamento) torna sveglia come una nata dietro e si rifotografa
-  al caricamento: la carta non deve mai avere il titolo di una pagina e la foto
-  di un'altra. Una foto chiesta lasciando la scheda e ancora in volo non copre
-  quella scattata dopo.
+  corso…», un aggiornamento, un sito a pagina unica che passa al video dopo
+  senza ricaricare) torna seguita come una nata dietro, anche se l'utente l'aveva
+  già vista: la carta non deve mai avere il titolo di una pagina e la foto di
+  un'altra. Una foto chiesta lasciando la scheda e ancora in volo non copre
+  quella scattata dopo. La stessa pagina vista e poi cambiata dietro (una chat)
+  resta com'era: quello è l'ultimo che l'utente ci ha visto.
 - **La carta** è una finestra figlia (`src/main/popup-anteprima.js`, strada 2 di
   [la shell non disegna sopra la pagina](la-shell-non-disegna-sopra-la-pagina.md)):
   non prende il puntatore né la tastiera, nasce quando il puntatore entra nella
-  barra e riceve tutte le foto in quel momento, poi ognuna appena scattata.
+  barra e riceve tutte le foto in quel momento, poi ognuna appena scattata; se è
+  aperta sulla scheda di quella foto, la mostra subito, senza uscire e rientrare.
   Prima di sparire si svuota, così chi la rivede non trova per un istante la
-  scheda di prima.
+  scheda di prima. Col menu del tasto destro aperto aspetta che si chiuda: gli
+  finirebbe sotto, mezza coperta.
 - **La prima compare dopo un attimo**, per non accendersi attraversando la
   barra; da lì, finché si resta sulle schede, passa dall'una all'altra subito.
   La barra si ridisegna a ogni titolo o icona che cambia: l'attesa della stessa
@@ -47,5 +58,8 @@ chiede.
   vanno con la scheda.
 - **Test:** `tests/tab-preview.spec.mjs` guarda la carta vera e il colore dei
   suoi pixel, per la scheda lasciata dietro, per quella nata dietro, per quella
-  nascosta prima di finire di caricare, per quella che si riempie dopo, per
-  quella che cambia pagina da sola e con la barra che si ridisegna di continuo.
+  nascosta prima di finire di caricare, per quella che si riempie dopo (anche
+  cinque secondi dopo), per quella che cambia pagina da sola (anche senza
+  ricaricare), per la carta aperta mentre arriva la foto, col menu aperto e con
+  la barra che si ridisegna di continuo; `tests/unit/anteprimeSchede.test.mjs`
+  tiene la regola della spia con viste finte.
