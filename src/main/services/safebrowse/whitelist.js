@@ -52,6 +52,7 @@ const EXTRA = [
   'spid.gov.it', 'pagopa.it', 'governo.it',
   // Siti veri di altri che portano il nome di un marchio dell'elenco
   'aruba.com', 'visitaruba.com', 'arubanetworks.com', 'arubainstanton.com', 'mediolanumforum.it', 'finecooking.com',
+  'intesa.it',
   // AI
   'openai.com', 'anthropic.com', 'claude.ai', 'chatgpt.com',
   'huggingface.co', 'perplexity.ai', 'gemini.google.com',
