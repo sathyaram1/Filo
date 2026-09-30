@@ -118,14 +118,15 @@
     if (timer && typeof timer.unref === 'function') timer.unref(); // non tenere vivo il processo
   }
 
-  async function enqueue(payload) {
+  async function enqueue(payload, opts) {
     await load();
     const id = (payload && payload.submissionId)
       ? String(payload.submissionId)
       : `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const dallOwner = !!(opts && opts.dallOwner);
     // Dedup su submissionId: due invii della stessa bozza non accodano due voci.
     if (!queue.some((it) => it.id === id)) {
-      queue.push({ id, payload, name: null, prepared: false, queuedAt: Date.now(), attempts: 0 });
+      queue.push({ id, payload, name: null, prepared: false, queuedAt: Date.now(), attempts: 0, dallOwner });
       if (queue.length > MAX_ITEMS) queue = queue.slice(-MAX_ITEMS);
       await persist();
     }
