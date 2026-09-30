@@ -4088,7 +4088,7 @@
     const html = `
       <div class="mg-sender-info">
         <div class="mg-sender-stat"><strong>${esc(senderLabel(group[0] || { clientId }))}</strong></div>
-        <div class="mg-sender-stat">${esc(clientId)}</div>
+        <div class="mg-sender-stat">${esc(clientId === '__anon__' ? 'anonimo' : clientId)}</div>
         <div class="mg-sender-stat">${esc(oldestStr)}</div>
         <div class="mg-sender-stat">Feedback totali: <strong>${total}</strong></div>
         <div class="mg-sender-list" id="senderFbList">${listHtml || '<em>Nessun feedback.</em>'}</div>
