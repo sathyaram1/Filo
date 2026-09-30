@@ -1,62 +1,59 @@
-// #382 giro 4: esplorazione (screenshot della bolla in attesa e delle righe non controllate, pagina 2 che fallisce).
+// #382 giro 4: esplorazione (righe non controllate, Riprova, uscita dal mazzo mentre controlla).
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { mockScryfall, mockProvider, manyCards, deckWithCommander, send } from './_finti.mjs';
 
+async function judgeFailsBatch(app) {
+  await app.evaluate(() => {
+    const orig = globalThis.__judge;
+    globalThis.__failBatch = true;
+    globalThis.__judge = (p, m) => (globalThis.__failBatch && /Carta 110\b/.test(p) ? 'boh' : orig(p, m));
+  });
+}
+
 for (const tema of ['light', 'dark']) {
-  test(`aspetto ${tema}: bolla in attesa e righe con ?`, async ({ app, openTab }) => {
+  test(`aspetto ${tema}: righe con ? e Riprova`, async ({ app, openTab }) => {
     test.setTimeout(120_000);
     await mockScryfall(app);
     await mockProvider(app);
     await manyCards(app, { pages: [175, 175], relevant: [7, 57, 107, 157, 207, 257, 307] });
-    await app.evaluate(() => {
-      globalThis.__judgeMs = 1500;
-      const orig = globalThis.__judge;
-      let n = 0;
-      globalThis.__judge = (p, m) => { n += 1; return n === 3 ? 'boh' : orig(p, m); };
-    });
+    await judgeFailsBatch(app);
     const page = await openTab('filo://decks/decks.html');
     await page.emulateMedia({ colorScheme: tema });
     await page.waitForLoadState('domcontentloaded');
     await deckWithCommander(page);
-    await page.fill('#chatInput', 'carte che danno haste');
-    await page.press('#chatInput', 'Enter');
-    await expect(page.locator('.dk-progress')).toBeVisible({ timeout: 15_000 });
-    await page.waitForTimeout(1200);
-    await page.screenshot({ path: `tests/.shots/382-g4-attesa-${tema}.png` });
-    const bubble = page.locator('.dk-msg-bot').last();
-    await expect(bubble.locator('.dk-msg-pending')).toHaveCount(0, { timeout: 60_000 });
-    await page.screenshot({ path: `tests/.shots/382-g4-fine-${tema}.png` });
-    console.log('TESTO', await bubble.innerText());
+    const bubble = await send(page, 'carte che danno haste', 60_000);
+    await page.screenshot({ path: `tests/.shots/382-g4-q-${tema}.png` });
+    console.log('TESTO', (await bubble.innerText()).slice(0, 400));
+    const calls0 = await app.evaluate(() => globalThis.__filterCalls.length);
+    await app.evaluate(() => { globalThis.__failBatch = false; });
+    await bubble.locator('[data-retry]').click();
+    const b2 = page.locator('.dk-msg-bot').last();
+    await expect(b2.locator('.dk-msg-pending')).toHaveCount(0, { timeout: 60_000 });
+    const calls1 = await app.evaluate(() => globalThis.__filterCalls.length);
+    console.log('CHIAMATE riprova', calls1 - calls0, 'righe', await b2.locator('.dk-cardlist .dk-row').count(), 'q', await b2.locator('.dk-row-unchecked').count());
   });
 }
 
-test('pagina 2 di Scryfall che fallisce', async ({ app, openTab }) => {
+test('esco dal mazzo mentre controlla e ci rientro', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   await mockScryfall(app);
   await mockProvider(app);
-  await manyCards(app, { pages: [175, 175, 175], relevant: [7, 207, 407] });
-  await app.evaluate(() => {
-    const SC = globalThis.SN_SCRYFALL;
-    // Riprendo il fetch finto e faccio fallire la pagina 2 una volta.
-    let failed = false;
-    const pages = globalThis.__pages;
-    SC._setFetch(async (url) => {
-      const u = new URL(String(url));
-      if (u.pathname === '/cards/search') {
-        const n = Number(u.searchParams.get('page') || '1');
-        if (n === 2 && !failed) { failed = true; return { ok: false, status: 503, json: async () => ({}) }; }
-        return { ok: true, status: 200, json: async () => ({ data: pages[n - 1] || [], has_more: n < pages.length, total_cards: 525 }) };
-      }
-      if (u.pathname === '/cards/niv-1') return { ok: true, status: 200, json: async () => ({ id: 'niv-1', name: 'Niv-Mizzet, Parun', mana_cost: '{U}{R}', cmc: 6, type_line: 'Legendary Creature', color_identity: ['U', 'R'], colors: ['U', 'R'], prices: { eur: '1' }, legalities: { commander: 'legal' } }) };
-      if (u.pathname === '/symbology') return { ok: true, status: 200, json: async () => ({ data: [] }) };
-      return { ok: false, status: 404, json: async () => ({}) };
-    });
-  });
+  await manyCards(app, { pages: [175, 175], relevant: [7, 57, 207] });
+  await app.evaluate(() => { globalThis.__judgeMs = 2500; });
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
   await deckWithCommander(page);
-  const bubble = await send(page, 'carte che danno haste', 60_000);
-  console.log('TESTO-P2', await bubble.innerText());
-  console.log('RIPROVA', await bubble.locator('[data-retry]').count());
+  await page.fill('#chatInput', 'carte che danno haste');
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('.dk-progress')).toBeVisible({ timeout: 15_000 });
+  await page.click('#backToLibrary');
+  await page.waitForTimeout(500);
+  await page.locator('[data-deck-id]').first().click();
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  console.log('DURANTE', await page.locator('.dk-msg-bot').last().innerText());
+  await page.waitForTimeout(8000);
+  const bubble = page.locator('.dk-msg-bot').last();
+  console.log('DOPO', await bubble.innerText());
+  await page.screenshot({ path: 'tests/.shots/382-g4-rientro.png' });
 });
