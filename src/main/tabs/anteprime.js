@@ -156,6 +156,91 @@ class AnteprimeSchede {
     this.spento = true;
     this.coda = [];
     this.sotto = null;
+    if (this._giro) { clearInterval(this._giro); this._giro = null; }
+  }
+
+  // Il periodo si allunga a ogni cambio di pagina; una pagina nuova riparte da zero.
+  _segui(tab, { nuova = false, sporca = false } = {}) {
+    if (this.spento) return;
+    let s = tab._anteprimaSegui;
+    if (!s || nuova) {
+      s = { n: null, ultima: Date.now(), passo: this.tempi.passo, dal: 0, sporca: false, inVolo: false };
+      tab._anteprimaSegui = s;
+    }
+    s.fino = Date.now() + this.tempi.segui;
+    if (sporca) s.sporca = true;
+    if (!this._giro) {
+      this._giro = setInterval(() => this._guarda(), this.tempi.giro);
+      this._giro.unref?.();
+    }
+  }
+
+  _smetti(tab) {
+    if (!tab || !tab._anteprimaSegui) return;
+    tab._anteprimaSegui = null;
+    this._spia(tab, SPEGNI);
+  }
+
+  // Ogni giro chiede a ogni pagina seguita se è cambiata dall'ultima foto; ferma da poco, o cambiata da un pezzo, si rifà.
+  _guarda() {
+    const ora = Date.now();
+    let seguite = 0;
+    for (const tab of this.m.tabs) {
+      const s = tab._anteprimaSegui;
+      if (!s) continue;
+      if (this.spento || tab.id === this.m.activeId || ora > s.fino || !vivo(tab)) { this._smetti(tab); continue; }
+      seguite++;
+      if (tab.loading || s.inVolo) continue;
+      s.inVolo = true;
+      this._spia(tab, SPIA).then((r) => {
+        s.inVolo = false;
+        if (!r || typeof r.n !== 'number' || tab._anteprimaSegui !== s) return;
+        if (s.n === null && !s.sporca) { s.n = r.n; return; }
+        if (!s.sporca && r.n === s.n) return;
+        const adesso = Date.now();
+        if (!s.dal) s.dal = adesso;
+        if (adesso - s.ultima < s.passo) return;
+        if (r.quiete < this.tempi.quiete && adesso - s.dal < SENZA_QUIETE) return;
+        s.n = r.n;
+        s.sporca = false;
+        s.dal = 0;
+        s.passo *= 2;
+        this._risveglia(tab);
+      });
+    }
+    if (!seguite && this._giro) { clearInterval(this._giro); this._giro = null; }
+  }
+
+  // Col tetto: una pagina ferma su un avviso del browser non deve tenere la spia in volo per sempre.
+  _spia(tab, codice) {
+    let wc;
+    try { wc = tab.view.webContents; } catch (_) { return Promise.resolve(null); }
+    if (!wc || typeof wc.executeJavaScriptInIsolatedWorld !== 'function') return Promise.resolve(null);
+    let timer;
+    const tetto = new Promise((r) => { timer = setTimeout(() => r(null), 1000); timer.unref?.(); });
+    const p = Promise.resolve()
+      .then(() => wc.executeJavaScriptInIsolatedWorld(MONDO, [{ code: codice }]))
+      .catch(() => null);
+    return Promise.race([p, tetto]).then((r) => { clearTimeout(timer); return r || null; });
+  }
+
+  // La foto di un cambio non chiama una ripresa: i cambi successivi li vede la spia.
+  _risveglia(tab) {
+    if (this.spento || !vivo(tab) || tab.id === this.m.activeId) return;
+    tab._anteprimaAttesa = TENTATIVI;
+    tab._anteprimaRipresa = true;
+    try { tab.view.setVisible?.(true); } catch (_) {}
+    this.caricata(tab);
+  }
+
+  // Dopo ogni foto di una pagina seguita la spia riparte da lì (e al primo giro si installa).
+  _fotografata(tab) {
+    const s = tab._anteprimaSegui;
+    if (!s) return;
+    s.ultima = Date.now();
+    this._spia(tab, SPIA).then((r) => {
+      if (r && typeof r.n === 'number' && tab._anteprimaSegui === s) { s.n = r.n; s.sporca = false; }
+    });
   }
 
   // La visibilità la rimette in riga il prossimo cambio di scheda, come per ogni scheda aperta dietro.
