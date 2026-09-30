@@ -442,6 +442,8 @@
     if (!d) return;
     d.el.classList.remove('dragging');
     if (!d.moved) return;
+    // Il riordino lo ridisegna il broadcast di api.tabs.move: ridisegnare prima rimetterebbe la scheda dov'era.
+    ridisegnoRimandato = false;
     // Il click che segue il mouseup non deve riattivare/spostare la tab.
     suppressClickId = d.id;
     // La posizione di rilascio è quella del NODO effettivamente trascinato, non
