@@ -13,6 +13,7 @@
 // La lista è volutamente corta e curata: pochi brand ad altissimo valore, per
 // tenere bassi i falsi positivi. Allungarla è sicuro finché i token restano
 // parole distintive (evita token generici tipo "pay" o "mail" da soli).
+// È l'unico elenco: la usa anche l'avviso sui link del tasto destro (#725.8).
 
 'use strict';
 
@@ -30,6 +31,7 @@ const BRANDS = [
   { token: 'intesa', display: 'Intesa Sanpaolo', domains: ['intesasanpaolo.com'] },
   { token: 'intesasanpaolo', display: 'Intesa Sanpaolo', domains: ['intesasanpaolo.com'] },
   { token: 'poste', display: 'Poste Italiane', domains: ['poste.it', 'posteitaliane.it'] },
+  { token: 'bancoposta', display: 'Poste Italiane', domains: ['poste.it', 'posteitaliane.it'] },
   { token: 'nexi', display: 'Nexi', domains: ['nexi.it'] },
 
   // Crypto
@@ -40,7 +42,7 @@ const BRANDS = [
   { token: 'ledger', display: 'Ledger', domains: ['ledger.com'] },
 
   // Email / account / cloud
-  { token: 'google', display: 'Google', domains: ['google.com', 'google.it', 'gmail.com', 'googlemail.com', 'googleblog.blogspot.com', 'google.ch', 'google.at', 'google.nl', 'google.be', 'google.pl', 'google.pt', 'google.ca', 'google.com.au', 'google.co.jp', 'google.com.br', 'google.co.in'] },
+  { token: 'google', display: 'Google', domains: ['google.com', 'google.it', 'google.co', 'gmail.com', 'googlemail.com', 'googleblog.blogspot.com', 'google.ch', 'google.at', 'google.nl', 'google.be', 'google.pl', 'google.pt', 'google.ca', 'google.com.au', 'google.co.jp', 'google.com.br', 'google.co.in'] },
   { token: 'gmail', display: 'Gmail', domains: ['gmail.com', 'google.com'] },
   { token: 'microsoft', display: 'Microsoft', domains: ['microsoft.com', 'live.com', 'office.com', 'office365.com', 'microsoft.sharepoint.com', 'microsoftonline.com', 'microsoft365.com', 'cloud.microsoft'] },
   { token: 'outlook', display: 'Outlook', domains: ['outlook.com', 'live.com', 'microsoft.com'] },
@@ -54,13 +56,14 @@ const BRANDS = [
   // Social / comunicazione
   { token: 'facebook', display: 'Facebook', domains: ['facebook.com', 'fb.com'] },
   { token: 'instagram', display: 'Instagram', domains: ['instagram.com'] },
-  { token: 'whatsapp', display: 'WhatsApp', domains: ['whatsapp.com'] },
+  { token: 'whatsapp', display: 'WhatsApp', domains: ['whatsapp.com', 'whatsapp.net', 'wa.me'] },
   { token: 'twitter', display: 'X (Twitter)', domains: ['twitter.com', 'x.com'] },
   { token: 'linkedin', display: 'LinkedIn', domains: ['linkedin.com'] },
   { token: 'tiktok', display: 'TikTok', domains: ['tiktok.com'] },
   { token: 'telegram', display: 'Telegram', domains: ['telegram.org', 't.me'] },
   { token: 'discord', display: 'Discord', domains: ['discord.com', 'discord.gg'] },
   { token: 'netflix', display: 'Netflix', domains: ['netflix.com'] },
+  { token: 'youtube', display: 'YouTube', domains: ['youtube.com', 'youtu.be', 'youtube-nocookie.com', 'youtubekids.com'] },
   { token: 'steam', display: 'Steam', domains: ['steampowered.com', 'steamcommunity.com'] },
 
   // Shopping

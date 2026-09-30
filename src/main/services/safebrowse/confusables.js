@@ -50,7 +50,8 @@ const MAP = new Map(Object.entries({
 // inserire trattini/punti per spezzare la parola: "p-a-y-p-a-l").
 function skeleton(s) {
   if (!s || typeof s !== 'string') return '';
-  const norm = s.normalize('NFC').toLowerCase();
+  // Coppie che a occhio fanno una lettera sola (arnazon, tvvitter): prima dei singoli caratteri.
+  const norm = s.normalize('NFC').toLowerCase().replace(/rn/g, 'm').replace(/vv/g, 'w');
   let out = '';
   for (const ch of norm) {
     const mapped = MAP.get(ch);
