@@ -405,10 +405,15 @@ function registerIpcHandlers() {
     const wc = paginaDiScheda(event, id);
     return wc ? require('./services/permessiPagine').dimentica(wc) : { tolte: 0, cera: false };
   });
-  ipcMain.handle('tabs:open-blocked-popup', (event, { url } = {}) => {
+  ipcMain.handle('tabs:open-blocked-popup', (event, { url, apriComunque, daScheda } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs || !url) return { ok: false };
-    win._filoTabs.openBlockedPopup(url);
+    // Scavalcare la lista lo chiede solo la shell, dove stanno la notifica «Sito bloccato» e la chip dei popup (#590).
+    const shell = event.sender === win.webContents;
+    win._filoTabs.openBlockedPopup(url, {
+      apriComunque: apriComunque === true && shell,
+      daScheda: shell && typeof daScheda === 'string' ? daScheda : null,
+    });
     return { ok: true };
   });
   // Proxy per-tab ("Apri da un altro paese"): instrada/de-instrada una singola

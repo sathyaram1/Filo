@@ -67,6 +67,13 @@
     faviconUrl: (url) => faviconUrl(url),
     applyCommandCwd: (actions) => Term.applyCommandCwd(actions),
   });
+  // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
+  if (window.filo?.onAperturaFermata) {
+    window.filo.onAperturaFermata((data) => {
+      const azioni = threadHistory.flatMap((m) => (m && Array.isArray(m.actions) ? m.actions : []));
+      Att.aperturaFermata(azioni, data || {});
+    });
+  }
   // #525 — una riga scritta in chat senza passare dal modello (la risposta a un
   // comando con lo slash, il comando di terminale e il suo esito) entra
   // nell'archivio come ogni altra battuta: l'utente l'ha letta dentro questa

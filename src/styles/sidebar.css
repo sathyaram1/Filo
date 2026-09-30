@@ -171,6 +171,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  /* Col padding dentro il 100%: una riga lunga non fa scorrere il diario di lato. */
+  box-sizing: border-box;
+}
+/* Una riga che dice perché qualcosa non è successo va letta fino in fondo, non tagliata. */
+.sn-sidebar-log.sn-sidebar-log-intera {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* Stato collassato: visibile solo la barra di input. Il pannello si rimpicciolisce

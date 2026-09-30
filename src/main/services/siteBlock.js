@@ -1,75 +1,12 @@
-// Blocco apertura siti in blacklist (#170.3).
-//
-// PERCHÉ ESISTE
-//   L'ad-blocking (adblock.js) annulla le SINGOLE richieste verso domini di
-//   ad/tracker, ma non impedisce di APRIRE la pagina top-level di un sito che
-//   sta in blacklist. Questo modulo decide, a livello di navigazione top-level,
-//   se l'apertura di un sito va bloccata del tutto.
-//
-//   Sorgenti della blacklist:
-//   - le liste pubbliche già scaricate dall'ad-blocker (#170.2: StevenBlack +
-//     EasyList), opzionali (useAdblockLists);
-//   - una blacklist DEDICATA dell'utente (domini aggiunti a mano nelle
-//     Preferenze).
-//
-//   ECCEZIONI (l'apertura è consentita anche se il sito è in blacklist):
-//   a) la navigazione proviene da un MOTORE DI RICERCA (referrer Google/Bing/…):
-//      l'utente l'ha cercato apposta, non lo intercettiamo;
-//   b) la navigazione è ORIGINATA DA FILO (azione NAVIGA dell'assistente o
-//      navigazione interna filo://): è Filo stesso ad aprire, su richiesta
-//      esplicita dell'utente.
-//
-//   Quando invece blocca, il chiamante (tabs.js) mostra una notifica in basso a
-//   destra (#170.1) col sito bloccato e l'opzione "Apri comunque".
-//
-// API: configureFromSettings, shouldBlockNavigation, isSearchEngineUrl,
-//      isBlacklistedHost, setForTest, status.
+// Blocco apertura siti in blacklist (#170.3): decide se una navigazione top-level va bloccata.
+// Non notifica e non conosce le schede: lo chiama solo _decisioneBlocco di tabs.js,
+// l'unico passaggio di ogni cambio d'indirizzo (#590). Regole: tests/unit/siteBlock.test.mjs.
+
+const NomiSito = require('../../shared/nomiSito.js');
 
 let enabled = true;
 let useAdblockLists = true;
 let userBlacklist = new Set(); // domini extra inseriti dall'utente
-
-// Second-level public suffix usati dai motori multi-TLD (co.uk, com.au,
-// co.jp, com.tr, …): la label del motore può stare subito prima di questi.
-const PUB_SLD = '(?:co|com|net|org|gov|edu|ac|ne|or|go|nom|nic)';
-
-// Ancora il nome di un motore multi-TLD (google/yahoo/yandex) al DOMINIO
-// REGISTRABILE: lo riconosce solo se <name> è la label subito prima del
-// suffisso pubblico (google.com, google.co.uk, search.yahoo.com, yandex.com.tr),
-// NON se è una label iniziale qualsiasi (google.evil.com, yahoo.phishing.io).
-// Il suffisso è un TLD singolo, eventualmente preceduto da un SLD pubblico;
-// nessuno dei due può contenere una label registrabile arbitraria (#230).
-function engineOnPublicSuffix(name) {
-  return new RegExp(`(^|\\.)${name}\\.(?:${PUB_SLD}\\.)?[a-z]{2,}$`);
-}
-
-// Motori di ricerca il cui referrer rende lecita l'apertura di un sito in
-// blacklist. Riconoscimento per pattern sul dominio registrabile, robusto ai
-// molti TLD di Google/Yandex e ai sottodomini (www., search., ecc.).
-const SEARCH_ENGINE_PATTERNS = [
-  engineOnPublicSuffix('google'), // google.com, google.it, google.co.uk, …
-  /(^|\.)bing\.com$/,
-  /(^|\.)duckduckgo\.com$/,
-  /(^|\.)ecosia\.org$/,
-  /(^|\.)startpage\.com$/,
-  /(^|\.)qwant\.com$/,
-  engineOnPublicSuffix('yahoo'), // search.yahoo.com, yahoo.com, yahoo.co.jp, …
-  engineOnPublicSuffix('yandex'), // yandex.com, yandex.ru, yandex.com.tr, …
-  /(^|\.)baidu\.com$/,
-  /(^|\.)brave\.com$/, // search.brave.com
-  /(^|\.)kagi\.com$/,
-  /(^|\.)mojeek\.com$/,
-  /(^|\.)ask\.com$/,
-  /(^|\.)searx\b/, // istanze SearXNG (searx.*)
-];
-
-function hostnameOf(url) {
-  try {
-    return new URL(url).hostname.toLowerCase();
-  } catch (_) {
-    return '';
-  }
-}
 
 // Normalizza un dominio inserito dall'utente: toglie schema, path, porta, www.
 function normalizeDomain(raw) {
@@ -81,16 +18,18 @@ function normalizeDomain(raw) {
   s = s.split('?')[0];
   s = s.split('#')[0];
   s = s.split(':')[0]; // porta
-  s = s.replace(/^www\./, '');
+  // «*.sito.it» e «.sito.it», la forma di filtri e cookie per «il sito e i sottodomini», valgono «sito.it».
+  s = s.replace(/^\*?\.+/, '').replace(/\.+$/, '').replace(/^www\./, '');
+  // Un nome con lettere accentate va confrontato nella forma che ha nell'URL (punycode).
+  if (/[^\x00-\x7f]/.test(s)) {
+    try { s = new URL(`http://${s}`).hostname; } catch (_) {}
+  }
   return s;
 }
 
-// Un dominio è valido come voce di blacklist solo se ha un'estensione (almeno
-// un punto + TLD alfabetico). Allineato al campo "siti fidati": una voce come
-// "facebook" o un IP non è mai un host reale, quindi non deve entrare nel Set
-// (matcherebbe "facebook.com/com", non "facebook") dando falsa sicurezza.
+// Una voce come "facebook" o un IP non è mai un host reale: non entra nel Set dando falsa sicurezza.
 function isValidDomain(host) {
-  return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host);
+  return NomiSito.valido(host);
 }
 
 // Da lista grezza (settings) → Set di domini normalizzati E validi.
@@ -111,16 +50,6 @@ function matchesSuffix(host, set) {
   return false;
 }
 
-function isSearchEngineHost(host) {
-  if (!host) return false;
-  return SEARCH_ENGINE_PATTERNS.some((re) => re.test(host));
-}
-
-// Il referrer (o la pagina di partenza) è un motore di ricerca?
-function isSearchEngineUrl(url) {
-  return isSearchEngineHost(hostnameOf(url));
-}
-
 // L'host è in blacklist? (blacklist dedicata dell'utente, oppure — se
 // abilitato — le liste pubbliche dell'ad-blocker.)
 function isBlacklistedHost(host) {
@@ -135,11 +64,9 @@ function isBlacklistedHost(host) {
   return false;
 }
 
-// Decisione centrale. Ritorna { block, host, reason }.
-//   targetUrl: dove si vuole andare.
-//   fromUrl:   pagina di partenza / referrer (per l'eccezione "ricerca").
-//   viaFilo:   true se l'apertura è originata da Filo (eccezione "Filo").
-function shouldBlockNavigation(targetUrl, { fromUrl = '', viaFilo = false } = {}) {
+// Decisione centrale. Ritorna { block, host, reason }. Nessuna eccezione per
+// provenienza, nemmeno una ricerca (#590, scelta dell'owner): scavalca solo «Apri comunque».
+function shouldBlockNavigation(targetUrl) {
   const res = { block: false, host: '', reason: '' };
   if (!enabled) return res;
 
@@ -149,17 +76,13 @@ function shouldBlockNavigation(targetUrl, { fromUrl = '', viaFilo = false } = {}
   } catch (_) {
     return res; // URL non valido: non interferiamo
   }
-  // Solo navigazioni web top-level. filo://, about:, data:, chrome:, ecc. sono
-  // sempre lecite (le pagine interne di Filo non si bloccano mai).
+  // Solo navigazioni web top-level: le pagine interne di Filo non si bloccano mai.
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return res;
 
-  const host = u.hostname.toLowerCase();
-  res.host = host;
-
-  // Eccezione b) — Filo apre direttamente (NAVIGA / navigazione interna).
-  if (viaFilo) return res;
-  // Eccezione a) — la navigazione proviene da un motore di ricerca.
-  if (fromUrl && isSearchEngineHost(hostnameOf(fromUrl))) return res;
+  // «sito.it.» è lo stesso host di «sito.it» per il DNS: senza, il punto finale aggira la lista.
+  const host = u.hostname.toLowerCase().replace(/\.+$/, '');
+  // Il nome come lo legge l'utente (münchen.de, non xn--mnchen-3ya.de): va in notifica e in chat.
+  res.host = NomiSito.leggibile(host);
 
   if (!isBlacklistedHost(host)) return res;
 
@@ -196,7 +119,6 @@ function status() {
 module.exports = {
   configureFromSettings,
   shouldBlockNavigation,
-  isSearchEngineUrl,
   isBlacklistedHost,
   normalizeDomain,
   setForTest,

@@ -464,6 +464,10 @@
     const o = a && a._output;
     if (!o) return '';
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    if (o.blocked === 'site') {
+      const quali = o.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati';
+      return `${o.host || 'il sito'} è fra i siti ${quali}`;
+    }
     if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
     if (o.proxy === 'non_disponibile') return 'non ancora disponibile';
     if (o.proxy === 'no_web_tab') return 'nessuna pagina web aperta';
@@ -501,10 +505,65 @@
   // si mangia il bottone e la funzione sparisce dalla chat.
   const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA'];
 
+  // Una pagina che il modello voleva aprire e che la lista dei siti bloccati ha fermato: la
+  // notifica se ne va in pochi secondi, e la chat le tiene il suo «Apri comunque» (#590).
+  function apribileComunque(a) {
+    const o = a && a._output;
+    return isType(a, 'NAVIGA') && a._executed === false && !!o && o.blocked === 'site' && /^https?:\/\//i.test(String(o.url || ''));
+  }
+
+  function bottoneApriComunque(a) {
+    const o = a._output;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn';
+    // Il nome del sito sta sul bottone: con due aperture fermate, o col testo che una pagina ha dettato
+    // al modello, è l'unica cosa che dice quale sito si sta aprendo.
+    btn.textContent = `Apri comunque ${o.host || o.url}`;
+    btn.title = `Apri ${o.host || o.url} anche se è fra i siti bloccati`;
+    // Un doppio clic apre una scheda sola; chiusa quella, il bottone riapre.
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      await send({ type: MSG.APRI_COMUNQUE, url: o.url });
+      setTimeout(() => { btn.disabled = false; }, 2000);
+    });
+    return btn;
+  }
+
+  // Blocchi arrivati mentre il turno della loro azione era ancora in corso: li prende renderActions.
+  const fermateInAttesa = new Map();
+
+  function segnaFermata(a, { host, reason, url }) {
+    a._executed = false;
+    a._output = { blocked: 'site', host: host || '', reason: reason || '', url: url || '', dopo: true };
+  }
+
+  // La pagina aperta dall'azione `callId` si è spostata da sé su un sito bloccato dopo l'attesa:
+  // l'azione nello storico lo dice al modello al turno dopo, e il suo chip diventa «Apri comunque».
+  function aperturaFermata(actions, data = {}) {
+    const callId = data.callId;
+    if (!callId) return false;
+    const a = (actions || []).find((x) => x && x._callId === callId && isType(x, 'NAVIGA'));
+    if (!a) { fermateInAttesa.set(callId, data); return false; }
+    segnaFermata(a, data);
+    const chip = document.querySelector(`[data-call-id="${CSS.escape(String(callId))}"]`);
+    if (chip && apribileComunque(a)) {
+      const row = activityRowFor(a);
+      if (row) chip.before(makeActivityRow(row.icon, row.text));
+      chip.replaceWith(bottoneApriComunque(a));
+    }
+    return true;
+  }
+
   // `shown`: gli id delle chiamate già raccontate in diretta nel blocco di
   // attività (evento 'done'): a fine turno non si ripetono.
   function renderActions(container, actions, { onAck, autoConfirm = false, activity = null, shown = null } = {}) {
     if (!actions || !actions.length) return;
+    for (const a of actions) {
+      const f = a && a._callId && isType(a, 'NAVIGA') ? fermateInAttesa.get(a._callId) : null;
+      if (f) { fermateInAttesa.delete(a._callId); segnaFermata(a, f); }
+    }
     const wrap = document.createElement('div');
     wrap.className = 'dash-bubble-actions';
     let hasAck = false;
@@ -515,7 +574,8 @@
       // che aspetta una conferma: la riga dice che Filo l'ha chiesta, il
       // bottone è come si risponde.
       const anche = a._confirm
-        || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false);
+        || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false)
+        || apribileComunque(a);
       if (activity) {
         if (told) {
           // Già in cronologia; resta solo l'eventuale bottone (link, conferma).
@@ -535,7 +595,7 @@
       // cieco (era il caso di un link con un indirizzo non ammesso). La sua
       // riga sta già nel diario. Un'azione IN ATTESA DI CONFERMA non è
       // «fallita»: non è ancora partita, e il suo bottone è tutto il punto.
-      if (!a._confirm && ((a._traccia && !anche) || a._executed === false)) continue;
+      if (!a._confirm && !apribileComunque(a) && ((a._traccia && !anche) || a._executed === false)) continue;
       const btn = renderActionButton(a, { onAck, activity });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
@@ -764,6 +824,7 @@
       // direttamente il bottone di raffinamento.
       return buildAestheticRefiner(a);
     }
+    if (type === 'NAVIGA' && apribileComunque(a)) return bottoneApriComunque(a);
     if (type === 'NAVIGA') {
       // #162 — il link è già stato aperto direttamente dal main (executeFiloAction
       // apre la scheda). Questo chip resta come riferimento per RIAPRIRLO, ma deve
@@ -795,6 +856,7 @@
         btn.title = `Riapri ${label}`;
       }
       btn.className = 'dash-action-btn dash-action-link-chip';
+      if (a._callId) btn.dataset.callId = String(a._callId);
       const favUrl = faviconUrl(a.url);
       if (favUrl) {
         const img = document.createElement('img');
@@ -995,6 +1057,7 @@
     // Il contratto: un blocco di attività appeso a `container`.
     create: createActivity,
     renderActions,
+    aperturaFermata,
     tellActionInActivity,
     stepTrace,
     isType,

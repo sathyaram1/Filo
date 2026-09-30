@@ -637,8 +637,74 @@
     return `azione Filo: ${type.toLowerCase().replace(/_/g, ' ')}`;
   }
 
+  // #590 — Le aperture chieste da qui, per id: se la pagina aperta finisce più tardi su un sito
+  // della lista, il main lo dice con APERTURA_FERMATA e la riga «fatto» diventa il blocco.
+  const apertureSeguite = new Map();
+
+  function rigaBloccata(label, { host, reason } = {}) {
+    return `${label}: ${host || 'il sito'} è fra i siti ${reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati'}`;
+  }
+
+  // Il perché del blocco sta in fondo alla riga: va a capo invece di finire nei puntini.
+  function scriviRigaBloccata(riga, label, dati) {
+    if (!riga) return null;
+    riga.textContent = '· ' + rigaBloccata(label, dati);
+    riga.classList.add('sn-sidebar-log-intera');
+    return riga;
+  }
+
+  // La notifica se ne va in pochi secondi, il bottone resta. Sta nel DOM della pagina, che ne guida clic
+  // e tasti: non apre niente, riporta la notifica «Sito bloccato» (che la pagina ottiene anche da sé).
+  function bottoneApriComunque(dopo, { host, url } = {}) {
+    if (!dopo || !/^https?:\/\//i.test(String(url || ''))) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-choices';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-sidebar-choice';
+    btn.textContent = `Apri comunque ${host || url}`;
+    btn.title = 'Filo ti chiede conferma nella notifica «Sito bloccato»';
+    btn.addEventListener('click', () => {
+      Promise.resolve().then(() => chrome.runtime.sendMessage({ type: MSG.APRI_COMUNQUE, url })).catch(() => {});
+    });
+    wrap.appendChild(btn);
+    dopo.insertAdjacentElement('afterend', wrap);
+    const conv = convEl();
+    if (conv) conv.scrollTop = conv.scrollHeight;
+  }
+
+  // L'esito di un'azione di Filo nel diario, uguale dopo l'invio diretto e dopo la conferma.
+  function scriviEsito(label, action, r) {
+    const done = !!(r && r.executed);
+    const o = (r && r.output) || null;
+    if (!done && o && o.blocked === 'site') {
+      bottoneApriComunque(scriviRigaBloccata(appendActionLog(''), label, o), o);
+      return false;
+    }
+    const riga = appendActionLog(esitoAzione(label, done, r));
+    if (done && riga && action && action._callId) {
+      apertureSeguite.set(action._callId, { riga, label });
+      // Il main segue l'apertura per un minuto: oltre, un avviso non arriva più.
+      setTimeout(() => apertureSeguite.delete(action._callId), 60_000);
+    }
+    return done;
+  }
+
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== MSG.APERTURA_FERMATA) return;
+      const seguita = apertureSeguite.get(msg.callId);
+      if (!seguita) return;
+      apertureSeguite.delete(msg.callId);
+      bottoneApriComunque(scriviRigaBloccata(seguita.riga, seguita.label, msg), msg);
+    });
+  } catch (_) {}
+
   async function runFiloAction(action) {
     const label = filoActionLabel(action);
+    if (action && String(action.type || '').toUpperCase() === 'NAVIGA' && !action._callId) {
+      action._callId = `assistente-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    }
     let res = null;
     try {
       res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action });
@@ -660,16 +726,13 @@
       if (!ok) { appendActionLog(`${label}: annullata`); return false; }
       let c = null;
       try {
-        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action });
+        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true });
       } catch (_) {}
-      const done = !!(c && c.executed);
-      appendActionLog(esitoAzione(label, done, c));
-      return done;
+      return scriviEsito(label, action, c);
     }
 
-    const done = !!res.executed;
-    appendActionLog(esitoAzione(label, done, res));
-    return done;
+    // #590 — un blocco muto sembra un guasto: la lista dei siti bloccati si dice.
+    return scriviEsito(label, action, res);
   }
 
   // Un rifiuto spiegato dal main (uno stile oltre il tetto) arriva all'utente col

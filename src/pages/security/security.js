@@ -241,7 +241,7 @@
     const sblk = sec.siteBlock || {};
     $('sec-siteblock').checked = sblk.enabled !== false;
     $('sec-siteblock-lists').checked = sblk.useAdblockLists !== false;
-    $('sec-siteblock-blacklist').value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : []).join('\n');
+    $('sec-siteblock-blacklist').value = righeLeggibili(sblk.blacklist);
     // Se ci sono voci salvate da prima del controllo (o non valide), avvisa
     // subito che non bloccheranno nulla invece di lasciarle passare mute.
     setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
@@ -250,7 +250,7 @@
     // chiave assente vale "chiedi", come nel main.
     const dl = sec.downloads || {};
     $('sec-dl-exe').checked = dl.confirmExecutables !== false;
-    $('sec-dl-trusted').value = (Array.isArray(dl.trustedSites) ? dl.trustedSites : []).join('\n');
+    $('sec-dl-trusted').value = righeLeggibili(dl.trustedSites);
     setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
     syncDownloadsEnabled();
     const sb = sec.safeBrowse || {};
@@ -279,6 +279,7 @@
 
     // F4 — Default ON quando il setting non è ancora stato scritto (undefined → true).
     $('sec-auto-feedback').checked = sec.autoFeedback === undefined ? true : !!sec.autoFeedback;
+    mostrata = leggiSicurezza();
   }
 
   // ─── protezione fingerprinting ─────────────────────────────────────────────
@@ -325,7 +326,9 @@
   // www. e porta, lascia il bare host minuscolo. "https://www.Gmail.com/x" →
   // "gmail.com". Ritorna '' se non estraibile.
   function cleanDomain(raw) {
-    let s = String(raw || '').trim().toLowerCase();
+    // Come la lista nel main: «*.sito.it», «.sito.it» e «sito.it.» valgono «sito.it». Prima di
+    // leggere l'indirizzo, perché il browser scrive la stella come «%2A».
+    let s = String(raw || '').trim().toLowerCase().replace(/^([a-z]+:\/\/)?\*?\.+/, '$1');
     if (!s) return '';
     try {
       if (s.includes('://')) s = new URL(s).hostname;
@@ -333,8 +336,13 @@
     } catch (_) {
       s = s.split('/')[0].split('?')[0];
     }
-    s = s.replace(/^www\./, '');
-    return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s) ? s : '';
+    s = s.replace(/^\.+|\.+$/g, '').replace(/^www\./, '');
+    return window.SN_NOMI_SITO.valido(s) ? s : '';
+  }
+
+  // Si salva la forma «xn--…», si mostra il nome come l'utente l'ha scritto (münchen.de).
+  function righeLeggibili(lista) {
+    return (Array.isArray(lista) ? lista : []).map((d) => window.SN_NOMI_SITO.leggibile(d)).join('\n');
   }
 
   function renderWhitelist() {
@@ -351,7 +359,7 @@
     for (const domain of cookieWhitelist) {
       const li = document.createElement('li');
       const span = document.createElement('span');
-      span.textContent = domain;
+      span.textContent = window.SN_NOMI_SITO.leggibile(domain);
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'sn-btn-secondary';
@@ -563,37 +571,61 @@
     return { valid, invalid };
   }
 
-  async function save() {
-    const { valid: dlTrusted, invalid: dlInvalid } = parseBlacklist($('sec-dl-trusted').value);
-    setTrustedError(dlInvalid);
-    const { valid: blacklist, invalid } = parseBlacklist($('sec-siteblock-blacklist').value);
-    setBlacklistError(invalid);
-    const partial = {
-      security: {
-        protectIpLeak: !!$('sec-protect-ip').checked,
-        blockPopups: !!$('sec-block-popups').checked,
-        adblock: { enabled: !!$('sec-adblock').checked },
-        siteBlock: {
-          enabled: !!$('sec-siteblock').checked,
-          useAdblockLists: !!$('sec-siteblock-lists').checked,
-          blacklist,
-        },
-        safeBrowse: {
-          enabled: !!$('sec-safebrowse').checked,
-          networkSignals: !!$('sec-safebrowse-network').checked,
-          llmJudge: !!$('sec-safebrowse-llm').checked,
-          sandbox: !!$('sec-safebrowse-sandbox').checked,
-        },
-        // #588 — conferma sui programmi scaricati, e i siti che ne sono esenti.
-        downloads: {
-          confirmExecutables: !!$('sec-dl-exe').checked,
-          trustedSites: dlTrusted,
-        },
-        // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
-        autoFeedback: !!$('sec-auto-feedback').checked,
+  // La sezione Sicurezza come la mostra la pagina adesso.
+  function leggiSicurezza() {
+    return {
+      protectIpLeak: !!$('sec-protect-ip').checked,
+      blockPopups: !!$('sec-block-popups').checked,
+      adblock: { enabled: !!$('sec-adblock').checked },
+      siteBlock: {
+        enabled: !!$('sec-siteblock').checked,
+        useAdblockLists: !!$('sec-siteblock-lists').checked,
+        blacklist: parseBlacklist($('sec-siteblock-blacklist').value).valid,
       },
+      safeBrowse: {
+        enabled: !!$('sec-safebrowse').checked,
+        networkSignals: !!$('sec-safebrowse-network').checked,
+        llmJudge: !!$('sec-safebrowse-llm').checked,
+        sandbox: !!$('sec-safebrowse-sandbox').checked,
+      },
+      // #588 — conferma sui programmi scaricati, e i siti che ne sono esenti.
+      downloads: {
+        confirmExecutables: !!$('sec-dl-exe').checked,
+        trustedSites: parseBlacklist($('sec-dl-trusted').value).valid,
+      },
+      // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
+      autoFeedback: !!$('sec-auto-feedback').checked,
     };
-    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+  }
+
+  // Quello che la pagina ha letto o scritto l'ultima volta. Si salva solo ciò che l'utente ha
+  // cambiato qui: una pagina rimasta aperta da prima non riscrive la lista cambiata altrove (#590).
+  let mostrata = null;
+
+  function soloCambiati(ora, prima) {
+    const out = {};
+    for (const k of Object.keys(ora)) {
+      const n = ora[k];
+      const v = prima ? prima[k] : undefined;
+      if (n && typeof n === 'object' && !Array.isArray(n)) {
+        const d = soloCambiati(n, v && typeof v === 'object' ? v : null);
+        if (Object.keys(d).length) out[k] = d;
+      } else if (JSON.stringify(n) !== JSON.stringify(v)) {
+        out[k] = n;
+      }
+    }
+    return out;
+  }
+
+  async function save() {
+    setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+    setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
+    const ora = leggiSicurezza();
+    const cambi = soloCambiati(ora, mostrata);
+    mostrata = ora;
+    if (Object.keys(cambi).length) {
+      await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security: cambi } });
+    }
     const hint = $('savedHint');
     hint.classList.add('sn-show');
     clearTimeout(save._t);
@@ -621,6 +653,13 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // Tornando su questa scheda si rilegge, a meno che l'utente non abbia qui modifiche non salvate:
+    // un'altra pagina Sicurezza può aver cambiato le liste nel frattempo.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || !mostrata) return;
+      if (Object.keys(soloCambiati(leggiSicurezza(), mostrata)).length) return;
+      load();
+    });
     // Niente pulsante "Salva": ogni toggle viene applicato e persistito subito.
     $('sec-protect-ip').addEventListener('change', save);
     $('sec-block-popups').addEventListener('change', save);

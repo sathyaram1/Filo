@@ -2334,10 +2334,8 @@
       },
       // Blocco apertura siti in blacklist (#170.3). A differenza dell'ad-block
       // (che annulla le singole richieste), qui si BLOCCA l'apertura della
-      // pagina top-level di un sito in blacklist. Eccezioni: navigazione da un
-      // motore di ricerca (l'utente l'ha cercato) o originata da Filo (azione
-      // NAVIGA / pagine filo://). Quando blocca mostra una notifica in basso a
-      // destra con "Apri comunque". Vedi src/main/services/siteBlock.js.
+      // pagina top-level di un sito in blacklist, da qualunque provenienza (#590):
+      // lo scavalca solo "Apri comunque". Vedi src/main/services/siteBlock.js.
       // - enabled: attiva/disattiva il blocco.
       // - useAdblockLists: usa anche i domini delle liste pubbliche (#170.2)
       //   come blacklist, oltre a quelli aggiunti a mano.
