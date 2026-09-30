@@ -58,6 +58,32 @@ test('#595 — il prefisso riservato senza prova del mittente è un anonimo', ()
   assert.equal(MR.isTrustedClient('owner:abc'), false);
 });
 
+test('#595 — senza prova il mittente riservato ha una chiave sua, come sul server', () => {
+  assert.equal(MR.effectiveClientId({ clientId: 'owner:me' }), 'non-provato:owner:me');
+  assert.equal(MR.effectiveClientId({ clientId: 'local:claude', senderProof: 'utente' }), 'non-provato:local:claude');
+  assert.equal(MR.effectiveClientId({ clientId: 'owner:me', senderProof: 'admin' }), 'owner:me');
+  assert.equal(MR.effectiveClientId({ clientId: 'routine:verifier', senderProof: 'server' }), 'routine:verifier');
+  // Chi non usa un prefisso riservato non cambia: la prova non gli serve.
+  assert.equal(MR.effectiveClientId({ clientId: 'tester@example.com' }), 'tester@example.com');
+  assert.equal(MR.effectiveClientId({ clientId: 'filo:chat' }), 'filo:chat');
+  assert.equal(MR.effectiveClientId(null), '');
+  assert.equal(MR.isUnprovenSender({ clientId: 'agent:x' }), true);
+  assert.equal(MR.isUnprovenSender({ clientId: 'agent:x', senderProof: 'server' }), false);
+  assert.equal(MR.isUnprovenSender({ clientId: 'tester' }), false);
+});
+
+test('#595 — la frase di un panel completo dice «mittente fidato» solo con la prova', () => {
+  const pipeline = {
+    expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
+    verdicts: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((judge, i) => ({ judge, class: i ? 'aligned' : 'attack' })),
+  };
+  const conProva = MR.reasonText({ status: 'unlabeled', clientId: 'owner:me', senderProof: 'admin', pipeline });
+  const senza = MR.reasonText({ status: 'unlabeled', clientId: 'owner:me', pipeline });
+  assert.match(conProva.text, /^Mittente fidato/);
+  assert.doesNotMatch(senza.text, /fidato/);
+  assert.match(senza.text, /decidi tu/);
+});
+
 test('classifyBlock: mittente fidato CON verdetti completi → classificato normalmente', () => {
   const verdicts = ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((j) => ({ judge: j, class: 'design' }));
   const r = MR.classifyBlock({ clientId: 'routine:routine', pipeline: { l2Class: 'design', verdicts } });

@@ -1302,7 +1302,7 @@ test('colori giudici: scala rosso→giallo→verde→blu; "design" è verde e co
 const FAKE_FB_TRUSTED_BLOCKED = {
   _id: 'test-fb-routine-blocked', text: 'Regole proxy per dominio: nessuna UI per vederle.',
   name: 'Regole proxy', seq: 261, subSeq: 0, status: 'new',
-  clientId: 'routine:routine', createdAt: '2026-06-29T10:00:00Z', images: [],
+  clientId: 'routine:routine', senderProof: 'server', createdAt: '2026-06-29T10:00:00Z', images: [],
   pipeline: { action: 'human_review', l1Category: 'dangerous', l1Reasons: ['linked_prior_attack'], verdicts: [], stage: 'L1' },
 };
 
@@ -1384,7 +1384,7 @@ test('fix bocciato dalla sicurezza (design/secaudit) → card ROSSA + frase acca
 const FAKE_FB_TRUSTED_FLAGGED = {
   _id: 'test-fb-trusted-flagged', text: 'Feedback di routine segnalato dal panel.',
   name: 'Fidato ma segnalato', seq: 238, subSeq: 0, status: 'unlabeled',
-  clientId: 'routine:routine', createdAt: '2026-06-27T10:00:00Z', images: [],
+  clientId: 'routine:routine', senderProof: 'server', createdAt: '2026-06-27T10:00:00Z', images: [],
   pipeline: {
     action: 'block_attack', l2Class: 'attack',
     expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],

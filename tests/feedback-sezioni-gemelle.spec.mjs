@@ -207,7 +207,7 @@ test('#509 — i ritrovamenti automatici sono un filtro, non una sezione', async
   await page.waitForFunction(() => window.__fbTest);
   await page.evaluate(() => window.__fbTest.setData([
     { _id: 'audit', seq: 20, status: 'unlabeled', name: 'ritrovamento audit', text: 'a',
-      clientId: 'routine:nightly-audit', createdAt: '2026-08-20T10:00:00Z' },
+      clientId: 'routine:nightly-audit', senderProof: 'server', createdAt: '2026-08-20T10:00:00Z' },
     { _id: 'umano', seq: 21, status: 'unlabeled', name: 'segnalazione umana', text: 'b',
       clientId: 'tester@example.com', createdAt: '2026-08-21T10:00:00Z' },
   ]));
