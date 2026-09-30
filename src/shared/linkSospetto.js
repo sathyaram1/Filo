@@ -26,19 +26,51 @@
     if (AZIONI.test(u.pathname) || AZIONI.test(query)) flags.push('side_effect');
     if (haCredenziale(query)) flags.push('token_in_url');
 
-    const imp = imitazione ? imitazione(u.href) : null;
-    if (imp && imp.stretta) flags.push('typosquatting:' + dominioImitato(imp));
-    else if (imp) flags.push('marchio_imitato:' + imp.brand.display);
+    const aggiungi = (c) => { if (c && !flags.includes(c)) flags.push(c); };
+    aggiungi(codiceImitazione(u.href));
+    for (const prima of [u.username, u.password]) aggiungi(nomePrimaDellaChiocciola(decodifica(prima), u.href));
 
-    // Un rinvio (google.com/url?q=, i collegamenti protetti di Outlook) porta dove dice il suo parametro: si giudica
-    // anche quello, come fa l'apertura sull'indirizzo d'arrivo (#725.8).
+    // Un rinvio porta dove dice l'indirizzo che si porta dentro: si giudica anche quello, come fa l'apertura
+    // sull'indirizzo d'arrivo (#725.8).
     if (rinvii < 2) {
-      for (const valore of u.searchParams.values()) {
-        if (!/^https?:\/\//i.test(valore)) continue;
-        for (const c of analizza(valore, rinvii + 1)) if (c !== 'url_invalido' && !flags.includes(c)) flags.push(c);
+      for (const dentro of indirizziDentro(u)) {
+        for (const c of analizza(dentro, rinvii + 1)) if (c !== 'url_invalido') aggiungi(c);
       }
     }
     return flags;
+  }
+
+  function codiceImitazione(url) {
+    const imp = imitazione ? imitazione(url) : null;
+    if (!imp) return '';
+    return imp.stretta ? 'typosquatting:' + dominioImitato(imp) : 'marchio_imitato:' + imp.brand.display;
+  }
+
+  // https://www.paypal.com@altro.net si legge come il sito vero, ma porta a quello dopo la chiocciola.
+  function nomePrimaDellaChiocciola(prima, href) {
+    if (!prima || !sitoNominato) return '';
+    const nominato = sitoNominato('https://' + prima.replace(/^[a-z]+:\/\//i, ''));
+    const arrivo = sitoNominato(href);
+    if (!nominato || (arrivo && arrivo.registrable === nominato.registrable)) return '';
+    if (nominato.brand) return 'marchio_imitato:' + nominato.brand.display;
+    return codiceImitazione('https://' + nominato.registrable + '/') || 'nome_prima_chiocciola';
+  }
+
+  // Dove un rinvio scrive la destinazione: in un parametro (google.com/url?q=, Outlook), nel percorso (Proofpoint,
+  // urldefense.com/v3/__https://…__) o codificata alla Proofpoint (u=https-3A__sito_percorso).
+  function indirizziDentro(u) {
+    const out = [];
+    for (let pezzo of [decodifica(u.pathname), decodifica(u.hash), ...u.searchParams.values()]) {
+      if (/^https?-3A__/i.test(pezzo)) {
+        pezzo = pezzo.replace(/-([0-9a-f]{2})/gi, (_, h) => String.fromCharCode(parseInt(h, 16))).replace(/_/g, '/');
+      }
+      for (const m of pezzo.matchAll(/https?:\/\/[^\s"'<>]+/gi)) out.push(m[0]);
+    }
+    return out;
+  }
+
+  function decodifica(s) {
+    try { return decodeURIComponent(s || ''); } catch (_) { return s || ''; }
   }
 
   // Il dominio vero da nominare: quello dello stesso Paese, se il marchio ce l'ha (arnazon.it somiglia ad amazon.it).
