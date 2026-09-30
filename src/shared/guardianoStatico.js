@@ -174,11 +174,13 @@
 
   // ── I segreti dentro un testo letto da fuori (#810) ──────────────────────
   // Stesse forme di `controlla`, ma qui servono i VALORI: l'uscita che li contiene si ferma.
-  // Per i codici conta solo ciò che sta vicino alla sua parola, così un telefono, una data o
+  // Per i codici conta solo ciò che la sua parola annuncia, così un telefono, una data o
   // un numero d'ordine sparsi nella pagina non diventano segreti.
 
-  // Blocchi prima delle cifre: «7563 0192» è un codice di recupero, non due numeri.
-  const CANDIDATO = new RegExp(`\\b(?:${BLOCCHI}|${MISTO}|${CIFRE})\\b`, 'g');
+  // Blocchi prima delle cifre: «7563 0192» è un codice di recupero, non due numeri; «482 913» è
+  // un codice monouso scritto a gruppi, come lo mostrano molte app.
+  const TERNE = '\\d{3}[ -]\\d{3}';
+  const CANDIDATO = new RegExp(`\\b(?:${BLOCCHI}|${MISTO}|${TERNE}|${CIFRE})\\b`, 'g');
   const PEZZO_CODICE = new RegExp(`^(?:${CIFRE}|${MISTO}|[A-Za-z0-9]{4,6}(?:-[A-Za-z0-9]{4,6}){1,5})$`);
   // Fra due codici di un elenco ci sono a capo, spazi, puntini o numeri di riga: una parola
   // in mezzo vuol dire che il numero dopo parla d'altro.
@@ -193,23 +195,29 @@
   }
 
   // I pezzi di un candidato che hanno la forma di un codice, più le coppie vicine: un codice
-  // di recupero «7563 0192» può uscire anche come «75630192».
+  // di recupero «7563 0192» può uscire anche come «75630192». `da` è dove comincia il primo: i
+  // blocchi di sole lettere davanti («codes», «vedi ticket») sono parole, non l'inizio del codice.
   function pezzi(s, m) {
+    if (/^\d{3}[ -]\d{3}$/.test(m[0])) {
+      return pezzoDiData(s, m.index, m.index + m[0].length, m[0]) ? { da: m.index, out: [] } : { da: m.index, out: [m[0].replace(/[ -]/, '')] };
+    }
     const out = [];
     const re = /\S+/g;
     let t;
     let prima = null;
+    let da = -1;
     while ((t = re.exec(m[0]))) {
       const i = m.index + t.index;
       const j = i + t[0].length;
       const buono = PEZZO_CODICE.test(t[0]) && !pezzoDiData(s, i, j, t[0]);
       if (buono) {
+        if (da < 0) da = i;
         out.push(t[0]);
         if (prima && prima.j + 1 === i) out.push(s.slice(prima.i, j));
       }
       prima = buono ? { i, j } : null;
     }
-    return out;
+    return { da, out };
   }
 
   // Tutti i candidati del testo in una passata sola: cercarli di nuovo per ogni parola rendeva
@@ -220,19 +228,28 @@
     let m;
     while ((m = re.exec(s))) {
       const p = pezzi(s, m);
-      if (p.length) out.push({ i: m.index, j: m.index + m[0].length, pezzi: p });
+      if (p.out.length) out.push({ i: p.da, j: m.index + m[0].length, v: s.slice(p.da, m.index + m[0].length), pezzi: p.out });
       if (m[0].length === 0) re.lastIndex++;
     }
     return out;
   }
 
-  // Il codice è quello che la parola annuncia: fra i due c'è niente, un «è», un «:», un «is».
-  // In «un OTP generato da un'app, secondo la RFC 6238» il numero è della norma.
+  // Il codice è quello che la parola annuncia: un attacco («è», «:», un «=» da solo) e al più parole che
+  // lo precisano, mai dentro un indirizzo né dopo una virgola che apre altro. Dopo quelle parole i due
+  // punti annunciano la parola che li precede: lì «1500» o «BENVENUTO10» sono altro. `stretto`: solo l'attacco.
   const ATTACCO = /(?:^|[:=]|(?:^|[\s(])(?:è|e'|is|are|was|sono|ecco|here|vale|risulta|seguente|seguenti|following))$/i;
+  const SOLO_ATTACCO = /^\s*(?:[:=]|è|e'|is|are|was|sono|ecco|here|vale|risulta)?\s*$/i;
   const ALTRA_FRASE = /[.!?]\s+[A-ZÀ-Ý]/;
-  function annunciato(fra) {
-    if (ALTRA_FRASE.test(fra)) return false;
-    return ATTACCO.test(fra.replace(/(?:\s*(?:\d{1,3}[.)]|[•·*"'«»“”(-]))*\s*$/, ''));
+  function annunciato(fra, valore = '', { stretto = false } = {}) {
+    if (ALTRA_FRASE.test(fra) || /\/|\bwww\./i.test(fra)) return false;
+    const g = fra.replace(/(?:\s*(?:\d{1,3}[.)]|[•·*"'«»“”(-]))*\s*$/, '');
+    if (!ATTACCO.test(g)) return false;
+    if (/=\s*$/.test(g) && !/^\s*=\s*$/.test(g)) return false;
+    if (/[,;]\s/.test(g) && !SOLO_ATTACCO.test(g.split(/[,;]\s/).pop())) return false;
+    if (!/[A-Za-z0-9À-ÿ]/.test(g.replace(ATTACCO, ''))) return true;
+    if (stretto) return false;
+    if (!/:\s*$/.test(g)) return true;
+    return !/^(?:\d{4}|[A-Za-z]{4,}\d{1,4})$/.test(String(valore));
   }
   // «482913 è il tuo codice OTP»: davanti alla parola il codice le si lega con un «è» o con niente.
   function legato(fra) {
@@ -245,7 +262,25 @@
     return /[a-z0-9][-_.]$/.test(s.slice(Math.max(0, i - 2), i)) || /^[-_.][a-z]/.test(s.slice(j, j + 2));
   }
   // «one-time» da solo è un acquisto o un pagamento: annuncia un codice solo se lo nomina.
-  const ONE_TIME_CODICE = /^[\s-]+(?:use[\s-]+)?(?:[a-z]+[\s-]+)?(?:password|pass\s?code|code|pin)\b/i;
+  const ONE_TIME_CODICE = /^[\s-]+(?:use[\s-]+)?(?:[a-z]+[\s-]+)?(?:password|pass\s?code|code|pin)s?\b/i;
+
+  // «Password: …», «la tua nuova password è …»: la parola da sola annuncia una password solo se la
+  // segue subito l'attacco. Solo qui e non in `controlla`: un avviso che nomina la password e una
+  // data non ha niente da fermare.
+  const MARCHIO_PASSWORD = /\b(?:password|passcode|passphrase)\b/i;
+  // Una parola sola, con una lettera e una cifra o un simbolo: «Tr7#kq29Lm».
+  const FORMA_PASSWORD = /^(?=.*[A-Za-z])(?=.*[^A-Za-z])(?=(?:[^A-Za-z0-9]*[A-Za-z0-9]){6})[^\s"'«»“”<>]{6,64}$/;
+  function passwordAnnunciata(s, fine, stretto, out) {
+    const finestra = s.slice(fine, fine + RAGGIO + 64);
+    const re = /\S+/g;
+    let t;
+    while ((t = re.exec(finestra)) && t.index <= RAGGIO) {
+      const v = t[0].replace(/[.,;)»”"']+$/, '');
+      if (!FORMA_PASSWORD.test(v)) continue;
+      if (annunciato(finestra.slice(0, t.index), v, { stretto })) out.push({ valore: v, regola: 'password' });
+      return;
+    }
+  }
 
   function codiciVicini(s, out) {
     const cerca = new RegExp(MARCHI_MONOUSO.source, 'gi');
@@ -274,7 +309,7 @@
       const presi = [];
       let k = primo(fine);
       for (; k < tutti.length && tutti[k].i < fine + RAGGIO; k++) {
-        if (annunciato(s.slice(fine, tutti[k].i))) { presi.push(tutti[k]); break; }
+        if (annunciato(s.slice(fine, tutti[k].i), tutti[k].v)) { presi.push(tutti[k]); break; }
       }
       if (presi.length) {
         for (k += 1; k < tutti.length && presi.length < 40; k++) {
@@ -286,6 +321,12 @@
         if (c && c.j <= inizio && c.i >= inizio - RAGGIO && legato(s.slice(c.j, inizio))) presi.push(c);
       }
       for (const c of presi) for (const v of c.pezzi) out.push({ valore: v, regola });
+      if (regola === 'password') passwordAnnunciata(s, fine, false, out);
+    }
+    const pw = new RegExp(MARCHIO_PASSWORD.source, 'gi');
+    while ((parola = pw.exec(s)) && out.length < MAX_ESTRATTI) {
+      const fine = parola.index + parola[0].length;
+      if (!dentroUnNome(s, parola.index, fine)) passwordAnnunciata(s, fine, true, out);
     }
   }
 

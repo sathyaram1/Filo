@@ -8,6 +8,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { cartellaInCasa } from './helpers/percorsi.mjs';
+import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
 import { writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -250,6 +251,42 @@ test('un codice letto dall’output di un comando non esce: la chat dice cosa ha
   await expect(riga).toHaveText(/Non ho aperto l'indirizzo: conteneva un codice letto dall'output di un comando/);
   await expect(riga).not.toContainText(CODICE);
   await page.screenshot({ path: 'tests/.shots/uscite-segreti-chat.png' });
+});
+
+test('la segnalazione che Filo propone da sé non cita il codice letto da fuori', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await preparaModelli(app);
+  await app.evaluate(() => {
+    globalThis.__fbInviati = [];
+    globalThis.SN_FEEDBACK.submit = async (p) => { globalThis.__fbInviati.push(p); return { id: 'fb-prova' }; };
+  });
+  await modelloFinto(app, {
+    giri: [
+      { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `echo "Il tuo codice monouso è ${CODICE}"` }) }] },
+      { text: 'La banca ti ha mandato il codice di accesso.' },
+      { text: `Non posso fare l’accesso al posto tuo con il codice ${CODICE}: inseriscilo tu nel sito.` },
+    ],
+  });
+  await page.locator('#input').fill('leggi la notifica della banca');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'La banca ti ha mandato' })).toBeVisible({ timeout: 20_000 });
+  await page.locator('#input').fill('puoi fare tu l’accesso?');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Non posso fare' })).toBeVisible({ timeout: 20_000 });
+
+  // La proposta c'è ancora e si apre da sola, ma senza la frase che portava il codice.
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  const testo = await confirmText(page);
+  expect(testo).toContain('puoi fare tu l’accesso?');
+  expect(testo).not.toContain(CODICE);
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => app.evaluate(() => globalThis.__fbInviati.length), { timeout: 10_000 }).toBe(1);
+  const inviato = JSON.stringify(await app.evaluate(() => globalThis.__fbInviati));
+  expect(inviato).toContain('Filo mi ha risposto che non può farlo.');
+  expect(inviato).not.toContain(CODICE);
 });
 
 test('una chiave custodita non esce nemmeno confermata, e nessun segreto arriva al prompt', async ({ app, shell, openTab, testServer }) => {

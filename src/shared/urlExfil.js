@@ -365,12 +365,41 @@
     return out.join('\n');
   }
 
-  // Le forme in cui un testo esce: grezza e decodificate, alfanumerica, e le sole cifre di fila per
-  // un testo corto come un indirizzo o una domanda (in un testo lungo le cifre sparse combacerebbero per caso).
+  // Un pezzo corto in base64 o in esadecimale: è lì che sta un codice di sei cifre («NDgyOTEz»,
+  // «343832393133»). Conta solo se ne esce testo stampabile, così un hash o una parola restano sé stessi.
+  const STAMPABILE = /^[\x20-\x7e]+$/;
+  function decodificaCorta(tok) {
+    const out = [];
+    const b = tok.replace(/=+$/, '');
+    if (b.length >= 6 && b.length % 4 !== 1 && /^[A-Za-z0-9+/_-]+$/.test(b)) {
+      try {
+        const norm = b.replace(/-/g, '+').replace(/_/g, '/');
+        const pad = norm.padEnd(Math.ceil(norm.length / 4) * 4, '=');
+        const bin = typeof atob === 'function' ? atob(pad) : Buffer.from(pad, 'base64').toString('binary');
+        if (STAMPABILE.test(bin)) out.push(bin);
+      } catch (_) { /* non era base64 */ }
+    }
+    if (tok.length >= 8 && tok.length % 2 === 0 && /^[0-9a-f]+$/i.test(tok)) {
+      let h = '';
+      for (let i = 0; i < tok.length; i += 2) h += String.fromCharCode(parseInt(tok.slice(i, i + 2), 16));
+      if (STAMPABILE.test(h)) out.push(h);
+    }
+    return out;
+  }
+
+  // Le forme in cui un testo esce: grezza, decodificate, alfanumerica, e le cifre di fila. Tutte le cifre
+  // solo in un testo corto, dove quelle sparse non combaciano per caso; quelle vicine («?a=482&b=913») sempre.
   function formeDi(testo) {
     const t = String(testo || '');
     const forme = varianti(t);
-    return { forme, alnum: exposedAlnum(t), cifre: t.length <= 4000 ? forme.map((f) => f.replace(/\D+/g, '')) : [] };
+    const brevi = [];
+    for (const tok of forme.join(' ').split(/[^A-Za-z0-9+_-]+/)) {
+      if (tok.length >= 6 && tok.length < 64) brevi.push(...decodificaCorta(tok));
+    }
+    forme.push(...brevi);
+    const vicine = forme.map((f) => (f.replace(/(\d)\D{1,4}(?=\d)/g, '$1').match(/\d{6,}/g) || []).join(' '));
+    const cifre = (t.length <= 4000 ? forme.map((f) => f.replace(/\D+/g, '')) : []).concat(vicine.filter(Boolean));
+    return { forme, alnum: forme.join(' ').toLowerCase().replace(/[^a-z0-9]+/g, ''), cifre };
   }
 
   // Un codice si cerca coi confini («4821» non sta dentro «348215»); `largo`, per ciò che esce, regge i

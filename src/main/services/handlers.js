@@ -2792,7 +2792,7 @@ function toolResultText({ action, res, rendered }) {
 //
 // Deterministico di proposito: il prompt chiede al modello di farlo da sé, ma un
 // invariante come questo non può dipendere dall'umore di un LLM.
-function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory }) {
+function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory, citaRisposta = true }) {
   try {
     const AF = globalThis.SN_AUTO_FEEDBACK;
     if (!AF || typeof AF.composeProposal !== 'function') return null;
@@ -2813,7 +2813,7 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
     const Caps = globalThis.SN_CAPABILITIES;
     const analysis = AF.analyzeReply(textReply, rawActions, userMessage, Caps ? Caps.all(cancelliAperti()) : []);
     if (!analysis || !analysis.kind) return null;
-    return AF.composeProposal(analysis, { userMessage, textReply });
+    return AF.composeProposal(analysis, { userMessage, textReply: citaRisposta ? textReply : '' });
   } catch (e) {
     console.warn('[#360] proposta di segnalazione non composta:', e?.message || e);
     return null;
@@ -3246,11 +3246,19 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
   // segnalazione entra tra le azioni di QUESTO turno, così l'utente la trova già
   // scritta nella stessa bolla invece di doverla chiedere.
-  const proposal = internal
+  let proposal = internal
     ? null // turno di prosecuzione automatica: il "messaggio utente" è un nudge nostro
     : maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
   if (proposal) {
-    const res = await executeFiloAction(proposal, { sender });
+    // La proposta è un'uscita come le altre: passa dalla porta con quello che la chat ha letto (#810).
+    // Se la risposta citata porta un segreto letto da fuori, la proposta parte senza citarla.
+    const conContesto = { sender, contesto: azioniViste, parole: paroleUtente };
+    let res = await executeFiloAction(proposal, conContesto);
+    if (res.output && res.output.blocked === 'segreto') {
+      proposal = maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory, citaRisposta: false });
+      res = proposal ? await executeFiloAction(proposal, conContesto) : { kept: false };
+      if (res.output && res.output.blocked === 'segreto') { proposal = null; res = { kept: false }; }
+    }
     if (res.kept) {
       const rendered = res.needsConfirm
         ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '' } }
