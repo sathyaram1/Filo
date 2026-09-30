@@ -5,7 +5,7 @@ import { test, expect, lista, schede } from '../../helpers/reteFinta.mjs';
 import { home, modelloFinto, ripristina, chiedi } from '../../helpers/chatFinta.mjs';
 
 const naviga = (url, id = 'n1') => ({ id, name: 'NAVIGA', arguments: JSON.stringify({ url, etichetta: 'pagina' }) });
-const LUNGO = `http://${'sottodominio-lunghissimo-'.repeat(4)}x.blocked.test/percorso`;
+const LUNGO = 'http://www.un-nome-di-sito.davvero-molto.lungo-per-provare.i-bottoni-della.chat-e-del.diario.blocked.test/p';
 
 async function tema(shell, t) {
   await shell.evaluate((x) => window.filoShell.message({ type: 'update_settings', settings: { theme: x } }), t);
@@ -56,10 +56,7 @@ test('assistente: nome lunghissimo sul bottone, chiaro e scuro', async ({ app, s
   test.setTimeout(60_000);
   await lista(shell, ['blocked.test']);
   const { tab, apri } = await assistenteSu(app, shell, rete.pagina('sito.test', '/', '<h1>PAGINA</h1><p>testo</p>'), 'sito.test');
-  apri(LUNGO).catch(() => {});
-  await tab.waitForTimeout(3000);
-  await tab.screenshot({ path: 'tests/.shots/590-g19-assistente-lungo-attesa.png' });
-  console.log('ASSISTENTE-DIARIO', JSON.stringify(await tab.evaluate(() => document.querySelector('.sn-sidebar')?.innerText || '')));
+  expect(await apri(LUNGO)).toBe(false);
   const b = tab.locator('.sn-sidebar button', { hasText: 'Apri comunque' });
   await expect(b).toBeVisible();
   const m = await b.evaluate((x) => {
@@ -103,5 +100,64 @@ test('strade: barra della shell su una scheda aperta e home con grafie strane', 
     await shell.evaluate(([i, x]) => window.filoShell.tabs.navigate(i, x), [id, u]);
     await shell.waitForTimeout(1200);
     console.log('NAVIGATE', u, JSON.stringify(await schede(app)));
+  }
+});
+
+test('assistente: la riga del diario con un nome di sito comune', async ({ app, shell, rete }) => {
+  test.setTimeout(60_000);
+  await lista(shell, ['blocked.test']);
+  const { tab, apri } = await assistenteSu(app, shell, rete.pagina('sito.test', '/', '<h1>PAGINA</h1><p>testo</p>'), 'sito.test');
+  expect(await apri('http://www.blocked.test/')).toBe(false);
+  await expect(tab.locator('.sn-sidebar button', { hasText: 'Apri comunque' })).toBeVisible();
+  const misura = () => tab.evaluate(() => {
+    const l = [...document.querySelectorAll('.sn-sidebar-log')].pop();
+    const c = document.querySelector('.sn-sidebar-conv');
+    return { testo: l.textContent, lsw: l.scrollWidth, lcw: l.clientWidth, csw: c.scrollWidth, ccw: c.clientWidth, bs: getComputedStyle(l).boxSizing };
+  });
+  console.log('RIGA-UTENTE', JSON.stringify(await misura()));
+  await tab.screenshot({ path: 'tests/.shots/590-g19-assistente-riga.png', clip: { x: 900, y: 0, width: 380, height: 200 } });
+  await tab.evaluate(() => { const l = [...document.querySelectorAll('.sn-sidebar-log')].pop(); l.textContent = '· azione Filo: naviga: www.doubleclick.net è fra i siti di pubblicità e tracciamento'; });
+  console.log('RIGA-LISTE', JSON.stringify(await misura()));
+  await tab.screenshot({ path: 'tests/.shots/590-g19-assistente-riga-liste.png', clip: { x: 900, y: 0, width: 380, height: 200 } });
+});
+
+test('pagina «Sito bloccato» e notifica, tema scuro', async ({ app, shell, rete }) => {
+  test.setTimeout(60_000);
+  await tema(shell, 'dark');
+  const pagina = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), pagina);
+  await expect.poll(async () => (await schede(app)).includes(pagina), { timeout: 8000 }).toBe(true);
+  await lista(shell, ['blocked.test']);
+  await expect.poll(async () => (await schede(app)).some((u) => /code=blocked/.test(u)), { timeout: 8000 }).toBe(true);
+  await shell.waitForTimeout(800);
+  const w = app.windows().find((x) => /code=blocked/.test(x.url()));
+  await w.screenshot({ path: 'tests/.shots/590-g19-pagina-bloccata-scuro.png' });
+  const s = rete.pagina('sito.test', '/', `<h1>PAGINA</h1><a id="l" href="${pagina}">vai</a>`);
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), s);
+  await expect.poll(async () => (await schede(app)).includes(s), { timeout: 8000 }).toBe(true);
+  await shell.waitForTimeout(600);
+  await app.windows().find((x) => x.url() === s).evaluate(() => document.getElementById('l').click());
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' })).toBeVisible({ timeout: 6000 });
+  await shell.screenshot({ path: 'tests/.shots/590-g19-notifica-scuro.png' });
+});
+
+test('Preferenze Sicurezza: lista con voci varie, scuro', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await tema(shell, 'dark');
+  await lista(shell, ['blocked.test', 'münchen.de', '.sito.it', 'www.facebook.com']);
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://security/security.html'));
+  await shell.waitForTimeout(1500);
+  const w = app.windows().find((x) => x.url().startsWith('filo://security'));
+  await w.waitForLoadState('domcontentloaded');
+  await shell.waitForTimeout(800);
+  const campo = w.locator('textarea').first();
+  console.log('SICUREZZA-TEXTAREA', await campo.count() ? JSON.stringify(await campo.inputValue()) : 'nessuna textarea');
+  await campo.evaluate((t) => t.scrollIntoView({ block: 'center' })).catch(() => {});
+  await w.screenshot({ path: 'tests/.shots/590-g19-sicurezza-scuro.png' });
+  if (await campo.count()) {
+    await campo.fill('blocked.test\nfacebook\n<b>x</b>.com\n' + 'a'.repeat(300) + '.com');
+    await campo.blur();
+    await shell.waitForTimeout(1200);
+    await w.screenshot({ path: 'tests/.shots/590-g19-sicurezza-voci-strane.png' });
   }
 });
