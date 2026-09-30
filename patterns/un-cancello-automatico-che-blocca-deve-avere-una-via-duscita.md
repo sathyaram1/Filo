@@ -10,17 +10,23 @@ chiavi; il lavoro locale dell'owner ci cade dentro quasi sempre, perché in
 locale si lavora proprio su quelle cose (§10 di `SPEC-RIDISEGNO-MAX.md`).
 
 La forma giusta non è indebolire il controllo né aggiungere un permesso a chi
-chiede, ma **spostare la decisione su una superficie diversa da quella da cui
-è partita la richiesta**:
+chiede, ma **far decidere l'owner su ciò che non viene da lui**:
 
 - **Il blocco apre una RICHIESTA IN ATTESA, non un rifiuto secco.** Chi ha
   chiesto riceve "l'ho messa in attesa, ecco dove approvarla" — mai un "decidi
   tu cosa farne" che non nomina nessuna mossa possibile.
-- **Approvare richiede un gesto umano su un'altra superficie.** Il terminale
-  (dove gira un LLM che legge testo di sconosciuti) può chiedere quanto vuole:
-  resta in attesa. Il click nella finestra dell'app non lo può dare una
-  sessione catturata. È questo — non la fiducia in chi chiede — a rendere
-  l'eccezione accettabile.
+- **Il sì lo dà l'owner, in Gestione: è una REGOLA del server, non un muro.**
+  Vale per il lavoro senza la prova di chi l'ha chiesto (routine, feedback
+  d'utente). Una sessione locale ha i poteri dell'owner, approvazione
+  compresa: per regola non approva, e i suoi script non lo fanno. Scriverlo
+  come impossibilità tecnica fa progettare guardie contro un muro che non c'è.
+- **Il lavoro locale provato non aspetta (#908).** L5 serve contro gli attacchi,
+  e il lavoro che l'owner chiede in sessione non lo è: pratica dell'owner o di
+  una sessione, con la prova del mittente (`senderProof: 'admin'`) e il segno
+  `localOnly`, fusa con `npm run finish -- --feedback <N>`. Il server fa girare
+  L5 solo per registrare, fonde, scrive i blocchi in una traccia («Fuse senza
+  chiedere» in Automazioni) e chiude la pratica. Il solo prefisso `local:` non
+  basta: senza prova si torna alla richiesta in attesa, col motivo.
 - **Due invarianti non negoziabili, e una scadenza che non è una di loro.**
   Reggono l'eccezione: si applica solo a ciò che è stato ESAMINATO (si registra
   lo `sha`, e si fonde quello, non "il ramo"; se il ramo si muove la richiesta
