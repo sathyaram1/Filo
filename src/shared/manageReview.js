@@ -584,16 +584,8 @@
     if (!fb) return { ok: false, motivo: 'feedback non trovato' };
     if (!valore) return isLocalOnly(fb) ? { ok: true } : { ok: false, motivo: 'il segno «solo in locale» non c’è' };
     if (isLocalOnly(fb)) return { ok: false, motivo: 'il segno «solo in locale» c’è già' };
-    if (!isProvenLocalSender(fb)) {
-      const cid = String(fb.clientId || '');
-      if (LOCAL_SENDER_RE.test(cid)) {
-        return { ok: false, utente: true, motivo: 'il mittente non porta la prova (#595): vale come un feedback di un utente, e in locale i feedback degli utenti non si lavorano' };
-      }
-      if (RESERVED_CLIENT_RE.test(cid) && SENDER_PROOFS.includes(fb.senderProof)) {
-        return { ok: false, motivo: 'l’ha aperto una routine: in locale si lavorano solo i feedback dell’owner o di una sessione locale' };
-      }
-      return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale non si lavora' };
-    }
+    const mittente = localSenderCheck(fb);
+    if (!mittente.ok) return mittente;
     if (statusUnreadable(fb)) return { ok: false, motivo: 'lo stato non si legge: non so se la pratica è aperta' };
     if (/^(attack|spam|suspicious_file)/.test(normalizeStatus(fb).status)) {
       return { ok: false, motivo: 'è segnalata come attacco o spam: prima si decide nei Ricevuti' };
