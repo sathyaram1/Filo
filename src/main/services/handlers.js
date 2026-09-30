@@ -1189,7 +1189,7 @@ function perimetroLettura(sender) {
 
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in
 // questo turno, turni passati compresi: servono all'anti-esfiltrazione di NAVIGA.
-async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null } = {}) {
+async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null, assistente = false } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
@@ -1401,21 +1401,26 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
             tabId = tm.openTab(url, { activate: !background });
             // Gli schemi non web sono esclusi qui sopra: una scheda che non
             // nasce è la lista dei siti bloccati (#590), e la chat lo deve dire.
+            // L'assistente sulla pagina può poi chiedere «Apri comunque» solo per quello che gli è stato fermato.
+            const fermata = (host, reason, target) => {
+              if (assistente && sender && sender.wc && typeof tm.ricordaApribile === 'function') tm.ricordaApribile(sender.wc, target);
+              return { executed: false, kept: true, output: { blocked: 'site', host: host || '', reason: reason || '', url: target } };
+            };
             if (!tabId) {
               const assoluto = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`;
               let d = null;
               try { d = require('./siteBlock').shouldBlockNavigation(assoluto); } catch (_) {}
-              return { executed: false, kept: true, output: { blocked: 'site', host: (d && d.host) || '', reason: (d && d.reason) || '', url: assoluto } };
+              return fermata(d && d.host, d && d.reason, assoluto);
             }
-            // Un blocco che la pagina provoca dopo l'attesa qui sotto arriva lo stesso alla chat della home.
-            if (sender && sender.wc && String(sender.url || '').startsWith('filo://') && action._callId && typeof tm.seguiApertura === 'function') {
-              tm.seguiApertura(tabId, { wc: sender.wc, callId: action._callId });
+            // Un blocco che la pagina provoca dopo l'attesa qui sotto arriva lo stesso a chi l'ha chiesta:
+            // la chat della home o l'assistente sulla pagina.
+            const seguibile = assistente || String((sender && sender.url) || '').startsWith('filo://');
+            if (sender && sender.wc && seguibile && action._callId && typeof tm.seguiApertura === 'function') {
+              tm.seguiApertura(tabId, { wc: sender.wc, callId: action._callId, assistente });
             }
             // La scheda nata può fermarla dopo un rimbalzo verso la lista (un link accorciato, un rinvio della pagina).
             const esito = typeof tm.esitoApertura === 'function' ? await tm.esitoApertura(tabId) : null;
-            if (esito && esito.bloccata) {
-              return { executed: false, kept: true, output: { blocked: 'site', host: esito.bloccata.host, reason: esito.bloccata.reason || '', url: esito.bloccata.target } };
-            }
+            if (esito && esito.bloccata) return fermata(esito.bloccata.host, esito.bloccata.reason, esito.bloccata.target);
             opened = true;
           }
         } catch (e) {

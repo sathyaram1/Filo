@@ -59,7 +59,7 @@ module.exports = function register(on, ctx) {
   // anche con confirmed:true): un client compromesso non può far eseguire
   // un'azione fuori registro.
   on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { confirmed: true, sender });
+    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true });
     return { ok: true, ...r };
   });
 
@@ -71,7 +71,7 @@ module.exports = function register(on, ctx) {
   // Le azioni fuori registro vengono rifiutate dal dispatch, esattamente come
   // per la chat: la sidebar non è un canale privilegiato.
   on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { sender });
+    const r = await executeFiloAction(msg.action, { sender, assistente: true });
     return { ok: true, ...r };
   });
 

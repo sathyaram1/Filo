@@ -414,3 +414,20 @@ test('dentro un sito aperto con «Apri comunque», «Apri» sulla chip dei popup
   expect(await avvisi()).toEqual([]);
 });
 
+
+test('modalità privacy: un link che passa da un accorciatore e rimbalza sul sito della lista lascia la pagina di prima, non una scheda vuota', async ({ app, shell, rete }) => {
+  await lista(shell, ['blocked.test']);
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { security: { cookies: { mode: 'privacy' } } } }));
+  await shell.waitForTimeout(400);
+  const avvisi = await contaAvvisi(app);
+  const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+  const corto = rete.rimbalzo('accorcia.test', '/r', bersaglio);
+  const pagina = rete.pagina('sito.test', '/', `<h1>PAGINA</h1><a id="l" href="${corto}">link</a>`);
+  await apri(app, shell, pagina);
+  const tab = app.windows().find((w) => w.url().includes('sito.test'));
+  await tab.click('#l');
+  await expect.poll(async () => (await schede(app)).includes(pagina), { timeout: 8000 }).toBe(true);
+  await shell.waitForTimeout(800);
+  expect((await schede(app)).filter((u) => u === '' || u.includes('blocked.test'))).toEqual([]);
+  expect((await avvisi()).length).toBeGreaterThan(0);
+});

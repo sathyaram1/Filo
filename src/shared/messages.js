@@ -314,7 +314,8 @@
     CLOSE_TAB: 'close_tab',
     CLOSE_ALL_TABS: 'close_all_tabs',               // chiude tutte le tab → 1 newtab
     OPEN_URL: 'open_url',                           // { url }
-    APRI_COMUNQUE: 'apri_comunque',                 // { url } — sito della lista dei siti bloccati, solo da pagine filo:// (#590)
+    APRI_COMUNQUE: 'apri_comunque',                 // { url } — sito della lista dei siti bloccati: pagine filo://, o l'assistente per una sua apertura fermata (#590)
+    APERTURA_FERMATA: 'apertura_fermata',           // main → assistente sulla pagina: { callId, host, reason, url } (#590)
     QUIT_APP: 'quit_app',
     NAV_BACK: 'nav_back',
     NAV_FORWARD: 'nav_forward',

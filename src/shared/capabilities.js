@@ -463,7 +463,7 @@
     },
     {
       id: 'security', title: 'Sicurezza e privacy', category: 'settings',
-      desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima), lista dei siti bloccati e lista dei siti fidati. Un sito bloccato non si apre da nessuna strada (link, risultati di una ricerca, barra della home, redirect, finestrelle, indietro e avanti, azioni di Filo) finché non scegli «Apri comunque» (nella notifica, sulla pagina «Sito bloccato» o sotto la risposta di Filo in chat); una scheda già aperta su un sito che metti in lista passa subito alla pagina «Sito bloccato», anche alla riapertura di Filo, e da lì un collegamento porta alla lista.',
+      desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima), lista dei siti bloccati e lista dei siti fidati. Un sito bloccato non si apre da nessuna strada (link, risultati di una ricerca, barra della home, redirect, finestrelle, indietro e avanti, azioni di Filo) finché non scegli «Apri comunque» (nella notifica, sulla pagina «Sito bloccato» o sotto la risposta di Filo in chat o nell\'assistente sulla pagina); una scheda già aperta su un sito che metti in lista passa subito alla pagina «Sito bloccato», anche alla riapertura di Filo, e da lì un collegamento porta alla lista.',
       invoke: 'Pagina filo://security/security.html.',
     },
     {

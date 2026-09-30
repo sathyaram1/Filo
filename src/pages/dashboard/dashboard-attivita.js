@@ -517,7 +517,9 @@
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'dash-action-btn';
-    btn.textContent = 'Apri comunque';
+    // Il nome del sito sta sul bottone: con due aperture fermate, o col testo che una pagina ha dettato
+    // al modello, è l'unica cosa che dice quale sito si sta aprendo.
+    btn.textContent = `Apri comunque ${o.host || o.url}`;
     btn.title = `Apri ${o.host || o.url} anche se è fra i siti bloccati`;
     // Un doppio clic apre una scheda sola; chiusa quella, il bottone riapre.
     btn.addEventListener('click', async () => {

@@ -1664,10 +1664,14 @@ class TabManager {
   _recreateView(tab, url, opts = {}) {
     const wasActive = tab.id === this.activeId;
     const partition = this._partitionForTab(tab, url);
+    // La pagina che la vista vecchia mostrava: se il primo salto della nuova si ferma sulla lista, si torna lì.
+    let prima = '';
+    try { prima = opts.ritorno ? '' : (tab.view.webContents.getURL() || ''); } catch (_) {}
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
     const view = this._makeView(url, partition, { suppressAutoplay: tab.suppressAutoplay });
     tab.view = view;
+    tab._vistaNuova = { wc: view.webContents, prima: /^(https?|filo):/i.test(prima) ? prima : '' };
     tab.partition = partition;
     tab.isInternal = url.startsWith('filo://');
     tab.partitionSite = tab.isInternal ? null : Cookies.registrableOf(url);
@@ -2009,11 +2013,8 @@ class TabManager {
       // «Apri comunque» della pagina «Sito bloccato» che il main ha messo in questa scheda (#590).
       if (this._apriComunqueDallaPagina(tab, url, event)) this._concediApriComunque(tab, url);
       // #170.3 — link o window.location verso un sito della lista: fermato.
-      const fermata = this._maybeBlockNavigation(tab, url);
-      if (fermata) {
+      if (this._fermaSaltoDellaScheda(tab, url)) {
         event.preventDefault();
-        // Una scheda aperta da NAVIGA che la pagina rimanda da sé sul sito della lista: la chat lo deve sapere.
-        this._esitoApertura(tab, fermata);
         return;
       }
       if (this._needsRecreate(tab, url)) {
@@ -2042,14 +2043,21 @@ class TabManager {
       // #590 — un redirect è un cambio d'indirizzo come gli altri: senza, un
       // accorciatore o un redirect aperto porta a un sito della lista.
       if (event.isMainFrame === false) return;
-      const fermata = this._maybeBlockNavigation(tab, url);
-      if (fermata) {
-        event.preventDefault();
-        // Una scheda nata per quell'indirizzo resterebbe bianca e senza storia.
-        if (!tab._everNavigated && !tab.isInternal) {
-          this._esitoApertura(tab, fermata);
-          setImmediate(() => this._dropTab(tab));
-        }
+      const fermata = this._fermaSaltoDellaScheda(tab, url);
+      if (!fermata) return;
+      event.preventDefault();
+      // Una scheda nata per quell'indirizzo resterebbe bianca e senza storia.
+      if (!tab._everNavigated && !tab.isInternal) {
+        setImmediate(() => this._dropTab(tab));
+      } else if (tab._vistaNuova && tab._vistaNuova.wc === wc) {
+        // Una vista appena ricreata (privacy fra siti, pagina di Filo → web) non ha niente dietro:
+        // torna la pagina di prima, com'è quando la vista resta la stessa.
+        const prima = tab._vistaNuova.prima;
+        setImmediate(() => {
+          if (!this.tabs.includes(tab) || tab.view.webContents !== wc) return;
+          if (prima) this._recreateView(tab, prima, { ritorno: true });
+          else this._mostraPaginaBloccata(tab, url, fermata);
+        });
       }
     });
     // Debug helper: in dev relay i log della pagina al main.
@@ -2218,6 +2226,7 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      if (tab._vistaNuova && tab._vistaNuova.wc === wc) tab._vistaNuova = null;
       this._sostituisciVoceBloccata(wc, url);
       // #590 — una navigazione già partita quando il suo sito è entrato in lista arriva lo stesso: si ferma qui.
       const bloccata = /^https?:\/\//i.test(url) && this._decisioneBlocco(tab, url);
@@ -2695,21 +2704,42 @@ class TabManager {
     });
   }
 
-  // La chat che ha chiesto l'apertura di `id` (home, con l'id dell'azione): dopo l'attesa di
-  // esitoApertura, un blocco che la pagina provoca da sé le arriva sul canale 'filo:apertura-fermata'.
-  seguiApertura(id, { wc, callId } = {}) {
+  // La chat che ha chiesto l'apertura di `id`, con l'id dell'azione: dopo l'attesa di esitoApertura,
+  // un blocco che la pagina provoca da sé le arriva lo stesso. `assistente`: l'assistente sulla pagina,
+  // che ascolta coi content script invece che sul canale della home.
+  seguiApertura(id, { wc, callId, assistente = false } = {}) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab || !wc || !callId) return;
-    tab._aperturaChat = { wc, callId, da: Date.now() };
+    tab._aperturaChat = { wc, callId, assistente: !!assistente, da: Date.now() };
+  }
+
+  // «Apri comunque» dell'assistente sulla pagina: una pagina web lo può chiedere solo per un
+  // indirizzo che la lista ha fermato a un'apertura chiesta da lei stessa.
+  ricordaApribile(wc, url) {
+    if (!wc || !url) return;
+    if (!this._apribiliAssistente) this._apribiliAssistente = new WeakMap();
+    let set = this._apribiliAssistente.get(wc);
+    if (!set) { set = new Set(); this._apribiliAssistente.set(wc, set); }
+    set.add(String(url));
+  }
+
+  apribileDallAssistente(wc, url) {
+    const set = wc && this._apribiliAssistente && this._apribiliAssistente.get(wc);
+    return !!set && set.has(String(url || ''));
   }
 
   _bloccoDopoApertura(tab, bloccata) {
     const c = tab._aperturaChat;
     tab._aperturaChat = null;
     if (!c || (tab._userInputAt || 0) >= c.da || Date.now() - c.da > SEGUI_APERTURA_MS) return;
+    const dati = { callId: c.callId, host: bloccata.host, reason: bloccata.reason || '', url: bloccata.target };
     try {
-      if (!c.wc.isDestroyed()) {
-        c.wc.send('filo:apertura-fermata', { callId: c.callId, host: bloccata.host, reason: bloccata.reason || '', url: bloccata.target });
+      if (c.wc.isDestroyed()) return;
+      if (c.assistente) {
+        this.ricordaApribile(c.wc, dati.url);
+        c.wc.send('filo:broadcast', { type: globalThis.SN_MSG?.MSG?.APERTURA_FERMATA || 'apertura_fermata', ...dati });
+      } else {
+        c.wc.send('filo:apertura-fermata', dati);
       }
     } catch (_) {}
   }
@@ -2757,6 +2787,14 @@ class TabManager {
     const decision = this._decisioneBlocco(tab, url);
     if (decision) this._notifyBlocked(decision);
     return decision;
+  }
+
+  // Un salto della pagina della scheda (link, rinvio, rimbalzo del server) fermato dalla lista: oltre
+  // alla notifica, l'esito va a chi aveva chiesto di aprire la scheda, qualunque forma abbia il salto.
+  _fermaSaltoDellaScheda(tab, url) {
+    const fermata = this._maybeBlockNavigation(tab, url);
+    if (fermata) this._esitoApertura(tab, fermata);
+    return fermata;
   }
 
   // La scheda passa alla pagina «Sito bloccato» al posto di `url`, che per l'utente

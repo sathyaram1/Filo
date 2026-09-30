@@ -637,8 +637,76 @@
     return `azione Filo: ${type.toLowerCase().replace(/_/g, ' ')}`;
   }
 
+  // #590 — Le aperture chieste da qui, per id: se la pagina aperta finisce più tardi su un sito
+  // della lista, il main lo dice con APERTURA_FERMATA e la riga «fatto» diventa il blocco.
+  const apertureSeguite = new Map();
+
+  function rigaBloccata(label, { host, reason } = {}) {
+    return `${label}: ${host || 'il sito'} è fra i siti ${reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati'}`;
+  }
+
+  // Come la chat della home: la notifica se ne va in pochi secondi, il bottone resta. Conta solo il
+  // clic vero dell'utente, perché il bottone sta nel DOM della pagina; il main accetta solo gli
+  // indirizzi che la lista ha fermato a un'apertura di questo assistente.
+  function bottoneApriComunque(dopo, { host, url } = {}) {
+    if (!dopo || !/^https?:\/\//i.test(String(url || ''))) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-choices';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-sidebar-choice';
+    btn.textContent = `Apri comunque ${host || url}`;
+    btn.title = `Apri ${host || url} anche se è fra i siti bloccati`;
+    let tastoAt = 0;
+    btn.addEventListener('keydown', (e) => { if (e.isTrusted && (e.key === 'Enter' || e.key === ' ')) tastoAt = Date.now(); });
+    btn.addEventListener('click', (e) => {
+      // Un clic della pagina (finto, o girato da un'etichetta che la pagina ci ha messo intorno) non vale:
+      // col mouse il punto cliccato è il bottone, da tastiera il tasto è stato premuto sul bottone.
+      const sulBottone = e.detail === 0 ? Date.now() - tastoAt < 1000 : document.elementFromPoint(e.clientX, e.clientY) === btn;
+      if (!e.isTrusted || !sulBottone || btn.disabled) return;
+      btn.disabled = true;
+      Promise.resolve().then(() => chrome.runtime.sendMessage({ type: MSG.APRI_COMUNQUE, url })).catch(() => {});
+      setTimeout(() => { btn.disabled = false; }, 2000);
+    });
+    wrap.appendChild(btn);
+    dopo.insertAdjacentElement('afterend', wrap);
+    const conv = convEl();
+    if (conv) conv.scrollTop = conv.scrollHeight;
+  }
+
+  // L'esito di un'azione di Filo nel diario, uguale dopo l'invio diretto e dopo la conferma.
+  function scriviEsito(label, action, r) {
+    const done = !!(r && r.executed);
+    const o = (r && r.output) || null;
+    if (!done && o && o.blocked === 'site') {
+      bottoneApriComunque(appendActionLog(rigaBloccata(label, o)), o);
+      return false;
+    }
+    const riga = appendActionLog(esitoAzione(label, done, r));
+    if (done && riga && action && action._callId) {
+      apertureSeguite.set(action._callId, { riga, label });
+      // Il main segue l'apertura per un minuto: oltre, un avviso non arriva più.
+      setTimeout(() => apertureSeguite.delete(action._callId), 60_000);
+    }
+    return done;
+  }
+
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== MSG.APERTURA_FERMATA) return;
+      const seguita = apertureSeguite.get(msg.callId);
+      if (!seguita) return;
+      apertureSeguite.delete(msg.callId);
+      seguita.riga.textContent = '· ' + rigaBloccata(seguita.label, msg);
+      bottoneApriComunque(seguita.riga, msg);
+    });
+  } catch (_) {}
+
   async function runFiloAction(action) {
     const label = filoActionLabel(action);
+    if (action && String(action.type || '').toUpperCase() === 'NAVIGA' && !action._callId) {
+      action._callId = `assistente-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    }
     let res = null;
     try {
       res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action });
@@ -660,19 +728,13 @@
       if (!ok) { appendActionLog(`${label}: annullata`); return false; }
       let c = null;
       try {
-        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action });
+        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true });
       } catch (_) {}
-      const done = !!(c && c.executed);
-      appendActionLog(esitoAzione(label, done, c));
-      return done;
+      return scriviEsito(label, action, c);
     }
 
-    const done = !!res.executed;
     // #590 — un blocco muto sembra un guasto: la lista dei siti bloccati si dice.
-    const bloccato = !done && res.output && res.output.blocked === 'site';
-    appendActionLog(bloccato ? `${label}: ${res.output.host || 'il sito'} è fra i siti ${res.output.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati'}`
-      : esitoAzione(label, done, res));
-    return done;
+    return scriviEsito(label, action, res);
   }
 
   // Un rifiuto spiegato dal main (uno stile oltre il tetto) arriva all'utente col
