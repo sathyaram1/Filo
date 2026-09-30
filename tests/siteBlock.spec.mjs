@@ -67,7 +67,7 @@ test('blocco diretto: click su link verso sito in blacklist → bloccato + notif
   expect(page.url()).toBe(fromUrl);
 });
 
-test('"Apri comunque" apre il sito, e i suoi link interni non vengono ribloccati', async ({ app, shell, openTab, testServer , avvisi }) => {
+test('"Apri comunque" apre il sito, e i suoi link interni non vengono ribloccati', async ({ app, shell, openTab, testServer, avvisi }) => {
   await enableBlock(shell);
 
   const dentro = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="t2">SECONDA PAGINA</h1>');
@@ -185,7 +185,7 @@ async function redirector(to) {
   return { url: `http://127.0.0.1:${server.address().port}/r`, close: () => new Promise((r) => server.close(r)) };
 }
 
-test('#590 barra della home: un indirizzo della lista non si apre, e «Apri comunque» lo apre', async ({ app, shell, testServer }) => {
+test('#590 barra della home: un indirizzo della lista non si apre, e «Apri comunque» lo apre', async ({ app, shell, testServer, avvisi }) => {
   await enableBlock(shell);
   const page = await newtabPage(app);
   const input = page.locator('#input');
@@ -197,7 +197,8 @@ test('#590 barra della home: un indirizzo della lista non si apre, e «Apri comu
   await input.fill(`/${target}`);
   await input.press('Enter');
 
-  const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' })).toHaveCount(1, { timeout: 6000 });
+  const card = (await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato' });
   await expect(card).toBeVisible({ timeout: 6000 });
   await expect(card).toContainText(BLOCKED_HOST);
   await page.waitForTimeout(500);
@@ -207,7 +208,7 @@ test('#590 barra della home: un indirizzo della lista non si apre, e «Apri comu
   await expect.poll(async () => (await tabUrls(app)).includes(target), { timeout: 8000 }).toBe(true);
 });
 
-test('#590 NAVIGA del modello verso un sito della lista: nessuna scheda, e la chat lo dice', async ({ app, shell, testServer }) => {
+test('#590 NAVIGA del modello verso un sito della lista: nessuna scheda, e la chat lo dice', async ({ app, shell, testServer, avvisi }) => {
   test.setTimeout(60_000);
   await enableBlock(shell);
   const page = await newtabPage(app);
@@ -229,7 +230,7 @@ test('#590 NAVIGA del modello verso un sito della lista: nessuna scheda, e la ch
     await page.locator('#sendBtn').click();
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Non l’ho aperta' })).toBeVisible({ timeout: 10_000 });
 
-    await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first()).toBeVisible({ timeout: 6000 });
+    await expect((await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato' }).first()).toBeVisible({ timeout: 6000 });
     expect((await tabUrls(app)).filter((u) => u.includes(BLOCKED_HOST))).toEqual([]);
 
     // Il diario lo dice, e il riassunto non si vanta di un'apertura mai avvenuta.
@@ -344,7 +345,7 @@ test('#590 NAVIGA verso un sito delle liste pubbliche: né il modello né la not
   }
 });
 
-test('#590 link in una nuova scheda e redirect verso un sito della lista: bloccati', async ({ app, shell, openTab, testServer }) => {
+test('#590 link in una nuova scheda e redirect verso un sito della lista: bloccati', async ({ app, shell, openTab, testServer, avvisi }) => {
   await enableBlock(shell);
   const target = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="t">ARRIVATO</h1>');
   const r = await redirector(target);
@@ -357,7 +358,7 @@ test('#590 link in una nuova scheda e redirect verso un sito della lista: blocca
     const prima = (await tabUrls(app)).length;
 
     await page.evaluate(() => document.getElementById('blank').click());
-    await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first()).toBeVisible({ timeout: 6000 });
+    await expect((await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato' }).first()).toBeVisible({ timeout: 6000 });
     await page.waitForTimeout(500);
     expect((await tabUrls(app)).length).toBe(prima);
 

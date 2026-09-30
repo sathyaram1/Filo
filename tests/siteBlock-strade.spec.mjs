@@ -36,7 +36,7 @@ test('una finestrella di accesso che il server rimbalza sul sito della lista si 
   expect((await avvisi()).length).toBeGreaterThan(0);
 });
 
-test('«Apri» sulla chip dei popup non scavalca la lista dei siti bloccati', async ({ app, shell, rete }) => {
+test('«Apri» sull\'avviso del popup non scavalca la lista dei siti bloccati', async ({ app, shell, rete, avvisi: vista }) => {
   await lista(shell, ['blocked.test']);
   const avvisi = await contaAvvisi(app);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO DELLA LISTA</h1>');
@@ -44,9 +44,9 @@ test('«Apri» sulla chip dei popup non scavalca la lista dei siti bloccati', as
   await apri(app, shell, pagina);
   const tab = app.windows().find((w) => w.url().includes('sito.test'));
   await tab.click('#b');
-  const chip = shell.locator('.popup-chip').first();
+  const chip = (await vista()).locator('.shell-notif', { hasText: 'Bloccato popup' }).first();
   await expect(chip).toBeVisible({ timeout: 6000 });
-  await chip.locator('button', { hasText: 'Apri' }).click();
+  await chip.locator('.shell-notif-action', { hasText: 'Apri' }).click();
   await shell.waitForTimeout(2000);
   expect(await aperteSu(app, 'blocked.test')).toEqual([]);
   expect((await avvisi()).length).toBeGreaterThan(0);
@@ -212,7 +212,7 @@ test('liste pubbliche: «Apri comunque» della pagina «Sito bloccato» apre dav
   await expect(app.windows().find((w) => w.url() === tracker).locator('h1')).toHaveText('TRACKER');
 });
 
-test('liste pubbliche: «Apri comunque» su un contatore di clic porta all\'articolo, non a una pagina d\'errore', async ({ app, shell, rete }) => {
+test('liste pubbliche: «Apri comunque» su un contatore di clic porta all\'articolo, non a una pagina d\'errore', async ({ app, shell, rete, avvisi }) => {
   await app.evaluate(() => { globalThis.__filoAdblock.setDomainsForTest(['tracker.test']); });
   const articolo = rete.pagina('articolo.test', '/', '<h1>ARTICOLO</h1>');
   const contatore = rete.rimbalzo('tracker.test', '/c', articolo);
@@ -221,7 +221,7 @@ test('liste pubbliche: «Apri comunque» su un contatore di clic porta all\'arti
   await apri(app, shell, pagina);
   const tab = app.windows().find((w) => w.url().includes('sito.test'));
   await tab.evaluate(() => document.getElementById('go').click());
-  const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first();
+  const card = (await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato' }).first();
   await expect(card).toBeVisible({ timeout: 6000 });
   await card.locator('.shell-notif-action', { hasText: 'Apri comunque' }).click();
   await expect.poll(async () => (await aperteSu(app, 'articolo.test')).length, { timeout: 8000 }).toBe(1);
@@ -252,7 +252,7 @@ test('una pagina che riprova in continuazione non riempie l\'angolo di notifiche
   await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' })).toHaveCount(1);
 });
 
-test('chiusa la notifica «Sito bloccato», il secondo tentativo lo dice di nuovo', async ({ app, shell, rete }) => {
+test('chiusa la notifica «Sito bloccato», il secondo tentativo lo dice di nuovo', async ({ app, shell, rete, avvisi: vista }) => {
   await lista(shell, ['blocked.test']);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
   const pagina = rete.pagina('sito.test', '/', `<a id="go" href="${bersaglio}">vai</a>`);
@@ -261,19 +261,21 @@ test('chiusa la notifica «Sito bloccato», il secondo tentativo lo dice di nuov
   await tab.waitForSelector('#go');
   const avvisi = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
   await tab.evaluate(() => document.getElementById('go').click());
-  await expect(avvisi.first()).toBeVisible({ timeout: 6000 });
-  await avvisi.first().locator('.shell-notif-close').click();
+  await expect(avvisi).toHaveCount(1, { timeout: 6000 });
+  const aSchermo = (await vista()).locator('.shell-notif', { hasText: 'Sito bloccato' });
+  await expect(aSchermo.first()).toBeVisible({ timeout: 6000 });
+  await aSchermo.first().locator('.shell-notif-close').click();
   await expect(avvisi).toHaveCount(0, { timeout: 3000 });
   await tab.evaluate(() => document.getElementById('go').click());
-  await expect(avvisi.first()).toBeVisible({ timeout: 3000 });
+  await expect(aSchermo.first()).toBeVisible({ timeout: 3000 });
   expect(tab.url()).toBe(pagina);
 });
 
-test('«Apri comunque» premuto due volte apre una scheda sola', async ({ app, shell, rete }) => {
+test('«Apri comunque» premuto due volte apre una scheda sola', async ({ app, shell, rete, avvisi }) => {
   await lista(shell, ['blocked.test']);
   const sito = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
   await shell.evaluate((u) => window.filoShell.tabs.open(u), sito);
-  const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first();
+  const card = (await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato' }).first();
   await expect(card).toBeVisible({ timeout: 6000 });
   await card.locator('.shell-notif-action', { hasText: 'Apri comunque' }).dblclick();
   await expect.poll(async () => (await aperteSu(app, 'blocked.test')).length, { timeout: 6000 }).toBeGreaterThan(0);
@@ -400,16 +402,16 @@ test('dentro un sito aperto con «Apri comunque» le sue finestrelle di accesso 
   await expect.poll(() => finestrelle(app), { timeout: 6000 }).toEqual([accesso, accesso]);
 });
 
-test('dentro un sito aperto con «Apri comunque», «Apri» sulla chip dei popup apre il popup di quel sito', async ({ app, shell, rete }) => {
+test('dentro un sito aperto con «Apri comunque», «Apri» sull\'avviso del popup apre il popup di quel sito', async ({ app, shell, rete, avvisi: vista }) => {
   await lista(shell, ['blocked.test']);
   const pop = rete.pagina('blocked.test', '/pop', '<h1>POPUP DEL SITO</h1>');
   const sito = rete.pagina('blocked.test', '/', `<h1>SITO</h1><button id="b" onclick="window.open('${pop}', 'p', 'width=400,height=300')">pop</button>`);
   const tab = await apertoComunque(app, shell, sito);
   const avvisi = await contaAvvisi(app);
   await tab.click('#b');
-  const chip = shell.locator('.popup-chip').first();
+  const chip = (await vista()).locator('.shell-notif', { hasText: 'Bloccato popup' }).first();
   await expect(chip).toBeVisible({ timeout: 6000 });
-  await chip.locator('button', { hasText: 'Apri' }).click();
+  await chip.locator('.shell-notif-action', { hasText: 'Apri' }).click();
   await expect.poll(async () => (await schede(app)).includes(pop), { timeout: 6000 }).toBe(true);
   expect(await avvisi()).toEqual([]);
 });

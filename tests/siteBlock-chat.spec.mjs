@@ -116,7 +116,7 @@ test('il blocco più tardivo arriva mentre il modello sta ancora rispondendo: la
   }
 });
 
-test('dopo un clic dell\'utente nella pagina aperta da NAVIGA, un sito della lista fermato non cambia la chat', async ({ app, shell, rete }) => {
+test('dopo un clic dell\'utente nella pagina aperta da NAVIGA, un sito della lista fermato non cambia la chat', async ({ app, shell, rete, avvisi }) => {
   test.setTimeout(60_000);
   await lista(shell, ['blocked.test']);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
@@ -128,7 +128,7 @@ test('dopo un clic dell\'utente nella pagina aperta da NAVIGA, un sito della lis
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco la pagina' })).toBeVisible({ timeout: 20_000 });
     const tab = app.windows().find((w) => w.url().includes('libero.test'));
     await tab.click('#l', { noWaitAfter: true });
-    await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first()).toBeVisible({ timeout: 6000 });
+    await expect((await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato' }).first()).toBeVisible({ timeout: 6000 });
     await page.waitForTimeout(800);
     await expect(page.locator('.dash-action-link-chip')).toBeVisible();
     await expect(page.getByRole('button', { name: /^Apri comunque/ })).toHaveCount(0);
@@ -188,7 +188,7 @@ async function assistenteSu(app, shell, pagina, host) {
   return { tab, naviga, esegui };
 }
 
-test('assistente sulla pagina: NAVIGA fermata, sotto c\'è «Apri comunque» col sito, che riporta la notifica di Filo: il sì si dà lì', async ({ app, shell, rete }) => {
+test('assistente sulla pagina: NAVIGA fermata, sotto c\'è «Apri comunque» col sito, che riporta la notifica di Filo: il sì si dà lì', async ({ app, shell, rete, avvisi }) => {
   test.setTimeout(60_000);
   await lista(shell, ['blocked.test']);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
@@ -202,19 +202,20 @@ test('assistente sulla pagina: NAVIGA fermata, sotto c\'è «Apri comunque» col
   await tab.screenshot({ path: 'tests/.shots/590-assistente-apri-comunque.png' });
   // Andata via la notifica dell'apertura fermata, il bottone la riporta; il sito si apre solo da lì.
   const notifica = shell.locator('.shell-notif', { hasText: 'Sito bloccato: blocked.test' });
+  const aSchermo = (await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato: blocked.test' });
   await expect(notifica).toHaveCount(0, { timeout: 10_000 });
   await bottone.click();
-  await expect(notifica).toBeVisible({ timeout: 6000 });
+  await expect(aSchermo).toBeVisible({ timeout: 6000 });
   await tab.waitForTimeout(500);
   expect(await suBloccato(app)).toEqual([]);
-  await notifica.locator('.shell-notif-action', { hasText: 'Apri comunque' }).click();
+  await aSchermo.locator('.shell-notif-action', { hasText: 'Apri comunque' }).click();
   await expect.poll(() => suBloccato(app), { timeout: 8000 }).toEqual([bersaglio]);
 });
 
 // Il bottone sta nel DOM della pagina: quello che la pagina gli fa (mondo principale) non deve aprire il sito.
 const bottoneDellaPagina = () => [...document.querySelectorAll('.sn-sidebar button')].find((x) => /Apri comunque|Chiudi questo avviso/.test(x.textContent));
 
-test('assistente sulla pagina: la pagina che dà il fuoco a «Apri comunque», lo traveste o lo stende su tutto lo schermo non apre il sito della lista', async ({ app, shell, rete }) => {
+test('assistente sulla pagina: la pagina che dà il fuoco a «Apri comunque», lo traveste o lo stende su tutto lo schermo non apre il sito della lista', async ({ app, shell, rete, avvisi }) => {
   test.setTimeout(60_000);
   await lista(shell, ['blocked.test']);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
@@ -222,14 +223,15 @@ test('assistente sulla pagina: la pagina che dà il fuoco a «Apri comunque», l
   expect(await apri(bersaglio)).toBe(false);
   await expect(tab.locator('.sn-sidebar button', { hasText: 'Apri comunque blocked.test' })).toBeVisible();
   const notifica = shell.locator('.shell-notif', { hasText: 'Sito bloccato: blocked.test' });
+  const aSchermo = (await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato: blocked.test' });
   const pagina = (codice) => tab.evaluate(([trova, c]) => { const b = new Function(`return (${trova})()`)(); new Function('b', c)(b); }, [bottoneDellaPagina.toString(), codice]);
   // Ogni gesto arriva al bottone (ricompare la notifica), e il sito resta chiuso.
   const gesto = async (fai) => {
-    await expect(notifica.first()).toBeVisible({ timeout: 6000 });
-    await notifica.first().locator('.shell-notif-close').click();
+    await expect(aSchermo.first()).toBeVisible({ timeout: 6000 });
+    await aSchermo.first().locator('.shell-notif-close').click();
     await expect(notifica).toHaveCount(0, { timeout: 3000 });
     await fai();
-    await expect(notifica.first()).toBeVisible({ timeout: 6000 });
+    await expect(aSchermo.first()).toBeVisible({ timeout: 6000 });
     await tab.waitForTimeout(800);
     expect(await suBloccato(app)).toEqual([]);
   };
