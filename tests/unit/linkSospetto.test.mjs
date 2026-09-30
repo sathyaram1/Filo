@@ -253,7 +253,8 @@ test('le imitazioni in cui il nome vero c’è tutto ma non comanda si fanno ric
     const avviso = LS.avviso(LS.analizza(u), u);
     const imitato = codice.split(':')[1];
     assert.ok(avviso.includes(imitato), `l’avviso non nomina il sito imitato su ${u}: ${avviso}`);
-    assert.ok(avviso.includes(`(${sito})`), `l’avviso non dice quale sito c’è davvero su ${u}: ${avviso}`);
+    assert.ok(new RegExp(`ma (il sito è|la pagina sta su) ${sito.replace(/\./g, '\\.')}:`).test(avviso),
+      `l’avviso non dice quale sito c’è davvero su ${u}: ${avviso}`);
     assert.match(avviso, /imitazione/i);
   }
   // Senza l'indirizzo la frase resta intera, solo senza il nome del sito.

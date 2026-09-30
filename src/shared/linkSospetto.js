@@ -255,8 +255,9 @@
     if (forma === 'homograph') return `L’indirizzo sembra ${dominio}, ma alcune lettere sono solo simili a quelle vere: potrebbe essere un’imitazione.`;
     if (forma === 'brand_in_subdomain' || forma === 'combosquatting') {
       const sito = url ? sitoCheComanda(url) : null;
-      const dove = sito ? ` (${sito.piattaforma || sito.registrabile})` : '';
-      return `L’indirizzo usa il nome di ${dominio}, ma porta a un altro sito${dove}: potrebbe essere un’imitazione.`;
+      const dove = !sito ? 'porta a un altro sito'
+        : sito.piattaforma ? `la pagina sta su ${sito.piattaforma}` : `il sito è ${sito.registrabile}`;
+      return `L’indirizzo usa il nome di ${dominio}, ma ${dove}: potrebbe essere un’imitazione.`;
     }
     return '';
   }
