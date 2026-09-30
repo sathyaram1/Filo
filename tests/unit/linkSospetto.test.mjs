@@ -337,9 +337,37 @@ test('un link che passa da un rinvio si giudica per dove porta', () => {
     'https://www.google.com/url?q=https://poste.it.accesso-sicuro.net/': 'Poste Italiane',
     'https://eur01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fposte.it.accesso-sicuro.net%2F&data=x': 'Poste Italiane',
     'https://l.facebook.com/l.php?u=https%3A%2F%2Fpaypal.support%2F': 'PayPal',
+    // Giro 2: la destinazione nel percorso o codificata a modo suo (i collegamenti protetti di Proofpoint).
+    'https://urldefense.com/v3/__https://poste.it.accesso-sicuro.net/login__;!!AbC123!xYz$': 'Poste Italiane',
+    'https://urldefense.proofpoint.com/v2/url?u=https-3A__paypal.support_login&d=DwMFaQ&c=abc': 'PayPal',
+    'https://web.archive.org/web/2020/https://netflix.top/': 'Netflix',
+    'https://esempio.it/?next=%2Fvai%3Fu%3Dhttps%3A%2F%2Fpaypal.support': 'PayPal',
   };
   for (const [u, marchio] of Object.entries(casi)) {
     assert.ok(LS.avviso(LS.analizza(u)).includes(marchio), `nessun avviso che nomini ${marchio} su ${u}`);
   }
   assert.deepEqual(LS.analizza('https://accounts.google.com/ServiceLogin?continue=https://mail.google.com/mail/'), []);
+});
+
+test('un indirizzo ufficiale prima della chiocciola non fa passare per vero il sito dopo', () => {
+  // https://www.paypal.com@altro.net si legge come PayPal e porta ad altro.net: l'apertura guarda giustamente
+  // solo il sito d'arrivo, il menu giudica il link com'è scritto.
+  const casi = {
+    'https://www.paypal.com@accesso-sicuro.net/login': 'PayPal',
+    'https://www.poste.it:login@verifica-conto.net/': 'Poste Italiane',
+    'https://login:www.paypal.com@evil.net/': 'PayPal',
+    'https://www.paypal.com%2Flogin@evil.net/': 'PayPal',
+    'https://paypa1.com@verifica-conto.net/': 'paypal.com',
+  };
+  for (const [u, marchio] of Object.entries(casi)) {
+    assert.ok(LS.avviso(LS.analizza(u)).includes(marchio), `nessun avviso che nomini ${marchio} su ${u}`);
+  }
+  assert.deepEqual(LS.analizza('https://user:pass@example.com/'), []);
+});
+
+test('un gestore SPID usa il nome di SPID, non quello degli altri marchi', () => {
+  // I gestori accreditati valgono solo per SPID: non entrano nella whitelist e non coprono un altro nome.
+  assert.ok(LS.avviso(LS.analizza('https://paypal.register.it/')).includes('PayPal'));
+  assert.ok(LS.avviso(LS.analizza('https://spid.accesso-sicuro.net/')).includes('SPID'));
+  assert.ok(LS.avviso(LS.analizza('https://spid.gov.it.accesso.net/')).includes('SPID'));
 });
