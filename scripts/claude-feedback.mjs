@@ -370,7 +370,7 @@ export async function main(argvIn) {
 
   // `!= null`, non un controllo di verità: lo 0 è una priorità da scrivere.
   if (p.valore != null) {
-    const pr = await applicaPriorita(r.id, p.valore);
+    const pr = await applicaPriorita(r.id, p.valore, r.authRefused ? '' : cred.idToken);
     if (pr.ok) console.log(`Priorità ${p.valore} impostata.`);
     else console.log(`Priorità NON impostata (${pr.motivo}): mettila dalla dashboard.`);
   }
