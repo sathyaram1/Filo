@@ -3289,13 +3289,16 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   }
   const actionsToRun = proposal ? [...rawActions, proposal] : rawActions;
   await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });
+  // I segreti letti da fuori che la risposta ripete, con la loro fonte: restano con la frase (#810).
+  let lettiRisposta = [];
+  try { lettiRisposta = globalThis.SN_URL_EXFIL.lettiNelTesto(textReply, SegretiLetti.tutti()); } catch (_) {}
   // #525 — la risposta di Filo raggiunge l'archivio insieme al messaggio che
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
   if (chatId) {
     const dopo = await appendToChatArchive(
       chatId,
-      { role: 'filo', text: textReply, actions: actionsToRun },
+      { role: 'filo', text: textReply, actions: actionsToRun, ...(lettiRisposta.length ? { letti: lettiRisposta } : {}) },
       { onboarding: onbActive },
     );
     // La chat può essere finita mentre Filo stava ancora rispondendo: l'utente
