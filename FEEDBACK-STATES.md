@@ -199,7 +199,7 @@ divergevano sulla STESSA segnalazione.
 - Ricevuti: `→ In coda` (`todo`, con `reviewDecision: accepted`) · `Conferma attacco`
   (`attack_confirmed`) su `attack` e `suspicious_file` · `Conferma spam`
   (`spam_confirmed`) su `spam` e `suspicious_file` · `Archivia`.
-- In coda: `✓ Risolto` (`done`, non offerto se è già `done` non rilasciato) · `Archivia`.
+- In coda e Lavori locali: `✓ Risolto` (`done`, non offerto se è già `done` non rilasciato) · `Archivia`.
 - Risolti: `Archivia` · `Riapri` (chiede cosa manca, poi `todo`).
 - Archiviati: `↩ Ripristina` (`todo`) e basta. **Nessun cammino riscrive uno stato
   terminale**: su `attack_confirmed`/`spam_confirmed` un `Archivia` cancellerebbe la
