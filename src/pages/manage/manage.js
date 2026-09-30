@@ -4195,10 +4195,14 @@
 
   // Indice per mittente (il pannello laterale lo usa). Si rifà a ogni
   // caricamento e a ogni giro di aggiornamento.
+  // Chiave del mittente = la stessa del server: chi copia il clientId dell'owner senza prova sta in un gruppo suo.
+  function senderKeyOf(fb) {
+    return (MR.effectiveClientId ? MR.effectiveClientId(fb) : String((fb && fb.clientId) || '')) || '__anon__';
+  }
   function reindexByClient() {
     allByClient = {};
     for (const fb of allFeedbacks) {
-      const c = fb.clientId || '__anon__';
+      const c = senderKeyOf(fb);
       if (!allByClient[c]) allByClient[c] = [];
       allByClient[c].push(fb);
     }
