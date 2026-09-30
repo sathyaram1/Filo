@@ -851,12 +851,30 @@
     const docId = sanitizeDocId(submissionId);
     const idParam = docId ? `documentId=${encodeURIComponent(docId)}&` : '';
     const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?${idParam}key=${API_KEY}`;
-    let res = await fetch(endpoint, {
+    let res = null;
+    let senderProof = '';
+    let authRefused = 0;
+    if (idToken) {
+      doc.fields.senderProof = toFsValue('admin');
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify(doc),
+      });
+      if (res.status === 401 || res.status === 403) {
+        authRefused = res.status;
+        delete doc.fields.senderProof;
+        res = null;
+      } else {
+        senderProof = 'admin';
+      }
+    }
+    if (!res) res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(doc),
     });
-    if (res.status === 403) {
+    if (!senderProof && res.status === 403) {
       // Rules non ancora aggiornate ai campi nuovi (name/seq/subSeq/parentId/clientIdHash):
       // meglio un feedback senza numero/titolo/collegamento che un invio
       // fallito. Ritenta con il solo schema storico.
