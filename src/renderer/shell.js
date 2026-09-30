@@ -765,6 +765,12 @@
       el.className = 'tab' + (t.id === state.activeId ? ' active' : '');
       el.dataset.id = t.id;
       el.dataset.tip = t.title || t.url;
+      const ferma = larghezzeFerme && larghezzeFerme.get(String(t.id));
+      if (ferma) {
+        el.style.flex = `0 0 ${ferma}px`;
+        el.style.minWidth = `${ferma}px`;
+        el.style.maxWidth = `${ferma}px`;
+      }
 
       // Tab attiva: tingila col colore live del sito (§1.1). Sovrascriviamo la
       // variabile --tab-active così anche i "piedini" a goccia (::before/::after)
@@ -1710,6 +1716,7 @@
   });
 
   api.tabs.onUpdate((snap) => {
+    fermaLarghezzeSeChiusa(snap);
     state = snap;
     render();
   });
