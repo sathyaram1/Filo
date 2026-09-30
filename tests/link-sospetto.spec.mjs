@@ -148,6 +148,9 @@ const IMITAZIONI = {
   'https://unicredit-sicurezza.com/': 'UniCredit',
   'https://whatsapp-web.com.accesso.net/': 'WhatsApp',
   'https://bancoposta-online.com/': 'Poste Italiane',
+  'https://posteitaliane.it.accesso-sicuro.net/': 'Poste Italiane',
+  'https://www.google.com/url?q=https://whatsappweb.accesso.net/': 'WhatsApp',
+  'https://inps-rimborso.com/': 'INPS',
   'https://paypal.support/': 'PayPal',
   'https://netflix.top/': 'Netflix',
   'https://amazon.shop/': 'Amazon',
@@ -174,4 +177,23 @@ test('le imitazioni di Poste, banche, WhatsApp e i nomi famosi su un altro domin
   await expect(page.locator('.sn-menu .sn-menu-inline[data-subject="link"]')).toBeVisible();
   await page.waitForTimeout(800);
   await expect(avviso).toHaveCount(0);
+});
+
+test('i siti veri con un nome vicino a un marchio non si prendono l’avviso', async ({ openTab, testServer }) => {
+  // #725.8 giro 1 — col giudizio dell'apertura il menu ne ereditava i falsi allarmi: indirizzi ufficiali che
+  // l'elenco non conosceva (revolut.me, apple.co) e parole vere (telegraph, cloud, imposte).
+  const veri = ['https://www.telegraph.co.uk/news/', 'https://www.cloud.it/', 'https://revolut.me/mario', 'https://apple.co/3abcdEf',
+    'https://cdn.discordapp.com/attachments/1/2/foto.png', 'https://www.imposte.it/'];
+  const link = veri.map((u, i) => `<p><a id="v${i}" href="${u}">Link ${i}</a></p>`).join('');
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px;font:16px sans-serif">${link}</body></html>`);
+  const conAvviso = [];
+  for (let i = 0; i < veri.length; i++) {
+    await page.locator('#v' + i).click({ button: 'right' });
+    await expect(page.locator('.sn-menu .sn-menu-inline[data-subject="link"]')).toBeVisible();
+    await page.waitForTimeout(400);
+    if (await page.locator('.sn-menu .sn-menu-link-warn').count()) conAvviso.push(veri[i]);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.sn-menu')).toHaveCount(0);
+  }
+  expect(conAvviso).toEqual([]);
 });

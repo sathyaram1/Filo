@@ -40,6 +40,17 @@ stesso verdetto sul marchio, con un elenco solo di marchi e domini ufficiali.
 Con due elenchi, un link è pulito nel menu e sospetto quando lo apri, e chi
 legge smette di credere a tutti e due.
 
+**Un elenco solo vale quanto quello che sa.** Dare al menu il giudizio
+dell'apertura gli ha passato anche i suoi falsi allarmi (#725.8, giro 1):
+`revolut.me` e `apple.co` sono indirizzi ufficiali che l'elenco non conosceva,
+`mail.com`, `post.ch`, `cloud.it` e `imposte.it` sono parole vere a una lettera
+da un marchio o con un marchio dentro, e all'apertura venivano bloccati come
+pericolosi. Ogni marchio porta tutti i suoi indirizzi ufficiali; le parole vere
+vicine ai marchi stanno in un elenco, ricavato dalle parole più usate in italiano
+e in inglese, e una parola vale solo dove sta: non scavalca un trattino e non
+copre il nome attaccato accanto (`risposte-poste`). Una sigla di tre lettere non
+basta da sola a nominare un marchio (`bnl.gov`).
+
 **Stringere la soglia non deve spegnere il controllo.** Quello che la soglia
 più stretta perde si recupera con un segnale più preciso, non allargandola di
 nuovo: le lettere che a occhio ne valgono un'altra (`paypa1`, `micros0ft`,
@@ -54,8 +65,9 @@ posto tuo» no.
 
 `src/shared/linkSospetto.js` (euristica e frasi), mostrato da
 `src/content/actions.js` nella sezione inline del link. Il giudizio sul marchio
-lo dà `imitazione()` in `src/main/services/safebrowse/engine.js`, coi marchi di
-`brands.js`. Le soglie e i casi
+lo dà `imitazione()` in `src/main/services/safebrowse/engine.js`, coi marchi e
+le parole vere di `brands.js`; un link che passa da un rinvio si giudica anche per
+l'indirizzo scritto nel rinvio. Le soglie e i casi
 — quelli che devono scattare e quelli che non devono — stanno in
 `tests/unit/linkSospetto.test.mjs`: un controllo nuovo aggiunge la sua coppia
 di elenchi lì, il falso allarme prima del vero positivo.

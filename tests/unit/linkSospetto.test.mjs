@@ -249,3 +249,92 @@ test('l’avviso all’apertura della pagina riconosce le stesse imitazioni', ()
     assert.notEqual(Pagina.evaluate(u).level, 'safe', `nessun avviso all’apertura di ${u}`);
   }
 });
+
+// #725.8 giro 1 — col giudizio unico il menu ereditava i falsi allarmi dell'apertura: indirizzi ufficiali che
+// l'elenco non conosceva e parole vere vicine a un marchio. All'apertura telegraph.co.uk o mail.com venivano bloccati.
+const SITI_VERI = [
+  'https://www.telegraph.co.uk/news/', 'https://www.cloud.it/', 'https://telegra.ph/pagina', 'https://revolut.me/mario',
+  'https://apple.co/3abcdEf', 'https://telegram.me/filo', 'https://cdn.discordapp.com/attachments/1/2/foto.png',
+  'https://www.aboutamazon.it/', 'https://www.postemobile.it/', 'https://www.nexigroup.com/', 'https://www.imposte.it/',
+  'https://www.posterlounge.it/', 'https://www.post.ch/', 'https://www.posti.fi/', 'https://www.mail.com/',
+  'https://www.email.it/', 'https://www.stream.it/', 'https://www.revolution.it/', 'https://www.pineapple.com/',
+  'https://www.otherwise.com/', 'https://www.connexion.fr/', 'https://www.arubanetworks.com/', 'https://bnl.gov/',
+  'https://www.google.com/url?q=https://www.poste.it/',
+];
+
+test('i siti veri con un nome vicino a un marchio non si prendono l’avviso, né nel menu né all’apertura', () => {
+  for (const u of SITI_VERI) {
+    assert.deepEqual(LS.analizza(u), [], `avviso a sproposito nel menu su ${u}`);
+    assert.equal(Pagina.evaluate(u).level, 'safe', `avviso a sproposito all’apertura di ${u}`);
+  }
+});
+
+test('una parola vera non copre il marchio attaccato accanto', () => {
+  // Il contrappeso: la parola vale solo dove sta, non scavalca un trattino e non copre un secondo nome.
+  for (const u of ['https://infoposte.net/', 'https://risposte-poste.com/', 'https://poste-rimborso.wordpress.com/',
+    'https://ebay-login.com/', 'https://wise-transfer.com/', 'https://p-a-y-p-a-l.com/']) {
+    assert.ok(LS.analizza(u).some((c) => /^(typosquatting|marchio_imitato):/.test(c)), `nessun avviso su ${u}`);
+  }
+});
+
+test('ogni parola vera dell’elenco contiene un marchio o gli somiglia', () => {
+  // Una parola che non tocca nessun marchio è peso morto; una che ne tocca uno lo spegne dove sta.
+  const { PAROLE } = require(join(ROOT, 'src', 'main', 'services', 'safebrowse', 'brands.js'));
+  const { osaDistance } = require(join(ROOT, 'src', 'main', 'services', 'safebrowse', 'signals.js'));
+  for (const w of PAROLE) {
+    const tocca = BRANDS.some((b) => w.includes(b.token) || osaDistance(w, b.token) <= (b.token.length >= 8 ? 2 : 1));
+    assert.ok(tocca, `«${w}» non contiene né somiglia a nessun marchio`);
+  }
+});
+
+test('il nome attaccato ad altre parole in un sottodominio, o un indirizzo ufficiale intero, fa scattare l’avviso', () => {
+  const casi = {
+    'https://posteitaliane.it.accesso-sicuro.net/': 'Poste Italiane',
+    'https://bancopostaonline.accesso.net/': 'Poste Italiane',
+    'https://intesasanpaolomobile.accesso.net/': 'Intesa Sanpaolo',
+    'https://unicreditonline.verifica.net/': 'UniCredit',
+    'https://whatsappweb.accesso.net/': 'WhatsApp',
+    'https://steamcommunity.com.accesso.net/': 'Steam',
+    'https://login-microsoftonline-com.sicuro.net/': 'Microsoft',
+    'https://office.com.accesso.net/': 'Microsoft',
+    'https://x.com.accesso.net/': 'X (Twitter)',
+  };
+  for (const [u, marchio] of Object.entries(casi)) {
+    assert.ok(LS.avviso(LS.analizza(u)).includes(marchio), `nessun avviso che nomini ${marchio} su ${u}`);
+    assert.notEqual(Pagina.evaluate(u).level, 'safe', `nessun avviso all’apertura di ${u}`);
+  }
+});
+
+test('le imitazioni degli enti, delle banche e dei corrieri italiani hanno l’avviso, i loro siti no', () => {
+  const casi = {
+    'https://inps-rimborso.com/': 'INPS', 'https://agenziaentrate-rimborsi.com/': 'Agenzia delle Entrate',
+    'https://agenzia-entrate.info/': 'agenziaentrate.gov.it', 'https://aruba-rinnovo.com/': 'Aruba',
+    'https://spid-accesso.com/': 'SPID', 'https://bper-sicurezza.com/': 'BPER Banca',
+    'https://mediolanum-accesso.com/': 'Banca Mediolanum', 'https://fineco-sicurezza.com/': 'Fineco',
+    'https://isybank-verifica.com/': 'Isybank', 'https://brt-spedizioni.info/': 'BRT',
+    'https://telepass-pedaggi.com/': 'Telepass', 'https://gls-consegna.com/': 'GLS', 'https://dhl-pacco.com/': 'DHL',
+    'https://bnl-sicurezza.com/': 'BNL', 'https://montepaschi-accesso.com/': 'Monte dei Paschi di Siena',
+    'https://bancobpm-verifica.com/': 'Banco BPM',
+  };
+  for (const [u, marchio] of Object.entries(casi)) {
+    assert.ok(LS.avviso(LS.analizza(u)).includes(marchio), `nessun avviso che nomini ${marchio} su ${u}`);
+  }
+  for (const u of ['https://www.inps.it/', 'https://www.agenziaentrate.gov.it/', 'https://www.aruba.it/', 'https://www.bper.it/',
+    'https://www.bancamediolanum.it/', 'https://www.finecobank.com/', 'https://www.brt.it/', 'https://www.gls-italy.com/',
+    'https://www.dhl.com/it-it/', 'https://www.telepass.com/']) {
+    assert.deepEqual(LS.analizza(u), [], `avviso sul sito vero ${u}`);
+  }
+});
+
+test('un link che passa da un rinvio si giudica per dove porta', () => {
+  // Il menu guardava solo il rinvio e taceva; l'apertura guarda l'indirizzo d'arrivo.
+  const casi = {
+    'https://www.google.com/url?q=https://poste.it.accesso-sicuro.net/': 'Poste Italiane',
+    'https://eur01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fposte.it.accesso-sicuro.net%2F&data=x': 'Poste Italiane',
+    'https://l.facebook.com/l.php?u=https%3A%2F%2Fpaypal.support%2F': 'PayPal',
+  };
+  for (const [u, marchio] of Object.entries(casi)) {
+    assert.ok(LS.avviso(LS.analizza(u)).includes(marchio), `nessun avviso che nomini ${marchio} su ${u}`);
+  }
+  assert.deepEqual(LS.analizza('https://accounts.google.com/ServiceLogin?continue=https://mail.google.com/mail/'), []);
+});
