@@ -36,6 +36,18 @@
       word-break: break-all;
     }
     .err-hint { font-size: 14px; margin: 0 0 24px; color: var(--sn-fg, inherit); }
+    /* Sotto «Apri comunque», più sommesso: porta alla lista in una scheda accanto. */
+    .err-lista {
+      display: inline-block;
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--sn-muted);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: color .15s, border-color .15s;
+    }
+    .err-lista[hidden] { display: none; }
+    .err-lista:hover, .err-lista:focus-visible { color: var(--sn-fg, inherit); border-bottom-color: currentColor; }
     .err-detail {
       margin-top: 22px;
       font-size: 11px;
@@ -63,6 +75,7 @@
     <p class="err-host" id="err-host"></p>
     <p class="err-hint" id="err-hint"></p>
     <button type="button" class="sn-btn" id="err-retry">Riprova</button>
+    <div><a class="err-lista" id="err-lista" href="filo://security/security.html" target="_blank" hidden>Gestisci i siti bloccati</a></div>
     <p class="err-detail" id="err-detail"></p>
   </main>
   <script src="error.js"></script>

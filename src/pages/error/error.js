@@ -40,6 +40,8 @@
   const retryBtn = document.getElementById('err-retry');
   // Sul sito bloccato il bottone è «Apri comunque»: il main riconosce il salto da qui al bersaglio.
   if (msg.blocked) retryBtn.textContent = 'Apri comunque';
+  // Per togliere il sito dalla lista per sempre: la scheda resta qui, e torna sul sito appena esce dalla lista.
+  if (msg.blocked) document.getElementById('err-lista').hidden = false;
   function retry() {
     if (!target) return;
     // replace(): il tentativo non aggiunge un'ulteriore voce di cronologia
