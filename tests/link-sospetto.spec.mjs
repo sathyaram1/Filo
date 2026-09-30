@@ -154,6 +154,8 @@ const IMITAZIONI = {
   'https://paypal.support/': 'PayPal',
   'https://netflix.top/': 'Netflix',
   'https://amazon.shop/': 'Amazon',
+  'https://urldefense.com/v3/__https://poste.it.accesso-sicuro.net/login__;!!AbC123!xYz$': 'Poste Italiane',
+  'https://www.paypal.com@accesso-sicuro.net/login': 'PayPal',
 };
 
 test('le imitazioni di Poste, banche, WhatsApp e i nomi famosi su un altro dominio hanno l’avviso', async ({ openTab, testServer }) => {
