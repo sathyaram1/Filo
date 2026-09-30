@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('filoShell', {
   // "Nuova scheda" nomina un tasto, e su Mac quel tasto è un altro. È un dato
   // pubblico del sistema, non un'informazione dell'utente.
   sistema: process.platform,
+  // Dove sta il puntatore quando è fuori dal documento della barra (#428).
+  puntatore: () => ipcRenderer.invoke('shell:puntatore'),
   tabs: {
     open: (url) => ipcRenderer.invoke('tabs:open', { url }),
     close: (id) => ipcRenderer.invoke('tabs:close', { id }),

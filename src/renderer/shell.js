@@ -442,6 +442,8 @@
     if (!d) return;
     d.el.classList.remove('dragging');
     if (!d.moved) return;
+    // Il riordino lo ridisegna il broadcast di api.tabs.move: ridisegnare prima rimetterebbe la scheda dov'era.
+    ridisegnoRimandato = false;
     // Il click che segue il mouseup non deve riattivare/spostare la tab.
     suppressClickId = d.id;
     // La posizione di rilascio è quella del NODO effettivamente trascinato, non
@@ -455,6 +457,24 @@
     if (toIndex >= 0) api.tabs.move(d.id, toIndex);
   }
 
+  // Un clic arriva solo se pressione e rilascio cadono sullo stesso nodo: se un aggiornamento ricrea la
+  // striscia in mezzo, la X e il tasto centrale non chiudono niente. Col tasto giù si ridisegna al rilascio.
+  let premutoSullaStriscia = false;
+  let ridisegnoRimandato = false;
+
+  function rilascioStriscia() {
+    if (!premutoSullaStriscia) return;
+    premutoSullaStriscia = false;
+    // Dopo il click, che il browser consegna subito dopo il mouseup.
+    setTimeout(() => {
+      if (!ridisegnoRimandato || premutoSullaStriscia || drag) return;
+      render();
+    }, 0);
+  }
+  tabsEl.addEventListener('mousedown', () => { premutoSullaStriscia = true; }, true);
+  window.addEventListener('mouseup', rilascioStriscia, true);
+  window.addEventListener('blur', rilascioStriscia);
+
   function startTabDrag(e, t, el) {
     if (e.button !== 0) return;
     // Non iniziare un drag dai controlli interni (chiudi, indicatori audio…).
@@ -463,6 +483,85 @@
     window.addEventListener('mousemove', onTabPointerMove);
     window.addEventListener('mouseup', onTabPointerUp);
   }
+
+  // ── Larghezze ferme dopo una chiusura (#428) ──────────────────────────────
+  // Chiusa una scheda col puntatore sulla fila in alto, le altre tengono la
+  // larghezza che avevano finché il puntatore non lascia la fila: fra schede
+  // larghe uguali la X di quella che scorre al posto della chiusa resta sotto il puntatore.
+  const tabRowEl = tabsEl.closest('.tab-row') || tabsEl;
+  let larghezzeFerme = null; // Map id → px
+  let strisciaFerma = 0; // px della striscia, solo se se n'è andata l'ultima scheda
+  let puntatoreSullaFila = false;
+  let sondaFila = null;
+  let giroSonda = 0;
+
+  function sullaFila(x, y) {
+    const r = tabRowEl.getBoundingClientRect();
+    return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+  }
+
+  function fermaSonda() {
+    giroSonda++;
+    if (sondaFila) { clearTimeout(sondaFila); sondaFila = null; }
+  }
+
+  function sciogliLarghezze() {
+    fermaSonda();
+    if (!larghezzeFerme) return;
+    larghezzeFerme = null;
+    strisciaFerma = 0;
+    tabsEl.style.flex = '';
+    for (const el of tabsEl.querySelectorAll('.tab')) {
+      el.style.flex = '';
+      el.style.minWidth = '';
+      el.style.maxWidth = '';
+    }
+  }
+
+  // Sulla pagina, e su Windows sulle zone di trascinamento della finestra, la
+  // barra non riceve eventi del mouse: chiede al main dove sta il puntatore.
+  function sondaPuntatore() {
+    fermaSonda();
+    if (!larghezzeFerme) return;
+    const giro = giroSonda;
+    Promise.resolve(typeof api.puntatore === 'function' ? api.puntatore() : null).then((p) => {
+      if (giro !== giroSonda || !larghezzeFerme || puntatoreSullaFila) return;
+      if (p && sullaFila(p.x, p.y)) sondaFila = setTimeout(sondaPuntatore, 150);
+      else sciogliLarghezze();
+    }, () => { if (giro === giroSonda) sciogliLarghezze(); });
+  }
+
+  // Le schede sparite si leggono dal confronto fra due fotografie: così vale
+  // per ogni strada di chiusura (X, clic centrale, Ctrl+W, menu, la pagina stessa).
+  function fermaLarghezzeSeChiusa(snap) {
+    const primaIds = (state.tabs || []).map((t) => String(t.id));
+    const prima = new Set(primaIds);
+    const dopo = new Set(((snap && snap.tabs) || []).map((t) => String(t.id)));
+    if ([...dopo].some((id) => !prima.has(id))) { sciogliLarghezze(); return; }
+    if (!puntatoreSullaFila || dopo.size >= prima.size) return;
+    const m = new Map();
+    for (const el of tabsEl.querySelectorAll('.tab')) {
+      const w = el.getBoundingClientRect().width;
+      if (w > 0) m.set(el.dataset.id, w);
+    }
+    if (!m.size) return;
+    larghezzeFerme = m;
+    // Se se ne va l'ultima, il + scivolerebbe sotto il puntatore e il clic
+    // dopo aprirebbe una scheda: la striscia tiene la sua larghezza.
+    strisciaFerma = dopo.has(primaIds[primaIds.length - 1]) ? 0 : tabsEl.getBoundingClientRect().width;
+  }
+
+  document.addEventListener('mousemove', (e) => {
+    puntatoreSullaFila = sullaFila(e.clientX, e.clientY);
+    if (puntatoreSullaFila) fermaSonda();
+    else sciogliLarghezze();
+  }, true);
+  document.addEventListener('mouseout', (e) => {
+    if (e.relatedTarget) return;
+    puntatoreSullaFila = false;
+    sondaPuntatore();
+  }, true);
+  window.addEventListener('resize', sciogliLarghezze);
 
   // ── Menu contestuale (tasto destro) su una tab ────────────────────────────
   // Riusa il popup-menu nativo della shell (sopra le WebContentsView). Le voci
@@ -686,7 +785,8 @@
     // fantasma affiancate e indice di rilascio sbagliato. Sospendere già da armato
     // costa solo un frame di lag visivo mentre il tasto è premuto (ridisegnato al
     // rilascio dal broadcast successivo).
-    if (drag) return;
+    if (drag || premutoSullaStriscia) { ridisegnoRimandato = true; return; }
+    ridisegnoRimandato = false;
     // tabs
     tabsEl.innerHTML = '';
     for (const t of state.tabs) {
@@ -694,6 +794,12 @@
       el.className = 'tab' + (t.id === state.activeId ? ' active' : '');
       el.dataset.id = t.id;
       el.dataset.tip = t.title || t.url;
+      const ferma = larghezzeFerme && larghezzeFerme.get(String(t.id));
+      if (ferma) {
+        el.style.flex = `0 0 ${ferma}px`;
+        el.style.minWidth = `${ferma}px`;
+        el.style.maxWidth = `${ferma}px`;
+      }
 
       // Tab attiva: tingila col colore live del sito (§1.1). Sovrascriviamo la
       // variabile --tab-active così anche i "piedini" a goccia (::before/::after)
@@ -820,6 +926,8 @@
       });
       tabsEl.appendChild(el);
     }
+
+    tabsEl.style.flex = larghezzeFerme && strisciaFerma ? `0 0 ${strisciaFerma}px` : '';
 
     // §6 — con la striscia scrollabile, assicuriamoci che la scheda attiva sia
     // sempre visibile (può finire fuori vista dopo che ne apri molte).
@@ -1639,6 +1747,7 @@
   });
 
   api.tabs.onUpdate((snap) => {
+    fermaLarghezzeSeChiusa(snap);
     state = snap;
     render();
   });

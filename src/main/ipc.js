@@ -484,6 +484,18 @@ function registerIpcHandlers() {
   });
   ipcMain.on('shell:tooltip-hide', () => hideTooltip());
 
+  // ─── puntatore fuori dal documento della barra (#428) ────────────────────
+  // In coordinate della barra (px CSS), per dirle se è ancora sulla fila delle schede.
+  ipcMain.handle('shell:puntatore', (event) => {
+    const win = finestraDellaBarra(event.sender);
+    if (!win || win.isDestroyed()) return null;
+    const { screen } = require('electron');
+    const p = screen.getCursorScreenPoint();
+    const b = win.getContentBounds();
+    const z = event.sender.getZoomFactor() || 1;
+    return { x: (p.x - b.x) / z, y: (p.y - b.y) / z };
+  });
+
   // ─── disegno annotazione sulla barra in alto (shell) ─────────────────────
   // La shell ci dice se c'è un disegno sulla sua barra: lo rilanciamo ai content
   // script (box feedback) così "Cancella disegno" compare anche quando si è
