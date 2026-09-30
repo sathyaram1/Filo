@@ -83,6 +83,10 @@
   function isProvenLocalSender(fb) {
     return !!fb && LOCAL_SENDER_RE.test(String(fb.clientId || '')) && fb.senderProof === 'admin';
   }
+  // Segno E prova: è la condizione con cui il server la fonde saltando L5, quindi lì «fondi senza chiedermelo» non conta.
+  function isProvenLocalWork(fb) {
+    return isLocalOnly(fb) && isProvenLocalSender(fb);
+  }
 
   // Vocabolario unico della macchina a stati (src/shared/feedbackStatus.js).
   // Letto pigramente: nelle pagine filo:// va incluso PRIMA di questo file,
