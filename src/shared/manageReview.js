@@ -595,6 +595,9 @@
       return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale non si lavora' };
     }
     if (statusUnreadable(fb)) return { ok: false, motivo: 'lo stato non si legge: non so se la pratica è aperta' };
+    if (/^(attack|spam|suspicious_file)/.test(normalizeStatus(fb).status)) {
+      return { ok: false, motivo: 'è segnalata come attacco o spam: prima si decide nei Ricevuti' };
+    }
     const tab = manageTabFor(fb, opts);
     if (tab === 'resolved' || tab === 'archived' || String(fb.statusPublic || 'open') === 'closed') {
       return { ok: false, motivo: 'la pratica è chiusa' };

@@ -14,18 +14,20 @@
 //   esploratore né automazione cloud — perché il contesto in cui nasce è
 //   diverso da entrambi.
 //
-// CON IL TOKEN DELL'OWNER, SE C'È (#595)
+// COL TOKEN DELL'OWNER, SEMPRE (#595, #908)
 //   Si usa la STESSA strada dell'app (`src/shared/feedback.js`), testo cifrato
-//   verso l'owner. Col token admin di questa macchina la create è autenticata
-//   e porta `senderProof: 'admin'`: senza quella prova il prefisso `local:` lo
-//   può scrivere chiunque, e il server tratta il feedback da anonimo. Senza
-//   token lo si dice su stderr e si parte lo stesso, come anonimo: passa dai
-//   giudici. `--priorita` riusa lo stesso token.
+//   verso l'owner, con la create autenticata che porta `senderProof: 'admin'`:
+//   senza quella prova il prefisso `local:` lo può scrivere chiunque. Di norma
+//   nasce col segno `localOnly`: è il lavoro di questa sessione, nessuna routine
+//   lo prende, e `npm run finish` col suo numero salta L5. `--non-locale` lo
+//   apre per le routine. Senza token (o col token rifiutato) non parte niente:
+//   da anonimo sarebbe un feedback d'utente. `--priorita` riusa lo stesso token.
 //
 // USO
 //   node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 0..3]
 //                                                         [--url <indirizzo>]
 //                                                         [--allega <file>]…
+//                                                         [--non-locale]
 //                                                         [--dry-run]
 //
 //   `--allega` (ripetibile, al più 5): un documento che viaggia CON il feedback,
@@ -40,7 +42,7 @@
 // "non l'ho scritto io male" da "il server non c'è")
 //   0  fatto           — il feedback è stato depositato
 //   1  uso sbagliato   — mancano titolo o testo
-//   3  rifiutato       — il server ha detto no (regole, campi, duplicato)
+//   3  rifiutato       — il server ha detto no (regole, campi, duplicato), o manca il token admin
 //   4  non raggiungibile — rete assente, timeout, guasto del server
 
 import { readFileSync, statSync } from 'node:fs';
@@ -169,14 +171,17 @@ export function parsePriorita(raw) {
  * numerazione non risponde il feedback parte lo stesso, senza numero), quindi
  * qui può tornare null senza che sia un errore.
  */
-export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '' } = {}) {
+export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true } = {}) {
   const name = String(titolo || '').trim();
   const text = String(testo || '').trim();
   if (!name) return { ok: false, uso: true, motivo: 'titolo mancante' };
   if (!text) return { ok: false, uso: true, motivo: 'testo mancante' };
 
   if (dryRun) {
-    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita, allegati: allegati.length };
+    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita, allegati: allegati.length, locale };
+  }
+  if (!idToken) {
+    return { ok: false, codice: EXIT.RIFIUTATO, motivo: 'manca il token admin: senza la prova del mittente il feedback sarebbe di un utente. Rigenera le credenziali: node scripts/admin-login.mjs' };
   }
 
   let res;
@@ -194,7 +199,7 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       // i giudici guardano (le vedono direttamente). Il resto sono documenti.
       images: (Array.isArray(allegati) ? allegati : []).filter((a) => a.type.startsWith('image/')),
       files: (Array.isArray(allegati) ? allegati : []).filter((a) => !a.type.startsWith('image/')),
-    }, idToken ? { idToken } : undefined);
+    }, { idToken, soloAdmin: true, ...(locale ? { localOnly: { by: CLIENT_ID, at: Date.now() } } : {}) });
   } catch (e) {
     return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
   }
@@ -204,8 +209,7 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
   const caricati = ((res && res.files) || []).length + ((res && res.images) || []).length;
   return {
     ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti,
-    senderProof: (res && res.senderProof) || '',
-    ...(res && res.authRefused ? { authRefused: res.authRefused } : {}),
+    senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly),
   };
 }
 
@@ -260,7 +264,8 @@ function leggiStdin() {
 }
 
 function uso() {
-  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--dry-run]');
+  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--non-locale] [--dry-run]');
+  console.error('     Di norma il feedback è un lavoro locale: nessuna routine lo prende. --non-locale lo apre per le routine.');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
   console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
 }
@@ -278,7 +283,7 @@ export async function main(argvIn) {
   // riga che chi l'ha scritta considera giusta.
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
-    opzioni: ['--priorita', '--url', '--allega', '--dry-run'],
+    opzioni: ['--priorita', '--url', '--allega', '--non-locale', '--dry-run'],
     conValore: ['--priorita', '--url', '--allega'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
@@ -304,6 +309,7 @@ export async function main(argvIn) {
   const prioritaRaw = flag('priorita');
   const url = flag('url');
   const dryRun = argv.includes('--dry-run');
+  const locale = !argv.includes('--non-locale');
   // `--allega` è ripetibile: si raccolgono tutti i valori.
   const percorsiAllegati = argv.flatMap((a, i) => (a === '--allega' && argv[i + 1] !== undefined ? [argv[i + 1]] : []));
 
@@ -341,19 +347,17 @@ export async function main(argvIn) {
   const deposita = !dryRun && Boolean(String(titolo || '').trim() && String(testo || '').trim());
   const cred = deposita ? await credenziale.ottieni() : { idToken: '' };
   if (deposita && !cred.idToken) {
-    console.error(`ATTENZIONE: ${cred.motivo || 'nessun token admin'}. Il feedback parte come anonimo e passa dai giudici.`);
+    console.error(`RIFIUTATO: ${cred.motivo || 'nessun token admin'}. Senza la prova del mittente non apro niente: node scripts/admin-login.mjs`);
+    return EXIT.RIFIUTATO;
   }
-  const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun, idToken: cred.idToken });
-  if (r.ok && r.authRefused) {
-    console.error(`ATTENZIONE: il token admin è stato rifiutato (${r.authRefused}). Il feedback è partito come anonimo e passa dai giudici.`);
-  }
+  const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun, idToken: cred.idToken, locale });
   if (!r.ok) {
     console.error(`${r.uso ? 'USO' : 'RIFIUTATO'}: ${r.motivo}`);
     if (r.uso) uso();
     return r.uso ? EXIT.USO : (r.codice || EXIT.RIFIUTATO);
   }
   if (r.dryRun) {
-    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}.`);
+    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${locale ? 'lavoro locale' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}.`);
     return EXIT.FATTO;
   }
 
@@ -362,6 +366,9 @@ export async function main(argvIn) {
   console.log(r.seq
     ? `OK: feedback #${r.seq} aperto (${r.id}), mittente ${r.clientId}.`
     : `OK: feedback aperto (${r.id}), mittente ${r.clientId}. Numero non assegnato (la numerazione non ha risposto).`);
+  console.log(locale
+    ? `Lavoro locale: nessuna routine lo prende. Legalo al ramo con verify-local start --feedback ${r.seq || r.id} (o npm run finish -- --feedback ${r.seq || r.id}).`
+    : 'Aperto per le routine.');
 
   if (r.allegati) console.log(`Allegati caricati: ${r.allegati}.`);
   for (const f of (r.falliti || [])) {
@@ -370,7 +377,7 @@ export async function main(argvIn) {
 
   // `!= null`, non un controllo di verità: lo 0 è una priorità da scrivere.
   if (p.valore != null) {
-    const pr = await applicaPriorita(r.id, p.valore, r.authRefused ? '' : cred.idToken);
+    const pr = await applicaPriorita(r.id, p.valore, cred.idToken);
     if (pr.ok) console.log(`Priorità ${p.valore} impostata.`);
     else console.log(`Priorità NON impostata (${pr.motivo}): mettila dalla dashboard.`);
   }
