@@ -1209,26 +1209,90 @@ async function segretiCustoditi() {
   return require('./segretiCustoditi').custoditi({ impostazioni: [salvate, effettive] });
 }
 
-// Il testo della pagina da cui parte l'azione: è quello che l'assistente di pagina ha letto.
-// Mondo isolato, così la pagina non può ridefinire cosa si legge; senza risposta in 3 s si va avanti.
+// Quello che l'assistente vede nella schermata, non solo il testo in chiaro: riquadri, caselle, parti
+// incapsulate (#810). Un riquadro interno si legge nel suo mondo: un sito ostile nasconde solo sé stesso.
 const MONDO_USCITE = 1002;
-const MAX_TESTO_PAGINA = 2000000;
+const MAX_TESTO_PAGINA = 8000000;
+const MAX_RIQUADRI = 60;
+const LEGGI_PAGINA_JS = `(function(){try{
+var out=[String(document.title||''),String((document.body&&document.body.innerText)||'')];
+var NO={hidden:1,checkbox:1,radio:1,file:1,submit:1,button:1,reset:1,image:1,range:1,color:1};
+function etichetta(c){var t='';try{if(c.labels&&c.labels.length)t=c.labels[0].innerText||'';}catch(e){}
+if(!t)t=c.getAttribute('aria-label')||c.getAttribute('placeholder')||c.getAttribute('title')||'';
+if(!t&&c.previousElementSibling)t=c.previousElementSibling.innerText||'';
+if(!t&&c.parentElement)t=c.parentElement.innerText||'';return String(t).slice(-120);}
+function campi(root){var cc=root.querySelectorAll('input,textarea');for(var i=0;i<cc.length&&i<5000;i++){var c=cc[i];
+if(NO[String(c.type||'').toLowerCase()])continue;var v=String(c.value||'');if(v.trim())out.push(etichetta(c)+' '+v);}}
+var visti=0;function ombre(root,n){if(n>8)return;var tt=root.querySelectorAll('*');
+for(var i=0;i<tt.length&&visti<300000;i++){visti++;var sr=tt[i].shadowRoot;if(!sr)continue;
+for(var k=0;k<sr.children.length;k++){var e=sr.children[k];out.push(String(e.innerText||e.textContent||''));}
+campi(sr);ombre(sr,n+1);}}
+campi(document);ombre(document,0);return out.join('\\n');}catch(e){return '';}})()`;
 async function testoDellaPagina(sender) {
   const url = String(sender?.tab?.url || sender?.url || '');
   const wc = sender?.wc;
   if (!/^https?:/i.test(url) || !wc || wc.isDestroyed?.()) return null;
   let host = '';
   try { host = new URL(url).hostname; } catch (_) {}
-  const js = '(function(){try{return String(document.title||"")+"\\n"+String((document.body&&document.body.innerText)||"");}catch(e){return "";}})()';
-  let testo = '';
-  try {
-    testo = await Promise.race([
-      wc.executeJavaScriptInIsolatedWorld(MONDO_USCITE, [{ code: js }]),
+  const leggi = (avvia) => {
+    let p;
+    try { p = Promise.resolve(avvia()); } catch (_) { return Promise.resolve(''); }
+    return Promise.race([
+      p.catch(() => ''),
       new Promise((res) => { const t = setTimeout(() => res(''), 3000); t.unref?.(); }),
     ]);
-  } catch (_) { testo = ''; }
-  testo = String(testo || '');
+  };
+  const letture = [leggi(() => wc.executeJavaScriptInIsolatedWorld(MONDO_USCITE, [{ code: LEGGI_PAGINA_JS }]))];
+  let riquadri = [];
+  try { riquadri = (wc.mainFrame && wc.mainFrame.framesInSubtree) || []; } catch (_) {}
+  for (const f of riquadri) {
+    if (letture.length > MAX_RIQUADRI) break;
+    if (f === wc.mainFrame || f.detached) continue;
+    letture.push(leggi(() => f.executeJavaScript(LEGGI_PAGINA_JS)));
+  }
+  const testo = (await Promise.all(letture)).map((t) => String(t || '')).filter((t) => t.trim()).join('\n\n');
   return { testo: testo.length > MAX_TESTO_PAGINA ? testo.slice(-MAX_TESTO_PAGINA) : testo, host };
+}
+
+// I segreti che l'assistente ha avuto davanti qui (#810): la pagina può cambiare senza ricaricarsi, il
+// codice letto prima resta. Si svuota a ogni caricamento, quando anche l'assistente ricomincia.
+const LETTI_DALL_AIUTO = new WeakMap();
+const MAX_LETTI_AIUTO = 50000;
+// `payload` è la richiesta dell'assistente: il sommario degli elementi (etichette e valori che il
+// testo della pagina non ha) e i risultati di una sua ricerca entrano anche loro nel contesto.
+async function ricordaLettoDallAiuto(sender, payload = null) {
+  const G = globalThis.SN_GUARDIANO_STATICO;
+  const wc = sender?.wc;
+  if (!G || !wc) return;
+  const p = await testoDellaPagina(sender);
+  const dallaPagina = p && p.host ? `dalla pagina ${p.host}` : 'dalla pagina';
+  const fonti = [{ testo: p ? p.testo : '', fonte: dallaPagina }];
+  if (payload && typeof payload.outline === 'string') fonti.push({ testo: payload.outline, fonte: dallaPagina });
+  const risultati = payload && payload.esterno && payload.esterno.ricercaWeb && payload.esterno.ricercaWeb.results;
+  if (Array.isArray(risultati)) {
+    const t = risultati.filter(Boolean).map((r) => `${r.title || ''}\n${r.url || ''}\n${r.snippet || ''}`).join('\n');
+    fonti.push({ testo: t, fonte: 'dai risultati di una ricerca' });
+  }
+  let reg = LETTI_DALL_AIUTO.get(wc);
+  if (!reg) {
+    reg = new Map();
+    LETTI_DALL_AIUTO.set(wc, reg);
+    try { wc.on('did-navigate', () => reg.clear()); } catch (_) {}
+  }
+  for (const f of fonti) {
+    if (typeof f.testo !== 'string' || !f.testo.trim()) continue;
+    for (const x of G.segretiNelTesto(f.testo)) {
+      const k = `${x.regola}:${x.valore.toLowerCase()}`;
+      reg.delete(k);
+      reg.set(k, { ...x, fonte: f.fonte });
+      if (reg.size > MAX_LETTI_AIUTO) reg.delete(reg.keys().next().value);
+    }
+  }
+}
+
+function lettiDallAiuto(sender) {
+  const reg = sender?.wc ? LETTI_DALL_AIUTO.get(sender.wc) : null;
+  return reg ? [...reg.values()] : [];
 }
 
 // La porta unica delle uscite (#810, regole in src/shared/urlExfil.js → valutaUscita): la
@@ -1243,6 +1307,7 @@ async function controllaUscita(action, { sender = null, contesto = null, parole 
     segreti: await segretiCustoditi(),
     azioni: Array.isArray(contesto) ? contesto : [],
     pagina: daPagina ? await testoDellaPagina(sender) : null,
+    letti: daPagina ? lettiDallAiuto(sender) : [],
     parole: typeof parole === 'string' ? parole : '',
     memoria: (tipo === 'NAVIGA' || tipo === 'CERCA_WEB') ? await navExfilCorpus() : '',
     daPagina,
@@ -3542,6 +3607,7 @@ const handlerCtx = {
   handleFiloGenerateDashboard,
   executeFiloAction,
   controllaUscita,
+  ricordaLettoDallAiuto,
   maybeRunCompactor,
   // Archivio delle chat (#525)
   closeAndTriageChat,

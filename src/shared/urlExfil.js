@@ -365,29 +365,42 @@
     return out.join('\n');
   }
 
-  // Un codice corto si cerca con i confini, ma a separatori liberi: «482913» esce anche come
-  // «482-913»; «4821» non combacia dentro «348215». Le chiavi lunghe si confrontano sulla
-  // forma alfanumerica, che copre anche le codifiche dell'indirizzo e il base64.
-  function esce(valore, regola, forme, alnum) {
+  // Le forme in cui un testo esce: grezza e decodificate, alfanumerica, e le sole cifre di fila per
+  // un testo corto come un indirizzo o una domanda (in un testo lungo le cifre sparse combacerebbero per caso).
+  function formeDi(testo) {
+    const t = String(testo || '');
+    const forme = varianti(t);
+    return { forme, alnum: exposedAlnum(t), cifre: t.length <= 4000 ? forme.map((f) => f.replace(/\D+/g, '')) : [] };
+  }
+
+  // Un codice si cerca coi confini («4821» non sta dentro «348215»); `largo`, per ciò che esce, regge i
+  // travestimenti («4.8.2.9.1.3», «?a=482&b=913», al contrario). Le parole dell'utente restano strette.
+  function esce(valore, regola, u, largo = false) {
     const v = String(valore || '');
     if (regola === 'codice' || regola === 'password') {
       const chars = v.replace(/[^A-Za-z0-9]/g, '');
       if (chars.length < 4) return false;
       const soloCifre = /^\d+$/.test(chars);
+      const giri = largo ? [chars, [...chars].reverse().join('')] : [chars];
+      if (largo && soloCifre && chars.length >= 6 && giri.some((c) => u.cifre.some((f) => f.includes(c)))) return true;
       const confine = soloCifre ? '\\d' : '[A-Za-z0-9]';
-      const re = new RegExp(`(?<!${confine})${chars.split('').join('[\\s-]?')}(?!${confine})`, 'i');
-      return forme.some((f) => re.test(f));
+      const sep = largo ? '[^A-Za-z0-9]{0,3}' : '[\\s-]?';
+      return giri.some((c) => {
+        if (!u.alnum.includes(c.toLowerCase())) return false;
+        const re = new RegExp(`(?<!${confine})${c.split('').join(sep)}(?!${confine})`, 'i');
+        return u.forme.some((f) => re.test(f));
+      });
     }
     const norm = v.toLowerCase().replace(/[^a-z0-9]+/g, '');
-    return norm.length >= 8 && alnum.includes(norm);
+    if (largo && regola === 'carta' && u.cifre.some((f) => f.includes(norm))) return true;
+    return norm.length >= 8 && u.alnum.includes(norm);
   }
 
-  // `segreti` = [{ valore, tipo }] custoditi da Filo; `pagina` = { testo, host } se l'azione
-  // parte da una pagina web che l'agente ha davanti; `parole` = ciò che l'utente ha scritto
-  // in chat (un codice che ha scritto lui passa); `memoria` e `daPagina` servono all'OK in
-  // più di NAVIGA e CERCA_WEB. Torna { blocca, frase } oppure { exfil, reason }.
+  // `pagina` = { testo, host } che l'agente ha davanti; `letti` = [{ valore, regola, fonte }] estratti da
+  // ciò che ha letto prima; `parole` = ciò che l'utente ha scritto (un codice suo passa). `memoria` e
+  // `daPagina` servono all'OK in più di #587. Torna { blocca, frase } oppure { exfil, reason }.
   function valutaUscita(action, {
-    segreti = [], azioni = [], pagina = null, parole = '', memoria = '', daPagina = false,
+    segreti = [], azioni = [], pagina = null, letti = [], parole = '', memoria = '', daPagina = false,
   } = {}) {
     const tipo = String((action && action.type) || '').toUpperCase();
     const verbo = USCITE[tipo];
@@ -395,33 +408,35 @@
     if (!verbo) return niente;
     const G = global.SN_GUARDIANO_STATICO;
     const uscente = testoUscente(action);
-    const forme = varianti(uscente);
-    const alnum = exposedAlnum(uscente);
+    const u = formeDi(uscente);
     const min = (G && G.SEGRETO_MIN) || 12;
     for (const s of Array.isArray(segreti) ? segreti : []) {
       const v = String((s && s.valore) || '').trim();
       if (v.length < min) continue;
       const norm = v.toLowerCase().replace(/[^a-z0-9]+/g, '');
-      if (forme.some((f) => f.includes(v)) || (norm.length >= min && alnum.includes(norm))) {
+      if (u.forme.some((f) => f.includes(v)) || (norm.length >= min && u.alnum.includes(norm))) {
         return { ...niente, blocca: true, regola: 'custodito', frase: `${verbo}: conteneva ${CUSTODITI[s.tipo] || CUSTODITI.chiave}` };
       }
     }
-    const ctx = contestoDaAzioni(azioni);
-    const fonti = ctx.esterni.slice();
+    if (!G || !uscente.trim()) return valutaAvvisi(tipo, action, { memoria, azioni, daPagina }, niente);
+    const fonti = contestoDaAzioni(azioni).esterni.slice();
     if (pagina && typeof pagina.testo === 'string' && pagina.testo.trim()) {
       fonti.push({ testo: pagina.testo, fonte: pagina.host ? `dalla pagina ${pagina.host}` : 'dalla pagina' });
     }
-    if (G && fonti.length && uscente.trim()) {
-      const scritte = varianti(parole);
-      const scritteAlnum = exposedAlnum(parole);
-      for (const f of fonti) {
-        for (const x of G.segretiNelTesto(f.testo)) {
-          if (!esce(x.valore, x.regola, forme, alnum)) continue;
-          if (parole && esce(x.valore, x.regola, scritte, scritteAlnum)) continue;
-          return { ...niente, blocca: true, regola: x.regola, frase: `${verbo}: conteneva ${LETTI[x.regola] || LETTI.codice} ${f.fonte}` };
-        }
-      }
+    const candidati = [];
+    for (const f of fonti) for (const x of G.segretiNelTesto(f.testo)) candidati.push({ ...x, fonte: f.fonte });
+    for (const x of Array.isArray(letti) ? letti : []) if (x && x.valore) candidati.push(x);
+    const scritte = parole ? formeDi(parole) : null;
+    for (const x of candidati) {
+      if (!esce(x.valore, x.regola, u, true)) continue;
+      if (scritte && esce(x.valore, x.regola, scritte)) continue;
+      return { ...niente, blocca: true, regola: x.regola, frase: `${verbo}: conteneva ${LETTI[x.regola] || LETTI.codice} ${x.fonte || 'da fuori'}` };
     }
+    return valutaAvvisi(tipo, action, { memoria, azioni, daPagina }, niente);
+  }
+
+  // Il resto del verdetto è l'anti-esfiltrazione di #587: un OK in più, non un blocco.
+  function valutaAvvisi(tipo, action, { memoria, azioni, daPagina }, niente) {
     if (tipo === 'NAVIGA') {
       const url = String(action.url ?? action.href ?? action.link ?? '').trim();
       const v = url ? valutaNaviga(url, { memoria, azioni, daPagina }) : null;

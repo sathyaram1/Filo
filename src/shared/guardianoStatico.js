@@ -183,7 +183,8 @@
   // Fra due codici di un elenco ci sono a capo, spazi, puntini o numeri di riga: una parola
   // in mezzo vuol dire che il numero dopo parla d'altro.
   const FRA_CODICI = /^[\s\d.,;:)(•·*-]{0,40}$/;
-  const MAX_ESTRATTI = 200;
+  // Largo: il costo resta lineare nel testo anche su una pagina da milioni di caratteri.
+  const MAX_ESTRATTI = 100000;
 
   // Un anno o un pezzo di data, ora o importo («30/09/2026», «1234,50») non è un codice.
   function pezzoDiData(s, i, j, v) {
@@ -211,12 +212,13 @@
     return out;
   }
 
-  function candidati(s, da, finoA) {
+  // Tutti i candidati del testo in una passata sola: cercarli di nuovo per ogni parola rendeva
+  // il costo quadratico, e una pagina lunga sul 2FA teneva fermo il processo per secondi.
+  function candidatiDi(s) {
     const out = [];
     const re = new RegExp(CANDIDATO.source, 'g');
-    re.lastIndex = da;
     let m;
-    while ((m = re.exec(s)) && m.index < finoA) {
+    while ((m = re.exec(s))) {
       const p = pezzi(s, m);
       if (p.length) out.push({ i: m.index, j: m.index + m[0].length, pezzi: p });
       if (m[0].length === 0) re.lastIndex++;
@@ -224,22 +226,64 @@
     return out;
   }
 
+  // Il codice è quello che la parola annuncia: fra i due c'è niente, un «è», un «:», un «is».
+  // In «un OTP generato da un'app, secondo la RFC 6238» il numero è della norma.
+  const ATTACCO = /(?:^|[:=]|(?:^|[\s(])(?:è|e'|is|are|was|sono|ecco|here|vale|risulta|seguente|seguenti|following))$/i;
+  const ALTRA_FRASE = /[.!?]\s+[A-ZÀ-Ý]/;
+  function annunciato(fra) {
+    if (ALTRA_FRASE.test(fra)) return false;
+    return ATTACCO.test(fra.replace(/(?:\s*(?:\d{1,3}[.)]|[•·*"'«»“”(-]))*\s*$/, ''));
+  }
+  // «482913 è il tuo codice OTP»: davanti alla parola il codice le si lega con un «è» o con niente.
+  function legato(fra) {
+    if (ALTRA_FRASE.test(fra)) return false;
+    const g = fra.replace(/^[\s"'«»“”(:=-]*/, '');
+    return !g || /^(?:è|e'|is|are|sono)\s/i.test(`${g} `);
+  }
+  // «otp-service», «django-otp», «2fa_enabled»: la parola dentro un nome tecnico non annuncia niente.
+  function dentroUnNome(s, i, j) {
+    return /[a-z0-9][-_.]$/.test(s.slice(Math.max(0, i - 2), i)) || /^[-_.][a-z]/.test(s.slice(j, j + 2));
+  }
+  // «one-time» da solo è un acquisto o un pagamento: annuncia un codice solo se lo nomina.
+  const ONE_TIME_CODICE = /^[\s-]+(?:use[\s-]+)?(?:[a-z]+[\s-]+)?(?:password|pass\s?code|code|pin)\b/i;
+
   function codiciVicini(s, out) {
     const cerca = new RegExp(MARCHI_MONOUSO.source, 'gi');
+    let tutti = null;
+    const primo = (pos) => {
+      let lo = 0;
+      let hi = tutti.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (tutti[mid].i < pos) lo = mid + 1; else hi = mid;
+      }
+      return lo;
+    };
     let parola;
     while ((parola = cerca.exec(s)) && out.length < MAX_ESTRATTI) {
-      const regola = /pass/i.test(parola[0]) ? 'password' : 'codice';
-      const fine = parola.index + parola[0].length;
-      let presi = candidati(s, fine, fine + RAGGIO);
+      const inizio = parola.index;
+      let fine = inizio + parola[0].length;
+      if (dentroUnNome(s, inizio, fine)) continue;
+      if (/^one[\s-]?time$/i.test(parola[0])) {
+        const coda = ONE_TIME_CODICE.exec(s.slice(fine, fine + 40));
+        if (!coda) continue;
+        fine += coda[0].length;
+      }
+      if (!tutti) tutti = candidatiDi(s);
+      const regola = /pass/i.test(s.slice(inizio, fine)) ? 'password' : 'codice';
+      const presi = [];
+      let k = primo(fine);
+      for (; k < tutti.length && tutti[k].i < fine + RAGGIO; k++) {
+        if (annunciato(s.slice(fine, tutti[k].i))) { presi.push(tutti[k]); break; }
+      }
       if (presi.length) {
-        let ultimo = presi[presi.length - 1];
-        for (const c of candidati(s, ultimo.j, s.length)) {
-          if (!FRA_CODICI.test(s.slice(ultimo.j, c.i)) || presi.length >= 40) break;
-          presi.push(c);
-          ultimo = c;
+        for (k += 1; k < tutti.length && presi.length < 40; k++) {
+          if (!FRA_CODICI.test(s.slice(presi[presi.length - 1].j, tutti[k].i))) break;
+          presi.push(tutti[k]);
         }
       } else {
-        presi = candidati(s, Math.max(0, parola.index - RAGGIO), parola.index).slice(-1);
+        const c = tutti[primo(inizio) - 1];
+        if (c && c.j <= inizio && c.i >= inizio - RAGGIO && legato(s.slice(c.j, inizio))) presi.push(c);
       }
       for (const c of presi) for (const v of c.pezzi) out.push({ valore: v, regola });
     }

@@ -5,7 +5,7 @@ module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
     providerRouting, openWeightsBlockReason, modelGate,
-    Defaults, isAdmin, broadcastToTabs, controllaUscita,
+    Defaults, isAdmin, broadcastToTabs, controllaUscita, ricordaLettoDallAiuto,
   } = ctx;
   const { SN_CONST } = globalThis;
   const WebSearch = globalThis.SN_WEB_SEARCH;
@@ -86,7 +86,13 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
+    // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
+    // anche se poi la pagina cambia. Si legge mentre il modello risponde.
+    const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
+      ? ricordaLettoDallAiuto(sender, msg.payload).catch(() => {})
+      : null;
     const r = await handleAIRequest({ action: msg.action, payload: msg.payload, origin });
+    if (lettura) await lettura;
     return { ok: true, ...r };
   });
 

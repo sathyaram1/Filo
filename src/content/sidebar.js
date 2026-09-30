@@ -294,7 +294,7 @@
         wrap.classList.add('sn-sidebar-choices-used');
         // disabilita visivamente tutti i bottoni
         wrap.querySelectorAll('button').forEach((b) => { b.disabled = true; });
-        submit({ userMessage: c.prompt });
+        submit({ userMessage: c.prompt, daScelta: true });
       });
       wrap.appendChild(btn);
     });
@@ -705,8 +705,9 @@
   }
 
   // Quello che l'utente ha scritto qui: il main lascia uscire un codice scritto da lui (#810).
+  // Il testo dietro una scelta lo scrive il modello, e una pagina ostile può dettarlo: non conta.
   function paroleUtente() {
-    return history.filter((h) => h && h.kind === 'real').map((h) => String(h.content || ''));
+    return history.filter((h) => h && h.kind === 'real' && !h.daScelta).map((h) => String(h.content || ''));
   }
 
   async function runFiloAction(action, { etichetta = '' } = {}) {
@@ -1001,7 +1002,7 @@
   //   qualcosa che viene da fuori: i risultati di una ricerca web, l'etichetta
   //   di un elemento della pagina. Quella roba NON entra nella nota (#593):
   //   viaggia qui e finisce imbustata, dichiarata dati e recintata.
-  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '' } = {}) {
+  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false } = {}) {
     if (!root) return;
     const wasCollapsed = collapsed;
     // Espandi solo se l'utente ha scritto qualcosa. Sui proseguimenti automatici
@@ -1011,7 +1012,7 @@
 
     if (userMessage) {
       appendChatMessage('user', userMessage);
-      history.push({ role: 'user', content: userMessage, kind: 'real' });
+      history.push({ role: 'user', content: userMessage, kind: 'real', ...(daScelta ? { daScelta: true } : {}) });
       // Salva il messaggio raw per il "judge" lato server (vedi pathsCollector).
       // Niente userAction qui: quelli sono note di sistema, non input dell'utente.
       if (session) session.rawUserMessages.push(userMessage);
