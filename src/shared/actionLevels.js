@@ -343,7 +343,7 @@
         const righe = Array.isArray(a && a._righe) ? a._righe : [];
         if (!righe.length) return 'Dimenticare una cosa';
         return [`Filo sta per dimenticare ${righe.length === 1 ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`,
-          elenco(righe), '\n\nNon entreranno più nelle conversazioni.'];
+          elenco(righe), righe.length === 1 ? '\n\nNon entrerà più nelle conversazioni.' : '\n\nNon entreranno più nelle conversazioni.'];
       },
       describeDone: (a) => `Dimenticato: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
     },
