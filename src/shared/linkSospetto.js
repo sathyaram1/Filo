@@ -13,8 +13,7 @@
     if (typeof require === 'function') ({ imitazione, sitoNominato } = require('../main/services/safebrowse/engine.js'));
   } catch (e) { console.error('[linkSospetto] controllo dei marchi non caricato', e); }
 
-  // Codici: 'url_invalido' | 'side_effect' | 'token_in_url' | 'typosquatting:<dominio>' | 'marchio_imitato:<marchio>'
-  // | 'nome_prima_chiocciola'.
+  // Codici: 'url_invalido' | 'side_effect' | 'token_in_url' | 'typosquatting:<dominio>' | 'marchio_imitato:<marchio>'.
   function analizza(rawUrl, rinvii = 0) {
     const flags = [];
     let u;
