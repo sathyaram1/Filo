@@ -23,7 +23,7 @@ import { join, dirname, resolve, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-import { collectTestFiles, isTestFile, UNIT_DIR, REPO_ROOT } from '../../scripts/run-unit-tests.mjs';
+import { collectTestFiles, fileArgs, isTestFile, UNIT_DIR, REPO_ROOT } from '../../scripts/run-unit-tests.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -67,6 +67,19 @@ describe('raccolta dei file di test', () => {
 
   test('i percorsi sono assoluti (è ciò che rende il lancio indipendente dalla cartella)', () => {
     for (const f of collectTestFiles()) assert.ok(isAbsolute(f), `percorso relativo: ${f}`);
+  });
+
+  test('a node --test arrivano relativi alla root: la riga di comando non cresce con la cartella del repo', () => {
+    const files = collectTestFiles();
+    const args = fileArgs(files);
+    assert.equal(args.length, files.length);
+    for (const a of args) {
+      assert.ok(!isAbsolute(a) && a.startsWith('tests/unit/'), `argomento inatteso: ${a}`);
+      assert.ok(existsSync(resolve(REPO_ROOT, a)), `non esiste dalla root: ${a}`);
+    }
+    // Il tetto di Windows è 32767 caratteri per tutta la riga: che il repo stia in una cartella lunga non deve contare.
+    const profonda = resolve(REPO_ROOT, 'x'.repeat(200));
+    assert.deepEqual(fileArgs(files.map((f) => resolve(profonda, f.slice(REPO_ROOT.length + 1))), profonda), args);
   });
 
   test('scende nelle sottocartelle, e ignora quello che non è un test', () => {
