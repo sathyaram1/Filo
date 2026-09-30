@@ -16,6 +16,7 @@
 const { normalize } = require('./normalize');
 const { isWhitelisted, hostedPlatform } = require('./whitelist');
 const { localSignals } = require('./signals');
+const { LEGIT_DOMAINS } = require('./brands');
 
 const YOUNG_DOMAIN_DAYS = 30;     // sotto: dominio "giovane" → rinforzo sospetto
 const VERY_YOUNG_DOMAIN_DAYS = 7; // sotto: rinforzo forte (combinato → pericoloso)
