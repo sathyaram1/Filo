@@ -298,16 +298,20 @@
   // la disegna sopra la scheda; qui restano il campo di chi scriveva e il suo fuoco.
   function fuori(tipo, opts) {
     const doc = global.document;
+    const segnale = opts && opts.segnale;
+    if (segnale && segnale.aborted) return Promise.resolve(false);
+    const copre = !!(opts && opts.coprePagina);
     const prima = campoAttivo(doc);
-    const campo = scrivibile(prima);
-    const richiesta = { tipo, scriveva: staScrivendo(prima), campo };
+    const campo = !copre && scrivibile(prima);
+    const richiesta = { tipo, scriveva: !copre && staScrivendo(prima), campo };
     for (const k of ['title', 'text', 'okLabel', 'cancelLabel', 'word']) {
       if (opts && opts[k] != null) richiesta[k] = String(opts[k]);
     }
+    for (const k of BANDIERE) if (opts && opts[k] === true) richiesta[k] = true;
     const suTasto = (t) => { if (campo && prima.isConnected && typeof t === 'string') applicaTasto(prima, t); };
     aperteFuori++;
     let attesa;
-    try { attesa = Promise.resolve(global.SN_CONFERMA_FUORI(richiesta, suTasto)); } catch (_) { attesa = Promise.resolve(false); }
+    try { attesa = Promise.resolve(global.SN_CONFERMA_FUORI(richiesta, suTasto, segnale)); } catch (_) { attesa = Promise.resolve(false); }
     return attesa.then((ok) => ok === true, () => false).then((ok) => {
       aperteFuori--;
       if (prima && prima.isConnected) { try { prima.focus({ preventScroll: true }); } catch (_) {} }
