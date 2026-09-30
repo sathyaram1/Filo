@@ -651,3 +651,117 @@ test('#382: una sessione di ricerche larghe non svuota la cronologia AI né le r
   }));
   expect(ready && ready.text, 'la risposta già pronta è uscita per far posto a quelle del giudice').toBe('pronta');
 });
+
+test('#382: un fornitore che risponde «troppe richieste» ai controlli in parallelo non lascia carte non controllate', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  // Tre pagine, 525 carte, 11 gruppi al giudice con una carta giusta ciascuno; il fornitore ne regge quattro insieme.
+  await manyCards(app, { pages: [175, 175, 175], relevant: Array.from({ length: 11 }, (_, i) => i * 50 + 7) });
+  await app.evaluate(() => { globalThis.__maxConcurrent = 4; globalThis.__judgeMs = 300; });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  await page.fill('#chatInput', 'carte che danno haste');
+  await page.press('#chatInput', 'Enter');
+  const bubble = page.locator('.dk-msg-bot').last();
+  await expect(bubble.locator('.dk-msg-pending')).toHaveCount(0, { timeout: 60_000 });
+  expect(await app.evaluate(() => globalThis.__rejected || 0)).toBeGreaterThan(0);
+  await expect(bubble).not.toContainText('non le ho potute controllare');
+  await expect(bubble.locator('.dk-row-unchecked')).toHaveCount(0);
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(11);
+});
+
+test('#382: un giudizio che dipendeva dal prezzo si rifà quando il prezzo cambia', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await app.evaluate(() => {
+    const card = (id, name, eur) => ({
+      id, name, mana_cost: '{R}', cmc: 1, type_line: 'Instant', oracle_text: `${name} deals 3 damage to any target.`,
+      colors: ['R'], color_identity: ['R'], image_uris: { normal: `https://cards.test/${id}.jpg` },
+      prices: { eur }, legalities: { commander: 'legal' }, scryfall_uri: `https://scryfall.com/card/${id}`,
+    });
+    globalThis.__card = card;
+    globalThis.__searchCards = [card('shock-1', 'Shock', '0.50'), card('bolt-1', 'Lightning Bolt', '2.00')];
+    // Il prezzo sta nel criterio e non nella query, come chiedono le regole della chat.
+    globalThis.__chat = () => JSON.stringify({ query: '(o:damage or o:deals)', filter: 'infligge danni ed è sotto 1 euro' });
+    // Giudice onesto: tiene le carte che, nella riga che vede, costano meno di 1 €.
+    globalThis.__judge = (prompt) => JSON.stringify({
+      keep: prompt.split('\n').filter((l) => /^\d+\. /.test(l)).filter((l) => {
+        const m = l.match(/prezzo (\d+),(\d+) €/);
+        return m && Number(`${m[1]}.${m[2]}`) < 1;
+      }).map((l) => Number(l.split('.')[0])),
+    });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const first = await send(page, 'rimozioni a danno sotto 1 euro');
+  await expect(first.locator('.dk-row-name')).toHaveText(['Shock']);
+  // Ripetuta coi prezzi uguali, la stessa ricerca riusa i giudizi.
+  const again = await send(page, 'rimozioni a danno sotto 1 euro');
+  await expect(again.locator('.dk-row-name')).toHaveText(['Shock']);
+  expect(await app.evaluate(() => globalThis.__filterCalls.length)).toBe(1);
+
+  // Tempo dopo: Shock è salito a 3 €, Lightning Bolt è sceso a 0,40 €.
+  await app.evaluate(() => {
+    const card = globalThis.__card;
+    globalThis.__searchCards = [card('shock-1', 'Shock', '3.00'), card('bolt-1', 'Lightning Bolt', '0.40')];
+  });
+  const later = await send(page, 'rimozioni a danno sotto 1 euro');
+  await expect(later.locator('.dk-row-name')).toHaveText(['Lightning Bolt']);
+});
+
+test('#382: se il controllo non riesce la bolla ha il tasto Riprova, anche riaprendo la chat, e rifà la ricerca filtrata', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await manyCards(app, { pages: [60], relevant: [7] });
+  await app.evaluate(() => {
+    globalThis.__good = globalThis.__judge;
+    globalThis.__judge = () => 'non saprei';
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'carte che danno haste');
+  await expect(bubble).toContainText('Riprova');
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(60);
+  await expect(bubble.locator('[data-retry]')).toBeVisible();
+  await page.screenshot({ path: 'tests/.shots/decks-search-filter-382-riprova.png' });
+
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  const riaperta = page.locator('.dk-msg-bot').last();
+  await expect(riaperta.locator('[data-retry]')).toBeVisible();
+
+  await app.evaluate(() => { globalThis.__judge = globalThis.__good; });
+  await riaperta.locator('[data-retry]').click();
+  await expect(page.locator('.dk-msg-user')).toHaveCount(1);
+  const rifatta = page.locator('.dk-msg-bot').last();
+  await expect(rifatta.locator('.dk-msg-pending')).toHaveCount(0, { timeout: 15_000 });
+  await expect(rifatta.locator('.dk-row-name')).toHaveText(['Giusta 7']);
+  await expect(rifatta.locator('[data-retry]')).toHaveCount(0);
+});
+
+test('#382: un messaggio tutto in sintassi non passa dal giudice nemmeno se il modello scrive un criterio', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await manyCards(app, { pages: [3], relevant: [2] });
+  await app.evaluate(() => {
+    // Il modello riassume la sintassi a parole, e la riassume male: «dà haste» invece di «ha haste nel testo».
+    globalThis.__chat = () => JSON.stringify({ query: 'o:haste', filter: 'fa guadagnare haste ad altre creature' });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'o:haste');
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(3);
+  expect(await app.evaluate(() => globalThis.__filterCalls.length)).toBe(0);
+});
