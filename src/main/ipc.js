@@ -385,8 +385,7 @@ function registerIpcHandlers() {
   });
   // Solo la cornice risponde a una domanda di permesso: è l'unico posto dove l'ha vista l'utente (#591.1).
   ipcMain.handle('tabs:permesso-risposta', (event, { id, si } = {}) => {
-    const cornice = BrowserWindow.getAllWindows().some((w) => w._filoTabs && (w.webContents === event.sender || w._filoShell?.webContents === event.sender));
-    if (!cornice || !id) return { ok: false };
+    if (!finestraDellaBarra(event.sender) || !id) return { ok: false };
     return { ok: require('./services/permessiPagine').rispondi(String(id), si === true) };
   });
   // Le scelte ricordate per il sito di una scheda: il suo menu le mostra e le toglie (#591.1).
