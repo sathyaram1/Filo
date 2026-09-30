@@ -2139,9 +2139,11 @@
     // carta, se rispetta l'intento dell'utente. La query Scryfall era larga
     // apposta (per non perdere sinonimi), qui si tiene solo il pertinente.
     // Risponde coi NUMERI della lista, non con gli id: un modello economico sbaglia a ricopiare un id lungo.
-    decksSearchFilter: ({ criterion, cards }) =>
+    // `context`: quello che la richiesta dà per scontato (commander, messaggi di prima), che il giudice non vede altrove.
+    decksSearchFilter: ({ criterion, context = '', cards }) =>
       `Sei un esperto di Magic: The Gathering. L'utente ha cercato carte con questo criterio, in italiano:\n"${criterion}"\n\n` +
-      `Qui sotto le CARTE CANDIDATE, numerate (già filtrate per colore). Per OGNI carta decidi se rispetta DAVVERO il criterio, guardando cosa fa la carta (testo Oracle, tipo, costo) — non basta che contenga una parola simile.\n\n` +
+      (context ? `CONTESTO (usalo solo se il criterio lo richiama, per esempio «il commander», «il mazzo» o una richiesta precedente):\n${context}\n\n` : '') +
+      `Qui sotto le CARTE CANDIDATE, numerate (già filtrate per colore). Per OGNI carta decidi se rispetta DAVVERO il criterio, guardando cosa fa la carta (testo Oracle, tipo, costo, forza/costituzione, prezzo) — non basta che contenga una parola simile.\n\n` +
       `CARTE CANDIDATE:\n${cards}\n\n` +
       `Rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`): i numeri delle carte che rispettano il criterio:\n` +
       `{"keep": [<numero>, ...]}\n\n` +
