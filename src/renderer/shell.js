@@ -785,7 +785,8 @@
     // fantasma affiancate e indice di rilascio sbagliato. Sospendere già da armato
     // costa solo un frame di lag visivo mentre il tasto è premuto (ridisegnato al
     // rilascio dal broadcast successivo).
-    if (drag) return;
+    if (drag || premutoSullaStriscia) { ridisegnoRimandato = true; return; }
+    ridisegnoRimandato = false;
     // tabs
     tabsEl.innerHTML = '';
     for (const t of state.tabs) {
