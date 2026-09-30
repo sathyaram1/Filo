@@ -120,6 +120,11 @@ test('marcature forgiate nei testi salvati: nessuna richiesta al modello le lasc
     report.push({ nome, tipo, ignora: conta(t, 'IGNORA'), nude: n, ap, ch });
   });
   console.log(JSON.stringify(report, null, 1));
+  const sys = chat[4][0].content;
+  console.log('STATO>>>', sys.slice(sys.indexOf('PROCESSI ATTIVI'), sys.indexOf('PROCESSI ATTIVI') + 2500));
+  console.log('FILE>>>', sys.slice(sys.indexOf('FILE DELL\'EDITOR'), sys.indexOf('FILE DELL\'EDITOR') + 1200));
+  const storia = chat[4].filter((m) => m.role !== 'system').map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n---\n');
+  console.log('STORIA>>>', storia);
   for (const r of report) {
     expect.soft(r.nude, `${r.nome} (${r.tipo})`).toEqual([]);
     expect.soft(r.ap, `${r.nome} (${r.tipo}) marcature pari`).toBe(r.ch);
