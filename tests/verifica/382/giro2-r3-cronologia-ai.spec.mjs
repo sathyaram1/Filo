@@ -2,7 +2,7 @@
 import { test, expect } from '../../fixtures/electron.mjs';
 import { mockScryfall, mockProvider, manyCards, deckWithCommander, send } from './_mock.mjs';
 
-test('dopo quattordici ricerche larghe la traduzione di stamattina è ancora nella cronologia AI', async ({ app, openTab }) => {
+test('dopo quattordici ricerche larghe la domanda di stamattina a Filo è ancora nella cronologia AI', async ({ app, openTab }) => {
   test.setTimeout(300_000);
   await mockScryfall(app);
   await mockProvider(app);
@@ -15,8 +15,8 @@ test('dopo quattordici ricerche larghe la traduzione di stamattina è ancora nel
     // Criteri diversi a ogni turno, come le frasi diverse di una sessione vera: niente giudizi già in cache.
     globalThis.__chat = () => JSON.stringify({ query: '(o:"have haste" or o:haste)', filter: `fa guadagnare haste ad altre creature (${++n})` });
     await globalThis.SN_HISTORY.append({
-      action: globalThis.SN_CONST.ACTIONS.TRANSLATE_PAGE || 'translate', provider: 'openrouter', model: 'x',
-      input: { text: 'traduzione di stamattina' }, output: 'this morning translation', origin: 'https://example.com',
+      action: globalThis.SN_CONST.ACTIONS.FILO_CHAT, provider: 'openrouter', model: 'x',
+      input: { text: 'domanda di stamattina' }, output: 'risposta di stamattina', origin: 'filo://home',
     });
   });
   const page = await openTab('filo://decks/decks.html');
@@ -28,6 +28,6 @@ test('dopo quattordici ricerche larghe la traduzione di stamattina è ancora nel
     await expect(bubble.locator('.dk-row-name')).toHaveText(['Giusta 3']);
   }
   const kept = await app.evaluate(async () => (await globalThis.SN_HISTORY.list())
-    .some((it) => it.input && it.input.text === 'traduzione di stamattina'));
+    .some((it) => it.input && it.input.text === 'domanda di stamattina'));
   expect(kept, 'la voce di stamattina è stata buttata per far posto ai controlli delle ricerche').toBe(true);
 });
