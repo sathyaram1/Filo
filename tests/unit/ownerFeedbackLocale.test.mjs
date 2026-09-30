@@ -184,3 +184,35 @@ test('verify-local start --feedback e finish --feedback passano dallo stesso con
     assert.match(src, /rifiutoPratica\(r\.id, lavorabile\)/, `${f}: il rifiuto propone i Ricevuti`);
   }
 });
+
+test('negli stati del lavoro una sessione porta solo pratiche sue o dell’owner, non quelle di un utente', async () => {
+  const utente = documento('u3', { clientId: 'c-utente', status: 'todo', statusPublic: 'open', notes: '' });
+  for (const [to, attore] of [['working', 'routine'], ['revision_capability', 'routine'], ['done', 'routine']]) {
+    await conRete(utente, async (patch) => {
+      const r = await mod.scrivi('u3', to, 'lavorato in locale', { ...OPTS, attore });
+      assert.equal(r.ok, false, `todo → ${to} su un utente`);
+      assert.equal(r.utente, true);
+      assert.equal(patch.length, 0);
+      assert.match(mod.rifiutoPratica('u3', r), /--serve-locale/);
+    });
+  }
+  const falso = documento('f3', { clientId: 'local:claude', status: 'working', statusPublic: 'open', notes: '' });
+  await conRete(falso, async (patch) => {
+    const r = await mod.scrivi('f3', 'done', 'fatto', { ...OPTS, attore: 'routine' });
+    assert.deepEqual([r.ok, r.senzaProva, patch.length], [false, true, 0]);
+    assert.match(mod.rifiutoPratica('f3', r), /feedback:ripasso/);
+  });
+  const owner = documento('o3', { clientId: 'owner:me', senderProof: 'admin', status: 'todo', statusPublic: 'open', notes: '' });
+  await conRete(owner, async (patch) => {
+    const r = await mod.scrivi('o3', 'working', 'lo prendo', { ...OPTS, attore: 'routine' });
+    assert.equal(r.ok, true, r.motivo);
+    assert.equal(patch.length, 1);
+  });
+  // Rimetterlo in coda non è lavorarlo: resta permesso anche su un utente.
+  const preso = documento('u4', { clientId: 'c-utente', status: 'working', statusPublic: 'open', notes: '' });
+  await conRete(preso, async (patch) => {
+    const r = await mod.scrivi('u4', 'todo', 'torna alle routine', { ...OPTS, attore: 'routine' });
+    assert.equal(r.ok, true, r.motivo);
+    assert.equal(patch.length, 1);
+  });
+});
