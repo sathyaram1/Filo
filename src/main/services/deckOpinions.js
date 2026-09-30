@@ -27,6 +27,7 @@
   const MAX_BATCH = 120;
   // Candidati per chiamata del giudice: i lotti partono insieme, e uno corto risponde prima e sbaglia meno.
   const FILTER_BATCH = 50;
+  const FILTER_PARALLEL = 8;
   const CONFIG_ERRORS = new Set(['NO_MODEL_FOR_ACTION', 'NO_API_KEY', 'LIMIT_REACHED']);
 
   const digest = (s) => crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 16);
