@@ -713,7 +713,10 @@ function annotaLink(ctx, testo) {
   if (!ctx || !testo) return;
   const s = String(testo);
   const trovati = [...s.matchAll(/https?:\/\/[^\s<>"'`\]]+/gi)].map((m) => m[0]);
-  for (const m of s.matchAll(/(?:^|[\s(«"'])(www\.[^\s<>"'`\]]+)/gi)) trovati.push(`https://${m[1]}`);
+  // Scritto senza «https://»: con «www.» davanti, o un dominio seguito da un percorso («repubblica.it/politica/…»).
+  for (const m of s.matchAll(/(?:^|[\s(«"'])((?:www\.|(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}\/)[^\s<>"'`\]]*)/gi)) {
+    trovati.push(`https://${m[1]}`);
+  }
   for (const u of trovati) {
     // Il link di un testo in markdown finisce alla parentesi; uno di Wikipedia la contiene. Valgono tutte e due.
     for (const v of [u, u.replace(/[).,;:!?»]+$/, ''), u.replace(/\)[.,;:!?»]*$/, ''), u.split(')')[0]]) {
