@@ -100,7 +100,6 @@
     url_invalido: 'Questo non è un indirizzo valido: Filo non riesce a capire dove porterebbe.',
     side_effect: 'Aprirlo può bastare a eseguire qualcosa sul sito — disiscriverti, uscire, confermare o cancellare — senza chiederti altro.',
     token_in_url: 'Nell’indirizzo c’è un codice che può valere come una chiave d’accesso. Chi lo riceve potrebbe entrare al posto tuo.',
-    nome_prima_chiocciola: 'L’indirizzo comincia col nome di un sito ma porta a quello scritto dopo la chiocciola: potrebbe essere un’imitazione.',
   };
 
   function frasePerCodice(codice) {
