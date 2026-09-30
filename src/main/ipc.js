@@ -17,7 +17,7 @@ const { createSession, defaultCwd, commandExists } = require('./services/shell')
 const { resolveShell } = require('./services/terminal');
 const { hostResolves } = require('./services/hostResolve');
 const DiskStorage = require('./shim/storage');
-const { chiediConferma } = require('./confermeSopraPagina');
+const { chiediConferma, ritiraConferma } = require('./confermeSopraPagina');
 
 const inFlightStreams = new Map(); // requestId → AbortController
 // Una shell PERSISTENTE per scheda, chiavata sull'id del WebContents che la
