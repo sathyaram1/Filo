@@ -204,7 +204,7 @@ class BarraLaterale {
 
   // ── il bordo che la vista non vede ───────────────────────────────────────
   // Finché il puntatore non è dentro la pagina lontano dal bordo, il main lo guarda da sé: chi ci arriva di
-  // corsa, o rientra da fuori della finestra, nella pagina non lascia traccia (#871 giro 2).
+  // corsa, o rientra da fuori della finestra, nella pagina non lascia traccia.
 
   // Dalla pagina: il puntatore si muove, forse verso il bordo.
   _forseBordo() {
