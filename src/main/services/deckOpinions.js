@@ -216,13 +216,15 @@
 
   // Filtro semantico dei risultati (§4.1): OGNI candidato passa dal giudice, a lotti in parallelo, mai un taglio
   // silenzioso; chi non ha potuto guardare torna in `unverifiedIds`, visibile, con `error` per dire perché.
-  async function filterSearch({ criterion, cardIds, cards, handleAIRequest, onProgress = null }) {
+  // `context` (commander, messaggi di prima) cambia il giudizio, quindi entra nella chiave come il criterio;
+  // `judgeModel` è il modello che giudicherà, e un altro modello non eredita i giudizi di questo.
+  async function filterSearch({ criterion, context = '', judgeModel = '', cardIds, cards, handleAIRequest, onProgress = null }) {
     const ids = [...new Set((cardIds || []).map(String))].filter((id) => cards && cards[id]);
     const crit = P.normCriterion(criterion);
     if (!crit || !ids.length) return { keepIds: ids, unverifiedIds: [], judgedCount: 0, error: null };
 
-    const fp = judgeFingerprint();
-    const key = `${fp}|${digest(crit)}`;
+    const fp = judgeFingerprint(judgeModel);
+    const key = `${fp}|${digest(`${crit}\n${P.normCriterion(context)}`)}`;
     const cache = await readSearchCache();
     const plan = P.planSearchFilter({ cardIds: ids, criterion: key, searchCache: cache });
 
@@ -237,7 +239,7 @@
     const worker = async () => {
       while (next < batches.length) {
         const i = next++;
-        results[i] = await judgeBatch({ criterion, ids: batches[i], cards, handleAIRequest });
+        results[i] = await judgeBatch({ criterion, context, ids: batches[i], cards, handleAIRequest });
         done += batches[i].length;
         progress();
       }
@@ -254,7 +256,9 @@
     if (Object.keys(judged).length) {
       // Riletta prima di scrivere: due ricerche in parallelo non si cancellano i giudizi a vicenda.
       await chrome.storage.local.set({
-        [STORAGE_KEYS.DECK_SEARCH_CACHE]: P.updateSearchCache(await readSearchCache(), key, judged, { keepPrefix: `${fp}|` }),
+        [STORAGE_KEYS.DECK_SEARCH_CACHE]: P.updateSearchCache(await readSearchCache(), key, judged, {
+          keepPrefix: `${fp}|`, maxPairs: SEARCH_CACHE_MAX_PAIRS, maxPerCard: SEARCH_CACHE_PER_CARD,
+        }),
       });
     }
 
@@ -269,10 +273,11 @@
 
   // Un lotto al giudice. Una risposta illeggibile si richiede una volta senza cache (quella rotta è appena stata
   // salvata); un errore di configurazione (niente modello, chiave, tetto) non migliora riprovando.
-  async function judgeBatch({ criterion, ids, cards, handleAIRequest }) {
+  async function judgeBatch({ criterion, context, ids, cards, handleAIRequest }) {
     const sys = PROMPTS.decksSearchFilter({
       criterion,
-      cards: ids.map((id, i) => `${i + 1}. ${cardPromptBody(cards[id])}`).join('\n'),
+      context,
+      cards: ids.map((id, i) => `${i + 1}. ${judgeCardBody(cards[id])}`).join('\n'),
     });
     let error = null;
     for (let attempt = 0; attempt < 2; attempt += 1) {

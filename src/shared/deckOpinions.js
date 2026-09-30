@@ -237,7 +237,9 @@
   // Aggiorna la cache coi giudizi freschi (id → bool) per un criterio. Ritorna
   // una NUOVA mappa (mai mutare l'input). Solo gli id davvero giudicati.
   // `keepPrefix`: le chiavi che non cominciano così vengono da un giudice con altre istruzioni e si buttano.
-  function updateSearchCache(searchCache, criterion, judged, { keepPrefix = '' } = {}) {
+  // `maxPairs`/`maxPerCard`: tetti sui giudizi tenuti. L'ordine delle chiavi è l'età (JSON lo conserva): un giudizio
+  // fresco va in fondo, e oltre il tetto escono i più vecchi, prima per carta e poi le carte intere.
+  function updateSearchCache(searchCache, criterion, judged, { keepPrefix = '', maxPairs = Infinity, maxPerCard = Infinity } = {}) {
     const key = normCriterion(criterion);
     if (!key) return searchCache && typeof searchCache === 'object' ? searchCache : {};
     const next = {};
@@ -249,8 +251,20 @@
       if (Object.keys(kept).length) next[id] = kept;
     }
     for (const [id, matched] of Object.entries(judged || {})) {
-      if (!next[id]) next[id] = {};
-      next[id][key] = !!matched;
+      const entry = { ...(next[id] || {}) };
+      delete next[id];
+      delete entry[key];
+      entry[key] = !!matched;
+      const ks = Object.keys(entry);
+      for (let i = 0; i < ks.length - maxPerCard; i += 1) delete entry[ks[i]];
+      next[id] = entry;
+    }
+    let pairs = 0;
+    for (const e of Object.values(next)) pairs += Object.keys(e).length;
+    for (const id of Object.keys(next)) {
+      if (pairs <= maxPairs) break;
+      pairs -= Object.keys(next[id]).length;
+      delete next[id];
     }
     return next;
   }
