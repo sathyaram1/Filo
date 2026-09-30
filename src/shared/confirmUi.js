@@ -320,6 +320,7 @@
   }
 
   const daFuori = (ospite) => !ospite && typeof global.SN_CONFERMA_FUORI === 'function';
+  const BANDIERE = ['coprePagina', 'reversibile'];
 
   function scrivibile(el) {
     if (!el || el.disabled || el.readOnly) return false;
