@@ -70,7 +70,8 @@ posto tuo» no.
 `src/content/actions.js` nella sezione inline del link. Il giudizio sul marchio
 lo dà `imitazione()` in `src/main/services/safebrowse/engine.js`, coi marchi e
 le parole vere di `brands.js`; un link che passa da un rinvio si giudica anche per
-l'indirizzo scritto nel rinvio. Le soglie e i casi
+l'indirizzo che si porta dentro (nei parametri, nel percorso, codificato alla
+Proofpoint), e il nome scritto prima della chiocciola conta come quello del link. Le soglie e i casi
 — quelli che devono scattare e quelli che non devono — stanno in
 `tests/unit/linkSospetto.test.mjs`: un controllo nuovo aggiunge la sua coppia
 di elenchi lì, il falso allarme prima del vero positivo.
