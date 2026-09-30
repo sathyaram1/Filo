@@ -89,9 +89,10 @@ function matchBrands(norm) {
       broad = { brand, reason: 'combosquat', sld }; continue;
     }
     // ── BROAD: brand come sottodominio mentre l'eTLD+1 è altro ───────────
+    // Anche come parola della label: whatsapp-web.com.accesso.net (#725.8).
     if (!broad && subLabels.length) {
       for (const lbl of subLabels) {
-        if (lbl === token || skeleton(lbl) === tokenSkel) { broad = { brand, reason: 'subdomain', sld: lbl }; break; }
+        if ([lbl, ...lbl.split('-')].some((p) => p === token || skeleton(p) === tokenSkel)) { broad = { brand, reason: 'subdomain', sld: lbl }; break; }
       }
     }
   }
