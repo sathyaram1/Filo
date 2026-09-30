@@ -141,3 +141,14 @@ test('opzioni: la ricerca fra i feedback non c\'è', async ({ openTab }) => {
   const labels = await page.locator('#modelsGrid label').allTextContents();
   console.log('options grid has ricerca:', labels.some((l) => /ricerca fra i feedback/i.test(l)), labels.length);
 });
+
+test('gestione: nickname inesistente nella ricerca', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await page.waitForLoadState('domcontentloaded');
+  await stubManage(page);
+  const inp = page.locator('.mg-sm-slot[data-slot="manageSearch"] .sn-chain-input').first();
+  await inp.fill('inesistentexyz');
+  await inp.press('Tab');
+  await page.waitForTimeout(200);
+  console.log('unknown flagged', await inp.evaluate((e) => ({ color: e.style.color, title: e.title })));
+});
