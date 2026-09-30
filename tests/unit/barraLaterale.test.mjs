@@ -153,3 +153,21 @@ test('il manifesto non manda più l\'utente dove le voci della barra non ci sono
   const errore = `${M.get('network-error-page').desc} ${M.get('network-error-page').invoke}`;
   assert.doesNotMatch(errore, /Ricarica"? dal menu/i, '«Ricarica» non sta più nel menu del tasto destro');
 });
+
+test('SPOSTA_ICONA: lo strumento elenca le icone vere col nome del menu, e dice cosa ha fatto', () => {
+  require('../../src/shared/i18n.js');
+  require('../../src/shared/disposizioneIcone.js');
+  require('../../src/shared/actionLevels.js');
+  require('../../src/shared/actionTools.js');
+  const D = globalThis.SN_DISPOSIZIONE_ICONE;
+  const def = globalThis.SN_ACTION_TOOLS.definitions({ sistema: 'win32' }).find((d) => d.function.name === 'SPOSTA_ICONA');
+  assert.ok(def, 'strumento SPOSTA_ICONA assente');
+  const p = def.function.parameters.properties;
+  assert.deepEqual(p.icona.enum, Object.keys(D.ICONE));
+  assert.deepEqual(p.dove.enum, Object.keys(D.DOVE));
+  assert.match(p.icona.description, /screenshot \([^)]+\)/);
+  assert.equal(D.nome('closeTab') !== 'closeTab', true, 'il nome del menu, non l\'id');
+  const L = globalThis.SN_ACTION_LEVELS;
+  assert.equal(L.levelFor({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra' }), 1);
+  assert.match(L.describeDone({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra' }), /nella barra laterale/);
+});

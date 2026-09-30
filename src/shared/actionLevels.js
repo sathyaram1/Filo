@@ -500,6 +500,13 @@
         const d = dove[String((a && a.dove) || '').trim().toLowerCase()];
         return d ? `Spostare «${nome}» ${d}` : `Spostare «${nome}»`;
       },
+      describeDone: (a) => {
+        const D = global.SN_DISPOSIZIONE_ICONE;
+        const id = String((a && (a.icona ?? a.id)) || '').trim();
+        const nome = D && D.noto(id) ? D.nome(id) : id;
+        const dove = { barra: 'nella barra laterale', menu: 'nella riga del tasto destro', altro: 'in «Altro…» del tasto destro' };
+        return `«${nome}» ora sta ${dove[String((a && a.dove) || '').trim().toLowerCase()] || 'al suo nuovo posto'}`;
+      },
     },
     // ── zoom della pagina via chat (#686) ────────────────────────────────────
     // Livello 1: è la stessa cosa che fanno Ctrl +/- e Ctrl 0, visibile e

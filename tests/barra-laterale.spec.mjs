@@ -533,3 +533,32 @@ test('menu aperto vicino al bordo: riordinandolo la barra non gli va sopra; al b
   await page.mouse.up();
   await expect.poll(async () => (await statoBarra(app)).bar).toContain('share');
 });
+
+test('a parole: Filo mette un\'icona del tasto destro nella barra e la toglie, come il trascinamento', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO);
+  const barra = await barraPage(app);
+  const esegui = (azione) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), azione);
+
+  let r = await esegui({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra', prima_di: 'home' });
+  expect(r.executed).toBe(true);
+  await expect.poll(async () => (await statoBarra(app)).bar).toEqual(['back', 'forward', 'reload', 'screenshot', 'home', 'incognito', 'fullscreen', 'closeTab']);
+  await expect(barra.locator('#nav .ico[data-id="screenshot"]')).toHaveCount(1);
+  // Il menu del tasto destro non ce l'ha più.
+  await page.locator('#p').click({ button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(page.locator('.sn-menu [data-sn-icon-id="screenshot"]')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  r = await esegui({ type: 'SPOSTA_ICONA', icona: 'closeTab', dove: 'altro' });
+  expect(r.executed).toBe(true);
+  await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('closeTab');
+  expect((await statoBarra(app)).secondary).toContain('closeTab');
+  await expect(barra.locator('#nav .ico[data-id="closeTab"]')).toHaveCount(0);
+
+  // Un'icona che non esiste o un posto che non c'è: niente cambia.
+  const prima = await statoBarra(app);
+  expect((await esegui({ type: 'SPOSTA_ICONA', icona: 'volante', dove: 'barra' })).executed).toBe(false);
+  expect((await esegui({ type: 'SPOSTA_ICONA', icona: 'reload', dove: 'cassetto' })).executed).toBe(false);
+  const dopo = await statoBarra(app);
+  expect([dopo.bar, dopo.primary, dopo.secondary]).toEqual([prima.bar, prima.primary, prima.secondary]);
+});
