@@ -420,3 +420,85 @@ test('dalla scheda aperta arriva quello che l\'utente vede: i pezzi affiancati s
   expect(await app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows().flatMap((w) => (w._filoTabs ? w._filoTabs.tabs : []))
     .find((x) => x.view.webContents.getURL() === u).view.webContents.executeJavaScript('innerWidth'), url)).toBe(0);
 });
+
+// ── #553, giro 14 ─────────────────────────────────────────────────────────────
+// Un indirizzo normale che il modello scrive da sé non è un blocco di dati; e una lettura confermata a turno finito
+// torna al modello da sola.
+
+const PREZZI = `<!doctype html><html lang="it"><head><title>Prezzi dell'API</title></head><body><main>
+<h1>Prezzi</h1><p>I prezzi sono espressi in dollari per milione di token, al netto delle imposte, per tutte le richieste
+fatte con una chiave a pagamento. Le richieste in lotti costano la metà.</p>
+<table><tr><th>Modello</th><th>Ingresso</th><th>Uscita</th></tr><tr><td>Gemini 2.5 Pro</td><td>1,25</td><td>10,00</td></tr></table>
+</main></body></html>`;
+
+// Qualunque indirizzo risponde col listino: conta cosa succede PRIMA che la richiesta parta.
+async function reteFinta(app) {
+  await app.evaluate((_e, html) => {
+    globalThis.__scaricati = [];
+    globalThis.SN_LETTURA_PAGINE._cache.clear();
+    globalThis.SN_LETTURA_PAGINE._dip.scarica = async (url) => {
+      globalThis.__scaricati.push({ url, inizio: Date.now() });
+      return new Response(html, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
+    };
+  }, PREZZI);
+}
+
+const PREZZO_RE = 'Gemini 2\\.5 Pro \\| ([\\d,]+)';
+
+test('«quanto costa Gemini 2.5 Pro?»: la pagina dei prezzi che il modello conosce si legge senza allarme', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab(NEWTAB);
+  await reteFinta(app);
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url: 'https://ai.google.dev/gemini-api/docs/pricing' } }] },
+    { finale: { cerca: PREZZO_RE, testo: 'RISPOSTA: $1 dollari per milione di token in ingresso.' } },
+  ]);
+  await chiedi(page, 'quanto costa gemini 2.5 pro?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA: 1,25 dollari' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
+});
+
+test('dopo aver letto una pagina, «aprimi la pagina ufficiale dei prezzi» apre la scheda senza avviso', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab(NEWTAB);
+  await reteFinta(app);
+  const url = 'https://ai.google.dev/gemini-api/docs/pricing';
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url: 'https://notizie.example/listino-modelli' } }] },
+    { finale: { cerca: PREZZO_RE, testo: 'PRIMA: $1 dollari.' } },
+    { strumenti: [{ nome: 'NAVIGA', args: { url } }] },
+    { finale: { cerca: '(x)', testo: 'SECONDA: aperta.' } },
+  ]);
+  await chiedi(page, 'leggi notizie.example/listino-modelli: quanto costa gemini 2.5 pro?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'PRIMA: 1,25 dollari' })).toBeVisible({ timeout: 20_000 });
+  await chiedi(page, 'aprimi la pagina ufficiale dei prezzi');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'SECONDA:' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows()
+    .some((w) => w._filoTabs && w._filoTabs.tabs.some((t) => String(t.url || '').startsWith(u))), url), { timeout: 10_000 }).toBe(true);
+});
+
+test('una lettura confermata dall\'utente torna al modello da sola, e la risposta arriva senza riscrivere', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab(NEWTAB);
+  // Il popup di conferma sta in una radice chiusa: si sostituisce, e il sì lo dà la prova.
+  await page.evaluate(() => {
+    window.SN_CONFIRM_UI = { confirm: async () => true, confirmTyped: async () => true };
+  });
+  await reteFinta(app);
+  const url = 'https://negozio.example/listino?sessione=8f3a9c2e7b1d4f6a9c2e7b1d4f6a0b1c';
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] },
+    { finale: { cerca: '(NON_ESISTE_MAI)', testo: 'ATTESA: aspetto la tua conferma.' } },
+    { finale: { cerca: PREZZO_RE, testo: 'RISPOSTA: $1 dollari.' } },
+  ]);
+  await chiedi(page, 'quanto costa gemini 2.5 pro su quel listino?');
+  const bottone = page.locator('.dash-bubble-actions .dash-action-btn-primary');
+  await expect(bottone).toHaveCount(1, { timeout: 20_000 });
+  expect(await app.evaluate(() => globalThis.__scaricati.length), 'niente parte prima del sì').toBe(0);
+  await bottone.click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA: 1,25 dollari' })).toBeVisible({ timeout: 20_000 });
+  // Il turno ripreso non è un messaggio dell'utente, e la lettura confermata ha la sua riga nel diario.
+  await expect(page.locator('.dash-bubble-user')).toHaveCount(1);
+  await expect(page.locator('.dash-activity-row', { hasText: 'Leggo la pagina' })).toHaveCount(1);
+});

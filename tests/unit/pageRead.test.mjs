@@ -266,3 +266,14 @@ test('un link scritto dall\'utente senza https né www è un indirizzo trovato',
   assert.equal(PR.formaDaControllare(c, 'LEGGI_PAGINA', 'https://www.repubblica.it/politica/2026/09/29/news/governo_manovra-8f3a9c2e7b1d4f6a9c2e7b1d/'), false);
   assert.equal(PR.formaDaControllare(c, 'LEGGI_PAGINA', 'https://repubblica.it/politica/2026/09/29/news/altro'), true, 'un altro indirizzo resta da controllare');
 });
+
+// #553, giro 14: «rileggila, ci sono novità?» porta la pagina com'è adesso; la copia da parte vale solo per il seguito.
+test('una pagina riletta da capo arriva com\'è adesso, non com\'era alla prima lettura', async () => {
+  const pagina = (n) => ({ corpo: `<html><head><title>Diretta</title></head><body><main><h1>Diretta del consiglio</h1><p>Aggiornamento numero ${n}: la seduta è in corso e la votazione sul bilancio non è ancora iniziata.</p></main></body></html>` });
+  const url = verso('/diretta', pagina(1));
+  await conRete(async () => {
+    assert.ok((await PR.leggiPagina(url)).testo.includes('Aggiornamento numero 1'));
+    PAGINE.set('/diretta', pagina(2));
+    assert.ok((await PR.leggiPagina(url)).testo.includes('Aggiornamento numero 2'));
+  });
+});
