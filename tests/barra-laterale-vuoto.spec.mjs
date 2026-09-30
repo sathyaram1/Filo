@@ -8,11 +8,10 @@ import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/ba
 const SITO = `<!doctype html><html><body style="margin:0;height:4000px;font:16px sans-serif">
   <div id="z" style="position:fixed;left:0;top:0;width:240px;height:100%;background:#f3eee6">colonna del sito</div>
   <script>
-    window.gesti = { clic: 0, doppio: 0, destro: 0 };
+    window.gesti = { clic: 0, doppio: 0 };
     const z = document.getElementById('z');
     z.addEventListener('click', () => window.gesti.clic++);
     z.addEventListener('dblclick', () => window.gesti.doppio++);
-    z.addEventListener('contextmenu', () => window.gesti.destro++);
   </script>
 </body></html>`;
 
@@ -41,10 +40,14 @@ test('barra aperta: rotella, tasto destro, doppio clic e clic nel margine dell\'
   await nelVuoto(app, [{ type: 'mouseMove', x, y: 300 }, { type: 'mouseWheel', x, y: 300, deltaX: 0, deltaY: -600 }]);
   await expect.poll(() => p.evaluate(() => window.scrollY), { timeout: 3000 }).toBeGreaterThan(0);
 
+  // Il tasto destro nel vuoto è quello della pagina: si apre il menu di Filo sulla pagina.
   await nelVuoto(app, clic(x, 300, 'right'));
-  await expect.poll(() => p.evaluate(() => window.gesti.destro), { timeout: 3000 }).toBe(1);
-  await p.keyboard.press('Escape').catch(() => {});
-  expect((await statoBarra(app)).aperta, 'il tasto destro sulla pagina non chiude la barra').toBe(true);
+  await expect(p.locator('.sn-menu')).toBeVisible({ timeout: 5000 });
+  await comandaBarra(app, 'chiudi');
+  await p.keyboard.press('Escape');
+  await expect(p.locator('.sn-menu')).toBeHidden();
+  await comandaBarra(app, 'tasto');
+  await pannelloFermo(barra);
 
   await nelVuoto(app, [...clic(x, 320), ...clic(x, 320, 'left', 2)]);
   await expect.poll(() => p.evaluate(() => window.gesti.doppio), { timeout: 3000 }).toBe(1);

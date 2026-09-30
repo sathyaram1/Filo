@@ -118,7 +118,7 @@ test('«Traduci» nella barra: a pagina tradotta si chiama «Mostra originale»,
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
   const icona = barra.locator('#nav .ico[data-id="translate"]');
-  await expect(icona).toHaveAttribute('aria-label', 'Traduci la pagina');
+  await expect(icona).toHaveAttribute('aria-label', 'Traduci');
   await icona.click();
   await expect(p.locator('#p1')).toContainText('IT ', { timeout: 10_000 });
 
@@ -131,5 +131,5 @@ test('«Traduci» nella barra: a pagina tradotta si chiama «Mostra originale»,
 
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
-  await expect(icona).toHaveAttribute('aria-label', 'Traduci la pagina', { timeout: 5000 });
+  await expect(icona).toHaveAttribute('aria-label', 'Traduci', { timeout: 5000 });
 });
