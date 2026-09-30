@@ -537,10 +537,12 @@
       models: models || {},
       getRegistry: () => collectModelRegistry(),
     });
+    hiddenModels = Object.fromEntries(Object.entries(models || {})
+      .filter(([action, chain]) => !(action in modelChains) && typeof chain === 'string'));
   }
 
   function collectModels() {
-    return ModelChain.collect(modelChains);
+    return { ...hiddenModels, ...ModelChain.collect(modelChains) };
   }
 
   // ── Load / Save ─────────────────────────────────────────────────────────────
