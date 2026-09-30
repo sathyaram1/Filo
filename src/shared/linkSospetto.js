@@ -123,6 +123,7 @@
     'abbonamento', 'subscription', 'carta', 'card', 'wallet', 'bonus', 'premio', 'premi', 'gift', 'regalo', 'promo', 'offerta', 'offer', 'rewards', 'prize',
     'alert', 'alerts', 'avviso', 'notifica', 'notification', 'update', 'aggiorna', 'aggiornamento', 'attivazione', 'activate',
     'blocco', 'blocked', 'sospeso', 'suspended', 'limited', 'limitato', 'official', 'ufficiale', 'italia', 'italy', 'team', 'mail', 'email', 'web', 'online',
+    'copyright', 'www',
   ]);
   // Incollate al nome (securepaypal, paypalcom) solo le più nette: googlemail e
   // amazonpay sono domini veri dei due marchi.
