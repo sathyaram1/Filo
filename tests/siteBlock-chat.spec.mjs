@@ -127,7 +127,7 @@ test('dopo un clic dell\'utente nella pagina aperta da NAVIGA, un sito della lis
     await chiedi(page, 'apri quella pagina');
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco la pagina' })).toBeVisible({ timeout: 20_000 });
     const tab = app.windows().find((w) => w.url().includes('libero.test'));
-    await tab.click('#l');
+    await tab.click('#l', { noWaitAfter: true });
     await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first()).toBeVisible({ timeout: 6000 });
     await page.waitForTimeout(800);
     await expect(page.locator('.dash-action-link-chip')).toBeVisible();

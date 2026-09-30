@@ -115,6 +115,22 @@ test('un sito messo in lista mentre lo si guarda passa subito alla pagina «Sito
   expect(await avvisi()).toEqual([]);
 });
 
+test('dalla pagina «Sito bloccato» si arriva alla lista, e tolto il sito da lì la scheda torna sul sito', async ({ app, shell, rete }) => {
+  await lista(shell, []);
+  const sito = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+  await apri(app, shell, sito);
+  await lista(shell, ['blocked.test']);
+  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toMatch(PAGINA_BLOCCATA);
+  await paginaBloccata(app).locator('a', { hasText: 'Gestisci i siti bloccati' }).click();
+  await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://security/')), { timeout: 6000 }).toBe(true);
+  const sicurezza = app.windows().find((w) => w.url().startsWith('filo://security/'));
+  const campo = sicurezza.locator('#sec-siteblock-blacklist');
+  await expect(campo).toHaveValue('blocked.test', { timeout: 6000 });
+  await campo.fill('');
+  await campo.dispatchEvent('change');
+  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toBe(sito);
+});
+
 test('indietro dalla pagina «Sito bloccato» torna alla pagina di prima; tolto dalla lista, il sito torna', async ({ app, shell, rete }) => {
   await lista(shell, []);
   const prima = rete.pagina('sito.test', '/', '<h1>PRIMA</h1>');
