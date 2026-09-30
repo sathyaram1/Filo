@@ -2150,9 +2150,11 @@
   function isOpenPublic(fb) {
     return String((fb && fb.statusPublic) || 'open') !== 'closed';
   }
+  // Un lavoro locale provato si fonde comunque senza chiedere: lì il segno dorme, e resta nel dato
+  // per quando la pratica torna alle routine.
   function preapprovedHtml(fb) {
     const m = preapprovedOf(fb);
-    if (!m || !isOpenPublic(fb)) return '';
+    if (!m || !isOpenPublic(fb) || MR.isProvenLocalWork(fb)) return '';
     const UI = window.SN_MERGE_APPROVALS;
     const t = (UI && UI.segnoTesti) ? UI.segnoTesti(m)
       : { etichetta: 'senza chiedere', titolo: `Si fonde senza chiedere: segno messo da ${m.by}` };
