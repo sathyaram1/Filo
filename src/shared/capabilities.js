@@ -96,8 +96,8 @@
     },
     {
       id: 'sidebar', title: 'Barra laterale', category: 'navigation',
-      desc: 'Una barra che si apre dal bordo sinistro su ogni pagina, siti e pagine di Filo, con quello che riguarda la finestra e non l\'elemento sotto il mouse: in cima Indietro, Avanti, Ricarica, Home, Nuova finestra incognito, Schermo intero e Chiudi pagina (Indietro e Avanti spenti quando non c\'è dove andare); in fondo l\'ora, Cronologia, App, Red-team, il profilo e le Impostazioni. Le icone del menu del tasto destro si trascinano nella barra laterale e da lì nel menu aperto, e restano dove le metti anche dopo un riavvio; col tasto destro su un\'icona della barra la rimetti nel menu.',
-      invoke: 'Spingi il mouse contro il bordo sinistro della finestra per un attimo, oppure clicca la striscia sottile sul bordo sinistro o la linguetta a sinistra delle schede, oppure Ctrl+Shift+B (Cmd+Shift+B su Mac), che la apre e la chiude, oppure chiedilo all’assistente («apri la barra laterale»). Si chiude uscendo col mouse, con Esc o cliccando sulla pagina.',
+      desc: 'Una barra che si apre dal bordo sinistro su ogni pagina, siti e pagine di Filo, con quello che riguarda la finestra e non l\'elemento sotto il mouse: in cima Indietro, Avanti, Ricarica, Home, Nuova finestra incognito, Schermo intero e Chiudi pagina (Indietro e Avanti spenti quando non c\'è dove andare); in fondo l\'ora, Cronologia, App, Red-team, il profilo e le Impostazioni. Le icone del menu del tasto destro si trascinano nella barra laterale e da lì nel menu aperto, e restano dove le metti anche dopo un riavvio; col tasto destro su un\'icona della barra la rimetti nel menu, e il tasto destro sulle voci in fondo, sull\'ora e sulla striscia apre le loro scelte (la data, la Cronologia AI, le Preferenze).',
+      invoke: 'Spingi il mouse contro il bordo sinistro della finestra per un attimo, oppure clicca la striscia sottile sul bordo sinistro o la linguetta a sinistra delle schede, oppure Ctrl+Shift+B (Cmd+Shift+B su Mac), che la apre e la chiude, oppure chiedilo all’assistente («apri la barra laterale»). Si chiude uscendo col mouse, con Esc o cliccando sulla pagina. In Preferenze → Impostazioni avanzate → «Barra laterale» (o chiedendolo a Filo, o col tasto destro sulla striscia) spegni l\'apertura dal bordo, cambi l\'attesa sul bordo e quanto resta aperta dopo che il mouse esce, e nascondi la striscia.',
       doesNot: 'Passarci sopra di corsa o trascinare una scheda non la apre. Un sito non può aprirla né premerne i pulsanti.',
     },
     {
@@ -109,7 +109,7 @@
     {
       id: 'network-error-page', title: 'Pagina d’errore quando un sito non si carica', category: 'navigation',
       desc: 'Se un sito non è raggiungibile (indirizzo sbagliato, server spento, sei offline) o una scheda si blocca, compare una pagina che spiega il problema in italiano con un tasto "Riprova". Se eri offline, riprova da sola appena torni in rete.',
-      invoke: 'Automatico quando un caricamento fallisce; "Riprova" sulla pagina o "Ricarica" dal menu ritentano il sito.',
+      invoke: 'Automatico quando un caricamento fallisce; "Riprova" sulla pagina, "Ricarica" della barra laterale o Ctrl+R (Cmd+R su Mac) ritentano il sito.',
       doesNot: 'Non aggira i blocchi di sicurezza: i siti segnalati come pericolosi restano gestiti dagli avvisi dedicati.',
     },
     {
@@ -422,7 +422,7 @@
     // ─────────────────────────── Pagine interne ──────────────────────────────
     {
       id: 'home-page', title: 'Home di Filo', category: 'pages',
-      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, azioni e suggerimenti, un messaggio in evidenza e gli aggiornamenti recenti. In alto a destra ci sono le icone per Red Team, Cronologia, Impostazioni, App e Profilo.',
+      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, azioni e suggerimenti, un messaggio in evidenza e gli aggiornamenti recenti. Red Team, Cronologia, Impostazioni, App e Profilo non stanno nella home: sono in fondo alla barra laterale, su ogni pagina.',
       invoke: 'Apri una nuova scheda, l\'icona Home della barra laterale, oppure indirizzo filo://newtab/.',
     },
     {

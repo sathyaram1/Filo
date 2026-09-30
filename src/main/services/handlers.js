@@ -926,6 +926,7 @@ async function applySettingsUpdate(partial) {
       if (w._filoTabs && typeof w._filoTabs.setSecurity === 'function') {
         w._filoTabs.setSecurity(merged.security || {});
       }
+      try { w._filoTabs?.barra?.impostazioni(merged.barraLaterale); } catch (_) {}
     }
   } catch (_) {}
   try { require('./fingerprint').setMode(merged); } catch (_) {}

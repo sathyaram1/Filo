@@ -261,6 +261,7 @@
         + `• stile_agente: testo libero, ${tettoStile()} (come deve scrivere Filo; "nessuno" lo toglie) [conferma]\n`
         + '• correttore: true | false (correttore ortografico AI)\n'
         + '• sidebar_aiuto: true | false ; categorizzazione: true | false\n'
+        + '• barra_spinta: true | false (la barra laterale si apre spingendo il mouse sul bordo sinistro) ; barra_striscia: true | false (la striscia sottile sul bordo) ; barra_attesa: millisecondi 100-3000 (attesa sul bordo prima che si apra) ; barra_uscita: millisecondi 100-5000 (dopo quanto si chiude quando il mouse esce)\n'
         + '• archiviazione_automatica: true | false ; archivia_alla_riapertura: true | false ; archivia_se_inattivo: true | false\n'
         + '• ore_inattivita: numero 1-168 (dopo quante ore archiviare)\n'
         + `• modalita_terminale: true | false [conferma] ; shell_terminale: ${sistemaInfo(sistema).shellPref} [conferma]\n`

@@ -1344,8 +1344,8 @@
       `{ "action": "web_search", "query": "<query in inglese o italiano, max 200 caratteri>" }\n` +
       `Il sistema farà la ricerca e ti rimanderà i primi risultati come messaggio system nel turno successivo. Allora potrai produrre il JSON normale.\n` +
       `Regole d'uso: massimo 2 ricerche per sessione. NON usare web_search per cose che si vedono già nell'outline. NON includere dati dell'utente nella query.\n\n` +
-      `# Output alternativo: comandi rapidi di Filo (barra in alto)\n` +
-      `Oltre alla pagina, puoi azionare le icone della barra in alto di Filo (il browser stesso). Servono quando l'utente chiede di comandare Filo, non il sito — es. "vai alla home", "metti a schermo intero", "apri le impostazioni", "apri le app", "riduci a icona", "apri l'account". Output speciale (al posto del JSON normale):\n` +
+      `# Output alternativo: comandi rapidi di Filo (barra laterale e finestra)\n` +
+      `Oltre alla pagina, puoi azionare i controlli di Filo (il browser stesso: la barra laterale sul bordo sinistro e la finestra). Servono quando l'utente chiede di comandare Filo, non il sito — es. "vai alla home", "metti a schermo intero", "apri le impostazioni", "apri le app", "riduci a icona", "apri l'account". Output speciale (al posto del JSON normale):\n` +
       `{ "action": "shell", "command": "home" | "fullscreen" | "minimize" | "settings" | "apps" | "account", "text": "<opzionale: breve conferma per l'utente>", "status": "done" | "continue" }\n` +
       `Cosa fa ogni comando:\n` +
       `  • home → apre la nuova scheda / home di Filo;\n` +
@@ -2211,6 +2211,9 @@
     // Mostra il commento proattivo di Filo al centro della home (newtab).
     // Disattivabile da Preferenze per chi preferisce una home più sobria.
     showHomeMessage: true,
+    // Barra laterale (#871): apertura spingendo sul bordo, attesa sul bordo, quanto resta aperta dopo
+    // che il mouse esce, striscia d'indizio. Preferenze → Avanzate, IMPOSTA_PREFERENZA, tasto destro sulla striscia.
+    barraLaterale: { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true },
     // Colore identità delle tab (spec "Colore identità delle tab"): i sei
     // parametri che governano come si estrae il colore dal favicon e quanto
     // tinge la tab. La fonte di verità dei default/range/commenti è
@@ -2436,6 +2439,25 @@
     return Array.from(String(text == null ? '' : text).trim()).length;
   }
 
+  // Le regolazioni della barra laterale come le usa chi le legge: un valore fuori dai limiti torna
+  // dentro, uno mancante o illeggibile prende il predefinito. Preferenze e chat rifiutano prima.
+  const BARRA_LATERALE_LIMITI = Object.freeze({ attesaMs: [100, 3000], uscitaMs: [100, 5000] });
+  function opzioniBarraLaterale(v) {
+    const d = DEFAULT_SETTINGS.barraLaterale;
+    const o = v && typeof v === 'object' ? v : {};
+    const ms = (k) => {
+      const n = Math.round(Number(o[k]));
+      const [min, max] = BARRA_LATERALE_LIMITI[k];
+      return Number.isFinite(n) && o[k] !== null && o[k] !== '' ? Math.max(min, Math.min(max, n)) : d[k];
+    };
+    return {
+      spinta: o.spinta !== false,
+      attesaMs: ms('attesaMs'),
+      uscitaMs: ms('uscitaMs'),
+      striscia: o.striscia !== false,
+    };
+  }
+
   // Tetto di una lezione, contato come lo stile: una regola su come comportarsi
   // ci sta larga, un testo che nessuno rilegge nel popup no (#592).
   const LESSON_MAX = 800;
@@ -2647,6 +2669,8 @@
     DEFAULT_SETTINGS,
     AGENT_STYLE_MAX,
     agentStyleLength,
+    BARRA_LATERALE_LIMITI,
+    opzioniBarraLaterale,
     testoLeggibile,
     LESSON_MAX,
     memoriaImbustata,
