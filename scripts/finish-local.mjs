@@ -487,13 +487,24 @@ async function praticaDelLavoro(valore) {
   const { risolviFeedback } = await import('./lib/pratica-locale.mjs');
   const { acquireBearer, FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
   let r;
+  let lavorabile = { ok: true };
   try {
-    r = await risolviFeedback(valore, { bearer: await acquireBearer(), base: FIRESTORE_BASE });
+    const bearer = await acquireBearer();
+    r = await risolviFeedback(valore, { bearer, base: FIRESTORE_BASE });
+    if (r.ok) {
+      const { praticaPerLaSessione } = await import('./owner-feedback.mjs');
+      lavorabile = await praticaPerLaSessione(r.id, { bearer });
+    }
   } catch (e) {
     r = { ok: false, motivo: String((e && e.message) || e).slice(0, 200) };
   }
   if (!r.ok) {
     console.error(`Pratica non trovata: ${r.motivo} — non ho toccato niente.`);
+    process.exit(1);
+  }
+  if (!lavorabile.ok) {
+    const { rifiutoPratica } = await import('./owner-feedback.mjs');
+    console.error(`${rifiutoPratica(r.id, lavorabile)}\nNon ho legato il lavoro a questa pratica e non ho toccato niente.`);
     process.exit(1);
   }
   if (scritta.feedbackId && scritta.feedbackId !== r.id) {
