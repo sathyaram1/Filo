@@ -476,6 +476,7 @@ service cloud.firestore {
                 && request.resource.data.mergePreapproved.get('at', '') is string
                 && request.resource.data.mergePreapproved.get('at', '').size() <= 40))
         && livelliValidi(request.resource.data)
+        && localOnlyValido(request.resource.data)
         && (!('senderProof' in request.resource.data)
             || request.resource.data.senderProof in ['admin', 'server'])
         // F4: capabilityGapId (opzionale) — id strutturale del gap di capacità
