@@ -8,6 +8,7 @@ const { collegaScorciatoie } = require('./shortcuts');
 
 const TIPI = new Set(['confirm', 'typed', 'notify']);
 const CAMPI = ['title', 'text', 'okLabel', 'cancelLabel', 'word'];
+const BANDIERE = ['coprePagina', 'reversibile'];
 
 // Dalla pagina arrivano solo le forme attese, e i testi interi: si conferma quello che si legge.
 function pulisci(r) {
