@@ -91,20 +91,25 @@ export function classifyOwnerMerge(status, body) {
 
 /**
  * Quello che il server dice della pratica locale (#908), solo se lo dice. PURA.
- * merged: skippedL5, trips (i blocchi registrati), closed / closeError; blocked:
- * localReason / localDetail, il motivo per cui L5 non è stato saltato.
+ * Tutto sta in `r.local` (localView in filo-security ownerMerge.js): ammessa →
+ * num, skippedL5, blocks (nomi dei cancelli), record, closed; non ammessa → reason, detail.
  */
 function campiLocali(r) {
+  const loc = (r.local && typeof r.local === 'object') ? r.local : null;
+  if (!loc) return {};
   const out = {};
-  if (r.skippedL5 === true) out.skippedL5 = true;
-  if (r.skippedL5 === true && Array.isArray(r.trips)) out.trips = r.trips;
-  const chiusa = r.closed !== undefined ? r.closed : r.feedbackClosed;
-  if (typeof chiusa === 'boolean') out.closed = chiusa;
-  if (r.closeError) out.closeError = String(r.closeError).slice(0, 300);
-  const loc = (r.local && typeof r.local === 'object') ? r.local : {};
-  const reason = String(r.localReason || loc.reason || '');
-  const detail = String(r.localDetail || loc.detail || '');
-  if (reason || detail) { out.localReason = reason.slice(0, 80); out.localDetail = detail.slice(0, 300); }
+  if (loc.num) out.localNum = String(loc.num).slice(0, 24);
+  if (loc.eligible === true) {
+    if (loc.skippedL5 === true) {
+      out.skippedL5 = true;
+      out.blocks = Array.isArray(loc.blocks) ? loc.blocks.slice(0, 50) : [];
+      out.record = String(loc.record || '').slice(0, 128);
+    }
+    if (typeof loc.closed === 'boolean') out.closed = loc.closed;
+    return out;
+  }
+  out.localReason = String(loc.reason || 'pratica_non_ammessa').slice(0, 80);
+  out.localDetail = String(loc.detail || '').slice(0, 300);
   return out;
 }
 
@@ -121,22 +126,28 @@ function bloccoInRiga(t) {
  */
 export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
   const r = reply || {};
-  const pratica = ctx.feedbackNum ? `#${String(ctx.feedbackNum).replace(/^#+/, '')}` : 'la pratica';
+  const num = ctx.feedbackNum || r.localNum;
+  const pratica = num ? `#${String(num).replace(/^#+/, '')}` : 'la pratica';
+  const chiudi = `npm run feedback -- ${ctx.feedbackId || '<id>'} done "fuso su main" --come-routine`;
   switch (r.outcome) {
     case 'merged': {
       const righe = [`✓ '${branch}' fuso su main dal server${r.sha ? ` (${String(r.sha).slice(0, 8)})` : ''}.`];
       if (r.skippedL5) {
-        const trips = Array.isArray(r.trips) ? r.trips : [];
+        const blocchi = Array.isArray(r.blocks) ? r.blocks : [];
         righe.push(`  L5 saltato: lavoro locale di ${pratica}, mittente provato.`);
-        righe.push(trips.length
-          ? `  Blocchi registrati (${trips.length}), li rileggi in Gestione → Automazioni, «Fuse senza chiedere»:\n${trips.map((t) => `    · ${bloccoInRiga(t)}`).join('\n')}`
+        righe.push(blocchi.length
+          ? `  Blocchi registrati (${blocchi.length}), li rileggi in Gestione → Automazioni, «Fuse senza chiedere»:\n${blocchi.map((t) => `    · ${bloccoInRiga(t)}`).join('\n')}`
           : '  Nessun blocco registrato: i controlli non avrebbero fermato niente.');
+        if (blocchi.length && !r.record) righe.push('  La traccia dei blocchi NON si è registrata: l’elenco resta solo nella nota della pratica e nei log del server.');
       }
       if (r.closed === true) righe.push(`  Pratica ${pratica} chiusa.`);
-      else if (r.closeError || r.closed === false) {
-        righe.push(`  La pratica ${pratica} NON si è chiusa${r.closeError ? `: ${r.closeError}` : ''}. Chiudila a mano.`);
+      else if (r.closed === false) righe.push(`  La pratica ${pratica} NON si è chiusa. Chiudila a mano: ${chiudi}`);
+      else if (r.localReason) {
+        // Il codice è su main ma la pratica resta aperta: una routine potrebbe rilavorarla.
+        righe.push(`  Pratica ${pratica} non chiusa: ${r.localDetail || r.localReason}. Se il lavoro la conclude, chiudila a mano: ${chiudi}`);
       }
-      return righe.join('\n');
+      return righe.join('
+');
     }
     case 'blocked':
       // Il lavoro locale tocca le aree protette quasi sempre: il messaggio dice
