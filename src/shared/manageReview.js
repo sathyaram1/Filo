@@ -594,12 +594,30 @@
     if (tab === 'resolved' || tab === 'archived' || String(fb.statusPublic || 'open') === 'closed') {
       return { ok: false, motivo: 'la pratica è chiusa' };
     }
-    const now = (opts && opts.now) != null ? opts.now : Date.now();
-    const scade = new Date(fb.claimExpiresAt || 0).getTime() || 0;
-    if (String(fb.claimedBy || '').trim() && scade > now) {
-      return { ok: false, motivo: 'una routine la sta lavorando adesso: il segno si mette quando il suo biglietto è revocato' };
+    // La presa di una routine si vede dal battito che il server specchia sul feedback (beatAt/workingSince):
+    // i biglietti vivono in una collezione che da qui non si legge.
+    const wp = workProgress(fb, opts);
+    if (wp && wp.active) {
+      return { ok: false, motivo: 'una routine la sta lavorando adesso: il segno si mette quando consegna o quando il suo biglietto è revocato' };
     }
     return { ok: true };
+  }
+
+  /**
+   * Una sessione locale può lavorare una pratica di questo mittente? PURA. Solo owner o sessione con la
+   * prova (#595); `utente` = feedback di un utente: in locale non si lavora e, se serve, torna nei Ricevuti.
+   */
+  function localSenderCheck(fb) {
+    if (!fb) return { ok: false, motivo: 'feedback non trovato' };
+    if (isProvenLocalSender(fb)) return { ok: true };
+    const cid = String(fb.clientId || '');
+    if (LOCAL_SENDER_RE.test(cid)) {
+      return { ok: false, utente: true, motivo: 'il mittente non porta la prova (#595): vale come un feedback di un utente, e in locale i feedback degli utenti non si lavorano' };
+    }
+    if (RESERVED_CLIENT_RE.test(cid) && SENDER_PROOFS.includes(fb.senderProof)) {
+      return { ok: false, motivo: 'l’ha aperto una routine: in locale si lavorano solo i feedback dell’owner o di una sessione locale' };
+    }
+    return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale non si lavora' };
   }
 
   function richiestaInAttesa(fb, opts) {
