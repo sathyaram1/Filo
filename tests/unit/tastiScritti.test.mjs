@@ -96,3 +96,15 @@ test('su Mac i tasti presi prima della pagina sono quelli del Mac', () => {
   assert.equal(T.delSistema('Ctrl+Tab', 'win32'), false);
   for (const p of ['win32', 'linux']) assert.equal(T.delSistema('Ctrl+Alt+Canc', p), true, p);
 });
+
+test('il nome di una combinazione scritta resta quello scritto, con Cmd al posto di Ctrl su Mac', () => {
+  for (const [scritta, mac] of [
+    ['Alt+1', 'Alt+1'], ['Alt+-', 'Alt+-'], ['Alt+E', 'Alt+E'], ['Alt+Freccia sinistra', 'Alt+Freccia sinistra'],
+    ['Ctrl+Shift+1', 'Cmd+Shift+1'], ['Ctrl Shift 2', 'Cmd+Shift+2'], ['Ctrl+Alt+E', 'Cmd+Alt+E'],
+  ]) {
+    assert.equal(T.etichettaScritta(scritta, 'darwin'), mac, scritta);
+    assert.equal(T.etichettaScritta(scritta, 'win32'), scritta, scritta);
+  }
+  // I tasti di Filo restano riscritti: Alt+1 è il salto di scheda, su Mac Cmd+1.
+  assert.equal(T.etichetta('Alt+1', 'darwin'), 'Cmd+1');
+});

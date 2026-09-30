@@ -99,7 +99,13 @@
 
   // L'etichetta da MOSTRARE per un acceleratore scritto in forma Windows.
   // Su Windows e Linux torna identica: la forma canonica è quella.
-  function etichetta(accel, esplicita) {
+  function etichetta(accel, esplicita) { return nomeSulMac(accel, esplicita, false); }
+
+  // Il nome di una combinazione scritta dall'utente: su Mac Ctrl diventa Cmd e basta. Le riscritture
+  // di Alt qui sotto valgono per i tasti di Filo, e ripetere Alt+1 come «Cmd+1» nominava un altro tasto (#545).
+  function etichettaScritta(accel, esplicita) { return nomeSulMac(accel, esplicita, true); }
+
+  function nomeSulMac(accel, esplicita, scritta) {
     const testo = String(accel || '');
     if (!testo || !suMac(esplicita)) return testo;
 
@@ -117,7 +123,7 @@
     // di una parola dentro OGNI campo di testo: prendersela vorrebbe dire
     // togliere quel movimento in tutta l'app. Lì la convenzione dei browser è
     // Cmd+[ e Cmd+], che non scrivono e non muovono niente.
-    if (haAlt && !haCtrl && (tastoFinale === '\u2190' || tastoFinale === '\u2192')) {
+    if (!scritta && haAlt && !haCtrl && (tastoFinale === '\u2190' || tastoFinale === '\u2192')) {
       return `Cmd+${tastoFinale === '\u2190' ? '[' : ']'}`;
     }
 
@@ -125,13 +131,13 @@
     // la forma è Cmd+cifra — quella di ogni browser su Mac. Lo zero fa
     // eccezione: su Mac Cmd+0 è lo zoom al 100%, e la decima scheda si raggiunge
     // con Cmd+9 come "l'ultima" (vedi `indiceSaltoScheda`).
-    if (haAlt && !haCtrl && /^[0-9]$/.test(tastoFinale)) {
+    if (!scritta && haAlt && !haCtrl && /^[0-9]$/.test(tastoFinale)) {
       return `Cmd+${tastoFinale === '0' ? '9' : tastoFinale}`;
     }
 
     // Alt+lettera: Spiega, Traduci, Salva, Aiuto. Su Mac prende un Control davanti
     // (e qui "Ctrl" è davvero il tasto Control del Mac, non Cmd): vedi shortcuts.js.
-    if (haAlt && !haCtrl) return ['Ctrl', 'Alt', ...altri, tastoFinale].join('+');
+    if (!scritta && haAlt && !haCtrl) return ['Ctrl', 'Alt', ...altri, tastoFinale].join('+');
 
     // Tutto il resto passa da Ctrl, e su Mac Ctrl si preme Cmd.
     const out = [];
@@ -489,7 +495,7 @@
   }
 
   global.SN_TASTI = {
-    piattaforma, suMac, etichetta, frase, acceleratoreElectron,
+    piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
     comandoNavigazione, etichettaIndietro, etichettaAvanti,
     tastiRiservati, riservato,

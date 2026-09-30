@@ -751,3 +751,58 @@ test('«Ctrl Shift 2» parte come Ctrl+Shift+2, e «Ctrl+» dice che manca il ta
   await page.keyboard.press('Control+Shift+Digit2');
   await expect(page.locator('#overlay h3', { hasText: 'Statistiche' })).toBeVisible();
 });
+
+// Invio in un campo del pannello conferma come «Salva», come Esc annulla (#545).
+test('Invio nel campo della scorciatoia salva, e la scorciatoia parte', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await apriDocConModuli(page, [WC]);
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await page.fill('#cfgShortcut', 'Ctrl+S');
+  await page.locator('#cfgShortcut').press('Enter');
+  await expect(page.locator('#cfgShortcutTaken')).toContainText('salva il documento');
+  await page.fill('#cfgShortcut', 'Ctrl+Shift+1');
+  await page.locator('#cfgShortcut').press('Enter');
+  await expect(page.locator('#overlay')).toBeHidden();
+  await exitSettingsMode(page);
+  await page.click('#doc');
+  await page.keyboard.press('Control+Shift+Digit1');
+  await expect(page.locator('#overlay h3', { hasText: 'Statistiche' })).toBeVisible();
+});
+
+// Su Mac l'avviso ripete la combinazione scritta (Ctrl si legge Cmd): le riscritture di Alt
+// valgono per i tasti di Filo, e «Alt+1» diventava «Cmd+1», che lì è il salto di scheda (#545).
+test('su Mac l\'avviso nomina la combinazione che hai scritto', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await page.addInitScript(() => {
+    let tasti;
+    Object.defineProperty(window, 'SN_TASTI', {
+      configurable: true,
+      get: () => tasti,
+      set: (v) => {
+        tasti = v;
+        if (!v) return;
+        const o = { ...v };
+        v.suMac = () => true;
+        v.piattaforma = () => 'darwin';
+        for (const f of ['etichetta', 'etichettaScritta', 'riservato', 'delSistema', 'modificatoreCheCambiaSimbolo']) v[f] = (a) => o[f](a, 'darwin');
+        v.tastiRiservati = () => o.tastiRiservati('darwin');
+      },
+    });
+  });
+  await apriDocConModuli(page, [{ ...WC, data: { count: 'words', shortcut: 'Alt+1' } }, COMMENT]);
+  expect(await page.evaluate(() => window.SN_TASTI.suMac())).toBe(true);
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="comment"]').click();
+  for (const [scritto, atteso] of [
+    ['Alt+1', /^Alt\+1 è già la scorciatoia di «Conteggio parole»/],
+    ['Alt+-', /quindi Alt\+- non partirebbe mai/],
+    ['Ctrl+S', /^Cmd\+S nell'Editor salva il documento/],
+  ]) {
+    await page.fill('#cfgShortcut', scritto);
+    await page.click('#cfgSave');
+    await expect(page.locator('#cfgShortcutTaken'), scritto).toHaveText(atteso);
+  }
+});

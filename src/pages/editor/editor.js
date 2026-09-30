@@ -4039,7 +4039,7 @@
   // Perché una scorciatoia non partirebbe mai su questo modulo ('' = va bene).
   function motivoScorciatoiaPresa(sc, m) {
     if (!sc) return '';
-    const nome = TASTI ? TASTI.etichetta(sc) : sc;
+    const nome = TASTI ? TASTI.etichettaScritta(sc) : sc;
     if (TASTI && TASTI.riservato(sc)) {
       return `${nome} è già di Filo (schede, zoom, annulla…) e non arriverebbe mai a questo modulo`;
     }
@@ -4065,11 +4065,11 @@
     const ignoto = TASTI.pezzoSconosciuto(sc);
     if (ignoto && ignoto.modificatore) return { tipo: 'modificatore', nome: ignoto.nome };
     const conReale = sc.split(/[+\s-]+/).some((p) => ['ctrl', 'alt'].includes(TASTI.tipoModificatore(p)));
-    if (conReale && TASTI.soloModificatori(sc)) return { tipo: 'senzaTasto', nome: TASTI.etichetta(sc.replace(/[+\s-]+$/, '')) };
+    if (conReale && TASTI.soloModificatori(sc)) return { tipo: 'senzaTasto', nome: TASTI.etichettaScritta(sc.replace(/[+\s-]+$/, '')) };
     // Senza Ctrl/Cmd/Alt la lettera scatterebbe mentre si scrive.
     if (!isValidShortcut(sc)) return { tipo: 'senzaModificatore' };
     if (ignoto) return { tipo: 'tasto', nome: ignoto.nome };
-    if (TASTI.delSistema(sc)) return { tipo: 'sistema', nome: TASTI.etichetta(sc) };
+    if (TASTI.delSistema(sc)) return { tipo: 'sistema', nome: TASTI.etichettaScritta(sc) };
     const motivo = motivoScorciatoiaPresa(sc, m);
     return motivo ? { tipo: 'presa', motivo } : null;
   }
