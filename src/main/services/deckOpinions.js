@@ -244,12 +244,12 @@
     const cache = await readSearchCache();
     const asSeen = new Map(ids.map((id) => [judgedAs(cards[id]), id]));
     const plan = P.planSearchFilter({ cardIds: [...asSeen.keys()], criterion: key, searchCache: cache });
-    plan.judgeIds = plan.judgeIds.map((s) => asSeen.get(s));
-    plan.keepFromCache = plan.keepFromCache.map((s) => asSeen.get(s));
+    const judgeIds = plan.judgeIds.map((s) => asSeen.get(s));
+    const keepFromCache = plan.keepFromCache.map((s) => asSeen.get(s));
 
     const batches = [];
-    for (let i = 0; i < plan.judgeIds.length; i += FILTER_BATCH) batches.push(plan.judgeIds.slice(i, i + FILTER_BATCH));
-    let done = ids.length - plan.judgeIds.length;
+    for (let i = 0; i < judgeIds.length; i += FILTER_BATCH) batches.push(judgeIds.slice(i, i + FILTER_BATCH));
+    let done = ids.length - judgeIds.length;
     const progress = () => { if (onProgress) { try { onProgress({ done, total: ids.length }); } catch (_) {} } };
     progress();
     // Più pagine di risultati fanno decine di lotti: al più `limit` chiamate insieme, che si dimezza a ogni «troppe
@@ -297,7 +297,7 @@
       });
     }
 
-    const keepSet = new Set([...plan.keepFromCache, ...Object.keys(judged).filter((id) => judged[id]), ...unverified]);
+    const keepSet = new Set([...keepFromCache, ...Object.keys(judged).filter((id) => judged[id]), ...unverified]);
     return {
       keepIds: ids.filter((id) => keepSet.has(id)),
       unverifiedIds: ids.filter((id) => unverified.has(id)),

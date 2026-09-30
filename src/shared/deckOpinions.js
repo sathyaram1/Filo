@@ -182,9 +182,8 @@
   // ── Filtro semantico dei risultati di ricerca (§4.1) ───────────────────────
   // La chat produce una query Scryfall LARGA (con sinonimi) + un "criterio" in
   // linguaggio naturale; il sistema tiene solo le carte che, giudicate da un
-  // LLM economico, rispettano quel criterio. Il giudizio (carta, criterio) →
-  // bool è cacheabile PERMANENTEMENTE cross-ricerca: dipende solo dal testo
-  // della carta e dal criterio, mai dal mazzo. Cache: { cardId → { critKey → bool } }.
+  // LLM economico, rispettano quel criterio. Cache: { carta come l'ha vista il giudice → { critKey → bool } }; chi la
+  // usa mette nelle due chiavi tutto quello che il giudice ha letto, così un prezzo o un modello cambiati la fanno scadere.
 
   // Chiave di cache di un criterio: minuscolo, spazi normalizzati. Due ricerche
   // scritte uguale (a meno di spazi/maiuscole) condividono i giudizi in cache.
