@@ -738,12 +738,17 @@ test('localSignCheck: pratica chiusa, segnalata o in mano a una routine → no',
   const now = Date.parse('2026-09-30T10:00:00Z');
   assert.equal(MR.localSignCheck(locale({ status: 'archived', statusPublic: 'closed' }), true, { now }).ok, false);
   assert.equal(MR.localSignCheck(locale({ status: 'attack' }), true, { now }).ok, false);
-  const presa = locale({ status: 'working', claimedBy: 'routine:worker', claimExpiresAt: '2026-09-30T11:00:00Z' });
+  // Presa da una routine: il server scrive workingSince alla presa e specchia il battito in beatAt.
+  const dueMinutiFa = '2026-09-30T09:58:00Z';
+  const presa = locale({ status: 'working', workingSince: dueMinutiFa, beatAt: dueMinutiFa });
   const r = MR.localSignCheck(presa, true, { now });
   assert.equal(r.ok, false);
-  assert.match(r.motivo, /biglietto/);
-  // Biglietto scaduto: la pratica è di nuovo libera.
-  assert.equal(MR.localSignCheck({ ...presa, claimExpiresAt: '2026-09-30T09:00:00Z' }, true, { now }).ok, true);
+  assert.match(r.motivo, /routine la sta lavorando/);
+  assert.equal(MR.localSignCheck(locale({ status: 'revision_capability', beatAt: dueMinutiFa }), true, { now }).ok, false, 'un verificatore col battito');
+  // Battito fermo da ben oltre la tolleranza: nessuno la tiene più.
+  assert.equal(MR.localSignCheck({ ...presa, workingSince: '2026-09-30T08:00:00Z', beatAt: '2026-09-30T09:00:00Z' }, true, { now }).ok, true);
+  // Consegnata e tornata in coda: il battito recente del giro finito non la tiene.
+  assert.equal(MR.localSignCheck(locale({ status: 'todo', beatAt: dueMinutiFa }), true, { now }).ok, true);
   // Stato cifrato: non si sa se è aperta, non si segna.
   assert.equal(MR.localSignCheck(locale({ status: 'FENC1:abc' }), true, { now }).ok, false);
 });
