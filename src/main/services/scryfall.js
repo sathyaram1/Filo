@@ -78,14 +78,33 @@
 
   // ── Ricerca (§4): il vincolo di identity lo aggiunge il chiamante via
   //    buildSearchQuery; qui si esegue e si semplifica. ─────────────────────
-  async function search(userQuery, { identity } = {}) {
+  //    `maxCards` oltre la pagina (175) segue le pagine successive; `hasMore` + `total` dicono a chi mostra quante
+  //    ne restano fuori (mai un taglio muto, #382). Una pagina successiva che fallisce chiude lì, con `hasMore`.
+  //    `remember: false`: chi filtra i risultati mette in cache solo quelli che tiene (`remember()`).
+  async function search(userQuery, { identity, maxCards = 0, remember = true, onPage = null } = {}) {
     const q = Q.buildSearchQuery(userQuery, identity);
-    if (!q) return { cards: [], hasMore: false, query: q };
-    const data = await apiGet(`/cards/search?q=${encodeURIComponent(q)}&order=cmc`);
-    if (!data) return { cards: [], hasMore: false, query: q };
-    const cards = (data.data || []).map(Q.simplifyCard).filter(Boolean);
-    cacheCards(cards).catch(() => {});
-    return { cards, hasMore: !!data.has_more, query: q };
+    if (!q) return { cards: [], hasMore: false, total: 0, query: q };
+    const cards = [];
+    let hasMore = false;
+    let total = 0;
+    for (let page = 1; ; page += 1) {
+      let data;
+      try {
+        data = await apiGet(`/cards/search?q=${encodeURIComponent(q)}&order=cmc${page > 1 ? `&page=${page}` : ''}`);
+      } catch (e) {
+        if (page === 1) throw e;
+        hasMore = true;
+        break;
+      }
+      if (!data) break;
+      for (const c of (data.data || []).map(Q.simplifyCard).filter(Boolean)) cards.push(c);
+      hasMore = !!data.has_more;
+      total = Math.max(Number(data.total_cards) || 0, cards.length);
+      if (onPage) { try { onPage({ found: cards.length, total }); } catch (_) {} }
+      if (!hasMore || cards.length >= maxCards) break;
+    }
+    if (remember) cacheCards(cards).catch(() => {});
+    return { cards, hasMore, total: Math.max(total, cards.length), query: q };
   }
 
   // Risoluzione nome fuzzy (§3.5): null se Scryfall non riconosce il nome.
