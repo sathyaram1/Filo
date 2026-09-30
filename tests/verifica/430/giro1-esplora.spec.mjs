@@ -151,8 +151,6 @@ test('E3 pagina interna aperta dietro e schede con titolo HTML/lungo/emoji', asy
     await fotoCarta(app, `e3-${nome}.png`);
     expect(c.pronta).toBe(true);
   }
-  const sh = await shell.screenshot();
-  require('node:fs');
 });
 
 test('E4 tempo fra hover e carta con foto', async ({ app, shell, openTab, testServer }) => {
