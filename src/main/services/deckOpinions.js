@@ -30,13 +30,16 @@
   const FILTER_PARALLEL = 8;
   const CONFIG_ERRORS = new Set(['NO_MODEL_FOR_ACTION', 'NO_API_KEY', 'LIMIT_REACHED']);
 
+  // Giudizi salvati: circa venti ricerche larghe. Oltre si perdono i più vecchi, e rifarne uno costa una chiamata
+  // economica; senza tetto ogni ricerca lasciava decine di KB nel file di Filo, per sempre.
+  const SEARCH_CACHE_MAX_PAIRS = 20000;
+  const SEARCH_CACHE_PER_CARD = 30;
+
   const digest = (s) => crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 16);
-  // I giudizi salvati valgono per le istruzioni che li hanno prodotti: cambiate quelle, la cache scade da sé
-  // (patterns/una-cache-scade-con-la-richiesta-non-solo-con-l-orologio.md).
-  let judgeFp = '';
-  function judgeFingerprint() {
-    if (!judgeFp) judgeFp = digest(PROMPTS.decksSearchFilter({ criterion: '', cards: '' })).slice(0, 10);
-    return judgeFp;
+  // I giudizi salvati valgono per le istruzioni E il modello che li hanno prodotti: cambiato uno dei due, la cache
+  // scade da sé (patterns/una-cache-scade-con-la-richiesta-non-solo-con-l-orologio.md).
+  function judgeFingerprint(model) {
+    return digest(`${PROMPTS.decksSearchFilter({ criterion: '', cards: '' })}\n${model || ''}`).slice(0, 10);
   }
 
   async function readOpinions() {
