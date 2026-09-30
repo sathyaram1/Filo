@@ -269,7 +269,7 @@ test('l’elenco vive in Automazioni: sulle schede-lista non c’è', async ({ o
   await apriGestione(page, { pending: [richiesta()] });
   await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toBeVisible({ timeout: 8_000 });
 
-  for (const scheda of ['inbox', 'queue', 'resolved', 'archived']) {
+  for (const scheda of ['inbox', 'queue', 'local', 'resolved', 'archived']) {
     await page.locator(`.mg-tab[data-tab="${scheda}"]`).click();
     await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).not.toBeVisible();
     await expect(page.locator('#panel-list .sn-mac')).toHaveCount(0);

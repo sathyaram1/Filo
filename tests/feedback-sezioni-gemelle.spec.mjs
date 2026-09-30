@@ -133,7 +133,7 @@ test('#509 — stato illeggibile: niente sezioni su ENTRAMBE le pagine', async (
   // 1. Le sezioni non si disegnano. Le schede che NON sono sezioni
   //    (Statistiche, Modelli, Automazioni, Log) non dipendono dallo stato delle
   //    segnalazioni e restano raggiungibili.
-  for (const tab of ['inbox', 'queue', 'resolved', 'archived']) {
+  for (const tab of ['inbox', 'queue', 'local', 'resolved', 'archived']) {
     await expect(mg.locator(`.mg-tab[data-tab="${tab}"]`)).toBeHidden();
   }
   await expect(mg.locator('.mg-tab[data-tab="log"]')).toBeVisible();
