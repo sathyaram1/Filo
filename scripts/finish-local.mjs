@@ -478,6 +478,21 @@ function readKnownRed(root) {
  * La pratica del lavoro: dall'opzione, o dal ramo in .claude/verify-local.json.
  * Un riferimento che non si risolve ferma tutto: fondere legati alla pratica sbagliata è peggio.
  */
+/**
+ * Ogni lavoro locale arriva su main con la sua pratica (#908): è il registro dell'owner di cosa fa ogni sessione.
+ * Tutte le strade verso main passano di qui, quindi la regola sta qui. PURA. '' = si prosegue.
+ */
+export function senzaPraticaStop({ checkOnly, pratica }) {
+  if (checkOnly || (pratica && pratica.id)) return '';
+  return [
+    'Questo lavoro non ha la sua pratica, e ogni lavoro locale ne ha una: in Gestione è il registro di cosa fa ogni sessione.',
+    'Aprila e legala, poi rilancia:',
+    '  npm run feedback:apri -- "<titolo>" "<cosa fa il lavoro>"',
+    '  npm run finish -- --feedback <N>',
+    'Non ho toccato niente.',
+  ].join('\n');
+}
+
 async function praticaDelLavoro(valore) {
   const branchCorrente = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   const scritta = (readState()[branchCorrente] || {});
