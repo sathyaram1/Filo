@@ -224,7 +224,10 @@ export async function askServerMerge({ branch, sha = '', feedbackId = '', fetchI
     const res = await fetchImpl(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-      body: JSON.stringify({ data: { branch: String(branch || ''), sha: String(sha || '') } }),
+      body: JSON.stringify({ data: {
+        branch: String(branch || ''), sha: String(sha || ''),
+        ...(feedbackId ? { feedbackId: String(feedbackId) } : {}),
+      } }),
     });
     const text = await res.text();
     let body = {};
