@@ -894,15 +894,16 @@
     // 409 ALREADY_EXISTS con documentId → il feedback è già stato scritto da un
     // tentativo precedente (identico submissionId). Non è un errore: successo
     // idempotente, nessun duplicato creato.
+    const prova = idToken ? { senderProof, ...(authRefused ? { authRefused } : {}) } : {};
     if (docId && res.status === 409) {
-      return { id: docId, seq: null, images: uploaded, files: uploadedFiles, failed, deduped: true };
+      return { id: docId, seq: null, images: uploaded, files: uploadedFiles, failed, deduped: true, ...prova };
     }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       throw new Error(`firestore create fallito (${res.status}): ${errText.slice(0, 300)}`);
     }
     const json = await res.json();
-    return { id: json.name?.split('/').pop() || '', seq, images: uploaded, files: uploadedFiles, failed };
+    return { id: json.name?.split('/').pop() || '', seq, images: uploaded, files: uploadedFiles, failed, ...prova };
   }
 
   // ── Il tetto del caricamento, e come si dice ──────────────────────────────
