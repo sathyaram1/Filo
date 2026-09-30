@@ -255,13 +255,11 @@
     return next;
   }
 
-  // Riga della risposta in chat dopo il giudice (§4.1): una carta scartata non si mostra mai, e quando il giudice
-  // non ha potuto guardarle lo si dice, perché la lista che resta non è filtrata (#382). '' = tutto a posto.
-  // `total` sono le carte che Scryfall ha trovato, `found` quelle arrivate al giudice: se sono di più lo si dice.
-  // Le non controllate, se sono solo una parte, la lista le segna col punto interrogativo.
+  // Riga della risposta in chat dopo il giudice (§4.1): una scartata non si mostra mai, una non controllata si dichiara
+  // (la lista la segna con ?), e le carte trovate oltre quelle arrivate al giudice (`total` > `found`) pure (#382).
   function searchFilterNote({ found, kept, unverified, criterion, why, total = 0 }) {
     const motivo = why ? ` Motivo: ${why}` : '';
-    const cap = searchCapNote({ seen: found, total, judged: true });
+    const cap = searchCapNote({ seen: found, total, judged: unverified < found });
     const withCap = (s) => [s, cap].filter(Boolean).join(' ');
     if (found > 0 && unverified >= found) {
       return withCap(`Non sono riuscito a controllare una per una le carte trovate. Qui sotto c'è la ricerca senza filtro, quindi può contenere carte che non c'entrano.${motivo}`);
@@ -276,7 +274,7 @@
       const c = String(criterion || '').trim().replace(/\s+/g, ' ');
       const crit = `«${c.length > 160 ? `${c.slice(0, 159).trimEnd()}…` : c}»`;
       if (total > found) {
-        return `Ho controllato una per una le prime ${num(found)} delle ${num(total)} carte trovate, in ordine di costo, ma nessuna corrisponde a ${crit}. Aggiungi un vincolo, per esempio un costo massimo o un tipo, per arrivare alle altre, o chiedilo con altre parole.`;
+        return `Ho controllato una per una le prime ${num(found)} delle ${num(total)} carte trovate, in ordine di costo, e nessuna corrisponde a ${crit}. Per arrivare alle altre aggiungi un vincolo, per esempio un costo massimo o un tipo, o chiedilo con altre parole.`;
       }
       return found === 1
         ? `Ho controllato la carta trovata, ma non corrisponde a ${crit}. Prova a chiederlo con altre parole.`
@@ -289,8 +287,8 @@
   function searchCapNote({ seen, total, judged }) {
     if (!(total > seen) || !(seen > 0)) return '';
     return judged
-      ? `Le carte trovate sono ${num(total)}: ho controllato le prime ${num(seen)}, in ordine di costo. Aggiungi un vincolo, per esempio un costo massimo o un tipo, per arrivare alle altre.`
-      : `Le carte trovate sono ${num(total)}: qui sotto ci sono le prime ${num(seen)}, in ordine di costo. Aggiungi un vincolo, per esempio un costo massimo o un tipo, per arrivare alle altre.`;
+      ? `Scryfall ne ha trovate ${num(total)} e ho controllato le prime ${num(seen)}, in ordine di costo. Per arrivare alle altre aggiungi un vincolo, per esempio un costo massimo o un tipo.`
+      : `Scryfall ne ha trovate ${num(total)} e qui sotto ci sono le prime ${num(seen)}, in ordine di costo. Per arrivare alle altre aggiungi un vincolo, per esempio un costo massimo o un tipo.`;
   }
 
   function num(n) { return Number(n).toLocaleString('it-IT'); }
@@ -309,5 +307,6 @@
     planSearchFilter,
     updateSearchCache,
     searchFilterNote,
+    searchCapNote,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

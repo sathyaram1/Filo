@@ -149,6 +149,12 @@ module.exports = function register(on, ctx) {
           try { wc.send('filo:reasoning', { reqId: reasoningReqId, text: t }); } catch (_) {}
         }
       };
+      // Stesso canale, fase della ricerca: la bolla in attesa dice cosa sta facendo Filo e a che punto è (#382).
+      const onProgress = (progress) => {
+        if (reasoningReqId && wc && !wc.isDestroyed?.()) {
+          try { wc.send('filo:reasoning', { reqId: reasoningReqId, progress: { ...progress, reply } }); } catch (_) {}
+        }
+      };
 
       const r = await handleAIRequest({
         action: ACTIONS.DECKS_CHAT,
