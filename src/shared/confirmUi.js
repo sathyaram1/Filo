@@ -482,6 +482,8 @@
         textScrollTop: textEl ? textEl.scrollTop : 0,
         hasInput: !!q('.sn-confirm-input'),
         copre: !!q('.sn-confirm-copre'),
+        okLabel: (okBtn && okBtn.textContent) || '',
+        cancelLabel: (q('.sn-confirm-btn-cancel') && q('.sn-confirm-btn-cancel').textContent) || '',
         textScrolls: !!(textEl && textEl.scrollHeight > textEl.clientHeight + 1),
         selectionBg,
       };
