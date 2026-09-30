@@ -119,6 +119,8 @@ test('titolo lunghissimo con markup ed emoji, tema chiaro e scuro, ultima scheda
   // Tema scuro.
   await shell.mouse.move(600, 500);
   await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
+  await shell.emulateMedia({ colorScheme: 'dark' });
+  await win.emulateMedia({ colorScheme: 'dark' });
   await shell.waitForTimeout(800);
   await shell.locator(`.tab[data-id="${id1}"]`).hover();
   await expect.poll(async () => (await carta(app)).visibile, { timeout: 3000 }).toBe(true);
