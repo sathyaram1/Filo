@@ -17,6 +17,11 @@ default sbagliato, e non ce ne si accorge finché qualcuno non lo cerca.
   (`origine.js` è la porta unica del confine: risponde `code: 'forbidden'`, così
   chi deve dirlo all'utente sa che è la provenienza e non la rete. `origin` è il
   terzo argomento dell'handler; la shell è `filo://shell/shell.html`.)
+- **La barra è il frame principale di una finestra CON le schede**
+  (`finestraDellaBarra` in `src/main/ipc.js`, che dà `sender.isShell`), non
+  di una finestra qualunque: un popup «Accedi con…» è una finestra vera con
+  dentro un sito, e le porte chiuse ai siti gli rispondevano (#589.3,
+  `tests/popup-di-accesso-da-un-sito.spec.mjs`).
 - **Due bandiere rosse** che rendono il gate non negoziabile: la risposta
   contiene **percorsi assoluti su disco** (rivelano lo username e la struttura
   del computer), oppure il comando fa **aprire/eseguire qualcosa** al sistema
