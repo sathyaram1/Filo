@@ -982,7 +982,7 @@ const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.m
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2);
 
-  const USO = 'Comandi: start ["<richiesta>"] | critica "<rilievi coi livelli>" | pulizia | corretto "<report>" | status';
+  const USO = 'Comandi: start ["<richiesta>"] [--feedback <N>] | critica "<rilievi coi livelli>" | pulizia | corretto "<report>" | status';
   // L’aiuto si stampa e basta, DOVUNQUE stia nella riga. Chiedere aiuto a uno
   // strumento è il primo gesto di chi verifica, e qui era l’unico posto dove
   // al posto dell’aiuto partiva l’azione: `start --help` apriva il giro per
@@ -996,16 +996,28 @@ if (isMain) {
   };
   if ([cmd, ...rest].some(chiedeAiuto)) {
     console.log(USO);
-    console.log('Non ho toccato niente. Nessun comando accetta opzioni: il testo va fra virgolette, tutto in un pezzo solo.');
+    console.log('Non ho toccato niente. L’unica opzione è --feedback <N> di start (la pratica del lavoro, per npm run finish); il testo va fra virgolette, tutto in un pezzo solo.');
     process.exit(0);
   }
 
-  // Qui nessun comando accetta opzioni: una parola con due trattini in coda
+  // Qui nessun comando accetta opzioni (tolto --feedback di start, qui sopra): una parola con due trattini in coda
   // finiva DENTRO al testo della critica (o del report) e l'esito veniva
   // registrato lo stesso — un testo che non si modifica più, e che l'owner
   // legge nella chat del feedback (feedback #565).
   // STA PRIMA DI TUTTI E TRE I COMANDI, e non è un dettaglio: quando stava
   // dopo, `start` aveva già aperto il giro e per lui non scattava mai.
+  let feedbackRif = null;
+  if (cmd === 'start') {
+    const { estraiOpzioneFeedback, parseRiferimento } = await import('./lib/pratica-locale.mjs');
+    const o = estraiOpzioneFeedback(rest);
+    if (o.errore) { console.error(`${o.errore} — non ho toccato niente.`); process.exit(1); }
+    if (o.valore !== null) {
+      const r = parseRiferimento(o.valore);
+      if (!r.ok) { console.error(`${r.motivo} — non ho toccato niente.`); process.exit(1); }
+      feedbackRif = o.valore;
+    }
+    rest.splice(0, rest.length, ...o.resto);
+  }
   if (['critica', 'corretto', 'start'].includes(cmd)) {
     const { sembraOpzione, sembraOpzioneNelReport } = await import('./lib/argomenti.mjs');
     const opzione = rest.find((a) => (cmd === 'corretto' ? sembraOpzioneNelReport(a) : sembraOpzione(a)));
@@ -1042,6 +1054,22 @@ if (isMain) {
   const sha = headSha();
 
   // I bilanci veri, o ci si ferma qui: un errore evidente, nessun ripiego.
+  // La pratica, o ci si ferma: legare il lavoro al feedback sbagliato è peggio che non legarlo.
+  const praticaOStop = async (rif) => {
+    const { risolviFeedback, avvisoPratica } = await import('./lib/pratica-locale.mjs');
+    const { acquireBearer, FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
+    try {
+      const bearer = await acquireBearer();
+      const r = await risolviFeedback(rif, { bearer, base: FIRESTORE_BASE });
+      if (!r.ok) throw new Error(r.motivo);
+      return { ...r, avviso: await avvisoPratica(r.id, { bearer, base: FIRESTORE_BASE }) };
+    } catch (e) {
+      console.error(`PRATICA NON TROVATA — mi fermo, non ho toccato niente. ${String((e && e.message) || e)}`);
+      process.exit(1);
+    }
+    return null;
+  };
+
   const bilanciOStop = async () => {
     try {
       return await leggiBilanciDalServer();
@@ -1070,6 +1098,8 @@ if (isMain) {
     // I bilanci si leggono già qui, PRIMA del lavoro: se il token manca o il
     // documento è incompleto, meglio saperlo adesso che dopo la verifica.
     const capsStart = await bilanciOStop();
+    // La pratica si risolve qui, prima del riallineamento: un numero sbagliato non tocca niente.
+    const pratica = feedbackRif !== null ? await praticaOStop(feedbackRif) : null;
     // Prima di consegnare il compito il ramo si riallinea alla linea
     // principale (caso #500): la verifica deve giudicare il contenuto che
     // verrà pubblicato. Sul conflitto ci si ferma qui, col ramo intatto.
@@ -1077,7 +1107,9 @@ if (isMain) {
     // Ramo e sha si rileggono: il riallineamento può averli riscritti, e il
     // verdetto deve legarsi al contenuto vero.
     const b = currentBranch();
-    const state = withRequest(readState(), b, { request, sha: headSha() });
+    const state = withRequest(readState(), b, {
+      request, sha: headSha(), feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '',
+    });
     const partenza = state[b].chiusura && state[b].chiusura.shaPrima;
     if (partenza) {
       const adesso = shaPrimaAllineato(partenza);
@@ -1099,6 +1131,10 @@ if (isMain) {
     // sull'altro canale, fuori dal compito che si consegna.
     console.error(bilanciText(capsStart));
     console.error('Ambito della verifica: ' + (scope === 'chiusura' ? 'chiusura (giro stretto acceso, e il giro prima è stato corretto)' : 'pieno'));
+    console.error(state[b].feedbackId
+      ? `Pratica del lavoro: ${state[b].feedbackNum ? '#' + state[b].feedbackNum : state[b].feedbackId} (la porta npm run finish).`
+      : 'Nessuna pratica collegata: npm run finish chiederà la fusione senza (start --feedback <N> per legarla).');
+    if (pratica && pratica.avviso) console.error(pratica.avviso);
     process.exit(0);
   }
 
