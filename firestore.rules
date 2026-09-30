@@ -354,6 +354,8 @@ service cloud.firestore {
                     // forma più sotto). Il server la legge prima di aprire una
                     // richiesta di approvazione per il lavoro delle routine.
                     'mergePreapproved',
+                    // #908: il segno «solo in locale» (forma: localOnlyValido).
+                    'localOnly',
                     // #595: il ripasso dei documenti vecchi con prefisso riservato.
                     'senderProof',
                     'capabilityGapId']) // F4: permettere update del gap id (backfill)
