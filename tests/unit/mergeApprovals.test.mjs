@@ -450,4 +450,16 @@ describe('i lavori locali (#908)', () => {
     const src = require('node:fs').readFileSync(join(ROOT, 'src', 'shared', 'mergeApprovals.js'), 'utf8');
     assert.doesNotMatch(src, /il terminale, da solo, non può/);
   });
+
+  test('il pattern del cancello dice regola, non muro, e che il lavoro locale provato non aspetta (#908)', () => {
+    const fs = require('node:fs');
+    const pattern = fs.readFileSync(join(ROOT, 'patterns', 'un-cancello-automatico-che-blocca-deve-avere-una-via-duscita.md'), 'utf8');
+    const riga = fs.readFileSync(join(ROOT, 'PATTERNS.md'), 'utf8').split('\n').find((l) => l.includes('un-cancello-automatico-che-blocca'));
+    for (const testo of [pattern, riga]) {
+      assert.doesNotMatch(testo, /non lo può dare una sessione|persona su un'altra superficie|può chiedere quanto vuole/);
+      assert.match(testo, /regola del server, non un muro/i);
+    }
+    assert.match(pattern, /#908/);
+    assert.match(riga, /lavoro locale provato/);
+  });
 });
