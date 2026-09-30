@@ -27,17 +27,17 @@ test('un feedback senza prova non compare scritto dall’owner, dalla sessione l
   // Il feedback vero dell'owner resta dell'owner.
   expect(await autore(page, 'VERO_OWNER')).toContain('Owner');
 
-  expect(await autore(page, 'FINTO_OWNER')).not.toContain('Owner');
-  expect(await autore(page, 'FINTA_LOCALE')).not.toContain('sessione locale');
-  expect(await autore(page, 'FINTA_ROUTINE')).not.toContain('verifica');
+  expect.soft(await autore(page, 'FINTO_OWNER')).not.toContain('Owner');
+  expect.soft(await autore(page, 'FINTA_LOCALE')).not.toContain('sessione locale');
+  expect.soft(await autore(page, 'FINTA_ROUTINE')).not.toContain('verifica');
 
   // Nel dettaglio: l'intestazione non dice «Da Owner», e la segnalazione è una bolla dell'utente.
   await page.locator('.mg-item[data-id="FINTO_OWNER"]').click();
   await expect(page.locator('#mgDetailHead, .mg-detail-head').first()).toBeVisible();
-  await expect(page.locator('.mg-sender-link')).not.toContainText('Owner');
+  await expect.soft(page.locator('.mg-sender-link')).not.toContainText('Owner');
   await page.locator('.mg-item[data-id="FINTA_ROUTINE"]').click();
-  await expect(page.locator('.mg-sender-link')).not.toContainText('Claude');
-  await expect(page.getByText('Filo (segnalazione automatica)')).toHaveCount(0);
+  await expect.soft(page.locator('.mg-sender-link')).not.toContainText('Claude');
+  await expect.soft(page.getByText('Filo (segnalazione automatica)')).toHaveCount(0);
 });
 
 test('nella pagina Feedback un feedback senza prova non ha il colore dell’owner né il badge di una routine', async ({ openTab }) => {
@@ -46,7 +46,7 @@ test('nella pagina Feedback un feedback senza prova non ha il colore dell’owne
   await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK_THREAD);
   await page.evaluate((list) => { window.__fbTest.setAdmin(true); window.__fbTest.setData(list); }, FBS);
   await expect(page.locator('.fb-card[data-id="VERO_OWNER"]')).toHaveClass(/fb-card--origin-owner/);
-  await expect(page.locator('.fb-card[data-id="FINTO_OWNER"]')).not.toHaveClass(/fb-card--origin-owner/);
+  await expect.soft(page.locator('.fb-card[data-id="FINTO_OWNER"]')).not.toHaveClass(/fb-card--origin-owner/);
   await page.evaluate(() => window.__fbTest.setAgentOnly(true));
-  await expect(page.locator('.fb-card[data-id="FINTA_ROUTINE"]')).toHaveCount(0);
+  await expect.soft(page.locator('.fb-card[data-id="FINTA_ROUTINE"]')).toHaveCount(0);
 });
