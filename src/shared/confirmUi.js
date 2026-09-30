@@ -570,5 +570,7 @@
     },
   };
 
-  global.SN_CONFIRM_UI = { confirm, confirmTyped, notify, _test };
+  _test.variabili = variabili;
+
+  global.SN_CONFIRM_UI = { confirm, confirmTyped, notify, tema: impostaTema, _test };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
