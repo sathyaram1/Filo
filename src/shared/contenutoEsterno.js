@@ -349,6 +349,7 @@
   }
 
   function tagliaDichiarando(testo, max) {
+    if (max === Infinity) return testo;
     const tetto = Number.isFinite(max) && max > 0 ? max : MAX_CHARS;
     if (testo.length <= tetto) return testo;
     let utile = Math.max(0, tetto - RIGA_TAGLIO.length - 1);
