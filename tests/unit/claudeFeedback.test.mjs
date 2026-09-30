@@ -28,13 +28,82 @@ const TH = globalThis.SN_FEEDBACK_THREAD;
 const SCRIPT = await import('../../scripts/claude-feedback.mjs');
 const FB = globalThis.SN_FEEDBACK;
 
+// La credenziale vera va in rete col token dell'owner: nei test non c'è mai,
+// salvo dove un test la mette apposta.
+const credenzialeVera = SCRIPT.credenziale.ottieni;
+SCRIPT.credenziale.ottieni = async () => ({ idToken: '', motivo: 'nessuna credenziale (test)' });
+
 /** Sostituisce submit per la durata di `fn`, raccogliendo cosa gli è arrivato. */
 async function conSubmit(impl, fn) {
   const orig = FB.submit;
   const visti = [];
-  FB.submit = async (payload) => { visti.push(payload); return impl(payload); };
+  FB.submit = async (payload, opts) => { visti.push(payload); visti.opts = [...(visti.opts || []), opts]; return impl(payload, opts); };
   try { return await fn(visti); } finally { FB.submit = orig; }
 }
+
+/** Raccoglie stderr per la durata di `fn`. */
+async function conStderr(fn) {
+  const righe = [];
+  const orig = console.error;
+  console.error = (...a) => righe.push(a.join(' '));
+  try { await fn(); } finally { console.error = orig; }
+  return righe.join('\n');
+}
+
+test('#595 col token admin il feedback parte autenticato e con la prova del mittente', async () => {
+  SCRIPT.credenziale.ottieni = async () => ({ idToken: 'tok-owner' });
+  try {
+    await conSubmit(async (_p, opts) => ({ id: 'd', seq: 3, senderProof: opts && opts.idToken ? 'admin' : '' }), async (visti) => {
+      let code;
+      const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X']); });
+      assert.equal(code, SCRIPT.EXIT.FATTO);
+      assert.deepEqual(visti.opts[0], { idToken: 'tok-owner' });
+      assert.doesNotMatch(err, /anonimo/);
+    });
+  } finally {
+    SCRIPT.credenziale.ottieni = async () => ({ idToken: '', motivo: 'nessuna credenziale (test)' });
+  }
+});
+
+test('#595 senza token: lo dice su stderr e parte lo stesso, anonimo', async () => {
+  await conSubmit(async () => ({ id: 'd', seq: 4 }), async (visti) => {
+    let code;
+    const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X']); });
+    assert.equal(code, SCRIPT.EXIT.FATTO, 'il codice d’uscita non cambia');
+    assert.equal(visti.length, 1);
+    assert.equal(visti.opts[0], undefined, 'submit anonima: nessuna opzione');
+    assert.match(err, /parte come anonimo e passa dai giudici/);
+  });
+});
+
+test('#595 token rifiutato dal server: lo dice su stderr', async () => {
+  SCRIPT.credenziale.ottieni = async () => ({ idToken: 'tok-vecchio' });
+  try {
+    await conSubmit(async () => ({ id: 'd', seq: 5, senderProof: '', authRefused: 403 }), async () => {
+      let code;
+      const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X']); });
+      assert.equal(code, SCRIPT.EXIT.FATTO);
+      assert.match(err, /rifiutato \(403\).*anonimo/);
+    });
+  } finally {
+    SCRIPT.credenziale.ottieni = async () => ({ idToken: '', motivo: 'nessuna credenziale (test)' });
+  }
+});
+
+test('#595 prova a vuoto ed errore d’uso non chiedono la credenziale', async () => {
+  let chiesta = 0;
+  SCRIPT.credenziale.ottieni = async () => { chiesta += 1; return { idToken: '' }; };
+  try {
+    await conSubmit(async () => ({ id: 'd' }), async () => {
+      await SCRIPT.main(['T', 'X', '--dry-run']);
+      await conStderr(() => SCRIPT.main(['T']));
+    });
+    assert.equal(chiesta, 0);
+  } finally {
+    SCRIPT.credenziale.ottieni = async () => ({ idToken: '', motivo: 'nessuna credenziale (test)' });
+  }
+  assert.equal(typeof credenzialeVera, 'function');
+});
 
 test('il feedback parte firmato come sessione locale, non come utente anonimo', async () => {
   await conSubmit(async () => ({ id: 'doc1', seq: 512 }), async (visti) => {
