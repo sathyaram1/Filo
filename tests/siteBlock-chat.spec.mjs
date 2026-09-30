@@ -232,3 +232,29 @@ test('assistente sulla pagina: la pagina aperta che dopo qualche secondo si spos
   await expect(tab.locator('.sn-sidebar button', { hasText: 'Apri comunque blocked.test' })).toBeVisible();
   expect(await suBloccato(app)).toEqual([]);
 });
+
+// La riga dell'apertura fermata nel diario dell'assistente: intera (il motivo sta in fondo), e il diario non scorre di lato.
+const rigaIntera = (tab) => tab.evaluate(() => {
+  const l = [...document.querySelectorAll('.sn-sidebar-log')].pop();
+  const c = document.querySelector('.sn-sidebar-conv');
+  return { testo: l.textContent, tagliata: l.scrollWidth > l.clientWidth, diarioDiLato: c.scrollWidth > c.clientWidth };
+});
+
+test('assistente sulla pagina: la riga di un\'apertura fermata dalle liste pubbliche o verso un nome lunghissimo si legge intera', async ({ app, shell, rete }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(() => { globalThis.__filoAdblock.setDomainsForTest(['doubleclick.net']); });
+  await shell.evaluate(() => window.filoShell.message({
+    type: 'update_settings',
+    settings: { security: { siteBlock: { enabled: true, useAdblockLists: true, blacklist: ['blocked.test'] } } },
+  }));
+  await shell.waitForTimeout(300);
+  const { tab, naviga: apri } = await assistenteSu(app, shell, rete.pagina('sito.test', '/', '<h1>PAGINA</h1>'), 'sito.test');
+  expect(await apri('https://www.doubleclick.net/')).toBe(false);
+  await expect(tab.locator('.sn-sidebar button', { hasText: 'Apri comunque www.doubleclick.net' })).toBeVisible();
+  expect(await rigaIntera(tab)).toMatchObject({ testo: expect.stringContaining('è fra i siti di pubblicità e tracciamento'), tagliata: false, diarioDiLato: false });
+  const lungo = 'www.un-nome-di-sito.davvero-molto.lungo-per-provare.i-bottoni-della.chat-e-del.diario.blocked.test';
+  expect(await apri(`https://${lungo}/`)).toBe(false);
+  await expect(tab.locator('.sn-sidebar button', { hasText: `Apri comunque ${lungo}` })).toBeVisible();
+  expect(await rigaIntera(tab)).toMatchObject({ testo: expect.stringContaining(`${lungo} è fra i siti bloccati`), tagliata: false, diarioDiLato: false });
+  await tab.screenshot({ path: 'tests/.shots/590-assistente-riga-intera.png' });
+});

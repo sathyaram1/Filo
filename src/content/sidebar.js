@@ -645,6 +645,14 @@
     return `${label}: ${host || 'il sito'} è fra i siti ${reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati'}`;
   }
 
+  // Il perché del blocco sta in fondo alla riga: va a capo invece di finire nei puntini.
+  function scriviRigaBloccata(riga, label, dati) {
+    if (!riga) return null;
+    riga.textContent = '· ' + rigaBloccata(label, dati);
+    riga.classList.add('sn-sidebar-log-intera');
+    return riga;
+  }
+
   // Come la chat della home: la notifica se ne va in pochi secondi, il bottone resta. Conta solo il
   // clic vero dell'utente, perché il bottone sta nel DOM della pagina; il main accetta solo gli
   // indirizzi che la lista ha fermato a un'apertura di questo assistente.
@@ -679,7 +687,7 @@
     const done = !!(r && r.executed);
     const o = (r && r.output) || null;
     if (!done && o && o.blocked === 'site') {
-      bottoneApriComunque(appendActionLog(rigaBloccata(label, o)), o);
+      bottoneApriComunque(scriviRigaBloccata(appendActionLog(''), label, o), o);
       return false;
     }
     const riga = appendActionLog(esitoAzione(label, done, r));
@@ -697,8 +705,7 @@
       const seguita = apertureSeguite.get(msg.callId);
       if (!seguita) return;
       apertureSeguite.delete(msg.callId);
-      seguita.riga.textContent = '· ' + rigaBloccata(seguita.label, msg);
-      bottoneApriComunque(seguita.riga, msg);
+      bottoneApriComunque(scriviRigaBloccata(seguita.riga, seguita.label, msg), msg);
     });
   } catch (_) {}
 
