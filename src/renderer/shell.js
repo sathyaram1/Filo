@@ -915,7 +915,8 @@
 
       const close = document.createElement('span');
       close.className = 'close';
-      close.dataset.tip = `Chiudi scheda (${tasto('Ctrl+W')})`;
+      // La scorciatoia chiude la scheda attiva: sulle altre la croce non la promette.
+      close.dataset.tip = t.id === state.activeId ? `Chiudi scheda (${tasto('Ctrl+W')})` : 'Chiudi scheda';
       if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
       else close.textContent = '×';
       close.addEventListener('click', (e) => {
