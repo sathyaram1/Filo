@@ -193,7 +193,8 @@
   }
 
   // { "keep": [...] } o array nudo, coi NUMERI della lista (1 = judgeIds[0]) o gli id esatti. `null` = illeggibile:
-  // non è «nessuna tiene», e salvata come tutte scartate avvelenerebbe la cache per sempre (#382).
+  // non è «nessuna tiene», e salvata come tutte scartate avvelenerebbe la cache per sempre (#382). Basta una voce
+  // che non indica una carta della lista (un nome, un numero fuori lista) e non si sa più cosa intendeva il giudice.
   function parseSearchKeep(text, judgeIds) {
     const ids = (judgeIds || []).map(String);
     const allow = new Set(ids);
@@ -206,7 +207,8 @@
       const s = String(it == null ? '' : it).trim();
       if (allow.has(s)) { out.add(s); continue; }
       const n = /^\d+$/.test(s) ? Number(s) : NaN;
-      if (n >= 1 && n <= ids.length) out.add(ids[n - 1]);
+      if (!(n >= 1 && n <= ids.length)) return null;
+      out.add(ids[n - 1]);
     }
     return out;
   }
