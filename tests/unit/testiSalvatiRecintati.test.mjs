@@ -130,3 +130,18 @@ test('generatore della home e lezioni: i testi salvati entrano recintati', () =>
   const lezione = P.filoLesson({ interazione: 'UTENTE: ciao', stato });
   assert.equal(soloDentro(lezione, VELENO).fuori, false);
 });
+
+// Prima del recinto l'elenco non aveva tetto: con 200 file il taglio a 32 KB
+// lasciava fuori i più recenti, che Filo non poteva più nemmeno aprire.
+test('duecento file dell\'editor: nel recinto ci sono tutti, l\'ultimo creato compreso', () => {
+  const riassunto = 'Appunti sulla riunione con il fornitore: i prezzi concordati per il prossimo trimestre, '
+    + 'le date di consegna e i punti ancora aperti sul contratto di manutenzione.';
+  const lista = Array.from({ length: 200 }, (_, i) => ({ id: `f-${i}`, title: `Riunione ${i + 1}`, summary: riassunto, source: 'ai' }));
+  const files = SUM.renderForPrompt(lista);
+  assert.ok(files.length > E.LIMITI.MAX_CHARS, 'la prova deve superare il tetto delle altre buste');
+  assert.ok(files.includes('- [f-199] Riunione 200:'), 'il file più recente manca');
+  assert.equal((files.match(/- \[f-\d+\] /g) || []).length, 200);
+  assert.ok(!files.includes(E.RIGA_TAGLIO));
+  // Il contenuto che non è di Filo resta col suo tetto.
+  assert.ok(E.imbusta({ tipo: 'RICERCA_WEB', testo: files }).includes(E.RIGA_TAGLIO));
+});
