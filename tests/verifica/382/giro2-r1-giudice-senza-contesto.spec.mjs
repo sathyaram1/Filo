@@ -3,8 +3,13 @@
 import { test, expect } from '../../fixtures/electron.mjs';
 import { mockScryfall, mockProvider, deckWithCommander, send } from './_mock.mjs';
 
-const head = (prompt) => prompt.split('CARTE CANDIDATE')[0];
-const lines = (prompt) => prompt.split('CARTE CANDIDATE')[1].split('\n').filter((l) => /^\d+\. /.test(l));
+// Nel main: la parte del prompt prima della lista, e le righe delle carte.
+async function helpers(app) {
+  await app.evaluate(() => {
+    globalThis.__head = (prompt) => prompt.split('CARTE CANDIDATE:')[0];
+    globalThis.__lines = (prompt) => (prompt.split('CARTE CANDIDATE:')[1] || '').split('\n').filter((l) => /^\d+\. /.test(l));
+  });
+}
 
 async function open(openTab) {
   const page = await openTab('filo://decks/decks.html');
@@ -17,6 +22,7 @@ test('una richiesta che parla del commander: il giudice sa chi è', async ({ app
   test.setTimeout(90_000);
   await mockScryfall(app);
   await mockProvider(app);
+  await helpers(app);
   await app.evaluate(() => {
     const card = globalThis.__card;
     globalThis.__pages = [[
@@ -26,8 +32,8 @@ test('una richiesta che parla del commander: il giudice sa chi è', async ({ app
     globalThis.__chat = () => JSON.stringify({ reply: 'Cerco carte per il tuo commander.', query: '(t:instant or t:sorcery or t:creature)', filter: 'carte che sinergizzano con il commander del mazzo' });
     // Sa giudicare la sinergia solo se il prompt dice chi è il commander.
     globalThis.__judge = (prompt) => {
-      if (!/Niv-Mizzet/.test(head(prompt))) return JSON.stringify({ keep: [] });
-      return JSON.stringify({ keep: lines(prompt).filter((l) => /Instant|Sorcery/.test(l)).map((l) => Number(l.split('.')[0])) });
+      if (!/Niv-Mizzet/.test(globalThis.__head(prompt))) return JSON.stringify({ keep: [] });
+      return JSON.stringify({ keep: globalThis.__lines(prompt).filter((l) => /Instant|Sorcery/.test(l)).map((l) => Number(l.split('.')[0])) });
     };
   });
   const page = await open(openTab);
@@ -41,6 +47,7 @@ test('una richiesta col prezzo: il giudice vede quanto costa ogni carta', async 
   test.setTimeout(90_000);
   await mockScryfall(app);
   await mockProvider(app);
+  await helpers(app);
   await app.evaluate(() => {
     const card = globalThis.__card;
     const cheap = card('shock-1', 'Shock', 1, 'Instant', 'Shock deals 2 damage to any target.');
@@ -50,7 +57,7 @@ test('una richiesta col prezzo: il giudice vede quanto costa ogni carta', async 
     globalThis.__chat = () => JSON.stringify({ query: '(o:damage or o:deals) eur<1', filter: 'infligge danni a una creatura e costa meno di 1 euro' });
     // Sa giudicare «meno di 1 euro» solo se ogni riga porta il prezzo.
     globalThis.__judge = (prompt) => {
-      const ls = lines(prompt);
+      const ls = globalThis.__lines(prompt);
       if (!ls.every((l) => /€|eur/i.test(l))) return JSON.stringify({ keep: [] });
       return JSON.stringify({ keep: ls.filter((l) => /0[.,]20/.test(l)).map((l) => Number(l.split('.')[0])) });
     };
@@ -65,6 +72,7 @@ test('un seguito senza "filter" dal modello: il giudice non perde la richiesta d
   test.setTimeout(90_000);
   await mockScryfall(app);
   await mockProvider(app);
+  await helpers(app);
   await app.evaluate(() => {
     const card = globalThis.__card;
     globalThis.__pages = [[
@@ -75,10 +83,11 @@ test('un seguito senza "filter" dal modello: il giudice non perde la richiesta d
     globalThis.__chat = () => (++n === 1
       ? JSON.stringify({ query: '(o:"have haste" or o:haste)', filter: 'fa guadagnare haste ad altre creature' })
       : JSON.stringify({ query: '(o:"have haste" or o:haste) cmc<=2' }));
-    // Tiene chi DÀ haste se il criterio parla di haste; altrimenti giudica solo il costo, e passano tutte.
+    // Tiene chi DÀ haste se il prompt porta la richiesta di haste (le regole fisse la nominano già, la frase no);
+    // altrimenti giudica solo il costo, e passano tutte.
     globalThis.__judge = (prompt) => {
-      const ls = lines(prompt);
-      const keep = /haste/i.test(head(prompt)) ? ls.filter((l) => /have haste/.test(l)) : ls;
+      const ls = globalThis.__lines(prompt);
+      const keep = /danno haste|haste ad altre/i.test(globalThis.__head(prompt)) ? ls.filter((l) => /have haste/.test(l)) : ls;
       return JSON.stringify({ keep: keep.map((l) => Number(l.split('.')[0])) });
     };
   });
