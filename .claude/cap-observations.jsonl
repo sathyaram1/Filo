@@ -1,1 +1,2 @@
 {"ts":"2026-09-29T23:35:30Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":null,"last_msg":"API Error: Can't reach the API server — check your internet or DNS (ENOTFOUND)"}
+{"ts":"2026-09-30T11:50:34Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":"general-purpose","last_msg":"API Error: Can't reach the API server — check your internet or DNS (ENOTFOUND)"}
