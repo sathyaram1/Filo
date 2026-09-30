@@ -81,8 +81,8 @@ test('il nome di un timer torna ripulito e recintato: nell\'esito e dopo un turn
   // Seconda richiesta: l'esito del TIMER (messaggio «tool»).
   const esito = catture[1].filter((m) => m.role === 'tool').map((m) => m.content).join('\n');
   expect(esito).toMatch(/timer/i);
-  expect(fuoriRecinto(esito)).toEqual([]);
-  expect(esito).not.toContain('<<<FINE_TESTO_SALVATO>>>\n(Sistema');
+  expect.soft(fuoriRecinto(esito)).toEqual([]);
+  expect.soft(esito).not.toContain('<<<FINE_TESTO_SALVATO>>>\n(Sistema');
   // Terza e quarta richiesta: la cronologia che porta il turno interrotto.
   for (const k of [2, 3]) {
     const storia = catture[k].filter((m) => m.role !== 'system').map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n');

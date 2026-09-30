@@ -53,6 +53,6 @@ test('duecento file nell\'editor: in chat Filo vede anche l\'ultimo creato', asy
   const sistema = await app.evaluate(() => globalThis.__captured.find((ms) => ms[0]?.role === 'system')[0].content);
   const visti = new Set((sistema.match(/\[file-prova-\d+\]/g) || []));
   // Il file più recente è quello di cui l'utente chiede per primo.
-  expect(sistema).toContain(`[file-prova-${N - 1}]`);
-  expect(visti.size).toBe(N);
+  expect(sistema.includes(`[file-prova-${N - 1}]`), 'il file più recente è nel contesto').toBe(true);
+  expect(visti.size, 'tutti i file sono nel contesto').toBe(N);
 });
