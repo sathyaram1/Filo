@@ -329,6 +329,7 @@
           userText: 'il modello del filtro ha risposto in un formato che non so leggere. Riprova, o scegli un altro modello per «Mazzi — filtro dei risultati di ricerca» in Modelli predefiniti.',
         });
       } catch (e) {
+        if (isBusy(e)) return { error: e, busy: true };
         error = e;
         if (e && CONFIG_ERRORS.has(e.code)) break;
       }
