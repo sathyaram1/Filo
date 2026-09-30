@@ -172,8 +172,9 @@
 
   /** L'etichetta della provenienza, col numero del feedback quando c'è. PURA. */
   function originLabel(req) {
-    if (originOf(req) !== 'routine') return 'lavoro tuo, da questo computer';
     var num = feedbackNum(req);
+    // Da #908 anche il lavoro locale porta la sua pratica.
+    if (originOf(req) !== 'routine') return num ? 'lavoro locale · feedback #' + num : 'lavoro tuo, da questo computer';
     return num ? 'automazione · feedback #' + num : 'automazione';
   }
 
@@ -182,6 +183,14 @@
     return originOf(req) === 'routine'
       ? 'Questo ramo l’ha scritto un’automazione partendo da una segnalazione: guarda cosa è stato bloccato prima di approvarlo.'
       : 'Questo ramo l’hai scritto tu su questo computer.';
+  }
+
+  /**
+   * Fusa senza passare dall’owner perché era il lavoro locale di una pratica provata (#908):
+   * L5 ha girato solo per registrare i blocchi. PURA.
+   */
+  function isSkippedL5(r) {
+    return !!(r && r.skippedL5 === true);
   }
 
   /** Un blocco, in una riga leggibile. PURA. Un blocco senza frase si NOMINA lo stesso. */
@@ -291,6 +300,7 @@
   function recentOutcome(r) {
     var v = r || {};
     var ria = !!(v.realigned && typeof v.realigned === 'object');
+    if (isSkippedL5(v)) return 'fusa senza chiedere (lavoro locale)';
     if (v.outcome === 'merged') return ria ? 'approvata, riallineata e fusa' : 'approvata e fusa';
     if (v.outcome === 'conflict') return 'approvata, ma in conflitto';
     if (v.outcome === 'stale') return ria ? 'riallineata, chiede di nuovo' : 'decaduta';
@@ -390,7 +400,7 @@
     // chiesto" è esattamente il gesto che serve prima di approvare, e deve
     // stare a un click, non a una ricerca.
     var origin;
-    if (originOf(req) === 'routine' && feedbackNum(req) && typeof o.onFeedback === 'function') {
+    if (feedbackNum(req) && typeof o.onFeedback === 'function') {
       origin = el('button', 'sn-mac-origin sn-mac-origin-link', originLabel(req));
       origin.type = 'button';
       origin.title = 'Apri la segnalazione #' + feedbackNum(req) + ' da cui nasce questo lavoro.';
@@ -552,7 +562,7 @@
 
     var head = el('div', 'sn-mac-head');
     var origin;
-    if (originOf(req) === 'routine' && feedbackNum(req) && typeof o.onFeedback === 'function') {
+    if (feedbackNum(req) && typeof o.onFeedback === 'function') {
       origin = el('button', 'sn-mac-origin sn-mac-origin-link', originLabel(req));
       origin.type = 'button';
       origin.title = 'Apri la segnalazione #' + feedbackNum(req) + ' da cui nasce questo lavoro.';
@@ -647,8 +657,7 @@
       box.appendChild(title);
 
       var intro = el('p', 'sn-mac-intro',
-        'I controlli di sicurezza del server le hanno fermate perché toccano parti protette. '
-        + 'Approvarle da qui è l’unica strada: il terminale, da solo, non può.');
+        'I controlli di sicurezza del server le hanno fermate perché toccano parti protette: aspettano il tuo sì.');
       box.appendChild(intro);
 
       for (var i = 0; i < list.length; i++) box.appendChild(buildCard(list[i], o));
@@ -832,8 +841,8 @@
     if (!list.length) return 0;
     host.appendChild(el('p', 'sn-mac-recent-title', 'Fuse senza chiedere'));
     var intro = el('p', 'sn-mac-preapproved-intro',
-      'Lavori delle automazioni fermati dai controlli e fusi lo stesso, perché sulla pratica avevi detto «fondi senza chiedermelo». '
-      + 'Qui c’è tutto quello che era stato segnalato.');
+      'Lavori fermati dai controlli e fusi lo stesso: delle automazioni, dove sulla pratica avevi detto «fondi senza chiedermelo», '
+      + 'e locali, dove la pratica era tua con la prova del mittente. Qui c’è tutto quello che era stato segnalato.');
     host.appendChild(intro);
     var ul = el('ul', 'sn-mac-preapproved');
     for (var i = 0; i < list.length; i++) {
@@ -853,8 +862,9 @@
       var sha = el('span', 'sn-mac-sha', shortSha(r.mergeSha || r.sha));
       sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '');
       head.appendChild(sha);
-      var who = el('span', 'sn-mac-recent-who', preapprovedBy(r));
-      if (r.preapprovedAt) who.title = preapprovedWhenText(r.preapprovedAt);
+      var who = el('span', 'sn-mac-recent-who', isSkippedL5(r) ? 'lavoro locale: L5 saltato' : preapprovedBy(r));
+      if (isSkippedL5(r)) who.title = 'Pratica aperta da te o da una sessione locale, con la prova del mittente: i controlli hanno solo registrato cosa avrebbero fermato.';
+      else if (r.preapprovedAt) who.title = preapprovedWhenText(r.preapprovedAt);
       head.appendChild(who);
       head.appendChild(el('span', 'sn-mac-recent-when', mergedWhenText(r.decidedAtMs || r.createdAtMs, now)));
       li.appendChild(head);
@@ -900,6 +910,7 @@
     feedbackNum: feedbackNum,
     originLabel: originLabel,
     originHint: originHint,
+    isSkippedL5: isSkippedL5,
     howToRetry: howToRetry,
     blockLabel: blockLabel,
     blockItems: blockItems,

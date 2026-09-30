@@ -76,17 +76,19 @@
     return Promise.reject(new Error('canale main non disponibile'));
   }
 
-  // Le quattro sezioni della macchina a stati, le stesse della dashboard di
+  // Le sezioni della macchina a stati, le stesse della dashboard di
   // gestione: 'inbox' Ricevuti (aspettano una decisione dell'owner), 'queue'
-  // In coda (l'iter di lavorazione), 'resolved' Risolti (fix usciti davvero in
+  // In coda (l'iter di lavorazione), 'local' Lavori locali (la stessa coda, che
+  // le routine non prendono: #908), 'resolved' Risolti (fix usciti davvero in
   // una versione rilasciata), 'archived' Archiviati.
-  const TABS = ['inbox', 'queue', 'resolved', 'archived'];
+  const TABS = ['inbox', 'queue', 'local', 'resolved', 'archived'];
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori locali', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox: 'Nessun feedback in attesa di una tua decisione.',
     queue: 'Nessun feedback in lavorazione.',
+    local: 'Nessun lavoro locale.',
     resolved: 'Nessun fix uscito in una versione rilasciata.',
     archived: 'Nessun feedback archiviato.',
   };
@@ -1065,7 +1067,7 @@
       // ci si scrive dentro non si può salvare (sostituirebbe il report), e
       // offrirla vorrebbe dire far scrivere l'owner per niente.
       const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply && !f._dettaglioMancato
-        && (currentTab === 'inbox' || currentTab === 'queue');
+        && (currentTab === 'inbox' || currentTab === 'queue' || currentTab === 'local');
       // Render di un turno come bolla di sola lettura (segnalazione esclusa).
       const convoBubble = (t) => {
         const who = (t.kind === 'note' || t.role === 'model') ? 'Filo' : 'Tu';
