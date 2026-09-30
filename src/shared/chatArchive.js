@@ -351,6 +351,16 @@
         .filter(Boolean);
     }
     if (turn.images) out.images = Number(turn.images) || 0;
+    // Da dove venivano i segreti che una frase di Filo ripete, o il testo stesso se l'ha scritto un comando (#810):
+    // riaperta, la chat li tratta ancora da letti. Regole: src/shared/urlExfil.js (lettiNelTesto).
+    if (role === 'filo') {
+      const letti = (Array.isArray(turn.letti) ? turn.letti : [])
+        .filter((x) => x && typeof x.valore === 'string' && x.valore)
+        .slice(0, 200)
+        .map((x) => ({ valore: x.valore.slice(0, 200), regola: String(x.regola || 'codice'), fonte: String(x.fonte || 'da fuori').slice(0, 120) }));
+      if (letti.length) out.letti = letti;
+      if (typeof turn.esterno === 'string' && turn.esterno.trim()) out.esterno = turn.esterno.trim().slice(0, 120);
+    }
     return out;
   }
 
