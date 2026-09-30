@@ -2664,7 +2664,7 @@
     mgDetailHead.innerHTML = `Da <a class="mg-sender-link" id="senderLink" href="#" data-client="${esc(clientId)}" title="${esc(clientId)}">${esc(senderLabel(fb))}</a> il ${dateStr}`;
     document.getElementById('senderLink').addEventListener('click', (e) => {
       e.preventDefault();
-      openSidebarSender(clientId);
+      openSidebarSender(senderKeyOf(fb));
     });
 
     // La fila dei cinque livelli: triangolo, cerchi, rombo, pentagono,
