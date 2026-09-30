@@ -28,9 +28,10 @@ const TH = globalThis.SN_FEEDBACK_THREAD;
 const SCRIPT = await import('../../scripts/claude-feedback.mjs');
 const FB = globalThis.SN_FEEDBACK;
 
-// La credenziale vera va in rete col token dell'owner: nei test non c'è mai,
-// salvo dove un test la mette apposta.
-SCRIPT.credenziale.ottieni = async () => ({ idToken: '', motivo: 'nessuna credenziale (test)' });
+// La credenziale vera va in rete col token dell'owner: nei test ce n'è una finta
+// (#908: senza token lo strumento non apre niente), tolta dove un test lo vuole.
+const CRED_FINTA = async () => ({ idToken: 'tok-test' });
+SCRIPT.credenziale.ottieni = CRED_FINTA;
 
 /** Sostituisce submit per la durata di `fn`, raccogliendo cosa gli è arrivato. */
 async function conSubmit(impl, fn) {
@@ -56,36 +57,47 @@ test('#595 col token admin il feedback parte autenticato e con la prova del mitt
       let code;
       const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X']); });
       assert.equal(code, SCRIPT.EXIT.FATTO);
-      assert.deepEqual(visti.opts[0], { idToken: 'tok-owner' });
+      const o = visti.opts[0];
+      assert.equal(o.idToken, 'tok-owner');
+      // Mai il ripiego anonimo: senza la prova sarebbe un feedback d'utente.
+      assert.equal(o.soloAdmin, true);
+      // #908: di norma è un lavoro locale, firmato dalla sessione, con l'ora in millisecondi.
+      assert.equal(o.localOnly.by, TH.LOCAL_CLIENT_ID);
+      assert.ok(Number.isInteger(o.localOnly.at) && o.localOnly.at > 1.7e12);
       assert.doesNotMatch(err, /anonimo/);
     });
   } finally {
-    SCRIPT.credenziale.ottieni = async () => ({ idToken: '', motivo: 'nessuna credenziale (test)' });
+    SCRIPT.credenziale.ottieni = CRED_FINTA;
   }
 });
 
-test('#595 senza token: lo dice su stderr e parte lo stesso, anonimo', async () => {
-  await conSubmit(async () => ({ id: 'd', seq: 4 }), async (visti) => {
-    let code;
-    const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X']); });
-    assert.equal(code, SCRIPT.EXIT.FATTO, 'il codice d’uscita non cambia');
-    assert.equal(visti.length, 1);
-    assert.equal(visti.opts[0], undefined, 'submit anonima: nessuna opzione');
-    assert.match(err, /parte come anonimo e passa dai giudici/);
-  });
+test('#908 senza token: si ferma e lo dice, niente feedback anonimo', async () => {
+  SCRIPT.credenziale.ottieni = async () => ({ idToken: '', motivo: 'nessuna credenziale admin su questa macchina' });
+  try {
+    await conSubmit(async () => ({ id: 'd', seq: 4 }), async (visti) => {
+      let code;
+      const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X']); });
+      assert.equal(code, SCRIPT.EXIT.RIFIUTATO);
+      assert.equal(visti.length, 0, 'non parte niente');
+      assert.match(err, /RIFIUTATO.*admin-login/);
+    });
+  } finally {
+    SCRIPT.credenziale.ottieni = CRED_FINTA;
+  }
 });
 
 test('#595 token rifiutato dal server: lo dice su stderr', async () => {
   SCRIPT.credenziale.ottieni = async () => ({ idToken: 'tok-vecchio' });
   try {
-    await conSubmit(async () => ({ id: 'd', seq: 5, senderProof: '', authRefused: 403 }), async () => {
+    // Con soloAdmin la submit non riparte da anonima: lancia, e lo strumento lo dice.
+    await conSubmit(async () => { throw new Error('firestore create fallito (403): token admin rifiutato, e questo feedback non parte da anonimo'); }, async () => {
       let code;
       const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X']); });
-      assert.equal(code, SCRIPT.EXIT.FATTO);
-      assert.match(err, /rifiutato \(403\).*anonimo/);
+      assert.equal(code, SCRIPT.EXIT.RIFIUTATO);
+      assert.match(err, /403.*anonimo/);
     });
   } finally {
-    SCRIPT.credenziale.ottieni = async () => ({ idToken: '', motivo: 'nessuna credenziale (test)' });
+    SCRIPT.credenziale.ottieni = CRED_FINTA;
   }
 });
 
@@ -99,13 +111,13 @@ test('#595 prova a vuoto ed errore d’uso non chiedono la credenziale', async (
     });
     assert.equal(chiesta, 0);
   } finally {
-    SCRIPT.credenziale.ottieni = async () => ({ idToken: '', motivo: 'nessuna credenziale (test)' });
+    SCRIPT.credenziale.ottieni = CRED_FINTA;
   }
 });
 
 test('il feedback parte firmato come sessione locale, non come utente anonimo', async () => {
   await conSubmit(async () => ({ id: 'doc1', seq: 512 }), async (visti) => {
-    const r = await SCRIPT.apri({ titolo: 'Titolo', testo: 'Corpo del ritrovamento' });
+    const r = await SCRIPT.apri({ titolo: 'Titolo', testo: 'Corpo del ritrovamento', idToken: 'tok' });
     assert.equal(r.ok, true);
     assert.equal(r.seq, 512);
     assert.equal(visti.length, 1);
@@ -309,5 +321,44 @@ test('--allega: una immagine va nel campo delle immagini (i giudici la guardano)
     assert.ok(visti[0].images[0].dataUrl.startsWith('data:image/png;base64,'));
     assert.equal(visti[0].files.length, 1);
     assert.equal(visti[0].files[0].name, 'spec.md');
+  });
+});
+
+// ── Lavori locali (#908) ─────────────────────────────────────────────────────
+
+test('#908 di norma il feedback nasce lavoro locale, e l’uscita lo dice col numero per il finish', async () => {
+  const righe = [];
+  const orig = console.log;
+  console.log = (...a) => righe.push(a.join(' '));
+  try {
+    await conSubmit(async (_p, o) => ({ id: 'd9', seq: 909, senderProof: 'admin', localOnly: !!o.localOnly }), async (visti) => {
+      assert.equal(await SCRIPT.main(['T', 'X']), SCRIPT.EXIT.FATTO);
+      assert.ok(visti.opts[0].localOnly);
+    });
+  } finally { console.log = orig; }
+  assert.ok(righe.some((r) => /Lavoro locale/.test(r) && /--feedback 909/.test(r)), righe.join('\n'));
+});
+
+test('#908 --non-locale: stessa prova del mittente, ma è per le routine', async () => {
+  const righe = [];
+  const orig = console.log;
+  console.log = (...a) => righe.push(a.join(' '));
+  try {
+    await conSubmit(async () => ({ id: 'd10', seq: 910, senderProof: 'admin' }), async (visti) => {
+      assert.equal(await SCRIPT.main(['T', 'X', '--non-locale']), SCRIPT.EXIT.FATTO);
+      assert.equal(visti.opts[0].soloAdmin, true);
+      assert.equal(visti.opts[0].localOnly, undefined);
+      assert.equal(visti[0].text, 'X', 'l’opzione non finisce nel testo');
+    });
+  } finally { console.log = orig; }
+  assert.ok(righe.some((r) => /per le routine/.test(r)));
+});
+
+test('#908 apri senza token: rifiuto, non una submit anonima', async () => {
+  await conSubmit(async () => { throw new Error('submit non doveva essere chiamata'); }, async (visti) => {
+    const r = await SCRIPT.apri({ titolo: 'T', testo: 'X' });
+    assert.equal(r.ok, false);
+    assert.equal(r.codice, SCRIPT.EXIT.RIFIUTATO);
+    assert.equal(visti.length, 0);
   });
 });
