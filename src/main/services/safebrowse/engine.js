@@ -220,4 +220,12 @@ function imitazione(url) {
   return { stretta: v.imp.kind === 'strict_impersonation', brand: v.imp.brand, reason: v.imp.reason, publicSuffix: n.publicSuffix };
 }
 
-module.exports = { evaluate, checkSync, imitazione, buildMessage, agePhrase, YOUNG_DOMAIN_DAYS, VERY_YOUNG_DOMAIN_DAYS };
+// Il sito che un pezzo d'indirizzo nomina (www.paypal.com prima della chiocciola, #725.8): il dominio e, se è un
+// sito ufficiale, il suo marchio. Nulla se non nomina un sito.
+function sitoNominato(url) {
+  const n = normalize(url);
+  if (!n || !n.ok || n.isIp || n.single || n.suffixOnly || !n.registrable) return null;
+  return { registrable: n.registrable, brand: LEGIT_DOMAINS.get(n.registrable) || null };
+}
+
+module.exports = { evaluate, checkSync, imitazione, sitoNominato, buildMessage, agePhrase, YOUNG_DOMAIN_DAYS, VERY_YOUNG_DOMAIN_DAYS };
