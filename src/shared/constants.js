@@ -2151,6 +2151,7 @@
       `- Metti in "keep" SOLO le carte che rispettano il criterio; ometti le altre.\n` +
       `- Guarda la FUNZIONE che il criterio chiede: se chiede di DARE qualcosa ad altre carte (haste, protezione, pedine, una capacità), una carta che ce l'ha solo per sé non va bene.\n` +
       `- Se una carta fa davvero ciò che il criterio chiede, anche con parole diverse, tienila; se non c'entra, scartala.\n` +
+      `- Se il criterio chiede qualcosa che la riga della carta non mostra (rarità, espansione, anno, legalità…), quel vincolo l'ha già applicato la ricerca: non scartare una carta per quello.\n` +
       `- Usa SOLO i numeri della lista.\n` +
       `- Se NESSUNA carta è pertinente, rispondi {"keep": []}.`,
   };
