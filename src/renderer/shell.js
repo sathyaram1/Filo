@@ -464,6 +464,77 @@
     window.addEventListener('mouseup', onTabPointerUp);
   }
 
+  // ── Larghezze ferme dopo una chiusura (#428) ──────────────────────────────
+  // Chiusa una scheda col puntatore sulla fila in alto, le altre tengono la
+  // larghezza che avevano finché il puntatore non lascia la fila: la X della
+  // scheda che scorre al posto di quella chiusa resta sotto il puntatore.
+  const tabRowEl = tabsEl.closest('.tab-row') || tabsEl;
+  let larghezzeFerme = null; // Map id → px
+  let puntatoreSullaFila = false;
+  let sondaFila = null;
+  let giroSonda = 0;
+
+  function sullaFila(x, y) {
+    const r = tabRowEl.getBoundingClientRect();
+    return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+  }
+
+  function fermaSonda() {
+    giroSonda++;
+    if (sondaFila) { clearTimeout(sondaFila); sondaFila = null; }
+  }
+
+  function sciogliLarghezze() {
+    fermaSonda();
+    if (!larghezzeFerme) return;
+    larghezzeFerme = null;
+    for (const el of tabsEl.querySelectorAll('.tab')) {
+      el.style.flex = '';
+      el.style.minWidth = '';
+      el.style.maxWidth = '';
+    }
+  }
+
+  // Sulla pagina, e su Windows sulle zone di trascinamento della finestra, la
+  // barra non riceve eventi del mouse: chiede al main dove sta il puntatore.
+  function sondaPuntatore() {
+    fermaSonda();
+    if (!larghezzeFerme) return;
+    const giro = giroSonda;
+    Promise.resolve(typeof api.puntatore === 'function' ? api.puntatore() : null).then((p) => {
+      if (giro !== giroSonda || !larghezzeFerme || puntatoreSullaFila) return;
+      if (p && sullaFila(p.x, p.y)) sondaFila = setTimeout(sondaPuntatore, 150);
+      else sciogliLarghezze();
+    }, () => { if (giro === giroSonda) sciogliLarghezze(); });
+  }
+
+  // Le schede sparite si leggono dal confronto fra due fotografie: così vale
+  // per ogni strada di chiusura (X, clic centrale, Ctrl+W, menu, la pagina stessa).
+  function fermaLarghezzeSeChiusa(snap) {
+    const prima = new Set((state.tabs || []).map((t) => String(t.id)));
+    const dopo = ((snap && snap.tabs) || []).map((t) => String(t.id));
+    if (dopo.some((id) => !prima.has(id))) { sciogliLarghezze(); return; }
+    if (larghezzeFerme || !puntatoreSullaFila || dopo.length >= prima.size) return;
+    const m = new Map();
+    for (const el of tabsEl.querySelectorAll('.tab')) {
+      const w = el.getBoundingClientRect().width;
+      if (w > 0) m.set(el.dataset.id, w);
+    }
+    if (m.size) larghezzeFerme = m;
+  }
+
+  document.addEventListener('mousemove', (e) => {
+    puntatoreSullaFila = sullaFila(e.clientX, e.clientY);
+    if (puntatoreSullaFila) fermaSonda();
+    else sciogliLarghezze();
+  }, true);
+  document.addEventListener('mouseout', (e) => {
+    if (e.relatedTarget) return;
+    puntatoreSullaFila = false;
+    sondaPuntatore();
+  }, true);
+  window.addEventListener('resize', sciogliLarghezze);
+
   // ── Menu contestuale (tasto destro) su una tab ────────────────────────────
   // Riusa il popup-menu nativo della shell (sopra le WebContentsView). Le voci
   // portano `action` custom prefissate `tab-`; la scelta torna via onMenuAction
