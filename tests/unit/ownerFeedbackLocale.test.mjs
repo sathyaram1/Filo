@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import(pathToFileURL(join(ROOT, 'scripts', 'owner-feedback.mjs')).href);
@@ -123,4 +124,63 @@ test('--serve-locale non serve sulle pratiche proprie, né su quelle già nei Ri
     assert.equal(r.ok, false);
     assert.equal(patch.length, 0);
   });
+});
+
+test('--solo-locale su una pratica che una routine sta lavorando (battito fresco): rifiutato, niente scritto', async () => {
+  const dueMinutiFa = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const doc = documento('w1', {
+    clientId: 'owner:me', senderProof: 'admin', status: 'working', statusPublic: 'open', workingSince: dueMinutiFa, beatAt: dueMinutiFa,
+  });
+  const maschere = [];
+  await conRete(doc, async (patch) => {
+    const finto = globalThis.fetch;
+    globalThis.fetch = async (url, opts) => { maschere.push(String(url)); return finto(url, opts); };
+    try {
+      const r = await mod.segnaLocale('w1', true, OPTS);
+      assert.equal(r.ok, false);
+      assert.match(r.motivo, /routine la sta lavorando/);
+      assert.equal(patch.length, 0);
+    } finally { globalThis.fetch = finto; }
+  });
+  assert.match(maschere[0], /mask\.fieldPaths=beatAt/, 'il battito si chiede al documento');
+  assert.match(maschere[0], /mask\.fieldPaths=workingSince/);
+});
+
+test('legare un lavoro locale a una pratica: sì a owner e sessioni con la prova, no a un utente (con la strada per i Ricevuti)', async () => {
+  await conRete(documento('o1', { clientId: 'local:claude', senderProof: 'admin', status: 'working', statusPublic: 'open', localOnly: { mapValue: { fields: { by: { stringValue: 'o@x' }, at: { integerValue: '1790000000000' } } } } }), async () => {
+    const r = await mod.praticaPerLaSessione('o1', OPTS);
+    assert.equal(r.ok, true, r.motivo);
+    assert.equal(r.avviso, '', 'pratica completa: niente da avvisare');
+  });
+  await conRete(documento('o2', { clientId: 'owner:me', senderProof: 'admin', status: 'todo', statusPublic: 'open' }), async () => {
+    const r = await mod.praticaPerLaSessione('o2', OPTS);
+    assert.equal(r.ok, true, r.motivo);
+    assert.match(r.avviso, /solo in locale/, 'senza il segno si lavora, ma L5 non si salta: lo dice');
+  });
+  for (const [id, campi] of [
+    ['u850', { clientId: 'c-tester', status: 'todo', statusPublic: 'open' }],
+    ['f850', { clientId: 'local:claude', status: 'todo', statusPublic: 'open' }],
+  ]) {
+    await conRete(documento(id, campi), async (patch) => {
+      const r = await mod.praticaPerLaSessione(id, OPTS);
+      assert.deepEqual([r.ok, r.utente], [false, true], id);
+      assert.equal(patch.length, 0);
+      const testo = mod.rifiutoPratica(id, r);
+      assert.match(testo, /^RIFIUTATO: /);
+      assert.match(testo, new RegExp(`owner-feedback\.mjs ${id} --serve-locale`));
+    });
+  }
+  await conRete(documento('r1', { clientId: 'routine:worker', senderProof: 'server', status: 'todo' }), async () => {
+    const r = await mod.praticaPerLaSessione('r1', OPTS);
+    assert.deepEqual([r.ok, r.utente], [false, false]);
+    assert.doesNotMatch(mod.rifiutoPratica('r1', r), /--serve-locale/);
+  });
+});
+
+test('verify-local start --feedback e finish --feedback passano dallo stesso controllo del mittente', () => {
+  for (const f of ['verify-local.mjs', 'finish-local.mjs']) {
+    const src = readFileSync(join(ROOT, 'scripts', f), 'utf8');
+    assert.match(src, /praticaPerLaSessione\(r\.id/, `${f}: la pratica si controlla prima di legarla`);
+    assert.match(src, /rifiutoPratica\(r\.id, lavorabile\)/, `${f}: il rifiuto propone i Ricevuti`);
+  }
 });

@@ -266,8 +266,8 @@ export async function praticaPerLaSessione(id, opts = {}) {
 export function rifiutoPratica(id, r) {
   const righe = [`RIFIUTATO: ${String((r && r.motivo) || 'pratica non lavorabile in locale').replace(/\.$/, '')}.`];
   if (r && r.utente) {
-    righe.push('In locale i feedback degli utenti non si lavorano. Se questo richiede lavoro locale, riportalo');
-    righe.push(`nei Ricevuti e decide l'owner: node scripts/owner-feedback.mjs ${id} --serve-locale "perché"`);
+    righe.push('Se richiede lavoro locale, riportalo nei Ricevuti e decide l’owner:');
+    righe.push(`  node scripts/owner-feedback.mjs ${id} --serve-locale "perché"`);
   }
   return righe.join('\n');
 }
