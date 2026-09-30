@@ -2914,10 +2914,11 @@
     }
     if (mgPreapprovedInfo) {
       const UI = window.SN_MERGE_APPROVALS;
-      mgPreapprovedInfo.hidden = !(segno && aperta);
-      mgPreapprovedInfo.textContent = !(segno && aperta) ? ''
-        : m ? `Si fonde senza chiedere: segno messo da ${m.by}${m.at ? ` il ${formatDateTime(m.at)}` : ''}.`
-          : UI.segnoTesti(segno).riga;
+      mgPreapprovedInfo.hidden = !((segno || locale) && aperta);
+      mgPreapprovedInfo.textContent = !((segno || locale) && aperta) ? ''
+        : locale ? 'Lavoro locale: alla chiusura si fonde senza chiedere, i blocchi restano registrati in Automazioni.'
+          : m ? `Si fonde senza chiedere: segno messo da ${m.by}${m.at ? ` il ${formatDateTime(m.at)}` : ''}.`
+            : UI.segnoTesti(segno).riga;
     }
   }
 
