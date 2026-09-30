@@ -1223,6 +1223,7 @@
     <nav class="mg-tabs" id="mgTabs" role="tablist">
       <button type="button" class="mg-tab mg-tab--active" data-tab="inbox" role="tab">Ricevuti</button>
       <button type="button" class="mg-tab" data-tab="queue" role="tab">In coda</button>
+      <button type="button" class="mg-tab" data-tab="local" role="tab">Lavori locali</button>
       <button type="button" class="mg-tab" data-tab="resolved" role="tab">Risolti</button>
       <button type="button" class="mg-tab" data-tab="archived" role="tab">Archiviati</button>
       <button type="button" class="mg-tab" data-tab="fbstats" role="tab">Statistiche feedback</button>
@@ -1347,6 +1348,8 @@
                     <button type="button" class="mg-star-btn mg-usernote-toggle" id="mgUserNoteToggle"
                       aria-expanded="false" aria-controls="mgUserNote"
                       title="Scrivi la riga che leggerà chi ha segnalato">Frase</button>
+                    <!-- «Solo in locale» (#908): c'è solo sui feedback dell'owner o di una sessione con la prova; testo e hover dal JS. -->
+                    <button type="button" class="mg-star-btn mg-local-btn" id="mgLocalBtn" aria-pressed="false" hidden>Locale</button>
                   </div>
                 </div>
               </div>
