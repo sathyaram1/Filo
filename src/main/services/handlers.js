@@ -1290,6 +1290,16 @@ async function ricordaLettoDallAiuto(sender, payload = null) {
   }
 }
 
+function segretiDetti(storia) {
+  const G = globalThis.SN_GUARDIANO_STATICO;
+  const out = [];
+  for (const m of G && Array.isArray(storia) ? storia : []) {
+    if (!m || m.role !== 'filo' || typeof m.text !== 'string' || !m.text.trim()) continue;
+    for (const x of G.segretiNelTesto(m.text)) out.push({ ...x, fonte: 'prima, in questa conversazione' });
+  }
+  return out;
+}
+
 function lettiDallAiuto(sender) {
   const reg = sender?.wc ? LETTI_DALL_AIUTO.get(sender.wc) : null;
   return reg ? [...reg.values()] : [];
@@ -1297,7 +1307,7 @@ function lettiDallAiuto(sender) {
 
 // La porta unica delle uscite (#810, regole in src/shared/urlExfil.js → valutaUscita): la
 // chiamano executeFiloAction e la ricerca dell'assistente di pagina, prima di ogni livello.
-async function controllaUscita(action, { sender = null, contesto = null, parole = '' } = {}) {
+async function controllaUscita(action, { sender = null, contesto = null, parole = '', letti = null } = {}) {
   const Exfil = globalThis.SN_URL_EXFIL;
   const tipo = String((action && action.type) || '').toUpperCase();
   if (!Exfil || !Exfil.USCITE[tipo]) return { blocca: false, exfil: false };
@@ -1307,7 +1317,7 @@ async function controllaUscita(action, { sender = null, contesto = null, parole 
     segreti: await segretiCustoditi(),
     azioni: Array.isArray(contesto) ? contesto : [],
     pagina: daPagina ? await testoDellaPagina(sender) : null,
-    letti: daPagina ? lettiDallAiuto(sender) : [],
+    letti: (daPagina ? lettiDallAiuto(sender) : []).concat(Array.isArray(letti) ? letti : []),
     parole: typeof parole === 'string' ? parole : '',
     memoria: (tipo === 'NAVIGA' || tipo === 'CERCA_WEB') ? await navExfilCorpus() : '',
     daPagina,
@@ -1317,7 +1327,8 @@ async function controllaUscita(action, { sender = null, contesto = null, parole 
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in
 // questo turno, turni passati compresi: servono all'anti-esfiltrazione di NAVIGA.
 // `parole` = ciò che l'utente ha scritto in chat: un codice scritto da lui può uscire.
-async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '' } = {}) {
+// `letti` = segreti già estratti da ciò che il modello ha davanti fuori dalle azioni (#810).
+async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '', letti = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
@@ -1346,7 +1357,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
   // `_exfil` (mai dall'LLM). Vedi src/shared/urlExfil.js.
   try {
-    const u = await controllaUscita(action, { sender, contesto, parole });
+    const u = await controllaUscita(action, { sender, contesto, parole, letti });
     if (u.blocca) {
       const comando = type === 'ESEGUI_COMANDO' ? { command: String(action.comando ?? action.command ?? action.cmd ?? '').trim() } : {};
       return { executed: false, kept: false, output: { blocked: 'segreto', frase: u.frase, ...comando } };
@@ -3004,6 +3015,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // interno non è sua voce.
   const paroleUtente = cleanHistory.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || ''))
     .concat(internal ? [] : [String(userMessage || '')]).join('\n');
+  // Le frasi di Filo nei turni passati non sono dell'utente: un codice che vi compare viene da fuori, anche
+  // quando la chat riaperta dalla Cronologia non ha più l'esito che lo aveva portato (#810).
+  const lettiNeiTurni = segretiDetti(cleanHistory);
   for (const m of cleanHistory) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     let content = String(m.text || '');
@@ -3152,7 +3166,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const esiti = new Map();
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
-        : executeFiloAction(a, { sender, contesto: azioniViste, parole: paroleUtente }));
+        : executeFiloAction(a, { sender, contesto: azioniViste, parole: paroleUtente, letti: lettiNeiTurni }));
       const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
       for (let i = 0; i < actions.length; i++) {
         const a = actions[i];
@@ -3252,7 +3266,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   if (proposal) {
     // La proposta è un'uscita come le altre: passa dalla porta con quello che la chat ha letto (#810).
     // Se la risposta citata porta un segreto letto da fuori, la proposta parte senza citarla.
-    const conContesto = { sender, contesto: azioniViste, parole: paroleUtente };
+    const conContesto = { sender, contesto: azioniViste, parole: paroleUtente, letti: lettiNeiTurni };
     let res = await executeFiloAction(proposal, conContesto);
     if (res.output && res.output.blocked === 'segreto') {
       proposal = maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory, citaRisposta: false });

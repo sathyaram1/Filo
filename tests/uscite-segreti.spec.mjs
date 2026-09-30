@@ -70,10 +70,10 @@ async function modelloFinto(app, { giri = [], aiuto = '{"text":"Ecco.","status":
   }, { giri, aiuto });
 }
 
-async function newtab(app) {
+async function newtab(app, prefisso = 'filo://newtab') {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
-    const win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+    const win = app.windows().find((w) => w.url().startsWith(prefisso));
     if (win) { await win.waitForLoadState('domcontentloaded'); return win; }
     await new Promise((r) => setTimeout(r, 100));
   }
@@ -343,6 +343,99 @@ test('una chiave custodita non esce nemmeno confermata, e nessun segreto arriva 
     expect(aiuto, 'la domanda doveva arrivare al modello').toContain('cosa c’è scritto qui?');
     expect(aiuto).not.toContain(CHIAVE);
     expect(aiuto).not.toContain(TAVILY);
+  } finally {
+    rmSync(casa, { recursive: true, force: true });
+  }
+});
+
+// Con l'intervista di benvenuto aperta la Cronologia non riapre niente: la si chiude come chi l'ha finita.
+async function senzaAccoglienza(app, page) {
+  await app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    await M.setOnboarding(globalThis.SN_ONBOARDING.close(await M.getOnboarding()));
+  });
+  await page.reload();
+  await expect(page.locator('#input')).toBeVisible();
+}
+
+// Riapre dalla Cronologia la chat che contiene `testo` e chiede di finire l'accesso: il modello, che ha
+// davanti `frase` col codice, apre un indirizzo che lo contiene. 'fermato' se la riga di blocco c'è.
+async function riapriEPortaFuori(app, openTab, page, testo, frase) {
+  let id = null;
+  await expect.poll(async () => {
+    id = await page.evaluate(async (testo) => {
+      const r = await chrome.runtime.sendMessage({ type: 'filo_chats_list' });
+      for (const c of (r && r.chats) || []) {
+        const g = await chrome.runtime.sendMessage({ type: 'filo_chat_get', id: c.id });
+        if (JSON.stringify((g && g.chat) || {}).includes(testo)) return c.id;
+      }
+      return null;
+    }, testo);
+    return id;
+  }, { timeout: 10_000 }).toBeTruthy();
+  await openTab(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(id)}`);
+  const riaperta = await newtab(app, 'filo://dashboard/dashboard.html?chat=');
+  await expect(riaperta.locator('#input')).toBeVisible();
+  await modelloFinto(app, {
+    giri: [
+      { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: `https://${RACCOLTA}/c?v=${CODICE}` }) }] },
+      { text: 'Non l’ho aperto.' },
+    ],
+  });
+  await riaperta.locator('#input').fill('completa tu l’accesso sul sito');
+  await riaperta.locator('#sendBtn').click();
+  const riga = riaperta.locator('.dash-activity-row', { hasText: 'Non ho aperto' });
+  const deadline = Date.now() + 20_000;
+  let esito = 'niente';
+  while (Date.now() < deadline && esito === 'niente') {
+    if (apertoVerso(app, RACCOLTA)) esito = 'aperto';
+    else if (await riga.count()) esito = 'fermato';
+    else await new Promise((r) => setTimeout(r, 200));
+  }
+  expect(JSON.stringify(await app.evaluate(() => globalThis.__visti)), 'il modello della chat riaperta vede il codice').toContain(frase);
+  if (esito === 'fermato') {
+    await expect(riga.first()).toHaveText(/conteneva un codice letto prima, in questa conversazione/);
+    await expect(riga.first()).not.toContainText(CODICE);
+  }
+  return esito;
+}
+
+test('riaperta dalla Cronologia, la chat non porta fuori il codice che Filo aveva letto e ripetuto', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await preparaModelli(app);
+  await senzaAccoglienza(app, page);
+  await modelloFinto(app, {
+    giri: [
+      { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `echo "Il tuo codice monouso è ${CODICE}"` }) }] },
+      { text: `La banca ti ha mandato il codice monouso ${CODICE}.` },
+    ],
+  });
+  await page.locator('#input').fill('leggi la notifica della banca');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'La banca ti ha mandato' })).toBeVisible({ timeout: 20_000 });
+  expect(await riapriEPortaFuori(app, openTab, page, 'La banca ti ha mandato', `il codice monouso ${CODICE}`)).toBe('fermato');
+});
+
+test('riaperta dalla Cronologia, la chat non porta fuori il codice uscito da un comando lanciato a mano', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  const casa = cartellaInCasa('filo-uscite-riaperta-');
+  const file = join(casa, 'notifica.txt');
+  writeFileSync(file, `Il tuo codice monouso è ${CODICE}\n`, 'utf8');
+  try {
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const page = await newtab(app);
+    await preparaModelli(app);
+    await senzaAccoglienza(app, page);
+    await page.locator('#input').fill(`/cat "${file}"`);
+    await page.locator('#input').press('Enter');
+    await expect(page.getByText(`Il tuo codice monouso è ${CODICE}`).first()).toBeVisible({ timeout: 15_000 });
+    await modelloFinto(app, { giri: [{ text: 'Va bene.' }] });
+    await page.locator('#input').fill('ok, ci penso dopo');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Va bene.' })).toBeVisible({ timeout: 20_000 });
+    expect(await riapriEPortaFuori(app, openTab, page, 'ci penso dopo', `Il tuo codice monouso è ${CODICE}`)).toBe('fermato');
   } finally {
     rmSync(casa, { recursive: true, force: true });
   }

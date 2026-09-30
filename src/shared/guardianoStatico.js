@@ -15,15 +15,16 @@
   // prenotazione, un wifi o una SIM, e sette giri di correzioni hanno mostrato
   // che l'elenco delle cose innocue non finisce mai: quelle frasi le legge il
   // guardiano, che vede la frase intera. Qui restano i marchi del codice
-  // MONOUSO, che nessuno usa per il cancello di casa (#536). Il marchio è una regola, non un elenco di
-  // frasi: il nome del codice e il suo senso vicini, in qualunque ordine, con al più tre parole in mezzo.
+  // MONOUSO, che nessuno usa per il cancello di casa (#536): il nome del codice col suo senso, anche oltre un
+  // complemento («codice di sicurezza monouso») o una parola («two-factor authentication code»).
   const NOME_CODICE = '(?:codic\\w*|chiav[ei]|passwords?|passphrases?|passcodes?|codes?|pins?)';
   const SENSO_MONOUSO = '(?:recupero|ripristino|backup|temporane\\w+|temporary|monouso|usa\\s+e\\s+getta|recovery'
     + '|one[\\s-]?time|single[\\s-]?use|(?:a|in)\\s+due\\s+(?:fattori|passaggi)|two[\\s-]?(?:factor|step))';
-  const IN_MEZZO = "(?:\\s+[\\wÀ-ÿ'’-]+){0,3}?\\s+";
+  const PAROLA = "[\\wÀ-ÿ'’-]+";
   const MARCHI_MONOUSO = new RegExp(
     '(?:\\b(?:otp|mfa|2fa)\\b(?:\\s+(?:codes?|codice|pin))?'
-    + `|\\b${NOME_CODICE}${IN_MEZZO}${SENSO_MONOUSO}\\b|\\b${SENSO_MONOUSO}${IN_MEZZO}${NOME_CODICE}\\b)`,
+    + `|\\b${NOME_CODICE}(?:\\s+(?:di|da|per)\\s+${PAROLA})?\\s+(?:di\\s+|da\\s+)?${SENSO_MONOUSO}\\b`
+    + `|\\b${SENSO_MONOUSO}(?:\\s+${PAROLA})?\\s+${NOME_CODICE}\\b)`,
     'i',
   );
 
