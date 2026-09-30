@@ -71,6 +71,19 @@
     return isUnprovenSender(fb) ? 'non-provato:' + c : c;
   }
 
+  // ── Lavori locali (#908) ─────────────────────────────────────────────────
+  // `localOnly { by, at }`: la pratica la lavora solo una sessione locale. Il segno
+  // da solo la toglie alle routine; si mette solo su feedback dell'owner o di una
+  // sessione CON la prova (#595), mai sul solo prefisso. Gemello: localWork.js sul server.
+  const LOCAL_SENDER_RE = /^(owner|local):/i;
+  function isLocalOnly(fb) {
+    const m = fb && fb.localOnly;
+    return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
+  }
+  function isProvenLocalSender(fb) {
+    return !!fb && LOCAL_SENDER_RE.test(String(fb.clientId || '')) && fb.senderProof === 'admin';
+  }
+
   // Vocabolario unico della macchina a stati (src/shared/feedbackStatus.js).
   // Letto pigramente: nelle pagine filo:// va incluso PRIMA di questo file,
   // nei test unit va require-ato prima. Se manca, errore chiaro subito.
