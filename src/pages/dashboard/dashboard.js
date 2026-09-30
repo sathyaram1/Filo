@@ -1269,7 +1269,6 @@
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       Comandi.setOwner(msg.signedIn && msg.isAdmin);
-      applyAccountProfile(msg.signedIn ? msg.profile : null);
       // #524 — l'accoglienza aspettava un modello: appena l'accesso lo rende
       // disponibile, Filo si presenta subito invece di rimandare alla prossima
       // scheda nuova.
@@ -1294,96 +1293,15 @@
 
 
   // ===== Bootstrap =====
-  // ===== Controlli del browser dentro la home (in alto a destra) =====
-  // Le icone home/impostazioni/app/profilo (un tempo nella barra in alto, ora
-  // rimossa) vivono qui. Ogni click aziona il comando REALE della shell via
-  // MSG.SHELL_ACTION: il main lo inoltra alla shell, che clicca il bottone
-  // corrispondente e apre il suo menu nativo (Impostazioni, App, Account) in
-  // alto a destra, oppure naviga (Home). Nessuna logica di menu duplicata qui.
-  let accountCtrlBtn = null; // riferimento all'icona profilo (mostra l'avatar)
-
-  function renderControls() {
-    const host = $('dashControls');
-    if (!host) return;
-    const ICONS = self.SN_ICONS || {};
-    const items = [
-      // Red-team: apre direttamente la pagina interna (è solo una navigazione,
-      // non un menu nativo). Tenuto per primo (più a sinistra) e in rosso (vedi
-      // dashboard.css) perché è il canale sicurezza, distinto dai controlli del
-      // browser. Spec §2: punto d'accesso in alto a destra nella home.
-      { command: 'redteam', icon: 'redteam', label: 'Red-team', url: 'filo://redteam/redteam.html' },
-      { command: 'home', icon: 'home', label: 'Home' },
-      // Cronologia: la pagina principale è quella delle schede visitate/chiuse
-      // (raggruppate per giorno), non il log delle azioni AI (raggiungibile da lì
-      // come "Cronologia AI"). Apre direttamente la pagina interna (non passa
-      // dalla shell come gli altri, che ancorano un menu nativo) — è solo una
-      // navigazione. Risponde al feedback "metti la cronologia in alto a destra".
-      { command: 'history', icon: 'history', label: 'Cronologia', url: 'filo://archive/archive.html' },
-      // Gli appunti non hanno più un pannello separato: Filo li scrive nei file
-      // dell'editor (icona Editor, che ora usa proprio l'SVG degli appunti).
-      { command: 'settings', icon: 'options', label: 'Impostazioni' },
-      { command: 'apps', icon: 'apps', label: 'App' },
-      { command: 'account', icon: 'user', label: 'Profilo' },
-    ];
-    host.replaceChildren();
-    accountCtrlBtn = null;
-    for (const it of items) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'dash-ctrl';
-      btn.dataset.command = it.command;
-      btn.setAttribute('aria-label', it.label);
-      btn.title = it.label;
-      const svg = typeof ICONS[it.icon] === 'function' ? ICONS[it.icon](18) : '';
-      btn.innerHTML = svg || it.label.charAt(0);
-      btn.addEventListener('click', () => {
-        if (typeof it.action === 'function') it.action();
-        else if (it.url) send({ type: MSG.OPEN_URL, url: it.url });
-        else send({ type: MSG.SHELL_ACTION, command: it.command });
-      });
-      host.appendChild(btn);
-      if (it.command === 'account') accountCtrlBtn = btn;
-    }
-    refreshAccountControl();
-  }
-
-  // L'icona profilo mostra la foto Google quando sei loggato (come faceva la
-  // vecchia barra in alto), con fallback all'icona utente se la foto non carica
-  // o se sei sloggato. Lo stato auth vive nel main: lo interroghiamo e ci
-  // iscriviamo a `auth_changed` per aggiornarla dal vivo a login/logout.
-  function applyAccountProfile(profile) {
-    if (!accountCtrlBtn) return;
-    const ICONS = self.SN_ICONS || {};
-    const userIcon = typeof ICONS.user === 'function' ? ICONS.user(18) : '';
-    if (profile && profile.picture) {
-      const name = profile.name || (profile.email || '').split('@')[0] || 'Account';
-      const img = document.createElement('img');
-      img.className = 'account-avatar';
-      img.alt = '';
-      img.referrerPolicy = 'no-referrer';
-      // Se la foto Google non carica (CSP/rete) ripieghiamo sull'icona utente.
-      img.onerror = () => { accountCtrlBtn.innerHTML = userIcon; };
-      img.src = profile.picture;
-      accountCtrlBtn.replaceChildren(img);
-      accountCtrlBtn.classList.add('signed-in');
-      accountCtrlBtn.title = profile.email ? `${name} — ${profile.email}` : name;
-      accountCtrlBtn.setAttribute('aria-label', `Account: ${name}`);
-    } else {
-      accountCtrlBtn.innerHTML = userIcon;
-      accountCtrlBtn.classList.remove('signed-in');
-      accountCtrlBtn.title = profile ? 'Profilo' : 'Accedi';
-      accountCtrlBtn.setAttribute('aria-label', profile ? 'Profilo' : 'Accedi');
-    }
-  }
-
+  // ===== Chi usa la home =====
+  // Le icone che stavano in alto a destra (Red-team, Home, Cronologia, Impostazioni, App,
+  // Profilo) vivono nella barra laterale (#871): qui resta solo sapere se è l'owner.
   async function refreshAccountControl() {
     try {
       const r = await send({ type: MSG.AUTH_STATUS });
       Comandi.setOwner(r && r.signedIn && r.isAdmin);
-      applyAccountProfile(r && r.signedIn ? r.profile : null);
     } catch (_) {
       Comandi.setOwner(false);
-      applyAccountProfile(null);
     }
   }
 
@@ -1606,19 +1524,17 @@
     renderFeedbackRewards(res.rewards, res.totalCredits || 0);
   }
 
-  // Anima alcune "monete credito" dorate dal centro dello schermo verso l'icona
-  // profilo (accountCtrlBtn). Riusa lo spirito di C3 ma vive nella home, dove
-  // l'icona account è un elemento DOM reale: puntiamo al suo centro. Decorativa,
-  // best-effort, rispetta prefers-reduced-motion.
+  // Anima alcune "monete credito" dorate dal centro dello schermo verso il profilo,
+  // che sta in basso nella barra laterale (#871). Decorativa, best-effort,
+  // rispetta prefers-reduced-motion.
   function flyCreditsToAccount(amount) {
     try {
       const reduce = !!(window.matchMedia &&
         window.matchMedia('(prefers-reduced-motion: reduce)').matches);
       if (reduce) return;
       const n = Math.max(1, Math.round(Number(amount) || 0));
-      const target = (accountCtrlBtn && accountCtrlBtn.getBoundingClientRect()) || null;
-      const tx = target ? target.left + target.width / 2 : Math.max(24, window.innerWidth - 26);
-      const ty = target ? target.top + target.height / 2 : 26;
+      const tx = 24;
+      const ty = Math.max(26, window.innerHeight - 64);
       const ox = window.innerWidth / 2;
       const oy = window.innerHeight / 2;
       const GOLD = '#e0a93f';
@@ -1784,7 +1700,7 @@
   });
 
   (async function init() {
-    renderControls();
+    refreshAccountControl();
     await applySavedTheme();
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();

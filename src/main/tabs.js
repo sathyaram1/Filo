@@ -28,6 +28,7 @@ require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il si
 const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
+const { BarraLaterale } = require('./barraLaterale');
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
@@ -274,6 +275,7 @@ class TabManager {
         return (t && t.view) || null;
       },
     });
+    this.barra = new BarraLaterale(window, this, { alto: () => this._altezzaCornice() });
     // §1.2 — cache del colore identità per dominio (host → 'rgb(r,g,b)'). Così
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
     // aspettare che il content script ricalcoli.
@@ -1724,6 +1726,7 @@ class TabManager {
       }
     }
     this.avvisi.posa();
+    this.barra.posa();
   }
 
   // ─── zoom da tastiera quando il focus è sulla barra di Filo ────────────
@@ -1849,6 +1852,11 @@ class TabManager {
       // perché questo evento arriva PRIMA che il documento veda il tasto, ed è
       // dentro quel giro che la pagina chiede.
       tab._ultimoInputEsc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
+      // La barra laterale prima di tutto: il suo tasto, e l'Esc che la chiude prima della modalità.
+      if (this.barra.tasto(input)) {
+        event.preventDefault();
+        return;
+      }
       if (input.type === 'keyDown' && input.key === 'Escape') {
         // Regola unica in tabs.js: handleFullscreenEscape decide (e sa quando
         // l'Esc va invece lasciato alla pagina che ha chiesto il fullscreen).
@@ -2190,6 +2198,7 @@ class TabManager {
     // NON conta: muovere il cursore sopra una scheda non è usarla.
     wc.on('input-event', (_e, input) => {
       const type = (input && input.type) || '';
+      if (tab.id === this.activeId) this.barra.inputAltrove(input);
       if (!type || HOVER_INPUT_TYPES.has(type)) return;
       tab._userInputAt = Date.now();
       // #514 — qui passa l'input VERO, quello che la pagina non può fabbricare:
@@ -2607,6 +2616,7 @@ class TabManager {
     try {
       this.win.webContents.send('tabs:updated', this.snapshot());
     } catch (_) { /* shell non ancora caricata */ }
+    this.barra.aggiornaNav();
     this._annunciaVista();
     this._persistSession();
   }

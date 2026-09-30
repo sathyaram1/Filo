@@ -1117,10 +1117,16 @@
   // ============================================================================
   const dropZones = [];
 
+  // La barra laterale come zona in più (#871): la installa menuIcons.js. Il puntatore resta della
+  // pagina per tutto il gesto, anche sopra la barra, quindi è da qui che si dice dove cade.
+  let ponteBarra = null;
+  function setPonteBarra(p) { ponteBarra = p || null; }
+
   function attachDrag(el, { id, source }) {
     el.dataset.snDraggable = '1';
     el.addEventListener('pointerdown', (ev) => {
-      if (ev.button !== 0) return;
+      // Solo gesti veri: un trascinamento finto aprirebbe la barra a comando di un sito.
+      if (!ev.isTrusted || ev.button !== 0) return;
       if (el.disabled) return;
       const startX = ev.clientX, startY = ev.clientY;
       let dragging = false;
@@ -1157,6 +1163,7 @@
         preview.style.height = r.height + 'px';
         menuHost().appendChild(preview);
         updatePreview(x, y);
+        try { ponteBarra?.inizio(id); } catch (_) {}
       };
 
       const checkHoverOpen = (x, y) => {
@@ -1179,13 +1186,16 @@
       };
 
       const onMove = (e) => {
+        if (!e.isTrusted) return;
         if (!dragging) {
           if (Math.hypot(e.clientX - startX, e.clientY - startY) < THRESHOLD) return;
           startDrag(e.clientX, e.clientY);
         }
         e.preventDefault();
         updatePreview(e.clientX, e.clientY);
-        setHover(findZoneAt(e.clientX, e.clientY));
+        let sopraBarra = false;
+        try { sopraBarra = !!ponteBarra?.sopra(e.clientX, e.clientY); } catch (_) {}
+        setHover(sopraBarra ? null : findZoneAt(e.clientX, e.clientY));
         checkHoverOpen(e.clientX, e.clientY);
       };
 
@@ -1197,11 +1207,15 @@
         el.classList.remove('sn-dragging');
         setHover(null);
         if (preview) { try { preview.remove(); } catch (_) {} preview = null; }
+        if (dragging) { try { ponteBarra?.fine(); } catch (_) {} }
       };
 
       const onUp = (e) => {
+        if (!e.isTrusted) return;
         if (!dragging) { cleanup(); return; }
-        const zone = findZoneAt(e.clientX, e.clientY);
+        let inBarra = false;
+        try { inBarra = !!ponteBarra?.posa(id, e.clientX, e.clientY); } catch (_) {}
+        const zone = inBarra ? null : findZoneAt(e.clientX, e.clientY);
         cleanup();
         if (zone) {
           const beforeBtn = findInsertBefore(zone.zoneEl, e.clientX, e.clientY, el);
@@ -1220,6 +1234,49 @@
       window.addEventListener('pointerup', onUp, true);
       window.addEventListener('pointercancel', onCancel, true);
     });
+  }
+
+  // Un'icona trascinata fuori dalla barra laterale, sopra questa pagina: il gesto è della barra,
+  // qui arrivano solo le coordinate. Se il menu è aperto, cade nelle sue zone.
+  let esterno = null;
+  function trascinaDaFuori({ fase, id, x, y, icon }) {
+    const via = () => {
+      if (!esterno) return;
+      if (esterno.zona) esterno.zona.zoneEl.classList.remove('sn-drop-hover');
+      try { esterno.preview.remove(); } catch (_) {}
+      esterno = null;
+    };
+    if (fase === 'muovi') {
+      if (!esterno || esterno.id !== id) {
+        via();
+        const preview = document.createElement('div');
+        preview.className = 'sn-drag-preview';
+        preview.style.width = '36px';
+        preview.style.height = '36px';
+        preview.innerHTML = icon || '';
+        menuHost().appendChild(preview);
+        esterno = { id, preview, zona: null };
+      }
+      esterno.preview.style.left = (x - 18) + 'px';
+      esterno.preview.style.top = (y - 18) + 'px';
+      const zona = findZoneAt(x, y);
+      if (zona !== esterno.zona) {
+        if (esterno.zona) esterno.zona.zoneEl.classList.remove('sn-drop-hover');
+        if (zona) zona.zoneEl.classList.add('sn-drop-hover');
+        esterno.zona = zona;
+      }
+      return true;
+    }
+    if (fase === 'rilascia') {
+      const zona = findZoneAt(x, y);
+      via();
+      if (!zona) return false;
+      const prima = findInsertBefore(zona.zoneEl, x, y, null);
+      try { zona.onDrop && zona.onDrop({ id, source: 'bar', target: zona.target, beforeId: prima?.dataset?.snIconId || null }); } catch (er) { console.error(er); }
+      return true;
+    }
+    via();
+    return false;
   }
 
   function attachDropZone(zoneEl, { target, onDrop }) {
@@ -1263,6 +1320,8 @@
     refreshIconRow,
     refreshIconGrid,
     isSubMenuOpen,
+    setPonteBarra,
+    trascinaDaFuori,
     // C'è un menu aperto adesso? Lo chiede content.js per decidere di chi è
     // l'Esc quando si è a tutto schermo (#514).
     isOpen: () => !!activeMenu,

@@ -2066,6 +2066,15 @@
   // Messaggi runtime: shortcut, settings update
   // ------------------------------------------------------------
   function onRuntimeMessage(msg, sender, sendResponse) {
+    // #871 — la disposizione delle icone è cambiata altrove, o un'icona arriva dalla barra laterale.
+    if (msg?.type === MSG.ICON_LAYOUT_CHANGED) {
+      try { MenuIcons.layoutCambiato?.(msg.layout); } catch (_) {}
+      return;
+    }
+    if (msg?.type === MSG.BARRA_FUORI) {
+      try { MenuIcons.dallaBarra?.(msg); } catch (_) {}
+      return;
+    }
     if (msg?.type === MSG.FULLSCREEN_CHANGED) {
       fullscreenAnnunciato = true;
       contentFullscreen = !!msg.fullscreen;

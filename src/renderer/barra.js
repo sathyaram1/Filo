@@ -198,8 +198,8 @@
 
   function scriviOra() {
     const d = new Date();
-    ora.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    ora.dataset.sugg = d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+    ora.textContent = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    ora.dataset.sugg = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
     setTimeout(scriviOra, 60000 - (Date.now() % 60000) + 50);
   }
   ora.addEventListener('pointerenter', (e) => { if (e.isTrusted) programmaSuggerimento(ora); });
@@ -266,14 +266,14 @@
       const r = b.getBoundingClientRect();
       fantasma.style.left = `${ev.clientX - r.width / 2}px`;
       fantasma.style.top = `${ev.clientY - r.height / 2}px`;
-      const ora = !dentroPannello(ev.clientX);
-      fantasma.hidden = ora;
-      if (ora) togliSegno(); else mostraSegno(ev.clientY);
-      if (ora || fuori) {
-        ultimo = { fase: ora ? 'muovi' : 'annulla', id, x: Math.round(ev.clientX), y: Math.round(ev.clientY) };
+      const esce = !dentroPannello(ev.clientX);
+      fantasma.hidden = esce;
+      if (esce) togliSegno(); else mostraSegno(ev.clientY);
+      if (esce || fuori) {
+        ultimo = { fase: esce ? 'muovi' : 'annulla', id, x: Math.round(ev.clientX), y: Math.round(ev.clientY) };
         if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (ultimo) api.trascinaFuori(ultimo); ultimo = null; });
       }
-      fuori = ora;
+      fuori = esce;
     };
 
     const fine = (ev, annullato) => {
@@ -333,9 +333,7 @@
     root.classList.toggle('aperta', !!stato.aperta);
     if (stato.aperta) annullaSpinta();
     else nascondiSuggerimento();
-    const tasto = stato.tasto || '';
-    striscia.title = '';
-    striscia.setAttribute('aria-label', `Barra laterale (${tasto})`);
+    striscia.setAttribute('aria-label', `Barra laterale (${stato.tasto || ''})`);
     disegnaIcone(Array.isArray(stato.icone) ? stato.icone : [], eraAperta);
     disegnaAccount(stato.account || null);
     disegnaMira(stato.mira, stato.trascinamento);

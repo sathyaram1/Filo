@@ -17,6 +17,16 @@
   const tabsEl = document.getElementById('tabs');
   const newBtn = document.getElementById('tab-new');
   if (newBtn) newBtn.dataset.tip = `Nuova scheda (${tasto('Ctrl+T')})`;
+  // #871 — la maniglia apre e chiude la barra laterale; un clic altrove nella fila la chiude.
+  const manigliaBarra = document.getElementById('barra-maniglia');
+  if (manigliaBarra) {
+    manigliaBarra.dataset.tip = `Barra laterale (${TASTI && TASTI.etichettaBarra ? TASTI.etichettaBarra() : tasto('Ctrl+Shift+B')})`;
+    manigliaBarra.addEventListener('click', (e) => { if (e.isTrusted) api.barra?.commuta(); });
+  }
+  document.addEventListener('pointerdown', (e) => {
+    if (!e.isTrusted || (manigliaBarra && manigliaBarra.contains(e.target))) return;
+    try { api.barra?.chiudi(); } catch (_) {}
+  }, true);
   const backBtn = document.getElementById('nav-back');
   const fwdBtn = document.getElementById('nav-forward');
   const reloadBtn = document.getElementById('nav-reload');
@@ -77,6 +87,7 @@
   api.message({ type: 'get_settings' })
     .then((r) => {
       applyShellTokens(r?.settings?.themeTokens);
+      rispecchiaBarra();
       applyTabColorParams(r?.settings?.tabColor);
       applyNotifConfig(r?.settings?.notifications);
       try { render(); } catch (_) {}
@@ -87,6 +98,7 @@
     api.onBroadcast((m) => {
       if (m?.type === 'settings_updated') {
         applyShellTokens(m.settings?.themeTokens);
+        rispecchiaBarra();
         applyTabColorParams(m.settings?.tabColor);
         applyNotifConfig(m.settings?.notifications);
         try { render(); } catch (_) {}
@@ -165,16 +177,20 @@
 
   // Popup menu custom: BrowserWindow frameless che appare sopra le
   // WebContentsView native, stilizzato come il menu tasto destro.
+  // Dove aprire il prossimo menu quando lo chiede la barra laterale: accanto alla sua icona.
+  let ancoraMenu = null;
   function showNativeMenu(btn, entries) {
     const r = btn.getBoundingClientRect();
     let x = Math.round(r.left);
     let y = Math.round(r.bottom + 4);
-    // La barra in alto è nascosta e le icone reali hanno rect nullo: i menu
-    // (Impostazioni, App, Account) si aprono sotto le icone, che ora vivono in
-    // alto a destra DENTRO la home. La home parte sotto la fila di tab (~40px) e
-    // le icone sono alte ~34px: ancoriamo appena sotto. Coordinate relative alla
-    // finestra shell. popup-menu.js riallinea/clampa per restare nello schermo.
-    if (r.width === 0 && r.height === 0) {
+    // La barra in alto è nascosta e le icone reali hanno rect nullo. Dalla barra
+    // laterale arriva l'ancora; dall'assistente no, e il menu si apre in alto a
+    // destra. Coordinate relative alla finestra shell: popup-menu.js clampa.
+    if (ancoraMenu) {
+      x = ancoraMenu.x;
+      y = ancoraMenu.y;
+      ancoraMenu = null;
+    } else if (r.width === 0 && r.height === 0) {
       x = Math.max(8, window.innerWidth - 250);
       y = 86;
     }
@@ -213,6 +229,7 @@
   }
 
   function renderAccount() {
+    rispecchiaBarra();
     if (!accountBtn) return;
     if (authBusy) {
       accountBtn.dataset.tip = 'Accesso in corso…';
@@ -321,6 +338,21 @@
     }
     refreshAuth();
   }
+  // La barra laterale si disegna in una vista sua: le arrivano da qui i colori già calcolati
+  // (tema, token dell'utente, incognito) e il profilo da mostrare.
+  const VAR_BARRA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--tab-bg', '--accent', '--accent-rgb', '--font', '--radius'];
+  function rispecchiaBarra() {
+    if (!api.barra) return;
+    const cs = getComputedStyle(document.documentElement);
+    const tema = {};
+    for (const k of VAR_BARRA) { const v = cs.getPropertyValue(k).trim(); if (v) tema[k] = v; }
+    const account = authProfile
+      ? { dentro: true, foto: authProfile.picture || '', etichetta: shortName(authProfile) }
+      : { dentro: false, foto: '', etichetta: '' };
+    try { api.barra.stato({ tema, account }); } catch (_) {}
+  }
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rispecchiaBarra); } catch (_) {}
+
   setIcon(winMinBtn, 'minimize', 16);
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
@@ -338,9 +370,13 @@
       minimize: winMinBtn,
       fullscreen: winMaxBtn,
     };
-    api.onTriggerButton((command) => {
+    api.onTriggerButton((command, anchor) => {
       const btn = triggerMap[command];
-      if (btn) btn.click();
+      if (!btn) return;
+      const ok = anchor && Number.isFinite(anchor.x) && Number.isFinite(anchor.y);
+      ancoraMenu = ok ? { x: Math.round(anchor.x), y: Math.round(anchor.y) } : null;
+      btn.click();
+      ancoraMenu = null;
     });
   }
 
