@@ -699,16 +699,26 @@
     });
   } catch (_) {}
 
-  async function runFiloAction(action) {
-    const label = filoActionLabel(action);
+  // Quello che l'utente ha scritto qui: il main lascia uscire un codice scritto da lui (#810).
+  function paroleUtente() {
+    return history.filter((h) => h && h.kind === 'real').map((h) => String(h.content || ''));
+  }
+
+  async function runFiloAction(action, { etichetta = '' } = {}) {
+    const label = etichetta || filoActionLabel(action);
     if (action && String(action.type || '').toUpperCase() === 'NAVIGA' && !action._callId) {
       action._callId = `assistente-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     }
     let res = null;
     try {
-      res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action });
+      res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action, parole: paroleUtente() });
     } catch (_) {}
     if (!res || !res.ok) { appendActionLog(`${label}: non riuscita`); return false; }
+    // Un segreto che sarebbe uscito: la riga dice cosa è stato fermato e da dove veniva.
+    if (res.output && res.output.blocked === 'segreto') {
+      appendActionLog(res.output.frase || `${label}: fermata`);
+      return false;
+    }
 
     // Livello ≥ 2: il main NON ha eseguito e ci ha mandato la spiegazione per il
     // popup di conferma di Filo. Mostriamo il popup; solo dopo l'OK rimandiamo
@@ -725,8 +735,12 @@
       if (!ok) { appendActionLog(`${label}: annullata`); return false; }
       let c = null;
       try {
-        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true });
+        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, parole: paroleUtente() });
       } catch (_) {}
+      if (c && c.output && c.output.blocked === 'segreto') {
+        appendActionLog(c.output.frase || `${label}: fermata`);
+        return false;
+      }
       return scriviEsito(label, action, c);
     }
 
@@ -876,14 +890,14 @@
       switch (page.op) {
         case 'copy': Actions?.copyToClipboard(text); break;
         case 'cut': Actions?.cutSelection(); break;
-        case 'search_text': Actions?.searchTextOnWeb(text); break;
+        case 'search_text': return await runFiloAction({ type: 'NAVIGA', url: Actions.searchUrlFor(text) }, { etichetta: label });
         case 'read_aloud': await Tts?.readAloud(text); break;
         case 'stop_reading': Tts?.stopReading(); break;
         case 'edit_text': global.SN_EDITBOX?.openEditBox(text); break;
         case 'copy_image': await Actions?.copyImage(imgEl); break;
         case 'save_image': Actions?.downloadImage(imgEl); break;
         case 'copy_image_link': Actions?.copyUrlToClipboard(imgEl.currentSrc || imgEl.src); break;
-        case 'search_image': Actions?.searchImageOnWeb(imgEl); break;
+        case 'search_image': return await runFiloAction({ type: 'NAVIGA', url: Actions.imageSearchUrlFor(imgEl) }, { etichetta: label });
         case 'open_link': {
           // "Apri in nuova scheda" è un'azione di sistema già registrata: la
           // instradiamo via il ponte di #192.1 (NAVIGA → TabManager del main).
@@ -1035,7 +1049,6 @@
           return;
         }
         if (session) session.webSearchCount += 1;
-        appendActionLog(`ricerca web: "${parsed.query}"`);
         // #593 — I RISULTATI NON SONO UNA NOTA DI FILO.
         //
         // Titolo, indirizzo e riassunto di ogni risultato li scrive chi
@@ -1048,10 +1061,18 @@
         let ricercaWeb = null;
         let esitoVuoto = '';
         try {
-          const r = await chrome.runtime.sendMessage({ type: MSG.WEB_SEARCH, query: parsed.query });
+          const r = await chrome.runtime.sendMessage({ type: MSG.WEB_SEARCH, query: parsed.query, parole: paroleUtente() });
+          // #810 — la domanda avrebbe portato fuori un segreto: la ricerca non parte, e né la
+          // riga né la nota ripetono la domanda.
+          if (r && r.blocked === 'segreto') {
+            appendActionLog(r.frase || 'non ho fatto la ricerca');
+            esitoVuoto = 'la ricerca web che avevi chiesto NON è partita: la domanda conteneva un codice, una password, una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire a nessun livello. Non riprovarla in altra forma; dillo all\'utente in una riga (se vuole la fa lui a mano)';
+          } else {
+            appendActionLog(`ricerca web: "${parsed.query}"`);
+          }
           if (r?.ok && Array.isArray(r.results) && r.results.length) {
             ricercaWeb = { query: parsed.query, provider: r.provider || '', results: r.results };
-          } else {
+          } else if (!esitoVuoto) {
             esitoVuoto = 'la ricerca web che avevi chiesto non ha dato nessun risultato';
           }
         } catch (_) {

@@ -64,7 +64,18 @@
       noteServed = plainNoteServed,
       costs = global.SN_COSTS,
       auditDelaysMs = AUDIT_DELAYS_MS,
+      segreti = async () => [],
     } = deps;
+
+    // Nessun segreto custodito da Filo entra nel contesto di un modello (#810): quello che non
+    // ha, il modello non lo può far uscire. Sentinella: tests/unit/usciteSegreti.test.mjs.
+    async function senzaSegreti(messages) {
+      const G = global.SN_GUARDIANO_STATICO;
+      if (!G || typeof G.oscuraSegreti !== 'function') return messages;
+      let lista = [];
+      try { lista = await segreti(); } catch (_) { lista = []; }
+      return G.oscuraSegreti(messages, lista);
+    }
 
     async function ensureUnderLimit(settings) {
       if (await costs.isOverLimit(settings && settings.monthlyLimitEur)) throw limitError();
@@ -102,7 +113,7 @@
 
     async function complete({ action, settings, attempts, messages, tools, toolChoice, signal, onFallback } = {}) {
       const { s, chain } = await chainFor({ action, settings, attempts });
-      const r = await providers().completeWithFallback({ attempts: chain, messages, tools, toolChoice, signal, onFallback });
+      const r = await providers().completeWithFallback({ attempts: chain, messages: await senzaSegreti(messages), tools, toolChoice, signal, onFallback });
       return settleChain(s, action, chain, r);
     }
 
@@ -118,7 +129,7 @@
       let r;
       try {
         r = await providers().streamCompleteWithFallback({
-          attempts: chain, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset,
+          attempts: chain, messages: await senzaSegreti(messages), tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset,
         });
       } catch (e) {
         auditBroken(s, action, e && e.brokenAttempts);
@@ -172,8 +183,10 @@
       if (!P || typeof P[method] !== 'function') {
         throw codeError(`Il fornitore ${a.provider || '—'} non sa fare questa chiamata (${method})`, 'PROVIDER_METHOD_MISSING');
       }
+      const conMessaggi = args && Array.isArray(args.messages) ? { messages: await senzaSegreti(args.messages) } : {};
       const input = {
         ...(args || {}),
+        ...conMessaggi,
         apiKey: a.apiKey,
         model: a.model,
         ...(a.reasoning !== undefined ? { reasoning: a.reasoning } : {}),

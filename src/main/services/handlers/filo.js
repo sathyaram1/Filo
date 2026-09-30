@@ -19,6 +19,11 @@ module.exports = function register(on, ctx) {
   // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
 
+  // Quello che l'utente ha scritto nella conversazione dell'assistente di pagina: un codice
+  // scritto da lui può uscire (#810).
+  const paroleDa = (msg) => (Array.isArray(msg && msg.parole) ? msg.parole : [])
+    .filter((x) => typeof x === 'string').join('\n').slice(-200000);
+
   // #525 — «l'elenco delle chat è cambiato». Lo ascolta la Cronologia aperta.
   const annunciaChat = () => {
     try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
@@ -59,7 +64,7 @@ module.exports = function register(on, ctx) {
   // anche con confirmed:true): un client compromesso non può far eseguire
   // un'azione fuori registro.
   on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true });
+    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg) });
     return { ok: true, ...r };
   });
 
@@ -71,7 +76,7 @@ module.exports = function register(on, ctx) {
   // Le azioni fuori registro vengono rifiutate dal dispatch, esattamente come
   // per la chat: la sidebar non è un canale privilegiato.
   on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { sender, assistente: true });
+    const r = await executeFiloAction(msg.action, { sender, assistente: true, parole: paroleDa(msg) });
     return { ok: true, ...r };
   });
 

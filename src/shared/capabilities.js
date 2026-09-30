@@ -381,7 +381,7 @@
       id: 'agent-actions', title: 'Filo agisce al posto tuo', category: 'assistant',
       desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, cercare sul web, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
       invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina (Alt+H, Ctrl+Alt+H su Mac).',
-      doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto. Se un link che sta per aprire, o una ricerca sul web che sta per fare, contiene dati letti dal tuo computer, prima te lo mostra e aspetta il tuo OK.',
+      doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto. Se un link che sta per aprire, o una ricerca sul web che sta per fare, contiene dati letti dal tuo computer, prima te lo mostra e aspetta il tuo OK. Non fa mai uscire un segreto: se un link, una ricerca, un comando o un feedback conterrebbe una chiave che Filo custodisce, oppure un codice monouso o di recupero, una password, una chiave, una carta o un IBAN letti da una pagina, un documento, una ricerca o un comando (e non scritti da te in chat), l’azione non parte a nessun livello, nemmeno col tuo OK, e in chat compare cosa è stato fermato. Se vuoi mandarlo davvero, lo fai tu a mano.',
     },
     {
       id: 'filo-memory', title: 'Memoria di Filo', category: 'assistant',

@@ -24,6 +24,7 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   routing: (s) => providerRouting(s),
   noteServed: (s, action, r) => noteServedProvider(s, action, r),
   costs: Costs,
+  segreti: async () => (await segretiCustoditi()).map((x) => x.valore),
 });
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
@@ -1200,9 +1201,58 @@ function perimetroLettura(sender) {
   return { cwd, home, win, maiuscole: win || process.platform === 'darwin' };
 }
 
+async function segretiCustoditi() {
+  let salvate = {};
+  let effettive = {};
+  try { salvate = await Storage.getSettings(); } catch (_) {}
+  try { effettive = await getEffectiveSettings(); } catch (_) {}
+  return require('./segretiCustoditi').custoditi({ impostazioni: [salvate, effettive] });
+}
+
+// Il testo della pagina da cui parte l'azione: è quello che l'assistente di pagina ha letto.
+// Mondo isolato, così la pagina non può ridefinire cosa si legge; senza risposta in 3 s si va avanti.
+const MONDO_USCITE = 1002;
+const MAX_TESTO_PAGINA = 2000000;
+async function testoDellaPagina(sender) {
+  const url = String(sender?.tab?.url || sender?.url || '');
+  const wc = sender?.wc;
+  if (!/^https?:/i.test(url) || !wc || wc.isDestroyed?.()) return null;
+  let host = '';
+  try { host = new URL(url).hostname; } catch (_) {}
+  const js = '(function(){try{return String(document.title||"")+"\\n"+String((document.body&&document.body.innerText)||"");}catch(e){return "";}})()';
+  let testo = '';
+  try {
+    testo = await Promise.race([
+      wc.executeJavaScriptInIsolatedWorld(MONDO_USCITE, [{ code: js }]),
+      new Promise((res) => { const t = setTimeout(() => res(''), 3000); t.unref?.(); }),
+    ]);
+  } catch (_) { testo = ''; }
+  testo = String(testo || '');
+  return { testo: testo.length > MAX_TESTO_PAGINA ? testo.slice(-MAX_TESTO_PAGINA) : testo, host };
+}
+
+// La porta unica delle uscite (#810, regole in src/shared/urlExfil.js → valutaUscita): la
+// chiamano executeFiloAction e la ricerca dell'assistente di pagina, prima di ogni livello.
+async function controllaUscita(action, { sender = null, contesto = null, parole = '' } = {}) {
+  const Exfil = globalThis.SN_URL_EXFIL;
+  const tipo = String((action && action.type) || '').toUpperCase();
+  if (!Exfil || !Exfil.USCITE[tipo]) return { blocca: false, exfil: false };
+  const origine = sender?.tab?.url || sender?.url || '';
+  const daPagina = /^https?:/i.test(origine);
+  return Exfil.valutaUscita(action, {
+    segreti: await segretiCustoditi(),
+    azioni: Array.isArray(contesto) ? contesto : [],
+    pagina: daPagina ? await testoDellaPagina(sender) : null,
+    parole: typeof parole === 'string' ? parole : '',
+    memoria: (tipo === 'NAVIGA' || tipo === 'CERCA_WEB') ? await navExfilCorpus() : '',
+    daPagina,
+  });
+}
+
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in
 // questo turno, turni passati compresi: servono all'anti-esfiltrazione di NAVIGA.
-async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null, assistente = false } = {}) {
+// `parole` = ciò che l'utente ha scritto in chat: un codice scritto da lui può uscire.
+async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '' } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
@@ -1226,45 +1276,19 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
     } catch (_) {}
   }
 
-  // NAVIGA: difesa anti-esfiltrazione. Una pagina ostile (prompt injection) può
-  // far aprire al modello un URL che PORTA FUORI dati che aveva nel contesto
-  // (memoria, appunti, output dei comandi e documenti letti nel turno)
-  // codificandoli nella query/path/sottodominio. Il fallback strutturale scatta
-  // quando nel contesto è entrato testo scritto da altri (#587: conta cosa il
-  // modello ha letto, non chi manda il messaggio). Se sospetto, `_exfil` PRIMA
-  // del gate (mai dall'LLM): livello 2 con l'URL completo. Vedi src/shared/urlExfil.js.
-  if (type === 'NAVIGA') {
-    try {
-      const Exfil = globalThis.SN_URL_EXFIL;
-      const url = String(action.url ?? action.href ?? action.link ?? '').trim();
-      if (Exfil && url) {
-        const origin = sender?.tab?.url || sender?.url || '';
-        const v = Exfil.valutaNaviga(url, {
-          memoria: await navExfilCorpus(),
-          azioni: Array.isArray(contesto) ? contesto : [],
-          daPagina: /^https?:/i.test(origin),
-        });
-        if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
-      }
-    } catch (_) {}
-  }
-
-  // CERCA_WEB: la query esce dal computer verso il motore di ricerca, come un
-  // NAVIGA porta fuori l'URL. Stessa difesa: se il testo cercato porta un
-  // segreto della memoria o un pezzo di ciò che il modello ha letto nel turno,
-  // `_exfil` PRIMA del gate (mai dall'LLM) → livello 2 con la query mostrata.
-  if (type === 'CERCA_WEB') {
-    try {
-      const Exfil = globalThis.SN_URL_EXFIL;
-      const query = String(action.query ?? action.q ?? action.testo ?? action.text ?? '').trim();
-      if (Exfil && query) {
-        const v = Exfil.valutaRicerca(query, {
-          memoria: await navExfilCorpus(),
-          azioni: Array.isArray(contesto) ? contesto : [],
-        });
-        if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
-      }
-    } catch (_) {}
+  // Le uscite (NAVIGA, CERCA_WEB, ESEGUI_COMANDO, INVIA_FEEDBACK) passano dalla porta unica
+  // PRIMA del gate: un segreto che esce si ferma a ogni livello, anche confermato. Il resto del
+  // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
+  // `_exfil` (mai dall'LLM). Vedi src/shared/urlExfil.js.
+  try {
+    const u = await controllaUscita(action, { sender, contesto, parole });
+    if (u.blocca) {
+      const comando = type === 'ESEGUI_COMANDO' ? { command: String(action.comando ?? action.command ?? action.cmd ?? '').trim() } : {};
+      return { executed: false, kept: false, output: { blocked: 'segreto', frase: u.frase, ...comando } };
+    }
+    if (u.exfil) { action._exfil = true; action._exfilReason = u.reason; }
+  } catch (e) {
+    console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e);
   }
 
   // CANCELLA_SVEGLIA / MODIFICA_SVEGLIA: il livello dipende da QUANTE sveglie o
@@ -2597,6 +2621,12 @@ function toolResultText({ action, res, rendered }) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
     return `Azione ${type} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
   }
+  if (res.output && res.output.blocked === 'segreto') {
+    return `Azione ${type} NON eseguita, e non si può eseguire: ${res.output.frase || 'conteneva un segreto'}. `
+      + 'È un blocco fisso di Filo: nessuna conferma e nessun livello lo sblocca. Non riprovare in un\'altra forma '
+      + '(spezzato, codificato, in un altro campo o con un\'altra azione). Di\' all\'utente in una riga cosa hai '
+      + 'fermato, senza ripetere il dato: se vuole mandarlo davvero, lo fa lui a mano.';
+  }
   const obs = observationsForPrompt([rendered]);
   if (obs) return obs;
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'site') {
@@ -2905,6 +2935,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // decidono se un NAVIGA di questo turno può portare fuori dati (#587).
   const azioniViste = [];
   for (const m of cleanHistory) if (m && Array.isArray(m.actions)) azioniViste.push(...m.actions);
+  // Le parole dell'utente in questa chat: un codice che ha scritto lui può uscire (#810). Un turno
+  // interno non è sua voce.
+  const paroleUtente = cleanHistory.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || ''))
+    .concat(internal ? [] : [String(userMessage || '')]).join('\n');
   for (const m of cleanHistory) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     let content = String(m.text || '');
@@ -3053,7 +3087,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const esiti = new Map();
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
-        : executeFiloAction(a, { sender, contesto: azioniViste }));
+        : executeFiloAction(a, { sender, contesto: azioniViste, parole: paroleUtente }));
       const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
       for (let i = 0; i < actions.length; i++) {
         const a = actions[i];
@@ -3505,6 +3539,7 @@ const handlerCtx = {
   handleFiloChat,
   handleFiloGenerateDashboard,
   executeFiloAction,
+  controllaUscita,
   maybeRunCompactor,
   // Archivio delle chat (#525)
   closeAndTriageChat,

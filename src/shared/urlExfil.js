@@ -18,7 +18,8 @@
 //
 // Il verdetto NON blocca: alza il livello di NAVIGA a 2 (vedi actionLevels.js)
 // così l'utente vede l'URL completo e conferma. Un falso positivo costa una
-// conferma in più, mai un'esecuzione silenziosa indebita.
+// conferma in più, mai un'esecuzione silenziosa indebita. Blocca solo un segreto
+// che esce (valutaUscita, in fondo): lì non c'è conferma che tenga.
 
 (function (global) {
   'use strict';
@@ -64,7 +65,7 @@
   // forma alfanumerica minuscola, così "Mario_Rossi", "mario.rossi" e
   // "MarioRossi" collassano sulla stessa chiave e i separatori non aiutano a
   // evadere il match.
-  function exposedAlnum(url) {
+  function varianti(url) {
     const raw = String(url || '');
     const pieces = [raw];
     let cur = raw;
@@ -84,7 +85,11 @@
         if (b) pieces.push(b);
       }
     }
-    return pieces.join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    return pieces;
+  }
+
+  function exposedAlnum(url) {
+    return varianti(url).join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
   }
 
   // Token sensibili del corpus: parole alfanumeriche (≥ MIN_TOKEN) + indirizzi
@@ -236,12 +241,15 @@
 
   // Cosa hanno portato nel contesto le azioni viste dal modello (turni passati
   // compresi): `letto` = dati del computer, `nonFidato` = è entrato testo scritto
-  // da altri, `linkNoti` = gli indirizzi dei risultati di ricerca.
+  // da altri, `linkNoti` = gli indirizzi dei risultati di ricerca, `esterni` = i
+  // pezzi scritti da altri con da dove vengono (la riga di un blocco li nomina, #810).
   function contestoDaAzioni(actions) {
     const pezzi = [];
     let nonFidato = false;
     const linkNoti = new Set();
+    const esterni = [];
     const testo = (v) => (typeof v === 'string' ? v : '');
+    const daFuori = (t, fonte) => { if (t.trim()) esterni.push({ testo: t, fonte }); };
     for (const a of Array.isArray(actions) ? actions : []) {
       const out = a && a._output;
       if (!out || typeof out !== 'object') continue;
@@ -249,26 +257,30 @@
       if (type === 'ESEGUI_COMANDO') {
         if (out.blocked) continue;
         const t = `${testo(out.stdout)}\n${testo(out.stderr)}`;
-        if (t.trim()) { nonFidato = true; pezzi.push(t); }
+        if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, "dall'output di un comando"); }
       } else if (type === 'LEGGI_DOCUMENTO') {
-        if (testo(out.text)) { nonFidato = true; pezzi.push(out.text); }
+        if (testo(out.text)) { nonFidato = true; pezzi.push(out.text); daFuori(out.text, 'da un documento'); }
       } else if (type === 'LEGGI_FILE') {
         pezzi.push(testo(out.text));
       } else if (type === 'CERCA_CHAT') {
         nonFidato = true;
-        pezzi.push(testo(out.title), testo(out.transcript));
+        const letti = [testo(out.title), testo(out.transcript)];
         for (const r of Array.isArray(out.results) ? out.results : []) {
-          if (r) pezzi.push(`${testo(r.title)}\n${testo(r.snippet)}`);
+          if (r) letti.push(`${testo(r.title)}\n${testo(r.snippet)}`);
         }
+        pezzi.push(...letti);
+        daFuori(letti.filter(Boolean).join('\n'), 'da una conversazione archiviata');
       } else if (type === 'CERCA_WEB') {
         const results = Array.isArray(out.results) ? out.results : [];
         if (results.length) nonFidato = true;
         for (const r of results) if (r && r.url) linkNoti.add(chiaveLink(r.url));
+        daFuori(results.filter(Boolean).map((r) => `${testo(r.title)}\n${testo(r.url)}\n${testo(r.snippet)}`).join('\n'),
+          'dai risultati di una ricerca');
       }
     }
     let letto = pezzi.filter(Boolean).join('\n');
     if (letto.length > MAX_LETTO) letto = letto.slice(-MAX_LETTO);
-    return { letto, nonFidato, linkNoti };
+    return { letto, nonFidato, linkNoti, esterni };
   }
 
   // Verdetto: { exfil, reason }. corpus = memoria e appunti (dati personali
@@ -312,8 +324,118 @@
     return t ? { exfil: true, reason: t.reason } : { exfil: false, reason: '' };
   }
 
+  // ── La porta unica delle uscite (#810) ───────────────────────────────────
+  // Ogni azione che porta testo fuori da Filo passa da valutaUscita prima del gate dei
+  // livelli, e ci passeranno le prossime (campi di una pagina, mail): la sentinella
+  // tests/unit/usciteSegreti.test.mjs è rossa se una la salta. Un blocco qui è la voce
+  // «far uscire un segreto» del capitolo 9: nessun livello e nessun OK lo sblocca.
+  const USCITE = Object.freeze({
+    NAVIGA: "non ho aperto l'indirizzo",
+    CERCA_WEB: 'non ho fatto la ricerca',
+    ESEGUI_COMANDO: 'non ho eseguito il comando',
+    INVIA_FEEDBACK: 'non ho inviato il feedback',
+  });
+
+  // Cosa conteneva, per la riga che legge l'utente: mai il segreto stesso.
+  const CUSTODITI = Object.freeze({
+    chiave: 'una chiave dei servizi AI che custodisco',
+    accesso: 'un token del tuo accesso a Filo',
+    identita: "l'identità di questa copia di Filo",
+    portafoglio: 'la chiave del tuo portafoglio',
+  });
+  const LETTI = Object.freeze({
+    codice: 'un codice letto',
+    password: 'una password letta',
+    chiave: 'una chiave letta',
+    iban: 'coordinate bancarie lette',
+    carta: 'il numero di una carta letto',
+  });
+
+  // Tutto il testo che l'azione porta con sé, non solo il campo che l'esecuzione legge
+  // oggi: un sinonimo nuovo non deve diventare una porta laterale.
+  function testoUscente(action) {
+    const out = [];
+    const giro = (v, n) => {
+      if (typeof v === 'string' || typeof v === 'number') { out.push(String(v)); return; }
+      if (n > 4 || !v || typeof v !== 'object') return;
+      if (Array.isArray(v)) { v.forEach((x) => giro(x, n + 1)); return; }
+      for (const k of Object.keys(v)) if (!k.startsWith('_') && k !== 'type') giro(v[k], n + 1);
+    };
+    giro(action, 0);
+    return out.join('\n');
+  }
+
+  // Un codice corto si cerca con i confini, ma a separatori liberi: «482913» esce anche come
+  // «482-913»; «4821» non combacia dentro «348215». Le chiavi lunghe si confrontano sulla
+  // forma alfanumerica, che copre anche le codifiche dell'indirizzo e il base64.
+  function esce(valore, regola, forme, alnum) {
+    const v = String(valore || '');
+    if (regola === 'codice' || regola === 'password') {
+      const chars = v.replace(/[^A-Za-z0-9]/g, '');
+      if (chars.length < 4) return false;
+      const soloCifre = /^\d+$/.test(chars);
+      const confine = soloCifre ? '\\d' : '[A-Za-z0-9]';
+      const re = new RegExp(`(?<!${confine})${chars.split('').join('[\\s-]?')}(?!${confine})`, 'i');
+      return forme.some((f) => re.test(f));
+    }
+    const norm = v.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    return norm.length >= 8 && alnum.includes(norm);
+  }
+
+  // `segreti` = [{ valore, tipo }] custoditi da Filo; `pagina` = { testo, host } se l'azione
+  // parte da una pagina web che l'agente ha davanti; `parole` = ciò che l'utente ha scritto
+  // in chat (un codice che ha scritto lui passa); `memoria` e `daPagina` servono all'OK in
+  // più di NAVIGA e CERCA_WEB. Torna { blocca, frase } oppure { exfil, reason }.
+  function valutaUscita(action, {
+    segreti = [], azioni = [], pagina = null, parole = '', memoria = '', daPagina = false,
+  } = {}) {
+    const tipo = String((action && action.type) || '').toUpperCase();
+    const verbo = USCITE[tipo];
+    const niente = { blocca: false, exfil: false, frase: '', reason: '' };
+    if (!verbo) return niente;
+    const G = global.SN_GUARDIANO_STATICO;
+    const uscente = testoUscente(action);
+    const forme = varianti(uscente);
+    const alnum = exposedAlnum(uscente);
+    const min = (G && G.SEGRETO_MIN) || 12;
+    for (const s of Array.isArray(segreti) ? segreti : []) {
+      const v = String((s && s.valore) || '').trim();
+      if (v.length < min) continue;
+      const norm = v.toLowerCase().replace(/[^a-z0-9]+/g, '');
+      if (forme.some((f) => f.includes(v)) || (norm.length >= min && alnum.includes(norm))) {
+        return { ...niente, blocca: true, regola: 'custodito', frase: `${verbo}: conteneva ${CUSTODITI[s.tipo] || CUSTODITI.chiave}` };
+      }
+    }
+    const ctx = contestoDaAzioni(azioni);
+    const fonti = ctx.esterni.slice();
+    if (pagina && typeof pagina.testo === 'string' && pagina.testo.trim()) {
+      fonti.push({ testo: pagina.testo, fonte: pagina.host ? `dalla pagina ${pagina.host}` : 'dalla pagina' });
+    }
+    if (G && fonti.length && uscente.trim()) {
+      const scritte = varianti(parole);
+      const scritteAlnum = exposedAlnum(parole);
+      for (const f of fonti) {
+        for (const x of G.segretiNelTesto(f.testo)) {
+          if (!esce(x.valore, x.regola, forme, alnum)) continue;
+          if (parole && esce(x.valore, x.regola, scritte, scritteAlnum)) continue;
+          return { ...niente, blocca: true, regola: x.regola, frase: `${verbo}: conteneva ${LETTI[x.regola] || LETTI.codice} ${f.fonte}` };
+        }
+      }
+    }
+    if (tipo === 'NAVIGA') {
+      const url = String(action.url ?? action.href ?? action.link ?? '').trim();
+      const v = url ? valutaNaviga(url, { memoria, azioni, daPagina }) : null;
+      if (v && v.exfil) return { ...niente, exfil: true, reason: v.reason };
+    }
+    if (tipo === 'CERCA_WEB') {
+      const v = valutaRicerca(String(action.query ?? action.q ?? action.testo ?? action.text ?? ''), { memoria, azioni });
+      if (v.exfil) return { ...niente, exfil: true, reason: v.reason };
+    }
+    return niente;
+  }
+
   global.SN_URL_EXFIL = {
-    assess, valutaNaviga, valutaRicerca, contestoDaAzioni,
+    assess, valutaNaviga, valutaRicerca, contestoDaAzioni, valutaUscita, testoUscente, USCITE,
     taint, taintLetto, taintTestoLetto, structural, exposedAlnum, corpusTokens,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

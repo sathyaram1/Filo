@@ -238,6 +238,8 @@
   // riassunto delle azioni, nell'ordine in cui sono avvenute, con i doppioni
   // contati. Senza azioni resta il solo ragionamento.
   const ACTIVITY_VERBS = {
+    // Un'azione fermata perché avrebbe portato fuori un segreto (#810): si vede anche a blocco chiuso.
+    FERMATA: (n) => (n > 1 ? `fermato ${n} azioni` : 'fermato un\'azione'),
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
     CERCA_CHAT: (n) => (n > 1 ? `riletto ${n} conversazioni di prima` : 'riletto una conversazione di prima'),
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
@@ -446,6 +448,9 @@
       return { icon: '❔', text: `Conferma chiesta · ${prima || String(a.type || '').toLowerCase()}`, failed: true };
     }
     const type = String(a.type || '').toUpperCase();
+    // Un segreto che sarebbe uscito (#810): cosa è stato fermato e da dove veniva, frase del main.
+    const fermata = a._output && a._output.blocked === 'segreto' ? String(a._output.frase || '').trim() : '';
+    if (fermata) return { icon: '🔒', text: fermata.charAt(0).toUpperCase() + fermata.slice(1), tipo: 'FERMATA' };
     // Non riuscita: la riga lo DICE, invece di raccontare un successo che non
     // c'è stato (un documento inesistente diceva «Leggo il documento…»).
     if (a._executed === false) {
@@ -491,7 +496,7 @@
       return true;
     }
     const row = activityRowFor(a);
-    if (row) { activity.addRow(a.type, row.icon, row.text, !!row.failed); return true; }
+    if (row) { activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed); return true; }
     return false;
   }
 
@@ -782,6 +787,16 @@
         if (!ok) return;
         btn.disabled = true;
         const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a });
+        // Nemmeno l'OK fa uscire un segreto (#810): la riga dice cosa è stato fermato.
+        if (r && r.output && r.output.blocked === 'segreto') {
+          a._output = r.output;
+          a._executed = false;
+          delete a._confirm;
+          const row = activityRowFor(a);
+          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed);
+          btn.textContent = `🔒 ${row ? row.text : 'Fermata'}`;
+          return;
+        }
         // L'utente ha detto sì: da qui in poi l'azione è FATTA. Lo deve sapere
         // il diario (una riga come per le azioni di livello 1) e lo deve sapere
         // il MODELLO al turno dopo — l'oggetto è lo stesso che sta nello
