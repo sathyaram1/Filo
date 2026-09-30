@@ -223,10 +223,10 @@ service cloud.firestore {
       // finiti in link e log.
       allow get, list: if isAdmin() || isRoutine();
 
-      // Creazione admin: senza vincoli di forma. Serve all'applier locale
-      // dell'owner (npm run feedback:apply col token admin) per creare i
-      // sub-feedback accodati dalle routine, che portano campi non previsti
-      // dal create anonimo (status, notes, seq/subSeq, priority…).
+      // Creazione admin: senza vincoli di forma. La usano l'app dell'owner e
+      // scripts/claude-feedback.mjs col token admin per scrivere `senderProof`
+      // (#595), la prova del mittente che il create anonimo sotto NON ammette:
+      // la sentinella tests/unit/firestoreRulesSenderProof.test.mjs lo tiene vero.
       allow create: if isAdmin();
 
       // `name` = titolo breve generato da un LLM all'invio; `seq`/`subSeq` =
