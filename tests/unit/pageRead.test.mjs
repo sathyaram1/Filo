@@ -258,3 +258,11 @@ test('un documento letto o l\'uscita di un comando sono testo di sconosciuti com
   PR.annotaAzione(c, { type: 'ESEGUI_COMANDO', _output: { blocked: true } });
   assert.equal(c.esterno, false, 'un comando bloccato non ha portato niente');
 });
+
+// #553, giro 14: un link che l'utente scrive senza «https://» né «www.» è suo, come gli altri.
+test('un link scritto dall\'utente senza https né www è un indirizzo trovato', () => {
+  const c = PR.contestoChat();
+  PR.annotaLink(c, 'leggimi questo: repubblica.it/politica/2026/09/29/news/governo_manovra-8f3a9c2e7b1d4f6a9c2e7b1d/');
+  assert.equal(PR.formaDaControllare(c, 'LEGGI_PAGINA', 'https://www.repubblica.it/politica/2026/09/29/news/governo_manovra-8f3a9c2e7b1d4f6a9c2e7b1d/'), false);
+  assert.equal(PR.formaDaControllare(c, 'LEGGI_PAGINA', 'https://repubblica.it/politica/2026/09/29/news/altro'), true, 'un altro indirizzo resta da controllare');
+});

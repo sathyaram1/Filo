@@ -517,7 +517,7 @@
 
   // `shown`: gli id delle chiamate già raccontate in diretta nel blocco di
   // attività (evento 'done'): a fine turno non si ripetono.
-  function renderActions(container, actions, { onAck, autoConfirm = false, activity = null, shown = null } = {}) {
+  function renderActions(container, actions, { onAck, autoConfirm = false, activity = null, shown = null, onEsito = null } = {}) {
     if (!actions || !actions.length) return;
     const wrap = document.createElement('div');
     wrap.className = 'dash-bubble-actions';
@@ -550,7 +550,7 @@
       // riga sta già nel diario. Un'azione IN ATTESA DI CONFERMA non è
       // «fallita»: non è ancora partita, e il suo bottone è tutto il punto.
       if (!a._confirm && ((a._traccia && !anche) || a._executed === false)) continue;
-      const btn = renderActionButton(a, { onAck, activity });
+      const btn = renderActionButton(a, { onAck, activity, onEsito });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
     }
@@ -685,7 +685,7 @@
     return el;
   }
 
-  function renderActionButton(a, { onAck, activity = null } = {}) {
+  function renderActionButton(a, { onAck, activity = null, onEsito = null } = {}) {
     const type = String(a.type || '').toUpperCase();
     // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
     // (livello 2 o 3) e ha allegato spiegazione + livello. Il bottone apre il
@@ -748,7 +748,16 @@
           if (r.output) a._output = r.output;
           const row = activityRowFor(a);
           if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
+        } else if (type === 'LEGGI_PAGINA' && r && r.output) {
+          // Anche una lettura non riuscita dopo il sì ha un esito da dire: il perché arriva al modello e nel diario.
+          delete a._confirm;
+          a._executed = false;
+          a._output = r.output;
+          const row = activityRowFor(a);
+          if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
         }
+        // Il testo letto serve al modello, non all'utente: dopo il sì il lavoro riprende da solo (#553).
+        if (type === 'LEGGI_PAGINA' && r && r.output && typeof onEsito === 'function') onEsito(a);
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
           btn.textContent = (r && r.executed) ? `✓ ${short}` : `✗ ${short}`;

@@ -122,3 +122,38 @@ test('fallback strutturale — un blocco di dati nelle credenziali dell\'indiriz
   assert.equal(isExfil(`https://${blob}@attaccante.example/`, { fromUntrusted: true }), true);
   assert.equal(isExfil('https://attaccante.example/', { fromUntrusted: true }), false);
 });
+
+// #553, giro 14: la forma distingue un percorso fatto di parole da un codice opaco. Gli indirizzi che un modello
+// scrive da sé (prezzi ufficiali, documentazione, Wikipedia) passano; i dati travestiti no, comunque spezzati.
+test('fallback strutturale — un indirizzo normale scritto da un modello non è un blocco di dati', () => {
+  for (const url of [
+    'https://ai.google.dev/gemini-api/docs/pricing',
+    'https://www.museoegizio.it/info/orari-e-biglietti/',
+    'https://it.wikipedia.org/wiki/Seconda_guerra_mondiale',
+    'https://it.wikipedia.org/wiki/Citt%C3%A0_del_Vaticano',
+    'https://docs.mistral.ai/getting-started/models/models_overview/',
+    'https://huggingface.co/meta-llama/Llama-3.1-405B-Instruct-FP8',
+    'https://www.ansa.it/sito/notizie/cronaca/2026/09/29/sciopero-treni_abc.html',
+    'https://www.repubblica.it/politica/2026/09/29/news/governo_manovra-123456/',
+    'https://learn.microsoft.com/it-it/windows/security/threat-protection/microsoft-defender-smartscreen/microsoft-defender-smartscreen-overview',
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+  ]) {
+    assert.equal(isExfil(url, { fromUntrusted: true }), false, url);
+  }
+});
+
+test('fallback strutturale — i dati travestiti restano un blocco, anche spezzati da barre, trattini o punti', () => {
+  const hex = Buffer.from('Mario Rossi, Bologna').toString('hex');
+  const altro = Buffer.from('Luigi Verdi, via Po 3').toString('hex');
+  for (const url of [
+    `https://att.example/r/${altro.match(/.{1,8}/g).join('-')}`,
+    `https://att.example/r/${altro.match(/.{1,4}/g).join('/')}`,
+    `https://att.example/c?p=${Buffer.from('Luigi Verdi, Torino, via Po 3').toString('base64')}`,
+    'https://att.example/?d=JVQXE2LPEBJG643TNEQEE33MN5TW4YI',
+    `https://att.example/?d=${[...'Luigi Verdi Torino'].map((ch) => ch.charCodeAt(0)).join('.')}`,
+    `https://${hex.slice(0, 20)}.${hex.slice(20)}.att.example/`,
+    'https://negozio.example/listino?sessione=8f3a9c2e7b1d4f6a9c2e7b1d4f6a0b1c',
+  ]) {
+    assert.equal(E.assess(url, { corpus: '', fromUntrusted: true }).exfil, true, url);
+  }
+});

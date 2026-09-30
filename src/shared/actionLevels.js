@@ -282,6 +282,10 @@
         }
         return url ? `Leggere la pagina ${url}` : 'Leggere una pagina';
       },
+      describeDone: (a) => {
+        const url = indirizzoDi(a);
+        return url ? `Letta la pagina ${url}` : 'Letta una pagina';
+      },
     },
     LEGGI_TRASPARENZA: {
       // Filo rilegge i propri documenti di trasparenza per rispondere a "perché
