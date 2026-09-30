@@ -82,25 +82,26 @@ test('«quanto costa Gemini 2.5 Pro?»: Filo legge la pagina dei prezzi che cono
   await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
 });
 
-test('dopo una ricerca, «aprimi la pagina dei prezzi» apre la scheda senza avviso di dati in uscita', async ({ app, openTab }) => {
+test('dopo aver letto una pagina, «aprimi la pagina dei prezzi» apre la scheda senza avviso di dati in uscita', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const page = await openTab(NEWTAB);
   await reteFinta(app);
   await app.evaluate(() => {
     globalThis.SN_WEB_SEARCH.search = async () => ({ ok: true, provider: 'stub', results: [
-      { title: 'Novità dei modelli', url: 'https://notizie.example/modelli', snippet: 'Gemini 2.5 Pro è uscito.' },
+      { title: 'Listino', url: 'https://notizie.example/listino-modelli', snippet: 'I prezzi dei modelli.' },
     ] });
   });
   const url = 'https://ai.google.dev/gemini-api/docs/pricing';
   await stubModello(app, [
-    { strumenti: [{ nome: 'CERCA_WEB', args: { query: 'gemini 2.5 pro novità' } }] },
-    { finale: { cerca: '(Gemini)', testo: 'PRIMA: è uscito $1 2.5 Pro.' } },
+    { strumenti: [{ nome: 'CERCA_WEB', args: { query: 'prezzi gemini 2.5 pro' } }] },
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url: 'https://notizie.example/listino-modelli' } }] },
+    { finale: { cerca: 'Gemini 2\\.5 Pro \\| ([\\d,]+)', testo: 'PRIMA: $1 dollari.' } },
     { strumenti: [{ nome: 'NAVIGA', args: { url } }] },
     { finale: { cerca: '(x)', testo: 'SECONDA: aperta.' } },
   ]);
-  await chiedi(page, 'è uscito gemini 2.5 pro?');
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'PRIMA:' })).toBeVisible({ timeout: 20_000 });
-  await chiedi(page, 'aprimi la pagina dei prezzi di gemini');
+  await chiedi(page, 'quanto costa gemini 2.5 pro?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'PRIMA: 1,25 dollari' })).toBeVisible({ timeout: 20_000 });
+  await chiedi(page, 'aprimi la pagina ufficiale dei prezzi');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'SECONDA:' })).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
   await expect.poll(() => app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows()
