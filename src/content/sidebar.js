@@ -295,8 +295,8 @@
       btn.type = 'button';
       btn.className = 'sn-sidebar-choice';
       btn.textContent = c.label;
-      btn.addEventListener('click', () => {
-        if (wrap.classList.contains('sn-sidebar-choices-used')) return;
+      btn.addEventListener('click', (e) => {
+        if (!gestoVero(e) || wrap.classList.contains('sn-sidebar-choices-used')) return;
         wrap.classList.add('sn-sidebar-choices-used');
         // disabilita visivamente tutti i bottoni
         wrap.querySelectorAll('button').forEach((b) => { b.disabled = true; });
@@ -474,9 +474,10 @@
       saveCurrentPath(riuscito).catch(() => {});
       thanks();
     }
-    up.addEventListener('click', () => rispondi(true));
-    down.addEventListener('click', () => rispondi(false));
-    skip.addEventListener('click', () => {
+    up.addEventListener('click', (e) => { if (gestoVero(e)) rispondi(true); });
+    down.addEventListener('click', (e) => { if (gestoVero(e)) rispondi(false); });
+    skip.addEventListener('click', (e) => {
+      if (!gestoVero(e)) return;
       // Niente save, solo dismiss visivo.
       disableAll();
       wrap.classList.add('sn-sidebar-feedback-dismissed');
