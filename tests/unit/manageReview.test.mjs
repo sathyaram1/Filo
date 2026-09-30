@@ -781,6 +781,24 @@ test('isLocalOnly: serve una mappa con chi l’ha messo', () => {
   assert.equal(MR.isLocalOnly({}), false);
 });
 
+test('isProvenLocalWork: segno e prova insieme, come il server che la fonde saltando L5', () => {
+  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO })), true);
+  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO, clientId: 'owner:me' })), true);
+  assert.equal(MR.isProvenLocalWork(locale()), false);
+  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO, senderProof: undefined })), false);
+  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO, clientId: 'utente-x' })), false);
+});
+
+test('livelli L5: la fusione locale che ha saltato L5 non dice «avevi messo il segno»', () => {
+  const fb = locale({ localOnly: SEGNO, seq: 908, subSeq: 0, status: 'done' });
+  const l5 = MR.livelloL5(fb, { fusioni: { preapproved: [{ id: 'x', feedbackId: 'l1', skippedL5: true }] } });
+  assert.equal(l5.esito, 'fuso');
+  assert.match(l5.pannello.testo, /lavoro locale/);
+  assert.doesNotMatch(l5.pannello.testo, /avevi messo il segno/);
+  const segnata = MR.livelloL5(fb, { fusioni: { preapproved: [{ id: 'y', feedbackId: 'l1' }] } });
+  assert.match(segnata.pannello.testo, /avevi messo il segno/);
+});
+
 // ── Riapertura a pagamento dalla board (DC4) ────────────────────────────────
 
 test('espone hasReopenRequest e canReopen', () => {
