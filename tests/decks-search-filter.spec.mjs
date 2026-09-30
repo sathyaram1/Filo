@@ -627,6 +627,8 @@ test('#382: una sessione di ricerche larghe non svuota la cronologia AI né le r
       action: globalThis.SN_CONST.ACTIONS.FILO_CHAT, provider: 'openrouter', model: 'x',
       input: { text: 'domanda di stamattina' }, output: 'risposta di stamattina', origin: 'filo://home',
     });
+    // Una risposta già pronta di un'altra funzione: rifatta la stessa domanda, Filo risponde senza pagare.
+    await globalThis.SN_AI_CACHE.set({ provider: 'openrouter', model: 'x', messages: [{ role: 'user', content: 'spiega «haste»' }], text: 'pronta' });
   });
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
