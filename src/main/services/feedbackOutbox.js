@@ -246,7 +246,7 @@
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _reset: () => {
       queue = []; loaded = false; flushing = false; auto = true;
-      prepareFn = null; onDoneFn = null; onGiveUpFn = null; backoff = backoffMin;
+      prepareFn = null; onDoneFn = null; onGiveUpFn = null; tokenOwnerFn = null; backoff = backoffMin;
       if (timer) { clearTimeout(timer); timer = null; }
     },
   };
