@@ -211,11 +211,12 @@ describe('la chiamata al server', () => {
   });
 });
 
-// Le risposte VERE di runOwnerMerge (filo-security, test/lavori-locali-908.test.js): la stessa
-// RISPOSTA_908 sta identica là, così una forma cambiata da una parte fa rosso anche qui.
+// Risposta VERA di runOwnerMerge (filo-security, giroLocale di test/lavori-locali-908.test.js):
+// se la forma cambia là, va ricopiata qui, o il finish smette di dire cosa è successo alla pratica.
+const BLOCCO = { gate: 'guard_the_guards', label: 'Tocca aree protette (guardie, regole del database, chiavi, automatismi)', detail: 'firestore.rules' };
 const RISPOSTA_908 = {
   ok: true, result: 'merged', sha: 'c'.repeat(40),
-  local: { feedbackId: 'fid908', eligible: true, num: '#908', skippedL5: true, record: 'traccia-1', closed: true, blocks: ['guard_the_guards'] },
+  local: { feedbackId: 'fid908', eligible: true, num: '#908', skippedL5: true, record: 'traccia-1', closed: true, blocks: [BLOCCO] },
 };
 const NON_AMMESSA = { feedbackId: 'fid908', eligible: false, reason: 'mittente_non_provato', detail: 'il feedback non porta la prova del mittente (senderProof admin)' };
 
@@ -224,7 +225,7 @@ describe('la pratica del lavoro locale (#908)', () => {
     const r = classifyOwnerMerge(200, risposta(RISPOSTA_908));
     assert.equal(r.outcome, 'merged');
     assert.equal(r.skippedL5, true);
-    assert.deepEqual(r.blocks, ['guard_the_guards']);
+    assert.deepEqual(r.blocks, [BLOCCO]);
     assert.equal(r.closed, true);
     const msg = messageForOwnerMerge(r, 'claude/x', { feedbackId: 'fid908' });
     assert.match(msg, /^✓/);
@@ -233,6 +234,14 @@ describe('la pratica del lavoro locale (#908)', () => {
     assert.match(msg, /Pratica #908 chiusa/);
     assert.doesNotMatch(msg, /NON si è registrata/);
     assert.equal(exitCodeForOwnerMerge(r), 0);
+  });
+
+  test('blocchi col solo nome, o con un elenco lunghissimo: si stampano, e un taglio si dichiara', () => {
+    const lungo = Array.from({ length: 400 }, (_, i) => `src/file-${i}.js`).join(', ');
+    const corpo = { ...RISPOSTA_908, local: { ...RISPOSTA_908.local, blocks: ['new_dependency', { ...BLOCCO, detail: lungo }] } };
+    const msg = messageForOwnerMerge(classifyOwnerMerge(200, risposta(corpo)), 'claude/x', {});
+    assert.match(msg, /· new_dependency\n/);
+    assert.match(msg, /src\/file-0\.js.*… \(elenco intero nella nota della pratica\)/);
   });
 
   test('fuso ma la pratica non si è chiusa: si dice, con il comando per chiuderla', () => {
