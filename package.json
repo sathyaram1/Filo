@@ -34,7 +34,9 @@
     "build:linux": "electron-builder --linux --publish never",
     "release:linux": "electron-builder --linux --publish always",
     "feedback": "node scripts/owner-feedback.mjs",
-    "feedback:apri": "node scripts/claude-feedback.mjs"
+    "feedback:apri": "node scripts/claude-feedback.mjs",
+    "feedback:leggi": "node scripts/leggi-feedback.mjs",
+    "feedback:ripasso": "node scripts/ripasso-mittenti.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
