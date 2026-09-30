@@ -938,7 +938,7 @@
     'claimExpiresAt', 'claimNum', 'claimedAt', 'claimedBy', 'clientId',
     'clientIdHash', 'createdAt', 'mergePreapproved', 'name', 'parentId', 'pipeline',
     'priority', 'priorityManual', 'reopenRequests', 'resolvedAt',
-    'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'seq', 'stalls',
+    'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'senderProof', 'seq', 'stalls',
     'starred', 'status', 'statusPublic', 'statusReason', 'subSeq', 'text',
     'title', 'url', 'userAgent', 'userNote', 'verifiedAt', 'votes',
     'walletPseudonym', 'workingResets', 'workingSince',
