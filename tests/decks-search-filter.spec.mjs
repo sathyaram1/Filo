@@ -86,7 +86,7 @@ async function mockProvider(app) {
         if (globalThis.__judgeGate) await globalThis.__judgeGate;
         await new Promise((r) => setTimeout(r, 5));
         globalThis.__inFlight -= 1;
-        text = globalThis.__judge ? globalThis.__judge(last) : JSON.stringify({ keep: ['bolt-1'] });
+        text = globalThis.__judge ? globalThis.__judge(last, attempts[0].model) : JSON.stringify({ keep: ['bolt-1'] });
       } else if (globalThis.__chat) {
         text = globalThis.__chat(last);
       } else if (/danni/i.test(last)) {
@@ -474,4 +474,169 @@ test('#382: mentre il giudice lavora la bolla dice cosa fa, con la frase di Filo
   await app.evaluate(() => globalThis.__openGate());
   await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(1);
   await expect(bubble.locator('.dk-progress')).toHaveCount(0);
+});
+
+// Il giudice finto delle prove qui sotto è SEVERO come un modello onesto: tiene una carta solo se il suo prompt gli
+// dà i dati per verificarla. `__head` è il prompt prima della lista, `__lines` le righe delle carte.
+async function strictJudgeTools(app, cards) {
+  await app.evaluate((_electron, cards) => {
+    const card = (c) => ({
+      id: c.id, name: c.name, mana_cost: `{${c.cmc}}`, cmc: c.cmc, type_line: c.type, oracle_text: c.oracle,
+      power: c.power, toughness: c.toughness, colors: ['R'], color_identity: ['R'],
+      image_uris: { normal: `https://cards.test/${c.id}.jpg` }, prices: { eur: c.eur }, legalities: { commander: 'legal' },
+      scryfall_uri: `https://scryfall.com/card/${c.id}`,
+    });
+    globalThis.__searchCards = cards.map(card);
+    globalThis.__head = (prompt) => prompt.split('CARTE CANDIDATE:')[0];
+    globalThis.__lines = (prompt) => (prompt.split('CARTE CANDIDATE:')[1] || '').split('\n').filter((l) => /^\d+\. /.test(l));
+    globalThis.__nums = (lines) => lines.map((l) => Number(l.split('.')[0]));
+  }, cards);
+}
+
+test('#382: una richiesta che parla del commander arriva al giudice col commander del mazzo', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await strictJudgeTools(app, [
+    { id: 'opt-1', name: 'Opt', cmc: 1, type: 'Instant', oracle: 'Scry 1. Draw a card.', eur: '0.10' },
+    { id: 'ogre-1', name: 'Hulking Ogre', cmc: 3, type: 'Creature — Ogre', oracle: 'Trample.', power: '3', toughness: '3', eur: '0.10' },
+  ]);
+  await app.evaluate(() => {
+    globalThis.__chat = () => JSON.stringify({ query: '(t:instant or t:creature)', filter: 'carte che sinergizzano con il commander del mazzo' });
+    globalThis.__judge = (prompt) => JSON.stringify({
+      keep: /Niv-Mizzet/.test(globalThis.__head(prompt))
+        ? globalThis.__nums(globalThis.__lines(prompt).filter((l) => /Instant/.test(l))) : [],
+    });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const bubble = await send(page, 'carte in sinergia col mio commander');
+  await expect(bubble).not.toContainText('nessuna corrisponde');
+  await expect(bubble.locator('.dk-row-name')).toHaveText(['Opt']);
+});
+
+test('#382: il giudice vede prezzo, forza e costituzione, e non scarta per ciò che non vede', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await strictJudgeTools(app, [
+    { id: 'shock-1', name: 'Shock', cmc: 1, type: 'Instant', oracle: 'Shock deals 2 damage to any target.', eur: '0.20' },
+    { id: 'fury-1', name: 'Fury', cmc: 5, type: 'Creature — Elemental Incarnation', oracle: 'Double strike.', power: '3', toughness: '3', eur: '32.00' },
+    { id: 'giant-1', name: 'Hill Giant', cmc: 4, type: 'Creature — Giant', oracle: '', power: '3', toughness: '3', eur: '0.05' },
+    { id: 'ogre-1', name: 'Big Ogre', cmc: 5, type: 'Creature — Ogre', oracle: 'Trample.', power: '5', toughness: '4', eur: '0.05' },
+  ]);
+  await app.evaluate(() => {
+    globalThis.__chat = (last) => (/euro/.test(last)
+      ? JSON.stringify({ query: '(o:damage) eur<1', filter: 'infligge danni e costa meno di 1 euro' })
+      : JSON.stringify({ query: 't:creature pow>=5', filter: 'creatura con forza 5 o più, di rarità comune' }));
+    globalThis.__judge = (prompt) => {
+      const ls = globalThis.__lines(prompt);
+      if (/euro/.test(globalThis.__head(prompt))) {
+        if (!ls.every((l) => /€/.test(l))) return JSON.stringify({ keep: [] });
+        return JSON.stringify({ keep: globalThis.__nums(ls.filter((l) => /damage/.test(l) && /prezzo 0,/.test(l))) });
+      }
+      // La rarità la riga non la mostra: un giudice che obbedisce alle regole non scarta per quella.
+      if (!/non scartare una carta per quello/.test(prompt)) return JSON.stringify({ keep: [] });
+      return JSON.stringify({ keep: globalThis.__nums(ls.filter((l) => /forza\/costituzione 5\//.test(l))) });
+    };
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const cheap = await send(page, 'rimozioni a danno sotto 1 euro');
+  await expect(cheap.locator('.dk-row-name')).toHaveText(['Shock']);
+  const big = await send(page, 'creature comuni con forza 5 o più');
+  await expect(big.locator('.dk-row-name')).toHaveText(['Big Ogre']);
+});
+
+test('#382: un seguito senza "filter" dal modello porta al giudice la richiesta di prima', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await hasteCards(app);
+  await app.evaluate(() => {
+    let n = 0;
+    globalThis.__chat = () => (++n === 1
+      ? JSON.stringify({ query: '(o:"have haste" or o:haste)', filter: 'fa guadagnare haste ad altre creature' })
+      : JSON.stringify({ query: '(o:"have haste" or o:haste) cmc<=3' }));
+    // Tiene chi DÀ haste se il prompt porta la richiesta di haste (le regole fisse la nominano già, la frase no);
+    // altrimenti giudica solo il costo, e passano tutte.
+    globalThis.__judge = (prompt) => {
+      const head = prompt.split('CARTE CANDIDATE:')[0];
+      const lines = prompt.split('CARTE CANDIDATE:')[1].split('\n').filter((l) => /^\d+\. /.test(l));
+      const keep = /danno haste|haste ad altre/i.test(head) ? lines.filter((l) => /have haste/.test(l)) : lines;
+      return JSON.stringify({ keep: keep.map((l) => Number(l.split('.')[0])) });
+    };
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const first = await send(page, 'carte che danno haste');
+  await expect(first.locator('.dk-row-name')).toHaveText(['Hammer of Purphoros']);
+  const next = await send(page, 'e solo quelle che costano poco');
+  await expect(next.locator('.dk-row-name')).toHaveText(['Hammer of Purphoros']);
+  // La nota parla con le parole dell'utente, non col contesto dato al giudice.
+  await expect(next).not.toContainText('Richieste precedenti');
+});
+
+test('#382: scelto un altro modello per il filtro, la stessa ricerca la giudica il modello nuovo', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await hasteCards(app);
+  await app.evaluate(() => {
+    globalThis.__chat = () => JSON.stringify({ query: '(o:haste)', filter: 'fa guadagnare haste ad altre creature' });
+    // Il giudice di partenza sbaglia e tiene Goblin Guide; quello scelto dopo tiene l'equipaggiamento giusto.
+    globalThis.__judge = (prompt, model) => {
+      const pick = /gemma/.test(model) ? /Hammer of Purphoros/ : /Goblin Guide/;
+      return JSON.stringify({ keep: [prompt.split('\n').find((l) => /^\d+\. /.test(l) && pick.test(l)).split('.')[0]] });
+    };
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  const first = await send(page, 'carte che danno haste');
+  await expect(first.locator('.dk-row-name')).toHaveText(['Goblin Guide']);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const s = await globalThis.SN_STORAGE.getSettings();
+    await globalThis.SN_STORAGE.updateSettings({ models: { ...s.models, [C.ACTIONS.DECKS_SEARCH_FILTER]: 'gemma' } });
+  });
+  const again = await send(page, 'carte che danno haste');
+  await expect(again.locator('.dk-row-name')).toHaveText(['Hammer of Purphoros']);
+});
+
+test('#382: una sessione di ricerche larghe non svuota la cronologia AI del resto di Filo', async ({ app, openTab }) => {
+  test.setTimeout(180_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await manyCards(app, { pages: [175, 175, 175, 175, 175, 175, 175], relevant: [3] });
+  await app.evaluate(async () => {
+    // Testo Oracle di lunghezza realistica: il prompt del giudice pesa quanto quello vero.
+    const long = ' Whenever another creature you control enters, you may pay {1}. If you do, put a +1/+1 counter on it and it gains trample until end of turn.';
+    for (const p of globalThis.__pages) for (const c of p) c.oracle_text += long;
+    let n = 0;
+    // Criteri diversi a ogni turno, come le frasi di una sessione vera: niente giudizi già in cache.
+    globalThis.__chat = () => JSON.stringify({ query: '(o:"have haste" or o:haste)', filter: `fa guadagnare haste ad altre creature (${++n})` });
+    await globalThis.SN_HISTORY.append({
+      action: globalThis.SN_CONST.ACTIONS.FILO_CHAT, provider: 'openrouter', model: 'x',
+      input: { text: 'domanda di stamattina' }, output: 'risposta di stamattina', origin: 'filo://home',
+    });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  for (let i = 0; i < 14; i++) {
+    const bubble = await send(page, `carte che danno haste ${i + 1}`);
+    await expect(bubble.locator('.dk-row-name')).toHaveText(['Giusta 3']);
+  }
+  const kept = await app.evaluate(async () => (await globalThis.SN_HISTORY.list())
+    .some((it) => it.input && it.input.text === 'domanda di stamattina'));
+  expect(kept, 'la voce di stamattina è uscita per far posto ai controlli delle ricerche').toBe(true);
 });
