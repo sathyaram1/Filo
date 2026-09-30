@@ -49,11 +49,11 @@
   // https://www.paypal.com@altro.net si legge come il sito vero, ma porta a quello dopo la chiocciola.
   function nomePrimaDellaChiocciola(prima, href) {
     if (!prima || !sitoNominato) return '';
-    const nominato = sitoNominato('https://' + prima.replace(/^[a-z]+:\/\//i, ''));
+    const come = 'https://' + prima.replace(/^[a-z]+:\/\//i, '');
+    const nominato = sitoNominato(come);
     const arrivo = sitoNominato(href);
     if (!nominato || (arrivo && arrivo.registrable === nominato.registrable)) return '';
-    if (nominato.brand) return 'marchio_imitato:' + nominato.brand.display;
-    return codiceImitazione('https://' + nominato.registrable + '/') || 'nome_prima_chiocciola';
+    return nominato.brand ? 'marchio_imitato:' + nominato.brand.display : codiceImitazione(come);
   }
 
   // Dove un rinvio scrive la destinazione: in un parametro (google.com/url?q=, Outlook), nel percorso (Proofpoint,
