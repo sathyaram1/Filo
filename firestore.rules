@@ -324,6 +324,8 @@ service cloud.firestore {
                     // forma più sotto). Il server la legge prima di aprire una
                     // richiesta di approvazione per il lavoro delle routine.
                     'mergePreapproved',
+                    // #595: il ripasso dei documenti vecchi con prefisso riservato.
+                    'senderProof',
                     'capabilityGapId']) // F4: permettere update del gap id (backfill)
         // S1.F2.1: status accetta l'enum esistente O un ciphertext FENC1: (gate on).
         // Enum: stati CANONICI della macchina a stati (FEEDBACK-STATES.md) +
