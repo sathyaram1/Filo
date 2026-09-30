@@ -2306,18 +2306,27 @@ function chatSearchesForPrompt(actions) {
 // sistema affidabili, non istruzioni dell'utente.
 function fileReadsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
   const blocks = [];
   for (const a of actions) {
     if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_FILE') continue;
     const out = a._output;
     if (!out || !('fileRead' in out)) continue;
     if (!out.found) {
-      blocks.push(`[File "${out.fileRead}" non trovato: non esiste (più) nell'editor]`);
+      blocks.push(`[File "${E.perCanaleSistema(out.fileRead)}" non trovato: non esiste (più) nell'editor]`);
       continue;
     }
-    let body = String(out.text || '');
-    if (body.length > 8000) body = `${tagliaInteri(body, 8000)}\n…(contenuto troncato)`;
-    blocks.push(`[Contenuto completo del file "${out.title || out.fileRead}"]\n${body || '(vuoto)'}`);
+    const body = String(out.text || '');
+    const taglio = body.length > 8000;
+    // Titolo e testo di un file dell'editor li può aver scritti il modello
+    // stesso mentre leggeva una pagina (#592.4): fuori dalla riga di Filo.
+    blocks.push(`[Contenuto completo del file ${E.perCanaleSistema(out.fileRead)}]\n`
+      + E.imbustaCampi({
+        tipo: 'TESTO_SALVATO',
+        campi: { Titolo: out.title || '(senza titolo)' },
+        corpo: (taglio ? tagliaInteri(body, 8000) : body) || '(vuoto)',
+      })
+      + (taglio ? '\n…(contenuto troncato: qui sopra ci sono i primi 8000 caratteri)' : ''));
   }
   return blocks.join('\n\n').trim();
 }
@@ -2506,8 +2515,14 @@ function toolResultText({ action, res, rendered }) {
     return `In attesa della conferma dell'utente: il sistema gli sta mostrando cosa stai per fare («${describe()}»). `
       + 'NON richiamare questa azione: la conferma è già in corso. Se hai altro da fare prosegui; altrimenti rispondi in una riga, senza dire di aver già fatto.';
   }
+  // I nomi di sveglie e timer tornano recintati: li può aver scelti un modello
+  // mentre leggeva una pagina (#592.4).
+  const nomiSalvati = (nomi) => globalThis.SN_ESTERNO.imbusta({
+    tipo: 'TESTO_SALVATO',
+    testo: nomi.map((n) => `- ${globalThis.SN_ESTERNO.neutralizza(n, { unaRiga: true })}`).join('\n'),
+  });
   if (type === 'CANCELLA_SVEGLIA' && res.output && Array.isArray(res.output.removed)) {
-    return res.output.removed.length ? `Tolte: ${res.output.removed.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da togliere. Non ripetere uguale: chiedi all\'utente quale intende.';
+    return res.output.removed.length ? `Tolte:\n${nomiSalvati(res.output.removed)}` : 'Nessuna sveglia o timer corrispondeva: niente da togliere. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
   if (type === 'DIMENTICA' && res.output && Array.isArray(res.output.dimenticate)) {
     return res.output.dimenticate.length
@@ -2515,7 +2530,7 @@ function toolResultText({ action, res, rendered }) {
       : 'Nella memoria nessuna riga corrispondeva: niente da togliere. Non ripetere uguale: copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.';
   }
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
-    return res.output.updated.length ? `Spostate: ${res.output.updated.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
+    return res.output.updated.length ? `Spostate:\n${nomiSalvati(res.output.updated)}` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
   // #686 — lo zoom lo riferisce il numero VERO, non quello chiesto: un «al
   // 900%» finisce al massimo, e l'utente deve sentirselo dire.
@@ -3144,10 +3159,16 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
 
   const payload = {
     profilo, preferenze, espansioni, lezioni, stato: stateText,
-    notifiche: notiList.length ? notiList.map((n) => `- [${n.ts}] ${n.kind}: ${n.text}`).join('\n') : '(nessuna)',
-    appunti: filesList.length
-      ? filesList.map((f) => `- [${f.id}] ${f.title}: ${f.summary}`).join('\n')
-      : '(nessuno)',
+    // Notifiche e file li può aver scritti un modello che leggeva una pagina: e
+    // da qui escono messaggio e bottoni della home (#592.4).
+    notifiche: notiList.length
+      ? globalThis.SN_ESTERNO.imbusta({
+        tipo: 'TESTO_SALVATO',
+        conIntestazione: true,
+        testo: notiList.map((n) => globalThis.SN_ESTERNO.neutralizza(`- [${n.ts}] ${n.kind}: ${n.text}`, { unaRiga: true })).join('\n'),
+      })
+      : '(nessuna)',
+    appunti: globalThis.SN_EDITOR_SUMMARY.renderForPrompt(filesList) || '(nessuno)',
     // #593 (secondo giro di verifica) — il titolo di una pagina salvata lo
     // scrive il sito, non l'utente e non Filo: da qui escono il messaggio al
     // centro della nuova scheda e dei bottoni che aprono un indirizzo, quindi
