@@ -14,9 +14,9 @@ async function apriSchede(shell, n) {
 }
 
 async function larghezze(shell) {
-  return shell.evaluate(() => Object.fromEntries(
-    [...document.querySelectorAll('#tabs .tab')].map((el) => [el.dataset.id, el.getBoundingClientRect().width]),
-  ));
+  return shell.evaluate(() => Object.fromEntries([...document.querySelectorAll('#tabs .tab')].map((el) => [
+    el.dataset.id, { w: el.getBoundingClientRect().width, attiva: el.classList.contains('active') },
+  ])));
 }
 
 // Confronta le schede ancora aperte con le misure prese prima: 'uguali', o la prima differenza.
@@ -26,7 +26,7 @@ async function verdettoUguali(shell, prima, quante) {
   if (ids.length !== quante) return `${ids.length} schede invece di ${quante}`;
   for (const id of ids) {
     if (!(id in prima)) return `scheda ${id} nuova`;
-    if (Math.abs(ora[id] - prima[id]) > 0.5) return `scheda ${id}: ${prima[id]} → ${ora[id]}`;
+    if (Math.abs(ora[id].w - prima[id].w) > 0.5) return `scheda ${id}: ${prima[id].w} → ${ora[id].w}`;
   }
   return 'uguali';
 }
@@ -36,13 +36,20 @@ async function verdettoAllargate(shell, prima, quante) {
   const ora = await shell.evaluate(() => [...document.querySelectorAll('#tabs .tab:not(.active)')]
     .map((el) => [el.dataset.id, el.getBoundingClientRect().width]));
   if (ora.length !== quante - 1) return `${ora.length} inattive invece di ${quante - 1}`;
-  const ferme = ora.filter(([id, w]) => id in prima && !(w > prima[id] + 0.5));
+  const ferme = ora.filter(([id, w]) => prima[id] && !prima[id].attiva && !(w > prima[id].w + 0.5));
   return ferme.length ? `ferme: ${ferme.map(([id, w]) => `${id}=${w}`).join(' ')}` : 'allargate';
 }
 
+async function riquadroChiudi(shell, id) {
+  return shell.evaluate((x) => {
+    const r = document.querySelector(`#tabs .tab[data-id="${x}"] .close`).getBoundingClientRect();
+    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+  }, id);
+}
+
 async function centroChiudi(shell, id) {
-  const box = await shell.locator(`#tabs .tab[data-id="${id}"] .close`).boundingBox();
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const r = await riquadroChiudi(shell, id);
+  return { x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 };
 }
 
 async function idInPosizione(shell, i) {
@@ -63,9 +70,9 @@ test('chiudendo con la X le altre schede tengono la larghezza, e la X accanto re
 
   // Nello stesso punto adesso c'è la X della scheda che ha preso il posto di quella chiusa.
   expect(await idInPosizione(shell, 5)).toBe(seguente);
-  const x2 = await shell.locator(`#tabs .tab[data-id="${seguente}"] .close`).boundingBox();
-  expect(punto.x).toBeGreaterThanOrEqual(x2.x);
-  expect(punto.x).toBeLessThanOrEqual(x2.x + x2.width);
+  const x2 = await riquadroChiudi(shell, seguente);
+  expect(punto.x).toBeGreaterThanOrEqual(x2.left);
+  expect(punto.x).toBeLessThanOrEqual(x2.right);
   await shell.mouse.click(punto.x, punto.y);
   await expect.poll(() => verdettoUguali(shell, prima, QUANTE - 2), { timeout: 8_000 }).toBe('uguali');
 
