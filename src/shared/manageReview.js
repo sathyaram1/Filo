@@ -1391,9 +1391,9 @@
       return forma('l5', 'quadrato', titolo, 'design', 'fuso', {
         titolo,
         righe: versione ? [riga('Uscito nella versione', versione)] : [],
-        testo: preapproved.length
-          ? 'Fusa senza chiedere: avevi messo il segno su questa pratica.'
-          : 'Il lavoro è entrato in main.',
+        testo: !preapproved.length ? 'Il lavoro è entrato in main.'
+          : preapproved[0].skippedL5 === true ? 'Fusa senza chiedere: lavoro locale, i blocchi sono registrati in Automazioni.'
+            : 'Fusa senza chiedere: avevi messo il segno su questa pratica.',
         azioni: [],
       }, { richiesta: preapproved[0] || null, richieste: preapproved, conflitto: false });
     }
