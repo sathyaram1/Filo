@@ -107,6 +107,7 @@ function matchBrands(norm) {
   let broad = null;
 
   for (const brand of BRANDS) {
+    if (brand.gestori && brand.gestori.includes(norm.registrable)) continue;
     const token = brand.token;
     const tokenSkel = skeleton(token);
 
