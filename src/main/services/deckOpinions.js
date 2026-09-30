@@ -199,7 +199,7 @@
 
   // Filtro semantico dei risultati (§4.1): OGNI candidato passa dal giudice, a lotti in parallelo, mai un taglio
   // silenzioso; chi non ha potuto guardare torna in `unverifiedIds`, visibile, con `error` per dire perché.
-  async function filterSearch({ criterion, cardIds, cards, handleAIRequest }) {
+  async function filterSearch({ criterion, cardIds, cards, handleAIRequest, onProgress = null }) {
     const ids = [...new Set((cardIds || []).map(String))].filter((id) => cards && cards[id]);
     const crit = P.normCriterion(criterion);
     if (!crit || !ids.length) return { keepIds: ids, unverifiedIds: [], judgedCount: 0, error: null };
@@ -211,7 +211,21 @@
 
     const batches = [];
     for (let i = 0; i < plan.judgeIds.length; i += FILTER_BATCH) batches.push(plan.judgeIds.slice(i, i + FILTER_BATCH));
-    const results = await Promise.all(batches.map((b) => judgeBatch({ criterion, ids: b, cards, handleAIRequest })));
+    let done = ids.length - plan.judgeIds.length;
+    const progress = () => { if (onProgress) { try { onProgress({ done, total: ids.length }); } catch (_) {} } };
+    progress();
+    // Più pagine di risultati fanno decine di lotti: al più FILTER_PARALLEL chiamate insieme, per non farsi limitare.
+    const results = new Array(batches.length);
+    let next = 0;
+    const worker = async () => {
+      while (next < batches.length) {
+        const i = next++;
+        results[i] = await judgeBatch({ criterion, ids: batches[i], cards, handleAIRequest });
+        done += batches[i].length;
+        progress();
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(FILTER_PARALLEL, batches.length) }, worker));
 
     const judged = {};
     const unverified = new Set();

@@ -210,5 +210,5 @@
     return map;
   }
 
-  global.SN_SCRYFALL = { search, named, card, cards, symbols, prints, PRICE_TTL_MS, _setFetch };
+  global.SN_SCRYFALL = { search, named, card, cards, symbols, prints, remember: cacheCards, PRICE_TTL_MS, _setFetch };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
