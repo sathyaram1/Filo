@@ -63,11 +63,13 @@ function daCattura(img) {
 
 class AnteprimeSchede {
   // manager: il TabManager della finestra. suNuova(id, dato): un'anteprima pronta, da portare alla carta.
-  constructor(manager, { suNuova = () => {}, suTolte = () => {}, ripresa = RIPRESA } = {}) {
+  constructor(manager, { suNuova = () => {}, suTolte = () => {}, ripresa = RIPRESA, segui = SEGUI, giro = GIRO, passo = PASSO, quiete = QUIETE } = {}) {
     this.m = manager;
     this.suNuova = suNuova;
     this.suTolte = suTolte;
     this.ripresa = ripresa;
+    this.tempi = { segui, giro, passo, quiete };
+    this._giro = null;
     this.foto = new Map();
     this.seq = 0;
     this.coda = [];
