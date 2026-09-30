@@ -182,6 +182,7 @@
       'Hai scelto solo modelli a pesi aperti: «%s» non lo è, quindi la prova non parte. Spegni «Solo modelli a pesi aperti» per provarlo.',
     err_model_where_own: 'Lo imposti in Opzioni → Modelli per azione.',
     err_model_where_default: 'Stai usando i modelli predefiniti: apri Opzioni, togli «Usa modelli predefiniti» e scegli il modello per questa funzione.',
+    err_model_where_owner: 'Lo imposti in Gestione → Modelli di supporto.',
 
     // Toast
     toast_saved: 'Salvata in: %s',
@@ -345,7 +346,6 @@
     options_action_editor_title: 'Editor — titolo automatico del documento',
     options_action_editor_summary: 'Editor — riassunto automatico del documento',
     options_action_editor_chat: 'Editor — chat col documento',
-    options_action_manage_search: 'Gestione — ricerca fra i feedback',
     options_action_archive_embed: 'Indicizzazione delle schede archiviate',
     options_action_provider_test: 'Prova di un fornitore (pulsante «Prova»)',
     // Elenco (di sola lettura) degli altri punti in cui Filo usa un modello:

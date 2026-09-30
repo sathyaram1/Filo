@@ -68,7 +68,6 @@
       [A.EDITOR_TITLE, 'options_action_editor_title'],
       [A.EDITOR_SUMMARY, 'options_action_editor_summary'],
       [A.EDITOR_CHAT, 'options_action_editor_chat'],
-      [A.MANAGE_SEARCH, 'options_action_manage_search'],
       [A.ARCHIVE_EMBED, 'options_action_archive_embed'],
       [A.PROVIDER_TEST, 'options_action_provider_test'],
     ];
