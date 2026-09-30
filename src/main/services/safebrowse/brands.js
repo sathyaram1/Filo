@@ -9,6 +9,8 @@
 //   display — nome leggibile per i messaggi d'avviso ("Questo non è PayPal")
 //   domains — gli eTLD+1 LEGITTIMI del brand. Se il dominio candidato è uno di
 //             questi, NON è impersonazione (è il sito vero).
+//   gestori — chi usa il nome per conto del marchio senza esserne il sito (i gestori SPID accreditati): lì il
+//             nome non è un'imitazione, ma il dominio non entra nella whitelist.
 //
 // La lista è volutamente corta e curata: pochi brand ad altissimo valore, per
 // tenere bassi i falsi positivi. Allungarla è sicuro finché i token restano
