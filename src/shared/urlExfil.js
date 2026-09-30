@@ -473,6 +473,22 @@
     return valutaAvvisi(tipo, action, { memoria, azioni, daPagina }, niente);
   }
 
+  // I segreti letti da fuori che una frase di Filo ripete: viaggiano con la frase nell'archivio, così la chat
+  // riaperta sa ancora cosa veniva da fuori. Una password che Filo propone da sé non c'è, e resta usabile.
+  const MAX_LETTI_FRASE = 200;
+  function lettiNelTesto(testo, letti) {
+    const t = String(testo || '');
+    const out = [];
+    if (!t.trim()) return out;
+    const u = formeDi(t);
+    for (const x of Array.isArray(letti) ? letti : []) {
+      if (out.length >= MAX_LETTI_FRASE) break;
+      if (!x || typeof x.valore !== 'string' || !x.valore || !esce(x.valore, x.regola, u)) continue;
+      out.push({ valore: x.valore, regola: String(x.regola || 'codice'), fonte: String(x.fonte || 'da fuori') });
+    }
+    return out;
+  }
+
   // Il resto del verdetto è l'anti-esfiltrazione di #587: un OK in più, non un blocco.
   function valutaAvvisi(tipo, action, { memoria, azioni, daPagina }, niente) {
     if (tipo === 'NAVIGA') {
