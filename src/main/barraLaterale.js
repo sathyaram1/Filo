@@ -68,7 +68,8 @@ class BarraLaterale {
     this.opzioni = opzioniDi(null);
     this.bordo = false;
     this.bordoDal = 0;
-    this.tastoGiu = false;
+    this.tasti = { scheda: false, shell: false };
+    this.puntoFermo = null;
     this.quieteFino = 0;
     this.ultimaSonda = 0;
     this.etichettePagina = null;
