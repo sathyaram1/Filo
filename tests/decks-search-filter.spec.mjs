@@ -641,4 +641,8 @@ test('#382: una sessione di ricerche larghe non svuota la cronologia AI né le r
   const kept = await app.evaluate(async () => (await globalThis.SN_HISTORY.list())
     .some((it) => it.input && it.input.text === 'domanda di stamattina'));
   expect(kept, 'la voce di stamattina è uscita per far posto ai controlli delle ricerche').toBe(true);
+  const ready = await app.evaluate(async () => globalThis.SN_AI_CACHE.get({
+    provider: 'openrouter', model: 'x', messages: [{ role: 'user', content: 'spiega «haste»' }],
+  }));
+  expect(ready && ready.text, 'la risposta già pronta è uscita per far posto a quelle del giudice').toBe('pronta');
 });
