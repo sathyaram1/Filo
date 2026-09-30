@@ -68,13 +68,6 @@ export function avvisoDaCampi(fields) {
   return `Attenzione: a questa pratica manca ${mancano.join(', ')}. Alla fusione L5 non si salta e, se i controlli fermano, si aspetta il tuo sì.`;
 }
 
-export async function avvisoPratica(id, { bearer, base, fetchImpl = fetch } = {}) {
-  const campi = ['senderProof', 'localOnly', 'statusPublic'].map((c) => `mask.fieldPaths=${c}`).join('&');
-  const res = await fetchImpl(`${base}/feedback/${encodeURIComponent(id)}?${campi}`, { headers: { Authorization: `Bearer ${bearer}` } });
-  if (!res.ok) return `Non ho potuto leggere la pratica (${res.status}): se manca qualcosa lo dirà il server alla fusione.`;
-  return avvisoDaCampi((await res.json()).fields);
-}
-
 /**
  * Il riferimento risolto all'id Firestore, in rete. Un numero con più documenti
  * (i vecchi #N.k) prende quello col subSeq chiesto, 0 se non detto.
