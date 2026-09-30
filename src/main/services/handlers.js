@@ -2504,7 +2504,7 @@ function apertureFermateDopoForPrompt(actions) {
     righe.push(`- ${String(a.url || '')}: ha rimandato a ${o.host || 'un sito'}, ${chi}`);
   }
   return righe.length
-    ? `[Pagine che avevi aperto e che poi si sono spostate da sole su un sito bloccato: l'utente NON le vede, e sotto la tua risposta ha «Apri comunque».\n${righe.join('\n')}]`
+    ? `[Pagine che avevi aperto e che poi si sono spostate da sole su un sito bloccato: Filo le ha fermate, l'utente è rimasto sulla pagina di passaggio e il sito NON l'ha visto; sotto la tua risposta ha «Apri comunque».\n${righe.join('\n')}]`
     : '';
 }
 
