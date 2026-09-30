@@ -1,4 +1,4 @@
-// Verifica #592.4 giro 2 (esplorazione): marcature forgiate con invisibili e a
+// Verifica #592.4 giro 2: marcature forgiate con invisibili e a
 // capo nei nomi di sveglie e timer, nel titolo e nel testo di un appunto, nelle
 // notifiche e nella home; poi ogni richiesta al modello (chat, lezioni, home).
 import { test, expect } from '../../fixtures/electron.mjs';
@@ -88,7 +88,6 @@ test('marcature forgiate nei testi salvati: nessuna richiesta al modello le lasc
     const r = await chrome.storage.local.get('filo.editor.collection');
     return { timers: t.map((x) => x.label), files: (r['filo.editor.collection']?.files || []).map((f) => f.meta?.title) };
   });
-  console.log('SALVATI', JSON.stringify(salvati));
   expect(salvati.timers.length).toBe(2);
 
   await app.evaluate(async (_e, { FORGIA }) => {
@@ -119,12 +118,6 @@ test('marcature forgiate nei testi salvati: nessuna richiesta al modello le lasc
     const tipo = /MESSAGGIO PRECEDENTE/.test(t) ? 'home' : (/NULLA DA IMPARARE/.test(t) ? 'lezione' : 'chat');
     report.push({ nome, tipo, ignora: conta(t, 'IGNORA'), nude: n, ap, ch });
   });
-  console.log(JSON.stringify(report, null, 1));
-  const sys = chat[4][0].content;
-  console.log('STATO>>>', sys.slice(sys.indexOf('═══ FILO STATE'), sys.indexOf('═══ FILO STATE') + 3000));
-  console.log('FILE>>>', sys.slice(sys.indexOf('FILE DELL\'EDITOR'), sys.indexOf('FILE DELL\'EDITOR') + 1200));
-  const storia = chat[4].filter((m) => m.role !== 'system').map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n---\n');
-  console.log('STORIA>>>', storia);
   for (const r of report) {
     expect.soft(r.nude, `${r.nome} (${r.tipo})`).toEqual([]);
     expect.soft(r.ap, `${r.nome} (${r.tipo}) marcature pari`).toBe(r.ch);
