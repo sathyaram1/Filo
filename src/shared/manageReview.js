@@ -522,6 +522,7 @@
     clarify: 'domande per te',
     loop: 'difetto non più correggibile da soli',
     decisione: 'fermo: aspetta una tua scelta',
+    locale: 'richiede lavoro locale',
     arenato: 'lavorazione arenata',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
