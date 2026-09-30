@@ -13,6 +13,10 @@
 //   file è una domanda, non un'azione: il server guarda il diff che scarica
 //   lui, fa girare i controlli deterministici e decide.
 //
+//   Con `feedbackId` (#908) il server rilegge la pratica: se è un lavoro locale
+//   provato fonde senza chiedere (L5 registra soltanto) e la chiude; se no dice
+//   perché, e la fusione ferma aspetta il sì dell'owner in Gestione, per regola.
+//
 //   La porta accanto non è stata murata togliendo la credenziale — quella su
 //   questa macchina c'è ancora — ma **su GitHub**: una regola di protezione del
 //   repo lascia scrivere su `main` la sola identità del server, e respinge
@@ -20,8 +24,8 @@
 //   un tentativo respinto in silenzio non è una difesa, è un guasto invisibile.
 //
 // COSA VIAGGIA
-//   Il ramo e lo SHA della sua punta — cioè esattamente il codice su cui i
-//   controlli locali sono girati. Se nel frattempo il ramo è cambiato, il
+//   Il ramo, lo SHA della sua punta — cioè esattamente il codice su cui i
+//   controlli locali sono girati — e, se c'è, l'id della pratica. Se nel frattempo il ramo è cambiato, il
 //   server se ne accorge e non fonde: senza quello sha basterebbe far passare i
 //   controlli su una versione e far fondere l'altra.
 //
@@ -58,13 +62,13 @@ export function classifyOwnerMerge(status, body) {
   const errMsg = String((b.error && b.error.message) || '');
 
   if (status === 200 && r.ok === true) {
-    if (r.result === 'merged') return { outcome: 'merged', sha: String(r.sha || '') };
+    if (r.result === 'merged') return { outcome: 'merged', sha: String(r.sha || ''), ...campiLocali(r) };
     // Bloccata dai controlli: il server non l'ha respinta e basta, ha aperto
     // una richiesta in attesa. `requestId` vuoto significa che non c'è riuscito
     // (deposito non raggiungibile, oppure server non ancora rideployato): sono
     // due situazioni diverse per chi legge, e vanno dette diverse.
     if (r.result === 'blocked') {
-      return { outcome: 'blocked', reason: String(r.reason || ''), requestId: String(r.requestId || '') };
+      return { outcome: 'blocked', reason: String(r.reason || ''), requestId: String(r.requestId || ''), ...campiLocali(r) };
     }
     if (r.result === 'conflict') return { outcome: 'conflict', reason: String(r.reason || '') };
     if (r.result === 'stale') return { outcome: 'stale', headSha: String(r.headSha || '') };
@@ -83,6 +87,32 @@ export function classifyOwnerMerge(status, body) {
   if (status === 400) return { outcome: 'rejected', reason: errMsg };
   if (status === 0 || status >= 500) return { outcome: 'unreachable', reason: errMsg || `http_${status}` };
   return { outcome: 'fault', reason: errMsg || `http_${status}` };
+}
+
+/**
+ * Quello che il server dice della pratica locale (#908), solo se lo dice. PURA.
+ * merged: skippedL5, trips (i blocchi registrati), closed / closeError; blocked:
+ * localReason / localDetail, il motivo per cui L5 non è stato saltato.
+ */
+function campiLocali(r) {
+  const out = {};
+  if (r.skippedL5 === true) out.skippedL5 = true;
+  if (r.skippedL5 === true && Array.isArray(r.trips)) out.trips = r.trips;
+  const chiusa = r.closed !== undefined ? r.closed : r.feedbackClosed;
+  if (typeof chiusa === 'boolean') out.closed = chiusa;
+  if (r.closeError) out.closeError = String(r.closeError).slice(0, 300);
+  const loc = (r.local && typeof r.local === 'object') ? r.local : {};
+  const reason = String(r.localReason || loc.reason || '');
+  const detail = String(r.localDetail || loc.detail || '');
+  if (reason || detail) { out.localReason = reason.slice(0, 80); out.localDetail = detail.slice(0, 300); }
+  return out;
+}
+
+/** Un blocco registrato, in una riga. PURA. */
+function bloccoInRiga(t) {
+  if (!t || typeof t !== 'object') return String(t || '');
+  const nome = String(t.label || t.gate || 'controllo');
+  return t.detail ? `${nome}: ${String(t.detail).slice(0, 160)}` : nome;
 }
 
 /**
