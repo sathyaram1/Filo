@@ -86,6 +86,15 @@ export function collectTestFiles(dir = UNIT_DIR) {
   return out.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
+/**
+ * I file come li riceve `node --test`: relativi alla root, che è la cartella corrente del lancio. PURA.
+ * Assoluti, in un worktree sotto `.claude/worktrees/<nome>` superavano i 32767 caratteri della riga di
+ * comando di Windows (ENAMETOOLONG) e non partiva nessun test.
+ */
+export function fileArgs(files, root = REPO_ROOT) {
+  return files.map((f) => relative(root, f).split(sep).join('/'));
+}
+
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 function main() {
