@@ -2252,7 +2252,11 @@
     const blues = alignedFeedbacks();
     const show = isAdmin && currentTab === 'inbox' && blues.length > 0;
     mgAlignedBar.hidden = !show;
-    if (show && mgAlignedBtn) mgAlignedBtn.textContent = `Approva tutti gli allineati (${blues.length}) → In coda`;
+    if (!show || !mgAlignedBtn) return;
+    // Quelli col segno locale approvati vanno nei Lavori locali (#908): la freccia dice dove.
+    const locali = blues.filter((f) => MR.isLocalOnly(f)).length;
+    const dove = !locali ? 'In coda' : (locali === blues.length ? 'Lavori locali' : 'In coda e Lavori locali');
+    mgAlignedBtn.textContent = `Approva tutti gli allineati (${blues.length}) → ${dove}`;
   }
   async function approveAllAligned() {
     const blues = alignedFeedbacks();
