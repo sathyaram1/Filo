@@ -28,7 +28,7 @@ test('aspetto della barra: sito e home, chiaro e scuro', async () => {
   const url = `http://127.0.0.1:${server.address().port}/sito`;
   const env = { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test', FILO_TEST_VISIBLE: '1' };
   delete env.FILO_HIDE_WINDOW;
-  const app = await electron.launch({ args: [...argomentiScala, '.'], cwd: APP_ROOT, env });
+  const app = await electron.launch({ args: [...argomentiScala, '.'], cwd: APP_ROOT, env, colorScheme: null });
   try {
     const shell = await app.firstWindow();
     await shell.waitForLoadState('domcontentloaded');
@@ -49,6 +49,9 @@ test('aspetto della barra: sito e home, chiaro e scuro', async () => {
     foto('sito-aperta-chiaro');
     await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { theme: 'dark' } }, { url: 'filo://preferences/preferences.html' }));
     await pausa(1200);
+    console.log('nativeTheme', await app.evaluate(({ nativeTheme }) => ({ src: nativeTheme.themeSource, dark: nativeTheme.shouldUseDarkColors })));
+    console.log('shell dark?', await shell.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches), 'barra dark?', await barra.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches));
+    console.log('shell bg', await shell.evaluate(() => getComputedStyle(document.body).backgroundColor), 'pannello bg', await barra.evaluate(() => getComputedStyle(document.getElementById('pannello')).backgroundColor));
     foto('sito-aperta-scuro');
     await comandaBarra(app, 'chiudi');
     await pausa(500);
