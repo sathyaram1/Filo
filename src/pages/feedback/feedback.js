@@ -1052,7 +1052,7 @@
       // blocco. Gli allegati vivono nella bolla della segnalazione.
       const turns = window.SN_FEEDBACK_THREAD ? SN_FEEDBACK_THREAD.parse(f) : [];
       const convoTurns = turns.filter((t) => t.kind !== 'report');
-      const reportRole = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.isFromModel(f.clientId) ? 'model' : 'user';
+      const reportRole = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.isFromModel(mittenteDi(f)) ? 'model' : 'user';
       const reportWho = reportRole === 'model' ? 'Agente' : 'Segnalazione';
       // Note editabili (textarea) dove l'admin sta lavorando: Ricevuti e In
       // coda. "Ricevuti" è incluso così si può COMMENTARE un feedback appena
