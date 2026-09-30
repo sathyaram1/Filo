@@ -13,7 +13,7 @@
   } catch (e) { console.error('[linkSospetto] controllo dei marchi non caricato', e); }
 
   // Codici: 'url_invalido' | 'side_effect' | 'token_in_url' | 'typosquatting:<dominio>' | 'marchio_imitato:<marchio>'.
-  function analizza(rawUrl) {
+  function analizza(rawUrl, rinvii = 0) {
     const flags = [];
     let u;
     try { u = new URL(rawUrl); } catch (_) { return ['url_invalido']; }
