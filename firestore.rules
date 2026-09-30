@@ -87,6 +87,20 @@ service cloud.firestore {
             && (!('l4' in d.livelli) || livelloValido(d.livelli.l4)));
     }
 
+    // `localOnly` { by, at } (#908): la pratica la lavora solo una sessione
+    // locale e la coda delle routine la salta. Solo l'admin la scrive (create
+    // e ramo di triage admin); assente = feedback normale. `at` in millisecondi.
+    function localOnlyValido(d) {
+      return !('localOnly' in d)
+        || (d.localOnly is map
+            && d.localOnly.keys().hasOnly(['by', 'at'])
+            && d.localOnly.get('by', '') is string
+            && d.localOnly.get('by', '').size() > 0
+            && d.localOnly.get('by', '').size() <= 120
+            && d.localOnly.get('at', 0) is int
+            && d.localOnly.get('at', 0) > 0);
+    }
+
     // Allowlist amministratori. Gestita SOLO da console Firebase.
     match /admins/{email} {
       allow read: if isAdmin();
