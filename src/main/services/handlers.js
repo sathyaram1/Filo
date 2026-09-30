@@ -1295,8 +1295,14 @@ async function ricordaLettoDallAiuto(sender, payload = null) {
 function ricordaLettoInChat(azioni, storia = []) {
   const Exfil = globalThis.SN_URL_EXFIL;
   if (Exfil) for (const e of Exfil.contestoDaAzioni(azioni).esterni) SegretiLetti.ricorda(e.testo, e.fonte);
+  // Di una frase di Filo conta solo ciò che veniva da fuori quando l'ha scritta: una password che propone lui
+  // resta sua. L'esito di un comando lanciato a mano invece è testo di fuori per intero.
   for (const m of Array.isArray(storia) ? storia : []) {
-    if (m && m.role === 'filo' && typeof m.text === 'string') SegretiLetti.ricorda(m.text, 'prima, in questa conversazione');
+    if (!m || m.role !== 'filo') continue;
+    for (const x of Array.isArray(m.letti) ? m.letti.slice(0, 200) : []) {
+      if (x && typeof x.valore === 'string') SegretiLetti.aggiungi({ valore: x.valore, regola: String(x.regola || 'codice') }, String(x.fonte || 'da fuori'));
+    }
+    if (typeof m.esterno === 'string' && m.esterno && typeof m.text === 'string') SegretiLetti.ricorda(m.text, m.esterno);
   }
 }
 
