@@ -592,7 +592,7 @@ module.exports = function register(on, ctx) {
       // Accoda e prova a inviare subito, ma NON aspettare la rete: l'ack torna
       // appena il feedback è al sicuro in coda (persistito). Il titolo lo genera
       // la coda al momento dell'invio (anche offline, col fallback).
-      const r = await Outbox.enqueue(payload);
+      const r = await Outbox.enqueue(payload, { dallOwner });
       return { ok: true, queued: true, id: r?.id };
     } catch (e) {
       console.error('[Filo feedback] submit failed', e);
