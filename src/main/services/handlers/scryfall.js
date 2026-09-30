@@ -84,6 +84,35 @@ module.exports = function register(on, ctx) {
     return withId ? `  - ${name} [id: ${entry.scryfall_id}]${tags}` : `  - ${name}${tags}`;
   }
 
+  // Il modello che giudicherà le carte: i giudizi salvati valgono solo per lui. '' se non è configurato (il giudice
+  // allora fallisce da sé, e lo dice).
+  async function judgeModelNow() {
+    try {
+      const settings = await ctx.getEffectiveSettings();
+      const chain = ctx.buildAttemptChain(settings, ctx.modelForAction(settings, ACTIONS.DECKS_SEARCH_FILTER), ACTIONS.DECKS_SEARCH_FILTER);
+      return chain[0] ? `${chain[0].provider || ''}/${chain[0].model || ''}` : '';
+    } catch (_) { return ''; }
+  }
+
+  // Quello che la richiesta dà per scontato e il giudice non vede altrove (#382): il commander del mazzo, e le
+  // richieste di prima quando il modello non ha scritto un criterio che le riprenda.
+  async function judgeContext(deck, previousAsks) {
+    const out = [];
+    const meta = deck && deck.commanderMeta;
+    if (deck && deck.commander) {
+      const c = (await Scry.cards([deck.commander]).catch(() => ({})))[deck.commander];
+      const body = c
+        ? [c.name, c.manaCost ? `costo ${c.manaCost}` : '', c.typeLine, c.oracleText ? `— ${c.oracleText.replace(/\n/g, ' ')}` : '']
+          .filter(Boolean).join(' · ')
+        : String((meta && meta.name) || '');
+      if (body) out.push(`Il commander del mazzo è ${body}`);
+    }
+    if (previousAsks.length) {
+      out.push(`Richieste precedenti dell'utente in questa chat, dalla più vecchia:\n${previousAsks.map((t) => `- «${t}»`).join('\n')}`);
+    }
+    return out.join('\n');
+  }
+
   // Errore → frase per l'utente (#331): mai un codice HTTP nudo in chat.
   // La traduzione vive in `shared/chatErrors.js` (#360): è la STESSA per tutte
   // le chat di Filo — prima era solo qui e la chat della home mostrava ancora
