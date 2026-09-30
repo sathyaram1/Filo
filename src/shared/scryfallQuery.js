@@ -27,6 +27,15 @@
     return `${q} id<=${identityCode(identity)}`.trim();
   }
 
+  // Messaggio scritto TUTTO in sintassi Scryfall: la query è già la richiesta esatta, e il giudice dei risultati
+  // (§4.1) non ha niente da aggiungere. Basta una parola libera e la richiesta torna «a parole» (#382).
+  const SYNTAX_TERM = /^-?[a-z]+(?::|<=|>=|!=|<|>|=)\S+$/i;
+  function isPureSyntax(text) {
+    const tokens = String(text || '').replace(/"[^"]*"/g, 'Q').replace(/[()]/g, ' ').split(/\s+/).filter(Boolean);
+    const terms = tokens.filter((t) => !/^(or|and)$/i.test(t));
+    return terms.length > 0 && terms.every((t) => SYNTAX_TERM.test(t));
+  }
+
   // Una carta è DENTRO l'identità di colore del commander se OGNI colore della
   // sua color identity è tra i colori del commander (regola Commander §8.4, la
   // stessa del check di legalità). Le incolori (identity vuota) sono sempre
