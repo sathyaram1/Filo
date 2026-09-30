@@ -84,12 +84,15 @@ class AnteprimeSchede {
   nataDietro(tab) {
     tab._anteprimaAttesa = TENTATIVI;
     tab._anteprimaRipresa = false;
+    this._segui(tab, { nuova: true });
   }
 
   // Una scheda di dietro che passa da sola a un'altra pagina (un rimando, un aggiornamento): la foto di prima
   // non è più sua. Torna sveglia come una nata dietro, e al caricamento si rifotografa.
-  navigata(tab) {
+  // Senza ricaricare (un sito a pagina unica) nessun caricamento segue: la foto la chiede la spia.
+  navigata(tab, { inPagina = false } = {}) {
     if (this.spento || !vivo(tab) || tab.id === this.m.activeId) return;
+    if (inPagina) { this._segui(tab, { sporca: true }); return; }
     this.nataDietro(tab);
     try { tab.view.setVisible?.(true); } catch (_) {}
   }
@@ -97,6 +100,7 @@ class AnteprimeSchede {
   // Si è vista davanti: la sua foto la prende congeda() quando torna dietro.
   mostrata(tab) {
     this._fineAttesa(tab);
+    this._smetti(tab);
   }
 
   tieneSveglia(tab) {
