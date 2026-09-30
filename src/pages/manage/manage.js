@@ -2170,7 +2170,17 @@
     const m = fb && fb.localOnly;
     if (!m) return '';
     const quando = Number(m.at) > 0 ? ` il ${formatDateTime(new Date(Number(m.at)).toISOString())}` : '';
-    return `Solo lavoro locale: nessuna routine la prende. Segno messo da ${m.by}${quando}.`;
+    return `Solo lavoro locale: nessuna routine la prende. Segno messo da ${chiHaMessoIlSegno(m.by)}${quando}.`;
+  }
+  // Una sessione firma il segno col suo mittente (`local:claude`), l'owner con l'email: il mittente si legge come in testata.
+  function chiHaMessoIlSegno(by) {
+    const s = String(by || '').trim();
+    if (s === 'owner') return AUTHOR_META.owner.label;
+    if (/^[a-z]+:/i.test(s) && TH && TH.authorKind) {
+      const m = AUTHOR_META[TH.authorKind(s)];
+      if (m) return m.label;
+    }
+    return s;
   }
 
   // ── Riga di stato della lavorazione (card pinnate + dettaglio) ────────────
