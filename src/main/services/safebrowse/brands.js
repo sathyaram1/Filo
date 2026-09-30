@@ -54,8 +54,9 @@ const BRANDS = [
   { token: 'aruba', display: 'Aruba', domains: ['aruba.it', 'arubapec.it', 'arubacloud.com', 'cloud.it'] },
   { token: 'telepass', display: 'Telepass', domains: ['telepass.com'] },
   { token: 'brt', display: 'BRT', domains: ['brt.it'] },
-  { token: 'gls', display: 'GLS', domains: ['gls-italy.com', 'gls-group.eu', 'gls-group.com', 'gls-pakete.de'] },
-  { token: 'dhl', display: 'DHL', domains: ['dhl.com', 'dhl.it', 'dhl.de', 'dhl.co.uk', 'express.dhl'] },
+  { token: 'gls', display: 'GLS', domains: ['gls-italy.com', 'gls-group.eu', 'gls-group.com', 'gls-pakete.de', 'gls-us.com', 'gls-canada.com',
+    'gls-spain.es', 'gls-portugal.pt', 'gls-hungary.com', 'gls-czech.com', 'gls-slovakia.sk', 'gls-croatia.com', 'gls-slovenia.com', 'gls-romania.ro'] },
+  { token: 'dhl', display: 'DHL', domains: ['dhl.com', 'dhl.it', 'dhl.de', 'dhl.co.uk', 'express.dhl', 'dhlparcel.nl', 'dhlparcel.co.uk', 'dhlparcel.be', 'dhlparcel.es'] },
 
   // Crypto
   { token: 'coinbase', display: 'Coinbase', domains: ['coinbase.com'] },
