@@ -2909,7 +2909,7 @@
     // che fonde subito la richiesta ferma.
     if (mgPreapproveRevokeBtn) {
       mgPreapproveRevokeBtn.disabled = false;
-      mgPreapproveRevokeBtn.hidden = !(aperta && segno && segno.tipo === 'approvazione');
+      mgPreapproveRevokeBtn.hidden = !(aperta && !locale && segno && segno.tipo === 'approvazione');
       mgPreapproveRevokeBtn.title = 'Toglie il sì dato col clic: da ora anche i riallineamenti di questa pratica aspettano il tuo via libera.';
     }
     if (mgPreapprovedInfo) {
