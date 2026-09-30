@@ -143,3 +143,34 @@ test('scheda stretta: l\'avviso audio resta sempre, la favicon cede solo quando 
     }
   }
 });
+
+test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il titolo della pagina', async ({ app, shell, openTab, testServer }) => {
+  await app.evaluate(({ ipcMain }) => {
+    globalThis.__suggerimenti = [];
+    ipcMain.on('shell:tooltip-show', (_e, d) => globalThis.__suggerimenti.push(d && d.text));
+  });
+  await openTab(testServer.html('<title>Musica di sottofondo</title>'));
+  await openTab(testServer.html('<title>Podcast</title>'));
+  // Le schede si allargano e stringono mentre i titoli arrivano: si passa col puntatore solo a barra ferma.
+  await expect(shell.locator('.tab .title')).toHaveText(['Home', 'Musica di sottofondo', 'Podcast'], { timeout: 10_000 });
+  await expect(shell.locator('.tab .spinner')).toHaveCount(0, { timeout: 10_000 });
+  const [suona, muta] = await patchWebTabs(app, [{ audible: true }, { muted: true, proxy: { country: 'us', tier: null } }]);
+  await expect(shell.locator('.tab .tab-alert')).toHaveCount(2, { timeout: 10_000 });
+  await expect(shell.locator(`.tab[data-id="${muta}"]`)).toHaveClass(/active/);
+  await expect(shell.locator('.tab .tab-alert[title]')).toHaveCount(0);
+
+  const ctrlW = await shell.evaluate(() => (window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl+W') : 'Ctrl+W'));
+  const casi = [
+    [`.tab[data-id="${suona}"] .audio-ind`, 'Silenzia'],
+    [`.tab[data-id="${muta}"] .mute-ind`, 'Riattiva audio'],
+    [`.tab[data-id="${muta}"] .proxy-ind`, 'Aperta da un altro paese'],
+    [`.tab[data-id="${muta}"] .close`, `Chiudi scheda (${ctrlW})`],
+    [`.tab[data-id="${suona}"] .close`, 'Chiudi scheda'],
+    [`.tab[data-id="${suona}"] .title`, 'Musica di sottofondo'],
+  ];
+  for (const [sel, atteso] of casi) {
+    await shell.mouse.move(2, 2);
+    await shell.locator(sel).hover();
+    await expect.poll(() => app.evaluate(() => globalThis.__suggerimenti.at(-1) || ''), { timeout: 3000, message: sel }).toBe(atteso);
+  }
+});
