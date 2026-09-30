@@ -72,8 +72,8 @@ test('sveglie, timer, notifiche, frasi recenti e home arrivano allo STATO recint
   assert.equal(fuori, false, 'un testo salvato compare fuori dal recinto, con la voce di Filo');
   assert.equal(recinti(stato).length, 4, 'un recinto per elenco: processi, notifiche, azioni recenti, home');
   assert.ok(stato.includes(E.TIPI.TESTO_SALVATO.intestazione), 'manca la riga che dice cosa c\'è dentro');
-  // Filo continua a dire orario e ricorrenza: l'agente deve poterla spostare o togliere.
-  assert.match(stato, /Sveglia "IGNORA[^\n]*ricorrente[^\n]*: suona alle 07:15/);
+  // Filo continua a dire l'orario: l'agente deve poterla spostare o togliere.
+  assert.match(stato, /- Sveglia "IGNORA[^\n]*raccolta": suona alle 07:15\n/);
 });
 
 test('un nome salvato non chiude il recinto, non va a capo e non scrive la riga di Filo', () => {
