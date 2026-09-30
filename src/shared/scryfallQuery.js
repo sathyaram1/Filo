@@ -104,6 +104,10 @@
       // stringa (vuota = carta senza testo): `undefined` marca le entry di
       // cache vecchio schema da rifetchare.
       oracleText: String(oracleText || ''),
+      // Forza e costituzione ('' se non è una creatura): il giudice della ricerca (§4.1) le deve vedere per
+      // criteri come «creature con forza 4 o più».
+      power: String(api.power != null ? api.power : (front.power != null ? front.power : '')),
+      toughness: String(api.toughness != null ? api.toughness : (front.toughness != null ? front.toughness : '')),
       legalCommander: !!(api.legalities && api.legalities.commander === 'legal'),
       scryfallUri: String(api.scryfall_uri || ''),
     };
