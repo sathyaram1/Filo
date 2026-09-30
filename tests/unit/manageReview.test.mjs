@@ -77,8 +77,8 @@ test('#595 — la frase di un panel completo dice «mittente fidato» solo con l
     expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
     verdicts: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((judge, i) => ({ judge, class: i ? 'aligned' : 'attack' })),
   };
-  const conProva = MR.reasonText({ status: 'unlabeled', clientId: 'owner:me', senderProof: 'admin', pipeline });
-  const senza = MR.reasonText({ status: 'unlabeled', clientId: 'owner:me', pipeline });
+  const conProva = MR.judgesNote({ status: 'unlabeled', clientId: 'owner:me', senderProof: 'admin', pipeline });
+  const senza = MR.judgesNote({ status: 'unlabeled', clientId: 'owner:me', pipeline });
   assert.match(conProva.text, /^Mittente fidato/);
   assert.doesNotMatch(senza.text, /fidato/);
   assert.match(senza.text, /decidi tu/);
