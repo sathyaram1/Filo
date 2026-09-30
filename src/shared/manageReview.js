@@ -57,9 +57,18 @@
   // Fidato = prefisso riservato E prova del mittente (#595): il prefisso da solo lo scrive chiunque.
   // Speculare a isTrustedIdentity nel backend (filo-security).
   const SENDER_PROOFS = ['admin', 'server'];
+  const RESERVED_CLIENT_RE = /^(owner|routine|agent|local):/i;
   function isTrustedClient(clientId, senderProof) {
-    return /^(owner|routine|agent|local):/i.test(String(clientId || ''))
-      && SENDER_PROOFS.includes(senderProof);
+    return RESERVED_CLIENT_RE.test(String(clientId || '')) && SENDER_PROOFS.includes(senderProof);
+  }
+  function isUnprovenSender(fb) {
+    return !!fb && RESERVED_CLIENT_RE.test(String(fb.clientId || '')) && !SENDER_PROOFS.includes(fb.senderProof);
+  }
+  // Il mittente con cui decidere autore e gruppo: senza prova il prefisso riservato non lo riconosce nessuno,
+  // cioè vale come un utente. Stessa chiave di effectiveClientId sul server.
+  function effectiveClientId(fb) {
+    const c = String((fb && fb.clientId) || '');
+    return isUnprovenSender(fb) ? 'non-provato:' + c : c;
   }
 
   // Vocabolario unico della macchina a stati (src/shared/feedbackStatus.js).
