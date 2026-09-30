@@ -470,6 +470,7 @@
   // scheda che scorre al posto di quella chiusa resta sotto il puntatore.
   const tabRowEl = tabsEl.closest('.tab-row') || tabsEl;
   let larghezzeFerme = null; // Map id → px
+  let strisciaFerma = 0; // px della striscia, solo se se n'è andata l'ultima scheda
   let puntatoreSullaFila = false;
   let sondaFila = null;
   let giroSonda = 0;
@@ -488,6 +489,8 @@
     fermaSonda();
     if (!larghezzeFerme) return;
     larghezzeFerme = null;
+    strisciaFerma = 0;
+    tabsEl.style.flex = '';
     for (const el of tabsEl.querySelectorAll('.tab')) {
       el.style.flex = '';
       el.style.minWidth = '';
@@ -511,16 +514,21 @@
   // Le schede sparite si leggono dal confronto fra due fotografie: così vale
   // per ogni strada di chiusura (X, clic centrale, Ctrl+W, menu, la pagina stessa).
   function fermaLarghezzeSeChiusa(snap) {
-    const prima = new Set((state.tabs || []).map((t) => String(t.id)));
-    const dopo = ((snap && snap.tabs) || []).map((t) => String(t.id));
-    if (dopo.some((id) => !prima.has(id))) { sciogliLarghezze(); return; }
-    if (larghezzeFerme || !puntatoreSullaFila || dopo.length >= prima.size) return;
+    const primaIds = (state.tabs || []).map((t) => String(t.id));
+    const prima = new Set(primaIds);
+    const dopo = new Set(((snap && snap.tabs) || []).map((t) => String(t.id)));
+    if ([...dopo].some((id) => !prima.has(id))) { sciogliLarghezze(); return; }
+    if (!puntatoreSullaFila || dopo.size >= prima.size) return;
     const m = new Map();
     for (const el of tabsEl.querySelectorAll('.tab')) {
       const w = el.getBoundingClientRect().width;
       if (w > 0) m.set(el.dataset.id, w);
     }
-    if (m.size) larghezzeFerme = m;
+    if (!m.size) return;
+    larghezzeFerme = m;
+    // Se se ne va l'ultima, il + scivolerebbe sotto il puntatore e il clic
+    // dopo aprirebbe una scheda: la striscia tiene la sua larghezza.
+    strisciaFerma = dopo.has(primaIds[primaIds.length - 1]) ? 0 : tabsEl.getBoundingClientRect().width;
   }
 
   document.addEventListener('mousemove', (e) => {
@@ -897,6 +905,8 @@
       });
       tabsEl.appendChild(el);
     }
+
+    tabsEl.style.flex = larghezzeFerme && strisciaFerma ? `0 0 ${strisciaFerma}px` : '';
 
     // §6 — con la striscia scrollabile, assicuriamoci che la scheda attiva sia
     // sempre visibile (può finire fuori vista dopo che ne apri molte).

@@ -81,6 +81,29 @@ test('chiudendo con la X le altre schede tengono la larghezza, e la X accanto re
   await expect.poll(() => verdettoAllargate(shell, prima, QUANTE - 2), { timeout: 8_000 }).toBe('allargate');
 });
 
+test('chiusa l’ultima scheda, il + resta dov’era e il clic seguente non apre una scheda', async ({ shell }) => {
+  // Con 22 schede quelle inattive sono strette quanto il +: se il + scorresse a sinistra finirebbe sotto il puntatore.
+  const N = 22;
+  await apriSchede(shell, N);
+  await shell.evaluate(async (id) => window.filoShell.tabs.activate(id), await idInPosizione(shell, 0));
+  await expect(shell.locator('#tabs .tab').first()).toHaveClass(/active/);
+  const prima = await larghezze(shell);
+  const piu = () => shell.evaluate(() => document.getElementById('tab-new').getBoundingClientRect().left);
+  const piuPrima = await piu();
+  const punto = await centroChiudi(shell, await idInPosizione(shell, N - 1));
+  await shell.mouse.move(punto.x, punto.y);
+  await shell.mouse.click(punto.x, punto.y);
+  await expect.poll(() => verdettoUguali(shell, prima, N - 1), { timeout: 8_000 }).toBe('uguali');
+  expect(Math.abs((await piu()) - piuPrima)).toBeLessThan(0.5);
+
+  await shell.mouse.click(punto.x, punto.y);
+  await shell.waitForTimeout(600);
+  expect(await verdettoUguali(shell, prima, N - 1)).toBe('uguali');
+
+  await shell.mouse.move(punto.x, 300);
+  await expect.poll(() => verdettoAllargate(shell, prima, N - 1), { timeout: 8_000 }).toBe('allargate');
+});
+
 test('col puntatore fuori dalla barra ma ancora sulla fila le larghezze restano, lasciata la fila si adattano', async ({ app, shell }) => {
   await apriSchede(shell, QUANTE);
   const prima = await larghezze(shell);
