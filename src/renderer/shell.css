@@ -134,7 +134,9 @@ html[data-chrome-compact="1"] .addr {
   transition: background 0.1s ease;
   -webkit-app-region: no-drag;
   app-region: no-drag;
+  /* Contenitore delle priorità delle icone (sotto); la larghezza del contenuto gliela misura shell.js. */
   container: tab / inline-size;
+  contain-intrinsic-inline-size: var(--tab-naturale, none);
 }
 
 .tab.audible {
@@ -159,6 +161,12 @@ html[data-chrome-compact="1"] .addr {
   min-width: 110px;
   max-width: 320px;
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tab.misura {
+  container-type: normal;
+  flex: none;
+  width: max-content;
 }
 
 .tab.active.audible {
@@ -278,20 +286,13 @@ html[data-chrome-compact="1"] .addr {
   line-height: 1;
 }
 
-/* Scheda stretta: gli elementi cedono il posto per priorità, come in Chrome. Avviso audio > icona del
-   sito > X (sull'attiva resta sempre) > paese > titolo. Soglia = spazio di chi resta: icone 16, X 18,
-   paese ~26, gap 6. Prova: tests/tab-audio-indicator.spec.mjs. */
+/* Scheda stretta con l'avviso audio, priorità come in Chrome: avviso > icona > X (sull'attiva sempre) > paese > titolo.
+   Soglia = spazio di chi resta (icone 16, X 18, paese ~26, gap 6); prova in tests/tab-audio-indicator.spec.mjs. */
 @container tab (width < 100px) {
   .tab:has(> .tab-alert) > .proxy-ind { display: none; }
 }
-@container tab (width < 78px) {
-  .tab > .proxy-ind { display: none; }
-}
 @container tab (width < 68px) {
   .tab:not(.active):has(> .tab-alert) > .close { display: none; }
-}
-@container tab (width < 46px) {
-  .tab:not(.active) > .close { display: none; }
 }
 @container tab (width < 44px) {
   .tab:has(> .tab-alert) > .title { display: none; }

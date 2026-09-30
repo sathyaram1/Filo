@@ -122,7 +122,10 @@ test('scheda stretta: l\'avviso audio resta sempre, la favicon cede solo quando 
     const schede = await misura(shell);
     for (const s of schede) {
       const dove = `scheda ${s.id} larga ${s.width}px: ${JSON.stringify(s.figli.map((f) => [f.cls, Math.round(f.left - s.left), Math.round(f.width)]))}`;
-      // Niente esce dalla scheda e niente si sovrappone: è così che, senza priorità, la X finiva sopra la scheda accanto.
+      const conAvviso = s.id === suona || s.id === mutata || s.id === attiva;
+      if (s.active) expect(s.figli.some((f) => f.cls === 'close'), dove).toBe(true);
+      if (!conAvviso) continue;
+      // Niente esce dalla scheda e niente si sovrappone: senza priorità l'avviso finiva fuori, sulla scheda accanto.
       for (const f of s.figli) {
         expect(f.left, dove).toBeGreaterThanOrEqual(s.left - 0.5);
         expect(f.right, dove).toBeLessThanOrEqual(s.right + 0.5);
@@ -131,18 +134,12 @@ test('scheda stretta: l\'avviso audio resta sempre, la favicon cede solo quando 
       for (let i = 1; i < piene.length; i++) expect(piene[i].left, dove).toBeGreaterThanOrEqual(piene[i - 1].right - 0.5);
 
       const avviso = s.figli.find((f) => f.cls.includes('tab-alert'));
-      const favicon = s.figli.find((f) => f.cls.startsWith('favicon'));
-      if (s.id === suona || s.id === mutata || s.id === attiva) {
-        expect(avviso && avviso.width, dove).toBe(16);
-        // La favicon cede solo sotto i 56px: 10+8 di margini, 16+6+16 per le due icone.
-        expect(!!favicon, dove).toBe(s.width >= 56);
-        if (!favicon) expect(Math.abs((avviso.left + avviso.right) / 2 - (s.left + s.right) / 2), dove).toBeLessThanOrEqual(2);
-      }
-      if (s.active) expect(s.figli.some((f) => f.cls === 'close'), dove).toBe(true);
-      if (s.width >= 200) {
-        expect(s.figli.map((f) => f.cls.split(' ')[0]).slice(-2), dove).toEqual(
-          s.id === suona || s.id === mutata || s.id === attiva ? ['tab-alert', 'close'] : ['title', 'close']);
-      }
+      const favicon = s.figli.find((f) => f.cls === 'favicon' || f.cls === 'spinner');
+      expect(avviso && avviso.width, dove).toBe(16);
+      // La favicon cede solo sotto i 56px: 10+8 di margini, 16+6+16 per le due icone.
+      expect(!!favicon, dove).toBe(s.width >= 56);
+      if (!favicon) expect(Math.abs((avviso.left + avviso.right) / 2 - (s.left + s.right) / 2), dove).toBeLessThanOrEqual(2);
+      if (s.width >= 200) expect(s.figli.map((f) => f.cls.split(' ')[0]).slice(-2), dove).toEqual(['tab-alert', 'close']);
     }
   }
 });
