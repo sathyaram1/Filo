@@ -584,11 +584,27 @@ class BarraLaterale {
       const icona = this._icone().find((i) => i.id === id);
       if (!icona) return;
       voci = [];
-      if (!icona.spenta) voci.push({ label: icona.etichetta, action: 'barra:esegui' });
+      const scheda = this._attiva();
+      // Indietro e Avanti: le pagine a cui si può andare, dalla più vicina, come in ogni browser.
+      const pagine = (id === 'back' || id === 'forward') && scheda && typeof this.tabs.vociCronologia === 'function'
+        ? this.tabs.vociCronologia(id === 'back' ? 'indietro' : 'avanti', scheda.id) : [];
+      for (const p of pagine.slice(0, PAGINE_NEL_MENU)) {
+        voci.push({ label: (p.titolo || p.url).slice(0, 200), action: `barra:voce:${p.indice}` });
+      }
+      if (pagine.length > PAGINE_NEL_MENU) {
+        const altre = pagine.length - PAGINE_NEL_MENU;
+        voci.push({ label: `…e ${altre === 1 ? 'un\'altra pagina' : `altre ${altre} pagine`} ${id === 'back' ? 'più indietro' : 'più avanti'}`, disabled: true });
+      }
+      if (pagine.length) voci.push({ type: 'separator' });
+      else if (!icona.spenta) voci.push({ label: icona.etichetta, action: 'barra:esegui' });
       voci.push({ label: 'Rimetti nel menu del tasto destro', action: 'barra:al-menu' });
       scegli = (a) => {
         if (a === 'barra:esegui') this.esegui(id);
         else if (a === 'barra:al-menu') Layout.posa({ id, target: 'secondary', beforeId: null }, { incognito: this._incognito() }).catch(() => {});
+        else if (a.startsWith('barra:voce:') && scheda) {
+          this.tabs.vaiAllaVoce(scheda.id, Number(a.slice('barra:voce:'.length)));
+          if (this.motivo === 'tasto') this.chiudi();
+        }
       };
     }
     if (!voci || !voci.length) return;
