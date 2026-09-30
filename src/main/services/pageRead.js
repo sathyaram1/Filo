@@ -593,7 +593,8 @@ async function leggiPagina(input, { da = 0, schede = [] } = {}) {
     }
   }
   if (!esito) {
-    esito = daCache(url);
+    // La copia tenuta da parte serve al seguito di una pagina lunga; una lettura da capo è fresca, come dalla scheda.
+    esito = Number(da) > 0 ? daCache(url) : null;
     if (!esito) {
       esito = await scaricaPagina(url);
       if (esito.ok) inCache(url, esito);
