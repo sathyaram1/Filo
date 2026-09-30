@@ -101,8 +101,14 @@
   }
 
   // Piattaforme dove il sottodominio è l'account di chi pubblica, e le aziende
-  // si tengono il proprio nome: microsoft.github.io è Microsoft.
-  const PIATTAFORME_ACCOUNT = new Set(['github.io', 'gitlab.io']);
+  // si tengono il proprio nome: microsoft.github.io è Microsoft. Su googleapis.com
+  // i nomi li sceglie Google (youtube.googleapis.com).
+  const PIATTAFORME_ACCOUNT = new Set(['github.io', 'gitlab.io', 'googleapis.com']);
+  // Servizi riservati alle aziende, che danno a ogni cliente un indirizzo col suo
+  // nome in testa: paypal.wd1.myworkdayjobs.com sono le offerte di lavoro di PayPal.
+  const SERVIZI_PER_AZIENDA = new Set([
+    'myworkdayjobs.com', 'qualtrics.com', 'service-now.com', 'webex.com', 'salesforce.com',
+  ]);
 
   // Parole che accompagnano un nome famoso nei domini di phishing
   // (secure-paypal, paypal-com, amazon-rimborsi). Senza una di queste accanto,
