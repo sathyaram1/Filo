@@ -156,6 +156,7 @@
   const mgPreapproveRevokeBtn = document.getElementById('mgPreapproveRevokeBtn');
   const mgPreapprovedInfo = document.getElementById('mgPreapprovedInfo');
   const mgPreapproveLine = document.getElementById('mgPreapproveLine');
+  const mgLocalBtn   = document.getElementById('mgLocalBtn');
   const mgStarBtn    = document.getElementById('mgStarBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
 
