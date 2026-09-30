@@ -15,14 +15,13 @@
   const fisse = $('fisse');
   const ora = $('ora');
 
-  // Il bordo va SPINTO, non sfiorato: il puntatore resta sulla striscia per questo tempo.
-  const SPINTA_MS = 250;
   const SUGGERIMENTO_MS = 350;
   const SOGLIA_TRASCINA = 4;
 
   const svg = (nome, px) => (typeof ICONS[nome] === 'function' ? ICONS[nome](px) : '');
 
-  let stato = { aperta: false, icone: [] };
+  let stato = { aperta: false, icone: [], opzioni: { spinta: true, attesaMs: 250, striscia: true } };
+  const opzioni = () => stato.opzioni || {};
   let firma = null;
   let eraAperta = false;
 
@@ -44,13 +43,14 @@
     if (spinta) { clearTimeout(spinta); spinta = null; }
     striscia.classList.remove('spinge');
   }
+  // Il bordo va SPINTO, non sfiorato: il puntatore resta sulla striscia per l'attesa scelta in Preferenze.
   striscia.addEventListener('pointermove', (e) => {
-    if (!e.isTrusted || stato.aperta) return;
+    if (!e.isTrusted || stato.aperta || opzioni().spinta === false) return;
     // Chi trascina una scheda o seleziona del testo passa di qui con un tasto premuto: non spinge.
     if (e.buttons) { annullaSpinta(); return; }
     if (spinta) return;
     striscia.classList.add('spinge');
-    spinta = setTimeout(() => { spinta = null; api.spinta(); }, SPINTA_MS);
+    spinta = setTimeout(() => { spinta = null; api.spinta(); }, Number(opzioni().attesaMs) || 250);
   });
   striscia.addEventListener('pointerleave', annullaSpinta);
   striscia.addEventListener('pointerdown', annullaSpinta);
@@ -68,11 +68,26 @@
     nascondiSuggerimento();
     api.fuori();
   });
-  // Il margine trasparente dell'ombra è della pagina, a vista: un clic lì chiude.
-  document.addEventListener('pointerdown', (e) => {
-    if (!e.isTrusted || !stato.aperta) return;
-    if (e.target === document.documentElement || e.target === document.body) api.chiudi();
+  // Il margine trasparente dell'ombra (e le fasce sopra e sotto il pannello) è della pagina: i gesti che ci
+  // cadono tornano alla scheda, e un clic lì, arrivato alla pagina, chiude la barra come ogni clic sulla pagina.
+  window.SN_VUOTO.collega({
+    inoltra: (gesto) => api.inoltra(gesto),
+    onCursore: api.onCursore,
+    proprio: (e) => !stato.aperta || !!trascina || !!(e.target && e.target.closest && e.target.closest('#pannello')),
+    // La vista tocca i bordi sinistro e basso della finestra, e in alto la fila delle schede: solo a destra c'è la pagina.
+    versoLaPagina: (e) => e.clientX >= innerWidth - 1,
   });
+
+  // Il tasto destro sulle voci che non sono icone del registro: le loro scelte le compone il main.
+  function menuDi(el, dati) {
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (!e.isTrusted) return;
+      nascondiSuggerimento();
+      api.menu(Object.assign({ x: Math.round(e.clientX), y: Math.round(e.clientY) }, dati));
+    });
+  }
+  menuDi(striscia, { striscia: true });
 
   // ── suggerimenti ─────────────────────────────────────────────────────────
   let suggTimer = null;
@@ -136,6 +151,8 @@
         api.menu({ id: it.id, x: e.clientX, y: e.clientY });
       });
       b.addEventListener('pointerdown', (e) => iniziaTrascina(e, b));
+      // L'etichetta di un'azione della pagina dipende dalla pagina («Traduci» o «Mostra originale»): si richiede al passaggio.
+      if (it.pagina) b.addEventListener('pointerenter', (e) => { if (e.isTrusted) api.chiedi(); });
       nav.appendChild(b);
     }
     misura();
@@ -170,6 +187,7 @@
       const r = b.getBoundingClientRect();
       api.sistema({ comando: f.comando, y: Math.round(r.top) });
     });
+    menuDi(b, { comando: f.comando });
     fisse.appendChild(b);
     fissi[f.comando] = b;
   }
@@ -203,6 +221,7 @@
     setTimeout(scriviOra, 60000 - (Date.now() % 60000) + 50);
   }
   ora.addEventListener('pointerenter', (e) => { if (e.isTrusted) programmaSuggerimento(ora); });
+  menuDi(ora, { ora: true });
   ora.addEventListener('pointerleave', () => { if (suggTimer) { clearTimeout(suggTimer); suggTimer = null; } nascondiSuggerimento(); });
   scriviOra();
 
@@ -331,6 +350,9 @@
     stato = s || { aperta: false, icone: [] };
     applicaTema(stato.tema);
     root.classList.toggle('aperta', !!stato.aperta);
+    root.classList.toggle('senza-striscia', opzioni().striscia === false);
+    // Il puntatore fermo nella fascia del bordo che la vista non vede: la sorveglia il main, e la striscia lo mostra.
+    striscia.classList.toggle('bordo', !stato.aperta && !!stato.bordo);
     if (stato.aperta) annullaSpinta();
     else nascondiSuggerimento();
     striscia.setAttribute('aria-label', `Barra laterale (${stato.tasto || ''})`);

@@ -72,7 +72,7 @@
       lasciaIlVuoto(e, versoLaPagina(e));
     });
     document.addEventListener('wheel', (e) => {
-      if (!gestoDellaPagina && proprio(e, 'rotella')) return;
+      if (proprio(e, 'rotella')) return;
       e.preventDefault();
       const riga = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? innerHeight : 1;
       manda('mouseWheel', e, { dx: -e.deltaX * riga, dy: -e.deltaY * riga });

@@ -23,12 +23,25 @@ module.exports = function register(on, ctx) {
     return layout ? { ok: true, layout } : { ok: false, error: 'icona o zona sconosciuta' };
   });
 
-  // Solo dalla scheda davanti: una in secondo piano non ha un menu sotto gli occhi di nessuno.
+  // Solo dalla scheda davanti, e dal suo frame principale: una in secondo piano non ha un menu sotto
+  // gli occhi di nessuno, e le coordinate di un riquadro non sono quelle della barra.
+  const barraDellaSchedaDavanti = (sender) => {
+    const tabs = winOf(sender)?._filoTabs;
+    if (!tabs?.barra || !sender?.tab?.id || sender.tab.id !== tabs.activeId) return null;
+    if (sender.frame && sender.frame.parent) return null;
+    return tabs.barra;
+  };
+
   on(MSG.BARRA_TRASCINA, async (msg, sender) => {
-    const win = winOf(sender);
-    const tabs = win?._filoTabs;
-    if (!tabs?.barra || !sender?.tab?.id || sender.tab.id !== tabs.activeId) return { ok: false };
-    if (sender.frame && sender.frame.parent) return { ok: false };
-    return tabs.barra.dallaScheda(msg || {}, sender.tab.id);
+    const barra = barraDellaSchedaDavanti(sender);
+    return barra ? barra.dallaScheda(msg || {}, sender.tab.id) : { ok: false };
+  });
+
+  // Come si chiamano adesso le azioni della pagina che stanno nella barra («Traduci» o «Mostra originale»).
+  on(MSG.BARRA_ETICHETTE, async (msg, sender) => {
+    const barra = barraDellaSchedaDavanti(sender);
+    if (!barra) return { ok: false };
+    barra.etichette(sender.tab.id, msg && msg.voci);
+    return { ok: true };
   });
 };

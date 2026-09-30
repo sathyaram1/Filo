@@ -120,6 +120,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     stato: (dati) => ipcRenderer.send('barra:dalla-shell', dati),
     commuta: () => ipcRenderer.send('barra:commuta'),
     chiudi: () => ipcRenderer.send('barra:chiudi'),
+    menu: (x, y) => ipcRenderer.send('barra:menu-maniglia', { x, y }),
   },
   // Modalità annotazione del box feedback: la shell mette/toglie un velo
   // d'ombra sopra la propria barra in alto così tutto Filo va in penombra.

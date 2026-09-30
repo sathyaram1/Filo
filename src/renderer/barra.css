@@ -50,7 +50,9 @@ html, body {
   opacity: 0.45;
   transition: opacity var(--dur), width var(--dur);
 }
-.striscia:hover, .striscia.spinge { opacity: 1; width: 4px; }
+.striscia:hover, .striscia.spinge, .striscia.bordo { opacity: 1; width: 4px; }
+/* Nascosta da Preferenze: il bordo resta vivo, e la striscia si accende solo mentre la si spinge. */
+html.senza-striscia .striscia:not(.spinge):not(.bordo) { opacity: 0; }
 html.aperta .striscia { opacity: 0; pointer-events: none; }
 
 .pannello {

@@ -22,6 +22,12 @@
   if (manigliaBarra) {
     manigliaBarra.dataset.tip = `Barra laterale (${TASTI && TASTI.etichettaBarra ? TASTI.etichettaBarra() : tasto('Ctrl+Shift+B')})`;
     manigliaBarra.addEventListener('click', (e) => { if (e.isTrusted) api.barra?.commuta(); });
+    // Tasto destro: le scelte della striscia (aprirla, nasconderla, spegnere l'apertura dal bordo, regolarla).
+    manigliaBarra.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.isTrusted) api.barra?.menu?.(Math.round(e.clientX), Math.round(e.clientY));
+    });
   }
   document.addEventListener('pointerdown', (e) => {
     if (!e.isTrusted || (manigliaBarra && manigliaBarra.contains(e.target))) return;

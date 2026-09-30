@@ -114,7 +114,7 @@
     const canBack = navState ? !!navState.canBack : true;
     const canFwd = navState ? !!navState.canFwd : true;
     const registry = {
-      translate:     { id: 'translate',     icon: translateIcon,    label: translateLabel,                   onClick: () => (restore ? Translate.restoreOriginal() : Translate.translatePage()) },
+      translate:     { id: 'translate',     icon: translateIcon,    iconName: restore ? 'showOriginal' : 'translate', label: translateLabel, onClick: () => (restore ? Translate.restoreOriginal() : Translate.translatePage()) },
       screenshot:    { id: 'screenshot',    icon: I('screenshot'),  label: I18n.t('menu_screenshot'),        onClick: () => Actions.takeScreenshot() },
       screenshotCrop:{ id: 'screenshotCrop',icon: I('screenshotCrop'),label: I18n.t('menu_screenshot_crop'), onClick: () => Actions.takePartialScreenshot() },
       transcribe:    { id: 'transcribe',    icon: I('transcribe'),  label: I18n.t('menu_transcribe'),        onClick: () => Actions.transcribeRegion() },
@@ -281,6 +281,16 @@
     });
   }
 
+  // Come si chiamano adesso, su questa pagina, le sue azioni che stanno nella barra laterale: la barra le
+  // mostra con lo stesso nome e la stessa icona del menu («Traduci» o «Mostra originale»).
+  function statoPerBarra(ids) {
+    if (IS_SUBFRAME) return [];
+    const reg = buildLocalIconRegistry(lastNavState);
+    return (Array.isArray(ids) ? ids : []).map(String)
+      .filter((id) => Disp.noto(id) && Disp.ICONE[id].tipo === 'pagina' && reg[id])
+      .map((id) => ({ id, etichetta: String(reg[id].label || ''), icona: reg[id].iconName || Disp.ICONE[id].icona }));
+  }
+
   // Un'icona portata fuori dalla barra sopra questa pagina: se il menu è aperto ci cade dentro.
   function dallaBarra(msg) {
     if (IS_SUBFRAME || !msg) return;
@@ -299,6 +309,7 @@
     init,
     buildGlobalIconRow,
     runIconAction,
+    statoPerBarra,
     // Ridisegna le icone del menu già aperto. Serve quando lo stato che
     // decide il NOME di una voce cambia mentre il menu è sotto gli occhi: lo
     // schermo intero si spegne per un'altra strada (l'assistente, un gesto di

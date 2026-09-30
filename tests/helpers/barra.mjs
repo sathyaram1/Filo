@@ -71,3 +71,31 @@ export async function mettiNelMenu(app, ids, zona = 'secondary') {
     if (!r || !r.ok) throw new Error(`mettiNelMenu: ${id} non spostata`);
   }
 }
+
+// Il menu di Filo aperto adesso (una finestra data: con le voci; anche il suggerimento è data:, ma senza .menu).
+export async function menuAperto(app, { tetto = 5000 } = {}) {
+  const fine = Date.now() + tetto;
+  while (Date.now() < fine) {
+    for (const w of app.windows()) {
+      let url = '';
+      try { url = w.url(); } catch (_) { continue; }
+      if (url.startsWith('data:text/html') && await w.$('.menu').catch(() => null)) return w;
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return null;
+}
+
+// Le voci del menu, come le legge l'utente.
+export function vociDelMenu(menu) {
+  return menu.evaluate(() => [...document.querySelectorAll('.item')].map((b) => b.textContent.trim()));
+}
+
+// La scelta chiude il menu: il clic non aspetta una pagina che non c'è più.
+export async function scegliNelMenu(menu, testo) {
+  await menu.evaluate((t) => {
+    const b = [...document.querySelectorAll('button.item')].find((x) => x.textContent.includes(t));
+    if (!b) throw new Error(`voce «${t}» assente`);
+    b.click();
+  }, testo).catch((e) => { if (/assente/.test(String(e && e.message))) throw e; });
+}
