@@ -309,9 +309,9 @@ test('#592 — una parte invisibile dello stile non passa dal popup e non arriva
   await page.locator('#input').fill('scrivimi breve e dammi del tu');
   await page.locator('#sendBtn').click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
-  const popup = (await confirmState(page)).text;
-  expect(popup).toContain(`«${visibile}»`);
-  expect(haInvisibili(popup)).toBe(false);
+  const popup = await confirmState(page);
+  expect(popup.citazioni).toEqual([visibile]);
+  expect(haInvisibili(popup.text)).toBe(false);
   await clickConfirm(page, 'ok');
   await expect.poll(() => storedStyle(app), { timeout: 5_000 }).toBe(visibile);
 
@@ -338,8 +338,7 @@ test('#592 — righe vuote in fila non spingono il resto dello stile oltre il bo
   await page.locator('#input').fill('scrivimi breve');
   await page.locator('#sendBtn').click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
-  const popup = (await confirmState(page)).text;
-  expect(popup).toContain(`«Rispondi breve.\n\n${NASCOSTO}»`);
+  expect((await confirmState(page)).citazioni).toEqual([`Rispondi breve.\n\n${NASCOSTO}`]);
   await page.screenshot({ path: 'tests/.shots/stile-agente-righe-vuote.png' });
   await clickConfirm(page, 'ok');
   await expect.poll(() => storedStyle(app), { timeout: 5_000 }).toBe(`Rispondi breve.\n\n${NASCOSTO}`);
@@ -369,7 +368,7 @@ test('#592 — righe in cui niente si disegna non spingono il resto dello stile 
   await page.locator('#sendBtn').click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
   const popup = await confirmState(page);
-  expect(popup.text).toContain(`«Rispondi breve.\n\n${NASCOSTO}»`);
+  expect(popup.citazioni).toEqual([`Rispondi breve.\n\n${NASCOSTO}`]);
   expect(popup.textScrolls).toBe(false);
   await clickConfirm(page, 'ok');
   await expect.poll(() => storedStyle(app), { timeout: 5_000 }).toBe(`Rispondi breve.\n\n${NASCOSTO}`);

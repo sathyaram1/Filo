@@ -243,6 +243,7 @@ test('a voce si dimentica una cosa sola: il popup mostra la riga esatta e l’OK
   expect(popup).not.toContain('Lisbona');
   // La riga salvata sta nel suo riquadro, non fra le parole di Filo (#592.7).
   expect((await confirmState(page)).citazioni).toEqual(['L’utente non beve caffè.']);
+  await page.screenshot({ path: 'tests/.shots/conferma-riquadro-dimentica.png' });
   expect((await memoria()).lezioni).toEqual(['L’utente non beve caffè.']);
   await clickConfirm(page, 'ok');
   await expect.poll(async () => (await memoria()).lezioni, { timeout: 5_000 }).toEqual([]);
