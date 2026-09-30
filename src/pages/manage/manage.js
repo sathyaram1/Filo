@@ -290,7 +290,7 @@
   // Ordine "per creatore": prima le persone (owner, utenti), poi le istanze di
   // Claude — la sessione locale in testa, perché è quella che lavora insieme
   // all'owner — e in fondo Filo che scrive per conto di un utente.
-  const AUTHOR_RANK = { owner: 0, user: 1, local: 2, worker: 3, verifier: 4, residuo: 5, prober: 6, claude: 7, filo: 8 };
+  const AUTHOR_RANK = { owner: 0, user: 1, unproven: 2, local: 3, worker: 4, verifier: 5, residuo: 6, prober: 7, claude: 8, filo: 9 };
   // Applica l'override di ordinamento scelto dall'owner. `list` arriva GIÀ
   // ordinata col criterio predefinito della tab: in 'smart' la lasciamo intatta.
   // `sort` è stabile → a parità di chiave si conserva l'ordine predefinito.
