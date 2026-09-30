@@ -323,6 +323,7 @@ class AnteprimeSchede {
           this._salva(tab, dato);
           this.sotto = null;
           m.layout();
+          this._fotografata(tab);
           this._dopoFoto(tab);
           return true;
         }
