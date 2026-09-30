@@ -78,6 +78,17 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // «Apri comunque» della chat (#590): scavalca la lista come quello della notifica, e lo può
+  // chiedere solo una pagina di Filo, mai il content script di una pagina web.
+  on(MSG.APRI_COMUNQUE, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    const win = winOf(sender);
+    const url = String((msg && msg.url) || '');
+    if (!win?._filoTabs || !/^https?:\/\//i.test(url)) return { ok: false };
+    win._filoTabs.openBlockedPopup(url, { apriComunque: true });
+    return { ok: true };
+  });
+
   on(MSG.QUIT_APP, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     app.quit();

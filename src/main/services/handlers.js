@@ -1402,14 +1402,19 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
             // Gli schemi non web sono esclusi qui sopra: una scheda che non
             // nasce è la lista dei siti bloccati (#590), e la chat lo deve dire.
             if (!tabId) {
+              const assoluto = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`;
               let d = null;
-              try { d = require('./siteBlock').shouldBlockNavigation(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`); } catch (_) {}
-              return { executed: false, kept: true, output: { blocked: 'site', host: (d && d.host) || '', reason: (d && d.reason) || '' } };
+              try { d = require('./siteBlock').shouldBlockNavigation(assoluto); } catch (_) {}
+              return { executed: false, kept: true, output: { blocked: 'site', host: (d && d.host) || '', reason: (d && d.reason) || '', url: assoluto } };
+            }
+            // Un blocco che la pagina provoca dopo l'attesa qui sotto arriva lo stesso alla chat della home.
+            if (sender && sender.wc && String(sender.url || '').startsWith('filo://') && action._callId && typeof tm.seguiApertura === 'function') {
+              tm.seguiApertura(tabId, { wc: sender.wc, callId: action._callId });
             }
             // La scheda nata può fermarla dopo un rimbalzo verso la lista (un link accorciato, un rinvio della pagina).
             const esito = typeof tm.esitoApertura === 'function' ? await tm.esitoApertura(tabId) : null;
             if (esito && esito.bloccata) {
-              return { executed: false, kept: true, output: { blocked: 'site', host: esito.bloccata.host, reason: esito.bloccata.reason || '' } };
+              return { executed: false, kept: true, output: { blocked: 'site', host: esito.bloccata.host, reason: esito.bloccata.reason || '', url: esito.bloccata.target } };
             }
             opened = true;
           }
@@ -2437,6 +2442,7 @@ function observationsForPrompt(actions) {
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
+    apertureFermateDopoForPrompt(actions),
   ].filter(Boolean).join('\n\n');
 }
 
@@ -2484,6 +2490,22 @@ function descriviPerModello(action, { fatto = false } = {}) {
     tipo: 'TESTO_SALVATO',
     testo: usate.map(({ v, n }) => `voce ${n}: ${E.neutralizza(v, { unaRiga: true })}`).join('\n'),
   })}`;
+}
+
+// Le pagine aperte con NAVIGA che si sono spostate da sé su un sito bloccato quando il turno era
+// già finito (la scheda le ha segnate `_output.dopo`): il modello le aveva date per aperte.
+function apertureFermateDopoForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const righe = [];
+  for (const a of actions) {
+    const o = a && a._output;
+    if (!o || !o.dopo || o.blocked !== 'site') continue;
+    const chi = o.reason === 'lists' ? 'fra i siti di pubblicità e tracciamento che Filo blocca' : 'nella lista dei siti bloccati dell\'utente';
+    righe.push(`- ${String(a.url || '')}: ha rimandato a ${o.host || 'un sito'}, ${chi}`);
+  }
+  return righe.length
+    ? `[Pagine che avevi aperto e che poi si sono spostate da sole su un sito bloccato: l'utente NON le vede, e sotto la tua risposta ha «Apri comunque».\n${righe.join('\n')}]`
+    : '';
 }
 
 // Un tentativo interrotto a metà da un guasto (rete, fornitore): queste azioni
@@ -2560,7 +2582,7 @@ function toolResultText({ action, res, rendered }) {
     const chi = res.output.reason === 'lists'
       ? 'è fra i siti di pubblicità e tracciamento che Filo blocca da sé (non è nella lista dell\'utente)'
       : 'è nella lista dei siti bloccati dell\'utente';
-    return `Pagina NON aperta: ${sito} ${chi}. Diglielo in una riga: se vuole aprirla lo stesso c'è «Apri comunque» nella notifica appena comparsa. Non riprovare e non cercare un altro indirizzo per arrivarci.`;
+    return `Pagina NON aperta: ${sito} ${chi}. Diglielo in una riga: se vuole aprirla lo stesso, sotto la tua risposta c'è «Apri comunque». Non riprovare e non cercare un altro indirizzo per arrivarci.`;
   }
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'scheme') {
     return 'Pagina NON aperta: l\'indirizzo non è una pagina web (ammessi solo http e https). Non riprovare con lo stesso indirizzo.';
@@ -3003,11 +3025,21 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       }
       const roundRendered = [];
       const results = [];
-      for (const a of actions) {
+      // Le aperture di pagina di fila partono insieme: ognuna aspetta l'esito della sua scheda,
+      // nessuna quello delle altre. Il resto resta in ordine (i suoi esiti decidono i passi dopo).
+      const esiti = new Map();
+      const avvia = (a) => (a._argsError
+        ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
+        : executeFiloAction(a, { sender, contesto: azioniViste }));
+      const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
+      for (let i = 0; i < actions.length; i++) {
+        const a = actions[i];
         rawActions.push(a);
-        const res = a._argsError
-          ? { executed: false, kept: false, rejected: true, error: a._argsError }
-          : await executeFiloAction(a, { sender, contesto: azioniViste });
+        if (!esiti.has(a)) {
+          if (apertura(a)) for (let j = i; j < actions.length && apertura(actions[j]); j++) esiti.set(actions[j], avvia(actions[j]));
+          else esiti.set(a, avvia(a));
+        }
+        const res = await esiti.get(a);
         // Contiene la home con il nome utente: serve solo al gate, non alla chat.
         delete a._perimetro;
         const rendered = { ...a };

@@ -75,6 +75,13 @@ const filoApi = {
     ipcRenderer.on('filo:action', wrapped);
     return () => ipcRenderer.removeListener('filo:action', wrapped);
   },
+  // #590 — una pagina aperta da NAVIGA che, a turno finito, si è spostata da sé su un sito
+  // della lista: { callId, host, reason, url }. Ritorna un unsubscribe.
+  onAperturaFermata: (fn) => {
+    const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
+    ipcRenderer.on('filo:apertura-fermata', wrapped);
+    return () => ipcRenderer.removeListener('filo:apertura-fermata', wrapped);
+  },
   aiStream: ({ action, payload, onMeta, onDelta, onReset, onDone, onError }) => {
     const requestId = `s${Date.now()}_${++streamCounter}`;
     const offMeta = (_e, data) => onMeta && onMeta(data);

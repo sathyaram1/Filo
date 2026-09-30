@@ -142,6 +142,11 @@ const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
 // che la pagina si sposti da sé su un sito della lista. Tetto e margine dopo il caricamento.
 const ASSESTAMENTO_MS = 1500;
 const DOPO_CARICAMENTO_MS = 300;
+// Dopo l'attesa, un blocco sulla stessa scheda arriva lo stesso alla chat che l'ha aperta,
+// finché l'utente non la tocca e per questo tempo al massimo.
+const SEGUI_APERTURA_MS = 60_000;
+// Il rinvio che la pagina dichiara di sé (meta refresh), in secondi, o -1.
+const RINVIO_DICHIARATO_JS = '(()=>{try{const m=document.querySelector(\'meta[http-equiv="refresh" i]\');const s=m?parseFloat(m.getAttribute("content")):NaN;return Number.isFinite(s)&&s>=0?s:-1;}catch(e){return -1;}})()';
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
 
 // SICUREZZA — schemi consentiti per le navigazioni ORIGINATE da contenuto web
@@ -2690,10 +2695,34 @@ class TabManager {
     });
   }
 
+  // La chat che ha chiesto l'apertura di `id` (home, con l'id dell'azione): dopo l'attesa di
+  // esitoApertura, un blocco che la pagina provoca da sé le arriva sul canale 'filo:apertura-fermata'.
+  seguiApertura(id, { wc, callId } = {}) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab || !wc || !callId) return;
+    tab._aperturaChat = { wc, callId, da: Date.now() };
+  }
+
+  _bloccoDopoApertura(tab, bloccata) {
+    const c = tab._aperturaChat;
+    tab._aperturaChat = null;
+    if (!c || (tab._userInputAt || 0) >= c.da || Date.now() - c.da > SEGUI_APERTURA_MS) return;
+    try {
+      if (!c.wc.isDestroyed()) {
+        c.wc.send('filo:apertura-fermata', { callId: c.callId, host: bloccata.host, reason: bloccata.reason || '', url: bloccata.target });
+      }
+    } catch (_) {}
+  }
+
   _esitoApertura(tab, bloccata) {
     const attese = tab._attesaEsito;
-    if (!attese) return;
+    if (!attese) {
+      if (bloccata && tab._aperturaChat) this._bloccoDopoApertura(tab, bloccata);
+      return;
+    }
     tab._attesaEsito = null;
+    // Detto adesso a chi aspettava: non va ridetto dopo.
+    if (bloccata) tab._aperturaChat = null;
     clearTimeout(tab._assestamento);
     tab._assestamento = null;
     for (const a of attese) a(bloccata);
@@ -2705,11 +2734,20 @@ class TabManager {
     if (!tab._attesaEsito || tab._assestamento) return;
     const arrivata = () => this._esitoApertura(tab, null);
     tab._assestamento = setTimeout(arrivata, ASSESTAMENTO_MS);
+    const wc = tab.view.webContents;
+    const riprogramma = (ms) => {
+      if (!tab._attesaEsito) return;
+      clearTimeout(tab._assestamento);
+      tab._assestamento = setTimeout(arrivata, ms);
+    };
     try {
-      tab.view.webContents.once('did-stop-loading', () => {
+      wc.once('did-stop-loading', () => {
         if (!tab._attesaEsito) return;
-        clearTimeout(tab._assestamento);
-        tab._assestamento = setTimeout(arrivata, DOPO_CARICAMENTO_MS);
+        // Una pagina che dichiara di spostarsi fra poco è un passaggio: si aspetta dove porta
+        // (dentro il tetto di esitoApertura). Quello che fa più tardi lo dice _bloccoDopoApertura.
+        wc.executeJavaScript(RINVIO_DICHIARATO_JS, false)
+          .then((sec) => riprogramma((Number(sec) >= 0 ? Number(sec) * 1000 : 0) + DOPO_CARICAMENTO_MS))
+          .catch(() => riprogramma(DOPO_CARICAMENTO_MS));
       });
     } catch (_) {}
   }
