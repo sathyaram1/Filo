@@ -22,10 +22,12 @@
 //   SN_CONST     STORAGE_KEYS.FEEDBACK_OUTBOX
 //
 // API
-//   init({ prepare, onDone, onGiveUp, log, backoffMin, backoffMax })  — una volta all'avvio
+//   init({ prepare, onDone, onGiveUp, tokenOwner, log, backoffMin, backoffMax })  — una volta all'avvio
 //     onGiveUp(item, motivo) torna `false` se l'avviso non è arrivato a
 //     nessuno: quella voce resta in coda finché non si riesce a dirlo.
-//   enqueue(payload) -> { id, queued:true }                 — accoda + prova subito
+//     tokenOwner() -> idToken admin fresco o '' (#595): chiesto a ogni
+//     spedizione di una voce dell'owner, MAI salvato nella coda.
+//   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
 //   size()                                                  — voci in coda
 
