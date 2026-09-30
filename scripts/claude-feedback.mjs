@@ -14,15 +14,13 @@
 //   esploratore né automazione cloud — perché il contesto in cui nasce è
 //   diverso da entrambi.
 //
-// NESSUNA CREDENZIALE DELL'OWNER
-//   Si usa la STESSA strada dell'app (`src/shared/feedback.js`): creazione
-//   anonima con la chiave pubblica di Firebase, testo cifrato verso l'owner.
-//   Così questo strumento funziona anche su una copia del repo senza token
-//   admin, e soprattutto non c'è nessuna credenziale in più da tenere qui.
-//   L'unica eccezione è `--priorita`, che le regole non concedono a un mittente
-//   anonimo: quella, se richiesta, si applica dopo con le credenziali
-//   dell'owner se ci sono, e se non ci sono si dice e basta (il feedback è già
-//   depositato).
+// CON IL TOKEN DELL'OWNER, SE C'È (#595)
+//   Si usa la STESSA strada dell'app (`src/shared/feedback.js`), testo cifrato
+//   verso l'owner. Col token admin di questa macchina la create è autenticata
+//   e porta `senderProof: 'admin'`: senza quella prova il prefisso `local:` lo
+//   può scrivere chiunque, e il server tratta il feedback da anonimo. Senza
+//   token lo si dice su stderr e si parte lo stesso, come anonimo: passa dai
+//   giudici. `--priorita` riusa lo stesso token.
 //
 // USO
 //   node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 0..3]
