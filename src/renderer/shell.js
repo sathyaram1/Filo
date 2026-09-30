@@ -478,7 +478,7 @@
   function startTabDrag(e, t, el) {
     if (e.button !== 0) return;
     // Non iniziare un drag dai controlli interni (chiudi, indicatori audio…).
-    if (e.target.closest('.close, .mute-ind, .audio-ind, .proxy-ind')) return;
+    if (e.target.closest('.close, .tab-alert, .proxy-ind')) return;
     drag = { id: t.id, el, startX: e.clientX, moved: false };
     window.addEventListener('mousemove', onTabPointerMove);
     window.addEventListener('mouseup', onTabPointerUp);
@@ -850,40 +850,14 @@
         }
       }
 
-      // Slot favicon / spinner. Quando la tab suona, l'icona audio SOSTITUISCE
-      // la favicon in questo slot: un unico indicatore, sempre visibile a
-      // qualsiasi larghezza (lo slot è a larghezza fissa), che non si sovrappone
-      // mai alla favicon né viene duplicato altrove nella tab.
       const ico = document.createElement('div');
       if (t.loading) {
         ico.className = 'spinner';
-      } else if (isAudible) {
-        // L'icona audio prende il posto della favicon (nessun overlay sotto).
-        ico.className = 'favicon favicon-audible';
-        ico.innerHTML = AUDIO_IND_SVG;
-        // Clic sullo slot favicon-audible muta la tab.
-        ico.setAttribute('role', 'button');
-        ico.title = 'Silenzia';
-        ico.setAttribute('aria-label', 'Audio in riproduzione — clicca per silenziare');
-        ico.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
       } else {
         ico.className = 'favicon';
         if (t.favicon) ico.style.backgroundImage = `url("${t.favicon}")`;
       }
       el.appendChild(ico);
-
-      // Indicatore "audio mutato": un altoparlante barrato accanto al titolo,
-      // così l'utente sa quali tab ha silenziato senza doverci passare sopra.
-      if (t.muted) {
-        const m = document.createElement('span');
-        m.className = 'mute-ind';
-        m.setAttribute('role', 'button');
-        m.title = 'Riattiva audio';
-        m.setAttribute('aria-label', 'Audio mutato — clicca per riattivare');
-        m.innerHTML = MUTE_IND_SVG;
-        m.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
-        el.appendChild(m);
-      }
 
       // Indicatore "aperta da un altro paese": globo + codice paese accanto al
       // titolo, così si riconoscono a colpo d'occhio le tab instradate altrove.
@@ -899,6 +873,21 @@
       title.className = 'title';
       title.textContent = tabLabel(t);
       el.appendChild(title);
+
+      // Avviso audio dopo il titolo, come in Chrome (#431): suona o mutata stanno
+      // nello stesso posto, così il clic che muta lascia lì il tasto per riattivare.
+      if (t.muted || isAudible) {
+        const a = document.createElement('span');
+        a.className = 'tab-alert ' + (t.muted ? 'mute-ind' : 'audio-ind');
+        a.setAttribute('role', 'button');
+        a.title = t.muted ? 'Riattiva audio' : 'Silenzia';
+        a.setAttribute('aria-label', t.muted
+          ? 'Audio mutato — clicca per riattivare'
+          : 'Audio in riproduzione — clicca per silenziare');
+        a.innerHTML = t.muted ? MUTE_IND_SVG : AUDIO_IND_SVG;
+        a.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
+        el.appendChild(a);
+      }
 
       // Tasto destro su una tab → menu contestuale (Duplica / Muta / Chiudi).
       el.addEventListener('contextmenu', (e) => {

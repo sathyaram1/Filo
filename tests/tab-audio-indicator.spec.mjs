@@ -1,113 +1,149 @@
-// Indicatore "audio in riproduzione" sulla tab — comportamento atteso:
-//
-//  1) La tab suonante riceve la classe .audible e mostra un bagliore animato
-//     (box-shadow pulsante col colore del sito, desaturato).
-//  2) L'icona dell'altoparlante SOSTITUISCE la favicon nello slot favicon
-//     (class .favicon-audible): un UNICO indicatore, sempre visibile a
-//     qualsiasi larghezza di tab, che NON si sovrappone mai alla favicon
-//     (nessuna favicon di sfondo) e NON viene duplicato altrove nella tab
-//     (nessun .audio-ind a fine riga).
-//  3) Il click sull'icona silenzia davvero la tab (muted nel main).
-//  4) Quando la tab è mutata appare l'indicatore .mute-ind; se poi viene
-//     riattivata e stava ancora suonando, torna l'icona audio (una sola).
-//
-// Lo stato `audible` è forzato dal main (stesso campo di audio-state-changed)
-// perché in headless non possiamo produrre audio reale.
+// Avviso audio sulla scheda (#431): come in Chrome sta dopo il titolo, col colore delle scritte, e
+// prende il posto della favicon solo quando non c'è spazio per tutte e due.
+// Lo stato `audible` lo forza il main (stesso campo di audio-state-changed): in headless non suona niente.
 
 import { test, expect } from './fixtures/electron.mjs';
 
-// Forza lo stato `audible` della tab web attiva (e opzionalmente una favicon,
-// per verificare che l'icona audio la sostituisca senza sovrapporsi) e
-// ribroadcasta alla shell, come farebbe l'handler di 'audio-state-changed'.
-async function setAudible(app, value, favicon) {
-  return app.evaluate(({ BrowserWindow }, { v, fav }) => {
+const FAV = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="3" fill="#e00"/></svg>');
+
+// Applica `patch[i]` alla i-esima scheda web e ribroadcasta alla shell, come l'handler di audio-state-changed.
+async function patchWebTabs(app, patch) {
+  return app.evaluate(({ BrowserWindow }, patch) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    const tabs = w._filoTabs;
-    const t = tabs.tabs.find((x) => /^https?:/.test(x.url || '')) || tabs.tabs.find((x) => x.id === tabs.activeId);
-    t.audible = v;
-    if (fav) t.favicon = fav;
-    tabs._broadcast();
-    return t.id;
-  }, { v: value, fav: favicon });
+    const web = w._filoTabs.tabs.filter((x) => /^https?:/.test(x.url || ''));
+    patch.forEach((p, i) => { if (p) Object.assign(web[i], p); });
+    w._filoTabs._broadcast();
+    return web.map((t) => t.id);
+  }, patch);
 }
 
-test('una tab che suona: l\'icona audio sostituisce la favicon, un solo indicatore', async ({ app, shell, openTab, testServer }) => {
-  const url = testServer.html('<title>AUDIO_TAB</title><h1 id="ok">pagina</h1>');
-  const page = await openTab(url);
+async function openPage(openTab, testServer, title) {
+  const page = await openTab(testServer.html(`<title>${title}</title><link rel="icon" href="${FAV}"><h1 id="ok">x</h1>`));
   await page.waitForSelector('#ok');
+}
 
-  // All'inizio nessun indicatore audio e nessuna classe audible.
-  await expect(shell.locator('.tab.audible')).toHaveCount(0);
-  await expect(shell.locator('.tab .favicon-audible')).toHaveCount(0);
-  await expect(shell.locator('.tab .audio-ind')).toHaveCount(0);
+// Geometria dei figli visibili di ogni scheda, nell'ordine in cui stanno.
+function misura(shell) {
+  return shell.evaluate(() => [...document.querySelectorAll('.tab')].map((tab) => {
+    const r = tab.getBoundingClientRect();
+    const figli = [...tab.children]
+      .filter((c) => getComputedStyle(c).display !== 'none')
+      .map((c) => {
+        const q = c.getBoundingClientRect();
+        return { cls: c.className, left: q.left, right: q.right, width: q.width };
+      });
+    return { id: tab.dataset.id, active: tab.classList.contains('active'), left: r.left, right: r.right, width: r.width, figli };
+  }));
+}
 
-  // La tab inizia a suonare, con una favicon impostata → classe audible,
-  // UNA sola icona audio (nello slot favicon), nessun duplicato a fine riga.
-  const favData = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
-  await setAudible(app, true, favData);
-  await expect(shell.locator('.tab.audible')).toHaveCount(1, { timeout: 10_000 });
-  await expect(shell.locator('.tab .favicon-audible')).toHaveCount(1, { timeout: 10_000 });
-  // Nessuna duplicazione: l'indicatore a fine riga non esiste più.
-  await expect(shell.locator('.tab .audio-ind')).toHaveCount(0);
-  await expect(shell.locator('.tab .mute-ind')).toHaveCount(0);
+test('la scheda che suona tiene la favicon, e l\'icona audio sta dopo il titolo col colore delle scritte', async ({ app, shell, openTab, testServer }) => {
+  await openPage(openTab, testServer, 'YouTube - un video');
+  await openPage(openTab, testServer, 'Seconda');
+  const ids = await patchWebTabs(app, [{ audible: true, favicon: FAV }, { audible: true, favicon: FAV }]);
 
-  // Il bagliore è attivo: la tab ha l'animazione tab-glow-pulse.
-  const hasGlowAnimation = await shell.locator('.tab.audible').evaluate((el) => {
-    return getComputedStyle(el).animationName.includes('tab-glow-pulse');
-  });
-  expect(hasGlowAnimation).toBe(true);
+  for (const id of ids) {
+    const tab = shell.locator(`.tab[data-id="${id}"]`);
+    await expect(tab.locator('.audio-ind')).toHaveCount(1, { timeout: 10_000 });
+    await expect(tab).toHaveClass(/audible/);
+    await expect(tab.locator('.tab-alert')).toHaveCount(1);
+    await expect(tab.locator('.favicon')).toHaveCSS('background-image', /data:image\/svg/);
 
-  // L'icona nel favicon-slot è visibile (non display:none) — essenziale per
-  // le tab strette dove il titolo è clippato.
-  const favAudibleVisible = await shell.locator('.tab .favicon-audible').evaluate((el) => {
-    const s = getComputedStyle(el);
-    return s.display !== 'none' && parseFloat(s.width) > 0;
-  });
-  expect(favAudibleVisible).toBe(true);
+    const [s] = (await misura(shell)).filter((t) => t.id === id);
+    const ordine = s.figli.map((f) => f.cls.split(' ')[0]);
+    expect(ordine).toEqual(['favicon', 'title', 'tab-alert', 'close']);
+    const title = s.figli[1];
+    expect(title.width).toBeGreaterThan(30);
 
-  // SOSTITUZIONE, non overlay: anche con una favicon impostata, lo slot NON
-  // mostra la favicon come sfondo (nessuna sovrapposizione icona-su-favicon).
-  const faviconBg = await shell.locator('.tab .favicon-audible').evaluate((el) => {
-    return getComputedStyle(el).backgroundImage;
-  });
-  expect(faviconBg).toBe('none');
-
-  // Ed è presente esattamente UNA icona audio in tutta la tab.
-  const audioIconCount = await shell.locator('.tab .favicon-audible svg, .tab .audio-ind').count();
-  expect(audioIconCount).toBe(1);
+    const colori = await tab.evaluate((el) => ({
+      icona: getComputedStyle(el.querySelector('.audio-ind')).color,
+      titolo: getComputedStyle(el.querySelector('.title')).color,
+    }));
+    expect(colori.icona).toBe(colori.titolo);
+  }
+  const glow = await shell.locator('.tab.audible').first().evaluate((el) => getComputedStyle(el).animationName);
+  expect(glow).toContain('tab-glow-pulse');
 });
 
-test('click sull\'icona audio (slot favicon) silenzia la tab, poi la riattiva', async ({ app, shell, openTab, testServer }) => {
-  const url = testServer.html('<title>MUTE_TAB</title><h1 id="ok">pagina</h1>');
-  const page = await openTab(url);
-  await page.waitForSelector('#ok');
-
-  await setAudible(app, true);
-  await expect(shell.locator('.tab .favicon-audible')).toHaveCount(1, { timeout: 10_000 });
-
-  // Click sull'icona audio → la tab viene silenziata davvero (muted nel main).
-  await shell.locator('.tab .favicon-audible').click();
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+test('clic sull\'icona audio: silenzia e al suo posto compare il tasto per riattivare, che la riporta', async ({ app, shell, openTab, testServer }) => {
+  await openPage(openTab, testServer, 'MUTE_TAB');
+  const [id] = await patchWebTabs(app, [{ audible: true }]);
+  const tab = shell.locator(`.tab[data-id="${id}"]`);
+  const muted = () => app.evaluate(({ BrowserWindow }, id) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    const t = w._filoTabs.tabs.find((x) => /^https?:/.test(x.url || ''));
-    return !!t.muted;
-  }), { timeout: 10_000 }).toBe(true);
+    return !!w._filoTabs.tabs.find((x) => x.id === id).muted;
+  }, id);
 
-  // Da mutata: niente classe audible, niente icona audio, compare mute-ind.
-  await expect(shell.locator('.tab.audible')).toHaveCount(0);
-  await expect(shell.locator('.tab .favicon-audible')).toHaveCount(0);
-  await expect(shell.locator('.tab .audio-ind')).toHaveCount(0);
-  await expect(shell.locator('.tab .mute-ind')).toHaveCount(1);
+  await expect(tab.locator('.audio-ind')).toHaveCount(1, { timeout: 10_000 });
+  const prima = await tab.locator('.audio-ind').boundingBox();
+  await tab.locator('.audio-ind').click();
+  await expect.poll(muted, { timeout: 10_000 }).toBe(true);
 
-  // Click sull'indicatore di muto → riattiva.
-  await shell.locator('.tab .mute-ind').click();
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    const t = w._filoTabs.tabs.find((x) => /^https?:/.test(x.url || ''));
-    return !!t.muted;
-  }), { timeout: 10_000 }).toBe(false);
-  // Stava ancora suonando → torna l'icona audio (una sola, nessun duplicato).
-  await expect(shell.locator('.tab.audible')).toHaveCount(1, { timeout: 10_000 });
-  await expect(shell.locator('.tab .favicon-audible')).toHaveCount(1, { timeout: 10_000 });
-  await expect(shell.locator('.tab .audio-ind')).toHaveCount(0);
+  await expect(tab.locator('.mute-ind')).toHaveCount(1);
+  await expect(tab.locator('.audio-ind')).toHaveCount(0);
+  await expect(tab).not.toHaveClass(/audible/);
+  const dopo = await tab.locator('.mute-ind').boundingBox();
+  expect(Math.abs(dopo.x - prima.x)).toBeLessThanOrEqual(1);
+  const colori = await tab.evaluate((el) => [getComputedStyle(el.querySelector('.mute-ind')).color, getComputedStyle(el.querySelector('.title')).color]);
+  expect(colori[0]).toBe(colori[1]);
+
+  await tab.locator('.mute-ind').click();
+  await expect.poll(muted, { timeout: 10_000 }).toBe(false);
+  await expect(tab.locator('.audio-ind')).toHaveCount(1, { timeout: 10_000 });
+  await expect(tab.locator('.tab-alert')).toHaveCount(1);
+});
+
+test('scheda stretta: l\'avviso audio resta sempre, la favicon cede solo quando non ci stanno tutte e due', async ({ app, shell, openTab, testServer }) => {
+  await openPage(openTab, testServer, 'Suona - un titolo abbastanza lungo');
+  await openPage(openTab, testServer, 'Mutata da un altro paese');
+  await openPage(openTab, testServer, 'Attiva');
+  const [suona, mutata, attiva] = await patchWebTabs(app, [
+    { audible: true, favicon: FAV },
+    { muted: true, favicon: FAV, proxy: { country: 'us', tier: null } },
+    { audible: true, favicon: FAV, proxy: { country: 'us', tier: null } },
+  ]);
+  await expect(shell.locator(`.tab[data-id="${attiva}"]`)).toHaveClass(/active/);
+  await expect(shell.locator('.tab .proxy-ind')).toHaveCount(2, { timeout: 10_000 });
+
+  await shell.addStyleTag({ content: '#larghezze-431{}' });
+  const larghezze = async (w, a) => {
+    await shell.evaluate(({ w, a }) => {
+      let st = document.getElementById('larghezze-431');
+      if (!st) { st = document.createElement('style'); st.id = 'larghezze-431'; document.head.appendChild(st); }
+      st.textContent = `.tab:not(.active){flex:0 0 ${w}px!important;min-width:${w}px!important;max-width:${w}px!important}`
+        + `.tab.active{flex:0 0 ${a}px!important;min-width:${a}px!important;max-width:${a}px!important}`;
+    }, { w, a });
+    await shell.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  };
+
+  const passi = [[40, 110], [44, 110], [50, 118], [55, 125], [56, 130], [60, 150], [63, 160], [64, 170], [70, 200],
+    [80, 230], [85, 260], [86, 290], [95, 320], [110, 320], [117, 320], [118, 320], [140, 320], [200, 320], [260, 320]];
+  for (const [w, a] of passi) {
+    await larghezze(w, a);
+    const schede = await misura(shell);
+    for (const s of schede) {
+      const dove = `scheda ${s.id} larga ${s.width}px: ${JSON.stringify(s.figli.map((f) => [f.cls, Math.round(f.left - s.left), Math.round(f.width)]))}`;
+      // Niente esce dalla scheda e niente si sovrappone: è così che, senza priorità, la X finiva sopra la scheda accanto.
+      for (const f of s.figli) {
+        expect(f.left, dove).toBeGreaterThanOrEqual(s.left - 0.5);
+        expect(f.right, dove).toBeLessThanOrEqual(s.right + 0.5);
+      }
+      const piene = s.figli.filter((f) => f.width > 0);
+      for (let i = 1; i < piene.length; i++) expect(piene[i].left, dove).toBeGreaterThanOrEqual(piene[i - 1].right - 0.5);
+
+      const avviso = s.figli.find((f) => f.cls.includes('tab-alert'));
+      const favicon = s.figli.find((f) => f.cls.startsWith('favicon'));
+      if (s.id === suona || s.id === mutata || s.id === attiva) {
+        expect(avviso && avviso.width, dove).toBe(16);
+        // La favicon cede solo sotto i 56px: 10+8 di margini, 16+6+16 per le due icone.
+        expect(!!favicon, dove).toBe(s.width >= 56);
+        if (!favicon) expect(Math.abs((avviso.left + avviso.right) / 2 - (s.left + s.right) / 2), dove).toBeLessThanOrEqual(2);
+      }
+      if (s.active) expect(s.figli.some((f) => f.cls === 'close'), dove).toBe(true);
+      if (s.width >= 200) {
+        expect(s.figli.map((f) => f.cls.split(' ')[0]).slice(-2), dove).toEqual(
+          s.id === suona || s.id === mutata || s.id === attiva ? ['tab-alert', 'close'] : ['title', 'close']);
+      }
+    }
+  }
 });
