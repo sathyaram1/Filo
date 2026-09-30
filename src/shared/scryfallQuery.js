@@ -236,7 +236,7 @@
   }
 
   global.SN_SCRYFALL_Q = {
-    WUBRG, identityCode, buildSearchQuery, withinIdentity, parseManaCost, simplifyCard, isFresh,
+    WUBRG, identityCode, buildSearchQuery, isPureSyntax, withinIdentity, parseManaCost, simplifyCard, isFresh,
     parseAgentReply, proseSegments,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
