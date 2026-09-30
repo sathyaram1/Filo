@@ -155,6 +155,9 @@
       if (it.pagina) b.addEventListener('pointerenter', (e) => { if (e.isTrusted) api.chiedi(); });
       nav.appendChild(b);
     }
+    // L'icona appena arrivata si fa vedere anche se il gruppo scorre: senza, sembra che il trascinamento non abbia fatto niente.
+    const arrivata = prima.size ? [...nav.querySelectorAll('.ico')].find((b) => !prima.has(b.dataset.id)) : null;
+    if (arrivata) arrivata.scrollIntoView({ block: 'nearest' });
     misura();
   }
 
@@ -163,6 +166,9 @@
       const r = b.getBoundingClientRect();
       return { id: b.dataset.id, alto: Math.round(r.top), basso: Math.round(r.bottom) };
     });
+    // Il gruppo che scorre sfuma dal lato dove ci sono altre icone: la barra di scorrimento non c'è.
+    nav.classList.toggle('altre-sopra', nav.scrollTop > 1);
+    nav.classList.toggle('altre-sotto', nav.scrollTop + nav.clientHeight < nav.scrollHeight - 1);
     api.misure({ icone });
   }
   window.addEventListener('resize', misura);

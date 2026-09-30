@@ -10,7 +10,7 @@ import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
-import { barraPage, statoBarra } from './helpers/barra.mjs';
+import { barraPage, statoBarra, premi } from './helpers/barra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -40,7 +40,7 @@ const SITO = `<!doctype html><html><body style="margin:0;padding:40px;font:16px 
   <h1>Una pagina qualunque</h1><p>Testo.</p></body></html>`;
 
 // Filo a schermo (la finestra si vede: il puntatore vero ci deve arrivare), su un sito.
-async function avvia() {
+async function avvia({ xFinestra = 80 } = {}) {
   const userData = cartellaTemporanea('filo-barra-bordo-');
   const server = createServer((_req, res) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(SITO); });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -54,7 +54,7 @@ async function avvia() {
   await expect.poll(() => app.windows().some((w) => { try { return w.url() === url; } catch (_) { return false; } }), { timeout: 10_000 }).toBe(true);
   await expect.poll(async () => (await statoBarra(app))?.bounds?.width ?? 0, { timeout: 10_000 }).toBe(4);
   // Staccata dal bordo dello schermo, così il puntatore può anche uscirne a sinistra.
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito).setBounds({ x: 80, y: 40, width: 1100, height: 800 }));
+  await app.evaluate(({ BrowserWindow }, x) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito).setBounds({ x, y: 40, width: 1100, height: 800 }), xFinestra);
   await pausa(900);
   const { cb, scala, max } = await app.evaluate(({ BrowserWindow, screen }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
@@ -66,7 +66,7 @@ async function avvia() {
     try { server.close(); } catch (_) {}
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   };
-  return { app, max, x0: px(cb.x), y: px(cb.y + 320), px, chiudi };
+  return { app, shell, max, cb, x0: px(cb.x), y: px(cb.y + 320), px, chiudi };
 }
 
 const aperta = async (app) => (await statoBarra(app)).aperta;
@@ -120,6 +120,64 @@ test('con l\'apertura dal bordo spenta, fermo sul bordo non si apre; la maniglia
     const yFinestra = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito).getContentBounds().y);
     puntatore(`move:${x0 + px(m.x + m.width / 2)}:${px(yFinestra + m.y + m.height / 2)};wait:100;down;wait:40;up;wait:500`);
     await expect.poll(() => aperta(app), { timeout: 2000 }).toBe(true);
+  } finally {
+    await chiudi();
+  }
+});
+
+test('un lancio contro il bordo, o il ritorno da fuori della finestra, e poi fermo: la barra si apre', async () => {
+  test.skip(!xtestDisponibile(), 'serve uno schermo X con XTest (contenitore Linux sotto xvfb-run)');
+  test.setTimeout(90_000);
+  // Finestra accostata al bordo dello schermo: il lancio, pochi movimenti veloci e l'ultimo nella pagina lontano dal bordo.
+  let f = await avvia({ xFinestra: 0 });
+  try {
+    const { app, x0, y, px } = f;
+    puntatore(`move:${x0 + px(400)}:${y};wait:150;move:${x0 + px(250)}:${y};wait:8;move:${x0 + px(120)}:${y};wait:8;move:${x0 + px(40)}:${y};wait:8;move:${x0}:${y};wait:900`);
+    await expect.poll(() => aperta(app), { timeout: 2000 }).toBe(true);
+  } finally {
+    await f.chiudi();
+  }
+  // Finestra in mezzo allo schermo: il puntatore sfora a sinistra, torna e si ferma sul bordo.
+  f = await avvia();
+  try {
+    const { app, x0, y, px } = f;
+    puntatore(`move:${x0 + px(400)}:${y};wait:150;move:${x0 + px(60)}:${y};wait:16;move:${x0 - 50}:${y};wait:300;move:${x0 - 20}:${y};wait:30;move:${x0 - 8}:${y};wait:30;move:${x0 + 2}:${y};wait:1000`);
+    await expect.poll(() => aperta(app), { timeout: 2000 }).toBe(true);
+  } finally {
+    await f.chiudi();
+  }
+});
+
+test('una scheda trascinata o una selezione portate sul bordo non la aprono, nemmeno lasciate lì; chiusa col tasto, ferma sul bordo resta chiusa', async () => {
+  test.skip(!xtestDisponibile(), 'serve uno schermo X con XTest (contenitore Linux sotto xvfb-run)');
+  test.setTimeout(90_000);
+  const { app, shell, cb, x0, y, px, chiudi } = await avvia();
+  try {
+    // La scheda attiva trascinata giù dalla fila fino al bordo sinistro, e tenuta lì.
+    const t = await shell.evaluate(() => { const r = document.querySelector('.tab.active').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+    const tx = px(cb.x + t.x);
+    const ty = px(cb.y + t.y);
+    puntatore(`move:${tx}:${ty};wait:100;down;wait:80;move:${tx - 10}:${ty + 5};wait:30;move:${tx - 40}:${ty + 60};wait:30;move:${x0 + 60}:${y};wait:30;move:${x0 + 2}:${y};wait:30;move:${x0}:${y + 6};wait:900`);
+    expect(await aperta(app), 'scheda tenuta sul bordo').toBe(false);
+    puntatore('up;wait:900');
+    expect(await aperta(app), 'scheda lasciata sul bordo').toBe(false);
+    puntatore(`move:${x0 + px(500)}:${y};wait:500`);
+
+    // Una selezione di testo trascinata fino al bordo, poi lasciata lì.
+    const ys = px(cb.y + (await statoBarra(app)).alto + 60);
+    puntatore(`move:${x0 + px(400)}:${ys};wait:100;down;wait:60;move:${x0 + px(200)}:${ys};wait:30;move:${x0 + 2}:${ys + 4};wait:30;move:${x0}:${ys + 8};wait:900`);
+    expect(await aperta(app), 'selezione tenuta sul bordo').toBe(false);
+    puntatore('up;wait:900');
+    expect(await aperta(app), 'selezione lasciata sul bordo').toBe(false);
+    // Ma basta muoversi lungo il bordo per spingere di nuovo.
+    puntatore(`move:${x0 + 1}:${ys + 30};wait:900`);
+    await expect.poll(() => aperta(app), { timeout: 2000 }).toBe(true);
+
+    // Chiusa con la scorciatoia col puntatore fermo sul bordo: resta chiusa.
+    await premi(app, 'scheda', 'B', ['control', 'shift']);
+    await expect.poll(() => aperta(app), { timeout: 2000 }).toBe(false);
+    await pausa(900);
+    expect(await aperta(app), 'chiusa col tasto, puntatore fermo sul bordo').toBe(false);
   } finally {
     await chiudi();
   }

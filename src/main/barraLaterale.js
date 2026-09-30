@@ -83,7 +83,7 @@ class BarraLaterale {
     });
     if (win && typeof win.once === 'function') win.once('closed', () => this._butta());
     if (win && typeof win.on === 'function') {
-      const quiete = () => { this.quieteFino = Date.now() + QUIETE_MS; this._segnaBordo(false); };
+      const quiete = () => { this.quieteFino = Date.now() + QUIETE_MS; this.puntoFermo = this._punto(); this._segnaBordo(false); this._guarda(); };
       for (const ev of ['will-resize', 'resize', 'move']) win.on(ev, quiete);
       for (const ev of ['focus', 'show', 'restore']) win.on(ev, () => this._guarda());
     }
@@ -203,21 +203,33 @@ class BarraLaterale {
   }
 
   // ── il bordo che la vista non vede ───────────────────────────────────────
+  // Finché il puntatore non è dentro la pagina lontano dal bordo, il main lo guarda da sé: chi ci arriva di
+  // corsa, o rientra da fuori della finestra, nella pagina non lascia traccia (#871 giro 2).
 
-  // La pagina ha visto il puntatore andare verso il bordo sinistro (o uscire): da qui lo guarda il main.
+  // Dalla pagina: il puntatore si muove, forse verso il bordo.
   _forseBordo() {
-    if (this.aperta || this.trascinamento || this.tastoGiu || this.timer.sonda || !this.opzioni.spinta) return;
+    if (this.timer.sonda) return;
     const ora = Date.now();
-    if (ora < this.quieteFino || ora - this.ultimaSonda < 40) return;
+    if (ora - this.ultimaSonda < 40) return;
     this.ultimaSonda = ora;
-    if (this._dovePuntatore() !== 'lontano') { this.bordoDal = 0; this._sonda(); }
+    if (this._dovePuntatore() !== 'lontano') this._guarda();
   }
 
-  _sonda() {
+  // Il puntatore potrebbe essere fuori dalla pagina: la guardia parte, e si ferma da sola quando ci rientra.
+  _guarda() {
+    if (this.aperta || this.timer.sonda || !this.opzioni.spinta || !this._guardabile()) return;
+    this._sonda(0);
+  }
+
+  _guardabile() {
+    return !!(this.win && !this.win.isDestroyed() && this.win.isVisible() && !this.win.isMinimized());
+  }
+
+  _sonda(dopo = SONDA_MS) {
     this._ferma('sonda');
     this.timer.sonda = setTimeout(() => {
       this.timer.sonda = null;
-      const dove = this._dovePuntatore();
+      const { dove, punto, nellaPagina } = this._puntatore();
       if (this.aperta) {
         // Aperta dal bordo: se il puntatore se ne va senza passare dal pannello, si chiude come uscendo.
         if (this.motivo !== 'spinta' || this.dentro) return;
@@ -225,36 +237,78 @@ class BarraLaterale {
         else this._sonda();
         return;
       }
-      if (dove === 'lontano' || this.tastoGiu || !this.opzioni.spinta || Date.now() < this.quieteFino) {
-        this._segnaBordo(false);
-        return;
-      }
-      if (dove === 'bordo') {
+      if (!this.opzioni.spinta || !this._guardabile()) { this._segnaBordo(false); return; }
+      const quiete = Date.now() < this.quieteFino;
+      // Finito un ridimensionamento dal bordo il puntatore è ancora lì: conta solo quando si muove di nuovo.
+      if (quiete && punto) this.puntoFermo = punto;
+      const fermo = !!this.trascinamento || this.tasti.scheda || this.tasti.shell || quiete;
+      if (dove === 'bordo' && !fermo && this._mosso(punto)) {
         if (!this.bordoDal) this.bordoDal = Date.now();
         this._segnaBordo(true);
         if (Date.now() - this.bordoDal >= this.opzioni.attesaMs) { this.apri('spinta'); return; }
       } else {
-        this.bordoDal = 0;
         this._segnaBordo(false);
       }
-      this._sonda();
-    }, SONDA_MS);
+      // Dentro la pagina, lontano dal bordo, il puntatore lo racconta lei.
+      if (dove === 'lontano' && nellaPagina) return;
+      this._sonda(dove === 'lontano' ? SONDA_LONTANO_MS : SONDA_MS);
+    }, dopo);
   }
 
-  // 'bordo': nella fascia del sistema; 'vicino': sulla pagina a due passi; 'lontano': altrove o fuori.
-  _dovePuntatore() {
-    if (!this.win || this.win.isDestroyed() || !this.win.isVisible() || this.win.isMinimized()) return 'lontano';
+  // Dopo un rilascio o una chiusura il bordo conta solo quando il puntatore si muove: chi finisce lì una
+  // selezione o il trascinamento di una scheda, o chiude la barra col puntatore sul bordo, non sta spingendo.
+  _mosso(p) {
+    const f = this.puntoFermo;
+    if (!f || !p) return true;
+    if (p.x === f.x && p.y === f.y) return false;
+    this.puntoFermo = null;
+    return true;
+  }
+
+  // Chi trascina o seleziona arriva sul bordo con un tasto premuto: non spinge. Il movimento dice se il
+  // tasto è ancora giù, anche quando il rilascio è andato a un'altra vista.
+  _tasti(chi, input) {
+    const t = input && input.type;
+    if (t === 'mouseDown') this.tasti[chi] = true;
+    else if (t === 'mouseUp') {
+      this.tasti[chi] = false;
+      this.puntoFermo = this._punto();
+      this._guarda();
+    } else if (t === 'mouseMove') {
+      this.tasti[chi] = (input.modifiers || []).some((m) => /buttondown$/i.test(String(m)));
+    }
+  }
+
+  _inputDellaShell(input) {
+    if (!input) return;
+    this._tasti('shell', input);
+    // Dalla fila delle schede il puntatore scende lungo il bordo senza passare dalla pagina.
+    if (input.type === 'mouseMove' || input.type === 'mouseLeave') this._guarda();
+  }
+
+  _punto() {
+    try { return require('electron').screen.getCursorScreenPoint(); } catch (_) { return null; }
+  }
+
+  _dovePuntatore() { return this._puntatore().dove; }
+
+  // dove: 'bordo' nella fascia del sistema, 'vicino' sulla pagina a due passi, 'lontano' altrove.
+  // nellaPagina: sopra la scheda, sotto la fila delle schede.
+  _puntatore() {
+    const via = { dove: 'lontano', punto: null, nellaPagina: false };
+    if (!this._guardabile()) return via;
     let p = null;
     let cb = null;
     try {
       p = require('electron').screen.getCursorScreenPoint();
       cb = this.win.getContentBounds();
-    } catch (_) { return 'lontano'; }
+    } catch (_) { return via; }
     const alto = cb.y + Math.max(0, Math.round(this.alto()));
-    if (p.y < alto || p.y >= cb.y + cb.height) return 'lontano';
     const dx = p.x - cb.x;
-    if (dx < 0 || dx >= VICINO) return 'lontano';
-    return dx < BORDO ? 'bordo' : 'vicino';
+    const inAltezza = p.y >= alto && p.y < cb.y + cb.height;
+    const nellaPagina = inAltezza && dx >= BORDO && dx < cb.width;
+    if (!inAltezza || dx < 0 || dx >= VICINO) return { dove: 'lontano', punto: p, nellaPagina };
+    return { dove: dx < BORDO ? 'bordo' : 'vicino', punto: p, nellaPagina };
   }
 
   _segnaBordo(v) {
