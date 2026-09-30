@@ -40,16 +40,13 @@ test('un feedback senza prova non compare scritto dall’owner, dalla sessione l
   await expect(page.getByText('Filo (segnalazione automatica)')).toHaveCount(0);
 });
 
-test('senza prova la dashboard non scrive «mittente fidato»', async ({ openTab }) => {
-  const page = await openTab(URL);
+test('nella pagina Feedback un feedback senza prova non ha il colore dell’owner né il badge di una routine', async ({ openTab }) => {
+  const page = await openTab('filo://feedback/feedback.html');
   await page.waitForLoadState('domcontentloaded');
-  const verdicts = ['A', 'B', 'C', 'D'].map((j) => ({ judge: j, class: j === 'A' ? 'attack' : 'aligned', reasoning: 'x' }));
-  await seed(page, [{
-    _id: 'SENZA_PROVA', seq: 905, subSeq: 0, name: 'Senza prova', clientId: 'owner:qualcuno', status: 'unlabeled',
-    text: 'scritto da chiunque', createdAt: '2026-09-30T10:04:00Z',
-    pipeline: { verdicts, expectedJudges: ['A', 'B', 'C', 'D'], decidedAt: '2026-09-30T10:05:00Z' },
-  }]);
-  await page.locator('.mg-item[data-id="SENZA_PROVA"]').click();
-  await page.waitForTimeout(500);
-  await expect(page.getByText(/mittente fidato/i)).toHaveCount(0);
+  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK_THREAD);
+  await page.evaluate((list) => { window.__fbTest.setAdmin(true); window.__fbTest.setData(list); }, FBS);
+  await expect(page.locator('.fb-card[data-id="VERO_OWNER"]')).toHaveClass(/fb-card--origin-owner/);
+  await expect(page.locator('.fb-card[data-id="FINTO_OWNER"]')).not.toHaveClass(/fb-card--origin-owner/);
+  await page.evaluate(() => window.__fbTest.setAgentOnly(true));
+  await expect(page.locator('.fb-card[data-id="FINTA_ROUTINE"]')).toHaveCount(0);
 });
