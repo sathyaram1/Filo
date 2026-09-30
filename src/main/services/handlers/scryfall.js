@@ -333,8 +333,12 @@ module.exports = function register(on, ctx) {
             onProgress({ fase: 'controllo', done: 0, total: found });
             let fr;
             try {
+              const previousAsks = criterion ? [] : history.filter((m) => m.role === 'user').slice(-3)
+                .map((m) => (m.content.length > 300 ? `${m.content.slice(0, 299)}…` : m.content));
               fr = await globalThis.SN_DECK_OPINIONS_SVC.filterSearch({
                 criterion: crit, cardIds, cards, handleAIRequest,
+                context: await judgeContext(deckOut || deck, previousAsks),
+                judgeModel: await judgeModelNow(),
                 onProgress: ({ done, total }) => onProgress({ fase: 'controllo', done, total }),
               });
             } catch (e) {
