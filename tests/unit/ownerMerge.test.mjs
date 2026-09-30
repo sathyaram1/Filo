@@ -211,39 +211,65 @@ describe('la chiamata al server', () => {
   });
 });
 
+// Le risposte VERE di runOwnerMerge (filo-security, test/lavori-locali-908.test.js): la stessa
+// RISPOSTA_908 sta identica là, così una forma cambiata da una parte fa rosso anche qui.
+const RISPOSTA_908 = {
+  ok: true, result: 'merged', sha: 'c'.repeat(40),
+  local: { feedbackId: 'fid908', eligible: true, num: '#908', skippedL5: true, record: 'traccia-1', closed: true, blocks: ['guard_the_guards'] },
+};
+const NON_AMMESSA = { feedbackId: 'fid908', eligible: false, reason: 'mittente_non_provato', detail: 'il feedback non porta la prova del mittente (senderProof admin)' };
+
 describe('la pratica del lavoro locale (#908)', () => {
-  test('fuso saltando L5: l’esito porta i blocchi registrati e la chiusura della pratica', () => {
-    const trips = [{ gate: 'guard_the_guards', detail: 'firestore.rules' }];
-    const r = classifyOwnerMerge(200, risposta({ ok: true, result: 'merged', sha: 'abc', skippedL5: true, trips, closed: true }));
-    assert.deepEqual(r, { outcome: 'merged', sha: 'abc', skippedL5: true, trips, closed: true });
-    const msg = messageForOwnerMerge(r, 'claude/x', { feedbackId: 'ID', feedbackNum: 908 });
+  test('fuso saltando L5, risposta vera del server: L5 saltato, blocchi registrati, pratica chiusa', () => {
+    const r = classifyOwnerMerge(200, risposta(RISPOSTA_908));
+    assert.equal(r.outcome, 'merged');
+    assert.equal(r.skippedL5, true);
+    assert.deepEqual(r.blocks, ['guard_the_guards']);
+    assert.equal(r.closed, true);
+    const msg = messageForOwnerMerge(r, 'claude/x', { feedbackId: 'fid908' });
     assert.match(msg, /^✓/);
-    assert.match(msg, /L5 saltato.*#908/);
-    assert.match(msg, /Blocchi registrati \(1\)/);
-    assert.match(msg, /guard_the_guards: firestore\.rules/);
+    assert.match(msg, /L5 saltato.*#908/, 'il numero arriva dal server anche senza quello del finish');
+    assert.match(msg, /Blocchi registrati \(1\)[^\n]*\n\s+· guard_the_guards/);
     assert.match(msg, /Pratica #908 chiusa/);
+    assert.doesNotMatch(msg, /NON si è registrata/);
     assert.equal(exitCodeForOwnerMerge(r), 0);
   });
 
-  test('fuso ma la pratica non si è chiusa: si dice, con cosa fare', () => {
-    const r = classifyOwnerMerge(200, risposta({ ok: true, result: 'merged', sha: 'abc', skippedL5: true, trips: [], closed: false, closeError: 'scrittura rifiutata' }));
-    const msg = messageForOwnerMerge(r, 'claude/x', { feedbackNum: 908 });
-    assert.match(msg, /Nessun blocco registrato/);
-    assert.match(msg, /NON si è chiusa: scrittura rifiutata.*a mano/);
+  test('fuso ma la pratica non si è chiusa: si dice, con il comando per chiuderla', () => {
+    const corpo = { ...RISPOSTA_908, local: { ...RISPOSTA_908.local, closed: false } };
+    const msg = messageForOwnerMerge(classifyOwnerMerge(200, risposta(corpo)), 'claude/x', { feedbackId: 'fid908', feedbackNum: 908 });
+    assert.match(msg, /La pratica #908 NON si è chiusa\. Chiudila a mano: npm run feedback -- fid908 done .* --come-routine/);
   });
 
-  test('bloccato con la pratica: dice perché L5 non è stato saltato, e aspetta il sì senza parlare di muri', () => {
-    for (const corpo of [
-      { localReason: 'mittente_non_provato', localDetail: 'il feedback non porta la prova del mittente (senderProof admin)' },
-      { local: { eligible: false, reason: 'mittente_non_provato', detail: 'il feedback non porta la prova del mittente (senderProof admin)' } },
-    ]) {
-      const r = classifyOwnerMerge(200, risposta({ ok: true, result: 'blocked', reason: 'x', requestId: 'ab12', ...corpo }));
-      assert.equal(r.localReason, 'mittente_non_provato');
-      const msg = messageForOwnerMerge(r, 'claude/x', { feedbackId: 'ID' });
-      assert.match(msg, /L5 non è stato saltato: il feedback non porta la prova/);
-      assert.match(msg, /aspetta il tuo sì/);
-      assert.doesNotMatch(msg, /non si aggirano|da qui non|unica strada/);
-    }
+  test('fuso con blocchi ma senza traccia: si dice che l’elenco non è in Automazioni', () => {
+    const corpo = { ...RISPOSTA_908, local: { ...RISPOSTA_908.local, record: '' } };
+    const msg = messageForOwnerMerge(classifyOwnerMerge(200, risposta(corpo)), 'claude/x', { feedbackNum: 908 });
+    assert.match(msg, /traccia dei blocchi NON si è registrata/);
+  });
+
+  test('fuso con L5 pulito: niente riga su L5, la pratica chiusa sì', () => {
+    const corpo = { ...RISPOSTA_908, local: { feedbackId: 'fid908', eligible: true, num: '#908', skippedL5: false, record: '', closed: true } };
+    const msg = messageForOwnerMerge(classifyOwnerMerge(200, risposta(corpo)), 'claude/x', {});
+    assert.doesNotMatch(msg, /L5 saltato/);
+    assert.match(msg, /Pratica #908 chiusa/);
+  });
+
+  test('fuso con L5 pulito ma pratica non ammessa: resta aperta, e si dice perché', () => {
+    const corpo = { ok: true, result: 'merged', sha: 'd'.repeat(40), local: NON_AMMESSA };
+    const msg = messageForOwnerMerge(classifyOwnerMerge(200, risposta(corpo)), 'claude/x', { feedbackId: 'fid908', feedbackNum: 908 });
+    assert.match(msg, /^✓/);
+    assert.match(msg, /Pratica #908 non chiusa: il feedback non porta la prova del mittente/);
+    assert.match(msg, /npm run feedback -- fid908 done/);
+  });
+
+  test('bloccato con la pratica, risposta vera del server: dice perché L5 non è stato saltato, e aspetta il sì senza parlare di muri', () => {
+    const corpo = { ok: true, result: 'blocked', reason: 'x', trips: [{ gate: 'guard_the_guards', detail: 'firestore.rules' }], requestId: 'richiesta-1', local: NON_AMMESSA };
+    const r = classifyOwnerMerge(200, risposta(corpo));
+    assert.equal(r.localReason, 'mittente_non_provato');
+    const msg = messageForOwnerMerge(r, 'claude/x', { feedbackId: 'fid908' });
+    assert.match(msg, /L5 non è stato saltato: il feedback non porta la prova/);
+    assert.match(msg, /aspetta il tuo sì/);
+    assert.doesNotMatch(msg, /non si aggirano|da qui non|unica strada/);
   });
 
   test('bloccato senza pratica: ricorda come legarla', () => {
