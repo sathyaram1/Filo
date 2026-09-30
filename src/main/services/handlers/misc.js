@@ -528,6 +528,9 @@ module.exports = function register(on, ctx) {
       onGiveUp: (_item, motivo) => avvisoNellaFinestra(
         String(motivo || 'La tua segnalazione non è partita.'),
       ),
+      // Chiesto al momento della spedizione: fra l'accodamento e l'invio
+      // possono passare ore (offline), e l'owner può aver chiuso la sessione.
+      tokenOwner: async () => (auth.isAdmin() ? (await auth.getIdToken()) || '' : ''),
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
     });
   }
