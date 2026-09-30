@@ -49,7 +49,10 @@ pericolosi. Ogni marchio porta tutti i suoi indirizzi ufficiali; le parole vere
 vicine ai marchi stanno in un elenco, ricavato dalle parole più usate in italiano
 e in inglese, e una parola vale solo dove sta: non scavalca un trattino e non
 copre il nome attaccato accanto (`risposte-poste`). Una sigla di tre lettere non
-basta da sola a nominare un marchio (`bnl.gov`).
+basta da sola a nominare un marchio (`bnl.gov`). Il nome di un sistema pubblico
+lo usano per mestiere anche altri: le pagine d'accesso SPID stanno sui domini
+dei gestori accreditati (`spid.register.it`), che il marchio elenca a parte,
+senza farli entrare nella whitelist (#725.8, giro 2).
 
 **Stringere la soglia non deve spegnere il controllo.** Quello che la soglia
 più stretta perde si recupera con un segnale più preciso, non allargandola di
