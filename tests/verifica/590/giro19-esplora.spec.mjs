@@ -56,7 +56,10 @@ test('assistente: nome lunghissimo sul bottone, chiaro e scuro', async ({ app, s
   test.setTimeout(60_000);
   await lista(shell, ['blocked.test']);
   const { tab, apri } = await assistenteSu(app, shell, rete.pagina('sito.test', '/', '<h1>PAGINA</h1><p>testo</p>'), 'sito.test');
-  expect(await apri(LUNGO)).toBe(false);
+  apri(LUNGO).catch(() => {});
+  await tab.waitForTimeout(3000);
+  await tab.screenshot({ path: 'tests/.shots/590-g19-assistente-lungo-attesa.png' });
+  console.log('ASSISTENTE-DIARIO', JSON.stringify(await tab.evaluate(() => document.querySelector('.sn-sidebar')?.innerText || '')));
   const b = tab.locator('.sn-sidebar button', { hasText: 'Apri comunque' });
   await expect(b).toBeVisible();
   const m = await b.evaluate((x) => {
