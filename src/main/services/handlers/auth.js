@@ -335,9 +335,16 @@ module.exports = function register(on, ctx) {
           mergePreapproved = null;
         }
       }
+      // «Solo in locale» (#908): stesso patto, il CHI lo mette il main.
+      let localOnly;
+      if (typeof msg.localOnly === 'boolean') {
+        let email = '';
+        if (msg.localOnly) { try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {} }
+        localOnly = msg.localOnly ? { by: email || 'owner', at: Date.now() } : null;
+      }
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly },
         { idToken },
       );
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
