@@ -566,7 +566,7 @@ if (isMain) {
 
   const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, preapprova, dryRun, attore });
   if (!r.ok) {
-    console.error(`RIFIUTATO: ${r.motivo}`);
+    console.error(r.utente ? rifiutoPratica(id, r) : `RIFIUTATO: ${r.motivo}`);
     if (attore === 'owner' && /non è un passaggio permesso/.test(r.motivo || '')) {
       console.error('Se stai chiudendo a mano una pratica dell\'iter di lavorazione, aggiungi --come-routine.');
     }
