@@ -18,7 +18,7 @@ for (const query of ['come recuperare una password dimenticata', 'campo obbligat
     await ricercheFinte(app, [{ title: 'Guida', url: 'https://guida.example/recupero', snippet: 'Come fare.' }]);
     await modelloFinto(app, {
       aiuto: [
-        ['Risultati', '{"text":"Ecco come fare.","status":"done"}'],
+        ['avevi chiesto', '{"text":"Ecco come fare.","status":"done"}'],
         ['', JSON.stringify({ action: 'web_search', query })],
       ],
     });
