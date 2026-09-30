@@ -13,6 +13,10 @@ function docFinto(id, campi) {
   return { name: `projects/p/databases/(default)/documents/feedback/${id}`, fields };
 }
 
+// Il processo del test è condiviso con gli altri file: la rete vera torna al suo posto alla fine.
+const fetchVera = globalThis.fetch;
+test.afterAll(() => { globalThis.fetch = fetchVera; });
+
 test.beforeAll(() => {
   const docs = new Map([
     ['utente-todo', docFinto('utente-todo', { clientId: 'anon-abc', status: 'todo', statusPublic: 'open' })],
