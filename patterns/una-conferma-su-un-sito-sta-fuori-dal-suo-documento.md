@@ -17,7 +17,13 @@ nella pagina, in uno Shadow DOM chiuso.
 - **Una porta sola.** Chi chiede un sì chiama `SN_CONFIRM_UI` come sempre. Su una pagina web il
   preload (`page-preload.js`) dà `SN_CONFERMA_FUORI`, e `confirmUi.js` manda lì la domanda invece di
   disegnarla: nessun chiamante sceglie la strada, quindi nessuno la sbaglia. Un content script nuovo
-  che ha bisogno di un sì usa `SN_CONFIRM_UI`, mai un riquadro suo nella pagina.
+  che ha bisogno di un sì usa `SN_CONFIRM_UI`, mai un riquadro suo nella pagina: è per questo che
+  l'avviso di sito pericoloso o sospetto e la proposta «Apri da un altro paese», che stavano in uno
+  Shadow DOM aperto, la pagina li premeva da sé (#592.6, giro 1).
+- **L'avviso sulla pagina stessa** (`coprePagina`): copre la pagina quasi del tutto, rispondono solo i
+  bottoni (Esc e il velo non scelgono, perché anche «Torna indietro» fa qualcosa), e i tasti non
+  tornano al campo di chi scriveva, che potrebbe essere la password chiesta dal sito dell'avviso.
+  Un verdetto che cambia ritira la domanda aperta (`segnale`, un AbortSignal) e ne fa un'altra.
 - **La vista.** Una per finestra, nata alla prima domanda e caricata fuori dalla finestra (ci entra
   quando è pronta, come in `patterns/la-shell-non-disegna-sopra-la-pagina.md`). Copre **tutta la
   scheda**, non solo il riquadro: è una domanda modale, il velo scuro è suo e la pagina sotto non si
