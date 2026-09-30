@@ -27,6 +27,15 @@
     const imp = imitazione ? imitazione(u.href) : null;
     if (imp && imp.stretta) flags.push('typosquatting:' + dominioImitato(imp));
     else if (imp) flags.push('marchio_imitato:' + imp.brand.display);
+
+    // Un rinvio (google.com/url?q=, i collegamenti protetti di Outlook) porta dove dice il suo parametro: si giudica
+    // anche quello, come fa l'apertura sull'indirizzo d'arrivo (#725.8).
+    if (rinvii < 2) {
+      for (const valore of u.searchParams.values()) {
+        if (!/^https?:\/\//i.test(valore)) continue;
+        for (const c of analizza(valore, rinvii + 1)) if (c !== 'url_invalido' && !flags.includes(c)) flags.push(c);
+      }
+    }
     return flags;
   }
 
