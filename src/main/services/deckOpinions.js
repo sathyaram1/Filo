@@ -242,25 +242,43 @@
     const fp = judgeFingerprint(judgeModel);
     const key = `${fp}|${digest(`${crit}\n${P.normCriterion(context)}`)}`;
     const cache = await readSearchCache();
-    const plan = P.planSearchFilter({ cardIds: ids, criterion: key, searchCache: cache });
+    const asSeen = new Map(ids.map((id) => [judgedAs(cards[id]), id]));
+    const plan = P.planSearchFilter({ cardIds: [...asSeen.keys()], criterion: key, searchCache: cache });
+    plan.judgeIds = plan.judgeIds.map((s) => asSeen.get(s));
+    plan.keepFromCache = plan.keepFromCache.map((s) => asSeen.get(s));
 
     const batches = [];
     for (let i = 0; i < plan.judgeIds.length; i += FILTER_BATCH) batches.push(plan.judgeIds.slice(i, i + FILTER_BATCH));
     let done = ids.length - plan.judgeIds.length;
     const progress = () => { if (onProgress) { try { onProgress({ done, total: ids.length }); } catch (_) {} } };
     progress();
-    // Più pagine di risultati fanno decine di lotti: al più FILTER_PARALLEL chiamate insieme, per non farsi limitare.
+    // Più pagine di risultati fanno decine di lotti: al più `limit` chiamate insieme, che si dimezza a ogni «troppe
+    // richieste». Un lotto rifiutato così resta di chi l'ha preso e si rimanda dopo l'attesa comune.
     const results = new Array(batches.length);
     let next = 0;
-    const worker = async () => {
-      while (next < batches.length) {
+    let limit = Math.min(FILTER_PARALLEL, batches.length);
+    let pauseUntil = 0;
+    let serviceDown = false;
+    const judgeWithWaits = async (i) => {
+      for (let wait = 0; ; wait += 1) {
+        const pause = pauseUntil - Date.now();
+        if (pause > 0) await sleep(pause);
+        const r = await judgeBatch({ criterion, context, ids: batches[i], cards, handleAIRequest });
+        if (!r.busy) return r;
+        if (serviceDown || wait >= BUSY_WAITS_MS.length) { serviceDown = true; return r; }
+        limit = Math.max(1, Math.ceil(limit / 2));
+        pauseUntil = Math.max(pauseUntil, Date.now() + BUSY_WAITS_MS[wait]);
+      }
+    };
+    const worker = async (w) => {
+      while (w < limit && next < batches.length) {
         const i = next++;
-        results[i] = await judgeBatch({ criterion, context, ids: batches[i], cards, handleAIRequest });
+        results[i] = await judgeWithWaits(i);
         done += batches[i].length;
         progress();
       }
     };
-    await Promise.all(Array.from({ length: Math.min(FILTER_PARALLEL, batches.length) }, worker));
+    await Promise.all(Array.from({ length: limit }, (_, w) => worker(w)));
 
     const judged = {};
     const unverified = new Set();
