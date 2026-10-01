@@ -2865,13 +2865,16 @@
   // ── «È mio» (#908) ────────────────────────────────────────────────────────
   // Un prefisso dell'owner o di una sessione senza prova vale come un utente: solo l'owner può dire che è suo.
   const TITOLO_E_MIO = 'L’hai aperto tu o una tua sessione: gli dai la prova del mittente, e da qui vale come tuo (anche per il lavoro locale).';
+  // Lo stesso giudizio che ferma il lettore delle sessioni, su ogni strada: un falso con quel prefisso avrebbe questa forma.
+  function titoloEMio(fb) {
+    const segnalato = MR.segnalatoComeAttacco({ status: MR.normalizeStatus(fb).status, pipeline: fb.pipeline });
+    return segnalato ? `${TITOLO_E_MIO} Attenzione: ${segnalato}, guardalo prima.` : TITOLO_E_MIO;
+  }
   function reflectSender(fb) {
     if (!mgSenderBtn) return;
     mgSenderBtn.hidden = !isAdmin || !MR.mittenteDaRiconoscere(fb);
     mgSenderBtn.disabled = false;
-    // Lo stesso giudizio che ferma il lettore delle sessioni: un falso con quel prefisso avrebbe questa forma.
-    const segnalato = MR.segnalatoComeAttacco(fb);
-    mgSenderBtn.title = segnalato ? `${TITOLO_E_MIO} Attenzione: ${segnalato}, guardalo prima.` : TITOLO_E_MIO;
+    mgSenderBtn.title = titoloEMio(fb);
   }
   async function setSenderProof(id) {
     const fb = allFeedbacks.find((f) => f._id === id);
