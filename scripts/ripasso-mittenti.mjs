@@ -505,6 +505,8 @@ export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre
     const questi = promossi.filter((d) => d.prova === prova);
     if (questi.length) log(`  ${prova}: ${questi.map(num).join(' ')}`);
   }
+  const locali = lavoriLocaliPassati(docs, rami, promossi);
+  log(`Lavori locali passati da segnare (escono dalla bacheca pubblica): ${locali.length}${locali.length ? ` (${locali.map(num).join(' ')})` : ''}`);
   if (dryRun) {
     log('(prova a vuoto: non ho scritto niente)');
     return 0;
@@ -518,7 +520,7 @@ export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre
     }
     log(`Soglie fissate (${nuove.join(', ')}): i giri dopo useranno queste.`);
   }
-  if (!promossi.length) {
+  if (!promossi.length && !locali.length) {
     log('Niente da ripassare.');
     return 0;
   }
@@ -533,7 +535,18 @@ export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre
     }
     scritti += 1;
   }
-  log(`Prova del mittente scritta su ${scritti} feedback.`);
+  if (promossi.length) log(`Prova del mittente scritta su ${scritti} feedback.`);
+  let segnati = 0;
+  for (const d of locali) {
+    const res = await scrivi.locale(d);
+    if (!res || !res.ok) {
+      const st = res ? res.status : 0;
+      err(`Fermo a ${num(d)} dopo ${segnati} lavori locali segnati: scrittura rifiutata (${st}).`);
+      return codiceDi(st);
+    }
+    segnati += 1;
+  }
+  if (locali.length) log(`Segnati come lavoro locale e tolti dalla bacheca pubblica: ${segnati}.`);
   return 0;
 }
 
