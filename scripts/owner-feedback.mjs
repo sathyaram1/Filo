@@ -525,7 +525,20 @@ if (isMain) {
     if (a.startsWith('--')) { if (CON_VALORE.has(a)) i += 1; continue; }
     posizionali.push(a);
   }
-  const [id, status, ...nota] = posizionali;
+  const [riferimento, status, ...nota] = posizionali;
+
+  // Il numero (#910, 910, #22.1) vale come nella lettura, nella verifica e nella chiusura: la sessione ha quello.
+  let id = riferimento;
+  let bearer;
+  if (riferimento) {
+    const { parseRiferimento, risolviFeedback } = await import('./lib/pratica-locale.mjs');
+    if (parseRiferimento(riferimento).seq) {
+      bearer = await acquireBearer();
+      const r = await risolviFeedback(riferimento, { bearer, base: FIRESTORE_BASE });
+      if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
+      id = r.id;
+    }
+  }
 
   // Il segno «solo in locale» e il ritorno nei Ricevuti: da soli, senza stato.
   const locali = ['--solo-locale', '--non-locale', '--serve-locale'].filter((o) => argv.includes(o));
@@ -533,7 +546,7 @@ if (isMain) {
   if (locali.length === 1) {
     if (!id) { uso(); process.exit(1); }
     if (locali[0] === '--serve-locale') {
-      const r = await serveLocale(id, [status, ...nota].filter(Boolean).join(' '), { dryRun });
+      const r = await serveLocale(id, [status, ...nota].filter(Boolean).join(' '), { dryRun, bearer });
       if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo}`); process.exit(3); }
       console.log(r.dryRun
         ? `(prova a vuoto) ${r.from} → design, «richiede lavoro locale»; campi: ${r.campi.join(', ')}`
