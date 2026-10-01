@@ -68,12 +68,12 @@ export function categoria(clientId) {
 export function motivoSegnalato(d) {
   const st = String((d && d.status) || '');
   if (STATI_SEGNALATI_RE.test(st)) return MOTIVO.SEGNALATI;
-  if (st !== 'unlabeled') return '';
+  // In tutti gli stati dei Ricevuti, con la regola del lettore: un giudice che dice attacco in un «allineato» conta.
+  if (!MR.isRicevutiStatus(st)) return '';
   const p = d.pipeline;
   if (p === undefined || p === null || p === '') return '';
   if (typeof p !== 'object') return MOTIVO.GIUDIZIO_ILLEGGIBILE;
-  const segnali = MR.segnaliDeiGiudici(p);
-  return segnali.attacco || segnali.spam ? MOTIVO.RICEVUTI_SEGNALATI : '';
+  return MR.segnalatoComeAttacco({ status: st, pipeline: p }) || MR.segnaliDeiGiudici(p).spam ? MOTIVO.RICEVUTI_SEGNALATI : '';
 }
 
 /**
