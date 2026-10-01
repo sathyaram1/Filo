@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, resolve } from 'node:path';
 import {
-  cartellaDelServer, leggiArgomenti, esegui, PRATICA_ENV,
+  cartellaDelServer, leggiArgomenti, esegui, ramiApertiDellaPratica, PRATICA_ENV,
 } from '../../scripts/server-fondi-pratica.mjs';
 import { FIRESTORE_BASE } from '../../scripts/lib/firestore-auth.mjs';
 
@@ -49,7 +49,7 @@ async function conRete(docs, fn) {
   try { return await fn(scritture); } finally { globalThis.fetch = vero; }
 }
 
-function giro({ docs, argv, codiceServer = 0 }) {
+function giro({ docs, argv, codiceServer = 0, ramiAperti = [] }) {
   return conRete(docs, async (scritture) => {
     const lanci = [];
     const righe = [];
@@ -57,7 +57,7 @@ function giro({ docs, argv, codiceServer = 0 }) {
       env: {}, bearer: 'finto', base: FIRESTORE_BASE, funzioni: '/srv/functions',
       log: (s) => righe.push(String(s)), err: (s) => righe.push(String(s)),
       lancia: (cartella, args, env) => { lanci.push({ cartella, args, pratica: env[PRATICA_ENV] }); return codiceServer; },
-      punta: () => 'a'.repeat(40),
+      punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti,
     });
     return { k, lanci, scritture, testo: righe.join('\n') };
   });
@@ -109,4 +109,26 @@ test('se il server si ferma la pratica resta in lavorazione, con la nota del mot
   assert.equal(r.scritture.length, 2);
   assert.ok(r.scritture.every((u) => !u.includes('resolvedInVersion')), 'non si chiude');
   assert.match(r.testo, /resta in lavorazione/);
+});
+
+test('un lavoro che tocca anche l’app: dopo il server la pratica resta aperta, la chiude la fusione dell’app', async () => {
+  const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p'], ramiAperti: ['claude/app'] });
+  assert.equal(r.k, 0, r.testo);
+  assert.equal(r.scritture.length, 2);
+  assert.ok(r.scritture.every((u) => !u.includes('resolvedInVersion')), 'non si chiude');
+  assert.match(r.testo, /resta aperta: la chiude la fusione di claude\/app/);
+});
+
+test('ramiApertiDellaPratica: i rami dell’app legati alla pratica in ogni worktree, tranne quelli già su main', () => {
+  const lista = 'worktree /a\nHEAD 1\nbranch refs/heads/main\n\nworktree /b\nHEAD 2\nbranch refs/heads/claude/app\n';
+  const stati = {
+    [join('/a', '.claude', 'verify-local.json')]: { 'claude/vecchio': { feedbackId: 'p' } },
+    [join('/b', '.claude', 'verify-local.json')]: { 'claude/app': { feedbackId: 'p' }, 'claude/altro': { feedbackId: 'q' } },
+  };
+  const git = (cwd, args) => {
+    if (args[0] === 'worktree') return lista;
+    return args[2] === 'claude/vecchio' ? '' : null; // il vecchio è già dentro origin/main
+  };
+  assert.deepEqual(ramiApertiDellaPratica('p', { radice: '/a', git, leggi: (f) => stati[f] || null }), ['claude/app']);
+  assert.deepEqual(ramiApertiDellaPratica('z', { radice: '/a', git, leggi: (f) => stati[f] || null }), []);
 });
