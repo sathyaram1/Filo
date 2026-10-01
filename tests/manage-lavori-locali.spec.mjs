@@ -326,3 +326,12 @@ test('un lavoro locale già chiuso si segna dal dettaglio e dal tasto destro: es
   const updates = await page.evaluate(() => window.__updates);
   expect(updates.map((u) => u.localOnly)).toEqual([true, false, true]);
 });
+
+test('«È mio» su un feedback che i giudici hanno detto attacco: l’hover lo dice prima del clic', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const segnalato = fb({ _id: 's-3', seq: 832, status: 'unlabeled', senderProof: undefined,
+    pipeline: { action: 'block_attack', l2Class: 'attack', verdicts: [{ class: 'aligned' }, { class: 'attack' }, { class: 'aligned' }, { class: 'aligned' }] } });
+  await apri(page, [segnalato], { tab: 'inbox' });
+  await page.evaluate((i) => window.__mgTest.openDetail(i), 's-3');
+  await expect(page.locator('#mgSenderBtn')).toHaveAttribute('title', /Attenzione: .*attacco.*guardalo prima/);
+});
