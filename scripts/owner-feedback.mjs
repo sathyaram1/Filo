@@ -74,7 +74,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
-import { avvisoDaCampi } from './lib/pratica-locale.mjs';
+import { avvisoDaCampi, parseRiferimento, risolviFeedback } from './lib/pratica-locale.mjs';
 // Moduli IIFE: importarli li registra su globalThis.
 import '../src/shared/feedbackThread.js';
 // La PUBBLICA va caricata PRIMA della cifratura: senza, il gate risulta spento e
