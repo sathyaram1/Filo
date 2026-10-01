@@ -2861,6 +2861,8 @@
     return MR.isLocalOnly(fb) || MR.isProvenLocalSender(fb);
   }
   const TITOLO_LOCALE_CHIUSA = 'Era un lavoro locale: la segna così, e la sua scheda esce dalla bacheca pubblica.';
+  // Una pratica chiusa le routine non la prendono più: togliere il segno la rimette solo nella bacheca.
+  const TITOLO_TOGLI_CHIUSA = 'Un clic toglie il segno, e la sua scheda torna nella bacheca pubblica.';
   function reflectLocal(fb) {
     if (!mgLocalBtn) return;
     const on = MR.isLocalOnly(fb);
@@ -2869,8 +2871,9 @@
     mgLocalBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
     mgLocalBtn.textContent = on ? '💻 Solo locale' : '💻 Locale';
     const perche = on ? null : MR.localSignCheck(fb, true);
+    const chiusa = on && MR.praticaChiusa(fb, { releasedVersion, fusioni });
     mgLocalBtn.title = on
-      ? `${localSignText(fb)} Un clic la rimette anche alle routine.`
+      ? `${localSignText(fb)} ${chiusa ? TITOLO_TOGLI_CHIUSA : 'Un clic la rimette anche alle routine.'}`
       : (perche.ok
         ? (perche.chiusa ? TITOLO_LOCALE_CHIUSA : 'La lavora solo una sessione locale. Nessuna routine la prende, e passa nei Lavori locali.')
         : `Adesso non si può: ${perche.motivo}.`);
