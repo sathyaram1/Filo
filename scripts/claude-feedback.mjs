@@ -263,9 +263,15 @@ function leggiStdin() {
   try { return readFileSync(0, 'utf8'); } catch (_) { return ''; }
 }
 
+const SENZA_SCELTA = [
+  'RIFIUTATO: manca chi lo lavora, e non ho aperto niente. Rilancia con una delle due:',
+  '  --non-locale  una segnalazione per le routine (un problema da mettere in coda);',
+  '  --locale      il lavoro di questa sessione: nessuna routine lo prende, e la chiusura col suo numero salta L5.',
+].join('\n');
+
 function uso() {
-  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--non-locale] [--dry-run]');
-  console.error('     Di norma il feedback è un lavoro locale: nessuna routine lo prende. --non-locale lo apre per le routine.');
+  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--dry-run]');
+  console.error('     --non-locale lo apre per le routine; --locale è il lavoro di questa sessione, e nessuna routine lo prende.');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
   console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
 }
