@@ -238,3 +238,52 @@ test('il feedback si indica col numero come negli strumenti fratelli: «910» no
   assert.equal(r.ok, false);
   assert.match(r.motivo, /#99999/);
 });
+
+/** fetch finto che registra metodo e indirizzo di ogni scrittura. */
+async function conReteScritture(doc, fn) {
+  const scritte = [];
+  const vero = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    const metodo = opts.method || 'GET';
+    if (metodo !== 'GET') scritte.push({ metodo, url: String(url), body: opts.body ? JSON.parse(opts.body) : null });
+    return { ok: true, status: 200, json: async () => doc, text: async () => '' };
+  };
+  try { return await fn(scritte); } finally { globalThis.fetch = vero; }
+}
+
+test('un lavoro locale già chiuso si segna e la sua scheda esce dalla bacheca pubblica', async () => {
+  const doc = documento('c1', { clientId: 'local:claude', senderProof: 'admin', status: 'done', statusPublic: 'closed' });
+  await conReteScritture(doc, async (scritte) => {
+    const r = await mod.segnaLocale('c1', true, OPTS);
+    assert.deepEqual([r.ok, r.chiusa, r.scheda], [true, true, ''], r.motivo);
+    assert.deepEqual(scritte.map((s) => s.metodo), ['PATCH', 'DELETE']);
+    assert.match(scritte[1].url, /\/feedback-public\/c1$/);
+  });
+  // Aperta: niente da togliere dalla bacheca.
+  const aperta = documento('a1', { clientId: 'local:claude', senderProof: 'admin', status: 'todo', statusPublic: 'open' });
+  await conReteScritture(aperta, async (scritte) => {
+    assert.equal((await mod.segnaLocale('a1', true, OPTS)).ok, true);
+    assert.deepEqual(scritte.map((s) => s.metodo), ['PATCH']);
+  });
+});
+
+test('--riconosci: la prova la dà l’owner, solo sui prefissi suoi e delle sessioni senza prova', async () => {
+  const senza = documento('s1', { clientId: 'local:claude', status: 'unlabeled', statusPublic: 'open' });
+  await conReteScritture(senza, async (scritte) => {
+    const r = await mod.riconosciMittente('s1', OPTS);
+    assert.equal(r.ok, true, r.motivo);
+    assert.equal(scritte.length, 1);
+    assert.match(scritte[0].url, /updateMask\.fieldPaths=senderProof$/);
+    assert.deepEqual(scritte[0].body.fields, { senderProof: { stringValue: 'admin' } });
+  });
+  for (const [id, f] of [
+    ['p1', { clientId: 'owner:me', senderProof: 'admin', status: 'todo' }],
+    ['u1', { clientId: 'c-utente', status: 'todo' }],
+    ['r1', { clientId: 'routine:residuo', status: 'unlabeled' }],
+  ]) {
+    await conReteScritture(documento(id, f), async (scritte) => {
+      assert.equal((await mod.riconosciMittente(id, OPTS)).ok, false, id);
+      assert.equal(scritte.length, 0, id);
+    });
+  }
+});
