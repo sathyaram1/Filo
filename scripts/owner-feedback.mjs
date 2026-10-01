@@ -336,6 +336,8 @@ export async function annotaPratica(id, nota, opts = {}) {
 /**
  * Una sessione locale può legare il suo lavoro a questa pratica (verify-local start --feedback, finish
  * --feedback)? Solo se è dell'owner o di una sessione con la prova: in locale i feedback degli utenti non si lavorano.
+ * Per cominciare serve anche il segno locale se la pratica sta dove le routine la prendono (verifica locale #910,
+ * giro 5): il server rimette in coda un «In lavorazione» senza segno. `allaChiusura`: a lavoro finito basta l'avviso.
  * @returns {Promise<{ ok: true, avviso: string } | { ok: false, motivo: string, utente: boolean }>}
  */
 export async function praticaPerLaSessione(id, opts = {}) {
@@ -346,6 +348,9 @@ export async function praticaPerLaSessione(id, opts = {}) {
   if (!fb) return { ok: false, motivo: 'mittente o stato non decifrabili: non so di chi è la pratica', utente: false };
   const chi = MR.localSenderCheck(fb);
   if (!chi.ok) return { ok: false, motivo: chi.motivo, utente: !!chi.utente, senzaProva: !!chi.senzaProva, ...contestoDelRifiuto(fb) };
+  if (!opts.allaChiusura && !MR.isLocalOnly(fb) && STATI_DEL_LAVORO_LOCALE.includes(fb.status)) {
+    return { ok: false, motivo: 'manca il segno «solo in locale»: senza, le routine la prendono, e la riprendono mentre la lavori', utente: false, senzaSegno: true };
+  }
   return { ok: true, avviso: avvisoDaCampi(doc.fields) };
 }
 
