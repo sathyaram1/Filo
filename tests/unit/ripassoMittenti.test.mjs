@@ -17,16 +17,67 @@ const esitoDi = (r, id) => {
   return p ? `${p.prova}|${p.via}` : null;
 };
 const saltati = (r) => Object.fromEntries(r.saltati.map((s) => [`${s.categoria}|${s.motivo}`, s.n]));
+const S = (ms) => ({ local: ms, owner: ms });
+const msDi = (soglie) => Object.fromEntries(Object.entries(soglie).map(([f, v]) => [f, v.ms]));
 
-test('la soglia è il primo feedback con la prova admin, altrimenti adesso', () => {
-  const adesso = Date.parse(T('10-01T12:00:00'));
-  assert.equal(mod.sogliaDellaProva([doc('a', 'local:claude', 'todo', T('09-01T00:00:00'))], adesso), adesso);
+test('senza soglie salvate: per famiglia, il primo feedback nato con la prova, altrimenti adesso', () => {
+  const adesso = Date.parse(T('10-09T00:00:00'));
+  const vuote = mod.soglieDelRipasso([doc('a', 'local:claude', 'todo', T('09-01T00:00:00'))], {}, adesso);
+  assert.deepEqual(vuote, { local: { ms: adesso, origine: 'adesso', doc: '' }, owner: { ms: adesso, origine: 'adesso', doc: '' } });
   const conProva = [
-    doc('p2', 'local:claude', 'todo', T('10-03T00:00:00'), 'admin'),
-    doc('p1', 'owner:me', 'todo', T('10-02T00:00:00'), 'admin'),
+    doc('p2', 'local:claude', 'todo', T('10-03T00:00:00'), 'admin', { seq: 902 }),
+    doc('p1', 'local:claude', 'todo', T('10-02T00:00:00'), 'admin', { seq: 901 }),
     doc('s', 'routine:x', 'todo', T('09-20T00:00:00'), 'server'),
   ];
-  assert.equal(mod.sogliaDellaProva(conProva, Date.parse(T('10-09T00:00:00'))), Date.parse(T('10-02T00:00:00')));
+  const s = mod.soglieDelRipasso(conProva, null, adesso);
+  assert.deepEqual(s.local, { ms: Date.parse(T('10-02T00:00:00')), origine: 'documento', doc: '#901' });
+  assert.deepEqual(s.owner, { ms: adesso, origine: 'adesso', doc: '' }, 'una sessione che parla per prima non sposta la soglia dell\'owner');
+});
+
+test('la soglia di una famiglia non è quella dell\'altra: l\'app vecchia dell\'owner resta coperta', () => {
+  const adesso = Date.parse(T('10-09T00:00:00'));
+  const docs = [
+    doc('sessione', 'local:claude', 'todo', T('10-02T00:00:00'), 'admin'),
+    doc('falso-locale', 'local:claude', 'todo', T('10-03T00:00:00')),
+    doc('owner-app-vecchia', 'owner:me', 'todo', T('10-04T00:00:00')),
+  ];
+  const r = mod.candidatiAlRipasso(docs, msDi(mod.soglieDelRipasso(docs, {}, adesso)));
+  assert.equal(esitoDi(r, 'owner-app-vecchia'), `admin|${VIA.EPOCA}`);
+  assert.equal(esitoDi(r, 'falso-locale'), null);
+});
+
+test('la soglia salvata dal primo giro vale ai giri dopo: un escluso accettato poi riceve la prova', () => {
+  const primoGiro = Date.parse(T('10-01T12:00:00'));
+  const voto = { pipeline: { verdicts: [{ class: 'attack' }] } };
+  const docs = [
+    doc('vecchio', 'local:claude', 'todo', T('06-16T00:00:00')),
+    doc('fermo', 'local:claude', 'unlabeled', T('07-01T00:00:00'), '', voto),
+    doc('owner-vecchio', 'owner:me', 'todo', T('08-01T00:00:00')),
+  ];
+  const s1 = mod.soglieDelRipasso(docs, {}, primoGiro);
+  const r1 = mod.candidatiAlRipasso(docs, msDi(s1));
+  assert.deepEqual(r1.promossi.map((d) => d.id).sort(), ['owner-vecchio', 'vecchio']);
+  // Il primo giro scrive le prove; l'owner accetta da Gestione quello fermo nei Ricevuti.
+  const promossi = new Set(r1.promossi.map((d) => d.id));
+  const dopo = docs.map((d) => (promossi.has(d.id) ? { ...d, senderProof: 'admin' } : d.id === 'fermo' ? { ...d, status: 'todo' } : d));
+  const salvate = msDi(s1);
+  const s2 = mod.soglieDelRipasso(dopo, salvate, Date.parse(T('10-20T00:00:00')));
+  assert.deepEqual(s2.local, { ms: primoGiro, origine: 'salvata', doc: '' });
+  assert.equal(esitoDi(mod.candidatiAlRipasso(dopo, msDi(s2)), 'fermo'), `admin|${VIA.EPOCA}`);
+  assert.equal(mod.soglieDelRipasso(dopo, {}, primoGiro).local.ms, Date.parse(T('06-16T00:00:00')),
+    'ricalcolata dai documenti, la soglia cadrebbe sulle prove scritte dal ripasso stesso');
+});
+
+test('una soglia salvata illeggibile ferma il giro, non si ricalcola', () => {
+  for (const male of ['2026-10-01', -5, 1.5, true]) {
+    assert.throws(() => mod.soglieDelRipasso([], { local: male }, Date.now()), /soglia salvata per local/);
+  }
+  assert.equal(mod.soglieDelRipasso([], { owner: 1000 }, 5000).owner.origine, 'salvata');
+});
+
+test('senza soglia per la famiglia nessuno passa per epoca', () => {
+  const r = mod.candidatiAlRipasso([doc('a', 'owner:me', 'todo', T('09-01T00:00:00'))], { local: Date.now() });
+  assert.equal(r.promossi.length, 0);
 });
 
 test('owner e sessioni: admin se nati prima della soglia, mai segnalati né illeggibili', () => {
@@ -42,7 +93,7 @@ test('owner e sessioni: admin se nati prima della soglia, mai segnalati né ille
     doc('gia', 'local:claude', 'todo', T('09-01T00:00:00'), 'admin'),
     doc('senza-ora', 'local:claude', 'todo', ''),
   ];
-  const r = mod.candidatiAlRipasso(docs, soglia);
+  const r = mod.candidatiAlRipasso(docs, S(soglia));
   assert.deepEqual(r.promossi.map((d) => d.id), ['vecchio-locale', 'vecchio-owner']);
   assert.ok(r.promossi.every((d) => d.prova === 'admin' && d.via === VIA.EPOCA));
   const s = saltati(r);
@@ -65,7 +116,7 @@ test('fermi nei Ricevuti: fuori se un giudice ha gridato attacco o spam, o se il
     doc('design', 'local:claude', 'unlabeled', nato, '', { pipeline: { verdicts: [{ class: 'design' }] } }),
     doc('approvato-dopo-un-voto', 'local:claude', 'todo', nato, '', { pipeline: { verdicts: [{ class: 'attack' }] } }),
   ];
-  const r = mod.candidatiAlRipasso(docs, soglia);
+  const r = mod.candidatiAlRipasso(docs, S(soglia));
   assert.deepEqual(r.promossi.map((d) => d.id).sort(), ['approvato-dopo-un-voto', 'design', 'mai-giudicato']);
   const s = saltati(r);
   assert.equal(s[`local|${MOTIVO.RICEVUTI_SEGNALATI}`], 1);
@@ -85,7 +136,7 @@ test('routine: la prova server solo con un segno del server, mai sul prefisso', 
     doc('solo-prefisso', 'routine:verifier', 'todo', nato),
     doc('esploratore', 'agent:gemma-3', 'archived', nato),
   ];
-  const r = mod.candidatiAlRipasso(docs, soglia);
+  const r = mod.candidatiAlRipasso(docs, S(soglia));
   assert.equal(esitoDi(r, 'derivato'), `server|${VIA.CAMPI}`);
   assert.equal(esitoDi(r, 'generazione'), `server|${VIA.CAMPI}`);
   assert.equal(esitoDi(r, 'allarme'), `server|${VIA.CAMPI}`);
@@ -95,11 +146,16 @@ test('routine: la prova server solo con un segno del server, mai sul prefisso', 
   assert.equal(s[`agent (esploratore)|${MOTIVO.ESPLORATORE}`], 1);
 });
 
-test('coda di triage: per uid col mittente giusto, per titolo solo se unico e nei tempi', () => {
+test('coda di triage: per uid col mittente giusto e nei tempi, per titolo solo se unico e nei tempi', () => {
   const soglia = Date.parse(T('10-02T00:00:00'));
   const coda = mod.vociDellaCoda([
-    { op: 'create', uid: 'u-1', queuedBy: 'prober', name: 'x' },
-    { op: 'create', uid: 'u-2', queuedBy: 'prober', name: 'y' },
+    { op: 'create', uid: 'u-1', queuedBy: 'prober', name: 'x', queuedAt: T('07-09T23:55:00') },
+    { op: 'create', uid: 'u-2', queuedBy: 'prober', name: 'y', queuedAt: T('07-09T23:55:00') },
+    { op: 'create', uid: 'u-pubblica', queuedBy: 'routine', name: 'z', queuedAt: T('06-12T10:00:00') },
+    { op: 'create', uid: 'u-rami', queuedBy: 'routine', name: 'w', queuedAt: T('06-15T10:00:00') },
+    { op: 'create', uid: 'u-rami', queuedBy: 'routine', name: 'w', queuedAt: T('06-12T10:00:00') },
+    { op: 'create', uid: 'u-rami', queuedBy: 'routine', name: 'w' },
+    { op: 'create', uid: 'u-senza-ora', queuedBy: 'routine', name: 'v' },
     { op: 'create', name: 'Vecchio', queuedBy: 'routine', queuedAt: T('06-12T10:00:00') },
     { op: 'create', name: 'Vecchio', queuedBy: 'routine', queuedAt: T('06-12T10:00:00') },
     { op: 'create', name: 'Doppio', queuedBy: 'routine', queuedAt: T('06-13T10:00:00') },
@@ -114,9 +170,15 @@ test('coda di triage: per uid col mittente giusto, per titolo solo se unico e ne
     doc('auto-3', 'routine:routine', 'archived', T('06-13T10:03:00'), '', { name: 'Doppio' }),
     doc('auto-4', 'routine:routine', 'done', T('06-20T10:00:00'), '', { name: 'Tardi' }),
     doc('u-9', 'routine:routine', 'done', T('06-20T10:00:00')),
+    doc('u-pubblica', 'routine:routine', 'todo', T('09-30T08:00:00')),
+    doc('u-rami', 'routine:routine', 'done', T('06-12T11:00:00')),
+    doc('u-senza-ora', 'routine:routine', 'done', T('06-12T11:00:00')),
   ];
-  const r = mod.candidatiAlRipasso(docs, soglia, { coda });
+  const r = mod.candidatiAlRipasso(docs, S(soglia), { coda });
   assert.equal(esitoDi(r, 'u-1'), `server|${VIA.CODA_ID}`);
+  assert.equal(esitoDi(r, 'u-pubblica'), null, 'un id preso dalla storia pubblica, nato mesi dopo l\'accodamento');
+  assert.equal(esitoDi(r, 'u-rami'), `server|${VIA.CODA_ID}`, 'la stessa voce su più rami vale col suo accodamento più vecchio');
+  assert.equal(esitoDi(r, 'u-senza-ora'), null, 'senza l\'ora dell\'accodamento non si sa se è nato nei tempi');
   assert.equal(esitoDi(r, 'u-2'), null, 'la uid di una voce con un altro mittente non prova niente');
   assert.equal(esitoDi(r, 'auto-1'), `server|${VIA.CODA_TITOLO}`, 'la stessa voce su due rami conta una volta');
   assert.equal(esitoDi(r, 'auto-2'), null, 'due documenti con lo stesso titolo: uno può essere un falso');
@@ -124,6 +186,7 @@ test('coda di triage: per uid col mittente giusto, per titolo solo se unico e ne
   assert.equal(esitoDi(r, 'u-9'), null, 'una voce di aggiornamento non crea niente');
   const s = saltati(r);
   assert.equal(s[`routine:routine|${MOTIVO.CODA_AMBIGUA}`], 3);
+  assert.equal(s[`routine:routine|${MOTIVO.CODA_FUORI_TEMPO}`], 2);
   assert.equal(s[`routine:verifier|${MOTIVO.SENZA_SEGNO}`], 1);
 });
 
@@ -138,7 +201,7 @@ test('derivati: la nota del server sul padre prova il numero, se il numero è un
     doc('d3', 'routine:residuo', 'todo', nato, '', { seq: 500, subSeq: 3, parentId: 'padre' }),
   ];
   const derivatiDelPadre = new Map([['padre', mod.numeriDerivatiNelleNote('x\nFeedback derivati aperti: #500.1 (priorità 2, esterno), #500.2 (priorità 1, rimasti).')]]);
-  const r = mod.candidatiAlRipasso(docs, soglia, { derivatiDelPadre });
+  const r = mod.candidatiAlRipasso(docs, S(soglia), { derivatiDelPadre });
   assert.equal(esitoDi(r, 'd1'), `server|${VIA.NOTA_PADRE}`);
   assert.equal(esitoDi(r, 'd2'), null);
   assert.equal(esitoDi(r, 'd3'), null);

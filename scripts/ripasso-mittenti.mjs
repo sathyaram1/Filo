@@ -32,6 +32,7 @@ export const MOTIVO = Object.freeze({
   GIUDIZIO_ILLEGGIBILE: 'fermi nei Ricevuti con un giudizio che non si decifra',
   ESPLORATORE: "creati in anonimo dall'esploratore (test:explore): una prova non c'è",
   CODA_AMBIGUA: 'titolo della coda di triage non univoco',
+  CODA_FUORI_TEMPO: "id della coda di triage, ma nati fuori dai tempi dell'Action",
   DERIVATO_SENZA_NOTA: 'derivati senza traccia del server sul padre',
   SENZA_SEGNO: 'nessun segno che li distingua da un falso',
 });
@@ -40,6 +41,11 @@ const RISCHIO = ['attack', 'spam'];
 const STATI_SEGNALATI_RE = /^(attack|spam|suspicious_file)/;
 // La GitHub Action della coda creava col service account entro minuti dall'accodamento (cron di riserva: 30').
 const FINESTRA_CODA_MS = { prima: 10 * 60e3, dopo: 24 * 3600e3 };
+const nellaFinestra = (nato, queuedAt) => Number.isFinite(nato) && Number.isFinite(queuedAt)
+  && nato >= queuedAt - FINESTRA_CODA_MS.prima && nato <= queuedAt + FINESTRA_CODA_MS.dopo;
+const piuVecchio = (a, b) => (Number.isFinite(a) && Number.isFinite(b) ? Math.min(a, b) : (Number.isFinite(a) ? a : b));
+// Le famiglie che ricevono la prova per epoca: ognuna ha la sua soglia, i loro cammini di creazione partono in momenti diversi.
+export const FAMIGLIE_EPOCA = Object.freeze(['local', 'owner']);
 
 /** La famiglia del mittente per i conteggi, '' se il prefisso non è riservato. PURA. */
 export function categoria(clientId) {
@@ -72,15 +78,32 @@ export function motivoSegnalato(d) {
   return '';
 }
 
-/** L'istante (ms) da cui la prova `admin` c'è sempre: il primo feedback che la porta, o adesso. PURA. */
-export function sogliaDellaProva(docs, adesso) {
-  let min = Number(adesso);
-  for (const d of Array.isArray(docs) ? docs : []) {
-    if (!d || d.senderProof !== 'admin') continue;
-    const t = Date.parse(d.createTime || '');
-    if (Number.isFinite(t) && t < min) min = t;
+/**
+ * La soglia di ogni famiglia (ms): quella salvata dal primo giro vero, se c'è; altrimenti il primo feedback della
+ * famiglia nato con la prova, o adesso. PURA. Una salvata non si ricalcola: dopo un giro le prove scritte dal ripasso
+ * la riporterebbero indietro. Una salvata illeggibile è un errore, non un ricalcolo.
+ * @returns {{ [famiglia: string]: { ms: number, origine: 'salvata'|'documento'|'adesso', doc: string } }}
+ */
+export function soglieDelRipasso(docs, salvate, adesso) {
+  const lista = Array.isArray(docs) ? docs : [];
+  const out = {};
+  for (const f of FAMIGLIE_EPOCA) {
+    const s = salvate && typeof salvate === 'object' ? salvate[f] : undefined;
+    if (s !== undefined && s !== null) {
+      if (!Number.isSafeInteger(s) || s <= 0) throw new Error(`la soglia salvata per ${f} non è un istante in millisecondi (${JSON.stringify(s)})`);
+      out[f] = { ms: s, origine: 'salvata', doc: '' };
+      continue;
+    }
+    let ms = Number(adesso);
+    let primo = null;
+    for (const d of lista) {
+      if (!d || d.senderProof !== 'admin' || categoria(d.clientId) !== f) continue;
+      const t = Date.parse(d.createTime || '');
+      if (Number.isFinite(t) && t < ms) { ms = t; primo = d; }
+    }
+    out[f] = { ms, origine: primo ? 'documento' : 'adesso', doc: primo ? (numeroDi(primo) || primo.id) : '' };
   }
-  return min;
+  return out;
 }
 
 /** `git log --diff-filter=A --name-only --format=@%H -- feedback-triage` → ['sha:percorso'] delle voci della coda. PURA. */
@@ -114,7 +137,8 @@ export function vociDalBatch(buf) {
 
 /**
  * Le creazioni della coda di triage (scripts/apply-triage.mjs, fino al 17/08), col clientId che l'Action scriveva. PURA.
- * La stessa voce aggiunta su più rami conta una volta; una uid con due mittenti diversi non prova niente.
+ * La stessa voce su più rami conta una volta, col suo accodamento più vecchio; una uid con due mittenti non prova niente.
+ * `perUid`: uid → { clientId, queuedAt } oppure null.
  */
 export function vociDellaCoda(voci) {
   const perUid = new Map();
@@ -123,7 +147,11 @@ export function vociDellaCoda(voci) {
     if (!e || e.op !== 'create') continue;
     const clientId = `routine:${String(e.queuedBy || 'routine').slice(0, 80)}`;
     if (typeof e.uid === 'string' && e.uid) {
-      perUid.set(e.uid, perUid.has(e.uid) && perUid.get(e.uid) !== clientId ? null : clientId);
+      const prima = perUid.get(e.uid);
+      if (prima === null) continue;
+      if (prima && prima.clientId !== clientId) { perUid.set(e.uid, null); continue; }
+      const t = Date.parse(e.queuedAt || '');
+      perUid.set(e.uid, { clientId, queuedAt: prima ? piuVecchio(prima.queuedAt, t) : t });
     } else {
       const v = { clientId, name: String(e.name || ''), queuedAt: Date.parse(e.queuedAt || '') };
       senzaUid.set(`${v.clientId}\n${v.name}\n${e.queuedAt}`, v);
@@ -174,10 +202,10 @@ function conta(lista, chiave) {
 /**
  * Chi riceve quale prova. PURA. `docs`: { id, seq, subSeq, createTime (del server), clientId e status decifrati,
  * senderProof, derived, generation, alarmKeys (bool), parentId, name (solo se in chiaro), pipeline }.
- * `coda` da vociDellaCoda, `derivatiDelPadre`: id del padre → Set dei numeri annotati dal server.
+ * `soglie`: famiglia → ms. `coda` da vociDellaCoda, `derivatiDelPadre`: id del padre → Set dei numeri annotati dal server.
  * @returns {{ promossi: object[], saltati: { categoria: string, motivo: string, n: number }[] }}
  */
-export function candidatiAlRipasso(docs, soglia, { coda = vociDellaCoda([]), derivatiDelPadre = new Map() } = {}) {
+export function candidatiAlRipasso(docs, soglie, { coda = vociDellaCoda([]), derivatiDelPadre = new Map() } = {}) {
   const lista = Array.isArray(docs) ? docs.filter(Boolean) : [];
   const numeri = conta(lista, numeroDi);
   const titoli = conta(lista, (d) => (d.name ? `${d.clientId}\n${d.name}` : ''));
@@ -187,13 +215,16 @@ export function candidatiAlRipasso(docs, soglia, { coda = vociDellaCoda([]), der
 
   function provaRoutine(d, cat) {
     if (campiDelServer(d)) return { prova: 'server', via: VIA.CAMPI };
-    if (coda.perUid.get(d.id) === d.clientId) return { prova: 'server', via: VIA.CODA_ID };
     const nato = Date.parse(d.createTime || '');
+    const perId = coda.perUid.get(d.id);
+    if (perId && perId.clientId === d.clientId) {
+      // Le uid della coda sono pubbliche e la create anonima accetta qualunque id: conta anche quando è nato.
+      return nellaFinestra(nato, perId.queuedAt) ? { prova: 'server', via: VIA.CODA_ID } : { motivo: MOTIVO.CODA_FUORI_TEMPO };
+    }
     const voci = d.name ? coda.senzaUid.filter((v) => v.clientId === d.clientId && v.name === d.name) : [];
     if (voci.length) {
       // Un falso che copia un titolo dalla coda pubblica fa due documenti con lo stesso titolo: non lo prende nessuno.
-      const v = voci[0];
-      const inFinestra = voci.length === 1 && nato >= v.queuedAt - FINESTRA_CODA_MS.prima && nato <= v.queuedAt + FINESTRA_CODA_MS.dopo;
+      const inFinestra = voci.length === 1 && nellaFinestra(nato, voci[0].queuedAt);
       if (inFinestra && titoli.get(`${d.clientId}\n${d.name}`) === 1) return { prova: 'server', via: VIA.CODA_TITOLO };
       return { motivo: MOTIVO.CODA_AMBIGUA };
     }
@@ -216,7 +247,7 @@ export function candidatiAlRipasso(docs, soglia, { coda = vociDellaCoda([]), der
     else if (motivoSegnalato(d)) esito = { motivo: motivoSegnalato(d) };
     else if (cat === 'owner' || cat === 'local') {
       const nato = Date.parse(d.createTime || '');
-      esito = Number.isFinite(nato) && nato < soglia ? { prova: 'admin', via: VIA.EPOCA } : { motivo: MOTIVO.DOPO };
+      esito = Number.isFinite(nato) && nato < Number(soglie && soglie[cat]) ? { prova: 'admin', via: VIA.EPOCA } : { motivo: MOTIVO.DOPO };
     } else if (cat === 'agent (esploratore)') esito = { motivo: MOTIVO.ESPLORATORE };
     else esito = provaRoutine(d, cat);
     if (esito.prova) promossi.push({ ...d, categoria: cat, prova: esito.prova, via: esito.via });
