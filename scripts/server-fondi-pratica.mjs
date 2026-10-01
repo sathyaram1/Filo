@@ -52,6 +52,33 @@ export function leggiArgomenti(argv, env = {}) {
 export const notaInizio = (ramo) => `Lavoro sul server: porto ${ramo} su main di filo-security (npm run server:fondi).`;
 export const notaFine = (ramo, sha) => `Fuso su main di filo-security: ${ramo}${sha ? ` a ${sha.slice(0, 9)}` : ''}. In produzione va col deploy, npm run server:pubblica.`;
 
+/**
+ * I rami dell'app legati alla pratica (verify-local start --feedback, in ogni worktree del repo) e non ancora su
+ * origin/main: un lavoro che tocca app e server lo chiude la fusione dell'app, che salta L5 solo a pratica aperta.
+ */
+export function ramiApertiDellaPratica(id, { radice = ROOT, git = gitIn, leggi = leggiJson } = {}) {
+  const lista = git(radice, ['worktree', 'list', '--porcelain']);
+  if (lista === null) return [];
+  const cartelle = lista.split('\n').filter((r) => r.startsWith('worktree ')).map((r) => r.slice('worktree '.length).trim());
+  const rami = new Set();
+  for (const c of cartelle) {
+    const stato = leggi(join(c, '.claude', 'verify-local.json')) || {};
+    for (const [ramo, e] of Object.entries(stato)) {
+      if (!e || e.feedbackId !== id) continue;
+      if (git(radice, ['merge-base', '--is-ancestor', ramo, 'refs/remotes/origin/main']) === null) rami.add(ramo);
+    }
+  }
+  return [...rami];
+}
+
+function gitIn(cwd, args) {
+  try { return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch (_) { return null; }
+}
+
+function leggiJson(p) {
+  try { return JSON.parse(readFileSync(p, 'utf8')); } catch (_) { return null; }
+}
+
 function lanciaServer(cartella, args, env) {
   const r = spawnSync(process.execPath, [join('tools', 'server-fondi.js'), ...args], { cwd: cartella, stdio: 'inherit', env });
   return typeof r.status === 'number' ? r.status : 1;
