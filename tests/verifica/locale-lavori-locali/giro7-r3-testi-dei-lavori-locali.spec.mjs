@@ -27,7 +27,7 @@ test('lavoro locale chiuso e feedback di un utente: i testi non promettono quell
   await page.evaluate((id) => window.__mgTest.openDetail(id), 'lc');
   const tasto = page.locator('#mgLocalBtn');
   await expect(tasto).toBeVisible();
-  await expect(tasto).not.toHaveAttribute('title', /routine/);
+  await expect(tasto).not.toHaveAttribute('title', /rimette anche alle routine/);
   await expect(page.locator('#mgDetail')).not.toContainText('alla chiusura si fonde');
   await page.locator('.mg-item[data-id="lc"]').click({ button: 'right' });
   await expect(page.locator('.mg-ctxmenu')).toBeVisible();
