@@ -508,7 +508,7 @@ async function praticaDelLavoro(valore) {
     r = await risolviFeedback(valore, { bearer, base: FIRESTORE_BASE });
     if (r.ok) {
       const { praticaPerLaSessione } = await import('./owner-feedback.mjs');
-      lavorabile = await praticaPerLaSessione(r.id, { bearer });
+      lavorabile = await praticaPerLaSessione(r.id, { bearer, allaChiusura: true });
     }
   } catch (e) {
     r = { ok: false, motivo: String((e && e.message) || e).slice(0, 200) };
