@@ -597,10 +597,10 @@ service cloud.firestore {
       // per costruzione. `text`, `url`, `userAgent`, `images`, `files`,
       // `notes`, `clientId`, `pipeline`, `priority` non sono qui dentro: se
       // qualcuno provasse a scriverli, la regola respinge tutto il documento.
+      // Un lavoro locale (#908) non ha scheda, ma qui NON si respinge: un'app
+      // rimasta alla versione di prima si fermerebbe alla prima scheda rifiutata
+      // e non pubblicherebbe più niente. La toglie il server (onPublicCardWrite).
       allow create, update: if (isAdmin() || isRoutine())
-        // Un lavoro locale (#908) non ha scheda: il codice lo salta, e qui si
-        // ferma anche un'app rimasta alla versione di prima. Una lettura in più.
-        && !('localOnly' in get(/databases/$(database)/documents/feedback/$(doc)).data)
         && request.resource.data.keys().hasOnly(
              ['name', 'seq', 'subSeq', 'status', 'statusPublic', 'resolvedInVersion',
               'createdAt', 'resolvedAt', 'clientIdTag', 'userNote', 'reward',
