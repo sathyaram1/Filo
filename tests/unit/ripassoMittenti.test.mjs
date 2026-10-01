@@ -387,3 +387,41 @@ test('un giudice che dice attacco in un «allineato» o in un «design» tiene f
   assert.equal(s[`local|${MOTIVO.RICEVUTI_SEGNALATI}`], 1);
   assert.equal(s[`owner|${MOTIVO.RICEVUTI_SEGNALATI}`], 1);
 });
+
+// Giro 4 della verifica locale: #507 e #714 il ramo lo nominavano solo nella conversazione.
+test('lavori locali passati col ramo solo nella conversazione: chiusi, senza ramo scritto, ramo fuso in locale', async () => {
+  const rami = new Set(['claude/routine-consegne', 'claude/rossi-windows']);
+  assert.deepEqual([...mod.ramiNelleNote('Risolto in locale sul ramo claude/routine-consegne. Poi «claude/rossi-windows», fine.')].sort(),
+    ['claude/rossi-windows', 'claude/routine-consegne']);
+  const docs = [
+    doc('507', 'local:claude', 'done', T('08-28T00:00:00'), 'admin', { seq: 507 }),
+    doc('714', 'local:claude', 'done', T('09-20T00:00:00'), 'admin', { seq: 714 }),
+    doc('aperto', 'local:claude', 'todo', T('09-20T00:00:00'), 'admin'),
+    doc('routine-fix', 'owner:me', 'done', T('09-20T00:00:00'), 'admin', { branch: 'worker/abc' }),
+    doc('nominato-non-fuso', 'local:claude', 'done', T('09-20T00:00:00'), 'admin'),
+    doc('utente', 'c-tester', 'done', T('09-20T00:00:00')),
+  ];
+  assert.deepEqual(mod.noteDaLeggere(docs), ['507', '714', 'nominato-non-fuso'], 'solo chiusi, owner o sessione, senza ramo scritto');
+  const note = new Map([
+    ['507', new Set(['claude/routine-consegne'])], ['714', new Set(['claude/rossi-windows'])],
+    ['aperto', new Set(['claude/rossi-windows'])], ['routine-fix', new Set(['claude/rossi-windows'])],
+    ['nominato-non-fuso', new Set(['claude/mai-fuso'])],
+  ]);
+  assert.deepEqual(mod.lavoriLocaliPassati(docs, rami, [], note).map((d) => d.id), ['507', '714']);
+
+  const righe = [];
+  const chiesti = [];
+  const base = {
+    docs, adesso: Date.now(), coda: mod.vociDellaCoda([]), derivatiDelPadre: new Map(), inizioProva: DA_SEMPRE, rami,
+    salvate: S(1), dryRun: true, err: () => {}, log: (r) => righe.push(r),
+    scrivi: { soglie: async () => ({ ok: true }), prova: async () => ({ ok: true }), locale: async () => ({ ok: true }) },
+    leggiNote: async (ids) => { chiesti.push(...ids); return note; },
+  };
+  assert.equal(await mod.eseguiGiro(base), 0);
+  assert.deepEqual(chiesti, ['507', '714', 'nominato-non-fuso']);
+  assert.ok(righe.some((r) => /Lavori locali passati da segnare.*: 2 \(#507 #714\)/.test(r)), righe.join('\n'));
+  // Le conversazioni che non si leggono si dicono, e il resto del giro va avanti.
+  const errori = [];
+  assert.equal(await mod.eseguiGiro({ ...base, leggiNote: async () => { throw new Error('rete giù'); }, err: (r) => errori.push(r) }), 0);
+  assert.match(errori.join('\n'), /conversazioni delle pratiche chiuse non si leggono/);
+});
