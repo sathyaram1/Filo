@@ -507,7 +507,7 @@ export async function scrivi(id, to, nota, opts = {}) {
   const vietata = partenzaVietata(from);
   if (vietata) return { ok: false, motivo: vietata, from };
   const lavoro = from === to ? null : await lavoroVietato(doc, to);
-  if (lavoro) return { ok: false, motivo: lavoro.motivo, utente: lavoro.utente, senzaProva: lavoro.senzaProva, from };
+  if (lavoro) return { ok: false, motivo: lavoro.motivo, utente: lavoro.utente, senzaProva: lavoro.senzaProva, senzaSegno: lavoro.senzaSegno, from };
   const check = transizioneAmmessa(from, to, opts.attore || 'owner');
   if (!check.ok) return { ok: false, motivo: check.motivo, from };
 
