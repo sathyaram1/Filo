@@ -55,7 +55,7 @@ test('#595 col token admin il feedback parte autenticato e con la prova del mitt
   try {
     await conSubmit(async (_p, opts) => ({ id: 'd', seq: 3, senderProof: opts && opts.idToken ? 'admin' : '' }), async (visti) => {
       let code;
-      const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X']); });
+      const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X', '--locale']); });
       assert.equal(code, SCRIPT.EXIT.FATTO);
       const o = visti.opts[0];
       assert.equal(o.idToken, 'tok-owner');
@@ -76,7 +76,7 @@ test('#908 senza token: si ferma e lo dice, niente feedback anonimo', async () =
   try {
     await conSubmit(async () => ({ id: 'd', seq: 4 }), async (visti) => {
       let code;
-      const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X']); });
+      const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X', '--locale']); });
       assert.equal(code, SCRIPT.EXIT.RIFIUTATO);
       assert.equal(visti.length, 0, 'non parte niente');
       assert.match(err, /RIFIUTATO.*admin-login/);
@@ -92,7 +92,7 @@ test('#595 token rifiutato dal server: lo dice su stderr', async () => {
     // Con soloAdmin la submit non riparte da anonima: lancia, e lo strumento lo dice.
     await conSubmit(async () => { throw new Error('firestore create fallito (403): token admin rifiutato, e questo feedback non parte da anonimo'); }, async () => {
       let code;
-      const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X']); });
+      const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X', '--locale']); });
       assert.equal(code, SCRIPT.EXIT.RIFIUTATO);
       assert.match(err, /403.*anonimo/);
     });
@@ -106,7 +106,7 @@ test('#595 prova a vuoto ed errore d’uso non chiedono la credenziale', async (
   SCRIPT.credenziale.ottieni = async () => { chiesta += 1; return { idToken: '' }; };
   try {
     await conSubmit(async () => ({ id: 'd' }), async () => {
-      await SCRIPT.main(['T', 'X', '--dry-run']);
+      await SCRIPT.main(['T', 'X', '--locale', '--dry-run']);
       await conStderr(() => SCRIPT.main(['T']));
     });
     assert.equal(chiesta, 0);
@@ -154,20 +154,20 @@ test('la prova a vuoto non deposita niente', async () => {
 
 test('tre esiti, tre codici d’uscita diversi', async () => {
   // Fatto.
-  const fatto = await conSubmit(async () => ({ id: 'd', seq: 1 }), () => SCRIPT.main(['T', 'X']));
+  const fatto = await conSubmit(async () => ({ id: 'd', seq: 1 }), () => SCRIPT.main(['T', 'X', '--locale']));
   assert.equal(fatto, SCRIPT.EXIT.FATTO);
 
   // Rifiutato dal server (le regole hanno detto no): riprovare identico è inutile.
   const rifiutato = await conSubmit(
     async () => { throw new Error('firestore create fallito (403): permission denied'); },
-    () => SCRIPT.main(['T', 'X']),
+    () => SCRIPT.main(['T', 'X', '--locale']),
   );
   assert.equal(rifiutato, SCRIPT.EXIT.RIFIUTATO);
 
   // Server non raggiungibile: riprovare è esattamente la cosa giusta.
   const irraggiungibile = await conSubmit(
     async () => { throw new Error('fetch failed'); },
-    () => SCRIPT.main(['T', 'X']),
+    () => SCRIPT.main(['T', 'X', '--locale']),
   );
   assert.equal(irraggiungibile, SCRIPT.EXIT.IRRAGGIUNGIBILE);
 
@@ -214,7 +214,7 @@ test('priorità 0 dalla riga di comando: si accetta e si dichiara (prova a vuoto
     const orig = console.log;
     console.log = (...a) => righe.push(a.join(' '));
     let code;
-    try { code = await SCRIPT.main(['T', 'X', '--priorita', '0', '--dry-run']); } finally { console.log = orig; }
+    try { code = await SCRIPT.main(['T', 'X', '--locale', '--priorita', '0', '--dry-run']); } finally { console.log = orig; }
     assert.equal(code, SCRIPT.EXIT.FATTO);
     assert.equal(visti.length, 0);
     // Uno 0 letto come «falso» spariva dalla riga: il numero va stampato.
@@ -224,7 +224,7 @@ test('priorità 0 dalla riga di comando: si accetta e si dichiara (prova a vuoto
 
 test('priorità fuori scala: si ferma PRIMA di depositare', async () => {
   await conSubmit(async () => { throw new Error('submit non doveva essere chiamata'); }, async (visti) => {
-    const code = await SCRIPT.main(['T', 'X', '--priorita', '9']);
+    const code = await SCRIPT.main(['T', 'X', '--locale', '--priorita', '9']);
     assert.equal(code, SCRIPT.EXIT.USO);
     assert.equal(visti.length, 0);
   });
@@ -235,8 +235,8 @@ test('numero assegnato: si stampa, e quando manca non lo si inventa', async () =
   const orig = console.log;
   console.log = (...a) => righe.push(a.join(' '));
   try {
-    await conSubmit(async () => ({ id: 'd1', seq: 777 }), () => SCRIPT.main(['T', 'X']));
-    await conSubmit(async () => ({ id: 'd2', seq: null }), () => SCRIPT.main(['T', 'X']));
+    await conSubmit(async () => ({ id: 'd1', seq: 777 }), () => SCRIPT.main(['T', 'X', '--locale']));
+    await conSubmit(async () => ({ id: 'd2', seq: null }), () => SCRIPT.main(['T', 'X', '--locale']));
   } finally { console.log = orig; }
   assert.ok(righe.some((r) => r.includes('#777')), 'il numero assegnato va stampato');
   assert.ok(righe.some((r) => /Numero non assegnato/.test(r)), 'senza numero lo si deve dire');
@@ -268,7 +268,7 @@ test('--allega: il documento parte con il feedback, nella forma dell\'app', asyn
   const spec = join(dir, 'spec.md');
   writeFileSync(spec, '# Spec\n\nContenuto della spec.', 'utf8');
   await conSubmit(async () => ({ id: 'd1', seq: 800, files: [{ url: 'u', name: 'spec.md', type: 'text/markdown' }], failed: [] }), async (visti) => {
-    const code = await SCRIPT.main(['Titolo', 'Testo', '--allega', spec]);
+    const code = await SCRIPT.main(['Titolo', 'Testo', '--locale', '--allega', spec]);
     assert.equal(code, SCRIPT.EXIT.FATTO);
     assert.equal(visti.length, 1);
     const files = visti[0].files;
@@ -283,11 +283,11 @@ test('--allega: il documento parte con il feedback, nella forma dell\'app', asyn
 
 test('--allega: file mancante o di tipo non ammesso → errore d\'uso, niente deposito', async () => {
   await conSubmit(async () => { throw new Error('submit non doveva essere chiamata'); }, async (visti) => {
-    assert.equal(await SCRIPT.main(['T', 'X', '--allega', join(tmpdir(), 'non-esiste-' + Date.now() + '.md')]), SCRIPT.EXIT.USO);
+    assert.equal(await SCRIPT.main(['T', 'X', '--locale', '--allega', join(tmpdir(), 'non-esiste-' + Date.now() + '.md')]), SCRIPT.EXIT.USO);
     const dir = cartellaTemporanea('filo-allega-');
     const html = join(dir, 'pagina.html');
     writeFileSync(html, '<script>1</script>', 'utf8');
-    assert.equal(await SCRIPT.main(['T', 'X', '--allega', html]), SCRIPT.EXIT.USO);
+    assert.equal(await SCRIPT.main(['T', 'X', '--locale', '--allega', html]), SCRIPT.EXIT.USO);
     assert.equal(visti.length, 0);
   });
 });
@@ -301,7 +301,7 @@ test('--allega: un allegato non caricato si dice e l\'uscita non è "fatto"', as
   console.error = (...a) => errori.push(a.join(' '));
   try {
     await conSubmit(async () => ({ id: 'd1', seq: 801, files: [], failed: [{ name: 'spec.md', reason: 'caricamento non riuscito' }] }), async () => {
-      const code = await SCRIPT.main(['T', 'X', '--allega', spec]);
+      const code = await SCRIPT.main(['T', 'X', '--locale', '--allega', spec]);
       assert.equal(code, SCRIPT.EXIT.RIFIUTATO);
     });
   } finally { console.error = orig; }
@@ -315,7 +315,7 @@ test('--allega: una immagine va nel campo delle immagini (i giudici la guardano)
   const md = join(dir, 'spec.md');
   writeFileSync(md, '# spec', 'utf8');
   await conSubmit(async () => ({ id: 'd1', seq: 900, images: ['u1'], files: [{ url: 'u2', name: 'spec.md' }], failed: [] }), async (visti) => {
-    const code = await SCRIPT.main(['T', 'X', '--allega', png, '--allega', md]);
+    const code = await SCRIPT.main(['T', 'X', '--locale', '--allega', png, '--allega', md]);
     assert.equal(code, SCRIPT.EXIT.FATTO);
     assert.equal(visti[0].images.length, 1);
     assert.ok(visti[0].images[0].dataUrl.startsWith('data:image/png;base64,'));
@@ -326,17 +326,31 @@ test('--allega: una immagine va nel campo delle immagini (i giudici la guardano)
 
 // ── Lavori locali (#908) ─────────────────────────────────────────────────────
 
-test('#908 di norma il feedback nasce lavoro locale, e l’uscita lo dice col numero per il finish', async () => {
+test('#908 --locale: il feedback nasce lavoro locale, e l’uscita lo dice col numero per il finish', async () => {
   const righe = [];
   const orig = console.log;
   console.log = (...a) => righe.push(a.join(' '));
   try {
     await conSubmit(async (_p, o) => ({ id: 'd9', seq: 909, senderProof: 'admin', localOnly: !!o.localOnly }), async (visti) => {
-      assert.equal(await SCRIPT.main(['T', 'X']), SCRIPT.EXIT.FATTO);
+      assert.equal(await SCRIPT.main(['T', 'X', '--locale']), SCRIPT.EXIT.FATTO);
       assert.ok(visti.opts[0].localOnly);
     });
   } finally { console.log = orig; }
   assert.ok(righe.some((r) => /Lavoro locale/.test(r) && /--feedback 909/.test(r)), righe.join('\n'));
+});
+
+// Verifica di #908, giro 6: la regola dell'owner sulle segnalazioni non urgenti apre un feedback senza opzioni, e
+// di norma voleva le routine. Senza scelta non si apre niente, a vuoto o no, e il rifiuto dice le due strade.
+test('#908 senza --locale né --non-locale non apre niente e dice le due strade; con tutte e due nemmeno', async () => {
+  await conSubmit(async () => { throw new Error('submit non doveva essere chiamata'); }, async (visti) => {
+    for (const argv of [['T', 'X'], ['T', 'X', '--dry-run'], ['T', 'X', '--locale', '--non-locale']]) {
+      let code;
+      const err = await conStderr(async () => { code = await SCRIPT.main(argv); });
+      assert.equal(code, SCRIPT.EXIT.USO, argv.join(' '));
+      assert.match(err, argv.length === 4 ? /scegline uno/ : /--non-locale {2}una segnalazione per le routine[\s\S]*--locale {6}il lavoro di questa sessione/, argv.join(' '));
+    }
+    assert.equal(visti.length, 0);
+  });
 });
 
 test('#908 --non-locale: stessa prova del mittente, ma è per le routine', async () => {

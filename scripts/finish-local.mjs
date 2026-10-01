@@ -487,7 +487,7 @@ export function senzaPraticaStop({ checkOnly, pratica }) {
   return [
     'Questo lavoro non ha la sua pratica, e ogni lavoro locale ne ha una: in Gestione è il registro di cosa fa ogni sessione.',
     'Aprila e legala, poi rilancia:',
-    '  npm run feedback:apri -- "<titolo>" "<cosa fa il lavoro>"',
+    '  npm run feedback:apri -- "<titolo>" "<cosa fa il lavoro>" --locale',
     '  npm run finish -- --feedback <N>',
     'Non ho toccato niente.',
   ].join('\n');
