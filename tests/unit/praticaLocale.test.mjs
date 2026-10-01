@@ -81,3 +81,17 @@ test('verify-local start: la pratica resta legata al ramo finché non se ne indi
   // Un ramo senza pratica non se ne inventa una.
   assert.equal(withRequest({}, 'claude/y', { request: 'r', sha: 'a' })['claude/y'].feedbackId, undefined);
 });
+
+// Giro 4 della verifica locale: a ogni avvio la pratica riceve il giro che parte e com'è andato quello prima.
+test('notaDelGiro: il giro che parte, e il precedente coi rilievi in una frase e il livello a parole', async () => {
+  const { notaDelGiro } = await import('../../scripts/verify-local.mjs');
+  const primo = notaDelGiro({ rounds: [] }, { branch: 'claude/x', sha: 'abcdef1234567' });
+  assert.equal(primo, 'Verifica locale, giro 1: avviata sul ramo claude/x (abcdef12).');
+  const critica = 'Ho provato tutto.\n[2i] Il salvataggio non parte. Passi lunghi.\n    passi\n[0e] Un menu esce dallo schermo.';
+  const secondo = notaDelGiro({ rounds: [{ outcome: 'corretto', critique: critica }] }, { branch: 'claude/x', sha: 'ff00ff00ff' });
+  assert.match(secondo, /^Verifica locale, giro 2: avviata sul ramo claude\/x \(ff00ff00\)\./);
+  assert.match(secondo, /Giro 1: corretto, 2 rilievi\./);
+  assert.match(secondo, /· livello 2: Il salvataggio non parte\./);
+  assert.match(secondo, /· livello 0, di un altro lavoro: Un menu esce dallo schermo\./);
+  assert.doesNotMatch(secondo, /\[\d[iev]/, 'niente quadre col livello: nella conversazione sembrerebbero rilievi');
+});

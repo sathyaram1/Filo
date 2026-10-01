@@ -348,3 +348,32 @@ test('le strade proposte dal rifiuto non rifiutano a loro volta: niente Ricevuti
     assert.deepEqual(vicoli, [], nome);
   }
 });
+
+// Giro 4 della verifica locale: la pratica racconta il lavoro, presa in carico e giri nella conversazione.
+test('l’avvio della verifica prende in carico la pratica in coda e ci scrive il giro; fuori dal lavoro non la tocca', async () => {
+  const base = { clientId: 'local:claude', senderProof: 'admin', statusPublic: 'open', notes: '' };
+  await conRete(documento('p1', { ...base, status: 'todo' }), async (patch) => {
+    const r = await mod.annotaPratica('p1', 'Verifica locale, giro 1: avviata.', OPTS);
+    assert.deepEqual([r.ok, r.from, r.to], [true, 'todo', 'working'], r.motivo);
+    assert.equal(patch.length, 1);
+    assert.match(patch[0].url, /updateMask\.fieldPaths=status/);
+    assert.match(patch[0].url, /updateMask\.fieldPaths=notes/);
+  });
+  await conRete(documento('p2', { ...base, status: 'working' }), async (patch) => {
+    const r = await mod.annotaPratica('p2', 'Verifica locale, giro 2: avviata.', OPTS);
+    assert.deepEqual([r.ok, r.from, r.to], [true, 'working', 'working'], r.motivo);
+    assert.equal(patch.length, 1);
+  });
+  for (const status of ['design', 'unlabeled', 'done', 'archived']) {
+    await conRete(documento('p3', { ...base, status }), async (patch) => {
+      const r = await mod.annotaPratica('p3', 'x', OPTS);
+      assert.equal(r.ok, false, status);
+      assert.equal(patch.length, 0, status);
+    });
+  }
+  // Un utente non si prende in carico nemmeno da qui.
+  await conRete(documento('p4', { clientId: 'c-tester', statusPublic: 'open', notes: '', status: 'todo' }), async (patch) => {
+    assert.equal((await mod.annotaPratica('p4', 'x', OPTS)).ok, false);
+    assert.equal(patch.length, 0);
+  });
+});

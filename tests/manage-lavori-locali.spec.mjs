@@ -359,3 +359,21 @@ test('segnalato dai giudici o dal filtro: «È mio» dal tasto destro avverte co
   }
   expect(await page.evaluate(() => window.__updates.filter((u) => 'localOnly' in u))).toEqual([]);
 });
+
+// Giro 4 della verifica locale: un lavoro locale preso in carico non riceve le frasi delle routine.
+test('un lavoro locale «In lavorazione» dice che lo porta avanti una sessione, non che rientra in coda da solo', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const da = new Date(Date.now() - 40 * 60 * 1000).toISOString();
+  const preso = fb({ status: 'working', workingSince: da, localOnly: SEGNO });
+  const routine = fb({ _id: 'r-1', seq: 701, clientId: 'utente-x', senderProof: undefined, status: 'working', workingSince: da });
+  await apri(page, [preso, routine]);
+  // Il lavoro di una routine resta com'era.
+  await expect(page.locator('.mg-item[data-id="r-1"]')).toContainText('rientra in coda da solo');
+  await tabBtn(page, 'local').click();
+  const scheda = page.locator('.mg-item[data-id="loc-1"]');
+  await expect(scheda).toContainText('In lavorazione in una sessione locale');
+  await expect(scheda).not.toContainText(/rientra in coda|Controllo sicurezza/);
+  await scheda.click();
+  await expect(page.locator('#mgWorkState')).toContainText('In lavorazione in una sessione locale');
+  await expect(page.locator('#mgWorkState')).not.toContainText('rientra in coda');
+});
