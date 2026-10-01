@@ -18,6 +18,11 @@ const DATI = [
   fb('X1', 905, 'todo', { senderProof: undefined }),
   fb('I1', 906, 'design', { localOnly: { by: 'local:claude', at: ADESSO }, statusReason: 'clarify' }),
   fb('R1', 907, 'unlabeled', { clientId: 'tester@example.com', senderProof: undefined, statusReason: 'locale' }),
+  fb('S1', 908, 'design', {
+    clientId: 'tester@example.com', senderProof: undefined, statusReason: 'locale', blockReason: 'locale',
+    pipeline: { action: 'candidate_change', l2Class: 'aligned', verdicts: [{ class: 'aligned' }, { class: 'aligned' }, { class: 'aligned' }, { class: 'aligned' }] },
+    notes: 'Richiede lavoro locale. Serve pubblicare le regole del server.',
+  }),
 ];
 
 async function apri(openTab) {
