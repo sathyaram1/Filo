@@ -306,10 +306,17 @@ export async function main(argvIn) {
     uso();
     return EXIT.USO;
   }
+  // Chi lo lavora si dice sempre: senza scelta, una segnalazione per le routine nasceva lavoro locale e non la
+  // prendeva nessuno (verifica di #908, giro 6). Un errore d'uso costa una riga; un feedback perso no.
+  const locale = argv.includes('--locale');
+  if (locale === argv.includes('--non-locale')) {
+    console.error(locale ? 'RIFIUTATO: --locale e --non-locale insieme: scegline uno. Non ho aperto niente.' : SENZA_SCELTA);
+    uso();
+    return EXIT.USO;
+  }
   const prioritaRaw = flag('priorita');
   const url = flag('url');
   const dryRun = argv.includes('--dry-run');
-  const locale = !argv.includes('--non-locale');
   // `--allega` è ripetibile: si raccolgono tutti i valori.
   const percorsiAllegati = argv.flatMap((a, i) => (a === '--allega' && argv[i + 1] !== undefined ? [argv[i + 1]] : []));
 
