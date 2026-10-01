@@ -1898,6 +1898,11 @@
       }
       mask.push('localOnly');
     }
+    // La prova del mittente data dall'owner («È mio», #908): si aggiunge e basta, non si toglie da qui.
+    if (senderProof === 'admin') {
+      fields.senderProof = toFsValue('admin');
+      mask.push('senderProof');
+    }
     if (priority !== undefined) {
       // Priorità 1-3 (0 = nessuna). Clamp PRIMA di cifrare.
       const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
