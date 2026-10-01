@@ -86,11 +86,11 @@ const DEPOSITO = 'https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebas
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
 
 /** Rete finta: il documento del feedback, e i byte di ogni allegato al suo indirizzo. */
-function reteConAllegati({ status = 'todo', files = [], images = [], pipeline }, byte = {}) {
+function reteConAllegati({ status = 'todo', files = [], images = [], pipeline, notes = '' }, byte = {}) {
   const chiesti = [];
   const fields = {
     status: { stringValue: status }, clientId: { stringValue: 'owner:me' }, senderProof: { stringValue: 'admin' },
-    name: { stringValue: 'Profilo segreto' }, text: { stringValue: 'La spec completa sta nel documento.' },
+    name: { stringValue: 'Profilo segreto' }, text: { stringValue: 'La spec completa sta nel documento.' }, notes: { stringValue: notes },
     files: { arrayValue: { values: files.map((f) => ({ mapValue: { fields: Object.fromEntries(Object.entries(f).map(([k, v]) => [k, { stringValue: v }])) } })) } },
     images: { arrayValue: { values: images.map((u) => ({ stringValue: u })) } },
   };
