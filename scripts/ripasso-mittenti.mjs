@@ -383,8 +383,8 @@ async function leggiTutti(bearer, letture) {
       branch: typeof f.branch === 'string' ? f.branch : '',
       localOnly: !!(f.localOnly && typeof f.localOnly === 'object' && String(f.localOnly.by || '').trim()),
     };
-    // Il giudizio si apre solo dove decide: prefisso riservato, senza prova, fermo nei Ricevuti.
-    if (f.pipeline && !d.senderProof && categoria(d.clientId) && d.status === 'unlabeled') {
+    // Il giudizio si apre solo dove decide: prefisso riservato, senza prova, in uno stato dei Ricevuti.
+    if (f.pipeline && !d.senderProof && categoria(d.clientId) && MR.isRicevutiStatus(d.status)) {
       let p = f.pipeline;
       try { p = (await decryptFeedbackFields({ pipeline: p })).pipeline; } catch (_) { /* resta illeggibile */ }
       d.pipeline = p && typeof p === 'object' ? p : 'illeggibile';
