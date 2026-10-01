@@ -147,9 +147,9 @@ export async function righeAllegati({ documenti, immagini }, { fetchImpl = fetch
         const testo = Buffer.from(byte).toString('utf8');
         const cornice = incornicia(`Allegato «${nome}»`, testo, segno);
         if (testo.length <= MAX_IN_LINEA) righe.push(cornice);
-        else righe.push(`Allegato «${nome}»: ${testo.length} caratteri, troppi da stampare qui. L’ho salvato con la cornice in ${salva(`${nome}.txt`, cornice)}: leggilo a pezzi.`);
+        else righe.push(`Allegato «${nome}»: ${testo.length} caratteri, troppi da stampare qui. L’ho salvato con la cornice in ${salva(`${i + 1}-${nome}.txt`, cornice)}: leggilo a pezzi.`);
       } else {
-        righe.push(`Allegato «${nome}» (${d.type || 'tipo non dichiarato'}, ${byte.length} byte): salvato in ${salva(nome, byte)}.`);
+        righe.push(`Allegato «${nome}» (${d.type || 'tipo non dichiarato'}, ${byte.length} byte): salvato in ${salva(`${i + 1}-${nome}`, byte)}.`);
       }
     } catch (e) {
       righe.push(`Allegato «${nome}»: non letto, ${String((e && e.message) || e)}.`);
@@ -169,10 +169,11 @@ export async function righeAllegati({ documenti, immagini }, { fetchImpl = fetch
 
 /**
  * Legge `id` e decide: stato e giudizio si decifrano da soli, e il resto solo se lo permettono.
- * `decifra` riceve i campi grezzi e li rende in chiaro (lib/decrypt-feedback-fields.mjs).
+ * `decifra` riceve i campi grezzi e li rende in chiaro (lib/decrypt-feedback-fields.mjs); `apriByte` fa lo stesso
+ * coi byte degli allegati, che finiscono in `cartella` quando non si stampano.
  * @returns {Promise<{ codice: number, errore?: string, testo?: string }>}
  */
-export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fetch, decifra, seq = null, segno } = {}) {
+export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fetch, decifra, apriByte, cartella, seq = null, segno } = {}) {
   const maschera = CAMPI.map((c) => `mask.fieldPaths=${c}`).join('&');
   const res = await fetchImpl(`${base}/feedback/${encodeURIComponent(id)}?${maschera}`, { headers: { Authorization: `Bearer ${bearer}` } });
   if (!res.ok) return { codice: res.status >= 500 ? 4 : 3, errore: `lettura fallita (${res.status})` };
