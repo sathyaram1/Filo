@@ -1784,7 +1784,8 @@
     if (num) {
       voci.push({
         testo: `Copia #${num}`,
-        titolo: 'Il numero con cui parlarne, anche a npm run finish -- --feedback',
+        // Solo le pratiche tue o di una sessione si legano a un lavoro locale: per le altre il numero serve a parlarne.
+        titolo: MR.isProvenLocalSender(fb) ? 'Il numero con cui parlarne, anche a npm run finish -- --feedback' : 'Il numero con cui parlarne',
         azione: () => { navigator.clipboard.writeText(`#${num}`).then(() => setManageMsg(`#${num} copiato.`, 'ok'), () => {}); },
       });
     }
