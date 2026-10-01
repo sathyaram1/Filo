@@ -278,6 +278,10 @@ export async function riconosciMittente(id, opts = {}) {
   if (!MR.mittenteDaRiconoscere(fb)) {
     return { ok: false, motivo: fb.senderProof ? 'la prova del mittente c’è già' : 'non porta il prefisso dell’owner né di una sessione' };
   }
+  const segnalato = MR.segnalatoComeAttacco(fb);
+  if (segnalato) {
+    return { ok: false, motivo: `${segnalato}: a un segnalato la prova la dà solo l’owner, in Gestione («È mio»), dopo averlo guardato` };
+  }
   if (opts.dryRun) return { ok: true, dryRun: true };
   const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=senderProof`, {
     method: 'PATCH',
