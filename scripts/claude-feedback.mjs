@@ -289,7 +289,7 @@ export async function main(argvIn) {
   // riga che chi l'ha scritta considera giusta.
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
-    opzioni: ['--priorita', '--url', '--allega', '--non-locale', '--dry-run'],
+    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--dry-run'],
     conValore: ['--priorita', '--url', '--allega'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
