@@ -316,6 +316,23 @@ export async function serveLocale(id, nota = '', opts = {}) {
   return scrivi(id, 'design', testo, { ...opts, bearer, attore: 'routine', reason: 'locale' });
 }
 
+const STATI_DEL_LAVORO_LOCALE = Object.freeze(['todo', 'working', 'revision_capability', 'revision_security']);
+
+/**
+ * Il giro di un lavoro locale nella sua pratica (#908): presa in carico se è ancora in coda, e la nota nella
+ * conversazione. Fuori dagli stati del lavoro (Ricevuti, chiusa) non la tocca.
+ * @returns {Promise<{ ok: true, from: string, to: string } | { ok: false, motivo: string }>}
+ */
+export async function annotaPratica(id, nota, opts = {}) {
+  const bearer = opts.bearer || await acquireBearer();
+  const doc = await getDoc(id, bearer, ['status']);
+  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
+  const { from, leggibile } = await statoAttuale(doc);
+  if (!leggibile) return { ok: false, motivo: 'stato non decifrabile' };
+  if (!STATI_DEL_LAVORO_LOCALE.includes(from)) return { ok: false, motivo: `la pratica è in «${from}», fuori dal lavoro: non la tocco` };
+  return scrivi(id, from === 'todo' ? 'working' : from, nota, { ...opts, bearer, attore: 'routine' });
+}
+
 /**
  * Una sessione locale può legare il suo lavoro a questa pratica (verify-local start --feedback, finish
  * --feedback)? Solo se è dell'owner o di una sessione con la prova: in locale i feedback degli utenti non si lavorano.
