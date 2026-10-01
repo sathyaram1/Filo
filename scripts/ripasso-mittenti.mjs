@@ -39,7 +39,6 @@ export const MOTIVO = Object.freeze({
   SENZA_SEGNO: 'nessun segno che li distingua da un falso',
 });
 
-const RISCHIO = ['attack', 'spam'];
 const STATI_SEGNALATI_RE = /^(attack|spam|suspicious_file)/;
 // La GitHub Action della coda creava col service account entro minuti dall'accodamento (cron di riserva: 30').
 const FINESTRA_CODA_MS = { prima: 10 * 60e3, dopo: 24 * 3600e3 };
