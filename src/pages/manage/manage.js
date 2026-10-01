@@ -2194,7 +2194,12 @@
   // Traduce l'avanzamento (MR.workProgress) in una riga leggibile: i tre
   // passaggi dell'iter come spunte (✓ fatto · ● in corso · ○ da fare) e se
   // un'istanza ci sta lavorando in questo momento.
-  function workStateHtml(progress) {
+  function workStateHtml(progress, fb) {
+    // Un lavoro locale non ha l'iter delle routine né il loro rientro in coda: lo porta avanti una sessione.
+    if (fb && MR.isLocalOnly(fb)) {
+      const dove = progress.status === 'working' ? 'In lavorazione' : 'In verifica';
+      return `<div class="mg-item-state"><span class="mg-work-idle">${dove} in una sessione locale</span></div>`;
+    }
     const marks = { done: '✓', current: '●', pending: '○' };
     const steps = progress.steps.map((s) =>
       `<span class="mg-step mg-step--${s.state}" title="${esc(s.label)}: ${
