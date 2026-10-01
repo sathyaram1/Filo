@@ -1147,6 +1147,16 @@ if (isMain) {
       }
     }
     writeState(state);
+    // La pratica racconta il lavoro: presa in carico al primo giro, e a ogni giro com'è andato quello prima.
+    if (state[b].feedbackId) {
+      const { annotaPratica } = await import('./owner-feedback.mjs');
+      const nota = notaDelGiro(state[b], { branch: b, sha: state[b].requestedSha || headSha() });
+      const a = await annotaPratica(state[b].feedbackId, nota).catch((e) => ({ ok: false, motivo: String((e && e.message) || e) }));
+      const chi = state[b].feedbackNum ? `#${state[b].feedbackNum}` : state[b].feedbackId;
+      console.error(a.ok
+        ? `Pratica ${chi}: ${a.from === a.to ? 'giro annotato' : 'presa in carico («In lavorazione») e giro annotato'}.`
+        : `Pratica ${chi} non aggiornata (${a.motivo}): in Gestione questo giro non compare.`);
+    }
     const scope = ambitoLocale(capsStart, state[b]);
     console.log(buildVerifierBrief({
       request, branch: b, recipe: readRecipe(ROOT, scope), history: historyFromRounds(state[b].rounds),
