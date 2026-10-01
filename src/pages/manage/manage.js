@@ -2925,7 +2925,7 @@
     const chi = num ? ` (#${num})` : '';
     if (!check.ok) { setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${check.motivo}.`, 'err'); return; }
     if (selectedId === id && mgLocalBtn) mgLocalBtn.disabled = true;
-    setManageMsg(valore ? 'Segno la pratica come lavoro locale…' : 'La rimetto anche alle routine…', '');
+    setManageMsg(valore ? 'Segno la pratica come lavoro locale…' : (check.chiusa ? 'Tolgo il segno…' : 'La rimetto anche alle routine…'), '');
     try {
       const r = await sendToMain({ type: 'feedback_update', id, localOnly: valore });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
