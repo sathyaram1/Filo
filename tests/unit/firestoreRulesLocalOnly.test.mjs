@@ -72,8 +72,8 @@ test('la scheda di un lavoro locale non si respinge nelle regole (la toglie il s
   const pubblicatore = rami.filter((r) => r.verbi.includes('create'));
   assert.equal(pubblicatore.length, 1, 'un solo ramo crea le schede');
   assert.match(pubblicatore[0].cond, /^\(isAdmin\(\) \|\| isRoutine\(\)\)/);
-  assert.ok(pubblicatore[0].cond.includes("!('localOnly' in get(/databases/$(database)/documents/feedback/$(doc)).data)"),
-    'il segno sta sul feedback vero: la scheda con lo stesso id si rifiuta finché c\'è');
+  assert.ok(!pubblicatore[0].cond.includes('localOnly'),
+    'un rifiuto per il segno locale ferma la pubblicazione intera di un’app di prima: la scheda la toglie il server');
   const togli = rami.filter((r) => r.verbi.includes('delete'));
   assert.equal(togli.length, 1);
   assert.ok(!togli[0].cond.includes('localOnly'), 'togliere una scheda deve funzionare sempre');
