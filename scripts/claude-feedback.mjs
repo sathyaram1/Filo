@@ -17,10 +17,11 @@
 // COL TOKEN DELL'OWNER, SEMPRE (#595, #908)
 //   Si usa la STESSA strada dell'app (`src/shared/feedback.js`), testo cifrato
 //   verso l'owner, con la create autenticata che porta `senderProof: 'admin'`:
-//   senza quella prova il prefisso `local:` lo può scrivere chiunque. Di norma
-//   nasce col segno `localOnly`: è il lavoro di questa sessione, nessuna routine
-//   lo prende, e `npm run finish` col suo numero salta L5. `--non-locale` lo
-//   apre per le routine. Senza token (o col token rifiutato) non parte niente:
+//   senza quella prova il prefisso `local:` lo può scrivere chiunque. Chi lo
+//   lavora si sceglie ogni volta: `--locale` mette il segno `localOnly` (il
+//   lavoro di questa sessione: nessuna routine lo prende, e `npm run finish` col
+//   suo numero salta L5), `--non-locale` lo apre per le routine. Senza scelta
+//   non parte niente. Senza token (o col token rifiutato) non parte niente:
 //   da anonimo sarebbe un feedback d'utente. `--priorita` riusa lo stesso token.
 //
 // USO
