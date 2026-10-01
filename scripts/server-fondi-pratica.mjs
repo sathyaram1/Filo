@@ -123,9 +123,13 @@ export async function esegui(argv, deps = {}) {
     if (!prova.ok) { err(`La pratica ${chi} non porta un lavoro (${prova.motivo}): per un lavoro nuovo aprine una. Non ho toccato niente.`); return 3; }
     const figlio = { ...env, [PRATICA_ENV]: chi };
     const lancia = deps.lancia || lanciaServer;
+    const ramiApp = (deps.ramiAperti || ramiApertiDellaPratica)(r.id);
+    const dopo = ramiApp.length
+      ? `resterebbe aperta: la chiude la fusione di ${ramiApp.join(', ')} dell'app`
+      : `si chiuderebbe con «${notaFine(a.ramo, '')}»`;
     if (a.dryRun) {
       const k = lancia(cartella, [a.ramo, '--dry-run'], figlio);
-      log(`PROVA: la pratica ${chi} andrebbe in lavorazione e, a fusione riuscita, si chiuderebbe con «${notaFine(a.ramo, '')}»`);
+      log(`PROVA: la pratica ${chi} andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`);
       return k;
     }
     const presa = await of.annotaPratica(r.id, notaInizio(a.ramo), { bearer });
