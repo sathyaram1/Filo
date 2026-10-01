@@ -1,6 +1,7 @@
 // Verifica locale «lavori locali», giro 5, rilievo 1: la presa in carico all'avvio della verifica porta «In lavorazione»
 // anche una pratica dell'owner senza segno locale, e il server (stall) la rimette in coda alle routine dopo un'ora.
-// Rete finta per gli strumenti della sessione; la regola del server si legge dal checkout di filo-security, se c'è.
+// Rete finta; `start --feedback` simulato con le sue due chiamate (se la cura sta altrove, la prova la segue).
+// La regola del server si legge dal checkout di filo-security, se c'è.
 import { test, expect } from '@playwright/test';
 import { pathToFileURL } from 'node:url';
 import { join, dirname } from 'node:path';
