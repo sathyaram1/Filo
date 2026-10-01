@@ -3,18 +3,18 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   cartellaDelServer, leggiArgomenti, esegui, PRATICA_ENV,
 } from '../../scripts/server-fondi-pratica.mjs';
 import { FIRESTORE_BASE } from '../../scripts/lib/firestore-auth.mjs';
 
 test('cartellaDelServer: il checkout del server accanto al repo, dal checkout principale e da una sua worktree', () => {
-  const server = join('/x', 'filo-security', 'functions');
+  const server = resolve('/x', 'filo-security', 'functions');
   const esiste = (p) => p === join(server, 'tools', 'server-fondi.js');
-  assert.equal(cartellaDelServer(join('/x', 'Filo'), esiste), server);
-  assert.equal(cartellaDelServer(join('/x', 'Filo', '.claude', 'worktrees', 'lavoro'), esiste), server);
-  assert.equal(cartellaDelServer(join('/y', 'Filo'), () => false), '');
+  assert.equal(cartellaDelServer(resolve('/x', 'Filo'), esiste), server);
+  assert.equal(cartellaDelServer(resolve('/x', 'Filo', '.claude', 'worktrees', 'lavoro'), esiste), server);
+  assert.equal(cartellaDelServer(resolve('/y', 'Filo'), () => false), '');
 });
 
 test('leggiArgomenti: ramo, pratica e prova a vuoto, anche quando npm si prende le opzioni', () => {

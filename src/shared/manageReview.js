@@ -617,9 +617,19 @@
    * è di un utente: in locale non si lavora, e se servisse lavoro locale torna nei Ricevuti.
    * `opts.now` iniettabile nei test.
    */
+  // Chiusa per lo stato o per il riflesso pubblico: lì il segno locale tiene la pratica fuori dalla bacheca, non dalle routine.
+  function praticaChiusa(fb, opts) {
+    const tab = manageTabFor(fb, opts);
+    return tab === 'resolved' || tab === 'archived' || ['done', 'archived'].includes(normalizeStatus(fb).status)
+      || String((fb && fb.statusPublic) || 'open') === 'closed';
+  }
+
   function localSignCheck(fb, valore, opts) {
     if (!fb) return { ok: false, motivo: 'feedback non trovato' };
-    if (!valore) return isLocalOnly(fb) ? { ok: true } : { ok: false, motivo: 'il segno «solo in locale» non c’è' };
+    if (!valore) {
+      if (!isLocalOnly(fb)) return { ok: false, motivo: 'il segno «solo in locale» non c’è' };
+      return praticaChiusa(fb, opts) ? { ok: true, chiusa: true } : { ok: true };
+    }
     if (isLocalOnly(fb)) return { ok: false, motivo: 'il segno «solo in locale» c’è già' };
     const mittente = localSenderCheck(fb);
     if (!mittente.ok) return mittente;
