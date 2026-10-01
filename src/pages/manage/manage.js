@@ -2112,7 +2112,7 @@
         ${priorityDotsHtml(fb)}
       `;
       item.innerHTML = progress
-        ? `<div class="mg-item-row">${rowHtml}</div>${workStateHtml(progress)}`
+        ? `<div class="mg-item-row">${rowHtml}</div>${workStateHtml(progress, fb)}`
         : rowHtml;
       item.addEventListener('click', (e) => {
         // Il click su un pallino priorità non apre il dettaglio (lo gestisce il
