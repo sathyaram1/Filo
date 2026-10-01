@@ -153,9 +153,9 @@ test('legare un lavoro locale a una pratica: sì a owner e sessioni con la prova
     assert.equal(r.avviso, '', 'pratica completa: niente da avvisare');
   });
   await conRete(documento('o2', { clientId: 'owner:me', senderProof: 'admin', status: 'todo', statusPublic: 'open' }), async () => {
-    const r = await mod.praticaPerLaSessione('o2', OPTS);
+    const r = await mod.praticaPerLaSessione('o2', { ...OPTS, allaChiusura: true });
     assert.equal(r.ok, true, r.motivo);
-    assert.match(r.avviso, /solo in locale/, 'senza il segno si lavora, ma L5 non si salta: lo dice');
+    assert.match(r.avviso, /solo in locale/, 'alla chiusura senza il segno si lega, ma L5 non si salta: lo dice');
   });
   for (const [id, campi] of [
     ['u850', { clientId: 'c-tester', status: 'todo', statusPublic: 'open' }],
