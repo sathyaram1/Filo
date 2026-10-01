@@ -385,7 +385,10 @@ test('le strade proposte dal rifiuto non rifiutano a loro volta: niente Ricevuti
 
 // Giro 4 della verifica locale: la pratica racconta il lavoro, presa in carico e giri nella conversazione.
 test('l’avvio della verifica prende in carico la pratica in coda e ci scrive il giro; fuori dal lavoro non la tocca', async () => {
-  const base = { clientId: 'local:claude', senderProof: 'admin', statusPublic: 'open', notes: '' };
+  const base = {
+    clientId: 'local:claude', senderProof: 'admin', statusPublic: 'open', notes: '',
+    localOnly: { mapValue: { fields: { by: { stringValue: 'local:claude' }, at: { integerValue: '1790000000000' } } } },
+  };
   await conRete(documento('p1', { ...base, status: 'todo' }), async (patch) => {
     const r = await mod.annotaPratica('p1', 'Verifica locale, giro 1: avviata.', OPTS);
     assert.deepEqual([r.ok, r.from, r.to], [true, 'todo', 'working'], r.motivo);
