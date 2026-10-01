@@ -1327,7 +1327,8 @@
 
   async function batchGetDirect(collectionId, wanted, { timeoutMs = 0, idToken = '', fields = null } = {}) {
     const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
-    const prefix = `${FIRESTORE_BASE}/${collectionId}/`;
+    // batchGet vuole il NOME della risorsa: con l'indirizzo intero risponde 400 a ogni richiesta.
+    const prefix = `projects/${PROJECT_ID}/databases/(default)/documents/${collectionId}/`;
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const corpo = { documents: wanted.map((id) => prefix + id) };
