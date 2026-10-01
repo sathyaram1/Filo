@@ -87,6 +87,10 @@
   function isProvenLocalWork(fb) {
     return isLocalOnly(fb) && isProvenLocalSender(fb);
   }
+  // Prefisso dell'owner o di una sessione senza prova: solo l'owner può dire che è suo, e dargliela (#908).
+  function mittenteDaRiconoscere(fb) {
+    return isUnprovenSender(fb) && LOCAL_SENDER_RE.test(String(fb.clientId || ''));
+  }
 
   // Vocabolario unico della macchina a stati (src/shared/feedbackStatus.js).
   // Letto pigramente: nelle pagine filo:// va incluso PRIMA di questo file,
