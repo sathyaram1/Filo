@@ -3,20 +3,30 @@
 // Regole: tests/unit/leggiFeedback.test.mjs. Uso: npm run feedback:leggi -- <numero|id>
 
 import { randomBytes } from 'node:crypto';
-import { resolve } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { risolviFeedback } from './lib/pratica-locale.mjs';
 import '../src/shared/feedbackThread.js';
 import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
+import '../src/shared/feedbackClientIdHash.js';
+import '../src/shared/feedback.js';
+import '../src/shared/feedbackImage.js';
 import '../src/shared/feedbackStatus.js';
 import '../src/shared/manageReview.js';
 
 const FS = globalThis.SN_FB_STATUS;
 const MR = globalThis.SN_MANAGE_REVIEW;
 const TH = globalThis.SN_FEEDBACK_THREAD;
-const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline'];
+const FB = globalThis.SN_FEEDBACK;
+const IMG = globalThis.SN_FEEDBACK_IMAGE;
+const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline', 'files', 'images'];
+// Un documento testuale si stampa nella cornice fino a qui; oltre va in un file (con la cornice), e la riga lo dice.
+const MAX_IN_LINEA = 60000;
+const TIPO_TESTO = /^(text\/|application\/(json|x-yaml|yaml)\b)/i;
 
 /** '' se il testo si può leggere, altrimenti il motivo. `pipeline` decifrato, se c'è. PURA. */
 export function vietatoLeggere(status, pipeline) {
