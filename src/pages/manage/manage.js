@@ -157,6 +157,7 @@
   const mgPreapprovedInfo = document.getElementById('mgPreapprovedInfo');
   const mgPreapproveLine = document.getElementById('mgPreapproveLine');
   const mgLocalBtn   = document.getElementById('mgLocalBtn');
+  const mgSenderBtn  = document.getElementById('mgSenderBtn');
   const mgStarBtn    = document.getElementById('mgStarBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
 
