@@ -379,6 +379,8 @@ async function leggiTutti(bearer, letture) {
       parentId: typeof f.parentId === 'string' ? f.parentId : '',
       // Il titolo serve solo dove è in chiaro (la coda vecchia): non si decifra.
       name: typeof f.name === 'string' && !/^FENC1:/.test(f.name) ? f.name : '',
+      branch: typeof f.branch === 'string' ? f.branch : '',
+      localOnly: !!(f.localOnly && typeof f.localOnly === 'object' && String(f.localOnly.by || '').trim()),
     };
     // Il giudizio si apre solo dove decide: prefisso riservato, senza prova, fermo nei Ricevuti.
     if (f.pipeline && !d.senderProof && categoria(d.clientId) && d.status === 'unlabeled') {
