@@ -54,6 +54,17 @@ function giudizioAperto(p) {
   try { return JSON.parse(p); } catch (_) { return p; }
 }
 
+/**
+ * Il giudizio dei campi grezzi di un documento, in chiaro: oggetto, stringa se non si apre, undefined se mai giudicato.
+ * `decifra` come in `leggi`. Serve a chi decide con la stessa regola del lettore (segno locale, prova del mittente).
+ */
+export async function giudizioInChiaro(fields, decifra) {
+  const g = giudizioGrezzo(fields);
+  if (g === undefined) return undefined;
+  const d = await Promise.resolve().then(() => decifra({ pipeline: g })).catch(() => ({ pipeline: g }));
+  return giudizioAperto(d && d.pipeline !== undefined ? d.pipeline : g);
+}
+
 /** Chi l'ha mandato, in parole. PURA. */
 export function mittenteInParole(fb) {
   if (MR.isProvenLocalSender(fb)) return /^local:/i.test(String(fb.clientId || '')) ? 'una sessione locale' : 'l’owner';
