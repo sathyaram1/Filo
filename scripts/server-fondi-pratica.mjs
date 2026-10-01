@@ -142,6 +142,13 @@ export async function esegui(argv, deps = {}) {
       return k;
     }
     const sha = (deps.punta || puntaDelServer)(cartella);
+    if (ramiApp.length) {
+      const nota = `${notaFine(a.ramo, sha)} La pratica resta aperta: la chiude la fusione di ${ramiApp.join(', ')} dell'app.`;
+      const annotata = await of.annotaPratica(r.id, nota, { bearer });
+      if (!annotata.ok) err(`${a.ramo} è su main del server, ma la pratica ${chi} non l'ha registrato (${annotata.motivo}).`);
+      log(`${a.ramo} è su main del server. La pratica ${chi} resta aperta: la chiude la fusione di ${ramiApp.join(', ')} dell'app. Per il deploy: npm run server:pubblica, da filo-security/functions.`);
+      return annotata.ok ? 0 : 1;
+    }
     const chiusa = await of.scrivi(r.id, 'done', notaFine(a.ramo, sha), { bearer, attore: 'routine' });
     if (!chiusa.ok) {
       err(`${a.ramo} è su main del server, ma la pratica ${chi} non si è chiusa (${chiusa.motivo}). Chiudila a mano:\n  npm run feedback -- ${r.id} done "${notaFine(a.ramo, sha)}" --come-routine`);
