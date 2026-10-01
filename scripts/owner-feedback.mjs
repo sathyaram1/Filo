@@ -208,9 +208,17 @@ async function praticaInChiaro(doc) {
   const status = String(dec.status || '').trim();
   if (!FS.isCanonical(status)) return null;
   const lo = f.localOnly?.mapValue?.fields;
+  // Il giudizio, per la regola del lettore (MR.segnalatoComeAttacco): un segnalato non prende segno né prova da qui.
+  let pipeline;
+  if (f.pipeline) {
+    const { giudizioInChiaro } = await import('./leggi-feedback.mjs');
+    const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
+    pipeline = await giudizioInChiaro(f, decryptFeedbackFields);
+  }
   return {
     clientId: String(dec.clientId || ''),
     status,
+    ...(pipeline === undefined ? {} : { pipeline }),
     senderProof: f.senderProof?.stringValue || '',
     statusPublic: f.statusPublic?.stringValue || 'open',
     localOnly: lo ? { by: lo.by?.stringValue || '', at: Number(lo.at?.integerValue || 0) } : undefined,
