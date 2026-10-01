@@ -385,7 +385,7 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   verifica locale li legge dal server e senza si ferma.)*
 - **`firestore.rules`**: enum `status` esteso ai nuovi valori (in create anonimo resta
   bloccato: solo `new`→ ora `unlabeled`), `hasOnly` esteso con `statusReason`,
-  `workingSince`. Deploy manuale (`firebase deploy --only firestore:rules`).
+  `workingSince`. Deploy manuale (`npm run regole:pubblica`).
 
 ### 8. Migrazione legacy → nuovi stati — ricostruito, [CONFERMARE con owner]
 Script one-shot (o normalizzazione in lettura + riscrittura al primo write):

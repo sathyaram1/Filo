@@ -243,10 +243,11 @@ automatico.
 
 Se le regole sono l'unico confine, il confine si sposta quando le regole
 arrivano sul progetto Firebase, non quando il file cambia nel repo. Nessun
-automatismo le pubblica: si fa a mano, con
+automatismo le pubblica: si fa a mano, da main allineato a origin/main (la
+guardia rifiuta un ramo o una modifica non fusa), con
 
 ```bash
-npm run deploy:regole                      # regole + indici di Firestore
+npm run regole:pubblica                    # regole + indici di Firestore
 firebase deploy --only storage:rules       # le regole dello storage, a parte
 ```
 

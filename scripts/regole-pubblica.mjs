@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-// Quello che pubblicava il vecchio deploy:regole: gli indici vanno con le regole che li usano.
+// Gli indici vanno con le regole che li usano: una query senza il suo indice smette di rispondere in silenzio.
 export const BERSAGLI = Object.freeze(['firestore:rules', 'firestore:indexes']);
 const OPZIONI = ['--dry-run'];
 
@@ -58,7 +58,7 @@ function git(args) {
   const env = { ...process.env };
   delete env.GIT_DIR; delete env.GIT_WORK_TREE; delete env.GIT_INDEX_FILE;
   const r = spawnSync('git', args, { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-  return { codice: r.error ? 127 : r.status, out: (r.stdout || '').trim(), err: (r.stderr || String(r.error || '')).trim() };
+  return { codice: r.error ? 127 : r.status, out: r.stdout || '', err: (r.stderr || String(r.error || '')).trim() };
 }
 
 const leggiJson = (nome) => { try { return JSON.parse(readFileSync(resolve(ROOT, nome), 'utf8')); } catch (_) { return null; } };
@@ -74,7 +74,7 @@ function stato() {
   const st = file.length ? git(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...file]) : { codice: 0, out: '' };
   if (ramo.codice !== 0 || testa.codice !== 0 || st.codice !== 0) return { errore: `git non risponde: ${ramo.err || testa.err || st.err}`, file, progetto };
   return {
-    ramo: ramo.out === 'HEAD' ? '' : ramo.out, testa: testa.out, origine: origine.codice === 0 ? origine.out : '',
+    ramo: ramo.out.trim() === 'HEAD' ? '' : ramo.out.trim(), testa: testa.out.trim(), origine: origine.codice === 0 ? origine.out.trim() : '',
     file, progetto, toccati: fileToccati(st.out),
   };
 }
