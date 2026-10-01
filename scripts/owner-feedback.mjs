@@ -354,7 +354,7 @@ export async function praticaPerLaSessione(id, opts = {}) {
   const chi = MR.localSenderCheck(fb);
   if (!chi.ok) return { ok: false, motivo: chi.motivo, utente: !!chi.utente, senzaProva: !!chi.senzaProva, ...contestoDelRifiuto(fb) };
   if (!opts.allaChiusura && !MR.isLocalOnly(fb) && STATI_DEL_LAVORO_LOCALE.includes(fb.status)) {
-    return { ok: false, motivo: 'manca il segno «solo in locale»: senza, le routine la prendono, e la riprendono mentre la lavori', utente: false, senzaSegno: true };
+    return { ok: false, motivo: SENZA_SEGNO, utente: false, senzaSegno: true };
   }
   return { ok: true, avviso: avvisoDaCampi(doc.fields) };
 }
