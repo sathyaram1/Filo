@@ -314,8 +314,10 @@ export async function praticaPerLaSessione(id, opts = {}) {
 export function rifiutoPratica(id, r) {
   const righe = [`RIFIUTATO: ${String((r && r.motivo) || 'pratica non lavorabile in locale').replace(/\.$/, '')}.`];
   if (r && r.senzaProva) {
-    righe.push('Se l’hanno aperto l’owner o una sessione prima che la prova esistesse, il ripasso gliela dà (a vuoto con --dry-run):');
+    righe.push('Se l’hanno aperto l’owner o una sessione, il ripasso gliela dà (a vuoto con --dry-run):');
     righe.push('  npm run feedback:ripasso');
+    righe.push('Se il ripasso lo salta, solo l’owner può dire che è suo: in Gestione («È mio»), o chiedilo a lui e su sua parola');
+    righe.push(`  node scripts/owner-feedback.mjs ${id} --riconosci`);
     righe.push('Altrimenti vale come un utente.');
   }
   if (r && r.utente) {
@@ -526,13 +528,14 @@ if (isMain) {
     console.error('     node scripts/owner-feedback.mjs <numero|id> --preapprova | --chiedi-prima   (solo il segno, stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --solo-locale | --non-locale    (segno «solo in locale», stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --serve-locale ["perché"]       (feedback di un utente → Ricevuti, «richiede lavoro locale»)');
+    console.error('     node scripts/owner-feedback.mjs <numero|id> --riconosci                      (prova del mittente su un feedback tuo o di una tua sessione: solo su tua parola)');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
     opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar', '--preapprova', '--chiedi-prima',
-      '--solo-locale', '--non-locale', '--serve-locale'],
+      '--solo-locale', '--non-locale', '--serve-locale', '--riconosci'],
     conValore: ['--branch', '--reason', '--frase'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
@@ -588,7 +591,7 @@ if (isMain) {
   }
 
   // Il segno «solo in locale» e il ritorno nei Ricevuti: da soli, senza stato.
-  const locali = ['--solo-locale', '--non-locale', '--serve-locale'].filter((o) => argv.includes(o));
+  const locali = ['--solo-locale', '--non-locale', '--serve-locale', '--riconosci'].filter((o) => argv.includes(o));
   if (locali.length > 1) { console.error(`RIFIUTATO: ${locali.join(' e ')} insieme — non ho toccato niente.`); process.exit(1); }
   if (locali.length === 1) {
     if (!id) { uso(); process.exit(1); }
