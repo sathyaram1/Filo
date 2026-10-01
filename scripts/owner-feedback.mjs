@@ -360,6 +360,11 @@ export async function praticaPerLaSessione(id, opts = {}) {
  */
 export function rifiutoPratica(id, r) {
   const righe = [`RIFIUTATO: ${String((r && r.motivo) || 'pratica non lavorabile in locale').replace(/\.$/, '')}.`];
+  if (r && r.senzaSegno) {
+    righe.push('Se l’owner ti ha chiesto di lavorarla in locale, mettilo e rilancia (col segno, alla chiusura si fonde senza chiedergli):');
+    righe.push(`  node scripts/owner-feedback.mjs ${id} --solo-locale`);
+    righe.push('Se il segno l’ha tolto lui, chiediglielo prima: la vuole rivedere prima della fusione, o lasciare alle routine.');
+  }
   if (r && r.senzaProva && r.segnalato) {
     righe.push('È segnalato dai giudici: la prova del mittente la può dare solo l’owner, in Gestione («È mio»), dopo averlo guardato.');
   } else if (r && r.senzaProva) {
