@@ -177,7 +177,8 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
   motivo `locale`, nota «Richiede lavoro locale») con `owner-feedback.mjs --serve-locale`.
 - Si mette e si toglie in Gestione (tasto «Locale» nel dettaglio, tasto destro sulla
   scheda), con `owner-feedback.mjs --solo-locale | --non-locale`, e nasce già messo sui
-  feedback aperti da `claude-feedback.mjs` (`--non-locale` per aprirne uno per le routine).
+  feedback aperti da `claude-feedback.mjs --locale` (`--non-locale` per le routine: la
+  scelta è obbligatoria, perché una segnalazione per le routine nata locale non la prende nessuno).
 - Le sessioni locali hanno le credenziali dell'owner. Per REGOLA (non per un blocco
   tecnico) non spostano feedback dai Ricevuti né dalle conferme `*_confirmed`, non
   lavorano feedback di utenti e non stampano testo di attacchi: `owner-feedback.mjs`
