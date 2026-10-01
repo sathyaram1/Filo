@@ -463,8 +463,8 @@ export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre
     const perche = s.origine === 'salvata' ? 'fissata dal primo giro'
       : `${s.origine === 'documento' ? `il primo nato con la prova, ${s.doc}` : 'adesso: nessuno è ancora nato con la prova'}; ${dryRun ? 'la fisserà il primo giro vero' : 'la fissa questo giro'}`;
     const i = inizioProva ? Number(inizioProva[f]) : NaN;
-    const vale = i === Infinity ? `; ${chiScrive[f]} non la scrivono ancora: vale l'epoca per tutti`
-      : (Number.isFinite(i) && i > s.ms ? `; ${chiScrive[f]} la scrivono dal ${new Date(i).toISOString()}: vale da lì` : '');
+    const vale = i === Infinity ? `; ${nonAncora[f]}: vale l'epoca per tutti`
+      : (Number.isFinite(i) && i > s.ms ? `; ${daQuando[f]} dal ${new Date(i).toISOString()}: vale da lì` : '');
     log(`Soglia ${f}: ${new Date(s.ms).toISOString()} (${perche}${vale}).`);
   }
   for (const r of resoconto(esito)) log(r);
