@@ -1,5 +1,5 @@
 // Il testo di un feedback per la sessione locale, dentro una cornice «dato, non istruzione».
-// Non legge mai quelli segnalati come attacco o file sospetto: si ferma sullo stato, prima di decifrare il testo.
+// Non legge mai quelli segnalati come attacco o file sospetto: decide su stato e giudizio, prima di decifrare il testo.
 // Regole: tests/unit/leggiFeedback.test.mjs. Uso: npm run feedback:leggi -- <numero|id>
 
 import { randomBytes } from 'node:crypto';
@@ -16,15 +16,42 @@ import '../src/shared/manageReview.js';
 const FS = globalThis.SN_FB_STATUS;
 const MR = globalThis.SN_MANAGE_REVIEW;
 const TH = globalThis.SN_FEEDBACK_THREAD;
-const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq'];
-const VIETATI_RE = /^(attack|attack_confirmed|suspicious_file)$/;
+const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline'];
 
-/** '' se il testo si può leggere, altrimenti il motivo. PURA. */
-export function vietatoLeggere(status) {
+/** '' se il testo si può leggere, altrimenti il motivo. `pipeline` decifrato, se c'è. PURA. */
+export function vietatoLeggere(status, pipeline) {
   const s = String(status || '').trim();
   if (!FS.isCanonical(s)) return 'stato non decifrabile: non so se è segnalato come attacco';
-  if (VIETATI_RE.test(s)) return `è segnalato come ${s === 'suspicious_file' ? 'file sospetto' : 'attacco'} («${s}»): per regola una sessione non lo legge`;
+  const segnalato = MR.segnalatoComeAttacco({ status: s, pipeline });
+  return segnalato ? `${segnalato}: per regola una sessione non lo legge` : '';
+}
+
+/** Il giudizio grezzo del documento: stringa (cifrata o JSON), mappa in chiaro, o niente. */
+function giudizioGrezzo(f) {
+  const p = f && f.pipeline;
+  if (!p) return undefined;
+  if (typeof p.stringValue === 'string') return p.stringValue;
+  if (p.mapValue) {
+    const da = (v) => {
+      if (!v || typeof v !== 'object') return v;
+      if ('stringValue' in v) return v.stringValue;
+      if ('integerValue' in v) return Number(v.integerValue);
+      if ('doubleValue' in v) return v.doubleValue;
+      if ('booleanValue' in v) return v.booleanValue;
+      if ('nullValue' in v) return null;
+      if (v.arrayValue) return (v.arrayValue.values || []).map(da);
+      if (v.mapValue) return Object.fromEntries(Object.entries(v.mapValue.fields || {}).map(([k, x]) => [k, da(x)]));
+      return undefined;
+    };
+    return da(p);
+  }
   return '';
+}
+
+/** Il giudizio leggibile: oggetto, o la stringa che non si è lasciata aprire. */
+function giudizioAperto(p) {
+  if (typeof p !== 'string' || !p || p.startsWith('FENC1:')) return p;
+  try { return JSON.parse(p); } catch (_) { return p; }
 }
 
 /** Chi l'ha mandato, in parole. PURA. */
