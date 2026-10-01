@@ -527,7 +527,16 @@ export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre
     const questi = promossi.filter((d) => d.prova === prova);
     if (questi.length) log(`  ${prova}: ${questi.map(num).join(' ')}`);
   }
-  const locali = lavoriLocaliPassati(docs, rami, promossi);
+  let ramiDaNote = new Map();
+  const daLeggere = rami.size ? noteDaLeggere(docs, promossi) : [];
+  if (daLeggere.length) {
+    try {
+      ramiDaNote = await leggiNote(daLeggere);
+    } catch (e) {
+      err(`Le conversazioni delle pratiche chiuse non si leggono (${String((e && e.message) || e)}): i lavori locali col ramo scritto solo lì restano come sono.`);
+    }
+  }
+  const locali = lavoriLocaliPassati(docs, rami, promossi, ramiDaNote);
   log(`Lavori locali passati da segnare (escono dalla bacheca pubblica): ${locali.length}${locali.length ? ` (${locali.map(num).join(' ')})` : ''}`);
   if (dryRun) {
     log('(prova a vuoto: non ho scritto niente)');
