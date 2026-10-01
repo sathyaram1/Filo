@@ -2869,7 +2869,9 @@
     if (!mgSenderBtn) return;
     mgSenderBtn.hidden = !isAdmin || !MR.mittenteDaRiconoscere(fb);
     mgSenderBtn.disabled = false;
-    mgSenderBtn.title = TITOLO_E_MIO;
+    // Lo stesso giudizio che ferma il lettore delle sessioni: un falso con quel prefisso avrebbe questa forma.
+    const segnalato = MR.segnalatoComeAttacco(fb);
+    mgSenderBtn.title = segnalato ? `${TITOLO_E_MIO} Attenzione: ${segnalato}, guardalo prima.` : TITOLO_E_MIO;
   }
   async function setSenderProof(id) {
     const fb = allFeedbacks.find((f) => f._id === id);
