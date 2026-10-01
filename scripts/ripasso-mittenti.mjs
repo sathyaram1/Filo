@@ -202,7 +202,8 @@ function conta(lista, chiave) {
  * `soglie`: famiglia → ms. `coda` da vociDellaCoda, `derivatiDelPadre`: id del padre → Set dei numeri annotati dal server.
  * @returns {{ promossi: object[], saltati: { categoria: string, motivo: string, n: number }[] }}
  */
-export function candidatiAlRipasso(docs, soglie, { coda = vociDellaCoda([]), derivatiDelPadre = new Map() } = {}) {
+export function candidatiAlRipasso(docs, soglie, { coda = vociDellaCoda([]), derivatiDelPadre = new Map(), inizioProva = inizioDiDefault() } = {}) {
+  const sogliaVera = sogliaEffettiva(soglie, inizioProva);
   const lista = Array.isArray(docs) ? docs.filter(Boolean) : [];
   const numeri = conta(lista, numeroDi);
   const titoli = conta(lista, (d) => (d.name ? `${d.clientId}\n${d.name}` : ''));
