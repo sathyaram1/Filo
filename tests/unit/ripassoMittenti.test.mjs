@@ -372,3 +372,18 @@ test('il giro segna i lavori locali passati dopo le prove, e a vuoto li elenca s
   const rifiuto = { ...scrivi, locale: async () => ({ ok: false, status: 403 }) };
   assert.equal(await mod.eseguiGiro({ ...base, salvate: S(1), dryRun: false, scrivi: rifiuto, log: () => {} }), 3);
 });
+
+// Giro 3 della verifica locale: la regola del lettore in ogni stato dei Ricevuti, non solo in «Non filtrato».
+test('un giudice che dice attacco in un «allineato» o in un «design» tiene fuori dal ripasso come in «Non filtrato»', () => {
+  const nato = T('09-20T00:00:00');
+  const voto = (cls) => ({ verdicts: [{ judge: 'A', class: cls }, { judge: 'B', class: 'attack' }] });
+  const r = cand([
+    doc('al', 'local:claude', 'aligned', nato, '', { pipeline: voto('aligned') }),
+    doc('de', 'owner:me', 'design', nato, '', { pipeline: voto('design') }),
+    doc('ok', 'local:claude', 'aligned', nato, '', { pipeline: { verdicts: [{ judge: 'A', class: 'aligned' }] } }),
+  ], S(Date.parse(T('10-01T00:00:00'))));
+  assert.deepEqual(r.promossi.map((d) => d.id), ['ok']);
+  const s = saltati(r);
+  assert.equal(s[`local|${MOTIVO.RICEVUTI_SEGNALATI}`], 1);
+  assert.equal(s[`owner|${MOTIVO.RICEVUTI_SEGNALATI}`], 1);
+});

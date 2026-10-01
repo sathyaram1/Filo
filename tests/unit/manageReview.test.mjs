@@ -1537,3 +1537,23 @@ test('judgesNote e reasonText: design/decisione dice che il lavoro è fermo su u
   assert.match(MR.reasonText('decisione'), /scelta/);
   assert.equal(MR.manageTabFor({ status: 'design', statusReason: 'decisione' }), 'inbox', 'sta fra i Ricevuti, dove l\'owner guarda');
 });
+
+// Giro 3 della verifica locale: il segno locale usa la regola del lettore. Con il segno una Ri-valutazione
+// manderebbe in coda senza giudici un feedback che il filtro o un giudice hanno segnalato.
+test('localSignCheck: niente segno su un feedback che il lettore rifiuta come segnalato', () => {
+  const segnalati = [
+    locale({ status: 'unlabeled', pipeline: { stage: 'L1', action: 'block_attack', l1Category: 'dangerous' } }),
+    locale({ status: 'unlabeled', pipeline: { verdicts: [{ judge: 'A', class: 'attack' }, { judge: 'B', class: 'attack' }], expectedJudges: ['A', 'B'] } }),
+    locale({ status: 'aligned', pipeline: { verdicts: [{ judge: 'A', class: 'aligned' }, { judge: 'B', class: 'attack' }] } }),
+    locale({ status: 'unlabeled', pipeline: 'FENC1:non-si-apre' }),
+  ];
+  for (const fb of segnalati) {
+    assert.notEqual(MR.segnalatoComeAttacco(fb), '', JSON.stringify(fb.pipeline));
+    const r = MR.localSignCheck(fb, true);
+    assert.equal(r.ok, false, JSON.stringify(fb.pipeline));
+    assert.match(r.motivo, /Ricevuti/);
+  }
+  assert.equal(MR.localSignCheck(locale({ status: 'unlabeled', pipeline: { verdicts: [{ judge: 'A', class: 'aligned' }] } }), true).ok, true);
+  // Toglierlo resta sempre possibile.
+  assert.equal(MR.localSignCheck({ ...segnalati[0], localOnly: { by: 'owner', at: 1 } }, false).ok, true);
+});

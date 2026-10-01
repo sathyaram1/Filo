@@ -287,3 +287,32 @@ test('--riconosci: la prova la dà l’owner, solo sui prefissi suoi e delle ses
     });
   }
 });
+
+// Giro 3 della verifica locale: la regola del lettore vale anche per chi dà fiducia (segno locale, prova del mittente).
+test('segno locale e prova del mittente: rifiutati, senza scrivere, sui feedback che il lettore rifiuta come segnalati', async () => {
+  const attacco = JSON.stringify({ verdicts: [{ judge: 'A', class: 'aligned' }, { judge: 'B', class: 'attack' }] });
+  const pericoloso = JSON.stringify({ stage: 'L1', action: 'block_attack', l1Category: 'dangerous' });
+  const casi = [
+    ['segno, collegio con un attacco', 'segnaLocale', { clientId: 'local:claude', senderProof: 'admin', status: 'unlabeled', pipeline: attacco }],
+    ['segno, fermato dal filtro', 'segnaLocale', { clientId: 'owner:me', senderProof: 'admin', status: 'unlabeled', pipeline: pericoloso }],
+    ['segno, giudizio illeggibile', 'segnaLocale', { clientId: 'local:claude', senderProof: 'admin', status: 'unlabeled', pipeline: 'FENC1:non-si-apre' }],
+    ['prova, allineato con un attacco', 'riconosciMittente', { clientId: 'local:claude', status: 'aligned', pipeline: attacco }],
+    ['prova, design con un attacco', 'riconosciMittente', { clientId: 'owner:me', status: 'design', pipeline: attacco }],
+  ];
+  for (const [nome, fn, f] of casi) {
+    await conReteScritture(documento('x1', { statusPublic: 'open', ...f }), async (scritte) => {
+      const r = fn === 'segnaLocale' ? await mod.segnaLocale('x1', true, OPTS) : await mod.riconosciMittente('x1', OPTS);
+      assert.equal(r.ok, false, nome);
+      assert.match(r.motivo, /attacco|giudizio/, nome);
+      assert.equal(scritte.length, 0, nome);
+    });
+  }
+  // Un giudizio pulito nei Ricevuti non ferma niente.
+  const pulito = JSON.stringify({ verdicts: [{ judge: 'A', class: 'aligned' }] });
+  await conReteScritture(documento('x2', { clientId: 'local:claude', senderProof: 'admin', status: 'unlabeled', statusPublic: 'open', pipeline: pulito }), async () => {
+    assert.equal((await mod.segnaLocale('x2', true, OPTS)).ok, true);
+  });
+  await conReteScritture(documento('x3', { clientId: 'local:claude', status: 'aligned', statusPublic: 'open', pipeline: pulito }), async () => {
+    assert.equal((await mod.riconosciMittente('x3', OPTS)).ok, true);
+  });
+});

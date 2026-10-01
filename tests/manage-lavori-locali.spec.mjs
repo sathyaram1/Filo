@@ -335,3 +335,27 @@ test('«È mio» su un feedback che i giudici hanno detto attacco: l’hover lo 
   await page.evaluate((i) => window.__mgTest.openDetail(i), 's-3');
   await expect(page.locator('#mgSenderBtn')).toHaveAttribute('title', /Attenzione: .*attacco.*guardalo prima/);
 });
+
+test('segnalato dai giudici o dal filtro: «È mio» dal tasto destro avverte come il tasto, e il segno locale non si mette', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const senza = fb({ _id: 's-4', seq: 833, status: 'unlabeled', senderProof: undefined,
+    pipeline: { verdicts: [{ judge: 'A', class: 'attack' }, { judge: 'B', class: 'attack' }], expectedJudges: ['A', 'B'] } });
+  const provato = fb({ _id: 's-5', seq: 834, status: 'unlabeled', pipeline: { stage: 'L1', action: 'block_attack', l1Category: 'dangerous' } });
+  await apri(page, [senza, provato], { tab: 'inbox' });
+  await page.locator('.mg-item[data-id="s-4"]').click({ button: 'right' });
+  const voce = page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'È mio' });
+  await expect(voce).toHaveAttribute('title', /Attenzione: .*attacco.*guardalo prima/);
+  await page.keyboard.press('Escape');
+  await page.locator('.mg-item[data-id="s-5"]').click({ button: 'right' });
+  await expect(page.locator('.mg-ctxmenu')).toBeVisible();
+  await expect(page.locator('.mg-ctxmenu')).not.toContainText('lavoro locale');
+  await page.keyboard.press('Escape');
+  await page.evaluate((i) => window.__mgTest.openDetail(i), 's-5');
+  const tasto = page.locator('#mgLocalBtn');
+  if (await tasto.isVisible()) {
+    await expect(tasto).toHaveAttribute('title', /Adesso non si può: .*attacco.*Ricevuti/);
+    await tasto.click();
+    await expect(page.locator('#mgManageMsg')).toContainText('Segno non messo');
+  }
+  expect(await page.evaluate(() => window.__updates.filter((u) => 'localOnly' in u))).toEqual([]);
+});
