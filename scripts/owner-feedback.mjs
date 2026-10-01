@@ -328,7 +328,7 @@ export async function praticaPerLaSessione(id, opts = {}) {
   const fb = await praticaInChiaro(doc);
   if (!fb) return { ok: false, motivo: 'mittente o stato non decifrabili: non so di chi è la pratica', utente: false };
   const chi = MR.localSenderCheck(fb);
-  if (!chi.ok) return { ok: false, motivo: chi.motivo, utente: !!chi.utente, senzaProva: !!chi.senzaProva };
+  if (!chi.ok) return { ok: false, motivo: chi.motivo, utente: !!chi.utente, senzaProva: !!chi.senzaProva, ...contestoDelRifiuto(fb) };
   return { ok: true, avviso: avvisoDaCampi(doc.fields) };
 }
 
