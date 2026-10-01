@@ -624,8 +624,9 @@
       return { ok: false, motivo: 'è segnalata come attacco o spam: prima si decide nei Ricevuti' };
     }
     const tab = manageTabFor(fb, opts);
+    // Chiusa: il segno dice che era un lavoro locale e la toglie dalla bacheca pubblica; L5 il server lo salta solo a pratica aperta.
     if (tab === 'resolved' || tab === 'archived' || String(fb.statusPublic || 'open') === 'closed') {
-      return { ok: false, motivo: 'la pratica è chiusa' };
+      return { ok: true, chiusa: true };
     }
     // La presa di una routine si vede dal battito che il server specchia sul feedback (beatAt/workingSince):
     // i biglietti vivono in una collezione che da qui non si legge.
