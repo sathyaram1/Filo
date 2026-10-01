@@ -456,7 +456,8 @@ export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre
   const esito = candidatiAlRipasso(docs, Object.fromEntries(FAMIGLIE_EPOCA.map((f) => [f, soglie[f].ms])), { coda, derivatiDelPadre, inizioProva });
   const promossi = esito.promossi.sort((a, b) => String(b.createTime).localeCompare(String(a.createTime)));
   const nuove = FAMIGLIE_EPOCA.filter((f) => soglie[f].origine !== 'salvata');
-  const chiScrive = { local: 'le sessioni da main', owner: 'il Filo pubblicato' };
+  const nonAncora = { local: 'le sessioni che lavorano da main non la scrivono ancora', owner: 'il Filo pubblicato non la scrive ancora' };
+  const daQuando = { local: 'le sessioni da main la scrivono', owner: 'il Filo pubblicato la scrive' };
   for (const f of FAMIGLIE_EPOCA) {
     const s = soglie[f];
     const perche = s.origine === 'salvata' ? 'fissata dal primo giro'

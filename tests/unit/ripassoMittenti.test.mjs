@@ -295,3 +295,42 @@ test('le soglie stanno in un documento che solo l\'admin legge e scrive', async 
   const allow = [...m[1].matchAll(/allow\s+([a-z,\s]+?)\s*:\s*if\s+([^;]+);/g)].map((x) => [x[1].trim(), x[2].trim()]);
   assert.deepEqual(allow, [['read', 'isAdmin()'], ['write', 'isAdmin()']], 'chi sposta la soglia fa passare i falsi');
 });
+
+test('la soglia salvata non vale finché chi crea non scrive la prova: l’owner dal Filo installato e le sessioni da main', () => {
+  // Il primo giro vero l'ha fissata il 01/10 alle 11:16, quando la prova la scriveva solo il ramo del lavoro.
+  const salvata = S(Date.parse(T('10-01T11:16:00')));
+  const docs = [
+    doc('owner-oggi', 'owner:caf', 'unlabeled', T('10-01T15:00:00')),
+    doc('sessione-oggi', 'local:claude', 'todo', T('10-01T15:05:00')),
+    doc('segnalato-oggi', 'local:claude', 'unlabeled', T('10-01T15:10:00'), '', { pipeline: { verdicts: [{ class: 'attack' }] } }),
+  ];
+  const nonAncora = mod.candidatiAlRipasso(docs, salvata, { inizioProva: { local: Infinity, owner: Infinity } });
+  assert.deepEqual(nonAncora.promossi.map((d) => d.id).sort(), ['owner-oggi', 'sessione-oggi']);
+  assert.equal(saltati(nonAncora)[`local|${MOTIVO.RICEVUTI_SEGNALATI}`], 1, 'i segnalati restano fuori comunque');
+  // Main la scrive dal 02/10 per le sessioni, la versione pubblicata dal 03/10 per l'owner.
+  const inizio = { local: Date.parse(T('10-02T09:00:00')), owner: Date.parse(T('10-03T09:00:00')) };
+  const dopo = [...docs,
+    doc('owner-app-nuova', 'owner:caf', 'todo', T('10-03T10:00:00')),
+    doc('sessione-ramo-vecchio', 'local:claude', 'todo', T('10-02T10:00:00')),
+    doc('owner-app-vecchia', 'owner:caf', 'todo', T('10-02T10:00:00'))];
+  const r = mod.candidatiAlRipasso(dopo, salvata, { inizioProva: inizio });
+  assert.deepEqual(r.promossi.map((d) => d.id).sort(), ['owner-app-vecchia', 'owner-oggi', 'sessione-oggi']);
+  assert.equal(saltati(r)[`owner|${MOTIVO.DOPO}`], 1);
+  assert.equal(saltati(r)[`local|${MOTIVO.DOPO}`], 1, 'dopo l’arrivo su main, senza prova si riconosce in Gestione');
+});
+
+test('da quando chi crea scrive la prova: dall’arrivo su main (sessioni) e dalla prima versione che la porta (owner)', () => {
+  const git = (risposte) => (args) => {
+    const chiave = args[0] === 'log' ? `log ${args[args.length - 1]}` : args[0];
+    if (!(chiave in risposte)) throw new Error('niente');
+    return risposte[chiave];
+  };
+  assert.deepEqual(mod.inizioDellaProva(git({})), { local: Infinity, owner: Infinity }, 'main non la scrive: non ancora');
+  const suMain = {
+    'log scripts/claude-feedback.mjs': 'aaa 2026-10-02T09:00:00+02:00\nbbb 2026-10-05T09:00:00+02:00\n',
+    'log src/shared/feedback.js': 'ccc 2026-10-02T09:00:00+02:00\n',
+  };
+  assert.deepEqual(mod.inizioDellaProva(git(suMain)), { local: Date.parse('2026-10-02T07:00:00Z'), owner: Infinity }, 'su main ma non ancora pubblicata');
+  const uscita = { ...suMain, tag: 'v0.2.229\nv0.2.230\n', 'for-each-ref': '2026-10-03T08:00:00+02:00\n' };
+  assert.deepEqual(mod.inizioDellaProva(git(uscita)), { local: Date.parse('2026-10-02T07:00:00Z'), owner: Date.parse('2026-10-03T06:00:00Z') });
+});
