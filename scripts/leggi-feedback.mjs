@@ -80,7 +80,7 @@ export function testoDaStampare(fb, segno) {
 }
 
 /**
- * Legge `id` e decide: lo stato si decifra da solo, e il resto solo se lo stato lo permette.
+ * Legge `id` e decide: stato e giudizio si decifrano da soli, e il resto solo se lo permettono.
  * `decifra` riceve i campi grezzi e li rende in chiaro (lib/decrypt-feedback-fields.mjs).
  * @returns {Promise<{ codice: number, errore?: string, testo?: string }>}
  */
@@ -90,8 +90,10 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
   if (!res.ok) return { codice: res.status >= 500 ? 4 : 3, errore: `lettura fallita (${res.status})` };
   const doc = await res.json();
   const f = doc.fields || {};
-  const stato = await decifra({ _id: doc.name, status: f.status?.stringValue || '' }).catch(() => ({}));
-  const vietato = vietatoLeggere(stato.status);
+  const giudizio = giudizioGrezzo(f);
+  const prima = { _id: doc.name, status: f.status?.stringValue || '', ...(giudizio === undefined ? {} : { pipeline: giudizio }) };
+  const stato = await decifra(prima).catch(() => ({}));
+  const vietato = vietatoLeggere(stato.status, giudizio === undefined ? undefined : giudizioAperto(stato.pipeline));
   if (vietato) return { codice: 3, errore: `${vietato}. Non ho decifrato il testo` };
   const pieno = await decifra({
     _id: doc.name, clientId: f.clientId?.stringValue || '', name: f.name?.stringValue || '',
