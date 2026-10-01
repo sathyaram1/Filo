@@ -263,6 +263,8 @@ export async function segnaLocale(id, valore, opts = {}) {
   });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   if (!chiusa) return { ok: true, segno };
+  // Tolto da una pratica chiusa: la scheda la rimette l'app dell'owner alla prossima sincronizzazione della bacheca.
+  if (!valore) return { ok: true, segno, chiusa };
   const scheda = await togliScheda(id, bearer);
   return { ok: true, segno, chiusa, scheda };
 }
