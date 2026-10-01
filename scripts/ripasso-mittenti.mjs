@@ -583,7 +583,13 @@ async function main(argv) {
     console.error(`RIFIUTATO: ${String((e && e.message) || e)}`);
     return e && e.codice === 3 ? 3 : 4;
   }
-  const codice = await eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre, dryRun, scrivi: scrittoreFirestore(bearer) });
+  let rami = new Set();
+  try {
+    rami = ramiFusiInLocale(gitDelRepo(['log', 'origin/main', '--first-parent', '--format=%s']));
+  } catch (e) {
+    console.warn(`I rami fusi in locale non si leggono da git (${String((e && e.message) || e).split('\n')[0]}): i lavori locali passati restano come sono.`);
+  }
+  const codice = await eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre, dryRun, rami, scrivi: scrittoreFirestore(bearer) });
   console.log(letture.riga());
   return codice;
 }
