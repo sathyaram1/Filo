@@ -227,11 +227,20 @@ test('negli stati del lavoro una sessione porta solo pratiche sue o dell’owner
     assert.deepEqual([r.ok, r.senzaProva, patch.length], [false, true, 0]);
     assert.match(mod.rifiutoPratica('f3', r), /feedback:ripasso/);
   });
-  const owner = documento('o3', { clientId: 'owner:me', senderProof: 'admin', status: 'todo', statusPublic: 'open', notes: '' });
+  const segno = { mapValue: { fields: { by: { stringValue: 'local:claude' }, at: { integerValue: '1790000000000' } } } };
+  const owner = documento('o3', { clientId: 'owner:me', senderProof: 'admin', status: 'todo', statusPublic: 'open', notes: '', localOnly: segno });
   await conRete(owner, async (patch) => {
     const r = await mod.scrivi('o3', 'working', 'lo prendo', { ...OPTS, attore: 'routine' });
     assert.equal(r.ok, true, r.motivo);
     assert.equal(patch.length, 1);
+  });
+  // Senza il segno la presa in carico a mano si rifiuta come all'avvio della verifica: le routine la riprenderebbero.
+  await conRete(documento('o4', { clientId: 'owner:me', senderProof: 'admin', status: 'todo', statusPublic: 'open', notes: '' }), async (patch) => {
+    const r = await mod.scrivi('o4', 'working', 'lo prendo', { ...OPTS, attore: 'routine' });
+    assert.deepEqual([r.ok, r.senzaSegno, patch.length], [false, true, 0], r.motivo);
+    assert.match(mod.rifiutoPratica('o4', r), /--solo-locale/);
+    const chiusa = await mod.scrivi('o4', 'done', 'fatto in locale', { ...OPTS, attore: 'routine', dryRun: true });
+    assert.equal(chiusa.ok, true, `chiuderla a mano resta permesso: ${chiusa.motivo}`);
   });
   // Rimetterlo in coda non è lavorarlo: resta permesso anche su un utente.
   const preso = documento('u4', { clientId: 'c-utente', status: 'working', statusPublic: 'open', notes: '' });
