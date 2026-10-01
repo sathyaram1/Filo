@@ -1461,6 +1461,15 @@ test('statusReason l5: blocco ROSSO in lista, non "questione di design"', () => 
   assert.equal(MR.reasonText('l5'), 'fermo al cancello di fusione');
 });
 
+test('statusReason locale: «In breve» dice il lavoro locale, non un giudizio dei giudici (#908)', () => {
+  const panel = { verdicts: [{ class: 'aligned' }, { class: 'aligned' }, { class: 'aligned' }, { class: 'aligned' }] };
+  for (const fb of [{ status: 'design', statusReason: 'locale' }, { status: 'design', statusReason: 'locale', pipeline: panel }]) {
+    const t = MR.judgesNote(fb).text;
+    assert.match(t, /lavoro locale/);
+    assert.doesNotMatch(t, /giudici/);
+  }
+});
+
 test('fusioneInAttesa: vera solo quando una fusione aspetta davvero l’owner', () => {
   assert.equal(MR.fusioneInAttesa(FB_412, { fusioni: { pending: [RICHIESTA] } }), true);
   assert.equal(MR.fusioneInAttesa(FB_412, { fusioni: {} }), false);
