@@ -2933,7 +2933,8 @@
       if (selectedId === id) { reflectLocal(fb); reflectPreapproved(fb); }
       renderList();
       const dove = MR.manageTabFor(fb, { releasedVersion, fusioni });
-      const fatto = !valore ? `Da ora${chi} la possono prendere anche le routine.`
+      const fatto = !valore
+        ? (check.chiusa ? `Da ora${chi} non è più un lavoro locale: la sua scheda torna nella bacheca pubblica.` : `Da ora${chi} la possono prendere anche le routine.`)
         : check.chiusa ? `Segnata${chi} come lavoro locale: fuori dalla bacheca pubblica.`
           : `Da ora${chi} la lavora solo una sessione locale${dove === 'local' ? ': la trovi nei Lavori locali' : ''}.`;
       setManageMsg(fatto, 'ok');
