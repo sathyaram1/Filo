@@ -40,7 +40,12 @@
 //   node scripts/owner-feedback.mjs <n|id> --non-locale
 //   node scripts/owner-feedback.mjs <n|id> --serve-locale ["perché"]
 //
+//   node scripts/owner-feedback.mjs <n|id> --riconosci     (prova del mittente data dall'owner)
+//
 //   <n|id>: il numero del feedback (910, #910, 22.1) o il suo id.
+//   `--riconosci`: un feedback con prefisso dell'owner o di una sessione ma senza prova è suo; la sessione lo lancia
+//   solo su parola dell'owner, come il tasto «È mio» in Gestione. Un segno locale su una pratica chiusa ne toglie
+//   la scheda dalla bacheca pubblica: era un lavoro locale.
 //
 //   `--solo-locale`: la pratica la lavora solo una sessione locale, nessuna
 //   routine la prende, e in Gestione sta nei Lavori locali. Solo sui feedback
