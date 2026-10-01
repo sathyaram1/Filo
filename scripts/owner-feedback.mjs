@@ -246,7 +246,7 @@ export async function segnaLocale(id, valore, opts = {}) {
   const fb = await praticaInChiaro(doc);
   if (!fb) return { ok: false, motivo: 'mittente o stato non decifrabili: non so di chi è la pratica' };
   const check = MR.localSignCheck(fb, valore);
-  if (!check.ok) return { ok: false, motivo: check.motivo, utente: !!check.utente, senzaProva: !!check.senzaProva };
+  if (!check.ok) return { ok: false, motivo: check.motivo, utente: !!check.utente, senzaProva: !!check.senzaProva, ...contestoDelRifiuto(fb) };
   const segno = valore ? { by: chiScrive(bearer), at: Date.now() } : null;
   const chiusa = !!check.chiusa;
   if (opts.dryRun) return { ok: true, dryRun: true, segno, chiusa };
