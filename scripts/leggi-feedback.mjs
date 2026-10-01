@@ -194,7 +194,13 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
     seq: Number(f.seq?.integerValue) || seq || null, subSeq: Number(f.subSeq?.integerValue) || 0,
   };
   const numero = fb.seq ? `${fb.seq}${fb.subSeq ? `.${fb.subSeq}` : ''}` : nomeSicuro(id, 'feedback');
-  const allegati = await righeAllegati(allegatiDaCampi(f), {
+  // Anche quelli dei commenti, che vivono come righe-marcatore nella conversazione.
+  const elenco = allegatiDaCampi(f);
+  for (const a of String(pieno.notes || '').split('\n').map((r) => TH.parseAttachmentLine(r)).filter(Boolean)) {
+    if (a.kind === 'file') elenco.documenti.push({ name: a.name, type: a.type, url: a.url });
+    else elenco.immagini.push(a.url);
+  }
+  const allegati = await righeAllegati(elenco, {
     fetchImpl, segno: s,
     apriByte: apriByte || (async (b) => (await import('./lib/decrypt-feedback-fields.mjs')).decryptAttachmentBytes(b)),
     cartella: cartella || join(tmpdir(), 'filo-feedback', `${numero}-${s}`),
