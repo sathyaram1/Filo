@@ -336,8 +336,8 @@ export async function annotaPratica(id, nota, opts = {}) {
 /**
  * Una sessione locale può legare il suo lavoro a questa pratica (verify-local start --feedback, finish
  * --feedback)? Solo se è dell'owner o di una sessione con la prova: in locale i feedback degli utenti non si lavorano.
- * Per cominciare serve anche il segno locale se la pratica sta dove le routine la prendono (verifica locale #910,
- * giro 5): il server rimette in coda un «In lavorazione» senza segno. `allaChiusura`: a lavoro finito basta l'avviso.
+ * Per cominciare serve anche il segno locale dove le routine la prendono: il server rimette in coda un «In
+ * lavorazione» senza segno, e una routine la rifà mentre la sessione la lavora. `allaChiusura`: basta l'avviso.
  * @returns {Promise<{ ok: true, avviso: string } | { ok: false, motivo: string, utente: boolean }>}
  */
 export async function praticaPerLaSessione(id, opts = {}) {
