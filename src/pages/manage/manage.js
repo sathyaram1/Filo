@@ -1765,7 +1765,12 @@
     const voci = [{ testo: 'Apri', azione: () => openDetail(fb._id) }];
     const segnabile = isAdmin && !MR.isLocalOnly(fb) ? MR.localSignCheck(fb, true) : { ok: false };
     if (isAdmin && MR.isLocalOnly(fb)) {
-      voci.push({ testo: '💻 Rimetti anche alle routine', titolo: localSignText(fb), azione: () => segnoDalMenu(fb, false) });
+      const chiusa = MR.praticaChiusa(fb, { releasedVersion, fusioni });
+      voci.push({
+        testo: chiusa ? '💻 Non era un lavoro locale' : '💻 Rimetti anche alle routine',
+        titolo: chiusa ? `${localSignText(fb)} ${TITOLO_TOGLI_CHIUSA}` : localSignText(fb),
+        azione: () => segnoDalMenu(fb, false),
+      });
     } else if (segnabile.ok) {
       voci.push({
         testo: segnabile.chiusa ? '💻 Era un lavoro locale' : '💻 Solo lavoro locale',
