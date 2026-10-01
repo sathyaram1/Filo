@@ -620,7 +620,8 @@ async function main(argv) {
   } catch (e) {
     console.warn(`I rami fusi in locale non si leggono da git (${String((e && e.message) || e).split('\n')[0]}): i lavori locali passati restano come sono.`);
   }
-  const codice = await eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre, dryRun, rami, scrivi: scrittoreFirestore(bearer) });
+  const leggiNote = (ids) => leggiRamiNelleNote(ids, bearer, letture);
+  const codice = await eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre, dryRun, rami, leggiNote, scrivi: scrittoreFirestore(bearer) });
   console.log(letture.riga());
   return codice;
 }
