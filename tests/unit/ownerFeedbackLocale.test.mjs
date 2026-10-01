@@ -216,3 +216,25 @@ test('negli stati del lavoro una sessione porta solo pratiche sue o dell’owner
     assert.equal(patch.length, 1);
   });
 });
+
+test('il feedback si indica col numero come negli strumenti fratelli: «910» non è «inesistente»', async () => {
+  const viste = [];
+  const fetchImpl = async (url, opts = {}) => {
+    viste.push({ url: String(url), body: opts.body ? JSON.parse(opts.body) : null });
+    const sub = (n) => ({ document: { name: `projects/p/databases/(default)/documents/feedback/id-${n}`, fields: { subSeq: { integerValue: String(n) } } } });
+    return { ok: true, status: 200, json: async () => [sub(0), sub(1)] };
+  };
+  for (const [rif, id] of [['910', 'id-0'], ['#910', 'id-0'], ['910.1', 'id-1']]) {
+    const r = await mod.idDelFeedback(rif, { bearer: 'x', base: 'https://finto', fetchImpl });
+    assert.deepEqual(r, { ok: true, id }, rif);
+  }
+  assert.ok(viste.every((v) => v.url.endsWith(':runQuery') && v.body.structuredQuery.where.fieldFilter.value.integerValue === '910'));
+  // Un id passa com'è, senza leggere niente.
+  viste.length = 0;
+  assert.deepEqual(await mod.idDelFeedback('tbCrpSR6tmPomfASfVdD', { bearer: 'x', base: 'https://finto', fetchImpl }), { ok: true, id: 'tbCrpSR6tmPomfASfVdD' });
+  assert.equal(viste.length, 0);
+  const vuoto = async () => ({ ok: true, status: 200, json: async () => [] });
+  const r = await mod.idDelFeedback('99999', { bearer: 'x', base: 'https://finto', fetchImpl: vuoto });
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /#99999/);
+});

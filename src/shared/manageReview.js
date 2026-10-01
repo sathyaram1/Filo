@@ -581,6 +581,32 @@
     return !!info && info.tab === 'inbox';
   }
 
+  /** Cosa hanno segnalato filtro e giudici (`pipeline` decifrato). PURA. Fonte unica per lettore e ripasso. */
+  function segnaliDeiGiudici(pipeline) {
+    const p = pipeline && typeof pipeline === 'object' ? pipeline : null;
+    if (!p) return { attacco: false, spam: false };
+    const verdetti = Array.isArray(p.verdicts) ? p.verdicts : [];
+    const ha = (cls) => verdetti.some((v) => v && v.class === cls);
+    return {
+      attacco: p.action === 'block_attack' || p.l1Category === 'dangerous' || p.l2Class === 'attack' || ha('attack'),
+      spam: p.action === 'block_spam' || p.l1Category === 'spam' || p.l2Class === 'spam' || ha('spam'),
+    };
+  }
+
+  /**
+   * '' se una sessione ne può leggere il testo, altrimenti il motivo (#908). PURA.
+   * Per un mittente fidato il server lascia l'attacco nei Ricevuti come «Non filtrato»: lo stato da solo non basta.
+   */
+  function segnalatoComeAttacco(fb) {
+    const s = String((fb && fb.status) || '').trim();
+    if (s === 'suspicious_file') return 'è segnalato come file sospetto';
+    if (s === 'attack' || s === 'attack_confirmed') return `è segnalato come attacco («${s}»)`;
+    if (!isRicevutiStatus(s)) return '';
+    const p = fb && fb.pipeline;
+    if (p !== undefined && p !== null && p !== '' && typeof p !== 'object') return 'il giudizio non si decifra: non so se è segnalato come attacco';
+    return segnaliDeiGiudici(p).attacco ? 'è nei Ricevuti col giudizio d’attacco del filtro o dei giudici' : '';
+  }
+
   /**
    * Il segno «solo in locale» si può mettere (`valore` true) o togliere su questa pratica? PURA.
    * Ritorna { ok: true } o { ok: false, motivo, utente } — `utente` vuol dire che il feedback
