@@ -1,6 +1,6 @@
-// La prova del mittente (#595) sui feedback vecchi con prefisso riservato: a ciascuno quella di chi l'ha creato davvero.
-// Owner e sessioni per epoca, con la soglia fissata dal primo giro; routine e costruzione solo con un segno che un falso
-// non può avere. Il testo non si decifra. Regole: tests/unit/ripassoMittenti.test.mjs. Uso: npm run feedback:ripasso [-- --dry-run]
+// Il ripasso dei feedback passati (#595, #908): la prova del mittente a chi l'ha creato davvero (owner e sessioni per
+// epoca, routine solo con un segno che un falso non ha), e il segno locale ai lavori fusi in locale, fuori dalla bacheca.
+// Il testo non si decifra. Regole: tests/unit/ripassoMittenti.test.mjs. Uso: npm run feedback:ripasso [-- --dry-run]
 
 import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
