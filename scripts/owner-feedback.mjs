@@ -230,7 +230,8 @@ export async function segnaLocale(id, valore, opts = {}) {
   const check = MR.localSignCheck(fb, valore);
   if (!check.ok) return { ok: false, motivo: check.motivo, utente: !!check.utente, senzaProva: !!check.senzaProva };
   const segno = valore ? { by: chiScrive(bearer), at: Date.now() } : null;
-  if (opts.dryRun) return { ok: true, dryRun: true, segno };
+  const chiusa = !!check.chiusa;
+  if (opts.dryRun) return { ok: true, dryRun: true, segno, chiusa };
   const fields = segno ? { localOnly: toFsValue(segno) } : {};
   const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=localOnly`, {
     method: 'PATCH',
@@ -238,7 +239,40 @@ export async function segnaLocale(id, valore, opts = {}) {
     body: JSON.stringify({ fields }),
   });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  return { ok: true, segno };
+  if (!chiusa) return { ok: true, segno };
+  const scheda = await togliScheda(id, bearer);
+  return { ok: true, segno, chiusa, scheda };
+}
+
+/** Un lavoro locale non sta nella bacheca pubblica: la sua scheda si toglie. '' se fatto (o non c'era), sennò il motivo. */
+async function togliScheda(id, bearer) {
+  const res = await fetch(`${FIRESTORE_BASE}/feedback-public/${encodeURIComponent(id)}`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${bearer}` },
+  });
+  return res.ok || res.status === 404 ? '' : `la scheda nella bacheca pubblica è rimasta (${res.status})`;
+}
+
+/**
+ * La prova del mittente data dall'owner (#908): «questo feedback l'ho aperto io, o una mia sessione».
+ * Solo sul prefisso dell'owner o di una sessione senza prova; la sessione la dà solo su parola dell'owner.
+ */
+export async function riconosciMittente(id, opts = {}) {
+  const bearer = opts.bearer || await acquireBearer();
+  const doc = await getDoc(id, bearer, CAMPI_PRATICA);
+  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
+  const fb = await praticaInChiaro(doc);
+  if (!fb) return { ok: false, motivo: 'mittente o stato non decifrabili: non so di chi è' };
+  if (!MR.mittenteDaRiconoscere(fb)) {
+    return { ok: false, motivo: fb.senderProof ? 'la prova del mittente c’è già' : 'non porta il prefisso dell’owner né di una sessione' };
+  }
+  if (opts.dryRun) return { ok: true, dryRun: true };
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=senderProof`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify({ fields: { senderProof: { stringValue: 'admin' } } }),
+  });
+  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
+  return { ok: true };
 }
 
 /**
