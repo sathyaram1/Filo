@@ -1,9 +1,9 @@
 // Il lavoro locale sul server con la sua pratica (#908): la controlla come start --feedback, la prende in carico,
-// lancia server:fondi di filo-security (che senza pratica si rifiuta) e a fusione riuscita la chiude. Non fonde da sé.
-// Regole: tests/unit/serverFondiPratica.test.mjs. Uso: npm run server:fondi -- claude/<ramo> --feedback <N> [--dry-run]
+// lancia server:fondi di filo-security (che senza pratica si rifiuta) e a fusione riuscita la chiude, se l'app non ha
+// un ramo aperto sulla stessa pratica. Regole: tests/unit/serverFondiPratica.test.mjs. Uso: npm run server:fondi -- claude/<ramo> --feedback <N>
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { estraiOpzioneFeedback, risolviFeedback } from './lib/pratica-locale.mjs';
