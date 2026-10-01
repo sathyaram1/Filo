@@ -1,6 +1,6 @@
-// Pubblica le regole di Firestore e i loro indici solo da main uguale a origin/main, coi file delle regole intatti.
-// È l'unica strada: un ramo o una modifica locale pubblicati sarebbero regole che nessuno ha fuso. Decisioni pure:
-// tests/unit/regolePubblica.test.mjs. Uso: npm run regole:pubblica [-- --dry-run]
+// Pubblica regole e indici di Firestore e regole di Storage solo da main uguale a origin/main, coi file intatti.
+// È l'unica strada: firebase.json la richiama (--controlla) a ogni deploy, così un ramo non pubblica regole mai fuse.
+// Decisioni: tests/unit/regolePubblica.test.mjs. Uso: npm run regole:pubblica [-- --dry-run]
 
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -10,13 +10,17 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Gli indici vanno con le regole che li usano: una query senza il suo indice smette di rispondere in silenzio.
-export const BERSAGLI = Object.freeze(['firestore:rules', 'firestore:indexes']);
-const OPZIONI = ['--dry-run'];
+export const BERSAGLI = Object.freeze(['firestore:rules', 'firestore:indexes', 'storage']);
+const OPZIONI = ['--dry-run', '--controlla'];
+// Il deploy lanciato da qui lo porta: il predeploy di firebase.json senza di esso è un firebase deploy a mano.
+export const SEGNO_GUARDIA = 'FILO_REGOLE_DALLA_GUARDIA';
 
 /** I file che i BERSAGLI pubblicano, letti da firebase.json. PURA. */
 export function fileDaPubblicare(firebaseJson) {
   const fs = (firebaseJson && firebaseJson.firestore) || {};
-  return [fs.rules, fs.indexes].filter((f) => typeof f === 'string' && f.trim()).map((f) => f.trim());
+  const st = firebaseJson && firebaseJson.storage;
+  const storage = (Array.isArray(st) ? st : [st]).map((x) => x && x.rules);
+  return [fs.rules, fs.indexes, ...storage].filter((f) => typeof f === 'string' && f.trim()).map((f) => f.trim());
 }
 
 /** Il progetto di default di .firebaserc, '' se manca. PURA. */
@@ -37,7 +41,7 @@ export function fileToccati(statusZ) {
 export function decidi(s) {
   const corto = (sha) => String(sha || '?').slice(0, 9);
   if (s.errore) return { ok: false, motivo: s.errore };
-  if (!s.file || s.file.length < BERSAGLI.length) return { ok: false, motivo: 'firebase.json non nomina i file delle regole e degli indici di Firestore' };
+  if (!s.file || s.file.length < BERSAGLI.length) return { ok: false, motivo: 'firebase.json non nomina i file di regole e indici di Firestore e delle regole di Storage' };
   if (!s.progetto) return { ok: false, motivo: '.firebaserc non dice su quale progetto pubblicare' };
   if (s.ramo !== 'main') return { ok: false, motivo: `il checkout è su «${s.ramo || 'testa staccata'}», non su main: si pubblica solo ciò che è stato fuso` };
   if (!s.origine) return { ok: false, motivo: 'origin/main non si legge' };
@@ -50,7 +54,7 @@ export function decidi(s) {
 
 /** Il comando di pubblicazione. PURA. */
 export function passo({ radice, progetto }) {
-  return { cmd: 'firebase', args: ['deploy', '--only', BERSAGLI.join(','), '--project', progetto], cwd: radice };
+  return { cmd: 'firebase', args: ['deploy', '--only', BERSAGLI.join(','), '--project', progetto], cwd: radice, env: { [SEGNO_GUARDIA]: '1' } };
 }
 
 function git(args) {
@@ -79,29 +83,40 @@ function stato() {
   };
 }
 
-async function main(argv) {
+function lancia(p) {
+  // Su Windows firebase è un .cmd, che Node lancia solo attraverso la shell; gli argomenti non hanno spazi.
+  const r = spawnSync(p.cmd, p.args, { cwd: p.cwd, env: { ...process.env, ...p.env }, stdio: 'inherit', shell: process.platform === 'win32', windowsHide: true });
+  return r.error ? 127 : (r.status ?? 1);
+}
+
+/** `--controlla` è il predeploy di firebase.json: decide e esce, 3 al rifiuto, che ferma il deploy. */
+export async function main(argv, { leggiStato = stato, esegui = lancia, env = process.env, log = console.log, err = console.error } = {}) {
   const { controllaArgomenti, argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
-  const storpiata = opzioneStorpiata(process.env, OPZIONI);
-  if (storpiata) { console.error(`RIFIUTATO: ${storpiata}`); return 1; }
+  const storpiata = opzioneStorpiata(env, OPZIONI);
+  if (storpiata) { err(`RIFIUTATO: ${storpiata}`); return 1; }
   // npm si mangia `--dry-run` (su PowerShell anche dopo i due trattini): lo si riprende dall'ambiente.
-  const daNpm = argomentiDaNpm(process.env, { opzioni: OPZIONI });
-  if (daNpm.nota) console.error(daNpm.nota);
+  const daNpm = argomentiDaNpm(env, { opzioni: OPZIONI });
+  if (daNpm.nota) err(daNpm.nota);
   const args = [...argv, ...daNpm.args];
   const male = controllaArgomenti(args, { opzioni: OPZIONI, senzaParoleLibere: true });
-  if (male) { console.error(`RIFIUTATO: ${male}`); return 1; }
+  if (male) { err(`RIFIUTATO: ${male}`); return 1; }
+  const controlla = args.includes('--controlla');
   const dryRun = args.includes('--dry-run');
+  if (controlla && env[SEGNO_GUARDIA] !== '1') {
+    err('RIFIUTATO: firebase deploy lanciato a mano. Le regole si pubblicano con npm run regole:pubblica, da main allineato a origin/main: regole e indici di Firestore e regole di Storage insieme.');
+    return 3;
+  }
 
-  const s = stato();
+  const s = leggiStato();
   const d = decidi(s);
-  if (!d.ok) { console.error(`RIFIUTATO: ${d.motivo}.`); return 3; }
+  if (!d.ok) { err(`RIFIUTATO: ${d.motivo}.`); return 3; }
+  if (controlla) { log(`Guardia delle regole: main = origin/main (${s.testa.slice(0, 9)}), file intatti.`); return 0; }
   const p = passo({ radice: ROOT, progetto: s.progetto });
-  console.log(`main = origin/main (${s.testa.slice(0, 9)}), ${s.file.join(' e ')} intatti.`);
-  console.log(`  in ${p.cwd}\n  $ ${p.cmd} ${p.args.join(' ')}`);
-  if (dryRun) { console.log('(prova a vuoto: non ho pubblicato niente)'); return 0; }
-  // Su Windows firebase è un .cmd, che Node lancia solo attraverso la shell; gli argomenti non hanno spazi.
-  const r = spawnSync(p.cmd, p.args, { cwd: p.cwd, stdio: 'inherit', shell: process.platform === 'win32', windowsHide: true });
-  const codice = r.error ? 127 : (r.status ?? 1);
-  if (codice !== 0) console.error(`firebase deploy è uscito con ${codice}: le regole in produzione potrebbero essere quelle di prima.`);
+  log(`main = origin/main (${s.testa.slice(0, 9)}), ${s.file.join(', ')} intatti.`);
+  log(`  in ${p.cwd}\n  $ ${p.cmd} ${p.args.join(' ')}`);
+  if (dryRun) { log('(prova a vuoto: non ho pubblicato niente)'); return 0; }
+  const codice = esegui(p);
+  if (codice !== 0) err(`firebase deploy è uscito con ${codice}: le regole in produzione potrebbero essere quelle di prima.`);
   return codice;
 }
 

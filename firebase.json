@@ -1,9 +1,11 @@
 {
   "firestore": {
     "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
+    "indexes": "firestore.indexes.json",
+    "predeploy": ["node scripts/regole-pubblica.mjs --controlla"]
   },
   "storage": {
-    "rules": "storage.rules"
+    "rules": "storage.rules",
+    "predeploy": ["node scripts/regole-pubblica.mjs --controlla"]
   }
 }
