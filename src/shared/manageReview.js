@@ -488,6 +488,9 @@
       if (statusReason === 'arenato') {
         return { text: 'La lavorazione si è arenata troppe volte: decidi tu.', color: S.design.color };
       }
+      if (statusReason === 'locale') {
+        return { text: 'Richiede lavoro locale, e in locale i feedback degli utenti non si lavorano: decidi tu.', color: S.design.color };
+      }
       return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
     }
     if (status === 'aligned') {
