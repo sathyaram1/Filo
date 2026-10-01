@@ -60,3 +60,19 @@ test('la forma: una mappa con by (testo, non vuoto) e at (intero)', () => {
   assert.match(corpo, /get\('by', ''\)\.size\(\) > 0/);
   assert.match(corpo, /get\('at', 0\) is int/);
 });
+
+test('una scheda pubblica non si scrive per un lavoro locale, anche da un codice che non lo sa', () => {
+  const da = RULES.indexOf('match /feedback-public/{');
+  const a = RULES.indexOf('match /counters/{');
+  assert.ok(da > 0 && a > da, 'firestore.rules: blocco di feedback-public non trovato');
+  const rami = [...RULES.slice(da, a).matchAll(/allow\s+([a-z,\s]+?)\s*:\s*if\s+([\s\S]*?);/g)]
+    .map((m) => ({ verbi: m[1].split(',').map((v) => v.trim()), cond: m[2].replace(/\s+/g, ' ').trim() }));
+  const pubblicatore = rami.filter((r) => r.verbi.includes('create'));
+  assert.equal(pubblicatore.length, 1, 'un solo ramo crea le schede');
+  assert.match(pubblicatore[0].cond, /^\(isAdmin\(\) \|\| isRoutine\(\)\)/);
+  assert.ok(pubblicatore[0].cond.includes("!('localOnly' in get(/databases/$(database)/documents/feedback/$(doc)).data)"),
+    'il segno sta sul feedback vero: la scheda con lo stesso id si rifiuta finché c\'è');
+  const togli = rami.filter((r) => r.verbi.includes('delete'));
+  assert.equal(togli.length, 1);
+  assert.ok(!togli[0].cond.includes('localOnly'), 'togliere una scheda deve funzionare sempre');
+});
