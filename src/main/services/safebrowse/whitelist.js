@@ -24,11 +24,12 @@ const EXTRA = [
   'youtube.com', 'youtu.be', 'google.co.uk', 'google.de', 'google.fr',
   'google.es', 'android.com', 'chromium.org', 'gstatic.com',
   'googleusercontent.com', 'googleapis.com', 'googletagmanager.com',
-  'google-analytics.com', 'ggpht.com', 'doubleclick.net', 'withgoogle.com',
+  'google-analytics.com', 'youtube-nocookie.com', 'ggpht.com', 'doubleclick.net', 'withgoogle.com',
   'goo.gl', 'recaptcha.net',
   // CDN/infra di altri brand (contengono il token del brand ma sono ufficiali)
   'fbcdn.net', 'cdninstagram.com', 'licdn.com', 'twimg.com',
-  'paypalobjects.com', 'icloud-content.com',
+  'paypalobjects.com', 'icloud-content.com', 'amazon-adsystem.com',
+  'media-amazon.com', 'ssl-images-amazon.com', 'images-amazon.com',
   // Microsoft / Apple ecosistema
   'bing.net', 'msn.com', 'skype.com', 'xbox.com', 'windows.com',
   'sharepoint.com', 'onedrive.com', 'azure.com', 'visualstudio.com',
@@ -42,7 +43,7 @@ const EXTRA = [
   'gazzetta.it', 'lastampa.it',
   // Streaming / intrattenimento
   'spotify.com', 'twitch.tv', 'primevideo.com', 'disneyplus.com',
-  'soundcloud.com', 'vimeo.com',
+  'soundcloud.com', 'vimeo.com', 'fandom.com',
   // Servizi / produttività
   'notion.so', 'slack.com', 'zoom.us', 'trello.com', 'atlassian.com',
   'figma.com', 'canva.com', 'adobe.com', 'wordpress.com', 'wordpress.org',
