@@ -291,6 +291,21 @@ export function rifiutoPratica(id, r) {
   return righe.join('\n');
 }
 
+/** «910», «#910», «22.1»: un numero di feedback, non un id. PURA. */
+export function numeroDiFeedback(riferimento) {
+  return !!parseRiferimento(riferimento).seq;
+}
+
+/**
+ * Il numero (#910, 910, #22.1) vale come nella lettura, nella verifica e nella chiusura: la sessione ha quello.
+ * Un id passa così com'è. @returns {Promise<{ ok: true, id: string } | { ok: false, motivo: string }>}
+ */
+export async function idDelFeedback(riferimento, { bearer, base = FIRESTORE_BASE, fetchImpl = fetch } = {}) {
+  if (!numeroDiFeedback(riferimento)) return { ok: true, id: String(riferimento) };
+  const r = await risolviFeedback(riferimento, { bearer, base, fetchImpl });
+  return r.ok ? { ok: true, id: r.id } : { ok: false, motivo: r.motivo };
+}
+
 /** La versione in costruzione: è quella in cui un fix confluisce. */
 function packageVersion() {
   try {
