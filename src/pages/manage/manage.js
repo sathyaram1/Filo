@@ -2183,7 +2183,10 @@
     const m = fb && fb.localOnly;
     if (!m) return '';
     const quando = Number(m.at) > 0 ? ` il ${formatDateTime(new Date(Number(m.at)).toISOString())}` : '';
-    return `Solo lavoro locale: nessuna routine la prende. Segno messo da ${chiHaMessoIlSegno(m.by)}${quando}.`;
+    const cosa = MR.praticaChiusa(fb, { releasedVersion, fusioni })
+      ? 'Era un lavoro locale: per questo non sta nella bacheca pubblica.'
+      : 'Solo lavoro locale: nessuna routine la prende.';
+    return `${cosa} Segno messo da ${chiHaMessoIlSegno(m.by)}${quando}.`;
   }
   // Una sessione firma il segno col suo mittente (`local:claude`), l'owner con l'email: il mittente si legge come in testata.
   function chiHaMessoIlSegno(by) {
