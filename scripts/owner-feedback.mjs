@@ -601,11 +601,25 @@ if (isMain) {
       process.exit(0);
     }
     if (status) { console.error(`RIFIUTATO: ${locali[0]} va da solo, senza stato né nota — non ho toccato niente.`); process.exit(1); }
+    if (locali[0] === '--riconosci') {
+      const r = await riconosciMittente(id, { dryRun, bearer });
+      if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
+      console.log(r.dryRun
+        ? `[dry-run] ${riferimento}: darei la prova del mittente (è dell'owner o di una sua sessione)`
+        : `${riferimento}: da ora vale come tuo o di una tua sessione (prova del mittente data dall'owner).`);
+      process.exit(0);
+    }
     const valore = locali[0] === '--solo-locale';
     const r = await segnaLocale(id, valore, { dryRun, bearer });
     if (!r.ok) {
       console.error(rifiutoPratica(riferimento, r));
       process.exit(3);
+    }
+    if (valore && r.chiusa) {
+      console.log(r.dryRun
+        ? `[dry-run] ${riferimento}: è chiusa; la segnerei come lavoro locale e toglierei la sua scheda dalla bacheca pubblica`
+        : `${riferimento}: segnata come lavoro locale${r.scheda ? `, ma ${r.scheda}` : ', fuori dalla bacheca pubblica'}.`);
+      process.exit(r.scheda ? 3 : 0);
     }
     console.log(r.dryRun
       ? `[dry-run] ${riferimento}: ${valore ? 'metterei' : 'toglierei'} il segno «solo in locale»`
