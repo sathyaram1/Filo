@@ -278,6 +278,54 @@ export function resoconto({ promossi, saltati }) {
   return righe;
 }
 
+/**
+ * Da quando chi crea scrive DAVVERO la prova, per famiglia (ms; Infinity = non ancora). Da git, su origin/main.
+ * Le sessioni: da quando main la scrive nello strumento che apre i feedback. L'owner: da quando esce una versione
+ * di Filo che la scrive. Prima, un feedback senza prova non si distingue da un falso e vale l'epoca, qualunque
+ * soglia sia stata salvata: il primo giro del 01/10 l'aveva fissata quando nessuno la scriveva ancora.
+ * `git(args)` → stdout; iniettabile nei test.
+ */
+export function inizioDellaProva(git = gitDelRepo) {
+  const quando = (args) => { try { return String(git(args) || '').trim(); } catch (_) { return ''; } };
+  // --first-parent: conta quando la prova è arrivata su main, non quando è nata sul ramo.
+  const primo = (file) => {
+    const riga = quando(['log', 'origin/main', '--first-parent', '--reverse', '--format=%H %cI', '-S', 'senderProof', '--', file]).split('\n')[0];
+    const [sha, data] = riga.split(' ');
+    return sha && Number.isFinite(Date.parse(data)) ? { sha, ms: Date.parse(data) } : null;
+  };
+  const sessioni = primo('scripts/claude-feedback.mjs');
+  const app = primo('src/shared/feedback.js');
+  let owner = Infinity;
+  if (app) {
+    const tag = quando(['tag', '--contains', app.sha, '--sort=creatordate', '--list', 'v*']).split('\n')[0];
+    const ms = tag ? Date.parse(quando(['for-each-ref', '--format=%(creatordate:iso-strict)', `refs/tags/${tag}`])) : NaN;
+    if (Number.isFinite(ms)) owner = ms;
+  }
+  return { local: sessioni ? sessioni.ms : Infinity, owner };
+}
+
+function gitDelRepo(args) {
+  const env = { ...process.env };
+  delete env.GIT_DIR; delete env.GIT_WORK_TREE; delete env.GIT_INDEX_FILE;
+  return execFileSync('git', args, { cwd: ROOT, env, encoding: 'utf8', maxBuffer: 1 << 26, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+}
+
+let inizioLetto = null;
+function inizioDiDefault() {
+  if (!inizioLetto) inizioLetto = inizioDellaProva();
+  return inizioLetto;
+}
+
+/** La soglia che decide: la salvata, ma mai prima che chi crea scriva la prova. Senza salvata, nessuno. PURA. */
+export function sogliaEffettiva(soglie, inizioProva) {
+  return (cat) => {
+    const s = Number(soglie && soglie[cat]);
+    if (!Number.isFinite(s)) return -Infinity;
+    const i = inizioProva ? Number(inizioProva[cat]) : NaN;
+    return Number.isNaN(i) ? s : Math.max(s, i);
+  };
+}
+
 function leggiCodaDiTriage() {
   // Il repo lo decide la cartella: un GIT_DIR ereditato da un hook leggerebbe un altro repo.
   const env = { ...process.env };
