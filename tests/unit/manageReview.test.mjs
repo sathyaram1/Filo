@@ -734,9 +734,26 @@ test('localSignCheck: il segno si mette solo su owner o sessione CON la prova', 
   assert.deepEqual([routine.ok, !!routine.utente], [false, false]);
 });
 
-test('localSignCheck: pratica chiusa, segnalata o in mano a una routine → no', () => {
+test('localSignCheck: una pratica chiusa si segna (era un lavoro locale: fuori dalla bacheca) e lo dice', () => {
+  for (const status of ['done', 'archived']) {
+    const r = MR.localSignCheck(locale({ status, statusPublic: 'closed' }), true);
+    assert.deepEqual([r.ok, r.chiusa], [true, true], status);
+  }
+  // Il solo prefisso resta di un utente anche a pratica chiusa.
+  assert.equal(MR.localSignCheck(locale({ status: 'done', statusPublic: 'closed', senderProof: undefined }), true).ok, false);
+  assert.equal(MR.localSignCheck(locale({ status: 'attack_confirmed', statusPublic: 'closed' }), true).ok, false);
+});
+
+test('mittenteDaRiconoscere: solo i prefissi dell’owner e delle sessioni senza prova', () => {
+  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'local:claude' }), true);
+  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'owner:abc' }), true);
+  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'local:claude', senderProof: 'admin' }), false);
+  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'routine:residuo' }), false);
+  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'c-utente' }), false);
+});
+
+test('localSignCheck: pratica segnalata o in mano a una routine → no', () => {
   const now = Date.parse('2026-09-30T10:00:00Z');
-  assert.equal(MR.localSignCheck(locale({ status: 'archived', statusPublic: 'closed' }), true, { now }).ok, false);
   assert.equal(MR.localSignCheck(locale({ status: 'attack' }), true, { now }).ok, false);
   // Presa da una routine: il server scrive workingSince alla presa e specchia il battito in beatAt.
   const dueMinutiFa = '2026-09-30T09:58:00Z';
