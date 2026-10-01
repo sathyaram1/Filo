@@ -2757,7 +2757,7 @@
     if (mgWorkState) {
       const progress = leggibile ? MR.workProgress(fb) : null;
       mgWorkState.hidden = !progress;
-      mgWorkState.innerHTML = progress ? workStateHtml(progress) : '';
+      mgWorkState.innerHTML = progress ? workStateHtml(progress, fb) : '';
     }
 
     // Bolle chat
