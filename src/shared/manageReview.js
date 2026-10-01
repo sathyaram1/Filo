@@ -921,6 +921,7 @@
       // (non lo status): un feedback segnalato dalla sicurezza non va mai in
       // board nemmeno se per qualche motivo è arrivato a `done`.
       .filter((fb) => !classifyLegacyBlock(fb))
+      .filter((fb) => !isLocalOnly(fb))
       .filter((fb) => !hasReopenRequest(fb));
   }
 
