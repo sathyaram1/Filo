@@ -15,6 +15,8 @@
 //   7. Su un lavoro locale provato «Fondi senza chiedermelo» non c'è (il server la
 //      fonde comunque senza chiedere): al suo posto una riga che lo dice. Un segno di
 //      pre-approvazione già messo resta nel dato, e torna quando il segno locale si toglie.
+//   8. Su un lavoro locale chiuso togliere il segno lo rimette nella bacheca pubblica, non alle
+//      routine, e i testi lo dicono; «Copia» nomina finish solo dove il numero lo lega a un lavoro.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -376,4 +378,26 @@ test('un lavoro locale «In lavorazione» dice che lo porta avanti una sessione,
   await scheda.click();
   await expect(page.locator('#mgWorkState')).toContainText('In lavorazione in una sessione locale');
   await expect(page.locator('#mgWorkState')).not.toContainText('rientra in coda');
+});
+
+test('lavoro locale chiuso: togliere il segno lo rimette nella bacheca, non alle routine; «Copia» sui feedback degli utenti non parla di finish', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const chiuso = fb({ _id: 'loc-chiuso', seq: 909, status: 'done', statusPublic: 'closed', localOnly: SEGNO });
+  const utente = fb({ _id: 'u-1', seq: 911, clientId: 'abc', senderProof: undefined });
+  await apri(page, [chiuso, utente], { tab: 'resolved' });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), 'loc-chiuso');
+  const tasto = page.locator('#mgLocalBtn');
+  await expect(tasto).toHaveAttribute('title', /Era un lavoro locale.*torna nella bacheca pubblica/);
+  await expect(tasto).not.toHaveAttribute('title', /routine/);
+  await expect(page.locator('#mgPreapprovedInfo')).toBeHidden();
+  await page.locator('.mg-item[data-id="loc-chiuso"]').click({ button: 'right' });
+  const voce = page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Non era un lavoro locale' });
+  await expect(voce).toHaveAttribute('title', /torna nella bacheca pubblica/);
+  await voce.click();
+  await expect(page.locator('#mgManageMsg')).toContainText('torna nella bacheca pubblica');
+  expect(await page.evaluate(() => window.__updates)).toEqual([{ type: 'feedback_update', id: 'loc-chiuso', localOnly: false }]);
+
+  await page.evaluate(() => window.__mgTest.setTab('queue'));
+  await page.locator('.mg-item[data-id="u-1"]').click({ button: 'right' });
+  await expect(page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Copia #911' })).toHaveAttribute('title', 'Il numero con cui parlarne');
 });

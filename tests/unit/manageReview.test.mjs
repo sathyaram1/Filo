@@ -1557,3 +1557,14 @@ test('localSignCheck: niente segno su un feedback che il lettore rifiuta come se
   // Toglierlo resta sempre possibile.
   assert.equal(MR.localSignCheck({ ...segnalati[0], localOnly: { by: 'owner', at: 1 } }, false).ok, true);
 });
+
+test('praticaChiusa e localSignCheck: su un lavoro locale chiuso togliere il segno lo dice (torna nella bacheca)', () => {
+  const chiusa = locale({ status: 'done', statusPublic: 'closed', localOnly: SEGNO });
+  assert.equal(MR.praticaChiusa(chiusa), true);
+  assert.deepEqual(MR.localSignCheck(chiusa, false), { ok: true, chiusa: true });
+  // Il riflesso pubblico può restare indietro: decide anche lo stato.
+  assert.equal(MR.praticaChiusa(locale({ status: 'archived', statusPublic: 'open', localOnly: SEGNO })), true);
+  const aperta = locale({ status: 'working', localOnly: SEGNO });
+  assert.equal(MR.praticaChiusa(aperta), false);
+  assert.deepEqual(MR.localSignCheck(aperta, false), { ok: true });
+});

@@ -414,3 +414,24 @@ test('l’avvio della verifica prende in carico la pratica in coda e ci scrive i
     assert.equal(patch.length, 0);
   });
 });
+
+test('--non-locale su un lavoro locale chiuso: toglie il segno, lo dice, e non cancella la scheda della bacheca', async () => {
+  const doc = documento('c1', {
+    clientId: 'local:claude', senderProof: 'admin', status: 'done', statusPublic: 'closed',
+    localOnly: { mapValue: { fields: { by: { stringValue: 'local:claude' }, at: { integerValue: '1790000000000' } } } },
+  });
+  const scritture = [];
+  const vero = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    const metodo = opts.method || 'GET';
+    if (metodo !== 'GET') { scritture.push(`${metodo} ${url}`); return { ok: true, status: 200, json: async () => ({}), text: async () => '' }; }
+    return { ok: true, status: 200, json: async () => doc, text: async () => '' };
+  };
+  try {
+    const r = await mod.segnaLocale('c1', false, OPTS);
+    assert.equal(r.ok, true, r.motivo);
+    assert.equal(r.chiusa, true);
+    assert.equal(scritture.length, 1, scritture.join('\n'));
+    assert.match(scritture[0], /^PATCH .*\/feedback\/c1\?updateMask\.fieldPaths=localOnly$/);
+  } finally { globalThis.fetch = vero; }
+});
