@@ -1774,7 +1774,7 @@
       });
     }
     if (isAdmin && MR.mittenteDaRiconoscere(fb)) {
-      voci.push({ testo: '🙋 È mio', titolo: TITOLO_E_MIO, azione: () => { if (selectedId !== fb._id) openDetail(fb._id); setSenderProof(fb._id); } });
+      voci.push({ testo: '🙋 È mio', titolo: titoloEMio(fb), azione: () => { if (selectedId !== fb._id) openDetail(fb._id); setSenderProof(fb._id); } });
     }
     if (num) {
       voci.push({
