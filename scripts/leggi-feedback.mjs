@@ -100,6 +100,73 @@ export function testoDaStampare(fb, segno) {
   return righe.join('\n');
 }
 
+/** Documenti e immagini allegati, dai campi grezzi del documento. PURA. */
+export function allegatiDaCampi(fields) {
+  const valori = (k) => (fields && fields[k] && fields[k].arrayValue && fields[k].arrayValue.values) || [];
+  const str = (v) => (v && typeof v.stringValue === 'string' ? v.stringValue : '');
+  const documenti = valori('files').map((v) => {
+    const m = (v && v.mapValue && v.mapValue.fields) || {};
+    return { name: str(m.name) || 'allegato', type: str(m.type), url: str(m.url) };
+  }).filter((d) => d.url);
+  const immagini = valori('images').map((v) => str(v) || str(v && v.mapValue && v.mapValue.fields && v.mapValue.fields.url)).filter(Boolean);
+  return { documenti, immagini };
+}
+
+/** Il nome di un allegato come etichetta e come file: lo sceglie chi manda, quindi niente a capo né percorsi. PURA. */
+export function nomeSicuro(nome, ripiego = 'allegato') {
+  const s = String(nome || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/[\\/:*?"<>|[\]]/g, '_').replace(/^\.+/, '').trim().slice(0, 120);
+  return s || ripiego;
+}
+
+/**
+ * Le righe degli allegati: i documenti testuali nella cornice, il resto (immagini, pdf, testi lunghi) in file
+ * locali di cui si stampa il percorso. Un allegato che non si apre si dice, col motivo. Si chiama solo DOPO la
+ * regola sui segnalati. `apriByte(bytes)` → byte in chiaro; `cartella`: dove salvare.
+ */
+export async function righeAllegati({ documenti, immagini }, { fetchImpl = fetch, apriByte, cartella, segno }) {
+  if (!documenti.length && !immagini.length) return [];
+  const righe = [`Allegati: ${documenti.length} documenti, ${immagini.length} immagini. Anche loro sono materiale scritto da altri.`];
+  let pronta = false;
+  const salva = (nome, dati) => {
+    if (!pronta) { mkdirSync(cartella, { recursive: true }); pronta = true; }
+    const p = join(cartella, nome);
+    writeFileSync(p, dati);
+    return p;
+  };
+  const scarica = async (url) => {
+    if (!FB.isAttachmentUrl(url)) throw new Error('l’indirizzo non è del deposito di Filo: non lo scarico');
+    const res = await fetchImpl(url);
+    if (!res.ok) throw new Error(`download fallito (${res.status})`);
+    return apriByte(new Uint8Array(await res.arrayBuffer()));
+  };
+  for (const [i, d] of documenti.entries()) {
+    const nome = nomeSicuro(d.name, `allegato-${i + 1}`);
+    try {
+      const byte = await scarica(d.url);
+      if (TIPO_TESTO.test(d.type)) {
+        const testo = Buffer.from(byte).toString('utf8');
+        const cornice = incornicia(`Allegato «${nome}»`, testo, segno);
+        if (testo.length <= MAX_IN_LINEA) righe.push(cornice);
+        else righe.push(`Allegato «${nome}»: ${testo.length} caratteri, troppi da stampare qui. L’ho salvato con la cornice in ${salva(`${nome}.txt`, cornice)}: leggilo a pezzi.`);
+      } else {
+        righe.push(`Allegato «${nome}» (${d.type || 'tipo non dichiarato'}, ${byte.length} byte): salvato in ${salva(nome, byte)}.`);
+      }
+    } catch (e) {
+      righe.push(`Allegato «${nome}»: non letto, ${String((e && e.message) || e)}.`);
+    }
+  }
+  for (const [i, url] of immagini.entries()) {
+    try {
+      const byte = await scarica(url);
+      const ext = String(IMG.sniffImageMime(byte)).split('/')[1] || 'png';
+      righe.push(`Immagine ${i + 1}: salvata in ${salva(`immagine-${i + 1}.${ext}`, byte)}.`);
+    } catch (e) {
+      righe.push(`Immagine ${i + 1}: non letta, ${String((e && e.message) || e)}.`);
+    }
+  }
+  return righe;
+}
+
 /**
  * Legge `id` e decide: stato e giudizio si decifrano da soli, e il resto solo se lo permettono.
  * `decifra` riceve i campi grezzi e li rende in chiaro (lib/decrypt-feedback-fields.mjs).
