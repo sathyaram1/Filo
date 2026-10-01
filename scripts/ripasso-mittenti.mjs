@@ -323,9 +323,16 @@ async function leggiNoteDeiPadri(ids, bearer, letture) {
 const num = (d) => numeroDi(d) || d.id;
 
 async function main(argv) {
-  const ignote = argv.filter((a) => a !== '--dry-run');
-  if (ignote.length) { console.error(`USO: npm run feedback:ripasso [-- --dry-run] (non capito: ${ignote.join(' ')})`); return 1; }
-  const dryRun = argv.includes('--dry-run');
+  const { controllaArgomenti, argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
+  const storpiata = opzioneStorpiata(process.env, ['--dry-run']);
+  if (storpiata) { console.error(`RIFIUTATO: ${storpiata}`); return 1; }
+  // npm si mangia `--dry-run` (su PowerShell anche dopo i due trattini): senza riprenderlo il giro a vuoto scriverebbe.
+  const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run'] });
+  if (daNpm.nota) console.error(daNpm.nota);
+  const args = [...argv, ...daNpm.args];
+  const male = controllaArgomenti(args, { opzioni: ['--dry-run'], senzaParoleLibere: true });
+  if (male) { console.error(`USO: npm run feedback:ripasso [-- --dry-run]. ${male}`); return 1; }
+  const dryRun = args.includes('--dry-run');
   const letture = contatoreLetture();
   const adesso = Date.now();
   let coda;

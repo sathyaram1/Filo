@@ -25,7 +25,7 @@
     "feedback:auto-archive": "node scripts/auto-archive.mjs",
     "feedback:vista-pubblica": "node scripts/publish-public-view.mjs",
     "feedback:login": "node scripts/admin-login.mjs",
-    "deploy:regole": "firebase deploy --only firestore:rules,firestore:indexes",
+    "regole:pubblica": "node scripts/regole-pubblica.mjs",
     "purga:percorsi-vecchi": "firebase firestore:delete paths --shallow",
     "build": "electron-builder --win --publish never",
     "release": "electron-builder --win --publish always",
