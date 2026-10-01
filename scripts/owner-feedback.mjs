@@ -27,18 +27,20 @@
 //   difetto (b) della spec. L'owner la chiave ce l'ha: qui il controllo gira.
 //
 // USO
-//   node scripts/owner-feedback.mjs <id> <status> "nota"  [--branch <nome>]
+//   node scripts/owner-feedback.mjs <n|id> <status> "nota"  [--branch <nome>]
 //                                                         [--reason <slug>]
 //                                                         [--starred|--unstar]
 //                                                         [--preapprova|--chiedi-prima]
 //                                                         [--frase "per l'utente"]
 //                                                         [--come-routine]
 //                                                         [--dry-run]
-//   node scripts/owner-feedback.mjs <id> --preapprova     (solo il segno, stato invariato)
-//   node scripts/owner-feedback.mjs <id> --chiedi-prima
-//   node scripts/owner-feedback.mjs <id> --solo-locale    (segno «solo in locale»)
-//   node scripts/owner-feedback.mjs <id> --non-locale
-//   node scripts/owner-feedback.mjs <id> --serve-locale ["perché"]
+//   node scripts/owner-feedback.mjs <n|id> --preapprova     (solo il segno, stato invariato)
+//   node scripts/owner-feedback.mjs <n|id> --chiedi-prima
+//   node scripts/owner-feedback.mjs <n|id> --solo-locale    (segno «solo in locale»)
+//   node scripts/owner-feedback.mjs <n|id> --non-locale
+//   node scripts/owner-feedback.mjs <n|id> --serve-locale ["perché"]
+//
+//   <n|id>: il numero del feedback (910, #910, 22.1) o il suo id.
 //
 //   `--solo-locale`: la pratica la lavora solo una sessione locale, nessuna
 //   routine la prende, e in Gestione sta nei Lavori locali. Solo sui feedback
@@ -471,10 +473,10 @@ if (isMain) {
   // scritta male non deve scalare sui posizionali e far partire lo stesso il
   // cambio di stato. `--help` è legittima: chiedere aiuto non è un errore.
   const uso = () => {
-    console.error('Uso: node scripts/owner-feedback.mjs <id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--preapprova|--chiedi-prima] [--come-routine] [--dry-run]');
-    console.error('     node scripts/owner-feedback.mjs <id> --preapprova | --chiedi-prima   (solo il segno, stato invariato)');
-    console.error('     node scripts/owner-feedback.mjs <id> --solo-locale | --non-locale    (segno «solo in locale», stato invariato)');
-    console.error('     node scripts/owner-feedback.mjs <id> --serve-locale ["perché"]       (feedback di un utente → Ricevuti, «richiede lavoro locale»)');
+    console.error('Uso: node scripts/owner-feedback.mjs <numero|id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--preapprova|--chiedi-prima] [--come-routine] [--dry-run]');
+    console.error('     node scripts/owner-feedback.mjs <numero|id> --preapprova | --chiedi-prima   (solo il segno, stato invariato)');
+    console.error('     node scripts/owner-feedback.mjs <numero|id> --solo-locale | --non-locale    (segno «solo in locale», stato invariato)');
+    console.error('     node scripts/owner-feedback.mjs <numero|id> --serve-locale ["perché"]       (feedback di un utente → Ricevuti, «richiede lavoro locale»)');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
@@ -550,41 +552,41 @@ if (isMain) {
       if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo}`); process.exit(3); }
       console.log(r.dryRun
         ? `(prova a vuoto) ${r.from} → design, «richiede lavoro locale»; campi: ${r.campi.join(', ')}`
-        : `OK: ${id} torna nei Ricevuti (design, «richiede lavoro locale»): decide l'owner.`);
+        : `OK: ${riferimento} torna nei Ricevuti (design, «richiede lavoro locale»): decide l'owner.`);
       process.exit(0);
     }
     if (status) { console.error(`RIFIUTATO: ${locali[0]} va da solo, senza stato né nota — non ho toccato niente.`); process.exit(1); }
     const valore = locali[0] === '--solo-locale';
-    const r = await segnaLocale(id, valore, { dryRun });
+    const r = await segnaLocale(id, valore, { dryRun, bearer });
     if (!r.ok) {
-      console.error(rifiutoPratica(id, r));
+      console.error(rifiutoPratica(riferimento, r));
       process.exit(3);
     }
     console.log(r.dryRun
-      ? `[dry-run] ${id}: ${valore ? 'metterei' : 'toglierei'} il segno «solo in locale»`
-      : `${id}: ${valore ? `da ora la lavora solo una sessione locale (segno di ${r.segno.by})` : 'da ora la possono prendere anche le routine'}`);
+      ? `[dry-run] ${riferimento}: ${valore ? 'metterei' : 'toglierei'} il segno «solo in locale»`
+      : `${riferimento}: ${valore ? `da ora la lavora solo una sessione locale (segno di ${r.segno.by})` : 'da ora la possono prendere anche le routine'}`);
     process.exit(0);
   }
 
   // Solo il segno, stato invariato: `<id> --preapprova` / `<id> --chiedi-prima`.
   if (id && !status && typeof preapprova === 'boolean') {
-    const r = await segnaPreapprovazione(id, preapprova, { dryRun });
+    const r = await segnaPreapprovazione(id, preapprova, { dryRun, bearer });
     if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo}`); process.exit(3); }
     console.log(r.dryRun
-      ? `[dry-run] ${id}: ${preapprova ? 'metterei' : 'toglierei'} il segno «fondi senza chiedermelo» (${r.campi.join(', ')})`
-      : `${id}: ${preapprova ? `da ora si fonde senza chiedere (segno di ${r.segno.by})` : 'da ora ti chiede prima di fondere'}`);
+      ? `[dry-run] ${riferimento}: ${preapprova ? 'metterei' : 'toglierei'} il segno «fondi senza chiedermelo» (${r.campi.join(', ')})`
+      : `${riferimento}: ${preapprova ? `da ora si fonde senza chiedere (segno di ${r.segno.by})` : 'da ora ti chiede prima di fondere'}`);
     process.exit(0);
   }
 
   if (!id || !status) {
-    console.error('Uso: node scripts/owner-feedback.mjs <id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--come-routine] [--dry-run]');
+    console.error('Uso: node scripts/owner-feedback.mjs <numero|id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--come-routine] [--dry-run]');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
     process.exit(1);
   }
 
-  const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, preapprova, dryRun, attore });
+  const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, preapprova, dryRun, attore, bearer });
   if (!r.ok) {
-    console.error(r.utente ? rifiutoPratica(id, r) : `RIFIUTATO: ${r.motivo}`);
+    console.error(r.utente ? rifiutoPratica(riferimento, r) : `RIFIUTATO: ${r.motivo}`);
     if (attore === 'owner' && /non è un passaggio permesso/.test(r.motivo || '')) {
       console.error('Se stai chiudendo a mano una pratica dell\'iter di lavorazione, aggiungi --come-routine.');
     }
@@ -592,5 +594,5 @@ if (isMain) {
   }
   console.log(r.dryRun
     ? `(prova a vuoto) ${r.from} → ${r.to}; campi che scriverei: ${r.campi.join(', ')}`
-    : `OK: ${id} da "${r.from}" a "${r.to}".`);
+    : `OK: ${riferimento} da "${r.from}" a "${r.to}".`);
 }
