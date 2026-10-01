@@ -72,12 +72,8 @@ export function motivoSegnalato(d) {
   const p = d.pipeline;
   if (p === undefined || p === null || p === '') return '';
   if (typeof p !== 'object') return MOTIVO.GIUDIZIO_ILLEGGIBILE;
-  const verdetti = Array.isArray(p.verdicts) ? p.verdicts : [];
-  if (p.action === 'block_attack' || p.action === 'block_spam'
-    || p.l1Category === 'dangerous' || p.l1Category === 'spam'
-    || RISCHIO.includes(p.l2Class)
-    || verdetti.some((v) => v && RISCHIO.includes(v.class))) return MOTIVO.RICEVUTI_SEGNALATI;
-  return '';
+  const segnali = MR.segnaliDeiGiudici(p);
+  return segnali.attacco || segnali.spam ? MOTIVO.RICEVUTI_SEGNALATI : '';
 }
 
 /**
