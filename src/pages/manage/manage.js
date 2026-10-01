@@ -2959,7 +2959,7 @@
     // L'interruttore è acceso solo col segno pieno: quello da approvazione non
     // fonde i blocchi nuovi, e un clic lo fa diventare pieno.
     const m = segno && segno.tipo === 'pieno' ? segno : null;
-    const aperta = isOpenPublic(fb);
+    const aperta = isOpenPublic(fb) && !MR.praticaChiusa(fb, { releasedVersion, fusioni });
     const locale = MR.isProvenLocalWork(fb);
     mgPreapproveBtn.disabled = false;
     mgPreapproveBtn.hidden = !aperta || locale;
