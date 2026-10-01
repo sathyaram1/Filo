@@ -64,6 +64,8 @@ test('aspetto dei Lavori locali, chiaro e scuro', async ({ openTab }) => {
     await page.screenshot({ path: `tests/.shots/ll-ricevuti-${tema}.png` });
     const r1 = page.locator('.mg-item[data-id="R1"]');
     if (await r1.count()) { await r1.click(); await page.waitForTimeout(300); await page.screenshot({ path: `tests/.shots/ll-ricevuti-R1-${tema}.png` }); }
+    const s1 = page.locator('.mg-item[data-id="S1"]');
+    if (await s1.count()) { await s1.click(); await page.waitForTimeout(300); await page.screenshot({ path: `tests/.shots/ll-ricevuti-S1-${tema}.png` }); }
   }
   expect(true).toBe(true);
 });
