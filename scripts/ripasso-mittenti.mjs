@@ -440,6 +440,29 @@ async function leggiNoteDeiPadri(ids, bearer, letture) {
   return out;
 }
 
+/** Per ogni pratica, i rami di sessione nominati nella sua conversazione. Il testo non si stampa né si conserva. */
+async function leggiRamiNelleNote(ids, bearer, letture) {
+  const out = new Map();
+  const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
+  const radice = FIRESTORE_BASE.replace(/^https:\/\/[^/]+\/v1\//, '');
+  for (let i = 0; i < ids.length; i += 100) {
+    const pezzo = ids.slice(i, i + 100);
+    const res = await fetch(`${FIRESTORE_BASE}:batchGet`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+      body: JSON.stringify({ documents: pezzo.map((id) => `${radice}/feedback/${id}`), mask: { fieldPaths: ['notes'] } }),
+    });
+    if (!res.ok) throw new Error(`lettura delle conversazioni fallita (${res.status})`);
+    const righe = (await res.json()).filter((x) => x && x.found);
+    letture.aggiungi(righe.length, 'conversazioni delle pratiche chiuse');
+    for (const x of righe) {
+      let notes = x.found.fields?.notes?.stringValue || '';
+      try { notes = (await decryptFeedbackFields({ notes })).notes || ''; } catch (_) { notes = ''; }
+      out.set(x.found.name.split('/').pop(), ramiNelleNote(notes));
+    }
+  }
+  return out;
+}
+
 const num = (d) => numeroDi(d) || d.id;
 
 // Le soglie fissate dal primo giro vero: famiglia → ms, in un documento che solo l'admin legge e scrive.
