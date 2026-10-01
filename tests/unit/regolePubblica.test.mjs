@@ -1,5 +1,5 @@
 // La guardia delle regole: si pubblica solo da main uguale a origin/main coi file delle regole intatti, ed è
-// l'unica strada (nessuno script del pacchetto lancia firebase deploy sulle regole per conto suo). Puro.
+// l'unica strada (firebase.json la richiama a ogni deploy, e nessuno script la scavalca). Puro.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +13,7 @@ const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 
 const SHA = 'a'.repeat(40);
 const buono = () => ({
-  ramo: 'main', testa: SHA, origine: SHA, file: ['firestore.rules', 'firestore.indexes.json'], progetto: 'filo-8b9cb', toccati: [],
+  ramo: 'main', testa: SHA, origine: SHA, file: ['firestore.rules', 'firestore.indexes.json', 'storage.rules'], progetto: 'filo-8b9cb', toccati: [],
 });
 
 test('main uguale a origin/main e file intatti: si pubblica', () => {
@@ -27,7 +27,8 @@ test('ogni scostamento rifiuta col suo motivo', () => {
     [{ testa: 'b'.repeat(40) }, /bbbbbbbbb.*non è origin\/main \(aaaaaaaaa\)/],
     [{ origine: '' }, /origin\/main non si legge/],
     [{ toccati: ['firestore.rules'] }, /modificati e non fusi: firestore\.rules/],
-    [{ file: ['firestore.rules'] }, /firebase\.json/],
+    [{ file: ['firestore.rules', 'firestore.indexes.json'] }, /firebase\.json.*Storage/],
+    [{ toccati: ['storage.rules'] }, /modificati e non fusi: storage\.rules/],
     [{ progetto: '' }, /\.firebaserc/],
     [{ errore: 'rete giù' }, /rete giù/],
   ];
@@ -41,7 +42,7 @@ test('ogni scostamento rifiuta col suo motivo', () => {
 test('i file e il progetto vengono dalla configurazione vera del repo', () => {
   const fb = JSON.parse(readFileSync(join(ROOT, 'firebase.json'), 'utf8'));
   const rc = JSON.parse(readFileSync(join(ROOT, '.firebaserc'), 'utf8'));
-  assert.deepEqual(mod.fileDaPubblicare(fb), ['firestore.rules', 'firestore.indexes.json']);
+  assert.deepEqual(mod.fileDaPubblicare(fb), ['firestore.rules', 'firestore.indexes.json', 'storage.rules']);
   assert.equal(mod.progettoDi(rc), 'filo-8b9cb');
   assert.deepEqual(mod.fileDaPubblicare({}), []);
 });
@@ -51,10 +52,49 @@ test('lo stato di git: un file in stage o modificato conta, uno pulito no', () =
   assert.deepEqual(mod.fileToccati(''), []);
 });
 
-test('il comando pubblica regole e indici insieme, sul progetto nominato', () => {
+test('il comando pubblica regole, indici e regole di Storage insieme, sul progetto nominato, col segno della guardia', () => {
   const p = mod.passo({ radice: '/r', progetto: 'filo-8b9cb' });
   assert.equal(p.cmd, 'firebase');
-  assert.deepEqual(p.args, ['deploy', '--only', 'firestore:rules,firestore:indexes', '--project', 'filo-8b9cb']);
+  assert.deepEqual(p.args, ['deploy', '--only', 'firestore:rules,firestore:indexes,storage', '--project', 'filo-8b9cb']);
+  assert.deepEqual(p.env, { [mod.SEGNO_GUARDIA]: '1' });
+});
+
+test('firebase.json richiama la guardia prima di ogni deploy di Firestore e di Storage', () => {
+  const fb = JSON.parse(readFileSync(join(ROOT, 'firebase.json'), 'utf8'));
+  for (const sezione of ['firestore', 'storage']) {
+    assert.deepEqual(fb[sezione].predeploy, ['node scripts/regole-pubblica.mjs --controlla'],
+      `firebase deploy a mano su ${sezione} pubblicherebbe da qualunque ramo`);
+  }
+});
+
+const silenzio = { log: () => {}, err: () => {} };
+const mai = () => { throw new Error('la guardia non deve lanciare firebase'); };
+
+test('--controlla: decide e basta, mai un deploy', async () => {
+  const env = { [mod.SEGNO_GUARDIA]: '1' };
+  assert.equal(await mod.main(['--controlla'], { leggiStato: buono, esegui: mai, env, ...silenzio }), 0);
+  const errori = [];
+  const codice = await mod.main(['--controlla'], { leggiStato: () => ({ ...buono(), ramo: 'claude/x' }), esegui: mai, env, log: () => {}, err: (m) => errori.push(m) });
+  assert.equal(codice, 3);
+  assert.match(errori.join('\n'), /claude\/x.*non su main/);
+});
+
+test('--controlla senza il segno: è un firebase deploy a mano, si rifiuta anche da main pulito', async () => {
+  const errori = [];
+  const codice = await mod.main(['--controlla'], { leggiStato: buono, esegui: mai, env: {}, log: () => {}, err: (m) => errori.push(m) });
+  assert.equal(codice, 3);
+  assert.match(errori.join('\n'), /npm run regole:pubblica/);
+});
+
+test('regole:pubblica lancia firebase col segno, e solo se la guardia passa', async () => {
+  const lanci = [];
+  const esegui = (p) => { lanci.push(p); return 0; };
+  assert.equal(await mod.main([], { leggiStato: buono, esegui, env: {}, ...silenzio }), 0);
+  assert.equal(lanci.length, 1);
+  assert.equal(lanci[0].env[mod.SEGNO_GUARDIA], '1');
+  assert.equal(await mod.main([], { leggiStato: () => ({ ...buono(), toccati: ['storage.rules'] }), esegui, env: {}, ...silenzio }), 3);
+  assert.equal(await mod.main(['--dry-run'], { leggiStato: buono, esegui, env: {}, ...silenzio }), 0);
+  assert.equal(lanci.length, 1, 'né il rifiuto né la prova a vuoto lanciano firebase');
 });
 
 test('una strada sola: regole:pubblica passa dalla guardia, nessun altro script pubblica le regole', () => {
