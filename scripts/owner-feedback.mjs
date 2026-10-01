@@ -332,17 +332,24 @@ export async function praticaPerLaSessione(id, opts = {}) {
   return { ok: true, avviso: avvisoDaCampi(doc.fields) };
 }
 
-/** Il rifiuto di una pratica come lo legge la sessione, con la strada per i Ricevuti se è di un utente. PURA. */
+/**
+ * Il rifiuto di una pratica come lo legge la sessione. PURA. Propone solo le strade che su QUESTA pratica
+ * funzionano: niente ripasso né prova su parola a un segnalato, niente rimando nei Ricevuti a chi c'è già.
+ */
 export function rifiutoPratica(id, r) {
   const righe = [`RIFIUTATO: ${String((r && r.motivo) || 'pratica non lavorabile in locale').replace(/\.$/, '')}.`];
-  if (r && r.senzaProva) {
+  if (r && r.senzaProva && r.segnalato) {
+    righe.push('È segnalato dai giudici: la prova del mittente la può dare solo l’owner, in Gestione («È mio»), dopo averlo guardato.');
+  } else if (r && r.senzaProva) {
     righe.push('Se l’hanno aperto l’owner o una sessione, il ripasso gliela dà (a vuoto con --dry-run):');
     righe.push('  npm run feedback:ripasso');
     righe.push('Se il ripasso lo salta, solo l’owner può dire che è suo: in Gestione («È mio»), o chiedilo a lui e su sua parola');
     righe.push(`  node scripts/owner-feedback.mjs ${id} --riconosci`);
     righe.push('Altrimenti vale come un utente.');
   }
-  if (r && r.utente) {
+  if (r && r.utente && r.ricevuti) {
+    righe.push('È già nei Ricevuti: se richiede lavoro locale, dillo all’owner, che decide in Gestione.');
+  } else if (r && r.utente) {
     righe.push('Se richiede lavoro locale, riportalo nei Ricevuti e decide l’owner:');
     righe.push(`  node scripts/owner-feedback.mjs ${id} --serve-locale "perché"`);
   }
