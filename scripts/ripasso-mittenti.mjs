@@ -349,12 +349,34 @@ export function ramiFusiInLocale(log) {
  * I lavori locali passati da segnare (#908): pratiche dell'owner o di una sessione con la prova (anche quella data
  * da questo giro) il cui ramo main ha fuso dalla strada locale, ancora senza segno. Col segno escono dalla bacheca. PURA.
  */
-export function lavoriLocaliPassati(docs, rami, promossi = []) {
+export function lavoriLocaliPassati(docs, rami, promossi = [], ramiDaNote = new Map()) {
+  const daNote = (d) => !d.branch && STATI_CHIUSI.includes(String(d.status || ''))
+    && [...(ramiDaNote.get(d.id) || [])].some((r) => rami && rami.has(r));
+  return candidatiLocali(docs, promossi).filter((d) => (rami && rami.has(d.branch)) || daNote(d));
+}
+
+const STATI_CHIUSI = Object.freeze(['done', 'archived']);
+
+/** Owner o sessione con la prova (anche data da questo giro), senza segno, mai un segnalato. PURA. */
+function candidatiLocali(docs, promossi) {
   const provati = new Set((promossi || []).filter((d) => d.prova === 'admin').map((d) => d.id));
-  return (Array.isArray(docs) ? docs : []).filter((d) => d && !d.localOnly && rami && rami.has(d.branch)
+  return (Array.isArray(docs) ? docs : []).filter((d) => d && !d.localOnly
     && FAMIGLIE_EPOCA.includes(categoria(d.clientId))
     && (d.senderProof === 'admin' || provati.has(d.id))
     && FS.isCanonical(String(d.status || '')) && !STATI_SEGNALATI_RE.test(String(d.status || '')));
+}
+
+/**
+ * Le pratiche chiuse di cui leggere la conversazione: senza ramo scritto, il lavoro locale lo dice solo lì
+ * («risolto in locale sul ramo claude/<x>», #507 e #714). PURA.
+ */
+export function noteDaLeggere(docs, promossi = []) {
+  return candidatiLocali(docs, promossi).filter((d) => !d.branch && STATI_CHIUSI.includes(String(d.status || ''))).map((d) => d.id);
+}
+
+/** I rami di sessione nominati in una conversazione. PURA. */
+export function ramiNelleNote(notes) {
+  return new Set([...String(notes || '').matchAll(/claude\/[A-Za-z0-9._-]+/g)].map((m) => m[0].replace(/[.]+$/, '')));
 }
 
 async function leggiTutti(bearer, letture) {
