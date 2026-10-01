@@ -188,13 +188,18 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
     _id: doc.name, clientId: f.clientId?.stringValue || '', name: f.name?.stringValue || '',
     text: f.text?.stringValue || '', notes: f.notes?.stringValue || '', url: f.url?.stringValue || '',
   });
-  return {
-    codice: 0,
-    testo: testoDaStampare({
-      ...pieno, _id: id, status: String(stato.status).trim(), senderProof: f.senderProof?.stringValue || '',
-      seq: Number(f.seq?.integerValue) || seq || null, subSeq: Number(f.subSeq?.integerValue) || 0,
-    }, segno || randomBytes(6).toString('hex')),
+  const s = segno || randomBytes(6).toString('hex');
+  const fb = {
+    ...pieno, _id: id, status: String(stato.status).trim(), senderProof: f.senderProof?.stringValue || '',
+    seq: Number(f.seq?.integerValue) || seq || null, subSeq: Number(f.subSeq?.integerValue) || 0,
   };
+  const numero = fb.seq ? `${fb.seq}${fb.subSeq ? `.${fb.subSeq}` : ''}` : nomeSicuro(id, 'feedback');
+  const allegati = await righeAllegati(allegatiDaCampi(f), {
+    fetchImpl, segno: s,
+    apriByte: apriByte || (async (b) => (await import('./lib/decrypt-feedback-fields.mjs')).decryptAttachmentBytes(b)),
+    cartella: cartella || join(tmpdir(), 'filo-feedback', `${numero}-${s}`),
+  });
+  return { codice: 0, testo: [testoDaStampare(fb, s), ...allegati].join('\n') };
 }
 
 async function main(argv) {
