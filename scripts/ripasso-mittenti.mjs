@@ -1,6 +1,7 @@
 // Il ripasso dei feedback passati (#595, #908): la prova del mittente a chi l'ha creato davvero (owner e sessioni per
 // epoca, routine solo con un segno che un falso non ha), e il segno locale ai lavori fusi in locale, fuori dalla bacheca.
-// Il testo non si decifra. Regole: tests/unit/ripassoMittenti.test.mjs. Uso: npm run feedback:ripasso [-- --dry-run]
+// Testo e titolo non si decifrano; la conversazione solo delle pratiche chiuse senza ramo, per trovarlo, e non si stampa.
+// Regole: tests/unit/ripassoMittenti.test.mjs. Uso: npm run feedback:ripasso [-- --dry-run]
 
 import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
