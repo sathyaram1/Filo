@@ -353,6 +353,106 @@ async function leggiNoteDeiPadri(ids, bearer, letture) {
 
 const num = (d) => numeroDi(d) || d.id;
 
+// Le soglie fissate dal primo giro vero: famiglia → ms, in un documento che solo l'admin legge e scrive.
+export const DOVE_SOGLIE = Object.freeze({ doc: 'config/automation', campo: 'senderProofSince' });
+
+async function leggiSoglie(bearer, letture) {
+  const res = await fetch(`${FIRESTORE_BASE}/${DOVE_SOGLIE.doc}?mask.fieldPaths=${DOVE_SOGLIE.campo}`, { headers: { Authorization: `Bearer ${bearer}` } });
+  if (res.status === 404) return {};
+  if (!res.ok) throw Object.assign(new Error(`lettura delle soglie salvate fallita (${res.status})`), { codice: res.status >= 500 ? 4 : 3 });
+  letture.aggiungi(1, 'soglie');
+  const f = ((await res.json()).fields || {})[DOVE_SOGLIE.campo];
+  if (!f) return {};
+  const v = globalThis.SN_FEEDBACK.fromFsValue(f);
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw Object.assign(new Error(`${DOVE_SOGLIE.doc}.${DOVE_SOGLIE.campo} non è una mappa`), { codice: 3 });
+  return v;
+}
+
+const scrittoreFirestore = (bearer) => {
+  const rete = (e) => ({ ok: false, status: 0, testo: String((e && e.message) || e) });
+  return {
+    async soglie(nuove) {
+      const fam = Object.keys(nuove);
+      const mask = fam.map((f) => `updateMask.fieldPaths=${DOVE_SOGLIE.campo}.${f}`).join('&');
+      const fields = Object.fromEntries(fam.map((f) => [f, { integerValue: String(nuove[f]) }]));
+      return fetch(`${FIRESTORE_BASE}/${DOVE_SOGLIE.doc}?${mask}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+        body: JSON.stringify({ fields: { [DOVE_SOGLIE.campo]: { mapValue: { fields } } } }),
+      }).catch(rete);
+    },
+    async prova(d) {
+      // Senza la precondizione un documento cancellato nel frattempo rinascerebbe con il solo campo della prova.
+      return fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(d.id)}?updateMask.fieldPaths=senderProof&currentDocument.exists=true`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+        body: JSON.stringify({ fields: { senderProof: { stringValue: d.prova } } }),
+      }).catch(rete);
+    },
+  };
+};
+
+const codiceDi = (status) => (status === 0 || status >= 500 ? 4 : 3);
+
+/**
+ * Il giro, dopo le letture. Le soglie nuove si salvano PRIMA di ogni prova: un giro fermo a metà lascerebbe al
+ * prossimo prove del ripasso senza la soglia che le ha decise. `scrivi`: { soglie(nuove), prova(d) } → { ok, status }.
+ * @returns {Promise<number>} il codice d'uscita
+ */
+export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre, dryRun, scrivi, log = console.log, err = console.error }) {
+  let soglie;
+  try {
+    soglie = soglieDelRipasso(docs, salvate, adesso);
+  } catch (e) {
+    err(`RIFIUTATO: ${e.message}. Va corretta a mano in ${DOVE_SOGLIE.doc}.${DOVE_SOGLIE.campo}: ricalcolata dai documenti cadrebbe sulle prove già scritte.`);
+    return 3;
+  }
+  const esito = candidatiAlRipasso(docs, Object.fromEntries(FAMIGLIE_EPOCA.map((f) => [f, soglie[f].ms])), { coda, derivatiDelPadre });
+  const promossi = esito.promossi.sort((a, b) => String(b.createTime).localeCompare(String(a.createTime)));
+  const nuove = FAMIGLIE_EPOCA.filter((f) => soglie[f].origine !== 'salvata');
+  for (const f of FAMIGLIE_EPOCA) {
+    const s = soglie[f];
+    const perche = s.origine === 'salvata' ? 'fissata dal primo giro'
+      : `${s.origine === 'documento' ? `il primo nato con la prova, ${s.doc}` : 'adesso: nessuno è ancora nato con la prova'}; ${dryRun ? 'la fisserà il primo giro vero' : 'la fissa questo giro'}`;
+    log(`Soglia ${f}: ${new Date(s.ms).toISOString()} (${perche}).`);
+  }
+  for (const r of resoconto(esito)) log(r);
+  for (const prova of ['admin', 'server']) {
+    const questi = promossi.filter((d) => d.prova === prova);
+    if (questi.length) log(`  ${prova}: ${questi.map(num).join(' ')}`);
+  }
+  if (dryRun) {
+    log('(prova a vuoto: non ho scritto niente)');
+    return 0;
+  }
+  if (nuove.length) {
+    const res = await scrivi.soglie(Object.fromEntries(nuove.map((f) => [f, soglie[f].ms])));
+    if (!res || !res.ok) {
+      const st = res ? res.status : 0;
+      err(`RIFIUTATO: le soglie non si salvano in ${DOVE_SOGLIE.doc} (${st}); senza, il prossimo giro le ricalcolerebbe sulle prove di questo. Non ho scritto niente.`);
+      return codiceDi(st);
+    }
+    log(`Soglie fissate (${nuove.join(', ')}): i giri dopo useranno queste.`);
+  }
+  if (!promossi.length) {
+    log('Niente da ripassare.');
+    return 0;
+  }
+  let scritti = 0;
+  for (const d of promossi) {
+    const res = await scrivi.prova(d);
+    if (!res || !res.ok) {
+      const st = res ? res.status : 0;
+      const regole = st === 403 ? ' Le regole pubblicate non ammettono ancora il campo: npm run regole:pubblica, poi rilancia.' : '';
+      err(`Fermo a ${num(d)} dopo ${scritti} scritti: scrittura rifiutata (${st}).${regole}`);
+      return codiceDi(st);
+    }
+    scritti += 1;
+  }
+  log(`Prova del mittente scritta su ${scritti} feedback.`);
+  return 0;
+}
+
 async function main(argv) {
   const { controllaArgomenti, argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const storpiata = opzioneStorpiata(process.env, ['--dry-run']);
@@ -376,48 +476,19 @@ async function main(argv) {
   let bearer;
   let docs;
   let derivatiDelPadre;
+  let salvate;
   try {
     bearer = await acquireBearer();
     docs = await leggiTutti(bearer, letture);
     derivatiDelPadre = await leggiNoteDeiPadri(padriDaLeggere(docs), bearer, letture);
+    salvate = await leggiSoglie(bearer, letture);
   } catch (e) {
     console.error(`RIFIUTATO: ${String((e && e.message) || e)}`);
     return e && e.codice === 3 ? 3 : 4;
   }
-  const soglia = sogliaDellaProva(docs, adesso);
-  const esito = candidatiAlRipasso(docs, soglia, { coda, derivatiDelPadre });
-  // Dal più recente: un giro interrotto lascia scoperti solo i più vecchi, che la soglia (il più vecchio provato) copre ancora.
-  const promossi = esito.promossi.sort((a, b) => String(b.createTime).localeCompare(String(a.createTime)));
-  console.log(`Soglia per owner e sessioni: ${new Date(soglia).toISOString()}.`);
-  for (const r of resoconto(esito)) console.log(r);
-  for (const prova of ['admin', 'server']) {
-    const questi = promossi.filter((d) => d.prova === prova);
-    if (questi.length) console.log(`  ${prova}: ${questi.map(num).join(' ')}`);
-  }
-  if (dryRun || !promossi.length) {
-    console.log(dryRun ? '(prova a vuoto: non ho scritto niente)' : 'Niente da ripassare.');
-    console.log(letture.riga());
-    return 0;
-  }
-  let scritti = 0;
-  for (const d of promossi) {
-    // Senza la precondizione un documento cancellato nel frattempo rinascerebbe con il solo campo della prova.
-    const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(d.id)}?updateMask.fieldPaths=senderProof&currentDocument.exists=true`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-      body: JSON.stringify({ fields: { senderProof: { stringValue: d.prova } } }),
-    }).catch((e) => ({ ok: false, status: 0, text: async () => String(e && e.message) }));
-    if (!res.ok) {
-      const regole = res.status === 403 ? ' Le regole pubblicate non ammettono ancora il campo: npm run regole:pubblica, poi rilancia.' : '';
-      console.error(`Fermo a ${num(d)} dopo ${scritti} scritti: scrittura rifiutata (${res.status}).${regole}`);
-      console.log(letture.riga());
-      return res.status === 0 || res.status >= 500 ? 4 : 3;
-    }
-    scritti += 1;
-  }
-  console.log(`Prova del mittente scritta su ${scritti} feedback.`);
+  const codice = await eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre, dryRun, scrivi: scrittoreFirestore(bearer) });
   console.log(letture.riga());
-  return 0;
+  return codice;
 }
 
 if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) {

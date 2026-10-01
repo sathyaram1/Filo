@@ -254,3 +254,41 @@ test('famiglie del mittente per i conti', () => {
   });
   assert.deepEqual(righe, ['Ricevono la prova: 1', `  owner: 1 → admin (${VIA.EPOCA})`, 'Restano senza: 2', `  local: 2 (${MOTIVO.DOPO})`]);
 });
+
+test('il giro salva le soglie nuove prima di ogni prova, e se non le salva non scrive niente', async () => {
+  const adesso = Date.parse(T('10-01T12:00:00'));
+  const docs = [doc('vecchio', 'local:claude', 'todo', T('06-16T00:00:00')), doc('o', 'owner:me', 'todo', T('07-01T00:00:00'))];
+  const base = { docs, adesso, coda: mod.vociDellaCoda([]), derivatiDelPadre: new Map(), log: () => {}, err: () => {} };
+  const traccia = [];
+  const scrivi = (esitoSoglie = { ok: true }) => ({
+    soglie: async (n) => { traccia.push(['soglie', n]); return esitoSoglie; },
+    prova: async (d) => { traccia.push(['prova', d.id]); return { ok: true }; },
+  });
+  assert.equal(await mod.eseguiGiro({ ...base, salvate: {}, dryRun: false, scrivi: scrivi() }), 0);
+  assert.deepEqual(traccia.map((x) => x[0]), ['soglie', 'prova', 'prova']);
+  assert.deepEqual(traccia[0][1], { local: adesso, owner: adesso });
+
+  traccia.length = 0;
+  assert.equal(await mod.eseguiGiro({ ...base, salvate: {}, dryRun: false, scrivi: scrivi({ ok: false, status: 403 }) }), 3);
+  assert.deepEqual(traccia.map((x) => x[0]), ['soglie'], 'senza le soglie salvate nessuna prova');
+
+  traccia.length = 0;
+  assert.equal(await mod.eseguiGiro({ ...base, salvate: {}, dryRun: true, scrivi: scrivi() }), 0);
+  assert.deepEqual(traccia, [], 'a vuoto non si scrivono nemmeno le soglie');
+
+  traccia.length = 0;
+  await mod.eseguiGiro({ ...base, salvate: { local: adesso }, dryRun: false, scrivi: scrivi() });
+  assert.deepEqual(traccia[0], ['soglie', { owner: adesso }], 'si scrive solo la famiglia che non l\'aveva');
+  traccia.length = 0;
+  await mod.eseguiGiro({ ...base, salvate: { local: adesso, owner: adesso }, dryRun: false, scrivi: scrivi() });
+  assert.ok(!traccia.some((x) => x[0] === 'soglie'), 'una soglia salvata non si riscrive');
+});
+
+test('le soglie stanno in un documento che solo l\'admin legge e scrive', async () => {
+  const { readFileSync } = await import('node:fs');
+  const regole = readFileSync(join(ROOT, 'firestore.rules'), 'utf8').replace(/\/\/[^\n]*/g, '');
+  const m = new RegExp(`match /${mod.DOVE_SOGLIE.doc.replace('/', '\/')} \{([^}]*)\}`).exec(regole);
+  assert.ok(m, `firestore.rules: blocco di ${mod.DOVE_SOGLIE.doc} non trovato`);
+  const allow = [...m[1].matchAll(/allow\s+([a-z,\s]+?)\s*:\s*if\s+([^;]+);/g)].map((x) => [x[1].trim(), x[2].trim()]);
+  assert.deepEqual(allow, [['read', 'isAdmin()'], ['write', 'isAdmin()']], 'chi sposta la soglia fa passare i falsi');
+});
