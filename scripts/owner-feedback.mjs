@@ -187,7 +187,12 @@ async function lavoroVietato(doc, to) {
   const fb = await praticaInChiaro(doc);
   if (!fb) return { motivo: 'mittente o stato non decifrabili: non so di chi è la pratica', utente: false };
   const chi = MR.localSenderCheck(fb);
-  return chi.ok ? null : { motivo: chi.motivo, utente: !!chi.utente, senzaProva: !!chi.senzaProva };
+  return chi.ok ? null : { motivo: chi.motivo, utente: !!chi.utente, senzaProva: !!chi.senzaProva, ...contestoDelRifiuto(fb) };
+}
+
+/** Dove sta la pratica rifiutata: decide quali strade il rifiuto può proporre (rifiutoPratica). PURA. */
+function contestoDelRifiuto(fb) {
+  return { ricevuti: MR.isRicevutiStatus(fb && fb.status), segnalato: !!MR.segnalatoComeAttacco(fb) };
 }
 
 /**
