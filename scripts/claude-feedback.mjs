@@ -25,10 +25,10 @@
 //   da anonimo sarebbe un feedback d'utente. `--priorita` riusa lo stesso token.
 //
 // USO
-//   node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 0..3]
+//   node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale
+//                                                         [--priorita 0..3]
 //                                                         [--url <indirizzo>]
 //                                                         [--allega <file>]…
-//                                                         [--non-locale]
 //                                                         [--dry-run]
 //
 //   `--allega` (ripetibile, al più 5): un documento che viaggia CON il feedback,
