@@ -445,7 +445,7 @@ const codiceDi = (status) => (status === 0 || status >= 500 ? 4 : 3);
  * prossimo prove del ripasso senza la soglia che le ha decise. `scrivi`: { soglie(nuove), prova(d) } → { ok, status }.
  * @returns {Promise<number>} il codice d'uscita
  */
-export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre, dryRun, scrivi, log = console.log, err = console.error }) {
+export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre, dryRun, scrivi, inizioProva = inizioDiDefault(), log = console.log, err = console.error }) {
   let soglie;
   try {
     soglie = soglieDelRipasso(docs, salvate, adesso);
@@ -453,14 +453,18 @@ export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre
     err(`RIFIUTATO: ${e.message}. Va corretta a mano in ${DOVE_SOGLIE.doc}.${DOVE_SOGLIE.campo}: ricalcolata dai documenti cadrebbe sulle prove già scritte.`);
     return 3;
   }
-  const esito = candidatiAlRipasso(docs, Object.fromEntries(FAMIGLIE_EPOCA.map((f) => [f, soglie[f].ms])), { coda, derivatiDelPadre });
+  const esito = candidatiAlRipasso(docs, Object.fromEntries(FAMIGLIE_EPOCA.map((f) => [f, soglie[f].ms])), { coda, derivatiDelPadre, inizioProva });
   const promossi = esito.promossi.sort((a, b) => String(b.createTime).localeCompare(String(a.createTime)));
   const nuove = FAMIGLIE_EPOCA.filter((f) => soglie[f].origine !== 'salvata');
+  const chiScrive = { local: 'le sessioni da main', owner: 'il Filo pubblicato' };
   for (const f of FAMIGLIE_EPOCA) {
     const s = soglie[f];
     const perche = s.origine === 'salvata' ? 'fissata dal primo giro'
       : `${s.origine === 'documento' ? `il primo nato con la prova, ${s.doc}` : 'adesso: nessuno è ancora nato con la prova'}; ${dryRun ? 'la fisserà il primo giro vero' : 'la fissa questo giro'}`;
-    log(`Soglia ${f}: ${new Date(s.ms).toISOString()} (${perche}).`);
+    const i = inizioProva ? Number(inizioProva[f]) : NaN;
+    const vale = i === Infinity ? `; ${chiScrive[f]} non la scrivono ancora: vale l'epoca per tutti`
+      : (Number.isFinite(i) && i > s.ms ? `; ${chiScrive[f]} la scrivono dal ${new Date(i).toISOString()}: vale da lì` : '');
+    log(`Soglia ${f}: ${new Date(s.ms).toISOString()} (${perche}${vale}).`);
   }
   for (const r of resoconto(esito)) log(r);
   for (const prova of ['admin', 'server']) {
