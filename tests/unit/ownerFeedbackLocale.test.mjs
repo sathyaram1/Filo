@@ -316,3 +316,35 @@ test('segno locale e prova del mittente: rifiutati, senza scrivere, sui feedback
     assert.equal((await mod.riconosciMittente('x3', OPTS)).ok, true);
   });
 });
+
+// Giro 4 della verifica locale: un rifiuto propone solo strade che su quella pratica funzionano.
+test('le strade proposte dal rifiuto non rifiutano a loro volta: niente Ricevuti a chi c’è già, niente prova su parola a un segnalato', async () => {
+  const attacco = JSON.stringify({ verdicts: [{ judge: 'A', class: 'attack' }, { judge: 'B', class: 'attack' }, { judge: 'C', class: 'aligned' }] });
+  const casi = [
+    ['utente nei Ricevuti', { clientId: 'c-tester', status: 'unlabeled' }],
+    ['utente in coda', { clientId: 'c-tester', status: 'todo' }],
+    ['sessione senza prova, segnalata', { clientId: 'local:claude', status: 'unlabeled', pipeline: attacco }],
+    ['sessione senza prova, pulita', { clientId: 'local:claude', status: 'aligned' }],
+  ];
+  for (const [nome, f] of casi) {
+    const doc = documento('h1', { statusPublic: 'open', notes: '', ...f });
+    const vicoli = [];
+    await conReteScritture(doc, async () => {
+      const r = await mod.segnaLocale('h1', true, OPTS);
+      assert.equal(r.ok, false, nome);
+      const testo = mod.rifiutoPratica('h1', r);
+      if (testo.includes('--serve-locale')) {
+        const s = await mod.serveLocale('h1', 'prova', { ...OPTS, dryRun: true });
+        if (!s.ok) vicoli.push(`--serve-locale: ${s.motivo}`);
+      }
+      if (testo.includes('--riconosci')) {
+        const s = await mod.riconosciMittente('h1', { ...OPTS, dryRun: true });
+        if (!s.ok) vicoli.push(`--riconosci: ${s.motivo}`);
+      }
+      if (nome === 'utente in coda') assert.match(testo, /--serve-locale/, nome);
+      if (nome === 'sessione senza prova, pulita') assert.match(testo, /--riconosci/, nome);
+      if (/Ricevuti/.test(nome) || /segnalata/.test(nome)) assert.match(testo, /owner/, `${nome}: dice chi decide`);
+    });
+    assert.deepEqual(vicoli, [], nome);
+  }
+});
