@@ -61,7 +61,9 @@ test('la forma: una mappa con by (testo, non vuoto) e at (intero)', () => {
   assert.match(corpo, /get\('at', 0\) is int/);
 });
 
-test('una scheda pubblica non si scrive per un lavoro locale, anche da un codice che non lo sa', () => {
+// Verifica locale, giro 4: un rifiuto qui fermava l'intera pubblicazione della bacheca di un'app di prima, che il
+// segno non lo conosce. La scheda di un lavoro locale la toglie il server (filo-security, onPublicCardWrite).
+test('la scheda di un lavoro locale non si respinge nelle regole (la toglie il server), e togliere funziona sempre', () => {
   const da = RULES.indexOf('match /feedback-public/{');
   const a = RULES.indexOf('match /counters/{');
   assert.ok(da > 0 && a > da, 'firestore.rules: blocco di feedback-public non trovato');
