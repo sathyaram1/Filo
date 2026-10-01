@@ -337,7 +337,24 @@ function leggiCodaDiTriage() {
   return vociDellaCoda(vociDalBatch(execFileSync('git', ['cat-file', '--batch'], { ...opz, input: `${specs.join('\n')}\n` })));
 }
 
-const CAMPI = ['clientId', 'senderProof', 'status', 'seq', 'subSeq', 'derived', 'generation', 'alarmKeys', 'parentId', 'name', 'pipeline'];
+const CAMPI = ['clientId', 'senderProof', 'status', 'seq', 'subSeq', 'derived', 'generation', 'alarmKeys', 'parentId', 'name', 'pipeline', 'branch', 'localOnly'];
+
+/** I rami che main ha fuso dalla strada locale (`npm run finish`): soggetto «finish: claude/<x> via server». PURA. */
+export function ramiFusiInLocale(log) {
+  return new Set([...String(log || '').matchAll(/^finish: (claude\/\S+) via server/gm)].map((m) => m[1]));
+}
+
+/**
+ * I lavori locali passati da segnare (#908): pratiche dell'owner o di una sessione con la prova (anche quella data
+ * da questo giro) il cui ramo main ha fuso dalla strada locale, ancora senza segno. Col segno escono dalla bacheca. PURA.
+ */
+export function lavoriLocaliPassati(docs, rami, promossi = []) {
+  const provati = new Set((promossi || []).filter((d) => d.prova === 'admin').map((d) => d.id));
+  return (Array.isArray(docs) ? docs : []).filter((d) => d && !d.localOnly && rami && rami.has(d.branch)
+    && FAMIGLIE_EPOCA.includes(categoria(d.clientId))
+    && (d.senderProof === 'admin' || provati.has(d.id))
+    && FS.isCanonical(String(d.status || '')) && !STATI_SEGNALATI_RE.test(String(d.status || '')));
+}
 
 async function leggiTutti(bearer, letture) {
   const q = { structuredQuery: { from: [{ collectionId: 'feedback' }], select: { fields: CAMPI.map((f) => ({ fieldPath: f })) } } };
