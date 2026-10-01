@@ -2907,9 +2907,10 @@
       if (selectedId === id) { reflectLocal(fb); reflectPreapproved(fb); }
       renderList();
       const dove = MR.manageTabFor(fb, { releasedVersion, fusioni });
-      setManageMsg(valore
-        ? `Da ora${chi} la lavora solo una sessione locale${dove === 'local' ? ': la trovi nei Lavori locali' : ''}.`
-        : `Da ora${chi} la possono prendere anche le routine.`, 'ok');
+      const fatto = !valore ? `Da ora${chi} la possono prendere anche le routine.`
+        : check.chiusa ? `Segnata${chi} come lavoro locale: fuori dalla bacheca pubblica.`
+          : `Da ora${chi} la lavora solo una sessione locale${dove === 'local' ? ': la trovi nei Lavori locali' : ''}.`;
+      setManageMsg(fatto, 'ok');
     } catch (e) {
       setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${e.message || 'Errore'}`, 'err');
     } finally {
