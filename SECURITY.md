@@ -247,9 +247,11 @@ automatismo le pubblica: si fa a mano, da main allineato a origin/main (la
 guardia rifiuta un ramo o una modifica non fusa), con
 
 ```bash
-npm run regole:pubblica                    # regole + indici di Firestore
-firebase deploy --only storage:rules       # le regole dello storage, a parte
+npm run regole:pubblica    # regole e indici di Firestore, regole dello storage
 ```
+
+La guardia sta anche dentro `firebase.json` (predeploy): un `firebase deploy`
+lanciato a mano sulle regole, da qualunque cartella, si ferma col motivo.
 
 Finché quel comando non gira, una regola stretta nel repo è una porta ancora
 aperta in produzione, e il lavoro sembra finito mentre non lo è.
