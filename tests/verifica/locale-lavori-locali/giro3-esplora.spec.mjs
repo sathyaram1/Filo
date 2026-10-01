@@ -50,6 +50,10 @@ test('esplora: Ricevuti per lavoro locale, «È mio», poi «Locale»', async ({
   await page.waitForTimeout(300);
   console.log('Lavori locali:', JSON.stringify(await page.locator('.mg-item .mg-item-num').allInnerTexts()));
 
+  await page.evaluate(() => window.__mgTest.openDetail('s-locale'));
+  await page.waitForTimeout(300);
+  console.log('lavoro locale: riga fusione', JSON.stringify(await page.locator('#mgPreapproveLine').innerText()), '| tasto fondi visibile', await page.locator('#mgPreapproveBtn').isVisible(), '| Locale title', await page.locator('#mgLocalBtn').getAttribute('title'));
+  await page.screenshot({ path: 'tests/.shots/giro3-lavoro-locale.png' });
   await page.evaluate(() => window.__mgTest.setTab('inbox'));
   await page.waitForTimeout(300);
   console.log('Ricevuti:', JSON.stringify(await page.locator('.mg-item .mg-item-num').allInnerTexts()));
