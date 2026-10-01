@@ -501,7 +501,7 @@ const codiceDi = (status) => (status === 0 || status >= 500 ? 4 : 3);
  * prossimo prove del ripasso senza la soglia che le ha decise. `scrivi`: { soglie(nuove), prova(d) } → { ok, status }.
  * @returns {Promise<number>} il codice d'uscita
  */
-export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre, dryRun, scrivi, inizioProva = inizioDiDefault(), rami = new Set(), log = console.log, err = console.error }) {
+export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre, dryRun, scrivi, inizioProva = inizioDiDefault(), rami = new Set(), leggiNote = async () => new Map(), log = console.log, err = console.error }) {
   let soglie;
   try {
     soglie = soglieDelRipasso(docs, salvate, adesso);
