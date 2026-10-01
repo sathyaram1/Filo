@@ -1528,7 +1528,7 @@
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient, isUnprovenSender, effectiveClientId,
     isLocalOnly, isProvenLocalSender, isProvenLocalWork, isRicevutiStatus, localSignCheck, localSenderCheck,
-    segnaliDeiGiudici, segnalatoComeAttacco,
+    segnaliDeiGiudici, segnalatoComeAttacco, mittenteDaRiconoscere,
     panelComplete, judgesNote, reasonText,
     statusUnreadable, valueUnreadable, sectionsReliable, publicStateLabel, PUBLIC_STATE_HINT,
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
