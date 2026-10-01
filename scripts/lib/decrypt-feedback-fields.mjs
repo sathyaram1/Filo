@@ -195,6 +195,22 @@ export async function decryptFeedbackFields(fb, privKey) {
 }
 
 /**
+ * I byte di un allegato, in chiaro: quelli cifrati si aprono con la stessa chiave dei campi, gli altri passano.
+ * Lancia se sono cifrati e la chiave manca o non li apre: un allegato illeggibile si dice, non si inventa.
+ * @param {Uint8Array} bytes
+ * @param {string} [privKey]
+ * @returns {Promise<Uint8Array>}
+ */
+export async function decryptAttachmentBytes(bytes, privKey) {
+  loadCrypto();
+  const C = globalThis.SN_FEEDBACK_CRYPTO;
+  if (!C || !C.isEncryptedBytes || !C.isEncryptedBytes(bytes)) return bytes;
+  const priv = privKey || readPrivKey();
+  if (!priv) throw new Error('allegato cifrato, ma la chiave privata non è configurata');
+  return C.decryptBytes(bytes, priv);
+}
+
+/**
  * Comodità: decifra un array di feedback in parallelo.
  * @param {object[]} feedbacks
  * @param {string}   [privKey]
