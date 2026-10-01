@@ -177,6 +177,31 @@ test('legare un lavoro locale a una pratica: sì a owner e sessioni con la prova
   });
 });
 
+// Il server rimette in coda un «In lavorazione» senza segno locale dopo un'ora: una routine rifarebbe il lavoro
+// della sessione. Per cominciare, dove le routine la prendono, la pratica deve portare il segno.
+test('all’avvio una pratica dell’owner senza segno locale, dove le routine la prendono, non si lega; nei Ricevuti e alla chiusura sì', async () => {
+  for (const status of ['todo', 'working', 'revision_capability', 'revision_security']) {
+    await conRete(documento('s1', { clientId: 'owner:me', senderProof: 'admin', status, statusPublic: 'open' }), async (patch) => {
+      const r = await mod.praticaPerLaSessione('s1', OPTS);
+      assert.deepEqual([r.ok, r.senzaSegno, r.utente], [false, true, false], status);
+      assert.equal(patch.length, 0, status);
+      const testo = mod.rifiutoPratica('s1', r);
+      assert.match(testo, /owner-feedback\.mjs s1 --solo-locale/, `${status}: dice come mettere il segno`);
+      assert.match(testo, /l’ha tolto lui/, `${status}: un segno tolto dall'owner non si rimette senza chiedere`);
+      assert.doesNotMatch(testo, /--serve-locale|feedback:ripasso/, `${status}: non è un utente né senza prova`);
+    });
+  }
+  await conRete(documento('s2', { clientId: 'owner:me', senderProof: 'admin', status: 'aligned', statusPublic: 'open' }), async () => {
+    assert.equal((await mod.praticaPerLaSessione('s2', OPTS)).ok, true, 'nei Ricevuti le routine non la prendono');
+  });
+  await conRete(documento('s3', { clientId: 'owner:me', senderProof: 'admin', status: 'working', statusPublic: 'open' }), async () => {
+    assert.equal((await mod.praticaPerLaSessione('s3', { ...OPTS, allaChiusura: true })).ok, true, 'a lavoro finito basta l’avviso');
+  });
+  const src = readFileSync(join(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
+  assert.match(src, /praticaPerLaSessione\(r\.id, \{ bearer, allaChiusura: true \}\)/, 'finish lega a lavoro finito');
+  assert.doesNotMatch(readFileSync(join(ROOT, 'scripts', 'verify-local.mjs'), 'utf8'), /allaChiusura/, 'start chiede il segno');
+});
+
 test('verify-local start --feedback e finish --feedback passano dallo stesso controllo del mittente', () => {
   for (const f of ['verify-local.mjs', 'finish-local.mjs']) {
     const src = readFileSync(join(ROOT, 'scripts', f), 'utf8');
