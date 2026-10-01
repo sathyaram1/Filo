@@ -2833,14 +2833,16 @@
     mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
     reflectPreapproved(fb);
     reflectLocal(fb);
+    reflectSender(fb);
   }
 
   // ── «Solo in locale» (#908) ───────────────────────────────────────────────
-  // Il tasto c'è dove il segno si può mettere (owner o sessione con la prova, pratica
-  // aperta) o togliere; sui feedback degli utenti no: in locale non si lavorano.
+  // Il tasto c'è dove il segno si può mettere (owner o sessione con la prova; su una pratica chiusa
+  // dice che era un lavoro locale e la toglie dalla bacheca) o togliere; sui feedback degli utenti no.
   function localToggleOffered(fb) {
-    return MR.isLocalOnly(fb) || (MR.isProvenLocalSender(fb) && isOpenPublic(fb));
+    return MR.isLocalOnly(fb) || MR.isProvenLocalSender(fb);
   }
+  const TITOLO_LOCALE_CHIUSA = 'Era un lavoro locale: la segna così, e la sua scheda esce dalla bacheca pubblica.';
   function reflectLocal(fb) {
     if (!mgLocalBtn) return;
     const on = MR.isLocalOnly(fb);
@@ -2852,8 +2854,41 @@
     mgLocalBtn.title = on
       ? `${localSignText(fb)} Un clic la rimette anche alle routine.`
       : (perche.ok
-        ? 'La lavora solo una sessione locale. Nessuna routine la prende, e passa nei Lavori locali.'
+        ? (perche.chiusa ? TITOLO_LOCALE_CHIUSA : 'La lavora solo una sessione locale. Nessuna routine la prende, e passa nei Lavori locali.')
         : `Adesso non si può: ${perche.motivo}.`);
+  }
+
+  // ── «È mio» (#908) ────────────────────────────────────────────────────────
+  // Un prefisso dell'owner o di una sessione senza prova vale come un utente: solo l'owner può dire che è suo.
+  const TITOLO_E_MIO = 'L’hai aperto tu o una tua sessione: gli dai la prova del mittente, e da qui vale come tuo (anche per il lavoro locale).';
+  function reflectSender(fb) {
+    if (!mgSenderBtn) return;
+    mgSenderBtn.hidden = !isAdmin || !MR.mittenteDaRiconoscere(fb);
+    mgSenderBtn.disabled = false;
+    mgSenderBtn.title = TITOLO_E_MIO;
+  }
+  async function setSenderProof(id) {
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb || !MR.mittenteDaRiconoscere(fb)) return;
+    const num = FB.formatNum(fb.seq, fb.subSeq);
+    const chi = num ? ` (#${num})` : '';
+    if (selectedId === id && mgSenderBtn) mgSenderBtn.disabled = true;
+    setManageMsg('Gli do la prova del mittente…', '');
+    try {
+      const r = await sendToMain({ type: 'feedback_update', id, senderProof: 'admin' });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      fb.senderProof = 'admin';
+      if (selectedId === id) openDetail(id);
+      renderList();
+      setManageMsg(`Da ora${chi} vale come tuo.`, 'ok');
+    } catch (e) {
+      setManageMsg(`Prova non data${chi}: ${e.message || 'Errore'}`, 'err');
+    } finally {
+      if (mgSenderBtn) mgSenderBtn.disabled = false;
+    }
+  }
+  if (mgSenderBtn) {
+    mgSenderBtn.addEventListener('click', () => { if (selectedId) setSenderProof(selectedId); });
   }
 
   async function setLocalSign(id, valore) {
