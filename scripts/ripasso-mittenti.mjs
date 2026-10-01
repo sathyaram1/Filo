@@ -245,7 +245,7 @@ export function candidatiAlRipasso(docs, soglie, { coda = vociDellaCoda([]), der
     else if (motivoSegnalato(d)) esito = { motivo: motivoSegnalato(d) };
     else if (cat === 'owner' || cat === 'local') {
       const nato = Date.parse(d.createTime || '');
-      esito = Number.isFinite(nato) && nato < Number(soglie && soglie[cat]) ? { prova: 'admin', via: VIA.EPOCA } : { motivo: MOTIVO.DOPO };
+      esito = Number.isFinite(nato) && nato < sogliaVera(cat) ? { prova: 'admin', via: VIA.EPOCA } : { motivo: MOTIVO.DOPO };
     } else if (cat === 'agent (esploratore)') esito = { motivo: MOTIVO.ESPLORATORE };
     else esito = provaRoutine(d, cat);
     if (esito.prova) promossi.push({ ...d, categoria: cat, prova: esito.prova, via: esito.via });
