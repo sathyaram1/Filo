@@ -1763,14 +1763,18 @@
     e.preventDefault();
     const num = FB.formatNum(fb.seq, fb.subSeq);
     const voci = [{ testo: 'Apri', azione: () => openDetail(fb._id) }];
+    const segnabile = isAdmin && !MR.isLocalOnly(fb) ? MR.localSignCheck(fb, true) : { ok: false };
     if (isAdmin && MR.isLocalOnly(fb)) {
       voci.push({ testo: '💻 Rimetti anche alle routine', titolo: localSignText(fb), azione: () => segnoDalMenu(fb, false) });
-    } else if (isAdmin && MR.localSignCheck(fb, true).ok) {
+    } else if (segnabile.ok) {
       voci.push({
-        testo: '💻 Solo lavoro locale',
-        titolo: 'Nessuna routine la prende. La lavora una sessione locale, e passa nei Lavori locali.',
+        testo: segnabile.chiusa ? '💻 Era un lavoro locale' : '💻 Solo lavoro locale',
+        titolo: segnabile.chiusa ? TITOLO_LOCALE_CHIUSA : 'Nessuna routine la prende. La lavora una sessione locale, e passa nei Lavori locali.',
         azione: () => segnoDalMenu(fb, true),
       });
+    }
+    if (isAdmin && MR.mittenteDaRiconoscere(fb)) {
+      voci.push({ testo: '🙋 È mio', titolo: TITOLO_E_MIO, azione: () => { if (selectedId !== fb._id) openDetail(fb._id); setSenderProof(fb._id); } });
     }
     if (num) {
       voci.push({
