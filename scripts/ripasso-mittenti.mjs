@@ -454,6 +454,19 @@ const scrittoreFirestore = (bearer) => {
         body: JSON.stringify({ fields: { senderProof: { stringValue: d.prova } } }),
       }).catch(rete);
     },
+    async locale(d) {
+      const segno = { mapValue: { fields: { by: { stringValue: chiScrive(bearer) }, at: { integerValue: String(Date.now()) } } } };
+      const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(d.id)}?updateMask.fieldPaths=localOnly&currentDocument.exists=true`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+        body: JSON.stringify({ fields: { localOnly: segno } }),
+      }).catch(rete);
+      if (!res || !res.ok) return res;
+      const via = await fetch(`${FIRESTORE_BASE}/feedback-public/${encodeURIComponent(d.id)}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${bearer}` },
+      }).catch(rete);
+      return via.ok || via.status === 404 ? { ok: true, status: 200 } : via;
+    },
   };
 };
 
