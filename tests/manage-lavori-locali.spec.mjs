@@ -268,3 +268,61 @@ test('il segno messo da una sessione dice chi l’ha messo come la testata, non 
   await expect(tasto).toHaveAttribute('title', /Segno messo da Claude \(sessione locale\)/);
   await expect(tasto).not.toHaveAttribute('title', /local:claude/);
 });
+
+test('«È mio» su un feedback di una sessione senza prova: la prova arriva al main, e da lì si può segnare locale', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const senza = fb({ _id: 's-1', seq: 908, status: 'todo', senderProof: undefined });
+  const utente = fb({ _id: 'u-2', seq: 803, clientId: 'utente-abc', senderProof: undefined });
+  const provato = fb({ _id: 'p-2', seq: 804 });
+  await apri(page, [senza, utente, provato]);
+  for (const id of ['u-2', 'p-2']) {
+    await page.evaluate((i) => window.__mgTest.openDetail(i), id);
+    await expect(page.locator('#mgStarBtn')).toBeVisible();
+    await expect(page.locator('#mgSenderBtn')).toBeHidden();
+    await page.locator(`.mg-item[data-id="${id}"]`).click({ button: 'right' });
+    await expect(page.locator('.mg-ctxmenu')).not.toContainText('È mio');
+    await page.keyboard.press('Escape');
+  }
+  await page.evaluate((i) => window.__mgTest.openDetail(i), 's-1');
+  const btn = page.locator('#mgSenderBtn');
+  await expect(btn).toBeVisible();
+  await expect(btn).toHaveAttribute('title', /prova del mittente/);
+  await expect(page.locator('#mgLocalBtn')).toBeHidden();
+  await btn.click();
+  await expect(page.locator('#mgManageMsg')).toContainText('vale come tuo');
+  await expect(btn).toBeHidden();
+  await expect(page.locator('#mgLocalBtn')).toBeVisible();
+  expect(await page.evaluate(() => window.__updates)).toEqual([{ type: 'feedback_update', id: 's-1', senderProof: 'admin' }]);
+});
+
+test('«È mio» dal tasto destro sulla scheda fa la stessa cosa del tasto', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const senza = fb({ _id: 's-2', seq: 907, status: 'todo', senderProof: undefined });
+  await apri(page, [senza]);
+  await page.locator('.mg-item[data-id="s-2"]').click({ button: 'right' });
+  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'È mio' }).click();
+  await expect(page.locator('#mgDetail')).toBeVisible();
+  await expect(page.locator('#mgManageMsg')).toContainText('vale come tuo');
+  expect(await page.evaluate(() => window.__updates)).toEqual([{ type: 'feedback_update', id: 's-2', senderProof: 'admin' }]);
+});
+
+test('un lavoro locale già chiuso si segna dal dettaglio e dal tasto destro: esce dalla bacheca pubblica', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const chiuso = fb({ _id: 'c-1', seq: 544, status: 'done', statusPublic: 'closed' });
+  await apri(page, [chiuso], { tab: 'resolved' });
+  await page.evaluate((i) => window.__mgTest.openDetail(i), 'c-1');
+  const btn = page.locator('#mgLocalBtn');
+  await expect(btn).toBeVisible();
+  await expect(btn).toHaveAttribute('title', /bacheca pubblica/);
+  await btn.click();
+  await expect(page.locator('#mgManageMsg')).toContainText('fuori dalla bacheca pubblica');
+  await expect(btn).toHaveAttribute('aria-pressed', 'true');
+  // Se si può mettere si può togliere, anche da chiusa; e dal tasto destro la voce lo dice.
+  await btn.click();
+  await expect(btn).toHaveAttribute('aria-pressed', 'false');
+  await page.locator('.mg-item[data-id="c-1"]').click({ button: 'right' });
+  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Era un lavoro locale' }).click();
+  await expect(btn).toHaveAttribute('aria-pressed', 'true');
+  const updates = await page.evaluate(() => window.__updates);
+  expect(updates.map((u) => u.localOnly)).toEqual([true, false, true]);
+});

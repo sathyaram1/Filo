@@ -1066,7 +1066,7 @@
     }
 
     /* «Solo in locale»: la tinta del muted, perché non è un allarme né una delega, dice solo dove si lavora. */
-    .mg-local-btn[hidden] { display: none; }
+    .mg-local-btn[hidden], .mg-sender-btn[hidden] { display: none; }
     .mg-local-btn[aria-pressed="true"] {
       border-color: var(--sn-fg); color: var(--sn-fg);
       background: color-mix(in srgb, var(--sn-fg) 8%, var(--sn-bg, transparent));

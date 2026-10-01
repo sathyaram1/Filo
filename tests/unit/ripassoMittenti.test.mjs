@@ -334,3 +334,41 @@ test('da quando chi crea scrive la prova: dall’arrivo su main (sessioni) e dal
   const uscita = { ...suMain, tag: 'v0.2.229\nv0.2.230\n', 'for-each-ref': '2026-10-03T08:00:00+02:00\n' };
   assert.deepEqual(mod.inizioDellaProva(git(uscita)), { local: Date.parse('2026-10-02T07:00:00Z'), owner: Date.parse('2026-10-03T06:00:00Z') });
 });
+
+test('lavori locali passati: il ramo fuso dalla strada locale e una pratica provata dell’owner o di una sessione', () => {
+  const rami = mod.ramiFusiInLocale([
+    'finish: claude/dashboard-viva via server',
+    'finish: claude/lavori-locali via server (lavoro locale 910, L5 registrato)',
+    'finish: worker/abc-123 via server (approvazione dell’owner)',
+    'merge: claude/altro',
+  ].join('\n'));
+  assert.deepEqual([...rami].sort(), ['claude/dashboard-viva', 'claude/lavori-locali']);
+  const docs = [
+    doc('fatto', 'local:claude', 'done', T('09-01T00:00:00'), 'admin', { branch: 'claude/dashboard-viva' }),
+    doc('owner', 'owner:me', 'archived', T('09-01T00:00:00'), 'admin', { branch: 'claude/lavori-locali' }),
+    doc('appena-provato', 'local:claude', 'done', T('09-01T00:00:00'), '', { branch: 'claude/dashboard-viva' }),
+    doc('gia-segnato', 'local:claude', 'done', T('09-01T00:00:00'), 'admin', { branch: 'claude/dashboard-viva', localOnly: true }),
+    doc('routine', 'routine:worker', 'done', T('09-01T00:00:00'), 'server', { branch: 'claude/dashboard-viva' }),
+    doc('ramo-routine', 'local:claude', 'done', T('09-01T00:00:00'), 'admin', { branch: 'worker/abc-123' }),
+    doc('senza-prova', 'local:claude', 'done', T('09-01T00:00:00'), '', { branch: 'claude/dashboard-viva' }),
+    doc('attacco', 'local:claude', 'attack_confirmed', T('09-01T00:00:00'), 'admin', { branch: 'claude/dashboard-viva' }),
+  ];
+  const promossi = [{ id: 'appena-provato', prova: 'admin' }];
+  assert.deepEqual(mod.lavoriLocaliPassati(docs, rami, promossi).map((d) => d.id), ['fatto', 'owner', 'appena-provato']);
+});
+
+test('il giro segna i lavori locali passati dopo le prove, e a vuoto li elenca soltanto', async () => {
+  const docs = [doc('l', 'local:claude', 'done', T('09-01T00:00:00'), 'admin', { branch: 'claude/x', seq: 544 })];
+  const rami = new Set(['claude/x']);
+  const righe = [];
+  const traccia = [];
+  const scrivi = { soglie: async () => ({ ok: true }), prova: async () => ({ ok: true }), locale: async (d) => { traccia.push(d.id); return { ok: true }; } };
+  const base = { docs, adesso: Date.now(), coda: mod.vociDellaCoda([]), derivatiDelPadre: new Map(), inizioProva: DA_SEMPRE, rami, scrivi, err: () => {} };
+  assert.equal(await mod.eseguiGiro({ ...base, salvate: S(1), dryRun: true, log: (r) => righe.push(r) }), 0);
+  assert.ok(righe.some((r) => /Lavori locali passati da segnare.*: 1 \(#544\)/.test(r)), righe.join('\n'));
+  assert.deepEqual(traccia, []);
+  assert.equal(await mod.eseguiGiro({ ...base, salvate: S(1), dryRun: false, log: () => {} }), 0);
+  assert.deepEqual(traccia, ['l']);
+  const rifiuto = { ...scrivi, locale: async () => ({ ok: false, status: 403 }) };
+  assert.equal(await mod.eseguiGiro({ ...base, salvate: S(1), dryRun: false, scrivi: rifiuto, log: () => {} }), 3);
+});
