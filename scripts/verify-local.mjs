@@ -454,6 +454,24 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
 }
 
 /**
+ * La riga che la pratica del lavoro riceve a ogni avvio della verifica (#908, log per l'owner): il giro che parte
+ * e com'è andato quello prima, coi rilievi in una frase. Il livello a parole: le quadre sono dei rilievi. PURA.
+ */
+export function notaDelGiro(entry, { branch, sha }) {
+  const rounds = Array.isArray(entry && entry.rounds) ? entry.rounds : [];
+  const righe = [`Verifica locale, giro ${rounds.length + 1}: avviata sul ramo ${branch} (${String(sha || '').slice(0, 8)}).`];
+  const prima = rounds[rounds.length - 1];
+  if (prima) {
+    const rilievi = ROUND.parseFindings(String(prima.critique || '')).findings;
+    righe.push(`Giro ${rounds.length}: ${prima.outcome || 'esito non registrato'}, ${rilievi.length === 1 ? '1 rilievo' : `${rilievi.length} rilievi`}.`);
+    for (const f of rilievi) {
+      righe.push(`· livello ${f.level}${f.sede === 'e' ? ', di un altro lavoro' : ''}: ${ROUND.primaFrase(f.text, 160)}`);
+    }
+  }
+  return righe.join('\n');
+}
+
+/**
  * La storia delle critiche per il verificatore dopo: il testo di ogni giro con
  * rilievi (mai il report di chi ha corretto), e come è andato. PURA.
  */
