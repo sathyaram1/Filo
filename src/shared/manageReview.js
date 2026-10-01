@@ -629,7 +629,7 @@
     }
     // La regola del lettore: col segno una Ri-valutazione la manderebbe in coda senza giudici.
     const segnalato = segnalatoComeAttacco({ status: normalizeStatus(fb).status, pipeline: fb.pipeline });
-    if (segnalato) return { ok: false, motivo: `${segnalato}: prima decidi tu, nei Ricevuti` };
+    if (segnalato) return { ok: false, motivo: `${segnalato}: prima si decide nei Ricevuti` };
     const tab = manageTabFor(fb, opts);
     // Chiusa: il segno dice che era un lavoro locale e la toglie dalla bacheca pubblica; L5 il server lo salta solo a pratica aperta.
     if (tab === 'resolved' || tab === 'archived' || String(fb.statusPublic || 'open') === 'closed') {
