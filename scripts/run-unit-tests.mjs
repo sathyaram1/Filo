@@ -132,7 +132,11 @@ export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false,
     }
   }
   const muti = rossiGruppi.filter((g) => !somma || !somma.rossi.some((r) => r.gruppo === g));
-  if (somma && muti.length) out.push(`[test:unit] ${muti.length > 1 ? 'i gruppi' : 'il gruppo'} ${muti.join(', ')} è uscito rosso senza un test rosso registrato: la causa è nella sua uscita, sopra.`);
+  if (somma && muti.length) {
+    out.push(muti.length > 1
+      ? `[test:unit] i gruppi ${muti.join(', ')} sono usciti rossi senza un test rosso registrato: la causa è nella loro uscita, sopra.`
+      : `[test:unit] il gruppo ${muti[0]} è uscito rosso senza un test rosso registrato: la causa è nella sua uscita, sopra.`);
+  }
   if (interrotto) out.push(`[test:unit] interrotto al gruppo ${n} di ${gruppi}: i gruppi dopo non sono partiti.`);
   out.push(rossiGruppi.length || interrotto
     ? `[test:unit] ROSSO: ${rossiGruppi.length > 1 ? 'gruppi' : 'gruppo'} ${rossiGruppi.join(', ')} di ${gruppi}.`
