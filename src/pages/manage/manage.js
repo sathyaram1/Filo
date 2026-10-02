@@ -4787,6 +4787,14 @@
     // sviluppa Filo lo è, il caricamento riesce, e quel rosso non parlava di un
     // difetto ma della rete di casa. Qui lo stato di guasto si CHIEDE, e vale
     // ovunque allo stesso modo.
+    // Il caricamento VERO, di nuovo, sulla porta col main che lo spec ha
+    // sostituito: per provare cosa chiede la pagina, non cosa le si inietta.
+    ricarica() {
+      stopLive();
+      liveBlocked = true;
+      testDataInjected = false;
+      return loadData();
+    },
     simulaCaricamentoFallito() {
       stopLive();
       liveBlocked = true;
