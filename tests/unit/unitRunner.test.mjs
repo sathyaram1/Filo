@@ -226,7 +226,7 @@ describe('il riepilogo di una suite a gruppi', () => {
     assert.deepEqual({ ...somma, rossi: somma.rossi.map((r) => `${r.gruppo}:${r.nome}`) },
       { test: 5, pass: 1, fail: 1, annullati: 1, saltati: 1, todo: 1, rossi: ['1:due', '2:H'] });
     const testo = testoRiepilogo({ somma, gruppi: 2, file: 2, esiti: [1, 1] });
-    assert.match(testo, /riepilogo di 2 gruppi, 2 file: 5 test, 1 passati, 1 falliti, 1 annullati, 1 saltati, 1 da fare\./);
+    assert.match(testo, /riepilogo di 2 gruppi, 2 file: 5 test, 1 passato, 1 fallito, 1 annullato, 1 saltato, 1 da fare\./);
     assert.match(testo, /✖ tests\/unit\/a\.test\.mjs:3 {2}due {2}\(gruppo 1\)/);
     assert.match(testo, /ROSSO: gruppi 1, 2 di 2\.$/);
   });
