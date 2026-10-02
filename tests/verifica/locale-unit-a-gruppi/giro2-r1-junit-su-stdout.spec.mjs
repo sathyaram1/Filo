@@ -17,7 +17,7 @@ test('junit sull’uscita standard a gruppi: un documento XML solo, senza altre 
   mkdirSync(prove);
   try {
     for (let i = 0; i < 6; i++) {
-      writeFileSync(join(prove, `f${String(i).padStart(3, '0')}.test.mjs`),
+      writeFileSync(join(prove, `f${String(i).padStart(3, '0')}-${'nome-lungo-'.repeat(15)}.test.mjs`),
         `import test from 'node:test';\ntest('caso-${i}', () => {});\n`);
     }
     const r = spawnSync(process.execPath, ['scripts/run-unit-tests.mjs', '--test-reporter=junit'], {
