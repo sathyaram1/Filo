@@ -147,7 +147,10 @@ test('in secondo piano o ridotta a icona non legge; tornando in vista si allinea
   expect(await page.evaluate(() => window.__srv.letture)).toBe(ridotta);
   await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 10 * 60 * 1000 }));
   await ilServerScrive(page, 'f716', { status: 'todo' });
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].restore());
+  await app.evaluate(({ BrowserWindow }, ridotta) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    if (ridotta) w.restore(); else w.show();
+  }, ridottaDavvero);
   await expect.poll(() => ids(page), { timeout: 4000 }).toEqual(['f515']);
 });
 
