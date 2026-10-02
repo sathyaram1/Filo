@@ -313,6 +313,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       if (badge.matches(':popover-open')) badge.hidePopover();
       badge.showPopover();
     } catch (_) {}
+    inCimaPrima = altriInCima();
   }
 
   // Nello strato superiore vince l'ultimo arrivato: una notifica del sito aperta
