@@ -546,10 +546,9 @@ export async function scrivi(id, to, nota, opts = {}) {
     return { ok: false, motivo: `lo stato «${to}» chiude la pratica: il segno «fondi senza chiedermelo» non conterebbe. Ometti --preapprova (o usa --chiedi-prima).` };
   }
   const bearer = opts.bearer || await acquireBearer();
-  // Di questo documento si guardano lo stato (per sapere se il passaggio è
-  // legale) e le note (per fondere il report): basta chiedere quei due, e la
-  // lettura va nel conto di chi ci ha mandato qui (#680).
-  const doc = await getDoc(id, bearer, ['status', 'notes', 'clientId', 'senderProof', 'localOnly']);
+  // La pratica coi campi di ogni altro passaggio (CAMPI_PRATICA: senza il sì dell'owner un approvato
+  // sembra un utente, #913) più le note da fondere. La lettura va nel conto di chi ci ha mandato qui (#680).
+  const doc = await getDoc(id, bearer, [...CAMPI_PRATICA, 'notes']);
   if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
 
