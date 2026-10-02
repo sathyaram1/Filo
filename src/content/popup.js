@@ -72,7 +72,10 @@
     return r;
   }
 
+  // In cattura sulla finestra: un antenato che ferma il clic lascerebbe al collegamento l'apertura da sé, senza porta.
+  // Nelle pagine di Filo no: lì ogni apertura passa già dalla porta nel main, e la chat ha la sua.
   const suCollegamento = (e) => {
+    if (location.protocol === 'filo:') return;
     if (e.type === 'auxclick' && e.button !== 1) return;
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
     if (!a) return;
@@ -80,8 +83,8 @@
     e.stopPropagation();
     apriCollegamento(a, { sfondo: e.type === 'auxclick' || e.ctrlKey || e.metaKey });
   };
-  document.addEventListener('click', suCollegamento);
-  document.addEventListener('auxclick', suCollegamento);
+  window.addEventListener('click', suCollegamento, true);
+  window.addEventListener('auxclick', suCollegamento, true);
 
   // ----------------------------------------------------------------
   // Compensazione zoom (Ctrl+/-, pinch). Identica per popup e menu.
