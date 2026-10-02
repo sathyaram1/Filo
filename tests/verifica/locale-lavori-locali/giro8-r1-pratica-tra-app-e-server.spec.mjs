@@ -32,6 +32,7 @@ function pratica(status) {
 // La rete finta tiene il documento: lo stato pubblico si scrive in chiaro, e da lì si sa se la pratica è chiusa.
 async function serverFondi(status) {
   const doc = pratica(status);
+  // Un riferimento di un altro test resta in memoria: il modulo si importa una volta.
   const vero = globalThis.fetch;
   globalThis.fetch = async (url, init = {}) => {
     if (init.method === 'PATCH') {
