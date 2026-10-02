@@ -620,3 +620,66 @@ test('Linux: il clic centrale nell\'editor che la pagina riempie in un riquadro 
   await expect.poll(() => page.evaluate(() => document.getElementById('ed').contentDocument.body.textContent)).toContain('ciaomondo');
   await expect(page.locator('#__filo-zoom-badge')).toHaveCount(0);
 });
+
+// Il clic centrale guarda tutto il percorso dell'evento: dentro un componente
+// aperto della pagina il bersaglio è solo il guscio, e il link si apriva insieme
+// alla modalità dello zoom (#686.1 giro 9).
+const urlAperti = (app) => app.evaluate(({ webContents }) =>
+  webContents.getAllWebContents().map((w) => { try { return w.getURL(); } catch (_) { return ''; } }));
+for (const [nome, dove] of [['nella pagina', 'pagina'], ['in un riquadro di un altro sito', 'riquadro']]) {
+  test(`clic centrale su un link dentro un componente ${nome}: si apre il link e basta`, async ({ app, openTab, testServer }) => {
+    const meta = testServer.html('<!doctype html><html><body><h1>arrivato</h1></body></html>');
+    const link = `<a href="${meta}" style="display:block;font:30px sans-serif;padding:20px;background:#eee">apri questo articolo</a>`;
+    const docHtml = `<!doctype html><html><body style="margin:0;padding-top:250px"><div id=host></div>
+      <script>document.getElementById('host').attachShadow({ mode: 'open' }).innerHTML = ${JSON.stringify(link)};</script></body></html>`;
+    let page;
+    if (dove === 'pagina') page = await testServer.openReady(openTab, docHtml);
+    else {
+      page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+        <iframe id=f src="${testServer.html(docHtml).replace('127.0.0.1', 'localhost')}" style="${PIENO}"></iframe></body></html>`);
+      await expect(page.frameLocator('#f').locator('#host')).toBeAttached();
+      await page.waitForTimeout(500);
+    }
+    const prima = (await urlAperti(app)).filter((u) => u === meta).length;
+    await page.mouse.move(100, 285);
+    await page.mouse.click(100, 285, { button: 'middle' });
+    await expect.poll(async () => (await urlAperti(app)).filter((u) => u === meta).length, { timeout: 5000 }).toBeGreaterThan(prima);
+    await page.waitForTimeout(400);
+    await expect(page.locator('#__filo-zoom-badge'), 'col link si è aperta anche la modalità dello zoom').toHaveCount(0);
+  });
+}
+
+// Un riquadro che la pagina riempie da sé passa gesti, come ogni riquadro: un
+// punto del suo documento misurato contro il riquadro dello zoom cadeva sul
+// numero, e il testo battuto nell'editor cambiava lo zoom (#686.1 giro 9).
+test('a modalità aperta, un clic nella prima riga dell\'editor riempito dalla pagina chiude lo zoom, e il testo va nell\'editor', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;height:2000px">
+    <h1 style="margin:0;height:300px">sopra</h1>
+    <iframe id=ed style="border:0;position:absolute;left:0;top:300px;width:100vw;height:300px"></iframe>
+    <script>const d = document.getElementById('ed').contentDocument; d.open(); d.write('<!doctype html><html><body style="margin:0;height:300px;font:16px sans-serif"><p>prima riga</p></body></html>'); d.close(); d.designMode = 'on';</script>
+    </body></html>`);
+  await page.mouse.move(400, 450);
+  await page.mouse.click(400, 150, { button: 'middle' });
+  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+  const box = await page.locator('#__filo-zoom-percent').boundingBox();
+  // Lo stesso punto del numero, ma dentro l'editor: 300 px più in basso.
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2 + 300);
+  await expect(page.locator('#__filo-zoom-badge'), 'il clic nell\'editor non chiude la modalità').toHaveCount(0);
+  await page.keyboard.type('30');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(400);
+  expect(await percentOf(app, page), 'il testo battuto nell\'editor ha cambiato lo zoom').toBe(100);
+  expect(await page.evaluate(() => document.getElementById('ed').contentDocument.body.textContent)).toContain('30');
+});
+
+test('a modalità aperta, il clic che la chiude su un campo della pagina ci mette anche il cursore', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;height:2000px">
+    <textarea id=t style="position:absolute;left:0;top:300px;width:400px;height:100px"></textarea></body></html>`);
+  await page.mouse.click(600, 150, { button: 'middle' });
+  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+  await page.mouse.click(100, 350);
+  await expect(page.locator('#__filo-zoom-badge')).toHaveCount(0);
+  await page.keyboard.type('30');
+  await expect(page.locator('#t')).toHaveValue('30');
+  expect(await percentOf(app, page)).toBe(100);
+});

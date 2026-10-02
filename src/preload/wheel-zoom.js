@@ -24,10 +24,15 @@ function suUnLink(e) {
   return percorso(e).some((n) => !!(n && n.nodeType === 1 && n.matches && n.matches('a[href], area[href]')));
 }
 
-// Dove il clic centrale incolla (src/shared/zoomPagina.js), in un campo in cui si scrive resta del sistema.
+// Un campo in cui si scrive: lì il clic che chiude la modalità ci mette anche il
+// cursore, e dove il clic centrale incolla (src/shared/zoomPagina.js) resta del sistema.
 const SCRIVIBILI = /^(|text|search|url|tel|email|password|number)$/;
 function incollaQui(e, Z) {
   if (!Z || typeof Z.centraleIncolla !== 'function' || !Z.centraleIncolla(typeof process !== 'undefined' ? process.platform : '')) return false;
+  return scrivibile(e);
+}
+
+function scrivibile(e) {
   let t = percorso(e)[0];
   if (t && t.nodeType === 3) t = t.parentElement;
   if (!t || t.nodeType !== 1) return false;
@@ -172,8 +177,10 @@ function gestiDiUnRiquadro(Z, s) {
     }
     if (!s.modalita()) return;
     if (e.button === 2) suppressContextMenu = true;
-    e.preventDefault();
-    e.stopPropagation();
+    if (e.button !== 0 || !scrivibile(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     s.manda({ tipo: 'esci' });
   }
 
@@ -634,6 +641,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       return;
     }
     if (e.button === 2) suppressContextMenu = true; // il destro chiude e basta
+    if (e.button === 0 && scrivibile(e)) { exit(); return; }
     e.preventDefault();
     e.stopPropagation();
     exit();
