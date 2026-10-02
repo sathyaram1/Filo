@@ -8,7 +8,6 @@ import { resolve } from 'node:path';
 const require = createRequire(import.meta.url);
 
 test('utente approvato come lavoro locale, risolto: la scheda per chi l’ha mandato c’è', async () => {
-  test.fail(true, 'rilievo 2 aperto: il segno locale toglie la scheda anche ai feedback degli utenti');
   for (const m of ['feedbackStatus', 'manageReview', 'feedbackPublicView']) require(resolve('src/shared', `${m}.js`));
   const V = globalThis.SN_FEEDBACK_PUBLIC_VIEW;
   const segno = { by: 'owner@esempio', at: 1790000000000 };

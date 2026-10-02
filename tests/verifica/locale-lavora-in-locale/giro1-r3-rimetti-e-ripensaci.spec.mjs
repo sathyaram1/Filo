@@ -7,7 +7,6 @@ const MANAGE = 'filo://manage/manage.html';
 const SEGNO = { by: 'owner@esempio', at: 1790000000000 };
 
 test('rimesso alle routine per sbaglio, torna lavoro locale', async ({ openTab }) => {
-  test.fail(true, 'rilievo 3 aperto: tolto il segno, il sì dell’owner sparisce e nessun tasto lo ridà fuori dai Ricevuti');
   const page = await openTab(MANAGE);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
