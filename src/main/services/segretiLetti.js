@@ -162,7 +162,7 @@ function tutti() { carica(); return letti.tutti(); }
 function aggiungi(x, fonte) { carica(); letti.aggiungi(x, fonte); }
 function aggiungiTutti(lista, fonte) { carica(); letti.aggiungiTutti(lista, fonte); }
 // Come a un riavvio: la memoria si svuota e alla prossima lettura torna quello che era salvato.
-function svuota() { letti.svuota(); caricato = false; }
+function svuota() { if (inAttesa) salvaOra(); letti.svuota(); caricato = false; }
 // Per gli unit test: un deposito finto (null = nessuno).
 function usaDeposito(d) { deposito = d; caricato = false; letti.svuota(); }
 
