@@ -287,14 +287,76 @@ const lanciaSu = (dir, args = [], extra = {}) => spawnSync(process.execPath, [LA
 
 describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
   test('una destinazione su file passa per una copia di gruppo; stdout e stderr restano', () => {
-    const r = destinazioniSuFile(
+    const r = rapportiDaRiunire(
       ['--test-reporter=junit', '--test-reporter-destination=out.xml', '--test-reporter=spec', '--test-reporter-destination', 'stdout',
         '--test-reporter=tap', '--test-reporter-destination', 'b.tap'],
       (k) => `COPIA${k}`,
     );
-    assert.deepEqual(r.file, ['out.xml', 'b.tap']);
+    assert.deepEqual(r.rapporti, ['out.xml', 'b.tap']);
     assert.deepEqual(r.flags, ['--test-reporter=junit', '--test-reporter-destination=COPIA0', '--test-reporter=spec',
       '--test-reporter-destination=stdout', '--test-reporter=tap', '--test-reporter-destination=COPIA1']);
+  });
+
+  test('un documento su stdout, junit o lcov, passa anch’esso per una copia; i formati che scorrono restano su stdout', () => {
+    const c = (k) => `COPIA${k}`;
+    assert.deepEqual(rapportiDaRiunire(['--test-reporter=junit'], c),
+      { flags: ['--test-reporter=junit', '--test-reporter-destination=COPIA0'], rapporti: ['stdout'] });
+    assert.deepEqual(rapportiDaRiunire(['--test-reporter', 'lcov', '--test-reporter-destination', 'stdout'], c).rapporti, ['stdout']);
+    assert.deepEqual(rapportiDaRiunire(['--test-reporter=spec'], c).rapporti, []);
+    const misti = ['--test-reporter=dot', '--test-reporter=junit', '--test-reporter-destination=x'];
+    assert.deepEqual(rapportiDaRiunire(misti, c), { flags: misti, rapporti: [] }, 'numeri diversi: decide node, che rifiuta');
+  });
+
+  test('i file dati a mano si separano dalle opzioni, anche dai valori scritti dopo l’opzione', () => {
+    assert.deepEqual(
+      separaArgomenti(['--test-reporter', 'spec', 'a.test.mjs', '--test-name-pattern', 'b.test.mjs', '--experimental-test-coverage', 'c.mjs']),
+      { opzioni: ['--test-reporter', 'spec', '--test-name-pattern', 'b.test.mjs', '--experimental-test-coverage'], posizionali: ['a.test.mjs', 'c.mjs'] },
+    );
+  });
+
+  test('a gruppi un junit su stdout è un documento solo, e stdout non porta altro', () => {
+    const casa = cartellaTemporanea('filo-runner-junit-stdout-');
+    try {
+      for (const n of ['uno', 'due', 'tre']) writeFileSync(join(casa, `${n}.test.mjs`), `import { test } from 'node:test';\ntest('caso-${n}', () => {});\n`);
+      const r = lanciaSu(casa, ['--test-reporter=junit'], { FILO_UNIT_TETTO_RIGA: '1' });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(r.stderr, /3 file in 3 gruppi/);
+      assert.match(r.stderr, /riuniti sull'uscita standard/);
+      assert.match(r.stdout.trim(), /^<\?xml[^>]*\?>\s*<testsuites>[\s\S]*<\/testsuites>$/);
+      assert.equal((r.stdout.match(/<\?xml/g) || []).length, 1);
+      for (const n of ['uno', 'due', 'tre']) assert.match(r.stdout, new RegExp(`name="caso-${n}"`));
+    } finally { rmSync(casa, { recursive: true, force: true }); }
+  });
+
+  test('un rapporto che non si può scrivere fa rosso l’esito, e il riepilogo non lo dà per riunito', () => {
+    const casa = cartellaTemporanea('filo-runner-rapporto-perso-');
+    try {
+      for (const n of ['a', 'b']) writeFileSync(join(casa, `${n}.test.mjs`), `import { test } from 'node:test';\ntest('${n}', () => {});\n`);
+      const dest = join(casa, 'manca', 'r.xml');
+      const r = lanciaSu(casa, ['--test-reporter=junit', `--test-reporter-destination=${dest}`], { FILO_UNIT_TETTO_RIGA: '1' });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.doesNotMatch(r.stdout, /riuniti/);
+      assert.match(r.stdout, /non è stato scritto/);
+      assert.match(r.stdout.trim().split('\n').pop(), /^\[test:unit\] ROSSO: rapporto non scritto\.$/);
+    } finally { rmSync(casa, { recursive: true, force: true }); }
+  });
+
+  test('a gruppi un file dato a mano gira una volta, e i conti tornano', () => {
+    const casa = cartellaTemporanea('filo-runner-argomento-');
+    const fuori = cartellaTemporanea('filo-runner-argomento-extra-');
+    try {
+      for (const n of ['a', 'b']) writeFileSync(join(casa, `${n}.test.mjs`), `import { test } from 'node:test';\ntest('${n}', () => {});\n`);
+      const extra = join(fuori, 'extra.test.mjs');
+      writeFileSync(extra, "import { test } from 'node:test';\ntest('extra', () => {});\n");
+      const r = lanciaSu(casa, [extra, join(casa, 'a.test.mjs')], { FILO_UNIT_TETTO_RIGA: '1' });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.equal((r.stdout.match(/ok \d+ - extra/g) || []).length, 1);
+      assert.equal((r.stdout.match(/ok \d+ - a\b/g) || []).length, 1, 'un file già trovato non gira due volte');
+      assert.match(r.stdout, /2 file: 3 test, 3 passati, 0 falliti/);
+    } finally {
+      rmSync(casa, { recursive: true, force: true });
+      rmSync(fuori, { recursive: true, force: true });
+    }
   });
 
   test('dei junit dei gruppi resta un documento solo con tutti i casi; gli altri formati si accodano', () => {
