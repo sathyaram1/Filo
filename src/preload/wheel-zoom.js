@@ -329,12 +329,29 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     } catch (_) { return false; }
   }
 
+  // Chi entra nello strato superiore dopo il riquadro gli sta sopra anche se non
+  // prende i clic, e lì elementFromPoint non lo vede: conta l'arrivo.
+  let inCimaPrima = [];
+  function altriInCima() {
+    try {
+      return Array.from(document.querySelectorAll(':popover-open, dialog:modal, :fullscreen'))
+        .filter((el) => el !== badge);
+    } catch (_) { return []; }
+  }
+  function arrivatoQualcuno() {
+    const ora = altriInCima();
+    const nuovo = ora.some((el) => !inCimaPrima.includes(el));
+    inCimaPrima = ora;
+    return nuovo;
+  }
+
   // Un dialogo che si apre o si chiude, un tutto schermo o un livello del sito
   // arrivato dopo, a riquadro aperto: lo controlla anche la guardia, senza gesti.
   function ricontrollaPosto() {
     if (!zoomMode || !badge) return;
     let fuori = !badge.isConnected || badge.parentNode !== ospite();
     try { if (!fuori && badge.showPopover && !badge.matches(':popover-open')) fuori = true; } catch (_) {}
+    if (arrivatoQualcuno()) fuori = true;
     if (!fuori && coperto()) fuori = true;
     if (fuori) mettiInCima();
   }
