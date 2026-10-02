@@ -97,3 +97,69 @@ export async function esitoUscita(app, page) {
   }
   return 'niente';
 }
+
+// La nuova scheda senza l'intervista di benvenuto: la chat risponde al modello finto da subito.
+export async function senzaAccoglienza(app, page) {
+  await app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    await M.setOnboarding(globalThis.SN_ONBOARDING.close(await M.getOnboarding()));
+  });
+  await page.reload();
+  await expect(page.locator('#input')).toBeVisible();
+}
+
+export const LEGGI_CODICE = {
+  toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `echo "Il tuo codice monouso è ${CODICE}"` }) }],
+};
+
+// Modello finto che risponde secondo la richiesta, non secondo l'ordine delle chiamate: la home, le lezioni e i
+// titoli chiamano anche loro il modello, e un elenco di giri in fila se li vedeva consumare a caso.
+// Senza strumenti risponde `home`; la chat legge il codice da un comando a «leggi la notifica», e apre
+// l'indirizzo col codice quando l'ultimo messaggio dell'utente lo contiene.
+export async function modelloARegole(app, { home = null } = {}) {
+  await app.evaluate(async (_electron, { home, CODICE, RACCOLTA }) => {
+    const P = globalThis.SN_PROVIDERS;
+    globalThis.__visti = [];
+    const risposta = ({ attempts, messages, tools, onToolCall }) => {
+      globalThis.__visti.push(JSON.parse(JSON.stringify(messages)));
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
+      if (!Array.isArray(tools) || !tools.length) return { ...base, text: home || '{"text":"ok","status":"done"}' };
+      let u = messages.length - 1;
+      while (u >= 0 && messages[u].role !== 'user') u -= 1;
+      const ultimo = JSON.stringify(u >= 0 ? messages[u].content : '');
+      const dopo = messages.slice(u + 1).some((m) => m.role === 'tool');
+      const chiama = (name, args) => {
+        const c = { id: `${name}-${globalThis.__visti.length}`, name, arguments: JSON.stringify(args) };
+        try { onToolCall && onToolCall({ id: c.id, name }); } catch (_) {}
+        return { ...base, text: '', toolCalls: [c], finishReason: 'tool_calls' };
+      };
+      if (ultimo.includes('leggi la notifica')) {
+        return dopo ? { ...base, text: `La banca ti ha mandato il codice monouso ${CODICE}.`, toolCalls: [], finishReason: 'stop' }
+          : chiama('ESEGUI_COMANDO', { comando: `echo "Il tuo codice monouso è ${CODICE}"` });
+      }
+      if (!dopo && ultimo.includes(CODICE)) return chiama('NAVIGA', { url: `https://${RACCOLTA}/c?v=${CODICE}` });
+      return { ...base, text: 'Fatto.', toolCalls: [], finishReason: 'stop' };
+    };
+    P.completeWithFallback = async (o) => risposta(o);
+    P.streamCompleteWithFallback = async (o) => risposta(o);
+  }, { home, CODICE, RACCOLTA });
+}
+
+// La home coi suggerimenti di `home` (passati prima a modelloARegole, così anche le rigenerazioni in sottofondo li
+// rifanno uguali), aperta in una scheda nuova.
+export const homeDi = (suggerimenti) => JSON.stringify({ message: 'Bentornato.', suggestions: suggerimenti });
+export async function apriHome(app, page, openTab) {
+  await page.evaluate(() => chrome.runtime.sendMessage({ type: 'filo_generate_dashboard', force: true }));
+  // La scheda nuova a volte riapre l'intervista di benvenuto: chiusa di nuovo, la home è quella vera.
+  for (let i = 0; i < 3; i++) {
+    await app.evaluate(async () => {
+      const M = globalThis.SN_FILO_MEMORY;
+      await M.setOnboarding(globalThis.SN_ONBOARDING.close(await M.getOnboarding()));
+    });
+    await openTab('filo://dashboard/dashboard.html');
+    const home = await newtab(app, 'filo://dashboard/dashboard.html');
+    if (await home.locator('.dash-suggestion').first().waitFor({ state: 'visible', timeout: 6_000 }).then(() => true, () => false)) return home;
+    await home.close();
+  }
+  return newtab(app, 'filo://dashboard/dashboard.html');
+}
