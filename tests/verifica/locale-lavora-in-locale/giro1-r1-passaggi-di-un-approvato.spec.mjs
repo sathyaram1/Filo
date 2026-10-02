@@ -30,7 +30,7 @@ test('approvato dall’owner: npm run feedback e la presa in carico lo accettano
     const OF = await import(pathToFileURL(resolve('scripts/owner-feedback.mjs')).href);
     const o = { bearer: 'finto', dryRun: true };
     expect((await OF.praticaPerLaSessione('inCoda', o)).ok).toBe(true);
-    for (const [id, to, attore] of [['inCoda', 'working', 'routine'], ['inLavoro', 'revision_capability', 'routine'], ['inLavoro', 'done', 'owner']]) {
+    for (const [id, to, attore] of [['inCoda', 'working', 'routine'], ['inLavoro', 'revision_capability', 'routine'], ['inLavoro', 'done', 'routine']]) {
       const r = await OF.scrivi(id, to, '', { ...o, attore });
       expect(r, `${id} → ${to}`).toMatchObject({ ok: true, to });
     }
