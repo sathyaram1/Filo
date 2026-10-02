@@ -74,7 +74,8 @@
   // ── Lavori locali (#908) ─────────────────────────────────────────────────
   // `localOnly { by, at }`: la pratica la lavora solo una sessione locale. Il segno
   // da solo la toglie alle routine; si mette solo su feedback dell'owner o di una
-  // sessione CON la prova (#595), mai sul solo prefisso. Gemello: localWork.js sul server.
+  // sessione CON la prova (#595), mai sul solo prefisso, o su un feedback che l'owner ha approvato come
+  // lavoro locale (`localApproval { by, at }`, #913: lo scrive solo l'admin). Gemello: localWork.js sul server.
   const LOCAL_SENDER_RE = /^(owner|local):/i;
   function isLocalOnly(fb) {
     const m = fb && fb.localOnly;
@@ -83,9 +84,16 @@
   function isProvenLocalSender(fb) {
     return !!fb && LOCAL_SENDER_RE.test(String(fb.clientId || '')) && fb.senderProof === 'admin';
   }
-  // Segno E prova: è la condizione con cui il server la fonde saltando L5, quindi lì «fondi senza chiedermelo» non conta.
+  function isLocalApproved(fb) {
+    const m = fb && fb.localApproval;
+    return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
+  }
+  function isLocalWorkSender(fb) {
+    return isProvenLocalSender(fb) || isLocalApproved(fb);
+  }
+  // Segno E (prova o sì dell'owner): la condizione con cui il server la fonde saltando L5, quindi lì «fondi senza chiedermelo» non conta.
   function isProvenLocalWork(fb) {
-    return isLocalOnly(fb) && isProvenLocalSender(fb);
+    return isLocalOnly(fb) && isLocalWorkSender(fb);
   }
   // Prefisso dell'owner o di una sessione senza prova: solo l'owner può dire che è suo, e dargliela (#908).
   function mittenteDaRiconoscere(fb) {
