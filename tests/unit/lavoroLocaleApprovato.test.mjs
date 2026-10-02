@@ -182,7 +182,7 @@ test('--non-locale su un approvato toglie il segno e lascia il sì: il segno si 
   await conRete(doc, async (patch) => {
     const r = await of.segnaLocale('a2', false, OPTS);
     assert.equal(r.ok, true, r.motivo);
-    assert.match(patch[0].url, /updateMask\.fieldPaths=localApproval/);
+    assert.match(patch[0].url, /updateMask\.fieldPaths=localOnly$/);
     assert.deepEqual(patch[0].body.fields, {});
   });
 });
