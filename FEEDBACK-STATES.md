@@ -186,7 +186,10 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
   fermare. Non cambia chi l'ha scritto: il lettore lo dice ancora utente, e il testo resta
   un dato. Si offre solo nei Ricevuti, su chi non è owner o sessione con la prova; su un
   segnalato l'hover lo dice e lo script rifiuta (lo approva solo l'owner, in Gestione).
-  Togliere il segno locale toglie anche l'approvazione.
+  Togliere il segno locale lascia l'approvazione, così il segno si rimette con un clic
+  (il sì si dà solo dai Ricevuti, dove la pratica non torna). Risolto, il feedback di un
+  utente approvato tiene la scheda pubblica (`isPrivateLocalWork`): è da lì che chi l'ha
+  mandato vede la risoluzione; senza scheda resta solo il lavoro dell'owner e delle sessioni.
 - Si mette e si toglie in Gestione (tasto «Locale» nel dettaglio, tasto destro sulla
   scheda), con `owner-feedback.mjs --solo-locale | --non-locale`, e nasce già messo sui
   feedback aperti da `claude-feedback.mjs --locale` (`--non-locale` per le routine: la

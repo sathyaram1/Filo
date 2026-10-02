@@ -1781,7 +1781,7 @@
     } else if (segnabile.ok) {
       voci.push({
         testo: segnabile.chiusa ? '💻 Era un lavoro locale' : '💻 Solo lavoro locale',
-        titolo: segnabile.chiusa ? TITOLO_LOCALE_CHIUSA : 'Nessuna routine la prende. La lavora una sessione locale, e passa nei Lavori locali.',
+        titolo: segnabile.chiusa ? titoloLocaleChiusa(fb) : 'Nessuna routine la prende. La lavora una sessione locale, e passa nei Lavori locali.',
         azione: () => segnoDalMenu(fb, true),
       });
     }
@@ -2883,7 +2883,10 @@
   const TITOLO_LOCALE_CHIUSA = 'Era un lavoro locale: la segna così, e la sua scheda esce dalla bacheca pubblica.';
   // Una pratica chiusa le routine non la prendono più: togliere il segno la rimette solo nella bacheca.
   const TITOLO_TOGLI_CHIUSA = 'Un clic toglie il segno, e la sua scheda torna nella bacheca pubblica.';
-  // Il feedback di un utente approvato la scheda l'ha già (#913).
+  // Il feedback di un utente approvato la scheda la tiene (#913): è da lì che chi l'ha mandato vede la risoluzione.
+  function titoloLocaleChiusa(fb) {
+    return MR.isLocalApproved(fb) ? 'Era un lavoro locale: la segna così, e la sua scheda resta nella bacheca pubblica.' : TITOLO_LOCALE_CHIUSA;
+  }
   function titoloTogliChiusa(fb) {
     return MR.isPrivateLocalWork(fb) ? TITOLO_TOGLI_CHIUSA : 'Un clic toglie il segno.';
   }
@@ -2899,7 +2902,7 @@
     mgLocalBtn.title = on
       ? `${localSignText(fb)} ${chiusa ? titoloTogliChiusa(fb) : 'Un clic la rimette anche alle routine.'}`
       : (perche.ok
-        ? (perche.chiusa ? TITOLO_LOCALE_CHIUSA : 'La lavora solo una sessione locale. Nessuna routine la prende, e passa nei Lavori locali.')
+        ? (perche.chiusa ? titoloLocaleChiusa(fb) : 'La lavora solo una sessione locale. Nessuna routine la prende, e passa nei Lavori locali.')
         : `Adesso non si può: ${perche.motivo}.`);
   }
 
@@ -2959,7 +2962,7 @@
       const dove = MR.manageTabFor(fb, { releasedVersion, fusioni });
       const fatto = !valore
         ? (check.chiusa ? `Da ora${chi} non è più un lavoro locale${MR.isLocalApproved(fb) ? '' : ': la sua scheda torna nella bacheca pubblica'}.` : `Da ora${chi} la possono prendere anche le routine.`)
-        : check.chiusa ? `Segnata${chi} come lavoro locale: fuori dalla bacheca pubblica.`
+        : check.chiusa ? `Segnata${chi} come lavoro locale${MR.isLocalApproved(fb) ? '' : ': fuori dalla bacheca pubblica'}.`
           : `Da ora${chi} la lavora solo una sessione locale${dove === 'local' ? ': la trovi nei Lavori locali' : ''}.`;
       setManageMsg(fatto, 'ok');
     } catch (e) {
