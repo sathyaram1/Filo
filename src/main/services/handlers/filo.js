@@ -95,6 +95,22 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // Dentro una pagina web un window.open dei content script non si distingue da quelli della pagina: i collegamenti
+  // che un modello scrive lì (assistente di pagina, Spiega, richiesta rapida) li apre il main, dopo la porta (#810).
+  on(MSG.APRI_COLLEGAMENTO_FILO, async (msg, sender, origin) => {
+    const url = String((msg && msg.url) || '').trim();
+    if (!SCHEMI_USCITA.test(url) || (/^https?:/i.test(url) && !/^https?:\/\//i.test(url))) return { ok: false, error: 'indirizzo non ammesso' };
+    const tm = winOf(sender)?._filoTabs;
+    const avvisato = isFilo(origin);
+    let pagina = '';
+    try { pagina = sender?.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
+    const r = await apriDaFilo(url, {
+      wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato,
+      apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo) }); },
+    });
+    return { ok: true, ...r, avvisato };
+  });
+
   // Il testo che l'assistente di pagina propone per un campo della pagina esce verso il sito: passa dalla porta
   // delle uscite prima di comparire (#810). Torna solo il verdetto e la frase, mai il segreto.
   on(MSG.CONTROLLA_CAMPO, async (msg, sender) => {
