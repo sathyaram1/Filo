@@ -1,4 +1,4 @@
-// Verifica locale, giro 1, rilievo 4: col tasto «Lavoro locale» in più, i tasti dei Ricevuti restano su una riga
+// Verifica locale, giro 1: col tasto «Lavoro locale» in più, i tasti dei Ricevuti restano su una riga
 // anche sul feedback che ne offre di più (il file sospetto), alla larghezza dello spec che lo tiene vero.
 
 import { test, expect } from '../../fixtures/electron.mjs';
@@ -11,7 +11,6 @@ for (const [nome, over] of [
   ['feedback normale', { _id: 'fb-norm', seq: 913, status: 'unlabeled' }],
 ]) {
   test(`Ricevuti, ${nome}: i tasti stanno su una riga a 1600 pixel`, async ({ app, openTab }) => {
-    if (nome === 'file sospetto') test.fail(true, 'rilievo 4 aperto: sette tasti, l’ultimo va a capo');
     const largo = await app.evaluate(({ BrowserWindow }) => {
       const w = BrowserWindow.getAllWindows()[0];
       if (w.isMaximized()) w.unmaximize();
