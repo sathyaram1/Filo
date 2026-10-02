@@ -75,7 +75,7 @@ test('tasto destro nei Ricevuti: «Approva come lavoro locale» fa la stessa scr
   expect(updates[0]).toMatchObject({ status: 'todo', localOnly: true, localApproval: true });
 });
 
-test('fuori dai Ricevuti, e senza admin, l’approvazione non c’è', async ({ openTab }) => {
+test('fuori dai Ricevuti l’approvazione non c’è', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [fb({ status: 'todo' })], 'queue');
   await page.locator('.mg-item').click();
