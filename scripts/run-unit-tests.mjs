@@ -241,9 +241,12 @@ export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false,
   for (const d of rapportiPersi) out.push(`[test:unit] il rapporto chiesto ${doveRapporto(d)} non è stato scritto: il motivo è sopra.`);
   if (copertura) out.push(`[test:unit] la copertura è per gruppo: ${gruppi} conti, ciascuno sui soli file del suo gruppo, nessuno sulla suite intera.`);
   if (interrotto) out.push(`[test:unit] interrotto al gruppo ${n} di ${gruppi}: i gruppi dopo non sono partiti.`);
-  out.push(rossiGruppi.length || interrotto
-    ? `[test:unit] ROSSO: ${rossiGruppi.length > 1 ? 'gruppi' : 'gruppo'} ${rossiGruppi.join(', ')} di ${gruppi}.`
-    : `[test:unit] verde: ${gruppi} gruppi, ${file} file.`);
+  const perche = [
+    rossiGruppi.length && `${rossiGruppi.length > 1 ? 'gruppi' : 'gruppo'} ${rossiGruppi.join(', ')} di ${gruppi}`,
+    !rossiGruppi.length && interrotto && `interrotto al gruppo ${n} di ${gruppi}`,
+    rapportiPersi.length && `${rapportiPersi.length > 1 ? 'rapporti non scritti' : 'rapporto non scritto'}`,
+  ].filter(Boolean);
+  out.push(perche.length ? `[test:unit] ROSSO: ${perche.join('; ')}.` : `[test:unit] verde: ${gruppi} gruppi, ${file} file.`);
   return out.join('\n');
 }
 
