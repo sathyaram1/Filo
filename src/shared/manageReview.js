@@ -745,8 +745,11 @@
       // Aspetta una decisione: approvare È scrivere `todo`. Col segno locale `todo` porta nei Lavori locali.
       const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: isLocalOnly(fb) ? '→ Lavori locali' : '→ In coda', primary: true }];
       // #913: approvarlo come lavoro locale. `locale` dice a chi scrive di aggiungere il segno e il sì dell'owner.
+      // Rimandato nei Ricevuti perché richiede lavoro locale (--serve-locale): la decisione attesa è questa.
       if (!isLocalOnly(fb) && localApprovalCheck(fb, opts).ok) {
-        acts.push({ key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro locale', primary: false, locale: true });
+        const attesa = String((fb && fb.statusReason) || '') === 'locale';
+        if (attesa) acts[0].primary = false;
+        acts.push({ key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro locale', primary: attesa, locale: true });
       }
       // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
       // Ricevuti e resta consultabile negli Archiviati. Il file sospetto non è
