@@ -97,15 +97,20 @@ async function settingsForOwnerAction(settings, action, getConfig) {
   };
 }
 
-// Per l'editor di Gestione: uno slot spostato e mai impostato mostra la catena
-// che la funzione usa davvero, così salvando la si porta nello slot.
+// Per l'editor di Gestione: uno slot spostato e mai impostato mostra la catena che la funzione usa
+// adesso, e `movedUnset` lo dice all'editor: quel valore è una lettura, non una scelta, e un
+// salvataggio che non l'ha cambiato non lo scrive (senza predefiniti arrivati sarebbe vuoto).
 function fillMovedSlots(models, settings) {
   const Usage = globalThis.SN_MODEL_USAGE;
   const pairs = Usage && typeof Usage.ownerActions === 'function' ? Usage.ownerActions() : [];
   const inUse = (settings && settings.models) || {};
+  const unset = [];
   for (const { action, slot } of pairs) {
-    if (models[slot] == null) models[slot] = typeof inUse[action] === 'string' ? inUse[action] : '';
+    if (models[slot] != null) continue;
+    models[slot] = typeof inUse[action] === 'string' ? inUse[action] : '';
+    unset.push(slot);
   }
+  models.movedUnset = unset;
   return models;
 }
 
