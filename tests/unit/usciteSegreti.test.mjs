@@ -753,13 +753,16 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
   test('i collegamenti che un modello scrive dentro una pagina web si aprono e si scaricano solo dopo la porta', () => {
     const src = (...p) => readFileSync(join(ROOT, 'src', ...p), 'utf8');
     const popup = src('content', 'popup.js');
-    assert.ok(!/window\.open\(/.test(popup), 'il popup apre un collegamento da sé');
     for (const gesto of ['click', 'auxclick']) {
       assert.ok(popup.includes(`window.addEventListener('${gesto}', suCollegamento, true)`), `il ${gesto} su un collegamento di Filo non passa dal main`);
     }
     const su = corpo(popup, 'const suCollegamento = (e) =>');
     assert.match(su, /a\.filo-md-link/);
     assert.match(su, /apriCollegamento\(a/);
+    // Un window.open da sé solo nelle pagine di Filo, dove la porta sta sull'apertura nel main.
+    assert.equal((popup.match(/window\.open\(/g) || []).length, 1, 'il popup apre un collegamento da sé');
+    assert.match(su, /if \(inPaginaDiFilo\) \{ try \{ window\.open\(/);
+    assert.match(popup, /const inPaginaDiFilo = location\.protocol === 'filo:';/);
     assert.match(corpo(popup, 'async function apriCollegamento('), /type: MSG\.APRI_COLLEGAMENTO_FILO, url, parole:/);
     assert.match(corpo(popup, 'async function scaricaCollegamento('), /type: MSG\.DOWNLOAD_LINK, url, diFilo: true, parole:/);
     const menu = corpo(src('content', 'content.js'), 'function buildLinkActionItems(');
@@ -769,7 +772,8 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     const porta = filo.indexOf('apriDaFilo(');
     assert.ok(porta > 0 && porta < filo.indexOf('apriDaCollegamento('), 'APRI_COLLEGAMENTO_FILO apre prima della porta');
     const scarica = corpo(src('main', 'services', 'handlers', 'misc.js'), 'on(MSG.DOWNLOAD_LINK');
-    assert.match(scarica, /if \(msg\.diFilo\) \{[\s\S]*apriDaFilo\(url, \{[\s\S]*apri: \(\) => \{ esito = scarica\(\); \}/);
+    assert.match(scarica, /if \(msg\.diFilo\) \{[\s\S]*apriDaFilo\(url, \{[\s\S]*tipo: 'SCARICA_COLLEGAMENTO', apri: \(\) => \{ esito = scarica\(\); \}/);
+    assert.equal(X.verboUscita('SCARICA_COLLEGAMENTO'), 'non ho scaricato il file');
   });
 
   // Riaperta, anche dopo un riavvio, una chat dice di nuovo cosa aveva letto prima che si clicchi qualcosa.

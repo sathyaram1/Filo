@@ -602,6 +602,8 @@ test('il bottone «apri file» con un indirizzo che porta fuori il codice letto 
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtab(app);
   await preparaModelli(app);
+  // Senza, l'accoglienza a volte arriva prima e il comando non parte: niente da fermare, e il bottone compare.
+  await senzaAccoglienza(app, page);
   await modelloFinto(app, {
     giri: [
       { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `echo "Il tuo codice monouso è ${CODICE}"` }) }] },
@@ -1102,8 +1104,10 @@ test('i collegamenti nella risposta dell’assistente di pagina col codice letto
   await expect(righe).toHaveCount(4, { timeout: 10_000 });
   await link('la ricevuta').click({ button: 'right' });
   await page.locator('.sn-menu').getByText('Salva file', { exact: false }).first().click();
-  await expect(righe).toHaveCount(5, { timeout: 10_000 });
+  await expect(page.locator('.sn-sidebar-log', { hasText: 'non ho scaricato il file: conteneva un codice letto dalla pagina 127.0.0.1' }))
+    .toHaveCount(1, { timeout: 10_000 });
   await page.waitForTimeout(500);
+  await page.screenshot({ path: 'tests/.shots/uscite-segreti-collegamenti-aiuto.png' });
   expect(apertoVerso(app, RACCOLTA), 'un gesto ha aperto l’indirizzo col codice').toBe(false);
   expect((await app.evaluate(() => globalThis.__esterni)).join(' '), 'il programma di posta si apre col codice').not.toContain(CODICE);
   expect((await app.evaluate(() => globalThis.__scaricati)).join(' '), 'lo scaricamento chiede al sito l’indirizzo col codice').not.toContain(CODICE);

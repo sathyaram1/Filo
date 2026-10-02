@@ -413,7 +413,7 @@ module.exports = function register(on, ctx) {
       const parole = (Array.isArray(msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').join('\n');
       let esito = { ok: false, error: 'download non avviato' };
       const avvisato = String(origin || '').startsWith('filo://');
-      const r = await apriDaFilo(url, { wc, parole, avvisa: avvisato, apri: () => { esito = scarica(); } });
+      const r = await apriDaFilo(url, { wc, parole, avvisa: avvisato, tipo: 'SCARICA_COLLEGAMENTO', apri: () => { esito = scarica(); } });
       return r.aperto ? esito : { ok: false, error: 'segreto', frase: r.frase, avvisato };
     }
     return scarica();

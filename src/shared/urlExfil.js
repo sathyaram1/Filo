@@ -346,9 +346,11 @@
     APRI_FILE: 'non ho preparato il collegamento',
   });
 
-  // Le uscite che non sono azioni del registro: il testo che l'assistente di pagina scrive in un campo.
+  // Le uscite che non sono azioni del registro: il testo che l'assistente di pagina scrive in un campo, lo
+  // scaricamento di un collegamento scritto da un modello.
   const USCITE_PAGINA = Object.freeze({
     CAMPO_PAGINA: 'non ho scritto nel campo',
+    SCARICA_COLLEGAMENTO: 'non ho scaricato il file',
   });
   const verboUscita = (tipo) => USCITE[tipo] || USCITE_PAGINA[tipo] || '';
 
