@@ -23,7 +23,7 @@ test('pratica dell’owner e di una sessione: la prima bolla dice lo stesso auto
     await page.evaluate((x) => window.__mgTest.openDetail(x), id);
     const prima = page.locator('#mgThread > *').first();
     await expect(prima).toContainText('Cosa fa il lavoro.');
+    await page.screenshot({ path: `tests/.shots/giro8-autore-pratica-${id}.png` });
     await expect(prima, id).not.toContainText(sbagliato);
   }
-  await page.screenshot({ path: 'tests/.shots/giro8-autore-pratica.png' });
 });
