@@ -188,9 +188,9 @@ function openExternalScheme(rawUrl) {
   return true;
 }
 
-// La lista dei bloccati si salva mentre si scrive (#590.2): una scheda ferma su un sito uscito dalla
-// lista torna sul sito solo se l'uscita tiene per questo tempo, o quando l'utente la guarda.
-const RIAPRI_DOPO_MS = 3000;
+// La lista dei bloccati si salva mentre si scrive (#590.2): una riga a metà non sposta le schede aperte,
+// né verso la pagina «Sito bloccato» né fuori. La seguono quando la lista sta ferma per questo tempo, o quando l'utente le guarda.
+const LISTA_FERMA_MS = 3000;
 
 // webContents → sito di un «Apri comunque»: il sì vale anche per il blocco delle richieste.
 const permessiApriComunque = new Map();
@@ -1558,7 +1558,7 @@ class TabManager {
     }
     this.layout();
     this._tastieraAllaSchedaAttiva();
-    if (tab._riapriTimer) this._riapriSeSbloccata(tab);
+    if (tab._listaTimer) this._seguiLista(tab, { ora: true });
     this._broadcast();
   }
 
@@ -2862,23 +2862,34 @@ class TabManager {
   }
 
   // #590 — la lista è cambiata: una scheda su un sito appena messo in lista passa
-  // subito alla pagina «Sito bloccato»; una ferma lì per un sito uscito dalla lista torna sul sito.
-  riapplicaListaBloccati() {
+  // alla pagina «Sito bloccato»; una ferma lì per un sito uscito dalla lista torna sul sito.
+  riapplicaListaBloccati(opts) {
+    if (opts && opts.mentreScrive) this._listaCambiaFino = Date.now() + LISTA_FERMA_MS;
+    for (const tab of this.tabs) this._seguiLista(tab);
+  }
+
+  // Con `ora` (la scheda viene guardata) la lista vale subito, anche se è a metà.
+  _seguiLista(tab, { ora = false } = {}) {
+    clearTimeout(tab._listaTimer);
+    tab._listaTimer = null;
     const NE = globalThis.SN_NET_ERROR;
-    if (!NE) return;
-    for (const tab of this.tabs) {
-      let grezzo = '';
-      try { grezzo = tab.view.webContents.getURL() || ''; } catch (_) { continue; }
-      if (NE.isBlockedPageUrl(grezzo)) {
-        if (this._daRiaprire(tab)) this._riapriQuandoTiene(tab);
-        continue;
-      }
+    if (!NE || !this.tabs.includes(tab)) return;
+    let grezzo = '';
+    try { grezzo = tab.view.webContents.getURL() || ''; } catch (_) { return; }
+    let passo = null;
+    if (NE.isBlockedPageUrl(grezzo)) {
+      const target = this._daRiaprire(tab);
+      if (target) passo = () => { try { tab.view.webContents.loadURL(target); } catch (_) {} };
+    } else {
       // Anche una pagina d'errore di rete: per l'utente la scheda sta sul sito che non si è aperto.
       const sito = NE.targetOf(grezzo) || grezzo;
-      if (!/^https?:\/\//i.test(sito)) continue;
-      const decision = this._decisioneBlocco(tab, sito);
-      if (decision) this._mostraPaginaBloccata(tab, sito, decision);
+      const decision = /^https?:\/\//i.test(sito) ? this._decisioneBlocco(tab, sito) : null;
+      if (decision) passo = () => this._mostraPaginaBloccata(tab, sito, decision);
     }
+    if (!passo) return;
+    const attesa = (this._listaCambiaFino || 0) - Date.now();
+    if (ora || attesa <= 0) passo();
+    else tab._listaTimer = setTimeout(() => this._seguiLista(tab), attesa);
   }
 
   // Il sito della pagina «Sito bloccato» messa dal main, se adesso la lista lo lascia aprire.
@@ -2890,19 +2901,6 @@ class TabManager {
     if (!NE.isBlockedPageUrl(grezzo)) return null;
     const target = NE.targetOf(grezzo);
     return target && !this._decisioneBlocco(tab, target) ? target : null;
-  }
-
-  // Una riga a metà correzione toglie il sito per un attimo: si ricontrolla allo scadere.
-  _riapriQuandoTiene(tab) {
-    clearTimeout(tab._riapriTimer);
-    tab._riapriTimer = setTimeout(() => this._riapriSeSbloccata(tab), RIAPRI_DOPO_MS);
-  }
-
-  _riapriSeSbloccata(tab) {
-    clearTimeout(tab._riapriTimer);
-    tab._riapriTimer = null;
-    const target = this._daRiaprire(tab);
-    if (target) { try { tab.view.webContents.loadURL(target); } catch (_) {} }
   }
 
   _siteAllowedIn(tab, url) {

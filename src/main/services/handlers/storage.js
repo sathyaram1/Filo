@@ -74,7 +74,7 @@ module.exports = function register(on, ctx) {
     // Tutta la propagazione (broadcast, tema nativo, sicurezza, fingerprint,
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato
     // quando Filo cambia una preferenza via chat.
-    const merged = await applySettingsUpdate(incoming);
+    const merged = await applySettingsUpdate(incoming, { mentreScrive: msg.mentreScrive === true });
     return { ok: true, settings: impostazioniPerOrigine(merged, origin, indirizziDelMittente(sender)) };
   });
 

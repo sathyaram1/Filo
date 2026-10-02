@@ -173,6 +173,48 @@ test('tolto il sito dalla lista scrivendo e tornati subito sulla sua scheda, il 
   await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 1500 }).toBe(sito);
 });
 
+test('scrivendo «blocked.test.it» con una pausa dopo «blocked.test», la scheda aperta su blocked.test resta com\'è', async ({ app, shell, rete }) => {
+  await lista(shell, []);
+  const sito = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+  await apri(app, shell, sito);
+  const id = await idAttiva(app);
+  await app.evaluate(({ BrowserWindow }, i) => {
+    const t = BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.tabs.find((x) => x.id === i);
+    globalThis.__aperture590b = [];
+    t.view.webContents.on('did-navigate', (_e, u) => globalThis.__aperture590b.push(u));
+  }, id);
+  const pref = await paginaSicurezza(app, shell);
+  const campo = pref.locator('#sec-siteblock-blacklist');
+  await campo.click();
+  await pref.keyboard.type('blocked.test', { delay: 30 });
+  await pref.waitForTimeout(1000);
+  await pref.keyboard.type('.it', { delay: 30 });
+  await pref.waitForTimeout(4500);
+  expect(await campo.inputValue()).toBe('blocked.test.it');
+  expect(await app.evaluate(() => globalThis.__aperture590b)).toEqual([]);
+  expect(await caricataSu(app, 'blocked.test')).toBe(sito);
+});
+
+test('scritto per intero il sito di una scheda aperta, la scheda passa alla pagina «Sito bloccato» appena la riga sta ferma, o subito se la si guarda', async ({ app, shell, rete }) => {
+  await lista(shell, []);
+  const sito = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+  await apri(app, shell, sito);
+  const id = await idAttiva(app);
+  const pref = await paginaSicurezza(app, shell);
+  await pref.locator('#sec-siteblock-blacklist').click();
+  await pref.keyboard.type('blocked.test', { delay: 30 });
+  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toMatch(PAGINA_BLOCCATA);
+
+  await lista(shell, []);
+  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toBe(sito);
+  await pref.locator('#sec-siteblock-blacklist').fill('');
+  await pref.locator('#sec-siteblock-blacklist').click();
+  await pref.keyboard.type('blocked.test', { delay: 30 });
+  await pref.waitForTimeout(700);
+  await shell.evaluate((i) => window.filoShell.tabs.activate(i), id);
+  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 1500 }).toMatch(PAGINA_BLOCCATA);
+});
+
 test('indietro dalla pagina «Sito bloccato» torna alla pagina di prima; tolto dalla lista, il sito torna', async ({ app, shell, rete }) => {
   await lista(shell, []);
   const prima = rete.pagina('sito.test', '/', '<h1>PRIMA</h1>');

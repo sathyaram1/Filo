@@ -695,7 +695,7 @@
     const cambi = soloCambiati(ora, mostrata);
     mostrata = ora;
     if (Object.keys(cambi).length) {
-      await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security: cambi } });
+      await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security: cambi }, mentreScrive: !!(opts && opts.avvisi === false) });
     }
     const hint = $('savedHint');
     hint.classList.add('sn-show');
