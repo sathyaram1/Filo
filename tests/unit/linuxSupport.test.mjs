@@ -558,5 +558,5 @@ test('su Linux il clic centrale in un campo resta all\'incolla del sistema, non 
   assert.equal(Z.centraleIncolla('win32'), false);
   assert.equal(Z.centraleIncolla('darwin'), false);
   const preload = readFileSync(join(ROOT, 'src', 'preload', 'wheel-zoom.js'), 'utf8');
-  assert.equal((preload.match(/incollaQui\(e, Z\)/g) || []).length, 2, 'la pagina e i riquadri incorporati lasciano tutti e due il clic centrale ai campi');
+  assert.equal((preload.match(/\|\| incollaQui\(e, Z\)/g) || []).length, 2, 'la pagina e i riquadri incorporati lasciano tutti e due il clic centrale ai campi');
 });
