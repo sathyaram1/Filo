@@ -41,7 +41,10 @@ test('riaperta dalla Cronologia, la chat non racconta come aperta la pagina che 
       const r = await chrome.runtime.sendMessage({ type: 'filo_chats_list' });
       for (const c of (r && r.chats) || []) {
         const g = await chrome.runtime.sendMessage({ type: 'filo_chat_get', id: c.id });
-        if (JSON.stringify((g && g.chat) || {}).includes('Fatto quello')) return c.id;
+        // L'archivio salva le azioni dopo il testo: si riapre quando ci sono entrambi, come farebbe chi passa dalla Cronologia.
+        const chat = (g && g.chat) || {};
+        const conAzioni = (chat.messages || []).some((m) => Array.isArray(m.actions) && m.actions.length);
+        if (JSON.stringify(chat).includes('Fatto quello') && conAzioni) return c.id;
       }
       return null;
     });
@@ -61,13 +64,21 @@ test('dopo un indirizzo fermato, l’assistente di pagina sa che non si è apert
   const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Banca</title></head>
     <body><p>Il tuo codice monouso è ${CODICE}.</p></body></html>`);
   await preparaModelli(app);
-  await modelloFinto(app, { aiuto: [['l’hai aperta', JSON.stringify({ text: 'Rispondo.', status: 'done' })], ['', NAVIGA_COL_CODICE]] });
+  await modelloFinto(app, { aiuto: [
+    ['l’hai aperta', JSON.stringify({ text: 'Rispondo.', status: 'done' })],
+    ['NON è partita', JSON.stringify({ text: 'Non l’ho aperta.', status: 'done' })],
+    ['', NAVIGA_COL_CODICE],
+  ] });
   await apriAiuto(shell, page);
   await scriviAllAiuto(page, 'aiutami a finire l’accesso');
   expect(await esitoUscita(app, page)).toBe('fermato');
+  // L'utente legge la riga e la risposta che la segue, poi chiede.
+  await expect(page.locator('.sn-sidebar', { hasText: 'Non l’ho aperta.' })).toBeVisible({ timeout: 20_000 });
   await scriviAllAiuto(page, 'l’hai aperta?');
-  await expect.poll(() => app.evaluate(() => globalThis.__visti.length), { timeout: 20_000 }).toBeGreaterThan(1);
-  const visti = await app.evaluate(() => globalThis.__visti);
+  // Il correttore ortografico interroga lo stesso modello finto: conta solo la chiamata dell'assistente.
+  const dellAiuto = () => app.evaluate(() => globalThis.__visti.filter((v) => JSON.stringify(v).includes('hai aperta') && !JSON.stringify(v).includes('ortograficamente')));
+  await expect.poll(async () => (await dellAiuto()).length, { timeout: 20_000 }).toBeGreaterThan(0);
+  const visti = await dellAiuto();
   const storia = JSON.stringify(visti[visti.length - 1].filter((m) => m.role !== 'system'));
   expect(storia, 'il modello non sa che l’indirizzo è stato fermato')
     .toMatch(/non ho aperto|non è stat[oa] apert|NON eseguit|bloccat[oa]\b|fermat[oa]\b/i);
