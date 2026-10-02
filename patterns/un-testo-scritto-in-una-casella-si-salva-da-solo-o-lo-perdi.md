@@ -99,6 +99,13 @@ sito e concludeva che la lista non funzionava (#590.2).
   subito, anche senza il tasto; all'uscita vera passa nell'elenco, dove lo si
   ritrova riaprendo la pagina. Quello che non è un dominio si salva come bozza e
   torna nella casella con l'avviso.
+- **Quello che parte mentre si scrive è uno stato a metà.** Chi lo riceve lo
+  salva e lo usa per le aperture nuove, ma non ne trae effetti visibili altrove
+  finché non tiene. Cancellata e riscritta l'ultima lettera di un sito, la
+  scheda ferma sulla pagina «Sito bloccato» riapriva il sito e tornava
+  bloccata. Adesso torna sul sito solo se il sito resta fuori dalla lista per
+  tre secondi, o subito quando l'utente passa a quella scheda. Togliere una
+  scheda da un sito appena messo in lista resta immediato.
 - **Nei test** la tastiera di Playwright non passa dal `before-input-event` e
   Playwright fa credere alla pagina di avere sempre il fuoco, quindi niente
   `blur`: Ctrl+W si prova con `sendInputEvent`, prima il Ctrl da solo e poi la
