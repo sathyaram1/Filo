@@ -1312,7 +1312,7 @@ function lettiDallAiuto(sender) {
 async function controllaUscita(action, { sender = null, contesto = null, parole = '' } = {}) {
   const Exfil = globalThis.SN_URL_EXFIL;
   const tipo = String((action && action.type) || '').toUpperCase();
-  if (!Exfil || !Exfil.USCITE[tipo]) return { blocca: false, exfil: false };
+  if (!Exfil || !Exfil.verboUscita(tipo)) return { blocca: false, exfil: false };
   const origine = sender?.tab?.url || sender?.url || '';
   const daPagina = /^https?:/i.test(origine);
   return Exfil.valutaUscita(action, {
@@ -2936,7 +2936,8 @@ async function editorFileSummaries() {
   } catch (_) { return ''; }
 }
 
-async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, chatId = null, sender = null }) {
+// `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
+async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, chatId = null, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
@@ -2968,6 +2969,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       role: 'user',
       text: String(userMessage || ''),
       images: Array.isArray(images) ? images.length : (image ? 1 : 0),
+      ...(daModello ? { daModello: true } : {}),
     }, { onboarding: onbActive });
   }
   // La conversazione dell'intervista viene tenuta da parte mano a mano: è così
@@ -3026,8 +3028,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   for (const m of cleanHistory) if (m && Array.isArray(m.actions)) azioniViste.push(...m.actions);
   // Le parole dell'utente in questa chat: un codice che ha scritto lui può uscire (#810). Un turno
   // interno non è sua voce.
-  const paroleUtente = cleanHistory.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || ''))
-    .concat(internal ? [] : [String(userMessage || '')]).join('\n');
+  // Nemmeno il testo di un suggerimento della home: lo scrive un modello.
+  const paroleUtente = cleanHistory.filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''))
+    .concat(internal || daModello ? [] : [String(userMessage || '')]).join('\n');
   // Quello che la chat ha davanti e non ha scritto l'utente entra nel registro dei segreti letti (#810). Anche
   // le frasi di Filo: riaperta dalla Cronologia, la chat non ha più l'esito che aveva portato il codice.
   ricordaLettoInChat(azioniViste, cleanHistory);
@@ -3510,6 +3513,13 @@ async function generateDashboardFromInputs(inputs) {
     }
   }
   if (!message) message = 'Filo è in ascolto.';
+  // Un suggerimento che porterebbe fuori un segreto perde l'azione e tiene la frase della porta (#810): la home
+  // chiede l'icona del sito appena lo mostra, prima di ogni clic, e al clic deve dire cosa ha fermato.
+  for (let i = 0; i < suggestions.length; i++) {
+    let u = null;
+    try { u = suggestions[i].action ? await controllaUscita(suggestions[i].action) : null; } catch (_) {}
+    if (u && u.blocca) suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase };
+  }
   await FiloMem.setDashboardCache({ message, suggestions, signature: inputs.signature });
   return { message, suggestions, ts: new Date().toISOString() };
 }

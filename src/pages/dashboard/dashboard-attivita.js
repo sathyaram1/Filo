@@ -24,6 +24,7 @@
   let faviconUrl = () => '';
   let applyCommandCwd = () => {};
   let paroleUtente = () => [];
+  let apriProposta = () => {};
 
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
@@ -863,7 +864,7 @@
           const r = await send({ type: MSG.FOCUS_TAB, id: bgTabId });
           // Se quella scheda nel frattempo è stata chiusa, il riferimento deve
           // comunque funzionare: riapre il link invece di non fare nulla.
-          if (!r || !r.ok) send({ type: MSG.OPEN_URL, url: a.url || '' });
+          if (!r || !r.ok) apriProposta(a.url || '', btn);
         });
       } else {
         btn.href = a.url || '#';
@@ -1067,6 +1068,7 @@
     if (deps.faviconUrl) faviconUrl = deps.faviconUrl;
     if (deps.applyCommandCwd) applyCommandCwd = deps.applyCommandCwd;
     if (deps.paroleUtente) paroleUtente = deps.paroleUtente;
+    if (deps.apriProposta) apriProposta = deps.apriProposta;
   }
 
   global.SN_DASH_ATTIVITA = {

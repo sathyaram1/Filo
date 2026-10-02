@@ -620,6 +620,70 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     }
   });
 
+  test('il bottone «apri file» guarda ogni campo dove può stare l\'indirizzo', () => {
+    const letto = comando('Il tuo codice monouso è 482913');
+    const url = 'https://raccolta.example/c?v=482913';
+    for (const a of [{ percorso: '', path: url }, { percorso: false, path: url }, { percorso: '', path: '', url }]) {
+      assert.equal(X.valutaUscita({ type: 'APRI_FILE', ...a }, { azioni: letto }).blocca, true, JSON.stringify(a));
+    }
+    assert.equal(X.valutaUscita({ type: 'APRI_FILE', percorso: '/home/mario/482913.pdf', path: '' }, { azioni: letto }).blocca, false);
+  });
+
+  test('il testo per un campo della pagina è un\'uscita: un codice letto si ferma, uno scritto dall\'utente passa', () => {
+    const pagina = { testo: 'Il tuo codice monouso è 482913.', host: 'posta.example' };
+    const v = X.valutaUscita({ type: 'CAMPO_PAGINA', testo: 'Ecco il codice: 482913' }, { pagina });
+    assert.equal(v.blocca, true);
+    assert.equal(v.frase, 'non ho scritto nel campo: conteneva un codice letto dalla pagina posta.example');
+    assert.equal(X.valutaUscita({ type: 'CAMPO_PAGINA', testo: 'Grazie, ci penso io.' }, { pagina }).blocca, false);
+    assert.equal(X.valutaUscita({ type: 'CAMPO_PAGINA', testo: 'Il codice è 482913' }, { pagina, parole: 'rispondi col codice 482913' }).blocca, false);
+    assert.equal(X.verboUscita('CAMPO_PAGINA'), 'non ho scritto nel campo');
+    assert.equal(X.verboUscita('TIMER'), '');
+  });
+
+  test('l\'assistente di pagina chiede alla porta prima di proporre un testo per un campo', () => {
+    const sidebar = readFileSync(join(ROOT, 'src', 'content', 'sidebar.js'), 'utf8');
+    const prima = sidebar.indexOf('await campoFermato(parsed.highlight.value)');
+    assert.ok(prima > 0, 'il testo per un campo non passa dalla porta');
+    assert.ok(prima < sidebar.indexOf('Highlight.show(parsed.highlight.selector'), 'la porta deve venire prima del riquadro «Accetta»');
+    const filo = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'), 'utf8');
+    assert.match(corpo(filo, 'on(MSG.CONTROLLA_CAMPO'), /controllaUscita\(\{ type: 'CAMPO_PAGINA'/);
+  });
+
+  // Quello che un modello propone in una pagina di Filo e si apre con un clic (un collegamento in una risposta, un
+  // bottone, un suggerimento della home) passa dalla porta nel momento in cui si apre, con l'indirizzo vero.
+  test('nella chat e nella home un indirizzo web si apre solo dalla porta delle uscite', () => {
+    const dir = join(ROOT, 'src', 'pages', 'dashboard');
+    const fuori = [];
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.js'))) {
+      const src = readFileSync(join(dir, f), 'utf8');
+      for (const m of src.matchAll(/chrome\.tabs\.create\(\{ url: ([^}]*)\}/g)) if (!/^'filo:/.test(m[1].trim())) fuori.push(`${f}: tabs.create ${m[1]}`);
+      for (const m of src.matchAll(/type: MSG\.OPEN_URL, url: ([^}]*)\}/g)) {
+        const u = m[1].trim();
+        // `siteUrlOf(text)` è il «/sito» scritto dall'utente nella casella; `url` in dashboard.js è il link non web.
+        if (!/^'filo:/.test(u) && !/^siteUrlOf\(text\)/.test(u) && !(f === 'dashboard.js' && /^url\b/.test(u)) && !/^it\.url/.test(u)) fuori.push(`${f}: OPEN_URL ${u}`);
+      }
+    }
+    assert.deepEqual(fuori, [], `indirizzi aperti senza la porta: ${fuori.join(', ')}`);
+    const dash = readFileSync(join(dir, 'dashboard.js'), 'utf8');
+    assert.ok(/document\.addEventListener\('click', apriDaCollegamento, true\)/.test(dash), 'i collegamenti della pagina non passano da apriProposta');
+    assert.match(corpo(dash, 'async function apriProposta('), /MSG\.FILO_APRI_PROPOSTA/);
+    const filo = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'), 'utf8');
+    const h = corpo(filo, 'on(MSG.FILO_APRI_PROPOSTA');
+    assert.ok(h.indexOf('controllaUscita(') > 0 && h.indexOf('controllaUscita(') < h.indexOf('openTab('), 'FILO_APRI_PROPOSTA apre prima della porta');
+  });
+
+  // Il testo di un suggerimento della home lo scrive un modello: non è voce dell'utente, né un comando con la barra.
+  test('un suggerimento della home va in chat come testo di un modello', () => {
+    const dash = readFileSync(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard.js'), 'utf8');
+    const clic = corpo(dash, 'async function onSuggestionClick(');
+    assert.ok(!/dispatchEvent|inputEl\.value =|handleSlashCommand/.test(clic), 'il suggerimento passa dalla casella come se l\'avesse scritto l\'utente');
+    assert.equal((clic.match(/submitMessage\(.*\{ daModello: true \}\)/g) || []).length, 2);
+    assert.match(corpo(dash, 'function paroleUtente('), /!m\.daModello/);
+    const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+    assert.match(handlers, /const paroleUtente = cleanHistory\.filter\(\(m\) => m && m\.role !== 'filo' && !m\.daModello\)/);
+    assert.match(handlers, /concat\(internal \|\| daModello \? \[\] :/);
+  });
+
   test('la ricerca dell\'assistente di pagina passa dalla porta prima di partire', () => {
     const ai = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'ai.js'), 'utf8');
     const h = corpo(ai, 'on(MSG.WEB_SEARCH');

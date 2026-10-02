@@ -765,6 +765,13 @@
     // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
     FILO_RUN_ACTION: 'filo_run_action',
 
+    // #810 — un indirizzo web proposto da un modello in una pagina di Filo si apre solo dopo la porta delle
+    // uscite. { url, parole } → { aperto, frase }
+    FILO_APRI_PROPOSTA: 'filo_apri_proposta',
+    // #810 — il testo che l'assistente di pagina vuole scrivere in un campo passa dalla porta delle uscite.
+    // { testo, parole } → { blocca, frase }
+    CONTROLLA_CAMPO: 'controlla_campo',
+
     // #405 — un'azione di PAGINA invocata dal menu aperto dentro un riquadro
     // incorporato (iframe). Il riquadro conosce solo se stesso: tradurre,
     // condividere, salvare o fare uno screenshot devono valere per la pagina

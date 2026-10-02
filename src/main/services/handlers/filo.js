@@ -4,7 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, handleFiloGenerateDashboard,
-    executeFiloAction, maybeRunCompactor, closeAndTriageChat, archiviaCongedoAccoglienza,
+    executeFiloAction, controllaUscita, maybeRunCompactor, closeAndTriageChat, archiviaCongedoAccoglienza,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
   const FiloMem = globalThis.SN_FILO_MEMORY;
@@ -35,7 +35,7 @@ module.exports = function register(on, ctx) {
       // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
       // Solo dalle pagine di Filo: una pagina web non apre chat nell'archivio.
       const chatId = isFilo(origin) ? (msg.chatId || null) : null;
-      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, chatId, sender });
+      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, daModello: !!msg.daModello, chatId, sender });
       return { ok: true, ...r };
     } catch (e) {
       // #360 — la chat non è un log: se il turno fallisce (rete assente, provider
@@ -78,6 +78,28 @@ module.exports = function register(on, ctx) {
   on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
     const r = await executeFiloAction(msg.action, { sender, assistente: true, parole: paroleDa(msg) });
     return { ok: true, ...r };
+  });
+
+  // Un indirizzo che un modello ha proposto in una pagina di Filo (un collegamento in una risposta, un bottone, un
+  // suggerimento della home) si apre solo da qui, dopo la porta delle uscite (#810).
+  on(MSG.FILO_APRI_PROPOSTA, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    const url = String((msg && msg.url) || '').trim();
+    if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'indirizzo non ammesso' };
+    const u = await controllaUscita({ type: 'NAVIGA', url }, { sender, parole: paroleDa(msg) });
+    if (u.blocca) return { ok: true, aperto: false, frase: u.frase };
+    const win = winOf(sender);
+    if (win?._filoTabs) win._filoTabs.openTab(url);
+    return { ok: true, aperto: true };
+  });
+
+  // Il testo che l'assistente di pagina propone per un campo della pagina esce verso il sito: passa dalla porta
+  // delle uscite prima di comparire (#810). Torna solo il verdetto e la frase, mai il segreto.
+  on(MSG.CONTROLLA_CAMPO, async (msg, sender) => {
+    const testo = String((msg && msg.testo) || '');
+    if (!testo.trim()) return { ok: true, blocca: false };
+    const u = await controllaUscita({ type: 'CAMPO_PAGINA', testo }, { sender, parole: paroleDa(msg) });
+    return { ok: true, blocca: !!u.blocca, frase: u.blocca ? u.frase : '' };
   });
 
   on(MSG.FILO_GET_STATE, async () => {

@@ -352,6 +352,8 @@
         .filter(Boolean);
     }
     if (turn.images) out.images = Number(turn.images) || 0;
+    // Un messaggio partito da un suggerimento della home l'ha scritto un modello: riaperta, non è voce dell'utente (#810).
+    if (role === 'user' && turn.daModello) out.daModello = true;
     // Da dove venivano i segreti che una frase di Filo ripete, o il testo stesso se l'ha scritto un comando (#810):
     // riaperta, la chat li tratta ancora da letti. Regole: src/shared/urlExfil.js (lettiNelTesto).
     if (role === 'filo') {

@@ -729,6 +729,15 @@
     return history.filter((h) => h && h.kind === 'real' && !h.daScelta).map((h) => String(h.content || ''));
   }
 
+  // La frase della porta delle uscite se il testo per un campo della pagina porterebbe fuori un segreto, se no ''.
+  async function campoFermato(testo) {
+    if (!String(testo || '').trim()) return '';
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.CONTROLLA_CAMPO, testo: String(testo), parole: paroleUtente() });
+      return r && r.blocca ? String(r.frase || '') : '';
+    } catch (_) { return ''; }
+  }
+
   async function runFiloAction(action, { etichetta = '' } = {}) {
     const label = etichetta || filoActionLabel(action);
     if (action && String(action.type || '').toUpperCase() === 'NAVIGA' && !action._callId) {
@@ -1269,12 +1278,19 @@
           const onAct = parsed.status === 'continue'
             ? () => onUserAction(parsed.highlight)
             : null;
-          Highlight.show(parsed.highlight.selector, {
-            note: parsed.highlight.note || '',
-            action: parsed.highlight.action,
-            value: parsed.highlight.value,
-            onAction: onAct,
-          });
+          // Il testo proposto per un campo esce verso il sito: prima passa dalla porta delle uscite (#810).
+          const fermo = act === 'fill' ? await campoFermato(parsed.highlight.value) : '';
+          if (fermo) {
+            fermata(fermo);
+            parsed.highlight = null;
+          } else {
+            Highlight.show(parsed.highlight.selector, {
+              note: parsed.highlight.note || '',
+              action: parsed.highlight.action,
+              value: parsed.highlight.value,
+              onAction: onAct,
+            });
+          }
         }
       }
 

@@ -346,10 +346,19 @@
     APRI_FILE: 'non ho preparato il collegamento',
   });
 
-  // Il bottone «apri file» porta fuori solo quando punta a un indirizzo, non a un file del computer.
+  // Le uscite che non sono azioni del registro: il testo che l'assistente di pagina scrive in un campo.
+  const USCITE_PAGINA = Object.freeze({
+    CAMPO_PAGINA: 'non ho scritto nel campo',
+  });
+  const verboUscita = (tipo) => USCITE[tipo] || USCITE_PAGINA[tipo] || '';
+
+  // Il bottone «apri file» porta fuori solo quando punta a un indirizzo, non a un file del computer. Conta ogni
+  // campo dove il bottone può trovarlo: un percorso vuoto non deve nascondere l'indirizzo nel campo accanto.
   function puntaFuori(action) {
-    const meta = String(action.percorso ?? action.path ?? action.url ?? '').trim().match(/^([a-z][a-z0-9+.-]*):/i);
-    return !!meta && meta[1].length > 1 && meta[1].toLowerCase() !== 'file';
+    return [action.percorso, action.path, action.url].some((v) => {
+      const meta = String(v ?? '').trim().match(/^([a-z][a-z0-9+.-]*):/i);
+      return !!meta && meta[1].length > 1 && meta[1].toLowerCase() !== 'file';
+    });
   }
 
   // Cosa conteneva, per la riga che legge l'utente: mai il segreto stesso.
@@ -448,7 +457,7 @@
     segreti = [], azioni = [], pagina = null, letti = [], parole = '', memoria = '', daPagina = false,
   } = {}) {
     const tipo = String((action && action.type) || '').toUpperCase();
-    const verbo = USCITE[tipo];
+    const verbo = verboUscita(tipo);
     const niente = { blocca: false, exfil: false, frase: '', reason: '' };
     if (!verbo || (tipo === 'APRI_FILE' && !puntaFuori(action))) return niente;
     const G = global.SN_GUARDIANO_STATICO;
@@ -530,7 +539,7 @@
   }
 
   global.SN_URL_EXFIL = {
-    assess, valutaNaviga, valutaRicerca, contestoDaAzioni, valutaUscita, testoUscente, lettiNelTesto, USCITE,
+    assess, valutaNaviga, valutaRicerca, contestoDaAzioni, valutaUscita, testoUscente, lettiNelTesto, USCITE, USCITE_PAGINA, verboUscita,
     taint, taintLetto, taintTestoLetto, structural, exposedAlnum, corpusTokens,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
