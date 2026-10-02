@@ -79,7 +79,7 @@ test('dai Ricevuti: «💻 Lavoro locale» lo porta nei Lavori locali col sì de
   await expect(page.locator('#mgPreapprovedInfo')).toContainText('si fonde senza chiedere');
   const segno = page.locator('#mgLocalBtn');
   await expect(segno).toBeVisible();
-  await expect(segno).toHaveAttribute('title', /Approvato come lavoro locale da .*togliere il segno toglie anche/);
+  await expect(segno).toHaveAttribute('title', /Approvato come lavoro locale da .*se ne va anche l'approvazione/);
 
   // Se si può mettere si può togliere: il segno se ne va col sì.
   await segno.click();

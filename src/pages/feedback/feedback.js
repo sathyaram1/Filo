@@ -779,7 +779,7 @@
   // dashboard di gestione legge la stessa tabella, quindi sulla stessa
   // segnalazione le due pagine offrono le stesse azioni per costruzione. Qui
   // resta solo il MODO di disegnarle (pulsanti dentro la scheda).
-  const TITOLO_LAVORO_LOCALE = 'Lo approvi come lavoro locale: nessuna routine lo prende e una sessione lo chiude senza chiederti la fusione.';
+  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro locale. Nessuna routine lo prende, lo chiude una sessione e la fusione non aspetta il tuo sì.';
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';

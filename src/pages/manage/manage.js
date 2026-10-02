@@ -1795,7 +1795,7 @@
     if (num) {
       voci.push({
         testo: `Copia #${num}`,
-        // Solo le pratiche tue o di una sessione si legano a un lavoro locale: per le altre il numero serve a parlarne.
+        // Solo le pratiche tue, di una sessione o approvate da te si legano a un lavoro locale: per le altre il numero serve a parlarne.
         titolo: MR.isLocalWorkSender(fb) ? 'Il numero con cui parlarne, anche a npm run finish -- --feedback' : 'Il numero con cui parlarne',
         azione: () => { navigator.clipboard.writeText(`#${num}`).then(() => setManageMsg(`#${num} copiato.`, 'ok'), () => {}); },
       });
@@ -2198,7 +2198,7 @@
       ? 'Era un lavoro locale: per questo non sta nella bacheca pubblica.'
       : 'Solo lavoro locale: nessuna routine la prende.';
     const a = MR.isLocalApproved(fb) ? fb.localApproval : null;
-    const si = a ? ` Approvato come lavoro locale da ${chiHaMessoIlSegno(a.by)}${Number(a.at) > 0 ? ` il ${formatDateTime(new Date(Number(a.at)).toISOString())}` : ''}: togliere il segno toglie anche l'approvazione.` : '';
+    const si = a ? ` Approvato come lavoro locale da ${chiHaMessoIlSegno(a.by)}${Number(a.at) > 0 ? ` il ${formatDateTime(new Date(Number(a.at)).toISOString())}` : ''}. Se togli il segno se ne va anche l'approvazione.` : '';
     return `${cosa} Segno messo da ${chiHaMessoIlSegno(m.by)}${quando}.${si}`;
   }
   // Una sessione firma il segno col suo mittente (`local:claude`), l'owner con l'email: il mittente si legge come in testata.
@@ -2869,12 +2869,12 @@
 
   // ── «Solo in locale» (#908) ───────────────────────────────────────────────
   // Il tasto c'è dove il segno si può mettere (owner o sessione con la prova; su una pratica chiusa
-  // dice che era un lavoro locale e la toglie dalla bacheca) o togliere; sui feedback degli utenti no.
+  // dice che era un lavoro locale e la toglie dalla bacheca) o togliere; sui feedback degli utenti solo col sì dell'owner (#913).
   function localToggleOffered(fb) {
     return MR.isLocalOnly(fb) || MR.isProvenLocalSender(fb) || MR.isLocalApproved(fb);
   }
   // #913: il feedback di un utente o di una routine diventa lavoro locale col sì dell'owner, che ne ha letto il testo.
-  const TITOLO_LAVORO_LOCALE = 'Lo approvi come lavoro locale: va nei Lavori locali, nessuna routine lo prende e una sessione lo chiude senza chiederti la fusione.';
+  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro locale. Nessuna routine lo prende, lo chiude una sessione e la fusione non aspetta il tuo sì.';
   // Stesso avviso di «È mio»: il sì vale anche alla fusione, quindi un segnalato si guarda prima.
   function titoloLavoroLocale(fb) {
     const c = MR.localApprovalCheck(fb, { releasedVersion, fusioni });
@@ -3215,7 +3215,7 @@
       updateTabCounts();
       if (action.locale) {
         const num = FB.formatNum(fb.seq, fb.subSeq);
-        toast(`Approvato come lavoro locale${num ? ` (#${num})` : ''}: lo trovi nei Lavori locali, e nessuna routine lo prende.`, 'ok');
+        toast(`${num ? `#${num}` : 'Il feedback'} è nei Lavori locali. Nessuna routine lo prende.`, 'ok');
       }
       // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
