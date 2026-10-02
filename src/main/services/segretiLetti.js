@@ -92,12 +92,15 @@ let deposito;
 let caricato = false;
 let inAttesa = null;
 
+function salvaOra() {
+  if (inAttesa) { clearTimeout(inAttesa); inAttesa = null; }
+  if (!deposito) return;
+  try { deposito.scrivi(JSON.stringify(letti.esporta())); } catch (e) { console.warn('[Filo] segreti letti non salvati', e?.message || e); }
+}
+
 function salvaPresto() {
   if (inAttesa || !deposito) return;
-  inAttesa = setTimeout(() => {
-    inAttesa = null;
-    try { deposito.scrivi(JSON.stringify(letti.esporta())); } catch (e) { console.warn('[Filo] segreti letti non salvati', e?.message || e); }
-  }, 300);
+  inAttesa = setTimeout(salvaOra, 300);
   if (typeof inAttesa.unref === 'function') inAttesa.unref();
 }
 
