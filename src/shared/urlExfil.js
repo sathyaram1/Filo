@@ -454,7 +454,7 @@
   // Un codice si cerca coi confini («4821» non sta dentro «348215»); `largo`, per ciò che esce, regge i
   // travestimenti («4.8.2.9.1.3», «?a=482&b=913», al contrario). Le parole dell'utente restano strette.
   function esce(valore, regola, u, largo = false) {
-    const v = String(valore || '');
+    const v = formaBase(valore);
     if (regola === 'codice' || regola === 'password') {
       const chars = v.replace(/[^A-Za-z0-9]/g, '');
       if (chars.length < 4) return false;
