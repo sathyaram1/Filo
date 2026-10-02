@@ -1326,6 +1326,29 @@ async function controllaUscita(action, { sender = null, contesto = null, parole 
   });
 }
 
+// Un indirizzo che una pagina di Filo apre o passa al sistema l'ha scelto quasi sempre un modello (#810): passa dalla
+// porta qualunque gesto l'abbia chiesto (clic, menu del tasto destro, posta). Fermato, la pagina lo dice se `avvisa`.
+const SCHEMI_USCITA = /^(?:https?|mailto|tel|sms):/i;
+async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true } = {}) {
+  const indirizzo = String(url || '').trim();
+  let pagina = '';
+  try { pagina = wc && !wc.isDestroyed?.() ? String(wc.getURL() || '') : ''; } catch (_) { pagina = ''; }
+  let u = { blocca: false };
+  try {
+    u = await controllaUscita({ type: 'NAVIGA', url: indirizzo }, { sender: wc ? { wc, url: pagina } : null, parole });
+  } catch (e) {
+    console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e);
+  }
+  if (u.blocca) {
+    if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase });
+    return { aperto: false, frase: u.frase };
+  }
+  if (typeof apri === 'function') apri();
+  return { aperto: true };
+}
+// tabs.js non vede i gestori: le aperture delle pagine di Filo (window.open, link con target) arrivano da qui.
+globalThis.SN_USCITA_DA_FILO = (url, wc, apri) => (SCHEMI_USCITA.test(String(url || '')) ? apriDaFilo(url, { wc, apri }) : (apri(), Promise.resolve({ aperto: true })));
+
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in
 // questo turno, turni passati compresi: servono all'anti-esfiltrazione di NAVIGA.
 // `parole` = ciò che l'utente ha scritto in chat: un codice scritto da lui può uscire.
