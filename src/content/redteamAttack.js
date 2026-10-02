@@ -164,7 +164,7 @@
     const onInput = () => {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(saveDraft, 250);
-      refreshSendState();
+      refreshSendState({ daInput: true });
     };
     attackEl.addEventListener('input', onInput);
     descEl.addEventListener('input', onInput);
