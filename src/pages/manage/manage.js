@@ -2950,7 +2950,6 @@
       const r = await sendToMain({ type: 'feedback_update', id, localOnly: valore });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.localOnly = valore ? { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() } : undefined;
-      if (!valore) fb.localApproval = undefined;
       if (selectedId === id) { reflectLocal(fb); reflectPreapproved(fb); }
       renderList();
       const dove = MR.manageTabFor(fb, { releasedVersion, fusioni });
