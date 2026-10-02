@@ -124,6 +124,7 @@ module.exports = {
   visibile,
   aggiorna,
   assicura,
+  rileggiOra: () => rileggi(),
   impostaApertoATutti,
   suCambio,
   accessoCambiato,

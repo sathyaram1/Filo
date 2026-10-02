@@ -176,8 +176,7 @@ module.exports = function register(on, ctx) {
   // L'interruttore di Gestione: lettura fresca e scrittura, solo all'owner e solo da Filo.
   on(MSG.REDTEAM_OPEN_GET, soloFilo(async () => {
     if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
-    await Gate.aggiorna({ forza: true });
-    const s = await Gate.assicura();
+    const s = await Gate.rileggiOra();
     return { ok: true, openToAll: s.openToAll, letto: s.letto };
   }));
 
