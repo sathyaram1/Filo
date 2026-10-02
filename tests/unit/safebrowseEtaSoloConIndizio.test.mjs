@@ -156,3 +156,31 @@ test('crt.sh: oltre il tetto di dimensione «non si sa», a tempo scaduto «non 
     globalThis.fetch = realFetch;
   }
 });
+
+test('login su un sito vecchio: prima l\'età, e senza più indizi niente giudizio AI né finestra isolata', async () => {
+  SB.setProviders({
+    rdap: async (r) => { conta.rdap.push(r); await new Promise((ok) => setTimeout(ok, 5)); return 4000; },
+    llm: async (m) => { conta.llm.push(m); return { suspicious: false, reason: null }; },
+    sandbox: async (u) => { conta.sandbox.push(u); return { verdict: 'clean', finalUrl: u, redirects: [] }; },
+  });
+  await analizza('https://forum-cucina-italiana.com/login', { hasPassword: true });
+  await analizza('https://forum-cucina-italiana.com/login', { hasPassword: true });
+  assert.equal(conta.rdap.length, 1);
+  assert.equal(conta.llm.length, 0);
+  assert.equal(conta.sandbox.length, 0);
+});
+
+test('il giudizio AI che parte dopo l\'età la riceve, e l\'avviso dell\'età arriva senza aspettarlo', async () => {
+  let libera;
+  const ferma = new Promise((ok) => { libera = ok; });
+  SB.setProviders({
+    rdap: async (r) => { conta.rdap.push(r); return 10; },
+    llm: async (m) => { conta.llm.push(m); await ferma; return { suspicious: false, reason: null }; },
+  });
+  const v = await new Promise((ok) => SB.analyze('https://negozio-scarpe-sconti.com/cassa', { hasPayment: true }, ok));
+  assert.equal(v.message.title, 'Dominio registrato da poco');
+  await new Promise((ok) => setTimeout(ok, 10));
+  assert.equal(conta.llm.length, 1);
+  assert.equal(Math.round(conta.llm[0].ageDays), 10);
+  libera();
+});
