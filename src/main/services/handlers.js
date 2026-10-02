@@ -901,7 +901,8 @@ async function maybeRunCompactor() {
 // safebrowse, cookie). È lo stesso percorso usato dal salvataggio dalla pagina
 // Preferenze: condividerlo garantisce che una modifica fatta da Filo via chat
 // si comporti esattamente come una fatta a mano (es. il tema cambia live).
-async function applySettingsUpdate(partial) {
+// `mentreScrive`: la lista dei bloccati arriva a metà riga, e le schede aperte aspettano che stia ferma (#590.2).
+async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   // Gli override dei token estetici finiscono dentro <style> iniettati in
   // tutte le superfici (incluse pagine web esterne): qui, nel choke point
   // delle scritture, teniamo solo i valori che passano la whitelist per tipo.
@@ -951,7 +952,7 @@ async function applySettingsUpdate(partial) {
   try { require('./siteBlock').configureFromSettings(merged); } catch (_) {}
   // Una scheda già aperta su un sito appena messo in lista si porta via subito (#590).
   try {
-    for (const w of BrowserWindow.getAllWindows()) w._filoTabs?.riapplicaListaBloccati?.();
+    for (const w of BrowserWindow.getAllWindows()) w._filoTabs?.riapplicaListaBloccati?.({ mentreScrive });
   } catch (_) {}
   try { require('./downloads').configureFromSettings(merged); } catch (_) {}
   return merged;

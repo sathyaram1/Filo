@@ -2315,6 +2315,8 @@
         mode: 'default',
         trustedSites: [],
         bannerSites: [],
+        // Il testo lasciato nella casella dei siti fidati che non è un dominio: torna lì con l'avviso.
+        bozza: '',
       },
       // Protezione anti-fingerprinting: rumore deterministico per-sito sui
       // segnali continui ad alta entropia (canvas 2D, WebGL, audio). Stessa
@@ -2349,6 +2351,9 @@
         enabled: true,
         useAdblockLists: true,
         blacklist: [],
+        // Righe scritte che non sono domini ({ riga, dopo }: dopo quanti domini validi stavano):
+        // non bloccano niente, restano per tornare al loro posto con l'avviso.
+        righeScartate: [],
       },
       // #588 — scaricamento di un file che il sistema ESEGUE (.exe, .dmg, .sh…
       // elenco in src/shared/eseguibili.js). Un programma arriva in cartella
@@ -2361,6 +2366,7 @@
       downloads: {
         confirmExecutables: true,
         trustedSites: [],
+        righeScartate: [],
       },
     },
     // Modalità terminale della dashboard: quando attiva, ogni comando con `/`
