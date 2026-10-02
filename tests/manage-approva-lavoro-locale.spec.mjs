@@ -79,14 +79,19 @@ test('dai Ricevuti: «💻 Lavoro locale» lo porta nei Lavori locali col sì de
   await expect(page.locator('#mgPreapprovedInfo')).toContainText('si fonde senza chiedere');
   const segno = page.locator('#mgLocalBtn');
   await expect(segno).toBeVisible();
-  await expect(segno).toHaveAttribute('title', /Approvato come lavoro locale da .*se ne va anche l'approvazione/);
+  await expect(segno).toHaveAttribute('title', /Approvato come lavoro locale da .*l'approvazione resta/);
 
-  // Se si può mettere si può togliere: il segno se ne va col sì.
+  // Se si può mettere si può togliere, e rimettere: il sì resta, e il segno torna senza passare dai Ricevuti.
   await segno.click();
   await expect(tabBtn(page, 'queue')).toHaveText('In coda (1)');
   const dopo = await page.evaluate(() => window.__updates);
   expect(dopo[1]).toEqual({ type: 'feedback_update', id: 'u-913', localOnly: false });
-  await expect(segno).toBeHidden();
+  await expect(segno).toBeVisible();
+  await expect(segno).toHaveAttribute('aria-pressed', 'false');
+  await segno.click();
+  await expect(tabBtn(page, 'local')).toHaveText('Lavori locali (1)');
+  const ancora = await page.evaluate(() => window.__updates);
+  expect(ancora[2]).toEqual({ type: 'feedback_update', id: 'u-913', localOnly: true });
 });
 
 test('su un feedback qualunque dei Ricevuti il tasto c’è, ma secondario; sui tuoi no', async ({ openTab }) => {
