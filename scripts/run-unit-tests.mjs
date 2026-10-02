@@ -75,14 +75,14 @@ export function gruppiDiLancio(files, { root = REPO_ROOT, flags = [], execPath =
 
 /**
  * I flag di un gruppo col reporter del riepilogo aggiunto su file, senza togliere a stdout quello che ci sarebbe
- * andato: dichiarare un reporter spegne quello predefinito (spec al terminale, tap altrove). `null` se i flag
- * dati appaiano reporter e destinazioni in numero diverso: lì non si sa a chi tocchi stdout. PURA.
+ * andato: dichiarare un reporter spegne quello predefinito (spec al terminale, tap altrove). `null` se nei flag
+ * dati reporter e destinazioni sono in numero diverso: lì non si sa a chi tocchi stdout. PURA.
  */
 export function flagsConRiepilogo(flags, destinazione, { tty = false } = {}) {
   const conta = (nome) => flags.filter((a) => a === nome || a.startsWith(`${nome}=`)).length;
   const reporter = conta('--test-reporter');
   const destinazioni = conta('--test-reporter-destination');
-  if (destinazioni > reporter || (destinazioni && destinazioni !== reporter)) return null;
+  if (destinazioni && destinazioni !== reporter) return null;
   const visibili = reporter
     ? [...flags, ...Array(reporter - destinazioni).fill('--test-reporter-destination=stdout')]
     : [`--test-reporter=${tty ? 'spec' : 'tap'}`, '--test-reporter-destination=stdout', ...flags];
@@ -114,20 +114,23 @@ export function sommaRiepiloghi(gruppi) {
 
 /** Le righe finali di una suite a gruppi: conti di tutti i gruppi, rossi uno per riga, verdetto. PURA. */
 export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false, root = REPO_ROOT }) {
+  // somma null: coi flag dati il reporter del riepilogo non si poteva aggiungere, restano i verdetti dei gruppi.
   const n = esiti.length;
   const rossiGruppi = esiti.map((e, i) => (e === 0 ? 0 : i + 1)).filter(Boolean);
-  const extra = [['annullati', somma.annullati], ['saltati', somma.saltati], ['da fare', somma.todo]]
+  const extra = !somma ? '' : [['annullati', somma.annullati], ['saltati', somma.saltati], ['da fare', somma.todo]]
     .filter(([, v]) => v).map(([k, v]) => `, ${v} ${k}`).join('');
-  const out = ['', `[test:unit] riepilogo di ${gruppi} gruppi, ${file} file: ${somma.test} test, ${somma.pass} passati, ${somma.fail} falliti${extra}.`];
-  if (somma.rossi.length) {
+  const out = ['', somma
+    ? `[test:unit] riepilogo di ${gruppi} gruppi, ${file} file: ${somma.test} test, ${somma.pass} passati, ${somma.fail} falliti${extra}.`
+    : `[test:unit] ${gruppi} gruppi, ${file} file: i conti e i test rossi sono nel riepilogo di ciascun gruppo, sopra.`];
+  if (somma && somma.rossi.length) {
     out.push(`[test:unit] test rossi (${somma.rossi.length}):`);
     for (const r of somma.rossi) {
       const dove = r.file ? `${perLaRiga(r.file, root)}${r.riga ? `:${r.riga}` : ''}` : '?';
       out.push(`  ✖ ${dove}  ${r.nome}  (gruppo ${r.gruppo})`);
     }
   }
-  const muti = rossiGruppi.filter((g) => !somma.rossi.some((r) => r.gruppo === g));
-  if (muti.length) out.push(`[test:unit] ${muti.length > 1 ? 'i gruppi' : 'il gruppo'} ${muti.join(', ')} è uscito rosso senza un test rosso registrato: la causa è nella sua uscita, sopra.`);
+  const muti = rossiGruppi.filter((g) => !somma || !somma.rossi.some((r) => r.gruppo === g));
+  if (somma && muti.length) out.push(`[test:unit] ${muti.length > 1 ? 'i gruppi' : 'il gruppo'} ${muti.join(', ')} è uscito rosso senza un test rosso registrato: la causa è nella sua uscita, sopra.`);
   if (interrotto) out.push(`[test:unit] interrotto al gruppo ${n} di ${gruppi}: i gruppi dopo non sono partiti.`);
   out.push(rossiGruppi.length || interrotto
     ? `[test:unit] ROSSO: ${rossiGruppi.length > 1 ? 'gruppi' : 'gruppo'} ${rossiGruppi.join(', ')} di ${gruppi}.`
@@ -207,7 +210,7 @@ async function main() {
       if (r.status === null) { esiti.push(1); interrotto = i + 1 < gruppi.length; break; }
       esiti.push(r.status);
     }
-    const somma = sommaRiepiloghi(esiti.map((_, i) => leggiRighe(destinazione(i))));
+    const somma = flagsGruppo(0) ? sommaRiepiloghi(esiti.map((_, i) => leggiRighe(destinazione(i)))) : null;
     await scrivi(testoRiepilogo({ somma, gruppi: gruppi.length, file: files.length, esiti, interrotto }));
     // `exitCode` e non `exit()`, come sopra: l'ultima riga non deve perdersi.
     process.exitCode = esiti.find((e) => e !== 0) ?? 0;
