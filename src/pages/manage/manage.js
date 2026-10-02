@@ -5209,7 +5209,7 @@
       out.push({ value: v, label: label && label !== v ? String(label) : '' });
     };
     if (smCatalog) for (const it of smCatalog) add(it && it.id, it && it.label);
-    else if (mgSmRegistryList) for (const el of mgSmRegistryList.querySelectorAll('.sn-model-id')) add(el.value, '');
+    else if (mgSmRegistryList) for (const el of mgSmRegistryList.querySelectorAll('.sn-model-id')) { if (el !== self) add(el.value, ''); }
     return out;
   }
 
