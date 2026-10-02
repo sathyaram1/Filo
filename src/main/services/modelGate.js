@@ -70,7 +70,10 @@
 
     // Nessun segreto custodito da Filo entra nel contesto di un modello (#810): quello che non
     // ha, il modello non lo può far uscire. Sentinella: tests/unit/usciteSegreti.test.mjs.
+    // Di qui passa anche tutto quello che da fuori arriva a un modello, qualunque strada abbia preso: i segreti che
+    // contiene diventano letti, e la porta delle uscite li ferma (#810).
     async function senzaSegreti(messages) {
+      try { ricordaEsterni(messages); } catch (_) {}
       const G = global.SN_GUARDIANO_STATICO;
       if (!G || typeof G.oscuraSegreti !== 'function') return messages;
       let lista = [];
