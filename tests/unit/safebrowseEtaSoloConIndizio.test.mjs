@@ -38,7 +38,7 @@ test('una pagina pulita non manda il nome del sito ai registri; con una password
   await analizza('https://forno-di-marco.com/chi-siamo', {});
   assert.deepEqual(conta.rdap, []);
   assert.deepEqual(conta.ct, []);
-  assert.equal(conta.gsb.length, 2, 'la lista nera resta consultata');
+  assert.equal(conta.gsb.length, 1, 'la lista nera resta consultata (e ricordata per il sito)');
 
   await analizza('https://forno-di-marco.com/accedi', { hasPassword: true });
   await analizza('https://forno-di-marco.com/accedi', { hasPassword: true });
@@ -80,7 +80,7 @@ test('con RDAP che dà l\'età crt.sh non viene chiamato', async () => {
   await analizza('https://banca-esempio.com/login', { hasPassword: true });
   assert.equal(conta.rdap.length, 1);
   assert.deepEqual(conta.ct, []);
-  assert.equal(SB.checkSync('https://banca-esempio.com/login', { hasPassword: true }).ageDays, 900);
+  assert.equal(SB._caches.ageCache.get('banca-esempio.com'), 900);
 });
 
 test('«non si sa» si ricorda un giorno; dopo un errore di rete si richiede solo passati pochi minuti', async () => {
