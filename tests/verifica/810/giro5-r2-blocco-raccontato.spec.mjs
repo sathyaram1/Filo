@@ -50,6 +50,7 @@ test('riaperta dalla Cronologia, la chat non racconta come aperta la pagina che 
   await openTab(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(id)}`);
   const riaperta = await newtab(app, 'filo://dashboard/dashboard.html?chat=');
   await expect(riaperta.locator('.dash-bubble-filo', { hasText: 'Fatto quello' })).toBeVisible({ timeout: 10_000 });
+  await expect(riaperta.locator('.dash-bubble-note[data-replay]').first()).toBeVisible({ timeout: 10_000 });
   const nota = (await riaperta.locator('.dash-bubble-note[data-replay]').allInnerTexts()).join(' | ');
   expect(nota, 'la chat riaperta dice di aver aperto la pagina fermata').not.toContain('aperto una pagina');
   expect(nota).toContain('fermato');
