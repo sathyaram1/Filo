@@ -62,15 +62,70 @@ export function perLaRiga(file, root = REPO_ROOT) {
   return r.split(sep).join('/');
 }
 
+// Da Node 21 `node --test` legge ogni argomento come un modello: un file con quadre o tonde nel nome non girava,
+// e l'esito restava verde. Node 20 (il runner della pubblicazione) li prende alla lettera.
+export const NODE_LEGGE_MODELLI = Number(process.versions.node.split('.')[0]) >= 21;
+
+/** Il nome preso alla lettera dal modello: ogni carattere speciale chiuso fra quadre. PURA. */
+export function allaLettera(arg) {
+  return String(arg).replace(/[[\]()*?]/g, (c) => `[${c}]`);
+}
+
+/** Le graffe con virgola o `..` si espandono prima di tutto e non c'è modo di chiuderle: quel nome va cambiato. PURA. */
+export function nomeNonLanciabile(arg) {
+  return /\{[^{}]*(?:,|\.\.)[^{}]*\}/.test(String(arg));
+}
+
 /** PURA. */
-export function fileArgs(files, root = REPO_ROOT) {
-  return files.map((f) => perLaRiga(f, root));
+export function fileArgs(files, root = REPO_ROOT, { modelli = NODE_LEGGE_MODELLI } = {}) {
+  return files.map((f) => (modelli ? allaLettera(perLaRiga(f, root)) : perLaRiga(f, root)));
 }
 
 /** I file di ogni `node --test`, a gruppi la cui riga intera (eseguibile e flag compresi) sta in `tetto`. PURA. */
-export function gruppiDiLancio(files, { root = REPO_ROOT, flags = [], execPath = process.execPath, tetto = TETTO_RIGA } = {}) {
+export function gruppiDiLancio(files, { root = REPO_ROOT, flags = [], execPath = process.execPath, tetto = TETTO_RIGA, modelli = NODE_LEGGE_MODELLI } = {}) {
   const fisso = [execPath, '--test', ...flags].reduce((n, a) => n + costoArgomentoWindows(a), 0);
-  return lottiPerRigaDiComando(fileArgs(files, root), tetto, { fisso, costo: costoArgomentoWindows });
+  return lottiPerRigaDiComando(fileArgs(files, root, { modelli }), tetto, { fisso, costo: costoArgomentoWindows });
+}
+
+const DESTINAZIONE = '--test-reporter-destination';
+
+/**
+ * Ogni destinazione su file dei flag dati sostituita da `copia(k)`: a gruppi ogni `node --test` riscriverebbe da capo
+ * lo stesso file e resterebbe solo l'ultimo gruppo. `file` sono le destinazioni chieste, nell'ordine. PURA.
+ */
+export function destinazioniSuFile(flags, copia) {
+  const out = [];
+  const file = [];
+  for (let i = 0; i < flags.length; i++) {
+    const a = flags[i];
+    const unito = a.startsWith(`${DESTINAZIONE}=`);
+    if (!unito && !(a === DESTINAZIONE && i + 1 < flags.length)) { out.push(a); continue; }
+    const valore = unito ? a.slice(DESTINAZIONE.length + 1) : flags[++i];
+    if (valore === 'stdout' || valore === 'stderr') { out.push(`${DESTINAZIONE}=${valore}`); continue; }
+    out.push(`${DESTINAZIONE}=${copia(file.length)}`);
+    file.push(valore);
+  }
+  return { flags: out, file };
+}
+
+/** I rapporti dei gruppi in uno: dei junit resta un documento solo, gli altri formati si accodano. PURA. */
+export function unisciRapporti(testi) {
+  const junit = /^\s*(<\?xml[^>]*\?>)\s*<testsuites>([\s\S]*)<\/testsuites>\s*$/;
+  const parti = testi.map((t) => String(t).match(junit));
+  if (parti.length && parti.every(Boolean)) {
+    return `${parti[0][1]}\n<testsuites>${parti.map((p) => p[2]).join('')}</testsuites>\n`;
+  }
+  return testi.join('');
+}
+
+/** `--watch` (anche `--watch-path`): il primo gruppo non finirebbe mai e gli altri non partirebbero. PURA. */
+export function chiedeWatch(flags) {
+  return flags.some((a) => a === '--watch' || a.startsWith('--watch=') || a.startsWith('--watch-path'));
+}
+
+/** La copertura si calcola per processo: a gruppi ne esce una per gruppo. PURA. */
+export function chiedeCopertura(flags) {
+  return flags.some((a) => a === '--experimental-test-coverage' || a.startsWith('--test-coverage'));
 }
 
 /**
