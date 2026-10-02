@@ -863,15 +863,17 @@ module.exports = function register(on, ctx) {
     // La lettura COMPLETA (#496): la chiede la scheda delle statistiche, che
     // fa domande sull'INSIEME («quanti ne sono arrivati in tutto»), e a una
     // domanda sull'insieme una finestra sui più recenti risponde sbagliato in
-    // silenzio (patterns/una-pagina-dei-piu-recenti-non-e-tutto.md). Qui non
-    // si riuniscono i campi delle schede pubbliche (voti e simili: non
-    // servono a un conteggio, e costerebbero una seconda lettura di tutto) e
-    // non si fa partire la sincronizzazione della vista, che è mestiere del
-    // caricamento della dashboard. `complete` viaggia con le righe: se il
-    // freno sulle pagine è scattato, chi guarda deve poterlo dire.
+    // silenzio (patterns/una-pagina-dei-piu-recenti-non-e-tutto.md). La
+    // statistica non vuole i campi delle schede pubbliche né la
+    // sincronizzazione della vista; il caricamento della dashboard sì
+    // (`comeLista`), come dalla `list` qui sotto. `complete` viaggia con le
+    // righe: se il freno sulle pagine è scattato, chi guarda deve poterlo dire.
     if (op === 'listAll') {
-      const { rows, complete } = await FB.listAllPaged({ timeoutMs, idToken });
-      return { ok: true, rows, complete };
+      const campi = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
+      const { rows, complete } = await FB.listAllPaged({ timeoutMs, idToken, fields: campi });
+      if (!msg.comeLista) return { ok: true, rows, complete };
+      scheduleViewSync({ rows });
+      return { ok: true, rows: await mergeCardFields(rows), complete };
     }
     if (op !== 'list' && op !== 'versions') return { ok: false, error: `lettura non prevista: ${op}` };
 
