@@ -2134,6 +2134,7 @@
     listAll,
     listAllPaged,
     listVersions,
+    listAllVersions,
     getMany,
     // #583 — la vista pubblica: l'unica lettura dei feedback che non chiede
     // credenziali. Ci sono dentro i soli campi pubblici dei feedback chiusi.
