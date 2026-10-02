@@ -36,11 +36,9 @@ test('pagina gemella: bolla per ogni mittente', async ({ openTab }) => {
   for (const tab of ['local', 'inbox', 'queue']) {
     await page.evaluate((t) => window.__fbTest.setTab(t), tab);
     await page.waitForTimeout(300);
-    out[tab] = await page.evaluate(() => Array.from(document.querySelectorAll('.fb-item, .fb-card, [data-id]')).map((el) => ({
-      id: el.dataset.id || '', head: (el.querySelector('.fb-title') || {}).textContent || '',
-      who: Array.from(el.querySelectorAll('.fb-bubble-who')).map((w) => w.textContent.trim()),
-      sender: Array.from(el.querySelectorAll('[class*=sender], [class*=author], [class*=origin]')).map((w) => w.textContent.trim()).filter(Boolean).slice(0, 3),
-    })));
+    out[tab] = await page.evaluate(() => Array.from(document.querySelectorAll('.fb-card')).map((el) => el.innerText.replace(/\s+/g, ' ').slice(0, 400)));
   }
   console.log(JSON.stringify(out, null, 1));
+  await page.evaluate(() => window.__fbTest.setTab('local'));
+  await page.screenshot({ path: 'tests/.shots/giro9-gemella-local.png', fullPage: true });
 });
