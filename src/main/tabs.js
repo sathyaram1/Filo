@@ -2865,10 +2865,7 @@ class TabManager {
       let grezzo = '';
       try { grezzo = tab.view.webContents.getURL() || ''; } catch (_) { continue; }
       if (NE.isBlockedPageUrl(grezzo)) {
-        const target = NE.targetOf(grezzo);
-        if (target && tab._pagineBloccate && !this._decisioneBlocco(tab, target)) {
-          try { tab.view.webContents.loadURL(target); } catch (_) {}
-        }
+        if (this._daRiaprire(tab)) this._riapriQuandoTiene(tab);
         continue;
       }
       // Anche una pagina d'errore di rete: per l'utente la scheda sta sul sito che non si è aperto.
