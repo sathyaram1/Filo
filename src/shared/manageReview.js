@@ -149,6 +149,7 @@
     // — spesso perché l'identità era stata flaggata per errore. NON è un blocco:
     // è "da ri-giudicare" (bianco). Va prima dei controlli di blocco identità.
     if (p && trusted && verdicts.length === 0 && judgeable) {
+      if (judgesSkippedText(fb)) return null;
       return { reason: 'unfiltered', ...REASONS.unfiltered };
     }
 
