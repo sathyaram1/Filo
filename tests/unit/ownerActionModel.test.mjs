@@ -77,6 +77,9 @@ test('l\'editor mostra la catena in uso negli slot spostati mai salvati, e non t
   assert.equal(fillMovedSlots({ manageSearch: '' }, EFFECTIVE).manageSearch, '');
   assert.equal(fillMovedSlots({ manageSearch: 'nuovo' }, EFFECTIVE).manageSearch, 'nuovo');
   assert.equal(fillMovedSlots({ manageSearch: null }, null).manageSearch, '');
+  // Solo quelli riempiti sono una lettura, non una scelta: l'editor non li riscrive se non cambiano.
+  assert.deepEqual(mai.movedUnset, ['manageSearch']);
+  assert.deepEqual(fillMovedSlots({ manageSearch: '' }, EFFECTIVE).movedUnset, []);
 });
 
 test('lo store distingue lo slot mai scritto (null) da quello svuotato (\'\')', async () => {
