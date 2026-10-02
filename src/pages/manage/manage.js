@@ -186,6 +186,7 @@
   let confirmedOnly = false;    // filtro "Bloccati confermati" (attack/spam confermati)
   let releasedVersion = '';     // versione dell'app in esecuzione = ultima rilasciata (DB3)
   let firstListPromise = null;  // prima lettura della lista, avviata da init PRIMA del resto
+  let listaIncompleta = false;  // la lettura completa si è fermata al freno: i numeri sono minimi
   let testDataInjected = false; // uno spec ha iniettato la lista: il caricamento vero non la tocca più
   let searchMode    = false;      // true = la lista mostra i risultati di ricerca
   let searchSeq     = 0;          // guardia anti-race tra ricerche concorrenti
@@ -1832,10 +1833,10 @@
   // confermati"), altrimenti direbbe un numero diverso da quello che si vede.
   // Finché i feedback non sono arrivati (caricamento in corso, o fallito) non
   // si scrive nessun numero: uno "(0)" là dove il dato manca è un numero falso.
-  // Il caricamento si ferma ai 500 più recenti: quando li tocca tutti, i numeri
-  // diventano "(24+)" — sono minimi, non totali — e l'hover dice perché.
+  // Il caricamento legge TUTTI i feedback (patterns/una-pagina-dei-piu-recenti-non-e-tutto.md):
+  // il "(24+)" resta solo se la lettura si è fermata al freno, e l'hover dice perché.
   function loadHitCap() {
-    return FB.listHitCap(allFeedbacks, FB.LIST_PAGE_SIZE);
+    return listaIncompleta;
   }
 
   // ── Quando lo stato non si legge, le sezioni non si disegnano ─────────────
@@ -1899,7 +1900,7 @@
     mgListHead.textContent = (n === null || n === undefined)
       ? label
       : `${label} ${countText(n)}`;
-    if (n !== null && n !== undefined && loadHitCap()) mgListHead.title = FB.COUNT_CAP_HINT;
+    if (n !== null && n !== undefined && loadHitCap()) mgListHead.title = FB.COUNT_INCOMPLETE_HINT;
     else mgListHead.removeAttribute('title');
     aggiornaSegnoFerma();
   }
@@ -1923,7 +1924,7 @@
       if (!btn) continue;
       btn.classList.toggle('mg-tab--arrivi', conArrivi.has(tab));
       btn.textContent = counts ? `${TAB_LABELS[tab] || tab} ` : (TAB_LABELS[tab] || tab);
-      if (capped) btn.title = FB.COUNT_CAP_HINT;
+      if (capped) btn.title = FB.COUNT_INCOMPLETE_HINT;
       else btn.removeAttribute('title');
       if (!counts) continue;
       const badge = document.createElement('span');
@@ -2016,7 +2017,7 @@
     // Col caricamento al tetto una sezione "vuota" può non esserlo davvero: i
     // feedback più vecchi non sono qui. Il vuoto lo dice, invece di negarli.
     if (loadHitCap() && dataLoaded) {
-      mgListEmpty.textContent = `${mgListEmpty.textContent} ${FB.COUNT_CAP_HINT}`;
+      mgListEmpty.textContent = `${mgListEmpty.textContent} ${FB.COUNT_INCOMPLETE_HINT}`;
     }
 
     // Barra "Ri-valuta i non filtrati": compare solo nei Ricevuti quando c'è
@@ -2483,7 +2484,7 @@
       mgList.hidden = true;
       mgListEmpty.hidden = false;
       mgListEmpty.textContent = 'Nessun feedback pertinente.'
-        + (loadHitCap() ? ` ${FB.COUNT_CAP_HINT}` : '');
+        + (loadHitCap() ? ` ${FB.COUNT_INCOMPLETE_HINT}` : '');
     };
 
     if (!results.length) {
@@ -4336,19 +4337,19 @@
     if (testDataInjected) return;
 
     try {
-      // Il tetto viene dal modulo condiviso: `loadHitCap()` confronta contro
-      // QUELLO, e due numeri scritti a mano prima o poi divergono.
       // La prima lettura parte all'apertura della pagina (init), PRIMA delle
       // altre letture di avvio: qui la si aspetta soltanto. Le volte dopo
       // (ricaricamento dopo un errore) si legge da capo.
       const pending = firstListPromise;
       firstListPromise = null;
-      const fresh = await (pending || FB.list({ pageSize: FB.LIST_PAGE_SIZE, fields: FB.CAMPI_LISTA }));
+      const letti = await (pending || leggiTutti());
       // Nel frattempo uno spec ha iniettato dati finti? Quelli vincono: la
       // lista vera arrivata dopo non li sovrascrive (era una gara persa a caso,
       // e più il caricamento è veloce più spesso la si perdeva).
       if (testDataInjected) return;
-      allFeedbacks = fresh;
+      allFeedbacks = LIVE ? LIVE.ordina(letti.rows) : letti.rows;
+      listaIncompleta = letti.complete === false;
+      liveCompletoAt = Date.now();
       dataLoaded = true;
       loadFailed = false;
       fondiPreapprovateInAttesa();
@@ -4403,6 +4404,12 @@
     }
   }
 
+  // Tutti i feedback, non i più recenti: una sezione che ne mostra solo una
+  // finestra nasconde i vecchi rimasti lì (il #597 fra i Ricevuti).
+  function leggiTutti() {
+    return FB.listAllPaged({ fields: FB.CAMPI_LISTA, comeLista: true });
+  }
+
   // ── Aggiornamento continuo ────────────────────────────────────────────────
   // Versioni → soli documenti cambiati → fusione, e solo mentre qualcuno
   // guarda: patterns/dati-che-cambiano-altrove-cloud-si-chiede-la-versione.md.
@@ -4410,6 +4417,7 @@
   // Sorgenti sostituibili dagli spec (che non hanno Firestore).
   const liveSources = {
     listVersions: (o) => FB.listVersions(o),
+    listAllVersions: (o) => FB.listAllVersions(o),
     // Il giro dal vivo rilegge le RIGHE: stessa proiezione del caricamento.
     getMany: (ids) => FB.getMany(ids, { fields: FB.CAMPI_LISTA, timeoutMs: 20000 }),
     // Il documento intero, per il feedback che l'owner ha aperto. Col tempo
@@ -4425,11 +4433,12 @@
   let liveGen     = 0;      // un giro abbandonato perché appeso non scrive più sulla lista
   let liveLastAt  = 0;      // ultimo giro tentato
   let liveOkAt    = 0;      // ultimo giro riuscito
+  let liveCompletoAt = 0;   // ultimo giro lungo (versioni di tutti, non della finestra)
   let inVista     = true;   // lo dice il main: in una scheda `document.hidden` non cambia mai
   // Le soglie vengono dal modulo; gli spec le accorciano per non aspettare minuti.
   const liveTempi = LIVE
-    ? { pollMs: LIVE.POLL_MS, rientroMs: LIVE.RIENTRO_MIN_MS, clockMs: LIVE.CLOCK_MS }
-    : { pollMs: 60000, rientroMs: 15000, clockMs: 5000 };
+    ? { pollMs: LIVE.POLL_MS, rientroMs: LIVE.RIENTRO_MIN_MS, clockMs: LIVE.CLOCK_MS, completoMs: LIVE.GIRO_COMPLETO_MS }
+    : { pollMs: 60000, rientroMs: 15000, clockMs: 5000, completoMs: 600000 };
   // Arrivate in una sezione mentre la pagina era aperta: con un ordinamento a
   // scelta possono finire a metà lista, e senza un segno l'arrivo non si vede.
   const arrivate = new Set();
@@ -4609,12 +4618,28 @@
     const gen = ++liveGen;
     liveTickDa = Date.now();
     liveTick = (async () => {
-      const remote = await liveSources.listVersions({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
+      // Ogni minuto la finestra dei più recenti; ogni tanto tutti, perché anche
+      // un feedback vecchio cambia (una routine lo prende in carico).
+      const completo = Date.now() - liveCompletoAt >= (liveTempi.completoMs || 0);
+      let remote;
+      let parziale = false;
+      if (completo) {
+        // Segnato prima: un giro lungo che fallisce riprova fra dieci minuti, e
+        // intanto la finestra continua a girare ogni minuto.
+        liveCompletoAt = Date.now();
+        const r = await liveSources.listAllVersions({ timeoutMs: 30000 });
+        remote = r && r.rows;
+        parziale = !!(r && r.complete === false);
+      } else {
+        remote = await liveSources.listVersions({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
+      }
       if (gen !== liveGen) return { changed: 0 };
       // Una risposta che non è un elenco non è "tutto sparito": è un guasto,
       // e un guasto lascia la lista com'è.
       if (!Array.isArray(remote)) throw new Error('versioni non lette');
-      const { changed, added, removed } = LIVE.diffVersions(allFeedbacks, remote);
+      const { changed, added, removed } = LIVE.diffVersions(allFeedbacks, remote, {
+        finestra: completo ? 0 : FB.LIST_PAGE_SIZE, parziale,
+      });
       const ids = changed.concat(added);
       if (ids.length === 0 && removed.length === 0) {
         // Niente di nuovo, ma una scheda sparita in un giro precedente (tenuta
@@ -4737,6 +4762,8 @@
       testDataInjected = true;
       arrivate.clear();
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
+      listaIncompleta = !!(opts && opts.incompleta);
+      liveCompletoAt = Date.now();
       dataLoaded = true;
       loadFailed = false;
       reindexByClient();
@@ -4776,7 +4803,16 @@
     // Un giro di ridisegno da aggiornamento remoto, su richiesta: i test lo
     // usano per verificare che una bozza in corso lo trattenga (ritorna false).
     rerenderIfIdle(id) { return rerenderAfterLive(new Set([id])); },
-    setLiveSources(src) { Object.assign(liveSources, src || {}); },
+    // Chi finge solo la finestra la finge anche per il giro lungo: una
+    // sorgente vera dietro uno spec andrebbe su Firestore.
+    setLiveSources(src) {
+      const s2 = { ...(src || {}) };
+      if (s2.listVersions && !s2.listAllVersions) {
+        const fin = s2.listVersions;
+        s2.listAllVersions = async (o) => ({ rows: await fin(o), complete: true });
+      }
+      Object.assign(liveSources, s2);
+    },
     isLiveOn() { return liveEnabled; },
     setAdmin(v) { setIsAdmin(!!v); applyAutoModeGate(); },
     // Ri-legge i contatori del verificatore dalla fonte (IPC) — per i test.
@@ -5371,7 +5407,7 @@
     if (fsRipiego) {
       righe.push(fsErrore
         ? fsErrore
-        : `Non è riuscita la lettura di tutte le segnalazioni: qui sotto ci sono solo le ${FB.LIST_PAGE_SIZE} più recenti già in pagina, quindi i numeri sono minimi, non totali.`);
+        : 'Non è riuscita la lettura di tutte le segnalazioni: qui sotto ci sono solo quelle già in pagina, quindi i numeri sono minimi, non totali.');
     } else if (!fsCompleto) {
       righe.push('La lettura delle segnalazioni si è fermata prima della fine: i numeri sulle segnalazioni sono minimi, non totali.');
     }
@@ -6692,7 +6728,7 @@
     // La lista è la cosa più lenta (secondi di rete): parte SUBITO, e le altre
     // letture di avvio girano mentre viaggia, invece di metterlesi davanti in
     // fila. loadData la aspetta; un errore lo raccoglie lì, non qui.
-    firstListPromise = FB.list({ pageSize: FB.LIST_PAGE_SIZE, fields: FB.CAMPI_LISTA });
+    firstListPromise = leggiTutti();
     firstListPromise.catch(() => {});
     injectSearchIcons();
     await loadLayout();

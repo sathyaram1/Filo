@@ -42,6 +42,49 @@ test('diffVersions: senza versione locale il documento va riletto', () => {
   assert.deepEqual(d.changed, ['a']);
 });
 
+// La dashboard tiene TUTTI i feedback, ma ogni minuto rilegge solo la finestra
+// dei più recenti: chi è più vecchio del bordo non è sparito, è fuori.
+test('diffVersions: con la finestra piena i più vecchi del bordo restano', () => {
+  const local = [
+    { _id: 'nuovo', _updateTime: 't1', createdAt: '2026-10-01T10:00:00Z' },
+    { _id: 'bordo', _updateTime: 't1', createdAt: '2026-09-30T10:00:00Z' },
+    { _id: 'cancellato', _updateTime: 't1', createdAt: '2026-09-30T12:00:00Z' },
+    { _id: 'f597', _updateTime: 't1', createdAt: '2026-09-01T10:00:00Z' },
+  ];
+  const remote = [
+    { _id: 'nuovo', _updateTime: 't2', createdAt: '2026-10-01T10:00:00Z' },
+    { _id: 'bordo', _updateTime: 't1', createdAt: '2026-09-30T10:00:00Z' },
+  ];
+  const d = LIVE.diffVersions(local, remote, { finestra: 2 });
+  assert.deepEqual(d.changed, ['nuovo']);
+  assert.deepEqual(d.removed, ['cancellato']);
+  // Senza finestra (giro lungo) lo stesso assente è davvero sparito.
+  assert.deepEqual(LIVE.diffVersions(local, remote).removed, ['cancellato', 'f597']);
+});
+
+test('diffVersions: finestra non piena = tutto, e lettura parziale non toglie niente', () => {
+  const local = [
+    { _id: 'a', _updateTime: 't1', createdAt: '2026-10-01T10:00:00Z' },
+    { _id: 'vecchio', _updateTime: 't1', createdAt: '2026-01-01T10:00:00Z' },
+  ];
+  const remote = [{ _id: 'a', _updateTime: 't1', createdAt: '2026-10-01T10:00:00Z' }];
+  assert.deepEqual(LIVE.diffVersions(local, remote, { finestra: 500 }).removed, ['vecchio']);
+  assert.deepEqual(LIVE.diffVersions(local, remote, { parziale: true }).removed, []);
+  // Finestra piena ma senza date: non si sa dove finisce, non si toglie niente.
+  const senzaDate = LIVE.diffVersions([{ _id: 'x', _updateTime: 't1' }], [{ _id: 'y', _updateTime: 't1' }], { finestra: 1 });
+  assert.deepEqual(senzaDate.removed, []);
+  assert.deepEqual(senzaDate.added, ['y']);
+});
+
+test('ordina: dal più recente, su una copia', () => {
+  const righe = [
+    { _id: 'b', createdAt: '2026-01-01T00:00:00Z' },
+    { _id: 'a', createdAt: '2026-10-01T00:00:00Z' },
+  ];
+  assert.deepEqual(LIVE.ordina(righe).map((r) => r._id), ['a', 'b']);
+  assert.deepEqual(righe.map((r) => r._id), ['b', 'a']);
+});
+
 test('diffVersions: niente di nuovo → tre liste vuote', () => {
   const local = [{ _id: 'a', _updateTime: 't1' }];
   const d = LIVE.diffVersions(local, [{ _id: 'a', _updateTime: 't1' }]);
