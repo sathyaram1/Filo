@@ -2591,6 +2591,8 @@
       if (r && r.ok && typeof r.text === 'string') {
         const parsed = SRCH.parseRanking(r.text, validIds);
         if (parsed.length) ranked = parsed;
+      } else if (r && r.ok === false && typeof r.error === 'string') {
+        motivo = r.error;
       }
     } catch (_) { /* ripiego per parole qui sotto */ }
 
