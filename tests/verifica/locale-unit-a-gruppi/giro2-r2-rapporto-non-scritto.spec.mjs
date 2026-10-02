@@ -17,7 +17,7 @@ test('rapporto su una cartella che non esiste: esito rosso e nessuna riga che di
   mkdirSync(prove);
   try {
     for (let i = 0; i < 4; i++) {
-      writeFileSync(join(prove, `f${String(i).padStart(3, '0')}.test.mjs`),
+      writeFileSync(join(prove, `f${String(i).padStart(3, '0')}-${'nome-lungo-'.repeat(15)}.test.mjs`),
         `import test from 'node:test';\ntest('caso-${i}', () => {});\n`);
     }
     const dest = join(dir, 'manca', 'rapporto.xml');
