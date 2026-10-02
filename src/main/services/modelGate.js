@@ -65,6 +65,7 @@
       costs = global.SN_COSTS,
       auditDelaysMs = AUDIT_DELAYS_MS,
       segreti = async () => [],
+      ricordaEsterni = () => {},
     } = deps;
 
     // Nessun segreto custodito da Filo entra nel contesto di un modello (#810): quello che non
