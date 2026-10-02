@@ -533,11 +533,17 @@ La regola, uguale per tutti e due:
 - **se il contenuto cambia, l'esito decade** e quel controllo va rifatto — la
   stessa cosa che già succede alle richieste di fusione in attesa. Al passo 2
   del cancello i PASS si leggono sullo **sha** risolto al passo 3, non sul nome
-  del ramo. Unica eccezione: dopo il pass il verificatore toglie le prove dei
-  rilievi usciti in feedback loro, e se fra il commit verificato e la punta
-  (che deve discenderne) ci sono solo prove del giro tolte il server fonde;
-  altrimenti azzera verifica e controllo di sicurezza e rimette il lavoro in
-  giro da sé;
+  del ramo: ciascuno dei due copre la punta solo se è stato dato lì. Unica
+  eccezione: dopo il pass il verificatore toglie le prove dei rilievi usciti in
+  feedback loro, e se fra il commit di un via libera e la punta (che deve
+  discenderne) ci sono solo prove del giro tolte, quel via libera la copre
+  ancora. Quando non la copre, o è registrato senza commit, il server lo
+  azzera e rimette il lavoro in giro da sé: la verifica si porta dietro anche
+  il controllo di sicurezza e torna al verificatore (`not_approved`), il
+  controllo di sicurezza azzera solo sé stesso e la pratica aspetta un nuovo
+  controllo (`secaudit_stale`, #773). Il salto del controllo deciso
+  dall'owner resta com'è: lì il via libera è una sua scelta, e L5 gira sulla
+  punta;
 - **l'esito vale per un commit, quindi si registra da un commit.** Con
   modifiche fuori dai commit il salvataggio automatico le committa *dopo* la
   registrazione, la punta si sposta e l'esito nasce già decaduto. Le tre
@@ -548,7 +554,8 @@ La regola, uguale per tutti e due:
 - **anche l'ULTIMO passo parla del commit.** Timbrare l'impronta sugli esiti
   non chiude niente finché la fusione si chiede per nome del ramo. Dal
   2026-09-20 `routineMerge` porta anche `sha`, come `ownerMerge` dal
-  2026-08-20, e il citofono (`scripts/merge-gate.mjs`) fa prima due controlli
+  2026-08-20: diverso dalla punta, niente fusione (`stale`) e il controllo di
+  sicurezza si rifà sulla punta vera (#773). Il citofono (`scripts/merge-gate.mjs`) fa prima due controlli
   che sul cammino locale c'erano da sempre e qui mancavano: non chiede la
   fusione se nella directory c'è qualcosa fuori dai commit (il salvataggio
   automatico lo committerebbe e lo spedirebbe, e il server fonderebbe la punta
@@ -617,10 +624,10 @@ Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs`,
 `scripts/routine-channel.mjs` e `scripts/merge-gate.mjs`, dove lo sha si
 timbra da solo invece di chiederlo a chi lavora — e questa regola. **Il
 confronto al passo 2 del cancello vive nel server** (`filo-security`), che è
-il posto giusto: è l'ultimo livello, quello che non si può convincere. Finché
-lì il verdetto L4 si legge sul nome del ramo, il campo arriva e non viene
-guardato: quello che il repo pubblico può fare da solo è chiudere il cammino
-onesto (fatto), non il muro.
+il posto giusto: è l'ultimo livello, quello che non si può convincere. Il
+repo pubblico chiude il cammino onesto; il muro è il server, che dal #773
+respinge un verdetto L4 senza sha e al cancello lo confronta con la punta
+come quello della verifica.
 
 ### Gli automatismi locali (2026-08-21, stessa verifica avversariale)
 

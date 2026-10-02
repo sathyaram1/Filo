@@ -123,7 +123,10 @@ server un verdetto raccontato non lo legge).
      riallineamento (la pratica torna a chi risolve con la critica che spiega
      il rebase). Niente `design`, niente nota: la sovrascriveresti.
    - `1` → errore tecnico (o richiesta rifiutata dal server: il motivo è
-     nell'output e il tentativo è già a registro).
+     nell'output e il tentativo è già a registro). Con `secaudit_stale` o
+     `stale` il server ha trovato il tuo verdetto su un commit diverso dalla
+     punta che fonderebbe: l'ha azzerato e rimanda da sé un nuovo controllo di
+     sicurezza sulla punta. Rilascia il biglietto e basta.
 
 **Quanto scrivere — dipende dall'esito:**
 

@@ -29,7 +29,7 @@ const MERGE_GATE = resolve(__dirname, '..', '..', 'scripts', 'merge-gate.mjs');
 
 // ─── logica pura del CLI (niente git, niente rete) ───────────────────────────
 
-const { parseArgs, isValidBranch, exitCodeFor } = await import('../../scripts/merge-gate.mjs');
+const { parseArgs, isValidBranch, exitCodeFor, testoRifiutoServer } = await import('../../scripts/merge-gate.mjs');
 
 test('parseArgs: solo il source; qualunque flag è sconosciuto', () => {
   assert.deepEqual(parseArgs(['worker/1']), { source: 'worker/1', unknown: [] });
@@ -169,6 +169,30 @@ test('rifiuto del server (verdetti non registrati) → exit 1, col motivo', asyn
     assert.equal(r.status, 1, `exit 1 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
     assert.match(r.stderr, /not_approved/);
   } finally { srv.close(); }
+});
+
+// #773: il server lega anche il via libera di sicurezza al commit. Quando non
+// copre la punta lo azzera e rimanda da sé un nuovo controllo: chi ha chiesto
+// la fusione deve leggerlo, non un «ERROR» che sembra un guasto.
+test('via libera di sicurezza decaduto sul server → exit 1, e la frase dice che non c’è altro da fare', async () => {
+  for (const reason of ['secaudit_stale', 'stale']) {
+    const { srv, port } = await fintoServer({ ok: false, reason }, 401);
+    try {
+      const r = await gate(port, ['worker/12']);
+      assert.equal(r.status, 1, `exit 1 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
+      assert.match(r.stderr, new RegExp(`RIFIUTATO \\(${reason}\\)`));
+      assert.match(r.stderr, /nuovo controllo sulla punta/);
+      assert.match(r.stderr, /rilascia il biglietto/);
+      assert.doesNotMatch(r.stderr, /ERROR/);
+    } finally { srv.close(); }
+  }
+});
+
+test('testoRifiutoServer: una frase per i due motivi del #773, niente per gli altri', () => {
+  assert.notEqual(testoRifiutoServer('secaudit_stale'), testoRifiutoServer('stale'));
+  for (const reason of ['not_approved', 'branch_mismatch', 'malformed', '', undefined]) {
+    assert.equal(testoRifiutoServer(reason), '', String(reason));
+  }
 });
 
 test('senza biglietto → exit 1 SENZA nemmeno chiamare il server', async () => {
