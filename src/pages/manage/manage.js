@@ -5351,6 +5351,7 @@
       const chain = ModelChain.buildChain(models[slot] || '', null, action ? appSlotCtx(action) : {});
       host.appendChild(chain.el);
       smChains[slot] = chain;
+      if (unset.includes(slot)) smUnsetShown[slot] = chain.getValue();
     }
   }
 
