@@ -129,7 +129,8 @@
     }
 
     // Abilita/disabilita il bottone d'invio in base a stato login, saldo e testo.
-    function refreshSendState() {
+    // Solo chi scrive cancella un errore: un rifiuto appena arrivato (la pausa del server) deve restare leggibile.
+    function refreshSendState({ daInput = false } = {}) {
       sendBtn.textContent = sendLabel();
       const hasText = !!attackEl.value.trim();
       // Crediti insufficienti noti → disabilita con messaggio (spec §8.1 punto 4).
