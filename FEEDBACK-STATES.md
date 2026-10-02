@@ -190,6 +190,29 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
   (`skippedL5: true`), fonde senza chiedere e chiude la pratica. Manca una condizione →
   la richiesta aspetta il sì dell'owner in Gestione, col motivo.
 
+### 4c. Chi nasce senza giudici (#914)
+
+Alla nascita (solo il trigger di creazione) L1 e L2 non girano per chi porta la prova
+scritta dal server o dall'admin, mai per il solo nome (`functions/src/nascita.js`):
+
+- lavoro locale (§4b): `todo` nei Lavori locali, senza nemmeno L0;
+- sessione per le routine (`local:` + `senderProof: 'admin'`, senza segno: `claude-feedback.mjs
+  --non-locale`): L0, poi `todo` In coda (`pipeline.skipped: 'session_proven'`), senza giudice
+  di priorità (la mette la sessione con `--priorita`);
+- routine (`routine:`/`agent:` + `senderProof: 'server'`: ritrovamenti, derivati, allarmi della
+  costruzione): L0, poi dove dice `config/automation.routineBirth` (`pipeline.skipped:
+  'routine_proven'`). `ricevuti`, o campo assente o ignoto → `aligned`; `interruttori` → `todo`
+  se l'automatica e l'interruttore del gruppo lo ammettono, come un allineato dei giudici,
+  altrimenti `aligned`; `coda` → `todo` con l'automatica accesa. Si cambia dalla console.
+
+Il prompt dei giudici dice che a loro arriva solo un utente: un linguaggio da sviluppatore o
+da agente è un segnale sospetto. Una ri-valutazione passa sempre dai giudici.
+
+Le routine non aprono lavoro locale: il canale non scrive il segno, e dentro una routine
+`claude-feedback.mjs` e `owner-feedback.mjs --solo-locale` si rifiutano. Un lavoro che si fa
+solo in locale torna nei Ricevuti dal canale (`deliver status --status design --reason
+locale`, nota «Richiede lavoro locale»): lo stesso motivo di `--serve-locale`.
+
 ### 4a. Le AZIONI dell'owner per sezione (`ownerActions`)
 
 Stessa regola delle tab, un gradino più in dentro: la sezione dice quali azioni

@@ -28,6 +28,8 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
 
 <!-- includi: _segnala.md -->
 
+<!-- includi: _solo-in-locale.md -->
+
 ## Consegna
 
 ```bash

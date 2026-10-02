@@ -1,5 +1,5 @@
 // #914: in Gestione un feedback che ha saltato i giudici alla nascita (routine, sessione per le routine, lavoro
-// locale) lo dice, e non sembra «da ri-giudicare»; senza mittente provato il segno del pipeline non conta.
+// locale) lo dice, e non sembra «da ri-giudicare»; i ruoli di chi risolve rimandano il lavoro solo locale.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -49,4 +49,16 @@ test('il segno senza mittente provato, o un valore sconosciuto, non vale', () =>
   }
   // Fidato senza verdetti e senza segno: resta «da ri-giudicare», come prima.
   assert.equal(MR.classifyLegacyBlock(routine({ pipeline: pipeline(undefined) })).reason, 'unfiltered');
+});
+
+// Chi risolve per una routine non apre lavoro locale: rimanda nei Ricevuti col motivo di --serve-locale.
+test('i tre ruoli di chi risolve dicono come rimandare un lavoro che si fa solo in locale', async () => {
+  const { espandiInclusioni } = await import('../../scripts/lib/role-text.mjs');
+  const { readFileSync } = await import('node:fs');
+  const dir = join(__dirname, '..', '..', 'routines', 'roles');
+  for (const ruolo of ['resolver.md', 'resolver-rebase.md', 'resolver-ripresa.md']) {
+    const t = espandiInclusioni(readFileSync(join(dir, ruolo), 'utf8'), dir);
+    assert.match(t, /deliver status --status design --reason locale/, ruolo);
+    assert.match(t, /le\s+routine non ne aprono/, ruolo);
+  }
 });
