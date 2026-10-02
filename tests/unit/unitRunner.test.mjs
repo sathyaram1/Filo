@@ -402,8 +402,11 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
     assert.ok(chiedeCopertura(['--experimental-test-coverage']) && !chiedeCopertura(['--test-only']));
     const testo = testoRiepilogo({ somma: sommaRiepiloghi([[], []]), gruppi: 2, file: 4, esiti: [0, 1], rapporti: ['r.xml'], copertura: true });
     assert.match(testo, /nella sua uscita, sopra o nel rapporto in r\.xml/);
-    assert.match(testo, /rapporti dei 2 gruppi sono riuniti in r\.xml/);
+    assert.match(testo, /rapporti di tutti i gruppi sono riuniti in r\.xml/);
     assert.match(testo, /copertura è per gruppo/);
+    // «dei 8», «dei 11»: l'articolo davanti a un numero cambia con la sua lettura.
+    const otto = testoRiepilogo({ somma: sommaRiepiloghi(Array(8).fill([])), gruppi: 8, file: 8, esiti: Array(8).fill(0), rapporti: ['r.xml'] });
+    assert.doesNotMatch(otto, /\bdei (8|11)\b/);
   });
 });
 
