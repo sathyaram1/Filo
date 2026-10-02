@@ -614,7 +614,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   function onMouseDown(e) {
     if (!gestoVero(e)) return;
     if (e.button === 1) {
-      if (!zoomMode && (isOnLink(e.target) || incollaQui(e, Z))) return;
+      if (!zoomMode && (suUnLink(e) || incollaQui(e, Z))) return;
       e.preventDefault();
       e.stopPropagation();
       centralePreso = true;
@@ -715,6 +715,20 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     if (percentInput && e.target === percentInput && percentInput.value !== campo.valore) mostraCampo();
   }
 
+  // I gesti fatti dentro un riquadro incorporato: arrivano dal main, o dai
+  // riquadri che la pagina riempie da sé, agganciati da qui.
+  function applicaGesto(g) {
+    const gesto = Z ? Z.gestoValido(g) : null;
+    if (!gesto) return;
+    if (gesto.tipo === 'rotella' || gesto.tipo === 'ctrl') rotellaPresa = Date.now();
+    if (gesto.tipo === 'medio') toggle();
+    else if (gesto.tipo === 'esci') exit();
+    else if (gesto.tipo === 'rotella') { if (zoomMode) passoModalita(gesto.dy); }
+    else if (gesto.tipo === 'ctrl') { if (pageZoom && !zoomMode && !pageHandlesZoom()) ctrlRotella(gesto.dy); }
+    else if (gesto.tipo === 'reset') eseguiZoom({ verso: 'reset' });
+    else if (gesto.tipo === 'tasto') battiNelCampo(gesto.key);
+  }
+
   try { globalThis.__filoZoomQui = true; } catch (_) {}
   const gesti = [
     ['mousedown', onMouseDown, true],
@@ -723,12 +737,18 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     ['wheel', onWheel, { capture: true, passive: false }],
     ['keydown', onKeyDown, true],
   ];
+  const daiRiquadri = gestiDiUnRiquadro(Z, {
+    modalita: () => zoomMode,
+    campoAperto: () => inModifica,
+    ctrlRotella: () => pageZoom && !pageHandlesZoom(),
+    manda: applicaGesto,
+  });
   tieniAscoltatori([
     ...gesti,
     ['paste', onPaste, true],
     ['input', onInput, true],
     ['fullscreenchange', () => { if (zoomMode) mettiInCima(); }, true],
-    ['pointerover', vegliaRiquadri(gesti, webFrame), true],
+    ['pointerover', vegliaRiquadri(daiRiquadri.gesti, webFrame), true],
   ], () => {
     // Il documento vecchio se n'è andato col riquadro e i suoi ascoltatori.
     const eraAperta = zoomMode;
@@ -740,6 +760,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     percentInput = null;
     suppressContextMenu = false;
     centralePreso = false;
+    daiRiquadri.azzera();
     rimettiVelo();
     if (eraAperta) avvisaModalita();
   });
@@ -791,18 +812,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     else if (typeof t.key === 'string') battiNelCampo(t.key);
   });
 
-  // I gesti fatti dentro un riquadro incorporato, girati qui dal main.
-  ipc.on('filo:zoom-gesto', (_e, g) => {
-    const gesto = Z ? Z.gestoValido(g) : null;
-    if (!gesto) return;
-    if (gesto.tipo === 'rotella' || gesto.tipo === 'ctrl') rotellaPresa = Date.now();
-    if (gesto.tipo === 'medio') toggle();
-    else if (gesto.tipo === 'esci') exit();
-    else if (gesto.tipo === 'rotella') { if (zoomMode) passoModalita(gesto.dy); }
-    else if (gesto.tipo === 'ctrl') { if (pageZoom && !zoomMode && !pageHandlesZoom()) ctrlRotella(gesto.dy); }
-    else if (gesto.tipo === 'reset') eseguiZoom({ verso: 'reset' });
-    else if (gesto.tipo === 'tasto') battiNelCampo(gesto.key);
-  });
+  ipc.on('filo:zoom-gesto', (_e, g) => applicaGesto(g));
 };
 
 // In un riquadro incorporato: niente zoom né riquadro propri (lo zoom è della
@@ -813,9 +823,13 @@ module.exports.riquadro = function setupRiquadro(webFrame, opts) {
   const Z = caricaRegole();
   let modalita = false;
   let campoAperto = false;
-  let suppressContextMenu = false;
-  let centralePreso = false;
-  const manda = (g) => { try { ipc.send('filo:zoom-gesto', g); } catch (_) {} };
+  // Lo stato si aggiorna subito, senza aspettare il giro dal frame principale.
+  const manda = (g) => {
+    if (g.tipo === 'medio') modalita = !modalita;
+    else if (g.tipo === 'esci') modalita = false;
+    else if (g.tipo === 'tasto' && (g.key === 'Enter' || g.key === 'Tab' || g.key === 'Escape')) campoAperto = false;
+    try { ipc.send('filo:zoom-gesto', g); } catch (_) {}
+  };
 
   try {
     ipc.on('filo:zoom-modalita', (_e, on) => { modalita = on === true; });
@@ -833,81 +847,12 @@ module.exports.riquadro = function setupRiquadro(webFrame, opts) {
     };
   } catch (_) {}
 
-  function onMouseDown(e) {
-    if (!gestoVero(e)) return;
-    if (e.button === 1) {
-      if (!modalita && (isOnLink(e.target) || incollaQui(e, Z))) return;
-      e.preventDefault();
-      e.stopPropagation();
-      centralePreso = true;
-      modalita = !modalita;
-      manda({ tipo: 'medio' });
-      return;
-    }
-    if (!modalita) return;
-    if (e.button === 2) suppressContextMenu = true;
-    e.preventDefault();
-    e.stopPropagation();
-    modalita = false;
-    manda({ tipo: 'esci' });
-  }
-
-  function onContextMenu(e) {
-    if (!suppressContextMenu) return;
-    suppressContextMenu = false;
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
-  function onMouseUp(e) {
-    if (!gestoVero(e) || e.button !== 1 || !centralePreso) return;
-    centralePreso = false;
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
-  function onWheel(e) {
-    if (!gestoVero(e)) return;
-    if (modalita) {
-      e.preventDefault();
-      e.stopPropagation();
-      manda({ tipo: 'rotella', dy: e.deltaY });
-      return;
-    }
-    if (!(e.ctrlKey || e.metaKey)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    manda({ tipo: 'ctrl', dy: e.deltaY });
-  }
-
-  // Col campo della percentuale aperto il tasto è del campo, anche se il fuoco
-  // l'ha portato qui il sito (#686.1 giro 7); di solito lo prende già il main.
-  function onKeyDown(e) {
-    if (!gestoVero(e)) return;
-    if (campoAperto) {
-      if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'v') return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const key = String(e.key || '');
-      if (key === 'Enter' || key === 'Tab' || key === 'Escape') campoAperto = false;
-      manda({ tipo: 'tasto', key });
-      return;
-    }
-    if (!modalita) return;
-    e.preventDefault();
-    e.stopPropagation();
-    modalita = false;
-    manda({ tipo: 'esci' });
-  }
-
+  const qui = gestiDiUnRiquadro(Z, {
+    modalita: () => modalita,
+    campoAperto: () => campoAperto,
+    ctrlRotella: () => true,
+    manda,
+  });
   try { globalThis.__filoZoomQui = true; } catch (_) {}
-  const gesti = [
-    ['mousedown', onMouseDown, true],
-    ['mouseup', onMouseUp, true],
-    ['contextmenu', onContextMenu, true],
-    ['wheel', onWheel, { capture: true, passive: false }],
-    ['keydown', onKeyDown, true],
-  ];
-  tieniAscoltatori([...gesti, ['pointerover', vegliaRiquadri(gesti, webFrame), true]], () => { suppressContextMenu = false; centralePreso = false; });
+  tieniAscoltatori([...qui.gesti, ['pointerover', vegliaRiquadri(qui.gesti, webFrame), true]], qui.azzera);
 };
