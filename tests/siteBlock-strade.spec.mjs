@@ -131,6 +131,48 @@ test('dalla pagina «Sito bloccato» si arriva alla lista, e tolto il sito da l�
   await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toBe(sito);
 });
 
+// La lista si salva mentre si scrive (#590.2): una riga a metà correzione non riapre il sito.
+async function bloccataConSicurezza(app, shell, rete) {
+  await lista(shell, []);
+  const sito = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+  await apri(app, shell, sito);
+  const id = await idAttiva(app);
+  await lista(shell, ['blocked.test']);
+  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toMatch(PAGINA_BLOCCATA);
+  await app.evaluate(({ BrowserWindow }, i) => {
+    const t = BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.tabs.find((x) => x.id === i);
+    globalThis.__aperture590 = [];
+    t.view.webContents.on('did-navigate', (_e, u) => globalThis.__aperture590.push(u));
+  }, id);
+  const pref = await paginaSicurezza(app, shell);
+  const campo = pref.locator('#sec-siteblock-blacklist');
+  await expect(campo).toHaveValue('blocked.test', { timeout: 6000 });
+  await campo.click();
+  await pref.keyboard.press('Control+End');
+  await pref.waitForTimeout(600);
+  return { sito, id, pref, aperture: () => app.evaluate(() => globalThis.__aperture590.filter((u) => !u.startsWith('filo://'))) };
+}
+
+test('tolta e riscritta l\'ultima lettera del sito nella lista, la scheda ferma sulla pagina «Sito bloccato» non lo riapre', async ({ app, shell, rete }) => {
+  const { pref, aperture } = await bloccataConSicurezza(app, shell, rete);
+  await pref.keyboard.press('Backspace');
+  await pref.waitForTimeout(1200);
+  await pref.keyboard.type('t');
+  await pref.waitForTimeout(4000);
+  expect(await pref.locator('#sec-siteblock-blacklist').inputValue()).toBe('blocked.test');
+  expect(await aperture()).toEqual([]);
+  expect(await caricataSu(app, 'blocked.test')).toMatch(PAGINA_BLOCCATA);
+});
+
+test('tolto il sito dalla lista scrivendo e tornati subito sulla sua scheda, il sito c\'è già', async ({ app, shell, rete }) => {
+  const { sito, id, pref } = await bloccataConSicurezza(app, shell, rete);
+  await pref.keyboard.press('Control+A');
+  await pref.keyboard.press('Delete');
+  await pref.waitForTimeout(700);
+  await shell.evaluate((i) => window.filoShell.tabs.activate(i), id);
+  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 1500 }).toBe(sito);
+});
+
 test('indietro dalla pagina «Sito bloccato» torna alla pagina di prima; tolto dalla lista, il sito torna', async ({ app, shell, rete }) => {
   await lista(shell, []);
   const prima = rete.pagina('sito.test', '/', '<h1>PRIMA</h1>');
