@@ -462,15 +462,34 @@
       fonti.push({ testo: pagina.testo, fonte: pagina.host ? `dalla pagina ${pagina.host}` : 'dalla pagina' });
     }
     const candidati = [];
-    for (const f of fonti) for (const x of G.segretiNelTesto(f.testo)) candidati.push({ ...x, fonte: f.fonte });
+    const saturi = [];
+    for (const f of fonti) {
+      const trovati = G.segretiNelTesto(f.testo);
+      for (const x of trovati) candidati.push({ ...x, fonte: f.fonte });
+      if (trovati.saturo) saturi.push(f);
+    }
     for (const x of Array.isArray(letti) ? letti : []) if (x && x.valore) candidati.push(x);
     const scritte = parole ? formeDi(parole) : null;
+    const ferma = (regola, fonte) => ({ ...niente, blocca: true, regola, frase: `${verbo}: conteneva ${LETTI[regola] || LETTI.codice} ${fonte || 'da fuori'}` });
     for (const x of candidati) {
       if (!esce(x.valore, x.regola, u, true)) continue;
       if (scritte && esce(x.valore, x.regola, scritte)) continue;
-      return { ...niente, blocca: true, regola: x.regola, frase: `${verbo}: conteneva ${LETTI[x.regola] || LETTI.codice} ${x.fonte || 'da fuori'}` };
+      return ferma(x.regola, x.fonte);
     }
+    for (const f of saturi) if (pezzoPresente(u, f.testo, parole)) return ferma('codice', f.fonte);
     return valutaAvvisi(tipo, action, { memoria, azioni, daPagina }, niente);
+  }
+
+  // Un testo con più segreti di quanti se ne tengano è costruito apposta per nascondere quello vero (#810): lì ferma
+  // ogni pezzo dell'uscita con una cifra che nel testo c'è, salvo quelli scritti dall'utente.
+  function pezzoPresente(u, testoLetto, parole) {
+    const pezzi = new Set(u.cifre.filter((c) => c.length >= 4));
+    for (const f of u.forme) for (const t of f.split(/[^A-Za-z0-9]+/)) if (t.length >= 4 && /\d/.test(t)) pezzi.add(t.toLowerCase());
+    if (!pezzi.size) return false;
+    const letto = String(testoLetto || '').toLowerCase();
+    const proprie = String(parole || '').toLowerCase();
+    for (const p of pezzi) if (letto.includes(p) && !proprie.includes(p)) return true;
+    return false;
   }
 
   // I segreti letti da fuori che una frase di Filo ripete: viaggiano con la frase nell'archivio, così la chat

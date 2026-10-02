@@ -206,8 +206,29 @@
   // Fra due codici di un elenco ci sono a capo, spazi, puntini o numeri di riga: una parola
   // in mezzo vuol dire che il numero dopo parla d'altro.
   const FRA_CODICI = /^[\s\d.,;:)(•·*-]{0,40}$/;
-  // Largo: il costo resta lineare nel testo anche su una pagina da milioni di caratteri.
+  // Valori diversi, non ripetizioni. Largo: una pagina onesta non ci arriva, e la memoria resta limitata anche su
+  // milioni di caratteri. Oltre, il testo è costruito apposta: si smette e lo si dice (`saturo`, vedi segretiNelTesto).
   const MAX_ESTRATTI = 100000;
+
+  // Raccoglie senza doppioni: righe ripetute non consumano il tetto che serve al codice vero.
+  function raccolta() {
+    const valori = [];
+    const chiavi = new Set();
+    return {
+      valori,
+      saturo: false,
+      push(...xs) {
+        for (const x of xs) {
+          const k = `${x.regola}:${x.valore.toLowerCase()}`;
+          if (chiavi.has(k)) continue;
+          if (valori.length >= MAX_ESTRATTI) { this.saturo = true; continue; }
+          chiavi.add(k);
+          valori.push(x);
+        }
+        return valori.length;
+      },
+    };
+  }
 
   // Un anno o un pezzo di data, ora o importo («30/09/2026», «1234,50») non è un codice.
   function pezzoDiData(s, i, j, v) {
@@ -324,7 +345,7 @@
       return lo;
     };
     let parola;
-    while ((parola = cerca.exec(s)) && out.length < MAX_ESTRATTI) {
+    while ((parola = cerca.exec(s)) && !out.saturo) {
       const inizio = parola.index;
       const fine = inizio + parola[0].length;
       if (dentroUnNome(s, inizio, fine)) continue;
@@ -348,21 +369,23 @@
       if (regola === 'password') passwordAnnunciata(s, fine, false, out);
     }
     const pw = new RegExp(MARCHIO_PASSWORD.source, 'gi');
-    while ((parola = pw.exec(s)) && out.length < MAX_ESTRATTI) {
+    while ((parola = pw.exec(s)) && !out.saturo) {
       const fine = parola.index + parola[0].length;
       if (!dentroUnNome(s, parola.index, fine)) passwordAnnunciata(s, fine, true, out);
     }
   }
 
-  // `[{ valore, regola }]` con regola 'codice' | 'password' | 'chiave' | 'iban' | 'carta'.
+  // `[{ valore, regola }]` con regola 'codice' | 'password' | 'chiave' | 'iban' | 'carta'. `saturo` sull'elenco: il
+  // testo ne aveva più del tetto, e chi controlla un'uscita lì guarda la presenza dei suoi pezzi (urlExfil.js).
   function segretiNelTesto(testoLetto) {
     const s = testo(testoLetto);
-    const out = [];
-    if (!s.trim()) return out;
+    const out = raccolta();
+    const fine = () => Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
+    if (!s.trim()) return fine();
     for (const re of FORME_CHIAVE) {
       const g = new RegExp(re.source, 'g');
       let m;
-      while ((m = g.exec(s)) && out.length < MAX_ESTRATTI) out.push({ valore: m[0], regola: 'chiave' });
+      while ((m = g.exec(s)) && !out.saturo) out.push({ valore: m[0], regola: 'chiave' });
     }
     codiciVicini(s, out);
     for (const m of s.match(IBAN_RE) || []) {
@@ -371,13 +394,7 @@
     for (const m of s.match(CARTA_RE) || []) {
       if (cartaValida(m)) out.push({ valore: m.replace(/[\s-]/g, ''), regola: 'carta' });
     }
-    const visti = new Set();
-    return out.filter((x) => {
-      const k = `${x.regola}:${x.valore.toLowerCase()}`;
-      if (visti.has(k)) return false;
-      visti.add(k);
-      return true;
-    });
+    return fine();
   }
 
   // ── I segreti custoditi non entrano in un prompt (#810) ──────────────────
