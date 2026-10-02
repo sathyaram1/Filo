@@ -3837,7 +3837,7 @@
     const files = (Array.isArray(fb.files) ? fb.files : [])
       .filter((f) => f && typeof f.url === 'string' && f.url)
       .map((f) => ({ kind: 'file', url: f.url, name: f.name, type: f.type }));
-    // Chi l'ha scritta si nomina come in testata: «Utente» sulle pratiche dell'owner contraddiceva «Da Owner».
+    // L'autore dalla stessa regola della testata, o le due righe dello stesso dettaglio si contraddicono.
     appendBubble(fromModel ? 'model' : 'user', authorMetaOf(fb).label, esc(fb.text || ''), imgs.concat(files));
 
     // Bolla 2: parere di Filo. Il riassunto sintetico (filoSummary) può
