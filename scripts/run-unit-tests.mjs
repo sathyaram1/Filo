@@ -254,7 +254,8 @@ export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false,
 
 // Il testo nostro aspetta di essere scritto prima che parta il figlio: con stdout asincrono (TTY su Windows) i
 // titoli dei gruppi finirebbero sotto l'uscita del gruppo stesso.
-const scrivi = (s) => new Promise((ok) => process.stdout.write(`${s}\n`, ok));
+let canale = process.stdout;
+const scrivi = (s) => new Promise((ok) => canale.write(`${s}\n`, ok));
 const lancia = (args) => new Promise((ok) => {
   // I test si aspettano la root come cartella corrente, come quando li lanciava npm.
   // Le manopole di questo lanciatore non arrivano ai test: la sua sentinella guarda i valori veri.
