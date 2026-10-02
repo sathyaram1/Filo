@@ -2410,9 +2410,8 @@ class TabManager {
       const { url, disposition } = details;
       // Da una pagina di Filo l'indirizzo l'ha scelto quasi sempre un modello: passa dalla porta delle uscite (#810).
       if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
-        const fromUrl = (details.referrer && details.referrer.url) || wc.getURL();
         globalThis.SN_USCITA_DA_FILO(url, wc, () => {
-          this.apriDaCollegamento(url, { fromUrl, sfondo: disposition === 'background-tab' });
+          this.apriDaCollegamento(url, { sfondo: disposition === 'background-tab' });
         }).catch(() => {});
         return { action: 'deny' };
       }
@@ -2682,6 +2681,15 @@ class TabManager {
         opts: { actions: [{ label: 'Riapri', openUrl: url }] },
       });
     } catch (_) {}
+  }
+
+  // Un collegamento che Filo apre per conto di una pagina, dopo la porta delle uscite (#810): la posta al sistema, i
+  // siti in blacklist fermati come un clic, il resto in una scheda nuova.
+  apriDaCollegamento(url, { sfondo = false } = {}) {
+    if (isWebUnsafeNav(url)) return openExternalScheme(url);
+    if (this._maybeBlockNavigation(null, url)) return false;
+    this.openTab(url, { activate: !sfondo, openedByLink: true });
+    return true;
   }
 
   // #590 — L'UNICO punto che applica la lista dei siti bloccati: ci passano
