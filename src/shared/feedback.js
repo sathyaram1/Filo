@@ -986,6 +986,11 @@
   const COUNT_CAP_HINT =
     `Caricati i ${LIST_PAGE_SIZE} feedback più recenti: se ce ne sono di più vecchi, non sono in pagina e non entrano nel conto.`;
 
+  // Chi legge TUTTO (la dashboard di gestione) ha il "+" solo se la lettura
+  // completa si è fermata prima della fine: lì il motivo è un altro.
+  const COUNT_INCOMPLETE_HINT =
+    'La lettura dei feedback si è fermata prima della fine: i più vecchi mancano e non entrano nel conto.';
+
   // Lista tutti i feedback (più recenti prima). Usata dalla dashboard e dalla
   // bacheca. `timeoutMs` (opzionale): se > 0, la fetch si arrende dopo quel tempo
   // invece di restare muta finché il sistema operativo non decide di mollare
