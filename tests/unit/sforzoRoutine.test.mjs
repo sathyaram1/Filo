@@ -34,3 +34,18 @@ test('l\'orchestratore manda ogni ruolo all\'agente giusto e dice gli stessi sfo
   assert.match(testo, /altrimenti `subagent_type: routine-worker`/);
   assert.match(testo, /il primo lavoro Opus a sforzo `xhigh`, gli altri due Opus a sforzo `high`/);
 });
+
+// Lo sforzo si fissa solo qui: una prova di un giro rimasta nel repo che lo ripete diventa rossa alla decisione dopo.
+test('nessuna prova dei giri fissa lo sforzo degli agenti delle routine', () => {
+  const verifica = resolve(ROOT, 'tests', 'verifica');
+  const colpevoli = [];
+  for (const cartella of readdirSync(verifica, { withFileTypes: true }).filter((d) => d.isDirectory())) {
+    for (const f of readdirSync(join(verifica, cartella.name)).filter((n) => n.endsWith('.spec.mjs'))) {
+      const t = readFileSync(join(verifica, cartella.name, f), 'utf8');
+      if (/\.claude['"\s,/]+agents|routine-(worker|secaudit|nuovo-lavoro)\.md|`\$\{nome\}\.md`/.test(t) && /effort:\\s\*(low|medium|high|xhigh)/.test(t)) {
+        colpevoli.push(`${cartella.name}/${f}`);
+      }
+    }
+  }
+  assert.deepEqual(colpevoli, []);
+});
