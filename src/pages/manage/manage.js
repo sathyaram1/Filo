@@ -5198,7 +5198,8 @@
     return smCatalogPending;
   }
 
-  function readSmModelOptions() {
+  // `self`: il campo che chiede; senza catalogo il suo testo a metà non è un modello da proporre.
+  function readSmModelOptions(self) {
     const out = [];
     const seen = new Set();
     const add = (id, label) => {
