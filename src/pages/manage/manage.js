@@ -3837,8 +3837,8 @@
     const files = (Array.isArray(fb.files) ? fb.files : [])
       .filter((f) => f && typeof f.url === 'string' && f.url)
       .map((f) => ({ kind: 'file', url: f.url, name: f.name, type: f.type }));
-    appendBubble(fromModel ? 'model' : 'user', fromModel ? 'Filo (segnalazione automatica)' : 'Utente',
-      esc(fb.text || ''), imgs.concat(files));
+    // Chi l'ha scritta si nomina come in testata: «Utente» sulle pratiche dell'owner contraddiceva «Da Owner».
+    appendBubble(fromModel ? 'model' : 'user', authorMetaOf(fb).label, esc(fb.text || ''), imgs.concat(files));
 
     // Bolla 2: parere di Filo. Il riassunto sintetico (filoSummary) può
     // arrivare troncato a metà frase dal backend; se manca o è troncato,
