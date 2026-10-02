@@ -516,6 +516,8 @@
       el.style.minWidth = '';
       el.style.maxWidth = '';
     }
+    // Da ferme le schede hanno misurato la larghezza fermata: senza rimisurarle restano strette fino al prossimo ridisegno.
+    misuraLarghezzeNaturali();
   }
 
   // Sulla pagina, e su Windows sulle zone di trascinamento della finestra, la
