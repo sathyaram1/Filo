@@ -93,7 +93,9 @@ class AnteprimeSchede {
   // non è più sua. Torna sveglia come una nata dietro, e al caricamento si rifotografa.
   // Senza ricaricare (un sito a pagina unica) nessun caricamento segue: la foto la chiede la spia.
   navigata(tab, { inPagina = false } = {}) {
-    if (this.spento || !vivo(tab) || tab.id === this.m.activeId) return;
+    if (this.spento || !vivo(tab)) return;
+    tab._anteprimaArrivata = Date.now();
+    if (tab.id === this.m.activeId) return;
     if (inPagina) { this._segui(tab, { sporca: true }); return; }
     this.nataDietro(tab);
     try { tab.view.setVisible?.(true); } catch (_) {}
