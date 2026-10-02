@@ -2408,6 +2408,14 @@ class TabManager {
     // 'foreground-tab' e 'background-tab' sono link cliccati dall'utente.
     wc.setWindowOpenHandler((details) => {
       const { url, disposition } = details;
+      // Da una pagina di Filo l'indirizzo l'ha scelto quasi sempre un modello: passa dalla porta delle uscite (#810).
+      if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
+        globalThis.SN_USCITA_DA_FILO(url, wc, () => {
+          if (isWebUnsafeNav(url)) openExternalScheme(url);
+          else this.openTab(url, { activate: disposition !== 'background-tab', openedByLink: true });
+        }).catch(() => {});
+        return { action: 'deny' };
+      }
       // SICUREZZA: nega l'apertura (window.open / target=_blank) verso schemi
       // non-web — stessa difesa di will-navigate (file:// → leak NTLM, ecc.).
       // mailto:/tel:/sms: vengono consegnati all'OS invece di essere ignorati.
