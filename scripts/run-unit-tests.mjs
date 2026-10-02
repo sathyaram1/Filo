@@ -230,7 +230,8 @@ export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false,
     }
   }
   const muti = rossiGruppi.filter((g) => !somma || !somma.rossi.some((r) => r.gruppo === g));
-  const dove = rapporti.length ? `sopra o nel rapporto in ${rapporti.join(', ')}` : 'sopra';
+  const scritti = rapporti.filter((d) => !rapportiPersi.includes(d));
+  const dove = scritti.length ? `sopra o nel rapporto ${scritti.map(doveRapporto).join(', ')}` : 'sopra';
   if (somma && muti.length) {
     out.push(muti.length > 1
       ? `[test:unit] i gruppi ${muti.join(', ')} sono usciti rossi senza un test rosso registrato: la causa è nella loro uscita, ${dove}.`
