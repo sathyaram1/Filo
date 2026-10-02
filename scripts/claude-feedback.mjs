@@ -20,7 +20,9 @@
 //   senza quella prova il prefisso `local:` lo può scrivere chiunque. Chi lo
 //   lavora si sceglie ogni volta: `--locale` mette il segno `localOnly` (il
 //   lavoro di questa sessione: nessuna routine lo prende, e `npm run finish` col
-//   suo numero salta L5), `--non-locale` lo apre per le routine. Senza scelta
+//   suo numero salta L5), `--non-locale` lo apre per le routine. Con la prova
+//   tutti e due saltano i giudici (#914): il primo va nei Lavori locali, il
+//   secondo In coda. Una routine non lo usa. Senza scelta
 //   non parte niente. Senza token (o col token rifiutato) non parte niente:
 //   da anonimo sarebbe un feedback d'utente. `--priorita` riusa lo stesso token.
 //
