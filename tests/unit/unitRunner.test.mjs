@@ -266,7 +266,7 @@ describe('il riepilogo di una suite a gruppi', () => {
       assert.equal((r.stdout.match(/^TAP version/gm) || []).length, 3, 'ogni gruppo stampa la sua uscita');
       assert.match(r.stdout, /^not ok 1 - prova b\.test\.mjs/m, 'il registro del cancello cerca le righe «not ok»');
       const coda = r.stdout.slice(r.stdout.lastIndexOf('[test:unit] riepilogo'));
-      assert.match(coda, /riepilogo di 3 gruppi, 3 file: 3 test, 2 passati, 1 falliti\./);
+      assert.match(coda, /riepilogo di 3 gruppi, 3 file: 3 test, 2 passati, 1 fallito\./);
       assert.match(coda, /✖ .*b\.test\.mjs:4 {2}prova b\.test\.mjs {2}\(gruppo 2\)/);
       assert.match(coda, /ROSSO: gruppo 2 di 3\.\s*$/);
 
