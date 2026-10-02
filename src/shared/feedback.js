@@ -1290,9 +1290,18 @@
   // Le sole "versioni" dei feedback: per ciascuno id + `_updateTime`, niente
   // campi. È la domanda che la dashboard fa a ogni giro per restare aggiornata
   // senza riscaricare tutto (≈130 KB invece di 5 MB per 500 feedback).
+  // `createdAt` viaggia con la versione: dice fin dove arriva la finestra, e
+  // chi è più vecchio del suo bordo non è sparito, è solo fuori.
   async function listVersions({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0 } = {}) {
-    const rows = await list({ pageSize, timeoutMs, fields: ['__name__'], op: 'versions' });
-    return rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime }));
+    const rows = await list({ pageSize, timeoutMs, fields: ['createdAt'], op: 'versions' });
+    return rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime, createdAt: r.createdAt }));
+  }
+
+  // Le versioni di TUTTI i feedback, non di una finestra: il giro lungo della
+  // dashboard, che vede cambiare anche i più vecchi. Torna { rows, complete }.
+  async function listAllVersions({ timeoutMs = 0 } = {}) {
+    const { rows, complete } = await listAllPaged({ timeoutMs, fields: ['createdAt'] });
+    return { rows: rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime, createdAt: r.createdAt })), complete };
   }
 
   // Legge i documenti indicati (interi) in UNA richiesta (batchGet). Ritorna
