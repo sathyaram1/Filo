@@ -6,7 +6,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -638,11 +638,10 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
   // giro e si ferma dopo la conferma.
   test('ogni superficie che manda un\'azione o il suo OK al main porta le parole dell\'utente', () => {
     const mancanti = [];
-    const cartelle = [['src', 'pages', 'dashboard'], ['src', 'content']];
-    for (const c of cartelle) {
-      for (const f of readdirSync(join(ROOT, ...c)).filter((x) => x.endsWith('.js'))) {
+    for (const c of [['src', 'pages'], ['src', 'content'], ['src', 'renderer']]) {
+      for (const f of readdirSync(join(ROOT, ...c), { recursive: true }).filter((x) => String(x).endsWith('.js'))) {
         const src = readFileSync(join(ROOT, ...c, f), 'utf8');
-        const re = /MSG\.(FILO_CONFIRM_ACTION|FILO_RUN_ACTION)\b/g;
+        const re = /type:\s*MSG\.(FILO_CONFIRM_ACTION|FILO_RUN_ACTION)\b/g;
         let m;
         while ((m = re.exec(src))) {
           const chiamata = src.slice(m.index, src.indexOf('})', m.index));

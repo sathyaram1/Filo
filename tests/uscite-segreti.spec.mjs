@@ -294,6 +294,40 @@ test('la segnalazione che Filo propone da sé non cita il codice letto da fuori'
   expect(inviato).not.toContain(CODICE);
 });
 
+test('il codice che l’utente scrive in chat esce anche dopo l’OK, dove l’ha letto Filo prima', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await preparaModelli(app);
+  await senzaAccoglienza(app, page);
+  await app.evaluate(() => {
+    globalThis.__fbInviati = [];
+    globalThis.SN_FEEDBACK.submit = async (p) => { globalThis.__fbInviati.push(p); return { id: 'fb-prova' }; };
+  });
+  await modelloFinto(app, {
+    giri: [
+      { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `echo "Il tuo codice monouso è ${CODICE}"` }) }] },
+      { text: 'La banca ti ha mandato un codice monouso.' },
+    ],
+  });
+  await page.locator('#input').fill('leggi la notifica della banca');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'La banca ti ha mandato' })).toBeVisible({ timeout: 20_000 });
+
+  await modelloFinto(app, {
+    giri: [
+      { toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ titolo: 'Codice in ritardo', testo: `Il codice ${CODICE} della banca arriva dopo dieci minuti.` }) }] },
+      { text: 'Ti preparo la segnalazione.' },
+    ],
+  });
+  await page.locator('#input').fill(`manda una segnalazione a Filo: il codice ${CODICE} della banca arriva dopo dieci minuti`);
+  await page.locator('#sendBtn').click();
+  await clickConfirm(page, 'ok', { timeout: 20_000 });
+  await expect.poll(() => app.evaluate(() => globalThis.__fbInviati.length), { timeout: 10_000 }).toBe(1);
+  expect(JSON.stringify(await app.evaluate(() => globalThis.__fbInviati))).toContain(CODICE);
+  await expect(page.locator('.dash-activity-row', { hasText: 'Non ho inviato' })).toHaveCount(0);
+});
+
 test('una chiave custodita non esce nemmeno confermata, e nessun segreto arriva al prompt', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const casa = cartellaInCasa('filo-uscite-segreti-');
