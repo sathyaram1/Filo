@@ -21,7 +21,8 @@ test('carta tenuta aperta su una scheda di dietro che finisce di caricare: la fo
     await expect.poll(async () => { d = (await schede(app)).tutte.find((t) => /localhost/.test(t.url))?.id; return !!d; }, { timeout: 5000 }).toBe(true);
     await shell.mouse.move(600, 500);
     await shell.waitForTimeout(900);
-    await shell.locator(`.tab[data-id="${d}"]`).hover();
+    // Sul bordo sinistro: la scheda si stringe quando «Nuova scheda» diventa «Lenta», e il centro finirebbe sul «+».
+    await shell.locator(`.tab[data-id="${d}"]`).hover({ position: { x: 12, y: 16 } });
     await expect.poll(async () => (await carta(app)).visibile, { timeout: 3000 }).toBe(true);
     await expect.poll(async () => (await schede(app)).tutte.find((t) => t.id === d)?.foto, { timeout: 10_000 }).toBe(true);
     await expect.poll(async () => verde((await carta(app)).colore), { timeout: 3000 }).toBe(true);
