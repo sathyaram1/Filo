@@ -145,7 +145,7 @@
         return;
       }
       sendBtn.disabled = !hasText;
-      if (statusEl.classList.contains('sn-rt-status--err') && hasText) setStatus('');
+      if (daInput && statusEl.classList.contains('sn-rt-status--err') && hasText) setStatus('');
     }
 
     // ---- bozze persistenti (sopravvivono a chiusura/riapertura) ----
