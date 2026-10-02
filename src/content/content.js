@@ -409,12 +409,22 @@
       // activeElement nel caso il keydown arrivi sul body con un campo a fuoco.
       const target = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
       if (isEditable(target) || isEditable(document.activeElement)) return;
+      // Una pagina di Filo in cui l'utente ha dato Ctrl+Z a un suo comando (un
+      // modulo dell'Editor) se lo tiene: vince la scelta esplicita (#545).
+      if (PAGINA_DI_FILO && document.documentElement.dataset.filoCtrlZ === 'pagina') return;
       e.preventDefault();
       e.stopPropagation();
       chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
     }, { capture: true });
 
-    if (isBlocked()) return;
+    if (isBlocked()) {
+      self.__snFiloSpento = true;
+      // Alt+S è un gesto rivolto a Filo: anche qui salva con la miniatura e la conferma della voce del menu (#839).
+      chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+        if (msg?.type === MSG.SHORTCUT_TRIGGERED && COMANDI_SALVA.has(msg.command)) suSalvaPerDopo(msg, sendResponse);
+      });
+      return;
+    }
 
     SpellCheck.init(settings);
 
@@ -2135,15 +2145,27 @@
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
-      // Shortcut save-for-later: il SW chiede al content il payload.
-      if (msg.command === 'save-for-later') {
-        if (isBlocked()) { sendResponse({ savePayload: null }); return; }
-        sendResponse({ savePayload: Actions.buildSavePayload() });
-        return;
-      }
+      if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
       handleShortcut(msg.command, msg.context);
       sendResponse({ ok: true });
     }
+  }
+
+  // #839 — Alt+S è la voce «Salva per dopo» del menu: stessa funzione, stessa miniatura, stessa conferma.
+  // La conferma arriva qui anche per un salvataggio che la scheda salvata non poteva mostrare: questa è quella davanti.
+  const COMANDI_SALVA = new Set(['save-for-later', 'save-for-later-confirm']);
+
+  function suSalvaPerDopo(msg, sendResponse) {
+    if (IS_SUBFRAME) return;
+    // Anche la conferma torna con la ricevuta: finché nessuna pagina la prende il main la riprova sulla scheda davanti.
+    sendResponse({ presa: true });
+    if (msg.command === 'save-for-later') {
+      try { Menu.close(); } catch (_) {}
+      Actions.savePage();
+      return;
+    }
+    const ctx = msg.context || {};
+    Actions.showSaveConfirm(ctx.entry, { chiudiScheda: false, conferma: ctx.conferma });
   }
 
   function selectionAnchor() {
@@ -2173,7 +2195,6 @@
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
     }
-    // save-for-later è gestito direttamente nel background
   }
 
   // La lettura ad alta voce e la dettatura (tutto l'audio del content script)

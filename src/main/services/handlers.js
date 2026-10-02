@@ -10,13 +10,21 @@
 
 const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
+const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
 const { MSG } = SN_MSG;
 const Storage = globalThis.SN_STORAGE;
-const Providers = globalThis.SN_PROVIDERS;
 const Costs = globalThis.SN_COSTS;
+const Gate = globalThis.SN_MODEL_GATE.create({
+  getSettings: () => getEffectiveSettings(),
+  buildChain: (s, ref, action) => buildAttemptChain(s, ref, action),
+  modelFor: (s, action) => modelForAction(s, action),
+  routing: (s) => providerRouting(s),
+  noteServed: (s, action, r) => noteServedProvider(s, action, r),
+  costs: Costs,
+});
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
 const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
@@ -26,6 +34,7 @@ const I18n = globalThis.SN_I18N;
 const Categorizer = globalThis.SN_CATEGORIZER;
 const AICache = globalThis.SN_AI_CACHE;
 const Fx = globalThis.SN_FX;
+const Calc = globalThis.SN_CALC;
 const Paths = globalThis.SN_PATHS;
 const LlmsTxt = globalThis.SN_LLMS_TXT;
 const FiloMem = globalThis.SN_FILO_MEMORY;
@@ -224,6 +233,11 @@ async function buildMessages(action, payload) {
   throw new Error(`Action sconosciuta: ${action}`);
 }
 
+// Chiave GSB effettiva: la condivisa (build, o quella dell'admin finché è dentro) vince sulla personale.
+function safeBrowsingKeyFor(settings, d = Defaults.get()) {
+  return d.safeBrowsingKey || settings?.security?.safeBrowse?.safeBrowsingKey || '';
+}
+
 // Quando "usa modelli predefiniti" è attivo (default), la risoluzione di
 // modelli/registry/provider usa la config predefinita condivisa, e le chiavi
 // sono quelle di default (build env / override admin via Firestore), con
@@ -240,8 +254,9 @@ function withDefaults(settings) {
   // DAL BUILD (default-keys.js), non da Firestore. Chi passa di qui non tolga
   // la strada del build credendola un doppione: è l'unica che serve tutti.
   const sec = settings.security || {};
-  const security = d.safeBrowsingKey
-    ? { ...sec, safeBrowse: { ...(sec.safeBrowse || {}), safeBrowsingKey: d.safeBrowsingKey } }
+  const sbKey = safeBrowsingKeyFor(settings, d);
+  const security = sbKey
+    ? { ...sec, safeBrowse: { ...(sec.safeBrowse || {}), safeBrowsingKey: sbKey } }
     : sec;
 
   // Politica sui fornitori (#421): è una regola di Filo, non una preferenza
@@ -365,21 +380,6 @@ function openWeightsConfigError(settings, action, droppedRefs) {
   e.action = action || '';
   e.droppedRefs = refs;
   return e;
-}
-
-async function ensureUnderLimit(settings) {
-  if (await Costs.isOverLimit(settings.monthlyLimitEur)) {
-    const e = new Error(I18n.t('err_limit_reached'));
-    e.code = 'LIMIT_REACHED';
-    throw e;
-  }
-}
-
-// Oltre il limite di spesa nessun tentativo parte: non esiste più un fornitore
-// "gratuito" su cui ripiegare (era l'API diretta di Google, oggi fuori da Filo).
-async function applyLimitToChain(settings, attempts) {
-  await ensureUnderLimit(settings);
-  return attempts;
 }
 
 // Catena di tentativi per servire una richiesta. L'UNICA sorgente dei modelli è
@@ -524,44 +524,6 @@ function noteServedProvider(settings, action, result) {
   return { servedBy, violation };
 }
 
-// ─── Chi ha servito, a posteriori (voce e dettatura) ─────────────────────────
-// Per le chiamate audio il router non mette il fornitore nella risposta; lo si
-// chiede dopo con l'id della generazione, che diventa leggibile qualche secondo
-// più tardi. Best-effort e FUORI dal cammino della risposta: la politica va
-// verificata, ma chi detta non deve aspettare la verifica. Se risulta un
-// escluso: log, toast a interruttore acceso, e la voce di cronologia (se c'è)
-// viene marchiata. Con `recordCost` registra anche il costo che il router
-// riporta lì (la lettura ad alta voce non lo dice nella risposta).
-function auditServedByLater({ settings, action, provider, model, apiKey, generationId, historyId, recordCost, keySource = '' }) {
-  if (!generationId) return;
-  const P = Providers.getProvider(provider);
-  if (!P || typeof P.lookupServedBy !== 'function') return;
-  const delays = [4000, 10000, 25000];
-  let i = 0;
-  const schedule = () => {
-    if (i >= delays.length) return;
-    const t = setTimeout(tick, delays[i++]);
-    if (t && typeof t.unref === 'function') t.unref();
-  };
-  const tick = async () => {
-    let r = null;
-    try { r = await P.lookupServedBy({ apiKey, generationId }); } catch (_) { r = null; }
-    if (!r || !r.servedBy) { schedule(); return; }
-    const { servedBy, violation } = noteServedProvider(settings, action, { servedBy: r.servedBy });
-    if (historyId) {
-      try { await History.patch(historyId, { servedBy, policyViolation: violation }); } catch (_) {}
-    }
-    if (recordCost && Number.isFinite(r.costUsd) && r.costUsd > 0) {
-      try {
-        await Costs.record({
-          action, provider, model, usage: { costUsd: r.costUsd, keySource }, pricing: null, usdToEur: settings.usdToEur,
-        });
-      } catch (_) {}
-    }
-  };
-  schedule();
-}
-
 // ─── Dettatura ───────────────────────────────────────────────────────────────
 // Non è una chat: l'audio va all'endpoint di trascrizione, che risponde col
 // testo. Stessa catena di modelli, stesso limite di spesa, stesso riscontro su
@@ -570,9 +532,8 @@ function auditServedByLater({ settings, action, provider, model, apiKey, generat
 async function handleTranscription({ settings, payload, origin, signal }) {
   const p = payload || {};
   const model = modelForAction(settings, ACTIONS.TRANSCRIBE_AUDIO);
-  const attempts = await applyLimitToChain(
-    settings, buildAttemptChain(settings, model, ACTIONS.TRANSCRIBE_AUDIO),
-  );
+  const attempts = buildAttemptChain(settings, model, ACTIONS.TRANSCRIBE_AUDIO);
+  await Gate.ensureUnderLimit(settings);
   let audioBase64 = typeof p.audioBase64 === 'string' ? p.audioBase64 : '';
   let format = typeof p.format === 'string' && p.format ? p.format : 'wav';
   if (!audioBase64 && typeof p.dataUrl === 'string') {
@@ -590,29 +551,23 @@ async function handleTranscription({ settings, payload, origin, signal }) {
   }
   const Voices = globalThis.SN_TTS_VOICES;
   const language = Voices ? Voices.langOf(p.lang) : '';
-  const routing = providerRouting(settings);
   let lastErr = null;
   for (const a of attempts) {
-    const P = Providers.getProvider(a.provider);
-    if (!P || typeof P.transcribe !== 'function' || !a.model) continue;
+    if (!Gate.supports(a.provider, 'transcribe') || !a.model) continue;
     try {
-      const r = await P.transcribe({
-        apiKey: a.apiKey, model: a.model, audioBase64, format,
-        language: language || undefined, providerRouting: routing, signal,
+      // Chi ha servito può arrivare dopo la voce di cronologia: la si marchia allora.
+      let historyId = null;
+      const r = await Gate.call({
+        action: ACTIONS.TRANSCRIBE_AUDIO, settings, attempt: a, method: 'transcribe',
+        args: { audioBase64, format, language: language || undefined, signal },
+        onLateServedBy: ({ servedBy, violation }) => (historyId
+          ? History.patch(historyId, { servedBy, policyViolation: violation }) : null),
       });
       const text = String(r.text || '').trim();
-      const { servedBy, violation } = noteServedProvider(settings, ACTIONS.TRANSCRIBE_AUDIO, r);
-      let costEur = 0;
-      try {
-        costEur = await Costs.record({
-          action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model,
-          usage: r.usage, pricing: null, usdToEur: settings.usdToEur,
-        });
-      } catch (_) {}
+      const { servedBy, violation, costEur } = r;
       // Le trascrizioni PROVVISORIE della dettatura in diretta non vanno in
       // cronologia: ne arriverebbe una al secondo, tutte sostituite dalla
       // definitiva. Il costo però si registra sempre.
-      let historyId = null;
       if (!p.interim) {
         try {
           const h = await History.append({
@@ -624,16 +579,9 @@ async function handleTranscription({ settings, payload, origin, signal }) {
           historyId = h && h.id;
         } catch (_) {}
       }
-      if (!servedBy) {
-        // La generazione si rilegge con la chiave che l'ha fatta: dopo un
-        // ripiego (#629) non è più quella con cui si era partiti.
-        auditServedByLater({
-          settings, action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model,
-          apiKey: r.keyUsed || a.apiKey, generationId: r.generationId, historyId,
-        });
-      }
       return { text, model: a.model, provider: a.provider, costEur, usage: r.usage };
     } catch (e) {
+      if (e && e.code === 'LIMIT_REACHED') throw e;
       lastErr = e;
       console.warn(`[SN] dettatura ${a.provider}/${a.model} fallita:`, e.message || e);
     }
@@ -727,13 +675,15 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   // Con gli strumenti in richiesta la cache si salta: conserva solo il testo, e
   // una risposta fatta di chiamate rientrerebbe come una risposta muta.
   const hasTools = Array.isArray(tools) && tools.length > 0;
-  const cached = (noCache || hasTools) ? null : await AICache.get({ provider: settings.provider, model, messages });
+  // Il giudice delle carte ha la sua cache per carta e criterio: qui le sue venti risposte a ricerca butterebbero
+  // fuori quelle del resto di Filo, che ha un tetto di voci (#382).
+  const skipCache = hasTools || action === ACTIONS.DECKS_SEARCH_FILTER;
+  const cached = (noCache || skipCache) ? null : await AICache.get({ provider: settings.provider, model, messages });
   if (cached) {
     return { text: cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
 
-  const attemptsRaw = buildAttemptChain(settings, model, action);
-  const attempts = await applyLimitToChain(settings, attemptsRaw);
+  const attempts = buildAttemptChain(settings, model, action);
 
   // Se il caller vuole il RAGIONAMENTO in diretta (es. la chat della home, #priorità1)
   // o la RISPOSTA in diretta (#420) usiamo il cammino in streaming, che espone i
@@ -754,8 +704,8 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   const result = (onReasoning || onText || onToolCall)
     ? await (async () => {
         let acc = '';
-        const r = await Providers.streamCompleteWithFallback({
-          attempts, messages, tools, toolChoice, signal,
+        const r = await Gate.stream({
+          action, settings, attempts, messages, tools, toolChoice, signal,
           onDelta: (d) => {
             acc += d;
             mark('firstTextMs');
@@ -775,18 +725,11 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
         if (textStreamer) textStreamer.flush();
         return { ...r, text: r.text != null ? r.text : acc };
       })()
-    : await Providers.completeWithFallback({ attempts, messages, tools, toolChoice, signal });
+    : await Gate.complete({ action, settings, attempts, messages, tools, toolChoice, signal });
   timing.totalMs = Date.now() - t0;
   const toolCalls = Array.isArray(result.toolCalls) ? result.toolCalls : [];
   const reasoningDetails = Array.isArray(result.reasoningDetails) ? result.reasoningDetails : [];
-  const usedProvider = result.provider || attempts[0].provider;
-  const concreteModel = result.model || attempts[0].model;
-  const { servedBy, violation } = noteServedProvider(settings, action, result);
-  const pricing = settings.pricing?.[concreteModel];
-  const costEur = await Costs.record({
-    action, provider: usedProvider, model: concreteModel,
-    usage: result.usage, pricing, usdToEur: settings.usdToEur,
-  });
+  const { provider: usedProvider, model: concreteModel, servedBy, violation, costEur } = result;
 
   if (
     action !== ACTIONS.TRANSLATE_PAGE && action !== ACTIONS.CATEGORIZE
@@ -796,6 +739,9 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     // richiesta dell'utente: come quando prendeva in prestito «Categorizza»,
     // resta fuori dalla cronologia.
     && action !== ACTIONS.MANAGE_SEARCH
+    // Il giudice delle carte è il passaggio interno di una ricerca nel deck builder, fino a venti chiamate a ricerca
+    // col prompt intero: in cronologia buttava fuori tutto il resto in una dozzina di ricerche (#382).
+    && action !== ACTIONS.DECKS_SEARCH_FILTER
   ) {
     // Le azioni chiamate in questo giro stanno nell'output della voce: un giro
     // fatto solo di chiamate non è una risposta vuota.
@@ -809,7 +755,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     });
   }
 
-  if (!hasTools) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage }).catch(() => {});
+  if (!skipCache) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage }).catch(() => {});
   return {
     text: result.text, toolCalls, reasoningDetails, finishReason: result.finishReason || null,
     model: concreteModel, provider: usedProvider, costEur, usage: result.usage, timing,
@@ -841,24 +787,14 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
     return { costEur: 0, usage: cached.usage || {}, cached: true, provider: settings.provider, model };
   }
 
-  await ensureUnderLimit(settings);
-  const attempts = buildAttemptChain(settings, model, action);
-
-  const result = await Providers.streamCompleteWithFallback({
-    attempts, messages, signal,
+  const result = await Gate.stream({
+    action, settings, messages, signal,
     onDelta: (delta) => { if (onDelta) onDelta(delta); },
     // Il provider è caduto DOPO aver già streamato dei delta: avvisa il
     // renderer di buttare il testo parziale prima che arrivi il fallback (#273).
     onReset: (info) => { if (onReset) onReset(info); },
   });
-  const usedProvider = result.provider || attempts[0].provider;
-  const concreteModel = result.model || attempts[0].model;
-  const { servedBy, violation } = noteServedProvider(settings, action, result);
-  const pricing = settings.pricing?.[concreteModel];
-  const costEur = await Costs.record({
-    action, provider: usedProvider, model: concreteModel,
-    usage: result.usage, pricing, usdToEur: settings.usdToEur,
-  });
+  const { provider: usedProvider, model: concreteModel, servedBy, violation, costEur } = result;
 
   await History.append({
     action, provider: usedProvider, model: concreteModel, servedBy,
@@ -911,7 +847,11 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
     const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     for (const line of lines) {
       const m = line.match(/^LEZIONE:\s*(.+)$/i);
-      if (m) await FiloMem.appendLesson(m[1]);
+      if (!m) continue;
+      // Il tetto vale anche per le lezioni che Filo si scrive da solo (#592).
+      const l = global.SN_PREF.lezioneDaAzione({ testo: m[1] });
+      if (l.rifiuto) { console.warn('[Filo] lezione automatica scartata:', l.rifiuto); continue; }
+      if (l.testo) await FiloMem.appendLesson(l.testo);
     }
     if (await FiloMem.lessonsBufferShouldCompact()) {
       maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
@@ -995,14 +935,24 @@ async function applySettingsUpdate(partial) {
     }
   } catch (_) {}
   try { require('./fingerprint').setMode(merged); } catch (_) {}
-  wireSafebrowse(withDefaults(merged)).catch(() => {});
+  wireSafebrowse(merged).catch(() => {});
   try {
     const Cookies = require('./cookies');
-    Cookies.configureFromSettings(merged);
-    broadcastToTabs({ type: MSG.COOKIES_CONFIG_UPDATE, mode: Cookies.getMode(merged) });
+    const cookiesChanged = Cookies.configureFromSettings(merged);
+    require('./cookieBanners').configureFromSettings(merged);
+    // Ogni frame di ogni scheda rilegge la sua config: solo se la modalità o i siti coi banner sono cambiati.
+    if (cookiesChanged) {
+      broadcastToTabs({ type: MSG.COOKIES_CONFIG_UPDATE, mode: Cookies.getMode(merged) });
+      // Il menu della scheda dice se su quel sito i banner si vedono: la barra deve saperlo subito.
+      for (const w of BrowserWindow.getAllWindows()) { try { w._filoTabs && w._filoTabs._broadcast(); } catch (_) {} }
+    }
   } catch (_) {}
   try { require('./adblock').configureFromSettings(merged); } catch (_) {}
   try { require('./siteBlock').configureFromSettings(merged); } catch (_) {}
+  // Una scheda già aperta su un sito appena messo in lista si porta via subito (#590).
+  try {
+    for (const w of BrowserWindow.getAllWindows()) w._filoTabs?.riapplicaListaBloccati?.();
+  } catch (_) {}
   try { require('./downloads').configureFromSettings(merged); } catch (_) {}
   return merged;
 }
@@ -1033,6 +983,14 @@ function targetWebTab(sender) {
   const recent = tm.tabs.filter(isWeb).sort((a, b) => (b.lastActiveAt || 0) - (a.lastActiveAt || 0));
   return { win, tm, tab: recent[0] || null };
 }
+
+// Esito di PROXY_TAB e REGOLA_PROXY_DOMINIO senza fornitore: proxyUnavailableForPrompt
+// e la riga del diario lo riconoscono da `proxy`, e nessuno dei due lo dà per fatto.
+const proxyNonDisponibile = () => ({ proxy: 'non_disponibile' });
+const esitoNonDisponibile = (a) => !!(a && a._output && a._output.proxy === 'non_disponibile');
+const RISPOSTA_PROXY_NON_DISPONIBILE = 'Aprire un sito da un altro paese in Filo non si può ancora.';
+const SOLLECITO_DOPO_RIFIUTO = '[Il tuo ultimo messaggio è vuoto. Il testo che hai scritto insieme alle azioni l\'utente non l\'ha letto come risposta, '
+  + 'e dava per fatto quello che non è disponibile. Scrivi adesso la risposta completa per l\'utente, tenendo conto degli esiti qui sopra.]';
 
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
 // cambio (la scrittura su storage è condivisa, le cache in-memory no).
@@ -1108,11 +1066,11 @@ function displayCwd(cwd) {
   return p;
 }
 
-// Corpus sensibile per il taint-match di NAVIGA (anti-esfiltrazione): SOLO i
-// dati personali persistenti che il modello aveva nel contesto — memoria
-// (profilo/preferenze/espansioni) e appunti. NON lo stato delle schede né le
-// loro URL: un legittimo "riapri la scheda X" porterebbe quell'URL nel link e
-// matcherebbe lo stato → falso positivo. Quelli non sono segreti da proteggere.
+// Corpus sensibile per il taint-match di NAVIGA (anti-esfiltrazione): i dati
+// personali persistenti — memoria (profilo/preferenze/espansioni) e appunti.
+// Ciò che il modello ha letto nel turno (comandi, documenti) lo aggiunge
+// SN_URL_EXFIL.valutaNaviga dalle azioni viste. NON lo stato delle schede né le
+// loro URL: un legittimo "riapri la scheda X" matcherebbe → falso positivo.
 async function navExfilCorpus() {
   try {
     const mem = await FiloMem.getMemory();
@@ -1141,7 +1099,7 @@ async function navExfilCorpus() {
 // Le pagine interne filo:// (chat della dashboard) restano fidate per origine e
 // non hanno bisogno del pending. Un CONFIRM forgiato senza il RUN corrispondente
 // non ha un pending e viene rifiutato.
-const pendingConfirms = new Map(); // key → scadenza (ms)
+const pendingConfirms = new Map(); // key → { scade, mostrati }
 const PENDING_CONFIRM_TTL = 5 * 60 * 1000;
 // Firma stabile dell'azione: ignora i campi iniettati dal main (prefissati con
 // `_`, es. `_illegible`/`_exfil`/`_confirm`) così RUN e CONFIRM combaciano.
@@ -1164,15 +1122,30 @@ function pendingConfirmKey(sender, action) {
 function recordPendingConfirm(sender, action) {
   const now = Date.now();
   // Purga opportunistica delle scadute (la mappa resta piccola).
-  for (const [k, exp] of pendingConfirms) if (exp <= now) pendingConfirms.delete(k);
-  pendingConfirms.set(pendingConfirmKey(sender, action), now + PENDING_CONFIRM_TTL);
+  for (const [k, rec] of pendingConfirms) if (rec.scade <= now) pendingConfirms.delete(k);
+  pendingConfirms.set(pendingConfirmKey(sender, action), {
+    scade: now + PENDING_CONFIRM_TTL,
+    mostrati: { righe: action._righe, targetIds: action._targetIds },
+  });
 }
 function consumePendingConfirm(sender, action) {
   const key = pendingConfirmKey(sender, action);
-  const exp = pendingConfirms.get(key);
-  if (!exp) return false;
+  const rec = pendingConfirms.get(key);
+  if (!rec) return false;
   pendingConfirms.delete(key); // one-time
-  return exp > Date.now();
+  return rec.scade > Date.now();
+}
+function daPaginaDiFilo(sender) {
+  return String(sender?.tab?.url || sender?.url || '').startsWith('filo://');
+}
+// All'OK si agisce su quello che il popup ha mostrato, non su ciò che lo stesso
+// riferimento trova adesso: nel frattempo la lista può essere cambiata (#592).
+// Una pagina di Filo rimanda l'azione col popup che ha mostrato; per le altre
+// vale quello registrato alla richiesta di conferma.
+function bersagliMostrati(sender, action) {
+  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds };
+  const rec = pendingConfirms.get(pendingConfirmKey(sender, action));
+  return rec && rec.scade > Date.now() ? rec.mostrati : null;
 }
 
 // Riferimento dell'utente a una sveglia / un timer, normalizzato dai sinonimi
@@ -1209,9 +1182,27 @@ function cleanLabel(v) {
   return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
 }
 
-async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
+// Il perimetro di lettura del comando o documento (#587): lo decide il main,
+// mai l'LLM, e lo sovrascrive sempre (gli argomenti del modello possono averne uno).
+function perimetroLettura(sender) {
+  let home = '';
+  try { home = require('node:os').homedir() || ''; } catch (_) {}
+  const win = process.platform === 'win32';
+  let cwd = '';
+  try { cwd = cartellaDelComando(getAssistantCwd(sender)) || ''; } catch (_) {}
+  return { cwd, home, win, maiuscole: win || process.platform === 'darwin' };
+}
+
+// `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in
+// questo turno, turni passati compresi: servono all'anti-esfiltrazione di NAVIGA.
+async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null, assistente = false } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
+  // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
+  // barra d'aiuto, confermate o no. `sender` assente = chiamata interna del main.
+  if (sender && !azioneAmmessaDa(action, sender?.tab?.url || sender?.url || '')) {
+    return { executed: false, kept: false, rejected: true, code: 'forbidden' };
+  }
 
   // IMPOSTA_ESTETICA: il livello (1 normale, 2 se rende il testo illeggibile)
   // dipende dallo stato risultante, che solo il main conosce (ha i token
@@ -1230,20 +1221,40 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
 
   // NAVIGA: difesa anti-esfiltrazione. Una pagina ostile (prompt injection) può
   // far aprire al modello un URL che PORTA FUORI dati che aveva nel contesto
-  // (memoria/profilo, appunti) codificandoli nella query/path/sottodominio. Il
-  // taint-match verifica se l'URL contiene pezzi del materiale sensibile; il
-  // fallback strutturale (solo da origine non fidata) copre i dati cifrati. Se
-  // sospetto, iniettiamo `_exfil` PRIMA del gate (mai dall'LLM): NAVIGA sale a
-  // livello 2 e l'utente conferma vedendo l'URL completo. Vedi src/shared/urlExfil.js.
+  // (memoria, appunti, output dei comandi e documenti letti nel turno)
+  // codificandoli nella query/path/sottodominio. Il fallback strutturale scatta
+  // quando nel contesto è entrato testo scritto da altri (#587: conta cosa il
+  // modello ha letto, non chi manda il messaggio). Se sospetto, `_exfil` PRIMA
+  // del gate (mai dall'LLM): livello 2 con l'URL completo. Vedi src/shared/urlExfil.js.
   if (type === 'NAVIGA') {
     try {
       const Exfil = globalThis.SN_URL_EXFIL;
       const url = String(action.url ?? action.href ?? action.link ?? '').trim();
       if (Exfil && url) {
         const origin = sender?.tab?.url || sender?.url || '';
-        const fromUntrusted = /^https?:/i.test(origin);
-        const corpus = await navExfilCorpus();
-        const v = Exfil.assess(url, { corpus, fromUntrusted });
+        const v = Exfil.valutaNaviga(url, {
+          memoria: await navExfilCorpus(),
+          azioni: Array.isArray(contesto) ? contesto : [],
+          daPagina: /^https?:/i.test(origin),
+        });
+        if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
+      }
+    } catch (_) {}
+  }
+
+  // CERCA_WEB: la query esce dal computer verso il motore di ricerca, come un
+  // NAVIGA porta fuori l'URL. Stessa difesa: se il testo cercato porta un
+  // segreto della memoria o un pezzo di ciò che il modello ha letto nel turno,
+  // `_exfil` PRIMA del gate (mai dall'LLM) → livello 2 con la query mostrata.
+  if (type === 'CERCA_WEB') {
+    try {
+      const Exfil = globalThis.SN_URL_EXFIL;
+      const query = String(action.query ?? action.q ?? action.testo ?? action.text ?? '').trim();
+      if (Exfil && query) {
+        const v = Exfil.valutaRicerca(query, {
+          memoria: await navExfilCorpus(),
+          azioni: Array.isArray(contesto) ? contesto : [],
+        });
         if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
       }
     } catch (_) {}
@@ -1253,16 +1264,37 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
   // timer il riferimento dell'utente prende davvero — cosa che solo il main sa,
   // avendo la lista. Risolviamo il riferimento PRIMA del gate e iniettiamo
   // `_targets` (le voci in chiaro, per il popup) e `_targetIds` (su cui agire
-  // dopo la conferma, così la risoluzione non viene rifatta su una lista nel
-  // frattempo cambiata). Mai calcolati dall'LLM.
+  // dopo la conferma: all'OK valgono quelli mostrati, vedi bersagliMostrati).
+  // Mai calcolati dall'LLM.
   if (type === 'CANCELLA_SVEGLIA' || type === 'MODIFICA_SVEGLIA') {
     try {
-      const ref = timerRefOf(action);
       const list = await FiloMem.listTimers();
-      const targets = FiloMem.resolveTimerRefs(list, ref);
+      const visti = confirmed ? bersagliMostrati(sender, action) : null;
+      const targets = visti && Array.isArray(visti.targetIds)
+        ? list.filter((t) => visti.targetIds.includes(t.id))
+        : FiloMem.resolveTimerRefs(list, timerRefOf(action));
       action._targets = targets.map(describeTimerEntry);
       action._targetIds = targets.map((t) => t.id);
     } catch (_) {}
+  }
+
+  // DIMENTICA: le righe che la frase indica le trova il main, prima del gate,
+  // così il popup mostra quelle che se ne andranno (#592).
+  // Il popup riporta righe della memoria: a una pagina visitata non si mostrano.
+  let righeDaDimenticare = [];
+  if (type === 'DIMENTICA') {
+    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+      return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
+    }
+    try {
+      if (confirmed) {
+        const visti = bersagliMostrati(sender, action);
+        righeDaDimenticare = await FiloMem.linesWithText(visti && Array.isArray(visti.righe) ? visti.righe : []);
+      } else {
+        righeDaDimenticare = await FiloMem.findLines(action.testo ?? action.text ?? action.riga ?? '');
+      }
+    } catch (_) {}
+    action._righe = righeDaDimenticare.map((r) => r.testo);
   }
 
   // ── modalità terminale: gate hard, indipendente dal livello (#146.6) ──────
@@ -1290,6 +1322,8 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     // parte, fatta nello stesso posto.
     action._cwd = displayCwd(cartellaDelComando(getAssistantCwd(sender)));
   }
+
+  if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO') action._perimetro = perimetroLettura(sender);
 
   // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
   // Il livello è assegnato STATICAMENTE nel registro (src/shared/actionLevels.js),
@@ -1326,9 +1360,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
   // sono fidate per origine. Un FILO_CONFIRM_ACTION forgiato "a freddo" da fuori
   // non ha un pending corrispondente → rifiutato (l'azione non si esegue).
   if (level >= 2 && confirmed && !hasBespokeConfirm) {
-    const origin = sender?.tab?.url || sender?.url || '';
-    const trusted = String(origin).startsWith('filo://');
-    if (!trusted && !consumePendingConfirm(sender, action)) {
+    if (!daPaginaDiFilo(sender) && !consumePendingConfirm(sender, action)) {
       console.warn('[Filo] FILO_CONFIRM_ACTION senza conferma legittima: rifiutata', type);
       return { executed: false, kept: false, rejected: true };
     }
@@ -1373,6 +1405,28 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           const tm = win && win._filoTabs;
           if (tm && typeof tm.openTab === 'function') {
             tabId = tm.openTab(url, { activate: !background });
+            // Gli schemi non web sono esclusi qui sopra: una scheda che non
+            // nasce è la lista dei siti bloccati (#590), e la chat lo deve dire.
+            // L'assistente sulla pagina può poi chiedere «Apri comunque» solo per quello che gli è stato fermato.
+            const fermata = (host, reason, target) => {
+              if (assistente && sender && sender.wc && typeof tm.ricordaApribile === 'function') tm.ricordaApribile(sender.wc, target);
+              return { executed: false, kept: true, output: { blocked: 'site', host: host || '', reason: reason || '', url: target } };
+            };
+            if (!tabId) {
+              const assoluto = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`;
+              let d = null;
+              try { d = require('./siteBlock').shouldBlockNavigation(assoluto); } catch (_) {}
+              return fermata(d && d.host, d && d.reason, assoluto);
+            }
+            // Un blocco che la pagina provoca dopo l'attesa qui sotto arriva lo stesso a chi l'ha chiesta:
+            // la chat della home o l'assistente sulla pagina.
+            const seguibile = assistente || String((sender && sender.url) || '').startsWith('filo://');
+            if (sender && sender.wc && seguibile && action._callId && typeof tm.seguiApertura === 'function') {
+              tm.seguiApertura(tabId, { wc: sender.wc, callId: action._callId, assistente });
+            }
+            // La scheda nata può fermarla dopo un rimbalzo verso la lista (un link accorciato, un rinvio della pagina).
+            const esito = typeof tm.esitoApertura === 'function' ? await tm.esitoApertura(tabId) : null;
+            if (esito && esito.bloccata) return fermata(esito.bloccata.host, esito.bloccata.reason, esito.bloccata.target);
             opened = true;
           }
         } catch (e) {
@@ -1485,16 +1539,15 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         return { executed: true, kept: false };
       }
       case 'SALVA_LEZIONE': {
-        // Filo fissa una lezione nella PROPRIA memoria su richiesta (o di sua
-        // iniziativa) in chat: la regola entra nel buffer delle lezioni — lo
-        // stesso che l'agente-lezioni riempie da solo — e da subito compare in
-        // LEZIONI RECENTI di ogni conversazione. Visibile e cancellabile
-        // dall'utente fra le memorie, come tutte le lezioni.
-        const lezione = String(action.testo ?? action.text ?? action.lezione ?? '').trim();
+        // Qui ci si arriva solo dopo l'OK dell'utente sul testo esatto (livello
+        // 2, #592). La lezione entra nel buffer e da subito in LEZIONI RECENTI
+        // di ogni conversazione; l'utente la rilegge e la toglie in Preferenze.
+        const l = global.SN_PREF.lezioneDaAzione(action);
+        if (l.rifiuto) return { executed: false, kept: false, output: { error: l.rifiuto, rifiuto: true } };
         let fissata = false;
-        if (lezione) {
+        if (l.testo) {
           try {
-            await FiloMem.appendLesson(lezione);
+            await FiloMem.appendLesson(l.testo);
             fissata = true;
             if (await FiloMem.lessonsBufferShouldCompact()) {
               maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
@@ -1536,6 +1589,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
         const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
         if (!built) return { executed: false, kept: false };
+        // Un rifiuto spiegato resta nel diario col suo perché: non è successo
+        // niente, ma l'utente deve saperlo anche se il modello non lo dice.
+        if (built.rifiuto) return { executed: false, kept: false, output: { error: built.rifiuto, rifiuto: true } };
         await applySettingsUpdate(built.partial);
         return { executed: true, kept: true };
       }
@@ -1721,6 +1777,23 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
             output: { documentRead: String(percorso == null ? '' : percorso), ok: false, error: 'unreadable', detail: 'lettura non disponibile' },
           };
         }
+        // Il nome quasi giusto (#551) può aver portato a un file diverso da
+        // quello valutato dal gate: se è fuori dal perimetro e nessuno ha
+        // confermato, il testo non esce di qui.
+        const C = globalThis.SN_CMD_CLASSIFY;
+        const fuori = r.path && !confirmed && (!C || C.fuoriPerimetro(r.path, action._perimetro));
+        if (fuori) {
+          return {
+            executed: false,
+            kept: true,
+            output: {
+              documentRead: String(percorso == null ? '' : percorso),
+              ok: false,
+              error: 'fuori_perimetro',
+              detail: 'il file trovato sta fuori dalla cartella personale: richiedilo col percorso esatto e l\'utente confermerà',
+            },
+          };
+        }
         return {
           executed: !!r.ok,
           kept: true,
@@ -1768,6 +1841,16 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           return { executed: false, kept: false };
         }
       }
+      case 'DIMENTICA': {
+        if (!righeDaDimenticare.length) {
+          return { executed: false, kept: false, output: { dimenticate: [] } };
+        }
+        const tolte = [];
+        for (const r of righeDaDimenticare) {
+          if (await FiloMem.forgetLine(r.via)) tolte.push(r.testo);
+        }
+        return { executed: tolte.length > 0, kept: false, output: { dimenticate: tolte } };
+      }
       case 'APRI_FILE':
         return { executed: true, kept: true };
       case 'ESEGUI_COMANDO': {
@@ -1797,8 +1880,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // di follow-up in chat — il testo della risposta è già la conferma, come
         // per IMPOSTA_PREFERENZA. kept:false → non resta un'azione nella bolla.
         const { tm, tab } = targetWebTab(sender);
+        if (tm && !(await tm.proxyAvailable())) return { executed: false, kept: false, output: proxyNonDisponibile() };
         if (!tm || !tab) return { executed: false, kept: false, output: { proxy: 'no_web_tab' } };
         const r = await tm.setTabProxy(tab.id, action.country ?? action.paese ?? action.codicePaese ?? action.location);
+        if (r && r.error === 'not_configured') return { executed: false, kept: false, output: proxyNonDisponibile() };
         return {
           executed: !!(r && r.ok),
           kept: false,
@@ -1825,6 +1910,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // Dominio esplicito dall'LLM, altrimenti quello della scheda web attiva.
         const domain = action.dominio ?? action.domain ?? action.sito ?? (tab ? tab.url : '');
         const r = await tm.setDomainProxyRule(country, { domain });
+        if (r && r.error === 'not_configured') return { executed: false, kept: false, output: proxyNonDisponibile() };
         if (r && r.ok) refreshProxyRulesAllWindows();
         return {
           executed: !!(r && r.ok),
@@ -1999,17 +2085,7 @@ function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', le
 }
 
 function broadcastLiveUpdate() {
-  const msg = { type: MSG.FILO_LIVE_UPDATED };
-  try {
-    for (const win of BrowserWindow.getAllWindows()) {
-      try { win.webContents.send('filo:broadcast', msg); } catch (_) {}
-      if (win._filoTabs) {
-        for (const t of win._filoTabs.tabs) {
-          try { t.view.webContents.send('filo:broadcast', msg); } catch (_) {}
-        }
-      }
-    }
-  } catch (_) {}
+  broadcastToTabs({ type: MSG.FILO_LIVE_UPDATED });
 }
 
 // Rende leggibile al modello l'output dei comandi eseguiti in un turno: estrae
@@ -2257,23 +2333,29 @@ function chatSearchesForPrompt(actions) {
 }
 
 // Re-immissione del CONTENUTO di un file letto con LEGGI_FILE in un turno
-// precedente (#379.5): l'agente vede il testo completo del file che ha chiesto e
-// risponde con quello davanti (prima vedeva solo il riassunto). Sono DATI di
-// sistema affidabili, non istruzioni dell'utente.
+// precedente (#379.5): l'agente risponde col testo completo davanti. Sono dati,
+// non istruzioni, e arrivano recintati come testo salvato (#592.4).
 function fileReadsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
   const blocks = [];
   for (const a of actions) {
     if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_FILE') continue;
     const out = a._output;
     if (!out || !('fileRead' in out)) continue;
     if (!out.found) {
-      blocks.push(`[File "${out.fileRead}" non trovato: non esiste (più) nell'editor]`);
+      blocks.push(`[File "${E.perCanaleSistema(out.fileRead)}" non trovato: non esiste (più) nell'editor]`);
       continue;
     }
-    let body = String(out.text || '');
-    if (body.length > 8000) body = `${tagliaInteri(body, 8000)}\n…(contenuto troncato)`;
-    blocks.push(`[Contenuto completo del file "${out.title || out.fileRead}"]\n${body || '(vuoto)'}`);
+    const body = String(out.text || '');
+    const taglio = body.length > 8000;
+    blocks.push(`[Contenuto completo del file ${E.perCanaleSistema(out.fileRead)}]\n`
+      + E.imbustaCampi({
+        tipo: 'TESTO_SALVATO',
+        campi: { Titolo: out.title || '(senza titolo)' },
+        corpo: (taglio ? tagliaInteri(body, 8000) : body) || '(vuoto)',
+      })
+      + (taglio ? '\n…(contenuto troncato: qui sopra ci sono i primi 8000 caratteri)' : ''));
   }
   return blocks.join('\n\n').trim();
 }
@@ -2363,17 +2445,78 @@ function documentReadsForPrompt(actions) {
 
 // Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
 // output dei comandi, dettagli delle capacità, risultati di ricerca, file e
-// documenti letti, documenti di trasparenza. Mai istruzioni — ma non tutti
-// nello stesso modo: le capacità e i documenti di trasparenza li scrive Filo,
-// i file dell'editor li scrive l'utente, mentre i risultati di una ricerca, il
-// testo di un documento e quello che un comando ha stampato li scrive qualcun
-// altro e arrivano imbustati come ogni altro contenuto esterno (#593).
+// documenti letti, documenti di trasparenza. Mai istruzioni: fuori dalla busta
+// resta solo ciò che scrive Filo (capacità, trasparenza); il resto, file
+// dell'editor compresi, arriva imbustato (#593, #592.4).
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
-    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions),
+    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
+    apertureFermateDopoForPrompt(actions),
   ].filter(Boolean).join('\n\n');
+}
+
+// Da un altro paese senza fornitore (#771): l'esito torna al modello anche nel
+// formato vecchio e nei turni dopo, dove il testo scritto con l'azione lo dava per fatto.
+function proxyUnavailableForPrompt(actions) {
+  if (!Array.isArray(actions) || !actions.some(esitoNonDisponibile)) return '';
+  return '[NON fatto: aprire da un altro paese non è ancora disponibile in Filo. Nessuna scheda è stata instradata e nessuna regola salvata. '
+    + 'Dillo all\'utente in una frase, senza darlo per fatto e senza promettere che succederà da solo, e non riprovare.]';
+}
+
+// I campi che portano un testo salvato da Filo, oltre alle voci colpite
+// (`_targets`, per ogni azione): un'azione nuova che ripete un nome salvato va qui.
+const CAMPI_SALVATI = {
+  TIMER: ['label', 'etichetta'],
+  SVEGLIA: ['label', 'etichetta'],
+  SALVA_LEZIONE: ['testo', 'text', 'lezione'],
+  DIMENTICA: ['_righe'],
+};
+
+// I testi salvati che una descrizione ripete (#592.4): nella frase di Filo
+// diventano «voce N», e i testi veri stanno nel recinto sotto, ripuliti.
+function descriviPerModello(action, { fatto = false } = {}) {
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  if (!Levels) return '';
+  const descrivi = fatto && Levels.describeDone ? Levels.describeDone : Levels.describe;
+  const tipo = String((action && action.type) || '').toUpperCase();
+  const voci = [];
+  const voce = (v) => {
+    const s = String(v);
+    if (!voci.includes(s)) voci.push(s);
+    return `voce ${voci.indexOf(s) + 1}`;
+  };
+  const copia = { ...action };
+  for (const campo of ['_targets', ...(CAMPI_SALVATI[tipo] || [])]) {
+    const v = action && action[campo];
+    if (Array.isArray(v)) copia[campo] = v.map(voce);
+    else if (typeof v === 'string' && v.trim()) copia[campo] = voce(v);
+  }
+  const frase = descrivi(copia) || '';
+  const usate = voci.map((v, i) => ({ v, n: i + 1 })).filter(({ n }) => new RegExp(`\\bvoce ${n}\\b`).test(frase));
+  if (!usate.length) return frase;
+  const E = globalThis.SN_ESTERNO;
+  return `${frase}\n${E.imbusta({
+    tipo: 'TESTO_SALVATO',
+    testo: usate.map(({ v, n }) => `voce ${n}: ${E.neutralizza(v, { unaRiga: true })}`).join('\n'),
+  })}`;
+}
+
+// Le pagine aperte con NAVIGA che si sono spostate da sé su un sito bloccato quando il turno era
+// già finito (la scheda le ha segnate `_output.dopo`): il modello le aveva date per aperte.
+function apertureFermateDopoForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const righe = [];
+  for (const a of actions) {
+    const o = a && a._output;
+    if (!o || !o.dopo || o.blocked !== 'site') continue;
+    const chi = o.reason === 'lists' ? 'fra i siti di pubblicità e tracciamento che Filo blocca' : 'nella lista dei siti bloccati dell\'utente';
+    righe.push(`- ${String(a.url || '')}: ha rimandato a ${o.host || 'un sito'}, ${chi}`);
+  }
+  return righe.length
+    ? `[Pagine che avevi aperto e che poi si sono spostate da sole su un sito bloccato: Filo le ha fermate, l'utente è rimasto sulla pagina di passaggio e il sito NON l'ha visto; sotto la tua risposta ha «Apri comunque».\n${righe.join('\n')}]`
+    : '';
 }
 
 // Un tentativo interrotto a metà da un guasto (rete, fornitore): queste azioni
@@ -2381,13 +2524,12 @@ function observationsForPrompt(actions) {
 // secondo timer, un secondo appunto. Dato di sistema, non istruzione.
 function interruptedActionsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
-  const Levels = globalThis.SN_ACTION_LEVELS;
   const righe = [];
   for (const a of actions) {
     if (!a || a._executed === false || a._confirm) continue;
     let cosa = String(a.type || '').toUpperCase();
     try {
-      const d = (Levels && (Levels.describeDone ? Levels.describeDone(a) : Levels.describe(a))) || '';
+      const d = descriviPerModello(a, { fatto: true });
       if (d) cosa = d.replace(/\.+\s*$/, '');
     } catch (_) {}
     righe.push(`- ${cosa}`);
@@ -2404,13 +2546,12 @@ function interruptedActionsForPrompt(actions) {
 // tirare a indovinare. Dato di sistema, non istruzione.
 function confirmedActionsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
-  const Levels = globalThis.SN_ACTION_LEVELS;
   const righe = [];
   for (const a of actions) {
     if (!a || !a._confirmed) continue;
     let cosa = String(a.type || '').toUpperCase();
     try {
-      const d = (Levels && (Levels.describeDone ? Levels.describeDone(a) : Levels.describe(a))) || '';
+      const d = descriviPerModello(a, { fatto: true });
       if (d) cosa = d.replace(/\.+\s*$/, '');
     } catch (_) {}
     righe.push(`- ${cosa}`);
@@ -2434,9 +2575,8 @@ const LEGACY_CONTINUE_NUDGE =
 // esplicitamente di NON richiamare l'azione: il popup è già davanti all'utente,
 // e un modello che la ritenta lo farebbe comparire due volte.
 function toolResultText({ action, res, rendered }) {
-  const Levels = globalThis.SN_ACTION_LEVELS;
   const type = String(action.type || '').toUpperCase();
-  const describe = () => { try { return (Levels && Levels.describe(action)) || type; } catch (_) { return type; } };
+  const describe = () => { try { return descriviPerModello(action) || type; } catch (_) { return type; } };
   // `rejected` è il solo «non è un'azione» (fuori registro, argomenti rotti,
   // conferma forgiata). `kept: false` NON vuol dire fallita: vuol dire che in
   // chat non c'è niente da mostrare (un appunto scritto, una lezione fissata,
@@ -2447,6 +2587,17 @@ function toolResultText({ action, res, rendered }) {
   }
   const obs = observationsForPrompt([rendered]);
   if (obs) return obs;
+  if (type === 'NAVIGA' && res.output && res.output.blocked === 'site') {
+    const sito = res.output.host || 'quel sito';
+    // Le liste pubbliche non sono la lista dell'utente: se il modello dice «la tua lista», lui lo cerca in Preferenze e non lo trova.
+    const chi = res.output.reason === 'lists'
+      ? 'è fra i siti di pubblicità e tracciamento che Filo blocca da sé (non è nella lista dell\'utente)'
+      : 'è nella lista dei siti bloccati dell\'utente';
+    return `Pagina NON aperta: ${sito} ${chi}. Diglielo in una riga: se vuole aprirla lo stesso, sotto la tua risposta c'è «Apri comunque». Non riprovare e non cercare un altro indirizzo per arrivarci.`;
+  }
+  if (type === 'NAVIGA' && res.output && res.output.blocked === 'scheme') {
+    return 'Pagina NON aperta: l\'indirizzo non è una pagina web (ammessi solo http e https). Non riprovare con lo stesso indirizzo.';
+  }
   if (res.output && res.output.blocked === 'disabled') {
     return 'Comando NON eseguito: la modalità terminale è spenta. Proponi all\'utente di attivarla (IMPOSTA_PREFERENZA modalita_terminale true) e non riprovare finché non è attiva.';
   }
@@ -2454,11 +2605,22 @@ function toolResultText({ action, res, rendered }) {
     return `In attesa della conferma dell'utente: il sistema gli sta mostrando cosa stai per fare («${describe()}»). `
       + 'NON richiamare questa azione: la conferma è già in corso. Se hai altro da fare prosegui; altrimenti rispondi in una riga, senza dire di aver già fatto.';
   }
+  // Nomi di sveglie e timer e righe della memoria tornano recintati: li può aver
+  // scritti un modello mentre leggeva una pagina (#592.4).
+  const nomiSalvati = (nomi) => globalThis.SN_ESTERNO.imbusta({
+    tipo: 'TESTO_SALVATO',
+    testo: nomi.map((n) => `- ${globalThis.SN_ESTERNO.neutralizza(n, { unaRiga: true })}`).join('\n'),
+  });
   if (type === 'CANCELLA_SVEGLIA' && res.output && Array.isArray(res.output.removed)) {
-    return res.output.removed.length ? `Tolte: ${res.output.removed.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da togliere. Non ripetere uguale: chiedi all\'utente quale intende.';
+    return res.output.removed.length ? `Tolte:\n${nomiSalvati(res.output.removed)}` : 'Nessuna sveglia o timer corrispondeva: niente da togliere. Non ripetere uguale: chiedi all\'utente quale intende.';
+  }
+  if (type === 'DIMENTICA' && res.output && Array.isArray(res.output.dimenticate)) {
+    return res.output.dimenticate.length
+      ? `Dimenticate:\n${nomiSalvati(res.output.dimenticate)}`
+      : 'Nella memoria nessuna riga corrispondeva: niente da togliere. Non ripetere uguale: copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.';
   }
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
-    return res.output.updated.length ? `Spostate: ${res.output.updated.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
+    return res.output.updated.length ? `Spostate:\n${nomiSalvati(res.output.updated)}` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
   // #686 — lo zoom lo riferisce il numero VERO, non quello chiesto: un «al
   // 900%» finisce al massimo, e l'utente deve sentirselo dire.
@@ -2487,9 +2649,14 @@ function toolResultText({ action, res, rendered }) {
     // impostare…»): un «vuole» dopo «Eseguita» faceva dire al modello che era
     // ancora da fare. Senza il punto finale: lo mette la riga.
     let done = '';
-    try { done = (Levels && Levels.describeDone && Levels.describeDone(action)) || ''; } catch (_) {}
+    try { done = descriviPerModello(action, { fatto: true }); } catch (_) {}
     done = String(done || describe()).replace(/\.+\s*$/, '');
     return `Eseguita: ${done}.`;
+  }
+  if (res.output && res.output.rifiuto && res.output.error) {
+    const cosa = type === 'SALVA_LEZIONE' ? 'Lezione NON salvata' : 'Impostazione NON applicata';
+    return `${cosa}: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
+      + 'dillo all\'utente e, se vuole, riprova con un testo che stia nel limite.';
   }
   // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
   // pulizia schede, cancellazione archivio) che l'utente aziona da sé.
@@ -2504,7 +2671,7 @@ function toolResultText({ action, res, rendered }) {
     return `Azione ${type} non riuscita: non c'è una scheda web attiva su cui agire. Dillo all'utente: deve aprire (o mettere davanti) la pagina.`;
   }
   if (PAGE_ACTIONS.includes(type) && !res.output) {
-    return `Azione ${type} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva (o il proxy non è configurato): dillo all'utente.`;
+    return `Azione ${type} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva: dillo all'utente.`;
   }
   return `Azione ${type} non riuscita: ${describe()}${detail}. Non ripeterla uguale: se manca un dato chiedilo all'utente, altrimenti diglielo.`;
 }
@@ -2700,10 +2867,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     return { text: bye, actions: [], onboardingClosed: true };
   }
 
+  // I cambi partono subito, in parallelo al resto del contesto: una volta al
+  // giorno vanno presi in rete, e non devono sommarsi all'attesa (#724.1).
+  const cambiP = Fx.get().then((fx) => Fx.formatForPrompt(fx)).catch(() => '');
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
-  const { stateText } = await FiloState.assemble();
+  const { stateText } = await FiloState.assemble({ creditiFreschi: true });
   // #379.5 — i file dell'editor entrano nel contesto come RIASSUNTI (uno per
   // file), non come testo integrale: economico e sempre presente. Filo, se serve,
   // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
@@ -2719,6 +2889,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // cosa ha prodotto il comando (prima lo vedeva solo l'utente, e l'assistente
   // rispondeva "non ho ancora l'output").
   const threadMessages = [];
+  // Le azioni che il modello ha davanti, turni passati compresi: i loro esiti
+  // decidono se un NAVIGA di questo turno può portare fuori dati (#587).
+  const azioniViste = [];
+  for (const m of cleanHistory) if (m && Array.isArray(m.actions)) azioniViste.push(...m.actions);
   for (const m of cleanHistory) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     let content = String(m.text || '');
@@ -2781,8 +2955,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const capacita = Caps ? Caps.renderIndexForPrompt() : '';
   const Tools = globalThis.SN_ACTION_TOOLS;
   const tools = Tools ? Tools.definitions({ sistema: process.platform, onboarding: onbActive }) : null;
+  const cambi = await cambiP;
   const payloadBase = {
-    profilo, preferenze, espansioni, lezioni, stato: stateText, capacita,
+    profilo, preferenze, espansioni, lezioni, stato: stateText, capacita, cambi,
     files: fileSummaries,
     onboarding: onboardingText,
     onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
@@ -2800,6 +2975,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const rawActions = [];
   const renderedActions = [];
   const notes = [];
+  // Quante note erano già scritte all'ultimo «non disponibile»: quelle lo
+  // davano per fatto, una nota successiva è scritta sapendolo (#771).
+  let noteAlRifiuto = -1;
+  let sollecitato = false;
   let r = null;
   let textReply = '';
   let reasoningDetails = [];
@@ -2839,7 +3018,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           ...a, type: String(a.type || '').toUpperCase(), _callId: a._callId || `json_${round}_${i}`,
         }));
       }
+      // I conti li fa Filo: il marker diventa il numero QUI, prima di archivio,
+      // cronologia del modello e voce, che altrimenti leggerebbero «[[calc: …]]».
+      if (Calc) text = Calc.resolveCalcMarkers(text);
       if (!actions.length) {
+        // Muto, e l'ultima frase scritta precede un «non disponibile»: la risposta la riscrive il
+        // modello sapendolo, una volta, perché quella frase poteva rispondere anche ad altro (#771).
+        if (!text.trim() && !sollecitato && round < MAX_ROUNDS && noteAlRifiuto >= 0 && notes.length <= noteAlRifiuto) {
+          sollecitato = true;
+          threadMessages.push({ role: 'user', content: SOLLECITO_DOPO_RIFIUTO });
+          continue;
+        }
         textReply = text;
         reasoningDetails = r.reasoningDetails || [];
         exhausted = false;
@@ -2847,11 +3036,23 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       }
       const roundRendered = [];
       const results = [];
-      for (const a of actions) {
+      // Le aperture di pagina di fila partono insieme: ognuna aspetta l'esito della sua scheda,
+      // nessuna quello delle altre. Il resto resta in ordine (i suoi esiti decidono i passi dopo).
+      const esiti = new Map();
+      const avvia = (a) => (a._argsError
+        ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
+        : executeFiloAction(a, { sender, contesto: azioniViste }));
+      const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
+      for (let i = 0; i < actions.length; i++) {
+        const a = actions[i];
         rawActions.push(a);
-        const res = a._argsError
-          ? { executed: false, kept: false, rejected: true, error: a._argsError }
-          : await executeFiloAction(a, { sender });
+        if (!esiti.has(a)) {
+          if (apertura(a)) for (let j = i; j < actions.length && apertura(actions[j]); j++) esiti.set(actions[j], avvia(actions[j]));
+          else esiti.set(a, avvia(a));
+        }
+        const res = await esiti.get(a);
+        // Contiene la home con il nome utente: serve solo al gate, non alla chat.
+        delete a._perimetro;
         const rendered = { ...a };
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
@@ -2875,10 +3076,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         }
         push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
         results.push({ action: a, res, rendered });
+        azioniViste.push(rendered);
       }
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
       if (text.trim()) notes.push(text.trim());
+      if (roundRendered.some(esitoNonDisponibile)) noteAlRifiuto = notes.length;
       push('filo:action', { kind: 'round', text });
       textReply = text;
       reasoningDetails = r.reasoningDetails || [];
@@ -2914,6 +3117,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const stop = 'Mi sono fermato: troppi passaggi di fila senza arrivare a una risposta. Dimmi se devo continuare.';
     const last = String(textReply || '').trim();
     textReply = last ? `${last}\n\n${stop}` : stop;
+  } else if (!String(textReply || '').trim() && noteAlRifiuto >= 0 && notes.length <= noteAlRifiuto) {
+    // Muto anche sollecitato: prima cosa non si può, poi la frase com'era, dichiarata scritta
+    // prima di saperlo. Toglierla perdeva le risposte ad altro che conteneva (#771).
+    const prima = notes.pop();
+    textReply = prima
+      ? `${RISPOSTA_PROXY_NON_DISPONIBILE}\n\nPrima di saperlo avevo scritto: «${prima}»`
+      : RISPOSTA_PROXY_NON_DISPONIBILE;
   } else if (!String(textReply || '').trim() && notes.length) {
     // Ultimo giro muto dopo un giro con azioni: la frase scritta insieme alle
     // azioni («Ti metto la sveglia alle 7, buonanotte!») era la risposta, non
@@ -3049,10 +3259,16 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
 
   const payload = {
     profilo, preferenze, espansioni, lezioni, stato: stateText,
-    notifiche: notiList.length ? notiList.map((n) => `- [${n.ts}] ${n.kind}: ${n.text}`).join('\n') : '(nessuna)',
-    appunti: filesList.length
-      ? filesList.map((f) => `- [${f.id}] ${f.title}: ${f.summary}`).join('\n')
-      : '(nessuno)',
+    // Notifiche e file li può aver scritti un modello che leggeva una pagina: e
+    // da qui escono messaggio e bottoni della home (#592.4).
+    notifiche: notiList.length
+      ? globalThis.SN_ESTERNO.imbusta({
+        tipo: 'TESTO_SALVATO',
+        conIntestazione: true,
+        testo: notiList.map((n) => globalThis.SN_ESTERNO.neutralizza(`- [${n.ts}] ${n.kind}: ${n.text}`, { unaRiga: true })).join('\n'),
+      })
+      : '(nessuna)',
+    appunti: globalThis.SN_EDITOR_SUMMARY.renderForPrompt(filesList) || '(nessuno)',
     // #593 (secondo giro di verifica) — il titolo di una pagina salvata lo
     // scrive il sito, non l'utente e non Filo: da qui escono il messaggio al
     // centro della nuova scheda e dei bottoni che aprono un indirizzo, quindi
@@ -3270,10 +3486,8 @@ const handlerCtx = {
   buildAttemptChain,
   providerRouting,
   openWeightsBlockReason,
-  applyLimitToChain,
+  modelGate: Gate,
   handleAIRequest,
-  noteServedProvider,
-  auditServedByLater,
   maybeCategorizeAsync,
   searchArchivedTabs,
   handleFiloChat,
@@ -3319,6 +3533,16 @@ async function handleMessage(msg, sender = {}) {
   return { ok: false, error: `Tipo messaggio sconosciuto: ${msg.type}` };
 }
 
+// Una pagina della rete di casa (router, NAS, localhost) non va ai lavori automatici col modello (#591).
+const isHomeNetworkUrl = (url) => Boolean(url && globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.isHomeNetworkUrl(url));
+async function isHomeNetworkUrlSettled(url) {
+  let host = '';
+  try { host = new URL(String(url)).hostname; } catch (_) {}
+  const pending = host && globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.homeNetworkPending(host);
+  if (pending) await pending;
+  return isHomeNetworkUrl(url);
+}
+
 // §2.1 — decisione LLM di triage tab. Riceve i metadati/segnali di TUTTE le tab
 // candidate + (opz.) un estratto del contenuto e la memoria a lungo termine, e
 // torna per ciascuna una decisione keep/archive con motivazione. Batch unico.
@@ -3326,11 +3550,6 @@ async function handleMessage(msg, sender = {}) {
 // lancia se manca la chiave / supera il limite di costo.
 async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' } = {}) {
   if (!Array.isArray(tabs) || !tabs.length) return { decisions: [] };
-  const settings = await getEffectiveSettings();
-  const model = modelForAction(settings, ACTIONS.FILO_TAB_TRIAGE);
-  const attemptsRaw = buildAttemptChain(settings, model, ACTIONS.FILO_TAB_TRIAGE);
-  const attempts = await applyLimitToChain(settings, attemptsRaw);
-
   const system = [
     'Sei il gestore delle schede del browser dell\'utente. Decidi quali schede',
     'TENERE aperte e quali ARCHIVIARE. Archiviare NON è perdere: la scheda viene',
@@ -3372,7 +3591,11 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
   const E = globalThis.SN_ESTERNO;
   const campo = (v) => E.neutralizza(v, { unaRiga: true });
   const lines = tabs.map((t, i) => {
-    const parts = [`#${i}`, t.title ? `"${campo(String(t.title).slice(0, 120))}"` : '', campo(t.url || '')];
+    // Di una pagina della rete di casa al modello arrivano solo i segnali di Filo: titolo, indirizzo e testo restano qui (#591).
+    const casa = isHomeNetworkUrl(t.url);
+    const parts = casa
+      ? [`#${i}`, '[pagina della rete di casa]']
+      : [`#${i}`, t.title ? `"${campo(String(t.title).slice(0, 120))}"` : '', campo(t.url || '')];
     const sig = [];
     if (typeof t.idleMin === 'number') sig.push(`inattiva da ${t.idleMin}min`);
     if (typeof t.ageMin === 'number') sig.push(`aperta da ${t.ageMin}min`);
@@ -3381,7 +3604,7 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
     if (t.audible) sig.push('audio in riproduzione');
     if (Array.isArray(t.coOpenUrls) && t.coOpenUrls.length) sig.push(`co-aperte: ${t.coOpenUrls.length}`);
     let s = parts.filter(Boolean).join(' ') + (sig.length ? ` [${sig.join(', ')}]` : '');
-    if (t.contentExtract) s += `\n   estratto: ${campo(String(t.contentExtract).slice(0, 500).replace(/\s+/g, ' '))}`;
+    if (t.contentExtract && !casa) s += `\n   estratto: ${campo(String(t.contentExtract).slice(0, 500).replace(/\s+/g, ' '))}`;
     return s;
   }).join('\n');
 
@@ -3399,16 +3622,8 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
     { role: 'user', content: userParts.join('\n') },
   ];
 
-  const result = await Providers.completeWithFallback({ attempts, messages });
-  const usedProvider = result.provider || attempts[0].provider;
-  const concreteModel = result.model || attempts[0].model;
-  try {
-    const pricing = settings.pricing?.[concreteModel];
-    await Costs.record({
-      action: ACTIONS.FILO_TAB_TRIAGE, provider: usedProvider, model: concreteModel,
-      usage: result.usage, pricing, usdToEur: settings.usdToEur,
-    });
-  } catch (_) {}
+  const result = await Gate.complete({ action: ACTIONS.FILO_TAB_TRIAGE, messages });
+  const { provider: usedProvider, model: concreteModel } = result;
 
   const parsed = extractJson(result.text) || {};
   const decisions = Array.isArray(parsed.decisions) ? parsed.decisions : [];
@@ -3436,20 +3651,7 @@ function cosineInt(a, b) {
 // Completamento LLM one-shot per un'azione (risolve modello/chiave/limite e
 // registra il costo). Ritorna il testo. Usato da riassunto, triage, re-rank.
 async function runOneShot(action, messages) {
-  const settings = await getEffectiveSettings();
-  const model = modelForAction(settings, action);
-  const attempts = await applyLimitToChain(settings, buildAttemptChain(settings, model, action));
-  const result = await Providers.completeWithFallback({ attempts, messages });
-  const usedProvider = result.provider || attempts[0].provider;
-  const concreteModel = result.model || attempts[0].model;
-  try {
-    const pricing = settings.pricing?.[concreteModel];
-    await Costs.record({
-      action, provider: usedProvider, model: concreteModel,
-      usage: result.usage, pricing, usdToEur: settings.usdToEur,
-    });
-  } catch (_) {}
-  return result.text || '';
+  return Gate.text({ action, messages });
 }
 
 // §3.1 — riassunto breve di una pagina (per l'archivio + base dell'embedding).
@@ -3722,10 +3924,7 @@ function embedAttempt(settings) {
     const attempts = buildAttemptChain(
       settings, modelForAction(settings, ACTIONS.ARCHIVE_EMBED), ACTIONS.ARCHIVE_EMBED,
     );
-    return attempts.find((a) => {
-      const P = Providers.getProvider(a.provider);
-      return P && typeof P.embed === 'function' && a.model;
-    }) || null;
+    return attempts.find((a) => Gate.supports(a.provider, 'embed') && a.model) || null;
   } catch (_) { return null; /* nessun modello configurato → niente indicizzazione */ }
 }
 
@@ -3733,21 +3932,11 @@ async function embedTexts(texts, settingsIn) {
   const settings = settingsIn || await getEffectiveSettings();
   const a = embedAttempt(settings);
   if (!a) return null;
-  // Stesso limite di spesa delle altre funzioni: oltre il limite niente
-  // indicizzazione (la ricerca per parole continua a funzionare).
-  await ensureUnderLimit(settings);
-  const P = Providers.getProvider(a.provider);
-  const r = await P.embed({
-    apiKey: a.apiKey, model: a.model, texts, dim: SN_CONST.EMBED_DIM,
-    providerRouting: providerRouting(settings),
+  // Oltre il limite di spesa il cancello rifiuta: la ricerca per parole continua a funzionare.
+  const r = await Gate.call({
+    action: ACTIONS.ARCHIVE_EMBED, settings, attempt: a, method: 'embed',
+    args: { texts, dim: SN_CONST.EMBED_DIM },
   });
-  noteServedProvider(settings, ACTIONS.ARCHIVE_EMBED, r);
-  try {
-    await Costs.record({
-      action: ACTIONS.ARCHIVE_EMBED, provider: a.provider, model: a.model,
-      usage: r.usage, pricing: settings.pricing?.[a.model], usdToEur: settings.usdToEur,
-    });
-  } catch (_) {}
   return { vectors: r.vectors || [], model: a.model };
 }
 
@@ -3790,6 +3979,12 @@ async function reindexArchivedEmbeddings(settings, items) {
 async function enrichArchivedTab(id, payload) {
   try {
     if (!id) return;
+    // Riassunto e indice passano dal modello: una pagina della rete di casa resta in casa (#591). Il segno resta sulla
+    // voce, perché dopo un riavvio Filo non sa più da dove aveva risposto un nome come tplinkwifi.net.
+    if (payload && typeof payload === 'object' && await isHomeNetworkUrlSettled(payload.url)) {
+      await ArchivedTabs.update(id, { casa: true });
+      return;
+    }
     const title = (payload && typeof payload === 'object') ? (payload.title || '') : '';
     const content = (payload && typeof payload === 'object')
       ? (payload.content || '')
@@ -3861,7 +4056,8 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
   for (const it of items) {
     const usable = Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model;
     if (usable) { scored.push({ score: cosineInt(qv, it.embedding), it }); continue; }
-    if ((it.title || it.summary || it.snippet) && stale.length < SN_CONST.ARCHIVED_EMBED_LIMIT) stale.push(it);
+    const casa = it.casa || isHomeNetworkUrl(it.url);
+    if ((it.title || it.summary || it.snippet) && !casa && stale.length < SN_CONST.ARCHIVED_EMBED_LIMIT) stale.push(it);
   }
   if (stale.length) reindexArchivedEmbeddings(settings, stale).catch(() => {});
   scored.sort((a, b) => b.score - a.score);
@@ -3887,78 +4083,59 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
   return { ok: true, results };
 }
 
+// Ogni destinatario riceve il messaggio ritagliato sul PROPRIO indirizzo (frame
+// per frame): a un sito arrivano solo i tipi che il codice di Filo lì ascolta.
 function broadcastToTabs(message) {
   try {
     for (const win of BrowserWindow.getAllWindows()) {
       if (win._filoTabs) {
         for (const t of win._filoTabs.tabs) {
-          try { sendToAllFrames(t.view.webContents, message); } catch (_) {}
+          try { spingiAllaScheda(t.view.webContents, message, { inVista: t.id === win._filoTabs.activeId }); } catch (_) {}
         }
       }
-      try { win.webContents.send('filo:broadcast', message); } catch (_) {}
+      spingiAllaFinestra(win, message);
     }
   } catch (_) {}
 }
 
 // Broadcast alle sole pagine INTERNE (`filo://`) e alla shell.
 //
-// `broadcastToTabs` parla a tutte le schede, e in una scheda esterna il
-// messaggio arriva al content script del sito visitato. Va benissimo per le
-// impostazioni o il tema — sono cose che quel content script deve applicare —
-// ma NON per un messaggio che porta un dato dell'owner: l'elenco delle fusioni
-// in attesa contiene nomi di rami e percorsi di file, cioè su cosa sta
-// lavorando. La regola è la stessa del gate d'origine sugli handler, vista dal
-// verso opposto: se un sito non lo può CHIEDERE, non glielo si può nemmeno
-// mandare da soli.
+// `broadcastToTabs` parla a tutte le schede; ai siti arrivano solo i tipi che il
+// loro content script ascolta (`messaggioPerDestinazione`). Questa strada è per
+// chi vuole dirlo esplicitamente: un dato dell'owner (l'elenco delle fusioni in
+// attesa ha nomi di rami e percorsi di file) non passa mai il confine. Se un
+// sito non lo può CHIEDERE, non glielo si manda nemmeno da soli.
 //
 // Il frame principale basta: qui non ci sono destinatari nei riquadri
-// incorporati (le pagine filo:// non ne ospitano di privilegiati).
+// incorporati (le pagine filo:// non ne ospitano di privilegiati). Anche fra le
+// finestre solo quelle di Filo: un popup di accesso è la pagina di un sito.
 function broadcastToFiloPages(message) {
+  const aFilo = (wc) => {
+    try {
+      if (wc && !wc.isDestroyed?.() && isFilo(wc.getURL())) wc.send('filo:broadcast', message);
+    } catch (_) {}
+  };
   try {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (win._filoTabs) {
-        for (const t of win._filoTabs.tabs) {
-          try {
-            const wc = t.view.webContents;
-            if (!wc || wc.isDestroyed?.()) continue;
-            if (!String(wc.getURL() || '').startsWith('filo://')) continue;
-            wc.send('filo:broadcast', message);
-          } catch (_) {}
-        }
-      }
-      try { win.webContents.send('filo:broadcast', message); } catch (_) {}
+      if (win._filoTabs) for (const t of win._filoTabs.tabs) aFilo(t.view?.webContents);
+      aFilo(win.webContents);
     }
   } catch (_) {}
 }
 
-// #405 — `webContents.send` consegna SOLO al frame principale. Da quando i
-// content script girano anche dentro i riquadri incorporati, un riquadro che
-// non riceve gli aggiornamenti di impostazioni (tema, colori, correttore) o lo
-// stato della lettura ad alta voce resta indietro rispetto alla pagina che lo
-// ospita. Raggiungiamo ogni frame vivo della scheda; se l'enumerazione non è
-// disponibile (frame in navigazione) si ripiega sul comportamento di prima.
-function sendToAllFrames(wc, message) {
-  if (!wc || wc.isDestroyed?.()) return;
-  let frames = null;
-  try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
-  if (!frames || !frames.length) { try { wc.send('filo:broadcast', message); } catch (_) {} return; }
-  for (const f of frames) {
-    try { if (!f.detached) f.send('filo:broadcast', message); } catch (_) {}
-  }
-}
-
-// Configura il rilevatore di siti pericolosi (services/safebrowse) con chiavi e
-// provider derivati dalle impostazioni. Va richiamato al boot e a ogni
-// UPDATE_SETTINGS. Best-effort: se SN_SAFEBROWSE non c'è o la feature è spenta,
-// disinnesca tutti i provider di rete/LLM/sandbox (resta solo l'analisi locale
-// deterministica, che non costa nulla e non fa rete).
+// Configura il rilevatore di siti pericolosi (services/safebrowse) dalle
+// impostazioni SALVATE (non quelle con i default già dentro): va richiamato al
+// boot e a ogni UPDATE_SETTINGS. La chiave GSB invece si ricalcola a ogni
+// verifica, perché accesso e uscita dell'admin la cambiano senza toccare
+// le preferenze (#679.4). Feature spenta: resta solo l'analisi locale.
 async function wireSafebrowse(settingsArg) {
   const SB = globalThis.SN_SAFEBROWSE;
   if (!SB || typeof SB.configure !== 'function') return;
   let settings = settingsArg;
   if (!settings) {
-    try { settings = await getEffectiveSettings(); } catch (_) { settings = {}; }
+    try { settings = await Storage.getSettings(); } catch (_) { settings = {}; }
   }
+  settings = settings || {};
   const sb = (settings.security && settings.security.safeBrowse) || {};
   if (sb.enabled === false) {
     SB.configure({ gsbKey: '', runLlm: null, enableSandbox: false, enableNetwork: false });
@@ -3967,14 +4144,10 @@ async function wireSafebrowse(settingsArg) {
   // Giudice LLM: riusa la catena di fallback dei provider con il modello
   // configurato per questa funzione (slot proprio, visibile nell'editor dei
   // modelli). Solo METADATI (mai contenuto pagina) passano da llm.judge.
-  const runLlm = sb.llmJudge === false ? null : async (messages) => {
-    const s = await getEffectiveSettings();
-    const attempts = buildAttemptChain(s, modelForAction(s, ACTIONS.SAFEBROWSE_JUDGE), ACTIONS.SAFEBROWSE_JUDGE);
-    const r = await Providers.completeWithFallback({ attempts, messages });
-    return r.text;
-  };
+  const runLlm = sb.llmJudge === false ? null
+    : (messages) => Gate.text({ action: ACTIONS.SAFEBROWSE_JUDGE, messages });
   SB.configure({
-    gsbKey: sb.safeBrowsingKey || '',
+    gsbKey: () => safeBrowsingKeyFor(settings),
     runLlm,
     enableSandbox: sb.sandbox !== false,
     enableNetwork: sb.networkSignals !== false,
@@ -3997,12 +4170,7 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
   const Classifier = globalThis.SN_GEOBLOCK_CLASSIFIER;
   if (!Classifier) return { class: null, route: { proxy: false }, skipped: true };
   if (!geoClassifierCache) geoClassifierCache = Classifier.createCache();
-  const complete = async ({ messages, signal }) => {
-    const s = await getEffectiveSettings();
-    const attempts = buildAttemptChain(s, modelForAction(s, ACTIONS.GEOBLOCK_CLASSIFY), ACTIONS.GEOBLOCK_CLASSIFY);
-    const r = await Providers.completeWithFallback({ attempts, messages, signal });
-    return r.text;
-  };
+  const complete = ({ messages, signal }) => Gate.text({ action: ACTIONS.GEOBLOCK_CLASSIFY, messages, signal });
   return Classifier.classify(input, { complete, cache: geoClassifierCache });
 };
 
@@ -4024,6 +4192,15 @@ globalThis.SN_HANDLE_MESSAGE = handleMessage;
 // e qui la cosa da verificare è proprio CHI riceve (una scheda su un sito
 // qualunque non deve vedere passare i rami dell'owner).
 globalThis.SN_BROADCAST_FILO = broadcastToFiloPages;
+// Le Preferenze mostrano la memoria riga per riga (#592): a ogni scrittura il
+// main la rilegge una volta e la manda dentro l'avviso, alle sole pagine di Filo.
+try {
+  FiloMem.setOnMemoryChange(() => {
+    FiloMem.viewForUser()
+      .then((v) => broadcastToFiloPages({ type: MSG.FILO_MEMORY_CHANGED, ...v }))
+      .catch(() => {});
+  });
+} catch (_) {}
 
 module.exports = {
   handleMessage,
@@ -4037,4 +4214,5 @@ module.exports = {
   wireSafebrowse,
   runTabTriageDecision,
   executeFiloAction,
+  applySettingsUpdate,
 };

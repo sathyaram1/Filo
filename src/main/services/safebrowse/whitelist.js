@@ -24,11 +24,12 @@ const EXTRA = [
   'youtube.com', 'youtu.be', 'google.co.uk', 'google.de', 'google.fr',
   'google.es', 'android.com', 'chromium.org', 'gstatic.com',
   'googleusercontent.com', 'googleapis.com', 'googletagmanager.com',
-  'google-analytics.com', 'ggpht.com', 'doubleclick.net', 'withgoogle.com',
+  'google-analytics.com', 'youtube-nocookie.com', 'ggpht.com', 'doubleclick.net', 'withgoogle.com',
   'goo.gl', 'recaptcha.net',
   // CDN/infra di altri brand (contengono il token del brand ma sono ufficiali)
   'fbcdn.net', 'cdninstagram.com', 'licdn.com', 'twimg.com',
-  'paypalobjects.com', 'icloud-content.com',
+  'paypalobjects.com', 'icloud-content.com', 'amazon-adsystem.com',
+  'media-amazon.com', 'ssl-images-amazon.com', 'images-amazon.com',
   // Microsoft / Apple ecosistema
   'bing.net', 'msn.com', 'skype.com', 'xbox.com', 'windows.com',
   'sharepoint.com', 'onedrive.com', 'azure.com', 'visualstudio.com',
@@ -42,7 +43,7 @@ const EXTRA = [
   'gazzetta.it', 'lastampa.it',
   // Streaming / intrattenimento
   'spotify.com', 'twitch.tv', 'primevideo.com', 'disneyplus.com',
-  'soundcloud.com', 'vimeo.com',
+  'soundcloud.com', 'vimeo.com', 'fandom.com',
   // Servizi / produttività
   'notion.so', 'slack.com', 'zoom.us', 'trello.com', 'atlassian.com',
   'figma.com', 'canva.com', 'adobe.com', 'wordpress.com', 'wordpress.org',
@@ -66,25 +67,42 @@ function isWhitelisted(registrable) {
 
 // Pagine che chiunque pubblica sotto un dominio in whitelist: il dominio dice chi ospita, non chi ha scritto.
 // Restano fuori gli accessi della piattaforma stessa e OneDrive, che non mostra pagine caricate.
+// `owner` è la parte del percorso che dice di chi è la pagina (il secchio, il sito, il documento): su questi domini il
+// proprietario sta lì, e i file sotto di lui sono suoi. Un percorso che non la contiene conta come la piattaforma.
 const HOSTED = [
-  { host: /^sites\.google\.com$/, platform: 'Google Sites' },
-  { host: /^docs\.google\.com$/, platform: 'Google Documenti e Moduli' },
-  { host: /^script\.google\.com$/, path: /^\/(a\/macros\/[^/]+\/|(a\/[^/]+\/)?macros\/)/, platform: 'Google Apps Script' },
-  { host: /^(forms|sway)\.(office\.com|cloud\.microsoft)$/, platform: 'Microsoft Forms e Sway' },
-  { host: /^ia\d+\.us\.archive\.org$/, platform: 'archive.org' },
-  { host: /^(www\.)?archive\.org$/, path: /^\/download\//, platform: 'archive.org' },
-  { host: /^(www\.)?notion\.so$/, path: /^\/(?!(login|signup)(\/|$))[^/]+/, platform: 'Notion' },
-  { host: /^(www\.)?canva\.com$/, path: /^\/design\//, platform: 'Canva' },
+  { host: /^sites\.google\.com$/, owner: /^\/[^/]+\/[^/]+/, platform: 'Google Sites' },
+  { host: /^docs\.google\.com$/, owner: /^(\/a\/[^/]+)?\/[^/]+\/d\/(e\/)?[^/]+/, platform: 'Google Documenti e Moduli' },
+  { host: /^script\.google\.com$/, path: /^\/(a\/macros\/[^/]+\/|(a\/[^/]+\/)?macros\/)/, owner: /^.*?\/s\/[^/]+/, platform: 'Google Apps Script' },
+  { host: /^(forms|sway)\.(office\.com|cloud\.microsoft)$/, owner: /^\/[^/]+\/[^/]+/, platform: 'Microsoft Forms e Sway' },
+  { host: /^ia\d+\.us\.archive\.org$/, owner: /^\/[^/]+\/items\/[^/]+/, platform: 'archive.org' },
+  { host: /^(www\.)?archive\.org$/, path: /^\/download\//, owner: /^\/download\/[^/]+/, platform: 'archive.org' },
+  // Una pagina di Notion si apre con qualunque titolo davanti al suo codice: conta il codice, non il titolo.
+  { host: /^(www\.)?notion\.so$/, path: /^\/(?!(login|signup)(\/|$))[^/]+/, owner: (p) => { const s = p.split('/')[1] || ''; const id = /[0-9a-f]{32}$/i.exec(s); return '/' + (id ? id[0].toLowerCase() : s); }, platform: 'Notion' },
+  { host: /^(www\.)?canva\.com$/, path: /^\/design\//, owner: /^\/design\/[^/]+/, platform: 'Canva' },
   // Indirizzi per percorso: s3.amazonaws.com/<secchio>/<file>, storage.googleapis.com/<secchio>/<file>.
-  { host: S3, path: /^\/[^/]+\/./, platform: 'Amazon S3' },
-  { host: /^(storage|firebasestorage)\.googleapis\.com$/, path: /^\/[^/]+\/./, platform: 'Google Cloud Storage' },
+  { host: S3, path: /^\/[^/]+\/./, owner: /^\/[^/]+/, platform: 'Amazon S3' },
+  { host: /^(storage|firebasestorage)\.googleapis\.com$/, path: /^\/[^/]+\/./, owner: /^(\/v0\/b)?\/[^/]+/, platform: 'Google Cloud Storage' },
 ];
 
-function hostedPlatform(host, path) {
+function hostedEntry(host, path) {
   const h = String(host || '').toLowerCase();
   const p = String(path || '/');
-  const r = HOSTED.find((x) => x.host.test(h) && (!x.path || x.path.test(p)));
+  return HOSTED.find((x) => x.host.test(h) && (!x.path || x.path.test(p))) || null;
+}
+
+function hostedPlatform(host, path) {
+  const r = hostedEntry(host, path);
   return r ? r.platform : null;
 }
 
-module.exports = { WHITELIST, isWhitelisted, hostedPlatform };
+// Il proprietario di una pagina ospitata, come percorso ('/secchio'); null se la pagina non è ospitata.
+function hostedOwner(host, path) {
+  const r = hostedEntry(host, path);
+  if (!r) return null;
+  const p = String(path || '/');
+  if (typeof r.owner === 'function') return r.owner(p);
+  const m = r.owner.exec(p);
+  return m ? m[0] : '';
+}
+
+module.exports = { WHITELIST, isWhitelisted, hostedPlatform, hostedOwner };

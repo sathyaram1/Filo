@@ -44,6 +44,7 @@
   border-radius: var(--sn-radius, 6px);
   box-shadow: var(--sn-shadow, 0 4px 16px rgba(0,0,0,0.18));
 }
+.sn-confirm-box:focus { outline: none; }
 .sn-confirm-title {
   margin: 0 0 8px;
   font-size: 14px;
@@ -56,11 +57,9 @@
   color: var(--sn-fg, #1a1918);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  /* Il testo di un'azione può essere lungo (il feedback che Filo sta per
-     mandare a nome dell'utente): deve restare LEGGIBILE PER INTERO, quindi il
-     popup non lo taglia — scorre. Il tetto è relativo al viewport così il box
-     resta dentro lo schermo insieme a titolo e bottoni. */
-  max-height: min(52vh, 420px);
+  /* Un testo lungo non si taglia: scorre, e OK aspetta che sia passato tutto
+     sotto gli occhi (tuttoVisto). Il tetto lascia posto a titolo e bottoni. */
+  max-height: min(640px, calc(100vh - 160px));
   overflow-y: auto;
 }
 .sn-confirm-input {
@@ -114,6 +113,10 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+/* OK in attesa del testo non ancora visto: grigio come un bottone spento, ma il
+   clic fa scorrere il testo, quindi il puntatore resta quello di un bottone. */
+.sn-confirm-btn[aria-disabled="true"] { opacity: 0.45; }
+.sn-confirm-btn[aria-disabled="true"]:hover { opacity: 0.6; }
 .sn-confirm-text {
   scrollbar-width: thin;
   scrollbar-color: var(--sn-border, #e0dcd4) transparent;
@@ -151,6 +154,20 @@
   // questo modulo. `active` serve a done() e agli hook di test qui sotto.
   let active = null; // { host, root }
 
+  // Chi batteva un carattere in un campo un attimo fa sta scrivendo: un popup che
+  // si apre in quel momento gli lascia i tasti nel suo campo (#592). L'Invio che
+  // spedisce e i tasti dati a un popup no: dopo, l'utente aspetta Filo.
+  let ultimoTasto = -Infinity;
+  try {
+    global.document.addEventListener('keydown', (e) => {
+      if (!e.isTrusted || active || !scrivibile(e.target)) return;
+      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) ultimoTasto = -Infinity;
+      else if (e.key && (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete')) ultimoTasto = performance.now();
+    }, true);
+  } catch (_) {}
+  const STA_SCRIVENDO_MS = 2000;
+  const RITARDO_SI_MS = 500;
+
   // Costruisce host+shadow(closed)+overlay+box e ritorna { overlay, box, done }
   // dove done(result) smonta tutto e risolve la Promise una sola volta.
   function buildOverlay(resolve) {
@@ -177,13 +194,31 @@
     overlay.appendChild(box);
     root.appendChild(overlay);
 
+    // Il popup si apre anche mentre l'utente scrive in chat: quello che batte
+    // finisce nel suo campo, non nel vuoto, e alla chiusura il fuoco torna lì.
+    const prima = doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : null;
+    box.addEventListener('keydown', (e) => {
+      if (e.target !== box || !scrivibile(prima) || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+      const s = prima.selectionStart;
+      const f = prima.selectionEnd;
+      try {
+        if (e.key.length === 1) prima.setRangeText(e.key, s, f, 'end');
+        else if (e.key === 'Backspace' && (s > 0 || f > s)) prima.setRangeText('', s === f ? s - 1 : s, f, 'end');
+        else return;
+      } catch (_) { return; }
+      e.preventDefault();
+      prima.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
     let settled = false;
     function done(result) {
       if (settled) return;
       settled = true;
       doc.removeEventListener('keydown', onKey, true);
+      doc.removeEventListener('visibilitychange', onVisibile);
       host.remove();
       if (active && active.root === root) active = null;
+      if (prima && prima.isConnected) { try { prima.focus({ preventScroll: true }); } catch (_) {} }
       resolve(result);
     }
     function onKey(e) {
@@ -194,7 +229,31 @@
 
     doc.body.appendChild(host);
     active = { host, root };
-    return { overlay, box, done };
+
+    // Un popup si apre anche da solo, sotto un gesto già partito per altro (#592):
+    // per mezzo secondo da quando si vede un clic o un invio veri non valgono come
+    // sì. Si conta dal primo fotogramma disegnato, e da capo quando la scheda torna
+    // visibile: un popup nato in una scheda dietro si vede solo lì. I clic del
+    // codice (gli hook _test) non arrivano da una pagina: lo shadow root è chiuso.
+    let visibileDa = Infinity;
+    function onVisibile() {
+      visibileDa = Infinity;
+      if (doc.visibilityState === 'hidden') return;
+      if (typeof global.requestAnimationFrame === 'function') global.requestAnimationFrame(() => { visibileDa = performance.now(); });
+      else visibileDa = performance.now();
+    }
+    doc.addEventListener('visibilitychange', onVisibile);
+    onVisibile();
+    const troppoPresto = (e) => !!(e && e.isTrusted) && !(performance.now() - visibileDa >= RITARDO_SI_MS);
+    // Chi stava scrivendo continua a scrivere nel suo campo: il fuoco va al
+    // riquadro, che gli gira i tasti, e non al bottone o al campo del popup.
+    const scriveva = scrivibile(prima) && performance.now() - ultimoTasto < STA_SCRIVENDO_MS;
+    const fuoco = (bersaglio) => {
+      const el = scriveva ? box : bersaglio;
+      if (el === box) box.tabIndex = -1;
+      el.focus();
+    };
+    return { overlay, box, done, troppoPresto, fuoco };
   }
 
   function header(box, { title, text }) {
@@ -209,6 +268,39 @@
     p.className = 'sn-confirm-text';
     p.textContent = text || '';
     box.appendChild(p);
+  }
+
+  function scrivibile(el) {
+    if (!el || el.disabled || el.readOnly) return false;
+    return el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|url|tel|password)?$/i.test(el.getAttribute('type') || ''));
+  }
+
+  // Si conferma quello che si è visto (#592): se il testo non sta nel riquadro,
+  // `visto()` resta falso finché non lo si fa scorrere fino in fondo. È la regola
+  // sul riquadro, non su un carattere: righe innocue o disegnate vuote non
+  // possono più tenere sotto il bordo l'istruzione e i rischi.
+  function tuttoVisto(box, onCambio) {
+    const el = box.querySelector('.sn-confirm-text');
+    let visto = false;
+    const visto_ = () => {
+      if (!visto && el.scrollTop + el.clientHeight >= el.scrollHeight - 2) visto = true;
+      return visto;
+    };
+    if (!visto_()) {
+      el.tabIndex = 0;
+      el.addEventListener('scroll', onCambio, { passive: true });
+      if (typeof global.ResizeObserver === 'function') new global.ResizeObserver(onCambio).observe(el);
+    }
+    // Il clic su OK prima della fine porta avanti il testo di una pagina: un
+    // bottone che non risponde sembra rotto, e il perché stava solo nel title.
+    const avanti = () => el.scrollBy({ top: Math.max(el.clientHeight - 24, 24), behavior: 'smooth' });
+    return { visto: visto_, avanti };
+  }
+
+  function inAttesa(btn, attesa) {
+    if (attesa) btn.setAttribute('aria-disabled', 'true');
+    else btn.removeAttribute('aria-disabled');
+    btn.title = attesa ? 'Scorri fino in fondo per confermare' : '';
   }
 
   function buttonRow(box) {
@@ -230,14 +322,23 @@
   // Livello 2 — popup di conferma con spiegazione + OK/Annulla.
   function confirm({ title = 'Conferma', text = '', okLabel = 'OK', cancelLabel = 'Annulla' } = {}) {
     return new Promise((resolve) => {
-      const { box, done } = buildOverlay(resolve);
+      const { box, done, troppoPresto } = buildOverlay(resolve);
       header(box, { title, text });
       const row = buttonRow(box);
       const cancel = makeBtn(row, cancelLabel, 'sn-confirm-btn-cancel');
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-ok');
+      const aggiorna = () => inAttesa(ok, !visto());
+      const { visto, avanti } = tuttoVisto(box, aggiorna);
       cancel.addEventListener('click', () => done(false));
-      ok.addEventListener('click', () => done(true));
-      ok.focus();
+      ok.addEventListener('click', (e) => {
+        if (!visto()) avanti();
+        else if (!troppoPresto(e)) done(true);
+      });
+      aggiorna();
+      // Mai il fuoco su OK, nemmeno se nessuno scriveva: il popup si apre anche
+      // da solo, e il primo spazio o invio lo confermerebbe senza leggerlo (#592).
+      box.tabIndex = -1;
+      box.focus();
     });
   }
 
@@ -246,7 +347,7 @@
   function confirmTyped({ title = 'Conferma richiesta', text = '', word = 'conferma', okLabel = 'Esegui', cancelLabel = 'Annulla' } = {}) {
     return new Promise((resolve) => {
       const doc = global.document;
-      const { box, done } = buildOverlay(resolve);
+      const { box, done, troppoPresto, fuoco } = buildOverlay(resolve);
       header(box, { title, text: `${text}\n\nQuesta azione non è reversibile. Scrivi “${word}” per procedere.` });
 
       const input = doc.createElement('input');
@@ -262,14 +363,24 @@
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-danger');
       ok.disabled = true;
 
-      const matches = () => input.value.trim().toLowerCase() === String(word).toLowerCase();
-      input.addEventListener('input', () => { ok.disabled = !matches(); });
+      const parola = () => input.value.trim().toLowerCase() === String(word).toLowerCase();
+      const aggiorna = () => {
+        ok.disabled = !parola();
+        inAttesa(ok, parola() && !visto());
+      };
+      const { visto, avanti } = tuttoVisto(box, aggiorna);
+      const premi = (e) => {
+        if (!parola()) return;
+        if (!visto()) avanti();
+        else if (!troppoPresto(e)) done(true);
+      };
+      input.addEventListener('input', aggiorna);
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && matches()) { e.preventDefault(); done(true); }
+        if (e.key === 'Enter') { e.preventDefault(); premi(e); }
       });
       cancel.addEventListener('click', () => done(false));
-      ok.addEventListener('click', () => { if (matches()) done(true); });
-      input.focus();
+      ok.addEventListener('click', premi);
+      fuoco(input);
     });
   }
 
@@ -277,12 +388,12 @@
   // (es. "Hai ricevuto N crediti in regalo 🎁"). Risolve quando l'utente chiude.
   function notify({ title = '', text = '', okLabel = 'OK' } = {}) {
     return new Promise((resolve) => {
-      const { box, done } = buildOverlay(resolve);
+      const { box, done, troppoPresto, fuoco } = buildOverlay(resolve);
       header(box, { title, text });
       const row = buttonRow(box);
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-ok');
-      ok.addEventListener('click', () => done(true));
-      ok.focus();
+      ok.addEventListener('click', (e) => { if (!troppoPresto(e)) done(true); });
+      fuoco(ok);
     });
   }
 
@@ -309,7 +420,8 @@
       return {
         title: (q('.sn-confirm-title') && q('.sn-confirm-title').textContent) || '',
         text: (textEl && textEl.textContent) || '',
-        okDisabled: !!(okBtn && okBtn.disabled),
+        okDisabled: !!(okBtn && (okBtn.disabled || okBtn.getAttribute('aria-disabled') === 'true')),
+        textScrollTop: textEl ? textEl.scrollTop : 0,
         hasInput: !!q('.sn-confirm-input'),
         textScrolls: !!(textEl && textEl.scrollHeight > textEl.clientHeight + 1),
         selectionBg,
@@ -320,8 +432,25 @@
     click(which) {
       if (!active) return false;
       const btn = active.root.querySelector('.sn-confirm-btn-' + which);
-      if (!btn || btn.disabled) return false;
+      if (!btn || btn.disabled || btn.getAttribute('aria-disabled') === 'true') return false;
       btn.click();
+      return true;
+    },
+    // Centro di un bottone, per un clic vero del mouse (anche su OK in attesa).
+    point(which) {
+      if (!active) return null;
+      const btn = active.root.querySelector('.sn-confirm-btn-' + which);
+      if (!btn) return null;
+      const r = btn.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    },
+    // Fa scorrere il testo fino in fondo, come chi lo legge tutto.
+    scrollToEnd() {
+      if (!active) return false;
+      const el = active.root.querySelector('.sn-confirm-text');
+      if (!el) return false;
+      el.scrollTop = el.scrollHeight;
+      el.dispatchEvent(new Event('scroll'));
       return true;
     },
     // Scrive nel campo del dialogo livello 3 (dispatch dell'evento input).

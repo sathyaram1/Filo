@@ -429,3 +429,37 @@ describe('richiesteCoperte: quali richieste ferme copre il segno «fondi senza c
     assert.deepEqual(UI.richiesteCoperte([base({ id: '' })], { feedbackId: ID }), []);
   });
 });
+
+describe('i lavori locali (#908)', () => {
+  test('la provenienza locale porta la sua pratica, quando c’è', () => {
+    assert.equal(UI.originLabel({ origin: 'locale', num: '#908' }), 'lavoro locale · feedback #908');
+    assert.equal(UI.originLabel({ origin: 'locale' }), 'lavoro tuo, da questo computer');
+    assert.equal(UI.originLabel({}), 'lavoro tuo, da questo computer');
+  });
+
+  test('una fusione che ha saltato L5 si legge come tale nella traccia', () => {
+    assert.equal(UI.isSkippedL5({ skippedL5: true }), true);
+    assert.equal(UI.isSkippedL5({ skippedL5: 'true' }), false);
+    assert.equal(UI.isSkippedL5(null), false);
+    assert.equal(UI.recentOutcome({ skippedL5: true, outcome: 'merged' }), 'fusa senza chiedere (lavoro locale)');
+    // Le altre restano come prima.
+    assert.equal(UI.recentOutcome({ used: true, outcome: 'merged' }), 'approvata e fusa');
+  });
+
+  test('nessuna frase dell’avviso parla del terminale come di un muro', () => {
+    const src = require('node:fs').readFileSync(join(ROOT, 'src', 'shared', 'mergeApprovals.js'), 'utf8');
+    assert.doesNotMatch(src, /il terminale, da solo, non può/);
+  });
+
+  test('il pattern del cancello dice regola, non muro, e che il lavoro locale provato non aspetta (#908)', () => {
+    const fs = require('node:fs');
+    const pattern = fs.readFileSync(join(ROOT, 'patterns', 'un-cancello-automatico-che-blocca-deve-avere-una-via-duscita.md'), 'utf8');
+    const riga = fs.readFileSync(join(ROOT, 'PATTERNS.md'), 'utf8').split('\n').find((l) => l.includes('un-cancello-automatico-che-blocca'));
+    for (const testo of [pattern, riga]) {
+      assert.doesNotMatch(testo, /non lo può dare una sessione|persona su un'altra superficie|può chiedere quanto vuole/);
+      assert.match(testo, /regola del server, non un muro/i);
+    }
+    assert.match(pattern, /#908/);
+    assert.match(riga, /lavoro locale provato/);
+  });
+});

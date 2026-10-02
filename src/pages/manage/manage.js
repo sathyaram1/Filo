@@ -156,6 +156,8 @@
   const mgPreapproveRevokeBtn = document.getElementById('mgPreapproveRevokeBtn');
   const mgPreapprovedInfo = document.getElementById('mgPreapprovedInfo');
   const mgPreapproveLine = document.getElementById('mgPreapproveLine');
+  const mgLocalBtn   = document.getElementById('mgLocalBtn');
+  const mgSenderBtn  = document.getElementById('mgSenderBtn');
   const mgStarBtn    = document.getElementById('mgStarBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
 
@@ -190,15 +192,16 @@
 
   // Etichette/testi vuoto per le tab-lista (DB1).
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori locali', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox:    'Nessun feedback ricevuto.',
     queue:    'Nessun feedback in coda.',
+    local:    'Nessun lavoro locale.',
     resolved: 'Nessun feedback risolto.',
     archived: 'Nessun feedback archiviato.',
   };
-  const LIST_TABS = ['inbox', 'queue', 'resolved', 'archived'];
+  const LIST_TABS = ['inbox', 'queue', 'local', 'resolved', 'archived'];
   // Come si chiama la lista quando le sezioni non ci sono: nessun nome di
   // sezione, perché nessuna sezione è stata scelta.
   const SENZA_SEZIONI_LABEL = 'Segnalazioni';
@@ -238,8 +241,11 @@
     // altre girano da sole, questa nasce da una conversazione.
     local:    { icon: '💻', label: 'Claude (sessione locale)' },
     claude:   { icon: '🤖', label: 'Claude (ruolo non indicato)' },
+    // #595: si firma col prefisso dell'owner o di una sua istanza ma senza prova; per la pipeline è un utente.
+    unproven: { icon: '❔', label: 'Utente, prefisso riservato senza prova' },
   };
   function authorKindOf(fb) {
+    if (MR && MR.isUnprovenSender && MR.isUnprovenSender(fb)) return 'unproven';
     return (TH && TH.authorKind) ? TH.authorKind(fb && fb.clientId) : 'user';
   }
   function authorMetaOf(fb) {
@@ -255,7 +261,7 @@
   function senderLabel(fb) {
     const kind = authorKindOf(fb);
     const m = AUTHOR_META[kind] || AUTHOR_META.user;
-    if (kind !== 'user') return `${m.icon} ${m.label}`;
+    if (kind !== 'user' && kind !== 'unproven') return `${m.icon} ${m.label}`;
     const id = String((fb && fb.clientId) || '').trim();
     const short = id.slice(0, 8);
     return short ? `${m.icon} ${m.label} · ${short}…` : `${m.icon} ${m.label}`;
@@ -287,7 +293,7 @@
   // Ordine "per creatore": prima le persone (owner, utenti), poi le istanze di
   // Claude — la sessione locale in testa, perché è quella che lavora insieme
   // all'owner — e in fondo Filo che scrive per conto di un utente.
-  const AUTHOR_RANK = { owner: 0, user: 1, local: 2, worker: 3, verifier: 4, residuo: 5, prober: 6, claude: 7, filo: 8 };
+  const AUTHOR_RANK = { owner: 0, user: 1, unproven: 2, local: 3, worker: 4, verifier: 5, residuo: 6, prober: 7, claude: 8, filo: 9 };
   // Applica l'override di ordinamento scelto dall'owner. `list` arriva GIÀ
   // ordinata col criterio predefinito della tab: in 'smart' la lasciamo intatta.
   // `sort` è stabile → a parità di chiave si conserva l'ordine predefinito.
@@ -300,8 +306,8 @@
       arr.sort((a, b) => MR.priorityOf(b) - MR.priorityOf(a));
     } else if (sortMode === 'creator') {
       arr.sort((a, b) => {
-        const ra = AUTHOR_RANK[authorKindOf(a)] ?? 9;
-        const rb = AUTHOR_RANK[authorKindOf(b)] ?? 9;
+        const ra = AUTHOR_RANK[authorKindOf(a)] ?? 99;
+        const rb = AUTHOR_RANK[authorKindOf(b)] ?? 99;
         if (ra !== rb) return ra - rb;
         return String(a.clientId || '').localeCompare(String(b.clientId || ''));
       });
@@ -1613,7 +1619,7 @@
   // dall'owner. Più pallini pieni = priorità più alta → le routine di Claude la
   // affrontano prima. Non mostrata su Risolti/Archiviati (lì non serve agire).
   function priorityHasDots() {
-    return currentTab === 'queue' || currentTab === 'inbox';
+    return currentTab === 'queue' || currentTab === 'local' || currentTab === 'inbox';
   }
   function priorityDotsHtml(fb) {
     if (!priorityHasDots()) return '';
@@ -1708,20 +1714,26 @@
       : 'Riordina i feedback — clic o tasto destro';
   }
   function openSortMenu(x, y) {
+    apriMenu(x, y, ['num', 'priority', 'creator', 'smart'].map((mode) => ({
+      testo: SORT_MODES[mode], acceso: mode === sortMode, radio: true, azione: () => chooseSort(mode),
+    })));
+  }
+  // Un menu di voci nello stile dei select (PATTERNS.md); uno solo aperto per volta.
+  function apriMenu(x, y, voci) {
     closeSortMenu();
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop mg-ctxmenu';
     menu.setAttribute('role', 'menu');
-    for (const mode of ['num', 'priority', 'creator', 'smart']) {
+    for (const v of voci) {
       const opt = document.createElement('div');
       opt.className = 'sn-select-option';
-      opt.setAttribute('role', 'menuitemradio');
-      const on = mode === sortMode;
-      opt.setAttribute('aria-checked', on ? 'true' : 'false');
-      if (on) opt.classList.add('sn-selected');
-      // ✓ sull'ordinamento attivo; spazio allineato sugli altri.
-      opt.textContent = `${on ? '✓ ' : ' '}${SORT_MODES[mode]}`;
-      opt.addEventListener('click', () => chooseSort(mode));
+      opt.setAttribute('role', v.radio ? 'menuitemradio' : 'menuitem');
+      if (v.radio) opt.setAttribute('aria-checked', v.acceso ? 'true' : 'false');
+      if (v.acceso) opt.classList.add('sn-selected');
+      if (v.titolo) opt.title = v.titolo;
+      // ✓ sulla voce attiva; spazio allineato sulle altre.
+      opt.textContent = v.radio ? `${v.acceso ? '✓ ' : ' '}${v.testo}` : v.testo;
+      opt.addEventListener('click', () => { closeSortMenu(); v.azione(); });
       menu.appendChild(opt);
     }
     document.body.appendChild(menu);
@@ -1737,6 +1749,49 @@
       window.addEventListener('resize', closeSortMenu);
     }, 0);
   }
+  // L'esito si legge nel dettaglio: dal menu la pratica si apre, così il messaggio ha dove stare.
+  function segnoDalMenu(fb, valore) {
+    if (selectedId !== fb._id) openDetail(fb._id);
+    setLocalSign(fb._id, valore);
+  }
+
+  // Tasto destro su una scheda: quello che si fa su una pratica senza aprirla (#908).
+  mgList.addEventListener('contextmenu', (e) => {
+    const item = e.target.closest('.mg-item[data-id]');
+    const fb = item && allFeedbacks.find((f) => f._id === item.dataset.id);
+    if (!fb) return;
+    e.preventDefault();
+    const num = FB.formatNum(fb.seq, fb.subSeq);
+    const voci = [{ testo: 'Apri', azione: () => openDetail(fb._id) }];
+    const segnabile = isAdmin && !MR.isLocalOnly(fb) ? MR.localSignCheck(fb, true) : { ok: false };
+    if (isAdmin && MR.isLocalOnly(fb)) {
+      const chiusa = MR.praticaChiusa(fb, { releasedVersion, fusioni });
+      voci.push({
+        testo: chiusa ? '💻 Non era un lavoro locale' : '💻 Rimetti anche alle routine',
+        titolo: chiusa ? `${localSignText(fb)} ${TITOLO_TOGLI_CHIUSA}` : localSignText(fb),
+        azione: () => segnoDalMenu(fb, false),
+      });
+    } else if (segnabile.ok) {
+      voci.push({
+        testo: segnabile.chiusa ? '💻 Era un lavoro locale' : '💻 Solo lavoro locale',
+        titolo: segnabile.chiusa ? TITOLO_LOCALE_CHIUSA : 'Nessuna routine la prende. La lavora una sessione locale, e passa nei Lavori locali.',
+        azione: () => segnoDalMenu(fb, true),
+      });
+    }
+    if (isAdmin && MR.mittenteDaRiconoscere(fb)) {
+      voci.push({ testo: '🙋 È mio', titolo: titoloEMio(fb), azione: () => { if (selectedId !== fb._id) openDetail(fb._id); setSenderProof(fb._id); } });
+    }
+    if (num) {
+      voci.push({
+        testo: `Copia #${num}`,
+        // Solo le pratiche tue o di una sessione si legano a un lavoro locale: per le altre il numero serve a parlarne.
+        titolo: MR.isProvenLocalSender(fb) ? 'Il numero con cui parlarne, anche a npm run finish -- --feedback' : 'Il numero con cui parlarne',
+        azione: () => { navigator.clipboard.writeText(`#${num}`).then(() => setManageMsg(`#${num} copiato.`, 'ok'), () => {}); },
+      });
+    }
+    apriMenu(e.clientX, e.clientY, voci);
+  });
+
   // Tasto destro ovunque sull'intestazione della lista → menu di ordinamento.
   if (mgListHeadRow) {
     mgListHeadRow.addEventListener('contextmenu', (e) => {
@@ -2016,7 +2071,7 @@
       // In lavorazione (working/revision_*): la card mostra una seconda riga con
       // il passaggio corrente dell'iter e se un'istanza ci lavora ORA. Solo
       // nella tab "In coda" (dove queste card sono pinnate in cima).
-      const progress = (leggibile && currentTab === 'queue') ? MR.workProgress(fb) : null;
+      const progress = (leggibile && (currentTab === 'queue' || currentTab === 'local')) ? MR.workProgress(fb) : null;
       item.className = 'mg-item'
         + (fb._id === selectedId ? ' mg-item--selected' : '')
         + unfilteredCls
@@ -2059,10 +2114,11 @@
         ${ferma ? '<span class="mg-fusione-badge" title="Una fusione aspetta il tuo via libera">fusione ferma</span>' : ''}
         ${leggibile ? '' : statePublicHtml(fb)}
         ${preapprovedHtml(fb)}
+        ${localBadgeHtml(fb)}
         ${priorityDotsHtml(fb)}
       `;
       item.innerHTML = progress
-        ? `<div class="mg-item-row">${rowHtml}</div>${workStateHtml(progress)}`
+        ? `<div class="mg-item-row">${rowHtml}</div>${workStateHtml(progress, fb)}`
         : rowHtml;
       item.addEventListener('click', (e) => {
         // Il click su un pallino priorità non apre il dettaglio (lo gestisce il
@@ -2105,9 +2161,11 @@
   function isOpenPublic(fb) {
     return String((fb && fb.statusPublic) || 'open') !== 'closed';
   }
+  // Un lavoro locale provato si fonde comunque senza chiedere: lì il segno dorme, e resta nel dato
+  // per quando la pratica torna alle routine.
   function preapprovedHtml(fb) {
     const m = preapprovedOf(fb);
-    if (!m || !isOpenPublic(fb)) return '';
+    if (!m || !isOpenPublic(fb) || MR.isProvenLocalWork(fb)) return '';
     const UI = window.SN_MERGE_APPROVALS;
     const t = (UI && UI.segnoTesti) ? UI.segnoTesti(m)
       : { etichetta: 'senza chiedere', titolo: `Si fonde senza chiedere: segno messo da ${m.by}` };
@@ -2115,11 +2173,42 @@
     return `<span class="${cls}" title="${esc(t.titolo)}">${esc(t.etichetta)}</span>`;
   }
 
+  // Nei Lavori locali il segno lo dice la sezione; altrove (una pratica che aspetta
+  // l'owner nei Ricevuti, una chiusa) la scheda lo porta, o sembrerebbe una delle routine.
+  function localBadgeHtml(fb) {
+    if (!MR.isLocalOnly(fb) || currentTab === 'local') return '';
+    return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">locale</span>`;
+  }
+  function localSignText(fb) {
+    const m = fb && fb.localOnly;
+    if (!m) return '';
+    const quando = Number(m.at) > 0 ? ` il ${formatDateTime(new Date(Number(m.at)).toISOString())}` : '';
+    const cosa = MR.praticaChiusa(fb, { releasedVersion, fusioni })
+      ? 'Era un lavoro locale: per questo non sta nella bacheca pubblica.'
+      : 'Solo lavoro locale: nessuna routine la prende.';
+    return `${cosa} Segno messo da ${chiHaMessoIlSegno(m.by)}${quando}.`;
+  }
+  // Una sessione firma il segno col suo mittente (`local:claude`), l'owner con l'email: il mittente si legge come in testata.
+  function chiHaMessoIlSegno(by) {
+    const s = String(by || '').trim();
+    if (s === 'owner') return AUTHOR_META.owner.label;
+    if (/^[a-z]+:/i.test(s) && TH && TH.authorKind) {
+      const m = AUTHOR_META[TH.authorKind(s)];
+      if (m) return m.label;
+    }
+    return s;
+  }
+
   // ── Riga di stato della lavorazione (card pinnate + dettaglio) ────────────
   // Traduce l'avanzamento (MR.workProgress) in una riga leggibile: i tre
   // passaggi dell'iter come spunte (✓ fatto · ● in corso · ○ da fare) e se
   // un'istanza ci sta lavorando in questo momento.
-  function workStateHtml(progress) {
+  function workStateHtml(progress, fb) {
+    // Un lavoro locale non ha l'iter delle routine né il loro rientro in coda: lo porta avanti una sessione.
+    if (fb && MR.isLocalOnly(fb)) {
+      const dove = progress.status === 'working' ? 'In lavorazione' : 'In verifica';
+      return `<div class="mg-item-state"><span class="mg-work-idle">${dove} in una sessione locale</span></div>`;
+    }
     const marks = { done: '✓', current: '●', pending: '○' };
     const steps = progress.steps.map((s) =>
       `<span class="mg-step mg-step--${s.state}" title="${esc(s.label)}: ${
@@ -2194,7 +2283,11 @@
     const blues = alignedFeedbacks();
     const show = isAdmin && currentTab === 'inbox' && blues.length > 0;
     mgAlignedBar.hidden = !show;
-    if (show && mgAlignedBtn) mgAlignedBtn.textContent = `Approva tutti gli allineati (${blues.length}) → In coda`;
+    if (!show || !mgAlignedBtn) return;
+    // Quelli col segno locale approvati vanno nei Lavori locali (#908): la freccia dice dove.
+    const locali = blues.filter((f) => MR.isLocalOnly(f)).length;
+    const dove = !locali ? 'In coda' : (locali === blues.length ? 'Lavori locali' : 'In coda e Lavori locali');
+    mgAlignedBtn.textContent = `Approva tutti gli allineati (${blues.length}) → ${dove}`;
   }
   async function approveAllAligned() {
     const blues = alignedFeedbacks();
@@ -2661,7 +2754,7 @@
     mgDetailHead.innerHTML = `Da <a class="mg-sender-link" id="senderLink" href="#" data-client="${esc(clientId)}" title="${esc(clientId)}">${esc(senderLabel(fb))}</a> il ${dateStr}`;
     document.getElementById('senderLink').addEventListener('click', (e) => {
       e.preventDefault();
-      openSidebarSender(clientId);
+      openSidebarSender(senderKeyOf(fb));
     });
 
     // La fila dei cinque livelli: triangolo, cerchi, rombo, pentagono,
@@ -2673,7 +2766,7 @@
     if (mgWorkState) {
       const progress = leggibile ? MR.workProgress(fb) : null;
       mgWorkState.hidden = !progress;
-      mgWorkState.innerHTML = progress ? workStateHtml(progress) : '';
+      mgWorkState.innerHTML = progress ? workStateHtml(progress, fb) : '';
     }
 
     // Bolle chat
@@ -2757,6 +2850,105 @@
     mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
     mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
     reflectPreapproved(fb);
+    reflectLocal(fb);
+    reflectSender(fb);
+  }
+
+  // ── «Solo in locale» (#908) ───────────────────────────────────────────────
+  // Il tasto c'è dove il segno si può mettere (owner o sessione con la prova; su una pratica chiusa
+  // dice che era un lavoro locale e la toglie dalla bacheca) o togliere; sui feedback degli utenti no.
+  function localToggleOffered(fb) {
+    return MR.isLocalOnly(fb) || MR.isProvenLocalSender(fb);
+  }
+  const TITOLO_LOCALE_CHIUSA = 'Era un lavoro locale: la segna così, e la sua scheda esce dalla bacheca pubblica.';
+  // Una pratica chiusa le routine non la prendono più: togliere il segno la rimette solo nella bacheca.
+  const TITOLO_TOGLI_CHIUSA = 'Un clic toglie il segno, e la sua scheda torna nella bacheca pubblica.';
+  function reflectLocal(fb) {
+    if (!mgLocalBtn) return;
+    const on = MR.isLocalOnly(fb);
+    mgLocalBtn.hidden = !isAdmin || !localToggleOffered(fb);
+    mgLocalBtn.disabled = false;
+    mgLocalBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    mgLocalBtn.textContent = on ? '💻 Solo locale' : '💻 Locale';
+    const perche = on ? null : MR.localSignCheck(fb, true);
+    const chiusa = on && MR.praticaChiusa(fb, { releasedVersion, fusioni });
+    mgLocalBtn.title = on
+      ? `${localSignText(fb)} ${chiusa ? TITOLO_TOGLI_CHIUSA : 'Un clic la rimette anche alle routine.'}`
+      : (perche.ok
+        ? (perche.chiusa ? TITOLO_LOCALE_CHIUSA : 'La lavora solo una sessione locale. Nessuna routine la prende, e passa nei Lavori locali.')
+        : `Adesso non si può: ${perche.motivo}.`);
+  }
+
+  // ── «È mio» (#908) ────────────────────────────────────────────────────────
+  // Un prefisso dell'owner o di una sessione senza prova vale come un utente: solo l'owner può dire che è suo.
+  const TITOLO_E_MIO = 'L’hai aperto tu o una tua sessione: gli dai la prova del mittente, e da qui vale come tuo (anche per il lavoro locale).';
+  // Lo stesso giudizio che ferma il lettore delle sessioni, su ogni strada: un falso con quel prefisso avrebbe questa forma.
+  function titoloEMio(fb) {
+    const segnalato = MR.segnalatoComeAttacco({ status: MR.normalizeStatus(fb).status, pipeline: fb.pipeline });
+    return segnalato ? `${TITOLO_E_MIO} Attenzione: ${segnalato}, guardalo prima.` : TITOLO_E_MIO;
+  }
+  function reflectSender(fb) {
+    if (!mgSenderBtn) return;
+    mgSenderBtn.hidden = !isAdmin || !MR.mittenteDaRiconoscere(fb);
+    mgSenderBtn.disabled = false;
+    mgSenderBtn.title = titoloEMio(fb);
+  }
+  async function setSenderProof(id) {
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb || !MR.mittenteDaRiconoscere(fb)) return;
+    const num = FB.formatNum(fb.seq, fb.subSeq);
+    const chi = num ? ` (#${num})` : '';
+    if (selectedId === id && mgSenderBtn) mgSenderBtn.disabled = true;
+    setManageMsg('Gli do la prova del mittente…', '');
+    try {
+      const r = await sendToMain({ type: 'feedback_update', id, senderProof: 'admin' });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      fb.senderProof = 'admin';
+      if (selectedId === id) openDetail(id);
+      renderList();
+      setManageMsg(`Da ora${chi} vale come tuo.`, 'ok');
+    } catch (e) {
+      setManageMsg(`Prova non data${chi}: ${e.message || 'Errore'}`, 'err');
+    } finally {
+      if (mgSenderBtn) mgSenderBtn.disabled = false;
+    }
+  }
+  if (mgSenderBtn) {
+    mgSenderBtn.addEventListener('click', () => { if (selectedId) setSenderProof(selectedId); });
+  }
+
+  async function setLocalSign(id, valore) {
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb) return;
+    const check = MR.localSignCheck(fb, valore);
+    const num = FB.formatNum(fb.seq, fb.subSeq);
+    const chi = num ? ` (#${num})` : '';
+    if (!check.ok) { setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${check.motivo}.`, 'err'); return; }
+    if (selectedId === id && mgLocalBtn) mgLocalBtn.disabled = true;
+    setManageMsg(valore ? 'Segno la pratica come lavoro locale…' : (check.chiusa ? 'Tolgo il segno…' : 'La rimetto anche alle routine…'), '');
+    try {
+      const r = await sendToMain({ type: 'feedback_update', id, localOnly: valore });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      fb.localOnly = valore ? { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() } : undefined;
+      if (selectedId === id) { reflectLocal(fb); reflectPreapproved(fb); }
+      renderList();
+      const dove = MR.manageTabFor(fb, { releasedVersion, fusioni });
+      const fatto = !valore
+        ? (check.chiusa ? `Da ora${chi} non è più un lavoro locale: la sua scheda torna nella bacheca pubblica.` : `Da ora${chi} la possono prendere anche le routine.`)
+        : check.chiusa ? `Segnata${chi} come lavoro locale: fuori dalla bacheca pubblica.`
+          : `Da ora${chi} la lavora solo una sessione locale${dove === 'local' ? ': la trovi nei Lavori locali' : ''}.`;
+      setManageMsg(fatto, 'ok');
+    } catch (e) {
+      setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${e.message || 'Errore'}`, 'err');
+    } finally {
+      if (mgLocalBtn) mgLocalBtn.disabled = false;
+    }
+  }
+  if (mgLocalBtn) {
+    mgLocalBtn.addEventListener('click', () => {
+      const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+      if (fb) setLocalSign(fb._id, !MR.isLocalOnly(fb));
+    });
   }
 
   // Il tasto «Fondi senza chiedermelo» e la riga che dice chi ha messo il
@@ -2767,9 +2959,10 @@
     // L'interruttore è acceso solo col segno pieno: quello da approvazione non
     // fonde i blocchi nuovi, e un clic lo fa diventare pieno.
     const m = segno && segno.tipo === 'pieno' ? segno : null;
-    const aperta = isOpenPublic(fb);
+    const aperta = isOpenPublic(fb) && !MR.praticaChiusa(fb, { releasedVersion, fusioni });
+    const locale = MR.isProvenLocalWork(fb);
     mgPreapproveBtn.disabled = false;
-    mgPreapproveBtn.hidden = !aperta;
+    mgPreapproveBtn.hidden = !aperta || locale;
     if (mgPreapproveLine) mgPreapproveLine.hidden = !aperta;
     mgPreapproveBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
     mgPreapproveBtn.textContent = m ? 'Chiedimi prima di fondere' : 'Fondi senza chiedermelo';
@@ -2780,15 +2973,16 @@
     // che fonde subito la richiesta ferma.
     if (mgPreapproveRevokeBtn) {
       mgPreapproveRevokeBtn.disabled = false;
-      mgPreapproveRevokeBtn.hidden = !(aperta && segno && segno.tipo === 'approvazione');
+      mgPreapproveRevokeBtn.hidden = !(aperta && !locale && segno && segno.tipo === 'approvazione');
       mgPreapproveRevokeBtn.title = 'Toglie il sì dato col clic: da ora anche i riallineamenti di questa pratica aspettano il tuo via libera.';
     }
     if (mgPreapprovedInfo) {
       const UI = window.SN_MERGE_APPROVALS;
-      mgPreapprovedInfo.hidden = !(segno && aperta);
-      mgPreapprovedInfo.textContent = !(segno && aperta) ? ''
-        : m ? `Si fonde senza chiedere: segno messo da ${m.by}${m.at ? ` il ${formatDateTime(m.at)}` : ''}.`
-          : UI.segnoTesti(segno).riga;
+      mgPreapprovedInfo.hidden = !((segno || locale) && aperta);
+      mgPreapprovedInfo.textContent = !((segno || locale) && aperta) ? ''
+        : locale ? 'Lavoro locale: alla chiusura si fonde senza chiedere, i blocchi restano registrati in Automazioni.'
+          : m ? `Si fonde senza chiedere: segno messo da ${m.by}${m.at ? ` il ${formatDateTime(m.at)}` : ''}.`
+            : UI.segnoTesti(segno).riga;
     }
   }
 
@@ -3638,13 +3832,13 @@
     // vivono nel campo piatto files[] ({ name, url, type }): senza mapparli qui
     // l'allegato del tester era invisibile nella dashboard unificata (la vecchia
     // pagina feedback li mostra — parità tra superfici equivalenti).
-    const fromModel = TH ? TH.isFromModel(fb.clientId) : false;
+    const fromModel = TH ? TH.isFromModel(MR.effectiveClientId(fb)) : false;
     const imgs = (Array.isArray(fb.images) ? fb.images : []).map((url) => ({ kind: 'img', url }));
     const files = (Array.isArray(fb.files) ? fb.files : [])
       .filter((f) => f && typeof f.url === 'string' && f.url)
       .map((f) => ({ kind: 'file', url: f.url, name: f.name, type: f.type }));
-    appendBubble(fromModel ? 'model' : 'user', fromModel ? 'Filo (segnalazione automatica)' : 'Utente',
-      esc(fb.text || ''), imgs.concat(files));
+    // L'autore dalla stessa regola della testata, o le due righe dello stesso dettaglio si contraddicono.
+    appendBubble(fromModel ? 'model' : 'user', authorMetaOf(fb).label, esc(fb.text || ''), imgs.concat(files));
 
     // Bolla 2: parere di Filo. Il riassunto sintetico (filoSummary) può
     // arrivare troncato a metà frase dal backend; se manca o è troncato,
@@ -3660,6 +3854,10 @@
       const fromVerdicts = filoOpinionFromVerdicts(fb);
       if (fromVerdicts) opinionHtml = fromVerdicts;         // parere completo dai giudici
       else if (summary) opinionHtml = esc(summary);          // troncato ma è l'unica cosa che c'è
+      // #908: un lavoro locale col mittente provato i giudici li salta di proposito.
+      else if (fb.pipeline && fb.pipeline.skipped === 'local_proven') {
+        opinionHtml = '<em>Lavoro locale aperto da te o da una sessione, con la prova del mittente. I giudici non servono.</em>';
+      }
       // "non ha ANCORA un parere" si legge come "sta arrivando": vero solo
       // finché la segnalazione aspetta una decisione. Su una già decisa (un
       // attacco confermato, un fix chiuso) quella parola diceva il falso — e su
@@ -4085,7 +4283,7 @@
     const html = `
       <div class="mg-sender-info">
         <div class="mg-sender-stat"><strong>${esc(senderLabel(group[0] || { clientId }))}</strong></div>
-        <div class="mg-sender-stat">${esc(clientId)}</div>
+        <div class="mg-sender-stat">${esc(clientId === '__anon__' ? 'anonimo' : clientId)}</div>
         <div class="mg-sender-stat">${esc(oldestStr)}</div>
         <div class="mg-sender-stat">Feedback totali: <strong>${total}</strong></div>
         <div class="mg-sender-list" id="senderFbList">${listHtml || '<em>Nessun feedback.</em>'}</div>
@@ -4192,10 +4390,14 @@
 
   // Indice per mittente (il pannello laterale lo usa). Si rifà a ogni
   // caricamento e a ogni giro di aggiornamento.
+  // Chiave del mittente = la stessa del server: chi copia il clientId dell'owner senza prova sta in un gruppo suo.
+  function senderKeyOf(fb) {
+    return (MR.effectiveClientId ? MR.effectiveClientId(fb) : String((fb && fb.clientId) || '')) || '__anon__';
+  }
   function reindexByClient() {
     allByClient = {};
     for (const fb of allFeedbacks) {
-      const c = fb.clientId || '__anon__';
+      const c = senderKeyOf(fb);
       if (!allByClient[c]) allByClient[c] = [];
       allByClient[c].push(fb);
     }

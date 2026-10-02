@@ -7,6 +7,21 @@ const Defaults = require('../defaultsStore');
 const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
 const { daFilo, soloFilo } = require('./origine');
+const { spiegaErroreAccesso } = require('../../auth/esitoAccesso');
+const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { consiglioPortachiavi } = require('../../portachiavi');
+
+// Chi accede su un computer senza portachiavi di sistema scopriva solo alla
+// riapertura di essere di nuovo fuori, e pensava a un guasto (#708.1).
+const CHIAVE_AVVISO_NON_RICORDATO = 'accesso-non-ricordato';
+function testoAccessoNonRicordato() {
+  const base = 'Hai fatto l\'accesso, ma Filo non trova un portachiavi di sistema dove custodirlo: '
+    + 'quando chiudi Filo dovrai accedere di nuovo.';
+  let backend = '';
+  try { backend = require('electron').safeStorage.getSelectedStorageBackend?.() || ''; } catch (_) {}
+  const consiglio = consiglioPortachiavi({ platform: process.platform, backend });
+  return consiglio ? `${base} ${consiglio}` : base;
+}
 
 // Base delle Cloud Function callable del backend di sicurezza (filo-security):
 // stessa region/progetto del deploy. Override per i test via env.
@@ -246,13 +261,19 @@ module.exports = function register(on, ctx) {
     const isAdmin = auth.isAdmin();
     if (!daFilo(origin, sender)) return { ok: true, signedIn, isAdmin };
     const uid = signedIn ? await auth.getUid() : null;
-    return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid };
+    return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid, remembered: auth.isRemembered() };
   });
 
   on(MSG.AUTH_SIGNIN, async () => {
     try {
       const profile = await auth.signIn();
-      avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
+      const remembered = auth.isRemembered();
+      avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile, remembered });
+      // Nel main e non nelle pagine: all'accesso si arriva da molte porte
+      // (menu account, bacheca, posta, red-team, siti), e l'avviso vale per tutte.
+      if (auth.isSignedIn() && !remembered) {
+        avvisoNellaFinestra(testoAccessoNonRicordato(), { chiave: CHIAVE_AVVISO_NON_RICORDATO });
+      }
       // Rinfresca la config condivisa in background. Le chiavi ruotate
       // dall'admin NON si leggono più qui (#581: config/secrets è admin-only e
       // le chiavi arrivano col build); resta utile per config/models.
@@ -260,9 +281,9 @@ module.exports = function register(on, ctx) {
       // Appena l'owner è dentro, la vista pubblica dei feedback si rimette in
       // pari da sola (#583): è il momento in cui il main ha di nuovo il token.
       if (auth.isAdmin()) scheduleViewSync({ delayMs: 4000, force: true });
-      return { ok: true, profile, isAdmin: auth.isAdmin() };
+      return { ok: true, profile, isAdmin: auth.isAdmin(), remembered };
     } catch (e) {
-      return { ok: false, error: e?.message || String(e) };
+      return { ok: false, ...spiegaErroreAccesso(e) };
     }
   });
 
@@ -314,9 +335,18 @@ module.exports = function register(on, ctx) {
           mergePreapproved = null;
         }
       }
+      // «Solo in locale» (#908): stesso patto, il CHI lo mette il main.
+      let localOnly;
+      if (typeof msg.localOnly === 'boolean') {
+        let email = '';
+        if (msg.localOnly) { try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {} }
+        localOnly = msg.localOnly ? { by: email || 'owner', at: Date.now() } : null;
+      }
+      // «È mio» (#908): l'unico valore che l'owner può dare è la sua prova.
+      const senderProof = msg.senderProof === 'admin' ? 'admin' : undefined;
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, senderProof },
         { idToken },
       );
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
@@ -335,6 +365,7 @@ module.exports = function register(on, ctx) {
       scheduleViewSync({ delayMs: 1500, force: true });
       // La pagina mostra subito chi ha messo il segno «fondi senza chiedermelo»:
       // glielo dice il main, che è l'unico a saperlo.
+      if (localOnly) return { ok: true, by: localOnly.by, at: localOnly.at };
       return mergePreapproved ? { ok: true, by: mergePreapproved.by } : { ok: true };
     } catch (e) {
       const raw = e?.message || String(e);

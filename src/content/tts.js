@@ -570,6 +570,8 @@
     }
     let stream;
     try {
+      // Il microfono lo chiede Filo, non il sito: senza lasciapassare la domanda uscirebbe col nome del sito.
+      try { await chrome.runtime.sendMessage({ type: MSG.PERMESSO_FILO, tipo: 'media' }); } catch (_) {}
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (_) {
       Popup.showToast(I18n.t('menu_dictate_no_mic'));

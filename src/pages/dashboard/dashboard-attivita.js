@@ -254,6 +254,7 @@
     IMPOSTA_ESTETICA: (n) => (n > 1 ? `cambiato ${n} dettagli dell'aspetto` : 'cambiato l\'aspetto'),
     SALVA_APPUNTO: (n) => (n > 1 ? `salvato ${n} appunti` : 'salvato un appunto'),
     SALVA_LEZIONE: (n) => (n > 1 ? `memorizzato ${n} cose` : 'memorizzato una cosa'),
+    DIMENTICA: (n) => (n > 1 ? `dimenticato ${n} cose` : 'dimenticato una cosa'),
     NAVIGA: (n) => (n > 1 ? `aperto ${n} pagine` : 'aperto una pagina'),
     ONBOARDING: () => 'proseguito con l\'accoglienza',
     PROXY_TAB: () => 'aperto la scheda da un altro paese',
@@ -375,6 +376,11 @@
       const t = String(a.testo || a.text || a.lezione || '').trim();
       return { icon: '🧠', text: `Memorizzato · ${t.length > 60 ? `${t.slice(0, 57)}…` : t}` };
     },
+    DIMENTICA: (a) => {
+      const tolte = (a._output && Array.isArray(a._output.dimenticate)) ? a._output.dimenticate : [];
+      const t = tolte.join(', ') || String(a.testo || '').trim();
+      return { icon: '🧠', text: `Dimenticato · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
+    },
     ONBOARDING: (a) => {
       if (a && (a.fine ?? a.chiudi ?? a.done)) return { icon: '👋', text: 'Accoglienza conclusa' };
       const ids = Array.isArray(a && a.spunta) ? a.spunta : [];
@@ -414,6 +420,7 @@
     TIMER: 'Timer non avviato', SVEGLIA: 'Sveglia non impostata',
     CANCELLA_SVEGLIA: 'Niente da cancellare', MODIFICA_SVEGLIA: 'Niente da spostare',
     SALVA_APPUNTO: 'Appunto non salvato', SALVA_LEZIONE: 'Non memorizzato',
+    DIMENTICA: 'Niente da dimenticare',
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto',
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
@@ -457,7 +464,13 @@
     const o = a && a._output;
     if (!o) return '';
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    if (o.blocked === 'site') {
+      const quali = o.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati';
+      return `${o.host || 'il sito'} è fra i siti ${quali}`;
+    }
     if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
+    if (o.proxy === 'non_disponibile') return 'non ancora disponibile';
+    if (o.proxy === 'no_web_tab') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
     if (o.ok === false && o.detail) return String(o.detail);
     if (o.error) return String(o.error);
@@ -492,10 +505,65 @@
   // si mangia il bottone e la funzione sparisce dalla chat.
   const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA'];
 
+  // Una pagina che il modello voleva aprire e che la lista dei siti bloccati ha fermato: la
+  // notifica se ne va in pochi secondi, e la chat le tiene il suo «Apri comunque» (#590).
+  function apribileComunque(a) {
+    const o = a && a._output;
+    return isType(a, 'NAVIGA') && a._executed === false && !!o && o.blocked === 'site' && /^https?:\/\//i.test(String(o.url || ''));
+  }
+
+  function bottoneApriComunque(a) {
+    const o = a._output;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn';
+    // Il nome del sito sta sul bottone: con due aperture fermate, o col testo che una pagina ha dettato
+    // al modello, è l'unica cosa che dice quale sito si sta aprendo.
+    btn.textContent = `Apri comunque ${o.host || o.url}`;
+    btn.title = `Apri ${o.host || o.url} anche se è fra i siti bloccati`;
+    // Un doppio clic apre una scheda sola; chiusa quella, il bottone riapre.
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      await send({ type: MSG.APRI_COMUNQUE, url: o.url });
+      setTimeout(() => { btn.disabled = false; }, 2000);
+    });
+    return btn;
+  }
+
+  // Blocchi arrivati mentre il turno della loro azione era ancora in corso: li prende renderActions.
+  const fermateInAttesa = new Map();
+
+  function segnaFermata(a, { host, reason, url }) {
+    a._executed = false;
+    a._output = { blocked: 'site', host: host || '', reason: reason || '', url: url || '', dopo: true };
+  }
+
+  // La pagina aperta dall'azione `callId` si è spostata da sé su un sito bloccato dopo l'attesa:
+  // l'azione nello storico lo dice al modello al turno dopo, e il suo chip diventa «Apri comunque».
+  function aperturaFermata(actions, data = {}) {
+    const callId = data.callId;
+    if (!callId) return false;
+    const a = (actions || []).find((x) => x && x._callId === callId && isType(x, 'NAVIGA'));
+    if (!a) { fermateInAttesa.set(callId, data); return false; }
+    segnaFermata(a, data);
+    const chip = document.querySelector(`[data-call-id="${CSS.escape(String(callId))}"]`);
+    if (chip && apribileComunque(a)) {
+      const row = activityRowFor(a);
+      if (row) chip.before(makeActivityRow(row.icon, row.text));
+      chip.replaceWith(bottoneApriComunque(a));
+    }
+    return true;
+  }
+
   // `shown`: gli id delle chiamate già raccontate in diretta nel blocco di
   // attività (evento 'done'): a fine turno non si ripetono.
   function renderActions(container, actions, { onAck, autoConfirm = false, activity = null, shown = null } = {}) {
     if (!actions || !actions.length) return;
+    for (const a of actions) {
+      const f = a && a._callId && isType(a, 'NAVIGA') ? fermateInAttesa.get(a._callId) : null;
+      if (f) { fermateInAttesa.delete(a._callId); segnaFermata(a, f); }
+    }
     const wrap = document.createElement('div');
     wrap.className = 'dash-bubble-actions';
     let hasAck = false;
@@ -506,7 +574,8 @@
       // che aspetta una conferma: la riga dice che Filo l'ha chiesta, il
       // bottone è come si risponde.
       const anche = a._confirm
-        || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false);
+        || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false)
+        || apribileComunque(a);
       if (activity) {
         if (told) {
           // Già in cronologia; resta solo l'eventuale bottone (link, conferma).
@@ -526,7 +595,7 @@
       // cieco (era il caso di un link con un indirizzo non ammesso). La sua
       // riga sta già nel diario. Un'azione IN ATTESA DI CONFERMA non è
       // «fallita»: non è ancora partita, e il suo bottone è tutto il punto.
-      if (!a._confirm && ((a._traccia && !anche) || a._executed === false)) continue;
+      if (!a._confirm && !apribileComunque(a) && ((a._traccia && !anche) || a._executed === false)) continue;
       const btn = renderActionButton(a, { onAck, activity });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
@@ -694,7 +763,7 @@
       // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
-      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK'];
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA'];
       if (AUTO_CONFIRM_TYPES.includes(type) && a._confirm.level === 2) {
         btn.dataset.autoConfirm = '1';
       }
@@ -755,6 +824,7 @@
       // direttamente il bottone di raffinamento.
       return buildAestheticRefiner(a);
     }
+    if (type === 'NAVIGA' && apribileComunque(a)) return bottoneApriComunque(a);
     if (type === 'NAVIGA') {
       // #162 — il link è già stato aperto direttamente dal main (executeFiloAction
       // apre la scheda). Questo chip resta come riferimento per RIAPRIRLO, ma deve
@@ -786,6 +856,7 @@
         btn.title = `Riapri ${label}`;
       }
       btn.className = 'dash-action-btn dash-action-link-chip';
+      if (a._callId) btn.dataset.callId = String(a._callId);
       const favUrl = faviconUrl(a.url);
       if (favUrl) {
         const img = document.createElement('img');
@@ -986,6 +1057,7 @@
     // Il contratto: un blocco di attività appeso a `container`.
     create: createActivity,
     renderActions,
+    aperturaFermata,
     tellActionInActivity,
     stepTrace,
     isType,

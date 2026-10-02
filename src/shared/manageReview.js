@@ -54,12 +54,42 @@
   // Stati "chiusi": non vanno (più) giudicati, restano nei loro flussi.
   const CLOSED_STATUSES = ['done', 'verified', 'archived', 'ignored'];
 
-  // Mittenti FIDATI = automazione dell'owner (owner:/routine:/agent:). I loro
-  // feedback non sono attacchi: se risultano bloccati a livello di identità è un
-  // errore (identità flaggata) e vanno ri-giudicati, non mostrati come "attacco".
-  // Speculare a isTrustedIdentity nel backend (filo-security/data/identities.js).
-  function isTrustedClient(clientId) {
-    return /^(owner|routine|agent):/i.test(String(clientId || ''));
+  // Fidato = prefisso riservato E prova del mittente (#595): il prefisso da solo lo scrive chiunque.
+  // Speculare a isTrustedIdentity nel backend (filo-security).
+  const SENDER_PROOFS = ['admin', 'server'];
+  const RESERVED_CLIENT_RE = /^(owner|routine|agent|local):/i;
+  function isTrustedClient(clientId, senderProof) {
+    return RESERVED_CLIENT_RE.test(String(clientId || '')) && SENDER_PROOFS.includes(senderProof);
+  }
+  function isUnprovenSender(fb) {
+    return !!fb && RESERVED_CLIENT_RE.test(String(fb.clientId || '')) && !SENDER_PROOFS.includes(fb.senderProof);
+  }
+  // Il mittente con cui decidere autore e gruppo: senza prova il prefisso riservato non lo riconosce nessuno,
+  // cioè vale come un utente. Stessa chiave di effectiveClientId sul server.
+  function effectiveClientId(fb) {
+    const c = String((fb && fb.clientId) || '');
+    return isUnprovenSender(fb) ? 'non-provato:' + c : c;
+  }
+
+  // ── Lavori locali (#908) ─────────────────────────────────────────────────
+  // `localOnly { by, at }`: la pratica la lavora solo una sessione locale. Il segno
+  // da solo la toglie alle routine; si mette solo su feedback dell'owner o di una
+  // sessione CON la prova (#595), mai sul solo prefisso. Gemello: localWork.js sul server.
+  const LOCAL_SENDER_RE = /^(owner|local):/i;
+  function isLocalOnly(fb) {
+    const m = fb && fb.localOnly;
+    return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
+  }
+  function isProvenLocalSender(fb) {
+    return !!fb && LOCAL_SENDER_RE.test(String(fb.clientId || '')) && fb.senderProof === 'admin';
+  }
+  // Segno E prova: è la condizione con cui il server la fonde saltando L5, quindi lì «fondi senza chiedermelo» non conta.
+  function isProvenLocalWork(fb) {
+    return isLocalOnly(fb) && isProvenLocalSender(fb);
+  }
+  // Prefisso dell'owner o di una sessione senza prova: solo l'owner può dire che è suo, e dargliela (#908).
+  function mittenteDaRiconoscere(fb) {
+    return isUnprovenSender(fb) && LOCAL_SENDER_RE.test(String(fb.clientId || ''));
   }
 
   // Vocabolario unico della macchina a stati (src/shared/feedbackStatus.js).
@@ -94,14 +124,14 @@
 
     const p = fb && fb.pipeline;
     const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
-    const trusted = isTrustedClient(fb && fb.clientId);
+    const trusted = isTrustedClient(fb && fb.clientId, fb && fb.senderProof);
     const status = (fb && fb.status) || 'new';
     // "Da giudicare": feedback aperto e in attesa di giudizio. Esclude i chiusi
     // (done/verified/archived/ignored) e i `clarify` (sono un dialogo con l'owner,
     // non in attesa dei giudici).
     const judgeable = !CLOSED_STATUSES.includes(status) && status !== 'clarify';
 
-    // Mittente FIDATO (automazione dell'owner: owner:/routine:/agent:) SENZA
+    // Mittente FIDATO (isTrustedClient: prefisso riservato e prova) SENZA
     // verdetti = i giudici non sono (ancora) girati su un feedback del proprietario
     // — spesso perché l'identità era stata flaggata per errore. NON è un blocco:
     // è "da ri-giudicare" (bianco). Va prima dei controlli di blocco identità.
@@ -462,6 +492,9 @@
       if (statusReason === 'arenato') {
         return { text: 'La lavorazione si è arenata troppe volte: decidi tu.', color: S.design.color };
       }
+      if (statusReason === 'locale') {
+        return { text: 'Richiede lavoro locale, e in locale i feedback degli utenti non si lavorano: decidi tu.', color: S.design.color };
+      }
       return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
     }
     if (status === 'aligned') {
@@ -477,7 +510,8 @@
       if (panelComplete(fb)) {
         const worst = worstVerdictBlock(fb);
         if (worst) {
-          return { text: `Mittente fidato segnalato come ${worst.label.toLowerCase()}: decidi tu.`, color: worst.color };
+          const chi = isTrustedClient(fb.clientId, fb.senderProof) ? 'Mittente fidato segnalato' : 'Segnalato';
+          return { text: `${chi} come ${worst.label.toLowerCase()}: decidi tu.`, color: worst.color };
         }
         return null;
       }
@@ -499,6 +533,7 @@
     clarify: 'domande per te',
     loop: 'difetto non più correggibile da soli',
     decisione: 'fermo: aspetta una tua scelta',
+    locale: 'richiede lavoro locale',
     arenato: 'lavorazione arenata',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
@@ -538,7 +573,99 @@
     // Una richiesta di fusione che aspetta l'owner è una sua decisione: Ricevuti anche se lo stato
     // non è arrivato al cancello. Solo `pending`: una fallita per conflitto la riallinea la routine.
     if (tab && tab !== 'archived' && richiestaInAttesa(fb, opts)) return 'inbox';
+    // Col segno locale la coda delle routine non la vede: mostrarla «In coda» direbbe il falso.
+    // Negli stati dei Ricevuti resta lì, perché aspetta comunque una decisione dell'owner.
+    if (tab === 'queue' && isLocalOnly(fb)) return 'local';
     return tab;
+  }
+
+  // Gli stati in cui una pratica aspetta l'owner: le sessioni locali non la spostano da lì (#908).
+  function isRicevutiStatus(status) {
+    const info = FS().STATUSES[String(status || '')];
+    return !!info && info.tab === 'inbox';
+  }
+
+  /** Cosa hanno segnalato filtro e giudici (`pipeline` decifrato). PURA. Fonte unica per lettore e ripasso. */
+  function segnaliDeiGiudici(pipeline) {
+    const p = pipeline && typeof pipeline === 'object' ? pipeline : null;
+    if (!p) return { attacco: false, spam: false };
+    const verdetti = Array.isArray(p.verdicts) ? p.verdicts : [];
+    const ha = (cls) => verdetti.some((v) => v && v.class === cls);
+    return {
+      attacco: p.action === 'block_attack' || p.l1Category === 'dangerous' || p.l2Class === 'attack' || ha('attack'),
+      spam: p.action === 'block_spam' || p.l1Category === 'spam' || p.l2Class === 'spam' || ha('spam'),
+    };
+  }
+
+  /**
+   * '' se una sessione ne può leggere il testo, altrimenti il motivo (#908). PURA.
+   * Per un mittente fidato il server lascia l'attacco nei Ricevuti come «Non filtrato»: lo stato da solo non basta.
+   */
+  function segnalatoComeAttacco(fb) {
+    const s = String((fb && fb.status) || '').trim();
+    if (s === 'suspicious_file') return 'è segnalato come file sospetto';
+    if (s === 'attack' || s === 'attack_confirmed') return `è segnalato come attacco («${s}»)`;
+    if (!isRicevutiStatus(s)) return '';
+    const p = fb && fb.pipeline;
+    if (p !== undefined && p !== null && p !== '' && typeof p !== 'object') return 'il giudizio non si decifra: non so se è segnalato come attacco';
+    return segnaliDeiGiudici(p).attacco ? 'è nei Ricevuti col giudizio d’attacco del filtro o dei giudici' : '';
+  }
+
+  /**
+   * Il segno «solo in locale» si può mettere (`valore` true) o togliere su questa pratica? PURA.
+   * Ritorna { ok: true } o { ok: false, motivo, utente } — `utente` vuol dire che il feedback
+   * è di un utente: in locale non si lavora, e se servisse lavoro locale torna nei Ricevuti.
+   * `opts.now` iniettabile nei test.
+   */
+  // Chiusa per lo stato o per il riflesso pubblico: lì il segno locale tiene la pratica fuori dalla bacheca, non dalle routine.
+  function praticaChiusa(fb, opts) {
+    const tab = manageTabFor(fb, opts);
+    return tab === 'resolved' || tab === 'archived' || ['done', 'archived'].includes(normalizeStatus(fb).status)
+      || String((fb && fb.statusPublic) || 'open') === 'closed';
+  }
+
+  function localSignCheck(fb, valore, opts) {
+    if (!fb) return { ok: false, motivo: 'feedback non trovato' };
+    if (!valore) {
+      if (!isLocalOnly(fb)) return { ok: false, motivo: 'il segno «solo in locale» non c’è' };
+      return praticaChiusa(fb, opts) ? { ok: true, chiusa: true } : { ok: true };
+    }
+    if (isLocalOnly(fb)) return { ok: false, motivo: 'il segno «solo in locale» c’è già' };
+    const mittente = localSenderCheck(fb);
+    if (!mittente.ok) return mittente;
+    if (statusUnreadable(fb)) return { ok: false, motivo: 'lo stato non si legge: non so se la pratica è aperta' };
+    if (/^(attack|spam|suspicious_file)/.test(normalizeStatus(fb).status)) {
+      return { ok: false, motivo: 'è segnalata come attacco o spam: prima si decide nei Ricevuti' };
+    }
+    // La regola del lettore: col segno una Ri-valutazione la manderebbe in coda senza giudici.
+    const segnalato = segnalatoComeAttacco({ status: normalizeStatus(fb).status, pipeline: fb.pipeline });
+    if (segnalato) return { ok: false, motivo: `${segnalato}: prima si decide nei Ricevuti` };
+    // Chiusa: il segno dice che era un lavoro locale e la toglie dalla bacheca pubblica; L5 il server lo salta solo a pratica aperta.
+    if (praticaChiusa(fb, opts)) return { ok: true, chiusa: true };
+    // La presa di una routine si vede dal battito che il server specchia sul feedback (beatAt/workingSince):
+    // i biglietti vivono in una collezione che da qui non si legge.
+    const wp = workProgress(fb, opts);
+    if (wp && wp.active) {
+      return { ok: false, motivo: 'una routine la sta lavorando adesso: il segno si mette quando consegna o quando il suo biglietto è revocato' };
+    }
+    return { ok: true };
+  }
+
+  /**
+   * Una sessione locale può lavorare una pratica di questo mittente? PURA. Solo owner o sessione con la
+   * prova (#595); `utente` = feedback di un utente: in locale non si lavora e, se serve, torna nei Ricevuti.
+   */
+  function localSenderCheck(fb) {
+    if (!fb) return { ok: false, motivo: 'feedback non trovato' };
+    if (isProvenLocalSender(fb)) return { ok: true };
+    const cid = String(fb.clientId || '');
+    if (LOCAL_SENDER_RE.test(cid)) {
+      return { ok: false, utente: true, senzaProva: true, motivo: 'il mittente non porta la prova (#595): vale come un feedback di un utente, e in locale i feedback degli utenti non si lavorano' };
+    }
+    if (RESERVED_CLIENT_RE.test(cid) && SENDER_PROOFS.includes(fb.senderProof)) {
+      return { ok: false, motivo: 'l’ha aperto una routine: in locale si lavorano solo i feedback dell’owner o di una sessione locale' };
+    }
+    return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale non si lavora' };
   }
 
   function richiestaInAttesa(fb, opts) {
@@ -588,8 +715,8 @@
     const { status } = normalizeStatus(fb);
     const tab = manageTabFor(fb, opts);
     if (tab === 'inbox') {
-      // Aspetta una decisione: approvare È scrivere `todo`.
-      const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: '→ In coda', primary: true }];
+      // Aspetta una decisione: approvare È scrivere `todo`. Col segno locale `todo` porta nei Lavori locali.
+      const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: isLocalOnly(fb) ? '→ Lavori locali' : '→ In coda', primary: true }];
       // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
       // Ricevuti e resta consultabile negli Archiviati. Il file sospetto non è
       // ancora classificato: le conferme possibili sono DUE, non una.
@@ -602,7 +729,7 @@
       acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
       return acts;
     }
-    if (tab === 'queue') {
+    if (tab === 'queue' || tab === 'local') {
       // Nell'iter di lavorazione: l'owner può chiuderlo a mano o archiviarlo.
       const acts = [];
       if (status !== 'done') acts.push({ key: 'resolve', kind: 'resolve', to: 'done', label: '✓ Risolto', primary: true });
@@ -708,9 +835,8 @@
    * non è in lavorazione. PURA (opts.now iniettabile nei test). Ritorna:
    *   { status, steps: [{key,label,state:'done'|'current'|'pending'}],
    *     current: <step corrente>, active: bool, by: string }
-   * `active` = un'istanza ci sta lavorando in questo momento: claim vivo
-   * (claimExpiresAt nel futuro) in qualunque fase, oppure — solo per `working`,
-   * l'unica fase con un lock a TTL suo — un workingSince fresco.
+   * `active` = un'istanza ci sta lavorando in questo momento: battito (`beatAt`)
+   * o presa in carico (`workingSince`) freschi, FS.isBeating.
    */
   function workProgress(fb, opts) {
     const { status } = normalizeStatus(fb);
@@ -746,8 +872,9 @@
     // In coda: priorità DESC come criterio primario tra i non-in-lavorazione.
     // `sort` è stabile, quindi a parità di priorità si conserva l'ordine di
     // sortReview (severità poi recenza), e il pinning finale conserva a sua
-    // volta l'ordine per priorità dentro ogni gruppo.
-    if (tab === 'queue') {
+    // volta l'ordine per priorità dentro ogni gruppo. I Lavori locali sono la
+    // stessa coda, lavorata da un'altra parte.
+    if (tab === 'queue' || tab === 'local') {
       const now = (opts && opts.now) != null ? opts.now : Date.now();
       // Rango di pinning: istanza attiva ora > fase più avanzata > non in
       // lavorazione (-1). Il +10 separa nettamente gli attivi dagli inattivi.
@@ -808,10 +935,10 @@
   // `opts`: { releasedVersion, starredOnly, confirmedOnly }. PURA.
   function manageTabCounts(feedbacks, opts) {
     const list = feedbacks || [];
-    const counts = { inbox: 0, queue: 0, resolved: 0, archived: 0 };
+    const counts = { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 };
     for (const f of list) {
       const tab = manageTabFor(f, opts);
-      if (tab === 'inbox' || tab === 'queue' || tab === 'resolved') counts[tab]++;
+      if (tab === 'inbox' || tab === 'queue' || tab === 'local' || tab === 'resolved') counts[tab]++;
     }
     counts.archived = listArchiveTab(list, opts).length;
     return counts;
@@ -838,6 +965,7 @@
       // (non lo status): un feedback segnalato dalla sicurezza non va mai in
       // board nemmeno se per qualche motivo è arrivato a `done`.
       .filter((fb) => !classifyLegacyBlock(fb))
+      .filter((fb) => !isLocalOnly(fb))
       .filter((fb) => !hasReopenRequest(fb));
   }
 
@@ -1308,9 +1436,9 @@
       return forma('l5', 'quadrato', titolo, 'design', 'fuso', {
         titolo,
         righe: versione ? [riga('Uscito nella versione', versione)] : [],
-        testo: preapproved.length
-          ? 'Fusa senza chiedere: avevi messo il segno su questa pratica.'
-          : 'Il lavoro è entrato in main.',
+        testo: !preapproved.length ? 'Il lavoro è entrato in main.'
+          : preapproved[0].skippedL5 === true ? 'Fusa senza chiedere: lavoro locale, i blocchi sono registrati in Automazioni.'
+            : 'Fusa senza chiedere: avevi messo il segno su questa pratica.',
         azioni: [],
       }, { richiesta: preapproved[0] || null, richieste: preapproved, conflitto: false });
     }
@@ -1408,7 +1536,9 @@
     workProgress, WORK_STAGES,
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
-    panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient,
+    panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient, isUnprovenSender, effectiveClientId,
+    isLocalOnly, isProvenLocalSender, isProvenLocalWork, isRicevutiStatus, localSignCheck, localSenderCheck, praticaChiusa,
+    segnaliDeiGiudici, segnalatoComeAttacco, mittenteDaRiconoscere,
     panelComplete, judgesNote, reasonText,
     statusUnreadable, valueUnreadable, sectionsReliable, publicStateLabel, PUBLIC_STATE_HINT,
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,

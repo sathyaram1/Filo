@@ -68,9 +68,12 @@ export const test = base.extend({
       //    rete di chi li lancia. Nessun test deve parlare con un apparecchio
       //    vero della LAN di qualcuno: la connessione viene rifiutata e la
       //    scheda resta sull'indirizzo chiesto, uguale ovunque.
+      //  • "sito-pubblico.test" al loopback: le pagine della rete di casa non vanno
+      //    ai lavori automatici col modello (#591), e chi prova quei lavori serve
+      //    la pagina con un nome da internet (testServer.html(…, { pubblico: true })).
       args: [
         ...argomentiScala,
-        '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9',
+        '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9, MAP sito-pubblico.test 127.0.0.1',
         '.',
       ],
       cwd: APP_ROOT,
@@ -99,6 +102,20 @@ export const test = base.extend({
     const win = await app.firstWindow();
     await win.waitForLoadState('domcontentloaded');
     await use(win);
+  },
+
+  // La vista che disegna sopra la pagina gli avvisi della barra (#588.5); nasce al primo avviso.
+  // La pila nella shell è solo il modello, nascosto: quello che l'utente vede e clicca sta qui.
+  avvisi: async ({ app }, use) => {
+    await use(async () => {
+      const scadenza = Date.now() + 10_000;
+      while (Date.now() < scadenza) {
+        const p = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/avvisi.html'); } catch (_) { return false; } });
+        if (p) return p;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      throw new Error('avvisi: la vista degli avvisi non è nata');
+    });
   },
 
   // Apre un URL come tab e ritorna la Page corrispondente al WebContentsView.
@@ -142,16 +159,17 @@ export const test = base.extend({
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const port = server.address().port;
     const api = {
-      html(body) {
+      html(body, { pubblico = false } = {}) {
         const id = String(++nextId);
         pages.set(id, body);
-        return `http://127.0.0.1:${port}/${id}`;
+        return `${pubblico ? this.originPubblico : this.origin}/${id}`;
       },
       origin: `http://127.0.0.1:${port}`,
+      originPubblico: `http://sito-pubblico.test:${port}`,
       // Naviga e aspetta che i content script si siano montati: il page-preload
       // imposta data-filo-ready su <html> al termine di start().
       async openReady(openTab, html, opts = {}) {
-        const url = this.html(html);
+        const url = this.html(html, opts);
         const page = await openTab(url);
         await page.waitForFunction(
           () => document.documentElement.dataset.filoReady === '1',

@@ -126,5 +126,9 @@ un'azione, Filo la compie — non lascia un bottone "da cliccare per davvero":
   mai un `…` a metà frase: un consenso su un testo che l'utente non ha potuto
   leggere per intero non è un consenso. Vale in particolare per il feedback, che
   parte a nome suo.
+- **Il popup di livello 2 non ha un bottone già scelto (#592).** Si apre da solo
+  anche mentre l'utente scrive la domanda dopo: col fuoco su OK il primo spazio o
+  invio battuto per la chat lo confermava senza che nessuno l'avesse letto. Il
+  fuoco va al riquadro; da tastiera si arriva a OK col tabulatore.
 - **Test:** `tests/filo-open-link-direct.spec.mjs`, `tests/filo-action-levels.spec.mjs`
   (più popup di livello 2 → si aprono in sequenza, nessun chip resta da cliccare).

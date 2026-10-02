@@ -9,6 +9,9 @@
   const STORAGE_KEY = 'sn_fx_rates';
   const TTL_MS = 24 * 60 * 60 * 1000;
   const TIMEOUT_MS = 4000;
+  // Dopo un tentativo fallito la rete non si riprova per un po': la chat aspetta
+  // i cambi prima di ogni turno, e con il servizio giù pagava 4 s a messaggio (#724.1).
+  const PAUSA_DOPO_GUASTO_MS = 10 * 60 * 1000;
   // Nessun elenco di valute nella richiesta: la fonte manda TUTTE quelle che la
   // BCE pubblica. Con dieci sigle scelte a mano «3000 rupie» finiva a memoria
   // del modello, e una valuta nuova sarebbe rimasta fuori per sempre (#724).
@@ -36,6 +39,7 @@
   };
 
   let inflight = null;
+  let guastoAl = 0;
 
   async function readCache() {
     try {
@@ -93,15 +97,18 @@
     // con la richiesta di prima non copre le valute di adesso: meglio le stime,
     // che almeno le contengono tutte e si dichiarano stime.
     const ripiego = () => (dellaRichiestaDiAdesso(cached) ? cached : FALLBACK);
+    if (guastoAl && (now - guastoAl) < PAUSA_DOPO_GUASTO_MS) return ripiego();
     if (inflight) {
       try { return await inflight; } catch (_) { return ripiego(); }
     }
     inflight = (async () => {
       try {
         const fresh = await fetchFresh();
+        guastoAl = 0;
         await writeCache(fresh);
         return fresh;
       } catch (e) {
+        guastoAl = Date.now();
         return ripiego();
       } finally {
         inflight = null;

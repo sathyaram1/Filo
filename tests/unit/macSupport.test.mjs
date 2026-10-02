@@ -218,21 +218,20 @@ test('nessuna scorciatoia guarda solo il tasto di Windows', () => {
     'queste righe reagiscono a Ctrl ma non a Cmd: su Mac la scorciatoia non risponde.\n' + colpevoli.join('\n'));
 });
 
-test('le scorciatoie globali non rubano il tasto degli accenti su Mac', () => {
-  // Alt+E/T/S/H sono scorciatoie di SISTEMA: valgono ovunque, non solo dentro
-  // Filo. Su Mac Alt è il tasto Opzione, che serve a comporre gli accenti
-  // (Opzione+E → é): registrarlo così toglierebbe l'accento acuto a chi scrive
-  // in italiano, in qualunque programma, finché Filo è acceso.
+test('le scorciatoie di Filo non rubano il tasto degli accenti su Mac', () => {
+  // Alt+E/T/S/H valgono con Filo davanti (#838). Su Mac Alt è il tasto Opzione,
+  // che compone gli accenti (Opzione+E → é) anche dentro le pagine di Filo:
+  // prenderselo toglierebbe l'accento acuto a chi scrive in italiano.
   const src = stripComments(readFileSync(join(ROOT, 'src', 'main', 'shortcuts.js'), 'utf8'));
   assert.match(src, /darwin/,
-    'shortcuts.js non distingue più il Mac: le scorciatoie globali tornerebbero a essere Opzione+lettera');
+    'shortcuts.js non distingue più il Mac: le scorciatoie tornerebbero a essere Opzione+lettera');
   const { acceleratorePerPiattaforma, COMMANDS } = require(join(ROOT, 'src', 'main', 'shortcuts.js'));
   const vero = process.platform;
   try {
     Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
     for (const accel of Object.keys(COMMANDS)) {
       assert.notEqual(acceleratorePerPiattaforma(accel), accel,
-        `su Mac ${accel} resta Opzione+lettera: mangia gli accenti in tutto il sistema`);
+        `su Mac ${accel} resta Opzione+lettera: mangia gli accenti a chi scrive in Filo`);
     }
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
     for (const accel of Object.keys(COMMANDS)) {
@@ -355,8 +354,8 @@ test('la regola dà il nome giusto su ogni sistema', () => {
   assert.equal(T.etichetta('Ctrl+\\', 'darwin'), 'Cmd+\\');
   assert.equal(T.etichetta('Ctrl+Shift+1', 'darwin'), 'Cmd+Shift+1');
   assert.equal(T.etichetta('Ctrl', 'darwin'), 'Cmd');
-  // …le scorciatoie globali prendono il Control del Mac davanti (Opzione da
-  // sola è il tasto degli accenti: vedi shortcuts.js)…
+  // …Spiega, Traduci, Salva e Aiuto prendono il Control del Mac davanti
+  // (Opzione da sola è il tasto degli accenti: vedi shortcuts.js)…
   assert.equal(T.etichetta('Alt+E', 'darwin'), 'Ctrl+Alt+E');
   assert.equal(T.etichetta('Alt+H', 'darwin'), 'Ctrl+Alt+H');
   // …e il salto di scheda passa a Cmd, perché Opzione+cifra su Mac SCRIVE.
@@ -733,8 +732,21 @@ test('la lista dei tasti già presi non si stacca dalla barra dei menu', () => {
   require(join(ROOT, 'src', 'shared', 'tasti.js'));
   const T = globalThis.SN_TASTI;
 
+  // Un role senza acceleratore scritto si porta quello di Electron (menu-item-roles), e su Mac
+  // il menu Aiuto si apre con Cmd+?: senza questa tabella quei tasti erano invisibili (#545).
+  const TASTO_DEL_ROLE_SU_MAC = {
+    cut: 'Ctrl+X', copy: 'Ctrl+C', paste: 'Ctrl+V', pasteandmatchstyle: 'Ctrl+Alt+Shift+V',
+    selectall: 'Ctrl+A', undo: 'Ctrl+Z', redo: 'Ctrl+Shift+Z', minimize: 'Ctrl+M', close: 'Ctrl+W',
+    quit: 'Ctrl+Q', hide: 'Ctrl+H', hideothers: 'Ctrl+Alt+H', help: 'Ctrl+?',
+    about: '', services: '', unhide: '', zoom: '', front: '', window: '',
+  };
+  const ignoti = vociDellaBarra('darwin')
+    .filter((v) => v.role && !v.accelerator && !(String(v.role).toLowerCase() in TASTO_DEL_ROLE_SU_MAC))
+    .map((v) => v.role);
+  assert.deepEqual(ignoti, [], 'role nuovo nella barra: scrivi qui sopra il tasto che Electron gli dà su Mac');
+
   const scoperti = vociDellaBarra('darwin')
-    .map((v) => v.accelerator)
+    .map((v) => v.accelerator || (v.role && TASTO_DEL_ROLE_SU_MAC[String(v.role).toLowerCase()]))
     .filter(Boolean)
     // "CommandOrControl" è come lo scrive Electron; la regola parla in Ctrl.
     .map((a) => a.replace(/CommandOrControl/g, 'Ctrl'))
@@ -761,7 +773,7 @@ test('nessuno può assegnarsi un tasto che Filo si prende prima', () => {
   assert.equal(T.riservato('Cmd+Shift+Z', 'darwin'), true);
   // Su Windows lo zoom NON passa dalla barra: quel tasto arriva alla pagina.
   assert.equal(T.riservato('Ctrl+0', 'win32'), false);
-  // Le scorciatoie globali sono registrate a livello di sistema.
+  // Spiega, Traduci, Salva e Aiuto: Filo se li prende prima della pagina.
   assert.equal(T.riservato('Alt+E', 'win32'), true);
   assert.equal(T.riservato('Ctrl+Alt+E', 'darwin'), true);
   // E una combinazione libera resta libera, altrimenti non se ne può usare più

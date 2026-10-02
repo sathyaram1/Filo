@@ -22,10 +22,12 @@
 //   SN_CONST     STORAGE_KEYS.FEEDBACK_OUTBOX
 //
 // API
-//   init({ prepare, onDone, onGiveUp, log, backoffMin, backoffMax })  — una volta all'avvio
+//   init({ prepare, onDone, onGiveUp, tokenOwner, log, backoffMin, backoffMax })  — una volta all'avvio
 //     onGiveUp(item, motivo) torna `false` se l'avviso non è arrivato a
 //     nessuno: quella voce resta in coda finché non si riesce a dirlo.
-//   enqueue(payload) -> { id, queued:true }                 — accoda + prova subito
+//     tokenOwner() -> idToken admin fresco o '' (#595): chiesto a ogni
+//     spedizione di una voce dell'owner, MAI salvato nella coda.
+//   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
 //   size()                                                  — voci in coda
 
@@ -52,6 +54,7 @@
   // (item, motivo) -> boolean  (#602: rinuncia definitiva, va DETTA; `false`
   // = non c'era nessuno a cui dirlo, la voce resta in coda e si riprova)
   let onGiveUpFn = null;
+  let tokenOwnerFn = null;
   let logFn = function () { try { console.log.apply(console, ['[feedback-outbox]'].concat([].slice.call(arguments))); } catch (_) {} };
   let backoffMin = 3000;
   let backoffMax = 30000;
@@ -60,7 +63,7 @@
   function serialize(it) {
     return {
       id: it.id, payload: it.payload, name: it.name, prepared: !!it.prepared,
-      queuedAt: it.queuedAt, attempts: it.attempts || 0,
+      queuedAt: it.queuedAt, attempts: it.attempts || 0, dallOwner: !!it.dallOwner,
       // #602 — una voce che aspetta solo di essere ANNUNCIATA (non partirà
       // mai): si persiste come le altre, così l'avviso sopravvive a un riavvio.
       rinuncia: !!it.rinuncia, motivoRinuncia: it.motivoRinuncia || '',
@@ -87,6 +90,7 @@
             prepared: !!x.prepared,
             queuedAt: Number(x.queuedAt) || Date.now(),
             attempts: Number(x.attempts) || 0,
+            dallOwner: !!x.dallOwner,
             rinuncia: !!x.rinuncia,
             motivoRinuncia: x.motivoRinuncia || '',
           }));
@@ -99,6 +103,7 @@
     if (typeof opts.prepare === 'function') prepareFn = opts.prepare;
     if (typeof opts.onDone === 'function') onDoneFn = opts.onDone;
     if (typeof opts.onGiveUp === 'function') onGiveUpFn = opts.onGiveUp;
+    if (typeof opts.tokenOwner === 'function') tokenOwnerFn = opts.tokenOwner;
     if (typeof opts.log === 'function') logFn = opts.log;
     if (Number.isFinite(opts.backoffMin)) { backoffMin = opts.backoffMin; backoff = opts.backoffMin; }
     if (Number.isFinite(opts.backoffMax)) backoffMax = opts.backoffMax;
@@ -113,14 +118,15 @@
     if (timer && typeof timer.unref === 'function') timer.unref(); // non tenere vivo il processo
   }
 
-  async function enqueue(payload) {
+  async function enqueue(payload, opts) {
     await load();
     const id = (payload && payload.submissionId)
       ? String(payload.submissionId)
       : `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const dallOwner = !!(opts && opts.dallOwner);
     // Dedup su submissionId: due invii della stessa bozza non accodano due voci.
     if (!queue.some((it) => it.id === id)) {
-      queue.push({ id, payload, name: null, prepared: false, queuedAt: Date.now(), attempts: 0 });
+      queue.push({ id, payload, name: null, prepared: false, queuedAt: Date.now(), attempts: 0, dallOwner });
       if (queue.length > MAX_ITEMS) queue = queue.slice(-MAX_ITEMS);
       await persist();
     }
@@ -186,9 +192,17 @@
             it.prepared = true;
           }
           const payload = it.name ? Object.assign({}, it.payload, { name: it.name }) : it.payload;
-          const result = await fb.submit(payload);
+          let idToken = '';
+          if (it.dallOwner) {
+            try { idToken = (tokenOwnerFn && await tokenOwnerFn()) || ''; } catch (_) { idToken = ''; }
+            if (!idToken) logFn('voce dell\'owner senza accesso valido: parte anonima e passa dai giudici', it.id);
+          }
+          const result = idToken ? await fb.submit(payload, { idToken }) : await fb.submit(payload);
           remove(it.id);
           logFn('inviato:', it.id);
+          if (idToken && result && result.senderProof !== 'admin') {
+            logFn('token dell\'owner rifiutato' + (result.authRefused ? ` (${result.authRefused})` : '') + ': partita anonima', it.id);
+          }
           try { onDoneFn && onDoneFn(it, result); } catch (_) {}
           backoff = backoffMin; // successo → azzera il backoff
         } catch (e) {
@@ -232,7 +246,7 @@
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _reset: () => {
       queue = []; loaded = false; flushing = false; auto = true;
-      prepareFn = null; onDoneFn = null; onGiveUpFn = null; backoff = backoffMin;
+      prepareFn = null; onDoneFn = null; onGiveUpFn = null; tokenOwnerFn = null; backoff = backoffMin;
       if (timer) { clearTimeout(timer); timer = null; }
     },
   };

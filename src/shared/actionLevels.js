@@ -24,6 +24,15 @@
 (function (global) {
   'use strict';
 
+  function lezione(a) {
+    const P = global.SN_PREF;
+    if (P && P.lezioneDaAzione) return P.lezioneDaAzione(a);
+    return { testo: String((a && (a.testo ?? a.text ?? a.lezione)) ?? '').trim() };
+  }
+  const RISCHIO_LEZIONE = 'Da adesso vale in ogni conversazione, e resta finché non la togli dalle Preferenze, '
+    + 'sotto «Memoria di Filo». Confermala solo se l\'hai detta tu: un testo letto in una pagina o in un '
+    + 'documento potrebbe provare a fargliela ricordare.';
+
   function prefBuilt(action) {
     const P = global.SN_PREF;
     if (!P) return null;
@@ -91,6 +100,15 @@
     return M.formatRepeat(raw);
   }
 
+  // Perché LEGGI_DOCUMENTO esce dal perimetro di lettura ('' se ci sta). Senza
+  // classificatore non si sa: si chiede.
+  function documentoFuori(a) {
+    const C = global.SN_CMD_CLASSIFY;
+    if (!C || !C.fuoriPerimetro) return 'non si sa dove legge';
+    const p = a && (a.percorso ?? a.path ?? a.file ?? a.documento ?? a.nome);
+    return C.fuoriPerimetro(p, a && a._perimetro);
+  }
+
   const REGISTRY = {
     NAVIGA: {
       // Aprire un link è di norma innocuo → livello 1, diretto. ECCEZIONE
@@ -103,8 +121,8 @@
       describe: (a) => {
         const url = a.url || a.href || a.link || 'una pagina';
         if (a && a._exfil) {
-          const why = a._exfilReason ? ` (${a._exfilReason})` : '';
-          return `Filo sta per aprire un link che${why}:\n${url}\n\n`
+          const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
+          return `Aprire un link${why}:\n${url}\n\n`
             + 'Potrebbe inviare tuoi dati a un sito esterno. Apri solo se l\'hai chiesto tu.';
         }
         return `Aprire ${url}`;
@@ -168,22 +186,16 @@
       describe: () => 'Salvare un appunto',
     },
     SALVA_LEZIONE: {
-      // Filo fissa una LEZIONE nella propria memoria su richiesta in chat (o di
-      // sua iniziativa quando una regola va fissata subito, es. proteggere i
-      // dati dell'utente da una richiesta sospetta): entra nel buffer delle
-      // lezioni — lo stesso che l'agente-lezioni riempie da solo dopo ogni
-      // scambio — e vale da subito in tutte le conversazioni. Livello 1 per la
-      // stessa ragione per cui le lezioni automatiche non chiedono conferma:
-      // stesso canale, stesso grado di fiducia, e le lezioni restano visibili e
-      // cancellabili dall'utente fra le memorie. Un popup qui sarebbe anche
-      // controproducente nel caso d'uso di protezione: confermerebbe chiunque
-      // sia alla tastiera in quel momento, che è proprio chi la lezione vuole
-      // tenere fuori.
-      level: 1,
+      // Una lezione entra in ogni conversazione e ci resta, come lo stile: se la
+      // propone il modello, l'utente ne conferma il testo esatto (#592). Vuota
+      // o oltre il tetto → 1: niente da confermare, il dispatch la respinge.
+      level: (a) => { const l = lezione(a); return l.testo && !l.rifiuto ? 2 : 1; },
       describe: (a) => {
-        const testo = String(a?.testo ?? a?.text ?? a?.lezione ?? '').trim();
-        return `Fissare una lezione nella memoria di Filo:\n“${testo || '(vuota)'}”`;
+        const l = lezione(a);
+        if (!l.testo || l.rifiuto) return 'Ricordare una cosa';
+        return `Filo vuole ricordare una cosa.\n\nTesto esatto:\n«${l.testo}»\n\n${RISCHIO_LEZIONE}`;
       },
+      describeDone: (a) => `Ricordato: «${lezione(a).testo}»`,
     },
     INVIA_FEEDBACK: {
       // Filo invia un feedback agli sviluppatori a NOME dell'utente (#146.5).
@@ -200,8 +212,20 @@
       },
     },
     CERCA_WEB: {
-      level: 1,
-      describe: (a) => `Cercare sul web "${a.query || ''}"`,
+      // Cercare è di norma innocuo → livello 1. ECCEZIONE anti-esfiltrazione: se
+      // la query trasporta FUORI un segreto (memoria, o ciò che il modello ha
+      // letto nel turno) sale a livello 2 → conferma con la query mostrata. Il
+      // flag `_exfil` lo calcola il main (→ urlExfil.js); mai l'LLM.
+      level: (a) => (a && a._exfil ? 2 : 1),
+      describe: (a) => {
+        const q = a.query || a.q || a.testo || a.text || '';
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
+          return `Cercare sul web un testo${why}:\n"${q}"\n\n`
+            + 'Potrebbe inviare tuoi dati a un motore di ricerca. Cerca solo se l\'hai chiesto tu.';
+        }
+        return `Cercare sul web "${q}"`;
+      },
     },
     ONBOARDING: {
       // Filo tiene il conto della micro-intervista di benvenuto (#524): spunta
@@ -261,11 +285,13 @@
       // esegue niente, non manda niente fuori dal computer — il testo entra solo
       // nel contesto del modello. Una conferma a ogni documento sarebbe attrito
       // su una cosa che l'utente ha appena chiesto, e una conferma che si accetta
-      // sempre smette di essere un controllo.
-      level: 1,
+      // sempre smette di essere un controllo. Fuori dal perimetro di lettura
+      // (#587: altri dischi, file nascosti, profilo) chiede un OK, come `cat`.
+      level: (a) => (documentoFuori(a) ? 2 : 1),
       describe: (a) => {
         const p = a && (a.percorso ?? a.path ?? a.file ?? a.documento);
-        return `Leggere il documento ${p || ''}`.trim();
+        const perche = documentoFuori(a);
+        return `Leggere il documento ${p || ''}`.trim() + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
       },
     },
     LEGGI_TRASPARENZA: {
@@ -298,27 +324,49 @@
         + 'profilo utente, preferenze apprese e lezioni non ancora salvate. '
         + 'Filo ripartirà senza ricordare nulla di te.',
     },
+    DIMENTICA: {
+      // Toglie dalla memoria le righe indicate a voce: le stesse della × nelle
+      // Preferenze. Il main risolve la frase in `_righe` prima del gate, mai
+      // l'LLM; nessuna riga → 1, il dispatch lo dice. Oltre tre è quasi un
+      // «dimentica tutto», e chiede di digitare «conferma» come CANCELLA_MEMORIA.
+      level: (a) => {
+        const n = Array.isArray(a && a._righe) ? a._righe.length : 0;
+        return n === 0 ? 1 : n > 3 ? 3 : 2;
+      },
+      describe: (a) => {
+        const righe = Array.isArray(a && a._righe) ? a._righe : [];
+        if (!righe.length) return 'Dimenticare una cosa';
+        return `Filo sta per dimenticare ${righe.length === 1 ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`
+          + righe.map((r) => `• ${r}`).join('\n')
+          + '\n\nNon entreranno più nelle conversazioni.';
+      },
+      describeDone: (a) => `Dimenticato: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
+    },
     IMPOSTA_PREFERENZA: {
       // Livello per-preferenza: lo dichiara il setter in preferences.js
       // (default 1). Preferenza sconosciuta/non valida → 2 per prudenza
-      // (tanto il dispatch non la eseguirà comunque).
+      // (tanto il dispatch non la eseguirà comunque). Un `rifiuto` → 1: non
+      // c'è niente da confermare, il dispatch lo respinge spiegando perché.
       level: (a) => {
         const built = prefBuilt(a);
         return (built && built.level) || (built ? 1 : 2);
       },
       describe: (a) => {
         const built = prefBuilt(a);
-        if (!built) return 'Modificare una preferenza';
+        if (!built || built.rifiuto) return 'Modificare una preferenza';
         // Il popup di conferma spiega COSA Filo sta per fare e, per le
         // impostazioni sensibili (livello 2), anche i RISCHI (#183). Il `risk`
         // arriva dal setter in preferences.js: è obbligatorio per il livello 2.
+        // Un testo libero si mostra per intero: si conferma quello (#592). La
+        // prima riga resta corta perché fa anche da bottone.
         const base = `Filo vuole impostare: ${built.label}.`;
-        return built.risk ? `${base}\n\n${built.risk}` : base;
+        const testo = built.testo ? `\n\nTesto esatto:\n«${built.testo}»` : '';
+        return built.risk ? `${base}${testo}\n\n${built.risk}` : `${base}${testo}`;
       },
       // A cosa fatta (esito allo strumento): niente «vuole», niente rischi.
       describeDone: (a) => {
         const built = prefBuilt(a);
-        return built ? `Impostazione applicata: ${built.label}` : 'Preferenza modificata';
+        return built && !built.rifiuto ? `Impostazione applicata: ${built.label}` : 'Preferenza modificata';
       },
     },
     IMPOSTA_ESTETICA: {
@@ -353,7 +401,7 @@
         const C = global.SN_CMD_CLASSIFY;
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
         if (!cmd || !C) return 3;
-        const lvl = C.classify(cmd);
+        const lvl = C.classify(cmd, a._perimetro);
         return lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3;
       },
       describe: (a) => {
@@ -365,8 +413,12 @@
         // dove sovrascrive una chiave. La cartella la inietta il main come
         // `_cwd` (mai l'LLM); il livello non ci si appoggia mai.
         const cwd = String((a && a._cwd) || '').trim();
+        const C = global.SN_CMD_CLASSIFY;
+        let perche = '';
+        try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
         return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`
-          + (cwd ? `\nCartella di lavoro: ${cwd}` : '');
+          + (cwd ? `\nCartella di lavoro: ${cwd}` : '')
+          + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
       },
     },
     // ── proxy per-tab via linguaggio naturale (#152) ──────────────────────────

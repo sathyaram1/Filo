@@ -4,12 +4,10 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
-    providerRouting, openWeightsBlockReason, auditServedByLater, applyLimitToChain,
+    providerRouting, openWeightsBlockReason, modelGate,
     Defaults, isAdmin, broadcastToTabs,
   } = ctx;
   const { SN_CONST } = globalThis;
-  const Providers = globalThis.SN_PROVIDERS;
-  const Costs = globalThis.SN_COSTS;
   const WebSearch = globalThis.SN_WEB_SEARCH;
   const PathsCollector = globalThis.SN_PATHS_COLLECTOR;
 
@@ -108,10 +106,11 @@ module.exports = function register(on, ctx) {
   // lista si ricorda). Se invece pretende una voce e non ne abbiamo nessuna da
   // dargli, l'errore diventa una frase per l'utente (codice TTS_VOICE_REQUIRED)
   // che dice dove scriverla.
-  async function synthesizeWithVoiceRecovery(P, { apiKey, model, text, voice, lang, speed, routing }) {
+  // `synth(voce)` fa la chiamata vera, passando dal cancello dei modelli.
+  async function synthesizeWithVoiceRecovery(synth, { model, voice, lang }) {
     const Voices = globalThis.SN_TTS_VOICES;
     try {
-      return await P.synthesizeSpeech({ apiKey, model, text, voice, speed, providerRouting: routing });
+      return await synth(voice);
     } catch (e) {
       const msg = (e && e.message) || '';
       const listed = Voices ? Voices.voicesFromError(msg) : [];
@@ -120,9 +119,8 @@ module.exports = function register(on, ctx) {
         const retry = Voices.pickFromList(listed, lang);
         if (retry && retry !== voice) {
           console.warn(`[SN] TTS: voce "${voice || '(nessuna)'}" rifiutata da ${model}, riprovo con "${retry}"`);
-          const r = await P.synthesizeSpeech({ apiKey, model, text, voice: retry, speed, providerRouting: routing });
-          r.voice = retry;
-          return r;
+          const r = await synth(retry);
+          return { ...r, voice: retry };
         }
       }
       const I18n = globalThis.SN_I18N;
@@ -185,7 +183,8 @@ module.exports = function register(on, ctx) {
       try {
         // Stesso limite di spesa delle altre funzioni: la voce del modello
         // costa, e oltre il limite si legge con quella del sistema.
-        attempts = await applyLimitToChain(settings, buildAttemptChain(settings, model, SN_CONST.ACTIONS.TTS));
+        attempts = buildAttemptChain(settings, model, SN_CONST.ACTIONS.TTS);
+        await modelGate.ensureUnderLimit(settings);
       } catch (e) {
         // Nessun modello di sintesi vocale configurato (o la scorciatoia citata
         // non esiste): si legge con la voce del browser, ma il motivo VERO viene
@@ -205,11 +204,9 @@ module.exports = function register(on, ctx) {
       const rate = Number(ttsPrefs.rate);
       const speed = rate >= 0.5 && rate <= 2 ? rate : 1;
       const text = String(msg.text == null ? '' : msg.text);
-      const routing = providerRouting(settings);
       let lastErr = null;
       for (const a of attempts) {
-        const P = Providers.getProvider(a.provider);
-        if (!P || typeof P.synthesizeSpeech !== 'function') continue;
+        if (!modelGate.supports(a.provider, 'synthesizeSpeech')) continue;
         // La voce dipende dal MODELLO: ogni modello ha i suoi nomi, e una voce
         // scelta per un altro modello va ignorata, non spedita (sarebbe un 400
         // e la lettura ripiegherebbe sul browser senza spiegazioni).
@@ -234,20 +231,13 @@ module.exports = function register(on, ctx) {
           }
         }
         try {
-          const r = await synthesizeWithVoiceRecovery(P, {
-            apiKey: a.apiKey, model: a.model, text, voice, lang, speed, routing,
-          });
+          // Chi ha servito e quanto è costato il router lo dice solo dopo: lo chiede il cancello, senza far aspettare la lettura.
+          const r = await synthesizeWithVoiceRecovery((v) => modelGate.call({
+            action: SN_CONST.ACTIONS.TTS, settings, attempt: a, method: 'synthesizeSpeech',
+            args: { text, voice: v, speed },
+          }), { model: a.model, voice, lang });
           if (key) ttsCache.set(key, { audioBase64: r.audioBase64, mimeType: r.mimeType });
           ttsFallbackAnnounced = false; // sintesi riuscita: riarma l'avviso
-          // Chi ha servito (e quanto è costato) il router lo dice solo dopo:
-          // si chiede a parte, senza far aspettare la lettura.
-          // Con la chiave che ha fatto la generazione (dopo un ripiego, #629,
-          // non è quella di partenza), e da dove viene: la riga d'uso si
-          // scrive solo se ha pagato la personale.
-          auditServedByLater({
-            settings, action: SN_CONST.ACTIONS.TTS, provider: a.provider, model: a.model,
-            apiKey: r.keyUsed || a.apiKey, generationId: r.generationId, recordCost: true, keySource: r.keySource || '',
-          });
           return {
             ok: true,
             audioBase64: r.audioBase64,
@@ -370,20 +360,22 @@ module.exports = function register(on, ctx) {
       // si prova nel suo mestiere.
       const kind = modelKind(provider, model, (s.modelRegistry || {})[msg.nickname] || null);
       if (kind !== 'text') {
-        return await probeNonText({ kind, provider, apiKey, model, routing: providerRouting(s), nickname: msg.nickname || '' });
+        return await probeNonText({ settings: s, kind, provider, apiKey, model, routing: providerRouting(s), nickname: msg.nickname || '' });
       }
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
       let firstTokenMs = null;
       let charCount = 0;
-      const result = await Providers.streamComplete({
-        provider, apiKey, model, messages,
-        // Anche la prova porta con sé chi NON deve servirla: senza, sarebbe
-        // l'unica richiesta di Filo che un fornitore escluso può servire.
-        providerRouting: providerRouting(s),
-        onDelta: (delta) => {
-          if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
-          charCount += (delta || '').length;
+      // Anche la prova porta con sé chi NON deve servirla: senza, sarebbe
+      // l'unica richiesta di Filo che un fornitore escluso può servire.
+      const result = await probe({
+        settings: s, provider, apiKey, model, routing: providerRouting(s), method: 'streamComplete',
+        args: {
+          messages,
+          onDelta: (delta) => {
+            if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
+            charCount += (delta || '').length;
+          },
         },
       });
       const totalMs = performance.now() - startMs;
@@ -429,8 +421,16 @@ module.exports = function register(on, ctx) {
     return 'text';
   }
 
-  async function probeNonText({ kind, provider, apiKey, model, routing, nickname }) {
-    const P = Providers.getProvider(provider);
+  // Le prove sono chiamate vere, pagate: passano dal cancello come le funzioni (limite, costo, chi ha servito).
+  function probe({ settings, provider, apiKey, model, routing, method, args }) {
+    return modelGate.call({
+      action: SN_CONST.ACTIONS.PROVIDER_TEST, settings,
+      attempt: { provider, apiKey, model, providerRouting: routing }, method, args,
+    });
+  }
+
+  async function probeNonText({ settings, kind, provider, apiKey, model, routing, nickname }) {
+    const via = (method, args) => probe({ settings, provider, apiKey, model, routing, method, args });
     const startMs = performance.now();
     const done = (extra) => ({
       ok: true, provider, model, nickname, kind,
@@ -440,27 +440,28 @@ module.exports = function register(on, ctx) {
       ...extra,
     });
     if (kind === 'tts') {
-      if (typeof P.synthesizeSpeech !== 'function') return { ok: false, error: 'Questo fornitore non sa leggere ad alta voce' };
+      if (!modelGate.supports(provider, 'synthesizeSpeech')) return { ok: false, error: 'Questo fornitore non sa leggere ad alta voce' };
       // La frase di prova è italiana: la voce è quella di partenza per
       // l'italiano nel catalogo del modello (o nessuna, se sceglie da sé).
       const Voices = globalThis.SN_TTS_VOICES;
       const voice = Voices ? Voices.resolveVoice({ chosen: '', lang: 'it', modelId: model, learned: learnedVoices.get(model) }) : '';
-      const r = await synthesizeWithVoiceRecovery(P, { apiKey, model, text: 'Uno, due, tre: prova della voce.', voice, lang: 'it', speed: 1, routing });
+      const text = 'Uno, due, tre: prova della voce.';
+      const r = await synthesizeWithVoiceRecovery((v) => via('synthesizeSpeech', { text, voice: v, speed: 1 }), { model, voice, lang: 'it' });
       if (!r || !r.audioBase64) return { ok: false, error: 'Il modello ha risposto senza audio' };
       return done({ audioBytes: Math.round(r.audioBase64.length * 3 / 4) });
     }
     if (kind === 'embedding') {
-      if (typeof P.embed !== 'function') return { ok: false, error: 'Questo fornitore non sa indicizzare' };
-      const r = await P.embed({ apiKey, model, texts: ['prova'], dim: SN_CONST.EMBED_DIM, providerRouting: routing });
+      if (!modelGate.supports(provider, 'embed')) return { ok: false, error: 'Questo fornitore non sa indicizzare' };
+      const r = await via('embed', { texts: ['prova'], dim: SN_CONST.EMBED_DIM });
       const v = r && r.vectors && r.vectors[0];
       if (!v || !v.length) return { ok: false, error: 'Il modello ha risposto senza vettori' };
       return done({ dims: v.length });
     }
     if (kind === 'stt') {
-      if (typeof P.transcribe !== 'function') return { ok: false, error: 'Questo fornitore non sa trascrivere' };
+      if (!modelGate.supports(provider, 'transcribe')) return { ok: false, error: 'Questo fornitore non sa trascrivere' };
       const Seg = globalThis.SN_DICTATION_SEGMENTER;
       const wav = Seg.pcm16ToWav(new Int16Array(16000), 16000); // un secondo di silenzio
-      const r = await P.transcribe({ apiKey, model, audioBase64: Seg.bytesToBase64(wav), format: 'wav', providerRouting: routing });
+      const r = await via('transcribe', { audioBase64: Seg.bytesToBase64(wav), format: 'wav' });
       if (!r || typeof r.text !== 'string') return { ok: false, error: 'Il modello non ha risposto' };
       return done({});
     }
@@ -529,19 +530,21 @@ module.exports = function register(on, ctx) {
       const model = modelId;
       const kind = modelKind(provider, model, regEntry);
       if (kind !== 'text') {
-        return await probeNonText({ kind, provider, apiKey, model, routing: providerRouting(eff), nickname });
+        return await probeNonText({ settings: eff, kind, provider, apiKey, model, routing: providerRouting(eff), nickname });
       }
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
       let firstTokenMs = null;
       let charCount = 0;
-      const result = await Providers.streamComplete({
-        provider, apiKey, model, messages,
-        // Come per le richieste vere: chi è escluso non serve nemmeno una prova.
-        providerRouting: providerRouting(eff),
-        onDelta: (delta) => {
-          if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
-          charCount += (delta || '').length;
+      // Come per le richieste vere: chi è escluso non serve nemmeno una prova.
+      const result = await probe({
+        settings: eff, provider, apiKey, model, routing: providerRouting(eff), method: 'streamComplete',
+        args: {
+          messages,
+          onDelta: (delta) => {
+            if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
+            charCount += (delta || '').length;
+          },
         },
       });
       const totalMs = performance.now() - startMs;

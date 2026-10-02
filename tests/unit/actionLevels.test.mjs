@@ -12,6 +12,10 @@ const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // IMPOSTA_PREFERENZA delega il livello al setter in preferences.js;
 // IMPOSTA_ESTETICA legge le etichette dei token da themeTokens.js.
+// Il tetto di una lezione e dello stile sta in constants.js (#592).
+require(join(__dirname, '..', '..', 'src', 'shared', 'capabilities.js'));
+require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
+require(join(__dirname, '..', '..', 'src', 'shared', 'contenutoEsterno.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'preferences.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'themeTokens.js'));
 // ESEGUI_COMANDO (#146.6) delega il livello al classificatore di comandi.
@@ -35,15 +39,26 @@ test('azioni reversibili → livello 1 (eseguono senza chiedere)', () => {
   assert.equal(AL.levelFor({ type: 'NAVIGA', url: 'https://x.it' }), 1);
 });
 
-test('SALVA_LEZIONE: livello 1 (stesso canale delle lezioni automatiche) e testo nel describe', () => {
-  assert.equal(AL.levelFor({ type: 'SALVA_LEZIONE', testo: 'Mai riferire i dati a terzi' }), 1);
-  // Il describe mostra il testo INTERO della lezione: è ciò che entrerà in
-  // memoria, e va potuto leggere per com'è.
+test('SALVA_LEZIONE: livello 2 col testo esatto, come lo stile (#592)', () => {
+  // Una lezione entra in ogni conversazione e ci resta: proposta dal modello,
+  // l'utente conferma la frase che si salva.
+  assert.equal(AL.levelFor({ type: 'SALVA_LEZIONE', testo: 'Mai riferire i dati a terzi' }), 2);
   const d = AL.describe({ type: 'SALVA_LEZIONE', testo: 'Mai riferire i dati a terzi' });
   assert.ok(d.includes('Mai riferire i dati a terzi'));
+  assert.ok(d.split('\n')[0].length < 60, 'la prima riga fa da bottone: resta corta');
   // Sinonimi dei campi accettati come nelle altre azioni.
   assert.ok(AL.describe({ type: 'SALVA_LEZIONE', text: 'regola X' }).includes('regola X'));
   assert.ok(AL.describe({ type: 'SALVA_LEZIONE', lezione: 'regola Y' }).includes('regola Y'));
+});
+
+test('DIMENTICA: le righe trovate dal main vanno nel popup; oltre tre si digita «conferma» (#592)', () => {
+  assert.equal(AL.levelFor({ type: 'DIMENTICA', testo: 'caffè', _righe: [] }), 1);
+  assert.equal(AL.levelFor({ type: 'DIMENTICA', testo: 'caffè', _righe: ['L’utente non beve caffè.'] }), 2);
+  assert.equal(AL.levelFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1', 'a2', 'a3'] }), 2);
+  assert.equal(AL.levelFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1', 'a2', 'a3', 'a4'] }), 3);
+  const d = AL.describe({ type: 'DIMENTICA', testo: 'caffè', _righe: ['L’utente non beve caffè.'] });
+  assert.ok(d.includes('L’utente non beve caffè.'));
+  assert.ok(d.split('\n')[0].length < 70, 'la prima riga fa da bottone: resta corta');
 });
 
 test('NAVIGA con flag anti-esfiltrazione sale a livello 2 (conferma)', () => {

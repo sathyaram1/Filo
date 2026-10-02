@@ -51,33 +51,21 @@
 //   obbligatori: sono quelli che dicono se il lavoro è finito. Il server non
 //   li rifà e non ci crede — controlla altro.
 //
-// SE IL SERVER BLOCCA, NON È UN VICOLO CIECO (SPEC-RIDISEGNO-MAX.md §10)
-//   I controlli deterministici del server fermano chi tocca le aree protette
-//   (guardie, automatismi, regole del database, chiavi, dipendenze nuove) — e
-//   il lavoro locale ci cade dentro quasi sempre, perché in locale si lavora
-//   proprio su quelle cose. Da qui non si aggirano, e su main da questa
-//   macchina non scrive nessuno: senza una via d'uscita quel lavoro non
-//   arriverebbe mai agli utenti.
-//
-//   La via d'uscita non è un permesso in più per questo script: il server APRE
-//   UNA RICHIESTA IN ATTESA, e l'owner la approva DENTRO FILO (l'avviso in
-//   cima ai Ricevuti della dashboard di gestione). Serve una persona davanti
-//   allo schermo, su una superficie diversa da questo terminale: è l'unica
-//   cosa che una sessione catturata non può procurarsi da sola.
-//
-//   Qui i compiti sono due. DIRLO bene (messageForOwnerMerge in
-//   scripts/lib/owner-merge.mjs): l'esito porta il nome della richiesta aperta,
-//   e il messaggio nomina dove approvarla invece di fermarsi al blocco. E
-//   SUONARE IL CAMPANELLO: se quella pagina è già aperta non si accorgerebbe
-//   di niente, perché l'elenco lo legge solo quando la si apre. Una riga qui e
-//   l'avviso compare sotto gli occhi di chi lo sta aspettando
-//   (src/main/services/mergeApprovalSignal.js).
+// SE IL SERVER BLOCCA (SPEC-RIDISEGNO-MAX.md §10, #908)
+//   I controlli deterministici del server fermano chi tocca le aree protette, e
+//   il lavoro locale ci cade quasi sempre. Con la pratica (`--feedback`, o il
+//   feedbackId che `verify-local.mjs start --feedback` scrive nel ramo) il server
+//   rilegge il feedback: un lavoro locale col mittente provato si fonde senza
+//   chiedere, i blocchi restano registrati e la pratica si chiude. Senza pratica
+//   qui non si parte (senzaPraticaStop); con una non ammessa il server apre una
+//   richiesta che aspetta il sì dell'owner in Gestione. Qui si dice bene (messageForOwnerMerge) e si suona il
+//   campanello per la pagina già aperta (src/main/services/mergeApprovalSignal.js).
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { verdictForCurrentBranch } from './verify-local.mjs';
+import { verdictForCurrentBranch, readState } from './verify-local.mjs';
 import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge } from './lib/owner-merge.mjs';
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { readMarker } from './lib/routine-role.mjs';
@@ -486,17 +474,74 @@ function readKnownRed(root) {
   } catch (_) { return []; }
 }
 
+/**
+ * La pratica del lavoro: dall'opzione, o dal ramo in .claude/verify-local.json.
+ * Un riferimento che non si risolve ferma tutto: fondere legati alla pratica sbagliata è peggio.
+ */
+/**
+ * Ogni lavoro locale arriva su main con la sua pratica (#908): è il registro dell'owner di cosa fa ogni sessione.
+ * Tutte le strade verso main passano di qui, quindi la regola sta qui. PURA. '' = si prosegue.
+ */
+export function senzaPraticaStop({ checkOnly, pratica }) {
+  if (checkOnly || (pratica && pratica.id)) return '';
+  return [
+    'Questo lavoro non ha la sua pratica, e ogni lavoro locale ne ha una: in Gestione è il registro di cosa fa ogni sessione.',
+    'Aprila e legala, poi rilancia:',
+    '  npm run feedback:apri -- "<titolo>" "<cosa fa il lavoro>" --locale',
+    '  npm run finish -- --feedback <N>',
+    'Non ho toccato niente.',
+  ].join('\n');
+}
+
+async function praticaDelLavoro(valore) {
+  const branchCorrente = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
+  const scritta = (readState()[branchCorrente] || {});
+  if (valore === null || valore === undefined) {
+    return scritta.feedbackId ? { id: String(scritta.feedbackId), seq: scritta.feedbackNum || null } : null;
+  }
+  const { risolviFeedback } = await import('./lib/pratica-locale.mjs');
+  const { acquireBearer, FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
+  let r;
+  let lavorabile = { ok: true };
+  try {
+    const bearer = await acquireBearer();
+    r = await risolviFeedback(valore, { bearer, base: FIRESTORE_BASE });
+    if (r.ok) {
+      const { praticaPerLaSessione } = await import('./owner-feedback.mjs');
+      lavorabile = await praticaPerLaSessione(r.id, { bearer, allaChiusura: true });
+    }
+  } catch (e) {
+    r = { ok: false, motivo: String((e && e.message) || e).slice(0, 200) };
+  }
+  if (!r.ok) {
+    console.error(`Pratica non trovata: ${r.motivo} — non ho toccato niente.`);
+    process.exit(1);
+  }
+  if (!lavorabile.ok) {
+    const { rifiutoPratica } = await import('./owner-feedback.mjs');
+    console.error(`${rifiutoPratica(r.id, lavorabile)}\nNon ho legato il lavoro a questa pratica e non ho toccato niente.`);
+    process.exit(1);
+  }
+  if (scritta.feedbackId && scritta.feedbackId !== r.id) {
+    console.error(`  (il ramo era legato a un'altra pratica, ${scritta.feedbackNum ? '#' + scritta.feedbackNum : scritta.feedbackId}: vale quella indicata adesso)`);
+  }
+  return r;
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   // Un aiuto vero: senza, QUALUNQUE argomento (`--help` compreso) faceva
   // partire l'intera chiusura, e chi voleva solo sapere cosa fa lo strumento
   // si ritrovava dentro la procedura (feedback #565).
   const AIUTO = [
-    'Uso: npm run finish [-- --check]',
+    'Uso: npm run finish [-- --check] [-- --feedback <N>]',
     '',
     '  (nessun argomento)   chiude il lavoro: controlli, verifica, richiesta di fusione',
     '  --check              esegue i controlli e si ferma prima di chiedere la fusione',
     '                       (con npm: `npm run finish -- --check`, oppure `npm run finish:check`)',
+    '  --feedback <N>       la pratica di questo lavoro (numero o id): senza, quella scritta da',
+    '                       verify-local start --feedback. Senza nessuna delle due non si chiude.',
+    '                       Un lavoro locale provato non aspetta il sì',
     '  --help               questa schermata',
   ].join('\n');
   if (argv.includes('--help') || argv.includes('-h')) { console.log(AIUTO); return; }
@@ -509,14 +554,15 @@ async function main() {
   // a chi voleva solo i controlli. L'opzione resta scritta nell'ambiente: da
   // lì ce ne accorgiamo e ci fermiamo (feedback #565).
   const { argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
-  const storpiata = opzioneStorpiata(process.env, ['--check']);
+  const storpiata = opzioneStorpiata(process.env, ['--check', '--feedback']);
   if (storpiata) {
     console.error(`${storpiata}
 `);
     console.error(AIUTO);
     process.exit(1);
   }
-  const daNpm = argomentiDaNpm(process.env, { opzioni: ['--check'] });
+  const daNpm = argomentiDaNpm(process.env, { opzioni: ['--check', '--feedback'], conValore: ['--feedback'] });
+  if (daNpm.errore) { console.error(daNpm.errore); process.exit(1); }
   if (daNpm.nota) { console.error(daNpm.nota); argv.push(...daNpm.args); }
   // Prima dell'elenco degli sconosciuti: a chi prova la vecchia scorciatoia
   // serve il PERCHÉ, non «argomento sconosciuto» (feedback #565).
@@ -525,13 +571,24 @@ async function main() {
     console.error('indipendente girano sempre (SPEC-RIDISEGNO-MAX.md §8).');
     process.exit(1);
   }
-  const ignoti = argv.filter((a) => !['--check', '--help', '-h'].includes(a));
+  const { estraiOpzioneFeedback, parseRiferimento } = await import('./lib/pratica-locale.mjs');
+  const opzFeedback = estraiOpzioneFeedback(argv);
+  if (opzFeedback.errore) { console.error(`${opzFeedback.errore} — non ho toccato niente.`); process.exit(1); }
+  if (opzFeedback.valore !== null) {
+    const rif = parseRiferimento(opzFeedback.valore);
+    if (!rif.ok) { console.error(`${rif.motivo} — non ho toccato niente.`); process.exit(1); }
+  }
+  const ignoti = opzFeedback.resto.filter((a) => !['--check', '--help', '-h'].includes(a));
   if (ignoti.length) {
     console.error(`Argomento sconosciuto: ${ignoti.join(' ')} — non ho toccato niente.\n`);
     console.error(AIUTO);
     process.exit(1);
   }
   const checkOnly = argv.includes('--check');
+  // Un numero sbagliato si scopre adesso, non dopo i controlli.
+  const pratica = checkOnly ? null : await praticaDelLavoro(opzFeedback.valore);
+  const senza = senzaPraticaStop({ checkOnly, pratica });
+  if (senza) { console.error(senza); process.exit(1); }
 
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   if (!branch || branch === 'HEAD') { console.error('Stato del repo non chiaro: nessun ramo corrente.'); process.exit(1); }
@@ -697,7 +754,9 @@ async function main() {
   //    un'identità che qui non esiste. Lo sha lega la richiesta esattamente al
   //    codice appena controllato.
   process.stdout.write('\n▸ Chiedo al server di fondere\n');
-  const reply = await askServerMerge({ branch, sha: cur });
+  if (pratica && pratica.id) console.log(`  pratica ${pratica.seq ? `#${pratica.seq}` : pratica.id}`);
+  else console.log('  nessuna pratica collegata: se i controlli fermano, la fusione aspetta il tuo sì');
+  const reply = await askServerMerge({ branch, sha: cur, feedbackId: pratica ? pratica.id : '' });
   // Il server ha aperto una richiesta: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
@@ -705,7 +764,7 @@ async function main() {
   // di comparire soltanto a chi apre una scheda nuova.
   if (reply?.outcome === 'blocked' && reply.requestId) mergeApprovalSignal.note(reply.requestId);
   const code = exitCodeForOwnerMerge(reply);
-  const message = messageForOwnerMerge(reply, branch);
+  const message = messageForOwnerMerge(reply, branch, { feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '' });
   if (code === 0) console.log(`\n${message}`);
   else console.error(`\n${message}`);
   process.exit(code);

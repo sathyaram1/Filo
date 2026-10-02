@@ -23,6 +23,15 @@ test('identityCode: ordina in WUBRG, scarta ignoti, incolore → C', () => {
   assert.equal(Q.identityCode(['X', 'u']), 'U');
 });
 
+test('isPureSyntax: solo un messaggio tutto in sintassi Scryfall salta il giudice dei risultati (#382)', () => {
+  for (const q of ['t:dragon cmc<=3', 'o:haste', '(o:"gains haste" or o:"have haste") -t:creature', 'is:commander id:UR', 'kw:flying and pow>=4']) {
+    assert.equal(Q.isPureSyntax(q), true, q);
+  }
+  for (const q of ['carte che danno haste', 'o:haste a 2 mana', 'draghi', 'Lightning Bolt', '', '   ', 'or and', '(( ))']) {
+    assert.equal(Q.isPureSyntax(q), false, q);
+  }
+});
+
 test('buildSearchQuery: aggiunge id<= con l\'identity del commander (§4)', () => {
   assert.equal(Q.buildSearchQuery('haste', ['U', 'R']), 'haste id<=UR');
   assert.equal(Q.buildSearchQuery('t:artifact cmc<3', []), 't:artifact cmc<3 id<=C');
@@ -100,6 +109,18 @@ test('simplifyCard: campi essenziali estratti e tipizzati', () => {
   assert.equal(c.legalCommander, true);
 });
 
+test('simplifyCard: forza e costituzione per il giudice della ricerca, anche dalla faccia davanti (#382)', () => {
+  const c = Q.simplifyCard({ ...API_CARD, power: '5', toughness: '5' });
+  assert.equal(c.power, '5');
+  assert.equal(c.toughness, '5');
+  const dfc = Q.simplifyCard({ id: 'd-1', name: 'A // B', card_faces: [{ name: 'A', power: '*', toughness: '3' }, { name: 'B' }] });
+  assert.equal(dfc.power, '*');
+  assert.equal(dfc.toughness, '3');
+  const spell = Q.simplifyCard({ id: 's-1', name: 'Shock', type_line: 'Instant' });
+  assert.equal(spell.power, '');
+  assert.equal(spell.toughness, '');
+});
+
 test('simplifyCard: carta a due facce — immagini e costo dalle card_faces', () => {
   const c = Q.simplifyCard({
     id: 'dfc-1',
@@ -172,7 +193,7 @@ test('isFresh: dentro il TTL sì, oltre no, timestamp rotto no', () => {
 
 const NONE = {
   reply: '', query: '', filter: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
-  import: [], commanderName: '',
+  import: [], commanderName: '', clearChat: false,
 };
 
 test('parseAgentReply: JSON pulito → campi normalizzati', () => {
@@ -274,4 +295,10 @@ test('proseSegments: testo senza marcatori / vuoto / marcatore vuoto', () => {
     { type: 'text', text: '[[ ]]' },
     { type: 'text', text: ' b' },
   ]);
+});
+
+test('parseAgentReply: «svuota la chat» chiesto a parole arriva come intenzione, solo se è proprio true', () => {
+  assert.equal(Q.parseAgentReply('{"clearChat":true}').clearChat, true);
+  assert.equal(Q.parseAgentReply('{"clearChat":"true","reply":"ok"}').clearChat, false);
+  assert.equal(Q.parseAgentReply('{"reply":"ciao"}').clearChat, false);
 });

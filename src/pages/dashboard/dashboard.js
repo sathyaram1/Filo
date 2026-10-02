@@ -67,6 +67,13 @@
     faviconUrl: (url) => faviconUrl(url),
     applyCommandCwd: (actions) => Term.applyCommandCwd(actions),
   });
+  // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
+  if (window.filo?.onAperturaFermata) {
+    window.filo.onAperturaFermata((data) => {
+      const azioni = threadHistory.flatMap((m) => (m && Array.isArray(m.actions) ? m.actions : []));
+      Att.aperturaFermata(azioni, data || {});
+    });
+  }
   // #525 — una riga scritta in chat senza passare dal modello (la risposta a un
   // comando con lo slash, il comando di terminale e il suo esito) entra
   // nell'archivio come ogni altra battuta: l'utente l'ha letta dentro questa
@@ -825,7 +832,11 @@
           bubblesEl.appendChild(streamBubble);
         }
         streamedText += data.delta;
-        streamBubble.textContent = streamedText;
+        // Il marker del conto si vede già come numero mentre scorre: la
+        // risposta finale lo avrà risolto nel main, e le due non devono differire.
+        streamBubble.textContent = globalThis.SN_CALC
+          ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
+          : streamedText;
         followBottomIfNear();
       });
     }
@@ -1667,7 +1678,8 @@
     box.className = 'dash-recap-box dash-thanks-box';
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
-    box.setAttribute('aria-label', 'Feedback risolto');
+    const nessunaRisolta = rewards.every((r) => r.status === 'closed');
+    box.setAttribute('aria-label', nessunaRisolta ? 'Feedback chiuso' : 'Feedback risolto');
     overlay.appendChild(box);
 
     let settled = false;
@@ -1688,9 +1700,11 @@
     header.className = 'dash-recap-header dash-thanks-header';
     const title = document.createElement('div');
     title.className = 'dash-recap-title';
+    // Una segnalazione archiviata o doppia è chiusa, non risolta (#816).
+    const tuttiRisolti = rewards.every((r) => r.status !== 'closed');
     title.textContent = rewards.length > 1
-      ? 'Grazie! I tuoi feedback sono stati risolti'
-      : 'Grazie! Il tuo feedback è stato risolto';
+      ? (tuttiRisolti ? 'Grazie! I tuoi feedback sono stati risolti' : 'Grazie! I tuoi feedback sono stati chiusi')
+      : (tuttiRisolti ? 'Grazie! Il tuo feedback è stato risolto' : 'Grazie! Il tuo feedback è stato chiuso');
     header.appendChild(title);
     if (totalCredits > 0) {
       const badge = document.createElement('div');
@@ -1736,7 +1750,7 @@
       const expl = document.createElement('div');
       expl.className = 'dash-thanks-item-body';
       expl.textContent = (r.explanation && String(r.explanation).trim())
-        || 'È stato sistemato: provalo e dicci com’è andata.';
+        || (r.status === 'closed' ? 'L’abbiamo chiuso senza modifiche.' : 'È stato sistemato: provalo e dicci com’è andata.');
       item.appendChild(expl);
 
       bodyEl.appendChild(item);
@@ -1747,7 +1761,8 @@
     const doneBtn = document.createElement('button');
     doneBtn.type = 'button';
     doneBtn.className = 'dash-recap-btn dash-recap-done';
-    doneBtn.textContent = 'Fantastico!';
+    // Archiviate e doppioni soltanto: il congedo non festeggia.
+    doneBtn.textContent = nessunaRisolta ? 'Va bene' : 'Fantastico!';
     doneBtn.addEventListener('click', close);
     footer.append(doneBtn);
     box.appendChild(footer);
@@ -1755,7 +1770,8 @@
     document.body.appendChild(overlay);
     doneBtn.focus();
     // Anima i crediti verso il profilo dopo un attimo (il box è già su schermo).
-    setTimeout(() => flyCreditsToAccount(totalCredits), 250);
+    // Senza una cifra non vola niente: nessun credito è arrivato.
+    if (totalCredits > 0) setTimeout(() => flyCreditsToAccount(totalCredits), 250);
   }
 
   // #525 — la scheda sta per sparire (chiusura della scheda o dell'app): è una

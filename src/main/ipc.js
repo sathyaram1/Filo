@@ -24,6 +24,16 @@ const inFlightStreams = new Map(); // requestId → AbortController
 // processo (variabili, $env, cwd persistono). Muore alla chiusura della scheda.
 const shellSessions = new Map(); // webContents.id → sessione shell persistente
 
+// La finestra di Filo di cui `wc` è la barra, o null. Essere il frame principale di una
+// finestra non basta: un popup di accesso è una finestra vera con dentro un sito (#589.3).
+function finestraDellaBarra(wc) {
+  if (!wc) return null;
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (w._filoTabs && (w.webContents === wc || w._filoShell?.webContents === wc)) return w;
+  }
+  return null;
+}
+
 function senderInfo(event) {
   const wc = event.sender;
   // BrowserWindow.fromWebContents() può ritornare null per le WebContentsView
@@ -45,7 +55,7 @@ function senderInfo(event) {
   return {
     tab: tab ? { id: tab.id, url: tab.url, title: tab.title } : null,
     url: wc.getURL(),
-    isShell: win ? win.webContents === wc : false,
+    isShell: Boolean(finestraDellaBarra(wc)),
     // Riferimento alla finestra proprietaria (in-process: l'handler è chiamato
     // direttamente, non oltre il confine IPC) + flag incognito, così i servizi
     // aprono i tab nella finestra giusta e l'IPC instrada lo storage in RAM.
@@ -82,6 +92,33 @@ function registerIpcHandlers() {
       event.returnValue = require('./services/fingerprint').configForHref(href);
     } catch (_) {
       event.returnValue = { level: 0, seed: 0 };
+    }
+  });
+
+  // #754 — la pagina che sta per caricarsi, prima degli script del sito: la risposta al banner dei cookie da
+  // togliere dalla sua memoria, se il sito ha cambiato elenco. SINCRONO per lo stesso motivo di fp-config.
+  ipcMain.on('filo:cookie-wipe', (event, href) => {
+    let out = null;
+    try {
+      const wc = event.sender;
+      const top = event.senderFrame && wc.mainFrame && event.senderFrame.frameTreeNodeId === wc.mainFrame.frameTreeNodeId;
+      if (top) {
+        for (const w of BrowserWindow.getAllWindows()) {
+          const tm = w._filoTabs;
+          if (tm && tm.tabs && tm.tabs.some((t) => t.view && t.view.webContents === wc)) { out = tm.takeCookieWipe(String(href || '')); break; }
+        }
+      }
+    } catch (_) { out = null; }
+    event.returnValue = out;
+  });
+
+  // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
+  ipcMain.on('filo:permessi-stato', (event, href) => {
+    try {
+      const Permessi = require('./services/permessiPagine');
+      event.returnValue = { notifiche: Permessi.statoNotifiche(event.sender.session, href), gestoMs: Permessi.GESTO_MS };
+    } catch (_) {
+      event.returnValue = { notifiche: 'default' };
     }
   });
 
@@ -346,10 +383,37 @@ function registerIpcHandlers() {
     if (!win?._filoTabs) return { activeId: null, tabs: [] };
     return win._filoTabs.snapshot();
   });
-  ipcMain.handle('tabs:open-blocked-popup', (event, { url } = {}) => {
+  // Solo la cornice risponde a una domanda di permesso: è l'unico posto dove l'ha vista l'utente (#591.1).
+  ipcMain.handle('tabs:permesso-risposta', (event, { id, si } = {}) => {
+    if (!finestraDellaBarra(event.sender) || !id) return { ok: false };
+    return { ok: require('./services/permessiPagine').rispondi(String(id), si === true) };
+  });
+  // Le scelte ricordate per il sito di una scheda: il suo menu le mostra e le toglie (#591.1).
+  const paginaDiScheda = (event, id) => {
+    const t = winFor(event)?._filoTabs?.tabs?.find((x) => x.id === id);
+    const wc = t && t.view && t.view.webContents;
+    return wc && !wc.isDestroyed() ? wc : null;
+  };
+  ipcMain.handle('tabs:permessi', (event, { id } = {}) => {
+    const wc = paginaDiScheda(event, id);
+    if (!wc) return { scelte: [] };
+    const Permessi = require('./services/permessiPagine');
+    const { origine, scelte } = Permessi.scelteDi(wc);
+    return { scelte, ...(origine ? Permessi.nomeDaMostrare(origine) : {}) };
+  });
+  ipcMain.handle('tabs:permessi-dimentica', (event, { id } = {}) => {
+    const wc = paginaDiScheda(event, id);
+    return wc ? require('./services/permessiPagine').dimentica(wc) : { tolte: 0, cera: false };
+  });
+  ipcMain.handle('tabs:open-blocked-popup', (event, { url, apriComunque, daScheda } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs || !url) return { ok: false };
-    win._filoTabs.openBlockedPopup(url);
+    // Scavalcare la lista lo chiede solo la shell, dove stanno la notifica «Sito bloccato» e la chip dei popup (#590).
+    const shell = event.sender === win.webContents;
+    win._filoTabs.openBlockedPopup(url, {
+      apriComunque: apriComunque === true && shell,
+      daScheda: shell && typeof daScheda === 'string' ? daScheda : null,
+    });
     return { ok: true };
   });
   // Proxy per-tab ("Apri da un altro paese"): instrada/de-instrada una singola
@@ -364,6 +428,15 @@ function registerIpcHandlers() {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
     return win._filoTabs.clearTabProxy(id);
+  });
+  // #754 — dal menu della scheda: rivedere i banner dei cookie su questo sito (show) o ridarli a Filo.
+  // Solo dalla shell: scrive le impostazioni.
+  ipcMain.handle('tabs:cookie-banners', async (event, { id, show } = {}) => {
+    const win = finestraDellaBarra(event.sender);
+    if (!win) return { ok: false, error: 'forbidden' };
+    // In incognito l'elenco dei siti si scrive nella memoria della sessione, non sul disco.
+    const run = () => win._filoTabs.setCookieBanners(id, !!show);
+    return win._filoIncognito ? DiskStorage.runIncognito(run) : run();
   });
   // Stato per il menu della shell: la voce compare solo se un endpoint è
   // configurato; defaultCountry = ultima location usata, altrimenti il default.
@@ -396,6 +469,13 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
+  // ─── avvisi della barra (sopra le WebContentsView, #588.5) ────────────────
+  // Solo la shell della finestra manda la sua pila: una scheda non deve poter disegnare lì.
+  ipcMain.on('avvisi:stato', (event, stato) => {
+    const win = finestraDellaBarra(event.sender);
+    if (win && win._filoTabs.avvisi) win._filoTabs.avvisi.aggiorna(stato);
+  });
+
   // ─── tooltip custom (sopra le WebContentsView) ───────────────────────────
   ipcMain.on('shell:tooltip-show', (event, { text, x, y }) => {
     const win = winFor(event);
@@ -403,6 +483,18 @@ function registerIpcHandlers() {
     showTooltip(win, String(text || ''), Number(x) || 0, Number(y) || 0);
   });
   ipcMain.on('shell:tooltip-hide', () => hideTooltip());
+
+  // ─── puntatore fuori dal documento della barra (#428) ────────────────────
+  // In coordinate della barra (px CSS), per dirle se è ancora sulla fila delle schede.
+  ipcMain.handle('shell:puntatore', (event) => {
+    const win = finestraDellaBarra(event.sender);
+    if (!win || win.isDestroyed()) return null;
+    const { screen } = require('electron');
+    const p = screen.getCursorScreenPoint();
+    const b = win.getContentBounds();
+    const z = event.sender.getZoomFactor() || 1;
+    return { x: (p.x - b.x) / z, y: (p.y - b.y) / z };
+  });
 
   // ─── disegno annotazione sulla barra in alto (shell) ─────────────────────
   // La shell ci dice se c'è un disegno sulla sua barra: lo rilanciamo ai content

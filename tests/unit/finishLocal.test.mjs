@@ -599,3 +599,15 @@ test('gli spec mirati si spezzano in lotti che stanno nella riga di comando di W
   assert.deepEqual(lottiPerRigaDiComando([], 6000), [], 'niente spec: nessun lotto');
   assert.deepEqual(lottiPerRigaDiComando(['x'.repeat(7000)], 6000), [['x'.repeat(7000)]], 'uno spec più lungo del tetto va da solo, non sparisce');
 });
+
+// Ogni lavoro locale arriva su main con la sua pratica (#908): senza, la chiusura non parte; i soli controlli sì.
+import { senzaPraticaStop } from '../../scripts/finish-local.mjs';
+
+test('senza pratica la chiusura si ferma e dice come aprirla; --check e una pratica passano', () => {
+  const msg = senzaPraticaStop({ checkOnly: false, pratica: null });
+  assert.match(msg, /npm run feedback:apri/);
+  assert.match(msg, /--feedback <N>/);
+  assert.match(msg, /Non ho toccato niente/);
+  assert.equal(senzaPraticaStop({ checkOnly: true, pratica: null }), '');
+  assert.equal(senzaPraticaStop({ checkOnly: false, pratica: { id: 'abc', seq: 908 } }), '');
+});

@@ -206,28 +206,28 @@ test('D — un\'azione eseguita senza bottone in chat torna al modello come eseg
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       if (n === 1) {
         // Il fornitore non manda gli id delle chiamate.
-        try { onToolCall && onToolCall({ id: '', name: 'SALVA_LEZIONE' }); } catch (_) {}
+        try { onToolCall && onToolCall({ id: '', name: 'IMPOSTA_PREFERENZA' }); } catch (_) {}
         try { onToolCall && onToolCall({ id: '', name: 'CANCELLA_SVEGLIA' }); } catch (_) {}
         return {
           ...base, text: '',
           toolCalls: [
-            { id: '', name: 'SALVA_LEZIONE', arguments: '{"testo":"L\'utente non beve caffè."}' },
+            { id: '', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' },
             { id: '', name: 'CANCELLA_SVEGLIA', arguments: '{"etichetta":"Uovo"}' },
           ],
           reasoningDetails: [], finishReason: 'tool_calls',
         };
       }
-      const finale = 'Segnato, e ho tolto il timer dell\'uovo.';
+      const finale = 'Tema scuro, e ho tolto il timer dell\'uovo.';
       try { onDelta && onDelta(finale); } catch (_) {}
       return { ...base, text: finale, toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
     };
   });
 
-  await page.locator('#input').fill('ricordati che non bevo caffè e togli il timer dell\'uovo');
+  await page.locator('#input').fill('metti il tema scuro e togli il timer dell\'uovo');
   await page.locator('#sendBtn').click();
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'Segnato, e ho tolto' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Tema scuro, e ho tolto' })).toBeVisible({ timeout: 10_000 });
 
-  // Al modello: la lezione risulta ESEGUITA (non c'è niente da mostrare in
+  // Al modello: il tema risulta ESEGUITO (non c'è niente da mostrare in
   // chat, ma è andata a buon fine), la sveglia risulta TOLTA, e le risposte
   // agli strumenti citano gli stessi id delle chiamate.
   const calls = await app.evaluate(() => globalThis.__calls4);
@@ -240,7 +240,7 @@ test('D — un\'azione eseguita senza bottone in chat torna al modello come eseg
   expect(m[m.length - 1].tool_call_id).toBe(ids[1]);
   expect(m[m.length - 2].content).toMatch(/^Eseguita/);
   expect(m[m.length - 2].content).not.toMatch(/NON eseguita/);
-  expect(m[m.length - 1].content).toMatch(/^Tolte: .*Uovo/);
+  expect(m[m.length - 1].content).toMatch(/^Tolte:\n<<<TESTO_SALVATO>>>\n.*Uovo/);
 
   // La riga della sveglia tolta c'è, una volta sola; il timer non c'è più.
   const activity = page.locator('.dash-activity');

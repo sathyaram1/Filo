@@ -34,6 +34,8 @@
       padding: 6px 12px; background: var(--sn-card); color: var(--sn-fg);
     }
     .bd-auth button:hover { border-color: var(--sn-accent); }
+    .bd-auth .bd-auth-ko { color: var(--sn-error); }
+    .bd-auth .bd-auth-lascia { background: transparent; }
 
     .bd-loading, .bd-empty { color: var(--sn-muted); font-size: 14px; padding: 24px 4px; }
     /* Quando non si può stimare il tempo, una rotella: la pagina non deve restare muta a "Caricamento…". */
@@ -42,7 +44,7 @@
        una riga per OGNI classe. patterns/una-classe-che-scrive-display-deve-lasciarsi-nascondere.md */
     .bd-auth[hidden], .bd-loading[hidden], .bd-error[hidden], .bd-retry[hidden], .bd-list[hidden],
     .bd-more[hidden], .bd-card[hidden], .bd-vote[hidden], .bd-vote-btn[hidden],
-    .bd-reopen-actions[hidden] { display: none; }
+    .bd-reopen-actions[hidden], .bd-spinner[hidden] { display: none; }
     .bd-spinner {
       width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%;
       border: 2px solid var(--sn-border); border-top-color: var(--sn-accent);
@@ -157,8 +159,10 @@
     </header>
 
     <div class="bd-auth">
-      <span id="bdAuthMsg">Accedi per votare i miglioramenti.</span>
+      <span id="bdAuthSpin" class="bd-spinner" aria-hidden="true" hidden></span>
+      <span id="bdAuthMsg" role="status">Accedi per votare i miglioramenti.</span>
       <button id="bdSignIn" type="button">Accedi</button>
+      <button id="bdAuthLascia" class="bd-auth-lascia" type="button" hidden>Lascia stare</button>
     </div>
 
     <div id="bdLoading" class="bd-loading"><span class="bd-spinner" aria-hidden="true"></span><span>Caricamento…</span></div>

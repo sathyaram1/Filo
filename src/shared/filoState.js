@@ -14,8 +14,6 @@
 (function (global) {
   'use strict';
 
-  const Mem = global.SN_FILO_MEMORY;
-
   // chrome.tabs non è disponibile in tutti i contesti (es. in un content script
   // top-frame con permessi limitati). Gestione difensiva: se non c'è, ritorna [].
   async function listTabs() {
@@ -64,11 +62,20 @@
   }
 
   // Saldo crediti corrente: così Filo può rispondere in chat a "quanti crediti
-  // mi restano?" senza che l'utente debba aprire la pagina Crediti (#359). Legge
-  // il motore crediti a runtime (non è disponibile in tutti i contesti in cui
-  // SN_FILO_STATE potrebbe caricarsi → guardia difensiva). getPublic() applica il
-  // refill di mezzanotte e ritorna la vista SENZA il costo € (che resta privato).
-  async function readCredits() {
+  // mi restano?" senza che l'utente debba aprire la pagina Crediti (#359). Con
+  // un portafoglio è il saldo del server, lo stesso della pagina (#816); senza,
+  // il motore locale (getPublic applica il refill e non espone il costo €).
+  async function readCredits({ fresco = false } = {}) {
+    try {
+      const WM = global.SN_WALLET_MAIN;
+      if (WM && typeof WM.saldoPerChat === 'function') {
+        const w = await WM.saldoPerChat({ fresco });
+        if (w) return { wallet: true, ...w };
+      }
+    } catch (_) {
+      // Col portafoglio il conteggio locale sarebbe una cifra sbagliata: meglio nessuna.
+      try { if (global.SN_WALLET_MAIN?.haPortafoglio?.()) return { wallet: true, balance: null }; } catch (_) {}
+    }
     try {
       const Credits = global.SN_CREDITS;
       if (!Credits || typeof Credits.getPublic !== 'function') return null;
@@ -80,7 +87,10 @@
     }
   }
 
-  async function assemble() {
+  // `creditiFreschi`: la chiede un turno di chat, dove «quanti crediti ho?» va
+  // risposto col saldo di adesso; la home si accontenta dell'ultimo letto.
+  async function assemble({ creditiFreschi = false } = {}) {
+    const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
     const [tabs, session, timers, notifications, dashboardCache, rawLog, credits] = await Promise.all([
       listTabs(),
@@ -89,7 +99,7 @@
       Mem.listNotifications(),
       Mem.getDashboardCache(),
       Mem.listRaw({ since: new Date(Date.now() - 24 * 3600 * 1000).toISOString(), limit: 50 }),
-      readCredits(),
+      readCredits({ fresco: creditiFreschi }),
     ]);
 
     const sessionInfo = session.sessionStartedAt
@@ -161,6 +171,36 @@
     return global.SN_ESTERNO;
   }
 
+  // Le righe del portafoglio (#816): saldo e quota del server, gli stessi numeri
+  // della pagina Crediti. Un saldo vecchio si dichiara, uno ignoto non si inventa.
+  function creditLinesWallet(c) {
+    const W = global.SN_WALLET;
+    const fmt = (n) => (W && W.formatCredits ? W.formatCredits(n) : String(n));
+    const out = [];
+    if (c.balance == null) {
+      out.push('Saldo: non riesco a leggerlo adesso (il server dei crediti non risponde): lo trovi nella pagina Crediti. Non dare una cifra.');
+    } else if (c.lastKnown) {
+      let quando = '';
+      const d = c.readAt ? new Date(c.readAt) : null;
+      if (d && !Number.isNaN(d.getTime())) {
+        quando = `, letto il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+      }
+      if (c.lastKnown === 'old') {
+        out.push(`Saldo: ${fmt(c.balance)} crediti (lo tiene il server${quando ? `; ${quando.slice(2)}` : ''})`);
+      } else {
+        const perche = c.lastKnown === 'models' ? 'il servizio dei modelli non dice il consumo' : 'il server dei crediti non risponde';
+        out.push(`Saldo: ${fmt(c.balance)} crediti. È l'ultimo saldo noto${quando}: adesso ${perche}, e se dai la cifra va detto.`);
+      }
+    } else {
+      out.push(`Saldo: ${fmt(c.balance)} crediti (lo tiene il server: è il numero della pagina Crediti)`);
+    }
+    if (c.dailyCredits > 0) out.push(`Ogni giorno ne arrivano altri ${fmt(c.dailyCredits)}, e si accumulano.`);
+    else if (c.dailyCredits === 0) out.push('In questo periodo non arriva una quota giornaliera.');
+    if (c.usingOwnKey) out.push('L\'utente usa la sua chiave OpenRouter: questi crediti servono solo se OpenRouter la rifiuta.');
+    if (c.keyMissing) out.push('La chiave personale non è su questo computer: i crediti ci sono, ma questa copia di Filo non li usa finché non ne chiede una nuova dalla pagina Crediti.');
+    return out;
+  }
+
   function renderForPrompt(state) {
     const lines = [];
     lines.push('═══ FILO STATE ═══', '');
@@ -176,25 +216,26 @@
     }
     lines.push('');
     // CREDITI — se l'utente chiede quanti crediti gli restano, rispondi con
-    // questo saldo (si ricarica di DAILY_REFILL ogni giorno a mezzanotte: letto
-    // dal valore in vigore, non scritto a mano, così resta veritiero se cambia).
-    if (state.credits) {
+    // questo saldo. Senza portafoglio la ricarica è DAILY_REFILL, letta dal
+    // valore in vigore e non scritta a mano.
+    if (state.credits && state.credits.wallet) {
+      lines.push('CREDITI', ...creditLinesWallet(state.credits), '');
+    } else if (state.credits) {
       const refill = global.SN_CONST?.CREDIT?.DAILY_REFILL ?? 100;
       lines.push('CREDITI');
       lines.push(`Saldo: ${state.credits.balance} crediti (si ricaricano di ${refill} ogni giorno a mezzanotte)`);
       lines.push('');
     }
-    // TAB APERTE
     // TAB APERTE — il titolo di una scheda lo scrive il SITO, non Filo e non
     // l'utente: è contenuto esterno come i risultati di una ricerca, e va
     // dichiarato tale e recintato prima di entrare in un prompt (#593). Filo
     // scrive la riga intorno (numero, fuoco, ultima attività); dentro la busta
     // ci va il titolo, ripulito come un campo, così non può aprire una riga
     // per conto suo.
+    const E = esterno();
     lines.push('TAB APERTE');
     if (!state.tabs.length) lines.push('(nessuna)');
     else {
-      const E = esterno();
       const top = state.tabs.slice(0, 12);
       const righe = [];
       top.forEach((t, i) => {
@@ -218,11 +259,17 @@
       lines.push(`Scheda davanti: ${davanti.zoomPercent}% (100% = dimensione reale; si cambia con ZOOM_PAGINA)`);
       lines.push('');
     }
-    // PROCESSI
+    // Da qui in giù i testi salvati: nomi, notifiche, frasi della chat e della
+    // home. Li può aver scritti un modello che leggeva una pagina (#592.4).
+    const salvati = (righe) => E.imbusta({
+      tipo: 'TESTO_SALVATO',
+      conIntestazione: true,
+      testo: righe.map((r) => E.neutralizza(r, { unaRiga: true })).join('\n'),
+    });
     lines.push('PROCESSI ATTIVI');
     if (!state.timers.length) lines.push('(nessuno)');
     else {
-      state.timers.forEach((t) => {
+      lines.push(salvati(state.timers.map((t) => {
         if (t.kind === 'alarm') {
           // #322 — le sveglie si descrivono con l'orario assoluto, non col
           // countdown (che per una sveglia a ore di distanza confonderebbe).
@@ -232,38 +279,34 @@
           // così l'agente e l'utente leggono la stessa cosa.
           const M = global.SN_FILO_MEMORY;
           const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
-          lines.push(`- Sveglia${t.label ? ` "${t.label}"` : ''}${rep ? ` ricorrente ${rep}` : ''}: suona alle ${hhmm}`);
-        } else {
-          const rem = t.paused ? '(in pausa)' : `${Math.floor(t.remainingSec / 60)}m ${t.remainingSec % 60}s rimanenti`;
-          lines.push(`- Timer "${t.label}": ${rem}`);
+          return `- Sveglia${t.label ? ` "${t.label}"` : ''}${rep ? ` ricorrente ${rep}` : ''}: suona alle ${hhmm}`;
         }
-      });
+        const rem = t.paused ? '(in pausa)' : `${Math.floor(t.remainingSec / 60)}m ${t.remainingSec % 60}s rimanenti`;
+        return `- Timer "${t.label}": ${rem}`;
+      })));
     }
     lines.push('');
-    // NOTIFICHE
     lines.push('NOTIFICHE NON GESTITE');
     if (!state.notifications.length) lines.push('(nessuna)');
-    else state.notifications.forEach((n) => lines.push(`- [${n.ageRel}] ${n.kind}: ${n.text}`));
+    else lines.push(salvati(state.notifications.map((n) => `- [${n.ageRel}] ${n.kind}: ${n.text}`)));
     lines.push('');
-    // AZIONI RECENTI
     lines.push('AZIONI RECENTI (ultime 24h)');
     if (!state.recentActions.length) lines.push('(nessuna)');
     else {
-      state.recentActions.slice(0, 30).forEach((a) => {
-        lines.push(`- [${formatRelativeTime(a.ts)}] ${a.type}: ${a.summary}`);
-      });
+      lines.push(salvati(state.recentActions.slice(0, 30)
+        .map((a) => `- [${formatRelativeTime(a.ts)}] ${a.type}: ${a.summary}`)));
     }
     lines.push('');
-    // DASHBOARD CORRENTE
     lines.push('DASHBOARD ATTUALE');
     if (state.dashboard) {
-      lines.push(`Messaggio: "${(state.dashboard.message || '').slice(0, 200)}"`);
+      const righe = [`Messaggio: "${String(state.dashboard.message || '').slice(0, 200)}"`];
       if (state.dashboard.suggestions?.length) {
-        lines.push('Suggerimenti:');
+        righe.push('Suggerimenti:');
         state.dashboard.suggestions.slice(0, 8).forEach((s, i) => {
-          lines.push(`${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`);
+          righe.push(`${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`);
         });
       }
+      lines.push(salvati(righe));
     } else {
       lines.push('(non ancora generata)');
     }

@@ -43,15 +43,16 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // 9 tab della dashboard unificata (la nona: «Statistiche feedback», #496).
-  await expect(page.locator('.mg-tab')).toHaveCount(9);
-  // Con i feedback caricati (qui: nessuno) le quattro schede-lista dicono
-  // quante ne contengono, le altre quattro no (#495).
+  // 10 tab della dashboard unificata (la nona: «Statistiche feedback», #496; la decima: «Lavori locali», #908).
+  await expect(page.locator('.mg-tab')).toHaveCount(10);
+  // Con i feedback caricati (qui: nessuno) le cinque schede-lista dicono
+  // quante ne contengono, le altre no (#495).
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
   await page.evaluate(() => window.__mgTest.whenReady());
   await page.evaluate(() => window.__mgTest.setData([]));
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti (0)');
   await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda (0)');
+  await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveText('Lavori locali (0)');
   await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti (0)');
   await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati (0)');
   await expect(page.locator('.mg-tab[data-tab="fbstats"]')).toHaveText('Statistiche feedback');
@@ -1302,7 +1303,7 @@ test('colori giudici: scala rosso→giallo→verde→blu; "design" è verde e co
 const FAKE_FB_TRUSTED_BLOCKED = {
   _id: 'test-fb-routine-blocked', text: 'Regole proxy per dominio: nessuna UI per vederle.',
   name: 'Regole proxy', seq: 261, subSeq: 0, status: 'new',
-  clientId: 'routine:routine', createdAt: '2026-06-29T10:00:00Z', images: [],
+  clientId: 'routine:routine', senderProof: 'server', createdAt: '2026-06-29T10:00:00Z', images: [],
   pipeline: { action: 'human_review', l1Category: 'dangerous', l1Reasons: ['linked_prior_attack'], verdicts: [], stage: 'L1' },
 };
 
@@ -1384,7 +1385,7 @@ test('fix bocciato dalla sicurezza (design/secaudit) → card ROSSA + frase acca
 const FAKE_FB_TRUSTED_FLAGGED = {
   _id: 'test-fb-trusted-flagged', text: 'Feedback di routine segnalato dal panel.',
   name: 'Fidato ma segnalato', seq: 238, subSeq: 0, status: 'unlabeled',
-  clientId: 'routine:routine', createdAt: '2026-06-27T10:00:00Z', images: [],
+  clientId: 'routine:routine', senderProof: 'server', createdAt: '2026-06-27T10:00:00Z', images: [],
   pipeline: {
     action: 'block_attack', l2Class: 'attack',
     expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],

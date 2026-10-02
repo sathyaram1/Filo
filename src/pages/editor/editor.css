@@ -535,12 +535,12 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   white-space: normal; word-break: break-word;
 }
 
-/* Gli avvisi si IMPILANO: un avviso nuovo non cancella più il precedente e il suo "Annulla".
-   Due argini, come lo stack della shell: tetto al numero di card (nel JS) e altezza massima. */
+/* Gli avvisi si IMPILANO (uno nuovo non cancella il precedente e il suo "Annulla"), col tetto al numero nel
+   JS e all'altezza qui, sopra la pila della barra quando c'è (--filo-avvisi-barra, dal main). */
 .ed-toasts {
-  position: fixed; right: 18px; bottom: 18px;
+  position: fixed; right: 18px; bottom: max(18px, var(--filo-avvisi-barra, 0px));
   display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
-  max-height: calc(100vh - 36px);
+  max-height: calc(100vh - 18px - max(18px, var(--filo-avvisi-barra, 0px)));
   overflow-y: auto; overflow-x: hidden;
   scrollbar-width: thin;
   pointer-events: none; z-index: 200;

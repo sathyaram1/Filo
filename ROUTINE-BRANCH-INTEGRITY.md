@@ -232,7 +232,7 @@ gli assert.
   macchina; una modifica parziale al dispatcher romperebbe il ciclo in volo. Il
   merge lo decide l'owner, a lavoro completo.
 - Niente voce nei patch notes: è infrastruttura interna, invisibile all'utente
-  (vedi `CLAUDE.md` § Patch notes).
+  (vedi `CLAUDE.md` § Consegna, punto 3).
 - Il report finale lo scrivi tu, minimo, secondo `CLAUDE.md` § "Tono dei report".
 
 ---

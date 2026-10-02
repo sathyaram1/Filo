@@ -59,7 +59,7 @@ module.exports = function register(on, ctx) {
   // anche con confirmed:true): un client compromesso non può far eseguire
   // un'azione fuori registro.
   on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { confirmed: true, sender });
+    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true });
     return { ok: true, ...r };
   });
 
@@ -71,7 +71,7 @@ module.exports = function register(on, ctx) {
   // Le azioni fuori registro vengono rifiutate dal dispatch, esattamente come
   // per la chat: la sidebar non è un canale privilegiato.
   on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { sender });
+    const r = await executeFiloAction(msg.action, { sender, assistente: true });
     return { ok: true, ...r };
   });
 
@@ -96,6 +96,22 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.FILO_GET_MEMORY, async () => ({ ok: true, memory: await FiloMem.getMemory() }));
+
+  // Rileggere e togliere una riga di memoria alla volta (#592): è il posto dove
+  // l'utente controlla quello che entra in ogni conversazione. Leggere o
+  // riscrivere la memoria non è roba di una pagina visitata.
+  on(MSG.FILO_MEMORY_VIEW, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    return { ok: true, ...(await FiloMem.viewForUser()) };
+  });
+
+  on(MSG.FILO_MEMORY_FORGET, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    const lezione = msg && msg.lezione && typeof msg.lezione === 'object';
+    const riga = msg && typeof msg.modulo === 'string' && typeof msg.riga === 'string';
+    if (!lezione && !riga) return { ok: false, error: 'bad_request' };
+    return { ok: true, tolta: await FiloMem.forgetLine(msg) };
+  });
 
   // Compattazione FORZATA: porta subito il buffer delle lezioni dentro
   // PROFILO/PREFERENZE senza aspettare la soglia. Prima non esisteva alcun modo

@@ -16,6 +16,8 @@
 (function (global) {
   'use strict';
 
+  const crypto = require('node:crypto');
+
   const { STORAGE_KEYS, ACTIONS, PROMPTS } = global.SN_CONST;
   const P = global.SN_DECK_OPINIONS;
   const Q = global.SN_SCRYFALL_Q;
@@ -23,6 +25,38 @@
   // Tetto di carte per batch: un mazzo Commander è ≤100; oltre è un errore del
   // chiamante, non un caso d'uso.
   const MAX_BATCH = 120;
+  // Candidati per chiamata del giudice: i lotti partono insieme, e uno corto risponde prima e sbaglia meno.
+  const FILTER_BATCH = 50;
+  const FILTER_PARALLEL = 8;
+  const CONFIG_ERRORS = new Set(['NO_MODEL_FOR_ACTION', 'NO_API_KEY', 'LIMIT_REACHED']);
+  // Un «troppe richieste» o un servizio sovraccarico si aspetta, con meno lotti insieme. Quando un lotto finisce
+  // queste attese (15 s in tutto) il servizio è giù davvero, e gli altri non aspettano più.
+  const BUSY_WAITS_MS = [1000, 2000, 4000, 8000];
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // Giudizi salvati: circa venti ricerche larghe. Oltre si perdono i più vecchi, e rifarne uno costa una chiamata
+  // economica; senza tetto ogni ricerca lasciava decine di KB nel file di Filo, per sempre.
+  const SEARCH_CACHE_MAX_PAIRS = 20000;
+  const SEARCH_CACHE_PER_CARD = 30;
+
+  const digest = (s) => crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 16);
+  // I giudizi salvati valgono per le istruzioni, la forma della riga carta e il modello che li hanno prodotti:
+  // cambiato uno dei tre, la cache scade da sé (patterns/una-cache-scade-con-la-richiesta-non-solo-con-l-orologio.md).
+  const JUDGE_SAMPLE = { name: 'n', manaCost: '{1}', typeLine: 't', power: '1', toughness: '1', priceEur: 1, oracleText: 'o' };
+  function judgeFingerprint(model) {
+    return digest(`${PROMPTS.decksSearchFilter({ criterion: '', cards: '' })}\n${judgeCardBody(JUDGE_SAMPLE)}\n${model || ''}`).slice(0, 10);
+  }
+  // Il giudizio salvato è per la carta COM'ERA quando il giudice l'ha vista: cambiato il prezzo o il testo, si rifà.
+  function judgedAs(card) {
+    return `${card.id}@${digest(judgeCardBody(card)).slice(0, 8)}`;
+  }
+  function isBusy(e) {
+    const m = /^(?:OpenRouter|Gemini)(?:\s+\S+)?\s+(\d{3})\b/.exec(String((e && e.message) || ''));
+    const status = Number(e && e.status) || (m ? Number(m[1]) : 0);
+    if (status === 429 || status >= 500) return true;
+    const CE = global.SN_CHAT_ERRORS;
+    return !!(CE && CE.isTransientNetwork(e));
+  }
 
   async function readOpinions() {
     const r = await chrome.storage.local.get(STORAGE_KEYS.DECK_OPINIONS);
@@ -56,14 +90,29 @@
   }
 
   // Riga di contesto per il prompt: la carta come la vede l'LLM.
-  function cardPromptLine(card) {
-    const parts = [
-      `- [id: ${card.id}] ${card.name}`,
+  function cardPromptBody(card) {
+    return [
+      card.name,
       card.manaCost ? `costo ${card.manaCost}` : '',
       card.typeLine,
       card.oracleText ? `— ${card.oracleText.replace(/\n/g, ' ')}` : '',
-    ].filter(Boolean);
-    return parts.join(' · ');
+    ].filter(Boolean).join(' · ');
+  }
+  // La carta come la vede il giudice della ricerca (§4.1): anche i dati che un criterio può citare, forza e prezzo.
+  function judgeCardBody(card) {
+    const pt = card.power || card.toughness ? `forza/costituzione ${card.power || '?'}/${card.toughness || '?'}` : '';
+    const price = Number.isFinite(card.priceEur) ? `prezzo ${card.priceEur.toFixed(2).replace('.', ',')} €` : 'prezzo sconosciuto';
+    return [
+      card.name,
+      card.manaCost ? `costo ${card.manaCost}` : '',
+      card.typeLine,
+      pt,
+      price,
+      card.oracleText ? `— ${card.oracleText.replace(/\n/g, ' ')}` : '',
+    ].filter(Boolean).join(' · ');
+  }
+  function cardPromptLine(card) {
+    return `- [id: ${card.id}] ${cardPromptBody(card)}`;
   }
 
   function deckListForPrompt(deck, cards) {
@@ -181,50 +230,111 @@
     };
   }
 
-  // Filtro semantico dei risultati di ricerca (§4.1): dato l'ordine dei
-  // candidati (già filtrati per colore da Scryfall) e un criterio in
-  // linguaggio naturale, tiene solo le carte che lo rispettano. UNA sola
-  // chiamata LLM per i soli id NON ancora in cache per quel criterio; il
-  // giudizio (carta, criterio) → bool è cacheato permanentemente cross-ricerca.
-  // `cards` è la mappa id → card (per il testo Oracle nel prompt).
-  // Ritorna { keepIds, judgedCount, fromCacheCount }: keepIds preserva l'ordine
-  // dei candidati. Se il criterio è vuoto, non filtra (tiene tutto).
-  async function filterSearch({ criterion, cardIds, cards, handleAIRequest }) {
-    const ids = (cardIds || []).map(String).filter((id) => cards && cards[id]);
+  // Filtro semantico dei risultati (§4.1): OGNI candidato passa dal giudice, a lotti in parallelo, mai un taglio
+  // silenzioso; chi non ha potuto guardare torna in `unverifiedIds`, visibile, con `error` per dire perché.
+  // `context` (commander, messaggi di prima) cambia il giudizio, quindi entra nella chiave come il criterio;
+  // `judgeModel` è il modello che giudicherà, e un altro modello non eredita i giudizi di questo.
+  async function filterSearch({ criterion, context = '', judgeModel = '', cardIds, cards, handleAIRequest, onProgress = null }) {
+    const ids = [...new Set((cardIds || []).map(String))].filter((id) => cards && cards[id]);
     const crit = P.normCriterion(criterion);
-    if (!crit || !ids.length) return { keepIds: ids, judgedCount: 0, fromCacheCount: 0 };
+    if (!crit || !ids.length) return { keepIds: ids, unverifiedIds: [], judgedCount: 0, error: null };
 
+    const fp = judgeFingerprint(judgeModel);
+    const key = `${fp}|${digest(`${crit}\n${P.normCriterion(context)}`)}`;
     const cache = await readSearchCache();
-    const plan = P.planSearchFilter({ cardIds: ids, criterion: crit, searchCache: cache });
+    const asSeen = new Map(ids.map((id) => [judgedAs(cards[id]), id]));
+    const plan = P.planSearchFilter({ cardIds: [...asSeen.keys()], criterion: key, searchCache: cache });
+    const judgeIds = plan.judgeIds.map((s) => asSeen.get(s));
+    const keepFromCache = plan.keepFromCache.map((s) => asSeen.get(s));
 
-    let judged = {};
-    let keptFresh = new Set();
-    if (plan.judgeIds.length) {
-      const toJudge = plan.judgeIds.slice(0, MAX_BATCH);
-      const sys = PROMPTS.decksSearchFilter({
-        criterion,
-        cards: toJudge.map((id) => cardPromptLine(cards[id])).join('\n'),
-      });
-      const r = await handleAIRequest({
-        action: ACTIONS.DECKS_SEARCH_FILTER,
-        payload: { messages: [{ role: 'user', content: sys }] },
-        origin: 'filo://decks',
-      });
-      keptFresh = P.parseSearchKeep(r.text, toJudge);
-      for (const id of toJudge) judged[id] = keptFresh.has(id);
+    const batches = [];
+    for (let i = 0; i < judgeIds.length; i += FILTER_BATCH) batches.push(judgeIds.slice(i, i + FILTER_BATCH));
+    let done = ids.length - judgeIds.length;
+    const progress = () => { if (onProgress) { try { onProgress({ done, total: ids.length }); } catch (_) {} } };
+    progress();
+    // Più pagine di risultati fanno decine di lotti: al più `limit` chiamate insieme, che si dimezza a ogni «troppe
+    // richieste». Un lotto rifiutato così resta di chi l'ha preso e si rimanda dopo l'attesa comune.
+    const results = new Array(batches.length);
+    let next = 0;
+    let limit = Math.min(FILTER_PARALLEL, batches.length);
+    let pauseUntil = 0;
+    let serviceDown = false;
+    const judgeWithWaits = async (i) => {
+      for (let wait = 0; ; wait += 1) {
+        const pause = pauseUntil - Date.now();
+        if (pause > 0) await sleep(pause);
+        const r = await judgeBatch({ criterion, context, ids: batches[i], cards, handleAIRequest });
+        if (!r.busy) return r;
+        if (serviceDown || wait >= BUSY_WAITS_MS.length) { serviceDown = true; return r; }
+        limit = Math.max(1, Math.ceil(limit / 2));
+        pauseUntil = Math.max(pauseUntil, Date.now() + BUSY_WAITS_MS[wait]);
+      }
+    };
+    const worker = async (w) => {
+      while (w < limit && next < batches.length) {
+        const i = next++;
+        results[i] = await judgeWithWaits(i);
+        done += batches[i].length;
+        progress();
+      }
+    };
+    await Promise.all(Array.from({ length: limit }, (_, w) => worker(w)));
+
+    const judged = {};
+    const unverified = new Set();
+    let error = null;
+    results.forEach((r, i) => {
+      if (r.keep) for (const id of batches[i]) judged[id] = r.keep.has(id);
+      else { for (const id of batches[i]) unverified.add(id); error = error || r.error; }
+    });
+    if (Object.keys(judged).length) {
+      const judgedSeen = Object.fromEntries(Object.entries(judged).map(([id, v]) => [judgedAs(cards[id]), v]));
+      // Riletta prima di scrivere: due ricerche in parallelo non si cancellano i giudizi a vicenda.
       await chrome.storage.local.set({
-        [STORAGE_KEYS.DECK_SEARCH_CACHE]: P.updateSearchCache(cache, crit, judged),
+        [STORAGE_KEYS.DECK_SEARCH_CACHE]: P.updateSearchCache(await readSearchCache(), key, judgedSeen, {
+          keepPrefix: `${fp}|`, maxPairs: SEARCH_CACHE_MAX_PAIRS, maxPerCard: SEARCH_CACHE_PER_CARD,
+        }),
       });
     }
 
-    const keepSet = new Set([...plan.keepFromCache, ...Object.keys(judged).filter((id) => judged[id])]);
-    // Preserva l'ordine originale dei candidati.
-    const keepIds = ids.filter((id) => keepSet.has(id));
+    const keepSet = new Set([...keepFromCache, ...Object.keys(judged).filter((id) => judged[id]), ...unverified]);
     return {
-      keepIds,
-      judgedCount: plan.judgeIds.length,
-      fromCacheCount: plan.keepFromCache.length + (ids.length - plan.judgeIds.length - plan.keepFromCache.length),
+      keepIds: ids.filter((id) => keepSet.has(id)),
+      unverifiedIds: ids.filter((id) => unverified.has(id)),
+      judgedCount: Object.keys(judged).length,
+      error,
     };
+  }
+
+  // Un lotto al giudice. Una risposta illeggibile si richiede una volta (le risposte del giudice non passano dalla
+  // cache delle risposte); un errore di configurazione (niente modello, chiave, tetto) non migliora riprovando, e un
+  // servizio occupato torna `busy` a chi sa aspettare.
+  async function judgeBatch({ criterion, context, ids, cards, handleAIRequest }) {
+    const sys = PROMPTS.decksSearchFilter({
+      criterion,
+      context,
+      cards: ids.map((id, i) => `${i + 1}. ${judgeCardBody(cards[id])}`).join('\n'),
+    });
+    let error = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const r = await handleAIRequest({
+          action: ACTIONS.DECKS_SEARCH_FILTER,
+          payload: { messages: [{ role: 'user', content: sys }] },
+          origin: 'filo://decks',
+        });
+        const keep = P.parseSearchKeep(r && r.text, ids);
+        if (keep) return { keep };
+        error = Object.assign(new Error('risposta del filtro illeggibile'), {
+          userText: 'il modello del filtro ha risposto in un formato che non so leggere. Riprova, o scegli un altro modello per «Mazzi — filtro dei risultati di ricerca» in Modelli predefiniti.',
+        });
+      } catch (e) {
+        if (isBusy(e)) return { error: e, busy: true };
+        error = e;
+        if (e && CONFIG_ERRORS.has(e.code)) break;
+      }
+    }
+    return { error };
   }
 
   global.SN_DECK_OPINIONS_SVC = { getOpinions, computeOpinions, autoTag, dropDeck, filterSearch };

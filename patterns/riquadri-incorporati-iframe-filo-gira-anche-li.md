@@ -16,10 +16,18 @@ Quattro regole quando si tocca qualcosa che vive nel content script:
   mai. Nel sottoframe `page-preload.js` non carica NIENTE finché non arriva la
   prima interazione vera (tasto destro, clic, tasto premuto, una scorciatoia
   indirizzata a quel frame); il primo tasto destro viene **rigiocato** appena
-  l'handler è pronto, così non serve cliccare due volte.
+  l'handler è pronto, così non serve cliccare due volte. Unica eccezione, il
+  rifiuto dei banner dei cookie (#754): il banner di Sourcepoint, TrustArc e
+  simili È un riquadro, e nessuno lo tocca prima che risponda. Lì il preload
+  carica subito il solo modulo cookie (`startCookiesInFrame`), senza il resto di
+  Filo; nascondere un banner e sbloccare lo scorrimento restano alla pagina. Un
+  riquadro che vede un banner senza «rifiuta» lo dice al main
+  (`MSG.COOKIES_FRAME_BANNER`), e il main passa alla pagina l'indirizzo del suo
+  riquadro figlio da nascondere (`MSG.COOKIES_HIDE_FRAME`): solo se sta in un
+  velo fisso, perché un riquadro nel flusso della pagina è contenuto.
 - **Frame vs pagina.** Ciò che riguarda l'ELEMENTO cliccato funziona identico nel
   riquadro. Ciò che riguarda la PAGINA no: colore della scheda, segnali di
-  attività, banner cookie/sito pericoloso, avvisi di sistema, e le azioni globali
+  attività, avviso del sito pericoloso, avvisi di sistema, e le azioni globali
   del menu (traduci, condividi, salva, QR, screenshot, feedback, sidebar Aiuto).
   Quelle o restano al frame principale, o gli vengono **rimandate**
   (`MSG.RUN_IN_TOP_FRAME` → `MSG.TOP_FRAME_COMMAND`): eseguirle nel riquadro

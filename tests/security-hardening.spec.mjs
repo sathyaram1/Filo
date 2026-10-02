@@ -116,8 +116,8 @@ test('#2 i canali privilegiati non trapelano le chiavi API a un\'origine web', a
   expect(webView.settingsApiKeys).toBeFalsy();
   expect(webView.storageApiKeys).toBeFalsy();
 
-  // Scrittura da un'origine web: non può iniettare/sovrascrivere una apiKey,
-  // ma una preferenza benigna (modello) passa. La chiave originale resta intatta.
+  // Scrittura da un'origine web: non può iniettare/sovrascrivere una apiKey
+  // (#589: la richiesta intera è rifiutata). La chiave originale resta intatta.
   const afterWebWrite = await app.evaluate(async () => {
     const MSG = globalThis.SN_MSG.MSG;
     await globalThis.SN_HANDLE_MESSAGE(

@@ -55,6 +55,31 @@
       + 'rel="noopener noreferrer nofollow">' + text + '</a>';
   }
 
+  const conta = (s, c) => s.split(c).length - 1;
+
+  // In coda a un URL nudo si stacca solo ciò che chiude la frase o una
+  // formattazione che questo renderer disegna (gli asterischi): ogni altro
+  // carattere da URL (_ ~ = / # e gli altri) resta nel link. Elenco chiuso,
+  // sentinella in tests/unit/filoMarkdown.test.mjs.
+  const STACCATI_IN_CODA = '.,;:!?…’*';
+
+  // Una ) o ] in coda resta solo se chiude una ( o [ dell'URL
+  // (wiki/Mercurio_(astronomia)). Lineare: una coda lunghissima non blocca.
+  function separaCoda(m) {
+    const aperte = { ')': conta(m, '('), ']': conta(m, '[') };
+    const chiuse = { ')': conta(m, ')'), ']': conta(m, ']') };
+    let fine = m.length;
+    while (fine > 0 && !m.endsWith('&amp;', fine)) {
+      if (m.endsWith('&#39;', fine)) { fine -= 5; continue; }
+      const c = m[fine - 1];
+      if (STACCATI_IN_CODA.includes(c)) { fine -= 1; continue; }
+      if (!(c in chiuse) || chiuse[c] <= aperte[c]) break;
+      chiuse[c] -= 1;
+      fine -= 1;
+    }
+    return [m.slice(0, fine), m.slice(fine)];
+  }
+
   // Formattazione inline su testo GIA' escapato: codice, link markdown, autolink
   // di URL nudi, grassetto, corsivo. Codice e link vengono "messi da parte" con
   // segnaposto cosi' le trasformazioni successive (autolink, grassetto/corsivo)
@@ -67,19 +92,18 @@
     // Codice inline `...`
     t = t.replace(/`([^`\n]+)`/g, (m, code) => stash('<code>' + code + '</code>'));
 
-    // Link markdown [testo](url)
-    t = t.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (m, label, url) => {
+    // Link markdown [testo](url): l'url può contenere parentesi bilanciate
+    // (wiki/Mercurio_(astronomia)).
+    t = t.replace(/\[([^\]\n]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)/g, (m, label, url) => {
       const safe = safeLinkUrl(url);
       return safe ? stash(anchor(safe, label)) : label;
     });
 
     // Autolink di URL nudi http(s)://... (mostrano l'URL stesso come testo).
-    t = t.replace(/\bhttps?:\/\/[^\s<]+/gi, (m) => {
-      let url = m;
-      let trail = '';
-      // La punteggiatura finale (. ) ] , ; : ! ?) non fa parte dell'URL.
-      const tm = /[.,;:!?)\]]+$/.exec(url);
-      if (tm) { trail = url.slice(url.length - tm[0].length); url = url.slice(0, -tm[0].length); }
+    // Dove finisce l'URL lo decide separaCoda; qui si ferma solo ai caratteri
+    // che in un URL non stanno mai (" < > già escapati, virgolette tipografiche).
+    t = t.replace(/\bhttps?:\/\/(?:&amp;|&#39;|[^\s&«»“”])+/gi, (m) => {
+      const [url, trail] = separaCoda(m);
       const safe = safeLinkUrl(url);
       return (safe ? stash(anchor(safe, url)) : url) + trail;
     });

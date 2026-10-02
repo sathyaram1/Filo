@@ -79,11 +79,12 @@ async function startSocks5({ mapHostTo = '127.0.0.1' } = {}) {
 
 // Esegue un'azione dell'agente nel main, costruendo un sender con la finestra
 // reale (così "questa tab" risolve la scheda web attiva). È il vero percorso
-// di routing comando→primitiva, lo stesso di handleFiloChat.
+// di routing comando→primitiva, lo stesso di handleFiloChat. Il mittente è la
+// chat della home: da un'origine che non è di Filo le azioni si rifiutano.
 function runAction(app, action) {
   return app.evaluate(async ({ BrowserWindow }, act) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    return globalThis.SN_EXECUTE_FILO_ACTION(act, { sender: { win } });
+    return globalThis.SN_EXECUTE_FILO_ACTION(act, { sender: { win, url: 'filo://newtab/' } });
   }, action);
 }
 

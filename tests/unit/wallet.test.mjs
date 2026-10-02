@@ -326,3 +326,48 @@ test('le manopole dei crediti sono sette, hanno un nome e limiti sensati', () =>
   assert.equal(W.knobOf('invitesMaxUses').min, 1);
   assert.equal(W.knobOf('non-esiste'), null);
 });
+
+// ── #816: le cifre dette fuori dalla pagina Crediti ─────────────────────────
+
+test('formatCredits scrive il saldo come la pagina Crediti: un decimale al più, alla italiana', () => {
+  assert.equal(W.formatCredits(4321.5), new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(4321.5));
+  assert.equal(W.formatCredits(12345.44), '12.345,4');
+  assert.equal(W.formatCredits(0.3), '0,3');
+  assert.equal(W.formatCredits(null), '0');
+});
+
+const ORA = Date.parse('2026-09-28T12:00:00.000Z');
+const scheda = (extra = {}) => ({
+  _id: 'fbX', status: 'done', statusPublic: 'closed',
+  createdAt: '2026-09-20T10:00:00.000Z', resolvedAt: '2026-09-28T11:00:00.000Z', ...extra,
+});
+
+test('risoluzione premiata dal server: si annuncia la cifra del suo movimento', () => {
+  const grants = [
+    { at: '2026-09-28T11:00:05.000Z', credits: 50, why: 'feedback_closed:fbX' },
+    { at: '2026-09-20T10:00:05.000Z', credits: 10, why: 'feedback_sent:fbX' },
+  ];
+  assert.deepEqual(W.resolutionReward({ card: scheda(), grants, grantsFresh: true, now: ORA }), { announce: true, credits: 50 });
+  // Il premio d'invio della stessa segnalazione non è quello di risoluzione.
+  assert.deepEqual(W.resolutionReward({ card: scheda(), grants: grants.slice(1), grantsFresh: true, now: ORA }), { announce: false, credits: 0 });
+});
+
+test('movimento non ancora arrivato: si aspetta, e dopo un giorno si annuncia senza cifra', () => {
+  assert.deepEqual(W.resolutionReward({ card: scheda(), grants: [], grantsFresh: true, now: ORA }), { announce: false, credits: 0 });
+  const dopo = ORA + W.PREMIO_ATTESA_MS;
+  assert.deepEqual(W.resolutionReward({ card: scheda(), grants: [], grantsFresh: true, now: dopo }), { announce: true, credits: 0 });
+  // Con i movimenti di una lettura vecchia (server muto) quello che manca può
+  // solo non essere ancora letto: si aspetta comunque.
+  assert.deepEqual(W.resolutionReward({ card: scheda(), grants: [], grantsFresh: false, now: dopo }), { announce: false, credits: 0 });
+  assert.deepEqual(W.resolutionReward({ card: scheda(), grants: null, grantsFresh: false, now: ORA }), { announce: false, credits: 0 });
+});
+
+test('archiviata o doppione: il server non la premia, si annuncia senza cifra e senza aspettare', () => {
+  assert.deepEqual(W.resolutionReward({ card: scheda({ status: 'archived' }), grants: [], grantsFresh: true, now: ORA }), { announce: true, credits: 0 });
+  assert.deepEqual(W.resolutionReward({ card: scheda({ status: 'archived' }), grants: null, grantsFresh: false, now: ORA }), { announce: true, credits: 0 });
+});
+
+test('segnalazione mandata prima del riscatto: il server non sa a chi darlo, niente attesa', () => {
+  const r = W.resolutionReward({ card: scheda(), grants: [], grantsFresh: true, redeemedAt: '2026-09-25T00:00:00.000Z', now: ORA });
+  assert.deepEqual(r, { announce: true, credits: 0 });
+});

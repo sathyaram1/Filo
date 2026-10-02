@@ -18,6 +18,14 @@ const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 require(join(ROOT, 'src', 'main', 'services', 'fxRates.js'));
 const Fx = globalThis.SN_FX;
+// Un'istanza appena avviata: il servizio ricorda i guasti di rete visti prima
+// (#724.1), e un test sulla rete non deve ereditare quelli di un altro.
+function fxNuovo() {
+  const file = join(ROOT, 'src', 'main', 'services', 'fxRates.js');
+  delete require.cache[require.resolve(file)];
+  require(file);
+  return globalThis.SN_FX;
+}
 
 test('la data dei cambi entra nel prompt solo se è una data', () => {
   const riga = Fx.formatForPrompt({ rates: { USD: 1.08 }, date: '2026-03-01' });
@@ -131,7 +139,7 @@ test('i cambi presi con una richiesta diversa da quella di adesso non si riusano
     ok: true,
     json: async () => ({ base: 'EUR', date: '2026-09-27', rates: { USD: 1.08, INR: 92 } }),
   });
-  const riga = Fx.formatForPrompt(await Fx.get());
+  const riga = Fx.formatForPrompt(await fxNuovo().get());
   assert.ok(riga.includes(' INR'), `i cambi vecchi hanno tenuto fuori le rupie: ${riga}`);
   assert.ok(salvato && salvato.req, 'i cambi si salvano insieme alla richiesta che li ha prodotti');
 });
@@ -144,7 +152,7 @@ test('i cambi presi con la richiesta di adesso non si riscaricano ogni volta', a
   let chiamate = 0;
   globalThis.chrome = { storage: { local: { get: async () => ({ sn_fx_rates: freschi }), set: async () => {} } } };
   globalThis.fetch = async () => { chiamate++; throw new Error('non dovrebbe servire'); };
-  const riga = Fx.formatForPrompt(await Fx.get());
+  const riga = Fx.formatForPrompt(await fxNuovo().get());
   assert.equal(chiamate, 0, 'i cambi del giorno si riusano, non si riscaricano a ogni spiegazione');
   assert.ok(riga.includes(' INR'));
 });

@@ -436,10 +436,10 @@
       'che usi davvero (Google, YouTube, banche…) non vengono mai bloccati.',
     options_security_siteblock: 'Blocca l’apertura dei siti in blacklist',
     options_security_siteblock_desc:
-      'Impedisce di APRIRE i siti in blacklist (non solo le loro pubblicità). Se provi ' +
-      'ad aprire un sito bloccato compare una notifica con “Apri comunque”. ' +
-      'Eccezioni: se arrivi da un motore di ricerca o lo apre Filo per te, l’apertura ' +
-      'è permessa. Puoi aggiungere domini tuoi qui sotto (uno per riga).',
+      'Impedisce di APRIRE i siti in blacklist (non solo le loro pubblicità), anche dai ' +
+      'risultati di una ricerca e quando è Filo ad aprirli. Se provi ad aprire un sito ' +
+      'bloccato compare una notifica con “Apri comunque”. Puoi aggiungere domini tuoi ' +
+      'qui sotto (uno per riga).',
     options_security_siteblock_lists: 'Usa anche le liste pubbliche (pubblicità/tracker) come blacklist',
     options_security_siteblock_blacklist_label: 'Domini in blacklist (uno per riga)',
     options_security_siteblock_blacklist_invalid:
@@ -520,7 +520,7 @@
     options_cookies_mode_default: 'Automatico (consigliato)',
     options_cookies_mode_default_desc:
       'Filo blocca a monte i tracker noti (Google Analytics, reti pubblicitarie, pixel dei social): lo script non ' +
-      'si carica nemmeno. Rifiuta da solo i banner cookie che riconosce, dice ai siti che non vuoi essere profilato ' +
+      'si carica nemmeno. Rifiuta da solo i banner dei cookie, nasconde quelli che non hanno un «rifiuta», dice ai siti che non vuoi essere profilato ' +
       'e carica i video YouTube senza cookie. I cookie utili a te (login, preferenze, le tue scelte sui siti) ' +
       'restano: non perdi quello che hai impostato.',
     options_cookies_mode_privacy: 'Privacy massima',
@@ -541,6 +541,26 @@
     options_cookies_trusted_note_other:
       'I siti fidati hanno effetto solo in "Privacy massima". In "Automatico" i tuoi login restano comunque salvati, ' +
       'quindi qui non serve aggiungere nulla.',
+    options_cookies_banners_title: 'Qui i banner dei cookie li vedi',
+    options_cookies_banners_remove: 'Rifiuta in automatico',
+    options_cookies_done_title: 'Qui Filo li ha rifiutati o nascosti',
+    options_cookies_done_rejected: 'cookie rifiutati',
+    options_cookies_done_hidden: 'banner nascosto',
+    options_cookies_done_show: 'Mostra il banner',
+    // Risposte date ai permessi dei siti (#591, giro 20)
+    options_site_perms_title: 'Permessi dei siti',
+    options_site_perms_empty: 'Nessuna risposta data a un sito.',
+    options_site_perms_remove: 'Togli',
+    options_site_perms_yes: 'consentito',
+    options_site_perms_no: 'negato',
+    options_site_perms_part_audio: 'Microfono',
+    options_site_perms_part_video: 'Fotocamera',
+    options_site_perms_part_appunti: 'Appunti',
+    options_site_perms_part_posizione: 'Posizione',
+    options_site_perms_part_notifiche: 'Notifiche',
+    options_site_perms_part_schermi: 'Schermi',
+    options_site_perms_part_presenza: 'Presenza al computer',
+    options_site_perms_part_strumenti: 'Strumenti musicali',
     // Protezione anti-fingerprinting
     options_fp_title: 'Protezione fingerprinting',
     options_fp_desc:

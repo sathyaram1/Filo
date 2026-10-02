@@ -2,6 +2,7 @@
 // feedback (annotazione/invio) e fetch dei metadati Open Graph di un link.
 
 const { safeFetch } = require('../safe-fetch');
+const { avvisoNellaFinestra } = require('../avvisoFinestra');
 const auth = require('../../auth/google-auth');
 // L'identità da allegare a un invio che il server limita per identità: la
 // chiede la coda dei percorsi condivisi, al momento in cui spedisce.
@@ -190,7 +191,7 @@ function safeImageFilename(name) {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, getEffectiveSettings, modelForAction, buildAttemptChain, broadcastToTabs } = ctx;
+  const { MSG, winOf, modelGate, broadcastToTabs } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
 
   // Titolo breve del feedback, generato da un LLM economico al momento
@@ -202,19 +203,15 @@ module.exports = function register(on, ctx) {
     const t = String(text || '').trim();
     if (!t) return fallback;
     try {
-      const settings = await getEffectiveSettings();
-      const attempts = buildAttemptChain(
-        settings, modelForAction(settings, ACTIONS.FEEDBACK_TITLE), ACTIONS.FEEDBACK_TITLE,
-      );
       const messages = [{
         role: 'user',
         content: 'Genera un titolo brevissimo (2-6 parole, nella stessa lingua del testo) che riassuma questo feedback su un\'app. Rispondi SOLO col titolo, senza virgolette e senza punto finale.\n\nFeedback:\n' + t.slice(0, 1500),
       }];
       const r = await Promise.race([
-        globalThis.SN_PROVIDERS.completeWithFallback({ attempts, messages }),
+        modelGate.text({ action: ACTIONS.FEEDBACK_TITLE, messages }),
         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout titolo (8s)')), 8000)),
       ]);
-      const name = String(r?.text || '').trim()
+      const name = String(r || '').trim()
         .split('\n')[0]
         .replace(/^["'«\s]+|["'»\s.]+$/g, '')
         .slice(0, 120);
@@ -486,32 +483,6 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // #602 — un avviso che DEVE essere visto: va nella cornice della finestra
-  // (la stessa striscia di notifiche che annuncia la fine di uno scaricamento),
-  // non nella pagina davanti. Resta lì finché non lo si chiude, perché dice che
-  // una segnalazione non è mai partita e va rimandata.
-  //
-  // Ritorna `false` se non c'era nessuna finestra pronta a mostrarlo: chi
-  // chiama tiene allora da parte l'avviso e riprova più tardi, invece di
-  // parlare al vuoto. Una finestra che sta ancora caricando non conta: la sua
-  // cornice non ascolta ancora.
-  function avvisoNellaFinestra(testo) {
-    let dette = 0;
-    try {
-      const { BrowserWindow } = require('electron');
-      for (const win of BrowserWindow.getAllWindows()) {
-        if (!win || win.isDestroyed?.() || !win._filoTabs) continue;
-        const wc = win.webContents;
-        if (!wc || wc.isDestroyed?.() || wc.isLoading?.()) continue;
-        try {
-          wc.send('shell:toast', { text: testo, opts: { durationSec: 0 } });
-          dette++;
-        } catch (_) {}
-      }
-    } catch (_) {}
-    return dette > 0;
-  }
-
   // Coda d'invio del feedback (#341): "Invia" NON aspetta più la rete. Il box
   // sparisce subito e il main si fa carico di consegnare il feedback in
   // background, ritentando da solo finché la connessione torna. L'invio è
@@ -557,6 +528,9 @@ module.exports = function register(on, ctx) {
       onGiveUp: (_item, motivo) => avvisoNellaFinestra(
         String(motivo || 'La tua segnalazione non è partita.'),
       ),
+      // Chiesto al momento della spedizione: fra l'accodamento e l'invio
+      // possono passare ore (offline), e l'owner può aver chiuso la sessione.
+      tokenOwner: async () => (auth.isAdmin() ? (await auth.getIdToken()) || '' : ''),
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
     });
   }
@@ -604,9 +578,12 @@ module.exports = function register(on, ctx) {
       // "owner:" così la dashboard lo distingue (verde) dai feedback dei tester
       // esterni (arancione). L'identità owner è nota solo qui nel main (auth
       // singleton): il content script che genera il clientId non sa di esserlo.
+      // `dallOwner` lo decide il main, non il payload: vale il token admin alla spedizione (#595).
+      let dallOwner = false;
       try {
         if (auth.isAdmin() && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
           payload.clientId = globalThis.SN_FEEDBACK_THREAD.ownerize(payload.clientId);
+          dallOwner = String(payload.clientId || '').startsWith('owner:');
         }
       } catch (_) {}
       console.log('[Filo feedback] submit start', {
@@ -617,7 +594,7 @@ module.exports = function register(on, ctx) {
       // Accoda e prova a inviare subito, ma NON aspettare la rete: l'ack torna
       // appena il feedback è al sicuro in coda (persistito). Il titolo lo genera
       // la coda al momento dell'invio (anche offline, col fallback).
-      const r = await Outbox.enqueue(payload);
+      const r = await Outbox.enqueue(payload, { dallOwner });
       return { ok: true, queued: true, id: r?.id };
     } catch (e) {
       console.error('[Filo feedback] submit failed', e);
@@ -643,16 +620,23 @@ module.exports = function register(on, ctx) {
     // ma marca la versione corrente come "vista" così il prossimo update parte
     // pulito. Niente note ritornate → niente popup.
     if (!lastSeen) {
-      try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, current); } catch (_) {}
+      await markUpdateSeen(current);
       return { ok: true, current, lastSeen: null, notes: [] };
     }
-    const notes = PN.since(lastSeen, current);
+    const foto = await globalThis.SN_STORAGE.getRaw(KEYS.LAST_SEEN_NOTES, null);
+    const notes = PN.recap(lastSeen, current, foto);
     return { ok: true, current, lastSeen, notes };
   });
 
-  on(MSG.MARK_UPDATE_SEEN, async () => {
+  // Versione e fotografia si scrivono insieme: recap() usa la fotografia solo se è della versione vista.
+  async function markUpdateSeen(version) {
     const KEYS = globalThis.SN_CONST.STORAGE_KEYS;
-    try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, appVersion()); } catch (_) {}
+    try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_NOTES, globalThis.SN_PATCH_NOTES.fotografia(version)); } catch (_) {}
+    try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, version); } catch (_) {}
+  }
+
+  on(MSG.MARK_UPDATE_SEEN, async () => {
+    await markUpdateSeen(appVersion());
     return { ok: true };
   });
 

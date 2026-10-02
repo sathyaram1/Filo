@@ -5,6 +5,7 @@
 const { BrowserWindow, nativeTheme } = require('electron');
 const path = require('node:path');
 const { hideForTests } = require('./test-window-mode');
+const { collegaScorciatoie } = require('./shortcuts');
 
 let activePopup = null;
 
@@ -45,6 +46,16 @@ const ICON_PATHS = {
 
   close:
     '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
+
+  // Biscotto morsicato — righe del banner dei cookie nel menu della scheda (#754).
+  cookie:
+    '<path d="M12 3a9 9 0 1 0 9 9 3 3 0 0 1-3.6-3.4A3 3 0 0 1 14.4 5 3 3 0 0 1 12 3z"/>' +
+    '<path d="M8.5 9.5h.01"/><path d="M15.5 15h.01"/><path d="M9.5 15.5h.01"/><path d="M12.5 12h.01"/>',
+
+  // Occhio — «Mostra il banner dei cookie».
+  eye:
+    '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>' +
+    '<circle cx="12" cy="12" r="2.8"/>',
 
   duplicate:
     '<rect x="9" y="9" width="11" height="11" rx="2"/>' +
@@ -193,6 +204,10 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   if (popX + WIN_W > cb.x + cb.width) {
     popX = cb.x + cb.width - WIN_W;
   }
+  // Sotto non c'è posto (un tasto destro in fondo alla finestra, sugli avvisi): si apre sopra il punto.
+  if (popY + WIN_H - MARGIN > cb.y + cb.height) {
+    popY = Math.max(cb.y - MARGIN, cb.y + y - 6 - contentH - MARGIN);
+  }
 
   const popup = new BrowserWindow({
     parent: parentWin,
@@ -217,6 +232,8 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   });
 
   activePopup = popup;
+  // Il menu prende il fuoco: senza, le scorciatoie di Filo lì dentro morirebbero.
+  collegaScorciatoie(popup.webContents, parentWin);
 
   const html = buildHTML(entries, isDark, MARGIN);
   popup.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
@@ -239,8 +256,41 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
       onSelect(url);
       if (!popup.isDestroyed()) popup.close();
     }
+    if (channel === 'popup-menu:close' && !popup.isDestroyed()) popup.close();
   });
 }
+
+// Il menu prende la tastiera appena si apre: Esc lo chiude, le frecce scelgono
+// la voce e Invio la esegue, come in un menu del sistema.
+const TASTIERA_MENU = `(() => {
+  const voci = () => [...document.querySelectorAll('button.item')];
+  let i = -1;
+  const segna = (n) => {
+    const v = voci();
+    if (!v.length) return;
+    i = n < 0 ? -1 : n % v.length;
+    v.forEach((b, k) => b.classList.toggle('attiva', k === i));
+    if (i >= 0) v[i].focus();
+    else if (document.activeElement) document.activeElement.blur();
+  };
+  document.addEventListener('mousemove', (e) => {
+    const b = e.target.closest && e.target.closest('button.item');
+    const k = b ? voci().indexOf(b) : -1;
+    if (k !== i) segna(k);
+  });
+  document.addEventListener('keydown', (e) => {
+    const n = voci().length;
+    const passo = { ArrowDown: i + 1, ArrowUp: (i < 0 ? n : i) - 1 + n, Home: 0, End: n - 1 }[e.key];
+    if (e.key === 'Escape') popupApi.close();
+    else if (passo !== undefined) segna(passo);
+    else if (e.key === 'ArrowRight' && i >= 0) {
+      const sotto = voci()[i].parentElement.querySelector('.subarrow');
+      if (!sotto) return;
+      sotto.click();
+    } else return;
+    e.preventDefault();
+  });
+})();`;
 
 // ── Genera l'HTML inline ──────────────────────────────────────────────────
 function buildHTML(entries, isDark, margin = 26) {
@@ -324,7 +374,7 @@ html,body{background:transparent;overflow:hidden;height:100%}
   cursor:pointer;color:${c.fg};
   font-family:inherit;font-size:13px;line-height:1.2;
 }
-.item:hover{background:rgba(${c.ar},0.12)}
+.item:hover,.item.attiva{background:rgba(${c.ar},0.12)}
 .item.disabled{color:${c.muted};cursor:default;font-size:12px}
 .item.disabled:hover{background:transparent}
 .item.centered{justify-content:center;text-align:center}
@@ -344,7 +394,7 @@ html,body{background:transparent;overflow:hidden;height:100%}
   flex:0 0 30px;cursor:pointer;color:${c.muted};
 }
 .subarrow:hover{background:rgba(${c.ar},0.12);color:rgba(${c.ar},0.95)}
-</style></head><body><div class="menu">${items}</div></body></html>`;
+</style></head><body><div class="menu">${items}</div><script>${TASTIERA_MENU}</script></body></html>`;
 }
 
 module.exports = { showPopupMenu, buildHTML, computeMenuWidth };
