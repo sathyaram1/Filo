@@ -253,7 +253,8 @@
     // l'intercettazione will-download di #410.1 e ottiene ESATTAMENTE lo stesso
     // trattamento del clic sul link — avanzamento in barra, salvataggio in
     // cartella Download, avviso finale, voce in cronologia (parità dei cammini).
-    // { url } → { ok } | { ok:false, error }
+    // { url, diFilo, parole } → { ok } | { ok:false, error, frase }. `diFilo`: il collegamento l'ha scritto un modello
+    // di Filo, e lo scaricamento passa dalla porta delle uscite (#810).
     DOWNLOAD_LINK: 'download_link',
     // --- Download "nativi" della navigazione (#410.1) --------------------
     // Sono i download che partono cliccando un link a un file (PDF, ZIP,
