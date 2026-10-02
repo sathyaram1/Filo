@@ -2496,7 +2496,11 @@
     hideTabBars();
     mgListLoading.hidden = true;
     mgList.innerHTML = '';
-    setSearchMsg(fallback ? 'Modello non disponibile: mostro i risultati per testo.' : '', null);
+    // Il motivo del main dice anche dove si imposta il modello: senza, l'owner lo cercava dove non c'è più (#465).
+    const motivo = fallback && opts && opts.motivo ? String(opts.motivo).trim() : '';
+    setSearchMsg(fallback
+      ? (motivo ? `${motivo} Intanto mostro i risultati per testo.` : 'Modello non disponibile: mostro i risultati per testo.')
+      : '', null);
 
     // "Nessun risultato" al tetto del caricamento significa "nessuno fra quelli
     // caricati": la ricerca legge solo i feedback che stanno in pagina.
