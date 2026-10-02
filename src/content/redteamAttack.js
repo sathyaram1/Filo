@@ -56,6 +56,9 @@
       }
       case 'dormant':
         return { ok: false, text: 'Canale non ancora attivo. Riprova più tardi.' };
+      case 'paused':
+        // La frase del server, così com'è (#896): mai l'errore di trasporto.
+        return { ok: false, paused: true, text: String(r.error || 'Il Red Team è in pausa: tornerà dopo il rilascio') };
       case 'not_signed_in':
         return { ok: false, needLogin: true, text: 'Accedi al tuo account per inviare un attacco.' };
       case 'empty':
