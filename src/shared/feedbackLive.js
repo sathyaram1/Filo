@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
 
-  // Un giro costa una lettura per feedback in pagina (500 al tetto): un minuto
+  // Un giro costa una lettura per feedback in finestra (500 al tetto): un minuto
   // tiene il passo con le routine, che lavorano per minuti.
   const POLL_MS = 60 * 1000;
 
@@ -28,25 +28,34 @@
   // (patterns/un-clic-una-scheda-nessuna-azione-ricompone-la-lista.md).
   const LISTA_IN_USO_MS = 1500;
 
+  // Il giro lungo: le versioni di TUTTI i feedback, non della finestra dei più
+  // recenti. È l'unico che vede cambiare (o sparire) i più vecchi; ogni dieci
+  // minuti costa una lettura per feedback, contro i cinquecento del minuto.
+  const GIRO_COMPLETO_MS = 10 * 60 * 1000;
+
   // Confronta la lista locale con le versioni appena lette.
   //   local:  documenti in mano (con `_id` e, se arrivano da Firestore, `_updateTime`)
-  //   remote: [{ _id, _updateTime }] — l'elenco corrente, nell'ordine della pagina
+  //   remote: [{ _id, _updateTime, createdAt? }] — l'elenco corrente
+  //   finestra: se > 0, `remote` sono i più recenti per data d'invio fino a quel
+  //             tetto; piena, non vede i più vecchi del suo bordo, che quindi
+  //             non sono spariti ma solo fuori (restano come sono).
+  //   parziale: lettura completa interrotta dal freno: niente esce.
   // Ritorna { changed, added, removed } (array di id):
   //   changed — presente in entrambi, ma scritto dopo l'ultima lettura
   //             (o senza versione locale: non sappiamo cos'abbiamo, rileggiamo);
   //   added   — nuovo, mai visto;
-  //   removed — non più in pagina: cancellato, oppure scivolato oltre il tetto
-  //             perché ne sono entrati di più recenti. In entrambi i casi un
-  //             ricaricamento non lo mostrerebbe, quindi neanche noi.
-  function diffVersions(local, remote) {
+  //   removed — cancellato.
+  function diffVersions(local, remote, { finestra = 0, parziale = false } = {}) {
     const seen = new Map();
+    const locali = new Map();
     for (const fb of Array.isArray(local) ? local : []) {
-      if (fb && fb._id) seen.set(String(fb._id), fb._updateTime || null);
+      if (fb && fb._id) { seen.set(String(fb._id), fb._updateTime || null); locali.set(String(fb._id), fb); }
     }
     const changed = [];
     const added = [];
     const remoteIds = new Set();
-    for (const v of Array.isArray(remote) ? remote : []) {
+    const righe = Array.isArray(remote) ? remote : [];
+    for (const v of righe) {
       if (!v || !v._id) continue;
       const id = String(v._id);
       remoteIds.add(id);
@@ -55,13 +64,32 @@
       if (!mine || mine !== (v._updateTime || null)) changed.push(id);
     }
     const removed = [];
-    for (const id of seen.keys()) if (!remoteIds.has(id)) removed.push(id);
+    if (parziale) return { changed, added, removed };
+    let bordo = -Infinity;
+    if (finestra > 0 && righe.length >= finestra) {
+      bordo = Infinity;
+      for (const v of righe) {
+        const ms = createdMs(v && v.createdAt ? v : locali.get(String((v && v._id) || '')));
+        if (ms > 0 && ms < bordo) bordo = ms;
+      }
+      // Senza date non si sa dove finisce la finestra: meglio non togliere niente.
+      if (bordo === Infinity) return { changed, added, removed };
+    }
+    for (const id of seen.keys()) {
+      if (!remoteIds.has(id) && createdMs(locali.get(id)) > bordo) removed.push(id);
+    }
     return { changed, added, removed };
   }
 
   function createdMs(fb) {
     const t = new Date((fb && fb.createdAt) || 0).getTime();
     return Number.isFinite(t) ? t : 0;
+  }
+
+  // La lettura completa arriva in ordine di identificativo; la lista va dal
+  // più recente al più vecchio. Una copia: le righe possono essere condivise.
+  function ordina(list) {
+    return (Array.isArray(list) ? list.slice() : []).sort((a, b) => createdMs(b) - createdMs(a));
   }
 
   // Applica un giro alla lista: i documenti `fresh` sostituiscono (o
@@ -189,8 +217,8 @@
   }
 
   global.SN_FEEDBACK_LIVE = {
-    POLL_MS, CLOCK_MS, RIENTRO_MIN_MS, GIRO_BLOCCATO_MS, FERMA_DOPO_MS, LISTA_IN_USO_MS,
-    diffVersions, applyChanges, decidiGiro, listaFerma, arrivi, statoCambiato,
+    POLL_MS, CLOCK_MS, RIENTRO_MIN_MS, GIRO_BLOCCATO_MS, FERMA_DOPO_MS, LISTA_IN_USO_MS, GIRO_COMPLETO_MS,
+    diffVersions, applyChanges, ordina, decidiGiro, listaFerma, arrivi, statoCambiato,
     ancoraScorrimento, scrollDaAncora, listaInUso,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
