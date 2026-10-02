@@ -32,6 +32,8 @@ const FB = globalThis.SN_FEEDBACK;
 // (#908: senza token lo strumento non apre niente), tolta dove un test lo vuole.
 const CRED_FINTA = async () => ({ idToken: 'tok-test' });
 SCRIPT.credenziale.ottieni = CRED_FINTA;
+// Le routine lanciano questi test con FILO_ROUTINE=1 nell'ambiente: lo strumento non deve credersi una routine qui.
+SCRIPT.ambiente.routine = () => false;
 
 /** Sostituisce submit per la durata di `fn`, raccogliendo cosa gli è arrivato. */
 async function conSubmit(impl, fn) {
