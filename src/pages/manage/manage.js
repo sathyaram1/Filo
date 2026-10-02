@@ -2194,11 +2194,11 @@
     const m = fb && fb.localOnly;
     if (!m) return '';
     const quando = Number(m.at) > 0 ? ` il ${formatDateTime(new Date(Number(m.at)).toISOString())}` : '';
-    const cosa = MR.praticaChiusa(fb, { releasedVersion, fusioni })
-      ? 'Era un lavoro locale: per questo non sta nella bacheca pubblica.'
-      : 'Solo lavoro locale: nessuna routine la prende.';
+    const cosa = !MR.praticaChiusa(fb, { releasedVersion, fusioni }) ? 'Solo lavoro locale: nessuna routine la prende.'
+      : MR.isPrivateLocalWork(fb) ? 'Era un lavoro locale: per questo non sta nella bacheca pubblica.'
+        : 'Era un lavoro locale: la sua scheda resta nella bacheca pubblica, per chi l’ha mandato.';
     const a = MR.isLocalApproved(fb) ? fb.localApproval : null;
-    const si = a ? ` Approvato come lavoro locale da ${chiHaMessoIlSegno(a.by)}${Number(a.at) > 0 ? ` il ${formatDateTime(new Date(Number(a.at)).toISOString())}` : ''}. Se togli il segno se ne va anche l'approvazione.` : '';
+    const si = a ? ` Approvato come lavoro locale da ${chiHaMessoIlSegno(a.by)}${Number(a.at) > 0 ? ` il ${formatDateTime(new Date(Number(a.at)).toISOString())}` : ''}. Se togli il segno l'approvazione resta, e il segno si rimette con un clic.` : '';
     return `${cosa} Segno messo da ${chiHaMessoIlSegno(m.by)}${quando}.${si}`;
   }
   // Una sessione firma il segno col suo mittente (`local:claude`), l'owner con l'email: il mittente si legge come in testata.
