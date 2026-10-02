@@ -3682,7 +3682,10 @@ const handlerCtx = {
   handleFiloGenerateDashboard,
   executeFiloAction,
   controllaUscita,
+  apriDaFilo,
+  SCHEMI_USCITA,
   ricordaLettoDallAiuto,
+  ricordaLettoInChat,
   maybeRunCompactor,
   // Archivio delle chat (#525)
   closeAndTriageChat,
