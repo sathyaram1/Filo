@@ -270,6 +270,19 @@ const SENZA_SCELTA = [
   '  --locale      il lavoro di questa sessione: nessuna routine lo prende, e la chiusura col suo numero salta L5.',
 ].join('\n');
 
+// #914: da qui il feedback nasce dell'owner (prova admin) e salta i giudici; una routine apre i suoi dal canale,
+// che li firma col biglietto, e non apre mai lavoro locale.
+const IN_ROUTINE = [
+  'RIFIUTATO: sei una routine, e da qui non apro niente: un feedback nato qui salterebbe i giudici come uno dell\'owner.',
+  '  Un ritrovamento: node scripts/routine-channel.mjs deliver feedback --name "…" --text "…"',
+  '  Un lavoro che si fa solo in locale: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché"',
+].join('\n');
+
+/** Siamo dentro una routine? Oggetto e non funzione, come `credenziale`, perché i test lo sostituiscono. */
+export const ambiente = {
+  routine() { return isRoutineInstance(resolve(fileURLToPath(import.meta.url), '..', '..')); },
+};
+
 function uso() {
   console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--dry-run]');
   console.error('     --non-locale lo apre per le routine; --locale è il lavoro di questa sessione, e nessuna routine lo prende.');
