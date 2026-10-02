@@ -5334,6 +5334,8 @@
     const ModelChain = window.SN_MODEL_CHAIN;
     if (!ModelChain) return;
     smChains = {};
+    smUnsetShown = {};
+    const unset = Array.isArray(models.movedUnset) ? models.movedUnset : [];
     for (const slot of SM_SLOTS) {
       const host = document.getElementById(`mgSmChain-${slot}`);
       if (!host) continue;
