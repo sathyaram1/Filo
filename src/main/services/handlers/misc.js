@@ -191,7 +191,7 @@ function safeImageFilename(name) {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita } = ctx;
+  const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita, apriDaFilo } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
 
   // Titolo breve del feedback, generato da un LLM economico al momento
@@ -395,17 +395,28 @@ module.exports = function register(on, ctx) {
   // per il salvataggio immagini. Non serve il gate "solo superfici interne": far
   // partire uno scaricamento di un URL è esattamente ciò che il clic sul link fa
   // già, e non espone cronologia né percorsi su disco (quelli restano riservati).
-  on(MSG.DOWNLOAD_LINK, async (msg, sender) => {
+  on(MSG.DOWNLOAD_LINK, async (msg, sender, origin) => {
     const url = String(msg.url || '').trim();
     if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
     const wc = sender && sender.wc;
     if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
-    try {
-      wc.downloadURL(url);
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, error: e?.message || 'download non avviato' };
+    const scarica = () => {
+      try {
+        wc.downloadURL(url);
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: e?.message || 'download non avviato' };
+      }
+    };
+    // Scaricare un collegamento scritto da un modello lo chiede al suo sito: passa dalla porta delle uscite (#810).
+    if (msg.diFilo) {
+      const parole = (Array.isArray(msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').join('\n');
+      let esito = { ok: false, error: 'download non avviato' };
+      const avvisato = String(origin || '').startsWith('filo://');
+      const r = await apriDaFilo(url, { wc, parole, avvisa: avvisato, apri: () => { esito = scarica(); } });
+      return r.aperto ? esito : { ok: false, error: 'segreto', frase: r.frase, avvisato };
     }
+    return scarica();
   });
 
   // ── Download "nativi" della navigazione (#410.1): la shell legge la

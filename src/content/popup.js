@@ -31,20 +31,57 @@
     return String(text == null ? '' : text).replace(/[&<>"']/g, (c) => ESCAPE[c]).replace(/\n/g, '<br>');
   }
 
-  // Un solo listener a livello di documento apre i link renderizzati da Filo
-  // (classe filo-md-link) in una NUOVA SCHEDA — vale per il popup, il riquadro
-  // "Spiega" e la sidebar, che vivono tutti nello stesso documento. I link
-  // non-sicuri (filo://, javascript:, relativi) non arrivano qui: SN_MARKDOWN li
-  // ha già scartati in fase di render.
-  document.addEventListener('click', (e) => {
+  // I collegamenti che un modello scrive qui (popup, «Spiega», assistente di pagina: classe filo-md-link) li apre il
+  // main dopo la porta delle uscite (#810), per ogni gesto: un window.open da qui sembrerebbe della pagina e non passa.
+  function paroleAccanto(el) {
+    if (el.closest && el.closest('.sn-sidebar')) {
+      try { return global.SN_SIDEBAR?.paroleUtente?.() || []; } catch (_) { return []; }
+    }
+    const p = popups.find((x) => x.root && x.root.contains(el));
+    // Il primo messaggio lo compone Filo dalla selezione: è testo della pagina, non parole dell'utente.
+    return p ? p.conversation.slice(1).filter((m) => m && m.role === 'user').map((m) => String(m.content || '')) : [];
+  }
+
+  function avvisaFermata(el, frase) {
+    if (el.closest && el.closest('.sn-sidebar') && global.SN_SIDEBAR?.notaFermata) {
+      global.SN_SIDEBAR.notaFermata(frase);
+      return;
+    }
+    showToast(frase.charAt(0).toUpperCase() + frase.slice(1), { duration: 6000 });
+  }
+
+  async function apriCollegamento(a, { sfondo = false } = {}) {
+    const url = a && a.getAttribute ? a.getAttribute('href') : '';
+    if (!url) return;
+    let r = null;
+    try {
+      r = await chrome.runtime.sendMessage({ type: MSG.APRI_COLLEGAMENTO_FILO, url, parole: paroleAccanto(a), sfondo });
+    } catch (_) {}
+    if (r && r.frase && !r.avvisato) avvisaFermata(a, r.frase);
+  }
+
+  // Lo scaricamento di un collegamento scritto da un modello passa dalla stessa porta.
+  async function scaricaCollegamento(a) {
+    const url = a && a.getAttribute ? a.getAttribute('href') : '';
+    if (!url) return null;
+    let r = null;
+    try {
+      r = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_LINK, url, diFilo: true, parole: paroleAccanto(a) });
+    } catch (_) {}
+    if (r && r.frase && !r.avvisato) avvisaFermata(a, r.frase);
+    return r;
+  }
+
+  const suCollegamento = (e) => {
+    if (e.type === 'auxclick' && e.button !== 1) return;
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
     if (!a) return;
-    const url = a.getAttribute('href');
-    if (!url) return;
     e.preventDefault();
     e.stopPropagation();
-    try { window.open(url, '_blank', 'noopener'); } catch (_) {}
-  });
+    apriCollegamento(a, { sfondo: e.type === 'auxclick' || e.ctrlKey || e.metaKey });
+  };
+  document.addEventListener('click', suCollegamento);
+  document.addEventListener('auxclick', suCollegamento);
 
   // ----------------------------------------------------------------
   // Compensazione zoom (Ctrl+/-, pinch). Identica per popup e menu.
