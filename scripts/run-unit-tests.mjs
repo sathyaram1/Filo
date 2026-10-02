@@ -215,10 +215,11 @@ export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false,
   // somma null: coi flag dati il reporter del riepilogo non si poteva aggiungere, restano i verdetti dei gruppi.
   const n = esiti.length;
   const rossiGruppi = esiti.map((e, i) => (e === 0 ? 0 : i + 1)).filter(Boolean);
-  const extra = !somma ? '' : [['annullati', somma.annullati], ['saltati', somma.saltati], ['da fare', somma.todo]]
-    .filter(([, v]) => v).map(([k, v]) => `, ${v} ${k}`).join('');
+  const conta = (v, uno, tanti) => `${v} ${v === 1 ? uno : tanti}`;
+  const extra = !somma ? '' : [['annullato', 'annullati', somma.annullati], ['saltato', 'saltati', somma.saltati], ['da fare', 'da fare', somma.todo]]
+    .filter(([, , v]) => v).map(([uno, tanti, v]) => `, ${conta(v, uno, tanti)}`).join('');
   const out = ['', somma
-    ? `[test:unit] riepilogo di ${gruppi} gruppi, ${file} file: ${somma.test} test, ${somma.pass} passati, ${somma.fail} falliti${extra}.`
+    ? `[test:unit] riepilogo di ${gruppi} gruppi, ${file} file: ${somma.test} test, ${conta(somma.pass, 'passato', 'passati')}, ${conta(somma.fail, 'fallito', 'falliti')}${extra}.`
     : `[test:unit] ${gruppi} gruppi, ${file} file: i conti e i test rossi sono nel riepilogo di ciascun gruppo, sopra.`];
   if (somma && somma.rossi.length) {
     out.push(`[test:unit] test rossi (${somma.rossi.length}):`);
