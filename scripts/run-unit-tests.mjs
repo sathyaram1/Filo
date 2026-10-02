@@ -187,11 +187,14 @@ export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false,
     }
   }
   const muti = rossiGruppi.filter((g) => !somma || !somma.rossi.some((r) => r.gruppo === g));
+  const dove = rapporti.length ? `sopra o nel rapporto in ${rapporti.join(', ')}` : 'sopra';
   if (somma && muti.length) {
     out.push(muti.length > 1
-      ? `[test:unit] i gruppi ${muti.join(', ')} sono usciti rossi senza un test rosso registrato: la causa è nella loro uscita, sopra.`
-      : `[test:unit] il gruppo ${muti[0]} è uscito rosso senza un test rosso registrato: la causa è nella sua uscita, sopra.`);
+      ? `[test:unit] i gruppi ${muti.join(', ')} sono usciti rossi senza un test rosso registrato: la causa è nella loro uscita, ${dove}.`
+      : `[test:unit] il gruppo ${muti[0]} è uscito rosso senza un test rosso registrato: la causa è nella sua uscita, ${dove}.`);
   }
+  if (rapporti.length) out.push(`[test:unit] i rapporti dei ${gruppi} gruppi sono riuniti in ${rapporti.join(', ')}.`);
+  if (copertura) out.push(`[test:unit] la copertura qui sopra è per gruppo: ${gruppi} conti, ciascuno sui soli file del suo gruppo, nessuno sulla suite intera.`);
   if (interrotto) out.push(`[test:unit] interrotto al gruppo ${n} di ${gruppi}: i gruppi dopo non sono partiti.`);
   out.push(rossiGruppi.length || interrotto
     ? `[test:unit] ROSSO: ${rossiGruppi.length > 1 ? 'gruppi' : 'gruppo'} ${rossiGruppi.join(', ')} di ${gruppi}.`
