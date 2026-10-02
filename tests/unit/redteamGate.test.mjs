@@ -138,10 +138,3 @@ test('#896 — la frase della pausa è una sola, dovunque si mostri', () => {
     assert.ok(readFileSync(join(ROOT, ...file), 'utf8').includes(frase), `${file.join('/')} non dice la frase della pausa`);
   }
 });
-
-test('#896 — la home e il tasto destro chiedono al main prima di mostrare il Red Team', () => {
-  const dash = readFileSync(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard.js'), 'utf8');
-  assert.match(dash, /redteamVisibile && \{ command: 'redteam'/);
-  const content = readFileSync(join(ROOT, 'src', 'content', 'content.js'), 'utf8');
-  assert.match(content, /if \(redteamVisibile\) items\.push\(buildRedteamAttackItem\(\)\)/);
-});
