@@ -356,21 +356,23 @@ async function main() {
       esiti.push(r.status);
     }
     // Relative alla root come per node, che gira lì.
-    let rapportoGuasto = false;
-    rapporti.forEach((dest, k) => {
+    const rapportiPersi = [];
+    for (const [k, dest] of rapporti.entries()) {
+      const testo = unisciRapporti(esiti.map((_, i) => leggiTesto(copia(i)(k))));
+      if (dest === 'stdout') { await new Promise((ok) => process.stdout.write(testo, ok)); continue; }
       try {
-        writeFileSync(resolve(REPO_ROOT, dest), unisciRapporti(esiti.map((_, i) => leggiTesto(copia(i)(k)))));
+        writeFileSync(resolve(REPO_ROOT, dest), testo);
       } catch (e) {
         console.error(`[test:unit] non sono riuscito a scrivere il rapporto in ${dest}: ${e.message}`);
-        rapportoGuasto = true;
+        rapportiPersi.push(dest);
       }
-    });
+    }
     const somma = flagsGruppo(0) ? sommaRiepiloghi(esiti.map((_, i) => leggiRighe(destinazione(i)))) : null;
     await scrivi(testoRiepilogo({
-      somma, gruppi: gruppi.length, file: files.length, esiti, interrotto, rapporti, copertura: chiedeCopertura(flags),
+      somma, gruppi: gruppi.length, file: files.length, esiti, interrotto, rapporti, rapportiPersi, copertura: chiedeCopertura(flags),
     }));
     // `exitCode` e non `exit()`, come sopra: l'ultima riga non deve perdersi.
-    process.exitCode = esiti.find((e) => e !== 0) ?? (rapportoGuasto ? 1 : 0);
+    process.exitCode = esiti.find((e) => e !== 0) ?? (rapportiPersi.length ? 1 : 0);
   } finally {
     rmSync(cartella, { recursive: true, force: true });
   }
