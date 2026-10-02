@@ -17,6 +17,25 @@ function isOnLink(target) {
   return !!(target && target.closest && target.closest('a[href], area[href]'));
 }
 
+// Dove il clic centrale incolla (src/shared/zoomPagina.js), in un campo in cui
+// si scrive resta del sistema. Il bersaglio vero sta anche dentro un componente aperto.
+const SCRIVIBILI = /^(|text|search|url|tel|email|password|number)$/;
+function incollaQui(e, Z) {
+  if (!Z || typeof Z.centraleIncolla !== 'function' || !Z.centraleIncolla(typeof process !== 'undefined' ? process.platform : '')) return false;
+  let t = e && e.target;
+  try { t = e.composedPath()[0] || t; } catch (_) {}
+  if (t && t.nodeType === 3) t = t.parentElement;
+  if (!t || t.nodeType !== 1) return false;
+  try {
+    if (t.ownerDocument && t.ownerDocument.designMode === 'on') return true;
+    if (t.isContentEditable) return true;
+    const tag = String(t.tagName || '').toUpperCase();
+    if (tag === 'TEXTAREA') return !t.readOnly && !t.disabled;
+    if (tag === 'INPUT') return SCRIVIBILI.test(String(t.type || '').toLowerCase()) && !t.readOnly && !t.disabled;
+  } catch (_) {}
+  return false;
+}
+
 // Sulla FINESTRA, in cattura, e dal preload: prima di qualunque script della
 // pagina, che quindi non può zittirli (#686). Un documento riscritto
 // (document.open) li cancella con i suoi: si rimettono, gli stessi, appena la
@@ -145,6 +164,9 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   let badge = null;
   let percentInput = null;
   let suppressContextMenu = false;
+  // Il rilascio di un clic centrale preso dallo zoom: su Linux incollerebbe la
+  // selezione nel campo che ha il fuoco, ovunque si sia cliccato.
+  let centralePreso = false;
   // Il numero nel riquadro: lo scrivono solo i tasti veri, dopo un clic vero
   // nel campo (#686.1: col comando di inserimento testo del browser il sito
   // scriveva un «25» che valeva come battuto, e poi toglieva il fuoco).
@@ -504,9 +526,10 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   function onMouseDown(e) {
     if (!gestoVero(e)) return;
     if (e.button === 1) {
-      if (!zoomMode && isOnLink(e.target)) return;
+      if (!zoomMode && (isOnLink(e.target) || incollaQui(e, Z))) return;
       e.preventDefault();
       e.stopPropagation();
+      centralePreso = true;
       toggle();
       return;
     }
@@ -531,6 +554,13 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   function onContextMenu(e) {
     if (!suppressContextMenu) return;
     suppressContextMenu = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function onMouseUp(e) {
+    if (!gestoVero(e) || e.button !== 1 || !centralePreso) return;
+    centralePreso = false;
     e.preventDefault();
     e.stopPropagation();
   }
@@ -600,6 +630,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   try { globalThis.__filoZoomQui = true; } catch (_) {}
   const gesti = [
     ['mousedown', onMouseDown, true],
+    ['mouseup', onMouseUp, true],
     ['contextmenu', onContextMenu, true],
     ['wheel', onWheel, { capture: true, passive: false }],
     ['keydown', onKeyDown, true],
@@ -620,6 +651,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     badge = null;
     percentInput = null;
     suppressContextMenu = false;
+    centralePreso = false;
     rimettiVelo();
     if (eraAperta) avvisaModalita();
   });
@@ -690,9 +722,11 @@ module.exports = function setupWheelZoom(webFrame, opts) {
 module.exports.riquadro = function setupRiquadro(webFrame, opts) {
   const ipc = (opts && opts.ipcRenderer) || null;
   if (!ipc || typeof ipc.send !== 'function' || typeof document === 'undefined') return;
+  const Z = caricaRegole();
   let modalita = false;
   let campoAperto = false;
   let suppressContextMenu = false;
+  let centralePreso = false;
   const manda = (g) => { try { ipc.send('filo:zoom-gesto', g); } catch (_) {} };
 
   try {
@@ -714,9 +748,10 @@ module.exports.riquadro = function setupRiquadro(webFrame, opts) {
   function onMouseDown(e) {
     if (!gestoVero(e)) return;
     if (e.button === 1) {
-      if (!modalita && isOnLink(e.target)) return;
+      if (!modalita && (isOnLink(e.target) || incollaQui(e, Z))) return;
       e.preventDefault();
       e.stopPropagation();
+      centralePreso = true;
       modalita = !modalita;
       manda({ tipo: 'medio' });
       return;
@@ -732,6 +767,13 @@ module.exports.riquadro = function setupRiquadro(webFrame, opts) {
   function onContextMenu(e) {
     if (!suppressContextMenu) return;
     suppressContextMenu = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function onMouseUp(e) {
+    if (!gestoVero(e) || e.button !== 1 || !centralePreso) return;
+    centralePreso = false;
     e.preventDefault();
     e.stopPropagation();
   }
@@ -774,9 +816,10 @@ module.exports.riquadro = function setupRiquadro(webFrame, opts) {
   try { globalThis.__filoZoomQui = true; } catch (_) {}
   const gesti = [
     ['mousedown', onMouseDown, true],
+    ['mouseup', onMouseUp, true],
     ['contextmenu', onContextMenu, true],
     ['wheel', onWheel, { capture: true, passive: false }],
     ['keydown', onKeyDown, true],
   ];
-  tieniAscoltatori([...gesti, ['pointerover', vegliaRiquadri(gesti, webFrame), true]], () => { suppressContextMenu = false; });
+  tieniAscoltatori([...gesti, ['pointerover', vegliaRiquadri(gesti, webFrame), true]], () => { suppressContextMenu = false; centralePreso = false; });
 };

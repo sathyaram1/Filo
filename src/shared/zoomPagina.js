@@ -143,10 +143,17 @@
     return 'tasto';
   }
 
+  // Fuori da Mac e Windows il clic centrale in un campo incolla la selezione
+  // del sistema: lì la rotella premuta lo lascia al sistema, come sui link.
+  function centraleIncolla(piattaforma) {
+    const p = String(piattaforma || '');
+    return !!p && p !== 'darwin' && p !== 'win32';
+  }
+
   global.SN_ZOOM = {
     BASE, PASSO, VERSI, GESTI, CIFRE_CAMPO,
     MIN_LIVELLO, MAX_LIVELLO, MIN_PERCENTUALE, MAX_PERCENTUALE,
     percentuale, livello, limita, leggiPercentuale, risolvi,
-    tastoZoom, gestoValido, tastoCampo, tastoPerCampo,
+    tastoZoom, gestoValido, tastoCampo, tastoPerCampo, centraleIncolla,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

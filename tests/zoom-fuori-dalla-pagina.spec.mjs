@@ -569,3 +569,53 @@ for (const [nome, regola, dialogo] of [
     await page.screenshot({ path: `tests/.shots/zoom-riquadro-stile-${regola}.png` });
   });
 }
+
+// Fuori da Mac e Windows il clic centrale in un campo incolla la selezione del
+// sistema: la rotella premuta lì resta del sistema, anche dentro i riquadri (#686.1 giro 8).
+const MODULO = '<p id=s style="font:20px sans-serif;margin:0;padding:10px">ciaomondo</p>'
+  + '<textarea id=t style="position:absolute;left:0;top:100px;width:400px;height:200px"></textarea>'
+  + '<textarea id=ro readonly style="position:absolute;left:0;top:320px;width:400px;height:100px"></textarea>';
+
+for (const [nome, dove] of [['nella pagina', 'pagina'], ['in un riquadro di un altro sito', 'riquadro']]) {
+  test(`Linux: il clic centrale in un campo di testo ${nome} incolla la selezione, fuori dai campi apre lo zoom`, async ({ openTab, testServer }) => {
+    test.skip(process.platform === 'win32' || process.platform === 'darwin', 'la selezione primaria non c\'è su Mac e Windows');
+    let page; let doc;
+    if (dove === 'pagina') {
+      page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">${MODULO}</body></html>`);
+      doc = page.locator('html');
+    } else {
+      const dentro = testServer.html(`<!doctype html><html><body style="margin:0">${MODULO}</body></html>`).replace('127.0.0.1', 'localhost');
+      page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+        <iframe id=f src="${dentro}" style="border:0;width:100vw;height:100vh;display:block"></iframe></body></html>`);
+      doc = page.frameLocator('#f').locator('html');
+    }
+    await expect(doc.locator('#s')).toBeVisible();
+    await page.mouse.dblclick(40, 22);
+    await page.mouse.click(100, 200, { button: 'middle' });
+    await expect.poll(() => doc.locator('#t').inputValue()).toBe('ciaomondo');
+    await expect(page.locator('#__filo-zoom-badge')).toHaveCount(0);
+
+    // Dove non si scrive, la rotella premuta apre lo zoom; a modalità aperta, nel campo la chiude.
+    await page.mouse.click(100, 360, { button: 'middle' });
+    await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+    expect(await doc.locator('#t').inputValue(), 'il clic centrale preso dallo zoom incolla nel campo che ha il fuoco').toBe('ciaomondo');
+    await page.mouse.click(100, 200, { button: 'middle' });
+    await page.waitForTimeout(300);
+    await expect(page.locator('#__filo-zoom-badge')).toHaveCount(0);
+    expect(await doc.locator('#t').inputValue()).toBe('ciaomondo');
+  });
+}
+
+test('Linux: il clic centrale nell\'editor che la pagina riempie in un riquadro incolla la selezione', async ({ openTab, testServer }) => {
+  test.skip(process.platform === 'win32' || process.platform === 'darwin', 'la selezione primaria non c\'è su Mac e Windows');
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+    <p id=s style="font:20px sans-serif;margin:0;padding:10px">ciaomondo</p>
+    <iframe id=ed style="border:0;position:absolute;left:0;top:100px;width:400px;height:200px"></iframe>
+    <script>const d = document.getElementById('ed').contentDocument; d.open(); d.write('<!doctype html><html><body style="margin:0;height:200px"></body></html>'); d.close(); d.designMode = 'on';</script>
+    </body></html>`);
+  await page.mouse.move(100, 200);
+  await page.mouse.dblclick(40, 22);
+  await page.mouse.click(100, 200, { button: 'middle' });
+  await expect.poll(() => page.evaluate(() => document.getElementById('ed').contentDocument.body.textContent)).toContain('ciaomondo');
+  await expect(page.locator('#__filo-zoom-badge')).toHaveCount(0);
+});

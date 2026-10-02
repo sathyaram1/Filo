@@ -36,6 +36,10 @@ dove il sito non arriva, o ci arriva solo per chiedere:
   lo si chiede all'albero dei frame (`webFrame`), e ogni figlio si presenta dal
   mondo isolato di Filo (999, dove il sito non arriva) al primo frame che veglia
   (#686.1 giro 3).
+- **Il clic centrale fuori da Mac e Windows incolla** la selezione del sistema:
+  in un campo in cui si scrive (anche un editor in un riquadro) resta al
+  sistema, come sui link (`SN_ZOOM.centraleIncolla`). Quando lo prende lo zoom,
+  si ferma anche il rilascio, che incollerebbe nel campo col fuoco (#686.1 giro 8).
 - **Il campo della percentuale** vale i tasti battuti dopo un clic vero nel
   campo, mai il `value` che ha nel documento: il sito lo scrive anche col
   comando di inserimento testo del browser, che conta come battuto. Si applica
