@@ -197,11 +197,13 @@ function once(key, run) {
   return p;
 }
 
-function deepen(stage, bKey, siteKey, run, store) {
+// In volo una per pagina, qualunque indizio abbia l'analisi che arriva dopo: la risposta si ricorda per pagina.
+function deepen(stage, bKey, pKey, siteKey, run, store) {
+  const fly = stage + ':' + pKey;
   const k = stage + ':' + siteKey;
-  if (inflight.has(k)) return inflight.get(k);
+  if (inflight.has(fly)) return inflight.get(fly);
   if (deepFailed.has(k) || !spend(stage + ':' + bKey)) return null;
-  return once(k, () => Promise.resolve(run()).then((r) => {
+  return once(fly, () => Promise.resolve(run()).then((r) => {
     if (!r) { deepFailed.set(k, true); return null; }
     store(r);
     return r;
@@ -211,6 +213,34 @@ function deepen(stage, bKey, siteKey, run, store) {
 // La rete di casa (router, NAS, stampanti, localhost) non ha niente da chiedere fuori: nessuno stadio di rete parte.
 const UrlNav = globalThis.SN_URL_NAV || (require('../../../shared/urlNav.js'), globalThis.SN_URL_NAV);
 const isHomeNetwork = (norm) => Boolean(UrlNav && UrlNav.isHomeNetworkHost(norm.host));
+
+// «Non si sa» si ricorda anche lui: un giorno se il registro ha risposto senza l'età, pochi minuti se non ha risposto.
+const AGE_UNKNOWN_MS = DAY;
+const AGE_RETRY_MS = 5 * MIN;
+
+// Nessun registro ha l'età utile: un IP, il sito di un utente su una piattaforma, una pagina ospitata sotto un dominio
+// in whitelist (l'età sarebbe della piattaforma), un sito in whitelist.
+function ageUnknowable(norm, url) {
+  return norm.isIp || norm.ospitato || whitelist.isWhitelisted(norm.registrable) || !!whitelist.hostedPlatform(norm.host, pathOf(url));
+}
+
+const settle = (v) => Promise.resolve(v).then((r) => r, () => net.TRANSIENT);
+
+// crt.sh solo se RDAP non ha dato l'età.
+async function lookupAge(reg, norm, ctOk) {
+  let transient = false;
+  if (providers.rdap) {
+    const r = await settle(providers.rdap(reg, norm));
+    if (typeof r === 'number') { ageCache.set(reg, r); return; }
+    if (r && r.transient) transient = true;
+  }
+  if (providers.ct && ctOk) {
+    const r = await settle(providers.ct(reg, norm));
+    if (r && typeof r.firstSeenDays === 'number') { ageCache.set(reg, r.firstSeenDays); return; }
+    if (r && r.transient) transient = true;
+  }
+  ageCache.set(reg, null, transient ? AGE_RETRY_MS : AGE_UNKNOWN_MS);
+}
 
 // Assembla i dati di rete già noti (da cache) per il dominio.
 function assembleCached(norm, url) {
@@ -257,38 +287,31 @@ function analyze(url, ctx = {}, onUpdate) {
   const tasks = [];
   const need = assembleCached(norm, url);
   const key = pageKey(norm, url);
+  // Il nome del sito esce verso i registri solo con lo stesso indizio che chiama il giudice (#894).
+  const worthDeepening = first.level === 'sospetto' || first.needsLlm;
 
   if (providers.gsb && need.gsb === undefined) {
-    tasks.push(Promise.resolve(providers.gsb(url, norm)).then((r) => {
+    const gsb = providers.gsb;
+    tasks.push(once('gsb:' + key, () => Promise.resolve(gsb(url, norm)).then((r) => {
       if (r) gsbCache.set('u:' + key, r);
-    }).catch(() => {}));
+    }).catch(() => {})));
   }
-  if (providers.rdap && need.ageDays === undefined) {
-    tasks.push(Promise.resolve(providers.rdap(reg, norm)).then((days) => {
-      if (typeof days === 'number') ageCache.set(reg, days);
-    }).catch(() => {}));
-  }
-  if (providers.ct && need.ageDays === undefined && !need.cert) {
-    tasks.push(Promise.resolve(providers.ct(reg, norm)).then((r) => {
-      // CT dà l'età del PRIMO certificato: usala solo se RDAP non ha risposto.
-      if (r && typeof r.firstSeenDays === 'number' && ageCache.get(reg) === undefined) {
-        ageCache.set(reg, r.firstSeenDays);
-      }
-    }).catch(() => {}));
+  if (worthDeepening && need.ageDays === undefined && (providers.rdap || providers.ct) && !ageUnknowable(norm, url)) {
+    const ctOk = !need.cert;
+    tasks.push(once('age:' + reg, () => lookupAge(reg, norm, ctOk)));
   }
   // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist).
-  const worthDeepening = first.level === 'sospetto' || first.needsLlm;
   const bKey = budgetKey(norm, url, ctx.budgetUrl);
   const siteKey = key + '|' + cluesOf(norm, ctx, first);
   const deep = (t) => { if (t) tasks.push(t); };
   if (worthDeepening && providers.llm && need.llm === undefined) {
     const llm = providers.llm;
     const meta = buildLlmMeta(norm, ctx, first);
-    deep(deepen('llm', bKey, siteKey, () => llm(meta), (r) => llmCache.set(key, r)));
+    deep(deepen('llm', bKey, key, siteKey, () => llm(meta), (r) => llmCache.set(key, r)));
   }
   if (worthDeepening && providers.sandbox && need.sandbox === undefined) {
     const detonate = providers.sandbox;
-    deep(deepen('sb', bKey, siteKey, () => detonate(url, norm), (r) => sandboxCache.set(key, r)));
+    deep(deepen('sb', bKey, key, siteKey, () => detonate(url, norm), (r) => sandboxCache.set(key, r)));
   }
 
   if (tasks.length && typeof onUpdate === 'function') {
