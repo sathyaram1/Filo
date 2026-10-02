@@ -194,7 +194,7 @@ export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false,
       : `[test:unit] il gruppo ${muti[0]} è uscito rosso senza un test rosso registrato: la causa è nella sua uscita, ${dove}.`);
   }
   if (rapporti.length) out.push(`[test:unit] i rapporti dei ${gruppi} gruppi sono riuniti in ${rapporti.join(', ')}.`);
-  if (copertura) out.push(`[test:unit] la copertura qui sopra è per gruppo: ${gruppi} conti, ciascuno sui soli file del suo gruppo, nessuno sulla suite intera.`);
+  if (copertura) out.push(`[test:unit] la copertura è per gruppo: ${gruppi} conti, ciascuno sui soli file del suo gruppo, nessuno sulla suite intera.`);
   if (interrotto) out.push(`[test:unit] interrotto al gruppo ${n} di ${gruppi}: i gruppi dopo non sono partiti.`);
   out.push(rossiGruppi.length || interrotto
     ? `[test:unit] ROSSO: ${rossiGruppi.length > 1 ? 'gruppi' : 'gruppo'} ${rossiGruppi.join(', ')} di ${gruppi}.`
