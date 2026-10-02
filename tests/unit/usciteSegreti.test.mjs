@@ -21,6 +21,7 @@ require(join(ROOT, 'src', 'main', 'services', 'modelGate.js'));
 const X = globalThis.SN_URL_EXFIL;
 const G = globalThis.SN_GUARDIANO_STATICO;
 const L = globalThis.SN_ACTION_LEVELS;
+const SL = require(join(ROOT, 'src', 'main', 'services', 'segretiLetti.js'));
 
 // Finte, e in una forma che nessun fornitore usa: il controllo non guarda la forma di un
 // segreto custodito, e un finto con la forma vera ferma il push (protezione dei segreti di GitHub).
