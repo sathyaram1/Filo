@@ -768,6 +768,10 @@
     // #810 — un indirizzo web proposto da un modello in una pagina di Filo si apre solo dopo la porta delle
     // uscite. { url, parole } → { aperto, frase }
     FILO_APRI_PROPOSTA: 'filo_apri_proposta',
+    // #810 — un collegamento scritto da un modello nelle superfici di Filo dentro una pagina web (assistente di pagina,
+    // Spiega, richiesta rapida) lo apre il main dopo la porta delle uscite. Aperto ai content script: non dà più di un
+    // window.open. { url, parole, sfondo } → { aperto, frase, avvisato }
+    APRI_COLLEGAMENTO_FILO: 'apri_collegamento_filo',
     // #810 — main → pagina di Filo: un indirizzo che la pagina ha chiesto di aprire (menu, link) è stato fermato
     // dalla porta delle uscite. { frase }
     USCITA_FERMATA: 'uscita_fermata',
