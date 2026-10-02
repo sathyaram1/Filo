@@ -244,7 +244,7 @@ async function finestraLarga(app, px) {
 }
 
 test('anche con quattro azioni i tasti restano su una riga sola', async ({ app, openTab }) => {
-  // Un file sospetto offre il massimo dei pulsanti: "In coda", "Conferma
+  // Un file sospetto offre il massimo dei pulsanti: "In coda", "Lavoro locale" (#913), "Conferma
   // attacco", "Conferma spam", "Archivia" — più preferito e frase. Prima gli
   // ultimi due finivano su una seconda riga.
   await finestraLarga(app, LARGHEZZA_FISSA);
