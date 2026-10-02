@@ -87,11 +87,14 @@ export function gruppiDiLancio(files, { root = REPO_ROOT, flags = [], execPath =
   return lottiPerRigaDiComando(fileArgs(files, root, { modelli }), tetto, { fisso, costo: costoArgomentoWindows });
 }
 
+const REPORTER = '--test-reporter';
 const DESTINAZIONE = '--test-reporter-destination';
+// Un documento intero: a gruppi, su stdout ne uscirebbe uno per gruppo e il tutto non si leggerebbe più.
+const DOCUMENTI = new Set(['junit', 'lcov']);
 
 /**
- * Ogni destinazione su file dei flag dati sostituita da `copia(k)`: a gruppi ogni `node --test` riscriverebbe da capo
- * lo stesso file e resterebbe solo l'ultimo gruppo. `file` sono le destinazioni chieste, nell'ordine. PURA.
+ * Le destinazioni da riunire sostituite da `copia(k)`: i file, che ogni `node --test` riscriverebbe da capo lasciando
+ * solo l'ultimo gruppo, e i documenti su stdout. `rapporti` sono le destinazioni chieste, nell'ordine. PURA.
  */
 export function rapportiDaRiunire(flags, copia) {
   const reporter = [];
