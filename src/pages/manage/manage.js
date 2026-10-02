@@ -4781,12 +4781,6 @@
       if (liveEnabled) armaOrologio();
     },
     liveArrivate() { return Array.from(arrivate); },
-    // Caricamento FALLITO, su richiesta. Lo spec che verifica "niente numeri
-    // inventati quando i dati non sono arrivati" si affidava al fatto che nel
-    // sandbox dei test Firestore non è raggiungibile: sulla macchina di chi
-    // sviluppa Filo lo è, il caricamento riesce, e quel rosso non parlava di un
-    // difetto ma della rete di casa. Qui lo stato di guasto si CHIEDE, e vale
-    // ovunque allo stesso modo.
     // Il caricamento VERO, di nuovo, sulla porta col main che lo spec ha
     // sostituito: per provare cosa chiede la pagina, non cosa le si inietta.
     ricarica() {
@@ -4795,6 +4789,12 @@
       testDataInjected = false;
       return loadData();
     },
+    // Caricamento FALLITO, su richiesta. Lo spec che verifica "niente numeri
+    // inventati quando i dati non sono arrivati" si affidava al fatto che nel
+    // sandbox dei test Firestore non è raggiungibile: sulla macchina di chi
+    // sviluppa Filo lo è, il caricamento riesce, e quel rosso non parlava di un
+    // difetto ma della rete di casa. Qui lo stato di guasto si CHIEDE, e vale
+    // ovunque allo stesso modo.
     simulaCaricamentoFallito() {
       stopLive();
       liveBlocked = true;
