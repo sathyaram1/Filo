@@ -254,7 +254,7 @@ test('anche con quattro azioni i tasti restano su una riga sola', async ({ app, 
     const bs = [...document.querySelectorAll('#mgOwnerBar .mg-owner-row button')].filter((b) => b.offsetParent !== null);
     return { quanti: bs.length, righe: window.__righeDeiTasti(bs) };
   });
-  expect(misure.quanti).toBe(6);
+  expect(misure.quanti).toBe(7);
   expect(misure.righe).toBe(1);
 });
 
