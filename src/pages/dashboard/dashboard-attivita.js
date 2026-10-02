@@ -23,6 +23,7 @@
   let send = null;
   let faviconUrl = () => '';
   let applyCommandCwd = () => {};
+  let paroleUtente = () => [];
 
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
@@ -786,7 +787,7 @@
           : window.confirm(opts.text); // fallback se il modulo non è caricato
         if (!ok) return;
         btn.disabled = true;
-        const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a });
+        const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a, parole: paroleUtente() });
         // Nemmeno l'OK fa uscire un segreto (#810): la riga dice cosa è stato fermato.
         if (r && r.output && r.output.blocked === 'segreto') {
           a._output = r.output;
@@ -1065,6 +1066,7 @@
     send = deps.send;
     if (deps.faviconUrl) faviconUrl = deps.faviconUrl;
     if (deps.applyCommandCwd) applyCommandCwd = deps.applyCommandCwd;
+    if (deps.paroleUtente) paroleUtente = deps.paroleUtente;
   }
 
   global.SN_DASH_ATTIVITA = {

@@ -634,6 +634,25 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     assert.ok(!/window\.open\(/.test(sidebar), 'l\'assistente di pagina non apre indirizzi da sé');
   });
 
+  // Il controllo ripassa all'OK: senza le parole dell'utente, un codice scritto da lui passa al primo
+  // giro e si ferma dopo la conferma.
+  test('ogni superficie che manda un\'azione o il suo OK al main porta le parole dell\'utente', () => {
+    const mancanti = [];
+    const cartelle = [['src', 'pages', 'dashboard'], ['src', 'content']];
+    for (const c of cartelle) {
+      for (const f of readdirSync(join(ROOT, ...c)).filter((x) => x.endsWith('.js'))) {
+        const src = readFileSync(join(ROOT, ...c, f), 'utf8');
+        const re = /MSG\.(FILO_CONFIRM_ACTION|FILO_RUN_ACTION)\b/g;
+        let m;
+        while ((m = re.exec(src))) {
+          const chiamata = src.slice(m.index, src.indexOf('})', m.index));
+          if (!/\bparole\s*:/.test(chiamata)) mancanti.push(`${f}: ${m[1]}`);
+        }
+      }
+    }
+    assert.deepEqual(mancanti, [], `azioni che arrivano al main senza le parole dell'utente: ${mancanti.join(', ')}`);
+  });
+
   test('il cancello dei modelli oscura i segreti sia nelle risposte intere sia in quelle a flusso', () => {
     const gate = readFileSync(join(ROOT, 'src', 'main', 'services', 'modelGate.js'), 'utf8');
     for (const f of ['completeWithFallback({', 'streamCompleteWithFallback({']) {
