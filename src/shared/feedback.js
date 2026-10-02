@@ -1111,7 +1111,9 @@
   // stabile, si passa sempre dalla porta ESPOSTA (`SN_FEEDBACK.list`) così chi
   // la sostituisce in una prova sostituisce anche questa, e il freno sulle
   // pagine non mente — se scatta, la risposta lo dice.
-  async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX, fields = null } = {}) {
+  // `comeLista`: chi legge per ELENCARE (la dashboard) vuole anche i voti
+  // delle schede pubbliche, come dalla `list` del main; una statistica no.
+  async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX, fields = null, comeLista = false } = {}) {
     // Da una pagina filo:// il cursore non è percorribile: `list` rifiuta
     // apposta `afterName` (le credenziali stanno nel main, non qui). Quindi la
     // lettura completa la fa il main e torna di là, col suo `complete`. Senza
@@ -1119,8 +1121,8 @@
     // alla prima riga (#496).
     const bridge = pageBridge();
     if (bridge) {
-      const r = await replyViaMain(bridge, { op: 'listAll', timeoutMs });
-      return { rows: Array.isArray(r.rows) ? r.rows : [], complete: r.complete !== false };
+      const r = await replyViaMain(bridge, { op: 'listAll', timeoutMs, fields, comeLista });
+      return { rows: marcaProiezione(Array.isArray(r.rows) ? r.rows : [], fields), complete: r.complete !== false };
     }
     const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
     const rows = [];
