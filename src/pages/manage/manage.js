@@ -2603,7 +2603,7 @@
       renderSearchResults(ranked, { fallback: false });
     } else {
       // Ripiego per parole: la ricerca trova comunque qualcosa.
-      renderSearchResults(SRCH.keywordSearch(allFeedbacks, query), { fallback: true });
+      renderSearchResults(SRCH.keywordSearch(allFeedbacks, query), { fallback: true, motivo });
     }
   }
 
