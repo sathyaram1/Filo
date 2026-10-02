@@ -346,8 +346,9 @@
     const text = String(turn.text == null ? '' : turn.text);
     const out = { role, text, ts: turn.ts || new Date().toISOString() };
     if (Array.isArray(turn.actions) && turn.actions.length) {
+      // Un'azione fermata perché portava fuori un segreto resta fermata (#810): riaperta, la chat non la dà per fatta.
       out.actions = turn.actions
-        .map((a) => (a && a.type ? String(a.type) : ''))
+        .map((a) => (a && a.type ? (a._output && a._output.blocked === 'segreto' ? 'FERMATA' : String(a.type)) : ''))
         .filter(Boolean);
     }
     if (turn.images) out.images = Number(turn.images) || 0;

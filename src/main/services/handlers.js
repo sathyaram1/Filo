@@ -2567,7 +2567,19 @@ function observationsForPrompt(actions) {
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
+    fermateForPrompt(actions),
   ].filter(Boolean).join('\n\n');
+}
+
+// Le azioni fermate perché portavano fuori un segreto (#810): nei turni dopo, e nella chat riaperta, il modello
+// non le dà per fatte e non le riprova in un'altra forma.
+function fermateForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const righe = actions
+    .filter((a) => a && ((a._output && a._output.blocked === 'segreto') || String(a.type || '').toUpperCase() === 'FERMATA'))
+    .map((a) => `- ${(a._output && a._output.frase) || "un'azione che avrebbe portato fuori un segreto"}`);
+  if (!righe.length) return '';
+  return `[NON fatte, fermate da Filo: un segreto non esce a nessun livello, nessuna conferma lo sblocca e non va riprovato in un'altra forma.\n${righe.join('\n')}]`;
 }
 
 // Da un altro paese senza fornitore (#771): l'esito torna al modello anche nel
@@ -3177,6 +3189,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           else esiti.set(a, avvia(a));
         }
         const res = await esiti.get(a);
+        // Fermata (#810): l'archivio la salva come tale.
+        if (res.output && res.output.blocked === 'segreto') a._output = res.output;
         // Contiene la home con il nome utente: serve solo al gate, non alla chat.
         delete a._perimetro;
         const rendered = { ...a };

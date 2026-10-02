@@ -704,6 +704,25 @@
     if (el) el.classList.add('sn-sidebar-log-fermata');
   }
 
+  // Un'uscita fermata (#810): oltre alla riga, l'assistente deve saperlo, come per la ricerca fermata. Una volta
+  // per domanda con un giro in più, perché lo dica; dopo resta solo nella storia, così un modello che insiste non gira.
+  const NOTA_FERMATA = 'l\'azione che avevi chiesto NON è partita, è stata fermata: avrebbe portato fuori un codice, una password, '
+    + 'una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire a nessun livello. Non riprovarla '
+    + 'in un\'altra forma; dillo all\'utente in una riga (se vuole la fa lui a mano)';
+  let fermataDetta = false;
+  function fermata(frase) {
+    logFermata(frase);
+    if (fermataDetta) {
+      history.push({ role: 'user', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_FERMATA, perCronologia: true }), kind: 'action' });
+      return;
+    }
+    fermataDetta = true;
+    setTimeout(() => submit({
+      userAction: `${NOTA_FERMATA}. Procedi ora con il JSON normale (highlight / choices / text / status) usando solo ciò che già sai`,
+      preActionUrl: location.href,
+    }), 50);
+  }
+
   // Quello che l'utente ha scritto qui: il main lascia uscire un codice scritto da lui (#810).
   // Il testo dietro una scelta lo scrive il modello, e una pagina ostile può dettarlo: non conta.
   function paroleUtente() {
@@ -722,7 +741,7 @@
     if (!res || !res.ok) { appendActionLog(`${label}: non riuscita`); return false; }
     // Un segreto che sarebbe uscito: la riga dice cosa è stato fermato e da dove veniva.
     if (res.output && res.output.blocked === 'segreto') {
-      logFermata(res.output.frase || `${label}: fermata`);
+      fermata(res.output.frase || `${label}: fermata`);
       return false;
     }
 
@@ -744,7 +763,7 @@
         c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, parole: paroleUtente() });
       } catch (_) {}
       if (c && c.output && c.output.blocked === 'segreto') {
-        logFermata(c.output.frase || `${label}: fermata`);
+        fermata(c.output.frase || `${label}: fermata`);
         return false;
       }
       return scriviEsito(label, action, c);
@@ -1011,6 +1030,7 @@
     if (userMessage) expand({ ai: false });
 
     if (userMessage) {
+      fermataDetta = false;
       appendChatMessage('user', userMessage);
       history.push({ role: 'user', content: userMessage, kind: 'real', ...(daScelta ? { daScelta: true } : {}) });
       // Salva il messaggio raw per il "judge" lato server (vedi pathsCollector).
