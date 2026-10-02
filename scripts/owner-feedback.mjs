@@ -17,7 +17,7 @@
 //   Lo usano soprattutto le sessioni locali, che hanno le credenziali dell'owner
 //   e quindi tutti i suoi poteri. Per regola però non spostano feedback DAI
 //   Ricevuti (aspettano una decisione dell'owner, in Gestione) né dalle sue
-//   conferme, non lavorano feedback di utenti e non stampano testo dei feedback:
+//   conferme, non lavorano feedback di utenti senza il sì dell'owner (--approva-locale, #913) e non stampano testo dei feedback:
 //   qui si rifiuta prima di scrivere. Firestore lo permetterebbe; è una scelta.
 //
 // PERCHÉ IL CONTROLLO QUI FUNZIONA DAVVERO
