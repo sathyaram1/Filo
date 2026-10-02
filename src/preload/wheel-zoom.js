@@ -13,17 +13,22 @@ function caricaRegole() {
 // ascoltatori: lo zoom si muove solo per quelli del browser (#686).
 function gestoVero(e) { return !!(e && e.isTrusted); }
 
-function isOnLink(target) {
-  return !!(target && target.closest && target.closest('a[href], area[href]'));
+// Cosa sta sotto il puntatore si legge da tutto il percorso dell'evento: dentro
+// un componente della pagina il bersaglio è solo il suo guscio (#686.1 giro 9).
+function percorso(e) {
+  try { const p = e.composedPath(); if (p && p.length) return p; } catch (_) {}
+  return e && e.target ? [e.target] : [];
 }
 
-// Dove il clic centrale incolla (src/shared/zoomPagina.js), in un campo in cui
-// si scrive resta del sistema. Il bersaglio vero sta anche dentro un componente aperto.
+function suUnLink(e) {
+  return percorso(e).some((n) => !!(n && n.nodeType === 1 && n.matches && n.matches('a[href], area[href]')));
+}
+
+// Dove il clic centrale incolla (src/shared/zoomPagina.js), in un campo in cui si scrive resta del sistema.
 const SCRIVIBILI = /^(|text|search|url|tel|email|password|number)$/;
 function incollaQui(e, Z) {
   if (!Z || typeof Z.centraleIncolla !== 'function' || !Z.centraleIncolla(typeof process !== 'undefined' ? process.platform : '')) return false;
-  let t = e && e.target;
-  try { t = e.composedPath()[0] || t; } catch (_) {}
+  let t = percorso(e)[0];
   if (t && t.nodeType === 3) t = t.parentElement;
   if (!t || t.nodeType !== 1) return false;
   try {
