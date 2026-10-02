@@ -215,3 +215,29 @@ test('slot svuotato in Gestione: la ricerca non parte su un modello e l\'errore 
   expect(esito.chiamato).toBe(false);
   expect(esito.errore).toContain('Gestione → Modelli di supporto');
 });
+
+test('senza catalogo il campo «Modello OpenRouter» propone i modelli delle altre righe, non il testo che stai scrivendo', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderSupportModelsEditor && window.filo);
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'default_models_list') return { ok: false, error: 'offline' };
+      return orig(msg);
+    };
+  });
+  await page.evaluate(() => window.__mgTest.setTab('models'));
+  await page.evaluate((m) => window.__mgTest.renderSupportModelsEditor(m), MODELS);
+  await expect(page.locator('#mgSmEditor')).toBeVisible();
+
+  await page.click('#mgSmRegistryAdd');
+  const riga = page.locator('#mgSmRegistryList .sn-model-row:not(.sn-model-row-head)').last();
+  const campo = riga.locator('.sn-model-id');
+  await campo.click();
+  await campo.pressSequentially('deep');
+  const tendina = riga.locator('.sn-select-pop');
+  await expect(tendina).toBeVisible();
+  const proposti = await tendina.locator('.sn-select-option').evaluateAll((els) => els.map((e) => e.dataset.value));
+  expect(proposti).toEqual(['deepseek/deepseek-v4-pro']);
+});
