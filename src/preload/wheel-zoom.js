@@ -152,6 +152,89 @@ function vegliaRiquadri(elenco, webFrame) {
   return sopra;
 }
 
+// I gesti di un documento che non è quello del riquadro con la percentuale (un
+// riquadro incorporato, o uno che la pagina riempie da sé) partono come gesti:
+// un punto di quel documento non si misura mai contro il riquadro (#686.1 giro 9).
+// `s`: modalita(), campoAperto(), ctrlRotella() (Ctrl+rotella è nostra), manda(gesto).
+function gestiDiUnRiquadro(Z, s) {
+  let suppressContextMenu = false;
+  let centralePreso = false;
+
+  function onMouseDown(e) {
+    if (!gestoVero(e)) return;
+    if (e.button === 1) {
+      if (!s.modalita() && (suUnLink(e) || incollaQui(e, Z))) return;
+      e.preventDefault();
+      e.stopPropagation();
+      centralePreso = true;
+      s.manda({ tipo: 'medio' });
+      return;
+    }
+    if (!s.modalita()) return;
+    if (e.button === 2) suppressContextMenu = true;
+    e.preventDefault();
+    e.stopPropagation();
+    s.manda({ tipo: 'esci' });
+  }
+
+  function onContextMenu(e) {
+    if (!suppressContextMenu) return;
+    suppressContextMenu = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function onMouseUp(e) {
+    if (!gestoVero(e) || e.button !== 1 || !centralePreso) return;
+    centralePreso = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function onWheel(e) {
+    if (!gestoVero(e)) return;
+    if (s.modalita()) {
+      e.preventDefault();
+      e.stopPropagation();
+      s.manda({ tipo: 'rotella', dy: e.deltaY });
+      return;
+    }
+    if (!(e.ctrlKey || e.metaKey) || !s.ctrlRotella()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    s.manda({ tipo: 'ctrl', dy: e.deltaY });
+  }
+
+  // Col campo della percentuale aperto il tasto è del campo, anche se il fuoco
+  // l'ha portato qui il sito (#686.1 giro 7); di solito lo prende già il main.
+  function onKeyDown(e) {
+    if (!gestoVero(e)) return;
+    if (s.campoAperto()) {
+      if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'v') return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      s.manda({ tipo: 'tasto', key: String(e.key || '') });
+      return;
+    }
+    if (!s.modalita()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    s.manda({ tipo: 'esci' });
+  }
+
+  return {
+    gesti: [
+      ['mousedown', onMouseDown, true],
+      ['mouseup', onMouseUp, true],
+      ['contextmenu', onContextMenu, true],
+      ['wheel', onWheel, { capture: true, passive: false }],
+      ['keydown', onKeyDown, true],
+    ],
+    azzera() { suppressContextMenu = false; centralePreso = false; },
+  };
+}
+
 module.exports = function setupWheelZoom(webFrame, opts) {
   if (!webFrame || typeof document === 'undefined') return;
   const pageZoom = !!(opts && opts.pageZoom);
