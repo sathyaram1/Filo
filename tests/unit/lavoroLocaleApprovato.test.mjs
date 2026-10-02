@@ -58,7 +58,9 @@ test('il tasto dei Ricevuti: c’è su utente e routine, non sui propri, non fuo
   const ricevuto = { clientId: 'utente-7', status: 'design', statusReason: 'locale', statusPublic: 'open' };
   const az = MR.ownerActionFor(ricevuto, 'accept_local');
   assert.ok(az, 'utente nei Ricevuti');
-  assert.deepEqual([az.kind, az.to, az.locale], ['accept', 'todo', true]);
+  assert.deepEqual([az.kind, az.to, az.locale, az.primary], ['accept', 'todo', true, true], 'rimandato per lavoro locale: è la scelta attesa');
+  const qualunque = MR.ownerActions({ ...ricevuto, statusReason: '' });
+  assert.deepEqual(qualunque.filter((a) => a.primary).map((a) => a.key), ['accept'], 'altrimenti resta secondario');
   assert.ok(MR.ownerActionAllowsStatus(ricevuto, 'todo'));
   assert.ok(MR.ownerActionFor({ ...ricevuto, clientId: 'routine:worker', senderProof: 'server' }, 'accept_local'), 'routine (#914)');
   assert.ok(MR.ownerActionFor({ ...ricevuto, clientId: 'local:claude' }, 'accept_local'), 'prefisso senza prova = utente');
