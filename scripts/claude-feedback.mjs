@@ -60,6 +60,7 @@ import '../src/shared/feedbackClientIdHash.js';
 import '../src/shared/feedback.js';
 import '../src/shared/feedbackStatus.js';
 import './lib/freno-letture.mjs';
+import { isRoutineInstance } from './lib/routine-role.mjs';
 
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
 const FB = globalThis.SN_FEEDBACK;
