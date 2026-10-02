@@ -23,7 +23,7 @@ const MR = globalThis.SN_MANAGE_REVIEW;
 const TH = globalThis.SN_FEEDBACK_THREAD;
 const FB = globalThis.SN_FEEDBACK;
 const IMG = globalThis.SN_FEEDBACK_IMAGE;
-const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline', 'files', 'images'];
+const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline', 'files', 'images', 'localApproval'];
 // Un documento testuale si stampa nella cornice fino a qui; oltre va in un file (con la cornice), e la riga lo dice.
 const MAX_IN_LINEA = 60000;
 const TIPO_TESTO = /^(text\/|application\/(json|x-yaml|yaml)\b)/i;
@@ -194,6 +194,7 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
   const fb = {
     ...pieno, _id: id, status: String(stato.status).trim(), senderProof: f.senderProof?.stringValue || '',
     seq: Number(f.seq?.integerValue) || seq || null, subSeq: Number(f.subSeq?.integerValue) || 0,
+    ...(f.localApproval?.mapValue ? { localApproval: { by: f.localApproval.mapValue.fields?.by?.stringValue || '' } } : {}),
   };
   const numero = fb.seq ? `${fb.seq}${fb.subSeq ? `.${fb.subSeq}` : ''}` : nomeSicuro(id, 'feedback');
   // Anche quelli dei commenti, che vivono come righe-marcatore nella conversazione.
