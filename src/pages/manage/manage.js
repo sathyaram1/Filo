@@ -5240,7 +5240,7 @@
     modelIn.addEventListener('focus', () => { ensureSmCatalog(); });
     if (window.SN_COMBOBOX) {
       window.SN_COMBOBOX.attach(modelWrap, modelIn, {
-        readOptions: readSmModelOptions,
+        readOptions: () => readSmModelOptions(modelIn),
         onPick: () => populateSmNicknames(),
       });
     }
