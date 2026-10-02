@@ -162,6 +162,24 @@ la sincronizzazione della vista. Un conteggio non ha bisogno dei voti, e
 appenderli costerebbe una seconda lettura di tutto a ogni apertura della
 scheda.
 
+## Le sezioni della dashboard sono domande sull'insieme (02/10/2026)
+
+La dashboard di gestione caricava i 500 più recenti e ci disegnava sopra le
+sezioni. Ma «cosa c'è nei Ricevuti» chiede TUTTI i feedback in quello stato:
+passati i mille, il #597 era ancora lì e non si vedeva, e il "(53+)" era
+l'unico indizio. Ora il caricamento è `listAllPaged` con `comeLista` (proiezione
+e voti delle schede, come la lista del main), riordinato con `LIVE.ordina`, e il
+"+" resta solo se la lettura completa si ferma al freno.
+
+Il prezzo si è deciso a parte: rileggere tutte le versioni ogni minuto
+raddoppiava il costo della pagina aperta. Il giro di ogni minuto resta sulla
+finestra dei più recenti (con `createdAt`, così chi è più vecchio del bordo non
+viene scambiato per cancellato: `diffVersions` con `finestra`), e ogni dieci
+minuti un giro lungo rilegge le versioni di tutti (`GIRO_COMPLETO_MS`). Un
+feedback vecchio che cambia si vede quindi entro dieci minuti, non entro uno.
+
+La pagina gemella `filo://feedback` legge ancora la finestra.
+
 ## Quando invece la finestra va bene
 
 Quando la domanda È «gli ultimi N»: la posta dei feedback, un elenco che si
