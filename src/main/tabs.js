@@ -188,6 +188,10 @@ function openExternalScheme(rawUrl) {
   return true;
 }
 
+// La lista dei bloccati si salva mentre si scrive (#590.2): una scheda ferma su un sito uscito dalla
+// lista torna sul sito solo se l'uscita tiene per questo tempo, o quando l'utente la guarda.
+const RIAPRI_DOPO_MS = 3000;
+
 // webContents → sito di un «Apri comunque»: il sì vale anche per il blocco delle richieste.
 const permessiApriComunque = new Map();
 Cookies.permettiRichieste((d) => {
