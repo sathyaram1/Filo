@@ -251,7 +251,7 @@ test('a un sito visitato l\'identità di chi usa Filo non arriva', async ({ app,
   // Da una pagina di Filo la risposta resta intera: è di lì che le pagine
   // mostrano chi è entrato.
   expect(out.filo.ok).toBe(true);
-  expect(Object.keys(out.filo).sort()).toEqual(['isAdmin', 'ok', 'profile', 'signedIn', 'uid']);
+  expect(Object.keys(out.filo).sort()).toEqual(['isAdmin', 'ok', 'profile', 'remembered', 'signedIn', 'uid']);
 });
 
 test('l\'avviso «l\'accesso è cambiato» non arriva alle schede sui siti, e porta il profilo solo a Filo', async ({ app, openTab, testServer }) => {
