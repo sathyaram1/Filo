@@ -147,7 +147,9 @@ export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false,
 const scrivi = (s) => new Promise((ok) => process.stdout.write(`${s}\n`, ok));
 const lancia = (args) => new Promise((ok) => {
   // I test si aspettano la root come cartella corrente, come quando li lanciava npm.
-  const c = spawn(process.execPath, args, { stdio: 'inherit', cwd: REPO_ROOT });
+  // Le manopole di questo lanciatore non arrivano ai test: la sua sentinella guarda i valori veri.
+  const { FILO_UNIT_DIR: _d, FILO_UNIT_TETTO_RIGA: _t, ...env } = process.env;
+  const c = spawn(process.execPath, args, { stdio: 'inherit', cwd: REPO_ROOT, env });
   c.on('error', (error) => ok({ error }));
   c.on('close', (status, signal) => ok({ status, signal }));
 });
