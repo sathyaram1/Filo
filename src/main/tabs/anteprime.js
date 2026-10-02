@@ -18,6 +18,8 @@ const GIRO = 1500;
 const QUIETE = 600;
 const PASSO = 3000;
 const SENZA_QUIETE = 4000;
+// Una pagina lasciata mentre carica, o arrivata da meno di così, non aveva finito di comparire: la si segue come una nata dietro.
+const ASSESTAMENTO = 20_000;
 const MONDO = 1430;
 const SPIA = `(() => {
   let s = window.__filoAnteprima;
