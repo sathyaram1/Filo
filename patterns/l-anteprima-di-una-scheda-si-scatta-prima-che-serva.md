@@ -39,6 +39,13 @@ chiede.
   un'altra. Una foto chiesta lasciando la scheda e ancora in volo non copre
   quella scattata dopo. La stessa pagina vista e poi cambiata dietro (una chat)
   resta com'era: quello è l'ultimo che l'utente ci ha visto.
+- **Una regola sola per lo scatto: la foto segue la pagina finché non si è
+  fermata.** Vale anche per la scheda che l'utente lascia: se carica ancora, o
+  la sua pagina è arrivata da meno di venti secondi (chi apre una posta e
+  nell'attesa torna altrove), la foto del congedo è mezza vuota. La scheda si
+  segue come una nata dietro: si rifà a caricamento finito, e la spia, messa
+  nel momento del congedo, vede quello che arriva dopo. Una pagina lasciata
+  ferma da più di venti secondi resta com'era.
 - **La carta** è una finestra figlia (`src/main/popup-anteprima.js`, strada 2 di
   [la shell non disegna sopra la pagina](la-shell-non-disegna-sopra-la-pagina.md)):
   non prende il puntatore né la tastiera, nasce quando il puntatore entra nella
