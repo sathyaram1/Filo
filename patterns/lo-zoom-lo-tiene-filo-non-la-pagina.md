@@ -35,11 +35,16 @@ dove il sito non arriva, o ci arriva solo per chiedere:
   il componente è aperto il riquadro sta nel percorso dell'evento, se è chiuso
   lo si chiede all'albero dei frame (`webFrame`), e ogni figlio si presenta dal
   mondo isolato di Filo (999, dove il sito non arriva) al primo frame che veglia
-  (#686.1 giro 3).
+  (#686.1 giro 3). Agganciato, passa gesti come ogni altro riquadro
+  (`gestiDiUnRiquadro`), mai eventi al frame principale: un suo punto misurato
+  contro il riquadro con la percentuale cadeva sul numero (#686.1 giro 9).
 - **Il clic centrale fuori da Mac e Windows incolla** la selezione del sistema:
   in un campo in cui si scrive (anche un editor in un riquadro) resta al
   sistema, come sui link (`SN_ZOOM.centraleIncolla`). Quando lo prende lo zoom,
   si ferma anche il rilascio, che incollerebbe nel campo col fuoco (#686.1 giro 8).
+  Link e campi si leggono da tutto il percorso dell'evento: dentro un componente
+  della pagina il bersaglio è solo il guscio (#686.1 giro 9). Il clic che chiude
+  la modalità su un campo ci mette anche il cursore.
 - **Il campo della percentuale** vale i tasti battuti dopo un clic vero nel
   campo, mai il `value` che ha nel documento: il sito lo scrive anche col
   comando di inserimento testo del browser, che conta come battuto. Si applica
@@ -86,6 +91,8 @@ all'utente comunque. Il riquadro con la percentuale sta ancora nel documento:
 un sito che lo cerca apposta può nasconderlo o toglierlo, non cambiare il numero
 che viene applicato né prenderne i tasti. Toglierlo del tutto dalla pagina vuol
 dire una vista di Filo sopra la scheda: l'owner, interpellato su #686.1, l'ha
-lasciato nella pagina. Si riapre solo se lo chiede lui.
+lasciato nella pagina. Si riapre solo se lo chiede lui. Dentro un componente
+chiuso il percorso dell'evento si ferma al guscio: un link lì apre anche la
+modalità, e su Linux un campo lì non incolla (chiesto all'owner su #686.1 giro 9).
 
-Prove: `tests/zoom-fuori-dalla-pagina.spec.mjs` (con i riquadri riempiti dalla pagina, il frameset, l'SVG, il dialogo modale anche dentro un componente, lo sfondo dei livelli in primo piano, il fuoco portato in un riquadro, la notifica arrivata dopo e lo stile del testo), `tests/unit/zoomPagina.test.mjs`.
+Prove: `tests/zoom-fuori-dalla-pagina.spec.mjs` (con i riquadri riempiti dalla pagina, il frameset, l'SVG, il dialogo modale anche dentro un componente, lo sfondo dei livelli in primo piano, il fuoco portato in un riquadro, la notifica arrivata dopo, lo stile del testo, i link dentro un componente e il clic nell'editor all'altezza del riquadro), `tests/unit/zoomPagina.test.mjs`.
