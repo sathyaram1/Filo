@@ -290,7 +290,7 @@ test('#495 — un risultato che punta a un feedback non più caricato non viene 
 // se la lettura completa si ferma al freno i più vecchi mancano, e allora
 // "Archiviati (312)" sembrerebbe una risposta e non lo è: il "+" lo toglie.
 
-test('#495 — lettura incompleta: i numeri diventano "+" e l'hover spiega perché', async ({ openTab }) => {
+test('#495 — lettura incompleta: i numeri diventano "+" e l\'hover spiega perché', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.SN_FEEDBACK);
