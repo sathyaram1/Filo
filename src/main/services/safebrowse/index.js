@@ -296,30 +296,43 @@ function analyze(url, ctx = {}, onUpdate) {
       if (r) gsbCache.set('u:' + key, r);
     }).catch(() => {})));
   }
+  let last = first;
+  const notify = () => {
+    if (typeof onUpdate !== 'function') return;
+    const next = engine.evaluate(url, ctx, assembleCached(norm, url));
+    if (verdictChanged(last, next)) { last = next; onUpdate(next); }
+  };
+  let ageTask = null;
   if (worthDeepening && need.ageDays === undefined && (providers.rdap || providers.ct) && !ageUnknowable(norm, url)) {
     const ctOk = !need.cert;
-    tasks.push(once('age:' + reg, () => lookupAge(reg, norm, ctOk)));
+    ageTask = once('age:' + reg, () => lookupAge(reg, norm, ctOk)).then(notify);
+    tasks.push(ageTask);
   }
-  // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist).
+  // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist). Con l'età in arrivo si decide dopo
+  // l'età: un sito vecchio con una password perde l'indizio senza spendere giudizio e finestra, e il giudizio la riceve.
   const bKey = budgetKey(norm, url, ctx.budgetUrl);
-  const siteKey = key + '|' + cluesOf(norm, ctx, first);
-  const deep = (t) => { if (t) tasks.push(t); };
-  if (worthDeepening && providers.llm && need.llm === undefined) {
-    const llm = providers.llm;
-    const meta = buildLlmMeta(norm, ctx, first);
-    deep(deepen('llm', bKey, key, siteKey, () => llm(meta), (r) => llmCache.set(key, r)));
-  }
-  if (worthDeepening && providers.sandbox && need.sandbox === undefined) {
-    const detonate = providers.sandbox;
-    deep(deepen('sb', bKey, key, siteKey, () => detonate(url, norm), (r) => sandboxCache.set(key, r)));
+  const deepTasks = (verdict) => {
+    if (!(verdict.level === 'sospetto' || verdict.needsLlm)) return [];
+    const siteKey = key + '|' + cluesOf(norm, ctx, verdict);
+    const out = [];
+    if (providers.llm && llmCache.get(key) === undefined) {
+      const llm = providers.llm;
+      const meta = buildLlmMeta(norm, ctx, verdict);
+      out.push(deepen('llm', bKey, key, siteKey, () => llm(meta), (r) => llmCache.set(key, r)));
+    }
+    if (providers.sandbox && sandboxCache.get(key) === undefined) {
+      const detonate = providers.sandbox;
+      out.push(deepen('sb', bKey, key, siteKey, () => detonate(url, norm), (r) => sandboxCache.set(key, r)));
+    }
+    return out.filter(Boolean);
+  };
+  if (worthDeepening && ageTask) {
+    tasks.push(ageTask.then(() => Promise.allSettled(deepTasks(engine.evaluate(url, ctx, assembleCached(norm, url))))));
+  } else if (worthDeepening) {
+    tasks.push(...deepTasks(first));
   }
 
-  if (tasks.length && typeof onUpdate === 'function') {
-    Promise.allSettled(tasks).then(() => {
-      const next = engine.evaluate(url, ctx, assembleCached(norm, url));
-      if (verdictChanged(first, next)) onUpdate(next);
-    });
-  }
+  if (tasks.length && typeof onUpdate === 'function') Promise.allSettled(tasks).then(notify);
   return first;
 }
 
