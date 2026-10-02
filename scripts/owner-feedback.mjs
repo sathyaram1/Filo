@@ -261,7 +261,9 @@ export async function segnaLocale(id, valore, opts = {}) {
   if (!check.ok) return { ok: false, motivo: check.motivo, utente: !!check.utente, routine: !!check.routine, senzaProva: !!check.senzaProva, ...contestoDelRifiuto(fb) };
   const segno = valore ? { by: chiScrive(bearer), at: Date.now() } : null;
   const chiusa = !!check.chiusa;
-  if (opts.dryRun) return { ok: true, dryRun: true, segno, chiusa };
+  // Il feedback di un utente approvato tiene la scheda: è da lì che chi l'ha mandato vede la risoluzione.
+  const tieneScheda = MR.isLocalApproved(fb);
+  if (opts.dryRun) return { ok: true, dryRun: true, segno, chiusa, tieneScheda };
   const fields = segno ? { localOnly: toFsValue(segno) } : {};
   // Il sì dell'owner (#913) resta anche col segno tolto: si dà solo dai Ricevuti, e senza il segno non si rimetterebbe.
   const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=localOnly`, {
@@ -270,11 +272,9 @@ export async function segnaLocale(id, valore, opts = {}) {
     body: JSON.stringify({ fields }),
   });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  if (!chiusa) return { ok: true, segno };
+  if (!chiusa) return { ok: true, segno, tieneScheda };
   // Tolto da una pratica chiusa: la scheda la rimette l'app dell'owner alla prossima sincronizzazione della bacheca.
-  if (!valore) return { ok: true, segno, chiusa };
-  // Il feedback di un utente approvato tiene la scheda: è da lì che chi l'ha mandato vede la risoluzione.
-  if (!MR.isPrivateLocalWork({ ...fb, localOnly: segno })) return { ok: true, segno, chiusa };
+  if (!valore || tieneScheda) return { ok: true, segno, chiusa, tieneScheda };
   const scheda = await togliScheda(id, bearer);
   return { ok: true, segno, chiusa, scheda };
 }
@@ -743,13 +743,13 @@ if (isMain) {
       console.error(rifiutoPratica(riferimento, r));
       process.exit(3);
     }
-    if (valore && r.chiusa) {
+    if (valore && r.chiusa && !r.tieneScheda) {
       console.log(r.dryRun
         ? `[dry-run] ${riferimento}: è chiusa; la segnerei come lavoro locale e toglierei la sua scheda dalla bacheca pubblica`
         : `${riferimento}: segnata come lavoro locale${r.scheda ? `, ma ${r.scheda}` : ', fuori dalla bacheca pubblica'}.`);
       process.exit(r.scheda ? 3 : 0);
     }
-    if (!valore && r.chiusa) {
+    if (!valore && r.chiusa && !r.tieneScheda) {
       console.log(r.dryRun
         ? `[dry-run] ${riferimento}: è chiusa; toglierei il segno «solo in locale», e la sua scheda tornerebbe nella bacheca pubblica alla prossima sincronizzazione`
         : `${riferimento}: non è più un lavoro locale; la sua scheda torna nella bacheca pubblica alla prossima sincronizzazione.`);
