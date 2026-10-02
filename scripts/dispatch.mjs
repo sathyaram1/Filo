@@ -1552,6 +1552,8 @@ export function usageText() {
     '                         promemoria del biglietto e avvia il battito',
     '  (nessun argomento)     giro locale, senza server (sceglie il bucket qui)',
     '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
+    '  --linea-principale     dopo ogni worker, prima del biglietto (orchestratore): la cartella',
+    '                         torna su main, perché il prossimo worker parta con i suoi agenti',
     '  --record-verifier <id> "<critica>" [--segnala <file.md>] [--ticket <b>]   una riga per rilievo,',
     '                         con livello e sede davanti ([2i] …, [1v] …, [2e] …; [1i?] = chiede una decisione);',
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
@@ -1681,6 +1683,23 @@ function prepareForProber() {
   } else {
     g(['checkout', MAIN_BRANCH]);
   }
+}
+
+// Fra un worker e l'altro la cartella torna sulla linea principale: la sessione legge gli agenti (e il loro
+// sforzo) dalla cartella, e il ramo vecchio lasciato dal worker prima li riporterebbe indietro (sforzo per ruolo).
+// Scarta le modifiche non salvate (il lavoro di un worker morto si butta): per questo solo nelle routine.
+export function tornaAllaLineaPrincipale() {
+  if (process.env.FILO_ROUTINE !== '1') {
+    return { ok: false, uso: true, message: 'solo nelle routine (FILO_ROUTINE=1): scarta le modifiche non salvate della cartella' };
+  }
+  clearExpectation(ROOT);
+  tryGit(['fetch', 'origin', MAIN_BRANCH]);
+  const rif = tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok ? `origin/${MAIN_BRANCH}` : MAIN_BRANCH;
+  const co = tryGit(['checkout', '-f', '-B', MAIN_BRANCH, rif]);
+  if (!co.ok || currentBranch(ROOT) !== MAIN_BRANCH) {
+    return { ok: false, message: `la cartella non torna su ${MAIN_BRANCH}: ${co.out.slice(0, 200)}` };
+  }
+  return { ok: true, head: headSha(ROOT) };
 }
 
 /**
@@ -1971,7 +1990,7 @@ if (isMainModule) {
   const argv = mano.args;
   const bigliettoAMano = mano.ticket;
   const flag = argv[0];
-  if (bigliettoAMano && (flag === '--preflight' || flag === '--clear-state')) {
+  if (bigliettoAMano && (flag === '--preflight' || flag === '--clear-state' || flag === '--linea-principale')) {
     console.error(`--ticket non vale con ${flag}: lì un biglietto non serve. Niente è stato toccato.`);
     process.exit(1);
   }
@@ -2192,6 +2211,14 @@ if (isMainModule) {
         else console.error(`[dispatch] GUASTO (${r.kind}): ${r.message}`);
         process.exit(preflightExitCode(r));
       }).catch((e) => { console.error(`[dispatch] GUASTO (transient): ${e?.message || e}`); process.exit(3); });
+    } else if (flag === '--linea-principale') {
+      const r = tornaAllaLineaPrincipale();
+      if (!r.ok) {
+        console.error(`[dispatch] ${r.uso ? '' : 'GUASTO (transient): '}${r.message}`);
+        process.exit(r.uso ? 1 : 3);
+      }
+      console.log(`[dispatch] cartella sulla linea principale (${String(r.head).slice(0, 9)}): il prossimo worker parte con gli agenti di ${MAIN_BRANCH}.`);
+      process.exit(0);
     } else if (flag === '--clear-state') {
       const id = argv[1];
       if (!id) { console.error('Uso: --clear-state <id>'); process.exit(1); }
