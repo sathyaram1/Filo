@@ -335,9 +335,18 @@ module.exports = function register(on, ctx) {
           mergePreapproved = null;
         }
       }
+      // «Solo in locale» (#908): stesso patto, il CHI lo mette il main.
+      let localOnly;
+      if (typeof msg.localOnly === 'boolean') {
+        let email = '';
+        if (msg.localOnly) { try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {} }
+        localOnly = msg.localOnly ? { by: email || 'owner', at: Date.now() } : null;
+      }
+      // «È mio» (#908): l'unico valore che l'owner può dare è la sua prova.
+      const senderProof = msg.senderProof === 'admin' ? 'admin' : undefined;
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, senderProof },
         { idToken },
       );
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
@@ -356,6 +365,7 @@ module.exports = function register(on, ctx) {
       scheduleViewSync({ delayMs: 1500, force: true });
       // La pagina mostra subito chi ha messo il segno «fondi senza chiedermelo»:
       // glielo dice il main, che è l'unico a saperlo.
+      if (localOnly) return { ok: true, by: localOnly.by, at: localOnly.at };
       return mergePreapproved ? { ok: true, by: mergePreapproved.by } : { ok: true };
     } catch (e) {
       const raw = e?.message || String(e);

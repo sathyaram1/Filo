@@ -1065,6 +1065,21 @@
       white-space: nowrap;
     }
 
+    /* «Solo in locale»: la tinta del muted, perché non è un allarme né una delega, dice solo dove si lavora. */
+    .mg-local-btn[hidden], .mg-sender-btn[hidden] { display: none; }
+    .mg-local-btn[aria-pressed="true"] {
+      border-color: var(--sn-fg); color: var(--sn-fg);
+      background: color-mix(in srgb, var(--sn-fg) 8%, var(--sn-bg, transparent));
+    }
+    .mg-local-badge {
+      flex: none;
+      font-size: 10.5px; line-height: 1;
+      padding: 3px 6px; border-radius: 999px;
+      border: 1px solid color-mix(in srgb, var(--sn-fg) 30%, transparent);
+      color: var(--sn-muted);
+      white-space: nowrap;
+    }
+
     /* Una fusione ferma sulla scheda: stessa forma del segno qui sopra, tinta del blocco di sicurezza. Senza, una
        decisione che aspetta l'owner non si distinguerebbe scorrendo la lista. */
     .mg-fusione-badge {
@@ -1223,6 +1238,7 @@
     <nav class="mg-tabs" id="mgTabs" role="tablist">
       <button type="button" class="mg-tab mg-tab--active" data-tab="inbox" role="tab">Ricevuti</button>
       <button type="button" class="mg-tab" data-tab="queue" role="tab">In coda</button>
+      <button type="button" class="mg-tab" data-tab="local" role="tab">Lavori locali</button>
       <button type="button" class="mg-tab" data-tab="resolved" role="tab">Risolti</button>
       <button type="button" class="mg-tab" data-tab="archived" role="tab">Archiviati</button>
       <button type="button" class="mg-tab" data-tab="fbstats" role="tab">Statistiche feedback</button>
@@ -1347,6 +1363,10 @@
                     <button type="button" class="mg-star-btn mg-usernote-toggle" id="mgUserNoteToggle"
                       aria-expanded="false" aria-controls="mgUserNote"
                       title="Scrivi la riga che leggerà chi ha segnalato">Frase</button>
+                    <!-- «Solo in locale» (#908): c'è solo sui feedback dell'owner o di una sessione con la prova; testo e hover dal JS. -->
+                    <button type="button" class="mg-star-btn mg-local-btn" id="mgLocalBtn" aria-pressed="false" hidden>Locale</button>
+                    <!-- «È mio» (#908): sul prefisso dell'owner o di una sessione senza prova; solo l'owner la può dare. -->
+                    <button type="button" class="mg-star-btn mg-sender-btn" id="mgSenderBtn" hidden>🙋 È mio</button>
                   </div>
                 </div>
               </div>

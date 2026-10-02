@@ -13,6 +13,10 @@
 //   file è una domanda, non un'azione: il server guarda il diff che scarica
 //   lui, fa girare i controlli deterministici e decide.
 //
+//   Con `feedbackId` (#908) il server rilegge la pratica: se è un lavoro locale
+//   provato fonde senza chiedere (L5 registra soltanto) e la chiude; se no dice
+//   perché, e la fusione ferma aspetta il sì dell'owner in Gestione, per regola.
+//
 //   La porta accanto non è stata murata togliendo la credenziale — quella su
 //   questa macchina c'è ancora — ma **su GitHub**: una regola di protezione del
 //   repo lascia scrivere su `main` la sola identità del server, e respinge
@@ -20,8 +24,8 @@
 //   un tentativo respinto in silenzio non è una difesa, è un guasto invisibile.
 //
 // COSA VIAGGIA
-//   Il ramo e lo SHA della sua punta — cioè esattamente il codice su cui i
-//   controlli locali sono girati. Se nel frattempo il ramo è cambiato, il
+//   Il ramo, lo SHA della sua punta — cioè esattamente il codice su cui i
+//   controlli locali sono girati — e, se c'è, l'id della pratica. Se nel frattempo il ramo è cambiato, il
 //   server se ne accorge e non fonde: senza quello sha basterebbe far passare i
 //   controlli su una versione e far fondere l'altra.
 //
@@ -58,13 +62,13 @@ export function classifyOwnerMerge(status, body) {
   const errMsg = String((b.error && b.error.message) || '');
 
   if (status === 200 && r.ok === true) {
-    if (r.result === 'merged') return { outcome: 'merged', sha: String(r.sha || '') };
+    if (r.result === 'merged') return { outcome: 'merged', sha: String(r.sha || ''), ...campiLocali(r) };
     // Bloccata dai controlli: il server non l'ha respinta e basta, ha aperto
     // una richiesta in attesa. `requestId` vuoto significa che non c'è riuscito
     // (deposito non raggiungibile, oppure server non ancora rideployato): sono
     // due situazioni diverse per chi legge, e vanno dette diverse.
     if (r.result === 'blocked') {
-      return { outcome: 'blocked', reason: String(r.reason || ''), requestId: String(r.requestId || '') };
+      return { outcome: 'blocked', reason: String(r.reason || ''), requestId: String(r.requestId || ''), ...campiLocali(r) };
     }
     if (r.result === 'conflict') return { outcome: 'conflict', reason: String(r.reason || '') };
     if (r.result === 'stale') return { outcome: 'stale', headSha: String(r.headSha || '') };
@@ -86,23 +90,77 @@ export function classifyOwnerMerge(status, body) {
 }
 
 /**
+ * Quello che il server dice della pratica locale (#908), solo se lo dice. PURA.
+ * Tutto sta in `r.local` (localView in filo-security ownerMerge.js): ammessa →
+ * num, skippedL5, blocks ({ gate, label, detail } o il solo nome), record, closed; non ammessa → reason, detail.
+ */
+function campiLocali(r) {
+  const loc = (r.local && typeof r.local === 'object') ? r.local : null;
+  if (!loc) return {};
+  const out = {};
+  if (loc.num) out.localNum = String(loc.num).slice(0, 24);
+  if (loc.eligible === true) {
+    if (loc.skippedL5 === true) {
+      out.skippedL5 = true;
+      out.blocks = Array.isArray(loc.blocks) ? loc.blocks.slice(0, 50) : [];
+      out.record = String(loc.record || '').slice(0, 128);
+    }
+    if (typeof loc.closed === 'boolean') out.closed = loc.closed;
+    return out;
+  }
+  out.localReason = String(loc.reason || 'pratica_non_ammessa').slice(0, 80);
+  out.localDetail = String(loc.detail || '').slice(0, 300);
+  return out;
+}
+
+/** Un blocco registrato, in una riga: il server manda l'elenco intero, e un taglio si dichiara. PURA. */
+function bloccoInRiga(t) {
+  if (!t || typeof t !== 'object') return String(t || '');
+  const nome = String(t.label || t.gate || 'controllo');
+  const det = String(t.detail || '');
+  if (!det) return nome;
+  return det.length > 2000 ? `${nome}: ${det.slice(0, 2000)}… (elenco intero nella nota della pratica)` : `${nome}: ${det}`;
+}
+
+/**
  * Cosa legge l'owner. PURA. Una riga di esito e, quando serve, la riga che
  * dice cosa fare adesso — mai un motivo tecnico lasciato lì da interpretare.
  */
-export function messageForOwnerMerge(reply, branch = 'il ramo') {
+export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
   const r = reply || {};
+  const num = ctx.feedbackNum || r.localNum;
+  const pratica = num ? `#${String(num).replace(/^#+/, '')}` : 'la pratica';
+  const chiudi = `npm run feedback -- ${ctx.feedbackId || '<id>'} done "fuso su main" --come-routine`;
   switch (r.outcome) {
-    case 'merged':
-      return `✓ '${branch}' fuso su main dal server${r.sha ? ` (${String(r.sha).slice(0, 8)})` : ''}.`;
+    case 'merged': {
+      const righe = [`✓ '${branch}' fuso su main dal server${r.sha ? ` (${String(r.sha).slice(0, 8)})` : ''}.`];
+      if (r.skippedL5) {
+        const blocchi = Array.isArray(r.blocks) ? r.blocks : [];
+        righe.push(`  L5 saltato: lavoro locale di ${pratica}, mittente provato.`);
+        righe.push(blocchi.length
+          ? `  Blocchi registrati (${blocchi.length}), li rileggi in Gestione → Automazioni, «Fuse senza chiedere»:\n${blocchi.map((t) => `    · ${bloccoInRiga(t)}`).join('\n')}`
+          : '  Nessun blocco registrato: i controlli non avrebbero fermato niente.');
+        if (blocchi.length && !r.record) righe.push('  La traccia dei blocchi NON si è registrata: l’elenco resta solo nella nota della pratica e nei log del server.');
+      }
+      if (r.closed === true) righe.push(`  Pratica ${pratica} chiusa.`);
+      else if (r.closed === false) righe.push(`  La pratica ${pratica} NON si è chiusa. Chiudila a mano: ${chiudi}`);
+      else if (r.localReason) {
+        // Il codice è su main ma la pratica resta aperta: una routine potrebbe rilavorarla.
+        righe.push(`  Pratica ${pratica} non chiusa: ${r.localDetail || r.localReason}. Se il lavoro la conclude, chiudila a mano: ${chiudi}`);
+      }
+      return righe.join('\n');
+    }
     case 'blocked':
-      // Il blocco NON è più un vicolo cieco. Il lavoro locale tocca le aree
-      // protette quasi sempre (in locale si lavora proprio sulle guardie): un
-      // messaggio che si ferma a "decidi tu cosa farne" lascia chi legge senza
-      // nessuna mossa possibile — e su main, da qui, non scrive più nessuno.
-      // La mossa c'è, ed è una sola: approvarla in Filo, dove serve una persona.
+      // Il lavoro locale tocca le aree protette quasi sempre: il messaggio dice
+      // perché L5 non è stato saltato e dove si dà il sì. Aspettare il sì è una
+      // regola del server, non un muro di questa macchina.
       return `✗ Fusione BLOCCATA dai controlli di sicurezza del server: ${r.reason || 'motivo non riportato'}\n`
         + '  Sono controlli automatici sul contenuto delle modifiche (aree protette,\n'
-        + '  dipendenze nuove, segreti), e da qui non si aggirano.\n'
+        + '  dipendenze nuove, segreti). La fusione aspetta il tuo sì.\n'
+        + (r.localDetail || r.localReason
+          ? `  L5 non è stato saltato: ${r.localDetail || r.localReason}.\n`
+          : (ctx.feedbackId ? '' : '  Nessuna pratica collegata: con npm run finish -- --feedback <N> il lavoro locale\n'
+            + '  di un feedback tuo o di una sessione, con la prova del mittente, non aspetta.\n'))
         + (r.requestId
           ? '\n  L\'ho messa IN ATTESA: approvala da Filo, nella dashboard di gestione\n'
             + '  (l\'avviso in cima ai Ricevuti). Da lì puoi anche scartarla.\n'
@@ -163,7 +221,7 @@ export function exitCodeForOwnerMerge(reply) {
  * La domanda al server: "fondi questo ramo, che alla mia ultima verifica era
  * questo commit". Ritorna sempre un esito classificato, mai un'eccezione.
  */
-export async function askServerMerge({ branch, sha = '', fetchImpl = fetch, url = OWNER_MERGE_URL } = {}) {
+export async function askServerMerge({ branch, sha = '', feedbackId = '', fetchImpl = fetch, url = OWNER_MERGE_URL } = {}) {
   const refresh = findAdminRefreshToken();
   if (!refresh) return { outcome: 'no_owner_credential' };
 
@@ -178,7 +236,10 @@ export async function askServerMerge({ branch, sha = '', fetchImpl = fetch, url 
     const res = await fetchImpl(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-      body: JSON.stringify({ data: { branch: String(branch || ''), sha: String(sha || '') } }),
+      body: JSON.stringify({ data: {
+        branch: String(branch || ''), sha: String(sha || ''),
+        ...(feedbackId ? { feedbackId: String(feedbackId) } : {}),
+      } }),
     });
     const text = await res.text();
     let body = {};

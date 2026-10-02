@@ -76,17 +76,19 @@
     return Promise.reject(new Error('canale main non disponibile'));
   }
 
-  // Le quattro sezioni della macchina a stati, le stesse della dashboard di
+  // Le sezioni della macchina a stati, le stesse della dashboard di
   // gestione: 'inbox' Ricevuti (aspettano una decisione dell'owner), 'queue'
-  // In coda (l'iter di lavorazione), 'resolved' Risolti (fix usciti davvero in
+  // In coda (l'iter di lavorazione), 'local' Lavori locali (la stessa coda, che
+  // le routine non prendono: #908), 'resolved' Risolti (fix usciti davvero in
   // una versione rilasciata), 'archived' Archiviati.
-  const TABS = ['inbox', 'queue', 'resolved', 'archived'];
+  const TABS = ['inbox', 'queue', 'local', 'resolved', 'archived'];
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori locali', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox: 'Nessun feedback in attesa di una tua decisione.',
     queue: 'Nessun feedback in lavorazione.',
+    local: 'Nessun lavoro locale.',
     resolved: 'Nessun fix uscito in una versione rilasciata.',
     archived: 'Nessun feedback archiviato.',
   };
@@ -148,8 +150,12 @@
   //     normalizza). I sub-feedback di una routine portano lo stesso prefisso ma
   //     nascono `todo`/`design`: NON sono ritrovamenti d'agente, quindi qui si
   //     escludono col vincolo sullo stato.
+  // #595: un prefisso riservato senza prova del mittente vale come un utente, anche nei colori e nei filtri.
+  function mittenteDi(f) {
+    return MR.effectiveClientId(f);
+  }
   function isAgent(f) {
-    const c = String(f.clientId || '');
+    const c = mittenteDi(f);
     if (c.startsWith('agent:')) return true;
     if (c.startsWith('routine:') && statusOf(f) === 'unlabeled') return true;
     return false;
@@ -157,7 +163,7 @@
   // Origine del feedback (per la colorazione di card/bolle). Delega alla logica
   // condivisa così dashboard e main usano la stessa classificazione.
   function originOf(f) {
-    const c = String(f.clientId || '');
+    const c = mittenteDi(f);
     if (window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.originOf) return SN_FEEDBACK_THREAD.originOf(c);
     if (c.startsWith('owner:')) return 'owner';
     if (c.startsWith('agent:')) return 'agent';
@@ -1048,7 +1054,7 @@
       // blocco. Gli allegati vivono nella bolla della segnalazione.
       const turns = window.SN_FEEDBACK_THREAD ? SN_FEEDBACK_THREAD.parse(f) : [];
       const convoTurns = turns.filter((t) => t.kind !== 'report');
-      const reportRole = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.isFromModel(f.clientId) ? 'model' : 'user';
+      const reportRole = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.isFromModel(mittenteDi(f)) ? 'model' : 'user';
       const reportWho = reportRole === 'model' ? 'Agente' : 'Segnalazione';
       // Note editabili (textarea) dove l'admin sta lavorando: Ricevuti e In
       // coda. "Ricevuti" è incluso così si può COMMENTARE un feedback appena
@@ -1061,7 +1067,7 @@
       // ci si scrive dentro non si può salvare (sostituirebbe il report), e
       // offrirla vorrebbe dire far scrivere l'owner per niente.
       const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply && !f._dettaglioMancato
-        && (currentTab === 'inbox' || currentTab === 'queue');
+        && (currentTab === 'inbox' || currentTab === 'queue' || currentTab === 'local');
       // Render di un turno come bolla di sola lettura (segnalazione esclusa).
       const convoBubble = (t) => {
         const who = (t.kind === 'note' || t.role === 'model') ? 'Filo' : 'Tu';

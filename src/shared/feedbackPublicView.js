@@ -192,6 +192,8 @@
    */
   function cardFor(fb) {
     if (isFlagged(fb)) return null;
+    // #908: un lavoro solo locale è una pratica interna dell'owner, non un fix da mostrare (decisione owner).
+    if (MR().isLocalOnly(fb)) return null;
     const { status } = MR().normalizeStatus(fb);
     if (!PUBLISHABLE_STATUSES.includes(status)) return null;
 

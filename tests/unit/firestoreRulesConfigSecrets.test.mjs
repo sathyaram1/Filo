@@ -41,6 +41,7 @@ const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
 const PUBBLICI_DICHIARATI = {
   models: 'solo nomi di modelli: serve anche a chi non ha fatto login',
   routines: 'interruttori delle routine, lette da macchine senza credenziali',
+  redteam: 'il solo interruttore «Red Team aperto a tutti» (#896)',
 };
 
 // Estrae i blocchi `match /config/<doc> { … }` con le condizioni di lettura.

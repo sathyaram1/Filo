@@ -68,11 +68,11 @@ test('l’indice pubblicato è quello che la lettura dei percorsi chiede davvero
     'i percorsi si leggono sotto un dominio nominato, mai come gruppo: una query di gruppo li rimetterebbe insieme tutti');
 });
 
-test('un comando solo pubblica regole e indici insieme', () => {
-  const cmd = pkg.scripts['deploy:regole'];
-  assert.ok(cmd, 'senza un comando la pubblicazione si fa a memoria, e prima o poi si salta');
-  assert.match(cmd, /firestore:rules/);
-  assert.match(cmd, /firestore:indexes/,
+test('un comando solo pubblica regole e indici insieme', async () => {
+  assert.ok(pkg.scripts['regole:pubblica'], 'senza un comando la pubblicazione si fa a memoria, e prima o poi si salta');
+  const { BERSAGLI } = await import(new URL('../../scripts/regole-pubblica.mjs', import.meta.url).href);
+  assert.ok(BERSAGLI.includes('firestore:rules'));
+  assert.ok(BERSAGLI.includes('firestore:indexes'),
     'gli indici vanno con le regole: una query senza il suo indice smette di dare risultati e non si rompe niente di visibile');
 });
 

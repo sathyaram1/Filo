@@ -696,7 +696,15 @@
   // storico): il collegato nasce come un feedback normale (numero
   // proprio), `parentId` serve solo a far comparire "collegato a #N" in
   // dashboard e a far risalire chi triagia all'originale.
-  async function submit({ text, url, title, userAgent, clientId, clientIdHash, images, files, name, parentId, capabilityGapId, submissionId }) {
+  // `opts.idToken` (#595): solo il token admin. Create autenticata con `senderProof: 'admin'`;
+  // token rifiutato (401/403) → si riparte anonimi e il risultato lo dice (`authRefused`).
+  async function submit({ text, url, title, userAgent, clientId, clientIdHash, images, files, name, parentId, capabilityGapId, submissionId }, opts = {}) {
+    const idToken = (opts && typeof opts.idToken === 'string') ? opts.idToken : '';
+    // #908: un lavoro locale nasce solo con la prova; da anonimo diventerebbe un feedback d'utente.
+    const localOnly = (opts && opts.localOnly && typeof opts.localOnly === 'object') ? opts.localOnly : null;
+    // `soloAdmin`: chi chiama vuole la prova o niente (lo script delle sessioni locali).
+    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly);
+    if (soloAdmin && !idToken) throw new Error('create senza token admin (401): questo feedback non parte da anonimo');
     // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
     // qualunque caricamento e prima di creare il documento: così «non è partito
     // niente» è vero alla lettera, e non «è partito tutto tranne il testo».
@@ -845,12 +853,39 @@
     const docId = sanitizeDocId(submissionId);
     const idParam = docId ? `documentId=${encodeURIComponent(docId)}&` : '';
     const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?${idParam}key=${API_KEY}`;
-    let res = await fetch(endpoint, {
+    let res = null;
+    let senderProof = '';
+    let authRefused = 0;
+    if (idToken) {
+      doc.fields.senderProof = toFsValue('admin');
+      if (localOnly) {
+        doc.fields.localOnly = toFsValue({
+          by: String(localOnly.by || '').slice(0, 120),
+          at: Math.round(Number(localOnly.at) || Date.now()),
+        });
+      }
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify(doc),
+      });
+      if (soloAdmin && (res.status === 401 || res.status === 403)) {
+        throw new Error(`firestore create fallito (${res.status}): token admin rifiutato, e questo feedback non parte da anonimo`);
+      }
+      if (res.status === 401 || res.status === 403) {
+        authRefused = res.status;
+        delete doc.fields.senderProof;
+        res = null;
+      } else {
+        senderProof = 'admin';
+      }
+    }
+    if (!res) res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(doc),
     });
-    if (res.status === 403) {
+    if (!senderProof && res.status === 403) {
       // Rules non ancora aggiornate ai campi nuovi (name/seq/subSeq/parentId/clientIdHash):
       // meglio un feedback senza numero/titolo/collegamento che un invio
       // fallito. Ritenta con il solo schema storico.
@@ -870,15 +905,16 @@
     // 409 ALREADY_EXISTS con documentId → il feedback è già stato scritto da un
     // tentativo precedente (identico submissionId). Non è un errore: successo
     // idempotente, nessun duplicato creato.
+    const prova = idToken ? { senderProof, ...(authRefused ? { authRefused } : {}), ...(localOnly ? { localOnly: true } : {}) } : {};
     if (docId && res.status === 409) {
-      return { id: docId, seq: null, images: uploaded, files: uploadedFiles, failed, deduped: true };
+      return { id: docId, seq: null, images: uploaded, files: uploadedFiles, failed, deduped: true, ...prova };
     }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       throw new Error(`firestore create fallito (${res.status}): ${errText.slice(0, 300)}`);
     }
     const json = await res.json();
-    return { id: json.name?.split('/').pop() || '', seq, images: uploaded, files: uploadedFiles, failed };
+    return { id: json.name?.split('/').pop() || '', seq, images: uploaded, files: uploadedFiles, failed, ...prova };
   }
 
   // ── Il tetto del caricamento, e come si dice ──────────────────────────────
@@ -911,9 +947,9 @@
   const CAMPI_LISTA = [
     'archiveOverride', 'beatAt', 'blockReason', 'branch', 'capabilityGapId',
     'claimExpiresAt', 'claimNum', 'claimedAt', 'claimedBy', 'clientId',
-    'clientIdHash', 'createdAt', 'mergePreapproved', 'name', 'parentId', 'pipeline',
+    'clientIdHash', 'createdAt', 'localOnly', 'mergePreapproved', 'name', 'parentId', 'pipeline',
     'priority', 'priorityManual', 'reopenRequests', 'resolvedAt',
-    'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'seq', 'stalls',
+    'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'senderProof', 'seq', 'stalls',
     'starred', 'status', 'statusPublic', 'statusReason', 'subSeq', 'text',
     'title', 'url', 'userAgent', 'userNote', 'verifiedAt', 'votes',
     'walletPseudonym', 'workingResets', 'workingSince',
@@ -1291,7 +1327,8 @@
 
   async function batchGetDirect(collectionId, wanted, { timeoutMs = 0, idToken = '', fields = null } = {}) {
     const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
-    const prefix = `${FIRESTORE_BASE}/${collectionId}/`;
+    // batchGet vuole il NOME della risorsa: con l'indirizzo intero risponde 400 a ogni richiesta.
+    const prefix = `projects/${PROJECT_ID}/databases/(default)/documents/${collectionId}/`;
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const corpo = { documents: wanted.map((id) => prefix + id) };
@@ -1742,7 +1779,7 @@
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
   // riuscirà solo se le regole consentono l'accesso anonimo (sconsigliato).
-  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved }, opts = {}) {
+  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, senderProof }, opts = {}) {
     if (!id) throw new Error('id mancante');
     const idToken = opts.idToken;
     const fields = {};
@@ -1850,6 +1887,21 @@
         });
       }
       mask.push('mergePreapproved');
+    }
+    // Il segno «solo in locale» (#908): stessa forma di scrittura, `at` in millisecondi.
+    if (localOnly !== undefined) {
+      if (localOnly && typeof localOnly === 'object') {
+        fields.localOnly = toFsValue({
+          by: String(localOnly.by || '').slice(0, 120),
+          at: Math.round(Number(localOnly.at) || Date.now()),
+        });
+      }
+      mask.push('localOnly');
+    }
+    // La prova del mittente data dall'owner («È mio», #908): si aggiunge e basta, non si toglie da qui.
+    if (senderProof === 'admin') {
+      fields.senderProof = toFsValue('admin');
+      mask.push('senderProof');
     }
     if (priority !== undefined) {
       // Priorità 1-3 (0 = nessuna). Clamp PRIMA di cifrare.

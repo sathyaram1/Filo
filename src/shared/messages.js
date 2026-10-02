@@ -445,7 +445,7 @@
     // Triage admin di un feedback (cambio stato/note/priorità). Instradato dal
     // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
     // loggato non è admin. → { ok } | { ok:false, error }
-    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride?, mergePreapproved?: bool }
+    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride?, mergePreapproved?: bool, localOnly?: bool, senderProof?: 'admin' }
     // #583 — LETTURA dei feedback per le superfici dell'owner. La collezione
     // non è più pubblica: leggono solo l'admin e il server. L'ID token vive nel
     // main e non deve arrivare in una pagina, quindi la pagina CHIEDE la
@@ -547,11 +547,10 @@
     // può leggere: si passa dalla callable owner-only del backend di sicurezza.
     ROUTINE_LOG_GET: 'routine_log_get',            // → { ok, rejections:[…], comparisons:[…] } | { ok:false, error }
     // Fusioni bloccate dai controlli di sicurezza del server, in attesa
-    // dell'owner (SPEC-RIDISEGNO-MAX.md §10). Il server non le respinge e
-    // basta: apre una richiesta, e l'owner la approva DENTRO Filo — su una
-    // superficie diversa dal terminale, dove serve una persona davanti allo
-    // schermo. Vivono in una collezione che nessun client può leggere: si passa
-    // dalla callable owner-only del backend di sicurezza.
+    // dell'owner (SPEC-RIDISEGNO-MAX.md §10): il server apre una richiesta che
+    // aspetta il suo sì in Gestione (un lavoro locale provato non la apre: #908).
+    // Vivono in una collezione che nessun client può leggere: si passa dalla
+    // callable owner-only del backend di sicurezza.
     //
     // ORIGINE: solo pagine `filo://`. Un sito visitato non deve poter né sapere
     // che c'è una fusione in attesa (dice cosa sta facendo l'owner) né tentare

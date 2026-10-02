@@ -528,6 +528,9 @@ module.exports = function register(on, ctx) {
       onGiveUp: (_item, motivo) => avvisoNellaFinestra(
         String(motivo || 'La tua segnalazione non è partita.'),
       ),
+      // Chiesto al momento della spedizione: fra l'accodamento e l'invio
+      // possono passare ore (offline), e l'owner può aver chiuso la sessione.
+      tokenOwner: async () => (auth.isAdmin() ? (await auth.getIdToken()) || '' : ''),
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
     });
   }
@@ -575,9 +578,12 @@ module.exports = function register(on, ctx) {
       // "owner:" così la dashboard lo distingue (verde) dai feedback dei tester
       // esterni (arancione). L'identità owner è nota solo qui nel main (auth
       // singleton): il content script che genera il clientId non sa di esserlo.
+      // `dallOwner` lo decide il main, non il payload: vale il token admin alla spedizione (#595).
+      let dallOwner = false;
       try {
         if (auth.isAdmin() && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
           payload.clientId = globalThis.SN_FEEDBACK_THREAD.ownerize(payload.clientId);
+          dallOwner = String(payload.clientId || '').startsWith('owner:');
         }
       } catch (_) {}
       console.log('[Filo feedback] submit start', {
@@ -588,7 +594,7 @@ module.exports = function register(on, ctx) {
       // Accoda e prova a inviare subito, ma NON aspettare la rete: l'ack torna
       // appena il feedback è al sicuro in coda (persistito). Il titolo lo genera
       // la coda al momento dell'invio (anche offline, col fallback).
-      const r = await Outbox.enqueue(payload);
+      const r = await Outbox.enqueue(payload, { dallOwner });
       return { ok: true, queued: true, id: r?.id };
     } catch (e) {
       console.error('[Filo feedback] submit failed', e);

@@ -133,7 +133,7 @@ test('#509 — stato illeggibile: niente sezioni su ENTRAMBE le pagine', async (
   // 1. Le sezioni non si disegnano. Le schede che NON sono sezioni
   //    (Statistiche, Modelli, Automazioni, Log) non dipendono dallo stato delle
   //    segnalazioni e restano raggiungibili.
-  for (const tab of ['inbox', 'queue', 'resolved', 'archived']) {
+  for (const tab of ['inbox', 'queue', 'local', 'resolved', 'archived']) {
     await expect(mg.locator(`.mg-tab[data-tab="${tab}"]`)).toBeHidden();
   }
   await expect(mg.locator('.mg-tab[data-tab="log"]')).toBeVisible();
@@ -207,7 +207,7 @@ test('#509 — i ritrovamenti automatici sono un filtro, non una sezione', async
   await page.waitForFunction(() => window.__fbTest);
   await page.evaluate(() => window.__fbTest.setData([
     { _id: 'audit', seq: 20, status: 'unlabeled', name: 'ritrovamento audit', text: 'a',
-      clientId: 'routine:nightly-audit', createdAt: '2026-08-20T10:00:00Z' },
+      clientId: 'routine:nightly-audit', senderProof: 'server', createdAt: '2026-08-20T10:00:00Z' },
     { _id: 'umano', seq: 21, status: 'unlabeled', name: 'segnalazione umana', text: 'b',
       clientId: 'tester@example.com', createdAt: '2026-08-21T10:00:00Z' },
   ]));

@@ -121,6 +121,8 @@ test('le proprie schede si chiedono per identificativo, e solo quelle', async ()
     assert.ok(url.includes(':batchGet'));
     assert.equal(corpo.documents.length, 2);
     assert.ok(corpo.documents.every((d) => d.includes('/feedback-public/')));
+    // Il nome della risorsa: l'indirizzo intero Firestore lo rifiuta (400) e l'annuncio delle ricompense taceva.
+    assert.ok(corpo.documents.every((d) => d.startsWith('projects/filo-8b9cb/databases/(default)/documents/')), corpo.documents[0]);
     assert.equal(rows.length, 1);
     assert.equal(rows[0]._id, 'mia-1');
   } finally { rete.ripristina(); }

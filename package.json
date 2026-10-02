@@ -25,7 +25,8 @@
     "feedback:auto-archive": "node scripts/auto-archive.mjs",
     "feedback:vista-pubblica": "node scripts/publish-public-view.mjs",
     "feedback:login": "node scripts/admin-login.mjs",
-    "deploy:regole": "firebase deploy --only firestore:rules,firestore:indexes",
+    "regole:pubblica": "node scripts/regole-pubblica.mjs",
+    "server:fondi": "node scripts/server-fondi-pratica.mjs",
     "purga:percorsi-vecchi": "firebase firestore:delete paths --shallow",
     "build": "electron-builder --win --publish never",
     "release": "electron-builder --win --publish always",
@@ -34,7 +35,9 @@
     "build:linux": "electron-builder --linux --publish never",
     "release:linux": "electron-builder --linux --publish always",
     "feedback": "node scripts/owner-feedback.mjs",
-    "feedback:apri": "node scripts/claude-feedback.mjs"
+    "feedback:apri": "node scripts/claude-feedback.mjs",
+    "feedback:leggi": "node scripts/leggi-feedback.mjs",
+    "feedback:ripasso": "node scripts/ripasso-mittenti.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

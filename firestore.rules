@@ -87,6 +87,20 @@ service cloud.firestore {
             && (!('l4' in d.livelli) || livelloValido(d.livelli.l4)));
     }
 
+    // `localOnly` { by, at } (#908): la pratica la lavora solo una sessione
+    // locale e la coda delle routine la salta. Solo l'admin la scrive (create
+    // e ramo di triage admin); assente = feedback normale. `at` in millisecondi.
+    function localOnlyValido(d) {
+      return !('localOnly' in d)
+        || (d.localOnly is map
+            && d.localOnly.keys().hasOnly(['by', 'at'])
+            && d.localOnly.get('by', '') is string
+            && d.localOnly.get('by', '').size() > 0
+            && d.localOnly.get('by', '').size() <= 120
+            && d.localOnly.get('at', 0) is int
+            && d.localOnly.get('at', 0) > 0);
+    }
+
     // Allowlist amministratori. Gestita SOLO da console Firebase.
     match /admins/{email} {
       allow read: if isAdmin();
@@ -158,6 +172,9 @@ service cloud.firestore {
     //   - `workerLog` (array di { role, startedAt, num }): il registro dei worker
     //     mostrato in dashboard. Lo scrive il server (functions, Admin SDK) al
     //     rilascio di ogni biglietto (le routine non hanno credenziali: #451).
+    //   - `senderProofSince` ({ local, owner }: ms): da quando ogni famiglia
+    //     nasce con la prova del mittente; lo fissa il primo giro di
+    //     scripts/ripasso-mittenti.mjs e da lì non si ricalcola (#908).
     // Le regole NON enumerano i campi (read/write admin-only): nuovi campi non
     // richiedono redeploy. Riservato agli admin: nessun utente normale legge/scrive.
     match /config/automation {
@@ -198,6 +215,22 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // config/redteam (#896) → `openToAll`: il Red Team è aperto a chi non è
+    // admin? Spento, assente o illeggibile = in pausa; le callable del server lo
+    // leggono con l'Admin SDK. Lettura pubblica: dentro c'è un interruttore e
+    // basta, e la pagina del Red Team deve poter dire «in pausa» a chiunque.
+    match /config/redteam {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['openToAll', 'updatedAt'])
+        && request.resource.data.get('openToAll', false) is bool
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt is timestamp
+            || (request.resource.data.updatedAt is string
+                && request.resource.data.updatedAt.size() <= 40));
+      allow delete: if isAdmin();
+    }
+
     // config/supportModels → modelli per gli slot di supporto (sanitizer,
     // judge1, judge2, judge3, judgeDynamic, judgeRedTeam, judgePriority). Ogni
     // campo è una stringa catena di nickname ("flash, flash-or"), stesso
@@ -223,11 +256,11 @@ service cloud.firestore {
       // finiti in link e log.
       allow get, list: if isAdmin() || isRoutine();
 
-      // Creazione admin: senza vincoli di forma. Serve all'applier locale
-      // dell'owner (npm run feedback:apply col token admin) per creare i
-      // sub-feedback accodati dalle routine, che portano campi non previsti
-      // dal create anonimo (status, notes, seq/subSeq, priority…).
-      allow create: if isAdmin();
+      // Creazione admin: senza vincoli di forma. La usano l'app dell'owner e
+      // scripts/claude-feedback.mjs col token admin per scrivere `senderProof`
+      // (#595), la prova del mittente che il create anonimo sotto NON ammette:
+      // la sentinella tests/unit/firestoreRulesSenderProof.test.mjs lo tiene vero.
+      allow create: if isAdmin() && localOnlyValido(request.resource.data);
 
       // `name` = titolo breve generato da un LLM all'invio; `seq`/`subSeq` =
       // numero progressivo leggibile (#22, #22.1) calcolato dal client.
@@ -324,6 +357,10 @@ service cloud.firestore {
                     // forma più sotto). Il server la legge prima di aprire una
                     // richiesta di approvazione per il lavoro delle routine.
                     'mergePreapproved',
+                    // #908: il segno «solo in locale» (forma: localOnlyValido).
+                    'localOnly',
+                    // #595: il ripasso dei documenti vecchi con prefisso riservato.
+                    'senderProof',
                     'capabilityGapId']) // F4: permettere update del gap id (backfill)
         // S1.F2.1: status accetta l'enum esistente O un ciphertext FENC1: (gate on).
         // Enum: stati CANONICI della macchina a stati (FEEDBACK-STATES.md) +
@@ -442,6 +479,9 @@ service cloud.firestore {
                 && request.resource.data.mergePreapproved.get('at', '') is string
                 && request.resource.data.mergePreapproved.get('at', '').size() <= 40))
         && livelliValidi(request.resource.data)
+        && localOnlyValido(request.resource.data)
+        && (!('senderProof' in request.resource.data)
+            || request.resource.data.senderProof in ['admin', 'server'])
         // F4: capabilityGapId (opzionale) — id strutturale del gap di capacità
         // per il dedup auto-feedback. Stringa breve.
         && request.resource.data.get('capabilityGapId', '') is string
@@ -557,6 +597,9 @@ service cloud.firestore {
       // per costruzione. `text`, `url`, `userAgent`, `images`, `files`,
       // `notes`, `clientId`, `pipeline`, `priority` non sono qui dentro: se
       // qualcuno provasse a scriverli, la regola respinge tutto il documento.
+      // Un lavoro locale (#908) non ha scheda, ma qui NON si respinge: un'app
+      // rimasta alla versione di prima si fermerebbe alla prima scheda rifiutata
+      // e non pubblicherebbe più niente. La toglie il server (onPublicCardWrite).
       allow create, update: if (isAdmin() || isRoutine())
         && request.resource.data.keys().hasOnly(
              ['name', 'seq', 'subSeq', 'status', 'statusPublic', 'resolvedInVersion',
