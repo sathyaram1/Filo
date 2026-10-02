@@ -10,7 +10,6 @@ const ROOT = resolve(process.cwd());
 
 test.setTimeout(240_000);
 
-test.fail(true, 'rilievo 1 del giro 2 aperto: a gruppi l’uscita standard porta un documento junit per gruppo e le righe del lanciatore');
 test('junit sull’uscita standard a gruppi: un documento XML solo, senza altre righe', () => {
   const dir = cartellaTemporanea('unit-junit-stdout-');
   const prove = join(dir, 'prove');
