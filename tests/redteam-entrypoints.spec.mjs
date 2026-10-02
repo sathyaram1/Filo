@@ -11,6 +11,7 @@
 // + funzione pura iniettata via page.evaluate).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriRedteamATutti } from './helpers/redteam.mjs';
 
 const RT_URL = 'filo://redteam/redteam.html';
 
@@ -28,6 +29,7 @@ async function newtabPage(app) {
 }
 
 test('la home ha un controllo Red-team in alto a destra che apre la pagina red-team', async ({ app, shell }) => {
+  await apriRedteamATutti(app);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
 
@@ -48,7 +50,8 @@ test('la home ha un controllo Red-team in alto a destra che apre la pagina red-t
   expect(opened, 'la pagina red-team non si è aperta dopo il click').toBeTruthy();
 });
 
-test('il pannello "Invia attacco" ha due campi separati e il costo, e blocca con testo vuoto', async ({ openTab }) => {
+test('il pannello "Invia attacco" ha due campi separati e il costo, e blocca con testo vuoto', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   // Apriamo una pagina filo:// (i content script — incluso redteamAttack — sono
   // iniettati lì) e invochiamo direttamente l'apertura del pannello.
   const page = await openTab(RT_URL);
@@ -82,7 +85,8 @@ test('il pannello "Invia attacco" ha due campi separati e il costo, e blocca con
   expect(statusAfter).not.toBe('Invio…');
 });
 
-test('il menu tasto destro ha "Invia attacco" che apre il pannello con i due campi', async ({ openTab, testServer }) => {
+test('il menu tasto destro ha "Invia attacco" che apre il pannello con i due campi', async ({ app, openTab, testServer }) => {
+  await apriRedteamATutti(app);
   // Su una pagina esterna i content script (menu + redteamAttack) sono iniettati.
   const url = testServer.html('<!doctype html><html><body><h1 id="t">pagina</h1></body></html>');
   const page = await openTab(url);
@@ -104,7 +108,8 @@ test('il menu tasto destro ha "Invia attacco" che apre il pannello con i due cam
   await expect(page.locator('.sn-rt-overlay .sn-rt-send')).toBeVisible();
 });
 
-test('mappa pura status→messaggio (spec §8.1)', async ({ openTab }) => {
+test('mappa pura status→messaggio (spec §8.1)', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const page = await openTab(RT_URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => !!window.SN_REDTEAM_ATTACK_UI, null, { timeout: 8_000 });
@@ -118,6 +123,7 @@ test('mappa pura status→messaggio (spec §8.1)', async ({ openTab }) => {
       notSignedIn: f({ status: 'not_signed_in' }),
       empty: f({ status: 'empty' }).text,
       error: f({ status: 'error' }).text,
+      paused: f({ status: 'paused', error: 'Il Red Team è in pausa: tornerà dopo il rilascio' }),
     };
   });
 
@@ -129,4 +135,6 @@ test('mappa pura status→messaggio (spec §8.1)', async ({ openTab }) => {
   expect(results.notSignedIn.needLogin).toBe(true);
   expect(results.empty.toLowerCase()).toContain('attacco');
   expect(results.error.toLowerCase()).toContain('attivo');
+  // In pausa (#896) la frase del server arriva così com'è.
+  expect(results.paused).toMatchObject({ ok: false, text: 'Il Red Team è in pausa: tornerà dopo il rilascio' });
 });
