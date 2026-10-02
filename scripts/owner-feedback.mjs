@@ -263,9 +263,8 @@ export async function segnaLocale(id, valore, opts = {}) {
   const chiusa = !!check.chiusa;
   if (opts.dryRun) return { ok: true, dryRun: true, segno, chiusa };
   const fields = segno ? { localOnly: toFsValue(segno) } : {};
-  // Togliere il segno toglie anche il sì dell'owner (#913): un'approvazione non resta senza il lavoro che approvava.
-  const maschera = valore ? 'updateMask.fieldPaths=localOnly' : 'updateMask.fieldPaths=localOnly&updateMask.fieldPaths=localApproval';
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${maschera}`, {
+  // Il sì dell'owner (#913) resta anche col segno tolto: si dà solo dai Ricevuti, e senza il segno non si rimetterebbe.
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=localOnly`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
@@ -274,6 +273,8 @@ export async function segnaLocale(id, valore, opts = {}) {
   if (!chiusa) return { ok: true, segno };
   // Tolto da una pratica chiusa: la scheda la rimette l'app dell'owner alla prossima sincronizzazione della bacheca.
   if (!valore) return { ok: true, segno, chiusa };
+  // Il feedback di un utente approvato tiene la scheda: è da lì che chi l'ha mandato vede la risoluzione.
+  if (!MR.isPrivateLocalWork({ ...fb, localOnly: segno })) return { ok: true, segno, chiusa };
   const scheda = await togliScheda(id, bearer);
   return { ok: true, segno, chiusa, scheda };
 }

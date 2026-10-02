@@ -433,7 +433,7 @@ test('--non-locale su un lavoro locale chiuso: toglie il segno, lo dice, e non c
     assert.equal(r.ok, true, r.motivo);
     assert.equal(r.chiusa, true);
     assert.equal(scritture.length, 1, scritture.join('\n'));
-    assert.match(scritture[0], /^PATCH .*\/feedback\/c1\?updateMask\.fieldPaths=localOnly&updateMask\.fieldPaths=localApproval$/);
+    assert.match(scritture[0], /^PATCH .*\/feedback\/c1\?updateMask\.fieldPaths=localOnly$/);
   } finally { globalThis.fetch = vero; }
 });
 
