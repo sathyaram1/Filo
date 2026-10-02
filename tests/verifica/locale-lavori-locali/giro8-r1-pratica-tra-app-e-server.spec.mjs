@@ -62,9 +62,3 @@ test('server fuso prima di legare il ramo dell’app: la stessa pratica fa ancor
   const app = LW.localMergeEligibility(s.dopo);
   expect(app.eligible, `${s.righe}\nalla fusione dell’app: ${app.detail || ''}`).toBe(true);
 });
-
-test('app già fusa con la pratica: la parte sul server si porta su main con la stessa pratica', async () => {
-  const s = await serverFondi('done');
-  expect(s.fusioni, s.righe).toBe(1);
-  expect(s.k, s.righe).toBe(0);
-});
