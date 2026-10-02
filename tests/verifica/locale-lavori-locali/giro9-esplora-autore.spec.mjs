@@ -23,7 +23,10 @@ test('Gestione: bolla e testata per ogni mittente', async ({ openTab }) => {
     await expect(page.locator('#mgThread .mg-bubble-body').first()).toContainText('Testo della segnalazione.');
     const chi = await page.locator('#mgThread .mg-bubble').allInnerTexts();
     const testata = (await page.locator('#senderLink').textContent()).trim();
-    out[fb._id] = { chi, testata };
+    await page.locator('#senderLink').click();
+    await page.waitForTimeout(250);
+    const lato = (await page.locator('.mg-sidebar, #mgSidebar, aside').last().innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
+    out[fb._id] = { chi, testata, lato };
     if (fb._id === 'ses' || fb._id === 'own') {
       for (const tema of ['light', 'dark']) {
         await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
