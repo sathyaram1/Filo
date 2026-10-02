@@ -172,8 +172,9 @@ test('legare un lavoro locale a una pratica: sì a owner e sessioni con la prova
   }
   await conRete(documento('r1', { clientId: 'routine:worker', senderProof: 'server', status: 'todo' }), async () => {
     const r = await mod.praticaPerLaSessione('r1', OPTS);
-    assert.deepEqual([r.ok, r.utente], [false, false]);
-    assert.doesNotMatch(mod.rifiutoPratica('r1', r), /--serve-locale/);
+    assert.deepEqual([r.ok, r.utente, r.routine], [false, false, true]);
+    // #914: una routine che scopre il lavoro locale lo rimanda nei Ricevuti, dove l'owner lo approva (#913).
+    assert.match(mod.rifiutoPratica('r1', r), /owner-feedback.mjs r1 --serve-locale/);
   });
 });
 
@@ -432,6 +433,6 @@ test('--non-locale su un lavoro locale chiuso: toglie il segno, lo dice, e non c
     assert.equal(r.ok, true, r.motivo);
     assert.equal(r.chiusa, true);
     assert.equal(scritture.length, 1, scritture.join('\n'));
-    assert.match(scritture[0], /^PATCH .*\/feedback\/c1\?updateMask\.fieldPaths=localOnly$/);
+    assert.match(scritture[0], /^PATCH .*\/feedback\/c1\?updateMask\.fieldPaths=localOnly&updateMask\.fieldPaths=localApproval$/);
   } finally { globalThis.fetch = vero; }
 });
