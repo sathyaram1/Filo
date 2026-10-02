@@ -666,14 +666,33 @@
   function localSenderCheck(fb) {
     if (!fb) return { ok: false, motivo: 'feedback non trovato' };
     if (isProvenLocalSender(fb)) return { ok: true };
+    if (isLocalApproved(fb)) return { ok: true, approvato: true };
     const cid = String(fb.clientId || '');
     if (LOCAL_SENDER_RE.test(cid)) {
-      return { ok: false, utente: true, senzaProva: true, motivo: 'il mittente non porta la prova (#595): vale come un feedback di un utente, e in locale i feedback degli utenti non si lavorano' };
+      return { ok: false, utente: true, senzaProva: true, motivo: 'il mittente non porta la prova (#595): vale come un feedback di un utente, e in locale si lavora solo se l’owner lo approva come lavoro locale' };
     }
     if (RESERVED_CLIENT_RE.test(cid) && SENDER_PROOFS.includes(fb.senderProof)) {
-      return { ok: false, motivo: 'l’ha aperto una routine: in locale si lavorano solo i feedback dell’owner o di una sessione locale' };
+      return { ok: false, routine: true, motivo: 'l’ha aperto una routine: in locale si lavora solo se l’owner lo approva come lavoro locale' };
     }
-    return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale non si lavora' };
+    return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale si lavora solo se l’owner lo approva come lavoro locale' };
+  }
+
+  /**
+   * L'owner può approvare ADESSO questo feedback come lavoro locale (#913)? PURA. Solo nei Ricevuti, solo su chi
+   * non è già owner o sessione con la prova (a quelli basta il segno). `segnalato`: il motivo per guardarlo prima;
+   * da Gestione l'owner approva lo stesso, lo script no (come «È mio»).
+   */
+  function localApprovalCheck(fb, opts) {
+    if (!fb) return { ok: false, motivo: 'feedback non trovato' };
+    if (statusUnreadable(fb)) return { ok: false, motivo: 'lo stato non si legge: non so dove sta la pratica' };
+    if (isLocalApproved(fb)) return { ok: false, motivo: 'l’hai già approvato come lavoro locale' };
+    if (isProvenLocalSender(fb)) return { ok: false, motivo: 'è tuo o di una tua sessione: basta il segno «solo in locale»' };
+    if (manageTabFor(fb, opts) !== 'inbox') return { ok: false, motivo: 'si approva come lavoro locale dai Ricevuti' };
+    const status = normalizeStatus(fb).status;
+    const segnalato = /^(attack|spam|suspicious_file)$/.test(status)
+      ? `è segnalato come ${status === 'spam' ? 'spam' : status === 'attack' ? 'attacco' : 'file sospetto'}`
+      : segnalatoComeAttacco({ status, pipeline: fb.pipeline });
+    return segnalato ? { ok: true, segnalato } : { ok: true };
   }
 
   function richiestaInAttesa(fb, opts) {
