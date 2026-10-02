@@ -66,6 +66,8 @@
     send,
     faviconUrl: (url) => faviconUrl(url),
     applyCommandCwd: (actions) => Term.applyCommandCwd(actions),
+    // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
+    paroleUtente: () => threadHistory.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')),
   });
   // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
   if (window.filo?.onAperturaFermata) {
