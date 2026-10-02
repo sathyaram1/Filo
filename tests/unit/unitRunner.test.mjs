@@ -26,7 +26,7 @@ import { spawnSync } from 'node:child_process';
 import {
   collectTestFiles, fileArgs, isTestFile, UNIT_DIR, REPO_ROOT, TETTO_WINDOWS, TETTO_RIGA,
   gruppiDiLancio, perLaRiga, flagsConRiepilogo, sommaRiepiloghi, testoRiepilogo,
-  allaLettera, nomeNonLanciabile, NODE_LEGGE_MODELLI, destinazioniSuFile, unisciRapporti, chiedeWatch, chiedeCopertura,
+  allaLettera, nomeNonLanciabile, NODE_LEGGE_MODELLI, rapportiDaRiunire, separaArgomenti, unisciRapporti, chiedeWatch, chiedeCopertura,
 } from '../../scripts/run-unit-tests.mjs';
 import { costoArgomentoWindows, lottiPerRigaDiComando } from '../../scripts/lib/riga-di-comando.mjs';
 import { lottiPerRigaDiComando as lottiDiFinish } from '../../scripts/finish-local.mjs';
