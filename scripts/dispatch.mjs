@@ -1990,7 +1990,7 @@ if (isMainModule) {
   const argv = mano.args;
   const bigliettoAMano = mano.ticket;
   const flag = argv[0];
-  if (bigliettoAMano && (flag === '--preflight' || flag === '--clear-state')) {
+  if (bigliettoAMano && (flag === '--preflight' || flag === '--clear-state' || flag === '--linea-principale')) {
     console.error(`--ticket non vale con ${flag}: lì un biglietto non serve. Niente è stato toccato.`);
     process.exit(1);
   }
