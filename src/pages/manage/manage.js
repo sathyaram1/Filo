@@ -5143,6 +5143,8 @@
   let smSharedNicknames = [];
   // Registro con cui l'app risolve gli slot spostati (#465): arriva col GET.
   let smAppRegistry = {};
+  // Slot spostati mai impostati → catena mostrata: se al salvataggio è ancora quella non si scrive (#465).
+  let smUnsetShown = {};
   let smLoaded  = false;    // true dopo il primo caricamento riuscito
   let smLoading = false;    // guard anti-doppio-caricamento
 
