@@ -145,7 +145,7 @@
         return;
       }
       sendBtn.disabled = !hasText;
-      if (daInput && statusEl.classList.contains('sn-rt-status--err') && hasText) setStatus('');
+      if (statusEl.classList.contains('sn-rt-status--err') && hasText) setStatus('');
     }
 
     // ---- bozze persistenti (sopravvivono a chiusura/riapertura) ----
@@ -164,7 +164,7 @@
     const onInput = () => {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(saveDraft, 250);
-      refreshSendState({ daInput: true });
+      refreshSendState();
     };
     attackEl.addEventListener('input', onInput);
     descEl.addEventListener('input', onInput);
