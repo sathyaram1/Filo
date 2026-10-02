@@ -2410,9 +2410,12 @@ class TabManager {
       const { url, disposition } = details;
       // Da una pagina di Filo l'indirizzo l'ha scelto quasi sempre un modello: passa dalla porta delle uscite (#810).
       if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
+        const fromUrl = (details.referrer && details.referrer.url) || wc.getURL();
         globalThis.SN_USCITA_DA_FILO(url, wc, () => {
           if (isWebUnsafeNav(url)) openExternalScheme(url);
-          else this.openTab(url, { activate: disposition !== 'background-tab', openedByLink: true });
+          else if (!this._maybeBlockNavigation(tab, url, { fromUrl })) {
+            this.openTab(url, { activate: disposition !== 'background-tab', openedByLink: true });
+          }
         }).catch(() => {});
         return { action: 'deny' };
       }
