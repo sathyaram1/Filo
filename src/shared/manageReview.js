@@ -512,6 +512,8 @@
       return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
     }
     if (status === 'aligned') {
+      const saltati = judgesSkippedText(fb);
+      if (saltati) return { text: `${saltati} Aspetta la tua approvazione.`, color: S.aligned.color };
       const worst = worstVerdictBlock(fb);
       if (worst) {
         return { text: `Un giudice ha segnalato: ${worst.label.toLowerCase()}. Da esaminare prima di approvare.`, color: worst.color };
