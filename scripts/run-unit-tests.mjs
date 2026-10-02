@@ -2,7 +2,7 @@
 // `node --test` relativi alla root e, se la riga supera il tetto di Windows, a gruppi con un riepilogo unico (#765).
 // Zero file = uscita rossa. `--list` stampa i file; ogni altro argomento è un flag di `node --test`. Sentinella: tests/unit/unitRunner.test.mjs.
 
-import { readdirSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve, dirname, join, relative, isAbsolute, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -216,6 +216,10 @@ const lancia = (args) => new Promise((ok) => {
   c.on('close', (status, signal) => ok({ status, signal }));
 });
 
+function leggiTesto(file) {
+  try { return readFileSync(file, 'utf8'); } catch (_) { return ''; }
+}
+
 function leggiRighe(file) {
   try {
     return readFileSync(file, 'utf8').split('\n').filter(Boolean).flatMap((l) => {
@@ -297,10 +301,22 @@ async function main() {
       if (r.status === null) { esiti.push(1); interrotto = i + 1 < gruppi.length; break; }
       esiti.push(r.status);
     }
+    // Relative alla root come per node, che gira lì.
+    let rapportoGuasto = false;
+    rapporti.forEach((dest, k) => {
+      try {
+        writeFileSync(resolve(REPO_ROOT, dest), unisciRapporti(esiti.map((_, i) => leggiTesto(copia(i)(k)))));
+      } catch (e) {
+        console.error(`[test:unit] non sono riuscito a scrivere il rapporto in ${dest}: ${e.message}`);
+        rapportoGuasto = true;
+      }
+    });
     const somma = flagsGruppo(0) ? sommaRiepiloghi(esiti.map((_, i) => leggiRighe(destinazione(i)))) : null;
-    await scrivi(testoRiepilogo({ somma, gruppi: gruppi.length, file: files.length, esiti, interrotto }));
+    await scrivi(testoRiepilogo({
+      somma, gruppi: gruppi.length, file: files.length, esiti, interrotto, rapporti, copertura: chiedeCopertura(flags),
+    }));
     // `exitCode` e non `exit()`, come sopra: l'ultima riga non deve perdersi.
-    process.exitCode = esiti.find((e) => e !== 0) ?? 0;
+    process.exitCode = esiti.find((e) => e !== 0) ?? (rapportoGuasto ? 1 : 0);
   } finally {
     rmSync(cartella, { recursive: true, force: true });
   }
