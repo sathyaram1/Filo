@@ -175,7 +175,7 @@ test('approvato: start/finish --feedback e i passaggi del lavoro lo accettano; s
   });
 });
 
-test('--non-locale su un approvato toglie anche il sì', async () => {
+test('--non-locale su un approvato toglie il segno e lascia il sì: il segno si rimette senza tornare nei Ricevuti', async () => {
   const doc = documento('a2', {
     clientId: 'utente-7', status: 'todo', statusPublic: 'open', localOnly: mappa(SEGNO), localApproval: mappa(SI),
   });
@@ -185,4 +185,20 @@ test('--non-locale su un approvato toglie anche il sì', async () => {
     assert.match(patch[0].url, /updateMask\.fieldPaths=localApproval/);
     assert.deepEqual(patch[0].body.fields, {});
   });
+});
+
+// Il gemello è il test di guardPublicCard nel server: stessa regola, isPrivateLocalWork.
+test('#913: risolto, il feedback di un utente approvato come lavoro locale tiene la scheda pubblica; il lavoro dell’owner no', () => {
+  require(join(ROOT, 'src', 'shared', 'feedbackPublicView.js'));
+  const V = globalThis.SN_FEEDBACK_PUBLIC_VIEW;
+  const base = { _id: 'u-1', name: 'Il terminale non parte', seq: 950, subSeq: 0, status: 'done', statusPublic: 'closed', createdAt: '2026-10-01T07:00:00Z' };
+  assert.notEqual(V.cardFor({ ...base, clientId: 'utente-7', localOnly: SEGNO, localApproval: SI }), null);
+  assert.equal(V.cardFor({ ...base, clientId: 'local:claude', senderProof: 'admin', localOnly: SEGNO }), null);
+  assert.equal(MR.isPrivateLocalWork({ clientId: 'utente-7', localOnly: SEGNO, localApproval: SI }), false);
+  assert.equal(MR.isPrivateLocalWork({ clientId: 'local:claude', senderProof: 'admin', localOnly: SEGNO }), true);
+});
+
+test('#913: tolto il segno, il sì dell’owner resta e il segno si rimette, anche da riga di comando', async () => {
+  const fb = { clientId: 'utente-7', status: 'todo', statusPublic: 'open', localApproval: SI };
+  assert.equal(MR.localSignCheck(fb, true).ok, true, MR.localSignCheck(fb, true).motivo);
 });
