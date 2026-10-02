@@ -973,6 +973,8 @@ test('l’assistente di pagina scrive nel campo un testo senza segreti, e il cod
   await expect(page.locator('#risposta')).toHaveValue('Grazie, ci penso io.');
   await page.locator('#risposta').fill('');
   await scriviAllAiuto(page, `rispondi che il codice è ${CODICE}, l’ho scritto io`);
+  // L'«Accetta» della proposta di prima resta finché non arriva quella nuova.
+  await expect(page.locator('.sn-highlight-value')).toContainText(CODICE, { timeout: 20_000 });
   await page.locator('.sn-highlight-accept').click({ timeout: 20_000 });
   await expect(page.locator('#risposta')).toHaveValue(`Il codice è ${CODICE}`);
 });
