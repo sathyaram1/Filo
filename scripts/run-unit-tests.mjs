@@ -93,19 +93,34 @@ const DESTINAZIONE = '--test-reporter-destination';
  * Ogni destinazione su file dei flag dati sostituita da `copia(k)`: a gruppi ogni `node --test` riscriverebbe da capo
  * lo stesso file e resterebbe solo l'ultimo gruppo. `file` sono le destinazioni chieste, nell'ordine. PURA.
  */
-export function destinazioniSuFile(flags, copia) {
-  const out = [];
-  const file = [];
+export function rapportiDaRiunire(flags, copia) {
+  const reporter = [];
+  const destinazioni = [];
+  const resto = [];
   for (let i = 0; i < flags.length; i++) {
     const a = flags[i];
-    const unito = a.startsWith(`${DESTINAZIONE}=`);
-    if (!unito && !(a === DESTINAZIONE && i + 1 < flags.length)) { out.push(a); continue; }
-    const valore = unito ? a.slice(DESTINAZIONE.length + 1) : flags[++i];
-    if (valore === 'stdout' || valore === 'stderr') { out.push(`${DESTINAZIONE}=${valore}`); continue; }
-    out.push(`${DESTINAZIONE}=${copia(file.length)}`);
-    file.push(valore);
+    const lista = a === REPORTER || a.startsWith(`${REPORTER}=`) ? reporter
+      : a === DESTINAZIONE || a.startsWith(`${DESTINAZIONE}=`) ? destinazioni : null;
+    const nome = lista === reporter ? REPORTER : DESTINAZIONE;
+    if (!lista || (a === nome && i + 1 >= flags.length)) { resto.push(a); continue; }
+    lista.push(a === nome ? flags[++i] : a.slice(nome.length + 1));
   }
-  return { flags: out, file };
+  // Come node: un reporter senza destinazione va su stdout; con numeri diversi è node a rifiutare, e i flag restano.
+  if (!destinazioni.length && reporter.length === 1) destinazioni.push('stdout');
+  if (destinazioni.length !== reporter.length) return { flags, rapporti: [] };
+  const rapporti = [];
+  const coppie = reporter.flatMap((r, k) => {
+    const d = destinazioni[k];
+    const daRiunire = d === 'stdout' ? DOCUMENTI.has(r) : d !== 'stderr';
+    if (daRiunire) rapporti.push(d);
+    return [`${REPORTER}=${r}`, `${DESTINAZIONE}=${daRiunire ? copia(rapporti.length - 1) : d}`];
+  });
+  return { flags: [...resto, ...coppie], rapporti };
+}
+
+/** Dove sta un rapporto riunito, detto in una frase. PURA. */
+export function doveRapporto(d) {
+  return d === 'stdout' ? "sull'uscita standard" : `in ${d}`;
 }
 
 /** I rapporti dei gruppi in uno: dei junit resta un documento solo, gli altri formati si accodano. PURA. */
