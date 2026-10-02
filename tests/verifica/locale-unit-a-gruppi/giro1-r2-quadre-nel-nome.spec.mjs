@@ -8,7 +8,6 @@ import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
 const ROOT = resolve(process.cwd());
 
-test.fail(true, 'rilievo 2 aperto: il nome con le quadre viene letto come un modello e il file non gira');
 
 test('un test rosso in un file con le quadre nel nome rende rosso l’esito', () => {
   const dir = cartellaTemporanea('unit-quadre-');
