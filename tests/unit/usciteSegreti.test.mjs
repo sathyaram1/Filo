@@ -554,6 +554,7 @@ describe('quello che da fuori arriva a un modello conta come letto, per qualunqu
     await gate.complete({ action: 'x', messages });
     await gate.stream({ action: 'x', messages });
     assert.deepEqual(visti, [messages, messages]);
+    const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
     assert.ok(/ricordaEsterni:\s*\(messages\)\s*=>\s*SegretiLetti\.ricordaBuste\(messages\)/.test(handlers), 'il cancello di Filo non ricorda il contenuto esterno');
   });
 
