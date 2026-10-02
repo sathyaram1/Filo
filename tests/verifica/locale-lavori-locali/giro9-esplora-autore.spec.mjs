@@ -21,7 +21,7 @@ test('Gestione: bolla e testata per ogni mittente', async ({ openTab }) => {
   for (const fb of FBS) {
     await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
     await expect(page.locator('#mgThread .mg-bubble-body').first()).toContainText('Testo della segnalazione.');
-    const chi = await page.locator('#mgThread .mg-bubble-who').allTextContents();
+    const chi = await page.locator('#mgThread .mg-bubble').allInnerTexts();
     const testata = (await page.locator('#senderLink').textContent()).trim();
     out[fb._id] = { chi, testata };
   }
