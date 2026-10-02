@@ -244,12 +244,27 @@ async function main() {
     return;
   }
 
+  if (NODE_LEGGE_MODELLI) {
+    const persi = files.filter((f) => nomeNonLanciabile(perLaRiga(f)));
+    if (persi.length) {
+      console.error('[test:unit] questi file hanno nel nome graffe che node --test espande come un modello, e non girerebbero:');
+      for (const f of persi) console.error(`  ${perLaRiga(f)}`);
+      console.error('[test:unit] togli la virgola o i due punti fra le graffe dal nome: mi fermo.');
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   // I gruppi si contano coi flag del riepilogo già dentro: sono i più lunghi che la riga potrà portare.
   const cartella = mkdtempSync(join(tmpdir(), 'filo-unit-'));
   const destinazione = (i) => join(cartella, `gruppo-${String(i + 1).padStart(4, '0')}.jsonl`);
-  const flagsGruppo = (i) => flagsConRiepilogo(flags, destinazione(i), { tty: !!process.stdout.isTTY });
-  const gruppi = gruppiDiLancio(files, { flags: flagsGruppo(0) || flags });
+  const copia = (i) => (k) => join(cartella, `rapporto-${k + 1}-gruppo-${String(i + 1).padStart(4, '0')}`);
+  const utente = (i) => destinazioniSuFile(flags, copia(i));
+  const flagsGruppo = (i) => flagsConRiepilogo(utente(i).flags, destinazione(i), { tty: !!process.stdout.isTTY });
+  const flagsDi = (i) => flagsGruppo(i) || utente(i).flags;
+  const gruppi = gruppiDiLancio(files, { flags: flagsDi(0) });
   const tanti = gruppi.length > 1;
+  const rapporti = utente(0).file;
 
   try {
     if (!tanti) {
