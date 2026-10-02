@@ -298,7 +298,7 @@ const editorInComponente = (modo) => `<!doctype html><html><head>
     const r = document.getElementById('h').attachShadow({ mode: '${modo}' });
     const f = document.createElement('iframe'); f.style.cssText = '${PIENO}'; r.appendChild(f);
     const d = f.contentDocument; d.open();
-    d.write('<body contenteditable style="margin:0;height:3000px"><h2>scrivi qui</h2></body>'); d.close();
+    d.write('<body style="margin:0;height:3000px"><h2 contenteditable>scrivi qui</h2></body>'); d.close();
   </script></body></html>`;
 const casiRiquadro = {
   'srcdoc': () => `<!doctype html><html><body style="margin:0"><iframe srcdoc="<div style='height:3000px'>contenuto</div>" style="${PIENO}"></iframe></body></html>`,
@@ -308,6 +308,7 @@ const casiRiquadro = {
     return `<!doctype html><html><body style="margin:0"><iframe src="${esterno}" style="${PIENO}"></iframe></body></html>`;
   },
   // Editor di testo ricco costruito dentro un componente della pagina (shadow DOM).
+  // I gesti cadono fuori dal testo: su Linux nel testo la rotella premuta incolla.
   'riempito dalla pagina dentro un componente aperto': () => editorInComponente('open'),
   'riempito dalla pagina dentro un componente chiuso': () => editorInComponente('closed'),
   'riempito dalla pagina dentro un componente chiuso, in un riquadro di un altro sito': (s) =>
