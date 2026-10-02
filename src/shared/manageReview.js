@@ -95,6 +95,11 @@
   function isProvenLocalWork(fb) {
     return isLocalOnly(fb) && isLocalWorkSender(fb);
   }
+  // Senza scheda pubblica solo il lavoro dell'owner e delle sessioni: il feedback di un utente approvato come lavoro
+  // locale (#913) la tiene, è da lì che chi l'ha mandato vede la risoluzione. Gemello: isPrivateLocalWork sul server.
+  function isPrivateLocalWork(fb) {
+    return isLocalOnly(fb) && !isLocalApproved(fb);
+  }
   // Prefisso dell'owner o di una sessione senza prova: solo l'owner può dire che è suo, e dargliela (#908).
   function mittenteDaRiconoscere(fb) {
     return isUnprovenSender(fb) && LOCAL_SENDER_RE.test(String(fb.clientId || ''));
@@ -1571,7 +1576,7 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient, isUnprovenSender, effectiveClientId,
-    isLocalOnly, isLocalApproved, isLocalWorkSender, isProvenLocalSender, isProvenLocalWork, isRicevutiStatus, localApprovalCheck,
+    isLocalOnly, isLocalApproved, isLocalWorkSender, isPrivateLocalWork, isProvenLocalSender, isProvenLocalWork, isRicevutiStatus, localApprovalCheck,
     localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco, mittenteDaRiconoscere,
     panelComplete, judgesNote, reasonText,
