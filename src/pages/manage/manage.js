@@ -5412,7 +5412,9 @@
     if (!smLoaded) return;
     const models = {};
     for (const slot of SM_SLOTS) {
-      models[slot] = smChains[slot] ? smChains[slot].getValue() : '';
+      const value = smChains[slot] ? smChains[slot].getValue() : '';
+      if (slot in smUnsetShown && value === smUnsetShown[slot]) continue;
+      models[slot] = value;
     }
     const judgeRegistry = collectJudgeRegistry();
     const openrouterKey = mgSmKeyInput ? mgSmKeyInput.value.trim() : '';
