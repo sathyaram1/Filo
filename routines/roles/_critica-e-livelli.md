@@ -89,7 +89,7 @@ Appena cominci lancia `npm run finish:check` **in sottofondo** (unit test più
 gli spec delle aree toccate dal ramo: da quindici a quarantacinque minuti) e
 lavora mentre gira: aspettarlo alla fine vorrebbe dire ripagare tutto il
 contesto. L'esito lo leggi prima di registrare. La suite intera (`npm test`)
-non la lancia nessuno: gira in GitHub prima di ogni pubblicazione.
+non la lancia nessuno: gira in GitHub a ogni fusione su main.
 
 - Un rosso **fuori dai rossi noti** è un rilievo di livello 2, interno se
   l'ha rotto il ramo (il confronto con `main` lo dice), con l'elenco esatto

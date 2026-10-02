@@ -656,9 +656,7 @@ async function main() {
       process.exit(1);
     }
     // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
-    //    Actions, nel lavoro di release, ogni sei ore prima di pubblicare
-    //    (dal 2026-09-15: nessun ruolo e nessuna sessione la lancia): qui
-    //    serve il segnale rapido.
+    //    Actions, a ogni fusione su main: qui serve il segnale rapido.
     if (blocking.length) {
       if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`)) {
         console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');

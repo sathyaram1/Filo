@@ -2259,7 +2259,7 @@ if (isMainModule) {
       // cade dopo un'ora di silenzio (era mezz'ora quando è nato il battito) e
       // una lavorazione lunga (finish:check più le prove del giro) lo supera
       // — la suite completa, che lo superava sempre, dal 2026-09-15 gira solo
-      // in GitHub Actions nel lavoro di release, mai nelle routine —
+      // in GitHub Actions a ogni fusione su main, mai nelle routine —
       // quindi senza battito ogni lavorazione lunga arriva alla consegna con un
       // biglietto morto (è già costato un giro intero: venti commit spinti e
       // nessun esito registrato). Chiederlo al prompt del lavoratore è la
