@@ -85,6 +85,10 @@
       pieces.push(dec);
       cur = dec;
     }
+    for (const p of pieces.slice()) {
+      const base = formaBase(p);
+      if (base !== p) pieces.push(base);
+    }
     // Decodifica base64 dei token lunghi (sulla forma già urldecodata). `=` è un
     // separatore qui (es. "p=<base64>"): il padding lo ripristina tryBase64.
     const joined = pieces.join(' ');
