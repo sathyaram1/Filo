@@ -184,3 +184,15 @@ test('il giudizio AI che parte dopo l\'età la riceve, e l\'avviso dell\'età ar
   assert.equal(Math.round(conta.llm[0].ageDays), 10);
   libera();
 });
+
+test('un sito in whitelist col certificato rotto ha l\'avviso, ma niente giudizio AI né finestra isolata', async () => {
+  SB.setProviders({
+    llm: async (m) => { conta.llm.push(m); return { suspicious: false, reason: null }; },
+    sandbox: async (u) => { conta.sandbox.push(u); return { verdict: 'clean', finalUrl: u, redirects: [] }; },
+  });
+  SB.recordCert('www.google.com', 'mismatch');
+  const v = SB.analyze('https://www.google.com/', {}, () => {});
+  await new Promise((ok) => setTimeout(ok, 20));
+  assert.equal(v.level, 'sospetto');
+  assert.deepEqual([conta.llm.length, conta.sandbox.length, conta.rdap.length], [0, 0, 0]);
+});

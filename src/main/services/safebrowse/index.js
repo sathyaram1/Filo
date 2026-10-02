@@ -224,6 +224,9 @@ function ageUnknowable(norm, url) {
   return norm.isIp || norm.ospitato || whitelist.isWhitelisted(norm.registrable) || !!whitelist.hostedPlatform(norm.host, pathOf(url));
 }
 
+// Un indizio non conclusivo, mai su un sito in whitelist: lì l'identità è certa e il giudizio non ha niente da aggiungere.
+const deepWorth = (v) => !v.whitelisted && (v.level === 'sospetto' || v.needsLlm);
+
 const settle = (v) => Promise.resolve(v).then((r) => r, () => net.TRANSIENT);
 
 // crt.sh solo se RDAP non ha dato l'età.
@@ -288,7 +291,7 @@ function analyze(url, ctx = {}, onUpdate) {
   const need = assembleCached(norm, url);
   const key = pageKey(norm, url);
   // Il nome del sito esce verso i registri solo con lo stesso indizio che chiama il giudice (#894).
-  const worthDeepening = first.level === 'sospetto' || first.needsLlm;
+  const worthDeepening = deepWorth(first);
 
   if (providers.gsb && need.gsb === undefined) {
     const gsb = providers.gsb;
@@ -312,7 +315,7 @@ function analyze(url, ctx = {}, onUpdate) {
   // l'età: un sito vecchio con una password perde l'indizio senza spendere giudizio e finestra, e il giudizio la riceve.
   const bKey = budgetKey(norm, url, ctx.budgetUrl);
   const deepTasks = (verdict) => {
-    if (!(verdict.level === 'sospetto' || verdict.needsLlm)) return [];
+    if (!deepWorth(verdict)) return [];
     const siteKey = key + '|' + cluesOf(norm, ctx, verdict);
     const out = [];
     if (providers.llm && llmCache.get(key) === undefined) {
