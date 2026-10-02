@@ -128,6 +128,20 @@ class AnteprimeSchede {
       if (tab._anteprimaSeq !== n) return;
       this._salva(tab, daCattura(img));
     }).catch(() => {});
+    if (tab.loading || Date.now() - (tab._anteprimaArrivata || 0) < ASSESTAMENTO) this._lasciataAMeta(tab);
+  }
+
+  // La foto del congedo è mezza vuota: a caricamento finito si rifà, e la spia, messa adesso, vede cosa arriva dopo.
+  _lasciataAMeta(tab) {
+    if (tab.loading) {
+      tab._anteprimaAttesa = TENTATIVI;
+      tab._anteprimaRipresa = false;
+    }
+    this._segui(tab, { nuova: true });
+    const s = tab._anteprimaSegui;
+    this._spia(tab, SPIA).then((r) => {
+      if (r && typeof r.n === 'number' && tab._anteprimaSegui === s && s.n === null) s.n = r.n;
+    });
   }
 
   // Finito di caricare: una scheda di dietro mai fotografata entra in coda.
