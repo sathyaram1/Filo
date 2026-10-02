@@ -87,6 +87,19 @@
   function isProvenLocalWork(fb) {
     return isLocalOnly(fb) && isProvenLocalSender(fb);
   }
+  // Giudici saltati alla nascita (#908, #914): `pipeline.skipped` lo scrive solo il server, che lo decide con la
+  // prova del mittente (functions/src/nascita.js). Senza mittente provato non vale, e la pratica resta da giudicare.
+  const GIUDICI_SALTATI = Object.freeze({
+    local_proven: 'Lavoro locale aperto da te o da una sessione, con la prova del mittente. I giudici non servono.',
+    session_proven: 'Aperto da una sessione per le routine, con la prova del mittente. I giudici non servono.',
+    routine_proven: 'Aperto da una routine, con la prova del server. I giudici non servono.',
+  });
+  function judgesSkippedText(fb) {
+    const p = fb && fb.pipeline;
+    const k = p && typeof p === 'object' ? String(p.skipped || '') : '';
+    if (!Object.prototype.hasOwnProperty.call(GIUDICI_SALTATI, k)) return '';
+    return isTrustedClient(fb.clientId, fb.senderProof) ? GIUDICI_SALTATI[k] : '';
+  }
   // Prefisso dell'owner o di una sessione senza prova: solo l'owner può dire che è suo, e dargliela (#908).
   function mittenteDaRiconoscere(fb) {
     return isUnprovenSender(fb) && LOCAL_SENDER_RE.test(String(fb.clientId || ''));
