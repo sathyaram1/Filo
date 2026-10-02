@@ -211,7 +211,7 @@ export function sommaRiepiloghi(gruppi) {
 }
 
 /** Le righe finali di una suite a gruppi: conti di tutti i gruppi, rossi uno per riga, verdetto. PURA. */
-export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false, root = REPO_ROOT, rapporti = [], copertura = false }) {
+export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false, root = REPO_ROOT, rapporti = [], rapportiPersi = [], copertura = false }) {
   // somma null: coi flag dati il reporter del riepilogo non si poteva aggiungere, restano i verdetti dei gruppi.
   const n = esiti.length;
   const rossiGruppi = esiti.map((e, i) => (e === 0 ? 0 : i + 1)).filter(Boolean);
