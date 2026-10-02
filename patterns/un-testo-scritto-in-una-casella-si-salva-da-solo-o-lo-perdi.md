@@ -111,6 +111,8 @@ sito e concludeva che la lista non funzionava (#590.2).
   `blur`: Ctrl+W si prova con `sendInputEvent`, prima il Ctrl da solo e poi la
   lettera.
 - **Dove:** `testoCambiato`, `spedisci`, `uscita`, `righe`, `save` e
-  `saveCookies` in `src/pages/security/security.js`. Test:
-  `tests/security-liste-non-si-perdono.spec.mjs`. Le pagine Opzioni e Altro
+  `saveCookies` in `src/pages/security/security.js`; `riapplicaListaBloccati`,
+  `_riapriQuandoTiene` e `activate` in `src/main/tabs.js`. Test:
+  `tests/security-liste-non-si-perdono.spec.mjs` e i due casi sulla riga a metà
+  in `tests/siteBlock-strade.spec.mjs`. Le pagine Opzioni e Altro
   hanno ancora campi che si salvano solo al `change` (#590.5).
