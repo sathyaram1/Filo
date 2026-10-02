@@ -276,12 +276,18 @@ async function main() {
       return;
     }
 
+    if (chiedeWatch(flags)) {
+      console.error(`[test:unit] ${files.length} file vanno in ${gruppi.length} gruppi, e --watch non finisce mai il primo: gli altri non partirebbero.`);
+      console.error('[test:unit] per guardare dei test mentre li cambi, lancia node --test --watch sui loro file.');
+      process.exitCode = 1;
+      return;
+    }
     await scrivi(`[test:unit] ${files.length} file in ${gruppi.length} gruppi: tutti insieme non stanno in una riga di comando di Windows.`);
     const esiti = [];
     let interrotto = false;
     for (const [i, gruppo] of gruppi.entries()) {
       await scrivi(`\n[test:unit] gruppo ${i + 1} di ${gruppi.length} (${gruppo.length} file)`);
-      const r = await lancia(['--test', ...(flagsGruppo(i) || flags), ...gruppo]);
+      const r = await lancia(['--test', ...flagsDi(i), ...gruppo]);
       if (r.error) {
         console.error(`[test:unit] non sono riuscito a lanciare node per il gruppo ${i + 1}: ${r.error.message}`);
         esiti.push(1);
