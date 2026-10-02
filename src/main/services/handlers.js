@@ -1304,7 +1304,7 @@ function ricordaLettoInChat(azioni, storia = []) {
 
 function lettiDallAiuto(sender) {
   const reg = sender?.wc ? LETTI_DALL_AIUTO.get(sender.wc) : null;
-  return reg ? [...reg.values()] : [];
+  return reg ? reg.tutti() : [];
 }
 
 // La porta unica delle uscite (#810, regole in src/shared/urlExfil.js → valutaUscita): la
