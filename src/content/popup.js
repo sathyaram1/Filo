@@ -68,7 +68,7 @@
     try {
       r = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_LINK, url, diFilo: true, parole: paroleAccanto(a) });
     } catch (_) {}
-    if (r && r.frase && !r.avvisato) avvisaFermata(a, r.frase);
+    if (r && r.frase) { if (!r.avvisato) avvisaFermata(a, r.frase); } else if (!r || r.ok === false) showToast(I18n.t('toast_file_save_failed'));
     return r;
   }
 

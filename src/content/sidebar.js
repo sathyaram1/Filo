@@ -709,6 +709,15 @@
   const NOTA_FERMATA = 'l\'azione che avevi chiesto NON è partita, è stata fermata: avrebbe portato fuori un codice, una password, '
     + 'una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire a nessun livello. Non riprovarla '
     + 'in un\'altra forma; dillo all\'utente in una riga (se vuole la fa lui a mano)';
+  // Un collegamento della risposta fermato al clic: la riga, e la nota nella storia per la domanda dopo. Nessun giro in
+  // più, perché l'ha chiesto l'utente e non il modello.
+  const NOTA_COLLEGAMENTO = 'l\'utente ha cliccato un collegamento della tua risposta, ma non si è aperto: avrebbe portato '
+    + 'fuori un codice, una password, una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire '
+    + 'a nessun livello. Non riproporlo in un\'altra forma';
+  function notaFermata(frase) {
+    logFermata(frase);
+    history.push({ role: 'user', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_COLLEGAMENTO, perCronologia: true }), kind: 'action' });
+  }
   let fermataDetta = false;
   function fermata(frase) {
     logFermata(frase);
@@ -1392,7 +1401,7 @@
     });
   }
 
-  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget };
+  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
   global.__filoSidebarTest = {
