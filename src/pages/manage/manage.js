@@ -1756,6 +1756,11 @@
     if (selectedId !== fb._id) openDetail(fb._id);
     setLocalSign(fb._id, valore);
   }
+  // Lo stesso cammino del tasto nel dettaglio (applyAction), che scrive solo la pratica aperta.
+  function approvaDalMenu(fb, azione) {
+    if (selectedId !== fb._id) openDetail(fb._id);
+    applyAction(azione, null);
+  }
 
   // Tasto destro su una scheda: quello che si fa su una pratica senza aprirla (#908).
   mgList.addEventListener('contextmenu', (e) => {
@@ -1780,6 +1785,10 @@
         azione: () => segnoDalMenu(fb, true),
       });
     }
+    const lavoroLocale = isAdmin ? MR.ownerActionFor(fb, 'accept_local', { releasedVersion }) : null;
+    if (lavoroLocale) {
+      voci.push({ testo: '💻 Approva come lavoro locale', titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
+    }
     if (isAdmin && MR.mittenteDaRiconoscere(fb)) {
       voci.push({ testo: '🙋 È mio', titolo: titoloEMio(fb), azione: () => { if (selectedId !== fb._id) openDetail(fb._id); setSenderProof(fb._id); } });
     }
@@ -1787,7 +1796,7 @@
       voci.push({
         testo: `Copia #${num}`,
         // Solo le pratiche tue o di una sessione si legano a un lavoro locale: per le altre il numero serve a parlarne.
-        titolo: MR.isProvenLocalSender(fb) ? 'Il numero con cui parlarne, anche a npm run finish -- --feedback' : 'Il numero con cui parlarne',
+        titolo: MR.isLocalWorkSender(fb) ? 'Il numero con cui parlarne, anche a npm run finish -- --feedback' : 'Il numero con cui parlarne',
         azione: () => { navigator.clipboard.writeText(`#${num}`).then(() => setManageMsg(`#${num} copiato.`, 'ok'), () => {}); },
       });
     }
@@ -2188,7 +2197,9 @@
     const cosa = MR.praticaChiusa(fb, { releasedVersion, fusioni })
       ? 'Era un lavoro locale: per questo non sta nella bacheca pubblica.'
       : 'Solo lavoro locale: nessuna routine la prende.';
-    return `${cosa} Segno messo da ${chiHaMessoIlSegno(m.by)}${quando}.`;
+    const a = MR.isLocalApproved(fb) ? fb.localApproval : null;
+    const si = a ? ` Approvato come lavoro locale da ${chiHaMessoIlSegno(a.by)}${Number(a.at) > 0 ? ` il ${formatDateTime(new Date(Number(a.at)).toISOString())}` : ''}: togliere il segno toglie anche l'approvazione.` : '';
+    return `${cosa} Segno messo da ${chiHaMessoIlSegno(m.by)}${quando}.${si}`;
   }
   // Una sessione firma il segno col suo mittente (`local:claude`), l'owner con l'email: il mittente si legge come in testata.
   function chiHaMessoIlSegno(by) {
@@ -2860,7 +2871,14 @@
   // Il tasto c'è dove il segno si può mettere (owner o sessione con la prova; su una pratica chiusa
   // dice che era un lavoro locale e la toglie dalla bacheca) o togliere; sui feedback degli utenti no.
   function localToggleOffered(fb) {
-    return MR.isLocalOnly(fb) || MR.isProvenLocalSender(fb);
+    return MR.isLocalOnly(fb) || MR.isProvenLocalSender(fb) || MR.isLocalApproved(fb);
+  }
+  // #913: il feedback di un utente o di una routine diventa lavoro locale col sì dell'owner, che ne ha letto il testo.
+  const TITOLO_LAVORO_LOCALE = 'Lo approvi come lavoro locale: va nei Lavori locali, nessuna routine lo prende e una sessione lo chiude senza chiederti la fusione.';
+  // Stesso avviso di «È mio»: il sì vale anche alla fusione, quindi un segnalato si guarda prima.
+  function titoloLavoroLocale(fb) {
+    const c = MR.localApprovalCheck(fb, { releasedVersion, fusioni });
+    return c.segnalato ? `${TITOLO_LAVORO_LOCALE} Attenzione: ${c.segnalato}, guardalo prima.` : TITOLO_LAVORO_LOCALE;
   }
   const TITOLO_LOCALE_CHIUSA = 'Era un lavoro locale: la segna così, e la sua scheda esce dalla bacheca pubblica.';
   // Una pratica chiusa le routine non la prendono più: togliere il segno la rimette solo nella bacheca.
@@ -2932,6 +2950,7 @@
       const r = await sendToMain({ type: 'feedback_update', id, localOnly: valore });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.localOnly = valore ? { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() } : undefined;
+      if (!valore) fb.localApproval = undefined;
       if (selectedId === id) { reflectLocal(fb); reflectPreapproved(fb); }
       renderList();
       const dove = MR.manageTabFor(fb, { releasedVersion, fusioni });
@@ -3051,6 +3070,7 @@
   // (attacco/spam confermato) con "archiviato", cancellando la conferma.
   const ACTION_BTN_ID = {
     accept: 'mgAcceptBtn',
+    accept_local: 'mgAcceptLocalBtn',
     confirm_attack: 'mgConfirmBtn',
     confirm_spam: 'mgConfirmSpamBtn',
     archive: 'mgArchiveBtn',
@@ -3060,6 +3080,7 @@
   };
   const ACTION_TITLE = {
     accept: 'Approva la segnalazione e mettila in coda di lavorazione',
+    accept_local: TITOLO_LAVORO_LOCALE,
     confirm_attack: 'Conferma che è un attacco: esce dai Ricevuti e resta consultabile negli Archiviati',
     confirm_spam: 'Conferma che è spam: esce dai Ricevuti e resta consultabile negli Archiviati',
     archive: 'Sposta la segnalazione negli archiviati',
@@ -3069,6 +3090,7 @@
   };
   const ACTION_PROGRESS = {
     accept: 'Metto in coda…',
+    accept_local: 'Lo passo nei Lavori locali…',
     confirm_attack: 'Conferma in corso…',
     confirm_spam: 'Conferma in corso…',
     archive: 'Archivio…',
@@ -3107,7 +3129,7 @@
       if (id) b.id = id;
       b.dataset.actionKey = a.key;
       b.textContent = a.label;
-      b.title = ACTION_TITLE[a.key] || a.label;
+      b.title = a.key === 'accept_local' ? titoloLavoroLocale(fb) : (ACTION_TITLE[a.key] || a.label);
       b.addEventListener('click', () => {
         // "Riapri" non scrive subito: chiede prima cosa manca ancora.
         if (a.kind === 'reopen') { apriRiapertura(); return; }
@@ -3177,14 +3199,24 @@
     if (action.kind === 'archive') { payload.archiveOverride = 'archived'; locale.archiveOverride = 'archived'; }
     if (action.kind === 'restore') { payload.archiveOverride = 'keep_open'; locale.archiveOverride = 'keep_open'; }
     if (extra && typeof extra.notes === 'string') { payload.notes = extra.notes; locale.notes = extra.notes; }
+    // #913: il segno e il sì dell'owner nella stessa scrittura dell'approvazione. Il CHI lo mette il main.
+    if (action.locale) { payload.localOnly = true; payload.localApproval = true; }
 
     setActionsBusy(true);
     setActionMsg(ACTION_PROGRESS[action.key] || 'Salvo…', '');
     try {
       const r = await sendToMain(payload);
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      if (action.locale) {
+        const segno = { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() };
+        Object.assign(locale, { localOnly: segno, localApproval: { ...segno } });
+      }
       Object.assign(fb, locale);
       updateTabCounts();
+      if (action.locale) {
+        const num = FB.formatNum(fb.seq, fb.subSeq);
+        toast(`Approvato come lavoro locale${num ? ` (#${num})` : ''}: lo trovi nei Lavori locali, e nessuna routine lo prende.`, 'ok');
+      }
       // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
       // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che

@@ -1779,7 +1779,7 @@
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
   // riuscirà solo se le regole consentono l'accesso anonimo (sconsigliato).
-  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, senderProof }, opts = {}) {
+  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, localApproval, senderProof }, opts = {}) {
     if (!id) throw new Error('id mancante');
     const idToken = opts.idToken;
     const fields = {};
@@ -1897,6 +1897,16 @@
         });
       }
       mask.push('localOnly');
+    }
+    // L'approvazione dell'owner come lavoro locale (#913): stessa forma del segno; `null` la toglie.
+    if (localApproval !== undefined) {
+      if (localApproval && typeof localApproval === 'object') {
+        fields.localApproval = toFsValue({
+          by: String(localApproval.by || '').slice(0, 120),
+          at: Math.round(Number(localApproval.at) || Date.now()),
+        });
+      }
+      mask.push('localApproval');
     }
     // La prova del mittente data dall'owner («È mio», #908): si aggiunge e basta, non si toglie da qui.
     if (senderProof === 'admin') {
