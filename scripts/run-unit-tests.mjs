@@ -311,17 +311,23 @@ async function main() {
   const cartella = mkdtempSync(join(tmpdir(), 'filo-unit-'));
   const destinazione = (i) => join(cartella, `gruppo-${String(i + 1).padStart(4, '0')}.jsonl`);
   const copia = (i) => (k) => join(cartella, `rapporto-${k + 1}-gruppo-${String(i + 1).padStart(4, '0')}`);
-  const utente = (i) => destinazioniSuFile(flags, copia(i));
+  const { opzioni, posizionali } = separaArgomenti(flags);
+  // Un file dato a mano che è già fra i trovati girerebbe due volte.
+  const trovati = new Set(files.map((f) => resolve(f)));
+  const extra = posizionali.filter((p) => !trovati.has(resolve(REPO_ROOT, p)));
+  const utente = (i) => rapportiDaRiunire(opzioni, copia(i));
   const flagsGruppo = (i) => flagsConRiepilogo(utente(i).flags, destinazione(i), { tty: !!process.stdout.isTTY });
   const flagsDi = (i) => flagsGruppo(i) || utente(i).flags;
-  const gruppi = gruppiDiLancio(files, { flags: flagsDi(0) });
+  const gruppi = gruppiDiLancio(files, { flags: flagsDi(0), extra });
   const tanti = gruppi.length > 1;
-  const rapporti = utente(0).file;
+  const rapporti = utente(0).rapporti;
+  // Con un documento su stdout, stdout porta solo quello: le nostre righe vanno su stderr.
+  if (tanti && rapporti.includes('stdout')) canale = process.stderr;
 
   try {
     if (!tanti) {
       // Un gruppo solo: l'uscita è quella di un `node --test` qualunque, riepilogo compreso.
-      const r = await lancia(['--test', ...flags, ...gruppi[0]]);
+      const r = await lancia(['--test', ...opzioni, ...gruppi[0]]);
       if (r.error) console.error(`[test:unit] non sono riuscito a lanciare node: ${r.error.message}`);
       // Ucciso da un segnale: non è un successo, e `status` in quel caso è null.
       process.exitCode = r.error || r.status === null ? 1 : r.status;
