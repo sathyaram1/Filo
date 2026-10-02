@@ -82,9 +82,34 @@ export function fileArgs(files, root = REPO_ROOT, { modelli = NODE_LEGGE_MODELLI
 }
 
 /** I file di ogni `node --test`, a gruppi la cui riga intera (eseguibile e flag compresi) sta in `tetto`. PURA. */
-export function gruppiDiLancio(files, { root = REPO_ROOT, flags = [], execPath = process.execPath, tetto = TETTO_RIGA, modelli = NODE_LEGGE_MODELLI } = {}) {
+export function gruppiDiLancio(files, { root = REPO_ROOT, flags = [], execPath = process.execPath, tetto = TETTO_RIGA, modelli = NODE_LEGGE_MODELLI, extra = [] } = {}) {
   const fisso = [execPath, '--test', ...flags].reduce((n, a) => n + costoArgomentoWindows(a), 0);
-  return lottiPerRigaDiComando(fileArgs(files, root, { modelli }), tetto, { fisso, costo: costoArgomentoWindows });
+  return lottiPerRigaDiComando([...fileArgs(files, root, { modelli }), ...extra], tetto, { fisso, costo: costoArgomentoWindows });
+}
+
+// Le opzioni di node che prendono il valore nell'argomento dopo: quel valore non è un file di prova.
+const CON_VALORE = new Set([
+  '--test-reporter', '--test-reporter-destination', '--test-name-pattern', '--test-skip-pattern', '--test-concurrency',
+  '--test-timeout', '--test-shard', '--test-coverage-include', '--test-coverage-exclude', '--test-coverage-lines',
+  '--test-coverage-branches', '--test-coverage-functions', '--test-global-setup', '--test-isolation',
+  '--experimental-test-isolation', '--import', '--require', '-r', '--loader', '--experimental-loader', '--watch-path',
+  '--conditions', '-C', '--env-file', '--env-file-if-exists', '--input-type', '--disable-warning',
+]);
+
+/**
+ * Le opzioni da una parte, i file o modelli dati a mano dall'altra: a gruppi un file fra le opzioni girerebbe in ogni
+ * gruppo, e node smette di leggere le opzioni che lo seguono. PURA.
+ */
+export function separaArgomenti(args) {
+  const opzioni = [];
+  const posizionali = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = String(args[i]);
+    if (!a.startsWith('-')) { posizionali.push(a); continue; }
+    opzioni.push(a);
+    if (CON_VALORE.has(a) && i + 1 < args.length) opzioni.push(args[++i]);
+  }
+  return { opzioni, posizionali };
 }
 
 const REPORTER = '--test-reporter';
