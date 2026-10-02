@@ -300,7 +300,7 @@ function analyze(url, ctx = {}, onUpdate) {
   const notify = () => {
     if (typeof onUpdate !== 'function') return;
     const next = engine.evaluate(url, ctx, assembleCached(norm, url));
-    if (verdictChanged(last, next)) { last = next; onUpdate(next); }
+    if (verdictChanged(last, next)) { last = next; try { onUpdate(next); } catch (_) {} }
   };
   let ageTask = null;
   if (worthDeepening && need.ageDays === undefined && (providers.rdap || providers.ct) && !ageUnknowable(norm, url)) {
