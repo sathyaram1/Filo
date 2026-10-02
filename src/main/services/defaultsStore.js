@@ -49,6 +49,8 @@ const ROUTINES_DOC = 'config/routines';
 // Le manopole dei crediti (#652). Il documento lo legge il server dei crediti a
 // ogni riscatto, quota e premio; da qui lo scrive l'owner dalla sua pagina.
 const CREDITS_DOC = 'config/credits';
+// L'interruttore del Red Team (#896): lettura pubblica, scrittura dell'owner.
+const REDTEAM_DOC = 'config/redteam';
 
 // Cache degli override remoti dall'ultimo refresh.
 let remoteModels = null;  // { provider?, models?, modelRegistry? }
@@ -696,6 +698,24 @@ async function setRoutineSessions(patch, idToken) {
 }
 
 
+// ── Red Team aperto a tutti (#896) ───────────────────────────────────────────
+// `aperto` è vero solo per un `openToAll: true` scritto: documento assente o
+// illeggibile vale «in pausa», come sul server. `risposto` distingue la rete giù
+// dal no del server, perché chi tiene una copia in memoria possa riprovare.
+async function getRedteamOpen() {
+  const r = await leggiDoc(REDTEAM_DOC, null);
+  return { risposto: r.risposto, aperto: !!(r.doc && r.doc.openToAll === true) };
+}
+
+async function setRedteamOpen(on, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per aprire o mettere in pausa il Red Team.');
+  await patchDoc(REDTEAM_DOC, {
+    openToAll: toFsValue(Boolean(on)),
+    updatedAt: { timestampValue: new Date(adesso()).toISOString() },
+  }, ['openToAll', 'updatedAt'], idToken);
+  return Boolean(on);
+}
+
 // ── Manopole dei crediti (#652) ──────────────────────────────────────────────
 // Le sette impostazioni di `config/credits` che l'owner cambia dalla sua
 // pagina. La tabella di cosa sono e quanto possono valere sta in
@@ -791,5 +811,7 @@ module.exports = {
   setRoutineSessions,
   getCreditsKnobs,
   setCreditsKnobs,
+  getRedteamOpen,
+  setRedteamOpen,
   getWorkerLog,
 };
