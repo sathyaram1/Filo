@@ -36,7 +36,6 @@ async function serverInPausaCopiaAperta(app) {
   }, FRASE);
 }
 
-test.fail(true, 'rilievo 1 del giro 1 ancora aperto: il pannello cancella la frase della pausa appena la scrive');
 
 test('invio dal pannello col server in pausa: la frase della pausa resta scritta', async ({ app, testServer, openTab }) => {
   await serverInPausaCopiaAperta(app);
