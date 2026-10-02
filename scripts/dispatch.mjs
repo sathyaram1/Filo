@@ -2209,6 +2209,14 @@ if (isMainModule) {
         else console.error(`[dispatch] GUASTO (${r.kind}): ${r.message}`);
         process.exit(preflightExitCode(r));
       }).catch((e) => { console.error(`[dispatch] GUASTO (transient): ${e?.message || e}`); process.exit(3); });
+    } else if (flag === '--linea-principale') {
+      const r = tornaAllaLineaPrincipale();
+      if (!r.ok) {
+        console.error(`[dispatch] ${r.uso ? '' : 'GUASTO (transient): '}${r.message}`);
+        process.exit(r.uso ? 1 : 3);
+      }
+      console.log(`[dispatch] cartella sulla linea principale (${String(r.head).slice(0, 9)}): il prossimo worker parte con gli agenti di ${MAIN_BRANCH}.`);
+      process.exit(0);
     } else if (flag === '--clear-state') {
       const id = argv[1];
       if (!id) { console.error('Uso: --clear-state <id>'); process.exit(1); }
