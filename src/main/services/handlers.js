@@ -1276,19 +1276,15 @@ async function ricordaLettoDallAiuto(sender, payload = null) {
   }
   let reg = LETTI_DALL_AIUTO.get(wc);
   if (!reg) {
-    reg = new Map();
+    reg = SegretiLetti.registro(MAX_LETTI_AIUTO);
     LETTI_DALL_AIUTO.set(wc, reg);
-    try { wc.on('did-navigate', () => reg.clear()); } catch (_) {}
+    try { wc.on('did-navigate', () => reg.svuota()); } catch (_) {}
   }
   for (const f of fonti) {
     if (typeof f.testo !== 'string' || !f.testo.trim()) continue;
-    for (const x of G.segretiNelTesto(f.testo)) {
-      const k = `${x.regola}:${x.valore.toLowerCase()}`;
-      reg.delete(k);
-      reg.set(k, { ...x, fonte: f.fonte });
-      SegretiLetti.aggiungi(x, f.fonte);
-      if (reg.size > MAX_LETTI_AIUTO) reg.delete(reg.keys().next().value);
-    }
+    const trovati = G.segretiNelTesto(f.testo);
+    reg.aggiungiTutti(trovati, f.fonte);
+    SegretiLetti.aggiungiTutti(trovati, f.fonte);
   }
 }
 
