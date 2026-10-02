@@ -2576,6 +2576,7 @@
 
     const validIds = new Set(candidates.map((c) => c.id));
     let ranked = null;
+    let motivo = '';
     try {
       const r = await sendToMain({
         type: (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.AI_REQUEST) || 'ai_request',
