@@ -24,7 +24,9 @@
   const MARCHI_MONOUSO = new RegExp(
     '(?:\\b(?:otp|mfa|2fa)\\b(?:\\s+(?:codes?|codice|pin))?'
     + `|\\b${NOME_CODICE}(?:\\s+(?:di|da|per)\\s+${PAROLA})?\\s+(?:di\\s+|da\\s+)?${SENSO_MONOUSO}\\b`
-    + `|\\b${SENSO_MONOUSO}(?:\\s+${PAROLA})?\\s+${NOME_CODICE}\\b)`,
+    + `|\\b${SENSO_MONOUSO}(?:\\s+${PAROLA})?\\s+${NOME_CODICE}\\b`
+    // «Recovery key», il nome di Apple: «key» da sola è troppo comune per stare fra i nomi del codice.
+    + '|\\brecovery\\s+keys?\\b)',
     'i',
   );
 
@@ -286,7 +288,9 @@
   // «Password: …», «la tua nuova password è …»: la parola da sola annuncia una password solo se la
   // segue subito l'attacco. Solo qui e non in `controlla`: un avviso che nomina la password e una
   // data non ha niente da fermare.
-  const MARCHIO_PASSWORD = /\b(?:password|passcode|passphrase)\b/i;
+  // Le precisazioni sono un elenco chiuso, scelto dall'owner (#810): le forme nuove le vede il guardiano.
+  const MARCHIO_PASSWORD = new RegExp('\\b(?:password|passcode|passphrase)(?:\\s+(?:di\\s+accesso|per\\s+il\\s+primo\\s+accesso'
+    + '|iniziale|provvisori[ao]|for\\s+your\\s+account))?\\b', 'i');
   // Una parola sola, con una lettera e una cifra o un simbolo DENTRO: «Tr7#kq29Lm», «Kx82mPq!». Il segno ai
   // bordi («dimenticata?», «(obbligatoria)», «manager:») è punteggiatura; un indirizzo o una mail non sono password.
   const FORMA_PASSWORD = /^(?=.*[A-Za-z])(?=.*[^A-Za-z])(?=(?:[^A-Za-z0-9]*[A-Za-z0-9]){6})[^\s"'«»“”<>]{6,64}$/;

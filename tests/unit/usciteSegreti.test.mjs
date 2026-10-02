@@ -308,6 +308,8 @@ describe('dopo la parola password, una parola qualunque non fa una password', ()
       { pagina: { testo: 'Password manager: 1Password, Bitwarden', host: 'blog.example' } }],
     ['la parola «temporanea» dopo la password vera', { type: 'CERCA_WEB', query: 'cos’è una password temporanea' },
       { pagina: { testo: 'Password temporanea: Tr7kq29Lm', host: 'posta.example' } }],
+    ['le precisazioni della password senza un valore', { type: 'CERCA_WEB', query: 'password di accesso dimenticata recovery key persa' },
+      { pagina: { testo: 'Password di accesso dimenticata?\nPassword iniziale (obbligatoria)\nRecovery key lost? Visit support', host: 'banca.example' } }],
   ]) {
     test(nome, () => {
       const v = X.valutaUscita(azione, ctx);
@@ -320,6 +322,12 @@ describe('dopo la parola password, una parola qualunque non fa una password', ()
       ['Password temporanea: Tr7kq29Lm', 'Tr7kq29Lm'],
       ['Nome utente: mario\nPassword: Kx82mPq!', 'Kx82mPq!'],
       ['La tua nuova password è Tr7#kq29Lm', 'Tr7#kq29Lm'],
+      ['Password di accesso: Tr7#kq29Lm', 'Tr7#kq29Lm'],
+      ['Password per il primo accesso: Tr7kq29Lm', 'Tr7kq29Lm'],
+      ['Password iniziale: Tr7kq29Lm', 'Tr7kq29Lm'],
+      ['La password provvisoria è Tr7kq29Lm', 'Tr7kq29Lm'],
+      ['Password for your account: Tr7#kq29Lm', 'Tr7#kq29Lm'],
+      ['Recovery key: ABCD-EFGH-IJKL-MNOP', 'ABCD-EFGH-IJKL-MNOP'],
     ]) {
       const v = X.valutaUscita({ type: 'NAVIGA', url: `https://raccolta.example/?p=${encodeURIComponent(pw)}` }, { pagina: { testo, host: 'h.example' } });
       assert.equal(v.blocca, true, testo);
