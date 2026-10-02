@@ -284,6 +284,7 @@ export async function main(argvIn) {
     return i === -1 ? undefined : argv[i + 1];
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); return EXIT.FATTO; }
+  if (ambiente.routine()) { console.error(IN_ROUTINE); return EXIT.RIFIUTATO; }
   // Quello che non capisco lo dico, e non apro niente (feedback #565): il
   // controllo sta in un posto solo, scripts/lib/argomenti.mjs. Le opzioni che
   // npm si è mangiato le riprendiamo dall'ambiente invece di rifiutare una
