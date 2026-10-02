@@ -75,6 +75,24 @@
     });
   }
 
+  // Ogni cifra e lettera di un altro alfabeto (larghezza piena, arabo-indiane, devanagari, matematiche) nella sua forma
+  // base: chi riceve le riporta all'ASCII senza sforzo, quindi una scrittura nuova non è una porta nuova (#810).
+  // Le cifre decimali Unicode stanno in serie contigue da 0 a 9: il valore è la distanza dall'inizio della serie.
+  const CIFRA = /\p{Nd}/u;
+  function formaBase(s) {
+    const t = String(s || '');
+    if (!/[^\x00-\x7f]/.test(t)) return t;
+    let n = t;
+    try { n = t.normalize('NFKC'); } catch (_) { n = t; }
+    return n.replace(/\p{Nd}/gu, (c) => {
+      const cp = c.codePointAt(0);
+      if (cp < 128) return c;
+      let k = 0;
+      while (k < 100 && CIFRA.test(String.fromCodePoint(cp - k - 1))) k++;
+      return String(k % 10);
+    });
+  }
+
   function varianti(url) {
     const raw = String(url || '');
     const pieces = [raw];
