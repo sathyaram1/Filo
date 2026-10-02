@@ -53,6 +53,17 @@ function registerProtocolSchemes() {
 // parser normalizza i `..` NON codificati, ma i `..` percent-encoded (%2e%2e)
 // sopravvivono e ridiventano `..` solo dopo decodeURIComponent — finendo in
 // path.join. Esportato per i test.
+// Il Red Team in pausa (#896): a chi non lo vede, ogni sua pagina HTML risponde con la sola frase della pausa.
+const REDTEAM_DIR = path.join(SRC, 'pages', 'redteam') + path.sep;
+const REDTEAM_PAUSA = path.join(SRC, 'pages', 'redteam', 'pausa.html');
+
+async function paginaRedteamChiusa(resolved) {
+  const p = resolved.toLowerCase();
+  if (!p.startsWith(REDTEAM_DIR.toLowerCase()) || !/\.html?$/.test(p) || p === REDTEAM_PAUSA.toLowerCase()) return false;
+  const Gate = require('./services/redteamGate');
+  return !(await Gate.assicura()).visible;
+}
+
 function relIsUnsafe(rel) {
   return /(^|[\\/])\.\.([\\/]|$)/.test(String(rel || ''));
 }
@@ -100,7 +111,8 @@ async function filoHandler(request) {
       return new Response('Forbidden', { status: 403 });
     }
 
-    const res = await net.fetch(pathToFileURL(resolved).href);
+    const servito = (await paginaRedteamChiusa(resolved)) ? REDTEAM_PAUSA : resolved;
+    const res = await net.fetch(pathToFileURL(servito).href);
     // CSP solo per i documenti HTML (le pagine privilegiate filo://): rete di
     // sicurezza contro un eventuale XSS futuro su una pagina che ha accesso a
     // storage + shellExec. Oggi nessun XSS sfruttabile (gli innerHTML esaminati
