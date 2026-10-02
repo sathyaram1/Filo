@@ -60,7 +60,8 @@ dove il sito non arriva, o ci arriva solo per chiedere:
   stili, anche dentro il dialogo. Nello strato superiore vince l'ultimo arrivato,
   quindi mentre è aperto una guardia ogni 250 ms controlla che al suo posto si
   veda lui, e lo rimette in cima se una notifica del sito gli è arrivata sopra
-  (#686.1 giro 7).
+  (#686.1 giro 7). Conta l'arrivo, non solo il punto: una notifica che non
+  prende i clic copre lo stesso, e `elementFromPoint` non la vede.
 
 **Il caso.** #686 aveva chiuso tre porte una dopo l'altra (eventi finti, il
 marcatore «mi zoomo da solo» scritto dal sito, ascoltatori zittiti dal sito
