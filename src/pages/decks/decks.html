@@ -179,6 +179,24 @@
     .dk-msg-bot { align-self: stretch; }
     .dk-msg-text { white-space: pre-wrap; overflow-wrap: break-word; margin: 0 0 4px; }
     .dk-msg-pending, .dk-msg-error { color: var(--sn-muted); font-size: 12px; }
+    /* Fase della ricerca mentre Filo lavora: frase, conteggio e una barra sottile d'accento. */
+    .dk-progress { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+    .dk-progress-n { margin-left: auto; font-variant-numeric: tabular-nums; }
+    .dk-progress-bar {
+      flex: 1 0 100%; height: 3px; border-radius: 2px; overflow: hidden;
+      background: var(--sn-border);
+    }
+    .dk-progress-bar > span {
+      display: block; height: 100%; background: var(--sn-accent);
+      transition: width .18s ease;
+    }
+    /* Carta che il giudice non ha potuto guardare: nome attenuato e un ? col suo perché al passaggio. */
+    .dk-row-unchecked .dk-row-name { color: var(--sn-muted); font-style: italic; }
+    .dk-row-flag {
+      flex: 0 0 auto; font-size: 11px; font-weight: 600; color: var(--sn-accent);
+      padding: 0 3px; border-radius: 4px; cursor: help;
+    }
+    .dk-row-flag:hover { background: var(--sn-hover); }
     .dk-msg-error { color: var(--sn-danger, #c0392b); }
     .dk-retry {
       margin-top: 4px; padding: 3px 9px;
