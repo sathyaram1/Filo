@@ -75,9 +75,8 @@
     });
   }
 
-  // Ogni cifra e lettera di un altro alfabeto (larghezza piena, arabo-indiane, devanagari, matematiche) nella sua forma
-  // base: chi riceve le riporta all'ASCII senza sforzo, quindi una scrittura nuova non è una porta nuova (#810).
-  // Le cifre decimali Unicode stanno in serie contigue da 0 a 9: il valore è la distanza dall'inizio della serie.
+  // Cifre e lettere di altri alfabeti nella forma base: chi riceve le riporta all'ASCII, quindi una scrittura nuova non è
+  // una porta nuova (#810). Le cifre Unicode stanno in serie contigue da 0 a 9: il valore è la distanza dall'inizio.
   const CIFRA = /\p{Nd}/u;
   function formaBase(s) {
     const t = String(s || '');
