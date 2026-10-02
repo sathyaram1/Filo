@@ -70,6 +70,17 @@ cornice. Fuori da una scheda (finestre di accesso) si chiede con la finestra del
   Parte vuota, non eredita e non scrive su disco. Una scrittura dell'ambito normale partita da una finestra incognito
   passa da `fuoriIncognito`, o finirebbe nella RAM di quella finestra.
 
+## Due porte aperte, che si chiudono fuori dalla pagina
+
+Il lavoro è stato fuso con queste due porte dichiarate (decisione dell'owner del 30/09/2026). Le difese che stanno nel
+documento del sito le restringono, non le chiudono: lì comanda la pagina.
+
+- **Il menu**: dopo un tasto destro vero la pagina può spostare e premere Incolla, Detta e la freccia della
+  cronologia, e legge la cronologia che il menu mostra. Si chiude portando il menu fuori dalla pagina (lavori a parte).
+- **Lo schermo per la strada vecchia**: da un riquadro vuoto preso per numero, o con una richiesta che cambia fra
+  una lettura e l'altra, arrivano lo schermo intero e l'audio del computer, o la scheda muore. Si chiude nei permessi,
+  dal main (lavoro a parte). Le prove del giro di tutt'e due restano in `tests/verifica/586/` finché il lavoro passa.
+
 ## Dove vive
 
 - `src/shared/permessiSiti.js`: tipi, innocui, chiusi, frasi, `decidi`, `normalizza`, le parole della chat.
