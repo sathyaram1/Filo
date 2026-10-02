@@ -285,12 +285,12 @@ test('#495 — un risultato che punta a un feedback non più caricato non viene 
   await expect(page.locator('#mgListHead')).toHaveText('Ricerca (1)');
 });
 
-// ── Quando il caricamento tocca il tetto, il numero è un MINIMO e lo dice ──
-// La pagina carica i 500 feedback più recenti. Oltre quella soglia i più vecchi
-// restano fuori: "Archiviati (312)" quando ce ne sono 400 sembra una risposta e
-// non lo è. Il "+" toglie l'affermazione senza costare una lettura in più.
+// ── Quando la lettura è incompleta, il numero è un MINIMO e lo dice ──────────
+// La pagina legge TUTTI i feedback: oltre i 500 il numero resta un totale. Solo
+// se la lettura completa si ferma al freno i più vecchi mancano, e allora
+// "Archiviati (312)" sembrerebbe una risposta e non lo è: il "+" lo toglie.
 
-test('#495 — caricamento al tetto: i numeri diventano "+" e l\'hover spiega perché', async ({ openTab }) => {
+test('#495 — lettura incompleta: i numeri diventano "+" e l'hover spiega perché', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.SN_FEEDBACK);
@@ -298,51 +298,41 @@ test('#495 — caricamento al tetto: i numeri diventano "+" e l\'hover spiega pe
   await page.evaluate(() => window.__mgTest.setAdmin(true));
 
   const CAP = await page.evaluate(() => window.SN_FEEDBACK.LIST_PAGE_SIZE);
-
-  // Una in meno del tetto: il caricamento ha visto tutto, i numeri sono totali.
-  await page.evaluate((cap) => {
+  const tanti = (n) => {
     const items = [];
-    for (let i = 0; i < cap - 1; i++) {
+    for (let i = 0; i < n; i++) {
       items.push({
         _id: `p${i}`, text: `t${i}`, name: `t${i}`, seq: i + 1, subSeq: 0,
         clientId: 'tester@example.com', createdAt: '2026-06-20T10:00:00Z', images: [],
         status: i === 0 ? 'todo' : 'unlabeled',
       });
     }
-    window.__mgTest.setData(items);
-  }, CAP);
-  await expect(tab(page, 'inbox')).toHaveText(`Ricevuti (${CAP - 2})`);
+    return items;
+  };
+
+  // Oltre la vecchia finestra dei 500, ma letti tutti: i numeri sono totali.
+  await page.evaluate((items) => window.__mgTest.setData(items), tanti(CAP + 1));
+  await expect(tab(page, 'inbox')).toHaveText(`Ricevuti (${CAP})`);
   await expect(tab(page, 'queue')).toHaveText('In coda (1)');
   await expect(tab(page, 'archived')).toHaveText('Archiviati (0)');
   await expect(tab(page, 'inbox')).not.toHaveAttribute('title', /./);
 
-  // Tetto toccato: gli stessi numeri smettono di affermare un totale.
-  await page.evaluate((cap) => {
-    const items = [];
-    for (let i = 0; i < cap; i++) {
-      items.push({
-        _id: `p${i}`, text: `t${i}`, name: `t${i}`, seq: i + 1, subSeq: 0,
-        clientId: 'tester@example.com', createdAt: '2026-06-20T10:00:00Z', images: [],
-        status: i === 0 ? 'todo' : 'unlabeled',
-      });
-    }
-    window.__mgTest.setData(items);
-  }, CAP);
+  // Lettura fermata prima della fine: gli stessi numeri smettono di affermare un totale.
+  await page.evaluate((items) => window.__mgTest.setData(items, { incompleta: true }), tanti(CAP));
   await expect(tab(page, 'inbox')).toHaveText(`Ricevuti (${CAP - 1}+)`);
   await expect(tab(page, 'queue')).toHaveText('In coda (1+)');
-  // Una sezione "vuota" al tetto non è vuota davvero: nemmeno lo zero afferma.
+  // Una sezione "vuota" a lettura incompleta non è vuota davvero: nemmeno lo zero afferma.
   await expect(tab(page, 'archived')).toHaveText('Archiviati (0+)');
   await expect(page.locator('#mgListHead')).toHaveText(`Ricevuti (${CAP - 1}+)`);
 
-  // Il "+" non resta un enigma: l'hover dice quanti se ne sono caricati.
-  const hint = await page.evaluate(() => window.SN_FEEDBACK.COUNT_CAP_HINT);
-  expect(hint).toContain(String(CAP));
+  // Il "+" non resta un enigma: l'hover dice perché.
+  const hint = await page.evaluate(() => window.SN_FEEDBACK.COUNT_INCOMPLETE_HINT);
   await expect(tab(page, 'inbox')).toHaveAttribute('title', hint);
   await expect(page.locator('#mgListHead')).toHaveAttribute('title', hint);
 
   // E la sezione vuota lo dice a parole, invece di negare i feedback più vecchi.
   await page.evaluate(() => window.__mgTest.setTab('archived'));
-  await expect(page.locator('#mgListEmpty')).toContainText(String(CAP));
+  await expect(page.locator('#mgListEmpty')).toContainText(hint);
 });
 
 // ── Caricamento fallito: il riquadro vuoto non è una risposta ────────────────
