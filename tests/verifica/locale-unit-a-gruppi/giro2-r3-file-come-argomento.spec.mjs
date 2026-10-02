@@ -17,7 +17,7 @@ test('file come argomento a gruppi: gira una volta e il riepilogo conta tutti i 
   mkdirSync(prove);
   try {
     for (let i = 0; i < 4; i++) {
-      writeFileSync(join(prove, `f${String(i).padStart(3, '0')}.test.mjs`),
+      writeFileSync(join(prove, `f${String(i).padStart(3, '0')}-${'nome-lungo-'.repeat(15)}.test.mjs`),
         `import test from 'node:test';\ntest('caso-${i}', () => {});\n`);
     }
     const extra = join(dir, 'extra.test.mjs');
