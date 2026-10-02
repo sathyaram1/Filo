@@ -399,7 +399,7 @@ export async function main(argvIn) {
     : `OK: feedback aperto (${r.id}), mittente ${r.clientId}. Numero non assegnato (la numerazione non ha risposto).`);
   console.log(locale
     ? `Lavoro locale: nessuna routine lo prende. Legalo al ramo con verify-local start --feedback ${r.seq || r.id} (o npm run finish -- --feedback ${r.seq || r.id}).`
-    : 'Per le routine: con la prova del mittente salta i giudici e va dritto In coda.');
+    : 'Aperto per le routine: con la prova del mittente salta i giudici e va dritto In coda.');
 
   if (r.allegati) console.log(`Allegati caricati: ${r.allegati}.`);
   for (const f of (r.falliti || [])) {

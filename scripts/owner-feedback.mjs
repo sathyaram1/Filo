@@ -676,6 +676,11 @@ if (isMain) {
       process.exit(0);
     }
     const valore = locali[0] === '--solo-locale';
+    // #914: le routine non aprono lavoro locale; quello che si fa solo in locale lo rimandano dal canale (--reason locale).
+    if (valore && isRoutineInstance(ROOT)) {
+      console.error('RIFIUTATO: una routine non segna lavoro locale. Rimandalo nei Ricevuti: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché" — non ho toccato niente.');
+      process.exit(3);
+    }
     const r = await segnaLocale(id, valore, { dryRun, bearer });
     if (!r.ok) {
       console.error(rifiutoPratica(riferimento, r));

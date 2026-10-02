@@ -378,3 +378,41 @@ test('#908 apri senza token: rifiuto, non una submit anonima', async () => {
     assert.equal(visti.length, 0);
   });
 });
+
+// #914: da qui il feedback nasce dell'owner e salta i giudici; una routine apre dal canale, mai lavoro locale.
+test('#914 una routine non apre feedback da qui, né locali né per le routine: niente credenziale, niente submit', async () => {
+  let chiesta = 0;
+  SCRIPT.credenziale.ottieni = async () => { chiesta += 1; return { idToken: 'tok-owner' }; };
+  SCRIPT.ambiente.routine = () => true;
+  try {
+    for (const scelta of ['--locale', '--non-locale']) {
+      await conSubmit(async () => ({ id: 'd', seq: 1, senderProof: 'admin' }), async (visti) => {
+        let code;
+        const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X', scelta]); });
+        assert.equal(code, SCRIPT.EXIT.RIFIUTATO, scelta);
+        assert.equal(visti.length, 0, scelta);
+        assert.match(err, /routine-channel\.mjs deliver feedback/);
+        assert.match(err, /--reason locale/);
+      });
+    }
+    assert.equal(chiesta, 0);
+  } finally {
+    SCRIPT.credenziale.ottieni = CRED_FINTA;
+    SCRIPT.ambiente.routine = () => false;
+  }
+});
+
+test('#914 una routine si riconosce dalla dichiarazione, dal biglietto o dal ruolo; una sessione no', async () => {
+  const { isRoutineInstance } = await import('../../scripts/lib/routine-role.mjs');
+  const { cartellaTemporanea } = await import('../helpers/percorsi.mjs');
+  const vuota = cartellaTemporanea('routine-o-no-');
+  assert.equal(isRoutineInstance(vuota, { env: {} }), false);
+  assert.equal(isRoutineInstance(vuota, { env: { FILO_ROUTINE: '0' } }), false);
+  assert.equal(isRoutineInstance(vuota, { env: { FILO_ROUTINE_ROLE: 'boh' } }), false);
+  assert.equal(isRoutineInstance(vuota, { env: { FILO_ROUTINE: '1' } }), true);
+  assert.equal(isRoutineInstance(vuota, { env: { FILO_ROUTINE_TICKET: 'abc' } }), true);
+  assert.equal(isRoutineInstance(vuota, { env: { FILO_ROUTINE_ROLE: 'fixer' } }), true);
+  const { writeRole } = await import('../../scripts/lib/routine-role.mjs');
+  writeRole(vuota, 'new-work');
+  assert.equal(isRoutineInstance(vuota, { env: {} }), true, 'il ruolo scritto da dispatch');
+});
