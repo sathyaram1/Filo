@@ -126,7 +126,9 @@ export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false,
     out.push(`[test:unit] test rossi (${somma.rossi.length}):`);
     for (const r of somma.rossi) {
       const dove = r.file ? `${perLaRiga(r.file, root)}${r.riga ? `:${r.riga}` : ''}` : '?';
-      out.push(`  ✖ ${dove}  ${r.nome}  (gruppo ${r.gruppo})`);
+      // Un file che non si carica è un test col nome del file: ripeterlo non dice niente.
+      const soloFile = r.file && resolve(root, String(r.nome)) === resolve(r.file);
+      out.push(`  ✖ ${dove}${soloFile ? '' : `  ${r.nome}`}  (gruppo ${r.gruppo})`);
     }
   }
   const muti = rossiGruppi.filter((g) => !somma || !somma.rossi.some((r) => r.gruppo === g));
