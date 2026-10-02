@@ -429,17 +429,22 @@
     else if (dopo) dopo.insertAdjacentElement('afterend', nota);
     else bubblesEl.appendChild(nota);
   }
-  // Ogni collegamento web della pagina (risposte, bottoni) passa da apriProposta, anche col tasto centrale.
+  // Ogni collegamento web o di posta della pagina (risposte, bottoni) passa da apriProposta, anche col tasto centrale.
   const apriDaCollegamento = (e) => {
     if (e.type === 'auxclick' && e.button !== 1) return;
     const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
-    if (!a || !/^https?:/i.test(a.href)) return;
+    if (!a || !/^(?:https?|mailto|tel|sms):/i.test(a.href)) return;
     e.preventDefault();
     e.stopPropagation();
     apriProposta(a.href, a);
   };
   document.addEventListener('click', apriDaCollegamento, true);
   document.addEventListener('auxclick', apriDaCollegamento, true);
+  // Un'apertura chiesta dal menu del tasto destro la ferma il main: la riga va accanto al collegamento di quel menu.
+  let ultimoTastoDestro = null;
+  document.addEventListener('contextmenu', (e) => {
+    ultimoTastoDestro = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+  }, true);
 
   function faviconUrl(rawUrl) {
     if (!rawUrl) return '';
@@ -1269,7 +1274,10 @@
 
   // ===== Bridge cambio stato live dal background =====
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type === MSG.FILO_LIVE_UPDATED) {
+    if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
+      const vicino = ultimoTastoDestro && ultimoTastoDestro.isConnected ? ultimoTastoDestro : null;
+      notaFermata(String(msg.frase), vicino);
+    } else if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
     } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.cancellata) {
       // #525 — qualcuno ha cancellato dalla Cronologia la conversazione che

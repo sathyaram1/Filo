@@ -1340,7 +1340,7 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true } =
     console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e);
   }
   if (u.blocca) {
-    if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase });
+    if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase }, { inVista: true });
     return { aperto: false, frase: u.frase };
   }
   if (typeof apri === 'function') apri();

@@ -233,6 +233,13 @@ describe('codici di recupero e password nelle forme più comuni si riconoscono',
     ['i «Codici di backup» di Google', 'Codici di backup\n1. 7563 0192\n2. 1122 3344\n3. 9988 7766', `${RACCOLTA}?v=11223344`],
     ['i «Recovery codes» sotto il titolo', 'Recovery codes\na1b2c-3d4e5\nf6g7h-8i9j0', `${RACCOLTA}?v=f6g7h-8i9j0`],
     ['i «one-time codes» in elenco', 'Your one-time codes:\n4417 2290\n8810 3321', `${RACCOLTA}?v=88103321`],
+    // Come li danno davvero: fra il titolo e l'elenco c'è una frase (#810, giro 8).
+    ['il file dei codici di backup di Google',
+      'SALVA I CODICI DI BACKUP\nTieni questi codici di backup in un luogo sicuro ma accessibile.\n\n1. 4573 8291    6. 1257 9935\n2. 3360 0281    7. 8812 4407',
+      `${RACCOLTA}?v=33600281`],
+    ['la pagina dei codici di recupero di GitHub',
+      'Recovery codes\nRecovery codes can be used to access your account in the event you lose access to your device and cannot receive two-factor authentication codes.\n\na1b2c-3d4e5\nf6g7h-8i9j0\nk1l2m-3n4o5',
+      `${RACCOLTA}?v=f6g7h-8i9j0`],
     ['un OTP a gruppi di tre', 'Il tuo codice OTP è 482 913. Non condividerlo.', `${RACCOLTA}?v=482913`],
     ['un OTP col trattino', 'Il tuo codice OTP è 482-913.', `${RACCOLTA}?v=482913`],
     ['una password temporanea con un simbolo', 'La tua password temporanea è Tr7#kq29Lm', `${RACCOLTA}?v=Tr7%23kq29Lm`],
@@ -272,6 +279,11 @@ describe('dopo le parole del codice, i due punti che annunciano altro non fanno 
       { type: 'CERCA_WEB', query: 'pacchetto 1500 SMS prezzo' }],
     ['un ticket dopo le parole', 'Backup code: vedi ticket 88231',
       { type: 'NAVIGA', url: 'https://help.example/ticket/88231' }],
+    // Un elenco sotto il titolo vale solo se è un elenco di codici: due o più, a inizio riga, senza parole in mezzo.
+    ['i passi di una guida ai codici di backup', 'Come usare i codici di backup\nSegui questi passi.\n1. Apri l\'app 2024 Authenticator\n2. Scegli il conto 4417',
+      { type: 'CERCA_WEB', query: 'conto 4417 authenticator' }],
+    ['un prezzo sotto i codici di recupero', 'Codici di recupero: cosa sono e quanto costano.\nIl servizio costa\n1299 euro l\'anno, 99 al mese.',
+      { type: 'CERCA_WEB', query: 'servizio 1299 euro recensioni' }],
   ]) {
     test(nome, () => {
       const v = X.valutaUscita(azione, { pagina: { testo, host: 'pagina.example' } });
@@ -649,27 +661,37 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     assert.match(corpo(filo, 'on(MSG.CONTROLLA_CAMPO'), /controllaUscita\(\{ type: 'CAMPO_PAGINA'/);
   });
 
-  // Quello che un modello propone in una pagina di Filo e si apre con un clic (un collegamento in una risposta, un
-  // bottone, un suggerimento della home) passa dalla porta nel momento in cui si apre, con l'indirizzo vero.
-  test('nella chat e nella home un indirizzo web si apre solo dalla porta delle uscite', () => {
-    const dir = join(ROOT, 'src', 'pages', 'dashboard');
-    const fuori = [];
-    for (const f of readdirSync(dir).filter((x) => x.endsWith('.js'))) {
-      const src = readFileSync(join(dir, f), 'utf8');
-      for (const m of src.matchAll(/chrome\.tabs\.create\(\{ url: ([^}]*)\}/g)) if (!/^'filo:/.test(m[1].trim())) fuori.push(`${f}: tabs.create ${m[1]}`);
-      for (const m of src.matchAll(/type: MSG\.OPEN_URL, url: ([^}]*)\}/g)) {
-        const u = m[1].trim();
-        // `siteUrlOf(text)` è il «/sito» scritto dall'utente nella casella; `url` in dashboard.js è il link non web.
-        if (!/^'filo:/.test(u) && !/^siteUrlOf\(text\)/.test(u) && !(f === 'dashboard.js' && /^url\b/.test(u)) && !/^it\.url/.test(u)) fuori.push(`${f}: OPEN_URL ${u}`);
-      }
-    }
-    assert.deepEqual(fuori, [], `indirizzi aperti senza la porta: ${fuori.join(', ')}`);
-    const dash = readFileSync(join(dir, 'dashboard.js'), 'utf8');
+  // Un indirizzo che una pagina di Filo apre, legge o passa al sistema l'ha scelto quasi sempre un modello: passa dalla
+  // porta nel main, dove si apre davvero, qualunque gesto l'abbia chiesto (clic, menu del tasto destro, posta).
+  test('ogni indirizzo che una pagina di Filo apre o legge passa prima dalla porta delle uscite', () => {
+    const src = (...p) => readFileSync(join(ROOT, 'src', ...p), 'utf8');
+    const handlers = src('main', 'services', 'handlers.js');
+    const apri = corpo(handlers, 'async function apriDaFilo(');
+    assert.ok(apri.indexOf('controllaUscita(') > 0 && apri.indexOf('controllaUscita(') < apri.indexOf('apri()'), 'apriDaFilo apre prima della porta');
+    assert.match(handlers, /const SCHEMI_USCITA = \/\^\(\?:https\?\|mailto\|tel\|sms\):\/i;/);
+    const prima = (testo, porta, apre, msg) => {
+      const i = testo.indexOf(porta);
+      assert.ok(i > 0 && i < testo.indexOf(apre), msg);
+    };
+    prima(corpo(src('main', 'services', 'handlers', 'filo.js'), 'on(MSG.FILO_APRI_PROPOSTA'), 'apriDaFilo(', 'openTab(', 'FILO_APRI_PROPOSTA apre prima della porta');
+    const nav = corpo(src('main', 'services', 'handlers', 'nav.js'), 'on(MSG.OPEN_URL');
+    prima(nav, 'apriDaFilo(', 'openTab(', 'OPEN_URL da una pagina di Filo apre prima della porta');
+    assert.match(nav, /if \(isFilo\(origin\) && SCHEMI_USCITA\.test\(url\)\)/);
+    const tabs = src('main', 'tabs.js');
+    const finestre = tabs.slice(tabs.indexOf('wc.setWindowOpenHandler((details)'));
+    prima(finestre, 'SN_USCITA_DA_FILO(', 'this.openTab(', 'una pagina di Filo apre una scheda prima della porta');
+    prima(finestre, 'SN_USCITA_DA_FILO(', 'openExternalScheme(', 'una pagina di Filo passa la posta al sistema prima della porta');
+    prima(corpo(src('main', 'services', 'handlers', 'misc.js'), "on('fetch_link_meta'"), 'controllaUscita(', 'safeFetch(', 'leggere un collegamento lo chiede al sito prima della porta');
+    const dash = src('pages', 'dashboard', 'dashboard.js');
     assert.ok(/document\.addEventListener\('click', apriDaCollegamento, true\)/.test(dash), 'i collegamenti della pagina non passano da apriProposta');
+    assert.match(corpo(dash, 'const apriDaCollegamento = (e) =>'), /mailto/);
     assert.match(corpo(dash, 'async function apriProposta('), /MSG\.FILO_APRI_PROPOSTA/);
+  });
+
+  // Riaperta, anche dopo un riavvio, una chat dice di nuovo cosa aveva letto prima che si clicchi qualcosa.
+  test('riaprire una chat rimette nel registro i segreti che aveva letto', () => {
     const filo = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'), 'utf8');
-    const h = corpo(filo, 'on(MSG.FILO_APRI_PROPOSTA');
-    assert.ok(h.indexOf('controllaUscita(') > 0 && h.indexOf('controllaUscita(') < h.indexOf('openTab('), 'FILO_APRI_PROPOSTA apre prima della porta');
+    assert.match(corpo(filo, 'on(MSG.FILO_CHAT_GET'), /ricordaLettoInChat\(\[\], \(chat && chat\.messages\) \|\| \[\]\)/);
   });
 
   // Il testo di un suggerimento della home lo scrive un modello: non è voce dell'utente, né un comando con la barra.

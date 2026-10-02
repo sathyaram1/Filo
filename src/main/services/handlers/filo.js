@@ -4,7 +4,8 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, handleFiloGenerateDashboard,
-    executeFiloAction, controllaUscita, maybeRunCompactor, closeAndTriageChat, archiviaCongedoAccoglienza,
+    executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
+    archiviaCongedoAccoglienza,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
   const FiloMem = globalThis.SN_FILO_MEMORY;
@@ -80,17 +81,18 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
-  // Un indirizzo che un modello ha proposto in una pagina di Filo (un collegamento in una risposta, un bottone, un
-  // suggerimento della home) si apre solo da qui, dopo la porta delle uscite (#810).
+  // Un indirizzo che un modello ha proposto in una pagina di Filo (un collegamento in una risposta, anche di posta, un
+  // bottone, un suggerimento della home) si apre solo dopo la porta delle uscite (#810). La frase torna a chi ha cliccato.
   on(MSG.FILO_APRI_PROPOSTA, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
     const url = String((msg && msg.url) || '').trim();
-    if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'indirizzo non ammesso' };
-    const u = await controllaUscita({ type: 'NAVIGA', url }, { sender, parole: paroleDa(msg) });
-    if (u.blocca) return { ok: true, aperto: false, frase: u.frase };
+    const web = /^https?:/i.test(url);
+    if (!SCHEMI_USCITA.test(url) || (web && !/^https?:\/\//i.test(url))) return { ok: false, error: 'indirizzo non ammesso' };
     const win = winOf(sender);
-    if (win?._filoTabs) win._filoTabs.openTab(url);
-    return { ok: true, aperto: true };
+    const r = await apriDaFilo(url, {
+      wc: sender?.wc, parole: paroleDa(msg), avvisa: false, apri: () => { if (win?._filoTabs) win._filoTabs.openTab(url); },
+    });
+    return { ok: true, ...r };
   });
 
   // Il testo che l'assistente di pagina propone per un campo della pagina esce verso il sito: passa dalla porta
@@ -162,7 +164,10 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_CHAT_GET, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
-    return { ok: true, chat: await FiloChats.get(msg.id) };
+    const chat = await FiloChats.get(msg.id);
+    // Riaperta (anche dopo un riavvio), la chat torna a dire cosa aveva letto da fuori prima di ogni clic (#810).
+    try { ricordaLettoInChat([], (chat && chat.messages) || []); } catch (_) {}
+    return { ok: true, chat };
   });
 
   // Chiusura di una chat. La risposta NON aspetta il classificatore: chi ha

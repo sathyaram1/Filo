@@ -191,7 +191,7 @@ function safeImageFilename(name) {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, modelGate, broadcastToTabs } = ctx;
+  const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
 
   // Titolo breve del feedback, generato da un LLM economico al momento
@@ -641,10 +641,14 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on('fetch_link_meta', async (msg) => {
+  on('fetch_link_meta', async (msg, sender) => {
     try {
       const url = msg.url;
       if (!url) return { ok: false, error: 'url mancante' };
+      // Leggere un collegamento per descriverlo lo chiede al suo sito: un segreto nell'indirizzo uscirebbe col solo tasto
+      // destro (#810). Fermato, la spiegazione parte senza titolo e descrizione.
+      const porta = await controllaUscita({ type: 'NAVIGA', url: String(url) }, { sender });
+      if (porta.blocca) return { ok: false, error: 'segreto' };
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 4000);
       // safeFetch: solo http/https + blocco di loopback/IP privati, rivalidando

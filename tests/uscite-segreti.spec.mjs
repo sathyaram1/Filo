@@ -770,6 +770,91 @@ test('un collegamento nella risposta di Filo che porta fuori il codice letto non
   await expect.poll(() => apertoVerso(app, 'guida.example'), { timeout: 10_000 }).toBe(true);
 });
 
+// Il sito risponde davvero: il nome si risolve, e ogni richiesta del main verso di lui resta in __chiesti.
+async function sitoCheRisponde(app, host) {
+  await app.evaluate((_electron, host) => {
+    const dns = process.getBuiltinModule('node:dns').promises;
+    globalThis.__chiesti = [];
+    const lookup = dns.lookup.bind(dns);
+    dns.lookup = async (h, o) => (String(h).endsWith(host) ? [{ address: '93.184.216.34', family: 4 }] : lookup(h, o));
+    const f = globalThis.fetch;
+    globalThis.fetch = async (u, o) => {
+      if (!String(u).includes(host)) return f(u, o);
+      globalThis.__chiesti.push(String(u));
+      return new Response('<html><head><title>Verifica</title></head></html>');
+    };
+  }, host);
+}
+
+test('il tasto destro su un collegamento della risposta non porta fuori il codice letto, nemmeno da «Apri in nuova tab»', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await sitoCheRisponde(app, RACCOLTA);
+  await leggiIlCodice(app, page, { risposta: `Per completare apri [la verifica](https://${RACCOLTA}/c?v=${CODICE}).` });
+  const link = page.locator('.dash-bubble-filo a', { hasText: 'la verifica' });
+  await expect(link).toBeVisible({ timeout: 10_000 });
+  await link.click({ button: 'right' });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible({ timeout: 5_000 });
+  // La sezione che descrive il collegamento parte da sola: senza il titolo del sito, ma parte.
+  await expect(menu.locator('.sn-menu-link-body')).toBeVisible({ timeout: 5_000 });
+  await page.waitForTimeout(1500);
+  expect((await app.evaluate(() => globalThis.__chiesti)).join(' '), 'aprire il menu chiede al sito l’indirizzo col codice').not.toContain(CODICE);
+  await menu.getByText('Apri in nuova tab', { exact: false }).first().click();
+  await expect(page.locator('.dash-fermata-clic')).toContainText("Non ho aperto l'indirizzo: conteneva un codice letto dall'output di un comando", { timeout: 10_000 });
+  expect(apertoVerso(app, RACCOLTA), 'il menu del tasto destro ha aperto l’indirizzo col codice').toBe(false);
+  expect((await app.evaluate(() => globalThis.__chiesti)).join(' ')).not.toContain(CODICE);
+});
+
+test('un collegamento di posta nella risposta col codice letto non apre il programma di posta, e la chat lo dice', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await app.evaluate(({ shell: s }) => {
+    globalThis.__esterni = [];
+    s.openExternal = async (u) => { globalThis.__esterni.push(String(u)); };
+  });
+  await leggiIlCodice(app, page, {
+    risposta: `Se non funziona [scrivi al supporto](mailto:supporto@${RACCOLTA}?subject=Verifica&body=Codice%20${CODICE}) oppure [chiedi aiuto](mailto:aiuto@guida.example?subject=Accesso).`,
+  });
+  await page.locator('.dash-bubble-filo a', { hasText: 'scrivi al supporto' }).click();
+  await expect(page.locator('.dash-fermata-clic')).toContainText("Non ho aperto l'indirizzo: conteneva un codice letto", { timeout: 10_000 });
+  expect((await app.evaluate(() => globalThis.__esterni)).join(' '), 'il programma di posta si apre col codice').not.toContain(CODICE);
+  // Un collegamento di posta che non porta niente di letto si apre come prima.
+  await page.locator('.dash-bubble-filo a', { hasText: 'chiedi aiuto' }).click();
+  await expect.poll(() => app.evaluate(() => globalThis.__esterni.join(' ')), { timeout: 10_000 }).toContain('aiuto@guida.example');
+});
+
+test('riaperta dopo un riavvio, il collegamento col codice letto non si apre al clic', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await leggiIlCodice(app, page, { risposta: `Per completare apri [la verifica](https://${RACCOLTA}/c?v=${CODICE}).` });
+  await expect(page.locator('.dash-bubble-filo a', { hasText: 'la verifica' })).toBeVisible({ timeout: 10_000 });
+  let id = null;
+  await expect.poll(async () => {
+    id = await page.evaluate(async () => {
+      const r = await chrome.runtime.sendMessage({ type: 'filo_chats_list' });
+      for (const c of (r && r.chats) || []) {
+        const g = await chrome.runtime.sendMessage({ type: 'filo_chat_get', id: c.id });
+        if (JSON.stringify((g && g.chat) || {}).includes('la verifica')) return c.id;
+      }
+      return null;
+    });
+    return id;
+  }, { timeout: 10_000 }).toBeTruthy();
+  // Il registro dei segreti letti vive quanto la sessione: un riavvio lo svuota.
+  await app.evaluate(() => globalThis.SN_SEGRETI_LETTI.svuota());
+  await openTab(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(id)}`);
+  const riaperta = await newtab(app, 'filo://dashboard/dashboard.html?chat=');
+  const link = riaperta.locator('.dash-bubble-filo a', { hasText: 'la verifica' });
+  await expect(link).toBeVisible({ timeout: 10_000 });
+  await link.click();
+  await expect(riaperta.locator('.dash-fermata-clic')).toContainText("Non ho aperto l'indirizzo: conteneva un codice letto", { timeout: 10_000 });
+  expect(apertoVerso(app, RACCOLTA), 'riaperta dopo il riavvio, il clic apre l’indirizzo col codice').toBe(false);
+});
+
 test('un suggerimento della home col codice letto non chiede fuori l’icona, e al clic dice cosa ha fermato', async ({ app, shell, openTab }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });

@@ -332,6 +332,21 @@
     }
   }
 
+  // Un titolo che nomina i codici al plurale («Codici di backup», «Recovery codes») vale per l'elenco che lo segue
+  // entro un paragrafo, anche con una frase in mezzo: un elenco sono due o più codici, ognuno a inizio riga o di numero.
+  const PLURALE = /\b(?:codici|codes|chiavi|keys)\b/i;
+  const RAGGIO_ELENCO = 400;
+  const A_INIZIO_RIGA = /(?:^|\n)[ \t]*(?:(?:\d{1,3}[.)]|[•·*-])[ \t]*)?$/;
+  function elencoDopo(s, fine, tutti, k) {
+    for (; k < tutti.length && tutti[k].i < fine + RAGGIO_ELENCO; k++) {
+      if (!A_INIZIO_RIGA.test(s.slice(Math.max(0, tutti[k].i - 12), tutti[k].i))) continue;
+      // Righe di blocchi col trattino arrivano già unite in un candidato solo.
+      if (/\n/.test(tutti[k].v) && tutti[k].pezzi.length > 1) return k;
+      if (k + 1 < tutti.length && FRA_CODICI.test(s.slice(tutti[k].j, tutti[k + 1].i))) return k;
+    }
+    return -1;
+  }
+
   function codiciVicini(s, out) {
     const cerca = new RegExp(MARCHI_MONOUSO.source, 'gi');
     let tutti = null;
@@ -355,6 +370,10 @@
       let k = primo(fine);
       for (; k < tutti.length && tutti[k].i < fine + RAGGIO; k++) {
         if (annunciato(s.slice(fine, tutti[k].i), tutti[k].v)) { presi.push(tutti[k]); break; }
+      }
+      if (!presi.length && PLURALE.test(parola[0])) {
+        k = elencoDopo(s, fine, tutti, primo(fine));
+        if (k >= 0) presi.push(tutti[k]);
       }
       if (presi.length) {
         for (k += 1; k < tutti.length && presi.length < 40; k++) {
