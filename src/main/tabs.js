@@ -2412,10 +2412,7 @@ class TabManager {
       if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
         const fromUrl = (details.referrer && details.referrer.url) || wc.getURL();
         globalThis.SN_USCITA_DA_FILO(url, wc, () => {
-          if (isWebUnsafeNav(url)) openExternalScheme(url);
-          else if (!this._maybeBlockNavigation(tab, url, { fromUrl })) {
-            this.openTab(url, { activate: disposition !== 'background-tab', openedByLink: true });
-          }
+          this.apriDaCollegamento(url, { fromUrl, sfondo: disposition === 'background-tab' });
         }).catch(() => {});
         return { action: 'deny' };
       }
