@@ -128,7 +128,8 @@ function ricorda(testo, fonte) {
 
 // Il testo scritto da altri entra in un modello dentro una busta (src/shared/contenutoEsterno.js), da qualunque
 // strada arrivi (titoli delle schede, risultati, pagine, comandi): i segreti dentro le buste contano come letti.
-// Memoria e stile di Filo no: li scrive Filo dalle parole dell'utente, e lì vale il controllo dei dati personali.
+// Memoria, stile e conversazioni archiviate no: ci sono le parole dell'utente e le proposte di Filo (una password che
+// Filo propone resta sua), e una conversazione porta già con sé quello che aveva letto da fuori.
 const FONTI_BUSTA = Object.freeze({
   RICERCA_WEB: 'dai risultati di una ricerca',
   ELEMENTO_PAGINA: 'da una pagina',
@@ -138,7 +139,6 @@ const FONTI_BUSTA = Object.freeze({
   ISTRUZIONI_SITO: 'da un sito',
   DATI_LINK: 'da un collegamento',
   DOCUMENTO_ESTERNO: 'da un documento',
-  CONVERSAZIONE_ARCHIVIATA: 'da una conversazione archiviata',
   ESITO_SERVIZIO: 'da un servizio esterno',
   ESITO_COMANDO: "dall'output di un comando",
   PERCORSI_CONDIVISI: 'da percorsi condivisi da altri',

