@@ -17,6 +17,10 @@ test('Sicurezza aperta dall\'incognito: il sito scritto resta in lista anche chi
   await pref.locator('#sec-siteblock-blacklist').click();
   await pref.keyboard.type('blocked.test');
   await pref.waitForTimeout(1500);
+  await pref.reload();
+  await pref.waitForSelector('#sec-siteblock-blacklist');
+  await expect(pref.locator('#sec-siteblock-blacklist')).toHaveValue('blocked.test', { timeout: 3000 });
+  console.log('disco con incognito aperto:', JSON.stringify(await lista(app)));
 
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoIncognito).close());
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito)), { timeout: 10_000 }).toBe(false);
