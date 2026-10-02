@@ -279,3 +279,102 @@ describe('il riepilogo di una suite a gruppi', () => {
     } finally { rmSync(casa, { recursive: true, force: true }); }
   });
 });
+
+const { NODE_TEST_CONTEXT: _contesto, ...AMBIENTE } = process.env;
+const lanciaSu = (dir, args = [], extra = {}) => spawnSync(process.execPath, [LANCIATORE, ...args], {
+  cwd: ROOT, encoding: 'utf8', env: { ...AMBIENTE, FILO_UNIT_DIR: dir, ...extra },
+});
+
+describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
+  test('una destinazione su file passa per una copia di gruppo; stdout e stderr restano', () => {
+    const r = destinazioniSuFile(
+      ['--test-reporter=junit', '--test-reporter-destination=out.xml', '--test-reporter=spec', '--test-reporter-destination', 'stdout',
+        '--test-reporter=tap', '--test-reporter-destination', 'b.tap'],
+      (k) => `COPIA${k}`,
+    );
+    assert.deepEqual(r.file, ['out.xml', 'b.tap']);
+    assert.deepEqual(r.flags, ['--test-reporter=junit', '--test-reporter-destination=COPIA0', '--test-reporter=spec',
+      '--test-reporter-destination=stdout', '--test-reporter=tap', '--test-reporter-destination=COPIA1']);
+  });
+
+  test('dei junit dei gruppi resta un documento solo con tutti i casi; gli altri formati si accodano', () => {
+    const j = (c) => `<?xml version="1.0" encoding="utf-8"?>\n<testsuites>\n\t<testcase name="${c}"/>\n</testsuites>\n`;
+    const uno = unisciRapporti([j('a'), j('b')]);
+    assert.equal((uno.match(/<testsuites>/g) || []).length, 1);
+    assert.equal((uno.match(/<\?xml/g) || []).length, 1);
+    assert.match(uno, /name="a"[\s\S]*name="b"/);
+    assert.equal(unisciRapporti(['uno\n', 'due\n']), 'uno\ndue\n');
+  });
+
+  test('il rapporto chiesto su file, a gruppi, contiene i test di ogni gruppo', () => {
+    const casa = cartellaTemporanea('filo-runner-rapporto-');
+    try {
+      for (const n of ['uno', 'due', 'tre']) writeFileSync(join(casa, `${n}.test.mjs`), `import { test } from 'node:test';\ntest('caso-${n}', () => {});\n`);
+      const xml = join(casa, 'rapporto.xml');
+      const testo = join(casa, 'rapporto.txt');
+      const r = lanciaSu(casa, ['--test-reporter=junit', `--test-reporter-destination=${xml}`, '--test-reporter=spec', '--test-reporter-destination', testo],
+        { FILO_UNIT_TETTO_RIGA: '1' });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(r.stdout, /3 file in 3 gruppi/);
+      const junit = readFileSync(xml, 'utf8');
+      assert.equal((junit.match(/<testsuites>/g) || []).length, 1, 'un documento junit solo');
+      for (const n of ['uno', 'due', 'tre']) {
+        assert.match(junit, new RegExp(`name="caso-${n}"`));
+        assert.match(readFileSync(testo, 'utf8'), new RegExp(`caso-${n}`));
+      }
+    } finally { rmSync(casa, { recursive: true, force: true }); }
+  });
+
+  test('--watch a gruppi si rifiuta con la ragione, invece di fermarsi al primo gruppo per sempre', () => {
+    assert.ok(chiedeWatch(['--watch']) && chiedeWatch(['--watch-path=src']) && !chiedeWatch(['--test-only']));
+    const casa = cartellaTemporanea('filo-runner-watch-');
+    try {
+      for (const n of ['a', 'b']) writeFileSync(join(casa, `${n}.test.mjs`), `import { test } from 'node:test';\ntest('${n}', () => {});\n`);
+      const r = lanciaSu(casa, ['--watch'], { FILO_UNIT_TETTO_RIGA: '1' });
+      assert.equal(r.status, 1);
+      assert.match(r.stderr, /--watch/);
+    } finally { rmSync(casa, { recursive: true, force: true }); }
+  });
+
+  test('copertura e rapporti su file a gruppi si dichiarano nel riepilogo; il rosso senza test rimanda anche al file', () => {
+    assert.ok(chiedeCopertura(['--experimental-test-coverage']) && !chiedeCopertura(['--test-only']));
+    const testo = testoRiepilogo({ somma: sommaRiepiloghi([[], []]), gruppi: 2, file: 4, esiti: [0, 1], rapporti: ['r.xml'], copertura: true });
+    assert.match(testo, /nella sua uscita, sopra o nel rapporto in r\.xml/);
+    assert.match(testo, /rapporti dei 2 gruppi sono riuniti in r\.xml/);
+    assert.match(testo, /copertura è per gruppo/);
+  });
+});
+
+describe('un file trovato è un file che gira', () => {
+  test('per un node che legge modelli, i caratteri speciali del nome si prendono alla lettera', () => {
+    assert.equal(allaLettera('tests/unit/caso [1] (b).test.mjs'), 'tests/unit/caso [[]1[]] [(]b[)].test.mjs');
+    assert.deepEqual(fileArgs([join(REPO_ROOT, 'tests', 'unit', 'a [1].test.mjs')], REPO_ROOT, { modelli: true }), ['tests/unit/a [[]1[]].test.mjs']);
+    assert.deepEqual(fileArgs([join(REPO_ROOT, 'tests', 'unit', 'a [1].test.mjs')], REPO_ROOT, { modelli: false }), ['tests/unit/a [1].test.mjs']);
+    assert.equal(NODE_LEGGE_MODELLI, Number(process.versions.node.split('.')[0]) >= 21);
+  });
+
+  test('un test rosso in un file con quadre o tonde nel nome rende rosso l’esito, da solo e a gruppi', () => {
+    const casa = cartellaTemporanea('filo-runner-nomi-');
+    try {
+      writeFileSync(join(casa, 'verde.test.mjs'), "import { test } from 'node:test';\ntest('verde', () => {});\n");
+      writeFileSync(join(casa, 'caso [1] (b).test.mjs'), "import { test } from 'node:test';\ntest('rosso-nel-nome-strano', () => { throw new Error('x'); });\n");
+      for (const extra of [{}, { FILO_UNIT_TETTO_RIGA: '1' }]) {
+        const r = lanciaSu(casa, [], extra);
+        assert.notEqual(r.status, 0, `il file con le quadre non è girato: ${JSON.stringify(extra)}`);
+        assert.match(r.stdout, /rosso-nel-nome-strano/);
+      }
+    } finally { rmSync(casa, { recursive: true, force: true }); }
+  });
+
+  test('un nome con graffe che node espanderebbe ferma la corsa e lo nomina, mai un verde senza quel file', () => {
+    assert.ok(nomeNonLanciabile('a{b,c}.test.mjs') && nomeNonLanciabile('a{1..2}.test.mjs') && !nomeNonLanciabile('a{b}.test.mjs'));
+    if (!NODE_LEGGE_MODELLI) return;
+    const casa = cartellaTemporanea('filo-runner-graffe-');
+    try {
+      writeFileSync(join(casa, 'a{b,c}.test.mjs'), "import { test } from 'node:test';\ntest('g', () => {});\n");
+      const r = lanciaSu(casa);
+      assert.equal(r.status, 1);
+      assert.match(r.stderr, /a\{b,c\}\.test\.mjs/);
+    } finally { rmSync(casa, { recursive: true, force: true }); }
+  });
+});
