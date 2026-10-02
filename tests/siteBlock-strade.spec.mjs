@@ -195,7 +195,7 @@ test('scrivendo «blocked.test.it» con una pausa dopo «blocked.test», la sche
   expect(await caricataSu(app, 'blocked.test')).toBe(sito);
 });
 
-test('scritto per intero il sito di una scheda aperta, la scheda passa alla pagina «Sito bloccato» appena la riga sta ferma, o subito se la si guarda', async ({ app, shell, rete }) => {
+async function apertaConSicurezza(app, shell, rete) {
   await lista(shell, []);
   const sito = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
   await apri(app, shell, sito);
@@ -203,13 +203,16 @@ test('scritto per intero il sito di una scheda aperta, la scheda passa alla pagi
   const pref = await paginaSicurezza(app, shell);
   await pref.locator('#sec-siteblock-blacklist').click();
   await pref.keyboard.type('blocked.test', { delay: 30 });
-  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toMatch(PAGINA_BLOCCATA);
+  return { id, pref };
+}
 
-  await lista(shell, []);
-  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toBe(sito);
-  await pref.locator('#sec-siteblock-blacklist').fill('');
-  await pref.locator('#sec-siteblock-blacklist').click();
-  await pref.keyboard.type('blocked.test', { delay: 30 });
+test('scritto per intero il sito di una scheda aperta, la scheda passa alla pagina «Sito bloccato» appena la riga sta ferma', async ({ app, shell, rete }) => {
+  await apertaConSicurezza(app, shell, rete);
+  await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 6000 }).toMatch(PAGINA_BLOCCATA);
+});
+
+test('scritto il sito di una scheda aperta e tornati subito su quella scheda, è già sulla pagina «Sito bloccato»', async ({ app, shell, rete }) => {
+  const { id, pref } = await apertaConSicurezza(app, shell, rete);
   await pref.waitForTimeout(700);
   await shell.evaluate((i) => window.filoShell.tabs.activate(i), id);
   await expect.poll(() => caricataSu(app, 'blocked.test'), { timeout: 1500 }).toMatch(PAGINA_BLOCCATA);

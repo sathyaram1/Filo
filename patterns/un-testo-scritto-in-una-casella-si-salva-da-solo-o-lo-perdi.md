@@ -103,16 +103,19 @@ sito e concludeva che la lista non funzionava (#590.2).
   salva e lo usa per le aperture nuove, ma non ne trae effetti visibili altrove
   finché non tiene. Cancellata e riscritta l'ultima lettera di un sito, la
   scheda ferma sulla pagina «Sito bloccato» riapriva il sito e tornava
-  bloccata. Adesso torna sul sito solo se il sito resta fuori dalla lista per
-  tre secondi, o subito quando l'utente passa a quella scheda. Togliere una
-  scheda da un sito appena messo in lista resta immediato.
+  bloccata; scritto «sito.it» con una pausa prima di «.br», la scheda aperta su
+  sito.it veniva bloccata e ricaricata, perdendo quello che c'era dentro. La
+  regola è una per le due direzioni: il salvataggio fatto mentre si scrive
+  arriva marcato `mentreScrive`, e le schede aperte seguono la lista solo
+  quando sta ferma per tre secondi, o subito quella che l'utente guarda. Una
+  lista cambiata da ogni altra strada vale subito.
 - **Nei test** la tastiera di Playwright non passa dal `before-input-event` e
   Playwright fa credere alla pagina di avere sempre il fuoco, quindi niente
   `blur`: Ctrl+W si prova con `sendInputEvent`, prima il Ctrl da solo e poi la
   lettera.
 - **Dove:** `testoCambiato`, `spedisci`, `uscita`, `righe`, `save` e
   `saveCookies` in `src/pages/security/security.js`; `riapplicaListaBloccati`,
-  `_riapriQuandoTiene` e `activate` in `src/main/tabs.js`. Test:
-  `tests/security-liste-non-si-perdono.spec.mjs` e i due casi sulla riga a metà
+  `_seguiLista` e `activate` in `src/main/tabs.js`. Test:
+  `tests/security-liste-non-si-perdono.spec.mjs` e i casi sulla riga a metà
   in `tests/siteBlock-strade.spec.mjs`. Le pagine Opzioni e Altro
   hanno ancora campi che si salvano solo al `change` (#590.5).
