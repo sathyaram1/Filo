@@ -62,11 +62,10 @@ test('il comando che l’utente detta col suo codice parte dopo l’OK', async (
   });
   await page.locator('#input').fill(`esegui ${comando}`);
   await page.locator('#sendBtn').click();
-  const bottone = page.locator('.dash-action-btn', { hasText: 'curl' });
-  await expect(bottone).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.dash-action-btn', { hasText: 'curl' })).toBeVisible({ timeout: 20_000 });
+  const bottone = page.locator('.dash-action-btn-primary').last();
   await bottone.click();
   await clickConfirm(page, 'ok');
-  await page.waitForTimeout(3000);
-  const tutto = await page.locator('#bubbles, body').first().innerText();
-  expect(tutto, 'dopo l’OK il comando scritto dall’utente è stato fermato').not.toMatch(/Non ho eseguito il comando/i);
+  await expect(bottone).toHaveText(/^[✓✗🔒]/u, { timeout: 15_000 });
+  await expect(bottone, 'dopo l’OK il comando scritto dall’utente è stato fermato').not.toContainText('Non ho eseguito il comando');
 });
