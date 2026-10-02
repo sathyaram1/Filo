@@ -350,3 +350,45 @@ test('col menu di una scheda aperto la carta aspetta che il menu si chiuda', asy
   });
   await expect.poll(async () => { const c = await carta(app); return c.visibile && c.titolo === 'Rossa'; }, { timeout: 3000 }).toBe(true);
 });
+
+// Chi apre una pagina e nell'attesa torna altrove: la foto del congedo è mezza vuota, la carta deve mostrare la pagina arrivata.
+test('una scheda lasciata mentre carica ancora, o appena arrivata e ancora vuota, mostra la pagina finita', async ({ app, shell, testServer }) => {
+  const lento = createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.write('<!doctype html><title>Lenta</title><style>html,body{margin:0;height:100%;background:#fff}</style><p>…</p>' + ' '.repeat(4096));
+    setTimeout(() => res.end('<style>html,body{background:#10a020 !important}</style><h1>Arrivata</h1>'), 2500);
+  });
+  await new Promise((r) => lento.listen(0, '127.0.0.1', r));
+  try {
+    const blu = await apri(app, shell, testServer.html(pagina('#1030e0', 'Blu')));
+    const lentaUrl = `http://127.0.0.1:${lento.address().port}/lenta`;
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), lentaUrl);
+    let lenta = null;
+    await expect.poll(async () => { lenta = (await schede(app)).tutte.find((x) => x.url === lentaUrl)?.id; return !!lenta; }, { timeout: 5000 }).toBe(true);
+    await new Promise((r) => setTimeout(r, 1000));
+    expect((await schede(app)).tutte.find((x) => x.id === lenta).loading).toBe(true);
+    await shell.locator(`.tab[data-id="${blu}"]`).click();
+    await expect.poll(async () => (await schede(app)).attiva, { timeout: 5000 }).toBe(blu);
+
+    // Una posta che mostra «Caricamento…» e si riempie dopo il caricamento, lasciata subito.
+    const postaUrl = testServer.html(`<!doctype html><title>Posta</title><style>html,body{margin:0;height:100%;background:#fff}</style>
+<p>Caricamento…</p><script>addEventListener('load',()=>setTimeout(()=>{document.documentElement.style.background=document.body.style.background='#10a020'},2000))</script>`);
+    const posta = await apri(app, shell, postaUrl);
+    await shell.locator(`.tab[data-id="${blu}"]`).click();
+    await expect.poll(async () => (await schede(app)).attiva, { timeout: 5000 }).toBe(blu);
+
+    await caricata(app, lentaUrl);
+    await new Promise((r) => setTimeout(r, 5000));
+    await shell.mouse.move(600, 500);
+    await new Promise((r) => setTimeout(r, 900));
+    // Sul bordo sinistro: la scheda si stringe quando cambia titolo.
+    await shell.locator(`.tab[data-id="${lenta}"]`).hover({ position: { x: 12, y: 16 } });
+    await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 3000 }).toBe('verde');
+    await shell.locator(`.tab[data-id="${posta}"]`).hover({ position: { x: 12, y: 16 } });
+    await expect.poll(async () => (await carta(app)).titolo, { timeout: 3000 }).toBe('Posta');
+    await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 3000 }).toBe('verde');
+  } finally {
+    lento.closeAllConnections?.();
+    await new Promise((r) => lento.close(r));
+  }
+});

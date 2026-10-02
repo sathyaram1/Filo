@@ -203,6 +203,47 @@ test('una scheda vista che cambia pagina senza ricaricarsi si rifotografa; torna
   m.anteprime.chiudi();
 });
 
+test('lasciata prima che la pagina si fermi si segue come una nata dietro; lasciata a pagina ferma no', async () => {
+  const davanti = scheda('d');
+  const lenta = scheda('l');
+  const appena = scheda('a');
+  const ferma = scheda('f');
+  const spia = conSpia(appena);
+  conSpia(ferma);
+  const m = manager([davanti, lenta, appena, ferma], 'l');
+  const arrivate = [];
+  m.anteprime = new AnteprimeSchede(m, { ripresa: 60_000, giro: 20, passo: 30, suNuova: (id) => arrivate.push(id) });
+  m.anteprime.navigata(lenta);
+  lenta.loading = true;
+  m.anteprime.congeda(lenta);
+  m.activeId = 'd';
+  assert.equal(m.anteprime.tieneSveglia(lenta), true, 'nascosta non si disegnerebbe a caricamento finito');
+  await aspetta(() => arrivate.length === 1);
+  lenta.loading = false;
+  m.anteprime.caricata(lenta);
+  await aspetta(() => arrivate.length === 2);
+  assert.deepEqual(arrivate, ['l', 'l']);
+
+  m.activeId = 'a';
+  m.anteprime.navigata(appena);
+  m.anteprime.congeda(appena);
+  m.activeId = 'd';
+  assert.equal(m.anteprime.tieneSveglia(appena), false, 'caricata: si sveglia solo quando cambia');
+  await aspetta(() => arrivate.length === 3);
+  await new Promise((r) => setTimeout(r, 200));
+  spia.n = 5;
+  await aspetta(() => arrivate.length === 4);
+  assert.equal(arrivate[3], 'a');
+
+  m.activeId = 'f';
+  m.anteprime.navigata(ferma);
+  ferma._anteprimaArrivata -= 60_000;
+  m.anteprime.congeda(ferma);
+  m.activeId = 'd';
+  assert.equal(ferma._anteprimaSegui, undefined, 'vista e ferma: resta com\'era');
+  m.anteprime.chiudi();
+});
+
 test('una scheda chiusa porta via la sua foto', async () => {
   const a = scheda('a');
   const m = manager([a], 'a');
