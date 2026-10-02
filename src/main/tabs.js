@@ -2880,6 +2880,30 @@ class TabManager {
     }
   }
 
+  // Il sito della pagina «Sito bloccato» messa dal main, se adesso la lista lo lascia aprire.
+  _daRiaprire(tab) {
+    const NE = globalThis.SN_NET_ERROR;
+    if (!NE || !tab._pagineBloccate || !this.tabs.includes(tab)) return null;
+    let grezzo = '';
+    try { grezzo = tab.view.webContents.getURL() || ''; } catch (_) { return null; }
+    if (!NE.isBlockedPageUrl(grezzo)) return null;
+    const target = NE.targetOf(grezzo);
+    return target && !this._decisioneBlocco(tab, target) ? target : null;
+  }
+
+  // Una riga a metà correzione toglie il sito per un attimo: si ricontrolla allo scadere.
+  _riapriQuandoTiene(tab) {
+    clearTimeout(tab._riapriTimer);
+    tab._riapriTimer = setTimeout(() => this._riapriSeSbloccata(tab), RIAPRI_DOPO_MS);
+  }
+
+  _riapriSeSbloccata(tab) {
+    clearTimeout(tab._riapriTimer);
+    tab._riapriTimer = null;
+    const target = this._daRiaprire(tab);
+    if (target) { try { tab.view.webContents.loadURL(target); } catch (_) {} }
+  }
+
   _siteAllowedIn(tab, url) {
     return !!(tab && tab.siteBlockAllowed && siteBlockSiteOf(url) === tab.siteBlockAllowed);
   }
