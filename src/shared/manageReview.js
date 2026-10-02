@@ -501,7 +501,7 @@
         return { text: 'La lavorazione si è arenata troppe volte: decidi tu.', color: S.design.color };
       }
       if (statusReason === 'locale') {
-        return { text: 'Richiede lavoro locale, e in locale i feedback degli utenti non si lavorano: decidi tu.', color: S.design.color };
+        return { text: 'Richiede lavoro locale: decidi tu. Con «💻 Lavoro locale» lo lavora e lo chiude una sessione.', color: S.design.color };
       }
       return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
     }
@@ -622,7 +622,7 @@
   /**
    * Il segno «solo in locale» si può mettere (`valore` true) o togliere su questa pratica? PURA.
    * Ritorna { ok: true } o { ok: false, motivo, utente } — `utente` vuol dire che il feedback
-   * è di un utente: in locale non si lavora, e se servisse lavoro locale torna nei Ricevuti.
+   * è di un utente: in locale si lavora solo col sì dell'owner (#913), e se servisse torna nei Ricevuti.
    * `opts.now` iniettabile nei test.
    */
   // Chiusa per lo stato o per il riflesso pubblico: lì il segno locale tiene la pratica fuori dalla bacheca, non dalle routine.
@@ -661,7 +661,7 @@
 
   /**
    * Una sessione locale può lavorare una pratica di questo mittente? PURA. Solo owner o sessione con la
-   * prova (#595); `utente` = feedback di un utente: in locale non si lavora e, se serve, torna nei Ricevuti.
+   * prova (#595), o approvata dall'owner come lavoro locale (#913); `utente`/`routine`: senza quel sì no.
    */
   function localSenderCheck(fb) {
     if (!fb) return { ok: false, motivo: 'feedback non trovato' };
