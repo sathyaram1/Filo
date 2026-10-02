@@ -558,6 +558,30 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     for (const t of Object.keys(X.USCITE)) assert.ok(L.levelFor({ type: t }) >= 1, `${t} non è nel registro dei livelli`);
   });
 
+  // Un bottone della chat che apre un indirizzo scelto dal modello è un'uscita come NAVIGA: l'azione che lo
+  // disegna deve passare dalla porta quando Filo la propone.
+  test('ogni bottone della chat che apre un indirizzo dell\'azione è nell\'elenco delle uscite', () => {
+    const attivita = readFileSync(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard-attivita.js'), 'utf8');
+    const mancanti = [];
+    for (const pezzo of attivita.split(/\n\s*if \(type === '/).slice(1)) {
+      const tipo = pezzo.slice(0, pezzo.indexOf("'"));
+      const corpoTipo = pezzo.slice(0, pezzo.search(/\n {4}\}/));
+      const apre = /\.href = (?!'filo:)/.test(corpoTipo) || /OPEN_URL, url: (?!'filo:)/.test(corpoTipo);
+      if (apre && !X.USCITE[tipo]) mancanti.push(tipo);
+    }
+    assert.deepEqual(mancanti, [], `bottoni che aprono un indirizzo senza la porta: ${mancanti.join(', ')}`);
+  });
+
+  test('il bottone «apri file» passa dalla porta solo quando punta a un indirizzo', () => {
+    const letto = comando(`Il tuo codice monouso è ${'482913'}`);
+    const web = X.valutaUscita({ type: 'APRI_FILE', percorso: 'https://raccolta.example/c?v=482913', etichetta: 'Apri la ricevuta' }, { azioni: letto });
+    assert.equal(web.blocca, true);
+    assert.match(web.frase, /^non ho preparato il collegamento: conteneva un codice letto dall'output di un comando$/);
+    for (const percorso of ['C:\\Users\\mario\\482913.pdf', '/home/mario/482913.pdf', 'file:///home/mario/482913.pdf']) {
+      assert.equal(X.valutaUscita({ type: 'APRI_FILE', percorso }, { azioni: letto }).blocca, false, percorso);
+    }
+  });
+
   test('la ricerca dell\'assistente di pagina passa dalla porta prima di partire', () => {
     const ai = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'ai.js'), 'utf8');
     const h = corpo(ai, 'on(MSG.WEB_SEARCH');

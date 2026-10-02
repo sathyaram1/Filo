@@ -343,7 +343,14 @@
     CERCA_WEB: 'non ho fatto la ricerca',
     ESEGUI_COMANDO: 'non ho eseguito il comando',
     INVIA_FEEDBACK: 'non ho inviato il feedback',
+    APRI_FILE: 'non ho preparato il collegamento',
   });
+
+  // Il bottone «apri file» porta fuori solo quando punta a un indirizzo, non a un file del computer.
+  function puntaFuori(action) {
+    const meta = String(action.percorso ?? action.path ?? action.url ?? '').trim().match(/^([a-z][a-z0-9+.-]*):/i);
+    return !!meta && meta[1].length > 1 && meta[1].toLowerCase() !== 'file';
+  }
 
   // Cosa conteneva, per la riga che legge l'utente: mai il segreto stesso.
   const CUSTODITI = Object.freeze({
@@ -443,7 +450,7 @@
     const tipo = String((action && action.type) || '').toUpperCase();
     const verbo = USCITE[tipo];
     const niente = { blocca: false, exfil: false, frase: '', reason: '' };
-    if (!verbo) return niente;
+    if (!verbo || (tipo === 'APRI_FILE' && !puntaFuori(action))) return niente;
     const G = global.SN_GUARDIANO_STATICO;
     const uscente = testoUscente(action);
     const u = formeDi(uscente);
