@@ -24,6 +24,13 @@ test('Gestione: bolla e testata per ogni mittente', async ({ openTab }) => {
     const chi = await page.locator('#mgThread .mg-bubble').allInnerTexts();
     const testata = (await page.locator('#senderLink').textContent()).trim();
     out[fb._id] = { chi, testata };
+    if (fb._id === 'ses' || fb._id === 'own') {
+      for (const tema of ['light', 'dark']) {
+        await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+        await page.waitForTimeout(150);
+        await page.screenshot({ path: `tests/.shots/giro9-autore-${fb._id}-${tema}.png` });
+      }
+    }
   }
   console.log(JSON.stringify(out, null, 1));
 });
