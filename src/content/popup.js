@@ -72,19 +72,24 @@
     return r;
   }
 
-  // In cattura sulla finestra: un antenato che ferma il clic lascerebbe al collegamento l'apertura da sé, senza porta.
-  // Nelle pagine di Filo no: lì ogni apertura passa già dalla porta nel main, e la chat ha la sua.
+  // Nelle pagine di Filo la porta sta già su ogni apertura nel main, e la chat ha la sua: lì il clic arriva in bolla,
+  // dopo quella, e basta aprire. Nelle pagine web in cattura sulla finestra: un antenato che fermasse il clic
+  // lascerebbe al collegamento l'apertura da sé, senza porta.
+  const inPaginaDiFilo = location.protocol === 'filo:';
   const suCollegamento = (e) => {
-    if (location.protocol === 'filo:') return;
     if (e.type === 'auxclick' && e.button !== 1) return;
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
     if (!a) return;
     e.preventDefault();
     e.stopPropagation();
+    if (inPaginaDiFilo) { try { window.open(a.getAttribute('href'), '_blank', 'noopener'); } catch (_) {} return; }
     apriCollegamento(a, { sfondo: e.type === 'auxclick' || e.ctrlKey || e.metaKey });
   };
-  window.addEventListener('click', suCollegamento, true);
-  window.addEventListener('auxclick', suCollegamento, true);
+  if (inPaginaDiFilo) document.addEventListener('click', suCollegamento);
+  else {
+    window.addEventListener('click', suCollegamento, true);
+    window.addEventListener('auxclick', suCollegamento, true);
+  }
 
   // ----------------------------------------------------------------
   // Compensazione zoom (Ctrl+/-, pinch). Identica per popup e menu.

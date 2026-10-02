@@ -1064,3 +1064,54 @@ test('dopo un riavvio vero, una chat nuova non porta fuori il codice che Filo av
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   }
 });
+
+// Dentro una pagina web i collegamenti scritti dall'assistente li apre il main, dopo la porta: con ogni gesto quello col
+// codice letto dalla pagina non esce, e la riga lo dice; quello che non porta niente si apre come prima.
+test('i collegamenti nella risposta dell’assistente di pagina col codice letto non si aprono con nessun gesto', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, PAGINA_OTP);
+  await preparaModelli(app);
+  await app.evaluate(({ shell: s, webContents }) => {
+    globalThis.__esterni = [];
+    globalThis.__scaricati = [];
+    s.openExternal = async (u) => { globalThis.__esterni.push(String(u)); };
+    for (const wc of webContents.getAllWebContents()) wc.downloadURL = (u) => { globalThis.__scaricati.push(String(u)); };
+  });
+  await modelloFinto(app, {
+    aiuto: JSON.stringify({
+      text: `Per completare apri [la verifica](https://${RACCOLTA}/c?v=${CODICE}), salva [la ricevuta](https://${RACCOLTA}/ricevuta-${CODICE}.pdf), `
+        + `[scrivi al supporto](mailto:supporto@${RACCOLTA}?body=Codice%20${CODICE}) o leggi [la guida](https://guida.example/verifica).`,
+      status: 'done',
+    }),
+  });
+  await apriAiuto(shell, page);
+  await scriviAllAiuto(page, 'aiutami a finire l’accesso');
+  const link = (testo) => page.locator('.sn-sidebar a', { hasText: testo });
+  await expect(link('la verifica')).toBeVisible({ timeout: 20_000 });
+  const righe = page.locator('.sn-sidebar-log', { hasText: "non ho aperto l'indirizzo: conteneva un codice letto dalla pagina 127.0.0.1" });
+
+  await link('la verifica').click();
+  await expect(righe).toHaveCount(1, { timeout: 10_000 });
+  await expect(righe.first()).not.toContainText(CODICE);
+  await link('la verifica').click({ button: 'middle' });
+  await expect(righe).toHaveCount(2, { timeout: 10_000 });
+  await link('la verifica').click({ button: 'right' });
+  await page.locator('.sn-menu').getByText('Apri in nuova tab', { exact: false }).first().click();
+  await expect(righe).toHaveCount(3, { timeout: 10_000 });
+  await link('scrivi al supporto').click();
+  await expect(righe).toHaveCount(4, { timeout: 10_000 });
+  await link('la ricevuta').click({ button: 'right' });
+  await page.locator('.sn-menu').getByText('Salva file', { exact: false }).first().click();
+  await expect(righe).toHaveCount(5, { timeout: 10_000 });
+  await page.waitForTimeout(500);
+  expect(apertoVerso(app, RACCOLTA), 'un gesto ha aperto l’indirizzo col codice').toBe(false);
+  expect((await app.evaluate(() => globalThis.__esterni)).join(' '), 'il programma di posta si apre col codice').not.toContain(CODICE);
+  expect((await app.evaluate(() => globalThis.__scaricati)).join(' '), 'lo scaricamento chiede al sito l’indirizzo col codice').not.toContain(CODICE);
+
+  // La domanda dopo, l'assistente sa che il collegamento non si è aperto.
+  await scriviAllAiuto(page, 'l’hai aperta?');
+  await expect.poll(() => app.evaluate(() => JSON.stringify(globalThis.__visti.at(-1))), { timeout: 20_000 }).toContain('non si è aperto');
+
+  await link('la guida').first().click();
+  await expect.poll(() => apertoVerso(app, 'guida.example'), { timeout: 10_000 }).toBe(true);
+});

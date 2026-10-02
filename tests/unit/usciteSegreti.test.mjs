@@ -738,11 +738,38 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     const finestre = tabs.slice(tabs.indexOf('wc.setWindowOpenHandler((details)'));
     prima(finestre, 'SN_USCITA_DA_FILO(', 'this.openTab(', 'una pagina di Filo apre una scheda prima della porta');
     prima(finestre, 'SN_USCITA_DA_FILO(', 'openExternalScheme(', 'una pagina di Filo passa la posta al sistema prima della porta');
+    assert.match(finestre.slice(0, finestre.indexOf('return { action: \'deny\' }')), /SN_USCITA_DA_FILO\(url, wc, \(\) => \{\s*this\.apriDaCollegamento\(/);
+    const apre = corpo(tabs, '  apriDaCollegamento(url');
+    for (const passo of ['openExternalScheme(', '_maybeBlockNavigation(', 'this.openTab(']) assert.ok(apre.includes(passo), `apriDaCollegamento senza ${passo}`);
     prima(corpo(src('main', 'services', 'handlers', 'misc.js'), "on('fetch_link_meta'"), 'controllaUscita(', 'safeFetch(', 'leggere un collegamento lo chiede al sito prima della porta');
     const dash = src('pages', 'dashboard', 'dashboard.js');
     assert.ok(/document\.addEventListener\('click', apriDaCollegamento, true\)/.test(dash), 'i collegamenti della pagina non passano da apriProposta');
     assert.match(corpo(dash, 'const apriDaCollegamento = (e) =>'), /mailto/);
     assert.match(corpo(dash, 'async function apriProposta('), /MSG\.FILO_APRI_PROPOSTA/);
+  });
+
+  // Dentro una pagina web un window.open dei content script sembra della pagina e non passa dalla porta: i collegamenti
+  // che un modello scrive lì (assistente di pagina, Spiega, richiesta rapida) li apre e li scarica il main, per ogni gesto.
+  test('i collegamenti che un modello scrive dentro una pagina web si aprono e si scaricano solo dopo la porta', () => {
+    const src = (...p) => readFileSync(join(ROOT, 'src', ...p), 'utf8');
+    const popup = src('content', 'popup.js');
+    assert.ok(!/window\.open\(/.test(popup), 'il popup apre un collegamento da sé');
+    for (const gesto of ['click', 'auxclick']) {
+      assert.ok(popup.includes(`window.addEventListener('${gesto}', suCollegamento, true)`), `il ${gesto} su un collegamento di Filo non passa dal main`);
+    }
+    const su = corpo(popup, 'const suCollegamento = (e) =>');
+    assert.match(su, /a\.filo-md-link/);
+    assert.match(su, /apriCollegamento\(a/);
+    assert.match(corpo(popup, 'async function apriCollegamento('), /type: MSG\.APRI_COLLEGAMENTO_FILO, url, parole:/);
+    assert.match(corpo(popup, 'async function scaricaCollegamento('), /type: MSG\.DOWNLOAD_LINK, url, diFilo: true, parole:/);
+    const menu = corpo(src('content', 'content.js'), 'function buildLinkActionItems(');
+    assert.match(menu, /diFilo \? Popup\.apriCollegamento\(linkEl\)/);
+    assert.match(menu, /diFilo \? Popup\.scaricaCollegamento\(linkEl\)/);
+    const filo = corpo(src('main', 'services', 'handlers', 'filo.js'), 'on(MSG.APRI_COLLEGAMENTO_FILO');
+    const porta = filo.indexOf('apriDaFilo(');
+    assert.ok(porta > 0 && porta < filo.indexOf('apriDaCollegamento('), 'APRI_COLLEGAMENTO_FILO apre prima della porta');
+    const scarica = corpo(src('main', 'services', 'handlers', 'misc.js'), 'on(MSG.DOWNLOAD_LINK');
+    assert.match(scarica, /if \(msg\.diFilo\) \{[\s\S]*apriDaFilo\(url, \{[\s\S]*apri: \(\) => \{ esito = scarica\(\); \}/);
   });
 
   // Riaperta, anche dopo un riavvio, una chat dice di nuovo cosa aveva letto prima che si clicchi qualcosa.
