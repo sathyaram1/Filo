@@ -198,7 +198,7 @@ test('#896 — chi non è owner, in pausa: niente icona, niente voce, la pagina 
   await sito.keyboard.press('Escape');
 
   const rt = await openTab(RT_URL);
-  await expect(rt.locator('body')).toHaveText(PAUSA);
+  await expect(rt.locator('#rtPausa')).toHaveText(PAUSA);
   await expect(rt.locator('.rt-tab')).toHaveCount(0);
 
   // Un invio e un riscatto forzati (una versione vecchia della pagina, o un sito) si fermano nel main.
@@ -228,7 +228,7 @@ test('#896 — l’owner, in pausa, vede tutto come prima', async ({ app, openTa
 
   const rt = await openTab(RT_URL);
   await expect(rt.locator('.rt-tab')).toHaveCount(4);
-  await expect(rt.locator('body')).not.toContainText(PAUSA);
+  await expect(rt.locator('#rtPausa')).toHaveCount(0);
 
   const invio = await rt.evaluate(() => chrome.runtime.sendMessage({ type: 'redteam_submit', attackText: 'prova', description: '' }));
   expect(invio.status).toBe('insufficient_credits');
