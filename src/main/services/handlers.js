@@ -26,6 +26,7 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   noteServed: (s, action, r) => noteServedProvider(s, action, r),
   costs: Costs,
   segreti: async () => (await segretiCustoditi()).map((x) => x.valore),
+  ricordaEsterni: (messages) => SegretiLetti.ricordaBuste(messages),
 });
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
