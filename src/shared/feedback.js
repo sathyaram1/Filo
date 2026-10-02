@@ -2176,6 +2176,7 @@
     listHitCap,
     countLabel,
     COUNT_CAP_HINT,
+    COUNT_INCOMPLETE_HINT,
     updateStatus,
     // S1.F2.1: mapping status fine → valore pubblico grossolano (in chiaro).
     // Esportata perché owner-feedback.mjs (script .mjs) la riusa per scrivere statusPublic.
