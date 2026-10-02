@@ -241,7 +241,8 @@
     .mg-search-input::placeholder { color: var(--sn-muted); }
     /* Il type=search del browser aggiunge una "x" nativa blu che stona col tema: resta solo la nostra. */
     .mg-search-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
-    .mg-search-msg { font-size: 12px; color: var(--sn-muted); flex: 0 0 auto; }
+    /* Il motivo di un ripiego può essere lungo: va a capo e lascia metà riga al campo. */
+    .mg-search-msg { font-size: 12px; color: var(--sn-muted); flex: 0 1 auto; min-width: 0; max-width: 50%; }
     .mg-search-msg.mg-err { color: #c0392b; }
     .mg-search-close {
       all: unset; cursor: pointer; flex: 0 0 auto;
