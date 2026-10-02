@@ -1558,6 +1558,7 @@ class TabManager {
     }
     this.layout();
     this._tastieraAllaSchedaAttiva();
+    if (tab._riapriTimer) this._riapriSeSbloccata(tab);
     this._broadcast();
   }
 
