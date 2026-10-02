@@ -109,7 +109,10 @@ const letti = registro(MAX_LETTI, { cambiato: salvaPresto });
 function carica() {
   if (caricato) return;
   caricato = true;
-  if (deposito === undefined) deposito = depositoDiSistema();
+  if (deposito === undefined) {
+    deposito = depositoDiSistema();
+    if (deposito) process.once('exit', () => { if (inAttesa) salvaOra(); });
+  }
   if (!deposito) return;
   let lista = null;
   try { lista = JSON.parse(deposito.leggi() || 'null'); } catch (_) { lista = null; }
