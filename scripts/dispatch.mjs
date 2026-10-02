@@ -1683,6 +1683,23 @@ function prepareForProber() {
   }
 }
 
+// Fra un worker e l'altro la cartella torna sulla linea principale: la sessione legge gli agenti (e il loro
+// sforzo) dalla cartella, e il ramo vecchio lasciato dal worker prima li riporterebbe indietro (sforzo per ruolo).
+// Scarta le modifiche non salvate (il lavoro di un worker morto si butta): per questo solo nelle routine.
+export function tornaAllaLineaPrincipale() {
+  if (process.env.FILO_ROUTINE !== '1') {
+    return { ok: false, uso: true, message: 'solo nelle routine (FILO_ROUTINE=1): scarta le modifiche non salvate della cartella' };
+  }
+  clearExpectation(ROOT);
+  tryGit(['fetch', 'origin', MAIN_BRANCH]);
+  const rif = tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok ? `origin/${MAIN_BRANCH}` : MAIN_BRANCH;
+  const co = tryGit(['checkout', '-f', '-B', MAIN_BRANCH, rif]);
+  if (!co.ok || currentBranch(ROOT) !== MAIN_BRANCH) {
+    return { ok: false, message: `la cartella non torna su ${MAIN_BRANCH}: ${co.out.slice(0, 200)}` };
+  }
+  return { ok: true, head: headSha(ROOT) };
+}
+
 /**
  * A + D: posiziona la directory sul branch del bucket e registra nello stato
  * l'identità attesa del contenuto. FAIL CLOSED: se non riesce, il lavoro NON
