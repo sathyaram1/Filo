@@ -1299,6 +1299,8 @@
     renderMarkdown,
     resolveCalcMarkers,
     registerStack,
+    apriCollegamento,
+    scaricaCollegamento,
     // C'è un riquadro aperto adesso? Lo chiede content.js per decidere di chi
     // è l'Esc quando si è a tutto schermo (#514).
     hasOpen: () => popups.length > 0,
