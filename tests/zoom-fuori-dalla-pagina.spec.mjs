@@ -521,21 +521,34 @@ for (const [nome, tastiDelSistema] of [
   });
 }
 
-test('una notifica del sito che arriva col riquadro aperto non lo copre, e il numero battuto vale', async ({ app, openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="height:4000px"><h1>sito con notifiche</h1>
-    <div id="t" popover="manual" style="position:fixed;inset:auto;top:8px;right:8px;margin:0;width:320px;padding:16px;background:#335;color:#fff">Nuovo messaggio</div></body></html>`);
-  await manda(app, page, clicIn(600, 500, 'middle'));
-  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
-  // Nessun gesto dopo la notifica: il riquadro torna sopra da solo.
-  await page.evaluate(() => document.getElementById('t').showPopover());
-  await expect.poll(() => page.evaluate(() => {
-    const b = document.getElementById('__filo-zoom-badge');
-    const r = b.getBoundingClientRect();
-    const sopra = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return !!(sopra && b.contains(sopra));
-  }), { message: 'al posto del riquadro si vede la notifica del sito', timeout: 2000 }).toBe(true);
-  await clicSulNumeroE(app, page, 130);
-});
+// Una notifica che non prende i clic (pointer-events: none) copre lo stesso.
+for (const [nome, stileNotifica] of [
+  ['', ''],
+  [' anche se non prende i clic', 'pointer-events:none;'],
+]) {
+  test(`una notifica del sito che arriva col riquadro aperto non lo copre${nome}, e il numero battuto vale`, async ({ app, openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, `<!doctype html><html><body style="height:4000px"><h1>sito con notifiche</h1>
+      <div id="t" popover="manual" style="${stileNotifica}position:fixed;inset:auto;top:8px;right:8px;margin:0;width:320px;padding:16px;background:#335;color:#fff">Nuovo messaggio</div></body></html>`);
+    await manda(app, page, clicIn(600, 500, 'middle'));
+    await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+    // Nessun gesto dopo la notifica: il riquadro torna sopra da solo.
+    await page.evaluate(() => document.getElementById('t').showPopover());
+    await expect.poll(() => page.evaluate(() => {
+      const b = document.getElementById('__filo-zoom-badge');
+      const t = document.getElementById('t');
+      const r = b.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      // Il punto si chiede con la notifica che prende i clic: così si vede chi sta sopra.
+      const prima = t.style.pointerEvents;
+      t.style.pointerEvents = 'auto';
+      const sopra = document.elementFromPoint(x, y);
+      t.style.pointerEvents = prima;
+      return !!(sopra && b.contains(sopra));
+    }), { message: 'al posto del riquadro si vede la notifica del sito', timeout: 2000 }).toBe(true);
+    await clicSulNumeroE(app, page, 130);
+  });
+}
 
 for (const [nome, regola, dialogo] of [
   ['dentro un dialogo modale', 'dialog', true],
