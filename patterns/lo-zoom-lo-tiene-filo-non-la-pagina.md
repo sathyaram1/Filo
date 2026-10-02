@@ -81,6 +81,7 @@ colpo di rotella con Ctrl lo recupera `zoom-changed`, i tasti restano
 all'utente comunque. Il riquadro con la percentuale sta ancora nel documento:
 un sito che lo cerca apposta può nasconderlo o toglierlo, non cambiare il numero
 che viene applicato né prenderne i tasti. Toglierlo del tutto dalla pagina vuol
-dire una vista di Filo sopra la scheda: è una scelta dell'owner.
+dire una vista di Filo sopra la scheda: l'owner, interpellato su #686.1, l'ha
+lasciato nella pagina. Si riapre solo se lo chiede lui.
 
 Prove: `tests/zoom-fuori-dalla-pagina.spec.mjs` (con i riquadri riempiti dalla pagina, il frameset, l'SVG, il dialogo modale anche dentro un componente, lo sfondo dei livelli in primo piano, il fuoco portato in un riquadro, la notifica arrivata dopo e lo stile del testo), `tests/unit/zoomPagina.test.mjs`.
