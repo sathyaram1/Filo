@@ -573,7 +573,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
   });
 
   test('il bottone «apri file» passa dalla porta solo quando punta a un indirizzo', () => {
-    const letto = comando(`Il tuo codice monouso è ${'482913'}`);
+    const letto = comando('Il tuo codice monouso è 482913');
     const web = X.valutaUscita({ type: 'APRI_FILE', percorso: 'https://raccolta.example/c?v=482913', etichetta: 'Apri la ricevuta' }, { azioni: letto });
     assert.equal(web.blocca, true);
     assert.match(web.frase, /^non ho preparato il collegamento: conteneva un codice letto dall'output di un comando$/);

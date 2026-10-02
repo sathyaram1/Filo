@@ -1353,7 +1353,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
     } catch (_) {}
   }
 
-  // Le uscite (NAVIGA, CERCA_WEB, ESEGUI_COMANDO, INVIA_FEEDBACK) passano dalla porta unica
+  // Le uscite (elenco in src/shared/urlExfil.js, USCITE) passano dalla porta unica
   // PRIMA del gate: un segreto che esce si ferma a ogni livello, anche confermato. Il resto del
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
   // `_exfil` (mai dall'LLM). Vedi src/shared/urlExfil.js.
