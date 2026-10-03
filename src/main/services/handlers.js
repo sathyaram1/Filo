@@ -1247,6 +1247,28 @@ async function segnaFonteLetta(chatId, fontiLette, action) {
   }
 }
 
+// Ciò che l'Aiuto ha letto sulla sua scheda (#530): su una pagina di Filo l'indirizzo non sporca il compito, la
+// ricerca sul web del pannello sì. Lo tiene il main per la scheda, fino alla navigazione successiva.
+const fontiPerAiuto = new WeakMap();     // webContents → fonti lette dall'Aiuto
+const aiutoAscoltato = new WeakSet();
+function fontiDellAiuto(sender) {
+  const wc = sender && sender.wc;
+  return (wc && fontiPerAiuto.get(wc)) || [];
+}
+function segnaLetturaAiuto(sender, action) {
+  const wc = sender && sender.wc;
+  const f = wc && globalThis.SN_ACTION_LEVELS && globalThis.SN_ACTION_LEVELS.fonteDi(action);
+  if (!f) return;
+  if (!aiutoAscoltato.has(wc)) {
+    aiutoAscoltato.add(wc);
+    try { wc.on('did-navigate', () => fontiPerAiuto.delete(wc)); } catch (_) {}
+  }
+  const fonti = fontiPerAiuto.get(wc) || [];
+  const voce = { classe: f.classe, campo: f.campo || null, chiave: String(f.chiave || ''), motivo: String(f.motivo || '') };
+  if (!fonti.some((x) => x.chiave === voce.chiave && x.classe === voce.classe)) fonti.push(voce);
+  fontiPerAiuto.set(wc, fonti);
+}
+
 // Un documento della cartella Download l'ha scritto qualcun altro: classe 5, non 4 (#530).
 function fileScaricato(p) {
   if (!p) return false;
