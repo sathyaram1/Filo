@@ -1302,7 +1302,7 @@ function fraseNo(ing, decisione, sender) {
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in questo turno, turni passati
 // compresi: dicono cosa il compito ha letto (#530) e servono all'anti-esfiltrazione di NAVIGA.
 async function executeFiloAction(action, {
-  confirmed = false, sender = null, contesto = null, assistente = false,
+  confirmed = false, sender = null, contesto = null, fontiLette = null, assistente = false,
   richiesta = '', origine = 'chat', dentroPerimetro = true,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
