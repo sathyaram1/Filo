@@ -67,6 +67,20 @@
     return `${dt.getDate()} ${MESI[dt.getMonth()]}`;
   }
   function plurale(n, uno, tanti) { return n === 1 ? `1 ${uno}` : `${n} ${tanti}`; }
+  let avvisoTimer = null;
+  function avviso(testo) {
+    let n = document.getElementById('dashFlash');
+    if (!n) {
+      n = el('div', 'dash-flash');
+      n.id = 'dashFlash';
+      n.setAttribute('role', 'status');
+      document.body.appendChild(n);
+    }
+    n.textContent = testo;
+    n.classList.add('vista');
+    clearTimeout(avvisoTimer);
+    avvisoTimer = setTimeout(() => n.classList.remove('vista'), 2600);
+  }
 
   // ===== Sveglie e timer =====
   function ricorrenza(t) {
@@ -156,7 +170,7 @@
       return;
     }
     if (res.missing) caricaDownloads();
-    d.avviso(res.error || 'Il file non si apre');
+    avviso(res.error || 'Il file non si apre');
   }
   const cmdDownload = (type, r) => () => d.send({ type, id: r.id }).then(caricaDownloads);
 
@@ -193,7 +207,13 @@
         filo: `«${nome}» è un programma: lo scarico solo se mi dici di sì, dagli Scaricamenti.`,
       };
     }
-    const cartella = { etichetta: 'Cartella', fai: () => d.send({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id }).then(() => caricaDownloads()) };
+    const cartella = {
+      etichetta: 'Cartella',
+      fai: () => d.send({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id }).then((res) => {
+        if (res && res.ok === false) avviso(res.error || 'La cartella non si apre');
+        caricaDownloads();
+      }),
+    };
     if (r.state === 'interrupted') {
       return { ...base, stato: 'interrotto', principale: cartella, filo: `Lo scaricamento di «${nome}» si è interrotto.` };
     }
@@ -256,7 +276,9 @@
   }
 
   // ===== Le carte di destra =====
-  function voceLista({ testo, coda, titolo, fai, iconaEl }) {
+  // Il clic chiede alla carta di adesso cosa fare: due documenti con lo stesso titolo che si scambiano di
+  // posto non rifanno la carta, e il pulsante deve aprire quello che mostra.
+  function voceLista({ testo, coda, titolo, iconaEl }, art, i) {
     const li = el('li');
     const b = el('button', 'dash-carta-voce');
     b.type = 'button';
@@ -264,7 +286,11 @@
     b.appendChild(el('span', 'dash-carta-voce-testo', testo));
     if (coda) b.appendChild(el('span', 'dash-carta-voce-coda', coda));
     b.title = titolo || testo;
-    b.addEventListener('click', (e) => { e.stopPropagation(); fai(b); });
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const v = art._carta && art._carta.voci && art._carta.voci[i];
+      if (v) v.fai(b);
+    });
     li.appendChild(b);
     return li;
   }
@@ -435,23 +461,27 @@
     }
     if (c.voci && c.voci.length) {
       const ul = el('ul', 'dash-carta-voci');
-      for (const v of c.voci) {
-        const li = voceLista(v);
+      c.voci.forEach((v, i) => {
+        const li = voceLista(v, art, i);
         if (v.piano) li.firstChild.classList.add('piano');
         ul.appendChild(li);
-      }
+      });
       art.appendChild(ul);
     }
     if (c.pastiglie) {
       const riga = el('div', 'dash-carta-pastiglie');
-      for (const p of c.pastiglie) {
+      c.pastiglie.forEach((p, i) => {
         const b = el('button', `dash-pastiglia${p.acceso ? ' acceso' : ''}`, p.etichetta);
         b.type = 'button';
         b.setAttribute('aria-pressed', p.acceso ? 'true' : 'false');
         b.title = p.acceso ? `${p.etichetta}: acceso` : `${p.etichetta}: spento`;
-        b.addEventListener('click', (e) => { e.stopPropagation(); scriviImpostazione(p.scrivi()); });
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const cur = art._carta.pastiglie && art._carta.pastiglie[i];
+          if (cur) scriviImpostazione(cur.scrivi());
+        });
         riga.appendChild(b);
-      }
+      });
       art.appendChild(riga);
     }
     if (c.principale || c.secondaria) {
