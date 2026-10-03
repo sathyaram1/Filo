@@ -1,0 +1,274 @@
+// #867 — ogni cambio di stato, chiesto in chat o fatto da una pagina, diventa un evento del filo
+// nel momento in cui si salva, e si annulla con un clic o chiedendo «rimetti come prima».
+// Ogni prova asserisce il successo dal punto di vista dell'utente: senza il registro sono rosse.
+
+import { test, expect } from './fixtures/electron.mjs';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+async function trovaPagina(app, prova, timeout = 10_000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const p = app.windows().find((w) => { try { return prova(w.url()); } catch (_) { return false; } });
+    if (p) { await p.waitForLoadState('domcontentloaded'); return p; }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('pagina non trovata');
+}
+const homeDi = (app) => trovaPagina(app, (u) => u.startsWith('filo://newtab') && !u.includes('incognito'));
+
+async function configura(app, extra = {}) {
+  await app.evaluate(async (_e, ex) => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+      theme: 'light',
+      ...ex,
+    });
+  }, extra);
+}
+
+// Il modello finto: un giro per elemento di `giri`. `annullaTema: true` cerca nel prompt l'id del
+// cambio del tema e lo annulla, come farebbe il modello leggendo i CAMBI RECENTI.
+async function modelloFinto(app, giri) {
+  await app.evaluate(async (_e, g) => {
+    const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.__finto_restore = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
+    globalThis.__finto_prompt = [];
+    let n = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
+      const testo = messages.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+      globalThis.__finto_prompt.push(testo);
+      const giro = g[Math.min(n, g.length - 1)];
+      n += 1;
+      let calls = giro.toolCalls || [];
+      if (giro.annullaTema) {
+        const m = testo.match(/(c[0-9a-f]{10}): tema: chiaro → scuro/);
+        calls = [{ id: 'u1', name: 'ANNULLA_CAMBIO', arguments: JSON.stringify({ id: m ? m[1] : 'nessuno' }) }];
+      }
+      for (const c of calls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
+      if (giro.text) { try { onDelta && onDelta(giro.text); } catch (_) {} }
+      return {
+        model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        text: giro.text || '', toolCalls: calls, reasoningDetails: [], finishReason: calls.length ? 'tool_calls' : 'stop',
+      };
+    };
+  }, giri);
+}
+const ripristina = (app) => app.evaluate(() => { try { globalThis.__finto_restore?.(); } catch (_) {} });
+
+const impostazioni = (app) => app.evaluate(async () => globalThis.SN_STORAGE.getSettings());
+const registro = (app) => app.evaluate(async () => {
+  await globalThis.SN_REGISTRO_CAMBI.attesa();
+  const r = await globalThis.chrome.storage.local.get('filo_cambi');
+  return r.filo_cambi || [];
+});
+
+async function scrivi(page, testo, risposta) {
+  await page.locator('#input').fill(testo);
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: risposta })).toBeVisible({ timeout: 10_000 });
+}
+
+test('A — «tema scuro» in chat: segno sulla bolla, «tema: chiaro → scuro · annulla», e annulla riporta il chiaro', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await homeDi(app);
+  await configura(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
+    { text: 'Fatto.' },
+  ]);
+  await scrivi(page, 'tema scuro', 'Fatto.');
+  expect((await impostazioni(app)).theme).toBe('dark');
+
+  const bolla = page.locator('.dash-bubble-user', { hasText: 'tema scuro' });
+  const segno = bolla.locator('.dash-cambi-segno');
+  const pop = bolla.locator('.dash-cambi-pop');
+  await expect(segno).toBeVisible();
+  await expect(pop).toHaveCSS('opacity', '0');
+  await bolla.hover();
+  await expect(pop).toHaveCSS('opacity', '1');
+  await expect(pop.locator('.dash-cambi-riga')).toHaveCount(1);
+  await expect(pop).toContainText('tema: chiaro → scuro');
+  await expect(pop.locator('.dash-cambi-annulla')).toHaveText('annulla');
+  // La riga del blocco di attività parla come la pagina Preferenze, non con la chiave interna (#557).
+  await page.locator('.dash-activity-head').click();
+  await expect(page.locator('.dash-activity-row', { hasText: 'Impostato · tema: chiaro → scuro' })).toHaveCount(1);
+  await expect(page.locator('.dash-activity-row', { hasText: '=' })).toHaveCount(0);
+  await bolla.hover();
+  await page.screenshot({ path: 'tests/.shots/cambi-segno-tema.png' });
+
+  await pop.locator('.dash-cambi-annulla').click();
+  await expect.poll(async () => (await impostazioni(app)).theme).toBe('light');
+  await expect(pop.locator('.dash-cambi-riga')).toHaveClass(/dash-cambi-annullato/);
+  await expect(pop.locator('.dash-cambi-annulla')).toHaveText('rifai');
+  await expect(segno).toHaveClass(/dash-cambi-tutti-annullati/);
+
+  // L'annullo resta come evento, che annulla quello della chat.
+  const eventi = await registro(app);
+  const tema = eventi.filter((e) => e.cambi.some((c) => c.chiave === 'theme'));
+  const daChat = tema.find((e) => e.via === 'chat');
+  expect(daChat).toBeTruthy();
+  const annullo = tema.find((e) => e.annulla === daChat.id);
+  expect(annullo).toBeTruthy();
+  expect(annullo.cambi[0]).toMatchObject({ prima: 'dark', dopo: 'light' });
+
+  // E si rifà: rifai rimette lo scuro.
+  await bolla.hover();
+  await pop.locator('.dash-cambi-annulla').click();
+  await expect.poll(async () => (await impostazioni(app)).theme).toBe('dark');
+  await expect(pop.locator('.dash-cambi-annulla')).toHaveText('annulla');
+  await ripristina(app);
+});
+
+test('B — tema cambiato dalle Preferenze, poi «rimetti come prima» in chat: torna il valore di prima', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await configura(app);
+  const pref = await openTab('filo://preferences/preferences.html');
+  await expect(pref.locator('#theme')).toHaveValue('light');
+  await pref.locator('#theme').selectOption('dark');
+  await expect.poll(async () => (await impostazioni(app)).theme).toBe('dark');
+  const daPagina = (await registro(app)).filter((e) => e.cambi.some((c) => c.chiave === 'theme')).pop();
+  expect(daPagina).toMatchObject({ via: 'interfaccia', dove: 'preferences' });
+
+  const page = await homeDi(app);
+  await shell.locator('.tab').first().click();
+  await modelloFinto(app, [{ annullaTema: true }, { text: 'Rimesso.' }]);
+  await scrivi(page, 'rimetti come prima', 'Rimesso.');
+  // Il modello l'ha visto nello STATO, con la sua provenienza, ed è tornato il chiaro.
+  const prompt = await app.evaluate(() => globalThis.__finto_prompt[0]);
+  expect(prompt).toContain('CAMBI RECENTI');
+  expect(prompt).toMatch(/dalle Preferenze\] c[0-9a-f]{10}: tema: chiaro → scuro/);
+  await expect.poll(async () => (await impostazioni(app)).theme).toBe('light');
+  // Anche l'annullo chiesto a parole lascia il segno sulla bolla, e si può a sua volta annullare.
+  const bolla = page.locator('.dash-bubble-user', { hasText: 'rimetti come prima' });
+  await bolla.hover();
+  await expect(bolla.locator('.dash-cambi-pop')).toContainText('tema: scuro → chiaro');
+  await ripristina(app);
+});
+
+test('C — trascinare il cursore della velocità di lettura lascia UN evento, non uno per passo', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const pref = await openTab('filo://preferences/preferences.html');
+  const cursore = pref.locator('#ttsRate');
+  await expect(cursore).toBeVisible();
+  const prima = (await registro(app)).length;
+  for (const v of ['1.1', '1.2', '1.3', '1.4', '1.5']) {
+    await cursore.evaluate((el, x) => { el.value = x; el.dispatchEvent(new Event('input', { bubbles: true })); }, v);
+    // Una pausa lunga quanto basta perché la pagina salvi a metà del gesto.
+    await pref.waitForTimeout(550);
+  }
+  await cursore.evaluate((el) => el.dispatchEvent(new Event('change', { bubbles: true })));
+  await expect.poll(async () => (await impostazioni(app)).tts.rate).toBe(1.5);
+  await pref.waitForTimeout(300);
+  const nuovi = (await registro(app)).slice(prima).filter((e) => e.cambi.some((c) => c.chiave === 'tts.rate'));
+  expect(nuovi).toHaveLength(1);
+  expect(nuovi[0].cambi).toEqual([{ chiave: 'tts.rate', prima: 1, dopo: 1.5 }]);
+  const frase = await app.evaluate((_e, ev) => globalThis.SN_CAMBI.frase(ev), nuovi[0]);
+  expect(frase).toBe('velocità di lettura: 1× → 1,5×');
+});
+
+test('D — da una finestra incognito nessun evento arriva su disco, ma lì dentro il segno c\'è', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await configura(app);
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  const incog = await trovaPagina(app, (u) => u.startsWith('filo://newtab') && app.windows().length > 2
+    && u !== (app.windows().find((w) => w.url().startsWith('filo://newtab'))?.url() || '') ? true : false, 3_000).catch(() => null)
+    || await (async () => {
+      const deadline = Date.now() + 10_000;
+      while (Date.now() < deadline) {
+        for (const w of app.windows()) {
+          if (!w.url().startsWith('filo://newtab')) continue;
+          const inc = await w.evaluate(() => document.documentElement.dataset.incognito === '1').catch(() => false);
+          if (inc) return w;
+        }
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      throw new Error('home incognito non trovata');
+    })();
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'i1', name: 'TIMER', arguments: '{"secondi":600,"etichetta":"segreto incognito"}' }] },
+    { text: 'Avviato.' },
+  ]);
+  await scrivi(incog, 'timer 10 minuti per il segreto incognito', 'Avviato.');
+  const bolla = incog.locator('.dash-bubble-user', { hasText: 'segreto incognito' });
+  await bolla.hover();
+  await expect(bolla.locator('.dash-cambi-pop')).toContainText('nuovo timer «segreto incognito», 10 min');
+
+  await app.evaluate(async () => { await globalThis.SN_REGISTRO_CAMBI.attesa(); await globalThis.__filoStorage.flushNow(); });
+  const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
+  const disco = readFileSync(join(userData, 'storage.json'), 'utf8');
+  expect(disco).not.toContain('segreto incognito');
+  const normale = await registro(app);
+  expect(JSON.stringify(normale)).not.toContain('segreto incognito');
+  await ripristina(app);
+});
+
+test('E — un\'importazione di dati diventa un evento suo, e si annulla come gli altri', async ({ app }) => {
+  test.setTimeout(30_000);
+  await configura(app);
+  const esito = await app.evaluate(async ({ dialog }) => {
+    const path = require('node:path');
+    const fs = require('node:fs');
+    const os = require('node:os');
+    const { buildExportZip } = require(path.join(process.cwd(), 'src/main/services/exportData.js'));
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'filo-imp-')), 'backup.zip');
+    fs.writeFileSync(file, buildExportZip({ settings: { theme: 'dark', textScale: 1.25 } }));
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] });
+    const H = globalThis.__filoHandlers;
+    const mittente = { url: 'filo://security/security.html', tab: { url: 'filo://security/security.html' } };
+    const anteprima = await H.handleMessage({ type: globalThis.SN_MSG.MSG.IMPORT_DATA_PREVIEW }, mittente);
+    const fatto = await H.handleMessage({ type: globalThis.SN_MSG.MSG.IMPORT_DATA_APPLY, token: anteprima.token }, mittente);
+    return { anteprima: !!anteprima.ok, fatto: !!fatto.ok };
+  }).catch((e) => ({ errore: String(e) }));
+  expect(esito).toEqual({ anteprima: true, fatto: true });
+  expect((await impostazioni(app)).theme).toBe('dark');
+  const ev = (await registro(app)).filter((e) => e.via === 'importazione').pop();
+  expect(ev).toBeTruthy();
+  const frase = await app.evaluate((_e, e) => globalThis.SN_CAMBI.frase(e) + ' · ' + globalThis.SN_CAMBI.provenienza(e), ev);
+  expect(frase).toContain('tema: chiaro → scuro');
+  expect(frase).toContain('dimensione del testo: 100% → 125%');
+  expect(frase).toContain('dall\'importazione dei dati');
+  const r = await app.evaluate((_e, id) => globalThis.SN_REGISTRO_CAMBI.annulla(id, { via: 'interfaccia' }), ev.id);
+  expect(r.ok).toBe(true);
+  const s = await impostazioni(app);
+  expect([s.theme, s.textScale]).toEqual(['light', 1]);
+});
+
+test('F — un timer chiesto in chat: annulla lo toglie, e riaperta la chat il segno è ancora lì col suo stato', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await homeDi(app);
+  await configura(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'p1', name: 'TIMER', arguments: '{"secondi":600,"etichetta":"pasta"}' }] },
+    { text: 'Avviato.' },
+  ]);
+  await scrivi(page, 'timer 10 minuti per la pasta', 'Avviato.');
+  const timer = () => app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.listTimers()).map((t) => t.label));
+  expect(await timer()).toContain('pasta');
+  const bolla = page.locator('.dash-bubble-user', { hasText: 'timer 10 minuti' });
+  await bolla.hover();
+  const pop = bolla.locator('.dash-cambi-pop');
+  await expect(pop).toContainText('nuovo timer «pasta», 10 min');
+  await pop.locator('.dash-cambi-annulla').click();
+  await expect.poll(timer).not.toContain('pasta');
+  await expect(pop.locator('.dash-cambi-riga')).toHaveClass(/dash-cambi-annullato/);
+
+  // La chat riaperta dall'archivio ritrova il segno, già annullato.
+  const chatId = await page.evaluate(() => new URLSearchParams(location.search).get('chat')
+    || document.body.dataset.chatId || null).catch(() => null);
+  const id = chatId || await app.evaluate(async () => (await globalThis.SN_FILO_CHATS.list())[0].id);
+  await page.goto(`filo://newtab/?chat=${encodeURIComponent(id)}`);
+  const riaperta = page.locator('.dash-bubble-user', { hasText: 'timer 10 minuti' });
+  await expect(riaperta.locator('.dash-cambi-segno')).toHaveClass(/dash-cambi-tutti-annullati/, { timeout: 10_000 });
+  await riaperta.hover();
+  await expect(riaperta.locator('.dash-cambi-pop')).toContainText('nuovo timer «pasta», 10 min');
+  await ripristina(app);
+});

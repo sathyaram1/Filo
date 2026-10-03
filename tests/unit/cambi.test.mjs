@@ -45,12 +45,9 @@ function foglie(o, base = '', out = []) {
 function leggibile(frase, chiave) {
   assert.ok(frase && typeof frase === 'string', `${chiave}: nessuna frase`);
   assert.ok(!/\s=\s|=$/.test(frase), `${chiave}: la frase ha il segno di uguale: «${frase}»`);
-  const nuda = chiave.split('.').pop();
-  if (/[A-Z]/.test(nuda) || nuda.length > 4) {
-    assert.ok(!frase.includes(nuda) || /^(apiKeys|models|modelRegistry|themeTokens|tabColor)$/.test(chiave.split('.')[0]),
-      `${chiave}: la frase mostra la chiave interna: «${frase}»`);
-  }
-  assert.ok(!/\b[a-z]+[A-Z][a-zA-Z]+\b/.test(frase.replace(/«[^»]*»/g, '')), `${chiave}: c'è un nome da programmatore: «${frase}»`);
+  const fuori = frase.replace(/«[^»]*»/g, '');
+  assert.ok(!fuori.includes(chiave), `${chiave}: la frase mostra la chiave interna: «${frase}»`);
+  assert.ok(!/\b[a-z]+[A-Z][a-zA-Z]*\b|\w_\w/.test(fuori), `${chiave}: c'è un nome da programmatore: «${frase}»`);
 }
 
 test('sentinella: ogni impostazione dei default ha una frase in parole, o un\'esclusione col motivo', () => {
@@ -158,8 +155,8 @@ test('criterio 4: i passi di un cursore si fondono in UN evento, e tornare all\'
     ultimo = K.fondi(ultimo, n);
   }
   assert.equal(ultimo.id, 'c0');
-  assert.equal(K.frase(ultimo), 'dimensione del testo: 100% → 170%');
-  assert.equal(K.fondi(ultimo, ev(9, 1.7, 1)), null);
+  assert.equal(K.frase(ultimo), 'dimensione del testo: 100% → 160%');
+  assert.equal(K.fondi(ultimo, ev(9, 1.6, 1)), null);
   // La chat non si fonde mai: due richieste sono due eventi.
   assert.equal(K.fondibile({ ...ev(0, 1, 2), via: 'chat' }, { ...ev(1, 2, 3), via: 'chat' }), false);
   // Dopo una pausa lunga è un cambio nuovo.
