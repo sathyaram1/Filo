@@ -120,5 +120,5 @@ test('#583 /feedback non apre la posta a chi non gestisce i feedback', async ({ 
 
   await expect(page.locator('body')).toContainText(/Invia feedback/i, { timeout: 8_000 });
   const urls = await tabUrls(app);
-  expect(urls.some((u) => u.startsWith('filo://feedback/'))).toBe(false);
+  expect(urls.some((u) => u.startsWith('filo://manage/'))).toBe(false);
 });
