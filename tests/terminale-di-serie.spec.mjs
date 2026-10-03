@@ -24,9 +24,12 @@ async function newtabPage(app) {
   throw new Error('newtab non trovata');
 }
 
+// L'intervista di benvenuto si ridisegna da sé quando un'altra scheda la fa
+// avanzare, e con lei sparirebbero i blocchi da guardare: qui è già chiusa.
 async function configureModel(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.setRaw(C.STORAGE_KEYS.FILO_ONBOARDING, { done: true, closedAt: Date.now() });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
