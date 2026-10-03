@@ -100,6 +100,10 @@
   function isPrivateLocalWork(fb) {
     return isLocalOnly(fb) && !isLocalApproved(fb);
   }
+  // Un utente approvato (#913) vede la risoluzione con la sola frase per lui: la chiusura locale non la porta, la scrive la sessione.
+  function fraseAttesa(fb) {
+    return isLocalApproved(fb) && !isTrustedClient(fb.clientId, fb.senderProof) && !String(fb.userNote || '').trim();
+  }
   // Prefisso dell'owner o di una sessione senza prova: solo l'owner può dire che è suo, e dargliela (#908).
   function mittenteDaRiconoscere(fb) {
     return isUnprovenSender(fb) && LOCAL_SENDER_RE.test(String(fb.clientId || ''));
