@@ -1570,6 +1570,7 @@
     fusioneInAttesa, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, righeTesto,
     aspettaRisposta, ultimaDomanda,
+    FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
