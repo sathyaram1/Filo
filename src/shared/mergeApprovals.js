@@ -934,6 +934,7 @@
     realignReasonText: realignReasonText,
     realignFailureText: realignFailureText,
     realignedNote: realignedNote,
+    provaNote: provaNote,
     recentOutcome: recentOutcome,
     timeAgo: timeAgo,
     expiresIn: expiresIn,
