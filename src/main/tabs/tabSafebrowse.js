@@ -39,6 +39,7 @@ const safebrowseMethods = {
     tab.sbAvviso = (level === 'pericoloso' || level === 'sospetto')
       ? { level, message: verdict.message || null, url: url || wc.getURL() } : null;
     if (tab.id === this.activeId && JSON.stringify(tab.sbAvviso) !== prima) this.layout();
+    if (tab.sbAvviso && tab._sbFinestrelle) for (const segui of [...tab._sbFinestrelle]) { try { segui(); } catch (_) {} }
   },
 
   // Una scheda con l'avviso non riceve tasti, nemmeno nascosta sotto un menu della barra. Se il fuoco torna a lei, o a
