@@ -111,9 +111,9 @@ server un verdetto raccontato non lo legge).
    directory lì col comando che il rifiuto ti scrive e rilancia.
    Il gate è una chiamata al SERVER: è lui che verifica dallo stato vero che
    verifica e controllo di sicurezza risultino registrati `pass`, fa girare L5
-   sul diff che scarica da GitHub, e fonde con la sua identità. Qui non gira
-   nessun git e non si passa nessun verdetto: se il tuo `pass` non è stato
-   registrato al passo 1, la fusione viene rifiutata.
+   sul diff che scarica da GitHub, e fonde con la sua identità. Qui girano
+   solo la prova degli unit e la richiesta, e non si passa nessun verdetto: se
+   il tuo `pass` non è stato registrato al passo 1, la fusione viene rifiutata.
 3. Chiudi in base all'exit del gate:
    - `0` → fuso → `node scripts/routine-channel.mjs deliver status --status done --notes "<riga>"` +
      `node scripts/dispatch.mjs --clear-state <id>`
