@@ -9,6 +9,15 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.231', date: '2026-10-03',
+      features: [
+        'Col tasto destro sull\'avviso di un sito pericoloso puoi chiedere a Filo di quel sito o segnalare un falso allarme: si apre una scheda nuova, e il sito resta coperto.',
+      ],
+      fixes: [
+        'Un sito segnalato come pericoloso o sospetto non può più coprire o far sparire l\'avviso di Filo, né sentire quello che scrivi mentre l\'avviso è aperto.',
+      ],
+    },
+    {
       version: '0.2.230', date: '2026-10-03',
       features: [
         'Passa il mouse su una scheda e vedi subito cosa c\'è dentro: titolo, sito e un\'immagine della pagina, già pronta, anche per le schede aperte in secondo piano che non hai ancora guardato. In Preferenze la spegni o scegli quanto è grande.',

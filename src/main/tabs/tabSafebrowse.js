@@ -35,21 +35,25 @@ const safebrowseMethods = {
     const level = verdict ? (verdict.level || 'safe') : 'safe';
     // È anche l'input «sito flaggato» delle regole geo-block (#151), che non devono aggirare i controlli di sicurezza.
     tab.sbLevel = level;
+    const prima = JSON.stringify(tab.sbAvviso || null);
     tab.sbAvviso = (level === 'pericoloso' || level === 'sospetto')
       ? { level, message: verdict.message || null, url: url || wc.getURL() } : null;
-    if (tab.id === this.activeId) this.layout();
+    if (tab.id === this.activeId && JSON.stringify(tab.sbAvviso) !== prima) this.layout();
   },
 
-  // Coperta dall'avviso, la scheda non riceve tasti: se il fuoco ci torna (un clic sulla barra, la finestra che
-  // riprende il primo piano, una pagina che chiama focus()), torna all'avviso.
+  // Una scheda con l'avviso non riceve tasti, nemmeno nascosta sotto un menu della barra. Se il fuoco torna a lei, o a
+  // una scheda dietro (una pagina che chiama focus() mentre carica), mentre l'avviso è a schermo, torna all'avviso.
   _sbGuardiaTastiera(tab, wc) {
-    const coperta = () => this.avvisoSito && this.avvisoSito.coperta() === tab && tab.view.webContents === wc;
     wc.on('before-input-event', (event, input) => {
-      if (event.daAvvisoSito || !coperta()) return;
+      if (event.daAvvisoSito || !tab.sbAvviso || tab.view.webContents !== wc) return;
       event.preventDefault();
-      if (input.type === 'keyDown') this.avvisoSito.prendiTastiera();
+      if (input.type === 'keyDown' && this.avvisoSito.coperta() === tab) this.avvisoSito.prendiTastiera();
     });
-    wc.on('focus', () => setTimeout(() => { if (coperta()) this.avvisoSito.prendiTastiera(); }, 0));
+    wc.on('focus', () => setTimeout(() => {
+      const coperta = this.avvisoSito && this.avvisoSito.coperta();
+      if (!coperta || tab.view.webContents !== wc) return;
+      if (coperta === tab || tab.id !== this.activeId) this.avvisoSito.prendiTastiera();
+    }, 0));
   },
 
   // Chiesto dal content script (SAFEBROWSE_GET) all'apertura del documento e quando compaiono campi sensibili: il
@@ -205,7 +209,7 @@ const safebrowseMethods = {
       { label: 'Segnala un falso allarme', icon: 'feedback', action: 'avviso-sito:segnala' },
       { type: 'separator' },
       { label: 'Copia l\'indirizzo', icon: 'duplicate', action: 'avviso-sito:copia' },
-      { label: 'Torna indietro', action: 'avviso-sito:indietro' },
+      { label: 'Torna indietro', icon: 'back', action: 'avviso-sito:indietro' },
     ];
   },
 

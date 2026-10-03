@@ -1,5 +1,5 @@
 /* Avviso del sito pericoloso o sospetto, nella sua vista sopra la scheda (src/main/avvisoSito.js).
-   Il fondo scuro lo dà la vista: la pagina disegna solo la carta. */
+   Il fondo copre la scheda sotto; il blur non attraversa le viste, quindi il pericoloso è quasi opaco. */
 
 :root {
   --carta: #fff;
@@ -12,8 +12,9 @@
   --su-accento: #fff;
   --ombra: 0 24px 60px rgba(0, 0, 0, 0.45);
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fondo: rgba(40, 6, 6, 0.94);
 }
-:root[data-livello="sospetto"] { --accento: #9a3412; }
+:root[data-livello="sospetto"] { --accento: #9a3412; --fondo: rgba(40, 20, 6, 0.8); }
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -24,19 +25,20 @@
     --campo: #2e2622;
     --bordo-campo: #54473f;
     --accento: #ef5350;
-    --ombra: 0 24px 60px rgba(0, 0, 0, 0.6);
+    --ombra: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
   }
   :root[data-livello="sospetto"] { --accento: #f0853c; }
 }
 
+html { background: var(--fondo); }
 html, body {
   margin: 0;
   height: 100%;
-  background: transparent;
   overflow: hidden;
   font: 15px/1.5 var(--font);
 }
 body {
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
