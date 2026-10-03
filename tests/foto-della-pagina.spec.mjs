@@ -34,6 +34,7 @@ async function coloreDi(app, dataUrl) {
   if (c.r > 200 && c.g < 80 && c.b < 80) return 'rossa';
   if (c.b > 200 && c.r < 80 && c.g < 80) return 'blu';
   if (c.g > 150 && c.r < 80 && c.b < 80) return 'verde';
+  if (c.r > 200 && c.b > 200 && c.g < 80) return 'magenta';
   return JSON.stringify(c);
 }
 
@@ -77,7 +78,7 @@ test('la foto la ha solo la scheda in vista, ed è la sua: una scheda di sfondo 
   await rifiutate(b, 'la scheda lasciata');
 });
 
-test('un popup di accesso fotografa sé stesso, anche dopo che l\'utente è passato a un\'altra scheda', async ({ app, openTab, testServer }) => {
+async function apriPopupDiAccesso(app, openTab, testServer) {
   const sito = await testServer.openReady(openTab, pagina('#ff0000', 'sito con «Accedi con…»'));
   const login = `${testServer.html(pagina('#00ff00', 'accedi'))}?client_id=filo5895&redirect_uri=http%3A%2F%2Fsito.example%2Fcb`;
   await sito.evaluate((u) => { window.open(u, '_blank', 'width=480,height=600'); }, login);
@@ -86,7 +87,28 @@ test('un popup di accesso fotografa sé stesso, anche dopo che l\'utente è pass
     if (!w) return 'nessun popup';
     try { return await w.webContents.executeJavaScript('document.documentElement.dataset.filoContentReady || "non pronto"'); } catch (_) { return 'non pronto'; }
   }), { timeout: 10000 }).toBe('1');
+  // L'utente passa a un'altra scheda, quella della banca: il popup resta aperto.
   await testServer.openReady(openTab, pagina('#0000ff', 'sito B, la banca'), { pubblico: true });
+}
+
+async function immagineNegliAppunti(shell) {
+  let immagine = '';
+  await expect.poll(async () => {
+    const r = await shell.evaluate(() => window.filoShell.message({ type: 'get_clipboard_history' }));
+    immagine = ((r && r.items) || []).find((v) => v && v.type === 'image')?.dataUrl || '';
+    return immagine.length;
+  }, { timeout: 20000 }).toBeGreaterThan(1000);
+  return immagine;
+}
+
+async function screenshotDalMenu(dove) {
+  await dove.locator('h1').click({ button: 'right' });
+  await expect(dove.locator('.sn-menu')).toBeVisible();
+  await dove.locator('.sn-menu [data-sn-icon-id="screenshot"]').click();
+}
+
+test('un popup di accesso fotografa sé stesso, anche dopo che l\'utente è passato a un\'altra scheda', async ({ app, openTab, testServer }) => {
+  await apriPopupDiAccesso(app, openTab, testServer);
   const popup = dalPreload(app, 'client_id=filo5895');
 
   expect(await fotoDi(app, popup)).toBe('verde');
@@ -96,21 +118,15 @@ test('un popup di accesso fotografa sé stesso, anche dopo che l\'utente è pass
   expect(barra).toMatchObject({ ok: false, code: 'fuori_vista' });
 });
 
-test('Screenshot dal menu della pagina in vista scarica la pagina che l\'utente guarda', async ({ app, openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, pagina('#ff0000', 'pagina da fotografare'));
-  await app.evaluate(() => { globalThis.__fotoSpia = []; });
-  await page.evaluate(() => {
-    window.__scaricate = [];
-    const orig = HTMLAnchorElement.prototype.click;
-    HTMLAnchorElement.prototype.click = function () {
-      if (this.download && String(this.href).startsWith('data:image')) { window.__scaricate.push(this.href); return; }
-      return orig.call(this);
-    };
-  });
-  await page.locator('h1').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
-  await page.locator('.sn-menu [data-sn-icon-id="screenshot"]').click();
-  await expect.poll(() => page.evaluate(() => window.__scaricate.length), { timeout: 15000 }).toBeGreaterThan(0);
-  const href = await page.evaluate(() => window.__scaricate[0]);
-  expect(await coloreDi(app, href)).toBe('rossa');
+test('Screenshot dal menu fotografa la pagina dove l\'utente l\'ha chiesto: la scheda in vista e il popup di accesso', async ({ app, shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina('#ff00ff', 'pagina da fotografare'));
+  await screenshotDalMenu(page);
+  expect(await coloreDi(app, await immagineNegliAppunti(shell))).toBe('magenta');
+
+  await shell.evaluate(() => window.filoShell.message({ type: 'clear_clipboard_history' }));
+  await apriPopupDiAccesso(app, openTab, testServer);
+  const finestra = app.windows().find((w) => w.url().includes('client_id=filo5895'));
+  expect(finestra, 'la pagina del popup non si trova').toBeTruthy();
+  await screenshotDalMenu(finestra);
+  expect(await coloreDi(app, await immagineNegliAppunti(shell))).toBe('verde');
 });
