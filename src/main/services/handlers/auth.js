@@ -289,7 +289,7 @@ module.exports = function register(on, ctx) {
   // Firebase REALE (request.auth.uid nelle Firestore rules) — diverso
   // dall'email del profilo — usato dalla bacheca (DC2) per riconoscere i
   // propri voti nella mappa `votes` autorevole letta da Firestore.
-  // `remembered` serve alla finestra per l'avviso «accesso non ricordato»: è di Filo, non identità.
+  // `remembered` serve solo alla finestra (avviso «accesso non ricordato»): ai siti non va.
   // Da un sito visitato questa porta risponde, ma senza IDENTITÀ: niente
   // indirizzo email, niente nome, niente identificativo dell'account. Un
   // content script gira anche dentro le pagine dei siti, e di sé deve sapere
