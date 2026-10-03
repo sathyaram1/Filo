@@ -249,9 +249,10 @@ test('a un sito visitato l\'identità di chi usa Filo non arriva', async ({ app,
   }
 
   // Da una pagina di Filo la risposta resta intera: è di lì che le pagine
-  // mostrano chi è entrato.
+  // mostrano chi è entrato. Elenco minimo e non esatto: il confine da tenere
+  // chiuso è quello dei siti, e un campo nuovo per Filo non deve far rosso qui (#816.1).
   expect(out.filo.ok).toBe(true);
-  expect(Object.keys(out.filo).sort()).toEqual(['isAdmin', 'ok', 'profile', 'remembered', 'signedIn', 'uid']);
+  expect(Object.keys(out.filo)).toEqual(expect.arrayContaining(['isAdmin', 'ok', 'profile', 'remembered', 'signedIn', 'uid']));
 });
 
 test('l\'avviso «l\'accesso è cambiato» non arriva alle schede sui siti, e porta il profilo solo a Filo', async ({ app, openTab, testServer }) => {
