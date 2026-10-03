@@ -90,6 +90,9 @@ let contextMenuHandler = null;
 try {
   globalThis.__snSetContextMenuHandler = (fn) => { contextMenuHandler = fn; };
   window.addEventListener('contextmenu', (e) => {
+    // Solo il tasto destro dell'utente: uno fabbricato dallo script del sito aprirebbe il menu, e con lui
+    // Incolla e la cronologia degli appunti, senza che l'utente l'abbia chiesto (#589.8).
+    if (!e.isTrusted) return;
     // Il sito non deve vedere il clic che apre il menu di Filo, nemmeno dal suo ascolto in cattura su window: se lo annulla,
     // il main non sa che l'utente ha aperto il menu e Incolla resta senza cronologia (#589.4). Chromium lo emette lo stesso.
     if (typeof contextMenuHandler === 'function') {
