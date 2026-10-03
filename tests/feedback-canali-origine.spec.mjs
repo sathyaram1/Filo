@@ -248,9 +248,8 @@ test('a un sito visitato l\'identità di chi usa Filo non arriva', async ({ app,
     expect(Object.keys(r).sort()).toEqual(['isAdmin', 'ok', 'signedIn']);
   }
 
-  // Da una pagina di Filo la risposta resta intera: è di lì che le pagine
-  // mostrano chi è entrato. Elenco minimo e non esatto: il confine da tenere
-  // chiuso è quello dei siti, e un campo nuovo per Filo non deve far rosso qui (#816.1).
+  // Da una pagina di Filo la risposta resta intera. Elenco minimo, non esatto: il
+  // confine chiuso è quello dei siti, un campo nuovo per Filo non è un rosso (#816.1).
   expect(out.filo.ok).toBe(true);
   expect(Object.keys(out.filo)).toEqual(expect.arrayContaining(['isAdmin', 'ok', 'profile', 'remembered', 'signedIn', 'uid']));
 });
