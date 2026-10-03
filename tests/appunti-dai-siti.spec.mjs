@@ -134,6 +134,17 @@ test('su un sito che annulla il tasto destro in cattura su window il menu Incoll
   await expect(sub).toContainText(PASSWORD);
 });
 
+test('su un sito che annulla il tasto destro il menu aperto da tastiera con Shift+F10 mostra la cronologia', async ({ shell, openTab, testServer }) => {
+  await copiaPassword(shell);
+  const page = await testServer.openReady(openTab, CAMPO.replace('</body>', "<script>window.addEventListener('contextmenu', (e) => e.preventDefault(), true);</script></body>"), { pubblico: true });
+  await page.locator('#ta').click();
+  await page.waitForTimeout(Math.ceil(5000 * 1.1)); // il clic sulla casella non deve valere come menu aperto
+  await page.keyboard.press('Shift+F10');
+  await expect(page.locator('.sn-menu[role=menu]')).toBeVisible();
+  await page.locator('.sn-menu-paste-arrow').click();
+  await expect(page.locator('.sn-menu-history-sub')).toContainText(PASSWORD);
+});
+
 test('il tasto destro nel riquadro di un altro sito non apre la cronologia alla pagina che lo ospita', async ({ app, shell, openTab, testServer }) => {
   await copiaPassword(shell);
   const dentro = testServer.html(CAMPO).replace('127.0.0.1', 'blocked.test');
