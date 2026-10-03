@@ -378,7 +378,8 @@ async function main() {
     }
     const somma = flagsGruppo(0) ? sommaRiepiloghi(esiti.map((_, i) => leggiRighe(destinazione(i)))) : null;
     await scrivi(testoRiepilogo({
-      somma, gruppi: gruppi.length, file: files.length, esiti, interrotto, rapporti, rapportiPersi, copertura: chiedeCopertura(flags),
+      somma, gruppi: gruppi.length, file: files.length, esiti, interrotto, rapporti, accodati: utente(0).accodati, rapportiPersi,
+      copertura: chiedeCopertura(flags),
     }));
     // `exitCode` e non `exit()`, come sopra: l'ultima riga non deve perdersi.
     process.exitCode = esiti.find((e) => e !== 0) ?? (rapportiPersi.length ? 1 : 0);
