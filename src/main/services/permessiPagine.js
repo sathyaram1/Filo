@@ -131,6 +131,23 @@ function lasciapassare(wc, tipo) {
   return true;
 }
 
+// Dentro un riquadro di un altro sito la domanda del tasto destro arriva prima del segnale del menu che fa da gesto:
+// se il gesto non c'è ancora lo si aspetta per `attesaMs`, poi è no.
+function gestoEntro(wc, attesaMs) {
+  if (gestoRecente(wc)) return Promise.resolve(true);
+  const fine = Date.now() + Math.max(0, Number(attesaMs) || 0);
+  return new Promise((resolve) => {
+    const guarda = () => {
+      if (gestoRecente(wc)) { resolve(true); return; }
+      let morta = !wc;
+      try { morta = morta || Boolean(wc.isDestroyed && wc.isDestroyed()); } catch (_) { morta = true; }
+      if (morta || Date.now() >= fine) { resolve(false); return; }
+      setTimeout(guarda, 20);
+    };
+    setTimeout(guarda, 20);
+  });
+}
+
 // Il gesto conta per il documento su cui è stato fatto: il clic che porta altrove non vale per la pagina d'arrivo.
 function seguiGesti(wc) {
   if (!wc || wc._filoGestiSeguiti) return;
@@ -140,6 +157,11 @@ function seguiGesti(wc) {
       const type = (input && input.type) || '';
       if (!GESTI.has(type) || String(input.key || '') === 'Escape') return;
       wc._filoGestoAlle = Date.now();
+    });
+    // Un riquadro di un altro sito non passa da `input-event`: lì il tasto destro e i tasti premuti arrivano da qui.
+    wc.on('context-menu', () => { wc._filoGestoAlle = Date.now(); });
+    wc.on('before-input-event', (_e, input) => {
+      if (input && input.type === 'keyDown' && String(input.key || '') !== 'Escape') wc._filoGestoAlle = Date.now();
     });
     wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
       const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
@@ -342,3 +364,4 @@ module.exports = {
   TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
 };
+module.exports.gestoEntro = gestoEntro;
