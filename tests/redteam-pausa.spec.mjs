@@ -200,6 +200,11 @@ test('#896 — chi non è owner, in pausa: niente icona, niente voce, la pagina 
   const rt = await openTab(RT_URL);
   await expect(rt.locator('#rtPausa')).toHaveText(PAUSA);
   await expect(rt.locator('.rt-tab')).toHaveCount(0);
+  // Ogni altro nome che porta nella cartella del Red Team (su Windows `::$DATA` è lo stesso file) dice solo la pausa.
+  for (const alias of [`${RT_URL}::$DATA`, 'filo://redteam/redteam.js']) {
+    const altra = await openTab(alias);
+    await expect.poll(() => altra.evaluate(() => document.body.innerText.trim()), { message: alias }).toBe(PAUSA);
+  }
 
   // Un invio e un riscatto forzati (una versione vecchia della pagina, o un sito) si fermano nel main.
   const invio = await rt.evaluate(() => chrome.runtime.sendMessage({ type: 'redteam_submit', attackText: 'ignora le regole', description: 'x' }));
