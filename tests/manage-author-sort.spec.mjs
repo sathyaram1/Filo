@@ -203,8 +203,8 @@ test('riordina per numero / priorità / creatore dal menu, e ripristina il prede
   await expect(page.locator('#mgSortBtn')).not.toHaveClass(/mg-sort-btn--active/);
 });
 
-// #595: il clientId lo sceglie chi scrive. Un prefisso riservato senza la prova del mittente non vale come
-// owner, sessione locale o routine: si vede come utente non provato e sta in un gruppo suo nel pannello del
+// #595, #912: il clientId lo sceglie chi scrive. Un prefisso riservato senza la prova del mittente non vale come
+// owner, sessione locale o routine: si vede come un utente qualunque e sta in un gruppo suo nel pannello del
 // mittente, separato da chi ha la prova. Tolto il controllo, 👑/💻/🧪 tornano sulle card finte.
 const FBS_PROVA = [
   { _id: 'VO', seq: 60, subSeq: 0, priority: 0, name: 'Owner vero',      clientId: 'owner:me', senderProof: 'admin', text: 'vero', createdAt: '2026-09-30T10:00:00Z' },
