@@ -97,10 +97,39 @@
     }).observe(ospite, { attributes: true, attributeFilter: ['style', 'popover'] });
   }
 
+  // Un filtro, un'opacità o una trasformazione sul contenitore del menu (la pagina in scala di grigi) per il browser
+  // nasconde tutto, sonde comprese: ogni clic verrebbe fermato. Valgono per menu e velo insieme, quindi non
+  // nascondono il menu più del sito: si sospendono finché il menu è aperto.
+  const EFFETTI = [['filter', 'none'], ['opacity', '1'], ['transform', 'none'], ['mix-blend-mode', 'normal']];
+  let sospesi = null;
+  function sospendiEffetti(el) {
+    if (sospesi?.el === el) return;
+    rimettiEffetti();
+    let cs;
+    try { cs = global.getComputedStyle(el); } catch (_) { return; }
+    const prima = [];
+    for (const [p, neutro] of EFFETTI) {
+      const v = cs.getPropertyValue(p);
+      if (!v || v === neutro || (p === 'transform' && /^matrix\(1, 0, 0, 1, [^,]+, [^,]+\)$/.test(v))) continue;
+      prima.push([p, el.style.getPropertyValue(p), el.style.getPropertyPriority(p)]);
+      el.style.setProperty(p, neutro, 'important');
+    }
+    sospesi = { el, prima };
+  }
+  function rimettiEffetti() {
+    if (!sospesi) return;
+    const { el, prima } = sospesi;
+    sospesi = null;
+    for (const [p, v, pr] of prima) {
+      try { if (v) el.style.setProperty(p, v, pr); else el.style.removeProperty(p); } catch (_) {}
+    }
+  }
+
   // Il nodo prima del quale montare un pezzo del menu in `parent` (null se la guardia è spenta).
   function prima(parent, el) {
     if (!ATTIVO || !parent) return null;
     if (!ospite) creaOspite();
+    sospendiEffetti(parent);
     if (genitore !== parent) {
       genitore = parent;
       try { moGenitore?.disconnect(); } catch (_) {}
