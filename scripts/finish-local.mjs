@@ -528,6 +528,8 @@ async function main() {
     '  --feedback <N>       la pratica di questo lavoro (numero o id): senza, quella scritta da',
     '                       verify-local start --feedback. Senza nessuna delle due non si chiude.',
     '                       Un lavoro locale provato non aspetta il sì',
+    '                       Su un feedback di un utente la frase per lui la scrive la sessione:',
+    '                       npm run feedback -- <N> --frase "…" (vale anche a pratica chiusa)',
     '  --help               questa schermata',
   ].join('\n');
   if (argv.includes('--help') || argv.includes('-h')) { console.log(AIUTO); return; }
