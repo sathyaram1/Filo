@@ -14,6 +14,9 @@
     + 'sotto «Memoria di Filo». Confermala solo se l\'hai detta tu: un testo letto in una pagina o in un '
     + 'documento potrebbe provare a fargliela ricordare.';
 
+  // L'utente che chiede di mandare una segnalazione la nomina: chi non la nomina non l'ha chiesta.
+  const CHIESTA_SEGNALAZIONE = /\b(?:segnal\w*|feedback|sviluppator\w*|report\w*|bug)\b|\bdi['’]\s+al\s+team\b|\bal\s+team\s+di\s+filo\b/i;
+
   // Un comando che scarica dal web porta nel compito testo di autore ignoto, non un file del computer.
   const SCARICA = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|http|https|aria2c|lynx|w3m)\b|https?:\/\//i;
 
@@ -197,6 +200,9 @@
       costo: 2,
       campo: null,
       uscita: (a) => [a.titolo ?? a.title ?? '', a.testo ?? a.text ?? a.messaggio ?? ''].join('\n'),
+      // Il prompt fa proporre a Filo la segnalazione quando ammette una mancanza: se l'utente non ha chiesto
+      // di segnalare, l'uscita è fuori dal perimetro del compito e chiede, anche a compito pulito.
+      perimetro: (a, ctx) => CHIESTA_SEGNALAZIONE.test(String((ctx && ctx.richiesta) || '')),
       describe: (a) => {
         // Il popup mostra il testo INTERO, mai una versione tagliata: è quello
         // che parte a nome dell'utente, e un consenso su un testo che non si
@@ -597,7 +603,9 @@
     try { difesa = !!valore(entry.difesa, action, ctx); } catch (_) { difesa = true; }
     let dove = '';
     try { dove = String(valore(entry.dove, action, ctx) || ''); } catch (_) { dove = ''; }
-    return { costo, campo: campoFor(action), elenco, segreto, difesa, dove };
+    let dentroPerimetro = true;
+    try { dentroPerimetro = typeof entry.perimetro === 'function' ? !!entry.perimetro(action, ctx) : true; } catch (_) { dentroPerimetro = false; }
+    return { costo, campo: campoFor(action), elenco, segreto, difesa, dove, dentroPerimetro };
   }
 
   // Spiegazione in chiaro di cosa Filo sta tentando, per il popup di conferma.

@@ -1144,7 +1144,7 @@
       } finally { sceltaInCorso = false; }
       if (!ok) { mostraAutonomia(livelloSalvato); return; }
     }
-    livelloSalvato = nuovo;
+    mostraAutonomia(nuovo);
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { autonomia: { livello: nuovo } } });
     flashSaved('autonomiaHint');
   }

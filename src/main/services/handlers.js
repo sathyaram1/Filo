@@ -829,6 +829,17 @@ async function lessonsBufferText() {
   return buf.map((l) => `- ${l.text}`).join('\n');
 }
 
+// Le lezioni che Filo si scrive da solo dopo un turno passano dalla regola di SALVA_LEZIONE: se a questo livello,
+// con quello che il compito ha letto, una lezione non partirebbe da sola, l'agente non la scrive (#530).
+async function lezioniAutomaticheConsentite({ sender = null, contesto = null } = {}) {
+  try {
+    const ing = globalThis.SN_ACTION_LEVELS.ingressi({ type: 'SALVA_LEZIONE', testo: 'lezione' }, {});
+    let impostazioni = {};
+    try { impostazioni = await Storage.getSettings(); } catch (_) {}
+    return !!ing && decisioneAutonomia(ing, { sender, contesto, impostazioni }).risposta === 'si';
+  } catch (_) { return false; }
+}
+
 async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
   try {
     const settings = await getEffectiveSettings();
@@ -1194,8 +1205,6 @@ function perimetroLettura(sender) {
   return { cwd, home, win, maiuscole: win || process.platform === 'darwin' };
 }
 
-// `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in
-// questo turno, turni passati compresi: servono all'anti-esfiltrazione di NAVIGA.
 // Le fonti che il compito ha letto: la pagina su cui vive l'assistente e ciò che hanno portato le azioni
 // già fatte, turni passati compresi. Le dichiara il registro, mai il modello (#530).
 function fontiDelCompito(sender, contesto) {
@@ -1269,6 +1278,8 @@ function fraseNo(ing) {
   };
 }
 
+// `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in questo turno, turni passati
+// compresi: dicono cosa il compito ha letto (#530) e servono all'anti-esfiltrazione di NAVIGA.
 async function executeFiloAction(action, {
   confirmed = false, sender = null, contesto = null, assistente = false,
   richiesta = '', origine = 'chat', dentroPerimetro = true,
@@ -1414,7 +1425,7 @@ async function executeFiloAction(action, {
     console.warn('[Filo] azione non registrata o senza costo, rifiutata:', type);
     return { executed: false, kept: false, rejected: true };
   }
-  const decisione = decisioneAutonomia(ing, { sender, contesto, origine, dentroPerimetro, impostazioni });
+  const decisione = decisioneAutonomia(ing, { sender, contesto, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, impostazioni });
   if (decisione.risposta === 'no') {
     const no = fraseNo(ing);
     return { executed: false, kept: false, no: true, error: no.perModello, output: { error: no.breve, rifiuto: true, no: true } };
@@ -3283,7 +3294,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   if (onboardingClosed) {
     finishOnboarding({ userMessage, filoReply: textReply, stateText });
   } else {
-    maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText }).catch(() => {});
+    lezioniAutomaticheConsentite({ sender, contesto: azioniViste })
+      .then((ok) => (ok ? maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText }) : null))
+      .catch(() => {});
   }
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.
   // Se in questo turno abbiamo già proposto la segnalazione all'utente (#360),

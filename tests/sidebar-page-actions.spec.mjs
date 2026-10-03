@@ -11,7 +11,9 @@
 //
 // Giriamo su filo://newtab/ (pagina interna, contextIsolation off → un solo
 // mondo) iniettando un'immagine e un link nel DOM: così possiamo stubbare
-// window.open / SN_ACTIONS nello stesso mondo del content script.
+// window.open / SN_ACTIONS nello stesso mondo del content script. Una pagina di
+// Filo non porta testo scritto da altri nel compito: perché le uscite chiedano
+// come su un sito, qui il livello è Conservativo (#530, la regola sta nel main).
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, clickConfirm } from './helpers/confirm.mjs';
@@ -21,6 +23,9 @@ const NEWTAB = 'filo://newtab/';
 // Prepara la pagina: aspetta i content script, inietta img+link, installa le spie.
 async function prep(page) {
   await page.waitForFunction(() => typeof window.__filoSidebarTest?.runPageAction === 'function', null, { timeout: 8000 });
+  await page.evaluate(() => chrome.runtime.sendMessage({
+    type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { autonomia: { livello: 'conservativo' } },
+  }));
   await page.evaluate(() => {
     window.SN_SIDEBAR.open();
     // Elementi bersaglio.

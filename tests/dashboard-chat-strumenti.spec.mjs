@@ -21,6 +21,7 @@
 //      argomenti siano arrivati.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -141,12 +142,14 @@ test('A — cerca, agisce e risponde in un turno solo; note e azioni nel blocco,
   await app.evaluate(() => { try { globalThis.__restoreProvider?.(); } catch (_) {} });
 });
 
-test('B — un\'azione di livello 2 chiamata come strumento apre la conferma, e il modello risponde sapendolo', async ({ app, shell }) => {
+test('B — un\'azione che chiede, chiamata come strumento, apre la conferma, e il modello risponde sapendolo', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  // A Conservativo il costo 2 chiede anche a compito pulito (#530).
+  await livelloAutonomia(app, 'conservativo');
 
   await app.evaluate(async () => {
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;

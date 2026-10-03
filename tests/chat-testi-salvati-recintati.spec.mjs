@@ -3,6 +3,7 @@
 // per notifiche, home e testo di un file letto per intero.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const NEWTAB = 'filo://newtab/';
 // Il nome di una sveglia si ferma a 60 caratteri: l'ago sta tutto dentro.
@@ -200,6 +201,8 @@ test('togliere più sveglie insieme: nell\'esito «in attesa di conferma» i lor
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configura(app);
+  // A Conservativo togliere più sveglie (costo 2) chiede anche a compito pulito (#530).
+  await livelloAutonomia(app, 'conservativo');
 
   await app.evaluate(async (_e, { veleno, apreChat }) => {
     await globalThis.SN_FILO_MEMORY.addAlarm({ label: veleno, time: '07:15', repeat: 'feriali' });

@@ -1,15 +1,16 @@
 // #146.5 — "Filo deve poter modificare QUALSIASI impostazione".
 //
 // Ogni impostazione della pagina Opzioni è esposta come azione IMPOSTA_PREFERENZA
-// col proprio livello di sicurezza, più l'azione INVIA_FEEDBACK (livello 2) e
-// l'azione CANCELLA_MEMORIA (livello 3). Qui esercitiamo, nel processo reale
-// dell'app, un caso PER LIVELLO end-to-end:
-//   • livello 1: l'impostazione cambia SUBITO (verificato leggendo lo storage);
-//   • livello 2: NON cambia finché l'utente non conferma; alla conferma cambia
-//     davvero e i campi vicini restano intatti (deepMerge);
-//   • livello 3 (CANCELLA_MEMORIA): non parte senza conferma; dopo confirmed:true
-//     la memoria è davvero azzerata (verificata leggendo lo storage);
-//   • INVIA_FEEDBACK: è gated a livello 2 (non parte senza conferma).
+// col proprio costo, più INVIA_FEEDBACK e CANCELLA_MEMORIA. Se partono, chiedono
+// o si fermano lo decide SN_AUTONOMIA (#530): qui, nel processo reale, al livello
+// Normale:
+//   • costo 1 e costo 2 a compito pulito: l'impostazione cambia SUBITO;
+//   • costo 2 dopo aver letto cose scritte da altri: NON cambia finché l'utente non
+//     conferma; alla conferma cambia davvero e i campi vicini restano (deepMerge);
+//   • spegnere una difesa (cookie meno stretti, provider, limite più alto): vuole
+//     «conferma» digitato anche a compito pulito;
+//   • CANCELLA_MEMORIA: Filo non la fa da solo, nemmeno confermata;
+//   • INVIA_FEEDBACK che l'utente non ha chiesto: non parte senza conferma.
 // Gli assert verificano il SUCCESSO (lo stato diventa quello richiesto), non
 // l'assenza di un errore.
 
@@ -25,6 +26,8 @@ const getSettings = (page) =>
   page.evaluate(async () => (await chrome.runtime.sendMessage({ type: 'get_settings' })).settings);
 
 const setPref = (chiave, valore, extra = {}) => ({ type: 'IMPOSTA_PREFERENZA', chiave, valore, ...extra });
+// Un compito che ha letto una ricerca sul web: testo scritto da altri nel contesto.
+const DOPO_UNA_RICERCA = { contesto: [{ type: 'CERCA_WEB', query: 'x', _output: { results: [{ url: 'https://esempio.test/' }] } }] };
 
 test('livello 1: un\'impostazione semplice cambia subito, senza conferma', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
@@ -37,17 +40,18 @@ test('livello 1: un\'impostazione semplice cambia subito, senza conferma', async
   await expect.poll(async () => (await getSettings(page)).featureFlags?.spellcheck).toBe(false);
 });
 
-test('livello 2: impostazione di sicurezza — non cambia senza conferma, cambia con la conferma', async ({ app, openTab }) => {
+test('costo 2: a compito pulito si applica subito; dopo una ricerca chiede, e cambia con la conferma', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   const before = await getSettings(page);
   expect(before.security?.cookies?.mode).toBe('default');
 
-  // Senza conferma: NON applica, torna livello + spiegazione per il popup.
+  // Dopo aver letto altro: NON applica, torna la spiegazione per il popup.
   const action = setPref('gestione_cookie', 'privacy');
-  const r = await execAction(app, action);
+  const r = await execAction(app, action, DOPO_UNA_RICERCA);
   expect(r.executed).toBe(false);
   expect(r.needsConfirm).toBe(2);
   expect(r.describe).toMatch(/cookie/i);
+  expect(r.describe).toContain('Te lo chiedo perché in questo compito ho fatto una ricerca sul web.');
   expect((await getSettings(page)).security?.cookies?.mode).toBe('default');
 
   // Con la conferma (MSG.FILO_CONFIRM_ACTION): applica davvero.
@@ -60,18 +64,29 @@ test('livello 2: impostazione di sicurezza — non cambia senza conferma, cambia
   expect(after.security?.blockPopups).toBe(before.security?.blockPopups);
   expect(after.security?.fingerprint?.mode).toBe(before.security?.fingerprint?.mode);
   expect(Array.isArray(after.security?.cookies?.trustedSites)).toBe(true);
+
+  // A compito pulito, stringere una protezione si fa da solo.
+  const subito = await execAction(app, setPref('fingerprint', 'privacy'));
+  expect(subito.executed).toBe(true);
+  expect(subito.needsConfirm).toBeUndefined();
+  await expect.poll(async () => (await getSettings(page)).security?.fingerprint?.mode).toBe('privacy');
 });
 
-test('livello 2: cambio provider — confermato, persiste sullo storage', async ({ app, openTab }) => {
+test('spegnere una difesa vuole «conferma» anche a compito pulito: provider, cookie meno stretti', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   const action = setPref('provider', 'openrouter');
-
   const r = await execAction(app, action);
-  expect(r.needsConfirm).toBe(2);
+  expect(r.needsConfirm).toBe(3);
+  expect(r.avviso).toBe('Abbassa una difesa di Filo.');
   const c = await page.evaluate(async (a) =>
     chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), action);
   expect(c.executed).toBe(true);
   expect((await getSettings(page)).provider).toBe('openrouter');
+
+  const cookie = await execAction(app, setPref('gestione_cookie', 'manuale'));
+  expect(cookie.executed).toBe(false);
+  expect(cookie.needsConfirm).toBe(3);
+  expect((await getSettings(page)).security?.cookies?.mode).toBe('default');
 });
 
 test('INVIA_FEEDBACK è gated a livello 2: senza conferma non invia nulla', async ({ app, openTab }) => {
@@ -84,41 +99,32 @@ test('INVIA_FEEDBACK è gated a livello 2: senza conferma non invia nulla', asyn
   expect(r.describe).toContain('La ricerca nella sidebar è troppo lenta');
 });
 
-test('le impostazioni sensibili NON sono auto-applicate da un giro di chat (restano in attesa di conferma)', async ({ app, openTab }) => {
-  // Simula ciò che fa handleFiloChat: esegue l'azione senza `confirmed`. Una
-  // preferenza di livello 2 deve tornare `kept` con needsConfirm, MAI eseguita.
+test('le impostazioni che abbassano una difesa NON sono auto-applicate da un giro di chat', async ({ app, openTab }) => {
+  // Simula ciò che fa handleFiloChat: esegue l'azione senza `confirmed`. Alzare il
+  // limite di spesa deve tornare `kept` con la «conferma» da digitare, MAI eseguita.
   const page = await openTab(NEWTAB);
   const r = await execAction(app, setPref('limite_spesa', '99'));
   expect(r.executed).toBe(false);
   expect(r.kept).toBe(true);
-  expect(r.needsConfirm).toBe(2);
+  expect(r.needsConfirm).toBe(3);
   // Il limite di default resta invariato.
   expect((await getSettings(page)).monthlyLimitEur).not.toBe(99);
 });
 
-test('livello 3: CANCELLA_MEMORIA — non parte senza conferma; dopo confirmed:true la memoria è azzerata', async ({ app, openTab }) => {
-  const page = await openTab(NEWTAB);
+test('CANCELLA_MEMORIA: Filo non svuota la memoria da solo, nemmeno confermata, e dice dove farlo', async ({ app, openTab }) => {
+  await openTab(NEWTAB);
   const action = { type: 'CANCELLA_MEMORIA' };
-
-  // Prima: scrivi qualcosa in memoria così abbiamo qualcosa da cancellare.
   await app.evaluate(() =>
     globalThis.SN_FILO_MEMORY.patchMemory({ PROFILO: 'utente di prova', PREFERENZE: 'preferisce il dark' }));
-  const memBefore = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getMemory());
-  expect(memBefore.PROFILO).toBeTruthy();
 
-  // Senza conferma: NON esegue, richiede livello 3.
-  const r = await execAction(app, action);
-  expect(r.executed).toBe(false);
-  expect(r.needsConfirm).toBe(3);
-  expect(r.describe).toMatch(/memoria/i);
-  // La memoria è ancora intatta.
-  const memStill = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getMemory());
-  expect(memStill.PROFILO).toBeTruthy();
-
-  // Con confirmed:true (l'utente ha digitato "conferma"): la memoria sparisce davvero.
-  const c = await execAction(app, action, { confirmed: true });
-  expect(c.executed).toBe(true);
-  const memAfter = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getMemory());
-  expect(memAfter.PROFILO || '').toBe('');
-  expect(memAfter.PREFERENZE || '').toBe('');
+  for (const opts of [{}, { confirmed: true }]) {
+    const r = await execAction(app, action, opts);
+    expect(r.executed).toBe(false);
+    expect(r.needsConfirm).toBeUndefined();
+    expect(r.no).toBe(true);
+    expect(r.error).toContain('Memoria di Filo');
+  }
+  const mem = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getMemory());
+  expect(mem.PROFILO).toBe('utente di prova');
+  expect(mem.PREFERENZE).toBe('preferisce il dark');
 });

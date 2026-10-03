@@ -9,11 +9,10 @@
 // azioni arrivano in streaming come il testo.
 //
 // UNA fonte per le azioni: qui stanno descrizione e parametri di ogni
-// strumento; il LIVELLO di sicurezza sta nel registro (actionLevels.js) e
-// resta l'unico a decidere se un'azione si esegue subito, chiede conferma o
-// pretende «conferma» digitato. Una sentinella negli unit test pretende che i
-// due elenchi combacino: uno strumento senza livello non si esegue, un livello
-// senza strumento non si può chiamare.
+// strumento; il COSTO sta nel registro (actionLevels.js) e se un'azione parte,
+// chiede o si ferma lo decide SN_AUTONOMIA (#530). Una sentinella negli unit
+// test pretende che i due elenchi combacino: uno strumento senza costo non si
+// esegue, un costo senza strumento non si può chiamare.
 //
 // Il nome dello strumento È il tipo dell'azione (`CERCA_WEB`), e gli argomenti
 // sono i campi dell'azione: `{type: nome, ...argomenti}` entra pari pari in
@@ -117,7 +116,7 @@
       required: ['time'],
     },
     CANCELLA_SVEGLIA: {
-      description: 'TOGLIE una sveglia o un timer già programmato ("cancella la sveglia della palestra", "leva quella delle 7", "togli tutte le sveglie", "annulla il timer della pasta"). Vale ANCHE per i timer. Guarda la sezione PROCESSI ATTIVI dello STATO per sapere cosa c\'è davvero e usare la sua etichetta. Se ne prende più d\'una è il SISTEMA a mostrare l\'elenco e a chiedere conferma. NON dichiarare di aver cancellato qualcosa senza chiamare questo strumento.',
+      description: 'TOGLIE una sveglia o un timer già programmato ("cancella la sveglia della palestra", "leva quella delle 7", "togli tutte le sveglie", "annulla il timer della pasta"). Vale ANCHE per i timer. Guarda la sezione PROCESSI ATTIVI dello STATO per sapere cosa c\'è davvero e usare la sua etichetta. Se ne prende più d\'una e serve l\'OK dell\'utente, è il SISTEMA a mostrargli l\'elenco. NON dichiarare di aver cancellato qualcosa senza chiamare questo strumento.',
       properties: {
         etichetta: S('Come l\'utente la chiama: basta una parola dell\'etichetta, o l\'orario ("le 7").'),
         tutte: B('true per toglierle tutte.'),
@@ -144,12 +143,12 @@
       required: ['testo', 'contesto'],
     },
     SALVA_LEZIONE: {
-      description: () => 'Fissa una LEZIONE nella memoria di Filo (la sezione LEZIONI RECENTI): una regola breve, in terza persona, che vale da subito in TUTTE le conversazioni. Il sistema la mostra all\'utente col testo esatto e la salva solo col suo OK: non chiederlo tu a parole. Al massimo ' + tettoLezione() + '. L\'utente la rilegge e la toglie nelle Preferenze, sotto «Memoria di Filo». Non usarla per i contenuti dell\'utente (per quelli c\'è SALVA_APPUNTO): è per come TU devi comportarti d\'ora in poi.',
+      description: () => 'Fissa una LEZIONE nella memoria di Filo (la sezione LEZIONI RECENTI): una regola breve, in terza persona, che vale da subito in TUTTE le conversazioni. Se serve l\'OK dell\'utente il sistema gli mostra il testo esatto e glielo chiede da sé: non chiederlo tu a parole. Al massimo ' + tettoLezione() + '. L\'utente la rilegge e la toglie nelle Preferenze, sotto «Memoria di Filo». Non usarla per i contenuti dell\'utente (per quelli c\'è SALVA_APPUNTO): è per come TU devi comportarti d\'ora in poi.',
       properties: { testo: S('La regola, breve e in terza persona ("L\'utente non beve caffè").') },
       required: ['testo'],
     },
     INVIA_FEEDBACK: {
-      description: 'Invia un feedback agli sviluppatori di Filo a nome dell\'utente. Il sistema chiede conferma all\'utente (con anteprima) prima di inviare: tu prepara il testo e basta.',
+      description: 'Invia un feedback agli sviluppatori di Filo a nome dell\'utente. Se serve il suo OK il sistema glielo chiede da sé, con l\'anteprima: tu prepara il testo e basta.',
       properties: {
         testo: S('La segnalazione completa.'),
         titolo: S('Un riassunto di 2-6 parole.'),
@@ -243,18 +242,18 @@
       required: ['query'],
     },
     CANCELLA_MEMORIA: {
-      description: 'Cancella DEFINITIVAMENTE tutta la memoria di Filo (profilo, preferenze apprese, lezioni). Il sistema chiede all\'utente di digitare "conferma" prima di eseguire; non parte mai senza. NON dichiarare di averlo già fatto.',
+      description: 'Cancella DEFINITIVAMENTE tutta la memoria di Filo (profilo, preferenze apprese, lezioni). Filo non lo fa da solo a nessun livello di autonomia: il sistema risponde di no e ti dice dove l\'utente può farlo lui. NON dichiarare mai di averlo fatto.',
       properties: {},
       required: [],
     },
     DIMENTICA: {
-      description: 'Fa dimenticare a Filo UNA cosa che ha imparato sull\'utente ("dimentica che non bevo caffè", "togli dalla memoria che vivo a Lisbona"): toglie le righe della memoria (profilo, preferenze, lezioni) che corrispondono a `testo`. Il sistema mostra all\'utente le righe esatte e le toglie solo col suo OK: non chiederlo tu a parole. Se non ne trova nessuna te lo dice. Per cancellare TUTTO c\'è CANCELLA_MEMORIA.',
+      description: 'Fa dimenticare a Filo UNA cosa che ha imparato sull\'utente ("dimentica che non bevo caffè", "togli dalla memoria che vivo a Lisbona"): toglie le righe della memoria (profilo, preferenze, lezioni) che corrispondono a `testo`. Se serve l\'OK dell\'utente il sistema gli mostra le righe esatte e glielo chiede da sé: non chiederlo tu a parole. Se non ne trova nessuna te lo dice. Per cancellare TUTTO c\'è CANCELLA_MEMORIA.',
       properties: { testo: S('La riga da dimenticare, copiata dalla memoria che vedi nel contesto (basta un pezzo che la identifichi).') },
       required: ['testo'],
     },
     IMPOSTA_PREFERENZA: {
       description: ({ sistema }) =>
-        'Modifica un\'impostazione dell\'app. Una sola chiave per chiamata (chiama più volte per più impostazioni). Le impostazioni segnate [conferma] sono di livello 2: il sistema chiede conferma all\'utente da sé, tu non chiederla a parole. Chiavi valide e valori ammessi:\n'
+        'Modifica un\'impostazione dell\'app. Una sola chiave per chiamata (chiama più volte per più impostazioni). Per le impostazioni segnate [conferma] il sistema può chiedere l\'OK all\'utente da sé: tu non chiederlo a parole. Il livello di autonomia di Filo non è fra queste: lo sceglie solo l\'utente, in Preferenze. Chiavi valide e valori ammessi:\n'
         + '• tema: "sistema" | "chiaro" | "scuro"\n'
         + '• dimensione_testo: "piccolo" | "normale" | "grande" | "molto grande" | "enorme"\n'
         + '• commento_home: true | false (commento di Filo al centro della home)\n'
@@ -293,7 +292,7 @@
       required: ['token', 'valore'],
     },
     ESEGUI_COMANDO: {
-      description: 'Esegue un comando shell. Il livello di sicurezza lo decide il SISTEMA dal comando (sola lettura → subito; modifiche recuperabili → conferma; cancellazioni / non riconosciuti / concatenati → digita "conferma"). L\'output ti torna subito e lo vede anche l\'utente. Solo con modalità terminale attiva: se è spenta il sistema te lo dice, e tu proponi di attivarla (IMPOSTA_PREFERENZA modalita_terminale true). UN comando per chiamata, niente concatenazioni con && o ;. La cartella di lavoro è persistente: un "cd" resta valido per i comandi successivi.',
+      description: 'Esegue un comando shell. Se parte subito, chiede conferma o vuole "conferma" digitato lo decide il SISTEMA, dal comando e dal livello di autonomia scelto dall\'utente. L\'output ti torna subito e lo vede anche l\'utente. Solo con modalità terminale attiva: se è spenta il sistema te lo dice, e tu proponi di attivarla (IMPOSTA_PREFERENZA modalita_terminale true). UN comando per chiamata, niente concatenazioni con && o ;. La cartella di lavoro è persistente: un "cd" resta valido per i comandi successivi.',
       properties: { comando: S('Il comando shell esatto.') },
       required: ['comando'],
       risultato: true,

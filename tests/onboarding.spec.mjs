@@ -19,7 +19,7 @@
 // chiusura), (4) è rossa (il pulsante non c'è).
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmState } from './helpers/confirm.mjs';
+import { CONFIRM_HOST } from './helpers/confirm.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -165,15 +165,13 @@ test('quello che Filo impara lo applica subito, lo spunta, e riprende da lì', a
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Piacere Anna' })).toBeVisible({ timeout: 30_000 });
 
-  // Lo stile entra in ogni conversazione: proposto da Filo passa dal popup
-  // col testo esatto (#592). Dato l'OK, è applicato DAVVERO, non promesso.
-  await expect.poll(async () => (await confirmState(page))?.text || '', { timeout: 10_000 })
-    .toContain('Risposte brevi, dà del tu.');
-  await clickConfirm(page, 'ok');
+  // Lo stile costa come una lezione (2): a Normale, in un'intervista che ha letto solo
+  // l'utente, Filo lo applica DAVVERO e da solo, non lo promette (#530).
   await expect.poll(
     () => app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.agentStyle || '')),
     { timeout: 15_000 },
   ).toContain('brevi');
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 
   // E l'elenco è avanzato: quelle tre voci non verranno più chieste.
   await expect.poll(() => onbState(app).then((s) => s.ticked.slice().sort()), { timeout: 15_000 })

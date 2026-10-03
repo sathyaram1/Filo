@@ -148,6 +148,17 @@ test('sopra la tabella (d): abbassare una difesa vuole «conferma» a ogni livel
   assert.deepEqual(A.livelliSelezionabili().map((l) => l.id), ['conservativo', 'default', 'automatico']);
 });
 
+test('un backup che rientra, o un ripristino, non alzano l\'autonomia: vince la più stretta', () => {
+  assert.equal(A.unisciPiuStretta({ livello: 'conservativo' }, { livello: 'automatico' }).livello, 'conservativo');
+  assert.equal(A.unisciPiuStretta({ livello: 'automatico' }, { livello: 'conservativo' }).livello, 'conservativo');
+  assert.equal(A.unisciPiuStretta(undefined, { livello: 'yolo' }).livello, 'default');
+  const m = A.unisciPiuStretta({ manopole: { posta: { grave: true } } }, { manopole: { posta: { grave: false, diffida: true } } }).manopole;
+  assert.deepEqual(m.posta, { diffida: true, grave: true }, 'una manopola accesa resta accesa');
+  const f = A.unisciPiuStretta({ fonti: { 'sito:a': 3 } }, { fonti: { 'sito:a': 1, 'sito:b': 1 } }).fonti;
+  assert.deepEqual(f, { 'sito:a': 3 }, 'nessuna fonte sale di fiducia senza «conferma»');
+  assert.equal(A.livelloAttivo('yolo'), 'default', 'yolo non vale finché non si può scegliere');
+});
+
 test('un costo non valido non parte mai', () => {
   for (const costo of [undefined, null, -1, 4, 1.5, '2']) assert.equal(A.decide({ livello: 'yolo', stato: 'pulito', costo }), 'no');
 });
@@ -222,13 +233,15 @@ function risposta(action, { azioni = [], livello = 'default', richiesta = '', im
   if (!ing) return 'rifiutata';
   const extra = paginaWeb ? [{ classe: 5, campo: 'web', motivo: 'ho letto una pagina web' }] : [];
   const st = A.stato({ fonti: daAzioni(azioni, extra), livello });
-  return A.decide({ livello, stato: st.stato, costo: ing.costo, campo: ing.campo, elenco: ing.elenco, difesa: ing.difesa });
+  return A.decide({
+    livello, stato: st.stato, costo: ing.costo, campo: ing.campo, elenco: ing.elenco, difesa: ing.difesa, dentroPerimetro: ing.dentroPerimetro,
+  });
 }
 const ricercaFatta = { type: 'CERCA_WEB', query: 'meteo', _output: { results: [{ url: 'https://x.it' }] } };
 
 test('a default, compito pulito: il costo 2 parte da solo, il 3 chiede', () => {
   assert.equal(risposta({ type: 'SALVA_LEZIONE', testo: 'L’utente preferisce il tu' }), 'si');
-  assert.equal(risposta({ type: 'INVIA_FEEDBACK', testo: 'la ricerca è lenta' }), 'si');
+  assert.equal(risposta({ type: 'INVIA_FEEDBACK', testo: 'la ricerca è lenta' }, { richiesta: 'segnala che la ricerca è lenta' }), 'si');
   assert.equal(risposta({ type: 'TIMER', seconds: 60 }), 'si');
   assert.equal(risposta({ type: 'ESEGUI_COMANDO', comando: 'rm -rf build' }), 'chiede');
 });
@@ -240,6 +253,15 @@ test('a default, dopo aver letto cose scritte da altri: il costo 2 chiede, il 3 
   assert.equal(risposta({ type: 'TIMER', seconds: 60 }, dopo), 'si');
   assert.equal(risposta({ type: 'CERCA_WEB', query: 'altro' }, dopo), 'si', 'leggere di più è sempre libero');
   assert.equal(risposta({ type: 'INVIA_FEEDBACK', testo: 'x' }, { paginaWeb: true }), 'chiede', 'l’assistente su una pagina web');
+});
+
+test('una segnalazione che l\'utente non ha chiesto è fuori perimetro: chiede anche a compito pulito', () => {
+  const fb = { type: 'INVIA_FEEDBACK', testo: 'Filo non sa ancora aprire i PDF protetti' };
+  assert.equal(risposta(fb, { richiesta: 'aprimi questo pdf protetto' }), 'chiede');
+  assert.equal(risposta(fb, { richiesta: 'aprimi questo pdf protetto', livello: 'automatico' }), 'chiede');
+  for (const r of ['segnalalo agli sviluppatori', 'manda un feedback', 'di\' al team che manca', 'è un bug, riportalo']) {
+    assert.equal(risposta(fb, { richiesta: r }), 'si', r);
+  }
 });
 
 test('elenco fisso nel registro: cancellare la memoria, cambiare il livello, far uscire un segreto', () => {
@@ -323,4 +345,9 @@ test('sentinella: ogni superficie che fa agire Filo chiede la risposta al modulo
   for (const riga of tab.split('\n').filter((r) => /^\s+[a-z_]+:\s*\{/.test(r))) assert.match(riga, /costo:\s*[0-3]/, riga.trim());
   assert.match(side, /MSG\.FILO_DECIDI_PAGINA/);
   assert.match(h, /async function decisioneAzionePagina[\s\S]*?decisioneAutonomia\(/);
+  // Le lezioni che Filo si scrive da solo dopo la chat passano dalla stessa regola di SALVA_LEZIONE.
+  const chat = h.slice(h.indexOf('async function handleFiloChat('));
+  const chiamata = chat.indexOf('maybeRunLessonAgent({ userMessage, filoReply: textReply');
+  assert.ok(chiamata > 0 && chat.lastIndexOf('lezioniAutomaticheConsentite(', chiamata) > 0, 'le lezioni automatiche chiedono al modulo');
+  assert.match(h, /async function lezioniAutomaticheConsentite[\s\S]*?decisioneAutonomia\(/);
 });

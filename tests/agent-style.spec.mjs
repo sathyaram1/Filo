@@ -6,6 +6,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm, confirmState, scrollConfirmToEnd, mouseClickConfirm, pointWhenConfirmAppears, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 test('scegliere un preset riempie il testo e lo stile persiste tra le ricariche', async ({ openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
@@ -113,6 +114,8 @@ async function configureModel(app) {
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
   });
+  // Il popup di un costo 2 a compito pulito si vede a Conservativo: a Normale partirebbe da solo (#530).
+  await livelloAutonomia(app, 'conservativo');
 }
 
 // Provider finto: una risposta per giro del modello; i messaggi ricevuti
@@ -533,6 +536,7 @@ test('#592 — un clic che arriva mentre il popup compare non conferma lo stile;
 
 test('#592 — nell’Aiuto un clic che arriva mentre il popup compare non conferma lo stile', async ({ app, openTab }) => {
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ agentStyle: '' }));
+  await livelloAutonomia(app, 'conservativo');
   const page = await openTab('filo://newtab/');
   await page.evaluate(() => window.SN_SIDEBAR.open());
   const corsa = page.evaluate((v) => window.__filoSidebarTest.runFiloAction({ type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: v }), NASCOSTO);

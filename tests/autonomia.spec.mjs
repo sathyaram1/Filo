@@ -1,7 +1,7 @@
 // Livelli di autonomia (#530) nell'app vera: il selettore in Preferenze, il livello in vista nella home,
 // e il dispatch che fa da solo il costo 2 a compito pulito e chiede, dicendo perché, dopo aver letto altro.
 import { test, expect } from './fixtures/electron.mjs';
-import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, scrollConfirmToEnd, fillConfirmInput } from './helpers/confirm.mjs';
 import { home, modelloFinto, ripristina, chiedi } from './helpers/chatFinta.mjs';
 import { cartellaInCasa } from './helpers/percorsi.mjs';
 import { writeFileSync, rmSync, mkdirSync } from 'node:fs';
@@ -14,12 +14,11 @@ const execAction = (app, action, opts) =>
   app.evaluate((_electron, { action, opts }) => globalThis.SN_EXECUTE_FILO_ACTION(action, opts), { action, opts });
 const impostazioni = (app) => app.evaluate(() => globalThis.SN_STORAGE.getSettings());
 const livello = async (app) => ((await impostazioni(app)).autonomia || {}).livello;
-const lezioni = (app) => app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getMemory()));
+const lezioni = (app) => app.evaluate(async () => {
+  const M = globalThis.SN_FILO_MEMORY;
+  return JSON.stringify({ memoria: await M.getMemory(), lezioni: (await M.getLessonsBuffer()).map((l) => l.text) });
+});
 const ricercaFatta = { type: 'CERCA_WEB', query: 'meteo', _output: { results: [{ url: 'https://meteo.example/', title: 'Meteo', snippet: 'sole' }] } };
-
-async function scriviNelBox(page, parola) {
-  await page.evaluate((w) => window.SN_CONFIRM_UI._test.type(w), parola);
-}
 
 test('Preferenze: tre livelli con le tre frasi; alzare vuole «conferma», abbassare no', async ({ app, openTab }) => {
   const page = await openTab(PREFS);
@@ -45,7 +44,7 @@ test('Preferenze: tre livelli con le tre frasi; alzare vuole «conferma», abbas
   // Alzare davvero: la parola sblocca il bottone e il livello si salva.
   await page.locator('label:has(#autonomia-automatico)').click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible();
-  await scriviNelBox(page, 'conferma');
+  await fillConfirmInput(page, 'conferma');
   await scrollConfirmToEnd(page);
   await clickConfirm(page, 'danger');
   await expect.poll(() => livello(app)).toBe('automatico');
@@ -57,7 +56,7 @@ test('Preferenze: tre livelli con le tre frasi; alzare vuole «conferma», abbas
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 });
 
-test('home: il livello attivo è sempre in vista, segue le Preferenze e porta alla scelta', async ({ app }) => {
+test('home: il livello attivo è sempre in vista, segue le Preferenze e porta alla scelta', async ({ app, openTab }) => {
   const page = await home(app);
   const chip = page.locator('#dashAutonomia');
   await expect(chip).toBeVisible();
@@ -66,20 +65,22 @@ test('home: il livello attivo è sempre in vista, segue le Preferenze e porta al
   mkdirSync(SHOTS, { recursive: true });
   await page.locator('#inputForm').screenshot({ path: join(SHOTS, 'autonomia-home-chiaro.png') });
 
-  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }));
-  await app.evaluate(async () => { const s = await globalThis.SN_STORAGE.getSettings(); globalThis.SN_TEST_BROADCAST?.(s); });
-  // Il cambio arriva alla home aperta come per ogni impostazione.
-  await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'scuro' }));
+  // Abbassato in Preferenze, la home già aperta lo mostra senza ricaricare.
+  const prefs = await openTab(PREFS);
+  await prefs.locator('label:has(#autonomia-conservativo)').click();
+  await expect.poll(() => livello(app)).toBe('conservativo');
   await expect(chip).toContainText('Conservativo');
   await expect(chip.locator('.dash-autonomia-tacca.piena')).toHaveCount(1);
-  await page.waitForTimeout(300);
+
+  await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'scuro' }));
+  await page.waitForTimeout(400);
   await page.locator('#inputForm').screenshot({ path: join(SHOTS, 'autonomia-home-scuro.png') });
 
   await chip.click();
-  await expect.poll(() => app.windows().some((w) => { try { return w.url().startsWith(PREFS); } catch (_) { return false; } })).toBe(true);
-  const prefs = app.windows().find((w) => w.url().startsWith(PREFS));
-  expect(prefs.url()).toContain('#autonomia');
-  await expect(prefs.locator('#autonomia-conservativo')).toBeChecked();
+  const allaScelta = () => app.windows().find((w) => { try { return w.url() === `${PREFS}#autonomia`; } catch (_) { return false; } });
+  await expect.poll(() => !!allaScelta()).toBe(true);
+  await expect(allaScelta().locator('#autonomia-conservativo')).toBeChecked();
+  await expect(allaScelta().locator('#autonomia')).toBeInViewport();
 });
 
 test('a Normale, compito pulito: una lezione si salva da sola', async ({ app }) => {
@@ -101,6 +102,23 @@ test('dopo aver letto cose scritte da altri: il costo 2 chiede, il 3 vuole «con
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Uno.\nDue.\nTre.\nQuattro.', PREFERENZE: '' }));
   const dimentica = await execAction(app, { type: 'DIMENTICA', testo: '.' }, { contesto: [ricercaFatta] });
   expect(dimentica.needsConfirm === 3 || dimentica.executed === false).toBe(true);
+});
+
+test('un link coi tuoi dati: chiesto da te in un compito pulito si apre; dall\'assistente su una pagina web chiede, e dice perché', async ({ app, testServer }) => {
+  await home(app);
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Mario Rossi, vive a Bologna.', PREFERENZE: '' }));
+  const url = `${testServer.html('<!doctype html><title>mappa</title><h1>ok</h1>')}&dove=Mario_Rossi_Bologna`;
+  const aperta = () => app.windows().some((w) => { try { return w.url() === url; } catch (_) { return false; } });
+
+  const daPagina = await execAction(app, { type: 'NAVIGA', url }, { sender: { url: 'https://blog.esempio.test/articolo' } });
+  expect(daPagina.executed).toBe(false);
+  expect(daPagina.needsConfirm).toBe(2);
+  expect(daPagina.describe).toContain('Te lo chiedo perché in questo compito ho letto una pagina web.');
+  expect(aperta()).toBe(false);
+
+  const pulito = await execAction(app, { type: 'NAVIGA', url });
+  expect(pulito.needsConfirm).toBeFalsy();
+  await expect.poll(aperta, { timeout: 8000 }).toBe(true);
 });
 
 test('Conservativo: dopo una ricerca chiede anche un timer; i no dell’elenco fisso non si confermano', async ({ app }) => {

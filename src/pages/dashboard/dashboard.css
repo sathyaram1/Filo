@@ -927,7 +927,9 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 
 /* Il livello di autonomia (#530): tacche come una carica, piene fino al livello scelto. */
 .dash-autonomia {
-  align-self: center;
+  /* In basso come l'invio: quando il testo va a capo resta sulla riga dei bottoni. */
+  align-self: flex-end;
+  margin-bottom: 2px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
