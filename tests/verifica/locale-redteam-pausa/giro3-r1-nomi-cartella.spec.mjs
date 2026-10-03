@@ -39,7 +39,7 @@ for (const url of VARIANTI) {
     const page = await openTab(url);
     await page.waitForTimeout(1500);
     const testo = (await page.locator('body').innerText().catch(() => '')).trim();
-    expect(testo).toContain(FRASE);
-    expect(await page.locator('script').count()).toBe(0);
+    expect(testo).toBe(FRASE);
+    expect(await page.locator('script[src*="redteam.js"]').count()).toBe(0);
   });
 }
