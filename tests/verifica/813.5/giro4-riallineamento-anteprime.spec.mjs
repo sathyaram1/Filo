@@ -21,7 +21,7 @@ async function servi(app) {
       session.defaultSession.protocol.handle(s, risposta);
     }
     globalThis.SN_SAFEBROWSE.setProviders({
-      gsb: async (u) => (/paypa1/.test(String(u && (u.url || u))) || true ? { listed: /paypa1/.test(JSON.stringify(u)), category: 'phishing' } : null),
+      gsb: async (u) => ({ listed: /paypa1/.test(String(u)), category: 'phishing' }),
       rdap: null, ct: null, sandbox: null,
       llm: async () => ({ suspicious: false, reason: null }),
     });
