@@ -493,7 +493,7 @@
     },
     {
       id: 'video-ad-skip', title: 'Pubblicità dei video saltate da sole', category: 'settings',
-      desc: 'Quando un video mostra una pubblicità che si può saltare, Filo preme «Salta» appena il pulsante compare, con un clic come il tuo. Vale su YouTube e sui lettori pubblicitari che usano molti siti (Google IMA, JW Player), anche dentro un riquadro della pagina. Se stai scrivendo in un campo o tieni premuto il mouse, aspetta che tu abbia finito.',
+      desc: 'Quando un video mostra una pubblicità che si può saltare, Filo preme «Salta» appena il pulsante compare, con un clic come il tuo. Vale su YouTube e sui lettori pubblicitari che usano molti siti (Google IMA, JW Player), anche dentro un riquadro della pagina e nelle schede in secondo piano. Su YouTube, se stai scrivendo in un campo della pagina o tieni premuto il mouse, aspetta che tu abbia finito; se hai scorso più giù e il lettore non si vede, lo preme appena torni a vederlo.',
       invoke: 'Da solo, acceso di serie. Si spegne in Impostazioni → Sicurezza → «Salta le pubblicità dei video», o chiedendolo a Filo.',
       doesNot: 'Non accorcia le pubblicità senza «Salta» e non lo preme prima che il lettore lo mostri. Su un video di YouTube incorporato in un altro sito il clic è quello di uno script, e YouTube può ignorarlo.',
     },
