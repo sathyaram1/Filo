@@ -108,8 +108,24 @@ test('arrivata In coda: il punto sta nella riga del titolo, che resta all\'altez
   expect(Math.abs(await altezzaTitolo('f515') - riferimento)).toBeLessThan(3);
 });
 
-test('in secondo piano o ridotta a icona non legge; tornando in vista si allinea subito', async ({ openTab, shell, app }) => {
-  const docs = [fb('f716', 716, 'design'), fb('f515', 515, 'working')];
+// Fuori vista niente letture anche col ritmo stretto; al rientro il cambio arriva
+// in pochi secondi col ritmo a minuti, quindi l'ha portato il rientro.
+async function fuoriVistaERitorno(page, app, { esci, rientra, cambia, attesi }) {
+  const come = await app.evaluate(esci);
+  await page.waitForTimeout(600);
+  const fuori = await page.evaluate(() => window.__srv.letture);
+  await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 800 }));
+  await page.waitForTimeout(3000);
+  expect(await page.evaluate(() => window.__srv.letture)).toBe(fuori);
+  await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 10 * 60 * 1000 }));
+  await cambia();
+  await app.evaluate(rientra, come);
+  await expect.poll(() => ids(page), { timeout: 4000 }).toEqual(attesi);
+  return come;
+}
+
+test('in secondo piano, ridotta a icona o nascosta non legge; tornando in vista si allinea subito', async ({ openTab, shell, app }) => {
+  const docs = [fb('f716', 716, 'design'), fb('f515', 515, 'working'), fb('f600', 600, 'todo')];
   const page = await apri(openTab, docs, { tempi: { pollMs: 800, rientroMs: 300, clockMs: 200 } });
   await page.evaluate(() => window.__mgTest.setTab('inbox'));
   await expect.poll(() => page.evaluate(() => window.__srv.letture)).toBeGreaterThan(1);
@@ -129,29 +145,38 @@ test('in secondo piano o ridotta a icona non legge; tornando in vista si allinea
   await shell.evaluate((id) => window.filoShell.tabs.activate(id), gestione);
   await expect.poll(() => ids(page), { timeout: 4000 }).toEqual(['f515', 'f716']);
 
-  // Finestra ridotta a icona: stesso discorso. Si chiede al sistema se l'ha
-  // ridotta: senza gestore di finestre (xvfb della suite) non succede, e lì la
-  // finestra si nasconde, che per Filo è la stessa uscita dalla vista.
-  const ridottaDavvero = await app.evaluate(async ({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    w.minimize();
-    for (let i = 0; i < 20 && !w.isMinimized(); i++) await new Promise((r) => setTimeout(r, 50));
-    if (w.isMinimized()) return true;
-    w.hide();
-    return false;
+  // Senza gestore di finestre (xvfb: il contenitore delle routine e la suite in
+  // GitHub) la riduzione non avviene: lì si finge quello che il sistema direbbe dopo.
+  const riduzione = await fuoriVistaERitorno(page, app, {
+    esci: async ({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+      w.minimize();
+      for (let i = 0; i < 20 && !w.isMinimized(); i++) await new Promise((r) => setTimeout(r, 50));
+      if (w.isMinimized()) return 'vera';
+      w.isMinimized = () => true;
+      w.emit('minimize');
+      return 'simulata';
+    },
+    rientra: ({ BrowserWindow }, come) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+      if (come === 'simulata') delete w.isMinimized;
+      if (w.isMinimized()) w.restore(); else w.emit('restore');
+    },
+    cambia: () => ilServerScrive(page, 'f716', { status: 'todo' }),
+    attesi: ['f515'],
   });
-  await page.waitForTimeout(600);
-  const ridotta = await page.evaluate(() => window.__srv.letture);
-  await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 800 }));
-  await page.waitForTimeout(3000);
-  expect(await page.evaluate(() => window.__srv.letture)).toBe(ridotta);
-  await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 10 * 60 * 1000 }));
-  await ilServerScrive(page, 'f716', { status: 'todo' });
-  await app.evaluate(({ BrowserWindow }, ridotta) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    if (ridotta) w.restore(); else w.show();
-  }, ridottaDavvero);
-  await expect.poll(() => ids(page), { timeout: 4000 }).toEqual(['f515']);
+  test.info().annotations.push({ type: 'riduzione a icona', description: riduzione });
+
+  await fuoriVistaERitorno(page, app, {
+    esci: ({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs).hide(); },
+    // Senza rubare il fuoco a chi lancia i test sulla sua macchina.
+    rientra: ({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs).showInactive(); },
+    cambia: async () => {
+      await ilServerScrive(page, 'f515', { status: 'todo', statusReason: null });
+      await ilServerScrive(page, 'f600', { status: 'design' });
+    },
+    attesi: ['f600'],
+  });
 });
 
 test('un giro non porta via sezione, scorrimento, scheda aperta, bozza e menu aperto', async ({ openTab }) => {
