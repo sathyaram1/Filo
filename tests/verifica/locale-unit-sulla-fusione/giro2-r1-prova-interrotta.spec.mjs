@@ -1,7 +1,8 @@
 // Verifica locale «unit-sulla-fusione», giro 2, rilievo 1: una prova degli unit sulla fusione interrotta a metà
 // non deve lasciare una strada con cui i comandi di git svuotino node_modules. Qui node_modules è un canarino.
 import { test, expect } from '@playwright/test';
-import { existsSync, mkdirSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
