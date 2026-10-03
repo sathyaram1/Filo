@@ -20,6 +20,17 @@ class VisiteSchede {
 
   // Ricaricare, o cambiare solo il frammento (#sezione), non è una pagina nuova.
   navigata(wc, scheda, url, { inPagina = false } = {}) {
+    const voce = voceAttiva(wc);
+    const vocePrima = this.voci.get(wc);
+    if (voce) this.voci.set(wc, voce); else this.voci.delete(wc);
+    // La pagina che riscrive la propria voce (una mappa spostata, un filtro) resta la stessa visita, come nei browser.
+    if (inPagina && voce && vocePrima && voce.i === vocePrima.i && voce.n === vocePrima.n) {
+      if (!registrabile(url)) return;
+      this.ultime.set(wc, url);
+      const v = this.inAttesa.get(wc);
+      if (v) v.url = url;
+      return;
+    }
     this.scrivi(wc, { titoloAttuale: false });
     if (!registrabile(url)) return;
     const prima = this.ultime.get(wc);
