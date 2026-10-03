@@ -353,6 +353,13 @@ export function statoContenitore({ osImpl = os, proc = process, leggi = leggiFil
   };
 }
 
+/** Quanto aspettare il battito dopo: ogni dieci minuti, ma sempre ben dentro la scadenza che il server ha detto. PURA. */
+export function attesaBattito(expiresAt, now = Date.now()) {
+  const resta = Date.parse(String(expiresAt || '')) - now;
+  if (!Number.isFinite(resta) || resta <= 0) return BEAT_EVERY_MS;
+  return Math.min(BEAT_EVERY_MS, Math.max(1000, Math.floor(resta / 3)));
+}
+
 export async function heartbeat(t, opts = {}) {
   const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts) }, opts);
   if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt };
