@@ -81,6 +81,42 @@ test('--frase da sola scrive solo la frase, e dice di no a vuota, troppo lunga o
   });
 });
 
+test('un passaggio di stato con una frase oltre i 500 caratteri è rifiutato col numero, mai tagliato', async () => {
+  await conRete(utente(), async (patch) => {
+    const r = await mod.scrivi('u1', 'done', 'finito', { ...OPTS, attore: 'routine', frase: 'a'.repeat(620) });
+    assert.equal(r.ok, false);
+    assert.match(r.motivo, /620/);
+    assert.equal(patch.length, 0);
+    const giusta = await mod.scrivi('u1', 'done', 'finito', { ...OPTS, attore: 'routine', frase: 'a'.repeat(500) });
+    assert.equal(giusta.ok, true);
+    assert.equal(patch[0].body.fields.userNote.stringValue.length, 500);
+  });
+});
+
+test('chiusa a mano senza frase, npm run feedback la ricorda; con la frase no', () => {
+  const dir = cartellaTemporanea('frase-913-');
+  const finto = join(dir, 'rete.mjs');
+  writeFileSync(finto, `
+const doc = ${JSON.stringify(utente())};
+globalThis.fetch = async (url, opts = {}) => {
+  const u = new URL(String(url));
+  if (!/firestore/.test(u.hostname)) return new Response(JSON.stringify({ id_token: 'finto', expires_in: '3600' }), { status: 200 });
+  if ((opts.method || 'GET') !== 'GET') return new Response('{}', { status: 200 });
+  const m = u.searchParams.getAll('mask.fieldPaths');
+  const fields = m.length ? Object.fromEntries(Object.entries(doc.fields).filter(([k]) => m.includes(k))) : doc.fields;
+  return new Response(JSON.stringify({ name: doc.name, fields }), { status: 200 });
+};`);
+  const lancia = (...extra) => spawnSync(process.execPath, ['--import', pathToFileURL(finto).href, join(ROOT, 'scripts', 'owner-feedback.mjs'), 'u1', 'done', 'finito', '--come-routine', ...extra], {
+    encoding: 'utf8', timeout: 60000, env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: 'finto', FILO_SA_KEY: '', GOOGLE_APPLICATION_CREDENTIALS: '' },
+  });
+  const senza = lancia();
+  assert.equal(senza.status, 0, senza.stderr);
+  assert.match(senza.stdout, /npm run feedback -- u1 --frase/);
+  const con = lancia('--frase', 'Ora il terminale parte');
+  assert.equal(con.status, 0, con.stderr);
+  assert.doesNotMatch(con.stdout, /--frase/);
+});
+
 test('l’aiuto di npm run finish dice dove si scrive la frase', () => {
   const aiuto = execFileSync(process.execPath, [join(ROOT, 'scripts', 'finish-local.mjs'), '--help'], { encoding: 'utf8', timeout: 60000 });
   assert.match(aiuto, /npm run feedback -- <N> --frase/);
