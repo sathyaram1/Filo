@@ -419,7 +419,9 @@ export async function praticaPerLaSessione(id, opts = {}) {
 /** Il promemoria della frase per chi ha segnalato (regola: SN_MANAGE_REVIEW.fraseAttesa), '' se non serve. PURA. */
 export function avvisoFrase(fb, rif) {
   if (!MR.fraseAttesa(fb)) return '';
-  return `Chi l’ha mandato è un utente: a pratica chiusa vede la risoluzione con la sola frase per lui, e questa pratica non ne ha una. Se il lavoro cambia qualcosa che vede, scrivila (una riga in chiaro, niente dettagli di sicurezza): npm run feedback -- ${rif} --frase "…". Vale anche a pratica chiusa.`;
+  // Il comando si incolla: un «#951» in bash e in PowerShell apre un commento, e npm partirebbe senza argomenti.
+  const chi = String(rif ?? '').trim().replace(/^#+/, '');
+  return `Chi l’ha mandato è un utente: a pratica chiusa vede la risoluzione con la sola frase per lui, e questa pratica non ne ha una. Se il lavoro cambia qualcosa che vede, scrivila (una riga in chiaro, niente dettagli di sicurezza): npm run feedback -- ${chi} --frase "…". Vale anche a pratica chiusa.`;
 }
 
 /** Lo stesso promemoria letto in rete, per chi ha la pratica ma non l'ha appena riletta (finish, server:fondi). '' anche se non si legge. */
