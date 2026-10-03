@@ -461,7 +461,7 @@
 
   function oscuraTesto(s, chiavi) {
     // Una foto mandata al modello è pixel, non testo: decodificarla costerebbe e non troverebbe niente.
-    if (/^data:image\//i.test(s.slice(0, 16))) return s.split(chiavi[0].v).length > 1 ? chiavi.reduce((a, c) => a.split(c.v).join(OSCURATO), s) : s;
+    if (/^data:image\//i.test(s.slice(0, 16))) return s;
     let t = s;
     for (const c of chiavi) {
       t = t.split(c.v).join(OSCURATO);
@@ -469,7 +469,6 @@
     }
     // Base64 a righe (il comando base64 va a capo ogni 76 caratteri) si legge come un pezzo solo.
     t = t.replace(/[A-Za-z0-9+/=_-]{16,}(?:[ \t]*\r?\n[ \t]*[A-Za-z0-9+/=_-]{4,})+|\S{8,}/g, (tok) => {
-      // Una foto mandata al modello è pixel, non testo: decodificarla costerebbe e non troverebbe niente.
       if (/^data:image\//i.test(tok)) return tok;
       const compatto = tok.replace(/\s+/g, '');
       const forme = decodifiche(compatto).map(alnumMinuscolo);
