@@ -304,9 +304,9 @@
     try {
       chrome.storage.local.get([DRAFT_KEY]).then((r) => {
         const saved = r?.[DRAFT_KEY];
-        if (!saved || activeRoot !== root) return;
-        if (!textEl.value) textEl.value = saved;
-        else if (proposta && textEl.value === proposta && !saved.includes(proposta)) {
+        if (activeRoot !== root) return;
+        if (saved && !textEl.value) textEl.value = saved;
+        else if (saved && proposta && textEl.value === proposta && !saved.includes(proposta)) {
           textEl.value = `${saved}\n\n${proposta}`;
           inFondo();
         }

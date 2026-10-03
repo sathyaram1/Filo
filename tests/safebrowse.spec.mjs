@@ -10,9 +10,9 @@
 //   - la chiave condivisa, quando presente, raggiunge DAVVERO il motore per tutti
 //     gli account (asserisce che lo stadio GSB si accende), senza mai trapelare
 //     il valore al renderer admin (solo un booleano "configurata").
-//   - l'interstitial "pericoloso" copre DAVVERO la pagina e si toglie solo dopo
-//     aver scritto "confermo" → Procedi (asserisce che l'overlay sparisce, cioè
-//     che il flusso di bypass funziona, non che un testo sia cambiato).
+//   - l'avviso sta in una vista sopra la scheda, fuori dalla pagina (#813.5): la
+//     copre, ha la tastiera, la pagina non sente niente, non lo copre né lo
+//     cancella, e si toglie solo dai suoi pulsanti ("confermo" → Procedi).
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createRequire } from 'node:module';
@@ -414,13 +414,23 @@ async function chiudiLenti(app) {
   await app.evaluate(() => { for (const c of globalThis.__sbLenti || []) { try { c.close(); } catch (_) {} } }).catch(() => {});
 }
 
+// Appena la scheda c'è, l'utente ci clicca dentro: la tastiera è della pagina, finché l'avviso non la prende. Il fuoco
+// lo chiede la prova, perché nella finestra di prova (fuori schermo, senza gestore di finestre) nessuno lo dà.
 async function apriSenzaAspettare(app, shell, url) {
   const host = new URL(url).hostname;
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
   const fine = Date.now() + 10_000;
   while (Date.now() < fine) {
     const p = app.windows().find((w) => { try { return new URL(w.url()).hostname === host; } catch (_) { return false; } });
-    if (p) return p;
+    if (p) {
+      await app.evaluate(({ BrowserWindow }) => {
+        const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+        const tm = win._filoTabs;
+        win.focus();
+        tm.tabs.find((t) => t.id === tm.activeId).view.webContents.focus();
+      });
+      return p;
+    }
     await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error(`nessuna scheda per ${url}`);
@@ -687,15 +697,16 @@ async function menuDellAvviso(app, avviso) {
   return menu;
 }
 
-async function schedaNuova(app, url) {
-  const fine = Date.now() + 10_000;
-  while (Date.now() < fine) {
-    const p = app.windows().find((w) => { try { return w.url().startsWith(url); } catch (_) { return false; } });
-    if (p) return p;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error(`nessuna scheda ${url}`);
+// La home aperta adesso, non quella che c'era già (la scheda d'avvio è anche lei una home).
+async function homeNuova(app, prima) {
+  let nuova = null;
+  await expect.poll(() => {
+    nuova = app.windows().find((w) => { try { return w.url().startsWith('filo://newtab/') && !prima.includes(w); } catch (_) { return false; } });
+    return !!nuova;
+  }, { timeout: 10_000 }).toBe(true);
+  return nuova;
 }
+const homeAperte = (app) => app.windows().filter((w) => { try { return w.url().startsWith('filo://newtab/'); } catch (_) { return false; } });
 
 test('tasto destro sull\'avviso: il menu di Filo sta sopra e porta alla segnalazione e alla domanda a Filo', async ({ app, shell }) => {
   await serviInCaricamento(app, { 'conto-destro.com/login': MODULO }, { gsbListed: true });
@@ -713,8 +724,9 @@ test('tasto destro sull\'avviso: il menu di Filo sta sopra e porta alla segnalaz
     return BrowserWindow.getAllWindows().some((w) => w !== win && w.getParentWindow() === win && w.isVisible());
   })).toBe(true);
 
+  let prima = homeAperte(app);
   await menu.evaluate(() => [...document.querySelectorAll('button.item')].find((b) => /falso allarme/.test(b.textContent)).click());
-  const home = await schedaNuova(app, 'filo://newtab/');
+  const home = await homeNuova(app, prima);
   await expect(home.locator('.sn-fb-text')).toBeVisible({ timeout: 10_000 });
   await expect(home.locator('.sn-fb-text')).toHaveValue(/Falso allarme: Filo ha segnalato come pericoloso https:\/\/conto-destro\.com\/login/);
   await expect(home.locator('.sn-fb-text')).toHaveValue(new RegExp(SEGNALATO));
@@ -722,23 +734,39 @@ test('tasto destro sull\'avviso: il menu di Filo sta sopra e porta alla segnalaz
   await expect.poll(() => home.evaluate(async () => (await chrome.storage.local.get(['sn_feedback_draft_text'])).sn_feedback_draft_text || ''))
     .toMatch(/Falso allarme/);
 
-  // Tornati al sito, l'avviso è ancora lì; dal suo menu la domanda a Filo parte da sola in una scheda nuova.
+  // Tornati al sito, l'avviso è ancora lì e la pagina non ha la tastiera (il sistema, ridando il primo piano alla
+  // finestra dopo il menu, la dà alla barra); dal suo menu la domanda a Filo parte da sola in una scheda nuova.
   await app.evaluate(({ BrowserWindow }) => {
-    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const tm = win._filoTabs;
     tm.activate(tm.tabs.find((t) => /conto-destro/.test(t.view.webContents.getURL())).id);
+    win.focus();
   });
-  await expect.poll(() => copertura(app)).toEqual(COPERTA);
-  const homeAperte = app.windows().filter((w) => { try { return w.url().startsWith('filo://newtab/'); } catch (_) { return false; } });
+  await expect.poll(async () => { const c = await copertura(app); return c.coperta && c.sopra && c.stessiBordi; }).toBe(true);
+  expect((await copertura(app)).tastiera).not.toBe('pagina');
+  prima = homeAperte(app);
   menu = await menuDellAvviso(app, avviso);
   await menu.evaluate(() => [...document.querySelectorAll('button.item')].find((b) => /Chiedi a Filo/.test(b.textContent)).click());
-  let chat = null;
-  await expect.poll(() => {
-    chat = app.windows().find((w) => { try { return w.url().startsWith('filo://newtab/') && !homeAperte.includes(w); } catch (_) { return false; } });
-    return !!chat;
-  }, { timeout: 10_000 }).toBe(true);
+  const chat = await homeNuova(app, prima);
   await expect(chat.locator('.dash-bubble-user')).toContainText('https://conto-destro.com/login', { timeout: 10_000 });
   await expect(chat.locator('.dash-bubble-user')).toContainText('È davvero da evitare?');
   // La richiesta vale una volta: ricaricata, la home non rimanda la domanda.
   expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs
     .filter((t) => t._richiestaCasa).length)).toBe(0);
+});
+
+test('Alt+H sull\'avviso: l\'Aiuto, che starebbe sotto l\'avviso, diventa la domanda a Filo sul sito', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'conto-aiuto.com/login': MODULO }, { gsbListed: true });
+  await apriSenzaAspettare(app, shell, 'https://conto-aiuto.com/login');
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+  await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  const prima = homeAperte(app);
+  await app.evaluate(({ webContents }) => {
+    const wc = webContents.getFocusedWebContents();
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'H', modifiers: ['alt'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'H', modifiers: ['alt'] });
+  });
+  const chat = await homeNuova(app, prima);
+  await expect(chat.locator('.dash-bubble-user')).toContainText('https://conto-aiuto.com/login', { timeout: 10_000 });
 });

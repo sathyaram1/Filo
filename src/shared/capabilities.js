@@ -468,6 +468,12 @@
       invoke: 'Pagina filo://security/security.html.',
     },
     {
+      id: 'dangerous-sites', title: 'Avviso dei siti pericolosi', category: 'settings',
+      desc: 'Un sito pericoloso (in lista per phishing o malware, o che imita un marchio e chiede la password) o sospetto viene coperto da un avviso appena si apre, prima che finisca di caricarsi. L\'avviso sta fuori dalla pagina: il sito non lo copre, non lo toglie e non sente quello che ci scrivi. Su un sito pericoloso si prosegue scrivendo «confermo», su uno sospetto con «Continua»; la scelta vale per quel sito in quella scheda finché resta aperta.',
+      invoke: 'Compare da solo. Tasto destro sull\'avviso: «Chiedi a Filo di questo sito» (apre una chat nuova con la domanda), «Segnala un falso allarme» (apre «Invia feedback» già scritto), «Copia l\'indirizzo», «Torna indietro». Impostazioni → Sicurezza → «Avvisa sui siti pericolosi».',
+      doesNot: 'Non blocca la navigazione e non chiude la scheda: la pagina carica sotto l\'avviso.',
+    },
+    {
       id: 'cookie-banners', title: 'Banner dei cookie rifiutati da soli', category: 'settings',
       desc: 'In modalità Automatico e Privacy Filo rifiuta da solo i banner dei cookie, anche quando stanno in un riquadro dentro la pagina. Quelli che non hanno un «rifiuta» (solo «Accetta», o «accetta o abbonati») li nasconde, senza accettare niente, e se la pagina era rimasta ferma o scurita la sblocca. Dove il sito lo dice, controlla che il rifiuto sia stato registrato davvero.',
       invoke: 'Da solo, a ogni pagina. Il tasto destro sulla scheda dice cosa è successo su quel sito («Cookie non necessari rifiutati» o «Banner dei cookie nascosto»), anche tornandoci dopo in un\'altra scheda o dopo un riavvio, e offre «Mostra il banner dei cookie» per rivederlo; sullo stesso menu «Rifiuta i cookie in automatico qui» torna indietro. In Impostazioni → Sicurezza si vedono tutti e due gli elenchi: i siti coi banner visibili («Rifiuta in automatico») e quelli dove Filo ha rifiutato o nascosto («Mostra il banner»).',

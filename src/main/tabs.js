@@ -1540,6 +1540,7 @@ class TabManager {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
     if (this.activeId !== id) this.activate(id);
+    if (this.avvisoSito.coperta() === tab) { this._sbScelta(tab, 'chiedi'); return; }
     try {
       tab.view.webContents.send('shortcut:triggered', {
         command: 'open-help-sidebar',

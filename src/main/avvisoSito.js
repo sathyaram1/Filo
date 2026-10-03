@@ -5,8 +5,6 @@
 const path = require('node:path');
 
 const LIVELLI = new Set(['pericoloso', 'sospetto']);
-// Il fondo è della vista, non della sua pagina: copre la scheda anche mentre la pagina dell'avviso si carica.
-const FONDO = { pericoloso: 'rgba(40, 6, 6, 0.94)', sospetto: 'rgba(40, 20, 6, 0.86)' };
 const SCELTE = new Set(['procedi', 'continua', 'indietro']);
 
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
@@ -14,7 +12,7 @@ const coord = (v) => Math.max(-10000, Math.min(10000, Math.round(Number(v) || 0)
 
 class AvvisoSito {
   // schedaAttiva: la scheda del TabManager in primo piano (o null). scegli(tab, scelta, dati): un pulsante o una voce
-  // del tasto destro. restituisciTastiera: a avviso tolto, i tasti tornano a chi li riceveva prima.
+  // del tasto destro. restituisciTastiera: tolto l'avviso, i tasti tornano alla scheda attiva.
   constructor(win, { schedaAttiva = () => null, scegli = () => {}, menu = () => [], restituisciTastiera = () => {} } = {}) {
     this.win = win;
     this.schedaAttiva = schedaAttiva;
@@ -25,9 +23,10 @@ class AvvisoSito {
     this.pronta = false;
     this.su = null;
     this.inviato = null;
-    this.fondo = '';
     this.nascosta = false;
     if (win && typeof win.once === 'function') win.once('closed', () => this._butta());
+    // La finestra che torna in primo piano (un menu chiuso, un'altra app) ridà la tastiera all'avviso a schermo.
+    if (win && typeof win.on === 'function') win.on('focus', () => setTimeout(() => this.prendiTastiera(), 0));
   }
 
   // La scheda che l'avviso copre adesso, o null.
@@ -46,11 +45,10 @@ class AvvisoSito {
   // Chiamata dal layout delle schede e a ogni verdetto.
   posa() {
     const tab = this._daCoprire();
-    if (!tab) { this._togli(); return; }
+    // Nascosto sotto un menu della barra, l'avviso non rende la tastiera: la pagina sotto la riprenderebbe.
+    if (!tab) { this._togli(!this.nascosta); return; }
     const vista = this._vista();
     if (!vista) return;
-    const fondo = FONDO[tab.sbAvviso.level];
-    if (fondo !== this.fondo) { vista.setBackgroundColor(fondo); this.fondo = fondo; }
     vista.setBounds(tab.view.getBounds());
     this._inCima();
     vista.setVisible(true);
@@ -80,7 +78,7 @@ class AvvisoSito {
     return b.width > 0 && b.height > 0 ? tab : null;
   }
 
-  _togli() {
+  _togli(restituisci) {
     const era = this.su;
     this.su = null;
     const vista = this.vista;
@@ -89,7 +87,7 @@ class AvvisoSito {
     try { aveva = require('electron').webContents.getFocusedWebContents() === vista.webContents; } catch (_) {}
     vista.setVisible(false);
     vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
-    if (era && aveva) this.restituisciTastiera();
+    if (era && aveva && restituisci) this.restituisciTastiera();
   }
 
   // Ogni scheda nuova entra in cima alle viste della finestra: l'avviso deve tornarle sopra.
@@ -157,11 +155,13 @@ class AvvisoSito {
         backgroundThrottling: false,
       },
     });
+    // Il fondo scuro lo disegna la sua pagina: quello della vista non si vede sopra un'altra vista. Mentre la pagina si
+    // carica la scheda resta visibile, ma clic e tasti sono già della vista.
+    vista.setBackgroundColor('#00000000');
     vista.setVisible(false);
     this.vista = vista;
     this.pronta = false;
     this.inviato = null;
-    this.fondo = '';
     const wc = vista.webContents;
     wc.setWindowOpenHandler(() => ({ action: 'deny' }));
     wc.on('will-navigate', (e) => e.preventDefault());
@@ -196,4 +196,4 @@ class AvvisoSito {
   }
 }
 
-module.exports = { AvvisoSito, FONDO };
+module.exports = { AvvisoSito };
