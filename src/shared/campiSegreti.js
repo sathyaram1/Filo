@@ -119,7 +119,7 @@
       if (!el || el.nodeType !== 1 || !CAMPO_CON_VALORE.test(el.tagName)) return false;
       const tipo = String(el.getAttribute('type') || '').toLowerCase();
       if (el.tagName === 'INPUT' && INPUT_BOTTONE.test(tipo)) return false;
-      if (copertoAschermo(el)) return true;
+      if (copertoAschermo(el) || eranoCoperti.has(el)) return true;
       if (AUTOCOMPLETE_SEGRETO.test(String(el.getAttribute('autocomplete') || ''))) return true;
       const nomi = ['aria-label', 'placeholder', 'name', 'id', 'title'].map((a) => el.getAttribute(a) || '');
       nomi.push(etichettaCollegata(el));
