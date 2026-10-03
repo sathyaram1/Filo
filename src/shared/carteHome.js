@@ -122,8 +122,8 @@
       return fine({ ...prima, destra: prima.destra.filter((x) => x !== id), tolte: [...prima.tolte, id] });
     }
     if (tipo === 'aggiungi') {
-      const dopo = m.verso ? primaDa([...prima.destra, id], id, m.verso) : rif;
-      return fine({ ...prima, destra: inserisci(prima.destra, id, dopo === id ? null : dopo), tolte: prima.tolte.filter((x) => x !== id) });
+      const dove = m.verso === 'cima' ? prima.destra.filter((x) => x !== id)[0] ?? null : rif;
+      return fine({ ...prima, destra: inserisci(prima.destra, id, dove), tolte: prima.tolte.filter((x) => x !== id) });
     }
     if (tipo === 'sposta') {
       if (!prima.destra.includes(id)) return fine(prima, 'la carta non è fra quelle a destra: prima va rimessa');
