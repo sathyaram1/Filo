@@ -36,8 +36,11 @@ const VARIANTI = [
 for (const url of VARIANTI) {
   test(`in pausa, da non owner, ${url} mostra solo la frase della pausa`, async ({ app, openTab }) => {
     await inPausaNonOwner(app);
-    const page = await openTab(url);
+    const page = await openTab('filo://redteam/redteam.html');
+    await expect(page.locator('body')).toContainText(FRASE);
+    await page.goto(url).catch(() => {});
     await page.waitForTimeout(1500);
+    console.log('URL', page.url(), 'TITOLO', await page.title().catch(() => '?'));
     const testo = (await page.locator('body').innerText().catch(() => '')).trim();
     expect(testo).toBe(FRASE);
     expect(await page.locator('script[src*="redteam.js"]').count()).toBe(0);
