@@ -38,21 +38,23 @@ test('il ritorno «richiede lavoro locale» dice la cosa giusta per ogni mittent
   const page = await openTab(MANAGE);
   await apri(page, ritorni, 'inbox');
   const item = (n) => page.locator('.mg-item', { hasText: `#${n}` });
+  // La frase sta nel pannello della prima forma, il filtro d’ingresso.
+  const apriPratica = async (n) => { await item(n).click(); await page.getByRole('button', { name: 'Filtro d’ingresso' }).click(); };
   await expect(page.locator('.mg-item')).toHaveCount(4);
 
-  await item(9001).click();
+  await apriPratica(9001);
   await expect(page.locator('body')).toContainText('con «Solo lavoro locale» la prende una sessione sulla tua macchina');
   await expect(page.locator('body')).not.toContainText('in locale i feedback degli utenti non si lavorano');
   if (OUT) await page.screenshot({ path: `${OUT}/g2-owner-locale.png` });
 
-  await item(9002).click();
+  await apriPratica(9002);
   await expect(page.locator('body')).toContainText('l’ha aperto una routine e non si segna solo in locale');
   if (OUT) await page.screenshot({ path: `${OUT}/g2-routine-locale.png` });
 
-  await item(9003).click();
+  await apriPratica(9003);
   await expect(page.locator('body')).toContainText('in locale i feedback degli utenti non si lavorano');
 
-  await item(9004).click();
+  await apriPratica(9004);
   await expect(page.locator('body')).toContainText('Aperto da una routine, con la prova del server. I giudici non servono.');
   if (OUT) await page.screenshot({ path: `${OUT}/g2-derivato.png` });
 });
