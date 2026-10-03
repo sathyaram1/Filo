@@ -203,3 +203,19 @@ test('#913: tolto il segno, il sì dell’owner resta e il segno si rimette, anc
   const fb = { clientId: 'utente-7', status: 'todo', statusPublic: 'open', localApproval: SI };
   assert.equal(MR.localSignCheck(fb, true).ok, true, MR.localSignCheck(fb, true).motivo);
 });
+
+test('#913: fuso sopra L5 per il sì dell’owner, la riga del finish e Automazioni lo dicono; la prova resta prova', async () => {
+  const OM = await import(pathToFileURL(join(ROOT, 'scripts', 'lib', 'owner-merge.mjs')).href);
+  require(join(ROOT, 'src', 'shared', 'mergeApprovals.js'));
+  const MA = globalThis.SN_MERGE_APPROVALS;
+  const riga = (local) => OM.messageForOwnerMerge(OM.classifyOwnerMerge(200, {
+    result: { ok: true, result: 'merged', sha: 'b'.repeat(40), local: { feedbackId: 'f', eligible: true, num: '#950', skippedL5: true, blocks: [], record: 'r', closed: true, ...local } },
+  }), 'claude/x', { feedbackNum: '950', feedbackId: 'f' });
+  assert.match(riga({ approvato: true }), /L5 saltato: lavoro locale di #950, feedback di un utente che hai approvato/);
+  assert.doesNotMatch(riga({ approvato: true }), /mittente provato/);
+  assert.match(riga({}), /mittente provato/);
+  const approvato = MA.skippedL5Hint({ skippedL5: true, localApproved: true, preapprovedBy: 'owner@esempio' });
+  assert.match(approvato, /approvato come lavoro locale da owner@esempio/);
+  assert.doesNotMatch(approvato, /prova del mittente/);
+  assert.match(MA.skippedL5Hint({ skippedL5: true }), /prova del mittente/);
+});
