@@ -234,6 +234,8 @@
         head.title = open ? 'Nascondi' : 'Mostra cosa ha fatto Filo';
       },
       remove() { wrap.remove(); },
+      // Il blocco sta subito sotto la bolla dell'utente che l'ha chiesto: da qui la si ritrova.
+      el: wrap,
     };
   }
 
@@ -886,7 +888,7 @@
         // il MODELLO al turno dopo — l'oggetto è lo stesso che sta nello
         // storico della conversazione, quindi basta segnarlo qui. Senza,
         // a «l'hai attivato?» il modello poteva solo tirare a indovinare.
-        if (r && r.executed) segnaConfermata(a, r.output, activity);
+        if (r && r.executed) segnaConfermata(a, r.output, activity, r.cambi);
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
           segnaComando((r && r.executed) ? '✓' : '✗');
@@ -1053,15 +1055,20 @@
 
   // Confermata e fatta: lo sanno il diario e, al turno dopo, il modello (è lo
   // stesso oggetto che sta nello storico della conversazione).
-  function segnaConfermata(a, output, activity) {
+  function segnaConfermata(a, output, activity, cambi) {
     a._confirmed = true;
     a._executed = true;
     delete a._confirm;
     if (output) a._output = output;
+    const ids = Array.isArray(cambi) ? cambi : [];
+    if (ids.length) {
+      a._cambi = ids;
+      if (activity && activity.el && global.SN_DASH_CAMBI) global.SN_DASH_CAMBI.segna(activity.el, ids);
+    }
     const row = activityRowFor(a);
     if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
     // L'archivio delle chat ha salvato il turno senza le azioni in attesa: questa adesso è successa.
-    try { archiviaAzione(String(a.type || '').toUpperCase()); } catch (_) {}
+    try { archiviaAzione(String(a.type || '').toUpperCase(), ids.map((c) => c.id)); } catch (_) {}
   }
 
   // La pulizia parte SOLO al click, con conferma, mai da sola (spec §2.1).

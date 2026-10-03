@@ -69,11 +69,15 @@
     // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
     paroleUtente: () => paroleUtente(),
     apriProposta: (url, vicino) => apriProposta(url, vicino),
-    archiviaAzione: (type) => {
+    archiviaAzione: (type, cambi) => {
       const id = chatDellaRiga();
-      if (id) { try { send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type] }); } catch (_) {} }
+      const ids = Array.isArray(cambi) ? cambi : [];
+      if (id) { try { send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type], ...(ids.length ? { cambi: ids } : {}) }); } catch (_) {} }
     },
   });
+  // #867 — il segno sulla bolla dell'utente per i cambi di stato che il suo messaggio ha chiesto.
+  const Cambi = self.SN_DASH_CAMBI;
+  Cambi.init({ send });
   // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
   if (window.filo?.onAperturaFermata) {
     window.filo.onAperturaFermata((data) => {
@@ -354,13 +358,18 @@
     threadHistory = [];
     bubblesEl.innerHTML = '';
     goThread();
+    let bollaUtente = null;
     for (const m of chat.messages) {
       const isUser = m.role === 'user';
       const text = String(m.text || '');
       const types = Array.isArray(m.actions) ? m.actions : [];
       if (text.trim()) {
-        bubblesEl.appendChild(makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser }));
+        const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
+        bubblesEl.appendChild(b);
+        if (isUser) bollaUtente = b;
       }
+      // I cambi chiesti con quel messaggio ritrovano il loro segno, col loro stato di adesso.
+      if (!isUser && Array.isArray(m.cambi) && m.cambi.length && bollaUtente) Cambi.segna(bollaUtente, m.cambi);
       // Le immagini incollate non stanno nell'archivio (sono data URL da
       // centinaia di KB l'una), ma il loro NUMERO sì: va detto. Senza, chi
       // rilegge trova «cosa vedi in questo grafico?» riferito al nulla e non
@@ -913,6 +922,7 @@
           pending.working(startLabelFor(data.type));
         } else if (data.kind === 'done') {
           const a = data.action;
+          if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
           if (a && data.kept !== false && Att.tellActionInActivity(pending, a) && a._callId) shown.add(a._callId);
         } else if (data.kind === 'round') {
           if (streamBubble) {
@@ -942,6 +952,10 @@
       msg.images = images;
     }
     const r = await send(msg);
+    // Anche quelle arrivate senza evento in diretta (o con un guasto dopo): il segno non dipende dalla diretta.
+    for (const a of (Array.isArray(r?.actions) ? r.actions : [])) {
+      if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
+    }
 
     if (offReasoning) { try { offReasoning(); } catch (_) {} }
     if (offAnswer) { try { offAnswer(); } catch (_) {} }

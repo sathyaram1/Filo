@@ -256,7 +256,11 @@ module.exports = function register(on, ctx) {
     const role = msg.role === 'user' ? 'user' : 'filo';
     // L'esito di un comando lanciato a mano l'ha scritto il comando: riaperta, la chat lo tratta da letto (#810).
     const esterno = role === 'filo' && msg.esterno === 'comando' ? "dall'output di un comando" : '';
-    await FiloChats.append(id, { role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}) });
+    // I cambi di stato di un'azione confermata dopo il turno (#867): riaperta, la bolla ritrova il segno.
+    const cambi = (Array.isArray(msg.cambi) ? msg.cambi : []).filter((c) => typeof c === 'string');
+    await FiloChats.append(id, {
+      role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
+    });
     return { ok: true };
   });
 
