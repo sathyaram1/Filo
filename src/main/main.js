@@ -268,6 +268,8 @@ app.whenReady().then(async () => {
   // di finire una conversazione, quindi senza questo giro la chat più comune
   // di tutte resterebbe senza nome in cronologia. In sottofondo: non blocca
   // l'avvio, e se il modello non c'è si riprova alla partenza dopo.
+  // #866 — il filo si legge adesso, e alla prima partenza dopo l'aggiornamento le chat salvate diventano segmenti.
+  try { require('./services/ilFilo').carica().catch(() => {}); } catch (_) {}
   try { require('./services/handlers').sweepPendingChats().catch(() => {}); } catch (_) {}
 
   // Sveglie e timer (#322): controlla nel main le scadenze arrivate, mostra la
