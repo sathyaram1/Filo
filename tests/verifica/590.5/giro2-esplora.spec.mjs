@@ -19,7 +19,7 @@ async function ctrlW(app) {
 async function chiudiColMouse(app) {
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    w._filoTabs.shellView.webContents.focus();
+    (w._filoTabs.shellView ? w._filoTabs.shellView.webContents : w.webContents).focus();
   });
   await new Promise((r) => setTimeout(r, 80));
   await app.evaluate(({ BrowserWindow }) => {
