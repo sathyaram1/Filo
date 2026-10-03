@@ -35,8 +35,8 @@
   let aiPrefersOpen = false;
   let docClickHandler = null;
 
-  // Telemetria sessione: viene inviata a fine task (status:"done" + 👍/👎) per
-  // arricchire il database globale dei percorsi (vedi pathsCollector.js).
+  // Telemetria sessione per la raccolta dei percorsi (pathsCollector.js), che
+  // oggi è spenta: il riquadro con pollice su/giù non compare e niente esce.
   // Tutto qui resta locale finché l'utente non clicca pollice su/giù.
   // executedSteps contiene SOLO le azioni effettivamente eseguite dall'utente
   // (o auto-action reveal/hover andate a buon fine), niente value di fill.
@@ -393,9 +393,8 @@
   //
   // Render del riquadrino "Ha funzionato?" che appare in chat quando l'AI
   // dichiara conclusa la sessione (status:"done") e l'utente ha eseguito
-  // almeno un'azione. Le risposte alimentano la collection `paths` su
-  // Firestore via SAVE_PATH (vedi pathsCollector.js per la pipeline di
-  // sanitizzazione 2-LLM).
+  // almeno un'azione, solo a raccolta accesa (RACCOLTA_ACCESA in
+  // pathsCollector.js, oggi spenta). Le risposte partono via SAVE_PATH.
   function renderFeedbackPrompt() {
     const conv = convEl();
     if (!conv) return;
@@ -415,7 +414,7 @@
     // modello guarda il resto e blocca tutto il percorso se ci riconosce una
     // persona. Prometteva «senza il tuo nome» quando quel modello, di fatto,
     // non vedeva niente di quello che stava per uscire (#584, terzo giro).
-    nota.textContent = 'Rispondendo condividi i passi di questo percorso con chi userà Filo su questo sito. Filo toglie prima i dati personali e l’ora; se resta qualcosa che dice chi sei, non lo pubblica.';
+    nota.textContent = 'Rispondendo condividi i passi di questo percorso in una raccolta che chiunque può leggere. Filo toglie prima i dati personali e l’ora; se resta qualcosa che dice chi sei, non lo pubblica.';
     wrap.appendChild(nota);
     const row = document.createElement('div');
     row.className = 'sn-sidebar-feedback-row';
@@ -1262,9 +1261,9 @@
         session.feedbackShown = true;
         // …e solo se da qui partirebbe davvero qualcosa. Da un server di prova,
         // dall'intranet, dal disco di rete e dalle pagine interne di Filo non
-        // si raccoglie niente (#584, sesto giro): chiedere lì vuol dire
-        // promettere una condivisione che non avviene e ringraziare per una
-        // risposta che non serve a nessuno. La domanda la fa il processo
+        // si raccoglie niente (#584, sesto giro), e a raccolta spenta da
+        // nessuna parte (#897): chiedere lì vuol dire promettere una
+        // condivisione che non avviene. La domanda la fa il processo
         // principale, con la stessa porta che usa la raccolta.
         if (await percorsoRaccoglibile()) {
           // Chat sempre aperta quando chiediamo feedback (l'utente deve vederlo).

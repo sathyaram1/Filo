@@ -34,10 +34,8 @@ password — la sicurezza è un requisito di design, non un'aggiunta successiva.
 - **I feedback che invii** (testo + eventuali screenshot) vengono salvati sui
   nostri server per permetterci di correggere i bug. Non includere in un
   feedback informazioni che non vuoi condividere.
-- **Quando l'Aiuto ti guida su un sito** e alla fine dici che ha funzionato,
-  salviamo la traccia della navigazione (il sito, i passaggi, una frase
-  sull'obiettivo) perché aiuti anche gli altri. Non ci finiscono i tuoi
-  messaggi, né niente che ti identifichi.
+- **Quando l'Aiuto ti guida su un sito**, i passi che fai restano sul tuo
+  computer: per ora Filo non li raccoglie e non li manda a nessuno (vedi §8).
 - **Trasparenza:** questa pagina elenca esattamente cosa raccogliamo e cosa
   no. Se qualcosa cambia, cambia anche qui.
 
@@ -212,18 +210,20 @@ I server applicano regole precise (Firebase Security Rules):
   quel collegamento se finisce in giro. Prima bastava il nome del deposito, che
   è scritto nel codice, per scaricarli tutti.
 
-C'è una seconda raccolta aperta a tutti, e va detto perché. Quando l'assistente
-ti aiuta a fare qualcosa su un sito, Filo può tenere da parte come ci è
-riuscito: il dominio, il percorso della pagina da cui si parte (senza la parte
-dopo il punto interrogativo), una riga che riassume l'obiettivo, riscritta da un
-modello e scartata se non è generica, i nomi degli elementi toccati e se la cosa
-è riuscita. Serve a tutte le installazioni, che la rileggono per
-il sito che hanno davanti, e per questo si legge senza credenziali. Lì dentro
-non c'è niente che dica da quale installazione arriva: nessun identificativo,
-nessun account, nemmeno la versione di Filo che l'ha raccolto. Le cose scritte
-qui sopra sono tutte quelle che partono, e non ce ne sono altre.
-Da settembre 2026 quei documenti non li scrive più il client: li scrive il
-server, che rifà la pulizia e tiene i limiti di frequenza.
+C'è una seconda raccolta che si legge senza credenziali, quella dei percorsi
+dell'Aiuto, e va detto perché. Per ora non ci entra niente di tuo: la raccolta
+dei percorsi è spenta (§8) e i passi delle tue sessioni non escono dal computer.
+Quando sarà riaccesa, Filo potrà tenere da parte come l'assistente ti ha aiutato
+a fare qualcosa su un sito: il dominio, il percorso della pagina da cui si parte
+(senza la parte dopo il punto interrogativo), una riga che riassume l'obiettivo,
+riscritta da un modello e scartata se non è generica, i nomi degli elementi
+toccati e se la cosa è riuscita. Ogni installazione rilegge i percorsi del sito
+che ha davanti, e per questo la lettura è aperta. Lì dentro non ci sarà niente
+che dica da quale installazione arriva: nessun identificativo, nessun account,
+nemmeno la versione di Filo che l'ha raccolto. Le cose scritte qui sopra saranno
+tutte quelle che partono, e non ce ne saranno altre. Quei documenti non li
+scriverà il client ma il server, che rifà la pulizia e tiene i limiti di
+frequenza.
 
 La sicurezza qui non sta nel nascondere la chiave API di Firebase (che, come in
 tutti i progetti Firebase, è pubblica per design e visibile nel client): sta
@@ -283,20 +283,24 @@ lavoro di migrazione dei documenti storici, e si fa insieme.
 
 ## 8. I percorsi condivisi dell'Aiuto
 
-**Stato: 🔜 — la porta è chiusa, la strada nuova non è ancora aperta.** Le
-regole non lasciano più scrivere nessun client, e in lettura i percorsi sono
-già trattati come contenuto esterno. Manca la callable `pathSubmit`: oggi
-l'indirizzo risponde che non esiste, quindi nessun percorso entra più nella
-raccolta e ogni invio fallisce senza lasciare traccia fuori dalla console.
-Va sciolto prima di pubblicare una versione, o la raccolta resta ferma e non
-se ne accorge nessuno.
+**Stato: 💭 — raccolta spenta fino a dopo il lancio.** Per ora i passi delle
+tue sessioni non escono dal computer: l'Aiuto non chiede «Ha funzionato?», non
+paga nessun modello per ripulirli, e i percorsi che una versione precedente
+aveva lasciato in coda si buttano al primo avvio senza spedirli. Per
+riaccenderla manca la callable `pathSubmit`, la funzione del server che riceve i
+percorsi: oggi l'indirizzo risponde che non esiste. La raccolta si accende e si
+spegne da un interruttore solo, e chi scrive `pathSubmit` lo riaccende nello
+stesso lavoro. La lettura resta com'è: l'Aiuto chiede i percorsi del sito che ha
+davanti e li tratta come contenuto esterno (in fondo a questa sezione). Le
+regole non lasciano scrivere nessun client.
 
-Quando l'Aiuto ti accompagna passo passo su un sito e alla fine rispondi «ha
-funzionato», Filo può salvare la traccia di quella navigazione. Dentro ci sono
-il dominio, la sezione di partenza, la sequenza di elementi toccati e una frase
-che riassume l'obiettivo, scritta da un modello che vede solo dati
-programmatici. Serve a far partire avvantaggiato chi cercherà la stessa cosa su
-quel sito.
+Quello che segue descrive la raccolta com'è costruita, cioè come ripartirà.
+
+A raccolta accesa, quando l'Aiuto ti accompagna passo passo su un sito e alla
+fine rispondi a «Ha funzionato?», Filo può salvare la traccia di quella
+navigazione. Dentro ci sono il dominio, la sezione di partenza, la sequenza di
+elementi toccati e una frase che riassume l'obiettivo, scritta da un modello che
+vede solo dati programmatici.
 
 Prima di partire, da tutti e tre (elementi toccati, sezione di partenza, frase
 dell'obiettivo) vengono cancellati i dati che identificano una persona:
@@ -318,10 +322,10 @@ macchina; `.test`, che è il progetto in lavorazione e spesso porta il nome di u
 cliente; `.invalid`, `.example`) e le reti anonime (`.onion`, `.alt`, `.i2p`),
 dove il nome del sito è il segreto. Il punto finale della forma assoluta si
 toglie prima di guardare, o `localhost.` passerebbe dove `localhost` non passa.
-Lì un percorso non serve comunque a nessun altro, e il nome direbbe come si
-chiama la tua macchina o per chi lavori. Dove non si raccoglie, l'Aiuto non
-chiede nemmeno «Ha funzionato?»: una promessa di condivisione che non si avvera
-è peggio del silenzio. La seconda: su tutti gli altri decide il secondo
+Lì il nome direbbe come si chiama la tua macchina o per chi lavori. Dove non si
+raccoglie, l'Aiuto non chiede nemmeno «Ha funzionato?», ed è lo stesso motivo
+per cui oggi non lo chiede da nessuna parte: una promessa di condivisione che
+non si avvera è peggio del silenzio. La seconda: su tutti gli altri decide il secondo
 modello, che il nome del sito ce l'ha davanti insieme al resto e sa che
 `mariorossi.github.io` dice di chi è il sito, non cos'è.
 
@@ -363,8 +367,8 @@ E non basta: su ogni documento Firestore scrive da sé l'ora di creazione, al
 microsecondo, e la rimanda a chiunque legga. Non c'è regola che la tolga. Due
 percorsi arrivati su due siti diversi a meno di un secondo l'uno dall'altro
 sono della stessa persona nella stessa sessione — la chiave che togliere
-l'identificativo doveva eliminare, rifatta con l'orologio. Quindi Filo **non
-spedisce un percorso quando lo fai**: lo tiene sul tuo computer e lo manda più
+l'identificativo doveva eliminare, rifatta con l'orologio. Quindi, a raccolta
+accesa, Filo **non spedisce un percorso quando lo fai**: lo tiene sul tuo computer e lo manda più
 tardi, a un'ora sorteggiata nelle ventiquattr'ore successive, uno alla volta.
 Due percorsi della stessa sessione partono a ore di distanza, in ordine
 qualsiasi, mescolati a quelli di tutti gli altri.
@@ -376,13 +380,15 @@ dalla console, o niente. Prima di partire invece è ancora sul computer di chi
 l'ha fatto, per ore, e lì un modo di toglierlo sarebbe possibile: oggi non c'è
 e la scelta è dell'owner (segnalata con #584, sesto giro).
 
-È l'unico dato di Filo che attraversa il confine fra utenti. Quello che salvi tu
-finisce nel prompt dell'Aiuto di un altro, quindi valgono due regole insieme.
+È l'unico dato di Filo fatto per attraversare il confine fra utenti: a raccolta
+accesa, quello che salvi tu finisce nel prompt dell'Aiuto di un altro. Quindi
+valgono due regole insieme.
 
 **In scrittura non scrive nessun client.** Le regole Firestore negano create,
 update e delete su `paths` a chiunque. Un percorso entra solo attraverso la
-Cloud Function `pathSubmit` del backend di sicurezza, che riapplica la pulizia
-condivisa e tiene i limiti di frequenza. Prima bastavano dei vincoli di forma, e
+Cloud Function `pathSubmit` del backend di sicurezza (ancora da scrivere: vedi
+lo stato in cima a questa sezione), che riapplica la pulizia condivisa e tiene i
+limiti di frequenza. Prima bastavano dei vincoli di forma, e
 la chiave web di Firebase è pubblica per design: chiunque poteva depositare un
 «percorso» per il dominio che voleva, saltando i due modelli che nell'app
 ripuliscono i percorsi. Nessuna regola se ne può accorgere, perché quei modelli
