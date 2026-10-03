@@ -141,6 +141,23 @@ test('Conservativo: dopo una ricerca chiede anche un timer; i no dell’elenco f
   expect(await livello(app)).toBe('conservativo');
 });
 
+test('Conservativo: il no della tabella non dice «a nessun livello», dice cosa ha letto e le strade', async ({ app }) => {
+  await home(app);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' }, terminal: { enabled: true } }));
+  const comando = { type: 'ESEGUI_COMANDO', comando: 'rm prova-inesistente-530.txt' };
+  const r = await execAction(app, comando, { contesto: [ricercaFatta] });
+  expect(r.executed).toBe(false);
+  expect(r.no).toBe(true);
+  expect(r.error).not.toMatch(/nessun livello|elenco fisso/);
+  expect(r.error).toContain('ho fatto una ricerca sul web');
+  expect(r.error).toMatch(/conversazione nuova/);
+  expect(r.error).toMatch(/Preferenze/);
+  expect(r.output.error).toMatch(/Conservativo.*ricerca sul web.*conversazione nuova.*Preferenze/s);
+  // È davvero una strada: in una conversazione che non ha letto niente lo stesso comando chiede un OK.
+  const nuova = await execAction(app, comando);
+  expect(nuova.needsConfirm).toBe(2);
+});
+
 test('chat: un documento letto dal disco fa chiedere la lezione, e il popup dice cosa ha letto', async ({ app }) => {
   const casa = cartellaInCasa('filo-autonomia-');
   const doc = join(casa, 'istruzioni.txt');
