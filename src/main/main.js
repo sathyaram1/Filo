@@ -213,6 +213,7 @@ app.whenReady().then(async () => {
     // blocco alla sessione di default, carica la cache e — se attivo e stantia —
     // avvia un refresh in background. Non blocca l'avvio.
     try { await require('./services/adblock').init(s); } catch (_) {}
+    try { require('./services/adSkip').configureFromSettings(s); } catch (_) {}
     // EasyList Cookie (banner da nascondere): cache su disco e aggiornamento settimanale in sottofondo.
     require('./services/cookieBanners').init(s).catch(() => {});
     // Cosa Filo ha fatto coi banner dei singoli siti: il menu della scheda lo mostra anche alla visita dopo.

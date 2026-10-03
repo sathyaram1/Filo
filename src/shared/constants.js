@@ -2375,6 +2375,10 @@
       adblock: {
         enabled: true,
       },
+      // #737 — il «Salta» delle pubblicità dei video premuto appena compare. Vedi src/content/adSkip.js.
+      adSkip: {
+        enabled: true,
+      },
       // Blocco apertura siti in blacklist (#170.3). A differenza dell'ad-block
       // (che annulla le singole richieste), qui si BLOCCA l'apertura della
       // pagina top-level di un sito in blacklist, da qualunque provenienza (#590):

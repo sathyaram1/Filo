@@ -37,6 +37,7 @@ const CAMPI_WEB_SCRITTURA = Object.freeze({
 const SPINTE_WEB = Object.freeze(new Set([
   'settings_updated',
   'cookies_config_update',
+  'ad_skip_config_update',
   'feedback_draw_state',
   'show_toast',
   'tts_global_reading',

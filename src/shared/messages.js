@@ -630,6 +630,16 @@
     // Solo pagine filo:// (Sicurezza): «Apri da un altro paese» ha un fornitore? E con quale host.
     PROXY_STATUS: 'proxy_status',                   // {} → { ok, configured, providerHost }
 
+    // === Pubblicità dei video da saltare (#737, src/content/adSkip.js) ===
+    // Aperti alle pagine web di proposito: li chiede il content script di ogni frame, e non portano dati dell'utente.
+    // `clicVero` dice se questo frame può chiedere il clic vero: solo il frame principale di una scheda su YouTube.
+    AD_SKIP_CONFIG: 'ad_skip_config',               // {} → { ok, enabled, clicVero }
+    // Il «Salta» premuto dal main con un clic vero nel punto dato (px CSS del riquadro visibile); il main ricontrolla
+    // interruttore, frame e sito, e ne dà uno ogni 800 ms per scheda.
+    AD_SKIP_CLICK: 'ad_skip_click',                 // { x, y } → { ok, code? }
+    // Broadcast main→content quando l'interruttore cambia: il content rilegge la config.
+    AD_SKIP_CONFIG_UPDATE: 'ad_skip_config_update',
+
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai
     // esposti alle pagine. La risposta porta solo il profilo pubblico.
