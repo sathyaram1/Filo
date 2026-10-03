@@ -71,7 +71,7 @@
       // #602 — una voce che aspetta solo di essere ANNUNCIATA (non partirà
       // mai): si persiste come le altre, così l'avviso sopravvive a un riavvio.
       rinuncia: !!it.rinuncia, motivoRinuncia: it.motivoRinuncia || '',
-      attesaAccesso: !!it.attesaAccesso, avvisatoAccesso: !!it.avvisatoAccesso,
+      attesaAccesso: !!it.attesaAccesso, avvisatoAccesso: it.avvisatoAccesso || '',
     };
   }
 
