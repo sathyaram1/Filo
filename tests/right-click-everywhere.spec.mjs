@@ -37,7 +37,7 @@ for (const [name, url, clickSelector] of [
   ['options',    'filo://options/options.html',       'body'],
   ['security',   'filo://security/security.html',     'body'],
   ['history',    'filo://history/history.html',       'body'],
-  ['feedback',   'filo://feedback/feedback.html',     'body'],
+  ['manage',     'filo://manage/manage.html',         'body'],
   ['spellcheck', 'filo://spellcheck/spellcheck.html', 'body'],
   ['editor',     'filo://editor/editor.html',         'body'],
 ]) {
