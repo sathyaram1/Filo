@@ -36,8 +36,8 @@ silenzio, su una segnalazione che nessuno aveva scelto (#509).
   l'elenco mentre la mano dell'utente è ancora lì. Serve anche nel ramo
   d'errore, o il ripristino rimescola la lista esattamente come il successo.
 - **Dove:** `azioneScheda` / `spegniScheda` / `marcaDecisa` / `bindCardActions`
-  e l'opzione `inPlace` di `patch()` in `src/pages/feedback/feedback.js`; la
-  gemella `src/pages/manage/manage.js` non ha il problema perché l'azione vive
+  e l'opzione `inPlace` di `patch()` nella vecchia pagina dei feedback, tolta;
+  `src/pages/manage/manage.js` non ha il problema perché l'azione vive
   in un pannello fermo e riguarda la scheda selezionata. Test:
   `tests/feedback-doppio-clic.spec.mjs` (clicca due volte alle STESSE
   coordinate con `page.mouse.click`, non sul locator: un locator seguirebbe il

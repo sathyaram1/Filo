@@ -98,10 +98,8 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
 - **Dove:** `manageTabCounts` in `src/shared/manageReview.js`; il tetto e la
   sua resa onesta (`LIST_PAGE_SIZE`, `listHitCap`, `countLabel`,
   `COUNT_CAP_HINT`) in `src/shared/feedback.js`; `updateTabCounts()` /
-  `setListHead()` in `src/pages/manage/manage.js` (`.mg-tab-count`),
-  `updateTabCounts()` in `src/pages/feedback/feedback.js`. I flag di onestà:
-  `dataLoaded`/`loadFailed` in `manage.js`, `dataLoaded`/`loadError` +
-  `showLoadError()` in `feedback.js`. Stato illeggibile: `statusUnreadable`,
+  `setListHead()` in `src/pages/manage/manage.js` (`.mg-tab-count`). I flag di
+  onestà: `dataLoaded`/`loadFailed`/`listaIncompleta` in `manage.js`. Stato illeggibile: `statusUnreadable`,
   `sectionsReliable`, `publicStateLabel`, `PUBLIC_STATE_HINT` in
   `src/shared/manageReview.js`, consumati da `sezioniAttendibili()` /
   `mostraSezioni()` in tutt'e due le pagine. Test:

@@ -40,6 +40,5 @@ alla SUA lista, il difetto stava a monte.
   `src/shared/feedbackStatus.js` (vocabolario e presentazione),
   `src/shared/manageReview.js` (`normalizeStatus`, `manageTabFor`,
   `listForManageTab`, `listArchiveTab`, `manageTabCounts`, `reasonText`);
-  consumate da `src/pages/manage/manage.js` e `src/pages/feedback/feedback.js`.
-  Test: `tests/feedback-sezioni-gemelle.spec.mjs` (apre le due pagine con la
-  stessa coda e confronta le schede una a una).
+  consumate da `src/pages/manage/manage.js` (la vecchia pagina gemella è stata
+  tolta). Test: `tests/feedback-sezioni-gemelle.spec.mjs`.

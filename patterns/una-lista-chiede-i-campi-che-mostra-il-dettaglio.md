@@ -85,7 +85,6 @@ il marchio `_proiezione` che distingue «non ce l'ha» da «non l'ho chiesto»
 (`soloLista`), `_dettaglioVecchio` per «ce l'ho ma è di prima» e
 `_dettaglioMancato` per «non è tornata»; la fusione in `applyChanges`
 (`src/shared/feedbackLive.js`); `completaDettaglio` in
-`src/pages/manage/manage.js` e `completaDettagli` in
-`src/pages/feedback/feedback.js`.
+`src/pages/manage/manage.js`.
 
 Vicino: [Una pagina dei più recenti non è tutto](una-pagina-dei-piu-recenti-non-e-tutto.md).

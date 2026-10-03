@@ -36,9 +36,7 @@ col valore salvato.
   niente da spedire dice che la riga è a destinazione, non "nessuna modifica":
   chi lo preme vuole sapere se il suo testo è arrivato.
 - **Dove:** `salvaFraseSubito`, `salvaFraseAutomatico`, `fraseAlSicuro`,
-  `applyAction` in `src/pages/manage/manage.js`; gli ascoltatori di
-  `.fb-usernote` e `.fb-notes` in `src/pages/feedback/feedback.js`, che così
-  facevano già. Test: `tests/manage-frase-non-si-perde.spec.mjs`.
+  `applyAction` in `src/pages/manage/manage.js`. Test: `tests/manage-frase-non-si-perde.spec.mjs`.
 
 ## La stessa regola quando a ridipingere è qualcosa che arriva da fuori
 

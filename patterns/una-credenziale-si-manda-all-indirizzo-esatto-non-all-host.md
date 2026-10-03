@@ -65,8 +65,7 @@ verificare l'indirizzo e restituire il contenuto; l'`href` resta `#`.
 Dove vive: `isAttachmentUrl` e `attachmentFetchHeaders` in
 `src/shared/feedback.js` (pure, una fonte sola per il main e per le pagine),
 con la guardia in `tests/unit/storageRulesAllegati.test.mjs`; il lato pagina in
-`filesListHtml`/`resolveFileLinks` di `src/pages/feedback/feedback.js`, con la
-guardia in `tests/feedback-allegato-del-mittente.spec.mjs`.
+`resolveBubbleFiles` di `src/pages/manage/manage.js`, con la guardia in `tests/feedback-allegato-del-mittente.spec.mjs`.
 
 Vicino:
 [Un permesso si concede col verbo stretto](un-permesso-si-concede-col-verbo-stretto-read-e-anche-list.md)
