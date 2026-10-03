@@ -1,4 +1,5 @@
 // Raccolta percorsi della sidebar Aiuto: pipeline di sanitizzazione + invio.
+// Oggi è SPENTA (RACCOLTA_ACCESA, qui sotto): i percorsi non escono dal computer.
 //
 // Il client (sidebar) raccoglie una sessione raw (URL iniziale, sequenza di
 // {selector, action, retracted}, messaggi raw dell'utente, esito 👍/👎) e la
@@ -58,6 +59,13 @@
   const { ACTIONS } = global.SN_CONST;
   const Paths = global.SN_PATHS;
   const Safety = global.SN_PATHS_SAFETY;
+
+  // L'interruttore della raccolta, l'unico (#897): spento fino a dopo il lancio,
+  // perché la callable `pathSubmit` che riceve i percorsi sul server non esiste.
+  // Spento: niente domanda, niente modelli, niente coda. Chi scrive `pathSubmit` lo accende.
+  const RACCOLTA_ACCESA = false;
+  const MOTIVO_SPENTA = 'raccolta dei percorsi spenta';
+  let accesa = RACCOLTA_ACCESA;
 
   // Limiti difensivi sui messaggi raw dell'utente: non escono dalla macchina
   // (li vede solo il judge, che risponde 1 bit), ma un prompt non deve poter
@@ -145,6 +153,7 @@
   const MAX_ETA_MS = 30 * 24 * 60 * 60 * 1000;    // un mese
 
   let coda = [];
+  let sulDisco = 0;         // voci lette dal disco, anche quelle scartate
   let caricamento = null;   // la lettura del disco, una sola per tutti
   let sto = false;          // un giro alla volta
   let auto = true;          // spegnibile nei test
@@ -180,6 +189,7 @@
   async function leggiDaDisco() {
     try {
       const raw = await deposito()?.getRaw?.(CHIAVE_CODA, []);
+      sulDisco = Array.isArray(raw) ? raw.length : 0;
       if (Array.isArray(raw)) {
         coda = raw
           .filter((v) => v && typeof v === 'object' && v.domain)
@@ -209,6 +219,7 @@
   }
 
   async function accoda(percorso) {
+    if (!accesa) return { id: '', spenta: true };
     await carica();
     if (coda.length >= MAX_IN_CODA) {
       console.warn(`[Filo] coda percorsi: piena (${coda.length} in attesa), il percorso nuovo non entra`);
@@ -234,6 +245,7 @@
   // Un giro: butta via gli scaduti, manda fuori UN percorso maturo, ripianifica.
   // Torna il numero di percorsi rimasti in coda.
   async function flush({ now = Date.now() } = {}) {
+    if (!accesa) { await buttaLaCoda(); return 0; }
     if (sto) return coda.length;
     sto = true;
     try {
@@ -281,12 +293,26 @@
 
   function inCoda() { return coda.length; }
 
+  // A raccolta spenta quello che una versione precedente aveva messo in coda non
+  // arriverebbe da nessuna parte: si butta, senza tentare l'invio, e lo si dice.
+  async function buttaLaCoda() {
+    await carica();
+    if (!coda.length && !sulDisco) return 0;
+    const quanti = coda.length;
+    coda = [];
+    sulDisco = 0;
+    await salva();
+    if (quanti) console.warn(`[Filo] raccolta percorsi spenta: ${quanti} percorso/i rimasto/i in coda buttato/i senza spedirli`);
+    return quanti;
+  }
+
   // All'avvio: se sul disco è rimasto qualcosa, si riparte (con una pausa, non
   // subito: un lampo di invii all'apertura sarebbe di nuovo un orario).
   function init(opzioni) {
     if (opzioni && typeof opzioni.ottieniIdToken === 'function') {
       ottieniIdToken = opzioni.ottieniIdToken;
     }
+    if (!accesa) { buttaLaCoda().catch(() => {}); return; }
     carica().then(() => {
       if (coda.length) pianifica(sorteggia(PAUSA_MIN_MS, PAUSA_MAX_MS));
     }).catch(() => {});
@@ -304,7 +330,8 @@
   // avvera è peggio del silenzio, e qui la promessa è tutto quello che
   // l'utente ha per decidere.
   //
-  // Sono tre cose, e nessuna costa una chiamata: il protocollo (l'Aiuto si apre
+  // Prima di tutto l'interruttore: a raccolta spenta non parte niente da nessun
+  // sito. Poi tre cose, e nessuna costa una chiamata: il protocollo (l'Aiuto si apre
   // anche sulle pagine `filo://`, con lo stesso tasto), il nome del sito, e lo
   // spazio in coda — perché un percorso che non ci entra è un'altra risposta
   // spesa per niente.
@@ -312,6 +339,7 @@
   // Ritorna { ok } oppure { ok:false, reason } con lo stesso motivo che
   // `collectAndSave` riporterebbe.
   async function raccoglibile(rawUrl) {
+    if (!accesa) return { ok: false, reason: MOTIVO_SPENTA };
     const domain = Safety._internal.domainOf(rawUrl);
     if (!domain) return { ok: false, reason: 'dominio non valido' };
     if (!/^https?:$/i.test(protocolloDi(rawUrl)) || !Safety.sitoCondivisibile(domain)) {
@@ -383,13 +411,14 @@
 
     // 3. in coda. NON si invia adesso: vedi la testata.
     try {
-      const { id, piena } = await accoda({
+      const { id, piena, spenta } = await accoda({
         domain,
         initialUrl,
         intent: guessedIntent,
         steps: sanitizedSteps,
         success: !!session.success,
       });
+      if (spenta) return { saved: false, reason: MOTIVO_SPENTA };
       if (piena) return { saved: false, reason: 'coda dei percorsi piena' };
       return { saved: true, queued: true, id, intent: guessedIntent };
     } catch (e) {
@@ -408,7 +437,7 @@
     // non riscritta.
     _internal: {
       sanitizeUserMessages, cleanGuessedIntent, parseJudgeOutput,
-      accoda, sorteggia, RITARDO_MIN_MS, RITARDO_MAX_MS, MAX_IN_CODA,
+      accoda, sorteggia, RITARDO_MIN_MS, RITARDO_MAX_MS, MAX_IN_CODA, RACCOLTA_ACCESA,
       redactSelector: Safety._internal.redactSelector,
       sanitizeSteps: Safety._internal.sanitizeSteps,
       domainOf: Safety._internal.domainOf,
@@ -418,10 +447,13 @@
     // ---- helper per i test (nessun effetto in produzione) ----
     _peek: () => coda.map((v) => ({ ...v })),
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
+    // I test della pipeline girano a raccolta accesa; `_reset` torna a quella del codice.
+    _setAccesa: (v) => { accesa = !!v; },
     _setSorteggio: (fn) => { sorteggio = typeof fn === 'function' ? fn : Math.random; },
     _setIdToken: (fn) => { ottieniIdToken = typeof fn === 'function' ? fn : async () => ''; },
     _reset: () => {
-      coda = []; caricamento = null; sto = false; auto = true; sorteggio = Math.random;
+      coda = []; sulDisco = 0; caricamento = null; sto = false; auto = true; sorteggio = Math.random;
+      accesa = RACCOLTA_ACCESA;
       ottieniIdToken = async () => '';
       if (timer) { clearTimeout(timer); timer = null; }
     },
