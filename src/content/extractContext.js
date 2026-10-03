@@ -944,15 +944,73 @@
     return parts.join(' > ');
   }
 
+  // Il testo di un'etichetta senza i campi che contiene: un <select> dentro la <label> porterebbe tutte le voci.
+  function testoSenzaCampi(nodo) {
+    let out = '';
+    const giu = (n) => {
+      for (const c of n.childNodes || []) {
+        if (c.nodeType === 3) out += c.nodeValue;
+        else if (c.nodeType === 1 && !/^(SELECT|TEXTAREA|SCRIPT|STYLE|TEMPLATE)$/.test(c.tagName)) giu(c);
+      }
+    };
+    giu(nodo);
+    return out;
+  }
+
+  // L'etichetta che il sito lega al campo (aria-labelledby, <label for>, <label> che lo avvolge).
+  function etichettaCollegata(el) {
+    const parti = [];
+    const doc = el.ownerDocument || document;
+    for (const id of String(el.getAttribute?.('aria-labelledby') || '').split(/\s+/)) {
+      const t = id && doc.getElementById(id);
+      if (t && t !== el) parti.push(testoSenzaCampi(t));
+    }
+    if (!parti.length) { try { for (const l of el.labels || []) parti.push(testoSenzaCampi(l)); } catch (_) {} }
+    return parti.join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  const CAMPO_CON_VALORE = /^(INPUT|TEXTAREA|SELECT)$/;
+  const INPUT_BOTTONE = /^(button|submit|reset|image)$/i;
+  const AUTOCOMPLETE_SEGRETO = /(^|\s)(current-password|new-password|one-time-code|cc-[a-z-]+)(\s|$)/i;
+  const PAROLE_SEGRETE = new RegExp(['pass ?word', 'passwd', 'pwd', 'passcode', 'pass_code', 'passwort', 'contrase[ñn]a',
+    'mot de passe', '\\bsenha\\b', 'parola d.ordine', '(^|[^a-z])(pin|otp|cvv2?|cvc2?|csc)([^a-z]|$)',
+    'codice (di )?(sicurezza|verifica)', 'security code', 'verification code', 'carta di (credito|debito)',
+    'numero (della |di )?carta', 'credit ?card', 'debit ?card', 'card ?number', 'card_number', 'cardnumber',
+    'n[uú]mero de (la )?tarjeta', 'tarjeta de (cr[eé]dito|d[eé]bito)', 'num[eé]ro de (la )?carte',
+    'carte (bancaire|de cr[eé]dit)', 'kartennummer', 'kreditkarte'].join('|'), 'i');
+
+  // Un campo il cui valore non esce mai dalla pagina verso un modello (#810.7): password, codici, dati della
+  // carta. Lo dice il tipo, l'autocompletamento, il testo coperto dai puntini o il nome che il sito gli dà.
+  function campoSegreto(el) {
+    if (!el || el.nodeType !== 1 || !CAMPO_CON_VALORE.test(el.tagName)) return false;
+    const tipo = String(el.getAttribute('type') || '').toLowerCase();
+    if (el.tagName === 'INPUT' && INPUT_BOTTONE.test(tipo)) return false;
+    if (tipo === 'password' || el.type === 'password') return true;
+    if (AUTOCOMPLETE_SEGRETO.test(String(el.getAttribute('autocomplete') || ''))) return true;
+    try {
+      const cs = window.getComputedStyle(el);
+      const coperto = cs.webkitTextSecurity || cs.getPropertyValue('-webkit-text-security');
+      if (coperto && coperto !== 'none') return true;
+    } catch (_) {}
+    const nomi = ['aria-label', 'placeholder', 'name', 'id', 'title'].map((a) => el.getAttribute(a) || '');
+    nomi.push(etichettaCollegata(el));
+    return PAROLE_SEGRETE.test(nomi.join(' '));
+  }
+
+  // Come chiamare un elemento descrivendolo al modello o nel registro delle azioni. Il valore di un campo
+  // serve solo quando non ha nessun nome, e mai se è segreto.
+  function nomeElemento(el) {
+    if (!el || el.nodeType !== 1) return '';
+    const nome = el.getAttribute?.('aria-label') || el.getAttribute?.('alt') || etichettaCollegata(el)
+      || el.getAttribute?.('placeholder') || '';
+    const campo = CAMPO_CON_VALORE.test(el.tagName);
+    const valore = campo && !campoSegreto(el) ? el.value : '';
+    const testo = nome || valore || (campo ? '' : (el.innerText || el.textContent || ''));
+    return String(testo).replace(/\s+/g, ' ').trim();
+  }
+
   function shortText(el) {
-    const txt = (el.getAttribute?.('aria-label')
-      || el.getAttribute?.('alt')
-      || el.getAttribute?.('placeholder')
-      || el.value
-      || el.innerText
-      || el.textContent
-      || '').replace(/\s+/g, ' ').trim();
-    return txt.slice(0, 80);
+    return nomeElemento(el).slice(0, 80);
   }
 
   // Espande <details> e [aria-expanded="false"] sull'antenato per portare
