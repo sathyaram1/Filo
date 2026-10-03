@@ -22,7 +22,9 @@
   const Z = '2147483646';
   const STILE_OSPITE = 'all:initial!important;display:block!important;position:fixed!important;top:0!important;'
     + 'left:0!important;width:0!important;height:0!important;z-index:' + Z + '!important;pointer-events:none!important;';
-  const STILE_SONDA = 'position:fixed;margin:0;padding:0;border:0;background:transparent;pointer-events:none;';
+  const STILE_SONDA = 'position:fixed;display:block;margin:0;padding:0;border:0;background:transparent;pointer-events:none;';
+  // Una voce nascosta porta la sua sonda fuori dallo schermo, mai a display:none: nascoderebbe la catena sotto.
+  const FUORI = 'left:-99999px;top:-99999px;width:1px;height:1px;';
 
   // 'ok' | 'attesa' (il browser non ha ancora risposto) | 'coperta' | 'presto' (scoperta da meno di RITARDO_MS).
   function giudica(rec, t) {
