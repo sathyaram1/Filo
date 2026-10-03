@@ -73,6 +73,9 @@ export function classifyOwnerMerge(status, body) {
     }
     if (r.result === 'conflict') return { outcome: 'conflict', reason: String(r.reason || '') };
     if (r.result === 'stale') return { outcome: 'stale', headSha: String(r.headSha || '') };
+    // #929: main non è più quello su cui sono girati gli unit della fusione; chi chiede rifà la prova.
+    if (r.result === 'main_moved') return { outcome: 'main_moved', mainSha: String(r.mainSha || '') };
+    if (r.result === 'unit_rossi') return { outcome: 'unit_rossi', reason: String(r.reason || '') };
     return { outcome: 'fault', reason: `risposta inattesa: ${String(r.result || '')}` };
   }
   if (status === 200 && r.ok === false) {
@@ -200,6 +203,14 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
     case 'conflict':
       return `✗ Conflitto: main è andato avanti e le modifiche non si incastrano da sole.\n`
         + '  Fai: git pull --rebase origin main, risolvi, e rilancia npm run finish.';
+    case 'main_moved':
+      return `✗ Main si è mosso a ogni prova degli unit sulla fusione${r.mainSha ? ` (adesso è ${String(r.mainSha).slice(0, 8)})` : ''}: nessuna fusione.
+`
+        + '  Il server fonde solo sul main su cui gli unit sono girati. Rilancia npm run finish.';
+    case 'unit_rossi':
+      return `✗ Il server non ha fuso: gli unit sul risultato della fusione erano rossi${r.reason ? ` (${r.reason})` : ''}.
+`
+        + '  Riallinea il ramo su origin/main, fai tornare verdi gli unit e rilancia npm run finish.';
     case 'stale':
       return `✗ Il ramo è cambiato dopo i controlli${r.headSha ? ` (adesso è ${String(r.headSha).slice(0, 8)})` : ''}.\n`
         + '  Il server fonde solo la versione che è stata controllata: rilancia\n'
@@ -241,6 +252,7 @@ export function exitCodeForOwnerMerge(reply) {
     case 'blocked': return 10;
     case 'conflict': return 20;
     case 'stale': return 30;
+    case 'unit_rossi': return 20;
     default: return 1;
   }
 }
@@ -249,7 +261,7 @@ export function exitCodeForOwnerMerge(reply) {
  * La domanda al server: "fondi questo ramo, che alla mia ultima verifica era
  * questo commit". Ritorna sempre un esito classificato, mai un'eccezione.
  */
-export async function askServerMerge({ branch, sha = '', feedbackId = '', pendingParts = [], fetchImpl = fetch, url = OWNER_MERGE_URL } = {}) {
+export async function askServerMerge({ branch, sha = '', feedbackId = '', pendingParts = [], provaUnit = null, fetchImpl = fetch, url = OWNER_MERGE_URL } = {}) {
   const refresh = findAdminRefreshToken();
   if (!refresh) return { outcome: 'no_owner_credential' };
 
@@ -260,16 +272,25 @@ export async function askServerMerge({ branch, sha = '', feedbackId = '', pendin
     return { outcome: 'denied', reason: String((e && e.message) || e).slice(0, 200) };
   }
 
+  const richiesta = () => fetchImpl(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ data: {
+      branch: String(branch || ''), sha: String(sha || ''),
+      ...(feedbackId ? { feedbackId: String(feedbackId) } : {}),
+      ...(feedbackId && Array.isArray(pendingParts) && pendingParts.length ? { pendingParts } : {}),
+      ...(provaUnit && typeof provaUnit === 'object' ? { provaUnit } : {}),
+    } }),
+  });
   try {
-    const res = await fetchImpl(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-      body: JSON.stringify({ data: {
-        branch: String(branch || ''), sha: String(sha || ''),
-        ...(feedbackId ? { feedbackId: String(feedbackId) } : {}),
-        ...(feedbackId && Array.isArray(pendingParts) && pendingParts.length ? { pendingParts } : {}),
-      } }),
-    });
+    let res;
+    try {
+      res = await richiesta();
+    } catch (e) {
+      // Dopo minuti di test la connessione tenuta viva può essere già chiusa dall'altra parte (#933): un altro tentativo.
+      if (!erroreDiConnessione(e)) throw e;
+      res = await richiesta();
+    }
     const text = await res.text();
     let body = {};
     try { body = text ? JSON.parse(text) : {}; } catch (_) { body = {}; }
@@ -277,4 +298,12 @@ export async function askServerMerge({ branch, sha = '', feedbackId = '', pendin
   } catch (e) {
     return { outcome: 'unreachable', reason: String((e && e.message) || e).slice(0, 200) };
   }
+}
+
+/** Un `fetch failed` di una connessione chiusa o rifiutata, non una risposta del server. PURA. */
+export function erroreDiConnessione(e) {
+  const causa = (e && e.cause) || {};
+  const codice = String(causa.code || (e && e.code) || '');
+  return /^(ECONNRESET|EPIPE|ECONNREFUSED|ETIMEDOUT|UND_ERR_SOCKET|UND_ERR_CLOSED)$/.test(codice)
+    || (e instanceof TypeError && /fetch failed/i.test(String(e.message || '')));
 }

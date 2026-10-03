@@ -710,13 +710,17 @@ export async function compare(t, mine, opts) {
  * se la chiede comunque. Questo è il controllo in più, e il posto dove
  * l'informazione arriva.
  *
- * @returns {{ ok:true, result:'merged'|'blocked'|'conflict', reason?, sha?, approval? }
+ * `opts.provaUnit` è l'esito degli unit sul risultato della fusione (#929, scripts/lib/unit-sulla-fusione.mjs):
+ * il server fonde solo se main è ancora lo sha provato, e altrimenti risponde `main_moved`.
+ *
+ * @returns {{ ok:true, result:'merged'|'blocked'|'conflict'|'main_moved'|'unit_rossi', reason?, sha?, approval?, mainSha? }
  *           | { ok:false, reason }}
  */
 export async function merge(t, branch, opts) {
-  const { sha = '', ...rest } = opts && typeof opts === 'object' ? opts : {};
+  const { sha = '', provaUnit = null, ...rest } = opts && typeof opts === 'object' ? opts : {};
   const payload = { ticket: t, branch: String(branch || '') };
   if (String(sha || '')) payload.sha = String(sha);
+  if (provaUnit && typeof provaUnit === 'object') payload.provaUnit = provaUnit;
   const { status, body } = await call('routineMerge', payload, rest);
   if (status === 200 && body && body.ok && body.result) {
     return {
@@ -725,6 +729,7 @@ export async function merge(t, branch, opts) {
       reason: String(body.reason || ''),
       sha: String(body.sha || ''),
       approval: String(body.approval || ''),
+      mainSha: String(body.mainSha || ''),
     };
   }
   return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
