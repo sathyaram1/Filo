@@ -704,7 +704,8 @@
     const localOnly = (opts && opts.localOnly && typeof opts.localOnly === 'object') ? opts.localOnly : null;
     // `soloAdmin`: chi chiama vuole la prova o niente (lo script delle sessioni locali).
     const soloAdmin = !!((opts && opts.soloAdmin) || localOnly);
-    if (soloAdmin && !idToken) throw new Error('create senza token admin (401): questo feedback non parte da anonimo');
+    // `accessoOwner`: chi chiama distingue l'accesso che manca dalla rete che manca (la coda d'invio aspetta, non rinuncia).
+    if (soloAdmin && !idToken) throw Object.assign(new Error('create senza token admin (401): questo feedback non parte da anonimo'), { accessoOwner: true });
     // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
     // qualunque caricamento e prima di creare il documento: così «non è partito
     // niente» è vero alla lettera, e non «è partito tutto tranne il testo».
@@ -877,7 +878,7 @@
         body: JSON.stringify(doc),
       });
       if (soloAdmin && (res.status === 401 || res.status === 403)) {
-        throw new Error(`firestore create fallito (${res.status}): token admin rifiutato, e questo feedback non parte da anonimo`);
+        throw Object.assign(new Error(`firestore create fallito (${res.status}): token admin rifiutato, e questo feedback non parte da anonimo`), { accessoOwner: true });
       }
       if (res.status === 401 || res.status === 403) {
         authRefused = res.status;
