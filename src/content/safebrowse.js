@@ -64,19 +64,69 @@
       global.SN_FILO_UI?.mark(host);
       css(host, { all: 'initial' });
       shadow = host.attachShadow({ mode: 'open' });
+      // Lo sfondo della modale lo dà l'avviso: senza, la pagina si scurisce un po' di più che prima.
+      try { const st = new CSSStyleSheet(); st.replaceSync('dialog::backdrop{background:transparent}'); shadow.adoptedStyleSheets = [st]; } catch (_) {}
     }
     if (host.parentNode !== root || host.nextElementSibling) {
       const focused = shadow.activeElement;
       root.appendChild(host);
+      keepOnTop();
       if (focused) { try { focused.focus(); } catch (_) {} }
     }
     return true;
+  }
+
+  // L'avviso è una finestra modale: la pagina sotto diventa inerte e non si riprende il fuoco né il clic. Una modale
+  // aperta dopo dalla pagina gli salirebbe sopra rendendolo inerte, e lo spostamento dell'host lo toglie dal livello
+  // più alto: in entrambi i casi si riapre in cima.
+  let dialog = null;
+  function keepOnTop() {
+    if (!dialog || !dialog.isConnected) return;
+    let onTop = dialog.matches(':modal');
+    if (onTop) {
+      try { onTop = document.elementFromPoint(innerWidth / 2, innerHeight / 2) === host; } catch (_) {}
+    }
+    if (onTop) return;
+    const focused = shadow.activeElement;
+    try { if (dialog.open) dialog.close(); dialog.showModal(); } catch (_) {}
+    if (focused) { try { focused.focus(); } catch (_) {} }
+  }
+
+  let guard = null;
+  function watchTopLayer() {
+    if (guard || typeof MutationObserver !== 'function') return;
+    guard = new MutationObserver(() => { if (dialog) keepOnTop(); });
+    try { guard.observe(document, { subtree: true, attributes: true, attributeFilter: ['open'] }); } catch (_) {}
+    document.addEventListener('toggle', () => { if (dialog) keepOnTop(); }, true);
+  }
+
+  function mount(overlay) {
+    dialog = document.createElement('dialog');
+    css(dialog, {
+      position: 'fixed', inset: '0', margin: '0', padding: '0', border: 'none',
+      width: '100vw', height: '100vh', maxWidth: 'none', maxHeight: 'none',
+      background: 'transparent', overflow: 'hidden', outline: 'none',
+    });
+    // Esc chiuderebbe la modale: l'avviso si toglie solo dai suoi pulsanti.
+    dialog.addEventListener('cancel', (e) => e.preventDefault());
+    const self = dialog;
+    dialog.addEventListener('close', () => {
+      if (dialog === self && currentLevel !== 'safe') { try { if (!self.open) self.showModal(); } catch (_) {} }
+    });
+    dialog.appendChild(overlay);
+    shadow.appendChild(dialog);
+    try { dialog.showModal(); } catch (_) {}
+    keepOnTop();
+    watchTopLayer();
   }
 
   function clear() {
     currentLevel = 'safe';
     drawn = null;
     pending = null;
+    const d = dialog;
+    dialog = null;
+    if (d) { try { d.close(); } catch (_) {} }
     if (shadow) { try { shadow.replaceChildren(); } catch (_) { shadow.innerHTML = ''; } }
     if (host) { css(host, { pointerEvents: 'none' }); }
   }
@@ -101,6 +151,7 @@
   // ── Interstitial "pericoloso" (blocca l'interazione) ──────────────────────
   function renderDanger(url, message) {
     ensureHost();
+    if (dialog) { const d = dialog; dialog = null; try { d.close(); } catch (_) {} }
     shadow.replaceChildren();
     css(host, { pointerEvents: 'auto' });
 
@@ -184,7 +235,7 @@
     card.appendChild(icon); card.appendChild(title); card.appendChild(body);
     card.appendChild(hint); card.appendChild(input); card.appendChild(row);
     overlay.appendChild(card);
-    shadow.appendChild(overlay);
+    mount(overlay);
     try { input.focus(); } catch (_) {}
   }
 
@@ -197,6 +248,7 @@
   // da digitare), ma comunque una scelta attiva, non un avviso ignorabile.
   function renderSuspect(url, message) {
     ensureHost();
+    if (dialog) { const d = dialog; dialog = null; try { d.close(); } catch (_) {} }
     shadow.replaceChildren();
     css(host, { pointerEvents: 'auto' });
 
@@ -249,7 +301,7 @@
     row.appendChild(back); row.appendChild(proceed);
     card.appendChild(icon); card.appendChild(title); card.appendChild(body); card.appendChild(row);
     overlay.appendChild(card);
-    shadow.appendChild(overlay);
+    mount(overlay);
     try { proceed.focus(); } catch (_) {}
   }
 

@@ -493,3 +493,63 @@ test('verdetto pronto prima che la pagina mandi il primo byte: l\'avviso compare
     await chiudiLenti(app);
   }
 });
+
+// L'avviso è una modale sopra la pagina: la pagina non gli riprende la tastiera e non gli sale sopra con una sua modale.
+const MODULO = '<title>Accedi</title><form><input name="email" placeholder="Email">'
+  + '<input type="password" id="pw" name="pw" placeholder="Password"><button>Accedi</button></form>';
+
+test('la pagina segnalata si riprende il fuoco dopo l\'avviso: quello che si scrive resta nell\'avviso', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'conto-verifica-fuoco.com/login': MODULO
+    + '<script>setTimeout(function(){document.getElementById("pw").focus()},2000)</script>' }, { gsbListed: true });
+  const page = await apriSenzaAspettare(app, shell, 'https://conto-verifica-fuoco.com/login');
+  await expect(page.getByText('Sito segnalato come pericoloso')).toBeVisible({ timeout: 8_000 });
+  await page.waitForTimeout(2800);
+  await page.keyboard.type('segreto');
+  await expect(page.getByPlaceholder('confermo')).toHaveValue('segreto');
+  await expect(page.locator('#pw')).toHaveValue('');
+  // Esc non toglie l'avviso: si toglie solo dai suoi pulsanti.
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  await expect(page.getByPlaceholder('confermo')).toBeVisible();
+  await page.getByPlaceholder('confermo').fill('confermo');
+  await page.getByRole('button', { name: 'Procedi comunque' }).click();
+  await expect(page.getByText('Sito segnalato come pericoloso')).toHaveCount(0, { timeout: 6_000 });
+  await page.locator('#pw').fill('segreto');
+  await expect(page.locator('#pw')).toHaveValue('segreto');
+});
+
+for (const quando of ['prima', 'dopo']) {
+  test(`modulo in una modale della pagina aperta ${quando} dell'avviso: l'avviso resta sopra e risponde`, async ({ app, shell }) => {
+    const apri = quando === 'prima' ? 'd.showModal()' : 'setTimeout(function(){d.showModal()},2000)';
+    await serviInCaricamento(app, { [`conto-modale-${quando}.com/login`]: '<title>Accedi</title><dialog id="d"><form>'
+      + '<input type="password" id="pw"></form></dialog><script>var d=document.getElementById("d");' + apri + '</script>' }, { gsbListed: true });
+    const page = await apriSenzaAspettare(app, shell, `https://conto-modale-${quando}.com/login`);
+    await expect(page.getByText('Sito segnalato come pericoloso')).toBeVisible({ timeout: 8_000 });
+    await page.waitForFunction(() => document.getElementById('d').open, null, { timeout: 6_000 });
+    await page.waitForTimeout(300);
+    const box = await page.locator('#pw').boundingBox();
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.keyboard.type('segreto');
+    await expect(page.locator('#pw')).toHaveValue('');
+    await page.getByPlaceholder('confermo').fill('confermo');
+    await page.getByRole('button', { name: 'Procedi comunque' }).click();
+    await expect(page.getByText('Sito segnalato come pericoloso')).toHaveCount(0, { timeout: 6_000 });
+    await page.locator('#pw').fill('segreto');
+    await expect(page.locator('#pw')).toHaveValue('segreto');
+  });
+}
+
+test('popup del sito sospetto: la pagina che si riprende il fuoco non riceve quello che si scrive', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'area-riservata-fuoco.it/accesso': MODULO
+    + '<script>setTimeout(function(){document.getElementById("pw").focus()},2000)</script>' });
+  const page = await apriSenzaAspettare(app, shell, 'http://area-riservata-fuoco.it/accesso');
+  await expect(page.getByText('Sito potenzialmente sospetto')).toBeVisible({ timeout: 8_000 });
+  await page.waitForTimeout(2800);
+  await page.keyboard.type('segreto');
+  await expect(page.locator('#pw')).toHaveValue('');
+  await page.getByRole('button', { name: 'Continua' }).click();
+  await expect(page.getByText('Sito potenzialmente sospetto')).toHaveCount(0, { timeout: 6_000 });
+  await page.locator('#pw').fill('segreto');
+  await expect(page.locator('#pw')).toHaveValue('segreto');
+});
