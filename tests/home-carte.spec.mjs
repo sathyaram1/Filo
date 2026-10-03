@@ -5,7 +5,7 @@
 // percentuale e poi «Apri», l'Editor mostra i documenti recenti e ne apre uno, i Mazzi si scambiano con
 // l'Editor e si tolgono e si rimettono da «altro» anche dopo il riavvio, i suggerimenti sono una carta
 // sola, senza chiave la prima carta porta ai Crediti, e la stessa mossa si chiede a Filo a parole.
-// Le foto (chiara, scura, col menu, in conversazione) finiscono in tests/.shots/; FILO_TEST_SCALE=1.25 per la scala.
+// Le foto (chiara, scura, col menu, in conversazione, stretta) vanno in tests/.shots/; FILO_TEST_SCALE=1.25 per la scala.
 
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
@@ -307,4 +307,12 @@ test('foto della home a carte, chiara e scura, ferma, col menu e in conversazion
   await page.mouse.move(640, 300);
   await page.waitForTimeout(250);
   await page.screenshot({ path: join(SHOTS, `home-carte-filo${scala}.png`) });
+
+  // Finestra stretta: colonne da 200 punti, i titoli si accorciano e niente esce dalla carta.
+  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setSize(900, 640); });
+  await expect.poll(() => page.evaluate(() => window.innerWidth)).toBeLessThan(980);
+  await page.waitForTimeout(400);
+  const fuori = await page.locator('.dash-carta').evaluateAll((ns) => ns.filter((n) => n.scrollWidth > n.clientWidth + 1).length);
+  expect(fuori, 'una carta ha contenuto che esce di lato').toBe(0);
+  await page.screenshot({ path: join(SHOTS, `home-carte-stretta${scala}.png`) });
 });

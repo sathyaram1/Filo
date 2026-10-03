@@ -459,6 +459,8 @@
 
     if (c.stato != null) {
       const st = el('div', `dash-carta-stato${c.grande ? ' grande' : ''}${c.lungo ? ' lungo' : ''}`, c.stato);
+      // Uno stato lungo si accorcia a qualche riga: intero sta al passaggio del puntatore, e nel filo.
+      if (!c.grande) st.title = c.stato;
       art.appendChild(st);
     }
     if (c.avanza != null) {
@@ -525,7 +527,10 @@
 
   function aggiornaTesti(art, c) {
     const st = art.querySelector('.dash-carta-stato');
-    if (st && st.textContent !== c.stato) st.textContent = c.stato;
+    if (st && st.textContent !== c.stato) {
+      st.textContent = c.stato;
+      if (!c.grande) st.title = c.stato;
+    }
     const i = art.querySelector('.dash-carta-avanza > i');
     if (i) {
       const ind = c.avanza < 0;
@@ -556,9 +561,14 @@
   }
 
   // ===== «altro»: le app senza carta, e le carte tolte =====
+  // Si rifà solo quando cambiano le carte tolte: il conto alla rovescia ridisegna la home ogni secondo.
+  let formaAltro = '';
   function disegnaAltro() {
     const tolte = ((layout && layout.tolte) || []).map((id) => ({ ...C.carta(id), tolta: true }));
     const voci = [...tolte, ...C.APP];
+    const f = voci.map((v) => `${v.id}:${v.tolta ? 1 : 0}`).join(',');
+    if (f === formaAltro && altroEl.childElementCount) return;
+    formaAltro = f;
     altroEl.replaceChildren();
     const tit = el('div', 'dash-altro-tit', 'altro');
     altroEl.appendChild(tit);
@@ -586,6 +596,7 @@
         b.draggable = true;
         b.addEventListener('dragstart', (e) => {
           presa = { chiave: v.id, colonna: 'altro', el: b };
+          trascinando = true;
           e.dataTransfer.effectAllowed = 'move';
           e.dataTransfer.setData('application/x-filo-carta', v.id);
           e.dataTransfer.setData('text/plain', v.titolo);
