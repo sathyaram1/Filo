@@ -109,7 +109,7 @@ test('davvero, con --solo-server: presa in carico, server con la pratica, a fusi
   assert.deepEqual(r.lanci, [{ cartella: '/srv/functions', args: ['claude/x'], pratica: '#910' }]);
   assert.equal(r.scritture.length, 3, r.scritture.join('\n'));
   assert.ok(!r.scritture[0].includes('resolvedInVersion'), 'la prima scrittura è la presa in carico');
-  assert.match(r.scritture[1], /fieldPaths=localMerges\.server&updateMask\.fieldPaths=localMerges\.solo$/, 'poi la parte del server, sola');
+  assert.match(r.scritture[1], /fieldPaths=localMerges\.server&updateMask\.fieldPaths=localMerges\.solo&updateMask\.fieldPaths=localMerges\.ramo$/, 'poi la parte del server, sola, col suo ramo');
   assert.ok(r.scritture[2].includes('resolvedInVersion'), 'l’ultima chiude la pratica');
   assert.match(r.testo, /Pratica #910 chiusa/);
 });
