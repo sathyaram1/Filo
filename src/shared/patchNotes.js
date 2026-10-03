@@ -12,7 +12,7 @@
       version: '0.2.231', date: '2026-10-03',
       features: [
         'Col tasto destro sull\'avviso di un sito pericoloso puoi chiedere a Filo di quel sito o segnalare un falso allarme. Si apre una scheda nuova e il sito resta coperto.',
-        'Le pubblicità dei video che si possono saltare, su YouTube e negli altri lettori, Filo le salta da solo appena compare «Salta». Se preferisci guardarle, lo spegni in Sicurezza.',
+        'Quando un video parte con una pubblicità che si può saltare, Filo preme «Salta» da solo appena il pulsante compare, su YouTube e negli altri lettori più diffusi. Se preferisci guardarle, lo spegni in Sicurezza o chiedendolo a Filo.',
       ],
       fixes: [
         'L\'avviso dei siti pericolosi e sospetti adesso sta sopra la pagina, fuori dalla sua portata, e resta lì finché non scegli tu.',
