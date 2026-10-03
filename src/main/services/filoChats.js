@@ -162,7 +162,10 @@
   }
 
   async function clear() {
-    for (const c of await list()) await remove(c.id);
+    const ids = (await list()).map((c) => c.id);
+    if (ids.length) {
+      await F().transazione((t) => t.scrivi(ids.map((id) => t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' }))));
+    }
     return [];
   }
 
