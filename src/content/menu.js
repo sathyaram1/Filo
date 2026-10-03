@@ -1340,7 +1340,7 @@
     const cerca = sub.querySelector('.sn-menu-history-search-input');
     return {
       voci: [...sub.querySelectorAll('.sn-menu-history-item')].filter(visibile).map((riga) => ({
-        testo: riga.querySelector('.sn-menu-label')?.textContent || '',
+        testo: riga.querySelector('.sn-menu-history-paste')?.getAttribute('aria-label') || '',
         incolla: centro(riga.querySelector('.sn-menu-history-paste')),
         rimuovi: centro(riga.querySelector('.sn-menu-history-remove')),
       })),
