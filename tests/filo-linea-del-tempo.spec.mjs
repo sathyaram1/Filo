@@ -510,7 +510,7 @@ test('una pagina che si dà il titolo dopo il caricamento, o lo cambia dopo un c
 test('cancellata una chat dalla Cronologia, il suo testo sparisce anche dalle richieste ai modelli, dalla cache e dal registro grezzo', async ({ app }) => {
   test.setTimeout(90_000);
   await configura(app);
-  await turno(app, 'chat-privata', 'La mia diagnosi PRIVATO-77, cosa ne pensi?');
+  await turno(app, 'chat-privata', 'La mia diagnosi è arrivata oggi.\nIl medico dice PRIVATO-77, cosa ne pensi?');
   await turno(app, 'chat-da-tenere', 'Parliamo di Epicuro TIENIMI-55');
   await app.evaluate(async () => { await globalThis.SN_CLOSE_FILO_CHAT('chat-privata'); await globalThis.SN_CLOSE_FILO_CHAT('chat-da-tenere'); });
   const voci = () => app.evaluate(async () => (await globalThis.SN_HISTORY.list()).length);

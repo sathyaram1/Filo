@@ -36,7 +36,7 @@ Nessun tetto e nessun taglio.
   attimo, subito nel primo mezzo minuto e poi all'uscita dalla pagina, così un titolo che cambia di continuo non
   riempie il filo. Se ne va con la sua pagina.
 - **Una chat cancellata sparisce anche dalle sue copie**: registro grezzo, cache delle risposte e richieste ai
-  modelli (che restano coi costi, senza il testo). Sentinella `tests/unit/chatCopieCancellate.test.mjs`.
+  modelli (che restano coi costi, senza il testo), anche dove il testo è riscritto su una riga o tagliato in testa o in coda. Sentinella `tests/unit/chatCopieCancellate.test.mjs`.
 - **Un tetto è una cancellazione automatica.** Il vecchio registro grezzo (5000 voci, testi a 200 caratteri)
   è esattamente il taglio silenzioso che le regole del repo vietano.
 
