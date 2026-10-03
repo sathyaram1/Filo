@@ -80,6 +80,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { avvisoDaCampi, parseRiferimento, risolviFeedback } from './lib/pratica-locale.mjs';
+import { PARTI, partiDaCampi } from './lib/parti-lavoro.mjs';
 // Moduli IIFE: importarli li registra su globalThis.
 import '../src/shared/feedbackThread.js';
 // La PUBBLICA va caricata PRIMA della cifratura: senza, il gate risulta spento e
@@ -359,6 +360,35 @@ export async function praticaPerLaSessione(id, opts = {}) {
     return { ok: false, motivo: SENZA_SEGNO, utente: false, senzaSegno: true };
   }
   return { ok: true, avviso: avvisoDaCampi(doc.fields) };
+}
+
+/**
+ * Stato in chiaro e parti già su main della pratica di un lavoro locale (#915).
+ * @returns {Promise<{ ok: true, status: string, parti: object, locale: boolean } | { ok: false, motivo: string }>}
+ */
+export async function partiDellaPratica(id, opts = {}) {
+  const bearer = opts.bearer || await acquireBearer();
+  const doc = await getDoc(id, bearer, ['status', 'localOnly', 'localMerges']);
+  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
+  const { from, leggibile } = await statoAttuale(doc);
+  if (!leggibile) return { ok: false, motivo: 'stato non decifrabile' };
+  return { ok: true, status: from, parti: partiDaCampi(doc.fields), locale: !!doc.fields?.localOnly?.mapValue };
+}
+
+/** La parte di un lavoro locale arrivata su main, nella pratica (#915): `localMerges.<parte>` = adesso, in ms. */
+export async function registraParte(id, parte, opts = {}) {
+  if (!PARTI.includes(parte)) return { ok: false, motivo: `parte sconosciuta: ${parte}` };
+  const at = Math.floor(opts.ora ?? Date.now());
+  if (opts.dryRun) return { ok: true, dryRun: true, at };
+  const bearer = opts.bearer || await acquireBearer();
+  const fields = { localMerges: { mapValue: { fields: { [parte]: { integerValue: String(at) } } } } };
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=localMerges.${parte}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
+  return { ok: true, at };
 }
 
 /**
