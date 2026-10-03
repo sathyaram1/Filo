@@ -136,7 +136,6 @@
       { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
     ];
     if (isAdmin) {
-      entries.push({ label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' });
       entries.push({ label: 'Gestione', icon: 'feedback', url: 'filo://manage/manage.html' });
     }
     return entries;
