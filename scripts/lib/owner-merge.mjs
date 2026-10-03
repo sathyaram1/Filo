@@ -243,7 +243,7 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
  * qualunque altro esito deve fermare chi ha lanciato il comando, anche quando
  * non è colpa di nessuno.
  *
- *   0 fuso · 10 bloccato dai controlli · 20 conflitto · 30 ramo cambiato ·
+ *   0 fuso · 10 bloccato dai controlli · 20 conflitto o unit rossi sulla fusione · 30 ramo cambiato ·
  *   1 tutto il resto (rifiuti, guasti, server assente)
  */
 export function exitCodeForOwnerMerge(reply) {
