@@ -75,15 +75,17 @@ function erroreSegno(e) {
 function aIso(v) {
   if (v == null || v === '') return '';
   let ms = NaN;
-  if (typeof v === 'number') ms = v < 1e11 ? v * 1000 : v;
-  else if (typeof v === 'string') ms = /^\d+$/.test(v.trim()) ? aIsoMs(Number(v)) : Date.parse(v);
-  else if (typeof v === 'object') {
+  if (typeof v === 'object') {
     const s = v._seconds ?? v.seconds;
     if (typeof s === 'number') ms = s * 1000;
+  } else if (typeof v === 'number' || /^\d+$/.test(String(v).trim())) {
+    const n = Number(v);
+    ms = n < 1e11 ? n * 1000 : n;
+  } else {
+    ms = Date.parse(String(v));
   }
   return Number.isFinite(ms) ? new Date(ms).toISOString() : '';
 }
-function aIsoMs(n) { return n < 1e11 ? n * 1000 : n; }
 
 // ---- Slot chiave privata feedback (S1.3) ----------------------------------------
 // La chiave privata non deve MAI uscire dal main process né essere passata al

@@ -136,6 +136,7 @@
   const mgReopenText    = document.getElementById('mgReopenText');
   const mgReopenCancel  = document.getElementById('mgReopenCancelBtn');
   const mgReopenConfirm = document.getElementById('mgReopenConfirmBtn');
+  const mgSegnoConferma = document.getElementById('mgSegnoConferma');
 
   // Risposta ai chiarimenti (owner-only)
   const mgClarify     = document.getElementById('mgClarify');
