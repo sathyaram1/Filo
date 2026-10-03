@@ -12,6 +12,7 @@
     CHAT_CHIUSA: 'chat.chiusa',
     CHAT_TITOLO: 'chat.titolo',
     NAVIGAZIONE: 'navigazione',
+    TITOLO_PAGINA: 'navigazione.titolo',
     CANCELLAZIONE: 'cancellazione',
   });
   const AUTORI = Object.freeze(['utente', 'filo', 'automazione']);
@@ -42,6 +43,8 @@
           && (ev.msg.role === 'user' || ev.msg.role === 'filo');
       case TIPI.NAVIGAZIONE:
         return stringa(ev.url) && typeof ev.titolo === 'string';
+      case TIPI.TITOLO_PAGINA:
+        return stringa(ev.visita) && typeof ev.titolo === 'string';
       case TIPI.CANCELLAZIONE:
         if (ev.chat != null) return stringa(ev.chat);
         return !!ev.pagine && typeof ev.pagine === 'object'
@@ -134,9 +137,12 @@
     return nelPeriodo(pagina.ts, c) && delSito(pagina.url, c.sito);
   }
 
-  // Una visita che una cancellazione già vista copre non entra: non si scrive nemmeno.
-  function coperto(stato, ev) {
-    return !!ev && ev.tipo === TIPI.NAVIGAZIONE && stato.tagli.some((c) => copre(c, ev));
+  // Una visita che una cancellazione già vista copre non entra: non si scrive nemmeno. Il titolo nuovo di una visita
+  // che qui non c'è (cancellata, o mai entrata) nemmeno: `visite` sono quelle che arrivano insieme a lui.
+  function coperto(stato, ev, visite) {
+    if (!ev) return false;
+    if (ev.tipo === TIPI.TITOLO_PAGINA) return !stato.pagine.has(ev.visita) && !(visite && visite.has(ev.visita));
+    return ev.tipo === TIPI.NAVIGAZIONE && stato.tagli.some((c) => copre(c, ev));
   }
 
   function chatNuova(id, ts) {
@@ -184,6 +190,11 @@
           id: ev.id, ts: ev.ts, url: ev.url, titolo: ev.titolo, scheda: ev.scheda ?? null, dispositivo: ev.dispositivo,
         });
         break;
+      case TIPI.TITOLO_PAGINA: {
+        const p = stato.pagine.get(ev.visita);
+        if (p) p.titolo = ev.titolo;
+        break;
+      }
       case TIPI.CANCELLAZIONE: {
         let tolti = 0;
         if (ev.chat != null) {
@@ -208,6 +219,8 @@
   function compatta(eventi) {
     const chatCancellate = new Set();
     const tagli = eventi.filter((ev) => ev.tipo === TIPI.CANCELLAZIONE && ev.chat == null).map(copertura);
+    // Il titolo di una pagina cancellata è suo contenuto: se ne va con lei.
+    const visiteTolte = new Set(eventi.filter((ev) => ev.tipo === TIPI.NAVIGAZIONE && tagli.some((c) => copre(c, ev))).map((ev) => ev.id));
     const tenuti = [];
     for (let i = eventi.length - 1; i >= 0; i--) {
       const ev = eventi[i];
@@ -217,7 +230,8 @@
         continue;
       }
       if (ev.chat != null && chatCancellate.has(ev.chat)) continue;
-      if (ev.tipo === TIPI.NAVIGAZIONE && tagli.some((c) => copre(c, ev))) continue;
+      if (ev.tipo === TIPI.NAVIGAZIONE && visiteTolte.has(ev.id)) continue;
+      if (ev.tipo === TIPI.TITOLO_PAGINA && visiteTolte.has(ev.visita)) continue;
       tenuti.push(ev);
     }
     return tenuti.reverse();

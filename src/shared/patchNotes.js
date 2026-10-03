@@ -16,6 +16,7 @@
       ],
       fixes: [
         'Lettura ad alta voce e dettatura non partono più verso un fornitore che Filo esclude. Se il modello che hai scelto lo serve solo lui, Filo te lo dice e non manda niente.',
+        'Quando elimini una chat dalla Cronologia, il suo testo sparisce anche dall\'elenco delle richieste fatte ai modelli: lì restano solo i costi.',
       ],
     },
     {

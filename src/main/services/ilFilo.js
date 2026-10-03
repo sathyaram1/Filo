@@ -176,7 +176,8 @@ function creaFilo({ cartella } = {}) {
       throw new Error(`evento del filo fuori formato: ${tutti.filter((ev) => !E().valido(ev)).map((ev) => ev && ev.tipo).join(', ')}`);
     }
     const st = incog ? incognito.stato : normale.stato;
-    const daScrivere = validi.filter((ev) => !E().coperto(st, ev));
+    const visite = new Set(validi.filter((ev) => ev.tipo === E().TIPI.NAVIGAZIONE && !E().coperto(st, ev)).map((ev) => ev.id));
+    const daScrivere = validi.filter((ev) => !E().coperto(st, ev, visite));
     if (!daScrivere.length) return { scritti: [], tolti: 0 };
     let tolti = 0;
     if (incog) {
@@ -247,6 +248,16 @@ function creaFilo({ cartella } = {}) {
     }, opts);
   }
 
+  // Il titolo che la pagina si dà dopo (un'app web, «Caricamento…» che diventa il nome vero) è un evento in coda.
+  function aggiornaTitolo({ visita, titolo } = {}, opts) {
+    if (!visita || typeof titolo !== 'string' || !titolo) return Promise.resolve(null);
+    return transazione(async (t) => {
+      const ev = t.evento(E().TIPI.TITOLO_PAGINA, { visita: String(visita), titolo }, { autore: 'utente' });
+      const { scritti } = await t.scrivi([ev]);
+      return scritti.length ? ev : null;
+    }, opts);
+  }
+
   function cancellaPagine(periodo, opts) {
     if (!periodo) return Promise.resolve(0);
     return transazione(async (t) => {
@@ -304,7 +315,7 @@ function creaFilo({ cartella } = {}) {
   }
 
   return {
-    carica, transazione, chats, chat, pagine, registraVisita, cancellaPagine, esporta, importa, importaChatSalvate,
+    carica, transazione, chats, chat, pagine, registraVisita, aggiornaTitolo, cancellaPagine, esporta, importa, importaChatSalvate,
     resetIncognito, dispositivo, quandoFermo, percorso: fileEventi,
   };
 }

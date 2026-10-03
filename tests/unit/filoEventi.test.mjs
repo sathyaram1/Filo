@@ -380,3 +380,35 @@ test('«cancella le pagine di YouTube» toglie solo quel sito, coi suoi sottodom
   assert.equal(ultima.pagine.sito, 'wikipedia');
   assert.ok(E.valido(ultima));
 });
+
+test('il titolo che una pagina si dà dopo è un evento in coda: aggiorna la visita, e se ne va con lei', async () => {
+  magazzino = {};
+  const { f, file, cartella } = nuovo();
+  const v = await f.registraVisita({ url: 'https://posta.example/', titolo: 'posta.example/' });
+  await f.registraVisita({ url: 'https://resta.example/', titolo: 'Resta', ts: new Date(Date.now() - 3 * 3600e3).toISOString() });
+  const prima = leggi(file);
+  await f.aggiornaTitolo({ visita: v.id, titolo: 'Posta in arrivo (3)' });
+  assert.ok(leggi(file).startsWith(prima), 'il titolo nuovo non si scrive in coda');
+  assert.equal(JSON.parse(righe(file).at(-1)).tipo, E.TIPI.TITOLO_PAGINA);
+  assert.deepEqual((await f.pagine()).map((p) => p.titolo).sort(), ['Posta in arrivo (3)', 'Resta']);
+  // Riletto da disco, ed esportato e reimportato su un profilo vuoto, vale il titolo nuovo.
+  assert.deepEqual((await creaFilo({ cartella }).pagine()).map((p) => p.titolo).sort(), ['Posta in arrivo (3)', 'Resta']);
+  const { f: B } = nuovo();
+  await B.importa(await f.esporta());
+  assert.deepEqual((await B.pagine()).map((p) => p.titolo).sort(), ['Posta in arrivo (3)', 'Resta']);
+  // Cancellata la pagina, il suo titolo nuovo sparisce dal file; uno che arriva dopo non entra.
+  await f.cancellaPagine(E.periodo('ultima_ora'));
+  assert.ok(!leggi(file).includes('Posta in arrivo'));
+  assert.equal(await f.aggiornaTitolo({ visita: v.id, titolo: 'Posta in arrivo (4)' }), null);
+  assert.ok(!leggi(file).includes('Posta in arrivo'));
+  assert.ok(leggi(file).includes('Resta'));
+});
+
+test('dall’incognito anche il titolo nuovo di una pagina resta in memoria', async () => {
+  magazzino = {};
+  const { f, file } = nuovo();
+  const v = await f.registraVisita({ url: 'https://segreta.example/', titolo: 'x' }, { incognito: true });
+  await f.aggiornaTitolo({ visita: v.id, titolo: 'Titolo segreto' }, { incognito: true });
+  assert.deepEqual((await f.pagine(null, { incognito: true })).map((p) => p.titolo), ['Titolo segreto']);
+  assert.ok(!leggi(file).includes('Titolo segreto'));
+});

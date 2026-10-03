@@ -387,7 +387,83 @@
     return `${testa}\n…(${tolti} caratteri dell'esito non conservati)…\n${coda}`;
   }
 
+  // ── Le copie di una chat cancellata (#866) ───────────────────────────────
+  // Una chat cancellata deve sparire anche dalle sue copie: le richieste ai modelli, la cache, il registro grezzo.
+  // Lì un messaggio può stare intero, scritto come stringa JSON o troncato: si cerca il suo inizio e si toglie
+  // tutto il pezzo che coincide. Un messaggio corto vale solo intero e fra due confini di parola.
+  const CHAT_CANCELLATA = '[chat cancellata]';
+  const SEME = 24;
+  const FORTE = 12;
+  const PAROLA = /[\p{L}\p{N}]/u;
+
+  function formeDaDimenticare(testi) {
+    const forme = new Set();
+    for (const t of Array.isArray(testi) ? testi : []) {
+      const s = String(t == null ? '' : t).trim();
+      if (!s) continue;
+      forme.add(s);
+      const json = JSON.stringify(s).slice(1, -1);
+      if (json !== s) forme.add(json);
+    }
+    return [...forme].sort((a, b) => b.length - a.length);
+  }
+
+  // Un pezzo troncato vale se la copia finisce lì, prosegue coi puntini, o coincide per 200 caratteri.
+  function pezzi(s, forme) {
+    const trovati = [];
+    for (const f of forme) {
+      const seme = f.slice(0, Math.min(f.length, SEME));
+      for (let i = s.indexOf(seme); i !== -1; i = s.indexOf(seme, i + 1)) {
+        let k = seme.length;
+        while (k < f.length && i + k < s.length && s[i + k] === f[k]) k++;
+        const intero = k === f.length;
+        if (!intero && !(i + k === s.length || s[i + k] === '…' || k >= 200)) continue;
+        if (i > 0 && PAROLA.test(s[i - 1]) && PAROLA.test(f[0])) continue;
+        if (intero && i + k < s.length && PAROLA.test(s[i + k]) && PAROLA.test(f[f.length - 1])) continue;
+        trovati.push({ i, k, forte: k >= FORTE || (i === 0 && k === s.length) });
+      }
+    }
+    return trovati;
+  }
+
+  function stringhe(valore, fn) {
+    if (typeof valore === 'string') return fn(valore);
+    if (Array.isArray(valore)) return valore.map((v) => stringhe(v, fn));
+    if (valore && typeof valore === 'object') {
+      const out = {};
+      for (const k of Object.keys(valore)) out[k] = stringhe(valore[k], fn);
+      return out;
+    }
+    return valore;
+  }
+
+  // Vero se il valore porta un messaggio della chat in modo riconoscibile (lungo, o una stringa che è il messaggio).
+  function riguardaChat(valore, forme) {
+    let si = false;
+    stringhe(valore, (s) => { if (!si && pezzi(s, forme).some((p) => p.forte)) si = true; return s; });
+    return si;
+  }
+
+  function redigiChat(valore, forme) {
+    return stringhe(valore, (s) => {
+      const trovati = pezzi(s, forme).sort((a, b) => a.i - b.i || b.k - a.k);
+      if (!trovati.length) return s;
+      let out = '';
+      let fine = 0;
+      for (const p of trovati) {
+        if (p.i < fine) continue;
+        out += s.slice(fine, p.i) + CHAT_CANCELLATA;
+        fine = p.i + p.k;
+      }
+      return out + s.slice(fine);
+    });
+  }
+
   global.SN_CHAT_ARCHIVE = {
+    CHAT_CANCELLATA,
+    formeDaDimenticare,
+    riguardaChat,
+    redigiChat,
     KIND_TALK,
     KIND_COMMAND,
     KINDS,

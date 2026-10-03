@@ -1958,7 +1958,7 @@ class TabManager {
   _wireEvents(tab) {
     const wc = tab.view.webContents;
     this._registraPermessoRichieste(tab);
-    try { wc.once('destroyed', () => this.visite.scrivi(wc, { titoloAttuale: false })); } catch (_) {}
+    try { wc.once('destroyed', () => this.visite.chiusa(wc)); } catch (_) {}
     const update = (patch) => {
       Object.assign(tab, patch);
       this._broadcast();

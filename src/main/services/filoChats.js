@@ -144,13 +144,33 @@
     return Number(chat.triagedCount) !== n;
   }
 
+  // Il testo di una chat cancellata se ne va anche dalle sue copie: registro grezzo, cache e richieste ai modelli.
+  async function dimenticaCopie(chat) {
+    const forme = CA().formeDaDimenticare((chat.messages || []).map((m) => m && m.text));
+    if (!forme.length) return;
+    const M = global.SN_FILO_MEMORY;
+    const C = global.SN_AI_CACHE;
+    const H = global.SN_HISTORY;
+    if (M && M.togliRaw) await M.togliRaw((e) => !!e && /^chat_/.test(String(e.type)) && CA().riguardaChat(e.summary, forme));
+    if (C && C.togli) await C.togli((e) => CA().riguardaChat(e, forme));
+    if (H && H.redigi) {
+      await H.redigi((it) => (CA().riguardaChat([it.input, it.output], forme)
+        ? { ...it, input: CA().redigiChat(it.input, forme), output: CA().redigiChat(it.output, forme) }
+        : it));
+    }
+  }
+
   // Cancellare è un evento in coda, e il contenuto della chat sparisce anche dal file.
   async function remove(id) {
     if (id) {
       id = String(id);
-      await F().transazione(async (t) => {
-        if (t.chat(id)) await t.scrivi([t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' })]);
+      const tolta = await F().transazione(async (t) => {
+        const c = t.chat(id);
+        if (!c) return null;
+        await t.scrivi([t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' })]);
+        return c;
       });
+      if (tolta) await dimenticaCopie(tolta).catch((e) => console.warn('[Filo] copie della chat cancellata:', e?.message || e));
     }
     return list();
   }

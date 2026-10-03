@@ -485,3 +485,48 @@ test('«cancella le pagine di ieri sera» e «di ieri» chiedono l’OK per quel
   expect(leggiFilo(userData)).not.toContain('Ieri mattina');
   expect(leggiFilo(userData)).toContain('Pagina di oggi');
 });
+
+test('una pagina che si dà il titolo dopo il caricamento, o lo cambia dopo un cambio d’indirizzo interno, porta quello vero', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
+  const titoli = () => app.evaluate(async () => (await globalThis.SN_IL_FILO.pagine()).map((p) => p.titolo).sort());
+  await openTab(testServer.html('<!doctype html><p>app</p><script>setTimeout(()=>{document.title="Posta in arrivo (3)"},700)</script>'));
+  await openTab(testServer.html('<!doctype html><title>Caricamento…</title><p>app</p><script>setTimeout(()=>{document.title="Ordine 1234 confermato"},700)</script>'));
+  await expect.poll(titoli, { timeout: 20_000 }).toEqual(['Ordine 1234 confermato', 'Posta in arrivo (3)']);
+
+  const page = await openTab(testServer.html('<!doctype html><title>Home video</title><p>x</p>'));
+  await expect.poll(async () => (await titoli()).includes('Home video'), { timeout: 20_000 }).toBe(true);
+  await page.evaluate(() => {
+    history.pushState(null, '', '/video/42');
+    document.title = 'Caricamento…';
+    setTimeout(() => { document.title = 'Orche al tramonto - Video'; }, 600);
+  });
+  await expect.poll(titoli, { timeout: 20_000 }).toEqual(['Home video', 'Orche al tramonto - Video', 'Ordine 1234 confermato', 'Posta in arrivo (3)']);
+  // Il titolo nuovo è una riga in coda, e riletto dal file vale quello.
+  await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
+  expect(eventi(userData).filter((e) => e.tipo === 'navigazione.titolo').map((e) => e.titolo)).toContain('Orche al tramonto - Video');
+});
+
+test('cancellata una chat dalla Cronologia, il suo testo sparisce anche dalle richieste ai modelli, dalla cache e dal registro grezzo', async ({ app }) => {
+  test.setTimeout(90_000);
+  await configura(app);
+  await turno(app, 'chat-privata', 'La mia diagnosi PRIVATO-77, cosa ne pensi?');
+  await turno(app, 'chat-da-tenere', 'Parliamo di Epicuro TIENIMI-55');
+  await app.evaluate(async () => { await globalThis.SN_CLOSE_FILO_CHAT('chat-privata'); await globalThis.SN_CLOSE_FILO_CHAT('chat-da-tenere'); });
+  const voci = () => app.evaluate(async () => (await globalThis.SN_HISTORY.list()).length);
+  const prima = await voci();
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_CHAT_DELETE, id: 'chat-privata' }, { url: 'filo://archive/archive.html' }));
+  const dove = await app.evaluate(async () => {
+    const tutto = await globalThis.chrome.storage.local.get(null);
+    return {
+      privato: Object.keys(tutto).filter((k) => JSON.stringify(tutto[k]).includes('PRIVATO-77')),
+      tenuto: Object.keys(tutto).filter((k) => JSON.stringify(tutto[k]).includes('TIENIMI-55')).sort(),
+      segnate: (tutto.aiHistory || []).filter((it) => JSON.stringify(it).includes('[chat cancellata]')).length,
+    };
+  });
+  expect(dove.privato).toEqual([]);
+  // L'altra chat resta dov'era, e le richieste della chat cancellata restano coi loro costi, senza il testo.
+  expect(dove.tenuto).toEqual(expect.arrayContaining(['aiHistory', 'filo_raw_log']));
+  expect(dove.segnate).toBeGreaterThan(0);
+  expect(await voci()).toBe(prima);
+});

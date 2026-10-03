@@ -103,6 +103,14 @@
     return out.slice(0, limit);
   }
 
+  // Toglie le voci che `pred` riconosce (i messaggi di una chat cancellata, #866).
+  async function togliRaw(pred) {
+    const list = await getRaw(KEYS.FILO_RAW_LOG, []);
+    const next = list.filter((e) => !pred(e));
+    if (next.length !== list.length) await setRaw(KEYS.FILO_RAW_LOG, next);
+    return list.length - next.length;
+  }
+
   // ===== Lessons buffer =====
 
   async function getLessonsBuffer() {
@@ -896,7 +904,7 @@
 
   global.SN_FILO_MEMORY = {
     // raw log
-    appendRaw, listRaw,
+    appendRaw, listRaw, togliRaw,
     // lessons
     getLessonsBuffer, appendLesson, lessonsBufferShouldCompact, clearLessonsBuffer, forgetLesson,
     LESSONS_BUFFER_TRIGGER_CHARS,

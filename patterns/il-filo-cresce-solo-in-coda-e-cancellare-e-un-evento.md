@@ -31,6 +31,12 @@ Nessun tetto e nessun taglio.
 - **Una visita è una voce nuova della cronologia della scheda.** Ricaricare, cambiare il frammento, riaprire le
   schede di prima o riscrivere la propria voce (una mappa spostata, un filtro) non è una pagina nuova; una pagina
   nuova dentro la stessa (un video dopo l'altro) sì. Sentinella `tests/unit/visiteSchede.test.mjs`.
+- **Il titolo di una visita segue la pagina.** Le app web lo scrivono dopo il caricamento, o passano da
+  «Caricamento…» al nome vero: il titolo nuovo è un evento in coda (`navigazione.titolo`) quando resta fermo un
+  attimo, subito nel primo mezzo minuto e poi all'uscita dalla pagina, così un titolo che cambia di continuo non
+  riempie il filo. Se ne va con la sua pagina.
+- **Una chat cancellata sparisce anche dalle sue copie**: registro grezzo, cache delle risposte e richieste ai
+  modelli (che restano coi costi, senza il testo). Sentinella `tests/unit/chatCopieCancellate.test.mjs`.
 - **Un tetto è una cancellazione automatica.** Il vecchio registro grezzo (5000 voci, testi a 200 caratteri)
   è esattamente il taglio silenzioso che le regole del repo vietano.
 
