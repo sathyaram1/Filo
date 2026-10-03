@@ -498,6 +498,7 @@
 
     // Posizionamento: misura, flip se necessario.
     place(root, x, y);
+    sorveglia(root);
 
     // #500 — il menu non ha un'altezza definitiva quando lo si posa: le sezioni
     // dinamiche (la spiegazione AI di una selezione, di un collegamento, di
