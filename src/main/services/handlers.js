@@ -1459,10 +1459,14 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
 
   // CANCELLA_PAGINE (#866): periodo e numero di pagine li calcola il main, così il popup dice il conto vero.
   if (type === 'CANCELLA_PAGINE') {
-    action._periodo = globalThis.SN_FILO_EVENTI.periodo(action.periodo || 'ultima_ora', { ore: action.ore });
+    const sito = globalThis.SN_FILO_EVENTI.normaSito(action.sito ?? action.dominio ?? action.site ?? '');
+    // Un sito senza periodo («cancella le pagine di YouTube») vuol dire tutte le sue pagine.
+    const nome = action.periodo || (sito && action.ore == null ? 'tutto' : 'ultima_ora');
+    action._periodo = globalThis.SN_FILO_EVENTI.periodo(nome, { ore: action.ore });
     if (!action._periodo) {
       return { executed: false, kept: false, output: { errore: 'periodo non capito: usa ultima_ora, oggi, tutto oppure ore' } };
     }
+    if (sito) { action._periodo.sito = sito; action._sito = sito; action._nomePeriodo = nome; }
     try { action._n = (await globalThis.SN_IL_FILO.pagine(action._periodo)).length; } catch (_) {}
   }
 

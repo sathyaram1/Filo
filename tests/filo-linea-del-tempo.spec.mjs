@@ -10,6 +10,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node
 import { createRequire } from 'node:module';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import http from 'node:http';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { buildExportZip } = createRequire(import.meta.url)('../src/main/services/exportData.js');
@@ -348,4 +349,94 @@ test('un sito non conta né cancella le pagine visitate, nemmeno chiedendolo com
   const conferma = await chiedi({ type: 'filo_confirm_action', action: { type: 'CANCELLA_PAGINE', periodo: 'tutto' } });
   expect(conferma?.executed).not.toBe(true);
   expect(leggiFilo(userData)).toContain('Sito curioso');
+});
+
+test('riaprire Filo con le schede di prima non scrive una visita nuova per ognuna', async () => {
+  test.setTimeout(120_000);
+  const server = http.createServer((req, res) => { res.setHeader('content-type', 'text/html'); res.end(`<!doctype html><title>Pagina ${req.url}</title><p>x</p>`); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const urls = [`${base}/uno`, `${base}/due`];
+  const userData = cartellaTemporanea('filo-866-ripristino-');
+  let { app, shell } = await avvia(userData);
+  const visite = () => eventi(userData).filter((e) => e.tipo === 'navigazione' && urls.includes(e.url)).length;
+  try {
+    for (const u of urls) await shell.evaluate((x) => window.filoShell.tabs.open(x), u);
+    await expect.poll(visite, { timeout: 20_000 }).toBe(2);
+    await new Promise((r) => setTimeout(r, 2500));
+    await chiudiApp(app, { tetto: 15_000 });
+    ({ app, shell } = await avvia(userData));
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+      .flatMap((w) => (w._filoTabs?.tabs || []).map((t) => t.view.webContents.getURL()))), { timeout: 20_000 })
+      .toEqual(expect.arrayContaining(urls));
+    // Dalla scheda ripristinata l'utente va altrove: questa sì che è una visita.
+    await app.evaluate(({ BrowserWindow }, u) => {
+      const t = BrowserWindow.getAllWindows().flatMap((w) => w._filoTabs?.tabs || []).find((x) => x.view.webContents.getURL() === u);
+      t.view.webContents.loadURL(u.replace('/uno', '/tre'));
+    }, urls[0]);
+    await expect.poll(() => eventi(userData).some((e) => e.tipo === 'navigazione' && e.url === `${base}/tre`), { timeout: 20_000 }).toBe(true);
+    await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
+    expect(visite(), 'il riavvio ha scritto una visita per ogni scheda ripristinata').toBe(2);
+  } finally {
+    await chiudiApp(app);
+    server.close();
+    rmSync(userData, { recursive: true, force: true });
+  }
+});
+
+test('la chat della home in una finestra incognito resta fuori dal file, anche a scheda chiusa', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
+  await configura(app);
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  // La home dell'incognito si riconosce dal main: le si mette un segno e la si cerca fra le pagine.
+  await expect.poll(() => app.evaluate(async ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito && x._filoTabs);
+    const t = w && w._filoTabs.tabs.find((tt) => tt.view.webContents.getURL().startsWith('filo://newtab'));
+    if (!t) return false;
+    try { await t.view.webContents.executeJavaScript('window.__homeIncognito = 1'); return true; } catch (_) { return false; }
+  }), { timeout: 20_000 }).toBe(true);
+  let home = null;
+  await expect.poll(async () => {
+    for (const w of app.windows()) {
+      try { if (await w.evaluate(() => window.__homeIncognito === 1)) { home = w; return true; } } catch (_) {}
+    }
+    return false;
+  }, { timeout: 20_000 }).toBe(true);
+  await home.locator('#input').fill('Messaggio SEGRETO-INCOG-42');
+  await home.locator('#sendBtn').click();
+  const inMemoria = (t) => app.evaluate(async (_e, t) => (await globalThis.SN_IL_FILO.chats({ incognito: true }))
+    .some((c) => c.messages.some((m) => m.text.includes(t))), t);
+  await expect.poll(() => inMemoria('SEGRETO-INCOG-42'), { timeout: 20_000 }).toBe(true);
+  await expect.poll(() => inMemoria('Risposta di Filo'), { timeout: 20_000 }).toBe(true);
+  await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
+  expect(leggiFilo(userData)).not.toContain('SEGRETO-INCOG-42');
+
+  await turno(app, 'chat-normale-77', 'Messaggio NORMALE-77');
+  await expect.poll(() => leggiFilo(userData).includes('NORMALE-77'), { timeout: 10_000 }).toBe(true);
+
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoIncognito).close());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito)), { timeout: 10_000 }).toBe(false);
+  await new Promise((r) => setTimeout(r, 1500));
+  await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
+  expect(leggiFilo(userData)).not.toContain('SEGRETO-INCOG-42');
+  expect(await app.evaluate(async () => (await globalThis.SN_IL_FILO.chats({ incognito: true })).length)).toBe(0);
+});
+
+test('«cancella le pagine di YouTube» chiede l’OK col conto di quel sito e toglie solo quelle dal file', async ({ app }) => {
+  const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
+  await app.evaluate(async () => {
+    for (const [url, titolo] of [['https://www.youtube.com/watch?v=1', 'Video uno'], ['https://m.youtube.com/watch?v=2', 'Video due'], ['https://it.wikipedia.org/', 'Wikipedia']]) {
+      await globalThis.SN_IL_FILO.registraVisita({ url, titolo });
+    }
+  });
+  const chiesta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', sito: 'youtube.com' }));
+  expect(chiesta.needsConfirm).toBe(2);
+  expect(chiesta.describe).toContain('le 2 pagine visitate su youtube.com di sempre');
+  const fatta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', sito: 'youtube.com' }, { confirmed: true }));
+  expect(fatta.output.cancellate).toBe(2);
+  const testo = leggiFilo(userData);
+  expect(testo).not.toContain('Video uno');
+  expect(testo).not.toContain('Video due');
+  expect(testo).toContain('Wikipedia');
 });

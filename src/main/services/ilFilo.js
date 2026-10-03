@@ -175,11 +175,13 @@ function creaFilo({ cartella } = {}) {
     if (validi.length < tutti.length && !scartaInvalidi) {
       throw new Error(`evento del filo fuori formato: ${tutti.filter((ev) => !E().valido(ev)).map((ev) => ev && ev.tipo).join(', ')}`);
     }
-    if (!validi.length) return { scritti: [], tolti: 0 };
+    const st = incog ? incognito.stato : normale.stato;
+    const daScrivere = validi.filter((ev) => !E().coperto(st, ev));
+    if (!daScrivere.length) return { scritti: [], tolti: 0 };
     let tolti = 0;
     if (incog) {
       const scritti = [];
-      for (const ev of validi) {
+      for (const ev of daScrivere) {
         const r = E().applica(incognito.stato, ev);
         if (r.nuovo) { incognito.eventi.push(ev); scritti.push(ev); }
         tolti += r.tolti;
@@ -187,7 +189,7 @@ function creaFilo({ cartella } = {}) {
       if (tolti) incognito.eventi = E().compatta(incognito.eventi);
       return { scritti, tolti };
     }
-    const nuovi = validi.filter((ev) => !normale.stato.ids.has(ev.id));
+    const nuovi = daScrivere.filter((ev) => !normale.stato.ids.has(ev.id));
     if (!nuovi.length) return { scritti: [], tolti: 0 };
     await scriviInCoda(nuovi.map(E().riga).join(''));
     for (const ev of nuovi) tolti += E().applica(normale.stato, ev).tolti;
@@ -248,7 +250,9 @@ function creaFilo({ cartella } = {}) {
   function cancellaPagine(periodo, opts) {
     if (!periodo) return Promise.resolve(0);
     return transazione(async (t) => {
-      const ev = t.evento(E().TIPI.CANCELLAZIONE, { pagine: { da: periodo.da ?? null, a: periodo.a ?? null } }, { autore: 'utente' });
+      const sito = periodo.sito ? E().normaSito(periodo.sito) : '';
+      const pagine = { da: periodo.da ?? null, a: periodo.a ?? null, ...(sito ? { sito } : {}) };
+      const ev = t.evento(E().TIPI.CANCELLAZIONE, { pagine }, { autore: 'utente' });
       const { tolti } = await t.scrivi([ev]);
       return tolti;
     }, opts);

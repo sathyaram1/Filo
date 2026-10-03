@@ -20,6 +20,10 @@ Nessun tetto e nessun taglio.
 - **Cancellare deve essere vero.** Un registro che segna «cancellato» e lascia il testo sul disco mente
   all'utente. La riga di cancellazione resta (un altro dispositivo dovrà saperla), il contenuto se ne va.
   Se l'app muore fra le due cose, la partenza dopo finisce il lavoro.
+- **Una cancellazione vale per il tempo che dice, non per l'ordine di arrivo.** Copre le pagine aperte prima
+  di lei nel suo periodo (e del suo sito, se ne nomina uno), anche quelle che arrivano dopo: una visita
+  ancora in caricamento, un import, un altro dispositivo. «Tutto» è tutto fino a quel momento: un backup
+  importato non porta via le pagine visitate dopo.
 - **L'incognito ha un filo in memoria.** La garanzia di `src/main/shim/storage.js` (overlay in RAM) vale solo
   per chi passa da lì: un file scritto per conto proprio la romperebbe. Il filo decide l'incognito alla
   richiesta (contesto dell'IPC, o la finestra per le pagine visitate) e tiene quell'altro filo in RAM fino

@@ -3174,6 +3174,8 @@ class TabManager {
         // Una scheda su un sito della lista torna sulla pagina «Sito bloccato»:
         // non sparisce dalla sessione e il sito non si riapre da solo (#590).
         const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true });
+        const nata = id && this.tabs.find((t) => t.id === id);
+        if (nata) this.visite.giaVista(nata.view.webContents, url);
         // §1.2/§1.3 — ripristina subito il colore identità salvato: la barra
         // riparte già tinta e il riordino cromatico alla riapertura ha i dati
         // pronti senza attendere il ricalcolo dei content script. Seeda anche la

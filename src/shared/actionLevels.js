@@ -88,10 +88,14 @@
   function periodoDetto(action) {
     const ore = Number(action && action.ore);
     if (Number.isFinite(ore) && ore > 0) return ore === 1 ? 'dell’ultima ora' : `delle ultime ${ore} ore`;
-    const p = String((action && action.periodo) || '').toLowerCase();
+    const p = String((action && (action.periodo || action._nomePeriodo)) || '').toLowerCase();
     if (p === 'oggi') return 'di oggi';
     if (p === 'tutto') return 'di sempre';
     return 'dell’ultima ora';
+  }
+  function sitoDetto(action) {
+    const s = String((action && (action._sito || action.sito)) || '').trim();
+    return s ? ` su ${s}` : '';
   }
   function timerRefLabel(action) {
     const kind = String((action && (action.tipo ?? action.kind)) || '').toLowerCase();
@@ -352,11 +356,11 @@
       describe: (a) => {
         const n = Number(a && a._n);
         const quali = Number.isFinite(n) ? (n === 1 ? 'la pagina visitata' : `le ${n} pagine visitate`) : 'le pagine visitate';
-        return `Cancellare ${quali} ${periodoDetto(a)}.\nFilo non le ricorderà più. Chat e schede chiuse restano.`;
+        return `Cancellare ${quali}${sitoDetto(a)} ${periodoDetto(a)}.\nFilo non le ricorderà più. Chat e schede chiuse restano.`;
       },
       describeDone: (a) => {
         const n = Number(a && a._output && a._output.cancellate) || 0;
-        return n ? `Cancellate ${n === 1 ? '1 pagina visitata' : `${n} pagine visitate`} ${periodoDetto(a)}` : `Nessuna pagina visitata ${periodoDetto(a)}`;
+        return n ? `Cancellate ${n === 1 ? '1 pagina visitata' : `${n} pagine visitate`}${sitoDetto(a)} ${periodoDetto(a)}` : `Nessuna pagina visitata${sitoDetto(a)} ${periodoDetto(a)}`;
       },
     },
     CANCELLA_MEMORIA: {

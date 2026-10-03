@@ -320,8 +320,8 @@
     },
     {
       id: 'visited-pages', title: 'Filo ricorda le pagine visitate', category: 'save',
-      desc: 'Ogni pagina che apri in una scheda (indirizzo, titolo e quando l’hai aperta) entra nella linea del tempo di Filo insieme alle chat, sul tuo computer, senza un limite di quante ne tiene. Le cancelli quando vuoi: quelle dell’ultima ora, di oggi, delle ultime ore che dici tu o tutte, e spariscono anche dal disco. Esporta dati e Importa dati le portano con sé, insieme alle chat.',
-      invoke: 'Chiedilo a Filo a parole ("cancella le pagine dell’ultima ora", "cancella la cronologia di oggi", "cancella le pagine delle ultime 3 ore", "cancella tutta la cronologia"): ti dice quante sono e aspetta il tuo OK. Oppure pagina Sicurezza (filo://security/security.html), sezione «Pagine visitate»: «Cancella l’ultima ora», «Cancella oggi», «Cancella tutto».',
+      desc: 'Ogni pagina che apri in una scheda (indirizzo, titolo e quando l’hai aperta) entra nella linea del tempo di Filo insieme alle chat, sul tuo computer, senza un limite di quante ne tiene. Le cancelli quando vuoi: quelle dell’ultima ora, di oggi, delle ultime ore che dici tu o tutte, anche di un sito solo, e spariscono anche dal disco. Riaprire Filo con le schede di prima non conta come una visita nuova. Esporta dati e Importa dati le portano con sé, insieme alle chat.',
+      invoke: 'Chiedilo a Filo a parole ("cancella le pagine dell’ultima ora", "cancella la cronologia di oggi", "cancella le pagine delle ultime 3 ore", "cancella tutta la cronologia", "cancella le pagine di YouTube"): ti dice quante sono e aspetta il tuo OK. Oppure pagina Sicurezza (filo://security/security.html), sezione «Pagine visitate»: «Cancella l’ultima ora», «Cancella oggi», «Cancella tutto».',
       doesNot: 'Non ricorda le pagine aperte in incognito, e niente esce dal tuo computer. Per ora non c’è una pagina per sfogliarle e Filo non le usa ancora per rispondere. Cancellarle non tocca le chat né le schede chiuse della Cronologia.',
     },
     {

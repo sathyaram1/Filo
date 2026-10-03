@@ -309,3 +309,56 @@ test('il filo lo scrive un modulo solo, e solo in coda o riscrivendo dopo una ca
   assert.deepEqual(aperture, [['fileEventi()', 'a'], ['tmp', 'w']], 'il file del filo si apre solo in coda (o il temporaneo della compattazione)');
   assert.doesNotMatch(modulo, /writeFile\(\s*fileEventi\(\)|truncate|ftruncate/, 'il file del filo non si riscrive sul posto');
 });
+
+// Una cancellazione di pagine vale per il tempo che dice, non per l'ordine in cui gli eventi arrivano.
+test('importare il backup di un profilo che aveva cancellato tutto non toglie le pagine visitate dopo', async () => {
+  magazzino = {};
+  const { f: A } = nuovo();
+  await A.registraVisita({ url: 'https://a.example/', titolo: 'A', ts: new Date(Date.now() - 5 * 86400e3).toISOString() });
+  await A.cancellaPagine(E.periodo('tutto'));
+  const backup = await A.esporta();
+  await new Promise((r) => setTimeout(r, 15));
+  const { f: B, file } = nuovo();
+  await B.registraVisita({ url: 'https://b.example/1', titolo: 'B1' });
+  await B.registraVisita({ url: 'https://b.example/2', titolo: 'B2', ts: new Date(Date.now() - 6 * 86400e3).toISOString() });
+  await B.importa(backup);
+  assert.deepEqual((await B.pagine()).map((p) => p.titolo), ['B1'], 'tolta una pagina aperta dopo la cancellazione, o tenuta una di prima');
+  assert.ok(leggi(file).includes('b.example/1'));
+  assert.ok(!leggi(file).includes('b.example/2'));
+});
+
+test('una visita del periodo cancellato che arriva dopo la cancellazione non entra, né in memoria né su disco', async () => {
+  magazzino = {};
+  const { f, file, cartella } = nuovo();
+  const aperta = new Date(Date.now() - 2000).toISOString();
+  await f.cancellaPagine(E.periodo('ultima_ora'));
+  await f.registraVisita({ url: 'https://in-caricamento.example/', titolo: 'In caricamento', ts: aperta });
+  await f.registraVisita({ url: 'https://dopo.example/', titolo: 'Dopo' });
+  assert.deepEqual((await f.pagine()).map((p) => p.titolo), ['Dopo']);
+  assert.ok(!leggi(file).includes('in-caricamento.example'));
+  // Riletta da disco, una riga coperta scritta da una versione di prima se ne va alla partenza.
+  appendFileSync(file, E.riga(E.crea(E.TIPI.NAVIGAZIONE, { url: 'https://vecchia-riga.example/', titolo: 'V' }, { ts: aperta, dispositivo: 'x' })));
+  const g = creaFilo({ cartella });
+  assert.deepEqual((await g.pagine()).map((p) => p.titolo), ['Dopo']);
+  assert.ok(!leggi(file).includes('vecchia-riga.example'));
+});
+
+test('«cancella le pagine di YouTube» toglie solo quel sito, coi suoi sottodomini', async () => {
+  magazzino = {};
+  const { f, file } = nuovo();
+  await f.registraVisita({ url: 'https://www.youtube.com/watch?v=1', titolo: 'Video' });
+  await f.registraVisita({ url: 'https://m.youtube.com/', titolo: 'Mobile' });
+  await f.registraVisita({ url: 'https://youtube.it.example.org/', titolo: 'Altro' });
+  await f.registraVisita({ url: 'https://notyoutube.com/', titolo: 'Simile' });
+  await f.registraVisita({ url: 'https://wikipedia.org/', titolo: 'Wiki' });
+  assert.equal(E.normaSito('https://www.YouTube.com/watch?v=1'), 'youtube.com');
+  assert.equal((await f.pagine({ da: null, a: null, sito: 'youtube.com' })).length, 2);
+  assert.equal(await f.cancellaPagine({ ...E.periodo('tutto'), sito: 'YouTube.com' }), 2);
+  assert.deepEqual((await f.pagine()).map((p) => p.titolo).sort(), ['Altro', 'Simile', 'Wiki']);
+  assert.ok(!leggi(file).includes('youtube.com/watch'));
+  // Il nome senza dominio vale per ogni dominio con quel nome.
+  assert.equal(await f.cancellaPagine({ ...E.periodo('tutto'), sito: 'wikipedia' }), 1);
+  const ultima = JSON.parse(righe(file).at(-1));
+  assert.equal(ultima.pagine.sito, 'wikipedia');
+  assert.ok(E.valido(ultima));
+});

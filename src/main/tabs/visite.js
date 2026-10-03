@@ -31,6 +31,11 @@ class VisiteSchede {
     this.inAttesa.set(wc, v);
   }
 
+  // Una scheda ripristinata dalla sessione di prima non è una visita: la sua pagina il filo l'ha già.
+  giaVista(wc, url) {
+    if (wc && registrabile(url)) this.ultime.set(wc, url);
+  }
+
   titolo(wc, titolo) {
     const v = this.inAttesa.get(wc);
     if (!v || !titolo) return;

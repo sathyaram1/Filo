@@ -12,7 +12,7 @@
       version: '0.2.232', date: '2026-10-03',
       features: [
         'Gli avvisi in basso a destra non se ne vanno finché ci tieni sopra il puntatore, anche quelli dentro le pagine come «Copiato»: un clic li chiude, e il tasto destro offre «Chiudi» e le loro azioni. La durata scelta in Preferenze adesso vale per tutti, e durata e suono li puoi chiedere anche a Filo: «fai durare gli avvisi 10 secondi», «metti il suono carillon alle notifiche».',
-        'Filo ricorda le pagine che apri nelle schede, sul tuo computer, accanto alle chat. Quelle aperte in incognito no. Le cancelli quando vuoi chiedendolo a Filo («cancella le pagine dell\'ultima ora») o in Sicurezza, dove scegli fra l\'ultima ora, oggi e tutto, e spariscono anche dal disco. Esporta dati e Importa dati le portano con sé.',
+        'Filo ricorda le pagine che apri nelle schede, sul tuo computer, accanto alle chat. Quelle aperte in incognito no. Le cancelli quando vuoi chiedendolo a Filo («cancella le pagine dell\'ultima ora», «cancella le pagine di YouTube») o in Sicurezza, dove scegli fra l\'ultima ora, oggi e tutto, e spariscono anche dal disco. Esporta dati e Importa dati le portano con sé.',
       ],
       fixes: [
         'Lettura ad alta voce e dettatura non partono più verso un fornitore che Filo esclude. Se il modello che hai scelto lo serve solo lui, Filo te lo dice e non manda niente.',

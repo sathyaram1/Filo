@@ -45,7 +45,8 @@
       case TIPI.CANCELLAZIONE:
         if (ev.chat != null) return stringa(ev.chat);
         return !!ev.pagine && typeof ev.pagine === 'object'
-          && (ev.pagine.da == null || isoValida(ev.pagine.da)) && (ev.pagine.a == null || isoValida(ev.pagine.a));
+          && (ev.pagine.da == null || isoValida(ev.pagine.da)) && (ev.pagine.a == null || isoValida(ev.pagine.a))
+          && (ev.pagine.sito == null || stringa(ev.pagine.sito));
       default:
         return true;
     }
@@ -94,7 +95,7 @@
   }
 
   function nuovoStato() {
-    return { chat: new Map(), pagine: new Map(), ids: new Set(), pos: 0 };
+    return { chat: new Map(), pagine: new Map(), ids: new Set(), pos: 0, tagli: [] };
   }
 
   function nelPeriodo(ts, pagine) {
@@ -102,6 +103,40 @@
     if (pagine.da != null && t < Date.parse(pagine.da)) return false;
     if (pagine.a != null && t > Date.parse(pagine.a)) return false;
     return true;
+  }
+
+  // «youtube.com», «https://www.youtube.com/watch», «YouTube»: il sito come lo dice l'utente, ridotto a un nome.
+  function normaSito(s) {
+    const t = String(s == null ? '' : s).trim().toLowerCase()
+      .replace(/^[a-z][a-z0-9+.-]*:\/\//, '').split(/[/?#]/)[0].replace(/:\d+$/, '').replace(/^www\./, '');
+    return t;
+  }
+
+  // Senza punto («youtube») vale ogni dominio con quel nome; con il punto, il dominio e i suoi sottodomini.
+  function delSito(url, sito) {
+    if (!sito) return true;
+    let host = '';
+    try { host = new URL(url).hostname.toLowerCase().replace(/^www\./, ''); } catch (_) { return false; }
+    if (!host) return false;
+    if (sito.includes('.')) return host === sito || host.endsWith('.' + sito);
+    return host.split('.').includes(sito);
+  }
+
+  // Una cancellazione di pagine copre quelle aperte PRIMA di lei nel suo periodo, in qualunque ordine arrivino
+  // (un import, una visita ancora in caricamento, un altro dispositivo): «tutto» è tutto fino a quel momento.
+  function copertura(ev) {
+    const p = ev.pagine || {};
+    const a = p.a != null && Date.parse(p.a) < Date.parse(ev.ts) ? p.a : ev.ts;
+    return { da: p.da ?? null, a, sito: p.sito ? normaSito(p.sito) : null };
+  }
+
+  function copre(c, pagina) {
+    return nelPeriodo(pagina.ts, c) && delSito(pagina.url, c.sito);
+  }
+
+  // Una visita che una cancellazione già vista copre non entra: non si scrive nemmeno.
+  function coperto(stato, ev) {
+    return !!ev && ev.tipo === TIPI.NAVIGAZIONE && stato.tagli.some((c) => copre(c, ev));
   }
 
   function chatNuova(id, ts) {
@@ -144,6 +179,7 @@
         if (Number.isFinite(ev.triagedCount)) c.triagedCount = ev.triagedCount;
         break;
       case TIPI.NAVIGAZIONE:
+        if (coperto(stato, ev)) return { nuovo: true, tolti: 1 };
         stato.pagine.set(ev.id, {
           id: ev.id, ts: ev.ts, url: ev.url, titolo: ev.titolo, scheda: ev.scheda ?? null, dispositivo: ev.dispositivo,
         });
@@ -153,8 +189,10 @@
         if (ev.chat != null) {
           if (stato.chat.delete(ev.chat)) tolti = 1;
         } else {
+          const c = copertura(ev);
+          stato.tagli.push(c);
           for (const [id, p] of stato.pagine) {
-            if (nelPeriodo(p.ts, ev.pagine)) { stato.pagine.delete(id); tolti++; }
+            if (copre(c, p)) { stato.pagine.delete(id); tolti++; }
           }
         }
         return { nuovo: true, tolti };
@@ -165,21 +203,21 @@
     return { nuovo: true, tolti: 0 };
   }
 
-  // Cosa resta su disco dopo le cancellazioni: ogni evento che una cancellazione SUCCESSIVA copre se ne va, tutto il
-  // resto resta identico e nello stesso ordine. Le cancellazioni restano: un altro dispositivo dovrà saperle.
+  // Cosa resta su disco dopo le cancellazioni: gli eventi di una chat cancellata DOPO di loro e le pagine che una
+  // cancellazione copre se ne vanno, il resto resta identico e in ordine. Le cancellazioni restano: un altro dispositivo dovrà saperle.
   function compatta(eventi) {
     const chatCancellate = new Set();
-    const periodi = [];
+    const tagli = eventi.filter((ev) => ev.tipo === TIPI.CANCELLAZIONE && ev.chat == null).map(copertura);
     const tenuti = [];
     for (let i = eventi.length - 1; i >= 0; i--) {
       const ev = eventi[i];
       if (ev.tipo === TIPI.CANCELLAZIONE) {
-        if (ev.chat != null) chatCancellate.add(ev.chat); else periodi.push(ev.pagine);
+        if (ev.chat != null) chatCancellate.add(ev.chat);
         tenuti.push(ev);
         continue;
       }
       if (ev.chat != null && chatCancellate.has(ev.chat)) continue;
-      if (ev.tipo === TIPI.NAVIGAZIONE && periodi.some((p) => nelPeriodo(ev.ts, p))) continue;
+      if (ev.tipo === TIPI.NAVIGAZIONE && tagli.some((c) => copre(c, ev))) continue;
       tenuti.push(ev);
     }
     return tenuti.reverse();
@@ -257,12 +295,13 @@
 
   function pagineNelPeriodo(stato, pagine) {
     if (!pagine) return [];
-    return [...stato.pagine.values()].filter((p) => nelPeriodo(p.ts, pagine));
+    const sito = pagine.sito ? normaSito(pagine.sito) : null;
+    return [...stato.pagine.values()].filter((p) => nelPeriodo(p.ts, pagine) && delSito(p.url, sito));
   }
 
   global.SN_FILO_EVENTI = {
     VERSIONE, TIPI, AUTORI, PERIODI,
     uuid, valido, crea, riga, analizza, nuovoStato, applica, compatta, elencoChat, copiaChat,
-    daChatSalvate, periodo, pagineNelPeriodo, nelPeriodo,
+    daChatSalvate, periodo, pagineNelPeriodo, nelPeriodo, normaSito, coperto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
