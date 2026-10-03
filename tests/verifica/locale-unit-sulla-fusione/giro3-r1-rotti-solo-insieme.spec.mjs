@@ -58,7 +58,8 @@ test('due lavori verdi da soli e sempre rossi insieme: la prova dice rosso sulla
     expect(unit(altro)).toBe('verde');
     const fusa = join(dir, 'fusa');
     git(dir, 'clone', '-q', origin, fusa);
-    git(fusa, 'merge', '-q', '--no-edit', join(lavoro, '.git') ? punta : punta);
+    git(fusa, 'fetch', '-q', lavoro, 'ramo');
+    git(fusa, 'merge', '-q', '--no-edit', 'FETCH_HEAD');
     expect([unit(fusa), unit(fusa), unit(fusa)]).toEqual(['rosso', 'rosso', 'rosso']);
 
     const { provaUnitSullaFusione } = await import(pathToFileURL(join(ROOT, 'scripts', 'lib', 'unit-sulla-fusione.mjs')).href);
