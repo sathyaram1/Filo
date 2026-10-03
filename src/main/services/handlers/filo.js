@@ -454,6 +454,16 @@ module.exports = function register(on, ctx) {
     return { ok: true, notifications: list.filter((n) => !n.dismissed) };
   }));
 
+  // #870 — le carte della home. La stessa mossa arriva dalla chat (azione CARTA_HOME) e passa dallo stesso posto.
+  on(MSG.CARTE_HOME_GET, soloFilo(async () => ({ ok: true, layout: await require('../carteHome').leggi() })));
+  on(MSG.CARTE_HOME_MODIFICA, soloFilo(async (msg) => {
+    const esito = await require('../carteHome').modifica(msg && msg.mossa);
+    if (esito.errore) return { ok: false, error: esito.errore, layout: esito.layout };
+    if (esito.cambiato) ctx.broadcastToFiloPages({ type: MSG.CARTE_HOME_CAMBIATE, layout: esito.layout });
+    return { ok: true, layout: esito.layout };
+  }));
+  on(MSG.EDITOR_RECENTI, soloFilo(async () => require('../editorFiles').recenti()));
+
   // F4 — Annulla un auto-feedback appena inviato (undo dal toast).
   // Marca il feedback come `ignored` via updateStatus. Usa l'ID token admin se
   // disponibile (l'utente è loggato come owner); se non loggato l'undo non può
