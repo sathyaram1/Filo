@@ -348,7 +348,7 @@
     const text = String(f.text || '').trim();
     if (text) {
       turns.push({
-        role: isFromModel(f.clientId) ? 'model' : 'user',
+        role: isFromModel(f) ? 'model' : 'user',
         kind: 'report',
         body: text,
         ts: f.createdAt || f._createTime || null,
