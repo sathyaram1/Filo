@@ -43,6 +43,15 @@ Tre unit test rossi solo su Windows.
 Riferimenti: `tests/unit/documentRead.test.mjs` (nomi ambigui, maiuscole),
 `tests/unit/terminaleCodifica.test.mjs` (preludio per shell, esito dei comandi).
 
+## Il contenitore senza gestore di finestre (#465.1)
+
+Sotto xvfb (le routine, la suite in GitHub) nessuno esegue `minimize()`: la richiesta
+cade nel vuoto e la finestra resta com'era. La prova chiede `isMinimized()`; se il
+sistema non l'ha ridotta, finge la sua risposta (`isMinimized` vero ed evento
+`minimize`, poi il contrario) e prova lo stesso cammino del codice. Sostituire la
+riduzione con un'altra uscita dalla vista lascerebbe la riduzione provata solo sul
+Windows dell'owner. Riferimento: `tests/manage-ricevuti-vivi.spec.mjs`.
+
 ## La macchina dell'owner (#563)
 
 Due proprietà che le altre macchine non hanno, e ogni test che le dava per scontate
