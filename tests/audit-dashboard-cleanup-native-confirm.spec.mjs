@@ -42,6 +42,8 @@ test('il suggerimento "Riordina schede" usa il confirm di Filo, non quello nativ
   // Inietta un suggerimento PULISCI_TAB via il bridge live del background
   // (stesso cammino di #155): chiama i listener di chrome.runtime.onMessage con
   // un FILO_DASHBOARD_UPDATED che porta il suggerimento, poi la home lo renderizza.
+  // Prima si aspetta la home vera: la sua risposta, arrivata dopo, sostituiva il suggerimento iniettato.
+  await expect(page.locator('#homeMessage')).not.toHaveText('…', { timeout: 10_000 });
   await page.evaluate(() => {
     const listeners = chrome.runtime.onMessage._listeners;
     const msg = {

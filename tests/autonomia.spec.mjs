@@ -227,7 +227,7 @@ test('una chat ripresa dall\'archivio ricorda cosa ha letto: la lezione chiede a
         { role: 'user', text: 'cercami il meteo' },
         { role: 'filo', text: 'Ho trovato il meteo: domani sole.', actions: [{ type: 'CERCA_WEB' }] },
       ]);
-      await C.segnaFonti(c.id, [{ classe: 5, campo: 'web', chiave: 'web:ricerca', motivo: 'ho letto una ricerca sul web' }]);
+      await C.segnaFonti(c.id, [{ classe: 5, campo: 'web', chiave: 'web:ricerca', motivo: 'ho fatto una ricerca sul web' }]);
       await C.close(c.id);
       return c.id;
     });
@@ -236,7 +236,7 @@ test('una chat ripresa dall\'archivio ricorda cosa ha letto: la lezione chiede a
     await modelloFinto(app, [SALVA, { text: 'Fatto.' }]);
     await chiedi(dash2, 'ricordatelo');
     expect(await chiedeLaLezione(dash2, app), 'la chat di ieri aveva letto una ricerca: la lezione chiede').toEqual({ popup: true, salvata: false });
-    expect(await confirmText(dash2)).toContain('ho letto una ricerca sul web');
+    expect(await confirmText(dash2)).toContain('ho fatto una ricerca sul web');
     await clickConfirm(dash2, 'cancel');
   } finally {
     await ripristina(app);
