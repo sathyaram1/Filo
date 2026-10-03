@@ -138,7 +138,6 @@ test('su un sito che annulla il tasto destro il menu aperto da tastiera con Shif
   await copiaPassword(shell);
   const page = await testServer.openReady(openTab, CAMPO.replace('</body>', "<script>window.addEventListener('contextmenu', (e) => e.preventDefault(), true);</script></body>"), { pubblico: true });
   await page.locator('#ta').click();
-  await page.waitForTimeout(Math.ceil(5000 * 1.1)); // il clic sulla casella non deve valere come menu aperto
   await page.keyboard.press('Shift+F10');
   await expect(page.locator('.sn-menu[role=menu]')).toBeVisible();
   await page.locator('.sn-menu-paste-arrow').click();
