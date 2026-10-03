@@ -120,7 +120,9 @@ module.exports = function register(on, ctx) {
     return { ok: true, blocca: !!u.blocca, frase: u.blocca ? u.frase : '' };
   });
 
-  on(MSG.FILO_GET_STATE, async () => {
+  // Lo stato porta schede aperte, notifiche e il messaggio della home con le pagine salvate: a un sito non si dà (#589.12).
+  on(MSG.FILO_GET_STATE, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
     const { state, stateText } = await FiloState.assemble();
     return { ok: true, state, stateText };
   });
