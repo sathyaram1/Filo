@@ -362,10 +362,11 @@
   // perché la shell è alta solo 88px e gli elementi DOM non possono apparire
   // sopra le WebContentsView delle tab. Delega globale così funziona anche per i
   // tab ricreati ad ogni render().
+  // Anche la carta di una scheda lo usa: cede al suggerimento di un controllo nell'istante in cui lui compare.
+  const SUGGERIMENTO_RITARDO = 350;
   (() => {
     let showTimer = null;
     let currentTarget = null;
-    const SHOW_DELAY = 350;
 
     function hide() {
       if (showTimer) { clearTimeout(showTimer); showTimer = null; }
@@ -374,7 +375,9 @@
     }
     document.addEventListener('mouseover', (e) => {
       const t = e.target.closest('[data-tip]');
-      if (!t || t === currentTarget) return;
+      if (t === currentTarget) return;
+      // Un elemento tolto dal ridisegno non riceve mouseout: il suo suggerimento resterebbe sopra la carta.
+      if (!t) { if (currentTarget && !currentTarget.isConnected) hide(); return; }
       hide();
       currentTarget = t;
       const text = t.dataset.tip;
@@ -386,7 +389,7 @@
         const x = Math.round(r.left + r.width / 2 - 60);
         const y = Math.round(r.bottom + 6);
         api.tooltipShow(text, x, y);
-      }, SHOW_DELAY);
+      }, SUGGERIMENTO_RITARDO);
     });
     document.addEventListener('mouseout', (e) => {
       const t = e.target.closest('[data-tip]');
@@ -463,6 +466,16 @@
         if (sottoIlPuntatore(id)) invia(id);
       }, RITARDO);
     }
+    // Croce, avviso audio e paese hanno il loro suggerimento, che cade dove sta la carta (#589.16): la carta gli
+    // cede il posto quando lui compare, non prima, o attraversando la croce verso la scheda accanto lampeggerebbe.
+    function suUnControllo(target, el) {
+      const c = target.closest('[data-tip]');
+      return !!c && c !== el && el.contains(c);
+    }
+    function cede() {
+      if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
+      if (aperta && !vaVia) vaVia = setTimeout(nascondi, SUGGERIMENTO_RITARDO);
+    }
     // Una scheda appena rifatta non ha ancora :hover col puntatore fermo sopra: conta dove sta il puntatore.
     function sottoIlPuntatore(id) {
       const el = elDi(id);
@@ -482,7 +495,8 @@
     tabsEl.addEventListener('mouseover', (e) => {
       puntatore = { x: e.clientX, y: e.clientY };
       const el = e.target.closest('.tab[data-anteprima]');
-      if (el) sopra(el.dataset.anteprima);
+      if (el && suUnControllo(e.target, el)) cede();
+      else if (el) sopra(el.dataset.anteprima);
       // Il bordo fra due schede non spegne la carta: passando alla vicina cambierebbe con un lampo.
       else if (!vaVia) vaVia = setTimeout(nascondi, 120);
     });

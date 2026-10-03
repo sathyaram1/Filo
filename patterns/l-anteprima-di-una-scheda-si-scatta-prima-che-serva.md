@@ -59,7 +59,10 @@ chiede.
   aperta sulla scheda di quella foto, la mostra subito, senza uscire e rientrare.
   Prima di sparire si svuota, così chi la rivede non trova per un istante la
   scheda di prima. Col menu del tasto destro aperto aspetta che si chiuda: gli
-  finirebbe sotto, mezza coperta.
+  finirebbe sotto, mezza coperta. Sui controlli della scheda (croce, avviso
+  audio, paese) cede al loro suggerimento, che cadrebbe sopra di lei, quando
+  quello compare e non prima: attraversando la croce verso la scheda accanto
+  non lampeggia (#589.16, `tests/tab-audio-indicator.spec.mjs`).
 - **La prima compare dopo un attimo**, per non accendersi attraversando la
   barra; da lì, finché si resta sulle schede, passa dall'una all'altra subito.
   La barra si ridisegna a ogni titolo o icona che cambia: l'attesa della stessa
