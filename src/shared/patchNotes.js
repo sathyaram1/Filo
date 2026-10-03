@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.231', date: '2026-10-03',
+      features: [],
+      fixes: [
+        'Il menu del tasto destro non esegue più un clic su una voce che la pagina stava coprendo con qualcosa di suo: il menu si chiude e te lo dice.',
+      ],
+    },
+    {
       version: '0.2.230', date: '2026-10-03',
       features: [
         'Ogni comando che Filo propone nel terminale ti dice prima a parole cosa fa, e sotto trovi il comando vero. Su un\'installazione nuova la modalità terminale è già accesa, quindi a «quanto spazio ho sul disco?» Filo risponde senza che tu debba accendere niente. Quello che legge parte subito, quello che cambia qualcosa ti chiede prima un OK, per cancellare scrivi «conferma». Se ce l\'avevi spenta resta spenta, e la accendi in Preferenze o chiedendolo a Filo.',

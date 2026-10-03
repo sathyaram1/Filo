@@ -1373,13 +1373,20 @@
     const cerca = sub.querySelector('.sn-menu-history-search-input');
     // Un clic conta solo su una voce che il browser ha già visto scoperta (#589.11): gli spec aspettano questo.
     const pronta = (el) => !el || !global.SN_VISTO || global.SN_VISTO._test.pronta(el);
+    // Una voce scorsa fuori dalla lista non ha niente da dire: null.
+    const nellaLista = (el) => {
+      if (!lista) return true;
+      const a = el.getBoundingClientRect(), b = lista.getBoundingClientRect();
+      return a.bottom > b.top && a.top < b.bottom;
+    };
     const svuota = sub.querySelector('.sn-menu-history-clear-btn');
     return {
       voci: [...sub.querySelectorAll('.sn-menu-history-item')].filter(visibile).map((riga) => ({
         testo: riga.querySelector('.sn-menu-history-paste')?.getAttribute('aria-label') || '',
         incolla: centro(riga.querySelector('.sn-menu-history-paste')),
         rimuovi: centro(riga.querySelector('.sn-menu-history-remove')),
-        pronta: pronta(riga.querySelector('.sn-menu-history-paste')) && pronta(riga.querySelector('.sn-menu-history-remove')),
+        pronta: !nellaLista(riga) ? null
+          : pronta(riga.querySelector('.sn-menu-history-paste')) && pronta(riga.querySelector('.sn-menu-history-remove')),
         libera: !global.SN_VISTO || !!global.SN_VISTO._test.libera(riga.querySelector('.sn-menu-history-paste')),
       })),
       svuotaPronta: pronta(svuota),
