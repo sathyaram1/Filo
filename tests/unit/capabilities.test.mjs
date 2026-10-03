@@ -227,7 +227,7 @@ test('ogni icona fissa della home che apre una pagina filo:// è coperta dal man
   // manifesto dice a un utente qualunque cosa sa fare Filo, e la posta delle
   // segnalazioni lui non la può aprire (#583). Dalla home ci si arriva solo da
   // admin, per questo l'indirizzo compare ancora nel file.
-  const SOLO_OWNER = new Set(['filo://feedback/feedback.html', 'filo://manage/manage.html']);
+  const SOLO_OWNER = new Set(['filo://manage/manage.html']);
   const urls = [...dash.matchAll(/url:\s*'(filo:\/\/[a-z-]+\/[a-z-]+\.html)'/g)]
     .map((m) => m[1])
     .filter((u) => !SOLO_OWNER.has(u));

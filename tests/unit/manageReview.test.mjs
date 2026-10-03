@@ -1113,9 +1113,8 @@ test('reasonText: traduce i codici noti e lascia passare gli ignoti', () => {
 
 // ── Stato illeggibile: la regola delle sezioni, in un posto solo (#509) ──────
 //
-// Senza il fix questi assert sono rossi: la regola viveva dentro
-// src/pages/feedback/feedback.js, quindi non esisteva come funzione condivisa e
-// la dashboard di gestione continuava a disegnare quattro sezioni su stati che
+// Senza il fix questi assert sono rossi: la regola non esisteva come funzione
+// condivisa e la dashboard di gestione disegnava quattro sezioni su stati che
 // non sapeva leggere.
 
 const CIFRATO = 'FENC1:AAAAAAAAAAAAAAAAAAAAAAAA';

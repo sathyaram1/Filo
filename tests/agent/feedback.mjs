@@ -11,8 +11,8 @@
 //   text     = dettaglio
 //   url      = dove è stato trovato (filo://…)
 //   images   = [screenshot]
-// La pagina feedback riconosce il prefisso "agent:" e mostra tutto come categoria
-// dedicata con badge del modello. Vedi src/pages/feedback/feedback.js.
+// Gestione riconosce il prefisso "agent:" e mostra tutto come categoria
+// dedicata con badge del modello. Vedi src/shared/feedbackThread.js.
 
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
