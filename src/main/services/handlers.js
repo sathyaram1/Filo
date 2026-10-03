@@ -1446,7 +1446,7 @@ async function executeFiloAction(action, {
     console.warn('[Filo] azione non registrata o senza costo, rifiutata:', type);
     return { executed: false, kept: false, rejected: true };
   }
-  const decisione = decisioneAutonomia(ing, { sender, contesto, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, impostazioni });
+  const decisione = decisioneAutonomia(ing, { sender, contesto, fontiLette, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, impostazioni });
   if (decisione.risposta === 'no') {
     const no = fraseNo(ing, decisione, sender);
     return { executed: false, kept: false, no: true, error: no.perModello, output: { error: no.breve, rifiuto: true, no: true } };
