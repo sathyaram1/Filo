@@ -75,7 +75,7 @@ test('server:fondi mentre la parte dell’app viene fusa: a fusioni finite, tutt
     });
     expect(k, out.join('\n')).toBe(0);
     expect(appSuMain).toBe(true);
-    // Tutte e due le parti sono su main e nessun altro comando arriverà a chiuderla: la chiude questo.
+    // Tutte e due le parti sono su main: la chiude questo comando, senza che qualcuno debba rilanciarne uno.
     expect(fs.doc.fields.statusPublic.stringValue, out.join('\n')).toBe('closed');
   } finally {
     globalThis.fetch = fetchVero;
