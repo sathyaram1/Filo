@@ -78,7 +78,7 @@ test('il suggerimento "Riordina schede" usa il confirm di Filo, non quello nativ
     }
   });
 
-  await sug.first().click();
+  await sug.filter({ hasText: 'Riordina e archivia le schede' }).click();
   // La domanda la decide il main (#530): un giro di messaggi prima del popup.
   await expect.poll(() => page.evaluate(() => !!(window.__styledConfirmCalled || window.__nativeConfirmCalled))).toBe(true);
 
