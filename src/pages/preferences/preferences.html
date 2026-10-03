@@ -199,13 +199,13 @@
       </div>
     </section>
 
-    <section>
+    <section id="sec-terminal">
       <h2>Modalità terminale</h2>
-      <p class="sn-muted">Quando è attiva, nella dashboard i comandi che iniziano con <code>/</code> (e che non sono comandi di Filo) vengono eseguiti da una shell di sistema, con l'output mostrato in tempo reale. Sopra la barra di scrittura compare la cartella in cui ti trovi. <strong>Esegue comandi reali sul tuo computer</strong>: attivala solo se sai cosa stai facendo.</p>
+      <p class="sn-muted">Filo usa il terminale del computer per le richieste che lo vogliono, come «quanto spazio ho sul disco?». Quello che legge parte subito, quello che cambia qualcosa ti chiede prima un OK, e per cancellare o per un comando che non riconosce devi scrivere «conferma». Nella home, un messaggio che inizia con <code>/</code> va dritto alla shell, se non è un comando di Filo.</p>
       <div class="sn-toggle-row">
         <label>
           <input type="checkbox" id="terminalEnabled" />
-          <span>Attiva la modalità terminale nella dashboard</span>
+          <span>Attiva la modalità terminale</span>
         </label>
       </div>
       <label for="terminalShell" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Shell da usare</label>

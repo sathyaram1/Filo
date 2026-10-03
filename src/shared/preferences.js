@@ -182,9 +182,10 @@
       keys: ['modalita_terminale', 'modalità terminale', 'modalita terminale', 'terminale', 'terminal'],
       // La modalità terminale dà a Filo accesso alla shell: conferma esplicita.
       level: 2,
-      risk: 'Questa impostazione decide se Filo può eseguire comandi nella shell del tuo computer. '
-        + 'È un permesso potente: una volta attivo, Filo può lanciare comandi (quelli rischiosi '
-        + 'chiederanno comunque una conferma a parte). Attivalo solo se ti fidi di quello che gli chiedi.',
+      risk: 'Questa impostazione decide se Filo può usare il terminale del tuo computer. '
+        + 'Da acceso, quello che legge parte subito, quello che cambia qualcosa ti chiede prima un OK, '
+        + 'e per cancellare o per un comando che non riconosce devi scrivere «conferma». '
+        + 'Da spento, Filo non esegue nessun comando.',
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;

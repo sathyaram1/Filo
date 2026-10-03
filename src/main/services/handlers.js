@@ -1445,10 +1445,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
   }
 
   // ── modalità terminale: gate hard, indipendente dal livello (#146.6) ──────
-  // Filo non può eseguire ALCUN comando se l'utente non ha attivato la modalità
-  // terminale nelle impostazioni. Controllo PRIMA del gate dei livelli: così un
-  // terminale disattivato non fa nemmeno comparire il box "digita conferma" —
-  // l'utente vede subito che deve attivarlo.
+  // Con la modalità terminale spenta nelle impostazioni Filo non esegue ALCUN
+  // comando. Controllo PRIMA del gate dei livelli: così un terminale spento
+  // non fa nemmeno comparire il box "digita conferma" — l'utente vede subito
+  // che è spento.
   if (type === 'ESEGUI_COMANDO') {
     const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim();
     let s = {};
@@ -1473,7 +1473,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
     if (AL && AL.spiegazioneComando) action.spiegazione = AL.spiegazioneComando(action);
     // La frase che spiega il terminale va con la prima proposta in chat (#892);
     // la conferma è un secondo giro della stessa, l'assistente di pagina non la mostra.
-    if (!confirmed && !assistente && await primaVoltaDelTerminale()) action._primaVolta = true;
+    if (cmd && !confirmed && !assistente && await primaVoltaDelTerminale()) action._primaVolta = true;
   }
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO') action._perimetro = perimetroLettura(sender);

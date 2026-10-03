@@ -372,6 +372,12 @@
       doesNot: 'Legge e basta: non modifica né sposta i tuoi file. Su un PDF che è in realtà una scansione o una foto di un foglio non c’è testo da estrarre, e Filo te lo dice invece di inventarsi cosa c’è scritto. Non legge ancora i documenti Word ed Excel, né i file molto grandi; di un documento lunghissimo legge la prima parte e ti avverte che si è fermato lì. Un file fuori dalla tua cartella personale (un altro disco, una chiavetta, una cartella di sistema) o un file nascosto di configurazione non lo apre senza il tuo OK.',
     },
     {
+      id: 'terminal-mode', title: 'Filo usa il terminale del computer', category: 'assistant',
+      desc: 'Per le richieste che lo vogliono («quanto spazio ho sul disco?», «trova i file più grandi in Download») Filo lancia un comando nel terminale del computer e ti risponde con quello che ha trovato. Non serve sapere cos’è un terminale. Ogni comando dice prima a parole cosa fa, e sotto c’è il comando vero. Quello che legge parte subito; quello che cambia qualcosa ti chiede prima un OK; per cancellare, o per un comando che non riconosce, devi scrivere «conferma». Quale conferma serve lo decide Filo leggendo il comando, mai il modello. Nella home puoi anche scrivere tu un comando che inizia con / e va dritto alla shell.',
+      invoke: 'È accesa di serie: chiedi a parole all’assistente (nuova scheda). Si spegne in Preferenze, alla voce «Modalità terminale», dove scegli anche la shell; oppure chiedi a Filo di spegnerla.',
+      doesNot: 'Da spenta Filo non esegue nessun comando. Non cambia, installa o cancella niente senza chiedertelo prima.',
+    },
+    {
       id: 'generate-dashboard', title: 'Dashboard personale di Filo', category: 'assistant',
       desc: 'Quando apri una nuova scheda, Filo prepara un breve messaggio per te e qualche suggerimento utile, in base a ciò che stavi facendo e a ciò che ricorda di te.',
       invoke: 'Si genera da sola all’apertura di una nuova scheda; il messaggio centrale si può nascondere dalle Preferenze ("Commento nella home").',
@@ -459,7 +465,7 @@
     },
     {
       id: 'preferences', title: 'Preferenze', category: 'settings',
-      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, e notifiche.',
+      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, notifiche, e la modalità terminale con la sua shell.',
       invoke: 'Pagina filo://preferences/preferences.html.',
     },
     {

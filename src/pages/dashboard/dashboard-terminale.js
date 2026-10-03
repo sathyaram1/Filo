@@ -30,6 +30,9 @@
   let terminalMode = false;          // attivabile da Preferenze
   let terminalShell = 'powershell';  // 'powershell' | 'cmd' | 'bash'
   let currentCwd = '';               // directory mostrata nella riga grigia
+  // #892 — segnaposto «/comando» e riga della cartella solo nella chat dove è
+  // girato un comando: la sola modalità accesa non riempie la home di gergo.
+  let comandoInChat = false;
 
   function updateDirLine() {
     dashDir.textContent = currentCwd || '';
@@ -53,19 +56,31 @@
   function applyCommandCwd(actions) {
     if (!Array.isArray(actions)) return;
     let cwd = '';
+    let girato = false;
     for (const a of actions) {
       const out = a && a._output;
-      if (out && out.cwd) cwd = out.cwd;
+      if (!out || (a.type && String(a.type).toUpperCase() !== 'ESEGUI_COMANDO')) continue;
+      if (out.cwd) cwd = out.cwd;
+      if (out.command && !out.blocked) girato = true;
     }
+    if (girato) comandoInChat = true;
     if (cwd) setCwd(cwd);
+    if (girato) applyTerminalMode();
   }
 
   function applyTerminalMode() {
-    dashDir.hidden = !terminalMode || !currentCwd;
-    inputEl.placeholder = terminalMode
+    const vivo = terminalMode && comandoInChat;
+    dashDir.hidden = !vivo || !currentCwd;
+    inputEl.placeholder = vivo
       ? 'Chiedi qualsiasi cosa… o /comando per la shell'
       : 'Chiedi qualsiasi cosa…';
     updateInputClass();
+  }
+
+  // Una chat nuova (o riaperta) riparte senza gergo, a meno che dentro ci sia già un comando.
+  function nuovaChat(conComandi = false) {
+    comandoInChat = !!conComandi;
+    if (dashDir) applyTerminalMode();
   }
 
   async function initCwd() {
@@ -143,6 +158,8 @@
   function runShellCommand(command, chat) {
     if (!command) return;
     if (document.body.dataset.state !== 'thread') goThread();
+    comandoInChat = true;
+    applyTerminalMode();
     // La conversazione a cui il comando e il suo esito appartengono è questa,
     // anche se l'esito arriva fra dieci secondi e intanto l'utente se n'è andato.
     const chatDelComando = chat || chatDellaRiga();
@@ -337,5 +354,7 @@
     applySettings,
     initCwd,
     runShellCommand,
+    nuovaChat,
+    comandoInChat: () => comandoInChat,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

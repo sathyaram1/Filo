@@ -10,7 +10,9 @@
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
       version: '0.2.230', date: '2026-10-03',
-      features: [],
+      features: [
+        'Ogni comando che Filo propone nel terminale ti dice prima a parole cosa fa, e sotto trovi il comando vero. Su un\'installazione nuova la modalità terminale è già accesa, quindi a «quanto spazio ho sul disco?» Filo risponde senza che tu debba accendere niente. Quello che legge parte subito, quello che cambia qualcosa ti chiede prima un OK, per cancellare scrivi «conferma». Se ce l\'avevi spenta resta spenta, e la accendi in Preferenze o chiedendolo a Filo.',
+      ],
       fixes: [
         'In Altro, Modelli e Preferenze quello che scrivi in una casella non si perde più se subito dopo cambi scheda o chiudi la pagina: domini esclusi, limite di spesa, chiavi, ore dell\'archivio automatico, durata delle notifiche, nome della voce. Il nome nuovo di una categoria vale anche senza premere «Rinomina».',
       ],
