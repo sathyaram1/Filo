@@ -61,7 +61,7 @@ test('il popup apre con la spiegazione a parole, e il comando vero resta sotto',
 
 test('la spiegazione si ripulisce: niente caratteri invisibili, tetto dichiarato, sempre la stessa', () => {
   const sp = (v) => AL.spiegazioneComando({ spiegazione: v });
-  assert.equal(sp('  Misuro\n lo   spazio‮ libero  '), 'Misuro lo spazio libero');
+  assert.equal(sp('  Misuro\n lo   spazio\u202e libero  '), 'Misuro lo spazio libero');
   assert.equal(sp(''), 'Uso il terminale del computer');
   assert.equal(sp('   '), 'Uso il terminale del computer');
   assert.equal(sp({ testo: 'oggetto' }), 'Uso il terminale del computer');
@@ -71,5 +71,5 @@ test('la spiegazione si ripulisce: niente caratteri invisibili, tetto dichiarato
   assert.ok(lunga.endsWith('…'), 'il taglio deve vedersi');
   assert.ok(!/�|[\uD800-\uDBFF]…$/.test(lunga), 'il taglio non spezza un carattere a metà');
   // Idempotente: rimandata alla conferma, la firma dell'azione non cambia.
-  for (const v of ['  a  b ', '', '🙂'.repeat(500), 'Cancello​ tutto']) assert.equal(sp(sp(v)), sp(v));
+  for (const v of ['  a  b ', '', '🙂'.repeat(500), 'Cancello\u200b tutto']) assert.equal(sp(sp(v)), sp(v));
 });

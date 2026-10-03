@@ -182,7 +182,7 @@
       keys: ['modalita_terminale', 'modalità terminale', 'modalita terminale', 'terminale', 'terminal'],
       // La modalità terminale dà a Filo accesso alla shell: conferma esplicita.
       level: 2,
-      risk: 'Questa impostazione decide se Filo può usare il terminale del tuo computer. '
+      risk: 'Questa impostazione decide se Filo può eseguire comandi nella shell del tuo computer, cioè nel terminale. '
         + 'Da acceso, quello che legge parte subito, quello che cambia qualcosa ti chiede prima un OK, '
         + 'e per cancellare o per un comando che non riconosce devi scrivere «conferma». '
         + 'Da spento, Filo non esegue nessun comando.',

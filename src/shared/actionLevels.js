@@ -116,7 +116,7 @@
   function spiegazioneComando(a) {
     const v = a && (a.spiegazione ?? a.descrizione);
     let t = (typeof v === 'string' ? v : '')
-      .replace(/[\u0000-\u001f\u007f-\u009f​-‏ -‮⁠-⁯﻿]+/g, ' ')
+      .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]+/g, ' ')
       .replace(/\s+/g, ' ').trim();
     const segni = Array.from(t);
     if (segni.length > SPIEGAZIONE_MAX) t = `${segni.slice(0, SPIEGAZIONE_MAX - 1).join('').trimEnd()}…`;

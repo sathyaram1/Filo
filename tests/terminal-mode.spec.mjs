@@ -1,8 +1,9 @@
 // Modalità terminale della dashboard.
 //
 // Richiesta utente: uno switch in Preferenze attiva una "modalità terminale"
-// (OFF di default). Quando è attiva:
-//   - sopra la barra di scrittura compare una riga grigia con la directory;
+// (accesa di serie, #892). Quando è attiva:
+//   - dopo il primo comando della chat, sopra la barra di scrittura compare una
+//     riga grigia con la directory (prima la home resta senza gergo);
 //   - i comandi che iniziano con `/` (e non sono comandi di Filo né un sito)
 //     vengono eseguiti da una shell di sistema, con output in streaming;
 //   - mentre si scrive l'input cambia colore: arancione se è un comando di
@@ -41,6 +42,13 @@ async function setTerminal(page, enabled) {
   }), enabled);
 }
 
+// Lo stato vero del terminale nella home: il segnaposto non lo dice più finché
+// nella chat non gira un comando (#892).
+const terminaleAcceso = (page, v = true) => expect.poll(
+  () => page.evaluate(() => window.SN_DASH_TERMINALE?.isEnabled?.() === true),
+  { timeout: 8_000 },
+).toBe(v);
+
 // Scrive nell'input e simula la digitazione (evento `input` per l'highlight).
 async function typeInput(page, value) {
   await page.evaluate((v) => {
@@ -60,27 +68,45 @@ async function submitInput(page, value) {
   }, value);
 }
 
-test('di default la modalità terminale è OFF: nessuna riga directory', async ({ app, shell }) => {
+test('#892: di serie il terminale è acceso, e la home resta senza gergo finché nella chat non gira un comando', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
-  await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
+  const input = page.locator('#input');
+  await expect(input).toBeVisible({ timeout: 8_000 });
+  await terminaleAcceso(page);
+  await expect(input).toHaveAttribute('placeholder', 'Chiedi qualsiasi cosa…');
+  await expect(page.locator('#dashDir')).toBeHidden();
+
+  await submitInput(page, '/echo primo-comando-892');
+  await expect(page.locator('.dash-term-out')).toContainText('primo-comando-892', { timeout: 12_000 });
+  await expect(page.locator('#dashDir')).toBeVisible();
+  await expect(page.locator('#dashDir')).not.toHaveText('');
+  await expect(input).toHaveAttribute('placeholder', /comando per la shell/);
+
+  // Tornati alla home la chat è nuova: niente gergo finché non gira un altro comando.
+  await submitInput(page, '/home');
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home');
+  await expect(input).toHaveAttribute('placeholder', 'Chiedi qualsiasi cosa…');
   await expect(page.locator('#dashDir')).toBeHidden();
 });
 
-test('attivando il terminale compare la riga directory e i comandi / vengono eseguiti dalla shell', async ({ app, shell }) => {
+test('riaccendendo il terminale i comandi / vengono eseguiti dalla shell', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
 
-  // Attiva: la riga grigia con la directory deve comparire (initCwd → home).
+  await setTerminal(page, false);
+  await terminaleAcceso(page, false);
   await setTerminal(page, true);
-  await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
-  await expect(page.locator('#dashDir')).not.toHaveText('');
+  await terminaleAcceso(page);
 
   // Un comando `/` viene eseguito dalla shell: l'output reale compare nella
   // bolla terminale (asserisce il SUCCESSO, non l'assenza di un errore).
   await submitInput(page, '/echo filo-term-OK-7421');
   await expect(page.locator('.dash-term-out')).toContainText('filo-term-OK-7421', { timeout: 12_000 });
+  // Girato un comando, la riga grigia dice in che cartella si è.
+  await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#dashDir')).not.toHaveText('');
 
   // Il comando NON è finito in chat come messaggio per l'LLM: non c'è una
   // bolla "Filo sta pensando…".
@@ -92,7 +118,7 @@ test('la shell è PERSISTENTE per scheda: una variabile impostata sopravvive al 
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
   await setTerminal(page, true);
-  await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
+  await terminaleAcceso(page);
 
   // Sintassi giusta per la shell che gira davvero: PowerShell su Windows,
   // /bin/sh nel cloud Linux. (Il primario è scelto da shell.js in base alla
@@ -119,7 +145,7 @@ test('la cartella del terminale sopravvive alla riapertura (#259): riaprendo si 
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
   await setTerminal(page, true);
-  await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
+  await terminaleAcceso(page);
 
   // Cartella temporanea reale, distinta dalla home, in cui spostarsi con `cd`.
   // Il processo di test gira sulla stessa macchina della shell: ne prendiamo il
@@ -152,7 +178,12 @@ test('la cartella del terminale sopravvive alla riapertura (#259): riaprendo si 
   // "Esci e rientra": ricarica la dashboard (rilancia l'init, la stessa via che
   // prima resettava la cartella alla home). Ora la cartella salvata va
   // ripristinata: la riga grigia deve mostrare ANCORA la temp dir, non la home.
+  // La riga resta nascosta nella chat nuova (#892), ma il primo comando gira lì.
   await page.reload();
+  await terminaleAcceso(page);
+  await expect(page.locator('#dashDir')).toBeHidden();
+  await submitInput(page, '/pwd');
+  await expect(page.locator('.dash-term-out').last()).toContainText(dir, { timeout: 12_000 });
   await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
   await expect(page.locator('#dashDir')).toHaveText(dir, { timeout: 8_000 });
   await expect(page.locator('#dashDir')).not.toHaveText(home);
@@ -163,7 +194,7 @@ test('i colori ANSI vengono resi (niente codici grezzi nel testo visibile)', asy
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
   await setTerminal(page, true);
-  await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
+  await terminaleAcceso(page);
 
   // Emette ESC[31m ROSSO ESC[0m -FINE con la sintassi giusta per la shell host.
   const win = process.platform === 'win32';
@@ -187,7 +218,7 @@ test('evidenziazione live: arancione per i comandi Filo, azzurro per i comandi s
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
   await setTerminal(page, true);
-  await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
+  await terminaleAcceso(page);
 
   // Comando interno di Filo → arancione (classe is-cmd-filo).
   await typeInput(page, '/help');
@@ -209,6 +240,8 @@ test('a terminale spento un comando shell non viene eseguito (niente bolla termi
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
+  await setTerminal(page, false);
+  await terminaleAcceso(page, false);
 
   // Con il terminale OFF, `/ls` non è un comando Filo né un sito: in modalità
   // shell sarebbe azzurro, ma qui non deve essere evidenziato come shell.
@@ -220,8 +253,8 @@ test('Preferenze: il toggle modalità terminale e la scelta della shell si persi
   const page = await openTab('filo://preferences/preferences.html');
   const box = page.locator('#terminalEnabled');
   await expect(box).toBeVisible({ timeout: 8_000 });
-  // Default: spento.
-  await expect(box).not.toBeChecked();
+  // Di serie: acceso (#892).
+  await expect(box).toBeChecked();
 
   // La shell da scegliere è una di quelle che ESISTONO sul sistema dove gira il
   // test: il menu si riscrive per piattaforma (PowerShell e cmd solo su
@@ -236,15 +269,17 @@ test('Preferenze: il toggle modalità terminale e la scelta della shell si persi
   await expect(page.locator('#terminalShell')).toHaveValue(predefinita);
   await expect(page.locator(`#terminalShell option[value="${scelta}"]`)).toHaveCount(1);
 
-  // Attiva + scegli una shell: auto-save (il "Salvato" lampeggia).
-  await box.check();
+  // Spegni + scegli una shell: auto-save (il "Salvato" lampeggia).
+  await box.uncheck();
   await page.selectOption('#terminalShell', scelta);
   await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
 
-  // Persistito: ricaricando, lo stato è conservato.
+  // Persistito: ricaricando, lo spento voluto resta spento.
   await page.reload();
-  await expect(page.locator('#terminalEnabled')).toBeChecked({ timeout: 8_000 });
-  await expect(page.locator('#terminalShell')).toHaveValue(scelta);
+  await expect(page.locator('#terminalShell')).toHaveValue(scelta, { timeout: 8_000 });
+  await expect(page.locator('#terminalEnabled')).not.toBeChecked();
+  await box.check();
+  await expect.poll(() => page.evaluate(async () => (await chrome.runtime.sendMessage({ type: 'get_settings' })).settings.terminal.enabled)).toBe(true);
 });
 
 // ── La cartella di lavoro dell'ASSISTENTE (#551) ────────────────────────────
