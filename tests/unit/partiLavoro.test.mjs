@@ -21,6 +21,8 @@ test('le parti fuse dai campi REST: solo app e server, solo numeri positivi', ()
   assert.deepEqual(partiDaCampi(campi({ app: { integerValue: '5' }, server: { integerValue: '0' }, altro: { integerValue: '9' } })), { app: 5 });
   assert.deepEqual(partiDaCampi(campi({ server: { integerValue: '5' }, solo: { stringValue: 'server' } })), { server: 5, solo: 'server' });
   assert.deepEqual(partiDaCampi(campi({ server: { integerValue: '5' }, solo: { stringValue: 'tutto' } })), { server: 5 });
+  assert.deepEqual(partiDaCampi(campi({ app: { integerValue: '5' }, ramo: { stringValue: 'claude/x' } })), { app: 5, ramo: 'claude/x' });
+  assert.deepEqual(partiDaCampi(campi({ app: { integerValue: '5' }, ramo: { stringValue: 'main' } })), { app: 5 });
   assert.deepEqual(partiDaCampi({}), {});
   assert.deepEqual(partiDaCampi(undefined), {});
   assert.deepEqual([...PARTI], ['app', 'server']);
