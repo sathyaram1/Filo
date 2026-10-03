@@ -221,8 +221,8 @@
           const payload = it.name ? Object.assign({}, it.payload, { name: it.name }) : it.payload;
           let idToken = '';
           if (it.dallOwner) {
-            try { idToken = (tokenOwnerFn && await tokenOwnerFn()) || ''; } catch (_) { idToken = ''; }
-            if (!idToken) { attendiAccesso(it, 'nessun accesso valido'); anyFail = true; continue; }
+            idToken = (tokenOwnerFn && await tokenOwnerFn()) || '';
+            if (!idToken) { attendiAccesso(it, 'nessun accesso valido', 'assente'); anyFail = true; continue; }
           }
           // #912: la voce dell'owner parte con la prova o non parte; da anonima diventerebbe un utente che nessuno riprende.
           const result = idToken ? await fb.submit(payload, { idToken, soloAdmin: true }) : await fb.submit(payload);
