@@ -119,7 +119,8 @@ const DOCUMENTI = new Set(['junit', 'lcov']);
 
 /**
  * Le destinazioni da riunire sostituite da `copia(k)`: i file, che ogni `node --test` riscriverebbe da capo lasciando
- * solo l'ultimo gruppo, e i documenti su stdout. `rapporti` sono le destinazioni chieste, nell'ordine. PURA.
+ * solo l'ultimo gruppo, e i documenti su stdout. `rapporti` sono le destinazioni chieste, nell'ordine. `accodati` quelle
+ * di un formato che non si sa riunire: ci finisce un rapporto per gruppo, e il riepilogo lo deve dire. PURA.
  */
 export function rapportiDaRiunire(flags, copia) {
   const reporter = [];
