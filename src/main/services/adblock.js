@@ -171,11 +171,11 @@ function offFor(off, host) {
   };
 }
 
-// Un selettore con graffe o commenti uscirebbe dalla sua regola e scriverebbe CSS nella pagina.
+// Un selettore con graffe, commenti o una @ in testa (@import) uscirebbe dalla sua regola e scriverebbe CSS nella pagina.
 function toCss(selectors) {
   const out = [];
   for (const sel of selectors) {
-    if (typeof sel !== 'string' || !sel || /[{}]|\/\*|\*\//.test(sel)) continue;
+    if (typeof sel !== 'string' || !sel || /[{}]|\/\*|\*\/|^\s*@/.test(sel)) continue;
     out.push(`${sel}{display:none!important}`);
   }
   return out.join('\n');

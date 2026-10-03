@@ -126,6 +126,7 @@ const LISTA = [
   'esempio.test#?#.box:has-text(Sponsor)',
   'sito-buono.test#@#.ad-slot',
   'rotto.test##.x}body{display:none',
+  'rotto.test##@import url(https://altrove.test/x.css);.y',
   '@@||accounts.google.com^$generichide',
   '@@||negozio.test^$elemhide',
   '@@$generichide,domain=altro.test|~niente.test',
@@ -169,7 +170,9 @@ test('occultamento: $generichide e $elemhide spengono le regole dove la lista lo
 test('occultamento: un selettore con graffe non scrive CSS nella pagina', () => {
   A.setCosmeticForTest(LISTA);
   A.configureFromSettings({});
-  assert.doesNotMatch(A.cosmeticForPage('https://rotto.test/').css, /body\{display:none/);
+  const css = A.cosmeticForPage('https://rotto.test/').css;
+  assert.doesNotMatch(css, /body\{display:none/);
+  assert.doesNotMatch(css, /@import/);
 });
 
 test('occultamento: spento col toggle, e fuori dalle pagine web', () => {
