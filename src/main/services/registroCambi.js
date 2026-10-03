@@ -174,9 +174,18 @@ function bersaglio(lista, id) {
   return null;
 }
 
+// Uno alla volta: due annulli dello stesso cambio arrivati insieme (il clic sul segno e la chat) devono
+// vedere l'uno l'evento dell'altro, se no tutti e due lo annullano e il segno smette di dire il vero.
+let codaAnnulli = Promise.resolve();
+function annulla(id, prov = {}) {
+  const p = codaAnnulli.then(() => annullaOra(id, prov));
+  codaAnnulli = p.then(() => {}, () => {});
+  return p;
+}
+
 // Rimette com'era lo stato toccato dall'evento. L'annullo è a sua volta un evento: lo scrive il
 // salvataggio, come ogni altro, col segno di chi annulla.
-async function annulla(id, prov = {}) {
+async function annullaOra(id, prov = {}) {
   await attesa();
   const lista = await leggiLista();
   const trovato = bersaglio(lista, id ? String(id) : null);

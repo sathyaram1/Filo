@@ -765,7 +765,7 @@
       Actions.getNavState(),
     ]);
     const items = buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
     });
 
     // Slot riservato per la correzione ortografica nativa: nascosto finché
@@ -1403,7 +1403,7 @@
       Actions.getNavState(),
     ]);
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
     });
   }
 
@@ -1679,7 +1679,7 @@
   // Ordine verticale: riga icone globali → Aiuto → zona contestuale → Feedback.
   // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
   function buildMenuItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target = null,
   }) {
     const items = [];
 
@@ -1723,9 +1723,12 @@
     if (zoomItem) items.push(zoomItem);
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
-    const contextItems = buildContextualItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
-    });
+    const contextItems = [
+      ...vociDellaPagina(target),
+      ...buildContextualItems({
+        selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
+      }),
+    ];
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
       for (const it of contextItems) items.push(it);
@@ -1739,6 +1742,21 @@
     if (redteamVisibile) items.push(buildRedteamAttackItem());
 
     return items;
+  }
+
+  // Le voci che una pagina di Filo dà ai suoi elementi (il segno di un cambio sulla bolla, #867): ogni
+  // fornitore in SN_VOCI_PAGINA riceve l'elemento cliccato. Mai sui siti: lì quel nome è della pagina.
+  function vociDellaPagina(target) {
+    if (!PAGINA_DI_FILO || !target) return [];
+    const fornitori = Array.isArray(self.SN_VOCI_PAGINA) ? self.SN_VOCI_PAGINA : [];
+    const out = [];
+    for (const f of fornitori) {
+      try {
+        const voci = typeof f === 'function' ? f(target) : null;
+        if (Array.isArray(voci)) out.push(...voci.filter((v) => v && v.label && typeof v.onClick === 'function'));
+      } catch (_) {}
+    }
+    return out;
   }
 
   // Parte nascosta: per difetto la voce manca a chi la vedrebbe fino alla risposta, per eccesso porta tutti in un vicolo cieco.

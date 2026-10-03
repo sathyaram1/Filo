@@ -368,3 +368,70 @@ test('I — un sito non legge né annulla i cambi: solo le pagine di Filo', asyn
   expect(r.leggiFilo.ok).toBe(true);
   expect(r.leggiFilo.eventi[0].frasi.join(' ')).toContain('tema: come il sistema → chiaro');
 });
+
+test('J — il tasto destro sulla bolla col segno offre l\'annullo e il rifai, come la pastiglia', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await homeDi(app);
+  await configura(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
+    { text: 'Fatto.' },
+  ]);
+  await scrivi(page, 'tema scuro', 'Fatto.');
+  const bolla = page.locator('.dash-bubble-user', { hasText: 'tema scuro' });
+  await expect(bolla.locator('.dash-cambi-segno')).toBeVisible();
+  const menu = page.locator('.sn-menu');
+
+  await bolla.click({ button: 'right', position: { x: 20, y: 10 } });
+  await expect(menu).toBeVisible();
+  await page.screenshot({ path: 'tests/.shots/cambi-tasto-destro-annulla.png' });
+  await menu.getByText('Annulla · tema: chiaro → scuro', { exact: true }).click();
+  await expect.poll(async () => (await impostazioni(app)).theme).toBe('light');
+  await bolla.hover();
+  await expect(bolla.locator('.dash-cambi-annulla')).toHaveText('rifai');
+
+  await page.mouse.move(5, 400);
+  await bolla.click({ button: 'right', position: { x: 20, y: 10 } });
+  await menu.getByText('Rifai · tema: chiaro → scuro', { exact: true }).click();
+  await expect.poll(async () => (await impostazioni(app)).theme).toBe('dark');
+  await bolla.hover();
+  await expect(bolla.locator('.dash-cambi-annulla')).toHaveText('annulla');
+
+  // Sulla risposta di Filo, che non ha cambiato niente, la voce non c'è.
+  await page.mouse.move(5, 400);
+  await page.locator('.dash-bubble-filo', { hasText: 'Fatto.' }).click({ button: 'right', position: { x: 10, y: 10 } });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByText(/^(Annulla|Rifai) ·/)).toHaveCount(0);
+  await ripristina(app);
+});
+
+test('K — due annulli dello stesso cambio arrivati insieme ne fanno uno: «rifai» rimette il cambio e il segno lo dice', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await homeDi(app);
+  await configura(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
+    { text: 'Fatto.' },
+  ]);
+  await scrivi(page, 'tema scuro', 'Fatto.');
+  const id = (await registro(app)).find((e) => e.via === 'chat' && e.cambi.some((c) => c.chiave === 'theme')).id;
+  // Il clic sul segno e l'«annulla» chiesto in chat nello stesso momento.
+  const esiti = await app.evaluate(async (_e, i) => Promise.all([
+    globalThis.SN_REGISTRO_CAMBI.annulla(i, { via: 'interfaccia' }),
+    globalThis.SN_REGISTRO_CAMBI.annulla(i, { via: 'chat' }),
+  ]), id);
+  expect(esiti.map((r) => r.ok)).toEqual([true, false]);
+  expect((await registro(app)).filter((e) => e.annulla === id)).toHaveLength(1);
+  expect((await impostazioni(app)).theme).toBe('light');
+
+  const bolla = page.locator('.dash-bubble-user', { hasText: 'tema scuro' });
+  await bolla.hover();
+  await expect(bolla.locator('.dash-cambi-annulla')).toHaveText('rifai');
+  await bolla.locator('.dash-cambi-annulla').click();
+  await expect.poll(async () => (await impostazioni(app)).theme).toBe('dark');
+  await bolla.hover();
+  await expect(bolla.locator('.dash-cambi-annulla')).toHaveText('annulla');
+  await ripristina(app);
+});

@@ -90,18 +90,42 @@
       if (b.disabled) return;
       b.disabled = true;
       b.classList.add('dash-cambi-in-corso');
-      const r = await send({ type: MSG.CAMBI_ANNULLA, id });
+      const r = await esegui(s, id);
       if (!r || !r.ok) {
         b.disabled = false;
         b.classList.remove('dash-cambi-in-corso');
         b.textContent = 'non riuscito';
         b.title = (r && r.error) ? `Non riuscito: ${r.error}` : 'Non riuscito';
-        setTimeout(() => { if (b.isConnected) { b.textContent = testo; b.title = titolo; } }, 2500);
-        return;
+        // Lo stato può essere cambiato da un'altra strada nel frattempo: il segno lo rilegge.
+        setTimeout(() => { if (b.isConnected) aggiorna([s]).catch(() => {}); }, 2500);
       }
-      await aggiorna([s]);
     });
     return b;
+  }
+
+  // Annulla (o rifà) e ridisegna: la stessa cosa dal bottone della pastiglia e dal tasto destro.
+  async function esegui(s, id) {
+    const r = await send({ type: MSG.CAMBI_ANNULLA, id });
+    if (r && r.ok) await aggiorna([s]);
+    return r;
+  }
+
+  // Il tasto destro sulla bolla offre le stesse cose della pastiglia (letto da src/content/content.js).
+  function vociMenu(target) {
+    const s = [...segni].find((x) => x.bolla.isConnected && x.bolla.contains(target));
+    if (!s) return [];
+    const voci = [];
+    for (const id of s.ids) {
+      const v = s.viste.get(id);
+      if (!v) continue;
+      const frase = (v.frasi && v.frasi.length) ? v.frasi.join('; ') : '';
+      if (v.annullatoDa) {
+        voci.push({ type: 'item', icon: icona('undo', 16), label: frase ? `Rifai · ${frase}` : 'Rifai il cambio', onClick: () => esegui(s, v.annullatoDa) });
+      } else if (v.annullabile) {
+        voci.push({ type: 'item', icon: icona('undo', 16), label: frase ? `Annulla · ${frase}` : 'Annulla il cambio', onClick: () => esegui(s, v.id) });
+      }
+    }
+    return voci;
   }
 
   function disegna(s) {
@@ -175,6 +199,8 @@
   let attesa = null;
   function init(deps) {
     if (deps && deps.send) send = deps.send;
+    global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
+    if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
     try {
       global.chrome.runtime.onMessage.addListener((m) => {
         if (!m || m.type !== MSG.CAMBI_AGGIORNATI || !segni.size) return;
