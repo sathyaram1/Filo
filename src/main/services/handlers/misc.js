@@ -540,9 +540,15 @@ module.exports = function register(on, ctx) {
       ),
       // Chiesto al momento della spedizione: fra l'accodamento e l'invio
       // possono passare ore (offline), e l'owner può aver chiuso la sessione.
-      tokenOwner: async () => (auth.isAdmin() ? (await auth.getIdToken()) || '' : ''),
-      onAttesaOwner: () => avvisoNellaFinestra(
-        'Il tuo feedback aspetta il tuo accesso da owner: parte con la tua firma appena rientri.',
+      // '' = l'accesso non c'è; un errore con la sessione ancora aperta è la rete, e la coda riprova senza dire niente.
+      tokenOwner: async () => {
+        if (!auth.isAdmin()) return '';
+        try { return (await auth.getIdToken()) || ''; } catch (e) { if (!auth.isAdmin()) return ''; throw e; }
+      },
+      onAttesaOwner: (_item, perche) => avvisoNellaFinestra(
+        perche === 'rifiutato'
+          ? 'Il tuo feedback aspetta la tua firma da owner: il server non accetta il tuo accesso. Riparte quando rientri, o al prossimo avvio di Filo.'
+          : 'Il tuo feedback aspetta il tuo accesso da owner: parte con la tua firma appena rientri.',
         { chiave: 'feedback-attesa-accesso-owner' },
       ),
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
