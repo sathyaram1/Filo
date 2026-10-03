@@ -2402,14 +2402,12 @@
         righeScartate: [],
       },
     },
-    // Modalità terminale della dashboard: quando attiva, ogni comando con `/`
-    // che non è un comando interno di Filo viene eseguito da una shell di
-    // sistema invece di andare all'LLM (l'output appare in streaming). È OFF
-    // di default ed è opt-in esplicito perché esegue comandi arbitrari sulla
-    // macchina. `shell` sceglie l'interprete: 'powershell' | 'cmd' | 'bash'
-    // (bash = WSL su Windows).
+    // Modalità terminale: Filo risponde con un comando a «quanto spazio ho sul
+    // disco?», e nella home un `/comando` va alla shell. Accesa di serie (#892):
+    // la sicurezza la fanno i livelli di cmdClassify, non l'interruttore.
+    // `shell`: 'powershell' | 'cmd' | 'bash' (bash = WSL su Windows).
     terminal: {
-      enabled: false,
+      enabled: true,
       shell: 'powershell',
     },
     // Proxy per-tab — "Apri da un altro paese" (vedi proxy-per-tab-spec.md).
