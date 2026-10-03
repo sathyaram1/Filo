@@ -53,13 +53,14 @@ function registerProtocolSchemes() {
 // parser normalizza i `..` NON codificati, ma i `..` percent-encoded (%2e%2e)
 // sopravvivono e ridiventano `..` solo dopo decodeURIComponent — finendo in
 // path.join. Esportato per i test.
-// Il Red Team in pausa (#896): a chi non lo vede, ogni sua pagina HTML risponde con la sola frase della pausa.
+// Il Red Team in pausa (#896): a chi non lo vede, ogni indirizzo della sua cartella risponde con la sola frase.
+// Si decide dalla cartella, non dal nome: Windows porta allo stesso file anche con altri nomi (`::$DATA`, nome corto).
 const REDTEAM_DIR = path.join(SRC, 'pages', 'redteam') + path.sep;
 const REDTEAM_PAUSA = path.join(SRC, 'pages', 'redteam', 'pausa.html');
 
 async function paginaRedteamChiusa(resolved) {
   const p = resolved.toLowerCase();
-  if (!p.startsWith(REDTEAM_DIR.toLowerCase()) || !/\.html?$/.test(p) || p === REDTEAM_PAUSA.toLowerCase()) return false;
+  if (!p.startsWith(REDTEAM_DIR.toLowerCase()) || p === REDTEAM_PAUSA.toLowerCase()) return false;
   const Gate = require('./services/redteamGate');
   return !(await Gate.assicura()).visible;
 }
