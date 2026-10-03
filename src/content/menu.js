@@ -1380,6 +1380,7 @@
         incolla: centro(riga.querySelector('.sn-menu-history-paste')),
         rimuovi: centro(riga.querySelector('.sn-menu-history-remove')),
         pronta: pronta(riga.querySelector('.sn-menu-history-paste')) && pronta(riga.querySelector('.sn-menu-history-remove')),
+        libera: !global.SN_VISTO || !!global.SN_VISTO._test.libera(riga.querySelector('.sn-menu-history-paste')),
       })),
       svuotaPronta: pronta(svuota),
       vuoto: [...sub.querySelectorAll('.sn-menu-empty')].filter(visibile).map((e) => e.textContent).join(' '),
