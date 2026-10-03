@@ -483,7 +483,8 @@
     tabsEl.addEventListener('mouseover', (e) => {
       puntatore = { x: e.clientX, y: e.clientY };
       const el = e.target.closest('.tab[data-anteprima]');
-      if (el) sopra(el.dataset.anteprima);
+      if (el && suUnControllo(e.target, el)) cede();
+      else if (el) sopra(el.dataset.anteprima);
       // Il bordo fra due schede non spegne la carta: passando alla vicina cambierebbe con un lampo.
       else if (!vaVia) vaVia = setTimeout(nascondi, 120);
     });
