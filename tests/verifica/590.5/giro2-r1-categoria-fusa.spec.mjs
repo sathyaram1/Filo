@@ -27,7 +27,6 @@ async function preparaAltro(openTab) {
   return altro;
 }
 
-const casellaDi = (altro, valore) => altro.locator('.sn-cat-row input').filter({ has: altro.locator(':scope') }).and(altro.locator(`[value="${valore}"]`));
 
 test('«Lavoro vecchio» → «Lavoro archiviato» togliendo la parola con Ctrl+Backspace: restano due categorie', async ({ app, openTab }) => {
   const altro = await preparaAltro(openTab);
