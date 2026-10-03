@@ -72,6 +72,7 @@ const STATE = {
   pending: null,
   flushTimer: null,
   listeners: new Set(),
+  scritture: new Set(),
 };
 
 // === Modalità incognito ===========================================
@@ -118,6 +119,12 @@ function inIncognito() {
 // Promise: AsyncLocalStorage propaga il contesto attraverso la catena async).
 function runIncognito(fn) {
   return als.run({ incognito: true }, fn);
+}
+
+// Il contrario, per chi scrive da una coda condivisa: la sua scrittura va sul disco anche se
+// la catena che l'ha messa in fila era partita da una finestra incognito.
+function runNormale(fn) {
+  return als.run({ incognito: false }, fn);
 }
 
 // Azzera l'overlay incognito. Chiamato dalla chiusura dell'ultima finestra
@@ -289,7 +296,17 @@ async function get(keysOrNull) {
 async function set(obj) {
   await loadIfNeeded();
   let keys = Object.keys(obj);
-  if (inIncognito()) {
+  // Chi tiene il registro dei cambi (src/main/services/registroCambi.js) vede OGNI scrittura,
+  // anche quelle dell'incognito: sono loro che decidono dove finisce l'evento, non questo file.
+  const incog = inIncognito();
+  if (STATE.scritture.size) {
+    const visti = {};
+    for (const k of keys) visti[k] = { oldValue: incog ? incognitoReadKey(k) : STATE.data[k], newValue: obj[k] };
+    for (const fn of STATE.scritture) {
+      try { fn(visti, { incognito: incog }); } catch (e) { console.warn('[Filo storage] scrittura osservata, errore', e); }
+    }
+  }
+  if (incog) {
     // Scrive solo nell'overlay in RAM: niente disco, niente flush e niente
     // emitChange (così non contamina i listener delle finestre normali).
     for (const k of keys) {
@@ -360,6 +377,12 @@ function onChanged(fn) {
   return () => STATE.listeners.delete(fn);
 }
 
+// Come onChanged, ma chiamato PRIMA della scrittura e anche in incognito, con { incognito }.
+function onScrittura(fn) {
+  STATE.scritture.add(fn);
+  return () => STATE.scritture.delete(fn);
+}
+
 // Flush sincrono best-effort prima della chiusura.
 function flushSync() {
   try {
@@ -386,12 +409,14 @@ module.exports = {
   remove,
   clear,
   onChanged,
+  onScrittura,
   flushSync,
   whenSettled,
   flushNow,
   maxFlushOverlap,
   setSync,
   runIncognito,
+  runNormale,
   resetIncognito,
   inIncognito,
 };

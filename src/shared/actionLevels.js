@@ -511,6 +511,23 @@
       level: 1,
       describe: () => 'Togliere le modifiche di stile applicate alla pagina',
     },
+    // ── rimettere com'era un cambio di stato (#867) ─────────────────────────
+    // Il livello è quello del cambio da rimettere: `_livelloCambio` lo scrive il main dal registro,
+    // sempre, prima del cancello (mai dall'azione del modello). Rimettere la protezione dell'IP
+    // spenta chiede la stessa conferma che chiederebbe spegnerla.
+    ANNULLA_CAMBIO: {
+      level: (a) => (a && a._livelloCambio === 1 ? 1 : 2),
+      describe: (a) => {
+        const f = String((a && a._fraseCambio) || '').trim();
+        const base = f ? `Filo vuole rimettere com'era prima di: ${f}.` : 'Filo vuole rimettere com\'era l\'ultimo cambio.';
+        if (a && a._livelloCambio === 1) return base;
+        return `${base}\n\nTocca un'impostazione di sicurezza, dei modelli o delle spese: conferma solo se l'hai chiesto tu.`;
+      },
+      describeDone: (a) => {
+        const f = String((a && a._fraseCambio) || '').trim();
+        return f ? `Rimesso com'era prima di: ${f}` : 'Cambio annullato';
+      },
+    },
     // ── zoom della pagina via chat (#686) ────────────────────────────────────
     // Livello 1: è la stessa cosa che fanno Ctrl +/- e Ctrl 0, visibile e
     // reversibile in un tasto.

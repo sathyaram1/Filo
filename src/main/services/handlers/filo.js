@@ -71,6 +71,20 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // #867 — il segno sulla bolla chiede come stanno i suoi cambi, e il suo «annulla» li rimette com'erano.
+  const Registro = require('../registroCambi');
+  const { soloFilo: soloDaFilo } = require('./origine');
+  on(MSG.CAMBI_LEGGI, soloDaFilo(async (msg) => {
+    const ids = (Array.isArray(msg.ids) ? msg.ids : []).map(String);
+    return { ok: true, eventi: await Registro.leggi(ids) };
+  }));
+  on(MSG.CAMBI_ANNULLA, soloDaFilo(async (msg) => {
+    const id = String((msg && msg.id) || '').trim();
+    if (!id) return { ok: false, error: 'manca il cambio' };
+    const r = await Registro.annulla(id, Registro.corrente() || { via: 'interfaccia' });
+    return r.ok ? { ok: true, id: r.id, eventi: r.eventi, saltati: r.saltati } : { ok: false, error: r.motivo };
+  }));
+
   // Primo dispatch (non confermato) di una singola azione di Filo richiesta
   // dall'agente "Aiuto" (la sidebar on-page). Passa per lo STESSO
   // executeFiloAction della chat dashboard: stesso registro dei livelli, stesse
@@ -242,7 +256,11 @@ module.exports = function register(on, ctx) {
     const role = msg.role === 'user' ? 'user' : 'filo';
     // L'esito di un comando lanciato a mano l'ha scritto il comando: riaperta, la chat lo tratta da letto (#810).
     const esterno = role === 'filo' && msg.esterno === 'comando' ? "dall'output di un comando" : '';
-    await FiloChats.append(id, { role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}) });
+    // I cambi di stato di un'azione confermata dopo il turno (#867): riaperta, la bolla ritrova il segno.
+    const cambi = (Array.isArray(msg.cambi) ? msg.cambi : []).filter((c) => typeof c === 'string');
+    await FiloChats.append(id, {
+      role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
+    });
     return { ok: true };
   });
 

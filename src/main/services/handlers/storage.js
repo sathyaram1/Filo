@@ -217,8 +217,11 @@ module.exports = function register(on, ctx) {
         if (k === SETTINGS_KEY) continue;
         if (JSON.stringify(merged[k]) !== JSON.stringify(current[k])) rest[k] = merged[k];
       }
-      if (Object.keys(rest).length) await DiskStorage.set(rest);
-      if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
+      // I cambi che l'importazione porta entrano nel filo come suoi, e si annullano come gli altri (#867).
+      await require('../registroCambi').con({ via: 'importazione' }, async () => {
+        if (Object.keys(rest).length) await DiskStorage.set(rest);
+        if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
+      });
       // Un backup di una versione vecchia porta le miniature a piena risoluzione (#839).
       globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {});
 

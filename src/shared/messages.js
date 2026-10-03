@@ -761,6 +761,11 @@
     // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
     // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
     FILO_CONFIRM_ACTION: 'filo_confirm_action',
+    // I cambi di stato come eventi del filo (#867). Solo dalle pagine di Filo: leggono e riscrivono le
+    // impostazioni dell'utente. LEGGI { ids } → { eventi }; ANNULLA { id } → { ok, eventi }.
+    CAMBI_LEGGI: 'cambi_leggi',
+    CAMBI_ANNULLA: 'cambi_annulla',
+    CAMBI_AGGIORNATI: 'cambi_aggiornati',           // main → pagine di Filo { ids }: un cambio è nato o è stato annullato
 
     // Primo dispatch (non ancora confermato) di UNA singola azione di Filo,
     // usato dall'agente "Aiuto" (sidebar) per attivare le azioni tipizzate di

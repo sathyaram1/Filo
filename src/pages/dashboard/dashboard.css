@@ -263,6 +263,61 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   color: var(--dash-paper);
   border-bottom-right-radius: 6px;
 }
+/* #867 — il segno di un cambio sulla bolla dell'utente, come la conferma di lettura: passandoci sopra
+   (sul segno, non sulla bolla che si attraversa leggendo) la frase e «annulla» in una pastiglia. */
+.dash-bubble-cambi { position: relative; margin-bottom: 6px; }
+.dash-cambi-segno {
+  position: absolute; right: 10px; bottom: -9px;
+  width: 19px; height: 19px; padding: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--dash-accent); color: var(--dash-paper);
+  border: 2px solid var(--dash-paper); cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.dash-cambi-segno svg { stroke-width: 3; }
+.dash-cambi-segno:hover, .dash-cambi-segno:focus-visible { transform: scale(1.12); outline: none; }
+.dash-cambi-segno.dash-cambi-tutti-annullati { background: var(--dash-ink-mute); }
+.dash-bubble-cambi.dash-cambi-vuoto .dash-cambi-segno { display: none; }
+.dash-cambi-pop {
+  position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 5;
+  display: flex; flex-direction: column; gap: 4px; width: max-content; max-width: min(460px, 80vw);
+  background: var(--dash-ink); color: var(--dash-paper);
+  border-radius: 12px; padding: 6px 8px 6px 12px;
+  font-size: 12px; line-height: 1.35; white-space: normal; user-select: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  opacity: 0; visibility: hidden; transform: translateY(4px);
+  /* Si chiude con un attimo di ritardo: dal segno alla pastiglia il mouse attraversa la bolla. */
+  transition: opacity 0.15s ease 0.35s, transform 0.15s ease 0.35s, visibility 0s linear 0.5s;
+}
+/* Il ponte fra la bolla e la pastiglia: andandoci col mouse non si chiude. */
+.dash-cambi-pop::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 10px; }
+.dash-bubble-cambi.dash-cambi-sotto .dash-cambi-pop { bottom: auto; top: calc(100% + 14px); }
+.dash-bubble-cambi.dash-cambi-sotto .dash-cambi-pop::after { top: auto; bottom: 100%; }
+/* Il fuoco apre solo da tastiera: quello lasciato da un clic terrebbe aperta la pastiglia che il clic ha chiuso. */
+.dash-cambi-segno:hover + .dash-cambi-pop,
+.dash-cambi-pop:hover,
+.dash-cambi-segno:focus-visible + .dash-cambi-pop,
+.dash-cambi-pop:has(:focus-visible),
+.dash-bubble-cambi.dash-cambi-aperto .dash-cambi-pop {
+  opacity: 1; visibility: visible; transform: none;
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s;
+}
+.dash-cambi-riga { display: flex; align-items: center; gap: 9px; }
+.dash-cambi-frase { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.dash-cambi-annullato .dash-cambi-frase { text-decoration: line-through; opacity: 0.6; }
+.dash-cambi-stato { flex: none; opacity: 0.6; font-size: 11px; }
+.dash-activity-row.dash-cambi-annullato > span:nth-child(2) { text-decoration: line-through; opacity: 0.6; }
+.dash-cambi-annulla {
+  flex: none; font: inherit; font-size: 11.5px; cursor: pointer;
+  border: 1px solid currentColor; background: transparent; color: inherit;
+  border-radius: 13px; padding: 1px 9px; opacity: 0.8;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.dash-cambi-annulla:hover, .dash-cambi-annulla:focus-visible {
+  opacity: 1; background: var(--dash-paper); color: var(--dash-ink); border-color: var(--dash-paper); outline: none;
+}
+.dash-cambi-annulla.dash-cambi-in-corso { opacity: 0.5; cursor: progress; }
+
 .dash-bubble-filo {
   align-self: flex-start;
   background: var(--dash-card);

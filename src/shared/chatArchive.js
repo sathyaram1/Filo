@@ -363,6 +363,9 @@
         .map((x) => ({ valore: x.valore.slice(0, 200), regola: String(x.regola || 'codice'), fonte: String(x.fonte || 'da fuori').slice(0, 120) }));
       if (letti.length) out.letti = letti;
       if (typeof turn.esterno === 'string' && turn.esterno.trim()) out.esterno = turn.esterno.trim().slice(0, 120);
+      // I cambi di stato chiesti con quel messaggio (#867): riaperta, la bolla dell'utente ritrova il suo segno.
+      const cambi = (Array.isArray(turn.cambi) ? turn.cambi : []).filter((id) => typeof id === 'string' && /^c[0-9a-f]+$/.test(id));
+      if (cambi.length) out.cambi = cambi;
     }
     return out;
   }

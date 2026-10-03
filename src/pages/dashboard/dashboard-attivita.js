@@ -166,10 +166,10 @@
       // Una riga di azione: icona e due parole («Timer avviato · 5 min»).
       // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la
       // conta — «Ha avviato un timer» su un timer non avviato è una bugia.
-      addRow(type, rowIcon, text, failed = false) {
+      addRow(type, rowIcon, text, failed = false, cambi = null) {
         closeTurnReasoning();
         if (!failed) doneTypes.push(String(type || '').toUpperCase());
-        append(makeActivityRow(rowIcon, text));
+        append(makeActivityRow(rowIcon, text, cambi));
         if (phase !== 'done') setPhase('act', text);
       },
       // Esito di un comando eseguito subito (livello 1): riga di comando e
@@ -234,6 +234,8 @@
         head.title = open ? 'Nascondi' : 'Mostra cosa ha fatto Filo';
       },
       remove() { wrap.remove(); },
+      // Il blocco sta subito sotto la bolla dell'utente che l'ha chiesto: da qui la si ritrova.
+      el: wrap,
     };
   }
 
@@ -257,6 +259,7 @@
     ESEGUI_COMANDO: (n) => (n > 1 ? `eseguito ${n} comandi` : 'eseguito un comando'),
     IMPOSTA_PREFERENZA: (n) => (n > 1 ? `cambiato ${n} impostazioni` : 'cambiato un\'impostazione'),
     IMPOSTA_ESTETICA: (n) => (n > 1 ? `cambiato ${n} dettagli dell'aspetto` : 'cambiato l\'aspetto'),
+    ANNULLA_CAMBIO: (n) => (n > 1 ? `rimesso com'era ${n} cambi` : 'rimesso com\'era un cambio'),
     SALVA_APPUNTO: (n) => (n > 1 ? `salvato ${n} appunti` : 'salvato un appunto'),
     SALVA_LEZIONE: (n) => (n > 1 ? `memorizzato ${n} cose` : 'memorizzato una cosa'),
     DIMENTICA: (n) => (n > 1 ? `dimenticato ${n} cose` : 'dimenticato una cosa'),
@@ -301,9 +304,13 @@
   // chi disegna una risposta senza blocco (replay, altre superfici) — fra le
   // azioni della bolla. Tiene la classe della traccia (#376): non è un bottone
   // e non deve sembrarlo.
-  function makeActivityRow(rowIcon, text) {
+  // `cambi`: gli id degli eventi del filo che la riga racconta; il tasto destro e lo stato
+  // «annullato» li leggono da lì (dashboard-cambi.js).
+  function makeActivityRow(rowIcon, text, cambi = null) {
     const el = document.createElement('div');
     el.className = 'dash-action-step dash-activity-row';
+    const ids = Array.isArray(cambi) ? cambi.filter(Boolean) : [];
+    if (ids.length) el.dataset.cambi = ids.join(' ');
     const ic = document.createElement('span');
     ic.className = 'dash-activity-row-icon';
     ic.setAttribute('aria-hidden', 'true');
@@ -324,6 +331,10 @@
   // di controllo (un byte nullo nell'etichetta finiva tale e quale nel diario).
   function pulito(v) {
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
+  }
+  function frasiCambi(a) {
+    const l = Array.isArray(a && a._cambi) ? a._cambi : [];
+    return l.map((c) => pulito(c && c.frase)).filter(Boolean).join('; ');
   }
   const ACTIVITY_ROWS = {
     TIMER: (a) => {
@@ -352,10 +363,17 @@
     EVENTO_CALENDARIO: (a) => ({ icon: '📅', text: `Evento creato · ${a.title || a.titolo || ''}` }),
     // Impostazione applicata subito (livello 1, es. il tema): prima non
     // lasciava traccia in chat, come se non fosse successo niente.
+    // La frase è quella dell'evento del filo, col nome della pagina Preferenze (#557, #867); senza
+    // evento il valore era già quello.
     IMPOSTA_PREFERENZA: (a) => {
-      const k = a.chiave || a.key || '';
-      const v = a.valore ?? a.value;
-      return { icon: '⚙', text: `Impostato · ${k}${v !== undefined && v !== '' ? ` = ${v}` : ''}` };
+      const f = frasiCambi(a);
+      if (f) return { icon: '⚙', text: `Impostato · ${f}` };
+      const etichetta = pulito(a._output && a._output.etichetta);
+      return { icon: '⚙', text: etichetta ? `Già così · ${etichetta}` : 'Impostazione già così' };
+    },
+    ANNULLA_CAMBIO: (a) => {
+      const f = pulito(a._output && a._output.frase);
+      return { icon: '↩', text: `Rimesso com’era${f ? ` · prima di: ${f}` : ''}` };
     },
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
@@ -402,6 +420,8 @@
       const T = window.SN_THEME_TOKENS;
       const t = T && T.get && T.get(tok);
       const val = a.valore ?? a.value ?? a.val ?? a.colore;
+      const f = frasiCambi(a);
+      if (f) return { icon: '🎨', text: `Aspetto · ${f.replace(/^aspetto, /, '')}` };
       return { icon: '🎨', text: `Aspetto · ${(t && t.label) || tok}${val ? ` = ${val}` : ''}` };
     },
     PROXY_TAB: (a) => ({ icon: '🌍', text: `Scheda aperta da · ${String(a.country || a.paese || '').toUpperCase()}` }),
@@ -443,6 +463,7 @@
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
+    ANNULLA_CAMBIO: 'Niente annullato',
     STILE_PAGINA: 'Aspetto della pagina non cambiato', RIPRISTINA_STILE_PAGINA: 'Aspetto della pagina non ripristinato',
     PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
     RIMUOVI_PROXY_TUTTE: 'Proxy non tolti', REGOLA_PROXY_DOMINIO: 'Regola non salvata',
@@ -450,6 +471,12 @@
     EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
   };
   function activityRowFor(a) {
+    const row = rigaAttivita(a);
+    if (!row || row.failed) return row;
+    const ids = (Array.isArray(a._cambi) ? a._cambi : []).map((c) => (typeof c === 'string' ? c : c && c.id)).filter(Boolean);
+    return ids.length ? { ...row, cambi: ids } : row;
+  }
+  function rigaAttivita(a) {
     if (!a) return null;
     // In attesa di conferma: il bottone lo mostra la chat, ma nel diario resta
     // la traccia che Filo l'ha CHIESTO — se no un turno fatto di sola richiesta
@@ -511,7 +538,7 @@
       return true;
     }
     const row = activityRowFor(a);
-    if (row) { activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed); return true; }
+    if (row) { activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi); return true; }
     return false;
   }
 
@@ -570,7 +597,7 @@
     const chip = document.querySelector(`[data-call-id="${CSS.escape(String(callId))}"]`);
     if (chip && apribileComunque(a)) {
       const row = activityRowFor(a);
-      if (row) chip.before(makeActivityRow(row.icon, row.text));
+      if (row) chip.before(makeActivityRow(row.icon, row.text, row.cambi));
       chip.replaceWith(bottoneApriComunque(a));
     }
     return true;
@@ -607,7 +634,7 @@
       } else {
         const row = activityRowFor(a);
         if (row) {
-          wrap.appendChild(makeActivityRow(row.icon, row.text));
+          wrap.appendChild(makeActivityRow(row.icon, row.text, row.cambi));
           if (!anche) continue;
         }
       }
@@ -861,7 +888,7 @@
           a._executed = false;
           delete a._confirm;
           const row = activityRowFor(a);
-          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed);
+          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi);
           btn.textContent = `🔒 ${row ? row.text : 'Fermata'}`;
           return;
         }
@@ -870,7 +897,7 @@
         // il MODELLO al turno dopo — l'oggetto è lo stesso che sta nello
         // storico della conversazione, quindi basta segnarlo qui. Senza,
         // a «l'hai attivato?» il modello poteva solo tirare a indovinare.
-        if (r && r.executed) segnaConfermata(a, r.output, activity);
+        if (r && r.executed) segnaConfermata(a, r.output, activity, r.cambi);
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
           segnaComando((r && r.executed) ? '✓' : '✗');
@@ -1037,15 +1064,20 @@
 
   // Confermata e fatta: lo sanno il diario e, al turno dopo, il modello (è lo
   // stesso oggetto che sta nello storico della conversazione).
-  function segnaConfermata(a, output, activity) {
+  function segnaConfermata(a, output, activity, cambi) {
     a._confirmed = true;
     a._executed = true;
     delete a._confirm;
     if (output) a._output = output;
+    const ids = Array.isArray(cambi) ? cambi : [];
+    if (ids.length) {
+      a._cambi = ids;
+      if (activity && activity.el && global.SN_DASH_CAMBI) global.SN_DASH_CAMBI.segna(activity.el, ids);
+    }
     const row = activityRowFor(a);
-    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
+    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, row.cambi);
     // L'archivio delle chat ha salvato il turno senza le azioni in attesa: questa adesso è successa.
-    try { archiviaAzione(String(a.type || '').toUpperCase()); } catch (_) {}
+    try { archiviaAzione(String(a.type || '').toUpperCase(), ids.map((c) => c.id)); } catch (_) {}
   }
 
   // La pulizia parte SOLO al click, con conferma, mai da sola (spec §2.1).
