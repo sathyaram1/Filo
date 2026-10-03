@@ -1,0 +1,135 @@
+// #589.8 — lo script di un sito fabbricava un tasto destro, premeva da sé la freccia di Incolla e leggeva la
+// cronologia degli appunti dal menu di Filo nel suo documento. Il menu risponde solo ai gesti dell'utente e la
+// cronologia sta in uno shadow root chiuso. Regola: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md.
+
+import { test, expect } from './fixtures/electron.mjs';
+import { statoCronologia, testiCronologia } from './helpers/cronologiaAppunti.mjs';
+
+const SEGRETO = 'pw-Segreta-589-otto';
+
+// Lo script del sito: tutto ciò che fa lo fa da sé, dentro il clic dell'utente su un suo pulsante.
+const ATTACCO = `
+  window.__visti = [];
+  new MutationObserver((ms) => {
+    for (const m of ms) for (const n of m.addedNodes) window.__visti.push((n.outerHTML || n.textContent || ''));
+  }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+  const aspetta = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  window.tasto = () => {
+    const c = document.getElementById('campo');
+    const r = c.getBoundingClientRect();
+    c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, composed: true,
+      clientX: r.left + 5, clientY: r.top + 5, button: 2, buttons: 2 }));
+  };
+  window.freccia = () => {
+    const f = document.querySelector('.sn-menu-paste-arrow');
+    if (!f) return false;
+    for (const t of ['pointerover', 'pointerenter', 'mouseover', 'mouseenter', 'pointerdown', 'mousedown', 'pointerup', 'mouseup']) {
+      f.dispatchEvent(new MouseEvent(t, { bubbles: true, composed: true }));
+    }
+    f.click();
+    return true;
+  };
+  window.incolla = () => { const b = document.querySelector('.sn-menu-paste-main'); if (b) b.click(); return !!b; };
+  window.cosaVede = () => {
+    let t = document.documentElement.outerHTML + (window.__visti || []).join(' ');
+    for (const el of document.querySelectorAll('*')) if (el.shadowRoot) t += el.shadowRoot.innerHTML;
+    return t;
+  };
+  window.attacca = async () => {
+    window.tasto();
+    await aspetta(800);
+    window.__menu = !!document.querySelector('.sn-menu');
+    window.freccia();
+    await aspetta(800);
+    window.incolla();
+    await aspetta(800);
+    window.__fatto = true;
+  };
+`;
+
+const PAGINA = `<!doctype html><html><body style="padding:40px">
+  <input id="campo" style="width:320px;font-size:16px">
+  <button id="gioca" style="margin-left:20px">Gioca</button>
+  <script>${ATTACCO}
+  document.getElementById('gioca').addEventListener('click', () => window.attacca());</script>
+</body></html>`;
+
+async function conCronologia(shell) {
+  for (const text of ['un testo qualsiasi', SEGRETO]) {
+    await shell.evaluate((t) => window.filoShell.message({ type: 'push_clipboard_entry', entry: { type: 'text', text: t } }), text);
+  }
+}
+
+test('il clic su un pulsante del sito non gli basta per aprire il menu e leggere la cronologia degli appunti', async ({ app, shell, openTab, testServer }) => {
+  await conCronologia(shell);
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+
+  await page.locator('#gioca').click();
+  await page.waitForFunction(() => window.__fatto === true, null, { timeout: 10_000 });
+
+  expect(await page.evaluate(() => window.__menu), 'il tasto destro fabbricato non apre il menu').toBe(false);
+  expect(await page.evaluate(() => window.cosaVede())).not.toContain(SEGRETO);
+  expect(await page.locator('#campo').inputValue(), 'Incolla premuto dal sito non incolla gli appunti').not.toContain(SEGRETO);
+  expect(await statoCronologia(app, page)).toBeNull();
+
+  // Il tasto destro dell'utente, sulla stessa pagina, apre il menu come sempre.
+  await page.locator('#campo').click({ button: 'right' });
+  await expect(page.locator('.sn-menu').first()).toBeVisible();
+});
+
+test('a menu aperto dall\'utente il sito non preme Incolla né la freccia; la cronologia la vede e la incolla solo l\'utente', async ({ app, shell, openTab, testServer }) => {
+  await conCronologia(shell);
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+
+  await page.locator('#campo').click({ button: 'right' });
+  await expect(page.locator('.sn-menu-paste-arrow')).toBeVisible();
+  expect(await page.evaluate(() => window.freccia())).toBe(true);
+  expect(await page.evaluate(() => window.incolla())).toBe(true);
+  await page.waitForTimeout(800);
+  expect(await statoCronologia(app, page), 'la freccia premuta dal sito non apre la cronologia').toBeNull();
+  expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
+
+  // L'utente passa sulla freccia: la cronologia c'è, e il sito non la legge da nessuna parte.
+  if (!(await page.locator('.sn-menu-paste-arrow').isVisible())) await page.locator('#campo').click({ button: 'right' });
+  await page.locator('.sn-menu-paste-arrow').hover();
+  await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
+  expect(await page.evaluate(() => window.cosaVede())).not.toContain(SEGRETO);
+  expect(await page.evaluate(() => [...document.querySelectorAll('[data-sn-ui]')].some((el) => el.shadowRoot))).toBe(false);
+
+  const voce = (await statoCronologia(app, page)).voci.find((v) => v.testo === SEGRETO);
+  await page.mouse.move(voce.incolla.x, voce.incolla.y, { steps: 4 });
+  await page.mouse.click(voce.incolla.x, voce.incolla.y);
+  await expect(page.locator('#campo')).toHaveValue(SEGRETO);
+});
+
+test('un riquadro di un altro sito dentro la pagina non apre il menu con un tasto destro fabbricato', async ({ app, shell, openTab, testServer }) => {
+  await conCronologia(shell);
+  const riquadro = testServer.html(`<!doctype html><html><body>
+    <input id="campo" style="width:200px">
+    <script>${ATTACCO}
+    window.__menuMai = false;
+    const t0 = Date.now();
+    const giro = setInterval(async () => {
+      window.tasto();
+      await new Promise((ok) => setTimeout(ok, 150));
+      if (document.querySelector('.sn-menu')) window.__menuMai = true;
+      window.freccia();
+      if (Date.now() - t0 > 5000) { clearInterval(giro); window.__fatto = true; }
+    }, 300);</script>
+  </body></html>`, { pubblico: true });
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:20px">
+    <button id="qui">Leggi l'articolo</button>
+    <iframe src="${riquadro}" style="width:400px;height:200px"></iframe>
+  </body></html>`);
+
+  await page.locator('#qui').click();
+  const frame = await expect.poll(() => page.frames().find((f) => f.url().includes('sito-pubblico.test')) || null).not.toBeNull()
+    .then(() => page.frames().find((f) => f.url().includes('sito-pubblico.test')));
+  await frame.waitForFunction(() => window.__fatto === true, null, { timeout: 10_000 });
+  expect(await frame.evaluate(() => window.__menuMai)).toBe(false);
+  expect(await frame.evaluate(() => window.cosaVede())).not.toContain(SEGRETO);
+});
