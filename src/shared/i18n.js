@@ -26,6 +26,8 @@
     menu_paste_remove: 'Rimuovi dalla cronologia',
     menu_paste_clear: 'Svuota cronologia',
     menu_paste_clear_confirm: 'Vuoi svuotare tutta la cronologia degli appunti? Le voci copiate finora verranno eliminate.',
+    // #589.11 — il clic su una voce che il sito copriva non parte.
+    menu_click_covered: 'Il menu era coperto: clic ignorato',
     menu_explain_loading: 'Spiegazione…',
 
     // Menu — pagina

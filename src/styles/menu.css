@@ -653,10 +653,11 @@
   outline-offset: -2px;
   border-radius: 6px;
 }
+/* Stesso piano del menu e montata dopo: sopra i pannelli, sotto le sonde che vedono i veli del sito (#589.11). */
 .sn-drag-preview {
   position: fixed;
   pointer-events: none;
-  z-index: 2147483647;
+  z-index: 2147483646;
   opacity: 0.92;
   background: var(--sn-bg);
   color: var(--sn-fg);
@@ -674,7 +675,7 @@
 
 .sn-tooltip {
   position: fixed;
-  z-index: 2147483647;
+  z-index: 2147483646;
   pointer-events: none;
   background: var(--sn-overlay-bg);
   color: var(--sn-fg);

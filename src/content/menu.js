@@ -1371,12 +1371,17 @@
     const r = sub.getBoundingClientRect();
     const lista = sub.querySelector('.sn-menu-history-list');
     const cerca = sub.querySelector('.sn-menu-history-search-input');
+    // Un clic conta solo su una voce che il browser ha già visto scoperta (#589.11): gli spec aspettano questo.
+    const pronta = (el) => !el || !global.SN_VISTO || global.SN_VISTO._test.pronta(el);
+    const svuota = sub.querySelector('.sn-menu-history-clear-btn');
     return {
       voci: [...sub.querySelectorAll('.sn-menu-history-item')].filter(visibile).map((riga) => ({
         testo: riga.querySelector('.sn-menu-history-paste')?.getAttribute('aria-label') || '',
         incolla: centro(riga.querySelector('.sn-menu-history-paste')),
         rimuovi: centro(riga.querySelector('.sn-menu-history-remove')),
+        pronta: pronta(riga.querySelector('.sn-menu-history-paste')) && pronta(riga.querySelector('.sn-menu-history-remove')),
       })),
+      pronta: pronta(svuota),
       vuoto: [...sub.querySelectorAll('.sn-menu-empty')].filter(visibile).map((e) => e.textContent).join(' '),
       cerca: cerca ? {
         centro: centro(cerca), valore: cerca.value, segnaposto: cerca.placeholder, fuoco: sub.getRootNode().activeElement === cerca,
