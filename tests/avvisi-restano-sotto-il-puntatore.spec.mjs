@@ -63,10 +63,11 @@ test('su una pagina web «Copiato» resta finché il puntatore ci sta sopra, e s
   await shot(page, 'avviso-630-puntatore-sopra');
 
   await page.mouse.move(40, 40, { steps: 4 });
+  await page.waitForTimeout(250);
   const fuori = await avviso.evaluate((el) => getComputedStyle(el).backgroundColor).catch(() => null);
   expect(fuori, 'al passaggio del puntatore l’avviso non dava nessun segno').not.toBe(sfondo);
   // Chi era agli sgoccioli ha ancora un attimo per finire di leggere, poi se ne va da solo.
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(650);
   await expect(avviso).toBeVisible();
   await expect(avviso).toHaveCount(0, { timeout: 4000 });
 });
@@ -84,7 +85,7 @@ test('col puntatore su un avviso aspettano anche gli altri della pila', async ({
   await expect(avvisi).toHaveCount(0, { timeout: 4500 });
 });
 
-test('un clic chiude l’avviso nella pagina, e il clic accanto resta della pagina', async ({ openTab, testServer }) => {
+test('un clic chiude l’avviso nella pagina', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGE);
   await copiaUrl(page);
   const avviso = page.locator('.sn-toast');
@@ -169,4 +170,23 @@ test('mazzi: l’avviso aspetta il puntatore e un clic lo chiude', async ({ open
   await page.mouse.down();
   await page.mouse.up();
   await expect(avviso).toHaveCount(0, { timeout: 1500 });
+});
+
+test('tema scuro: l’avviso col puntatore sopra si schiarisce appena e il testo resta leggibile', async ({ shell, openTab }) => {
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
+  const page = await openTab('filo://newtab/');
+  await page.waitForFunction(() => !!globalThis.SN_POPUP && document.documentElement.dataset.snTheme === 'dark', null, { timeout: 8000 });
+  await page.evaluate(() => globalThis.SN_POPUP.showToast('Avviso nel tema scuro', { duration: 0 }));
+  const avviso = page.locator('.sn-toast', { hasText: 'Avviso nel tema scuro' });
+  await expect(avviso).toHaveClass(/sn-toast-visible/);
+  await page.waitForTimeout(250);
+  const prima = await avviso.evaluate((el) => getComputedStyle(el).backgroundColor);
+  await puntatoreSopra(page, avviso);
+  await page.waitForTimeout(250);
+  const [sopra, testo] = await avviso.evaluate((el) => [getComputedStyle(el).backgroundColor, getComputedStyle(el).color]);
+  await shot(page, 'avviso-630-tema-scuro');
+  expect(sopra).not.toBe(prima);
+  // Sfondo scuro e testo chiaro anche col puntatore sopra.
+  const luce = (c) => { const [r, g, b] = c.match(/\d+(\.\d+)?/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  expect(luce(testo) - luce(sopra)).toBeGreaterThan(100);
 });
