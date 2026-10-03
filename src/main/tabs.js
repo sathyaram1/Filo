@@ -2165,6 +2165,8 @@ class TabManager {
       }
     });
 
+    // I riquadri si guardano da quando nascono: uno che non finisce mai di caricarsi mostra già il modulo (#813.1).
+    wc.on('did-frame-navigate', (_e, _url, _code, _text, isMainFrame) => this._sbOnFrameLoad(tab, isMainFrame));
     wc.on('did-frame-finish-load', (_e, isMainFrame) => this._sbOnFrameLoad(tab, isMainFrame));
 
     // §3.1 — ripristino scroll alla riapertura da archivio: a caricamento finito
