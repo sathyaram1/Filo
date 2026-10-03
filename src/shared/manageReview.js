@@ -74,7 +74,8 @@
   // ── Lavori locali (#908) ─────────────────────────────────────────────────
   // `localOnly { by, at }`: la pratica la lavora solo una sessione locale. Il segno
   // da solo la toglie alle routine; si mette solo su feedback dell'owner o di una
-  // sessione CON la prova (#595), mai sul solo prefisso. Gemello: localWork.js sul server.
+  // sessione CON la prova (#595), mai sul solo prefisso, o su un feedback che l'owner ha approvato come
+  // lavoro locale (`localApproval { by, at }`, #913: lo scrive solo l'admin). Gemello: localWork.js sul server.
   const LOCAL_SENDER_RE = /^(owner|local):/i;
   function isLocalOnly(fb) {
     const m = fb && fb.localOnly;
@@ -83,9 +84,25 @@
   function isProvenLocalSender(fb) {
     return !!fb && LOCAL_SENDER_RE.test(String(fb.clientId || '')) && fb.senderProof === 'admin';
   }
-  // Segno E prova: è la condizione con cui il server la fonde saltando L5, quindi lì «fondi senza chiedermelo» non conta.
+  function isLocalApproved(fb) {
+    const m = fb && fb.localApproval;
+    return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
+  }
+  function isLocalWorkSender(fb) {
+    return isProvenLocalSender(fb) || isLocalApproved(fb);
+  }
+  // Segno E (prova o sì dell'owner): la condizione con cui il server la fonde saltando L5, quindi lì «fondi senza chiedermelo» non conta.
   function isProvenLocalWork(fb) {
-    return isLocalOnly(fb) && isProvenLocalSender(fb);
+    return isLocalOnly(fb) && isLocalWorkSender(fb);
+  }
+  // Senza scheda pubblica solo il lavoro dell'owner e delle sessioni: il feedback di un utente approvato come lavoro
+  // locale (#913) la tiene, è da lì che chi l'ha mandato vede la risoluzione. Gemello: isPrivateLocalWork sul server.
+  function isPrivateLocalWork(fb) {
+    return isLocalOnly(fb) && !isLocalApproved(fb);
+  }
+  // Un utente approvato (#913) vede la risoluzione con la sola frase per lui: la chiusura locale non la porta, la scrive la sessione.
+  function fraseAttesa(fb) {
+    return isLocalApproved(fb) && !isTrustedClient(fb.clientId, fb.senderProof) && !String(fb.userNote || '').trim();
   }
   // Giudici saltati alla nascita (#908, #914): `pipeline.skipped` lo scrive solo il server, che lo decide con la
   // prova del mittente (functions/src/nascita.js). Senza mittente provato non vale, e la pratica resta da giudicare.
@@ -508,10 +525,10 @@
       }
       // Lo rimandano qui una sessione o una routine, su un feedback di chiunque (#914): la frase segue il mittente.
       if (statusReason === 'locale') {
-        const mittente = localSenderCheck(fb);
-        let text = 'Richiede lavoro locale, e in locale i feedback degli utenti non si lavorano: decidi tu.';
-        if (mittente.ok) text = 'Richiede lavoro locale: con «Solo lavoro locale» la prende una sessione sulla tua macchina.';
-        else if (!mittente.utente) text = 'Richiede lavoro locale, ma l’ha aperto una routine e non si segna solo in locale: decidi tu.';
+        // Owner, sessione provata o già approvato: basta il segno. Routine e utenti passano dal sì dell'owner (#913).
+        const text = localSenderCheck(fb).ok
+          ? 'Richiede lavoro locale: con «Solo lavoro locale» la prende una sessione sulla tua macchina.'
+          : 'Richiede lavoro locale: decidi tu. Con «💻 Lavoro locale» lo lavora e lo chiude una sessione.';
         return { text, color: S.design.color };
       }
       return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
@@ -635,7 +652,7 @@
   /**
    * Il segno «solo in locale» si può mettere (`valore` true) o togliere su questa pratica? PURA.
    * Ritorna { ok: true } o { ok: false, motivo, utente } — `utente` vuol dire che il feedback
-   * è di un utente: in locale non si lavora, e se servisse lavoro locale torna nei Ricevuti.
+   * è di un utente: in locale si lavora solo col sì dell'owner (#913), e se servisse torna nei Ricevuti.
    * `opts.now` iniettabile nei test.
    */
   // Chiusa per lo stato o per il riflesso pubblico: lì il segno locale tiene la pratica fuori dalla bacheca, non dalle routine.
@@ -674,19 +691,38 @@
 
   /**
    * Una sessione locale può lavorare una pratica di questo mittente? PURA. Solo owner o sessione con la
-   * prova (#595); `utente` = feedback di un utente: in locale non si lavora e, se serve, torna nei Ricevuti.
+   * prova (#595), o approvata dall'owner come lavoro locale (#913); `utente`/`routine`: senza quel sì no.
    */
   function localSenderCheck(fb) {
     if (!fb) return { ok: false, motivo: 'feedback non trovato' };
     if (isProvenLocalSender(fb)) return { ok: true };
+    if (isLocalApproved(fb)) return { ok: true, approvato: true };
     const cid = String(fb.clientId || '');
     if (LOCAL_SENDER_RE.test(cid)) {
-      return { ok: false, utente: true, senzaProva: true, motivo: 'il mittente non porta la prova (#595): vale come un feedback di un utente, e in locale i feedback degli utenti non si lavorano' };
+      return { ok: false, utente: true, senzaProva: true, motivo: 'il mittente non porta la prova (#595): vale come un feedback di un utente, e in locale si lavora solo se l’owner lo approva come lavoro locale' };
     }
     if (RESERVED_CLIENT_RE.test(cid) && SENDER_PROOFS.includes(fb.senderProof)) {
-      return { ok: false, motivo: 'l’ha aperto una routine: in locale si lavorano solo i feedback dell’owner o di una sessione locale' };
+      return { ok: false, routine: true, motivo: 'l’ha aperto una routine: in locale si lavora solo se l’owner lo approva come lavoro locale' };
     }
-    return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale non si lavora' };
+    return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale si lavora solo se l’owner lo approva come lavoro locale' };
+  }
+
+  /**
+   * L'owner può approvare ADESSO questo feedback come lavoro locale (#913)? PURA. Solo nei Ricevuti, solo su chi
+   * non è già owner o sessione con la prova (a quelli basta il segno). `segnalato`: il motivo per guardarlo prima;
+   * da Gestione l'owner approva lo stesso, lo script no (come «È mio»).
+   */
+  function localApprovalCheck(fb, opts) {
+    if (!fb) return { ok: false, motivo: 'feedback non trovato' };
+    if (statusUnreadable(fb)) return { ok: false, motivo: 'lo stato non si legge: non so dove sta la pratica' };
+    if (isLocalApproved(fb)) return { ok: false, motivo: 'l’hai già approvato come lavoro locale' };
+    if (isProvenLocalSender(fb)) return { ok: false, motivo: 'è tuo o di una tua sessione: basta il segno «solo in locale»' };
+    if (manageTabFor(fb, opts) !== 'inbox') return { ok: false, motivo: 'si approva come lavoro locale dai Ricevuti' };
+    const status = normalizeStatus(fb).status;
+    const segnalato = /^(attack|spam|suspicious_file)$/.test(status)
+      ? `è segnalato come ${status === 'spam' ? 'spam' : status === 'attack' ? 'attacco' : 'file sospetto'}`
+      : segnalatoComeAttacco({ status, pipeline: fb.pipeline });
+    return segnalato ? { ok: true, segnalato } : { ok: true };
   }
 
   function richiestaInAttesa(fb, opts) {
@@ -738,6 +774,13 @@
     if (tab === 'inbox') {
       // Aspetta una decisione: approvare È scrivere `todo`. Col segno locale `todo` porta nei Lavori locali.
       const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: isLocalOnly(fb) ? '→ Lavori locali' : '→ In coda', primary: true }];
+      // #913: approvarlo come lavoro locale. `locale` dice a chi scrive di aggiungere il segno e il sì dell'owner.
+      // Rimandato nei Ricevuti perché richiede lavoro locale (--serve-locale): la decisione attesa è questa.
+      if (!isLocalOnly(fb) && localApprovalCheck(fb, opts).ok) {
+        const attesa = String((fb && fb.statusReason) || '') === 'locale';
+        if (attesa) acts[0].primary = false;
+        acts.push({ key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro locale', primary: attesa, locale: true });
+      }
       // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
       // Ricevuti e resta consultabile negli Archiviati. Il file sospetto non è
       // ancora classificato: le conferme possibili sono DUE, non una.
@@ -1558,7 +1601,8 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient, isUnprovenSender, effectiveClientId,
-    isLocalOnly, isProvenLocalSender, isProvenLocalWork, judgesSkippedText, isRicevutiStatus, localSignCheck, localSenderCheck, praticaChiusa,
+    isLocalOnly, isLocalApproved, isLocalWorkSender, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, isProvenLocalWork, judgesSkippedText,
+    isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco, mittenteDaRiconoscere,
     panelComplete, judgesNote, reasonText,
     statusUnreadable, valueUnreadable, sectionsReliable, publicStateLabel, PUBLIC_STATE_HINT,

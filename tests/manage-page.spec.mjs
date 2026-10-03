@@ -56,7 +56,7 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti (0)');
   await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati (0)');
   await expect(page.locator('.mg-tab[data-tab="fbstats"]')).toHaveText('Statistiche feedback');
-  await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Statistiche Red Team');
+  await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Red Team');
   await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveText('Modelli di supporto');
   await expect(page.locator('.mg-tab[data-tab="automation"]')).toHaveText('Automazioni');
   await expect(page.locator('.mg-tab[data-tab="log"]')).toHaveText('Log');
@@ -86,10 +86,10 @@ test('le tab-lista condividono panel-list; stats/models sono segnaposto "In arri
     await expect(page.locator('#mgListHead')).toHaveText(`${head} (0)`);
   }
 
-  // Statistiche Red Team → segnaposto dedicato.
+  // Red Team → l'interruttore «aperto a tutti» (#896).
   await page.locator('.mg-tab[data-tab="stats"]').click();
   await expect(page.locator('#panel-stats')).toHaveClass(/mg-panel--active/);
-  await expect(page.locator('#panel-stats .mg-coming')).toBeVisible();
+  await expect(page.locator('#panel-stats #mgRtOpenSwitch')).toBeVisible();
   await expect(page.locator('#panel-list')).not.toHaveClass(/mg-panel--active/);
 
   // Modelli di supporto → pannello dedicato (DD1: non più un segnaposto).

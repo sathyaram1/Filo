@@ -47,12 +47,14 @@ test('il ritorno «richiede lavoro locale» dice la cosa giusta per ogni mittent
   await expect(page.locator('body')).not.toContainText('in locale i feedback degli utenti non si lavorano');
   if (OUT) await page.screenshot({ path: `${OUT}/g2-owner-locale.png` });
 
+  // Routine e utente: dopo #913 la frase porta al sì dell'owner, e il tasto c'è.
   await apriPratica(9002);
-  await expect(page.locator('body')).toContainText('l’ha aperto una routine e non si segna solo in locale');
+  await expect(page.locator('body')).toContainText('Con «💻 Lavoro locale» lo lavora e lo chiude una sessione');
+  await expect(page.getByRole('button', { name: /Lavoro locale/ }).first()).toBeVisible();
   if (OUT) await page.screenshot({ path: `${OUT}/g2-routine-locale.png` });
 
   await apriPratica(9003);
-  await expect(page.locator('body')).toContainText('in locale i feedback degli utenti non si lavorano');
+  await expect(page.locator('body')).toContainText('Con «💻 Lavoro locale» lo lavora e lo chiude una sessione');
 
   await apriPratica(9004);
   await expect(page.locator('body')).toContainText('Aperto da una routine, con la prova del server. I giudici non servono.');

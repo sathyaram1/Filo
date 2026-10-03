@@ -417,6 +417,17 @@ test('#914 una routine si riconosce dalla dichiarazione, dal biglietto o dal ruo
   assert.equal(isRoutineInstance(vuota, { env: {} }), true, 'il ruolo scritto da dispatch');
 });
 
+test('#914 dentro una routine owner-feedback rifiuta il segno locale e il sì dell’owner (#913) prima di scrivere', async () => {
+  const { spawnSync } = await import('node:child_process');
+  for (const opzione of ['--solo-locale', '--approva-locale']) {
+    const r = spawnSync(process.execPath, [resolve(ROOT, 'scripts', 'owner-feedback.mjs'), '123', opzione], {
+      env: { ...process.env, FILO_ROUTINE: '1' }, encoding: 'utf8', timeout: 30000,
+    });
+    assert.equal(r.status, 3, `${opzione}: ${r.stderr}`);
+    assert.match(r.stderr, /una routine non segna lavoro locale/);
+  }
+});
+
 test('#914 la priorità scelta parte col documento, e senza scelta non se ne inventa una', async () => {
   SCRIPT.credenziale.ottieni = async () => ({ idToken: 'tok-owner' });
   try {

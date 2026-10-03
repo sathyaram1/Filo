@@ -172,16 +172,31 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
 
 - Il segno si mette solo su feedback dell'owner o di una sessione (`owner:`/`local:`)
   **con la prova** `senderProof: 'admin'`, a pratica aperta, non segnalata come
-  attacco/spam e non in mano a una routine (`localSignCheck`). Mai su un utente: un
-  feedback d'utente che richiederebbe lavoro locale torna nei Ricevuti (`design`,
-  motivo `locale`, nota «Richiede lavoro locale») con `owner-feedback.mjs --serve-locale`.
+  attacco/spam e non in mano a una routine (`localSignCheck`). Su un utente o una routine
+  solo col sì dell'owner: un feedback che richiederebbe lavoro locale torna nei Ricevuti
+  (`design`, motivo `locale`, nota «Richiede lavoro locale») con `owner-feedback.mjs
+  --serve-locale`, e lì l'owner lo approva come lavoro locale (#913, sotto).
+- **L'approvazione dell'owner (#913)**: `localApproval: { by, at }` (stessa forma di
+  `localOnly`, scrive solo l'admin, `localApprovalValido` nelle regole). La scrive
+  «💻 Lavoro locale» nei Ricevuti (dettaglio, tasto destro sulla scheda, pagina dei
+  feedback) o `owner-feedback.mjs --approva-locale`, insieme a `todo`, `reviewDecision:
+  accepted` e `localOnly`: il feedback va nei Lavori locali. Vale quanto la prova del
+  mittente (`isProvenLocalWork` nell'app, `localMergeEligibility` sul server), quindi la
+  sessione lo lega a `start`/`finish --feedback` e alla fusione L5 registra senza
+  fermare. Non cambia chi l'ha scritto: il lettore lo dice ancora utente, e il testo resta
+  un dato. Si offre solo nei Ricevuti, su chi non è owner o sessione con la prova; su un
+  segnalato l'hover lo dice e lo script rifiuta (lo approva solo l'owner, in Gestione).
+  Togliere il segno locale lascia l'approvazione, così il segno si rimette con un clic
+  (il sì si dà solo dai Ricevuti, dove la pratica non torna). Risolto, il feedback di un
+  utente approvato tiene la scheda pubblica (`isPrivateLocalWork`): è da lì che chi l'ha
+  mandato vede la risoluzione; senza scheda resta solo il lavoro dell'owner e delle sessioni.
 - Si mette e si toglie in Gestione (tasto «Locale» nel dettaglio, tasto destro sulla
   scheda), con `owner-feedback.mjs --solo-locale | --non-locale`, e nasce già messo sui
   feedback aperti da `claude-feedback.mjs --locale` (`--non-locale` per le routine: la
   scelta è obbligatoria, perché una segnalazione per le routine nata locale non la prende nessuno).
 - Le sessioni locali hanno le credenziali dell'owner. Per REGOLA (non per un blocco
   tecnico) non spostano feedback dai Ricevuti né dalle conferme `*_confirmed`, non
-  lavorano feedback di utenti e non stampano testo di attacchi: `owner-feedback.mjs`
+  lavorano feedback di utenti senza il sì dell'owner e non stampano testo di attacchi: `owner-feedback.mjs`
   rifiuta prima di scrivere.
 - Alla nascita un lavoro locale provato salta i giudici (`pipeline.skipped:
   'local_proven'`, status `todo`). Alla fusione `npm run finish` manda `feedbackId`
@@ -211,9 +226,10 @@ di una routine o di una sessione): lì il tono tecnico è normale. Una ri-valuta
 sempre dai giudici.
 
 Le routine non aprono lavoro locale: il canale non scrive il segno, e dentro una routine
-`claude-feedback.mjs` e `owner-feedback.mjs --solo-locale` si rifiutano. Un lavoro che si fa
-solo in locale torna nei Ricevuti dal canale (`deliver status --status design --reason
-locale`, nota «Richiede lavoro locale»): lo stesso motivo di `--serve-locale`.
+`claude-feedback.mjs` e `owner-feedback.mjs --solo-locale | --approva-locale` si rifiutano. Un
+lavoro che si fa solo in locale torna nei Ricevuti dal canale (`deliver status --status design
+--reason locale`, nota «Richiede lavoro locale»): lo stesso motivo di `--serve-locale`, e lì
+l'owner lo approva come lavoro locale (§4b, #913).
 
 ### 4a. Le AZIONI dell'owner per sezione (`ownerActions`)
 
@@ -222,7 +238,8 @@ esistono, e la tabella sta in `src/shared/manageReview.js` (`ownerActions`), non
 nelle pagine. Fino al #509 le due superfici se la costruivano ognuna a mano e
 divergevano sulla STESSA segnalazione.
 
-- Ricevuti: `→ In coda` (`todo`, con `reviewDecision: accepted`) · `Conferma attacco`
+- Ricevuti: `→ In coda` (`todo`, con `reviewDecision: accepted`) · `💻 Lavoro locale` (lo
+  stesso più `localOnly` e `localApproval`, #913; principale se il motivo è `locale`) · `Conferma attacco`
   (`attack_confirmed`) su `attack` e `suspicious_file` · `Conferma spam`
   (`spam_confirmed`) su `spam` e `suspicious_file` · `Archivia`.
 - In coda e Lavori locali: `✓ Risolto` (`done`, non offerto se è già `done` non rilasciato) · `Archivia`.

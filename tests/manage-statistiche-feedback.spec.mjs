@@ -85,7 +85,7 @@ test('#496 — la scheda «Statistiche feedback» sta accanto a quella del Red T
   const nuova = page.locator('.mg-tab[data-tab="fbstats"]');
   const redteam = page.locator('.mg-tab[data-tab="stats"]');
   await expect(nuova).toHaveText('Statistiche feedback');
-  await expect(redteam).toHaveText('Statistiche Red Team');
+  await expect(redteam).toHaveText('Red Team');
   // Una accanto all'altra, nell'ordine: prima i feedback, poi il red team.
   const xNuova = (await nuova.boundingBox()).x;
   const xRed = (await redteam.boundingBox()).x;

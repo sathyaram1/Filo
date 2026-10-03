@@ -61,7 +61,10 @@ export function estraiOpzioneFeedback(argv) {
 export function avvisoDaCampi(fields) {
   const f = fields || {};
   const mancano = [];
-  if (f.senderProof?.stringValue !== 'admin') mancano.push('la prova del mittente (senderProof admin)');
+  // Il sì dell'owner come lavoro locale (#913) vale quanto la prova: il server lo legge allo stesso modo.
+  if (f.senderProof?.stringValue !== 'admin' && !f.localApproval?.mapValue) {
+    mancano.push('la prova del mittente (senderProof admin) o l’approvazione dell’owner come lavoro locale');
+  }
   if (!f.localOnly?.mapValue) mancano.push('il segno «solo in locale»');
   if (f.statusPublic?.stringValue === 'closed') mancano.push('una pratica aperta (è chiusa)');
   if (!mancano.length) return '';

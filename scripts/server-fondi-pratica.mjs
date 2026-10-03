@@ -155,6 +155,8 @@ export async function esegui(argv, deps = {}) {
       return 1;
     }
     log(`Pratica ${chi} chiusa: ${a.ramo} è su main del server. Per il deploy: npm run server:pubblica, da filo-security/functions.`);
+    const frase = await of.fraseDaScrivere(r.id, chi, { bearer });
+    if (frase) log(frase);
     return 0;
   } catch (e) {
     err(`Server dei feedback non raggiungibile: ${String((e && e.message) || e).slice(0, 200)}`);

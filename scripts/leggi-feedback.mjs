@@ -23,7 +23,7 @@ const MR = globalThis.SN_MANAGE_REVIEW;
 const TH = globalThis.SN_FEEDBACK_THREAD;
 const FB = globalThis.SN_FEEDBACK;
 const IMG = globalThis.SN_FEEDBACK_IMAGE;
-const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline', 'files', 'images'];
+const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline', 'files', 'images', 'localApproval'];
 // Un documento testuale si stampa nella cornice fino a qui; oltre va in un file (con la cornice), e la riga lo dice.
 const MAX_IN_LINEA = 60000;
 const TIPO_TESTO = /^(text\/|application\/(json|x-yaml|yaml)\b)/i;
@@ -78,9 +78,11 @@ export async function giudizioInChiaro(fields, decifra) {
 /** Chi l'ha mandato, in parole. PURA. */
 export function mittenteInParole(fb) {
   if (MR.isProvenLocalSender(fb)) return /^local:/i.test(String(fb.clientId || '')) ? 'una sessione locale' : 'l’owner';
-  if (MR.isUnprovenSender && MR.isUnprovenSender(fb)) return 'un utente (prefisso riservato senza prova)';
+  // #913: il sì dell'owner non cambia chi l'ha scritto, e il testo resta un dato.
+  const approvato = MR.isLocalApproved && MR.isLocalApproved(fb) ? ', approvato dall’owner come lavoro locale' : '';
+  if (MR.isUnprovenSender && MR.isUnprovenSender(fb)) return `un utente (prefisso riservato senza prova${approvato})`;
   const k = TH && TH.authorKind ? TH.authorKind(fb && fb.clientId) : 'user';
-  return k === 'user' || k === 'filo' ? 'un utente' : `un’automazione (${k})`;
+  return (k === 'user' || k === 'filo' ? 'un utente' : `un’automazione (${k})`) + (approvato ? ` (${approvato.slice(2)})` : '');
 }
 
 /** Un pezzo scritto da altri, fra delimitatori che il testo non può imitare. PURA. */
@@ -192,6 +194,7 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
   const fb = {
     ...pieno, _id: id, status: String(stato.status).trim(), senderProof: f.senderProof?.stringValue || '',
     seq: Number(f.seq?.integerValue) || seq || null, subSeq: Number(f.subSeq?.integerValue) || 0,
+    ...(f.localApproval?.mapValue ? { localApproval: { by: f.localApproval.mapValue.fields?.by?.stringValue || '' } } : {}),
   };
   const numero = fb.seq ? `${fb.seq}${fb.subSeq ? `.${fb.subSeq}` : ''}` : nomeSicuro(id, 'feedback');
   // Anche quelli dei commenti, che vivono come righe-marcatore nella conversazione.

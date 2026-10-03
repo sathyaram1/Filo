@@ -1273,9 +1273,13 @@
       if (msg.settings && msg.settings.timerRingtone && RINGTONES[msg.settings.timerRingtone]) {
         _timerRingTone = msg.settings.timerRingtone;
       }
+    } else if (msg?.type === MSG.REDTEAM_VISIBILITY_CHANGED) {
+      setRedteamVisibile(msg.visible);
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       Comandi.setOwner(msg.signedIn && msg.isAdmin);
+      // Entrare o uscire come owner apre o chiude il Red Team in pausa (#896).
+      refreshRedteamVisibile();
       applyAccountProfile(msg.signedIn ? msg.profile : null);
       // #524 — l'accoglienza aspettava un modello: appena l'accesso lo rende
       // disponibile, Filo si presenta subito invece di rimandare alla prossima
@@ -1309,6 +1313,21 @@
   // alto a destra, oppure naviga (Home). Nessuna logica di menu duplicata qui.
   let accountCtrlBtn = null; // riferimento all'icona profilo (mostra l'avatar)
 
+  // Il Red Team in pausa (#896) si mostra solo a chi lo vede: lo decide il main. Parte nascosto.
+  let redteamVisibile = false;
+  function setRedteamVisibile(v) {
+    const nuovo = !!v;
+    if (nuovo === redteamVisibile) return;
+    redteamVisibile = nuovo;
+    renderControls();
+  }
+  async function refreshRedteamVisibile() {
+    try {
+      const r = await send({ type: MSG.REDTEAM_VISIBILITY, attendi: true });
+      setRedteamVisibile(r && r.ok && r.visible);
+    } catch (_) { /* resta com'era */ }
+  }
+
   function renderControls() {
     const host = $('dashControls');
     if (!host) return;
@@ -1318,7 +1337,7 @@
       // non un menu nativo). Tenuto per primo (più a sinistra) e in rosso (vedi
       // dashboard.css) perché è il canale sicurezza, distinto dai controlli del
       // browser. Spec §2: punto d'accesso in alto a destra nella home.
-      { command: 'redteam', icon: 'redteam', label: 'Red-team', url: 'filo://redteam/redteam.html' },
+      redteamVisibile && { command: 'redteam', icon: 'redteam', label: 'Red-team', url: 'filo://redteam/redteam.html' },
       { command: 'home', icon: 'home', label: 'Home' },
       // Cronologia: la pagina principale è quella delle schede visitate/chiuse
       // (raggruppate per giorno), non il log delle azioni AI (raggiungibile da lì
@@ -1334,7 +1353,7 @@
     ];
     host.replaceChildren();
     accountCtrlBtn = null;
-    for (const it of items) {
+    for (const it of items.filter(Boolean)) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'dash-ctrl';
@@ -1792,6 +1811,7 @@
 
   (async function init() {
     renderControls();
+    refreshRedteamVisibile();
     await applySavedTheme();
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();

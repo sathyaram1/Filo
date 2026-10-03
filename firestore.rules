@@ -101,6 +101,21 @@ service cloud.firestore {
             && d.localOnly.get('at', 0) > 0);
     }
 
+    // `localApproval` { by, at } (#913): l'owner approva come lavoro locale il
+    // feedback di un utente o di una routine, e alla fusione vale quanto la prova
+    // del mittente. Solo l'admin: nessun altro ramo lo nomina (sentinella
+    // tests/unit/firestoreRulesLocalOnly.test.mjs). Stessa forma di localOnly.
+    function localApprovalValido(d) {
+      return !('localApproval' in d)
+        || (d.localApproval is map
+            && d.localApproval.keys().hasOnly(['by', 'at'])
+            && d.localApproval.get('by', '') is string
+            && d.localApproval.get('by', '').size() > 0
+            && d.localApproval.get('by', '').size() <= 120
+            && d.localApproval.get('at', 0) is int
+            && d.localApproval.get('at', 0) > 0);
+    }
+
     // Allowlist amministratori. Gestita SOLO da console Firebase.
     match /admins/{email} {
       allow read: if isAdmin();
@@ -260,7 +275,7 @@ service cloud.firestore {
       // scripts/claude-feedback.mjs col token admin per scrivere `senderProof`
       // (#595), la prova del mittente che il create anonimo sotto NON ammette:
       // la sentinella tests/unit/firestoreRulesSenderProof.test.mjs lo tiene vero.
-      allow create: if isAdmin() && localOnlyValido(request.resource.data);
+      allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data);
 
       // `name` = titolo breve generato da un LLM all'invio; `seq`/`subSeq` =
       // numero progressivo leggibile (#22, #22.1) calcolato dal client.
@@ -359,6 +374,8 @@ service cloud.firestore {
                     'mergePreapproved',
                     // #908: il segno «solo in locale» (forma: localOnlyValido).
                     'localOnly',
+                    // #913: l'approvazione dell'owner come lavoro locale (forma: localApprovalValido).
+                    'localApproval',
                     // #595: il ripasso dei documenti vecchi con prefisso riservato.
                     'senderProof',
                     'capabilityGapId']) // F4: permettere update del gap id (backfill)
@@ -480,6 +497,7 @@ service cloud.firestore {
                 && request.resource.data.mergePreapproved.get('at', '').size() <= 40))
         && livelliValidi(request.resource.data)
         && localOnlyValido(request.resource.data)
+        && localApprovalValido(request.resource.data)
         && (!('senderProof' in request.resource.data)
             || request.resource.data.senderProof in ['admin', 'server'])
         // F4: capabilityGapId (opzionale) — id strutturale del gap di capacità

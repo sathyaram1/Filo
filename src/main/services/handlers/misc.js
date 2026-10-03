@@ -538,7 +538,8 @@ module.exports = function register(on, ctx) {
   // Coda dei percorsi condivisi dell'Aiuto (#584). Ritarda apposta l'invio
   // perché l'ora in cui Firestore riceve un percorso è pubblica e, se fosse
   // quella della sessione, ricucirebbe i percorsi di una persona su domini
-  // diversi. Qui si riprende quello che era rimasto in coda alla chiusura.
+  // diversi. Qui si riprende quello che era rimasto in coda alla chiusura; a
+  // raccolta spenta (#897) lo si butta senza spedirlo.
   //
   // L'identità va chiesta AL MOMENTO DELL'INVIO, non quando il percorso viene
   // raccolto: in mezzo passano ore e un token di allora sarebbe scaduto. Chi

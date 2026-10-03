@@ -445,7 +445,7 @@
     // Triage admin di un feedback (cambio stato/note/priorità). Instradato dal
     // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
     // loggato non è admin. → { ok } | { ok:false, error }
-    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride?, mergePreapproved?: bool, localOnly?: bool, senderProof?: 'admin' }
+    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride?, mergePreapproved?: bool, localOnly?: bool, localApproval?: true, senderProof?: 'admin' }
     // #583 — LETTURA dei feedback per le superfici dell'owner. La collezione
     // non è più pubblica: leggono solo l'admin e il server. L'ID token vive nel
     // main e non deve arrivare in una pagina, quindi la pagina CHIEDE la
@@ -875,6 +875,16 @@
     // REDTEAM_REVOKE_CODE: revoca un codice ancora libero (SOLO owner). { code } →
     //   { ok } | { ok:false, status:'invalid_code'|'code_used', error? }.
     REDTEAM_REVOKE_CODE: 'redteam_revoke_code',
+    // In pausa (#896) gli handler qui sopra rispondono { status:'paused', paused:true, error } (invio, riscatto)
+    // o { paused:true, error, … } (stato, tentativo, classifica) a chi non vede il Red Team.
+    // REDTEAM_VISIBILITY: { attendi? } → { ok, visible } (a un sito) | { ok, visible, owner, openToAll, letto }.
+    REDTEAM_VISIBILITY: 'redteam_visibility',
+    // Broadcast main → pagine di Filo: { visible } quando cambia.
+    REDTEAM_VISIBILITY_CHANGED: 'redteam_visibility_changed',
+    // L'interruttore «Red Team aperto a tutti» di Gestione (SOLO owner, solo da Filo).
+    //   GET { } → { ok, openToAll, letto } · SET { openToAll } → { ok, openToAll } | { ok:false, error }.
+    REDTEAM_OPEN_GET: 'redteam_open_get',
+    REDTEAM_OPEN_SET: 'redteam_open_set',
   };
 
   // Port-based streaming

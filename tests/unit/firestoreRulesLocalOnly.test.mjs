@@ -78,3 +78,24 @@ test('la scheda di un lavoro locale non si respinge nelle regole (la toglie il s
   assert.equal(togli.length, 1);
   assert.ok(!togli[0].cond.includes('localOnly'), 'togliere una scheda deve funzionare sempre');
 });
+
+// #913: `localApproval` è il sì dell'owner che alla fusione vale quanto la prova del mittente: un utente non se lo dà.
+test('localApproval: nessun ramo non-admin lo nomina, create e update admin ne controllano la forma', () => {
+  for (const s of scritture()) {
+    if (/^isAdmin\(\)/.test(s.cond)) continue;
+    assert.ok(!s.cond.includes('localApproval'), `ramo non-admin che parla di localApproval: ${s.cond.slice(0, 120)}`);
+  }
+  const admin = scritture().filter((s) => /^isAdmin\(\)/.test(s.cond));
+  const create = admin.filter((s) => s.verbi.includes('create'));
+  const update = admin.filter((s) => s.verbi.includes('update'));
+  assert.match(create[0].cond, /localApprovalValido\(request\.resource\.data\)/);
+  assert.ok(liste(update[0].cond)[0].includes('localApproval'), 'il triage admin deve poterlo mettere e togliere');
+  assert.match(update[0].cond, /localApprovalValido\(request\.resource\.data\)/);
+  const m = /function localApprovalValido\(d\) \{([\s\S]*?)\n\s*\}/.exec(RULES);
+  assert.ok(m, 'funzione localApprovalValido non trovata');
+  const corpo = m[1].replace(/\s+/g, ' ');
+  assert.match(corpo, /!\('localApproval' in d\)/);
+  assert.match(corpo, /keys\(\)\.hasOnly\(\['by', 'at'\]\)/);
+  assert.match(corpo, /get\('by', ''\)\.size\(\) > 0/);
+  assert.match(corpo, /get\('at', 0\) is int/);
+});
