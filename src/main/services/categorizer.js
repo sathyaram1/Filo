@@ -145,6 +145,7 @@
 
   global.SN_CATEGORIZER = {
     listCategories,
+    findByName,
     setCategories,
     ensureCategory,
     renameCategory,

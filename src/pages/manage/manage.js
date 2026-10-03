@@ -2495,7 +2495,11 @@
     hideTabBars();
     mgListLoading.hidden = true;
     mgList.innerHTML = '';
-    setSearchMsg(fallback ? 'Modello non disponibile: mostro i risultati per testo.' : '', null);
+    // Il motivo del main dice anche dove si imposta il modello: senza, l'owner lo cercava dove non c'è più (#465).
+    const motivo = fallback && opts && opts.motivo ? String(opts.motivo).trim() : '';
+    setSearchMsg(fallback
+      ? (motivo ? `${motivo} Intanto mostro i risultati per testo.` : 'Modello non disponibile: mostro i risultati per testo.')
+      : '', null);
 
     // "Nessun risultato" al tetto del caricamento significa "nessuno fra quelli
     // caricati": la ricerca legge solo i feedback che stanno in pagina.
@@ -2571,6 +2575,7 @@
 
     const validIds = new Set(candidates.map((c) => c.id));
     let ranked = null;
+    let motivo = '';
     try {
       const r = await sendToMain({
         type: (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.AI_REQUEST) || 'ai_request',
@@ -2585,6 +2590,8 @@
       if (r && r.ok && typeof r.text === 'string') {
         const parsed = SRCH.parseRanking(r.text, validIds);
         if (parsed.length) ranked = parsed;
+      } else if (r && r.ok === false && typeof r.error === 'string') {
+        motivo = r.error;
       }
     } catch (_) { /* ripiego per parole qui sotto */ }
 
@@ -2595,7 +2602,7 @@
       renderSearchResults(ranked, { fallback: false });
     } else {
       // Ripiego per parole: la ricerca trova comunque qualcosa.
-      renderSearchResults(SRCH.keywordSearch(allFeedbacks, query), { fallback: true });
+      renderSearchResults(SRCH.keywordSearch(allFeedbacks, query), { fallback: true, motivo });
     }
   }
 
@@ -5120,7 +5127,7 @@
   // ── Sezione "Modelli di supporto" (DD1) ──────────────────────────────────
   // Slot → editor a segmenti (buildChain del modelChainEditor).
   // Caricato pigro: viene inizializzato la prima volta che l'utente clicca la tab.
-  const SM_SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority'];
+  const SM_SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority', 'manageSearch'];
   // Etichette amichevoli per slot (i giudici del panel L2 sono "Giudice 1/2/3"
   // + "Giudice dinamico"; l'id grezzo non va mai mostrato all'utente). L'HTML
   // ha già le <label> statiche; questa mappa è la sorgente di verità se in
@@ -5133,8 +5140,16 @@
     judgeDynamic:  'Giudice dinamico',
     judgeRedTeam:  'Giudice red-team',
     judgePriority: 'Giudice priorità',
+    manageSearch:  'Ricerca fra i feedback',
   };
   let smChains = {};        // slot → { getValue }
+  // Nickname del registro condiviso (Modelli predefiniti): il server dei giudici
+  // lo unisce al loro, quindi valgono anche qui. Arrivano col GET.
+  let smSharedNicknames = [];
+  // Registro con cui l'app risolve gli slot spostati (#465): arriva col GET.
+  let smAppRegistry = {};
+  // Slot spostati mai impostati → catena mostrata: se al salvataggio è ancora quella non si scrive (#465).
+  let smUnsetShown = {};
   let smLoaded  = false;    // true dopo il primo caricamento riuscito
   let smLoading = false;    // guard anti-doppio-caricamento
 
@@ -5169,9 +5184,40 @@
     // 1. Registro dedicato ai giudici (priorità: compaiono per primi).
     const judgeReg = collectJudgeRegistry();
     for (const nick of Object.keys(judgeReg)) addNick(nick, judgeReg[nick].label);
-    // 2. Registro condiviso predefinito (fallback comodo: flash, haiku, …).
+    // 2. Registro condiviso (Modelli predefiniti).
+    for (const n of smSharedNicknames) addNick(n && n.nick, n && n.label);
     const shared = (window.SN_CONST && window.SN_CONST.DEFAULT_MODEL_REGISTRY) || {};
     for (const nick of Object.keys(shared)) addNick(nick, (shared[nick] || {}).label);
+  }
+
+  // Catalogo OpenRouter del campo «Modello OpenRouter», dal main come in Modelli predefiniti (#465):
+  // finché non arriva la tendina propone i modelli già scritti; se non arriva, il campo resta libero.
+  let smCatalog = null;
+  let smCatalogPending = null;
+  function ensureSmCatalog() {
+    if (smCatalog || smCatalogPending) return smCatalogPending;
+    const type = (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.DEFAULT_MODELS_LIST) || 'default_models_list';
+    smCatalogPending = Promise.resolve()
+      .then(() => sendToMain({ type, provider: 'openrouter' }))
+      .then((r) => { if (r && r.ok && Array.isArray(r.items) && r.items.length) smCatalog = r.items; })
+      .catch(() => {})
+      .finally(() => { smCatalogPending = null; });
+    return smCatalogPending;
+  }
+
+  // `self`: il campo che chiede; senza catalogo il suo testo a metà non è un modello da proporre.
+  function readSmModelOptions(self) {
+    const out = [];
+    const seen = new Set();
+    const add = (id, label) => {
+      const v = String(id || '').trim();
+      if (!v || seen.has(v)) return;
+      seen.add(v);
+      out.push({ value: v, label: label && label !== v ? String(label) : '' });
+    };
+    if (smCatalog) for (const it of smCatalog) add(it && it.id, it && it.label);
+    else if (mgSmRegistryList) for (const el of mgSmRegistryList.querySelectorAll('.sn-model-id')) { if (el !== self) add(el.value, ''); }
+    return out;
   }
 
   // ── Registro modelli dei giudici (nickname → modello OpenRouter) ───────────
@@ -5195,6 +5241,16 @@
     modelIn.setAttribute('autocomplete', 'off');
     modelIn.placeholder = 'modello OpenRouter (es. deepseek/deepseek-v4-pro)';
     modelIn.value = e.model || '';
+    const modelWrap = document.createElement('div');
+    modelWrap.className = 'sn-model-id-wrap';
+    modelWrap.appendChild(modelIn);
+    modelIn.addEventListener('focus', () => { ensureSmCatalog(); });
+    if (window.SN_COMBOBOX) {
+      window.SN_COMBOBOX.attach(modelWrap, modelIn, {
+        readOptions: () => readSmModelOptions(modelIn),
+        onPick: () => populateSmNicknames(),
+      });
+    }
 
     const del = document.createElement('button');
     del.type = 'button';
@@ -5208,7 +5264,7 @@
     modelIn.addEventListener('input', () => populateSmNicknames());
 
     row.appendChild(nickIn);
-    row.appendChild(modelIn);
+    row.appendChild(modelWrap);
     row.appendChild(del);
     return row;
   }
@@ -5247,12 +5303,46 @@
     return out;
   }
 
+  function appSlotAction(slot) {
+    const pairs = (window.SN_MODEL_USAGE && window.SN_MODEL_USAGE.ownerActions && window.SN_MODEL_USAGE.ownerActions()) || [];
+    const hit = pairs.find((p) => p.slot === slot);
+    return hit ? hit.action : '';
+  }
+
+  // Lo stesso registro della risoluzione nell'app: quello in uso lì con sopra quello dei giudici.
+  function appSlotRegistry() {
+    return { ...smAppRegistry, ...collectJudgeRegistry() };
+  }
+
+  function appSlotCtx(action) {
+    const MC = window.SN_MODEL_CHAIN;
+    return {
+      validate: MC.makeValidator ? MC.makeValidator(action, appSlotRegistry) : undefined,
+      isKnown: MC.makeKnownCheck ? MC.makeKnownCheck(appSlotRegistry) : undefined,
+      readOptions: () => {
+        const out = [];
+        const seen = new Set();
+        for (const reg of [collectJudgeRegistry(), smAppRegistry]) {
+          for (const [nick, e] of Object.entries(reg || {})) {
+            if (seen.has(nick)) continue;
+            seen.add(nick);
+            const label = e && e.label && e.label !== nick ? String(e.label) : '';
+            out.push({ value: nick, label });
+          }
+        }
+        return out;
+      },
+    };
+  }
+
   // Rende gli editor a segmenti per tutti gli slot, usando SN_MODEL_CHAIN.buildChain.
   // Ogni chain è attaccata al div #mgSmChain-<slot>.
   function renderSmSlots(models) {
     const ModelChain = window.SN_MODEL_CHAIN;
     if (!ModelChain) return;
     smChains = {};
+    smUnsetShown = {};
+    const unset = Array.isArray(models.movedUnset) ? models.movedUnset : [];
     for (const slot of SM_SLOTS) {
       const host = document.getElementById(`mgSmChain-${slot}`);
       if (!host) continue;
@@ -5262,12 +5352,13 @@
       const labelEl = slotEl && slotEl.querySelector('label');
       if (labelEl && SM_SLOT_LABELS[slot]) labelEl.textContent = SM_SLOT_LABELS[slot];
       host.innerHTML = '';
-      // Nessun validatore di azione (questi slot non corrispondono a un'azione
-      // in SN_CONST.ACTIONS): accettiamo qualunque nickname. Il validatore è
-      // opzionale in buildChain — basta non passarlo.
-      const chain = ModelChain.buildChain(models[slot] || '', null, {});
+      // Gli slot dei giudici non corrispondono a un'azione: accettano qualunque nickname.
+      // Quelli spostati dall'app (#465) hanno i controlli e i suggerimenti che avevano nelle Opzioni.
+      const action = appSlotAction(slot);
+      const chain = ModelChain.buildChain(models[slot] || '', null, action ? appSlotCtx(action) : {});
       host.appendChild(chain.el);
       smChains[slot] = chain;
+      if (unset.includes(slot)) smUnsetShown[slot] = chain.getValue();
     }
   }
 
@@ -5312,6 +5403,9 @@
   // Render dell'editor (chiave + registro giudici + nickname + slot) e reveal.
   // Estratta da loadSupportModels così i test possono esercitarla senza il canale.
   function renderSupportModelsEditor(models) {
+    if (models && Array.isArray(models.sharedNicknames)) smSharedNicknames = models.sharedNicknames;
+    if (models && models.appRegistry && typeof models.appRegistry === 'object') smAppRegistry = models.appRegistry;
+    ensureSmCatalog();
     applyJudgeKeyState(models || {});
     renderJudgeRegistry((models || {}).judgeRegistry || {});
     populateSmNicknames();
@@ -5325,7 +5419,9 @@
     if (!smLoaded) return;
     const models = {};
     for (const slot of SM_SLOTS) {
-      models[slot] = smChains[slot] ? smChains[slot].getValue() : '';
+      const value = smChains[slot] ? smChains[slot].getValue() : '';
+      if (slot in smUnsetShown && value === smUnsetShown[slot]) continue;
+      models[slot] = value;
     }
     const judgeRegistry = collectJudgeRegistry();
     const openrouterKey = mgSmKeyInput ? mgSmKeyInput.value.trim() : '';
@@ -5337,6 +5433,8 @@
       // Ricarica i valori salvati (confirma round-trip Firestore).
       if (mgSmKeyInput) mgSmKeyInput.value = ''; // non riteniamo la chiave in pagina
       applyJudgeKeyState(r.models || {});
+      if (r.models && Array.isArray(r.models.sharedNicknames)) smSharedNicknames = r.models.sharedNicknames;
+      if (r.models && r.models.appRegistry && typeof r.models.appRegistry === 'object') smAppRegistry = r.models.appRegistry;
       renderJudgeRegistry((r.models || {}).judgeRegistry || judgeRegistry);
       populateSmNicknames();
       renderSmSlots(r.models || models);

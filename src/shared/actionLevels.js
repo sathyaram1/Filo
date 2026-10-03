@@ -109,6 +109,20 @@
     return C.fuoriPerimetro(p, a && a._perimetro);
   }
 
+  // Cosa fa un comando, a parole (#892): la scrive il modello e apre bottone e
+  // popup, sopra il comando vero. È solo testo, il livello non la legge mai.
+  // Via i caratteri invisibili o che rigirano il testo; il tetto si vede (…).
+  const SPIEGAZIONE_MAX = 300;
+  function spiegazioneComando(a) {
+    const v = a && (a.spiegazione ?? a.descrizione);
+    let t = (typeof v === 'string' ? v : '')
+      .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]+/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+    const segni = Array.from(t);
+    if (segni.length > SPIEGAZIONE_MAX) t = `${segni.slice(0, SPIEGAZIONE_MAX - 1).join('').trimEnd()}…`;
+    return t || 'Uso il terminale del computer';
+  }
+
   const REGISTRY = {
     NAVIGA: {
       // Aprire un link è di norma innocuo → livello 1, diretto. ECCEZIONE
@@ -425,7 +439,7 @@
         const C = global.SN_CMD_CLASSIFY;
         let perche = '';
         try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
-        return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`
+        return `${spiegazioneComando(a)}\n\nIl comando, nel terminale:\n${cmd || '(comando vuoto)'}`
           + (cwd ? `\nCartella di lavoro: ${cwd}` : '')
           + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
       },
@@ -542,5 +556,5 @@
     try { return (entry.describeDone ? entry.describeDone(action) : entry.describe(action)) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone };
+  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone, spiegazioneComando };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

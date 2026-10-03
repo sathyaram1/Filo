@@ -74,4 +74,44 @@ async function resolveSupportModel(slot, hardcoded, getConfig) {
   return fallback;
 }
 
-module.exports = { resolveSupportModel, SLOT_DEFAULTS };
+function ownerSlotFor(action) {
+  const Usage = globalThis.SN_MODEL_USAGE;
+  return Usage && typeof Usage.ownerSlotForAction === 'function' ? Usage.ownerSlotForAction(action) : '';
+}
+
+// Funzioni che usa solo l'owner (#465): catena dal loro slot, registro dei giudici sopra a quello
+// effettivo come sul server; slot null = mai impostato, resta la scelta di prima dello spostamento.
+async function settingsForOwnerAction(settings, action, getConfig) {
+  const slot = ownerSlotFor(action);
+  if (!slot) return settings;
+  const getter = typeof getConfig === 'function' ? getConfig : SupportModels.get;
+  let config = null;
+  try { config = await getter(); } catch (_) { config = null; }
+  const chain = config ? config[slot] : null;
+  if (typeof chain !== 'string') return settings;
+  const judgeRegistry = (config.judgeRegistry && typeof config.judgeRegistry === 'object') ? config.judgeRegistry : {};
+  return {
+    ...settings,
+    models: { ...(settings.models || {}), [action]: chain.trim() },
+    modelRegistry: { ...(settings.modelRegistry || {}), ...judgeRegistry },
+  };
+}
+
+// Per l'editor di Gestione: uno slot spostato e mai impostato mostra la catena che la funzione usa
+// adesso, e `movedUnset` lo dice all'editor: quel valore è una lettura, non una scelta, e un
+// salvataggio che non l'ha cambiato non lo scrive (senza predefiniti arrivati sarebbe vuoto).
+function fillMovedSlots(models, settings) {
+  const Usage = globalThis.SN_MODEL_USAGE;
+  const pairs = Usage && typeof Usage.ownerActions === 'function' ? Usage.ownerActions() : [];
+  const inUse = (settings && settings.models) || {};
+  const unset = [];
+  for (const { action, slot } of pairs) {
+    if (models[slot] != null) continue;
+    models[slot] = typeof inUse[action] === 'string' ? inUse[action] : '';
+    unset.push(slot);
+  }
+  models.movedUnset = unset;
+  return models;
+}
+
+module.exports = { resolveSupportModel, SLOT_DEFAULTS, ownerSlotFor, settingsForOwnerAction, fillMovedSlots };

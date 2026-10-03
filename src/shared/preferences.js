@@ -182,9 +182,10 @@
       keys: ['modalita_terminale', 'modalità terminale', 'modalita terminale', 'terminale', 'terminal'],
       // La modalità terminale dà a Filo accesso alla shell: conferma esplicita.
       level: 2,
-      risk: 'Questa impostazione decide se Filo può eseguire comandi nella shell del tuo computer. '
-        + 'È un permesso potente: una volta attivo, Filo può lanciare comandi (quelli rischiosi '
-        + 'chiederanno comunque una conferma a parte). Attivalo solo se ti fidi di quello che gli chiedi.',
+      risk: 'Questa impostazione decide se Filo può eseguire comandi nella shell del tuo computer, cioè nel terminale. '
+        + 'Da acceso, quello che legge parte subito, quello che cambia qualcosa ti chiede prima un OK, '
+        + 'e per cancellare o per un comando che non riconosce devi scrivere «conferma». '
+        + 'Da spento, Filo non esegue nessun comando.',
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
@@ -519,6 +520,26 @@
         if (!tone) return null;
         const labelMap = { default: 'Standard', gentle: 'Delicata', urgent: 'Urgente', chime: 'Carillon' };
         return { partial: { timerRingtone: tone }, label: `Suoneria timer → ${labelMap[tone]}` };
+      },
+    },
+
+    // ── Anteprima delle schede (#430) — reversibile, innocua → livello 1 ──
+    {
+      keys: ['anteprima_schede', 'anteprima delle schede', 'anteprima schede', 'anteprima delle tab', 'anteprima tab', 'tabpreview'],
+      // In fondo all'elenco: una chiave vaga («tab», «schede») resta di chi la prendeva prima.
+      // Un sì/no la accende o la spegne; una misura la accende a quella misura.
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const MISURE = { piccola: 'piccola', piccole: 'piccola', 'più piccola': 'piccola', small: 'piccola',
+          media: 'media', normale: 'media', medie: 'media', medium: 'media',
+          grande: 'grande', grandi: 'grande', 'più grande': 'grande', large: 'grande' };
+        if (MISURE[s]) {
+          const size = MISURE[s];
+          return { partial: { tabPreview: { enabled: true, size } }, label: `Anteprima delle schede → ${size}` };
+        }
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { tabPreview: { enabled: b } }, label: `Anteprima delle schede → ${b ? 'accesa' : 'spenta'}` };
       },
     },
   ];

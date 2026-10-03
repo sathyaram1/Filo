@@ -237,7 +237,8 @@
     //   servito e costo. { pseudonym } → { ok, detail } (detail.found false se
     //   lo pseudonimo non esiste).
     WALLET_OWNER_USER_DETAIL: 'wallet_owner_user_detail',
-    CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
+    // Le due foto (pagina e barra) vanno solo alla pagina in vista, che inquadra sé stessa: services/fotoDellaPagina.js.
+    CAPTURE_VISIBLE_TAB: 'capture_visible_tab', // → { ok, dataUrl? }
     // "Salva immagine come…" dal menu contestuale. Instradato dal main
     // (session download + will-download) perché l'attributo `download` di un
     // <a> lato pagina è onorato da Chromium SOLO per URL same-origin/blob:/
@@ -639,10 +640,10 @@
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai
     // esposti alle pagine. La risposta porta solo il profilo pubblico.
-    AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile } | { ok: false, code, error: frase per l'utente }
+    AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile, isAdmin, remembered }; a un sito solo { ok, signedIn, isAdmin } | { ok: false, code, error: frase per l'utente }
     AUTH_SIGNOUT: 'auth_signout',                  // → { ok }
-    AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, profile|null }
-    AUTH_CHANGED: 'auth_changed',                  // broadcast → { signedIn, profile|null }
+    AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, isAdmin, profile|null, uid, remembered }; a un sito solo { ok, signedIn, isAdmin }
+    AUTH_CHANGED: 'auth_changed',                  // broadcast alle sole pagine di Filo → { signedIn, isAdmin, profile|null, remembered }
 
     // Clipboard history (per il menu "Incolla"). Chi legge e chi scrive da un sito: services/appuntiDaiSiti.js. L'elenco
     // lo dà solo GET; le scritture rispondono { ok } e basta.
@@ -654,7 +655,7 @@
 
     // Categorie (Fase 2)
     GET_CATEGORIES: 'get_categories',
-    RENAME_CATEGORY: 'rename_category',         // { id, name }
+    RENAME_CATEGORY: 'rename_category',         // { id, name, unisci? } — unisci:false non fonde con un'omonima
     DELETE_CATEGORY: 'delete_category',         // { id }
     MERGE_CATEGORIES: 'merge_categories',       // { fromId, toId }
     MOVE_PAGE_CATEGORY: 'move_page_category',   // { pageId, categoryId }

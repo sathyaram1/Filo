@@ -289,6 +289,7 @@ module.exports = function register(on, ctx) {
   // Firebase REALE (request.auth.uid nelle Firestore rules) — diverso
   // dall'email del profilo — usato dalla bacheca (DC2) per riconoscere i
   // propri voti nella mappa `votes` autorevole letta da Firestore.
+  // `remembered` serve solo alla finestra (avviso «accesso non ricordato»): ai siti non va.
   // Da un sito visitato questa porta risponde, ma senza IDENTITÀ: niente
   // indirizzo email, niente nome, niente identificativo dell'account. Un
   // content script gira anche dentro le pagine dei siti, e di sé deve sapere
@@ -304,7 +305,9 @@ module.exports = function register(on, ctx) {
     return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid, remembered: auth.isRemembered() };
   });
 
-  on(MSG.AUTH_SIGNIN, async () => {
+  // Un sito può chiedere l'accesso (il pannello del red-team gira nelle sue
+  // pagine), ma come per lo stato gli torna solo l'esito, mai chi è entrato.
+  on(MSG.AUTH_SIGNIN, async (msg, sender, origin) => {
     try {
       const profile = await auth.signIn();
       const remembered = auth.isRemembered();
@@ -321,6 +324,7 @@ module.exports = function register(on, ctx) {
       // Appena l'owner è dentro, la vista pubblica dei feedback si rimette in
       // pari da sola (#583): è il momento in cui il main ha di nuovo il token.
       if (auth.isAdmin()) scheduleViewSync({ delayMs: 4000, force: true });
+      if (!daFilo(origin, sender)) return { ok: true, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin() };
       return { ok: true, profile, isAdmin: auth.isAdmin(), remembered };
     } catch (e) {
       return { ok: false, ...spiegaErroreAccesso(e) };
@@ -1354,11 +1358,24 @@ module.exports = function register(on, ctx) {
     return { ok: true, result: 'discarded' };
   }));
 
+  // All'editor servono anche la catena in uso negli slot spostati mai salvati e
+  // i nickname del registro condiviso, che il server dei giudici unisce al loro.
+  async function perEditor(models) {
+    let settings = null;
+    try { settings = await ctx.getEffectiveSettings(); } catch (_) {}
+    if (typeof ctx.fillMovedSlots === 'function') ctx.fillMovedSlots(models, settings);
+    const shared = (Defaults.get() || {}).modelRegistry || {};
+    models.sharedNicknames = Object.keys(shared).map((nick) => ({ nick, label: String((shared[nick] || {}).label || '') }));
+    // Gli slot spostati girano nell'app: i loro nickname si risolvono sul registro in uso qui (#465).
+    models.appRegistry = (settings && settings.modelRegistry && typeof settings.modelRegistry === 'object') ? settings.modelRegistry : {};
+    return models;
+  }
+
   // Config "modelli di supporto" (doc config/supportModels). Owner-only.
-  // GET legge i 4 slot; UPDATE scrive solo i campi passati (per-campo PATCH).
+  // GET legge gli slot; UPDATE scrive solo i campi passati (per-campo PATCH).
   on(MSG.SUPPORT_MODELS_GET, ownerOnly(async () => {
     try {
-      const models = await SupportModels.get();
+      const models = await perEditor(await SupportModels.get());
       return { ok: true, models };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
@@ -1391,7 +1408,7 @@ module.exports = function register(on, ctx) {
       if (typeof msg.openrouterKey === 'string') partial.openrouterKey = msg.openrouterKey;
       // Timeout per giudice (ms): solo se passato (PATCH per-campo, non tocca il resto).
       if (msg.judgeTimeoutMs != null) partial.judgeTimeoutMs = msg.judgeTimeoutMs;
-      const models = await SupportModels.update(partial, idToken);
+      const models = await perEditor(await SupportModels.update(partial, idToken));
       return { ok: true, models };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };

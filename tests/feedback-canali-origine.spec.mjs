@@ -254,6 +254,38 @@ test('a un sito visitato l\'identità di chi usa Filo non arriva', async ({ app,
   expect(Object.keys(out.filo)).toEqual(expect.arrayContaining(['isAdmin', 'ok', 'profile', 'remembered', 'signedIn', 'uid']));
 });
 
+test('chiedere l\'accesso da un sito non consegna al sito chi è entrato (#810.9)', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const M = process.getBuiltinModule('module');
+    const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
+    const ga = M._cache[k].exports;
+    const profilo = { email: 'chi-usa-filo@example.com', name: 'Chi Usa Filo' };
+    ga.signIn = async () => profilo;
+    ga.isSignedIn = () => true;
+    ga.isRemembered = () => true;
+    ga.getProfile = () => profilo;
+    const MSG = globalThis.SN_MSG.MSG;
+    const accedi = (m) => globalThis.SN_HANDLE_MESSAGE({ type: MSG.AUTH_SIGNIN }, m);
+    return {
+      sito: await accedi(mittenti.sito),
+      sitoConScheda: await accedi(mittenti.sitoConScheda),
+      filo: await accedi(mittenti.filo),
+    };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO });
+
+  for (const provenienza of ['sito', 'sitoConScheda']) {
+    const r = out[provenienza];
+    expect(r.ok, `${provenienza}: l'esito dell'accesso arriva anche al sito`).toBe(true);
+    expect(r.signedIn).toBe(true);
+    expect(JSON.stringify(r), `${provenienza}: l'email di chi usa Filo è arrivata al sito`).not.toContain('chi-usa-filo@example.com');
+    expect(Object.keys(r).sort()).toEqual(['isAdmin', 'ok', 'signedIn']);
+  }
+  expect(out.filo.ok).toBe(true);
+  expect(out.filo.profile && out.filo.profile.email).toBe('chi-usa-filo@example.com');
+});
+
 test('l\'avviso «l\'accesso è cambiato» non arriva alle schede sui siti, e porta il profilo solo a Filo', async ({ app, openTab, testServer }) => {
   // La stessa porta vista dal verso opposto: se un sito non può CHIEDERE chi
   // sta usando Filo, non glielo si manda nemmeno da soli. L'avviso di cambio

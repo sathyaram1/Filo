@@ -486,7 +486,7 @@
 
   // Un sito lasciato nella casella vale già come fidato; quello che non è un dominio resta come `bozza`.
   async function saveCookies() {
-    spedita('fidato');
+    caselle.spedita('fidato');
     const bozza = String($('cookie-wl-input').value || '').trim();
     const dominio = cleanDomain(bozza);
     const fidati = dominio && !cookieWhitelist.includes(dominio) ? [...cookieWhitelist, dominio].sort() : cookieWhitelist.slice();
@@ -594,44 +594,22 @@
     return out.join('\n');
   }
 
-  // Le caselle di testo della pagina non hanno un «Salva» e chiudere la scheda non avvisa la pagina (#590.2): ognuna
-  // parte da qui, dopo una pausa o al primo segno di uscita. Regole: patterns/un-testo-scritto-in-una-casella-si-salva-da-solo-o-lo-perdi.md.
-  const BATTUTA = new Set(['insertText', 'insertLineBreak', 'insertParagraph', 'insertCompositionText', 'deleteContentBackward', 'deleteContentForward']);
-  const SPEDISCI = { liste: (avvisi) => save({ avvisi }), fidato: (avvisi) => spedisciFidato(avvisi) };
-  const daSpedire = new Set();
-  let testoTimer = null;
-  function testoCambiato(casella, e) {
-    daSpedire.add(casella);
-    clearTimeout(testoTimer);
-    if (e && e.inputType && !BATTUTA.has(e.inputType)) { spedisci(false); return; }
-    testoTimer = setTimeout(() => spedisci(false), 400);
-  }
-  function spedisci(avvisi) {
-    clearTimeout(testoTimer);
-    testoTimer = null;
-    const caselle = [...daSpedire];
-    daSpedire.clear();
-    for (const c of caselle) SPEDISCI[c](avvisi);
-  }
-  function spedita(casella) {
-    daSpedire.delete(casella);
-    if (!daSpedire.size) { clearTimeout(testoTimer); testoTimer = null; }
-  }
-  function testoSubito(avvisi) {
-    if (daSpedire.size) spedisci(avvisi);
-  }
+  // Le caselle di testo della pagina non hanno un «Salva» (#590.2): ognuna si iscrive qui e ne eredita pausa e uscite.
+  // L'uscita vera accende gli avvisi anche se il testo è già partito col Ctrl di Ctrl+Tab, e il sito lasciato
+  // nella casella dei fidati passa nell'elenco: tornando lo si trova dove si trova riaprendo la pagina.
+  const caselle = window.SN_CASELLE.crea({
+    uscita() {
+      setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
+      setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+      if (String($('cookie-wl-input').value || '').trim()) addWhitelistDomain({ fuoco: false });
+    },
+  });
+  caselle.registra('liste', (avvisi) => save({ avvisi }));
+  caselle.registra('fidato', (avvisi) => spedisciFidato(avvisi));
   function spedisciFidato(avvisi) {
     const raw = String($('cookie-wl-input').value || '').trim();
     if (avvisi && raw && !cleanDomain(raw)) setWhitelistError(I18n.t('options_cookies_whitelist_invalid'));
     saveCookies();
-  }
-  // L'uscita vera accende gli avvisi anche se il testo è già partito col Ctrl di Ctrl+Tab, e il sito lasciato
-  // nella casella dei fidati passa nell'elenco: tornando lo si trova dove si trova riaprendo la pagina.
-  function uscita() {
-    spedisci(true);
-    setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
-    setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
-    if (String($('cookie-wl-input').value || '').trim()) addWhitelistDomain({ fuoco: false });
   }
 
   // La sezione Sicurezza come la mostra la pagina adesso.
@@ -686,7 +664,7 @@
 
   // Con `avvisi: false` (mentre si scrive) le righe scartate non si dicono ancora: «faceb» è una riga a metà.
   async function save(opts) {
-    spedita('liste');
+    caselle.spedita('liste');
     if (!(opts && opts.avvisi === false)) {
       setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
       setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
@@ -721,23 +699,15 @@
   }
   // Filo rifiuta e nasconde mentre si naviga nelle altre schede: tornando qui l'elenco è quello di adesso.
   // In una scheda di Filo il cambio di scheda non passa da `visibilitychange` (resta per il
-  // ricaricamento): lo annuncia il main con TAB_IN_VISTA.
+  // ricaricamento): lo annuncia il main con TAB_IN_VISTA. L'uscita la ascolta SN_CASELLE.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') loadCookieDone();
-    else uscita();
   });
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (!msg || msg.type !== MSG.TAB_IN_VISTA) return;
-      if (msg.inVista) loadCookieDone();
-      else uscita();
+      if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) loadCookieDone();
     });
   }
-  // Il fuoco esce anche per un menu del tasto destro: si salva, ma l'avviso aspetta l'uscita vera.
-  window.addEventListener('blur', () => testoSubito(false));
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Control' || e.key === 'Meta' || e.key === 'Alt') testoSubito(false);
-  });
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
@@ -756,10 +726,10 @@
     $('sec-siteblock-lists').addEventListener('change', save);
     // L'avviso sulle righe scartate si toglie mentre si corregge e torna quando si esce dal campo.
     $('sec-siteblock-blacklist').addEventListener('change', save);
-    $('sec-siteblock-blacklist').addEventListener('input', (e) => { setBlacklistError([]); testoCambiato('liste', e); });
+    $('sec-siteblock-blacklist').addEventListener('input', (e) => { setBlacklistError([]); caselle.cambiato('liste', e); });
     $('sec-dl-exe').addEventListener('change', () => { syncDownloadsEnabled(); save(); });
     $('sec-dl-trusted').addEventListener('change', save);
-    $('sec-dl-trusted').addEventListener('input', (e) => { setTrustedError([]); testoCambiato('liste', e); });
+    $('sec-dl-trusted').addEventListener('input', (e) => { setTrustedError([]); caselle.cambiato('liste', e); });
     $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
     $('sec-safebrowse-network').addEventListener('change', save);
     $('sec-safebrowse-llm').addEventListener('change', save);
@@ -776,7 +746,7 @@
       if (e.key === 'Enter') { e.preventDefault(); addWhitelistDomain(); }
     });
     // Mentre si corregge l'avviso sparisce, e il testo parte come quello delle due liste.
-    $('cookie-wl-input').addEventListener('input', (e) => { setWhitelistError(''); testoCambiato('fidato', e); });
+    $('cookie-wl-input').addEventListener('input', (e) => { setWhitelistError(''); caselle.cambiato('fidato', e); });
     $('cookie-wl-input').addEventListener('change', () => spedisciFidato(true));
     $('sec-export-btn').addEventListener('click', exportData);
     $('sec-import-btn').addEventListener('click', importData);

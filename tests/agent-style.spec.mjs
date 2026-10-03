@@ -5,7 +5,7 @@
 // funzione pura di iniezione realmente spedita nei moduli.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmState, scrollConfirmToEnd, mouseClickConfirm, pointWhenConfirmAppears, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, confirmState, scrollConfirmToEnd, mouseClickConfirm, pointWhenConfirmAppears, aspettaConfermaPronta, CONFIRM_HOST } from './helpers/confirm.mjs';
 
 test('scegliere un preset riempie il testo e lo stile persiste tra le ricariche', async ({ openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
@@ -414,6 +414,7 @@ test('#592 — scrivere in chat mentre Filo lavora non conferma lo stile; da tas
   await page.screenshot({ path: 'tests/.shots/stile-agente-popup-mentre-scrivi.png' });
 
   // Chi usa la tastiera sceglie OK col tabulatore (dopo Annulla) e lo preme.
+  await aspettaConfermaPronta(page);
   await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');

@@ -120,6 +120,12 @@
       doesNot: 'Non chiude né archivia nessuna scheda: le riordina soltanto (per chiudere quelle non più utili c’è /pulisci).',
     },
     {
+      id: 'tab-preview', title: 'Anteprima di una scheda al passaggio del mouse', category: 'navigation',
+      desc: 'Passando il mouse su una scheda della barra compare una carta con il suo titolo, il sito e un’immagine della pagina com’era l’ultima volta che l’hai vista. Le schede aperte in secondo piano hanno la loro immagine appena finiscono di caricare, anche se non le hai mai aperte. Sulla scheda che hai davanti la carta mostra solo il titolo.',
+      invoke: 'Passa il mouse su una scheda. In Preferenze → «Anteprima delle schede» la spegni o scegli la dimensione (piccola, media, grande); lo stesso chiedendolo a Filo ("spegni l\'anteprima delle schede", "anteprima delle schede più grande").',
+      doesNot: 'L’immagine è quella dell’ultima volta che la pagina si è vista. Una pagina aperta dietro e mai vista si rifà quando cambia (una posta che si riempie tardi), e così una scheda dietro che passa da sola a un’altra pagina, anche senza ricaricare (il video dopo), o una scheda lasciata mentre caricava ancora o appena arrivata; se invece una pagina già vista e ferma cambia mentre è dietro (una chat, un feed che si aggiorna), l’anteprima resta com’era finché non ci torni. Le immagini restano in memoria e non vengono salvate sul computer.',
+    },
+    {
       id: 'open-in-background', title: 'Apri una scheda in secondo piano', category: 'navigation',
       desc: 'Filo può aprire una pagina senza portartici davanti: tu resti dove sei e quello che hai chiesto — un brano, una radio, un podcast — parte lo stesso nella scheda dietro.',
       invoke: 'Chiedilo a parole all’assistente ("mettimi questa canzone", "apri senza cambiare scheda"): quando ciò che apre serve solo da ascoltare, la scheda nasce in secondo piano. Il riferimento che resta nella conversazione ti porta a quella scheda quando vuoi.',
@@ -372,6 +378,12 @@
       doesNot: 'Legge e basta: non modifica né sposta i tuoi file. Su un PDF che è in realtà una scansione o una foto di un foglio non c’è testo da estrarre, e Filo te lo dice invece di inventarsi cosa c’è scritto. Non legge ancora i documenti Word ed Excel, né i file molto grandi; di un documento lunghissimo legge la prima parte e ti avverte che si è fermato lì. Un file fuori dalla tua cartella personale (un altro disco, una chiavetta, una cartella di sistema) o un file nascosto di configurazione non lo apre senza il tuo OK.',
     },
     {
+      id: 'terminal-mode', title: 'Filo usa il terminale del computer', category: 'assistant',
+      desc: 'Per le richieste che lo vogliono («quanto spazio ho sul disco?», «trova i file più grandi in Download») Filo lancia un comando nel terminale del computer e ti risponde con quello che ha trovato. Non serve sapere cos’è un terminale. Ogni comando dice prima a parole cosa fa, e sotto c’è il comando vero. Quello che legge parte subito; quello che cambia qualcosa ti chiede prima un OK; per cancellare, o per un comando che non riconosce, devi scrivere «conferma». Quale conferma serve lo decide Filo leggendo il comando, mai il modello. Nella home puoi anche scrivere tu un comando che inizia con / e va dritto alla shell.',
+      invoke: 'È accesa di serie: chiedi a parole all’assistente (nuova scheda). Si spegne in Preferenze, alla voce «Modalità terminale», dove scegli anche la shell; oppure chiedi a Filo di spegnerla.',
+      doesNot: 'Da spenta Filo non esegue nessun comando. Non cambia, installa o cancella niente senza chiedertelo prima.',
+    },
+    {
       id: 'generate-dashboard', title: 'Dashboard personale di Filo', category: 'assistant',
       desc: 'Quando apri una nuova scheda, Filo prepara un breve messaggio per te e qualche suggerimento utile, in base a ciò che stavi facendo e a ciò che ricorda di te.',
       invoke: 'Si genera da sola all’apertura di una nuova scheda; il messaggio centrale si può nascondere dalle Preferenze ("Commento nella home").',
@@ -459,7 +471,7 @@
     },
     {
       id: 'preferences', title: 'Preferenze', category: 'settings',
-      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, e notifiche.',
+      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, notifiche, e la modalità terminale con la sua shell.',
       invoke: 'Pagina filo://preferences/preferences.html.',
     },
     {

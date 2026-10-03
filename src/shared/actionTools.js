@@ -258,6 +258,7 @@
         + '• tema: "sistema" | "chiaro" | "scuro"\n'
         + '• dimensione_testo: "piccolo" | "normale" | "grande" | "molto grande" | "enorme"\n'
         + '• commento_home: true | false (commento di Filo al centro della home)\n'
+        + '• anteprima_schede: true | false | "piccola" | "media" | "grande" (carta con l\'anteprima di una scheda al passaggio del mouse sulla barra)\n'
         + `• stile_agente: testo libero, ${tettoStile()} (come deve scrivere Filo; "nessuno" lo toglie) [conferma]\n`
         + '• correttore: true | false (correttore ortografico AI)\n'
         + '• sidebar_aiuto: true | false ; categorizzazione: true | false\n'
@@ -294,8 +295,11 @@
     },
     ESEGUI_COMANDO: {
       description: 'Esegue un comando shell. Il livello di sicurezza lo decide il SISTEMA dal comando (sola lettura → subito; modifiche recuperabili → conferma; cancellazioni / non riconosciuti / concatenati → digita "conferma"). L\'output ti torna subito e lo vede anche l\'utente. Solo con modalità terminale attiva: se è spenta il sistema te lo dice, e tu proponi di attivarla (IMPOSTA_PREFERENZA modalita_terminale true). UN comando per chiamata, niente concatenazioni con && o ;. La cartella di lavoro è persistente: un "cd" resta valido per i comandi successivi.',
-      properties: { comando: S('Il comando shell esatto.') },
-      required: ['comando'],
+      properties: {
+        comando: S('Il comando shell esatto.'),
+        spiegazione: S('Cosa fa il comando, in una frase semplice e in prima persona, per chi non sa cos\'è un terminale: «Misuro lo spazio libero sul disco», «Cancello la cartella build». È la prima cosa che l\'utente legge, sopra il comando: dice l\'effetto vero, anche quando cancella o cambia qualcosa. Non decide il livello di sicurezza.'),
+      },
+      required: ['comando', 'spiegazione'],
       risultato: true,
     },
     PROXY_TAB: {

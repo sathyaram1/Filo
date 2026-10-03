@@ -316,6 +316,7 @@
     // "chat nuova" e alla chiusura dell'app. Prima di svuotare le bolle,
     // perché da qui in poi la conversazione non esiste più in questa pagina.
     closeCurrentChat();
+    Term.nuovaChat(false);
     body.dataset.state = 'home';
     homeView.hidden = false;
     threadView.hidden = true;
@@ -391,6 +392,10 @@
         ? { role: 'user', text, ...(m.daModello ? { daModello: true } : {}) }
         : { role: 'filo', text, actions: types.map((t) => ({ type: t })), ...fuori });
     }
+    Term.nuovaChat(chat.messages.some((m) => (
+      (m.role !== 'user' && Array.isArray(m.actions) && m.actions.includes('ESEGUI_COMANDO'))
+      || (m.role === 'user' && /^\//.test(String(m.text || '').trim()) && Comandi.classifyInput(String(m.text)) !== 'filo')
+    )));
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     inputEl.focus();
     return true;

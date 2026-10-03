@@ -9,6 +9,18 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.230', date: '2026-10-03',
+      features: [
+        'Passa il mouse su una scheda e vedi subito cosa c\'è dentro: titolo, sito e un\'immagine della pagina, già pronta, anche per le schede aperte in secondo piano che non hai ancora guardato. In Preferenze la spegni o scegli quanto è grande.',
+        'Ogni comando che Filo propone nel terminale ti dice prima a parole cosa fa, e sotto trovi il comando vero. Su un\'installazione nuova la modalità terminale è già accesa, quindi a «quanto spazio ho sul disco?» Filo risponde senza che tu debba accendere niente. Quello che legge parte subito, quello che cambia qualcosa ti chiede prima un OK, per cancellare scrivi «conferma». Se ce l\'avevi spenta resta spenta, e la accendi in Preferenze o chiedendolo a Filo.',
+      ],
+      fixes: [
+        'In Altro, Modelli e Preferenze quello che scrivi in una casella non si perde più se subito dopo cambi scheda o chiudi la pagina: domini esclusi, limite di spesa, chiavi, ore dell\'archivio automatico, durata delle notifiche, nome della voce. Il nome nuovo di una categoria vale anche senza premere «Rinomina».',
+        'Lo screenshot fatto col tasto destro dentro una finestra di accesso, come quella di «Accedi con Google», fotografa quella finestra e non la scheda che sta dietro.',
+        'Sulla scheda che suona resta l\'icona del sito. L\'altoparlante sta dopo il titolo, come in Chrome, ha il colore delle scritte e prende il posto dell\'icona solo quando la scheda è troppo stretta per tutte e due. Un clic toglie l\'audio, e nello stesso punto trovi il tasto per rimetterlo. Se ti fermi col puntatore sull\'altoparlante o sulla croce, il suggerimento dice cosa fa il clic, non più il titolo della pagina.',
+      ],
+    },
+    {
       version: '0.2.229', date: '2026-09-11',
       features: [
         'Il Red Team va in pausa fino al rilascio. Tornerà, e classifica e codici d’invito restano come sono.',

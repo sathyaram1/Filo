@@ -545,6 +545,43 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   margin-top: 8px;
   width: 100%;
 }
+/* #892 — un comando si presenta prima a parole; il comando vero sta sotto, più piccolo. */
+.dash-cmd-btn {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  max-width: 100%;
+  padding: 7px 14px;
+  border-radius: 14px;
+  text-align: left;
+}
+.dash-cmd-btn-cosa { line-height: 1.35; }
+.dash-cmd-btn-codice {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  opacity: 0.72;
+  word-break: break-all;
+}
+.dash-cmd-cosa {
+  margin-bottom: 4px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--dash-ink-soft);
+}
+/* La frase della prima volta: una riga a sé sopra i bottoni, discreta come una nota. */
+.dash-cmd-primavolta {
+  flex-basis: 100%;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--dash-ink-soft);
+}
+.dash-cmd-primavolta a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+.dash-cmd-primavolta a:hover { color: var(--dash-accent); }
 /* Riga di comando: scatola QUADRATA col colore della bolla utente, così si distingue a colpo d'occhio
    dalle bolle arrotondate delle istruzioni, e il testo resta leggibile invece che tenue sul trasparente. */
 .dash-cmd-line {

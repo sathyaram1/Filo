@@ -3,6 +3,7 @@
 // svuota senza un gesto; il menu Incolla aperto dall'utente la mostra ancora, anche in un riquadro. Regola: services/appuntiDaiSiti.js.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { testiCronologia } from './helpers/cronologiaAppunti.mjs';
 
 const PASSWORD = 'Pw-segreta-5894!';
 const MONDO_CONTENT_SCRIPT = 999;
@@ -27,9 +28,26 @@ async function cronologiaDelMenu(dove) {
   await dove.locator('#ta').click({ button: 'right' });
   await expect(dove.locator('.sn-menu')).toBeVisible();
   await dove.locator('.sn-menu-paste-arrow').click();
-  const sub = dove.locator('.sn-menu-history-sub');
-  await expect(sub).toBeVisible();
-  return sub;
+}
+
+// La cronologia sta in uno shadow root chiuso e i suoi testi non sono nodi di testo (#589.8): in un riquadro di un
+// altro sito la legge solo il protocollo di debug, che attraversa gli shadow root chiusi.
+async function testiNelRiquadro(page) {
+  const frame = page.frames().find((f) => f.url().includes('blocked.test'));
+  let s;
+  try { s = await page.context().newCDPSession(frame); } catch (_) { s = await page.context().newCDPSession(page); }
+  try {
+    const { root } = await s.send('DOM.getDocument', { depth: -1, pierce: true });
+    const testi = [];
+    const visita = (n) => {
+      const a = n.attributes || [];
+      const attr = (k) => { const i = a.indexOf(k); return i >= 0 && i % 2 === 0 ? a[i + 1] : null; };
+      if (/\bsn-menu-history-paste\b/.test(attr('class') || '')) testi.push(attr('aria-label') || '');
+      for (const c of [...(n.children || []), ...(n.shadowRoots || []), ...(n.contentDocument ? [n.contentDocument] : [])]) visita(c);
+    };
+    visita(root);
+    return testi;
+  } finally { await s.detach().catch(() => {}); }
 }
 
 test('da una scheda di sfondo o senza un gesto la cronologia appunti non esce; il menu Incolla la mostra ancora', async ({ app, shell, openTab, testServer }) => {
@@ -59,8 +77,8 @@ test('da una scheda di sfondo o senza un gesto la cronologia appunti non esce; i
   expect(JSON.stringify(senzaGesto)).not.toContain(PASSWORD);
 
   // L'utente apre il menu Incolla nella scheda che guarda: la cronologia c'è, password compresa.
-  const sub = await cronologiaDelMenu(inVista);
-  await expect(sub).toContainText(PASSWORD);
+  await cronologiaDelMenu(inVista);
+  await expect.poll(() => testiCronologia(app, inVista)).toContain(PASSWORD);
 
   // Il gesto vale per la scheda dove è stato fatto: quella di sfondo resta fuori.
   expect(await sfondo(domande[0])).toMatchObject({ ok: false, code: 'forbidden' });
@@ -71,8 +89,8 @@ test('nel riquadro di un altro sito il menu Incolla mostra la cronologia', async
   const dentro = testServer.html(CAMPO).replace('127.0.0.1', 'blocked.test');
   const page = await testServer.openReady(openTab,
     `<!doctype html><html><body style="margin:0;padding:12px"><iframe id="embed" src="${dentro}" width="640" height="460"></iframe></body></html>`);
-  const sub = await cronologiaDelMenu(page.frameLocator('#embed'));
-  await expect(sub).toContainText(PASSWORD);
+  await cronologiaDelMenu(page.frameLocator('#embed'));
+  await expect.poll(() => testiNelRiquadro(page)).toContain(PASSWORD);
 });
 
 test('le pagine di Filo leggono la cronologia senza gesto', async ({ shell }) => {
@@ -111,7 +129,7 @@ test('un clic qualunque sulla pagina non apre la cronologia: serve il menu, aper
     const sub = await aspetta('.sn-menu-history-sub, .sn-menu-sub');
     return sub ? sub.textContent : '(nessun sottomenu)';
   });
-  expect(letto).not.toBe('(nessun menu)');
+  // Il menu finto non si apre nemmeno (#589.8): la cronologia, comunque, al riquadro non arriva.
   expect(letto, 'la cronologia è arrivata al riquadro col gesto fatto sulla pagina ospite').not.toContain(PASSWORD);
 });
 
@@ -127,21 +145,21 @@ test('una scheda di sfondo senza gesti non svuota la cronologia e non ci aggiung
   expect(r.items.map((i) => i.text)).toEqual([PASSWORD]);
 });
 
-test('su un sito che annulla il tasto destro in cattura su window il menu Incolla mostra ancora la cronologia', async ({ shell, openTab, testServer }) => {
+test('su un sito che annulla il tasto destro in cattura su window il menu Incolla mostra ancora la cronologia', async ({ app, shell, openTab, testServer }) => {
   await copiaPassword(shell);
   const page = await testServer.openReady(openTab, CAMPO.replace('</body>', "<script>window.addEventListener('contextmenu', (e) => e.preventDefault(), true);</script></body>"), { pubblico: true });
-  const sub = await cronologiaDelMenu(page);
-  await expect(sub).toContainText(PASSWORD);
+  await cronologiaDelMenu(page);
+  await expect.poll(() => testiCronologia(app, page)).toContain(PASSWORD);
 });
 
-test('su un sito che annulla il tasto destro il menu aperto da tastiera con Shift+F10 mostra la cronologia', async ({ shell, openTab, testServer }) => {
+test('su un sito che annulla il tasto destro il menu aperto da tastiera con Shift+F10 mostra la cronologia', async ({ app, shell, openTab, testServer }) => {
   await copiaPassword(shell);
   const page = await testServer.openReady(openTab, CAMPO.replace('</body>', "<script>window.addEventListener('contextmenu', (e) => e.preventDefault(), true);</script></body>"), { pubblico: true });
   await page.locator('#ta').click();
   await page.keyboard.press('Shift+F10');
   await expect(page.locator('.sn-menu[role=menu]')).toBeVisible();
   await page.locator('.sn-menu-paste-arrow').click();
-  await expect(page.locator('.sn-menu-history-sub')).toContainText(PASSWORD);
+  await expect.poll(() => testiCronologia(app, page)).toContain(PASSWORD);
 });
 
 test('nel riquadro di un altro sito che annulla il tasto destro il menu Incolla mostra la cronologia', async ({ shell, openTab, testServer }) => {
@@ -150,8 +168,8 @@ test('nel riquadro di un altro sito che annulla il tasto destro il menu Incolla 
   const dentro = testServer.html(CAMPO.replace('</body>', blocca)).replace('127.0.0.1', 'blocked.test');
   const page = await testServer.openReady(openTab,
     `<!doctype html><html><body style="margin:0;padding:12px"><iframe id="embed" src="${dentro}" width="640" height="460"></iframe></body></html>`);
-  const sub = await cronologiaDelMenu(page.frameLocator('#embed'));
-  await expect(sub).toContainText(PASSWORD);
+  await cronologiaDelMenu(page.frameLocator('#embed'));
+  await expect.poll(() => testiNelRiquadro(page)).toContain(PASSWORD);
 });
 
 test('il tasto destro nel riquadro di un altro sito non apre la cronologia alla pagina che lo ospita', async ({ app, shell, openTab, testServer }) => {

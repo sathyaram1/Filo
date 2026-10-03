@@ -845,9 +845,12 @@
   //  • `scrollHeight` comprende l'IMBOTTITURA, `height` (se il box è
   //    content-box) no. Scriverlo tal quale lasciava la casella più alta del
   //    suo testo di quei pixel, e non li restituiva più: cancellata la domanda
-  //    la casella restava gonfia e la risposta non si riprendeva lo spazio.
+  //    la casella restava gonfia e la risposta non si riprendeva lo spazio;
+  //  • vuota torna alla misura con cui è nata: misurata, andrebbe a capo col
+  //    segnaposto lungo e resterebbe una riga più alta di prima di scrivere.
   function autoGrow(el) {
     if (!el) return;
+    if (!el.value) { el.style.height = ''; return; }
     el.style.height = 'auto';
     let pad = 0;
     try {

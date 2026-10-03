@@ -21,6 +21,11 @@ module.exports = function register(on, ctx) {
   on(MSG.GET_CATEGORIES, async () => ({ ok: true, categories: await Categorizer.listCategories() }));
 
   on(MSG.RENAME_CATEGORY, async (msg) => {
+    // Un nome non confermato (`unisci: false`) uguale a un'altra categoria non le fonde: la fusione non si disfa (#590.5).
+    if (msg.unisci === false) {
+      const omonima = Categorizer.findByName(await Categorizer.listCategories(), String(msg.name || ''));
+      if (omonima && omonima.id !== msg.id) return { ok: false, error: 'name_taken', category: omonima };
+    }
     const c = await Categorizer.renameCategory(msg.id, msg.name);
     return { ok: true, category: c };
   });

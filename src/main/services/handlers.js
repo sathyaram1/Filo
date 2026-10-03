@@ -10,6 +10,7 @@
 
 const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
+const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const SegretiLetti = require('./segretiLetti');
 
@@ -354,9 +355,11 @@ function actionLabelForSettings(action) {
 
 function modelConfigError(settings, action, missingRefs) {
   const label = actionLabelForSettings(action);
-  const where = settings && settings.useDefaultModels === false
-    ? I18n.t('err_model_where_own')
-    : I18n.t('err_model_where_default');
+  const where = ownerSlotFor(action)
+    ? I18n.t('err_model_where_owner')
+    : settings && settings.useDefaultModels === false
+      ? I18n.t('err_model_where_own')
+      : I18n.t('err_model_where_default');
   const missing = missingRefs || [];
   const e = new Error(missing.length
     ? I18n.t('err_unknown_model_for_action', label, SN_CONST.formatModelRefsForMessage(missing), where)
@@ -652,7 +655,7 @@ function createAnswerStreamer(onText) {
 // della chat», punto 1): senza numeri per turno ogni scelta sui modelli è a
 // occhio. `timing` finisce nella cronologia AI accanto al costo.
 async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false }) {
-  const settings = await getEffectiveSettings();
+  const settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
   if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
   // poteva imporre un modello scritto nel codice, scavalcando la configurazione
@@ -1352,6 +1355,12 @@ globalThis.SN_USCITA_DA_FILO = (url, wc, apri) => (SCHEMI_USCITA.test(String(url
 
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in
 // questo turno, turni passati compresi: servono all'anti-esfiltrazione di NAVIGA.
+// Vero finché la chat non ha MOSTRATO la frase sul terminale: il segno lo mette
+// chi la disegna, così un turno perso a metà (scheda chiusa, ricarica) non la brucia.
+async function primaVoltaDelTerminale() {
+  try { return (await Storage.getRaw(SN_CONST.STORAGE_KEYS.FILO_TERMINALE_SPIEGATO, false)) !== true; } catch (_) { return false; }
+}
+
 // `parole` = ciò che l'utente ha scritto in chat: un codice scritto da lui può uscire.
 async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '' } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
@@ -1430,10 +1439,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
   }
 
   // ── modalità terminale: gate hard, indipendente dal livello (#146.6) ──────
-  // Filo non può eseguire ALCUN comando se l'utente non ha attivato la modalità
-  // terminale nelle impostazioni. Controllo PRIMA del gate dei livelli: così un
-  // terminale disattivato non fa nemmeno comparire il box "digita conferma" —
-  // l'utente vede subito che deve attivarlo.
+  // Con la modalità terminale spenta nelle impostazioni Filo non esegue ALCUN
+  // comando. Controllo PRIMA del gate dei livelli: così un terminale spento
+  // non fa nemmeno comparire il box "digita conferma" — l'utente vede subito
+  // che è spento.
   if (type === 'ESEGUI_COMANDO') {
     const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim();
     let s = {};
@@ -1453,6 +1462,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
     // un'altra (#551, quarto giro). Stessa domanda che si fa il comando quando
     // parte, fatta nello stesso posto.
     action._cwd = displayCwd(cartellaDelComando(getAssistantCwd(sender)));
+    // Ripulita qui una volta, la stessa per popup, bottone e conferma (idempotente: la firma regge).
+    const AL = globalThis.SN_ACTION_LEVELS;
+    if (AL && AL.spiegazioneComando) action.spiegazione = AL.spiegazioneComando(action);
+    // La frase che spiega il terminale va coi comandi in chat finché non è stata
+    // mostrata (#892); la conferma è un secondo giro della stessa proposta.
+    if (cmd && !confirmed && !assistente && await primaVoltaDelTerminale()) action._primaVolta = true;
   }
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO') action._perimetro = perimetroLettura(sender);
@@ -3683,6 +3698,7 @@ const handlerCtx = {
   broadcastToFiloPages,
   broadcastLiveUpdate,
   getEffectiveSettings,
+  fillMovedSlots,
   withDefaults,
   Defaults,
   isAdmin: () => {
