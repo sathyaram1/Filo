@@ -353,8 +353,9 @@ test('durante la prova la cartella non è un worktree del repo: unlock e remove 
 
 test('i resti di una prova interrotta si tolgono alla richiesta dopo anche se il ramo contiene già main', () => {
   const r = repoFinto();
-  // Nella temporanea vera, dove la prova la cerca, col pid di un processo che è già finito.
-  const base = mkdtempSync(join(tmpdir(), 'filo-fusione-'));
+  // Nella temporanea vera, dove la prova la cerca e col nome che riconosce, col pid di un processo già finito.
+  const base = join(tmpdir(), `filo-fusione-t${Math.random().toString(36).slice(2).padEnd(5, '0').slice(0, 5)}`);
+  mkdirSync(base);
   try {
     const morto = spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8' }).stdout.trim();
     writeFileSync(join(base, 'pid'), morto);
