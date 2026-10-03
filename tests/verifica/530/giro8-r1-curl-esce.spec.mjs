@@ -24,7 +24,8 @@ test('Normale, conversazione pulita: caricare un documento su un server con curl
   writeFileSync(file, 'IBAN e redditi dell’utente: dati personali');
   try {
     await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true, shell: 'bash' } }));
-    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: `curl -s -F doc=@${file} http://127.0.0.1:${porta}/carica` });
+    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: `curl -s -F "doc=@${file}" http://127.0.0.1:${porta}/carica` });
+    console.log("ESITO", JSON.stringify(r).slice(0, 800));
     await new Promise((res) => setTimeout(res, 1500));
     expect(ricevuti.join(''), 'il documento è partito verso il server senza nessuna domanda').not.toContain('dati personali');
     expect(r.needsConfirm, 'un caricamento verso un server qualsiasi non si disfa: chiede').toBeTruthy();
