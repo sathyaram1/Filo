@@ -4,7 +4,7 @@
 //   SN_CONFIRM_UI.confirm({ title, text, okLabel, cancelLabel }) → Promise<bool>
 //     Livello 2: popup che SPIEGA in chiaro la modifica, con OK e Annulla.
 //
-//   SN_CONFIRM_UI.confirmTyped({ title, text, word }) → Promise<bool>
+//   SN_CONFIRM_UI.confirmTyped({ title, text, word, avviso }) → Promise<bool>
 //     Livello 3: box con attrito maggiore — il bottone resta disabilitato
 //     finché l'utente non digita espressamente la parola ("conferma").
 //
@@ -344,11 +344,13 @@
 
   // Livello 3 — l'utente deve digitare la parola (default "conferma") per
   // sbloccare il bottone. Per azioni irreversibili.
-  function confirmTyped({ title = 'Conferma richiesta', text = '', word = 'conferma', okLabel = 'Esegui', cancelLabel = 'Annulla' } = {}) {
+  // `avviso` sostituisce la frase sull'irreversibilità quando a chiedere la parola è altro (una difesa abbassata).
+  function confirmTyped({ title = 'Conferma richiesta', text = '', word = 'conferma', okLabel = 'Esegui', cancelLabel = 'Annulla', avviso = '' } = {}) {
     return new Promise((resolve) => {
       const doc = global.document;
       const { box, done, troppoPresto, fuoco } = buildOverlay(resolve);
-      header(box, { title, text: `${text}\n\nQuesta azione non è reversibile. Scrivi “${word}” per procedere.` });
+      const perche = String(avviso || '').trim() || 'Questa azione non è reversibile.';
+      header(box, { title, text: `${text}\n\n${perche} Scrivi “${word}” per procedere.` });
 
       const input = doc.createElement('input');
       input.type = 'text';

@@ -1,29 +1,6 @@
-// Mappa "linguaggio naturale → preferenza dell'app" usata quando Filo modifica
-// le impostazioni su richiesta dell'utente dalla chat (azione IMPOSTA_PREFERENZA).
-//
-// È volutamente un modulo condiviso (IIFE su globalThis): la conoscenza di
-// QUALI preferenze sono modificabili e COME interpretarne i valori è la stessa
-// esposta dalla pagina Preferenze, e deve restare testabile senza Electron.
-//
-// Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS, lezioneDaAzione }.
-// `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk },
-// { rifiuto } col perché, oppure null se chiave/valore non sono validi. Solo le
-// preferenze qui elencate sono scrivibili. Dal #146.5 l'elenco copre TUTTE le
-// impostazioni della pagina Opzioni (modelli, provider, chiavi API,
-// sicurezza/privacy, limite di spesa, funzionalità) oltre a quelle
-// estetiche/comportamentali: ognuna dichiara il
-// proprio `level` (1 = applica subito, 2 = popup di conferma). Le impostazioni
-// sensibili (sicurezza, modelli, chiavi, provider, costi) sono di livello 2.
-//
-// REGOLA (#183): ogni setter di livello 2 DEVE dichiarare anche `risk` — una
-// frase in chiaro che spiega cosa controlla l'impostazione e quali sono gli
-// eventuali rischi. È il testo che il popup di conferma mostra all'utente
-// (lo compone actionLevels.describe). Un setter di livello 2 senza `risk` è
-// un bug: il test tests/unit/preferences.test.mjs lo intercetta.
-//
-// REGOLA (#592): un testo libero che finisce in un prompt è di livello 2, porta
-// il `testo` esatto al popup e oltre il tetto torna un `rifiuto`, mai un taglio
-// (sentinella in tests/unit/preferences.test.mjs).
+// Mappa "linguaggio naturale → preferenza dell'app" per IMPOSTA_PREFERENZA: quali preferenze Filo può
+// toccare dalla chat, come se ne leggono i valori e, per ognuna, costo e difesa abbassata (#530).
+// Regole: tests/unit/preferences.test.mjs (rischio obbligatorio, testo libero mai tagliato, #183 e #592).
 
 (function (global) {
   'use strict';
@@ -82,17 +59,22 @@
     return Number.isFinite(n) ? n : NaN;
   }
 
-  // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }.
-  // `partial` è il pezzo di settings da fondere (deepMerge preserva i campi
-  // annidati vicini); `label` è la conferma leggibile per l'utente.
-  // `level` (opzionale, default 1) è il livello di sicurezza quando è FILO a
-  // cambiare la preferenza via chat (#146.2, vedi actionLevels.js): 1 applica
-  // subito, 2 chiede conferma con popup. `risk` (obbligatorio quando level=2,
-  // #183) è la spiegazione in chiaro mostrata nel popup: cosa controlla
-  // l'impostazione e quali rischi comporta toccarla.
+  // Quanto stringe un modo: scendere di rigore abbassa una difesa. Il valore attuale ignoto vale il più stretto.
+  const RIGORE_COOKIE = { manual: 0, default: 1, privacy: 2 };
+  const RIGORE_IMPRONTA = { off: 0, default: 1, privacy: 2 };
+  function scende(rigore, nuovo, attuale) {
+    const prima = Object.prototype.hasOwnProperty.call(rigore, attuale) ? rigore[attuale] : 2;
+    return rigore[nuovo] < prima;
+  }
+
+  // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }; `partial` si fonde nelle impostazioni.
+  // `costo` (0-3) è il costo di sbagliare quando la cambia FILO dalla chat; `allenta(r, attuali)` dice se il
+  // valore abbassa una difesa (vuole «conferma» a ogni livello); `elenco` la mette nell'elenco fisso.
+  // `risk` è obbligatorio dal costo 2 o con `allenta`: è il rischio che il popup mostra.
   const PREF_SETTERS = [
     {
       keys: ['tema', 'theme', 'aspetto'],
+      costo: 1,
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
         const map = {
@@ -108,6 +90,7 @@
     },
     {
       keys: ['dimensione_testo', 'dimensione testo', 'dimensione del testo', 'textscale', 'grandezza testo', 'grandezza del testo', 'testo', 'font'],
+      costo: 1,
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
         const byLabel = { piccolo: 0.9, normale: 1, medio: 1, grande: 1.1, 'molto grande': 1.25, enorme: 1.5, grandissimo: 1.5 };
@@ -126,6 +109,7 @@
     },
     {
       keys: ['commento_home', 'commento nella home', 'commento home', 'messaggio home', 'messaggio nella home', 'showhomemessage', 'commento'],
+      costo: 1,
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
@@ -134,9 +118,9 @@
     },
     {
       keys: ['stile_agente', 'stile agente', "stile dell'agente", 'agentstyle', 'stile'],
-      // Entra in ogni prompt conversazionale e ci resta: proposto dal modello,
-      // passa dal popup col testo esatto (#592). Anche toglierlo, che lo perde.
-      level: 2,
+      // Entra in ogni prompt conversazionale e ci resta, come una lezione: costo 2, e
+      // quando si chiede il popup mostra il testo esatto (#592). Anche toglierlo, che lo perde.
+      costo: 2,
       risk: 'Lo stile di scrittura decide come Filo ti scrive in ogni conversazione (chat, Aiuto, spiegazioni, '
         + 'editor) e resta finché non lo cambi. Confermalo solo se l\'hai chiesto tu: un testo letto in una '
         + 'pagina o in un documento potrebbe provare a cambiarlo.',
@@ -155,6 +139,7 @@
     },
     {
       keys: ['archiviazione_automatica', 'archiviazione automatica', 'gestione automatica delle schede', 'gestione automatica schede', 'autoarchive', 'archiviazione', 'archivia automaticamente'],
+      costo: 1,
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
@@ -163,6 +148,7 @@
     },
     {
       keys: ['archivia_alla_riapertura', 'riordina alla riapertura', 'archivia alla riapertura', 'autoarchiveonclose'],
+      costo: 1,
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
@@ -171,6 +157,7 @@
     },
     {
       keys: ['ore_inattivita', 'ore inattivita', 'ore di inattivita', 'ore_inattivita_archivio', 'idlehours', 'ore inattività'],
+      costo: 1,
       build(v) {
         let n = parseInt(String(v == null ? '' : v).replace(/[^0-9]/g, ''), 10);
         if (!Number.isFinite(n) || n < 1) return null;
@@ -181,7 +168,8 @@
     {
       keys: ['modalita_terminale', 'modalità terminale', 'modalita terminale', 'terminale', 'terminal'],
       // La modalità terminale dà a Filo accesso alla shell: conferma esplicita.
-      level: 2,
+      costo: 2,
+      allenta: (r) => r.partial.terminal.enabled === true,
       risk: 'Questa impostazione decide se Filo può eseguire comandi nella shell del tuo computer. '
         + 'È un permesso potente: una volta attivo, Filo può lanciare comandi (quelli rischiosi '
         + 'chiederanno comunque una conferma a parte). Attivalo solo se ti fidi di quello che gli chiedi.',
@@ -193,7 +181,7 @@
     },
     {
       keys: ['shell_terminale', 'shell terminale', 'shell'],
-      level: 2,
+      costo: 2,
       risk: 'Sceglie quale shell usa Filo per eseguire i comandi del terminale (su Windows '
         + 'PowerShell, Prompt dei comandi o Bash; su Mac e Linux sh o Bash). Cambia come '
         + 'vengono interpretati i comandi che Filo lancia.',
@@ -215,6 +203,7 @@
     },
     {
       keys: ['velocita_voce', 'velocità voce', 'velocita voce', 'velocità lettura', 'velocita lettura', 'ttsrate'],
+      costo: 1,
       build(v) {
         let n = parseItalianNumber(v);
         if (!Number.isFinite(n)) return null;
@@ -224,6 +213,7 @@
     },
     {
       keys: ['tono_voce', 'tono voce', 'tono lettura', 'ttspitch'],
+      costo: 1,
       build(v) {
         let n = parseItalianNumber(v);
         if (!Number.isFinite(n)) return null;
@@ -234,8 +224,9 @@
     {
       // La voce TTS è una stringa URI (voiceURI o nome del sistema): si imposta
       // passando la stringa esatta come valore (il sistema la riconosce all'avvio).
-      // Reversibile (puoi cambiarla di nuovo) → livello 1.
+      // Reversibile (puoi cambiarla di nuovo) → costo 1.
       keys: ['voce', 'voce lettura', 'voce tts', 'ttsvoice', 'voce del sistema'],
+      costo: 1,
       build(v) {
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
@@ -245,8 +236,9 @@
     {
       // Voce del MODELLO di lettura (quella naturale): si indica per nome
       // ("Sara", "Nicola") o per id ("if_sara"); "automatica" torna a seguire
-      // la lingua del testo. Reversibile → livello 1.
+      // la lingua del testo. Reversibile → costo 1.
       keys: ['voce_modello', 'voce del modello', 'voce naturale', 'voce modello', 'ttsmodelvoice'],
+      costo: 1,
       build(v) {
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
@@ -268,9 +260,10 @@
       },
     },
 
-    // ── Funzionalità (interruttori) — reversibili, nessun rischio → livello 1 ──
+    // ── Funzionalità (interruttori) — reversibili, nessun rischio → costo 1 ──
     {
       keys: ['correttore', 'correttore ortografico', 'correttore_ortografico', 'controllo ortografico', 'spellcheck', 'correzione'],
+      costo: 1,
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
@@ -279,6 +272,7 @@
     },
     {
       keys: ['sidebar_aiuto', 'sidebar aiuto', 'pannello aiuto', 'aiuto', 'help', 'assistente aiuto'],
+      costo: 1,
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
@@ -287,6 +281,7 @@
     },
     {
       keys: ['categorizzazione', 'categorie automatiche', 'categorizza', 'categorie'],
+      costo: 1,
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
@@ -295,6 +290,7 @@
     },
     {
       keys: ['archivia_se_inattivo', 'archivia quando inattivo', 'archiviazione su inattivita', 'archivia se inattivo', 'archiviazione inattivita'],
+      costo: 1,
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
@@ -302,10 +298,11 @@
       },
     },
 
-    // ── Sicurezza / privacy — livello 2 (popup di conferma prima di applicare) ──
+    // ── Sicurezza / privacy — costo 2; spegnere una protezione abbassa una difesa ──
     {
       keys: ['protezione_ip', 'protezione ip', 'proteggi ip', 'protezione ip locale', 'webrtc', 'protezione webrtc', 'ip locale'],
-      level: 2,
+      costo: 2,
+      allenta: (r) => r.partial.security.protectIpLeak === false,
       risk: 'Controlla la protezione che impedisce ai siti di scoprire il tuo indirizzo IP locale '
         + 'tramite WebRTC. Disattivarla espone più informazioni sulla tua rete ai siti che visiti.',
       build(v) {
@@ -316,7 +313,8 @@
     },
     {
       keys: ['blocco_popup', 'blocco popup', 'blocca popup', 'popup', 'finestre popup'],
-      level: 2,
+      costo: 2,
+      allenta: (r) => r.partial.security.blockPopups === false,
       risk: 'Controlla il blocco delle finestre popup. Disattivarlo permette ai siti di aprire '
         + 'finestre da soli, anche pubblicitarie o ingannevoli.',
       build(v) {
@@ -327,7 +325,8 @@
     },
     {
       keys: ['navigazione_sicura', 'navigazione sicura', 'rilevamento siti pericolosi', 'siti pericolosi', 'safe browsing', 'safebrowsing', 'protezione phishing', 'rilevamento phishing'],
-      level: 2,
+      costo: 2,
+      allenta: (r) => r.partial.security.safeBrowse.enabled === false,
       risk: 'Controlla il rilevamento dei siti pericolosi (phishing e malware). Disattivarlo '
         + 'toglie l’avviso prima che tu apra un sito potenzialmente dannoso.',
       build(v) {
@@ -340,7 +339,8 @@
       keys: ['conferma_programmi', 'conferma programmi', 'conferma prima di scaricare un programma',
         'chiedi prima di scaricare un programma', 'avviso programmi scaricati', 'download eseguibili',
         'scaricamento programmi', 'file eseguibili'],
-      level: 2,
+      costo: 2,
+      allenta: (r) => r.partial.security.downloads.confirmExecutables === false,
       risk: 'Controlla l’avviso prima che un programma (.exe, .msi, .dmg, .iso, .sh…) entri nella cartella '
         + 'Download e prima che “Apri file” lo esegua. Disattivarlo fa scendere e aprire i programmi '
         + 'senza domande, anche quelli di un sito sbagliato.',
@@ -355,7 +355,8 @@
     },
     {
       keys: ['gestione_cookie', 'gestione cookie', 'gestione dei cookie', 'cookie', 'banner cookie', 'banner dei cookie'],
-      level: 2,
+      costo: 2,
+      allenta: (r, at) => scende(RIGORE_COOKIE, r.partial.security.cookies.mode, at && at.security && at.security.cookies && at.security.cookies.mode),
       risk: 'Decide come Filo gestisce i cookie dei siti. Le modalità più permissive aumentano '
         + 'il tracciamento pubblicitario; quelle più strette possono farti perdere i login già attivi.',
       build(v) {
@@ -373,7 +374,8 @@
     },
     {
       keys: ['fingerprint', 'anti-fingerprinting', 'anti fingerprinting', 'antifingerprint', 'impronta digitale', 'protezione impronta', 'protezione fingerprint'],
-      level: 2,
+      costo: 2,
+      allenta: (r, at) => scende(RIGORE_IMPRONTA, r.partial.security.fingerprint.mode, at && at.security && at.security.fingerprint && at.security.fingerprint.mode),
       risk: 'Controlla la protezione contro il fingerprinting, cioè il riconoscimento del tuo '
         + 'browser tra un sito e l’altro. Cambiarla incide sulla tua privacy e su come i siti ti identificano.',
       build(v) {
@@ -390,10 +392,11 @@
       },
     },
 
-    // ── Modelli / provider / chiavi / costi — livello 2 (conferma) ──
+    // ── Modelli / provider / chiavi / costi — costo 2; cambiare chi elabora i dati o alzare la spesa abbassa una difesa ──
     {
       keys: ['modelli_predefiniti', 'modelli predefiniti', 'usa modelli predefiniti', 'modelli di default', 'configurazione predefinita modelli'],
-      level: 2,
+      costo: 2,
+      allenta: (r) => r.partial.useDefaultModels === false,
       risk: 'Decide se Filo usa i modelli AI predefiniti o la tua configurazione personalizzata. '
         + 'Cambia quali modelli elaborano le tue richieste, con effetti su qualità e costi.',
       build(v) {
@@ -406,7 +409,8 @@
       keys: ['solo_pesi_aperti', 'solo pesi aperti', 'modelli a pesi aperti', 'solo modelli a pesi aperti',
         'solo modelli aperti', 'modelli aperti', 'modelli proprietari', 'niente modelli proprietari',
         'disattiva modelli proprietari', 'open weights'],
-      level: 2,
+      costo: 2,
+      allenta: (r) => r.partial.openWeightsOnly === false,
       risk: 'Spegne tutti i modelli proprietari (Anthropic compresa) e lascia lavorare solo modelli '
         + 'a pesi aperti serviti da fornitori indipendenti. Alcune funzioni cambiano modello e quelle '
         + 'senza equivalente aperto smettono di funzionare finché non lo rispegni.',
@@ -421,7 +425,8 @@
     },
     {
       keys: ['provider', 'fornitore', 'provider ai', 'provider modelli'],
-      level: 2,
+      costo: 2,
+      allenta: () => true,
       risk: 'Cambia il fornitore AI che elabora le tue richieste. '
         + 'Le richieste e i relativi costi passeranno dal nuovo provider, con la sua chiave API.',
       build(v) {
@@ -434,7 +439,8 @@
     },
     {
       keys: ['chiave_openrouter', 'chiave openrouter', 'api key openrouter', 'chiave api openrouter', 'openrouter key'],
-      level: 2,
+      costo: 2,
+      allenta: () => true,
       risk: 'Imposta la chiave API di OpenRouter. È una credenziale che autorizza spese sul tuo '
         + 'account: confermala solo se questa chiave arriva davvero da te.',
       build(v) {
@@ -446,7 +452,8 @@
 
     {
       keys: ['chiave_tavily', 'chiave tavily', 'api key tavily', 'chiave ricerca', 'chiave api tavily', 'tavily key'],
-      level: 2,
+      costo: 2,
+      allenta: () => true,
       risk: 'Imposta la chiave API di Tavily, il servizio di ricerca web. È una credenziale '
         + 'collegata al tuo account Tavily: confermala solo se arriva davvero da te.',
       build(v) {
@@ -457,7 +464,12 @@
     },
     {
       keys: ['limite_spesa', 'limite di spesa', 'limite spesa', 'limite di spesa mensile', 'limite mensile', 'budget mensile', 'spesa massima', 'limite costi', 'budget'],
-      level: 2,
+      costo: 2,
+      allenta: (r, at) => {
+        const tetto = (v) => (Number(v) > 0 ? Number(v) : Infinity);
+        const prima = at && at.monthlyLimitEur;
+        return prima == null || tetto(r.partial.monthlyLimitEur) > tetto(prima);
+      },
       risk: 'Imposta il tetto di spesa mensile per le richieste AI. Alzarlo può far aumentare i '
         + 'costi; abbassarlo può bloccare le richieste una volta raggiunto il limite.',
       build(v) {
@@ -469,7 +481,7 @@
       },
     },
 
-    // ── Colore identità delle tab — cosmetico, reversibile → livello 1 ──
+    // ── Colore identità delle tab — cosmetico, reversibile → costo 1 ──
     // Mappa le richieste verbali ("voglio colori più vivaci nelle tab", "rendile
     // più neutre", "niente colore", "Poste è verde non gialla") sui sei parametri
     // di src/shared/tabColor.js. I valori sono preset ASSOLUTI (non delta: il
@@ -480,6 +492,7 @@
     {
       keys: ['colore_tab', 'colore delle tab', 'colore tab', 'colori tab', 'colori delle tab',
         'colore schede', 'colori schede', 'tinta tab', 'tinta delle tab', 'vivacita tab', 'vivacità tab'],
+      costo: 1,
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
         if (!s) return null;
@@ -503,10 +516,10 @@
       },
     },
 
-    // ── Suoneria timer — reversibile, innocuo → livello 1 ──
+    // ── Suoneria timer — reversibile, innocuo → costo 1 ──
     {
       keys: ['suoneria_timer', 'suoneria timer', 'suoneria', 'ringtone', 'timer ringtone', 'suono timer', 'tono timer'],
-      level: 1,
+      costo: 1,
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
         const map = {
@@ -521,18 +534,43 @@
         return { partial: { timerRingtone: tone }, label: `Suoneria timer → ${labelMap[tone]}` };
       },
     },
+
+    // Il livello di autonomia lo cambia solo l'utente, in Preferenze: dalla chat è nell'elenco fisso.
+    // Sta in fondo perché i sinonimi corti («auto») trovino prima le voci di sopra.
+    {
+      keys: ['autonomia', 'livello di autonomia', 'livello autonomia', 'livello_autonomia', 'quanto fa da solo'],
+      costo: 3,
+      elenco: 'regole',
+      dove: 'Il livello di autonomia lo sceglie l\'utente in Preferenze, sotto «Autonomia di Filo».',
+      build(v) {
+        const A = global.SN_AUTONOMIA;
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const lv = A && A.LIVELLI.find((l) => l.id === s || l.nome.toLowerCase() === s);
+        return { partial: {}, label: `Autonomia di Filo → ${lv ? lv.nome : (s || '?')}` };
+      },
+    },
   ];
 
-  // Trova il setter giusto per una chiave (match esatto, poi fuzzy) e costruisce
-  // il partial. Ritorna { partial, label, level, risk, testo? }, { rifiuto } se il
-  // valore va rifiutato spiegando perché, o null se chiave/valore non validi.
-  function buildPreferencePartial(rawKey, rawVal) {
+  // Trova il setter giusto per una chiave (match esatto, poi fuzzy) e costruisce il partial.
+  // Ritorna { partial, label, costo, allenta, elenco, dove, risk, testo? }, { rifiuto } col perché, o null.
+  // `attuali` = le impostazioni correnti, se note: senza, un cambio di rigore vale come abbassare.
+  function buildPreferencePartial(rawKey, rawVal, { attuali = null } = {}) {
     const key = String(rawKey == null ? '' : rawKey).trim().toLowerCase();
     if (!key) return null;
     const withLevel = (setter) => {
       const r = setter.build(rawVal);
       if (r && r.rifiuto) return { rifiuto: r.rifiuto };
-      return r ? { ...r, level: setter.level || 1, risk: setter.risk || '' } : null;
+      if (!r) return null;
+      let allenta = false;
+      try { allenta = typeof setter.allenta === 'function' ? !!setter.allenta(r, attuali) : false; } catch (_) { allenta = true; }
+      return {
+        ...r,
+        costo: setter.costo,
+        allenta,
+        elenco: setter.elenco || '',
+        dove: setter.dove || '',
+        risk: setter.risk || '',
+      };
     };
     for (const setter of PREF_SETTERS) {
       if (setter.keys.includes(key)) return withLevel(setter);

@@ -153,18 +153,18 @@ test('il livello di base non scende: scritture e comandi ignoti restano dove era
 
 test('ESEGUI_COMANDO: il registro usa il perimetro iniettato dal main e lo spiega nel popup', () => {
   const a = { type: 'ESEGUI_COMANDO', comando: 'cat ~/.ssh/id_rsa', _perimetro: LINUX, _cwd: '~' };
-  assert.equal(AL.levelFor(a), 2);
+  assert.equal(AL.costoFor(a), 2);
   assert.match(AL.describe(a), /Perché te lo chiedo: legge un file nascosto o di configurazione/);
   const ok = { type: 'ESEGUI_COMANDO', comando: 'cat note.txt', _perimetro: LINUX };
-  assert.equal(AL.levelFor(ok), 1);
+  assert.equal(AL.costoFor(ok), 1);
   assert.doesNotMatch(AL.describe(ok), /Perché/);
 });
 
 test('LEGGI_DOCUMENTO: stesso perimetro del terminale', () => {
-  const doc = (percorso, ctx = LINUX) => AL.levelFor({ type: 'LEGGI_DOCUMENTO', percorso, _perimetro: ctx });
-  assert.equal(doc('~/Scaricati/estratto.pdf'), 1);
-  assert.equal(doc('bolletta.pdf'), 1);
-  assert.equal(doc('"~/Documenti/contratto affitto.pdf"'), 1);
+  const doc = (percorso, ctx = LINUX) => AL.costoFor({ type: 'LEGGI_DOCUMENTO', percorso, _perimetro: ctx });
+  assert.equal(doc('~/Scaricati/estratto.pdf'), 0);
+  assert.equal(doc('bolletta.pdf'), 0);
+  assert.equal(doc('"~/Documenti/contratto affitto.pdf"'), 0);
   assert.equal(doc('~/.ssh/id_rsa'), 2);
   assert.equal(doc('/etc/shadow'), 2);
   assert.equal(doc('~/.config/chiavi.txt'), 2);

@@ -760,6 +760,9 @@
     // needsConfirm, describe }: se needsConfirm il client mostra il popup di
     // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
     FILO_RUN_ACTION: 'filo_run_action',
+    // #530 — l'agente "Aiuto" chiede se una sua azione sulla pagina (copia, cerca,
+    // condividi) parte, chiede o no. { costo, campo } → { risposta, digita, perche }.
+    FILO_DECIDI_PAGINA: 'filo_decidi_pagina',
 
     // #405 — un'azione di PAGINA invocata dal menu aperto dentro un riquadro
     // incorporato (iframe). Il riquadro conosce solo se stesso: tradurre,

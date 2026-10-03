@@ -119,7 +119,7 @@
     for (const f of Array.isArray(fonti) ? fonti : []) {
       if (!f) continue;
       const c = classeFonte(f, { spostamenti, manopole });
-      if (c > classe || !peggiore) { if (c >= classe) { classe = c; peggiore = f; } }
+      if (c > classe || (!peggiore && c === classe)) { classe = c; peggiore = f; }
     }
     const soglia = SOGLIA_PULITO[livelloDa(livello)];
     return { stato: classe <= soglia ? 'pulito' : 'contaminato', classe, fonte: classe <= soglia ? null : peggiore };
@@ -186,11 +186,11 @@
     /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
   ];
   const PAROLA_PASSWORD = /(?:password|passwd|pwd|passphrase|parola\s+d['’]ordine|chiave\s+segreta|secret)\s*(?:[:=]|\bè\b|\bis\b|\bera\b)\s*["'«“]?([^\s"'»”,;&]{4,})/gi;
-  const PAROLA_CODICE = /(?:\botp\b|\b2fa\b|one[-\s]?time|codic[ei]\s+(?:di\s+|usa\s+e\s+getta|monouso|temporane[oi]|sms)(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione)?|recovery\s+codes?|backup\s+codes?|verification\s+code|security\s+code)\D{0,24}?([A-Za-z0-9]{4,}(?:[-\s][A-Za-z0-9]{4,}){0,9})/gi;
+  const PAROLA_CODICE = /(?:\botp\b|\b2fa\b|\bone[-\s]?time\b|\bpin\b|\bcodic[ei]\s+(?:di\s+)?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\s+e\s+getta|monouso|temporane[oi]|sms)\b|\b(?:recovery|backup|verification|security)\s+codes?\b)\D{0,24}?(\d[A-Za-z0-9]{3,}|[A-Za-z0-9]{4,}(?:[-\s][A-Za-z0-9]{4,}){1,9})/gi;
 
   function sembraPassword(tok) {
     const s = String(tok || '');
-    return s.length >= 4 && /[0-9]/.test(s) || /[^A-Za-z0-9À-ÿ]/.test(s) || (/[a-z]/.test(s) && /[A-Z]/.test(s.slice(1)));
+    return s.length >= 4 && (/[0-9]/.test(s) || /[^A-Za-z0-9À-ÿ]/.test(s) || (/[a-z]/.test(s) && /[A-Z]/.test(s.slice(1))));
   }
   function ibanValido(raw) {
     const s = raw.replace(/\s+/g, '').toUpperCase();
@@ -212,6 +212,7 @@
     }
     return somma % 10 === 0;
   }
+  const CARTA = /^(?:4\d{12}(?:\d{3}){0,2}|5[1-5]\d{14}|2(?:2[2-9]|[3-6]\d|7[01])\d{13}|3[47]\d{13}|6(?:011|5\d{2})\d{12})$/;
   function soloAlnum(s) { return String(s || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase(); }
 
   // Il segreto che `testo` porterebbe fuori: '' se nessuno. `richiesta` = cosa ha scritto l'utente nel
@@ -224,12 +225,16 @@
     for (const m of t.matchAll(PAROLA_PASSWORD)) if (sembraPassword(m[1])) return 'password';
     for (const m of t.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) return 'codice';
     const chiesto = soloAlnum(richiesta);
-    for (const m of t.matchAll(/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]){11,30}\b/gi)) {
-      if (ibanValido(m[0]) && !chiesto.includes(soloAlnum(m[0]))) return 'banca';
+    for (const m of t.matchAll(/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]){11,30}/g)) {
+      const s = soloAlnum(m[0]);
+      for (let n = s.length; n >= 15; n--) {
+        if (ibanValido(s.slice(0, n)) && !chiesto.includes(s.slice(0, n))) return 'banca';
+      }
     }
-    for (const m of t.matchAll(/(?<![\d])(?:\d[ -]?){12,18}\d(?![\d])/g)) {
+    // Solo i prefissi dei circuiti: un numero di 13 cifre che comincia per 1 è un orario in millisecondi.
+    for (const m of t.matchAll(/(?<![\d])[2-6](?:[ -]?\d){12,18}(?![\d])/g)) {
       const cifre = m[0].replace(/\D/g, '');
-      if (cifre.length >= 13 && cifre.length <= 19 && luhn(cifre) && !chiesto.includes(cifre)) return 'banca';
+      if (CARTA.test(cifre) && luhn(cifre) && !chiesto.includes(cifre)) return 'banca';
     }
     return '';
   }

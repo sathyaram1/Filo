@@ -4,7 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, handleFiloGenerateDashboard,
-    executeFiloAction, maybeRunCompactor, closeAndTriageChat, archiviaCongedoAccoglienza,
+    executeFiloAction, decisioneAzionePagina, maybeRunCompactor, closeAndTriageChat, archiviaCongedoAccoglienza,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
   const FiloMem = globalThis.SN_FILO_MEMORY;
@@ -72,6 +72,13 @@ module.exports = function register(on, ctx) {
   // per la chat: la sidebar non è un canale privilegiato.
   on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
     const r = await executeFiloAction(msg.action, { sender, assistente: true });
+    return { ok: true, ...r };
+  });
+
+  // Anche da una pagina web, di proposito: la sidebar vive lì. Risponde solo cosa farebbe Filo; l'azione la
+  // esegue comunque il codice di Filo nel content script, quindi chi lo chiama non ottiene niente di più.
+  on(MSG.FILO_DECIDI_PAGINA, async (msg, sender) => {
+    const r = await decisioneAzionePagina({ costo: msg && msg.costo, campo: msg && msg.campo, sender });
     return { ok: true, ...r };
   });
 

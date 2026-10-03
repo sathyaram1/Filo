@@ -1196,7 +1196,82 @@ function perimetroLettura(sender) {
 
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in
 // questo turno, turni passati compresi: servono all'anti-esfiltrazione di NAVIGA.
-async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null, assistente = false } = {}) {
+// Le fonti che il compito ha letto: la pagina su cui vive l'assistente e ciò che hanno portato le azioni
+// già fatte, turni passati compresi. Le dichiara il registro, mai il modello (#530).
+function fontiDelCompito(sender, contesto) {
+  const fonti = [];
+  const origine = String(sender?.tab?.url || sender?.url || '');
+  if (/^https?:/i.test(origine)) {
+    let host = '';
+    try { host = new URL(origine).hostname; } catch (_) {}
+    fonti.push({ classe: 5, campo: 'web', chiave: `sito:${host}`, motivo: 'ho letto una pagina web' });
+  }
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  for (const a of Array.isArray(contesto) ? contesto : []) {
+    const f = Levels && Levels.fonteDi(a);
+    if (f) fonti.push(f);
+  }
+  return fonti;
+}
+
+// Un documento della cartella Download l'ha scritto qualcun altro: classe 5, non 4 (#530).
+function fileScaricato(p) {
+  if (!p) return false;
+  try {
+    const nodePath = require('node:path');
+    const rel = nodePath.relative(nodePath.resolve(require('./downloads').downloadsDir()), nodePath.resolve(String(p)));
+    return !!rel && !rel.startsWith('..') && !nodePath.isAbsolute(rel);
+  } catch (_) { return false; }
+}
+
+// L'unico punto del main che chiede a SN_AUTONOMIA se un'azione parte (#530). Il guardiano di uscita non
+// esiste ancora: le celle «+G» chiedono. `perche` è la frase del popup quando non è ovvio cosa fa chiedere.
+function decisioneAutonomia(ing, { sender = null, contesto = null, origine = 'chat', dentroPerimetro = true, impostazioni = null } = {}) {
+  const A = globalThis.SN_AUTONOMIA;
+  const aut = (impostazioni && impostazioni.autonomia) || {};
+  const st = A.stato({ fonti: fontiDelCompito(sender, contesto), livello: aut.livello, spostamenti: aut.fonti, manopole: aut.manopole });
+  const ingressi = {
+    livello: aut.livello, stato: st.stato, costo: ing.costo, campo: ing.campo, manopole: aut.manopole,
+    elenco: ing.elenco, difesa: ing.difesa, origine, dentroPerimetro, guardiano: false,
+  };
+  const d = A.decideDettaglio(ingressi);
+  let perche = '';
+  if (d.risposta !== 'si' && d.risposta !== 'no') {
+    const daPulito = st.stato === 'contaminato' ? A.decide({ ...ingressi, stato: 'pulito' }) : d.risposta;
+    if (daPulito !== d.risposta) perche = A.frasePerche(st.fonte);
+    else if (d.regola === 'difesa') perche = 'Te lo chiedo perché abbassa una difesa di Filo.';
+    else if (d.regola === 'perimetro') perche = 'Te lo chiedo perché non me l\'hai chiesto tu: è una mia proposta.';
+  }
+  return { ...d, stato: st, perche, conCosto: (costo) => A.decide({ ...ingressi, costo }) };
+}
+
+// Le azioni che l'agente sulla pagina fa da sé nel content script (copia, cerca, condividi) dichiarano solo
+// il costo: la risposta è la stessa del dispatch, con la pagina web come fonte letta.
+async function decisioneAzionePagina({ costo, campo = 'web', sender = null } = {}) {
+  const A = globalThis.SN_AUTONOMIA;
+  if (!A.costoValido(costo)) return { risposta: 'no', digita: false, perche: '' };
+  let impostazioni = {};
+  try { impostazioni = await Storage.getSettings(); } catch (_) {}
+  const d = decisioneAutonomia({ costo, campo: A.campoValido(campo) ? campo : null, elenco: '', difesa: false }, { sender, impostazioni });
+  return { risposta: d.risposta, digita: d.digita, perche: d.perche };
+}
+
+// Un «no» dell'elenco fisso: breve per il diario, intero per il modello, con la strada che resta all'utente.
+function fraseNo(ing) {
+  const A = globalThis.SN_AUTONOMIA;
+  const voce = A.ELENCO_FISSO.find((e) => e.id === ing.elenco);
+  const cosa = ing.segreto ? `porterebbe fuori ${A.SEGRETI[ing.segreto] || 'un segreto'}` : (voce ? voce.cosa : 'è fra le cose che Filo non fa');
+  return {
+    breve: `Filo non lo fa da solo: ${cosa}`,
+    perModello: `${cosa}: è nell'elenco fisso, e Filo non lo fa a nessun livello di autonomia, nemmeno se l'utente conferma. `
+      + `Dillo all'utente in una riga${ing.dove ? `: ${ing.dove}` : ''}. Non riprovare e non cercare un'altra strada per farlo`,
+  };
+}
+
+async function executeFiloAction(action, {
+  confirmed = false, sender = null, contesto = null, assistente = false,
+  richiesta = '', origine = 'chat', dentroPerimetro = true,
+} = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
@@ -1326,33 +1401,41 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO') action._perimetro = perimetroLettura(sender);
 
-  // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
-  // Il livello è assegnato STATICAMENTE nel registro (src/shared/actionLevels.js),
-  // mai deciso dall'LLM. Azione non registrata → rifiutata (ogni nuovo potere
-  // di Filo è obbligato a dichiarare il suo livello). Livello ≥ 2 senza
-  // conferma utente → non si esegue: torna al client con la spiegazione, il
-  // client mostra popup (2) o box "digita conferma" (3) e solo allora rimanda
-  // l'azione via MSG.FILO_CONFIRM_ACTION. La riclassificazione avviene anche
-  // alla conferma (`confirmed` salta solo la sospensione, non il registro).
+  // ── chi decide se parte (#530) ─────────────────────────────────────────────
+  // Il registro dà costo, campo, elenco fisso e difesa (src/shared/actionLevels.js), mai l'LLM; la risposta
+  // la dà SN_AUTONOMIA col livello scelto dall'utente e lo stato del compito. Fuori registro o senza costo:
+  // non parte. `confirmed` salta solo la sospensione, il registro si rilegge anche alla conferma.
   const Levels = globalThis.SN_ACTION_LEVELS;
-  const level = Levels ? Levels.levelFor(action) : 1;
-  if (Levels && !level) {
-    console.warn('[Filo] azione non registrata rifiutata:', type);
+  let impostazioni = {};
+  try { impostazioni = await Storage.getSettings(); } catch (_) {}
+  const ing = Levels ? Levels.ingressi(action, { richiesta, impostazioni }) : null;
+  if (!ing) {
+    console.warn('[Filo] azione non registrata o senza costo, rifiutata:', type);
     return { executed: false, kept: false, rejected: true };
+  }
+  const decisione = decisioneAutonomia(ing, { sender, contesto, origine, dentroPerimetro, impostazioni });
+  if (decisione.risposta === 'no') {
+    const no = fraseNo(ing);
+    return { executed: false, kept: false, no: true, error: no.perModello, output: { error: no.breve, rifiuto: true, no: true } };
   }
   // PULISCI_TAB e CANCELLA_ARCHIVIO hanno già un flusso di conferma dedicato
   // lato client (bottone → RUN_TAB_TRIAGE / pannello eliminazione): restano
   // `kept` come prima e la conferma la gestisce la loro UI specifica.
   const hasBespokeConfirm = type === 'PULISCI_TAB' || type === 'CANCELLA_ARCHIVIO';
-  if (level >= 2 && !confirmed && !hasBespokeConfirm) {
+  const daChiedere = decisione.risposta !== 'si';
+  if (daChiedere && !confirmed && !hasBespokeConfirm) {
     // Da qui in poi QUESTO mittente potrà confermare questa stessa azione
     // (difesa in profondità #250): registriamo il pending prima di sospendere.
     recordPendingConfirm(sender, action);
+    const describe = Levels.describe(action);
     return {
       executed: false,
       kept: true,
-      needsConfirm: level,
-      describe: Levels ? Levels.describe(action) : '',
+      needsConfirm: decisione.digita ? 3 : 2,
+      ...(decisione.risposta === 'propone' ? { proposta: true } : {}),
+      describe: decisione.perche ? `${describe}\n\n${decisione.perche}` : describe,
+      // Il box da digitare dice «non è reversibile»: per una difesa abbassata non è vero.
+      ...(decisione.digita && decisione.regola === 'difesa' ? { avviso: 'Abbassa una difesa di Filo.' } : {}),
     };
   }
   // #250 — Un'azione che RICHIEDE conferma non può arrivare `confirmed` da una
@@ -1360,7 +1443,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
   // richiesta di conferma (RUN → popup → CONFIRM). Le pagine interne filo://
   // sono fidate per origine. Un FILO_CONFIRM_ACTION forgiato "a freddo" da fuori
   // non ha un pending corrispondente → rifiutato (l'azione non si esegue).
-  if (level >= 2 && confirmed && !hasBespokeConfirm) {
+  if (daChiedere && confirmed && !hasBespokeConfirm) {
     if (!daPaginaDiFilo(sender) && !consumePendingConfirm(sender, action)) {
       console.warn('[Filo] FILO_CONFIRM_ACTION senza conferma legittima: rifiutata', type);
       return { executed: false, kept: false, rejected: true };
@@ -1782,7 +1865,8 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         // quello valutato dal gate: se è fuori dal perimetro e nessuno ha
         // confermato, il testo non esce di qui.
         const C = globalThis.SN_CMD_CLASSIFY;
-        const fuori = r.path && !confirmed && (!C || C.fuoriPerimetro(r.path, action._perimetro));
+        const fuori = r.path && !confirmed && (!C || C.fuoriPerimetro(r.path, action._perimetro))
+          && decisione.conCosto(2) !== 'si';
         if (fuori) {
           return {
             executed: false,
@@ -1801,6 +1885,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
           output: {
             documentRead: String(percorso == null ? '' : percorso),
             ok: !!r.ok,
+            scaricato: fileScaricato(r.path),
             // Il percorso chiesto, quando NON è quello aperto davvero: il nome
             // era quasi giusto (accenti, trattino lungo) e il file è stato
             // ritrovato lo stesso. Va detto, non taciuto (#551).
@@ -2587,6 +2672,7 @@ function toolResultText({ action, res, rendered }) {
   // conferma forgiata). `kept: false` NON vuol dire fallita: vuol dire che in
   // chat non c'è niente da mostrare (un appunto scritto, una lezione fissata,
   // una spunta dell'accoglienza): l'esito lo dice `executed`.
+  if (res && res.no) return `Azione ${type} NON fatta: ${res.error}.`;
   if (!res || res.rejected) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
     return `Azione ${type} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
@@ -2899,6 +2985,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // decidono se un NAVIGA di questo turno può portare fuori dati (#587).
   const azioniViste = [];
   for (const m of cleanHistory) if (m && Array.isArray(m.actions)) azioniViste.push(...m.actions);
+  // Cosa ha scritto l'utente nel compito: le coordinate bancarie che ci stanno dentro le ha chieste lui (#530).
+  const richiesta = [...cleanHistory.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
   for (const m of cleanHistory) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     let content = String(m.text || '');
@@ -3047,7 +3135,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const esiti = new Map();
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
-        : executeFiloAction(a, { sender, contesto: azioniViste }));
+        : executeFiloAction(a, { sender, contesto: azioniViste, richiesta }));
       const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
       for (let i = 0; i < actions.length; i++) {
         const a = actions[i];
@@ -3063,7 +3151,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
         // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
-        if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '' };
+        if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) };
         // Output di un comando eseguito subito (livello 1) o esito bloccato
         // (terminale spento): il client lo mostra in chat (#146.6).
         if (res.output) rendered._output = res.output;
@@ -3145,10 +3233,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     ? null // turno di prosecuzione automatica: il "messaggio utente" è un nudge nostro
     : maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
   if (proposal) {
-    const res = await executeFiloAction(proposal, { sender });
+    // La segnalazione la propone Filo, non l'ha chiesta l'utente: è fuori dal perimetro del compito.
+    const res = await executeFiloAction(proposal, { sender, contesto: azioniViste, richiesta, dentroPerimetro: false });
     if (res.kept) {
       const rendered = res.needsConfirm
-        ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '' } }
+        ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) } }
         : { ...proposal };
       if (res.output) rendered._output = res.output;
       renderedActions.push(rendered);
@@ -3499,6 +3588,7 @@ const handlerCtx = {
   handleFiloChat,
   handleFiloGenerateDashboard,
   executeFiloAction,
+  decisioneAzionePagina,
   maybeRunCompactor,
   // Archivio delle chat (#525)
   closeAndTriageChat,

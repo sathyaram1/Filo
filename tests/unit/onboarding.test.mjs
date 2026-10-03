@@ -398,8 +398,8 @@ test('a intervista finita il prompt torna quello di sempre (niente elenco addoss
 });
 
 test('l’azione ONBOARDING è registrata: livello 1 e una descrizione in chiaro', () => {
-  assert.equal(Levels.levelFor({ type: 'ONBOARDING', spunta: ['profilo'] }), 1);
-  assert.equal(Levels.levelFor({ type: 'onboarding', fine: true }), 1, 'il type è case-insensitive');
+  assert.equal(Levels.costoFor({ type: 'ONBOARDING', spunta: ['profilo'] }), 1);
+  assert.equal(Levels.costoFor({ type: 'onboarding', fine: true }), 1, 'il type è case-insensitive');
   assert.match(Levels.describe({ type: 'ONBOARDING', fine: true }), /intervista di benvenuto/i);
   assert.match(Levels.describe({ type: 'ONBOARDING', spunta: ['profilo'] }), /profilo/);
 });

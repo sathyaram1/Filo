@@ -82,6 +82,8 @@ require(path.join(SHARED, 'campoNumero.js'));
 require(path.join(SHARED, 'routineSessioni.js'));
 require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei marker [[calc:]]: la chat li risolve nel main
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
+// #530 — la regola «Filo può fare X?» come dati: prima del registro, che le passa gli ingressi.
+require(path.join(SHARED, 'autonomia.js'));
 require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SHARED, 'actionTools.js'));  // le azioni come strumenti del modello (tool calling nativo)
 require(path.join(SHARED, 'pageRestyle.js'));

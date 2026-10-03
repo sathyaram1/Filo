@@ -2158,6 +2158,8 @@
 
   const DEFAULT_SETTINGS = {
     provider: DEFAULT_PROVIDER,
+    // #530 — quanto Filo fa da solo (src/shared/autonomia.js). Manopole e fonti spostate: solo dati, finché non arriva la posta.
+    autonomia: { livello: 'default', manopole: {}, fonti: {} },
     // "Usa modelli predefiniti": quando true (default), Filo funziona da subito
     // con la config e le chiavi predefinite condivise, senza che l'utente debba
     // impostare nulla. Le altre impostazioni modelli/chiavi restano nascoste
