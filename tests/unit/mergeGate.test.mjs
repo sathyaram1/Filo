@@ -130,16 +130,18 @@ test('merged → exit 0, e al server arrivano biglietto, branch e il COMMIT da f
     const r = await gate(port, ['worker/7']);
     assert.equal(r.status, 0, `exit 0 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
     assert.match(r.stdout, /fuso su main dal server/);
-    assert.equal(richieste.length, 1);
-    assert.ok(richieste[0].url.endsWith('/routineMerge'));
+    // Prima della richiesta un battito: la prova degli unit che la precede dura minuti (#929).
+    assert.ok(richieste[0].url.endsWith('/routineHeartbeat'), richieste.map((x) => x.url).join(' '));
+    const fusioni = richieste.filter((x) => x.url.endsWith('/routineMerge'));
+    assert.equal(fusioni.length, 1);
     // Il contratto che chiude il buco: nessun verdetto viaggia nel corpo. Se
     // un giorno qualcuno reinfilasse un FILO_L4_VERDICT, questo diventa rosso.
     // Lo `sha` invece c'è, e non è un verdetto: dice su quale contenuto
     // giravano i controlli, come fa il cammino locale (#485).
-    assert.deepEqual(Object.keys(richieste[0].body).sort(), ['branch', 'sha', 'ticket']);
-    assert.equal(richieste[0].body.ticket, 'biglietto-di-prova');
-    assert.equal(richieste[0].body.branch, 'worker/7');
-    assert.match(String(richieste[0].body.sha), /^[0-9a-f]{40}$/);
+    assert.deepEqual(Object.keys(fusioni[0].body).sort(), ['branch', 'sha', 'ticket']);
+    assert.equal(fusioni[0].body.ticket, 'biglietto-di-prova');
+    assert.equal(fusioni[0].body.branch, 'worker/7');
+    assert.match(String(fusioni[0].body.sha), /^[0-9a-f]{40}$/);
   } finally { srv.close(); }
 });
 
