@@ -1453,6 +1453,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
     // un'altra (#551, quarto giro). Stessa domanda che si fa il comando quando
     // parte, fatta nello stesso posto.
     action._cwd = displayCwd(cartellaDelComando(getAssistantCwd(sender)));
+    // Ripulita qui una volta, la stessa per popup, bottone e conferma (idempotente: la firma regge).
+    const AL = globalThis.SN_ACTION_LEVELS;
+    if (AL && AL.spiegazioneComando) action.spiegazione = AL.spiegazioneComando(action);
+    // La frase che spiega il terminale va con la prima proposta in chat (#892);
+    // la conferma è un secondo giro della stessa, l'assistente di pagina non la mostra.
+    if (!confirmed && !assistente && await primaVoltaDelTerminale()) action._primaVolta = true;
   }
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO') action._perimetro = perimetroLettura(sender);
