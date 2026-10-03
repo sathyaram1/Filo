@@ -13,7 +13,10 @@ cui Filo usa — o volutamente NON usa — un modello, con `from`:
 - `user` → lo sceglie chi usa Filo (una funzione di `SN_CONST.ACTIONS`, campo
   in Opzioni → Modelli);
 - `owner` → lo sceglie chi gestisce Filo (uno slot di `supportModelsStore.js`,
-  Gestione → Modelli di supporto: gira sui server, non sul PC dell'utente);
+  Gestione → Modelli di supporto: gira sui server, non sul PC dell'utente). Con
+  `action` è una funzione dell'app che usa solo lui (la ricerca fra i feedback,
+  #465): sta fuori da Opzioni e Modelli predefiniti, la risolve
+  `settingsForOwnerAction` e il registro dei giudici vale sopra a quello di tutti;
 - `none` → quel punto un modello non lo usa (sta nell'elenco **apposta**, così
   non lo si cerca);
 - `code` → deve restare **vuoto**: è l'invariante.

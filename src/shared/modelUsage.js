@@ -18,8 +18,9 @@
 //   from      da dove viene il modello:
 //               'user'  → impostazione di chi usa Filo (Opzioni → Modelli)
 //               'owner' → impostazione di chi gestisce Filo (Gestione → Modelli
-//                         di supporto): sono i punti che girano sui server di
-//                         Filo, non sul computer di chi lo usa
+//                         di supporto): i punti che girano sui server di Filo,
+//                         e con `action` le funzioni che solo lui usa, sul suo
+//                         computer (fuori da Opzioni e Modelli predefiniti, #465)
 //               'none'  → questo punto NON usa nessun modello (è scritto qui
 //                         apposta: sono i punti che sembrano usarne uno e non
 //                         lo fanno, così non si continua a cercarlo)
@@ -27,6 +28,7 @@
 //                         cambiarlo. DEVE restare vuoto: è la condizione che il
 //                         test `modelUsage.test.mjs` verifica.
 //   ref       per 'user' il nome interno della funzione; per 'owner' lo slot
+//   action    solo 'owner' che gira nell'app: la funzione che prende lo slot
 //   where     dove si imposta, in parole (per l'utente)
 //   note      dettaglio opzionale
 //
@@ -47,8 +49,10 @@
   function user(id, label, area, action, note) {
     return { id, label, area, from: 'user', ref: action, where: WHERE_USER, note: note || '' };
   }
-  function owner(id, label, area, slot, note) {
-    return { id, label, area, from: 'owner', ref: slot, where: WHERE_OWNER, note: note || '' };
+  function owner(id, label, area, slot, note, action) {
+    const e = { id, label, area, from: 'owner', ref: slot, where: WHERE_OWNER, note: note || '' };
+    if (action) e.action = action;
+    return e;
   }
   function none(id, label, area, note) {
     return { id, label, area, from: 'none', ref: '', where: '', note: note || '' };
@@ -109,7 +113,8 @@
 
     // Feedback
     user('feedback-title', 'Titolo automatico di un feedback', 'Feedback', A.FEEDBACK_TITLE),
-    user('manage-search', 'Ricerca fra i feedback', 'Feedback', A.MANAGE_SEARCH),
+    owner('manage-search', 'Ricerca fra i feedback', 'Feedback', 'manageSearch',
+      'Gira sul computer di chi gestisce Filo, con la chiave che usa nel resto di Filo.', A.MANAGE_SEARCH),
 
     // Diagnostica
     user('provider-test', 'Prova di un fornitore («Prova» accanto alla chiave)', 'Diagnostica', A.PROVIDER_TEST),
@@ -156,6 +161,18 @@
     return ENTRIES.filter((e) => e.from === 'owner' && e.ref).map((e) => e.ref);
   }
 
+  // Le funzioni dell'app che prendono il modello da uno slot di chi gestisce
+  // Filo: [{ action, slot }].
+  function ownerActions() {
+    return ENTRIES.filter((e) => e.from === 'owner' && e.ref && e.action)
+      .map((e) => ({ action: e.action, slot: e.ref }));
+  }
+
+  function ownerSlotForAction(action) {
+    const hit = ownerActions().find((p) => p.action === action);
+    return hit ? hit.slot : '';
+  }
+
   // I punti che prendono il modello da un valore deciso nel codice. Deve essere
   // sempre vuoto: è l'invariante di questo censimento.
   function hardcoded() {
@@ -189,6 +206,8 @@
     byId,
     userActions,
     ownerSlots,
+    ownerActions,
+    ownerSlotForAction,
     hardcoded,
     WHERE_USER,
     WHERE_OWNER,
