@@ -97,9 +97,8 @@
     }).observe(ospite, { attributes: true, attributeFilter: ['style', 'popover'] });
   }
 
-  // Un filtro, un'opacità o una trasformazione sul contenitore del menu (la pagina in scala di grigi) per il browser
-  // nasconde tutto, sonde comprese: ogni clic verrebbe fermato. Valgono per menu e velo insieme, quindi non
-  // nascondono il menu più del sito: si sospendono finché il menu è aperto.
+  // Un filtro sul contenitore del menu (la pagina in scala di grigi) per il browser nasconde anche le sonde: vale per
+  // menu e velo insieme, quindi non nasconde il menu più del sito, e si sospende finché il menu è aperto.
   const EFFETTI = [['filter', 'none'], ['opacity', '1'], ['transform', 'none'], ['mix-blend-mode', 'normal']];
   let sospesi = null;
   function sospendiEffetti(el) {
@@ -107,20 +106,20 @@
     rimettiEffetti();
     let cs;
     try { cs = global.getComputedStyle(el); } catch (_) { return; }
-    const prima = [];
+    const vecchi = [];
     for (const [p, neutro] of EFFETTI) {
       const v = cs.getPropertyValue(p);
       if (!v || v === neutro || (p === 'transform' && /^matrix\(1, 0, 0, 1, [^,]+, [^,]+\)$/.test(v))) continue;
-      prima.push([p, el.style.getPropertyValue(p), el.style.getPropertyPriority(p)]);
+      vecchi.push([p, el.style.getPropertyValue(p), el.style.getPropertyPriority(p)]);
       el.style.setProperty(p, neutro, 'important');
     }
-    sospesi = { el, prima };
+    sospesi = { el, vecchi };
   }
   function rimettiEffetti() {
     if (!sospesi) return;
-    const { el, prima } = sospesi;
+    const { el, vecchi } = sospesi;
     sospesi = null;
-    for (const [p, v, pr] of prima) {
+    for (const [p, v, pr] of vecchi) {
       try { if (v) el.style.setProperty(p, v, pr); else el.style.removeProperty(p); } catch (_) {}
     }
   }
@@ -129,7 +128,6 @@
   function prima(parent, el) {
     if (!ATTIVO || !parent) return null;
     if (!ospite) creaOspite();
-    sospendiEffetti(parent);
     if (genitore !== parent) {
       genitore = parent;
       try { moGenitore?.disconnect(); } catch (_) {}
@@ -183,6 +181,7 @@
     if (!ATTIVO || !pannello || pannelli.has(pannello) || !ospite) return;
     const reg = { bloccato: opts.bloccato, premuta: null, detto: false, mo: null, moPiano: null };
     pannelli.set(pannello, reg);
+    if (genitore) sospendiEffetti(genitore);
     for (const tipo of ['pointerdown', 'mousedown', 'click', 'auxclick']) {
       pannello.addEventListener(tipo, (e) => filtra(e, pannello, reg), true);
     }

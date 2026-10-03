@@ -139,6 +139,12 @@ Un sito controlla lo stile e i nodi del menu che stanno nel suo documento. La
 regola 3 ferma ciò che il sito disegna **sopra** il menu; non ferma ciò che fa
 **al** menu: il suo CSS sulle nostre classi (colori trasparenti, opacità, un
 `::after` dentro un nostro nodo) o il suo script sui nostri nodi. La cura vera
-è disegnare il menu fuori dal documento del sito. E su una pagina che filtra
-l'intero documento (`html { filter: … }`, scala di grigi o colori invertiti) il
-browser non sa più dire che il menu è visibile: lì i clic si fermano.
+è disegnare il menu fuori dal documento del sito (#589.11 giro 1, in attesa
+della scelta dell'owner; la prova rossa sta in `tests/verifica/589.11/`).
+
+Un filtro, un'opacità o una trasformazione sul contenitore del menu (`html {
+filter: grayscale(1) }`, una pagina in lutto) per il browser nasconde anche le
+sonde, e ogni clic si fermava. Valgono per menu e velo insieme, quindi non
+nascondono il menu più del sito: la guardia li sospende finché il menu è aperto
+e li rimette alla chiusura. Se il sito li rimette lui, i clic si fermano: è il
+lato sicuro.

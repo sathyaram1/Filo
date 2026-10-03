@@ -266,3 +266,30 @@ test('i pezzi di Filo sopra il menu non contano come velo: etichetta delle icone
   await page.mouse.click(voce.incolla.x, voce.incolla.y);
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
 });
+
+test('su una pagina tutta in scala di grigi il menu risponde, il velo resta fermato e il grigio torna alla chiusura', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  const page = await apri(openTab, testServer, `<!doctype html><html style="filter:grayscale(1)"><body style="padding:40px">
+    <input id="campo" style="width:320px;font-size:16px">
+    <script>${SITO}</script>
+  </body></html>`);
+  const filtro = () => page.evaluate(() => getComputedStyle(document.documentElement).filter);
+
+  await page.locator('#campo').click({ button: 'right' });
+  await page.locator('.sn-menu-paste-main').click();
+  await expect(page.locator('#campo')).toHaveValue(SEGRETO);
+  await expect(avvisoCoperto(page)).toHaveCount(0);
+  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect.poll(filtro).toBe('grayscale(1)');
+
+  // Il filtro della pagina non spegne la guardia: il velo steso sopra il menu ferma ancora il clic.
+  await page.locator('#campo').fill('');
+  await page.evaluate(() => window.alMenu(() => window.stendi()));
+  await page.locator('#campo').click({ button: 'right' });
+  await expect(page.locator('#velo')).toBeVisible();
+  await page.waitForTimeout(700);
+  await page.locator('.sn-menu-paste-main').click();
+  await expect(avvisoCoperto(page)).toBeVisible();
+  expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
+  await expect.poll(filtro).toBe('grayscale(1)');
+});
