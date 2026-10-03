@@ -224,6 +224,8 @@
             else anyFail = true; // nessuno a cui dirlo: si riprova, non si butta
             continue;
           }
+          if (it.dallOwner && e && e.accessoOwner) { attendiAccesso(it, e.message || 'token rifiutato'); anyFail = true; continue; }
+          it.attesaAccesso = false;
           it.attempts = (it.attempts || 0) + 1;
           anyFail = true;
           logFn('invio fallito (riprovo):', it.id, e?.message || e);
