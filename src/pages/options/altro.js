@@ -103,7 +103,10 @@
     const nome = `categoria:${cat.id}`;
     caselleCategorie.set(input, cat);
     caselle.registra(nome, (uscita) => rinomina(cat, input, { ripristina: uscita }));
-    input.addEventListener('input', (e) => caselle.cambiato(nome, e, { pausa: window.SN_CASELLE.PAUSA_LUNGA_MS }));
+    input.addEventListener('input', (e) => {
+      avvisoOmonima(input, null);
+      caselle.cambiato(nome, e, { pausa: window.SN_CASELLE.PAUSA_LUNGA_MS });
+    });
     input.addEventListener('change', () => rinomina(cat, input, { ripristina: true }));
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); rinomina(cat, input, { ripristina: true, conferma: true }); }
