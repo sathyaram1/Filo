@@ -183,15 +183,19 @@ test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro: il se
   assert.match(r.testo, /resta chiusa/);
 });
 
-test('pratica chiusa che non viene dall’app da poco: si rifiuta prima di toccare il server, col perché', async () => {
+test('pratica chiusa che non viene da poco dall’app dello stesso lavoro: si rifiuta prima di toccare il server, col perché', async () => {
   const casi = [
-    [{ status: 'done', parti: { app: ORA - 49 * ORE } }, /più di 48 ore/],
-    [{ status: 'done', parti: { app: ORA - ORE, server: ORA - ORE } }, /parte del server di questo lavoro è già su main/],
+    [{ status: 'done', parti: { app: ORA - 49 * ORE, ramo: 'claude/x' } }, /più di 48 ore/],
+    [{ status: 'done', parti: { app: ORA - ORE, server: ORA - ORE, ramo: 'claude/x' } }, /parte del server di questo lavoro è già su main/],
     [{ status: 'done' }, /non l’ha chiusa la fusione della parte dell’app/],
-    [{ status: 'done', parti: { app: ORA - ORE }, locale: false }, /segno «solo in locale»/],
+    [{ status: 'done', parti: { app: ORA - ORE, ramo: 'claude/x' }, locale: false }, /segno «solo in locale»/],
+    // Un altro lavoro che cita la pratica di un lavoro tutto nell'app: altro ramo, ramo ignoto, o detto «solo server».
+    [{ status: 'done', parti: { app: ORA - ORE, ramo: 'claude/lavoro-app' } }, /l’ha chiusa la fusione di claude\/lavoro-app/],
+    [{ status: 'done', parti: { app: ORA - ORE } }, /non dice quale ramo/],
+    [{ status: 'done', parti: { app: ORA - ORE, ramo: 'claude/x' } }, /non è di questo lavoro/, ['--solo-server']],
   ];
-  for (const [opz, motivo] of casi) {
-    const r = await giro({ docs: { p: doc('p', opz) }, argv: ['claude/x', '--feedback', 'p'] });
+  for (const [opz, motivo, extra = []] of casi) {
+    const r = await giro({ docs: { p: doc('p', opz) }, argv: ['claude/x', '--feedback', 'p', ...extra] });
     assert.equal(r.k, 3, r.testo);
     assert.match(r.testo, motivo);
     assert.match(r.testo, /aprine una/);
