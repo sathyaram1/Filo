@@ -230,10 +230,9 @@ test('i pezzi di Filo sopra il menu non contano come velo: etichetta delle icone
   await expect.poll(async () => (await statoCronologia(app, page)).voci.every((v) => !v.pronta)).toBe(true);
   expect(await nelMondo(app, page, `SN_CONFIRM_UI._test.click('cancel')`)).toBe(true);
   await expect(page.locator('.sn-confirm-host')).toHaveCount(0);
+  // Scoperta senza attesa: a coprirla era Filo, non il sito.
+  await expect.poll(async () => (await statoCronologia(app, page)).voci.find((v) => v.testo === SEGRETO)?.libera).toBe(true);
   const voce = (await statoCronologia(app, page)).voci.find((v) => v.testo === SEGRETO);
-  await expect.poll(() => nelMondo(app, page, `(() => {
-    const b = [...document.querySelectorAll('[data-sn-ui]')].length; return b; })()`)).toBeGreaterThan(0);
-  await expect.poll(async () => (await statoCronologia(app, page)).voci.find((v) => v.testo === SEGRETO)?.pronta).toBe(true);
   await page.mouse.move(voce.incolla.x, voce.incolla.y, { steps: 2 });
   await page.mouse.click(voce.incolla.x, voce.incolla.y);
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
