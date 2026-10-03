@@ -5,7 +5,7 @@ module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
     providerRouting, openWeightsBlockReason, modelGate,
-    Defaults, isAdmin, broadcastToTabs,
+    Defaults, isAdmin, broadcastToTabs, segnaLetturaAiuto,
   } = ctx;
   const { SN_CONST } = globalThis;
   const WebSearch = globalThis.SN_WEB_SEARCH;
@@ -618,11 +618,13 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  on(MSG.WEB_SEARCH, async (msg) => {
+  // La ricerca dell'Aiuto è una lettura del suo compito come CERCA_WEB in chat (#530): la stessa fonte.
+  on(MSG.WEB_SEARCH, async (msg, sender) => {
     try {
       const settings = await getEffectiveSettings();
       const tavilyKey = settings.apiKeys?.tavily || '';
       const r = await WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });
+      segnaLetturaAiuto(sender, { type: 'CERCA_WEB', query: msg.query, _output: r });
       return { ok: true, ...r };
     } catch (e) {
       return { ok: false, error: e.message || String(e), results: [] };

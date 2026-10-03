@@ -13,7 +13,9 @@ il livello di autonomia scelto dall'utente, lo stato del compito (pulito o
 contaminato, dalla classe peggiore fra le fonti lette: le letture lo dichiarano
 nel registro con `fonte`; ciò che una chat ha letto lo tiene il main per chat,
 e nell'archivio della chat, perché lo storico che la pagina rimanda a ogni turno
-si perde riprendendo la chat e si ferma agli ultimi venti messaggi), il costo,
+si perde riprendendo la chat e si ferma agli ultimi venti messaggi; ciò che ha
+letto l'Aiuto, ricerca sul web compresa, lo tiene il main per scheda fino alla
+navigazione, perché su una pagina di Filo l'indirizzo non sporca niente), il costo,
 il perimetro e l'origine. Sopra la tabella
 stanno l'elenco fisso (no a ogni livello: segreti, molti destinatari,
 credenziali, regole, cancellazioni definitive) e la difesa abbassata («conferma»

@@ -3666,6 +3666,7 @@ const handlerCtx = {
   handleFiloGenerateDashboard,
   executeFiloAction,
   decisioneAzionePagina,
+  segnaLetturaAiuto,
   maybeRunCompactor,
   // Archivio delle chat (#525)
   closeAndTriageChat,
