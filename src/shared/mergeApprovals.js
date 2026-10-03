@@ -296,6 +296,25 @@
   }
 
   /**
+   * Gli unit sul risultato della fusione (#929): su quale main sono girati, e quando. Al clic non si rifanno, quindi
+   * chi approva giorni dopo deve sapere quanto è vecchia la prova. PURA: null per una richiesta senza prova.
+   */
+  function provaNote(req, nowMs) {
+    var p = req && req.provaUnit;
+    if (!p || typeof p !== 'object') return null;
+    var t = timeAgo(p.atMs, nowMs);
+    var quando = t ? (t === 'adesso' ? ' di adesso' : ' di ' + t) : '';
+    var titolo = 'Gli unit test sono girati sul risultato della fusione con main com’era allora (' + shortSha(p.mainSha)
+      + '). Approvando non si rifanno: se main nel frattempo è andato avanti, quello che fondi insieme non l’ha provato nessuno.';
+    if (p.esito === 'verde' || p.esito === 'main_contenuto') return { testo: 'Unit verdi sulla fusione con main' + quando, titolo: titolo };
+    if (p.esito === 'rosso_anche_su_main') {
+      return { testo: 'Unit rossi anche su main da solo' + (t ? ', ' + t : '') + ': la fusione non ne rompeva altri', titolo: titolo };
+    }
+    if (p.esito === 'conflitto') return { testo: 'Unit non provati: la fusione con main' + quando + ' andava in conflitto', titolo: titolo };
+    return null;
+  }
+
+  /**
    * L'esito di una decisione passata, in due parole. PURA.
    *
    * `stale` con `used: true` è una richiesta CONSUMATA senza fusione: dirla
