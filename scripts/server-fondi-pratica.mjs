@@ -190,7 +190,7 @@ export async function esegui(argv, deps = {}) {
       return k;
     }
     const sha = (deps.punta || puntaDelServer)(cartella);
-    const parte = await of.registraParte(r.id, 'server', { bearer, solo });
+    const parte = await of.registraParte(r.id, 'server', { bearer, solo, ramo: a.ramo });
     if (!parte.ok) err(`La pratica ${chi} non ha registrato che la parte del server è su main (${parte.motivo}): una parte dell'app che arrivasse a pratica chiusa non la troverebbe.`);
     if (tardiva) {
       const nota = `${notaFine(a.ramo, sha)} Era l'ultima parte: la pratica l'aveva chiusa la fusione della parte ${NOME_PARTE.app} dello stesso lavoro (${quando}), e resta chiusa.`;
