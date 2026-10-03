@@ -97,7 +97,7 @@ test('A — «tema scuro» in chat: segno sulla bolla, «tema: chiaro → scuro 
   const pop = bolla.locator('.dash-cambi-pop');
   await expect(segno).toBeVisible();
   await expect(pop).toHaveCSS('opacity', '0');
-  await bolla.hover();
+  await bolla.locator(".dash-cambi-segno").hover();
   await expect(pop).toHaveCSS('opacity', '1');
   await expect(pop.locator('.dash-cambi-riga')).toHaveCount(1);
   await expect(pop).toContainText('tema: chiaro → scuro');
@@ -106,7 +106,7 @@ test('A — «tema scuro» in chat: segno sulla bolla, «tema: chiaro → scuro 
   await page.locator('.dash-activity-head').click();
   await expect(page.locator('.dash-activity-row', { hasText: 'Impostato · tema: chiaro → scuro' })).toHaveCount(1);
   await expect(page.locator('.dash-activity-row', { hasText: '=' })).toHaveCount(0);
-  await bolla.hover();
+  await bolla.locator(".dash-cambi-segno").hover();
   await page.screenshot({ path: 'tests/.shots/cambi-segno-tema-scuro.png' });
 
   await pop.locator('.dash-cambi-annulla').click();
@@ -114,7 +114,7 @@ test('A — «tema scuro» in chat: segno sulla bolla, «tema: chiaro → scuro 
   await expect(pop.locator('.dash-cambi-riga')).toHaveClass(/dash-cambi-annullato/);
   await expect(pop.locator('.dash-cambi-annulla')).toHaveText('rifai');
   await expect(segno).toHaveClass(/dash-cambi-tutti-annullati/);
-  await bolla.hover();
+  await bolla.locator(".dash-cambi-segno").hover();
   await page.screenshot({ path: 'tests/.shots/cambi-segno-annullato-chiaro.png' });
 
   // L'annullo resta come evento, che annulla quello della chat.
@@ -127,7 +127,7 @@ test('A — «tema scuro» in chat: segno sulla bolla, «tema: chiaro → scuro 
   expect(annullo.cambi[0]).toMatchObject({ prima: 'dark', dopo: 'light' });
 
   // E si rifà: rifai rimette lo scuro.
-  await bolla.hover();
+  await bolla.locator(".dash-cambi-segno").hover();
   await pop.locator('.dash-cambi-annulla').click();
   await expect.poll(async () => (await impostazioni(app)).theme).toBe('dark');
   await expect(pop.locator('.dash-cambi-annulla')).toHaveText('annulla');
@@ -156,7 +156,7 @@ test('B — tema cambiato dalle Preferenze, poi «rimetti come prima» in chat: 
   await expect.poll(async () => (await impostazioni(app)).theme).toBe('light');
   // Anche l'annullo chiesto a parole lascia il segno sulla bolla, e si può a sua volta annullare.
   const bolla = page.locator('.dash-bubble-user', { hasText: 'rimetti come prima' });
-  await bolla.hover();
+  await bolla.locator(".dash-cambi-segno").hover();
   await expect(bolla.locator('.dash-cambi-pop')).toContainText('tema: scuro → chiaro');
   await ripristina(app);
 });
@@ -210,7 +210,7 @@ test('D — da una finestra incognito nessun evento arriva su disco, ma lì dent
   ]);
   await scrivi(incog, 'timer 10 minuti per il segreto incognito', 'Avviato.');
   const bolla = incog.locator('.dash-bubble-user', { hasText: 'segreto incognito' });
-  await bolla.hover();
+  await bolla.locator(".dash-cambi-segno").hover();
   await expect(bolla.locator('.dash-cambi-pop')).toContainText('nuovo timer «segreto incognito», 10 min');
 
   await app.evaluate(async () => { await globalThis.SN_REGISTRO_CAMBI.attesa(); await globalThis.__filoStorage.flushNow(); });
@@ -262,7 +262,7 @@ test('F — un timer chiesto in chat: annulla lo toglie, e riaperta la chat il s
   const timer = () => app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.listTimers()).map((t) => t.label));
   expect(await timer()).toContain('pasta');
   const bolla = page.locator('.dash-bubble-user', { hasText: 'timer 10 minuti' });
-  await bolla.hover();
+  await bolla.locator(".dash-cambi-segno").hover();
   const pop = bolla.locator('.dash-cambi-pop');
   await expect(pop).toContainText('nuovo timer «pasta», 10 min');
   await pop.locator('.dash-cambi-annulla').click();
@@ -274,7 +274,7 @@ test('F — un timer chiesto in chat: annulla lo toglie, e riaperta la chat il s
   await page.goto(`filo://newtab/?chat=${encodeURIComponent(id)}`);
   const riaperta = page.locator('.dash-bubble-user', { hasText: 'timer 10 minuti' });
   await expect(riaperta.locator('.dash-cambi-segno')).toHaveClass(/dash-cambi-tutti-annullati/, { timeout: 10_000 });
-  await riaperta.hover();
+  await riaperta.locator(".dash-cambi-segno").hover();
   await expect(riaperta.locator('.dash-cambi-pop')).toContainText('nuovo timer «pasta», 10 min');
   await ripristina(app);
 });
@@ -334,11 +334,11 @@ test('H — annulla quando lo stato era già tornato com\'era: l\'annullo resta,
   await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'light' }); });
   const bolla = page.locator('.dash-bubble-user', { hasText: 'tema scuro' });
   const pop = bolla.locator('.dash-cambi-pop');
-  await bolla.hover();
+  await bolla.locator(".dash-cambi-segno").hover();
   await pop.locator('.dash-cambi-annulla').click();
   await expect(pop.locator('.dash-cambi-riga')).toHaveClass(/dash-cambi-annullato/);
   expect((await impostazioni(app)).theme).toBe('light');
-  await bolla.hover();
+  await bolla.locator(".dash-cambi-segno").hover();
   await pop.locator('.dash-cambi-annulla', { hasText: 'rifai' }).click();
   await expect.poll(async () => (await impostazioni(app)).theme).toBe('dark');
   await expect(pop.locator('.dash-cambi-riga')).not.toHaveClass(/dash-cambi-annullato/);
@@ -388,14 +388,14 @@ test('J — il tasto destro sulla bolla col segno offre l\'annullo e il rifai, c
   await page.screenshot({ path: 'tests/.shots/cambi-tasto-destro-annulla.png' });
   await menu.getByText('Annulla · tema: chiaro → scuro', { exact: true }).click();
   await expect.poll(async () => (await impostazioni(app)).theme).toBe('light');
-  await bolla.hover();
+  await bolla.locator(".dash-cambi-segno").hover();
   await expect(bolla.locator('.dash-cambi-annulla')).toHaveText('rifai');
 
   await page.mouse.move(5, 400);
   await bolla.click({ button: 'right', position: { x: 20, y: 10 } });
   await menu.getByText('Rifai · tema: chiaro → scuro', { exact: true }).click();
   await expect.poll(async () => (await impostazioni(app)).theme).toBe('dark');
-  await bolla.hover();
+  await bolla.locator(".dash-cambi-segno").hover();
   await expect(bolla.locator('.dash-cambi-annulla')).toHaveText('annulla');
 
   // Sulla risposta di Filo, che non ha cambiato niente, la voce non c'è.
@@ -427,11 +427,70 @@ test('K — due annulli dello stesso cambio arrivati insieme ne fanno uno: «rif
   expect((await impostazioni(app)).theme).toBe('light');
 
   const bolla = page.locator('.dash-bubble-user', { hasText: 'tema scuro' });
-  await bolla.hover();
+  await bolla.locator(".dash-cambi-segno").hover();
   await expect(bolla.locator('.dash-cambi-annulla')).toHaveText('rifai');
   await bolla.locator('.dash-cambi-annulla').click();
   await expect.poll(async () => (await impostazioni(app)).theme).toBe('dark');
-  await bolla.hover();
+  await bolla.locator(".dash-cambi-segno").hover();
   await expect(bolla.locator('.dash-cambi-annulla')).toHaveText('annulla');
+  await ripristina(app);
+});
+
+test('L — tasto destro sulla riga del blocco che nomina il cambio: annulla da lì, e la riga dice che è annullato', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await homeDi(app);
+  await configura(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
+    { text: 'Fatto.' },
+  ]);
+  await scrivi(page, 'tema scuro', 'Fatto.');
+  const menu = page.locator('.sn-menu');
+  // Anche l'intestazione del blocco chiuso offre l'annullo del turno.
+  await page.locator('.dash-activity-head').first().click({ button: 'right' });
+  await expect(menu.getByText(/^Annulla · tema: chiaro → scuro$/)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await page.locator('.dash-activity-head').first().click();
+  const riga = page.locator('.dash-activity-row', { hasText: 'tema: chiaro → scuro' }).first();
+  await riga.click({ button: 'right' });
+  await menu.getByText(/^Annulla · tema: chiaro → scuro$/).click();
+  await expect.poll(async () => (await impostazioni(app)).theme).toBe('light');
+  await expect(riga).toHaveClass(/dash-cambi-annullato/);
+  await expect(riga).toContainText('annullato');
+  // E da lì si rifà: la riga torna in piedi.
+  await riga.click({ button: 'right' });
+  await menu.getByText(/^Rifai · tema: chiaro → scuro$/).click();
+  await expect.poll(async () => (await impostazioni(app)).theme).toBe('dark');
+  await expect(riga).not.toHaveClass(/dash-cambi-annullato/);
+  await ripristina(app);
+});
+
+test('M — passare sul testo della bolla non apre la pastiglia sopra la risposta di prima; il segno sì', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await homeDi(app);
+  await configura(app);
+  await modelloFinto(app, [
+    { text: 'Ciao.' },
+    { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
+    { text: 'Fatto.' },
+  ]);
+  await scrivi(page, 'ciao', 'Ciao.');
+  await scrivi(page, 'tema scuro', 'Fatto.');
+  const bolla = page.locator('.dash-bubble-user', { hasText: 'tema scuro' });
+  const pop = bolla.locator('.dash-cambi-pop');
+  await bolla.hover({ position: { x: 12, y: 10 } });
+  await page.waitForTimeout(400);
+  await expect(pop).toHaveCSS('opacity', '0');
+  await bolla.locator('.dash-cambi-segno').hover();
+  await expect(pop).toHaveCSS('opacity', '1');
+  // Dal segno alla pastiglia il mouse attraversa la bolla: la pastiglia aspetta e il clic arriva.
+  const b = await pop.locator('.dash-cambi-annulla').boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 8 });
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect.poll(async () => (await impostazioni(app)).theme).toBe('light');
   await ripristina(app);
 });

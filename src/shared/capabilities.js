@@ -477,7 +477,7 @@
     {
       id: 'undo-changes', title: 'Rimetti com’era un cambio, da dovunque venga', category: 'settings',
       desc: 'Ogni cambio allo stato di Filo resta segnato con chi l’ha fatto: impostazioni, aspetto, tema, sveglie e timer, regole del proxy, zoom di un sito. Vale per quelli chiesti in chat e per quelli fatti a mano nelle pagine delle impostazioni, e Filo li vede tutti. Quando lo chiedi in chat, sulla tua bolla compare un piccolo segno: al passaggio del mouse dice cosa è cambiato, per esempio «tema: chiaro → scuro», e offre «annulla». Anche l’annullo resta segnato, e si rifà con «rifai».',
-      invoke: 'Passa il mouse sul segno della tua bolla in chat e premi «annulla» (o fai tasto destro sulla bolla), oppure scrivi a Filo «rimetti come prima».',
+      invoke: 'Passa il mouse sul segno della tua bolla in chat e premi «annulla» (o fai tasto destro sulla bolla, o sulla riga che racconta il cambio), oppure scrivi a Filo «rimetti come prima».',
       doesNot: 'Le chiavi API e gli indirizzi dei proxy non vengono conservati: un loro cambio si vede ma non si annulla. In una finestra incognito i cambi restano solo finché la finestra è aperta. I cambi fatti dalle pagine non hanno ancora una riga nella home: per ora li ritrova Filo quando glielo chiedi.',
     },
     {

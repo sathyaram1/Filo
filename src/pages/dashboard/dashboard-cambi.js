@@ -39,7 +39,7 @@
     pop.className = 'dash-cambi-pop';
     bolla.append(segno, pop);
     const s = { bolla, segno, pop, ids: [], viste: new Map() };
-    bolla.addEventListener('mouseenter', () => posiziona(s));
+    segno.addEventListener('mouseenter', () => posiziona(s));
     segno.addEventListener('focus', () => posiziona(s));
     // Al tocco e da tastiera il segno apre e chiude: il passaggio del mouse lì non c'è.
     segno.addEventListener('click', (e) => {
@@ -110,12 +110,20 @@
     return r;
   }
 
-  // Il tasto destro sulla bolla offre le stesse cose della pastiglia (letto da src/content/content.js).
+  // Il tasto destro sulla bolla, e sul blocco di attività che racconta il turno, offre le stesse cose
+  // della pastiglia (letto da src/content/content.js). Su una riga del blocco, solo i cambi di quella riga.
   function vociMenu(target) {
-    const s = [...segni].find((x) => x.bolla.isConnected && x.bolla.contains(target));
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    if (!el) return [];
+    const blocco = el.closest('.dash-activity');
+    const bolla = blocco ? bollaUtenteDi(blocco) : null;
+    const s = [...segni].find((x) => x.bolla.isConnected && (x.bolla.contains(el) || x.bolla === bolla));
     if (!s) return [];
+    const riga = blocco ? el.closest('[data-cambi]') : null;
+    const soli = riga ? new Set(riga.dataset.cambi.split(' ')) : null;
     const voci = [];
     for (const id of s.ids) {
+      if (soli && !soli.has(id)) continue;
       const v = s.viste.get(id);
       if (!v) continue;
       const frase = (v.frasi && v.frasi.length) ? v.frasi.join('; ') : '';
@@ -138,6 +146,29 @@
     const detto = viste.map((v) => (v.frasi || []).join('; ')).filter(Boolean).join('; ');
     s.segno.setAttribute('aria-label', `${tutti ? 'Cambi annullati' : 'Cambi fatti'}${detto ? `: ${detto}` : ''}`);
     s.bolla.classList.toggle('dash-cambi-vuoto', !viste.length);
+    righe(s);
+  }
+
+  // Le righe del blocco di attività che raccontano questi cambi dicono anche se sono stati annullati.
+  function righe(s) {
+    const area = s.bolla.parentElement;
+    if (!area) return;
+    for (const r of area.querySelectorAll('.dash-activity-row[data-cambi]')) {
+      const ids = r.dataset.cambi.split(' ').filter((id) => s.ids.includes(id));
+      if (!ids.length) continue;
+      const viste = ids.map((id) => s.viste.get(id));
+      const annullata = viste.every((v) => v && v.annullatoDa);
+      r.classList.toggle('dash-cambi-annullato', annullata);
+      let stato = r.querySelector('.dash-cambi-stato');
+      if (annullata && !stato) {
+        stato = document.createElement('span');
+        stato.className = 'dash-cambi-stato';
+        stato.textContent = 'annullato';
+        r.appendChild(stato);
+      } else if (!annullata && stato) {
+        stato.remove();
+      }
+    }
   }
 
   async function aggiorna(lista = [...segni]) {

@@ -166,10 +166,10 @@
       // Una riga di azione: icona e due parole («Timer avviato · 5 min»).
       // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la
       // conta — «Ha avviato un timer» su un timer non avviato è una bugia.
-      addRow(type, rowIcon, text, failed = false) {
+      addRow(type, rowIcon, text, failed = false, cambi = null) {
         closeTurnReasoning();
         if (!failed) doneTypes.push(String(type || '').toUpperCase());
-        append(makeActivityRow(rowIcon, text));
+        append(makeActivityRow(rowIcon, text, cambi));
         if (phase !== 'done') setPhase('act', text);
       },
       // Esito di un comando eseguito subito (livello 1): riga di comando e
@@ -304,9 +304,13 @@
   // chi disegna una risposta senza blocco (replay, altre superfici) — fra le
   // azioni della bolla. Tiene la classe della traccia (#376): non è un bottone
   // e non deve sembrarlo.
-  function makeActivityRow(rowIcon, text) {
+  // `cambi`: gli id degli eventi del filo che la riga racconta; il tasto destro e lo stato
+  // «annullato» li leggono da lì (dashboard-cambi.js).
+  function makeActivityRow(rowIcon, text, cambi = null) {
     const el = document.createElement('div');
     el.className = 'dash-action-step dash-activity-row';
+    const ids = Array.isArray(cambi) ? cambi.filter(Boolean) : [];
+    if (ids.length) el.dataset.cambi = ids.join(' ');
     const ic = document.createElement('span');
     ic.className = 'dash-activity-row-icon';
     ic.setAttribute('aria-hidden', 'true');
@@ -467,6 +471,12 @@
     EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
   };
   function activityRowFor(a) {
+    const row = rigaAttivita(a);
+    if (!row || row.failed) return row;
+    const ids = (Array.isArray(a._cambi) ? a._cambi : []).map((c) => (typeof c === 'string' ? c : c && c.id)).filter(Boolean);
+    return ids.length ? { ...row, cambi: ids } : row;
+  }
+  function rigaAttivita(a) {
     if (!a) return null;
     // In attesa di conferma: il bottone lo mostra la chat, ma nel diario resta
     // la traccia che Filo l'ha CHIESTO — se no un turno fatto di sola richiesta
@@ -528,7 +538,7 @@
       return true;
     }
     const row = activityRowFor(a);
-    if (row) { activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed); return true; }
+    if (row) { activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi); return true; }
     return false;
   }
 
@@ -587,7 +597,7 @@
     const chip = document.querySelector(`[data-call-id="${CSS.escape(String(callId))}"]`);
     if (chip && apribileComunque(a)) {
       const row = activityRowFor(a);
-      if (row) chip.before(makeActivityRow(row.icon, row.text));
+      if (row) chip.before(makeActivityRow(row.icon, row.text, row.cambi));
       chip.replaceWith(bottoneApriComunque(a));
     }
     return true;
@@ -624,7 +634,7 @@
       } else {
         const row = activityRowFor(a);
         if (row) {
-          wrap.appendChild(makeActivityRow(row.icon, row.text));
+          wrap.appendChild(makeActivityRow(row.icon, row.text, row.cambi));
           if (!anche) continue;
         }
       }
@@ -878,7 +888,7 @@
           a._executed = false;
           delete a._confirm;
           const row = activityRowFor(a);
-          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed);
+          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi);
           btn.textContent = `🔒 ${row ? row.text : 'Fermata'}`;
           return;
         }
@@ -1065,7 +1075,7 @@
       if (activity && activity.el && global.SN_DASH_CAMBI) global.SN_DASH_CAMBI.segna(activity.el, ids);
     }
     const row = activityRowFor(a);
-    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
+    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, row.cambi);
     // L'archivio delle chat ha salvato il turno senza le azioni in attesa: questa adesso è successa.
     try { archiviaAzione(String(a.type || '').toUpperCase(), ids.map((c) => c.id)); } catch (_) {}
   }
