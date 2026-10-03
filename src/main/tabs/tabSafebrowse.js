@@ -115,7 +115,7 @@ const safebrowseMethods = {
       const id = this.openTab(url, { activate: true, openedByLink: true, apriComunque: this._siteAllowedIn(origine, url) });
       const nuova = this.tabs.find((t) => t.id === id);
       if (nuova && origine) nuova._sbApertaDa = origine._urlNavigato;
-      setImmediate(() => { try { win.close(); } catch (_) {} });
+      setImmediate(() => { try { win.close(); } catch (_) {} try { this.win.focus(); } catch (_) {} });
     };
     const giudica = (hints) => {
       if (pwc.isDestroyed()) return;

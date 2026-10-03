@@ -770,3 +770,69 @@ test('Alt+H sull\'avviso: l\'Aiuto, che starebbe sotto l\'avviso, diventa la dom
   const chat = await homeNuova(app, prima);
   await expect(chat.locator('.dash-bubble-user')).toContainText('https://conto-aiuto.com/login', { timeout: 10_000 });
 });
+
+// Il sito in lista vale anche nei documenti che crea da sé: una copia blob, una finestrella di accesso.
+const BLOB_MODULO = MODULO + '<script>window.__k="";addEventListener("keydown",function(e){window.__k+=e.key},true);'
+  + 'setTimeout(function(){document.getElementById("pw").focus()},300)<\/script>';
+const nelBlob = (app) => app.windows().find((w) => { try { return w.url().startsWith('blob:'); } catch (_) { return false; } });
+const urlAttiva = (app) => app.evaluate(({ BrowserWindow }) => {
+  const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+  return tm.tabs.find((t) => t.id === tm.activeId).view.webContents.getURL();
+});
+
+for (const [dove, js] of [['nella stessa scheda', 'location.href=u'], ['in una scheda nuova', 'window.open(u)']]) {
+  test(`la pagina in lista si riscrive in una sua copia blob (${dove}): l'avviso resta e i tasti non le arrivano`, async ({ app, shell }) => {
+    const h = `conto-blob-${js.length}.com`;
+    await serviInCaricamento(app, { [h + '/login']: '<title>Attendere</title><p>Caricamento…</p><script>var F='
+      + JSON.stringify(BLOB_MODULO).replace(/<\//g, '<\\/')
+      + ';setTimeout(function(){var u=URL.createObjectURL(new Blob([F],{type:"text/html"}));' + js + '},2500)</script>' }, { gsbListed: true });
+    await apriSenzaAspettare(app, shell, `https://${h}/login`);
+    const avviso = await vistaAvviso(app);
+    await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+    await expect.poll(() => urlAttiva(app), { timeout: 8_000 }).toMatch(/^blob:/);
+    await expect(avviso.getByText(SEGNALATO)).toBeVisible();
+    await expect.poll(() => copertura(app)).toEqual(COPERTA);
+    await scriviDallaTastiera(app, 'segreto');
+    await expect(avviso.getByPlaceholder('confermo')).toHaveValue('segreto');
+    expect(await nelBlob(app).evaluate(() => ({ k: window.__k, pw: document.getElementById('pw').value }))).toEqual({ k: '', pw: '' });
+  });
+}
+
+const finestreFuoriDaFilo = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+  .filter((w) => !w._filoTabs && !w.isDestroyed() && w.isVisible() && /^https?:/.test(w.webContents.getURL())).map((w) => w.webContents.getURL()));
+
+test('la pagina in lista apre da sola una finestrella di accesso del suo sito: nessuna finestra fuori dall\'avviso', async ({ app, shell }) => {
+  const h = 'conto-finestrella.com';
+  await serviInCaricamento(app, {
+    [h + '/login']: '<title>Attendere</title><p>Caricamento…</p><script>setTimeout(function(){'
+      + `window.open("https://${h}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600")},2500)</script>`,
+    [h + '/oauth/authorize']: BLOB_MODULO,
+  }, { gsbListed: true });
+  await apriSenzaAspettare(app, shell, `https://${h}/login`);
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+  await new Promise((r) => setTimeout(r, 4000));
+  expect(await finestreFuoriDaFilo(app)).toEqual([]);
+  expect((await copertura(app)).coperta).toBe(true);
+});
+
+test('una finestrella di accesso che apre un sito in lista torna in una scheda, sotto l\'avviso', async ({ app, shell }) => {
+  const h = 'conto-in-finestrella.com';
+  await serviInCaricamento(app, {
+    'pagina-con-accesso.it/': '<title>Negozio</title><script>setTimeout(function(){'
+      + `window.open("https://${h}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600")},1000)</script>`,
+    [h + '/oauth/authorize']: BLOB_MODULO,
+  });
+  await app.evaluate((_e, host) => {
+    globalThis.SN_SAFEBROWSE.setProviders({
+      gsb: async (url, norm) => (norm.host === host ? { listed: true, category: 'phishing' } : null),
+      rdap: null, ct: null, sandbox: null, llm: async () => ({ suspicious: false, reason: null }),
+    });
+  }, h);
+  await apriSenzaAspettare(app, shell, 'https://pagina-con-accesso.it/');
+  const avviso = await vistaAvviso(app, 12_000);
+  await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+  await expect.poll(() => urlAttiva(app)).toContain(`${h}/oauth/authorize`);
+  await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  expect(await finestreFuoriDaFilo(app)).toEqual([]);
+});
