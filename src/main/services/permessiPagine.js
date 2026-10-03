@@ -141,13 +141,16 @@ function gestoEntro(wc, attesaMs) {
   const attesa = new Promise((resolve) => {
     const guarda = () => {
       if (gestoRecente(wc)) { resolve(true); return; }
-      let morta = !wc;
-      try { morta = morta || Boolean(wc.isDestroyed && wc.isDestroyed()); } catch (_) { morta = true; }
+      let morta = false;
+      try { morta = Boolean(wc.isDestroyed && wc.isDestroyed()); } catch (_) { morta = true; }
       if (morta || Date.now() >= fine) { resolve(false); return; }
       setTimeout(guarda, 20);
     };
     setTimeout(guarda, 20);
   });
+  wc._filoAttesaGesto = attesa;
+  attesa.then(() => { if (wc._filoAttesaGesto === attesa) wc._filoAttesaGesto = null; });
+  return attesa;
 }
 
 // Il gesto conta per il documento su cui è stato fatto: il clic che porta altrove non vale per la pagina d'arrivo.
