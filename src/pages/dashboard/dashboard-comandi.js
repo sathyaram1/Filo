@@ -57,7 +57,7 @@
         showFiloLine('I feedback li vede chi li gestisce. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
         return;
       }
-      send({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' });
+      send({ type: MSG.OPEN_URL, url: 'filo://manage/manage.html' });
     },
     '/incognito': () => { send({ type: MSG.OPEN_INCOGNITO }); },
     '/pulisci': (text, chat) => { runTabCleanup(chat); },
