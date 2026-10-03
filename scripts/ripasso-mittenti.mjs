@@ -28,7 +28,8 @@ export const VIA = Object.freeze({
 });
 
 export const MOTIVO = Object.freeze({
-  DOPO: 'nati quando la prova esisteva già',
+  // Decisione dell'owner del 02/10/2026: owner e sessioni firmano con la credenziale, e il suo Filo la scrive.
+  SOLO_NOME: 'solo il nome: senza la prova è un utente (#912)',
   ILLEGGIBILE: 'stato non decifrabile',
   SEGNALATI: 'segnalati come attacco, spam o file sospetto',
   RICEVUTI_SEGNALATI: 'segnalati dai giudici, fermi nei Ricevuti',
