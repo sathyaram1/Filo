@@ -311,6 +311,6 @@
     livelloValido, livelloDa, livelloAttivo, selezionabile, infoLivello, livelliSelezionabili, unisciPiuStretta,
     costoValido, campoValido, classeValida, costoEffettivo, classeFonte, stato,
     decide, decideDettaglio, richiestaCambioLivello, richiestaSpostamentoFonte,
-    segreto, frasePerche,
+    segreto, frasePerche, fraseNo,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : self);
