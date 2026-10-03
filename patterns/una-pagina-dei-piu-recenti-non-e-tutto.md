@@ -178,14 +178,14 @@ viene scambiato per cancellato: `diffVersions` con `finestra`), e ogni dieci
 minuti un giro lungo rilegge le versioni di tutti (`GIRO_COMPLETO_MS`). Un
 feedback vecchio che cambia si vede quindi entro dieci minuti, non entro uno.
 
-La pagina gemella `filo://feedback` legge ancora la finestra.
+La vecchia pagina gemella `filo://feedback` è stata tolta: l'indirizzo porta a Gestione.
 
 ## Quando invece la finestra va bene
 
 Quando la domanda È «gli ultimi N»: la posta dei feedback, un elenco che si
 scorre, una diagnostica. Lì il tetto è una scelta, non una dimenticanza, e va
-detto a chi guarda: `listHitCap` più `countLabel` scrivono `(24+)` invece di
-`(24)` quando il caricamento ha toccato il tetto, e l'hover spiega perché. Un
+detto a chi guarda: `countLabel` scrive `(24+)` invece di `(24)` quando la
+lettura non è arrivata in fondo, e l'hover spiega perché. Un
 numero che afferma un totale che non conosce è peggio di nessun numero.
 
 ## Come si prova
