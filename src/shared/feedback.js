@@ -877,7 +877,9 @@
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify(doc),
       });
-      if (soloAdmin && (res.status === 401 || res.status === 403)) {
+      // #912: un nome riservato col token rifiutato non riparte da anonimo: sarebbe un utente che nessuno può dire suo.
+      const riservato = /^(owner|routine|agent|local):/i.test(String(clientId || ''));
+      if ((soloAdmin || riservato) && (res.status === 401 || res.status === 403)) {
         throw Object.assign(new Error(`firestore create fallito (${res.status}): token admin rifiutato, e questo feedback non parte da anonimo`), { accessoOwner: true });
       }
       if (res.status === 401 || res.status === 403) {
