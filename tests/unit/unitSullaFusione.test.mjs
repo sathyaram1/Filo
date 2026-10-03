@@ -317,6 +317,30 @@ test('prova vera: un rosso instabile si riprova da solo e non ferma la fusione',
   }
 });
 
+test('prova vera: due test verdi da soli che si rompono sempre insieme non sono instabili, e fermano la fusione', () => {
+  const r = repoFinto();
+  try {
+    // Ciascuno lascia un segno legato alla corsa (il `node --test` padre) e cade se trova quello dell'altro: da soli
+    // passano sempre, nella stessa suite mai, con qualunque parallelismo.
+    const insieme = (io, altro) => "import { test } from 'node:test';\nimport assert from 'node:assert';\n"
+      + "import { existsSync, writeFileSync } from 'node:fs';\nimport { join } from 'node:path';\n"
+      + `test('${io} da solo', async () => { const d = join(process.cwd(), '..');\n`
+      + `  writeFileSync(join(d, \`segno-\${process.ppid}-${io}\`), 'x');\n`
+      + '  await new Promise((ok) => setTimeout(ok, 300));\n'
+      + `  assert.ok(!existsSync(join(d, \`segno-\${process.ppid}-${altro}\`)), 'insieme no'); });\n`;
+    const punta = r.ramo('claude/insieme', () => r.scrivi('tests/unit/ramo.test.mjs', insieme('ramo', 'main')));
+    r.suMain(() => r.scrivi('tests/unit/main.test.mjs', insieme('main', 'ramo')));
+    r.ok(['checkout', '-q', 'claude/insieme']);
+    const p = provaIn(r, punta);
+    assert.equal(p.esito, 'rosso_sulla_fusione', JSON.stringify(p));
+    assert.ok(p.rossi.length >= 1, JSON.stringify(p));
+    assert.ok(!p.instabili, 'niente instabili: si rompono a ogni suite intera');
+    pulita(r);
+  } finally {
+    rmSync(r.casa, { recursive: true, force: true });
+  }
+});
+
 // ─── Una prova interrotta a metà (Ctrl+C, timeout di chi la lancia) ──────────
 //
 // Un worktree di prova interrotto resta nell'elenco del repo, e il `worktree unlock` + `remove --force` che git stesso
