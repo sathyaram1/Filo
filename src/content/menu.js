@@ -27,6 +27,12 @@
     return document.fullscreenElement || document.documentElement;
   }
 
+  // Ogni pezzo entra nel documento del sito già chiuso ai gesti finti, nodo per nodo (#589.8).
+  function monta(el) {
+    global.SN_FILO_UI?.soloGestiVeri(el);
+    return menuHost().appendChild(el);
+  }
+
   let activeMenu = null;
 
   function close() {
@@ -463,7 +469,7 @@
       root.appendChild(el);
     }
 
-    menuHost().appendChild(root);
+    monta(root);
 
     // #405 — su una pagina con riquadri incorporati il menu può nascere dentro
     // il riquadro o fuori, e i clic non attraversano quel confine: chi ha un
@@ -615,6 +621,7 @@
       setupArrowSubmenu(arrow, () => openGenericSubmenu(arrow, props.subItems || []), cleanups);
       wrap.appendChild(arrow);
     }
+    global.SN_FILO_UI?.soloGestiVeri(wrap);
   }
 
   // Sotto-menu generico (lista di {label, onClick}). Si ancora a `anchorEl`.
@@ -669,7 +676,7 @@
       }
     }
 
-    menuHost().appendChild(sub);
+    monta(sub);
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
@@ -938,7 +945,7 @@
     }
 
     const host = pannelloChiuso(sub);
-    menuHost().appendChild(host);
+    monta(host);
     // Compensazione zoom anche per il sub-menu
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
@@ -980,7 +987,7 @@
     populateGrid(sub, items, { dropTarget: opts.dropTarget });
     if (opts.dropTarget) attachDropZone(sub, { target: opts.dropTarget, onDrop: opts.onDrop });
 
-    menuHost().appendChild(sub);
+    monta(sub);
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
@@ -1004,7 +1011,7 @@
     tooltipEl.className = 'sn-tooltip';
     global.SN_FILO_UI?.mark(tooltipEl);
     tooltipEl.style.display = 'none';
-    menuHost().appendChild(tooltipEl);
+    monta(tooltipEl);
     return tooltipEl;
   }
   function showTooltip(target, text) {
@@ -1130,6 +1137,7 @@
     row.innerHTML = '';
     row.__snRowOpts = opts;
     for (const sub of items) row.appendChild(makeRowButton(sub, opts));
+    global.SN_FILO_UI?.soloGestiVeri(row);
   }
 
   function makeGridButton(it, opts = {}) {
@@ -1163,6 +1171,7 @@
     } else {
       for (const it of items) sub.appendChild(makeGridButton(it, opts));
     }
+    global.SN_FILO_UI?.soloGestiVeri(sub);
   }
 
   // Aggiorna in-place i bottoni della riga primaria (senza chiudere il menu).
@@ -1231,7 +1240,7 @@
         const r = el.getBoundingClientRect();
         preview.style.width = r.width + 'px';
         preview.style.height = r.height + 'px';
-        menuHost().appendChild(preview);
+        monta(preview);
         updatePreview(x, y);
       };
 

@@ -29,6 +29,14 @@ const ATTACCO = `
     f.click();
     return true;
   };
+  // Il pulsante portato fuori dal menu, nella pagina, e premuto lì: fuori dal contenitore deve restare chiuso.
+  window.sposta = (sel) => {
+    const b = document.querySelector(sel);
+    if (!b) return false;
+    document.body.appendChild(b);
+    b.click();
+    return true;
+  };
   window.incolla = () => { const b = document.querySelector('.sn-menu-paste-main'); if (b) b.click(); return !!b; };
   window.cosaVede = () => {
     let t = document.documentElement.outerHTML + (window.__visti || []).join(' ');
@@ -104,6 +112,58 @@ test('a menu aperto dall\'utente il sito non preme Incolla né la freccia; la cr
   await page.mouse.move(voce.incolla.x, voce.incolla.y, { steps: 4 });
   await page.mouse.click(voce.incolla.x, voce.incolla.y);
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
+});
+
+test('il sito non preme Incolla, la freccia o Detta spostandoli fuori dal menu che l\'utente ha aperto', async ({ app, shell, openTab, testServer }) => {
+  await conCronologia(shell);
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+  const apri = async (sel) => {
+    await page.locator('#campo').click({ button: 'right' });
+    await expect(page.locator(sel).first()).toBeVisible();
+  };
+
+  await apri('.sn-menu-paste-main');
+  expect(await page.evaluate(() => window.sposta('.sn-menu-paste-main'))).toBe(true);
+  await page.waitForTimeout(800);
+  expect(await page.locator('#campo').inputValue(), 'il sito non si incolla gli appunti da solo').not.toContain(SEGRETO);
+
+  await page.keyboard.press('Escape');
+  await apri('.sn-menu-paste-arrow');
+  expect(await page.evaluate(() => window.sposta('.sn-menu-paste-arrow'))).toBe(true);
+  await page.waitForTimeout(800);
+  expect(await statoCronologia(app, page), 'la freccia premuta dal sito non apre la cronologia').toBeNull();
+
+  await page.keyboard.press('Escape');
+  await apri('.sn-menu-split-main');
+  expect(await page.evaluate(() => window.sposta('.sn-menu-split-main'))).toBe(true);
+  await page.waitForTimeout(800);
+  const visto = await page.evaluate(() => document.documentElement.innerText);
+  expect(visto, 'il sito non accende il microfono da solo').not.toMatch(/Ti ascolto|Microfono/);
+
+  // Il pulsante spostato resta della pagina, ma la mano dell'utente sul menu vero incolla come sempre.
+  await page.keyboard.press('Escape');
+  await page.locator('#campo').fill('');
+  await apri('.sn-menu-paste-main');
+  await page.locator('.sn-menu .sn-menu-paste-main').first().click();
+  await expect(page.locator('#campo')).toHaveValue(SEGRETO);
+});
+
+test('il sito non preme Incolla nemmeno nell\'istante in cui il menu entra nella sua pagina', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+  // Un osservatore del sito creato prima di quelli di Filo viene avvisato per primo.
+  await page.evaluate(() => {
+    new MutationObserver(() => {
+      const b = document.querySelector('.sn-menu .sn-menu-paste-main');
+      if (b) { document.body.appendChild(b); b.click(); }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  });
+  await page.locator('#campo').click({ button: 'right' });
+  await page.waitForTimeout(800);
+  expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
 });
 
 test('un riquadro di un altro sito dentro la pagina non apre il menu con un tasto destro fabbricato', async ({ app, shell, openTab, testServer }) => {

@@ -20,8 +20,13 @@ il clic sul pulsante del sito.
    - il tasto destro che apre il menu, nel ponte del page-preload (vale anche nei
      riquadri incorporati, dove il ponte rigioca il clic);
    - clic, passaggi, tasti, rotella sulle voci: `SN_FILO_UI.soloGestiVeri(el)`
-     sulla radice di ogni pezzo attaccato al documento, **per primo**, appena il
-     nodo nasce (`src/shared/filoUi.js`);
+     (`src/shared/filoUi.js`) mette il cancello su **ogni nodo** del pezzo, non
+     solo sulla radice: il sito può spostare un pulsante fuori dal menu, nella
+     sua pagina, e premerlo lì (#589.8, giro 3: Incolla gli dava gli appunti,
+     Detta accendeva il microfono). Si chiama **prima** di attaccare il pezzo al
+     documento (`monta` in `src/content/menu.js`), perché un osservatore del sito
+     creato prima del nostro vede il nodo per primo; per ciò che entra dopo c'è un
+     osservatore di riserva;
    - un ascoltatore su `window`/`document` che fa qualcosa di più che chiudere
      (il trascinamento delle icone) guarda `e.isTrusted` da sé, come fa già il
      cartellino dello zoom (`gestoVero` in `src/preload/wheel-zoom.js`).
