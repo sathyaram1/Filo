@@ -3084,6 +3084,7 @@
   function renderActions(fb) {
     if (!mgActions || !mgActionsRow) return;
     chiudiRiapertura();
+    chiudiConfermaSegno();
     setActionMsg('', '');
     mgActionsRow.querySelectorAll('button').forEach((b) => b.remove());
     const azioni = (isAdmin && fb) ? MR.ownerActions(fb, { releasedVersion }) : [];
