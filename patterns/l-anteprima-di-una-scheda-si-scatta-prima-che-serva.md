@@ -46,6 +46,12 @@ chiede.
   segue come una nata dietro: si rifà a caricamento finito, e la spia, messa
   nel momento del congedo, vede quello che arriva dopo. Una pagina lasciata
   ferma da più di venti secondi resta com'era.
+- **Una foto dovuta non si perde.** Con la finestra ridotta a icona (o la
+  pagina davanti nascosta) la foto aspetta senza consumare tentativi; se i
+  tentativi finiscono perché la cattura torna vuota (su Windows una finestra
+  coperta da un'altra smette di disegnare senza dirlo), la foto resta dovuta.
+  Quando la finestra torna (riaperta, mostrata, rimessa a fuoco) ogni scheda di
+  dietro che la aspetta torna in coda.
 - **La carta** è una finestra figlia (`src/main/popup-anteprima.js`, strada 2 di
   [la shell non disegna sopra la pagina](la-shell-non-disegna-sopra-la-pagina.md)):
   non prende il puntatore né la tastiera, nasce quando il puntatore entra nella

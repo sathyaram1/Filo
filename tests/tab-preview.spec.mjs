@@ -392,3 +392,30 @@ test('una scheda lasciata mentre carica ancora, o appena arrivata e ancora vuota
     await new Promise((r) => lento.close(r));
   }
 });
+
+// Chi apre dei link dietro e riduce Filo a icona mentre caricano: la foto aspetta che la finestra torni, non si perde.
+// Senza gestore di finestre ridurre a icona non fa niente: la finestra «si riduce» con isMinimized() e i suoi eventi.
+test('una scheda aperta dietro che finisce di caricare con Filo ridotto a icona ha l\'anteprima quando Filo torna', async ({ app, shell, testServer }) => {
+  const url = testServer.html(pagina('#10a020', 'Dietro'));
+  const davantiUrl = testServer.html(pagina('#e01010', 'Davanti', `<a id="vai" href="${url}">link</a>`));
+  const davanti = await apri(app, shell, davantiUrl);
+  const page = app.windows().find((w) => w.url() === davantiUrl);
+  const riduci = (si) => app.evaluate(({ BrowserWindow }, si) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    if (si) { w.__isMin = w.isMinimized; w.isMinimized = () => true; w.emit('minimize'); }
+    else { w.isMinimized = w.__isMin; w.emit('restore'); }
+  }, si);
+
+  await riduci(true);
+  await page.click('#vai', { modifiers: ['Control'] });
+  const dietro = await caricata(app, url);
+  // Più dei tentativi che la foto si concedeva prima di arrendersi.
+  await new Promise((r) => setTimeout(r, 10_000));
+  expect((await schede(app)).tutte.find((x) => x.id === dietro).foto).toBe(false);
+  await riduci(false);
+
+  expect((await schede(app)).attiva).toBe(davanti);
+  await haFoto(app, dietro);
+  await shell.locator(`.tab[data-id="${dietro}"]`).hover();
+  await expect.poll(async () => tinta((await carta(app)).colore), { timeout: 3000 }).toBe('verde');
+});
