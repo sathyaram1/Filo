@@ -60,7 +60,7 @@ const REDTEAM_PAUSA = path.join(SRC, 'pages', 'redteam', 'pausa.html');
 
 async function paginaRedteamChiusa(resolved) {
   const p = resolved.toLowerCase();
-  if (!p.startsWith(REDTEAM_DIR.toLowerCase()) || p === REDTEAM_PAUSA.toLowerCase()) return false;
+  if (!(p + path.sep).startsWith(REDTEAM_DIR.toLowerCase()) || p === REDTEAM_PAUSA.toLowerCase()) return false;
   const Gate = require('./services/redteamGate');
   return !(await Gate.assicura()).visible;
 }
