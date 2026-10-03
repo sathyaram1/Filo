@@ -4,8 +4,8 @@
 
 **La regola.** Ogni carta della home ha titolo, stato, un'azione principale, «apri nel filo» e un modo di
 toglierla, e risponde al passaggio del puntatore e al tasto destro. A sinistra stanno le cose che
-**accadono** (le spinge Filo e cambiano da sole: timer, sveglie, scaricamenti, avvisi, la carta dei Crediti
-senza chiave); a destra quelle che l'utente **tiene** (le sceglie e le dispone lui). Una carta nuova entra
+**accadono** (le spinge Filo e cambiano da sole: timer, sveglie, scaricamenti, avvisi, i lavori lunghi in corso in
+un'altra scheda, la carta dei Crediti senza chiave); a destra quelle che l'utente **tiene** (le sceglie e le dispone lui). Una carta nuova entra
 nel catalogo condiviso, non in un `if` della pagina.
 
 ## Perché
@@ -39,6 +39,15 @@ un file scaricato) viaggia con la sua provenienza, come l'esito di un comando.
 - **Tolta non vuol dire persa.** Una carta di destra tolta diventa un'icona in «altro», da cui si rimette
   col clic sul «+», col tasto destro o trascinandola nella colonna. Togliere una carta di sinistra toglie la
   cosa che racconta (il timer, l'avviso) o, se è solo un ricordo (uno scaricamento finito), la nasconde.
+- **Clic e Invio fanno la stessa cosa.** A sinistra aprono nel filo; a destra aprono l'app della carta
+  (`apri`), o nel filo se non ne ha una (`usaCarta`).
+- **La colonna di sinistra ha un ordine solo.** `SN_CARTE_HOME.sinistra` decide quali carte ci sono e in che
+  ordine, e `trovaSinistra` le riconosce dalle parole dell'utente: la home la disegna da lì e la chat
+  (`CARTA_HOME`) la legge da lì, così «metti il forno in cima» sposta la carta che l'utente vede in cima.
+  Un nome di destra dalla chat vale solo esatto: «lo scaricamento del file» non è l'Editor.
+- **Un lavoro lungo è una carta finché dura.** Il main tiene i lavori in corso (`lavoriInCorso.js`: un turno
+  di Filo, un comando del terminale) e li annuncia; la home mostra quelli delle altre schede dopo qualche
+  secondo, e «Vai» porta alla conversazione che li fa.
 - **Una carta nuova si aggiunge al catalogo.** `CARTE` e `APP` in `src/shared/carteHome.js`: chi aveva
   già salvato una disposizione la ritrova in fondo a destra, perché tolte sono solo quelle tolte da lui.
   Colori e misure passano dai token `--dash-*`
