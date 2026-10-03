@@ -160,6 +160,28 @@ test('Automazioni: una fusione ferma senza segnalazione c’è, e dice ramo, com
   await expect(page.locator('#panel-list .sn-mac')).toHaveCount(0);
 });
 
+// ── 1ter. Su quale main sono girati gli unit della fusione (#929) ───────────
+//
+// Al clic, anche giorni dopo, nessuno rifà gli unit sul risultato della fusione: la scheda dice quando sono girati.
+
+test('la scheda dice su quale main sono girati gli unit della fusione, e che approvando non si rifanno', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const prova = { esito: 'verde', mainSha: 'c0ffee00'.repeat(5), atMs: Date.now() - 3 * 60 * 60 * 1000 };
+  await apriGestione(page, { pending: [richiesta({ provaUnit: prova })] });
+
+  const riga = page.locator('#mgMergeApprovalsOrphans .sn-mac .sn-mac-prova');
+  await expect(riga).toHaveText('Unit verdi sulla fusione con main di 3 ore fa', { timeout: 8_000 });
+  await expect(riga).toHaveAttribute('title', /c0ffee00.*non si rifanno/);
+  await page.locator('#mgMergeApprovalsOrphans .sn-mac').first().screenshot({ path: 'tests/.shots/merge-approvals-prova-unit.png' }).catch(() => {});
+});
+
+test('una richiesta di prima, senza la prova, non dice niente degli unit', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriGestione(page, { pending: [richiesta()] });
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-prova')).toHaveCount(0);
+});
+
 // ── 1bis. Un sì già dato che non ha prodotto niente resta in vista ──────────
 //
 // Caso vero (#500, 27/08): approvata, conflitto di merge, e la scheda è
