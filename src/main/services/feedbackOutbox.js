@@ -27,9 +27,11 @@
 //     nessuno: quella voce resta in coda finché non si riesce a dirlo.
 //     tokenOwner() -> idToken admin fresco o '' (#595): chiesto a ogni
 //     spedizione di una voce dell'owner, MAI salvato nella coda.
-//     onAttesaOwner(item) -> boolean: la voce dell'owner aspetta il suo accesso (#912: mai da anonima); `false` = non detto.
+//     onAttesaOwner(item, perche) -> boolean: la voce dell'owner aspetta il suo accesso (#912: mai da anonima);
+//     perche 'assente' | 'rifiutato'; `false` = non detto. Un tokenOwner che lancia è la rete: si riprova zitti.
 //   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
+//   accessoCambiato()                                       — l'owner è rientrato: riprova le voci col token rifiutato
 //   size()                                                  — voci in coda
 
 (function (global) {
