@@ -128,7 +128,8 @@
     if (tipo === 'sposta') {
       if (!prima.destra.includes(id)) return fine(prima, 'la carta non è fra quelle a destra: prima va rimessa');
       const dove = m.verso ? primaDa(prima.destra, id, m.verso) : rif;
-      return fine({ ...prima, destra: inserisci(prima.destra, id, dove === undefined ? null : dove) });
+      if (dove === undefined) return fine(prima, 'verso sconosciuto');
+      return fine({ ...prima, destra: inserisci(prima.destra, id, dove) });
     }
     return fine(prima, 'mossa sconosciuta');
   }
