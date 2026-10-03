@@ -685,6 +685,11 @@
   // attraversa (#589.8). I fogli di stile del documento lì dentro non arrivano: si portano i nostri.
   const HOST_CHIUSO = 'all:initial!important;display:block!important;position:fixed!important;'
     + 'top:0!important;left:0!important;width:0!important;height:0!important;z-index:2147483646!important;';
+  // Un font chiamato per nome il sito lo ridefinisce col suo, e dai pezzi che il browser carica sa quali caratteri
+  // ha disegnato il pannello (#589.8): sui siti solo famiglie generiche, che nessun @font-face rimpiazza.
+  const PAGINA_DI_FILO = (() => { try { return location.protocol === 'filo:'; } catch (_) { return false; } })();
+  const FONT_SOLO_GENERICO = '\n.sn-menu, .sn-menu *, .sn-menu ::before, .sn-menu ::after, .sn-menu ::placeholder'
+    + ' { font-family: system-ui, sans-serif !important; }\n';
   let fogli = null;
   function fogliDelMenu() {
     if (fogli) return fogli;
@@ -695,6 +700,7 @@
       testo = ['theme.css', 'menu.css']
         .map((f) => fs.readFileSync(path.join(__dirname, '..', 'styles', f), 'utf8')).join('\n');
     } catch (_) {}
+    if (!PAGINA_DI_FILO) testo += FONT_SOLO_GENERICO;
     const foglio = new CSSStyleSheet();
     try { foglio.replaceSync(testo); } catch (_) {}
     fogli = [foglio];

@@ -57,6 +57,15 @@ il clic sul pulsante del sito.
    `innerHTML`, selezione, `getComputedStyle`) vede i caratteri. Un dato privato
    nuovo nel menu segue la stessa regola: niente nodo di testo.
 
+   Anche i **font** passano il confine: un `@font-face` del documento vale
+   dentro lo shadow, e una variabile come `--sn-font` arriva per eredità (`all:
+   initial` non tocca le variabili). Un font del sito diviso in un pezzo per
+   carattere (`unicode-range`) dice, da quali pezzi il browser carica, quali
+   caratteri il pannello ha disegnato (#589.8, giro 2). Sui siti il pannello
+   chiuso usa solo **famiglie generiche** (`system-ui, sans-serif`), che nessun
+   `@font-face` rimpiazza; un font chiamato per nome, anche quello scelto
+   dall'utente, lì non entra. Sulle pagine `filo://` il font dell'utente resta.
+
 Il resto del menu resta nel documento: non porta dati di altri siti, e una
 settantina di spec lo guarda coi locator. Se un giorno ci entra un dato privato
 (appunti, password, cose di un'altra scheda), entra in un pannello chiuso.
