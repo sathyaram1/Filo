@@ -1352,6 +1352,21 @@ globalThis.SN_USCITA_DA_FILO = (url, wc, apri) => (SCHEMI_USCITA.test(String(url
 
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in
 // questo turno, turni passati compresi: servono all'anti-esfiltrazione di NAVIGA.
+// true una volta sola per profilo, anche con due comandi nello stesso giro: la
+// catena tiene in fila le letture, e solo la prima trova la chiave vuota.
+let spiegazioneTerminale = null;
+function primaVoltaDelTerminale() {
+  const KEY = SN_CONST.STORAGE_KEYS.FILO_TERMINALE_SPIEGATO;
+  const prima = (spiegazioneTerminale || Storage.getRaw(KEY, false).then((v) => v === true, () => true))
+    .then(async (gia) => {
+      if (gia) return false;
+      try { await Storage.setRaw(KEY, true); } catch (_) {}
+      return true;
+    });
+  spiegazioneTerminale = prima.then(() => true);
+  return prima;
+}
+
 // `parole` = ciò che l'utente ha scritto in chat: un codice scritto da lui può uscire.
 async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '' } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
