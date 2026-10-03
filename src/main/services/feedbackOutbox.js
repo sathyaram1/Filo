@@ -271,6 +271,7 @@
     init,
     enqueue,
     flush,
+    accessoCambiato,
     size: () => queue.length,
     // ---- helper per i test (logica pura, nessun effetto in produzione) ----
     _peek: () => queue.map(serialize),
