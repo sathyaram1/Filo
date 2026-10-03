@@ -162,7 +162,8 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
         + (r.localDetail || r.localReason
           ? `  L5 non è stato saltato: ${r.localDetail || r.localReason}.\n`
           : (ctx.feedbackId ? '' : '  Nessuna pratica collegata: con npm run finish -- --feedback <N> il lavoro locale\n'
-            + '  di un feedback tuo o di una sessione, con la prova del mittente, non aspetta.\n'))
+            + '  di un feedback tuo o di una sessione con la prova del mittente, o che hai approvato\n'
+            + '  come lavoro locale, non aspetta.\n'))
         + (r.requestId
           ? '\n  L\'ho messa IN ATTESA: approvala da Filo, nella dashboard di gestione\n'
             + '  (l\'avviso in cima ai Ricevuti). Da lì puoi anche scartarla.\n'
