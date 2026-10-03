@@ -80,7 +80,6 @@
 
   function creaOspite() {
     ospite = DOC.createElement('div');
-    global.SN_FILO_UI?.mark(ospite);
     ospite.setAttribute('aria-hidden', 'true');
     ospite.style.cssText = STILE_OSPITE;
     stileOspite = ospite.getAttribute('style');
