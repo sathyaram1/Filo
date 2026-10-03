@@ -441,7 +441,8 @@ export async function fraseDaScrivere(id, rif = id, opts = {}) {
 export async function scriviFrase(id, frase, opts = {}) {
   const testo = String(frase || '').trim();
   if (!testo) return { ok: false, motivo: 'la frase è vuota' };
-  if (testo.length > 500) return { ok: false, motivo: `la frase è di ${testo.length} caratteri e la bacheca ne tiene 500: accorciala` };
+  const lunga = fraseTroppoLunga(testo);
+  if (lunga) return { ok: false, motivo: lunga };
   const bearer = opts.bearer || await acquireBearer();
   const doc = await getDoc(id, bearer, ['status']);
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
