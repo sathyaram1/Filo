@@ -130,7 +130,8 @@
 
   // Una selezione dentro un campo segreto resta all'utente: si copia e si taglia, ma non va a nessun modello (#810.7).
   function selezioneSegreta(target) {
-    const el = target?.closest?.('input, textarea') || document.activeElement;
+    let el = target?.closest?.('input, textarea') || document.activeElement;
+    for (let i = 0; el?.shadowRoot?.activeElement && i < 8; i++) el = el.shadowRoot.activeElement;
     return !!el && /^(INPUT|TEXTAREA)$/.test(el.tagName) && campoSegreto(el);
   }
 

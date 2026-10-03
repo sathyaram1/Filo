@@ -45,7 +45,10 @@ test('il numero di carta si riconosce dal valore, qualunque nome abbia il campo'
   const s = creaIsolata();
   assert.equal(s.campoSegreto(campo({ name: 'number' }, '4111 1111 1111 1111')), true);
   assert.equal(s.campoSegreto(campo({ id: 'n' }, '5500-0000-0000-0004')), true);
-  assert.equal(s.campoSegreto(campo({ id: 'n' }, '4111 1111 1111 1112')), false, 'cifra di controllo sbagliata');
+  assert.equal(s.campoSegreto(campo({ id: 'n' }, '4111 1111 1111 1112')), true, 'con una cifra sbagliata resta una carta');
+  assert.equal(s.campoSegreto(campo({ id: 'n' }, '333 123 4567')), false, 'un telefono non è una carta');
+  assert.equal(s.campoSegreto(campo({ id: 'n' }, '8001234567890')), false, 'un codice a barre non è una carta');
+  assert.equal(s.campoSegreto(campo({ id: 'n' }, '0039 333 1234567')), false);
   assert.equal(s.campoSegreto(campo({ id: 'n' }, 'via Roma 4111 1111 1111 1111')), false, 'un indirizzo non è un campo della carta');
   assert.equal(s.campoSegreto(campo({ id: 'q' }, 'biciclette rosse')), false);
 });
@@ -59,3 +62,23 @@ test('i nomi della carta che i moduli usano davvero', () => {
     assert.equal(s.campoSegreto(campo({ name: nome })), false, nome);
   }
 });
+
+// Caselle corte sotto lo stesso contenitore, come le scrive un modulo che divide il numero in pezzi.
+function caselle(valori, max, primo = {}) {
+  const cont = { querySelectorAll: () => figli, parentElement: null };
+  const figli = valori.map((v, i) => ({ ...campo(i === 0 ? primo : {}, v), maxLength: max, parentElement: cont }));
+  return figli;
+}
+
+test('la carta e il codice divisi in caselle sono segreti in ogni casella', () => {
+  const s = creaIsolata();
+  const conEtichetta = caselle(['5500', '0000', '0000', '0004'], 4, { autocomplete: 'cc-number' });
+  assert.deepEqual(conEtichetta.map((c) => s.campoSegreto(c)), [true, true, true, true]);
+  const senzaNome = caselle(['4111', '1111', '1111', '1111'], 4);
+  assert.deepEqual(senzaNome.map((c) => s.campoSegreto(c)), [true, true, true, true], 'il numero si ricompone');
+  const codice = caselle(['7', '3', '9', '1', '4', '6'], 1);
+  assert.deepEqual(codice.map((c) => s.campoSegreto(c)), [true, true, true, true, true, true]);
+  const data = caselle(['12', '05', '1990'], 4);
+  assert.deepEqual(data.map((c) => s.campoSegreto(c)), [false, false, false], 'una data divisa in tre resta leggibile');
+});
+

@@ -76,6 +76,7 @@ const SEGRETI = [
   { nome: 'un codice che il sito copre coi puntini', campo: '<label for="c">Codice</label> <input id="c" style="-webkit-text-security:disc">', valore: 'Zq7Kp2xW', etichetta: 'Codice' },
   { nome: 'il numero di carta in un campo che il sito chiama solo «cc-number»', campo: '<div>Numero della carta</div><input id="c" name="cc-number">', valore: '4111 1111 1111 1111', etichetta: '' },
   { nome: 'il numero di carta in un campo dal nome qualunque', campo: '<input id="c" name="q">', valore: '5500 0000 0000 0004', etichetta: '' },
+  { nome: 'il numero di carta con una cifra sbagliata in un campo dal nome qualunque', campo: '<div>Numero della carta</div><input id="c" name="number">', valore: '4111 1111 1111 1112', etichetta: '' },
 ];
 
 for (const caso of SEGRETI) {
@@ -296,4 +297,69 @@ test('il numero di carta selezionato nel suo campo non parte verso la spiegazion
   await page.keyboard.press('Control+a');
   await expect.poll(() => arrivato(app, page), { timeout: 15_000 }).toContain('portone verde');
   expect(await arrivato(app, page), 'il numero di carta selezionato è partito verso il modello').not.toContain('4111');
+});
+
+// L'avviso del sito sospetto compare secondo i campi che la pagina dichiara: qui si supera solo se c'è.
+async function superaAvvisoSeCe(page) {
+  const continua = page.getByRole('button', { name: 'Continua' });
+  if (await continua.isVisible({ timeout: 4_000 }).catch(() => false)) {
+    await continua.click();
+    await expect(continua).toHaveCount(0, { timeout: 6_000 });
+  }
+}
+
+const QUATTRO_CASELLE = '<label for="k1">Numero della carta</label> '
+  + [1, 2, 3, 4].map((i) => `<input id="k${i}" maxlength="4" inputmode="numeric" style="width:70px;font-size:18px;outline:0;caret-color:transparent">`).join(' ');
+
+// Molti moduli dividono il numero della carta in quattro caselle, e il codice monouso in sei: l'etichetta o
+// l'autocompletamento stanno su una casella sola, ma il segreto è di tutte.
+test('la carta divisa in quattro caselle non arriva al modello, né nella descrizione né nell’immagine', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, modulo(QUATTRO_CASELLE));
+  await superaAvvisoSeCe(page);
+  const immagini = await immaginiConDueCarte(app, shell, page, async (v) => {
+    const pezzi = v.split(' ');
+    for (let i = 0; i < 4; i++) await page.fill(`#k${i + 1}`, pezzi[i]);
+  });
+  const testo = await arrivato(app, page);
+  const righe = testo.split('\\n').filter((r) => /:: #k[1-4]/.test(r));
+  expect(righe.length, 'le quattro caselle devono restare nell’elenco').toBeGreaterThanOrEqual(4);
+  expect(righe.join('\n'), 'le cifre della carta sono arrivate al modello').not.toMatch(/5500|0004|4111/);
+  for (const id of ['#k2', '#k4']) {
+    const b = await page.locator(id).boundingBox();
+    expect(await pixelDiversi(page, immagini, { left: b.x + 3, top: b.y + 3, width: b.width - 6, height: b.height - 6 }),
+      `le cifre di ${id} si leggono nell’immagine`).toBe(0);
+  }
+});
+
+test('il codice monouso diviso in sei caselle non arriva al modello', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const caselle = [1, 2, 3, 4, 5, 6].map((i) => `<input id="o${i}" maxlength="1" inputmode="numeric" style="width:24px">`).join('');
+  const page = await testServer.openReady(openTab, modulo(`<p>Inserisci il codice che ti abbiamo mandato</p>${caselle}`));
+  await superaAvvisoSeCe(page);
+  for (const [i, c] of [...'739146'].entries()) await page.fill(`#o${i + 1}`, c);
+  await preparaModelli(app);
+  await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
+  await apriAiuto(shell, page);
+  await scriviAllAiuto(page, 'aiutami a entrare');
+  await expect(page.locator('.sn-sidebar', { hasText: 'Premi «Accedi».' })).toBeVisible({ timeout: 20_000 });
+  const righe = (await arrivato(app, page)).split('\\n').filter((r) => /:: #o[1-6]/.test(r));
+  expect(righe).toHaveLength(6);
+  expect(righe.join('\n'), 'le cifre del codice sono arrivate al modello').not.toMatch(/input \\"\d\\"/);
+});
+
+// Le parti che un sito incapsula in un componente si vedono a schermo come le altre.
+test('nell’immagine è coperto il numero di carta scritto in un campo dentro un componente della pagina', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, modulo(`<carta-pagamento></carta-pagamento><script>
+    customElements.define('carta-pagamento', class extends HTMLElement { constructor() { super();
+      this.attachShadow({ mode: 'open' }).innerHTML = '<label for="c">Numero della carta</label> '
+        + '<input id="c" autocomplete="cc-number" style="width:300px;font-size:18px;outline:0;caret-color:transparent">'; } });
+  </script>`));
+  await superaAvvisoSeCe(page);
+  const campo = page.locator('carta-pagamento input');
+  const immagini = await immaginiConDueCarte(app, shell, page, (v) => campo.fill(v));
+  const b = await campo.boundingBox();
+  expect(await pixelDiversi(page, immagini, { left: b.x + 3, top: b.y + 3, width: b.width - 6, height: b.height - 6 }),
+    'il numero scritto nel componente si legge nell’immagine').toBe(0);
 });

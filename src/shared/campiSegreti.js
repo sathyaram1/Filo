@@ -34,7 +34,9 @@
     // L'etichetta che il sito lega al campo (aria-labelledby, <label for>, <label> che lo avvolge).
     function etichettaCollegata(el) {
       const parti = [];
-      const d = el.ownerDocument || doc;
+      // Dentro un componente gli id si cercano nel suo albero, non nel documento.
+      const radice = el.getRootNode?.();
+      const d = radice && typeof radice.getElementById === 'function' ? radice : (el.ownerDocument || doc);
       for (const id of String(el.getAttribute?.('aria-labelledby') || '').split(/\s+/)) {
         const t = id && d.getElementById(id);
         if (t && t !== el) parti.push(testoSenzaCampi(t));
@@ -53,9 +55,20 @@
       } catch (_) { return false; }
     }
 
+    // Un numero con la forma di una carta anche se sbagliato: l'utente chiede aiuto proprio quando il sito lo rifiuta.
+    // Dalle 14 cifre in su e con la prima di un circuito, per lasciare fuori telefoni e codici a barre.
+    function formaDiCarta(valore) {
+      const t = String(valore || '').trim();
+      if (!/^\d[\d\s-]*$/.test(t)) return false;
+      const cifre = t.replace(/\D/g, '');
+      if (cifre.length < 12 || cifre.length > 19) return false;
+      if (typeof cartaValida === 'function' && cartaValida(t)) return true;
+      return cifre.length >= 14 && /^[2-6]/.test(cifre);
+    }
+
     // Lo dice il tipo, l'autocompletamento, i puntini, il nome che il sito gli dà, o il valore stesso quando ha la
     // forma di una carta: il nome lo sceglie il sito, e non sempre dice «carta».
-    function campoSegreto(el) {
+    function segretoDaSe(el) {
       if (!el || el.nodeType !== 1 || !CAMPO_CON_VALORE.test(el.tagName)) return false;
       const tipo = String(el.getAttribute('type') || '').toLowerCase();
       if (el.tagName === 'INPUT' && INPUT_BOTTONE.test(tipo)) return false;
@@ -64,15 +77,53 @@
       const nomi = ['aria-label', 'placeholder', 'name', 'id', 'title'].map((a) => el.getAttribute(a) || '');
       nomi.push(etichettaCollegata(el));
       if (PAROLE_SEGRETE.test(nomi.join(' ').replace(/([a-z])([A-Z])/g, '$1 $2'))) return true;
-      const valore = String(el.value || '');
-      return /^[\d\s-]{12,30}$/.test(valore.trim()) && typeof cartaValida === 'function' && cartaValida(valore);
+      return formaDiCarta(el.value);
+    }
+
+    // Le caselle corte vicine sono un campo solo diviso in pezzi (carta in quattro, codice in sei): l'etichetta e
+    // l'autocompletamento il sito li mette su una sola, e una casella da sola non ha la forma di niente.
+    function casellaCorta(el) {
+      if (!el || el.tagName !== 'INPUT') return false;
+      const tipo = String(el.getAttribute?.('type') || '').toLowerCase();
+      if (INPUT_BOTTONE.test(tipo)) return false;
+      const max = Number(el.maxLength);
+      return max >= 1 && max <= 6;
+    }
+
+    function caselleSorelle(el) {
+      if (!casellaCorta(el)) return [];
+      let cont = el.parentElement;
+      for (let i = 0; cont && i < 3; i++, cont = cont.parentElement) {
+        const corte = Array.from(cont.querySelectorAll?.('input') || []).filter(casellaCorta);
+        if (corte.length >= 2) return corte;
+      }
+      return [];
+    }
+
+    function campoSegreto(el) {
+      if (segretoDaSe(el)) return true;
+      const sorelle = caselleSorelle(el);
+      if (sorelle.length < 2) return false;
+      if (sorelle.some((c) => c !== el && segretoDaSe(c))) return true;
+      if (sorelle.length >= 4 && sorelle.every((c) => Number(c.maxLength) === 1)) return true;
+      return formaDiCarta(sorelle.map((c) => String(c.value || '').trim()).join(''));
+    }
+
+    // Anche i campi dentro i componenti della pagina (ombra aperta): a schermo si vedono come gli altri.
+    function tuttiICampi(radice, profondita = 0) {
+      const out = Array.from(radice.querySelectorAll('input, textarea, select'));
+      if (profondita > 8) return out;
+      for (const n of radice.querySelectorAll('*')) {
+        if (n.shadowRoot) out.push(...tuttiICampi(n.shadowRoot, profondita + 1));
+      }
+      return out;
     }
 
     // I campi segreti compilati che a schermo si leggono (un numero di carta, una password resa visibile), con
     // quanto serve a ridisegnarli coperti nell'immagine della pagina. Coordinate della finestra di questo documento.
     function campiInVista() {
       const out = [];
-      for (const el of doc.querySelectorAll('input, textarea, select')) {
+      for (const el of tuttiICampi(doc)) {
         if (!el.value || !campoSegreto(el) || copertoAschermo(el)) continue;
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height || r.bottom <= 0 || r.right <= 0 || r.top >= win.innerHeight || r.left >= win.innerWidth) continue;
