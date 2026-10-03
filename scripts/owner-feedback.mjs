@@ -849,7 +849,6 @@ if (isMain) {
     process.exit(1);
   }
 
-  if (!bearer && ALLOWED.includes(status)) bearer = await acquireBearer();
   const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, preapprova, dryRun, attore, bearer });
   if (!r.ok) {
     console.error(r.utente || r.senzaSegno ? rifiutoPratica(riferimento, r) : `RIFIUTATO: ${r.motivo}`);
