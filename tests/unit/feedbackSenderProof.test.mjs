@@ -103,12 +103,16 @@ test('#912 — da anonimo un nome riservato parte come utente, anche quello dell
         assert.equal(await mittenteSpedito(f.create[0], priv), `non-provato:${clientId}`, clientId);
       } finally { f.restore(); }
     }
-    const rifiutato = installFetch([401, 200]);
-    try {
-      await FB.submit({ text: 'ciao', clientId: 'owner:abc' }, { idToken: 'tok-scaduto' });
-      assert.equal(await mittenteSpedito(rifiutato.create[0], priv), 'owner:abc', 'col token il nome parte com’è');
-      assert.equal(await mittenteSpedito(rifiutato.create[1], priv), 'non-provato:owner:abc', 'la ripartenza anonima no');
-    } finally { rifiutato.restore(); }
+    // Col token rifiutato un nome riservato non riparte da anonimo: l'errore lo dice, e chi chiama aspetta l'accesso.
+    for (const rifiuto of [401, 403]) {
+      const rifiutato = installFetch([rifiuto, 200]);
+      try {
+        const e = await FB.submit({ text: 'ciao', clientId: 'owner:abc' }, { idToken: 'tok-scaduto' }).then(() => null, (x) => x);
+        assert.ok(e && e.accessoOwner === true, `con ${rifiuto} deve fermarsi`);
+        assert.equal(rifiutato.create.length, 1, 'nessuna create anonima dopo il rifiuto');
+        assert.equal(await mittenteSpedito(rifiutato.create[0], priv), 'owner:abc', 'col token il nome parte com’è');
+      } finally { rifiutato.restore(); }
+    }
     // Chi non usa un nome riservato parte com'è.
     for (const clientId of ['c-utente', 'filo:chat', 'auto:capacita', 'uid:123']) {
       const f = installFetch();
