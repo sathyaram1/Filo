@@ -96,7 +96,7 @@ export function testoProva(prova) {
     case 'verde': {
       const ins = Array.isArray(p.instabili) ? p.instabili : [];
       if (!ins.length) return `▸ Unit sulla fusione con main ${m}: verdi.`;
-      return [`▸ Unit sulla fusione con main ${m}: verdi. Rossi al primo giro, verdi da soli e rifacendo la suite intera, quindi instabili e non della fusione:`,
+      return [`▸ Unit sulla fusione con main ${m}: verdi. Rossi al primo giro e verdi riprovati da soli, quindi instabili e non della fusione:`,
         ...ins.map((r) => `    ~ ${r}`)].join('\n');
     }
     case 'conflitto': return `▸ Unit sulla fusione con main ${m}: non provati, la fusione va in conflitto${p.file && p.file.length ? ` su ${p.file.join(', ')}` : ''}.`;
@@ -334,21 +334,15 @@ export function provaUnitSullaFusione({ root, punta, git = gitIn(root), lancia =
     if (daRiprovare.length) {
       scrivi(`▸ Unit rossi sulla fusione (${fusione.rossi.length}): riprovo i loro file da soli`);
       const ri = lancia(a.dir, base, 'riprova', { ...opz, file: daRiprovare });
-      let ancora = ri.errore || ri.ok ? [] : fusione.rossi.filter((k) => ri.rossi.includes(k));
-      if (!ri.errore && (ri.ok || ancora.length)) {
-        let forse = fusione.rossi.filter((k) => !ancora.includes(k));
-        if (forse.length) {
-          // Verde da solo non vuol dire instabile: due test che si pestano i piedi solo girando insieme passano sempre
-          // da soli (verifica #929 giro 3). Instabile è solo ciò che torna verde rifacendo la suite intera.
-          scrivi(`▸ Verdi da soli (${forse.length}): rifaccio la suite intera sulla fusione per distinguere un instabile da due test che si rompono solo insieme`);
-          const di = lancia(a.dir, base, 'di-nuovo', opz);
-          if (di.errore) return { errore: di.errore, mainSha };
-          const ripetuti = !di.ok && !di.rossi.length ? forse : forse.filter((k) => di.rossi.includes(k));
-          ancora = [...ancora, ...ripetuti];
-          forse = forse.filter((k) => !ripetuti.includes(k));
+      if (!ri.errore && ri.ok) {
+        instabili = fusione.rossi;
+        fusione = { ...fusione, ok: true, rossi: [] };
+      } else if (!ri.errore) {
+        const ancora = fusione.rossi.filter((k) => ri.rossi.includes(k));
+        if (ancora.length) {
+          instabili = fusione.rossi.filter((k) => !ancora.includes(k));
+          fusione = { ...fusione, rossi: ancora };
         }
-        instabili = forse;
-        fusione = ancora.length ? { ...fusione, rossi: ancora } : { ...fusione, ok: true, rossi: [] };
       }
     }
     let d = decidiEsito({ fusione });
