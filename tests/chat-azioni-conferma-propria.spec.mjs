@@ -408,3 +408,31 @@ test('le pagine della rete di casa si propongono per parole, senza passare dal m
   expect(alGiudice).not.toContain('192.168');
   expect(alGiudice).not.toContain('Telecamera');
 });
+
+test('«svuota tutto l\'archivio»: il pannello propone anche le pagine di casa, senza mandarle al modello', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configure(app);
+  // Il giudice finto prende i titoli sui gatti: qui sono tutte le pagine web, come per una richiesta di tutto.
+  await seedArchive(app, [
+    { title: 'Gatti persiani', gatto: true },
+    { title: 'Gattini in adozione', gatto: true },
+    { title: 'Pannello del router', gatto: false, url: 'http://192.168.1.1/' },
+  ]);
+  await fakeChat(app, [
+    { toolCalls: [{ id: 'c9', name: 'CANCELLA_ARCHIVIO', arguments: '{"query":"tutte le schede archiviate"}' }] },
+    { text: 'Ecco tutto l\'archivio.' },
+  ]);
+
+  await chiedi(page, 'svuota tutto l\'archivio delle schede');
+  const panel = page.locator('.dash-delete-panel');
+  await expect(panel.locator('.dash-delete-list li')).toHaveText(['Gatti persiani', 'Gattini in adozione', 'Pannello del router'], { timeout: 15_000 });
+  expect(await app.evaluate(() => globalThis.__giudice.testi.join('\n'))).not.toContain('192.168');
+  await panel.locator('.dash-action-btn-danger').click();
+  await fillConfirmInput(page, 'conferma');
+  await clickConfirm(page, 'danger');
+  await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminate definitivamente 3 schede.', { timeout: 5_000 });
+  expect(await archiviate(app)).toEqual([]);
+});

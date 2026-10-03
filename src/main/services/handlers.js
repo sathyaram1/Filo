@@ -4366,9 +4366,9 @@ async function archivioDaCancellare(query, { avanzamento = () => {} } = {}) {
   const senzaVettore = [];
   const diCasa = [];
   for (const it of await ArchivedTabs.list()) {
-    // Le pagine della rete di casa non vanno a nessun modello (#591): per loro un confronto per parole qui.
+    // Le pagine della rete di casa non vanno a nessun modello (#591): per loro un confronto per parole, più sotto.
     if (it.casa || isHomeNetworkUrl(it.url)) {
-      if (casaPertinente(q, it)) diCasa.push(it);
+      diCasa.push(it);
       continue;
     }
     if (qv && Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model) {
@@ -4403,21 +4403,27 @@ async function archivioDaCancellare(query, { avanzamento = () => {} } = {}) {
   } catch (e) {
     return { ok: false, error: 'giudizio', detail: e?.message || String(e) };
   }
-  return { ok: true, results: [...trovate, ...diCasa].map(({ embedding, ...meta }) => meta) };
+  // «Svuota l'archivio» non ha parole da confrontare: le pagine di casa seguono il giudice, che ha preso tutte le altre.
+  const parole = paroleDellaRichiesta(q);
+  const tutto = !parole.length && trovate.length === scored.length + senzaVettore.length;
+  const casaPresa = diCasa.filter((it) => tutto || casaPertinente(parole, it));
+  return { ok: true, results: [...trovate, ...casaPresa].map(({ embedding, ...meta }) => meta) };
 }
 
 const PAROLE_VUOTE_ARCHIVIO = new Set(['pagine', 'pagina', 'schede', 'scheda', 'archivio', 'tutte', 'tutto', 'tutti',
   'quelle', 'quella', 'quello', 'quelli', 'sulle', 'sugli', 'delle', 'degli', 'dalla', 'dalle', 'nella', 'nelle',
-  'riguardano', 'riguarda', 'parlano', 'cancella', 'elimina', 'siti', 'sito']);
+  'riguardano', 'riguarda', 'parlano', 'cancella', 'elimina', 'siti', 'sito', 'svuota', 'intero', 'intera', 'ogni',
+  'archiviate', 'archiviati', 'cronologia', 'cancellare', 'eliminare', 'rimuovi', 'rimuovere']);
 const senzaAccenti = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 // Una pagina di casa riguarda la richiesta se titolo o indirizzo contengono una sua
 // parola, a meno della desinenza («gatti» trova «gatto» e «gattini»).
-function casaPertinente(query, it) {
+const paroleDellaRichiesta = (query) => senzaAccenti(query).split(/[^a-z0-9]+/)
+  .filter((w) => w.length >= 4 && !PAROLE_VUOTE_ARCHIVIO.has(w));
+
+function casaPertinente(parole, it) {
   const dove = senzaAccenti(`${it.title || ''} ${it.url || ''}`);
-  return senzaAccenti(query).split(/[^a-z0-9]+/)
-    .filter((w) => w.length >= 4 && !PAROLE_VUOTE_ARCHIVIO.has(w))
-    .some((w) => dove.includes(w.slice(0, Math.max(4, w.length - 1))));
+  return parole.some((w) => dove.includes(w.slice(0, Math.max(4, w.length - 1))));
 }
 
 // Ogni destinatario riceve il messaggio ritagliato sul PROPRIO indirizzo (frame
