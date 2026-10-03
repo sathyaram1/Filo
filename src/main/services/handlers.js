@@ -3783,9 +3783,10 @@ function buildNoKeyDashboard(settings, saved) {
     action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
     importance: 2,
   }));
-  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu.
+  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu: nella home è la prima carta (#870).
   if (!settings.apiKeys?.openrouter) {
     suggestions.unshift({
+      carta: 'crediti',
       icon: 'credits', text: 'Apri Crediti e riscatta l\'invito',
       action: { type: 'NAVIGA', url: 'filo://credits/credits.html', label: 'Crediti' },
       importance: 3,

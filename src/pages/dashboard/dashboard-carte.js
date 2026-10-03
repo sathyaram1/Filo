@@ -1,0 +1,837 @@
+// Le carte della home (#870): a sinistra quello che accade, a destra quello che l'utente tiene, sotto «altro».
+// Timer, avvisi e suggerimenti li riceve da dashboard.js, che li possiede; la disposizione la chiede al main.
+// Regole: patterns/le-carte-della-home-hanno-un-contratto-unico.md
+(function (global) {
+  'use strict';
+
+  let d = null;
+  let MSG = null;
+  let C = null;
+  let accadeEl = null;
+  let tieniEl = null;
+  let altroEl = null;
+
+  let layout = null;
+  const dati = {
+    timers: [],
+    notifiche: [],
+    suggerimenti: [],
+    suggerimentiPronti: false,
+    tuttiSuggerimenti: false,
+    downloads: [],
+    editor: null,
+    mazzi: null,
+    impostazioni: null,
+  };
+
+  // Un download finito resta fra le cose accadute per un giorno: dopo lo si ritrova negli Scaricamenti.
+  const DOWNLOAD_RECENTE_MS = 24 * 60 * 60 * 1000;
+  const VOCI_IN_CARTA = 5;
+  const SUGGERIMENTI_VISIBILI = 5;
+  const URL_EDITOR = 'filo://editor/editor.html';
+  const URL_MAZZI = 'filo://decks/decks.html';
+  const URL_SCARICAMENTI = 'filo://downloads/downloads.html';
+  const URL_PREFERENZE = 'filo://preferences/preferences.html';
+
+  // ===== Piccoli attrezzi =====
+  function el(tag, cls, testo) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (testo != null) n.textContent = testo;
+    return n;
+  }
+  function icona(nome, size = 16) {
+    const ICONS = global.SN_ICONS || {};
+    const s = el('span', 'dash-carta-ico');
+    s.setAttribute('aria-hidden', 'true');
+    s.innerHTML = typeof ICONS[nome] === 'function' ? ICONS[nome](size) : '';
+    return s;
+  }
+  function apri(url) { d.send({ type: MSG.OPEN_URL, url }); }
+  function fmtBytes(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+    if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+    return `${(n / (1024 * 1024 * 1024)).toFixed(2).replace('.', ',')} GB`;
+  }
+  const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+  const hhmm = (dt) => `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+  function quando(iso) {
+    const t = Date.parse(iso);
+    if (!Number.isFinite(t)) return '';
+    const dt = new Date(t);
+    const oggi = new Date();
+    if (dt.toDateString() === oggi.toDateString()) return hhmm(dt);
+    if (dt.toDateString() === new Date(oggi.getTime() - 864e5).toDateString()) return 'ieri';
+    return `${dt.getDate()} ${MESI[dt.getMonth()]}`;
+  }
+  function plurale(n, uno, tanti) { return n === 1 ? `1 ${uno}` : `${n} ${tanti}`; }
+
+  // ===== Sveglie e timer =====
+  function ricorrenza(t) {
+    const M = global.SN_FILO_MEMORY;
+    return (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
+  }
+  // Se si ripete, il giorno della prossima volta dice meno dei giorni in cui suona (#322).
+  function quandoSuona(t) {
+    const dt = new Date(t.endsAt);
+    const rep = ricorrenza(t);
+    if (rep) return `${hhmm(dt)} · ${rep}`;
+    const ora = new Date();
+    if (dt.toDateString() === ora.toDateString()) return hhmm(dt);
+    if (dt.toDateString() === new Date(ora.getTime() + 864e5).toDateString()) return `domani, ${hhmm(dt)}`;
+    return `${dt.getDate()}/${dt.getMonth() + 1}, ${hhmm(dt)}`;
+  }
+  function restante(t) {
+    const s = (t.paused && Number.isFinite(t.remainingMs))
+      ? Math.max(0, Math.round(t.remainingMs / 1000))
+      : Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000));
+    return global.SN_TIME ? global.SN_TIME.fmtCountdown(s) : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+  const timerMsg = (type, id) => () => d.send({ type, id }).then(() => d.refreshLive());
+
+  function cartaTimer(t) {
+    const sveglia = t.kind === 'alarm';
+    const nome = t.label || (sveglia ? 'Sveglia' : 'Timer');
+    const rep = ricorrenza(t);
+    // Una sveglia che si ripete: «Ferma» la zittisce per oggi, togliere la carta la toglie del tutto.
+    const togli = timerMsg(rep || !t.ringing ? MSG.FILO_DELETE_TIMER : MSG.FILO_STOP_TIMER_ALARM, t.id);
+    const base = {
+      chiave: `timer:${t.id}`, tipo: sveglia ? 'sveglia' : 'timer', icona: sveglia ? 'alarm' : 'timer',
+      titolo: nome, togli, chat: t.chat || null, suona: !!t.ringing,
+      etichettaTogli: sveglia ? 'Togli la sveglia' : 'Togli il timer',
+    };
+    if (t.ringing) {
+      return {
+        ...base,
+        stato: sveglia ? (rep ? `suona · ${rep}` : 'suona adesso') : 'scaduto',
+        grande: true,
+        principale: { etichetta: 'Ferma', forte: true, fai: timerMsg(MSG.FILO_STOP_TIMER_ALARM, t.id) },
+        filo: sveglia ? `La sveglia «${nome}» sta suonando.` : `Il timer «${nome}» è scaduto.`,
+      };
+    }
+    if (sveglia) {
+      const q = quandoSuona(t);
+      return {
+        ...base,
+        stato: q,
+        principale: { etichetta: 'Sposta', fai: () => d.scriviNelCampo(`Sposta la sveglia «${nome}» alle `) },
+        filo: `La sveglia «${nome}» suona ${rep ? `alle ${q}` : (q.startsWith('domani') ? q : `alle ${q}`)}.`,
+      };
+    }
+    const resta = restante(t);
+    return {
+      ...base,
+      stato: t.paused ? `${resta} · in pausa` : resta,
+      grande: true,
+      principale: t.paused
+        ? { etichetta: 'Riprendi', fai: timerMsg(MSG.FILO_RESUME_TIMER, t.id) }
+        : { etichetta: 'Pausa', fai: timerMsg(MSG.FILO_PAUSE_TIMER, t.id) },
+      filo: t.paused ? `Il timer «${nome}» è in pausa: mancano ${resta}.` : `Il timer «${nome}» scade fra ${resta}.`,
+    };
+  }
+
+  // ===== Scaricamenti =====
+  const ATTIVI = new Set(['progressing', 'paused', 'pending']);
+  function downloadVisibile(r) {
+    if (!r || !r.id) return false;
+    if (ATTIVI.has(r.state)) return true;
+    if (r.state !== 'completed' && r.state !== 'interrupted') return false;
+    const fine = Date.parse(r.endedAt || r.startedAt || '');
+    return Number.isFinite(fine) && Date.now() - fine < DOWNLOAD_RECENTE_MS;
+  }
+  function percento(r) {
+    return r.totalBytes > 0 ? Math.min(100, Math.round((r.receivedBytes / r.totalBytes) * 100)) : null;
+  }
+  async function apriDownload(r, confermato = false) {
+    const res = await d.send({ type: MSG.DOWNLOAD_OPEN_FILE, id: r.id, confirmed: confermato });
+    if (!res || res.ok !== false) return;
+    // Un programma si apre solo col sì dell'utente (#588): le parole le scrive il main.
+    if (res.needsConfirm) {
+      const ok = global.SN_CONFIRM_UI
+        ? await global.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, okLabel: 'Apri comunque' })
+        : global.confirm(res.text);
+      if (ok) await apriDownload(r, true);
+      return;
+    }
+    if (res.missing) caricaDownloads();
+    d.avviso(res.error || 'Il file non si apre');
+  }
+  const cmdDownload = (type, r) => () => d.send({ type, id: r.id }).then(caricaDownloads);
+
+  function cartaDownload(r) {
+    const nome = r.filename || 'download';
+    const pct = percento(r);
+    const base = {
+      chiave: `download:${r.id}`, tipo: 'download', icona: 'download', titolo: nome,
+      togli: () => muovi({ tipo: 'nascondi', chiave: `download:${r.id}` }), etichettaTogli: 'Togli dalla home',
+      esterno: 'download',
+      altreVoci: [{ etichetta: 'Mostra negli Scaricamenti', fai: () => apri(URL_SCARICAMENTI) }],
+    };
+    if (r.state === 'progressing' || r.state === 'paused') {
+      const fermo = r.state === 'paused';
+      const quanto = pct != null ? `${pct}% · ${fmtBytes(r.receivedBytes)} di ${fmtBytes(r.totalBytes)}` : `${fmtBytes(r.receivedBytes)}`;
+      const pausa = r.canPause === false ? null : (fermo
+        ? { etichetta: 'Riprendi', fai: cmdDownload(MSG.DOWNLOAD_RESUME, r) }
+        : { etichetta: 'Pausa', fai: cmdDownload(MSG.DOWNLOAD_PAUSE, r) });
+      const annulla = { etichetta: 'Annulla', fai: cmdDownload(MSG.DOWNLOAD_CANCEL, r) };
+      return {
+        ...base,
+        stato: fermo ? `in pausa · ${quanto}` : quanto,
+        avanza: pct == null ? -1 : pct,
+        principale: pausa || annulla,
+        secondaria: pausa ? annulla : null,
+        filo: pct != null ? `Sto scaricando «${nome}»: ${pct}% (${fmtBytes(r.receivedBytes)} di ${fmtBytes(r.totalBytes)}).` : `Sto scaricando «${nome}».`,
+      };
+    }
+    if (r.state === 'pending') {
+      return {
+        ...base,
+        stato: 'è un programma: aspetta il tuo sì',
+        principale: { etichetta: 'Decidi', fai: () => apri(URL_SCARICAMENTI) },
+        filo: `«${nome}» è un programma: lo scarico solo se mi dici di sì, dagli Scaricamenti.`,
+      };
+    }
+    const cartella = { etichetta: 'Cartella', fai: () => d.send({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id }).then(() => caricaDownloads()) };
+    if (r.state === 'interrupted') {
+      return { ...base, stato: 'interrotto', principale: cartella, filo: `Lo scaricamento di «${nome}» si è interrotto.` };
+    }
+    if (r.missing) {
+      return { ...base, stato: 'il file non c’è più', principale: cartella, filo: `Avevo scaricato «${nome}», ma il file non è più al suo posto.` };
+    }
+    const peso = fmtBytes(r.totalBytes || r.receivedBytes);
+    return {
+      ...base,
+      stato: `scaricato · ${peso}`,
+      principale: { etichetta: 'Apri', forte: true, fai: () => apriDownload(r) },
+      secondaria: cartella,
+      filo: `Ho scaricato «${nome}» (${peso}).`,
+    };
+  }
+
+  // ===== Avvisi e crediti =====
+  function cartaAvviso(n) {
+    const allarme = n.kind === 'alert';
+    const chiudi = () => d.send({ type: MSG.FILO_DISMISS_NOTIFICATION, id: n.id }).then(() => d.refreshLive());
+    return {
+      chiave: `avviso:${n.id}`, tipo: 'avviso', icona: allarme ? 'warning' : 'bell',
+      titolo: allarme ? 'Avviso' : 'Filo', stato: n.text, lungo: true,
+      principale: { etichetta: 'Chiudi', fai: chiudi },
+      togli: chiudi, etichettaTogli: 'Chiudi l’avviso',
+      filo: n.text,
+    };
+  }
+  function suggerimentoCrediti() {
+    return dati.suggerimenti.find((s) => s && s.carta === 'crediti') || null;
+  }
+  function cartaCrediti(s) {
+    return {
+      chiave: 'crediti', tipo: 'crediti', icona: 'credits', titolo: 'Crediti',
+      stato: 'Riscatta l’invito e Filo si accende',
+      principale: { etichetta: 'Apri Crediti', forte: true, fai: (btn) => d.onSuggestionClick(s, btn) },
+      togli: () => muovi({ tipo: 'nascondi', chiave: 'crediti' }), etichettaTogli: 'Togli dalla home',
+      filo: 'Per accendermi serve un codice d’invito: lo riscatti nella pagina Crediti, dove puoi anche mettere una tua chiave OpenRouter.',
+    };
+  }
+
+  // L'ordine di Filo è l'urgenza; quello dell'utente, se ha spostato qualcosa, vince, tranne su quello che suona.
+  function carteSinistra() {
+    const nascoste = new Set((layout && layout.nascoste) || []);
+    const out = [];
+    const cred = suggerimentoCrediti();
+    if (cred && !nascoste.has('crediti')) out.push(cartaCrediti(cred));
+    const suonano = dati.timers.filter((t) => t.ringing).map(cartaTimer);
+    const resto = [];
+    for (const r of dati.downloads.filter((x) => ATTIVI.has(x.state) && downloadVisibile(x))) resto.push(cartaDownload(r));
+    const inCorso = dati.timers.filter((t) => !t.ringing)
+      .sort((a, b) => Date.parse(a.endsAt) - Date.parse(b.endsAt));
+    for (const t of inCorso) resto.push(cartaTimer(t));
+    for (const n of dati.notifiche) resto.push(cartaAvviso(n));
+    for (const r of dati.downloads.filter((x) => !ATTIVI.has(x.state) && downloadVisibile(x))) resto.push(cartaDownload(r));
+    const visibili = resto.filter((c) => !nascoste.has(c.chiave));
+    const ordine = C.ordinaSinistra(visibili.map((c) => c.chiave), layout);
+    const perChiave = new Map(visibili.map((c) => [c.chiave, c]));
+    return [...out, ...suonano, ...ordine.map((k) => perChiave.get(k))];
+  }
+
+  // ===== Le carte di destra =====
+  function voceLista({ testo, coda, titolo, fai, iconaEl }) {
+    const li = el('li');
+    const b = el('button', 'dash-carta-voce');
+    b.type = 'button';
+    if (iconaEl) b.appendChild(iconaEl);
+    b.appendChild(el('span', 'dash-carta-voce-testo', testo));
+    if (coda) b.appendChild(el('span', 'dash-carta-voce-coda', coda));
+    b.title = titolo || testo;
+    b.addEventListener('click', (e) => { e.stopPropagation(); fai(b); });
+    li.appendChild(b);
+    return li;
+  }
+
+  function cartaEditor() {
+    const e = dati.editor;
+    const file = (e && e.file) || [];
+    const voci = file.slice(0, VOCI_IN_CARTA).map((f) => ({
+      testo: f.titolo, coda: quando(f.modificato),
+      fai: () => apri(`${URL_EDITOR}?file=${encodeURIComponent(f.id)}`),
+    }));
+    if (file.length > VOCI_IN_CARTA) voci.push({ testo: `altri ${file.length - VOCI_IN_CARTA} nell’Editor`, fai: () => apri(URL_EDITOR), piano: true });
+    const titoli = file.slice(0, 3).map((f) => `«${f.titolo}»`).join(', ');
+    return {
+      stato: e ? (file.length ? plurale(file.length, 'documento', 'documenti') : 'nessun documento') : '…',
+      voci,
+      principale: { etichetta: file.length ? 'Apri l’Editor' : 'Scrivi', fai: () => apri(URL_EDITOR) },
+      filo: file.length
+        ? `Nell’Editor hai ${plurale(file.length, 'documento', 'documenti')}${titoli ? `; gli ultimi: ${titoli}` : ''}.`
+        : 'L’Editor è vuoto: quando vuoi, scriviamo qualcosa insieme.',
+    };
+  }
+
+  function cartaMazzi() {
+    const m = dati.mazzi;
+    const mazzi = (m || []).slice().sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+    const voci = mazzi.slice(0, VOCI_IN_CARTA).map((x) => ({
+      testo: x.nome || 'Mazzo', coda: quando(x.updated_at),
+      fai: () => apri(`${URL_MAZZI}#/deck/${encodeURIComponent(x.id)}`),
+    }));
+    if (mazzi.length > VOCI_IN_CARTA) voci.push({ testo: `altri ${mazzi.length - VOCI_IN_CARTA} nei Mazzi`, fai: () => apri(URL_MAZZI), piano: true });
+    const nomi = mazzi.slice(0, 3).map((x) => `«${x.nome || 'Mazzo'}»`).join(', ');
+    return {
+      stato: m ? (mazzi.length ? plurale(mazzi.length, 'mazzo', 'mazzi') : 'nessun mazzo') : '…',
+      voci,
+      principale: { etichetta: mazzi.length ? 'Apri i Mazzi' : 'Nuovo mazzo', fai: () => apri(URL_MAZZI) },
+      filo: mazzi.length ? `Hai ${plurale(mazzi.length, 'mazzo', 'mazzi')}${nomi ? `: ${nomi}` : ''}.` : 'Non hai ancora nessun mazzo.',
+    };
+  }
+
+  function faviconDi(s) {
+    const tipo = String((s.action && s.action.type) || '').toUpperCase();
+    const url = tipo === 'NAVIGA' ? d.faviconUrl(s.action.url) : '';
+    const ico = el('span', 'dash-carta-voce-ico');
+    ico.setAttribute('aria-hidden', 'true');
+    const iniziale = () => { ico.textContent = (String(s.icon || s.text || '·').trim()[0] || '·').toUpperCase(); };
+    if (url) {
+      const img = el('img');
+      img.src = url;
+      img.alt = '';
+      img.referrerPolicy = 'no-referrer';
+      img.onerror = () => { img.remove(); iniziale(); };
+      ico.appendChild(img);
+    } else iniziale();
+    return ico;
+  }
+
+  function cartaSuggerimenti() {
+    const tutti = dati.suggerimenti.filter((s) => s && s.text && s.carta !== 'crediti')
+      .sort((a, b) => (b.importance || 0) - (a.importance || 0));
+    const visibili = dati.tuttiSuggerimenti ? tutti : tutti.slice(0, SUGGERIMENTI_VISIBILI);
+    const voci = visibili.map((s) => ({ testo: s.text, iconaEl: faviconDi(s), fai: (b) => d.onSuggestionClick(s, b) }));
+    if (tutti.length > SUGGERIMENTI_VISIBILI) {
+      voci.push({
+        testo: dati.tuttiSuggerimenti ? 'Mostra meno' : `Mostra tutti (${tutti.length})`, piano: true,
+        fai: () => { dati.tuttiSuggerimenti = !dati.tuttiSuggerimenti; disegna(); },
+      });
+    }
+    const senzaChiave = !!suggerimentoCrediti();
+    return {
+      stato: !dati.suggerimentiPronti ? '…' : (tutti.length ? null : 'niente da suggerire, per ora'),
+      voci,
+      principale: senzaChiave ? null : { etichetta: 'Aggiorna', fai: () => d.aggiornaSuggerimenti() },
+      filo: tutti.length
+        ? `Ti suggerisco:\n${visibili.map((s) => `- ${s.text}`).join('\n')}`
+        : 'Per ora non ho suggerimenti: chiedimi pure quello che ti serve.',
+    };
+  }
+
+  function temaScuro(s) {
+    const t = (s && s.theme) || 'system';
+    if (t === 'system') return global.matchMedia && global.matchMedia('(prefers-color-scheme: dark)').matches;
+    return t === 'dark';
+  }
+  // Una pastiglia scrive solo il campo che cambia: il resto delle impostazioni non passa di qui.
+  function pastiglie() {
+    const s = dati.impostazioni || {};
+    const scuro = temaScuro(s);
+    return [
+      { etichetta: 'Tema scuro', acceso: scuro, scrivi: () => ({ theme: scuro ? 'light' : 'dark' }) },
+      { etichetta: 'Terminale', acceso: !!(s.terminal && s.terminal.enabled), scrivi: () => ({ terminal: { enabled: !(s.terminal && s.terminal.enabled) } }) },
+      { etichetta: 'Anteprima schede', acceso: !(s.tabPreview && s.tabPreview.enabled === false), scrivi: () => ({ tabPreview: { enabled: !!(s.tabPreview && s.tabPreview.enabled === false) } }) },
+    ];
+  }
+  function cartaRapide() {
+    const p = pastiglie();
+    return {
+      stato: null,
+      pastiglie: p,
+      principale: { etichetta: 'Preferenze', fai: () => apri(URL_PREFERENZE) },
+      filo: `Impostazioni rapide: ${p.map((x) => `${x.etichetta.toLowerCase()} ${x.acceso ? 'acceso' : 'spento'}`).join(', ')}.`,
+    };
+  }
+
+  const COSTRUTTORI = { editor: cartaEditor, mazzi: cartaMazzi, suggerimenti: cartaSuggerimenti, rapide: cartaRapide };
+
+  function carteDestra() {
+    return ((layout && layout.destra) || []).map((id) => {
+      const def = C.carta(id);
+      const corpo = COSTRUTTORI[id]();
+      return {
+        chiave: id, tipo: id, icona: def.icona, titolo: def.titolo, ...corpo,
+        togli: () => muovi({ tipo: 'togli', carta: id }), etichettaTogli: 'Togli dalla home',
+        sposta: true,
+        altreVoci: def.url && id !== 'rapide' ? [{ etichetta: `Apri ${def.titolo}`, fai: () => apri(def.url) }] : [],
+      };
+    });
+  }
+
+  // ===== Il contratto unico: titolo, stato, un'azione principale, «apri nel filo» =====
+  // Una carta si rifà solo se cambia la sua forma; se cambia solo il testo dello stato si scrive quello, così
+  // un clic che cade mentre il conto alla rovescia avanza resta sul suo pulsante.
+  function forma(c) {
+    return JSON.stringify([c.tipo, c.titolo, c.suona, c.grande, c.lungo, c.avanza != null,
+      c.principale && c.principale.etichetta, c.principale && c.principale.forte, c.secondaria && c.secondaria.etichetta,
+      (c.voci || []).map((v) => [v.testo, v.coda]), (c.pastiglie || []).map((p) => [p.etichetta, p.acceso]), c.stato == null]);
+  }
+
+  function costruisci(c, colonna) {
+    const art = el('article', 'dash-carta');
+    art.dataset.chiave = c.chiave;
+    art.dataset.tipo = c.tipo;
+    art.dataset.colonna = colonna;
+    if (c.suona) art.dataset.suona = '1';
+    art.tabIndex = 0;
+    art.draggable = true;
+    art.setAttribute('aria-label', c.titolo);
+
+    const testa = el('div', 'dash-carta-testa');
+    testa.appendChild(icona(c.icona));
+    const tit = el('span', 'dash-carta-tit', c.titolo);
+    tit.title = c.titolo;
+    testa.appendChild(tit);
+    const filo = el('button', 'dash-carta-filo', 'apri nel filo');
+    filo.type = 'button';
+    filo.title = 'Apri nel filo';
+    filo.addEventListener('click', (e) => { e.stopPropagation(); apriNelFilo(art); });
+    testa.appendChild(filo);
+    if (c.togli) {
+      const x = el('button', 'dash-carta-togli', '×');
+      x.type = 'button';
+      x.title = c.etichettaTogli || 'Togli';
+      x.setAttribute('aria-label', x.title);
+      x.addEventListener('click', (e) => { e.stopPropagation(); art._carta.togli(); });
+      testa.appendChild(x);
+    }
+    art.appendChild(testa);
+
+    if (c.stato != null) {
+      const st = el('div', `dash-carta-stato${c.grande ? ' grande' : ''}${c.lungo ? ' lungo' : ''}`, c.stato);
+      art.appendChild(st);
+    }
+    if (c.avanza != null) {
+      const bar = el('div', 'dash-carta-avanza');
+      const i = el('i');
+      bar.appendChild(i);
+      art.appendChild(bar);
+    }
+    if (c.voci && c.voci.length) {
+      const ul = el('ul', 'dash-carta-voci');
+      for (const v of c.voci) {
+        const li = voceLista(v);
+        if (v.piano) li.firstChild.classList.add('piano');
+        ul.appendChild(li);
+      }
+      art.appendChild(ul);
+    }
+    if (c.pastiglie) {
+      const riga = el('div', 'dash-carta-pastiglie');
+      for (const p of c.pastiglie) {
+        const b = el('button', `dash-pastiglia${p.acceso ? ' acceso' : ''}`, p.etichetta);
+        b.type = 'button';
+        b.setAttribute('aria-pressed', p.acceso ? 'true' : 'false');
+        b.title = p.acceso ? `${p.etichetta}: acceso` : `${p.etichetta}: spento`;
+        b.addEventListener('click', (e) => { e.stopPropagation(); scriviImpostazione(p.scrivi()); });
+        riga.appendChild(b);
+      }
+      art.appendChild(riga);
+    }
+    if (c.principale || c.secondaria) {
+      const piede = el('div', 'dash-carta-piede');
+      for (const [a, cls] of [[c.principale, 'principale'], [c.secondaria, 'secondaria']]) {
+        if (!a) continue;
+        const b = el('button', `dash-carta-az ${cls}${a.forte ? ' forte' : ''}`, a.etichetta);
+        b.type = 'button';
+        b.addEventListener('click', (e) => { e.stopPropagation(); const cur = art._carta[cls]; if (cur) cur.fai(b); });
+        piede.appendChild(b);
+      }
+      art.appendChild(piede);
+    }
+
+    // A sinistra la carta è una conversazione che Filo ha cominciato: il clic la apre nel filo.
+    art.addEventListener('click', () => { if (colonna === 'sinistra') apriNelFilo(art); });
+    art.addEventListener('keydown', (e) => {
+      if (e.target !== art) return;
+      if (e.key === 'Enter') { e.preventDefault(); if (colonna === 'sinistra' || !art._carta.principale) apriNelFilo(art); else art._carta.principale.fai(); }
+      else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+        e.preventDefault();
+        const r = art.getBoundingClientRect();
+        apriMenu(r.left + 12, r.top + 28, vociMenu(art));
+      } else if (e.key === 'Delete' && art._carta.togli) { e.preventDefault(); art._carta.togli(); }
+    });
+    art.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      apriMenu(e.clientX, e.clientY, vociMenu(art));
+    });
+    agganciaTrascinamento(art);
+    return art;
+  }
+
+  function aggiornaTesti(art, c) {
+    const st = art.querySelector('.dash-carta-stato');
+    if (st && st.textContent !== c.stato) st.textContent = c.stato;
+    const i = art.querySelector('.dash-carta-avanza > i');
+    if (i) {
+      const ind = c.avanza < 0;
+      i.parentNode.classList.toggle('indeterminato', ind);
+      i.style.width = ind ? '' : `${c.avanza}%`;
+    }
+  }
+
+  function disegnaColonna(host, carte, colonna) {
+    const presenti = new Map([...host.querySelectorAll(':scope > .dash-carta')].map((n) => [n.dataset.chiave, n]));
+    const ordine = [];
+    for (const c of carte) {
+      let art = presenti.get(c.chiave);
+      const f = forma(c);
+      if (!art || art._forma !== f) {
+        const nuovo = costruisci(c, colonna);
+        if (art) art.replaceWith(nuovo);
+        art = nuovo;
+        art._forma = f;
+      }
+      art._carta = c;
+      aggiornaTesti(art, c);
+      presenti.delete(c.chiave);
+      ordine.push(art);
+    }
+    for (const vecchia of presenti.values()) vecchia.remove();
+    ordine.forEach((art, i) => { if (host.children[i] !== art) host.insertBefore(art, host.children[i] || null); });
+  }
+
+  // ===== «altro»: le app senza carta, e le carte tolte =====
+  function disegnaAltro() {
+    const tolte = ((layout && layout.tolte) || []).map((id) => ({ ...C.carta(id), tolta: true }));
+    const voci = [...tolte, ...C.APP];
+    altroEl.replaceChildren();
+    const tit = el('div', 'dash-altro-tit', 'altro');
+    altroEl.appendChild(tit);
+    const griglia = el('div', 'dash-altro-griglia');
+    for (const v of voci) {
+      const cella = el('div', 'dash-altro-cella');
+      const b = el('button', 'dash-altro-app');
+      b.type = 'button';
+      b.dataset.id = v.id;
+      if (v.tolta) b.dataset.tolta = '1';
+      b.appendChild(icona(v.icona, 20));
+      b.appendChild(el('span', 'dash-altro-nome', v.titolo));
+      b.title = v.tolta ? (v.url ? `Apri ${v.titolo}` : 'Rimetti nella home') : `Apri ${v.titolo}`;
+      const rimetti = () => muovi({ tipo: 'aggiungi', carta: v.id });
+      b.addEventListener('click', () => { if (v.url) apri(v.url); else rimetti(); });
+      b.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const menu = [];
+        if (v.url) menu.push({ etichetta: `Apri ${v.titolo}`, fai: () => apri(v.url) });
+        if (v.tolta) menu.push({ etichetta: 'Rimetti nella home', fai: rimetti });
+        apriMenu(e.clientX, e.clientY, menu);
+      });
+      cella.appendChild(b);
+      if (v.tolta) {
+        b.draggable = true;
+        b.addEventListener('dragstart', (e) => {
+          presa = { chiave: v.id, colonna: 'altro', el: b };
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('application/x-filo-carta', v.id);
+          e.dataTransfer.setData('text/plain', v.titolo);
+        });
+        b.addEventListener('dragend', fineTrascinamento);
+        const piu = el('button', 'dash-altro-rimetti', '+');
+        piu.type = 'button';
+        piu.title = 'Rimetti nella home';
+        piu.setAttribute('aria-label', `Rimetti ${v.titolo} nella home`);
+        piu.addEventListener('click', (e) => { e.stopPropagation(); rimetti(); });
+        cella.appendChild(piu);
+      }
+      griglia.appendChild(cella);
+    }
+    altroEl.appendChild(griglia);
+  }
+
+  let trascinando = false;
+  let daRidisegnare = false;
+  function disegna() {
+    if (!layout || !accadeEl) return;
+    if (trascinando) { daRidisegnare = true; return; }
+    disegnaColonna(accadeEl, carteSinistra(), 'sinistra');
+    disegnaColonna(tieniEl, carteDestra(), 'destra');
+    disegnaAltro();
+    accadeEl.dataset.suona = dati.timers.some((t) => t.ringing) ? '1' : '0';
+  }
+
+  // ===== Menu del tasto destro =====
+  function vociMenu(art) {
+    const c = art._carta;
+    const voci = [];
+    if (c.principale) voci.push({ etichetta: c.principale.etichetta, fai: () => c.principale.fai() });
+    if (c.secondaria) voci.push({ etichetta: c.secondaria.etichetta, fai: () => c.secondaria.fai() });
+    for (const v of c.altreVoci || []) voci.push(v);
+    if (voci.length) voci.push(null);
+    voci.push({ etichetta: 'Apri nel filo', fai: () => apriNelFilo(art) });
+    const fratelli = [...art.parentNode.querySelectorAll(':scope > .dash-carta')];
+    const at = fratelli.indexOf(art);
+    if (at > 0) voci.push({ etichetta: 'Sposta su', fai: () => spostaCarta(art, -1) });
+    if (at >= 0 && at < fratelli.length - 1) voci.push({ etichetta: 'Sposta giù', fai: () => spostaCarta(art, 1) });
+    if (c.togli) voci.push({ etichetta: c.etichettaTogli || 'Togli', fai: () => c.togli() });
+    return voci;
+  }
+
+  let menuAperto = null;
+  function chiudiMenu() {
+    if (!menuAperto) return;
+    const { nodo, primaDelMenu } = menuAperto;
+    menuAperto = null;
+    nodo.remove();
+    document.removeEventListener('mousedown', fuoriDalMenu, true);
+    document.removeEventListener('keydown', tastiMenu, true);
+    global.removeEventListener('blur', chiudiMenu);
+    global.removeEventListener('resize', chiudiMenu);
+    if (primaDelMenu && primaDelMenu.isConnected) try { primaDelMenu.focus({ preventScroll: true }); } catch (_) {}
+  }
+  function fuoriDalMenu(e) { if (menuAperto && !menuAperto.nodo.contains(e.target)) chiudiMenu(); }
+  function tastiMenu(e) {
+    if (!menuAperto) return;
+    const voci = [...menuAperto.nodo.querySelectorAll('.dash-menu-voce')];
+    const at = voci.indexOf(document.activeElement);
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); chiudiMenu(); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); (voci[at + 1] || voci[0]).focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); (voci[at - 1] || voci[voci.length - 1]).focus(); }
+  }
+  function apriMenu(x, y, voci) {
+    chiudiMenu();
+    if (!voci.length) return;
+    const nodo = el('div', 'dash-menu');
+    nodo.setAttribute('role', 'menu');
+    for (const v of voci) {
+      if (!v) { nodo.appendChild(el('div', 'dash-menu-sep')); continue; }
+      const b = el('button', 'dash-menu-voce', v.etichetta);
+      b.type = 'button';
+      b.setAttribute('role', 'menuitem');
+      b.addEventListener('click', () => { chiudiMenu(); v.fai(); });
+      nodo.appendChild(b);
+    }
+    document.body.appendChild(nodo);
+    const w = nodo.offsetWidth;
+    const h = nodo.offsetHeight;
+    nodo.style.left = `${Math.max(4, Math.min(x, global.innerWidth - w - 4))}px`;
+    nodo.style.top = `${Math.max(4, Math.min(y, global.innerHeight - h - 4))}px`;
+    menuAperto = { nodo, primaDelMenu: document.activeElement };
+    const prima = nodo.querySelector('.dash-menu-voce');
+    if (prima) prima.focus({ preventScroll: true });
+    setTimeout(() => {
+      if (!menuAperto || menuAperto.nodo !== nodo) return;
+      document.addEventListener('mousedown', fuoriDalMenu, true);
+      document.addEventListener('keydown', tastiMenu, true);
+      global.addEventListener('blur', chiudiMenu);
+      global.addEventListener('resize', chiudiMenu);
+    }, 0);
+  }
+
+  // ===== Spostare, togliere, rimettere =====
+  function muovi(mossa) {
+    const prova = C.applica(layout, mossa);
+    if (prova.errore) return Promise.resolve(false);
+    layout = prova.layout;
+    disegna();
+    return d.send({ type: MSG.CARTE_HOME_MODIFICA, mossa }).then((r) => {
+      if (r && r.layout) { layout = C.normalizza(r.layout); disegna(); }
+      return !!(r && r.ok);
+    });
+  }
+
+  // `prima`: la chiave davanti a cui va (null = in fondo).
+  function ordinaColonna(colonna, chiave, prima) {
+    if (colonna === 'destra') return muovi({ tipo: 'sposta', carta: chiave, prima });
+    const chiavi = [...accadeEl.querySelectorAll(':scope > .dash-carta')].map((n) => n.dataset.chiave).filter((k) => k !== chiave);
+    const at = prima == null ? -1 : chiavi.indexOf(prima);
+    if (at < 0) chiavi.push(chiave); else chiavi.splice(at, 0, chiave);
+    return muovi({ tipo: 'ordina-sinistra', ordine: chiavi });
+  }
+  function spostaCarta(art, passo) {
+    const fratelli = [...art.parentNode.querySelectorAll(':scope > .dash-carta')];
+    const at = fratelli.indexOf(art);
+    const prima = passo < 0 ? fratelli[at - 1] : fratelli[at + 2];
+    ordinaColonna(art.dataset.colonna, art.dataset.chiave, prima ? prima.dataset.chiave : null)
+      .then(() => { const n = art.parentNode && art.parentNode.querySelector(`:scope > [data-chiave="${CSS.escape(art.dataset.chiave)}"]`); if (n) n.focus({ preventScroll: true }); });
+  }
+
+  let presa = null;
+  function fineTrascinamento() {
+    if (presa && presa.el) presa.el.classList.remove('presa');
+    presa = null;
+    for (const n of document.querySelectorAll('.dash-carta.sopra-prima, .dash-carta.sopra-dopo')) n.classList.remove('sopra-prima', 'sopra-dopo');
+    if (altroEl) altroEl.classList.remove('bersaglio');
+    trascinando = false;
+    if (daRidisegnare) { daRidisegnare = false; disegna(); }
+  }
+  function agganciaTrascinamento(art) {
+    art.addEventListener('dragstart', (e) => {
+      if (e.target !== art) return;
+      chiudiMenu();
+      presa = { chiave: art.dataset.chiave, colonna: art.dataset.colonna, el: art };
+      trascinando = true;
+      art.classList.add('presa');
+      const c = art._carta;
+      e.dataTransfer.effectAllowed = 'copyMove';
+      e.dataTransfer.setData('application/x-filo-carta', art.dataset.chiave);
+      // Nel campo di scrittura del filo arriva quello che la carta dice.
+      e.dataTransfer.setData('text/plain', c.stato ? `${c.titolo}: ${c.stato}` : c.titolo);
+    });
+    art.addEventListener('dragend', fineTrascinamento);
+  }
+  // Dove cade il puntatore dentro una colonna: la carta sotto, e se si entra sopra o sotto la sua metà.
+  function bersaglio(host, e) {
+    const carte = [...host.querySelectorAll(':scope > .dash-carta')].filter((n) => !presa || n !== presa.el);
+    for (const n of carte) {
+      const r = n.getBoundingClientRect();
+      if (e.clientY < r.top + r.height / 2) return { prima: n };
+    }
+    return { prima: null, ultima: carte[carte.length - 1] || null };
+  }
+  function ammessa(host) {
+    if (!presa) return false;
+    if (host === tieniEl) return presa.colonna === 'destra' || presa.colonna === 'altro';
+    return host === accadeEl && presa.colonna === 'sinistra';
+  }
+  function agganciaColonna(host) {
+    host.addEventListener('dragover', (e) => {
+      if (!ammessa(host)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      for (const n of host.querySelectorAll('.sopra-prima, .sopra-dopo')) n.classList.remove('sopra-prima', 'sopra-dopo');
+      const b = bersaglio(host, e);
+      if (b.prima) b.prima.classList.add('sopra-prima');
+      else if (b.ultima) b.ultima.classList.add('sopra-dopo');
+    });
+    host.addEventListener('dragleave', (e) => {
+      if (host.contains(e.relatedTarget)) return;
+      for (const n of host.querySelectorAll('.sopra-prima, .sopra-dopo')) n.classList.remove('sopra-prima', 'sopra-dopo');
+    });
+    host.addEventListener('drop', (e) => {
+      if (!ammessa(host)) return;
+      e.preventDefault();
+      const { chiave, colonna } = presa;
+      const b = bersaglio(host, e);
+      const prima = b.prima ? b.prima.dataset.chiave : null;
+      fineTrascinamento();
+      if (colonna === 'altro') muovi({ tipo: 'aggiungi', carta: chiave, prima });
+      else ordinaColonna(colonna, chiave, prima);
+    });
+  }
+  function agganciaAltro() {
+    altroEl.addEventListener('dragover', (e) => {
+      if (!presa || presa.colonna !== 'destra') return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      altroEl.classList.add('bersaglio');
+    });
+    altroEl.addEventListener('dragleave', (e) => { if (!altroEl.contains(e.relatedTarget)) altroEl.classList.remove('bersaglio'); });
+    altroEl.addEventListener('drop', (e) => {
+      if (!presa || presa.colonna !== 'destra') return;
+      e.preventDefault();
+      const chiave = presa.chiave;
+      fineTrascinamento();
+      muovi({ tipo: 'togli', carta: chiave });
+    });
+  }
+
+  // ===== «Apri nel filo» =====
+  function apriNelFilo(art) {
+    const c = art && art._carta;
+    if (!c) return;
+    d.apriNelFilo({ chat: c.chat || null, testo: c.filo || '', esterno: c.esterno || '' });
+  }
+
+  function scriviImpostazione(parziale) {
+    d.send({ type: MSG.UPDATE_SETTINGS, settings: parziale }).then((r) => {
+      if (r && r.ok && r.settings) { dati.impostazioni = r.settings; disegna(); }
+    });
+  }
+
+  // ===== Dati che la carta chiede da sé =====
+  async function caricaLayout() {
+    const r = await d.send({ type: MSG.CARTE_HOME_GET });
+    layout = C.normalizza(r && r.ok ? r.layout : null);
+    disegna();
+  }
+  async function caricaDownloads() {
+    const r = await d.send({ type: MSG.DOWNLOADS_LIST });
+    dati.downloads = (r && Array.isArray(r.items)) ? r.items : [];
+    disegna();
+  }
+  async function caricaEditor() {
+    const r = await d.send({ type: MSG.EDITOR_RECENTI });
+    dati.editor = r && r.ok ? r : { totale: 0, file: [] };
+    disegna();
+  }
+  async function caricaMazzi() {
+    const r = await d.send({ type: MSG.DECKS_LIST });
+    dati.mazzi = r && r.ok && Array.isArray(r.decks) ? r.decks : [];
+    disegna();
+  }
+  async function caricaImpostazioni() {
+    try { dati.impostazioni = await global.SN_STORAGE.getSettings(); } catch (_) { dati.impostazioni = {}; }
+    disegna();
+  }
+  let downloadsTimer = null;
+  function ricaricaDownloadsPresto() {
+    if (downloadsTimer) return;
+    downloadsTimer = setTimeout(() => { downloadsTimer = null; caricaDownloads().catch(() => {}); }, 250);
+  }
+
+  function init(deps) {
+    d = deps;
+    MSG = global.SN_MSG.MSG;
+    C = global.SN_CARTE_HOME;
+    accadeEl = deps.accadeEl;
+    tieniEl = deps.tieniEl;
+    altroEl = deps.altroEl;
+    agganciaColonna(accadeEl);
+    agganciaColonna(tieniEl);
+    agganciaAltro();
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg) return;
+      if (msg.type === MSG.CARTE_HOME_CAMBIATE && msg.layout) { layout = C.normalizza(msg.layout); disegna(); }
+      else if (msg.type === MSG.DOWNLOADS_UPDATED) ricaricaDownloadsPresto();
+      else if (msg.type === MSG.FILO_LIVE_UPDATED) caricaEditor().catch(() => {});
+      else if (msg.type === MSG.SETTINGS_UPDATED && msg.settings) { dati.impostazioni = msg.settings; disegna(); }
+      else if (msg.type === MSG.TAB_IN_VISTA && msg.inVista) {
+        caricaEditor().catch(() => {});
+        caricaMazzi().catch(() => {});
+        caricaDownloads().catch(() => {});
+      }
+    });
+    return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni()]).catch(() => {});
+  }
+
+  global.SN_DASH_CARTE = {
+    init,
+    setVive({ timers, notifiche }) {
+      dati.timers = Array.isArray(timers) ? timers : [];
+      dati.notifiche = Array.isArray(notifiche) ? notifiche : [];
+      disegna();
+    },
+    setSuggerimenti(lista, { pronti = true } = {}) {
+      dati.suggerimenti = Array.isArray(lista) ? lista : [];
+      dati.suggerimentiPronti = pronti;
+      disegna();
+    },
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : self);
