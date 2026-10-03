@@ -14,11 +14,12 @@ module.exports = function register(on, ctx) {
     return { ok: true, id };
   });
 
-  on('_tabs:remove', async (msg, sender) => {
+  // Chiude QUALSIASI scheda per id: un sito non ha mai motivo di chiudere quelle degli altri (la propria passa da CLOSE_TAB).
+  on('_tabs:remove', soloFilo(async (msg, sender) => {
     const win = winOf(sender);
     if (win && win._filoTabs) win._filoTabs.closeTab(msg.id);
     return { ok: true };
-  });
+  }));
 
   on(MSG.TAB_DOMINANT_COLOR, async (msg, sender) => {
     // Colore dominante campionato dalla pagina → tinge la tab attiva (§1.1).
@@ -58,27 +59,25 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.RUN_TAB_TRIAGE, async (msg, sender) => {
-    // Pulizia/riordino su richiesta esplicita (l'utente ha confermato nel
-    // bottone dell'agente). Gira sul TabManager della finestra del mittente.
+  // Il riordino chiude schede, le manda al modello e costa una chiamata: lo chiede solo un gesto su una pagina di Filo (#589.15).
+  on(MSG.RUN_TAB_TRIAGE, soloFilo(async (msg, sender) => {
     const win = winOf(sender);
     if (win && win._filoTabs) {
       const res = await win._filoTabs.runAutoTriage({ trigger: 'manual' });
       return { ok: true, archived: (res && res.archived) || 0 };
     }
     return { ok: false, archived: 0 };
-  });
+  }));
 
-  on(MSG.REORDER_TABS, async (msg, sender) => {
-    // "/riordina": riordino cromatico esplicito della striscia, senza archiviare
-    // nulla (a differenza di RUN_TAB_TRIAGE). Gira sul TabManager della finestra.
+  // "/riordina" sposta tutta la striscia: stessa porta del riordino con archivio.
+  on(MSG.REORDER_TABS, soloFilo(async (msg, sender) => {
     const win = winOf(sender);
     if (win && win._filoTabs) {
       const res = win._filoTabs.reorderTabs();
       return { ok: true, reordered: !!(res && res.reordered) };
     }
     return { ok: false, reordered: false };
-  });
+  }));
 
   // #376 — porta in primo piano una scheda già aperta. La usa il riferimento in
   // chat quando Filo ha aperto qualcosa in secondo piano (un brano da
