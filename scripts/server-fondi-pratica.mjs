@@ -159,7 +159,7 @@ export async function esegui(argv, deps = {}) {
       err([
         `Dici che il lavoro sta solo sul server, ma ${ramiApp.join(', ')} dell'app è legato a questa pratica e non è su main.`,
         `Se è di questo lavoro, rilancia senza --solo-server: ${soloComando.replace(/ --solo-server$/, '')}`,
-        'Se non lo è, legalo alla sua pratica e rilancia questo comando. Non ho toccato niente.',
+        'Se non lo è, legalo alla sua pratica (dal suo checkout: node scripts/verify-local.mjs start --feedback <N>) e rilancia questo comando. Non ho toccato niente.',
       ].join('\n'));
       return 1;
     }
