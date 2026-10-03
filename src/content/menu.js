@@ -1381,7 +1381,7 @@
         rimuovi: centro(riga.querySelector('.sn-menu-history-remove')),
         pronta: pronta(riga.querySelector('.sn-menu-history-paste')) && pronta(riga.querySelector('.sn-menu-history-remove')),
       })),
-      pronta: pronta(svuota),
+      svuotaPronta: pronta(svuota),
       vuoto: [...sub.querySelectorAll('.sn-menu-empty')].filter(visibile).map((e) => e.textContent).join(' '),
       cerca: cerca ? {
         centro: centro(cerca), valore: cerca.value, segnaposto: cerca.placeholder, fuoco: sub.getRootNode().activeElement === cerca,

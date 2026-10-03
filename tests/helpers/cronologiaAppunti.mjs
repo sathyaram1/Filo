@@ -31,7 +31,13 @@ export async function apriCronologia(app, page, campo) {
   const freccia = page.locator('.sn-menu-paste-arrow');
   await expect(freccia).toBeVisible();
   await freccia.click();
-  await expect.poll(() => statoCronologia(app, page), { timeout: 5000 }).not.toBeNull();
+  return cronologiaPronta(app, page);
+}
+
+// Il pannello aperto, quando ogni sua voce conterebbe un clic: il browser deve averla vista scoperta (#589.11).
+export async function cronologiaPronta(app, page) {
+  const pronta = (s) => !!s && s.voci.every((v) => v.pronta) && s.svuotaPronta !== false;
+  await expect.poll(async () => pronta(await statoCronologia(app, page)), { timeout: 5000 }).toBe(true);
   return statoCronologia(app, page);
 }
 
