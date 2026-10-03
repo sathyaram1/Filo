@@ -25,6 +25,7 @@
   let applyCommandCwd = () => {};
   let paroleUtente = () => [];
   let apriProposta = () => {};
+  let archiviaAzione = () => {};
 
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
@@ -284,7 +285,9 @@
       if (fn) parts.push(fn(n));
     }
     if (!parts.length) return hasReasoning ? 'Ragionamento' : 'Come ha lavorato';
-    const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}` : parts[0];
+    const ultima = parts[parts.length - 1];
+    const e = /^e/i.test(ultima) ? 'ed' : 'e';
+    const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} ${e} ${ultima}` : parts[0];
     return `Ha ${list}`;
   }
   function fmtActivityDuration(ms) {
@@ -991,6 +994,8 @@
     if (output) a._output = output;
     const row = activityRowFor(a);
     if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
+    // L'archivio delle chat ha salvato il turno senza le azioni in attesa: questa adesso è successa.
+    try { archiviaAzione(String(a.type || '').toUpperCase()); } catch (_) {}
   }
 
   // La pulizia parte SOLO al click, con conferma, mai da sola (spec §2.1).
@@ -1063,10 +1068,6 @@
       }
       const results = (r && r.ok && Array.isArray(r.results)) ? r.results : null;
       if (!results) {
-        if (r && r.ok && r.results === null) {
-          note.textContent = 'Ricerca non disponibile (manca la chiave per la ricerca semantica).';
-          return;
-        }
         // Senza un giudizio completo non si propone niente: un elenco a metà
         // farebbe credere di aver tolto tutto.
         note.textContent = `Non sono riuscito a capire quali schede riguardano “${query}”.`;
@@ -1158,6 +1159,7 @@
     if (deps.applyCommandCwd) applyCommandCwd = deps.applyCommandCwd;
     if (deps.paroleUtente) paroleUtente = deps.paroleUtente;
     if (deps.apriProposta) apriProposta = deps.apriProposta;
+    if (deps.archiviaAzione) archiviaAzione = deps.archiviaAzione;
   }
 
   global.SN_DASH_ATTIVITA = {

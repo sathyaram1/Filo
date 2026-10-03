@@ -3349,9 +3349,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
   if (chatId) {
+    // Nell'archivio solo ciò che è successo: riaperta, la chat racconta al passato
+    // ogni azione salvata. Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
+    const successe = renderedActions.filter((x) => x && x._executed && !x._confirm);
     const dopo = await appendToChatArchive(
       chatId,
-      { role: 'filo', text: textReply, actions: actionsToRun, ...(lettiRisposta.length ? { letti: lettiRisposta } : {}) },
+      { role: 'filo', text: textReply, actions: successe, ...(lettiRisposta.length ? { letti: lettiRisposta } : {}) },
       { onboarding: onbActive },
     );
     // La chat può essere finita mentre Filo stava ancora rispondendo: l'utente
@@ -4356,14 +4359,19 @@ async function archivioDaCancellare(query, { avanzamento = () => {} } = {}) {
   const settings = await getEffectiveSettings();
   let emb = null;
   try { emb = await embedTexts([q], settings); } catch (_) { emb = null; }
-  if (!emb || !emb.vectors[0] || !emb.vectors[0].length) return { ok: true, results: null, noEmbed: true };
-  const qv = quantizeEmbedding(emb.vectors[0]);
+  // Senza indice (rete giù, limite di spesa, nessun modello) decide lo stesso il
+  // giudice: tutte le schede vanno fra quelle senza vettore.
+  const qv = emb && emb.vectors[0] && emb.vectors[0].length ? quantizeEmbedding(emb.vectors[0]) : null;
   const scored = [];
   const senzaVettore = [];
+  const diCasa = [];
   for (const it of await ArchivedTabs.list()) {
-    // Le pagine della rete di casa non vanno a nessun modello (#591).
-    if (it.casa || isHomeNetworkUrl(it.url)) continue;
-    if (Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model) {
+    // Le pagine della rete di casa non vanno a nessun modello (#591): per loro un confronto per parole qui.
+    if (it.casa || isHomeNetworkUrl(it.url)) {
+      if (casaPertinente(q, it)) diCasa.push(it);
+      continue;
+    }
+    if (qv && Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model) {
       scored.push({ score: cosineInt(qv, it.embedding), it });
     } else if (it.title || it.summary || it.snippet || it.url) {
       senzaVettore.push(it);
@@ -4395,7 +4403,21 @@ async function archivioDaCancellare(query, { avanzamento = () => {} } = {}) {
   } catch (e) {
     return { ok: false, error: 'giudizio', detail: e?.message || String(e) };
   }
-  return { ok: true, results: trovate.map(({ embedding, ...meta }) => meta) };
+  return { ok: true, results: [...trovate, ...diCasa].map(({ embedding, ...meta }) => meta) };
+}
+
+const PAROLE_VUOTE_ARCHIVIO = new Set(['pagine', 'pagina', 'schede', 'scheda', 'archivio', 'tutte', 'tutto', 'tutti',
+  'quelle', 'quella', 'quello', 'quelli', 'sulle', 'sugli', 'delle', 'degli', 'dalla', 'dalle', 'nella', 'nelle',
+  'riguardano', 'riguarda', 'parlano', 'cancella', 'elimina', 'siti', 'sito']);
+const senzaAccenti = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+// Una pagina di casa riguarda la richiesta se titolo o indirizzo contengono una sua
+// parola, a meno della desinenza («gatti» trova «gatto» e «gattini»).
+function casaPertinente(query, it) {
+  const dove = senzaAccenti(`${it.title || ''} ${it.url || ''}`);
+  return senzaAccenti(query).split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 4 && !PAROLE_VUOTE_ARCHIVIO.has(w))
+    .some((w) => dove.includes(w.slice(0, Math.max(4, w.length - 1))));
 }
 
 // Ogni destinatario riceve il messaggio ritagliato sul PROPRIO indirizzo (frame

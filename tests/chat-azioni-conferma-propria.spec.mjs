@@ -52,31 +52,36 @@ async function fakeChat(app, giri) {
 // Archivio finto: `schede` = [{ title, gatto, senzaVettore? }]. Il vettore dice
 // «gatto» o «altro»; il giudice finto prende le righe col titolo sui gatti.
 // `guasti`: quante chiamate del giudice falliscono prima di rispondere (con
-// `guastiSu`, solo quelle che contengono quel testo); `ritardo`: ms per giudizio.
-async function seedArchive(app, schede, { guasti = 0, guastiSu = '', ritardo = 0 } = {}) {
-  await app.evaluate(async (_electron, { schede: s, guasti: g, guastiSu: su, ritardo: rit }) => {
+// `guastiSu`, solo quelle che contengono quel testo); `ritardo`: ms per giudizio;
+// `indiceGiu`: l'indicizzazione risponde con un errore di rete.
+async function seedArchive(app, schede, { guasti = 0, guastiSu = '', ritardo = 0, indiceGiu = false } = {}) {
+  await app.evaluate(async (_electron, { schede: s, guasti: g, guastiSu: su, ritardo: rit, giu }) => {
     const EM = globalThis.SN_TEST_MODELS.registry['qwen-embed'].model;
     const items = s.map((x, i) => ({
-      id: `t${i}`, url: `https://sito${i}.example.com/`, title: x.title, favicon: '',
+      id: `t${i}`, url: x.url || `https://sito${i}.example.com/`, title: x.title, favicon: '',
       closedAt: new Date(Date.now() - i * 1000).toISOString(), reason: 'manual', coOpenUrls: [],
       snippet: x.title,
       ...(x.senzaVettore ? {} : { embedding: x.gatto ? [127, 0] : [0, 127], embedModel: EM }),
     }));
     await chrome.storage.local.set({ [globalThis.SN_CONST.STORAGE_KEYS.ARCHIVED_TABS]: items });
-    globalThis.SN_PROVIDER_OPENROUTER.embed = async ({ texts }) => ({ vectors: texts.map(() => [1, 0]) });
-    globalThis.__giudice = { chiamate: 0, guasti: g };
+    globalThis.SN_PROVIDER_OPENROUTER.embed = async ({ texts }) => {
+      if (giu) throw new Error('fetch failed');
+      return { vectors: texts.map(() => [1, 0]) };
+    };
+    globalThis.__giudice = { chiamate: 0, guasti: g, testi: [] };
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
       const sys = String(messages[0] && messages[0].content || '');
       const out = (text) => ({ text, provider: attempts[0].provider, model: attempts[0].model, usage: {} });
       if (!/eliminare dall'archivio/.test(sys)) return out('{}');
       globalThis.__giudice.chiamate += 1;
       const user = String(messages[1].content || '');
+      globalThis.__giudice.testi.push(user);
       if (rit) await new Promise((r) => setTimeout(r, rit));
       if (globalThis.__giudice.guasti > 0 && (!su || user.includes(su))) { globalThis.__giudice.guasti -= 1; throw new Error('rete giù'); }
       const presi = [...user.matchAll(/^#(\d+) (.*)$/gm)].filter((m) => /gatt/i.test(m[2])).map((m) => Number(m[1]));
       return out(JSON.stringify({ pertinenti: presi }));
     };
-  }, { schede, guasti, guastiSu, ritardo });
+  }, { schede, guasti, guastiSu, ritardo, giu: indiceGiu });
 }
 
 const archiviate = (app) => app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((x) => x.title));
@@ -323,4 +328,83 @@ test('una scheda proposta per sbaglio si toglie dall\'elenco e resta; senza spun
   await clickConfirm(page, 'danger');
   await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminata definitivamente 1 scheda.', { timeout: 5_000 });
   expect((await archiviate(app)).sort()).toEqual(['Il Gattopardo, recensione', 'Ricetta della torta']);
+});
+
+test('chat riaperta dall\'archivio: racconta la cancellazione confermata, non il riordino mai premuto', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
+  await configure(app);
+  await seedArchive(app, [{ title: 'Gatti persiani', gatto: true }, { title: 'Torta', gatto: false }]);
+  await fakeChat(app, [
+    { toolCalls: [{ id: 'p6', name: 'PULISCI_TAB', arguments: '{}' }, { id: 'c6', name: 'CANCELLA_ARCHIVIO', arguments: '{"query":"gatti"}' }] },
+    { text: 'Ecco.' },
+  ]);
+
+  await chiedi(page, 'fai pulizia delle schede e cancella dall\'archivio le pagine sui gatti');
+  const panel = page.locator('.dash-delete-panel');
+  await expect(panel.locator('.dash-delete-list li')).toHaveCount(1, { timeout: 15_000 });
+  const chat = () => app.evaluate(() => globalThis.SN_FILO_CHATS.list().then((l) => l[0]));
+  await expect.poll(async () => ((await chat()) || { messages: [] }).messages.length, { timeout: 5_000 }).toBe(2);
+  // Il turno salvato non dice fatto ciò che aspetta ancora un clic.
+  expect((await chat()).messages[1].actions || []).toEqual([]);
+
+  await panel.locator('.dash-action-btn-danger').click();
+  await fillConfirmInput(page, 'conferma');
+  await clickConfirm(page, 'danger');
+  await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminata definitivamente 1 scheda.', { timeout: 5_000 });
+  await expect.poll(async () => (await chat()).messages.flatMap((m) => m.actions || []), { timeout: 5_000 }).toEqual(['CANCELLA_ARCHIVIO']);
+
+  const { id } = await chat();
+  await app.evaluate((_e, chatId) => globalThis.SN_CLOSE_FILO_CHAT(chatId), id);
+  await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(id)}`);
+  await expect(page.locator('.dash-bubble')).toHaveCount(2, { timeout: 8_000 });
+  const racconto = (await page.locator('.dash-bubble-note[data-replay]').allTextContents()).join(' | ');
+  expect(racconto).toContain('eliminato schede dall\'archivio');
+  expect(racconto).not.toContain('riordinato');
+});
+
+test('indicizzazione giù: il pannello propone lo stesso le schede pertinenti', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configure(app);
+  await seedArchive(app, [{ title: 'Gatti persiani', gatto: true }, { title: 'Torta', gatto: false }], { indiceGiu: true });
+  await fakeChat(app, [
+    { toolCalls: [{ id: 'c7', name: 'CANCELLA_ARCHIVIO', arguments: '{"query":"gatti"}' }] },
+    { text: 'Ecco.' },
+  ]);
+
+  await chiedi(page, 'cancella dall\'archivio le pagine sui gatti');
+  const panel = page.locator('.dash-delete-panel');
+  await expect(panel.locator('.dash-delete-note')).toHaveText(/Trovata 1 scheda pertinente/, { timeout: 15_000 });
+  await expect(panel.locator('.dash-delete-list li')).toHaveText(['Gatti persiani']);
+});
+
+test('le pagine della rete di casa si propongono per parole, senza passare dal modello', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configure(app);
+  await seedArchive(app, [
+    { title: 'Gatti persiani', gatto: true },
+    { title: 'Telecamera del gattino', gatto: true, url: 'http://192.168.1.20/' },
+    { title: 'Pannello del router', gatto: false, url: 'http://192.168.1.1/' },
+  ]);
+  await fakeChat(app, [
+    { toolCalls: [{ id: 'c8', name: 'CANCELLA_ARCHIVIO', arguments: '{"query":"pagine sui gatti"}' }] },
+    { text: 'Ecco.' },
+  ]);
+
+  await chiedi(page, 'cancella dall\'archivio le pagine sui gatti');
+  const panel = page.locator('.dash-delete-panel');
+  await expect(panel.locator('.dash-delete-list li')).toHaveText(['Gatti persiani', 'Telecamera del gattino'], { timeout: 15_000 });
+  const alGiudice = await app.evaluate(() => globalThis.__giudice.testi.join('\n'));
+  expect(alGiudice).toContain('Gatti persiani');
+  expect(alGiudice).not.toContain('192.168');
+  expect(alGiudice).not.toContain('Telecamera');
 });

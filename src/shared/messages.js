@@ -58,7 +58,7 @@
     // §3.2 — ricerca semantica nell'archivio (embedding Google). { query }
     SEARCH_ARCHIVED_TABS: 'search_archived_tabs',
     // §5 — le schede archiviate da proporre per la cancellazione: solo le
-    // pertinenti, tutte. { query } → { ok, results | null, error? }
+    // pertinenti, tutte. { query, richiesta } → { ok, results } | { ok: false, error }
     ARCHIVIO_DA_CANCELLARE: 'archivio_da_cancellare',
     // Main → la pagina che ha chiesto: { richiesta, fatte, totali } schede giudicate.
     ARCHIVIO_DA_CANCELLARE_AVANZAMENTO: 'archivio_da_cancellare_avanzamento',
