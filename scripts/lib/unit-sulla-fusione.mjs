@@ -4,10 +4,11 @@
 
 import { spawnSync, execFileSync } from 'node:child_process';
 import {
-  closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync,
+  closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync,
+  unlinkSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { sommaRiepiloghi, perLaRiga, allaLettera, NODE_LEGGE_MODELLI } from '../run-unit-tests.mjs';
 
@@ -293,7 +294,9 @@ export function provaUnitSullaFusione({ root, punta, git = gitIn(root), lancia =
   if (!/^[0-9a-f]{40}$/i.test(String(punta || ''))) return { errore: 'punta del ramo non valida', mainSha };
   if (git(['merge-base', '--is-ancestor', mainSha, punta]).ok) return { esito: 'main_contenuto', mainSha };
 
+  pulisciResti({ git });
   const base = realpathSync.native(mkdtempSync(join(tmpdir(), 'filo-fusione-')));
+  try { writeFileSync(join(base, FILE_PID), String(process.pid)); } catch (_) { /* senza pid la cartella vale viva per età */ }
   const nessunHook = join(base, 'nessun-hook');
   mkdirSync(nessunHook);
   const moduli = cartellaModuli(root);
