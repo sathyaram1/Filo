@@ -117,7 +117,7 @@
     const via = it.servedBy ? ` • via ${it.servedBy}` : '';
     left.textContent = `${formatActionLabel(it.action)} • ${it.model || ''}${via} • ${formatDate(it.timestamp)}`;
     meta.appendChild(left);
-    // Servita da un fornitore escluso: la voce lo dice, non solo il log.
+    // Servita da un fornitore non ammesso: la voce lo dice, non solo il log.
     if (it.policyViolation) {
       const warn = document.createElement('span');
       warn.className = 'sn-history-policy-warn';

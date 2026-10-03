@@ -582,15 +582,45 @@
   // separatore): così "Google Vertex" e "Google AI Studio" cadono sotto "Google",
   // ma "Googleplex-AI" (nome diverso) no.
   function isProviderExcluded(served, excluded) {
+    return matchesProviderBase(served, excluded);
+  }
+
+  function matchesProviderBase(served, bases) {
     const s = normalizeProviderName(served);
     if (!s) return false;
-    const list = Array.isArray(excluded) ? excluded : [];
+    const list = Array.isArray(bases) ? bases : [];
     return list.some((base) => {
       const b = normalizeProviderName(base);
       if (!b) return false;
       return s === b || s.startsWith(b + ' ') || s.startsWith(b + '/')
         || s.startsWith(b + '-') || s.startsWith(b + ',') || s.startsWith(b + '.');
     });
+  }
+
+  // Modelli chiusi che la politica ammette solo comprati dal produttore (#904): il
+  // router li fa servire anche da rivenditori (Amazon Bedrock, Azure) che la lista
+  // di esclusione non può togliere, perché servono anche modelli a pesi aperti.
+  // `only` va a OpenRouter come slug; `hosts` sono i nomi con cui riporta chi ha servito.
+  // Claude Platform on AWS lo gestisce Anthropic (diverso da Bedrock, gestito da AWS).
+  const PRODUCER_ONLY_MODELS = [
+    { prefix: 'anthropic/', only: ['anthropic', 'claude-on-aws'], hosts: ['Anthropic', 'Claude Platform on AWS'] },
+  ];
+
+  function producerOnlyRule(modelId) {
+    const id = String(modelId == null ? '' : modelId).trim().toLowerCase().replace(/^~/, '');
+    if (!id) return null;
+    return PRODUCER_ONLY_MODELS.find((r) => id.startsWith(r.prefix)) || null;
+  }
+
+  // Perché chi ha servito viola la politica: 'excluded' (è nella lista di
+  // esclusione), 'not-producer' (il modello si compra solo dal produttore e
+  // l'host non è dei suoi), '' se non la viola o se chi ha servito non si sa. PURA.
+  function servedPolicyViolation(servedBy, modelId, excluded) {
+    if (!normalizeProviderName(servedBy)) return '';
+    if (isProviderExcluded(servedBy, excluded)) return 'excluded';
+    const rule = producerOnlyRule(modelId);
+    if (rule && !matchesProviderBase(servedBy, [...rule.hosts, ...rule.only])) return 'not-producer';
+    return '';
   }
 
   // Forme base di `base` che `list` NON copre. PURA.
@@ -807,12 +837,12 @@
     'claude-haiku': 'deepseek',
   };
 
-  // Fornitori esclusi in più quando l'interruttore è acceso. Anthropic non è
-  // nella lista base (la politica ammette i suoi modelli): qui ci finisce perché
-  // il punto dell'interruttore è poter rifiutare anche quella scelta.
+  // Fornitori esclusi in più quando l'interruttore è acceso. Gli host di Anthropic
+  // non sono nella lista base (la politica ammette i suoi modelli): qui ci finiscono
+  // perché il punto dell'interruttore è poter rifiutare anche quella scelta.
   // I produttori dei «modelli stretti» ammessi dalla politica stanno qui per lo
   // stesso motivo: pesi chiusi comprati dal produttore, l'interruttore li spegne.
-  const OPEN_WEIGHTS_EXTRA_EXCLUDED = ['Anthropic', 'TypeSafe'];
+  const OPEN_WEIGHTS_EXTRA_EXCLUDED = [...PRODUCER_ONLY_MODELS.flatMap((r) => r.hosts), 'TypeSafe'];
 
   // Lista di esclusione EFFETTIVA da usare per una richiesta. PURA.
   function effectiveExcludedProviders(excluded, openWeightsOnly) {
@@ -2633,6 +2663,9 @@
     DEFAULT_EXCLUDED_PROVIDER_REASONS,
     normalizeProviderName,
     isProviderExcluded,
+    PRODUCER_ONLY_MODELS,
+    producerOnlyRule,
+    servedPolicyViolation,
     missingExcludedProviders,
     providerIgnoreList,
     excludedProviderReasons,

@@ -626,7 +626,7 @@
     history_reuse: 'riuso %s%',
     history_reuse_title: '%s token su %s riusati da una richiesta precedente invece di essere rielaborati: costano meno e la risposta arriva prima.',
     history_reuse_none_title: 'Nessuna parte di questa richiesta (%s token) è stata riusata da una richiesta precedente: è stata rielaborata tutta.',
-    history_policy_violation: '⚠ fornitore escluso',
+    history_policy_violation: '⚠ fornitore non ammesso',
     // Tempi del turno (idee «Latenza della chat»): quando è arrivato il primo
     // pezzo di ragionamento, la prima parola, e quando è finito.
     history_timing: 'ragiona %s · scrive %s · fine %s',

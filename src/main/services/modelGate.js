@@ -50,8 +50,8 @@
   function plainNoteServed(settings, action, result) {
     const servedBy = (result && result.servedBy) || null;
     const C = global.SN_CONST;
-    const violation = Boolean(servedBy && C && typeof C.isProviderExcluded === 'function'
-      && C.isProviderExcluded(servedBy, (settings && settings.excludedProviders) || []));
+    const violation = Boolean(servedBy && C && typeof C.servedPolicyViolation === 'function'
+      && C.servedPolicyViolation(servedBy, result.model, (settings && settings.excludedProviders) || []));
     return { servedBy, violation };
   }
 
@@ -95,7 +95,7 @@
       const res = r || {};
       const provider = res.provider || (chain[0] && chain[0].provider);
       const model = res.model || (chain[0] && chain[0].model);
-      const { servedBy, violation } = noteServed(s, action, res);
+      const { servedBy, violation } = noteServed(s, action, { ...res, model });
       const costEur = await recordCost(s, action, provider, model, res.usage);
       return { ...res, provider, model, servedBy, violation, costEur };
     }
@@ -153,7 +153,7 @@
           await recordCost(s, action, provider, model, { costUsd: r.costUsd, keySource: keySource || '' });
         }
         if (!r || !r.servedBy) { schedule(); return; }
-        const seen = noteServed(s, action, { servedBy: r.servedBy });
+        const seen = noteServed(s, action, { servedBy: r.servedBy, model });
         if (typeof onServedBy === 'function') {
           try { await onServedBy(seen); } catch (_) {}
         }
@@ -184,7 +184,7 @@
       const viaRouter = (method === 'complete' || method === 'streamComplete') && typeof router[method] === 'function';
       const r = (await (viaRouter ? router[method]({ ...input, provider: a.provider }) : P[method](input))) || {};
       const usage = r.usage;
-      const { servedBy, violation } = noteServed(s, action, r);
+      const { servedBy, violation } = noteServed(s, action, { ...r, model: r.model || a.model });
       const later = !servedBy && Boolean(r.generationId);
       const costNow = carriesCost(usage) || (!later && Boolean(usage));
       const costEur = costNow ? await recordCost(s, action, a.provider, a.model, usage) : 0;
