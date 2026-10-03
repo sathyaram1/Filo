@@ -11,10 +11,10 @@
     {
       version: '0.2.231', date: '2026-10-03',
       features: [
-        'Col tasto destro sull\'avviso di un sito pericoloso puoi chiedere a Filo di quel sito o segnalare un falso allarme: si apre una scheda nuova, e il sito resta coperto.',
+        'Col tasto destro sull\'avviso di un sito pericoloso puoi chiedere a Filo di quel sito o segnalare un falso allarme. Si apre una scheda nuova e il sito resta coperto.',
       ],
       fixes: [
-        'Un sito segnalato come pericoloso o sospetto non può più coprire o far sparire l\'avviso di Filo, né sentire quello che scrivi mentre l\'avviso è aperto.',
+        'L\'avviso dei siti pericolosi e sospetti adesso sta sopra la pagina, fuori dalla sua portata, e resta lì finché non scegli tu.',
       ],
     },
     {
