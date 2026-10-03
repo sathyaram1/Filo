@@ -506,8 +506,13 @@
       if (statusReason === 'arenato') {
         return { text: 'La lavorazione si è arenata troppe volte: decidi tu.', color: S.design.color };
       }
+      // Lo rimandano qui una sessione o una routine, su un feedback di chiunque (#914): la frase segue il mittente.
       if (statusReason === 'locale') {
-        return { text: 'Richiede lavoro locale, e in locale i feedback degli utenti non si lavorano: decidi tu.', color: S.design.color };
+        const mittente = localSenderCheck(fb);
+        let text = 'Richiede lavoro locale, e in locale i feedback degli utenti non si lavorano: decidi tu.';
+        if (mittente.ok) text = 'Richiede lavoro locale: con «Solo lavoro locale» la prende una sessione sulla tua macchina.';
+        else if (!mittente.utente) text = 'Richiede lavoro locale, ma l’ha aperto una routine e non si segna solo in locale: decidi tu.';
+        return { text, color: S.design.color };
       }
       return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
     }

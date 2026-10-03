@@ -24,7 +24,7 @@
 //   tutti e due saltano i giudici (#914): il primo va nei Lavori locali, il
 //   secondo In coda. Una routine non lo usa. Senza scelta
 //   non parte niente. Senza token (o col token rifiutato) non parte niente:
-//   da anonimo sarebbe un feedback d'utente. `--priorita` riusa lo stesso token.
+//   da anonimo sarebbe un feedback d'utente. `--priorita` nasce col documento.
 //
 // USO
 //   node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale
@@ -203,7 +203,12 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       // i giudici guardano (le vedono direttamente). Il resto sono documenti.
       images: (Array.isArray(allegati) ? allegati : []).filter((a) => a.type.startsWith('image/')),
       files: (Array.isArray(allegati) ? allegati : []).filter((a) => !a.type.startsWith('image/')),
-    }, { idToken, soloAdmin: true, ...(locale ? { localOnly: { by: CLIENT_ID, at: Date.now() } } : {}) });
+    }, {
+      idToken, soloAdmin: true,
+      // Nasce col documento: il server alla nascita la vede e non la fa decidere al giudice (#914).
+      ...(Number.isInteger(priorita) ? { priority: priorita } : {}),
+      ...(locale ? { localOnly: { by: CLIENT_ID, at: Date.now() } } : {}),
+    });
   } catch (e) {
     return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
   }
@@ -214,6 +219,7 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
   return {
     ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti,
     senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly),
+    priorita: Number.isInteger(priorita) && res && res.senderProof === 'admin' ? priorita : null,
   };
 }
 
@@ -233,31 +239,6 @@ export const credenziale = {
     }
   },
 };
-
-/**
- * Priorità: le regole non la concedono a un mittente anonimo (vedi il ramo
- * `create` di firestore.rules), quindi si scrive DOPO, con le credenziali
- * dell'owner. È l'unico pezzo che ne ha bisogno: se qui non ci sono, il
- * feedback resta depositato e lo si dice — meglio di un feedback non aperto.
- *
- * Si scrive anche `priorityManual`, altrimenti il giudice di priorità del
- * server la sovrascrive appena passa: una priorità che sparisce da sola è
- * peggio di una non impostata.
- */
-export async function applicaPriorita(id, valore, idTokenGiaPreso = '') {
-  let idToken = idTokenGiaPreso;
-  if (!idToken) {
-    const c = await credenziale.ottieni();
-    if (!c.idToken) return { ok: false, motivo: c.motivo };
-    idToken = c.idToken;
-  }
-  try {
-    await FB.updateStatus(id, { priority: valore, priorityManual: true }, { idToken });
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, motivo: String((e && e.message) || e) };
-  }
-}
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
@@ -407,11 +388,9 @@ export async function main(argvIn) {
   }
 
   // `!= null`, non un controllo di verità: lo 0 è una priorità da scrivere.
-  if (p.valore != null) {
-    const pr = await applicaPriorita(r.id, p.valore, cred.idToken);
-    if (pr.ok) console.log(`Priorità ${p.valore} impostata.`);
-    else console.log(`Priorità NON impostata (${pr.motivo}): mettila dalla dashboard.`);
-  }
+  if (r.priorita != null) console.log(`Priorità ${r.priorita} impostata.`);
+  else if (p.valore != null) console.log(`Priorità ${p.valore} NON impostata: mettila dalla dashboard.`);
+  else if (!locale) console.log('Priorità: la decide il giudice di priorità, come per ogni feedback che entra in coda.');
   // Un allegato mancante è un rifiuto parziale: chi lancia lo script deve
   // accorgersene, perché il feedback senza il documento può non avere senso.
   return (r.falliti && r.falliti.length) ? EXIT.RIFIUTATO : EXIT.FATTO;
