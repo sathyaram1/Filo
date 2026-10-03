@@ -136,12 +136,14 @@ export function rapportiDaRiunire(flags, copia) {
   }
   // Come node: un reporter senza destinazione va su stdout; con numeri diversi è node a rifiutare, e i flag restano.
   if (!destinazioni.length && reporter.length === 1) destinazioni.push('stdout');
-  if (destinazioni.length !== reporter.length) return { flags, rapporti: [] };
+  if (destinazioni.length !== reporter.length) return { flags, rapporti: [], accodati: [] };
   const rapporti = [];
+  const accodati = [];
   const coppie = reporter.flatMap((r, k) => {
     const d = destinazioni[k];
     const daRiunire = d === 'stdout' ? DOCUMENTI.has(r) : d !== 'stderr';
     if (daRiunire) rapporti.push(d);
+    if (!DOCUMENTI.has(r)) accodati.push(d);
     return [`${REPORTER}=${r}`, `${DESTINAZIONE}=${daRiunire ? copia(rapporti.length - 1) : d}`];
   });
   return { flags: [...resto, ...coppie], rapporti };
