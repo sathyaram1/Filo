@@ -46,6 +46,12 @@ tasto destro di Filo restava sotto la modale, inerte.
   giudica come la pagina che l'ha creato (nella scheda o in una scheda aperta da
   lei), e una finestrella di accesso con un sito da avviso torna in una scheda,
   dove l'avviso c'è. Una pagina sotto l'avviso non apre finestrelle.
+- **Una finestrella segue la scheda che l'ha aperta.** Il suo sito è l'origine
+  del documento, non l'indirizzo: una pagina vuota scritta dall'apritore è sua.
+  Quando la scheda riceve l'avviso, ogni sua finestrella dello stesso sito torna
+  in una scheda; un verdetto in ritardo vale finché il sito è lo stesso, anche
+  con l'indirizzo cambiato sul posto. Giudicarla solo dal proprio indirizzo nel
+  momento del verdetto ha lasciato aperte due porte (#813.5, giro 2).
 - **Lo stato sta nel main, per scheda** (`tab.sbAvviso`, `_sbMostra` in
   `src/main/tabs/tabSafebrowse.js`). Il content script manda solo indirizzo e
   indizi; un verdetto in ritardo per un sito da cui la scheda è andata via non

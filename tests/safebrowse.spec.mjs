@@ -840,3 +840,55 @@ test('una finestrella di accesso che apre un sito in lista torna in una scheda, 
   await expect.poll(() => copertura(app)).toEqual(COPERTA);
   expect(await finestreFuoriDaFilo(app)).toEqual([]);
 });
+
+// La finestrella aperta prima del verdetto segue la scheda che l'ha aperta, anche se poi il sito la riscrive.
+async function gsbInRitardo(app, host, ms) {
+  await app.evaluate((_e, { host, ms }) => {
+    globalThis.SN_SAFEBROWSE.setProviders({
+      gsb: async (url, norm) => { await new Promise((r) => setTimeout(r, ms)); return norm.host === host ? { listed: true, category: 'phishing' } : null; },
+      rdap: null, ct: null, sandbox: null, llm: async () => ({ suspicious: false, reason: null }),
+    });
+  }, { host, ms });
+}
+
+test('finestrella aperta prima del verdetto e poi riscritta dal sito in lista in una pagina vuota: torna in una scheda, sotto l\'avviso', async ({ app, shell }) => {
+  const h = 'conto-vuota.com';
+  const idp = 'accesso-esempio.org';
+  await serviInCaricamento(app, {
+    [h + '/login']: '<title>Attendere</title><p>Caricamento…</p><script>var F=' + JSON.stringify(BLOB_MODULO).replace(/<\//g, '<\\/')
+      + `;if(!localStorage.aperta){localStorage.aperta=1;var p=window.open("https://${idp}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600");`
+      + 'setTimeout(function(){p.location="about:blank";setTimeout(function(){p.document.open();p.document.write(F);p.document.close()},700)},3000)}</script>',
+    [idp + '/oauth/authorize']: '<title>Accedi con</title><p>Accesso</p>',
+  });
+  await gsbInRitardo(app, h, 800);
+  await apriSenzaAspettare(app, shell, `https://${h}/login`);
+  await expect.poll(() => finestreFuoriDaFilo(app), { timeout: 8_000 }).toEqual([expect.stringContaining(idp)]);
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+  await expect.poll(async () => (await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .filter((w) => !w._filoTabs && !w.isDestroyed() && w.isVisible() && w.webContents.getType() === 'window').length)), { timeout: 8_000 }).toBe(0);
+  await expect.poll(() => urlAttiva(app)).toContain(`${h}/login`);
+  await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  await scriviDallaTastiera(app, 'segreto');
+  await expect(avviso.getByPlaceholder('confermo')).toHaveValue('segreto');
+});
+
+test('finestrella del sito in lista che cambia indirizzo sul posto prima del verdetto: torna in una scheda, sotto l\'avviso', async ({ app, shell }) => {
+  const h = 'conto-sposta.com';
+  await serviInCaricamento(app, {
+    [h + '/login']: `<title>Attendere</title><p>Caricamento…</p><script>if(!localStorage.aperta){localStorage.aperta=1;window.open("https://${h}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600")}</script>`,
+    [h + '/oauth/authorize']: BLOB_MODULO + '<script>var i=0;setInterval(function(){history.replaceState(null,"",'
+      + 'location.pathname+"?client_id=1&redirect_uri=x&t="+(++i))},150)</script>',
+  });
+  await gsbInRitardo(app, h, 1500);
+  await apriSenzaAspettare(app, shell, `https://${h}/login`);
+  const avviso = await vistaAvviso(app, 12_000);
+  await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+  await expect.poll(() => finestreFuoriDaFilo(app), { timeout: 8_000 }).toEqual([]);
+  await expect.poll(() => urlAttiva(app)).toContain(`${h}/oauth/authorize`);
+  await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  await scriviDallaTastiera(app, 'segreto');
+  await expect(avviso.getByPlaceholder('confermo')).toHaveValue('segreto');
+  const accesso = app.windows().find((w) => { try { return w.url().includes('/oauth/authorize'); } catch (_) { return false; } });
+  expect(await accesso.evaluate(() => ({ k: window.__k, pw: document.getElementById('pw').value }))).toEqual({ k: '', pw: '' });
+});
