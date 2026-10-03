@@ -1,0 +1,172 @@
+// #630 — Un avviso in basso a destra non se ne va mentre l'utente ci tiene sopra il puntatore, e la durata
+// delle Preferenze vale per tutti gli avvisi, anche quelli disegnati dentro le pagine. Gli avvisi della barra
+// hanno il loro spec (avvisi-sopra-pagina, notifications): qui le pile delle pagine.
+//
+// Prima: «Copiato» e simili sparivano dopo 2,2 s anche col puntatore sopra, ignoravano la durata scelta in
+// Preferenze e, trasparenti ai clic, non si potevano chiudere.
+
+import { test, expect } from './fixtures/electron.mjs';
+import { mkdirSync } from 'node:fs';
+
+const PAGE = `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif;height:100vh">
+  <h1>Pagina con un collegamento</h1>
+  <a id="link" href="https://example.com/articolo">Un collegamento di prova</a>
+</body></html>`;
+
+function shot(page, name) {
+  try { mkdirSync('tests/.shots', { recursive: true }); } catch (_) {}
+  return page.screenshot({ path: `tests/.shots/${name}.png` }).catch(() => {});
+}
+
+// «Copia URL» dal tasto destro vero sul link: produce l'avviso «Copiato» nella pila della pagina.
+async function copiaUrl(page) {
+  const menu = page.locator('.sn-menu');
+  for (let i = 0; i < 6; i++) {
+    await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });
+    const voce = menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' });
+    try {
+      await voce.first().waitFor({ state: 'visible', timeout: 1500 });
+      await voce.first().click();
+      await expect(menu).toHaveCount(0);
+      return;
+    } catch (_) { await page.waitForTimeout(200); }
+  }
+  throw new Error('voce «Copia URL» non raggiungibile');
+}
+
+// Il puntatore vero sul centro dell'avviso (quando ha finito di entrare).
+async function puntatoreSopra(page, locator) {
+  await expect(locator).toHaveClass(/sn-toast-visible|show/);
+  await page.waitForTimeout(250);
+  const b = await locator.boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 4 });
+}
+
+async function impostaDurata(shell, durationSec) {
+  await shell.evaluate((d) => window.filoShell.message({
+    type: 'update_settings',
+    settings: { notifications: { durationSec: d, soundEnabled: false, sound: 'default' } },
+  }), durationSec);
+}
+
+test('su una pagina web «Copiato» resta finché il puntatore ci sta sopra, e se ne va poco dopo che esce', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, PAGE);
+  await copiaUrl(page);
+  const avviso = page.locator('.sn-toast');
+  await expect(avviso).toHaveCount(1);
+
+  await puntatoreSopra(page, avviso);
+  // Ben oltre i 2,2 s della sua durata: c'è ancora, e risponde al passaggio.
+  await page.waitForTimeout(3500);
+  await expect(avviso).toBeVisible();
+  const sfondo = await avviso.evaluate((el) => getComputedStyle(el).backgroundColor);
+  await shot(page, 'avviso-630-puntatore-sopra');
+
+  await page.mouse.move(40, 40, { steps: 4 });
+  const fuori = await avviso.evaluate((el) => getComputedStyle(el).backgroundColor).catch(() => null);
+  expect(fuori, 'al passaggio del puntatore l’avviso non dava nessun segno').not.toBe(sfondo);
+  // Chi era agli sgoccioli ha ancora un attimo per finire di leggere, poi se ne va da solo.
+  await page.waitForTimeout(900);
+  await expect(avviso).toBeVisible();
+  await expect(avviso).toHaveCount(0, { timeout: 4000 });
+});
+
+test('col puntatore su un avviso aspettano anche gli altri della pila', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, PAGE);
+  await copiaUrl(page);
+  await copiaUrl(page);
+  const avvisi = page.locator('.sn-toast');
+  await expect(avvisi).toHaveCount(2);
+  await puntatoreSopra(page, avvisi.last());
+  await page.waitForTimeout(3500);
+  await expect(avvisi, 'l’avviso sopra quello col puntatore è sparito e la pila è scivolata sotto il cursore').toHaveCount(2);
+  await page.mouse.move(40, 40, { steps: 4 });
+  await expect(avvisi).toHaveCount(0, { timeout: 4500 });
+});
+
+test('un clic chiude l’avviso nella pagina, e il clic accanto resta della pagina', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, PAGE);
+  await copiaUrl(page);
+  const avviso = page.locator('.sn-toast');
+  await expect(avviso).toHaveCount(1);
+  await puntatoreSopra(page, avviso);
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(avviso).toHaveCount(0, { timeout: 1500 });
+});
+
+test('la durata delle Preferenze vale anche per gli avvisi delle pagine, e a 0 restano finché non li chiudi', async ({ shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, PAGE);
+
+  // Il doppio della durata standard: «Copiato» passa da 2,2 a 4,4 s.
+  await impostaDurata(shell, 10);
+  await page.waitForTimeout(300);
+  await copiaUrl(page);
+  const avviso = page.locator('.sn-toast');
+  await expect(avviso).toHaveCount(1);
+  await page.waitForTimeout(3200);
+  await expect(avviso, 'la durata scelta in Preferenze non arriva agli avvisi della pagina').toHaveCount(1);
+  await expect(avviso).toHaveCount(0, { timeout: 4000 });
+
+  await impostaDurata(shell, 0);
+  await page.waitForTimeout(300);
+  await copiaUrl(page);
+  await expect(avviso).toHaveCount(1);
+  await page.waitForTimeout(4000);
+  await expect(avviso).toBeVisible();
+  await avviso.click();
+  await expect(avviso).toHaveCount(0, { timeout: 1500 });
+});
+
+test('nella nuova scheda (dove è nata la segnalazione) l’avviso aspetta il puntatore', async ({ openTab }) => {
+  const page = await openTab('filo://newtab/');
+  await page.waitForFunction(() => !!(globalThis.SN_POPUP && globalThis.SN_AVVISI), null, { timeout: 8000 });
+  await page.evaluate(() => globalThis.SN_POPUP.showToast('Avviso nella nuova scheda'));
+  const avviso = page.locator('.sn-toast', { hasText: 'Avviso nella nuova scheda' });
+  await puntatoreSopra(page, avviso);
+  await page.waitForTimeout(3500);
+  await expect(avviso).toBeVisible();
+  await shot(page, 'avviso-630-nuova-scheda');
+  await page.mouse.move(20, 300, { steps: 4 });
+  await expect(avviso).toHaveCount(0, { timeout: 4000 });
+});
+
+test('editor: l’avviso con «Annulla» aspetta il puntatore e segue la durata delle Preferenze', async ({ shell, openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  // Durata 1 s: l'avviso con un pulsante (7 s di base) scende a 1,4 s.
+  await impostaDurata(shell, 1);
+  await page.waitForTimeout(300);
+  await page.click('#docSwitch');
+  await page.click('#docNew');
+  await page.click('#docSwitch');
+  await expect(page.locator('.ed-doc-item')).toHaveCount(2);
+  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();
+  const avviso = page.locator('.ed-toast.show');
+  await expect(avviso).toHaveCount(1);
+  await puntatoreSopra(page, avviso);
+  await page.waitForTimeout(3000);
+  await expect(avviso, 'l’avviso dell’editor se n’è andato col puntatore sopra').toHaveCount(1);
+  await page.mouse.move(400, 40, { steps: 4 });
+  await expect(page.locator('.ed-toast')).toHaveCount(0, { timeout: 4000 });
+});
+
+test('mazzi: l’avviso aspetta il puntatore e un clic lo chiude', async ({ openTab }) => {
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.click('#newDeck');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  await page.click('#deckName');
+  await page.locator('.dk-switcher .sn-select-option', { hasText: 'Budget' }).click();
+  const campo = page.locator('#deckBudgetEdit');
+  await campo.pressSequentially('abc');
+  await campo.press('Enter');
+  const avviso = page.locator('.dk-toast.show');
+  await expect(avviso).toBeVisible();
+  await puntatoreSopra(page, avviso);
+  await page.waitForTimeout(4200);
+  await expect(avviso, 'l’avviso dei mazzi se n’è andato col puntatore sopra').toBeVisible();
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(avviso).toHaveCount(0, { timeout: 1500 });
+});

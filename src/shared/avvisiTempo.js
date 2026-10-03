@@ -4,6 +4,8 @@
 
 (function (global) {
   'use strict';
+  // Sulle pagine filo:// il preload e la pagina condividono il mondo: ricaricato, azzererebbe la preferenza.
+  if (global.SN_AVVISI) return;
 
   // La durata delle Preferenze è quella dell'avviso standard: chi chiede di più o di meno per il suo
   // testo (una conferma breve, un avviso con un pulsante) resta in proporzione, così una preferenza sola

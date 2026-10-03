@@ -2,7 +2,7 @@
 // La durata delle Preferenze vale per l'avviso standard e porta in scala tutti gli altri; col puntatore
 // sopra un avviso i tempi di tutta la pila si fermano, e all'uscita a chi era agli sgoccioli resta tempo.
 
-import { test, mock } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
