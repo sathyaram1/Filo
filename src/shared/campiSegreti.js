@@ -122,7 +122,7 @@
       if (copertoAschermo(el) || eranoCoperti.has(el)) return true;
       if (AUTOCOMPLETE_SEGRETO.test(String(el.getAttribute('autocomplete') || ''))) return true;
       const nomi = ['aria-label', 'placeholder', 'name', 'id', 'title'].map((a) => el.getAttribute(a) || '');
-      nomi.push(etichettaCollegata(el));
+      nomi.push(etichettaCollegata(el), etichettaVicina(el));
       if (PAROLE_SEGRETE.test(nomi.join(' ').replace(/([a-z])([A-Z])/g, '$1 $2'))) return true;
       return formaDiCarta(el.value);
     }
