@@ -167,7 +167,7 @@ test('la parte dell’app già su main secondo la pratica: un suo ramo rimasto i
 });
 
 test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro: il server la usa, non la riapre, la annota', async () => {
-  const d = doc('p', { status: 'done', parti: { app: ORA - 3 * ORE } });
+  const d = doc('p', { status: 'done', parti: { app: ORA - 3 * ORE, ramo: 'claude/x' } });
   const prova = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p', '--dry-run'] });
   assert.equal(prova.k, 0, prova.testo);
   assert.deepEqual(prova.scritture, []);
