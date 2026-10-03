@@ -696,7 +696,8 @@ export function readRoleInstructions(role, { scope, caso } = {}) {
  *   - secaudit: SOLO il diff, MAI il feedback (isolamento strutturale).
  *   - verifier: il feedback (sintomo), MAI il diff (isolamento comportamentale).
  *   - fixer    (caso `riallineamento`): il feedback, per capire le intenzioni
- *              in conflitto. Nessuna critica: qui non si corregge niente.
+ *              in conflitto, e il perché scritto dal server (`critique`): un
+ *              conflitto, o gli unit rossi sulla fusione con il loro elenco (#929).
  *   - new-work (resolver, caso `primo-passaggio`): il feedback decifrato.
  *   - prober:   niente.
  *
