@@ -241,7 +241,11 @@ export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false,
       ? `[test:unit] i gruppi ${muti.join(', ')} sono usciti rossi senza un test rosso registrato: la causa è nella loro uscita, ${dove}.`
       : `[test:unit] il gruppo ${muti[0]} è uscito rosso senza un test rosso registrato: la causa è nella sua uscita, ${dove}.`);
   }
-  if (scritti.length) out.push(`[test:unit] i rapporti di tutti i gruppi sono riuniti ${scritti.map(doveRapporto).join(', ')}.`);
+  const riuniti = scritti.filter((d) => !accodati.includes(d));
+  if (riuniti.length) out.push(`[test:unit] i rapporti di tutti i gruppi sono riuniti ${riuniti.map(doveRapporto).join(', ')}.`);
+  for (const d of accodati.filter((x) => !rapportiPersi.includes(x))) {
+    out.push(`[test:unit] ${doveRapporto(d)} c'è un rapporto per gruppo, uno dopo l'altro: i conti di tutta la suite sono in questo riepilogo.`);
+  }
   for (const d of rapportiPersi) out.push(`[test:unit] il rapporto chiesto ${doveRapporto(d)} non è stato scritto: il motivo è sopra.`);
   if (copertura) out.push(`[test:unit] la copertura è per gruppo: ${gruppi} conti, ciascuno sui soli file del suo gruppo, nessuno sulla suite intera.`);
   if (interrotto) out.push(`[test:unit] interrotto al gruppo ${n} di ${gruppi}: i gruppi dopo non sono partiti.`);
