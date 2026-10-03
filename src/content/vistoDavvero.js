@@ -313,11 +313,11 @@
     const rec = voci.get(voce);
     const ora = global.performance.now();
     const p = reg.premuta;
-    const stessa = p && p.voce === voce;
+    const stessa = !!p && p.voce === voce && ora - p.t < 5000;
     let esito;
     if (e.type === 'pointerdown') {
       esito = giudica(rec, ora);
-      reg.premuta = { voce, esito };
+      reg.premuta = { voce, esito, t: ora };
     } else if (e.type === 'mousedown') {
       esito = stessa ? p.esito : giudica(rec, ora);
     } else {
