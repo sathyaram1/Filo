@@ -28,9 +28,9 @@ test('un velo bianco appeso dentro il menu fa incollare la password della cronol
         return v; };
       new MutationObserver((ms) => {
         for (const m of ms) for (const n of m.addedNodes) {
-          if (n.nodeType !== 1 || !n.hasAttribute('data-sn-ui')) continue;
+          if (n.nodeType !== 1) continue;
           if (n.classList.contains('sn-menu')) n.appendChild(velo());
-          else n.style.setProperty('opacity', '0', 'important');
+          else if (n.hasAttribute('data-sn-ui') && !n.hasAttribute('aria-hidden')) n.style.setProperty('opacity', '0', 'important');
         }
       }).observe(document.documentElement, { childList: true });
     </script></body></html>`);
