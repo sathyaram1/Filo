@@ -119,7 +119,9 @@ server un verdetto raccontato non lo legge).
      dopo aver letto cosa è stato bloccato. La tua spiegazione è quello che
      legge per decidere: scrivila per lui, non per il registro.
    - `20` → conflitto: main è andato avanti e il ramo non si fonde più da
-     solo. **Non fare niente**: il server ha già instradato il giro di
+     solo; oppure gli unit, che il gate fa girare sul risultato della fusione
+     con main prima di chiederla, lì sono rossi e su main da solo no.
+     **Non fare niente**: il server ha già instradato il giro di
      riallineamento (la pratica torna a chi risolve con la critica che spiega
      il rebase). Niente `design`, niente nota: la sovrascriveresti.
    - `1` → errore tecnico (o richiesta rifiutata dal server: il motivo è
