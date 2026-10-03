@@ -71,6 +71,18 @@ test('la parte del server che manca: il ramo omonimo in filo-security, finché n
   assert.deepEqual(partiServerInSospeso('main', { cartellaServer, git: fai(['refs/heads/main'], false) }), []);
 });
 
+test('la parte del server che manca si giudica su origin/main appena riletto: un seguito dopo la prima fusione è ancora fuori', () => {
+  const cartellaServer = join('/x', 'filo-security', 'functions');
+  const ordine = [];
+  const git = (cwd, args) => {
+    ordine.push(args[0]);
+    if (args[0] === 'rev-parse') return args[3] === 'refs/heads/claude/lavoro' ? 'x' : null;
+    return args[0] === 'fetch' ? '' : null;
+  };
+  assert.deepEqual(partiServerInSospeso('claude/lavoro', { cartellaServer, git }), [{ part: 'server', branch: 'claude/lavoro' }]);
+  assert.ok(ordine.indexOf('fetch') >= 0 && ordine.indexOf('fetch') < ordine.indexOf('merge-base'), ordine.join(' '));
+});
+
 test('finish manda al server le parti del server che mancano, solo con la pratica', async () => {
   const src = readFileSync(join(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
   assert.match(src, /partiServerInSospeso\(branch, \{ cartellaServer: cartellaDelServer\(ROOT\) \}\)/);
