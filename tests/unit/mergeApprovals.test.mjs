@@ -470,7 +470,7 @@ describe('la prova degli unit sulla fusione nella richiesta (#929)', () => {
     assert.equal(p.testo, 'Unit verdi sulla fusione con main di 3 ore fa');
     assert.match(p.titolo, /bbbbbbbb/);
     assert.match(p.titolo, /non si rifanno/);
-    assert.match(UI.provaNote({ provaUnit: { esito: 'rosso_anche_su_main', mainSha: 'b'.repeat(40), atMs: ORA } }, ORA).testo, /rossi anche su main/);
+    assert.match(UI.provaNote({ provaUnit: { esito: 'rosso_anche_su_main', mainSha: 'b'.repeat(40), atMs: ORA } }, ORA).testo, /già rossi su main/);
     assert.match(UI.provaNote({ provaUnit: { esito: 'conflitto', mainSha: 'b'.repeat(40), atMs: ORA } }, ORA).testo, /conflitto/);
     assert.equal(UI.provaNote({}, ORA), null, 'una richiesta di prima non dice niente');
   });
