@@ -91,7 +91,7 @@ async function mittenteSpedito(create, priv) {
   return globalThis.SN_FEEDBACK_CRYPTO.decrypt(create.body.fields.clientId.stringValue, priv);
 }
 
-test('#912 — da anonimo un nome riservato parte come utente, anche quello dell’owner col token rifiutato', async () => {
+test('#912 — senza token un nome riservato parte come utente; col token rifiutato non riparte', async () => {
   const { pub, priv } = await chiaviDiProva();
   const salvata = globalThis.SN_FEEDBACK_PUBKEY;
   globalThis.SN_FEEDBACK_PUBKEY = pub;
