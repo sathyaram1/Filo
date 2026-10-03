@@ -375,7 +375,9 @@
     }
     document.addEventListener('mouseover', (e) => {
       const t = e.target.closest('[data-tip]');
-      if (!t || t === currentTarget) return;
+      if (t === currentTarget) return;
+      // Un elemento tolto dal ridisegno non riceve mouseout: il suo suggerimento resterebbe sopra la carta.
+      if (!t) { if (currentTarget && !currentTarget.isConnected) hide(); return; }
       hide();
       currentTarget = t;
       const text = t.dataset.tip;

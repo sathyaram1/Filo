@@ -231,6 +231,18 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
   await expect.poll(() => scritte(app), { timeout: 3000, message: 'carta sulla scheda accanto' }).toEqual({ carta: 'Podcast', suggerimento: null });
   expect(await app.evaluate(() => globalThis.__spente), 'la carta si è spenta passando sulla croce').toBe(0);
 
+  // La musica finisce col puntatore fermo sull'altoparlante: il suo suggerimento se ne va con lui.
+  await via();
+  await sulTitolo(suona);
+  await shell.locator(`.tab[data-id="${suona}"] .audio-ind`).hover();
+  await expect.poll(async () => (await scritte(app)).suggerimento, { timeout: 3000, message: 'altoparlante' }).toBe('Silenzia');
+  await patchWebTabs(app, [{ audible: false }]);
+  await expect(shell.locator(`.tab[data-id="${suona}"] .tab-alert`)).toHaveCount(0);
+  await expect.poll(async () => {
+    const r = await riquadri(app);
+    return { rimasto: r.suggerimento && r.suggerimento.testo === 'Silenzia', coperti: siCoprono(r.suggerimento, r.carta) };
+  }, { timeout: 3000, message: 'altoparlante sparito' }).toEqual({ rimasto: false, coperti: false });
+
   // Con l'anteprima spenta dalle Preferenze il titolo torna nel suggerimento, e i controlli tengono il loro.
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { tabPreview: { enabled: false } } }));
   await expect(shell.locator(`.tab[data-id="${suona}"]`)).toHaveAttribute('data-tip', 'Musica di sottofondo', { timeout: 5000 });
