@@ -10,6 +10,16 @@ const ATTESA_TITOLO_IN_PAGINA = 4_000;
 const registrabile = (url) => /^(https?|file):/i.test(String(url || ''));
 const senzaFrammento = (url) => String(url || '').split('#')[0];
 
+// history.replaceState non aggiunge voci né sposta quella attiva: è così che si distingue da una pagina nuova.
+function voceAttiva(wc) {
+  try {
+    const h = wc.navigationHistory;
+    const i = h.getActiveIndex();
+    const n = h.length();
+    return Number.isInteger(i) && Number.isInteger(n) ? { i, n } : null;
+  } catch (_) { return null; }
+}
+
 class VisiteSchede {
   constructor({ incognito = false, registra } = {}) {
     this.incognito = !!incognito;
