@@ -1,5 +1,5 @@
-// Il ripasso dei feedback passati (#595, #908): la prova del mittente a chi l'ha creato davvero (owner e sessioni per
-// epoca, routine solo con un segno che un falso non ha), e il segno locale ai lavori fusi in locale, fuori dalla bacheca.
+// Il ripasso dei feedback passati (#595, #908, #912): la prova del server alle routine solo con un segno che un falso
+// non ha, mai al solo nome; e il segno locale ai lavori fusi in locale, fuori dalla bacheca.
 // Testo e titolo non si decifrano; la conversazione solo delle pratiche chiuse senza ramo, per trovarlo, e non si stampa.
 // Regole: tests/unit/ripassoMittenti.test.mjs. Uso: npm run feedback:ripasso [-- --dry-run]
 
