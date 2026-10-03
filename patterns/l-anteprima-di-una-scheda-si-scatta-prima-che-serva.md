@@ -73,6 +73,6 @@ chiede.
   suoi pixel, per la scheda lasciata dietro, per quella nata dietro, per quella
   nascosta prima di finire di caricare, per quella che si riempie dopo (anche
   cinque secondi dopo), per quella che cambia pagina da sola (anche senza
-  ricaricare), per la carta aperta mentre arriva la foto, col menu aperto e con
-  la barra che si ridisegna di continuo; `tests/unit/anteprimeSchede.test.mjs`
+  ricaricare), per la carta aperta mentre arriva la foto, col menu aperto, con
+  la barra che si ridisegna di continuo e con Filo ridotto a icona; `tests/unit/anteprimeSchede.test.mjs`
   tiene la regola della spia con viste finte.
