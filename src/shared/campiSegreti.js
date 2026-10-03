@@ -46,6 +46,37 @@
       return parti.join(' ').replace(/\s+/g, ' ').trim();
     }
 
+    // L'ultimo testo visibile di `n`, a ritroso; null se prima di trovarlo c'è un altro campo.
+    function ultimoTesto(n, prof = 0) {
+      if (n.nodeType === 3) return String(n.nodeValue || '').replace(/\s+/g, ' ').trim();
+      if (n.nodeType !== 1 || /^(SCRIPT|STYLE|TEMPLATE|NOSCRIPT|BUTTON)$/.test(n.tagName)) return '';
+      if (CAMPO_CON_VALORE.test(n.tagName)) return String(n.getAttribute?.('type') || '').toLowerCase() === 'hidden' ? '' : null;
+      if (prof > 6) return '';
+      try { if (typeof n.getClientRects === 'function' && !n.getClientRects().length) return ''; } catch (_) {}
+      const figli = n.childNodes || [];
+      for (let i = figli.length - 1; i >= 0; i--) {
+        const t = ultimoTesto(figli[i], prof + 1);
+        if (t === null || t) return t;
+      }
+      return '';
+    }
+
+    // Il testo scritto subito prima del campo quando il sito non gliel'ha legato: per chi guarda è il suo nome.
+    // Si ferma al primo altro campo, per non prendere il nome di quello, e al confine del modulo.
+    function etichettaVicina(el) {
+      let cur = el;
+      for (let livello = 0; cur && livello < 3; livello++) {
+        for (let s = cur.previousSibling; s; s = s.previousSibling) {
+          const t = ultimoTesto(s);
+          if (t === null) return '';
+          if (t) return t.slice(-80);
+        }
+        cur = cur.parentElement;
+        if (!cur || /^(FORM|FIELDSET|BODY|HTML)$/.test(cur.tagName)) break;
+      }
+      return '';
+    }
+
     // Il browser o il sito mostrano già i puntini al posto del testo.
     function copertoAschermo(el) {
       if (el.type === 'password' || String(el.getAttribute?.('type') || '').toLowerCase() === 'password') return true;
