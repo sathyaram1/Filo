@@ -187,9 +187,9 @@ service cloud.firestore {
     //   - `workerLog` (array di { role, startedAt, num }): il registro dei worker
     //     mostrato in dashboard. Lo scrive il server (functions, Admin SDK) al
     //     rilascio di ogni biglietto (le routine non hanno credenziali: #451).
-    //   - `senderProofSince` ({ local, owner }: ms): da quando ogni famiglia
-    //     nasce con la prova del mittente; lo fissa il primo giro di
-    //     scripts/ripasso-mittenti.mjs e da lì non si ricalcola (#908).
+    //   - `senderProofSince` ({ local, owner }: ms): storico, non lo legge più
+    //     nessuno. Il ripasso dava la prova per epoca a chi nasceva prima;
+    //     dal #912 non la dà più al solo nome.
     // Le regole NON enumerano i campi (read/write admin-only): nuovi campi non
     // richiedono redeploy. Riservato agli admin: nessun utente normale legge/scrive.
     match /config/automation {
