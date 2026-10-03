@@ -293,9 +293,11 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 .dash-cambi-pop::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 10px; }
 .dash-bubble-cambi.dash-cambi-sotto .dash-cambi-pop { bottom: auto; top: calc(100% + 14px); }
 .dash-bubble-cambi.dash-cambi-sotto .dash-cambi-pop::after { top: auto; bottom: 100%; }
+/* Il fuoco apre solo da tastiera: quello lasciato da un clic terrebbe aperta la pastiglia che il clic ha chiuso. */
 .dash-cambi-segno:hover + .dash-cambi-pop,
 .dash-cambi-pop:hover,
-.dash-bubble-cambi:focus-within .dash-cambi-pop,
+.dash-cambi-segno:focus-visible + .dash-cambi-pop,
+.dash-cambi-pop:has(:focus-visible),
 .dash-bubble-cambi.dash-cambi-aperto .dash-cambi-pop {
   opacity: 1; visibility: visible; transform: none;
   transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s;
