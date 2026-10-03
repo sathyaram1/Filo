@@ -1,4 +1,4 @@
-// Verifica locale «mittenti provati», giro 2, rilievo 3: nella pagina dei feedback la riga «client:» di chi si era
+// Verifica locale «mittenti provati», giro 2, rilievo 2: nella pagina dei feedback la riga «client:» di chi si era
 // dato un nome riservato senza prova non mostra quel nome, e non è uguale per tutti («non-provato:»).
 import { test, expect } from '../../fixtures/electron.mjs';
 

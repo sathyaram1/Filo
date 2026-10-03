@@ -1,4 +1,4 @@
-// Verifica locale «mittenti provati», giro 2, rilievo 2: se l'accesso dell'owner è già caduto quando manda un
+// Verifica locale «mittenti provati», giro 2, rilievo 1: se l'accesso dell'owner è già caduto quando manda un
 // feedback (il rinnovo l'ha fatto fallire un'altra parte di Filo), il feedback non parte da anonimo senza dirglielo.
 // Rete finta nel main: niente Firestore vero; l'owner è una sessione finta nella cartella dati isolata.
 import { test, expect } from '../../fixtures/electron.mjs';
