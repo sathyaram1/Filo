@@ -146,10 +146,11 @@ export async function esegui(argv, deps = {}) {
     const lancia = deps.lancia || lanciaServer;
     // La parte dell'app già su main: questa è l'ultima. Altrimenti l'app può ancora arrivare, anche da un ramo che da
     // qui non si vede, e la pratica si chiude solo a parola (--solo-server), che resta scritta per chi arrivasse dopo.
-    const ultima = !!letta.parti.app;
+    // Un ramo dell'app legato e fuori da main vince sul registro: è un seguito, o la pratica è stata riaperta.
+    const ramiApp = tardiva ? [] : (deps.ramiAperti || ramiApertiDellaPratica)(r.id, { ramoGemello: a.ramo });
+    const ultima = !!letta.parti.app && !ramiApp.length;
     const solo = a.soloServer && !ultima && !tardiva;
     const chiude = !tardiva && (ultima || solo);
-    const ramiApp = tardiva || ultima ? [] : (deps.ramiAperti || ramiApertiDellaPratica)(r.id, { ramoGemello: a.ramo });
     const quando = tardiva ? new Date(tardiva.at).toISOString() : '';
     const numero = chi.replace(/^#/, '');
     const chiudeApp = `la chiude la fusione di ${ramiApp.length ? ramiApp.join(', ') : 'quella parte'} (npm run finish -- --feedback ${numero})`;
