@@ -179,10 +179,19 @@ function leggiRighe(file) {
   } catch (_) { return []; }
 }
 
-/** `npm run test:unit` dell'albero provato, con l'uscita su file. { ok, rossi, coda } | { errore }. */
-export function lanciaUnit(dir, base, nome, { timeoutMs = TETTO_UNIT_MS } = {}) {
+/** Il file di un test rosso, dalla sua chiave. PURA. '' se non c'è. */
+export function fileDellaChiave(chiave) {
+  const f = String(chiave || '').split(' › ')[0];
+  return f && f !== '?' && !isAbsolute(f) && !f.split('/').includes('..') ? f : '';
+}
+
+/**
+ * `npm run test:unit` dell'albero provato, con l'uscita su file; con `file`, solo quei file (la riprova dei rossi).
+ * { ok, rossi, coda } | { errore }.
+ */
+export function lanciaUnit(dir, base, nome, { timeoutMs = TETTO_UNIT_MS, file = null } = {}) {
   const runner = join(dir, 'scripts', 'run-unit-tests.mjs');
-  if (!existsSync(runner)) return { errore: 'nell\'albero provato manca scripts/run-unit-tests.mjs' };
+  if (!file && !existsSync(runner)) return { errore: 'nell\'albero provato manca scripts/run-unit-tests.mjs' };
   const dest = join(base, `${nome}.jsonl`);
   const log = join(base, `${nome}.log`);
   const fd = openSync(log, 'w');
