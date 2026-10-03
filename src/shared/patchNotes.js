@@ -13,7 +13,9 @@
       features: [
         'Gli avvisi in basso a destra non se ne vanno finché ci tieni sopra il puntatore, anche quelli dentro le pagine come «Copiato»: un clic li chiude, e il tasto destro offre «Chiudi» e le loro azioni. La durata scelta in Preferenze adesso vale per tutti, e durata e suono li puoi chiedere anche a Filo: «fai durare gli avvisi 10 secondi», «metti il suono carillon alle notifiche».',
       ],
-      fixes: [],
+      fixes: [
+        'Lettura ad alta voce e dettatura non partono più verso un fornitore che Filo esclude. Se il modello che hai scelto lo serve solo lui, Filo te lo dice e non manda niente.',
+      ],
     },
     {
       version: '0.2.231', date: '2026-10-03',

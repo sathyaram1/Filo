@@ -431,12 +431,104 @@
     return err;
   }
 
+  // ─── Chi può servire un modello, prima di chiamarlo ───────────────────────
+  // Sugli endpoint audio il router ignora il blocco `provider` (#713): l'esclusione si applica qui, sugli host
+  // dichiarati. Regole: patterns/voce-dettatura-e-vettori-passano-dal-router-come-le-chat.md.
+  const HOSTS_FRESH_MS = 60 * 60 * 1000;
+  const HOSTS_RETRY_MS = 5 * 60 * 1000;
+  const HOSTS_TIMEOUT_MS = 10 * 1000;
+  const HOSTS_MAX_MODELS = 500;
+  const hostsCache = new Map(); // id → { until, hosts, pending }
+
+  function endpointsUrl(model) {
+    const id = String(model == null ? '' : model).trim();
+    const parts = id.split('/');
+    if (parts.length !== 2 || parts.some((p) => !p || p === '.' || p === '..')) return '';
+    return `${MODELS_ENDPOINT}/${parts.map(encodeURIComponent).join('/')}/endpoints`;
+  }
+
+  async function fetchModelHosts(apiKey, model) {
+    const url = endpointsUrl(model);
+    if (!url) return null;
+    const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(HOSTS_TIMEOUT_MS) });
+    if (!res.ok) throw new Error(`OpenRouter endpoints ${res.status}`);
+    const data = (await res.json()) || {};
+    const list = data.data && Array.isArray(data.data.endpoints) ? data.data.endpoints : [];
+    const hosts = [];
+    for (const e of list) {
+      const name = e && typeof e.provider_name === 'string' ? e.provider_name.trim() : '';
+      const tag = e && typeof e.tag === 'string' ? e.tag.trim() : '';
+      if (name || tag) hosts.push({ name, tag });
+    }
+    return hosts;
+  }
+
+  // [{ name, tag }] o null se non si sa. Un elenco scaduto si usa mentre si rilegge;
+  // una lettura fallita si ritenta dopo qualche minuto, non a ogni frase dettata.
+  async function modelHosts({ apiKey, model } = {}) {
+    const key = String(model == null ? '' : model).trim();
+    if (!key) return null;
+    const hit = hostsCache.get(key);
+    if (hit && hit.pending) return hit.hosts || hit.pending;
+    if (hit && Date.now() < hit.until) return hit.hosts;
+    const entry = { until: 0, hosts: hit ? hit.hosts : null, pending: null };
+    entry.pending = fetchModelHosts(apiKey, key)
+      .then((hosts) => {
+        entry.hosts = hosts;
+        entry.until = Date.now() + (hosts ? HOSTS_FRESH_MS : HOSTS_RETRY_MS);
+        return entry.hosts;
+      })
+      .catch((e) => {
+        console.warn(`[Filo policy] host di "${key}" non letti:`, (e && e.message) || e);
+        entry.until = Date.now() + HOSTS_RETRY_MS;
+        return entry.hosts;
+      })
+      .finally(() => { entry.pending = null; });
+    hostsCache.delete(key);
+    hostsCache.set(key, entry);
+    while (hostsCache.size > HOSTS_MAX_MODELS) hostsCache.delete(hostsCache.keys().next().value);
+    return entry.hosts || entry.pending;
+  }
+
+  function forgetModelHosts() { hostsCache.clear(); }
+
+  function joinNames(names) {
+    if (names.length < 2) return names.join('');
+    return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
+  }
+
+  async function ensureAllowedHost({ apiKey, model, providerRouting }) {
+    const C = global.SN_CONST;
+    if (!C || typeof C.hostPolicyViolation !== 'function') return;
+    const r = providerRouting && typeof providerRouting === 'object' ? providerRouting : {};
+    const excluded = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
+    if (!excluded.length && !C.producerOnlyRule(model)) return;
+    const hosts = await modelHosts({ apiKey, model });
+    if (!Array.isArray(hosts) || !hosts.length) return;
+    if (hosts.some((h) => !C.hostPolicyViolation(h, model, excluded))) return;
+    const names = [];
+    for (const h of hosts) {
+      const n = h.name || h.tag;
+      if (!names.some((x) => x.toLowerCase() === n.toLowerCase())) names.push(n);
+    }
+    const I18n = global.SN_I18N;
+    const chiave = names.length > 1 ? 'err_audio_no_allowed_host_many' : 'err_audio_no_allowed_host';
+    const err = new Error(I18n ? I18n.t(chiave, model, joinNames(names)) : `NO_ALLOWED_HOST ${model}`);
+    err.code = 'NO_ALLOWED_HOST';
+    err.provider = 'openrouter';
+    err.model = model;
+    err.hosts = names;
+    throw err;
+  }
+
   // ─── Lettura ad alta voce ──────────────────────────────────────────────────
   // Chiede l'audio in PCM grezzo (16 bit, mono): il content script lo incapsula
   // in un WAV e lo suona, lo stesso formato che usava prima. Il router risponde
   // con i byte e basta: chi ha servito non è nella risposta, ma l'id della
   // generazione sì (header), e con quello si chiede dopo (lookupServedBy).
   async function synthesizeSpeech({ apiKey, model, text, voice, speed, providerRouting, signal }) {
+    await ensureAllowedHost({ apiKey, model, providerRouting });
     const body = { model, input: String(text == null ? '' : text), response_format: 'pcm' };
     if (voice) body.voice = voice;
     const sp = Number(speed);
@@ -469,6 +561,7 @@
   // l'estensione ('wav', 'mp3', 'webm', …). `language` è un codice ISO-639-1
   // ('it'): se manca, il modello la riconosce da sé.
   async function transcribe({ apiKey, model, audioBase64, format, language, providerRouting, signal }) {
+    await ensureAllowedHost({ apiKey, model, providerRouting });
     const body = { model, input_audio: { data: audioBase64, format: format || 'wav' } };
     if (language) body.language = language;
     const pb = providerBlock(providerRouting, model);
@@ -601,7 +694,8 @@
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
     cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy, keyInfo, fetchWithKey,
+    modelHosts, forgetModelHosts,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
-    ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
+    ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -626,6 +626,18 @@
     return '';
   }
 
+  // Lo stesso giudizio su un host che il router DICHIARA per un modello, prima di
+  // chiamarlo: `host` = { name, tag }; basta il nome o lo slug per escluderlo. PURA.
+  function hostPolicyViolation(host, modelId, excluded) {
+    const h = host || {};
+    const names = [h.name, h.tag].filter((x) => normalizeProviderName(x));
+    if (!names.length) return '';
+    if (names.some((n) => isProviderExcluded(n, excluded))) return 'excluded';
+    const rule = producerOnlyRule(modelId);
+    if (rule && !names.some((n) => matchesProviderBase(n, [...rule.hosts, ...rule.only]))) return 'not-producer';
+    return '';
+  }
+
   // Forme base di `base` che `list` NON copre. PURA.
   // Serve dove una lista scritta a mano SOSTITUISCE quella di build (la lista
   // remota in config/models): senza questo confronto, un'esclusione aggiunta al
@@ -2674,6 +2686,7 @@
     PRODUCER_ONLY_MODELS,
     producerOnlyRule,
     servedPolicyViolation,
+    hostPolicyViolation,
     missingExcludedProviders,
     providerIgnoreList,
     excludedProviderReasons,
