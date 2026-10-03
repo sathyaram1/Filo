@@ -344,8 +344,9 @@ class AnteprimeSchede {
   _piuTardi(tab) {
     if (!this.tieneSveglia(tab) || tab.loading) return;
     tab._anteprimaAttesa -= 1;
-    if (!this.tieneSveglia(tab)) return;
-    const t = setTimeout(() => this.caricata(tab), RITENTA);
+    // Una finestra coperta può non disegnare senza dirlo: finiti i tentativi la foto resta dovuta, per riprendi().
+    if (!this.tieneSveglia(tab)) { tab._anteprimaPersa = true; return; }
+    const t = setTimeout(() => this.caricata(tab), this.ritenta);
     t.unref?.();
   }
 
