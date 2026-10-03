@@ -58,8 +58,6 @@ export function parteTardiva({ status, parti = {}, parte, ramo = '', solo = fals
   return { ok: true, altra, at: parti[altra] };
 }
 
-const RAMO_RE = /^claude\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
-
 /**
  * La parte del server che manca: il ramo di filo-security con lo stesso nome di quello dell'app, se c'è e non è
  * ancora su origin/main del server. `cartellaServer` = filo-security/functions ('' = server assente).
