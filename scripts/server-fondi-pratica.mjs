@@ -62,6 +62,8 @@ export const notaFine = (ramo, sha) => `Fuso su main di filo-security: ${ramo}${
 export function ramiApertiDellaPratica(id, { radice = ROOT, git = gitIn, leggi = leggiJson, ramoGemello = '' } = {}) {
   const lista = git(radice, ['worktree', 'list', '--porcelain']);
   if (lista === null) return [];
+  // Il ramo appena fuso dal server (npm run finish) è dentro origin/main solo dopo un fetch; se non riesce, si resta prudenti.
+  git(radice, ['fetch', '--quiet', 'origin', 'main']);
   const cartelle = lista.split('\n').filter((r) => r.startsWith('worktree ')).map((r) => r.slice('worktree '.length).trim());
   const rami = new Set();
   const altrui = new Set();
