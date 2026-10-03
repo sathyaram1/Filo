@@ -1166,7 +1166,10 @@ if (isMain) {
       // clone verrebbero scartati come moncone di un'istanza morta.
       try {
         const { sealCurrentWork } = await import('./lib/branch-integrity.mjs');
-        sealCurrentWork(ROOT, { by: 'release' });
+        const { readRole } = await import('./lib/routine-role.mjs');
+        // Il ruolo nel sigillo: dopo un «pass» vale come pulizia solo quello del verificatore (#880).
+        const chi = readRole(ROOT);
+        sealCurrentWork(ROOT, { by: chi ? `release:${chi}` : 'release' });
       } catch (_) { /* best-effort: il rilascio è già andato */ }
     }
     if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');

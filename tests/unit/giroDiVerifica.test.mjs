@@ -12,9 +12,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { execFile, execFileSync } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
+import { delimiter, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { chmodSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -216,5 +216,94 @@ test('#561 giro 6: una critica lunga parte INTERA, coi rilievi in coda oltre i 4
     const inviato = ricevuti.find((x) => x.url.includes('routineDeliver')).body.data;
     assert.ok(inviato.critique.endsWith('[2i] in fondo\n[0i] raro'), 'il testo arriva intero');
     assert.deepEqual(inviato.findings.map((f) => f.level), [2, 0]);
+  } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+});
+
+// #880 (#591): verifica superata, pulizia delle prove dei rilievi diventati feedback sigillata dal rilascio, poi
+// conflitto e riallineamento. Il Playwright finto risponde rosso a ogni prova: una consegna che ne rilancia una si ferma.
+function riallineatoDopoIlPass() {
+  const casa = cartellaTemporanea('filo-riallinea-pass-');
+  const g = (...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd: casa, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const scrivi = (f, t) => { mkdirSync(dirname(resolve(casa, f)), { recursive: true }); writeFileSync(resolve(casa, f), t, 'utf8'); };
+  g('init', '-q', '-b', 'main');
+  g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+  scrivi('.gitignore', 'stato/\n.claude/\nbin/\ntests/verifica/_tolte-*/\n');
+  scrivi('src/main.js', '1\n');
+  g('add', '-A'); g('commit', '-qm', 'main');
+  g('checkout', '-q', '-b', 'worker/591');
+  scrivi('src/x.js', 'lavoro\n');
+  scrivi('tests/verifica/591/giro2-r1-diventato-feedback.spec.mjs', '// rossa per costruzione\n');
+  scrivi('tests/verifica/591/giro1-chiusa.spec.mjs', '// verde prima del rebase\n');
+  g('add', '-A'); g('commit', '-qm', 'verifica #591 giro 2: prove');
+  const critica = g('rev-parse', 'HEAD');
+  g('rm', '-q', 'tests/verifica/591/giro2-r1-diventato-feedback.spec.mjs'); g('commit', '-qm', 'via le prove dei rilievi diventati feedback');
+  const pulizia = g('rev-parse', 'HEAD');
+  g('checkout', '-q', 'main'); scrivi('src/main.js', '2\n'); g('commit', '-qam', 'main va avanti');
+  g('checkout', '-q', 'worker/591'); g('rebase', '-q', 'main');
+  scrivi('bin/npx', '#!/bin/sh\necho prova rossa\nexit 1\n');
+  chmodSync(resolve(casa, 'bin', 'npx'), 0o755);
+  scrivi('bin/npx.cmd', '@echo prova rossa\r\n@exit /b 1\r\n');
+  scrivi('stato/fid-591.json', JSON.stringify({
+    id: 'fid-591', branch: 'worker/591', verifierVerdict: 'pass', verifierSha: critica, puliziaSha: '', messiDaParteGiro: null,
+    checkpoints: [{ sha: critica, by: 'verifier:pass' }, { sha: pulizia, by: 'release:verifier' }],
+  }));
+  return { casa, g, pulizia };
+}
+
+test('#880: il riallineamento dopo un pass con pulizia si consegna; una prova rossa tolta da chi riallinea lo ferma ancora', async () => {
+  const { casa, g, pulizia } = riallineatoDopoIlPass();
+  const { srv, ricevuti, port } = await fintoServer(() => ({}));
+  const env = {
+    ...ENV(casa, port), FILO_ROUTINE_ROLE: 'fixer', DISPLAY: process.env.DISPLAY || ':0',
+    PATH: `${resolve(casa, 'bin')}${delimiter}${process.env.PATH}`,
+  };
+  const REPORT_RIALLINEO = 'Riallineato su main: un solo conflitto meccanico, nessuna riga della logica del lavoro toccata.';
+  const consegne = () => ricevuti.filter((x) => x.url.includes('routineDeliver') && x.body.intent === 'fixed').length;
+  try {
+    g('rm', '-q', 'tests/verifica/591/giro1-chiusa.spec.mjs'); g('commit', '-qm', 'riallineamento: tolta una prova rossa');
+    const fermo = await esegui(['--record-fixed', 'fid-591', REPORT_RIALLINEO], env);
+    assert.notEqual(fermo.code, 0, 'la prova tolta da chi riallinea è rossa: la consegna si ferma (#679)');
+    assert.match(fermo.se + fermo.so, /giro1-chiusa\.spec\.mjs/);
+    assert.doesNotMatch(fermo.se + fermo.so, /Consegna respinta[^]*giro2-r1-diventato-feedback/, 'la prova uscita dopo il pass non è fra le respinte');
+    assert.equal(consegne(), 0);
+
+    g('reset', '-q', '--hard', 'HEAD~1');
+    const r = await esegui(['--record-fixed', 'fid-591', REPORT_RIALLINEO], env);
+    assert.equal(r.code, 0, `il riallineamento doveva consegnarsi (stderr: ${r.se})`);
+    assert.match(r.se, new RegExp(`tolte in ${pulizia.slice(0, 8)} sono la pulizia`));
+    assert.doesNotMatch(r.se, /Rilancio/, 'niente da rilanciare: la prova del rilievo diventato feedback è uscita nella pulizia');
+    assert.equal(consegne(), 1, 'la consegna arriva al server');
+  } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+});
+
+// #880: il rilascio sigilla la punta col ruolo di chi rilascia, e dopo un pass vale come pulizia solo quello del verificatore.
+test('#880: il rilascio firma il punto fermo col ruolo; il commit sigillato da chi riallinea non diventa la pulizia', async () => {
+  const { casa } = casaSulRamo();
+  const g = (...a) => execFileSync('git', a, { cwd: casa, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const { srv, port } = await fintoServer(() => ({}));
+  const rilascia = (ruolo) => new Promise((r) => {
+    execFile(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'), 'release', 'biglietto-di-prova', '--senza-push', '--senza-rapporto'],
+      { cwd: casa, env: { ...process.env, ...ENV(casa, port), FILO_ROUTINE_ROLE: ruolo } }, (err, so, se) => r({ code: err ? (err.code ?? 1) : 0, se: String(se || '') }));
+  });
+  const stato = () => JSON.parse(readFileSync(resolve(casa, 'stato', 'fid-901.json'), 'utf8'));
+  try {
+    mkdirSync(resolve(casa, 'tests', 'verifica', '901'), { recursive: true });
+    for (const f of ['giro1-r1-feedback.spec.mjs', 'giro1-chiusa.spec.mjs']) writeFileSync(resolve(casa, 'tests', 'verifica', '901', f), '//\n');
+    g('add', '-A'); g('commit', '-qm', 'critica');
+    const critica = g('rev-parse', 'HEAD');
+    writeFileSync(resolve(casa, 'stato', 'fid-901.json'), JSON.stringify({
+      id: 'fid-901', branch: 'worker/901', verifierVerdict: 'pass', verifierSha: critica, checkpoints: [{ sha: critica, by: 'verifier:pass' }],
+    }), 'utf8');
+    g('rm', '-q', 'tests/verifica/901/giro1-r1-feedback.spec.mjs'); g('commit', '-qm', 'pulizia');
+    const pulizia = g('rev-parse', 'HEAD');
+    const v = await rilascia('verifier');
+    assert.equal(v.code, 0, v.se);
+    assert.deepEqual([stato().checkpoints.at(-1).sha, stato().checkpoints.at(-1).by], [pulizia, 'release:verifier']);
+    g('rm', '-q', 'tests/verifica/901/giro1-chiusa.spec.mjs'); g('commit', '-qm', 'tolta da chi riallinea');
+    const f = await rilascia('fixer');
+    assert.equal(f.code, 0, f.se);
+    assert.equal(stato().checkpoints.at(-1).by, 'release:fixer');
+    const { puliziaDelPass } = await import('../../scripts/lib/prove-tolte.mjs');
+    assert.equal(puliziaDelPass(critica, stato().checkpoints, casa), pulizia, 'la base resta la pulizia del verificatore');
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 });

@@ -81,7 +81,7 @@ import {
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
 import {
-  baseDelConfronto, controllaProveTolte, controllaPulizia, numeraRilievi, rigaNumerata, testoPuliziaFuoriNumero,
+  baseDelConfronto, controllaProveTolte, controllaPulizia, numeraRilievi, puliziaDelPass, rigaNumerata, testoPuliziaFuoriNumero,
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
@@ -341,6 +341,9 @@ export function applyFixed(state) {
  */
 export function applyPulizia(state, controllo) {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
+  if (s.verifierVerdict === 'pass') {
+    return { ok: false, message: 'dopo una verifica superata la pulizia non si registra: basta il commit che toglie solo le prove, e il rilascio del biglietto la sigilla. Un riallineamento confronta da lì.' };
+  }
   if (s.verifierVerdict !== 'fix-pending' || !s.verifierSha) {
     return { ok: false, message: 'nessun giro di correzione aperto: la pulizia si registra subito dopo una critica a cui il server ha risposto «c\'è da correggere», prima di ogni correzione.' };
   }
@@ -1267,7 +1270,13 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   // Stessa guardia di «verify-local.mjs corretto»: una prova del giro cancellata ancora rossa è
   // una porta aperta che la verifica dopo non rilancerebbe più (#679).
   const shaCritica = String(guard.state?.verifierSha || '');
-  const baseTolte = baseDelConfronto(shaCritica, guard.state?.puliziaSha, ROOT);
+  // Dopo un «pass» la pulizia non si registra: senza questa base il riallineamento rilancia le prove dei
+  // rilievi diventati feedback, rosse per costruzione, e non si consegna mai (#880).
+  const puliziaPass = guard.state?.verifierVerdict === 'pass' ? puliziaDelPass(shaCritica, guard.state?.checkpoints, ROOT) : '';
+  const baseTolte = baseDelConfronto(shaCritica, guard.state?.puliziaSha || puliziaPass, ROOT);
+  if (puliziaPass && baseTolte === puliziaPass) {
+    process.stderr.write(`Dopo la verifica superata le prove del giro tolte in ${puliziaPass.slice(0, 8)} sono la pulizia: il confronto parte da lì.\n`);
+  }
   if (baseTolte && baseTolte !== headSha(ROOT)) {
     const md = guard.state?.messiDaParteGiro;
     const tolte = controllaProveTolte({
