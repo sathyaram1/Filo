@@ -66,7 +66,8 @@ test('una prova interrotta non lascia un worktree col collegamento ai moduli ver
 
   try {
     // 1. Una prova lunga, interrotta mentre gli unit girano sulla fusione.
-    const lento = preparaRepo(join(base, 'r1') && (mkdirSync(join(base, 'r1')), join(base, 'r1')),
+    mkdirSync(join(base, 'r1'));
+    const lento = preparaRepo(join(base, 'r1'),
       "import test from 'node:test';\ntest('lento', async () => { await new Promise((r) => setTimeout(r, 120000)); });\n");
     symlinkSync(moduli, join(lento.work, 'node_modules'), 'junction');
     const codice = `const L = await import(${JSON.stringify(LIB)}); L.provaUnitSullaFusione({ root: ${JSON.stringify(lento.work)}, punta: ${JSON.stringify(lento.punta)} });`;
