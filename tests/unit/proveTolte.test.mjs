@@ -378,7 +378,7 @@ function riallineatoDopoIlPass({ primaDelRebase = null } = {}) {
   scrivi('src/main.js', '2\n'); g('commit', '-qam', 'main va avanti');
   g('checkout', '-q', 'lavoro');
   g('rebase', '-q', 'main');
-  const punti = [{ sha: critica, by: 'verifier:pass' }, { sha: pulizia, by: 'release' }];
+  const punti = [{ sha: critica, by: 'verifier:pass' }, { sha: pulizia, by: 'release:verifier' }];
   return { dir, g, scrivi, critica, pulizia, punti };
 }
 
@@ -415,10 +415,16 @@ test('#880 senza riaprire #679: una prova rossa tolta da chi riallinea, prima o 
   } finally {
     rmSync(dopo.dir, { recursive: true, force: true });
   }
-  // Un commit che toglie solo prove, fatto da chi riallinea prima del rebase, non è un punto fermo: non diventa la base.
-  const prima = riallineatoDopoIlPass({ primaDelRebase: ({ g }) => { g('rm', '-q', 'tests/verifica/591/giro1-rotta-dal-rebase.spec.mjs'); g('commit', '-qm', 'tolta prima del rebase'); } });
+  // Un commit che toglie solo prove, fatto da chi riallinea prima del rebase, non diventa la base nemmeno se il suo
+  // rilascio (o quello di chiunque non sia il verificatore) lo sigilla.
+  let diChiRiallinea = '';
+  const prima = riallineatoDopoIlPass({ primaDelRebase: ({ g }) => { g('rm', '-q', 'tests/verifica/591/giro1-rotta-dal-rebase.spec.mjs'); g('commit', '-qm', 'tolta prima del rebase'); diChiRiallinea = g('rev-parse', 'HEAD'); } });
   try {
     assert.equal(puliziaDelPass(prima.critica, prima.punti, prima.dir), prima.pulizia);
+    for (const by of ['release:fixer', 'release', 'fixer:checkout', 'deliver:status', 'pulizia']) {
+      assert.equal(puliziaDelPass(prima.critica, [...prima.punti, { sha: diChiRiallinea, by }], prima.dir), prima.pulizia, `sigillo «${by}»`);
+      assert.equal(puliziaDelPass(prima.critica, [prima.punti[0], { sha: diChiRiallinea, by }], prima.dir), '', `sigillo «${by}» senza pulizia del verificatore`);
+    }
     const e = controllaProveTolte({ shaPrima: prima.pulizia, root: prima.dir, lancia: playwrightFinto(prima.dir, []), prepara: preparaFinto, conPulizia: true, shaCritica: prima.critica, log: () => {} });
     assert.equal(e.ferma, true);
     assert.match(e.testo, /giro1-rotta-dal-rebase/);
@@ -431,12 +437,12 @@ test('#880: è pulizia del pass solo un punto fermo che discende dalla critica e
   const { dir, g, scrivi, critica, pulizia, punti } = riallineatoDopoIlPass();
   try {
     const riallineato = g('rev-parse', 'HEAD');
-    assert.equal(puliziaDelPass(critica, [...punti, { sha: riallineato, by: 'release' }], dir), pulizia, 'il ramo riscritto dal rebase non discende dalla critica');
+    assert.equal(puliziaDelPass(critica, [...punti, { sha: riallineato, by: 'release:verifier' }], dir), pulizia, 'il ramo riscritto dal rebase non discende dalla critica');
     assert.equal(puliziaDelPass(critica, [punti[0]], dir), '', 'senza il sigillo della pulizia non c\'è base nuova');
     g('checkout', '-q', critica);
     scrivi('src/x.js', 'cambiato dopo il verdetto\n');
     g('rm', '-q', 'tests/verifica/591/giro2-r1-diventato-feedback.spec.mjs'); g('commit', '-qam', 'pulizia con del codice dentro');
-    assert.equal(puliziaDelPass(critica, [punti[0], { sha: g('rev-parse', 'HEAD'), by: 'release' }], dir), '', 'una riga di codice non è una pulizia');
+    assert.equal(puliziaDelPass(critica, [punti[0], { sha: g('rev-parse', 'HEAD'), by: 'release:verifier' }], dir), '', 'una riga di codice non è una pulizia');
     for (const storto of [[], null, [{}], [{ sha: 'non-uno-sha' }]]) assert.equal(puliziaDelPass(critica, storto, dir), '');
     assert.equal(puliziaDelPass('', punti, dir), '');
   } finally {

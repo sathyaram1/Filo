@@ -245,7 +245,7 @@ function riallineatoDopoIlPass() {
   scrivi('bin/npx.cmd', '@echo prova rossa\r\n@exit /b 1\r\n');
   scrivi('stato/fid-591.json', JSON.stringify({
     id: 'fid-591', branch: 'worker/591', verifierVerdict: 'pass', verifierSha: critica, puliziaSha: '', messiDaParteGiro: null,
-    checkpoints: [{ sha: critica, by: 'verifier:pass' }, { sha: pulizia, by: 'release' }, { sha: pulizia, by: 'fixer:checkout' }],
+    checkpoints: [{ sha: critica, by: 'verifier:pass' }, { sha: pulizia, by: 'release:verifier' }],
   }));
   return { casa, g, pulizia };
 }
@@ -273,5 +273,37 @@ test('#880: il riallineamento dopo un pass con pulizia si consegna; una prova ro
     assert.match(r.se, new RegExp(`tolte in ${pulizia.slice(0, 8)} sono la pulizia`));
     assert.doesNotMatch(r.se, /Rilancio/, 'niente da rilanciare: la prova del rilievo diventato feedback è uscita nella pulizia');
     assert.equal(consegne(), 1, 'la consegna arriva al server');
+  } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+});
+
+// #880: il rilascio sigilla la punta col ruolo di chi rilascia, e dopo un pass vale come pulizia solo quello del verificatore.
+test('#880: il rilascio firma il punto fermo col ruolo; il commit sigillato da chi riallinea non diventa la pulizia', async () => {
+  const { casa } = casaSulRamo();
+  const g = (...a) => execFileSync('git', a, { cwd: casa, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const { srv, port } = await fintoServer(() => ({}));
+  const rilascia = (ruolo) => new Promise((r) => {
+    execFile(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'), 'release', 'biglietto-di-prova', '--senza-push', '--senza-rapporto'],
+      { cwd: casa, env: { ...process.env, ...ENV(casa, port), FILO_ROUTINE_ROLE: ruolo } }, (err, so, se) => r({ code: err ? (err.code ?? 1) : 0, se: String(se || '') }));
+  });
+  const stato = () => JSON.parse(readFileSync(resolve(casa, 'stato', 'fid-901.json'), 'utf8'));
+  try {
+    mkdirSync(resolve(casa, 'tests', 'verifica', '901'), { recursive: true });
+    for (const f of ['giro1-r1-feedback.spec.mjs', 'giro1-chiusa.spec.mjs']) writeFileSync(resolve(casa, 'tests', 'verifica', '901', f), '//\n');
+    g('add', '-A'); g('commit', '-qm', 'critica');
+    const critica = g('rev-parse', 'HEAD');
+    writeFileSync(resolve(casa, 'stato', 'fid-901.json'), JSON.stringify({
+      id: 'fid-901', branch: 'worker/901', verifierVerdict: 'pass', verifierSha: critica, checkpoints: [{ sha: critica, by: 'verifier:pass' }],
+    }), 'utf8');
+    g('rm', '-q', 'tests/verifica/901/giro1-r1-feedback.spec.mjs'); g('commit', '-qm', 'pulizia');
+    const pulizia = g('rev-parse', 'HEAD');
+    const v = await rilascia('verifier');
+    assert.equal(v.code, 0, v.se);
+    assert.deepEqual([stato().checkpoints.at(-1).sha, stato().checkpoints.at(-1).by], [pulizia, 'release:verifier']);
+    g('rm', '-q', 'tests/verifica/901/giro1-chiusa.spec.mjs'); g('commit', '-qm', 'tolta da chi riallinea');
+    const f = await rilascia('fixer');
+    assert.equal(f.code, 0, f.se);
+    assert.equal(stato().checkpoints.at(-1).by, 'release:fixer');
+    const { puliziaDelPass } = await import('../../scripts/lib/prove-tolte.mjs');
+    assert.equal(puliziaDelPass(critica, stato().checkpoints, casa), pulizia, 'la base resta la pulizia del verificatore');
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 });
