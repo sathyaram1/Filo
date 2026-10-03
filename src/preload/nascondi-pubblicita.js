@@ -52,13 +52,17 @@ module.exports = function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
     if (!timer && (ids.length || classes.length)) timer = setTimeout(flush, 30);
   };
 
-  new MutationObserver((records) => {
-    for (const r of records) for (const n of r.addedNodes) survey(n);
-    schedule();
-  }).observe(document, { childList: true, subtree: true });
-
-  // Una classe messa dopo l'inserimento non passa dall'osservatore: un giro intero a pagina pronta e a pagina caricata.
-  const again = () => { survey(document.documentElement); schedule(); };
-  document.addEventListener('DOMContentLoaded', again, { once: true });
+  // Durante il caricamento un giro solo, a pagina pronta: seguire il parser nodo per nodo lo rallenta (come uBlock).
+  // Dopo, l'osservatore vede quello che arriva; a pagina caricata un altro giro per le classi messe dopo.
+  const again = () => { survey(document.documentElement); flush(); };
+  const start = () => {
+    again();
+    new MutationObserver((records) => {
+      for (const r of records) for (const n of r.addedNodes) survey(n);
+      schedule();
+    }).observe(document, { childList: true, subtree: true });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+  else start();
   window.addEventListener('load', again, { once: true });
 };

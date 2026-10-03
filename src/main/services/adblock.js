@@ -16,7 +16,7 @@ const DEFAULT_SOURCES = [
   'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts',
   'https://easylist.to/easylist/easylist.txt',
   'https://easylist-downloads.adblockplus.org/easylistitaly.txt',
-  'https://easylist-downloads.adblockplus.org/liste_fr.txt',
+  'https://raw.githubusercontent.com/easylist/listefr/master/liste_fr.txt',
 ];
 
 // Una cache scritta prima delle regole di occultamento (e del parser che non blocca più siti interi per una
