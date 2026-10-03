@@ -354,6 +354,95 @@ test('dopo la pulizia la base è lei: la prova messa da parte non si rilancia, u
   }
 });
 
+// #880 (il caso di #591): verifica superata sulla vecchia base, la pulizia toglie la prova del rilievo diventato
+// feedback (rossa per costruzione), il rilascio la sigilla, poi main va avanti e il ramo si riallinea.
+function riallineatoDopoIlPass({ primaDelRebase = null } = {}) {
+  const dir = cartellaTemporanea('prove-tolte-pass-');
+  const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
+  g('init', '-q', '-b', 'main');
+  g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+  scrivi('src/main.js', '1\n');
+  g('add', '-A'); g('commit', '-qm', 'main');
+  g('checkout', '-q', '-b', 'lavoro');
+  scrivi('src/x.js', 'lavoro\n');
+  scrivi('tests/verifica/591/giro2-r1-diventato-feedback.spec.mjs', 'ROSSA\n');
+  scrivi('tests/verifica/591/giro1-rotta-dal-rebase.spec.mjs', 'ROSSA\n');
+  g('add', '-A'); g('commit', '-qm', 'critica: verifica superata');
+  const critica = g('rev-parse', 'HEAD');
+  g('rm', '-q', 'tests/verifica/591/giro2-r1-diventato-feedback.spec.mjs'); g('commit', '-qm', 'via le prove dei rilievi diventati feedback');
+  const pulizia = g('rev-parse', 'HEAD');
+  if (primaDelRebase) primaDelRebase({ g, scrivi });
+  g('checkout', '-q', 'main');
+  scrivi('src/main.js', '2\n'); g('commit', '-qam', 'main va avanti');
+  g('checkout', '-q', 'lavoro');
+  g('rebase', '-q', 'main');
+  const punti = [{ sha: critica, by: 'verifier:pass' }, { sha: pulizia, by: 'release' }];
+  return { dir, g, scrivi, critica, pulizia, punti };
+}
+
+test('#880: dopo un pass la pulizia sigillata è la base del riallineamento, e la prova del rilievo diventato feedback non si rilancia', () => {
+  const { dir, critica, pulizia, punti } = riallineatoDopoIlPass();
+  try {
+    assert.notEqual(execFileSync('git', ['merge-base', '--is-ancestor', critica, 'HEAD'], { cwd: dir, stdio: 'ignore' }) === null && false, true);
+    assert.equal(puliziaDelPass(critica, punti, dir), pulizia);
+    assert.equal(baseDelConfronto(critica, puliziaDelPass(critica, punti, dir), dir), pulizia);
+    const visti = [];
+    const lancia = playwrightFinto(dir, visti);
+    assert.deepEqual(controllaProveTolte({ shaPrima: pulizia, root: dir, lancia, prepara: preparaFinto, conPulizia: true, shaCritica: critica, log: () => {} }),
+      { ferma: false, testo: '' });
+    assert.equal(visti.length, 0, 'la prova uscita dopo il pass non si rilancia');
+    // Senza la pulizia come base, è il blocco di #591: la prova rossa per costruzione ferma ogni riallineamento.
+    const vecchio = controllaProveTolte({ shaPrima: critica, root: dir, lancia, prepara: preparaFinto, conPulizia: false, log: () => {} });
+    assert.equal(vecchio.ferma, true);
+    assert.match(vecchio.testo, /giro2-r1-diventato-feedback/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('#880 senza riaprire #679: una prova rossa tolta da chi riallinea, prima o dopo il rebase, ferma ancora la consegna', () => {
+  const dopo = riallineatoDopoIlPass();
+  try {
+    dopo.g('rm', '-q', 'tests/verifica/591/giro1-rotta-dal-rebase.spec.mjs'); dopo.g('commit', '-qm', 'riallineamento: tolta la rossa');
+    const visti = [];
+    const e = controllaProveTolte({ shaPrima: puliziaDelPass(dopo.critica, dopo.punti, dopo.dir), root: dopo.dir, lancia: playwrightFinto(dopo.dir, visti), prepara: preparaFinto, conPulizia: true, shaCritica: dopo.critica, log: () => {} });
+    assert.equal(e.ferma, true);
+    assert.match(e.testo, /giro1-rotta-dal-rebase/);
+    assert.doesNotMatch(e.testo, /giro2-r1-diventato-feedback/);
+    assert.deepEqual(visti.map((v) => v.file.split('/').pop()), ['giro1-rotta-dal-rebase.spec.mjs']);
+  } finally {
+    rmSync(dopo.dir, { recursive: true, force: true });
+  }
+  // Un commit che toglie solo prove, fatto da chi riallinea prima del rebase, non è un punto fermo: non diventa la base.
+  const prima = riallineatoDopoIlPass({ primaDelRebase: ({ g }) => { g('rm', '-q', 'tests/verifica/591/giro1-rotta-dal-rebase.spec.mjs'); g('commit', '-qm', 'tolta prima del rebase'); } });
+  try {
+    assert.equal(puliziaDelPass(prima.critica, prima.punti, prima.dir), prima.pulizia);
+    const e = controllaProveTolte({ shaPrima: prima.pulizia, root: prima.dir, lancia: playwrightFinto(prima.dir, []), prepara: preparaFinto, conPulizia: true, shaCritica: prima.critica, log: () => {} });
+    assert.equal(e.ferma, true);
+    assert.match(e.testo, /giro1-rotta-dal-rebase/);
+  } finally {
+    rmSync(prima.dir, { recursive: true, force: true });
+  }
+});
+
+test('#880: è pulizia del pass solo un punto fermo che discende dalla critica e ne toglie soltanto prove del giro', () => {
+  const { dir, g, scrivi, critica, pulizia, punti } = riallineatoDopoIlPass();
+  try {
+    const riallineato = g('rev-parse', 'HEAD');
+    assert.equal(puliziaDelPass(critica, [...punti, { sha: riallineato, by: 'release' }], dir), pulizia, 'il ramo riscritto dal rebase non discende dalla critica');
+    assert.equal(puliziaDelPass(critica, [punti[0]], dir), '', 'senza il sigillo della pulizia non c\'è base nuova');
+    g('checkout', '-q', critica);
+    scrivi('src/x.js', 'cambiato dopo il verdetto\n');
+    g('rm', '-q', 'tests/verifica/591/giro2-r1-diventato-feedback.spec.mjs'); g('commit', '-qam', 'pulizia con del codice dentro');
+    assert.equal(puliziaDelPass(critica, [punti[0], { sha: g('rev-parse', 'HEAD'), by: 'release' }], dir), '', 'una riga di codice non è una pulizia');
+    for (const storto of [[], null, [{}], [{ sha: 'non-uno-sha' }]]) assert.equal(puliziaDelPass(critica, storto, dir), '');
+    assert.equal(puliziaDelPass('', punti, dir), '');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // Il caso di tests/verifica/locale-attriti-verifica/giro1: un rilievo esterno nel giro non apre più la porta.
 // Processo vero di verify-local, npx finto che risponde rosso a ogni prova.
 function giroLocaleAperto({ external = [], derived = [] } = {}) {
