@@ -806,16 +806,6 @@ if (isMain) {
     process.exit(0);
   }
 
-  // Solo il segno, stato invariato: `<id> --preapprova` / `<id> --chiedi-prima`.
-  if (id && !status && typeof preapprova === 'boolean') {
-    const r = await segnaPreapprovazione(id, preapprova, { dryRun, bearer });
-    if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo}`); process.exit(3); }
-    console.log(r.dryRun
-      ? `[dry-run] ${riferimento}: ${preapprova ? 'metterei' : 'toglierei'} il segno «fondi senza chiedermelo» (${r.campi.join(', ')})`
-      : `${riferimento}: ${preapprova ? `da ora si fonde senza chiedere (segno di ${r.segno.by})` : 'da ora ti chiede prima di fondere'}`);
-    process.exit(0);
-  }
-
   // Solo la frase per chi ha segnalato, stato invariato: `<id> --frase "…"`.
   if (id && !status && typeof frase === 'string') {
     if (typeof preapprova === 'boolean' || typeof starred === 'boolean' || branch !== undefined || reason !== undefined) {
@@ -827,6 +817,16 @@ if (isMain) {
     console.log(r.dryRun
       ? `[dry-run] ${riferimento}: scriverei la frase per chi ha segnalato, stato invariato`
       : `${riferimento}: frase per chi ha segnalato scritta; la bacheca la mostra alla prossima sincronizzazione.`);
+    process.exit(0);
+  }
+
+  // Solo il segno, stato invariato: `<id> --preapprova` / `<id> --chiedi-prima`.
+  if (id && !status && typeof preapprova === 'boolean') {
+    const r = await segnaPreapprovazione(id, preapprova, { dryRun, bearer });
+    if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo}`); process.exit(3); }
+    console.log(r.dryRun
+      ? `[dry-run] ${riferimento}: ${preapprova ? 'metterei' : 'toglierei'} il segno «fondi senza chiedermelo» (${r.campi.join(', ')})`
+      : `${riferimento}: ${preapprova ? `da ora si fonde senza chiedere (segno di ${r.segno.by})` : 'da ora ti chiede prima di fondere'}`);
     process.exit(0);
   }
 
