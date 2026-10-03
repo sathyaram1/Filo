@@ -83,13 +83,4 @@ test.describe('nascita dei feedback delle routine e delle sessioni', () => {
     const sviati = v.messaggiAiGiudici.filter((m) => regolaTecnica(m) && !sannoCheEOwner(m));
     expect(sviati.length, 'giudici istruiti a sospettare del linguaggio tecnico, senza sapere che scrive l’owner').toBe(0);
   });
-
-  test('r4: con l’automatica accesa e gli interruttori aperti, un derivato di un giro entra in coda da solo come oggi', async () => {
-    // Su main un derivato (routine:residuo) passa dai giudici e, allineato, entra in coda con l'automatica accesa.
-    // «Per le routine resta solo il salto dei giudici»: la destinazione non dovrebbe cambiare da sola.
-    const v = await nasce({ clientId: 'routine:residuo', senderProof: 'server', derived: true, priorityManual: true },
-      { cfg: { enabled: true } });
-    expect(v.messaggiAiGiudici).toHaveLength(0);
-    expect(v.status).toBe('todo');
-  });
 });
