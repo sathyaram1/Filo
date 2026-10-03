@@ -223,14 +223,15 @@ test('un prefisso riservato senza prova del mittente si legge come un utente qua
   const author = (id) => page.locator(`.mg-item[data-id="${id}"] .mg-item-author`);
   await expect(author('VO')).toHaveText('👑');
   for (const id of ['FO', 'FL', 'FR']) {
-    await expect(author(id)).toHaveText('❔');
-    await expect(author(id)).toHaveAttribute('title', /senza prova/);
+    await expect(author(id)).toHaveText('👤');
+    await expect(author(id)).toHaveAttribute('title', 'Scritto da: Utente');
   }
 
-  // Il dettaglio non dice «Owner», la segnalazione è una bolla dell'utente e l'identificativo resta leggibile.
+  // Il dettaglio dice «Utente» senza la firma che si era dato, la segnalazione è una bolla dell'utente, e
+  // l'identificativo intero resta leggibile al passaggio.
   await page.locator('.mg-item[data-id="FO"]').click();
   const link = page.locator('#senderLink');
-  await expect(link).toContainText('senza prova');
+  await expect(link).toHaveText('👤 Utente · me…');
   await expect(link).not.toContainText('Owner');
   await expect(link).toHaveAttribute('title', 'owner:me');
   await expect(page.locator('.mg-bubble').first()).toHaveClass(/mg-bubble--user/);
