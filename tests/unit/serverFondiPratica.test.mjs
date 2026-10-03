@@ -178,7 +178,7 @@ test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro: il se
   assert.equal(r.k, 0, r.testo);
   assert.deepEqual(r.lanci, [{ cartella: '/srv/functions', args: ['claude/x'], pratica: '#910' }]);
   assert.equal(r.scritture.length, 2, 'nessuna presa in carico: la parte e la nota');
-  assert.match(r.scritture[0], /localMerges\.server$/);
+  assert.match(r.scritture[0], /localMerges\.server&updateMask\.fieldPaths=localMerges\.ramo$/);
   assert.match(r.testo, /meno di 48 ore fa/);
   assert.match(r.testo, /resta chiusa/);
 });
