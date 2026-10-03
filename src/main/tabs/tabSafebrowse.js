@@ -305,13 +305,17 @@ const safebrowseMethods = {
   },
 };
 
-// Un documento blob: lo scrive la pagina che l'ha creato e vale quanto lei: la pagina web conosciuta della stessa
-// origine (`note`: quella della scheda, o di chi l'ha aperta), altrimenti l'origine. Una pagina che non è un sito: null.
-function sitoDellaPagina(url, note = []) {
+// Un documento blob, o una pagina vuota con l'origine di chi l'ha scritta (`origineDoc`), vale quanto la pagina che lo
+// scrive: la pagina web conosciuta della stessa origine (`note`: quella della scheda, o di chi l'ha aperta), altrimenti
+// l'origine. Una pagina che non è un sito: null.
+function sitoDellaPagina(url, note = [], origineDoc = null) {
   if (/^https?:\/\//i.test(url || '')) return url;
-  if (!/^blob:/i.test(url || '')) return null;
   let origine = '';
-  try { origine = new URL(url).origin; } catch (_) {}
+  if (/^blob:/i.test(url || '')) {
+    try { origine = new URL(url).origin; } catch (_) {}
+  } else if (/^about:/i.test(url || '') && origineDoc) {
+    origine = String(origineDoc);
+  } else return null;
   if (!/^https?:\/\//i.test(origine)) return null;
   for (const n of note) {
     try { if (n && new URL(n).origin === origine) return n; } catch (_) {}
