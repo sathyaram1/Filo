@@ -357,7 +357,7 @@ class AnteprimeSchede {
       m.win.contentView.addChildView(tab.view, 0);
       m.layout();
       await pausa(ATTESA_DISEGNO);
-      const fine = Date.now() + TETTO_DISEGNO;
+      const fine = Date.now() + this.tettoDisegno;
       while (this.sotto === tab.id && vivo(tab)) {
         let img = null;
         try { img = await tab.view.webContents.capturePage(); } catch (_) { img = null; }
