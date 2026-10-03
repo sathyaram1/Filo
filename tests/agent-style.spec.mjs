@@ -5,7 +5,7 @@
 // funzione pura di iniezione realmente spedita nei moduli.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmState, scrollConfirmToEnd, mouseClickConfirm, pointWhenConfirmAppears, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, confirmState, scrollConfirmToEnd, mouseClickConfirm, pointWhenConfirmAppears, aspettaConfirmPronto, CONFIRM_HOST } from './helpers/confirm.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 test('scegliere un preset riempie il testo e lo stile persiste tra le ricariche', async ({ openTab }) => {
@@ -527,7 +527,7 @@ test('#592 — un clic che arriva mentre il popup compare non conferma lo stile;
   await expect(page.locator(CONFIRM_HOST), 'un clic arrivato mentre il popup compariva l’ha chiuso').toBeVisible();
   expect(await storedStyle(app), 'un clic arrivato mentre il popup compariva ha confermato lo stile').toBe('');
 
-  await page.waitForTimeout(600);
+  await aspettaConfirmPronto(page);
   await mouseClickConfirm(page, 'ok');
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0, { timeout: 5_000 });
   await expect.poll(() => storedStyle(app), { timeout: 5_000 }).toBe(NASCOSTO);
@@ -545,7 +545,7 @@ test('#592 — nell’Aiuto un clic che arriva mentre il popup compare non confe
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(300);
   expect(await storedStyle(app), 'un clic arrivato mentre il popup compariva ha confermato lo stile').toBe('');
-  await page.waitForTimeout(600);
+  await aspettaConfirmPronto(page);
   await mouseClickConfirm(page, 'ok');
   expect(await corsa).toBe(true);
   expect(await storedStyle(app)).toBe(NASCOSTO);

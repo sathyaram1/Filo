@@ -32,6 +32,12 @@ export async function clickConfirm(page, which = 'ok', opts = {}) {
   expect(clicked, `bottone di conferma "${which}" presente e abilitato`).toBe(true);
 }
 
+// Il riquadro accetta un sì vero (clic, invio) mezzo secondo dopo il suo primo fotogramma (#592): un'attesa fissa
+// non basta quando la finestra di prova disegna in ritardo. Solo sulle pagine filo://, come gli altri hook.
+export async function aspettaConfirmPronto(page) {
+  await expect.poll(async () => (await confirmState(page))?.pronto, { timeout: 8000 }).toBe(true);
+}
+
 // Fa scorrere il testo del dialogo fino in fondo: OK si accende solo dopo (#592).
 export async function scrollConfirmToEnd(page) {
   const done = await page.evaluate(() => window.SN_CONFIRM_UI._test.scrollToEnd());
