@@ -125,7 +125,9 @@ module.exports = function register(on, ctx) {
     return { ok: true, state, stateText };
   });
 
-  on(MSG.FILO_GENERATE_DASHBOARD, async (msg, sender) => {
+  on(MSG.FILO_GENERATE_DASHBOARD, async (msg, sender, origin) => {
+    // Il messaggio della home mette in fila le pagine salvate: a un sito non si dà, come il loro elenco (#589.12).
+    if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
     // Numero di schede web aperte → l'agente può suggerire una pulizia (§6).
     let openTabsCount = 0;
     try {
