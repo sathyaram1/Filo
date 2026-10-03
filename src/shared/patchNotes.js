@@ -11,6 +11,7 @@
     {
       version: '0.2.231', date: '2026-10-03',
       features: [
+        'Nella pagina Crediti trovi il tuo pseudonimo: basta quello per ricevere un regalo di crediti.',
         'Col tasto destro sull\'avviso di un sito pericoloso puoi chiedere a Filo di quel sito o segnalare un falso allarme. Si apre una scheda nuova e il sito resta coperto.',
       ],
       fixes: [
