@@ -129,8 +129,17 @@ test('in secondo piano o ridotta a icona non legge; tornando in vista si allinea
   await shell.evaluate((id) => window.filoShell.tabs.activate(id), gestione);
   await expect.poll(() => ids(page), { timeout: 4000 }).toEqual(['f515', 'f716']);
 
-  // Finestra ridotta a icona: stesso discorso.
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].minimize());
+  // Finestra ridotta a icona: stesso discorso. Si chiede al sistema se l'ha
+  // ridotta: senza gestore di finestre (xvfb della suite) non succede, e lì la
+  // finestra si nasconde, che per Filo è la stessa uscita dalla vista.
+  const ridottaDavvero = await app.evaluate(async ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w.minimize();
+    for (let i = 0; i < 20 && !w.isMinimized(); i++) await new Promise((r) => setTimeout(r, 50));
+    if (w.isMinimized()) return true;
+    w.hide();
+    return false;
+  });
   await page.waitForTimeout(600);
   const ridotta = await page.evaluate(() => window.__srv.letture);
   await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 800 }));
@@ -138,7 +147,10 @@ test('in secondo piano o ridotta a icona non legge; tornando in vista si allinea
   expect(await page.evaluate(() => window.__srv.letture)).toBe(ridotta);
   await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 10 * 60 * 1000 }));
   await ilServerScrive(page, 'f716', { status: 'todo' });
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].restore());
+  await app.evaluate(({ BrowserWindow }, ridotta) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    if (ridotta) w.restore(); else w.show();
+  }, ridottaDavvero);
   await expect.poll(() => ids(page), { timeout: 4000 }).toEqual(['f515']);
 });
 
