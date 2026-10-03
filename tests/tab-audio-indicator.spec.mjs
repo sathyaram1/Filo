@@ -240,7 +240,7 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
   await expect(shell.locator(`.tab[data-id="${suona}"] .tab-alert`)).toHaveCount(0);
   await expect.poll(async () => {
     const r = await riquadri(app);
-    return { rimasto: r.suggerimento && r.suggerimento.testo === 'Silenzia', coperti: siCoprono(r.suggerimento, r.carta) };
+    return { rimasto: !!r.suggerimento && r.suggerimento.testo === 'Silenzia', coperti: siCoprono(r.suggerimento, r.carta) };
   }, { timeout: 3000, message: 'altoparlante sparito' }).toEqual({ rimasto: false, coperti: false });
 
   // Con l'anteprima spenta dalle Preferenze il titolo torna nel suggerimento, e i controlli tengono il loro.
