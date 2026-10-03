@@ -23,6 +23,7 @@
 //   SN_FILO_UI.is(el)       → è la radice di un pezzo di UI di Filo?
 //   SN_FILO_UI.inside(el)   → sta dentro (o è) un pezzo di UI di Filo?
 //   SN_FILO_UI.aperti()     → le radici NOSTRE attaccate al documento adesso
+//   SN_FILO_UI.soloGestiVeri(el) → i gesti fabbricati dallo script del sito non lo toccano
 //
 // L'attributo e l'elenco rispondono a due domande diverse, e la differenza è
 // tutta nel mittente. Chi cammina sulla pagina chiede «questo pezzo lo salto?»:
