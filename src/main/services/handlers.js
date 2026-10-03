@@ -493,33 +493,39 @@ function openWeightsBlockReason(settings, entry) {
 // Registra e verifica CHI ha davvero servito una risposta (#421). Il fornitore
 // upstream (es. "Together", "DeepInfra", oppure — se la politica è stata aggirata
 // — un produttore escluso) è la controprova della lista di esclusione: senza
-// registrarlo, l'esclusione è solo una speranza. Se l'host servito risulta fra
-// gli esclusi (è comparso con un nome che l'ignore non ha intercettato), lo
-// segnaliamo in modo evidente.
-// Ritorna { servedBy, violation }: `violation` è true quando chi ha servito
-// risulta fra gli esclusi. Con l'interruttore "solo pesi aperti" acceso quel
-// caso non resta nei log: chi l'ha acceso ha chiesto una garanzia, e una
+// registrarlo, l'esclusione è solo una speranza. Viola la politica un host
+// escluso e, per un modello da comprare solo dal produttore, un host che non è
+// suo (#904): Claude servito da Amazon Bedrock o da Azure.
+// Ritorna { servedBy, violation }. Con l'interruttore "solo pesi aperti" acceso
+// il caso non resta nei log: chi l'ha acceso ha chiesto una garanzia, e una
 // garanzia caduta in silenzio è peggio dell'interruttore assente — quindi lo
 // vede anche a schermo, e la voce di cronologia resta marchiata.
 function noteServedProvider(settings, action, result) {
   const servedBy = (result && result.servedBy) || null;
-  const violation = Boolean(servedBy
-    && SN_CONST.isProviderExcluded(servedBy, settings.excludedProviders || []));
-  if (violation) {
+  const model = (result && result.model) || '';
+  const why = SN_CONST.servedPolicyViolation(servedBy, model, settings.excludedProviders || []);
+  const violation = Boolean(why);
+  if (why === 'not-producer') {
+    console.error(
+      `[Filo policy] Richiesta "${action}" per "${model}" servita da "${servedBy}", che non è `
+      + 'del produttore: il vincolo provider.only non ha tenuto, o l\'host ha un nome nuovo '
+      + '(PRODUCER_ONLY_MODELS in constants.js).',
+    );
+  } else if (violation) {
     console.error(
       `[Filo policy] Richiesta "${action}" servita da un fornitore ESCLUSO: "${servedBy}". `
       + 'La politica sui modelli è stata aggirata (nome host non intercettato dalla lista di '
       + 'esclusione): aggiornare excludedProviders in config/models.',
     );
-    if (settings.openWeightsOnly === true) {
-      try {
-        broadcastToTabs({
-          type: MSG.SHOW_TOAST,
-          text: I18n.t('toast_open_weights_violated', servedBy),
-          duration: 8000,
-        });
-      } catch (_) {}
-    }
+  }
+  if (violation && settings.openWeightsOnly === true) {
+    try {
+      broadcastToTabs({
+        type: MSG.SHOW_TOAST,
+        text: I18n.t('toast_open_weights_violated', servedBy),
+        duration: 8000,
+      });
+    } catch (_) {}
   }
   return { servedBy, violation };
 }
