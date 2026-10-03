@@ -1,18 +1,6 @@
-// Push delle issue trovate dagli agenti nella collezione `feedback` di Firestore
-// (stesso DB dei feedback alpha), in una "categoria" dedicata.
-//
-// Le Firestore rules accettano in CREATE solo i campi:
-//   text, url, title, userAgent, clientId, images, createdAt
-// quindi NON possiamo aggiungere campi nuovi (source/model/…) senza toccare le
-// rules (che vivono nell'extension, congelata). Codifichiamo perciò la
-// provenienza dentro i campi consentiti:
-//   clientId = "agent:<model>"           → categoria + modello
-//   title    = "<severity>|<area>|<titolo>"
-//   text     = dettaglio
-//   url      = dove è stato trovato (filo://…)
-//   images   = [screenshot]
-// La pagina feedback riconosce il prefisso "agent:" e mostra tutto come categoria
-// dedicata con badge del modello. Vedi src/pages/feedback/feedback.js.
+// Le issue dell'agente esploratore diventano feedback `agent:<model>`, titolo «severità|area|titolo».
+// Si creano solo con la credenziale admin e la prova del mittente (#912): da anonimo l'esploratore sarebbe un utente,
+// quindi senza credenziale non parte niente. Testo, indirizzo e mittente viaggiano cifrati come dall'app (#602).
 
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
