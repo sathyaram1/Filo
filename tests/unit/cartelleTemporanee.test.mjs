@@ -20,8 +20,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, relative } from 'node:path';
-import { cartellaTemporanea, percorsoCanonico } from '../helpers/percorsi.mjs';
+import { dirname, join, relative, posix, win32 } from 'node:path';
+import { cartellaTemporanea, fuoriDa, percorsoCanonico } from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TESTS = join(__dirname, '..');
@@ -123,4 +123,38 @@ test('nessun test crea un collegamento che Windows nega a chi non è amministrat
     'questi file creano un collegamento simbolico, che su Windows senza privilegi dà EPERM: per una cartella usa '
     + '`collegaCartella(verso, collegamento)` da ./helpers/percorsi.mjs; per un file salta il caso su win32 e '
     + 'aggiungi il file a COLLEGAMENTI_GUARDATI');
+});
+
+// Sul cancello Windows il repo sta su D: e la temporanea su C:. Fra due dischi `relative` dà un percorso assoluto,
+// e «comincia con ..» risponde «dentro» per un file che sta fuori (#931).
+const FUORI_A_MANO = /\brelative\s*\([^;\n]*\)\s*\.startsWith\(\s*[`'"]\.\./;
+// Il node che esegue la prova tiene aperto il suo file: su Windows nessun nome di quel file si cancella (#931).
+const COLLEGAMENTO_AL_NODE = new RegExp(`\\b${'link'}(?:Sync)?\\s*\\(\\s*process\\.execPath`);
+
+test('le due trappole del disco del cancello si riconoscono', () => {
+  assert.ok(FUORI_A_MANO.test("assert.ok(relative(repo, f).startsWith('..'));"));
+  assert.ok(!FUORI_A_MANO.test('assert.ok(fuoriDa(repo, f));'));
+  assert.ok(COLLEGAMENTO_AL_NODE.test(`${'link'}Sync(process.execPath, join(bin, 'gh.exe'));`));
+  assert.ok(!COLLEGAMENTO_AL_NODE.test("copyFileSync(process.execPath, join(bin, 'gh.exe'));"));
+});
+
+test('nessun test presume il repo e la temporanea sullo stesso disco, né collega il node che gira', () => {
+  const colpevoli = [];
+  for (const p of fileDiTest()) {
+    if (p === AMMESSO || p === fileURLToPath(import.meta.url)) continue;
+    const testo = readFileSync(p, 'utf8');
+    if (FUORI_A_MANO.test(testo)) colpevoli.push(`${relative(TESTS, p)}: usa fuoriDa(cartella, percorso) da ./helpers/percorsi.mjs`);
+    if (COLLEGAMENTO_AL_NODE.test(testo)) colpevoli.push(`${relative(TESTS, p)}: copia l'eseguibile invece di collegarlo`);
+  }
+  assert.deepEqual(colpevoli, []);
+});
+
+test('fuoriDa: un file su un altro disco sta fuori, uno dentro sta dentro, su Windows come altrove', () => {
+  assert.equal(fuoriDa('D:\\a\\Filo', 'C:\\Users\\r\\Temp\\01-diff.txt', win32), true);
+  assert.equal(fuoriDa('D:\\a\\Filo', 'D:\\a\\Altro\\x.txt', win32), true);
+  assert.equal(fuoriDa('D:\\a\\Filo', 'D:\\a\\Filo\\..cache\\x.txt', win32), false);
+  assert.equal(fuoriDa('D:\\a\\Filo', 'D:\\a\\Filo', win32), false);
+  assert.equal(fuoriDa('/repo', '/tmp/01-diff.txt', posix), true);
+  assert.equal(fuoriDa('/repo', '/repo/..cache/x', posix), false);
+  assert.equal(fuoriDa('/repo', '/', posix), true);
 });

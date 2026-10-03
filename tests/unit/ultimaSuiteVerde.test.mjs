@@ -4,13 +4,17 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
-import { chmodSync, copyFileSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'ultima-suite-verde.mjs');
+
+// Una copia, mai un collegamento fisso: il node che esegue questa prova tiene il suo file aperto, e su Windows
+// nessun nome di quel file si cancella finché gira (EPERM alla pulizia).
+const ghExeFinto = (bin) => copyFileSync(process.execPath, join(bin, 'gh.exe'));
 
 const {
   scegliUltimoVerde, corseVerdi, rilascioFermo, testoRilascioFermo, rigaCorsa, verdePiuNuovoDelTag, SOGLIA_ORE, CHIAVE_FERMO,
@@ -217,7 +221,7 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
       const bin = join(tmp, 'bin');
       mkdirSync(bin);
       if (WIN) {
-        try { linkSync(process.execPath, join(bin, 'gh.exe')); } catch { copyFileSync(process.execPath, join(bin, 'gh.exe')); }
+        ghExeFinto(bin);
         writeFileSync(join(repo, 'api'), CORPO_GH);
       } else {
         writeFileSync(join(bin, 'gh'), `#!${process.execPath}\n${CORPO_GH}`);
@@ -240,7 +244,7 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
       return { codice, ricevute, output: readFileSync(join(tmp, 'output.txt'), 'utf8'), verde: sha[1] };
     } finally {
       await new Promise((ok) => srv.close(ok));
-      rmSync(tmp, { recursive: true, force: true });
+      rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   }
 
@@ -315,7 +319,7 @@ else process.stdout.write(JSON.stringify({ workflow_runs: [] }));
       const bin = join(tmp, 'bin');
       mkdirSync(bin);
       if (WIN) {
-        try { linkSync(process.execPath, join(bin, 'gh.exe')); } catch { copyFileSync(process.execPath, join(bin, 'gh.exe')); }
+        ghExeFinto(bin);
         writeFileSync(join(repo, 'api'), CORPO_GH);
       } else {
         writeFileSync(join(bin, 'gh'), `#!${process.execPath}\n${CORPO_GH}`);
@@ -343,7 +347,7 @@ else process.stdout.write(JSON.stringify({ workflow_runs: [] }));
       return aperti;
     } finally {
       await new Promise((ok) => srv.close(ok));
-      rmSync(tmp, { recursive: true, force: true });
+      rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   }
 

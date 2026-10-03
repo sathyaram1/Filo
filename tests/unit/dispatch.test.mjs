@@ -15,9 +15,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { rmSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
-import { resolve, dirname, isAbsolute, relative } from 'node:path';
+import { resolve, dirname, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, fuoriDa } from '../helpers/percorsi.mjs';
 
 // STATE_DIR isolata PRIMA di importare il modulo (è letta a import-time).
 const TMP = cartellaTemporanea('filo-dispatch-');
@@ -677,7 +677,7 @@ test('emit secaudit: un diff grosso va intero in un file fuori dal repo, e il te
   assert.equal(j.payload.diff, undefined);
   assert.ok(isAbsolute(j.payload.diffFile));
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-  assert.ok(relative(repo, j.payload.diffFile).startsWith('..'), 'il file sta fuori dal repo');
+  assert.ok(fuoriDa(repo, j.payload.diffFile), 'il file sta fuori dal repo');
   assert.equal(readFileSync(j.payload.diffFile, 'utf8'), diff, 'il file contiene tutto il diff');
   assert.deepEqual(j.payload.diffBase, base);
   assert.equal(j.payload.diffComando, `git diff ${'a'.repeat(40)}...${'b'.repeat(40)}`);
