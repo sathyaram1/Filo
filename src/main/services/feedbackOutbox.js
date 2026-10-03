@@ -163,12 +163,21 @@
     catch (_) { return true; }
   }
 
-  // Detto una volta per voce; un avvisatore che risponde `false` (nessuno a cui dirlo) riprova al giro dopo.
-  function attendiAccesso(it, motivo) {
+  // Detto una volta per voce e per motivo; un avvisatore che risponde `false` (nessuno a cui dirlo) riprova al giro dopo.
+  function attendiAccesso(it, motivo, perche) {
     it.attesaAccesso = true;
     logFn('voce dell\'owner ferma finché torna il suo accesso:', it.id, motivo);
-    if (it.avvisatoAccesso || !onAttesaOwnerFn) return;
-    try { it.avvisatoAccesso = onAttesaOwnerFn(it) !== false; } catch (_) { it.avvisatoAccesso = true; }
+    if (it.avvisatoAccesso === perche || !onAttesaOwnerFn) return;
+    let detto = true;
+    try { detto = onAttesaOwnerFn(it, perche) !== false; } catch (_) { detto = true; }
+    if (detto) it.avvisatoAccesso = perche;
+  }
+
+  // #912: col token rifiutato ogni giro consumava un numero del contatore comune e ricaricava gli allegati, ogni
+  // mezzo minuto e per sempre. Si riprova solo quando l'owner rientra o al riavvio (il segno non si salva).
+  function accessoCambiato() {
+    for (const it of queue) it.tokenRifiutato = false;
+    if (queue.length) scheduleFlush(0);
   }
 
   // Tenta di inviare TUTTA la coda una volta. Ritorna true se la coda è vuota
