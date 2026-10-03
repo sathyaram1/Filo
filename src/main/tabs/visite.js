@@ -26,6 +26,7 @@ class VisiteSchede {
     this.registra = registra || ((visita, opts) => require('../services/ilFilo').registraVisita(visita, opts));
     this.inAttesa = new Map();
     this.ultime = new WeakMap();
+    this.voci = new WeakMap();
   }
 
   // Ricaricare, o cambiare solo il frammento (#sezione), non è una pagina nuova.
