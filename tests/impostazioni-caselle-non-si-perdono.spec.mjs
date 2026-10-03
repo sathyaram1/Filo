@@ -90,6 +90,9 @@ test('Altro: il nome nuovo di una categoria vale senza «Rinomina»; vuoto non l
   expect(await leggi(altro)).toEqual(['Ufficio']);
 });
 
+const rigaDi = async (page, nome) => page.locator('.sn-cat-row').nth(
+  await page.evaluate((n) => [...document.querySelectorAll('.sn-cat-row input')].findIndex((i) => i.value === n), nome));
+
 test('Altro: un nome a metà uguale a un\'altra categoria non le fonde; «Rinomina» sì', async ({ app, openTab }) => {
   const leggi = (page) => page.evaluate(async () => ((await chrome.storage.local.get('categories')).categories || []).map((c) => c.name).sort());
   const altro = await openTab('filo://options/altro.html');
@@ -99,7 +102,7 @@ test('Altro: un nome a metà uguale a un\'altra categoria non le fonde; «Rinomi
   });
   await altro.reload();
   await expect(altro.locator('.sn-cat-row input')).toHaveCount(2, { timeout: 8000 });
-  const riga = altro.locator('.sn-cat-row').filter({ has: altro.locator('input[value="Lavoro vecchio"]') });
+  const riga = await rigaDi(altro, 'Lavoro vecchio');
   const casella = riga.locator('input');
 
   // Ctrl+Backspace parte subito, e a metà il nome è «Lavoro».
@@ -120,7 +123,7 @@ test('Altro: un nome a metà uguale a un\'altra categoria non le fonde; «Rinomi
 
   // Confermato col tasto, il nome già preso le unisce come prima.
   await expect(riaperta.locator('.sn-cat-row input')).toHaveCount(2, { timeout: 8000 });
-  const seconda = riaperta.locator('.sn-cat-row').filter({ has: riaperta.locator('input[value="Lavoro archiviato"]') });
+  const seconda = await rigaDi(riaperta, 'Lavoro archiviato');
   await seconda.locator('input').click();
   await riaperta.keyboard.press('Control+A');
   await riaperta.keyboard.type('lavoro');

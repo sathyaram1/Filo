@@ -153,6 +153,13 @@ chiavi, le ore dell'archivio automatico tornavano com'erano (#590.5).
   modelli, scritta partendo dalla stringa, a metà non ha ancora il nickname:
   mentre si scrive una riga corretta si ripulisce ma una nuova non si accende,
   e il «Salvato» non compare finché una riga resta fuori.
+- **Un effetto che non si disfa parte solo confermato.** Rinominare una
+  categoria col nome di un'altra le fonde. Il nome a metà, partito da solo,
+  passava da «Lavoro» togliendo una parola a «Lavoro vecchio», e le fondeva
+  prima che si finisse di scrivere. Ora il nome salvato senza conferma arriva
+  con `unisci: false`: un nome già preso resta in attesa, con l'avviso nella
+  riga, e fonde solo col tasto o con Invio. La conferma va in fila dietro il
+  `change` del suo stesso clic, così vede com'è finito.
 - **All'uscita la casella dice il valore in uso.** Un numero fuori scala torna
   al valore salvato, un nome di categoria svuotato torna al nome che la
   categoria ha davvero.

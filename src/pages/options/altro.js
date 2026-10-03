@@ -138,9 +138,15 @@
   }
 
   // Un nome vuoto non rinomina: uscendo, la casella torna a dire il nome che la categoria ha davvero. A metà (il Ctrl
-  // di un Ctrl+V) resta vuota, perché ci si sta per incollare il nome nuovo.
-  async function rinomina(cat, input, opts) {
+  // di un Ctrl+V) resta vuota, perché ci si sta per incollare il nome nuovo. In fila per categoria: il `change` del
+  // clic su «Rinomina» parte prima del clic, e la conferma deve vedere com'è finito.
+  function rinomina(cat, input, opts) {
     caselle.spedita(`categoria:${cat.id}`);
+    cat._coda = (cat._coda || Promise.resolve()).then(() => rinominaOra(cat, input, opts), () => {});
+    return cat._coda;
+  }
+
+  async function rinominaOra(cat, input, opts) {
     const conferma = !!(opts && opts.conferma);
     const newName = input.value.trim();
     if (!newName) {
@@ -148,12 +154,9 @@
       return;
     }
     if (newName !== cat.name) {
-      const vecchio = cat.name;
-      cat.name = newName;
       // Un nome già preso fonde le due categorie e non si disfa: parte solo confermato (Rinomina, Invio), mai da solo.
       const r = await chrome.runtime.sendMessage({ type: MSG.RENAME_CATEGORY, id: cat.id, name: newName, unisci: conferma }).catch(() => null);
       if (!r || !r.ok) {
-        cat.name = vecchio;
         if (r && r.error === 'name_taken') avvisoOmonima(input, r.category);
         return;
       }
@@ -162,6 +165,7 @@
         mostraSalvato();
         return;
       }
+      cat.name = newName;
     } else if (!conferma) {
       return;
     }
