@@ -21,7 +21,6 @@ const MR = globalThis.SN_MANAGE_REVIEW;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const VIA = Object.freeze({
-  EPOCA: 'nati prima che la prova esistesse',
   CAMPI: 'campi che solo il server scrive alla nascita',
   CODA_ID: 'coda di triage in git, per id',
   CODA_TITOLO: 'coda di triage in git, per titolo',
