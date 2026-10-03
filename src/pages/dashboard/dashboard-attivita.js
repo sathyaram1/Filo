@@ -174,13 +174,13 @@
       },
       // Esito di un comando eseguito subito (livello 1): riga di comando e
       // output, nella cronologia — non nella bolla della risposta.
-      addCommand(out) {
+      addCommand(out, spiegazione = '') {
         closeTurnReasoning();
         doneTypes.push('ESEGUI_COMANDO');
-        const el = renderCommandResult(out);
+        const el = renderCommandResult(out, spiegazione);
         el.classList.add('dash-activity-cmd');
         append(el);
-        if (phase !== 'done') setPhase('act', `Eseguito · ${(out && out.command) || 'comando'}`);
+        if (phase !== 'done') setPhase('act', `Eseguito · ${spiegazione || (out && out.command) || 'comando'}`);
       },
       // La bolla di un turno che NON era l'ultimo («Provo subito tutti e tre…»)
       // entra nella cronologia come nota e sparisce dalla conversazione: per
@@ -507,7 +507,7 @@
     // va nella cronologia del blocco, non sotto la risposta. Se è stato
     // bloccato (terminale spento) resta in vista: è un problema da leggere.
     if (isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked) {
-      activity.addCommand(a._output);
+      activity.addCommand(a._output, spiegazioneDi(a));
       return true;
     }
     const row = activityRowFor(a);
@@ -586,6 +586,7 @@
     }
     const wrap = document.createElement('div');
     wrap.className = 'dash-bubble-actions';
+    if (actions.some((a) => isType(a, 'ESEGUI_COMANDO') && a._primaVolta)) wrap.appendChild(notaPrimaVolta());
     let hasAck = false;
     for (const a of actions) {
       const told = a && a._callId && shown && shown.has(a._callId);
@@ -687,10 +688,35 @@
     return R.buildButton(a, { Tokens, resolve });
   }
 
-  // Esito di un comando da terminale mostrato in chat (#146.6): la riga di
-  // comando + stdout/stderr in monospazio, con note per uscita/timeout/
-  // troncamento, o l'avviso "modalità terminale disattivata".
-  function renderCommandResult(out) {
+  // Cosa fa il comando a parole (#892): il main l'ha già ripulita, qui resta testo.
+  function spiegazioneDi(a) {
+    return a && typeof a.spiegazione === 'string' ? a.spiegazione.trim() : '';
+  }
+
+  const PREF_TERMINALE = 'filo://preferences/preferences.html#sec-terminal';
+
+  // La prima volta che Filo propone o esegue un comando (#892): cosa succede e
+  // dove si spegne, una volta sola per profilo (lo decide il main).
+  function notaPrimaVolta() {
+    const nota = document.createElement('div');
+    nota.className = 'dash-cmd-primavolta';
+    nota.append('Per questo uso il terminale del computer: quello che legge parte subito, quello che cambia qualcosa te lo chiedo prima. Si spegne in ');
+    const link = document.createElement('a');
+    link.href = PREF_TERMINALE;
+    link.textContent = 'Preferenze';
+    link.title = 'Apri le Preferenze del terminale';
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      send({ type: MSG.OPEN_URL, url: PREF_TERMINALE });
+    });
+    nota.append(link, '.');
+    return nota;
+  }
+
+  // Esito di un comando da terminale mostrato in chat (#146.6): cosa fa a
+  // parole, la riga di comando + stdout/stderr in monospazio, con note per
+  // uscita/timeout/troncamento, o l'avviso "modalità terminale disattivata".
+  function renderCommandResult(out, spiegazione = '') {
     const wrap = document.createElement('div');
     wrap.className = 'dash-cmd-result';
     if (!out) return wrap;
@@ -703,6 +729,12 @@
       wrap.classList.add('dash-cmd-blocked');
       wrap.textContent = 'Comando vuoto.';
       return wrap;
+    }
+    if (spiegazione) {
+      const cosa = document.createElement('div');
+      cosa.className = 'dash-cmd-cosa';
+      cosa.textContent = spiegazione;
+      wrap.appendChild(cosa);
     }
     const cmdLine = document.createElement('div');
     cmdLine.className = 'dash-cmd-line';
@@ -765,8 +797,7 @@
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn dash-action-btn-primary';
       btn.type = 'button';
-      // Per i comandi (#146.6) l'etichetta è il comando stesso, conciso; la
-      // spiegazione completa resta nel popup di conferma (a._confirm.text).
+      // Il comando sul bottone è accorciato; intero sta nel popup e al passaggio del mouse.
       const cmdText = String(a.comando || a.command || a.cmd || '').trim();
       const isCmd = type === 'ESEGUI_COMANDO';
       const short = cmdText.length > 60 ? `${cmdText.slice(0, 57)}…` : cmdText;
@@ -776,7 +807,25 @@
       // I due punti finali annunciano il testo che segue nel popup ("…a tuo
       // nome:"): sul bottone, dove quel testo non c'è, restano appesi nel vuoto.
       const shortLabel = (fullText.split('\n')[0] || 'Esegui').replace(/\s*:\s*$/, '');
-      btn.textContent = isCmd ? `▶ ${short}` : shortLabel;
+      // Un comando dice prima a parole cosa fa, e sotto il comando vero (#892).
+      const cosa = isCmd ? spiegazioneDi(a) : '';
+      const segnaComando = (simbolo) => {
+        if (!cosa) { btn.textContent = `${simbolo} ${short}`; return; }
+        const riga = document.createElement('span');
+        riga.className = 'dash-cmd-btn-cosa';
+        riga.textContent = `${simbolo} ${cosa}`;
+        const codice = document.createElement('code');
+        codice.className = 'dash-cmd-btn-codice';
+        codice.textContent = short;
+        btn.replaceChildren(riga, codice);
+      };
+      if (isCmd) {
+        if (cosa) btn.classList.add('dash-cmd-btn');
+        if (short !== cmdText) btn.title = cmdText;
+        segnaComando('▶');
+      } else {
+        btn.textContent = shortLabel;
+      }
       // #159/#414 — le azioni di livello 2 che Filo PROPONE da sé aprono il
       // popup di conferma da sole: marchiamo il bottone perché renderActions lo
       // possa aprire automaticamente. Oltre alle impostazioni (preferenza/
@@ -823,7 +872,7 @@
         if (r && r.executed) segnaConfermata(a, r.output, activity);
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
-          btn.textContent = (r && r.executed) ? `✓ ${short}` : `✗ ${short}`;
+          segnaComando((r && r.executed) ? '✓' : '✗');
           if (r && r.output) btn.after(renderCommandResult(r.output));
           if (r && r.output) applyCommandCwd([{ _output: r.output }]);
           return;
@@ -843,7 +892,7 @@
     if (type === 'ESEGUI_COMANDO') {
       // Livello 1 (sola lettura) già eseguito dal main, oppure esito bloccato
       // (terminale spento): mostriamo direttamente il risultato in chat.
-      return renderCommandResult(a._output);
+      return renderCommandResult(a._output, spiegazioneDi(a));
     }
     if (type === 'IMPOSTA_ESTETICA') {
       // Livello 1 (caso normale): Filo l'ha già applicata server-side. Mostriamo
