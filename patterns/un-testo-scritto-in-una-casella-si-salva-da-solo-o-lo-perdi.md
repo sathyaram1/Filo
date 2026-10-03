@@ -113,9 +113,56 @@ sito e concludeva che la lista non funzionava (#590.2).
   Playwright fa credere alla pagina di avere sempre il fuoco, quindi niente
   `blur`: Ctrl+W si prova con `sendInputEvent`, prima il Ctrl da solo e poi la
   lettera.
-- **Dove:** `testoCambiato`, `spedisci`, `uscita`, `righe`, `save` e
-  `saveCookies` in `src/pages/security/security.js`; `riapplicaListaBloccati`,
-  `_seguiLista` e `activate` in `src/main/tabs.js`. Test:
+- **Dove:** pausa e uscite in `SN_CASELLE` (`src/shared/caselleAlSicuro.js`);
+  `uscita`, `righe`, `save` e `saveCookies` in
+  `src/pages/security/security.js`; `riapplicaListaBloccati`, `_seguiLista` e
+  `activate` in `src/main/tabs.js`. Test:
   `tests/security-liste-non-si-perdono.spec.mjs` e i casi sulla riga a metà
-  in `tests/siteBlock-strade.spec.mjs`. Le pagine Opzioni e Altro
-  hanno ancora campi che si salvano solo al `change` (#590.5).
+  in `tests/siteBlock-strade.spec.mjs`.
+
+## Le altre pagine delle impostazioni passano dallo stesso punto
+
+In Altro, Modelli e Preferenze le caselle si salvavano solo al `change`, o dopo
+una pausa che Ctrl+W tagliava: un dominio escluso, il limite di spesa, le
+chiavi, le ore dell'archivio automatico tornavano com'erano (#590.5).
+
+- **Una pagina, un modulo.** Ogni pagina crea il suo `SN_CASELLE.crea()`,
+  iscrive chi salva e gli passa ogni `input`; pausa, Ctrl da solo, fuoco che
+  esce, `TAB_IN_VISTA` e ricarica li ascolta il modulo. Una casella nuova non
+  scrive i suoi ascoltatori di uscita: si iscrive.
+- **Un valore che a metà ha effetto aspetta la pausa lunga** (tre secondi,
+  `PAUSA_LUNGA_MS`) o l'uscita. Scrivendo «15» il limite di spesa passerebbe
+  da «1» e fermerebbe le richieste di quell'istante; con una chiave tronca la
+  richiesta verrebbe rifiutata e pagata coi crediti; un modello scritto a metà
+  fallirebbe; il nome di una categoria a metà finirebbe nelle altre pagine.
+  Senza nessuna pausa no: la scheda chiusa col mouse arriva alla pagina al più
+  come fuoco che esce, e le prove non lo sanno riprodurre. Incollare parte
+  subito.
+  Un numero che serve a vedere l'effetto mentre lo si regola, come il colore
+  delle schede, tiene la pausa breve.
+- **Una scelta finita parte subito.** Nell'editor dei modelli per azione il
+  segmento a metà arriva come `scrivendo`; la scelta dalla tendina, un
+  segmento aggiunto o tolto e il valore confermato o respinto partono al
+  momento.
+- **Quello che parte prima della conferma passa dallo stesso controllo.** Un
+  modello che l'azione respinge, lasciato col clic, torna indietro; salvato da
+  pausa, Ctrl+W o cambio di scheda finiva salvato lo stesso. Chi salva prima
+  legge il segmento a metà già controllato (respinto vale l'ultimo accettato),
+  e all'uscita vera il segmento si conferma come al clic, avviso compreso.
+- **Gli avvisi aspettano l'uscita anche qui.** Una riga nuova del registro dei
+  modelli, scritta partendo dalla stringa, a metà non ha ancora il nickname:
+  mentre si scrive una riga corretta si ripulisce ma una nuova non si accende,
+  e il «Salvato» non compare finché una riga resta fuori.
+- **Un effetto che non si disfa parte solo confermato.** Rinominare una
+  categoria col nome di un'altra le fonde. Il nome a metà, partito da solo,
+  passava da «Lavoro» togliendo una parola a «Lavoro vecchio», e le fondeva
+  prima che si finisse di scrivere. Ora il nome salvato senza conferma arriva
+  con `unisci: false`: un nome già preso resta in attesa, con l'avviso nella
+  riga, e fonde solo col tasto o con Invio. La conferma va in fila dietro il
+  `change` del suo stesso clic, così vede com'è finito.
+- **All'uscita la casella dice il valore in uso.** Un numero fuori scala torna
+  al valore salvato, un nome di categoria svuotato torna al nome che la
+  categoria ha davvero.
+- **Dove:** `caselle` in `src/pages/options/altro.js`,
+  `src/pages/options/options.js`, `src/pages/preferences/preferences.js`. Test:
+  `tests/impostazioni-caselle-non-si-perdono.spec.mjs`.

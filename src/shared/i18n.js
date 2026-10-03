@@ -366,6 +366,7 @@
     options_category_delete: 'Elimina',
     options_category_delete_confirm: 'Eliminare la categoria "%s"? Le schede diventeranno non categorizzate.',
     options_category_pages: '%s schede',
+    options_category_name_taken: 'C\'è già «%s»: Rinomina le unisce',
 
     // Pagina admin "Modelli predefiniti" (config condivisa via Firestore)
     admin_defaults_title: 'Modelli predefiniti',

@@ -199,7 +199,7 @@
   }
 
   // Costruisce l'editor a segmenti per UNA azione.
-  // Ritorna { el, getValue } dove getValue() torna la stringa "a, b, c".
+  // Ritorna { el, getValue, conferma } dove getValue() torna la stringa "a, b, c".
   function buildChain(value, onChange, ctx) {
     const validate = ctx && ctx.validate;
     const isKnown = (ctx && ctx.isKnown) || (() => true);
@@ -208,11 +208,27 @@
     let refs = splitRefs(value);
     if (!refs.length) refs = [''];
 
-    function emit() { if (typeof onChange === 'function') onChange(); }
-    function getValue() { return refs.map((s) => s.trim()).filter(Boolean).join(', '); }
+    // Ultimo valore accettato per segmento: chi salva prima della conferma (pausa, cambio scheda, Ctrl+W) legge il
+    // segmento a metà passato dallo stesso controllo del clic, così le due uscite salvano la stessa cosa (#590.5).
+    let confermati = refs.slice();
+    const conferme = [];
+
+    // `scrivendo`: il segmento è a metà, non ancora confermato né validato.
+    function emit(scrivendo) { if (typeof onChange === 'function') onChange(!!scrivendo); }
+    function getValue() {
+      return refs.map((s, i) => {
+        const v = s.trim();
+        if (!v || !validate || validate(v).ok) return v;
+        return String(confermati[i] || '').trim();
+      }).filter(Boolean).join(', ');
+    }
+    // All'uscita vera un segmento rimasto a metà si conferma come al clic: accettato, o respinto col suo avviso.
+    function conferma() { for (const fn of conferme) fn(); }
 
     function render(focusIdx) {
       el.innerHTML = '';
+      confermati = refs.slice();
+      conferme.length = 0;
       refs.forEach((ref, i) => {
         if (i > 0) {
           const sep = document.createElement('span');
@@ -237,7 +253,6 @@
         // vengono bloccati). Alla conferma (blur/scelta) un modello NON adatto
         // viene rifiutato: si ripristina l'ultimo valore valido e si mostra il
         // motivo. Così non è possibile SALVARE un abbinamento incompatibile.
-        let lastGood = ref;
         // Scorciatoia citata ma inesistente (mai definita, rinominata o
         // eliminata): la funzione non partirebbe, quindi lo segnaliamo QUI,
         // mentre si configura, invece di lasciarlo scoprire a chi la usa.
@@ -251,18 +266,20 @@
           if (bad) inp.title = t('options_chain_unknown_title');
           else inp.removeAttribute('title');
         };
-        const accept = (val) => { clearSegMsg(seg); lastGood = val; refs[i] = val; emit(); markUnknown(val); };
+        const accept = (val) => { clearSegMsg(seg); confermati[i] = val; refs[i] = val; emit(); markUnknown(val); };
         const reject = (reason) => {
           showSegMsg(seg, reason);
-          inp.value = lastGood; fit(inp);
-          refs[i] = lastGood; emit();
+          inp.value = confermati[i]; fit(inp);
+          refs[i] = confermati[i]; emit();
         };
-        inp.addEventListener('input', () => { refs[i] = inp.value; fit(inp); emit(); });
-        inp.addEventListener('change', () => {
+        const confermaSegmento = () => {
           const val = inp.value.trim();
           const v = validate ? validate(val) : { ok: true };
           if (v.ok) accept(val); else reject(v.reason);
-        });
+        };
+        inp.addEventListener('input', () => { refs[i] = inp.value; fit(inp); emit(true); });
+        inp.addEventListener('change', confermaSegmento);
+        conferme.push(() => { if (inp.value.trim() !== String(confermati[i] || '').trim()) confermaSegmento(); });
         seg.appendChild(inp);
         attachDropdown(seg, inp, (value) => {
           const v = validate ? validate(value) : { ok: true };
@@ -309,7 +326,7 @@
     }
 
     render();
-    return { el, getValue };
+    return { el, getValue, conferma };
   }
 
   // Popola un host (.sn-grid-2) con una cella per azione: etichetta + editor a
@@ -342,5 +359,9 @@
     return out;
   }
 
-  global.SN_MODEL_CHAIN = { buildChain, renderGrid, collect, actionLabels };
+  function conferma(chains) {
+    for (const action of Object.keys(chains || {})) chains[action].conferma();
+  }
+
+  global.SN_MODEL_CHAIN = { buildChain, renderGrid, collect, conferma, actionLabels };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

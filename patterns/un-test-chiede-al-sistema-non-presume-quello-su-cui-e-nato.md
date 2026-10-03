@@ -52,6 +52,15 @@ sistema non l'ha ridotta, finge la sua risposta (`isMinimized` vero ed evento
 riduzione con un'altra uscita dalla vista lascerebbe la riduzione provata solo sul
 Windows dell'owner. Riferimento: `tests/manage-ricevuti-vivi.spec.mjs`.
 
+## Il contenitore che disegna adagio (#592.11)
+
+Sotto xvfb un fotogramma può arrivare un secondo dopo che il riquadro sta nel DOM:
+`toBeVisible()` guarda il DOM, l'utente vede i fotogrammi. Il dialogo di conferma conta
+dal primo fotogramma il mezzo secondo in cui un gesto vero non vale, e una prova che
+aspettava 600 ms da `toBeVisible()` prima di premere Invio era rossa tre volte su
+quattro. Prima di un gesto che deve valere si chiede al dialogo se è pronto
+(`aspettaConfermaPronta`, `tests/helpers/confirm.mjs`), non si aspetta un tempo fisso.
+
 ## La macchina dell'owner (#563)
 
 Due proprietà che le altre macchine non hanno, e ogni test che le dava per scontate

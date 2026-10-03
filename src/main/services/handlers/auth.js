@@ -289,6 +289,7 @@ module.exports = function register(on, ctx) {
   // Firebase REALE (request.auth.uid nelle Firestore rules) — diverso
   // dall'email del profilo — usato dalla bacheca (DC2) per riconoscere i
   // propri voti nella mappa `votes` autorevole letta da Firestore.
+  // `remembered` serve solo alla finestra (avviso «accesso non ricordato»): ai siti non va.
   // Da un sito visitato questa porta risponde, ma senza IDENTITÀ: niente
   // indirizzo email, niente nome, niente identificativo dell'account. Un
   // content script gira anche dentro le pagine dei siti, e di sé deve sapere
@@ -304,7 +305,9 @@ module.exports = function register(on, ctx) {
     return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid, remembered: auth.isRemembered() };
   });
 
-  on(MSG.AUTH_SIGNIN, async () => {
+  // Un sito può chiedere l'accesso (il pannello del red-team gira nelle sue
+  // pagine), ma come per lo stato gli torna solo l'esito, mai chi è entrato.
+  on(MSG.AUTH_SIGNIN, async (msg, sender, origin) => {
     try {
       const profile = await auth.signIn();
       const remembered = auth.isRemembered();
@@ -321,6 +324,7 @@ module.exports = function register(on, ctx) {
       // Appena l'owner è dentro, la vista pubblica dei feedback si rimette in
       // pari da sola (#583): è il momento in cui il main ha di nuovo il token.
       if (auth.isAdmin()) scheduleViewSync({ delayMs: 4000, force: true });
+      if (!daFilo(origin, sender)) return { ok: true, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin() };
       return { ok: true, profile, isAdmin: auth.isAdmin(), remembered };
     } catch (e) {
       return { ok: false, ...spiegaErroreAccesso(e) };
