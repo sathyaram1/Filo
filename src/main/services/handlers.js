@@ -831,12 +831,12 @@ async function lessonsBufferText() {
 
 // Le lezioni che Filo si scrive da solo dopo un turno passano dalla regola di SALVA_LEZIONE: se a questo livello,
 // con quello che il compito ha letto, una lezione non partirebbe da sola, l'agente non la scrive (#530).
-async function lezioniAutomaticheConsentite({ sender = null, contesto = null } = {}) {
+async function lezioniAutomaticheConsentite({ sender = null, contesto = null, fontiLette = null } = {}) {
   try {
     const ing = globalThis.SN_ACTION_LEVELS.ingressi({ type: 'SALVA_LEZIONE', testo: 'lezione' }, {});
     let impostazioni = {};
     try { impostazioni = await Storage.getSettings(); } catch (_) {}
-    return !!ing && decisioneAutonomia(ing, { sender, contesto, impostazioni }).risposta === 'si';
+    return !!ing && decisioneAutonomia(ing, { sender, contesto, fontiLette, impostazioni }).risposta === 'si';
   } catch (_) { return false; }
 }
 
