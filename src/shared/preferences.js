@@ -351,6 +351,19 @@
       },
     },
     {
+      keys: ['blocco_pubblicita', 'blocco pubblicità', 'blocco pubblicita', 'blocca pubblicità', 'blocca la pubblicità',
+        'pubblicità', 'pubblicita', 'annunci', 'adblock', 'ad block', 'blocco annunci', 'blocco tracker'],
+      level: 2,
+      risk: 'Controlla il blocco di pubblicità e tracker: le liste pubbliche fermano le richieste ai server '
+        + 'della pubblicità e nascondono i riquadri pubblicitari nelle pagine. Disattivarlo fa tornare annunci e '
+        + 'tracciamento su tutti i siti.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { security: { adblock: { enabled: b } } }, label: `Blocco pubblicità e tracker → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    },
+    {
       keys: ['navigazione_sicura', 'navigazione sicura', 'rilevamento siti pericolosi', 'siti pericolosi', 'safe browsing', 'safebrowsing', 'protezione phishing', 'rilevamento phishing'],
       level: 2,
       risk: 'Controlla il rilevamento dei siti pericolosi (phishing e malware). Disattivarlo '
