@@ -2789,6 +2789,7 @@
     // La casella e il rombo verde della fila nascono dalla stessa domanda.
     const isClarify = leggibile && MR.aspettaRisposta(fb);
     renderActions(fb);
+    disegnaSegnoTestata(fb);
     mgClarify.hidden = !(isAdmin && isClarify);
     mgClarifyText.value = '';
     setClarifyMsg('', '');
