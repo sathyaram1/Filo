@@ -172,6 +172,21 @@
     return chat;
   }
 
+  // Ciò che la chat ha letto, come classi di fonte (#530): una chat ripresa dall'archivio non riparte pulita,
+  // perché l'archivio dei messaggi tiene solo il nome delle azioni.
+  async function segnaFonti(id, fonti) {
+    const items = await list();
+    const chat = items.find((c) => c && c.id === id);
+    if (!chat) return null;
+    const prima = Array.isArray(chat.fonti) ? chat.fonti : [];
+    const nuove = (Array.isArray(fonti) ? fonti : []).filter((f) => f && Number.isInteger(f.classe)
+      && !prima.some((p) => p && p.chiave === f.chiave && p.classe === f.classe));
+    if (!nuove.length) return chat;
+    chat.fonti = prima.concat(nuove);
+    await save(items);
+    return chat;
+  }
+
   // Chiude una chat: fissa la data di chiusura. Titolo e tipo li scrive
   // `classify` subito dopo, e possono arrivare con qualche secondo di ritardo
   // (una chiamata al modello): la chat esiste già, intera, da prima.
