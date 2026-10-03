@@ -2,10 +2,11 @@
 // e il dispatch che fa da solo il costo 2 a compito pulito e chiede, dicendo perché, dopo aver letto altro.
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, scrollConfirmToEnd, fillConfirmInput } from './helpers/confirm.mjs';
-import { home, modelloFinto, ripristina, chiedi } from './helpers/chatFinta.mjs';
+import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { cartellaInCasa } from './helpers/percorsi.mjs';
 import { writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import http from 'node:http';
 
 const PREFS = 'filo://preferences/preferences.html';
 const SHOTS = join(process.cwd(), 'tests', '.shots');
@@ -466,6 +467,51 @@ test('Normale: «elimina dall\'archivio le schede sulle ricette» mostra l\'elen
     await chiedi(page, 'elimina dall\'archivio le schede sulle ricette');
     await expect(page.locator('.dash-bubble').filter({ hasText: 'Ecco.' })).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.dash-delete-panel')).toBeVisible({ timeout: 5000 });
+  } finally {
+    await ripristina(app);
+  }
+});
+
+test('Normale, conversazione pulita: un comando che carica un documento su un server, o vi cancella qualcosa, chiede prima', async ({ app }) => {
+  const ricevuti = [];
+  const server = http.createServer((req, res) => {
+    let corpo = '';
+    req.on('data', (c) => { corpo += c; });
+    req.on('end', () => { ricevuti.push(`${req.method} ${corpo}`); res.end('ok'); });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const porta = server.address().port;
+  const dir = cartellaInCasa('filo-530-curl-');
+  const file = join(dir, 'dichiarazione-redditi.txt');
+  writeFileSync(file, 'IBAN e redditi: dati personali');
+  try {
+    await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true, shell: 'bash' } }));
+    const carica = await execAction(app, { type: 'ESEGUI_COMANDO', comando: `curl -s -F "doc=@${file}" http://127.0.0.1:${porta}/carica` });
+    const cancella = await execAction(app, { type: 'ESEGUI_COMANDO', comando: `curl -s -X DELETE http://127.0.0.1:${porta}/progetto` });
+    expect(carica.needsConfirm, 'un documento caricato su un server non torna indietro: chiede').toBeTruthy();
+    expect(cancella.needsConfirm, 'una cancellazione sul server non si disfa: chiede').toBeTruthy();
+    // Leggere una pagina col terminale resta una cosa che si rimedia: a Normale parte da sola.
+    const leggi = await execAction(app, { type: 'ESEGUI_COMANDO', comando: `curl -s http://127.0.0.1:${porta}/pagina` });
+    expect(leggi.executed).toBe(true);
+    await new Promise((r) => setTimeout(r, 500));
+    expect(ricevuti.join('\n')).not.toContain('dati personali');
+    expect(ricevuti.join('\n')).not.toContain('DELETE');
+  } finally {
+    server.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('in chat Filo sa a che livello di autonomia sta: il contesto di ogni turno lo dice', async ({ app }) => {
+  const page = await home(app);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }));
+  await modelloFinto(app, [{ text: 'Conservativo.' }]);
+  try {
+    await chiedi(page, 'a che livello di autonomia sei adesso?');
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 15000 }).toBeGreaterThan(0);
+    const sistema = String((await chiamateAlModello(app))[0][0].content || '');
+    expect(sistema).toMatch(/AUTONOMIA DI FILO\nLivello scelto dall'utente: Conservativo\./);
   } finally {
     await ripristina(app);
   }

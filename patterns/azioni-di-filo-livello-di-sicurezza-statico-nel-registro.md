@@ -89,6 +89,11 @@ della chat (riordino delle schede, svuota archivio), che chiedono come dice la
   che copra le strade che non hai visto: `-P` sceglie la cartella invece del
   nome, `-c`/`-N` accodano o sovrascrivono un file già lì, `-K` prende le opzioni
   da un file. Un check per flag si aggira con un altro flag.
+- **Un comando che manda qualcosa fuori è costo 3 (#530).** Da quando a Normale il
+  costo 2 parte da solo, «2» non vuol più dire «popup»: un file caricato con
+  `curl -F`, un `-X DELETE` sul server, un `git push` verso un indirizzo scritto
+  nel comando o un remoto riscritto (`remote add`/`set-url`, `remote.*.url`) non
+  tornano indietro. Il push verso il remoto già configurato resta 2.
 - **Un'ESENZIONE non si decide leggendo il testo del comando (#479).** Alzare
   il livello guardando una parola è sicuro (al massimo costa attrito); ABBASSARLO
   perché una parola compare non lo è mai, perché il classificatore legge un

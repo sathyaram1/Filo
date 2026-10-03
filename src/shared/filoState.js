@@ -87,12 +87,22 @@
     }
   }
 
+  // Il livello di autonomia che vale adesso (#530): a «a che livello sei?» il modello risponde col dato, non a naso.
+  async function readAutonomia() {
+    const A = global.SN_AUTONOMIA;
+    if (!A || !global.SN_STORAGE) return null;
+    try {
+      const s = await global.SN_STORAGE.getSettings();
+      return A.infoLivello(A.livelloAttivo(s && s.autonomia && s.autonomia.livello));
+    } catch (_) { return null; }
+  }
+
   // `creditiFreschi`: la chiede un turno di chat, dove «quanti crediti ho?» va
   // risposto col saldo di adesso; la home si accontenta dell'ultimo letto.
   async function assemble({ creditiFreschi = false } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
-    const [tabs, session, timers, notifications, dashboardCache, rawLog, credits] = await Promise.all([
+    const [tabs, session, timers, notifications, dashboardCache, rawLog, credits, autonomia] = await Promise.all([
       listTabs(),
       Mem.getSession(),
       Mem.listTimers(),
@@ -100,6 +110,7 @@
       Mem.getDashboardCache(),
       Mem.listRaw({ since: new Date(Date.now() - 24 * 3600 * 1000).toISOString(), limit: 50 }),
       readCredits({ fresco: creditiFreschi }),
+      readAutonomia(),
     ]);
 
     const sessionInfo = session.sessionStartedAt
@@ -150,6 +161,7 @@
       recentActions: rawLog,
       dashboard: dashboardCache,
       credits,
+      autonomia,
     };
 
     const stateText = renderForPrompt(state);
@@ -257,6 +269,12 @@
     if (davanti && typeof davanti.zoomPercent === 'number') {
       lines.push('ZOOM DELLA PAGINA');
       lines.push(`Scheda davanti: ${davanti.zoomPercent}% (100% = dimensione reale; si cambia con ZOOM_PAGINA)`);
+      lines.push('');
+    }
+    if (state.autonomia) {
+      lines.push('AUTONOMIA DI FILO');
+      lines.push(`Livello scelto dall'utente: ${state.autonomia.nome}. ${state.autonomia.frase}`);
+      lines.push('Lo cambia solo l\'utente, in Preferenze sotto «Autonomia di Filo».');
       lines.push('');
     }
     // Da qui in giù i testi salvati: nomi, notifiche, frasi della chat e della
